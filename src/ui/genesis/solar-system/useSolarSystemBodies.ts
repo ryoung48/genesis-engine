@@ -8,6 +8,7 @@ import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM_GENERATION } from "@/model/celestial/system/generation"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
+import type { MainWorldMode } from "@/model/celestial/system/generation/types"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type {
@@ -23,6 +24,67 @@ import type { SolarSystemBodiesInput } from "@/ui/genesis/view/types"
 import { updateBodyDiameter } from "@/ui/wiki/stats/orbit/body-mutations"
 import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters"
 import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
+
+/** Where the main world currently lives: a top-level SystemBody (moonIndex
+ * null, "earth-clone"/"moon-system" modes), or a moon nested inside a
+ * sibling's moons array ("gas-giant-moon" mode) -- see generateSystemBodies'
+ * gas-giant-moon branch. */
+interface MainWorldLocation {
+	bodyIndex: number
+	moonIndex: number | null
+}
+
+function findMainWorldLocation(orbits: SystemBody[]): MainWorldLocation | null {
+	const bodyIndex = orbits.findIndex((body) => body.isMainWorld)
+	if (bodyIndex >= 0) return { bodyIndex, moonIndex: null }
+	for (let i = 0; i < orbits.length; i++) {
+		const moonIndex = orbits[i]!.moons.findIndex((moon) => moon.isMainWorld)
+		if (moonIndex >= 0) return { bodyIndex: i, moonIndex }
+	}
+	return null
+}
+
+// Projects a promoted moon into a SystemBody-shaped read view so every
+// existing mainWorldSystemBody?.field slider derivation below keeps working
+// unchanged -- orbitalDistanceAU/gravityG are synthesized (a moon has no
+// star-relative AU of its own; it shares its parent's), and moons is always
+// empty (moons don't nest further).
+function moonToMainWorldView(moon: MoonBody, parent: SystemBody): SystemBody {
+	// A moon promoted to main world (see promoteMoonToMainWorld) always has
+	// sizeClass/density/group/classification/atmosphere populated, satisfying
+	// SystemBody's narrower required fields even though MoonBody types them
+	// as optional -- hence the cast.
+	return {
+		...moon,
+		seed: "main-world",
+		isMainWorld: true,
+		orbitalDistanceAU: parent.orbitalDistanceAU,
+		gravityG: ORBIT_BODY.computeGravityG({
+			massKg: moon.massKg,
+			diameterKm: moon.diameterKm,
+		}),
+		moons: [],
+	} as SystemBody
+}
+
+// Inverse of moonToMainWorldView -- writes an updated view's MoonBody-
+// compatible fields back onto the original moon, dropping the
+// SystemBody-only fields the view synthesized (orbitalDistanceAU, gravityG,
+// moons, seed, rings) that don't exist on MoonBody.
+function applyMainWorldViewToMoon(
+	updatedView: SystemBody,
+	originalMoon: MoonBody,
+): MoonBody {
+	const {
+		orbitalDistanceAU: _orbitalDistanceAU,
+		gravityG: _gravityG,
+		moons: _moons,
+		seed: _seed,
+		rings: _rings,
+		...moonFields
+	} = updatedView
+	return { ...originalMoon, ...moonFields }
+}
 
 /**
  * Owns the solar system's data model: the star, every orbiting body, and the
@@ -45,6 +107,11 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	)
 	const spectralClass = solarSystem.star.class
 	const starSubtype = solarSystem.star.subtype
+	const hostStar = solarSystem.star.hostStar
+	// Same shape as spectralClass/starSubtype above: the live, authoritative
+	// value, built once wherever solarSystem.star is constructed (see
+	// SolarSystemState's doc) rather than derived fresh on every read.
+	const starAgeGyr = solarSystem.star.ageGyr
 	const seed =
 		solarSystem.star.seed === "sol"
 			? SOL_DATA.solSeed
@@ -74,18 +141,76 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			},
 		}))
 	}, [])
-	// Whether a star reroll reserves the HZ-center slot for a rolled main
-	// world (see generateSystemBodies) -- ignored for Sol, which always has
-	// Earth. Plain component state, not persisted, matching spectral
-	// class/subtype/seed.
-	const [forceMainWorld, setForceMainWorld] = useState(true)
+	// Guards the generatedSystemBodies sync effect below (see its own doc) --
+	// armed right before a direct setSolarSystem call whose orbits are already
+	// final/correct, so that effect's next fire doesn't clobber them with a
+	// fresh (and possibly very different) recompute. Declared up here, ahead
+	// of resetMainWorldToEarth, which is one such direct-setter.
+	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
+	// The Earth-icon shortcut's full reset: unlike setSeed(SOL_DATA.solSeed),
+	// which no-ops when we're already on Sol (the derived `seed`/spectralClass/
+	// starSubtype primitives don't change, so generatedSystemBodies' useMemo
+	// never reruns and any live-edited slider values -- axial tilt, pressure,
+	// etc -- survive untouched), this replaces star+orbits outright so it
+	// always lands on the real, unedited Earth/Luna defaults.
+	const resetMainWorldToEarth = useCallback(() => {
+		// solDefaultSolarSystem's own orbits carry zero surfaceTidesHeating (see
+		// applySystemSeismology's doc -- that static top-level computation has
+		// no real tide callbacks to run yet), so it's redone here with real
+		// tide callbacks rather than left for generatedSystemBodies' Sol branch
+		// to patch in later.
+		//
+		// When called from a NON-Sol seed (the common case -- this is the
+		// "back to Earth" shortcut from wherever you are, e.g. right after
+		// Dice), `seed` itself changes here, which *does* make the
+		// generatedSystemBodies memo below rerun for its Sol branch on the
+		// next render -- and that branch doesn't reproduce the real Sol
+		// system, it procedurally rolls a fresh (seeded-by-SOL_DATA.solSeed)
+		// set of siblings around an Earth-clone main world. Left unguarded,
+		// the sync effect would silently swap these real orbits for that
+		// fake set right after this call, moving Earth to a different
+		// position/index than whatever the camera just focused on. Arm the
+		// skip flag whenever we're actually changing seed to prevent that.
+		if (seed !== SOL_DATA.solSeed) {
+			skipNextGeneratedSystemBodiesSyncRef.current = true
+		}
+		const base = structuredClone(SOL_SYSTEM.solDefaultSolarSystem)
+		setSolarSystem(() => ({
+			...base,
+			orbits: PLANET.applySystemSeismology({
+				bodies: base.orbits,
+				starAgeGyr: SOL_DATA.solStarAgeGyr,
+				starLuminositySol: 1,
+				spectralClass: "G",
+				...TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({
+					spectralClass: "G",
+					starSubtype: 2,
+				}),
+			}),
+		}))
+	}, [seed])
+	// How the HZ-center slot builds its main world (see generateSystemBodies)
+	// -- ignored for Sol, which always has Earth. Plain component state, not
+	// persisted, matching spectral class/subtype/seed.
+	const [mainWorldMode, setMainWorldMode] = useState<MainWorldMode>(
+		initialGenerationSession?.mainWorldMode ?? "earth-clone",
+	)
+	// Set once from a restored snapshot when the system was opened from the
+	// galaxy view, and reassigned every time GenesisView opens another system
+	// from its own in-page galaxy mode (see GenesisView's handleOpenGalaxySystem)
+	// -- there's no longer a separate route to round-trip through, so this is
+	// the only place that ever changes it. Drives SolarSystemControls' "back
+	// to galaxy" control.
+	const [galaxyOrigin, setGalaxyOrigin] = useState(
+		() => initialGenerationSession?.galaxyOrigin ?? null,
+	)
 
 	// --- The main world's own physical/orbital state ---
 	// Every one of these fields lives ONLY on the main world's SystemBody
 	// entry in `solarSystem.orbits`, exactly like every sibling planet -- no
 	// separate slider state to keep in sync. A procedurally generated (non-
 	// Sol) main world is fully rolled fresh by generateSystemBodies itself on
-	// every seed/star-type/forceMainWorld change (see generatedSystemBodies
+	// every seed/star-type/mainWorldMode change (see generatedSystemBodies
 	// below); its live edits persist via direct solarSystem.orbits mutation
 	// (updateEditableSystemBody), never threaded back through regeneration.
 	// Sol is the one remaining exception: Earth's live-edited values (e.g.
@@ -112,6 +237,9 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({
 				spectralClass,
 				starSubtype,
+				starMassKg: hostStar?.massSol
+					? hostStar.massSol * ORBIT_BODY.solarMassKg
+					: undefined,
 			})
 		if (seed === SOL_DATA.solSeed) {
 			return {
@@ -122,17 +250,14 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			}
 		}
 		return {
-			starAgeGyr: STAR_IDENTITY.getStarAgeGyr({
-				massSol: STAR.getStarMassSol({ cls, subtype: starSubtype }),
-			}),
-			starLuminositySol: STAR.getStarLuminositySol({
-				cls,
-				subtype: starSubtype,
-			}),
+			starAgeGyr,
+			starLuminositySol:
+				hostStar?.luminositySol ??
+				STAR.getStarLuminositySol({ cls, subtype: starSubtype }),
 			spectralClass: cls,
 			...surfaceTidesCallbacks,
 		}
-	}, [seed, spectralClass, starSubtype])
+	}, [seed, spectralClass, starSubtype, hostStar, starAgeGyr])
 
 	const generatedSystemBodies: SystemBody[] = useMemo(() => {
 		const cls = STAR.isValidSpectralClass(spectralClass)
@@ -145,7 +270,8 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 				seed: seed,
 				spectralClass: cls,
 				starSubtype,
-				forceMainWorld,
+				mainWorldMode,
+				starAgeGyrOverride: starAgeGyr,
 			})
 		}
 		// Sol: Earth's real live-edited slider values need to survive this
@@ -215,10 +341,10 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			seed: seed,
 			spectralClass: cls,
 			starSubtype,
-			forceMainWorld: true,
+			mainWorldMode: "earth-clone",
 			solMainWorldOverrides,
 		})
-	}, [seed, spectralClass, starSubtype, forceMainWorld])
+	}, [seed, spectralClass, starSubtype, mainWorldMode, starAgeGyr])
 	const resetSourceSystemBodies = useMemo(
 		() =>
 			seed === SOL_DATA.solSeed
@@ -227,7 +353,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		[generatedSystemBodies, seed],
 	)
 
-	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
 	useEffect(() => {
 		if (skipNextGeneratedSystemBodiesSyncRef.current) {
 			skipNextGeneratedSystemBodiesSyncRef.current = false
@@ -239,9 +364,30 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		}))
 	}, [generatedSystemBodies])
 	const systemBodies = solarSystem.orbits
+	const mainWorldLocation = findMainWorldLocation(systemBodies)
 	const mainWorldSystemBody =
-		systemBodies.find((body) => body.isMainWorld) ?? null
-	const displayMoons = mainWorldSystemBody?.moons ?? []
+		mainWorldLocation === null
+			? null
+			: mainWorldLocation.moonIndex === null
+				? systemBodies[mainWorldLocation.bodyIndex]!
+				: moonToMainWorldView(
+						systemBodies[mainWorldLocation.bodyIndex]!.moons[
+							mainWorldLocation.moonIndex
+						]!,
+						systemBodies[mainWorldLocation.bodyIndex]!,
+					)
+	// The moons shown in the UI's "moons of the main world" list: the main
+	// world's own moons normally, but its parent gas giant's *other* moons
+	// when the main world is itself a moon (gas-giant-moon mode) -- there's
+	// nothing else to call "this world's moons" in that case.
+	const displayMoons =
+		mainWorldLocation?.moonIndex === null
+			? (mainWorldSystemBody?.moons ?? [])
+			: mainWorldLocation
+				? systemBodies[mainWorldLocation.bodyIndex]!.moons.filter(
+						(moon) => !moon.isMainWorld,
+					)
+				: []
 	const systemBodiesRef = useRef(systemBodies)
 	systemBodiesRef.current = systemBodies
 	const displayMoonsRef = useRef(displayMoons)
@@ -257,15 +403,30 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	// for every sibling planet.
 	const updateMainWorldBody = useCallback(
 		(updater: (body: SystemBody) => SystemBody) => {
-			setSolarSystem((current) => ({
-				...current,
-				orbits: PLANET.applySystemSeismology({
-					bodies: current.orbits.map((body) =>
-						body.isMainWorld ? updater(body) : body,
-					),
-					...systemSeismologyContext,
-				}),
-			}))
+			setSolarSystem((current) => {
+				const location = findMainWorldLocation(current.orbits)
+				return {
+					...current,
+					orbits: PLANET.applySystemSeismology({
+						bodies: current.orbits.map((body, bodyIndex) => {
+							if (!location || bodyIndex !== location.bodyIndex) return body
+							if (location.moonIndex === null) return updater(body)
+							return {
+								...body,
+								moons: body.moons.map((moon, moonIndex) =>
+									moonIndex === location.moonIndex
+										? applyMainWorldViewToMoon(
+												updater(moonToMainWorldView(moon, body)),
+												moon,
+											)
+										: moon,
+								),
+							}
+						}),
+						...systemSeismologyContext,
+					}),
+				}
+			})
 		},
 		[systemSeismologyContext],
 	)
@@ -345,21 +506,71 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		? spectralClass
 		: STAR.defaultSpectralClass
 
-	const setSpectralClass = useCallback((cls: string) => {
-		const nextClass: MainSequenceClass = STAR.isValidSpectralClass(cls)
-			? cls
-			: STAR.defaultSpectralClass
-		setSolarSystem((current) => ({
-			...current,
-			star: { ...current.star, class: nextClass },
-		}))
-	}, [])
-	const setStarSubtype = useCallback((subtype: number) => {
-		setSolarSystem((current) => ({
-			...current,
-			star: { ...current.star, subtype },
-		}))
-	}, [])
+	// Re-clamps the current ageGyr to a new class/subtype's main-sequence-
+	// lifespan bounds -- ageGyr is a plain, always-valid stored value (see
+	// SolarSystemState's doc), so whichever setter changes what "valid" means
+	// for it is responsible for keeping it in range, the same way nothing else
+	// re-derives it on every read anymore.
+	const clampAgeGyrForStar = useCallback(
+		(star: SolarSystemState["star"], cls: string, subtype: number) => {
+			const validCls: MainSequenceClass = STAR.isValidSpectralClass(cls)
+				? cls
+				: STAR.defaultSpectralClass
+			return STAR_IDENTITY.clampStarAgeGyr({
+				ageGyr: star.ageGyr,
+				massSol:
+					star.hostStar?.massSol ??
+					STAR.getStarMassSol({ cls: validCls, subtype }),
+			})
+		},
+		[],
+	)
+	const setSpectralClass = useCallback(
+		(cls: string) => {
+			const nextClass: MainSequenceClass = STAR.isValidSpectralClass(cls)
+				? cls
+				: STAR.defaultSpectralClass
+			setSolarSystem((current) => ({
+				...current,
+				star: {
+					...current.star,
+					class: nextClass,
+					ageGyr: clampAgeGyrForStar(current.star, nextClass, current.star.subtype),
+				},
+			}))
+		},
+		[clampAgeGyrForStar],
+	)
+	const setStarSubtype = useCallback(
+		(subtype: number) => {
+			setSolarSystem((current) => ({
+				...current,
+				star: {
+					...current.star,
+					subtype,
+					ageGyr: clampAgeGyrForStar(current.star, current.star.class, subtype),
+				},
+			}))
+		},
+		[clampAgeGyrForStar],
+	)
+	// Not meant to be wired up for Sol, whose age is fixed real value.
+	const setStarAgeGyr = useCallback(
+		(ageGyr: number) => {
+			setSolarSystem((current) => ({
+				...current,
+				star: {
+					...current.star,
+					ageGyr: clampAgeGyrForStar(
+						{ ...current.star, ageGyr },
+						current.star.class,
+						current.star.subtype,
+					),
+				},
+			}))
+		},
+		[clampAgeGyrForStar],
+	)
 
 	// Changing star class/subtype re-rolls the whole system (including the
 	// main world) from the same seed -- generatedSystemBodies already
@@ -521,6 +732,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			setSeed,
 			setSeaLevel,
 			setEra,
+			resetMainWorldToEarth,
 		}),
 		[
 			setEccentricity,
@@ -539,6 +751,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			setLandCoverage,
 			setLandDistribution,
 			setSeaLevel,
+			resetMainWorldToEarth,
 		],
 	)
 
@@ -557,7 +770,9 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		displayMoons,
 		eccentricity,
 		effectiveDaysPerYear,
-		forceMainWorld,
+		mainWorldMode,
+		galaxyOrigin,
+		setGalaxyOrigin,
 		glacialErosion,
 		hoursPerDay,
 		hydraulicErosion,
@@ -571,6 +786,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		perihelion,
 		planetRadiusKm,
 		pressure,
+		resetMainWorldToEarth,
 		resetSystemMoon,
 		seed,
 		ridgeSharpening,
@@ -578,7 +794,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		setAxialTiltDirection,
 		setContinentSizeVariety,
 		setEccentricity,
-		setForceMainWorld,
+		setMainWorldMode,
 		setHoursPerDay,
 		setLandCoverage,
 		setLandDistribution,
@@ -592,6 +808,8 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		setSolarSystem,
 		setSpectralClass,
 		setStarSubtype,
+		setStarAgeGyr,
+		starAgeGyr,
 		setSubstellarLon,
 		setTideLock,
 		setEra,
@@ -610,7 +828,9 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		thermalErosion,
 		tidallyLocked,
 		tideLock,
+		hostStar: solarSystem.star.hostStar,
 		updateEditableSystemBody,
 		updateEditableSystemMoon,
+		updateMainWorldBody,
 	}
 }

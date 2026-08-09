@@ -14,7 +14,10 @@ import type {
 	ElevationKmForLonLat,
 } from "@/ui/genesis/political/eu4-nation-fill-overlay"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
-import type { SolarSystemOverlayParams } from "@/ui/genesis/solar-system/overlay"
+import type {
+	OrbitAddress,
+	SolarSystemOverlayParams,
+} from "@/ui/genesis/solar-system/overlay"
 
 export type { WindArrowData }
 
@@ -193,21 +196,15 @@ export interface GenesisScene {
 	 * view's rotation clock — independent of updateSolarSystemDay. */
 	setSolarSystemSpinHours(hours: number): void
 	/** Enters the solar-system view if needed, then animates the camera to
-	 * frame the given body (or one of its moons). `bodyIndex` is the index
-	 * into the `bodies` array passed to setSolarSystemOverlay, or -1 for the
-	 * star. `moonIndex`, if given, focuses that body's moon instead (index
-	 * into the body's own `moons` array). */
-	focusOnSystemBody(
-		bodyIndex: number,
-		moonIndex?: number,
-		opts?: { durationMs?: number },
-	): void
+	 * frame the addressed node (a star, one of its bodies, or a body's
+	 * moon). */
+	focusOnSystemBody(address: OrbitAddress, opts?: { durationMs?: number }): void
 	/** Notifies the caller whenever the solar-system focus target changes for
 	 * any reason (GPS button, double-click, ...), so React state (e.g. the
 	 * clock knobs' reference body) can stay in sync even when the change
 	 * originated from a renderer-internal event like a canvas double-click. */
 	setSolarSystemFocusChangeHandler(
-		handler: ((bodyIndex: number, moonIndex?: number) => void) | null,
+		handler: ((address: OrbitAddress) => void) | null,
 	): void
 }
 

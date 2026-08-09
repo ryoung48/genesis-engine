@@ -66,8 +66,16 @@ export interface AtmosphereProfile {
 		| "hydrogen"
 	/** Set only for otherwise-breathable/exotic profiles with contaminants. */
 	tainted?: boolean
-	/** Set only when the atmosphere table assigns a specific named hazard. */
-	hazard?: string
+	/** Set only when the atmosphere table assigns a specific named hazard --
+	 * see ATMOSPHERE.rollHazard (ported from galaxy-gen's ATMOSPHERE.taint). */
+	hazard?:
+		| "biologic"
+		| "radioactive"
+		| "gas mix"
+		| "low oxygen"
+		| "high oxygen"
+		| "particulates"
+		| "sulphur compounds"
 	breathable: boolean
 }
 
@@ -113,6 +121,37 @@ export type TideLock = {
 	target: number
 }
 
+export interface TemperatureTraceEntry {
+	value: number
+	description: string
+}
+
+// Kept local to this dependency-free leaf rather than imported from
+// environment/temperature/types.ts's TemperatureFinalizeResult (which itself
+// imports OrbitGroup/TideLock from here) -- see this file's own doc comment
+// on staying import-free. Structurally identical to that type.
+export interface TemperatureEstimate {
+	mean: number
+	high: number
+	low: number
+	/** high - low, in Kelvin -- galaxy-gen's finalize delta.value. */
+	deltaK: number
+	boiledOffHydrosphereCode?: number
+	/** NOT computed by TEMPERATURE.finalize -- the permutation-based
+	 * contribution breakdown (5!+6! orderings) was expensive enough to slow
+	 * down bulk galaxy generation when run for every body/moon eagerly. Call
+	 * TEMPERATURE.trace(...) on demand instead (e.g. from a UI detail panel)
+	 * if this is ever needed. */
+}
+
+// Kept local for the same reason as TemperatureEstimate above -- structurally
+// identical to biosphere/types.ts's BiosphereProfile.
+export interface BiosphereProfile {
+	code: number
+	trace: TemperatureTraceEntry[]
+	label?: "remnants" | "engineered" | "miscible" | "hybrid" | "immiscible"
+}
+
 export interface SeismologyProfile {
 	residualHeating: number
 	tidalHeating: number
@@ -154,6 +193,13 @@ export interface OrbitBody {
 	subtype?: string
 	composition?: OrbitComposition
 	chemistry?: OrbitChemistry
+	/** True when this orbit slot was one of the star's own innermost few before
+	 * it evolved/collapsed (see PLANET.classifyBody's impactZone doc) -- kept
+	 * on the body after classification (rather than only threaded through as a
+	 * transient param) so later passes, like BIOSPHERE, can read it without
+	 * re-deriving it from classification. A moon inherits its parent planet's
+	 * value unchanged. Absent for a hand-authored/incomplete body. */
+	impactZone?: boolean
 	hydrosphereCode?: number
 	hydrosphere?: HydrosphereProfile
 	/** Fraction of surface covered by land, 0..1 */
@@ -207,6 +253,12 @@ export interface OrbitBody {
 	 * falls back to a plain prograde/retrograde read off axialTiltDeg when
 	 * it isn't -- see GenerationPanel.tsx's buildTideLockStat. */
 	tideLockStatus?: "1:1" | "3:2"
+	/** Ported from galaxy-gen's orbit.rotation.trace -- the DM breakdown (each
+	 * modifier's value/description, e.g. "Planet size (4)", "Eccentric (0.3)")
+	 * plus the final 2d6+dm base-roll entry, in the order they were applied by
+	 * tide-lock.ts's rollPlanetTideLock/rollMoonTideLock. Empty for an asteroid
+	 * belt (never rolled) or a body generated before this field existed. */
+	tideLockTrace?: TemperatureTraceEntry[]
 	/** Longitude of the substellar point (the spot on the surface directly
 	 * facing the star), in degrees 0-360 — only meaningful when tideLock is
 	 * set. Defaults to 0° when unset. */
@@ -214,6 +266,24 @@ export interface OrbitBody {
 	/** Unset until applySystemSeismology runs after bodies and moon orbits
 	 * have been assembled. */
 	seismology?: SeismologyProfile
+	/** Ported from galaxy-gen's TEMPERATURE.finalize -- a closed-form mean/
+	 * high/low estimate computed right after seismology.totalHeating is
+	 * known (see system-seismology.ts's applyBodySeismology/
+	 * applyMoonSeismology), in Kelvin. This is a cheap worldbuilder estimate,
+	 * not the full spatial EBM solve (see climate/temperature/ebm) -- unset
+	 * until applySystemSeismology runs, same as seismology above. */
+	temperatureEstimate?: TemperatureEstimate
+	/** Ported from galaxy-gen's BIOSPHERE.get -- computed alongside
+	 * temperatureEstimate, right after seismology.totalHeating is known, since
+	 * it depends on temperatureEstimate.mean. Only `get` is ported (not
+	 * biomass/complexity/diversity/compatibility). */
+	biosphere?: BiosphereProfile
+	/** Ported from galaxy-gen's DESIRABILITY.habitability -- computed alongside
+	 * biosphere, right after seismology.totalHeating and temperatureEstimate
+	 * are known, since it depends on both plus gravityG/hydrosphereCode/
+	 * atmosphere. Structurally identical to BiosphereProfile (code + trace),
+	 * so it's typed with the same interface rather than a separate one. */
+	habitability?: BiosphereProfile
 	/** Terrain-generation controls -- only ever supplied for the main world's
 	 * planet card, but live here (rather than only on SystemBody) since
 	 * nothing else about them is planet- vs moon-specific. */

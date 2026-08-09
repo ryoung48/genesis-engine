@@ -1,5 +1,3 @@
-import type { MainSequenceClass } from "@/model/celestial/star/types"
-
 export interface StarTidalPosition {
 	latRad: number
 	lonRad: number
@@ -36,8 +34,7 @@ export type StarTideContributionParams = {
 	starLatRad: number
 	starLonRad: number
 	starDistanceM: number
-	spectralClass: MainSequenceClass
-	starSubtype: number
+	starMassKg: number
 	surfaceLatRad: number
 	surfaceLonRad: number
 	planetMassKg: number

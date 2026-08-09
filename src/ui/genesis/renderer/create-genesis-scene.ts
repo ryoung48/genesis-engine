@@ -228,8 +228,7 @@ export function createGenesisScene(
 
 	const interactionController = createInteractionController(context, {
 		setSelectedProvince: (provinceId) => setSelectedProvince(provinceId),
-		focusOnSystemBody: (bodyIndex, moonIndex) =>
-			focusOnSystemBody(bodyIndex, moonIndex),
+		focusOnSystemBody: (address, opts) => focusOnSystemBody(address, opts),
 	})
 	const {
 		setHoveredRegion,

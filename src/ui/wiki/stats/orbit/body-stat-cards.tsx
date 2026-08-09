@@ -6,15 +6,29 @@ import type {
 	SeismologyProfile,
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
+import type { BiosphereProfile } from "@/model/celestial/planet/biosphere/types"
+import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
+import type { FinalizeTemperatureInput } from "@/model/celestial/planet/environment/temperature/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { SurfaceTidesBreakdown } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
 import { Slider } from "@/ui/components/primitives/Slider"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
+import {
+	atmosphereSwatchColor,
+	axialTiltSwatchColor,
+	biosphereSwatchColor,
+	eccentricitySwatchColor,
+	habitabilitySwatchColor,
+	hydrosphereSwatchColor,
+	rotationSwatchColor,
+	sizeSwatchColor,
+} from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
 import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
@@ -32,9 +46,13 @@ import {
 	formatClassificationLabel,
 	formatDays,
 	formatHours,
+	formatBiosphereLabelParts,
+	formatHabitabilityValue,
 	formatHydrosphereValuePrefix,
+	habitabilityCategoryLabel,
 	formatHydrosphereValueSuffix,
 	formatPressureBar,
+	temperatureSwatchColor,
 } from "@/ui/wiki/stats/orbit/formatters"
 import { buildSeismologyStats } from "@/ui/wiki/stats/orbit/seismology-stats"
 import {
@@ -86,6 +104,66 @@ function buildOrbitalShapeEditor(
 	}
 }
 
+// Ported from galaxy-gen's OrbitTooltips.tsx TemperatureTooltip -- the mean-
+// temperature permutation breakdown (TEMPERATURE.trace's on-demand, not
+// eagerly computed, so this only runs when a detail panel actually renders
+// it -- see that function's own doc for why). Returns undefined whenever any
+// input needed to run the trace isn't known yet (e.g. albedo/greenhouse not
+// yet rolled, or luminosity/AU not threaded through for this card).
+function buildTemperatureTraceTooltip(params: {
+	luminositySol?: number
+	orbitalDistanceAU?: number
+	eccentricity: number
+	albedo?: number
+	greenhouseFactor?: number
+	hydrosphereCode?: number
+	pressureBar?: number
+	axialTiltDeg: number
+	orbitalPeriodDays: number
+	siderealDayHours: number
+	tideLock?: TideLock | null
+	seismologyTotal?: number
+	group?: string
+}): React.ReactNode | undefined {
+	if (params.luminositySol === undefined || params.orbitalDistanceAU === undefined)
+		return undefined
+	if (params.albedo === undefined || params.greenhouseFactor === undefined)
+		return undefined
+	const { mean } = TEMPERATURE.trace({
+		luminositySol: params.luminositySol,
+		orbitalDistanceAU: params.orbitalDistanceAU,
+		eccentricity: params.eccentricity,
+		albedo: params.albedo,
+		greenhouseFactor: params.greenhouseFactor,
+		hydrosphereCode: params.hydrosphereCode ?? 0,
+		pressureBar: params.pressureBar ?? 0,
+		axialTiltDeg: params.axialTiltDeg,
+		orbitalPeriodDays: params.orbitalPeriodDays,
+		siderealDayHours: params.siderealDayHours,
+		tideLock: params.tideLock,
+		seismologyTotal: params.seismologyTotal ?? 0,
+		group: (params.group ?? "terrestrial") as FinalizeTemperatureInput["group"],
+	})
+	const finalMeanC =
+		mean.baseline + mean.trace.reduce((sum, entry) => sum + entry.value, 0)
+	return (
+		<TraceTooltipContent
+			title="Temperature Estimate"
+			trace={[
+				{
+					value: mean.baseline,
+					description: `baseline (${(mean.baseline + 273.15).toFixed(0)}K reference)`,
+				},
+				...mean.trace,
+			]}
+			formatValue={(value) => `${value > 0 ? "+" : ""}${value.toFixed(1)}°C`}
+			finalLabel="Estimated Mean"
+			finalValue={finalMeanC}
+			colorScheme="temperature"
+		/>
+	)
+}
+
 function buildGroupClassStat(
 	group: string | undefined,
 	classification: string | undefined,
@@ -131,6 +209,11 @@ function buildBodyStats({
 	surfaceTidesM,
 	seismology,
 	albedo,
+	biosphere,
+	habitability,
+	luminositySol,
+	orbitalDistanceAU,
+	pressureBar,
 }: {
 	kind: "planet" | "moon"
 	group?: string
@@ -156,6 +239,9 @@ function buildBodyStats({
 		siderealEditor?: StatEntry["editor"]
 		tideLockStat?: StatEntry
 		tideLocked: boolean
+		/** Drives rotationSwatchColor's star/planet/moon lock distinction --
+		 * tideLocked alone can't tell those apart. */
+		tideLock?: TideLock | null
 		/** See formatLocalCalendarValue's doc -- only ever set for a moon's
 		 * own card. */
 		moonOrbitalPeriodDays?: number
@@ -187,6 +273,20 @@ function buildBodyStats({
 	surfaceTidesM?: SurfaceTidesBreakdown
 	seismology?: SeismologyProfile
 	albedo?: number
+	biosphere?: BiosphereProfile
+	/** Structurally identical to BiosphereProfile (code + trace) -- see
+	 * OrbitBody's habitability doc. */
+	habitability?: BiosphereProfile
+	/** Star's luminosity and this body's own orbital distance -- both needed
+	 * (alongside albedo/greenhouseFactor above) to run TEMPERATURE.trace for
+	 * the Temperature row's info-icon breakdown. Omitted (not just falsy)
+	 * skips the icon entirely rather than showing a broken/empty tooltip. */
+	luminositySol?: number
+	orbitalDistanceAU?: number
+	/** Atmospheric pressure, in bar -- also needed for TEMPERATURE.trace's
+	 * seasonality term. Defaults to 0 (vacuum) in the trace call when unset,
+	 * same as finalize()'s own convention. */
+	pressureBar?: number
 }): StatEntry[] {
 	const diameterRel = diameterKm / ORBIT_BODY.earthDiameterKm
 	const massRelEarth = massKg / ORBIT_BODY.earthMassKg
@@ -207,12 +307,21 @@ function buildBodyStats({
 			? []
 			: [{ label: "Period", value: formatDays(orbitalPeriodDays) }]),
 		...(dayLength
-			? buildDayLengthStats({ ...dayLength, substellarLonStat })
+			? buildDayLengthStats({
+					...dayLength,
+					substellarLonStat,
+					rotationColor: rotationSwatchColor({
+						tideLockStatus: dayLength.tideLocked ? "1:1" : undefined,
+						tideLock: dayLength.tideLock,
+						siderealDayHours: dayLength.siderealDayHours,
+					}),
+				})
 			: []),
 		{
 			label: "Eccentricity",
 			value: eccentricity.value.toFixed(4),
 			editor: eccentricity.editor,
+			swatchColor: eccentricitySwatchColor(eccentricity.value),
 		},
 		{
 			label: "Inclination",
@@ -223,12 +332,17 @@ function buildBodyStats({
 			label: "Axial Tilt",
 			value: `${axialTiltDeg.value.toFixed(1)}°`,
 			editor: axialTiltDeg.editor,
+			swatchColor: axialTiltSwatchColor({
+				tideLockStatus: dayLength?.tideLocked ? "1:1" : undefined,
+				axialTiltDeg: axialTiltDeg.value,
+			}),
 		},
 		{
 			label: "Radius",
 			valuePrefix: `${diameterRel.toFixed(2)} R⊕`,
 			value: sizeClass !== undefined ? ` · Size ${sizeClass}` : "",
 			editor: radiusEditor,
+			swatchColor: sizeSwatchColor(sizeClass),
 		},
 		{
 			label: "Mass",
@@ -255,6 +369,7 @@ function buildBodyStats({
 						valuePrefix: formatHydrosphereValuePrefix(landCoverage),
 						value: formatHydrosphereValueSuffix(hydrosphereCode),
 						editor: landCoverageEditor,
+						swatchColor: hydrosphereSwatchColor(hydrosphereCode),
 					},
 				]
 			: []),
@@ -264,6 +379,7 @@ function buildBodyStats({
 						label: "Temperature",
 						valuePrefix: formatAvgTempValue(avgTempK, unitSystem),
 						value: ` · ${describeTemperatureK(avgTempK)}`,
+						swatchColor: temperatureSwatchColor(avgTempK),
 						valueHelp: (
 							<ContributionTooltipContent
 								title="Climate Inputs"
@@ -286,10 +402,66 @@ function buildBodyStats({
 							/>
 						),
 						valueHelpTarget: "prefix" as const,
+						trailingHelp: buildTemperatureTraceTooltip({
+							luminositySol,
+							orbitalDistanceAU,
+							eccentricity: eccentricity.value,
+							albedo,
+							greenhouseFactor,
+							hydrosphereCode,
+							pressureBar,
+							axialTiltDeg: axialTiltDeg.value,
+							orbitalPeriodDays,
+							siderealDayHours: dayLength?.siderealDayHours ?? 0,
+							tideLock: dayLength?.tideLock,
+							seismologyTotal: seismology?.totalHeating,
+							group,
+						}),
 					},
 				]
 			: []),
 		...buildSeismologyStats(seismology, surfaceTidesM),
+		...(biosphere !== undefined && biosphere.code > 0
+			? [
+					(() => {
+						const { base, suffix } = formatBiosphereLabelParts(biosphere)
+						return {
+							label: "Biosphere",
+							valuePrefix: base,
+							value: suffix ? `· ${suffix}` : "",
+							swatchColor: biosphereSwatchColor(biosphere.code),
+							valueHelp: (
+								<TraceTooltipContent
+									title="Biosphere Factors"
+									trace={biosphere.trace}
+									finalLabel="Final Biosphere"
+									finalValue={biosphere.code}
+								/>
+							),
+							valueHelpTarget: "prefix" as const,
+						}
+					})(),
+				]
+			: []),
+		...(habitability !== undefined
+			? [
+					{
+						label: "Habitability",
+						valuePrefix: formatHabitabilityValue(habitability),
+						value: ` · ${habitabilityCategoryLabel(habitability.code)}`,
+						swatchColor: habitabilitySwatchColor(habitability.code),
+						valueHelp: (
+							<TraceTooltipContent
+								title="Habitability Factors"
+								trace={habitability.trace}
+								finalLabel="Final Habitability"
+								finalValue={habitability.code}
+							/>
+						),
+						valueHelpTarget: "prefix" as const,
+					},
+				]
+			: []),
 	]
 }
 
@@ -323,6 +495,10 @@ function buildMoonStats({
 	tideLock,
 	substellarLon,
 	editors,
+	biosphere,
+	habitability,
+	luminositySol,
+	orbitalDistanceAU,
 }: {
 	diameterKm: number
 	massKg: number
@@ -363,6 +539,12 @@ function buildMoonStats({
 		axialTilt?: StatEntry["editor"]
 		substellarLon?: (value: number) => void
 	}
+	biosphere?: BiosphereProfile
+	habitability?: BiosphereProfile
+	/** Star's luminosity and this moon's parent-planet orbital distance --
+	 * see buildBodyStats' doc on the same fields. */
+	luminositySol?: number
+	orbitalDistanceAU?: number
 }): StatEntry[] {
 	const substellarLonStat = buildSubstellarLonStat({
 		tideLock,
@@ -393,6 +575,7 @@ function buildMoonStats({
 					siderealEditor: editors?.siderealDay,
 					tideLockStat,
 					tideLocked: !!tideLock,
+					tideLock,
 					moonOrbitalPeriodDays: orbitalPeriodDays,
 				}
 			: null,
@@ -408,7 +591,11 @@ function buildMoonStats({
 		densityDescription,
 		atmosphereStat:
 			atmosphere !== undefined
-				? { label: "Atmosphere", value: formatAtmosphereLabel(atmosphere) }
+				? {
+						label: "Atmosphere",
+						value: formatAtmosphereLabel(atmosphere),
+						swatchColor: atmosphereSwatchColor(atmosphere?.code),
+					}
 				: undefined,
 		landCoverage,
 		hydrosphereCode,
@@ -418,6 +605,11 @@ function buildMoonStats({
 		surfaceTidesM,
 		seismology,
 		albedo,
+		biosphere,
+		habitability,
+		luminositySol,
+		orbitalDistanceAU,
+		pressureBar: atmosphere?.pressureBar,
 	})
 }
 
@@ -551,6 +743,7 @@ export function buildOrbitBodyStats(params: {
 			),
 			tideLockStat,
 			tideLocked: !!body.tideLock,
+			tideLock: body.tideLock,
 			siderealEditor: onUpdateBody
 				? {
 						label: "Rotation",
@@ -691,8 +884,15 @@ export function buildOrbitBodyStats(params: {
 						display: pressureSlider.display,
 						set: pressureSlider.set,
 					},
+					swatchColor: atmosphereSwatchColor(
+						buildPressureAtmosphereProfile(pressureSlider.value).code,
+					),
 				}
-			: { label: "Atmosphere", value: formatAtmosphereLabel(body.atmosphere) },
+			: {
+					label: "Atmosphere",
+					value: formatAtmosphereLabel(body.atmosphere),
+					swatchColor: atmosphereSwatchColor(body.atmosphere?.code),
+				},
 		landCoverage: body.landCoverage,
 		hydrosphereCode: body.hydrosphereCode,
 		avgTempK,
@@ -702,6 +902,11 @@ export function buildOrbitBodyStats(params: {
 		surfaceTidesM,
 		seismology: body.seismology,
 		albedo: body.albedo ?? estimateAlbedo(body.landCoverage),
+		biosphere: body.biosphere,
+		habitability: body.habitability,
+		luminositySol: starLuminositySol,
+		orbitalDistanceAU: body.orbitalDistanceAU,
+		pressureBar: pressureSlider?.value ?? body.atmosphere?.pressureBar,
 	})
 }
 
@@ -719,6 +924,12 @@ export function buildOrbitMoonStats(params: {
 	onUpdateMoon?: (
 		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
+	/** Star's luminosity and the parent planet's orbital distance -- a moon
+	 * orbits its star at essentially the same AU as its planet, so this is
+	 * the parent's own orbitalDistanceAU, not the moon's PD offset. Needed
+	 * for the Temperature row's info-icon trace breakdown. */
+	luminositySol?: number
+	orbitalDistanceAU?: number
 }): StatEntry[] {
 	const {
 		moon,
@@ -729,6 +940,8 @@ export function buildOrbitMoonStats(params: {
 		avgTempK,
 		unitSystem,
 		onUpdateMoon,
+		luminositySol,
+		orbitalDistanceAU,
 	} = params
 	const pd = moon.semiMajorAxisPlanetDiameters ?? pdOverride ?? 0
 	const gravityG = ORBIT_BODY.computeGravityG({
@@ -764,6 +977,10 @@ export function buildOrbitMoonStats(params: {
 		tideLockStat,
 		tideLock: moon.tideLock,
 		substellarLon: moon.substellarLon,
+		biosphere: moon.biosphere,
+		habitability: moon.habitability,
+		luminositySol,
+		orbitalDistanceAU,
 		editors: onUpdateMoon
 			? {
 					substellarLon: (value: number) =>

@@ -6,6 +6,7 @@ import type {
 	ComputeTidalTemperatureParams,
 	LockedDeclinationParams,
 	LockedMonthlyDaylightHoursParams,
+	LockedStarRadiationParams,
 	MonthlyLibrationParams,
 	SubstellarDirectionParams,
 	TidalTransportParams,
@@ -37,15 +38,19 @@ function computeDailyLockedOrbit(
 		| "spectralClass"
 		| "starSubtype"
 		| "orbitalDistanceAU"
-	>,
+	> &
+		LockedStarRadiationParams,
 ): { flux: number[]; libration: number[]; solarLongitude: number[] } {
 	const { SIGMA, R_SUN, AU } = CONSTANTS.embConstants.stellar
 	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
-	const T_star = STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
+	const T_star =
+		params.starTemperatureK ??
+		STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
 	const R_star =
-		STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) * R_SUN
+		(params.starDiameterSol ??
+			STAR.getStarDiameterSol({ cls, subtype: params.starSubtype })) * R_SUN
 	const d = params.orbitalDistanceAU * AU
 	const s0 =
 		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
@@ -264,7 +269,8 @@ function computeTidalTransportParams(
 		| "starSubtype"
 		| "orbitalDistanceAU"
 		| "seismologyTotalHeatingK"
-	>,
+	> &
+		LockedStarRadiationParams,
 ): TidalTransportParams {
 	const radiusM = params.planetRadiusKm * 1000
 	const pressure = params.pressure ?? 1.0
@@ -274,9 +280,12 @@ function computeTidalTransportParams(
 	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
-	const T_star = STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
+	const T_star =
+		params.starTemperatureK ??
+		STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
 	const R_star =
-		STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) * R_SUN
+		(params.starDiameterSol ??
+			STAR.getStarDiameterSol({ cls, subtype: params.starSubtype })) * R_SUN
 	const d = params.orbitalDistanceAU * AU
 	const S0 =
 		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)

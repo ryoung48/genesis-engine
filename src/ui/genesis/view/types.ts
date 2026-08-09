@@ -1,6 +1,7 @@
 import type { Dispatch, RefObject, SetStateAction } from "react"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { MainWorldMode } from "@/model/celestial/system/generation/types"
 import type {
 	SolarSystemState,
 	SystemBody,
@@ -24,7 +25,10 @@ import type {
 } from "@/ui/genesis/controls/OverlayControls"
 import type { Eu4GhslSettlementAsset } from "@/ui/genesis/generation/earth-assets"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
-import type { loadGenerationSessionSnapshotSync } from "@/ui/genesis/generation/session-persistence"
+import type {
+	GalaxyOrigin,
+	loadGenerationSessionSnapshotSync,
+} from "@/ui/genesis/generation/session-persistence"
 import type { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
 import type { useEarthHistoryTimeline } from "@/ui/genesis/generation/useEarthHistoryTimeline"
 import type { StoredViewPrefs } from "@/ui/genesis/generation/view-prefs"
@@ -111,6 +115,11 @@ export type SolarSystemBodiesInput = {
 	initialGenerationSession: ReturnType<
 		typeof loadGenerationSessionSnapshotSync
 	> | null
+	/** Scopes this instance's session-persistence localStorage entry so
+	 * independent solar-system-view instances (e.g. the earth/sol-centric
+	 * Genesis page vs. a `/galaxy` drill-in view) don't read/write the same
+	 * key. Omit for the original unnamespaced Genesis session. */
+	sessionNamespace?: string
 }
 
 export type OverlayStateInput = SolarSystemBodiesInput & {
@@ -141,6 +150,8 @@ export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	tideLock: TideLock | null
 	spectralClass: SolarSystemState["star"]["class"]
 	starSubtype: number
+	mainWorldMode: MainWorldMode
+	galaxyOrigin: GalaxyOrigin | null
 	// [JUSTIFICATION] Sol's star uses its own hardcoded "Sol" name instead of
 	// a generated one, so there is no generated name to pass for that system.
 	starName: string | undefined

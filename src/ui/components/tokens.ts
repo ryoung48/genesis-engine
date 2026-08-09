@@ -2,6 +2,7 @@
  * as hex literals at each call site (war swatch, chart series, ...). */
 export const uiPalette = {
 	war: "#b91c1c",
+	giantStar: "#ef4444",
 	/** Shared accent used for "current date"/"active" reference markers
 	 * (WikiTimeline's current-date line, star-stats' active chip). */
 	accent: "#4f46e5",

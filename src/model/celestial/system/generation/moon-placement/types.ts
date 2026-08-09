@@ -1,7 +1,7 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SpectralClass } from "@/model/celestial/star/types"
 import { RNG } from "@/model/shared/random/rng"
 
 export interface MoonPlacementInput {
@@ -14,11 +14,14 @@ export interface MoonPlacementInput {
 	isPrimaryWorld: boolean
 	zone: Zone
 	deviation: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	starAgeGyr: number
 	massKg: number
 	moonSlotName: string
 	nameBody: (slot: string) => string
+	/** Inherited unchanged from the parent planet's own impactZone flag -- see
+	 * PLANET.classifyBody's impactZone doc. */
+	impactZone: boolean
 }
 
 export type MoonPlacementResult = MoonBody[]

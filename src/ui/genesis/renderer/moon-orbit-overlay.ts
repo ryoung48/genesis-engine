@@ -9,6 +9,7 @@ import {
 	type Text,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
+import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -114,8 +115,9 @@ function buildMoonMesh(
 	showGrid: boolean,
 	gridSpacing: number,
 	texturePath?: string,
+	cloudsTexturePath?: string,
 ): THREE.Mesh {
-	const geo = new THREE.SphereGeometry(radius, 8, 6)
+	const geo = new THREE.SphereGeometry(radius, 24, 18)
 	let map: THREE.Texture
 	if (texturePath) {
 		map = loadMoonTexture(texturePath)
@@ -135,6 +137,37 @@ function buildMoonMesh(
 		metalness: 0,
 	})
 	const mesh = new THREE.Mesh(geo, mat)
+	// A cloud shell, parented directly to the moon mesh so it inherits the
+	// same tilt/spin quaternion automatically -- see overlay.ts's planet
+	// clouds for the sibling-mesh + independently-tracked-quaternion version
+	// of this, which a moon doesn't need since it has no separate cloud-drift
+	// animation.
+	if (cloudsTexturePath) {
+		const cloudsTexture = loadMoonTexture(cloudsTexturePath)
+		cloudsTexture.flipY = false
+		const cloudsMaterial = new THREE.MeshStandardMaterial({
+			color: 0xffffff,
+			alphaMap: cloudsTexture,
+			transparent: true,
+			opacity: 1,
+			alphaTest: 0.02,
+			depthWrite: false,
+			roughness: 1,
+			metalness: 0,
+		})
+		boostCloudAlphaMap(cloudsMaterial)
+		const cloudsMesh = new THREE.Mesh(
+			new THREE.SphereGeometry(1, 24, 18),
+			cloudsMaterial,
+		)
+		// mesh's own geometry bakes `radius` in directly (no mesh-level scale, so
+		// this child's local units equal world units), unlike overlay.ts's
+		// unit-sphere-plus-scale planet meshes -- hence the absolute radius here
+		// instead of a relative scale factor.
+		cloudsMesh.scale.setScalar(radius * 1.025)
+		cloudsMesh.renderOrder = 2
+		mesh.add(cloudsMesh)
+	}
 	// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
 	// XY (Z-north) — same quarter-turn the terrestrial/gas-giant meshes get
 	// elsewhere in this renderer. Composed as a quaternion (pole correction
@@ -368,6 +401,7 @@ export function buildMoonOrbitOverlay(
 			showGrid,
 			gridSpacing,
 			moon.texturePath,
+			moon.cloudsTexturePath,
 		)
 		group.add(moonMesh)
 		moonMeshes.push(moonMesh)
@@ -489,7 +523,19 @@ export function buildMoonOrbitOverlay(
 
 	function getMoonIndexForMesh(object: THREE.Object3D): number | null {
 		const index = moonMeshes.indexOf(object as THREE.Mesh)
-		return index === -1 ? null : index
+		if (index !== -1) return index
+		// A moon's cloud shell (see buildMoonMesh) is a child of its moon mesh,
+		// not a sibling in moonMeshes -- and sits just above the surface, so a
+		// raycast from outside typically hits it (or its own children) first.
+		// Walk up to the nearest ancestor that IS a tracked moon mesh instead of
+		// failing the hit entirely.
+		let current: THREE.Object3D | null = object.parent
+		while (current) {
+			const parentIndex = moonMeshes.indexOf(current as THREE.Mesh)
+			if (parentIndex !== -1) return parentIndex
+			current = current.parent
+		}
+		return null
 	}
 
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {

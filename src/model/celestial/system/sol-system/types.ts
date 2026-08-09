@@ -1,5 +1,8 @@
 import type { MoonBody, MoonOrbitRange } from "@/model/celestial/moons/types"
-import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
+import type {
+	AtmosphereProfile,
+	BiosphereProfile,
+} from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 
 export interface SolMoonSeed {
@@ -68,6 +71,7 @@ export interface SolPlanetSeed {
 	lsAphelionDeg: number
 	isMainWorld?: boolean
 	rings?: SystemBody["rings"]
+	biosphere?: BiosphereProfile
 }
 
 export interface BuildPlanetOptions {

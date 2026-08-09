@@ -1,16 +1,48 @@
 import * as THREE from "three"
 import { BELT_WIDTH, TWO_PI } from "@/ui/genesis/solar-system/overlay/constants"
+import { loadBodyTexture } from "@/ui/genesis/solar-system/overlay/textures"
 import type { AsteroidFieldData } from "@/ui/genesis/solar-system/overlay/types"
+
+const ASTEROID_TEXTURE_PATH = "/textures/celestial/generated/asteroid/1.png"
+const ICE_ASTEROID_TEXTURE_PATH =
+	"/textures/celestial/generated/asteroid-ice/1.png"
 
 // Scatters a field of small, irregularly-scaled rocks around a belt's ring —
 // each on its own randomized circular sub-orbit (slightly jittered radius and
 // out-of-plane offset) plus a random tumble, so the belt reads as a lively
 // swarm rather than a flat static band.
-export function buildAsteroidField(orbitRadius: number): AsteroidFieldData {
-	const count = ASTEROID_COUNT_PER_BELT
+export function buildAsteroidField(
+	orbitRadius: number,
+	// Belts never get a real temperature estimate (seismology/index.ts skips
+	// it for group "asteroid belt"), so orbital zone is the only signal
+	// available to approximate "frozen" -- an outer-zone belt gets the icy
+	// variant, everything else the rocky one.
+	isOuterZone: boolean,
+): AsteroidFieldData {
+	// Scene orbit radii are packed by rendered size, not real AU (see
+	// ORBIT_GAP_STAR_RADII's own doc elsewhere), so a belt close to the star
+	// can end up with a far smaller ring circumference than one further out.
+	// A fixed rock count spread over a fixed-width band ignored that entirely
+	// -- every belt got the same 900 rocks regardless of ring size, so a
+	// small-radius inner belt packed them into a much shorter circumference
+	// and looked badly overcrowded while a large-radius outer belt (already
+	// hitting the cap below) looked fine. Scaling count by orbitRadius keeps
+	// rocks-per-unit-circumference roughly constant across belts instead.
+	const count = Math.round(
+		Math.min(
+			ASTEROID_COUNT_MAX,
+			Math.max(ASTEROID_COUNT_MIN, orbitRadius * ASTEROID_DENSITY_PER_RADIUS),
+		),
+	)
 	const geometry = new THREE.IcosahedronGeometry(1, 0)
+	// Every instance shares this one texture (loadBodyTexture caches it) --
+	// the per-instance vertex color below still multiplies over it so each
+	// rock reads as a distinct shade/tint rather than an identical stamp.
 	const material = new THREE.MeshStandardMaterial({
 		color: 0xb0b0b0,
+		map: loadBodyTexture(
+			isOuterZone ? ICE_ASTEROID_TEXTURE_PATH : ASTEROID_TEXTURE_PATH,
+		),
 		roughness: 1,
 		metalness: 0,
 	})
@@ -98,7 +130,14 @@ export function updateAsteroidField(
 	field.mesh.instanceMatrix.needsUpdate = true
 }
 
-const ASTEROID_COUNT_PER_BELT = 900
+// Rocks per unit of scene orbitRadius -- calibrated so a belt around
+// orbitRadius ~12 (a typical further-out belt) still lands near the old
+// fixed 900-rock count that already looked right there, while a close-in
+// belt (small orbitRadius, and thus a much shorter ring circumference) gets
+// proportionally fewer instead of the same 900 crammed into a tight ring.
+const ASTEROID_DENSITY_PER_RADIUS = 75
+const ASTEROID_COUNT_MIN = 120
+const ASTEROID_COUNT_MAX = 900
 
 const ASTEROID_MIN_SCALE = 0.006
 

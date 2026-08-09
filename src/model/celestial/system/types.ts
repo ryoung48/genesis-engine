@@ -56,13 +56,63 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		maxElevation?: number
 	}
 
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type {
+	HostStarAttributes,
+	SpectralClass,
+} from "@/model/celestial/star/types"
+
+/** A companion star bound to another star in the same system -- see
+ * GALAXY_SYSTEMS.rollStarTree. Structurally the same "a star with its own
+ * orbiting bodies" shape as the top-level `star`/`orbits` pair; kept as a
+ * separate array (rather than folded into `orbits`) since a companion is a
+ * star, not a SystemBody -- it has no diameter/mass/classification/etc. of
+ * its own planet-shaped fields, just its own class/subtype/seed and its own
+ * orbiting bodies. [JUSTIFICATION] Absent for a single-star system -- every
+ * existing session (including Sol) has no companions, so this field being
+ * empty/absent is the common case, not the exception. */
+export interface CompanionStar {
+	class: SpectralClass
+	subtype: number
+	/** The companion's original galaxy profile. [JUSTIFICATION] Authored
+	 * single-system companions do not have a separately rolled profile. */
+	hostStar?: HostStarAttributes
+	seed: string
+	starName: string
+	/** How this star relates to the star it orbits -- mirrors
+	 * GALAXY_SYSTEMS' StarRole minus "primary" (only the root star has no
+	 * parent). */
+	role: "epistellar" | "inner" | "outer" | "distant"
+	/** Distance from the star it orbits, using that parent's own
+	 * habitable-zone deviation-to-AU mapping -- see GalaxyStar's doc. */
+	orbitalDistanceAU: number
+	/** Kepler period around its parent. */
+	orbitalPeriodDays: number
+	/** Orbital eccentricity around the parent star. */
+	eccentricity: number
+	/** Orbital inclination around the parent star. */
+	inclinationDeg: number
+	orbits: SystemBody[]
+}
 
 export interface SolarSystemState {
 	star: {
-		class: MainSequenceClass
+		class: SpectralClass
 		subtype: number
 		seed: string
+		/** The original galaxy host's physical profile. [JUSTIFICATION] Authored
+		 * single-system states expose only class/subtype and therefore have no
+		 * rolled profile to retain. */
+		hostStar?: HostStarAttributes
+		/** Same shape as class/subtype: the live, authoritative value -- built
+		 * once at initialization (STAR_IDENTITY.getStarAgeGyr's Sol-relative
+		 * default, or the real hostStar.ageGyr for a galaxy-opened system), then
+		 * read directly everywhere. setStarSpectralClass/setStarSubtype re-clamp
+		 * it to the new class/subtype's main-sequence-lifespan bounds when they
+		 * run (see useSolarSystemBodies.ts) so it never goes stale/invalid the
+		 * way a derived-on-read value couldn't. Editable for every star except
+		 * Sol, whose age is a fixed real value. */
+		ageGyr: number
 	}
 	orbits: SystemBody[]
+	companionStars?: CompanionStar[]
 }

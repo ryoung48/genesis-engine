@@ -169,6 +169,8 @@ export function LazyPlanetDetailTabs({
 	isSolarLocked,
 	spectralClass,
 	starSubtype,
+	starTemperatureK,
+	starDiameterSol,
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
@@ -214,6 +216,8 @@ export function LazyPlanetDetailTabs({
 	isSolarLocked: boolean
 	spectralClass: string
 	starSubtype: number
+	starTemperatureK?: number
+	starDiameterSol?: number
 	orbitalDistanceAU: number
 	eccentricity: number
 	perihelion: number
@@ -271,6 +275,8 @@ export function LazyPlanetDetailTabs({
 			isSolarLocked={isSolarLocked}
 			spectralClass={spectralClass}
 			starSubtype={starSubtype}
+			starTemperatureK={starTemperatureK}
+			starDiameterSol={starDiameterSol}
 			orbitalDistanceAU={orbitalDistanceAU}
 			eccentricity={eccentricity}
 			perihelion={perihelion}
@@ -328,6 +334,8 @@ export function useAvgTempKPreview(config: {
 	perihelion: number
 	spectralClass: string
 	starSubtype: number
+	starTemperatureK?: number
+	starDiameterSol?: number
 	orbitalDistanceAU: number
 	hoursPerDay: number
 	daysPerYear: number
@@ -347,6 +355,8 @@ export function useAvgTempKPreview(config: {
 		perihelion,
 		spectralClass,
 		starSubtype,
+		starTemperatureK,
+		starDiameterSol,
 		orbitalDistanceAU,
 		hoursPerDay,
 		daysPerYear,
@@ -367,6 +377,8 @@ export function useAvgTempKPreview(config: {
 			perihelion,
 			spectralClass,
 			starSubtype,
+			starTemperatureK,
+			starDiameterSol,
 			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
@@ -384,6 +396,8 @@ export function useAvgTempKPreview(config: {
 			perihelion,
 			spectralClass,
 			starSubtype,
+			starTemperatureK,
+			starDiameterSol,
 			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
@@ -403,6 +417,8 @@ export function useAvgTempKPreview(config: {
 			perihelion,
 			spectralClass,
 			starSubtype,
+			starTemperatureK,
+			starDiameterSol,
 			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
@@ -418,6 +434,8 @@ export function useAvgTempKPreview(config: {
 			perihelion,
 			spectralClass,
 			starSubtype,
+			starTemperatureK,
+			starDiameterSol,
 			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
@@ -444,6 +462,8 @@ function LazyPlanetDetailTabsContent({
 	isSolarLocked,
 	spectralClass,
 	starSubtype,
+	starTemperatureK,
+	starDiameterSol,
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
@@ -485,6 +505,8 @@ function LazyPlanetDetailTabsContent({
 	isSolarLocked: boolean
 	spectralClass: string
 	starSubtype: number
+	starTemperatureK?: number
+	starDiameterSol?: number
 	orbitalDistanceAU: number
 	eccentricity: number
 	perihelion: number
@@ -516,6 +538,8 @@ function LazyPlanetDetailTabsContent({
 			perihelion,
 			spectralClass,
 			starSubtype,
+			starTemperatureK,
+			starDiameterSol,
 			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
@@ -533,6 +557,8 @@ function LazyPlanetDetailTabsContent({
 			perihelion,
 			spectralClass,
 			starSubtype,
+			starTemperatureK,
+			starDiameterSol,
 			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,

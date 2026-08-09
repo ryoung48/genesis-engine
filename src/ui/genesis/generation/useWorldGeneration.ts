@@ -30,6 +30,11 @@ import {
 } from "@/ui/genesis/generation/generation"
 import { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
 import type { WorldGenerationInput } from "@/ui/genesis/view/types"
+
+// Fits Earth's own SeismologyProfile.totalHeating to volcanism 1 (the prior
+// hardcoded default for every generated world).
+const SEISMOLOGY_VOLCANISM_DIVISOR = 25.599
+
 /**
  * Owns world generation: the worker callbacks, the assembled generation
  * parameter set, the seed input field's own dirty/error state, and the two
@@ -186,7 +191,18 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			ridgeSharpening,
 			glacialErosion,
 			seaLevel,
-			volcanism: 1,
+			// volcanism = totalHeating / SEISMOLOGY_VOLCANISM_DIVISOR -- fits Earth's
+			// own totalHeating to volcanism 1 (the prior hardcoded default). Falls
+			// back to 1 when there's no live seismology score yet (e.g. before the
+			// main world's SystemBody has been built).
+			volcanism:
+				mainWorldSystemBody?.seismology?.totalHeating !== undefined
+					? Math.min(
+							10,
+							mainWorldSystemBody.seismology.totalHeating /
+								SEISMOLOGY_VOLCANISM_DIVISOR,
+						)
+					: 1,
 			craters: 0,
 			maxElevation,
 			pressure,
@@ -368,7 +384,14 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				glacialErosion: 0,
 				seaLevel,
 				maxElevation,
-				volcanism: 1,
+				volcanism:
+					mainWorldSystemBody?.seismology?.totalHeating !== undefined
+						? Math.min(
+								10,
+								mainWorldSystemBody.seismology.totalHeating /
+									SEISMOLOGY_VOLCANISM_DIVISOR,
+							)
+						: 1,
 				craters: 0,
 			}
 			importHeightmap(

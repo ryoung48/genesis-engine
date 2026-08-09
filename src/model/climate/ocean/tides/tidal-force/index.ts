@@ -1,5 +1,4 @@
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import { STAR } from "@/model/celestial/star"
 import type {
 	ApparentDiameterRadParams,
 	MoonMoonTideContributionParams,
@@ -110,16 +109,12 @@ function starTideContribution({
 	starLatRad,
 	starLonRad,
 	starDistanceM,
-	spectralClass,
-	starSubtype,
+	starMassKg,
 	surfaceLatRad,
 	surfaceLonRad,
 	planetMassKg,
 	planetRadiusM,
 }: StarTideContributionParams): number {
-	const starMassKg =
-		STAR.getStarMassSol({ cls: spectralClass, subtype: starSubtype }) *
-		ORBIT_BODY.solarMassKg
 	return tideContribution({
 		bodyLatRad: starLatRad,
 		bodyLonRad: starLonRad,

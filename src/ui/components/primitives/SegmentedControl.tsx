@@ -11,7 +11,7 @@ interface SegmentedOption<T extends string> {
 }
 
 type SegmentedTone = "panel" | "overlay"
-type SegmentedSize = "sm" | "md"
+type SegmentedSize = "xs" | "sm" | "md"
 
 const containerClassName: Record<SegmentedTone, string> = {
 	panel: "border border-slate-200 bg-slate-100 p-0.5",
@@ -33,6 +33,7 @@ const buttonToneClassName: Record<
 }
 
 const buttonSizeClassName: Record<SegmentedSize, string> = {
+	xs: "px-1 py-0.5 text-[9px]",
 	sm: "px-2 py-1 text-[10px]",
 	md: "px-2.5 py-1 text-[10px]",
 }
@@ -46,6 +47,11 @@ interface SegmentedControlProps<T extends string> {
 	size?: SegmentedSize
 	className?: string
 	buttonClassName?: string
+	/** Stretches the track to fill its container and gives every option an
+	 * equal-width button (grid instead of inline-flex), rather than each
+	 * button sizing to its own label. Use when option labels vary a lot in
+	 * length and a lopsided, left-packed track would look unbalanced. */
+	fullWidth?: boolean
 }
 
 export function SegmentedControl<T extends string>({
@@ -57,15 +63,22 @@ export function SegmentedControl<T extends string>({
 	size = "sm",
 	className,
 	buttonClassName,
+	fullWidth,
 }: SegmentedControlProps<T>) {
 	return (
 		<div
 			className={cx(
-				"inline-flex w-fit gap-1",
+				fullWidth ? "grid w-full" : "inline-flex w-fit",
+				"gap-1",
 				uiTokens.radius.md,
 				containerClassName[tone],
 				className,
 			)}
+			style={
+				fullWidth
+					? { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }
+					: undefined
+			}
 		>
 			{options.map((option) => {
 				const active = isActive
@@ -81,8 +94,9 @@ export function SegmentedControl<T extends string>({
 						aria-label={option.ariaLabel}
 						className={cx(
 							uiTokens.radius.sm,
-							uiTokens.type.control,
+							"font-semibold uppercase tracking-[0.08em]",
 							buttonSizeClassName[size],
+							fullWidth && "w-full text-center",
 							"transition-all disabled:cursor-not-allowed disabled:opacity-40",
 							buttonToneClassName[tone][active ? "active" : "idle"],
 							buttonClassName,

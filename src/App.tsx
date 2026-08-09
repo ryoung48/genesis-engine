@@ -8,6 +8,12 @@ function App() {
 			<Routes>
 				<Route path={APP_PATHS.tectonicLab} element={<GenesisView />} />
 				<Route
+					path={APP_PATHS.galaxy}
+					element={
+						<GenesisView sessionNamespace="galaxy" initialGalaxyModeActive />
+					}
+				/>
+				<Route
 					path="*"
 					element={<Navigate to={APP_PATHS.tectonicLab} replace />}
 				/>

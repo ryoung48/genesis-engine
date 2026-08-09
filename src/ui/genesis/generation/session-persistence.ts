@@ -1,4 +1,6 @@
-﻿import type { MoonBody } from "@/model/celestial/moons/types"
+﻿import type { GalaxyParams } from "@/model/celestial/galaxy/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { MainWorldMode } from "@/model/celestial/system/generation/types"
 import type {
 	SolarSystemState,
 	SystemBody,
@@ -8,11 +10,25 @@ import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
 } from "@/ui/genesis/generation/generation-preview"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 
-type FocusTarget = {
-	bodyIndex: number
-	moonIndex?: number
-} | null
+type FocusTarget = OrbitAddress | null
+
+const VALID_MAIN_WORLD_MODES = new Set<MainWorldMode>([
+	"earth-clone",
+	"moon-system",
+	"gas-giant-moon",
+	"procedural",
+])
+
+/** Present only when this system was opened from galaxy mode (see
+ * GenesisView's handleOpenGalaxySystem) -- lets the solar-system view show a
+ * "back to galaxy" control and hands the exact params needed to regenerate
+ * the same galaxy layout back to it. */
+export interface GalaxyOrigin {
+	galaxyParams: GalaxyParams
+	systemIndex: number
+}
 
 interface GenerationSessionSnapshot {
 	solarSystem: SolarSystemState
@@ -20,10 +36,18 @@ interface GenerationSessionSnapshot {
 	currentFocus: FocusTarget
 	generationPanelOpen: boolean
 	generationPreviewTab: GenerationPreviewTab
+	/** [JUSTIFICATION] Absent from snapshots saved before this field existed
+	 * -- treated as "earth-clone" (the pre-existing default) wherever it's
+	 * read, so old sessions keep restoring exactly as they did before. */
+	mainWorldMode?: MainWorldMode
+	/** [JUSTIFICATION] Absent for any session not opened from the galaxy
+	 * view -- absence itself is the signal to hide the "back to galaxy"
+	 * control. */
+	galaxyOrigin?: GalaxyOrigin
 }
 
 type StoredGenerationSession = {
-	version: 4
+	version: 5
 	snapshot: GenerationSessionSnapshot
 }
 
@@ -155,17 +179,45 @@ function isSystemBodyArray(
 }
 
 function isFocusTarget(value: unknown): value is FocusTarget {
-	return (
-		value === null ||
-		(() => {
-			if (!value || typeof value !== "object") return false
-			const candidate = value as { bodyIndex?: unknown; moonIndex?: unknown }
+	if (value === null) return true
+	if (!value || typeof value !== "object") return false
+	const candidate = value as Record<string, unknown>
+	if (typeof candidate.starIndex !== "number") return false
+	switch (candidate.kind) {
+		case "star":
+			return true
+		case "body":
+			return typeof candidate.bodyIdx === "number"
+		case "moon":
 			return (
-				typeof candidate.bodyIndex === "number" &&
-				(candidate.moonIndex === undefined ||
-					typeof candidate.moonIndex === "number")
+				typeof candidate.bodyIdx === "number" &&
+				typeof candidate.moonIdx === "number"
 			)
-		})()
+		default:
+			return false
+	}
+}
+
+function isGalaxyOrigin(value: unknown): value is GalaxyOrigin {
+	if (!value || typeof value !== "object") return false
+	const candidate = value as Record<string, unknown>
+	if (typeof candidate.systemIndex !== "number") return false
+	const params = candidate.galaxyParams
+	if (!params || typeof params !== "object") return false
+	const typedParams = params as Record<string, unknown>
+	const radius = typedParams.radius
+	const dimensions = typedParams.dimensions
+	return (
+		typeof typedParams.size === "number" &&
+		typeof typedParams.seed === "number" &&
+		!!radius &&
+		typeof radius === "object" &&
+		typeof (radius as Record<string, unknown>).min === "number" &&
+		typeof (radius as Record<string, unknown>).max === "number" &&
+		!!dimensions &&
+		typeof dimensions === "object" &&
+		typeof (dimensions as Record<string, unknown>).w === "number" &&
+		typeof (dimensions as Record<string, unknown>).h === "number"
 	)
 }
 
@@ -197,7 +249,11 @@ function isGenerationSessionSnapshot(
 		typeof candidate.generationPanelOpen === "boolean" &&
 		validGenerationPreviewTabs.has(
 			candidate.generationPreviewTab as GenerationPreviewTab,
-		)
+		) &&
+		(candidate.mainWorldMode === undefined ||
+			VALID_MAIN_WORLD_MODES.has(candidate.mainWorldMode as MainWorldMode)) &&
+		(candidate.galaxyOrigin === undefined ||
+			isGalaxyOrigin(candidate.galaxyOrigin))
 	)
 }
 
@@ -205,14 +261,27 @@ function parseStoredGenerationSession(
 	stored: string,
 ): GenerationSessionSnapshot | null {
 	const parsed = deserializeValue<StoredGenerationSession>(JSON.parse(stored))
-	if (parsed.version !== 4 || !isGenerationSessionSnapshot(parsed.snapshot)) {
+	if (parsed.version !== 5 || !isGenerationSessionSnapshot(parsed.snapshot)) {
 		return null
 	}
 	return parsed.snapshot
 }
 
-export function loadGenerationSessionSnapshotSync(): GenerationSessionSnapshot | null {
-	const stored = window.localStorage.getItem(GENERATION_SESSION_STORAGE_KEY)
+/** Distinguishes independent solar-system-view instances (e.g. the
+ * earth/sol-centric Genesis page vs. a future `/galaxy` drill-in view) so
+ * they don't read/write the same localStorage entry. Defaults to the
+ * original unnamespaced key so existing Genesis sessions keep restoring
+ * unchanged. */
+function storageKeyFor(namespace?: string): string {
+	return namespace
+		? `${GENERATION_SESSION_STORAGE_KEY}:${namespace}`
+		: GENERATION_SESSION_STORAGE_KEY
+}
+
+export function loadGenerationSessionSnapshotSync(
+	namespace?: string,
+): GenerationSessionSnapshot | null {
+	const stored = window.localStorage.getItem(storageKeyFor(namespace))
 	if (!stored || stored.startsWith("gzip:")) return null
 	try {
 		return parseStoredGenerationSession(stored)
@@ -223,17 +292,20 @@ export function loadGenerationSessionSnapshotSync(): GenerationSessionSnapshot |
 
 export async function saveGenerationSessionSnapshot(
 	snapshot: GenerationSessionSnapshot,
+	namespace?: string,
 ): Promise<void> {
 	const payload: StoredGenerationSession = {
-		version: 4,
+		version: 5,
 		snapshot,
 	}
 	const serialized = JSON.stringify(serializeValue(payload))
-	window.localStorage.setItem(GENERATION_SESSION_STORAGE_KEY, serialized)
+	window.localStorage.setItem(storageKeyFor(namespace), serialized)
 }
 
-export async function loadGenerationSessionSnapshot(): Promise<GenerationSessionSnapshot | null> {
-	const stored = window.localStorage.getItem(GENERATION_SESSION_STORAGE_KEY)
+export async function loadGenerationSessionSnapshot(
+	namespace?: string,
+): Promise<GenerationSessionSnapshot | null> {
+	const stored = window.localStorage.getItem(storageKeyFor(namespace))
 	if (!stored) return null
 	const decompressed = await decompressString(stored)
 	if (!decompressed) return null

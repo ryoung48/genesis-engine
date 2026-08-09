@@ -8,7 +8,7 @@ import type {
 	ClassifiedEnvironment,
 } from "@/model/celestial/planet/environment/classification/dice-table/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SpectralClass } from "@/model/celestial/star/types"
 import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
@@ -32,7 +32,7 @@ function rollClassificationAssignment(params: {
 	sizeClass: number
 	zone: Zone
 	deviation: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	isPrimaryWorld: boolean
 }): ClassifiedEnvironment {
 	const {

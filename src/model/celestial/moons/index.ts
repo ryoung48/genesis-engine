@@ -25,14 +25,24 @@ const ROCHE_PD = 2
 const MINIMUM_MOON_SPACING_PD = 0.6
 const MINIMUM_MOON_SPACING_SCALE = 0.03
 const EXTREME_ORBIT_SKIP_CHANCE = 0.65
+// Ported from galaxy-gen's rollMoonOrbit (orbits/moons/index.ts) -- pd =
+// ROCHE_PD + mor * uniform(min, max) per range, with outer/extreme sharing
+// one roll bucket split at outerMod > 1. Widening these (as a prior version
+// of this file did, to 0/0.24/0.56/0.92/1.1) inflates typical moon PD past
+// what galaxy-gen produces, which matters beyond flavor: rollMoonToPlanetLockDM
+// penalizes pd > 20, so wider bands silently suppress the moon→planet tide-lock
+// rate. Weights approximate galaxy-gen's 1d6(+mod) selection odds when mor is
+// large (the now-common case since generateMoons' morPd is capped like
+// galaxy-gen's own mor, not the mod<60 small-mor case): inner ~50%, middle
+// ~33%, outer/extreme ~17% split 5:1 by the outerMod>1 threshold.
 const ORBIT_RANGE_CONFIG: Record<
 	MoonOrbitRange,
 	{ minFactor: number; maxFactor: number; weight: number }
 > = {
-	inner: { minFactor: 0, maxFactor: 0.24, weight: 5 },
-	middle: { minFactor: 0.24, maxFactor: 0.56, weight: 4.2 },
-	outer: { minFactor: 0.56, maxFactor: 0.92, weight: 2.4 },
-	extreme: { minFactor: 0.92, maxFactor: 1.1, weight: 0.65 },
+	inner: { minFactor: 0, maxFactor: 0.16, weight: 6 },
+	middle: { minFactor: 0.16, maxFactor: 0.5, weight: 4 },
+	outer: { minFactor: 0.5, maxFactor: 1.0, weight: 1.7 },
+	extreme: { minFactor: 1.0, maxFactor: 1.1, weight: 0.3 },
 }
 const MOON_ORBIT_RANGE_ORDER: MoonOrbitRange[] = [
 	"inner",
@@ -272,7 +282,12 @@ export const MOON = {
 				rollDie({ rng, sides: 6 }) -
 				6
 
-		if (orbitalDistanceAU < 0.5) {
+		// Ported from galaxy-gen's `MATH.orbits.fromAU(orbit.au) < 1` (orbits/
+		// moons/index.ts) -- fromAU linearly interpolates AU to a "orbit number"
+		// scale where orbit 0 = 0 AU and orbit 1 = 0.4 AU (utilities/math/
+		// index.ts's orbitAUMapping), so `< 1` on that scale is exactly `< 0.4`
+		// AU, not `< 0.5`.
+		if (orbitalDistanceAU < 0.4) {
 			roll -=
 				parentSizeClass > 16
 					? 4
@@ -331,7 +346,12 @@ export const MOON = {
 		const maxStableM = 0.5 * hill
 		const maxStablePd = maxStableM / planetDiameterM
 		if (maxStablePd <= ROCHE_PD) return []
-		const morPd = Math.max((maxStablePd - ROCHE_PD) / 1.1, 0.25)
+		// Ported from galaxy-gen's `orbit.mor = Math.min(hillLimit - 2, 200 +
+		// orbits)` (orbits/index.ts) -- without this cap, planets far from their
+		// star have huge Hill spheres and produce implausibly high moon PDs, since
+		// nothing else bounds how far out "outer"/"extreme" orbits can land.
+		const cappedRangePd = Math.min(maxStablePd - ROCHE_PD, 200 + count)
+		const morPd = Math.max(cappedRangePd / 1.1, 0.25)
 		const parentSizeClass =
 			MOON.estimateMoonSizeClassFromDiameter(planetDiameterKm)
 		const minimumSpacingPd = Math.max(

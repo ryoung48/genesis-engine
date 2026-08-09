@@ -195,6 +195,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 			type: "breathable",
 			breathable: true,
 		},
+		biosphere: { code: 10, trace: [] },
 		moons: [
 			{
 				name: "Luna",

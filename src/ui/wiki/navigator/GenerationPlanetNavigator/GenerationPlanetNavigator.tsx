@@ -5,10 +5,13 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type {
+	HostStarAttributes,
+	SpectralClass,
+} from "@/model/celestial/star/types"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import type { SystemBody } from "@/model/celestial/system/types"
+import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_FORCE } from "@/model/climate/ocean/tides/tidal-force"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import type {
@@ -21,6 +24,7 @@ import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
 import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
+import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import { uiChartPalette, uiPalette } from "@/ui/components/tokens"
@@ -28,6 +32,7 @@ import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-pr
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
 import {
 	type ApparentSizeEntry,
@@ -60,10 +65,28 @@ import {
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildStarStats } from "@/ui/wiki/stats/star/star-stats"
 
-type OrbitSelection =
-	| { kind: "star" }
-	| { kind: "orbit"; bodyIndex: number }
-	| { kind: "orbit-moon"; bodyIndex: number; moonIndex: number }
+/** This component's own selection state -- see OrbitAddress's own doc for
+ * the addressing scheme (starIndex 0 = the system's own primary star,
+ * 1-based = a companion; a companion is `{kind: "star", starIndex: N>0}`,
+ * the exact same shape the primary uses for N = 0, so there's only ever one
+ * "star" branch to handle below instead of a separate special-cased
+ * "companion-star" kind). */
+type OrbitSelection = OrbitAddress
+
+// Finds wherever the main world currently lives -- a top-level SystemBody,
+// or (gas-giant-moon mode) a moon nested inside a sibling's moons array --
+// and returns the OrbitSelection that points at it. Falls back to the
+// primary star when no main world exists at all (procedural mode).
+function findMainWorldSelection(systemBodies?: SystemBody[]): OrbitSelection {
+	if (!systemBodies) return { kind: "star", starIndex: 0 }
+	const bodyIdx = systemBodies.findIndex((body) => body.isMainWorld)
+	if (bodyIdx >= 0) return { kind: "body", starIndex: 0, bodyIdx }
+	for (let i = 0; i < systemBodies.length; i++) {
+		const moonIdx = systemBodies[i]!.moons.findIndex((moon) => moon.isMainWorld)
+		if (moonIdx >= 0) return { kind: "moon", starIndex: 0, bodyIdx: i, moonIdx }
+	}
+	return { kind: "star", starIndex: 0 }
+}
 
 interface OrbitChildCardModel {
 	key: string
@@ -72,6 +95,11 @@ interface OrbitChildCardModel {
 	/** Swatch color for this body's classification (see CLASSIFICATION_COLOR)
 	 * -- null when unclassified, in which case no swatch renders. */
 	color: string | null
+	/** "star" renders a small star-shaped icon (tinted by `color`) instead of
+	 * the usual square/round classification swatch -- used for companion
+	 * stars, which have a spectral-class color but no CLASSIFICATION_COLOR of
+	 * their own. Omitted/undefined uses the normal Swatch. */
+	icon?: "star"
 	onClick: () => void
 }
 
@@ -94,8 +122,9 @@ interface OrbitNavigatorViewModel {
 interface BuildApparentSizeEntriesParams {
 	body: SystemBody
 	moon?: MoonBody
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	starSubtype: number
+	starDiameterSol?: number
 	starLabel: string
 }
 
@@ -104,6 +133,7 @@ function buildApparentSizeEntries({
 	moon,
 	spectralClass,
 	starSubtype,
+	starDiameterSol,
 	starLabel,
 }: BuildApparentSizeEntriesParams): ApparentSizeEntry[] {
 	const toArcminutes = (diameterRad: number) =>
@@ -116,8 +146,11 @@ function buildApparentSizeEntries({
 			}),
 		)
 	const starDiameterKm =
-		STAR.getStarDiameterSol({ cls: spectralClass, subtype: starSubtype }) *
-		ORBIT_BODY.solarDiameterKm
+		(starDiameterSol ??
+			STAR.getStarDiameterSol({
+				cls: spectralClass as (typeof STAR.mainSequenceClasses)[number],
+				subtype: starSubtype,
+			})) * ORBIT_BODY.solarDiameterKm
 	const entries: ApparentSizeEntry[] = [
 		{
 			label: starLabel,
@@ -182,7 +215,10 @@ export function GenerationPlanetNavigator({
 	systemBodies,
 	onFocusBody,
 	currentFocus,
-	onUpdateSystemBody,
+	companionStars,
+	hostStar,
+	mainWorldSystemBody,
+	updateMainWorldBody,
 	surfaceTidesM,
 	setTideLock,
 	setHoursPerDay,
@@ -198,14 +234,16 @@ export function GenerationPlanetNavigator({
 	planetRadiusKm,
 	seed,
 	starName,
-	setForceMainWorld,
 	surfaceStats,
 	showRealSolNames,
 	spectralClass,
 	setSpectralClass,
 	starSubtype,
 	setStarSubtype,
+	setStarAgeGyr,
+	starAgeGyr,
 	setSeed,
+	resetMainWorldToEarth,
 	setObliquity,
 	generationPreviewTab,
 	onSelectGenerationPreviewTab,
@@ -217,15 +255,22 @@ export function GenerationPlanetNavigator({
 }: {
 	orbitBodies?: SystemBody[]
 	systemBodies?: SystemBody[]
-	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
-	currentFocus?: {
-		bodyIndex: number
-		moonIndex?: number
-	} | null
-	onUpdateSystemBody?: (
-		bodyIndex: number,
-		updater: (body: SystemBody) => SystemBody,
-	) => void
+	onFocusBody?: (address: OrbitAddress) => void
+	/** Every companion star bound to this system, each with its own real
+	 * generated planets -- see CompanionStar's doc. Shown alongside the
+	 * primary's own bodies in the "Orbits" list (a companion is just
+	 * `{kind: "star", starIndex: N>0}`, same OrbitSelection shape the
+	 * primary uses); not live-edited, so no setSpectralClass/setStarSubtype
+	 * equivalent for them. */
+	companionStars?: CompanionStar[]
+	hostStar?: HostStarAttributes
+	currentFocus?: OrbitAddress | null
+	/** The main world's SystemBody entry wherever it lives -- see
+	 * useSolarSystemBodies' mainWorldSystemBody/moonToMainWorldView. */
+	mainWorldSystemBody?: SystemBody | null
+	/** Edits the main world wherever it lives (top-level or nested in a gas
+	 * giant's moons) -- see useSolarSystemBodies' updateMainWorldBody. */
+	updateMainWorldBody?: (updater: (body: SystemBody) => SystemBody) => void
 	surfaceTidesM?: SurfaceTidesBreakdown
 	setTideLock: (v: TideLock | null) => void
 	setHoursPerDay: (v: number) => void
@@ -241,8 +286,6 @@ export function GenerationPlanetNavigator({
 	onToggleSpin?: () => void
 	planetRadiusKm: number
 	seed: number
-	forceMainWorld: boolean
-	setForceMainWorld: (v: boolean) => void
 	starName?: string
 	daysPerYear: number
 	surfaceStats: StatEntry[]
@@ -256,7 +299,16 @@ export function GenerationPlanetNavigator({
 	setSpectralClass: (v: string) => void
 	starSubtype: number
 	setStarSubtype: (v: number) => void
+	setStarAgeGyr: (v: number) => void
+	starAgeGyr: number
 	setSeed: (v: number) => void
+	/** Full-state reset for the Earth-icon shortcut -- replaces star+orbits
+	 * outright so live-edited main-world sliders (axial tilt, pressure, etc)
+	 * don't survive a reset onto an already-Sol seed. See
+	 * useSolarSystemBodies' resetMainWorldToEarth. Optional: falls back to
+	 * the field-by-field seed/spectralClass/starSubtype reset below when a
+	 * caller doesn't wire it through. */
+	resetMainWorldToEarth?: () => void
 	setObliquity: (v: number) => void
 	tidalSchedulePreview?: TidalSchedule
 	generationPreviewTab: GenerationPreviewTab
@@ -284,21 +336,32 @@ export function GenerationPlanetNavigator({
 	// The solar-lock UI button that used setObliquity was removed; kept as a
 	// prop for now since GenesisView still threads it through.
 	void setObliquity
-	const [selection, setSelection] = useState<OrbitSelection>(() => {
-		const mainWorldIndex =
-			systemBodies?.findIndex((body) => body.isMainWorld) ?? -1
-		return mainWorldIndex >= 0
-			? { kind: "orbit", bodyIndex: mainWorldIndex }
-			: { kind: "star" }
-	})
+	const [selection, setSelection] = useState<OrbitSelection>(() =>
+		findMainWorldSelection(systemBodies),
+	)
 	const selectionKey = useCallback((target: OrbitSelection): string => {
-		if (target.kind === "star") return "star"
-		if (target.kind === "orbit") return `orbit:${target.bodyIndex}`
-		return `orbit-moon:${target.bodyIndex}:${target.moonIndex}`
+		if (target.kind === "star") return `star:${target.starIndex}`
+		if (target.kind === "body")
+			return `body:${target.starIndex}:${target.bodyIdx}`
+		return `moon:${target.starIndex}:${target.bodyIdx}:${target.moonIdx}`
 	}, [])
-	const isSelectionMainWorld = (target: OrbitSelection): boolean =>
-		target.kind === "orbit" &&
-		systemBodies?.[target.bodyIndex]?.isMainWorld === true
+	// A main world can only ever live on the system's own primary star -- a
+	// companion never has one (see CompanionStar's doc) -- so this is always
+	// false for a starIndex > 0 target.
+	const isSelectionMainWorld = useCallback(
+		(target: OrbitSelection): boolean => {
+			if (target.starIndex !== 0) return false
+			if (target.kind === "body")
+				return systemBodies?.[target.bodyIdx]?.isMainWorld === true
+			if (target.kind === "moon")
+				return (
+					systemBodies?.[target.bodyIdx]?.moons[target.moonIdx]?.isMainWorld ===
+					true
+				)
+			return false
+		},
+		[systemBodies],
+	)
 	const [dataExpanded, setDataExpanded] = useState(() =>
 		isSelectionMainWorld(selection),
 	)
@@ -344,13 +407,10 @@ export function GenerationPlanetNavigator({
 	// sibling, moon, or star, it can no longer have a Generate tab, so clear
 	// the flag before any later body-to-body navigation can reuse it.
 	useEffect(() => {
-		if (
-			selection.kind !== "orbit" ||
-			systemBodies?.[selection.bodyIndex]?.isMainWorld !== true
-		) {
+		if (!isSelectionMainWorld(selection)) {
 			setIsGenerateTabFocused(false)
 		}
-	}, [selection, systemBodies])
+	}, [selection, isSelectionMainWorld])
 	// Closes the Preview section the moment a Generate run finishes (the
 	// falling edge of `generating`), regardless of which body is selected --
 	// the button was just pressed from inside it, so leaving it open after
@@ -380,15 +440,26 @@ export function GenerationPlanetNavigator({
 	// Runs the same climate simulation the "Preview" section uses, but
 	// unconditionally -- independent of whether that section is expanded --
 	// so the stats card's Temperature row populates as soon as a body is
-	// selected and recomputes whenever a relevant stat changes.
+	// selected and recomputes whenever a relevant stat changes. A companion's
+	// own bodies aren't in `systemBodies` (the primary's own reactive array)
+	// -- see getBodiesForStar -- but they're real, already-generated
+	// SystemBody data (CompanionStar.orbits), so the same probe/stats
+	// machinery applies to them unchanged.
+	const getBodiesForStar = useCallback(
+		(starIndex: number): SystemBody[] | undefined =>
+			starIndex === 0 ? systemBodies : companionStars?.[starIndex - 1]?.orbits,
+		[systemBodies, companionStars],
+	)
 	const probeBody =
-		selection.kind === "orbit" || selection.kind === "orbit-moon"
-			? systemBodies?.[selection.bodyIndex]
+		selection.kind === "body" || selection.kind === "moon"
+			? getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
 			: undefined
 	const probeMoon =
-		selection.kind === "orbit-moon"
-			? probeBody?.moons[selection.moonIndex]
-			: undefined
+		selection.kind === "moon" ? probeBody?.moons[selection.moonIdx] : undefined
+	const probeHostStar =
+		selection.starIndex === 0
+			? hostStar
+			: companionStars?.[selection.starIndex - 1]?.hostStar
 	const probeConfig = useMemo(() => {
 		if (probeMoon && probeBody) {
 			const parentYearHours =
@@ -411,6 +482,8 @@ export function GenerationPlanetNavigator({
 					probeBody.lsAphelionDeg ?? probeBody.longitudeOfPerihelionDeg,
 				spectralClass,
 				starSubtype,
+				starTemperatureK: probeHostStar?.temperatureK,
+				starDiameterSol: probeHostStar?.diameterSol,
 				orbitalDistanceAU: probeBody.orbitalDistanceAU,
 				hoursPerDay: climateHoursPerDay,
 				daysPerYear: climateDaysPerYear,
@@ -436,6 +509,8 @@ export function GenerationPlanetNavigator({
 					probeBody.lsAphelionDeg ?? probeBody.longitudeOfPerihelionDeg,
 				spectralClass,
 				starSubtype,
+				starTemperatureK: probeHostStar?.temperatureK,
+				starDiameterSol: probeHostStar?.diameterSol,
 				orbitalDistanceAU: probeBody.orbitalDistanceAU,
 				hoursPerDay: probeBody.siderealDayHours,
 				daysPerYear: probeBody.orbitalPeriodDays,
@@ -466,6 +541,8 @@ export function GenerationPlanetNavigator({
 			perihelion: 0,
 			spectralClass,
 			starSubtype,
+			starTemperatureK: probeHostStar?.temperatureK,
+			starDiameterSol: probeHostStar?.diameterSol,
 			orbitalDistanceAU: 1,
 			hoursPerDay: 24,
 			daysPerYear: 365,
@@ -478,34 +555,23 @@ export function GenerationPlanetNavigator({
 			seismologyTotalHeatingK: undefined,
 			substellarLon: 0,
 		}
-	}, [probeBody, probeMoon, spectralClass, starSubtype])
+	}, [probeBody, probeMoon, spectralClass, starSubtype, probeHostStar])
 	const probedAvgTempK = useAvgTempKPreview(probeConfig)
 	const avgTempK =
-		selection.kind === "orbit" || selection.kind === "orbit-moon"
+		selection.kind === "body" || selection.kind === "moon"
 			? probedAvgTempK
 			: undefined
 	useEffect(() => {
 		if (!currentFocus) return
-		if (currentFocus.bodyIndex < 0) {
+		if (currentFocus.kind === "star" || currentFocus.kind === "moon") {
 			mainWorldIntentRef.current = false
-			setSelection({ kind: "star" })
-			return
-		}
-		if (currentFocus.moonIndex !== undefined) {
-			mainWorldIntentRef.current = false
-			setSelection({
-				kind: "orbit-moon",
-				bodyIndex: currentFocus.bodyIndex,
-				moonIndex: currentFocus.moonIndex,
-			})
+			setSelection(currentFocus)
 			return
 		}
 		mainWorldIntentRef.current =
-			systemBodies?.[currentFocus.bodyIndex]?.isMainWorld === true
-		setSelection({
-			kind: "orbit",
-			bodyIndex: currentFocus.bodyIndex,
-		})
+			currentFocus.starIndex === 0 &&
+			systemBodies?.[currentFocus.bodyIdx]?.isMainWorld === true
+		setSelection(currentFocus)
 	}, [currentFocus, systemBodies])
 	const [seedOverrides, setSeedOverrides] = useState<Record<string, string>>({})
 	const [rootSeedLabel, setRootSeedLabel] = useState(
@@ -516,9 +582,8 @@ export function GenerationPlanetNavigator({
 		numeric: number
 		label: string
 	} | null>(null)
-	const starClass: MainSequenceClass = STAR.isValidSpectralClass(spectralClass)
-		? spectralClass
-		: "G"
+	const starClass: SpectralClass =
+		hostStar?.spectralClass ?? (spectralClass as SpectralClass)
 	// showRealSolNames itself is already Sol-gated by the caller (real Sol
 	// names should only ever show behind that toggle) -- but a procedurally
 	// generated system's body/moon/star names aren't "real" spoilers to hide,
@@ -535,14 +600,18 @@ export function GenerationPlanetNavigator({
 		() => labelOrbitBodies(orbitBodies ?? [], namesEnabled),
 		[orbitBodies, namesEnabled],
 	)
-	const starMassSol = STAR.getStarMassSol({
-		cls: starClass,
-		subtype: starSubtype,
-	})
-	const starLuminositySol = STAR.getStarLuminositySol({
-		cls: starClass,
-		subtype: starSubtype,
-	})
+	const starMassSol =
+		hostStar?.massSol ??
+		STAR.getStarMassSol({
+			cls: starClass as (typeof STAR.mainSequenceClasses)[number],
+			subtype: starSubtype,
+		})
+	const starLuminositySol =
+		hostStar?.luminositySol ??
+		STAR.getStarLuminositySol({
+			cls: starClass as (typeof STAR.mainSequenceClasses)[number],
+			subtype: starSubtype,
+		})
 	// The main world's Semi Major Axis editor always spans ±10% of this
 	// frozen baseline (a balanced, stable window) rather than recentering on
 	// whatever the live value is -- if it recomputed from the current
@@ -575,33 +644,31 @@ export function GenerationPlanetNavigator({
 	// center) -- every other body/moon just carries its own derived
 	// seedOverrides entry. See GenerationPlanetNavigator subtitle-row seed
 	// controls, which are only ever shown for this selection.
-	const isMainWorldTarget = useCallback(
-		(target: OrbitSelection): boolean =>
-			target.kind === "orbit" &&
-			systemBodies?.[target.bodyIndex]?.isMainWorld === true,
-		[systemBodies],
-	)
+	const isMainWorldTarget = isSelectionMainWorld
 	const getDefaultSeedLabel = useCallback(
 		(target: OrbitSelection): string => {
 			if (isMainWorldTarget(target)) return rootSeedLabel
-			if (target.kind === "star") return rootSeedLabel
-			if (target.kind === "orbit") {
-				const body = systemBodies?.[target.bodyIndex]
+			if (target.kind === "star")
+				return target.starIndex === 0
+					? rootSeedLabel
+					: `companion-${target.starIndex}`
+			if (target.kind === "body") {
+				const body = getBodiesForStar(target.starIndex)?.[target.bodyIdx]
 				return SEED_LABEL.normalizeSeedLabel(
-					body?.seed ?? `orbit-${target.bodyIndex + 1}`,
+					body?.seed ?? `orbit-${target.bodyIdx + 1}`,
 				)
 			}
-			const body = systemBodies?.[target.bodyIndex]
-			const moon = body?.moons[target.moonIndex]
+			const body = getBodiesForStar(target.starIndex)?.[target.bodyIdx]
+			const moon = body?.moons[target.moonIdx]
 			return SEED_LABEL.normalizeSeedLabel(
 				getMoonSeedBaseName({
 					moon,
-					moonIndex: target.moonIndex,
+					moonIndex: target.moonIdx,
 					showRealSolNames,
 				}),
 			)
 		},
-		[isMainWorldTarget, rootSeedLabel, showRealSolNames, systemBodies],
+		[isMainWorldTarget, rootSeedLabel, showRealSolNames, getBodiesForStar],
 	)
 	const getSeedLabel = useCallback(
 		(target: OrbitSelection): string =>
@@ -616,12 +683,14 @@ export function GenerationPlanetNavigator({
 					? SOL_DATA.solSeed
 					: RNG.seedStringToNumber(label)
 			}
-			let parent: OrbitSelection
-			if (target.kind === "orbit") {
-				parent = { kind: "star" }
-			} else {
-				parent = { kind: "orbit", bodyIndex: target.bodyIndex }
-			}
+			const parent: OrbitSelection =
+				target.kind === "body"
+					? { kind: "star", starIndex: target.starIndex }
+					: {
+							kind: "body",
+							starIndex: target.starIndex,
+							bodyIdx: target.bodyIdx,
+						}
 			const parentLabel = getSeedLabel(parent)
 			return RNG.seedStringToNumber(`${parentLabel}/${label}`)
 		},
@@ -647,16 +716,7 @@ export function GenerationPlanetNavigator({
 	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 	const focusSelection = useCallback(
 		(nextSelection: OrbitSelection) => {
-			if (!onFocusBody) return
-			if (nextSelection.kind === "star") {
-				onFocusBody(-1)
-				return
-			}
-			if (nextSelection.kind === "orbit") {
-				onFocusBody(nextSelection.bodyIndex)
-				return
-			}
-			onFocusBody(nextSelection.bodyIndex, nextSelection.moonIndex)
+			onFocusBody?.(nextSelection)
 		},
 		[onFocusBody],
 	)
@@ -674,13 +734,15 @@ export function GenerationPlanetNavigator({
 	// pointing at the actual main world instead of whatever sibling now sits
 	// at the old index.
 	useEffect(() => {
-		if (!mainWorldIntentRef.current || selection.kind !== "orbit") return
-		const mainWorldIndex =
-			systemBodies?.findIndex((body) => body.isMainWorld) ?? -1
-		if (mainWorldIndex >= 0 && mainWorldIndex !== selection.bodyIndex) {
-			setSelection({ kind: "orbit", bodyIndex: mainWorldIndex })
+		if (!mainWorldIntentRef.current) return
+		const next = findMainWorldSelection(systemBodies)
+		if (
+			next.kind !== "star" &&
+			selectionKey(next) !== selectionKey(selection)
+		) {
+			setSelection(next)
 		}
-	}, [systemBodies, selection])
+	}, [systemBodies, selection, selectionKey])
 	// Re-focuses the camera on the main world once a dice/earth/apply-seed
 	// rebuild's regenerated body shows up in systemBodies -- a rebuild can
 	// change its orbital distance (or even which slot it lands in), so the
@@ -690,11 +752,10 @@ export function GenerationPlanetNavigator({
 	// flag those seed actions set.
 	useEffect(() => {
 		if (!pendingMainWorldFocusRef.current) return
-		const mainWorldIndex =
-			systemBodies?.findIndex((body) => body.isMainWorld) ?? -1
-		if (mainWorldIndex < 0) return
+		const next = findMainWorldSelection(systemBodies)
+		if (next.kind === "star") return
 		pendingMainWorldFocusRef.current = false
-		focusSelection({ kind: "orbit", bodyIndex: mainWorldIndex })
+		focusSelection(next)
 	}, [systemBodies, focusSelection])
 	const applySeedInput = useCallback(() => {
 		const normalized = SEED_LABEL.normalizeSeedLabel(seedInput)
@@ -714,12 +775,12 @@ export function GenerationPlanetNavigator({
 			}
 			setRootSeedLabel(normalized)
 			setSeed(numericSeed)
-			setForceMainWorld(true)
-			// The forced main world is a literal Earth clone (see body/index.ts) --
-			// its host star should mimic Sol too, not whatever class/subtype the
-			// star card was last left on.
+			// The main world's host star should mimic Sol too, not whatever
+			// class/subtype/age the star card was last left on -- mainWorldMode is
+			// left as-is (whatever the user last picked) rather than reset here.
 			setSpectralClass(STAR.defaultSpectralClass)
 			setStarSubtype(STAR.defaultStarSubtype)
+			setStarAgeGyr(SOL_DATA.solStarAgeGyr)
 			setSeedInput(normalized)
 			pendingMainWorldFocusRef.current = true
 			return
@@ -735,10 +796,10 @@ export function GenerationPlanetNavigator({
 		seedInput,
 		selection,
 		selectionKey,
-		setForceMainWorld,
 		setSeed,
 		setSpectralClass,
 		setStarSubtype,
+		setStarAgeGyr,
 	])
 	// Rolls a fresh random label straight into the seed and applies it --
 	// same immediate regenerate-on-click behavior as the Earth shortcut. Only
@@ -751,25 +812,35 @@ export function GenerationPlanetNavigator({
 		lastAppliedRootSeedRef.current = { numeric: numericSeed, label }
 		setRootSeedLabel(label)
 		setSeed(numericSeed)
-		setForceMainWorld(true)
 		setSpectralClass(STAR.defaultSpectralClass)
 		setStarSubtype(STAR.defaultStarSubtype)
+		setStarAgeGyr(SOL_DATA.solStarAgeGyr)
 		setSeedInput(label)
 		pendingMainWorldFocusRef.current = true
-	}, [setForceMainWorld, setSeed, setSpectralClass, setStarSubtype])
+	}, [setSeed, setSpectralClass, setStarSubtype, setStarAgeGyr])
 	// The main world's dedicated "set to Earth" shortcut -- applies
 	// SOL_DATA.solSeed immediately (no staging/Generate step needed) so the
 	// whole solar system regenerates as the real Sol system.
 	const applyEarthSeed = useCallback(() => {
 		lastAppliedRootSeedRef.current = { numeric: SOL_DATA.solSeed, label: "sol" }
 		setRootSeedLabel("sol")
-		setSeed(SOL_DATA.solSeed)
-		setSpectralClass(STAR.defaultSpectralClass)
-		setStarSubtype(STAR.defaultStarSubtype)
-		setForceMainWorld(true)
+		if (resetMainWorldToEarth) {
+			resetMainWorldToEarth()
+		} else {
+			setSeed(SOL_DATA.solSeed)
+			setSpectralClass(STAR.defaultSpectralClass)
+			setStarSubtype(STAR.defaultStarSubtype)
+			setStarAgeGyr(SOL_DATA.solStarAgeGyr)
+		}
 		setSeedInput("sol")
 		pendingMainWorldFocusRef.current = true
-	}, [setForceMainWorld, setSeed, setSpectralClass, setStarSubtype])
+	}, [
+		resetMainWorldToEarth,
+		setSeed,
+		setSpectralClass,
+		setStarSubtype,
+		setStarAgeGyr,
+	])
 	const getMainWorldMoonOrbitDistance = useCallback(
 		(moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
@@ -787,49 +858,168 @@ export function GenerationPlanetNavigator({
 
 	const viewModel = useMemo<OrbitNavigatorViewModel>(() => {
 		if (selection.kind === "star") {
-			const starChildren = (systemBodies ?? [])
-				.map((body, bodyIndex) => ({
-					key: `orbit-${body.idx}-${bodyIndex}`,
-					au: body.orbitalDistanceAU,
-					title:
-						body.isMainWorld && !body.name
-							? appendSizeToTitle(
-									showRealSolNames
-										? SOL_DATA.solMainWorldName
-										: "Terrestrial Planet",
-									body.sizeClass,
-								)
-							: (labeledOrbits.find((entry) => entry.body === body)?.title ??
-								resolveOrbitBodyTitle(body, bodyIndex + 1, namesEnabled)),
-					subtitle: getSystemBodyKindLabel(body),
-					color: classificationSwatchColor(body.classification),
-					onClick: () => selectAndFocus({ kind: "orbit", bodyIndex }),
-				}))
-				.sort((a, b) => a.au - b.au)
+			const starIndex = selection.starIndex
+			const isPrimary = starIndex === 0
+			const companion = isPrimary ? undefined : companionStars?.[starIndex - 1]
+			if (!isPrimary && !companion) {
+				return {
+					title: "Companion Star",
+					typeLabel: "Star",
+					breadcrumbs: [
+						{
+							label: starTitle,
+							onClick: () => selectAndFocus({ kind: "star", starIndex: 0 }),
+						},
+					],
+					childrenLabel: "Orbits",
+					stats: [],
+					children: [],
+					emptyChildrenLabel: "No child orbits.",
+				}
+			}
+			const bodies = getBodiesForStar(starIndex) ?? []
+			const planetChildren = bodies.map((body, bodyIdx) => ({
+				key: `orbit-${starIndex}-${body.idx}-${bodyIdx}`,
+				au: body.orbitalDistanceAU,
+				title:
+					isPrimary && body.isMainWorld && !body.name
+						? appendSizeToTitle(
+								showRealSolNames
+									? SOL_DATA.solMainWorldName
+									: "Terrestrial Planet",
+								body.sizeClass,
+							)
+						: (labeledOrbits.find((entry) => entry.body === body)?.title ??
+							resolveOrbitBodyTitle(body, bodyIdx + 1, namesEnabled)),
+				subtitle: getSystemBodyKindLabel(body),
+				color: classificationSwatchColor(body.classification),
+				onClick: () => selectAndFocus({ kind: "body", starIndex, bodyIdx }),
+			}))
+			// Companion stars are orbiting bodies same as any planet -- listed
+			// alongside them (interleaved by AU, not a separate section), each
+			// clickable to view that star's own real generated system. See
+			// CompanionStar's doc for why "big star orbiting a small one" can't
+			// happen here (companions are rolled floored at one class-step
+			// cooler than their own parent). A companion never has its own
+			// companions (see CompanionStar's doc), so this list is only ever
+			// built for the primary.
+			const companionChildren = isPrimary
+				? (companionStars ?? []).map((childCompanion, companionIndex) => ({
+						key: `companion-star-${companionIndex}`,
+						au: childCompanion.orbitalDistanceAU,
+						title: childCompanion.starName,
+						subtitle: "Star",
+						color: SPECTRAL_CLASS_COLORS[childCompanion.class],
+						icon: "star" as const,
+						onClick: () =>
+							selectAndFocus({
+								kind: "star",
+								starIndex: companionIndex + 1,
+							}),
+					}))
+				: []
+			const starChildren = [...planetChildren, ...companionChildren].sort(
+				(a, b) => a.au - b.au,
+			)
 			return {
-				title: starTitle,
+				title: isPrimary ? starTitle : companion!.starName,
 				typeLabel: "Star",
-				breadcrumbs: [],
+				breadcrumbs: isPrimary
+					? []
+					: [
+							{
+								label: starTitle,
+								onClick: () => selectAndFocus({ kind: "star", starIndex: 0 }),
+							},
+						],
 				childrenLabel: "Orbits",
-				onFocus: onFocusBody
-					? () => focusSelection({ kind: "star" })
-					: undefined,
+				onFocus: onFocusBody ? () => focusSelection(selection) : undefined,
 				stats: buildStarStats({
-					starClass,
-					starSubtype,
+					starClass: isPrimary ? starClass : companion!.class,
+					starSubtype: isPrimary ? starSubtype : companion!.subtype,
+					hostStar: isPrimary ? hostStar : companion!.hostStar,
 					// Sol is always a real G2V star -- its type isn't editable.
+					// A companion isn't live-edited either (no seed/spectral-class
+					// UI targets one).
 					setSpectralClass:
-						seed === SOL_DATA.solSeed ? undefined : setSpectralClass,
+						isPrimary && seed !== SOL_DATA.solSeed
+							? setSpectralClass
+							: undefined,
 					setStarSubtype:
-						seed === SOL_DATA.solSeed ? undefined : setStarSubtype,
+						isPrimary && seed !== SOL_DATA.solSeed ? setStarSubtype : undefined,
+					setStarAgeGyr:
+						isPrimary && seed !== SOL_DATA.solSeed ? setStarAgeGyr : undefined,
+					ageGyr: isPrimary ? starAgeGyr : undefined,
+					orbitalDistanceAU: isPrimary
+						? undefined
+						: companion!.orbitalDistanceAU,
+					eccentricity: isPrimary ? undefined : companion!.eccentricity,
+					inclinationDeg: isPrimary ? undefined : companion!.inclinationDeg,
 				}),
 				children: starChildren.filter((entry) => entry.title),
 				emptyChildrenLabel: "No child orbits.",
 			}
 		}
 
-		if (selection.kind === "orbit") {
-			const body = systemBodies?.[selection.bodyIndex]
+		// A companion star's own bodies aren't live-edited (no seed/
+		// spectral-class UI targets a companion, and a companion never has a
+		// main world of its own -- see CompanionStar's doc), so every edit-only
+		// prop below (onUpdateBody, pressureSlider, substellarLonSlider,
+		// onToggleSpin, onSetLock, ...) is gated on this.
+		const starTitleFor = (starIndex: number) =>
+			starIndex === 0
+				? starTitle
+				: (companionStars?.[starIndex - 1]?.starName ?? "Companion Star")
+		// A companion's own physical params (mass/luminosity/climate inputs)
+		// come from ITS spectral class, not the primary's -- reusing the
+		// primary's spectralClass/starSubtype/starClass/starMassSol/
+		// starLuminositySol for a companion's own bodies would silently
+		// simulate their climate against the wrong star.
+		const starParamsFor = (starIndex: number) => {
+			if (starIndex === 0)
+				return {
+					spectralClass: starClass,
+					starSubtype,
+					starMassSol,
+					starLuminositySol,
+					starTemperatureK: hostStar?.temperatureK,
+					starDiameterSol: hostStar?.diameterSol,
+				}
+			const companion = companionStars?.[starIndex - 1]
+			const cls = companion?.class ?? starClass
+			const subtype = companion?.subtype ?? starSubtype
+			return {
+				spectralClass: cls,
+				starSubtype: subtype,
+				starMassSol:
+					companion?.hostStar?.massSol ??
+					STAR.getStarMassSol({
+						cls: cls as (typeof STAR.mainSequenceClasses)[number],
+						subtype,
+					}),
+				starLuminositySol:
+					companion?.hostStar?.luminositySol ??
+					STAR.getStarLuminositySol({
+						cls: cls as (typeof STAR.mainSequenceClasses)[number],
+						subtype,
+					}),
+				starTemperatureK: companion?.hostStar?.temperatureK,
+				starDiameterSol: companion?.hostStar?.diameterSol,
+			}
+		}
+
+		// A gas-giant-moon main world is a MoonBody nested in its parent's
+		// moons array, not a top-level SystemBody -- but it's still shown with
+		// the exact same rich stats/editors/Generate-tab card as any other main
+		// world, via mainWorldSystemBody's SystemBody-shaped projection (see
+		// useSolarSystemBodies' moonToMainWorldView).
+		const nestedMainWorldSelected =
+			selection.kind === "moon" && isSelectionMainWorld(selection)
+		if (selection.kind === "body" || nestedMainWorldSelected) {
+			const body =
+				selection.kind === "body"
+					? getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
+					: (mainWorldSystemBody ?? undefined)
 			if (!body)
 				return {
 					title: "Orbit",
@@ -841,6 +1031,10 @@ export function GenerationPlanetNavigator({
 					emptyChildrenLabel: "No child orbits.",
 				}
 			const isMainWorld = body.isMainWorld
+			const bodyStarParams = starParamsFor(selection.starIndex)
+			const parentBody = nestedMainWorldSelected
+				? getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
+				: undefined
 			const bodySurfaceTidesM =
 				body.group === "asteroid belt"
 					? undefined
@@ -857,8 +1051,8 @@ export function GenerationPlanetNavigator({
 									// hoursPerDay slider -- matches the moon-level card's
 									// parentHoursPerDay convention below.
 									hoursPerDay: body.siderealDayHours,
-									spectralClass,
-									starSubtype,
+									spectralClass: bodyStarParams.spectralClass,
+									starSubtype: bodyStarParams.starSubtype,
 									orbitalDistanceAU: body.orbitalDistanceAU,
 									eccentricity: body.eccentricity,
 									starName:
@@ -876,16 +1070,37 @@ export function GenerationPlanetNavigator({
 							body.sizeClass,
 						)
 					: (labeledOrbits.find((entry) => entry.body === body)?.title ??
-						resolveOrbitBodyTitle(body, selection.bodyIndex + 1, namesEnabled))
+						resolveOrbitBodyTitle(body, selection.bodyIdx + 1, namesEnabled))
 			const orbitMoons = body.moons
 			return {
 				title: bodyTitle,
 				typeLabel: "Planet",
 				breadcrumbs: [
 					{
-						label: starTitle,
-						onClick: () => selectAndFocus({ kind: "star" }),
+						label: starTitleFor(selection.starIndex),
+						onClick: () =>
+							selectAndFocus({ kind: "star", starIndex: selection.starIndex }),
 					},
+					...(parentBody
+						? [
+								{
+									label:
+										labeledOrbits.find((entry) => entry.body === parentBody)
+											?.title ??
+										resolveOrbitBodyTitle(
+											parentBody,
+											selection.bodyIdx + 1,
+											namesEnabled,
+										),
+									onClick: () =>
+										selectAndFocus({
+											kind: "body" as const,
+											starIndex: selection.starIndex,
+											bodyIdx: selection.bodyIdx,
+										}),
+								},
+							]
+						: []),
 				],
 				childrenLabel: "Moons",
 				onFocus: onFocusBody ? () => focusSelection(selection) : undefined,
@@ -899,8 +1114,8 @@ export function GenerationPlanetNavigator({
 				// orbit body's card.
 				stats: buildOrbitBodyStats({
 					body,
-					starMassSol,
-					starLuminositySol,
+					starMassSol: bodyStarParams.starMassSol,
+					starLuminositySol: bodyStarParams.starLuminositySol,
 					avgTempK,
 					unitSystem,
 					orbitalDistanceBaselineAU: isMainWorld
@@ -910,17 +1125,20 @@ export function GenerationPlanetNavigator({
 					tideLockStat: buildTideLockStat({
 						tideLock: body.tideLock,
 						tideLockStatus: body.tideLockStatus,
+						trace: body.tideLockTrace,
 						retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 							body.axialTiltDeg,
 						),
-						starTitle,
-						onSelectStar: () => selectAndFocus({ kind: "star" }),
+						starTitle: starTitleFor(selection.starIndex),
+						onSelectStar: () =>
+							selectAndFocus({ kind: "star", starIndex: selection.starIndex }),
 						siblingMoons: orbitMoons,
 						onSelectSiblingMoon: (moonIndex) =>
 							selectAndFocus({
-								kind: "orbit-moon",
-								bodyIndex: selection.bodyIndex,
-								moonIndex,
+								kind: "moon",
+								starIndex: selection.starIndex,
+								bodyIdx: selection.bodyIdx,
+								moonIdx: moonIndex,
 							}),
 						onSetLock: isMainWorld
 							? (lock) => {
@@ -989,7 +1207,12 @@ export function GenerationPlanetNavigator({
 									updated.longitudeOfAscendingNodeDeg !==
 										body.longitudeOfAscendingNodeDeg
 								)
-									onUpdateSystemBody?.(selection.bodyIndex, () => updated)
+									// Routes to wherever the main world actually lives (a
+									// top-level SystemBody, or a moon nested in a gas
+									// giant's moons -- see updateMainWorldBody), unlike
+									// onUpdateSystemBody above which only ever patches a
+									// raw top-level orbits[] index.
+									updateMainWorldBody?.(() => updated)
 							}
 						: undefined,
 				}),
@@ -1012,8 +1235,10 @@ export function GenerationPlanetNavigator({
 								body.siderealDayHours,
 								body.orbitalPeriodDays,
 							)}
-							spectralClass={spectralClass}
-							starSubtype={starSubtype}
+							spectralClass={bodyStarParams.spectralClass}
+							starSubtype={bodyStarParams.starSubtype}
+							starTemperatureK={bodyStarParams.starTemperatureK}
+							starDiameterSol={bodyStarParams.starDiameterSol}
 							orbitalDistanceAU={body.orbitalDistanceAU}
 							eccentricity={body.eccentricity}
 							perihelion={body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg}
@@ -1037,9 +1262,10 @@ export function GenerationPlanetNavigator({
 								<ApparentSizePreview
 									entries={buildApparentSizeEntries({
 										body,
-										spectralClass: starClass,
-										starSubtype,
-										starLabel: starTitle,
+										spectralClass: bodyStarParams.spectralClass,
+										starSubtype: bodyStarParams.starSubtype,
+										starDiameterSol: bodyStarParams.starDiameterSol,
+										starLabel: starTitleFor(selection.starIndex),
 									})}
 								/>
 							}
@@ -1071,9 +1297,10 @@ export function GenerationPlanetNavigator({
 									color: classificationSwatchColor(moon.classification),
 									onClick: () =>
 										selectAndFocus({
-											kind: "orbit-moon",
-											bodyIndex: selection.bodyIndex,
-											moonIndex,
+											kind: "moon",
+											starIndex: selection.starIndex,
+											bodyIdx: selection.bodyIdx,
+											moonIdx: moonIndex,
 										}),
 								}))
 								.sort((a, b) => a.order - b.order),
@@ -1088,10 +1315,10 @@ export function GenerationPlanetNavigator({
 			}
 		}
 
-		if (selection.kind === "orbit-moon") {
-			const body = systemBodies?.[selection.bodyIndex]
+		if (selection.kind === "moon") {
+			const body = getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
 			const sourceMoons = body?.moons
-			const moon = sourceMoons?.[selection.moonIndex]
+			const moon = sourceMoons?.[selection.moonIdx]
 			if (!body || !moon) {
 				return {
 					title: "Orbit",
@@ -1104,6 +1331,7 @@ export function GenerationPlanetNavigator({
 				}
 			}
 			const isMainWorld = body.isMainWorld
+			const moonStarParams = starParamsFor(selection.starIndex)
 			const parentMassKg = body.massKg
 			const parentDiameterKm = body.diameterKm
 			const parentMoons = body.moons
@@ -1127,28 +1355,30 @@ export function GenerationPlanetNavigator({
 							body.sizeClass,
 						)
 					: (labeledOrbits.find((entry) => entry.body === body)?.title ??
-						resolveOrbitBodyTitle(body, selection.bodyIndex + 1, namesEnabled))
+						resolveOrbitBodyTitle(body, selection.bodyIdx + 1, namesEnabled))
 			return {
 				title: resolveMoonTitle(
 					moon,
-					selection.moonIndex + 1,
+					selection.moonIdx + 1,
 					namesEnabled,
-					isMainWorld && selection.moonIndex === 0 && seed === SOL_DATA.solSeed
+					isMainWorld && selection.moonIdx === 0 && seed === SOL_DATA.solSeed
 						? SOL_SYSTEM.solLunaDefault.name
 						: undefined,
 				),
 				typeLabel: "Moon",
 				breadcrumbs: [
 					{
-						label: starTitle,
-						onClick: () => selectAndFocus({ kind: "star" }),
+						label: starTitleFor(selection.starIndex),
+						onClick: () =>
+							selectAndFocus({ kind: "star", starIndex: selection.starIndex }),
 					},
 					{
 						label: parentTitle,
 						onClick: () =>
 							selectAndFocus({
-								kind: "orbit",
-								bodyIndex: selection.bodyIndex,
+								kind: "body",
+								starIndex: selection.starIndex,
+								bodyIdx: selection.bodyIdx,
 							}),
 					},
 				],
@@ -1160,27 +1390,33 @@ export function GenerationPlanetNavigator({
 					moon,
 					avgTempK,
 					unitSystem,
+					luminositySol: moonStarParams.starLuminositySol,
+					orbitalDistanceAU: parentOrbitalDistanceAU,
 					tideLockStat: buildTideLockStat({
 						tideLock: moon.tideLock,
 						tideLockStatus: moon.tideLockStatus,
+						trace: moon.tideLockTrace,
 						retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 							moon.axialTiltDeg,
 						),
-						starTitle,
-						onSelectStar: () => selectAndFocus({ kind: "star" }),
+						starTitle: starTitleFor(selection.starIndex),
+						onSelectStar: () =>
+							selectAndFocus({ kind: "star", starIndex: selection.starIndex }),
 						parentTitle,
 						parentTarget: body.idx,
 						onSelectParent: () =>
 							selectAndFocus({
-								kind: "orbit",
-								bodyIndex: selection.bodyIndex,
+								kind: "body",
+								starIndex: selection.starIndex,
+								bodyIdx: selection.bodyIdx,
 							}),
 						siblingMoons: parentMoons,
 						onSelectSiblingMoon: (moonIndex) =>
 							selectAndFocus({
-								kind: "orbit-moon",
-								bodyIndex: selection.bodyIndex,
-								moonIndex,
+								kind: "moon",
+								starIndex: selection.starIndex,
+								bodyIdx: selection.bodyIdx,
+								moonIdx: moonIndex,
 							}),
 						resolveSiblingMoonLabel: (siblingMoon, moonIndex) =>
 							resolveMoonTitle(
@@ -1207,8 +1443,8 @@ export function GenerationPlanetNavigator({
 						},
 						params: {
 							hoursPerDay: parentHoursPerDay,
-							spectralClass,
-							starSubtype,
+							spectralClass: moonStarParams.spectralClass,
+							starSubtype: moonStarParams.starSubtype,
 							orbitalDistanceAU: parentOrbitalDistanceAU,
 							eccentricity: parentEccentricity,
 							starName:
@@ -1240,20 +1476,22 @@ export function GenerationPlanetNavigator({
 							parentOrbitalDistanceAU,
 							parentEccentricity,
 							parentPerihelionDeg,
-							spectralClass,
-							starSubtype,
+							spectralClass: moonStarParams.spectralClass,
+							starSubtype: moonStarParams.starSubtype,
 							generationPreviewTab,
 							onSelectGenerationPreviewTab,
 							unitSystem,
 						})}
+						starTemperatureK={moonStarParams.starTemperatureK}
+						starDiameterSol={moonStarParams.starDiameterSol}
 						observerContent={
 							<ApparentSizePreview
 								entries={buildApparentSizeEntries({
 									body,
 									moon,
-									spectralClass: starClass,
-									starSubtype,
-									starLabel: starTitle,
+									spectralClass: moonStarParams.spectralClass,
+									starSubtype: moonStarParams.starSubtype,
+									starLabel: starTitleFor(selection.starIndex),
 								})}
 							/>
 						}
@@ -1269,6 +1507,7 @@ export function GenerationPlanetNavigator({
 		dayLengthSlider,
 		eccentricitySlider,
 		labeledOrbits,
+		getBodiesForStar,
 		getBodyMoonOrbitDistance,
 		getDerivedSeedNumber,
 		getMainWorldMoonOrbitDistance,
@@ -1276,7 +1515,9 @@ export function GenerationPlanetNavigator({
 		onFocusBody,
 		onSelectGenerationPreviewTab,
 		onToggleSpin,
-		onUpdateSystemBody,
+		mainWorldSystemBody,
+		updateMainWorldBody,
+		isSelectionMainWorld,
 		orbitalDistanceBaselineAU,
 		orbitalDistanceSlider,
 		perihelionSlider,
@@ -1289,8 +1530,9 @@ export function GenerationPlanetNavigator({
 		setHoursPerDay,
 		setSpectralClass,
 		setStarSubtype,
+		setStarAgeGyr,
+		starAgeGyr,
 		showRealSolNames,
-		spectralClass,
 		starLuminositySol,
 		starMassSol,
 		starClass,
@@ -1298,7 +1540,6 @@ export function GenerationPlanetNavigator({
 		starTitle,
 		surfaceStats,
 		surfaceTidesM,
-		systemBodies,
 		substellarLonSlider,
 		unitSystem,
 		focusSelection,
@@ -1307,6 +1548,10 @@ export function GenerationPlanetNavigator({
 		namesEnabled,
 		avgTempK,
 		generateContent,
+		companionStars,
+		hostStar?.diameterSol,
+		hostStar?.temperatureK,
+		hostStar,
 	])
 
 	return (
@@ -1344,7 +1589,14 @@ export function GenerationPlanetNavigator({
 							<div className="flex flex-wrap items-center gap-y-0.5 font-mono text-[9px] text-slate-700">
 								{viewModel.children.map((child, index) => (
 									<span key={child.key} className="inline-flex items-center">
-										{child.color ? (
+										{child.icon === "star" ? (
+											child.color ? (
+												<StarIcon
+													className="mr-1 h-2.5 w-2.5"
+													style={{ color: child.color }}
+												/>
+											) : null
+										) : child.color ? (
 											<Swatch color={child.color} className="mr-1" />
 										) : null}
 										<InlineTextButton

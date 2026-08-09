@@ -16,7 +16,7 @@ import { DENSITY } from "@/model/celestial/planet/environment/density"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/environment/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SpectralClass } from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/temperature/ebm/greenhouse-estimate"
 import { RNG } from "@/model/shared/random/rng"
 
@@ -43,10 +43,47 @@ function classifyGroup(params: {
 	return "helian"
 }
 
+// Ported from galaxy-gen's getRareDwarfType (orbits/groups.ts) -- the
+// epistellar/inner dwarf zones' "not rockball" fallback.
+function rollRareDwarfType(
+	rng: ReturnType<typeof RNG.createRng>,
+): "hebean" | "geo-tidal" {
+	return rng.randint(1, 6) <= 4 ? "hebean" : "geo-tidal"
+}
+
+// Ported from galaxy-gen's getOuterRareDwarfType (orbits/groups.ts) -- the
+// outer dwarf zone's "not snowball/rockball" fallback.
+function rollOuterRareDwarfType(
+	rng: ReturnType<typeof RNG.createRng>,
+): "hebean" | "geo-cyclic" | "geo-tidal" {
+	const roll = rng.randint(1, 6)
+	if (roll <= 3) return "hebean"
+	if (roll <= 5) return "geo-cyclic"
+	return "geo-tidal"
+}
+
 function classifyBody(params: {
+	rng: ReturnType<typeof RNG.createRng>
 	/** Absent while a body is being classified from its size; explicit orbit
 	 * rolls and authored seeds supply the group to preserve that decision. */
 	groupHint?: OrbitGroup
+	/** Only ever set for a moon -- the group of the planet it orbits. Ported
+	 * from galaxy-gen's ORBIT_GROUPS.dwarf/terrestrial.type parent-group roll
+	 * modifiers (orbits/groups.ts): e.g. an outer-zone dwarf moon of a jovian
+	 * or helian rolls snowball noticeably less often than one orbiting a
+	 * terrestrial/dwarf primary, since gas giants' many small moons would
+	 * otherwise skew heavily toward ice. */
+	parentGroup?: OrbitGroup
+	/** True when this orbit slot is one of the star's own innermost few --
+	 * only ever set for a star whose luminosityClass is "III" (giant) or
+	 * whose spectralClass is "D" (white dwarf), meaning this slot used to be
+	 * inside the star before it evolved/collapsed. Forces a specific
+	 * "burned out" classification for every group, overriding the zone roll
+	 * entirely -- ported from galaxy-gen's impactZone (stars/index.ts). A
+	 * moon inherits its parent planet's impactZone flag unchanged, exactly
+	 * like galaxy-gen's ORBIT.spawn passes the same closure variable down to
+	 * every child orbit. */
+	impactZone: boolean
 	zone: Zone
 	orbitalDistanceAU: number
 	sizeClass: number
@@ -60,71 +97,114 @@ function classifyBody(params: {
 	 * a non-main-world sibling. */
 	forceMeltball?: boolean
 }): { group: OrbitGroup; classification: OrbitClassification } {
-	const { zone, orbitalDistanceAU, sizeClass, isMoon, tidal, forceMeltball } =
-		params
+	const {
+		rng,
+		zone,
+		sizeClass,
+		isMoon,
+		tidal,
+		forceMeltball,
+		parentGroup,
+		impactZone,
+	} = params
 	if (forceMeltball) return { group: "dwarf", classification: "meltball" }
 	const group = classifyGroup({ groupHint: params.groupHint, sizeClass })
 	if (group === "asteroid belt") {
 		return { group, classification: isMoon ? "asteroid" : "asteroid belt" }
 	}
 	if (group === "jovian") {
-		if (zone === "epistellar" && orbitalDistanceAU < 0.15) {
-			return { group, classification: "chthonian" }
+		if (impactZone) return { group, classification: "chthonian" }
+		if (zone === "epistellar") {
+			return {
+				group,
+				classification: rng.randint(1, 6) <= 5 ? "jovian" : "chthonian",
+			}
 		}
 		return { group, classification: "jovian" }
 	}
 	if (group === "helian") {
-		if (zone === "epistellar" && orbitalDistanceAU < 0.2) {
-			return { group, classification: "asphodelian" }
+		if (impactZone) return { group, classification: "asphodelian" }
+		if (zone === "epistellar") {
+			return {
+				group,
+				classification: rng.randint(1, 6) <= 5 ? "helian" : "asphodelian",
+			}
 		}
-		if (zone === "inner" && sizeClass >= 12) {
-			return { group, classification: "panthalassic" }
+		if (zone === "inner") {
+			return {
+				group,
+				classification: rng.randint(1, 6) <= 4 ? "helian" : "panthalassic",
+			}
 		}
 		return { group, classification: "helian" }
 	}
 	if (group === "terrestrial") {
-		if (zone === "epistellar" && orbitalDistanceAU < 0.15) {
-			return { group, classification: "acheronian" }
-		}
+		if (impactZone) return { group, classification: "acheronian" }
 		if (tidal) {
 			if (zone === "epistellar") return { group, classification: "jani-lithic" }
 			if (zone === "inner") return { group, classification: "vesperian" }
 		}
 		if (zone === "epistellar") {
-			return { group, classification: sizeClass >= 8 ? "telluric" : "arid" }
+			return {
+				group,
+				classification: rng.randint(1, 6) <= 5 ? "arid" : "telluric",
+			}
 		}
 		if (zone === "inner") {
-			if (sizeClass <= 5) return { group, classification: "telluric" }
-			if (sizeClass <= 7) return { group, classification: "arid" }
-			if (sizeClass <= 9) return { group, classification: "oceanic" }
-			return { group, classification: "tectonic" }
+			// Ported from galaxy-gen's 2d6 inner-zone roll.
+			const roll = rng.randint(1, 6) + rng.randint(1, 6)
+			if (roll <= 4) return { group, classification: "telluric" }
+			if (roll <= 6) return { group, classification: "arid" }
+			if (roll <= 8) return { group, classification: "oceanic" }
+			if (roll <= 10) return { group, classification: "tectonic" }
+			return { group, classification: "telluric" }
 		}
-		if (sizeClass <= 7) return { group, classification: "arid" }
-		if (sizeClass <= 9) return { group, classification: "tectonic" }
+		// outer -- a moon of anything but an asteroid belt rolls warmer
+		// (higher roll -> less oceanic) than a bare planet, same as dwarf's
+		// outer-zone parentGroup modifiers.
+		let roll = rng.randint(1, 6)
+		if (parentGroup !== undefined && parentGroup !== "asteroid belt") roll += 2
+		if (roll <= 4) return { group, classification: "arid" }
+		if (roll <= 6) return { group, classification: "tectonic" }
 		return { group, classification: "oceanic" }
 	}
-	if (zone === "epistellar" && orbitalDistanceAU < 0.15) {
-		return { group, classification: "stygian" }
-	}
+	// dwarf
+	if (impactZone) return { group, classification: "stygian" }
 	if (zone === "epistellar") {
 		if (tidal && sizeClass >= 2) {
 			return { group, classification: sizeClass >= 4 ? "geo-tidal" : "hebean" }
 		}
-		return { group, classification: sizeClass <= 2 ? "rockball" : "meltball" }
+		let roll = rng.randint(1, 6)
+		if (parentGroup === "asteroid belt") roll -= 2
+		if (roll <= 5) return { group, classification: "rockball" }
+		return { group, classification: rollRareDwarfType(rng) }
 	}
 	if (zone === "inner") {
 		if (tidal && sizeClass >= 2) {
 			return { group, classification: sizeClass >= 4 ? "geo-tidal" : "hebean" }
 		}
-		if (sizeClass >= 4) return { group, classification: "geo-cyclic" }
-		return { group, classification: "rockball" }
+		let roll = rng.randint(1, 6)
+		if (parentGroup === "asteroid belt") roll -= 2
+		else if (parentGroup === "helian") roll += 1
+		else if (parentGroup === "jovian") roll += 2
+		if (roll <= 6) return { group, classification: "rockball" }
+		if (roll <= 7) return { group, classification: "geo-cyclic" }
+		return { group, classification: rollRareDwarfType(rng) }
 	}
 	if (tidal && sizeClass >= 2) {
 		return { group, classification: sizeClass >= 4 ? "geo-tidal" : "hebean" }
 	}
-	if (sizeClass <= 1) return { group, classification: "snowball" }
-	if (sizeClass >= 4) return { group, classification: "geo-cyclic" }
-	return { group, classification: "rockball" }
+	// Ported from galaxy-gen's ORBIT_GROUPS.dwarf.type outer-zone roll (orbits/
+	// groups.ts) -- a real 1d6 roll, not derived from sizeClass, so a jovian's
+	// or helian's many small outer-zone moons don't all land on snowball the
+	// way a fixed sizeClass<=1 threshold would (see parentGroup's doc).
+	let outerRoll = rng.randint(1, 6)
+	if (parentGroup === "asteroid belt") outerRoll -= 1
+	else if (parentGroup === "helian") outerRoll += 1
+	else if (parentGroup === "jovian") outerRoll += 2
+	if (outerRoll <= 5) return { group, classification: "snowball" }
+	if (outerRoll <= 7) return { group, classification: "rockball" }
+	return { group, classification: rollOuterRareDwarfType(rng) }
 }
 
 // Ported from galaxy-gen's TEMPERATURE.finalize albedo roll (orbits/
@@ -143,7 +223,7 @@ function buildClassificationEnvironment(params: {
 	sizeClass: number
 	zone: Zone
 	deviation: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	diameterKm: number
 	massKg: number
 	isPrimaryWorld: boolean
@@ -153,6 +233,8 @@ function buildClassificationEnvironment(params: {
 	/** Present when classification was rolled earlier to choose physical
 	 * properties; reusing it prevents consuming RNG and rolling it twice. */
 	assignment?: ClassifiedEnvironment
+	/** Forwarded to ATMOSPHERE.codeToProfile's hazard roll. */
+	starAgeGyr: number
 }): {
 	density: DensityProfile | null
 	landCoverage: number
@@ -206,6 +288,7 @@ function buildClassificationEnvironment(params: {
 			gravityG,
 			classification: params.classification,
 			isPrimaryWorld: params.isPrimaryWorld,
+			starAgeGyr: params.starAgeGyr,
 		},
 	})
 	const greenhouseFactor =
@@ -249,15 +332,4 @@ export const ENVIRONMENT = {
 	classifyGroup,
 	classifyBody,
 	buildClassificationEnvironment,
-	deviationToCelsius: TEMPERATURE.deviationToCelsius,
-	auFromTemperature: TEMPERATURE.auFromTemperature,
-	deviationToAU: TEMPERATURE.deviationToAU,
-	estimateDeviationFromOrbitalDistance:
-		TEMPERATURE.estimateDeviationFromOrbitalDistance,
-	zoneFromDeviation: TEMPERATURE.zoneFromDeviation,
-	codeFromWaterPct: HYDROSPHERE.codeFromWaterPct,
-	buildProfile: HYDROSPHERE.buildProfile,
-	waterFraction: HYDROSPHERE.waterFraction,
-	rollClassificationAssignment: DICE_TABLE.rollClassificationAssignment,
-	buildDensityProfile: DENSITY.buildProfile,
 }

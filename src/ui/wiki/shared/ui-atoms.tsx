@@ -2,10 +2,12 @@ import React from "react"
 import {
 	EditableStatValue,
 	type StatEntry,
+	TrailingHelpIcon,
 } from "@/ui/components/composites/EditableStatValue"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
 import { CrosshairsGpsIcon } from "@/ui/components/primitives/icons/CrosshairsGpsIcon"
+import { Swatch } from "@/ui/components/primitives/Swatch"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { uiTokens } from "@/ui/components/tokens"
 
@@ -49,6 +51,7 @@ export function renderStatGrid(stats: StatEntry[]) {
 					!stat.editor &&
 					stat.valuePrefix ? (
 					<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
+						{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
 						<UITooltip content={stat.valueHelp} position="top" align="center">
 							<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
 								{stat.valuePrefix}
@@ -56,6 +59,9 @@ export function renderStatGrid(stats: StatEntry[]) {
 						</UITooltip>
 						<span>{stat.value}</span>
 						{stat.valueAction}
+						{stat.trailingHelp ? (
+							<TrailingHelpIcon content={stat.trailingHelp} />
+						) : null}
 					</span>
 				) : (
 					<EditableStatValue stat={stat} />

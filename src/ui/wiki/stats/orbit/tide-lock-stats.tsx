@@ -1,11 +1,16 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type {
+	TemperatureTraceEntry,
+	TideLock,
+} from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import {
 	EditableStatValue,
 	type StatEntry,
+	TrailingHelpIcon,
 } from "@/ui/components/composites/EditableStatValue"
+import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
 import { Slider } from "@/ui/components/primitives/Slider"
@@ -28,6 +33,9 @@ export function buildDayLengthStats(params: {
 	 * disable its editor rather than let an edit silently desync it. */
 	tideLocked?: boolean
 	substellarLonStat?: StatEntry
+	/** Mirrors the galaxy wiki's Rotation distribution swatch colors -- see
+	 * rotationSwatchColor in galaxy-body-distributions.ts. */
+	rotationColor?: string
 	/** See formatLocalCalendarValue's doc -- only ever set for a moon's own
 	 * card. */
 	moonOrbitalPeriodDays?: number
@@ -53,10 +61,42 @@ export function buildDayLengthStats(params: {
 				hourPrecision: 2,
 			}),
 			value: params.tideLockStat ? " · " : "",
+			// Rendered directly (bypassing renderStatGrid's normal valueHelp ->
+			// UITooltip wiring in ui-atoms.tsx, which only ever looks at the
+			// *outer* "Rotation" stat, never at a nested valueAction) -- wrap it
+			// here instead so a locked stat's tooltip still shows on hover. Only
+			// for a non-editable stat: an editable one's value is itself the
+			// click target for the lock-target dropdown, which already
+			// highlights the active target among its buttons. The trailingHelp
+			// info icon is rendered OUTSIDE this wrapper (not via
+			// EditableStatValue's own built-in rendering) so hovering it doesn't
+			// also trigger this "Locked to X" tooltip underneath/behind it.
 			valueAction: params.tideLockStat ? (
-				<EditableStatValue stat={params.tideLockStat} />
+				<>
+					{params.tideLockStat.valueHelp && !params.tideLockStat.editor ? (
+						<UITooltip
+							content={params.tideLockStat.valueHelp}
+							position="bottom"
+							align="center"
+						>
+							<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
+								<EditableStatValue
+									stat={{ ...params.tideLockStat, trailingHelp: undefined }}
+								/>
+							</span>
+						</UITooltip>
+					) : (
+						<EditableStatValue
+							stat={{ ...params.tideLockStat, trailingHelp: undefined }}
+						/>
+					)}
+					{params.tideLockStat.trailingHelp ? (
+						<TrailingHelpIcon content={params.tideLockStat.trailingHelp} />
+					) : null}
+				</>
 			) : undefined,
 			editor: params.tideLocked ? undefined : params.siderealEditor,
+			swatchColor: params.rotationColor,
 		},
 		...(params.substellarLonStat ? [params.substellarLonStat] : []),
 	]
@@ -135,6 +175,22 @@ function buildTideLockEditorContent(params: {
 	)
 }
 
+function resolveLunarLockTargetName(params: {
+	target: number
+	siblingMoons?: MoonBody[]
+	resolveSiblingMoonLabel?: (moon: MoonBody, moonIndex: number) => string
+}): string | undefined {
+	const moonIndex = params.siblingMoons?.findIndex(
+		(moon) => moon.idx === params.target,
+	)
+	if (moonIndex === undefined || moonIndex === -1) return undefined
+	const moon = params.siblingMoons![moonIndex]!
+	return (
+		params.resolveSiblingMoonLabel?.(moon, moonIndex) ??
+		getMoonSeedBaseName({ moon, moonIndex, showRealSolNames: true })
+	)
+}
+
 export function buildTideLockStat(params: {
 	tideLock: TideLock | null | undefined
 	/** See OrbitBody.tideLockStatus's doc -- "1:1" whenever tideLock is set,
@@ -159,14 +215,32 @@ export function buildTideLockStat(params: {
 	onSetLock?: (lock: TideLock | null) => void
 	/** Present only on a moon's card -- the parent planet's SystemBody idx. */
 	parentTarget?: number
+	/** Ported from galaxy-gen's OrbitTooltips.tsx RotationTooltip -- the DM
+	 * breakdown behind this body's lock roll (see tide-lock/index.ts's
+	 * rollPlanetTideLock/rollMoonTideLock). Empty/unset shows no help icon. */
+	trace?: TemperatureTraceEntry[]
 }): StatEntry {
-	const { tideLock } = params
+	const { tideLock, trace = [] } = params
 	const unlockedDescriptor =
 		params.tideLockStatus === "3:2"
 			? "3:2 Tidal Lock"
 			: params.retrograde
 				? "Retrograde"
 				: "Prograde"
+	const totalDm = trace.reduce((sum, entry) => sum + entry.value, 0)
+	// Always available (independent of editable/locked state) via a dedicated
+	// help-circle icon at the far right of the row -- see EditableStatValue's
+	// trailingHelp, which renders it without competing with the value's own
+	// hover tooltip or click-to-edit target.
+	const traceTooltip =
+		trace.length > 0 ? (
+			<TraceTooltipContent
+				title="Tidal Lock Modifiers"
+				trace={trace}
+				finalLabel="Total Score"
+				finalValue={totalDm}
+			/>
+		) : undefined
 
 	const editorContent = params.onSetLock
 		? buildTideLockEditorContent({
@@ -209,15 +283,33 @@ export function buildTideLockStat(params: {
 		return {
 			label: "Tide Lock",
 			value: unlockedDescriptor,
-			valueHelp: unlockedDescriptor,
+			trailingHelp: traceTooltip,
 			editor,
 		}
 	}
 
+	// Only shown when the stat isn't editable -- an editable stat's popover
+	// already highlights the active lock target among its buttons, so a
+	// redundant hover tooltip would just repeat what's already visible there.
+	const lockTargetName = editor
+		? undefined
+		: tideLock.type === "solar"
+			? params.starTitle
+			: tideLock.type === "planet"
+				? params.parentTitle
+				: resolveLunarLockTargetName({
+						target: tideLock.target,
+						siblingMoons: params.siblingMoons,
+						resolveSiblingMoonLabel: params.resolveSiblingMoonLabel,
+					})
+
 	return {
 		label: "Tide Lock",
 		value: "1:1 Tidal Lock",
-		valueHelp: "1:1 Tidal Lock",
+		valueHelp: lockTargetName
+			? `Locked to ${lockTargetName}`
+			: "1:1 Tidal Lock",
+		trailingHelp: traceTooltip,
 		editor,
 	}
 }

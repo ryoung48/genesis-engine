@@ -28,7 +28,10 @@ import type {
 	WindArrowData,
 } from "@/ui/genesis/renderer/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
-import type { SolarSystemOverlayState } from "@/ui/genesis/solar-system/overlay"
+import type {
+	OrbitAddress,
+	SolarSystemOverlayState,
+} from "@/ui/genesis/solar-system/overlay"
 
 /** Shared mutable rendering context for the genesis scene's controller
  * modules (see plans/genesis-scene-controller-split.md). Controller
@@ -261,14 +264,9 @@ export interface GenesisContext {
 	 * view (set by focusOnSystemBody) -- re-applied after every setDay/
 	 * setSpinHours call so the clock knobs can move the focused body
 	 * without the camera drifting away from it. */
-	solarSystemTrackedFocus: {
-		bodyIndex: number
-		moonIndex?: number
-	} | null
+	solarSystemTrackedFocus: OrbitAddress | null
 	solarSystemTrackedFocusPosition: THREE.Vector3 | null
-	solarSystemFocusChangeHandler:
-		| ((bodyIndex: number, moonIndex?: number) => void)
-		| null
+	solarSystemFocusChangeHandler: ((address: OrbitAddress) => void) | null
 	savedCameraPosition: THREE.Vector3 | null
 	savedControlsTarget: THREE.Vector3 | null
 	solarSystemFocusTween: {

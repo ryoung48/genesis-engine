@@ -14,6 +14,10 @@ interface EbmConfig {
 	perihelion: number
 	spectralClass: string
 	starSubtype: number
+	/** Physical host values from a rolled galaxy star. [JUSTIFICATION] The
+	 * authored stellar editor still supplies class/subtype lookup inputs. */
+	starTemperatureK?: number
+	starDiameterSol?: number
 	orbitalDistanceAU: number
 	hoursPerDay: number
 	daysPerYear: number
@@ -76,6 +80,8 @@ export function useEbmPreview(config: EbmConfig) {
 		perihelion,
 		spectralClass,
 		starSubtype,
+		starTemperatureK,
+		starDiameterSol,
 		orbitalDistanceAU,
 		hoursPerDay,
 		daysPerYear,
@@ -91,9 +97,12 @@ export function useEbmPreview(config: EbmConfig) {
 		const cls: MainSequenceClass = STAR.isValidSpectralClass(spectralClass)
 			? spectralClass
 			: "G"
-		const T_star = STAR.getStarTemperatureK({ cls, subtype: starSubtype })
+		const T_star =
+			starTemperatureK ??
+			STAR.getStarTemperatureK({ cls, subtype: starSubtype })
 		const R_star_m =
-			STAR.getStarDiameterSol({ cls, subtype: starSubtype }) *
+			(starDiameterSol ??
+				STAR.getStarDiameterSol({ cls, subtype: starSubtype })) *
 			CONSTANTS.embConstants.stellar.R_SUN
 		const d_m = orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU
 		const modelConfig = {
@@ -122,7 +131,8 @@ export function useEbmPreview(config: EbmConfig) {
 				greenhouseFactorOverride ??
 				GREENHOUSE_ESTIMATE.estimateGreenhouseFactor(pressure),
 			internalHeatTempK,
-			seismologyTotalHeatingK,
+			// TEMP: seismology zeroed out for debugging
+			seismologyTotalHeatingK: 0,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel({ years: 30, dtDays: 0.5 })
@@ -202,6 +212,8 @@ export function useEbmPreview(config: EbmConfig) {
 		perihelion,
 		spectralClass,
 		starSubtype,
+		starTemperatureK,
+		starDiameterSol,
 		orbitalDistanceAU,
 		hoursPerDay,
 		daysPerYear,

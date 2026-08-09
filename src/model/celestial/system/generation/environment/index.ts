@@ -1,9 +1,12 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
-import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
+import type {
+	OrbitClassification,
+	OrbitGroup,
+} from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment/classification/dice-table/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SpectralClass } from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { RNG } from "@/model/shared/random/rng"
 
@@ -19,7 +22,7 @@ function buildBodyEnvironment(params: {
 	groupHint?: OrbitGroup
 	zone: Zone
 	deviation: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	diameterKm: number
 	massKg: number
 	orbitalDistanceAU: number
@@ -30,6 +33,13 @@ function buildBodyEnvironment(params: {
 	forceMeltball?: boolean
 	/** Reuses the assignment rolled before mass/density construction. */
 	assignment?: ClassifiedEnvironment
+	/** Already-rolled by the caller (see body/index.ts) -- PLANET.classifyBody
+	 * itself rolls dice for some groups now, so this must be reused rather
+	 * than re-derived here, or a body's final group/classification could
+	 * silently diverge from whatever was already used to pick its
+	 * composition/density assignment. */
+	classified: { group: OrbitGroup; classification: OrbitClassification }
+	starAgeGyr: number
 }): Pick<
 	SystemBody,
 	| "sizeClass"
@@ -50,7 +60,7 @@ function buildBodyEnvironment(params: {
 		params.groupHint === "jovian"
 			? PLANET.estimateGasGiantSizeClass(params.diameterKm)
 			: PLANET.estimateRockySizeClass(params.diameterKm)
-	const body = PLANET.classifyBody({ ...params, sizeClass })
+	const body = params.classified
 	const environment = PLANET.buildClassificationEnvironment({
 		rng: params.rng,
 		group: body.group,
@@ -64,6 +74,7 @@ function buildBodyEnvironment(params: {
 		isPrimaryWorld: params.isPrimaryWorld,
 		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
 		assignment: params.assignment,
+		starAgeGyr: params.starAgeGyr,
 	})
 	return {
 		sizeClass,
@@ -96,10 +107,11 @@ function buildForcedClassificationEnvironment(params: {
 	sizeClass: number
 	zone: Zone
 	deviation: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	diameterKm: number
 	massKg: number
 	isPrimaryWorld: boolean
+	starAgeGyr: number
 }): Pick<
 	SystemBody,
 	| "sizeClass"
@@ -128,6 +140,7 @@ function buildForcedClassificationEnvironment(params: {
 		massKg: params.massKg,
 		isPrimaryWorld: params.isPrimaryWorld,
 		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
+		starAgeGyr: params.starAgeGyr,
 	})
 	return {
 		sizeClass: params.sizeClass,
@@ -153,7 +166,7 @@ function buildMoonEnvironment(params: {
 	orbitalDistanceAU: number
 	zone: Zone
 	deviation: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	/** Moon generation supplies this when known; hand-authored/incomplete
 	 * moons infer it from diameter before their environment is built. */
 	sizeClass?: number
@@ -162,6 +175,16 @@ function buildMoonEnvironment(params: {
 	 * classification must tolerate both orbital fields being absent. */
 	orbitRange?: MoonBody["orbitRange"]
 	semiMajorAxisPlanetDiameters?: number
+	/** The group of the planet this moon orbits -- see PLANET.classifyBody's
+	 * parentGroup doc. Absent for a hand-authored/incomplete moon whose
+	 * environment is being (re)built outside a real moon-placement pass. */
+	parentGroup?: OrbitGroup
+	/** Inherited unchanged from the parent planet's own impactZone flag -- see
+	 * PLANET.classifyBody's impactZone doc. Absent for a hand-authored/
+	 * incomplete moon whose environment is being (re)built outside a real
+	 * moon-placement pass. */
+	impactZone?: boolean
+	starAgeGyr: number
 }): Pick<
 	MoonBody,
 	| "sizeClass"
@@ -184,7 +207,10 @@ function buildMoonEnvironment(params: {
 		params.orbitRange === "inner" ||
 		(params.semiMajorAxisPlanetDiameters ?? Number.POSITIVE_INFINITY) <= 8
 	const body = PLANET.classifyBody({
+		rng: params.rng,
 		groupHint: undefined,
+		parentGroup: params.parentGroup,
+		impactZone: params.impactZone ?? false,
 		zone: params.zone,
 		orbitalDistanceAU: params.orbitalDistanceAU,
 		sizeClass,
@@ -203,6 +229,7 @@ function buildMoonEnvironment(params: {
 		massKg: params.massKg,
 		isPrimaryWorld: params.isPrimaryWorld,
 		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
+		starAgeGyr: params.starAgeGyr,
 	})
 	return {
 		sizeClass,

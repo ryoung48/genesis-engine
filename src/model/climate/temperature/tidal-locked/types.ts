@@ -12,6 +12,13 @@ export interface TidalTransportParams {
 	contrast: number
 }
 
+/** Physical stellar radiation values for a rolled galaxy host.
+ * [JUSTIFICATION] Authored systems still derive these from class/subtype. */
+export interface LockedStarRadiationParams {
+	starTemperatureK?: number
+	starDiameterSol?: number
+}
+
 export type MonthlyLibrationParams = {
 	eccentricity: number
 	perihelion: number

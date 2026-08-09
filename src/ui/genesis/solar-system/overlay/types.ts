@@ -1,8 +1,29 @@
 import type * as THREE from "three"
 import type { Text } from "troika-three-text"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type {
+	HostStarAttributes,
+	SpectralClass,
+} from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { MoonOrbitState } from "@/ui/genesis/renderer/moon-orbit-overlay"
+
+/** Addresses any node in a solar system's orbit tree -- the parent of any
+ * node is always either a star or a planet, so this is the whole address
+ * space: `starIndex` picks WHICH star (0 = the system's own primary/root
+ * star, 1-based = a companion, indexing into `companionStars`/`companions`
+ * same as before), and `bodyIdx`/`moonIdx` are that node's own array
+ * position among its parent's siblings (a star's own `bodies`, or a body's
+ * own `moons`). This replaces the old ad hoc `{bodyIndex, moonIndex?,
+ * starIndex?}` triple (with `bodyIndex === -1` magic-numbering "the star
+ * itself") and the Navigator's separate `"companion-star"` selection kind --
+ * a companion is just `{kind: "star", starIndex: N}` for N > 0, the exact
+ * same shape the primary uses for N = 0, so there is no longer a second
+ * branch to special-case (and forget to update, as happened with the
+ * original double-click-doesn't-update-the-wiki-panel bug). */
+export type OrbitAddress =
+	| { kind: "star"; starIndex: number }
+	| { kind: "body"; starIndex: number; bodyIdx: number }
+	| { kind: "moon"; starIndex: number; bodyIdx: number; moonIdx: number }
 
 // Scatters a field of small, irregularly-scaled rocks around a belt's ring —
 // each on its own randomized circular sub-orbit (slightly jittered radius and
@@ -19,15 +40,45 @@ export interface AsteroidFieldData {
 	rotationSpeeds: Float32Array
 }
 
+/** One companion star's own overlay params plus where it sits relative to
+ * the star it orbits. `star` is itself a full SolarSystemOverlayParams --
+ * companions are just another orbit slot, interleaved with planets in the
+ * SAME distance-ordered pack (see buildSolarSystemOverlay); a companion's
+ * own `star.companions` is always empty, since this repo's model has no
+ * companion-of-a-companion nesting (CompanionStar has no companionStars
+ * field of its own). Its orbit uses the companion's own real Kepler period
+ * around its parent (from GALAXY_SYSTEMS.generate), not the daysPerYear-
+ * anchored heuristic scaling planets use. */
+export interface CompanionOverlayParams {
+	star: SolarSystemOverlayParams
+	orbitalDistanceAU: number
+	orbitalPeriodDays: number
+	eccentricity: number
+	inclinationDeg: number
+}
+
+/** Params for one star's full worth of orbiting bodies -- both planets and
+ * any companion stars, packed together in one distance-ordered pass by
+ * buildSolarSystemOverlay (see its own doc comment). A single-star system is
+ * simply the `companions: []` case of the same call, not a different path;
+ * this is also what a companion's own nested system looks like (with its
+ * own `companions: []`, per CompanionOverlayParams' doc). */
 export interface SolarSystemOverlayParams {
-	/** All bodies in the system (siblings + the main world), sorted by
+	/** All bodies orbiting this star (siblings + the main world), sorted by
 	 * generated orbital distance — see generateSystemBodies. */
 	bodies: SystemBody[]
+	/** Empty for a single-star system -- the common case, not a different
+	 * code path. */
+	companions: CompanionOverlayParams[]
 	/** The main world's real orbital period, used as the Kepler-scaling
-	 * reference for every other body's period. */
+	 * reference for every other body's period. A companion (no main world of
+	 * its own) passes its own outermost body's rolled period instead. */
 	daysPerYear: number
-	spectralClass: MainSequenceClass
+	spectralClass: SpectralClass
 	starSubtype: number
+	/** [JUSTIFICATION] Manually authored O–M hosts still store class/subtype
+	 * only; generated galaxy hosts provide the canonical physical profile. */
+	hostStar?: HostStarAttributes
 	initialDay: number
 	/** Also controls moon orbits, same as the existing moon-orbit overlay. */
 	showEllipticalOrbits: boolean
@@ -74,6 +125,10 @@ export interface SolarSystemOverlayState {
 	group: THREE.Group
 	suggestedCameraDistance: number
 	setDay(day: number): void
+	/** Only ever called with the primary's own next bodies (see
+	 * useSolarSystemView) -- companions aren't live-edited, so they don't
+	 * need an update path; a changed companion set is a whole new
+	 * `buildSolarSystemOverlay` call, same as any other structural change. */
 	updateBodies(
 		bodies: SystemBody[],
 		mainWorldTexture?: THREE.DataTexture | null,
@@ -84,15 +139,11 @@ export interface SolarSystemOverlayState {
 	 * camera-facing). */
 	updateLabelOrientations(camera: THREE.PerspectiveCamera): void
 	dispose(): void
-	/** Current world-space position + a reasonable framing radius for a body
-	 * (or one of its moons), for camera-focus purposes. `bodyIndex` is the
-	 * index into the `bodies` array passed to `buildSolarSystemOverlay`, or -1
-	 * for the star. `moonIndex`, if given, focuses that body's moon instead
-	 * (index into the body's own `moons` array), falling back to the body
-	 * itself if that moon can't be resolved. */
+	/** Current world-space position + a reasonable framing radius for any
+	 * addressed node (a star, one of its bodies, or one of a body's moons),
+	 * for camera-focus purposes. */
 	getBodyFocus(
-		bodyIndex: number,
-		moonIndex?: number,
+		address: OrbitAddress,
 	): { position: THREE.Vector3; radius: number } | null
 	/** Spins every body's (and their moons') mesh around its own axis by a
 	 * fraction of a full turn derived from `hours` and that body's own
@@ -100,10 +151,13 @@ export interface SolarSystemOverlayState {
 	setSpinHours(hours: number): void
 	/** Resolves a raycast hit's object back to a focus target — e.g. for
 	 * double-click-to-focus. Returns null if `object` isn't part of any
-	 * body/moon/the star in this overlay. */
-	resolveHitBodyIndex(
-		object: THREE.Object3D,
-	): { bodyIndex: number; moonIndex?: number } | null
+	 * body/moon/star in this overlay. */
+	resolveHitBodyIndex(object: THREE.Object3D): OrbitAddress | null
+	/** Every addressable node in this overlay (the star, its bodies, their
+	 * moons, and recursively any companion stars' own bodies/moons) — used to
+	 * find the screen-space-nearest body for a double-click that didn't land
+	 * an exact raycast hit. */
+	listAddresses(): OrbitAddress[]
 }
 
 export interface PlacedBody {
@@ -138,4 +192,32 @@ export interface PlacedBody {
 	}
 	/** Only set for asteroid belts. */
 	asteroidField?: AsteroidFieldData
+}
+
+/** A companion star mounted inside its parent's own group, orbiting it --
+ * built once (recursively via buildSolarSystemOverlay) and then repositioned
+ * every setDay() call, same as a PlacedBody's bodyGroup. */
+export interface PlacedCompanion {
+	mount: THREE.Group
+	overlay: SolarSystemOverlayState
+	orbitalPeriodDays: number
+	eccentricity: number
+	inclinationDeg: number
+	/** Assigned by the combined distance-ordered layout pass (see
+	 * buildSolarSystemOverlay's layoutSlots) -- 0 until then. */
+	orbitRadius: number
+	kepler: {
+		P: THREE.Vector3
+		Q: THREE.Vector3
+		a: number
+		b: number
+		ae: number
+		e: number
+	}
+	orbitLine: THREE.Line
+	/** Golden-angle-spread starting angle, same technique as every planet's
+	 * own meanAnomalyAtEpoch -- without this every companion starts at angle
+	 * 0 and multiple companions render collinear from the primary instead of
+	 * spread around it. */
+	meanAnomalyAtEpoch: number
 }

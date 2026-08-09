@@ -9,6 +9,7 @@ import {
 import { buildMoonOrbitOverlay } from "@/ui/genesis/renderer/moon-orbit-overlay"
 import {
 	buildSolarSystemOverlay,
+	type OrbitAddress,
 	type SolarSystemOverlayParams,
 } from "@/ui/genesis/solar-system/overlay"
 
@@ -57,17 +58,16 @@ export function createSolarSystemController(
 	}
 
 	function focusOnSystemBody(
-		bodyIndex: number,
-		moonIndex?: number,
+		address: OrbitAddress,
 		opts?: { durationMs?: number },
 	) {
 		if (!ctx.solarSystemActive) setSolarSystemActive(true)
 		if (!ctx.solarSystemOverlayState) return
-		const focus = ctx.solarSystemOverlayState.getBodyFocus(bodyIndex, moonIndex)
+		const focus = ctx.solarSystemOverlayState.getBodyFocus(address)
 		if (!focus) return
-		ctx.solarSystemTrackedFocus = { bodyIndex, moonIndex }
+		ctx.solarSystemTrackedFocus = address
 		ctx.solarSystemTrackedFocusPosition = focus.position.clone()
-		ctx.solarSystemFocusChangeHandler?.(bodyIndex, moonIndex)
+		ctx.solarSystemFocusChangeHandler?.(address)
 		const distance = Math.max(
 			focus.radius * SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER,
 			SOLAR_SYSTEM_MIN_FOCUS_DISTANCE,
@@ -233,8 +233,7 @@ export function createSolarSystemController(
 	function reapplyTrackedSolarSystemFocus() {
 		if (!ctx.solarSystemTrackedFocus || !ctx.solarSystemOverlayState) return
 		const focus = ctx.solarSystemOverlayState.getBodyFocus(
-			ctx.solarSystemTrackedFocus.bodyIndex,
-			ctx.solarSystemTrackedFocus.moonIndex,
+			ctx.solarSystemTrackedFocus,
 		)
 		if (!focus) return
 		if (ctx.solarSystemTrackedFocusPosition) {
@@ -262,7 +261,7 @@ export function createSolarSystemController(
 	}
 
 	function setSolarSystemFocusChangeHandler(
-		handler: ((bodyIndex: number, moonIndex?: number) => void) | null,
+		handler: ((address: OrbitAddress) => void) | null,
 	) {
 		ctx.solarSystemFocusChangeHandler = handler
 	}

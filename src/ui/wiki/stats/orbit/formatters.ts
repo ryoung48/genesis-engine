@@ -1,4 +1,7 @@
-import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
+import type {
+	AtmosphereProfile,
+	BiosphereProfile,
+} from "@/model/celestial/orbit-body/types"
 import {
 	formatTemperature,
 	type UnitSystem,
@@ -164,6 +167,81 @@ export function formatHydrosphereValueSuffix(hydrosphereCode?: number): string {
 	return description ? ` · ${description}` : ""
 }
 
+// Mirrors BIOSPHERE_LABEL in galaxy-body-distributions.ts (galaxy-gen's
+// BIOSPHERE.labels) -- kept as its own copy since this module has no reason
+// to depend on the galaxy stats-distribution module.
+const BIOSPHERE_CODE_LABEL: Record<number, string> = {
+	0: "Sterile",
+	1: "Prebiotic Chemistry",
+	2: "Simple Microbes",
+	3: "Complex Microbes",
+	4: "Multicellular Beginnings",
+	5: "Small Macroscopic Life",
+	6: "Large Macroscopic Life",
+	7: "Complex Ecosystems",
+	8: "Social Species",
+	9: "Proto-Sapience",
+	10: "Full Sapience",
+	11: "Bio-Engineered Life",
+}
+
+const BIOSPHERE_LABEL_SUFFIX: Record<
+	NonNullable<BiosphereProfile["label"]>,
+	string
+> = {
+	remnants: "Remnants",
+	engineered: "Engineered",
+	miscible: "Miscible",
+	hybrid: "Hybrid",
+	immiscible: "Immiscible",
+}
+
+export function formatBiosphereLabel(
+	biosphere: BiosphereProfile | null | undefined,
+): string {
+	if (!biosphere || biosphere.code <= 0) return "Sterile"
+	const base = BIOSPHERE_CODE_LABEL[biosphere.code] ?? `Code ${biosphere.code}`
+	const suffix = biosphere.label
+		? BIOSPHERE_LABEL_SUFFIX[biosphere.label]
+		: undefined
+	return suffix ? `${base} · ${suffix}` : base
+}
+
+// Split form of formatBiosphereLabel used where only the main code label
+// (not the remnants/engineered/etc. suffix) should carry the trace tooltip.
+export function formatBiosphereLabelParts(
+	biosphere: BiosphereProfile | null | undefined,
+): { base: string; suffix?: string } {
+	if (!biosphere || biosphere.code <= 0) return { base: "Sterile" }
+	const base = BIOSPHERE_CODE_LABEL[biosphere.code] ?? `Code ${biosphere.code}`
+	const suffix = biosphere.label
+		? BIOSPHERE_LABEL_SUFFIX[biosphere.label]
+		: undefined
+	return { base, suffix }
+}
+
+// Habitability has no code->label table like biosphere's (it's a signed
+// modifier sum, not a dice-table result) -- just the signed score itself.
+export function formatHabitabilityValue(
+	habitability: { code: number } | null | undefined,
+): string {
+	if (!habitability) return "—"
+	return habitability.code > 0
+		? `+${habitability.code}`
+		: `${habitability.code}`
+}
+
+// Ported from galaxy-gen's getHabitabilityCategory (components/statistics/
+// Habitability.tsx), minus its "(N)" threshold suffix.
+export function habitabilityCategoryLabel(code: number): string {
+	if (code <= 0) return "Hostile"
+	if (code <= 2) return "Barely Habitable"
+	if (code <= 4) return "Marginally Survivable"
+	if (code <= 6) return "Regionally Habitable"
+	if (code <= 8) return "Suitable"
+	return "Garden World"
+}
+
 export function describeTemperatureK(kelvin: number): string {
 	return kelvin <= 223
 		? "Frozen"
@@ -174,6 +252,24 @@ export function describeTemperatureK(kelvin: number): string {
 				: kelvin <= 353.15
 					? "Hot"
 					: "Burning"
+}
+
+// Mirrors TEMPERATURE_COLORS in galaxy-body-distributions.ts, keyed to the
+// same Frozen/Cold/Temperate/Hot/(Scorching->Burning) buckets as
+// describeTemperatureK above.
+export function temperatureSwatchColor(kelvin: number): string {
+	switch (describeTemperatureK(kelvin)) {
+		case "Frozen":
+			return "#a8d8f0"
+		case "Cold":
+			return "#6bb6de"
+		case "Temperate":
+			return "#8fcf7f"
+		case "Hot":
+			return "#f7a463"
+		default:
+			return "#e0524f"
+	}
 }
 
 export function formatAvgTempValue(

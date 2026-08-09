@@ -21,5 +21,8 @@ export interface AtmosphereCodeInput {
 		gravityG: number
 		classification: OrbitClassification
 		isPrimaryWorld: boolean
+		/** Drives rollHazard's "lifeless" branch (a young system's tainted
+		 * atmosphere can't have produced a biologic hazard yet). */
+		starAgeGyr: number
 	}
 }

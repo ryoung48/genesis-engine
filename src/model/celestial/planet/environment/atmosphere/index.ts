@@ -28,6 +28,40 @@ function rollAtmosphereBar({
 	return 0
 }
 
+// Ported from galaxy-gen's ATMOSPHERE.taint (orbits/atmosphere/index.ts) --
+// rolls a specific named hazard for a tainted atmosphere. NOT ported: the
+// isExoticNeutronStar override that forces every non-vacuum/trace atmosphere
+// to "radioactive" regardless of tainted, since that needs the host star's
+// luminosityClass threaded all the way through classification and no caller
+// here has it yet.
+function rollHazard({
+	rng,
+	profile,
+	starAgeGyr,
+}: {
+	rng: RollAtmosphereInput["rng"]
+	profile: Pick<AtmosphereProfile, "type" | "subtype">
+	starAgeGyr: number
+}): AtmosphereProfile["hazard"] {
+	const breathable = profile.type === "breathable"
+	const lifeless =
+		profile.type === "vacuum" ||
+		profile.type === "trace" ||
+		profile.type === "gas" ||
+		starAgeGyr < 0.1
+	const extreme = !["thin", "standard", "dense"].includes(profile.subtype ?? "")
+	const low = breathable && profile.subtype === "thin"
+	const high = breathable && profile.subtype === "dense"
+	const roll = DICE.roll2d6(rng) + (low ? -2 : 0) + (high ? 2 : 0)
+	if (roll <= 2) return breathable && !extreme ? "low oxygen" : "gas mix"
+	if (roll === 3 || roll === 11) return "radioactive"
+	if (roll === 4 || roll === 9) return lifeless ? "gas mix" : "biologic"
+	if (roll === 5 || roll === 7) return "gas mix"
+	if (roll === 8) return "sulphur compounds"
+	if (roll === 10) return "particulates"
+	return breathable && !extreme ? "high oxygen" : "gas mix"
+}
+
 function atmosphereCodeToProfile({
 	rng,
 	atmosphereCode,
@@ -222,7 +256,7 @@ function atmosphereCodeToProfile({
 	}
 
 	if (!profile) return null
-	return {
+	const completed: AtmosphereProfile = {
 		...profile,
 		pressureBar: rollAtmosphereBar({
 			rng,
@@ -230,6 +264,14 @@ function atmosphereCodeToProfile({
 			panthalassic: params.classification === "panthalassic",
 		}),
 	}
+	if (completed.tainted) {
+		completed.hazard = rollHazard({
+			rng,
+			profile: completed,
+			starAgeGyr: params.starAgeGyr,
+		})
+	}
+	return completed
 }
 
 export const ATMOSPHERE = { codeToProfile: atmosphereCodeToProfile }

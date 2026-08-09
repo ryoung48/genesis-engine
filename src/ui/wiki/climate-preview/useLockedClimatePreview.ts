@@ -10,6 +10,8 @@ interface LockedClimatePreviewConfig {
 	perihelion: number
 	spectralClass: string
 	starSubtype: number
+	starTemperatureK?: number
+	starDiameterSol?: number
 	orbitalDistanceAU: number
 	hoursPerDay: number
 	daysPerYear: number
@@ -31,18 +33,23 @@ function buildLockedClimatePreview(
 		eccentricity: config.eccentricity,
 		spectralClass: config.spectralClass,
 		starSubtype: config.starSubtype,
+		starTemperatureK: config.starTemperatureK,
+		starDiameterSol: config.starDiameterSol,
 		orbitalDistanceAU: config.orbitalDistanceAU,
 		daysPerYear: config.daysPerYear,
 		perihelion: config.perihelion,
 		substellarLon: config.substellarLon,
 		obliquity: config.obliquity,
-		seismologyTotalHeatingK: config.seismologyTotalHeatingK,
+		// TEMP: seismology zeroed out for debugging -- see useEbmPreview.ts
+		seismologyTotalHeatingK: 0,
 	} as const
 	const { flux, libration, solarLongitude } = HEAT.computeDailyLockedOrbit({
 		eccentricity: config.eccentricity,
 		perihelion: config.perihelion,
 		spectralClass: config.spectralClass,
 		starSubtype: config.starSubtype,
+		starTemperatureK: config.starTemperatureK,
+		starDiameterSol: config.starDiameterSol,
 		orbitalDistanceAU: config.orbitalDistanceAU,
 	})
 	const dayCount = flux.length

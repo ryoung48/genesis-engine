@@ -1,10 +1,14 @@
 import * as THREE from "three"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import type { GenesisHoverInfo } from "@/ui/genesis/renderer/types"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 
 export interface InteractionControllerDeps {
 	setSelectedProvince: (provinceId: number | null) => void
-	focusOnSystemBody: (bodyIndex: number, moonIndex?: number) => void
+	focusOnSystemBody: (
+		address: OrbitAddress,
+		opts?: { durationMs?: number },
+	) => void
 }
 
 /** Owns pointer/hover/click interaction with the canvas: hover raycasting
@@ -134,14 +138,44 @@ export function createInteractionController(
 			true,
 		)
 		const hit = hits.find((h) => h.object instanceof THREE.Mesh)
-		if (!hit) return
-		const target = ctx.solarSystemOverlayState.resolveHitBodyIndex(hit.object)
+		const overlayState = ctx.solarSystemOverlayState
+		const target = hit
+			? overlayState.resolveHitBodyIndex(hit.object)
+			: findClosestBodyOnScreen(overlayState, pointer)
 		if (!target) return
 		// Route through focusOnSystemBody (not a one-off controls.target set) so
 		// this double-click gets the same tracked-focus treatment as a GPS
 		// click — otherwise the camera would stop following as soon as the
 		// clock or any other slider moved the body.
-		deps.focusOnSystemBody(target.bodyIndex, target.moonIndex)
+		deps.focusOnSystemBody(target)
+	}
+
+	// A raycast only hits a body if the click lands exactly on its (often
+	// tiny, at solar-system scale) mesh. Double-clicking empty space nearby
+	// should still snap to something, so fall back to whichever body's
+	// projected screen position is nearest the click, regardless of distance.
+	function findClosestBodyOnScreen(
+		overlayState: NonNullable<GenesisContext["solarSystemOverlayState"]>,
+		clickNdc: THREE.Vector2,
+	): OrbitAddress | null {
+		let closest: OrbitAddress | null = null
+		let closestDistSq = Infinity
+		const projected = new THREE.Vector3()
+		for (const address of overlayState.listAddresses()) {
+			const focus = overlayState.getBodyFocus(address)
+			if (!focus) continue
+			projected.copy(focus.position).project(ctx.camera)
+			// Behind the camera — not a valid on-screen candidate.
+			if (projected.z > 1) continue
+			const dx = projected.x - clickNdc.x
+			const dy = projected.y - clickNdc.y
+			const distSq = dx * dx + dy * dy
+			if (distSq < closestDistSq) {
+				closestDistSq = distSq
+				closest = address
+			}
+		}
+		return closest
 	}
 
 	function setHoverHandler(

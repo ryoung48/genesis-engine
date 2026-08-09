@@ -1,5 +1,5 @@
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SpectralClass } from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { BODY_VISUAL_BASE_RADIUS } from "@/ui/genesis/shared/moon-visual-scale"
 
@@ -24,6 +24,13 @@ export const BELT_WIDTH = 0.12
 // ROCKY_SIBLING_COLOR for anything else.
 export const MAIN_WORLD_COLOR = 0x3b82f6
 export const ROCKY_SIBLING_COLOR = 0x9ca3af
+// Solid-color fallback for a tectonic/vesperian body whose hydrosphereCode is
+// 10-11 ("no continents" full ocean) -- deliberately close to Earth's ocean
+// blue rather than that classification's usual land-tinted
+// CLASSIFICATION_COLOR entry (tectonic's green, vesperian's gold), since
+// there's no land left to tint. See pickGeneratedBodyTextures's doc (texture/
+// index.ts) for why these bodies never get a texturePath at all.
+export const FULL_OCEAN_COLOR = 0x1b3d6d
 // Ported from galaxy-gen's ORBIT_CLASSIFICATION[type].color.primary (orbits/
 // classification.ts) -- used as the untextured solid-color fallback for any
 // body (main world or sibling) whose classification has no generated art
@@ -82,7 +89,7 @@ export const GROUP_LABEL: Record<SystemBody["group"], string> = {
 }
 
 // Matches the spectral-class palette used by galaxy-gen's system map.
-export const STAR_COLOR_BY_CLASS: Record<MainSequenceClass, string> = {
+export const STAR_COLOR_BY_CLASS: Record<SpectralClass, string> = {
 	O: "#7cc6ff",
 	B: "#d8eeff",
 	A: "#ffffff",
@@ -90,6 +97,12 @@ export const STAR_COLOR_BY_CLASS: Record<MainSequenceClass, string> = {
 	G: "#fff772",
 	K: "#ffc37f",
 	M: "#ff9719",
+	L: "#b43cff",
+	T: "#8c37c8",
+	Y: "#5e2a7a",
+	D: "#e9f4ff",
+	NS: "#8b5cff",
+	BH: "#090909",
 }
 
 // Golden angle — an irrational fraction of a full turn, so successive bodies

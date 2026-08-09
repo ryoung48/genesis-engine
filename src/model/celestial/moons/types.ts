@@ -20,6 +20,11 @@ export interface MoonBody extends OrbitBody {
 	/** Unset alongside orbitRange before orbital placement calculates the
 	 * parent-diameter distance. */
 	semiMajorAxisPlanetDiameters?: number
+	/** Set when the "gas-giant-moon" main-world mode promotes this moon to be
+	 * the player's home world instead of a top-level SystemBody -- see
+	 * generateSystemBodies' gas-giant-moon branch. Absent/false for every
+	 * ordinary moon. */
+	isMainWorld?: boolean
 }
 
 interface MoonRngInput {

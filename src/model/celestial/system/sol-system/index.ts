@@ -220,6 +220,7 @@ function buildPlanet({
 		albedo: seed.albedo,
 		greenhouseFactor: seed.greenhouseFactor,
 		internalHeatTempK,
+		biosphere: seed.biosphere,
 	}
 }
 
@@ -247,6 +248,7 @@ const solDefaultSolarSystem: SolarSystemState = {
 		class: "G",
 		subtype: 2,
 		seed: "sol",
+		ageGyr: SOL_DATA.solStarAgeGyr,
 	},
 	orbits: solSystemBodies,
 }

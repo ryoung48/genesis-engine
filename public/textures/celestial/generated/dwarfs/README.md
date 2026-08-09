@@ -1,0 +1,1 @@
+brown dwarf textures a re from here: https://www.reddit.com/r/SolarBalls/comments/1czsf8c/made_some_star_textures_free_to_use/

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
+import type { GalaxyParams } from "@/model/celestial/galaxy/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
@@ -20,6 +22,7 @@ import {
 	OverlayControls,
 } from "@/ui/genesis/controls/OverlayControls"
 import { SimulationControls } from "@/ui/genesis/controls/SimulationControls"
+import { GalaxyModeView } from "@/ui/genesis/galaxy/view/GalaxyModeView"
 import {
 	DEFAULT_WORLD_PARAMS,
 	VIEW_PREFS_STORAGE_KEY,
@@ -97,7 +100,17 @@ import { useProceduralNationWikiData } from "@/ui/genesis/wiki-bridge/useProcedu
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
-export const GenesisView: React.FC = () => {
+export const GenesisView: React.FC<{
+	/** Scopes this instance's localStorage session/view-prefs entries so an
+	 * independently-mounted instance (e.g. a `/galaxy` route reusing this same
+	 * component for its system drill-in view) doesn't collide with the
+	 * default "/" instance. Omit for the original unnamespaced behavior. */
+	sessionNamespace?: string
+	/** Mounts straight into galaxy mode instead of the default globe/map view
+	 * -- used by the `/galaxy` route so its instance opens directly on the
+	 * galaxy-scale view rather than a Sol/Earth default. */
+	initialGalaxyModeActive?: boolean
+}> = ({ sessionNamespace, initialGalaxyModeActive = false }) => {
 	// Refs
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const viewportRef = useRef<HTMLDivElement>(null)
@@ -105,14 +118,19 @@ export const GenesisView: React.FC = () => {
 	const workerRef = useRef<Worker | null>(null)
 	const lastWorldRef = useRef<SerializedGenesisWorld | null>(null)
 	const hoverCardRef = useRef<HTMLDivElement>(null)
+	const viewPrefsStorageKey = sessionNamespace
+		? `${VIEW_PREFS_STORAGE_KEY}:${sessionNamespace}`
+		: VIEW_PREFS_STORAGE_KEY
 	const initialViewPrefs =
 		typeof window === "undefined"
 			? DEFAULT_VIEW_PREFS
 			: (parseStoredViewPrefs(
-					window.localStorage.getItem(VIEW_PREFS_STORAGE_KEY),
+					window.localStorage.getItem(viewPrefsStorageKey),
 				) ?? DEFAULT_VIEW_PREFS)
 	const initialGenerationSession =
-		typeof window === "undefined" ? null : loadGenerationSessionSnapshotSync()
+		typeof window === "undefined"
+			? null
+			: loadGenerationSessionSnapshotSync(sessionNamespace)
 
 	// Core state
 	const [world, setWorld] = useState<SerializedGenesisWorld | null>(null)
@@ -231,8 +249,27 @@ export const GenesisView: React.FC = () => {
 		initialViewPrefs,
 		initialGenerationSession,
 		isEarthImport: !!world?.isEarthImport,
+		sessionNamespace,
 	})
 	const [worldTab, setWorldTab] = useState<"planet" | "society">("planet")
+	// Full-screen galaxy-scale overlay -- see GalaxyModeView's own doc.
+	// Entered via the primary star's "view galaxy" dice icon or the solar-
+	// system view's "back to galaxy" control, exited by opening a system or
+	// the galaxy panel's "view Sol system" Earth icon.
+	const [galaxyModeActive, setGalaxyModeActive] = useState(
+		initialGalaxyModeActive,
+	)
+	// Once GalaxyModeView has been mounted, keep it mounted (just hidden) for
+	// the rest of this GenesisView's lifetime instead of unmounting it -- it
+	// owns its own generated galaxy/scene/worker as local state, and
+	// unmounting would destroy all of that, forcing a full regeneration the
+	// next time galaxy mode is re-entered.
+	const [galaxyModeEverActive, setGalaxyModeEverActive] = useState(
+		initialGalaxyModeActive,
+	)
+	useEffect(() => {
+		if (galaxyModeActive) setGalaxyModeEverActive(true)
+	}, [galaxyModeActive])
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(
 		initialGenerationSession?.generationPanelOpen ?? true,
 	)
@@ -484,7 +521,9 @@ export const GenesisView: React.FC = () => {
 		displayMoons,
 		eccentricity,
 		effectiveDaysPerYear,
-		forceMainWorld,
+		mainWorldMode,
+		galaxyOrigin,
+		setGalaxyOrigin,
 		glacialErosion,
 		hoursPerDay,
 		hydraulicErosion,
@@ -504,7 +543,7 @@ export const GenesisView: React.FC = () => {
 		setAxialTiltDirection,
 		setContinentSizeVariety,
 		setEccentricity,
-		setForceMainWorld,
+		setMainWorldMode,
 		setHoursPerDay,
 		setLandCoverage,
 		setLandDistribution,
@@ -514,10 +553,13 @@ export const GenesisView: React.FC = () => {
 		setPlanetRadiusKm,
 		setPressure,
 		setSeed,
+		resetMainWorldToEarth,
 		setSeaLevel,
 		setSolarSystem,
 		setSpectralClass,
 		setStarSubtype,
+		setStarAgeGyr,
+		starAgeGyr,
 		setSubstellarLon,
 		setTideLock,
 		setEra,
@@ -536,8 +578,9 @@ export const GenesisView: React.FC = () => {
 		thermalErosion,
 		tidallyLocked,
 		tideLock,
-		updateEditableSystemBody,
-	} = useSolarSystemBodies({ initialGenerationSession })
+		hostStar,
+		updateMainWorldBody,
+	} = useSolarSystemBodies({ initialGenerationSession, sessionNamespace })
 	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
 
 	// --- Three.js scene lifecycle ---
@@ -1737,6 +1780,7 @@ export const GenesisView: React.FC = () => {
 	} = useSolarSystemView({
 		sceneRef,
 		initialGenerationSession,
+		sessionNamespace,
 		world,
 		solarSystem,
 		setSolarSystem,
@@ -1754,6 +1798,8 @@ export const GenesisView: React.FC = () => {
 		tideLock,
 		spectralClass,
 		starSubtype,
+		mainWorldMode,
+		galaxyOrigin,
 		starName,
 		namesEnabled,
 		seed,
@@ -1773,468 +1819,557 @@ export const GenesisView: React.FC = () => {
 		setGenerationSessionRestored,
 	})
 
+	// Shown on the primary star's subtitle row (dice icon) and the solar-
+	// system view's "back to galaxy" control -- both just enter galaxy mode;
+	// GalaxyModeView itself decides whether to resume the last-viewed layout
+	// (galaxyOrigin set) or start a fresh default galaxy (galaxyOrigin null).
+	const handleOpenGalaxy = useCallback(() => {
+		setSolarSystemViewActive(false)
+		setGalaxyModeActive(true)
+	}, [setSolarSystemViewActive])
+
+	// Double-clicking a system in galaxy mode hands it straight to this same
+	// component (no more session-snapshot + route navigation round trip --
+	// see plans/galaxy-view-port.md) -- load it into the solar-system state
+	// directly and switch back to the normal view.
+	const handleOpenGalaxySystem = useCallback(
+		(system: GalaxySystem, galaxyParams: GalaxyParams) => {
+			const [primary, ...companions] = system.stars
+			if (!primary) return
+			// Sorted by orbitalDistanceAU so this array's order matches exactly
+			// what buildSolarSystemOverlay's composer sorts its own companions
+			// into (see overlay.ts) -- the two MUST agree, since starIndex
+			// (1-based into this array) is how the renderer's focus/pick API and
+			// the wiki Navigator address "which companion".
+			const sortedCompanions = [...companions].sort(
+				(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
+			)
+			setSolarSystem({
+				star: {
+					class: primary.spectralClass,
+					subtype: primary.subtype,
+					seed: primary.seed.toString(36).padStart(6, "0"),
+					hostStar: primary,
+					ageGyr: primary.ageGyr,
+				},
+				orbits: primary.bodies,
+				companionStars: sortedCompanions.map((star) => ({
+					class: star.spectralClass,
+					subtype: star.subtype,
+					hostStar: star,
+					seed: star.seed.toString(36).padStart(6, "0"),
+					starName: star.starName,
+					role: star.role as "epistellar" | "inner" | "outer" | "distant",
+					orbitalDistanceAU: star.orbitalDistanceAU,
+					orbitalPeriodDays: star.orbitalPeriodDays,
+					eccentricity: star.eccentricity,
+					inclinationDeg: star.inclinationDeg,
+					orbits: star.bodies,
+				})),
+			})
+			setMainWorldMode("procedural")
+			setGalaxyOrigin({ galaxyParams, systemIndex: system.systemIndex })
+			setSolarSystemViewActive(true)
+			setGalaxyModeActive(false)
+			// Zoom/focus the primary star on both the 3D view and the wiki
+			// Navigator, rather than leaving the camera wherever it was left
+			// pointed at from whatever was last focused before entering galaxy
+			// mode.
+			handleFocusBody({ kind: "star", starIndex: 0 })
+		},
+		[
+			setSolarSystem,
+			setMainWorldMode,
+			setGalaxyOrigin,
+			setSolarSystemViewActive,
+			handleFocusBody,
+		],
+	)
+
 	// --- Render ---
 	return (
-		<div className="w-full h-full flex flex-col xl:flex-row bg-slate-100">
-			{generationPanelOpen && (
-				<GenerationPanel
-					worldTab={worldTab}
-					setWorldTab={setWorldTab}
-					resetWorldDefaults={handleResetDefaults}
-					setTideLock={setTideLock}
-					setObliquity={setObliquity}
-					seed={seed}
-					starName={starName}
-					showRealSolNames={seed === SOL_DATA.solSeed}
-					setSeed={setSeed}
-					forceMainWorld={forceMainWorld}
-					setForceMainWorld={setForceMainWorld}
-					tidalSchedulePreview={tidalSchedulePreview}
-					surfaceTidesM={surfaceTidesM}
-					orbitBodies={systemBodies.filter((b) => !b.isMainWorld)}
-					systemBodies={systemBodies}
-					onUpdateSystemBody={updateEditableSystemBody}
-					onFocusBody={handleFocusBody}
-					currentFocus={currentFocus}
-					daysPerYear={daysPerYear}
-					setHoursPerDay={setHoursPerDay}
-					planetRadiusKm={planetRadiusKm}
-					generatedMoons={displayMoons}
-					planetSliders={planetSliders}
-					terrainSliders={terrainSliders}
-					spectralClass={spectralClass}
-					setSpectralClass={setSpectralClass}
-					starSubtype={starSubtype}
-					setStarSubtype={setStarSubtype}
-					orbitalDistanceAU={orbitalDistanceAU}
-					eccentricity={eccentricity}
-					perihelion={perihelion}
-					obliquity={obliquity}
-					era={era}
-					setEra={setEra}
-					generating={generating}
-					generationLabel={generationLabel}
-					generationProgress={generationProgress}
-					generationTimings={generationTimings}
-					landCoverage={landCoverage}
-					generationPreviewTab={generationPreviewTab}
-					onSelectGenerationPreviewTab={setGenerationPreviewTab}
-					unitSystem={unitSystem}
-					handleGenerate={handleGenerate}
-					onClose={() => setGenerationPanelOpen(false)}
-					worldDetails={{
-						hasGeneratedWorld: !!world && !generating,
-						planetName,
-						planetStats,
-						worldPopulation: drawerWorldPopulation,
-						activeWarCount: earthSocialCounts?.activeWarCount ?? null,
-						cultureCount:
-							earthSocialCounts?.cultureCount ??
-							worldForDisplay?.cultures?.count ??
-							null,
-						religionCount:
-							earthSocialCounts?.religionCount ??
-							worldForDisplay?.religions?.count ??
-							null,
-						nationSizeDistribution,
-						governmentDistribution,
-						religionDistribution: religionTypeDistribution,
-						conflictDistribution,
-						relationDistribution,
-						climateDistribution,
-						vegetationDistribution,
-						topographyDistribution,
-						showObservedDistributions,
-						tradeGoodsDistribution,
-					}}
-					nationWiki={nationWikiData ?? proceduralNationWikiData}
-					organizationWiki={organizationWikiData}
-					warWiki={warWikiData}
-				/>
-			)}
+		<div className="relative w-full h-full">
+			<div className="w-full h-full flex flex-col xl:flex-row bg-slate-100">
+				{generationPanelOpen && (
+					<GenerationPanel
+						worldTab={worldTab}
+						setWorldTab={setWorldTab}
+						resetWorldDefaults={handleResetDefaults}
+						setTideLock={setTideLock}
+						setObliquity={setObliquity}
+						seed={seed}
+						starName={starName}
+						showRealSolNames={seed === SOL_DATA.solSeed}
+						setSeed={setSeed}
+						resetMainWorldToEarth={resetMainWorldToEarth}
+						mainWorldMode={mainWorldMode}
+						setMainWorldMode={setMainWorldMode}
+						mainWorldSystemBody={mainWorldSystemBody}
+						updateMainWorldBody={updateMainWorldBody}
+						tidalSchedulePreview={tidalSchedulePreview}
+						surfaceTidesM={surfaceTidesM}
+						orbitBodies={systemBodies.filter((b) => !b.isMainWorld)}
+						systemBodies={systemBodies}
+						companionStars={solarSystem.companionStars}
+						hostStar={hostStar}
+						onFocusBody={handleFocusBody}
+						currentFocus={currentFocus}
+						daysPerYear={daysPerYear}
+						setHoursPerDay={setHoursPerDay}
+						planetRadiusKm={planetRadiusKm}
+						generatedMoons={displayMoons}
+						planetSliders={planetSliders}
+						terrainSliders={terrainSliders}
+						spectralClass={spectralClass}
+						setSpectralClass={setSpectralClass}
+						starSubtype={starSubtype}
+						setStarSubtype={setStarSubtype}
+						setStarAgeGyr={setStarAgeGyr}
+						starAgeGyr={starAgeGyr}
+						orbitalDistanceAU={orbitalDistanceAU}
+						eccentricity={eccentricity}
+						perihelion={perihelion}
+						obliquity={obliquity}
+						era={era}
+						setEra={setEra}
+						generating={generating}
+						generationLabel={generationLabel}
+						generationProgress={generationProgress}
+						generationTimings={generationTimings}
+						landCoverage={landCoverage}
+						generationPreviewTab={generationPreviewTab}
+						onSelectGenerationPreviewTab={setGenerationPreviewTab}
+						unitSystem={unitSystem}
+						handleGenerate={handleGenerate}
+						onClose={() => setGenerationPanelOpen(false)}
+						worldDetails={{
+							hasGeneratedWorld: !!world && !generating,
+							planetName,
+							planetStats,
+							worldPopulation: drawerWorldPopulation,
+							activeWarCount: earthSocialCounts?.activeWarCount ?? null,
+							cultureCount:
+								earthSocialCounts?.cultureCount ??
+								worldForDisplay?.cultures?.count ??
+								null,
+							religionCount:
+								earthSocialCounts?.religionCount ??
+								worldForDisplay?.religions?.count ??
+								null,
+							nationSizeDistribution,
+							governmentDistribution,
+							religionDistribution: religionTypeDistribution,
+							conflictDistribution,
+							relationDistribution,
+							climateDistribution,
+							vegetationDistribution,
+							topographyDistribution,
+							showObservedDistributions,
+							tradeGoodsDistribution,
+						}}
+						nationWiki={nationWikiData ?? proceduralNationWikiData}
+						organizationWiki={organizationWikiData}
+						warWiki={warWikiData}
+					/>
+				)}
 
-			<div
-				ref={viewportRef}
-				className="flex-1 h-[56vh] xl:h-full relative overflow-hidden bg-[#050510]"
-			>
-				<canvas
-					ref={canvasRef}
-					className={`h-full w-full block ${
-						measureMode !== "off" ? "cursor-crosshair" : ""
-					}`}
-				/>
-				<WindParticleCanvas
-					windGrid={windGrid}
-					projectToScreen={projectToScreen}
-					getGlobeCameraDir={getGlobeCameraDir}
-					visible={showWindArrows && !solarSystemViewActive}
-					viewMode={viewMode}
-				/>
-				<OceanCurrentParticleCanvas
-					currentGrid={oceanCurrentGrid}
-					projectToScreen={projectToScreen}
-					getGlobeCameraDir={getGlobeCameraDir}
-					visible={showOceanCurrents && !solarSystemViewActive}
-					viewMode={viewMode}
-				/>
+				<div
+					ref={viewportRef}
+					className="flex-1 h-[56vh] xl:h-full relative overflow-hidden bg-[#050510]"
+				>
+					<canvas
+						ref={canvasRef}
+						className={`h-full w-full block ${
+							measureMode !== "off" ? "cursor-crosshair" : ""
+						}`}
+					/>
+					<WindParticleCanvas
+						windGrid={windGrid}
+						projectToScreen={projectToScreen}
+						getGlobeCameraDir={getGlobeCameraDir}
+						visible={showWindArrows && !solarSystemViewActive}
+						viewMode={viewMode}
+					/>
+					<OceanCurrentParticleCanvas
+						currentGrid={oceanCurrentGrid}
+						projectToScreen={projectToScreen}
+						getGlobeCameraDir={getGlobeCameraDir}
+						visible={showOceanCurrents && !solarSystemViewActive}
+						viewMode={viewMode}
+					/>
 
-				<>
-					{hoverInfo && hoverElevationKm !== null ? (
-						<InfoPanel
-							hoverInfo={hoverInfo}
-							hoverElevationKm={hoverElevationKm}
-							hoverTopography={hoverTopography}
-							hoverCoordinates={hoverCoordinates}
-							hoverTimezone={hoverTimezone}
-							hoverLandmark={hoverLandmark}
-							hoverIsLand={hoverIsLand}
-							hoverTemperatureDelta={hoverTemperatureDelta}
-							hoverRealTemperature={hoverRealTemperature}
-							hoverTemperatureDiff={hoverTemperatureDiff}
-							hoverRainfall={hoverRainfall}
-							hoverCloudCover={hoverCloudCover}
-							hoverRealRainfall={hoverRealRainfall}
-							hoverRealCloudCover={hoverRealCloudCover}
-							hoverRainfallDiff={hoverRainfallDiff}
-							hoverDtr={hoverDtr}
-							hoverRealDtr={hoverRealDtr}
-							hoverDtrDiff={hoverDtrDiff}
-							hoverHumidity={hoverHumidity}
-							hoverRealHumidity={hoverRealHumidity}
-							hoverHumidityDiff={hoverHumidityDiff}
-							hoverMisery={hoverMisery}
-							hoverClimateDisplay={hoverClimateDisplay}
-							hoverIceSummary={hoverIceSummary}
-							hoverBiome={hoverBiome}
-							hoverProvince={hoverProvince}
-							hoverNationId={hoverNationId}
-							hoverOccupation={hoverOccupation}
-							hoverOceanDist={hoverOceanDist}
-							hoverDistCoast={hoverDistCoast}
-							hoverDistCoastKm={hoverDistCoastKm}
-							hoverHazards={hoverHazards}
-							hoverHotspot={hoverHotspot}
-							hoverRiver={hoverRiver}
-							hoverTerrainFeature={hoverTerrainFeature}
-							hoverOceanCurrents={hoverOceanCurrents}
-							hoverWindSpeed={hoverWindSpeed}
-							hoverWindDir={hoverWindDir}
-							hoverWindMonthly={hoverWindMonthly}
-							showWindArrows={showWindArrows}
-							showRivers={showRivers}
-							showGdd={showGdd}
-							showGint={showGint}
-							showPet={showPet}
-							showAet={showAet}
-							showOceanCurrentOverlay={showOceanCurrents}
-							colorMode={colorMode}
-							dangerSubMode={dangerSubMode}
-							populationMode={populationMode}
-							dataVariant={dataVariant}
-							selectedTimeMs={selectedTimeMs}
-							displayMonth={displayMonth}
-							clockMonthMode={clockMonthMode}
-							clockMonth={clockMonth}
-							unitSystem={unitSystem}
-							world={worldForDisplay}
-							routes={worldForDisplay?.routes ?? null}
-							hoverCardRef={hoverCardRef}
-							getProvinceName={getProvinceName}
-							getNationName={getNationName}
-							getLeaderName={getLeaderName}
-							getDynastyName={getDynastyName}
-							getCultureName={getCultureName}
-							getHeritageName={getHeritageName}
-							getLandmarkName={getLandmarkName}
-							getRiverName={getRiverName}
-							hoverNationAdjOffset={
-								colorMode === "nations"
-									? (nationAdjacency?.adjOffset ?? null)
-									: null
-							}
-							hoverNationAdjList={
-								colorMode === "nations"
-									? (nationAdjacency?.adjList ?? null)
-									: null
-							}
-							hoverNationCounts={
-								colorMode === "nations" ? nationProvinceCounts : null
-							}
-							relationAt={null}
-							earthHistoryHoverOverride={earthHistoryHoverOverride}
-						/>
-					) : null}
+					<>
+						{hoverInfo && hoverElevationKm !== null ? (
+							<InfoPanel
+								hoverInfo={hoverInfo}
+								hoverElevationKm={hoverElevationKm}
+								hoverTopography={hoverTopography}
+								hoverCoordinates={hoverCoordinates}
+								hoverTimezone={hoverTimezone}
+								hoverLandmark={hoverLandmark}
+								hoverIsLand={hoverIsLand}
+								hoverTemperatureDelta={hoverTemperatureDelta}
+								hoverRealTemperature={hoverRealTemperature}
+								hoverTemperatureDiff={hoverTemperatureDiff}
+								hoverRainfall={hoverRainfall}
+								hoverCloudCover={hoverCloudCover}
+								hoverRealRainfall={hoverRealRainfall}
+								hoverRealCloudCover={hoverRealCloudCover}
+								hoverRainfallDiff={hoverRainfallDiff}
+								hoverDtr={hoverDtr}
+								hoverRealDtr={hoverRealDtr}
+								hoverDtrDiff={hoverDtrDiff}
+								hoverHumidity={hoverHumidity}
+								hoverRealHumidity={hoverRealHumidity}
+								hoverHumidityDiff={hoverHumidityDiff}
+								hoverMisery={hoverMisery}
+								hoverClimateDisplay={hoverClimateDisplay}
+								hoverIceSummary={hoverIceSummary}
+								hoverBiome={hoverBiome}
+								hoverProvince={hoverProvince}
+								hoverNationId={hoverNationId}
+								hoverOccupation={hoverOccupation}
+								hoverOceanDist={hoverOceanDist}
+								hoverDistCoast={hoverDistCoast}
+								hoverDistCoastKm={hoverDistCoastKm}
+								hoverHazards={hoverHazards}
+								hoverHotspot={hoverHotspot}
+								hoverRiver={hoverRiver}
+								hoverTerrainFeature={hoverTerrainFeature}
+								hoverOceanCurrents={hoverOceanCurrents}
+								hoverWindSpeed={hoverWindSpeed}
+								hoverWindDir={hoverWindDir}
+								hoverWindMonthly={hoverWindMonthly}
+								showWindArrows={showWindArrows}
+								showRivers={showRivers}
+								showGdd={showGdd}
+								showGint={showGint}
+								showPet={showPet}
+								showAet={showAet}
+								showOceanCurrentOverlay={showOceanCurrents}
+								colorMode={colorMode}
+								dangerSubMode={dangerSubMode}
+								populationMode={populationMode}
+								dataVariant={dataVariant}
+								selectedTimeMs={selectedTimeMs}
+								displayMonth={displayMonth}
+								clockMonthMode={clockMonthMode}
+								clockMonth={clockMonth}
+								unitSystem={unitSystem}
+								world={worldForDisplay}
+								routes={worldForDisplay?.routes ?? null}
+								hoverCardRef={hoverCardRef}
+								getProvinceName={getProvinceName}
+								getNationName={getNationName}
+								getLeaderName={getLeaderName}
+								getDynastyName={getDynastyName}
+								getCultureName={getCultureName}
+								getHeritageName={getHeritageName}
+								getLandmarkName={getLandmarkName}
+								getRiverName={getRiverName}
+								hoverNationAdjOffset={
+									colorMode === "nations"
+										? (nationAdjacency?.adjOffset ?? null)
+										: null
+								}
+								hoverNationAdjList={
+									colorMode === "nations"
+										? (nationAdjacency?.adjList ?? null)
+										: null
+								}
+								hoverNationCounts={
+									colorMode === "nations" ? nationProvinceCounts : null
+								}
+								relationAt={null}
+								earthHistoryHoverOverride={earthHistoryHoverOverride}
+							/>
+						) : null}
 
-					{solarSystemViewActive ? (
-						<SolarSystemControls
-							expanded={solarSystemControlsExpanded}
-							setExpanded={setSolarSystemControlsExpanded}
-							onBack={handleReturnToPlanetView}
-							canReturnToPlanetMap={!!worldForDisplay}
-							generationPanelOpen={generationPanelOpen}
-							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
-							showEllipticalOrbits={showSolarSystemEllipticalOrbits}
-							setShowEllipticalOrbits={setShowSolarSystemEllipticalOrbits}
-							showDaylight={showSolarSystemDaylight}
-							setShowDaylight={setShowSolarSystemDaylight}
-							showInclination={showSolarSystemInclination}
-							setShowInclination={setShowSolarSystemInclination}
-							showAxialTilt={showSolarSystemAxialTilt}
-							setShowAxialTilt={setShowSolarSystemAxialTilt}
-							showRealisticSizes={showSolarSystemRealisticSizes}
-							setShowRealisticSizes={setShowSolarSystemRealisticSizes}
-							showBodyNames={showSolarSystemBodyNames}
-							setShowBodyNames={setShowSolarSystemBodyNames}
-							clock={
-								solarSystemClock
-									? {
-											rotationFraction: solarSystemRotationFraction,
-											setRotationFraction: setSolarSystemRotationFraction,
-											orbitFraction: solarSystemOrbitFraction,
-											setOrbitFraction: setSolarSystemOrbitFraction,
-											rotationPeriodHours: solarSystemClock.rotationPeriodHours,
-											orbitalPeriodDays: solarSystemClock.orbitalPeriodDays,
+						{solarSystemViewActive ? (
+							<SolarSystemControls
+								expanded={solarSystemControlsExpanded}
+								setExpanded={setSolarSystemControlsExpanded}
+								onBack={handleReturnToPlanetView}
+								canReturnToPlanetMap={!!worldForDisplay}
+								onBackToGalaxy={galaxyOrigin ? handleOpenGalaxy : undefined}
+								generationPanelOpen={generationPanelOpen}
+								onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
+								showEllipticalOrbits={showSolarSystemEllipticalOrbits}
+								setShowEllipticalOrbits={setShowSolarSystemEllipticalOrbits}
+								showDaylight={showSolarSystemDaylight}
+								setShowDaylight={setShowSolarSystemDaylight}
+								showInclination={showSolarSystemInclination}
+								setShowInclination={setShowSolarSystemInclination}
+								showAxialTilt={showSolarSystemAxialTilt}
+								setShowAxialTilt={setShowSolarSystemAxialTilt}
+								showRealisticSizes={showSolarSystemRealisticSizes}
+								setShowRealisticSizes={setShowSolarSystemRealisticSizes}
+								showBodyNames={showSolarSystemBodyNames}
+								setShowBodyNames={setShowSolarSystemBodyNames}
+								clock={
+									solarSystemClock
+										? {
+												rotationFraction: solarSystemRotationFraction,
+												setRotationFraction: setSolarSystemRotationFraction,
+												orbitFraction: solarSystemOrbitFraction,
+												setOrbitFraction: setSolarSystemOrbitFraction,
+												rotationPeriodHours:
+													solarSystemClock.rotationPeriodHours,
+												orbitalPeriodDays: solarSystemClock.orbitalPeriodDays,
+											}
+										: null
+								}
+							/>
+						) : (
+							<OverlayControls
+								isEarthImport={worldForDisplay?.isEarthImport ?? false}
+								onEnterSolarSystem={handleEnterSolarSystem}
+								overlaysExpanded={overlaysExpanded}
+								setOverlaysExpanded={setOverlaysExpanded}
+								measureMode={measureMode}
+								setMeasureMode={setMeasureMode}
+								pathfindingLand={pathfindingLand}
+								setPathfindingLand={setPathfindingLand}
+								pathfindingSea={pathfindingSea}
+								setPathfindingSea={setPathfindingSea}
+								pathfindingResult={pathfindingResult}
+								showWireframe={showWireframe}
+								setShowWireframe={handleSetWireframe}
+								showRivers={showRivers}
+								setShowRivers={setShowRivers}
+								showThermalEquator={showThermalEquator}
+								setShowThermalEquator={setShowThermalEquator}
+								showClouds={showClouds}
+								setShowClouds={setShowClouds}
+								showCoastlines={showCoastlines}
+								setShowCoastlines={setShowCoastlines}
+								showWindArrows={showWindArrows}
+								setShowWindArrows={setShowWindArrows}
+								showGdd={showGdd}
+								setShowGdd={setShowGdd}
+								showGint={showGint}
+								setShowGint={setShowGint}
+								showPet={showPet}
+								setShowPet={setShowPet}
+								showAet={showAet}
+								setShowAet={setShowAet}
+								showOceanCurrents={showOceanCurrents}
+								setShowOceanCurrents={setShowOceanCurrents}
+								showGrid={showGrid}
+								setShowGrid={setShowGrid}
+								showNationBorders={showNationBorders}
+								setShowNationBorders={setShowNationBorders}
+								showNationHierarchy={showNationHierarchy}
+								setShowNationHierarchy={setShowNationHierarchy}
+								nationMode={nationMode}
+								populationMode={populationMode}
+								labelMode={labelMode}
+								setLabelMode={setLabelMode}
+								showElevation={showElevation}
+								setShowElevation={handleSetElevation}
+								showInfrastructure={showInfrastructure}
+								setShowInfrastructure={setShowInfrastructure}
+								gridSpacing={gridSpacing}
+								setGridSpacing={setGridSpacing}
+								viewMode={viewMode}
+								setViewMode={setViewMode}
+								unitSystem={unitSystem}
+								setUnitSystem={setUnitSystem}
+								mapProjectionLatitude={mapProjectionLatitude}
+								draftMapProjectionLatitude={draftMapProjectionLatitude}
+								setDraftMapProjectionLatitude={setDraftMapProjectionLatitude}
+								setMapProjectionLatitude={setMapProjectionLatitude}
+								debugMapModes={debugMapModes}
+								setDebugMapModes={setDebugMapModes}
+								colorMode={colorMode}
+								setColorMode={setGeographyColorMode}
+								dataVariant={dataVariant}
+								setDataVariant={handleSetDataVariant}
+								clockCurrent={clockCurrent}
+								setClockCurrent={setClockCurrent}
+								clockMonthMode={clockMonthMode}
+								setClockMonthMode={setClockMonthMode}
+								clockMonth={clockMonth}
+								setClockMonth={setClockMonth}
+								clockDay={clockDay}
+								setClockDay={setClockDay}
+								clockHour={clockHour}
+								setClockHour={setClockHour}
+								clockUseMeridiem={clockUseMeridiem}
+								setClockUseMeridiem={setClockUseMeridiem}
+								hoursPerDay={hoursPerDay}
+								tidallyLocked={tidallyLocked}
+								daysPerYear={effectiveDaysPerYear}
+								vegetationSubMode={vegetationSubMode}
+								setVegetationSubMode={setVegetationSubMode}
+								climateSubMode={climateSubMode}
+								setClimateSubMode={setClimateSubMode}
+								elevationSubMode={elevationSubMode}
+								setElevationSubMode={setElevationSubMode}
+								topographySubMode={topographySubMode}
+								setTopographySubMode={setTopographySubMode}
+								dangerSubMode={dangerSubMode}
+								setDangerSubMode={setDangerSubMode}
+								hasCycloneRisk={!!world?.cycloneRisk}
+								hasTornadoRisk={!!world?.tornadoRisk}
+								hasTidalRisk={!!world?.tidalRange}
+								exportWidthPreset={exportWidthPreset}
+								setExportWidthPreset={setExportWidthPreset}
+								exportCenterLongitude={exportCenterLongitude}
+								setExportCenterLongitude={setExportCenterLongitude}
+								exportDisabled={exportDisabled}
+								exportBusy={exportBusy}
+								exportProgress={exportProgress}
+								exportError={exportError}
+								onExport={() => {
+									void handleExportMap()
+								}}
+								onReset={() => {
+									setViewMode("globe")
+									setUnitSystem("metric")
+									setShowGrid(true)
+									setGridSpacing(15)
+									setShowWireframe(false)
+									setShowRivers(false)
+									setShowThermalEquator(false)
+									setShowNationBorders(false)
+									setShowNationHierarchy(false)
+									setLabelMode({
+										nations: false,
+										dynasty: false,
+										settlements: false,
+										culture: false,
+										heritage: false,
+										religion: false,
+										script: false,
+									})
+									setShowElevation(false)
+									setShowInfrastructure(false)
+									setMeasureMode("off")
+									setPathfindingLand(true)
+									setPathfindingSea(true)
+									setDebugMapModes(false)
+									setShowDaylight(false)
+									setClockHour(12)
+									setExportCenterLongitude(0)
+									setMapProjectionLatitude(0)
+									setDraftMapProjectionLatitude(0)
+								}}
+								generationPanelOpen={generationPanelOpen}
+								onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
+								showDaylight={showDaylight}
+								setShowDaylight={setShowDaylight}
+							/>
+						)}
+
+						{measureDistanceKm !== null && measureLabelPos && (
+							<FloatingPanel
+								interactive={false}
+								padding="sm"
+								className="pointer-events-none absolute z-20 px-2.5 py-1"
+								style={{
+									left: measureLabelPos[0],
+									top: measureLabelPos[1] - 32,
+									transform: "translateX(-50%)",
+								}}
+							>
+								<span className="font-mono text-xs font-semibold">
+									{formatDistance(measureDistanceKm, unitSystem, {
+										under100Digits: 1,
+										over100Digits: 0,
+									})}
+								</span>
+							</FloatingPanel>
+						)}
+
+						{worldForDisplay?.isEarthImport ? (
+							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+								<div className="pointer-events-auto">
+									<SimulationControls
+										selectedTimeMs={earthHistory.selectedDays}
+										minTimeMs={earthHistory.minDays}
+										maxTimeMs={earthHistory.maxDays}
+										onTimeChange={earthHistory.setSelectedDays}
+										floating={false}
+										onPlayPause={handleToggleEarthHistoryPlayback}
+										simPlaying={earthHistoryPlaying}
+										formatLabel={earthHistoryFormatLabel}
+										stepValue={365}
+										playPauseLabels={{
+											play: "Start timeline",
+											pause: "Pause timeline",
+										}}
+										extraControls={
+											<EarthHistoryBookmarks
+												onSelect={earthHistory.setSelectedDays}
+												selectedDate={earthHistory.selectedDays}
+												placement="below"
+											/>
 										}
-									: null
-							}
-						/>
-					) : (
-						<OverlayControls
-							isEarthImport={worldForDisplay?.isEarthImport ?? false}
-							onEnterSolarSystem={handleEnterSolarSystem}
-							overlaysExpanded={overlaysExpanded}
-							setOverlaysExpanded={setOverlaysExpanded}
-							measureMode={measureMode}
-							setMeasureMode={setMeasureMode}
-							pathfindingLand={pathfindingLand}
-							setPathfindingLand={setPathfindingLand}
-							pathfindingSea={pathfindingSea}
-							setPathfindingSea={setPathfindingSea}
-							pathfindingResult={pathfindingResult}
-							showWireframe={showWireframe}
-							setShowWireframe={handleSetWireframe}
-							showRivers={showRivers}
-							setShowRivers={setShowRivers}
-							showThermalEquator={showThermalEquator}
-							setShowThermalEquator={setShowThermalEquator}
-							showClouds={showClouds}
-							setShowClouds={setShowClouds}
-							showCoastlines={showCoastlines}
-							setShowCoastlines={setShowCoastlines}
-							showWindArrows={showWindArrows}
-							setShowWindArrows={setShowWindArrows}
-							showGdd={showGdd}
-							setShowGdd={setShowGdd}
-							showGint={showGint}
-							setShowGint={setShowGint}
-							showPet={showPet}
-							setShowPet={setShowPet}
-							showAet={showAet}
-							setShowAet={setShowAet}
-							showOceanCurrents={showOceanCurrents}
-							setShowOceanCurrents={setShowOceanCurrents}
-							showGrid={showGrid}
-							setShowGrid={setShowGrid}
-							showNationBorders={showNationBorders}
-							setShowNationBorders={setShowNationBorders}
-							showNationHierarchy={showNationHierarchy}
-							setShowNationHierarchy={setShowNationHierarchy}
-							nationMode={nationMode}
-							populationMode={populationMode}
-							labelMode={labelMode}
-							setLabelMode={setLabelMode}
-							showElevation={showElevation}
-							setShowElevation={handleSetElevation}
-							showInfrastructure={showInfrastructure}
-							setShowInfrastructure={setShowInfrastructure}
-							gridSpacing={gridSpacing}
-							setGridSpacing={setGridSpacing}
-							viewMode={viewMode}
-							setViewMode={setViewMode}
-							unitSystem={unitSystem}
-							setUnitSystem={setUnitSystem}
-							mapProjectionLatitude={mapProjectionLatitude}
-							draftMapProjectionLatitude={draftMapProjectionLatitude}
-							setDraftMapProjectionLatitude={setDraftMapProjectionLatitude}
-							setMapProjectionLatitude={setMapProjectionLatitude}
-							debugMapModes={debugMapModes}
-							setDebugMapModes={setDebugMapModes}
-							colorMode={colorMode}
-							setColorMode={setGeographyColorMode}
-							dataVariant={dataVariant}
-							setDataVariant={handleSetDataVariant}
-							clockCurrent={clockCurrent}
-							setClockCurrent={setClockCurrent}
-							clockMonthMode={clockMonthMode}
-							setClockMonthMode={setClockMonthMode}
-							clockMonth={clockMonth}
-							setClockMonth={setClockMonth}
-							clockDay={clockDay}
-							setClockDay={setClockDay}
-							clockHour={clockHour}
-							setClockHour={setClockHour}
-							clockUseMeridiem={clockUseMeridiem}
-							setClockUseMeridiem={setClockUseMeridiem}
-							hoursPerDay={hoursPerDay}
-							tidallyLocked={tidallyLocked}
-							daysPerYear={effectiveDaysPerYear}
-							vegetationSubMode={vegetationSubMode}
-							setVegetationSubMode={setVegetationSubMode}
-							climateSubMode={climateSubMode}
-							setClimateSubMode={setClimateSubMode}
-							elevationSubMode={elevationSubMode}
-							setElevationSubMode={setElevationSubMode}
-							topographySubMode={topographySubMode}
-							setTopographySubMode={setTopographySubMode}
-							dangerSubMode={dangerSubMode}
-							setDangerSubMode={setDangerSubMode}
-							hasCycloneRisk={!!world?.cycloneRisk}
-							hasTornadoRisk={!!world?.tornadoRisk}
-							hasTidalRisk={!!world?.tidalRange}
-							exportWidthPreset={exportWidthPreset}
-							setExportWidthPreset={setExportWidthPreset}
-							exportCenterLongitude={exportCenterLongitude}
-							setExportCenterLongitude={setExportCenterLongitude}
-							exportDisabled={exportDisabled}
-							exportBusy={exportBusy}
-							exportProgress={exportProgress}
-							exportError={exportError}
-							onExport={() => {
-								void handleExportMap()
-							}}
-							onReset={() => {
-								setViewMode("globe")
-								setUnitSystem("metric")
-								setShowGrid(true)
-								setGridSpacing(15)
-								setShowWireframe(false)
-								setShowRivers(false)
-								setShowThermalEquator(false)
-								setShowNationBorders(false)
-								setShowNationHierarchy(false)
-								setLabelMode({
-									nations: false,
-									dynasty: false,
-									settlements: false,
-									culture: false,
-									heritage: false,
-									religion: false,
-									script: false,
-								})
-								setShowElevation(false)
-								setShowInfrastructure(false)
-								setMeasureMode("off")
-								setPathfindingLand(true)
-								setPathfindingSea(true)
-								setDebugMapModes(false)
-								setShowDaylight(false)
-								setClockHour(12)
-								setExportCenterLongitude(0)
-								setMapProjectionLatitude(0)
-								setDraftMapProjectionLatitude(0)
-							}}
-							generationPanelOpen={generationPanelOpen}
-							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
-							showDaylight={showDaylight}
-							setShowDaylight={setShowDaylight}
-						/>
-					)}
-
-					{measureDistanceKm !== null && measureLabelPos && (
-						<FloatingPanel
-							interactive={false}
-							padding="sm"
-							className="pointer-events-none absolute z-20 px-2.5 py-1"
-							style={{
-								left: measureLabelPos[0],
-								top: measureLabelPos[1] - 32,
-								transform: "translateX(-50%)",
-							}}
-						>
-							<span className="font-mono text-xs font-semibold">
-								{formatDistance(measureDistanceKm, unitSystem, {
-									under100Digits: 1,
-									over100Digits: 0,
-								})}
-							</span>
-						</FloatingPanel>
-					)}
-
-					{worldForDisplay?.isEarthImport ? (
-						<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
-							<div className="pointer-events-auto">
-								<SimulationControls
-									selectedTimeMs={earthHistory.selectedDays}
-									minTimeMs={earthHistory.minDays}
-									maxTimeMs={earthHistory.maxDays}
-									onTimeChange={earthHistory.setSelectedDays}
-									floating={false}
-									onPlayPause={handleToggleEarthHistoryPlayback}
-									simPlaying={earthHistoryPlaying}
-									formatLabel={earthHistoryFormatLabel}
-									stepValue={365}
-									playPauseLabels={{
-										play: "Start timeline",
-										pause: "Pause timeline",
-									}}
-									extraControls={
-										<EarthHistoryBookmarks
-											onSelect={earthHistory.setSelectedDays}
-											selectedDate={earthHistory.selectedDays}
-											placement="below"
-										/>
-									}
-								/>
+									/>
+								</div>
 							</div>
-						</div>
-					) : null}
-					{worldForDisplay &&
-					!worldForDisplay.isEarthImport &&
-					proceduralHistoryFrame ? (
-						<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
-							<div className="pointer-events-auto">
-								<SimulationControls
-									selectedTimeMs={proceduralHistoryTimeMs}
-									minTimeMs={proceduralHistoryTimeMs}
-									maxTimeMs={proceduralHistoryTimeMs}
-									onTimeChange={() => {
-										// Scrubbing is disabled while this control is pinned to one frame.
-									}}
-									floating={false}
-									onPlayPause={handleToggleProceduralHistoryPlayback}
-									simPlaying={proceduralHistoryPlaying}
-									formatLabel={(ms) =>
-										DATE.formatHistoryDays(HISTORY_DAYS.historyMsToDays(ms))
-									}
-									stepValue={STATE.yearMs}
-								/>
+						) : null}
+						{worldForDisplay &&
+						!worldForDisplay.isEarthImport &&
+						proceduralHistoryFrame ? (
+							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+								<div className="pointer-events-auto">
+									<SimulationControls
+										selectedTimeMs={proceduralHistoryTimeMs}
+										minTimeMs={proceduralHistoryTimeMs}
+										maxTimeMs={proceduralHistoryTimeMs}
+										onTimeChange={() => {
+											// Scrubbing is disabled while this control is pinned to one frame.
+										}}
+										floating={false}
+										onPlayPause={handleToggleProceduralHistoryPlayback}
+										simPlaying={proceduralHistoryPlaying}
+										formatLabel={(ms) =>
+											DATE.formatHistoryDays(HISTORY_DAYS.historyMsToDays(ms))
+										}
+										stepValue={STATE.yearMs}
+									/>
+								</div>
 							</div>
-						</div>
-					) : null}
-					{!solarSystemViewActive && (
-						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
-							<div className="pointer-events-auto">
-								<ModeBar
-									colorMode={colorMode}
-									setColorMode={setGeographyColorMode}
-									geographyMode={geographyMode}
-									setGeographyMode={setGeographyMode}
-									nationMode={nationMode}
-									setNationMode={setNationMode}
-									populationMode={populationMode}
-									setPopulationMode={setPopulationMode}
-									debugMapModes={debugMapModes}
-									vegetationSubMode={vegetationSubMode}
-									climateSubMode={climateSubMode}
-									elevationSubMode={elevationSubMode}
-									topographySubMode={topographySubMode}
-									isEarthImport={worldForDisplay?.isEarthImport ?? false}
-								/>
+						) : null}
+						{!solarSystemViewActive && (
+							<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
+								<div className="pointer-events-auto">
+									<ModeBar
+										colorMode={colorMode}
+										setColorMode={setGeographyColorMode}
+										geographyMode={geographyMode}
+										setGeographyMode={setGeographyMode}
+										nationMode={nationMode}
+										setNationMode={setNationMode}
+										populationMode={populationMode}
+										setPopulationMode={setPopulationMode}
+										debugMapModes={debugMapModes}
+										vegetationSubMode={vegetationSubMode}
+										climateSubMode={climateSubMode}
+										elevationSubMode={elevationSubMode}
+										topographySubMode={topographySubMode}
+										isEarthImport={worldForDisplay?.isEarthImport ?? false}
+									/>
+								</div>
 							</div>
-						</div>
-					)}
-				</>
+						)}
+					</>
+				</div>
 			</div>
+			{galaxyModeEverActive && (
+				<div
+					className={`absolute inset-0 z-40 ${
+						galaxyModeActive ? "" : "invisible pointer-events-none"
+					}`}
+				>
+					<GalaxyModeView
+						initialGalaxyOrigin={galaxyOrigin}
+						onOpenSystem={handleOpenGalaxySystem}
+					/>
+				</div>
+			)}
 		</div>
 	)
 }

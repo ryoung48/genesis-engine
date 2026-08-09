@@ -6,6 +6,7 @@ import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { TransferDownIcon } from "@/ui/components/primitives/icons/TransferDownIcon"
+import { TransferUpIcon } from "@/ui/components/primitives/icons/TransferUpIcon"
 import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
 import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
@@ -26,6 +27,9 @@ interface SolarSystemControlsProps {
 	setExpanded: (v: boolean | ((prev: boolean) => boolean)) => void
 	onBack: () => void
 	canReturnToPlanetMap?: boolean
+	/** Present only when this system was opened from the galaxy view -- see
+	 * useSolarSystemBodies' galaxyOrigin. */
+	onBackToGalaxy?: () => void
 	generationPanelOpen?: boolean
 	onToggleGenerationPanel?: () => void
 	showEllipticalOrbits: boolean
@@ -59,6 +63,7 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 	setExpanded,
 	onBack,
 	canReturnToPlanetMap = false,
+	onBackToGalaxy,
 	generationPanelOpen,
 	onToggleGenerationPanel,
 	showEllipticalOrbits,
@@ -75,13 +80,30 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 	setShowBodyNames,
 	clock,
 }) => {
-	const headerAction = canReturnToPlanetMap ? (
-		<Tooltip content="Planet map" position="top">
-			<IconButton onClick={onBack} tone="overlay" shape="pill" size="sm">
-				<TransferDownIcon className="h-3.5 w-3.5" />
-			</IconButton>
-		</Tooltip>
-	) : undefined
+	const headerAction =
+		onBackToGalaxy || canReturnToPlanetMap ? (
+			<div className="flex items-center gap-1.5">
+				{onBackToGalaxy && (
+					<Tooltip content="Galaxy map" position="top">
+						<IconButton
+							onClick={onBackToGalaxy}
+							tone="overlay"
+							shape="pill"
+							size="sm"
+						>
+							<TransferUpIcon className="h-3.5 w-3.5" />
+						</IconButton>
+					</Tooltip>
+				)}
+				{canReturnToPlanetMap && (
+					<Tooltip content="Planet map" position="top">
+						<IconButton onClick={onBack} tone="overlay" shape="pill" size="sm">
+							<TransferDownIcon className="h-3.5 w-3.5" />
+						</IconButton>
+					</Tooltip>
+				)}
+			</div>
+		) : undefined
 
 	return (
 		<>
@@ -105,8 +127,8 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 						"pointer-events-none absolute bottom-full left-0 mb-2",
 					)}
 				>
-					<div className="pointer-events-auto">
-						<FloatingPanel className="w-56" padding="md">
+					<div className={expanded ? "pointer-events-auto" : "pointer-events-none"}>
+						<FloatingPanel interactive={expanded} className="w-56" padding="md">
 							<PanelHeader
 								title="Solar System"
 								tone="overlay"

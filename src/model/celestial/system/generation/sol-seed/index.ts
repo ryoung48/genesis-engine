@@ -48,6 +48,12 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		greenhouseFactor:
 			mainWorld.greenhouseFactor ??
 			GREENHOUSE_ESTIMATE.estimateGreenhouseFactor(pressureBar),
+		// The live/editable Sol main world always reads as real Earth --
+		// without this it falls through to buildPlanet's seed.biosphere
+		// undefined and gets re-rolled by applySystemSeismology below (unlike
+		// the static SOL_DATA seed, which hardcodes this).
+		biosphere: SOL_DATA.solPlanetSeeds.find((seed) => seed.isMainWorld)
+			?.biosphere,
 	}
 }
 

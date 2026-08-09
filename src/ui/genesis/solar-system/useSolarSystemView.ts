@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { STAR } from "@/model/celestial/star"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
+import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RNG } from "@/model/shared/random/rng"
 import { GENERATION_SESSION_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
@@ -11,7 +11,108 @@ import {
 	saveGenerationSessionSnapshot,
 } from "@/ui/genesis/generation/session-persistence"
 import { getSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
+import type {
+	CompanionOverlayParams,
+	OrbitAddress,
+} from "@/ui/genesis/solar-system/overlay"
 import type { SolarSystemViewInput } from "@/ui/genesis/view/types"
+
+const DEFAULT_COMPANION_DAYS_PER_YEAR = 365
+
+/** Builds every companion star's own overlay params -- companions aren't
+ * live-edited (no seed/spectral-class UI targets them), so this is a pure
+ * mapping from the persisted solarSystem.companionStars, unlike the
+ * primary's params which flow through the reactive generatedSystemBodies
+ * pipeline below. */
+function buildCompanionOverlayParams(
+	companionStars: CompanionStar[] | undefined,
+	toggles: {
+		showEllipticalOrbits: boolean
+		showDaylight: boolean
+		showInclination: boolean
+		showAxialTilt: boolean
+		showRealisticSizes: boolean
+		showBodyNames: boolean
+		namesEnabled: boolean
+	},
+	initialDay: number,
+): CompanionOverlayParams[] {
+	return (companionStars ?? []).map((companion) => ({
+		star: {
+			bodies: companion.orbits,
+			companions: [] as CompanionOverlayParams[],
+			daysPerYear:
+				companion.orbits[0]?.orbitalPeriodDays ??
+				DEFAULT_COMPANION_DAYS_PER_YEAR,
+			spectralClass: companion.class,
+			starSubtype: companion.subtype,
+			hostStar: companion.hostStar,
+			initialDay,
+			showEllipticalOrbits: toggles.showEllipticalOrbits,
+			showDaylight: toggles.showDaylight,
+			showInclination: toggles.showInclination,
+			showAxialTilt: toggles.showAxialTilt,
+			showRealisticSizes: toggles.showRealisticSizes,
+			showBodyNames: toggles.showBodyNames,
+			showRealNames: false,
+			namesEnabled: toggles.namesEnabled,
+			starName: companion.starName,
+		},
+		orbitalDistanceAU: companion.orbitalDistanceAU,
+		orbitalPeriodDays: companion.orbitalPeriodDays,
+		eccentricity: companion.eccentricity,
+		inclinationDeg: companion.inclinationDeg,
+	}))
+}
+
+type ViewFocus = { bodyIndex: number; moonIndex?: number }
+
+function isMainWorldFocus(bodies: SystemBody[], focus: ViewFocus): boolean {
+	const body = bodies[focus.bodyIndex]
+	if (!body) return false
+	return focus.moonIndex === undefined
+		? body.isMainWorld
+		: body.moons[focus.moonIndex]?.isMainWorld === true
+}
+
+function findMainWorldFocus(bodies: SystemBody[]): ViewFocus | null {
+	const bodyIndex = bodies.findIndex((body) => body.isMainWorld)
+	if (bodyIndex >= 0) return { bodyIndex }
+	for (let i = 0; i < bodies.length; i++) {
+		const moonIndex = bodies[i]!.moons.findIndex((moon) => moon.isMainWorld)
+		if (moonIndex >= 0) return { bodyIndex: i, moonIndex }
+	}
+	return null
+}
+
+/** This hook's own clock-knob/tidal-schedule machinery only ever reads the
+ * primary's own `systemBodies` -- a companion star's bodies live in a
+ * separate array (`solarSystem.companionStars[n].orbits`) this hook doesn't
+ * have reactive access to, so a companion focus falls back to whatever the
+ * primary was last focused on (see solarSystemClock/handleEnterSolarSystem)
+ * rather than indexing the wrong array. The camera itself still flies to a
+ * companion body/moon (that's the whole fix -- see
+ * setSolarSystemFocusChangeHandler below), this only gates the
+ * primary-scoped bookkeeping. Returns null for a star address too (no
+ * "moon" of the star itself to look up). */
+function toPrimaryBodyFocus(address: OrbitAddress | null): ViewFocus | null {
+	if (!address || address.starIndex !== 0 || address.kind === "star")
+		return null
+	return address.kind === "moon"
+		? { bodyIndex: address.bodyIdx, moonIndex: address.moonIdx }
+		: { bodyIndex: address.bodyIdx }
+}
+
+function viewFocusToAddress(focus: ViewFocus): OrbitAddress {
+	return focus.moonIndex !== undefined
+		? {
+				kind: "moon",
+				starIndex: 0,
+				bodyIdx: focus.bodyIndex,
+				moonIdx: focus.moonIndex,
+			}
+		: { kind: "body", starIndex: 0, bodyIdx: focus.bodyIndex }
+}
 
 /**
  * Owns the 3D solar-system view: which body the camera is focused on, the
@@ -27,6 +128,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	const {
 		sceneRef,
 		initialGenerationSession,
+		sessionNamespace,
 		world,
 		solarSystem,
 		setSolarSystem,
@@ -44,6 +146,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		tideLock,
 		spectralClass,
 		starSubtype,
+		mainWorldMode,
+		galaxyOrigin,
 		starName,
 		namesEnabled,
 		seed,
@@ -118,16 +222,16 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
+		const initialDay = solarSystemElapsedHoursRef.current / 24
 		sceneRef.current?.setSolarSystemOverlay(
 			solarSystemViewActive && systemBodiesRef.current.length > 0
 				? {
 						bodies: systemBodiesRef.current,
 						daysPerYear: effectiveDaysPerYear,
-						spectralClass: STAR.isValidSpectralClass(spectralClass)
-							? (spectralClass as MainSequenceClass)
-							: STAR.defaultSpectralClass,
+						spectralClass,
 						starSubtype,
-						initialDay: solarSystemElapsedHoursRef.current / 24,
+						hostStar: solarSystem.star.hostStar,
+						initialDay,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
@@ -138,6 +242,19 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						namesEnabled,
 						starName,
 						mainWorldTexture: mainWorldSatelliteTexture,
+						companions: buildCompanionOverlayParams(
+							solarSystem.companionStars,
+							{
+								showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+								showDaylight: showSolarSystemDaylight,
+								showInclination: showSolarSystemInclination,
+								showAxialTilt: showSolarSystemAxialTilt,
+								showRealisticSizes: showSolarSystemRealisticSizes,
+								showBodyNames: showSolarSystemBodyNames,
+								namesEnabled,
+							},
+							initialDay,
+						),
 					}
 				: null,
 		)
@@ -155,20 +272,21 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		starName,
 		showSolarSystemDaylight,
 		mainWorldSatelliteTexture,
+		solarSystem.companionStars,
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		if (!solarSystemViewActive) return
+		const initialDay = solarSystemElapsedHoursRef.current / 24
 		sceneRef.current?.updateSolarSystemOverlay(
 			systemBodies.length > 0
 				? {
 						bodies: systemBodies,
 						daysPerYear: effectiveDaysPerYear,
-						spectralClass: STAR.isValidSpectralClass(spectralClass)
-							? (spectralClass as MainSequenceClass)
-							: STAR.defaultSpectralClass,
+						spectralClass,
 						starSubtype,
-						initialDay: solarSystemElapsedHoursRef.current / 24,
+						hostStar: solarSystem.star.hostStar,
+						initialDay,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
@@ -179,6 +297,19 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						namesEnabled,
 						starName,
 						mainWorldTexture: mainWorldSatelliteTexture,
+						companions: buildCompanionOverlayParams(
+							solarSystem.companionStars,
+							{
+								showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+								showDaylight: showSolarSystemDaylight,
+								showInclination: showSolarSystemInclination,
+								showAxialTilt: showSolarSystemAxialTilt,
+								showRealisticSizes: showSolarSystemRealisticSizes,
+								showBodyNames: showSolarSystemBodyNames,
+								namesEnabled,
+							},
+							initialDay,
+						),
 					}
 				: null,
 		)
@@ -197,6 +328,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		starName,
 		showSolarSystemDaylight,
 		mainWorldSatelliteTexture,
+		solarSystem.companionStars,
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -214,26 +346,59 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	// populates the renderer's body positions once that flips true, so a
 	// focus request has to wait for that same commit before the renderer has
 	// anything to focus on.
-	const [pendingFocus, setPendingFocus] = useState<{
-		bodyIndex: number
-		moonIndex?: number
-	} | null>(
+	const [pendingFocus, setPendingFocus] = useState<OrbitAddress | null>(
 		initialGenerationSession?.solarSystemViewActive
 			? (initialGenerationSession.currentFocus ?? null)
 			: null,
 	)
-	// The last body/moon focused via the GPS buttons — drives the clock
+	// The last body/moon/star focused via the GPS buttons — drives the clock
 	// knobs' reference periods and is not cleared on use (unlike pendingFocus,
 	// which just triggers the one-shot camera animation).
-	const [currentFocus, setCurrentFocus] = useState<{
-		bodyIndex: number
-		moonIndex?: number
-	} | null>(initialGenerationSession?.currentFocus ?? null)
+	const [currentFocus, setCurrentFocus] = useState<OrbitAddress | null>(
+		initialGenerationSession?.currentFocus ?? null,
+	)
+	// Whether the camera is (or was, as of the last systemBodies snapshot)
+	// following the main world specifically -- kept in sync imperatively
+	// wherever focus is set explicitly (handleFocusBody, the renderer's
+	// double-click handler below), and consulted here, synchronously during
+	// render rather than in an effect, so a main-world-driven regeneration
+	// (the Main World mode toggle, dice/earth/apply seed) can move
+	// pendingFocus/currentFocus onto the new main world's location in the
+	// SAME commit the new systemBodies arrives in -- ahead of every effect in
+	// this hook, including the overlay-rebuild effect above, which always
+	// runs first among them since effects fire in declaration order within
+	// one component. Doing this in an effect instead raced that rebuild:
+	// depending on unrelated component-tree ordering, focusOnSystemBody could
+	// fire against the stale pre-regeneration overlay and silently no-op.
+	const wasFocusedOnMainWorldRef = useRef(
+		(() => {
+			const primary = toPrimaryBodyFocus(currentFocus)
+			return primary ? isMainWorldFocus(systemBodies, primary) : true
+		})(),
+	)
+	const prevSystemBodiesForFocusRef = useRef(systemBodies)
+	if (systemBodies !== prevSystemBodiesForFocusRef.current) {
+		prevSystemBodiesForFocusRef.current = systemBodies
+		if (wasFocusedOnMainWorldRef.current) {
+			const next = findMainWorldFocus(systemBodies)
+			const currentPrimary = toPrimaryBodyFocus(currentFocus)
+			if (
+				next &&
+				(!currentPrimary ||
+					currentPrimary.bodyIndex !== next.bodyIndex ||
+					currentPrimary.moonIndex !== next.moonIndex)
+			) {
+				const nextAddress = viewFocusToAddress(next)
+				setPendingFocus(nextAddress)
+				setCurrentFocus(nextAddress)
+			}
+		}
+	}
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		if (typeof window === "undefined") return
 		let cancelled = false
-		void loadGenerationSessionSnapshot()
+		void loadGenerationSessionSnapshot(sessionNamespace)
 			.then((snapshot) => {
 				if (cancelled || !snapshot) return
 				// Only worth arming: the generated-bodies sync effect in
@@ -270,22 +435,38 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			cancelled = true
 		}
 	}, [])
+	// Syncs the primary-scoped bookkeeping (currentFocus's clock-knob/
+	// tidal-schedule consumers, wasFocusedOnMainWorldRef) for any address --
+	// a no-op for a companion star's own nodes (starIndex !== 0), same as a
+	// star address itself (nothing to look up a "main world" status for).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
+	const syncPrimaryFocusBookkeeping = useCallback((address: OrbitAddress) => {
+		if (address.starIndex !== 0) return
+		if (address.kind === "star") {
+			wasFocusedOnMainWorldRef.current = false
+			return
+		}
+		wasFocusedOnMainWorldRef.current = isMainWorldFocus(
+			systemBodiesRef.current,
+			address.kind === "moon"
+				? { bodyIndex: address.bodyIdx, moonIndex: address.moonIdx }
+				: { bodyIndex: address.bodyIdx },
+		)
+	}, [])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleFocusBody = useCallback(
-		(bodyIndex: number, moonIndex?: number) => {
+		(address: OrbitAddress) => {
 			setSolarSystemViewActive(true)
-			setPendingFocus({ bodyIndex, moonIndex })
-			setCurrentFocus({ bodyIndex, moonIndex })
+			setPendingFocus(address)
+			setCurrentFocus(address)
+			syncPrimaryFocusBookkeeping(address)
 		},
-		[],
+		[syncPrimaryFocusBookkeeping],
 	)
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		if (!solarSystemViewActive || !pendingFocus) return
-		sceneRef.current?.focusOnSystemBody(
-			pendingFocus.bodyIndex,
-			pendingFocus.moonIndex,
-		)
+		sceneRef.current?.focusOnSystemBody(pendingFocus)
 		setPendingFocus(null)
 	}, [solarSystemViewActive, pendingFocus])
 
@@ -295,24 +476,30 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		if (!sceneRef.current) return
-		sceneRef.current.setSolarSystemFocusChangeHandler((bodyIndex, moonIndex) =>
-			setCurrentFocus({ bodyIndex, moonIndex }),
-		)
+		sceneRef.current.setSolarSystemFocusChangeHandler((address) => {
+			setCurrentFocus(address)
+			syncPrimaryFocusBookkeeping(address)
+		})
 		return () => sceneRef.current?.setSolarSystemFocusChangeHandler(null)
-	}, [])
+	}, [syncPrimaryFocusBookkeeping])
 	useEffect(() => {
 		if (typeof window === "undefined" || !generationSessionRestored) return
 		const validGenerationPreviewTabs = new Set(
 			GENERATION_PREVIEW_TABS.map(([tab]) => tab),
 		)
 		if (!validGenerationPreviewTabs.has(generationPreviewTab)) return
-		void saveGenerationSessionSnapshot({
-			solarSystem,
-			solarSystemViewActive,
-			currentFocus,
-			generationPanelOpen,
-			generationPreviewTab,
-		}).catch((error) => {
+		void saveGenerationSessionSnapshot(
+			{
+				solarSystem,
+				solarSystemViewActive,
+				currentFocus,
+				generationPanelOpen,
+				generationPreviewTab,
+				mainWorldMode,
+				galaxyOrigin: galaxyOrigin ?? undefined,
+			},
+			sessionNamespace,
+		).catch((error) => {
 			console.warn(
 				`Failed to persist generation session to ${GENERATION_SESSION_STORAGE_KEY}:`,
 				error,
@@ -325,30 +512,41 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		generationSessionRestored,
 		solarSystemViewActive,
 		solarSystem,
+		mainWorldMode,
+		galaxyOrigin,
+		sessionNamespace,
 	])
-	const mainWorldIndex = useMemo(
-		() => systemBodies.findIndex((body) => body.isMainWorld),
-		[systemBodies],
-	)
+	// Finds the main world wherever it lives -- a top-level SystemBody, or
+	// (gas-giant-moon mode) a moon nested inside a sibling's moons array.
+	const mainWorldFocus = useMemo(():
+		| { bodyIndex: number; moonIndex?: number }
+		| undefined => {
+		const bodyIndex = systemBodies.findIndex((body) => body.isMainWorld)
+		if (bodyIndex >= 0) return { bodyIndex }
+		for (let i = 0; i < systemBodies.length; i++) {
+			const moonIndex = systemBodies[i]!.moons.findIndex(
+				(moon) => moon.isMainWorld,
+			)
+			if (moonIndex >= 0) return { bodyIndex: i, moonIndex }
+		}
+		return undefined
+	}, [systemBodies])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleEnterSolarSystem = useCallback(() => {
-		const targetBodyIndex =
-			currentFocus && currentFocus.bodyIndex >= 0
-				? currentFocus.bodyIndex
-				: mainWorldIndex
-		if (targetBodyIndex >= 0) {
-			handleFocusBody(targetBodyIndex)
+		const target = toPrimaryBodyFocus(currentFocus) ?? mainWorldFocus
+		if (target) {
+			handleFocusBody(viewFocusToAddress(target))
 			return
 		}
 		setSolarSystemViewActive(true)
-	}, [currentFocus, handleFocusBody, mainWorldIndex])
+	}, [currentFocus, handleFocusBody, mainWorldFocus])
 
 	// Clock-knob reference periods for whatever is currently focused — the
 	// knobs stay hidden for the star (no parent to orbit, and no rotation
 	// period worth exposing here) and default to the main world otherwise.
 	const solarSystemClock = useMemo(() => {
-		const focus = currentFocus ?? { bodyIndex: mainWorldIndex }
-		if (focus.bodyIndex === -1) return null
+		const focus = toPrimaryBodyFocus(currentFocus) ?? mainWorldFocus
+		if (!focus) return null
 		const body = systemBodies[focus.bodyIndex]
 		if (!body) return null
 		const moon =
@@ -361,7 +559,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			: body.orbitalPeriodDays
 		if (rotationPeriodHours <= 0 || orbitalPeriodDays <= 0) return null
 		return { rotationPeriodHours, orbitalPeriodDays }
-	}, [systemBodies, currentFocus, mainWorldIndex])
+	}, [systemBodies, currentFocus, mainWorldFocus])
 
 	const wrapFraction = (value: number, period: number) =>
 		period > 0 ? (((value % period) + period) % period) / period : 0
@@ -386,14 +584,15 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		setSolarSystemOrbitHours(fraction * solarSystemClock.orbitalPeriodDays * 24)
 	}
 
+	const primaryFocus = toPrimaryBodyFocus(currentFocus)
 	const focusedMoon =
-		solarSystemViewActive && currentFocus?.moonIndex !== undefined
-			? (systemBodies[currentFocus.bodyIndex]?.moons[currentFocus.moonIndex] ??
+		solarSystemViewActive && primaryFocus?.moonIndex !== undefined
+			? (systemBodies[primaryFocus.bodyIndex]?.moons[primaryFocus.moonIndex] ??
 				null)
 			: null
 	const focusedMoonParent =
 		focusedMoon && solarSystemViewActive
-			? systemBodies[currentFocus!.bodyIndex]
+			? systemBodies[primaryFocus!.bodyIndex]
 			: null
 
 	const tidalSchedulePreview = useMemo(() => {
@@ -410,6 +609,12 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 					hoursPerDay,
 					spectralClass,
 					starSubtype,
+					starMassKg: solarSystem.star.hostStar
+						? solarSystem.star.hostStar.massSol * ORBIT_BODY.solarMassKg
+						: undefined,
+					starDiameterM: solarSystem.star.hostStar
+						? solarSystem.star.hostStar.diameterSol * 1.392e9
+						: undefined,
 					orbitalDistanceAU: focusedMoonParent.orbitalDistanceAU,
 					eccentricity: focusedMoonParent.eccentricity,
 					perihelion,
@@ -424,6 +629,12 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			tideLock,
 			spectralClass,
 			starSubtype,
+			starMassKg: solarSystem.star.hostStar
+				? solarSystem.star.hostStar.massSol * ORBIT_BODY.solarMassKg
+				: undefined,
+			starDiameterM: solarSystem.star.hostStar
+				? solarSystem.star.hostStar.diameterSol * 1.392e9
+				: undefined,
 			orbitalDistanceAU,
 			eccentricity,
 			perihelion,
@@ -446,6 +657,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		orbitalDistanceAU,
 		eccentricity,
 		perihelion,
+		solarSystem.star.hostStar,
 	])
 
 	const solStarName = seed === SOL_DATA.solSeed ? "Sol" : undefined

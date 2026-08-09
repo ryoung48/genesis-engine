@@ -5,6 +5,8 @@ export {
 export { buildSolarSystemOverlay } from "@/ui/genesis/solar-system/overlay/overlay"
 export type {
 	AsteroidFieldData,
+	CompanionOverlayParams,
+	OrbitAddress,
 	SolarSystemOverlayParams,
 	SolarSystemOverlayState,
 } from "@/ui/genesis/solar-system/overlay/types"

@@ -7,7 +7,6 @@ import type {
 	MoonPlacementInput,
 	MoonPlacementResult,
 } from "@/model/celestial/system/generation/moon-placement/types"
-import { TEXTURE } from "@/model/celestial/system/generation/texture"
 
 function place(params: MoonPlacementInput): MoonPlacementResult {
 	if (params.moonCount <= 0) return []
@@ -33,6 +32,9 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 				isPrimaryWorld: params.isPrimaryWorld,
 				orbitRange: moon.orbitRange,
 				semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters,
+				parentGroup: params.group,
+				impactZone: params.impactZone,
+				starAgeGyr: params.starAgeGyr,
 			})
 			const moonTideLock = PLANET.rollMoonTideLock({
 				rng: params.rng,
@@ -52,6 +54,12 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 						sizeClass: moonEnvironment.sizeClass,
 					}),
 			})
+			// texturePath/cloudsTexturePath are assigned later by
+			// PLANET.applySystemSeismology, once the moon's real
+			// seismology-inclusive temperature (and any post-seismology
+			// hydrosphere/classification change) is known -- see
+			// seismology/index.ts's applyMoonSeismology. Picking them here would
+			// use a stale pre-seismology climate estimate.
 			return ENVIRONMENT.enforceMoonTidalSafety({
 				rng: params.rng,
 				parentMassKg: params.massKg,
@@ -59,13 +67,11 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 				moon: {
 					...moon,
 					...moonEnvironment,
+					impactZone: params.impactZone,
 					siderealDayHours: moonTideLock.siderealDayHours,
 					axialTiltDeg: moonTideLock.axialTiltDeg,
 					eccentricity: moonTideLock.eccentricity,
-					texturePath: TEXTURE.pickGeneratedTexturePath({
-						rng: params.rng,
-						classification: moonEnvironment.classification,
-					}),
+					tideLockTrace: moonTideLock.trace,
 					name: params.nameBody(`${params.moonSlotName}-moon-${moonIdx}`),
 				},
 			})

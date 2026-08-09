@@ -4,44 +4,47 @@ import type {
 	OrbitGroup,
 } from "@/model/celestial/orbit-body/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { DensityComposition } from "@/model/celestial/system/generation/rolls/types"
+import type {
+	DensityComposition,
+	RollEccentricityInput,
+} from "@/model/celestial/system/generation/rolls/types"
 import type { RingProfile } from "@/model/celestial/system/types"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
 
+// Ported from galaxy-gen's ORBIT.spawn group weightedChoice + star-age
+// overrides (orbits/index.ts) -- dwarf and helian weights are fixed
+// regardless of zone (galaxy-gen never varies them), asteroid-belt/
+// terrestrial/jovian vary only by a binary zone split (inner vs. not, outer
+// vs. not), not three distinct per-zone tables. [JUSTIFICATION] Drops
+// galaxy-gen's extra proto/primordial (protoplanetary-disk-age) boost to the
+// asteroid-belt weight -- chaos-machine has no equivalent stellar-lifecycle
+// stage to key that off of; postStellar (dead/degenerate star) and the
+// star-age overrides below are both ported in full since starAgeGyr and
+// spectralClass are already available.
 function rollOrbitGroup({
 	rng,
 	zone,
+	postStellar,
+	starAgeGyr,
 }: {
 	rng: ReturnType<typeof RNG.createRng>
 	zone: Zone
+	/** True for a spectralClass "D"/"NS"/"BH" host star -- a dead/degenerate
+	 * remnant, same condition as generateSystemBodies' own `deadStar`. */
+	postStellar: boolean
+	starAgeGyr: number
 }): OrbitGroup {
-	const weights: Record<OrbitGroup, number> =
-		zone === "outer"
-			? {
-					"asteroid belt": 1,
-					dwarf: 1,
-					terrestrial: 1,
-					helian: 0.6,
-					jovian: 2,
-				}
-			: zone === "inner"
-				? {
-						"asteroid belt": 1,
-						dwarf: 1.2,
-						terrestrial: 2,
-						helian: 0.3,
-						jovian: 0.2,
-					}
-				: {
-						"asteroid belt": 0.5,
-						dwarf: 1.5,
-						terrestrial: 1.3,
-						helian: 0.2,
-						jovian: 0.1,
-					}
+	const weights: Record<OrbitGroup, number> = {
+		"asteroid belt": postStellar ? 4 : zone === "inner" ? 1 : 2,
+		dwarf: 2,
+		terrestrial: zone === "inner" ? 3 : 2,
+		helian: 1,
+		jovian: zone === "outer" || postStellar ? 2 : 0.5,
+	}
 	const total = Object.values(weights).reduce((sum, value) => sum + value, 0)
 	let roll = rng.uniform(0, total)
+	let selected: OrbitGroup = "dwarf"
 	for (const group of [
 		"asteroid belt",
 		"dwarf",
@@ -50,9 +53,22 @@ function rollOrbitGroup({
 		"jovian",
 	] as const) {
 		roll -= weights[group]
-		if (roll <= 0) return group
+		if (roll <= 0) {
+			selected = group
+			break
+		}
 	}
-	return "dwarf"
+	if (starAgeGyr < 0.002 && selected !== "jovian") return "asteroid belt"
+	if (
+		starAgeGyr < 0.005 &&
+		(selected === "terrestrial" || selected === "helian")
+	) {
+		return "dwarf"
+	}
+	if (starAgeGyr < 0.011 && selected === "helian") {
+		return rng.choice(["terrestrial", "dwarf"])
+	}
+	return selected
 }
 
 function rollSizeClass({
@@ -184,11 +200,10 @@ function pickDensityEarthRelative({
 	return rollDensityFromComposition({ rng, composition: densityComposition })
 }
 
-// Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts), with
-// the star-companion/moon/stellar-age modifiers dropped — none of those
-// apply to a plain sibling planet around a lone main-sequence star.
-function rollEccentricity(rng: ReturnType<typeof RNG.createRng>): number {
-	const roll = DICE.roll2d6(rng)
+// Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts). A
+// companion star gets the source's +2 modifier; a planet has no modifier.
+function rollEccentricity({ rng, orbitKind }: RollEccentricityInput): number {
+	const roll = DICE.roll2d6(rng) + (orbitKind === "companion-star" ? 2 : 0)
 	if (roll <= 5) return 0
 	if (roll <= 7) return rng.uniform(0.01, 0.03)
 	if (roll <= 9) return rng.uniform(0.04, 0.09)

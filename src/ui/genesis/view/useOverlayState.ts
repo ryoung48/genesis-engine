@@ -36,7 +36,15 @@ import type { OverlayStateInput } from "@/ui/genesis/view/types"
  * stay with the scene wiring so the coupling is visible at the call site.
  */
 export function useOverlayState(input: OverlayStateInput) {
-	const { initialViewPrefs, initialGenerationSession, isEarthImport } = input
+	const {
+		initialViewPrefs,
+		initialGenerationSession,
+		isEarthImport,
+		sessionNamespace,
+	} = input
+	const viewPrefsStorageKey = sessionNamespace
+		? `${VIEW_PREFS_STORAGE_KEY}:${sessionNamespace}`
+		: VIEW_PREFS_STORAGE_KEY
 
 	const [colorMode, setColorMode] = useState<ColorMode>(
 		initialViewPrefs.colorMode,
@@ -205,7 +213,7 @@ export function useOverlayState(input: OverlayStateInput) {
 	useEffect(() => {
 		if (typeof window === "undefined") return
 		window.localStorage.setItem(
-			VIEW_PREFS_STORAGE_KEY,
+			viewPrefsStorageKey,
 			serializeStoredViewPrefs({
 				colorMode,
 				geographyMode,
@@ -308,6 +316,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		measureMode,
 		pathfindingLand,
 		pathfindingSea,
+		viewPrefsStorageKey,
 	])
 
 	return {

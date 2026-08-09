@@ -15,6 +15,40 @@ function getStarAgeGyr({ massSol }: { massSol: number }): number {
 	return Math.min(mainSequenceLifespanGyr, SOL_DATA.solStarAgeGyr)
 }
 
+// Same young-star floor STAR.rollStarAgeGyr's uniform rolls use, and the same
+// 14 Gyr universe-age cap it clamps toward for very light (long-lived) stars.
+const MIN_STAR_AGE_GYR = 0.1
+const MAX_STAR_AGE_GYR = 14
+
+/** Valid age range for a live-editable star of this mass, e.g. for an Age
+ * slider's min/max -- a star can't be older than its own main-sequence
+ * lifespan (same formula as rollStarAgeGyr/getStarAgeGyr), nor older than the
+ * universe. */
+function getStarAgeBoundsGyr({ massSol }: { massSol: number }): {
+	minGyr: number
+	maxGyr: number
+} {
+	const mainSequenceLifespanGyr = 10 / massSol ** 2.5
+	return {
+		minGyr: MIN_STAR_AGE_GYR,
+		maxGyr: Math.min(mainSequenceLifespanGyr, MAX_STAR_AGE_GYR),
+	}
+}
+
+/** Clamps a candidate age (e.g. a user-set override) into this star's valid
+ * range -- used wherever a live age override must survive a class/subtype
+ * change to a star it's no longer valid for. */
+function clampStarAgeGyr({
+	ageGyr,
+	massSol,
+}: {
+	ageGyr: number
+	massSol: number
+}): number {
+	const { minGyr, maxGyr } = getStarAgeBoundsGyr({ massSol })
+	return Math.min(maxGyr, Math.max(minGyr, ageGyr))
+}
+
 /** The star's own name, from the same per-system language every sibling
  * planet/moon in this system is named from (see generateSystemBodies) --
  * spawning the language again here (rather than threading generateSystemBodies'
@@ -36,4 +70,9 @@ function generateStarName(seed: number): string {
 	)
 }
 
-export const STAR_IDENTITY = { getStarAgeGyr, generateStarName }
+export const STAR_IDENTITY = {
+	getStarAgeGyr,
+	getStarAgeBoundsGyr,
+	clampStarAgeGyr,
+	generateStarName,
+}

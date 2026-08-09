@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { HostStarAttributes } from "@/model/celestial/star/types"
+import type { MainWorldMode } from "@/model/celestial/system/generation/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import type { SystemBody } from "@/model/celestial/system/types"
+import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
@@ -12,6 +14,7 @@ import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { Button } from "@/ui/components/primitives/Button"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
+import { ProgressBar } from "@/ui/components/primitives/ProgressBar"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { ToggleChip } from "@/ui/components/primitives/ToggleChip"
 import { uiTokens } from "@/ui/components/tokens"
@@ -26,6 +29,7 @@ import { WorldDetails } from "@/ui/genesis/details/world/WorldDetails"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
 import {
 	type NationWikiData,
@@ -56,24 +60,30 @@ interface GenerationPanelProps {
 	starName?: string
 	showRealSolNames: boolean
 	setSeed: (v: number) => void
-	forceMainWorld: boolean
-	setForceMainWorld: (v: boolean) => void
+	resetMainWorldToEarth?: () => void
+	mainWorldMode: MainWorldMode
+	setMainWorldMode: (v: MainWorldMode) => void
+	/** The main world's SystemBody entry regardless of where it lives -- a
+	 * top-level orbit, or (gas-giant-moon mode) a moon nested inside a
+	 * sibling's moons array, projected into a SystemBody-shaped view. See
+	 * useSolarSystemBodies' mainWorldSystemBody/moonToMainWorldView. */
+	mainWorldSystemBody?: SystemBody | null
+	/** Edits the main world wherever it lives, routing the write back to the
+	 * correct top-level or nested location automatically. */
+	updateMainWorldBody?: (updater: (body: SystemBody) => SystemBody) => void
 	tidalSchedulePreview?: TidalSchedule
 	surfaceTidesM?: SurfaceTidesBreakdown
 	orbitBodies?: SystemBody[]
 	/** Full sorted system body list (orbits + main world), used to resolve a
 	 * body's index for onFocusBody. */
 	systemBodies?: SystemBody[]
-	/** Focuses the 3D solar-system view's camera on a body. -1 = the star. */
-	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
-	currentFocus?: {
-		bodyIndex: number
-		moonIndex?: number
-	} | null
-	onUpdateSystemBody?: (
-		bodyIndex: number,
-		updater: (body: SystemBody) => SystemBody,
-	) => void
+	/** Every companion star bound to this system -- see CompanionStar's doc.
+	 * Passed straight through to GenerationPlanetNavigator. */
+	companionStars?: CompanionStar[]
+	hostStar?: HostStarAttributes
+	/** Focuses the 3D solar-system view's camera on any addressed node. */
+	onFocusBody?: (address: OrbitAddress) => void
+	currentFocus?: OrbitAddress | null
 	daysPerYear: number
 	setHoursPerDay: (v: number) => void
 	planetRadiusKm: number
@@ -84,6 +94,8 @@ interface GenerationPanelProps {
 	setSpectralClass: (v: string) => void
 	starSubtype: number
 	setStarSubtype: (v: number) => void
+	setStarAgeGyr: (v: number) => void
+	starAgeGyr: number
 	orbitalDistanceAU: number
 	eccentricity: number
 	perihelion: number
@@ -132,16 +144,20 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	seed,
 	starName,
 	showRealSolNames,
-	forceMainWorld,
-	setForceMainWorld,
+	mainWorldMode,
+	setMainWorldMode,
+	mainWorldSystemBody,
+	updateMainWorldBody,
 	setSeed,
+	resetMainWorldToEarth,
 	tidalSchedulePreview,
 	surfaceTidesM,
 	orbitBodies,
 	systemBodies,
+	companionStars,
+	hostStar,
 	onFocusBody,
 	currentFocus,
-	onUpdateSystemBody,
 	daysPerYear,
 	setHoursPerDay,
 	planetRadiusKm,
@@ -152,6 +168,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	setSpectralClass,
 	starSubtype,
 	setStarSubtype,
+	setStarAgeGyr,
+	starAgeGyr,
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
@@ -244,6 +262,41 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 
 	const generateContent = (
 		<div className="space-y-2.5 pt-1.5">
+			{seed !== SOL_DATA.solSeed ? (
+				<div className="space-y-1">
+					<SegmentedControl
+						tone="panel"
+						size="xs"
+						fullWidth
+						options={[
+							{
+								value: "earth-clone",
+								label: "Earth Clone",
+								title: "A literal Earth/Luna clone, unchanged from every slot.",
+							},
+							{
+								value: "moon-system",
+								label: "Procedural Moons",
+								title:
+									"The same Earth clone, with a procedurally rolled moon system instead of a single Luna clone.",
+							},
+							{
+								value: "gas-giant-moon",
+								label: "Gas Giant Moon",
+								title:
+									"A jovian world with Earth's eccentricity/rotation, whose moon system has one moon promoted to be the main world.",
+							},
+						]}
+						// mainWorldMode's type also allows a "procedural" value used
+						// elsewhere in the model layer, but this toggle never sets it and
+						// nothing else drives this UI's state to it.
+						value={
+							mainWorldMode as "earth-clone" | "moon-system" | "gas-giant-moon"
+						}
+						onChange={setMainWorldMode}
+					/>
+				</div>
+			) : null}
 			<Button
 				tone="panel"
 				selected
@@ -257,20 +310,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 			</Button>
 
 			{generating ? (
-				<div className="space-y-1">
-					<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
-						<span>{generationLabel}</span>
-						<span>{Math.round(generationProgress)}%</span>
-					</div>
-					<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-						<div
-							className="h-full rounded-full bg-slate-900 transition-all duration-200"
-							style={{
-								width: `${Math.max(0, Math.min(100, generationProgress))}%`,
-							}}
-						/>
-					</div>
-				</div>
+				<ProgressBar label={generationLabel} percent={generationProgress} />
 			) : null}
 
 			{generationTimingSummary && (
@@ -423,9 +463,12 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							<GenerationPlanetNavigator
 								orbitBodies={orbitBodies}
 								systemBodies={systemBodies}
+								companionStars={companionStars}
+								hostStar={hostStar}
 								onFocusBody={onFocusBody}
 								currentFocus={currentFocus}
-								onUpdateSystemBody={onUpdateSystemBody}
+								mainWorldSystemBody={mainWorldSystemBody}
+								updateMainWorldBody={updateMainWorldBody}
 								surfaceTidesM={surfaceTidesM}
 								setTideLock={setTideLock}
 								setHoursPerDay={setHoursPerDay}
@@ -442,8 +485,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								planetRadiusKm={planetRadiusKm}
 								seed={seed}
 								starName={starName}
-								forceMainWorld={forceMainWorld}
-								setForceMainWorld={setForceMainWorld}
 								daysPerYear={daysPerYear}
 								surfaceStats={surfaceStats}
 								orbitalDistanceAU={orbitalDistanceAU}
@@ -456,7 +497,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								setSpectralClass={setSpectralClass}
 								starSubtype={starSubtype}
 								setStarSubtype={setStarSubtype}
+								setStarAgeGyr={setStarAgeGyr}
+								starAgeGyr={starAgeGyr}
 								setSeed={setSeed}
+								resetMainWorldToEarth={resetMainWorldToEarth}
 								setObliquity={setObliquity}
 								tidalSchedulePreview={tidalSchedulePreview}
 								generationPreviewTab={generationPreviewTab}

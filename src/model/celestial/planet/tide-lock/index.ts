@@ -4,10 +4,29 @@ import type {
 	MoonTideLockResult,
 	PlanetTideLockResult,
 	TideLockEffectResult,
+	TideLockTraceEntry,
 } from "@/model/celestial/planet/tide-lock/types"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
+
+// Ported from galaxy-gen's rotation/index.ts createCollector -- accumulates a
+// DM total alongside a human-readable trace of the individual modifiers that
+// produced it (skipping any that contributed 0), so a UI detail panel can
+// show exactly why a body did or didn't end up tide-locked.
+type DmBreakdown = { value: number; trace: TideLockTraceEntry[] }
+
+function createDmCollector() {
+	let value = 0
+	const trace: TideLockTraceEntry[] = []
+	return {
+		add: (delta: number, description: string) => {
+			value += delta
+			if (delta !== 0) trace.push({ value: delta, description })
+		},
+		result: (): DmBreakdown => ({ value, trace }),
+	}
+}
 
 // Relative (not absolute) tolerance on the sidereal:orbital ratio -- these
 // periods span everything from hours (close-in moons) to centuries (distant
@@ -101,18 +120,28 @@ function rollGeneralLockDM(params: {
 	axialTiltDeg: number
 	atmospherePressureBar: number
 	starAgeGyr: number
-}): number {
-	let dm = 0
-	if (params.sizeClass > 0) dm += Math.ceil(params.sizeClass / 3)
-	if (params.eccentricity > 0.1) dm -= Math.floor(params.eccentricity * 10)
-	if (params.axialTiltDeg > 30) dm -= 2
-	if (params.axialTiltDeg >= 60 && params.axialTiltDeg <= 120) dm -= 4
-	if (params.axialTiltDeg >= 80 && params.axialTiltDeg <= 100) dm -= 4
-	if (params.atmospherePressureBar > 2.5) dm -= 2
-	if (params.starAgeGyr < 1) dm -= 2
-	else if (params.starAgeGyr < 10) dm += 2
-	else dm += 4
-	return dm
+}): DmBreakdown {
+	const dm = createDmCollector()
+	if (params.sizeClass > 0)
+		dm.add(Math.ceil(params.sizeClass / 3), `Planet size (${params.sizeClass})`)
+	if (params.eccentricity > 0.1)
+		dm.add(
+			-Math.floor(params.eccentricity * 10),
+			`Eccentric (${params.eccentricity.toFixed(1)})`,
+		)
+	if (params.axialTiltDeg > 30)
+		dm.add(-2, `Axial tilt (${params.axialTiltDeg.toFixed(0)}°)`)
+	if (params.axialTiltDeg >= 60 && params.axialTiltDeg <= 120)
+		dm.add(-4, "Axial tilt 60°-120°")
+	if (params.axialTiltDeg >= 80 && params.axialTiltDeg <= 100)
+		dm.add(-4, "Axial tilt 80°-100°")
+	if (params.atmospherePressureBar > 2.5)
+		dm.add(-2, `Atmosphere (${params.atmospherePressureBar.toFixed(1)} bar)`)
+	const systemNote = `System age (${params.starAgeGyr.toFixed(1)} Gyr)`
+	if (params.starAgeGyr < 1) dm.add(-2, systemNote)
+	else if (params.starAgeGyr < 10) dm.add(2, systemNote)
+	else dm.add(4, systemNote)
+	return dm.result()
 }
 
 // Ported from galaxy-gen's ROTATION.locks.planet.star -- the DM for this
@@ -121,21 +150,27 @@ function rollStarLockDM(params: {
 	orbitalDistanceAU: number
 	starMassSol: number
 	totalMoonSizeClass: number
-}): number {
-	let dm = -4
+}): DmBreakdown {
+	const dm = createDmCollector()
+	dm.add(-4, "Star modifier")
+
 	const orbitNumber = orbitNumberFromAU(params.orbitalDistanceAU)
-	if (orbitNumber < 1) dm += 4 + Math.floor(10 * (1 - orbitNumber))
-	else if (orbitNumber < 2) dm += 4
-	else if (orbitNumber < 3) dm += 1
-	else dm -= Math.floor(orbitNumber * 2)
+	const orbitNote = `Distance (orbit #${orbitNumber.toFixed(1)})`
+	if (orbitNumber < 1)
+		dm.add(4 + Math.floor(10 * (1 - orbitNumber)), orbitNote)
+	else if (orbitNumber < 2) dm.add(4, orbitNote)
+	else if (orbitNumber < 3) dm.add(1, orbitNote)
+	else dm.add(-Math.floor(orbitNumber * 2), orbitNote)
 
-	if (params.starMassSol < 0.5) dm -= 2
-	else if (params.starMassSol < 1) dm -= 1
-	else if (params.starMassSol < 5) dm += 1
-	else dm += 2
+	const starMassNote = `Star mass (${params.starMassSol.toFixed(1)} M☉)`
+	if (params.starMassSol < 0.5) dm.add(-2, starMassNote)
+	else if (params.starMassSol < 1) dm.add(-1, starMassNote)
+	else if (params.starMassSol < 5) dm.add(1, starMassNote)
+	else dm.add(2, starMassNote)
 
-	if (params.totalMoonSizeClass > 0) dm -= params.totalMoonSizeClass
-	return dm
+	if (params.totalMoonSizeClass > 0)
+		dm.add(-params.totalMoonSizeClass, "Large moons")
+	return dm.result()
 }
 
 // Ported from galaxy-gen's ROTATION.locks.planet.moon -- the DM for this
@@ -145,16 +180,22 @@ function rollMoonLockDM(params: {
 	moonSizeClass: number
 	moonSemiMajorAxisPlanetDiameters: number
 	siblingMoonCount: number
-}): number {
-	let dm = -10 + params.moonSizeClass
+}): DmBreakdown {
+	const dm = createDmCollector()
+	dm.add(-10 + params.moonSizeClass, `Moon size (${params.moonSizeClass})`)
 	const pd = params.moonSemiMajorAxisPlanetDiameters
-	if (pd < 5) dm += 5 + Math.ceil((5 - pd) * 5)
-	else if (pd < 10) dm += 4
-	else if (pd < 20) dm += 2
-	else if (pd < 40) dm += 1
-	else if (pd > 60) dm -= 6
-	if (params.siblingMoonCount > 0) dm -= 2 * params.siblingMoonCount
-	return dm
+	const pdNote = `Moon orbit (PD ${pd.toFixed(0)})`
+	if (pd < 5) dm.add(5 + Math.ceil((5 - pd) * 5), pdNote)
+	else if (pd < 10) dm.add(4, pdNote)
+	else if (pd < 20) dm.add(2, pdNote)
+	else if (pd < 40) dm.add(1, pdNote)
+	else if (pd > 60) dm.add(-6, pdNote)
+	if (params.siblingMoonCount > 0)
+		dm.add(
+			-2 * params.siblingMoonCount,
+			`Sibling moons (${params.siblingMoonCount})`,
+		)
+	return dm.result()
 }
 
 // Ported from galaxy-gen's ROTATION.locks.effect -- the 2d6+dm roll that
@@ -174,17 +215,26 @@ function rollTideLockEffect(params: {
 	homeworld: boolean
 	baseSiderealDayHours: number
 	broke: boolean
+	/** The previous roll, only set on the recursive "broke" reroll -- lets the
+	 * trace record the swing a broken lock made, mirroring galaxy-gen's
+	 * comparison against the stashed orbit.rotation.roll. */
+	prevRoll?: number
 }): TideLockEffectResult {
 	const { rng, dm, periodHours, homeworld, baseSiderealDayHours, broke } =
 		params
 	const roll = DICE.roll2d6(rng) + dm
+	const trace: TideLockTraceEntry[] = []
+	if (broke && params.prevRoll !== undefined && params.prevRoll !== roll)
+		trace.push({ value: roll - params.prevRoll, description: "Broken lock" })
 
 	if (roll <= 4) {
+		trace.push({ value: roll - dm, description: "Base roll (2d6)" })
 		return {
 			siderealDayHours: baseSiderealDayHours,
 			axialTiltDeg: params.axialTiltDeg,
 			eccentricity: params.eccentricity,
 			locked: false,
+			trace,
 		}
 	}
 
@@ -212,11 +262,18 @@ function rollTideLockEffect(params: {
 	// (finite, if long) 2-years-per-solar-day result real Mercury has.
 	else if (roll === 11) siderealDayHours = (periodHours * 2) / 3
 	else if (!broke && (DICE.roll2d6(rng) === 12 || homeworld)) {
-		return rollTideLockEffect({ ...params, dm: 0, broke: true })
+		return rollTideLockEffect({
+			...params,
+			dm: 0,
+			broke: true,
+			prevRoll: roll,
+		})
 	} else {
 		siderealDayHours = periodHours
 		locked = true
 	}
+
+	trace.push({ value: roll - dm, description: "Base roll (2d6)" })
 
 	if (roll === 10 && axialTiltDeg < 90) axialTiltDeg = 180 - axialTiltDeg
 	if (roll >= 11 && axialTiltDeg > 3) {
@@ -226,7 +283,7 @@ function rollTideLockEffect(params: {
 		eccentricity = Math.min(eccentricity, params.rerollEccentricity())
 	}
 
-	return { siderealDayHours, axialTiltDeg, eccentricity, locked }
+	return { siderealDayHours, axialTiltDeg, eccentricity, locked, trace }
 }
 
 /**
@@ -259,7 +316,7 @@ function rollPlanetTideLock(params: {
 	homeworld: boolean
 	rerollEccentricity: () => number
 }): PlanetTideLockResult {
-	const generalDM = rollGeneralLockDM({
+	const general = rollGeneralLockDM({
 		sizeClass: params.sizeClass,
 		eccentricity: params.eccentricity,
 		axialTiltDeg: params.axialTiltDeg,
@@ -270,15 +327,16 @@ function rollPlanetTideLock(params: {
 		(sum, moon) => sum + (moon.sizeClass ?? 0),
 		0,
 	)
-	const starDM = rollStarLockDM({
+	const star = rollStarLockDM({
 		orbitalDistanceAU: params.orbitalDistanceAU,
 		starMassSol: params.starMassSol,
 		totalMoonSizeClass,
 	})
 
-	let winnerDM = starDM + generalDM
+	let winnerDM = star.value + general.value
 	let winnerTideLock: TideLock = { type: "solar", target: 0 }
 	let winnerPeriodHours = params.orbitalPeriodDays * TIME.hoursPerDay
+	let winnerTrace = star.trace
 
 	// Only an already-planet-locked moon (mirroring galaxy-gen's
 	// lockedMoons -- a moon that already keeps one face toward this planet)
@@ -292,17 +350,18 @@ function rollPlanetTideLock(params: {
 			: []
 	lockedMoons.forEach((moon, index) => {
 		const siblingMoonCount = lockedMoons.length - 1
-		const moonDM =
-			rollMoonLockDM({
-				moonSizeClass: moon.sizeClass ?? 0,
-				moonSemiMajorAxisPlanetDiameters:
-					moon.semiMajorAxisPlanetDiameters ?? 0,
-				siblingMoonCount,
-			}) + generalDM
+		const moonBreakdown = rollMoonLockDM({
+			moonSizeClass: moon.sizeClass ?? 0,
+			moonSemiMajorAxisPlanetDiameters:
+				moon.semiMajorAxisPlanetDiameters ?? 0,
+			siblingMoonCount,
+		})
+		const moonDM = moonBreakdown.value + general.value
 		if (moonDM >= winnerDM) {
 			winnerDM = moonDM
 			winnerTideLock = { type: "lunar", target: moon.idx }
 			winnerPeriodHours = moon.orbitalPeriodDays * TIME.hoursPerDay
+			winnerTrace = moonBreakdown.trace
 		}
 		void index
 	})
@@ -325,6 +384,7 @@ function rollPlanetTideLock(params: {
 		eccentricity: effect.eccentricity,
 		tideLock: effect.locked ? winnerTideLock : null,
 		starLocked: effect.locked && winnerTideLock.type === "solar",
+		trace: [...general.trace, ...winnerTrace, ...effect.trace],
 	}
 }
 
@@ -339,16 +399,19 @@ function rollMoonToPlanetLockDM(params: {
 	moonSemiMajorAxisPlanetDiameters: number
 	moonRetrograde: boolean
 	planetMassEarths: number
-}): number {
-	let dm = 6
+}): DmBreakdown {
+	const dm = createDmCollector()
+	dm.add(6, "Planet modifier")
 	const pd = params.moonSemiMajorAxisPlanetDiameters
-	if (pd > 20) dm -= Math.floor(pd / 20)
-	if (params.moonRetrograde) dm -= 2
-	if (params.planetMassEarths <= 10) dm += 2
-	else if (params.planetMassEarths < 100) dm += 4
-	else if (params.planetMassEarths < 1000) dm += 6
-	else dm += 8
-	return dm
+	const pdNote = `Moon orbit (PD ${pd.toFixed(0)})`
+	if (pd > 20) dm.add(-Math.floor(pd / 20), pdNote)
+	if (params.moonRetrograde) dm.add(-2, "Retrograde")
+	const planetMassNote = `Planet mass (${params.planetMassEarths.toFixed(0)} M⊕)`
+	if (params.planetMassEarths <= 10) dm.add(2, planetMassNote)
+	else if (params.planetMassEarths < 100) dm.add(4, planetMassNote)
+	else if (params.planetMassEarths < 1000) dm.add(6, planetMassNote)
+	else dm.add(8, planetMassNote)
+	return dm.result()
 }
 
 /**
@@ -378,14 +441,14 @@ function rollMoonTideLock(params: {
 	baseSiderealDayHours: number
 	rerollEccentricity: () => number
 }): MoonTideLockResult {
-	const generalDM = rollGeneralLockDM({
+	const general = rollGeneralLockDM({
 		sizeClass: params.sizeClass,
 		eccentricity: params.eccentricity,
 		axialTiltDeg: params.axialTiltDeg,
 		atmospherePressureBar: params.atmospherePressureBar,
 		starAgeGyr: params.starAgeGyr,
 	})
-	const moonDM = rollMoonToPlanetLockDM({
+	const moon = rollMoonToPlanetLockDM({
 		moonSemiMajorAxisPlanetDiameters: params.semiMajorAxisPlanetDiameters,
 		moonRetrograde: params.axialTiltDeg > 90,
 		planetMassEarths: params.planetMassEarths,
@@ -393,7 +456,7 @@ function rollMoonTideLock(params: {
 
 	const effect = rollTideLockEffect({
 		rng: params.rng,
-		dm: generalDM + moonDM,
+		dm: general.value + moon.value,
 		periodHours: params.orbitalPeriodDays * TIME.hoursPerDay,
 		axialTiltDeg: params.axialTiltDeg,
 		eccentricity: params.eccentricity,
@@ -411,6 +474,7 @@ function rollMoonTideLock(params: {
 		axialTiltDeg: effect.axialTiltDeg,
 		eccentricity: effect.eccentricity,
 		locked: effect.locked,
+		trace: [...moon.trace, ...general.trace, ...effect.trace],
 	}
 }
 

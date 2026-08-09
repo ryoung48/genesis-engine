@@ -44,7 +44,13 @@ export const GridSection: React.FC<GridSectionProps> = ({
 				</div>
 			</label>
 			{gridSpacingExpanded && (
-				<div className={showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"}>
+				<div
+					className={
+						showGrid
+							? "space-y-1.5"
+							: "space-y-1.5 opacity-50 pointer-events-none"
+					}
+				>
 					<LabeledSlider
 						label="Grid Spacing"
 						value={`${gridSpacing}°`}

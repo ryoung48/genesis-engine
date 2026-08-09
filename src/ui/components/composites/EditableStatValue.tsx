@@ -1,5 +1,7 @@
 import { type ReactNode, useState } from "react"
+import { FloatingTooltip } from "@/ui/components/composites/FloatingTooltip"
 import { Popover } from "@/ui/components/composites/Popover"
+import { InformationIcon } from "@/ui/components/primitives/icons/InformationIcon"
 import { Slider } from "@/ui/components/primitives/Slider"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 
@@ -25,6 +27,15 @@ export interface StatEntry {
 	valueHelpTarget?: "all" | "prefix"
 	editor?: StatEditor
 	valueAction?: ReactNode
+	/** Rendered at the far right, after the value (and valueAction) -- e.g. a
+	 * help-circle icon with its own hover tooltip -- distinct from valueHelp
+	 * (which puts the tooltip on the value itself) since some values already
+	 * carry a different hover/click meaning (e.g. an editable dropdown
+	 * target) and need the detail breakdown parked somewhere that doesn't
+	 * compete for the same hover/click target. Tooltip opens downward (not
+	 * up) since this sits at the top of a scrollable stats panel, where an
+	 * upward tooltip gets clipped by the panel's own edge. */
+	trailingHelp?: ReactNode
 	/** A small color swatch shown immediately before the value (e.g. a
 	 * planet's classification color, or a star's spectral-class color) --
 	 * omitted/null renders no swatch. */
@@ -54,6 +65,14 @@ function splitNumericAndUnit(text: string): { numeric: string; unit: string } {
 	return { numeric, unit }
 }
 
+export function TrailingHelpIcon({ content }: { content: ReactNode }) {
+	return (
+		<FloatingTooltip content={content}>
+			<InformationIcon className="h-3 w-3 shrink-0 cursor-help text-slate-400 hover:text-slate-600" />
+		</FloatingTooltip>
+	)
+}
+
 export function EditableStatValue({ stat }: { stat: StatEntry }) {
 	const [visible, setVisible] = useState(false)
 	const editor = stat.editor
@@ -70,6 +89,7 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 			<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
 				{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
 				{valueNode}
+				{stat.trailingHelp ? <TrailingHelpIcon content={stat.trailingHelp} /> : null}
 			</span>
 		)
 	}
@@ -111,6 +131,7 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 			</Popover>
 			{stat.valuePrefix && <span>{stat.value}</span>}
 			{stat.valueAction}
+			{stat.trailingHelp ? <TrailingHelpIcon content={stat.trailingHelp} /> : null}
 		</span>
 	)
 }
