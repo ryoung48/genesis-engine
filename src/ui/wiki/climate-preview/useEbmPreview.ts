@@ -223,6 +223,5 @@ export function useEbmPreview(config: EbmConfig) {
 		albedoOverride,
 		greenhouseFactorOverride,
 		internalHeatTempK,
-		seismologyTotalHeatingK,
 	])
 }

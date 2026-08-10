@@ -144,7 +144,9 @@ const SIZE_LABEL: Record<number, string> = {
 	18: "Gas Giant 18 (Large)",
 }
 
-export function sizeSwatchColor(sizeClass: number | undefined): string | undefined {
+export function sizeSwatchColor(
+	sizeClass: number | undefined,
+): string | undefined {
 	if (sizeClass === undefined) return undefined
 	return SIZE_COLOR[sizeClass] ?? FALLBACK_COLOR
 }
@@ -194,7 +196,9 @@ function eccentricityCategory(eccentricity: number): string {
 }
 
 export function eccentricitySwatchColor(eccentricity: number): string {
-	return ECCENTRICITY_COLORS[eccentricityCategory(eccentricity)] ?? FALLBACK_COLOR
+	return (
+		ECCENTRICITY_COLORS[eccentricityCategory(eccentricity)] ?? FALLBACK_COLOR
+	)
 }
 
 export function buildEccentricityDistribution(
@@ -426,7 +430,9 @@ const ATMOSPHERE_LABEL: Record<number, string> = {
 	17: "Gas, Hydrogen (H)",
 }
 
-export function atmosphereSwatchColor(code: number | undefined): string | undefined {
+export function atmosphereSwatchColor(
+	code: number | undefined,
+): string | undefined {
 	if (code === undefined) return undefined
 	return ATMOSPHERE_COLOR[code] ?? FALLBACK_COLOR
 }
@@ -498,7 +504,9 @@ const HYDROSPHERE_LABEL: Record<number, string> = {
 	13: "Gas giant core",
 }
 
-export function hydrosphereSwatchColor(code: number | undefined): string | undefined {
+export function hydrosphereSwatchColor(
+	code: number | undefined,
+): string | undefined {
 	if (code === undefined) return undefined
 	return HYDROSPHERE_COLOR[code] ?? FALLBACK_COLOR
 }
@@ -570,7 +578,9 @@ const BIOSPHERE_COLOR: Record<number, string> = {
 }
 const BIOSPHERE_OVERFLOW_COLOR = "#8268ed"
 
-export function biosphereSwatchColor(code: number | undefined): string | undefined {
+export function biosphereSwatchColor(
+	code: number | undefined,
+): string | undefined {
 	if (code === undefined || code <= 0) return undefined
 	return BIOSPHERE_COLOR[code] ?? BIOSPHERE_OVERFLOW_COLOR
 }
@@ -594,7 +604,9 @@ const HABITABILITY_COLOR: readonly string[] = [
 	"#5e4fa2",
 ]
 
-export function habitabilitySwatchColor(code: number | undefined): string | undefined {
+export function habitabilitySwatchColor(
+	code: number | undefined,
+): string | undefined {
 	if (code === undefined) return undefined
 	const clamped = Math.max(0, Math.min(10, Math.round(code)))
 	return HABITABILITY_COLOR[clamped]
@@ -650,7 +662,8 @@ export function buildSystemHabitabilityDistribution(
 		(code) => habitabilityCategoryLabel(code),
 		(key) => key,
 		(key) =>
-			habitabilitySwatchColor(HABITABILITY_CATEGORY_CODE[key]) ?? FALLBACK_COLOR,
+			habitabilitySwatchColor(HABITABILITY_CATEGORY_CODE[key]) ??
+			FALLBACK_COLOR,
 	)
 	return buckets.sort(
 		(a, b) =>
@@ -659,7 +672,12 @@ export function buildSystemHabitabilityDistribution(
 	)
 }
 
-const MOON_ORBIT_RANGE_CATEGORIES = ["inner", "middle", "outer", "extreme"] as const
+const MOON_ORBIT_RANGE_CATEGORIES = [
+	"inner",
+	"middle",
+	"outer",
+	"extreme",
+] as const
 
 const MOON_ORBIT_RANGE_COLORS: Record<string, string> = {
 	inner: "#f7b67b",
@@ -694,7 +712,9 @@ export function buildMoonOrbitRangeDistribution(
 			index,
 		]),
 	)
-	return buckets.sort((a, b) => (order.get(a.label) ?? 0) - (order.get(b.label) ?? 0))
+	return buckets.sort(
+		(a, b) => (order.get(a.label) ?? 0) - (order.get(b.label) ?? 0),
+	)
 }
 
 export function buildBiosphereDistribution(
@@ -708,7 +728,10 @@ export function buildBiosphereDistribution(
 		(key) => BIOSPHERE_LABEL[Number(key)] ?? `Code ${key}`,
 		(key) => BIOSPHERE_COLOR[Number(key)] ?? BIOSPHERE_OVERFLOW_COLOR,
 	)
-	return buckets.sort((a, b) => (BIOSPHERE_CODE_OF[a.label] ?? 0) - (BIOSPHERE_CODE_OF[b.label] ?? 0))
+	return buckets.sort(
+		(a, b) =>
+			(BIOSPHERE_CODE_OF[a.label] ?? 0) - (BIOSPHERE_CODE_OF[b.label] ?? 0),
+	)
 }
 const BIOSPHERE_CODE_OF: Record<string, number> = Object.fromEntries(
 	Object.entries(BIOSPHERE_LABEL).map(([code, label]) => [label, Number(code)]),

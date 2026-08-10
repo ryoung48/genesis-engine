@@ -42,8 +42,6 @@ export interface RollMoonDiameterInput extends MoonRngInput {
 }
 export interface RollMoonOrbitCandidateInput extends MoonRngInput {
 	morPd: number
-	moonMinimumPd: number
-	maxPd: number
 }
 export interface PendingMoon {
 	massKg: number
@@ -51,9 +49,10 @@ export interface PendingMoon {
 	sizeClass: number
 	moonMinimumPd: number
 	orbitRange: MoonOrbitRange
+	rolledPd: number
 	radiusPd: number
 }
-export interface PlaceMoonOrbitsInput extends MoonRngInput {
+export interface PlaceMoonOrbitsInput {
 	moons: PendingMoon[]
 	morPd: number
 	maxStablePd: number

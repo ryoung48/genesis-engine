@@ -1,4 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	AtmosphereProfile,
 	BiosphereProfile,
@@ -7,7 +8,6 @@ import type {
 	TemperatureEstimate,
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { BIOSPHERE } from "@/model/celestial/planet/biosphere"
 import { ENVIRONMENT } from "@/model/celestial/planet/environment"
 import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
@@ -369,7 +369,8 @@ function applyMoonSeismology(params: {
 			})
 		: null
 
-	const resolvedHydrosphereCode = rerolled?.hydrosphereCode ?? moon.hydrosphereCode
+	const resolvedHydrosphereCode =
+		rerolled?.hydrosphereCode ?? moon.hydrosphereCode
 	const resolvedGreenhouseFactor =
 		rerolled?.greenhouseFactor ?? moon.greenhouseFactor
 	const resolvedAtmosphere = rerolled?.atmosphere ?? moon.atmosphere

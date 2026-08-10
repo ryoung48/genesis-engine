@@ -131,7 +131,10 @@ const seasonality = (
 	geography: number,
 	atmospheric: number,
 ) => {
-	const seasonalityNumerator = Math.min(1, Math.max(0, tilt + rotation + geography))
+	const seasonalityNumerator = Math.min(
+		1,
+		Math.max(0, tilt + rotation + geography),
+	)
 	const seasonalityDenominator = 1 + atmospheric
 	return seasonalityNumerator / seasonalityDenominator
 }
@@ -149,8 +152,20 @@ const temperatureRange = (
 	const lowLuminosity = luminosity * (1 - luminosityMod)
 	const nearAU = au * (1 - eccentricity)
 	const farAU = au * (1 + eccentricity)
-	const high = temperatureBase(highLuminosity, albedo, greenhouse, nearAU, seismology)
-	const low = temperatureBase(lowLuminosity, albedo, greenhouse, farAU, seismology)
+	const high = temperatureBase(
+		highLuminosity,
+		albedo,
+		greenhouse,
+		nearAU,
+		seismology,
+	)
+	const low = temperatureBase(
+		lowLuminosity,
+		albedo,
+		greenhouse,
+		farAU,
+		seismology,
+	)
 	return { high, low, delta: high - low }
 }
 
@@ -235,11 +250,23 @@ function traceMean(params: {
 	)
 
 	const trace: TemperatureTraceEntry[] = [
-		{ value: contribMean.luminosity, description: `luminosity (${luminosity.toFixed(2)})` },
+		{
+			value: contribMean.luminosity,
+			description: `luminosity (${luminosity.toFixed(2)})`,
+		},
 		{ value: contribMean.albedo, description: `albedo (${albedo.toFixed(2)})` },
-		{ value: contribMean.greenhouse, description: `greenhouse (${greenhouse.toFixed(2)})` },
-		{ value: contribMean.distance, description: `distance (${au.toFixed(2)} AU)` },
-		{ value: contribMean.seismology, description: `seismology (${seismology.toFixed(2)})` },
+		{
+			value: contribMean.greenhouse,
+			description: `greenhouse (${greenhouse.toFixed(2)})`,
+		},
+		{
+			value: contribMean.distance,
+			description: `distance (${au.toFixed(2)} AU)`,
+		},
+		{
+			value: contribMean.seismology,
+			description: `seismology (${seismology.toFixed(2)})`,
+		},
 	]
 	return { baseline: baselineRadiative - 273.15, trace }
 }
@@ -256,8 +283,18 @@ function traceDelta(params: {
 	eccentricity: number
 	seismology: number
 }): { baseline: number; trace: TemperatureTraceEntry[] } {
-	const { luminosity, albedo, greenhouse, au, tilt, rotation, geography, atmospheric, eccentricity, seismology } =
-		params
+	const {
+		luminosity,
+		albedo,
+		greenhouse,
+		au,
+		tilt,
+		rotation,
+		geography,
+		atmospheric,
+		eccentricity,
+		seismology,
+	} = params
 
 	const deltaF = (
 		tilt: number,
@@ -268,7 +305,15 @@ function traceDelta(params: {
 		seismology: number,
 	) => {
 		const luminosityMod = seasonality(tilt, rotation, geography, atmospheric)
-		return temperatureRange(luminosityMod, luminosity, albedo, greenhouse, au, eccentricity, seismology).delta
+		return temperatureRange(
+			luminosityMod,
+			luminosity,
+			albedo,
+			greenhouse,
+			au,
+			eccentricity,
+			seismology,
+		).delta
 	}
 	const refDelta = {
 		tilt: 0,
@@ -317,11 +362,25 @@ function traceDelta(params: {
 	for (const order of permsDelta) {
 		const on = new Set<FactorDelta>()
 		const s0 = stateDelta(on)
-		let prev = deltaF(s0.tilt, s0.rotation, s0.geography, s0.atmospheric, s0.eccentricity, s0.seismology)
+		let prev = deltaF(
+			s0.tilt,
+			s0.rotation,
+			s0.geography,
+			s0.atmospheric,
+			s0.eccentricity,
+			s0.seismology,
+		)
 		for (const f of order) {
 			on.add(f)
 			const s1 = stateDelta(on)
-			const curr = deltaF(s1.tilt, s1.rotation, s1.geography, s1.atmospheric, s1.eccentricity, s1.seismology)
+			const curr = deltaF(
+				s1.tilt,
+				s1.rotation,
+				s1.geography,
+				s1.atmospheric,
+				s1.eccentricity,
+				s1.seismology,
+			)
 			const dK = curr - prev
 			deltaContrib[f] += dK
 			prev = curr
@@ -337,11 +396,26 @@ function traceDelta(params: {
 
 	const trace: TemperatureTraceEntry[] = [
 		{ value: deltaContrib.tilt, description: `tilt (${tilt.toFixed(2)})` },
-		{ value: deltaContrib.rotation, description: `rotation (${rotation.toFixed(2)})` },
-		{ value: deltaContrib.geography, description: `geography (${geography.toFixed(2)})` },
-		{ value: deltaContrib.atmospheric, description: `atmospheric (${atmospheric.toFixed(2)})` },
-		{ value: deltaContrib.eccentricity, description: `eccentricity (${eccentricity.toFixed(2)})` },
-		{ value: deltaContrib.seismology, description: `seismology (${seismology.toFixed(2)})` },
+		{
+			value: deltaContrib.rotation,
+			description: `rotation (${rotation.toFixed(2)})`,
+		},
+		{
+			value: deltaContrib.geography,
+			description: `geography (${geography.toFixed(2)})`,
+		},
+		{
+			value: deltaContrib.atmospheric,
+			description: `atmospheric (${atmospheric.toFixed(2)})`,
+		},
+		{
+			value: deltaContrib.eccentricity,
+			description: `eccentricity (${eccentricity.toFixed(2)})`,
+		},
+		{
+			value: deltaContrib.seismology,
+			description: `seismology (${seismology.toFixed(2)})`,
+		},
 	]
 
 	return { baseline, trace }
@@ -381,7 +455,8 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 		effectiveSeismology,
 	)
 
-	const boiledOffHydrosphereCode = mean > 1e3 && group !== "jovian" ? 12 : undefined
+	const boiledOffHydrosphereCode =
+		mean > 1e3 && group !== "jovian" ? 12 : undefined
 
 	const { tiltFactor, rotationFactor, geographicFactor } = seasonalFactors({
 		axialTiltDeg,
@@ -390,7 +465,12 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 		siderealDayHours,
 		hydrosphereCode,
 	})
-	const luminosityMod = seasonality(tiltFactor, rotationFactor, geographicFactor, pressureBar)
+	const luminosityMod = seasonality(
+		tiltFactor,
+		rotationFactor,
+		geographicFactor,
+		pressureBar,
+	)
 
 	const { high, low, delta } = temperatureRange(
 		luminosityMod,
@@ -420,8 +500,13 @@ function seasonalFactors(params: {
 	siderealDayHours: number
 	hydrosphereCode: number
 }): { tiltFactor: number; rotationFactor: number; geographicFactor: number } {
-	const { axialTiltDeg, periodYears, tideLock, siderealDayHours, hydrosphereCode } =
-		params
+	const {
+		axialTiltDeg,
+		periodYears,
+		tideLock,
+		siderealDayHours,
+		hydrosphereCode,
+	} = params
 	const tiltForFactor = axialTiltDeg > 90 ? 180 - axialTiltDeg : axialTiltDeg
 	let tiltFactor = Math.sin((tiltForFactor * Math.PI) / 180)
 	if (periodYears < 0.1) tiltFactor *= 0.5

@@ -156,8 +156,7 @@ function rollStarLockDM(params: {
 
 	const orbitNumber = orbitNumberFromAU(params.orbitalDistanceAU)
 	const orbitNote = `Distance (orbit #${orbitNumber.toFixed(1)})`
-	if (orbitNumber < 1)
-		dm.add(4 + Math.floor(10 * (1 - orbitNumber)), orbitNote)
+	if (orbitNumber < 1) dm.add(4 + Math.floor(10 * (1 - orbitNumber)), orbitNote)
 	else if (orbitNumber < 2) dm.add(4, orbitNote)
 	else if (orbitNumber < 3) dm.add(1, orbitNote)
 	else dm.add(-Math.floor(orbitNumber * 2), orbitNote)
@@ -352,8 +351,7 @@ function rollPlanetTideLock(params: {
 		const siblingMoonCount = lockedMoons.length - 1
 		const moonBreakdown = rollMoonLockDM({
 			moonSizeClass: moon.sizeClass ?? 0,
-			moonSemiMajorAxisPlanetDiameters:
-				moon.semiMajorAxisPlanetDiameters ?? 0,
+			moonSemiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters ?? 0,
 			siblingMoonCount,
 		})
 		const moonDM = moonBreakdown.value + general.value

@@ -178,14 +178,11 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 		useState("all")
 	const [moonClassificationFilter, setMoonClassificationFilter] =
 		useState("all")
-	const [planetTemperatureFilter, setPlanetTemperatureFilter] =
-		useState("all")
+	const [planetTemperatureFilter, setPlanetTemperatureFilter] = useState("all")
 	const [moonTemperatureFilter, setMoonTemperatureFilter] = useState("all")
-	const [planetHydrosphereFilter, setPlanetHydrosphereFilter] =
-		useState("all")
+	const [planetHydrosphereFilter, setPlanetHydrosphereFilter] = useState("all")
 	const [moonHydrosphereFilter, setMoonHydrosphereFilter] = useState("all")
-	const [planetAtmosphereFilter, setPlanetAtmosphereFilter] =
-		useState("all")
+	const [planetAtmosphereFilter, setPlanetAtmosphereFilter] = useState("all")
 	const [moonAtmosphereFilter, setMoonAtmosphereFilter] = useState("all")
 	useEffect(() => {
 		setSeedInput(seed.toString(36).padStart(6, "0"))
@@ -291,7 +288,8 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 			hydrosphere: buildHydrosphereDistribution(pregeneratedSystems),
 			biosphere: buildBiosphereDistribution(pregeneratedSystems),
 			temperature: buildTemperatureDistribution(pregeneratedSystems),
-			systemHabitability: buildSystemHabitabilityDistribution(pregeneratedSystems),
+			systemHabitability:
+				buildSystemHabitabilityDistribution(pregeneratedSystems),
 		}
 	}, [pregeneratedSystems])
 	const spectralClassOptions = useMemo(
@@ -450,7 +448,9 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 						? [
 								{
 									systemIndex: entry.systemIndex,
-									match: ["L", "T", "Y", "D"].includes(matchingStar.spectralClass)
+									match: ["L", "T", "Y", "D"].includes(
+										matchingStar.spectralClass,
+									)
 										? matchingStar.spectralClass
 										: `${matchingStar.spectralClass} ${matchingStar.luminosityClass}`,
 								},
@@ -780,7 +780,9 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 														setPlanetClassificationFilter(event.target.value)
 													else setMoonClassificationFilter(event.target.value)
 												}}
-												disabled={generating || systemBodySearchEntries === null}
+												disabled={
+													generating || systemBodySearchEntries === null
+												}
 												aria-label={`${searchTab} classification`}
 												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
 											>
@@ -805,7 +807,9 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 														setPlanetTemperatureFilter(event.target.value)
 													else setMoonTemperatureFilter(event.target.value)
 												}}
-												disabled={generating || systemBodySearchEntries === null}
+												disabled={
+													generating || systemBodySearchEntries === null
+												}
 												aria-label={`${searchTab} temperature class`}
 												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
 											>
@@ -832,7 +836,9 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 														setPlanetHydrosphereFilter(event.target.value)
 													else setMoonHydrosphereFilter(event.target.value)
 												}}
-												disabled={generating || systemBodySearchEntries === null}
+												disabled={
+													generating || systemBodySearchEntries === null
+												}
 												aria-label={`${searchTab} hydrosphere`}
 												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
 											>
@@ -857,7 +863,9 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 														setPlanetAtmosphereFilter(event.target.value)
 													else setMoonAtmosphereFilter(event.target.value)
 												}}
-												disabled={generating || systemBodySearchEntries === null}
+												disabled={
+													generating || systemBodySearchEntries === null
+												}
 												aria-label={`${searchTab} atmosphere`}
 												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
 											>

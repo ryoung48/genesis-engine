@@ -19,8 +19,14 @@ const VACUUM_ATMOSPHERE: AtmosphereProfile = {
 // Ported from galaxy-gen's BIOSPHERE.get (orbits/biosphere/index.ts). Only
 // `get` is ported -- biomass/complexity/diversity/compatibility are not.
 function get(params: BiosphereInput): BiosphereResult {
-	const { rng, starAgeGyr, temperatureMeanK, classification, impactZone, isMainWorld } =
-		params
+	const {
+		rng,
+		starAgeGyr,
+		temperatureMeanK,
+		classification,
+		impactZone,
+		isMainWorld,
+	} = params
 	const atmosphere = params.atmosphere ?? VACUUM_ATMOSPHERE
 	const hydrosphereCode = params.hydrosphereCode ?? 0
 
@@ -51,7 +57,8 @@ function get(params: BiosphereInput): BiosphereResult {
 	if (hydrosphereCode === 0) add(-4, "lack of accessible water")
 	else if (hydrosphereCode >= 1 && hydrosphereCode <= 3)
 		add(-2, "desert conditions prevalent")
-	else if (hydrosphereCode >= 6 && hydrosphereCode <= 8) add(1, "ocean-dominated")
+	else if (hydrosphereCode >= 6 && hydrosphereCode <= 8)
+		add(1, "ocean-dominated")
 	else if (hydrosphereCode >= 9 && hydrosphereCode < 12) add(2, "no continents")
 	else if (hydrosphereCode === 13) add(-4, "gas giant core")
 
@@ -114,13 +121,21 @@ function get(params: BiosphereInput): BiosphereResult {
 	let convertedAtmosphere: AtmosphereProfile | undefined
 	if (oxygen && value <= 0 && rng.random() <= 0.8) {
 		converted = true
-		convertedAtmosphere = { ...atmosphere, code: 10, type: "exotic", breathable: false }
+		convertedAtmosphere = {
+			...atmosphere,
+			code: 10,
+			type: "exotic",
+			breathable: false,
+		}
 		trace.push({ value: 0, description: "breathable converted to exotic" })
 	}
 
 	if (!(atmosphere.code >= 2 && atmosphere.code <= 9) && value >= 9) {
 		const collapse = rng.randint(2, 8)
-		trace.push({ value: -(value - collapse), description: "biosphere collapse" })
+		trace.push({
+			value: -(value - collapse),
+			description: "biosphere collapse",
+		})
 		value = collapse
 	}
 
@@ -144,8 +159,14 @@ function get(params: BiosphereInput): BiosphereResult {
 		const simple = biosphere.code <= 5
 		biosphere.label =
 			rng.weightedChoice([
-				{ w: oxygen && !converted ? (simple ? 2 : 1) : 0, v: "miscible" as const },
-				{ w: oxygen && !converted ? (simple ? 1 : 2) : 0, v: "hybrid" as const },
+				{
+					w: oxygen && !converted ? (simple ? 2 : 1) : 0,
+					v: "miscible" as const,
+				},
+				{
+					w: oxygen && !converted ? (simple ? 1 : 2) : 0,
+					v: "hybrid" as const,
+				},
 				{ w: 2, v: "immiscible" as const },
 			]) ?? "immiscible"
 	}

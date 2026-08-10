@@ -1,7 +1,7 @@
 import type {
+	TemperatureTraceEntry as OrbitBodyTemperatureTraceEntry,
 	OrbitGroup,
 	TemperatureEstimate,
-	TemperatureTraceEntry as OrbitBodyTemperatureTraceEntry,
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
 

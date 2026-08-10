@@ -89,7 +89,9 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 			<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
 				{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
 				{valueNode}
-				{stat.trailingHelp ? <TrailingHelpIcon content={stat.trailingHelp} /> : null}
+				{stat.trailingHelp ? (
+					<TrailingHelpIcon content={stat.trailingHelp} />
+				) : null}
 			</span>
 		)
 	}
@@ -131,7 +133,9 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 			</Popover>
 			{stat.valuePrefix && <span>{stat.value}</span>}
 			{stat.valueAction}
-			{stat.trailingHelp ? <TrailingHelpIcon content={stat.trailingHelp} /> : null}
+			{stat.trailingHelp ? (
+				<TrailingHelpIcon content={stat.trailingHelp} />
+			) : null}
 		</span>
 	)
 }

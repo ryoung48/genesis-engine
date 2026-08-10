@@ -1,7 +1,7 @@
 import { BIOSPHERE } from "@/model/celestial/planet/biosphere"
 import { ENVIRONMENT } from "@/model/celestial/planet/environment"
-import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
 import { DICE_TABLE } from "@/model/celestial/planet/environment/classification/dice-table"
+import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
 import { DENSITY } from "@/model/celestial/planet/environment/density"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import { HABITABILITY } from "@/model/celestial/planet/habitability"

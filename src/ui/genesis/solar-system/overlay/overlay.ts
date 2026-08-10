@@ -1109,6 +1109,11 @@ export function buildSolarSystemOverlay(
 			if (!c) return null
 			const focus = c.overlay.getBodyFocus({ ...address, starIndex: 0 })
 			if (!focus) return null
+			// MoonOrbitState.getMoonFocus resolves its mesh through the complete
+			// scene graph, so a companion moon's position already includes the
+			// companion mount translation. Body and star positions are local to the
+			// nested overlay, hence only those still need the mount translation.
+			if (address.kind === "moon") return focus
 			return {
 				position: focus.position.clone().add(c.mount.position),
 				radius: focus.radius,

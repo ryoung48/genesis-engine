@@ -24,25 +24,19 @@ const TWO_PI = 2 * Math.PI
 const ROCHE_PD = 2
 const MINIMUM_MOON_SPACING_PD = 0.6
 const MINIMUM_MOON_SPACING_SCALE = 0.03
-const EXTREME_ORBIT_SKIP_CHANCE = 0.65
-// Ported from galaxy-gen's rollMoonOrbit (orbits/moons/index.ts) -- pd =
-// ROCHE_PD + mor * uniform(min, max) per range, with outer/extreme sharing
-// one roll bucket split at outerMod > 1. Widening these (as a prior version
-// of this file did, to 0/0.24/0.56/0.92/1.1) inflates typical moon PD past
-// what galaxy-gen produces, which matters beyond flavor: rollMoonToPlanetLockDM
-// penalizes pd > 20, so wider bands silently suppress the moon→planet tide-lock
-// rate. Weights approximate galaxy-gen's 1d6(+mod) selection odds when mor is
-// large (the now-common case since generateMoons' morPd is capped like
-// galaxy-gen's own mor, not the mod<60 small-mor case): inner ~50%, middle
-// ~33%, outer/extreme ~17% split 5:1 by the outerMod>1 threshold.
+// Band bounds mirror galaxy-gen's rollMoonOrbit (orbits/moons/index.ts)
+// directly -- see rollMoonOrbitCandidate below, which ports its roll formula
+// verbatim. Kept here (rather than inlined) since placeMoonOrbits also needs
+// each band's [min, max] pd bounds to clamp a moon's rolled pd against
+// collisions with its neighbors.
 const ORBIT_RANGE_CONFIG: Record<
 	MoonOrbitRange,
-	{ minFactor: number; maxFactor: number; weight: number }
+	{ minFactor: number; maxFactor: number }
 > = {
-	inner: { minFactor: 0, maxFactor: 0.16, weight: 6 },
-	middle: { minFactor: 0.16, maxFactor: 0.5, weight: 4 },
-	outer: { minFactor: 0.5, maxFactor: 1.0, weight: 1.7 },
-	extreme: { minFactor: 1.0, maxFactor: 1.1, weight: 0.3 },
+	inner: { minFactor: 0, maxFactor: 0.16 },
+	middle: { minFactor: 0.16, maxFactor: 0.5 },
+	outer: { minFactor: 0.5, maxFactor: 1.0 },
+	extreme: { minFactor: 1.0, maxFactor: 1.1 },
 }
 const MOON_ORBIT_RANGE_ORDER: MoonOrbitRange[] = [
 	"inner",
@@ -138,46 +132,36 @@ function rollMoonDiameterKm({ rng, sizeClass }: RollMoonDiameterInput): number {
 	return rng.uniform(minKm, maxKm)
 }
 
-function rollMoonOrbitCandidate({
-	rng,
-	morPd,
-	moonMinimumPd,
-	maxPd,
-}: RollMoonOrbitCandidateInput):
-	| { range: MoonOrbitRange; pd: number }
-	| undefined {
-	const availableRanges = MOON_ORBIT_RANGE_ORDER.map((range) => {
-		const config = ORBIT_RANGE_CONFIG[range]
-		const rangeMinPd = ROCHE_PD + morPd * config.minFactor
-		const rangeMaxPd = Math.min(maxPd, ROCHE_PD + morPd * config.maxFactor)
-		const usableMinPd = Math.max(moonMinimumPd, rangeMinPd)
-		const usableWidthPd = rangeMaxPd - usableMinPd
-		if (usableWidthPd <= 0) return undefined
-		return { range, weight: config.weight * usableWidthPd }
-	}).filter((range) => range !== undefined)
-
-	if (availableRanges.length === 0) return undefined
-	const nonExtremeRanges = availableRanges.filter(
-		(range) => range.range !== "extreme",
-	)
-	const sampledRanges =
-		nonExtremeRanges.length > 0 && rng.uniform(0, 1) < EXTREME_ORBIT_SKIP_CHANCE
-			? nonExtremeRanges
-			: availableRanges
-	const totalWeight = sampledRanges.reduce(
-		(sum, range) => sum + range.weight,
-		0,
-	)
-	let roll = rng.uniform(0, totalWeight)
-	for (const range of sampledRanges) {
-		roll -= range.weight
-		if (roll <= 0) return { range: range.range, pd: 0 }
+// Direct port of galaxy-gen's rollMoonOrbit (orbits/moons/index.ts):
+//   const mod = mor < 60 ? 1 : 0
+//   const roll = dice.roll(1, 6) + mod
+//   if (roll <= 3) return { range: "inner", pd: ROCHE_PD + mor * uniform(0, 0.16) }
+//   if (roll <= 5) return { range: "middle", pd: ROCHE_PD + mor * uniform(0.16, 0.5) }
+//   const outerMod = uniform(0.5, 1.1)
+//   return { range: outerMod > 1 ? "extreme" : "outer", pd: ROCHE_PD + mor * outerMod }
+// Unlike galaxy-gen, the returned pd isn't used as-is -- placeMoonOrbits
+// clamps it against this moon's Roche-derived minimum and against its
+// neighbors' spacing, since galaxy-gen's own version has no such guard.
+function rollMoonOrbitCandidate({ rng, morPd }: RollMoonOrbitCandidateInput): {
+	range: MoonOrbitRange
+	pd: number
+} {
+	const mod = morPd < 60 ? 1 : 0
+	const roll = rollDie({ rng, sides: 6 }) + mod
+	if (roll <= 3) {
+		return { range: "inner", pd: ROCHE_PD + morPd * rng.uniform(0, 0.16) }
 	}
-	return { range: sampledRanges[sampledRanges.length - 1]!.range, pd: 0 }
+	if (roll <= 5) {
+		return { range: "middle", pd: ROCHE_PD + morPd * rng.uniform(0.16, 0.5) }
+	}
+	const outerMod = rng.uniform(0.5, 1.1)
+	return {
+		range: outerMod > 1 ? "extreme" : "outer",
+		pd: ROCHE_PD + morPd * outerMod,
+	}
 }
 
 function placeMoonOrbits({
-	rng,
 	moons,
 	morPd,
 	maxStablePd,
@@ -211,7 +195,7 @@ function placeMoonOrbits({
 			)
 			const maxPd = rangeMaxPd - reservePd - moon.radiusPd
 			if (maxPd <= minPd) continue
-			const pd = rng.uniform(minPd, maxPd)
+			const pd = Math.min(Math.max(moon.rolledPd, minPd), maxPd)
 			placedMoons.push({ ...moon, pd })
 			previousOuterPd = pd + moon.radiusPd
 		}
@@ -387,13 +371,7 @@ export const MOON = {
 					moonDiameterM: moonRadiusM * 2,
 				}) / planetDiameterM
 			const moonMinimumPd = Math.max(rochePd * 1.2, ROCHE_PD + minimumSpacingPd)
-			const orbit = rollMoonOrbitCandidate({
-				rng,
-				morPd,
-				moonMinimumPd,
-				maxPd: maxStablePd,
-			})
-			if (!orbit) continue
+			const orbit = rollMoonOrbitCandidate({ rng, morPd })
 
 			pendingMoons.push({
 				massKg,
@@ -401,12 +379,12 @@ export const MOON = {
 				sizeClass,
 				moonMinimumPd,
 				orbitRange: orbit.range,
+				rolledPd: orbit.pd,
 				radiusPd: diameterKm / planetDiameterKm / 2,
 			})
 		}
 
 		for (const moon of placeMoonOrbits({
-			rng,
 			moons: pendingMoons,
 			morPd,
 			maxStablePd,

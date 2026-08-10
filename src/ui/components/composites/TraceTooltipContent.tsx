@@ -24,8 +24,16 @@ const dotColorBySchemeAndSign: Record<
 	NonNullable<TraceTooltipContentProps["colorScheme"]>,
 	{ positive: string; negative: string; zero: string }
 > = {
-	signed: { positive: "bg-emerald-500", negative: "bg-rose-500", zero: "bg-slate-300" },
-	temperature: { positive: "bg-rose-500", negative: "bg-sky-500", zero: "bg-slate-300" },
+	signed: {
+		positive: "bg-emerald-500",
+		negative: "bg-rose-500",
+		zero: "bg-slate-300",
+	},
+	temperature: {
+		positive: "bg-rose-500",
+		negative: "bg-sky-500",
+		zero: "bg-slate-300",
+	},
 }
 
 const dotColor = (value: number, colorScheme: "signed" | "temperature") => {
@@ -33,8 +41,7 @@ const dotColor = (value: number, colorScheme: "signed" | "temperature") => {
 	return value > 0 ? colors.positive : value < 0 ? colors.negative : colors.zero
 }
 
-const defaultFormatValue = (value: number) =>
-	`${value > 0 ? "+" : ""}${value}`
+const defaultFormatValue = (value: number) => `${value > 0 ? "+" : ""}${value}`
 
 export function TraceTooltipContent({
 	title,
@@ -70,7 +77,9 @@ export function TraceTooltipContent({
 				<div className="text-[10px] text-slate-400">{emptyMessage}</div>
 			)}
 			<div className="flex items-center gap-1.5 border-t border-slate-100 pt-1.5 text-[10px] font-medium text-slate-700">
-				<span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(finalValue, colorScheme)}`} />
+				<span
+					className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(finalValue, colorScheme)}`}
+				/>
 				<span className="flex-1">{finalLabel}</span>
 				<span className="font-mono">{formatValue(finalValue)}</span>
 			</div>

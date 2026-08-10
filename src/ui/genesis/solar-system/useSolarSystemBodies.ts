@@ -535,7 +535,11 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 				star: {
 					...current.star,
 					class: nextClass,
-					ageGyr: clampAgeGyrForStar(current.star, nextClass, current.star.subtype),
+					ageGyr: clampAgeGyrForStar(
+						current.star,
+						nextClass,
+						current.star.subtype,
+					),
 				},
 			}))
 		},

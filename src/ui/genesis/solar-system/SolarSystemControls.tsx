@@ -127,7 +127,9 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 						"pointer-events-none absolute bottom-full left-0 mb-2",
 					)}
 				>
-					<div className={expanded ? "pointer-events-auto" : "pointer-events-none"}>
+					<div
+						className={expanded ? "pointer-events-auto" : "pointer-events-none"}
+					>
 						<FloatingPanel interactive={expanded} className="w-56" padding="md">
 							<PanelHeader
 								title="Solar System"

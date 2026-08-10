@@ -19,6 +19,8 @@ import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-pr
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
+import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
+import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
 	atmosphereSwatchColor,
 	axialTiltSwatchColor,
@@ -29,8 +31,6 @@ import {
 	rotationSwatchColor,
 	sizeSwatchColor,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
-import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
-import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
 	updateBodyDiameter,
 	updateBodyOrbitalDistance,
@@ -43,15 +43,15 @@ import {
 	formatAtmosphereLabel,
 	formatAtmosphereSuffix,
 	formatAvgTempValue,
+	formatBiosphereLabelParts,
 	formatClassificationLabel,
 	formatDays,
-	formatHours,
-	formatBiosphereLabelParts,
 	formatHabitabilityValue,
+	formatHours,
 	formatHydrosphereValuePrefix,
-	habitabilityCategoryLabel,
 	formatHydrosphereValueSuffix,
 	formatPressureBar,
+	habitabilityCategoryLabel,
 	temperatureSwatchColor,
 } from "@/ui/wiki/stats/orbit/formatters"
 import { buildSeismologyStats } from "@/ui/wiki/stats/orbit/seismology-stats"
@@ -125,7 +125,10 @@ function buildTemperatureTraceTooltip(params: {
 	seismologyTotal?: number
 	group?: string
 }): React.ReactNode | undefined {
-	if (params.luminositySol === undefined || params.orbitalDistanceAU === undefined)
+	if (
+		params.luminositySol === undefined ||
+		params.orbitalDistanceAU === undefined
+	)
 		return undefined
 	if (params.albedo === undefined || params.greenhouseFactor === undefined)
 		return undefined
