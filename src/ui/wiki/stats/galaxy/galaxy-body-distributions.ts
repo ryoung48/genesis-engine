@@ -1,5 +1,5 @@
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
-import type { MoonBody } from "@/model/celestial/moons/types"
+import type { MoonBody, MoonOrbitRange } from "@/model/celestial/moons/types"
 import type { OrbitBody } from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
@@ -657,6 +657,44 @@ export function buildSystemHabitabilityDistribution(
 			(HABITABILITY_CATEGORY_ORDER[a.label] ?? 0) -
 			(HABITABILITY_CATEGORY_ORDER[b.label] ?? 0),
 	)
+}
+
+const MOON_ORBIT_RANGE_CATEGORIES = ["inner", "middle", "outer", "extreme"] as const
+
+const MOON_ORBIT_RANGE_COLORS: Record<string, string> = {
+	inner: "#f7b67b",
+	middle: "#94c796",
+	outer: "#5aa5c0",
+	extreme: "#8268ed",
+}
+
+function moonOrbitRangeLabel(key: string): string {
+	return key.charAt(0).toUpperCase() + key.slice(1)
+}
+
+export function moonOrbitRangeSwatchColor(
+	range: MoonOrbitRange | undefined,
+): string | undefined {
+	if (range === undefined) return undefined
+	return MOON_ORBIT_RANGE_COLORS[range] ?? FALLBACK_COLOR
+}
+
+export function buildMoonOrbitRangeDistribution(
+	systems: readonly GalaxySystem[],
+): DistributionChartBucket[] {
+	const buckets = bucketBy(
+		collectMoons(systems),
+		(moon) => moon.orbitRange,
+		moonOrbitRangeLabel,
+		(key) => MOON_ORBIT_RANGE_COLORS[key] ?? FALLBACK_COLOR,
+	)
+	const order = new Map(
+		MOON_ORBIT_RANGE_CATEGORIES.map((category, index) => [
+			moonOrbitRangeLabel(category),
+			index,
+		]),
+	)
+	return buckets.sort((a, b) => (order.get(a.label) ?? 0) - (order.get(b.label) ?? 0))
 }
 
 export function buildBiosphereDistribution(

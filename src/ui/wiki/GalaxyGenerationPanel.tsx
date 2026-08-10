@@ -19,6 +19,7 @@ import {
 	buildEccentricityDistribution,
 	buildHydrosphereDistribution,
 	buildMoonClassificationDistribution,
+	buildMoonOrbitRangeDistribution,
 	buildPlanetClassificationDistribution,
 	buildRotationDistribution,
 	buildSizeDistribution,
@@ -281,6 +282,7 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 				buildPlanetClassificationDistribution(pregeneratedSystems),
 			moonClassification:
 				buildMoonClassificationDistribution(pregeneratedSystems),
+			moonOrbitRange: buildMoonOrbitRangeDistribution(pregeneratedSystems),
 			size: buildSizeDistribution(pregeneratedSystems),
 			eccentricity: buildEccentricityDistribution(pregeneratedSystems),
 			axialTilt: buildAxialTiltDistribution(pregeneratedSystems),
@@ -605,6 +607,12 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 								<DistributionChart
 									title="Moons"
 									buckets={bodyDistributions.moonClassification}
+									variant="compact"
+									showTotal={false}
+								/>
+								<DistributionChart
+									title="Moon Orbit"
+									buckets={bodyDistributions.moonOrbitRange}
 									variant="compact"
 									showTotal={false}
 								/>
