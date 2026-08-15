@@ -3,9 +3,10 @@ import { BELT_WIDTH, TWO_PI } from "@/ui/genesis/solar-system/overlay/constants"
 import { loadBodyTexture } from "@/ui/genesis/solar-system/overlay/textures"
 import type { AsteroidFieldData } from "@/ui/genesis/solar-system/overlay/types"
 
-const ASTEROID_TEXTURE_PATH = "/textures/celestial/generated/asteroid/1.png"
+const ASTEROID_TEXTURE_PATH =
+	"/textures/celestial/generated/asteroids/rocky/1.png"
 const ICE_ASTEROID_TEXTURE_PATH =
-	"/textures/celestial/generated/asteroid-ice/1.png"
+	"/textures/celestial/generated/asteroids/ice/1.png"
 
 // Scatters a field of small, irregularly-scaled rocks around a belt's ring —
 // each on its own randomized circular sub-orbit (slightly jittered radius and

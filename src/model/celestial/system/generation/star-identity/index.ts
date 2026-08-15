@@ -15,10 +15,12 @@ function getStarAgeGyr({ massSol }: { massSol: number }): number {
 	return Math.min(mainSequenceLifespanGyr, SOL_DATA.solStarAgeGyr)
 }
 
-// Same young-star floor STAR.rollStarAgeGyr's uniform rolls use, and the same
-// 14 Gyr universe-age cap it clamps toward for very light (long-lived) stars.
-const MIN_STAR_AGE_GYR = 0.1
+// Ordinary stars keep the 100 Myr editing floor, while shorter-lived stars
+// scale down to the same 10%-of-lifespan lower bound used by STAR's age roll.
+const DEFAULT_MIN_STAR_AGE_GYR = 0.1
+const MIN_EDITABLE_STAR_AGE_GYR = 0.000001
 const MAX_STAR_AGE_GYR = 14
+const DEFAULT_STAR_AGE_STEP_GYR = 0.01
 
 /** Valid age range for a live-editable star of this mass, e.g. for an Age
  * slider's min/max -- a star can't be older than its own main-sequence
@@ -27,11 +29,18 @@ const MAX_STAR_AGE_GYR = 14
 function getStarAgeBoundsGyr({ massSol }: { massSol: number }): {
 	minGyr: number
 	maxGyr: number
+	stepGyr: number
 } {
 	const mainSequenceLifespanGyr = 10 / massSol ** 2.5
+	const maxGyr = Math.min(mainSequenceLifespanGyr, MAX_STAR_AGE_GYR)
+	const minGyr = Math.max(
+		MIN_EDITABLE_STAR_AGE_GYR,
+		Math.min(DEFAULT_MIN_STAR_AGE_GYR, maxGyr * 0.1),
+	)
 	return {
-		minGyr: MIN_STAR_AGE_GYR,
-		maxGyr: Math.min(mainSequenceLifespanGyr, MAX_STAR_AGE_GYR),
+		minGyr,
+		maxGyr,
+		stepGyr: Math.min(DEFAULT_STAR_AGE_STEP_GYR, (maxGyr - minGyr) / 100),
 	}
 }
 

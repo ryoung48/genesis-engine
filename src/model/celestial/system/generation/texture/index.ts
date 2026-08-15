@@ -79,6 +79,7 @@ const GENERATED_TEXTURE_FILES: Partial<Record<GeneratedArtSet, string[]>> = {
 	acheronian: ["1.png"],
 	stygian: ["1.png"],
 	oasis: ["1.png", "2.png"],
+	asphodelian: ["1.png"],
 	// Cold-variant art for oasis-qualifying bodies that are cold or frozen --
 	// overrides the usual frozen -> snowball branch for those (see
 	// pickGeneratedBodyTextures below).
@@ -114,6 +115,29 @@ const GENERATED_TEXTURE_FILES: Partial<Record<GeneratedArtSet, string[]>> = {
 	"helian-helium": ["1.png"],
 }
 
+// Families with variant art live below a shared parent folder rather than as
+// sibling generated art-set folders. Unlisted art sets retain their direct
+// generated/<set> folder.
+const GENERATED_ART_SET_FOLDERS: Partial<Record<GeneratedArtSet, string>> = {
+	asteroid: "asteroids/rocky",
+	"oasis-cold": "oasis/cold",
+	"vesperian-arid": "vesperian/arid",
+	"vesperian-land": "vesperian/land",
+	"vesperian-continental": "vesperian/continental",
+	"vesperian-archipelago": "vesperian/archipelago",
+	"vesperian-water-world": "vesperian/water-world",
+	"jovian-hot": "jovian/hot",
+	"helian-hot": "helian/hot",
+	"hebean-arid": "hebean/arid",
+	"hebean-water": "hebean/water",
+	"geo-tidal-arid": "geo-tidal/arid",
+	"geo-tidal-water": "geo-tidal/water",
+	"geo-cyclic-arid": "geo-cyclic/arid",
+	"geo-cyclic-water": "geo-cyclic/water",
+	"helian-hydrogen": "helian/hydrogen",
+	"helian-helium": "helian/helium",
+}
+
 // Shared cloud-layer pool (public/textures/celestial/generated/clouds/...),
 // pooled from savanna+terrestrial+oceanic's cloud sets -- interchangeable,
 // not keyed by classification like GENERATED_TEXTURE_FILES above.
@@ -129,7 +153,8 @@ function pickGeneratedTexturePath({
 	const files = GENERATED_TEXTURE_FILES[classification]
 	if (!files || files.length === 0) return undefined
 	const file = rng.choice(files)
-	return `/textures/celestial/generated/${classification}/${file}`
+	const folder = GENERATED_ART_SET_FOLDERS[classification] ?? classification
+	return `/textures/celestial/generated/${folder}/${file}`
 }
 
 function pickGeneratedCloudsTexturePath({
@@ -155,6 +180,7 @@ function pickGeneratedBodyTextures({
 	zone,
 	atmosphereSubtype,
 	temperatureMeanK,
+	atmospherePressureBar,
 }: {
 	rng: ReturnType<typeof RNG.createRng>
 	classification: OrbitClassification
@@ -166,6 +192,9 @@ function pickGeneratedBodyTextures({
 	 * (frozen/cold/temperate/hot/burning) isn't fine-grained enough, e.g.
 	 * helian-hot's literal ">500C" requirement below. */
 	temperatureMeanK?: number
+	/** Only needed for helian's molten/thin-atmosphere -> meltball override
+	 * below. */
+	atmospherePressureBar?: number
 }): { texturePath?: string; cloudsTexturePath?: string } {
 	const frozen = climateBand === "frozen"
 	const pick = (cls: GeneratedArtSet) =>
@@ -174,6 +203,24 @@ function pickGeneratedBodyTextures({
 		texturePath,
 		cloudsTexturePath: pickGeneratedCloudsTexturePath({ rng }),
 	})
+
+	// hydrosphereCode 12 ("intense volcanism/molten surface") always gets the
+	// meltball art regardless of classification -- previously only reachable
+	// via the "meltball" classification itself (see dice-table's fixed
+	// hydrosphereCode: 12), but the proto/primordial youth override
+	// (planet/environment/index.ts's applyProtoHydrosphereSuppression) can now
+	// force any non-asteroid-belt, non-jovian classification down to code 12
+	// too, so this check runs before the classification switch below.
+	// telluric is excluded -- it keeps its own art even when molten. helian is
+	// also excluded -- its own case below picks between meltball and
+	// helian-hot depending on atmospherePressureBar.
+	if (
+		hydrosphereCode === 12 &&
+		classification !== "telluric" &&
+		classification !== "helian"
+	) {
+		return { texturePath: pick("meltball") }
+	}
 
 	switch (classification) {
 		case "tectonic": {
@@ -222,8 +269,21 @@ function pickGeneratedBodyTextures({
 			return { texturePath: pick("oasis") }
 		}
 		case "helian": {
+			// hydrosphereCode 12 ("intense volcanism/molten surface") is the real
+			// molten-surface code -- see the shared code-12 check above, which
+			// excludes helian so it can branch on atmospherePressureBar here.
+			const molten = hydrosphereCode === 12
+			// Molten-surface helian bodies that haven't held onto much of an
+			// atmosphere (< 1 bar) show bare volcanic ground instead of the
+			// hazy helian-hot render.
+			if (
+				molten &&
+				atmospherePressureBar !== undefined &&
+				atmospherePressureBar < 1
+			)
+				return { texturePath: pick("meltball") }
 			// 500C = 773.15K.
-			if (temperatureMeanK !== undefined && temperatureMeanK > 773.15)
+			if (molten || (temperatureMeanK !== undefined && temperatureMeanK > 773.15))
 				return { texturePath: pick("helian-hot") }
 			if (atmosphereSubtype === "hydrogen")
 				return { texturePath: pick("helian-hydrogen") }
@@ -256,7 +316,7 @@ function pickGeneratedBodyTextures({
 		case "stygian":
 			return { texturePath: pick("stygian") }
 		case "asphodelian":
-			return { texturePath: pick("arid") }
+			return { texturePath: pick("asphodelian") }
 		case "acheronian":
 			return { texturePath: pick("acheronian") }
 		case "chthonian":

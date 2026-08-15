@@ -578,10 +578,13 @@ const BIOSPHERE_COLOR: Record<number, string> = {
 }
 const BIOSPHERE_OVERFLOW_COLOR = "#8268ed"
 
+const BIOSPHERE_STERILE_COLOR = "#d9d9d9"
+
 export function biosphereSwatchColor(
 	code: number | undefined,
 ): string | undefined {
-	if (code === undefined || code <= 0) return undefined
+	if (code === undefined || code < 0) return undefined
+	if (code === 0) return BIOSPHERE_STERILE_COLOR
 	return BIOSPHERE_COLOR[code] ?? BIOSPHERE_OVERFLOW_COLOR
 }
 

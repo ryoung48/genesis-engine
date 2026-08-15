@@ -424,7 +424,7 @@ function buildBodyStats({
 				]
 			: []),
 		...buildSeismologyStats(seismology, surfaceTidesM),
-		...(biosphere !== undefined && biosphere.code > 0
+		...(biosphere !== undefined
 			? [
 					(() => {
 						const { base, suffix } = formatBiosphereLabelParts(biosphere)

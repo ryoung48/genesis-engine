@@ -131,8 +131,7 @@ export function useEbmPreview(config: EbmConfig) {
 				greenhouseFactorOverride ??
 				GREENHOUSE_ESTIMATE.estimateGreenhouseFactor(pressure),
 			internalHeatTempK,
-			// TEMP: seismology zeroed out for debugging
-			seismologyTotalHeatingK: 0,
+			seismologyTotalHeatingK,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel({ years: 30, dtDays: 0.5 })
@@ -223,5 +222,6 @@ export function useEbmPreview(config: EbmConfig) {
 		albedoOverride,
 		greenhouseFactorOverride,
 		internalHeatTempK,
+		seismologyTotalHeatingK,
 	])
 }

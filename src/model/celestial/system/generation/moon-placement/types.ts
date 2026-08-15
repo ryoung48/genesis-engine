@@ -8,6 +8,7 @@ export interface MoonPlacementInput {
 	rng: ReturnType<typeof RNG.createRng>
 	moonCount: number
 	diameterKm: number
+	parentSizeClass: number
 	orbitalDistanceAU: number
 	starMassKg: number
 	group: OrbitGroup

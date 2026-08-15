@@ -40,6 +40,10 @@ function buildBodyEnvironment(params: {
 	 * composition/density assignment. */
 	classified: { group: OrbitGroup; classification: OrbitClassification }
 	starAgeGyr: number
+	/** See PLANET.buildClassificationEnvironment's doc -- forwarded unchanged
+	 * from body/index.ts's inline proto/primordial derivation. */
+	proto?: boolean
+	primordial?: boolean
 }): Pick<
 	SystemBody,
 	| "sizeClass"
@@ -75,6 +79,8 @@ function buildBodyEnvironment(params: {
 		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
 		assignment: params.assignment,
 		starAgeGyr: params.starAgeGyr,
+		proto: params.proto,
+		primordial: params.primordial,
 	})
 	return {
 		sizeClass,
@@ -208,7 +214,9 @@ function buildMoonEnvironment(params: {
 		(params.semiMajorAxisPlanetDiameters ?? Number.POSITIVE_INFINITY) <= 8
 	const body = PLANET.classifyBody({
 		rng: params.rng,
-		groupHint: undefined,
+		// galaxy-gen assigns any moon above size 15 to the Jovian group before
+		// choosing its classification (orbits/index.ts's moon-spawn branch).
+		groupHint: sizeClass > 15 ? "jovian" : undefined,
 		parentGroup: params.parentGroup,
 		impactZone: params.impactZone ?? false,
 		zone: params.zone,

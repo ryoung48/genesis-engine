@@ -18,6 +18,8 @@ import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/e
 import type { Zone } from "@/model/celestial/planet/types"
 import type { SpectralClass } from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/temperature/ebm/greenhouse-estimate"
+import { MATH } from "@/model/shared/math/core"
+import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
 
 function applyTemperatureHydrosphereLoss({
@@ -207,6 +209,51 @@ function classifyBody(params: {
 	return { group, classification: rollOuterRareDwarfType(rng) }
 }
 
+// Ported from galaxy-gen's HYDROSPHERE.proto (orbits/hydrosphere/index.ts) --
+// a young (proto/primordial-age star) body below the size-scaled magma-
+// cooling threshold hasn't solidified a surface yet, so its hydrosphere is
+// forced to code 12 ("intense volcanism/molten surface") regardless of what
+// its classification would otherwise roll. sizeClass is the direct
+// equivalent of galaxy-gen's "size" (both split dwarf/terrestrial/helian/
+// jovian at the same 4/10/15 boundaries -- see rolls/index.ts's
+// rollSizeClass), and starAgeGyr*1000 converts to the Myr scale galaxy-gen's
+// star.age*1000 uses.
+function applyProtoHydrosphereSuppression({
+	sizeClass,
+	starAgeGyr,
+	hydrosphereCode,
+}: {
+	sizeClass: number
+	starAgeGyr: number
+	hydrosphereCode: number
+}): number {
+	if (sizeClass < 2) return hydrosphereCode
+	const magmaThresholdMyr = (sizeClass - 2) ** 2 + 2
+	if (starAgeGyr * 1000 < magmaThresholdMyr) return 12
+	return hydrosphereCode
+}
+
+// Ported from galaxy-gen's ATMOSPHERE.youth (orbits/atmosphere/index.ts) --
+// replaces a young body's normally-rolled atmosphere code with its own size/
+// star-age-driven roll, skewed harder toward exotic/insidious outcomes at
+// proto ages (starAgeGyr<0.01) than at the broader primordial window
+// (starAgeGyr<0.1).
+function rollYouthAtmosphereCode({
+	rng,
+	proto,
+	sizeClass,
+}: {
+	rng: ReturnType<typeof RNG.createRng>
+	proto: boolean
+	sizeClass: number
+}): number {
+	const atmosphereMod = proto ? 4 : 2
+	const atmosphere = DICE.roll2d6(rng) - 7 + sizeClass + atmosphereMod
+	if (atmosphere >= 2 && atmosphere <= (proto ? 5 : 7)) return 10
+	if (atmosphere >= (proto ? 6 : 8) && atmosphere <= 11) return 12
+	return MATH.clamp({ value: atmosphere, lo: 0, hi: 14 })
+}
+
 // Ported from galaxy-gen's TEMPERATURE.finalize albedo roll (orbits/
 // temperature/index.ts) -- a real composition/atmosphere/hydrosphere-driven
 // Bond albedo, dice-rolled and stored at generation time. Chaos-machine
@@ -235,6 +282,14 @@ function buildClassificationEnvironment(params: {
 	assignment?: ClassifiedEnvironment
 	/** Forwarded to ATMOSPHERE.codeToProfile's hazard roll. */
 	starAgeGyr: number
+	/** Ported from galaxy-gen's star.proto/star.primordial (stars/index.ts) --
+	 * proto is starAgeGyr<0.01 && starMassSol<8, primordial is the broader
+	 * starAgeGyr<0.1. Both false for a system whose star's mass/age isn't
+	 * known to be young (e.g. Sol-seeded bodies). Suppresses hydrosphere and
+	 * overrides atmosphere for any non-asteroid-belt, non-jovian body -- see
+	 * applyProtoHydrosphereSuppression/rollYouthAtmosphereCode above. */
+	proto?: boolean
+	primordial?: boolean
 }): {
 	density: DensityProfile | null
 	landCoverage: number
@@ -262,10 +317,21 @@ function buildClassificationEnvironment(params: {
 			spectralClass: params.spectralClass,
 			isPrimaryWorld: params.isPrimaryWorld,
 		})
-	const hydrosphereCode = applyTemperatureHydrosphereLoss({
+	const youth =
+		params.group !== "asteroid belt" &&
+		params.group !== "jovian" &&
+		(params.proto === true || params.primordial === true)
+	let hydrosphereCode = applyTemperatureHydrosphereLoss({
 		hydrosphereCode: rolledEnvironment.hydrosphereCode,
 		deviation: params.deviation,
 	})
+	if (youth) {
+		hydrosphereCode = applyProtoHydrosphereSuppression({
+			sizeClass: params.sizeClass,
+			starAgeGyr: params.starAgeGyr,
+			hydrosphereCode,
+		})
+	}
 	const hydrosphere = HYDROSPHERE.buildProfile({
 		rng: params.rng,
 		code: hydrosphereCode,
@@ -277,9 +343,16 @@ function buildClassificationEnvironment(params: {
 					diameterKm: params.diameterKm,
 				})
 			: 0
+	const atmosphereCode = youth
+		? rollYouthAtmosphereCode({
+				rng: params.rng,
+				proto: params.proto === true,
+				sizeClass: params.sizeClass,
+			})
+		: rolledEnvironment.atmosphereCode
 	const atmosphere = ATMOSPHERE.codeToProfile({
 		rng: params.rng,
-		atmosphereCode: rolledEnvironment.atmosphereCode,
+		atmosphereCode,
 		params: {
 			chemistry: rolledEnvironment.chemistry ?? rolledEnvironment.composition,
 			sizeClass: params.sizeClass,
@@ -319,8 +392,8 @@ function buildClassificationEnvironment(params: {
 		hydrosphereCode,
 		hydrosphere,
 		composition: rolledEnvironment.composition,
-		chemistry: rolledEnvironment.chemistry,
-		subtype: rolledEnvironment.subtype,
+		chemistry: youth ? undefined : rolledEnvironment.chemistry,
+		subtype: youth ? "primordial" : rolledEnvironment.subtype,
 		eccentricByClassification: rolledEnvironment.eccentric,
 		atmosphere,
 		greenhouseFactor,

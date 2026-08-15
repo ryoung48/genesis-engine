@@ -128,7 +128,7 @@ function rollMoonSizeClass({
 }
 
 function rollMoonDiameterKm({ rng, sizeClass }: RollMoonDiameterInput): number {
-	const [minKm, maxKm] = ORBIT_BODY.sizeClassToRockyDiameterRangeKm(sizeClass)
+	const [minKm, maxKm] = ORBIT_BODY.sizeClassToDiameterRangeKm({ sizeClass })
 	return rng.uniform(minKm, maxKm)
 }
 
@@ -308,6 +308,7 @@ export const MOON = {
 		count,
 		seed,
 		planetRadiusKm,
+		parentSizeClass,
 		orbitalDistanceAU,
 		starMassKg,
 		parentGroup = "terrestrial",
@@ -336,8 +337,6 @@ export const MOON = {
 		// nothing else bounds how far out "outer"/"extreme" orbits can land.
 		const cappedRangePd = Math.min(maxStablePd - ROCHE_PD, 200 + count)
 		const morPd = Math.max(cappedRangePd / 1.1, 0.25)
-		const parentSizeClass =
-			MOON.estimateMoonSizeClassFromDiameter(planetDiameterKm)
 		const minimumSpacingPd = Math.max(
 			MINIMUM_MOON_SPACING_PD,
 			morPd * MINIMUM_MOON_SPACING_SCALE,
@@ -359,11 +358,19 @@ export const MOON = {
 		for (let i = 0; i < count; i++) {
 			const sizeClass = rollMoonSizeClass({ rng, parentSizeClass, parentGroup })
 			const diameterKm = rollMoonDiameterKm({ rng, sizeClass })
-			const moonDensity = rng.uniform(2200, 4000)
+			const massKg =
+				sizeClass > 15
+					? ORBIT_BODY.massKgFromEarthRelativeDensity({
+							diameterKm,
+							densityEarthRelative: rng.uniform(0.08, 0.35),
+						})
+					: (() => {
+							const moonRadiusM = diameterKm * 500
+							const moonVol =
+								(4 / 3) * Math.PI * moonRadiusM * moonRadiusM * moonRadiusM
+							return moonVol * rng.uniform(2200, 4000)
+						})()
 			const moonRadiusM = diameterKm * 500
-			const moonVol =
-				(4 / 3) * Math.PI * moonRadiusM * moonRadiusM * moonRadiusM
-			const massKg = moonVol * moonDensity
 			const rochePd =
 				MECHANICS.rocheLimitM({
 					planetRadiusM,

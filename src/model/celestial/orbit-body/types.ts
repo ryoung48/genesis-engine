@@ -28,6 +28,10 @@ export type OrbitClassification =
 	| "telluric"
 	| "vesperian"
 
+export interface SizeClassToDiameterRangeInput {
+	sizeClass: number
+}
+
 export interface DensityProfile {
 	earthRelative: number
 	description: string

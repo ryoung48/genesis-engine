@@ -718,6 +718,9 @@ function runPostElevationPipeline(
 			count: 1,
 			seed: params.seed + 8831,
 			planetRadiusKm: params.planetRadiusKm,
+			parentSizeClass: MOON.estimateMoonSizeClassFromDiameter(
+				params.planetRadiusKm * 2,
+			),
 			orbitalDistanceAU: params.orbitalDistanceAU,
 			starMassKg,
 		}),

@@ -279,7 +279,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		if (!solarSystemViewActive) return
 		const initialDay = solarSystemElapsedHoursRef.current / 24
 		sceneRef.current?.updateSolarSystemOverlay(
-			systemBodies.length > 0
+			solarSystemViewActive
 				? {
 						bodies: systemBodies,
 						daysPerYear: effectiveDaysPerYear,

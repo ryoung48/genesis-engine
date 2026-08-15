@@ -10,6 +10,7 @@ import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMu
 import { ProgressBar } from "@/ui/components/primitives/ProgressBar"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
+import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	ATMOSPHERE_CATEGORIES,
@@ -67,13 +68,35 @@ interface GalaxySystemSearchEntry {
 interface GalaxySystemSearchStar {
 	spectralClass: string
 	luminosityClass: string
+	/** Very young (age<0.01 Gyr, mass<8 Msol) -- a strict subset of primordial.
+	 * See body/index.ts's proto/primordial derivation. */
+	proto: boolean
+	/** Young (age<0.1 Gyr). */
+	primordial: boolean
 }
+
+type StarYouthFilter = "all" | "proto" | "primordial"
+type StarCountFilter = "all" | "1" | "2" | "3" | "4+"
+
+function matchesStarCountFilter(count: number, filter: StarCountFilter): boolean {
+	if (filter === "all") return true
+	if (filter === "4+") return count > 3
+	return count === Number(filter)
+}
+
+const SPECIAL_CIRCUMSTANCE_OPTIONS: SpecialCircumstance[] = [
+	"Trojan Orbit",
+	"Minor Rings",
+	"Major Rings",
+	"Twin Moon",
+]
 
 interface GalaxyBodyClassificationTemperaturePair {
 	classification: string
 	temperatureClass: string | undefined
 	hydrosphereClass: string | undefined
 	atmosphereClass: string | undefined
+	specialCircumstances: SpecialCircumstance[]
 }
 
 interface GalaxySystemBodySearchEntry {
@@ -82,6 +105,16 @@ interface GalaxySystemBodySearchEntry {
 	moonClassifications: string[]
 	planetClassificationTemperaturePairs: GalaxyBodyClassificationTemperaturePair[]
 	moonClassificationTemperaturePairs: GalaxyBodyClassificationTemperaturePair[]
+}
+
+interface SystemSearchResult {
+	systemIndex: number
+	match: string
+}
+
+interface SystemSearchResults {
+	matches: SystemSearchResult[]
+	total: number
 }
 
 type SystemSearchTab = "stars" | "planets" | "moons"
@@ -174,6 +207,8 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 	const [searchTab, setSearchTab] = useState<SystemSearchTab>("stars")
 	const [spectralClassFilter, setSpectralClassFilter] = useState("all")
 	const [luminosityClassFilter, setLuminosityClassFilter] = useState("all")
+	const [starYouthFilter, setStarYouthFilter] = useState<StarYouthFilter>("all")
+	const [starCountFilter, setStarCountFilter] = useState<StarCountFilter>("all")
 	const [planetClassificationFilter, setPlanetClassificationFilter] =
 		useState("all")
 	const [moonClassificationFilter, setMoonClassificationFilter] =
@@ -184,6 +219,12 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 	const [moonHydrosphereFilter, setMoonHydrosphereFilter] = useState("all")
 	const [planetAtmosphereFilter, setPlanetAtmosphereFilter] = useState("all")
 	const [moonAtmosphereFilter, setMoonAtmosphereFilter] = useState("all")
+	const [
+		planetSpecialCircumstancesFilter,
+		setPlanetSpecialCircumstancesFilter,
+	] = useState("all")
+	const [moonSpecialCircumstancesFilter, setMoonSpecialCircumstancesFilter] =
+		useState("all")
 	useEffect(() => {
 		setSeedInput(seed.toString(36).padStart(6, "0"))
 	}, [seed])
@@ -342,6 +383,42 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 			setLuminosityClassFilter("all")
 		}
 	}, [luminosityClassFilter, luminosityClassOptions])
+	const starYouthOptions = useMemo(
+		() =>
+			(["proto", "primordial"] as const).filter((category) =>
+				systemSearchEntries.some((entry) =>
+					entry.stars.some((star) =>
+						category === "proto" ? star.proto : star.primordial,
+					),
+				),
+			),
+		[systemSearchEntries],
+	)
+	useEffect(() => {
+		if (
+			starYouthFilter !== "all" &&
+			!starYouthOptions.includes(starYouthFilter)
+		) {
+			setStarYouthFilter("all")
+		}
+	}, [starYouthFilter, starYouthOptions])
+	const starCountOptions = useMemo(
+		() =>
+			(["1", "2", "3", "4+"] as const).filter((bucket) =>
+				systemSearchEntries.some((entry) =>
+					matchesStarCountFilter(entry.stars.length, bucket),
+				),
+			),
+		[systemSearchEntries],
+	)
+	useEffect(() => {
+		if (
+			starCountFilter !== "all" &&
+			!starCountOptions.includes(starCountFilter)
+		) {
+			setStarCountFilter("all")
+		}
+	}, [starCountFilter, starCountOptions])
 	const planetClassificationOptions = useMemo(
 		() =>
 			[
@@ -430,34 +507,71 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 			),
 		[systemBodySearchEntries],
 	)
-	const systemSearchResults = useMemo(() => {
+	const planetSpecialCircumstancesOptions = useMemo(
+		() =>
+			SPECIAL_CIRCUMSTANCE_OPTIONS.filter((circumstance) =>
+				(systemBodySearchEntries ?? []).some((entry) =>
+					entry.planetClassificationTemperaturePairs.some((pair) =>
+						pair.specialCircumstances.includes(circumstance),
+					),
+				),
+			),
+		[systemBodySearchEntries],
+	)
+	const moonSpecialCircumstancesOptions = useMemo(
+		() =>
+			SPECIAL_CIRCUMSTANCE_OPTIONS.filter((circumstance) =>
+				(systemBodySearchEntries ?? []).some((entry) =>
+					entry.moonClassificationTemperaturePairs.some((pair) =>
+						pair.specialCircumstances.includes(circumstance),
+					),
+				),
+			),
+		[systemBodySearchEntries],
+	)
+	const systemSearchResults = useMemo<SystemSearchResults>(() => {
 		if (searchTab === "stars") {
 			const hasFilter =
-				spectralClassFilter !== "all" || luminosityClassFilter !== "all"
-			if (!hasFilter) return []
-			return systemSearchEntries
-				.flatMap((entry) => {
-					const matchingStar = entry.stars.find(
-						(star) =>
-							(spectralClassFilter === "all" ||
-								star.spectralClass === spectralClassFilter) &&
-							(luminosityClassFilter === "all" ||
-								star.luminosityClass === luminosityClassFilter),
-					)
-					return matchingStar
-						? [
-								{
-									systemIndex: entry.systemIndex,
-									match: ["L", "T", "Y", "D"].includes(
-										matchingStar.spectralClass,
-									)
-										? matchingStar.spectralClass
-										: `${matchingStar.spectralClass} ${matchingStar.luminosityClass}`,
-								},
-							]
-						: []
-				})
-				.slice(0, 8)
+				spectralClassFilter !== "all" ||
+				luminosityClassFilter !== "all" ||
+				starYouthFilter !== "all" ||
+				starCountFilter !== "all"
+			if (!hasFilter) return { matches: [], total: 0 }
+			const matches = systemSearchEntries.flatMap((entry) => {
+				if (!matchesStarCountFilter(entry.stars.length, starCountFilter))
+					return []
+				const matchingStar = entry.stars.find(
+					(star) =>
+						(spectralClassFilter === "all" ||
+							star.spectralClass === spectralClassFilter) &&
+						(luminosityClassFilter === "all" ||
+							star.luminosityClass === luminosityClassFilter) &&
+						(starYouthFilter === "all" ||
+							(starYouthFilter === "proto" ? star.proto : star.primordial)),
+				)
+				if (!matchingStar) return []
+				const classLabel = ["L", "T", "Y", "D"].includes(
+					matchingStar.spectralClass,
+				)
+					? matchingStar.spectralClass
+					: `${matchingStar.spectralClass} ${matchingStar.luminosityClass}`
+				const details = [
+					starYouthFilter !== "all"
+						? starYouthFilter === "proto"
+							? "Proto"
+							: "Primordial"
+						: null,
+					starCountFilter !== "all"
+						? `${entry.stars.length} star${entry.stars.length === 1 ? "" : "s"}`
+						: null,
+				].filter((detail): detail is string => detail !== null)
+				const match =
+					details.length === 0
+						? classLabel
+						: `${classLabel} (${details.join(", ")})`
+				return [{ systemIndex: entry.systemIndex, match }]
+			})
+			return { matches: matches.slice(0, 8), total: matches.length }
 		}
 		const classificationFilter =
 			searchTab === "planets"
@@ -469,14 +583,19 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 			searchTab === "planets" ? planetHydrosphereFilter : moonHydrosphereFilter
 		const atmosphereFilter =
 			searchTab === "planets" ? planetAtmosphereFilter : moonAtmosphereFilter
+		const specialCircumstancesFilter =
+			searchTab === "planets"
+				? planetSpecialCircumstancesFilter
+				: moonSpecialCircumstancesFilter
 		if (
 			classificationFilter === "all" &&
 			temperatureFilter === "all" &&
 			hydrosphereFilter === "all" &&
-			atmosphereFilter === "all"
+			atmosphereFilter === "all" &&
+			specialCircumstancesFilter === "all"
 		)
-			return []
-		return (systemBodySearchEntries ?? [])
+			return { matches: [], total: 0 }
+		const matches = (systemBodySearchEntries ?? [])
 			.filter((entry) => {
 				const pairs =
 					searchTab === "planets"
@@ -491,10 +610,13 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 						(hydrosphereFilter === "all" ||
 							pair.hydrosphereClass === hydrosphereFilter) &&
 						(atmosphereFilter === "all" ||
-							pair.atmosphereClass === atmosphereFilter),
+							pair.atmosphereClass === atmosphereFilter) &&
+						(specialCircumstancesFilter === "all" ||
+							pair.specialCircumstances.includes(
+								specialCircumstancesFilter as SpecialCircumstance,
+							)),
 				)
 			})
-			.slice(0, 8)
 			.map((entry) => ({
 				systemIndex: entry.systemIndex,
 				match: [
@@ -502,14 +624,18 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 					temperatureFilter,
 					hydrosphereFilter,
 					atmosphereFilter,
+					specialCircumstancesFilter,
 				]
 					.filter((value) => value !== "all")
 					.join(" / "),
 			}))
+		return { matches: matches.slice(0, 8), total: matches.length }
 	}, [
 		searchTab,
 		spectralClassFilter,
 		luminosityClassFilter,
+		starYouthFilter,
+		starCountFilter,
 		planetClassificationFilter,
 		moonClassificationFilter,
 		planetTemperatureFilter,
@@ -518,6 +644,8 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 		moonHydrosphereFilter,
 		planetAtmosphereFilter,
 		moonAtmosphereFilter,
+		planetSpecialCircumstancesFilter,
+		moonSpecialCircumstancesFilter,
 		systemSearchEntries,
 		systemBodySearchEntries,
 	])
@@ -700,7 +828,7 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 							disabled={generating}
 							className="h-3 w-3 rounded-sm border-slate-300"
 						/>
-						Pre-generate all systems (bodies only, no climate)
+						Pre-generate all systems
 					</label>
 
 					{generating ? (
@@ -764,6 +892,43 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 													{value}
 												</option>
 											))}
+										</select>
+										<select
+											value={starCountFilter}
+											onChange={(event) =>
+												setStarCountFilter(
+													event.target.value as StarCountFilter,
+												)
+											}
+											disabled={generating || starCountOptions.length === 0}
+											aria-label="Star count"
+											className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+										>
+											<option value="all">Any star count</option>
+											{starCountOptions.map((bucket) => (
+												<option key={bucket} value={bucket}>
+													{bucket} star{bucket === "1" ? "" : "s"}
+												</option>
+											))}
+										</select>
+										<select
+											value={starYouthFilter}
+											onChange={(event) =>
+												setStarYouthFilter(
+													event.target.value as StarYouthFilter,
+												)
+											}
+											disabled={generating || starYouthOptions.length === 0}
+											aria-label="Star age"
+											className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+										>
+											<option value="all">Any star age</option>
+											{starYouthOptions.includes("proto") ? (
+												<option value="proto">Proto (very young)</option>
+											) : null}
+											{starYouthOptions.includes("primordial") ? (
+												<option value="primordial">Primordial (young)</option>
+											) : null}
 										</select>
 									</div>
 								) : (
@@ -880,6 +1045,40 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 												))}
 											</select>
 										</div>
+										<div className="grid grid-cols-2 gap-1.5">
+											<select
+												value={
+													searchTab === "planets"
+														? planetSpecialCircumstancesFilter
+														: moonSpecialCircumstancesFilter
+												}
+												onChange={(event) => {
+													if (searchTab === "planets")
+														setPlanetSpecialCircumstancesFilter(
+															event.target.value,
+														)
+													else
+														setMoonSpecialCircumstancesFilter(
+															event.target.value,
+														)
+												}}
+												disabled={
+													generating || systemBodySearchEntries === null
+												}
+												aria-label={`${searchTab} special circumstances`}
+												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+											>
+												<option value="all">Any special circumstances</option>
+												{(searchTab === "planets"
+													? planetSpecialCircumstancesOptions
+													: moonSpecialCircumstancesOptions
+												).map((value) => (
+													<option key={value} value={value}>
+														{value}
+													</option>
+												))}
+											</select>
+										</div>
 										{systemBodySearchEntries === null ? (
 											<p className="text-[10px] text-slate-500">
 												Generate with “Pre-generate all systems” enabled to
@@ -888,22 +1087,30 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 										) : null}
 									</>
 								)}
-								{systemSearchResults.length > 0 ? (
-									<div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-										{systemSearchResults.map(({ systemIndex, match }) => (
-											<button
-												key={systemIndex}
-												type="button"
-												onClick={() => onFocusSystem(systemIndex)}
-												className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs text-slate-700 transition-colors hover:bg-slate-50"
-											>
-												<span>{match}</span>
-												<span className="font-mono text-[10px] text-slate-400">
-													System #{systemIndex + 1}
-												</span>
-											</button>
-										))}
-									</div>
+								{systemSearchResults.total > 0 ? (
+									<>
+										<p className="text-[10px] text-slate-500">
+											{systemSearchResults.total.toLocaleString()} matching
+											systems
+										</p>
+										<div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+											{systemSearchResults.matches.map(
+												({ systemIndex, match }) => (
+													<button
+														key={systemIndex}
+														type="button"
+														onClick={() => onFocusSystem(systemIndex)}
+														className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs text-slate-700 transition-colors hover:bg-slate-50"
+													>
+														<span>{match}</span>
+														<span className="font-mono text-[10px] text-slate-400">
+															System #{systemIndex + 1}
+														</span>
+													</button>
+												),
+											)}
+										</div>
+									</>
 								) : null}
 							</div>
 						) : null}

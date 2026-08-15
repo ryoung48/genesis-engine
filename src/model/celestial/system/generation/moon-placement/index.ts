@@ -14,6 +14,7 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 		count: params.moonCount,
 		seed: params.rng.randint(1, 1_000_000_000),
 		planetRadiusKm: params.diameterKm / 2,
+		parentSizeClass: params.parentSizeClass,
 		orbitalDistanceAU: params.orbitalDistanceAU,
 		starMassKg: params.starMassKg,
 		parentGroup: params.group,

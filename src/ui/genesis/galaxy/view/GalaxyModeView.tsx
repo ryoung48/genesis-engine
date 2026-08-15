@@ -4,13 +4,13 @@ import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import type { Galaxy, GalaxyParams } from "@/model/celestial/galaxy/types"
 import type { GalaxyWorkerResponse } from "@/model/celestial/galaxy/worker-protocol/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import {
 	createGalaxyScene,
 	disposeGalaxyScene,
-	focusCameraOnSystem,
 	pickAtCanvasPoint,
 	render,
 	resize,
@@ -21,6 +21,7 @@ import {
 import type { GalaxySceneContext } from "@/ui/genesis/galaxy/renderer/galaxy-scene/types"
 import type { GalaxyOrigin } from "@/ui/genesis/generation/session-persistence"
 import { GalaxyGenerationPanel } from "@/ui/wiki/GalaxyGenerationPanel"
+import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import {
 	atmosphereCategory,
 	hydrosphereCategory,
@@ -33,6 +34,23 @@ const DEFAULT_SYSTEM_COUNT = 2000
 // the core glow/nebula proportions read the same as the old repo.
 const DEFAULT_RADIUS = { min: 100, max: 300 }
 const DEFAULT_DIMENSIONS = { w: 1600, h: 1600 }
+const MAJOR_RING_MINIMUM_WIDTH = 0.4
+
+function specialCircumstances(body: SystemBody): SpecialCircumstance[] {
+	const circumstances: SpecialCircumstance[] = []
+	if (body.trojan) circumstances.push("Trojan Orbit")
+	if (body.rings) {
+		const ringWidth =
+			body.rings.outerRadiusRelative - body.rings.innerRadiusRelative
+		circumstances.push(
+			ringWidth >= MAJOR_RING_MINIMUM_WIDTH ? "Major Rings" : "Minor Rings",
+		)
+	}
+	if (body.moons.some((moon) => moon.sizeClass === body.sizeClass)) {
+		circumstances.push("Twin Moon")
+	}
+	return circumstances
+}
 
 function createWorker(
 	onProgress: (label: string, pct: number) => void,
@@ -74,11 +92,12 @@ function createWorker(
  * prefs are fully independent of the default "/" instance -- see
  * plans/galaxy-view-port.md. */
 export const GalaxyModeView: React.FC<{
-	/** Where this session last opened a system from, if any -- reused to
-	 * regenerate the exact same layout and re-select/re-center on the same
-	 * system when re-entering galaxy mode (see the resume effect below).
-	 * Deterministic (seeded) generation means the layout comes back
-	 * identical; only the camera/selection needs restoring. */
+	/** Where this session last opened a system from, if any -- reused only to
+	 * regenerate the exact same galaxy layout (seed/size/radius) on mount, so
+	 * reloading /galaxy shows the same galaxy rather than a new random one.
+	 * Deliberately NOT used to re-center the camera on that system -- opening
+	 * this view (including via a bare page load/refresh) should always land
+	 * centered on the galaxy, not silently jump to wherever you last looked. */
 	initialGalaxyOrigin: GalaxyOrigin | null
 	/** Double-clicking a system hands it straight to GenesisView, which loads
 	 * it into its own solar-system state and exits galaxy mode -- no
@@ -89,13 +108,6 @@ export const GalaxyModeView: React.FC<{
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const sceneRef = useRef<GalaxySceneContext | null>(null)
 	const workerRef = useRef<Worker | null>(null)
-	// Set once on mount from initialGalaxyOrigin, consumed by the `galaxy`
-	// effect once the regenerated layout actually arrives -- selecting the
-	// system and re-centering the camera can't happen until then, since both
-	// need the galaxy's own r_xy data.
-	const pendingResumeSystemIndexRef = useRef<number | null>(
-		initialGalaxyOrigin?.systemIndex ?? null,
-	)
 
 	const [seed, setSeed] = useState(
 		initialGalaxyOrigin?.galaxyParams.seed ?? DEFAULT_SEED,
@@ -153,15 +165,15 @@ export const GalaxyModeView: React.FC<{
 	useEffect(() => {
 		if (!galaxy || !sceneRef.current) return
 		setGalaxy(sceneRef.current, galaxy)
-		const resumeSystemIndex = pendingResumeSystemIndexRef.current
-		if (resumeSystemIndex !== null) {
-			pendingResumeSystemIndexRef.current = null
-			focusCameraOnSystem(sceneRef.current, resumeSystemIndex)
-		}
 	}, [galaxy])
 
 	const handleGenerate = (paramsOverride?: GalaxyParams) => {
 		workerRef.current?.terminate()
+		// Disabled until setGalaxy re-centers and re-enables it -- otherwise a
+		// stray wheel/pan during this re-roll's async generation drifts the view
+		// off-center before the new galaxy even renders (see createGalaxyScene's
+		// initial controls.enabled = false for the same reasoning on first load).
+		if (sceneRef.current) sceneRef.current.controls.enabled = false
 		setGenerating(true)
 		setGenerationLabel("Starting...")
 		setGenerationProgress(0)
@@ -271,6 +283,13 @@ export const GalaxyModeView: React.FC<{
 						}).map((star) => ({
 							spectralClass: star.spectralClass,
 							luminosityClass: star.luminosityClass,
+							// Ported from body/index.ts's inline proto/primordial
+							// derivation (galaxy-gen's star.proto/star.primordial,
+							// stars/index.ts) -- proto is a strict subset of primordial
+							// (narrower age window, plus a mass cap), so a star can match
+							// both.
+							proto: star.ageGyr < 0.01 && star.massSol < 8,
+							primordial: star.ageGyr < 0.1,
 						})),
 					}))
 				: [],
@@ -298,8 +317,12 @@ export const GalaxyModeView: React.FC<{
 						temperatureClass: temperatureCategory(body),
 						hydrosphereClass: hydrosphereCategory(body),
 						atmosphereClass: atmosphereCategory(body),
+						specialCircumstances: specialCircumstances(body),
 					})),
 				),
+				// Moons don't roll their own trojan orbits -- only top-level bodies
+				// do (see generateSystemBodies' trojan pass) -- so this is always
+				// false here.
 				moonClassificationTemperaturePairs: system.stars.flatMap((star) =>
 					star.bodies.flatMap((body) =>
 						body.moons.map((moon) => ({
@@ -307,6 +330,7 @@ export const GalaxyModeView: React.FC<{
 							temperatureClass: temperatureCategory(moon),
 							hydrosphereClass: hydrosphereCategory(moon),
 							atmosphereClass: atmosphereCategory(moon),
+							specialCircumstances: [] as SpecialCircumstance[],
 						})),
 					),
 				),
@@ -345,7 +369,13 @@ export const GalaxyModeView: React.FC<{
 					onFocusSystem={focusSearchedSystem}
 				/>
 			)}
-			<div className="flex-1 h-[56vh] xl:h-full relative overflow-hidden bg-[#050510]">
+			{/* max-xl:/xl: (not a bare h-[56vh] plus xl:h-full) so the two height
+			rules are mutually exclusive by media query -- Tailwind doesn't
+			guarantee an xl: variant of a named utility beats an unconditional
+			arbitrary-value utility in generated source order, so a bare
+			h-[56vh] alongside xl:h-full could win even at xl and squash the
+			canvas (and therefore the centered camera) into a short strip. */}
+			<div className="flex-1 max-xl:h-[56vh] xl:h-full relative overflow-hidden bg-[#050510]">
 				<canvas
 					ref={canvasRef}
 					className="absolute inset-0 h-full w-full"

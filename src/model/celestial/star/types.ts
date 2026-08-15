@@ -76,9 +76,9 @@ export type HostStarAttributes = Omit<RolledStarAttributes, "hzco">
 
 /** Mirrors galaxy-gen's ParentStarLike (stars/generation.ts) -- the subset of
  * a rolled star's own attributes a companion roll needs to know about its
- * parent (spectral/luminosity class for the cooler-than-parent floor and
- * exotic-class inheritance, age to copy directly, mass for the white-dwarf
- * mass cap). */
+ * parent (spectral/luminosity class for the Non-Primary Star Determination
+ * table's method roll and exotic-class inheritance, age to copy directly,
+ * mass for post-stellar mass derivation). */
 export interface ParentStarLike {
 	spectralClass: SpectralClass
 	luminosityClass: LuminosityClass
@@ -86,6 +86,27 @@ export interface ParentStarLike {
 	massSol: number
 	ageGyr: number
 }
+
+/** Which column of the Non-Primary Star Determination table a companion
+ * roll uses -- "secondary" for a companion of the system's root primary
+ * (Close/Near/Far in the source text; this codebase's inner/outer/distant
+ * StarRoles), "companion" for a companion of a companion (this codebase's
+ * epistellar StarRole). Post-stellar parents (white dwarf/neutron
+ * star/black hole) use neither -- STAR.rollStarAttributes switches to the
+ * table's Post-Stellar column internally whenever the parent is one of
+ * those, regardless of which column is passed in. */
+export type NonPrimaryStarColumn = "secondary" | "companion"
+
+/** One row's resolved method from the Non-Primary Star Determination table.
+ * "exotic" carries the Other-column direct-result case (D* / D / BD) rather
+ * than a further transform -- see STAR.rollStarAttributes' method-roll
+ * doc comment for the full table and the Other-column swap/resolve rule. */
+export type NonPrimaryStarMethod =
+	| "random"
+	| "lesser"
+	| "sibling"
+	| "twin"
+	| { exotic: "D*" | "D" | "BD" }
 
 export interface BlackbodyFractionInput {
 	lambdaNm: number

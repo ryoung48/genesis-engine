@@ -33,6 +33,10 @@ import type { SharedRng } from "@/model/shared/random/rng"
 import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 
+function isPostStellarClass(spectralClass: StarPreview["spectralClass"]): boolean {
+	return spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
+}
+
 function toParentStarLike(star: StarPreview): ParentStarLike {
 	return {
 		spectralClass: star.spectralClass,
@@ -152,12 +156,19 @@ function seedForStar({
  * companionOddsFor) is recomputed per star from its own rolled spectral AND
  * luminosity class, exactly mirroring the source. Every star's full physical
  * attributes -- not just its class -- come from STAR.rollStarAttributes,
- * which also handles the parent-cooler-than-child floor, exotic-class
- * inheritance (a white-dwarf/brown-dwarf parent's children roll from the
- * same exotic pool), and the shared-age-with-parent rule internally. Stopping
- * here (no body generation) is what makes this cheap enough to call for
- * every visible galaxy point; `generate` below walks the identical tree and
- * then additionally hydrates each star's real planets/moons.
+ * which now types every companion via the Traveller Non-Primary Star
+ * Determination table (Random/Lesser/Sibling/Twin/Other; see
+ * resolveCompanionType in star/index.ts) keyed by the `column` this
+ * function derives from StarRole just below ("epistellar" -> "companion",
+ * everything else -> "secondary" -- the post-stellar column is chosen
+ * automatically whenever the immediate parent is D/NS/BH). Every non-exotic
+ * companion still inherits `parent.ageGyr` verbatim, but a companion that
+ * itself resolves to post-stellar now rolls its own independent elapsed
+ * age -- see the system-age-reset pass at the end of this function, which
+ * mirrors the book's age-reset rule using that value. Stopping here (no
+ * body generation) is what makes this cheap enough to call for every
+ * visible galaxy point; `generate` below walks the identical tree and then
+ * additionally hydrates each star's real planets/moons.
  */
 function rollStarTree(rng: SharedRng): StarPreview[] {
 	const stars: StarPreview[] = []
@@ -166,7 +177,8 @@ function rollStarTree(rng: SharedRng): StarPreview[] {
 		const index = stars.length
 		const parent =
 			parentIndex === null ? undefined : toParentStarLike(stars[parentIndex]!)
-		const rolled = STAR.rollStarAttributes(rng, parent)
+		const column = role === "epistellar" ? "companion" : "secondary"
+		const rolled = STAR.rollStarAttributes(rng, parent, undefined, column)
 		const deviation =
 			role === "primary"
 				? 0
@@ -220,6 +232,37 @@ function rollStarTree(rng: SharedRng): StarPreview[] {
 
 	const primaryIndex = rollOne("primary", null)
 	rollCompanionsFor(primaryIndex, false)
+
+	// System age reset (book: "if a new star is a post-stellar object but
+	// the primary is a fusing star, the age of the entire stellar system
+	// could be reset ... use the final age of the post-stellar object ...
+	// to determine system age"). Only fires when the root primary is still
+	// fusing (a post-stellar root already sets its own age including any
+	// post-death bump) and some companion's independently-rolled
+	// post-stellar age (see rollPostStellarCompanionAgeGyr in star/index.ts)
+	// implies an older system than currently assigned. [DEVIATION] see that
+	// function's doc comment -- the book's Referee-arbitrated mass
+	// reverse-engineering fallback for when this would exceed the primary's
+	// own achievable lifespan has no automated equivalent here; the age is
+	// simply carried forward (already capped at STAR.rollStarAttributes'
+	// flat uniform(13, 14) ceiling) and every other still-fusing star in the
+	// tree is bumped to match, same as they'd otherwise have inherited a
+	// younger age from the primary.
+	const root = stars[primaryIndex]!
+	if (!isPostStellarClass(root.spectralClass)) {
+		let systemAgeGyr = root.ageGyr
+		for (const star of stars) {
+			if (isPostStellarClass(star.spectralClass) && star.ageGyr > systemAgeGyr) {
+				systemAgeGyr = star.ageGyr
+			}
+		}
+		if (systemAgeGyr > root.ageGyr) {
+			for (const star of stars) {
+				if (!isPostStellarClass(star.spectralClass)) star.ageGyr = systemAgeGyr
+			}
+		}
+	}
+
 	return stars
 }
 

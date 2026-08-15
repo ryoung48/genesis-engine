@@ -1,6 +1,7 @@
 import type {
 	DensityFromMassAndDiameterInput,
 	MassFromDensityInput,
+	SizeClassToDiameterRangeInput,
 } from "@/model/celestial/orbit-body/types"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
@@ -36,6 +37,18 @@ const ROCKY_SIZE_DIAMETER_BANDS_KM = [
 ] as const
 
 export const ORBIT_BODY = {
+	sizeClassToDiameterRangeKm({
+		sizeClass,
+	}: SizeClassToDiameterRangeInput): [number, number] {
+		if (sizeClass <= 15)
+			return ORBIT_BODY.sizeClassToRockyDiameterRangeKm(sizeClass)
+		if (sizeClass === 16) return [2 * earthDiameterKm, 6 * earthDiameterKm]
+		if (sizeClass === 17) return [6 * earthDiameterKm, 12 * earthDiameterKm]
+		if (sizeClass === 18) return [8 * earthDiameterKm, 18 * earthDiameterKm]
+		const minKm = 1200 + sizeClass * 1600
+		return [minKm, minKm + 1600]
+	},
+
 	sizeClassToRockyDiameterRangeKm(sizeClass: number): [number, number] {
 		const boundedSizeClass = Math.max(
 			0,

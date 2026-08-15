@@ -5,7 +5,10 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type {
+	MainSequenceClass,
+	SpectralClass,
+} from "@/model/celestial/star/types"
 import { SYSTEM_GENERATION } from "@/model/celestial/system/generation"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import type { MainWorldMode } from "@/model/celestial/system/generation/types"
@@ -253,8 +256,16 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			starAgeGyr,
 			starLuminositySol:
 				hostStar?.luminositySol ??
-				STAR.getStarLuminositySol({ cls, subtype: starSubtype }),
-			spectralClass: cls,
+				STAR.getStarLuminositySolExtended({
+					cls: spectralClass as SpectralClass,
+					subtype: starSubtype,
+				}),
+			// The real, uncoerced class -- SEISMOLOGY.applySystemSeismology's
+			// spectralClass param is typed SpectralClass (the full exotic set,
+			// see its own doc), not MainSequenceClass, so it's expected to see
+			// "Y" here, not `cls`'s G-coerced fallback (only right for the
+			// main-sequence-only dice-table lookups above).
+			spectralClass: spectralClass as SpectralClass,
 			...surfaceTidesCallbacks,
 		}
 	}, [seed, spectralClass, starSubtype, hostStar, starAgeGyr])
@@ -266,8 +277,14 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		if (seed !== SOL_DATA.solSeed) {
 			// Non-Sol: the main world (if any) is rolled fresh right alongside
 			// its siblings -- no external params to build here at all.
+			// hostStar (when present) takes priority over spectralClass/cls
+			// inside generateSystemBodies -- required for exotic classes (L/T/
+			// Y/D/NS/BH), which `cls`'s MainSequenceClass coercion would
+			// otherwise collapse to the default G star, giving every sibling
+			// body a Sun-like luminosity instead of its real host star's.
 			return SYSTEM_GENERATION.generateSystemBodies({
 				seed: seed,
+				hostStar: hostStar ?? undefined,
 				spectralClass: cls,
 				starSubtype,
 				mainWorldMode,
@@ -344,7 +361,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			mainWorldMode: "earth-clone",
 			solMainWorldOverrides,
 		})
-	}, [seed, spectralClass, starSubtype, mainWorldMode, starAgeGyr])
+	}, [seed, spectralClass, starSubtype, mainWorldMode, starAgeGyr, hostStar])
 	const resetSourceSystemBodies = useMemo(
 		() =>
 			seed === SOL_DATA.solSeed

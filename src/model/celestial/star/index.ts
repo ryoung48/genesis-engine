@@ -5,6 +5,8 @@ import type {
 	LuminosityClass,
 	MainSequenceClass,
 	NeutronStarLuminosityClass,
+	NonPrimaryStarColumn,
+	NonPrimaryStarMethod,
 	ParentStarLike,
 	RolledStarAttributes,
 	RollStarAgeInput,
@@ -26,6 +28,12 @@ const defaultOrbitalDistanceAu = DEFAULT_ORBITAL_DISTANCE_AU_VALUE
 const defaultSpectralClass = DEFAULT_SPECTRAL_CLASS_VALUE
 const defaultStarSubtype = DEFAULT_STAR_SUBTYPE_VALUE
 const mainSequenceClasses = MAIN_SEQUENCE_CLASSES_VALUE
+// See rollStarAttributes' young-star-override [DEVIATION] comment below --
+// the odds any given non-evolved, non-dead star independently rolls as
+// freshly formed (regardless of mass), and the share of that pool narrow
+// enough to also count as proto rather than just primordial.
+const YOUNG_STAR_CHANCE = 0.01
+const YOUNG_STAR_PROTO_SHARE = 0.25
 // Position ranges within the 20-entry V-class lookup tables
 const SPECTRAL_RANGES: Record<MainSequenceClass, [number, number]> = {
 	O: [0, 2],
@@ -37,30 +45,18 @@ const SPECTRAL_RANGES: Record<MainSequenceClass, [number, number]> = {
 	M: [12, 14],
 }
 
-// Temperature (K) indexed by spectral position 0–19 (O0 → Y9)
-const STAR_TEMP_K = [
-	50000, 40000, 30000, 15000, 10000, 8000, 7500, 6500, 5920, 5600, 5200, 4400,
-	3700, 3000, 2400, 1850, 1300, 900, 550, 300,
-]
-
-// Diameter (solar radii) for main-sequence (V class), indexed 0–19
-const STAR_DIAMETER_SOL = [
-	20, 12, 7, 3.5, 2.2, 2, 1.7, 1.5, 1.04, 0.95, 0.9, 0.8, 0.7, 0.2, 0.1, 0.08,
-	0.09, 0.11, 0.1, 0.1,
-]
-
-// Mass (solar masses) for main-sequence V class, indexed 0–19
-// Index 8 (G0) nudged from 1.1 → 1.08 so G2 interpolates to exactly 1.0 M☉
-const STAR_MASS_SOL = [
-	90, 60, 18, 5, 2.2, 1.8, 1.5, 1.3, 1.08, 0.9, 0.8, 0.7, 0.5, 0.16, 0.08, 0.06,
-	0.05, 0.04, 0.025, 0.013,
-]
-
-// Minimum allowable orbit (AU) for main-sequence V class, first 15 entries
-const STAR_MAO_AU = [
-	0.5, 0.3, 0.18, 0.09, 0.06, 0.05, 0.04, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02,
-	0.01, 0.01,
-]
+// getStarTemperatureK/getStarDiameterSol/getStarMassSol/getStarMAO below all
+// read off starTempFull/starDiameterByLuminosityClass.V/
+// starMassByLuminosityClass.V/starMAOByLuminosityClass.V (defined further
+// down alongside rollStarAttributes) -- there used to be a second,
+// near-duplicate copy of these four tables up here that only the plain
+// getStarXxx functions read, which is how the G0 entries drifted apart
+// (temperature 5920 vs 6000, diameter 1.04 vs 1.1, mass 1.08 vs 1.1 -- the
+// 1.08 was a deliberate nudge, per the comment on starMassByLuminosityClass
+// below, "so G2 interpolates to exactly 1.0 M☉," that never made it into the
+// second copy). Consolidated onto one copy so getStarXxx and
+// rollStarAttributes can no longer disagree about what a given class/subtype
+// actually is.
 
 const T_SUN_K = 5778
 const C2_UM_K = 14388 // second radiation constant in Î¼m·K
@@ -129,6 +125,32 @@ function getStarSpectralPosition({ cls, subtype }: StarSpectralInput): number {
 	return start + (Math.max(0, Math.min(9, subtype)) / 9) * (end - start)
 }
 
+// starTempFull/starDiameterByLuminosityClass.V are already indexed across the
+// full O0->Y9 domain (see their doc comments), so brown dwarfs (L/T/Y) have
+// real data here -- they just aren't reachable through getStarSpectralPosition,
+// which only maps the seven main-sequence SPECTRAL_RANGES keys. This sibling
+// uses FULL_SPECTRAL_RANGES instead so L/T/Y resolve to their own position
+// rather than collapsing to the default class (G) -- see
+// getStarLuminositySolExtended, used wherever a caller needs a real
+// (non-Sun-like) luminosity for an exotic dwarf without going through the
+// separate rollStarAttributes model. D/NS/BH start past this array's domain
+// and clamp to its last entry (Y9) -- callers needing those already have
+// dedicated formulas elsewhere.
+function getExtendedStarSpectralPosition({
+	cls,
+	subtype,
+}: {
+	cls: SpectralClass
+	subtype: number
+}): number {
+	const maxPos = starTempFull.length - 1
+	const [rawStart, rawEnd] =
+		FULL_SPECTRAL_RANGES[cls] ?? SPECTRAL_RANGES[defaultSpectralClass]
+	const start = Math.min(rawStart, maxPos)
+	const end = Math.min(rawEnd, maxPos)
+	return start + (Math.max(0, Math.min(9, subtype)) / 9) * (end - start)
+}
+
 // Non-realistic-sizes star radius: same spirit as galaxy-gen's
 // getStarRenderRadius (a handful of fixed radii instead of scaling
 // continuously with the star's true diameter/luminosity), but interpolated
@@ -141,13 +163,15 @@ const NON_REALISTIC_STAR_RATIO_AT_M9 = 8
 const NON_REALISTIC_STAR_SPECTRAL_POSITION_MAX = 14 // O0 = 0 … M9 = 14
 
 // --- Extended stellar-evolution model (galaxy-gen parity) -----------------
-// Ports galaxy-gen's rollStarAttributes (stars/generation.ts) end to end:
-// the giant/subgiant/subdwarf/supergiant luminosity-class ladder, the brown-
+// Ports galaxy-gen's rollStarAttributes (stars/generation.ts) end to end: the
+// giant/subgiant/subdwarf/supergiant luminosity-class ladder, the brown-
 // dwarf/white-dwarf/neutron-star/black-hole branches, and their dedicated
-// mass/diameter/temperature formulas. Deliberately kept separate from
-// SPECTRAL_RANGES/STAR_TEMP_K/etc. above (which only ever modeled ordinary
-// V-class O-M dwarfs) so no existing caller of STAR.getStarTemperatureK/
-// getStarMassSol/etc. changes behavior -- those stay main-sequence-only.
+// formulas. The V-class (main-sequence) mass/diameter/temperature series
+// below (starMassByLuminosityClass.V/starDiameterByLuminosityClass.V/
+// starTempFull) are the same tables STAR.getStarMassSol/getStarDiameterSol/
+// getStarTemperatureK read via SPECTRAL_RANGES above -- there's only one copy
+// of the main-sequence O-M data now, shared by both the plain lookup
+// functions and rollStarAttributes.
 
 const FULL_SPECTRAL_RANGES: Record<SpectralClass, [number, number]> = {
 	O: [0, 2],
@@ -175,8 +199,11 @@ const starMassByLuminosityClass: Record<StandardLuminosityClass, number[]> = {
 	II: [130, 40, 30, 20, 14, 11, 10, 8, 8, 10, 10, 12, 14, 16, 18],
 	III: [110, 30, 20, 10, 8, 6, 4, 3, 2.5, 2.4, 1.1, 1.5, 1.8, 2.4, 8],
 	IV: [20, 20, 20, 10, 4, 2.3, 2, 1.5, 1.7, 1.2, 1.5, 1.5, 1.5, 1.5, 1.5],
+	// Index 8 (G0) nudged from 1.1 -> 1.08 so G2 interpolates to exactly 1.0 M☉
+	// (used by both getStarMassSol and rollStarAttributes -- see the note on
+	// SPECTRAL_RANGES above).
 	V: [
-		90, 60, 18, 5, 2.2, 1.8, 1.5, 1.3, 1.1, 0.9, 0.8, 0.7, 0.5, 0.16, 0.08,
+		90, 60, 18, 5, 2.2, 1.8, 1.5, 1.3, 1.08, 0.9, 0.8, 0.7, 0.5, 0.16, 0.08,
 		0.06, 0.05, 0.04, 0.025, 0.013, 0.01,
 	],
 	VI: [
@@ -194,7 +221,7 @@ const starDiameterByLuminosityClass: Record<StandardLuminosityClass, number[]> =
 		III: [21, 15, 10, 6, 5, 5, 5, 5, 10, 15, 20, 40, 60, 100, 200],
 		IV: [8, 8, 8, 5, 4, 3, 3, 2, 3, 4, 6, 6, 6, 6, 6],
 		V: [
-			20, 12, 7, 3.5, 2.2, 2, 1.7, 1.5, 1.1, 0.95, 0.9, 0.8, 0.7, 0.2, 0.1,
+			20, 12, 7, 3.5, 2.2, 2, 1.7, 1.5, 1.04, 0.95, 0.9, 0.8, 0.7, 0.2, 0.1,
 			0.08, 0.09, 0.11, 0.1, 0.1,
 		],
 		VI: [
@@ -203,8 +230,10 @@ const starDiameterByLuminosityClass: Record<StandardLuminosityClass, number[]> =
 		],
 	}
 
+// Index 8 (G0) is 5920, not the more commonly cited 6000 -- kept consistent
+// with getStarTemperatureK's pre-consolidation value (used by both here).
 const starTempFull = [
-	50000, 40000, 30000, 15000, 10000, 8000, 7500, 6500, 6000, 5600, 5200, 4400,
+	50000, 40000, 30000, 15000, 10000, 8000, 7500, 6500, 5920, 5600, 5200, 4400,
 	3700, 3000, 2400, 1850, 1300, 900, 550, 300,
 ]
 
@@ -384,30 +413,22 @@ export function getNeutronStarColor(
 	return "#002aff"
 }
 
-/**
- * Ports galaxy-gen's rollStarAttributes (stars/generation.ts) end to end --
- * the primary's initial 2d6 giant/subgiant/subdwarf/supergiant ladder (only
- * reachable when `!parent && !homeworld`), the O-M spectral-class ladder
- * with its baked-in "at least one step cooler than parent" floors, the
- * brown-dwarf-tail/white-dwarf-parent inheritance branch, the 5% root-only
- * exotic branch (brown dwarf/white dwarf/neutron star/black hole), and the
- * age roll including the now-reachable giant/subgiant lifespan branches and
- * the dead-star post-death age bump. Every dice.* call is translated to its
- * SharedRng/DICE equivalent 1:1 (see whiteDwarfRoll's doc for the one
- * intentional argument-order cleanup). Companion-orbit eccentricity is
- * rolled separately by GALAXY_SYSTEMS, where parent/role information is
- * available and the galaxy-gen star-companion modifier applies.
- */
-export function rollStarAttributes(
+/** Root-only (parent-blind) giant/subgiant/subdwarf/supergiant ladder + O-M
+ * spectral-class ladder -- galaxy-gen's rollStarAttributes primary path,
+ * extracted so it can also serve as the Non-Primary Star Determination
+ * table's "Random" method body ("Roll on the regular Star Type
+ * Determination table"). `homeworld` only ever comes from the true system
+ * primary's own call; companion rolls always pass `false`, which is also
+ * what makes the giant ladder reachable for a companion's Random result
+ * (the book's "regular" table isn't parent-gated). */
+function rollUnconstrainedStarType(
 	rng: SharedRng,
-	parent?: ParentStarLike,
-	homeworld?: boolean,
-): RolledStarAttributes {
-	const parentClass = parent?.spectralClass
+	homeworld: boolean,
+): { spectralClass: MainSequenceClass; luminosityClass: LuminosityClass; subtype: number } {
 	let spectralRoll = DICE.rollDice({ rng, count: 2, sides: 6 })
 	let luminosityClass: LuminosityClass = "V"
-	let spectralClass: SpectralClass = "G"
-	if (spectralRoll <= 3 && !homeworld && !parent) {
+	let spectralClass: MainSequenceClass = "G"
+	if (spectralRoll <= 3 && !homeworld) {
 		spectralRoll = DICE.rollDice({ rng, count: 2, sides: 6 }) + 2
 		let lumRoll = DICE.rollDice({ rng, count: 2, sides: 6 })
 		if (lumRoll <= 5) luminosityClass = "VI"
@@ -426,19 +447,19 @@ export function rollStarAttributes(
 	const subDwarf = luminosityClass === "VI"
 	if (spectralRoll >= 12 && homeworld) spectralRoll -= 2
 	if (spectralRoll <= 6 && (subGiant || giant)) spectralRoll += 5
-	if (spectralRoll <= 6 || parentClass === "K" || parentClass === "M") {
+	if (spectralRoll <= 6) {
 		spectralClass = "M"
-	} else if (spectralRoll <= 8 || parentClass === "G") {
+	} else if (spectralRoll <= 8) {
 		spectralClass = "K"
-	} else if (spectralRoll <= 10 || parentClass === "F") {
+	} else if (spectralRoll <= 10) {
 		spectralClass = "G"
-	} else if (spectralRoll <= 11 || parentClass === "A") {
+	} else if (spectralRoll <= 11) {
 		spectralClass = subDwarf ? "G" : "F"
 	} else if (spectralRoll === 12) {
 		spectralRoll = DICE.rollDice({ rng, count: 2, sides: 6 })
-		if ((spectralRoll <= 9 || parentClass === "B") && !subDwarf) {
+		if (spectralRoll <= 9 && !subDwarf) {
 			spectralClass = "A"
-		} else if (spectralRoll <= 11 || subGiant || parentClass === "O") {
+		} else if (spectralRoll <= 11 || subGiant) {
 			spectralClass = "B"
 		} else {
 			spectralClass = "O"
@@ -446,43 +467,359 @@ export function rollStarAttributes(
 	}
 	let subtype = rng.randint(0, 9)
 	if (spectralClass === "K" && subtype > 4) subtype -= 5
-	if (spectralClass === "M" && parentClass === "M") {
-		subtype = rng.randint((parent?.subtype ?? 0) + 1, 9)
+	return { spectralClass, luminosityClass, subtype }
+}
+
+/** Spectral-class hotness order for the book's Random-method demotion rule
+ * ("if the new star result is hotter than the primary, treat as Lesser
+ * instead") -- O is hottest, M coolest; within a class, lower subtype is
+ * hotter. Exotic (non-main-sequence) classes have no comparable position on
+ * this ladder, so callers skip the comparison entirely for post-stellar
+ * parents rather than routing through here. */
+function isHotterThanParent(
+	candidate: { spectralClass: MainSequenceClass; subtype: number },
+	parent: { spectralClass: SpectralClass; subtype: number },
+): boolean {
+	const parentIndex = (mainSequenceClasses as readonly string[]).indexOf(
+		parent.spectralClass,
+	)
+	if (parentIndex === -1) return false
+	const candidateIndex = mainSequenceClasses.indexOf(candidate.spectralClass)
+	if (candidateIndex !== parentIndex) return candidateIndex < parentIndex
+	return candidate.subtype < parent.subtype
+}
+
+const isPostStellar = (spectralClass: SpectralClass): boolean =>
+	spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
+
+// Cooler-direction ordering for brown dwarf siblings -- these fall outside
+// mainSequenceClasses entirely, so applySibling's ordinary O-M class-step
+// logic can't index into it for them (brown dwarf parents are always
+// forced to the Sibling method -- see resolveCompanionType -- so this is
+// reachable on every such roll, not just an edge case).
+const BROWN_DWARF_CLASSES = ["L", "T", "Y"] as const
+
+// Minimums post-stellar Sibling results must not shrink past ("do not
+// reduce size past minimums for that type of object") -- derived from each
+// roller's own formula floor just below (whiteDwarfRoll/neutronStarRoll's
+// smallest possible dice.rollDice/randint outcome).
+const POST_STELLAR_MIN_MASS_SOL: Record<"D" | "NS" | "BH", number> = {
+	D: 0.11,
+	NS: 1.1,
+	BH: 2.2,
+}
+
+/**
+ * The Non-Primary Star Determination table's 2D+DM roll: which of
+ * Random/Lesser/Sibling/Twin/Other applies, keyed by column (Secondary for
+ * this codebase's inner/outer/distant StarRoles, Companion for epistellar,
+ * Post-Stellar whenever the parent is D/NS/BH regardless of role). "Other"
+ * on the Secondary/Companion columns rerolls once on the other of those two
+ * columns (the book: "roll again on the other column"); "Other" on the
+ * Post-Stellar column has no swap partner and resolves directly via the
+ * table's own Other column (D* / D / BD), read here off the same row.
+ */
+const NON_PRIMARY_TABLE: Record<
+	"secondary" | "companion" | "post-stellar",
+	readonly ("other" | "random" | "lesser" | "sibling" | "twin")[]
+> = {
+	// rows: 2-, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12+
+	secondary: [
+		"other", "other", "random", "random", "random", "lesser", "lesser",
+		"sibling", "sibling", "twin", "twin",
+	],
+	companion: [
+		"other", "other", "random", "random", "lesser", "lesser", "sibling",
+		"sibling", "twin", "twin", "twin",
+	],
+	"post-stellar": [
+		"other", "other", "random", "random", "random", "random", "random",
+		"lesser", "lesser", "twin", "twin",
+	],
+}
+const NON_PRIMARY_OTHER_COLUMN: readonly ("D*" | "D" | "BD")[] = [
+	"D*", "D", "D", "D", "D", "D", "BD", "BD", "BD", "BD", "BD",
+]
+
+function nonPrimaryRowIndex(roll: number): number {
+	if (roll <= 2) return 0
+	if (roll >= 12) return 10
+	return roll - 2
+}
+
+function rollNonPrimaryMethod(
+	rng: SharedRng,
+	column: NonPrimaryStarColumn | "post-stellar",
+	dm: number,
+	swapped = false,
+): NonPrimaryStarMethod {
+	const roll = DICE.roll2d6(rng) + dm
+	const rowIndex = nonPrimaryRowIndex(roll)
+	const result = NON_PRIMARY_TABLE[column][rowIndex]!
+	if (result !== "other") return result
+	if (column === "post-stellar" || swapped) {
+		return { exotic: NON_PRIMARY_OTHER_COLUMN[rowIndex]! }
 	}
+	return rollNonPrimaryMethod(
+		rng,
+		column === "secondary" ? "companion" : "secondary",
+		dm,
+		true,
+	)
+}
 
-	const whiteDwarfParent = parent?.spectralClass === "D"
-	const brownDwarfParent =
-		parent?.spectralClass === "L" || parent?.spectralClass === "T"
+interface ResolvedCompanionType {
+	spectralClass: SpectralClass
+	luminosityClass: LuminosityClass
+	subtype: number
+	/** Post-stellar Sibling/Twin bypass the ordinary mass roller entirely --
+	 * their mass is defined relative to the parent's, not rolled fresh. */
+	massSolOverride?: number
+	/** Main-sequence Twin's "optional -1D-1%" mass/diameter jitter, applied
+	 * on top of the ordinary interpolated mass/diameter (only set when
+	 * massSolOverride isn't -- the two are mutually exclusive). */
+	massJitterFactor?: number
+}
 
-	if (whiteDwarfParent || brownDwarfParent || (parent && rng.random() > 0.85)) {
-		spectralClass =
-			rng.weightedChoice([
-				{
-					v: "L" as const,
-					w:
-						parent?.spectralClass === "L" || parent?.spectralClass === "T"
-							? 0
-							: 0.4,
-				},
-				{ v: "T" as const, w: parent?.spectralClass === "T" ? 0 : 0.3 },
-				{ v: "Y" as const, w: 0.3 },
-				{ v: "D" as const, w: whiteDwarfParent ? 1 : 0 },
-			]) ?? "D"
-		luminosityClass = "V"
-		subtype = rng.randint(0, 9)
+/** Lesser: same class, one type cooler, subtype rerolled. The lesser of an
+ * M-type is another M-type (rerolled subtype); if that reroll comes out
+ * hotter than the parent's own subtype, it demotes to a brown dwarf
+ * instead. Class IV (subgiant) lesser results that would be too cool for
+ * Class IV fall back to an ordinary Class V lesser. Post-stellar chain:
+ * BH -> NS -> WD -> BD. */
+function applyLesser(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionType {
+	if (parent.spectralClass === "BH") {
+		return {
+			spectralClass: "NS",
+			luminosityClass: rollNeutronStarLuminosityClass(rng),
+			subtype: rng.randint(0, 9),
+		}
 	}
+	if (parent.spectralClass === "NS") {
+		return { spectralClass: "D", luminosityClass: "V", subtype: rng.randint(0, 9) }
+	}
+	if (parent.spectralClass === "D") {
+		return {
+			spectralClass: rng.choice(["L", "T"] as const),
+			luminosityClass: "V",
+			subtype: rng.randint(0, 9),
+		}
+	}
+	const parentIndex = mainSequenceClasses.indexOf(
+		parent.spectralClass as MainSequenceClass,
+	)
+	const coolerIndex = Math.min(parentIndex + 1, mainSequenceClasses.length - 1)
+	const spectralClass = mainSequenceClasses[coolerIndex]!
+	const subtype = rng.randint(0, 9)
+	if (spectralClass === "M" && parent.spectralClass === "M" && subtype < parent.subtype) {
+		return {
+			spectralClass: rng.choice(["L", "T"] as const),
+			luminosityClass: "V",
+			subtype: rng.randint(0, 9),
+		}
+	}
+	// Class IV lesser too cool for IV -> ordinary Class V lesser instead.
+	const luminosityClass = parent.luminosityClass === "IV" ? "V" : parent.luminosityClass
+	return { spectralClass, luminosityClass, subtype }
+}
 
-	if (rng.random() > 0.95 && !parent && !homeworld) {
-		spectralClass =
-			rng.weightedChoice([
-				{ v: rng.choice(["L", "T"] as const), w: 0.1 },
-				{ v: "D" as const, w: 0.5 },
-				{ v: "NS" as const, w: 0.1 },
-				{ v: "BH" as const, w: 0.1 },
-			]) ?? "D"
-		luminosityClass =
-			spectralClass === "NS" ? rollNeutronStarLuminosityClass(rng) : "V"
-		subtype = rng.randint(0, 9)
+/** Sibling: subtype shifted by one roll of 1D; overflowing past 9 steps one
+ * class cooler with the remainder (matches the book's own worked example:
+ * G8 V + a roll of 3 becomes K1 V, not "G11 V" -- 8+3=11 overflows into K1,
+ * despite the surrounding prose describing this as a subtraction). Post-
+ * stellar sibling: same class, mass reduced by 1D x 10% of the parent's
+ * mass, floored at POST_STELLAR_MIN_MASS_SOL. */
+function applySibling(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionType {
+	if (isPostStellar(parent.spectralClass)) {
+		const reduction = DICE.rollDice({ rng, count: 1, sides: 6 }) * 0.1
+		const massSolOverride = Math.max(
+			parent.massSol * (1 - reduction),
+			POST_STELLAR_MIN_MASS_SOL[parent.spectralClass as "D" | "NS" | "BH"],
+		)
+		return {
+			spectralClass: parent.spectralClass,
+			luminosityClass: parent.luminosityClass,
+			subtype: parent.subtype,
+			massSolOverride,
+		}
+	}
+	if (isBrownDwarf(parent.spectralClass)) {
+		let subtype = parent.subtype + DICE.rollDice({ rng, count: 1, sides: 6 })
+		let classIndex = BROWN_DWARF_CLASSES.indexOf(
+			parent.spectralClass as (typeof BROWN_DWARF_CLASSES)[number],
+		)
+		if (subtype > 9) {
+			subtype -= 10
+			classIndex = Math.min(classIndex + 1, BROWN_DWARF_CLASSES.length - 1)
+		}
+		return {
+			spectralClass: BROWN_DWARF_CLASSES[classIndex]!,
+			luminosityClass: "V",
+			subtype,
+		}
+	}
+	let subtype = parent.subtype + DICE.rollDice({ rng, count: 1, sides: 6 })
+	let classIndex = mainSequenceClasses.indexOf(parent.spectralClass as MainSequenceClass)
+	if (subtype > 9) {
+		subtype -= 10
+		classIndex = Math.min(classIndex + 1, mainSequenceClasses.length - 1)
+	}
+	return {
+		spectralClass: mainSequenceClasses[classIndex]!,
+		luminosityClass: parent.luminosityClass,
+		subtype,
+	}
+}
+
+/** Twin: same class/type/subtype as the parent, with an optional -1D-1%
+ * jitter on mass/diameter ("Optional subtract 1D-1% from the mass and
+ * diameter of the new star to allow for some variation" -- 1D rolled here
+ * as a 0-5% reduction). */
+function applyTwin(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionType {
+	const jitterFactor = 1 - (DICE.rollDice({ rng, count: 1, sides: 6 }) - 1) * 0.01
+	const base = {
+		spectralClass: parent.spectralClass,
+		luminosityClass: parent.luminosityClass,
+		subtype: parent.subtype,
+	}
+	return isPostStellar(parent.spectralClass)
+		? { ...base, massSolOverride: parent.massSol * jitterFactor }
+		: { ...base, massJitterFactor: jitterFactor }
+}
+
+/** Brown dwarfs "may only have additional 'stars' of the same type; all
+ * brown dwarfs use the sibling result" -- forces Sibling ahead of any table
+ * roll, skipping the 2D entirely. */
+function resolveCompanionType(
+	rng: SharedRng,
+	parent: ParentStarLike,
+	column: NonPrimaryStarColumn,
+): ResolvedCompanionType {
+	const postStellarParent = isPostStellar(parent.spectralClass)
+	// Class III/IV primary (here: the immediate parent, treated as "primary"
+	// for typing purposes per the book) applies DM-1 to every column.
+	const dm = parent.luminosityClass === "III" || parent.luminosityClass === "IV" ? -1 : 0
+	const method: NonPrimaryStarMethod = isBrownDwarf(parent.spectralClass)
+		? "sibling"
+		: rollNonPrimaryMethod(rng, postStellarParent ? "post-stellar" : column, dm)
+
+	if (typeof method === "object") {
+		if (method.exotic === "D*") {
+			return {
+				spectralClass: "NS",
+				luminosityClass: rollNeutronStarLuminosityClass(rng),
+				subtype: rng.randint(0, 9),
+			}
+		}
+		if (method.exotic === "D") {
+			return { spectralClass: "D", luminosityClass: "V", subtype: rng.randint(0, 9) }
+		}
+		return {
+			spectralClass: rng.choice(["L", "T", "Y"] as const),
+			luminosityClass: "V",
+			subtype: rng.randint(0, 9),
+		}
+	}
+	if (method === "twin") return applyTwin(rng, parent)
+	if (method === "sibling") return applySibling(rng, parent)
+	if (method === "lesser") return applyLesser(rng, parent)
+
+	// Random: roll on the regular (unconstrained) Star Type Determination
+	// table; demote to Lesser if the result comes out hotter than the
+	// parent. Post-stellar parents have no comparable position on the
+	// hotness ladder, so the demotion check is skipped for them entirely --
+	// their Random result stands as an ordinary, independently-typed star.
+	const rolled = rollUnconstrainedStarType(rng, false)
+	if (!postStellarParent && isHotterThanParent(rolled, parent)) {
+		return applyLesser(rng, parent)
+	}
+	return rolled
+}
+
+/** Independent post-death age progression for a companion that itself
+ * resolved to a post-stellar class (D/NS/BH), mirroring the root primary's
+ * own dead-star age bump below (progenitor main-sequence lifespan fraction
+ * + post-death elapsed time). Needed so GALAXY_SYSTEMS' system-age-reset
+ * pass -- mirroring the book's "if a new star is a post-stellar object but
+ * the primary is a fusing star, the age of the entire stellar system could
+ * be reset" rule -- has a real elapsed age to compare against the rest of
+ * the system, instead of this companion just inheriting its parent's age
+ * like every other (still-fusing) companion does. [DEVIATION] the book's
+ * Referee-arbitrated fallback (reverse-engineering a larger post-stellar
+ * mass when this age would exceed the *primary's own* main-sequence
+ * lifespan, e.g. a young hot primary with an old white dwarf companion) has
+ * no automated equivalent here -- GALAXY_SYSTEMS' post-pass only clamps to
+ * the existing flat uniform(13, 14) ceiling below, so that specific
+ * contradiction (a companion implying a system older than its own primary
+ * could ever have lived) is accepted rather than resolved. */
+function rollPostStellarCompanionAgeGyr(rng: SharedRng, massSol: number): number {
+	const progenitorLifespanGyr = 10 / Math.max(massSol, 0.01) ** 2.5
+	let ageGyr = progenitorLifespanGyr * rng.uniform(0.1, 0.9)
+	ageGyr +=
+		DICE.rollDice({ rng, count: 1, sides: 6 }) * 2 +
+		DICE.rollDice({ rng, count: 2, sides: 3 }) * massSol -
+		2 +
+		rng.uniform(0.1, 0.9)
+	if (ageGyr > 14) ageGyr = rng.uniform(13, 14)
+	return ageGyr
+}
+
+/**
+ * Ports galaxy-gen's rollStarAttributes (stars/generation.ts) for the root
+ * primary path unchanged (giant/subgiant/subdwarf/supergiant ladder, the 5%
+ * root-only exotic branch, the full age roll including giant/subgiant
+ * lifespans and the young-star override), and replaces the companion path
+ * with the Traveller Non-Primary Star Determination table (see
+ * resolveCompanionType and its helpers above) in place of the previous
+ * "always one class cooler than parent" approximation. `column` selects
+ * Secondary vs. Companion for that table and is only meaningful when
+ * `parent` is set (GALAXY_SYSTEMS passes it based on StarRole; the
+ * post-stellar column is chosen automatically whenever the parent is
+ * D/NS/BH, regardless of what's passed). Companion-orbit eccentricity is
+ * rolled separately by GALAXY_SYSTEMS, where parent/role information is
+ * available and the galaxy-gen star-companion modifier applies.
+ */
+export function rollStarAttributes(
+	rng: SharedRng,
+	parent?: ParentStarLike,
+	homeworld?: boolean,
+	column: NonPrimaryStarColumn = "secondary",
+): RolledStarAttributes {
+	let spectralClass: SpectralClass
+	let luminosityClass: LuminosityClass
+	let subtype: number
+	let massSolOverride: number | undefined
+	let massJitterFactor: number | undefined
+
+	if (parent) {
+		const resolved = resolveCompanionType(rng, parent, column)
+		spectralClass = resolved.spectralClass
+		luminosityClass = resolved.luminosityClass
+		subtype = resolved.subtype
+		massSolOverride = resolved.massSolOverride
+		massJitterFactor = resolved.massJitterFactor
+	} else {
+		const rolled = rollUnconstrainedStarType(rng, homeworld ?? false)
+		spectralClass = rolled.spectralClass
+		luminosityClass = rolled.luminosityClass
+		subtype = rolled.subtype
+		if (rng.random() > 0.95 && !homeworld) {
+			spectralClass =
+				rng.weightedChoice([
+					// Brown dwarf tail: was L/T-only, missing Y entirely -- a
+					// standalone/primary star could never roll as a Y brown
+					// dwarf. Widened to match the companion Other-column exotic
+					// branch (resolveCompanionType above), which already draws
+					// evenly from all three.
+					{ v: rng.choice(["L", "T"] as const), w: 0.1 },
+					{ v: "D" as const, w: 0.5 },
+					{ v: "NS" as const, w: 0.1 },
+					{ v: "BH" as const, w: 0.1 },
+				]) ?? "D"
+			luminosityClass =
+				spectralClass === "NS" ? rollNeutronStarLuminosityClass(rng) : "V"
+			subtype = rng.randint(0, 9)
+		}
 	}
 	if (spectralClass === "Y" && subtype > 5) subtype = rng.randint(0, 5)
 
@@ -501,17 +838,19 @@ export function rollStarAttributes(
 			: COMPACT_STAR_DOMAIN_LENGTH
 	const idx = mapSubtypeToSpectralPosition(subtype, range)
 
-	const massSol = whiteDwarf
-		? whiteDwarfRoll.massSol(rng, parent?.massSol)
-		: neutronStar
-			? neutronStarRoll.massSol(rng)
-			: blackHole
-				? blackHoleRoll.massSol(rng)
-				: fullInterpolateSeries(
-						idx,
-						starMassByLuminosityClass[physicalLuminosityClass],
-						domainLength,
-					)
+	const massSol =
+		massSolOverride ??
+		(whiteDwarf
+			? whiteDwarfRoll.massSol(rng, parent?.massSol)
+			: neutronStar
+				? neutronStarRoll.massSol(rng)
+				: blackHole
+					? blackHoleRoll.massSol(rng)
+					: fullInterpolateSeries(
+							idx,
+							starMassByLuminosityClass[physicalLuminosityClass],
+							domainLength,
+						) * (massJitterFactor ?? 1))
 	const temperatureK = whiteDwarf
 		? whiteDwarfRoll.temperatureK(rng, massSol)
 		: neutronStar
@@ -519,17 +858,18 @@ export function rollStarAttributes(
 			: blackHole
 				? blackHoleRoll.temperatureK()
 				: fullInterpolateSeries(idx, starTempFull, domainLength)
-	const diameterSol = whiteDwarf
-		? whiteDwarfRoll.diameterSol(massSol)
-		: neutronStar
-			? neutronStarRoll.diameterSol(rng)
-			: blackHole
-				? blackHoleRoll.diameterSol(rng, massSol)
-				: fullInterpolateSeries(
-						idx,
-						starDiameterByLuminosityClass[physicalLuminosityClass],
-						domainLength,
-					)
+	const diameterSol =
+		(whiteDwarf
+			? whiteDwarfRoll.diameterSol(massSol)
+			: neutronStar
+				? neutronStarRoll.diameterSol(rng)
+				: blackHole
+					? blackHoleRoll.diameterSol(rng, massSol)
+					: fullInterpolateSeries(
+							idx,
+							starDiameterByLuminosityClass[physicalLuminosityClass],
+							domainLength,
+						)) * (massSolOverride === undefined ? (massJitterFactor ?? 1) : 1)
 	const luminositySol = blackHole
 		? blackHoleRoll.luminositySol(rng)
 		: diameterSol ** 2 * (temperatureK / 5772) ** 4
@@ -544,9 +884,20 @@ export function rollStarAttributes(
 					COMPACT_STAR_DOMAIN_LENGTH,
 				)
 
+	const deadStar = whiteDwarf || neutronStar || blackHole
 	let ageGyr = parent?.ageGyr ?? 0
+	if (parent && deadStar) {
+		// A companion that resolved to post-stellar gets its own elapsed age
+		// instead of inheriting the parent's -- see
+		// rollPostStellarCompanionAgeGyr's doc comment and the [DEVIATION]
+		// note there. Every other companion result (including a protostar
+		// parent's -- see the plan's "protostar/primordial interaction"
+		// section: sharing ageGyr verbatim is exactly what keeps a
+		// protostar's companions proto-aged too) keeps copying parent.ageGyr
+		// via the initialization above.
+		ageGyr = rollPostStellarCompanionAgeGyr(rng, massSol)
+	}
 	if (!parent) {
-		const deadStar = whiteDwarf || neutronStar || blackHole
 		const mainSequenceMassSol = fullInterpolateSeries(
 			idx,
 			starMassByLuminosityClass.V,
@@ -585,6 +936,27 @@ export function rollStarAttributes(
 				2 +
 				rng.uniform(0.1, 0.9)
 		}
+		// [DEVIATION] galaxy-gen (and the block above) ties age entirely to a
+		// fraction of the star's own main-sequence lifespan, so only short-lived
+		// massive stars (upper-B/O, lifespan under ~0.1 Gyr) can ever roll young
+		// enough for proto/primordial (see body/index.ts's proto/primordial
+		// derivation) -- a G/K/M dwarf's multi-Gyr lifespan puts every possible
+		// age roll for it far above the 0.1 Gyr primordial threshold, no matter
+		// the dice. In reality a star's age reflects when it formed, not how
+		// long it will eventually live, so any non-evolved, non-dead star gets
+		// an independent chance here to be freshly formed regardless of mass.
+		// Skipped for giants/subgiants (already evolved, can't be freshly
+		// formed) and dead stars (already bumped older just above).
+		if (
+			!deadStar &&
+			(luminosityClass === "V" || luminosityClass === "VI") &&
+			rng.random() < YOUNG_STAR_CHANCE
+		) {
+			ageGyr =
+				rng.random() < YOUNG_STAR_PROTO_SHARE
+					? rng.uniform(0, 0.01)
+					: rng.uniform(0.01, 0.1)
+		}
 		if (ageGyr > 14) ageGyr = rng.uniform(13, 14)
 	}
 
@@ -611,14 +983,14 @@ export const STAR = {
 	getStarTemperatureK({ cls, subtype }: StarSpectralInput): number {
 		return interpolateSeries({
 			position: getStarSpectralPosition({ cls, subtype }),
-			values: STAR_TEMP_K,
+			values: starTempFull,
 		})
 	},
 
 	getStarDiameterSol({ cls, subtype }: StarSpectralInput): number {
 		return interpolateSeries({
 			position: getStarSpectralPosition({ cls, subtype }),
-			values: STAR_DIAMETER_SOL,
+			values: starDiameterByLuminosityClass.V,
 		})
 	},
 
@@ -628,17 +1000,41 @@ export const STAR = {
 		return d * d * Math.pow(t / T_SUN_K, 4)
 	},
 
+	// Same physics as getStarLuminositySol, but usable for any SpectralClass
+	// (including brown dwarfs) instead of only the seven main-sequence
+	// classes -- see getExtendedStarSpectralPosition's doc for why that
+	// matters: a naive isValidSpectralClass(cls) ? cls : defaultSpectralClass
+	// coercion before calling getStarLuminositySol silently substitutes a
+	// Sun-like G star's luminosity for a Y-dwarf's, which is many orders of
+	// magnitude too bright and makes every orbiting body's temperature/
+	// texture/biosphere compute as if it were warm.
+	getStarLuminositySolExtended({
+		cls,
+		subtype,
+	}: {
+		cls: SpectralClass
+		subtype: number
+	}): number {
+		const position = getExtendedStarSpectralPosition({ cls, subtype })
+		const d = interpolateSeries({
+			position,
+			values: starDiameterByLuminosityClass.V,
+		})
+		const t = interpolateSeries({ position, values: starTempFull })
+		return d * d * Math.pow(t / T_SUN_K, 4)
+	},
+
 	getStarMassSol({ cls, subtype }: StarSpectralInput): number {
 		return interpolateSeries({
 			position: getStarSpectralPosition({ cls, subtype }),
-			values: STAR_MASS_SOL,
+			values: starMassByLuminosityClass.V,
 		})
 	},
 
 	getStarMAO({ cls, subtype }: StarSpectralInput): number {
 		return interpolateSeries({
 			position: getStarSpectralPosition({ cls, subtype }),
-			values: STAR_MAO_AU,
+			values: starMAOByLuminosityClass.V,
 		})
 	},
 

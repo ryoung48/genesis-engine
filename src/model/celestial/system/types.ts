@@ -28,7 +28,9 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		 * moon's tideLock reference "my parent" without embedding an object
 		 * reference. See attachParentTideLocks. */
 		seed: string
-		/** Only jovians roll a ring geometry; all other bodies are ringless. */
+		/** Jovians roll rings; eligible non-jovian planets have a 1-in-100
+		 * minor-ring chance. [JUSTIFICATION] Optional because ringless planets
+		 * have no geometry to render; moons never receive this field. */
 		rings?: RingProfile
 		isMainWorld: boolean
 		orbitalDistanceAU: number
@@ -54,6 +56,16 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		continentSizeVariety?: number
 		seaLevel?: number
 		maxElevation?: number
+		/** True for a body sharing another body's Orbit# 60° ahead (leading) or
+		 * behind (trailing) it, Lagrange-point style -- see generateSystemBodies'
+		 * trojan roll. Set so trojan worlds are easy to find later. */
+		trojan?: boolean
+		/** +60 (trailing) or -60 (leading) -- only set when trojan is true. */
+		trojanOffsetDeg?: number
+		/** idx of the body this trojan shares its Orbit# with -- only set when
+		 * trojan is true. Lets the renderer place this body 60° from that body
+		 * on a shared orbit instead of its own independent ring. */
+		trojanOfIdx?: number
 	}
 
 import type {

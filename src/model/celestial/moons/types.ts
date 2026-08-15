@@ -75,6 +75,7 @@ export interface GenerateMoonsInput {
 	count: number
 	seed: number
 	planetRadiusKm: number
+	parentSizeClass: number
 	orbitalDistanceAU: number
 	starMassKg: number /** Defaults to terrestrial when omitted for ordinary rocky parents. */
 	parentGroup?: ParentOrbitGroup

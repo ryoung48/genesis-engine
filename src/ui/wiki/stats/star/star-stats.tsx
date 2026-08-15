@@ -10,6 +10,16 @@ import { Slider } from "@/ui/components/primitives/Slider"
 import { uiPalette } from "@/ui/components/tokens"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 
+function formatCompactNumber(value: number): string {
+	return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
+function formatStarAge(ageGyr: number): string {
+	if (ageGyr < 0.001) return `${formatCompactNumber(ageGyr * 1_000_000)}k years`
+	if (ageGyr < 1) return `${formatCompactNumber(ageGyr * 1_000)}M years`
+	return `${formatCompactNumber(ageGyr)}B years`
+}
+
 export function buildStarStats(params: {
 	starClass: SpectralClass
 	starSubtype: number
@@ -55,9 +65,12 @@ export function buildStarStats(params: {
 	const isGiant = STAR.isGiant(luminosityClass)
 	const isDwarfWithoutLuminosityClass =
 		STAR.isBrownDwarf(starClass) || starClass === "D"
-	const typeStatValue = isDwarfWithoutLuminosityClass
-		? `${starClass}${Math.round(starSubtype)}`
-		: hasSubtype
+	const isRemnantWithoutSubtype = starClass === "NS" || starClass === "BH"
+	const typeStatValue = isRemnantWithoutSubtype
+		? starClass
+		: isDwarfWithoutLuminosityClass
+			? `${starClass}${Math.round(starSubtype)}`
+			: hasSubtype
 			? `${starClass}${Math.round(starSubtype)} ${luminosityClass}`
 			: `${starClass} ${luminosityClass}`
 	const starTempK = Math.round(
@@ -77,7 +90,7 @@ export function buildStarStats(params: {
 		ageGyr ??
 		hostStar?.ageGyr ??
 		STAR_IDENTITY.getStarAgeGyr({ massSol: starMassSolValue })
-	const starAgeGyr = starAgeGyrValue.toFixed(2)
+	const starAge = formatStarAge(starAgeGyrValue)
 	const starAgeBoundsGyr = STAR_IDENTITY.getStarAgeBoundsGyr({
 		massSol: starMassSolValue,
 	})
@@ -161,15 +174,15 @@ export function buildStarStats(params: {
 		{ label: "MAO", value: `${starMaoAU} AU` },
 		{
 			label: "Age",
-			value: `${starAgeGyr} Gyr`,
+			value: starAge,
 			editor: setStarAgeGyr
 				? {
 						label: "Age",
 						value: starAgeGyrValue,
 						min: starAgeBoundsGyr.minGyr,
 						max: starAgeBoundsGyr.maxGyr,
-						step: 0.01,
-						display: `${starAgeGyr} Gyr`,
+						step: starAgeBoundsGyr.stepGyr,
+						display: starAge,
 						set: setStarAgeGyr,
 					}
 				: undefined,

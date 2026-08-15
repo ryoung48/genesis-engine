@@ -22,7 +22,11 @@ import type {
 const HOVER_RING_COLOR = 0xf59e0b
 const BACKGROUND_COLOR = 0x030308
 
-const HOVER_RING_RADIUS = 20
+const HOVER_RING_RADIUS = 8
+// Extra headroom beyond the galaxy's own playable radius so the fit doesn't
+// frame it edge-to-edge -- purely a comfortable-viewing margin, not tied to
+// any galaxy data.
+const CAMERA_ZOOM_OUT_MARGIN = 1.15
 
 function buildHoverRing(): THREE.LineLoop {
 	const segments = 32
@@ -60,6 +64,12 @@ export function createGalaxyScene(
 	camera.lookAt(0, 0, 0)
 
 	const controls = new OrbitControls(camera, canvas)
+	// Left disabled until the first setGalaxy call centers the camera --
+	// otherwise a stray wheel/pan during the async generation (zoomToCursor
+	// panning toward wherever the pointer happens to be, plus damping
+	// coasting that motion afterward) silently drifts the view off-center
+	// before the galaxy even renders.
+	controls.enabled = false
 	controls.enableRotate = false
 	controls.screenSpacePanning = true
 	controls.enableDamping = true
@@ -114,7 +124,7 @@ export function createGalaxyScene(
 }
 
 /** Replaces the scene's points/lanes meshes with the given galaxy and fits
- * the camera to its extent. */
+ * the camera tightly around its playable extent. */
 export function setGalaxy(ctx: GalaxySceneContext, galaxy: Galaxy): void {
 	if (ctx.points) {
 		ctx.pointsGroup.remove(ctx.points)
@@ -163,9 +173,10 @@ export function setGalaxy(ctx: GalaxySceneContext, galaxy: Galaxy): void {
 	fitCameraToHalfHeight({
 		camera: ctx.camera,
 		canvas: ctx.canvas,
-		halfHeight: halfHeightOf(galaxy),
+		halfHeight: galaxy.radius.max * CAMERA_ZOOM_OUT_MARGIN,
 	})
 	ctx.controls.target.set(centerX, centerY, 0)
+	ctx.controls.enabled = true
 	ctx.controls.update()
 }
 
@@ -198,13 +209,6 @@ export function zoomCameraToSystem({
 	ctx.camera.zoom = Math.max(ctx.camera.zoom, 12)
 	ctx.camera.updateProjectionMatrix()
 	ctx.controls.update()
-}
-
-// Matches galaxy-gen's fixed HALF_H (half its canvas height) rather than
-// the playable radius, so the core glow/nebula occupy the same proportion
-// of the view as the old repo instead of filling the whole screen.
-function halfHeightOf(galaxy: Galaxy): number {
-	return galaxy.dimensions.h / 2
 }
 
 /** Converts a canvas-space (offsetX/offsetY) pointer position to world
@@ -287,7 +291,7 @@ export function resize(ctx: GalaxySceneContext): void {
 		fitCameraToHalfHeight({
 			camera: ctx.camera,
 			canvas: ctx.canvas,
-			halfHeight: halfHeightOf(ctx.galaxy),
+			halfHeight: ctx.galaxy.radius.max * CAMERA_ZOOM_OUT_MARGIN,
 		})
 	}
 }

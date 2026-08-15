@@ -7,6 +7,7 @@ import type { Zone } from "@/model/celestial/planet/types"
 import type {
 	DensityComposition,
 	RollEccentricityInput,
+	RollPlanetRingsInput,
 } from "@/model/celestial/system/generation/rolls/types"
 import type { RingProfile } from "@/model/celestial/system/types"
 import { DICE } from "@/model/shared/random/dice"
@@ -16,17 +17,18 @@ import { RNG } from "@/model/shared/random/rng"
 // overrides (orbits/index.ts) -- dwarf and helian weights are fixed
 // regardless of zone (galaxy-gen never varies them), asteroid-belt/
 // terrestrial/jovian vary only by a binary zone split (inner vs. not, outer
-// vs. not), not three distinct per-zone tables. [JUSTIFICATION] Drops
-// galaxy-gen's extra proto/primordial (protoplanetary-disk-age) boost to the
-// asteroid-belt weight -- chaos-machine has no equivalent stellar-lifecycle
-// stage to key that off of; postStellar (dead/degenerate star) and the
-// star-age overrides below are both ported in full since starAgeGyr and
-// spectralClass are already available.
+// vs. not), not three distinct per-zone tables. proto/primordial (young-star
+// protoplanetary-disk-age) boost the asteroid-belt weight the same way
+// postStellar does -- see body/index.ts's inline derivation (starAgeGyr<0.01
+// && starMassSol<8 for proto, starAgeGyr<0.1 for primordial) and
+// environment/index.ts's matching hydrosphere/atmosphere youth override.
 function rollOrbitGroup({
 	rng,
 	zone,
 	postStellar,
 	starAgeGyr,
+	proto,
+	primordial,
 }: {
 	rng: ReturnType<typeof RNG.createRng>
 	zone: Zone
@@ -34,9 +36,19 @@ function rollOrbitGroup({
 	 * remnant, same condition as generateSystemBodies' own `deadStar`. */
 	postStellar: boolean
 	starAgeGyr: number
+	/** starAgeGyr<0.01 && starMassSol<8 -- see body/index.ts. */
+	proto?: boolean
+	/** starAgeGyr<0.1 -- see body/index.ts. */
+	primordial?: boolean
 }): OrbitGroup {
 	const weights: Record<OrbitGroup, number> = {
-		"asteroid belt": postStellar ? 4 : zone === "inner" ? 1 : 2,
+		"asteroid belt": proto
+			? 6
+			: primordial || postStellar
+				? 4
+				: zone === "inner"
+					? 1
+					: 2,
 		dwarf: 2,
 		terrestrial: zone === "inner" ? 3 : 2,
 		helian: 1,
@@ -93,15 +105,7 @@ function rollDiameterKmFromSizeClass({
 	sizeClass: number
 }): number {
 	if (sizeClass < 0) return 0
-	if (sizeClass <= 15) {
-		const [minKm, maxKm] = ORBIT_BODY.sizeClassToRockyDiameterRangeKm(sizeClass)
-		return rng.uniform(minKm, maxKm)
-	}
-	if (sizeClass === 16) return rng.uniform(2, 6) * ORBIT_BODY.earthDiameterKm
-	if (sizeClass === 17) return rng.uniform(6, 12) * ORBIT_BODY.earthDiameterKm
-	if (sizeClass === 18) return rng.uniform(8, 18) * ORBIT_BODY.earthDiameterKm
-	const minKm = 1200 + sizeClass * 1600
-	const maxKm = minKm + 1600
+	const [minKm, maxKm] = ORBIT_BODY.sizeClassToDiameterRangeKm({ sizeClass })
 	return rng.uniform(minKm, maxKm)
 }
 
@@ -227,26 +231,32 @@ function rollAxialTiltDeg(rng: ReturnType<typeof RNG.createRng>): number {
 	return rng.uniform(144, 180)
 }
 
-// Ported from galaxy-gen's orbit.rings roll (orbits/index.ts) -- restricted
-// to jovians for now. Galaxy-gen also rolls a 1-in-20 chance of rings for any
-// other non-asteroid-belt/non-dwarf body, and only ever allows "complex"
-// rings for a jovian; that non-jovian roll isn't ported yet, so every other
-// group stays ringless here. The concrete ring geometry/color bands below
-// have no galaxy-gen equivalent (it only stores a flavor string, "none" /
-// "minor" / "complex" -- rendering real ring geometry is this codebase's own
-// addition); authored against Saturn's real values (sol-system.ts's
-// SOL_PLANET_RINGS_BY_NAME: inner 1.52, outer 2.08, opacity 0.52) as an
-// anchor for "complex", with "minor" scaled down to a fainter, narrower band.
+// Ported from galaxy-gen's orbit.rings roll (orbits/index.ts). Jovians roll
+// none/minor/complex rings; non-jovian planets, except dwarf planets and
+// asteroid belts, have a deliberately rarer 1-in-100 chance of minor rings.
+// The concrete geometry/color bands have no galaxy-gen equivalent (it only
+// stores a flavor string, "none" / "minor" / "complex" -- rendering real
+// geometry is this codebase's own addition); authored against Saturn's real
+// values (sol-system.ts's SOL_PLANET_RINGS_BY_NAME: inner 1.52, outer 2.08,
+// opacity 0.52) as an anchor for "complex", with "minor" scaled down to a
+// fainter, narrower band.
 const JOVIAN_RING_COLOR_CHOICES = [0xd8c69a, 0xcac2b0, 0xb8c4cf, 0xa89f8f]
 
-function rollJovianRings(
-	rng: ReturnType<typeof RNG.createRng>,
-): RingProfile | undefined {
-	const tier = rng.weightedChoice([
-		{ v: "none", w: 6 },
-		{ v: "minor", w: 2 },
-		{ v: "complex", w: 1 },
-	] as const)
+function rollPlanetRings({
+	rng,
+	group,
+}: RollPlanetRingsInput): RingProfile | undefined {
+	if (group === "asteroid belt" || group === "dwarf") return undefined
+	const tier =
+		group === "jovian"
+			? rng.weightedChoice([
+					{ v: "none", w: 6 },
+					{ v: "minor", w: 2 },
+					{ v: "complex", w: 1 },
+				] as const)
+			: rng.randint(1, 100) === 1
+				? "minor"
+				: "none"
 	if (!tier || tier === "none") return undefined
 	const color = rng.choice(JOVIAN_RING_COLOR_CHOICES)
 	const innerRadiusRelative = rng.uniform(1.3, 1.7)
@@ -254,7 +264,7 @@ function rollJovianRings(
 		innerRadiusRelative +
 		(tier === "complex" ? rng.uniform(0.4, 0.7) : rng.uniform(0.15, 0.35))
 	const opacity =
-		tier === "complex" ? rng.uniform(0.35, 0.6) : rng.uniform(0.12, 0.25)
+		tier === "complex" ? rng.uniform(0.35, 0.6) : rng.uniform(0.22, 0.35)
 	return { innerRadiusRelative, outerRadiusRelative, color, opacity }
 }
 
@@ -289,6 +299,6 @@ export const ROLLS = {
 	pickDensityEarthRelative,
 	rollEccentricity,
 	rollAxialTiltDeg,
-	rollJovianRings,
+	rollPlanetRings,
 	rollSiderealDayHours,
 }

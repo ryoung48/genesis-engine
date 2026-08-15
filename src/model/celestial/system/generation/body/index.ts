@@ -106,8 +106,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 
 	const luminositySol =
 		hostStar?.luminositySol ??
-		STAR.getStarLuminositySol({
-			cls: tableSpectralClass,
+		STAR.getStarLuminositySolExtended({
+			cls: spectralClass,
 			subtype: starSubtype,
 		})
 	const starMassKg =
@@ -200,6 +200,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		hostStar?.ageGyr ??
 		params.starAgeGyrOverride ??
 		STAR_IDENTITY.getStarAgeGyr({ massSol: starMassSol })
+	// Ported from galaxy-gen's star.proto/star.primordial (stars/index.ts) --
+	// derived inline rather than stored, since nothing outside this generation
+	// pass needs them (see rollOrbitGroup's asteroid-belt weight boost and
+	// buildBodyEnvironment's hydrosphere/atmosphere youth override below).
+	const proto = starAgeGyr < 0.01 && starMassSol < 8
+	const primordial = starAgeGyr < 0.1
 
 	// Ported from galaxy-gen's impactZone (stars/index.ts) -- a giant
 	// (luminosityClass "III") or white dwarf ("D") host star's innermost few
@@ -283,6 +289,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				rng,
 				moonCount,
 				diameterKm: builtMainWorld.diameterKm,
+				parentSizeClass: earthSizeClass,
 				orbitalDistanceAU,
 				starMassKg,
 				group: "terrestrial",
@@ -325,6 +332,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					zone: slot.zone,
 					postStellar: deadStar,
 					starAgeGyr,
+					proto,
+					primordial,
 				})
 		let orbitalDistanceAU = PLANET.deviationToAU({
 			deviation: slot.deviation,
@@ -441,6 +450,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			rng,
 			moonCount,
 			diameterKm,
+			parentSizeClass: sizeClass,
 			orbitalDistanceAU,
 			starMassKg,
 			group,
@@ -464,6 +474,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					rng,
 					moonCount: moonCount + attempts,
 					diameterKm,
+					parentSizeClass: sizeClass,
 					orbitalDistanceAU,
 					starMassKg,
 					group,
@@ -523,6 +534,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			assignment,
 			classified: { group, classification },
 			starAgeGyr,
+			proto,
+			primordial,
 		})
 		// Ported from galaxy-gen's ROTATION.locks.get (see tide-lock.ts) -- may
 		// override this body's rotation/tilt/eccentricity entirely (a partial
@@ -594,10 +607,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			// hydrosphere/classification change) is known -- see
 			// seismology/index.ts's applyBodySeismology. Picking them here would
 			// use a stale pre-seismology climate estimate.
-			rings:
-				finalEnvironment.group === "jovian"
-					? ROLLS.rollJovianRings(rng)
-					: undefined,
+			rings: ROLLS.rollPlanetRings({ rng, group: finalEnvironment.group }),
 			orbitalDistanceAU,
 			diameterKm,
 			massKg,
@@ -632,6 +642,26 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			moons: finalMoons,
 		}
 	})
+
+	// Trojan orbits: a very small chance for a body to share another body's
+	// Orbit# instead of its own, sitting 60° ahead (leading, 1d6 1-3) or behind
+	// (trailing, 1d6 4-6) it at the Lagrange point -- flagged via `trojan` so
+	// these are easy to find later.
+	const TROJAN_CHANCE = 1 / 500
+	for (const body of bodies) {
+		if (body.isMainWorld || body.group === "asteroid belt") continue
+		if (rng.uniform(0, 1) > TROJAN_CHANCE) continue
+		const shareOrbitWith = bodies.filter(
+			(other) => other !== body && !other.isMainWorld,
+		)
+		if (shareOrbitWith.length === 0) continue
+		const target = rng.choice(shareOrbitWith)
+		body.orbitalDistanceAU = target.orbitalDistanceAU
+		body.orbitalPeriodDays = target.orbitalPeriodDays
+		body.trojan = true
+		body.trojanOffsetDeg = rng.randint(1, 6) <= 3 ? -60 : 60
+		body.trojanOfIdx = target.idx
+	}
 
 	// Surface-tide heating is itself just a display/classification refinement
 	// on top of residual heating -- skipped under skipNaming along with naming,

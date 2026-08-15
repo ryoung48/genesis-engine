@@ -40,6 +40,7 @@ function withGeneratedTextures(params: {
 	seed: number
 	zone?: Zone
 	atmosphereSubtype?: string
+	atmospherePressureBar?: number
 	existingTexturePath?: string
 	existingCloudsTexturePath?: string
 }): { texturePath?: string; cloudsTexturePath?: string } {
@@ -74,6 +75,7 @@ function withGeneratedTextures(params: {
 		zone: params.zone,
 		atmosphereSubtype: params.atmosphereSubtype,
 		temperatureMeanK: params.temperatureMeanK,
+		atmospherePressureBar: params.atmospherePressureBar,
 	})
 	return {
 		texturePath: generated.texturePath,
@@ -289,6 +291,8 @@ function applyBodySeismology(params: {
 		seed: seedForBody(body),
 		zone: body.zone,
 		atmosphereSubtype: (convertedAtmosphere ?? body.atmosphere)?.subtype,
+		atmospherePressureBar: (convertedAtmosphere ?? body.atmosphere)
+			?.pressureBar,
 		existingTexturePath: body.texturePath,
 		existingCloudsTexturePath: body.cloudsTexturePath,
 	})
@@ -595,6 +599,8 @@ function applySystemSeismology(params: {
 			seed: seedForBody(seismologyBody),
 			zone: seismologyBody.zone,
 			atmosphereSubtype: (convertedAtmosphere ?? rerolled.atmosphere)?.subtype,
+			atmospherePressureBar: (convertedAtmosphere ?? rerolled.atmosphere)
+				?.pressureBar,
 		})
 		return {
 			...seismologyBody,

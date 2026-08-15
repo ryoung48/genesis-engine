@@ -325,7 +325,12 @@ export function buildSolarSystemOverlay(
 					: isWhiteDwarf
 						? 2.8
 						: isBrownDwarf
-							? 0.5
+							? // Y dwarfs shared L/T's flat 0.5, reading as effectively
+								// dark next to them -- bumped up so a Y primary still
+								// visibly lights its own system.
+								renderSpectralClass === "Y"
+								? 0.9
+								: 0.5
 							: 2.4
 			: 0,
 		0,
@@ -368,8 +373,24 @@ export function buildSolarSystemOverlay(
 	// --- Build every body (siblings + main world), each with its own nested
 	// moon system, but don't position them yet — spacing depends on every
 	// body's own size, computed below in orbital order. ---
+	// A trojan shares its target's orbitalPeriodDays (see generateSystemBodies'
+	// trojan roll), so locking its epoch phase to the target's own golden-angle
+	// phase plus the rolled ±60° offset keeps it exactly that far ahead/behind
+	// the target at every day forever, instead of the arbitrary golden-angle
+	// phase every other body gets from its own array index.
+	const arrayIndexByIdx = new Map(
+		bodies.map((body, index) => [body.idx, index]),
+	)
 	const placed: PlacedBody[] = bodies.map((body, index) => {
-		const meanAnomalyAtEpoch = index * GOLDEN_ANGLE_RAD
+		const trojanTargetIndex =
+			body.trojan && body.trojanOfIdx !== undefined
+				? arrayIndexByIdx.get(body.trojanOfIdx)
+				: undefined
+		const meanAnomalyAtEpoch =
+			trojanTargetIndex !== undefined
+				? trojanTargetIndex * GOLDEN_ANGLE_RAD +
+					(body.trojanOffsetDeg ?? 60) * DEG2RAD
+				: index * GOLDEN_ANGLE_RAD
 		groupCounters[body.group] += 1
 		if (body.group === "asteroid belt") {
 			return {
@@ -420,7 +441,9 @@ export function buildSolarSystemOverlay(
 								(body.hydrosphereCode ?? 0) >= 10
 									? FULL_OCEAN_COLOR
 									: (CLASSIFICATION_COLOR[body.classification] ??
-										(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR)),
+										(body.isMainWorld
+											? MAIN_WORLD_COLOR
+											: ROCKY_SIBLING_COLOR)),
 							roughness: 0.9,
 							metalness: 0,
 						})
@@ -572,6 +595,11 @@ export function buildSolarSystemOverlay(
 			meanAnomalyAtEpoch,
 		}
 	})
+	// Looked up by applyPlacedBodyLayout's trojan pass below to copy a trojan's
+	// ring (orbitRadius + full kepler ellipse) from the body it shares an
+	// Orbit# with, so the two render on the literal same ring instead of two
+	// independently size-packed ones.
+	const placedByIdx = new Map(placed.map((p) => [p.body.idx, p]))
 
 	// --- Build every companion star's own full nested overlay (recursive --
 	// always with companions: [], since this repo's model has no
@@ -748,6 +776,40 @@ export function buildSolarSystemOverlay(
 		// system instead of also reaching a companion's, unlike previousOuterEdge
 		// (used for camera framing) which intentionally does include companions.
 		lastPlanetOuterEdge = starRadius
+		// Own sceneRadius/moonSystemOuterRadius don't depend on packing order --
+		// computed for every body up front so a trojan's footprint is known
+		// before its target's slot is packed, regardless of which one the
+		// (orbitalDistanceAU-tied, so arbitrarily ordered) sort put first.
+		for (const p of placed) {
+			p.sceneRadius = p.isBelt
+				? BELT_SCENE_RADIUS
+				: bodySceneRadius(
+						p.body.diameterKm,
+						p.body.sizeClass,
+						showRealisticSizes,
+					)
+			p.moonSystemOuterRadius = p.isBelt
+				? BELT_SCENE_RADIUS
+				: measureBodyMoonSystemOuterRadius(
+						p.body,
+						p.sceneRadius,
+						showEllipticalOrbits,
+						showRealisticSizes,
+					)
+		}
+		// Groups each trojan under the idx of the body it shares an Orbit# with
+		// -- consulted below so that body's own slot reserves enough clearance
+		// for whichever of the pair has the larger moon system, since a trojan
+		// consumes no independent slot of its own (see the isTrojanSlot branch).
+		const trojansByTargetIdx = new Map<number, PlacedBody[]>()
+		for (const p of placed) {
+			if (p.isBelt || !p.body.trojan || p.body.trojanOfIdx === undefined)
+				continue
+			if (!placedByIdx.has(p.body.trojanOfIdx)) continue
+			const list = trojansByTargetIdx.get(p.body.trojanOfIdx) ?? []
+			list.push(p)
+			trojansByTargetIdx.set(p.body.trojanOfIdx, list)
+		}
 		for (const slot of layoutSlots) {
 			if (slot.kind === "companion") {
 				const c = placedCompanions[slot.companionIndex]!
@@ -773,30 +835,32 @@ export function buildSolarSystemOverlay(
 			}
 
 			const p = placed[slot.placedIndex]!
-			p.sceneRadius = p.isBelt
-				? BELT_SCENE_RADIUS
-				: bodySceneRadius(
-						p.body.diameterKm,
-						p.body.sizeClass,
-						showRealisticSizes,
+			// A trojan shares its target's ring (set in the trojan pass below)
+			// instead of packing its own independent slot -- it must still get
+			// its own mesh/quaternion/tilt setup below, just not consume any
+			// previousOuterEdge space or get its own orbitRadius/kepler here.
+			const isTrojanSlot =
+				p.body.trojan === true &&
+				p.body.trojanOfIdx !== undefined &&
+				placedByIdx.has(p.body.trojanOfIdx)
+			const trojansHere = trojansByTargetIdx.get(p.body.idx)
+			const effectiveMoonSystemOuterRadius = trojansHere?.length
+				? Math.max(
+						p.moonSystemOuterRadius,
+						...trojansHere.map((t) => t.moonSystemOuterRadius),
 					)
-			p.moonSystemOuterRadius = p.isBelt
-				? BELT_SCENE_RADIUS
-				: measureBodyMoonSystemOuterRadius(
-						p.body,
-						p.sceneRadius,
-						showEllipticalOrbits,
-						showRealisticSizes,
-					)
+				: p.moonSystemOuterRadius
 			const gap =
 				ORBIT_GAP_STAR_RADII * Math.max(p.sceneRadius, starRadius * 0.05)
-			const periapsis = previousOuterEdge + gap + p.moonSystemOuterRadius
-			p.orbitRadius = periapsis
+			const periapsis = previousOuterEdge + gap + effectiveMoonSystemOuterRadius
+			if (!isTrojanSlot) p.orbitRadius = periapsis
 
 			if (p.isBelt) {
 				p.kepler = undefined
-				previousOuterEdge = periapsis + p.moonSystemOuterRadius
-				lastPlanetOuterEdge = previousOuterEdge
+				if (!isTrojanSlot) {
+					previousOuterEdge = periapsis + effectiveMoonSystemOuterRadius
+					lastPlanetOuterEdge = previousOuterEdge
+				}
 				continue
 			}
 
@@ -814,12 +878,14 @@ export function buildSolarSystemOverlay(
 			const omega =
 				(p.body.longitudeOfPerihelionDeg - p.body.longitudeOfAscendingNodeDeg) *
 				DEG2RAD
-			const a = periapsis / (1 - e)
-			const b = a * Math.sqrt(1 - e * e)
-			const { P, Q } = perifocalBasis(Omega, inc, omega)
-			p.kepler = { P, Q, a, b, ae: a * e, e }
-			previousOuterEdge = a * (1 + e) + p.moonSystemOuterRadius
-			lastPlanetOuterEdge = previousOuterEdge
+			if (!isTrojanSlot) {
+				const a = periapsis / (1 - e)
+				const b = a * Math.sqrt(1 - e * e)
+				const { P, Q } = perifocalBasis(Omega, inc, omega)
+				p.kepler = { P, Q, a, b, ae: a * e, e }
+				previousOuterEdge = a * (1 + e) + effectiveMoonSystemOuterRadius
+				lastPlanetOuterEdge = previousOuterEdge
+			}
 
 			if (p.mesh && p.meshRestQuaternion) {
 				p.baseQuaternion = p.meshRestQuaternion.clone()
@@ -845,6 +911,19 @@ export function buildSolarSystemOverlay(
 				p.moonState?.group.quaternion.premultiply(tiltQuat)
 				p.ringMesh?.quaternion.premultiply(tiltQuat)
 			}
+		}
+		// Trojan pass: re-point each trojan onto the exact ring (orbitRadius +
+		// kepler ellipse) of the body it shares an Orbit# with, overriding
+		// whatever independent slot the size-packing loop above just gave it --
+		// a real trojan orbits at the same radius as its target, just ±60° of
+		// mean anomaly away (already baked into meanAnomalyAtEpoch above).
+		for (const p of placed) {
+			if (p.isBelt || !p.body.trojan || p.body.trojanOfIdx === undefined)
+				continue
+			const target = placedByIdx.get(p.body.trojanOfIdx)
+			if (!target || target.isBelt || !target.kepler) continue
+			p.orbitRadius = target.orbitRadius
+			p.kepler = { ...target.kepler }
 		}
 		return previousOuterEdge
 	}
@@ -917,7 +996,10 @@ export function buildSolarSystemOverlay(
 					}),
 				),
 			)
-			p.asteroidField = buildAsteroidField(p.orbitRadius, p.body.zone === "outer")
+			p.asteroidField = buildAsteroidField(
+				p.orbitRadius,
+				p.body.zone === "outer",
+			)
 			group.add(p.asteroidField.mesh)
 		}
 	}
@@ -1156,8 +1238,7 @@ export function buildSolarSystemOverlay(
 				p.body.siderealDayHours > 0
 			) {
 				const lockedAngle = solarLockedSpinAngle(p)
-				const angle =
-					lockedAngle ?? (hours / p.body.siderealDayHours) * TWO_PI
+				const angle = lockedAngle ?? (hours / p.body.siderealDayHours) * TWO_PI
 				bodySpinQuat.setFromAxisAngle(bodySpinAxis, angle)
 				p.mesh.quaternion.copy(p.baseQuaternion).multiply(bodySpinQuat)
 				if (p.cloudsMesh) {
