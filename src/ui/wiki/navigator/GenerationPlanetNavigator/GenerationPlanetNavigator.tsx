@@ -878,23 +878,30 @@ export function GenerationPlanetNavigator({
 				}
 			}
 			const bodies = getBodiesForStar(starIndex) ?? []
-			const planetChildren = bodies.map((body, bodyIdx) => ({
-				key: `orbit-${starIndex}-${body.idx}-${bodyIdx}`,
-				au: body.orbitalDistanceAU,
-				title:
-					isPrimary && body.isMainWorld && !body.name
-						? appendSizeToTitle(
-								showRealSolNames
-									? SOL_DATA.solMainWorldName
-									: "Terrestrial Planet",
-								body.sizeClass,
-							)
-						: (labeledOrbits.find((entry) => entry.body === body)?.title ??
-							resolveOrbitBodyTitle(body, bodyIdx + 1, namesEnabled)),
-				subtitle: getSystemBodyKindLabel(body),
-				color: classificationSwatchColor(body.classification),
-				onClick: () => selectAndFocus({ kind: "body", starIndex, bodyIdx }),
-			}))
+			// Ceres/Pallas-style belt-interior bodies (SystemBody.beltOfIdx) live
+			// under their own asteroid belt's "Orbits" list instead of this star's
+			// -- see the asteroid-belt branch below, which builds their cards from
+			// the same `bodies` array.
+			const planetChildren = bodies
+				.map((body, bodyIdx) => ({ body, bodyIdx }))
+				.filter(({ body }) => body.beltOfIdx === undefined)
+				.map(({ body, bodyIdx }) => ({
+					key: `orbit-${starIndex}-${body.idx}-${bodyIdx}`,
+					au: body.orbitalDistanceAU,
+					title:
+						isPrimary && body.isMainWorld && !body.name
+							? appendSizeToTitle(
+									showRealSolNames
+										? SOL_DATA.solMainWorldName
+										: "Terrestrial Planet",
+									body.sizeClass,
+								)
+							: (labeledOrbits.find((entry) => entry.body === body)?.title ??
+								resolveOrbitBodyTitle(body, bodyIdx + 1, namesEnabled)),
+					subtitle: getSystemBodyKindLabel(body),
+					color: classificationSwatchColor(body.classification),
+					onClick: () => selectAndFocus({ kind: "body", starIndex, bodyIdx }),
+				}))
 			// Companion stars are orbiting bodies same as any planet -- listed
 			// alongside them (interleaved by AU, not a separate section), each
 			// clickable to view that star's own real generated system. See
@@ -1035,6 +1042,24 @@ export function GenerationPlanetNavigator({
 			const parentBody = nestedMainWorldSelected
 				? getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
 				: undefined
+			// Ceres/Pallas-style belt-interior bodies aren't moons -- they're real
+			// planet-class SystemBody entries whose "parent" is an asteroid belt
+			// (SystemBody.beltOfIdx). Only ever set on a normal top-level body
+			// selection (never the gas-giant-moon main-world path above), so this
+			// and parentBody never both apply.
+			const bodiesForBeltLookup = getBodiesForStar(selection.starIndex) ?? []
+			const beltParentEntry =
+				body.beltOfIdx !== undefined
+					? bodiesForBeltLookup
+							.map((b, bodyIdx) => ({ b, bodyIdx }))
+							.find(({ b }) => b.idx === body.beltOfIdx)
+					: undefined
+			const beltChildren =
+				body.group === "asteroid belt"
+					? bodiesForBeltLookup
+							.map((b, bodyIdx) => ({ b, bodyIdx }))
+							.filter(({ b }) => b.beltOfIdx === body.idx)
+					: []
 			const bodySurfaceTidesM =
 				body.group === "asteroid belt"
 					? undefined
@@ -1101,8 +1126,29 @@ export function GenerationPlanetNavigator({
 								},
 							]
 						: []),
+					...(beltParentEntry
+						? [
+								{
+									label:
+										labeledOrbits.find(
+											(entry) => entry.body === beltParentEntry.b,
+										)?.title ??
+										resolveOrbitBodyTitle(
+											beltParentEntry.b,
+											beltParentEntry.bodyIdx + 1,
+											namesEnabled,
+										),
+									onClick: () =>
+										selectAndFocus({
+											kind: "body" as const,
+											starIndex: selection.starIndex,
+											bodyIdx: beltParentEntry.bodyIdx,
+										}),
+								},
+							]
+						: []),
 				],
-				childrenLabel: "Moons",
+				childrenLabel: body.group === "asteroid belt" ? "Orbits" : "Moons",
 				onFocus: onFocusBody ? () => focusSelection(selection) : undefined,
 				// The main world's own physical fields (radius/orbital distance/day
 				// length/eccentricity/periapsis/axial tilt) are still owned by the
@@ -1278,7 +1324,20 @@ export function GenerationPlanetNavigator({
 					),
 				children:
 					body.group === "asteroid belt"
-						? []
+						? beltChildren.map(({ b: child, bodyIdx: childBodyIdx }) => ({
+								key: `orbit-belt-child-${body.idx}-${child.idx}`,
+								title:
+									labeledOrbits.find((entry) => entry.body === child)?.title ??
+									resolveOrbitBodyTitle(child, childBodyIdx + 1, namesEnabled),
+								subtitle: getSystemBodyKindLabel(child),
+								color: classificationSwatchColor(child.classification),
+								onClick: () =>
+									selectAndFocus({
+										kind: "body",
+										starIndex: selection.starIndex,
+										bodyIdx: childBodyIdx,
+									}),
+							}))
 						: orbitMoons
 								.map((moon, moonIndex) => ({
 									key: `orbit-moon-${body.idx}-${moon.idx ?? moonIndex}`,
@@ -1306,7 +1365,7 @@ export function GenerationPlanetNavigator({
 								.sort((a, b) => a.order - b.order),
 				emptyChildrenLabel:
 					body.group === "asteroid belt"
-						? "No moons"
+						? "No orbiting bodies"
 						: orbitMoons.length === 0
 							? "Computing moon parameters…"
 							: orbitMoons.length === 0

@@ -28,9 +28,9 @@ const temperatureBoundarySubtropical = 16
 
 const temperatureBoundaryTropical = 24
 
-const chaoticMin = 15
+const chaoticMin = 10
 
-const chaoticMax = 40
+const chaoticMax = 50
 
 function assignClimateZones({
 	mesh,

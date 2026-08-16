@@ -1,5 +1,8 @@
 import * as THREE from "three"
-import { BELT_WIDTH, TWO_PI } from "@/ui/genesis/solar-system/overlay/constants"
+import {
+	BELT_VERTICAL_RATIO,
+	TWO_PI,
+} from "@/ui/genesis/solar-system/overlay/constants"
 import { loadBodyTexture } from "@/ui/genesis/solar-system/overlay/textures"
 import type { AsteroidFieldData } from "@/ui/genesis/solar-system/overlay/types"
 
@@ -19,20 +22,27 @@ export function buildAsteroidField(
 	// available to approximate "frozen" -- an outer-zone belt gets the icy
 	// variant, everything else the rocky one.
 	isOuterZone: boolean,
+	// Half the belt's radial (inner-to-outer) span -- scaled off the belt's
+	// own orbitRadius by the caller (see BELT_WIDTH_RATIO) rather than a
+	// fixed width, since a realistic main-belt-like spread is far wider than
+	// a thin fixed ring would be.
+	beltHalfWidth: number,
 ): AsteroidFieldData {
 	// Scene orbit radii are packed by rendered size, not real AU (see
 	// ORBIT_GAP_STAR_RADII's own doc elsewhere), so a belt close to the star
-	// can end up with a far smaller ring circumference than one further out.
-	// A fixed rock count spread over a fixed-width band ignored that entirely
-	// -- every belt got the same 900 rocks regardless of ring size, so a
-	// small-radius inner belt packed them into a much shorter circumference
-	// and looked badly overcrowded while a large-radius outer belt (already
-	// hitting the cap below) looked fine. Scaling count by orbitRadius keeps
-	// rocks-per-unit-circumference roughly constant across belts instead.
+	// can end up with a far smaller ring area than one further out. Count now
+	// scales with the belt's actual annulus area (orbitRadius * beltHalfWidth,
+	// proportional to circumference * radial span) rather than orbitRadius
+	// alone -- beltHalfWidth now scales with orbitRadius too (BELT_WIDTH_RATIO),
+	// so a naive orbitRadius-only count left the now-much-wider band looking
+	// sparse: same rock count smeared over several times the area.
 	const count = Math.round(
 		Math.min(
 			ASTEROID_COUNT_MAX,
-			Math.max(ASTEROID_COUNT_MIN, orbitRadius * ASTEROID_DENSITY_PER_RADIUS),
+			Math.max(
+				ASTEROID_COUNT_MIN,
+				orbitRadius * beltHalfWidth * ASTEROID_DENSITY_PER_AREA,
+			),
 		),
 	)
 	const geometry = new THREE.IcosahedronGeometry(1, 0)
@@ -46,6 +56,15 @@ export function buildAsteroidField(
 		),
 		roughness: 1,
 		metalness: 0,
+		// With daylight mode's dim 0.15 ambient (vs. the 2.6 non-daylight uses,
+		// which already fully lights every rock regardless of facing), each
+		// tiny rock's unlit hemisphere reads as near-black -- at this scale and
+		// instance count that makes roughly half the belt disappear instead of
+		// reading as a lit swarm. A small constant emissive floor keeps the
+		// dark side dimly visible without washing out the terminator lighting
+		// a planet-scale body gets elsewhere.
+		emissive: 0x2a2a2a,
+		emissiveIntensity: 0.6,
 	})
 	const mesh = new THREE.InstancedMesh(geometry, material, count)
 	const angles = new Float32Array(count)
@@ -55,12 +74,21 @@ export function buildAsteroidField(
 	const rotationAxes: THREE.Vector3[] = []
 	const rotationSpeeds = new Float32Array(count)
 
+	// Real belt density tapers toward the inner/outer edges rather than
+	// cutting off sharply -- averaging two uniform samples (a cheap
+	// triangular distribution, no extra Math.random() cost worth avoiding)
+	// biases rocks toward the belt's own center instead of the flat-uniform
+	// spread a single sample would give.
+	const beltVerticalHalfSpan = beltHalfWidth * BELT_VERTICAL_RATIO
 	const dummy = new THREE.Object3D()
 	const color = new THREE.Color()
 	for (let i = 0; i < count; i++) {
 		angles[i] = Math.random() * TWO_PI
-		radii[i] = orbitRadius + (Math.random() - 0.5) * BELT_WIDTH
-		zOffsets[i] = (Math.random() - 0.5) * ASTEROID_Z_JITTER
+		radii[i] =
+			orbitRadius +
+			((Math.random() + Math.random() - 1) / 2) * 2 * beltHalfWidth
+		zOffsets[i] =
+			((Math.random() + Math.random() - 1) / 2) * 2 * beltVerticalHalfSpan
 		scales[i] =
 			ASTEROID_MIN_SCALE +
 			Math.random() * (ASTEROID_MAX_SCALE - ASTEROID_MIN_SCALE)
@@ -131,17 +159,17 @@ export function updateAsteroidField(
 	field.mesh.instanceMatrix.needsUpdate = true
 }
 
-// Rocks per unit of scene orbitRadius -- calibrated so a belt around
-// orbitRadius ~12 (a typical further-out belt) still lands near the old
-// fixed 900-rock count that already looked right there, while a close-in
-// belt (small orbitRadius, and thus a much shorter ring circumference) gets
-// proportionally fewer instead of the same 900 crammed into a tight ring.
-const ASTEROID_DENSITY_PER_RADIUS = 75
-const ASTEROID_COUNT_MIN = 120
-const ASTEROID_COUNT_MAX = 900
+// Rocks per unit of belt annulus area (orbitRadius * beltHalfWidth) --
+// calibrated so a belt around orbitRadius ~12 (a typical further-out belt,
+// beltHalfWidth ~12*0.22 there) lands near ASTEROID_COUNT_MAX, keeping
+// rocks-per-unit-area roughly constant across belts of any size instead of
+// thinning out as the (now width-scaled) band grows. InstancedMesh rocks are
+// cheap enough on the GPU that a several-thousand-instance ceiling costs
+// nothing next to the rest of the scene.
+const ASTEROID_DENSITY_PER_AREA = 350
+const ASTEROID_COUNT_MIN = 600
+const ASTEROID_COUNT_MAX = 12000
 
 const ASTEROID_MIN_SCALE = 0.006
 
 const ASTEROID_MAX_SCALE = 0.02
-
-const ASTEROID_Z_JITTER = 0.02

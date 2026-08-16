@@ -13,7 +13,7 @@ import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
 import type { GenesisProvinces } from "@/model/society/types"
 
-const provinceAreaTargetKm2 = 37_000
+const provinceAreaTargetKm2 = 10_000
 
 const SEA_CROSSING_RANGE_KM = 500
 

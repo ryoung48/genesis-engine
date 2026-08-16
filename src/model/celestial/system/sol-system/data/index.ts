@@ -36,6 +36,15 @@ const solPlanetRingsByName: Partial<Record<string, SystemBody["rings"]>> = {
 		color: 0xd8c69a,
 		opacity: 0.52,
 	},
+	// Real, discovered 2017 -- a narrow ~70km-wide ring at ~2287km from
+	// Haumea's center, roughly 3x its own mean radius out. Far fainter/
+	// narrower than Saturn's -- low opacity reflects that.
+	Haumea: {
+		innerRadiusRelative: 2.89,
+		outerRadiusRelative: 2.98,
+		color: 0xb8c4d0,
+		opacity: 0.35,
+	},
 }
 
 /**
@@ -341,6 +350,81 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		lsAphelionDeg: 0,
 	},
 	{
+		name: "Ceres",
+		group: "dwarf",
+		classification: "rockball",
+		// No real Ceres photo texture available yet -- reuses a generic
+		// rockball texture like every other unphotographed dwarf here.
+		texturePath: "/textures/celestial/generated/rockball/1.png",
+		parentBeltName: "Asteroid Belt",
+		au: 2.77,
+		diameterEarths: 939.4 / ORBIT_BODY.earthDiameterKm,
+		massEarths: 9.393e20 / ORBIT_BODY.earthMassKg,
+		gravityG: 0.029,
+		densityEarthRelative: 0.392,
+		densityDescription: "Mostly Rock",
+		rotationHours: 9.07417,
+		tiltDeg: 4,
+		eccentricity: 0.0758,
+		atmosphere: {
+			code: 0,
+			pressureBar: 0,
+			type: "vacuum",
+			breathable: false,
+		},
+		landCoverage: 1,
+		albedo: 0.09,
+		// Airless -- same 0 convention as every other bare-rock dwarf/moon here
+		// (Phobos, Deimos, ...); Ceres's real ~167K mean surface temp is close
+		// to its own blackbody equilibrium without any greenhouse trap.
+		greenhouseFactor: 0,
+		inclinationDeg: 10.59,
+		longitudeOfAscendingNodeDeg: 80.3,
+		longitudeOfPerihelionDeg: 73.6,
+		// No published real Ls-at-perihelion for Ceres (unlike Mars/the giants)
+		// -- reuses the raw fixed-frame value like Mercury/Venus, justified the
+		// same way: ~4 deg tilt means negligible seasonal declination swing
+		// regardless of which exact value lands here.
+		lsAphelionDeg: 73.6,
+	},
+	{
+		name: "Pallas",
+		group: "dwarf",
+		classification: "rockball",
+		// No real Pallas photo texture available yet -- reuses a generic
+		// rockball texture (a different one than Ceres's, so the two don't
+		// render identically).
+		texturePath: "/textures/celestial/generated/rockball/3.png",
+		parentBeltName: "Asteroid Belt",
+		au: 2.77,
+		diameterEarths: 512 / ORBIT_BODY.earthDiameterKm,
+		massEarths: 2.04e20 / ORBIT_BODY.earthMassKg,
+		gravityG: 0.0212,
+		densityEarthRelative: 0.53,
+		densityDescription: "Mostly Rock",
+		rotationHours: 7.8132,
+		// Real, unusually high obliquity -- Pallas spins close to on its side
+		// relative to its own orbital plane, unlike every other belt body here.
+		tiltDeg: 84,
+		// Real, unusually high for a major asteroid -- both more eccentric and
+		// far more inclined than Ceres or the belt's own mean plane, a known
+		// real oddity (likely an ancient collision) rather than a data error.
+		eccentricity: 0.2302,
+		atmosphere: {
+			code: 0,
+			pressureBar: 0,
+			type: "vacuum",
+			breathable: false,
+		},
+		landCoverage: 1,
+		albedo: 0.16,
+		greenhouseFactor: 0,
+		inclinationDeg: 34.93,
+		longitudeOfAscendingNodeDeg: 173.08,
+		longitudeOfPerihelionDeg: 124,
+		lsAphelionDeg: 124,
+	},
+	{
 		name: "Jupiter",
 		group: "jovian",
 		classification: "jovian",
@@ -551,6 +635,34 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				greenhouseFactor: 0.6942,
 				inclinationDeg: 0.348,
 			},
+			{
+				name: "Iapetus",
+				group: "dwarf",
+				classification: "snowball",
+				texturePath: "/textures/celestial/generated/rockball/3.png",
+				diameterEarths: 1469 / ORBIT_BODY.earthDiameterKm,
+				massEarths: 1.805e21 / ORBIT_BODY.earthMassKg,
+				gravityG: 0.02277,
+				densityEarthRelative: 0.1975,
+				densityDescription: "Mostly Ice",
+				rotationHours: 79.3216 * TIME.hoursPerDay,
+				tiltDeg: 0,
+				eccentricity: 0.0286,
+				pd: 3560820 / (9.449 * ORBIT_BODY.earthDiameterKm),
+				orbitRange: "extreme",
+				atmosphere: NO_MOON_ATMOSPHERE,
+				landCoverage: 1,
+				// Real Iapetus is famously two-toned -- a very dark (albedo
+				// ~0.03-0.05) leading hemisphere and a much brighter (~0.5-0.6)
+				// trailing one, a known real oddity this single-albedo schema
+				// can't represent. This is a rough disk-averaged stand-in, not
+				// either real hemisphere's value.
+				albedo: 0.25,
+				greenhouseFactor: 0,
+				// Real and unusually high for a regular-ish moon this far out --
+				// most of Saturn's other major moons sit near 0 deg.
+				inclinationDeg: 15.47,
+			},
 		],
 	},
 	{
@@ -592,6 +704,34 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		// Ls ~= 182 deg, so aphelion sits 180 deg earlier/later at Ls ~= 2.
 		lsAphelionDeg: 2,
 		moons: [
+			{
+				name: "Miranda",
+				group: "dwarf",
+				classification: "snowball",
+				texturePath: "/textures/celestial/generated/rockball/4.png",
+				diameterEarths: 471.6 / ORBIT_BODY.earthDiameterKm,
+				massEarths: 6.4e19 / ORBIT_BODY.earthMassKg,
+				gravityG: 0.00783,
+				densityEarthRelative: 0.2178,
+				densityDescription: "Mostly Ice",
+				rotationHours: 1.413 * TIME.hoursPerDay,
+				tiltDeg: 0,
+				eccentricity: 0.0013,
+				pd: 129900 / (4.007 * ORBIT_BODY.earthDiameterKm),
+				orbitRange: "inner",
+				atmosphere: NO_MOON_ATMOSPHERE,
+				// Real Miranda has the most extreme, chaotically fractured terrain
+				// of any known moon (huge cliffs and disjointed "coronae"
+				// terrain) -- not representable by this schema's single
+				// landCoverage figure.
+				landCoverage: 0.6,
+				albedo: 0.32,
+				greenhouseFactor: 0,
+				// Real and notably high compared to Titania/Oberon's near-zero
+				// inclination -- a known oddity, likely from a past orbital
+				// resonance.
+				inclinationDeg: 4.232,
+			},
 			{
 				name: "Titania",
 				group: "dwarf",
@@ -716,13 +856,76 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				// sensible on its own merits given the trace 0.02 bar atmosphere.
 				greenhouseFactor: 0,
 			},
+			{
+				name: "Nereid",
+				group: "dwarf",
+				classification: "snowball",
+				texturePath: "/textures/celestial/generated/rockball/5.png",
+				diameterEarths: 340 / ORBIT_BODY.earthDiameterKm,
+				// Real mass/density are both poorly constrained (Voyager 2 never
+				// flew close) -- order-of-magnitude estimates, not tightly
+				// measured figures.
+				massEarths: 3.1e19 / ORBIT_BODY.earthMassKg,
+				gravityG: 0.0073,
+				densityEarthRelative: 0.2722,
+				densityDescription: "Mostly Ice",
+				// Real rotation period is not well determined -- one of several
+				// reported light-curve estimates, not a settled figure.
+				rotationHours: 11.52,
+				tiltDeg: 0,
+				// Real and extreme -- by far the most eccentric orbit of any
+				// major moon in the solar system, a consequence of its huge
+				// distance leaving it only loosely bound and susceptible to
+				// solar perturbation (unlike Triton's circularized orbit).
+				eccentricity: 0.7512,
+				pd: 5504000 / (3.883 * ORBIT_BODY.earthDiameterKm),
+				orbitRange: "extreme",
+				atmosphere: NO_MOON_ATMOSPHERE,
+				landCoverage: 1,
+				albedo: 0.155,
+				greenhouseFactor: 0,
+				// Real inclination relative to Neptune's own equator isn't a
+				// well-defined quantity the way it is for Triton -- Nereid orbits
+				// so far out that solar tides dominate over Neptune's oblateness,
+				// so its orbital plane doesn't track Neptune's equator at all.
+				// This uses its real ecliptic-relative inclination instead, the
+				// only commonly published figure for it.
+				inclinationDeg: 7.23,
+			},
 		],
+	},
+	{
+		name: "Kuiper Belt",
+		group: "asteroid belt",
+		classification: "asteroid belt",
+		// Real classical Kuiper Belt spans roughly 30 (Neptune's orbit) to 50
+		// AU, with most classical (non-resonant) KBOs concentrated around
+		// 42-45 AU -- placed between Pluto's 39.482 AU (a 3:2 resonant "plutino"
+		// technically at the belt's inner edge) and Makemake's 45.79 AU (a
+		// classical KBO near its outer edge), same convention as the main
+		// Asteroid Belt entry sitting at Ceres/Pallas's shared 2.77 AU.
+		au: 43,
+		diameterEarths: 0,
+		massEarths: 0,
+		gravityG: 0,
+		densityEarthRelative: 0,
+		densityDescription: "",
+		rotationHours: 0,
+		tiltDeg: 0,
+		eccentricity: 0,
+		albedo: 0,
+		greenhouseFactor: 0,
+		landCoverage: 1,
+		// Not a real climate body (no tilt, no atmosphere, no EBM-driven
+		// terrain) -- value is inert filler to satisfy SolPlanetSeed.
+		lsAphelionDeg: 0,
 	},
 	{
 		name: "Pluto",
 		group: "dwarf",
 		classification: "snowball",
 		texturePath: "/textures/celestial/sol/pluto/pluto.jpg",
+		parentBeltName: "Kuiper Belt",
 		au: 39.482,
 		diameterEarths: 0.186,
 		massEarths: 0.0022,
@@ -785,6 +988,225 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				// Mutually tidally locked with Pluto in the same plane as
 				// Pluto's own equator/orbit -- effectively 0.
 				inclinationDeg: 0.08,
+			},
+		],
+	},
+	{
+		name: "Haumea",
+		group: "dwarf",
+		classification: "snowball",
+		// No real Haumea photo texture available -- generic rockball texture,
+		// same convention as Ceres/Pallas/Eris.
+		texturePath: "/textures/celestial/generated/rockball/6.png",
+		parentBeltName: "Kuiper Belt",
+		au: 43.13,
+		// Real Haumea is a strongly elongated triaxial ellipsoid (~2100 x 1680 x
+		// 1074 km, the defining consequence of its own extreme spin below) --
+		// this data schema only has a single diameter field, so it uses the
+		// real published "effective" (equal-volume-sphere) diameter rather than
+		// any one axis.
+		diameterEarths: 1560 / ORBIT_BODY.earthDiameterKm,
+		massEarths: 4.006e21 / ORBIT_BODY.earthMassKg,
+		gravityG: 0.0409,
+		densityEarthRelative: 0.342,
+		densityDescription: "Rock and Ice",
+		// Real and remarkable -- Haumea is the fastest-known rotator of any
+		// large solar-system body, which is what stretched it into its own
+		// triaxial shape in the first place (likely from an ancient collision
+		// that also produced its moons and ring).
+		rotationHours: 3.9155,
+		// Real axial tilt is observationally unconstrained, same caveat as
+		// Eris.
+		tiltDeg: 0,
+		eccentricity: 0.195,
+		atmosphere: {
+			code: 0,
+			pressureBar: 0,
+			type: "vacuum",
+			breathable: false,
+		},
+		landCoverage: 1,
+		albedo: 0.66,
+		greenhouseFactor: 0,
+		inclinationDeg: 28.19,
+		longitudeOfAscendingNodeDeg: 122.09,
+		longitudeOfPerihelionDeg: 1.27,
+		// No published real Ls-at-perihelion -- reuses the raw fixed-frame
+		// value, same convention as Ceres/Eris.
+		lsAphelionDeg: 1.27,
+		moons: [
+			{
+				name: "Namaka",
+				group: "dwarf",
+				classification: "snowball",
+				texturePath: "/textures/celestial/generated/rockball/7.png",
+				diameterEarths: 170 / ORBIT_BODY.earthDiameterKm,
+				// Real mass/density are both poorly constrained -- these are
+				// order-of-magnitude estimates (assumed ~1 g/cm3 icy bulk
+				// density), not tightly measured figures like Charon's.
+				massEarths: 1.8e18 / ORBIT_BODY.earthMassKg,
+				gravityG: 0.0017,
+				densityEarthRelative: 0.1815,
+				densityDescription: "Mostly Ice",
+				// Real and notable: unlike most moons here, Namaka's rotation is
+				// NOT synchronous -- it tumbles chaotically due to perturbation
+				// from Hi'iaka's gravity, and this value (one of several reported)
+				// is only an approximate snapshot.
+				rotationHours: 18.2,
+				tiltDeg: 0,
+				// Real, fairly eccentric for a moon -- part of what drives its
+				// chaotic (non-synchronous) rotation above.
+				eccentricity: 0.249,
+				pd: 25657 / 1560,
+				orbitRange: "inner",
+				atmosphere: NO_MOON_ATMOSPHERE,
+				landCoverage: 1,
+				// Not well measured -- an icy-surface estimate, not a precise
+				// published figure.
+				albedo: 0.7,
+				greenhouseFactor: 0,
+				// Real and unusual: inclined relative to Hi'iaka's own orbital
+				// plane (its dynamical reference here, since Haumea's own equator
+				// isn't well pinned down) rather than aligned with it.
+				inclinationDeg: 13,
+			},
+			{
+				name: "Hi'iaka",
+				group: "dwarf",
+				classification: "snowball",
+				texturePath: "/textures/celestial/generated/rockball/8.png",
+				diameterEarths: 310 / ORBIT_BODY.earthDiameterKm,
+				// Same estimate caveat as Namaka -- order-of-magnitude, not a
+				// tightly measured figure.
+				massEarths: 1.79e19 / ORBIT_BODY.earthMassKg,
+				gravityG: 0.00507,
+				densityEarthRelative: 0.1815,
+				densityDescription: "Mostly Ice",
+				// Real and notable, same non-synchronous-rotation family as
+				// Namaka -- the larger of Haumea's two moons, but still not
+				// tidally locked to it.
+				rotationHours: 9.8,
+				tiltDeg: 0,
+				eccentricity: 0.0513,
+				pd: 49880 / 1560,
+				orbitRange: "outer",
+				atmosphere: NO_MOON_ATMOSPHERE,
+				landCoverage: 1,
+				albedo: 0.7,
+				greenhouseFactor: 0,
+				// Real and highly unusual -- close to a polar/near-perpendicular
+				// orbit relative to Haumea's own spin, unlike the near-equatorial
+				// moons everywhere else in this table.
+				inclinationDeg: 126,
+			},
+		],
+	},
+	{
+		name: "Makemake",
+		group: "dwarf",
+		classification: "snowball",
+		// No real Makemake photo texture available -- generic rockball
+		// texture.
+		texturePath: "/textures/celestial/generated/rockball/1.png",
+		parentBeltName: "Kuiper Belt",
+		au: 45.79,
+		diameterEarths: 1434 / ORBIT_BODY.earthDiameterKm,
+		massEarths: 3.1e21 / ORBIT_BODY.earthMassKg,
+		gravityG: 0.041,
+		densityEarthRelative: 0.3086,
+		densityDescription: "Rock and Ice",
+		rotationHours: 22.48,
+		// Real axial tilt is observationally unconstrained, same caveat as
+		// Eris/Haumea.
+		tiltDeg: 0,
+		eccentricity: 0.161,
+		atmosphere: {
+			code: 0,
+			pressureBar: 0,
+			type: "vacuum",
+			breathable: false,
+		},
+		landCoverage: 1,
+		// Real, very high -- a fresh methane/ethane-ice surface, among the
+		// most reflective large KBOs after Eris.
+		albedo: 0.82,
+		greenhouseFactor: 0,
+		inclinationDeg: 28.98,
+		longitudeOfAscendingNodeDeg: 79.62,
+		longitudeOfPerihelionDeg: 16.56,
+		lsAphelionDeg: 16.56,
+	},
+	{
+		name: "Eris",
+		group: "dwarf",
+		classification: "snowball",
+		// No real Eris photo texture available -- reuses a generic rockball
+		// texture, same convention as Ceres/Pallas.
+		texturePath: "/textures/celestial/generated/rockball/4.png",
+		au: 67.78,
+		diameterEarths: 2326 / ORBIT_BODY.earthDiameterKm,
+		massEarths: 1.6466e22 / ORBIT_BODY.earthMassKg,
+		gravityG: 0.0836,
+		densityEarthRelative: 0.4573,
+		densityDescription: "Mostly Ice",
+		rotationHours: 25.9,
+		// Real axial tilt is observationally unconstrained (unlike Pluto's
+		// well-measured value) -- left at 0 rather than guessing.
+		tiltDeg: 0,
+		eccentricity: 0.436,
+		atmosphere: {
+			code: 0,
+			pressureBar: 0,
+			type: "vacuum",
+			breathable: false,
+		},
+		landCoverage: 1,
+		// Real Eris Bond albedo -- one of the most reflective bodies in the
+		// solar system, higher even than Enceladus's fresh-ice surface.
+		albedo: 0.96,
+		// Airless in practice: Eris is cold enough that any real atmosphere it
+		// once had is frozen onto the surface -- same 0 convention as Ceres/
+		// Pallas/the outer icy moons.
+		greenhouseFactor: 0,
+		inclinationDeg: 44.04,
+		longitudeOfAscendingNodeDeg: 35.95,
+		longitudeOfPerihelionDeg: 187.23,
+		// No published real Ls-at-perihelion for Eris -- reuses the raw
+		// fixed-frame value, same convention as Ceres/Mercury/Venus.
+		lsAphelionDeg: 187.23,
+		moons: [
+			{
+				name: "Dysnomia",
+				group: "dwarf",
+				classification: "snowball",
+				texturePath: "/textures/celestial/generated/rockball/5.png",
+				diameterEarths: 700 / ORBIT_BODY.earthDiameterKm,
+				// Real measured mass is imprecise (derived from a low, unexpected
+				// bulk density found by JWST in 2023, suggesting a giant-impact
+				// origin) -- this is a plausible estimate, not a tightly
+				// constrained published figure the way Charon's is.
+				massEarths: 2.1e20 / ORBIT_BODY.earthMassKg,
+				gravityG: 0.01166,
+				densityEarthRelative: 0.2178,
+				densityDescription: "Mostly Ice",
+				// Synchronous with its 15.786-day orbit around Eris, same
+				// mutual-lock convention as Charon/Pluto.
+				rotationHours: 15.786 * TIME.hoursPerDay,
+				tiltDeg: 0,
+				eccentricity: 0,
+				pd: 37350 / 2326,
+				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
+				landCoverage: 1,
+				// Not well measured -- Charon's real albedo used as a placeholder
+				// stand-in rather than an invented precise figure.
+				albedo: 0.35,
+				greenhouseFactor: 0,
+				// Real orbital inclination relative to Eris's equator is poorly
+				// constrained; the ~78 deg figure sometimes quoted is relative to
+				// the ecliptic instead, so this is left at the mutual-lock default
+				// (effectively 0) rather than mixing reference frames.
+				inclinationDeg: 0,
 			},
 		],
 	},

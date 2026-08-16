@@ -15,6 +15,7 @@ import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RAIN } from "@/model/climate/precipitation/rain"
+import { CLOUD_COVER_TEMPERATURE_MODIFIER } from "@/model/climate/temperature/cloud-cover-modifier"
 import { DTR } from "@/model/climate/temperature/dtr"
 import type { GenesisRainfall } from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
@@ -455,6 +456,19 @@ function runPostElevationPipeline(
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
 	record("Post: landmarks + distances + temperature (post-lake)", t0)
 	onProgress?.("Post: landmarks", 62)
+
+	// ── Cloud cover temperature modifier ────────────────────────────────
+	// Clear skies amplify a month's temperature away from 0°C; overcast
+	// skies damp it back toward 0°C. Modeled temperature only.
+	t0 = performance.now()
+	CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
+		climate,
+		rainfall,
+		hydrology,
+		dtrMonthly: dtr_monthly,
+		oceanDist,
+	})
+	record("Post: cloud cover temperature modifier", t0)
 
 	// ── Observed Earth climate (must run before pasta/vegetation so Earth
 	// imports classify vegetation from observed rather than procedural

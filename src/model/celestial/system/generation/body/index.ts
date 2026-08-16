@@ -643,13 +643,136 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		}
 	})
 
+	// Real-body asteroid-belt residents: an asteroid belt occasionally hosts
+	// one or two protoplanet-sized dwarf worlds embedded within it (a
+	// procedural Ceres/Pallas), instead of always being pure debris. Each is
+	// a full SystemBody (own stats/wiki card, group "dwarf") flagged via
+	// beltOfIdx to render on the belt's own ring radius instead of its own
+	// independently packed orbit slot -- see SystemBody.beltOfIdx's doc and
+	// Ceres/Pallas in sol-system/data/index.ts.
+	const BELT_DWARF_CHANCE = 0.35
+	const beltDwarfs: SystemBody[] = []
+	for (const belt of bodies) {
+		if (belt.group !== "asteroid belt") continue
+		if (rng.uniform(0, 1) > BELT_DWARF_CHANCE) continue
+		const dwarfCount = rng.randint(1, 2)
+		for (let i = 0; i < dwarfCount; i++) {
+			const dwarfIdx = bodies.length + beltDwarfs.length
+			// Belt residents skew much smaller than free-orbiting dwarf planets
+			// (most real belt dwarfs are Ceres/Pallas-scale, not Pluto-scale) --
+			// weighted toward sizeClass 0, with 1 rare and 2-4 rarer still.
+			const sizeClass = rng.weightedChoice([
+				{ v: 0, w: 8 },
+				{ v: 1, w: 2 }
+			])
+			const classification = PLANET.classifyBody({
+				rng,
+				groupHint: "dwarf",
+				impactZone: false,
+				zone: belt.zone,
+				orbitalDistanceAU: belt.orbitalDistanceAU,
+				sizeClass,
+				isMoon: false,
+				tidal: false,
+				forceMeltball: false,
+			}).classification
+			const assignment = PLANET.rollClassificationAssignment({
+				rng,
+				classification,
+				sizeClass,
+				zone: belt.zone,
+				deviation: 0,
+				spectralClass,
+				isPrimaryWorld: false,
+			})
+			const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
+			const densityEarthRelative = ROLLS.pickDensityEarthRelative({
+				rng,
+				group: "dwarf",
+				classification,
+				composition: assignment.composition,
+			})
+			const massKg = ORBIT_BODY.massKgFromEarthRelativeDensity({
+				diameterKm,
+				densityEarthRelative,
+			})
+			const siderealDayHours = ROLLS.rollSiderealDayHours({
+				rng,
+				isJovian: false,
+				starAgeGyr,
+			})
+			const eccentricity = ROLLS.rollEccentricity({ rng, orbitKind: "planet" })
+			const axialTiltDeg = ROLLS.rollAxialTiltDeg(rng)
+			const orbitalPeriodDays =
+				STAR.getKeplerYearYears({
+					orbitalDistanceAU: belt.orbitalDistanceAU,
+					massSol: starMassSol,
+				}) * DAYS_PER_YEAR
+			const environment = ENVIRONMENT.buildBodyEnvironment({
+				rng,
+				groupHint: "dwarf",
+				zone: belt.zone,
+				deviation: 0,
+				spectralClass,
+				diameterKm,
+				massKg,
+				orbitalDistanceAU: belt.orbitalDistanceAU,
+				isPrimaryWorld: false,
+				isMoon: false,
+				tidal: false,
+				forceMeltball: false,
+				assignment,
+				classified: { group: "dwarf", classification },
+				starAgeGyr,
+				proto,
+				primordial,
+			})
+			beltDwarfs.push({
+				...environment,
+				idx: dwarfIdx,
+				seed: `belt-${belt.idx}-dwarf-${i + 1}`,
+				name: nameBody(`belt-${belt.idx}-dwarf-${i + 1}`),
+				isMainWorld: false,
+				zone: belt.zone,
+				impactZone: false,
+				beltOfIdx: belt.idx,
+				orbitalDistanceAU: belt.orbitalDistanceAU,
+				diameterKm,
+				massKg,
+				gravityG: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
+				orbitalPeriodDays,
+				siderealDayHours,
+				eccentricity,
+				longitudeOfPerihelionDeg: rng.uniform(0, 360),
+				lsAphelionDeg: rng.uniform(0, 360),
+				axialTiltDeg,
+				inclinationDeg: ORBIT_BODY.rollInclinationDeg(rng),
+				longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+				tideLock: null,
+				tideLockStatus: PLANET.deriveTideLockStatus({
+					siderealDayHours,
+					orbitalPeriodDays,
+					tideLock: null,
+				}),
+				tideLockTrace: [],
+				moons: [],
+			})
+		}
+	}
+	bodies.push(...beltDwarfs)
+
 	// Trojan orbits: a very small chance for a body to share another body's
 	// Orbit# instead of its own, sitting 60° ahead (leading, 1d6 1-3) or behind
 	// (trailing, 1d6 4-6) it at the Lagrange point -- flagged via `trojan` so
 	// these are easy to find later.
 	const TROJAN_CHANCE = 1 / 500
 	for (const body of bodies) {
-		if (body.isMainWorld || body.group === "asteroid belt") continue
+		if (
+			body.isMainWorld ||
+			body.group === "asteroid belt" ||
+			body.beltOfIdx !== undefined
+		)
+			continue
 		if (rng.uniform(0, 1) > TROJAN_CHANCE) continue
 		const shareOrbitWith = bodies.filter(
 			(other) => other !== body && !other.isMainWorld,

@@ -114,10 +114,7 @@ export type GovernmentType =
 	| "constitutional_monarchy" // 8: limited monarchy — earlyModern+
 	| "dynastic_signoria" // 9: republic fallen under one dynastic lord — small, earlyModern (Medici, Visconti)
 	| "warlord_state" // 10: fragmented post-imperial military rule — no legitimate succession
-	| "shogunate" // 11: military rule under a figurehead monarch — large, institutionalized
-	| "bureaucratic_monarchy" // 12: centralised crown, impersonal exam-selected bureaucracy — large (China)
 	// republic (13–19)
-	| "merchant_republic" // 13: trade oligarchy — small coastal core
 	| "oligarchic_republic" // 14: aristocratic senate — medium ancient core
 	| "free_city" // 15: self-governing city or league (poleis, Swiss cantons, HRE free cities) — medium
 	| "peasant_republic" // 16: lord-less free-peasant commune — small coastal/marsh (Dithmarschen, Frisia)

@@ -179,8 +179,7 @@ function refineGovernmentSubtype({
 		}
 
 		case 1: {
-			// monarchy → feudal, elective, absolute, constitutional, dynastic signoria,
-			// warlord state, shogunate, bureaucratic monarchy
+			// monarchy → feudal, elective, absolute, constitutional, warlord state
 			// Information era (sizeWeight ~0.15): constitutional dominant, a few
 			// absolute holdouts (Gulf-style states).
 			if (sizeWeight < 0.22) {
@@ -197,32 +196,23 @@ function refineGovernmentSubtype({
 				return getGovIdx().constitutional_monarchy
 			}
 			// Early modern (~0.45): age of absolutism; elective and feudal persist;
-			// constitutional begins to emerge. Small polities under one dynastic
-			// lord (dynastic signoria) are an early-modern-specific phenomenon
-			// (Medici Florence, Visconti Milan).
+			// constitutional begins to emerge.
 			if (sizeWeight < 0.55) {
 				if (size >= 8 && r < 0.45) return getGovIdx().absolute_monarchy // medium+
 				if (size >= 8 && r < 0.65) return getGovIdx().elective_monarchy // medium+ (Poland, HRE)
-				if (size < 6 && r < 0.15) return getGovIdx().dynastic_signoria // small princely city-state
 				if (r < 0.88) return getGovIdx().feudal_monarchy // still widespread
 				return getGovIdx().constitutional_monarchy // early constitutional
 			}
 			// Ancient & medieval (>=0.55): feudal default; elective for medium+
-			// kingdoms; large empires split between absolute, bureaucratic
-			// (exam-selected administration, e.g. China), and shogunate (military
-			// rule under a figurehead monarch, e.g. Japan).
-			if (size >= 20 && r < 0.65) {
-				if (r < 0.25) return getGovIdx().bureaucratic_monarchy
-				if (r < 0.35) return getGovIdx().shogunate
-				return getGovIdx().absolute_monarchy
-			}
+			// kingdoms; absolute for large empires.
+			if (size >= 20 && r < 0.65) return getGovIdx().absolute_monarchy
 			if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
 			return getGovIdx().feudal_monarchy // default
 		}
 
 		case 2: {
-			// republic → merchant, oligarchic, free city, presidential, parliamentary,
-			// pirate republic, socialist, junta, fascist, dictatorial
+			// republic → oligarchic, dynastic signoria, free city, presidential,
+			// parliamentary, pirate republic, socialist, junta, fascist, dictatorial
 			// Information era: socialist states emerge alongside parliamentary,
 			// presidential, juntas, and personalist dictatorships. Fascism is a
 			// 20th-century-specific (WWII) phenomenon, excluded here.
@@ -248,15 +238,23 @@ function refineGovernmentSubtype({
 			if (size === 1 && r < 0.3) return getGovIdx().free_city
 			if (water >= 2 && size <= 3 && r < 0.06)
 				return getGovIdx().pirate_republic // small remote coastal havens
-			if (water >= 1 && size <= 4 && hab >= 0.4 && r < 0.1)
-				return getGovIdx().peasant_republic // lord-less coastal/marsh free-peasant commune
+			if (size <= 4 && hab >= 0.3 && r < 0.25)
+				return getGovIdx().peasant_republic // lord-less free-peasant commune
 			if (water >= 2 && size <= 10 && wave >= 0 && wave < 0.35)
-				return getGovIdx().merchant_republic // coastal core
+				return getGovIdx().free_city // coastal core
 			if (water >= 1 && size <= 6 && wave >= 0 && wave < 0.3 && r < 0.55)
-				return getGovIdx().merchant_republic
+				return getGovIdx().free_city
+			// Dynastic signoria (a princely lord ruling what was a republic, e.g.
+			// Medici Florence, Visconti Milan) shares oligarchic republic's core-only
+			// condition rather than a size cap — a coin flip decides which one a
+			// settled, non-frontier core polity becomes.
 			if (size >= 8 && wave >= 0 && wave < 0.28)
-				return getGovIdx().oligarchic_republic
-			return getGovIdx().merchant_republic // default
+				return r < 0.5
+					? getGovIdx().dynastic_signoria
+					: getGovIdx().oligarchic_republic
+			if (wave >= 0 && wave < 0.28 && r < 0.15)
+				return getGovIdx().dynastic_signoria
+			return getGovIdx().free_city // default
 		}
 
 		case 3: {

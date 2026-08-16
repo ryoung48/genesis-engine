@@ -137,7 +137,19 @@ export function createInteractionController(
 			ctx.solarSystemOverlayState.group,
 			true,
 		)
-		const hit = hits.find((h) => h.object instanceof THREE.Mesh)
+		// A belt's asteroid field is one big InstancedMesh spanning the same
+		// region a belt-interior dwarf planet (Ceres, Pallas, ...) sits in, and
+		// often sits closer along the ray than the dwarf's own tiny mesh. A
+		// belt is never a valid click target (see resolveHitBodyIndex/
+		// listAddresses' own doc), so InstancedMesh hits are skipped entirely
+		// here rather than merely deprioritized -- any real hit still wins over
+		// the nearest-on-screen fallback, but an unresolved/absent hit (a stray
+		// rock, or empty space between them) always falls through to it.
+		const hit = hits.find(
+			(h) =>
+				h.object instanceof THREE.Mesh &&
+				!(h.object instanceof THREE.InstancedMesh),
+		)
 		const overlayState = ctx.solarSystemOverlayState
 		const target = hit
 			? overlayState.resolveHitBodyIndex(hit.object)

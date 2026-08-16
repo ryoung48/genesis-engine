@@ -21,13 +21,10 @@ const governmentTypes: GovernmentType[] = [
 	"elective_monarchy",
 	"absolute_monarchy",
 	"constitutional_monarchy",
-	"dynastic_signoria",
 	"warlord_state",
-	"shogunate",
-	"bureaucratic_monarchy",
 	// republic
-	"merchant_republic",
 	"oligarchic_republic",
+	"dynastic_signoria",
 	"free_city",
 	"peasant_republic",
 	"presidential_republic",
@@ -59,9 +56,6 @@ const governmentTypeLabels: Record<GovernmentType, string> = {
 	constitutional_monarchy: "Constitutional Monarchy",
 	dynastic_signoria: "Dynastic Signoria",
 	warlord_state: "Warlord State",
-	shogunate: "Shogunate",
-	bureaucratic_monarchy: "Imperial Bureaucracy",
-	merchant_republic: "Merchant Republic",
 	oligarchic_republic: "Oligarchic Republic",
 	free_city: "Free City",
 	peasant_republic: "Peasant Republic",
@@ -89,12 +83,9 @@ const governmentTypeFamily: Record<GovernmentType, GovernmentFamily> = {
 	elective_monarchy: "monarchy",
 	absolute_monarchy: "monarchy",
 	constitutional_monarchy: "monarchy",
-	dynastic_signoria: "monarchy",
 	warlord_state: "monarchy",
-	shogunate: "monarchy",
-	bureaucratic_monarchy: "monarchy",
-	merchant_republic: "republic",
 	oligarchic_republic: "republic",
+	dynastic_signoria: "republic",
 	free_city: "republic",
 	peasant_republic: "republic",
 	presidential_republic: "republic",
@@ -227,15 +218,17 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		// shares: the previous weights assumed the 50-250 bucket averaged 150
 		// provinces, which handed it 26.8% of all provinces. In 1444 the only
 		// nation above 49 is Ming at 113, so that bucket is really 4.4%.
+		// Rebalanced from the raw EU4-measured shares above: nation *count* skews
+		// heavily to the [1,1] bucket relative to its province mass (a size-1
+		// nation is 1 count per 1 province, while a [10,24] nation is 1 count per
+		// ~17 provinces), so trimming its mass share meaningfully thins out
+		// single-province nations and fills in the middle tiers by count.
 		nationPercentages: MATH.normalize([
-			0.0, 0.044, 0.138, 0.257, 0.16, 0.273, 0.128,
+			0.0, 0.4554, 0.102, 0.152, 0.1146, 0.0786, 0.1,
 		]),
-		// Top bucket stays empty and the 50+ tier is capped near Ming's 113
-		// rather than the shared 250 ceiling, so the largest generated nation
-		// lands in the right range instead of doubling the real maximum.
 		nationBuckets: [
 			[251, 600],
-			[50, 120],
+			[50, 250],
 			[25, 49],
 			[10, 24],
 			[5, 9],

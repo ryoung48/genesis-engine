@@ -33,11 +33,8 @@ const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 	constitutional_monarchy: { U: 0.25, q: 1.0 }, // modern urbanization, moderate primacy
 	dynastic_signoria: { U: 0.3, q: 1.3 }, // one dominant princely city (Florence, Milan)
 	warlord_state: { U: 0.1, q: 0.85 }, // fragmented garrison towns, weak primacy
-	shogunate: { U: 0.15, q: 1.15 }, // institutionalized military capital, strong primacy
-	bureaucratic_monarchy: { U: 0.18, q: 1.15 }, // imperial capital plus provincial admin cities
 
 	// republic — coastal oligarchy through modern mass-urban democracy
-	merchant_republic: { U: 0.35, q: 1.3 }, // trade oligarchy, one dominant port capital
 	oligarchic_republic: { U: 0.2, q: 1.1 }, // aristocratic senate, strong core city
 	free_city: { U: 0.5, q: 0.9 }, // self-governing city or loose league, mostly urban
 	peasant_republic: { U: 0.04, q: 0.65 }, // lord-less free-peasant commune, rural and flat

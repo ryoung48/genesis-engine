@@ -49,6 +49,7 @@ function specialCircumstances(body: SystemBody): SpecialCircumstance[] {
 	if (body.moons.some((moon) => moon.sizeClass === body.sizeClass)) {
 		circumstances.push("Twin Moon")
 	}
+	if (body.beltOfIdx !== undefined) circumstances.push("Asteroid Body")
 	return circumstances
 }
 

@@ -3,3 +3,4 @@ export type SpecialCircumstance =
 	| "Minor Rings"
 	| "Major Rings"
 	| "Twin Moon"
+	| "Asteroid Body"

@@ -283,7 +283,10 @@ function pickGeneratedBodyTextures({
 			)
 				return { texturePath: pick("meltball") }
 			// 500C = 773.15K.
-			if (molten || (temperatureMeanK !== undefined && temperatureMeanK > 773.15))
+			if (
+				molten ||
+				(temperatureMeanK !== undefined && temperatureMeanK > 773.15)
+			)
 				return { texturePath: pick("helian-hot") }
 			if (atmosphereSubtype === "hydrogen")
 				return { texturePath: pick("helian-hydrogen") }

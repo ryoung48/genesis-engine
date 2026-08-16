@@ -72,6 +72,11 @@ export interface SolPlanetSeed {
 	isMainWorld?: boolean
 	rings?: SystemBody["rings"]
 	biosphere?: BiosphereProfile
+	/** Name of another SolPlanetSeed with group "asteroid belt" that this body
+	 * orbits inside of -- resolved to SystemBody.beltOfIdx once every seed has
+	 * a built idx (see sol-system/index.ts's buildPlanet). A real planet-class
+	 * body, not a moon of the belt. */
+	parentBeltName?: string
 }
 
 export interface BuildPlanetOptions {

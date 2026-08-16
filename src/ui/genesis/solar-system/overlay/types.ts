@@ -192,6 +192,10 @@ export interface PlacedBody {
 	}
 	/** Only set for asteroid belts. */
 	asteroidField?: AsteroidFieldData
+	/** Only set for asteroid belts — half the belt's radial (inner-to-outer)
+	 * span, scaled off its own orbitRadius (see BELT_WIDTH_RATIO) rather than
+	 * a fixed constant. */
+	beltHalfWidth?: number
 }
 
 /** A companion star mounted inside its parent's own group, orbiting it --

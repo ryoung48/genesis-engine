@@ -66,6 +66,13 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		 * trojan is true. Lets the renderer place this body 60° from that body
 		 * on a shared orbit instead of its own independent ring. */
 		trojanOfIdx?: number
+		/** idx of the asteroid-belt body this orbits inside of -- a real
+		 * planet-class body (its own stats/wiki card, group "dwarf"), NOT a
+		 * moon of the belt and NOT a trojan (no fixed ±60° offset, no "Trojan
+		 * Orbit" circumstance tag). Lets the renderer place it on the belt's own
+		 * ring radius instead of its own independently packed orbit slot. See
+		 * Ceres/Pallas in sol-system/data/index.ts. */
+		beltOfIdx?: number
 	}
 
 import type {

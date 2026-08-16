@@ -26,7 +26,8 @@ import {
 } from "@/ui/genesis/solar-system/overlay/asteroid-field"
 import {
 	BELT_SCENE_RADIUS,
-	BELT_WIDTH,
+	BELT_WIDTH_MIN,
+	BELT_WIDTH_RATIO,
 	CLASSIFICATION_COLOR,
 	DEG2RAD,
 	FULL_OCEAN_COLOR,
@@ -708,7 +709,11 @@ export function buildSolarSystemOverlay(
 			if (Array.isArray(material)) material.forEach((entry) => entry.dispose())
 			else material.dispose()
 		}
-		p.asteroidField = buildAsteroidField(p.orbitRadius, p.body.zone === "outer")
+		p.asteroidField = buildAsteroidField(
+			p.orbitRadius,
+			p.body.zone === "outer",
+			p.beltHalfWidth ?? BELT_WIDTH_MIN / 2,
+		)
 		group.add(p.asteroidField.mesh)
 	}
 
@@ -843,6 +848,22 @@ export function buildSolarSystemOverlay(
 				p.body.trojan === true &&
 				p.body.trojanOfIdx !== undefined &&
 				placedByIdx.has(p.body.trojanOfIdx)
+			// A belt-interior dwarf planet (Ceres, Pallas, Pluto, ...) gets
+			// re-anchored onto its belt's own orbitRadius by the belt-child pass
+			// below, same as a trojan sharing its target's ring -- it must not
+			// consume its own previousOuterEdge space here using ITS OWN
+			// eccentricity, since that packed slot is discarded outright. Left
+			// ungated (as main-belt Ceres/Pallas were before Kuiper Belt existed),
+			// a real-eccentricity outer-system body like Pluto (e=0.248) inflates
+			// previousOuterEdge by its own apoapsis before being thrown away, and
+			// with three such bodies in a row (Pluto/Haumea/Makemake, all e>0.15)
+			// ahead of the Kuiper Belt the inflation compounds enough to push
+			// Eris (and suggestedCameraDistance/camera framing with it) out by
+			// roughly 10x, shrinking the belt itself to an invisible sliver on
+			// screen at the default zoom.
+			const isBeltChildSlot =
+				p.body.beltOfIdx !== undefined && placedByIdx.has(p.body.beltOfIdx)
+			const skipsOwnSlot = isTrojanSlot || isBeltChildSlot
 			const trojansHere = trojansByTargetIdx.get(p.body.idx)
 			const effectiveMoonSystemOuterRadius = trojansHere?.length
 				? Math.max(
@@ -852,17 +873,31 @@ export function buildSolarSystemOverlay(
 				: p.moonSystemOuterRadius
 			const gap =
 				ORBIT_GAP_STAR_RADII * Math.max(p.sceneRadius, starRadius * 0.05)
-			const periapsis = previousOuterEdge + gap + effectiveMoonSystemOuterRadius
-			if (!isTrojanSlot) p.orbitRadius = periapsis
 
 			if (p.isBelt) {
+				// The belt's own half-width scales off its own orbitRadius (real
+				// main-belt asteroids span ~0.44x their orbit radius -- see
+				// BELT_WIDTH_RATIO's doc), but orbitRadius isn't known until the
+				// periapsis below is computed from it, so previousOuterEdge (the
+				// belt's inner clearance boundary, only a small `gap` short of its
+				// eventual orbitRadius) stands in for it here.
+				const beltHalfWidth = Math.max(
+					BELT_WIDTH_MIN / 2,
+					previousOuterEdge * (BELT_WIDTH_RATIO / 2),
+				)
+				const periapsis = previousOuterEdge + gap + beltHalfWidth
 				p.kepler = undefined
 				if (!isTrojanSlot) {
-					previousOuterEdge = periapsis + effectiveMoonSystemOuterRadius
+					p.orbitRadius = periapsis
+					p.beltHalfWidth = beltHalfWidth
+					previousOuterEdge = periapsis + beltHalfWidth
 					lastPlanetOuterEdge = previousOuterEdge
 				}
 				continue
 			}
+
+			const periapsis = previousOuterEdge + gap + effectiveMoonSystemOuterRadius
+			if (!skipsOwnSlot) p.orbitRadius = periapsis
 
 			p.mesh?.scale.setScalar(p.sceneRadius)
 			p.cloudsMesh?.scale.setScalar(p.sceneRadius * 1.025)
@@ -878,7 +913,7 @@ export function buildSolarSystemOverlay(
 			const omega =
 				(p.body.longitudeOfPerihelionDeg - p.body.longitudeOfAscendingNodeDeg) *
 				DEG2RAD
-			if (!isTrojanSlot) {
+			if (!skipsOwnSlot) {
 				const a = periapsis / (1 - e)
 				const b = a * Math.sqrt(1 - e * e)
 				const { P, Q } = perifocalBasis(Omega, inc, omega)
@@ -924,6 +959,30 @@ export function buildSolarSystemOverlay(
 			if (!target || target.isBelt || !target.kepler) continue
 			p.orbitRadius = target.orbitRadius
 			p.kepler = { ...target.kepler }
+		}
+		// Belt-child pass: re-point each belt-interior dwarf planet (Ceres,
+		// Pallas, ...) onto its own ring at the belt's own radius, overriding
+		// the independent slot the size-packing loop above gave it. Unlike a
+		// trojan these aren't offset/shared with the belt's own basis (belts
+		// have no kepler -- see the `p.isBelt` branch above, which sets
+		// `p.kepler = undefined`); each belt child instead gets its own real
+		// eccentricity/inclination ellipse anchored at the belt's radius.
+		for (const p of placed) {
+			if (p.isBelt || p.body.beltOfIdx === undefined) continue
+			const target = placedByIdx.get(p.body.beltOfIdx)
+			if (!target || !target.isBelt) continue
+			const e = showEllipticalOrbits ? p.body.eccentricity : 0
+			const inc = (showInclination ? p.body.inclinationDeg : 0) * DEG2RAD
+			const Omega = p.body.longitudeOfAscendingNodeDeg * DEG2RAD
+			const omega =
+				(p.body.longitudeOfPerihelionDeg - p.body.longitudeOfAscendingNodeDeg) *
+				DEG2RAD
+			const periapsis = target.orbitRadius
+			const a = periapsis / (1 - e)
+			const b = a * Math.sqrt(1 - e * e)
+			const { P, Q } = perifocalBasis(Omega, inc, omega)
+			p.orbitRadius = periapsis
+			p.kepler = { P, Q, a, b, ae: a * e, e }
 		}
 		return previousOuterEdge
 	}
@@ -981,24 +1040,41 @@ export function buildSolarSystemOverlay(
 		group.add(orbitLine)
 
 		if (p.isBelt) {
-			group.add(
-				new THREE.Mesh(
-					new THREE.RingGeometry(
-						p.orbitRadius - BELT_WIDTH / 2,
-						p.orbitRadius + BELT_WIDTH / 2,
-						128,
-					),
-					new THREE.MeshBasicMaterial({
-						color: 0xb8b8b8,
-						transparent: true,
-						opacity: 0.25,
-						side: THREE.DoubleSide,
-					}),
+			const beltHalfWidth = p.beltHalfWidth ?? BELT_WIDTH_MIN / 2
+			const haze = new THREE.Mesh(
+				new THREE.RingGeometry(
+					p.orbitRadius - beltHalfWidth,
+					p.orbitRadius + beltHalfWidth,
+					128,
 				),
+				new THREE.MeshBasicMaterial({
+					color: 0xb8b8b8,
+					transparent: true,
+					// The ring is now wide enough (see BELT_WIDTH_RATIO) that the
+					// old flat 0.25 read as a solid disc instead of a haze behind
+					// the instanced rocks -- thinned out further so it stays a
+					// faint backdrop. Unlit (MeshBasicMaterial), so it doesn't dim
+					// under daylight mode's darker ambient the way the lit rocks do
+					// -- bumped up in that mode specifically so the ring still helps
+					// the band read as a whole against a scene that's otherwise
+					// noticeably darker there.
+					opacity: showDaylight ? 0.18 : 0.1,
+					side: THREE.DoubleSide,
+				}),
 			)
+			// Purely decorative -- untracked in `placed`, so a raycast hit on it
+			// can't resolve to anything and would otherwise swallow a double-click
+			// aimed at a belt-interior dwarf planet or empty space behind it
+			// (resolveHitBodyIndex returning null for an unrecognized hit stops
+			// the click dead instead of falling back to the nearest body).
+			haze.raycast = () => {
+				// Intentionally inert -- see doc above.
+			}
+			group.add(haze)
 			p.asteroidField = buildAsteroidField(
 				p.orbitRadius,
 				p.body.zone === "outer",
+				beltHalfWidth,
 			)
 			group.add(p.asteroidField.mesh)
 		}
@@ -1218,7 +1294,7 @@ export function buildSolarSystemOverlay(
 		if (p.isBelt) {
 			return {
 				position: new THREE.Vector3(p.orbitRadius, 0, 0),
-				radius: BELT_WIDTH,
+				radius: (p.beltHalfWidth ?? BELT_WIDTH_MIN / 2) * 2,
 			}
 		}
 		if (!p.bodyGroup) return null
@@ -1263,10 +1339,13 @@ export function buildSolarSystemOverlay(
 		if (object === starMesh) return { kind: "star", starIndex: 0 }
 		for (let i = 0; i < placed.length; i++) {
 			const p = placed[i]!
+			// A belt itself is never a click target (see listAddresses' matching
+			// doc below) -- its asteroidField mesh intentionally isn't matched
+			// here, so a raycast hit on a stray rock falls through unresolved
+			// instead of resolving to the belt.
 			if (
-				p.mesh === object ||
-				p.cloudsMesh === object ||
-				p.ringMesh === object
+				!p.isBelt &&
+				(p.mesh === object || p.cloudsMesh === object || p.ringMesh === object)
 			) {
 				return { kind: "body", starIndex: 0, bodyIdx: i }
 			}
@@ -1281,11 +1360,16 @@ export function buildSolarSystemOverlay(
 		return null
 	}
 
+	// Excludes belts -- a belt is a diffuse ring of rocks, not a clickable
+	// body, so it's never a valid double-click target either directly (see
+	// resolveHitBodyIndex above) or via the nearest-on-screen fallback below.
+	// Its interior dwarf planets (Ceres, Pallas, ...) are their own separate
+	// placed entries and stay fully clickable.
 	function listAddresses(): OrbitAddress[] {
 		const addresses: OrbitAddress[] = [{ kind: "star", starIndex: 0 }]
 		for (let i = 0; i < placed.length; i++) {
 			const p = placed[i]!
-			addresses.push({ kind: "body", starIndex: 0, bodyIdx: i })
+			if (!p.isBelt) addresses.push({ kind: "body", starIndex: 0, bodyIdx: i })
 			for (let m = 0; m < p.body.moons.length; m++) {
 				addresses.push({ kind: "moon", starIndex: 0, bodyIdx: i, moonIdx: m })
 			}

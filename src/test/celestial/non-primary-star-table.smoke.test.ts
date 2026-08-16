@@ -5,7 +5,9 @@ import type { ParentStarLike } from "@/model/celestial/star/types"
 import { RNG } from "@/model/shared/random/rng"
 
 function isPostStellar(spectralClass: string): boolean {
-	return spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
+	return (
+		spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
+	)
 }
 
 describe("Non-Primary Star Determination table", () => {
@@ -19,10 +21,12 @@ describe("Non-Primary Star Determination table", () => {
 		expect(sawStandaloneY).toBe(true)
 	})
 
-
 	it("rolls thousands of full galaxy star trees without crashing or producing NaN/undefined fields", () => {
 		for (let seed = 1; seed <= 3000; seed++) {
-			const stars = GALAXY_SYSTEMS.previewStars({ galaxySeed: seed, systemIndex: 0 })
+			const stars = GALAXY_SYSTEMS.previewStars({
+				galaxySeed: seed,
+				systemIndex: 0,
+			})
 			expect(stars.length).toBeGreaterThan(0)
 			for (const star of stars) {
 				expect(star.spectralClass).toBeTruthy()
@@ -56,7 +60,12 @@ describe("Non-Primary Star Determination table", () => {
 			}
 			// Directly exercise the internal roll via the public API: force the
 			// table roll to hit Sibling by trying seeds and checking the result.
-			const rolled = STAR.rollStarAttributes(rng, parent, undefined, "secondary")
+			const rolled = STAR.rollStarAttributes(
+				rng,
+				parent,
+				undefined,
+				"secondary",
+			)
 			if (
 				rolled.spectralClass === "K" &&
 				rolled.luminosityClass === "V" &&
@@ -78,7 +87,12 @@ describe("Non-Primary Star Determination table", () => {
 				massSol: 0.05,
 				ageGyr: 3,
 			}
-			const rolled = STAR.rollStarAttributes(rng, parent, undefined, "companion")
+			const rolled = STAR.rollStarAttributes(
+				rng,
+				parent,
+				undefined,
+				"companion",
+			)
 			expect(["L", "T", "Y"]).toContain(rolled.spectralClass)
 			expect(rolled.luminosityClass).toBe("V")
 			expect(Number.isFinite(rolled.subtype)).toBe(true)
@@ -96,7 +110,12 @@ describe("Non-Primary Star Determination table", () => {
 				massSol: 1.3,
 				ageGyr: 2,
 			}
-			const rolled = STAR.rollStarAttributes(rng, parent, undefined, "companion")
+			const rolled = STAR.rollStarAttributes(
+				rng,
+				parent,
+				undefined,
+				"companion",
+			)
 			if (
 				rolled.spectralClass === "F" &&
 				rolled.subtype === 3 &&
@@ -111,7 +130,10 @@ describe("Non-Primary Star Determination table", () => {
 	it("a post-stellar companion can bump the whole system's age above the primary's own roll", () => {
 		let sawReset = false
 		for (let seed = 1; seed <= 20000 && !sawReset; seed++) {
-			const stars = GALAXY_SYSTEMS.previewStars({ galaxySeed: seed, systemIndex: 0 })
+			const stars = GALAXY_SYSTEMS.previewStars({
+				galaxySeed: seed,
+				systemIndex: 0,
+			})
 			const root = stars[0]!
 			if (isPostStellar(root.spectralClass)) continue
 			const exoticCompanion = stars

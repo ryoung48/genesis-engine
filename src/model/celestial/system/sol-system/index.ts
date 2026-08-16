@@ -230,10 +230,35 @@ const LUNA_SEED = EARTH_SEED.moons?.[0]
 if (!LUNA_SEED)
 	throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
 
+const SOL_BODIES_BY_SEED_NAME = new Map(
+	SOL_DATA.solPlanetSeeds.map((seed, i) => [
+		seed.name,
+		seed.isMainWorld ? -1 : i,
+	]),
+)
+
 const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_DATA.solPlanetSeeds
-	.map((seed, i) =>
-		buildPlanet({ seed, seedTag: i + 1, idx: seed.isMainWorld ? -1 : i }),
-	)
+	.map((seed, i) => {
+		const body = buildPlanet({
+			seed,
+			seedTag: i + 1,
+			idx: seed.isMainWorld ? -1 : i,
+		})
+		// Resolves Ceres/Pallas's parentBeltName into the built Asteroid Belt
+		// body's own idx -- see SystemBody.beltOfIdx's doc. Not a moon: this is
+		// a real planet-class body sharing the belt's ring, not the belt's
+		// `moons` array.
+		if (seed.parentBeltName) {
+			const beltIdx = SOL_BODIES_BY_SEED_NAME.get(seed.parentBeltName)
+			if (beltIdx === undefined) {
+				throw new Error(
+					`SolPlanetSeed "${seed.name}" references unknown parentBeltName "${seed.parentBeltName}"`,
+				)
+			}
+			body.beltOfIdx = beltIdx
+		}
+		return body
+	})
 	.sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 
 const solSystemBodies: SystemBody[] = PLANET.applySystemSeismology({

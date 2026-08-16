@@ -33,8 +33,12 @@ import type { SharedRng } from "@/model/shared/random/rng"
 import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 
-function isPostStellarClass(spectralClass: StarPreview["spectralClass"]): boolean {
-	return spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
+function isPostStellarClass(
+	spectralClass: StarPreview["spectralClass"],
+): boolean {
+	return (
+		spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
+	)
 }
 
 function toParentStarLike(star: StarPreview): ParentStarLike {
@@ -252,7 +256,10 @@ function rollStarTree(rng: SharedRng): StarPreview[] {
 	if (!isPostStellarClass(root.spectralClass)) {
 		let systemAgeGyr = root.ageGyr
 		for (const star of stars) {
-			if (isPostStellarClass(star.spectralClass) && star.ageGyr > systemAgeGyr) {
+			if (
+				isPostStellarClass(star.spectralClass) &&
+				star.ageGyr > systemAgeGyr
+			) {
 				systemAgeGyr = star.ageGyr
 			}
 		}

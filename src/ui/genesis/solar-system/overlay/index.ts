@@ -1,5 +1,6 @@
 export {
-	BELT_WIDTH,
+	BELT_WIDTH_MIN,
+	BELT_WIDTH_RATIO,
 	TWO_PI,
 } from "@/ui/genesis/solar-system/overlay/constants"
 export { buildSolarSystemOverlay } from "@/ui/genesis/solar-system/overlay/overlay"

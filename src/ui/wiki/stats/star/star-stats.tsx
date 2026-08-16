@@ -71,8 +71,8 @@ export function buildStarStats(params: {
 		: isDwarfWithoutLuminosityClass
 			? `${starClass}${Math.round(starSubtype)}`
 			: hasSubtype
-			? `${starClass}${Math.round(starSubtype)} ${luminosityClass}`
-			: `${starClass} ${luminosityClass}`
+				? `${starClass}${Math.round(starSubtype)} ${luminosityClass}`
+				: `${starClass} ${luminosityClass}`
 	const starTempK = Math.round(
 		hostStar?.temperatureK ?? STAR.getStarTemperatureK(tableInput),
 	)

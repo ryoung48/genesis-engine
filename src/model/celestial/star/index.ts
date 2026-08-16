@@ -424,7 +424,11 @@ export function getNeutronStarColor(
 function rollUnconstrainedStarType(
 	rng: SharedRng,
 	homeworld: boolean,
-): { spectralClass: MainSequenceClass; luminosityClass: LuminosityClass; subtype: number } {
+): {
+	spectralClass: MainSequenceClass
+	luminosityClass: LuminosityClass
+	subtype: number
+} {
 	let spectralRoll = DICE.rollDice({ rng, count: 2, sides: 6 })
 	let luminosityClass: LuminosityClass = "V"
 	let spectralClass: MainSequenceClass = "G"
@@ -525,20 +529,57 @@ const NON_PRIMARY_TABLE: Record<
 > = {
 	// rows: 2-, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12+
 	secondary: [
-		"other", "other", "random", "random", "random", "lesser", "lesser",
-		"sibling", "sibling", "twin", "twin",
+		"other",
+		"other",
+		"random",
+		"random",
+		"random",
+		"lesser",
+		"lesser",
+		"sibling",
+		"sibling",
+		"twin",
+		"twin",
 	],
 	companion: [
-		"other", "other", "random", "random", "lesser", "lesser", "sibling",
-		"sibling", "twin", "twin", "twin",
+		"other",
+		"other",
+		"random",
+		"random",
+		"lesser",
+		"lesser",
+		"sibling",
+		"sibling",
+		"twin",
+		"twin",
+		"twin",
 	],
 	"post-stellar": [
-		"other", "other", "random", "random", "random", "random", "random",
-		"lesser", "lesser", "twin", "twin",
+		"other",
+		"other",
+		"random",
+		"random",
+		"random",
+		"random",
+		"random",
+		"lesser",
+		"lesser",
+		"twin",
+		"twin",
 	],
 }
 const NON_PRIMARY_OTHER_COLUMN: readonly ("D*" | "D" | "BD")[] = [
-	"D*", "D", "D", "D", "D", "D", "BD", "BD", "BD", "BD", "BD",
+	"D*",
+	"D",
+	"D",
+	"D",
+	"D",
+	"D",
+	"BD",
+	"BD",
+	"BD",
+	"BD",
+	"BD",
 ]
 
 function nonPrimaryRowIndex(roll: number): number {
@@ -587,7 +628,10 @@ interface ResolvedCompanionType {
  * instead. Class IV (subgiant) lesser results that would be too cool for
  * Class IV fall back to an ordinary Class V lesser. Post-stellar chain:
  * BH -> NS -> WD -> BD. */
-function applyLesser(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionType {
+function applyLesser(
+	rng: SharedRng,
+	parent: ParentStarLike,
+): ResolvedCompanionType {
 	if (parent.spectralClass === "BH") {
 		return {
 			spectralClass: "NS",
@@ -596,7 +640,11 @@ function applyLesser(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionT
 		}
 	}
 	if (parent.spectralClass === "NS") {
-		return { spectralClass: "D", luminosityClass: "V", subtype: rng.randint(0, 9) }
+		return {
+			spectralClass: "D",
+			luminosityClass: "V",
+			subtype: rng.randint(0, 9),
+		}
 	}
 	if (parent.spectralClass === "D") {
 		return {
@@ -611,7 +659,11 @@ function applyLesser(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionT
 	const coolerIndex = Math.min(parentIndex + 1, mainSequenceClasses.length - 1)
 	const spectralClass = mainSequenceClasses[coolerIndex]!
 	const subtype = rng.randint(0, 9)
-	if (spectralClass === "M" && parent.spectralClass === "M" && subtype < parent.subtype) {
+	if (
+		spectralClass === "M" &&
+		parent.spectralClass === "M" &&
+		subtype < parent.subtype
+	) {
 		return {
 			spectralClass: rng.choice(["L", "T"] as const),
 			luminosityClass: "V",
@@ -619,7 +671,8 @@ function applyLesser(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionT
 		}
 	}
 	// Class IV lesser too cool for IV -> ordinary Class V lesser instead.
-	const luminosityClass = parent.luminosityClass === "IV" ? "V" : parent.luminosityClass
+	const luminosityClass =
+		parent.luminosityClass === "IV" ? "V" : parent.luminosityClass
 	return { spectralClass, luminosityClass, subtype }
 }
 
@@ -629,7 +682,10 @@ function applyLesser(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionT
  * despite the surrounding prose describing this as a subtraction). Post-
  * stellar sibling: same class, mass reduced by 1D x 10% of the parent's
  * mass, floored at POST_STELLAR_MIN_MASS_SOL. */
-function applySibling(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionType {
+function applySibling(
+	rng: SharedRng,
+	parent: ParentStarLike,
+): ResolvedCompanionType {
 	if (isPostStellar(parent.spectralClass)) {
 		const reduction = DICE.rollDice({ rng, count: 1, sides: 6 }) * 0.1
 		const massSolOverride = Math.max(
@@ -659,7 +715,9 @@ function applySibling(rng: SharedRng, parent: ParentStarLike): ResolvedCompanion
 		}
 	}
 	let subtype = parent.subtype + DICE.rollDice({ rng, count: 1, sides: 6 })
-	let classIndex = mainSequenceClasses.indexOf(parent.spectralClass as MainSequenceClass)
+	let classIndex = mainSequenceClasses.indexOf(
+		parent.spectralClass as MainSequenceClass,
+	)
 	if (subtype > 9) {
 		subtype -= 10
 		classIndex = Math.min(classIndex + 1, mainSequenceClasses.length - 1)
@@ -675,8 +733,12 @@ function applySibling(rng: SharedRng, parent: ParentStarLike): ResolvedCompanion
  * jitter on mass/diameter ("Optional subtract 1D-1% from the mass and
  * diameter of the new star to allow for some variation" -- 1D rolled here
  * as a 0-5% reduction). */
-function applyTwin(rng: SharedRng, parent: ParentStarLike): ResolvedCompanionType {
-	const jitterFactor = 1 - (DICE.rollDice({ rng, count: 1, sides: 6 }) - 1) * 0.01
+function applyTwin(
+	rng: SharedRng,
+	parent: ParentStarLike,
+): ResolvedCompanionType {
+	const jitterFactor =
+		1 - (DICE.rollDice({ rng, count: 1, sides: 6 }) - 1) * 0.01
 	const base = {
 		spectralClass: parent.spectralClass,
 		luminosityClass: parent.luminosityClass,
@@ -698,7 +760,8 @@ function resolveCompanionType(
 	const postStellarParent = isPostStellar(parent.spectralClass)
 	// Class III/IV primary (here: the immediate parent, treated as "primary"
 	// for typing purposes per the book) applies DM-1 to every column.
-	const dm = parent.luminosityClass === "III" || parent.luminosityClass === "IV" ? -1 : 0
+	const dm =
+		parent.luminosityClass === "III" || parent.luminosityClass === "IV" ? -1 : 0
 	const method: NonPrimaryStarMethod = isBrownDwarf(parent.spectralClass)
 		? "sibling"
 		: rollNonPrimaryMethod(rng, postStellarParent ? "post-stellar" : column, dm)
@@ -712,7 +775,11 @@ function resolveCompanionType(
 			}
 		}
 		if (method.exotic === "D") {
-			return { spectralClass: "D", luminosityClass: "V", subtype: rng.randint(0, 9) }
+			return {
+				spectralClass: "D",
+				luminosityClass: "V",
+				subtype: rng.randint(0, 9),
+			}
 		}
 		return {
 			spectralClass: rng.choice(["L", "T", "Y"] as const),
@@ -752,7 +819,10 @@ function resolveCompanionType(
  * the existing flat uniform(13, 14) ceiling below, so that specific
  * contradiction (a companion implying a system older than its own primary
  * could ever have lived) is accepted rather than resolved. */
-function rollPostStellarCompanionAgeGyr(rng: SharedRng, massSol: number): number {
+function rollPostStellarCompanionAgeGyr(
+	rng: SharedRng,
+	massSol: number,
+): number {
 	const progenitorLifespanGyr = 10 / Math.max(massSol, 0.01) ** 2.5
 	let ageGyr = progenitorLifespanGyr * rng.uniform(0.1, 0.9)
 	ageGyr +=

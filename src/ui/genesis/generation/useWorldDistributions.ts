@@ -7,6 +7,7 @@ import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import { RELIGION } from "@/model/society/religion"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
+import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
 import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-details-model"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
@@ -109,30 +110,6 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 
 	const governmentDistribution = useMemo(() => {
 		if (earthGovernmentDistribution) return earthGovernmentDistribution
-		// Indexed by government type (aligns with GOVERNMENT_TYPES / region-colors).
-		const GOV_COLORS = [
-			"rgb(204, 143, 71)", // 0 chiefdom
-			"rgb(140, 89, 36)", // 1 tribal monarchy
-			"rgb(237, 194, 128)", // 2 tribal federation
-			"rgb(112, 61, 28)", // 3 native council
-			"rgb(107, 138, 184)", // 4 feudal monarchy
-			"rgb(140, 199, 242)", // 5 elective monarchy
-			"rgb(15, 41, 112)", // 6 absolute monarchy
-			"rgb(33, 102, 217)", // 7 constitutional monarchy
-			"rgb(26, 143, 117)", // 8 merchant republic
-			"rgb(28, 92, 46)", // 9 noble republic
-			"rgb(163, 204, 61)", // 10 city-state confederation
-			"rgb(61, 163, 87)", // 11 presidential republic
-			"rgb(122, 214, 117)", // 12 parliamentary republic
-			"rgb(133, 61, 179)", // 13 theocracy
-			"rgb(71, 28, 117)", // 14 monastic state
-			"rgb(194, 143, 230)", // 15 prince-bishopric
-			"rgb(209, 46, 148)", // 16 imperial cult
-			"rgb(189, 36, 36)", // 17 socialist state
-			"rgb(112, 117, 61)", // 18 military junta
-			"rgb(230, 84, 61)", // 19 trading company
-			"rgb(245, 140, 128)", // 20 settler colony
-		]
 		const counts = new Array(ERAS.governmentTypes.length).fill(0)
 		const govType = worldForDisplay?.nations?.governmentType
 		if (govType && nationModel) {
@@ -144,7 +121,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		return ERAS.governmentTypes.map((key, i) => ({
 			label: ERAS.governmentTypeLabels[key],
 			count: counts[i] ?? 0,
-			color: GOV_COLORS[i] ?? "rgb(148, 163, 184)",
+			color: GOVERNMENT_COLORS_CSS[i] ?? "rgb(148, 163, 184)",
 		}))
 	}, [
 		earthGovernmentDistribution,

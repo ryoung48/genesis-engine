@@ -78,7 +78,10 @@ interface GalaxySystemSearchStar {
 type StarYouthFilter = "all" | "proto" | "primordial"
 type StarCountFilter = "all" | "1" | "2" | "3" | "4+"
 
-function matchesStarCountFilter(count: number, filter: StarCountFilter): boolean {
+function matchesStarCountFilter(
+	count: number,
+	filter: StarCountFilter,
+): boolean {
 	if (filter === "all") return true
 	if (filter === "4+") return count > 3
 	return count === Number(filter)
@@ -89,6 +92,7 @@ const SPECIAL_CIRCUMSTANCE_OPTIONS: SpecialCircumstance[] = [
 	"Minor Rings",
 	"Major Rings",
 	"Twin Moon",
+	"Asteroid Body",
 ]
 
 interface GalaxyBodyClassificationTemperaturePair {

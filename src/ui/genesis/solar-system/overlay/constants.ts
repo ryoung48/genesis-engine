@@ -17,7 +17,20 @@ export const MIN_MOON_VISUAL_RADIUS = 0.004
 // beyond any reasonable camera distance depending on spectral class.
 export const ORBIT_GAP_STAR_RADII = 1.5
 export const BELT_SCENE_RADIUS = 0.05
-export const BELT_WIDTH = 0.12
+// Real main-belt asteroids span roughly 2.1-3.3 AU around a ~2.77 AU center
+// -- an inner-to-outer radial spread of about 0.44x its own orbit radius, far
+// wider than a thin fixed-width ring. beltHalfWidth (overlay.ts) derives each
+// belt's actual half-width from this ratio against its own orbitRadius, with
+// BELT_WIDTH_MIN as a floor so a belt packed in close to its star doesn't
+// collapse to an invisible sliver.
+export const BELT_WIDTH_RATIO = 0.44
+export const BELT_WIDTH_MIN = 0.12
+// Real main-belt inclinations mostly fall within ~20deg of the ecliptic, so
+// the belt's vertical (out-of-plane) thickness is real but much shallower
+// than its radial spread -- this ratio is applied against beltHalfWidth
+// rather than getting its own fixed jitter constant, so a wide belt also
+// reads as a proportionally thicker toroidal swarm instead of a flat disc.
+export const BELT_VERTICAL_RATIO = 0.35
 // Fallbacks only for a body whose classification isn't in
 // CLASSIFICATION_COLOR below (shouldn't happen in practice, since every
 // classification is mapped) -- MAIN_WORLD_COLOR for the main world,
