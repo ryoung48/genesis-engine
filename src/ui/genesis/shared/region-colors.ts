@@ -362,6 +362,15 @@ export function computeRegionColors(
 		return rgb
 	}
 
+	// Prefer the cache populated once during generation (real_cloud_cover_monthly
+	// mirrors this same observed-preferred-else-modeled fallback order;
+	// cloud_cover_monthly is the pure-modeled fallback for a procedural world
+	// with no observed data) over recomputing CLOUD_COVER.estimate for every
+	// cell/month on every render -- see real-earth-data's
+	// attachCachedCloudCoverEstimate and the cloud-cover temperature modifier.
+	const cachedCloudCoverMonthly =
+		world.climate?.real_cloud_cover_monthly ??
+		world.climate?.cloud_cover_monthly
 	const cloudAetMonthly =
 		world.observedHydrology?.aet_monthly ?? world.hydrology?.aet_monthly
 	const cloudPetMonthly =
@@ -374,11 +383,12 @@ export function computeRegionColors(
 		world.climate?.temperature_monthly
 	if (
 		colorMode === "cloudCover" &&
-		cloudAetMonthly &&
-		cloudPetMonthly &&
-		cloudRainfallMonthly &&
-		cloudDtrMonthly &&
-		cloudTemperatureMonthly
+		(cachedCloudCoverMonthly ||
+			(cloudAetMonthly &&
+				cloudPetMonthly &&
+				cloudRainfallMonthly &&
+				cloudDtrMonthly &&
+				cloudTemperatureMonthly))
 	) {
 		const monthlyOffset = rainfallMonth > 0 ? (rainfallMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
@@ -390,26 +400,35 @@ export function computeRegionColors(
 				continue
 			}
 			let cloudFraction = 0
-			if (rainfallMonth === 0) {
+			if (cachedCloudCoverMonthly) {
+				if (rainfallMonth === 0) {
+					for (let month = 0; month < 12; month++) {
+						cloudFraction += cachedCloudCoverMonthly[month * N + r]
+					}
+					cloudFraction /= 12
+				} else {
+					cloudFraction = cachedCloudCoverMonthly[monthlyOffset + r]
+				}
+			} else if (rainfallMonth === 0) {
 				for (let month = 0; month < 12; month++) {
 					const idx = month * N + r
 					cloudFraction += CLOUD_COVER.estimate({
-						aetMm: cloudAetMonthly[idx],
-						petMm: cloudPetMonthly[idx],
-						rainfallMm: cloudRainfallMonthly[idx],
-						dtrC: cloudDtrMonthly[idx],
-						temperatureC: cloudTemperatureMonthly[idx],
+						aetMm: cloudAetMonthly![idx],
+						petMm: cloudPetMonthly![idx],
+						rainfallMm: cloudRainfallMonthly![idx],
+						dtrC: cloudDtrMonthly![idx],
+						temperatureC: cloudTemperatureMonthly![idx],
 						oceanDistanceKm: world.oceanDist[r],
 					})
 				}
 				cloudFraction /= 12
 			} else {
 				cloudFraction = CLOUD_COVER.estimate({
-					aetMm: cloudAetMonthly[monthlyOffset + r],
-					petMm: cloudPetMonthly[monthlyOffset + r],
-					rainfallMm: cloudRainfallMonthly[monthlyOffset + r],
-					dtrC: cloudDtrMonthly[monthlyOffset + r],
-					temperatureC: cloudTemperatureMonthly[monthlyOffset + r],
+					aetMm: cloudAetMonthly![monthlyOffset + r],
+					petMm: cloudPetMonthly![monthlyOffset + r],
+					rainfallMm: cloudRainfallMonthly![monthlyOffset + r],
+					dtrC: cloudDtrMonthly![monthlyOffset + r],
+					temperatureC: cloudTemperatureMonthly![monthlyOffset + r],
 					oceanDistanceKm: world.oceanDist[r],
 				})
 			}

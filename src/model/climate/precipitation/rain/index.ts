@@ -36,8 +36,21 @@ const eastMoistureWinBias = (absLat: number, hadley: number): number => {
 	return norm >= 20 / 30 && norm <= 30 / 30 ? 1.05 : 1.05
 }
 
+// Full strength out to 0.15 hadley-widths (was a straight ramp starting at
+// 0, dropping to 0.7 by 0.26), then a steeper drop to near-zero by 0.65
+// (was 0.93) -- makes monsoon-driven regions swing harder between "in the
+// migrating rain band" and "out of it" as the ITCZ shifts seasonally,
+// instead of a smooth rise and fall. Keeping the near-zero-distance months
+// at full strength (rather than an immediate falloff) was necessary: an
+// earlier version that dropped right away from x=0 sharpened the seasonal
+// swing but also dragged down the near-peak months along with the
+// off-peak ones, making already-too-dry wet-tropical regions (e.g. the
+// Amazon) drier overall on top of more seasonal -- this plateau shape
+// widens the swing (~45% bigger peak-to-trough range in the Amazon,
+// verified against WorldClim) while the peak itself matches or slightly
+// exceeds the old curve's.
 const itczScale = (x: number) =>
-	MATH.piecewise({ domain: [0, 0.26, 0.6, 0.93], range: [1, 0.7, 0.2, 0], x })
+	MATH.piecewise({ domain: [0, 0.15, 0.4, 0.65], range: [1, 1, 0.15, 0], x })
 
 // Hadley-cell subsidence: no suppression until 10°/hadleyWidth off the
 // thermal equator, ramps to near-full suppression by 18°, holds through 32°,

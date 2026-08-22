@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
-import type { GalaxyParams } from "@/model/celestial/galaxy/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
@@ -22,7 +21,7 @@ import {
 	OverlayControls,
 } from "@/ui/genesis/controls/OverlayControls"
 import { SimulationControls } from "@/ui/genesis/controls/SimulationControls"
-import { GalaxyModeView } from "@/ui/genesis/galaxy/view/GalaxyModeView"
+import { PortedGalaxyView } from "@/ui/genesis/galaxy/view/PortedGalaxyView"
 import {
 	DEFAULT_WORLD_PARAMS,
 	VIEW_PREFS_STORAGE_KEY,
@@ -252,16 +251,16 @@ export const GenesisView: React.FC<{
 		sessionNamespace,
 	})
 	const [worldTab, setWorldTab] = useState<"planet" | "society">("planet")
-	// Full-screen galaxy-scale overlay -- see GalaxyModeView's own doc.
+	// Full-screen galaxy-scale overlay -- see PortedGalaxyView's own doc.
 	// Entered via the primary star's "view galaxy" dice icon or the solar-
 	// system view's "back to galaxy" control, exited by opening a system or
 	// the galaxy panel's "view Sol system" Earth icon.
 	const [galaxyModeActive, setGalaxyModeActive] = useState(
 		initialGalaxyModeActive,
 	)
-	// Once GalaxyModeView has been mounted, keep it mounted (just hidden) for
-	// the rest of this GenesisView's lifetime instead of unmounting it -- it
-	// owns its own generated galaxy/scene/worker as local state, and
+	// Once PortedGalaxyView has been mounted, keep it mounted (just hidden)
+	// for the rest of this GenesisView's lifetime instead of unmounting it --
+	// it owns its own generated galaxy/scene/worker as local state, and
 	// unmounting would destroy all of that, forcing a full regeneration the
 	// next time galaxy mode is re-entered.
 	const [galaxyModeEverActive, setGalaxyModeEverActive] = useState(
@@ -523,7 +522,6 @@ export const GenesisView: React.FC<{
 		effectiveDaysPerYear,
 		mainWorldMode,
 		galaxyOrigin,
-		setGalaxyOrigin,
 		glacialErosion,
 		hoursPerDay,
 		hydraulicErosion,
@@ -1828,19 +1826,20 @@ export const GenesisView: React.FC<{
 
 	// Shown on the primary star's subtitle row (dice icon) and the solar-
 	// system view's "back to galaxy" control -- both just enter galaxy mode;
-	// GalaxyModeView itself decides whether to resume the last-viewed layout
-	// (galaxyOrigin set) or start a fresh default galaxy (galaxyOrigin null).
+	// PortedGalaxyView owns its own seed/systemCount/radius state internally
+	// (reset fresh on every mount, no session-persistence tie-in) and starts
+	// its own worker-driven galaxy generation as soon as it mounts.
 	const handleOpenGalaxy = useCallback(() => {
 		setSolarSystemViewActive(false)
 		setGalaxyModeActive(true)
 	}, [setSolarSystemViewActive])
 
-	// Double-clicking a system in galaxy mode hands it straight to this same
-	// component (no more session-snapshot + route navigation round trip --
-	// see plans/galaxy-view-port.md) -- load it into the solar-system state
-	// directly and switch back to the normal view.
+	// Double-clicking a system in the ported density-wave galaxy view (see
+	// PortedGalaxyView) hands its generated GalaxySystem straight to this
+	// same component -- load it into the solar-system state directly and
+	// switch back to the normal view.
 	const handleOpenGalaxySystem = useCallback(
-		(system: GalaxySystem, galaxyParams: GalaxyParams) => {
+		(system: GalaxySystem) => {
 			const [primary, ...companions] = system.stars
 			if (!primary) return
 			// Sorted by orbitalDistanceAU so this array's order matches exactly
@@ -1875,7 +1874,6 @@ export const GenesisView: React.FC<{
 				})),
 			})
 			setMainWorldMode("procedural")
-			setGalaxyOrigin({ galaxyParams, systemIndex: system.systemIndex })
 			setSolarSystemViewActive(true)
 			setGalaxyModeActive(false)
 			// Zoom/focus the primary star on both the 3D view and the wiki
@@ -1887,7 +1885,6 @@ export const GenesisView: React.FC<{
 		[
 			setSolarSystem,
 			setMainWorldMode,
-			setGalaxyOrigin,
 			setSolarSystemViewActive,
 			handleFocusBody,
 		],
@@ -2371,10 +2368,7 @@ export const GenesisView: React.FC<{
 						galaxyModeActive ? "" : "invisible pointer-events-none"
 					}`}
 				>
-					<GalaxyModeView
-						initialGalaxyOrigin={galaxyOrigin}
-						onOpenSystem={handleOpenGalaxySystem}
-					/>
+					<PortedGalaxyView onOpenSystem={handleOpenGalaxySystem} />
 				</div>
 			)}
 		</div>

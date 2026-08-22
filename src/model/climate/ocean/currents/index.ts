@@ -21,13 +21,36 @@ const CURRENT_EFFECT_MONTHS = 12
 const SST_ANOMALY_SATURATION_C = 4
 
 // Separate saturation constant for the modeled bandC table below: bandC's
-// own peak values (up to 6, e.g. west-facing 70°) intentionally exceed real
-// SST-anomaly magnitudes, so reusing SST_ANOMALY_SATURATION_C here would
-// clamp the strongest bands to ±1 in every month of the year -- a value
-// permanently pinned at its ceiling has zero headroom left for the ITCZ's
-// monthly drift to move it, which flattens out the very seasonal signal
-// that drift is supposed to provide. This is sized against bandC's own max.
-const MODELED_SST_SATURATION_C = 6
+// own peak values intentionally exceed real SST-anomaly magnitudes, so
+// reusing SST_ANOMALY_SATURATION_C here would clamp the strongest bands to
+// ±1 in every month of the year -- a value permanently pinned at its ceiling
+// has zero headroom left for the ITCZ's monthly drift to move it, which
+// flattens out the very seasonal signal that drift is supposed to provide.
+// Sized against bandC's own max (see CURRENT_STRENGTH_SCALE below).
+const MODELED_SST_SATURATION_C = 9
+
+// bandC's raw table values (below) were originally fit small enough that,
+// even combined with LAND_CURRENT_EFFECT_SCALE at its own ceiling, coastal
+// regions whose real climate is dominated by a strong western-boundary
+// current (e.g. Scotland/Norway under the North Atlantic Current's real
+// influence) came out with an ANNUAL-MEAN cold bias of several degrees --
+// verified directly against WorldClim (Norway ~4.8C short, Scotland ~4.9C
+// short). This scales the whole table up to close most of that gap.
+// Deliberately NOT scaled all the way to fully closing it (a ~2.2x scale
+// closed the annual mean almost exactly but pushed summer months into a
+// 2-3C overshoot and cost ~6.5% on the global land RMSE vs WorldClim,
+// since the real current's warming effect is winter-weighted -- ocean
+// thermal inertia matters most when land would otherwise radiate away heat
+// fast in low-sun winter, not in summer when direct insolation already
+// dominates -- and this uniform per-month scale can't reproduce that
+// asymmetry, only shift the whole seasonal curve up equally). 1.5x was
+// chosen as the point past which further scale bought rapidly diminishing
+// annual-mean improvement at rapidly increasing summer-overshoot cost; a
+// winter-weighted seasonal profile (rather than a flat scale) would be the
+// real fix if this needs to close further -- see
+// earth-real-temperature-compare.smoke.test.ts for the global regression
+// check (RMSE 4.49 -> 4.56, ~1.6%, at this value).
+const CURRENT_STRENGTH_SCALE = 1.5
 
 // West-facing coast SST anomaly by distance from the (monthly) ITCZ, °C --
 // cold eastern-boundary upwelling close to the ITCZ (Peru/Benguela/
@@ -36,20 +59,26 @@ const MODELED_SST_SATURATION_C = 6
 // just a separate wobble on top of it -- migrates with the ITCZ's monthly
 // drift; that drift is the sole source of seasonality, there's no separate
 // per-month table or scaling term.
+const WEST_BAND_C_TABLE = [-0.5, -1, -5, -2.5, 1, 4, 5, 6, 2, 0].map(
+	(v) => v * CURRENT_STRENGTH_SCALE,
+)
 const westBandC = (dist: number) =>
 	MATH.piecewise({
 		domain: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
-		range: [-0.5, -1, -5, -2.5, 1, 4, 5, 6, 2, 0],
+		range: WEST_BAND_C_TABLE,
 		x: dist,
 	})
 
 // East-facing coast SST anomaly by distance from the (monthly) ITCZ, °C --
 // warm western-boundary currents (Gulf Stream/Kuroshio/Agulhas) close to the
 // ITCZ, cooling into the subpolar gyres further away.
+const EAST_BAND_C_TABLE = [0.2, 1, 2, 3, -2, -5, -3, -1.5, 0, 0].map(
+	(v) => v * CURRENT_STRENGTH_SCALE,
+)
 const eastBandC = (dist: number) =>
 	MATH.piecewise({
 		domain: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
-		range: [0.2, 1, 2, 3, -2, -5, -3, -1.5, 0, 0],
+		range: EAST_BAND_C_TABLE,
 		x: dist,
 	})
 
@@ -284,10 +313,14 @@ function computeSST({
 }
 
 // Land cells only get the cosmetic coastal bleed of the nearest ocean sst,
-// not the current's full open-water strength, so their applied delta is
-// scaled down -- coastal moderation reaches inland, but weaker than what
-// the water itself experiences.
-const LAND_CURRENT_EFFECT_SCALE = 0.68
+// not a separately-modeled inland transport -- was 0.68 (bleed weaker than
+// the water's own effect), raised to 1 (full bleed-through, matched to open
+// water) as part of closing the UK/Norway-style annual-mean cold bias (see
+// CURRENT_STRENGTH_SCALE) -- 1 is the physically-defensible ceiling for this
+// constant (land literally receiving MORE than the adjacent water's own
+// current strength would have no physical basis), so the remaining gap after
+// maxing this out came from CURRENT_STRENGTH_SCALE instead.
+const LAND_CURRENT_EFFECT_SCALE = 1
 
 /** Applies a previously computed SST field to climate.temperature_avg/min/
  * max/monthly. Kept as a separate step from computeSST (rather than folded

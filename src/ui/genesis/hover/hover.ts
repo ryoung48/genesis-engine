@@ -259,43 +259,59 @@ export function getHoverModeledCloudCover({
 	world,
 	rainfallMonth,
 }: GetHoverModeledCloudCoverParams): HoverRainfallSeries | null {
-	const aetMonthly =
-		world?.observedHydrology?.aet_monthly ?? world?.hydrology?.aet_monthly
-	const petMonthly =
-		world?.observedHydrology?.pet_monthly ?? world?.climate?.pet_monthly
-	const rainfallMonthly =
-		world?.rainfall?.real_monthly ?? world?.rainfall?.monthly
-	const dtrMonthly = world?.observedDtr?.real_monthly ?? world?.dtr_monthly
-	const temperatureMonthly =
-		world?.climate?.real_temperature_monthly ??
-		world?.climate?.temperature_monthly
-	if (
-		!(
-			hoverInfo &&
-			world?.isLand?.[hoverInfo.region] &&
-			aetMonthly &&
-			petMonthly &&
-			rainfallMonthly &&
-			dtrMonthly &&
-			temperatureMonthly
-		)
-	)
-		return null
+	if (!(hoverInfo && world?.isLand?.[hoverInfo.region])) return null
 	const r = hoverInfo.region
 	const N = world.mesh.numRegions
-	const monthly: number[] = []
-	for (let m = 0; m < 12; m++) {
-		const idx = m * N + r
-		monthly.push(
-			CLOUD_COVER.estimate({
-				aetMm: aetMonthly[idx],
-				petMm: petMonthly[idx],
-				rainfallMm: rainfallMonthly[idx],
-				dtrC: dtrMonthly[idx],
-				temperatureC: temperatureMonthly[idx],
-				oceanDistanceKm: world.oceanDist[r],
-			}),
+
+	// Prefer the cached estimate (climate.real_cloud_cover_monthly mirrors
+	// this function's own observed-preferred-else-modeled fallback order;
+	// climate.cloud_cover_monthly is the pure-modeled fallback for a
+	// procedural world with no observed data at all) over recomputing
+	// CLOUD_COVER.estimate here -- see real-earth-data's
+	// attachCachedCloudCoverEstimate and the cloud-cover temperature
+	// modifier, which populate these once during generation.
+	const cached =
+		world.climate?.real_cloud_cover_monthly ??
+		world.climate?.cloud_cover_monthly
+	let monthly: number[]
+	if (cached) {
+		monthly = []
+		for (let m = 0; m < 12; m++) monthly.push(cached[m * N + r])
+	} else {
+		const aetMonthly =
+			world?.observedHydrology?.aet_monthly ?? world?.hydrology?.aet_monthly
+		const petMonthly =
+			world?.observedHydrology?.pet_monthly ?? world?.climate?.pet_monthly
+		const rainfallMonthly =
+			world?.rainfall?.real_monthly ?? world?.rainfall?.monthly
+		const dtrMonthly = world?.observedDtr?.real_monthly ?? world?.dtr_monthly
+		const temperatureMonthly =
+			world?.climate?.real_temperature_monthly ??
+			world?.climate?.temperature_monthly
+		if (
+			!(
+				aetMonthly &&
+				petMonthly &&
+				rainfallMonthly &&
+				dtrMonthly &&
+				temperatureMonthly
+			)
 		)
+			return null
+		monthly = []
+		for (let m = 0; m < 12; m++) {
+			const idx = m * N + r
+			monthly.push(
+				CLOUD_COVER.estimate({
+					aetMm: aetMonthly[idx],
+					petMm: petMonthly[idx],
+					rainfallMm: rainfallMonthly[idx],
+					dtrC: dtrMonthly[idx],
+					temperatureC: temperatureMonthly[idx],
+					oceanDistanceKm: world.oceanDist[r],
+				}),
+			)
+		}
 	}
 	const annual = monthly.reduce((sum, value) => sum + value, 0) / monthly.length
 	return {

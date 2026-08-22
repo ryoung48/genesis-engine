@@ -9,6 +9,7 @@
 // footprint only needs to shrink enough to compensate, not match 1:1) and
 // clamp so neither extreme collapses to invisible or blows out the view.
 const REFERENCE_SYSTEM_COUNT = 4000
+export const DENSE_GALAXY_SYSTEM_COUNT = 2000
 const MIN_SCALE = 0.35
 const MAX_SCALE = 2.5
 
@@ -16,4 +17,11 @@ export function computeGalaxyDensityScale(numSystems: number): number {
 	if (numSystems <= 0) return MAX_SCALE
 	const raw = Math.sqrt(REFERENCE_SYSTEM_COUNT / numSystems)
 	return Math.min(MAX_SCALE, Math.max(MIN_SCALE, raw))
+}
+
+/** Reduces companion-star spacing only once a galaxy has enough systems for
+ * its map to become visually crowded. */
+export function computeClusterDensityScale(numSystems: number): number {
+	if (numSystems <= 0) return 1
+	return Math.min(1, Math.sqrt(DENSE_GALAXY_SYSTEM_COUNT / numSystems))
 }

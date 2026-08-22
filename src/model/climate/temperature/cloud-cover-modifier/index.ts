@@ -13,7 +13,8 @@ const INTENSITY_CAP_TEMP_C = 20
  * *annual average* temperature (not the individual month's), scaling
  * linearly with distance from 0°C, reaching its cap at |avg temp| >= 25°C
  * and vanishing at avg temp === 0. Uses modeled (procedural) temperature
- * only, never earth-observed.
+ * only, never earth-observed. Also caches the estimated cloud fraction
+ * itself onto climate.cloud_cover_monthly for hover/map reuse.
  */
 function applyCloudCoverTemperatureModifier({
 	climate,
@@ -23,14 +24,17 @@ function applyCloudCoverTemperatureModifier({
 	oceanDist,
 }: CloudCoverTemperatureModifierParams): void {
 	const N = oceanDist.length
+	// Cached here (rather than left for hover/map to recompute on their own)
+	// since this loop already visits every cell/month to estimate cloud
+	// fraction for the temperature effect below -- see GenesisClimate's
+	// cloud_cover_monthly doc.
+	const cloudCoverMonthly = new Float32Array(N * 12)
+	climate.cloud_cover_monthly = cloudCoverMonthly
+
 	for (let r = 0; r < N; r++) {
-		const annualTempC = climate.temperature_avg[r]
-		if (annualTempC === 0) continue
-
-		const intensity = Math.min(1, Math.abs(annualTempC) / INTENSITY_CAP_TEMP_C)
-		if (intensity === 0) continue
-
 		const oceanDistanceKm = oceanDist[r]
+		const annualTempC = climate.temperature_avg[r]
+		const intensity = Math.min(1, Math.abs(annualTempC) / INTENSITY_CAP_TEMP_C)
 		let annualDelta = 0
 		let minDelta = 0
 		let maxDelta = 0
@@ -44,6 +48,9 @@ function applyCloudCoverTemperatureModifier({
 				temperatureC: climate.temperature_monthly[idx],
 				oceanDistanceKm,
 			})
+			cloudCoverMonthly[idx] = cloudFraction
+			if (intensity === 0) continue
+
 			// +1 (max warming) at <=20% cloud cover (clear), -1 (max cooling) at
 			// >=80% cloud cover (overcast), linear ramp between.
 			const clearness = MATH.piecewise({
@@ -64,6 +71,7 @@ function applyCloudCoverTemperatureModifier({
 			if (scaledDelta < minDelta) minDelta = scaledDelta
 			if (scaledDelta > maxDelta) maxDelta = scaledDelta
 		}
+		if (intensity === 0) continue
 		annualDelta /= 12
 		climate.temperature_avg[r] += annualDelta
 		climate.temperature_min[r] += minDelta

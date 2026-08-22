@@ -15,10 +15,57 @@ import { computeGalaxyDensityScale } from "@/ui/genesis/galaxy/renderer/galaxy-s
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 
 const EDGE_COLOR = new THREE.Color(0x333333)
-// Matches galaxy-gen's renderer/geometry/points.ts createGlowTexture/
-// PointsMaterial exactly.
-const GLOW_TEXTURE_SIZE = 32
 const POINT_SIZE_PX = 4
+export const CLUSTER_CENTER_MASK_SIZE_RATIO = 0.5
+const BINARY_CLUSTER_FACTOR = 0.8
+const TRINARY_CLUSTER_FACTOR = 0.65
+const TRINARY_CLUSTER_ANGLE_OFFSET = Math.PI / 2
+
+// Ported from beltoforion/Galaxy-Renderer-Typescript's VertexBufferStars.ts
+// (type==0 "star" branch): gl_PointSize set directly per-vertex in the
+// vertex shader (no sizeAttenuation), and a soft circular dot computed
+// straight in the fragment shader (alpha = 1 - length(circCoord)) rather
+// than sampling a baked glow texture, additively blended (SRC_ALPHA, ONE)
+// the same way their renderer's draw() configures gl.blendFunc.
+const STAR_POINT_VERTEX_SHADER = /* glsl */ `
+	attribute vec3 color;
+	uniform float uSize;
+	varying vec3 vColor;
+
+	void main() {
+		vColor = color;
+		vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+		gl_Position = projectionMatrix * mvPosition;
+		gl_PointSize = uSize;
+	}
+`
+
+const STAR_POINT_FRAGMENT_SHADER = /* glsl */ `
+	varying vec3 vColor;
+
+	void main() {
+		vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
+		float dist = length(circCoord);
+		if (dist >= 1.0) discard;
+		// A plain (1.0 - dist) linear falloff reads fine at the few-pixel
+		// sizes this was originally sized for, but zoomed in (see
+		// PortedGalaxyView.tsx's zoom-based uSize scaling) it blows up into a
+		// flat-sided cone with a harsh visible edge rather than a glow.
+		// Squaring concentrates brightness toward the center and tapers the
+		// rim off more gently, closer to how a point-source glow should look
+		// at any size.
+		float alpha = pow(1.0 - dist, 2.0);
+		gl_FragColor = vec4(vColor, alpha);
+	}
+`
+
+const CLUSTER_CENTER_MASK_FRAGMENT_SHADER = /* glsl */ `
+	void main() {
+		vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
+		if (length(circCoord) >= 1.0) discard;
+		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+	}
+`
 
 const spectralColorCache = new Map<string, THREE.Color>()
 function colorForStar(
@@ -41,36 +88,9 @@ function colorForStar(
 	return color
 }
 
-// Soft radial glow -- bright solid core out to 65% radius, then a
-// power-curve falloff to the edge. Ported from galaxy-gen's
-// renderer/geometry/points.ts createGlowTexture (bumped resolution since
-// this repo's default point size renders larger on screen).
-let glowTexture: THREE.DataTexture | null = null
-function getGlowTexture(): THREE.DataTexture {
-	if (glowTexture) return glowTexture
-	const size = GLOW_TEXTURE_SIZE
-	const data = new Uint8Array(size * size * 4)
-	const r = size / 2
-	for (let y = 0; y < size; y++) {
-		for (let x = 0; x < size; x++) {
-			const dx = x - r + 0.5
-			const dy = y - r + 0.5
-			const t = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / r)
-			const alpha = t > 0.65 ? 255 : Math.round(255 * (t / 0.65) ** 1.8)
-			const i = (y * size + x) * 4
-			data[i] = 255
-			data[i + 1] = 255
-			data[i + 2] = 255
-			data[i + 3] = alpha
-		}
-	}
-	glowTexture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
-	glowTexture.needsUpdate = true
-	return glowTexture
-}
-
 export interface GalaxyPointsResult {
 	points: THREE.Points
+	clusterCenterMasks: THREE.Points
 	clusterData: ClusterData
 }
 
@@ -96,6 +116,7 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 	} = galaxy
 
 	const positions: number[] = []
+	const clusterCenterMaskPositions: number[] = []
 	const colors: number[] = []
 	const baseCenters: number[] = []
 	const clusterAngles: number[] = []
@@ -117,6 +138,7 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		const start = systemStarOffset[i]!
 		const end = systemStarOffset[i + 1]!
 		const n = end - start
+		if (n > 1) clusterCenterMaskPositions.push(wx, wy, 0)
 		for (let j = 0; j < n; j++) {
 			const color = colorForStar(
 				decodeSpectralClass(starSpectralClass[start + j]!),
@@ -125,8 +147,23 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 			positions.push(wx, wy, 0)
 			colors.push(color.r, color.g, color.b)
 			baseCenters.push(wx, wy)
-			clusterAngles.push(n > 1 ? (j / n) * Math.PI * 2 : 0)
-			clusterFactors.push(n > 1 ? 1 : 0)
+			const isBinary = n === 2
+			const isTrinary = n === 3
+			clusterAngles.push(
+				n > 1
+					? (j / n) * Math.PI * 2 +
+							(isTrinary ? TRINARY_CLUSTER_ANGLE_OFFSET : 0)
+					: 0,
+			)
+			clusterFactors.push(
+				n > 1
+					? isBinary
+						? BINARY_CLUSTER_FACTOR
+						: isTrinary
+							? TRINARY_CLUSTER_FACTOR
+							: 1
+					: 0,
+			)
 		}
 	}
 
@@ -140,18 +177,52 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		new THREE.BufferAttribute(Float32Array.from(colors), 3),
 	)
 
-	const material = new THREE.PointsMaterial({
-		size: POINT_SIZE_PX * computeGalaxyDensityScale(numSystems),
-		sizeAttenuation: false,
-		vertexColors: true,
-		map: getGlowTexture(),
-		alphaTest: 0.02,
+	const material = new THREE.ShaderMaterial({
+		uniforms: {
+			uSize: { value: POINT_SIZE_PX * computeGalaxyDensityScale(numSystems) },
+		},
+		vertexShader: STAR_POINT_VERTEX_SHADER,
+		fragmentShader: STAR_POINT_FRAGMENT_SHADER,
 		transparent: true,
+		depthWrite: false,
+		blending: THREE.CustomBlending,
+		blendSrc: THREE.SrcAlphaFactor,
+		blendDst: THREE.OneFactor,
+		blendEquation: THREE.AddEquation,
 	})
+	const clusterCenterMaskGeometry = new THREE.BufferGeometry()
+	clusterCenterMaskGeometry.setAttribute(
+		"position",
+		new THREE.BufferAttribute(Float32Array.from(clusterCenterMaskPositions), 3),
+	)
+	const clusterCenterMaskMaterial = new THREE.ShaderMaterial({
+		uniforms: {
+			uSize: {
+				value:
+					POINT_SIZE_PX *
+					computeGalaxyDensityScale(numSystems) *
+					CLUSTER_CENTER_MASK_SIZE_RATIO,
+			},
+		},
+		vertexShader: STAR_POINT_VERTEX_SHADER,
+		fragmentShader: CLUSTER_CENTER_MASK_FRAGMENT_SHADER,
+		transparent: true,
+		depthTest: false,
+		depthWrite: false,
+	})
+	const clusterCenterMasks = new THREE.Points(
+		clusterCenterMaskGeometry,
+		clusterCenterMaskMaterial,
+	)
+	const points = new THREE.Points(geometry, material)
+	clusterCenterMasks.renderOrder = 1
+	points.renderOrder = 2
 
 	return {
-		points: new THREE.Points(geometry, material),
+		points,
+		clusterCenterMasks,
 		clusterData: {
+			numSystems,
 			baseCenters: Float32Array.from(baseCenters),
 			clusterAngles: Float32Array.from(clusterAngles),
 			clusterFactors: Float32Array.from(clusterFactors),

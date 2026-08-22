@@ -131,11 +131,13 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		},
 		landCoverage: 1,
 		albedo: 0.76,
-		// Fit against Venus's real ~737K/463.85C surface temp using
-		// EnergyBalanceModel's direct annual-mean equilibrium solve (see
-		// seedPerLatitudeEquilibrium()), not by time-stepping to convergence --
-		// gives 463.82C, no meaningful time-stepping needed.
-		greenhouseFactor: 9,
+		// Fit against Venus's real ~737K/463.85C surface temp. Was 9 before
+		// thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY moved to VPlanet-
+		// sourced values (see ebm/constants/index.ts's thermal comment) --
+		// barely moved (Venus's near-zero effective obliquity/eccentricity
+		// leaves almost no seasonal swing for a heat-capacity change to act
+		// on).
+		greenhouseFactor: 9.0004,
 		inclinationDeg: 3.86,
 		longitudeOfAscendingNodeDeg: 179.19,
 		longitudeOfPerihelionDeg: 55.839,
@@ -187,10 +189,11 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		 * for this override, so the calibration has to match, not the model
 		 * behavior. Was 0.578 before energy-balance-model split land/ocean
 		 * into separate thermal columns, then 0.6047 before greenhouse-
-		 * moisture's temperature-dependent trapping strength (see
-		 * ebm/constants/index.ts's GREENHOUSE_FACTOR comment) -- re-bisect
-		 * whenever either changes again. */
-		greenhouseFactor: 0.65,
+		 * moisture's temperature-dependent trapping strength, then 0.65
+		 * before LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY moved to VPlanet-
+		 * sourced values (see ebm/constants/index.ts's GREENHOUSE_FACTOR and
+		 * thermal comments) -- re-bisect whenever any of these change again. */
+		greenhouseFactor: 0.6321,
 		/** Real Earth sea-level pressure (~1 bar), matching every sibling
 		 * body's own hand-authored atmosphere below. Without this, the static
 		 * Sol system's Earth entry (seed === SOL_SEED, unlike the live
@@ -268,7 +271,10 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		albedo: 0.25,
 		// Fit against Mars's real ~-63C mean surface temp -- barely above 0,
 		// consistent with its thin CO2 atmosphere providing almost no warming.
-		greenhouseFactor: 0.0084,
+		// Was 0.0084 before thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY
+		// moved to VPlanet-sourced values (see ebm/constants/index.ts's
+		// thermal comment) -- barely moved.
+		greenhouseFactor: 0.00835,
 		inclinationDeg: 5.65,
 		longitudeOfAscendingNodeDeg: 188.324,
 		longitudeOfPerihelionDeg: 260.348,
@@ -454,8 +460,11 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		// Fit against Jupiter's real ~-108C 1-bar-level temp, WITH
 		// estimateGasGiantInternalHeatTempK's ~104K already applied (see
 		// buildPlanet()) -- this remaining value represents the lapse-rate/
-		// opacity gap up to the 1-bar level, not internal heat.
-		greenhouseFactor: 1.4332,
+		// opacity gap up to the 1-bar level, not internal heat. Was 1.4332
+		// before thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY moved to
+		// VPlanet-sourced values (see ebm/constants/index.ts's thermal
+		// comment) -- barely moved.
+		greenhouseFactor: 1.4312,
 		inclinationDeg: 6.09,
 		longitudeOfAscendingNodeDeg: 174.853,
 		longitudeOfPerihelionDeg: 298.934,
@@ -576,8 +585,11 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		landCoverage: 0,
 		albedo: 0.342,
 		// Fit against Saturn's real ~-139C 1-bar-level temp, WITH
-		// estimateGasGiantInternalHeatTempK's ~77K already applied.
-		greenhouseFactor: 1.9196,
+		// estimateGasGiantInternalHeatTempK's ~77K already applied. Was
+		// 1.9196 before thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY moved
+		// to VPlanet-sourced values (see ebm/constants/index.ts's thermal
+		// comment) -- barely moved.
+		greenhouseFactor: 1.9193,
 		inclinationDeg: 5.51,
 		longitudeOfAscendingNodeDeg: 163.869,
 		longitudeOfPerihelionDeg: 16.742,
@@ -636,6 +648,10 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				// Fit against Titan's real ~-179.5C surface temp -- its thick
 				// 1.45 bar N2/CH4 atmosphere gives a real, well-characterized
 				// greenhouse effect unlike every other Sol moon here.
+				// Unchanged after thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY
+				// moved to VPlanet-sourced values (see ebm/constants/index.ts's
+				// thermal comment) -- re-bisecting landed on the same value to
+				// 4 decimals.
 				greenhouseFactor: 0.6942,
 				inclinationDeg: 0.348,
 			},
@@ -698,8 +714,11 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		// itself an overshoot (see the formula's own doc), meaning this fitted
 		// greenhouseFactor is compensating for the formula's Uranus-specific
 		// error on top of the real lapse-rate gap. Not a "purer" greenhouse
-		// value than Jupiter/Saturn's despite Uranus's real heat anomaly.
-		greenhouseFactor: 1.3257,
+		// value than Jupiter/Saturn's despite Uranus's real heat anomaly. Was
+		// 1.3257 before thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY moved
+		// to VPlanet-sourced values (see ebm/constants/index.ts's thermal
+		// comment) -- barely moved.
+		greenhouseFactor: 1.3403,
 		inclinationDeg: 6.48,
 		longitudeOfAscendingNodeDeg: 180.208,
 		longitudeOfPerihelionDeg: 95.196,
@@ -812,6 +831,9 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		// heat is genuinely significant -- it radiates ~2.6x what it receives
 		// from the Sun) closes that gap; this fitted value now represents just
 		// the remaining lapse-rate/opacity gap, same as the other giants.
+		// Unchanged after thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY moved
+		// to VPlanet-sourced values (see ebm/constants/index.ts's thermal
+		// comment) -- re-bisecting landed on the same value to 4 decimals.
 		greenhouseFactor: 2.4833,
 		inclinationDeg: 6.43,
 		longitudeOfAscendingNodeDeg: 166.777,

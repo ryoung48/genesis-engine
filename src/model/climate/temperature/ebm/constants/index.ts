@@ -34,7 +34,7 @@ const embConstants = {
 		// individually fit so EBM's simulated average matches its known real
 		// surface temperature (see EnergyBalanceModel.computeGreenhouseOLR()
 		// for the T_eq = T_blackbody*(1+greenhouseFactor/4) relationship).
-		// 0.65 is Earth's fitted value, bisected in
+		// 0.6321 is Earth's fitted value, bisected in
 		// earth-import-greenhouse-refit.smoke.test.ts directly against the real
 		// imported Earth world's own land-only WorldClim bias (zeroed exactly),
 		// not the idealized ALBEDO.landFraction() proxy earth-default-refit.
@@ -49,16 +49,33 @@ const embConstants = {
 		// greenhouse-moisture's local, temperature-dependent trapping strength
 		// -- weaker in cold/dry columns like Antarctica's, since it was
 		// overheating there with one flat global value -- shifted it again,
-		// 0.6047 -> 0.65). Bodies fit with the ice feedback off (sol-system.ts's
-		// per-planet greenhouseFactor values, all bisected with
-		// iceAlbedoFeedback:false against each body's own real, measured
-		// albedo) are unaffected by this default OR by greenhouse-moisture,
-		// which reuses the same iceAlbedoFeedback flag as its on/off switch.
-		GREENHOUSE_FACTOR: 0.65,
+		// 0.6047 -> 0.65; then thermal.LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY
+		// moving to VPlanet-sourced values -- see thermal's own comment --
+		// shifted it again, 0.65 -> 0.6321). Bodies fit with the ice feedback
+		// off (sol-system.ts's per-planet greenhouseFactor values, all
+		// bisected with iceAlbedoFeedback:false against each body's own real,
+		// measured albedo) are unaffected by this default OR by greenhouse-
+		// moisture, which reuses the same iceAlbedoFeedback flag as its on/off
+		// switch -- BUT those per-body fits still depend on
+		// LAND_HEAT_CAPACITY/OCEAN_HEAT_CAPACITY directly and have NOT been
+		// re-bisected against the new thermal values yet (deferred; Pluto in
+		// particular is now unreachable by greenhouseFactor alone under the
+		// new OCEAN_HEAT_CAPACITY -- see git history around this comment for
+		// the batch re-fit attempt).
+		GREENHOUSE_FACTOR: 0.6321,
 	},
 	thermal: {
-		OCEAN_HEAT_CAPACITY: 4e7,
-		LAND_HEAT_CAPACITY: 1e7,
+		// Sourced from VPlanet's POISE module (peer-reviewed EBM,
+		// examples/EarthClimate/earth.in): dHeatCapWater(4.428e6 J/m^3/K) *
+		// dMixingDepth(70m) = 3.0996e8 J/m^2/K for ocean, dHeatCapLand=1.55e7
+		// J/m^2/K for land directly. The old values (4e7 ocean, 1e7 land) left
+		// land's raw seasonal swing far too large (mid-lat land hit +41C in
+		// July with no feedback active, vs a real ~20C) -- see
+		// earth-real-temperature-compare.smoke.test.ts's by-latitude-band
+		// bias. Re-fit GREENHOUSE_FACTOR whenever these change (see its own
+		// comment).
+		OCEAN_HEAT_CAPACITY: 4.428e6 * 70,
+		LAND_HEAT_CAPACITY: 1.55e7,
 		ICE_LIMIT: 273.15 - 10,
 	},
 	orbital: {

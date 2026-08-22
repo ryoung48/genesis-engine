@@ -19,14 +19,34 @@ import type {
  * design section for why packing/topology/systems stay separate modules.
  */
 function spawn(
-	{ size, seed, radius, dimensions }: GalaxyParams,
+	{
+		size,
+		seed,
+		radius,
+		dimensions,
+		eccentricityInner,
+		eccentricityOuter,
+		angleWindPerUnit,
+		pertN,
+		pertAmp,
+	}: GalaxyParams,
 	progressCb?: (label: string, pct: number) => void,
 ): { galaxy: Galaxy; timings: GalaxyStageTiming[] } {
 	const timings: GalaxyStageTiming[] = []
 	let t0 = performance.now()
 
 	progressCb?.("Placing systems...", 20)
-	const packing = GALAXY_PACKING.place({ size, seed, radius, dimensions })
+	const packing = GALAXY_PACKING.place({
+		size,
+		seed,
+		radius,
+		dimensions,
+		eccentricityInner,
+		eccentricityOuter,
+		angleWindPerUnit,
+		pertN,
+		pertAmp,
+	})
 	timings.push({ stage: "Point placement", ms: performance.now() - t0 })
 	t0 = performance.now()
 

@@ -526,6 +526,10 @@ function importGenesisWorld({
 			world: post,
 		})
 		record("Observed Earth humidity sampling", t0)
+
+		t0 = performance.now()
+		REAL_EARTH_DATA.attachCachedCloudCoverEstimate({ mesh, world: post })
+		record("Observed Earth cloud cover cache", t0)
 	}
 
 	if (post.climate.real_temperature_monthly && post.rainfall.real_monthly) {

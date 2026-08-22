@@ -30,40 +30,22 @@ import {
 	TEMPERATURE_CATEGORIES,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 
-interface GalaxyGenerationPanelProps {
-	name: string
-	seed: number
-	setSeed: (v: number) => void
-	systemCount: number
-	setSystemCount: (v: number) => void
-	radiusMin: number
-	setRadiusMin: (v: number) => void
-	radiusMax: number
-	setRadiusMax: (v: number) => void
-	generating: boolean
-	generationLabel: string
-	generationProgress: number
-	/** When on, the next generate() pre-generates full bodies (planets/moons,
-	 * no climate) for every system up front instead of only on entering one. */
-	pregenerateAllSystems: boolean
-	setPregenerateAllSystems: (v: boolean) => void
-	/** Bodies-only (unnamed) systems from the last generate() that had
-	 * pregenerateAllSystems on -- feeds the body-stat distribution charts
-	 * below. Null before that's ever run for the current galaxy. */
-	pregeneratedSystems: GalaxySystem[] | null
-	onGenerate: () => void
-	onClose?: () => void
-	systemSearchEntries: GalaxySystemSearchEntry[]
-	/** [JUSTIFICATION] Planet and moon classifications only exist after the
-	 * user has requested all systems be pre-generated. */
-	systemBodySearchEntries: GalaxySystemBodySearchEntry[] | null
-	onFocusSystem: (systemIndex: number) => void
-}
-
-interface GalaxySystemSearchEntry {
-	systemIndex: number
-	stars: GalaxySystemSearchStar[]
-}
+// The built-in preset table (GalaxyRendererThree.ts's initSimulation) has no
+// names of its own -- these are original descriptive labels picked from
+// each preset's actual shape (winding tightness, eccentricity, core size),
+// in the same push order as initSimulation so index i always lines up with
+// renderer.presets[i].
+const PRESET_NAMES = [
+	"Classic Spiral",
+	"Grand Design",
+	"Tightly Wound",
+	"Barred Core",
+	"Flocculent Arms",
+	"Strong Bar",
+	"Giant Bulge",
+	"Compact Core",
+	"Mild Spiral",
+] as const
 
 interface GalaxySystemSearchStar {
 	spectralClass: string
@@ -73,6 +55,11 @@ interface GalaxySystemSearchStar {
 	proto: boolean
 	/** Young (age<0.1 Gyr). */
 	primordial: boolean
+}
+
+interface GalaxySystemSearchEntry {
+	systemIndex: number
+	stars: GalaxySystemSearchStar[]
 }
 
 type StarYouthFilter = "all" | "proto" | "primordial"
@@ -179,21 +166,66 @@ const SystemCountEditor: React.FC<{
 	)
 }
 
+interface PortedGalaxyPanelProps {
+	name: string
+	seed: number
+	setSeed: (v: number) => void
+	systemCount: number
+	setSystemCount: (v: number) => void
+	radiusMin: number
+	radiusMax: number
+	generating: boolean
+	generationLabel: string
+	generationProgress: number
+	/** When on, the next generate() pre-generates full bodies (planets/moons,
+	 * no climate) for every system up front instead of only on entering one. */
+	pregenerateAllSystems: boolean
+	setPregenerateAllSystems: (v: boolean) => void
+	/** Bodies-only (unnamed) systems from the last generate() that had
+	 * pregenerateAllSystems on -- feeds the body-stat distribution charts
+	 * below. Null before that's ever run for the current galaxy. */
+	pregeneratedSystems: GalaxySystem[] | null
+	onGenerate: () => void
+	onClose?: () => void
+	/** True briefly while a shape preset switch is being applied to the
+	 * renderer (see PortedGalaxyView.tsx's handleSelectPreset) -- distinct
+	 * from `generating`, which covers the old-model galaxy's own worker
+	 * regen. */
+	applying: boolean
+	systemSearchEntries: GalaxySystemSearchEntry[]
+	/** [JUSTIFICATION] Planet and moon classifications only exist after the
+	 * user has requested all systems be pre-generated. */
+	systemBodySearchEntries: GalaxySystemBodySearchEntry[] | null
+	onFocusSystem: (systemIndex: number) => void
+	/** Built-in density-wave shape presets (see GalaxyRendererThree.ts's
+	 * initSimulation) -- drive the packing's own eccentricity/winding, not
+	 * the system count/radius/seed fields above. */
+	presetCount: number
+	/** null when nothing has been explicitly selected yet, or after some
+	 * other interaction changed the params away from a preset. */
+	selectedPresetIndex: number | null
+	onSelectPreset: (index: number) => void
+}
+
 /** Left sidebar for the /galaxy route -- built from the same wiki-page shell
  * as GenerationPlanetNavigator (WikiPageHeader hero + Surface stat-grid card
  * with editable/popover stats), just with galaxy-scoped fields (name/seed/
  * params) instead of a planet's. Mirrors GenerationPanel.tsx's outer sidebar
- * chrome so both routes read as the same panel system. */
-export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
+ * chrome so both routes read as the same panel system.
+ *
+ * Combines the old GalaxyGenerationPanel's full generation/search UI (seed,
+ * system count, radius, pregeneration, spectral/body distribution charts,
+ * system search) with the ported density-wave renderer's built-in shape
+ * preset picker, since PortedGalaxyView is now the only mounted galaxy view
+ * -- see PortedGalaxyView.tsx's own doc comment. */
+export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	name,
 	seed,
 	setSeed,
 	systemCount,
 	setSystemCount,
 	radiusMin,
-	setRadiusMin,
 	radiusMax,
-	setRadiusMax,
 	generating,
 	generationLabel,
 	generationProgress,
@@ -202,9 +234,13 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 	pregeneratedSystems,
 	onGenerate,
 	onClose,
+	applying,
 	systemSearchEntries,
 	systemBodySearchEntries,
 	onFocusSystem,
+	presetCount,
+	selectedPresetIndex,
+	onSelectPreset,
 }) => {
 	const [seedInput, setSeedInput] = useState(seed.toString(36).padStart(6, "0"))
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false)
@@ -270,30 +306,8 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 			},
 		},
 		{
-			label: "Radius Min",
-			value: `${radiusMin} ly`,
-			editor: {
-				label: "Radius Min",
-				value: radiusMin,
-				min: 10,
-				max: radiusMax,
-				step: 10,
-				display: `${radiusMin} ly`,
-				set: (v) => setRadiusMin(Math.round(v)),
-			},
-		},
-		{
-			label: "Radius Max",
-			value: `${radiusMax} ly`,
-			editor: {
-				label: "Radius Max",
-				value: radiusMax,
-				min: radiusMin,
-				max: 1000,
-				step: 10,
-				display: `${radiusMax} ly`,
-				set: (v) => setRadiusMax(Math.round(v)),
-			},
+			label: "Radius",
+			value: `${radiusMin.toLocaleString()}–${radiusMax.toLocaleString()} ly`,
 		},
 	]
 	const spectralClassDistribution = useMemo(() => {
@@ -685,7 +699,15 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 									</IconButton>
 								) : undefined
 							}
-							meta={<span>Galaxy</span>}
+							meta={
+								<span>
+									{applying
+										? "Applying…"
+										: generating
+											? "Generating…"
+											: "Galaxy"}
+								</span>
+							}
 							metaAction={
 								<div className="flex items-center gap-1.5">
 									<input
@@ -701,7 +723,7 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 										onBlur={applySeedInput}
 										aria-label="Galaxy seed"
 										title="Galaxy seed"
-										className="mr-1 w-20 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-700 outline-none transition-colors focus:border-slate-400"
+										className="w-20 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-700 outline-none transition-colors focus:border-slate-400"
 									/>
 									<IconButton
 										tone="borderless"
@@ -810,6 +832,40 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 						) : null}
 					</Surface>
 
+					<div className="flex items-center justify-between gap-2 px-0.5">
+						<label className="flex items-center gap-1.5 text-[10px] text-slate-500">
+							<input
+								type="checkbox"
+								checked={pregenerateAllSystems}
+								onChange={(event) =>
+									setPregenerateAllSystems(event.target.checked)
+								}
+								disabled={generating}
+								className="h-3 w-3 rounded-sm border-slate-300"
+							/>
+							Pre-generate all systems
+						</label>
+						<select
+							value={selectedPresetIndex ?? ""}
+							onChange={(e) => {
+								const idx = Number(e.target.value)
+								if (Number.isFinite(idx)) onSelectPreset(idx)
+							}}
+							aria-label="Density-wave shape preset"
+							title="Density-wave shape preset"
+							className="rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px] text-slate-700"
+						>
+							<option value="" disabled>
+								Shape…
+							</option>
+							{Array.from({ length: presetCount }, (_, i) => (
+								<option key={i} value={i}>
+									{PRESET_NAMES[i] ?? `Preset ${i + 1}`}
+								</option>
+							))}
+						</select>
+					</div>
+
 					<Button
 						tone="panel"
 						selected
@@ -821,19 +877,6 @@ export const GalaxyGenerationPanel: React.FC<GalaxyGenerationPanelProps> = ({
 					>
 						Generate
 					</Button>
-
-					<label className="flex items-center gap-1.5 px-0.5 text-[10px] text-slate-500">
-						<input
-							type="checkbox"
-							checked={pregenerateAllSystems}
-							onChange={(event) =>
-								setPregenerateAllSystems(event.target.checked)
-							}
-							disabled={generating}
-							className="h-3 w-3 rounded-sm border-slate-300"
-						/>
-						Pre-generate all systems
-					</label>
 
 					{generating ? (
 						<ProgressBar label={generationLabel} percent={generationProgress} />

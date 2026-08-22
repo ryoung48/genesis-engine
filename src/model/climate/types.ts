@@ -13,6 +13,16 @@ export interface GenesisClimate {
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
 	landFraction: number[] // 36-band land fraction used by EBM
+	/** CLOUD_COVER.estimate's modeled proxy, [month * numRegions + region],
+	 * cached once (by the cloud-cover temperature modifier, which already
+	 * computes it for every cell/month) so hover/map display don't each
+	 * recompute the same values from the same modeled inputs. */
+	cloud_cover_monthly?: Float32Array
+	/** Same proxy, but computed from OBSERVED (real-Earth) aet/pet/rainfall/
+	 * dtr/temperature inputs once those are attached -- diverges from
+	 * cloud_cover_monthly for an imported Earth world, since hover/map prefer
+	 * observed inputs there. Cached the same way, for the same reason. */
+	real_cloud_cover_monthly?: Float32Array
 }
 
 export interface GenesisRainfall {

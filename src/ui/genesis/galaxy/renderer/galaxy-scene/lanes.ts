@@ -3,12 +3,16 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { Galaxy } from "@/model/celestial/galaxy/types"
-import { computeGalaxyDensityScale } from "@/ui/genesis/galaxy/renderer/galaxy-scene/density-scale"
+import {
+	computeGalaxyDensityScale,
+	DENSE_GALAXY_SYSTEM_COUNT,
+} from "@/ui/genesis/galaxy/renderer/galaxy-scene/density-scale"
 
 // Matches galaxy-gen's renderer/geometry/lanes.ts buildLanesGeometry exactly.
 const LANE_COLOR = 0xffffff
 const LANE_OPACITY = 0.12
 const LANE_WIDTH_PX = 1
+const DENSE_LANE_MIN_WIDTH_PX = 1.5
 
 /** One LineSegments2 for every hyperlane pair in Galaxy.lanes -- real
  * screen-space linewidth (via LineMaterial) rather than THREE.LineBasicMaterial's
@@ -35,12 +39,18 @@ export function buildGalaxyLanes(
 
 	const geometry = new LineSegmentsGeometry()
 	geometry.setPositions(positions)
+	const densityScaledLaneWidth =
+		LANE_WIDTH_PX * computeGalaxyDensityScale(numSystems)
+	const laneWidth =
+		numSystems > DENSE_GALAXY_SYSTEM_COUNT
+			? Math.max(DENSE_LANE_MIN_WIDTH_PX, densityScaledLaneWidth)
+			: densityScaledLaneWidth
 
 	const material = new LineMaterial({
 		color: LANE_COLOR,
 		transparent: true,
 		opacity: LANE_OPACITY,
-		linewidth: LANE_WIDTH_PX * computeGalaxyDensityScale(numSystems),
+		linewidth: laneWidth,
 		resolution: new THREE.Vector2(resolution[0], resolution[1]),
 	})
 

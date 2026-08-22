@@ -1,4 +1,5 @@
 import { HYDROLOGY } from "@/model/climate/classification/hydrology"
+import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
@@ -382,8 +383,74 @@ function reconcileElevationWithMask({
 	}
 }
 
+// Caches the SAME per-field observed-preferred-else-modeled cloud-cover
+// estimate hover.ts/region-colors.ts compute on every hover/render, onto
+// climate.real_cloud_cover_monthly, so those call sites can read it back
+// instead of recomputing CLOUD_COVER.estimate for every cell/month each
+// time. Must run after attachObservedEarthHumidity (observedHydrology) and
+// any observed DTR attachment, since it mirrors their exact fallback order.
+function attachCachedCloudCoverEstimate(params: {
+	mesh: SphereMesh
+	world: {
+		climate: GenesisWorld["climate"]
+		rainfall?: GenesisWorld["rainfall"]
+		oceanDist?: GenesisWorld["oceanDist"]
+		dtr_monthly?: GenesisWorld["dtr_monthly"]
+		observedDtr?: GenesisWorld["observedDtr"]
+		observedHydrology?: GenesisWorld["observedHydrology"]
+		hydrology?: GenesisWorld["hydrology"]
+	}
+}): void {
+	const { mesh, world } = params
+	const aetMonthly =
+		world.observedHydrology?.aet_monthly ?? world.hydrology?.aet_monthly
+	const petMonthly =
+		world.observedHydrology?.pet_monthly ?? world.climate.pet_monthly
+	const rainfallMonthly =
+		world.rainfall?.real_monthly ?? world.rainfall?.monthly
+	const dtrMonthly = world.observedDtr?.real_monthly ?? world.dtr_monthly
+	const temperatureMonthly =
+		world.climate.real_temperature_monthly ?? world.climate.temperature_monthly
+	if (
+		!(
+			aetMonthly &&
+			petMonthly &&
+			rainfallMonthly &&
+			dtrMonthly &&
+			temperatureMonthly
+		)
+	)
+		return
+
+	const N = mesh.numRegions
+	const oceanDist = world.oceanDist
+	const cached = new Float32Array(N * 12)
+	for (let r = 0; r < N; r++) {
+		const oceanDistanceKm = oceanDist?.[r] ?? 0
+		for (let m = 0; m < 12; m++) {
+			const idx = m * N + r
+			const dtrC = dtrMonthly[idx]
+			const temperatureC = temperatureMonthly[idx]
+			if (!Number.isFinite(dtrC) || !Number.isFinite(temperatureC)) {
+				cached[idx] = NaN
+				continue
+			}
+			cached[idx] = CLOUD_COVER.estimate({
+				aetMm: aetMonthly[idx],
+				petMm: petMonthly[idx],
+				rainfallMm: rainfallMonthly[idx],
+				dtrC,
+				temperatureC,
+				oceanDistanceKm,
+			})
+		}
+	}
+	world.climate.real_cloud_cover_monthly = cached
+}
+
 export const REAL_EARTH_DATA = {
 	attachObservedEarthHumidity,
+	attachCachedCloudCoverEstimate,
 	buildRealRiversData,
 	matchRealLakeNames,
 	resolveRealProvinceSeeds,

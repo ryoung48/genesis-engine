@@ -13,6 +13,15 @@ export interface GalaxyParams {
 	 * instead of leaving that to whenever a system is actually opened -- see
 	 * GalaxyWorkerDoneResponse.systems. */
 	pregenerateAllSystems?: boolean
+	/** Density-wave shape knobs forwarded straight to GALAXY_PACKING.place --
+	 * see packing/index.ts's own doc comment. Left optional (falling back to
+	 * that module's own defaults) so existing callers that only care about
+	 * plain size/seed/radius/dimensions don't need to change. */
+	eccentricityInner?: number
+	eccentricityOuter?: number
+	angleWindPerUnit?: number
+	pertN?: number
+	pertAmp?: number
 }
 
 export interface Galaxy {

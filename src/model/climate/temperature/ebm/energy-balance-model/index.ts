@@ -285,7 +285,9 @@ export class EnergyBalanceModel {
 		const daysPerYear = CONSTANTS.embConstants.time.DAYS_PER_YEAR
 		for (let i = 0; i < grid.NUM_LAT; i++) {
 			this.dx.push(this.sin_lat_bounds[i + 1] - this.sin_lat_bounds[i])
-			this.heat_capacity_land.push(thermal.LAND_HEAT_CAPACITY * pressureCapFactor)
+			this.heat_capacity_land.push(
+				thermal.LAND_HEAT_CAPACITY * pressureCapFactor,
+			)
 			this.heat_capacity_ocean.push(
 				thermal.OCEAN_HEAT_CAPACITY * pressureCapFactor,
 			)
