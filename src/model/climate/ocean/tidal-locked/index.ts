@@ -1,69 +1,53 @@
 import type {
-	ApplyLockedCurrentTemperatureEffectParams,
+	ApplyLockedSSTToClimateParams,
 	BuildLockedOceanCurrentGridParams,
-	ComputeLockedOceanCurrentsParams,
-	LockedCurrentParams,
+	ComputeLockedSSTParams,
+	LockedSSTParams,
 } from "@/model/climate/ocean/tidal-locked/types"
-import { OCEAN_CURRENTS_SHARED } from "@/model/climate/shared/ocean-currents"
+import { RAIN } from "@/model/climate/precipitation/rain"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import { WIND } from "@/model/climate/weather/wind"
 import type { FlowGrid } from "@/model/climate/weather/wind/types"
-import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
-import type { SphereMesh } from "@/model/mesh/types"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { MATH } from "@/model/shared/math/core"
 import { UNITS } from "@/model/shared/units"
 
 const CURRENT_EFFECT_MONTHS = 12
 
-const LOCKED_WARMTH_SMOOTHING_PASSES = 6
+const RAD2DEG = 180 / Math.PI
 
-const LOCKED_VECTOR_SMOOTHING_PASSES = 2
+// SST anomaly by angular distance from the (monthly) substellar point, °C --
+// warm dayside, cooling through the terminator, cold nightside. Indexed by
+// substellar distance rather than a fixed angle so the whole curve migrates
+// with the star's monthly libration/declination drift -- that drift (from
+// orbital eccentricity/obliquity) is the sole source of seasonality here,
+// mirroring how the rotating-planet model is indexed by ITCZ distance
+// instead of absolute latitude (see ocean/currents/index.ts).
+const substellarBandC = (distDeg: number) =>
+	MATH.piecewise({
+		domain: [0, 30, 60, 90, 120, 150, 180],
+		range: [6, 4, 1, -1, -3, -4, -4],
+		x: distDeg,
+	})
 
-const TYPE_LAKE = 5
+// bandC's own peak (6, at the substellar point) sets its own saturation
+// ceiling -- see ocean/currents/index.ts's MODELED_SST_SATURATION_C for why
+// this must be sized off the table's own max rather than reusing the
+// observed-data constant.
+const MODELED_SST_SATURATION_C = 6
 
-function normalizeField({
-	field,
-	isBlocked,
-}: {
-	field: Float32Array
-	isBlocked: Uint8Array
-}): void {
-	let maxAbs = 0
-	for (let i = 0; i < field.length; i++) {
-		if (isBlocked[i]) continue
-		maxAbs = Math.max(maxAbs, Math.abs(field[i]))
-	}
-	if (maxAbs <= 1e-6) return
-	for (let i = 0; i < field.length; i++) {
-		if (isBlocked[i]) {
-			field[i] = 0
-			continue
-		}
-		field[i] = MATH.clamp({ value: field[i] / maxAbs, lo: -1, hi: 1 })
-	}
-}
+// Coast-hugging falloff -- currents/upwelling are a coastal phenomenon, not
+// a whole-basin gyre, so the signal fades to nothing by ~800km offshore.
+const COAST_DECAY_KM = 800
 
-function buildLakeMask({
-	numRegions,
-	isLand,
-	landmarks,
-}: {
-	numRegions: number
-	isLand: Uint8Array
-	landmarks: GenesisLandmarks
-}): Uint8Array {
-	const isLake = new Uint8Array(numRegions)
-	for (let r = 0; r < numRegions; r++) {
-		const landmark = landmarks.regionLandmark[r]
-		if (landmark < 0 || isLand[r]) continue
-		if (landmarks.type[landmark] === TYPE_LAKE) isLake[r] = 1
-	}
-	return isLake
-}
+const coastDecay = (distCoastKm: number) =>
+	1 - MATH.smoothstep({ edge0: 0, edge1: COAST_DECAY_KM, x: distCoastKm })
+
+const OCEAN_CURRENT_SMOOTHING_PASSES = 2
 
 function computeMonthlySubstellarDirections(
-	params?: LockedCurrentParams,
+	params?: LockedSSTParams,
 ): Array<[number, number, number]> {
 	const substellarLon = params?.substellarLon ?? UNITS.defaultSubstellarLon
 	const obliquity = params?.obliquity ?? 0
@@ -90,362 +74,316 @@ function computeMonthlySubstellarDirections(
 	return directions
 }
 
-function getAnnualMeanSubstellarDirection(
-	monthlyDirs: Array<[number, number, number]>,
-): [number, number, number] {
-	let x = 0
-	let y = 0
-	let z = 0
-	for (const dir of monthlyDirs) {
-		x += dir[0]
-		y += dir[1]
-		z += dir[2]
-	}
-	const mag = Math.hypot(x, y, z)
-	if (mag <= 1e-6) return [1, 0, 0]
-	return [x / mag, y / mag, z / mag]
-}
-
-function computeCellCosines({
-	mesh,
-	substellarDir,
-}: {
-	mesh: SphereMesh
-	substellarDir: [number, number, number]
-}): Float32Array {
-	const result = new Float32Array(mesh.numRegions)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		const offset = r * 3
-		result[r] =
-			mesh.r_xyz[offset] * substellarDir[0] +
-			mesh.r_xyz[offset + 1] * substellarDir[1] +
-			mesh.r_xyz[offset + 2] * substellarDir[2]
-	}
-	return result
-}
-
-function computeLockedOceanWarmthField({
+/** Cosmetic-only fade of an ocean-cell field onto adjacent land, purely for
+ * visual continuity at the coastline in the map overlay/hover -- does not
+ * feed back into anything. Identical to ocean/currents/index.ts's helper of
+ * the same name -- kept local rather than shared since it's the only thing
+ * these two otherwise-unrelated models (rotating vs. tidally locked) have in
+ * common. */
+function bleedOntoLand({
 	mesh,
 	isLand,
 	isLake,
-	substellarDir,
+	oceanValue,
+	avgEdgeKm,
 }: {
-	mesh: SphereMesh
+	mesh: ComputeLockedSSTParams["mesh"]
 	isLand: Uint8Array
 	isLake: Uint8Array
-	substellarDir: [number, number, number]
+	oceanValue: Float32Array
+	avgEdgeKm: number
 }): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const source = computeCellCosines({ mesh, substellarDir })
-	const state = new Float32Array(N)
-	const next = new Float32Array(N)
-	const blocked = new Uint8Array(N)
+	const bleed = new Float32Array(N)
+	const landFadeHops = Math.max(4, Math.round(600 / avgEdgeKm))
+	const dist = new Int32Array(N).fill(-1)
+	const queue = new Int32Array(N)
+	let head = 0
+	let tail = 0
 
 	for (let r = 0; r < N; r++) {
-		if (isLand[r] || isLake[r]) {
-			blocked[r] = 1
-			continue
+		if (!isLand[r]) continue
+		let sum = 0
+		let count = 0
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (!isLand[nb] && !isLake[nb]) {
+				sum += oceanValue[nb]
+				count++
+			}
 		}
-		state[r] = source[r]
+		if (count === 0) continue
+		bleed[r] = sum / count
+		dist[r] = 0
+		queue[tail++] = r
 	}
 
-	for (let pass = 0; pass < LOCKED_WARMTH_SMOOTHING_PASSES; pass++) {
-		for (let r = 0; r < N; r++) {
-			if (blocked[r]) {
-				next[r] = 0
-				continue
+	while (head < tail) {
+		const r = queue[head++]
+		const d = dist[r] + 1
+		if (d >= landFadeHops) continue
+		const fade = 1 - d / landFadeHops
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (isLand[nb] && dist[nb] === -1) {
+				dist[nb] = d
+				bleed[nb] = bleed[r] * fade
+				queue[tail++] = nb
 			}
-			let sum = source[r] * 2
-			let weight = 2
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if (blocked[nb]) continue
-				sum += state[nb]
-				weight++
-			}
-			next[r] = sum / weight
 		}
-		state.set(next)
 	}
 
-	normalizeField({ field: state, isBlocked: blocked })
-	return state
+	return bleed
 }
 
-function computeLockedEffectLimit({
-	cellCosTheta,
-	isLandCell,
-}: {
-	cellCosTheta: number
-	isLandCell: boolean
-}): number {
-	const exchangeFactor = 0.65 + 0.35 * (1 - Math.abs(cellCosTheta))
-	return (isLandCell ? 4 : 6) * exchangeFactor
-}
-
-function computeLockedOceanCurrents({
+/** Purely a display quantity: two inputs (a substellar-facing band indexed
+ * by angular distance from the (monthly) substellar point, and distance
+ * from coast) -- no temperature field involved, and the result never feeds
+ * back into climate.temperature. There's no east/west coast-facing concept
+ * here (unlike the rotating model): a tidally locked ocean's SST pattern is
+ * radially symmetric around the substellar point, not organized by
+ * rotation-driven wind belts. Land cells get a cosmetic fade of the nearest
+ * ocean value so the coastline reads continuously in the overlay/hover;
+ * that fade carries no signal of its own. */
+function computeLockedSST({
 	mesh,
 	isLand,
+	distCoast,
 	landmarks,
 	params,
-}: ComputeLockedOceanCurrentsParams): GenesisOceanCurrents {
+}: ComputeLockedSSTParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const avgEdgeKm = UNITS.meanEdgeLengthKm({
 		mesh,
 		planetRadiusKm: params?.planetRadiusKm,
 	})
-	const isLake = buildLakeMask({ numRegions: N, isLand, landmarks })
-	const monthlyDirs = computeMonthlySubstellarDirections(params)
+	const isLake = new Uint8Array(N)
+	for (let r = 0; r < N; r++) {
+		const landmark = landmarks.regionLandmark[r]
+		if (landmark < 0 || isLand[r]) continue
+		if (landmarks.type[landmark] === LANDMARKS.landmarkTypeLake) isLake[r] = 1
+	}
 
-	const oceanWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
-	const coastalWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
-	const oceanWarmth = new Float32Array(N)
-	const coastalWarmth = new Float32Array(N)
+	const monthlyDirs = computeMonthlySubstellarDirections(params)
+	const r_xyz = mesh.r_xyz
+
+	const sstMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
+	const sst = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) continue
+		const decay = coastDecay(distCoast[r])
+		if (decay <= 0) continue
+		const offset = r * 3
+		const x = r_xyz[offset]
+		const y = r_xyz[offset + 1]
+		const z = r_xyz[offset + 2]
+		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+			const dir = monthlyDirs[month]
+			const ct = MATH.clamp({
+				value: x * dir[0] + y * dir[1] + z * dir[2],
+				lo: -1,
+				hi: 1,
+			})
+			const distDeg = Math.acos(ct) * RAD2DEG
+			const anomalyC = substellarBandC(distDeg) * decay
+			const value = MATH.clamp({
+				value: anomalyC / MODELED_SST_SATURATION_C,
+				lo: -1,
+				hi: 1,
+			})
+			sstMonthly[month * N + r] = value
+			sst[r] += value / CURRENT_EFFECT_MONTHS
+		}
+	}
+
+	const landBleed = bleedOntoLand({
+		mesh,
+		isLand,
+		isLake,
+		oceanValue: sst,
+		avgEdgeKm,
+	})
+	for (let r = 0; r < N; r++) if (isLand[r]) sst[r] = landBleed[r]
 
 	for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-		const monthWarmth = computeLockedOceanWarmthField({
+		const monthOcean = sstMonthly.subarray(month * N, (month + 1) * N)
+		const monthBleed = bleedOntoLand({
 			mesh,
 			isLand,
 			isLake,
-			substellarDir: monthlyDirs[month],
+			oceanValue: monthOcean,
+			avgEdgeKm,
 		})
-		oceanWarmthMonthly.set(monthWarmth, month * N)
-		const monthCoastalWarmth =
-			OCEAN_CURRENTS_SHARED.computeCoastalWarmthFromOceanWarmth({
-				mesh,
-				isLand,
-				isLake,
-				oceanWarmth: monthWarmth,
-				avgEdgeKm,
-			})
-		coastalWarmthMonthly.set(monthCoastalWarmth, month * N)
-		for (let r = 0; r < N; r++) {
-			oceanWarmth[r] += monthWarmth[r] / CURRENT_EFFECT_MONTHS
-			coastalWarmth[r] += monthCoastalWarmth[r] / CURRENT_EFFECT_MONTHS
-		}
+		for (let r = 0; r < N; r++)
+			if (isLand[r]) sstMonthly[month * N + r] = monthBleed[r]
 	}
 
-	return {
-		oceanWarmth,
-		coastalWarmth,
-		oceanWarmthMonthly,
-		coastalWarmthMonthly,
-		temperatureDeltaMonthly: new Float32Array(N * CURRENT_EFFECT_MONTHS),
-		temperatureDelta: new Float32Array(N),
-	}
+	return { sst, sstMonthly }
 }
 
-function applyLockedCurrentTemperatureEffect({
+// Land cells only get the cosmetic coastal bleed of the nearest ocean sst,
+// not the current's full open-water strength, so their applied delta is
+// scaled down -- coastal moderation reaches inland, but weaker than what
+// the water itself experiences. Same value/rationale as the rotating
+// model's LAND_CURRENT_EFFECT_SCALE.
+const LAND_CURRENT_EFFECT_SCALE = 0.68
+
+/** Applies a previously computed locked SST field to climate.temperature_
+ * avg/monthly (temperature_min/max are deliberately left untouched -- they
+ * get fully recomputed later by CLIMATE.applyDtrToClimateMinMax straight
+ * from temperature_monthly, which this function mutates in place). Kept as
+ * a separate step from computeLockedSST so it can be re-run each time the
+ * pipeline recomputes climate from scratch later on, without recomputing
+ * the SST field itself. */
+function applyLockedSSTToClimate({
 	mesh,
 	climate,
 	isLand,
-	currents,
-	params,
-}: ApplyLockedCurrentTemperatureEffectParams): void {
+	oceanCurrents,
+}: ApplyLockedSSTToClimateParams): void {
 	const N = mesh.numRegions
-	const monthlyDirs = computeMonthlySubstellarDirections(params)
-	const annualDir = getAnnualMeanSubstellarDirection(monthlyDirs)
-	const annualCt = computeCellCosines({ mesh, substellarDir: annualDir })
-	const temperatureDeltaMonthly =
-		currents.temperatureDeltaMonthly ??
-		(currents.temperatureDeltaMonthly = new Float32Array(
-			N * CURRENT_EFFECT_MONTHS,
-		))
-
-	if (currents.oceanWarmthMonthly && currents.coastalWarmthMonthly) {
-		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			const cellCt = computeCellCosines({
-				mesh,
-				substellarDir: monthlyDirs[month],
-			})
-			for (let r = 0; r < N; r++) {
-				const warmth = isLand[r]
-					? currents.coastalWarmthMonthly[month * N + r]
-					: currents.oceanWarmthMonthly[month * N + r]
-				if (Math.abs(warmth) <= 1e-4) continue
-				const delta =
-					warmth *
-					computeLockedEffectLimit({
-						cellCosTheta: cellCt[r],
-						isLandCell: !!isLand[r],
-					})
-				temperatureDeltaMonthly[month * N + r] = delta
-				climate.temperature_monthly[month * N + r] += delta
-				currents.temperatureDelta[r] += delta / CURRENT_EFFECT_MONTHS
-			}
-		}
-	} else {
-		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			for (let r = 0; r < N; r++) {
-				const warmth = isLand[r]
-					? currents.coastalWarmth[r]
-					: currents.oceanWarmth[r]
-				if (Math.abs(warmth) <= 1e-4) continue
-				const delta =
-					warmth *
-					computeLockedEffectLimit({
-						cellCosTheta: annualCt[r],
-						isLandCell: !!isLand[r],
-					})
-				temperatureDeltaMonthly[month * N + r] = delta
-				climate.temperature_monthly[month * N + r] += delta
-				currents.temperatureDelta[r] = delta
-			}
-		}
-	}
-
 	for (let r = 0; r < N; r++) {
-		climate.temperature_avg[r] += currents.temperatureDelta[r]
-		// Use per-month deltas to correctly shift the seasonal extremes.
-		let minDelta = 0
-		let maxDelta = 0
-		for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
-			const d = temperatureDeltaMonthly[m * N + r]
-			if (d < minDelta) minDelta = d
-			if (d > maxDelta) maxDelta = d
+		const landScale = isLand[r] ? LAND_CURRENT_EFFECT_SCALE : 1
+		let annualSum = 0
+		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+			const delta =
+				oceanCurrents.sstMonthly[month * N + r] *
+				MODELED_SST_SATURATION_C *
+				landScale
+			const updated = climate.temperature_monthly[month * N + r] + delta
+			climate.temperature_monthly[month * N + r] = updated
+			annualSum += updated
 		}
-		climate.temperature_min[r] += minDelta
-		climate.temperature_max[r] += maxDelta
+		climate.temperature_avg[r] = annualSum / CURRENT_EFFECT_MONTHS
 	}
 }
 
-function smoothVectorField({
-	mesh,
-	isLand,
-	srcX,
-	srcY,
-	passes,
-}: {
-	mesh: SphereMesh
-	isLand: Uint8Array
-	srcX: Float32Array
-	srcY: Float32Array
-	passes: number
-}): { x: Float32Array; y: Float32Array } {
-	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const tmpX = new Float32Array(N)
-	const tmpY = new Float32Array(N)
-	let currentX = srcX
-	let currentY = srcY
-	let nextX: Float32Array = tmpX
-	let nextY: Float32Array = tmpY
-
-	for (let pass = 0; pass < passes; pass++) {
-		for (let r = 0; r < N; r++) {
-			if (isLand[r]) {
-				nextX[r] = 0
-				nextY[r] = 0
-				continue
-			}
-			let sumX = currentX[r]
-			let sumY = currentY[r]
-			let count = 1
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if (isLand[nb]) continue
-				sumX += currentX[nb]
-				sumY += currentY[nb]
-				count++
-			}
-			nextX[r] = sumX / count
-			nextY[r] = sumY / count
-		}
-		;[currentX, nextX] = [nextX, currentX]
-		;[currentY, nextY] = [nextY, currentY]
-	}
-
-	return { x: currentX, y: currentY }
-}
-
+/** Derives a flow-direction FlowGrid from the spatial gradient of the locked
+ * SST field (warm dayside to cold nightside implies a surface current),
+ * restricted to a coastal display band. Unlike the rotating model's
+ * buildOceanCurrentGrid, there's no hemisphere-based Coriolis turn applied
+ * -- a tidally locked planet's day/night thermal circulation isn't
+ * organized into rotation-driven gyres the same way, so the raw gradient
+ * direction is used as-is. Purely a visualization -- the direction isn't
+ * otherwise tracked. */
 function buildLockedOceanCurrentGrid({
 	mesh,
-	oceanWarmth,
+	sst,
 	isLand,
-	latDeg,
-	lonDeg,
-	params,
-	currentMonth,
+	planetRadiusKm,
 }: BuildLockedOceanCurrentGridParams): FlowGrid {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const monthlyDirs = computeMonthlySubstellarDirections(params)
-	const substellarDir =
-		currentMonth && currentMonth > 0 && currentMonth <= CURRENT_EFFECT_MONTHS
-			? monthlyDirs[currentMonth - 1]
-			: getAnnualMeanSubstellarDirection(monthlyDirs)
-	const cellCt = computeCellCosines({ mesh, substellarDir })
+	const { latDeg, lonDeg } = RAIN.getClimateGeometry(mesh)
 	const gradX = new Float32Array(N)
 	const gradY = new Float32Array(N)
-	const coastX = new Float32Array(N)
-	const coastY = new Float32Array(N)
+	const smoothedX = new Float32Array(N)
+	const smoothedY = new Float32Array(N)
+	const currentU = new Float32Array(N)
+	const currentV = new Float32Array(N)
+	const currentSpeed = new Float32Array(N)
+
+	const wrapLonDeltaDeg = (delta: number): number => {
+		if (delta > 180) return delta - 360
+		if (delta < -180) return delta + 360
+		return delta
+	}
 
 	for (let r = 0; r < N; r++) {
 		if (isLand[r]) continue
 		let gx = 0
 		let gy = 0
 		let weightSum = 0
-		let shoreX = 0
-		let shoreY = 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
 			const dx =
-				(lonDeg[nb] - lonDeg[r] > 180
-					? lonDeg[nb] - lonDeg[r] - 360
-					: lonDeg[nb] - lonDeg[r] < -180
-						? lonDeg[nb] - lonDeg[r] + 360
-						: lonDeg[nb] - lonDeg[r]) *
+				wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r]) *
 				Math.cos((((latDeg[r] + latDeg[nb]) * 0.5) / 180) * Math.PI)
 			const dy = latDeg[nb] - latDeg[r]
 			const distSq = dx * dx + dy * dy
 			if (distSq <= 1e-6) continue
-			gx += ((cellCt[nb] - cellCt[r]) * dx) / distSq
-			gy += ((cellCt[nb] - cellCt[r]) * dy) / distSq
+			const neighbourSst = isLand[nb] ? 0 : sst[nb]
+			const dw = neighbourSst - sst[r]
+			gx += (dw * dx) / distSq
+			gy += (dw * dy) / distSq
 			weightSum += 1
-			if (isLand[nb]) {
-				shoreX += dx / distSq
-				shoreY += dy / distSq
-			}
 		}
 		if (weightSum > 0) {
 			gradX[r] = gx / weightSum
 			gradY[r] = gy / weightSum
 		}
-		coastX[r] = shoreX
-		coastY[r] = shoreY
 	}
 
-	const smoothed = smoothVectorField({
-		mesh,
-		isLand,
-		srcX: gradX,
-		srcY: gradY,
-		passes: LOCKED_VECTOR_SMOOTHING_PASSES,
-	})
-	const currentU = new Float32Array(N)
-	const currentV = new Float32Array(N)
-	const currentSpeed = new Float32Array(N)
+	let srcX = gradX
+	let srcY = gradY
+	let dstX = smoothedX
+	let dstY = smoothedY
+	for (let pass = 0; pass < OCEAN_CURRENT_SMOOTHING_PASSES; pass++) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r]) {
+				dstX[r] = 0
+				dstY[r] = 0
+				continue
+			}
+			let sumX = srcX[r]
+			let sumY = srcY[r]
+			let count = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (isLand[nb]) continue
+				sumX += srcX[nb]
+				sumY += srcY[nb]
+				count++
+			}
+			dstX[r] = sumX / count
+			dstY[r] = sumY / count
+		}
+		;[srcX, dstX] = [dstX, srcX]
+		;[srcY, dstY] = [dstY, srcY]
+	}
 
 	for (let r = 0; r < N; r++) {
 		if (isLand[r]) continue
-		let flowEast = -smoothed.x[r]
-		let flowNorth = -smoothed.y[r]
-		const coastMag = Math.hypot(coastX[r], coastY[r])
-		if (coastMag > 1e-6) {
-			let tangentEast = -coastY[r] / coastMag
-			let tangentNorth = coastX[r] / coastMag
-			if (flowEast * tangentEast + flowNorth * tangentNorth < 0) {
-				tangentEast = -tangentEast
-				tangentNorth = -tangentNorth
+		const u = srcY[r]
+		const v = -srcX[r]
+		currentU[r] = u
+		currentV[r] = v
+		currentSpeed[r] = Math.hypot(u, v)
+	}
+
+	// BFS from land to find ocean cells within the coastal display band.
+	const maxCoastHops = Math.round(
+		600 / UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm }),
+	)
+	const coastalOcean = new Uint8Array(N)
+	const bfsQueue = new Int32Array(N)
+	const bfsDist = new Int32Array(N).fill(-1)
+	let head = 0
+	let tail = 0
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (!isLand[nb] && bfsDist[nb] < 0) {
+				bfsDist[nb] = 0
+				coastalOcean[nb] = 1
+				bfsQueue[tail++] = nb
 			}
-			flowEast = flowEast * 0.6 + tangentEast * 0.4
-			flowNorth = flowNorth * 0.6 + tangentNorth * 0.4
 		}
-		const speedScale = 0.4 + 0.6 * Math.abs(oceanWarmth[r])
-		currentU[r] = flowEast
-		currentV[r] = flowNorth
-		currentSpeed[r] = Math.hypot(flowEast, flowNorth) * speedScale
+	}
+	while (head < tail) {
+		const r = bfsQueue[head++]
+		if (bfsDist[r] >= maxCoastHops) continue
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (!isLand[nb] && bfsDist[nb] < 0) {
+				bfsDist[nb] = bfsDist[r] + 1
+				coastalOcean[nb] = 1
+				bfsQueue[tail++] = nb
+			}
+		}
 	}
 
 	return WIND.rasterizeVectorGrid({
@@ -454,15 +392,15 @@ function buildLockedOceanCurrentGrid({
 		vectorV: currentV,
 		vectorSpeed: currentSpeed,
 		options: {
-			scalar: oceanWarmth,
-			allowCell: (region) => !isLand[region],
+			scalar: sst,
+			allowCell: (region) => !isLand[region] && coastalOcean[region] === 1,
 			isBlockedRegion: (region) => !!isLand[region],
 		},
 	})
 }
 
 export const OCEAN_CURRENTS = {
-	computeLockedOceanCurrents,
-	applyLockedCurrentTemperatureEffect,
+	computeLockedSST,
+	applyLockedSSTToClimate,
 	buildLockedOceanCurrentGrid,
 }

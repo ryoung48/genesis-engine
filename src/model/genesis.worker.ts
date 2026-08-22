@@ -191,7 +191,12 @@ function serializeWorld(
 					minFlow: world.rivers.minFlow,
 				}
 			: world.rivers,
-		oceanCurrents: world.oceanCurrents,
+		oceanCurrents: world.oceanCurrents
+			? {
+					sst: world.oceanCurrents.sst,
+					sstMonthly: world.oceanCurrents.sstMonthly,
+				}
+			: undefined,
 		provinces: world.provinces,
 		locations: world.locations,
 		nations: world.nations,
@@ -419,6 +424,9 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		if (world.rainfall.diff_monthly) add(world.rainfall.diff_monthly.buffer)
 		if (world.rainfall.diff_annual) add(world.rainfall.diff_annual.buffer)
 	}
+	if (world.oceanCurrents) {
+		add(world.oceanCurrents.sst.buffer, world.oceanCurrents.sstMonthly.buffer)
+	}
 	if (world.cycloneRisk) add(world.cycloneRisk.buffer)
 	if (world.tornadoRisk) add(world.tornadoRisk.buffer)
 	if (world.tidalRange) add(world.tidalRange.buffer)
@@ -526,22 +534,6 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.rivers.basinId.buffer,
 			world.rivers.waterLevel.buffer,
 		)
-	}
-	if (world.oceanCurrents) {
-		add(
-			world.oceanCurrents.oceanWarmth.buffer,
-			world.oceanCurrents.coastalWarmth.buffer,
-			world.oceanCurrents.temperatureDelta.buffer,
-		)
-		if (world.oceanCurrents.oceanWarmthMonthly) {
-			add(world.oceanCurrents.oceanWarmthMonthly.buffer)
-		}
-		if (world.oceanCurrents.coastalWarmthMonthly) {
-			add(world.oceanCurrents.coastalWarmthMonthly.buffer)
-		}
-		if (world.oceanCurrents.temperatureDeltaMonthly) {
-			add(world.oceanCurrents.temperatureDeltaMonthly.buffer)
-		}
 	}
 	if (world.monthlyTEQ) {
 		for (const teq of world.monthlyTEQ) add(teq.buffer)

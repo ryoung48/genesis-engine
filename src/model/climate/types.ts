@@ -15,21 +15,6 @@ export interface GenesisClimate {
 	landFraction: number[] // 36-band land fraction used by EBM
 }
 
-export interface GenesisOceanCurrents {
-	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */
-	oceanWarmth: Float32Array
-	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean/deep interior. */
-	coastalWarmth: Float32Array
-	/** Per-cell monthly ocean warmth, flattened [month * N + r]. Optional seasonal field. */
-	oceanWarmthMonthly?: Float32Array
-	/** Per-cell monthly coastal warmth, flattened [month * N + r]. Optional seasonal field. */
-	coastalWarmthMonthly?: Float32Array
-	/** Per-cell monthly temperature delta applied by ocean currents, flattened [month * N + r]. */
-	temperatureDeltaMonthly?: Float32Array
-	/** Per-cell temperature delta applied by ocean currents (°C). Zero where no effect. */
-	temperatureDelta: Float32Array
-}
-
 export interface GenesisRainfall {
 	monthly: Float32Array // [month * N + r] mm
 	annual: Float32Array // per-cell annual mm
@@ -39,6 +24,17 @@ export interface GenesisRainfall {
 	diff_annual?: Float32Array // per-cell annual modeled minus observed precipitation mm
 	east: Float32Array // per-cell normalized east moisture (0–1)
 	west: Float32Array // per-cell normalized west moisture (0–1)
+}
+
+export interface GenesisOceanCurrents {
+	/** Per-cell modeled SST anomaly vs zonal mean, -1..+1: latitude/coast-facing
+	 * band strength × distance-from-ITCZ × distance-from-coast falloff. Ocean
+	 * cells only carry the real signal; land cells hold a cosmetic fade of the
+	 * nearest ocean value for visual continuity at the coastline. Purely a
+	 * display quantity -- does not feed back into climate.temperature. */
+	sst: Float32Array
+	/** Per-cell monthly SST anomaly, flattened [month * numRegions + region]. */
+	sstMonthly: Float32Array
 }
 
 export interface GenesisHydrology {

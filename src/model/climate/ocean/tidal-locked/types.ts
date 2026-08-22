@@ -6,7 +6,7 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 
-export type LockedCurrentParams = Pick<
+export type LockedSSTParams = Pick<
 	Partial<GenesisParams>,
 	| "substellarLon"
 	| "eccentricity"
@@ -15,30 +15,24 @@ export type LockedCurrentParams = Pick<
 	| "planetRadiusKm"
 >
 
-export type ComputeLockedOceanCurrentsParams = {
+export type ComputeLockedSSTParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
+	distCoast: Float32Array
 	landmarks: GenesisLandmarks
-	params?: Partial<GenesisParams>
+	params?: LockedSSTParams
 }
 
-export type ApplyLockedCurrentTemperatureEffectParams = {
+export type ApplyLockedSSTToClimateParams = {
 	mesh: SphereMesh
 	climate: GenesisClimate
 	isLand: Uint8Array
-	currents: GenesisOceanCurrents
-	params?: Partial<GenesisParams>
+	oceanCurrents: GenesisOceanCurrents
 }
 
 export type BuildLockedOceanCurrentGridParams = {
 	mesh: SphereMesh
-	oceanWarmth: Float32Array
+	sst: Float32Array
 	isLand: Uint8Array
-	latDeg: Float32Array
-	lonDeg: Float32Array
-	params?: Pick<
-		GenesisParams,
-		"substellarLon" | "eccentricity" | "obliquity" | "perihelion"
-	>
-	currentMonth?: number
+	planetRadiusKm?: number
 }

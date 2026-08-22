@@ -664,7 +664,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			// weighted toward sizeClass 0, with 1 rare and 2-4 rarer still.
 			const sizeClass = rng.weightedChoice([
 				{ v: 0, w: 8 },
-				{ v: 1, w: 2 }
+				{ v: 1, w: 2 },
 			])
 			const classification = PLANET.classifyBody({
 				rng,

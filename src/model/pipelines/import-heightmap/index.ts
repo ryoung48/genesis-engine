@@ -469,7 +469,6 @@ function importGenesisWorld({
 		r_hotspot: new Float32Array(mesh.numRegions),
 		r_mantleUpwelling: new Float32Array(mesh.numRegions),
 		terrainFeatures: undefined,
-		enableOceanCurrents: true,
 		realClimateMonthly: params.realClimateMonthly,
 		realClimateWidth: params.realClimateWidth,
 		realClimateHeight: params.realClimateHeight,

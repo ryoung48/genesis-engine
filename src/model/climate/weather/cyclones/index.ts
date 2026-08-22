@@ -10,7 +10,6 @@ function computeCycloneRisk({
 	isLand,
 	topography,
 	params,
-	oceanCurrents,
 }: ComputeCycloneRiskParams): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
@@ -74,13 +73,7 @@ function computeCycloneRisk({
 			(1 - MATH.smoothstep({ edge0: 30, edge1: 38, x: distFromTeq }))
 		if (latFactor <= 0) continue
 
-		// Warm-current boost: hot currents raise effective SST
-		let currentBoost = 1.0
-		if (oceanCurrents?.oceanWarmth) {
-			currentBoost = 1 + 0.4 * Math.max(0, oceanCurrents.oceanWarmth[r])
-		}
-
-		genesis[r] = sstScore * latFactor * currentBoost
+		genesis[r] = sstScore * latFactor
 	}
 
 	// --- Step 2: BFS storm-track propagation across open ocean ---

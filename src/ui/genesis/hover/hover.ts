@@ -1,6 +1,7 @@
 import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
@@ -60,19 +61,18 @@ export interface HoverRiver {
 	lengthKm: number
 }
 
-export interface HoverOceanCurrents {
-	warmth: number
-	delta: number
-	averageDelta: number
-	mode: "warm" | "cold"
-	monthlyDelta: number[]
-	sstAnomalyMonthly: number[] | null
-	sstAnomalyAverage: number | null
-}
-
 export interface HoverTerrainFeature {
 	dominant: string | null
 	all: string[]
+}
+
+export interface HoverOceanCurrents {
+	/** Modeled SST anomaly, -1..+1 (display-only; not applied to climate). */
+	sst: number
+	mode: "warm" | "cold"
+	monthlySst: number[]
+	sstAnomalyMonthly: number[] | null
+	sstAnomalyAverage: number | null
 }
 
 export interface HoverDtr {
@@ -849,54 +849,6 @@ export function getHoverRiver(
 	}
 }
 
-export function getHoverOceanCurrents(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-): HoverOceanCurrents | null {
-	if (!(hoverInfo && world?.oceanCurrents)) return null
-	const r = hoverInfo.region
-	const isLand = !!world.isLand?.[r]
-	const warmth = isLand
-		? world.oceanCurrents.coastalWarmth[r]
-		: world.oceanCurrents.oceanWarmth[r]
-	const delta = world.oceanCurrents.temperatureDelta?.[r] ?? 0
-	const monthlyDelta: number[] = []
-	const monthly = world.oceanCurrents.temperatureDeltaMonthly
-	const N = world.mesh.numRegions
-	if (monthly) {
-		for (let m = 0; m < 12; m++) {
-			monthlyDelta.push(monthly[m * N + r] ?? delta)
-		}
-	} else {
-		for (let m = 0; m < 12; m++) monthlyDelta.push(delta)
-	}
-	const averageDelta =
-		monthlyDelta.reduce((sum, value) => sum + value, 0) / monthlyDelta.length
-
-	const sstAnomalyRaster = world.observedCurrent?.real_sst_anomaly_monthly
-	let sstAnomalyMonthly: number[] | null = null
-	let sstAnomalyAverage: number | null = null
-	if (sstAnomalyRaster && !isLand) {
-		const values: number[] = []
-		for (let m = 0; m < 12; m++) values.push(sstAnomalyRaster[m * N + r])
-		if (values.every((value) => Number.isFinite(value))) {
-			sstAnomalyMonthly = values
-			sstAnomalyAverage =
-				values.reduce((sum, value) => sum + value, 0) / values.length
-		}
-	}
-
-	return {
-		warmth,
-		delta: averageDelta,
-		averageDelta,
-		mode: averageDelta >= 0 ? "warm" : "cold",
-		monthlyDelta,
-		sstAnomalyMonthly,
-		sstAnomalyAverage,
-	}
-}
-
 export function getHoverTerrainFeature(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
@@ -920,6 +872,45 @@ export function getHoverTerrainFeature(
 				world.terrainFeatures.dominantFeature[r]
 			] ?? null,
 		all,
+	}
+}
+
+export function getHoverOceanCurrents(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+): HoverOceanCurrents | null {
+	if (!(hoverInfo && world?.oceanCurrents)) return null
+	const r = hoverInfo.region
+	const N = world.mesh.numRegions
+	// Stored sst is normalized -1..+1 for the color scale; scale back up to an
+	// approximate °C anomaly so it reads on the same units/verbiage as the
+	// observed SST anomaly below.
+	const saturationC = OCEAN_CURRENTS.sstAnomalySaturationC
+	const monthlySst: number[] = []
+	for (let m = 0; m < 12; m++) {
+		monthlySst.push(world.oceanCurrents.sstMonthly[m * N + r] * saturationC)
+	}
+	const sst = world.oceanCurrents.sst[r] * saturationC
+
+	const sstAnomalyRaster = world.observedCurrent?.real_sst_anomaly_monthly
+	let sstAnomalyMonthly: number[] | null = null
+	let sstAnomalyAverage: number | null = null
+	if (sstAnomalyRaster && !world.isLand?.[r]) {
+		const values: number[] = []
+		for (let m = 0; m < 12; m++) values.push(sstAnomalyRaster[m * N + r])
+		if (values.every((value) => Number.isFinite(value))) {
+			sstAnomalyMonthly = values
+			sstAnomalyAverage =
+				values.reduce((sum, value) => sum + value, 0) / values.length
+		}
+	}
+
+	return {
+		sst,
+		mode: sst >= 0 ? "warm" : "cold",
+		monthlySst,
+		sstAnomalyMonthly,
+		sstAnomalyAverage,
 	}
 }
 

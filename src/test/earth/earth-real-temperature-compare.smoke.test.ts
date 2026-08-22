@@ -303,7 +303,9 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 				}
 				if (count > 0) {
 					const mean = sum / count
-					terrainRoughnessKm[r] = Math.sqrt(Math.max(0, sumSq / count - mean * mean))
+					terrainRoughnessKm[r] = Math.sqrt(
+						Math.max(0, sumSq / count - mean * mean),
+					)
 				}
 			}
 
@@ -338,9 +340,10 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			): { west: number; east: number } {
 				const latRad = (lat * Math.PI) / 180
 				const lonRad = (lon * Math.PI) / 180
-				const px = ((((lonRad / Math.PI + 1) * 0.5 * coastline.width) %
-					coastline.width) +
-					coastline.width) %
+				const px =
+					((((lonRad / Math.PI + 1) * 0.5 * coastline.width) %
+						coastline.width) +
+						coastline.width) %
 					coastline.width
 				const py = Math.max(
 					0,
@@ -355,7 +358,8 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 				const maxSteps = coastline.width
 				let west = maxSteps
 				for (let step = 0; step < maxSteps; step++) {
-					const x = (((xi - step) % coastline.width) + coastline.width) %
+					const x =
+						(((xi - step) % coastline.width) + coastline.width) %
 						coastline.width
 					if (coastline.grayscale[row + x] < 128) {
 						west = step
@@ -416,7 +420,8 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			const monthsBelowZero = new Int32Array(mesh.numRegions)
 			for (let r = 0; r < mesh.numRegions; r++) {
 				if (!isLand[r]) continue
-				annualRangeC[r] = climate.temperature_max[r] - climate.temperature_min[r]
+				annualRangeC[r] =
+					climate.temperature_max[r] - climate.temperature_min[r]
 				let count = 0
 				for (let month = 0; month < 12; month++) {
 					if (climate.temperature_monthly[month * mesh.numRegions + r] < 0)
@@ -452,7 +457,9 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 				}
 			}
 			fs.writeFileSync(process.env.DUMP_GBM_CSV as string, rows.join("\n"))
-			console.info(`Wrote ${rows.length - 1} rows to ${process.env.DUMP_GBM_CSV}`)
+			console.info(
+				`Wrote ${rows.length - 1} rows to ${process.env.DUMP_GBM_CSV}`,
+			)
 		}
 
 		let n = 0

@@ -1136,26 +1136,25 @@ export const GenesisView: React.FC<{
 		}
 		if (!world.oceanCurrents) return null
 		const N = world.mesh.numRegions
-		const monthlyWarmth = world.oceanCurrents.oceanWarmthMonthly
-		const warmth =
-			monthlyWarmth && currentMonth > 0
-				? monthlyWarmth.subarray((currentMonth - 1) * N, currentMonth * N)
-				: world.oceanCurrents.oceanWarmth
-		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
+		const sst =
+			currentMonth > 0
+				? world.oceanCurrents.sstMonthly.subarray(
+						(currentMonth - 1) * N,
+						currentMonth * N,
+					)
+				: world.oceanCurrents.sst
 		if (world.params.tideLock?.type === "solar") {
 			return LOCKED_OCEAN_CURRENTS.buildLockedOceanCurrentGrid({
 				mesh: world.mesh,
-				oceanWarmth: warmth,
+				sst,
 				isLand: world.isLand,
-				latDeg,
-				lonDeg,
-				params: world.params,
-				currentMonth,
+				planetRadiusKm: world.params.planetRadiusKm,
 			})
 		}
+		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		return OCEAN_CURRENTS.buildOceanCurrentGrid({
 			mesh: world.mesh,
-			oceanWarmth: warmth,
+			sst,
 			isLand: world.isLand,
 			latDeg,
 			lonDeg,

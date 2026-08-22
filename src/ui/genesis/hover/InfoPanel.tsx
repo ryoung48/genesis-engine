@@ -69,7 +69,10 @@ import {
 } from "@/ui/genesis/shared/colors"
 import { daylightColor } from "@/ui/genesis/shared/colors/misc"
 import { monthLabels } from "@/ui/genesis/shared/constants"
-import { getDataVariant, type DataVariant } from "@/ui/genesis/shared/data-variant"
+import {
+	type DataVariant,
+	getDataVariant,
+} from "@/ui/genesis/shared/data-variant"
 import {
 	getMapModePrimary,
 	type PopulationMapMode,
@@ -337,7 +340,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showGeography &&
 		dataVariant !== "observed" &&
 		hoverOceanCurrents !== null &&
-		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
+		hoverOceanCurrents.monthlySst.some((value) => Math.abs(value) > 0.01)
 	const hasSstAnomaly =
 		showGeography &&
 		dataVariant === "observed" &&
@@ -1318,16 +1321,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							hoverOceanCurrents !== null && (
 								<div className="space-y-1 border-t border-white/5 pt-1">
 									<SeriesBars
-										values={hoverOceanCurrents.monthlyDelta}
+										values={hoverOceanCurrents.monthlySst}
 										labels={MONTH_SHORT}
-										label="Ocean Current"
+										label="Modeled SST Anomaly"
 										colorForValue={(value) => currentImpactColor(value)}
 										activeIndex={activeBarIndex}
 										formatValue={(value) =>
 											`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1).replace(/ ?°[CF]$/, "")}`
 										}
-										summary={buildSummary(hoverOceanCurrents.averageDelta, {
-											prefix: `${hoverOceanCurrents.mode} · avg`,
+										summary={buildSummary(hoverOceanCurrents.sst, {
+											prefix: "avg",
 											formatValue: (value) =>
 												`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`,
 										})}

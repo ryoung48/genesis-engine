@@ -603,7 +603,6 @@ function generateGenesisWorld({
 			r_hotspot,
 			r_mantleUpwelling,
 			terrainFeatures,
-			enableOceanCurrents: true,
 			onProgress,
 		}),
 	)

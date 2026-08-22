@@ -150,7 +150,7 @@ export interface GenesisWorld {
 	realPastaClimate?: Uint8Array
 	/** Per-cell pasta climate detail metrics for realPastaClimate — distinct from pastaDebug since observed and modeled temps/DTR differ. Earth-import only. */
 	realPastaDebug?: PastaDebug
-	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
+	/** Modeled SST anomaly (display-only, does not affect temperature). */
 	oceanCurrents?: GenesisOceanCurrents
 	/** Per-cell cyclone risk score in [0, 1]. */
 	cycloneRisk?: Float32Array

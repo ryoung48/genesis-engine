@@ -11,13 +11,18 @@ import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { CLOUD_COVER_TEMPERATURE_MODIFIER } from "@/model/climate/temperature/cloud-cover-modifier"
 import { DTR } from "@/model/climate/temperature/dtr"
-import type { GenesisRainfall } from "@/model/climate/types"
+import type {
+	GenesisClimate,
+	GenesisOceanCurrents,
+	GenesisRainfall,
+} from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
@@ -30,6 +35,7 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import { PROVINCES } from "@/model/geography/terrain/provinces"
 import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import type { SphereMesh } from "@/model/mesh/types"
 import type {
 	PostPipelineInput,
 	PostPipelineOutput,
@@ -44,6 +50,31 @@ import type { ProvincePopulation } from "@/model/society/population/types"
 import type { GenesisProvinces } from "@/model/society/types"
 
 const LAKE_RETENTION_THRESHOLD = 100
+
+/** Applies a previously computed ocean-current SST field to climate,
+ * dispatching to the tidally locked model (substellar-distance banded) or
+ * the rotating model (ITCZ-distance banded) depending on tideLock. Kept as
+ * a single call site since the pipeline reapplies the same, already-
+ * computed oceanCurrents each time it recomputes climate from scratch. */
+function applyOceanCurrentsToClimate(params: {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	oceanCurrents: GenesisOceanCurrents
+	isLocked: boolean
+}): void {
+	const { mesh, climate, isLand, oceanCurrents, isLocked } = params
+	if (isLocked) {
+		LOCKED_OCEAN_CURRENTS.applyLockedSSTToClimate({
+			mesh,
+			climate,
+			isLand,
+			oceanCurrents,
+		})
+	} else {
+		OCEAN_CURRENTS.applySSTToClimate({ mesh, climate, isLand, oceanCurrents })
+	}
+}
 
 function reconcileClosedWaterBodies(params: {
 	isLand: Uint8Array
@@ -109,7 +140,6 @@ function runPostElevationPipeline(
 		boundary,
 		distFields,
 		r_hotspot,
-		enableOceanCurrents,
 		onProgress,
 		realLakeRegions,
 		realRivers,
@@ -224,32 +254,36 @@ function runPostElevationPipeline(
 	record("Post: moisture advection", t0)
 	onProgress?.("Post: moisture advection", 50)
 
-	// ── Ocean currents ─────────────────────────────────────────────────
+	// ── Ocean SST ────────────────────────────────────────────────────────
 	t0 = performance.now()
-	const oceanCurrents = enableOceanCurrents
-		? OCEAN_CURRENTS.computeOceanCurrents({
+	const isLockedOcean = params.tideLock?.type === "solar"
+	const oceanCurrents = isLockedOcean
+		? LOCKED_OCEAN_CURRENTS.computeLockedSST({
 				mesh,
 				isLand,
 				distCoast,
-				landmarks: currentLandmarks!,
+				landmarks: currentLandmarks,
 				params,
-				monthlyTEQ,
 			})
-		: undefined
-	if (enableOceanCurrents) record("Post: ocean currents", t0)
-	if (oceanCurrents) {
-		t0 = performance.now()
-		OCEAN_CURRENTS.applyCurrentTemperatureEffect({
-			mesh,
-			climate,
-			isLand,
-			currents: oceanCurrents,
-			monthlyTEQ,
-			params,
-		})
-		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
-		record("Post: current temperature effect", t0)
-	}
+		: OCEAN_CURRENTS.computeSST({
+				mesh,
+				isLand,
+				distCoast,
+				landmarks: currentLandmarks,
+				monthlyTEQ,
+				eastAdv,
+				westAdv,
+				planetRadiusKm: params.planetRadiusKm,
+			})
+	applyOceanCurrentsToClimate({
+		mesh,
+		climate,
+		isLand,
+		oceanCurrents,
+		isLocked: isLockedOcean,
+	})
+	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+	record("Post: ocean SST", t0)
 
 	// ── Rainfall ───────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -298,17 +332,14 @@ function runPostElevationPipeline(
 				temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 			})
 		}
-		if (oceanCurrents) {
-			OCEAN_CURRENTS.applyCurrentTemperatureEffect({
-				mesh,
-				climate,
-				isLand,
-				currents: oceanCurrents,
-				monthlyTEQ,
-				params,
-			})
-			HYDROLOGY.refreshClimatePetMonthly({ climate, params })
-		}
+		applyOceanCurrentsToClimate({
+			mesh,
+			climate,
+			isLand,
+			oceanCurrents,
+			isLocked: isLockedOcean,
+		})
+		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		record("Post: drain arid closed water", t0)
 	}
 
@@ -437,17 +468,14 @@ function runPostElevationPipeline(
 			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 		})
 	}
-	if (oceanCurrents) {
-		OCEAN_CURRENTS.applyCurrentTemperatureEffect({
-			mesh,
-			climate,
-			isLand,
-			currents: oceanCurrents,
-			monthlyTEQ,
-			params,
-		})
-		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
-	}
+	applyOceanCurrentsToClimate({
+		mesh,
+		climate,
+		isLand,
+		oceanCurrents,
+		isLocked: isLockedOcean,
+	})
+	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
 		rainfall,
 		elevationKm: elevation_km,
@@ -850,7 +878,6 @@ function runPostElevationPipeline(
 		isLand,
 		topography,
 		params,
-		oceanCurrents,
 	})
 	record("Post: cyclones", t0)
 

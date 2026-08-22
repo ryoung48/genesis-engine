@@ -67,7 +67,12 @@ function summarizeByLatitude(world: ReturnType<typeof buildEarth>) {
 	const r_xyz = mesh.r_xyz
 	const avg = climate.temperature_avg
 
-	const bandStats = LAT_BANDS.map((b) => ({ ...b, n: 0, sum: 0, min: Infinity }))
+	const bandStats = LAT_BANDS.map((b) => ({
+		...b,
+		n: 0,
+		sum: 0,
+		min: Infinity,
+	}))
 	let globalN = 0
 	let globalSum = 0
 	let belowFreezingN = 0

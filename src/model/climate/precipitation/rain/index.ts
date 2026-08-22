@@ -71,7 +71,6 @@ const westerliesScale = (x: number) =>
 const orographicLiftScale = (slope: number) =>
 	MATH.piecewise({ domain: [0, 0.2, 0.45, 1], range: [1, 1, 1.6, 3], x: slope })
 
-
 const hadleyWidth = (x: number) =>
 	MATH.piecewise({
 		domain: [6, 12, 24, 48, 96, 192, 384],
@@ -268,7 +267,8 @@ function computeAdvection({
 
 	const planetRadiusKm =
 		typeof params === "number" ? params : params?.planetRadiusKm
-	const hoursPerDay = typeof params === "number" ? 24 : (params?.hoursPerDay ?? 24)
+	const hoursPerDay =
+		typeof params === "number" ? 24 : (params?.hoursPerDay ?? 24)
 	const hadley = hadleyWidth(hoursPerDay)
 	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
 	const scale = 94.5 / avgEdgeKm
@@ -290,7 +290,8 @@ function computeAdvection({
 	const isOceanWater = (r: number): boolean =>
 		!land[r] &&
 		(!landmarks ||
-			landmarks.type[landmarks.regionLandmark[r]] === LANDMARKS.landmarkTypeOcean)
+			landmarks.type[landmarks.regionLandmark[r]] ===
+				LANDMARKS.landmarkTypeOcean)
 
 	const elevKm =
 		elevation_km ??
@@ -301,7 +302,6 @@ function computeAdvection({
 			}
 			return arr
 		})()
-
 
 	const computePair = (teqByLon: Float32Array) => {
 		const basinLabel = new Int32Array(N).fill(-1)
@@ -536,7 +536,10 @@ function computeAdvection({
 		// BASE_REDUCTION, until no reachable neighbor still qualifies. Runs
 		// per channel (east/west never mix here) on the raw 0..wet values,
 		// with no orographic/lift term — purely lateral leveling.
-		const spreadMoisture = (attr: "east" | "west", blockedBy?: Float32Array) => {
+		const spreadMoisture = (
+			attr: "east" | "west",
+			blockedBy?: Float32Array,
+		) => {
 			const moisture = attr === "east" ? east : west
 			const liftAffected = attr === "east" ? eastLiftAffected : westLiftAffected
 			const settled = new Uint8Array(N)
@@ -567,7 +570,8 @@ function computeAdvection({
 					// nb and doesn't keep propagating past it.
 					if (
 						blockedBy &&
-						candidate <= blockedBy[nb] * eastMoistureWinBias(absLatDeg[nb], hadley)
+						candidate <=
+							blockedBy[nb] * eastMoistureWinBias(absLatDeg[nb], hadley)
 					)
 						continue
 					if (moisture[nb] < candidate - 1e-3) {
@@ -688,7 +692,10 @@ function computeMonthlyRain({
 	// of the Hadley cell that drives desert suppression is a stable,
 	// rotation-driven feature that doesn't track the ITCZ's full seasonal
 	// swing the way the rain band itself does (see computeWeight).
-	const annualTeq = computeThermalEquator({ mesh, temps: climate.temperature_avg })
+	const annualTeq = computeThermalEquator({
+		mesh,
+		temps: climate.temperature_avg,
+	})
 
 	const monthly = new Float32Array(N * 12)
 	const boundaryWarpDeg = RAIN_SHARED.computeRainBandWarpField({

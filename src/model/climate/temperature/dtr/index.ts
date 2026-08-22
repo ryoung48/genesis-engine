@@ -51,12 +51,12 @@ function computeDiurnalRange(args: {
 			const daylightWet = 1 - Math.E ** (-rain / 100)
 			const daylightAmp = 0.6 * (1 - 0.5 * daylightWet)
 			const daylightFactor = 1 - daylightAmp * (2 * dayFrac - 1) ** 2
-			const rainVariability = 9 * Math.E ** (-rain / 85)
+			const rainVariability = 8.5 * Math.E ** (-rain / 85)
 			const dayAlpha = 0.2 + 0.23 * Math.E ** (-rain / 90)
 			const dayFactor = relHours ** dayAlpha
 
 			const landAlpha = 0.08 + 0.37 * Math.E ** (-rain / 85)
-			const landFactor = Math.min(1, 1 - Math.E ** (-distKm / 1200))
+			const landFactor = Math.min(1, 1 - Math.E ** (-distKm / 3000))
 
 			dtr_monthly[idx] =
 				5 +

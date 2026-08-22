@@ -187,12 +187,8 @@ export interface SerializedGenesisWorld {
 		waterLevel: Float32Array
 	}
 	oceanCurrents?: {
-		oceanWarmth: Float32Array
-		coastalWarmth: Float32Array
-		oceanWarmthMonthly?: Float32Array
-		coastalWarmthMonthly?: Float32Array
-		temperatureDeltaMonthly?: Float32Array
-		temperatureDelta: Float32Array
+		sst: Float32Array
+		sstMonthly: Float32Array
 	}
 	provinces?: SerializedProvinces
 	locations?: SerializedLocations

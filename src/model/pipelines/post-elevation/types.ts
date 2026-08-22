@@ -56,7 +56,6 @@ export interface PostPipelineInput {
 	r_hotspot: Float32Array
 	r_mantleUpwelling?: Float32Array
 	terrainFeatures?: GenesisTerrainFeatures
-	enableOceanCurrents: boolean
 	onProgress?: (label: string, pct?: number) => void
 	/** Real lake cells (from a vector lake mask) that must survive the arid/rainfall-based lake-draining heuristic below — real lakes (e.g. the Aral Sea) can sit in regions too dry for computeLakes' own rainfall model to have created them procedurally. */
 	realLakeRegions?: Uint8Array
@@ -184,7 +183,7 @@ export interface PostPipelineOutput {
 	tidalRange: Float32Array
 	tidalSchedule: TidalSchedule
 	landmarks: GenesisLandmarks
-	oceanCurrents: GenesisOceanCurrents | undefined
+	oceanCurrents: GenesisOceanCurrents
 	timings: StageTiming[]
 	eraSettledMask: Uint8Array | undefined
 	eraStatehoodMask: Uint8Array | undefined

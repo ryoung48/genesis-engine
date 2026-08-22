@@ -799,30 +799,11 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "oceanCurrents" && world.oceanCurrents) {
-		const {
-			oceanWarmth,
-			oceanWarmthMonthly,
-			temperatureDelta,
-			temperatureDeltaMonthly,
-		} = world.oceanCurrents
-		const monthly = currentMonth === 0 ? null : temperatureDeltaMonthly
-		const monthlyOceanWarmth = currentMonth === 0 ? null : oceanWarmthMonthly
+		const { sst, sstMonthly } = world.oceanCurrents
+		const monthly = currentMonth === 0 ? null : sstMonthly
 		const offset = monthly ? (currentMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
-			const isLand = isLandRegion(r)
-			const colorValue = isLand
-				? Math.max(
-						-1,
-						Math.min(
-							1,
-							(monthly
-								? (monthly[offset + r] ?? temperatureDelta?.[r] ?? 0)
-								: (temperatureDelta?.[r] ?? 0)) / 15,
-						),
-					)
-				: monthlyOceanWarmth
-					? (monthlyOceanWarmth[offset + r] ?? oceanWarmth?.[r] ?? 0)
-					: (oceanWarmth?.[r] ?? 0)
+			const colorValue = monthly ? (monthly[offset + r] ?? sst[r]) : sst[r]
 			const [cr, cg, cb] = oceanCurrentColor(colorValue)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
