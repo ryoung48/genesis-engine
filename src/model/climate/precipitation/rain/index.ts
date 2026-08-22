@@ -18,23 +18,59 @@ import { UNITS } from "@/model/shared/units"
 
 const DEG2RAD = Math.PI / 180
 
-const EAST_MOISTURE_WIN_BIAS = 1.03
+// Matches BASE_REDUCTION in computeAdvection's per-hop orographic depletion —
+// the post-advection spread pass reuses the same per-hop cost so a spread hop
+// "feels" like an ordinary advection hop.
+const SPREAD_BASE_REDUCTION = 0.9
+
+// East gets first claim on a cell's moisture at 1.05x almost everywhere, but
+// that bias is reduced to 0.95x between 20/30 and 30/30 hadley-widths off the
+// equator (20°-30° at the standard 24h-day hadleyWidth of 30) — this is the
+// subtropical belt where westerlies (winter storm track) start meaningfully
+// competing with the trade-wind easterlies, so west shouldn't need to
+// overcome an east-favoring handicap there. Scales with hadleyWidth like
+// subsidenceScale so the band tracks each planet's own Hadley-cell geometry
+// instead of a fixed real-world latitude.
+const eastMoistureWinBias = (absLat: number, hadley: number): number => {
+	const norm = absLat / hadley
+	return norm >= 20 / 30 && norm <= 30 / 30 ? 1.05 : 1.05
+}
 
 const itczScale = (x: number) =>
 	MATH.piecewise({ domain: [0, 0.26, 0.6, 0.93], range: [1, 0.7, 0.2, 0], x })
 
+// Hadley-cell subsidence: no suppression until 10°/hadleyWidth off the
+// thermal equator, ramps to near-full suppression by 18°, holds through 32°,
+// and releases back to zero by 40° (standard 24h day; scales with hadleyWidth
+// since dist is already normalized to hadley-cell units). Peak is 0.9, not
+// 1.0, so even the driest subtropical belt keeps a small trickle of ITCZ
+// rain through rather than going bone-dry.
 const subsidenceScale = (x: number) =>
 	MATH.piecewise({
-		domain: [0.5, 0.66, 0.83, 1, 1.16, 1.33],
-		range: [0, 0.5, 1, 1, 0.5, 0],
+		domain: [10 / 30, 18 / 30, 32 / 30, 40 / 30],
+		range: [0, 0.9, 0.9, 0],
 		x,
 	})
 
+// Shifted 10° closer to the thermal equator (standard 24h day): east storms
+// now ramp in from 0° and reach full strength by 25° instead of 10°/35°;
+// westerlies now onset at 30° and peak at 40° instead of 40°/50°.
 const eastStormScale = (x: number) =>
-	MATH.piecewise({ domain: [0.33, 1.16, 3], range: [0, 0.8, 1], x })
+	MATH.piecewise({ domain: [0 / 30, 25 / 30, 80 / 30], range: [0, 0.8, 1], x })
 
 const westerliesScale = (x: number) =>
-	MATH.piecewise({ domain: [1.33, 1.66, 3], range: [0, 1, 0.8], x })
+	MATH.piecewise({ domain: [30 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
+
+// Windward orographic lift: keyed off the target cell's `slopeScore` — the
+// same [0, 1] mesh-relative slope value shown in the hover panel
+// (`CLASSIFICATION.computeSlopeScore`) — so "steep" means the same thing
+// here as it does in the UI, instead of a separately-derived grade. Only
+// climbing into the wind matters — flat/downslope hops get 1x (unaffected);
+// the existing per-hop depletion already handles leeward rain-shadow drying
+// once moisture has been pulled out here.
+const orographicLiftScale = (slope: number) =>
+	MATH.piecewise({ domain: [0, 0.2, 0.45, 1], range: [1, 1, 1.6, 3], x: slope })
+
 
 const hadleyWidth = (x: number) =>
 	MATH.piecewise({
@@ -133,7 +169,14 @@ function buildRainRegionMask({
 
 const TEQ_NUM_BINS = 120
 
-const TEQ_HALF_WIN = 5
+// Wide enough (18 bins × 3° = ±54° of longitude) to reach past a large hot
+// desert's own longitude span (e.g. the Sahara, ~50°+ wide) and pull in
+// genuinely ocean-anchored ITCZ latitudes on either side, so a broad
+// temperature-only hijack can't smooth itself with equally-hijacked
+// neighbors. Still narrow enough to preserve real regional ITCZ asymmetry
+// (e.g. the Indian monsoon trough sitting well north of the mid-Atlantic
+// ITCZ at the same time of year).
+const TEQ_HALF_WIN = 18
 
 function computeTEQBins({
 	mesh,
@@ -214,6 +257,8 @@ function computeAdvection({
 	params,
 	isLand,
 	elevation_km,
+	landmarks,
+	slopeScore,
 }: ComputeAdvectionParams): {
 	east: Float32Array
 	west: Float32Array
@@ -223,6 +268,8 @@ function computeAdvection({
 
 	const planetRadiusKm =
 		typeof params === "number" ? params : params?.planetRadiusKm
+	const hoursPerDay = typeof params === "number" ? 24 : (params?.hoursPerDay ?? 24)
+	const hadley = hadleyWidth(hoursPerDay)
 	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
 	const scale = 94.5 / avgEdgeKm
 	// computeCoastDistances now returns real km (not a hop count), so this
@@ -236,6 +283,25 @@ function computeAdvection({
 	const { adjOffset, adjList, neighborDist } = mesh
 	const land = isLand
 	const planetRadiusKmResolved = planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
+
+	// A landlocked sea/lake evaporates locally but isn't the open-ocean
+	// airmass this per-hop transit gain models — without landmarks to tell
+	// them apart, fall back to treating all water as ocean (prior behavior).
+	const isOceanWater = (r: number): boolean =>
+		!land[r] &&
+		(!landmarks ||
+			landmarks.type[landmarks.regionLandmark[r]] === LANDMARKS.landmarkTypeOcean)
+
+	const elevKm =
+		elevation_km ??
+		(() => {
+			const arr = new Float32Array(N)
+			for (let r = 0; r < N; r++) {
+				arr[r] = ELEVATION.elevToHeightKm({ elev: elevation[r] })
+			}
+			return arr
+		})()
+
 
 	const computePair = (teqByLon: Float32Array) => {
 		const basinLabel = new Int32Array(N).fill(-1)
@@ -271,7 +337,14 @@ function computeAdvection({
 				!land[r] &&
 				elevation[r] <= 0 &&
 				basinLabel[r] >= 0 &&
-				basinSize[basinLabel[r]] >= minBasinSize
+				basinSize[basinLabel[r]] >= minBasinSize &&
+				// A landlocked sea/lake (e.g. the Caspian) can clear the size
+				// threshold above without being connected to open ocean — only
+				// an actual ocean-classified landmark evaporates enough to feed
+				// the wind-driven advection this basin flood-fill seeds.
+				(!landmarks ||
+					landmarks.type[landmarks.regionLandmark[r]] ===
+						LANDMARKS.landmarkTypeOcean)
 			) {
 				sourceMoisture[r] =
 					wet *
@@ -285,6 +358,18 @@ function computeAdvection({
 
 		const east = new Float32Array(N)
 		const west = new Float32Array(N)
+		// Uncapped "stays here" moisture per channel — same as east/west except
+		// windward-lift cells are allowed to exceed the wet=30 transport cap,
+		// since lift represents rain deposited locally, not moisture still in
+		// transit. Never fed back into the flood-fill itself (see assignRain).
+		const eastLocal = new Float32Array(N)
+		const westLocal = new Float32Array(N)
+		// Cells whose moisture was ever boosted by windward orographic lift
+		// (liftMultiplier > 1) during advection — this value is a local
+		// deposit, not transportable airmass, so the post-advection spread
+		// pass must never use it as a source nor overwrite it as a target.
+		const eastLiftAffected = new Uint8Array(N)
+		const westLiftAffected = new Uint8Array(N)
 		const isValidFlow = ({
 			attr,
 			r,
@@ -345,8 +430,10 @@ function computeAdvection({
 			return alignment >= 0.4
 		}
 
-		const assignRain = (attr: "east" | "west") => {
+		const assignRain = (attr: "east" | "west", blockedBy?: Float32Array) => {
 			const moisture = attr === "east" ? east : west
+			const localMoisture = attr === "east" ? eastLocal : westLocal
+			const liftAffected = attr === "east" ? eastLiftAffected : westLiftAffected
 			const settled = new Uint8Array(N)
 			// Max-heap on moisture: push the negated value into the min-heap.
 			const queue = new PriorityHeap<number>()
@@ -354,6 +441,7 @@ function computeAdvection({
 			for (let r = 0; r < N; r++) {
 				if (!land[r] && sourceMoisture[r] > 1e-3) {
 					moisture[r] = sourceMoisture[r]
+					localMoisture[r] = sourceMoisture[r]
 					queue.push(-sourceMoisture[r], r)
 				}
 			}
@@ -366,12 +454,24 @@ function computeAdvection({
 				if (settled[r]) continue
 				if (nextMoisture + 1e-3 < moisture[r]) continue
 				settled[r] = 1
-				const heightKm = elevation_km
-					? elevation_km[r]
-					: ELEVATION.elevToHeightKm({ elev: elevation[r] })
-				const orographic = heightKm > 2 ? -1.8 : -0.6
-				const baseImpact = (!land[r] ? 0.5 : orographic) / scale
 
+				// Sequential precedence: once this westward hop can no longer
+				// beat the already-settled east value at this cell (east gets
+				// first claim, per eastMoistureWinBias), stop piling on —
+				// this cell and everything only reachable further downwind
+				// concede to east.
+				if (
+					blockedBy &&
+					land[r] &&
+					nextMoisture <=
+						blockedBy[r] * eastMoistureWinBias(absLatDeg[r], hadley)
+				) {
+					moisture[r] = 0
+					localMoisture[r] = 0
+					continue
+				}
+
+				const rIsOceanWater = !land[r] && isOceanWater(r)
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
 					if (
@@ -389,6 +489,25 @@ function computeAdvection({
 					// through the sparse open ocean, and should lose/gain
 					// proportionally less moisture.
 					const edgeKm = neighborDist[j] * planetRadiusKmResolved
+
+					// Windward lift: climbing into the wind pulls extra moisture
+					// out of the transported airmass (steeper depletion below)
+					// and deposits it locally (localMoisture), uncapped, so
+					// genuinely extreme orographic hotspots aren't clamped to
+					// the same ceiling as an ordinary saturated coastal cell.
+					let liftMultiplier = 1
+					if (land[r] && edgeKm > 1e-6 && elevKm[nb] > elevKm[r]) {
+						liftMultiplier = orographicLiftScale(slopeScore?.[nb] ?? 0)
+					}
+					const BASE_REDUCTION = 0.9
+					const orographic = -BASE_REDUCTION * liftMultiplier
+					// Lake/sea (non-ocean) water is neither a transit boost nor
+					// subject to land's orographic depletion — it's just neutral.
+					const baseImpact = land[r]
+						? orographic / scale
+						: rIsOceanWater
+							? 0.5 / scale
+							: -0.1 / scale
 					const impact = baseImpact * (edgeKm / avgEdgeKm)
 					const m = Math.max(
 						Math.min(Math.max(moisture[r], 0) + impact, wet),
@@ -396,39 +515,79 @@ function computeAdvection({
 					)
 					if (!settled[nb] && m > moisture[nb] + 1e-3) {
 						moisture[nb] = m
+						if (liftMultiplier > 1) {
+							localMoisture[nb] = Math.max(moisture[r], 0) * liftMultiplier
+							liftAffected[nb] = 1
+						} else {
+							localMoisture[nb] = m
+						}
 						queue.push(-m, nb)
 					}
 				}
 			}
 
-			const smoothed = new Float32Array(N)
+			for (let r = 0; r < N; r++) moisture[r] = localMoisture[r]
+		}
+
+		// Post-advection lateral spread: a settled cell whose e/w-aligned
+		// neighbor sits more than BASE_REDUCTION below it gives that neighbor
+		// moisture[r] - BASE_REDUCTION, then the neighbor keeps spreading
+		// outward from its new value the same way, each hop losing another
+		// BASE_REDUCTION, until no reachable neighbor still qualifies. Runs
+		// per channel (east/west never mix here) on the raw 0..wet values,
+		// with no orographic/lift term — purely lateral leveling.
+		const spreadMoisture = (attr: "east" | "west", blockedBy?: Float32Array) => {
+			const moisture = attr === "east" ? east : west
+			const liftAffected = attr === "east" ? eastLiftAffected : westLiftAffected
+			const settled = new Uint8Array(N)
+			const queue = new PriorityHeap<number>()
+
 			for (let r = 0; r < N; r++) {
-				if (!land[r]) {
-					smoothed[r] = moisture[r]
-					continue
-				}
-				let sum = moisture[r]
-				let count = 1
+				if (moisture[r] > 1e-3 && !liftAffected[r]) queue.push(-moisture[r], r)
+			}
+
+			while (queue.size > 0) {
+				const next = queue.pop()
+				if (!next) break
+				const r = next.value
+				const nextMoisture = -next.key
+				if (settled[r]) continue
+				if (nextMoisture + 1e-3 < moisture[r]) continue
+				settled[r] = 1
+
+				const candidate = moisture[r] - SPREAD_BASE_REDUCTION
+				if (candidate <= 1e-3) continue
+
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
-					if (land[nb]) {
-						sum += moisture[nb]
-						count++
+					if (settled[nb] || liftAffected[nb]) continue
+					// Same precedence as assignRain's blockedBy: west's spread
+					// stops cold the moment it can no longer beat the other
+					// channel's claim at this neighbor — it doesn't overwrite
+					// nb and doesn't keep propagating past it.
+					if (
+						blockedBy &&
+						candidate <= blockedBy[nb] * eastMoistureWinBias(absLatDeg[nb], hadley)
+					)
+						continue
+					if (moisture[nb] < candidate - 1e-3) {
+						const m = Math.min(candidate, wet)
+						moisture[nb] = m
+						queue.push(-m, nb)
 					}
 				}
-				smoothed[r] = sum / count
 			}
-			for (let r = 0; r < N; r++) moisture[r] = smoothed[r]
 		}
 
 		assignRain("east")
-		assignRain("west")
+		assignRain("west", east)
+		spreadMoisture("east")
+		spreadMoisture("west", east)
 
 		for (let r = 0; r < N; r++) {
 			east[r] /= wet
 			west[r] /= wet
-			if (east[r] * EAST_MOISTURE_WIN_BIAS > west[r]) west[r] = 0
-			else east[r] = 0
+			if (west[r] > 0) east[r] = 0
 		}
 
 		return { east, west }
@@ -445,6 +604,7 @@ function computeAdvection({
 function computeWeight({
 	cellLat,
 	teq,
+	subsidenceTeq = teq,
 	eastMoisture,
 	westMoisture,
 	hoursPerDay,
@@ -452,12 +612,24 @@ function computeWeight({
 }: ComputeRainWeightParams): number {
 	const hadley = hadleyWidth(hoursPerDay)
 	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
+	// Subtropical highs (what actually drives desert suppression) don't swing
+	// with the ITCZ's full seasonal migration the way the rain band itself
+	// does — they're a much more stable, rotation-driven feature. Measuring
+	// suppression from a separately-damped teq (subsidenceTeq, blended toward
+	// the annual mean by the caller) keeps the dry belt roughly in place
+	// year-round instead of dragging north/south with the monsoon.
+	const subsidenceDist =
+		Math.abs(cellLat - (subsidenceTeq + bandOffsetDeg)) / hadley
 	const moisture = Math.max(eastMoisture, westMoisture)
 	const itcz = itczScale(dist) * moisture
 	const suppression =
-		1 - MATH.clamp({ value: subsidenceScale(dist), lo: 0, hi: 1 })
+		1 - MATH.clamp({ value: subsidenceScale(subsidenceDist), lo: 0, hi: 1 })
 	const eastStorms = eastStormScale(dist) * eastMoisture
-	const westerlies = westerliesScale(dist) * westMoisture
+	// Unlike the trade-wind easterlies, westerlies at these latitudes pass
+	// through the same subtropical-high subsidence belt that suppresses the
+	// ITCZ, so they're damped by the same suppression factor rather than
+	// escaping it entirely.
+	const westerlies = westerliesScale(dist) * westMoisture * suppression
 	return MATH.clamp({
 		value: Math.max(itcz * suppression, eastStorms, westerlies),
 		lo: 0,
@@ -511,6 +683,13 @@ function computeMonthlyRain({
 			return result
 		})()
 
+	// Subtropical-high position for subsidence: anchored to the annual-mean
+	// thermal equator rather than the monthly one, since the descending branch
+	// of the Hadley cell that drives desert suppression is a stable,
+	// rotation-driven feature that doesn't track the ITCZ's full seasonal
+	// swing the way the rain band itself does (see computeWeight).
+	const annualTeq = computeThermalEquator({ mesh, temps: climate.temperature_avg })
+
 	const monthly = new Float32Array(N * 12)
 	const boundaryWarpDeg = RAIN_SHARED.computeRainBandWarpField({
 		mesh,
@@ -522,11 +701,19 @@ function computeMonthlyRain({
 		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
 		const w = reverseCirculation ? eastAdv[r] : westAdv[r]
 		const bin = regionBin[r]
+		// computeWeight clamps its own output to [0,1] as a safety net for the
+		// normal itcz/subsidence/storm blend. Windward orographic lift can push
+		// e/w above 1 (see computeAdvection's localMoisture) — that overflow
+		// wouldn't survive the clamp otherwise, so it's re-applied here as an
+		// uncapped multiplier on the final mm value, scoped only to cells that
+		// actually earned it via lift.
+		const liftOverflow = Math.max(1, e, w)
 		for (let month = 0; month < 12; month++) {
 			const teq = teqPerMonth[month][bin]
 			const weight = computeWeight({
 				cellLat: latDeg[r],
 				teq,
+				subsidenceTeq: annualTeq[bin],
 				eastMoisture: e,
 				westMoisture: w,
 				hoursPerDay: params?.hoursPerDay ?? 24,
@@ -534,7 +721,10 @@ function computeMonthlyRain({
 			})
 			const monthTemp = climate.temperature_monthly[month * N + r]
 			monthly[month * N + r] =
-				weight * RAIN_SHARED.ceilingScale(monthTemp) * pressureRainFactor
+				weight *
+				RAIN_SHARED.ceilingScale(monthTemp) *
+				pressureRainFactor *
+				liftOverflow
 		}
 	}
 

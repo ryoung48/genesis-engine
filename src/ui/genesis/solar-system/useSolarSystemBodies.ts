@@ -644,12 +644,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		[updateMainWorldBody],
 	)
 
-	useEffect(() => {
-		if (tideLock?.type !== "solar") return
-		if (obliquity !== 0) setObliquity(0)
-		if (eccentricity !== 0) setEccentricity(0)
-	}, [tideLock, obliquity, eccentricity, setObliquity, setEccentricity])
-
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
 			STAR.getKeplerYearYears({

@@ -162,6 +162,7 @@ function serializeWorld(
 		koppenClimate: world.koppenClimate,
 		realKoppenClimate: world.realKoppenClimate,
 		realPastaClimate: world.realPastaClimate,
+		realPastaDebug: world.realPastaDebug,
 		vegetation: world.vegetation,
 		realVegetation: world.realVegetation,
 		topography: world.topography,
@@ -440,6 +441,11 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.koppenClimate) add(world.koppenClimate.buffer)
 	if (world.realKoppenClimate) add(world.realKoppenClimate.buffer)
 	if (world.realPastaClimate) add(world.realPastaClimate.buffer)
+	if (world.realPastaDebug) {
+		for (const arr of Object.values(world.realPastaDebug)) {
+			add((arr as Float32Array).buffer)
+		}
+	}
 	if (world.iceThickness) add(world.iceThickness.buffer)
 	if (world.iceMinMonthly) add(world.iceMinMonthly.buffer)
 	if (world.iceMaxMonthly) add(world.iceMaxMonthly.buffer)

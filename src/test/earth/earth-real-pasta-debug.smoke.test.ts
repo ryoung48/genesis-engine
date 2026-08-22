@@ -121,10 +121,10 @@ describe("Real-input pasta climate: southern Italy", () => {
 			)
 			console.info(
 				"  gdd/gint/minT/maxT",
-				world.pastaDebug?.gdd[r],
-				world.pastaDebug?.gint[r],
-				world.pastaDebug?.minT[r],
-				world.pastaDebug?.maxT[r],
+				world.realPastaDebug?.gdd[r],
+				world.realPastaDebug?.gint[r],
+				world.realPastaDebug?.minT[r],
+				world.realPastaDebug?.maxT[r],
 			)
 			console.info(
 				"  real monthly temp (C)",

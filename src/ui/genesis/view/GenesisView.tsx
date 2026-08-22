@@ -1090,15 +1090,23 @@ export const GenesisView: React.FC<{
 	const thermalEquator = useMemo(() => {
 		if (!world?.climate) return null
 		const N = world.mesh.numRegions
+		const useObserved = dataVariant === "observed"
+		const avgTemps = useObserved
+			? world.climate.real_temperature_avg
+			: world.climate.temperature_avg
+		const monthlyTemps = useObserved
+			? world.climate.real_temperature_monthly
+			: world.climate.temperature_monthly
 		const temps =
 			resolvedClimateMonth === 0
-				? world.climate.temperature_avg
-				: world.climate.temperature_monthly.subarray(
+				? avgTemps
+				: monthlyTemps?.subarray(
 						(resolvedClimateMonth - 1) * N,
 						resolvedClimateMonth * N,
 					)
+		if (!temps) return null
 		return RAIN.computeThermalEquatorLine({ mesh: world.mesh, temps })
-	}, [resolvedClimateMonth, world])
+	}, [resolvedClimateMonth, world, dataVariant])
 
 	useEffect(() => {
 		sceneRef.current?.setThermalEquator(

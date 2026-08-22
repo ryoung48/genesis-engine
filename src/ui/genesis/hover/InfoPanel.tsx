@@ -69,7 +69,7 @@ import {
 } from "@/ui/genesis/shared/colors"
 import { daylightColor } from "@/ui/genesis/shared/colors/misc"
 import { monthLabels } from "@/ui/genesis/shared/constants"
-import type { DataVariant } from "@/ui/genesis/shared/data-variant"
+import { getDataVariant, type DataVariant } from "@/ui/genesis/shared/data-variant"
 import {
 	getMapModePrimary,
 	type PopulationMapMode,
@@ -269,8 +269,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showGeography && hoverInfo
 			? buildHoverChartData(hoverInfo, hoverElevationKm, world)
 			: null
+	const showObservedPasta = getDataVariant(colorMode) === "observed"
+	const activePastaDebug = showObservedPasta
+		? world?.realPastaDebug
+		: world?.pastaDebug
 	const pastaMonthlyData =
-		showGeography && hoverInfo ? buildPastaMonthlyData(hoverInfo, world) : null
+		showGeography && hoverInfo
+			? buildPastaMonthlyData(hoverInfo, world, showObservedPasta)
+			: null
 	const landmarkShare =
 		hoverLandmark?.size != null && world?.mesh.numRegions
 			? (hoverLandmark.size / world.mesh.numRegions) * 100
@@ -329,8 +335,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		: null
 	const hasCurrentImpact =
 		showGeography &&
+		dataVariant !== "observed" &&
 		hoverOceanCurrents !== null &&
 		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
+	const hasSstAnomaly =
+		showGeography &&
+		dataVariant === "observed" &&
+		hoverOceanCurrents !== null &&
+		hoverOceanCurrents.sstAnomalyMonthly !== null
 	const { provinceName, provinceNation } = buildProvinceDisplayData({
 		hoverProvince,
 		hoverNationId,
@@ -695,6 +707,20 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={formatPrecipitation(hoverRainfall, unitSystem, 0)}
 							/>
 						)}
+						{colorMode === "moisture" &&
+							hoverRegion !== null &&
+							world?.rainfall && (
+								<>
+									<Row
+										label="East Moisture"
+										value={`${(world.rainfall.east[hoverRegion] * 100).toFixed(0)}%`}
+									/>
+									<Row
+										label="West Moisture"
+										value={`${(world.rainfall.west[hoverRegion] * 100).toFixed(0)}%`}
+									/>
+								</>
+							)}
 						{colorMode === "cloudCover" && hoverCloudCover && (
 							<Row
 								label="Cloud Cover"
@@ -1023,14 +1049,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							/>
 						)}
 						{hoverRegion !== null &&
-							world.pastaDebug?.minT &&
-							world.pastaDebug?.maxT && (
+							activePastaDebug?.minT &&
+							activePastaDebug?.maxT && (
 								<div className="flex justify-between font-mono text-[9px] text-slate-400">
 									<span>
 										MIN{" "}
 										<span className="text-slate-200">
 											{formatTemperature(
-												world.pastaDebug.minT[hoverRegion],
+												activePastaDebug.minT[hoverRegion],
 												unitSystem,
 											)}
 										</span>
@@ -1039,7 +1065,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										MAX{" "}
 										<span className="text-slate-200">
 											{formatTemperature(
-												world.pastaDebug.maxT[hoverRegion],
+												activePastaDebug.maxT[hoverRegion],
 												unitSystem,
 											)}
 										</span>
@@ -1238,7 +1264,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							pastaMonthlyData &&
 							!!chartData?.isLand &&
 							(() => {
-								const rawGdd = world.pastaDebug?.gdd[hoverRegion] ?? undefined
+								const rawGdd = activePastaDebug?.gdd[hoverRegion] ?? undefined
 								const isInfGdd = rawGdd !== undefined && rawGdd >= 99999
 								return (
 									<SeriesBars
@@ -1270,10 +1296,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								colorForValue={(value) => gintColor(value)}
 								activeIndex={activeBarIndex}
 								summary={buildSummary(
-									world.pastaDebug?.gint[hoverRegion] !== undefined
-										? world.pastaDebug.gint[hoverRegion] >= 99999
+									activePastaDebug?.gint[hoverRegion] !== undefined
+										? activePastaDebug.gint[hoverRegion] >= 99999
 											? 12
-											: world.pastaDebug.gint[hoverRegion]
+											: activePastaDebug.gint[hoverRegion]
 										: undefined,
 									{
 										prefix: "ANN",
@@ -1305,6 +1331,35 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 											formatValue: (value) =>
 												`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`,
 										})}
+										tooltipLabel={({ index, value }) =>
+											`${monthLabels[index + 1]}: ${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`
+										}
+										showValues
+									/>
+								</div>
+							)}
+						{(colorMode === "oceanCurrents" || showOceanCurrentOverlay) &&
+							hasSstAnomaly &&
+							hoverOceanCurrents !== null &&
+							hoverOceanCurrents.sstAnomalyMonthly !== null && (
+								<div className="space-y-1 border-t border-white/5 pt-1">
+									<SeriesBars
+										values={hoverOceanCurrents.sstAnomalyMonthly}
+										labels={MONTH_SHORT}
+										label="Observed SST Anomaly"
+										colorForValue={(value) => currentImpactColor(value)}
+										activeIndex={activeBarIndex}
+										formatValue={(value) =>
+											`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1).replace(/ ?°[CF]$/, "")}`
+										}
+										summary={buildSummary(
+											hoverOceanCurrents.sstAnomalyAverage ?? undefined,
+											{
+												prefix: "avg",
+												formatValue: (value) =>
+													`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`,
+											},
+										)}
 										tooltipLabel={({ index, value }) =>
 											`${monthLabels[index + 1]}: ${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`
 										}

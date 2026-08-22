@@ -118,6 +118,14 @@ export interface SerializedGenesisWorld {
 	koppenClimate: Uint8Array
 	realKoppenClimate?: Uint8Array
 	realPastaClimate?: Uint8Array
+	realPastaDebug?: {
+		gdd: Float32Array
+		gint: Float32Array
+		gdd_monthly: Float32Array
+		gint_monthly: Float32Array
+		minT: Float32Array
+		maxT: Float32Array
+	}
 	vegetation: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where it is classified from observed climate data. */
 	realVegetation?: Uint8Array

@@ -1,5 +1,6 @@
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import type { CloudCoverTemperatureModifierParams } from "@/model/climate/temperature/cloud-cover-modifier/types"
+import { MATH } from "@/model/shared/math/core"
 
 const HOT_LOW_CLOUD_WARMING_C = 10
 const HOT_HIGH_CLOUD_COOLING_C = 5
@@ -43,8 +44,13 @@ function applyCloudCoverTemperatureModifier({
 				temperatureC: climate.temperature_monthly[idx],
 				oceanDistanceKm,
 			})
-			// +1 at 0% cloud cover (clear), -1 at 100% cloud cover (overcast).
-			const clearness = 1 - 2 * cloudFraction
+			// +1 (max warming) at <=20% cloud cover (clear), -1 (max cooling) at
+			// >=80% cloud cover (overcast), linear ramp between.
+			const clearness = MATH.piecewise({
+				domain: [0.2, 0.8],
+				range: [1, -1],
+				x: cloudFraction,
+			})
 			const hotSideDelta =
 				clearness >= 0
 					? clearness * HOT_LOW_CLOUD_WARMING_C

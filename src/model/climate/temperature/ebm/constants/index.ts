@@ -34,7 +34,7 @@ const embConstants = {
 		// individually fit so EBM's simulated average matches its known real
 		// surface temperature (see EnergyBalanceModel.computeGreenhouseOLR()
 		// for the T_eq = T_blackbody*(1+greenhouseFactor/4) relationship).
-		// 0.598 is Earth's fitted value, bisected in
+		// 0.65 is Earth's fitted value, bisected in
 		// earth-import-greenhouse-refit.smoke.test.ts directly against the real
 		// imported Earth world's own land-only WorldClim bias (zeroed exactly),
 		// not the idealized ALBEDO.landFraction() proxy earth-default-refit.
@@ -42,11 +42,19 @@ const embConstants = {
 		// the real planet's actual land distribution, which left a ~2C
 		// calibration gap invisible until evaluated against the real import (see
 		// earth-real-temperature-compare.smoke.test.ts). Re-fit whenever
-		// ALBEDO.BASE/ICE change. Bodies fit with the ice feedback off
-		// (sol-system.ts's per-planet greenhouseFactor values, all bisected with
-		// iceAlbedoFeedback:false against each body's own real, measured albedo)
-		// are unaffected by this default.
-		GREENHOUSE_FACTOR: 0.598,
+		// ALBEDO.BASE/ICE change, OR whenever the EBM's thermal response changes
+		// (e.g. energy-balance-model's land/ocean columns were split into
+		// separate heat capacities/ice states instead of one land-fraction-
+		// blended column, which shifted the fit from 0.598 -> 0.6047; then
+		// greenhouse-moisture's local, temperature-dependent trapping strength
+		// -- weaker in cold/dry columns like Antarctica's, since it was
+		// overheating there with one flat global value -- shifted it again,
+		// 0.6047 -> 0.65). Bodies fit with the ice feedback off (sol-system.ts's
+		// per-planet greenhouseFactor values, all bisected with
+		// iceAlbedoFeedback:false against each body's own real, measured
+		// albedo) are unaffected by this default OR by greenhouse-moisture,
+		// which reuses the same iceAlbedoFeedback flag as its on/off switch.
+		GREENHOUSE_FACTOR: 0.65,
 	},
 	thermal: {
 		OCEAN_HEAT_CAPACITY: 4e7,

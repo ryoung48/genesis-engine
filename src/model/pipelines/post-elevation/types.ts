@@ -164,6 +164,7 @@ export interface PostPipelineOutput {
 	realPastaClimate?: Uint8Array
 	pastaClimate: Uint8Array | undefined
 	pastaDebug: PastaDebug | undefined
+	realPastaDebug?: PastaDebug
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
 	observedDtr?: GenesisWorld["observedDtr"]

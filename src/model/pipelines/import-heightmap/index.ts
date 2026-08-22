@@ -589,6 +589,7 @@ function importGenesisWorld({
 		koppenClimate: post.koppenClimate,
 		realKoppenClimate: post.realKoppenClimate,
 		realPastaClimate: post.realPastaClimate,
+		realPastaDebug: post.realPastaDebug,
 		vegetation: post.vegetation,
 		realVegetation: post.realVegetation,
 		topography: post.topography,

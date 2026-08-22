@@ -148,6 +148,8 @@ export interface GenesisWorld {
 	realKoppenClimate?: Uint8Array
 	/** Per-cell pasta climate code classified from observed-Earth temp/rain (PET/AET approximated via Thornthwaite/bucket model). Earth-import only. */
 	realPastaClimate?: Uint8Array
+	/** Per-cell pasta climate detail metrics for realPastaClimate — distinct from pastaDebug since observed and modeled temps/DTR differ. Earth-import only. */
+	realPastaDebug?: PastaDebug
 	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
 	oceanCurrents?: GenesisOceanCurrents
 	/** Per-cell cyclone risk score in [0, 1]. */

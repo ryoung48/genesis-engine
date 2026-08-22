@@ -231,9 +231,9 @@ const PASTA_NAMES: Record<(typeof pastaLabels)[number], string> = {
 
 const TH_COOL = 10
 
-const TH_COLD = -4
+const TH_COLD = -10
 
-const TH_FRIGID = -35
+const TH_FRIGID = -40
 
 const TH_HOT = 50
 

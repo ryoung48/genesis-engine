@@ -148,6 +148,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	if (
 		blackHole ||
 		yBrownDwarf ||
+		params.isEpistellarCompanion === true ||
 		(params.hasParent === true && rng.uniform(0, 1) > 0.5) ||
 		(deadStar && rng.uniform(0, 1) > 0.2)
 	) {

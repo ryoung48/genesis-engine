@@ -66,6 +66,8 @@ export interface HoverOceanCurrents {
 	averageDelta: number
 	mode: "warm" | "cold"
 	monthlyDelta: number[]
+	sstAnomalyMonthly: number[] | null
+	sstAnomalyAverage: number | null
 }
 
 export interface HoverTerrainFeature {
@@ -870,12 +872,28 @@ export function getHoverOceanCurrents(
 	}
 	const averageDelta =
 		monthlyDelta.reduce((sum, value) => sum + value, 0) / monthlyDelta.length
+
+	const sstAnomalyRaster = world.observedCurrent?.real_sst_anomaly_monthly
+	let sstAnomalyMonthly: number[] | null = null
+	let sstAnomalyAverage: number | null = null
+	if (sstAnomalyRaster && !isLand) {
+		const values: number[] = []
+		for (let m = 0; m < 12; m++) values.push(sstAnomalyRaster[m * N + r])
+		if (values.every((value) => Number.isFinite(value))) {
+			sstAnomalyMonthly = values
+			sstAnomalyAverage =
+				values.reduce((sum, value) => sum + value, 0) / values.length
+		}
+	}
+
 	return {
 		warmth,
 		delta: averageDelta,
 		averageDelta,
 		mode: averageDelta >= 0 ? "warm" : "cold",
 		monthlyDelta,
+		sstAnomalyMonthly,
+		sstAnomalyAverage,
 	}
 }
 

@@ -202,6 +202,14 @@ function runPostElevationPipeline(
 
 	// ── Moisture advection ─────────────────────────────────────────────
 	t0 = performance.now()
+	// Computed once here (instead of inside classifyTopography below) so the
+	// windward-lift orographic term uses the exact same per-cell slope value
+	// shown in the hover panel, rather than a separately-derived grade.
+	const slopeScore = CLASSIFICATION.computeSlopeScore({
+		mesh,
+		elevationKm: elevation_km,
+		planetRadiusKm: params.planetRadiusKm,
+	})
 	const { east: eastAdv, west: westAdv } = RAIN.computeAdvection({
 		mesh,
 		elevation,
@@ -210,6 +218,8 @@ function runPostElevationPipeline(
 		params,
 		isLand,
 		elevation_km,
+		landmarks: currentLandmarks,
+		slopeScore,
 	})
 	record("Post: moisture advection", t0)
 	onProgress?.("Post: moisture advection", 50)
@@ -670,6 +680,7 @@ function runPostElevationPipeline(
 				})
 			: undefined
 	const realPastaClimate: Uint8Array | undefined = earthPastaResult?.zones
+	const realPastaDebug: PastaDebug | undefined = earthPastaResult?.debug
 	record("Post: pasta climate", t0)
 	onProgress?.("Post: pasta climate", 59)
 
@@ -752,7 +763,7 @@ function runPostElevationPipeline(
 
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
-	const { topography, coastal, oceanCoastal, lakeCoastal, slopeScore } =
+	const { topography, coastal, oceanCoastal, lakeCoastal } =
 		CLASSIFICATION.classifyTopography({
 			mesh,
 			elevationKm: elevation_km,
@@ -763,6 +774,7 @@ function runPostElevationPipeline(
 			planetRadiusKm: params.planetRadiusKm,
 			seed: params.seed,
 			tidalRange,
+			slopeScore,
 		})
 	record("Post: topography", t0)
 	onProgress?.("Post: topography", 65)
@@ -1046,6 +1058,7 @@ function runPostElevationPipeline(
 		koppenClimate,
 		pastaClimate,
 		pastaDebug,
+		realPastaDebug,
 		realPastaClimate,
 		dtr_annual,
 		dtr_monthly,

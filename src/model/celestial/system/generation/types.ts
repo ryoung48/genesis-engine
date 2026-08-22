@@ -75,6 +75,13 @@ export interface GenerateSystemBodiesParams {
 	 * has no parent, while galaxy generation needs galaxy-gen's independent
 	 * secondary-no-planets roll. */
 	hasParent?: boolean
+	/** True when this star is itself an "epistellar" companion (galaxy-gen's
+	 * closest-orbiting companion role, 1.5-2.5 HZ-deviation from its parent --
+	 * see ROLE_DEVIATION_RANGE in galaxy/systems/index.ts). An orbit that
+	 * close to another star is too perturbed for planets of its own to hold
+	 * stable orbits, so such a star unconditionally gets none -- see the
+	 * epistellarCompanion branch below. */
+	isEpistellarCompanion?: boolean
 	/** Overrides the traditional G2V Sol-equivalent star every generated
 	 * system otherwise gets -- omit for that default. */
 	spectralClass?: MainSequenceClass

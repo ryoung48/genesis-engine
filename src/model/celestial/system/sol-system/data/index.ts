@@ -185,8 +185,12 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		 * temperature-driven ice-albedo feedback ON (default) -- was 0.534
 		 * when that feedback was disabled. useEbmPreview.ts never disables it
 		 * for this override, so the calibration has to match, not the model
-		 * behavior. */
-		greenhouseFactor: 0.578,
+		 * behavior. Was 0.578 before energy-balance-model split land/ocean
+		 * into separate thermal columns, then 0.6047 before greenhouse-
+		 * moisture's temperature-dependent trapping strength (see
+		 * ebm/constants/index.ts's GREENHOUSE_FACTOR comment) -- re-bisect
+		 * whenever either changes again. */
+		greenhouseFactor: 0.65,
 		/** Real Earth sea-level pressure (~1 bar), matching every sibling
 		 * body's own hand-authored atmosphere below. Without this, the static
 		 * Sol system's Earth entry (seed === SOL_SEED, unlike the live

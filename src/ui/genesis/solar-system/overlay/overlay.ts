@@ -1108,16 +1108,20 @@ export function buildSolarSystemOverlay(
 	/** For a body solar-tide-locked to its star, the mesh's dayside axis must
 	 * continuously track the body's actual current direction to the star (set
 	 * by setDay, via p.bodyGroup.position) as it moves along its orbit.
-	 * Deliberately ignores body.substellarLon: that's a leftover per-body
-	 * random tag from when locked bodies used generic, non-directional art
-	 * (any snowball/rockball texture, spun to an arbitrary "which longitude
-	 * faces the star" angle since it didn't matter). The vesperian/jani-lithic
-	 * art these bodies actually get now is drawn with the dayside baked into
-	 * the image's horizontal center -- there is no "which longitude" choice
-	 * left to make, the center must always face the star, so applying
-	 * substellarLon on top only rotated each body away from correct alignment
-	 * by a different random amount (visibly inconsistent dayside-to-star
-	 * facing from one locked planet to the next). */
+	 * Ignores body.substellarLon for every body EXCEPT the main world: for
+	 * generic-art locked bodies (vesperian/jani-lithic snowball/rockball
+	 * textures picked at random from a pool), substellarLon is a leftover
+	 * per-body random tag with no matching surface detail, and the art's
+	 * dayside is baked into the image's horizontal center -- applying
+	 * substellarLon on top of that just rotated each body away from correct
+	 * alignment by a different random amount (visibly inconsistent
+	 * dayside-to-star facing from one locked planet to the next). The main
+	 * world is different: its texture is the actual generated/imported
+	 * equirectangular map (mainWorldSatelliteMap), where longitude is real
+	 * and substellarLon is the deliberate choice of which longitude the
+	 * player locked toward the star, so it must additionally rotate the mesh
+	 * to bring that longitude (not the texture's lon=0 center) to face the
+	 * star. */
 	function solarLockedSpinAngle(p: PlacedBody): number | null {
 		if (p.body.tideLock?.type !== "solar" || !p.bodyGroup || !p.baseQuaternion)
 			return null
@@ -1128,7 +1132,10 @@ export function buildSolarSystemOverlay(
 		toStarWorld.applyQuaternion(inverseBaseQuat)
 		// RotY(theta) * (1,0,0) = (cos theta, 0, -sin theta) -- solve for the
 		// theta that lands it on (toStarWorld.x, _, toStarWorld.z).
-		return Math.atan2(-toStarWorld.z, toStarWorld.x)
+		const centerFacingAngle = Math.atan2(-toStarWorld.z, toStarWorld.x)
+		if (!p.body.isMainWorld) return centerFacingAngle
+		const substellarLonRad = ((p.body.substellarLon ?? 0) * Math.PI) / 180
+		return centerFacingAngle - substellarLonRad
 	}
 
 	function setDay(day: number) {

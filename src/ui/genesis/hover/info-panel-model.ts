@@ -160,21 +160,19 @@ export function buildHoverChartData(
 export function buildPastaMonthlyData(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
+	useReal = false,
 ): HoverPastaMonthlyData | null {
-	if (
-		!hoverInfo ||
-		!world?.pastaDebug?.gdd_monthly ||
-		!world.pastaDebug.gint_monthly
-	) {
+	const pastaDebug = useReal ? world?.realPastaDebug : world?.pastaDebug
+	if (!hoverInfo || !pastaDebug?.gdd_monthly || !pastaDebug.gint_monthly) {
 		return null
 	}
 	const region = hoverInfo.region
-	const regionCount = world.mesh.numRegions
+	const regionCount = world!.mesh.numRegions
 	const gdd: number[] = []
 	const gint: number[] = []
 	for (let month = 0; month < 12; month++) {
-		gdd.push(world.pastaDebug.gdd_monthly[month * regionCount + region])
-		gint.push(world.pastaDebug.gint_monthly[month * regionCount + region])
+		gdd.push(pastaDebug.gdd_monthly[month * regionCount + region])
+		gint.push(pastaDebug.gint_monthly[month * regionCount + region])
 	}
 	return { gdd, gint }
 }

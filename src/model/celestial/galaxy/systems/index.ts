@@ -494,6 +494,7 @@ function generate({
 			seed: starSeed,
 			hostStar: toHostStarAttributes(preview),
 			hasParent: preview.parentIndex !== null,
+			isEpistellarCompanion: preview.role === "epistellar",
 			mainWorldMode: "procedural",
 			skipNaming,
 		})

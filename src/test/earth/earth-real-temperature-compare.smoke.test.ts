@@ -1,5 +1,10 @@
+import fs from "node:fs"
 import { describe, expect, it } from "vitest"
+import { STAR } from "@/model/celestial/star"
+import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
+import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import { UNITS } from "@/model/shared/units"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
 	loadEarthElevationRaster,
@@ -45,6 +50,9 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		const realClimate = loadEarthMonthlyRaster("earth-real-temperature")
 		const realPrecip = loadEarthMonthlyRaster("earth-real-precipitation")
 		const realElevation = loadEarthElevationRaster()
+		const realWindU = loadEarthMonthlyRaster("earth-real-wind-u")
+		const realWindV = loadEarthMonthlyRaster("earth-real-wind-v")
+		const realCloudCover = loadEarthMonthlyRaster("earth-real-cloud-cover")
 
 		const world = IMPORT_HEIGHTMAP.importGenesisWorld({
 			params: {
@@ -78,6 +86,19 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 				realElevationHeight: realElevation.height,
 				realElevationScale: realElevation.scale,
 				realElevationNoData: realElevation.nodata,
+				realWindUMonthly: realWindU.monthly,
+				realWindVMonthly: realWindV.monthly,
+				realWindWidth: realWindU.width,
+				realWindHeight: realWindU.height,
+				realWindMonths: realWindU.months,
+				realWindScale: realWindU.scale,
+				realWindNoData: realWindU.nodata,
+				realCloudCoverMonthly: realCloudCover.monthly,
+				realCloudCoverWidth: realCloudCover.width,
+				realCloudCoverHeight: realCloudCover.height,
+				realCloudCoverMonths: realCloudCover.months,
+				realCloudCoverScale: realCloudCover.scale,
+				realCloudCoverNoData: realCloudCover.nodata,
 				// Zeroed, not DEFAULT_WORLD_PARAMS -- those are tuned for shaping
 				// synthetic noise into plausible terrain. A real Earth heightmap
 				// already IS realistic terrain; warping/smoothing/eroding it distorts
@@ -107,7 +128,7 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			},
 		})
 
-		const { climate, isLand, mesh, elevation_km } = world
+		const { climate, isLand, mesh, elevation_km, oceanDist } = world
 		expect(climate.real_temperature_avg).toBeDefined()
 		expect(climate.temperature_diff_avg).toBeDefined()
 
@@ -118,6 +139,320 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		function latDegAt(r: number): number {
 			const z = r_xyz[r * 3 + 2]
 			return (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
+		}
+
+		// GBM training data dump: per-cell-month rows of (modeled temp,
+		// elevation, dist-from-coast, landmass extent, lat) -> (modeled -
+		// observed) diff, for a bias-correction GBM fit offline in
+		// scripts/gbm-temp-bias-correction.
+		if (process.env.DUMP_GBM_CSV) {
+			// RAW EBM signal for temp_c: re-run the same 1D zonal model
+			// computeTemperature() uses (climate/classification/climate/index.ts),
+			// but stop right after the model solves -- no per-cell latitude
+			// interpolation adjustment beyond the band itself, no elevation
+			// lapse correction, no continentality inertia scaling, no ocean SST
+			// noise. This is the model's actual physics output before any of
+			// the per-cell post-processing that climate.temperature_monthly
+			// already has baked in.
+			const p = world.params
+			const clsRaw = STAR.isValidSpectralClass(p.spectralClass)
+				? p.spectralClass
+				: "G"
+			const T_star = STAR.getStarTemperatureK({
+				cls: clsRaw,
+				subtype: p.starSubtype,
+			})
+			const R_star_m =
+				STAR.getStarDiameterSol({ cls: clsRaw, subtype: p.starSubtype }) *
+				CONSTANTS.embConstants.stellar.R_SUN
+			const d_m = p.orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU
+			const rawEbm = new EnergyBalanceModel({
+				orbital: {
+					OBLIQUITY: UNITS.getEffectiveObliquityDeg(p.obliquity),
+					ECCENTRICITY: p.eccentricity,
+					PERIHELION: p.perihelion,
+				},
+				stellar: {
+					...CONSTANTS.embConstants.stellar,
+					T_SUN: T_star,
+					R_SUN: R_star_m,
+					AU: d_m,
+				},
+				time: {
+					YEAR_LENGTH_DAYS: p.daysPerYear,
+					HOURS_PER_DAY: p.hoursPerDay,
+				},
+				pressure: p.pressure ?? 1.0,
+				radius: p.planetRadiusKm * 1000,
+				albedo: p.albedo,
+				greenhouseFactor: p.greenhouseFactor,
+				seismologyTotalHeatingK: p.seismologyTotalHeatingK,
+			})
+			rawEbm.runModel({ years: 30, dtDays: 0.5 })
+
+			const NUM_LAT = CONSTANTS.embConstants.grid.NUM_LAT
+			const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+			const rawMonthlyByBand: number[][] = new Array(12)
+			let dayStart = 0
+			for (let month = 0; month < 12; month++) {
+				const start = dayStart
+				const end = start + MONTH_DAY_COUNTS[month]
+				dayStart = end
+				rawMonthlyByBand[month] = rawEbm.temperature.map((row) => {
+					let sum = 0
+					for (let d = start; d < end; d++) sum += row[d]
+					return sum / (end - start)
+				})
+			}
+			function interpolateLatBandRaw(range: number[], latDeg: number): number {
+				const pos = Math.max(
+					0,
+					Math.min(NUM_LAT - 1, ((latDeg + 90) * (NUM_LAT - 1)) / 180),
+				)
+				const i0 = Math.min(NUM_LAT - 2, pos | 0)
+				const t = pos - i0
+				return range[i0] + t * (range[i0 + 1] - range[i0])
+			}
+			const rawTempMonthly = new Float32Array(mesh.numRegions * 12)
+			for (let month = 0; month < 12; month++) {
+				for (let r = 0; r < mesh.numRegions; r++) {
+					if (!isLand[r]) continue
+					rawTempMonthly[month * mesh.numRegions + r] = interpolateLatBandRaw(
+						rawMonthlyByBand[month],
+						latDegAt(r),
+					)
+				}
+			}
+
+			// Continentality proxy: distCoast is the distance to the NEAREST
+			// ocean point in any direction, so it can't tell a narrow peninsula
+			// (small dist, correctly maritime) apart from a cell that happens to
+			// sit near an enclosed/frozen sea deep inside a huge landmass (small
+			// dist, but actually continental). Landmass extent -- the effective
+			// radius of the whole connected land blob a cell belongs to --
+			// captures that: same flood-fill approach as the coast-distance BFS
+			// above, just labeling connected components over isLand instead of
+			// measuring distance.
+			const { adjOffset, adjList } = mesh
+			const landmassId = new Int32Array(mesh.numRegions).fill(-1)
+			const landmassCellCount: number[] = []
+			for (let start = 0; start < mesh.numRegions; start++) {
+				if (!isLand[start] || landmassId[start] !== -1) continue
+				const id = landmassCellCount.length
+				let count = 0
+				const stack = [start]
+				landmassId[start] = id
+				while (stack.length > 0) {
+					const r = stack.pop() as number
+					count++
+					for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+						const nb = adjList[j]
+						if (isLand[nb] && landmassId[nb] === -1) {
+							landmassId[nb] = id
+							stack.push(nb)
+						}
+					}
+				}
+				landmassCellCount.push(count)
+			}
+			const sphereAreaKm2 =
+				4 * Math.PI * DEFAULT_WORLD_PARAMS.planetRadiusKm ** 2
+			const avgCellAreaKm2 = sphereAreaKm2 / mesh.numRegions
+			const landmassExtentKm = landmassCellCount.map((count) =>
+				Math.sqrt((count * avgCellAreaKm2) / Math.PI),
+			)
+
+			// Orographic barrier proxy: does this cell sit near mountains that
+			// intercept moisture (like India near the Himalayas), or is it in
+			// open flat terrain with nothing to force air to rise and rain out
+			// -- like the Arabian Peninsula, which stays under persistent dry
+			// subsidence with no comparable barrier. Regional max elevation via
+			// iterative graph dilation (each pass replaces every cell's value
+			// with the max over itself and its neighbors) approximates "highest
+			// terrain within roughly N hops" far cheaper than a per-cell BFS.
+			const DILATION_PASSES = 20
+			let nearbyMaxElevKm = Float32Array.from(elevation_km ?? [])
+			for (let pass = 0; pass < DILATION_PASSES; pass++) {
+				const next = new Float32Array(nearbyMaxElevKm)
+				for (let r = 0; r < mesh.numRegions; r++) {
+					let m = nearbyMaxElevKm[r]
+					for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+						const v = nearbyMaxElevKm[adjList[j]]
+						if (v > m) m = v
+					}
+					next[r] = m
+				}
+				nearbyMaxElevKm = next
+			}
+
+			// Local terrain roughness: stddev of elevation among a cell's
+			// immediate mesh neighbors -- valley cold-pooling / exposed-ridge
+			// microclimate effects that raw elevation_km alone can't
+			// distinguish from smooth terrain at the same height.
+			const terrainRoughnessKm = new Float32Array(mesh.numRegions)
+			for (let r = 0; r < mesh.numRegions; r++) {
+				if (!isLand[r]) continue
+				let sum = 0
+				let sumSq = 0
+				let count = 0
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					const v = elevation_km ? elevation_km[adjList[j]] : 0
+					sum += v
+					sumSq += v * v
+					count++
+				}
+				if (count > 0) {
+					const mean = sum / count
+					terrainRoughnessKm[r] = Math.sqrt(Math.max(0, sumSq / count - mean * mean))
+				}
+			}
+
+			// Observed wind (u/v components, real Earth reanalysis data --
+			// see attachObservedEarthWind in climate/observed-earth). Unlike
+			// everything else in this file, this is NOT derivable from
+			// topology alone -- it's the actual atmospheric circulation
+			// signature (subsidence, monsoon flow) that the zonal EBM has no
+			// way to represent, targeting the Arabian-Peninsula-style errors
+			// no geometric feature (local, regional, or whole-band) touched.
+			const observedU = world.observedWind?.real_u_monthly
+			const observedV = world.observedWind?.real_v_monthly
+
+			// Observed cloud cover: the more direct mechanism than wind for
+			// the Arabian-Peninsula-style cluster -- persistent clear skies
+			// under a subsidence zone mean intense direct solar heating
+			// almost independent of surface wind speed/direction.
+			const observedCloud = world.observedCloudCover?.real_monthly
+
+			// Which SIDE of the continent a cell sits on: mid-latitude
+			// westerlies mean west coasts get onshore (maritime) flow while
+			// east coasts at the same latitude get offshore (continental) flow
+			// from the interior -- a real asymmetry (W Europe vs E Siberia)
+			// that an omnidirectional distCoast can't distinguish. March along
+			// the coastline raster row (same lon<->pixel convention as
+			// SAMPLING.sampleCoastlineMask) due west and due east from each
+			// cell's pixel until hitting ocean; convert pixel-steps to km via
+			// the latitude-scaled circumference at that row.
+			function coastDistDirectional(
+				lat: number,
+				lon: number,
+			): { west: number; east: number } {
+				const latRad = (lat * Math.PI) / 180
+				const lonRad = (lon * Math.PI) / 180
+				const px = ((((lonRad / Math.PI + 1) * 0.5 * coastline.width) %
+					coastline.width) +
+					coastline.width) %
+					coastline.width
+				const py = Math.max(
+					0,
+					Math.min(
+						coastline.height - 1,
+						(0.5 - latRad / Math.PI) * coastline.height,
+					),
+				)
+				const xi = Math.min(coastline.width - 1, Math.round(px))
+				const yi = Math.min(coastline.height - 1, Math.round(py))
+				const row = yi * coastline.width
+				const maxSteps = coastline.width
+				let west = maxSteps
+				for (let step = 0; step < maxSteps; step++) {
+					const x = (((xi - step) % coastline.width) + coastline.width) %
+						coastline.width
+					if (coastline.grayscale[row + x] < 128) {
+						west = step
+						break
+					}
+				}
+				let east = maxSteps
+				for (let step = 0; step < maxSteps; step++) {
+					const x = (xi + step) % coastline.width
+					if (coastline.grayscale[row + x] < 128) {
+						east = step
+						break
+					}
+				}
+				const kmPerPixel =
+					(2 *
+						Math.PI *
+						DEFAULT_WORLD_PARAMS.planetRadiusKm *
+						Math.cos(latRad)) /
+					coastline.width
+				return { west: west * kmPerPixel, east: east * kmPerPixel }
+			}
+
+			// Per-cell, not per-cell-month -- lat/lon don't depend on month, and
+			// the ray march is the expensive part here.
+			const cellLat = new Float32Array(mesh.numRegions)
+			const cellLon = new Float32Array(mesh.numRegions)
+			const cellWest = new Float32Array(mesh.numRegions)
+			const cellEast = new Float32Array(mesh.numRegions)
+			for (let r = 0; r < mesh.numRegions; r++) {
+				if (!isLand[r]) continue
+				const lat = latDegAt(r)
+				const lon = (Math.atan2(r_xyz[r * 3 + 1], r_xyz[r * 3]) * 180) / Math.PI
+				cellLat[r] = lat
+				cellLon[r] = lon
+				const { west, east } = coastDistDirectional(lat, lon)
+				cellWest[r] = west
+				cellEast[r] = east
+			}
+
+			// Continentality signature straight from the EBM's own output, no
+			// raster/mesh geometry needed: a large annual swing and many
+			// months below freezing is exactly what marks a place like Siberia
+			// as continental, independent of whether nearby water literally
+			// freezes over. temperature_min/max are already per-cell annual
+			// stats the EBM produces; monthsBelowZero is a straight count over
+			// its own monthly output.
+			//
+			// [TRIED] Using the no-lapse series here and for temp_c below, on
+			// the theory that the lapse-corrected value "double counts"
+			// elevation_km as a separate feature -- measured WORSE on both
+			// linreg (R2 0.469->0.423) and GBM (R2 0.897->0.862). diff_c is
+			// defined against the lapse-corrected temperature_monthly, so
+			// that value is a strictly more direct predictor of it; stripping
+			// the lapse correction just makes the model reconstruct the same
+			// relationship indirectly and less efficiently. Reverted.
+			const annualRangeC = new Float32Array(mesh.numRegions)
+			const monthsBelowZero = new Int32Array(mesh.numRegions)
+			for (let r = 0; r < mesh.numRegions; r++) {
+				if (!isLand[r]) continue
+				annualRangeC[r] = climate.temperature_max[r] - climate.temperature_min[r]
+				let count = 0
+				for (let month = 0; month < 12; month++) {
+					if (climate.temperature_monthly[month * mesh.numRegions + r] < 0)
+						count++
+				}
+				monthsBelowZero[r] = count
+			}
+
+			const monthly = climate.temperature_monthly
+			const realMonthly = climate.real_temperature_monthly!
+			const rows: string[] = [
+				"temp_c,elevation_km,dist_coast_km,landmass_extent_km,dist_coast_west_km,dist_coast_east_km,annual_range_c,months_below_zero,nearby_max_elev_km,terrain_roughness_km,wind_u,wind_v,cloud_cover,lat,lon,month,modeled_c,observed_c,diff_c",
+			]
+			for (let month = 0; month < 12; month++) {
+				for (let r = 0; r < mesh.numRegions; r++) {
+					if (!isLand[r]) continue
+					const obs = realMonthly[month * mesh.numRegions + r]
+					if (!Number.isFinite(obs)) continue
+					const modeled = monthly[month * mesh.numRegions + r]
+					const raw = rawTempMonthly[month * mesh.numRegions + r]
+					const diff = modeled - obs
+					const elevKm = elevation_km ? elevation_km[r] : 0
+					const coastKm = oceanDist ? oceanDist[r] : 0
+					const extentKm = landmassExtentKm[landmassId[r]]
+					const windU = observedU ? observedU[month * mesh.numRegions + r] : 0
+					const windV = observedV ? observedV[month * mesh.numRegions + r] : 0
+					const cloud = observedCloud
+						? observedCloud[month * mesh.numRegions + r]
+						: 0
+					rows.push(
+						`${raw.toFixed(3)},${elevKm.toFixed(3)},${coastKm.toFixed(3)},${extentKm.toFixed(3)},${cellWest[r].toFixed(3)},${cellEast[r].toFixed(3)},${annualRangeC[r].toFixed(3)},${monthsBelowZero[r]},${nearbyMaxElevKm[r].toFixed(3)},${terrainRoughnessKm[r].toFixed(3)},${windU.toFixed(3)},${windV.toFixed(3)},${cloud.toFixed(3)},${cellLat[r].toFixed(3)},${cellLon[r].toFixed(3)},${month},${modeled.toFixed(3)},${obs.toFixed(3)},${diff.toFixed(3)}`,
+					)
+				}
+			}
+			fs.writeFileSync(process.env.DUMP_GBM_CSV as string, rows.join("\n"))
+			console.info(`Wrote ${rows.length - 1} rows to ${process.env.DUMP_GBM_CSV}`)
 		}
 
 		let n = 0

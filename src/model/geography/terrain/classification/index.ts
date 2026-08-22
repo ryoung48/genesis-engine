@@ -233,6 +233,7 @@ function classifyTopography(params: ClassifyTopographyParams): {
 }
 
 export const CLASSIFICATION = {
+	computeSlopeScore,
 	topoFlat,
 	topoHill,
 	topoPlateau,
