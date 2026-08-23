@@ -36,14 +36,17 @@ export function buildAsteroidField(
 	// alone -- beltHalfWidth now scales with orbitRadius too (BELT_WIDTH_RATIO),
 	// so a naive orbitRadius-only count left the now-much-wider band looking
 	// sparse: same rock count smeared over several times the area.
+	const areaScaledCount =
+		orbitRadius * beltHalfWidth * ASTEROID_DENSITY_PER_AREA
 	const count = Math.round(
-		Math.min(
-			ASTEROID_COUNT_MAX,
-			Math.max(
-				ASTEROID_COUNT_MIN,
-				orbitRadius * beltHalfWidth * ASTEROID_DENSITY_PER_AREA,
-			),
-		),
+		Math.max(ASTEROID_COUNT_MIN, Math.min(ASTEROID_COUNT_MAX, areaScaledCount)),
+	)
+	// Keep the 100-rock floor from crowding a compact inner belt. The square
+	// root maintains the perceived fill area as the forced count increases.
+	const asteroidScaleMultiplier = Math.min(
+		1,
+		beltHalfWidth / 0.12,
+		Math.sqrt(areaScaledCount / count),
 	)
 	const geometry = new THREE.IcosahedronGeometry(1, 0)
 	// Every instance shares this one texture (loadBodyTexture caches it) --
@@ -90,8 +93,9 @@ export function buildAsteroidField(
 		zOffsets[i] =
 			((Math.random() + Math.random() - 1) / 2) * 2 * beltVerticalHalfSpan
 		scales[i] =
-			ASTEROID_MIN_SCALE +
-			Math.random() * (ASTEROID_MAX_SCALE - ASTEROID_MIN_SCALE)
+			(ASTEROID_MIN_SCALE +
+				Math.random() * (ASTEROID_MAX_SCALE - ASTEROID_MIN_SCALE)) *
+			asteroidScaleMultiplier
 		rotationAxes.push(
 			new THREE.Vector3(
 				Math.random() - 0.5,
@@ -167,8 +171,8 @@ export function updateAsteroidField(
 // cheap enough on the GPU that a several-thousand-instance ceiling costs
 // nothing next to the rest of the scene.
 const ASTEROID_DENSITY_PER_AREA = 350
-const ASTEROID_COUNT_MIN = 600
-const ASTEROID_COUNT_MAX = 12000
+const ASTEROID_COUNT_MIN = 100
+const ASTEROID_COUNT_MAX = 25000
 
 const ASTEROID_MIN_SCALE = 0.006
 

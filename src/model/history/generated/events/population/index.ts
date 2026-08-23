@@ -36,7 +36,6 @@ const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 
 	// republic — coastal oligarchy through modern mass-urban democracy
 	oligarchic_republic: { U: 0.2, q: 1.1 }, // aristocratic senate, strong core city
-	free_city: { U: 0.5, q: 0.9 }, // self-governing city or loose league, mostly urban
 	peasant_republic: { U: 0.04, q: 0.65 }, // lord-less free-peasant commune, rural and flat
 	presidential_republic: { U: 0.4, q: 1.0 }, // industrial+ mass urbanization
 	parliamentary_republic: { U: 0.4, q: 0.9 }, // industrial+, slightly less primacy

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { STATE } from "@/model/history/generated/state"
@@ -27,6 +27,7 @@ import {
 	generateWorld,
 	importHeightmap,
 	loadImageAsGrayscale,
+	requestInfrastructure,
 } from "@/ui/genesis/generation/generation"
 import { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
 import type { WorldGenerationInput } from "@/ui/genesis/view/types"
@@ -96,6 +97,10 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	const [generating, setGenerating] = useState(false)
 	const [generationProgress, setGenerationProgress] = useState(0)
 	const [generationLabel, setGenerationLabel] = useState("Idle")
+	// Tracks whether a "compute-infrastructure" request is already in flight
+	// (or done) for the current world, so toggling the Infrastructure overlay
+	// on/off doesn't re-request the road/sea network every time.
+	const infrastructureRequestedRef = useRef(false)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleSetWorld = useCallback(
@@ -105,6 +110,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				setProceduralHistoryPlaying(false)
 				setProceduralHistoryTimeMs(800 * STATE.yearMs)
 				resetProceduralHistoryAccumulation()
+				infrastructureRequestedRef.current = false
 			}
 			setWorld(w)
 		},
@@ -155,6 +161,24 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 					setPathfindingResult(null)
 					sceneRef.current?.setPathfindingOverlay(null, null, null)
 				}
+			},
+			onInfrastructureResult: (result) => {
+				// Must merge onto the raw generation world (setWorld's own state),
+				// NOT lastWorldRef.current -- that ref tracks worldForDisplay, a
+				// derived copy whose assignment/colors/etc are overwritten for
+				// display purposes (see buildDisplayWorld). Spreading it back into
+				// setWorld corrupted world.nations, which showed up as some
+				// nations losing their color and rendering gray as soon as
+				// Infrastructure was toggled on.
+				setWorld((prev) =>
+					prev
+						? {
+								...prev,
+								routes: result.routes,
+								network: result.network,
+							}
+						: prev,
+				)
 			},
 		}),
 		[handleSetWorld, resetProceduralHistoryAccumulation, recordProceduralFrame],
@@ -579,6 +603,14 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		[setters],
 	)
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
+	const handleRequestInfrastructure = useCallback(() => {
+		if (infrastructureRequestedRef.current) return
+		if (!lastWorldRef.current || lastWorldRef.current.network) return
+		infrastructureRequestedRef.current = true
+		requestInfrastructure(workerRef)
+	}, [])
+
 	return {
 		generating,
 		generationProgress,
@@ -587,5 +619,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		handleGenerate,
 		handleResetDefaults,
 		handleReturnToPlanetView,
+		handleRequestInfrastructure,
 	}
 }

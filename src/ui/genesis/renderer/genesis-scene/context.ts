@@ -208,6 +208,7 @@ export interface GenesisContext {
 	settlementLabelNames: string[] | null
 	cultureNames: string[] | null
 	heritageNames: string[] | null
+	religionNames: string[] | null
 
 	// overlay-controllers/nation-borders.ts's state.
 	cachedEu4BorderGeometry: Eu4ProvinceBorderGeometry | null

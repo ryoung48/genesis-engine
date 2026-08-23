@@ -36,7 +36,7 @@ const TRADE_ROUTE_STYLE = {
 	},
 	[TRANSPORT.ROUTE_SEA]: {
 		color: 0x2563eb,
-		baseWidth: 1.2,
+		baseWidth: 0.55,
 		opacity: 0.82,
 		dashed: true,
 	},

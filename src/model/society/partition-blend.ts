@@ -3,7 +3,7 @@
  * culture-spread event's BLEED_INIT_PROBABILITY (0.35) -- that value grew
  * over time via per-tick diffusion in the old sim, whereas this is a single
  * static pass, so the same starting probability reads as too dense here. */
-const BLEED_PROBABILITY = 0.15
+const BLEED_PROBABILITY = 0.35
 /** Relative size difference within which two partitions are considered
  * "balanced" and neither bleeds into the other. Mirrors the old
  * culture-spread event's BALANCE_THRESHOLD (population there; node count,

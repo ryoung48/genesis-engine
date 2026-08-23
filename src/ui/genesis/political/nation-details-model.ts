@@ -25,6 +25,7 @@ interface NationDetailsData {
 	}>
 	governmentType: string | null
 	governmentColor: string | null
+	organizations: Array<{ id: string; name: string; color: string }>
 	cultureDistribution: DistributionBucket[]
 	heritageDistribution: DistributionBucket[]
 	religionDistribution: DistributionBucket[]
@@ -33,7 +34,7 @@ interface NationDetailsData {
 	topographyDistribution: DistributionBucket[]
 }
 
-function colorFromPartition(
+export function colorFromPartition(
 	partition: { colors: Float32Array } | null | undefined,
 	index: number,
 ): string {
@@ -43,7 +44,7 @@ function colorFromPartition(
 	return `rgb(${Math.round(partition.colors[base] * 255)}, ${Math.round(partition.colors[base + 1] * 255)}, ${Math.round(partition.colors[base + 2] * 255)})`
 }
 
-function buildPartitionDistribution(params: {
+export function buildPartitionDistribution(params: {
 	provinces: readonly number[]
 	getPartitionId: (province: number) => number
 	getLabel: (id: number) => string
@@ -140,6 +141,7 @@ export function buildSelectedNationDetails(params: {
 	getNationName: (nationId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
+	getOrganizationName: (orgId: string) => string
 }): NationDetailsData | null {
 	const {
 		selectedNationId,
@@ -149,6 +151,7 @@ export function buildSelectedNationDetails(params: {
 		getNationName,
 		getCultureName,
 		getHeritageName,
+		getOrganizationName,
 	} = params
 	if (
 		!world?.nations ||
@@ -190,6 +193,25 @@ export function buildSelectedNationDetails(params: {
 	const governmentColor =
 		govIdx >= 0 ? (GOVERNMENT_COLORS_CSS[govIdx] ?? null) : null
 
+	// selectedNationId lives in "capital province index" space (see
+	// buildDisplayWorld's nations.assignment = sovereign.slice() rewrite --
+	// every nation-identity lookup in this UI layer is keyed by capital
+	// province index, not the raw 0..nationCount-1 array index), so
+	// member.nationIndex (a raw array index) has to be translated via
+	// nations.seeds before comparing.
+	const organizations = (world.nations.organizations ?? [])
+		.filter((org) =>
+			org.members.some(
+				(member) =>
+					world.nations!.seeds[member.nationIndex] === selectedNationId,
+			),
+		)
+		.map((org) => ({
+			id: org.id,
+			name: getOrganizationName(org.id),
+			color: rgbToCss(org.color),
+		}))
+
 	return {
 		id: selectedNationId,
 		name: getNationName(selectedNationId),
@@ -197,6 +219,7 @@ export function buildSelectedNationDetails(params: {
 		totalPopulation,
 		governmentType,
 		governmentColor,
+		organizations,
 		color: getNationColor(selectedNationId),
 		neighbors,
 		cultureDistribution: buildPartitionDistribution({

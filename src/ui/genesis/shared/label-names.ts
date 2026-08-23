@@ -7,6 +7,7 @@ interface LabelNameResolvers {
 	province: (provinceIdx: number) => string
 	culture: (cultureId: number) => string
 	heritage: (heritageId: number) => string
+	religion: (religionId: number) => string
 }
 
 export function buildNationLabelNames(
@@ -86,6 +87,16 @@ export function buildHeritageLabelNames(
 		names[h] = resolvers.heritage(h)
 	}
 	return names
+}
+
+export function buildReligionLabelNames(
+	world: SerializedGenesisWorld | null,
+	resolvers: LabelNameResolvers | null,
+): string[] | null {
+	if (!world?.religions || !resolvers) return null
+	return Array.from({ length: world.religions.count }, (_, religionIdx) =>
+		resolvers.religion(religionIdx),
+	)
 }
 
 export function buildNationDynastyLabelNames(

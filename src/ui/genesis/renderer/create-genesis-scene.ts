@@ -73,6 +73,7 @@ export function createGenesisScene(
 		syncMapLighting: () => syncMapLighting(),
 		rebuildNationBorders: () => rebuildNationBorders(),
 		rebuildSelectedProvinceBorder: () => rebuildSelectedProvinceBorder(),
+		rebuildSettlementLabels: () => rebuildSettlementLabels(),
 		emitHover: (info) => emitHover(info),
 		requestRender: () => requestRender(),
 		resetMapSolarTerminator: () => {
@@ -172,6 +173,7 @@ export function createGenesisScene(
 		setDynastyNames,
 		setCultureNames,
 		setHeritageNames,
+		setReligionNames,
 		setSettlementNames,
 		setEarthHistoryLabelPartitions,
 	} = labelsController
@@ -254,6 +256,7 @@ export function createGenesisScene(
 
 	const infrastructureController = createInfrastructureController(context, {
 		updateOverlayVisibility: () => updateOverlayVisibility(),
+		rebuildSettlementLabels: () => rebuildSettlementLabels(),
 	})
 	const rebuildTradeRouteOverlay = infrastructureController.rebuild
 	const setInfrastructure = infrastructureController.setInfrastructure
@@ -472,6 +475,7 @@ export function createGenesisScene(
 		setDynastyNames,
 		setCultureNames,
 		setHeritageNames,
+		setReligionNames,
 		setEarthHistoryLabelPartitions,
 		setSettlementNames,
 		setElevationVisible,

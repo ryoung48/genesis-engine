@@ -25,7 +25,6 @@ const governmentTypes: GovernmentType[] = [
 	// republic
 	"oligarchic_republic",
 	"dynastic_signoria",
-	"free_city",
 	"peasant_republic",
 	"presidential_republic",
 	"parliamentary_republic",
@@ -57,7 +56,6 @@ const governmentTypeLabels: Record<GovernmentType, string> = {
 	dynastic_signoria: "Dynastic Signoria",
 	warlord_state: "Warlord State",
 	oligarchic_republic: "Oligarchic Republic",
-	free_city: "Free City",
 	peasant_republic: "Peasant Republic",
 	presidential_republic: "Presidential Republic",
 	parliamentary_republic: "Parliamentary Republic",
@@ -86,7 +84,6 @@ const governmentTypeFamily: Record<GovernmentType, GovernmentFamily> = {
 	warlord_state: "monarchy",
 	oligarchic_republic: "republic",
 	dynastic_signoria: "republic",
-	free_city: "republic",
 	peasant_republic: "republic",
 	presidential_republic: "republic",
 	parliamentary_republic: "republic",
@@ -223,8 +220,11 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		// nation is 1 count per 1 province, while a [10,24] nation is 1 count per
 		// ~17 provinces), so trimming its mass share meaningfully thins out
 		// single-province nations and fills in the middle tiers by count.
+		// [1,1] trimmed further (0.1 -> 0.03) to cut the remaining
+		// singleton-nation count, with the freed mass spread across the other
+		// buckets in proportion to their existing share.
 		nationPercentages: MATH.normalize([
-			0.0, 0.4554, 0.102, 0.152, 0.1146, 0.0786, 0.1,
+			0.0, 0.4907, 0.1099, 0.1638, 0.1235, 0.0847, 0.03,
 		]),
 		nationBuckets: [
 			[251, 600],
@@ -243,6 +243,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		},
 		// Size and era roughly equal; geography (coast → republic) meaningful
 		governmentSizeWeight: 0.55,
+		organizations: { imperialPatchwork: false, tradeLeague: false },
 	},
 	earlyModern: {
 		id: "earlyModern",

@@ -8,7 +8,10 @@ import type { HistoryState } from "@/model/history/generated/state/types"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
+import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
+import type { RouteWorldInput } from "@/model/society/infrastructure/trade/routing/types"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
+import type { SocietyEra } from "@/model/society/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
@@ -96,27 +99,43 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 }
 
 interface PathfindSeedWorld {
-	params: { planetRadiusKm?: number }
+	params: { planetRadiusKm?: number; era?: SocietyEra }
 	mesh: { r_xyz: Float32Array; adjOffset: Int32Array; adjList: Int32Array }
 	isLand: Uint8Array | null
 	vegetation: Uint8Array | null
 	topography: Uint8Array | null
 	regionProvince: Int32Array | null
 	desolate: Uint8Array | null
+	// Only present when the generated world has enough society data to route
+	// over -- lets a later "compute-infrastructure" request build the road/sea
+	// network lazily, on first Infrastructure-overlay toggle, instead of on
+	// every world generation (see generate-world/index.ts).
+	routeSeed: {
+		provinces: RouteWorldInput["provinces"]
+		nations: RouteWorldInput["nations"]
+		landmarks: RouteWorldInput["landmarks"]
+		urbanPopulation: Float32Array
+		settlementRegions?: Int32Array
+		settlementWaterLandmarks?: Int32Array
+		settlementPortRegions?: Int32Array
+	} | null
 }
 
-// Retained across messages so a later "pathfind" request can route over the
-// most recently generated world without regenerating it. This used to be a
-// much larger HistorySeedWorld carrying nations/population/cultures so the
-// worker could seed the procedural history sim; only the routing inputs
-// remain.
+// Retained across messages so a later "pathfind" or "compute-infrastructure"
+// request can route over the most recently generated world without
+// regenerating it. This used to be a much larger HistorySeedWorld carrying
+// nations/population/cultures so the worker could seed the procedural
+// history sim; only the routing inputs remain.
 let lastGeneratedWorld: PathfindSeedWorld | null = null
 
 function clonePathfindSeedWorld(
 	world: ReturnType<typeof GENERATE_WORLD.generateGenesisWorld>,
 ): PathfindSeedWorld {
 	return {
-		params: { planetRadiusKm: world.params.planetRadiusKm },
+		params: {
+			planetRadiusKm: world.params.planetRadiusKm,
+			era: world.params.era,
+		},
 		mesh: {
 			r_xyz: world.mesh.r_xyz.slice(),
 			adjOffset: world.mesh.adjOffset.slice(),
@@ -127,6 +146,32 @@ function clonePathfindSeedWorld(
 		topography: world.topography ? world.topography.slice() : null,
 		regionProvince: world.provinces?.regionProvince.slice() ?? null,
 		desolate: world.provinces?.desolate.slice() ?? null,
+		routeSeed:
+			world.provinces && world.nations && world.landmarks
+				? {
+						provinces: {
+							count: world.provinces.count,
+							desolate: world.provinces.desolate.slice(),
+							regionProvince: world.provinces.regionProvince.slice(),
+							adjOffset: world.provinces.adjOffset.slice(),
+							adjList: world.provinces.adjList.slice(),
+						},
+						nations: { sovereign: world.nations.sovereign.slice() },
+						landmarks: {
+							regionLandmark: world.landmarks.regionLandmark.slice(),
+							type: world.landmarks.type.slice(),
+							size: world.landmarks.size.slice(),
+							dominantCulture: world.landmarks.dominantCulture?.slice(),
+							nameSeeds: world.landmarks.nameSeeds?.slice(),
+							realNames: world.landmarks.realNames,
+							count: world.landmarks.count,
+						},
+						urbanPopulation: world.urbanPopulation.slice(),
+						settlementRegions: world.settlementRegions?.slice(),
+						settlementWaterLandmarks: world.settlementWaterLandmarks?.slice(),
+						settlementPortRegions: world.settlementPortRegions?.slice(),
+					}
+				: null,
 	}
 }
 function serializeWorld(
@@ -203,6 +248,7 @@ function serializeWorld(
 		cultures: world.cultures,
 		heritages: world.heritages,
 		religions: world.religions,
+		religionFamilies: world.religionFamilies,
 		religionTypes: world.religionTypes,
 		landmarks: world.landmarks
 			? {
@@ -546,6 +592,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.cultures) add(...partitionBuffers(world.cultures))
 	if (world.heritages) add(...partitionBuffers(world.heritages))
 	if (world.religions) add(...partitionBuffers(world.religions))
+	if (world.religionFamilies) add(world.religionFamilies.buffer)
 	if (world.religionTypes) add(world.religionTypes.buffer)
 	if (world.landmarks) {
 		add(
@@ -668,6 +715,67 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			travelDays: result.travelDays,
 			reachable: result.reachable,
 		} satisfies GenesisWorkerResponse)
+		return
+	}
+
+	if (message.type === "compute-infrastructure") {
+		if (!lastGeneratedWorld?.routeSeed) {
+			self.postMessage({
+				type: "error",
+				message: "No world generated yet",
+			} satisfies GenesisWorkerResponse)
+			return
+		}
+
+		const world = lastGeneratedWorld
+		const seed = world.routeSeed
+
+		const computation = ROUTES.computeRoutes({
+			world: {
+				mesh: {
+					r_xyz: world.mesh.r_xyz,
+					adjOffset: world.mesh.adjOffset,
+					adjList: world.mesh.adjList,
+				},
+				params: {
+					planetRadiusKm: world.params.planetRadiusKm,
+					era: world.params.era,
+				},
+				provinces: seed.provinces,
+				nations: seed.nations,
+				landmarks: seed.landmarks,
+				isLand: world.isLand ?? new Uint8Array(world.mesh.r_xyz.length / 3),
+			},
+			inputs: {
+				urbanPopulation: seed.urbanPopulation,
+				settlementRegions: seed.settlementRegions,
+				settlementWaterLandmarks: seed.settlementWaterLandmarks,
+				settlementPortRegions: seed.settlementPortRegions,
+			},
+		})
+
+		const routes = TRANSPORT.packRoutes(computation.routes)
+		const network = TRANSPORT.packNetwork(computation.network)
+
+		self.postMessage(
+			{
+				type: "infrastructure-result",
+				routes,
+				network,
+			} satisfies GenesisWorkerResponse,
+			[
+				routes.fromProvince.buffer,
+				routes.toProvince.buffer,
+				routes.kind.buffer,
+				routes.pathOffsets.buffer,
+				routes.pathRegions.buffer,
+				network.fromRegion.buffer,
+				network.toRegion.buffer,
+				network.kind.buffer,
+				network.usage.buffer,
+				network.weight.buffer,
+			],
+		)
 		return
 	}
 

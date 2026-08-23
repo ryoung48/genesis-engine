@@ -44,4 +44,17 @@ export interface EraConfig {
 	 * Also scales spatial modifier strength — geography matters less in modernity.
 	 */
 	governmentSizeWeight: number
+	/**
+	 * Procedural organizations to generate for this era, layered on top of the
+	 * normal nation partition. imperialPatchwork: shatter the largest eligible
+	 * (settled, wave >= 0) nation into an HRE-style patchwork of small member
+	 * states — see src/model/society/organizations/imperial-patchwork.
+	 * tradeLeague: shatter the largest eligible coastal republic into a flat
+	 * Hansa-style patchwork of small trade-city members — see
+	 * src/model/society/organizations/trade-league.
+	 */
+	organizations?: {
+		imperialPatchwork?: boolean
+		tradeLeague?: boolean
+	}
 }

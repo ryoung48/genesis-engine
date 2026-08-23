@@ -47,6 +47,7 @@ import {
 	buildHeritageLabelNames,
 	buildNationDynastyLabelNames,
 	buildNationLabelNames,
+	buildReligionLabelNames,
 	buildSettlementLabelNames,
 } from "@/ui/genesis/shared/label-names"
 import { getMapModePrimary } from "@/ui/genesis/shared/map-modes"
@@ -232,6 +233,9 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	const heritageLabelsArray = useMemo(() => {
 		return buildHeritageLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
+	const religionLabelsArray = useMemo(() => {
+		return buildReligionLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
 	const labelsPlaybackActive = earthHistoryPlaying
 	const sampledNationLabelsArray = usePlaybackSampledValue(
 		nationLabelsArray,
@@ -258,6 +262,11 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		350,
 		labelsPlaybackActive,
 	)
+	const sampledReligionLabelsArray = usePlaybackSampledValue(
+		religionLabelsArray,
+		350,
+		labelsPlaybackActive,
+	)
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
 		[worldNames],
@@ -277,6 +286,11 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 			worldNames?.heritage(heritageId) ?? `Heritage #${heritageId}`,
 		[worldNames],
 	)
+	const getReligionName = useCallback(
+		(religionId: number) =>
+			worldNames?.religion(religionId) ?? `Religion #${religionId}`,
+		[worldNames],
+	)
 	const getLeaderName = useCallback(
 		(nationId: number, timeMs: number) =>
 			worldNames?.leader(nationId, timeMs) ?? `Leader #${nationId}`,
@@ -294,6 +308,10 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	)
 	const getRiverName = useCallback(
 		(riverId: number) => worldNames?.river(riverId) ?? `#${riverId}`,
+		[worldNames],
+	)
+	const getOrganizationName = useCallback(
+		(orgId: string) => worldNames?.organization(orgId) ?? orgId,
 		[worldNames],
 	)
 	const getProvinceColor = useCallback(
@@ -480,9 +498,11 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		getDynastyName,
 		getGlobeCameraDir,
 		getHeritageName,
+		getReligionName,
 		getLandmarkName,
 		getLeaderName,
 		getNationName,
+		getOrganizationName,
 		getProvinceColor,
 		getProvinceName,
 		getRiverName,
@@ -529,6 +549,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		sampledCultureLabelsArray,
 		sampledDynastyLabelsArray,
 		sampledHeritageLabelsArray,
+		sampledReligionLabelsArray,
 		sampledNationLabelsArray,
 		sampledSettlementLabelsArray,
 		windVectors,

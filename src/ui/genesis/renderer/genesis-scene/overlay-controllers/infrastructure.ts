@@ -10,6 +10,7 @@ import {
 
 export interface InfrastructureControllerDeps {
 	updateOverlayVisibility: () => void
+	rebuildSettlementLabels: () => void
 }
 
 /** Owns the trade-route/transport-network overlay -- named "infrastructure"
@@ -69,6 +70,7 @@ export function createInfrastructureController(
 			if (ctx.mapMesh) ctx.mapInfrastructure.position.copy(ctx.mapMesh.position)
 			ctx.scene.add(ctx.mapInfrastructure)
 		}
+		deps.rebuildSettlementLabels()
 		deps.updateOverlayVisibility()
 	}
 

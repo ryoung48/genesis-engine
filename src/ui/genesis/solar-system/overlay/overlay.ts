@@ -870,10 +870,7 @@ export function buildSolarSystemOverlay(
 			: isPanthalassic
 				? buildAtmosphericCloudBandMaterial(
 						body.idx,
-						panthalassicCloudPalette(
-						body.idx,
-						body.temperatureEstimate?.mean,
-					),
+						panthalassicCloudPalette(body.idx, body.temperatureEstimate?.mean),
 					)
 				: isHelian
 					? buildAtmosphericCloudBandMaterial(
@@ -885,32 +882,32 @@ export function buildSolarSystemOverlay(
 							),
 						)
 					: texturePath
-					? new THREE.MeshStandardMaterial({
-							map: loadBodyTexture(texturePath),
-							roughness: 1,
-							metalness: 0,
-						})
-					: isGasGiant
 						? new THREE.MeshStandardMaterial({
-								map: loadBodyTexture(
-									"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
-								),
+								map: loadBodyTexture(texturePath),
 								roughness: 1,
 								metalness: 0,
 							})
-						: new THREE.MeshStandardMaterial({
-								color:
-									(body.classification === "tectonic" ||
-										body.classification === "vesperian") &&
-									(body.hydrosphereCode ?? 0) >= 10
-										? FULL_OCEAN_COLOR
-										: (CLASSIFICATION_COLOR[body.classification] ??
-											(body.isMainWorld
-												? MAIN_WORLD_COLOR
-												: ROCKY_SIBLING_COLOR)),
-								roughness: 0.9,
-								metalness: 0,
-							})
+						: isGasGiant
+							? new THREE.MeshStandardMaterial({
+									map: loadBodyTexture(
+										"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
+									),
+									roughness: 1,
+									metalness: 0,
+								})
+							: new THREE.MeshStandardMaterial({
+									color:
+										(body.classification === "tectonic" ||
+											body.classification === "vesperian") &&
+										(body.hydrosphereCode ?? 0) >= 10
+											? FULL_OCEAN_COLOR
+											: (CLASSIFICATION_COLOR[body.classification] ??
+												(body.isMainWorld
+													? MAIN_WORLD_COLOR
+													: ROCKY_SIBLING_COLOR)),
+									roughness: 0.9,
+									metalness: 0,
+								})
 		const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), material)
 		// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
 		// XY (Z-north) — textured bodies need the same quarter-turn so their

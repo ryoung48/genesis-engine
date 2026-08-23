@@ -34,6 +34,7 @@ interface DerivedProvinceSociety {
 	cultures: ReturnType<typeof CULTURE.computeCultures> | undefined
 	heritages: ReturnType<typeof HERITAGE.computeHeritages> | undefined
 	religions: ReturnType<typeof RELIGION.computeReligions> | undefined
+	religionFamilies: Int32Array | undefined
 	religionTypes: Uint8Array | undefined
 	landmarks: GenesisLandmarks
 	settlementRegions: Int32Array
@@ -59,6 +60,7 @@ function deriveProvinceSociety({
 	let cultures: ReturnType<typeof CULTURE.computeCultures> | undefined
 	let heritages: ReturnType<typeof HERITAGE.computeHeritages> | undefined
 	let religions: ReturnType<typeof RELIGION.computeReligions> | undefined
+	let religionFamilies: Int32Array | undefined
 	let religionTypes: Uint8Array | undefined
 	let nations: ReturnType<typeof NATIONS.computeNations> | undefined
 
@@ -117,6 +119,8 @@ function deriveProvinceSociety({
 						governmentSizeWeight: eraConfig.governmentSizeWeight,
 						migrationWave: post.population.migrationWave,
 						statehoodFraction: eraConfig.statehoodFraction,
+						buildImperialPatchwork: eraConfig.organizations?.imperialPatchwork,
+						buildTradeLeague: eraConfig.organizations?.tradeLeague,
 					}),
 				)
 			}
@@ -145,8 +149,15 @@ function deriveProvinceSociety({
 				cultures: cultures!,
 				seed: params.seed,
 			})
+			const families = RELIGION.computeReligionFamilies({
+				religions: religions!,
+				seed: params.seed,
+			})
+			religionFamilies = families.assignment
 			religionTypes = RELIGION.assignReligionTypes({
 				religionCount: religions!.count,
+				religionFamilies,
+				religionFamilyCount: families.count,
 				cultureToReligion: religions!.assignment,
 				cultureCount: cultures!.count,
 				provinceCount,
@@ -156,9 +167,11 @@ function deriveProvinceSociety({
 				sizeWeight: eraConfig.governmentSizeWeight ?? 0.55,
 				seed: params.seed,
 			})
-			religions!.colors = RELIGION.buildReligionColors({
-				religionCount: religions!.count,
-				religionTypes,
+			religions!.colors = GRAPH_PARTITION.deriveChildColors({
+				childCount: religions!.count,
+				childToParent: religionFamilies,
+				parentColors: families.colors,
+				seed: params.seed + 6281,
 			})
 			cultures!.colors = GRAPH_PARTITION.deriveChildColors({
 				childCount: cultures!.count,
@@ -166,6 +179,17 @@ function deriveProvinceSociety({
 				parentColors: heritages!.colors,
 				seed: params.seed + 5101,
 			})
+			// Organization naming needs the emperor's culture, which isn't known
+			// until cultures are computed (nations run first -- see governmentType
+			// feeding religionTypes above) -- patch it in now rather than
+			// reordering the pipeline.
+			if (nations?.organizations?.length) {
+				for (const org of nations.organizations) {
+					const capital = nations.seeds[org.leadNationIndex]
+					org.cultureIdx =
+						capital !== undefined ? cultures!.assignment[capital] : -1
+				}
+			}
 		})
 	}
 
@@ -199,6 +223,7 @@ function deriveProvinceSociety({
 		cultures,
 		heritages,
 		religions,
+		religionFamilies,
 		religionTypes,
 		landmarks,
 		settlementRegions: settlementAnchors.settlementRegions,

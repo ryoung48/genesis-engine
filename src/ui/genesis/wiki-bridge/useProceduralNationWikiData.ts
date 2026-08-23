@@ -13,8 +13,9 @@ import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
  * Nation wiki page for procedural (non-Earth-import) worlds -- mirrors
  * useNationWikiData but sourced from buildSelectedNationDetails rather than
  * the Earth-history fold engine. Procedural nations have no diplomatic-tie
- * data wired up yet, so dependencies/organizations/environmental
- * distributions stay empty until src/model/history is wired into generation.
+ * (dependencies) data wired up yet; organizations are populated from
+ * GenesisNationHierarchy.organizations (see src/model/society/organizations)
+ * when the nation belongs to one, e.g. an Imperial Patchwork.
  */
 export function useProceduralNationWikiData(
 	input: ProceduralNationWikiDataInput,
@@ -29,6 +30,7 @@ export function useProceduralNationWikiData(
 		getNationName,
 		getNationColor,
 		setSelectedNationId,
+		setSelectedWikiOrganizationId,
 		onSelectNation,
 		sceneRef,
 	} = input
@@ -58,7 +60,8 @@ export function useProceduralNationWikiData(
 			totalPopulation: selectedNation.totalPopulation,
 			totalUrbanPopulation: 0,
 			provinceCount: selectedNation.provinceCount,
-			governmentLabel: selectedNation.governmentType,
+			governmentSubtype: selectedNation.governmentType,
+			governmentColor: selectedNation.governmentColor,
 		})
 		const nationId = selectedNation.id
 		const currentDate = HISTORY_DAYS.historyMsToDays(proceduralHistoryTimeMs)
@@ -81,7 +84,7 @@ export function useProceduralNationWikiData(
 			planetTitle: planetName,
 			stats,
 			dependencies: [],
-			organizations: [],
+			organizations: selectedNation.organizations,
 			cultureDistribution: selectedNation.cultureDistribution,
 			religionDistribution: selectedNation.religionDistribution,
 			climateDistribution: selectedNation.climateDistribution,
@@ -106,12 +109,12 @@ export function useProceduralNationWikiData(
 				})
 			},
 			// Procedural nations have no stored past frames to scrub to (see
-			// PROCEDURAL-HISTORY-PLAN.md's live-play design) and no orgs/wars yet.
+			// PROCEDURAL-HISTORY-PLAN.md's live-play design) and no wars yet.
 			onSelectDate: () => {
 				/* no-op: no scrubbable timeline */
 			},
-			onSelectOrganization: () => {
-				/* no-op: no organizations */
+			onSelectOrganization: (orgId: string) => {
+				setSelectedWikiOrganizationId(orgId)
 			},
 			onSelectWar: () => {
 				/* no-op: no wars */

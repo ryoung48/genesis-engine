@@ -170,9 +170,13 @@ export function useNationWikiData(
 		}
 		const title = resolveNationName(tag)
 		const color = resolveNationColor(tag)
-		const governmentLabel = GOVERNMENT.formatEarthHistoryGovernmentLabel({
+		const governmentSubtype =
+			GOVERNMENT.formatEarthHistoryGovernmentReformLabel({
+				governmentReform: nationState?.governmentReform,
+			})
+		const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
 			governmentType: nationState?.governmentType ?? null,
-			governmentReform: nationState?.governmentReform ?? null,
+			governmentReform: nationState?.governmentReform,
 		})
 		const currentRulerPayload =
 			earthHistory.engine.data.nationEvents[tag]?.events
@@ -326,7 +330,10 @@ export function useNationWikiData(
 			totalUrbanPopulation,
 			provinceCount: provinceIndexes.length,
 			rulerLabel,
-			governmentLabel,
+			governmentSubtype,
+			governmentColor: governmentColor
+				? COLOR.rgb01ToCss(governmentColor)
+				: null,
 		})
 		const rulerStat = stats.find((stat) => stat.label === "Ruler")
 		if (rulerStat && nationState?.ruler) {

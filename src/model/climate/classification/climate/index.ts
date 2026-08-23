@@ -277,7 +277,7 @@ function computeTemperature({
 		const distMiles = oceanDist ? oceanDist[r] * KM_TO_MI : 0
 		const absLat = Math.abs(latDeg)
 		const polarTaper = absLat > 55 ? 1 - (absLat - 55) / 35 : 1 // linear fade 55°–90°
-		const maxAmplitude = 0.5 * Math.max(0, polarTaper)
+		const maxAmplitude = 1 * Math.max(0, polarTaper)
 		const inertiaFactor = oceanDist
 			? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000)
 			: 1

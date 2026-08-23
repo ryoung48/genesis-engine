@@ -12,8 +12,8 @@ import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
 	MapModePrimary,
 	NationMapMode,
-	PopulationMapMode,
 	SocietyMapMode,
+	SocietyMapOption,
 } from "@/ui/genesis/shared/map-modes"
 import {
 	getMapModePrimary,
@@ -29,8 +29,8 @@ interface ModeBarProps {
 	setGeographyMode: (v: ColorMode) => void
 	nationMode: NationMapMode
 	setNationMode: (v: NationMapMode) => void
-	populationMode: PopulationMapMode
-	setPopulationMode: (v: PopulationMapMode) => void
+	societyMode: SocietyMapMode
+	setSocietyMode: (v: SocietyMapMode) => void
 	debugMapModes: boolean
 	vegetationSubMode: VegetationSubMode
 	climateSubMode: ClimateSubMode
@@ -76,8 +76,8 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	setGeographyMode,
 	nationMode,
 	setNationMode,
-	populationMode,
-	setPopulationMode,
+	societyMode,
+	setSocietyMode,
 	debugMapModes,
 	vegetationSubMode,
 	climateSubMode,
@@ -123,11 +123,11 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				buttonClassName="px-1.5"
 			/>
 		) : (
-			<ModeButtonGroup<SocietyMapMode>
+			<ModeButtonGroup<SocietyMapOption>
 				options={societyOptions}
 				value={
 					getBaseMapMode(colorMode) === "population"
-						? populationMode
+						? societyMode
 						: colorMode === "timezone"
 							? "timezone"
 							: nationMode
@@ -147,7 +147,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						mode === "migration"
 					) {
 						setColorMode("population")
-						setPopulationMode(mode)
+						setSocietyMode(mode)
 						return
 					}
 					setColorMode("nations")

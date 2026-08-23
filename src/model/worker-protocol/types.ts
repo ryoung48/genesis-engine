@@ -42,6 +42,10 @@ interface SerializedGenesisClimate {
 	pet_monthly: Float32Array
 	daylight_hours_monthly: Float32Array
 	landFraction: number[]
+	/** [JUSTIFICATION] Cached cloud cover is absent from worlds generated before this cache was introduced. */
+	cloud_cover_monthly?: Float32Array
+	/** [JUSTIFICATION] Observed-input cloud cover is only available for imported Earth worlds. */
+	real_cloud_cover_monthly?: Float32Array
 }
 
 type SerializedPartition = GenesisPartition
@@ -200,6 +204,8 @@ export interface SerializedGenesisWorld {
 	cultures?: SerializedPartition
 	heritages?: SerializedPartition
 	religions?: SerializedPartition
+	/** [JUSTIFICATION] Religion families are absent from worlds without procedural society generation. */
+	religionFamilies?: Int32Array
 	religionTypes?: Uint8Array
 	landmarks?: {
 		regionLandmark: Int32Array
@@ -470,6 +476,9 @@ export type GenesisWorkerRequest =
 	| {
 			type: "pause"
 	  }
+	| {
+			type: "compute-infrastructure"
+	  }
 
 export type GenesisWorkerResponse =
 	| {
@@ -495,6 +504,11 @@ export type GenesisWorkerResponse =
 			seaKm: number
 			travelDays: number
 			reachable: boolean
+	  }
+	| {
+			type: "infrastructure-result"
+			routes: SerializedRoutes
+			network: SerializedNetwork
 	  }
 	| {
 			type: "sim-progress"

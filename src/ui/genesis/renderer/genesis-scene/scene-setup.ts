@@ -333,6 +333,7 @@ export function buildGenesisSceneSetup(
 		settlementLabelNames: null,
 		cultureNames: null,
 		heritageNames: null,
+		religionNames: null,
 		cachedEu4BorderGeometry: null,
 		cachedEu4FillGeometry: null,
 		currentNationFillColorForRawId: null,

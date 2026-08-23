@@ -25,6 +25,11 @@ export interface GetCultureLanguageParams {
 	cultureIdx: number
 }
 
+export interface GetReligionLanguageParams {
+	context: LanguageNameContext
+	religionIdx: number
+}
+
 export interface GetLeaderEntryParams {
 	province: LanguageNameProvince | undefined
 	time: number

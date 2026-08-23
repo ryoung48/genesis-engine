@@ -71,7 +71,7 @@ import {
 import { getDataVariant } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
@@ -120,7 +120,7 @@ const DIPLOMACY_RGB_COLORS: Record<number, [number, number, number]> = {
 }
 const CULTURE_ELEVATION_BUMP_SCALE = 1.6
 
-function hasPartitionElevationBump(populationMode: PopulationMapMode): boolean {
+function hasPartitionElevationBump(populationMode: SocietyMapMode): boolean {
 	return (
 		populationMode === "culture" ||
 		populationMode === "heritage" ||
@@ -142,7 +142,7 @@ export function computeRegionColors(
 	world: SerializedGenesisWorld,
 	colorMode: ColorMode,
 	nationMode: NationMapMode,
-	populationMode: PopulationMapMode,
+	populationMode: SocietyMapMode,
 	temperatureMonth: number,
 	rainfallMonth: number,
 	dtrMonth: number,
@@ -154,6 +154,7 @@ export function computeRegionColors(
 	selectedNationId?: number | null,
 	relationAt?: ((a: number, b: number) => number) | null,
 	dangerSubMode: DangerSubMode = "earthquake",
+	religionMode: "religions" | "types" = "religions",
 ): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
 
@@ -980,6 +981,62 @@ export function computeRegionColors(
 			}
 			return rgb
 		}
+		if (nationMode === "organizations" && world.nations?.organizations) {
+			// Keyed by capital province id (world.nations.assignment's value
+			// space here -- see buildDisplayWorld's nations.assignment =
+			// sovereign.slice() rewrite), not org.members[].nationIndex's raw
+			// array index -- translated via nations.seeds, same convention as
+			// every other nation-identity lookup in this display layer.
+			const patchworkCapitals = new Set<number>()
+			const tradeLeagueCapitals = new Set<number>()
+			for (const org of world.nations.organizations) {
+				const target =
+					org.kind === "imperialPatchwork"
+						? patchworkCapitals
+						: tradeLeagueCapitals
+				for (const member of org.members) {
+					const capital = world.nations.seeds[member.nationIndex]
+					if (capital !== undefined) target.add(capital)
+				}
+			}
+			const { regionProvince, desolate } = world.provinces
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0) {
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+					continue
+				}
+				if (desolate[p]) {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						[0.35, 0.33, 0.32],
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+					continue
+				}
+				const capital = world.nations.assignment[p]
+				const baseColor: [number, number, number] = patchworkCapitals.has(
+					capital,
+				)
+					? [0.58, 0.29, 0.82] // purple -- Imperial Patchwork
+					: tradeLeagueCapitals.has(capital)
+						? [0.16, 0.68, 0.38] // green -- Trade League
+						: [0.82, 0.8, 0.78] // muted -- no organization
+				const [cr, cg, cb] = darkenPoliticalAtElevation(
+					baseColor,
+					world.elevation_km[r],
+				)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
 		if (nationMode === "dynasty") {
 			const { regionProvince, desolate } = world.provinces
 			const migrationWaveDyn = world.population?.migrationWave
@@ -1400,7 +1457,13 @@ export function computeRegionColors(
 					}
 				} else if (populationMode === "religion") {
 					const typeIdx = getReligionTypeIndexForProvince(world, p)
-					if (typeIdx < 0) {
+					const religionColor = getReligionColorForProvince(world, p)
+					const color =
+						religionMode === "types" && typeIdx >= 0
+							? (RELIGION.religionTypeColors[typeIdx] ??
+								RELIGION.religionTypeColors[0])
+							: religionColor
+					if (!color) {
 						const [cr, cg, cb] = darkenPartitionAtElevation(
 							[0.35, 0.33, 0.32],
 							world.elevation_km[r],
@@ -1409,12 +1472,8 @@ export function computeRegionColors(
 						rgb[3 * r + 1] = cg
 						rgb[3 * r + 2] = cb
 					} else {
-						const typeColor =
-							getReligionColorForProvince(world, p) ??
-							RELIGION.religionTypeColors[typeIdx] ??
-							RELIGION.religionTypeColors[0]
 						const [cr, cg, cb] = darkenPartitionAtElevation(
-							[typeColor[0], typeColor[1], typeColor[2]],
+							[color[0], color[1], color[2]],
 							world.elevation_km[r],
 						)
 						rgb[3 * r] = cr

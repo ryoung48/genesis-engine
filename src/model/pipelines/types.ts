@@ -198,6 +198,8 @@ export interface GenesisWorld {
 	cultures?: GenesisPartition
 	heritages?: GenesisPartition
 	religions?: GenesisPartition
+	/** [JUSTIFICATION] Religion families are only generated after province society is derived. */
+	religionFamilies?: Int32Array
 	religionTypes?: Uint8Array
 	landmarks?: GenesisLandmarks
 	population?: ProvincePopulation

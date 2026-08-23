@@ -234,27 +234,21 @@ function refineGovernmentSubtype({
 				if (r < 0.72) return getGovIdx().parliamentary_republic
 				return getGovIdx().presidential_republic
 			}
-			// Pre-modern republics
-			if (size === 1 && r < 0.3) return getGovIdx().free_city
+			// Pre-modern republics.
 			if (water >= 2 && size <= 3 && r < 0.06)
 				return getGovIdx().pirate_republic // small remote coastal havens
 			if (size <= 4 && hab >= 0.3 && r < 0.25)
 				return getGovIdx().peasant_republic // lord-less free-peasant commune
-			if (water >= 2 && size <= 10 && wave >= 0 && wave < 0.35)
-				return getGovIdx().free_city // coastal core
-			if (water >= 1 && size <= 6 && wave >= 0 && wave < 0.3 && r < 0.55)
-				return getGovIdx().free_city
 			// Dynastic signoria (a princely lord ruling what was a republic, e.g.
 			// Medici Florence, Visconti Milan) shares oligarchic republic's core-only
-			// condition rather than a size cap — a coin flip decides which one a
+			// condition — no size cap, since small city-states fell under one lord
+			// just as often as larger ones — a coin flip decides which one a
 			// settled, non-frontier core polity becomes.
-			if (size >= 8 && wave >= 0 && wave < 0.28)
+			if (wave >= 0 && wave < 0.28)
 				return r < 0.5
 					? getGovIdx().dynastic_signoria
 					: getGovIdx().oligarchic_republic
-			if (wave >= 0 && wave < 0.28 && r < 0.15)
-				return getGovIdx().dynastic_signoria
-			return getGovIdx().free_city // default
+			return getGovIdx().oligarchic_republic // default
 		}
 
 		case 3: {

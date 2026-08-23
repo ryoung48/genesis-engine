@@ -44,6 +44,14 @@ export function getReligionTypeIndexForProvince(
 	return getReligionTypeIndexForCulture(world, cultureIdx)
 }
 
+export function getReligionIndexForProvince(
+	world: Pick<SerializedGenesisWorld, "cultures" | "religions">,
+	provinceIdx: number,
+): number {
+	const cultureIdx = world.cultures?.assignment[provinceIdx] ?? -1
+	return getReligionIndexForCulture(world, cultureIdx)
+}
+
 export function getReligionColorForProvince(
 	world: Pick<SerializedGenesisWorld, "cultures" | "religions">,
 	provinceIdx: number,

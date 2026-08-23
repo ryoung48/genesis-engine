@@ -10,6 +10,7 @@ import type {
 	GetHeritageLanguageParams,
 	GetLanguageParams,
 	GetLeaderEntryParams,
+	GetReligionLanguageParams,
 	SpawnSeededLanguageParams,
 } from "@/model/society/language/names/types"
 import { CultureGenderSystem } from "@/model/society/types"
@@ -41,6 +42,12 @@ export interface LanguageNameHeritage {
 	nameSeed?: number
 }
 
+export interface LanguageNameReligion {
+	language: Language | null
+	languageSeed: number | undefined
+	nameSeed: number | undefined
+}
+
 export interface LanguageNameNation {
 	id: number
 	capital: number
@@ -65,14 +72,26 @@ export interface LanguageNameDynasty {
 	name: string
 }
 
+export interface LanguageNameOrganization {
+	id: string
+	culture: number
+	nameSeed?: number
+	name?: string
+	/** Picks the name suffix ("Empire" vs "League"/"Confederation") --
+	 * see cachedOrganizationName. */
+	kind?: "imperialPatchwork" | "tradeLeague"
+}
+
 export interface LanguageNameContext {
 	provinces: readonly LanguageNameProvince[]
 	cultures: readonly LanguageNameCulture[]
 	heritages?: readonly LanguageNameHeritage[]
+	religions: readonly LanguageNameReligion[]
 	landmarks?: readonly LanguageNameLandmark[]
 	rivers?: readonly LanguageNameRiver[]
 	nations?: readonly LanguageNameNation[]
 	dynasties?: readonly LanguageNameDynasty[]
+	organizations?: readonly LanguageNameOrganization[]
 }
 
 export interface LanguageNames {
@@ -80,11 +99,16 @@ export interface LanguageNames {
 	nation(capitalIdx: number): string
 	culture(cultureIdx: number): string
 	heritage(heritageIdx: number): string
+	religion(religionIdx: number): string
 	landmark(landmarkIdx: number): string
 	river(provinceIdx: number): string
 	mountain(provinceIdx: number): string
 	leader(provinceIdx: number, time: number): string
 	dynasty(dynastyIdx: number): string
+	/** e.g. an Imperial Patchwork's "[Word] Empire" or a Trade League's
+	 * "[Word] League"/"[Word] Confederation" -- named off the lead member's
+	 * culture language. */
+	organization(orgId: string): string
 	clear(): void
 }
 
@@ -137,6 +161,21 @@ function getCultureLanguage({
 		? LANGUAGE.dialect(heritageLanguage, seed)
 		: spawnSeededLanguage({ seed, namespace: "culture" })
 	return culture.language
+}
+
+function getReligionLanguage({
+	context,
+	religionIdx,
+}: GetReligionLanguageParams): Language | null {
+	const religion = context.religions[religionIdx]
+	if (!religion) return null
+	if (religion.language) return religion.language
+	if (religion.languageSeed == null) return null
+	religion.language = spawnSeededLanguage({
+		seed: religion.languageSeed,
+		namespace: "religion",
+	})
+	return religion.language
 }
 
 function getLeaderEntry({
@@ -193,9 +232,14 @@ function createNames(context: LanguageNameContext): LanguageNames {
 	const nationNames = new Map<number, string>()
 	const cultureNames = new Map<number, string>()
 	const heritageNames = new Map<number, string>()
+	const religionNames = new Map<number, string>()
 	const landmarkNames = new Map<number, string>()
 	const riverNames = new Map<number, string>()
 	const mountainNames = new Map<number, string>()
+	const organizationNames = new Map<string, string>()
+	const organizationById = new Map(
+		context.organizations?.map((org) => [org.id, org]) ?? [],
+	)
 	const nationById = new Map(
 		context.nations?.map((nation) => [nation.id, nation]) ?? [],
 	)
@@ -310,6 +354,59 @@ function createNames(context: LanguageNameContext): LanguageNames {
 		})
 	}
 
+	function cachedReligionName(religionIdx: number): string {
+		const religion = context.religions[religionIdx]
+		return cachedScopedName({
+			cache: religionNames,
+			index: religionIdx,
+			key: "culture",
+			namespace: "religion",
+			slot: buildNamedGroupSlot({
+				namespace: "religion",
+				index: religionIdx,
+				nameSeed: religion?.nameSeed,
+			}),
+			lang: getReligionLanguage({ context, religionIdx }),
+			fallback: `Religion #${religionIdx}`,
+		})
+	}
+
+	function cachedOrganizationName(orgId: string): string {
+		const cached = organizationNames.get(orgId)
+		if (cached) return cached
+		const org = organizationById.get(orgId)
+		if (org?.name) {
+			organizationNames.set(orgId, org.name)
+			return org.name
+		}
+		const lang =
+			org && org.culture >= 0
+				? getCultureLanguage({ context, cultureIdx: org.culture })
+				: null
+		if (!lang) return orgId
+		const word = TEXT.titleCase(
+			LANGUAGE.word.simple({
+				lang,
+				key: "region",
+				namespace: "organization",
+				slot: `organization:${orgId}:${org?.nameSeed ?? orgId}`,
+			}).word,
+		)
+		// Trade League alternates League/Confederation (deterministic on the
+		// name seed, not a fresh random draw) since neither reads as wrong for
+		// a Hansa-style city alliance; Imperial Patchwork is always "Empire".
+		const suffix =
+			org?.kind === "tradeLeague"
+				? (org.nameSeed ?? 0) % 2 === 0
+					? "League"
+					: "Confederation"
+				: "Empire"
+		const name = `${word} ${suffix}`
+		organizationNames.set(orgId, name)
+		if (org) org.name = name
+		return name
+	}
+
 	function cachedLandmarkName(landmarkIdx: number): string {
 		const landmark = context.landmarks?.[landmarkIdx]
 		if (landmark?.name) {
@@ -348,6 +445,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 		nation: cachedNationName,
 		culture: cachedCultureName,
 		heritage: cachedHeritageName,
+		religion: cachedReligionName,
 		landmark: cachedLandmarkName,
 		river: (riverIdx: number) => {
 			const river = context.rivers?.[riverIdx]
@@ -427,14 +525,17 @@ function createNames(context: LanguageNameContext): LanguageNames {
 			if (!dynasty) return `Dynasty #${dynastyIdx}`
 			return dynasty.name
 		},
+		organization: cachedOrganizationName,
 		clear: () => {
 			provinceNames.clear()
 			nationNames.clear()
 			cultureNames.clear()
 			heritageNames.clear()
+			religionNames.clear()
 			landmarkNames.clear()
 			riverNames.clear()
 			mountainNames.clear()
+			organizationNames.clear()
 		},
 	}
 }
@@ -446,6 +547,7 @@ function createWorldNames(
 			| "provinces"
 			| "cultures"
 			| "heritages"
+			| "religions"
 			| "landmarks"
 			| "nations"
 			| "rivers"
@@ -455,6 +557,7 @@ function createWorldNames(
 	const provinceCount = world.provinces?.count ?? 0
 	const cultureCount = world.cultures?.count ?? 0
 	const heritageCount = world.heritages?.count ?? 0
+	const religionCount = world.religions?.count ?? 0
 	const cultures: LanguageNameCulture[] = Array.from(
 		{ length: cultureCount },
 		(_, cultureIdx): LanguageNameCulture => ({
@@ -477,6 +580,14 @@ function createWorldNames(
 			language: null,
 			languageSeed: world.heritages?.languageSeeds?.[heritageIdx],
 			nameSeed: world.heritages?.nameSeeds?.[heritageIdx],
+		}),
+	)
+	const religions: LanguageNameReligion[] = Array.from(
+		{ length: religionCount },
+		(_, religionIdx): LanguageNameReligion => ({
+			language: null,
+			languageSeed: world.religions?.languageSeeds?.[religionIdx],
+			nameSeed: world.religions?.nameSeeds?.[religionIdx],
 		}),
 	)
 	const landmarks: LanguageNameLandmark[] = Array.from(
@@ -534,13 +645,23 @@ function createWorldNames(
 			}
 		},
 	)
+	const organizations: LanguageNameOrganization[] = (
+		world.nations?.organizations ?? []
+	).map((org) => ({
+		id: org.id,
+		culture: org.cultureIdx,
+		nameSeed: org.nameSeed,
+		kind: org.kind,
+	}))
 	return createNames({
 		provinces,
 		cultures,
 		heritages,
+		religions,
 		landmarks,
 		rivers,
 		nations,
+		organizations,
 	})
 }
 

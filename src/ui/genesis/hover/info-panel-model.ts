@@ -4,13 +4,12 @@ import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ERAS } from "@/model/society/eras"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
-import { RELIGION } from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/genesis/hover/hover"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
 import {
 	getReligionColorForProvince,
-	getReligionTypeIndexForProvince,
+	getReligionIndexForProvince,
 } from "@/ui/genesis/political/religion-type"
 import {
 	type ColorMode,
@@ -30,7 +29,7 @@ import {
 	getBaseMapMode,
 	getDataVariant,
 } from "@/ui/genesis/shared/data-variant"
-import type { PopulationMapMode } from "@/ui/genesis/shared/map-modes"
+import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
 	getTerrainFeatureColor,
@@ -357,13 +356,14 @@ export function buildTopographySwatchColor(
 }
 
 export function buildDemographicDisplayData(params: {
-	populationMode: PopulationMapMode
+	populationMode: SocietyMapMode
 	colorMode: ColorMode
 	hoverProvince: number | null
 	world: SerializedGenesisWorld | null
 	unitSystem: UnitSystem
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
+	getReligionName: (religionId: number) => string
 }): HoverDemographicDisplayData | null {
 	const {
 		populationMode,
@@ -373,6 +373,7 @@ export function buildDemographicDisplayData(params: {
 		unitSystem,
 		getCultureName,
 		getHeritageName,
+		getReligionName,
 	} = params
 	if (
 		hoverProvince === null ||
@@ -482,16 +483,13 @@ export function buildDemographicDisplayData(params: {
 	}
 
 	if (populationMode === "religion") {
-		const typeIdx = getReligionTypeIndexForProvince(world, hoverProvince)
-		if (typeIdx < 0) return null
-		const typeColor =
-			getReligionColorForProvince(world, hoverProvince) ??
-			RELIGION.religionTypeColors[typeIdx] ??
-			RELIGION.religionTypeColors[0]
+		const religionIdx = getReligionIndexForProvince(world, hoverProvince)
+		const religionColor = getReligionColorForProvince(world, hoverProvince)
+		if (religionIdx < 0 || !religionColor) return null
 		return {
 			label: "Religion",
-			value: RELIGION.religionTypeNames[typeIdx] ?? "Unknown",
-			color: rgbToCss([typeColor[0], typeColor[1], typeColor[2]]),
+			value: getReligionName(religionIdx),
+			color: rgbToCss([religionColor[0], religionColor[1], religionColor[2]]),
 		}
 	}
 

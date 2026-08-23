@@ -39,7 +39,8 @@ import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	ReligionMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import type { DisplayNationModel } from "@/ui/genesis/view/display-model"
 import type { WikiCountHistoryPoint } from "@/ui/wiki/shared/WikiTimeline"
@@ -107,6 +108,21 @@ export type ProceduralNationWikiDataInput = {
 	getNationName: (nationId: number) => string
 	getNationColor: (nationId: number) => string | null
 	setSelectedNationId: (nationId: number | null) => void
+	setSelectedWikiOrganizationId: (orgId: string | null) => void
+	onSelectNation: (nationId: number) => void
+	sceneRef: SceneRef
+}
+
+export type ProceduralOrganizationWikiDataInput = {
+	world: SerializedGenesisWorld | null
+	selectedWikiOrganizationId: string | null
+	planetName: string
+	getNationName: (nationId: number) => string
+	getNationColor: (nationId: number) => string | null
+	getCultureName: (cultureId: number) => string
+	getHeritageName: (heritageId: number) => string
+	getOrganizationName: (orgId: string) => string
+	setSelectedWikiOrganizationId: (orgId: string | null) => void
 	onSelectNation: (nationId: number) => void
 	sceneRef: SceneRef
 }
@@ -124,7 +140,6 @@ export type SolarSystemBodiesInput = {
 
 export type OverlayStateInput = SolarSystemBodiesInput & {
 	initialViewPrefs: StoredViewPrefs
-	isEarthImport: boolean
 }
 
 export type SolarSystemViewInput = SolarSystemBodiesInput & {
@@ -217,7 +232,8 @@ export type MapColoringInput = {
 	earthHistory: EarthHistoryTimeline
 	colorMode: ColorMode
 	nationMode: NationMapMode
-	populationMode: PopulationMapMode
+	societyMode: SocietyMapMode
+	religionMode: ReligionMapMode
 	viewMode: GenesisViewMode
 	showElevation: boolean
 	dangerSubMode: DangerSubMode
@@ -231,13 +247,25 @@ export type MapColoringInput = {
 	rainfallMonth: number
 	dtrMonth: number
 	currentMonth: number
+	/** Resolves a procedural organization's lazily-generated display name
+	 * (e.g. an Imperial Patchwork's "[Word] Empire") for the org-highlight
+	 * label -- Earth-import orgs get their name straight off
+	 * earthHistory.organizationReference instead, so this is unused there. */
+	getOrganizationName: (orgId: string) => string
 }
 
 export type WorldGenerationInput = {
 	sceneRef: SceneRef
 	workerRef: RefObject<Worker | null>
 	lastWorldRef: RefObject<SerializedGenesisWorld | null>
-	setWorld: (world: SerializedGenesisWorld | null) => void
+	setWorld: (
+		world:
+			| SerializedGenesisWorld
+			| null
+			| ((
+					prev: SerializedGenesisWorld | null,
+			  ) => SerializedGenesisWorld | null),
+	) => void
 	setSelectedTimeMs: (timeMs: number) => void
 	simStartTimeMs: number
 	setShowCoastlines: (show: boolean) => void
@@ -324,4 +352,5 @@ export type GenesisSceneSyncInput = {
 	sampledSettlementLabelsArray: string[] | null
 	sampledCultureLabelsArray: string[] | null
 	sampledHeritageLabelsArray: string[] | null
+	sampledReligionLabelsArray: string[] | null
 }

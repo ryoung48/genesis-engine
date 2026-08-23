@@ -23,6 +23,8 @@ import { ElevationModeSection } from "./ElevationModeSection"
 import { GeographySection } from "./GeographySection"
 import { GridSection } from "./GridSection"
 import { MeasureSection } from "./MeasureSection"
+import { NationsModeSection } from "./NationsModeSection"
+import { ReligionModeSection } from "./ReligionModeSection"
 import { SocietySection } from "./SocietySection"
 import { TopographyModeSection } from "./TopographyModeSection"
 import type { OverlayControlsProps } from "./types"
@@ -79,7 +81,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	showNationHierarchy,
 	setShowNationHierarchy,
 	nationMode,
+	setNationMode,
 	populationMode,
+	religionMode,
+	setReligionMode,
 	labelMode,
 	setLabelMode,
 	showElevation,
@@ -159,6 +164,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [measureExpanded, setMeasureExpanded] = React.useState(false)
 	const [elevationExpanded, setElevationExpanded] = React.useState(false)
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
+	const [nationsExpanded, setNationsExpanded] = React.useState(false)
+	const [religionExpanded, setReligionExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
 	const exportExpanded =
 		controlledExportExpanded !== undefined
@@ -358,6 +365,22 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									labelMode={labelMode}
 									setLabelMode={setLabelMode}
 									isEarthImport={isEarthImport}
+								/>
+
+								<NationsModeSection
+									colorMode={colorMode}
+									nationMode={nationMode}
+									setNationMode={setNationMode}
+									nationsExpanded={nationsExpanded}
+									setNationsExpanded={setNationsExpanded}
+								/>
+								<ReligionModeSection
+									colorMode={colorMode}
+									societyMode={populationMode}
+									religionMode={religionMode}
+									setReligionMode={setReligionMode}
+									religionExpanded={religionExpanded}
+									setReligionExpanded={setReligionExpanded}
 								/>
 
 								<ClimateToggleSection

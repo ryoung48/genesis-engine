@@ -10,7 +10,8 @@ import type { GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	ReligionMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import { DEFAULT_GEOGRAPHY_MODE } from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
@@ -19,7 +20,8 @@ export interface StoredViewPrefs {
 	colorMode: ColorMode
 	geographyMode: ColorMode
 	nationMode: NationMapMode
-	populationMode: PopulationMapMode
+	societyMode: SocietyMapMode
+	religionMode: ReligionMapMode
 	viewMode: GenesisViewMode
 	solarSystemViewActive: boolean
 	showSolarSystemEllipticalOrbits: boolean
@@ -122,7 +124,7 @@ const NATION_MAP_MODES = new Set<NationMapMode>([
 	"government",
 ])
 
-const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
+const SOCIETY_MAP_MODES = new Set<SocietyMapMode>([
 	"density",
 	"urban",
 	"development",
@@ -139,7 +141,8 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	colorMode: DEFAULT_GEOGRAPHY_MODE,
 	geographyMode: DEFAULT_GEOGRAPHY_MODE,
 	nationMode: "borders",
-	populationMode: "density",
+	societyMode: "density",
+	religionMode: "religions",
 	viewMode: "globe",
 	solarSystemViewActive: false,
 	showSolarSystemEllipticalOrbits: true,
@@ -205,10 +208,9 @@ function isNationMapMode(value: unknown): value is NationMapMode {
 	)
 }
 
-function isPopulationMapMode(value: unknown): value is PopulationMapMode {
+function isSocietyMapMode(value: unknown): value is SocietyMapMode {
 	return (
-		typeof value === "string" &&
-		POPULATION_MAP_MODES.has(value as PopulationMapMode)
+		typeof value === "string" && SOCIETY_MAP_MODES.has(value as SocietyMapMode)
 	)
 }
 
@@ -273,9 +275,13 @@ export function parseStoredViewPrefs(
 			nationMode: isNationMapMode(parsed.nationMode)
 				? parsed.nationMode
 				: DEFAULT_VIEW_PREFS.nationMode,
-			populationMode: isPopulationMapMode(parsed.populationMode)
-				? parsed.populationMode
-				: DEFAULT_VIEW_PREFS.populationMode,
+			societyMode: isSocietyMapMode(parsed.societyMode)
+				? parsed.societyMode
+				: DEFAULT_VIEW_PREFS.societyMode,
+			religionMode:
+				parsed.religionMode === "religions" || parsed.religionMode === "types"
+					? parsed.religionMode
+					: DEFAULT_VIEW_PREFS.religionMode,
 			viewMode: isViewMode(parsed.viewMode)
 				? parsed.viewMode
 				: DEFAULT_VIEW_PREFS.viewMode,

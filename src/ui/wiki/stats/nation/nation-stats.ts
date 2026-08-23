@@ -50,7 +50,8 @@ export function buildNationWikiStats(params: {
 	totalUrbanPopulation: number
 	provinceCount: number
 	rulerLabel?: string | null
-	governmentLabel: string | null
+	governmentSubtype: string | null
+	governmentColor: string | null
 }): StatEntry[] {
 	const {
 		totalAreaKm2,
@@ -58,7 +59,8 @@ export function buildNationWikiStats(params: {
 		totalUrbanPopulation,
 		provinceCount,
 		rulerLabel,
-		governmentLabel,
+		governmentSubtype,
+		governmentColor,
 	} = params
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
 	return [
@@ -74,6 +76,10 @@ export function buildNationWikiStats(params: {
 		...(rulerLabel !== null && rulerLabel !== undefined
 			? [{ label: "Ruler", value: rulerLabel }]
 			: []),
-		{ label: "Government", value: governmentLabel ?? "Unknown" },
+		{
+			label: "Government",
+			value: governmentSubtype ?? "Unknown",
+			swatchColor: governmentColor,
+		},
 	]
 }

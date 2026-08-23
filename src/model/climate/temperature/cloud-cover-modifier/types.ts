@@ -1,11 +1,15 @@
+import type { GenesisClimate } from "@/model/climate/types"
+
 export interface CloudCoverTemperatureModifierParams {
-	climate: {
-		temperature_monthly: Float32Array
-		temperature_avg: Float32Array
-		temperature_min: Float32Array
-		temperature_max: Float32Array
-		pet_monthly: Float32Array
-	}
+	climate: Pick<
+		GenesisClimate,
+		| "temperature_monthly"
+		| "temperature_avg"
+		| "temperature_min"
+		| "temperature_max"
+		| "pet_monthly"
+		| "cloud_cover_monthly"
+	>
 	rainfall: {
 		monthly: Float32Array
 	}

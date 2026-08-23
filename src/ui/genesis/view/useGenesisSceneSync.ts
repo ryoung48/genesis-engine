@@ -38,6 +38,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		sampledSettlementLabelsArray,
 		sampledCultureLabelsArray,
 		sampledHeritageLabelsArray,
+		sampledReligionLabelsArray,
 	} = input
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -228,6 +229,10 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		sceneRef.current?.setHeritageNames(sampledHeritageLabelsArray)
 	}, [sampledHeritageLabelsArray])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
+	useEffect(() => {
+		sceneRef.current?.setReligionNames(sampledReligionLabelsArray)
+	}, [sampledReligionLabelsArray])
 	// --- Elevation ---
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {

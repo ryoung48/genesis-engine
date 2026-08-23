@@ -3,7 +3,8 @@ import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	ReligionMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
@@ -76,7 +77,10 @@ export interface OverlayControlsProps {
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
 	nationMode: NationMapMode
-	populationMode: PopulationMapMode
+	setNationMode: (v: NationMapMode) => void
+	populationMode: SocietyMapMode
+	religionMode: ReligionMapMode
+	setReligionMode: (v: ReligionMapMode) => void
 	labelMode: LabelMode
 	setLabelMode: (v: LabelMode) => void
 	showElevation: boolean

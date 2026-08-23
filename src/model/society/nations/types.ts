@@ -72,4 +72,20 @@ export interface ComputeNationsParams {
 	 * [JUSTIFICATION] only meaningful when governmentMix is supplied; defaults to 0.75 otherwise
 	 */
 	statehoodFraction?: number
+	/**
+	 * When true (and governmentMix is supplied), shatter the largest eligible
+	 * nation into an HRE-style Imperial Patchwork organization after the main
+	 * partition finishes. See src/model/society/organizations/imperial-patchwork.
+	 * [JUSTIFICATION] most eras don't want this; era config opts in explicitly
+	 */
+	buildImperialPatchwork?: boolean
+	/**
+	 * When true (and governmentMix is supplied), shatter the largest eligible
+	 * coastal republic into a flat, non-hierarchical Trade League organization
+	 * after the main partition finishes (and after any Imperial Patchwork --
+	 * see the buildImperialPatchwork branch, which runs first). See
+	 * src/model/society/organizations/trade-league.
+	 * [JUSTIFICATION] most eras don't want this; era config opts in explicitly
+	 */
+	buildTradeLeague?: boolean
 }

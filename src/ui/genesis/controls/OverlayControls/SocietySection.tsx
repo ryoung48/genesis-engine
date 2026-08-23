@@ -5,7 +5,7 @@ import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import type { LabelMode } from "./types"
 
@@ -19,7 +19,7 @@ export interface SocietySectionProps {
 	showInfrastructure: boolean
 	setShowInfrastructure: (v: boolean) => void
 	colorMode: ColorMode
-	populationMode: PopulationMapMode
+	populationMode: SocietyMapMode
 	nationMode: NationMapMode
 	labelMode: LabelMode
 	setLabelMode: (v: LabelMode) => void

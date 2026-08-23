@@ -18,7 +18,8 @@ import {
 } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	ReligionMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import { syncLabelModeToMapMode } from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
@@ -36,12 +37,7 @@ import type { OverlayStateInput } from "@/ui/genesis/view/types"
  * stay with the scene wiring so the coupling is visible at the call site.
  */
 export function useOverlayState(input: OverlayStateInput) {
-	const {
-		initialViewPrefs,
-		initialGenerationSession,
-		isEarthImport,
-		sessionNamespace,
-	} = input
+	const { initialViewPrefs, initialGenerationSession, sessionNamespace } = input
 	const viewPrefsStorageKey = sessionNamespace
 		? `${VIEW_PREFS_STORAGE_KEY}:${sessionNamespace}`
 		: VIEW_PREFS_STORAGE_KEY
@@ -66,8 +62,11 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [nationMode, setNationMode] = useState<NationMapMode>(
 		initialViewPrefs.nationMode,
 	)
-	const [populationMode, setPopulationMode] = useState<PopulationMapMode>(
-		initialViewPrefs.populationMode,
+	const [societyMode, setSocietyMode] = useState<SocietyMapMode>(
+		initialViewPrefs.societyMode,
+	)
+	const [religionMode, setReligionMode] = useState<ReligionMapMode>(
+		initialViewPrefs.religionMode,
 	)
 	const [viewMode, setViewMode] = useState<GenesisViewMode>(
 		initialViewPrefs.viewMode,
@@ -146,11 +145,10 @@ export function useOverlayState(input: OverlayStateInput) {
 				labelMode: prev,
 				colorMode,
 				nationMode,
-				populationMode,
-				isEarthImport,
+				societyMode,
 			}),
 		)
-	}, [nationMode, colorMode, populationMode, isEarthImport])
+	}, [nationMode, colorMode, societyMode])
 	useEffect(() => {
 		setLabelMode((prev) =>
 			prev.settlements === showInfrastructure
@@ -218,7 +216,8 @@ export function useOverlayState(input: OverlayStateInput) {
 				colorMode,
 				geographyMode,
 				nationMode,
-				populationMode,
+				societyMode,
+				religionMode,
 				viewMode,
 				solarSystemViewActive,
 				showSolarSystemEllipticalOrbits,
@@ -293,7 +292,8 @@ export function useOverlayState(input: OverlayStateInput) {
 		mapProjectionLatitude,
 		nationMode,
 		overlaysExpanded,
-		populationMode,
+		societyMode,
+		religionMode,
 		showGrid,
 		showInfrastructure,
 		showNationBorders,
@@ -344,7 +344,8 @@ export function useOverlayState(input: OverlayStateInput) {
 		overlaysExpanded,
 		pathfindingLand,
 		pathfindingSea,
-		populationMode,
+		societyMode,
+		religionMode,
 		setClimateSubMode,
 		setClockCurrent,
 		setClockDay,
@@ -369,7 +370,8 @@ export function useOverlayState(input: OverlayStateInput) {
 		setOverlaysExpanded,
 		setPathfindingLand,
 		setPathfindingSea,
-		setPopulationMode,
+		setSocietyMode,
+		setReligionMode,
 		setShowAet,
 		setShowClouds,
 		setShowCoastlines,

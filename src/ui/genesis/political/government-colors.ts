@@ -20,7 +20,6 @@ export const GOVERNMENT_COLORS_BY_TYPE: Record<
 	// republic — green family
 	oligarchic_republic: [0.1, 0.56, 0.46],
 	dynastic_signoria: [0.36, 0.6, 0.28],
-	free_city: [0.64, 0.8, 0.24],
 	peasant_republic: [0.55, 0.62, 0.32],
 	presidential_republic: [0.24, 0.64, 0.34],
 	parliamentary_republic: [0.48, 0.84, 0.46],

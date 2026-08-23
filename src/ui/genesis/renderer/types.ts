@@ -158,6 +158,7 @@ export interface GenesisScene {
 	setDynastyNames(names: string[] | null): void
 	setCultureNames(names: string[] | null): void
 	setHeritageNames(names: string[] | null): void
+	setReligionNames(names: string[] | null): void
 	/** Real culture/religion partitions for Earth-imported worlds -- see
 	 * create-genesis-scene.ts's earthHistoryLabelPartitions doc comment. */
 	setEarthHistoryLabelPartitions(

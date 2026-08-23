@@ -52,7 +52,6 @@ const FAMILY_TYPES: Record<
 	republic: [
 		"oligarchic_republic",
 		"dynastic_signoria",
-		"free_city",
 		"peasant_republic",
 		"presidential_republic",
 		"parliamentary_republic",

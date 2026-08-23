@@ -1,6 +1,4 @@
 export class CumulativeDistributionFunction {
-	public constructor() {}
-
 	public probFromVal(fVal: number): number {
 		if (fVal < this.min || fVal > this.max) throw new Error("out of range")
 
@@ -110,7 +108,7 @@ export class CumulativeDistributionFunction {
 		for (let i = 1, k = 0; i < nsteps; ++i) {
 			p = i * h
 
-			for (; this.y1[k + 1] <= p; ++k) {}
+			while (this.y1[k + 1] <= p) k++
 
 			y = this.x1[k] + (p - this.y1[k]) / this.m1[k]
 

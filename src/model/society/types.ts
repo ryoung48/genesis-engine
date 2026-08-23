@@ -67,6 +67,66 @@ export interface GenesisPartition {
 	blendWeight?: Float32Array
 }
 
+/**
+ * Member rank within a GenesisOrganization, mirrored off the Holy Roman
+ * Empire's estate hierarchy. "princeElector"/"archbishopElector" are the
+ * (up to 7) largest monarchy/theocracy members; "imperialPrelate" and
+ * "imperialPrince" are the non-elector monarchy/theocracy remainder;
+ * "republic" covers every republic-family member.
+ */
+export type OrganizationTitle =
+	| "emperor"
+	| "princeElector"
+	| "archbishopElector"
+	| "imperialPrelate"
+	| "republic"
+	/** Size-1 republic-family member -- a self-governing city, not a
+	 * princely lord's domain (e.g. poleis, HRE free imperial cities). */
+	| "freeCity"
+	/** Size-1..2 republic-family member specifically assigned the
+	 * peasant_republic government type -- a lord-less free-peasant commune
+	 * (e.g. Dithmarschen, Frisia), distinct from an urban free city. */
+	| "peasantRepublic"
+	| "imperialPrince"
+	/** Flat membership tier for non-hierarchical orgs (e.g. a Trade League --
+	 * a confederation of equals, unlike the HRE's estate hierarchy). Every
+	 * member, including the naming anchor, gets this same title. */
+	| "member"
+
+export interface GenesisOrganizationMember {
+	nationIndex: number
+	title: OrganizationTitle
+}
+
+/**
+ * A procedurally generated patchwork organization: one large eligible nation
+ * is shattered into many small member states.
+ * - "imperialPatchwork": HRE-style -- eligible = largest settled
+ *   (migrationWave >= 0) nation; one member (the largest) keeps the
+ *   "emperor" title; rest get HRE estate titles. See
+ *   src/model/society/organizations/imperial-patchwork.
+ * - "tradeLeague": Hansa-style -- eligible = largest coastal republic;
+ *   members are flat ("member" title, no hierarchy), capped small (< 10
+ *   provinces). See src/model/society/organizations/trade-league.
+ */
+export interface GenesisOrganization {
+	id: string
+	kind: "imperialPatchwork" | "tradeLeague"
+	/** Deterministic name seed; the display name is generated lazily (same
+	 * pattern as nation names) from leadNationIndex's culture language. */
+	nameSeed: number
+	/** The org's own identity color (0-1 RGB), independent of any member
+	 * nation's color -- e.g. for its wiki page swatch and map highlight. */
+	color: [number, number, number]
+	/** Culture index of the lead member's capital province, -1 if unknown
+	 * (patched in by the pipeline once cultures are computed). */
+	cultureIdx: number
+	/** The largest member -- the Emperor for an imperialPatchwork, or just a
+	 * naming/culture anchor with no special authority for a tradeLeague. */
+	leadNationIndex: number
+	members: GenesisOrganizationMember[]
+}
+
 export interface GenesisNationHierarchy extends GenesisPartition {
 	/** Deterministic per-nation name seed aligned to `seeds` order */
 	nameSeeds?: Int32Array
@@ -88,6 +148,8 @@ export interface GenesisNationHierarchy extends GenesisPartition {
 	nationColonizer?: Int32Array
 	/** Active rebel wars — attacker is the overlord, defender is the rebel nation */
 	activeRebelWars?: ReadonlyArray<{ attacker: number; defender: number }>
+	/** Procedurally generated organizations (e.g. an Imperial Patchwork). */
+	organizations?: GenesisOrganization[]
 }
 
 export type SocietyEra =
@@ -116,7 +178,6 @@ export type GovernmentType =
 	| "warlord_state" // 10: fragmented post-imperial military rule — no legitimate succession
 	// republic (13–19)
 	| "oligarchic_republic" // 14: aristocratic senate — medium ancient core
-	| "free_city" // 15: self-governing city or league (poleis, Swiss cantons, HRE free cities) — medium
 	| "peasant_republic" // 16: lord-less free-peasant commune — small coastal/marsh (Dithmarschen, Frisia)
 	| "presidential_republic" // 17: elected executive — industrial+
 	| "parliamentary_republic" // 18: legislature-led — industrial+

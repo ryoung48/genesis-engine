@@ -119,6 +119,12 @@ export interface GenerationCallbacks {
 		travelDays: number
 		reachable: boolean
 	}) => void
+	/** Fired when a "compute-infrastructure" request completes -- see
+	 * requestInfrastructure below. */
+	onInfrastructureResult?: (result: {
+		routes: SerializedGenesisWorld["routes"]
+		network: SerializedGenesisWorld["network"]
+	}) => void
 	/** The seed history frame attached to "done", if the generated world has
 	 * nations/provinces/population wired up for the live-play sim. */
 	onHistoryFrame?: (frame: SerializedHistoryFrame) => void
@@ -175,6 +181,13 @@ function createWorker(
 				seaKm: message.seaKm,
 				travelDays: message.travelDays,
 				reachable: message.reachable,
+			})
+			return
+		}
+		if (message.type === "infrastructure-result") {
+			callbacks.onInfrastructureResult?.({
+				routes: message.routes,
+				network: message.network,
 			})
 			return
 		}
@@ -284,6 +297,16 @@ export function generateWorld(
 		)
 		worker.postMessage(request)
 	})
+}
+
+/** Asks the worker to lazily compute the road/sea route network for the most
+ * recently generated world. Call once when the Infrastructure overlay is
+ * first toggled on; the result arrives via onInfrastructureResult. */
+export function requestInfrastructure(
+	workerRef: React.MutableRefObject<Worker | null>,
+): void {
+	const request: GenesisWorkerRequest = { type: "compute-infrastructure" }
+	workerRef.current?.postMessage(request)
 }
 
 export function importHeightmap(

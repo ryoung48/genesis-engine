@@ -2,7 +2,58 @@ import type { LabelMode } from "@/ui/genesis/controls/OverlayControls"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 
-export type PopulationMapMode =
+/**
+ * MAP MODE HIERARCHY -- three tiers, each a distinct concept. Before adding a
+ * new map mode, figure out which tier it actually belongs to; picking the
+ * wrong one is the single most common mistake here (it was gotten wrong once
+ * already, for the Organizations mode below -- see the git history around
+ * that "organizations" NationMapMode value for the false starts).
+ *
+ * 1. PRIMARY (`MapModePrimary`, this file): "geography" vs. "society". The
+ *    two big buttons at the very top of ModeBar. Adding a new one here is
+ *    extremely rare -- almost nothing you're asked to add belongs at this
+ *    tier.
+ *
+ * 2. MODE (`ColorMode` in shared/colors.ts, or `NationMapMode`/
+ *    `PopulationMapMode` in this file): the actual map-mode buttons a user
+ *    clicks in ModeBar's tray -- "Elevation", "Climate", "Nations",
+ *    "Government", "Population", etc. Each one recolors the whole globe
+ *    differently and is listed in one of this file's `*_MODE_OPTIONS`
+ *    arrays (`DEFAULT_GEOGRAPHY_MODE_OPTIONS`, `DEFAULT_POLITICAL_MODE_
+ *    OPTIONS`, `DEFAULT_DEMOGRAPHIC_MODE_OPTIONS`, ...) so it renders as a
+ *    tray button. This is the tier for "an entirely new way to color the
+ *    map that deserves its own button."
+ *
+ * 3. SUBMODE (e.g. `ClimateSubMode`/`TopographySubMode`/`VegetationSubMode`/
+ *    `DangerSubMode` in controls/OverlayControls/types.ts, or
+ *    `NationMapMode`'s own "organizations" value below): a variant of an
+ *    *existing* mode, toggled from a `RadioGroup` inside a `*ModeSection.tsx`
+ *    in controls/OverlayControls/ (e.g. ClimateModeSection, Topography
+ *    ModeSection, NationsModeSection) -- NOT a ModeBar tray button. Two
+ *    submode shapes exist, both already in use:
+ *      - A genuine second ColorMode value under one tray button (Climate's
+ *        "pasta"/"koppen" swap colorMode to "pastaClimate"/"koppenClimate"
+ *        while the tray still shows one "Climate" button selected).
+ *      - A second NationMapMode value that isn't listed in any
+ *        `*_MODE_OPTIONS` array, so it never gets its own tray button, only
+ *        reachable via its ModeSection's RadioGroup (Organizations: still a
+ *        real `NationMapMode`, colored in region-colors.ts exactly like
+ *        "borders"/"government", but selectable only from
+ *        NationsModeSection's Normal/Organizations toggle -- see that
+ *        component's doc comment).
+ *    This is the tier for "a variant/overlay on an existing mode" -- if the
+ *    ask is "add a toggle for X within Y", it's a submode of Y, not a new
+ *    top-level mode button.
+ *
+ * Getting this right matters because `*_MODE_OPTIONS` arrays feed ModeBar's
+ * tray directly -- adding a value there when it was meant to be a submode
+ * clutters the tray with a button nobody asked for, and conversely a value
+ * left out of every `*_MODE_OPTIONS` array (like "organizations" here) is
+ * correctly invisible in the tray but must still be wired into whichever
+ * `*ModeSection.tsx` is supposed to expose it, or it's unreachable entirely.
+ */
+
+export type SocietyMapMode =
 	| "density"
 	| "urban"
 	| "development"
@@ -11,6 +62,8 @@ export type PopulationMapMode =
 	| "religion"
 	| "migration"
 
+export type ReligionMapMode = "religions" | "types"
+
 export type NationMapMode =
 	| "borders"
 	| "provinces"
@@ -18,8 +71,12 @@ export type NationMapMode =
 	| "dynasty"
 	| "diplomacy"
 	| "government"
+	/** Not in DEFAULT_POLITICAL_MODE_OPTIONS (no ModeBar tray button) --
+	 * reachable only via NationsModeSection's Normal/Organizations toggle in
+	 * OverlayControls, which appears while "borders" or this mode is active. */
+	| "organizations"
 
-export type SocietyMapMode = NationMapMode | PopulationMapMode | "timezone"
+export type SocietyMapOption = NationMapMode | SocietyMapMode | "timezone"
 
 export type MapModePrimary = "geography" | "society"
 
@@ -65,7 +122,7 @@ const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 ]
 
 const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
-	readonly [PopulationMapMode, string]
+	readonly [SocietyMapMode, string]
 > = [
 	["density", "Population"],
 	["development", "Development"],
@@ -74,14 +131,14 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 ]
 
 const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
-	readonly [PopulationMapMode, string]
+	readonly [SocietyMapMode, string]
 > = [
 	["heritage", "Heritage"],
 	["migration", "Migration"],
 ]
 
 const EARTH_IMPORT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
-	readonly [PopulationMapMode, string]
+	readonly [SocietyMapMode, string]
 > = [["urban", "Urban"]]
 
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
@@ -181,7 +238,7 @@ export function getVisibleGeographyModeOptions(
 export function getVisibleSocietyModeOptions(
 	debugEnabled: boolean,
 	isEarthImport = false,
-): ReadonlyArray<readonly [SocietyMapMode, string]> {
+): ReadonlyArray<readonly [SocietyMapOption, string]> {
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
@@ -197,7 +254,7 @@ export function getVisibleSocietyModeOptions(
 	if (isEarthImport) {
 		demographicOptions.splice(1, 0, ...EARTH_IMPORT_DEMOGRAPHIC_MODE_OPTIONS)
 	}
-	const trailingSocietyModes = new Set<PopulationMapMode>([
+	const trailingSocietyModes = new Set<SocietyMapMode>([
 		"density",
 		"urban",
 		"development",
@@ -220,11 +277,9 @@ export function syncLabelModeToMapMode(params: {
 	labelMode: LabelMode
 	colorMode: ColorMode
 	nationMode: NationMapMode
-	populationMode: PopulationMapMode
-	isEarthImport: boolean
+	societyMode: SocietyMapMode
 }): LabelMode {
-	const { labelMode, colorMode, nationMode, populationMode, isEarthImport } =
-		params
+	const { labelMode, colorMode, nationMode, societyMode } = params
 	const anyActive =
 		labelMode.nations ||
 		labelMode.dynasty ||
@@ -243,7 +298,7 @@ export function syncLabelModeToMapMode(params: {
 	}
 
 	if (getBaseMapMode(colorMode) === "population") {
-		if (populationMode === "culture") {
+		if (societyMode === "culture") {
 			return {
 				...labelMode,
 				nations: false,
@@ -253,32 +308,17 @@ export function syncLabelModeToMapMode(params: {
 				religion: false,
 			}
 		}
-		if (populationMode === "religion") {
-			// Real per-province religion labels only exist for Earth imports
-			// (see create-genesis-scene.ts's earthHistoryLabelPartitions);
-			// the procedural generator has no religion label overlay at all
-			// (world.religions is culture-indexed, not province-indexed), so
-			// procedural worlds keep the previous heritage-label
-			// approximation rather than showing nothing.
-			return isEarthImport
-				? {
-						...labelMode,
-						nations: false,
-						dynasty: false,
-						culture: false,
-						heritage: false,
-						religion: true,
-					}
-				: {
-						...labelMode,
-						nations: false,
-						dynasty: false,
-						culture: false,
-						heritage: true,
-						religion: false,
-					}
+		if (societyMode === "religion") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: false,
+				heritage: false,
+				religion: true,
+			}
 		}
-		if (populationMode === "heritage") {
+		if (societyMode === "heritage") {
 			return {
 				...labelMode,
 				nations: false,

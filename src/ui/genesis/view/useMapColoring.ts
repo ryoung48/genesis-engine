@@ -8,7 +8,9 @@ import type { FoldedState } from "@/model/history/earth/fold/types"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import { ORGANIZATION_TITLE_COLORS } from "@/model/society/organizations/titles"
 import { RELIGION } from "@/model/society/religion"
+import type { OrganizationTitle } from "@/model/society/types"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
 import {
 	miseryColor,
@@ -39,7 +41,8 @@ export function useMapColoring(input: MapColoringInput) {
 		earthHistory,
 		colorMode,
 		nationMode,
-		populationMode,
+		societyMode: populationMode,
+		religionMode,
 		viewMode,
 		showElevation,
 		dangerSubMode,
@@ -53,6 +56,7 @@ export function useMapColoring(input: MapColoringInput) {
 		rainfallMonth,
 		dtrMonth,
 		currentMonth,
+		getOrganizationName,
 	} = input
 
 	const buildOrgCategorizer = useCallback(
@@ -149,35 +153,82 @@ export function useMapColoring(input: MapColoringInput) {
 		(baseColors: Float32Array | null): Float32Array | null => {
 			if (
 				!selectedWikiOrganizationId ||
-				!worldForDisplay?.provinces?.regionProvince ||
-				!earthHistory.query ||
-				!earthHistory.organizationReference ||
-				!earthHistory.engine
+				!worldForDisplay?.provinces?.regionProvince
 			)
 				return baseColors
-			const orgRef = earthHistory.organizationReference.get(
-				selectedWikiOrganizationId,
+			if (
+				earthHistory.query &&
+				earthHistory.organizationReference &&
+				earthHistory.engine
+			) {
+				const orgRef = earthHistory.organizationReference.get(
+					selectedWikiOrganizationId,
+				)
+				if (orgRef) {
+					const provinceColor = resolveOrgProvinceColor(
+						earthHistory.query.state,
+						orgRef,
+					)
+					const regionProvince = worldForDisplay.provinces.regionProvince
+					const compactToRealId =
+						earthHistory.engine.provinceMap.compactToRealId
+					const N = worldForDisplay.mesh.numRegions
+					// Mutate baseColors in place rather than copying it first -- every
+					// caller (see regionColors' useMemo) computes a brand-new
+					// Float32Array on the spot and never reads it again itself, so
+					// there's nothing to protect by copying, only a wasted full-array
+					// allocation + copy on top of the write loop below.
+					const out = baseColors ?? new Float32Array(N * 3)
+					for (let region = 0; region < N; region++) {
+						const compact = regionProvince[region]
+						if (compact < 0 || compact >= compactToRealId.length) continue
+						const rawId = compactToRealId[compact]
+						const color = provinceColor(rawId)
+						if (!color) continue
+						out[3 * region] = color[0]
+						out[3 * region + 1] = color[1]
+						out[3 * region + 2] = color[2]
+					}
+					return out
+				}
+			}
+			// Procedural counterpart -- same white-outside/category-color-inside
+			// convention as resolveOrgProvinceColor above, keyed directly by raw
+			// nation array index (no rawId translation layer needed, unlike the
+			// Earth-import path). Deliberately reads world.nations.assignment, NOT
+			// worldForDisplay.nations.assignment -- buildDisplayWorld overwrites
+			// the display copy's assignment with sovereign.slice() (capital
+			// province ids, for the label/selection convention used elsewhere in
+			// this UI layer), which would never match member.nationIndex's raw
+			// 0..nationCount-1 array index space.
+			const proceduralOrg = world?.nations?.organizations?.find(
+				(org) => org.id === selectedWikiOrganizationId,
 			)
-			if (!orgRef) return baseColors
-			const provinceColor = resolveOrgProvinceColor(
-				earthHistory.query.state,
-				orgRef,
+			if (!proceduralOrg || !world?.nations) return baseColors
+			const titleByNation = new Map<number, OrganizationTitle>(
+				proceduralOrg.members.map((m) => [m.nationIndex, m.title]),
 			)
 			const regionProvince = worldForDisplay.provinces.regionProvince
-			const compactToRealId = earthHistory.engine.provinceMap.compactToRealId
+			const assignment = world.nations.assignment
 			const N = worldForDisplay.mesh.numRegions
-			// Mutate baseColors in place rather than copying it first -- every
-			// caller (see regionColors' useMemo) computes a brand-new
-			// Float32Array on the spot and never reads it again itself, so
-			// there's nothing to protect by copying, only a wasted full-array
-			// allocation + copy on top of the write loop below.
+			const WHITE: [number, number, number] = [1, 1, 1]
 			const out = baseColors ?? new Float32Array(N * 3)
 			for (let region = 0; region < N; region++) {
-				const compact = regionProvince[region]
-				if (compact < 0 || compact >= compactToRealId.length) continue
-				const rawId = compactToRealId[compact]
-				const color = provinceColor(rawId)
-				if (!color) continue
+				const province = regionProvince[region]
+				// Ocean regions (province < 0) are left untouched -- same
+				// convention as resolveOrgProvinceColor's Earth-import counterpart
+				// -- so water stays whatever the base fill already painted it,
+				// instead of getting overwritten white like unclaimed land.
+				if (province < 0) continue
+				const nationId = assignment[province]
+				const title = nationId >= 0 ? titleByNation.get(nationId) : undefined
+				const color = title
+					? (ORGANIZATION_TITLE_COLORS[title].map((c) => c / 255) as [
+							number,
+							number,
+							number,
+						])
+					: WHITE
 				out[3 * region] = color[0]
 				out[3 * region + 1] = color[1]
 				out[3 * region + 2] = color[2]
@@ -186,6 +237,7 @@ export function useMapColoring(input: MapColoringInput) {
 		},
 		[
 			selectedWikiOrganizationId,
+			world,
 			worldForDisplay,
 			earthHistory.query,
 			earthHistory.organizationReference,
@@ -342,6 +394,7 @@ export function useMapColoring(input: MapColoringInput) {
 				selectedNationId,
 				null,
 				dangerSubMode,
+				religionMode,
 			),
 		)
 	}, [
@@ -364,6 +417,7 @@ export function useMapColoring(input: MapColoringInput) {
 		earthHistory.religionColorById,
 		earthHistory.cultureColorById,
 		withOrgHighlight,
+		religionMode,
 	])
 
 	// Earth-import political/demographic fills are temporarily rendered only
@@ -592,7 +646,11 @@ export function useMapColoring(input: MapColoringInput) {
 
 		if (populationMode === "religion") {
 			const { cultures, religions, religionTypes } = worldForDisplay
-			if (!cultures?.blendSecondary || !religions || !religionTypes) {
+			if (
+				!cultures?.blendSecondary ||
+				!religions ||
+				(religionMode === "types" && !religionTypes)
+			) {
 				return null
 			}
 			// Religion has no border-bleed pass of its own -- it rides the same
@@ -600,9 +658,8 @@ export function useMapColoring(input: MapColoringInput) {
 			// looks up the bled-to culture's religion, so religion stripes
 			// appear on exactly the same provinces as culture stripes rather
 			// than bleeding over an entire (much coarser) religion region.
-			// Colored by religion TYPE (animistic, monotheistic, ...), matching
-			// the base religion fill -- not the individual religion's own color
-			// or the culture's color.
+			// Religions use the bled-to religion's individual color; the Types
+			// submode substitutes its family's shared type palette color.
 			const overlay = new Float32Array(N * 4)
 			let hasAny = false
 			for (let r = 0; r < N; r++) {
@@ -614,23 +671,36 @@ export function useMapColoring(input: MapColoringInput) {
 				if (secondaryCulture < 0) continue
 				const secondaryReligion = religions.assignment[secondaryCulture]
 				if (secondaryReligion < 0) continue
-				const typeIdx = religionTypes[secondaryReligion]
 				// Skip the stripe when the bled-to culture practices the same
-				// religion type as the province's own culture -- nothing would be
+				// religion as the province's own culture -- nothing would be
 				// visually different from the base fill.
 				const primaryReligion = religions.assignment[primaryCulture]
+				const typeIdx = religionTypes?.[secondaryReligion] ?? -1
 				if (
-					primaryReligion >= 0 &&
-					religionTypes[primaryReligion] === typeIdx
+					primaryReligion === secondaryReligion ||
+					(religionMode === "types" &&
+						typeIdx >= 0 &&
+						religionTypes?.[primaryReligion] === typeIdx)
 				) {
 					continue
 				}
-				const typeColor =
-					RELIGION.religionTypeColors[typeIdx] ?? RELIGION.religionTypeColors[0]
+				const colorBase = secondaryReligion * 3
+				const color =
+					religionMode === "types" && typeIdx >= 0
+						? (RELIGION.religionTypeColors[typeIdx] ??
+							RELIGION.religionTypeColors[0])
+						: colorBase + 2 < religions.colors.length
+							? [
+									religions.colors[colorBase],
+									religions.colors[colorBase + 1],
+									religions.colors[colorBase + 2],
+								]
+							: null
+				if (!color) continue
 				const base = r * 4
-				overlay[base] = typeColor[0]
-				overlay[base + 1] = typeColor[1]
-				overlay[base + 2] = typeColor[2]
+				overlay[base] = color[0]
+				overlay[base + 1] = color[1]
+				overlay[base + 2] = color[2]
 				overlay[base + 3] = 1
 				hasAny = true
 			}
@@ -638,7 +708,7 @@ export function useMapColoring(input: MapColoringInput) {
 		}
 
 		return null
-	}, [worldForDisplay, populationMode])
+	}, [worldForDisplay, populationMode, religionMode])
 	const earthHistorySceneNationOverride = usePlaybackSampledValue(
 		worldForDisplay?.isEarthImport && earthHistory.query
 			? {
@@ -693,31 +763,58 @@ export function useMapColoring(input: MapColoringInput) {
 	// it, an open org wiki page rebuilt borders+labels every single tick
 	// instead of at most once per 350ms during playback.
 	const organizationHighlightSpecRaw = useMemo<OrgHighlightSpec | null>(() => {
+		if (!selectedWikiOrganizationId) return null
 		if (
-			!selectedWikiOrganizationId ||
-			!world?.isEarthImport ||
-			!earthHistory.query ||
-			!earthHistory.organizationReference
-		)
-			return null
-		const orgRef = earthHistory.organizationReference.get(
-			selectedWikiOrganizationId,
-		)
-		if (!orgRef) return null
-		const { state } = earthHistory.query
-		const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
-			state,
-			orgId: orgRef.id,
-		})
-		if (memberProvinceRawIds.size === 0) return null
-		const memberProvinceCompactIndexes = new Set<number>()
-		for (const rawId of memberProvinceRawIds) {
-			const compact = earthImportRawIdToCompact?.get(rawId)
-			if (compact !== undefined) memberProvinceCompactIndexes.add(compact)
+			world?.isEarthImport &&
+			earthHistory.query &&
+			earthHistory.organizationReference
+		) {
+			const orgRef = earthHistory.organizationReference.get(
+				selectedWikiOrganizationId,
+			)
+			if (!orgRef) return null
+			const { state } = earthHistory.query
+			const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
+				state,
+				orgId: orgRef.id,
+			})
+			if (memberProvinceRawIds.size === 0) return null
+			const memberProvinceCompactIndexes = new Set<number>()
+			for (const rawId of memberProvinceRawIds) {
+				const compact = earthImportRawIdToCompact?.get(rawId)
+				if (compact !== undefined) memberProvinceCompactIndexes.add(compact)
+			}
+			return {
+				orgId: orgRef.id,
+				name: orgRef.name,
+				memberProvinceCompactIndexes,
+			}
 		}
+		// Procedural counterpart: membership is static (carved once at
+		// generation time), so this is just a straight scan rather than a
+		// fold -- no per-scrub-tick recomputation needed, but kept in the same
+		// memo/throttle path for consistency with the Earth branch. Reads
+		// world.nations.assignment (raw array indices), NOT
+		// worldForDisplay.nations.assignment (capital-province-id-keyed, see
+		// buildDisplayWorld) -- see withOrgHighlight's matching comment above.
+		if (!world?.nations?.organizations || !world.provinces) return null
+		const org = world.nations.organizations.find(
+			(o) => o.id === selectedWikiOrganizationId,
+		)
+		if (!org) return null
+		const memberNations = new Set(org.members.map((m) => m.nationIndex))
+		const memberProvinceCompactIndexes = new Set<number>()
+		const { assignment } = world.nations
+		const { count } = world.provinces
+		for (let province = 0; province < count; province++) {
+			if (memberNations.has(assignment[province])) {
+				memberProvinceCompactIndexes.add(province)
+			}
+		}
+		if (memberProvinceCompactIndexes.size === 0) return null
 		return {
-			orgId: orgRef.id,
-			name: orgRef.name,
+			orgId: org.id,
+			name: getOrganizationName(org.id),
 			memberProvinceCompactIndexes,
 		}
 	}, [
@@ -726,6 +823,7 @@ export function useMapColoring(input: MapColoringInput) {
 		earthHistory.query,
 		earthHistory.organizationReference,
 		earthImportRawIdToCompact,
+		getOrganizationName,
 	])
 	const organizationHighlightSpec = usePlaybackSampledValue(
 		organizationHighlightSpecRaw,

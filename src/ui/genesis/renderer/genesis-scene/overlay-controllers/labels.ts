@@ -404,38 +404,57 @@ export function createLabelsController(
 		deps.updateOverlayVisibility()
 	}
 
-	/** Only ever populated for Earth-imported worlds -- see
-	 * ctx.earthHistoryLabelPartitions's doc comment. */
 	function rebuildReligionLabels() {
 		const earthReligion = ctx.earthHistoryLabelPartitions?.religion
-		if (!ctx.currentWorld || !ctx.labelMode.religion || !earthReligion) {
+		if (
+			!ctx.currentWorld ||
+			!ctx.labelMode.religion ||
+			(!earthReligion && (!ctx.currentWorld.religions || !ctx.religionNames))
+		) {
 			ctx.globeReligionLabels?.clear()
 			ctx.mapReligionLabels?.clear()
 			return
 		}
+		const names = earthReligion
+			? earthReligion.names
+			: (ctx.religionNames as string[])
+		const partitionCount = earthReligion
+			? earthReligion.count
+			: ctx.currentWorld.religions!.count
+		const getPartition = earthReligion
+			? (p: number) => earthReligion.assignment[p] ?? -1
+			: (p: number) => {
+					const culture = ctx.currentWorld!.cultures?.assignment[p] ?? -1
+					return culture >= 0
+						? (ctx.currentWorld!.religions!.assignment[culture] ?? -1)
+						: -1
+				}
+		const scaleCurve = earthReligion
+			? EARTH_HISTORY_LABEL_SCALE_CURVE
+			: undefined
 
 		ctx.globeReligionLabels = buildGlobePartitionLabels(
 			ctx.currentWorld,
-			earthReligion.names,
-			earthReligion.count,
-			(p) => earthReligion.assignment[p] ?? -1,
+			names,
+			partitionCount,
+			getPartition,
 			ctx.camera,
 			religionLabelPools.globe,
 			labelCullingEnabled,
 			ctx.elevationVisible,
-			EARTH_HISTORY_LABEL_SCALE_CURVE,
+			scaleCurve,
 			ctx.globeReligionLabels ?? undefined,
 		)
 		ctx.mapReligionLabels = buildMapPartitionLabels(
 			ctx.currentWorld,
-			earthReligion.names,
-			earthReligion.count,
-			(p) => earthReligion.assignment[p] ?? -1,
+			names,
+			partitionCount,
+			getPartition,
 			ctx.currentMapCenterLongitudeDeg,
 			ctx.currentMapProjectionLatitudeDeg,
 			religionLabelPools.map,
 			labelCullingEnabled,
-			EARTH_HISTORY_LABEL_SCALE_CURVE,
+			scaleCurve,
 			ctx.mapReligionLabels ?? undefined,
 		)
 		if (ctx.globeReligionLabels.parent !== ctx.globeGroup) {
@@ -526,6 +545,12 @@ export function createLabelsController(
 		rebuildHeritageLabels()
 	}
 
+	function setReligionNames(names: string[] | null) {
+		if (stringArraysEqual(ctx.religionNames, names)) return
+		ctx.religionNames = names
+		rebuildReligionLabels()
+	}
+
 	function setSettlementNames(names: string[] | null) {
 		if (stringArraysEqual(ctx.settlementLabelNames, names)) return
 		ctx.settlementLabelNames = names
@@ -577,6 +602,7 @@ export function createLabelsController(
 		setDynastyNames,
 		setCultureNames,
 		setHeritageNames,
+		setReligionNames,
 		setSettlementNames,
 		setEarthHistoryLabelPartitions,
 		disposePools,

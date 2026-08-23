@@ -75,7 +75,7 @@ import {
 } from "@/ui/genesis/shared/data-variant"
 import {
 	getMapModePrimary,
-	type PopulationMapMode,
+	type SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import {
 	formatDistance,
@@ -150,7 +150,7 @@ interface InfoPanelProps {
 	showOceanCurrentOverlay?: boolean
 	colorMode: ColorMode
 	dangerSubMode: "earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
-	populationMode: PopulationMapMode
+	populationMode: SocietyMapMode
 	dataVariant: DataVariant
 	selectedTimeMs: number | null
 	displayMonth: number
@@ -166,6 +166,7 @@ interface InfoPanelProps {
 	getDynastyName?: (dynastyId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
+	getReligionName: (religionId: number) => string
 	getLandmarkName: (landmarkId: number) => string
 	getRiverName: (riverId: number) => string
 	hoverNationAdjOffset?: Int32Array | null
@@ -258,6 +259,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getNationName,
 	getCultureName,
 	getHeritageName,
+	getReligionName,
 	getLandmarkName,
 	getRiverName,
 	earthHistoryHoverOverride,
@@ -362,7 +364,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const governmentDisplay = showSociety
 		? buildGovernmentDisplayData({ hoverNationId, world })
 		: null
-	const demographicModes: PopulationMapMode[] = [
+	const demographicModes: SocietyMapMode[] = [
 		"density",
 		"urban",
 		"development",
@@ -383,6 +385,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					unitSystem,
 					getCultureName,
 					getHeritageName,
+					getReligionName,
 				})
 				return display ? [display] : []
 			})

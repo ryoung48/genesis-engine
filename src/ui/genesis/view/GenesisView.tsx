@@ -96,6 +96,7 @@ import { useWorldDisplayData } from "@/ui/genesis/view/useWorldDisplayData"
 import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
 import { useProceduralNationWikiData } from "@/ui/genesis/wiki-bridge/useProceduralNationWikiData"
+import { useProceduralOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useProceduralOrganizationWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
@@ -161,7 +162,8 @@ export const GenesisView: React.FC<{
 		overlaysExpanded,
 		pathfindingLand,
 		pathfindingSea,
-		populationMode,
+		societyMode,
+		religionMode,
 		setClimateSubMode,
 		setClockCurrent,
 		setClockDay,
@@ -185,7 +187,8 @@ export const GenesisView: React.FC<{
 		setOverlaysExpanded,
 		setPathfindingLand,
 		setPathfindingSea,
-		setPopulationMode,
+		setSocietyMode,
+		setReligionMode,
 		setShowAet,
 		setShowCoastlines,
 		setShowDaylight,
@@ -247,9 +250,9 @@ export const GenesisView: React.FC<{
 	} = useOverlayState({
 		initialViewPrefs,
 		initialGenerationSession,
-		isEarthImport: !!world?.isEarthImport,
 		sessionNamespace,
 	})
+	const populationMode = societyMode
 	const [worldTab, setWorldTab] = useState<"planet" | "society">("planet")
 	// Full-screen galaxy-scale overlay -- see PortedGalaxyView's own doc.
 	// Entered via the primary star's "view galaxy" dice icon or the solar-
@@ -294,6 +297,11 @@ export const GenesisView: React.FC<{
 	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<string | null>(
 		null,
 	)
+	// selectedNationId (the procedural-world nation selection, set from map
+	// clicks) predates this three-way mutual exclusion and isn't part of it by
+	// default -- cleared here too so switching to the org/war wiki page on a
+	// procedural world doesn't leave proceduralNationWikiData non-null and
+	// stuck winning GenerationPanel's nationWiki-first render priority.
 	const setSelectedWikiNationTag = useCallback((tag: string | null) => {
 		setSelectedWikiOrganizationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
@@ -303,11 +311,13 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationTagRaw(null)
 		setSelectedWikiWarIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(orgId)
+		if (orgId !== null) setSelectedNationId(null)
 	}, [])
 	const setSelectedWikiWarId = useCallback((warId: string | null) => {
 		setSelectedWikiNationTagRaw(null)
 		setSelectedWikiOrganizationIdRaw(null)
 		setSelectedWikiWarIdRaw(warId)
+		if (warId !== null) setSelectedNationId(null)
 	}, [])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
@@ -883,9 +893,11 @@ export const GenesisView: React.FC<{
 		getDynastyName,
 		getGlobeCameraDir,
 		getHeritageName,
+		getReligionName,
 		getLandmarkName,
 		getLeaderName,
 		getNationName,
+		getOrganizationName,
 		getProvinceColor,
 		getProvinceName,
 		getRiverName,
@@ -932,6 +944,7 @@ export const GenesisView: React.FC<{
 		sampledCultureLabelsArray,
 		sampledDynastyLabelsArray,
 		sampledHeritageLabelsArray,
+		sampledReligionLabelsArray,
 		sampledNationLabelsArray,
 		sampledSettlementLabelsArray,
 		windVectors,
@@ -1015,7 +1028,8 @@ export const GenesisView: React.FC<{
 		earthHistory,
 		colorMode,
 		nationMode,
-		populationMode,
+		societyMode,
+		religionMode,
 		viewMode,
 		showElevation,
 		dangerSubMode,
@@ -1029,6 +1043,7 @@ export const GenesisView: React.FC<{
 		rainfallMonth,
 		dtrMonth,
 		currentMonth,
+		getOrganizationName,
 	})
 
 	useEffect(() => {
@@ -1383,6 +1398,7 @@ export const GenesisView: React.FC<{
 			getNationName,
 			getCultureName,
 			getHeritageName,
+			getOrganizationName,
 		})
 	}, [
 		nationModel,
@@ -1390,10 +1406,17 @@ export const GenesisView: React.FC<{
 		getNationName,
 		getCultureName,
 		getHeritageName,
+		getOrganizationName,
 		selectedNationId,
 		worldForDisplay,
 	])
 	const handleWikiNationClick = useCallback((nationId: number) => {
+		// Clear any open org/war wiki selection too -- otherwise navigating from
+		// an org's member-list chip back to a nation page leaves
+		// selectedWikiOrganizationId set, and the org's map highlight never
+		// turns off (see setSelectedWikiOrganizationId's doc comment above).
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(null)
 		setSelectedNationId(nationId)
 		sceneRef.current?.focusOnNation(nationId)
 	}, [])
@@ -1527,6 +1550,7 @@ export const GenesisView: React.FC<{
 		sampledSettlementLabelsArray,
 		sampledCultureLabelsArray,
 		sampledHeritageLabelsArray,
+		sampledReligionLabelsArray,
 	})
 
 	// --- Generation callbacks ---
@@ -1537,6 +1561,7 @@ export const GenesisView: React.FC<{
 		handleGenerate,
 		handleResetDefaults,
 		handleReturnToPlanetView,
+		handleRequestInfrastructure,
 	} = useWorldGeneration({
 		sceneRef,
 		workerRef,
@@ -1586,6 +1611,14 @@ export const GenesisView: React.FC<{
 		pressure,
 		mainWorldSystemBody,
 	})
+
+	// The road/sea route network is expensive, so it's computed lazily in the
+	// worker rather than on every world generation -- request it the first
+	// time the user turns the Infrastructure overlay on (handleRequestInfrastructure
+	// no-ops once it's already been requested/received for this world).
+	useEffect(() => {
+		if (showInfrastructure && worldForDisplay) handleRequestInfrastructure()
+	}, [showInfrastructure, worldForDisplay, handleRequestInfrastructure])
 
 	const {
 		exportWidthPreset,
@@ -1687,6 +1720,21 @@ export const GenesisView: React.FC<{
 		getNationName,
 		getNationColor,
 		setSelectedNationId,
+		setSelectedWikiOrganizationId,
+		onSelectNation: handleWikiNationClick,
+		sceneRef,
+	})
+
+	const proceduralOrganizationWikiData = useProceduralOrganizationWikiData({
+		world,
+		selectedWikiOrganizationId,
+		planetName,
+		getNationName,
+		getNationColor,
+		getCultureName,
+		getHeritageName,
+		getOrganizationName,
+		setSelectedWikiOrganizationId,
 		onSelectNation: handleWikiNationClick,
 		sceneRef,
 	})
@@ -1972,7 +2020,9 @@ export const GenesisView: React.FC<{
 							tradeGoodsDistribution,
 						}}
 						nationWiki={nationWikiData ?? proceduralNationWikiData}
-						organizationWiki={organizationWikiData}
+						organizationWiki={
+							organizationWikiData ?? proceduralOrganizationWikiData
+						}
 						warWiki={warWikiData}
 					/>
 				)}
@@ -2069,6 +2119,7 @@ export const GenesisView: React.FC<{
 								getDynastyName={getDynastyName}
 								getCultureName={getCultureName}
 								getHeritageName={getHeritageName}
+								getReligionName={getReligionName}
 								getLandmarkName={getLandmarkName}
 								getRiverName={getRiverName}
 								hoverNationAdjOffset={
@@ -2166,7 +2217,10 @@ export const GenesisView: React.FC<{
 								showNationHierarchy={showNationHierarchy}
 								setShowNationHierarchy={setShowNationHierarchy}
 								nationMode={nationMode}
+								setNationMode={setNationMode}
 								populationMode={populationMode}
+								religionMode={religionMode}
+								setReligionMode={setReligionMode}
 								labelMode={labelMode}
 								setLabelMode={setLabelMode}
 								showElevation={showElevation}
@@ -2347,8 +2401,8 @@ export const GenesisView: React.FC<{
 										setGeographyMode={setGeographyMode}
 										nationMode={nationMode}
 										setNationMode={setNationMode}
-										populationMode={populationMode}
-										setPopulationMode={setPopulationMode}
+										societyMode={societyMode}
+										setSocietyMode={setSocietyMode}
 										debugMapModes={debugMapModes}
 										vegetationSubMode={vegetationSubMode}
 										climateSubMode={climateSubMode}

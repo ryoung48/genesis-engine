@@ -24,7 +24,10 @@ point is `view/GenesisView.tsx`, mounted at the app root.
 - `hover` — hover/info-panel state and formatting
 - `particles` — wind/ocean-current/flow particle canvas overlays
 - `shared` — small cross-cutting helpers: color palettes, clock, export
-  naming, screen-local constants and formatters
+  naming, screen-local constants and formatters. **Before adding any new map
+  mode/toggle**, read the doc comment at the top of `shared/map-modes.ts` --
+  it lays out the three-tier primary/mode/submode hierarchy and is the most
+  commonly mis-picked tier in this codebase.
 
 ## What does not belong here
 

@@ -33,7 +33,6 @@ import type {
 import { STATS } from "@/model/shared/math/stats"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
-import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { URBANIZATION } from "@/model/society/urbanization"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
@@ -639,25 +638,10 @@ function generateGenesisWorld({
 	)
 	onProgress?.("urbanization", 80)
 
-	const infrastructure = withTiming("computeRoutes", infrastructureTiming, () =>
-		ROUTES.computeRoutes({
-			world: {
-				mesh,
-				params,
-				provinces: post.provinces,
-				nations: provinceSociety.nations,
-				landmarks: provinceSociety.landmarks,
-				isLand,
-			},
-			inputs: {
-				urbanPopulation: urbanization.urbanPopulation,
-				settlementRegions: provinceSociety.settlementRegions,
-				settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
-				settlementPortRegions: provinceSociety.settlementPortRegions,
-				timings: infrastructureTiming,
-			},
-		}),
-	)
+	// The route/road network is expensive and only needed for the
+	// Infrastructure overlay's display, so it's no longer computed here --
+	// GenesisView requests it lazily from the worker (see "compute-infrastructure"
+	// in genesis.worker.ts) the first time the user toggles that overlay on.
 	pipelineTiming.push(...infrastructureTiming)
 	onProgress?.("routes", 85)
 
@@ -719,6 +703,7 @@ function generateGenesisWorld({
 		cultures: provinceSociety.cultures,
 		heritages: provinceSociety.heritages,
 		religions: provinceSociety.religions,
+		religionFamilies: provinceSociety.religionFamilies,
 		religionTypes: provinceSociety.religionTypes,
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
@@ -728,8 +713,8 @@ function generateGenesisWorld({
 		settlementPortRegions: provinceSociety.settlementPortRegions,
 		urbanPopulation: urbanization.urbanPopulation,
 		development: urbanization.development,
-		routes: infrastructure.routes,
-		network: infrastructure.network,
+		routes: undefined,
+		network: undefined,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: STATS.countContinents({ mesh, isLand }),
 		monthlyTEQ: post.monthlyTEQ,

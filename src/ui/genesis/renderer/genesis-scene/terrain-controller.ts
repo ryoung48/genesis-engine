@@ -34,6 +34,7 @@ export interface TerrainControllerDeps {
 	syncMapLighting: () => void
 	rebuildNationBorders: () => void
 	rebuildSelectedProvinceBorder: () => void
+	rebuildSettlementLabels: () => void
 	emitHover: (info: GenesisHoverInfo | null) => void
 	requestRender: () => void
 	/** Disposes and clears the map solar-terminator overlay -- it has to be
@@ -319,6 +320,7 @@ export function createTerrainController(
 		if (geometryUnchanged) {
 			deps.rebuildNationBorders()
 			deps.rebuildSelectedProvinceBorder()
+			deps.rebuildSettlementLabels()
 			return
 		}
 		rebuildTerrain()

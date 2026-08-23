@@ -15,7 +15,7 @@ import {
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
-	PopulationMapMode,
+	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
@@ -62,7 +62,7 @@ function buildNationColorByTag(
 export function computeEarthHistoryRegionColors(params: {
 	colorMode: string
 	nationMode: NationMapMode
-	populationMode: PopulationMapMode
+	populationMode: SocietyMapMode
 	state: FoldedState
 	provinceMap: { compactToRealId: Int32Array }
 	nationIds: Map<string, number>
