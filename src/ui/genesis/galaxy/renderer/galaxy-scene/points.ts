@@ -17,6 +17,7 @@ import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 const EDGE_COLOR = new THREE.Color(0x333333)
 const POINT_SIZE_PX = 4
 export const CLUSTER_CENTER_MASK_SIZE_RATIO = 0.5
+export const BLACK_HOLE_POINT_SIZE_RATIO = 0.75
 const BINARY_CLUSTER_FACTOR = 0.8
 const TRINARY_CLUSTER_FACTOR = 0.65
 const TRINARY_CLUSTER_ANGLE_OFFSET = Math.PI / 2
@@ -67,6 +68,28 @@ const CLUSTER_CENTER_MASK_FRAGMENT_SHADER = /* glsl */ `
 	}
 `
 
+const BLACK_HOLE_VERTEX_SHADER = /* glsl */ `
+	uniform float uSize;
+
+	void main() {
+		vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+		gl_Position = projectionMatrix * mvPosition;
+		gl_PointSize = uSize;
+	}
+`
+
+const BLACK_HOLE_FRAGMENT_SHADER = /* glsl */ `
+	void main() {
+		float radius = length(2.0 * gl_PointCoord - 1.0);
+		if (radius >= 1.0) discard;
+		// The opaque core keeps the marker legible over the dense decorative
+		// star field; its high-contrast white rim identifies the exotic object
+		// without using the normal stellar-color palette.
+		vec3 color = radius < 0.9 ? vec3(0.0) : vec3(1.0);
+		gl_FragColor = vec4(color, 1.0);
+	}
+`
+
 const spectralColorCache = new Map<string, THREE.Color>()
 function colorForStar(
 	spectralClass: SpectralClass,
@@ -90,6 +113,7 @@ function colorForStar(
 
 export interface GalaxyPointsResult {
 	points: THREE.Points
+	blackHolePoints: THREE.Points
 	clusterCenterMasks: THREE.Points
 	clusterData: ClusterData
 }
@@ -116,6 +140,7 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 	} = galaxy
 
 	const positions: number[] = []
+	const blackHolePositions: number[] = []
 	const clusterCenterMaskPositions: number[] = []
 	const colors: number[] = []
 	const baseCenters: number[] = []
@@ -140,8 +165,13 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		const n = end - start
 		if (n > 1) clusterCenterMaskPositions.push(wx, wy, 0)
 		for (let j = 0; j < n; j++) {
+			const spectralClass = decodeSpectralClass(starSpectralClass[start + j]!)
+			if (spectralClass === "BH") {
+				blackHolePositions.push(wx, wy, 0)
+				continue
+			}
 			const color = colorForStar(
-				decodeSpectralClass(starSpectralClass[start + j]!),
+				spectralClass,
 				decodeLuminosityClass(starLuminosityClass[start + j]!),
 			)
 			positions.push(wx, wy, 0)
@@ -190,6 +220,26 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		blendDst: THREE.OneFactor,
 		blendEquation: THREE.AddEquation,
 	})
+	const blackHoleGeometry = new THREE.BufferGeometry()
+	blackHoleGeometry.setAttribute(
+		"position",
+		new THREE.BufferAttribute(Float32Array.from(blackHolePositions), 3),
+	)
+	const blackHoleMaterial = new THREE.ShaderMaterial({
+		uniforms: {
+			uSize: {
+				value:
+					POINT_SIZE_PX *
+					computeGalaxyDensityScale(numSystems) *
+					BLACK_HOLE_POINT_SIZE_RATIO,
+			},
+		},
+		vertexShader: BLACK_HOLE_VERTEX_SHADER,
+		fragmentShader: BLACK_HOLE_FRAGMENT_SHADER,
+		transparent: true,
+		depthTest: false,
+		depthWrite: false,
+	})
 	const clusterCenterMaskGeometry = new THREE.BufferGeometry()
 	clusterCenterMaskGeometry.setAttribute(
 		"position",
@@ -215,11 +265,14 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		clusterCenterMaskMaterial,
 	)
 	const points = new THREE.Points(geometry, material)
+	const blackHolePoints = new THREE.Points(blackHoleGeometry, blackHoleMaterial)
 	clusterCenterMasks.renderOrder = 1
 	points.renderOrder = 2
+	blackHolePoints.renderOrder = 3
 
 	return {
 		points,
+		blackHolePoints,
 		clusterCenterMasks,
 		clusterData: {
 			numSystems,

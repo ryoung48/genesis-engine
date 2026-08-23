@@ -20,15 +20,12 @@ type GeneratedArtSet =
 	| "vesperian-archipelago"
 	| "vesperian-water-world"
 	| "jovian-hot"
-	| "helian-hot"
 	| "hebean-arid"
 	| "hebean-water"
 	| "geo-tidal-arid"
 	| "geo-tidal-water"
 	| "geo-cyclic-arid"
 	| "geo-cyclic-water"
-	| "helian-hydrogen"
-	| "helian-helium"
 
 // Procedurally generated body textures (public/textures/celestial/generated/<set>/...)
 // -- only classifications/art-sets with real art get a texturePath; anything
@@ -69,11 +66,11 @@ const GENERATED_TEXTURE_FILES: Partial<Record<GeneratedArtSet, string[]>> = {
 	// Hydrosphere-driven art pool (formerly the "oceanic" folder name, renamed
 	// to disambiguate from the "oceanic" classification below).
 	archepligo: ["1.png", "2.png", "3.png", "4.png", "5.png"],
-	// Single-image art sets -- panthalassic and oceanic classifications each
-	// get their own dedicated realistic full-ocean render; chthonian,
-	// acheronian, and stygian get their own dedicated art; oasis is also
-	// curated images.
-	panthalassic: ["1.png"],
+	// Single-image art sets -- oceanic gets its own dedicated realistic
+	// full-ocean render (panthalassic no longer does -- see overlay.ts's
+	// procedural cloud-band shader, used for every panthalassic body
+	// instead); chthonian, acheronian, and stygian get their own dedicated
+	// art; oasis is also curated images.
 	oceanic: ["1.png"],
 	chthonian: ["1.png"],
 	acheronian: ["1.png"],
@@ -95,10 +92,9 @@ const GENERATED_TEXTURE_FILES: Partial<Record<GeneratedArtSet, string[]>> = {
 	"vesperian-continental": ["1.png"],
 	"vesperian-archipelago": ["1.png"],
 	"vesperian-water-world": ["1.png"],
-	// Epistellar-zone ("hot Jupiter"/scorched helian) variants -- see the
-	// zone check in pickGeneratedBodyTextures below.
+	// Epistellar-zone ("hot Jupiter") variant -- see the zone check in
+	// pickGeneratedBodyTextures below.
 	"jovian-hot": ["1.png", "2.png"],
-	"helian-hot": ["1.png"],
 	// hebean/geo-tidal/geo-cyclic each have their own hydrosphereCode-keyed
 	// art (hydro 0 -> arid, hydro > 0 -> water), no frozen/rockball fallback.
 	"hebean-arid": ["1.png"],
@@ -107,12 +103,6 @@ const GENERATED_TEXTURE_FILES: Partial<Record<GeneratedArtSet, string[]>> = {
 	"geo-tidal-water": ["1.png"],
 	"geo-cyclic-arid": ["1.png"],
 	"geo-cyclic-water": ["1.png"],
-	// A helian body that rolled a hydrogen/helium gas envelope (see
-	// atmosphere/index.ts's code-13 branch) gets this instead of its usual
-	// hydrosphere-banded surface art -- see the atmosphereSubtype check in
-	// pickGeneratedBodyTextures below.
-	"helian-hydrogen": ["1.png"],
-	"helian-helium": ["1.png"],
 }
 
 // Families with variant art live below a shared parent folder rather than as
@@ -127,15 +117,12 @@ const GENERATED_ART_SET_FOLDERS: Partial<Record<GeneratedArtSet, string>> = {
 	"vesperian-archipelago": "vesperian/archipelago",
 	"vesperian-water-world": "vesperian/water-world",
 	"jovian-hot": "jovian/hot",
-	"helian-hot": "helian/hot",
 	"hebean-arid": "hebean/arid",
 	"hebean-water": "hebean/water",
 	"geo-tidal-arid": "geo-tidal/arid",
 	"geo-tidal-water": "geo-tidal/water",
 	"geo-cyclic-arid": "geo-cyclic/arid",
 	"geo-cyclic-water": "geo-cyclic/water",
-	"helian-hydrogen": "helian/hydrogen",
-	"helian-helium": "helian/helium",
 }
 
 // Shared cloud-layer pool (public/textures/celestial/generated/clouds/...),
@@ -178,23 +165,12 @@ function pickGeneratedBodyTextures({
 	hydrosphereCode,
 	climateBand,
 	zone,
-	atmosphereSubtype,
-	temperatureMeanK,
-	atmospherePressureBar,
 }: {
 	rng: ReturnType<typeof RNG.createRng>
 	classification: OrbitClassification
 	hydrosphereCode: number
 	climateBand: ClimateBand
 	zone?: Zone
-	atmosphereSubtype?: string
-	/** Raw mean temperature -- only needed where climateBand's coarse bucketing
-	 * (frozen/cold/temperate/hot/burning) isn't fine-grained enough, e.g.
-	 * helian-hot's literal ">500C" requirement below. */
-	temperatureMeanK?: number
-	/** Only needed for helian's molten/thin-atmosphere -> meltball override
-	 * below. */
-	atmospherePressureBar?: number
 }): { texturePath?: string; cloudsTexturePath?: string } {
 	const frozen = climateBand === "frozen"
 	const pick = (cls: GeneratedArtSet) =>
@@ -268,36 +244,15 @@ function pickGeneratedBodyTextures({
 			if (climateBand === "burning") return { texturePath: pick("arid") }
 			return { texturePath: pick("oasis") }
 		}
-		case "helian": {
-			// hydrosphereCode 12 ("intense volcanism/molten surface") is the real
-			// molten-surface code -- see the shared code-12 check above, which
-			// excludes helian so it can branch on atmospherePressureBar here.
-			const molten = hydrosphereCode === 12
-			// Molten-surface helian bodies that haven't held onto much of an
-			// atmosphere (< 1 bar) show bare volcanic ground instead of the
-			// hazy helian-hot render.
-			if (
-				molten &&
-				atmospherePressureBar !== undefined &&
-				atmospherePressureBar < 1
-			)
-				return { texturePath: pick("meltball") }
-			// 500C = 773.15K.
-			if (
-				molten ||
-				(temperatureMeanK !== undefined && temperatureMeanK > 773.15)
-			)
-				return { texturePath: pick("helian-hot") }
-			if (atmosphereSubtype === "hydrogen")
-				return { texturePath: pick("helian-hydrogen") }
-			if (atmosphereSubtype === "helium")
-				return { texturePath: pick("helian-helium") }
-			if (frozen) return { texturePath: pick("snowball") }
-			if (hydrosphereCode <= 2) return { texturePath: pick("arid") }
-			if (hydrosphereCode <= 4) return withClouds(pick("savanna"))
-			if (hydrosphereCode <= 7) return withClouds(pick("terrestrial"))
-			return withClouds(pick("archepligo"))
-		}
+		// No texture generated -- overlay.ts's buildSolarSystemOverlay renders
+		// every "helian"-classification body (regardless of temperature,
+		// atmosphere subtype, or hydrosphere -- molten included) with its own
+		// procedural fbm cloud-band shader instead (see
+		// buildAtmosphericCloudBandMaterial/helianCloudPalette), which ignores
+		// texturePath entirely. Generating and storing a path here that's
+		// permanently unread is just dead weight.
+		case "helian":
+			return {}
 		case "geo-cyclic":
 			return {
 				texturePath: pick(
@@ -324,8 +279,11 @@ function pickGeneratedBodyTextures({
 			return { texturePath: pick("acheronian") }
 		case "chthonian":
 			return { texturePath: pick("chthonian") }
+		// No texture generated -- same reasoning as "helian" above: overlay.ts
+		// renders every panthalassic body with the procedural cloud-band
+		// shader (deep blue, or the shared icy palette when frozen) instead.
 		case "panthalassic":
-			return { texturePath: frozen ? pick("snowball") : pick("panthalassic") }
+			return {}
 		case "oceanic":
 			return { texturePath: frozen ? pick("snowball") : pick("oceanic") }
 		case "jovian":

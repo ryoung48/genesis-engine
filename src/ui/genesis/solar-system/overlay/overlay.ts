@@ -67,6 +67,295 @@ import type {
 const COMPANION_ORBIT_GAP_FACTOR = 0.4
 const COMPANION_ORBIT_LINE_COLOR = 0xfbbf24
 
+type CloudBandPalette = {
+	top: THREE.Color
+	bot: THREE.Color
+	mid1: THREE.Color
+	mid2: THREE.Color
+	mid3: THREE.Color
+}
+
+// Deterministic 0-1 hash of a float seed -- lets a body's hue variation be
+// derived straight from its own seed (body.idx) without storing anything.
+function hash01(n: number): number {
+	const s = Math.sin(n * 12.9898) * 43758.5453
+	return s - Math.floor(s)
+}
+
+/** The ported shader's own original hardcoded palette (white/black bands
+ * over a brown-tan-orange mid range) was: mid1 (0.1,0.2,0.0) -- hue ~0.25
+ * (olive/yellow-green), s=1, l=0.1; mid2/mid3 (0.7,0.4,0.3)/(1.0,0.4,0.2) --
+ * hue ~0.04 (orange), s=0.4/1.0, l=0.5/0.6. Reproduced here in HSL, keeping
+ * every band's saturation/lightness and their ~0.21 relative hue offset
+ * (mid1 vs. mid2/mid3) exactly as authored, but with the base hue rolled
+ * per body across an orange -> yellow -> green range instead of fixed at
+ * orange, so helians read as a family of related-but-varied worlds. */
+function helianNormalPalette(seed: number): CloudBandPalette {
+	const hue = 0.04 + hash01(seed * 3.77 + 0.41) * 0.29
+	return {
+		top: new THREE.Color(1, 1, 1),
+		bot: new THREE.Color(0, 0, 0),
+		mid1: new THREE.Color().setHSL((hue + 0.21) % 1, 1.0, 0.1),
+		mid2: new THREE.Color().setHSL(hue, 0.4, 0.5),
+		mid3: new THREE.Color().setHSL(hue, 1.0, 0.6),
+	}
+}
+
+/** A "burning" helian (very high estimated temperature) -- red to deep-orange
+ * bands instead of the normal brown/tan. Same per-body hue-rolling technique
+ * as helianNormalPalette above, spanning red through deep orange (hue 0 to
+ * ~0.08), with every band sharing the SAME hue (no relative per-band
+ * offset) -- `top` (the brightest band, mixed in over a large fraction of
+ * the visible surface -- see giantCloudColor's `pos>0` mix) is what a
+ * viewer mostly perceives as "the" color, and an earlier version's relative
+ * hue offset on top plus its high lightness made every body read as orange
+ * regardless of the rolled hue (lighter warm colors shift toward orange
+ * perceptually). Kept dark and saturated rather than light and pale, so the
+ * rolled hue itself (not lightness) is what reads as red vs. orange. */
+function helianBurningPalette(seed: number): CloudBandPalette {
+	const hue = hash01(seed * 4.91 + 1.23) * 0.08
+	return {
+		top: new THREE.Color().setHSL(hue, 0.55, 0.55),
+		bot: new THREE.Color().setHSL(hue, 1.0, 0.02),
+		mid1: new THREE.Color().setHSL(hue, 0.9, 0.14),
+		mid2: new THREE.Color().setHSL(hue, 1.0, 0.28),
+		mid3: new THREE.Color().setHSL(hue, 1.0, 0.38),
+	}
+}
+
+/** An "icy" helian (very low estimated temperature) -- very light blue mixed
+ * with white, instead of the normal palette's dark-to-black shadow bands
+ * (which would read as dirty soot rather than ice on a cold world). */
+const HELIAN_PALETTE_ICY: CloudBandPalette = {
+	top: new THREE.Color(1, 1, 1),
+	bot: new THREE.Color().setHSL(0.58, 0.35, 0.55),
+	mid1: new THREE.Color().setHSL(0.56, 0.3, 0.68),
+	mid2: new THREE.Color().setHSL(0.58, 0.2, 0.82),
+	mid3: new THREE.Color(1, 1, 1),
+}
+
+/** A hydrogen-envelope helian -- pale warm gold/cream haze, distinct from
+ * both the normal brown/tan and the helium palette below. */
+const HELIAN_PALETTE_HYDROGEN: CloudBandPalette = {
+	top: new THREE.Color(1, 1, 1),
+	bot: new THREE.Color().setHSL(0.11, 0.4, 0.18),
+	mid1: new THREE.Color().setHSL(0.1, 0.35, 0.3),
+	mid2: new THREE.Color().setHSL(0.13, 0.55, 0.6),
+	mid3: new THREE.Color().setHSL(0.14, 0.7, 0.78),
+}
+
+/** A helium-envelope helian -- pale violet/lavender haze, distinct from the
+ * hydrogen palette above. */
+const HELIAN_PALETTE_HELIUM: CloudBandPalette = {
+	top: new THREE.Color(1, 1, 1),
+	bot: new THREE.Color().setHSL(0.76, 0.35, 0.2),
+	mid1: new THREE.Color().setHSL(0.77, 0.3, 0.32),
+	mid2: new THREE.Color().setHSL(0.79, 0.4, 0.62),
+	mid3: new THREE.Color().setHSL(0.8, 0.5, 0.8),
+}
+
+// Matches TEMPERATURE.describe's own "frozen" cutoff (environment/
+// temperature/index.ts) -- reused below for any classification's own
+// frozen-state palette, not just helian's, since it's the game's general
+// climate-band convention rather than something helian-specific.
+const FROZEN_CLIMATE_MAX_K = 223
+// Matches TEMPERATURE.describe's own "burning" cutoff (same file) -- the
+// game's general climate-band threshold. An earlier version of this constant
+// instead matched the old helian-hot *texture*'s literal ">500C" (773.15K)
+// override, which is a much higher, texture-specific bar than what the game
+// itself already labels "burning" -- a body the UI calls burning at, say,
+// 400K was landing on the normal palette here instead of red/orange.
+const HELIAN_BURNING_MIN_K = 353.15
+
+function helianCloudPalette(
+	seed: number,
+	meanTemperatureK: number | undefined,
+	atmosphereSubtype: string | undefined,
+): CloudBandPalette {
+	// Mirrors pickGeneratedBodyTextures' own helian precedence (generation/
+	// texture/index.ts): burning-hot overrides everything else (a burning
+	// hydrogen/helium helian still reads as burning, not as its gas), then
+	// the atmosphere's own gas composition, then icy, then the normal range.
+	if (
+		meanTemperatureK !== undefined &&
+		meanTemperatureK >= HELIAN_BURNING_MIN_K
+	)
+		return helianBurningPalette(seed)
+	if (atmosphereSubtype === "hydrogen") return HELIAN_PALETTE_HYDROGEN
+	if (atmosphereSubtype === "helium") return HELIAN_PALETTE_HELIUM
+	if (
+		meanTemperatureK !== undefined &&
+		meanTemperatureK <= FROZEN_CLIMATE_MAX_K
+	)
+		return HELIAN_PALETTE_ICY
+	return helianNormalPalette(seed)
+}
+
+/** A panthalassic (deep-ocean) world's normal-temperature palette -- a rich,
+ * saturated blue instead of helian's brown/tan, reflecting open ocean rather
+ * than a thick gas envelope. Rolls the base hue per body (same technique as
+ * helianNormalPalette above) across a teal -> deep-blue range instead of a
+ * single fixed blue, keeping each band's original saturation/lightness and
+ * relative hue offset from the original fixed palette (bot/mid1 slightly
+ * higher hue than mid3, mid2 in between). */
+function panthalassicDeepPalette(seed: number): CloudBandPalette {
+	const hue = 0.45 + hash01(seed * 2.13 + 0.87) * 0.2
+	return {
+		top: new THREE.Color(1, 1, 1),
+		bot: new THREE.Color().setHSL(hue + 0.04, 0.75, 0.08),
+		mid1: new THREE.Color().setHSL(hue + 0.05, 0.7, 0.16),
+		mid2: new THREE.Color().setHSL(hue + 0.02, 0.75, 0.32),
+		mid3: new THREE.Color().setHSL(hue, 0.85, 0.48),
+	}
+}
+
+function panthalassicCloudPalette(
+	seed: number,
+	meanTemperatureK: number | undefined,
+): CloudBandPalette {
+	// Same icy palette as a frozen helian -- the ask here is specifically
+	// "same icy light blue/white as frozen helians", not a distinct frozen
+	// ocean-world look of its own.
+	if (
+		meanTemperatureK !== undefined &&
+		meanTemperatureK <= FROZEN_CLIMATE_MAX_K
+	)
+		return HELIAN_PALETTE_ICY
+	return panthalassicDeepPalette(seed)
+}
+
+/** Procedural fbm cloud-band material -- see this function's own header
+ * comment further up the file for the full port rationale. Originally built
+ * for jovians (see git history), now used for helian bodies instead (their
+ * atmosphereCode is always the "thick" value -- see PLANET.classifyBody's
+ * helian case in dice-table/index.ts -- so no separate thickness gate is
+ * needed here). `seed` still varies the noise-domain offset per body (so
+ * multiple helians don't show identical band placement); `palette` is now
+ * an explicit fixed choice (helianCloudPalette's temperature buckets) rather
+ * than a per-body random roll, since the ask here is specific named colors
+ * per temperature category, not continuous variety. */
+function buildAtmosphericCloudBandMaterial(
+	seed: number,
+	palette: CloudBandPalette,
+): THREE.MeshStandardMaterial {
+	const uniforms = { giantCloudTime: { value: 0 } }
+	const material = new THREE.MeshStandardMaterial({
+		roughness: 1,
+		metalness: 0,
+	})
+	// Stashed here (rather than threading a new PlacedBody field through)
+	// purely so setSpinHours below can find and drive this material's own
+	// cloud-animation clock every frame -- onBeforeCompile's own `shader`
+	// object is a fresh copy Three creates at compile time, not something
+	// callers can reach back into later.
+	material.userData.giantCloudUniforms = uniforms
+	material.onBeforeCompile = (shader) => {
+		shader.uniforms.giantCloudTime = uniforms.giantCloudTime
+		shader.uniforms.giantSeed = { value: seed }
+		shader.uniforms.giantColTop = { value: palette.top }
+		shader.uniforms.giantColBot = { value: palette.bot }
+		shader.uniforms.giantColMid1 = { value: palette.mid1 }
+		shader.uniforms.giantColMid2 = { value: palette.mid2 }
+		shader.uniforms.giantColMid3 = { value: palette.mid3 }
+		shader.vertexShader = shader.vertexShader
+			.replace(
+				"#include <common>",
+				"#include <common>\nvarying vec3 vGiantObjectPosition;",
+			)
+			.replace(
+				"#include <begin_vertex>",
+				"#include <begin_vertex>\nvGiantObjectPosition = position;",
+			)
+		shader.fragmentShader = shader.fragmentShader
+			.replace(
+				"#include <common>",
+				`
+				#include <common>
+				varying vec3 vGiantObjectPosition;
+				uniform float giantCloudTime;
+				uniform float giantSeed;
+				uniform vec3 giantColTop;
+				uniform vec3 giantColBot;
+				uniform vec3 giantColMid1;
+				uniform vec3 giantColMid2;
+				uniform vec3 giantColMid3;
+				#define GIANT_NUM_NOISE_OCTAVES 10
+				#define GIANT_PLANET_SIZE 0.75
+
+				float giantHash(float p) {
+					p = fract(p * 0.011);
+					p *= p + 7.5;
+					p *= p + p;
+					return fract(p);
+				}
+				float giantNoise(vec3 x) {
+					const vec3 step = vec3(110.0, 241.0, 171.0);
+					vec3 i = floor(x);
+					vec3 f = fract(x);
+					float n = dot(i, step);
+					vec3 u = f * f * (3.0 - 2.0 * f);
+					return mix(
+						mix(
+							mix(giantHash(n + dot(step, vec3(0.0, 0.0, 0.0))), giantHash(n + dot(step, vec3(1.0, 0.0, 0.0))), u.x),
+							mix(giantHash(n + dot(step, vec3(0.0, 1.0, 0.0))), giantHash(n + dot(step, vec3(1.0, 1.0, 0.0))), u.x),
+							u.y
+						),
+						mix(
+							mix(giantHash(n + dot(step, vec3(0.0, 0.0, 1.0))), giantHash(n + dot(step, vec3(1.0, 0.0, 1.0))), u.x),
+							mix(giantHash(n + dot(step, vec3(0.0, 1.0, 1.0))), giantHash(n + dot(step, vec3(1.0, 1.0, 1.0))), u.x),
+							u.y
+						),
+						u.z
+					);
+				}
+				float giantFbm(vec3 x) {
+					float v = 0.0;
+					float a = 0.5;
+					vec3 shift = vec3(100.0);
+					for (int i = 0; i < GIANT_NUM_NOISE_OCTAVES; ++i) {
+						v += a * giantNoise(x);
+						x = x * 2.0 + shift;
+						a *= 0.5;
+					}
+					return v;
+				}
+				float giantMax3(vec3 v) { return max(max(v.x, v.y), v.z); }
+				mat3 giantBandRotation(float theta) {
+					return mat3(
+						cos(theta), 0.0, sin(theta),
+						0.0, 1.0, 0.0,
+						-sin(theta), 0.0, cos(theta)
+					);
+				}
+				vec3 giantCloudColor(vec3 objectPosition, float t, float seed, vec3 colTop, vec3 colBot, vec3 colMid1, vec3 colMid2, vec3 colMid3) {
+					mat3 rot = giantBandRotation(t * 0.15);
+					vec3 X = rot * (objectPosition * GIANT_PLANET_SIZE)
+						+ vec3(seed * 17.3, seed * 11.7, seed * 29.1);
+
+					vec3 q = vec3(giantFbm(X + 0.025 * t), giantFbm(X), giantFbm(X));
+					vec3 r = vec3(giantFbm(X + 1.0 * q + 0.01 * t), giantFbm(X + q), giantFbm(X + q));
+					float v = giantFbm(X + 5.0 * r + t * 0.005);
+
+					vec3 colMid = mix(colMid1, colMid2, clamp(r, 0.0, 1.0));
+					colMid = mix(colMid, colMid3, clamp(q, 0.0, 1.0));
+
+					float pos = v * 2.0 - 1.0;
+					vec3 color = mix(colMid, colTop, clamp(vec3(pos), 0.0, 1.0));
+					color = mix(color, colBot, clamp(vec3(-pos), 0.0, 1.0));
+					color = color / giantMax3(color);
+					color = (clamp(0.4 * pow(v, 3.0) + pow(v, 2.0) + 0.5 * v, 0.0, 1.0) * 0.9 + 0.1) * color;
+					return color;
+				}
+				`,
+			)
+			.replace(
+				"#include <map_fragment>",
+				"diffuseColor.rgb = giantCloudColor(normalize(vGiantObjectPosition), giantCloudTime, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
+			)
+	}
+	return material
+}
+
 /**
  * Builds one star's full worth of orbiting bodies -- the star mesh/glow/
  * light, every sibling+main-world body (with its own nested moon overlay),
@@ -219,54 +508,201 @@ export function buildSolarSystemOverlay(
 	// mesh elsewhere in this renderer.
 	starMesh.rotation.x = Math.PI / 2
 	group.add(starMesh)
+	let blackHoleDiskMaterial: THREE.ShaderMaterial | null = null
+	let blackHoleMesh: THREE.Mesh | null = null
+	const HOLE_RADIUS = 0.3
 	if (isBlackHole) {
-		// This is intentionally a visual approximation rather than a full
-		// relativistic ray tracer: radial heat falloff, warped spiral turbulence,
-		// and a brighter approaching side make the disk legible at map scale.
-		const diskMaterial = new THREE.ShaderMaterial({
+		group.remove(starMesh)
+		starMesh.geometry.dispose()
+		starMaterial.dispose()
+		// Port of a volumetric-raymarch black hole shader (Shadertoy-style: a
+		// fixed 200-step march accumulating gravitational lensing + a glowing
+		// disc, rather than a single sphere/disc-plane intersection test).
+		// `bh` in the source shader is always the local origin -- centre/
+		// objectScale (from the vertex shader) convert the true camera ray
+		// into that local unit-sphere space so the same march applies however
+		// this mesh is scaled/positioned in the scene.
+		//
+		// This mesh renders ONLY the glow/disc, additively, with no background
+		// sampling at all -- there's a separate plain black opaque sphere
+		// (below) for the actual event-horizon shadow. An earlier version
+		// tried to recomposite a captured copy of the background wherever the
+		// march contributed nothing, which needed the resampled copy's
+		// resolution/color-space to exactly match the real scene; any mismatch
+		// (and a raw ShaderMaterial skips Three's automatic output color-space
+		// encoding entirely) showed up as a tinted circle at the mesh's own
+		// silhouette. Additive blending with zero contribution is just zero --
+		// nothing to mismatch, so the real scene shows through untouched.
+		const discNoiseTexture = loadBodyTexture(
+			"/textures/celestial/black-hole/disc-noise.png",
+		)
+		// The source shader's iChannel1: a small tileable noise texture,
+		// sampled with wraparound as the disc spins past the seam.
+		discNoiseTexture.wrapS = THREE.RepeatWrapping
+		discNoiseTexture.wrapT = THREE.RepeatWrapping
+		blackHoleDiskMaterial = new THREE.ShaderMaterial({
 			uniforms: {
-				diskRadius: { value: starRadius },
-				intensity: {
-					value: 0.75 + Math.min(0.25, Math.sqrt(blackHoleLuminositySol) / 12),
-				},
+				discTexture: { value: discNoiseTexture },
+				holeRadius: { value: HOLE_RADIUS },
+				holeMass: { value: 5 },
+				innerColor: { value: new THREE.Color(0xffccb3) },
+				outerColor: { value: new THREE.Color(diskColorHex) },
+				time: { value: 0 },
 			},
 			vertexShader: `
-				varying vec2 diskPosition;
+				varying vec3 fragPosWs;
+				varying vec3 localPosition;
 				void main() {
-					diskPosition = position.xy;
-					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+					vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+					fragPosWs = worldPosition.xyz;
+					// The geometry is a UNIT sphere (radius 1, world size comes from
+					// mesh.scale) -- its raw object-space position IS the black
+					// hole's local frame ("bh" at the origin, event horizon well
+					// inside radius 1), no arithmetic required. Deriving this same
+					// point in the fragment shader instead, as
+					// (cameraWorldPos - centre) / scale, produced a value whose
+					// magnitude grows with camera distance; subtracting the march's
+					// small step offsets from that then hit catastrophic
+					// floating-point cancellation -- the concentric moire/banding
+					// rings seen at most zoom levels.
+					localPosition = position;
+					gl_Position = projectionMatrix * viewMatrix * worldPosition;
 				}
 			`,
 			fragmentShader: `
-				uniform float diskRadius;
-				uniform float intensity;
-				varying vec2 diskPosition;
+				// cameraPosition below is Three.js's own built-in uniform --
+				// ShaderMaterial (unlike RawShaderMaterial) auto-declares and
+				// updates it every frame, so it must NOT be redeclared here.
+				uniform sampler2D discTexture;
+				uniform float holeRadius;
+				uniform float holeMass;
+				uniform vec3 innerColor;
+				uniform vec3 outerColor;
+				uniform float time;
+				varying vec3 fragPosWs;
+				varying vec3 localPosition;
+
+				float hash13(vec3 p) {
+					p = fract(p * vec3(0.16532, 0.17369, 0.15787));
+					p += dot(p.xyz, p.yzx + 19.19);
+					return fract(p.x * p.y * p.z);
+				}
+				float sdSphere(vec3 p, float s) { return length(p) - s; }
+				float sdTorus(vec3 p, vec2 t) {
+					vec2 q = vec2(length(p.xz) - t.x, p.y);
+					return length(q) - t.y;
+				}
 				void main() {
-					float radius = length(diskPosition) / diskRadius;
-					float angle = atan(diskPosition.y, diskPosition.x);
-					float heat = pow(1.0 - radius, 0.58);
-					float spiral = 0.72 + 0.28 * sin(angle * 9.0 - radius * 68.0);
-					float turbulence = 0.86 + 0.14 * sin(angle * 31.0 + radius * 113.0);
-					float doppler = 0.66 + 0.34 * sin(angle);
-					vec3 outer = vec3(0.45, 0.035, 0.005);
-					vec3 middle = vec3(1.0, 0.16, 0.012);
-					vec3 inner = vec3(1.0, 0.88, 0.55);
-					vec3 color = mix(outer, middle, smoothstep(0.05, 0.62, heat));
-					color = mix(color, inner, smoothstep(0.58, 1.0, heat));
-					color *= spiral * turbulence * doppler * intensity;
-					float alpha = smoothstep(1.0, 0.68, radius) * 0.94;
-					gl_FragColor = vec4(color, alpha);
+					vec3 rayDirWs = normalize(fragPosWs - cameraPosition);
+					// localPosition (the mesh's own unit-sphere object-space
+					// position, radius <= 1) is already the black hole's local
+					// frame ("bh" at the origin) -- well-conditioned regardless of
+					// camera distance, unlike deriving it from the camera position.
+					vec3 ro = localPosition;
+					vec3 rd = rayDirWs;
+
+					vec3 bhMass = vec3(holeMass * 0.001);
+					// The march only ever covers 200*dt = 4 local units total.
+					// Jump straight to a point just before the ray's closest
+					// approach to the hole (skipping the empty vacuum in between,
+					// where gravity is negligible anyway) so a grazing ray that
+					// enters the mesh far from the hole still gets there in time.
+					float tClosest = dot(-ro, rd);
+					vec3 p = ro + rd * max(0.0, tClosest - 4.0);
+					vec3 pv = rd;
+					p += pv * hash13(rd + vec3(time)) * 0.02;
+
+					float dt = 0.02;
+					vec3 col = vec3(0.0);
+					float noncaptured = 1.0;
+
+					// The march is otherwise unconditional (200 iterations for every
+					// pixel the mesh covers, however far the ray passes from the
+					// hole) -- fine for a small Shadertoy preview, but on a
+					// screen-filling mesh in a real scene that's enough per-pixel
+					// work to trip a GPU driver's hang detection and take down the
+					// whole WebGL context. Skip the march for rays that never come
+					// near the hole/disc, and bail out early once a ray has clearly
+					// escaped -- both are no-ops for the rays that actually matter.
+					float closestApproach = length(ro - rd * dot(ro, rd));
+					if (closestApproach < 4.0) {
+						for (int i = 0; i < 200; i++) {
+							p += pv * dt * noncaptured;
+
+							vec3 bhv = -p;
+							float r = dot(bhv, bhv);
+							pv += normalize(bhv) * (bhMass.x / r);
+
+							noncaptured = smoothstep(0.0, 0.01, sdSphere(p, holeRadius));
+
+							float dr = length(bhv.xz);
+							float da = atan(bhv.x, bhv.z);
+							vec2 ra = vec2(dr, da * (0.01 + (dr - holeRadius) * 0.002) + 2.0 * 3.14159265 + time * 0.02);
+							ra *= vec2(10.0, 20.0);
+
+							vec3 dcol = mix(innerColor, outerColor, pow(length(bhv) - holeRadius, 2.0))
+								* max(0.0, texture2D(discTexture, ra * vec2(0.1, 0.5)).r + 0.05)
+								* (4.0 / (0.001 + (length(bhv) - holeRadius) * 50.0));
+
+							col += max(vec3(0.0), dcol * step(0.0, -sdTorus((p * vec3(1.0, 50.0, 1.0)), vec2(0.8, 0.99))) * noncaptured);
+							// Ambient point-glow, gated only by noncaptured in the
+							// source shader -- fine there (a full open 3D scene
+							// where a grazing ray's bhv grows large quickly), but
+							// here every ray is pre-jumped to start near its
+							// closest approach (see tClosest above, added to fix
+							// a separate zoom/precision bug), so bhv stays small
+							// for most of the march on almost every pixel of the
+							// mesh, not just ones actually near the hole. Summed
+							// over ~200 steps that reads as a near-uniform dull
+							// wash across the whole sphere. An explicit falloff
+							// confines it to actually being near the hole/disc.
+							float glowFalloff = smoothstep(holeRadius * 3.0, holeRadius, length(bhv));
+							col += vec3(1.0, 0.9, 0.7) * (1.0 / vec3(dot(bhv, bhv))) * 0.003 * noncaptured * glowFalloff;
+
+							if (noncaptured > 0.5 && length(p) > 4.0) break;
+						}
+					}
+
+					// Additive: zero contribution here is genuinely zero, so the
+					// real scene (whatever's actually behind this mesh) shows
+					// through untouched -- no captured/resampled background to
+					// mismatch resolution or color-space with.
+					gl_FragColor = vec4(col, 1.0);
 				}
 			`,
 			transparent: true,
-			side: THREE.DoubleSide,
+			blending: THREE.AdditiveBlending,
+			side: THREE.FrontSide,
 			depthWrite: false,
+			depthTest: true,
 		})
-		const disk = new THREE.Mesh(
-			new THREE.RingGeometry(starRadius * 0.22, starRadius, 128),
-			diskMaterial,
+		// See body meshes elsewhere in this file: a unit-radius geometry
+		// scaled via mesh.scale keeps objectScale (read by the shader above)
+		// equal to the mesh's real world-space radius.
+		// The accretion disc's own torus (major/minor radius 0.8/0.99 in the
+		// shader's local units, below) reaches out to about 1.8 -- a bounding
+		// radius of 1 clips it flat exactly at the mesh's silhouette instead
+		// of letting it taper off. mesh.scale (not this geometry radius) is
+		// what ties local units to starRadius, so bounding the mesh bigger
+		// only changes which pixels get shaded, not the disc's actual size.
+		const BLACK_HOLE_BOUNDS_RADIUS = 2
+		blackHoleMesh = new THREE.Mesh(
+			new THREE.SphereGeometry(BLACK_HOLE_BOUNDS_RADIUS, 48, 32),
+			blackHoleDiskMaterial,
 		)
-		group.add(disk)
+		blackHoleMesh.scale.setScalar(starRadius)
+		// The actual event-horizon shadow: a plain opaque black sphere, sized
+		// to the shader's own holeRadius (in the same unit-sphere local
+		// space). A flat MeshBasicMaterial can't produce a tint/seam bug --
+		// there's no resampling or color-space step for it to get wrong.
+		const blackHoleShadowMesh = new THREE.Mesh(
+			new THREE.SphereGeometry(HOLE_RADIUS, 32, 24),
+			new THREE.MeshBasicMaterial({ color: 0x000000 }),
+		)
+		blackHoleShadowMesh.scale.setScalar(starRadius)
+		group.add(blackHoleShadowMesh)
+		blackHoleMesh.renderOrder = 10_000
+		group.add(blackHoleMesh)
 	}
 	if (isNeutronStar) {
 		const beamLength = starRadius * 5
@@ -303,8 +739,7 @@ export function buildSolarSystemOverlay(
 	glowSprite.scale.setScalar(
 		starRadius * (isBlackHole ? 2 : isNeutronStar || isWhiteDwarf ? 5 : 3),
 	)
-	if ((!isBlackHole || hasActiveAccretionDisk) && !isBrownDwarf)
-		group.add(glowSprite)
+	if (!isBlackHole && !isBrownDwarf) group.add(glowSprite)
 	else {
 		glowTexture.dispose()
 		glowSprite.material.dispose()
@@ -410,7 +845,18 @@ export function buildSolarSystemOverlay(
 			showRealisticSizes,
 		)
 		const bodyGroup = new THREE.Group()
-		const isGasGiant = body.group === "jovian"
+		// These three all target `classification`, not `group` -- a body's
+		// group (jovian/helian/terrestrial/...) is a broader bucket that can
+		// hold several distinct classifications (e.g. a "helian"-group body's
+		// classification rolls as "helian", "panthalassic", or "asphodelian";
+		// a "jovian"-group body's as "jovian" or "chthonian" -- see
+		// classifyBody in environment/index.ts). Checking group instead of
+		// classification here previously caught panthalassic bodies under the
+		// helian branch (they never even reached their own palette) and would
+		// equally mis-catch chthonian bodies under the gas-giant branch.
+		const isGasGiant = body.classification === "jovian"
+		const isHelian = body.classification === "helian"
+		const isPanthalassic = body.classification === "panthalassic"
 		const texturePath = body.texturePath
 		// The main world's own simulated terrain/vegetation, standing in for
 		// its static texturePath image -- see mainWorldTexture's doc comment.
@@ -421,33 +867,50 @@ export function buildSolarSystemOverlay(
 					roughness: 1,
 					metalness: 0,
 				})
-			: texturePath
-				? new THREE.MeshStandardMaterial({
-						map: loadBodyTexture(texturePath),
-						roughness: 1,
-						metalness: 0,
-					})
-				: isGasGiant
-					? new THREE.MeshStandardMaterial({
-							map: loadBodyTexture(
-								"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
+			: isPanthalassic
+				? buildAtmosphericCloudBandMaterial(
+						body.idx,
+						panthalassicCloudPalette(
+						body.idx,
+						body.temperatureEstimate?.mean,
+					),
+					)
+				: isHelian
+					? buildAtmosphericCloudBandMaterial(
+							body.idx,
+							helianCloudPalette(
+								body.idx,
+								body.temperatureEstimate?.mean,
+								body.atmosphere?.subtype,
 							),
+						)
+					: texturePath
+					? new THREE.MeshStandardMaterial({
+							map: loadBodyTexture(texturePath),
 							roughness: 1,
 							metalness: 0,
 						})
-					: new THREE.MeshStandardMaterial({
-							color:
-								(body.classification === "tectonic" ||
-									body.classification === "vesperian") &&
-								(body.hydrosphereCode ?? 0) >= 10
-									? FULL_OCEAN_COLOR
-									: (CLASSIFICATION_COLOR[body.classification] ??
-										(body.isMainWorld
-											? MAIN_WORLD_COLOR
-											: ROCKY_SIBLING_COLOR)),
-							roughness: 0.9,
-							metalness: 0,
-						})
+					: isGasGiant
+						? new THREE.MeshStandardMaterial({
+								map: loadBodyTexture(
+									"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
+								),
+								roughness: 1,
+								metalness: 0,
+							})
+						: new THREE.MeshStandardMaterial({
+								color:
+									(body.classification === "tectonic" ||
+										body.classification === "vesperian") &&
+									(body.hydrosphereCode ?? 0) >= 10
+										? FULL_OCEAN_COLOR
+										: (CLASSIFICATION_COLOR[body.classification] ??
+											(body.isMainWorld
+												? MAIN_WORLD_COLOR
+												: ROCKY_SIBLING_COLOR)),
+								roughness: 0.9,
+								metalness: 0,
+							})
 		const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), material)
 		// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
 		// XY (Z-north) — textured bodies need the same quarter-turn so their
@@ -1313,7 +1776,16 @@ export function buildSolarSystemOverlay(
 
 	function setSpinHours(hours: number) {
 		currentSpinHours = hours
+		if (blackHoleDiskMaterial) {
+			blackHoleDiskMaterial.uniforms.time.value = hours
+		}
 		for (const p of placed) {
+			const giantCloudUniforms = (
+				p.mesh?.material as THREE.MeshStandardMaterial | undefined
+			)?.userData.giantCloudUniforms as
+				| { giantCloudTime: { value: number } }
+				| undefined
+			if (giantCloudUniforms) giantCloudUniforms.giantCloudTime.value = hours
 			if (
 				!p.isBelt &&
 				p.mesh &&
@@ -1343,7 +1815,8 @@ export function buildSolarSystemOverlay(
 	}
 
 	function resolveHitBodyIndex(object: THREE.Object3D): OrbitAddress | null {
-		if (object === starMesh) return { kind: "star", starIndex: 0 }
+		if (object === starMesh || object === blackHoleMesh)
+			return { kind: "star", starIndex: 0 }
 		for (let i = 0; i < placed.length; i++) {
 			const p = placed[i]!
 			// A belt itself is never a click target (see listAddresses' matching

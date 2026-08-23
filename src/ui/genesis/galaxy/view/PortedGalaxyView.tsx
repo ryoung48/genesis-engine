@@ -12,6 +12,7 @@ import { updateClusterPositions } from "@/ui/genesis/galaxy/renderer/galaxy-scen
 import { buildGalaxyLanes } from "@/ui/genesis/galaxy/renderer/galaxy-scene/lanes"
 import { pickNearestSystem } from "@/ui/genesis/galaxy/renderer/galaxy-scene/picking"
 import {
+	BLACK_HOLE_POINT_SIZE_RATIO,
 	buildGalaxyPoints,
 	CLUSTER_CENTER_MASK_SIZE_RATIO,
 } from "@/ui/genesis/galaxy/renderer/galaxy-scene/points"
@@ -35,6 +36,15 @@ import {
 const DEFAULT_SEED = 1
 const DEFAULT_SYSTEM_COUNT = 2000
 const MAJOR_RING_MINIMUM_WIDTH = 0.4
+const SELECTED_SYSTEM_ZOOM_FACTOR = 12
+const SELECTION_PULSE_COUNT = 2
+const SELECTION_PULSE_DURATION_MS = 260
+const SELECTION_PULSE_RADIUS_PX = 14
+
+type SelectionPulse = {
+	ring: THREE.LineLoop
+	startedAt: number
+}
 
 function specialCircumstances(body: SystemBody): SpecialCircumstance[] {
 	const circumstances: SpecialCircumstance[] = []
@@ -108,6 +118,7 @@ export const PortedGalaxyView: React.FC<{
 	const galaxyRef = useRef<Galaxy | null>(null)
 	const pointsRef = useRef<ReturnType<typeof buildGalaxyPoints> | null>(null)
 	const lanesRef = useRef<ReturnType<typeof buildGalaxyLanes> | null>(null)
+	const selectionPulseRef = useRef<SelectionPulse | null>(null)
 	// points.ts's own uSize uniform (see its own doc comment) is a fixed
 	// pixel size with no zoom attenuation, matching how the original
 	// galaxy-scene module's OWN camera/controls worked -- but this renderer's
@@ -162,6 +173,15 @@ export const PortedGalaxyView: React.FC<{
 		GalaxySystem[] | null
 	>(null)
 
+	function disposeSelectionPulse() {
+		const pulse = selectionPulseRef.current
+		if (!pulse) return
+		rendererRef.current?.scene.remove(pulse.ring)
+		pulse.ring.geometry.dispose()
+		;(pulse.ring.material as THREE.Material).dispose()
+		selectionPulseRef.current = null
+	}
+
 	/** Swaps a freshly worker-generated old-model galaxy's points/lanes into
 	 * the renderer's scene, disposing whatever was there before. */
 	const applyOldGalaxy = (renderer: GalaxyRenderer, nextGalaxy: Galaxy) => {
@@ -169,6 +189,9 @@ export const PortedGalaxyView: React.FC<{
 			renderer.scene.remove(pointsRef.current.points)
 			pointsRef.current.points.geometry.dispose()
 			;(pointsRef.current.points.material as THREE.Material).dispose()
+			renderer.scene.remove(pointsRef.current.blackHolePoints)
+			pointsRef.current.blackHolePoints.geometry.dispose()
+			;(pointsRef.current.blackHolePoints.material as THREE.Material).dispose()
 			renderer.scene.remove(pointsRef.current.clusterCenterMasks)
 			pointsRef.current.clusterCenterMasks.geometry.dispose()
 			;(
@@ -192,10 +215,12 @@ export const PortedGalaxyView: React.FC<{
 		])
 		lanes.visible = showStarOverlayRef.current
 		built.points.visible = showStarOverlayRef.current
+		built.blackHolePoints.visible = showStarOverlayRef.current
 		built.clusterCenterMasks.visible = showStarOverlayRef.current
 		renderer.scene.add(lanes)
 		renderer.scene.add(built.clusterCenterMasks)
 		renderer.scene.add(built.points)
+		renderer.scene.add(built.blackHolePoints)
 		pointsRef.current = built
 		lanesRef.current = lanes
 	}
@@ -320,6 +345,10 @@ export const PortedGalaxyView: React.FC<{
 				const material = pointsRef.current.points
 					.material as THREE.ShaderMaterial
 				material.uniforms.uSize!.value = pointSizePx
+				const blackHoleMaterial = pointsRef.current.blackHolePoints
+					.material as THREE.ShaderMaterial
+				blackHoleMaterial.uniforms.uSize!.value =
+					pointSizePx * BLACK_HOLE_POINT_SIZE_RATIO
 				const clusterCenterMaskMaterial = pointsRef.current.clusterCenterMasks
 					.material as THREE.ShaderMaterial
 				clusterCenterMaskMaterial.uniforms.uSize!.value =
@@ -332,6 +361,22 @@ export const PortedGalaxyView: React.FC<{
 					pointSizePx,
 				})
 			}
+			const selectionPulse = selectionPulseRef.current
+			if (selectionPulse) {
+				const elapsed = performance.now() - selectionPulse.startedAt
+				const totalDuration =
+					SELECTION_PULSE_COUNT * SELECTION_PULSE_DURATION_MS
+				if (elapsed >= totalDuration) {
+					disposeSelectionPulse()
+				} else {
+					const phase =
+						(elapsed % SELECTION_PULSE_DURATION_MS) /
+						SELECTION_PULSE_DURATION_MS
+					selectionPulse.ring.scale.setScalar(1 + phase * 0.8)
+					;(selectionPulse.ring.material as THREE.LineBasicMaterial).opacity =
+						1 - phase
+				}
+			}
 			clusterFrame = requestAnimationFrame(updateCluster)
 		})
 
@@ -341,6 +386,7 @@ export const PortedGalaxyView: React.FC<{
 			window.removeEventListener("resize", handleResize)
 			ro.disconnect()
 			workerRef.current?.terminate()
+			disposeSelectionPulse()
 			renderer.dispose()
 		}
 	}, [])
@@ -360,6 +406,7 @@ export const PortedGalaxyView: React.FC<{
 		// decorative stars stay on unconditionally, see the mount effect).
 		showStarOverlayRef.current = checked
 		if (pointsRef.current) pointsRef.current.points.visible = checked
+		if (pointsRef.current) pointsRef.current.blackHolePoints.visible = checked
 		if (lanesRef.current) lanesRef.current.visible = checked
 		if (pointsRef.current)
 			pointsRef.current.clusterCenterMasks.visible = checked
@@ -490,10 +537,38 @@ export const PortedGalaxyView: React.FC<{
 	const focusSearchedSystem = (systemIndex: number) => {
 		const renderer = rendererRef.current
 		const currentGalaxy = galaxyRef.current
-		if (!renderer || !currentGalaxy) return
+		const canvas = canvasRef.current
+		if (!renderer || !currentGalaxy || !canvas) return
 		const worldX = currentGalaxy.r_xy[2 * systemIndex]!
 		const worldY = currentGalaxy.r_xy[2 * systemIndex + 1]!
-		renderer.panTo(worldX, worldY, 4)
+		renderer.panTo(worldX, worldY, SELECTED_SYSTEM_ZOOM_FACTOR)
+		disposeSelectionPulse()
+		const pulseRadius =
+			((renderer.camera.top - renderer.camera.bottom) /
+				(renderer.camera.zoom * Math.max(1, canvas.clientHeight))) *
+			SELECTION_PULSE_RADIUS_PX
+		const segments = 48
+		const positions = new Float32Array(segments * 3)
+		for (let index = 0; index < segments; index++) {
+			const angle = (index / segments) * Math.PI * 2
+			positions[3 * index] = Math.cos(angle) * pulseRadius
+			positions[3 * index + 1] = Math.sin(angle) * pulseRadius
+		}
+		const geometry = new THREE.BufferGeometry()
+		geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+		const ring = new THREE.LineLoop(
+			geometry,
+			new THREE.LineBasicMaterial({
+				color: 0x22c55e,
+				transparent: true,
+				opacity: 1,
+				depthTest: false,
+			}),
+		)
+		ring.position.set(worldX, worldY, 0)
+		ring.renderOrder = 4
+		renderer.scene.add(ring)
+		selectionPulseRef.current = { ring, startedAt: performance.now() }
 	}
 
 	return (
