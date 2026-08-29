@@ -119,6 +119,14 @@ export interface SolarSystemOverlayParams {
 	 * import (which keeps its curated photo) or while no world has been
 	 * simulated yet. See useSolarSystemView's mainWorldSatelliteTexture. */
 	mainWorldTexture?: THREE.DataTexture | null
+	/** Set internally by buildSolarSystemOverlay's own recursive companion-star
+	 * call (never by an external caller) — true exactly when this star is
+	 * itself a companion orbiting another star. That other star is a sibling
+	 * light source this star's own light must not bleed onto (and vice
+	 * versa), even though a companion's own `companions` is always `[]` (no
+	 * companion-of-a-companion nesting) and so can't see that sibling in its
+	 * own `companions.length`. See starLight.distance and systemAmbient. */
+	isCompanion?: boolean
 }
 
 export interface SolarSystemOverlayState {

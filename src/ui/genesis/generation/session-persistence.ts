@@ -1,5 +1,4 @@
-﻿import type { GalaxyParams } from "@/model/celestial/galaxy/types"
-import type { MoonBody } from "@/model/celestial/moons/types"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import type { MainWorldMode } from "@/model/celestial/system/generation/types"
 import type {
 	SolarSystemState,
@@ -22,11 +21,11 @@ const VALID_MAIN_WORLD_MODES = new Set<MainWorldMode>([
 ])
 
 /** Present only when this system was opened from galaxy mode (see
- * GenesisView's handleOpenGalaxySystem) -- lets the solar-system view show a
- * "back to galaxy" control and hands the exact params needed to regenerate
- * the same galaxy layout back to it. */
+ * GenesisView's handleOpenGalaxySystem) -- its presence is what lets the
+ * solar-system view show a "back to galaxy" control. PortedGalaxyView owns
+ * its own seed/systemCount/radius state and regenerates fresh on re-entry,
+ * so nothing beyond the originating system's index needs to be carried. */
 export interface GalaxyOrigin {
-	galaxyParams: GalaxyParams
 	systemIndex: number
 }
 
@@ -201,24 +200,7 @@ function isFocusTarget(value: unknown): value is FocusTarget {
 function isGalaxyOrigin(value: unknown): value is GalaxyOrigin {
 	if (!value || typeof value !== "object") return false
 	const candidate = value as Record<string, unknown>
-	if (typeof candidate.systemIndex !== "number") return false
-	const params = candidate.galaxyParams
-	if (!params || typeof params !== "object") return false
-	const typedParams = params as Record<string, unknown>
-	const radius = typedParams.radius
-	const dimensions = typedParams.dimensions
-	return (
-		typeof typedParams.size === "number" &&
-		typeof typedParams.seed === "number" &&
-		!!radius &&
-		typeof radius === "object" &&
-		typeof (radius as Record<string, unknown>).min === "number" &&
-		typeof (radius as Record<string, unknown>).max === "number" &&
-		!!dimensions &&
-		typeof dimensions === "object" &&
-		typeof (dimensions as Record<string, unknown>).w === "number" &&
-		typeof (dimensions as Record<string, unknown>).h === "number"
-	)
+	return typeof candidate.systemIndex === "number"
 }
 
 function isGenerationSessionSnapshot(

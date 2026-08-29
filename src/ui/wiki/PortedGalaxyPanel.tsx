@@ -2,13 +2,16 @@ import React, { useEffect, useMemo, useState } from "react"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { Popover } from "@/ui/components/composites/Popover"
 import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { Button } from "@/ui/components/primitives/Button"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { ProgressBar } from "@/ui/components/primitives/ProgressBar"
+import { Slider } from "@/ui/components/primitives/Slider"
 import { Surface } from "@/ui/components/primitives/Surface"
+import type { PortedGalaxyParams } from "@/ui/genesis/galaxy/view/portedGalaxyParams"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
@@ -166,14 +169,81 @@ const SystemCountEditor: React.FC<{
 	)
 }
 
+const RadiusRangeEditor: React.FC<{
+	coreRadius: number
+	radius: number
+	onCoreRadiusChange: (coreRadius: number) => void
+	onRadiusChange: (radius: number) => void
+}> = ({ coreRadius, radius, onCoreRadiusChange, onRadiusChange }) => {
+	const [coreEditorOpen, setCoreEditorOpen] = useState(false)
+	const [radiusEditorOpen, setRadiusEditorOpen] = useState(false)
+
+	return (
+		<span className="inline-flex items-center text-[9px] font-mono text-slate-700">
+			<Popover
+				open={coreEditorOpen}
+				onDismiss={() => setCoreEditorOpen(false)}
+				panelClassName="bottom-full left-1/2 mb-2 -translate-x-1/2"
+				trigger={
+					<span
+						onClick={() => setCoreEditorOpen((open) => !open)}
+						className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-slate-900"
+					>
+						{coreRadius.toLocaleString()}
+					</span>
+				}
+			>
+				<div className="w-36 px-1 pt-0.5 pb-2">
+					<Slider
+						label="Galaxy Core Radius"
+						value={`${coreRadius.toLocaleString()} ly`}
+						min={0.01}
+						max={radius}
+						step={0.01}
+						inputValue={coreRadius}
+						onChange={onCoreRadiusChange}
+					/>
+				</div>
+			</Popover>
+			<span>–</span>
+			<Popover
+				open={radiusEditorOpen}
+				onDismiss={() => setRadiusEditorOpen(false)}
+				panelClassName="bottom-full left-1/2 mb-2 -translate-x-1/2"
+				trigger={
+					<span
+						onClick={() => setRadiusEditorOpen((open) => !open)}
+						className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-slate-900"
+					>
+						{radius.toLocaleString()}
+					</span>
+				}
+			>
+				<div className="w-36 px-1 pt-0.5 pb-2">
+					<Slider
+						label="Galaxy Radius"
+						value={`${radius.toLocaleString()} ly`}
+						min={coreRadius}
+						max={30000}
+						step={100}
+						inputValue={radius}
+						onChange={onRadiusChange}
+					/>
+				</div>
+			</Popover>
+			<span className="ml-1">ly</span>
+		</span>
+	)
+}
+
 interface PortedGalaxyPanelProps {
 	name: string
 	seed: number
 	setSeed: (v: number) => void
 	systemCount: number
 	setSystemCount: (v: number) => void
-	radiusMin: number
-	radiusMax: number
+	params: PortedGalaxyParams
+	onParamsChange: (params: PortedGalaxyParams) => void
 	generating: boolean
 	generationLabel: string
 	generationProgress: number
@@ -187,11 +257,6 @@ interface PortedGalaxyPanelProps {
 	pregeneratedSystems: GalaxySystem[] | null
 	onGenerate: () => void
 	onClose?: () => void
-	/** True briefly while a shape preset switch is being applied to the
-	 * renderer (see PortedGalaxyView.tsx's handleSelectPreset) -- distinct
-	 * from `generating`, which covers the old-model galaxy's own worker
-	 * regen. */
-	applying: boolean
 	systemSearchEntries: GalaxySystemSearchEntry[]
 	/** [JUSTIFICATION] Planet and moon classifications only exist after the
 	 * user has requested all systems be pre-generated. */
@@ -224,8 +289,8 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	setSeed,
 	systemCount,
 	setSystemCount,
-	radiusMin,
-	radiusMax,
+	params,
+	onParamsChange,
 	generating,
 	generationLabel,
 	generationProgress,
@@ -234,7 +299,6 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	pregeneratedSystems,
 	onGenerate,
 	onClose,
-	applying,
 	systemSearchEntries,
 	systemBodySearchEntries,
 	onFocusSystem,
@@ -243,6 +307,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	onSelectPreset,
 }) => {
 	const [seedInput, setSeedInput] = useState(seed.toString(36).padStart(6, "0"))
+	const [isStatisticsExpanded, setIsStatisticsExpanded] = useState(false)
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false)
 	const [searchTab, setSearchTab] = useState<SystemSearchTab>("stars")
 	const [spectralClassFilter, setSpectralClassFilter] = useState("all")
@@ -307,7 +372,95 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 		},
 		{
 			label: "Radius",
-			value: `${radiusMin.toLocaleString()}–${radiusMax.toLocaleString()} ly`,
+			value: "",
+			valueAction: (
+				<RadiusRangeEditor
+					coreRadius={params.coreRad}
+					radius={params.rad}
+					onCoreRadiusChange={(coreRad) =>
+						onParamsChange({ ...params, coreRad })
+					}
+					onRadiusChange={(rad) => onParamsChange({ ...params, rad })}
+				/>
+			),
+		},
+		{
+			label: "Angular Offset",
+			value: `${params.angleOffset.toFixed(5)}°`,
+			editor: {
+				label: "Angular Offset",
+				value: params.angleOffset,
+				min: 0,
+				max: 0.002,
+				step: 0.00001,
+				display: `${params.angleOffset.toFixed(5)}°`,
+				set: (angleOffset) => onParamsChange({ ...params, angleOffset }),
+			},
+		},
+		{
+			label: "Inner Eccentricity",
+			value: params.exInner.toFixed(2),
+			editor: {
+				label: "Inner Eccentricity",
+				value: params.exInner,
+				min: 0.1,
+				max: 1,
+				step: 0.01,
+				display: params.exInner.toFixed(2),
+				set: (exInner) => onParamsChange({ ...params, exInner }),
+			},
+		},
+		{
+			label: "Outer Eccentricity",
+			value: params.exOuter.toFixed(2),
+			editor: {
+				label: "Outer Eccentricity",
+				value: params.exOuter,
+				min: 0.1,
+				max: 1,
+				step: 0.01,
+				display: params.exOuter.toFixed(2),
+				set: (exOuter) => onParamsChange({ ...params, exOuter }),
+			},
+		},
+		{
+			label: "Ellipse Disturbances",
+			value: params.pertN.toLocaleString(),
+			editor: {
+				label: "Ellipse Disturbances",
+				value: params.pertN,
+				min: 0,
+				max: 12,
+				step: 1,
+				display: params.pertN.toLocaleString(),
+				set: (pertN) => onParamsChange({ ...params, pertN }),
+			},
+		},
+		{
+			label: "Ellipse Disturbance Damping Factor",
+			value: params.pertAmp.toLocaleString(),
+			editor: {
+				label: "Ellipse Disturbance Damping Factor",
+				value: params.pertAmp,
+				min: 1,
+				max: 100,
+				step: 1,
+				display: params.pertAmp.toLocaleString(),
+				set: (pertAmp) => onParamsChange({ ...params, pertAmp }),
+			},
+		},
+		{
+			label: "Base Temperature",
+			value: `${params.baseTemp.toLocaleString()} K`,
+			editor: {
+				label: "Base Temperature",
+				value: params.baseTemp,
+				min: 1000,
+				max: 10000,
+				step: 100,
+				display: `${params.baseTemp.toLocaleString()} K`,
+				set: (baseTemp) => onParamsChange({ ...params, baseTemp }),
+			},
 		},
 	]
 	const spectralClassDistribution = useMemo(() => {
@@ -699,15 +852,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 									</IconButton>
 								) : undefined
 							}
-							meta={
-								<span>
-									{applying
-										? "Applying…"
-										: generating
-											? "Generating…"
-											: "Galaxy"}
-								</span>
-							}
+							meta={<span>{generating ? "Generating…" : "Galaxy"}</span>}
 							metaAction={
 								<div className="flex items-center gap-1.5">
 									<input
@@ -740,96 +885,6 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 						<div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
 							{renderStatGrid(stats)}
 						</div>
-						{spectralClassDistribution.length > 0 ? (
-							<div className="mt-3">
-								<DistributionChart
-									title="Stars"
-									buckets={spectralClassDistribution}
-									variant="compact"
-									showTotal={false}
-								/>
-							</div>
-						) : null}
-						{bodyDistributions ? (
-							<div className="mt-2 space-y-2">
-								<DistributionChart
-									title="Planets"
-									buckets={bodyDistributions.planetClassification}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Moons"
-									buckets={bodyDistributions.moonClassification}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Moon Orbit"
-									buckets={bodyDistributions.moonOrbitRange}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Size"
-									buckets={bodyDistributions.size}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Eccentricity"
-									buckets={bodyDistributions.eccentricity}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Axial Tilt"
-									buckets={bodyDistributions.axialTilt}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Rotation"
-									buckets={bodyDistributions.rotation}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Atmosphere"
-									buckets={bodyDistributions.atmosphere}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Hydrosphere"
-									buckets={bodyDistributions.hydrosphere}
-									variant="compact"
-									showTotal={false}
-								/>
-								<DistributionChart
-									title="Temperature"
-									buckets={bodyDistributions.temperature}
-									variant="compact"
-									showTotal={false}
-								/>
-								{bodyDistributions.biosphere.length > 0 ? (
-									<DistributionChart
-										title="Biosphere"
-										buckets={bodyDistributions.biosphere}
-										variant="compact"
-										showTotal={false}
-									/>
-								) : null}
-								{bodyDistributions.systemHabitability.length > 0 ? (
-									<DistributionChart
-										title="Habitability"
-										buckets={bodyDistributions.systemHabitability}
-										variant="compact"
-										showTotal={false}
-									/>
-								) : null}
-							</div>
-						) : null}
 					</Surface>
 
 					<div className="flex items-center justify-between gap-2 px-0.5">
@@ -881,6 +936,106 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 					{generating ? (
 						<ProgressBar label={generationLabel} percent={generationProgress} />
 					) : null}
+
+					<div className="rounded-lg border border-slate-200 bg-white p-2.5">
+						<DisclosureButton
+							label="Statistics"
+							expanded={isStatisticsExpanded}
+							onClick={() => setIsStatisticsExpanded((current) => !current)}
+						/>
+						{isStatisticsExpanded ? (
+							<div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
+								{spectralClassDistribution.length > 0 ? (
+									<DistributionChart
+										title="Stars"
+										buckets={spectralClassDistribution}
+										variant="compact"
+										showTotal={false}
+									/>
+								) : null}
+								{bodyDistributions ? (
+									<>
+										<DistributionChart
+											title="Planets"
+											buckets={bodyDistributions.planetClassification}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Moons"
+											buckets={bodyDistributions.moonClassification}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Moon Orbit"
+											buckets={bodyDistributions.moonOrbitRange}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Size"
+											buckets={bodyDistributions.size}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Eccentricity"
+											buckets={bodyDistributions.eccentricity}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Axial Tilt"
+											buckets={bodyDistributions.axialTilt}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Rotation"
+											buckets={bodyDistributions.rotation}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Atmosphere"
+											buckets={bodyDistributions.atmosphere}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Hydrosphere"
+											buckets={bodyDistributions.hydrosphere}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
+											title="Temperature"
+											buckets={bodyDistributions.temperature}
+											variant="compact"
+											showTotal={false}
+										/>
+										{bodyDistributions.biosphere.length > 0 ? (
+											<DistributionChart
+												title="Biosphere"
+												buckets={bodyDistributions.biosphere}
+												variant="compact"
+												showTotal={false}
+											/>
+										) : null}
+										{bodyDistributions.systemHabitability.length > 0 ? (
+											<DistributionChart
+												title="Habitability"
+												buckets={bodyDistributions.systemHabitability}
+												variant="compact"
+												showTotal={false}
+											/>
+										) : null}
+									</>
+								) : null}
+							</div>
+						) : null}
+					</div>
 
 					<div className="rounded-lg border border-slate-200 bg-white p-2.5">
 						<DisclosureButton

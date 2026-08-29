@@ -16,7 +16,6 @@ import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 
 const EDGE_COLOR = new THREE.Color(0x333333)
 const POINT_SIZE_PX = 4
-export const CLUSTER_CENTER_MASK_SIZE_RATIO = 0.5
 export const BLACK_HOLE_POINT_SIZE_RATIO = 0.75
 const BINARY_CLUSTER_FACTOR = 0.8
 const TRINARY_CLUSTER_FACTOR = 0.65
@@ -57,14 +56,6 @@ const STAR_POINT_FRAGMENT_SHADER = /* glsl */ `
 		// at any size.
 		float alpha = pow(1.0 - dist, 2.0);
 		gl_FragColor = vec4(vColor, alpha);
-	}
-`
-
-const CLUSTER_CENTER_MASK_FRAGMENT_SHADER = /* glsl */ `
-	void main() {
-		vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
-		if (length(circCoord) >= 1.0) discard;
-		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 	}
 `
 
@@ -114,7 +105,6 @@ function colorForStar(
 export interface GalaxyPointsResult {
 	points: THREE.Points
 	blackHolePoints: THREE.Points
-	clusterCenterMasks: THREE.Points
 	clusterData: ClusterData
 }
 
@@ -141,7 +131,6 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 
 	const positions: number[] = []
 	const blackHolePositions: number[] = []
-	const clusterCenterMaskPositions: number[] = []
 	const colors: number[] = []
 	const baseCenters: number[] = []
 	const clusterAngles: number[] = []
@@ -163,7 +152,6 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		const start = systemStarOffset[i]!
 		const end = systemStarOffset[i + 1]!
 		const n = end - start
-		if (n > 1) clusterCenterMaskPositions.push(wx, wy, 0)
 		for (let j = 0; j < n; j++) {
 			const spectralClass = decodeSpectralClass(starSpectralClass[start + j]!)
 			if (spectralClass === "BH") {
@@ -240,40 +228,14 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		depthTest: false,
 		depthWrite: false,
 	})
-	const clusterCenterMaskGeometry = new THREE.BufferGeometry()
-	clusterCenterMaskGeometry.setAttribute(
-		"position",
-		new THREE.BufferAttribute(Float32Array.from(clusterCenterMaskPositions), 3),
-	)
-	const clusterCenterMaskMaterial = new THREE.ShaderMaterial({
-		uniforms: {
-			uSize: {
-				value:
-					POINT_SIZE_PX *
-					computeGalaxyDensityScale(numSystems) *
-					CLUSTER_CENTER_MASK_SIZE_RATIO,
-			},
-		},
-		vertexShader: STAR_POINT_VERTEX_SHADER,
-		fragmentShader: CLUSTER_CENTER_MASK_FRAGMENT_SHADER,
-		transparent: true,
-		depthTest: false,
-		depthWrite: false,
-	})
-	const clusterCenterMasks = new THREE.Points(
-		clusterCenterMaskGeometry,
-		clusterCenterMaskMaterial,
-	)
 	const points = new THREE.Points(geometry, material)
 	const blackHolePoints = new THREE.Points(blackHoleGeometry, blackHoleMaterial)
-	clusterCenterMasks.renderOrder = 1
 	points.renderOrder = 2
 	blackHolePoints.renderOrder = 3
 
 	return {
 		points,
 		blackHolePoints,
-		clusterCenterMasks,
 		clusterData: {
 			numSystems,
 			baseCenters: Float32Array.from(baseCenters),

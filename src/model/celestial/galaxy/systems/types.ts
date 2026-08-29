@@ -17,6 +17,12 @@ export interface GalaxyStarSeedParams extends GalaxySystemSeedParams {
 export interface GalaxySystemParams {
 	galaxySeed: number
 	systemIndex: number
+	/** Index of the nation that owns this system (Galaxy.nationAssignment),
+	 * or -1/undefined for an unclaimed system. When set, the system's stars
+	 * are named from that nation's language (see
+	 * GALAXY_IDENTITY.generateSystemStarName) so a realm's worlds share a
+	 * naming style; otherwise they fall back to the per-system language. */
+	nationIndex?: number
 	/** Skips star names and every body/moon name (see generateSystemBodies'
 	 * own skipNaming) -- for bulk pre-generation of a whole galaxy's systems,
 	 * where naming's LANGUAGE.spawn cost is wasted until a system is opened. */

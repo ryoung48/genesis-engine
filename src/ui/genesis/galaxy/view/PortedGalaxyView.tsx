@@ -10,11 +10,11 @@ import { GalaxyOverlayControls } from "@/ui/genesis/galaxy/controls/GalaxyOverla
 import { GalaxyRenderer } from "@/ui/genesis/galaxy/renderer/GalaxyRendererThree"
 import { updateClusterPositions } from "@/ui/genesis/galaxy/renderer/galaxy-scene/cluster"
 import { buildGalaxyLanes } from "@/ui/genesis/galaxy/renderer/galaxy-scene/lanes"
+import { buildNationOverlay } from "@/ui/genesis/galaxy/renderer/galaxy-scene/nation-overlay"
 import { pickNearestSystem } from "@/ui/genesis/galaxy/renderer/galaxy-scene/picking"
 import {
 	BLACK_HOLE_POINT_SIZE_RATIO,
 	buildGalaxyPoints,
-	CLUSTER_CENTER_MASK_SIZE_RATIO,
 } from "@/ui/genesis/galaxy/renderer/galaxy-scene/points"
 import { recenterGalaxy } from "@/ui/genesis/galaxy/view/old-galaxy-overlay"
 import {
@@ -24,6 +24,7 @@ import {
 	fromGalaxyParam,
 	type PortedGalaxyDisplayFlags,
 	type PortedGalaxyParams,
+	toGalaxyParam,
 } from "@/ui/genesis/galaxy/view/portedGalaxyParams"
 import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import { PortedGalaxyPanel } from "@/ui/wiki/PortedGalaxyPanel"
@@ -118,6 +119,9 @@ export const PortedGalaxyView: React.FC<{
 	const galaxyRef = useRef<Galaxy | null>(null)
 	const pointsRef = useRef<ReturnType<typeof buildGalaxyPoints> | null>(null)
 	const lanesRef = useRef<ReturnType<typeof buildGalaxyLanes> | null>(null)
+	const nationOverlayRef = useRef<ReturnType<typeof buildNationOverlay> | null>(
+		null,
+	)
 	const selectionPulseRef = useRef<SelectionPulse | null>(null)
 	// points.ts's own uSize uniform (see its own doc comment) is a fixed
 	// pixel size with no zoom attenuation, matching how the original
@@ -137,6 +141,12 @@ export const PortedGalaxyView: React.FC<{
 	const showStarOverlayRef = useRef(
 		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS.showStarOverlay,
 	)
+	// Same reasoning as showStarOverlayRef above -- read inside
+	// applyOldGalaxy's worker-callback closure so a freshly rebuilt nation
+	// overlay always picks up the current toggle state.
+	const showNationOverlayRef = useRef(
+		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS.showNationOverlay,
+	)
 
 	const [params, setParams] = useState(DEFAULT_PORTED_GALAXY_PARAMS)
 	const [displayFlags, setDisplayFlags] = useState(
@@ -146,24 +156,11 @@ export const PortedGalaxyView: React.FC<{
 	const [selectedPresetIndex, setSelectedPresetIndex] = useState<number | null>(
 		0,
 	)
-	const [applying, setApplying] = useState(false)
 	const [panelOpen, setPanelOpen] = useState(true)
 	const [timeStep, setTimeStep] = useState(0)
 
 	const [seed, setSeed] = useState(DEFAULT_SEED)
 	const [systemCount, setSystemCount] = useState(DEFAULT_SYSTEM_COUNT)
-	// Seeded from the ported renderer's OWN default preset (coreRad/rad), not
-	// an arbitrary small radius -- the old-model galaxy's systems are placed
-	// in this same world-unit coordinate space as the beltoforion renderer's
-	// stars (see recenterGalaxy/applyOldGalaxy below), so a radius scaled for
-	// a ~300-unit galaxy would place every system in a cluster of a few
-	// pixels near the origin against a renderer whose disc runs out to
-	// ~13,000 units -- effectively invisible. Kept in sync with whichever
-	// scale the current shape preset uses (see handleSelectPreset).
-	const [radiusMin, setRadiusMin] = useState(
-		DEFAULT_PORTED_GALAXY_PARAMS.coreRad,
-	)
-	const [radiusMax, setRadiusMax] = useState(DEFAULT_PORTED_GALAXY_PARAMS.rad)
 	const [generating, setGenerating] = useState(false)
 	const [generationLabel, setGenerationLabel] = useState("")
 	const [generationProgress, setGenerationProgress] = useState(0)
@@ -192,16 +189,16 @@ export const PortedGalaxyView: React.FC<{
 			renderer.scene.remove(pointsRef.current.blackHolePoints)
 			pointsRef.current.blackHolePoints.geometry.dispose()
 			;(pointsRef.current.blackHolePoints.material as THREE.Material).dispose()
-			renderer.scene.remove(pointsRef.current.clusterCenterMasks)
-			pointsRef.current.clusterCenterMasks.geometry.dispose()
-			;(
-				pointsRef.current.clusterCenterMasks.material as THREE.Material
-			).dispose()
 		}
 		if (lanesRef.current) {
 			renderer.scene.remove(lanesRef.current)
 			lanesRef.current.geometry.dispose()
 			;(lanesRef.current.material as THREE.Material).dispose()
+		}
+		if (nationOverlayRef.current) {
+			renderer.scene.remove(nationOverlayRef.current.group)
+			nationOverlayRef.current.dispose()
+			nationOverlayRef.current = null
 		}
 
 		recenterGalaxy(nextGalaxy)
@@ -216,31 +213,20 @@ export const PortedGalaxyView: React.FC<{
 		lanes.visible = showStarOverlayRef.current
 		built.points.visible = showStarOverlayRef.current
 		built.blackHolePoints.visible = showStarOverlayRef.current
-		built.clusterCenterMasks.visible = showStarOverlayRef.current
 		renderer.scene.add(lanes)
-		renderer.scene.add(built.clusterCenterMasks)
 		renderer.scene.add(built.points)
 		renderer.scene.add(built.blackHolePoints)
 		pointsRef.current = built
 		lanesRef.current = lanes
+
+		const nationOverlay = buildNationOverlay(nextGalaxy)
+		nationOverlay.group.visible = showNationOverlayRef.current
+		renderer.scene.add(nationOverlay.group)
+		nationOverlayRef.current = nationOverlay
 	}
 
-	/** (Re)generates the old-model galaxy on the worker, shaped to match
-	 * `shapeParams`'s current density-wave preset -- shared by the initial
-	 * mount, the Generate button, and every preset switch.
-	 *
-	 * `radiusOverride` lets a preset switch supply its own coreRad/rad
-	 * immediately (see handleSelectPreset) instead of reading the `radiusMin`/
-	 * `radiusMax` state closed over here, which wouldn't yet reflect a
-	 * same-tick setRadiusMin/setRadiusMax call (React state updates are
-	 * async) -- using stale radius here would place the new preset's systems
-	 * at the OLD preset's scale, which is exactly the invisible-cluster bug
-	 * this radius syncing exists to avoid. */
-	const regenerate = (
-		shapeParams: PortedGalaxyParams,
-		radiusOverride?: { min: number; max: number },
-	) => {
-		const radius = radiusOverride ?? { min: radiusMin, max: radiusMax }
+	const regenerate = (shapeParams: PortedGalaxyParams) => {
+		const radius = { min: shapeParams.coreRad, max: shapeParams.rad }
 		workerRef.current?.terminate()
 		setGenerating(true)
 		setGenerationLabel("Starting...")
@@ -280,6 +266,21 @@ export const PortedGalaxyView: React.FC<{
 		worker.postMessage({ type: "generate", params: workerParams })
 	}
 
+	const handleGenerate = () => {
+		rendererRef.current?.applyParams(toGalaxyParam(params))
+		regenerate(params)
+	}
+
+	const updateDensityWaveGuides = (nextParams: PortedGalaxyParams) => {
+		rendererRef.current?.updateDensityWaveParam(toGalaxyParam(nextParams))
+	}
+
+	const handleParamsChange = (nextParams: PortedGalaxyParams) => {
+		setParams(nextParams)
+		setSelectedPresetIndex(null)
+		updateDensityWaveGuides(nextParams)
+	}
+
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once on mount only, seeding the freshly-constructed renderer from whatever displayFlags/params/seed/etc. state existed at that point -- it must NOT re-run (and reconstruct the whole renderer) whenever that state changes later.
 	useEffect(() => {
 		const canvas = canvasRef.current
@@ -298,6 +299,7 @@ export const PortedGalaxyView: React.FC<{
 		// given preset's own GalaxyParam row specifies.
 		renderer.showAxis = false
 		renderer.showDensityWaves = displayFlags.showDensityWaves
+		renderer.showGalaxy = displayFlags.showGalaxy
 		renderer.showDust = true
 		renderer.showDustFilaments = true
 		renderer.showStars = true
@@ -308,6 +310,7 @@ export const PortedGalaxyView: React.FC<{
 		// view's default of paused (0) -- push the initial state in explicitly,
 		// same reasoning as the flags above.
 		renderer.timeStep = timeStep
+		renderer.applyParams(toGalaxyParam(params))
 
 		regenerate(params)
 
@@ -349,10 +352,6 @@ export const PortedGalaxyView: React.FC<{
 					.material as THREE.ShaderMaterial
 				blackHoleMaterial.uniforms.uSize!.value =
 					pointSizePx * BLACK_HOLE_POINT_SIZE_RATIO
-				const clusterCenterMaskMaterial = pointsRef.current.clusterCenterMasks
-					.material as THREE.ShaderMaterial
-				clusterCenterMaskMaterial.uniforms.uSize!.value =
-					pointSizePx * CLUSTER_CENTER_MASK_SIZE_RATIO
 				updateClusterPositions({
 					geometry: pointsRef.current.points.geometry,
 					clusterData: pointsRef.current.clusterData,
@@ -387,6 +386,11 @@ export const PortedGalaxyView: React.FC<{
 			ro.disconnect()
 			workerRef.current?.terminate()
 			disposeSelectionPulse()
+			if (nationOverlayRef.current) {
+				renderer.scene.remove(nationOverlayRef.current.group)
+				nationOverlayRef.current.dispose()
+				nationOverlayRef.current = null
+			}
 			renderer.dispose()
 		}
 	}, [])
@@ -401,6 +405,17 @@ export const PortedGalaxyView: React.FC<{
 			if (renderer) renderer.showDensityWaves = checked
 			return
 		}
+		if (key === "showGalaxy") {
+			const renderer = rendererRef.current
+			if (renderer) renderer.showGalaxy = checked
+			return
+		}
+		if (key === "showNationOverlay") {
+			showNationOverlayRef.current = checked
+			if (nationOverlayRef.current)
+				nationOverlayRef.current.group.visible = checked
+			return
+		}
 		// showStarOverlay -- toggles the OLD packed-galaxy model's points/
 		// lanes visibility directly, not any GalaxyRenderer property (its own
 		// decorative stars stay on unconditionally, see the mount effect).
@@ -408,8 +423,6 @@ export const PortedGalaxyView: React.FC<{
 		if (pointsRef.current) pointsRef.current.points.visible = checked
 		if (pointsRef.current) pointsRef.current.blackHolePoints.visible = checked
 		if (lanesRef.current) lanesRef.current.visible = checked
-		if (pointsRef.current)
-			pointsRef.current.clusterCenterMasks.visible = checked
 	}
 
 	const handleTimeStepChange = (value: number) => {
@@ -423,31 +436,11 @@ export const PortedGalaxyView: React.FC<{
 		if (!renderer) return
 		const preset = renderer.presets[index]
 		if (!preset) return
-		setApplying(true)
-		// Rebuilding the particle population is synchronous and can take a
-		// beat -- defer one frame so the "Applying…" label actually paints
-		// first.
-		requestAnimationFrame(() => {
-			renderer.selectPreset(index)
-			// selectPreset applies the chosen row's own GalaxyParam.hasDarkMatter
-			// (see GalaxyRenderer.applyParams) -- force it back on afterward
-			// since the dark matter halo is meant to stay on regardless of what
-			// a given preset specifies (see the mount effect's own comment).
-			renderer.hasDarkMatter = true
-			const nextParams = fromGalaxyParam(preset)
-			nextParams.hasDarkMatter = true
-			setParams(nextParams)
-			setSelectedPresetIndex(index)
-			// Keep the old-model radius state in the same coordinate scale as
-			// this preset's own coreRad/rad (see radiusMin/radiusMax's own doc
-			// comment) -- pass it straight to regenerate rather than relying on
-			// these setters landing before this call reads the old state.
-			const nextRadius = { min: nextParams.coreRad, max: nextParams.rad }
-			setRadiusMin(nextRadius.min)
-			setRadiusMax(nextRadius.max)
-			regenerate(nextParams, nextRadius)
-			setApplying(false)
-		})
+		const nextParams = fromGalaxyParam(preset)
+		nextParams.hasDarkMatter = true
+		setParams(nextParams)
+		setSelectedPresetIndex(index)
+		updateDensityWaveGuides(nextParams)
 	}
 
 	const handleDoubleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -473,6 +466,7 @@ export const PortedGalaxyView: React.FC<{
 			GALAXY_SYSTEMS.generate({
 				galaxySeed: currentGalaxy.seed,
 				systemIndex,
+				nationIndex: currentGalaxy.nationAssignment[systemIndex] ?? -1,
 				packed: currentGalaxy,
 			}),
 		)
@@ -580,17 +574,16 @@ export const PortedGalaxyView: React.FC<{
 					setSeed={setSeed}
 					systemCount={systemCount}
 					setSystemCount={setSystemCount}
-					radiusMin={radiusMin}
-					radiusMax={radiusMax}
+					params={params}
+					onParamsChange={handleParamsChange}
 					generating={generating}
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
 					pregenerateAllSystems={pregenerateAllSystems}
 					setPregenerateAllSystems={setPregenerateAllSystems}
 					pregeneratedSystems={pregeneratedSystems}
-					onGenerate={() => regenerate(params)}
+					onGenerate={handleGenerate}
 					onClose={() => setPanelOpen(false)}
-					applying={applying}
 					systemSearchEntries={systemSearchEntries}
 					systemBodySearchEntries={systemBodySearchEntries}
 					onFocusSystem={focusSearchedSystem}

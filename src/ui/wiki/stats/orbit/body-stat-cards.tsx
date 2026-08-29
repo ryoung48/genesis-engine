@@ -645,7 +645,7 @@ export function buildOrbitBodyStats(params: {
 	 * onAvgTempKChange. Undefined until that preview has produced a result. */
 	avgTempK?: number
 	unitSystem: UnitSystem
-	/** The Semi Major Axis editor's min/max are always ±10% of this value
+	/** The Semi Major Axis editor's min/max are always ±20% of this value
 	 * (defaults to the body's own current orbitalDistanceAU, i.e. no fixed
 	 * baseline) rather than one fixed 0.01-60 AU span for every body --
 	 * callers that track a frozen post-generation baseline (see
@@ -721,9 +721,9 @@ export function buildOrbitBodyStats(params: {
 				? {
 						label: "Semi Major Axis",
 						value: body.orbitalDistanceAU,
-						min: (orbitalDistanceBaselineAU ?? body.orbitalDistanceAU) * 0.9,
-						max: (orbitalDistanceBaselineAU ?? body.orbitalDistanceAU) * 1.1,
-						step: 0.01,
+						min: (orbitalDistanceBaselineAU ?? body.orbitalDistanceAU) * 0.8,
+						max: (orbitalDistanceBaselineAU ?? body.orbitalDistanceAU) * 1.2,
+						step: 0.001,
 						display: `${body.orbitalDistanceAU.toFixed(3)} AU`,
 						set: (value: number) =>
 							onUpdateBody((current) =>

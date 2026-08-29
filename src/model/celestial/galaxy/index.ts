@@ -1,3 +1,4 @@
+import { GALAXY_NATIONS } from "@/model/celestial/galaxy/nations"
 import { GALAXY_PACKING } from "@/model/celestial/galaxy/packing"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
 import { GALAXY_TOPOLOGY } from "@/model/celestial/galaxy/topology"
@@ -61,6 +62,18 @@ function spawn(
 	timings.push({ stage: "Topology + hyperlanes", ms: performance.now() - t0 })
 	t0 = performance.now()
 
+	progressCb?.("Assigning nations...", 75)
+	const nations = GALAXY_NATIONS.build({
+		numSystems: size,
+		r_edge: packing.r_edge,
+		r_xy: packing.r_xy,
+		adjOffset,
+		adjList,
+		seed,
+	})
+	timings.push({ stage: "Nations", ms: performance.now() - t0 })
+	t0 = performance.now()
+
 	progressCb?.("Rolling star trees...", 85)
 	const packedStars = GALAXY_SYSTEMS.buildPackedGalaxyStars({
 		galaxySeed: seed,
@@ -82,6 +95,10 @@ function spawn(
 			lanes,
 			laneCount,
 			...packedStars,
+			nationAssignment: nations.assignment,
+			nationSeeds: nations.seeds,
+			nationSize: nations.size,
+			nationColors: nations.colors,
 			radius,
 			dimensions,
 		},

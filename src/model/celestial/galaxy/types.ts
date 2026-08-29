@@ -68,6 +68,15 @@ export interface Galaxy {
 	starTemperature: Float32Array
 	starLuminosity: Float32Array
 	starMao: Float32Array
+	/** Nation index per system, -1 for edge/boundary systems -- see
+	 * GALAXY_NATIONS.build. */
+	nationAssignment: Int32Array
+	/** Capital system index per nation. */
+	nationSeeds: Int32Array
+	/** System count per nation. */
+	nationSize: Int32Array
+	/** Interleaved rgb (0-1) per nation. */
+	nationColors: Float32Array
 	radius: { min: number; max: number }
 	dimensions: { w: number; h: number }
 }

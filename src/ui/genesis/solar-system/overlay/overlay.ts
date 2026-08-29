@@ -393,7 +393,11 @@ export function buildSolarSystemOverlay(
 		namesEnabled,
 		starName,
 		mainWorldTexture,
+		isCompanion,
 	} = params
+	// A companion's own recursive build always passes companions: [], so it
+	// can't see its sibling primary star that way -- isCompanion carries it.
+	const hasSiblingStar = companions.length > 0 || isCompanion === true
 
 	const group = new THREE.Group()
 	let currentDay = initialDay
@@ -773,11 +777,17 @@ export function buildSolarSystemOverlay(
 		0,
 	)
 	group.add(starLight)
-	const systemAmbient = new THREE.AmbientLight(
-		showDaylight ? 0x445566 : 0xffffff,
-		showDaylight ? 0.15 : 2.6,
-	)
-	group.add(systemAmbient)
+	// AmbientLight has no position/distance falloff -- it lights the whole
+	// scene uniformly, so only the primary star adds one. A companion adding
+	// its own would stack, washing out every body's day/night terminator
+	// regardless of which star it actually orbits.
+	if (!isCompanion) {
+		const systemAmbient = new THREE.AmbientLight(
+			showDaylight ? 0x445566 : 0xffffff,
+			showDaylight ? 0.15 : 2.6,
+		)
+		group.add(systemAmbient)
+	}
 
 	let starNameLabel: Text | undefined
 	let starNameLeader: THREE.Line | undefined
@@ -1070,7 +1080,10 @@ export function buildSolarSystemOverlay(
 	// pass with the planets. ---
 	const placedCompanions: PlacedCompanion[] = companions.map(
 		(companion, index) => {
-			const overlay = buildSolarSystemOverlay(companion.star)
+			const overlay = buildSolarSystemOverlay({
+				...companion.star,
+				isCompanion: true,
+			})
 			const mount = new THREE.Group()
 			mount.add(overlay.group)
 			group.add(mount)
@@ -1458,8 +1471,7 @@ export function buildSolarSystemOverlay(
 	// just given a generous margin -- capping unconditionally left an
 	// extreme-outer-zone planet (e.g. ~130 AU packed radius) outside the cut
 	// and rendered solid black despite having a perfectly good texture.
-	starLight.distance =
-		placedCompanions.length > 0 ? lastPlanetOuterEdge * 1.05 : 0
+	starLight.distance = hasSiblingStar ? lastPlanetOuterEdge * 1.05 : 0
 	// A body "hosts" the main world either directly (isMainWorld) or by
 	// having it nested in its moons (gas-giant-moon mode) -- both get the
 	// same highlighted orbit ring / camera-scale reference below.

@@ -1,3 +1,4 @@
+import { GALAXY_IDENTITY } from "@/model/celestial/galaxy/galaxy-identity"
 import {
 	decodeLuminosityClass,
 	decodeSpectralClass,
@@ -27,7 +28,6 @@ import type {
 } from "@/model/celestial/star/types"
 import { BODY_GENERATION } from "@/model/celestial/system/generation/body"
 import { ROLLS } from "@/model/celestial/system/generation/rolls"
-import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { DICE } from "@/model/shared/random/dice"
 import type { SharedRng } from "@/model/shared/random/rng"
 import { RNG } from "@/model/shared/random/rng"
@@ -464,6 +464,7 @@ function previewStars({
 function generate({
 	galaxySeed,
 	systemIndex,
+	nationIndex = -1,
 	packed,
 	skipNaming,
 }: GalaxySystemParams & { packed?: PackedGalaxyStars }): GalaxySystem {
@@ -503,7 +504,13 @@ function generate({
 			parentIndex: preview.parentIndex,
 			role: preview.role,
 			seed: starSeed,
-			starName: skipNaming ? "" : STAR_IDENTITY.generateStarName(starSeed),
+			starName: skipNaming
+				? ""
+				: GALAXY_IDENTITY.generateSystemStarName({
+						seed: galaxySeed,
+						nationIndex,
+						starSeed,
+					}),
 			spectralClass: preview.spectralClass,
 			luminosityClass: preview.luminosityClass,
 			...toHostStarAttributes(preview),

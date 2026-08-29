@@ -1,5 +1,7 @@
+import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { TEXT } from "@/model/shared/text"
 import { LANGUAGE } from "@/model/society/language/languages"
+import type { Language } from "@/model/society/language/languages/types"
 
 /** The galaxy's own name, from a language spawned off its own seed --
  * mirrors STAR_IDENTITY.generateStarName's per-system naming (same
@@ -18,4 +20,66 @@ function generateGalaxyName(seed: number): string {
 	)
 }
 
-export const GALAXY_IDENTITY = { generateGalaxyName }
+/** Lazily-built, process-lifetime cache of one spawned Language per nation,
+ * keyed by its `galaxy:${seed}:nation:${index}` spawn seed. LANGUAGE.spawn
+ * builds a whole phonology/phonotactics table, so it's only paid the first
+ * time a nation is actually named or one of its systems is opened -- never
+ * up front for a whole galaxy's worth of nations. */
+const nationLanguageCache = new Map<string, Language>()
+
+function nationLanguage(seed: number, nationIndex: number): Language {
+	const key = `galaxy:${seed}:nation:${nationIndex}`
+	let lang = nationLanguageCache.get(key)
+	if (!lang) {
+		lang = LANGUAGE.spawn(key)
+		nationLanguageCache.set(key, lang)
+	}
+	return lang
+}
+
+/** One nation's own name, from its lazily-spawned language (see
+ * nationLanguage) -- scoped per-nation so two nations in the same galaxy
+ * don't share a name, and the same language its owned systems are named
+ * from (see generateSystemStarName). */
+function generateNationName(seed: number, nationIndex: number): string {
+	return TEXT.titleCase(
+		LANGUAGE.word.simple({
+			lang: nationLanguage(seed, nationIndex),
+			key: "region",
+			namespace: "nation",
+			slot: "nation",
+		}).word,
+	)
+}
+
+/** A star's name in the language of the nation that owns its system, so a
+ * realm's worlds all read as belonging to the same tongue. The per-star
+ * `slot` keeps each star in a nation deterministically distinct while
+ * sharing that nation's phonology. Systems no nation claims (edge/unassigned,
+ * `nationIndex < 0`) fall back to the per-system language
+ * (STAR_IDENTITY.generateStarName), exactly as before. */
+function generateSystemStarName({
+	seed,
+	nationIndex,
+	starSeed,
+}: {
+	seed: number
+	nationIndex: number
+	starSeed: number
+}): string {
+	if (nationIndex < 0) return STAR_IDENTITY.generateStarName(starSeed)
+	return TEXT.titleCase(
+		LANGUAGE.word.simple({
+			lang: nationLanguage(seed, nationIndex),
+			key: "region",
+			namespace: "planet",
+			slot: `star:${starSeed}`,
+		}).word,
+	)
+}
+
+export const GALAXY_IDENTITY = {
+	generateGalaxyName,
+	generateNationName,
+	generateSystemStarName,
+}

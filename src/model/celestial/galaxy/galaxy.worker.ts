@@ -31,6 +31,10 @@ function buildTransferList(galaxy: {
 	starTemperature: Float32Array
 	starLuminosity: Float32Array
 	starMao: Float32Array
+	nationAssignment: Int32Array
+	nationSeeds: Int32Array
+	nationSize: Int32Array
+	nationColors: Float32Array
 }): Transferable[] {
 	return [
 		galaxy.r_xy.buffer,
@@ -53,6 +57,10 @@ function buildTransferList(galaxy: {
 		galaxy.starTemperature.buffer,
 		galaxy.starLuminosity.buffer,
 		galaxy.starMao.buffer,
+		galaxy.nationAssignment.buffer,
+		galaxy.nationSeeds.buffer,
+		galaxy.nationSize.buffer,
+		galaxy.nationColors.buffer,
 	]
 }
 
@@ -83,6 +91,7 @@ self.onmessage = (event: MessageEvent<GalaxyWorkerRequest>) => {
 					GALAXY_SYSTEMS.generate({
 						galaxySeed: galaxy.seed,
 						systemIndex,
+						nationIndex: galaxy.nationAssignment[systemIndex] ?? -1,
 						packed: galaxy,
 						skipNaming: true,
 					}),

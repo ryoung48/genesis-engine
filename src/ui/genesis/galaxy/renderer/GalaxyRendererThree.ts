@@ -602,24 +602,15 @@ export class GalaxyRenderer {
 		}
 	}
 
-	public updateDensityWaveParam(
-		coreRad: number,
-		rad: number,
-		angularOffset: number,
-		innerEx: number,
-		outterEx: number,
-		pertN: number,
-		pertAmp: number,
-		baseTemp: number,
-	): void {
-		this._galaxy.coreRad = coreRad
-		this._galaxy.rad = rad
-		this._galaxy.exInner = innerEx
-		this._galaxy.exOuter = outterEx
-		this._galaxy.angleOffset = angularOffset
-		this._galaxy.pertN = pertN
-		this._galaxy.pertAmp = pertAmp
-		this._galaxy.baseTemp = baseTemp
+	public updateDensityWaveParam(param: GalaxyParam): void {
+		this._galaxy.coreRad = param.radCore
+		this._galaxy.rad = param.rad
+		this._galaxy.exInner = param.ex1
+		this._galaxy.exOuter = param.ex2
+		this._galaxy.angleOffset = param.deltaAng
+		this._galaxy.pertN = param.pertN
+		this._galaxy.pertAmp = param.pertAmp
+		this._galaxy.baseTemp = param.baseTemp
 		this.rebuildDensityWaves()
 	}
 
@@ -665,6 +656,13 @@ export class GalaxyRenderer {
 	public set showDensityWaves(value: boolean) {
 		this._showDensityWaves = value
 		this.densityWaveGroup.visible = value
+	}
+
+	public get showGalaxy(): boolean {
+		return this.starsGroup.visible
+	}
+	public set showGalaxy(value: boolean) {
+		this.starsGroup.visible = value
 	}
 
 	public get showDust(): boolean {

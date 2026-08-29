@@ -2,6 +2,8 @@
 
 NEVER git stash without asking for permission first.
 
+Do not write doc comments. The code should speak for itself. If you see verbose doc strings, please remove them.
+
 Before finishing any TypeScript or TSX code change in this repository, verify it with:
 
 - `pnpm lint`

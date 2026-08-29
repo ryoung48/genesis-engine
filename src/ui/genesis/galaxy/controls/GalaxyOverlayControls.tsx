@@ -11,8 +11,17 @@ import type { PortedGalaxyDisplayFlags } from "@/ui/genesis/galaxy/view/portedGa
 
 const DISPLAY_FLAG_LABELS: Record<keyof PortedGalaxyDisplayFlags, string> = {
 	showStarOverlay: "Star Map",
+	showGalaxy: "Galaxy",
 	showDensityWaves: "Density-Wave Guides",
+	showNationOverlay: "Nations",
 }
+
+const DISPLAY_FLAG_KEYS: (keyof PortedGalaxyDisplayFlags)[] = [
+	"showStarOverlay",
+	"showGalaxy",
+	"showDensityWaves",
+	"showNationOverlay",
+]
 
 interface GalaxyOverlayControlsProps {
 	displayFlags: PortedGalaxyDisplayFlags
@@ -69,11 +78,7 @@ export const GalaxyOverlayControls: React.FC<GalaxyOverlayControlsProps> = ({
 						>
 							<PanelHeader title="Display" tone="overlay" />
 							<div className="space-y-2">
-								{(
-									Object.keys(
-										DISPLAY_FLAG_LABELS,
-									) as (keyof PortedGalaxyDisplayFlags)[]
-								).map((key) => (
+								{DISPLAY_FLAG_KEYS.map((key) => (
 									<ToggleRow
 										key={key}
 										label={DISPLAY_FLAG_LABELS[key]}

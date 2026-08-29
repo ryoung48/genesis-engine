@@ -25,11 +25,16 @@ export interface PortedGalaxyParams {
  * regen involved. */
 export interface PortedGalaxyDisplayFlags {
 	showDensityWaves: boolean
+	showGalaxy: boolean
 	/** Toggles the OLD packed-galaxy model's points/lanes objects (the real,
 	 * clickable systems -- see PortedGalaxyView.tsx's applyOldGalaxy), not
 	 * GalaxyRenderer's own decorative star particles, which stay on
 	 * unconditionally. */
 	showStarOverlay: boolean
+	/** Toggles the per-system nation color tint + capital name labels built by
+	 * nation-overlay.ts, from the old-model galaxy's own GALAXY_NATIONS
+	 * partition. */
+	showNationOverlay: boolean
 }
 
 // Matches GalaxyRenderer's own initSimulation first preset exactly, so the
@@ -60,7 +65,9 @@ export const DEFAULT_PORTED_GALAXY_PARAMS: PortedGalaxyParams = {
 // defaults on since that's the whole point of this view.
 export const DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS: PortedGalaxyDisplayFlags = {
 	showDensityWaves: false,
+	showGalaxy: true,
 	showStarOverlay: true,
+	showNationOverlay: true,
 }
 
 export function toGalaxyParam(p: PortedGalaxyParams): GalaxyParam {

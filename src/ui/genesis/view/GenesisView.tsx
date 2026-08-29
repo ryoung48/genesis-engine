@@ -532,6 +532,7 @@ export const GenesisView: React.FC<{
 		effectiveDaysPerYear,
 		mainWorldMode,
 		galaxyOrigin,
+		setGalaxyOrigin,
 		glacialErosion,
 		hoursPerDay,
 		hydraulicErosion,
@@ -1922,6 +1923,10 @@ export const GenesisView: React.FC<{
 				})),
 			})
 			setMainWorldMode("procedural")
+			// Marks this system as galaxy-opened so the solar-system view shows
+			// its "back to galaxy" control (see SolarSystemControls' onBackToGalaxy
+			// and useSolarSystemBodies' galaxyOrigin).
+			setGalaxyOrigin({ systemIndex: system.systemIndex })
 			setSolarSystemViewActive(true)
 			setGalaxyModeActive(false)
 			// Zoom/focus the primary star on both the 3D view and the wiki
@@ -1933,6 +1938,7 @@ export const GenesisView: React.FC<{
 		[
 			setSolarSystem,
 			setMainWorldMode,
+			setGalaxyOrigin,
 			setSolarSystemViewActive,
 			handleFocusBody,
 		],
