@@ -65,13 +65,11 @@ const subsidenceScale = (x: number) =>
 		x,
 	})
 
-// East-coast storm regimes (US Eastern Seaboard, East Asia, SE Brazil, E
-// Australia) live ~25°+ off the thermal equator, so the ramp onsets at 12°
-// and reaches near-full strength by 30° — keeping it out of the 8–18°
-// summer-wet tropical belt, which should track the ITCZ's seasonal migration
-// rather than carry a year-round easterly floor.
+// Shifted 10° closer to the thermal equator (standard 24h day): east storms
+// now ramp in from 0° and reach full strength by 25° instead of 10°/35°;
+// westerlies now onset at 30° and peak at 40° instead of 40°/50°.
 const eastStormScale = (x: number) =>
-	MATH.piecewise({ domain: [12 / 30, 30 / 30, 80 / 30], range: [0, 0.8, 1], x })
+	MATH.piecewise({ domain: [0 / 30, 25 / 30, 80 / 30], range: [0, 0.8, 1], x })
 
 const westerliesScale = (x: number) =>
 	MATH.piecewise({ domain: [35 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
@@ -192,10 +190,6 @@ const TEQ_NUM_BINS = 120
 // ITCZ at the same time of year).
 const TEQ_HALF_WIN = 18
 
-// Width (°C below a bin's hottest cell) of the band whose latitudes are
-// averaged into that bin's warm-zone centroid (see computeTEQBins).
-const TEQ_WARM_BAND_C = 6
-
 function computeTEQBins({
 	mesh,
 	temps,
@@ -207,9 +201,11 @@ function computeTEQBins({
 	const N = mesh.numRegions
 	const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
 	const binMaxTemp = new Float32Array(numBins).fill(-Infinity)
+	const binMaxLat = new Float32Array(numBins)
 	const useCachedBins = numBins === TEQ_NUM_BINS
-	const binOf = (r: number): number =>
-		useCachedBins
+
+	for (let r = 0; r < N; r++) {
+		const bin = useCachedBins
 			? regionBin[r]
 			: Math.max(
 					0,
@@ -218,30 +214,10 @@ function computeTEQBins({
 						Math.floor(((lonDeg[r] + 180) / 360) * numBins),
 					),
 				)
-
-	for (let r = 0; r < N; r++) {
-		const bin = binOf(r)
-		if (temps[r] > binMaxTemp[bin]) binMaxTemp[bin] = temps[r]
-	}
-
-	// Latitude of a bin's warm zone as the temperature-weighted centroid of
-	// every cell within TEQ_WARM_BAND_C of that bin's hottest cell -- not the
-	// single warmest cell, which a lone hot pixel or (worse) a high-altitude
-	// cold pool wedged next to hot lowlands, e.g. the Tibetan Plateau, can
-	// yank tens of degrees off the real monsoon-trough latitude.
-	const binWarmLatSum = new Float32Array(numBins)
-	const binWarmWeight = new Float32Array(numBins)
-	for (let r = 0; r < N; r++) {
-		const bin = binOf(r)
-		const w = temps[r] - (binMaxTemp[bin] - TEQ_WARM_BAND_C)
-		if (w <= 0) continue
-		binWarmLatSum[bin] += latDeg[r] * w
-		binWarmWeight[bin] += w
-	}
-	const binWarmLat = new Float32Array(numBins)
-	for (let i = 0; i < numBins; i++) {
-		binWarmLat[i] =
-			binWarmWeight[i] > 0 ? binWarmLatSum[i] / binWarmWeight[i] : 0
+		if (temps[r] > binMaxTemp[bin]) {
+			binMaxTemp[bin] = temps[r]
+			binMaxLat[bin] = latDeg[r]
+		}
 	}
 
 	const smoothLat = new Float32Array(numBins)
@@ -251,7 +227,7 @@ function computeTEQBins({
 		for (let d = -TEQ_HALF_WIN; d <= TEQ_HALF_WIN; d++) {
 			const j = (((i + d) % numBins) + numBins) % numBins
 			if (binMaxTemp[j] !== -Infinity) {
-				sum += binWarmLat[j]
+				sum += binMaxLat[j]
 				count++
 			}
 		}
