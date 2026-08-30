@@ -303,7 +303,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 				onClick={handleGenerate}
 				disabled={generating}
 				aria-label={generating ? "Generating" : "Generate"}
-				title={generating ? "Generating..." : "Generate"}
+				title={generating ? "Generating..." : "Generateeee"}
 				className="w-full px-2.5 py-1.5"
 			>
 				Generate

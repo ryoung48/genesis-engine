@@ -120,7 +120,6 @@ export interface HistoryState {
 	provinceAdjOffset: Int32Array
 	provinceAdjList: Int32Array
 	provinceSize: Int32Array
-	provinceColors: Float32Array
 	desolate: Uint8Array
 	stateless: Uint8Array
 	waterAccess: Uint8Array
@@ -140,7 +139,6 @@ export interface HistoryState {
 	events: HistoryNote[]
 	nextDynasty: number
 	heap: EventHeap
-	nationColors: Map<number, [number, number, number]>
 	leaderRuntime: LeaderRuntime
 	routes: Route[]
 	network: RouteEdge[]
@@ -187,11 +185,6 @@ export interface DiffYearsParams {
 export interface BuildProvinceXyzParams {
 	provinceSeeds: Int32Array
 	r_xyz: Float32Array
-}
-
-export interface EnsureNationColorParams {
-	state: HistoryState
-	province: number
 }
 
 export interface ValidateParentArrayParams {

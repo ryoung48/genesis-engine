@@ -12,6 +12,7 @@ import {
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { LockedClimatePreview } from "@/ui/wiki/climate-preview/LockedClimatePreview"
 import { RegularClimatePreview } from "@/ui/wiki/climate-preview/RegularClimatePreview"
+import { SpaceEngineClimatePreview } from "@/ui/wiki/climate-preview/SpaceEngineClimatePreview"
 import { TidalCalendarChart } from "@/ui/wiki/climate-preview/TidalCalendarChart"
 import type {
 	ClimatePreviewData,
@@ -33,6 +34,7 @@ function PlanetDetailContent({
 	tidesEmptyLabel,
 	generateContent,
 	observerContent,
+	spaceEngineContent,
 	onDetailTabChange,
 }: {
 	tidalSchedulePreview?: TidalSchedule
@@ -50,11 +52,19 @@ function PlanetDetailContent({
 	/** Angular-size comparison for the selected body, shown in the final
 	 * Observer tab. */
 	observerContent?: ReactNode
+	/** Analytic SpaceEngine-style climate model, shown as a comparison tab.
+	 * Absent for tidally-locked bodies (out of that model's scope here). */
+	spaceEngineContent?: ReactNode
 	/** Reports the active tab on every change (including the initial default)
 	 * -- lets the navigator know whether "generate" currently has focus, so
 	 * it can decide whether switching planets should reset this card at all. */
 	onDetailTabChange?: (
-		tab: GenerationPreviewTab | "tides" | "generate" | "observer",
+		tab:
+			| GenerationPreviewTab
+			| "tides"
+			| "generate"
+			| "observer"
+			| "spaceengine",
 	) => void
 }) {
 	// Defaults per destination, not per whatever tab was last viewed
@@ -63,7 +73,7 @@ function PlanetDetailContent({
 	// LazyPlanetDetailTabs (keyed by selection) remounts this on every
 	// navigation so this initializer re-runs instead of carrying over state.
 	const [detailTab, setDetailTab] = useState<
-		GenerationPreviewTab | "tides" | "generate" | "observer"
+		GenerationPreviewTab | "tides" | "generate" | "observer" | "spaceengine"
 	>(() => (generateContent ? "generate" : "climate"))
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: onDetailTabChange intentionally excluded -- callers pass an inline closure that would otherwise re-fire this on every parent render.
@@ -80,6 +90,9 @@ function PlanetDetailContent({
 			label: label.toLowerCase(),
 		})),
 		{ tab: "tides" as const, label: "tides" },
+		...(spaceEngineContent
+			? [{ tab: "spaceengine" as const, label: "spaceengine" }]
+			: []),
 		...(observerContent
 			? [{ tab: "observer" as const, label: "observer" }]
 			: []),
@@ -94,7 +107,12 @@ function PlanetDetailContent({
 						type="button"
 						onClick={() => {
 							setDetailTab(tab)
-							if (tab !== "tides" && tab !== "generate" && tab !== "observer")
+							if (
+								tab !== "tides" &&
+								tab !== "generate" &&
+								tab !== "observer" &&
+								tab !== "spaceengine"
+							)
 								onSelectGenerationPreviewTab(tab)
 						}}
 						className={`px-2 pb-1.5 ${uiTokens.type.controlSm} transition-colors border-b-2 ${
@@ -111,6 +129,10 @@ function PlanetDetailContent({
 				<div className="px-1 py-1">{generateContent}</div>
 			) : detailTab === "observer" ? (
 				<div className="px-1 py-1">{observerContent}</div>
+			) : detailTab === "spaceengine" ? (
+				<div className="pt-1">
+					<div className="h-[340px] overflow-hidden">{spaceEngineContent}</div>
+				</div>
 			) : detailTab === "tides" ? (
 				<div className="px-1 py-1" style={{ minHeight: 140 }}>
 					{tidalSchedulePreview && tidalSchedulePreview.events.length > 0 ? (
@@ -166,6 +188,7 @@ export function LazyPlanetDetailTabs({
 	daysPerYear,
 	hoursPerDay,
 	planetRadiusKm,
+	planetMassKg,
 	isSolarLocked,
 	spectralClass,
 	starSubtype,
@@ -213,6 +236,9 @@ export function LazyPlanetDetailTabs({
 	daysPerYear: number
 	hoursPerDay: number
 	planetRadiusKm: number
+	/** Planet mass, kg -- used only by the SpaceEngine comparison tab to derive
+	 * surface gravity; optional, falls back to Earth's g when absent. */
+	planetMassKg?: number
 	isSolarLocked: boolean
 	spectralClass: string
 	starSubtype: number
@@ -254,7 +280,12 @@ export function LazyPlanetDetailTabs({
 	/** Reports the active tab on every change (including the initial
 	 * default) -- see PlanetDetailContent's own doc. */
 	onDetailTabChange?: (
-		tab: GenerationPreviewTab | "tides" | "generate" | "observer",
+		tab:
+			| GenerationPreviewTab
+			| "tides"
+			| "generate"
+			| "observer"
+			| "spaceengine",
 	) => void
 }) {
 	const [enabled, setEnabled] = useState(false)
@@ -272,6 +303,7 @@ export function LazyPlanetDetailTabs({
 			daysPerYear={daysPerYear}
 			hoursPerDay={hoursPerDay}
 			planetRadiusKm={planetRadiusKm}
+			planetMassKg={planetMassKg}
 			isSolarLocked={isSolarLocked}
 			spectralClass={spectralClass}
 			starSubtype={starSubtype}
@@ -459,6 +491,7 @@ function LazyPlanetDetailTabsContent({
 	daysPerYear,
 	hoursPerDay,
 	planetRadiusKm,
+	planetMassKg,
 	isSolarLocked,
 	spectralClass,
 	starSubtype,
@@ -502,6 +535,9 @@ function LazyPlanetDetailTabsContent({
 	daysPerYear: number
 	hoursPerDay: number
 	planetRadiusKm: number
+	/** Planet mass, kg -- used only by the SpaceEngine comparison tab to derive
+	 * surface gravity; optional, falls back to Earth's g when absent. */
+	planetMassKg?: number
 	isSolarLocked: boolean
 	spectralClass: string
 	starSubtype: number
@@ -526,7 +562,12 @@ function LazyPlanetDetailTabsContent({
 	generateContent?: ReactNode
 	observerContent?: ReactNode
 	onDetailTabChange?: (
-		tab: GenerationPreviewTab | "tides" | "generate" | "observer",
+		tab:
+			| GenerationPreviewTab
+			| "tides"
+			| "generate"
+			| "observer"
+			| "spaceengine",
 	) => void
 }) {
 	const pressureBar = atmosphere?.pressureBar ?? 0
@@ -659,6 +700,36 @@ function LazyPlanetDetailTabsContent({
 	const tidalSchedulePreview =
 		tidalSchedulePreviewOverride ?? computedTidalSchedulePreview
 
+	// Analytic SpaceEngine-style model, shown as a comparison tab alongside the
+	// spatial EBM. Terrestrial + single-star only, so it's offered only for
+	// non-locked bodies (the locked case has its own dedicated preview).
+	const spaceEngineContent = isSolarLocked ? undefined : (
+		<SpaceEngineClimatePreview
+			config={{
+				obliquity,
+				eccentricity,
+				perihelion,
+				spectralClass,
+				starSubtype,
+				starTemperatureK,
+				starDiameterSol,
+				orbitalDistanceAU,
+				hoursPerDay,
+				landFraction,
+				planetRadiusKm,
+				planetMassKg,
+				pressureBar,
+				atmosphereType: atmosphere?.type,
+				albedo,
+				greenhouseFactor,
+				internalHeatTempK,
+				seismologyTotalHeatingK,
+			}}
+			unitSystem={unitSystem}
+			daysPerYear={daysPerYear}
+		/>
+	)
+
 	return (
 		<PlanetDetailContent
 			tidalSchedulePreview={tidalSchedulePreview}
@@ -671,6 +742,7 @@ function LazyPlanetDetailTabsContent({
 			tidesEmptyLabel={tidesEmptyLabel}
 			generateContent={generateContent}
 			observerContent={observerContent}
+			spaceEngineContent={spaceEngineContent}
 			onDetailTabChange={onDetailTabChange}
 		/>
 	)

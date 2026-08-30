@@ -23,6 +23,9 @@ const LABEL_COLOR = "#f8fafc"
 const LABEL_MIN_FONT_SCALE = 0.35
 const LABEL_MAX_FONT_SCALE = 2.6
 const LABEL_BASE_FONT_FRACTION = 0.008
+// How far above its capital star each nation label sits, as a multiple of
+// that label's own font size.
+const LABEL_VERTICAL_OFFSET_SCALE = 0.9
 
 // No geometric clip is applied to a cell's polygon or a border segment (see
 // this file's own build doc comment on why a real boundary/gap-edge system's
@@ -46,16 +49,32 @@ const OUTER_FADE_END_FRACTION = 1.05
 const INNER_FADE_END_FRACTION = 0.9
 const INNER_FADE_START_FRACTION = 1.1
 
+// The radial fade above only hides the disk's outer rim and core hole -- it
+// can't follow the spiral, so a Voronoi cell that balloons across an inter-
+// arm gap (its site has no near neighbour in that direction) still gets
+// painted solid. This second fade fixes that: every fill/border vertex
+// carries its distance to the real star it belongs to (a cell vertex's own
+// circumradius, in practice), and fragments fade out past a few times the
+// galaxy's median star spacing -- so tint pools around where stars actually
+// are and dissolves in the gaps, tracing the arms instead of a flat annulus.
+const SITE_FADE_START_SPACINGS = 2.2
+const SITE_FADE_END_SPACINGS = 4.6
+
 const RADIAL_FADE_GLSL = /* glsl */ `
 	varying vec2 vPos;
+	varying float vSiteDist;
 	uniform float uInnerFadeStart;
 	uniform float uInnerFadeEnd;
 	uniform float uOuterFadeStart;
 	uniform float uOuterFadeEnd;
+	uniform float uSiteFadeStart;
+	uniform float uSiteFadeEnd;
 	float radialFade() {
 		float dist = length(vPos);
-		return smoothstep(uInnerFadeStart, uInnerFadeEnd, dist) *
+		float disk = smoothstep(uInnerFadeStart, uInnerFadeEnd, dist) *
 			(1.0 - smoothstep(uOuterFadeStart, uOuterFadeEnd, dist));
+		float site = 1.0 - smoothstep(uSiteFadeStart, uSiteFadeEnd, vSiteDist);
+		return disk * site;
 	}
 `
 
@@ -64,11 +83,14 @@ const RADIAL_FADE_GLSL = /* glsl */ `
 // no need for two separate shader pairs.
 const TINT_VERTEX_SHADER = /* glsl */ `
 	attribute vec3 color;
+	attribute float siteDist;
 	varying vec3 vColor;
 	varying vec2 vPos;
+	varying float vSiteDist;
 	void main() {
 		vColor = color;
 		vPos = position.xy;
+		vSiteDist = siteDist;
 		gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 	}
 `
@@ -175,6 +197,10 @@ interface RawBorderEdge {
 	 * edges' directions into one shared joint perpendicular. */
 	dirX: number
 	dirY: number
+	/** Distance from each endpoint to a star of one of its two flanking
+	 * systems (its own circumradius) -- feeds the per-vertex site fade. */
+	d1: number
+	d2: number
 }
 
 interface BorderChain {
@@ -184,6 +210,9 @@ interface BorderChain {
 	/** One per edge between consecutive vertices -- segmentDirs.length is
 	 * always vertices.length - 1. */
 	segmentDirs: { x: number; y: number }[]
+	/** Parallel to vertices -- each vertex's distance to its nearest flanking
+	 * star (see RawBorderEdge.d1/d2). */
+	vertexDists: number[]
 }
 
 /**
@@ -238,6 +267,7 @@ function buildBorderChains(edges: readonly RawBorderEdge[]): BorderChain[] {
 				{ x: e0.p2x, y: e0.p2y },
 			]
 			const segmentDirs = [{ x: e0.dirX, y: e0.dirY }]
+			const vertexDists = [e0.d1, e0.d2]
 
 			for (let extended = true; extended; ) {
 				extended = false
@@ -246,10 +276,10 @@ function buildBorderChains(edges: readonly RawBorderEdge[]): BorderChain[] {
 					if (used[cand.edgeIndex]) continue
 					const e = groupEdges[cand.edgeIndex]!
 					used[cand.edgeIndex] = 1
-					vertices.push(
-						cand.end === "p1" ? { x: e.p2x, y: e.p2y } : { x: e.p1x, y: e.p1y },
-					)
+					const isP1 = cand.end === "p1"
+					vertices.push(isP1 ? { x: e.p2x, y: e.p2y } : { x: e.p1x, y: e.p1y })
 					segmentDirs.push({ x: e.dirX, y: e.dirY })
+					vertexDists.push(isP1 ? e.d2 : e.d1)
 					extended = true
 					break
 				}
@@ -261,16 +291,18 @@ function buildBorderChains(edges: readonly RawBorderEdge[]): BorderChain[] {
 					if (used[cand.edgeIndex]) continue
 					const e = groupEdges[cand.edgeIndex]!
 					used[cand.edgeIndex] = 1
+					const isP1 = cand.end === "p1"
 					vertices.unshift(
-						cand.end === "p1" ? { x: e.p2x, y: e.p2y } : { x: e.p1x, y: e.p1y },
+						isP1 ? { x: e.p2x, y: e.p2y } : { x: e.p1x, y: e.p1y },
 					)
 					segmentDirs.unshift({ x: e.dirX, y: e.dirY })
+					vertexDists.unshift(isP1 ? e.d2 : e.d1)
 					extended = true
 					break
 				}
 			}
 
-			chains.push({ regionLo, regionHi, vertices, segmentDirs })
+			chains.push({ regionLo, regionHi, vertices, segmentDirs, vertexDists })
 		}
 	}
 	return chains
@@ -293,6 +325,7 @@ function buildChainRibbon(
 	colorHi: readonly [number, number, number],
 	positions: number[],
 	colors: number[],
+	dists: number[],
 ): void {
 	const n = chain.vertices.length
 	if (n < 2) return
@@ -319,6 +352,10 @@ function buildChainRibbon(
 		const b = chain.vertices[i + 1]!
 		const pa = perp[i]!
 		const pb = perp[i + 1]!
+		const di = chain.vertexDists[i]!
+		const dj = chain.vertexDists[i + 1]!
+		// Matches the a/b-derived vertex order of both quad-pairs pushed below.
+		for (let k = 0; k < 2; k++) dists.push(di, dj, dj, di, dj, di)
 
 		positions.push(
 			a.x,
@@ -416,6 +453,7 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	const {
 		numSystems,
 		r_xy,
+		r_edge,
 		nationAssignment,
 		nationColors,
 		nationSeeds,
@@ -456,6 +494,29 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	)
 	const voronoi = delaunay.voronoi([xmin, ymin, xmax, ymax])
 
+	// Median nearest-neighbour distance among real systems -- the scale the
+	// site fade (see SITE_FADE_*) is expressed in, so it adapts to galaxy
+	// size and star count without a hand-tuned world-space constant.
+	const spacings: number[] = []
+	for (let i = 0; i < numSystems; i++) {
+		if (r_edge[i]) continue
+		let nearest = Number.POSITIVE_INFINITY
+		for (const j of delaunay.neighbors(i)) {
+			if (r_edge[j]) continue
+			const dx = r_xy[2 * i]! - r_xy[2 * j]!
+			const dy = r_xy[2 * i + 1]! - r_xy[2 * j + 1]!
+			nearest = Math.min(nearest, Math.hypot(dx, dy))
+		}
+		if (Number.isFinite(nearest)) spacings.push(nearest)
+	}
+	spacings.sort((a, b) => a - b)
+	const medianSpacing = Math.max(
+		spacings[spacings.length >> 1] ?? radius.max * 0.02,
+		radius.max * 1e-4,
+	)
+	const siteFadeStart = medianSpacing * SITE_FADE_START_SPACINGS
+	const siteFadeEnd = medianSpacing * SITE_FADE_END_SPACINGS
+
 	// --- borders ---
 	// Every raw Voronoi edge between two differently-owned systems is
 	// collected first (with a per-edge "which real system sits on the lower-
@@ -474,18 +535,7 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	// at anything but a perfectly straight angle.
 	const { triangles, halfedges } = delaunay
 	const { circumcenters } = voronoi
-	const rawBorderEdges: {
-		p1x: number
-		p1y: number
-		p2x: number
-		p2y: number
-		regionLo: number
-		regionHi: number
-		/** Unit perpendicular (not yet scaled to borderHalfWidth) pointing
-		 * from the segment toward whichever real system owns regionLo. */
-		dirX: number
-		dirY: number
-	}[] = []
+	const rawBorderEdges: RawBorderEdge[] = []
 	for (let s = 0; s < halfedges.length; s++) {
 		const opposite = halfedges[s]!
 		if (opposite === -1 || s >= opposite) continue
@@ -525,6 +575,14 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 		dirX /= dirLen
 		dirY /= dirLen
 
+		// sysA is an endpoint of the shared Delaunay edge, so it's a vertex of
+		// both triangles whose circumcenters this border segment spans -- its
+		// distance to each endpoint is that endpoint's own circumradius.
+		const sax = r_xy[2 * sysA]!
+		const say = r_xy[2 * sysA + 1]!
+		const d1 = Math.hypot(seg[0] - sax, seg[1] - say)
+		const d2 = Math.hypot(seg[2] - sax, seg[3] - say)
+
 		rawBorderEdges.push({
 			p1x: seg[0],
 			p1y: seg[1],
@@ -534,11 +592,14 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 			regionHi,
 			dirX,
 			dirY,
+			d1,
+			d2,
 		})
 	}
 
 	const borderPositions: number[] = []
 	const borderColors: number[] = []
+	const borderDists: number[] = []
 	for (const chain of buildBorderChains(rawBorderEdges)) {
 		buildChainRibbon(
 			chain,
@@ -547,12 +608,14 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 			colorFor(chain.regionHi),
 			borderPositions,
 			borderColors,
+			borderDists,
 		)
 	}
 
 	// --- polygon fill ---
 	const fillPositions: number[] = []
 	const fillColors: number[] = []
+	const fillDists: number[] = []
 	for (let i = 0; i < numSystems; i++) {
 		const nation = nationAssignment[i]!
 		const polygon = voronoi.cellPolygon(i)
@@ -562,12 +625,20 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 			: polygon.length
 		if (uniqueCount < 3) continue
 		const [r, g, b] = colorFor(nation)
+		const sx = r_xy[2 * i]!
+		const sy = r_xy[2 * i + 1]!
 		const [ax, ay] = polygon[0]!
+		const da = Math.hypot(ax - sx, ay - sy)
 		for (let v = 1; v < uniqueCount - 1; v++) {
 			const [bx, by] = polygon[v]!
 			const [ex, ey] = polygon[v + 1]!
 			fillPositions.push(ax, ay, 0, bx, by, 0, ex, ey, 0)
 			for (let k = 0; k < 3; k++) fillColors.push(r, g, b)
+			fillDists.push(
+				da,
+				Math.hypot(bx - sx, by - sy),
+				Math.hypot(ex - sx, ey - sy),
+			)
 		}
 	}
 
@@ -579,6 +650,8 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 				uInnerFadeEnd: { value: innerFadeEnd },
 				uOuterFadeStart: { value: outerFadeStart },
 				uOuterFadeEnd: { value: outerFadeEnd },
+				uSiteFadeStart: { value: siteFadeStart },
+				uSiteFadeEnd: { value: siteFadeEnd },
 			},
 			vertexShader: TINT_VERTEX_SHADER,
 			fragmentShader: TINT_FRAGMENT_SHADER,
@@ -598,6 +671,10 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 		"color",
 		new THREE.BufferAttribute(Float32Array.from(fillColors), 3),
 	)
+	fillGeometry.setAttribute(
+		"siteDist",
+		new THREE.BufferAttribute(Float32Array.from(fillDists), 1),
+	)
 	const fillMaterial = buildTintMaterial(TINT_ALPHA)
 	const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial)
 	// Drawn first (behind hyperlanes/star points, which don't set an explicit
@@ -613,6 +690,10 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	borderGeometry.setAttribute(
 		"color",
 		new THREE.BufferAttribute(Float32Array.from(borderColors), 3),
+	)
+	borderGeometry.setAttribute(
+		"siteDist",
+		new THREE.BufferAttribute(Float32Array.from(borderDists), 1),
 	)
 	const borderMaterial = buildTintMaterial(BORDER_OPACITY)
 	const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial)
@@ -655,7 +736,14 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 		label.textRenderingMode = "distanceField"
 		label.renderOrder = 5
 		label.frustumCulled = false
-		label.position.set(r_xy[2 * capital]!, r_xy[2 * capital + 1]!, 1)
+		// Nudge the label up off its capital star so the glyphs don't sit
+		// directly on top of the star point -- scaled by the label's own font
+		// size so larger labels clear proportionally.
+		label.position.set(
+			r_xy[2 * capital]!,
+			r_xy[2 * capital + 1]! + fontSize * LABEL_VERTICAL_OFFSET_SCALE,
+			1,
+		)
 		group.add(label)
 		labels.push(label)
 	}

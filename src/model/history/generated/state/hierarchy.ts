@@ -1,6 +1,5 @@
 import { DERIVE } from "@/model/history/generated/derive"
 import { FIELDS } from "@/model/history/generated/fields"
-import { ensureNationColor } from "@/model/history/generated/state/index"
 import { isSovereign } from "@/model/history/generated/state/relations"
 import type {
 	GetChildrenParams,
@@ -104,6 +103,5 @@ export function rebuildAssignment({
 		if (state.desolate[p]) continue
 		const root = state.sovereignCurrent[p]
 		FIELDS.prov.assignment.set({ state, p, time, value: root })
-		if (state.parentCurrent[p] < 0) ensureNationColor({ state, province: p })
 	}
 }

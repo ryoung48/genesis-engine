@@ -18,4 +18,9 @@ export interface GalaxyTopology {
 	/** Flat hyperlane pairs [a0,b0, a1,b1, …], length 2*laneCount. */
 	lanes: Int32Array
 	laneCount: number
+	/** CSR row offsets into laneAdjList, length numSystems+1. */
+	laneAdjOffset: Int32Array
+	/** CSR flat neighbor indices over the hyperlane graph only (deduped,
+	 * undirected). Nation territory spreads along this. */
+	laneAdjList: Int32Array
 }

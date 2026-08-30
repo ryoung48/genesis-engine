@@ -24,7 +24,9 @@ import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
 import type {
 	HostStarAttributes,
+	MainSequenceClass,
 	ParentStarLike,
+	SpectralClass,
 } from "@/model/celestial/star/types"
 import { BODY_GENERATION } from "@/model/celestial/system/generation/body"
 import { ROLLS } from "@/model/celestial/system/generation/rolls"
@@ -377,6 +379,139 @@ function buildPackedGalaxyStars({
 	}
 }
 
+// Sun-like slice of the main sequence a habitable homeworld can form around,
+// weighted toward G/K. Hotter O/B/A dwarfs and every exotic class are excluded.
+const CAPITAL_CLASS_WEIGHTS: [MainSequenceClass, number][] = [
+	["F", 2],
+	["G", 4],
+	["K", 3],
+	["M", 2],
+]
+const CAPITAL_CLASSES = new Set<SpectralClass>(
+	CAPITAL_CLASS_WEIGHTS.map(([cls]) => cls),
+)
+
+function isLoneCapitalClassStar({
+	packed,
+	systemIndex,
+}: {
+	packed: PackedGalaxyStars
+	systemIndex: number
+}): boolean {
+	const start = packed.systemStarOffset[systemIndex]!
+	if (packed.systemStarOffset[systemIndex + 1]! - start !== 1) return false
+	if (decodeLuminosityClass(packed.starLuminosityClass[start]!) !== "V") {
+		return false
+	}
+	return CAPITAL_CLASSES.has(
+		decodeSpectralClass(packed.starSpectralClass[start]!),
+	)
+}
+
+function rollCapitalClass(rng: SharedRng): MainSequenceClass {
+	const total = CAPITAL_CLASS_WEIGHTS.reduce(
+		(sum, [, weight]) => sum + weight,
+		0,
+	)
+	let roll = rng.random() * total
+	for (const [cls, weight] of CAPITAL_CLASS_WEIGHTS) {
+		roll -= weight
+		if (roll <= 0) return cls
+	}
+	return "G"
+}
+
+// GALAXY_NATIONS picks capitals on geography alone, so any capital that isn't
+// already a lone F/G/K/M V star is rewritten into one here: companions stripped,
+// a fresh Sun-like primary rolled from the system seed, original age kept.
+function forceCapitalsMainWorldCapable({
+	packed,
+	capitalSystemIndices,
+	galaxySeed,
+}: {
+	packed: PackedGalaxyStars
+	capitalSystemIndices: Int32Array
+	galaxySeed: number
+}): PackedGalaxyStars {
+	const numSystems = packed.systemStarOffset.length - 1
+	const capitals = new Set(capitalSystemIndices)
+	const primaryRole = encodeStarRole("primary")
+	const classV = encodeLuminosityClass("V")
+
+	const out = createMutablePackedGalaxyStarData()
+	const systemStarOffset = new Int32Array(numSystems + 1)
+
+	for (let i = 0; i < numSystems; i++) {
+		const start = packed.systemStarOffset[i]!
+		const end = packed.systemStarOffset[i + 1]!
+
+		if (
+			!capitals.has(i) ||
+			isLoneCapitalClassStar({ packed, systemIndex: i })
+		) {
+			for (let s = start; s < end; s++) {
+				out.parent.push(packed.starParent[s]!)
+				out.role.push(packed.starRole[s]!)
+				out.spectralClass.push(packed.starSpectralClass[s]!)
+				out.luminosityClass.push(packed.starLuminosityClass[s]!)
+				out.subtype.push(packed.starSubtype[s]!)
+				out.deviation.push(packed.starDeviation[s]!)
+				out.eccentricity.push(packed.starEccentricity[s]!)
+				out.inclinationDeg.push(packed.starInclinationDeg[s]!)
+				out.age.push(packed.starAge[s]!)
+				out.mass.push(packed.starMass[s]!)
+				out.diameter.push(packed.starDiameter[s]!)
+				out.temperature.push(packed.starTemperature[s]!)
+				out.luminosity.push(packed.starLuminosity[s]!)
+				out.mao.push(packed.starMao[s]!)
+			}
+			systemStarOffset[i + 1] = out.parent.length
+			continue
+		}
+
+		const rng = RNG.createRng({
+			seed: RNG.seedStringToNumber(`galaxy:${galaxySeed}:${i}:capital-star`),
+		})
+		const cls = rollCapitalClass(rng)
+		const subtype = rng.random() * 10
+		const spectralInput = { cls, subtype }
+
+		out.parent.push(-1)
+		out.role.push(primaryRole)
+		out.spectralClass.push(encodeSpectralClass(cls))
+		out.luminosityClass.push(classV)
+		out.subtype.push(subtype)
+		out.deviation.push(0)
+		out.eccentricity.push(0)
+		out.inclinationDeg.push(0)
+		out.age.push(packed.starAge[start]!)
+		out.mass.push(STAR.getStarMassSol(spectralInput))
+		out.diameter.push(STAR.getStarDiameterSol(spectralInput))
+		out.temperature.push(STAR.getStarTemperatureK(spectralInput))
+		out.luminosity.push(STAR.getStarLuminositySol(spectralInput))
+		out.mao.push(STAR.getStarMAO(spectralInput))
+		systemStarOffset[i + 1] = out.parent.length
+	}
+
+	return {
+		systemStarOffset,
+		starParent: Int32Array.from(out.parent),
+		starRole: Uint8Array.from(out.role),
+		starSpectralClass: Uint8Array.from(out.spectralClass),
+		starLuminosityClass: Uint8Array.from(out.luminosityClass),
+		starSubtype: Float32Array.from(out.subtype),
+		starDeviation: Float32Array.from(out.deviation),
+		starEccentricity: Float32Array.from(out.eccentricity),
+		starInclinationDeg: Float32Array.from(out.inclinationDeg),
+		starAge: Float32Array.from(out.age),
+		starMass: Float32Array.from(out.mass),
+		starDiameter: Float32Array.from(out.diameter),
+		starTemperature: Float32Array.from(out.temperature),
+		starLuminosity: Float32Array.from(out.luminosity),
+		starMao: Float32Array.from(out.mao),
+	}
+}
+
 /** One system's window into a galaxy-wide PackedGalaxyStars -- mirrors
  * galaxy-gen's getPackedSystemStarSlice (scaled/model/packed-stars.ts). */
 function getPackedSystemStarSlice(
@@ -530,5 +665,6 @@ export const GALAXY_SYSTEMS = {
 	previewStars,
 	generate,
 	buildPackedGalaxyStars,
+	forceCapitalsMainWorldCapable,
 	getPackedSystemStarSlice,
 }

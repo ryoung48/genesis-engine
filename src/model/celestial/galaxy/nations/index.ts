@@ -355,7 +355,8 @@ function emptyResult(numSystems: number): GalaxyNations {
  * Partitions every non-edge system in a generated galaxy into nations, via
  * the same percentage-bucket/flood-fill shape as society/nations' province
  * partition (see this file's own bucket comment), but over the galaxy's
- * flat 2D Delaunay adjacency (GalaxyTopology.adjOffset/adjList) and r_xy
+ * hyperlane graph (GalaxyTopology.laneAdjOffset/laneAdjList, passed in as
+ * adjOffset/adjList) so realms grow along travel routes, plus r_xy
  * distance instead of provinces' spherical habitability-weighted claim
  * scoring -- there's no equivalent habitability/water/continent signal at
  * the galaxy scale, so claims are driven by proximity + shared-border

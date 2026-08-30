@@ -284,7 +284,7 @@ function importGenesisWorld({
 	// Build GenesisParams from ImportParams
 	const genesisParams: GenesisParams = {
 		seed: params.seed,
-		tideLock: null,
+		tideLock: params.tideLock ?? null,
 		numPoints: params.numPoints,
 		numPlates: plateIds.length,
 		landDistribution: 0.25,

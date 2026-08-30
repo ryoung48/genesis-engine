@@ -1,3 +1,5 @@
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+
 interface ImportParams {
 	seed: number
 	numPoints: number
@@ -136,7 +138,7 @@ interface ImportParams {
 	hoursPerDay?: number
 	/** [JUSTIFICATION] Import callers may omit this newer Pasta tuning option. */
 	pastaGintThreshold?: number
-	tidallyLocked?: boolean
+	tideLock?: TideLock | null
 	substellarLon?: number
 	perihelion?: number
 	pressure?: number

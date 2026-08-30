@@ -108,7 +108,7 @@ function summarizeByLatitude(world: ReturnType<typeof buildEarth>) {
 }
 
 describe("EBM at extreme axial tilt (90 deg obliquity)", () => {
-	it("shows the real Earth heightmap freezing over at 90 deg obliquity vs today's 23.4 deg", () => {
+	it("shows the real Earth heightmap's polar/tropical climate inverting at 90 deg obliquity vs today's 23.4 deg", () => {
 		const baseline = summarizeByLatitude(
 			buildEarth(DEFAULT_WORLD_PARAMS.obliquity),
 		)
@@ -124,12 +124,41 @@ describe("EBM at extreme axial tilt (90 deg obliquity)", () => {
 		)
 		console.table(tilted.bandStats)
 
-		// The 90-degree case should run measurably colder overall and have far
-		// more of the planet sitting below freezing than today's tilt, because
-		// six-month polar nights let the poles (and, by transport, everywhere
-		// else) cool far more than the six-month polar days can rewarm them
-		// once the ice-albedo feedback locks in a bright, reflective surface.
+		// [CHANGED] Used to assert belowFreezingPct simply went up at extreme
+		// tilt, on the theory that six-month polar nights would let the poles
+		// (and, by transport, everywhere else) cool far more than the
+		// six-month polar days could rewarm them. That was wrong: a pole at
+		// 90 deg obliquity gets six continuous months of DAYLIGHT per year,
+		// which gives it a higher annual-mean insolation than a low-tilt
+		// pole ever sees (it barely gets direct sun at all) -- a documented
+		// real effect in high-obliquity planet climate literature (warmer
+		// poles, cooler tropics, sometimes a full pole/equator inversion).
+		// This only became visible once land was properly thermally coupled
+		// to the ocean at the same latitude (see energy-balance-model's
+		// land/water Nu coupling) -- beforehand, land's un-buffered swings
+		// let it plunge far colder during polar winter regardless of the
+		// warm annual mean, masking the real insolation-driven pattern with
+		// an artificially inflated polar freeze. The physically meaningful
+		// check is the inversion itself: poles warm up, tropics cool down.
+		const baselinePoles =
+			(baseline.bandStats.find((b) => b.band === "60N-90N")!.meanC +
+				baseline.bandStats.find((b) => b.band === "60S-90S")!.meanC) /
+			2
+		const tiltedPoles =
+			(tilted.bandStats.find((b) => b.band === "60N-90N")!.meanC +
+				tilted.bandStats.find((b) => b.band === "60S-90S")!.meanC) /
+			2
+		const baselineTropics =
+			(baseline.bandStats.find((b) => b.band === "0-30N")!.meanC +
+				baseline.bandStats.find((b) => b.band === "0-30S")!.meanC) /
+			2
+		const tiltedTropics =
+			(tilted.bandStats.find((b) => b.band === "0-30N")!.meanC +
+				tilted.bandStats.find((b) => b.band === "0-30S")!.meanC) /
+			2
+
 		expect(tilted.globalMeanC).toBeLessThan(baseline.globalMeanC)
-		expect(tilted.belowFreezingPct).toBeGreaterThan(baseline.belowFreezingPct)
+		expect(tiltedPoles).toBeGreaterThan(baselinePoles)
+		expect(tiltedTropics).toBeLessThan(baselineTropics)
 	}, 600_000)
 })

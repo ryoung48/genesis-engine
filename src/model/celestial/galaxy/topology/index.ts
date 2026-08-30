@@ -52,6 +52,42 @@ function buildCSR({
 	return { adjOffset, adjList }
 }
 
+/** CSR adjacency over the hyperlane graph only (the flat [a0,b0, a1,b1, …]
+ * pair list from buildHyperlanes), deduped and undirected. Nation territory
+ * spreads along this instead of the full Delaunay adjacency so realms follow
+ * travel routes. */
+function buildLaneCSR({
+	lanes,
+	numSystems,
+}: {
+	lanes: Int32Array
+	numSystems: number
+}): { laneAdjOffset: Int32Array; laneAdjList: Int32Array } {
+	const neighbors: Set<number>[] = Array.from(
+		{ length: numSystems },
+		() => new Set<number>(),
+	)
+	for (let i = 0; i < lanes.length; i += 2) {
+		const a = lanes[i]!
+		const b = lanes[i + 1]!
+		neighbors[a]!.add(b)
+		neighbors[b]!.add(a)
+	}
+
+	const laneAdjOffset = new Int32Array(numSystems + 1)
+	for (let i = 0; i < numSystems; i++) {
+		laneAdjOffset[i + 1] = laneAdjOffset[i]! + neighbors[i]!.size
+	}
+
+	const laneAdjList = new Int32Array(laneAdjOffset[numSystems]!)
+	let cursor = 0
+	for (let i = 0; i < numSystems; i++) {
+		for (const nb of neighbors[i]!) laneAdjList[cursor++] = nb
+	}
+
+	return { laneAdjOffset, laneAdjList }
+}
+
 /** Returns true if segment (x1,y1)-(x2,y2) intersects the circle at
  * (cx,cy) with radius r, via the parametric line-circle discriminant. */
 function segmentCrossesCircle({
@@ -245,7 +281,9 @@ function build({
 		rng,
 	})
 
-	return { adjOffset, adjList, lanes, laneCount }
+	const { laneAdjOffset, laneAdjList } = buildLaneCSR({ lanes, numSystems })
+
+	return { adjOffset, adjList, lanes, laneCount, laneAdjOffset, laneAdjList }
 }
 
 export const GALAXY_TOPOLOGY = { build }

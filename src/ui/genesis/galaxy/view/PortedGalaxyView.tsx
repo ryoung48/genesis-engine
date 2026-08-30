@@ -6,6 +6,9 @@ import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import type { Galaxy, GalaxyParams } from "@/model/celestial/galaxy/types"
 import type { GalaxyWorkerResponse } from "@/model/celestial/galaxy/worker-protocol/types"
 import type { SystemBody } from "@/model/celestial/system/types"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
+import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import { GalaxyOverlayControls } from "@/ui/genesis/galaxy/controls/GalaxyOverlayControls"
 import { GalaxyRenderer } from "@/ui/genesis/galaxy/renderer/GalaxyRendererThree"
 import { updateClusterPositions } from "@/ui/genesis/galaxy/renderer/galaxy-scene/cluster"
@@ -621,13 +624,17 @@ export const PortedGalaxyView: React.FC<{
 					onTimeStepChange={handleTimeStepChange}
 				/>
 				{!panelOpen ? (
-					<button
-						type="button"
-						onClick={() => setPanelOpen(true)}
-						className="absolute top-3 left-3 z-20 rounded-md bg-black/60 px-2 py-1 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
-					>
-						Show panel
-					</button>
+					<div className="absolute top-3 left-3 pointer-events-auto z-20">
+						<Tooltip content="Show generation panel" position="bottom">
+							<IconButton
+								onClick={() => setPanelOpen(true)}
+								tone="overlay"
+								size="sm"
+							>
+								<DetailsIcon className="h-4 w-4 text-white" />
+							</IconButton>
+						</Tooltip>
+					</div>
 				) : null}
 			</div>
 		</div>

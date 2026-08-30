@@ -477,6 +477,10 @@ export type GenesisWorkerRequest =
 			type: "pause"
 	  }
 	| {
+			type: "snapshot-at"
+			timeMs: number
+	  }
+	| {
 			type: "compute-infrastructure"
 	  }
 
@@ -519,4 +523,12 @@ export type GenesisWorkerResponse =
 			 * main thread accumulate a running event log without resending the
 			 * whole history each tick. */
 			newEvents: HistoryNote[]
+	  }
+	| {
+			/** Reply to a "snapshot-at" request: a history frame reconstructed
+			 * from the field timelines at an arbitrary past time, for scrubbing
+			 * procedural worlds. Never advances the sim. */
+			type: "history-scrub"
+			timeMs: number
+			frame: SerializedHistoryFrame
 	  }

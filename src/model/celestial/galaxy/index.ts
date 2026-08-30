@@ -53,12 +53,13 @@ function spawn(
 
 	progressCb?.("Routing hyperlanes...", 60)
 	const coreRadius = radius.min
-	const { adjOffset, adjList, lanes, laneCount } = GALAXY_TOPOLOGY.build({
-		packing,
-		seed,
-		dimensions,
-		coreRadius,
-	})
+	const { adjOffset, adjList, lanes, laneCount, laneAdjOffset, laneAdjList } =
+		GALAXY_TOPOLOGY.build({
+			packing,
+			seed,
+			dimensions,
+			coreRadius,
+		})
 	timings.push({ stage: "Topology + hyperlanes", ms: performance.now() - t0 })
 	t0 = performance.now()
 
@@ -67,18 +68,22 @@ function spawn(
 		numSystems: size,
 		r_edge: packing.r_edge,
 		r_xy: packing.r_xy,
-		adjOffset,
-		adjList,
+		adjOffset: laneAdjOffset,
+		adjList: laneAdjList,
 		seed,
 	})
 	timings.push({ stage: "Nations", ms: performance.now() - t0 })
 	t0 = performance.now()
 
 	progressCb?.("Rolling star trees...", 85)
-	const packedStars = GALAXY_SYSTEMS.buildPackedGalaxyStars({
+	const packedStars = GALAXY_SYSTEMS.forceCapitalsMainWorldCapable({
+		packed: GALAXY_SYSTEMS.buildPackedGalaxyStars({
+			galaxySeed: seed,
+			numSystems: size,
+			r_edge: packing.r_edge,
+		}),
+		capitalSystemIndices: nations.seeds,
 		galaxySeed: seed,
-		numSystems: size,
-		r_edge: packing.r_edge,
 	})
 	timings.push({ stage: "Star tree packing", ms: performance.now() - t0 })
 

@@ -52,6 +52,16 @@ export const ALBEDO = {
 		 * flat baseAlbedo as pressure -> 0 -- see iceAlbedoAt's couplingFactor
 		 * doc. Defaults to 1.0 (full strength, Earth-like). */
 		pressure?: number
+		/**
+		 * Per-latitude seasonal correction added to baseAlbedo before the ice
+		 * blend, e.g. `0.08 * (3*sin(zenith)^2 - 1) / 2` from VPlanet's POISE
+		 * module -- surfaces (water especially) reflect more at low sun angles
+		 * (grazing incidence), so the ice-free albedo isn't flat across the
+		 * year even where nothing freezes. Only touches the non-ice branch of
+		 * the blend, same as POISE (a fully ice-locked latitude still reports
+		 * the flat iceAlbedo regardless of sun angle). Omit for no correction.
+		 */
+		zenithOffset?: readonly number[]
 	}): void => {
 		const {
 			albedo,
@@ -61,6 +71,7 @@ export const ALBEDO = {
 			iceAlbedo,
 			iceAlbedoFeedback,
 			pressure,
+			zenithOffset,
 		} = params
 		const { surface } = CONSTANTS.embConstants
 		const base = baseAlbedo ?? surface.ALBEDO.BASE
@@ -68,15 +79,16 @@ export const ALBEDO = {
 		const couplingFactor = Math.min(1, Math.sqrt(Math.max(0, pressure ?? 1.0)))
 
 		for (let i = 0; i < CONSTANTS.embConstants.grid.NUM_LAT; i++) {
+			const localBase = base + (zenithOffset?.[i] ?? 0)
 			albedo[i][time] =
 				(iceAlbedoFeedback ?? true)
 					? iceAlbedoAt({
 							temperatureK: temperature[i][time],
-							baseAlbedo: base,
+							baseAlbedo: localBase,
 							iceAlbedo: ice,
 							couplingFactor,
 						})
-					: base
+					: localBase
 		}
 	},
 }

@@ -583,7 +583,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	// Sol's. Every other seed runs the ordinary procedural pipeline.
 	const handleGenerate = useCallback(() => {
 		if (seed === SOL_DATA.solSeed) {
-			setDataVariant("observed")
 			void handleEarthImport()
 			return
 		}

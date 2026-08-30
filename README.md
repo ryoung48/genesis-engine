@@ -89,7 +89,8 @@ tx8izx
 tvizni
 h8jpmj
 
-claude --resume b4f38b78-14c8-47dc-bcc4-d62e7b281103
+claude --resume a404dfe6-6132-4ad9-b386-0c162f2c8f5c << hist
+claude --resume 743a3b51-aab0-4458-bd92-dc66828b5a32 << monsoons
 codex resume 019f8775-0271-7a70-8d80-a58fe1d0b10b
 
 claude --resume 4bc48604-7335-4e3b-a1c5-87270824c9e0 --dangerously-skip-permissions

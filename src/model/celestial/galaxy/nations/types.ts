@@ -4,7 +4,8 @@ export interface BuildGalaxyNationsParams {
 	r_edge: Uint8Array
 	/** Interleaved [x0,y0, x1,y1, …], length 2*numSystems. */
 	r_xy: Float32Array
-	/** Full Delaunay CSR adjacency (see GalaxyTopology). */
+	/** CSR adjacency territory spreads along -- the hyperlane graph
+	 * (GalaxyTopology.laneAdjOffset/laneAdjList), so realms follow travel routes. */
 	adjOffset: Int32Array
 	adjList: Int32Array
 	seed: number

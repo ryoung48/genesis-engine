@@ -141,6 +141,8 @@ function getWorldSections({
 }
 
 const TRADE_GOODS_PAGE_SIZE = 5
+/** Trade Goods section is hidden for now -- data plumbing left intact. */
+const SHOW_TRADE_GOODS = false
 
 interface WorldDetailsProps extends DetailsDrawerBaseProps {
 	openSections: ReadonlySet<WorldSection>
@@ -300,24 +302,26 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 					</div>
 				</div>
 			</TopLevelSection>
-			<TopLevelSection
-				title="Trade Goods"
-				open={openSections.has("trade-goods")}
-				onToggle={() => onSectionToggle("trade-goods")}
-			>
-				<DataTable
-					columns={tradeGoodsColumns}
-					rows={pagedTradeGoods}
-					rowKey={(row) => row.label}
-					empty="No trade goods assigned"
-				/>
-				<Pagination
-					pageIndex={tradeGoodsPage}
-					pageSize={TRADE_GOODS_PAGE_SIZE}
-					totalItems={tradeGoodsDistribution.length}
-					onPageChange={setTradeGoodsPage}
-				/>
-			</TopLevelSection>
+			{SHOW_TRADE_GOODS && (
+				<TopLevelSection
+					title="Trade Goods"
+					open={openSections.has("trade-goods")}
+					onToggle={() => onSectionToggle("trade-goods")}
+				>
+					<DataTable
+						columns={tradeGoodsColumns}
+						rows={pagedTradeGoods}
+						rowKey={(row) => row.label}
+						empty="No trade goods assigned"
+					/>
+					<Pagination
+						pageIndex={tradeGoodsPage}
+						pageSize={TRADE_GOODS_PAGE_SIZE}
+						totalItems={tradeGoodsDistribution.length}
+						onPageChange={setTradeGoodsPage}
+					/>
+				</TopLevelSection>
+			)}
 		</>
 	)
 }

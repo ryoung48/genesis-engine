@@ -346,6 +346,7 @@ function runPostElevationPipeline(
 	// ── Diurnal temperature range + PET ───────────────────────────────
 	t0 = performance.now()
 	let { monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
+		mesh,
 		rainfall,
 		elevationKm: elevation_km,
 		oceanDist,
@@ -477,6 +478,7 @@ function runPostElevationPipeline(
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
+		mesh,
 		rainfall,
 		elevationKm: elevation_km,
 		oceanDist,
@@ -505,6 +507,7 @@ function runPostElevationPipeline(
 		hydrology,
 		dtrMonthly: dtr_monthly,
 		oceanDist,
+		isTidallyLocked: params.tideLock?.type === "solar",
 	})
 	record("Post: cloud cover temperature modifier", t0)
 
@@ -714,22 +717,6 @@ function runPostElevationPipeline(
 
 	// ── Vegetation ─────────────────────────────────────────────────────
 	t0 = performance.now()
-	// Compute GAr (growing-season aridity ratio) per cell for cold/extraseasonal forest transition
-	const garField = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue
-		let petGdd = 0
-		let aetGdd = 0
-		for (let m = 0; m < 12; m++) {
-			const idx = m * N + r
-			const temp = climate.temperature_monthly[idx]
-			const g5 =
-				temp > 5 ? Math.min(temp - 5, 20) * (params.daysPerYear / 12) : 0
-			petGdd += climate.pet_monthly[idx] * g5
-			aetGdd += hydrology.aet_monthly[idx] * g5
-		}
-		garField[r] = petGdd > 0 ? aetGdd / petGdd : 1
-	}
 	const vegetation = VEGETATION.assignVegetation({
 		mesh,
 		isLand,
@@ -738,7 +725,7 @@ function runPostElevationPipeline(
 		rng: RNG.makeRng(params.seed),
 		pastaZones: pastaClimate,
 		gdd: pastaDebug.gdd,
-		gar: garField,
+		gar: pastaDebug.gar,
 	})
 	const realVegetation = earthPastaResult
 		? VEGETATION.assignVegetation({
@@ -749,7 +736,7 @@ function runPostElevationPipeline(
 				rng: RNG.makeRng(params.seed),
 				pastaZones: earthPastaResult.zones,
 				gdd: earthPastaResult.debug.gdd,
-				gar: garField,
+				gar: earthPastaResult.debug.gar,
 			})
 		: undefined
 	record("Post: vegetation", t0)

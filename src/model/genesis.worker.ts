@@ -32,6 +32,9 @@ declare const self: DedicatedWorkerGlobalScope
 let historyState: HistoryState | null = null
 let historyRng: ReturnType<typeof HISTORY_RNG.createHistoryRng> | null = null
 let historyTime = 800 * STATE.yearMs
+// Earliest time the sim can be scrubbed back to -- the start year seeded by
+// initHistory. Set at generate/import time alongside historyTime.
+let historyStartTime = 800 * STATE.yearMs
 let simulationRunning = false
 // Index into historyState.events already sent to the main thread, so each
 // "sim-progress" only carries newly-pushed events instead of the whole log.
@@ -659,6 +662,30 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		return
 	}
 
+	if (message.type === "snapshot-at") {
+		if (!historyState) {
+			self.postMessage({
+				type: "error",
+				message: "No world generated yet - generate a world first",
+			} satisfies GenesisWorkerResponse)
+			return
+		}
+		const time = Math.max(
+			historyStartTime,
+			Math.min(historyTime, message.timeMs),
+		)
+		const frame = SNAPSHOT.buildHistoryFrame({ state: historyState, time })
+		self.postMessage(
+			{
+				type: "history-scrub",
+				timeMs: time,
+				frame,
+			} satisfies GenesisWorkerResponse,
+			buildFrameTransferList(frame),
+		)
+		return
+	}
+
 	if (message.type === "pathfind") {
 		if (!lastGeneratedWorld) {
 			self.postMessage({
@@ -806,6 +833,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		historyState = null
 		historyRng = null
 		historyTime = 800 * STATE.yearMs
+		historyStartTime = 800 * STATE.yearMs
 		simulationRunning = false
 		historyEventCursor = 0
 		if (
@@ -841,6 +869,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				settlementPortRegions: generated.settlementPortRegions,
 			})
 			historyTime = historyState.time
+			historyStartTime = historyState.time
 		}
 
 		lastGeneratedWorld = clonePathfindSeedWorld(generated)

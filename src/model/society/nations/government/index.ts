@@ -203,8 +203,20 @@ function refineGovernmentSubtype({
 				if (r < 0.88) return getGovIdx().feudal_monarchy // still widespread
 				return getGovIdx().constitutional_monarchy // early constitutional
 			}
-			// Ancient & medieval (>=0.55): feudal default; elective for medium+
-			// kingdoms; absolute for large empires.
+			// Late medieval (~0.55): feudal fragmentation is the default even for
+			// large realms -- centralized absolute rule is a rare, well-organized
+			// exception here, unlike antiquity's large-empire tier below.
+			if (sizeWeight < 0.65) {
+				if (size >= 20) {
+					if (r < 0.2) return getGovIdx().absolute_monarchy
+					if (r < 0.35) return getGovIdx().elective_monarchy
+					return getGovIdx().feudal_monarchy
+				}
+				if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
+				return getGovIdx().feudal_monarchy // default
+			}
+			// Ancient (>=0.65): feudal default; elective for medium+ kingdoms;
+			// absolute for large empires.
 			if (size >= 20 && r < 0.65) return getGovIdx().absolute_monarchy
 			if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
 			return getGovIdx().feudal_monarchy // default
@@ -242,10 +254,11 @@ function refineGovernmentSubtype({
 			// Dynastic signoria (a princely lord ruling what was a republic, e.g.
 			// Medici Florence, Visconti Milan) shares oligarchic republic's core-only
 			// condition — no size cap, since small city-states fell under one lord
-			// just as often as larger ones — a coin flip decides which one a
-			// settled, non-frontier core polity becomes.
+			// just as often as larger ones — a settled, non-frontier core polity
+			// mostly stays an oligarchic republic, with a lord's takeover the
+			// minority outcome.
 			if (wave >= 0 && wave < 0.28)
-				return r < 0.5
+				return r < 0.25
 					? getGovIdx().dynastic_signoria
 					: getGovIdx().oligarchic_republic
 			return getGovIdx().oligarchic_republic // default

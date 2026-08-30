@@ -28,7 +28,6 @@ import type {
 	BuildProvinceXyzParams,
 	CreateActiveWarParams,
 	CreateHistoryStateParams,
-	EnsureNationColorParams,
 	FixConnectionsParams,
 	GetWarAlliesParams,
 	HistoryState,
@@ -94,20 +93,6 @@ function buildProvinceXyz({
 		out[dst + 2] = r_xyz[src + 2]
 	}
 	return out
-}
-
-export function ensureNationColor({
-	state,
-	province,
-}: EnsureNationColorParams): void {
-	if (province < 0 || province >= state.P || state.nationColors.has(province))
-		return
-	const i = province * 3
-	state.nationColors.set(province, [
-		state.provinceColors[i],
-		state.provinceColors[i + 1],
-		state.provinceColors[i + 2],
-	])
 }
 
 function makeDerivedCache(): DerivedCache {
@@ -669,7 +654,6 @@ function createHistoryState({
 		provinceAdjOffset: provinces.adjOffset,
 		provinceAdjList: provinces.adjList,
 		provinceSize: provinces.size,
-		provinceColors: provinces.colors,
 		desolate: provinces.desolate,
 		stateless,
 		waterAccess: waterAccessLevels,
@@ -687,7 +671,6 @@ function createHistoryState({
 		events: [],
 		nextDynasty: 0,
 		heap: new EventHeap(),
-		nationColors: new Map(),
 		leaderRuntime: {
 			idx: new Int32Array(P),
 			birth: new Float64Array(P),
@@ -739,7 +722,6 @@ function createHistoryState({
 		FIELDS.prov.leader.claim.set({ state, p, time: startTime, value: 0 })
 		FIELDS.prov.leader.birthYear.set({ state, p, time: startTime, value: -1 })
 		FIELDS.prov.occupation.set({ state, p, time: startTime, value: -1 })
-		if (nations.parent[p] < 0) ensureNationColor({ state, province: p })
 	}
 
 	for (let p = 0; p < P; p++) {

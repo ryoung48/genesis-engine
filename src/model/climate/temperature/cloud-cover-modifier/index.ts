@@ -2,7 +2,7 @@ import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import type { CloudCoverTemperatureModifierParams } from "@/model/climate/temperature/cloud-cover-modifier/types"
 import { MATH } from "@/model/shared/math/core"
 
-const HOT_LOW_CLOUD_WARMING_C = 10
+const HOT_LOW_CLOUD_WARMING_C = 5
 const HOT_HIGH_CLOUD_COOLING_C = 5
 const INTENSITY_CAP_TEMP_C = 20
 
@@ -22,6 +22,7 @@ function applyCloudCoverTemperatureModifier({
 	hydrology,
 	dtrMonthly,
 	oceanDist,
+	isTidallyLocked,
 }: CloudCoverTemperatureModifierParams): void {
 	const N = oceanDist.length
 	// Cached here (rather than left for hover/map to recompute on their own)
@@ -47,6 +48,7 @@ function applyCloudCoverTemperatureModifier({
 				dtrC: dtrMonthly[idx],
 				temperatureC: climate.temperature_monthly[idx],
 				oceanDistanceKm,
+				isTidallyLocked,
 			})
 			cloudCoverMonthly[idx] = cloudFraction
 			if (intensity === 0) continue

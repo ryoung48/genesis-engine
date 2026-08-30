@@ -424,6 +424,7 @@ function classifyLand({
 }: ClassifyLandParams): {
 	zone: number
 	gdd: number
+	gar: number
 	gint: number
 } {
 	let annualPrecip = 0
@@ -592,6 +593,7 @@ function classifyLand({
 	return {
 		zone,
 		gdd,
+		gar,
 		gint,
 	}
 }
@@ -621,6 +623,7 @@ function computePastaZones({
 
 	const debug: PastaDebug = {
 		gdd: new Float32Array(N),
+		gar: new Float32Array(N),
 		gint: new Float32Array(N),
 		gdd_monthly: new Float32Array(12 * N),
 		gint_monthly: new Float32Array(12 * N),
@@ -691,6 +694,7 @@ function computePastaZones({
 			})
 			output[r] = result.zone
 			debug.gdd[r] = result.gdd
+			debug.gar[r] = result.gar
 			debug.gint[r] = result.gint === Infinity ? 99999 : result.gint
 			for (let m = 0; m < 12; m++) {
 				debug.gdd_monthly[m * N + r] = mGDD[m]

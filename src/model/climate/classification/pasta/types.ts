@@ -77,6 +77,7 @@ export type AssignEarthPastaClimateParams = Omit<
 
 export type PastaDebug = {
 	gdd: Float32Array
+	gar: Float32Array
 	gint: Float32Array
 	gdd_monthly: Float32Array
 	gint_monthly: Float32Array

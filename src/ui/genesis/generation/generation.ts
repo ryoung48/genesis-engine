@@ -135,6 +135,9 @@ export interface GenerationCallbacks {
 		frame: SerializedHistoryFrame,
 		newEvents: HistoryNote[],
 	) => void
+	/** Reply to a requestHistorySnapshot call: a frame reconstructed at an
+	 * arbitrary past time for scrubbing, without advancing the sim. */
+	onHistoryScrub?: (timeMs: number, frame: SerializedHistoryFrame) => void
 }
 
 function createWorker(
@@ -197,6 +200,10 @@ function createWorker(
 				message.frame,
 				message.newEvents,
 			)
+			return
+		}
+		if (message.type === "history-scrub") {
+			callbacks.onHistoryScrub?.(message.timeMs, message.frame)
 			return
 		}
 	}
@@ -306,6 +313,17 @@ export function requestInfrastructure(
 	workerRef: React.MutableRefObject<Worker | null>,
 ): void {
 	const request: GenesisWorkerRequest = { type: "compute-infrastructure" }
+	workerRef.current?.postMessage(request)
+}
+
+/** Asks the worker to reconstruct a history frame at an arbitrary past time
+ * (clamped to what has been simulated). The result arrives via
+ * onHistoryScrub. Used by the procedural history scrubber. */
+export function requestHistorySnapshot(
+	workerRef: React.MutableRefObject<Worker | null>,
+	timeMs: number,
+): void {
+	const request: GenesisWorkerRequest = { type: "snapshot-at", timeMs }
 	workerRef.current?.postMessage(request)
 }
 
@@ -444,6 +462,7 @@ export function importHeightmap(
 			pressure: importParams.pressure as number,
 			albedo: importParams.albedo,
 			greenhouseFactor: importParams.greenhouseFactor,
+			tideLock: importParams.tideLock,
 			substellarLon: importParams.substellarLon as number,
 			terrainWarp: importParams.terrainWarp as number,
 			smoothing: importParams.smoothing as number,

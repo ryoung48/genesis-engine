@@ -62,7 +62,7 @@ const embConstants = {
 		// particular is now unreachable by greenhouseFactor alone under the
 		// new OCEAN_HEAT_CAPACITY -- see git history around this comment for
 		// the batch re-fit attempt).
-		GREENHOUSE_FACTOR: 0.6321,
+		GREENHOUSE_FACTOR: 0.5967965067364277,
 	},
 	thermal: {
 		// Sourced from VPlanet's POISE module (peer-reviewed EBM,
@@ -77,6 +77,18 @@ const embConstants = {
 		OCEAN_HEAT_CAPACITY: 4.428e6 * 70,
 		LAND_HEAT_CAPACITY: 1.55e7,
 		ICE_LIMIT: 273.15 - 10,
+		// Sourced from the same VPlanet POISE reference (dNuLandWater in
+		// examples/EarthClimate/earth.in) as OCEAN/LAND_HEAT_CAPACITY above --
+		// a W/m^2/K heat-exchange coefficient between the land and water
+		// columns AT THE SAME LATITUDE, scaled by each column's areal
+		// fraction (see energy-balance-model's stepTemperature). Without
+		// this, land and ocean only interact through the final land-
+		// fraction-weighted output blend, never during the solve itself --
+		// land's much smaller heat capacity then lets a whole latitude band
+		// of land cool independently of its much more thermally-stable
+		// ocean neighbor, which is what let land run away by ~70C across
+		// an AU step that barely moved the (properly-coupled) ocean at all.
+		LAND_WATER_COUPLING: 0.8,
 	},
 	orbital: {
 		OBLIQUITY: 23.5,

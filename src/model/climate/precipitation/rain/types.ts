@@ -66,13 +66,6 @@ export type ComputeRainWeightParams = {
 	westMoisture: number
 	hoursPerDay: number
 	bandOffsetDeg: number
-	/**
-	 * Signed land/sea thermal-contrast index in [-1, 1] for this cell/month
-	 * (see `computeMonsoonIndex`). Positive = continental thermal low drawing
-	 * maritime air onshore (wet monsoon); negative = continental high pushing
-	 * air offshore (dry season). Omitted to disable the monsoon term.
-	 */
-	monsoon?: number
 }
 
 export type ComputeMonthlyRainParams = {

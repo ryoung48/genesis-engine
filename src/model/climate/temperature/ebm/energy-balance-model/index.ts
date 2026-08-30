@@ -8,6 +8,7 @@ import type {
 import { GREENHOUSE_MOISTURE } from "@/model/climate/temperature/ebm/greenhouse-moisture"
 import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
 import { UTILS } from "@/model/climate/temperature/ebm/utils"
+import type { Matrix2x2 } from "@/model/climate/temperature/ebm/utils/types"
 import { TIME } from "@/model/shared/time"
 
 export class EnergyBalanceModel {
@@ -19,6 +20,9 @@ export class EnergyBalanceModel {
 	dx: number[] = []
 	insolation: number[][] = []
 	daylightHours: number[][] = []
+	/** Solar declination (radians) per day of year -- used only for the
+	 * zenith-angle albedo correction below. */
+	declination: number[] = []
 	/** Land-fraction-weighted blend of temperature_land/temperature_ocean --
 	 * the only field external callers should read. Populated once runModel()
 	 * finishes; empty/unused mid-run. */
@@ -73,12 +77,16 @@ export class EnergyBalanceModel {
 		const pressureFactor = Math.pow(this.config.pressure ?? 1.0, 0.5)
 		const diffuser = (latDeg: number) => {
 			const absLat = Math.abs(latDeg)
-			return (
-				(0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) *
-				radiusFactor *
-				pressureFactor *
-				rotationFactor
-			)
+			// Baroclinic-eddy transport, peaking near the mid-latitude jet.
+			const eddy = 0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))
+			// Low-latitude mixing (Hadley overturning + stationary waves) that
+			// the eddy term alone under-represents. Without it the deep tropics
+			// hoard summer heat while the subtropics starve, steepening the
+			// meridional gradient so the seasonal thermal-equator estimate never
+			// migrates past ~6° (real monsoon troughs reach 20-30°). Faded out
+			// poleward of ~40° so it doesn't warm the polar caps.
+			const tropical = 0.15 * Math.exp(-Math.pow(absLat / 28, 2))
+			return (eddy + tropical) * radiusFactor * pressureFactor * rotationFactor
 		}
 
 		this.lowerCoef = new Array(grid.NUM_LAT).fill(0)
@@ -178,22 +186,42 @@ export class EnergyBalanceModel {
 		}
 	}
 
-	private stepColumn(params: {
+	// VPlanet POISE's seasonal albedo correction (fvAlbedoSeasonal): surfaces
+	// reflect more at low sun angles (grazing incidence), so ice-free albedo
+	// isn't flat across the year -- it wobbles with solar geometry. `zenith`
+	// here is their simplified noon-zenith proxy (|lat - declination|), not a
+	// true zenith angle, matching what they actually use.
+	private zenithOffsetForDay(dayIdx: number): number[] {
+		const declination = this.declination[dayIdx]
+		return this.lats.map((lat) => {
+			const zenith = Math.abs(lat - declination)
+			const sinZenith = Math.sin(zenith)
+			return (0.08 * (3 * sinZenith * sinZenith - 1)) / 2
+		})
+	}
+
+	// Land and water fractions are clamped away from the extremes before
+	// dividing -- a latitude band that's 100% ocean (or 100% land) would
+	// otherwise blow up its own coupling coefficient (see thermal.
+	// LAND_WATER_COUPLING's comment for why the coupling is scaled by
+	// 1/fraction in the first place).
+	private static readonly MIN_LAND_WATER_FRACTION = 0.1
+
+	// Builds the same diag/rhs terms stepColumn used to compute standalone --
+	// heat capacity stays dt-unscaled while diffusion/OLR (and, in
+	// stepTemperature, the land/water coupling) are all dt-scaled flux terms.
+	private buildColumnTerms(params: {
 		tIdx: number
-		nextIdx: number
 		dt: number
-		lower: readonly number[]
-		upper: readonly number[]
 		heatCapacity: readonly number[]
 		temperature: number[][]
 		albedo: number[][]
 		olr: number[][]
-	}): void {
-		const { tIdx, nextIdx, dt, lower, upper, heatCapacity } = params
-		const { temperature, albedo, olr } = params
+	}): { diagSelf: number[]; rhs: number[] } {
+		const { tIdx, dt, heatCapacity, temperature, albedo, olr } = params
 		const { grid } = CONSTANTS.embConstants
-		const rhs = new Array(grid.NUM_LAT).fill(0)
-		const diag = new Array(grid.NUM_LAT)
+		const diagSelf = new Array(grid.NUM_LAT)
+		const rhs = new Array(grid.NUM_LAT)
 
 		for (let i = 0; i < grid.NUM_LAT; i++) {
 			const absorbed =
@@ -204,11 +232,10 @@ export class EnergyBalanceModel {
 			// colder/dryer than the other.
 			const { olrA, olrB } = this.localOlrCoefficients(temperature[i][tIdx])
 			olr[i][tIdx] = olrA + olrB * (temperature[i][tIdx] - this.olrTRef)
-			diag[i] =
+			diagSelf[i] =
 				heatCapacity[i] +
 				dt * (this.lowerCoef[i] + this.upperCoef[i]) +
 				dt * olrB
-
 			rhs[i] =
 				heatCapacity[i] * temperature[i][tIdx] +
 				dt * absorbed -
@@ -216,48 +243,91 @@ export class EnergyBalanceModel {
 				dt * olrB * this.olrTRef
 		}
 
-		const newTemps = UTILS.solveTridiagonal({ lower, diag, upper, rhs })
-		for (let i = 0; i < grid.NUM_LAT; i++) {
-			temperature[i][nextIdx] = newTemps[i]
-		}
-
-		ALBEDO.update({
-			albedo,
-			temperature,
-			time: nextIdx,
-			baseAlbedo: this.config.albedo,
-			iceAlbedo: this.config.iceAlbedo,
-			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
-			pressure: this.config.pressure,
-		})
+		return { diagSelf, rhs }
 	}
 
 	stepTemperature(params: StepTemperatureParams): void {
 		const { tIdx, dt, lower, upper } = params
-		const { time } = CONSTANTS.embConstants
+		const { grid, time, thermal } = CONSTANTS.embConstants
 		const nextIdx = (tIdx + 1) % time.DAYS_PER_YEAR
+		const nu = this.config.landWaterCoupling ?? thermal.LAND_WATER_COUPLING
 
-		this.stepColumn({
+		const land = this.buildColumnTerms({
 			tIdx,
-			nextIdx,
 			dt,
-			lower,
-			upper,
 			heatCapacity: this.heat_capacity_land,
 			temperature: this.temperature_land,
 			albedo: this.albedo_land,
 			olr: this.olr_land,
 		})
-		this.stepColumn({
+		const water = this.buildColumnTerms({
 			tIdx,
-			nextIdx,
 			dt,
-			lower,
-			upper,
 			heatCapacity: this.heat_capacity_ocean,
 			temperature: this.temperature_ocean,
 			albedo: this.albedo_ocean,
 			olr: this.olr_ocean,
+		})
+
+		const diag: Matrix2x2[] = new Array(grid.NUM_LAT)
+		const rhsLand = new Array(grid.NUM_LAT)
+		const rhsWater = new Array(grid.NUM_LAT)
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			const landFrac = Math.min(
+				1 - EnergyBalanceModel.MIN_LAND_WATER_FRACTION,
+				Math.max(
+					EnergyBalanceModel.MIN_LAND_WATER_FRACTION,
+					this.land_fraction[i],
+				),
+			)
+			const waterFrac = 1 - landFrac
+			const nuLand = nu / landFrac
+			const nuWater = nu / waterFrac
+
+			diag[i] = {
+				a: land.diagSelf[i] + dt * nuLand,
+				b: -dt * nuLand,
+				c: -dt * nuWater,
+				d: water.diagSelf[i] + dt * nuWater,
+			}
+			rhsLand[i] = land.rhs[i]
+			rhsWater[i] = water.rhs[i]
+		}
+
+		const solved = UTILS.solveBlockTridiagonal2x2({
+			lowerLand: lower,
+			lowerWater: lower,
+			diag,
+			upperLand: upper,
+			upperWater: upper,
+			rhsLand,
+			rhsWater,
+		})
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			this.temperature_land[i][nextIdx] = solved.land[i]
+			this.temperature_ocean[i][nextIdx] = solved.water[i]
+		}
+
+		const zenithOffset = this.zenithOffsetForDay(nextIdx)
+		ALBEDO.update({
+			albedo: this.albedo_land,
+			temperature: this.temperature_land,
+			time: nextIdx,
+			baseAlbedo: this.config.albedo,
+			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
+			zenithOffset,
+		})
+		ALBEDO.update({
+			albedo: this.albedo_ocean,
+			temperature: this.temperature_ocean,
+			time: nextIdx,
+			baseAlbedo: this.config.albedo,
+			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
+			zenithOffset,
 		})
 	}
 
@@ -302,16 +372,18 @@ export class EnergyBalanceModel {
 
 		this.computeDiffusionCoefficients()
 
-		const { _insolation, _daylight_hours } = INSOLATION.compute({
+		const { _insolation, _daylight_hours, _declination } = INSOLATION.compute({
 			lats: this.lats,
 			orbital: this.config.orbital,
 			stellarOverride: this.config.stellar,
 		})
 		this.insolation = _insolation
 		this.daylightHours = _daylight_hours
+		this.declination = _declination
 
 		this.seedPerLatitudeEquilibrium()
 
+		const initialZenithOffset = this.zenithOffsetForDay(0)
 		ALBEDO.update({
 			albedo: this.albedo_land,
 			temperature: this.temperature_land,
@@ -320,6 +392,7 @@ export class EnergyBalanceModel {
 			iceAlbedo: this.config.iceAlbedo,
 			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
 			pressure: this.config.pressure,
+			zenithOffset: initialZenithOffset,
 		})
 		ALBEDO.update({
 			albedo: this.albedo_ocean,
@@ -329,6 +402,7 @@ export class EnergyBalanceModel {
 			iceAlbedo: this.config.iceAlbedo,
 			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
 			pressure: this.config.pressure,
+			zenithOffset: initialZenithOffset,
 		})
 	}
 

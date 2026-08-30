@@ -1251,13 +1251,10 @@ export function GenerationPlanetNavigator({
 								if (
 									updated.inclinationDeg !== body.inclinationDeg ||
 									updated.longitudeOfAscendingNodeDeg !==
-										body.longitudeOfAscendingNodeDeg
+										body.longitudeOfAscendingNodeDeg ||
+									updated.greenhouseFactor !== body.greenhouseFactor ||
+									updated.albedo !== body.albedo
 								)
-									// Routes to wherever the main world actually lives (a
-									// top-level SystemBody, or a moon nested in a gas
-									// giant's moons -- see updateMainWorldBody), unlike
-									// onUpdateSystemBody above which only ever patches a
-									// raw top-level orbits[] index.
 									updateMainWorldBody?.(() => updated)
 							}
 						: undefined,
@@ -1277,6 +1274,7 @@ export function GenerationPlanetNavigator({
 							daysPerYear={body.orbitalPeriodDays}
 							hoursPerDay={body.siderealDayHours}
 							planetRadiusKm={body.diameterKm / 2}
+							planetMassKg={body.massKg}
 							isSolarLocked={isApproxSolarLocked(
 								body.siderealDayHours,
 								body.orbitalPeriodDays,

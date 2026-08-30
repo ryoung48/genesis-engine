@@ -23,10 +23,13 @@ function estimate({
 	dtrC,
 	temperatureC,
 	oceanDistanceKm,
+	isTidallyLocked,
 }: CloudCoverEstimateParams): number {
 	const wetness = petMm > 0 ? Math.min(1, Math.max(0, aetMm / petMm)) : 1
 	const rainfallCloudiness = 1 - Math.exp(-Math.max(0, rainfallMm) / 100)
-	const inverseDtr = 1 - Math.min(1, Math.max(0, dtrC / 18))
+	const inverseDtr = isTidallyLocked
+		? 0
+		: 1 - Math.min(1, Math.max(0, dtrC / 18))
 	const coastalInfluence = Math.exp(-Math.max(0, oceanDistanceKm) / 800)
 	const warmth = Math.min(1, Math.max(0, (temperatureC + 10) / 35))
 	return Math.min(

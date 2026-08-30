@@ -17,6 +17,7 @@ export const INSOLATION = {
 		const _daylight_hours: number[][] = new Array(grid.NUM_LAT)
 			.fill(0)
 			.map(() => new Array(time.DAYS_PER_YEAR).fill(0))
+		const _declination: number[] = new Array(time.DAYS_PER_YEAR).fill(0)
 		const obliquityRad = (orbital.OBLIQUITY * Math.PI) / 180
 		const perihelionRad = (orbital.PERIHELION * Math.PI) / 180
 		const PI = Math.PI
@@ -77,6 +78,7 @@ export const INSOLATION = {
 			const declination = Math.asin(Math.sin(obliquityRad) * Math.sin(trueL))
 			const sinDeclination = Math.sin(declination)
 			const cosDeclination = Math.cos(declination)
+			_declination[day] = declination
 
 			for (let i = 0; i < grid.NUM_LAT; i++) {
 				const lat = lats[i]
@@ -104,6 +106,6 @@ export const INSOLATION = {
 			}
 		}
 
-		return { _insolation, _daylight_hours }
+		return { _insolation, _daylight_hours, _declination }
 	},
 }

@@ -209,9 +209,11 @@ function buildBodyStats({
 	avgTempK,
 	unitSystem,
 	greenhouseFactor,
+	greenhouseFactorEditor,
 	surfaceTidesM,
 	seismology,
 	albedo,
+	albedoEditor,
 	biosphere,
 	habitability,
 	luminositySol,
@@ -273,9 +275,11 @@ function buildBodyStats({
 	avgTempK?: number
 	unitSystem: UnitSystem
 	greenhouseFactor?: number
+	greenhouseFactorEditor?: StatEntry["editor"]
 	surfaceTidesM?: SurfaceTidesBreakdown
 	seismology?: SeismologyProfile
 	albedo?: number
+	albedoEditor?: StatEntry["editor"]
 	biosphere?: BiosphereProfile
 	/** Structurally identical to BiosphereProfile (code + trace) -- see
 	 * OrbitBody's habitability doc. */
@@ -383,28 +387,55 @@ function buildBodyStats({
 						valuePrefix: formatAvgTempValue(avgTempK, unitSystem),
 						value: ` · ${describeTemperatureK(avgTempK)}`,
 						swatchColor: temperatureSwatchColor(avgTempK),
-						valueHelp: (
-							<ContributionTooltipContent
-								title="Climate Inputs"
-								items={[
-									{
-										label: "Greenhouse",
-										value: (greenhouseFactor ?? 0).toFixed(2),
-										tone: "warm" as const,
-									},
-									...(albedo !== undefined
-										? [
-												{
-													label: "Albedo",
-													value: albedo.toFixed(3),
-													tone: "cool" as const,
-												},
-											]
-										: []),
-								]}
-							/>
-						),
-						valueHelpTarget: "prefix" as const,
+						editor: {
+							label: "Temperature",
+							value: avgTempK,
+							min: avgTempK,
+							max: avgTempK,
+							step: 1,
+							display: formatAvgTempValue(avgTempK, unitSystem),
+							set: () => {
+								// unused -- editor.content overrides the default slider
+							},
+							content: (
+								<ContributionTooltipContent
+									items={[
+										{
+											label: "Greenhouse",
+											value: (greenhouseFactor ?? 0).toFixed(2),
+											tone: "warm" as const,
+											editor: greenhouseFactorEditor
+												? {
+														value: greenhouseFactor ?? 0,
+														min: greenhouseFactorEditor.min,
+														max: greenhouseFactorEditor.max,
+														step: greenhouseFactorEditor.step,
+														set: greenhouseFactorEditor.set,
+													}
+												: undefined,
+										},
+										...(albedo !== undefined
+											? [
+													{
+														label: "Albedo",
+														value: albedo.toFixed(3),
+														tone: "cool" as const,
+														editor: albedoEditor
+															? {
+																	value: albedo,
+																	min: albedoEditor.min,
+																	max: albedoEditor.max,
+																	step: albedoEditor.step,
+																	set: albedoEditor.set,
+																}
+															: undefined,
+													},
+												]
+											: []),
+									]}
+								/>
+							),
+						},
 						trailingHelp: buildTemperatureTraceTooltip({
 							luminositySol,
 							orbitalDistanceAU,
@@ -902,9 +933,43 @@ export function buildOrbitBodyStats(params: {
 		unitSystem,
 		landCoverageEditor,
 		greenhouseFactor: body.greenhouseFactor,
+		greenhouseFactorEditor:
+			onUpdateBody && body.greenhouseFactor !== undefined
+				? {
+						label: "Greenhouse",
+						value: body.greenhouseFactor,
+						// 0-5 covers the overwhelming majority of realistic
+						// terrestrial/rocky main worlds (Earth 0.6, Mars 0.008, Titan
+						// 9 and Venus 44 are the rare exceptions this range doesn't
+						// reach -- widen it if a main world ever needs to hit those).
+						min: 0,
+						max: 5,
+						step: 0.01,
+						display: body.greenhouseFactor.toFixed(2),
+						set: (value: number) =>
+							onUpdateBody((current) => ({
+								...current,
+								greenhouseFactor: value,
+							})),
+					}
+				: undefined,
 		surfaceTidesM,
 		seismology: body.seismology,
 		albedo: body.albedo ?? estimateAlbedo(body.landCoverage),
+		albedoEditor: onUpdateBody
+			? {
+					label: "Albedo",
+					value: body.albedo ?? estimateAlbedo(body.landCoverage),
+					min: 0,
+					max: 1,
+					step: 0.01,
+					display: (body.albedo ?? estimateAlbedo(body.landCoverage)).toFixed(
+						3,
+					),
+					set: (value: number) =>
+						onUpdateBody((current) => ({ ...current, albedo: value })),
+				}
+			: undefined,
 		biosphere: body.biosphere,
 		habitability: body.habitability,
 		luminositySol: starLuminositySol,
@@ -1114,6 +1179,7 @@ export function buildMoonPreviewDataProps(params: {
 		daysPerYear: climateDaysPerYear,
 		hoursPerDay: climateHoursPerDay,
 		planetRadiusKm: params.moon.diameterKm / 2,
+		planetMassKg: params.moon.massKg,
 		isSolarLocked: params.moon.tideLock?.type === "solar",
 		spectralClass: params.spectralClass,
 		starSubtype: params.starSubtype,

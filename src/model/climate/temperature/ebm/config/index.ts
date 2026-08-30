@@ -114,4 +114,11 @@ export interface EBMConfig {
 	 * history, for the numbers.
 	 */
 	seismologyTotalHeatingK?: number
+	/**
+	 * Heat-exchange coefficient (W/m^2/K) between the land and water columns
+	 * AT THE SAME LATITUDE -- see thermal.LAND_WATER_COUPLING's own comment
+	 * for why this exists. Defaults to that constant (VPlanet POISE's fitted
+	 * Earth value) when unset.
+	 */
+	landWaterCoupling?: number
 }
