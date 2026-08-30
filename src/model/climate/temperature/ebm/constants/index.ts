@@ -62,7 +62,12 @@ const embConstants = {
 		// particular is now unreachable by greenhouseFactor alone under the
 		// new OCEAN_HEAT_CAPACITY -- see git history around this comment for
 		// the batch re-fit attempt).
-		GREENHOUSE_FACTOR: 0.6321,
+		//
+		// 0.6321 -> 0.6038: the VPlanet heat-capacity re-fit above overshot.
+		// Re-bisected in earth-import-greenhouse-refit.smoke.test.ts against the
+		// real imported Earth's land-only WorldClim mean, 0.6321 was leaving a
+		// +2.19C land warm bias; 0.6038 zeroes it (land-only bias 0.000C).
+		GREENHOUSE_FACTOR: 0.6038,
 	},
 	thermal: {
 		// Sourced from VPlanet's POISE module (peer-reviewed EBM,
