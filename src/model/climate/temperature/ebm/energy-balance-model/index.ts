@@ -77,16 +77,12 @@ export class EnergyBalanceModel {
 		const pressureFactor = Math.pow(this.config.pressure ?? 1.0, 0.5)
 		const diffuser = (latDeg: number) => {
 			const absLat = Math.abs(latDeg)
-			// Baroclinic-eddy transport, peaking near the mid-latitude jet.
-			const eddy = 0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))
-			// Low-latitude mixing (Hadley overturning + stationary waves) that
-			// the eddy term alone under-represents. Without it the deep tropics
-			// hoard summer heat while the subtropics starve, steepening the
-			// meridional gradient so the seasonal thermal-equator estimate never
-			// migrates past ~6° (real monsoon troughs reach 20-30°). Faded out
-			// poleward of ~40° so it doesn't warm the polar caps.
-			const tropical = 0.15 * Math.exp(-Math.pow(absLat / 28, 2))
-			return (eddy + tropical) * radiusFactor * pressureFactor * rotationFactor
+			return (
+				(0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) *
+				radiusFactor *
+				pressureFactor *
+				rotationFactor
+			)
 		}
 
 		this.lowerCoef = new Array(grid.NUM_LAT).fill(0)

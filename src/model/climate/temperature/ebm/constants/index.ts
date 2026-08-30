@@ -62,7 +62,7 @@ const embConstants = {
 		// particular is now unreachable by greenhouseFactor alone under the
 		// new OCEAN_HEAT_CAPACITY -- see git history around this comment for
 		// the batch re-fit attempt).
-		GREENHOUSE_FACTOR: 0.5967965067364277,
+		GREENHOUSE_FACTOR: 0.6321,
 	},
 	thermal: {
 		// Sourced from VPlanet's POISE module (peer-reviewed EBM,
