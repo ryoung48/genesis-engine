@@ -5,6 +5,7 @@ import { HISTORY_RNG } from "@/model/history/generated/history-rng"
 import { SNAPSHOT } from "@/model/history/generated/snapshot"
 import { STATE } from "@/model/history/generated/state"
 import type { HistoryState } from "@/model/history/generated/state/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
@@ -16,7 +17,6 @@ import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
-	SerializedHistoryFrame,
 } from "@/model/worker-protocol/types"
 import {
 	computeMapGeometryArrays,
@@ -40,27 +40,17 @@ let simulationRunning = false
 // "sim-progress" only carries newly-pushed events instead of the whole log.
 let historyEventCursor = 0
 
-function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
+function buildFrameTransferList(frame: WorldFrame): Transferable[] {
 	return [
-		frame.assignment.buffer,
-		frame.parent.buffer,
-		frame.sovereign.buffer,
-		frame.leaderDynasty.buffer,
-		frame.leaderNameSeed.buffer,
-		frame.leaderClaim.buffer,
-		frame.leaderBirthYear.buffer,
-		frame.colors.buffer,
-		frame.populationTotal.buffer,
-		frame.populationUrban.buffer,
-		frame.development.buffer,
-		frame.consumption.buffer,
-		frame.nationWealth.buffer,
-		frame.nationOptimalWealth.buffer,
-		frame.relationA.buffer,
-		frame.relationB.buffer,
-		frame.relationValues.buffer,
-		frame.cultureBlendSecondary.buffer,
-		frame.cultureBlendWeight.buffer,
+		frame.provinceNation.buffer,
+		frame.provinceController.buffer,
+		frame.provinceCulture.buffer,
+		frame.provinceReligion.buffer,
+		frame.provinceCultureBlendSecondary.buffer,
+		frame.provinceHre.buffer,
+		frame.provincePopulation.buffer,
+		frame.provincePopulationUrban.buffer,
+		frame.provinceDevelopment.buffer,
 	]
 }
 
@@ -77,7 +67,7 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 				rng: historyRng,
 				validate: false,
 			})
-			const frame = SNAPSHOT.buildHistoryFrame({ state: historyState })
+			const frame = SNAPSHOT.buildWorldFrame({ state: historyState })
 			const newEvents = historyState.events.slice(historyEventCursor)
 			historyEventCursor = historyState.events.length
 			const progress: GenesisWorkerResponse = {
@@ -674,7 +664,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			historyStartTime,
 			Math.min(historyTime, message.timeMs),
 		)
-		const frame = SNAPSHOT.buildHistoryFrame({ state: historyState, time })
+		const frame = SNAPSHOT.buildWorldFrame({ state: historyState, time })
 		self.postMessage(
 			{
 				type: "history-scrub",
@@ -856,6 +846,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				riverVisible: generated.rivers.visible,
 				r_xyz: generated.mesh.r_xyz,
 				cultures: generated.cultures,
+				religions: generated.religions,
 				era: generated.params.era,
 				seed: generated.params.seed,
 				landmarks: generated.landmarks,
@@ -877,7 +868,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		const world = attachPrecomputedGeometry(serializeWorld(generated))
 		progressCb("Done", 100)
 		const frame = historyState
-			? SNAPSHOT.buildHistoryFrame({ state: historyState })
+			? SNAPSHOT.buildWorldFrame({ state: historyState })
 			: undefined
 		self.postMessage(
 			{ type: "done", world, frame } satisfies GenesisWorkerResponse,

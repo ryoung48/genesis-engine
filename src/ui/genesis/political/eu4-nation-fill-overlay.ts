@@ -27,7 +27,7 @@ export type ElevationKmForLonLat = (lonDeg: number, latDeg: number) => number
 
 /** Raw EU4 province id -> nation fill color (0-1 RGB), or null to fall back
  * to FALLBACK_COLOR. Left to the caller (GenesisView.tsx) so this module
- * doesn't need to know about FoldedState/nationColorByTag -- same
+ * doesn't need to know about historical nation color storage -- same
  * decoupling as buildEu4NationBorderContext's realIdToNation map. */
 export type ColorForRawId = (rawId: number) => [number, number, number] | null
 

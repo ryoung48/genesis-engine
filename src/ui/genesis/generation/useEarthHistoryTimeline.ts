@@ -1,15 +1,12 @@
 ﻿import { useEffect, useMemo, useState } from "react"
-import type {
-	RawNationReference,
-	RawOrganizationReference,
-} from "@/model/history/earth/data-source/types"
+import type { RawOrganizationReference } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
-import { ENGINE } from "@/model/history/earth/engine"
-import type { EarthHistoryEngine } from "@/model/history/earth/engine/types"
 import { HERITAGES } from "@/model/history/earth/reference/heritages"
-import { NATIONS } from "@/model/history/earth/reference/nations"
 import { ORGANIZATIONS } from "@/model/history/earth/reference/organizations"
 import { RELIGION_GROUPS } from "@/model/history/earth/reference/religion-groups"
+import { HISTORY } from "@/model/history/record"
+import type { HistoryState } from "@/model/history/record/types"
+import { FRAME } from "@/model/history/world-frame"
 import type { GenesisProvinces } from "@/model/society/types"
 
 /**
@@ -23,15 +20,11 @@ export function useEarthHistoryTimeline(
 	provinces: GenesisProvinces | null | undefined,
 	isEarthImport: boolean,
 ) {
-	const [engine, setEngine] = useState<EarthHistoryEngine | null>(null)
-	const [selectedDays, setSelectedDays] = useState(
-		DATE.earthHistoryDefaultStartDays,
+	const [state, setState] = useState<HistoryState | null>(null)
+	const [selectedTimeMs, setSelectedTimeMs] = useState(
+		DATE.earthHistoryDefaultStartTimeMs,
 	)
 	const [loading, setLoading] = useState(false)
-	const [nationReference, setNationReference] = useState<Map<
-		string,
-		RawNationReference
-	> | null>(null)
 	const [organizationReference, setOrganizationReference] = useState<Map<
 		string,
 		RawOrganizationReference
@@ -55,7 +48,6 @@ export function useEarthHistoryTimeline(
 
 	useEffect(() => {
 		if (!isEarthImport) return
-		NATIONS.getNationReferenceIndex().then(setNationReference)
 		ORGANIZATIONS.getOrganizationReferenceIndex().then(setOrganizationReference)
 		RELIGION_GROUPS.getReligionIndex().then((index) => {
 			const scaled = new Map<string, [number, number, number]>()
@@ -95,22 +87,25 @@ export function useEarthHistoryTimeline(
 
 	useEffect(() => {
 		if (!isEarthImport || !provinces?.realIds) {
-			setEngine(null)
+			setState(null)
 			return
 		}
 		let cancelled = false
 		setLoading(true)
-		ENGINE.createEarthHistoryEngine(provinces)
+		HISTORY.loadEarthState({ provinces })
 			.then((result) => {
 				if (!cancelled) {
-					setEngine(result)
-					setSelectedDays(
+					setState(result?.state ?? null)
+					setSelectedTimeMs(
 						result
 							? Math.min(
-									Math.max(DATE.earthHistoryDefaultStartDays, result.minDate),
-									result.maxDate,
+									Math.max(
+										DATE.earthHistoryDefaultStartTimeMs,
+										result.state.record.minTimeMs,
+									),
+									result.state.record.maxTimeMs,
 								)
-							: DATE.earthHistoryDefaultStartDays,
+							: DATE.earthHistoryDefaultStartTimeMs,
 					)
 				}
 			})
@@ -126,33 +121,18 @@ export function useEarthHistoryTimeline(
 	}, [isEarthImport, provinces?.realIds, provinces])
 
 	const query = useMemo(() => {
-		if (!engine) return null
-		return ENGINE.queryEarthHistory({
-			engine,
-			timeDays: selectedDays,
-			nationReference: nationReference ?? undefined,
-			cultureNameById: cultureNameById ?? undefined,
-			religionNameById: religionNameById ?? undefined,
-		})
-	}, [engine, selectedDays, nationReference, cultureNameById, religionNameById])
-
-	const queryNation = (tag: string) => {
-		if (!engine) return null
-		return ENGINE.queryEarthHistoryNation({
-			engine,
-			timeDays: selectedDays,
-			tag,
-		})
-	}
+		if (!state) return null
+		const frame = HISTORY.frameAt({ state, timeMs: selectedTimeMs })
+		return { frame, renderInputs: FRAME.toRenderInputs({ frame }) }
+	}, [state, selectedTimeMs])
 
 	return {
-		engine,
+		state,
 		loading,
-		selectedDays,
-		setSelectedDays,
+		selectedTimeMs,
+		setSelectedTimeMs,
 		query,
-		queryNation,
-		nationReference,
+		nations: state?.record.nations ?? null,
 		religionColorById,
 		religionNameById,
 		cultureNameById,
@@ -161,15 +141,15 @@ export function useEarthHistoryTimeline(
 		// into provinces.json's base fields rather than a separate fetch,
 		// since they're keyed by the same raw EU4 province id as everything
 		// else there (see scripts/build-eu4-history-events.py).
-		provinceMeta: engine?.provinceMeta ?? null,
+		provinceMeta: state?.provinceMeta ?? null,
 		organizationReference,
 		// Bound the slider to where real converted data actually exists
 		// (mostly ~year 2 to present) rather than geo-explorer's full
 		// 2..9999 Extended-Timeline-mod range, which is almost entirely
 		// empty for us and made the slider impractical to scrub. Falls back
 		// to the full range while the engine is still loading.
-		minDays: engine?.minDate ?? DATE.earthHistoryMinDays,
-		maxDays: engine?.maxDate ?? DATE.earthHistoryMaxDays,
-		formatLabel: DATE.formatHistoryDays,
+		minTimeMs: state ? state.record.minTimeMs : DATE.earthHistoryMinTimeMs,
+		maxTimeMs: state ? state.record.maxTimeMs : DATE.earthHistoryMaxTimeMs,
+		formatLabel: DATE.formatHistoryTimeMs,
 	}
 }

@@ -2,6 +2,7 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { HistoryNote } from "@/model/history/generated/state/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
@@ -290,40 +291,6 @@ export interface SerializedGenesisWorld {
 	}
 }
 
-export interface SerializedHistoryFrame {
-	timeMs: number
-	assignment: Int32Array
-	parent: Int32Array
-	sovereign: Int32Array
-	leaderDynasty: Int32Array
-	leaderNameSeed: Int32Array
-	leaderClaim: Int32Array
-	leaderBirthYear: Float32Array
-	colors: Float32Array
-	populationTotal: Float32Array
-	populationUrban: Float32Array
-	development: Float32Array
-	consumption: Float32Array
-	nationWealth: Float32Array
-	nationOptimalWealth: Float32Array
-	relationA: Int32Array
-	relationB: Int32Array
-	relationValues: Uint8Array
-	activeWars: Array<{
-		idx: number
-		attacker: number
-		defender: number
-		rebel: boolean
-		occupied: number[]
-	}>
-	sovereignCount: number
-	totalPopulation: number
-	/** Per-province secondary (bleeding) culture index. -1 = no blend. */
-	cultureBlendSecondary: Int32Array
-	/** Per-province blend weight [0, 1]. 0 = pure primary culture. */
-	cultureBlendWeight: Float32Array
-}
-
 export interface SerializedNetwork {
 	fromRegion: Int32Array
 	toRegion: Int32Array
@@ -493,7 +460,7 @@ export type GenesisWorkerResponse =
 	| {
 			type: "done"
 			world: SerializedGenesisWorld
-			frame?: SerializedHistoryFrame
+			frame?: WorldFrame
 	  }
 	| {
 			type: "error"
@@ -517,7 +484,7 @@ export type GenesisWorkerResponse =
 	| {
 			type: "sim-progress"
 			timeMs: number
-			frame: SerializedHistoryFrame
+			frame: WorldFrame
 			/** Events pushed to HistoryState.events since the previous
 			 * "sim-progress" (or since init, for the first tick) -- lets the
 			 * main thread accumulate a running event log without resending the
@@ -530,5 +497,5 @@ export type GenesisWorkerResponse =
 			 * procedural worlds. Never advances the sim. */
 			type: "history-scrub"
 			timeMs: number
-			frame: SerializedHistoryFrame
+			frame: WorldFrame
 	  }

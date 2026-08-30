@@ -262,9 +262,6 @@ def _clausewitz_value_to_json(value: object) -> object:
 
 def _province_history_payload(sub_key: str, sub_value: object) -> tuple[str, dict] | None:
     numeric_keys = {
-        "base_tax",
-        "base_production",
-        "base_manpower",
         "manpower",
         "unrest",
         "revolt_risk",
@@ -278,9 +275,6 @@ def _province_history_payload(sub_key: str, sub_value: object) -> tuple[str, dic
     if sub_key in numeric_keys:
         return (
             {
-                "base_tax": "baseTax",
-                "base_production": "baseProduction",
-                "base_manpower": "baseManpower",
                 "revolt_risk": "revoltRisk",
                 "citysize": "citySize",
                 "native_size": "nativeSize",
@@ -406,9 +400,6 @@ happened before EU4's own coverage starts."""
 
 PROVINCE_SETTLEMENT_EVENT_KINDS = {
     "capitalName",
-    "baseTax",
-    "baseProduction",
-    "baseManpower",
     "citySize",
     "centerOfTrade",
     "isCity",
@@ -620,13 +611,9 @@ def _nation_history_payload(sub_key: object, sub_value: object) -> tuple[str, di
 
     simple_value_kinds = {
         "add_accepted_culture": "acceptedCultureAdd",
-        "add_heir_personality": "heirTrait",
         "add_piety": "piety",
-        "add_queen_personality": "queenTrait",
-        "add_ruler_personality": "rulerTrait",
         "change_unit_type": "unitType",
         "changed_tag_from": "tagFrom",
-        "clear_scripted_personalities": "clearTraits",
         "clr_country_flag": "countryFlagClear",
         "culture": "culture",
         "decision": "decision",

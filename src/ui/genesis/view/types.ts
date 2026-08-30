@@ -11,14 +11,11 @@ import type {
 	Eu4ProvinceFillGeometry,
 	RawOrganizationReference,
 } from "@/model/history/earth/data-source/types"
-import type { FoldedState } from "@/model/history/earth/fold/types"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
 import type { HistoryNote } from "@/model/history/generated/state/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { SocietyEra } from "@/model/society/types"
-import type {
-	SerializedGenesisWorld,
-	SerializedHistoryFrame,
-} from "@/model/worker-protocol/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
 	DangerSubMode,
 	LabelMode,
@@ -57,7 +54,7 @@ export type EarthHistoryTimeline = ReturnType<typeof useEarthHistoryTimeline>
  * for an org with no registered schema.
  */
 export type OrgCategorizerBuilder = (
-	state: FoldedState,
+	frame: WorldFrame,
 	orgRef: RawOrganizationReference,
 ) => {
 	categorize: OrgCategorizer
@@ -66,13 +63,13 @@ export type OrgCategorizerBuilder = (
 
 /** Wiki page selection setters -- mutually exclusive, see useWikiSelection. */
 export type WikiSelectionSetters = {
-	setSelectedWikiNationTag: (tag: string | null) => void
+	setSelectedWikiNationId: (id: number | null) => void
 	setSelectedWikiOrganizationId: (orgId: string | null) => void
-	setSelectedWikiWarId: (warId: string | null) => void
+	setSelectedWikiWarId: (warId: number | null) => void
 }
 
 export type NationWikiDataInput = WikiSelectionSetters & {
-	selectedWikiNationTag: string | null
+	selectedWikiNationId: number | null
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
 	earthHistory: EarthHistoryTimeline
@@ -89,7 +86,7 @@ export type OrganizationWikiDataInput = NationWikiDataInput & {
 }
 
 export type WarWikiDataInput = WikiSelectionSetters & {
-	selectedWikiWarId: string | null
+	selectedWikiWarId: number | null
 	world: SerializedGenesisWorld | null
 	earthHistory: EarthHistoryTimeline
 	earthImportRawIdToCompact: Map<number, number> | null
@@ -230,6 +227,7 @@ export type MapColoringInput = {
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
 	earthHistory: EarthHistoryTimeline
+	historyFrame: WorldFrame | null
 	colorMode: ColorMode
 	nationMode: NationMapMode
 	societyMode: SocietyMapMode
@@ -271,13 +269,13 @@ export type WorldGenerationInput = {
 	setShowCoastlines: (show: boolean) => void
 	setSolarSystemViewActive: (active: boolean) => void
 	setPathfindingResult: (result: PathfindingResult | null) => void
-	setProceduralHistoryFrame: (frame: SerializedHistoryFrame | null) => void
+	setProceduralHistoryFrame: (frame: WorldFrame | null) => void
 	setProceduralHistoryPlaying: (playing: boolean) => void
 	setProceduralHistoryTimeMs: (timeMs: number) => void
 	resetProceduralHistoryAccumulation: () => void
 	recordProceduralFrame: (
 		timeMs: number,
-		frame: SerializedHistoryFrame,
+		frame: WorldFrame,
 		newEvents: HistoryNote[],
 	) => void
 	seed: number

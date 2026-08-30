@@ -1,11 +1,11 @@
 ﻿import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { HistoryNote } from "@/model/history/generated/state/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
-	SerializedHistoryFrame,
 } from "@/model/worker-protocol/types"
 
 export type GenerationParams = GenesisParams
@@ -127,17 +127,17 @@ export interface GenerationCallbacks {
 	}) => void
 	/** The seed history frame attached to "done", if the generated world has
 	 * nations/provinces/population wired up for the live-play sim. */
-	onHistoryFrame?: (frame: SerializedHistoryFrame) => void
+	onHistoryFrame?: (frame: WorldFrame) => void
 	/** Fired for each "sim-progress" tick emitted while a "simulate" request
 	 * is running in the worker. */
 	onSimProgress?: (
 		timeMs: number,
-		frame: SerializedHistoryFrame,
+		frame: WorldFrame,
 		newEvents: HistoryNote[],
 	) => void
 	/** Reply to a requestHistorySnapshot call: a frame reconstructed at an
 	 * arbitrary past time for scrubbing, without advancing the sim. */
-	onHistoryScrub?: (timeMs: number, frame: SerializedHistoryFrame) => void
+	onHistoryScrub?: (timeMs: number, frame: WorldFrame) => void
 }
 
 function createWorker(

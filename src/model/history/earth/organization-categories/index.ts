@@ -1,5 +1,3 @@
-import { FOLD } from "@/model/history/earth/fold"
-import type { FoldedState } from "@/model/history/earth/fold/types"
 import type {
 	CreateMembershipCategorizerParams,
 	ListOrgMembersParams,
@@ -8,16 +6,18 @@ import type {
 	OrgCategorySchema,
 	OrgProvinceCategory,
 } from "@/model/history/earth/organization-categories/types"
+import { FRAME } from "@/model/history/world-frame"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 
 function listOrgMembers({
-	state,
+	frame,
 	categorize,
-}: ListOrgMembersParams): Map<string, OrgProvinceCategory> {
-	const members = new Map<string, OrgProvinceCategory>()
-	for (const [rawId, province] of state.provinces) {
-		const owner = province.owner
-		if (!owner || members.has(owner)) continue
-		const category = categorize(Number(rawId))
+}: ListOrgMembersParams): Map<number, OrgProvinceCategory> {
+	const members = new Map<number, OrgProvinceCategory>()
+	for (let province = 0; province < frame.provinceCount; province++) {
+		const owner = frame.provinceNation[province]
+		if (owner < 0 || members.has(owner)) continue
+		const category = categorize(province)
 		if (category) members.set(owner, category)
 	}
 	return members
@@ -55,14 +55,14 @@ const HRE_CATEGORIES: OrgCategory[] = [
 function resolveHreEstateCategory(nation: {
 	isEmperor: boolean
 	isElector: boolean
-	governmentType: string | null
-	governmentReform: string | null
+	government: string
+	governmentReform: string
 }): string {
 	if (nation.isEmperor) return "emperor"
-	if (nation.governmentType === "theocracy") {
+	if (nation.government === "theocracy") {
 		return nation.isElector ? "archbishopElector" : "imperialPrelate"
 	}
-	if (nation.governmentType === "republic") {
+	if (nation.government === "republic") {
 		if (nation.governmentReform === "free_city") return "freeImperialCity"
 		if (nation.governmentReform === "peasants_republic")
 			return "peasantRepublic"
@@ -72,33 +72,32 @@ function resolveHreEstateCategory(nation: {
 	return "imperialPrince"
 }
 
-function createHreCategorizer(state: FoldedState): OrgCategorizer {
-	const foreignHolderTags = FOLD.collectOrgForeignHolderNations({
-		state,
+function createHreCategorizer(frame: WorldFrame): OrgCategorizer {
+	const foreignHolderNations = FRAME.orgForeignHolders({
+		frame,
 		orgId: "HRE",
 	})
-	const categoryByOwner = new Map<string, string>()
-	const categoryForOwner = (owner: string): string => {
+	const categoryByOwner = new Map<number, string>()
+	const categoryForOwner = (owner: number): string => {
 		let category = categoryByOwner.get(owner)
 		if (category) return category
-		const ownerState = state.nations.get(owner)
+		const ownerState = frame.nations.get(owner)
 		category = resolveHreEstateCategory({
 			isEmperor: ownerState?.isEmperor ?? false,
 			isElector: ownerState?.isElector ?? false,
-			governmentType: ownerState?.governmentType ?? null,
-			governmentReform: ownerState?.governmentReform ?? null,
+			government: ownerState?.government ?? "",
+			governmentReform: ownerState?.governmentReform ?? "",
 		})
 		categoryByOwner.set(owner, category)
 		return category
 	}
-	return (rawProvinceId: number): OrgProvinceCategory | null => {
-		const province = state.provinces.get(String(rawProvinceId))
-		if (!province?.isHre) return null
-		const owner = province.owner
+	return (province: number): OrgProvinceCategory | null => {
+		if (!frame.provinceHre[province]) return null
+		const owner = frame.provinceNation[province]
 		// Foreign-held provinces (e.g. Venice's Terraferma) count as HRE
 		// territory but not as a genuine Estate -- see
 		// collectOrgForeignHolderNations' doc comment.
-		if (!owner || foreignHolderTags.has(owner)) {
+		if (owner < 0 || foreignHolderNations.has(owner)) {
 			return { categoryId: "foreignHolder", striped: true }
 		}
 		return { categoryId: categoryForOwner(owner), striped: false }
@@ -122,31 +121,35 @@ const HSA_CATEGORIES: OrgCategory[] = [
 function createMembershipCategorizer({
 	orgId,
 	siteRoles,
-}: CreateMembershipCategorizerParams): (state: FoldedState) => OrgCategorizer {
-	return (state: FoldedState): OrgCategorizer => {
-		const memberTags = new Set<string>()
-		for (const [tag, nation] of state.nations) {
-			if (nation.organizations.has(orgId)) memberTags.add(tag)
+}: CreateMembershipCategorizerParams): (frame: WorldFrame) => OrgCategorizer {
+	return (frame: WorldFrame): OrgCategorizer => {
+		const memberIds = new Set<number>()
+		for (const nation of frame.nations.values()) {
+			if (
+				nation.organizations.some(
+					(organization) => organization.orgId === orgId,
+				)
+			)
+				memberIds.add(nation.id)
 		}
 		const siteProvinceIds = new Set<number>()
 		const seatProvinceIds = new Set<number>()
-		for (const site of state.organizationSites.values()) {
+		for (const site of frame.organizations) {
 			if (site.orgId === orgId && siteRoles.includes(site.role)) {
-				siteProvinceIds.add(Number(site.provinceId))
+				siteProvinceIds.add(site.province)
 			} else if (site.orgId === orgId && site.role === "member_seat") {
-				seatProvinceIds.add(Number(site.provinceId))
+				seatProvinceIds.add(site.province)
 			}
 		}
-		return (rawProvinceId: number): OrgProvinceCategory | null => {
-			if (seatProvinceIds.has(rawProvinceId)) {
+		return (province: number): OrgProvinceCategory | null => {
+			if (seatProvinceIds.has(province)) {
 				return { categoryId: "member", striped: false }
 			}
-			if (siteProvinceIds.has(rawProvinceId)) {
+			if (siteProvinceIds.has(province)) {
 				return { categoryId: "tradePost", striped: true }
 			}
-			const province = state.provinces.get(String(rawProvinceId))
-			const owner = province?.owner
-			if (owner && memberTags.has(owner)) {
+			const owner = frame.provinceNation[province]
+			if (owner >= 0 && memberIds.has(owner)) {
 				return { categoryId: "member", striped: false }
 			}
 			return null
@@ -189,13 +192,14 @@ const GG_CATEGORIES: OrgCategory[] = [
 	},
 ]
 
-function createGuelphGhibellineCategorizer(state: FoldedState): OrgCategorizer {
-	return (rawProvinceId: number): OrgProvinceCategory | null => {
-		const province = state.provinces.get(String(rawProvinceId))
-		const owner = province?.owner
-		if (!owner) return null
-		const ownerState = state.nations.get(owner)
-		const role = ownerState?.organizations.get("GG")
+function createGuelphGhibellineCategorizer(frame: WorldFrame): OrgCategorizer {
+	return (province: number): OrgProvinceCategory | null => {
+		const owner = frame.provinceNation[province]
+		if (owner < 0) return null
+		const ownerState = frame.nations.get(owner)
+		const role = ownerState?.organizations.find(
+			(organization) => organization.orgId === "GG",
+		)?.role
 		if (role) return { categoryId: role, striped: false }
 		if (ownerState?.isEmperor)
 			return { categoryId: "ghibellineLeader", striped: false }

@@ -3,11 +3,11 @@ import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
 import { COLOR } from "@/model/history/earth/color"
 import type { RawOrganizationReference } from "@/model/history/earth/data-source/types"
-import { FOLD } from "@/model/history/earth/fold"
-import type { FoldedState } from "@/model/history/earth/fold/types"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import { FRAME } from "@/model/history/world-frame"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 import { ORGANIZATION_TITLE_COLORS } from "@/model/society/organizations/titles"
 import { RELIGION } from "@/model/society/religion"
 import type { OrganizationTitle } from "@/model/society/types"
@@ -39,6 +39,7 @@ export function useMapColoring(input: MapColoringInput) {
 		world,
 		worldForDisplay,
 		earthHistory,
+		historyFrame,
 		colorMode,
 		nationMode,
 		societyMode: populationMode,
@@ -49,7 +50,6 @@ export function useMapColoring(input: MapColoringInput) {
 		selectedNationId,
 		selectedWikiOrganizationId,
 		windVectors,
-		earthImportRawIdToCompact,
 		hoverProvince,
 		labelsPlaybackActive,
 		temperatureMonth,
@@ -61,7 +61,7 @@ export function useMapColoring(input: MapColoringInput) {
 
 	const buildOrgCategorizer = useCallback(
 		(
-			state: FoldedState,
+			frame: WorldFrame,
 			orgRef: RawOrganizationReference,
 		): {
 			categorize: OrgCategorizer
@@ -69,7 +69,7 @@ export function useMapColoring(input: MapColoringInput) {
 		} | null => {
 			const schema = ORGANIZATION_CATEGORIES.orgCategorySchemas[orgRef.id]
 			if (!schema) return null
-			const categorize = schema.createCategorizer(state)
+			const categorize = schema.createCategorizer(frame)
 			const colorCache = new Map<string, [number, number, number]>()
 			const categoryColor = (categoryId: string): [number, number, number] => {
 				let color = colorCache.get(categoryId)
@@ -85,6 +85,10 @@ export function useMapColoring(input: MapColoringInput) {
 		},
 		[],
 	)
+	const historyRenderInputs = useMemo(
+		() => (historyFrame ? FRAME.toRenderInputs({ frame: historyFrame }) : null),
+		[historyFrame],
+	)
 
 	// Recolors provinces belonging to the currently-open org's wiki page,
 	// entirely at region level -- eu4-province-borders-fills.json's real
@@ -99,17 +103,16 @@ export function useMapColoring(input: MapColoringInput) {
 	// buildOrgCategorizer) for every province a category covers.
 	const resolveOrgProvinceColor = useCallback(
 		(
-			state: FoldedState,
+			frame: WorldFrame,
 			orgRef: RawOrganizationReference,
-		): ((rawId: number) => [number, number, number] | null) => {
+		): ((province: number) => [number, number, number] | null) => {
 			const WHITE: [number, number, number] = [1, 1, 1]
-			const colorByRawId = new Map<number, [number, number, number]>()
-			const resolvers = buildOrgCategorizer(state, orgRef)
+			const colorByProvince = new Map<number, [number, number, number]>()
+			const resolvers = buildOrgCategorizer(frame, orgRef)
 			if (resolvers) {
 				const { categorize, categoryColor } = resolvers
-				for (const rawId of state.provinces.keys()) {
-					const numericRawId = Number(rawId)
-					const category = categorize(numericRawId)
+				for (let province = 0; province < frame.provinceCount; province++) {
+					const category = categorize(province)
 					// Striped categories (HRE's foreign holders, HSA's trade posts)
 					// stay white at this base layer -- their diagonal stripe
 					// (computeOrgStripeOverlay, fed through the SAME occColor/
@@ -117,8 +120,8 @@ export function useMapColoring(input: MapColoringInput) {
 					// sole indicator, same convention as the real occupation
 					// overlay (owner's own color underneath, controller's color
 					// striped on top).
-					colorByRawId.set(
-						numericRawId,
+					colorByProvince.set(
+						province,
 						category && !category.striped
 							? categoryColor(category.categoryId)
 							: WHITE,
@@ -128,8 +131,8 @@ export function useMapColoring(input: MapColoringInput) {
 				// No registered schema: fall back to plain solid-member-color/
 				// white-elsewhere coloring, so a brand new org still renders
 				// reasonably before anyone gets around to giving it a real schema.
-				const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
-					state,
+				const memberProvinces = FRAME.orgMemberProvinces({
+					frame,
 					orgId: orgRef.id,
 				})
 				const orgColor: [number, number, number] = [
@@ -137,15 +140,14 @@ export function useMapColoring(input: MapColoringInput) {
 					orgRef.color[1] / 255,
 					orgRef.color[2] / 255,
 				]
-				for (const rawId of state.provinces.keys()) {
-					const numericRawId = Number(rawId)
-					colorByRawId.set(
-						numericRawId,
-						memberProvinceRawIds.has(numericRawId) ? orgColor : WHITE,
+				for (let province = 0; province < frame.provinceCount; province++) {
+					colorByProvince.set(
+						province,
+						memberProvinces.has(province) ? orgColor : WHITE,
 					)
 				}
 			}
-			return (rawId: number) => colorByRawId.get(rawId) ?? WHITE
+			return (province: number) => colorByProvince.get(province) ?? WHITE
 		},
 		[buildOrgCategorizer],
 	)
@@ -159,19 +161,17 @@ export function useMapColoring(input: MapColoringInput) {
 			if (
 				earthHistory.query &&
 				earthHistory.organizationReference &&
-				earthHistory.engine
+				earthHistory.state
 			) {
 				const orgRef = earthHistory.organizationReference.get(
 					selectedWikiOrganizationId,
 				)
 				if (orgRef) {
 					const provinceColor = resolveOrgProvinceColor(
-						earthHistory.query.state,
+						earthHistory.query.frame,
 						orgRef,
 					)
 					const regionProvince = worldForDisplay.provinces.regionProvince
-					const compactToRealId =
-						earthHistory.engine.provinceMap.compactToRealId
 					const N = worldForDisplay.mesh.numRegions
 					// Mutate baseColors in place rather than copying it first -- every
 					// caller (see regionColors' useMemo) computes a brand-new
@@ -181,9 +181,12 @@ export function useMapColoring(input: MapColoringInput) {
 					const out = baseColors ?? new Float32Array(N * 3)
 					for (let region = 0; region < N; region++) {
 						const compact = regionProvince[region]
-						if (compact < 0 || compact >= compactToRealId.length) continue
-						const rawId = compactToRealId[compact]
-						const color = provinceColor(rawId)
+						if (
+							compact < 0 ||
+							compact >= earthHistory.query.frame.provinceCount
+						)
+							continue
+						const color = provinceColor(compact)
 						if (!color) continue
 						out[3 * region] = color[0]
 						out[3 * region + 1] = color[1]
@@ -241,7 +244,7 @@ export function useMapColoring(input: MapColoringInput) {
 			worldForDisplay,
 			earthHistory.query,
 			earthHistory.organizationReference,
-			earthHistory.engine,
+			earthHistory.state,
 			resolveOrgProvinceColor,
 		],
 	)
@@ -353,10 +356,7 @@ export function useMapColoring(input: MapColoringInput) {
 			return withOrgHighlight(rgb)
 		}
 		if (
-			worldForDisplay?.isEarthImport &&
-			earthHistory.engine &&
-			earthHistory.query &&
-			earthHistory.nationReference &&
+			historyFrame &&
 			worldForDisplay.provinces &&
 			worldForDisplay.elevation_km
 		) {
@@ -364,10 +364,7 @@ export function useMapColoring(input: MapColoringInput) {
 				colorMode,
 				nationMode,
 				populationMode,
-				state: earthHistory.query.state,
-				provinceMap: earthHistory.engine.provinceMap,
-				nationIds: earthHistory.query.frame.nationIds,
-				nationReference: earthHistory.nationReference,
+				frame: historyFrame,
 				regionProvince: worldForDisplay.provinces.regionProvince,
 				desolate: worldForDisplay.provinces.desolate,
 				elevationKm: worldForDisplay.elevation_km,
@@ -411,11 +408,9 @@ export function useMapColoring(input: MapColoringInput) {
 		selectedNationId,
 		windVectors,
 		dangerSubMode,
-		earthHistory.engine,
-		earthHistory.query,
-		earthHistory.nationReference,
 		earthHistory.religionColorById,
 		earthHistory.cultureColorById,
+		historyFrame,
 		withOrgHighlight,
 		religionMode,
 	])
@@ -437,23 +432,19 @@ export function useMapColoring(input: MapColoringInput) {
 	const earthHistoryHoverOverride = useMemo(() => {
 		if (
 			!worldForDisplay?.isEarthImport ||
-			!earthHistory.engine ||
+			!earthHistory.state ||
 			!earthHistory.query ||
 			hoverProvince === null ||
 			hoverProvince < 0
 		)
 			return undefined
-		const rawId = String(
-			earthHistory.engine.provinceMap.compactToRealId[hoverProvince],
-		)
 		// ps (folded owner/culture/religion state) can be missing for
 		// provinces with no recorded history at all -- area/region/
 		// superregion are static and come from `meta` regardless, so this no
 		// longer bails out entirely; it just leaves the history-derived
 		// fields null below.
-		const ps = earthHistory.query.state.provinces.get(rawId) ?? null
-
-		const meta = earthHistory.provinceMeta?.get(rawId)
+		const frame = earthHistory.query.frame
+		const meta = earthHistory.state.provinceMeta[hoverProvince]
 		// EU4's own "wasteland" flag describes present-day/in-engine
 		// uninhabitability, not history -- a wasteland province can still
 		// have real recorded culture/religion data (EU4 itself records this
@@ -461,49 +452,47 @@ export function useMapColoring(input: MapColoringInput) {
 		// nation/government, matching computeEarthHistoryRegionColors'
 		// map-coloring behavior.
 		const isWasteland = !!meta?.wasteland
-		const owner = isWasteland ? null : (ps?.owner ?? null)
-		const nationRef = owner ? earthHistory.nationReference?.get(owner) : null
-		const nationName = owner
-			? (earthHistory.query.state.nations.get(owner)?.currentName ??
-				nationRef?.name ??
-				owner)
-			: null
-		const nationColor = owner
-			? nationRef
-				? COLOR.rgb01ToCss([
-						nationRef.color[0] / 255,
-						nationRef.color[1] / 255,
-						nationRef.color[2] / 255,
-					])
-				: COLOR.rgb01ToCss(COLOR.hashColorForKey(`nation:${owner}`))
+		const provinceNation = frame.provinceNation[hoverProvince] ?? -1
+		const owner = isWasteland || provinceNation < 0 ? null : provinceNation
+		const nation = owner === null ? null : (frame.nations.get(owner) ?? null)
+		const nationName =
+			owner !== null
+				? (nation?.name ??
+					earthHistory.state.record.nations[owner]?.name ??
+					`nation ${owner}`)
+				: null
+		const nationColor = nation
+			? COLOR.rgb01ToCss([
+					nation.color[0] / 255,
+					nation.color[1] / 255,
+					nation.color[2] / 255,
+				])
 			: null
 
-		const nationState = owner
-			? (earthHistory.query.state.nations.get(owner) ?? null)
-			: null
+		const nationState = nation
 		const governmentLabel = nationState
 			? GOVERNMENT.formatEarthHistoryGovernmentReformLabel({
 					governmentReform: nationState.governmentReform,
 				})
 			: null
 		const governmentColorRgb = GOVERNMENT.getEarthHistoryGovernmentColor({
-			governmentType: nationState?.governmentType ?? null,
+			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
 		})
 		const governmentColor = COLOR.rgb01ToCss(
 			governmentColorRgb ?? GOVERNMENT.earthHistoryNoGovernmentColor,
 		)
 
-		const cultureId = ps?.cultureId
-		const cultureName = cultureId
-			? (earthHistory.cultureNameById?.get(cultureId) ?? cultureId)
-			: null
-		const cultureColorRgb = cultureId
-			? earthHistory.cultureColorById?.get(cultureId)
-			: null
-		const cultureColor = cultureId
+		const cultureId = frame.provinceCulture[hoverProvince]
+		const culture = cultureId >= 0 ? (frame.cultures[cultureId] ?? null) : null
+		const cultureName = culture?.name ?? null
+		const cultureColor = culture
 			? COLOR.rgb01ToCss(
-					cultureColorRgb ?? COLOR.hashColorForKey(`culture:${cultureId}`),
+					culture.color.map((component) => component / 255) as [
+						number,
+						number,
+						number,
+					],
 				)
 			: null
 
@@ -512,16 +501,17 @@ export function useMapColoring(input: MapColoringInput) {
 		const region = meta?.region ?? null
 		const superregion = meta?.superregion ?? null
 
-		const religionId = ps?.religionId
-		const religionName = religionId
-			? (earthHistory.religionNameById?.get(religionId) ?? religionId)
-			: null
-		const religionColorRgb = religionId
-			? earthHistory.religionColorById?.get(religionId)
-			: null
-		const religionColor = religionId
+		const religionId = frame.provinceReligion[hoverProvince]
+		const religion =
+			religionId >= 0 ? (frame.religions[religionId] ?? null) : null
+		const religionName = religion?.name ?? null
+		const religionColor = religion
 			? COLOR.rgb01ToCss(
-					religionColorRgb ?? COLOR.hashColorForKey(`religion:${religionId}`),
+					religion.color.map((component) => component / 255) as [
+						number,
+						number,
+						number,
+					],
 				)
 			: null
 
@@ -541,23 +531,17 @@ export function useMapColoring(input: MapColoringInput) {
 		}
 	}, [
 		worldForDisplay?.isEarthImport,
-		earthHistory.engine,
+		earthHistory.state,
 		earthHistory.query,
-		earthHistory.nationReference,
-		earthHistory.cultureNameById,
-		earthHistory.cultureColorById,
-		earthHistory.religionNameById,
-		earthHistory.religionColorById,
-		earthHistory.provinceMeta,
 		hoverProvince,
 	])
 
 	const occupationOverlay = useMemo(() => {
 		if (
 			worldForDisplay?.isEarthImport &&
-			earthHistory.engine &&
+			earthHistory.state &&
 			earthHistory.query &&
-			earthHistory.nationReference &&
+			earthHistory.nations &&
 			worldForDisplay.provinces
 		) {
 			// Any org wiki page open: its own striped categories (HRE's
@@ -573,12 +557,11 @@ export function useMapColoring(input: MapColoringInput) {
 					selectedWikiOrganizationId,
 				)
 				const resolvers = orgRef
-					? buildOrgCategorizer(earthHistory.query.state, orgRef)
+					? buildOrgCategorizer(earthHistory.query.frame, orgRef)
 					: null
 				if (resolvers) {
 					return computeOrgStripeOverlay({
-						state: earthHistory.query.state,
-						provinceMap: earthHistory.engine.provinceMap,
+						frame: earthHistory.query.frame,
 						regionProvince: worldForDisplay.provinces.regionProvince,
 						categorize: resolvers.categorize,
 						categoryColor: resolvers.categoryColor,
@@ -591,10 +574,8 @@ export function useMapColoring(input: MapColoringInput) {
 				return null
 			}
 			return computeEarthHistoryOccupationOverlay({
-				state: earthHistory.query.state,
-				provinceMap: earthHistory.engine.provinceMap,
+				frame: earthHistory.query.frame,
 				regionProvince: worldForDisplay.provinces.regionProvince,
-				nationReference: earthHistory.nationReference,
 			})
 		}
 		// Procedural worlds no longer have wars, so there is nothing to occupy.
@@ -602,8 +583,8 @@ export function useMapColoring(input: MapColoringInput) {
 	}, [
 		worldForDisplay,
 		earthHistory.query,
-		earthHistory.nationReference,
-		earthHistory.engine,
+		earthHistory.nations,
+		earthHistory.state,
 		earthHistory.organizationReference,
 		selectedWikiOrganizationId,
 		buildOrgCategorizer,
@@ -710,41 +691,40 @@ export function useMapColoring(input: MapColoringInput) {
 		return null
 	}, [worldForDisplay, populationMode, religionMode])
 	const earthHistorySceneNationOverride = usePlaybackSampledValue(
-		worldForDisplay?.isEarthImport && earthHistory.query
+		historyFrame && historyRenderInputs
 			? {
-					assignment: earthHistory.query.frame.assignment,
-					seeds: earthHistory.query.frame.seeds,
+					assignment: historyRenderInputs.assignment,
+					seeds: historyRenderInputs.seeds,
 					names:
 						colorMode === "nations" && nationMode === "dynasty"
 							? (() => {
-									const { frame, state } = earthHistory.query!
 									const dynastyNames = new Array<string>(
-										frame.names.length,
+										historyRenderInputs.names.length,
 									).fill("")
-									for (const [tag, id] of frame.nationIds) {
-										const dynasty = state.nations.get(tag)?.ruler?.dynasty
-										if (dynasty) dynastyNames[id] = dynasty
+									for (const nation of historyFrame.nations.values()) {
+										const dynasty = nation.ruler?.dynasty
+										if (dynasty) dynastyNames[nation.id] = dynasty
 									}
 									return dynastyNames
 								})()
-							: earthHistory.query.frame.names,
+							: historyRenderInputs.names,
 				}
 			: null,
 		350,
 		labelsPlaybackActive,
 	)
 	const earthHistorySceneLabelPartitions = usePlaybackSampledValue(
-		worldForDisplay?.isEarthImport && earthHistory.query
+		historyFrame && historyRenderInputs
 			? {
 					culture: {
-						assignment: earthHistory.query.frame.cultureAssignment,
-						count: earthHistory.query.frame.cultureCount,
-						names: earthHistory.query.frame.cultureNames,
+						assignment: historyRenderInputs.cultureAssignment,
+						count: historyFrame.cultures.length,
+						names: historyFrame.cultures.map((culture) => culture.name),
 					},
 					religion: {
-						assignment: earthHistory.query.frame.religionAssignment,
-						count: earthHistory.query.frame.religionCount,
-						names: earthHistory.query.frame.religionNames,
+						assignment: historyRenderInputs.religionAssignment,
+						count: historyFrame.religions.length,
+						names: historyFrame.religions.map((religion) => religion.name),
 					},
 				}
 			: null,
@@ -754,7 +734,7 @@ export function useMapColoring(input: MapColoringInput) {
 
 	// Map territory highlight (HRE, Hanseatic League, ...) -- recomputed on
 	// every timeline scrub tick since membership is derived fresh from
-	// FoldedState each time (see fold.ts's collectOrgMemberProvinceRawIds).
+	// WorldFrame each time because membership changes with the scrubbed date.
 	// setOrganizationHighlight rebuilds nation BORDERS and LABELS (border
 	// tracing + label-texture regeneration, both far more expensive than a
 	// region-color array fill) whenever the spec reference changes, so this
@@ -773,17 +753,11 @@ export function useMapColoring(input: MapColoringInput) {
 				selectedWikiOrganizationId,
 			)
 			if (!orgRef) return null
-			const { state } = earthHistory.query
-			const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
-				state,
+			const memberProvinceCompactIndexes = FRAME.orgMemberProvinces({
+				frame: earthHistory.query.frame,
 				orgId: orgRef.id,
 			})
-			if (memberProvinceRawIds.size === 0) return null
-			const memberProvinceCompactIndexes = new Set<number>()
-			for (const rawId of memberProvinceRawIds) {
-				const compact = earthImportRawIdToCompact?.get(rawId)
-				if (compact !== undefined) memberProvinceCompactIndexes.add(compact)
-			}
+			if (memberProvinceCompactIndexes.size === 0) return null
 			return {
 				orgId: orgRef.id,
 				name: orgRef.name,
@@ -822,7 +796,6 @@ export function useMapColoring(input: MapColoringInput) {
 		world,
 		earthHistory.query,
 		earthHistory.organizationReference,
-		earthImportRawIdToCompact,
 		getOrganizationName,
 	])
 	const organizationHighlightSpec = usePlaybackSampledValue(

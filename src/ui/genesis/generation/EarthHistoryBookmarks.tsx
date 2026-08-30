@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react"
+import { DATE } from "@/model/history/earth/date"
 import { BOOKMARKS } from "@/model/history/earth/reference/bookmarks"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 
 interface EarthHistoryBookmarksProps {
-	onSelect: (dateDays: number) => void
+	onSelect: (timeMs: number) => void
 	/** Currently selected timeline date (in days), used to auto-scroll the
 	 * popup to the nearest bookmark when it opens. */
 	selectedDate?: number
@@ -33,8 +34,8 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 		selectedDate === undefined
 			? undefined
 			: BOOKMARKS.earthHistoryBookmarks.reduce((nearest, bookmark) =>
-					Math.abs(bookmark.date - selectedDate) <
-					Math.abs(nearest.date - selectedDate)
+					Math.abs(DATE.eu4DateToTimeMs(bookmark.eu4Date) - selectedDate) <
+					Math.abs(DATE.eu4DateToTimeMs(nearest.eu4Date) - selectedDate)
 						? bookmark
 						: nearest,
 				)
@@ -88,7 +89,7 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 												key={bookmark.eu4Date}
 												ref={isNearest ? activeButtonRef : undefined}
 												onClick={() => {
-													onSelect(bookmark.date)
+													onSelect(DATE.eu4DateToTimeMs(bookmark.eu4Date))
 													setOpen(false)
 												}}
 												className={`rounded border px-1.5 py-1 text-[10px] hover:bg-white/15 ${

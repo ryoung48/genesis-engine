@@ -11,6 +11,7 @@ import type {
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
+	GenesisPartition,
 	GenesisProvinces,
 	SocietyEra,
 } from "@/model/society/types"
@@ -132,6 +133,11 @@ export interface HistoryState {
 	habitability: Float32Array
 	culture: Int32Array
 	cultureCount: number
+	cultureColors: Float32Array
+	religion: Int32Array
+	religionCount: number
+	religionColors: Float32Array
+	nationColors: Float32Array
 	/** Per-province government type index into GOVERNMENT_TYPES (eras.ts) */
 	governmentType: Uint8Array
 
@@ -328,7 +334,9 @@ export interface CreateHistoryStateParams {
 	coastal: Uint8Array
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
-	cultures: { assignment: Int32Array; count: number }
+	cultures: GenesisPartition
+	// [JUSTIFICATION] Some generated eras do not create religious partitions.
+	religions?: GenesisPartition
 	startYear: number
 	rng: SharedRng
 	waterAccess?: Uint8Array

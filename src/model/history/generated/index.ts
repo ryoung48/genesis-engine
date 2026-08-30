@@ -7,6 +7,7 @@ import { SUCCESSION } from "@/model/history/generated/events/succession"
 import { TAX } from "@/model/history/generated/events/tax"
 import { WAR } from "@/model/history/generated/events/war"
 import { FIELDS } from "@/model/history/generated/fields"
+import { FRAME } from "@/model/history/generated/frame"
 import { HISTORY_RNG } from "@/model/history/generated/history-rng"
 import { STATE } from "@/model/history/generated/state"
 import type { HistoryState } from "@/model/history/generated/state/types"
@@ -20,6 +21,7 @@ import type { StageTiming } from "@/model/pipelines/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
+	GenesisPartition,
 	GenesisProvinces,
 	SocietyEra,
 } from "@/model/society/types"
@@ -63,7 +65,9 @@ function initHistory(params: {
 	waterAccess?: Uint8Array
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
-	cultures: { assignment: Int32Array; count: number }
+	cultures: GenesisPartition
+	// [JUSTIFICATION] Some generated eras do not create religious partitions.
+	religions?: GenesisPartition
 	era?: SocietyEra
 	seed: number
 	startYear?: number
@@ -92,6 +96,7 @@ function initHistory(params: {
 				riverVisible: params.riverVisible,
 				r_xyz: params.r_xyz,
 				cultures: params.cultures,
+				religions: params.religions,
 				startYear,
 				rng,
 				waterAccess: params.waterAccess,
@@ -229,4 +234,5 @@ function simulateUntil({
 export const HISTORY = {
 	initHistory,
 	simulateUntil,
+	frameAt: FRAME.frameAt,
 }

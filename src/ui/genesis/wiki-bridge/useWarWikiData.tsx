@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { COLOR } from "@/model/history/earth/color"
-import type { RawWarParticipantEvent } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
+import type { WarParticipantEventRecord } from "@/model/history/record/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
@@ -9,9 +9,7 @@ import type { WarWikiDataInput } from "@/ui/genesis/view/types"
 import {
 	cleanEu4Identifier,
 	eventComment,
-	isRebelTag,
 	joinWithAnd,
-	normalizeTimelineTag,
 	pushTimelineEvent,
 } from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
@@ -30,7 +28,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		earthImportRawIdToCompact,
 		planetName,
 		getProvinceColor,
-		setSelectedWikiNationTag,
+		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		sceneRef,
@@ -38,47 +36,38 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	return useMemo<WarWikiData | null>(() => {
 		if (
-			!selectedWikiWarId ||
+			selectedWikiWarId === null ||
 			!world?.isEarthImport ||
-			!earthHistory.engine ||
+			!earthHistory.state ||
 			!earthHistory.query
 		)
 			return null
-		const war = earthHistory.engine.data.wars.find(
-			(w) => w.warId === selectedWikiWarId,
+		const record = earthHistory.state.record
+		if (record.origin !== "earth") return null
+		const frame = earthHistory.query.frame
+		const war = record.events.wars.find(
+			(entry) => entry.id === selectedWikiWarId,
 		)
 		if (!war || war.events.length === 0) return null
-		const { state } = earthHistory.query
-		const resolveNationName = (otherTag: string): string =>
-			isRebelTag(otherTag)
-				? "Rebels"
-				: (state.nations.get(otherTag)?.currentName ??
-					earthHistory.nationReference?.get(otherTag)?.name ??
-					otherTag)
-		const resolveNationColor = (otherTag: string): string => {
-			if (isRebelTag(otherTag)) return "#020617"
-			const ref = earthHistory.nationReference?.get(otherTag)
-			return ref
+		const nations = record.nations
+		const daysFromMs = (timeMs: number) => timeMs / 86_400_000
+		const resolveNationName = (id: number): string =>
+			frame.nations.get(id)?.name ?? nations[id]?.name ?? `nation ${id}`
+		const resolveNationColor = (id: number): string => {
+			const n = frame.nations.get(id) ?? nations[id]
+			return n
 				? COLOR.rgb01ToCss([
-						ref.color[0] / 255,
-						ref.color[1] / 255,
-						ref.color[2] / 255,
+						n.color[0] / 255,
+						n.color[1] / 255,
+						n.color[2] / 255,
 					])
 				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
-		const nationMention = (otherTag: string) =>
-			isRebelTag(otherTag)
-				? {
-						tag: otherTag,
-						name: "Rebels",
-						color: "#020617",
-						link: false,
-					}
-				: {
-						tag: otherTag,
-						name: resolveNationName(otherTag),
-						color: resolveNationColor(otherTag),
-					}
+		const nationMention = (id: number) => ({
+			tag: String(id),
+			name: resolveNationName(id),
+			color: resolveNationColor(id),
+		})
 		const provinceMention = (
 			rawId: string,
 			fallbackColor: string,
@@ -88,17 +77,18 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			return {
 				id: provinceId,
 				name:
-					earthHistory.provinceMeta?.get(rawId)?.name ?? `Province ${rawId}`,
+					earthHistory.state.provinceMeta[provinceId]?.name ??
+					`Province ${rawId}`,
 				color: getProvinceColor(provinceId) ?? fallbackColor,
 			}
 		}
 		// Last-known side per nation across the whole war (matches the
 		// existing nation-timeline convention) -- a nation that switched
 		// sides mid-war ends up bucketed by whichever side it held last.
-		const sideByTag = new Map<string, "attacker" | "defender">()
-		for (const event of war.events) sideByTag.set(event.nationTag, event.side)
+		const sideById = new Map<number, "attacker" | "defender">()
+		for (const event of war.events) sideById.set(event.nationId, event.side)
 
-		const dates = war.events.map((event) => event.date)
+		const dates = war.events.map((event) => daysFromMs(event.timeMs))
 		const dateRangeStart = Math.min(...dates)
 		const dateRangeEnd = Math.max(...dates)
 		const dateRangeLabel = `${DATE.formatHistoryDays(dateRangeStart)} – ${DATE.formatHistoryDays(dateRangeEnd)}`
@@ -114,21 +104,21 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				label: "Casus Belli",
 				value: cleanEu4Identifier(war.casusBelli),
 			})
-		if (war.warGoalTag) {
-			const target = nationMention(war.warGoalTag)
+		if (war.warGoalId >= 0) {
+			const target = nationMention(war.warGoalId)
 			stats.push({
 				label: "War Goal Target",
 				value: "",
 				valueAction: (
 					<InlineTextButton
-						onClick={() => setSelectedWikiNationTag(target.tag)}
+						onClick={() => setSelectedWikiNationId(Number(target.tag))}
 					>
 						{target.name}
 					</InlineTextButton>
 				),
 			})
-		} else if (war.warGoalProvince) {
-			const province = provinceMention(war.warGoalProvince, "#94a3b8")
+		} else if (war.warGoalProvinceId >= 0) {
+			const province = provinceMention(String(war.warGoalProvinceId), "#94a3b8")
 			if (province) {
 				stats.push({
 					label: "War Goal Target",
@@ -143,26 +133,26 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				})
 			}
 		}
-		if (war.isRebel) stats.push({ label: "Type", value: "Rebellion" })
+		if (war.rebel) stats.push({ label: "Type", value: "Rebellion" })
 
 		// A nation stays listed under whichever side it last held (sideByTag
 		// above), but whether it's actually *in* the war right now depends on
 		// the selected date -- find each tag's most recent join/leave at or
 		// before that date and check whether it was a join. A tag with no
 		// qualifying event yet (hasn't joined) is treated as inactive too.
-		const currentDate = earthHistory.selectedDays
-		const eventsByTag = new Map<string, RawWarParticipantEvent[]>()
+		const currentDate = daysFromMs(earthHistory.selectedTimeMs)
+		const eventsById = new Map<number, WarParticipantEventRecord[]>()
 		for (const event of war.events) {
-			const list = eventsByTag.get(event.nationTag)
+			const list = eventsById.get(event.nationId)
 			if (list) list.push(event)
-			else eventsByTag.set(event.nationTag, [event])
+			else eventsById.set(event.nationId, [event])
 		}
-		const isActiveAtCurrentDate = (nationTag: string): boolean => {
-			const events = eventsByTag.get(nationTag)
+		const isActiveAtCurrentDate = (nationId: number): boolean => {
+			const events = eventsById.get(nationId)
 			if (!events) return false
 			let active = false
-			for (const event of [...events].sort((a, b) => a.date - b.date)) {
-				if (event.date > currentDate) break
+			for (const event of [...events].sort((a, b) => a.timeMs - b.timeMs)) {
+				if (daysFromMs(event.timeMs) > currentDate) break
 				active = event.kind === "warStart"
 			}
 			return active
@@ -175,18 +165,18 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		const dateWithinWar =
 			currentDate >= dateRangeStart && currentDate <= dateRangeEnd
 		const participantMention = (
-			nationTag: string,
+			nationId: number,
 		): WarWikiData["participants"][number]["nations"][number] => ({
-			...nationMention(nationTag),
-			active: !dateWithinWar || isActiveAtCurrentDate(nationTag),
+			...nationMention(nationId),
+			active: !dateWithinWar || isActiveAtCurrentDate(nationId),
 		})
 
 		const sideOrder: Array<"attacker" | "defender"> = ["attacker", "defender"]
 		const participants: WarWikiData["participants"] = sideOrder.map((side) => ({
 			side,
-			nations: Array.from(sideByTag.entries())
-				.filter(([, tagSide]) => tagSide === side)
-				.map(([nationTag]) => nationTag)
+			nations: Array.from(sideById.entries())
+				.filter(([, idSide]) => idSide === side)
+				.map(([nationId]) => nationId)
 				.sort((a, b) =>
 					resolveNationName(a).localeCompare(resolveNationName(b)),
 				)
@@ -198,55 +188,55 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		// treaty ending the war for every belligerent at once, or several
 		// allies declaring together) -- group by (date, kind) so that shows
 		// up as one combined entry instead of one per nation.
-		const eventGroups = new Map<string, RawWarParticipantEvent[]>()
+		const eventGroups = new Map<string, WarParticipantEventRecord[]>()
 		for (const event of war.events) {
-			const key = `${event.date}:${event.kind}`
+			const key = `${event.timeMs}:${event.kind}`
 			const group = eventGroups.get(key)
 			if (group) group.push(event)
 			else eventGroups.set(key, [event])
 		}
 		for (const [key, group] of eventGroups) {
-			const date = group[0].date
+			const date = daysFromMs(group[0].timeMs)
 			const kind = group[0].kind
 			const comment = group.find((event) => event.comment)?.comment
-			const attackerTags = group
+			const attackerIds = group
 				.filter((event) => event.side === "attacker")
-				.map((event) => event.nationTag)
-			const defenderTags = group
+				.map((event) => event.nationId)
+			const defenderIds = group
 				.filter((event) => event.side === "defender")
-				.map((event) => event.nationTag)
+				.map((event) => event.nationId)
 			const nations: NationTimelineEvent["nations"] = []
-			for (const nationTag of [...attackerTags, ...defenderTags]) {
-				if (!nations.some((entry) => entry.tag === nationTag))
-					nations.push(nationMention(nationTag))
+			for (const nationId of [...attackerIds, ...defenderIds]) {
+				if (!nations.some((entry) => entry.tag === String(nationId)))
+					nations.push(nationMention(nationId))
 			}
 			let description: string
 			if (kind === "warStart") {
-				const attackerNames = attackerTags.map(resolveNationName)
-				const defenderNames = defenderTags.map(resolveNationName)
+				const attackerNames = attackerIds.map(resolveNationName)
+				const defenderNames = defenderIds.map(resolveNationName)
 				if (attackerNames.length > 0 && defenderNames.length > 0) {
 					description = `${joinWithAnd(attackerNames)} entered the war against ${joinWithAnd(defenderNames)}.`
 				} else {
 					const joiningSide = attackerNames.length > 0 ? "attacker" : "defender"
-					const joiningTags =
-						attackerNames.length > 0 ? attackerTags : defenderTags
+					const joiningIds =
+						attackerNames.length > 0 ? attackerIds : defenderIds
 					const joiningNames =
 						attackerNames.length > 0 ? attackerNames : defenderNames
-					const opponentTags = Array.from(sideByTag.entries())
+					const opponentIds = Array.from(sideById.entries())
 						.filter(
-							([opponentTag, side]) =>
-								side !== joiningSide && !joiningTags.includes(opponentTag),
+							([opponentId, side]) =>
+								side !== joiningSide && !joiningIds.includes(opponentId),
 						)
-						.map(([opponentTag]) => opponentTag)
-					for (const opponentTag of opponentTags) {
-						if (!nations.some((entry) => entry.tag === opponentTag))
-							nations.push(nationMention(opponentTag))
+						.map(([opponentId]) => opponentId)
+					for (const opponentId of opponentIds) {
+						if (!nations.some((entry) => entry.tag === String(opponentId)))
+							nations.push(nationMention(opponentId))
 					}
-					const opponentNames = opponentTags.map(resolveNationName)
+					const opponentNames = opponentIds.map(resolveNationName)
 					description = `${joinWithAnd(joiningNames)} entered the war${opponentNames.length > 0 ? ` against ${joinWithAnd(opponentNames)}` : ""}.`
 				}
 			} else {
-				const names = [...attackerTags, ...defenderTags].map(resolveNationName)
+				const names = [...attackerIds, ...defenderIds].map(resolveNationName)
 				description = `${joinWithAnd(names)} left the war.`
 			}
 			pushTimelineEvent(timelineEvents, {
@@ -260,22 +250,26 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		}
 
 		for (const [index, battle] of war.battles.entries()) {
-			const province = battle.locationProvinceId
-				? provinceMention(battle.locationProvinceId, "#94a3b8")
-				: null
+			const province =
+				battle.locationProvinceId >= 0
+					? provinceMention(String(battle.locationProvinceId), "#94a3b8")
+					: null
 			const winner = battle.attackerWon ? battle.attacker : battle.defender
 			const loser = battle.attackerWon ? battle.defender : battle.attacker
-			const description = `${resolveNationName(winner.country)} defeated ${resolveNationName(loser.country)} at the Battle of ${battle.name}.`
+			const winnerName =
+				winner.countryId >= 0 ? resolveNationName(winner.countryId) : "unknown"
+			const loserName =
+				loser.countryId >= 0 ? resolveNationName(loser.countryId) : "unknown"
+			const description = `${winnerName} defeated ${loserName} at the Battle of ${battle.name}.`
 			pushTimelineEvent(timelineEvents, {
-				id: `warBattle:${battle.date}:${index}`,
-				date: battle.date,
+				id: `warBattle:${battle.timeMs}:${index}`,
+				date: daysFromMs(battle.timeMs),
 				type: "Battle",
 				description,
 				comment: eventComment(battle.comment),
-				nations: [
-					nationMention(battle.attacker.country),
-					nationMention(battle.defender.country),
-				],
+				nations: [battle.attacker.countryId, battle.defender.countryId].flatMap(
+					(id) => (id >= 0 ? [nationMention(id)] : []),
+				),
 				provinces: province ? [province] : [],
 			})
 		}
@@ -292,8 +286,8 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			string,
 			{
 				date: number
-				owner: string
-				nextOwner: string
+				owner: number
+				nextOwner: number
 				provinces: NationTimelineEvent["provinces"]
 			}
 		>()
@@ -308,36 +302,34 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			string,
 			{
 				date: number
-				controller: string
-				nextController: string
+				controller: number
+				nextController: number
 				provinces: NationTimelineEvent["provinces"]
 			}
 		>()
-		for (const [rawId, entry] of Object.entries(
-			earthHistory.engine.data.provinceEvents,
-		)) {
-			let owner = normalizeTimelineTag(entry.base.owner)
-			let controller = normalizeTimelineTag(entry.base.controller)
+		for (const [rawId, entry] of record.events.provinceEvents) {
+			let owner = entry.base.ownerId
+			let controller = entry.base.controllerId
 			for (const event of entry.events) {
 				if (event.kind === "owner") {
-					const nextOwner = normalizeTimelineTag(event.payload.tag)
+					const nextOwner = (event.payload.nationId as number | null) ?? null
 					if (
-						event.date >= dateRangeStart &&
-						event.date <= dateRangeEnd &&
-						owner &&
-						nextOwner &&
+						daysFromMs(event.timeMs) >= dateRangeStart &&
+						daysFromMs(event.timeMs) <= dateRangeEnd &&
+						owner >= 0 &&
+						nextOwner >= 0 &&
 						owner !== nextOwner &&
-						sideByTag.has(owner) &&
-						sideByTag.has(nextOwner)
+						sideById.has(owner) &&
+						sideById.has(nextOwner)
 					) {
-						const province = provinceMention(rawId, "#94a3b8")
+						const province = provinceMention(String(rawId), "#94a3b8")
 						if (province) {
-							const key = `${event.date}:${owner}:${nextOwner}`
+							const key = `${event.timeMs}:${owner}:${nextOwner}`
 							const group = territoryGroups.get(key)
 							if (group) group.provinces.push(province)
 							else
 								territoryGroups.set(key, {
-									date: event.date,
+									date: daysFromMs(event.timeMs),
 									owner,
 									nextOwner,
 									provinces: [province],
@@ -346,24 +338,25 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 					}
 					owner = nextOwner
 				} else if (event.kind === "controller") {
-					const nextController = normalizeTimelineTag(event.payload.tag)
+					const nextController =
+						(event.payload.nationId as number | null) ?? null
 					if (
-						event.date >= dateRangeStart &&
-						event.date <= dateRangeEnd &&
-						controller &&
-						nextController &&
+						daysFromMs(event.timeMs) >= dateRangeStart &&
+						daysFromMs(event.timeMs) <= dateRangeEnd &&
+						controller >= 0 &&
+						nextController >= 0 &&
 						controller !== nextController &&
-						sideByTag.has(controller) &&
-						sideByTag.has(nextController)
+						sideById.has(controller) &&
+						sideById.has(nextController)
 					) {
-						const province = provinceMention(rawId, "#94a3b8")
+						const province = provinceMention(String(rawId), "#94a3b8")
 						if (province) {
-							const key = `${event.date}:${controller}:${nextController}`
+							const key = `${event.timeMs}:${controller}:${nextController}`
 							const group = controlGroups.get(key)
 							if (group) group.provinces.push(province)
 							else
 								controlGroups.set(key, {
-									date: event.date,
+									date: daysFromMs(event.timeMs),
 									controller,
 									nextController,
 									provinces: [province],
@@ -410,7 +403,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		timelineEvents.sort((a, b) => a.date - b.date)
 
 		return {
-			id: war.warId,
+			id: war.id,
 			name: war.name,
 			planetTitle: planetName,
 			dateRangeLabel,
@@ -419,18 +412,19 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			timelineEvents,
 			dateRangeStart,
 			dateRangeEnd,
-			currentDate: earthHistory.selectedDays,
-			currentDateLabel: DATE.formatHistoryDays(earthHistory.selectedDays),
+			currentDate,
+			currentDateLabel: DATE.formatHistoryTimeMs(earthHistory.selectedTimeMs),
 			onBack: () => setSelectedWikiWarId(null),
 			onSelectNation: (targetTag: string) => {
-				setSelectedWikiNationTag(targetTag)
+				setSelectedWikiNationId(Number(targetTag))
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
 					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 				})
 			},
-			onSelectDate: earthHistory.setSelectedDays,
+			onSelectDate: (day: number) =>
+				earthHistory.setSelectedTimeMs(day * 86_400_000),
 			onSelectOrganization: (orgId: string) => {
 				setSelectedWikiOrganizationId(orgId)
 			},
@@ -439,15 +433,14 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		selectedWikiWarId,
 		world,
 		earthHistory.query,
-		earthHistory.engine,
-		earthHistory.nationReference,
+		earthHistory.state,
 		earthHistory.provinceMeta,
-		earthHistory.selectedDays,
-		earthHistory.setSelectedDays,
+		earthHistory.selectedTimeMs,
+		earthHistory.setSelectedTimeMs,
 		earthImportRawIdToCompact,
 		getProvinceColor,
 		planetName,
-		setSelectedWikiNationTag,
+		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 	])

@@ -56,8 +56,6 @@ export function timelineTypeColor(type: string): string {
 			return "#475569"
 		case "Decision":
 			return "#9333ea"
-		case "Trait":
-			return "#e11d48"
 		case "Flag":
 			return "#64748b"
 		case "Economy":
@@ -105,30 +103,32 @@ export function paletteColorForDynasty(dynasty: string): string {
 export function formatRulerAgeLabel(
 	birthDate: unknown,
 	deathDate: unknown,
-	selectedDays: number,
+	selectedTimeMs: number,
 ): string | null {
 	if (
 		typeof deathDate === "string" &&
-		DATE.eu4DateToDays(deathDate) <= selectedDays
+		DATE.eu4DateToTimeMs(deathDate) <= selectedTimeMs
 	) {
 		return "Deceased"
 	}
 	if (typeof birthDate !== "string") return null
-	const age = Math.floor((selectedDays - DATE.eu4DateToDays(birthDate)) / 365)
+	const age = Math.floor(
+		(selectedTimeMs - DATE.eu4DateToTimeMs(birthDate)) / (365 * 86_400_000),
+	)
 	return Number.isFinite(age) && age >= 0 ? String(age) : null
 }
 
 export function formatRulerStatLabel(
 	payload: Record<string, unknown> | null,
 	fallbackName: string,
-	selectedDays: number,
+	selectedTimeMs: number,
 ): string {
 	const rulerName = String(payload?.name ?? fallbackName)
 	const parts: string[] = []
 	const ageLabel = formatRulerAgeLabel(
 		payload?.birthDate,
 		payload?.deathDate,
-		selectedDays,
+		selectedTimeMs,
 	)
 	if (ageLabel) parts.push(ageLabel)
 	if (

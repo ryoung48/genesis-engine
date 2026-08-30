@@ -30,14 +30,14 @@ export interface WikiTimelineEvent {
 	organizations: Array<{ id: string; name: string; color: string }>
 	/** Wars (wars.json) mentioned in this event's description -- clicking
 	 * navigates to that war's wiki page via refs.onSelectWar. */
-	wars: Array<{ id: string; name: string; color: string }>
+	wars: Array<{ id: number; name: string; color: string }>
 }
 
 interface WikiTimelineRefs {
 	onSelectNation: (tag: string) => void
 	onSelectProvince: (provinceId: number) => void
 	onSelectOrganization: (orgId: string) => void
-	onSelectWar: (warId: string) => void
+	onSelectWar: (warId: number) => void
 	onSelectDate: (date: number) => void
 }
 
@@ -110,7 +110,7 @@ function renderLinkedTimelineText(
 				key: string
 				name: string
 				color: string
-				id: string
+				id: number
 		  }
 		| { kind: "label"; key: string; name: string; color: string }
 	> = [

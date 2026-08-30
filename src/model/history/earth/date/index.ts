@@ -8,6 +8,8 @@ const earthHistoryStartYear = 2
 
 const EARTH_HISTORY_END_YEAR = 9999
 
+const MS_PER_DAY = 86_400_000
+
 function dayOfYear({ month, day }: DayOfYearParams): number {
 	return CUM_MONTH_DAYS[month - 1] + day
 }
@@ -59,6 +61,26 @@ function formatHistoryDays(days: number): string {
 	return formatEu4Date(daysToEu4Date(days))
 }
 
+function eu4DateToTimeMs(dateStr: string): number {
+	return eu4DateToDays(dateStr) * MS_PER_DAY
+}
+
+function timeMsToEu4Date(timeMs: number): string {
+	return daysToEu4Date(Math.floor(timeMs / MS_PER_DAY))
+}
+
+function timeMsToDays(timeMs: number): number {
+	return Math.floor(timeMs / MS_PER_DAY)
+}
+
+function formatHistoryTimeMs(timeMs: number): string {
+	return formatEu4Date(timeMsToEu4Date(timeMs))
+}
+
+function historyTimeMsToYear(timeMs: number): number {
+	return historyDaysToYear(Math.floor(timeMs / MS_PER_DAY))
+}
+
 function historyDaysToYear(days: number): number {
 	return earthHistoryStartYear + Math.floor(days / 365)
 }
@@ -69,13 +91,26 @@ const earthHistoryMaxDays = eu4DateToDays(`${EARTH_HISTORY_END_YEAR}.12.31`)
 
 const earthHistoryDefaultStartDays = eu4DateToDays("1444.11.11")
 
+const earthHistoryMinTimeMs = earthHistoryMinDays * MS_PER_DAY
+
+const earthHistoryMaxTimeMs = earthHistoryMaxDays * MS_PER_DAY
+
+const earthHistoryDefaultStartTimeMs = earthHistoryDefaultStartDays * MS_PER_DAY
+
 export const DATE = {
 	earthHistoryStartYear,
 	earthHistoryMinDays,
 	earthHistoryMaxDays,
 	earthHistoryDefaultStartDays,
+	earthHistoryMinTimeMs,
+	earthHistoryMaxTimeMs,
+	earthHistoryDefaultStartTimeMs,
 	eu4DateToDays,
+	eu4DateToTimeMs,
+	timeMsToDays,
 	formatEu4Year,
 	formatHistoryDays,
+	formatHistoryTimeMs,
 	historyDaysToYear,
+	historyTimeMsToYear,
 }

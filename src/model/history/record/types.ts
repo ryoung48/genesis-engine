@@ -1,0 +1,200 @@
+import type {
+	RawDiplomacyEvent,
+	RawNationEvents,
+	RawOrganizationEvent,
+	RawProvinceEvents,
+	RawWar,
+} from "@/model/history/earth/data-source/types"
+import type { Eu4ProvinceMap } from "@/model/history/earth/import/eu4-province-map/types"
+import type { Nation } from "@/model/history/earth/reference/nations/types"
+import type { LonLat } from "@/model/history/earth/types"
+import type {
+	PartitionRow,
+	WorldFrame,
+} from "@/model/history/world-frame/types"
+import type { GenesisProvinces } from "@/model/society/types"
+
+export interface HistoryEvent {
+	timeMs: number
+	kind: string
+	payload: Record<string, unknown>
+	comment: string | null
+}
+
+export interface ProvinceEventLog {
+	base: {
+		ownerId: number
+		controllerId: number
+		cultureId: number
+		religionId: number
+		inHolyRomanEmpire: boolean
+	}
+	events: HistoryEvent[]
+}
+
+export interface NationEventLog {
+	base: {
+		reforms: string[]
+		capitalProvinceId: number
+		initialGovernment: string
+	}
+	events: HistoryEvent[]
+}
+
+export interface DiplomacyEventRecord {
+	timeMs: number
+	kind: string
+	firstId: number
+	secondId: number
+	subjectType: string | null
+}
+
+export interface WarParticipantEventRecord {
+	timeMs: number
+	nationId: number
+	kind: "warStart" | "warEnd"
+	side: "attacker" | "defender"
+	comment: string | null
+}
+
+export interface BattleParticipant {
+	countryId: number
+	commander: string | null
+	infantry: number | null
+	cavalry: number | null
+	artillery: number | null
+	losses: number | null
+}
+
+export interface Battle {
+	timeMs: number
+	name: string
+	locationProvinceId: number
+	attacker: BattleParticipant
+	defender: BattleParticipant
+	attackerWon: boolean
+	comment: string | null
+}
+
+export interface WarRecord {
+	id: number
+	name: string
+	casusBelli: string
+	warGoalType: string
+	warGoalId: number
+	warGoalProvinceId: number
+	rebel: boolean
+	events: WarParticipantEventRecord[]
+	battles: Battle[]
+}
+
+export interface OrgMembershipEventRecord {
+	timeMs: number
+	nationId: number
+	kind: "join" | "leave"
+	payload: { orgId: string; role: string | null }
+}
+
+export interface OrgSiteEventRecord {
+	timeMs: number
+	provinceId: number
+	kind: "siteStart" | "siteEnd"
+	payload: { orgId: string; name: string; role: string }
+}
+
+export type OrganizationEventRecord =
+	| OrgMembershipEventRecord
+	| OrgSiteEventRecord
+
+export interface EarthHistoryEvents {
+	provinceEvents: Map<number, ProvinceEventLog>
+	nationEvents: (NationEventLog | undefined)[]
+	wars: WarRecord[]
+	diplomacy: DiplomacyEventRecord[]
+	organizationEvents: OrganizationEventRecord[]
+}
+
+export interface NationIdentity {
+	id: number
+	name: string
+	color: readonly [number, number, number]
+	/** Earliest timeMs the nation appears as a province owner / in its own
+	 * country history. `record.minTimeMs` when it already exists at the start. */
+	birthTimeMs: number
+	/** timeMs the nation last lost its final province with no later re-grant, or
+	 * -1 if it still owns territory at `record.maxTimeMs`. */
+	deathTimeMs: number
+	/** EU4's generic rebel actor (`tag === "REB"`) -- rendered black, labelled
+	 * "Rebels" rather than by name. */
+	isRebel: boolean
+	tag: string | null
+}
+
+export interface HistoryRecordCommon {
+	minTimeMs: number
+	maxTimeMs: number
+	nations: NationIdentity[]
+	cultures: PartitionRow[]
+	religions: PartitionRow[]
+}
+
+export interface ProceduralTimeline {}
+
+export type HistoryRecord =
+	| (HistoryRecordCommon & { origin: "earth"; events: EarthHistoryEvents })
+	| (HistoryRecordCommon & {
+			origin: "procedural"
+			timeline: ProceduralTimeline
+	  })
+
+export interface ProvinceMeta {
+	name: string | null
+	wasteland: boolean
+	area: string | null
+	region: string | null
+	superregion: string | null
+}
+
+export type ProvinceMap = Eu4ProvinceMap
+
+export type FrameCache = Map<number, WorldFrame>
+
+export interface HistoryState {
+	record: HistoryRecord
+	frameCache: FrameCache
+	provinceMap: ProvinceMap
+	provinceMeta: ProvinceMeta[]
+	provinceCoords: LonLat[]
+}
+
+export interface BuildEarthRecordParams {
+	provinceEvents: RawProvinceEvents
+	nationEvents: RawNationEvents
+	wars: RawWar[]
+	diplomacy: RawDiplomacyEvent[]
+	organizationEvents: RawOrganizationEvent[]
+	nations: Nation[]
+	idByTag: Map<string, number>
+	cultures: PartitionRow[]
+	religions: PartitionRow[]
+}
+
+export interface CreateHistoryStateParams {
+	record: HistoryRecord
+	provinceMap: ProvinceMap
+	provinceMeta: ProvinceMeta[]
+	provinceCoords: LonLat[]
+}
+
+export interface FrameAtParams {
+	state: HistoryState
+	timeMs: number
+}
+
+export interface LoadEarthStateParams {
+	provinces: GenesisProvinces
+}
+
+export interface LoadedEarthState {
+	state: HistoryState
+}

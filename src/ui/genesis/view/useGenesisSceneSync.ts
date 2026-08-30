@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { DATE } from "@/model/history/earth/date"
 import {
 	buildGhslSettlementPopulationSlice,
 	topSettlementIndices,
@@ -153,7 +154,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		if (showInfrastructure && isEarthImportDisplay && eu4GhslSettlements) {
 			const population = buildGhslSettlementPopulationSlice(
 				eu4GhslSettlements,
-				earthHistory.selectedDays,
+				DATE.timeMsToDays(earthHistory.selectedTimeMs),
 			)
 			const realSettlement = worldForDisplay?.realSettlement
 			const indices = realSettlement
@@ -173,7 +174,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 			// capital-preferring seeds per nation for the current date -- see
 			// adapter.ts's GenesisFrameFromHistory.seeds.
 			const capitalProvinceIds = new Set<number>()
-			const frameSeeds = earthHistory.query?.frame.seeds
+			const frameSeeds = earthHistory.query?.renderInputs.seeds
 			const realIds = worldForDisplay?.provinces?.realIds
 			if (frameSeeds && realIds) {
 				for (const compactIdx of frameSeeds) {
@@ -199,7 +200,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		showInfrastructure,
 		isEarthImportDisplay,
 		eu4GhslSettlements,
-		earthHistory.selectedDays,
+		earthHistory.selectedTimeMs,
 		earthHistory.query,
 		worldForDisplay,
 	])

@@ -38,7 +38,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 	const earthNationProvinceCounts = useMemo(() => {
 		if (!world?.isEarthImport || !earthHistory.query) return null
 		const counts = new Map<number, number>()
-		for (const nationId of earthHistory.query.frame.assignment) {
+		for (const nationId of earthHistory.query.frame.provinceNation) {
 			if (nationId < 0) continue
 			counts.set(nationId, (counts.get(nationId) ?? 0) + 1)
 		}
@@ -52,19 +52,13 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 			!earthNationProvinceCounts
 		)
 			return null
-		const { nationIds } = earthHistory.query.frame
-		const { nations } = earthHistory.query.state
-		const tagById = new Map<number, string>()
-		for (const [tag, id] of nationIds) tagById.set(id, tag)
+		const { nations } = earthHistory.query.frame
 		const counts = new Map<
 			(typeof GOVERNMENT.earthHistoryGovernmentFamilies)[number],
 			number
 		>()
 		for (const nationId of earthNationProvinceCounts.keys()) {
-			const tag = tagById.get(nationId)
-			const governmentType = tag
-				? (nations.get(tag)?.governmentType ?? null)
-				: null
+			const governmentType = nations.get(nationId)?.government ?? null
 			const family = GOVERNMENT.getEarthHistoryGovernmentFamily(governmentType)
 			if (!family) continue
 			counts.set(family, (counts.get(family) ?? 0) + 1)
@@ -83,7 +77,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 	const unclaimedProvinceCount = useMemo(() => {
 		if (world?.isEarthImport && earthHistory.query) {
 			let unclaimed = 0
-			for (const nationId of earthHistory.query.frame.assignment) {
+			for (const nationId of earthHistory.query.frame.provinceNation) {
 				if (nationId < 0) unclaimed++
 			}
 			return unclaimed

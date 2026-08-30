@@ -30,7 +30,7 @@ interface WarWikiParticipant {
 }
 
 export interface WarWikiData {
-	id: string
+	id: number
 	name: string
 	planetTitle: string
 	/** Human-readable date range, e.g. "1618.5.23 – 1648.10.24" -- always

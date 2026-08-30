@@ -84,7 +84,7 @@ export interface OrganizationWikiData {
 	/** Switches the page to a war's wiki page. Organizations' own timelines
 	 * don't currently mention wars, but WikiTimelineSection's refs are shared
 	 * with NationWikiPage, so this needs a real (if unused) handler. */
-	onSelectWar: (warId: string) => void
+	onSelectWar: (warId: number) => void
 }
 
 function NationLink({

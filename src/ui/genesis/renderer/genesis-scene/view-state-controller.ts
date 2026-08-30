@@ -63,7 +63,7 @@ export function createViewStateController(
 
 	/** Current territory highlight for one international organization (HRE,
 	 * Hanseatic League, ...), from GenesisView's organizationHighlightSpec --
-	 * recomputed fresh from FoldedState each earth-history scrub tick, so
+	 * recomputed fresh from the history frame each earth-history scrub tick, so
 	 * this always does a full rebuild rather than an in-place update. Pass
 	 * null exactly when no organization's wiki page is open, which both
 	 * clears the fill highlight and lets rebuildNationLabels resume showing

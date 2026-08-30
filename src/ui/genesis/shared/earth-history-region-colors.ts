@@ -1,17 +1,13 @@
 ﻿import { COLOR } from "@/model/history/earth/color"
-import type { RawNationReference } from "@/model/history/earth/data-source/types"
-import type { FoldedState } from "@/model/history/earth/fold/types"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import type { Nation } from "@/model/history/earth/reference/nations/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 import {
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
 } from "@/ui/genesis/shared/color-helpers"
-import {
-	type ColorMode,
-	developmentColor,
-	OCEAN_LIGHT_BLUE,
-} from "@/ui/genesis/shared/colors"
+import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
@@ -20,28 +16,7 @@ import type {
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 
-/** Nation tag -> fill color (0-1 RGB), from RawNationReference.color
- * (0-255), falling back to a neutral gray for tags with no reference color.
- * Shared by computeEarthHistoryRegionColors (per-region vertex coloring)
- * and buildEarthHistoryNationFillColorForRawId (per-province-polygon
- * coloring) so both paths render the same nation the same color. */
-function buildNationColorByTag(
-	nationIds: Map<string, number>,
-	nationReference: Map<string, RawNationReference>,
-): Map<string, [number, number, number]> {
-	const nationColorByTag = new Map<string, [number, number, number]>()
-	for (const tag of nationIds.keys()) {
-		const ref = nationReference.get(tag)
-		nationColorByTag.set(
-			tag,
-			ref
-				? [ref.color[0] / 255, ref.color[1] / 255, ref.color[2] / 255]
-				: [0.5, 0.5, 0.5],
-		)
-	}
-	return nationColorByTag
-}
-
+/** Per Nation.id: fill color (0-1 RGB) from Nation.color (0-255). */
 /** Political/culture/religion/diplomacy map-mode coloring sourced from the
  * earth-history engine's folded state, for Earth-imported worlds. A sibling
  * to computeRegionColors in region-colors.ts rather than a branch inside it:
@@ -56,17 +31,12 @@ function buildNationColorByTag(
  * Returns null for any (colorMode, nationMode, populationMode) combination
  * this doesn't cover -- callers should fall back to computeRegionColors
  * (still correct for terrain/climate/density/etc, which aren't part of this
- * engine's scope). Development IS covered here (unlike density/urban) since
- * baseTax/baseProduction/baseManpower are folded per-date state, not a
- * static world.development array. */
+ * engine's scope). */
 export function computeEarthHistoryRegionColors(params: {
 	colorMode: string
 	nationMode: NationMapMode
 	populationMode: SocietyMapMode
-	state: FoldedState
-	provinceMap: { compactToRealId: Int32Array }
-	nationIds: Map<string, number>
-	nationReference: Map<string, RawNationReference>
+	frame: WorldFrame
 	regionProvince: Int32Array
 	desolate: Uint8Array
 	elevationKm: Float32Array
@@ -91,10 +61,7 @@ export function computeEarthHistoryRegionColors(params: {
 		colorMode,
 		nationMode,
 		populationMode,
-		state,
-		provinceMap,
-		nationIds,
-		nationReference,
+		frame,
 		regionProvince,
 		desolate,
 		elevationKm,
@@ -112,9 +79,6 @@ export function computeEarthHistoryRegionColors(params: {
 	const isDemographic =
 		getBaseMapMode(colorMode as ColorMode) === "population" &&
 		(populationMode === "culture" || populationMode === "religion")
-	const isDevelopment =
-		getBaseMapMode(colorMode as ColorMode) === "population" &&
-		populationMode === "development"
 	// density/urban (any variant -- generated/observed/diff) has no
 	// per-region rendering path here: it falls through to the plain
 	// computeRegionColors in region-colors.ts, which reads world.population/
@@ -124,7 +88,7 @@ export function computeEarthHistoryRegionColors(params: {
 	// version of this function routed the generated variant through one, but
 	// that overlay was never implemented, which left the map solid gray for
 	// Model/Density on earth-import worlds.
-	if (!isPolitical && !isDemographic && !isDevelopment) return null
+	if (!isPolitical && !isDemographic) return null
 
 	const N = regionProvince.length
 	const rgb = new Float32Array(N * 3)
@@ -136,11 +100,7 @@ export function computeEarthHistoryRegionColors(params: {
 		rgb[3 * r + 2] = color[2]
 	}
 
-	// province index -> raw EU4 id string, cached once per call.
-	const rawIdByProvince = provinceMap.compactToRealId
-
-	const nationColorByTag = buildNationColorByTag(nationIds, nationReference)
-
+	// compact province index -> raw EU4 id (number), cached once per call.
 	// Deterministic fallback color for culture/religion ids with no explicit
 	// reference color (most EU4 cultures have no inherent color; religions
 	// do via religion-groups.ts, applied by the caller before calling this).
@@ -155,26 +115,13 @@ export function computeEarthHistoryRegionColors(params: {
 		return c
 	}
 
-	// Precomputed once over the (much smaller) province set rather than the
-	// region set below, same normalization approach region-colors.ts uses for
-	// the procedural world.development array.
-	let maxDevelopment = 0
-	if (isDevelopment) {
-		for (const ps of state.provinces.values()) {
-			const dev = ps.baseTax + ps.baseProduction + ps.baseManpower
-			if (dev > maxDevelopment) maxDevelopment = dev
-		}
-	}
-	const invDevelopmentMax = maxDevelopment > 0 ? 1 / maxDevelopment : 0
-
 	for (let r = 0; r < N; r++) {
 		const p = regionProvince[r]
 		if (p < 0) {
 			write(r, oceanRgb(r))
 			continue
 		}
-		const rawId = String(rawIdByProvince[p])
-		const ps = state.provinces.get(rawId)
+		const owner = frame.provinceNation[p]
 
 		// "Desolate" (this app's own procedural habitability model) only
 		// suppresses political/population coloring, never isDemographic's
@@ -196,15 +143,14 @@ export function computeEarthHistoryRegionColors(params: {
 				write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
 				continue
 			}
-			const owner = ps?.owner ?? null
-			if (!owner) {
+			if (owner < 0) {
 				write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
 				continue
 			}
 			if (nationMode === "government") {
-				const nation = state.nations.get(owner)
+				const nation = frame.nations.get(owner)
 				const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
-					governmentType: nation?.governmentType ?? null,
+					governmentType: nation?.government ?? null,
 					governmentReform: nation?.governmentReform,
 				})
 				write(
@@ -221,7 +167,7 @@ export function computeEarthHistoryRegionColors(params: {
 				// dynasty. A republic, an interregnum, or simply no ruler
 				// recorded at this date all fall back to the same neutral gray
 				// as "no culture"/"no religion" below.
-				const dynasty = state.nations.get(owner)?.ruler?.dynasty ?? null
+				const dynasty = frame.nations.get(owner)?.ruler?.dynasty ?? null
 				write(
 					r,
 					darkenPoliticalAtElevation(
@@ -230,28 +176,16 @@ export function computeEarthHistoryRegionColors(params: {
 					),
 				)
 			} else {
-				const color = nationColorByTag.get(owner) ?? colorFor(`nation:${owner}`)
+				const nation = frame.nations.get(owner)
+				const color: [number, number, number] = nation
+					? [
+							nation.color[0] / 255,
+							nation.color[1] / 255,
+							nation.color[2] / 255,
+						]
+					: colorFor(`nation:${owner}`)
 				write(r, darkenPoliticalAtElevation(color, elevationKm[r] ?? 0))
 			}
-			continue
-		}
-
-		if (isDevelopment) {
-			if (suppressFill || desolate[p]) {
-				write(
-					r,
-					darkenPoliticalAtElevation([0.35, 0.33, 0.32], elevationKm[r] ?? 0),
-				)
-				continue
-			}
-			const dev = ps ? ps.baseTax + ps.baseProduction + ps.baseManpower : 0
-			write(
-				r,
-				darkenVegetationAtElevation(
-					developmentColor(dev * invDevelopmentMax),
-					elevationKm[r] ?? 0,
-				),
-			)
 			continue
 		}
 
@@ -261,27 +195,28 @@ export function computeEarthHistoryRegionColors(params: {
 			continue
 		}
 		if (populationMode === "culture") {
-			const cultureId = ps?.cultureId ?? null
-			if (!cultureId) {
+			const cultureId = frame.provinceCulture[p]
+			if (cultureId < 0) {
 				write(
 					r,
 					darkenPoliticalAtElevation([0.35, 0.33, 0.32], elevationKm[r] ?? 0),
 				)
 			} else {
 				const color =
-					cultureColorById?.get(cultureId) ?? colorFor(`culture:${cultureId}`)
+					cultureColorById?.get(frame.cultures[cultureId]?.key ?? "") ??
+					colorFor(`culture:${cultureId}`)
 				write(r, darkenPoliticalAtElevation(color, elevationKm[r] ?? 0))
 			}
 		} else {
-			const religionId = ps?.religionId ?? null
-			if (!religionId) {
+			const religionId = frame.provinceReligion[p]
+			if (religionId < 0) {
 				write(
 					r,
 					darkenPoliticalAtElevation([0.35, 0.33, 0.32], elevationKm[r] ?? 0),
 				)
 			} else {
 				const color =
-					religionColorById?.get(religionId) ??
+					religionColorById?.get(frame.religions[religionId]?.key ?? "") ??
 					colorFor(`religion:${religionId}`)
 				write(r, darkenPoliticalAtElevation(color, elevationKm[r] ?? 0))
 			}
@@ -300,42 +235,37 @@ export function computeEarthHistoryRegionColors(params: {
  * (per-region) and buildEarthHistoryOccupationStripeColorForRawId
  * (per-province-polygon) so both render the same controller the same
  * stripe color. */
-function buildOccupationColorForTag(
-	nationReference: Map<string, RawNationReference>,
-): (tag: string) => [number, number, number] {
+export function buildOccupationColorById(
+	nations: Nation[],
+): (id: number) => [number, number, number] {
 	const REBEL_BLACK: [number, number, number] = [0, 0, 0]
-	const colorCache = new Map<string, [number, number, number]>()
-	return (tag: string) => {
-		if (tag === "REB") return REBEL_BLACK
-		let c = colorCache.get(tag)
-		if (!c) {
-			const ref = nationReference.get(tag)
-			c = ref
-				? [ref.color[0] / 255, ref.color[1] / 255, ref.color[2] / 255]
-				: COLOR.hashColorForKey(`nation:${tag}`)
-			colorCache.set(tag, c)
-		}
-		return c
+	return (id: number) => {
+		const n = nations[id]
+		if (!n) return COLOR.hashColorForKey(`nation:${id}`)
+		if (n.isRebel) return REBEL_BLACK
+		return [n.color[0] / 255, n.color[1] / 255, n.color[2] / 255]
 	}
 }
 
 /** Occupation-stripe overlay for Earth-imported worlds: every province whose
  * controller differs from its owner (EU4's own convention for "occupied")
- * gets a stripe. Reads state.provinces directly instead of going through
+ * gets a stripe. Reads state.provinceStateById directly instead of going through
  * activeWars/nationIds (the mechanism computeEarthHistoryRegionColors's
  * sibling, buildPoliticalOccupationOverlay, uses for the procedural
  * generator's own war system) because most real occupations here have no
  * matching tracked war at all -- owner/controller divergence is the ground
  * truth. */
 export function computeEarthHistoryOccupationOverlay(params: {
-	state: FoldedState
-	provinceMap: { compactToRealId: Int32Array }
+	frame: WorldFrame
 	regionProvince: Int32Array
-	nationReference: Map<string, RawNationReference>
 }): Float32Array | null {
-	const { state, provinceMap, regionProvince, nationReference } = params
-	const rawIdByProvince = provinceMap.compactToRealId
-	const colorForTag = buildOccupationColorForTag(nationReference)
+	const { frame, regionProvince } = params
+	const colorForId = (id: number): [number, number, number] => {
+		const nation = frame.nations.get(id)
+		return nation
+			? [nation.color[0] / 255, nation.color[1] / 255, nation.color[2] / 255]
+			: COLOR.hashColorForKey(`nation:${id}`)
+	}
 
 	const N = regionProvince.length
 	const overlay = new Float32Array(N * 4)
@@ -343,10 +273,10 @@ export function computeEarthHistoryOccupationOverlay(params: {
 	for (let r = 0; r < N; r++) {
 		const p = regionProvince[r]
 		if (p < 0) continue
-		const rawId = String(rawIdByProvince[p])
-		const ps = state.provinces.get(rawId)
-		if (!ps?.owner || !ps?.controller || ps.owner === ps.controller) continue
-		const color = colorForTag(ps.controller)
+		const owner = frame.provinceNation[p]
+		const controller = frame.provinceController[p]
+		if (owner < 0 || controller < 0 || owner === controller) continue
+		const color = colorForId(controller)
 		const base = r * 4
 		overlay[base] = color[0]
 		overlay[base + 1] = color[1]
@@ -372,15 +302,12 @@ export function computeEarthHistoryOccupationOverlay(params: {
  * timeline (unlike ordinary occupation, which is only non-null during rare
  * active sieges). */
 export function computeOrgStripeOverlay(params: {
-	state: FoldedState
-	provinceMap: { compactToRealId: Int32Array }
+	frame: WorldFrame
 	regionProvince: Int32Array
 	categorize: OrgCategorizer
 	categoryColor: (categoryId: string) => [number, number, number]
 }): Float32Array | null {
-	const { state, provinceMap, regionProvince, categorize, categoryColor } =
-		params
-	const rawIdByProvince = provinceMap.compactToRealId
+	const { frame, regionProvince, categorize, categoryColor } = params
 
 	// Precompute a stripe color per province ONCE here (a single, small
 	// ~province-count pass calling categorize), rather than calling it once
@@ -388,15 +315,14 @@ export function computeOrgStripeOverlay(params: {
 	// larger than the province count, and this runs every earth-history
 	// scrub tick (see organization-categories.ts's OrgCategorySchema doc
 	// comment for the perf incident this avoids repeating).
-	const stripeColorByRawId = new Map<number, [number, number, number]>()
-	for (const rawId of state.provinces.keys()) {
-		const numericRawId = Number(rawId)
-		const category = categorize(numericRawId)
+	const stripeColorByProvince = new Map<number, [number, number, number]>()
+	for (let province = 0; province < frame.provinceCount; province++) {
+		const category = categorize(province)
 		if (category?.striped) {
-			stripeColorByRawId.set(numericRawId, categoryColor(category.categoryId))
+			stripeColorByProvince.set(province, categoryColor(category.categoryId))
 		}
 	}
-	if (stripeColorByRawId.size === 0) return null
+	if (stripeColorByProvince.size === 0) return null
 
 	const N = regionProvince.length
 	const overlay = new Float32Array(N * 4)
@@ -404,8 +330,7 @@ export function computeOrgStripeOverlay(params: {
 	for (let r = 0; r < N; r++) {
 		const p = regionProvince[r]
 		if (p < 0) continue
-		const rawId = rawIdByProvince[p]
-		const color = stripeColorByRawId.get(rawId)
+		const color = stripeColorByProvince.get(p)
 		if (!color) continue
 		const base = r * 4
 		overlay[base] = color[0]

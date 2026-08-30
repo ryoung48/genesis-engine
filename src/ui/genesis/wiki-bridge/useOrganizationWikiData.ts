@@ -3,9 +3,10 @@ import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
-import { FOLD } from "@/model/history/earth/fold"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgProvinceCategory } from "@/model/history/earth/organization-categories/types"
+import { HISTORY } from "@/model/history/record"
+import { FRAME } from "@/model/history/world-frame"
 import {
 	nationFocusDistanceScale,
 	SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
@@ -16,8 +17,6 @@ import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
 import {
-	isRebelTag,
-	normalizeTimelineTag,
 	pushTimelineEvent,
 	rgb255ToCss,
 } from "@/ui/wiki/nation/timeline-formatting"
@@ -49,7 +48,7 @@ export function useOrganizationWikiData(
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
-		setSelectedWikiNationTag,
+		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		buildOrgCategorizer,
@@ -60,7 +59,7 @@ export function useOrganizationWikiData(
 		if (
 			!selectedWikiOrganizationId ||
 			!world?.isEarthImport ||
-			!earthHistory.engine ||
+			!earthHistory.state ||
 			!earthHistory.query ||
 			!worldForDisplay
 		)
@@ -68,15 +67,18 @@ export function useOrganizationWikiData(
 		const orgId = selectedWikiOrganizationId
 		const orgRef = earthHistory.organizationReference?.get(orgId)
 		if (!orgRef) return null
-		const engine = earthHistory.engine
-		const { frame, state } = earthHistory.query
-		const focusOrgNation = (targetTag: string) => {
-			const targetId = frame.nationIds.get(targetTag)
-			const seedProvince =
-				targetId !== undefined ? frame.seeds[targetId] : undefined
-			if (seedProvince === undefined || seedProvince < 0) return
+		const record = earthHistory.state.record
+		if (record.origin !== "earth") return null
+		// The WikiTimeline component works in whole days (like the procedural
+		// wiki); convert every timeMs value crossing that boundary.
+		const daysFromMs = (timeMs: number) => Math.floor(timeMs / 86_400_000)
+		const frame = earthHistory.query.frame
+		const nations = record.nations
+		const focusOrgNation = (targetId: number) => {
+			const seedProvince = frame.nations.get(targetId)?.capitalProvince ?? -1
+			if (seedProvince < 0) return
 			let targetProvinceCount = 0
-			for (const assigned of frame.assignment) {
+			for (const assigned of frame.provinceNation) {
 				if (assigned === targetId) targetProvinceCount++
 			}
 			sceneRef.current?.focusOnProvince(seedProvince, {
@@ -84,35 +86,23 @@ export function useOrganizationWikiData(
 				pulseTarget: "nation",
 			})
 		}
-		const resolveNationName = (otherTag: string): string =>
-			isRebelTag(otherTag)
-				? "Rebels"
-				: (state.nations.get(otherTag)?.currentName ??
-					earthHistory.nationReference?.get(otherTag)?.name ??
-					otherTag)
-		const resolveNationColor = (otherTag: string): string => {
-			const ref = earthHistory.nationReference?.get(otherTag)
-			return ref
+		const resolveNationName = (id: number): string =>
+			frame.nations.get(id)?.name ?? nations[id]?.name ?? `nation ${id}`
+		const resolveNationColor = (id: number): string => {
+			const n = nations[id]
+			return n
 				? COLOR.rgb01ToCss([
-						ref.color[0] / 255,
-						ref.color[1] / 255,
-						ref.color[2] / 255,
+						n.color[0] / 255,
+						n.color[1] / 255,
+						n.color[2] / 255,
 					])
 				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
-		const nationMention = (otherTag: string) =>
-			isRebelTag(otherTag)
-				? {
-						tag: otherTag,
-						name: "Rebels",
-						color: "#020617",
-						link: false,
-					}
-				: {
-						tag: otherTag,
-						name: resolveNationName(otherTag),
-						color: resolveNationColor(otherTag),
-					}
+		const nationMention = (id: number) => ({
+			tag: String(id),
+			name: resolveNationName(id),
+			color: resolveNationColor(id),
+		})
 		const color = COLOR.rgb01ToCss([
 			orgRef.color[0] / 255,
 			orgRef.color[1] / 255,
@@ -147,7 +137,8 @@ export function useOrganizationWikiData(
 			return {
 				id: provinceId,
 				name:
-					earthHistory.provinceMeta?.get(rawId)?.name ?? `Province ${rawId}`,
+					earthHistory.state.provinceMeta[provinceId]?.name ??
+					`Province ${rawId}`,
 				color: getProvinceColor(provinceId) ?? color,
 			}
 		}
@@ -159,80 +150,77 @@ export function useOrganizationWikiData(
 			// Every province's own hre join/leave history, not filtered to any
 			// single nation -- owner is tracked while walking each province's
 			// events chronologically so the mention can name who held it.
-			for (const [rawId, entry] of Object.entries(engine.data.provinceEvents)) {
-				let owner = normalizeTimelineTag(entry.base.owner)
+			for (const [rawId, entry] of record.events.provinceEvents) {
+				let owner = entry.base.ownerId
 				for (const [index, event] of entry.events.entries()) {
 					if (event.kind === "owner") {
-						owner = normalizeTimelineTag(
-							event.payload.tag as string | undefined,
-						)
+						owner = (event.payload.nationId as number | null) ?? null
 						continue
 					}
 					if (event.kind !== "hre") continue
 					const joined = Boolean(event.payload.member)
-					const province = provinceMention(rawId)
+					const province = provinceMention(String(rawId))
 					pushTimelineEvent(timelineEvents, {
-						id: `hre:${rawId}:${event.date}:${index}`,
-						date: event.date,
+						id: `hre:${rawId}:${event.timeMs}:${index}`,
+						date: daysFromMs(event.timeMs),
 						type: joined ? "HRE (+)" : "HRE (-)",
 						description: joined
 							? `${province?.name ?? `Province ${rawId}`} joined the Holy Roman Empire.`
 							: `${province?.name ?? `Province ${rawId}`} left the Holy Roman Empire.`,
-						nations: owner ? [nationMention(owner)] : [],
+						nations: owner !== null ? [nationMention(owner)] : [],
 						provinces: province ? [province] : [],
 						organizations: [orgMention],
 					})
 				}
 			}
-			for (const [index, e] of engine.data.diplomacy.entries()) {
-				if (
-					(e.kind !== "emperorStart" && e.kind !== "emperorEnd") ||
-					e.payload.secondTag !== "HLR"
-				)
-					continue
+			for (const [index, e] of record.events.diplomacy.entries()) {
+				// EU4 emperor events are always "<nation> HLR"; the junior side is
+				// the HRE pseudo-tag, so only firstId (the emperor) matters here.
+				if (e.kind !== "emperorStart" && e.kind !== "emperorEnd") continue
 				const starts = e.kind === "emperorStart"
-				const emperorName = resolveNationName(e.payload.firstTag)
+				const emperorName = resolveNationName(e.firstId)
 				pushTimelineEvent(timelineEvents, {
-					id: `emperor:${e.date}:${index}`,
-					date: e.date,
+					id: `emperor:${e.timeMs}:${index}`,
+					date: daysFromMs(e.timeMs),
 					type: starts ? "Emperor (+)" : "Emperor (-)",
 					description: starts
 						? `${emperorName} became Emperor of the Holy Roman Empire.`
 						: `${emperorName}'s reign as Emperor of the Holy Roman Empire ended.`,
-					nations: [nationMention(e.payload.firstTag)],
+					nations: [nationMention(e.firstId)],
 					organizations: [orgMention],
 				})
 			}
-			for (const [tag, entry] of Object.entries(engine.data.nationEvents)) {
+			for (const [id, entry] of record.events.nationEvents.entries()) {
+				if (!entry) continue
 				for (const [index, event] of entry.events.entries()) {
 					if (event.kind !== "elector") continue
 					const elected = Boolean(event.payload.elector)
-					const nationName = resolveNationName(tag)
+					const nationName = resolveNationName(id)
 					pushTimelineEvent(timelineEvents, {
-						id: `elector:${tag}:${event.date}:${index}`,
-						date: event.date,
+						id: `elector:${id}:${event.timeMs}:${index}`,
+						date: daysFromMs(event.timeMs),
 						type: elected ? "Elector (+)" : "Elector (-)",
 						description: elected
 							? `${nationName} became an Elector in the Holy Roman Empire.`
 							: `${nationName} ceased to be an Elector in the Holy Roman Empire.`,
-						nations: [nationMention(tag)],
+						nations: [nationMention(id)],
 						organizations: [orgMention],
 					})
 				}
 			}
 		} else {
-			for (const [index, e] of engine.data.organizationEvents.entries()) {
+			for (const [index, e] of record.events.organizationEvents.entries()) {
 				if (e.payload.orgId !== orgId) continue
 				if (e.kind === "siteStart" || e.kind === "siteEnd") {
 					const started = e.kind === "siteStart"
-					const province = provinceMention(e.provinceId)
+					const province = provinceMention(String(e.provinceId))
 					if (e.payload.role === "member_seat") {
 						const siteDescription = province
 							? `${e.payload.name} ${started ? "became" : "ceased to be"} a member seat of the ${orgRef.name} in ${province.name}.`
 							: `${e.payload.name} ${started ? "became" : "ceased to be"} a member seat of the ${orgRef.name}.`
 						pushTimelineEvent(timelineEvents, {
-							id: `organization-site:${orgId}:${e.provinceId}:${e.date}:${index}`,
-							date: e.date,
+							id: `organization-site:${orgId}:${e.provinceId}:${e.timeMs}:${index}`,
+							date: daysFromMs(e.timeMs),
 							type: started ? "Organization (+)" : "Organization (-)",
 							description: siteDescription,
 							provinces: province ? [province] : [],
@@ -252,8 +240,8 @@ export function useOrganizationWikiData(
 						? `${e.payload.name} ${started ? "opened" : "closed"} as a ${roleLabel} of the ${orgRef.name} in ${province.name}.`
 						: `${e.payload.name} ${started ? "opened" : "closed"} as a ${roleLabel} of the ${orgRef.name}.`
 					pushTimelineEvent(timelineEvents, {
-						id: `organization-site:${orgId}:${e.provinceId}:${e.date}:${index}`,
-						date: e.date,
+						id: `organization-site:${orgId}:${e.provinceId}:${e.timeMs}:${index}`,
+						date: daysFromMs(e.timeMs),
 						type: started ? "Organization (+)" : "Organization (-)",
 						description: siteDescription,
 						provinces: province ? [province] : [],
@@ -263,16 +251,16 @@ export function useOrganizationWikiData(
 				}
 				if (e.kind === "join" || e.kind === "leave") {
 					const joined = e.kind === "join"
-					const nationName = resolveNationName(e.nationTag)
+					const nationName = resolveNationName(e.nationId)
 					const mention = mentionForRole(e.payload.role)
 					pushTimelineEvent(timelineEvents, {
-						id: `organization:${orgId}:${e.date}:${index}`,
-						date: e.date,
+						id: `organization:${orgId}:${e.timeMs}:${index}`,
+						date: daysFromMs(e.timeMs),
 						type: joined ? "Organization (+)" : "Organization (-)",
 						description: joined
 							? `${nationName} joined the ${mention.name}.`
 							: `${nationName} left the ${mention.name}.`,
-						nations: [nationMention(e.nationTag)],
+						nations: [nationMention(e.nationId)],
 						organizations: [mention],
 					})
 				}
@@ -286,35 +274,46 @@ export function useOrganizationWikiData(
 		// listOrgMembers, rather than bespoke per-org membership/foreign-holder
 		// logic -- adding a new org or member type (e.g. HSA's trade posts) is
 		// then just a data entry in that schema, not new branches here.
-		const orgCategorizers = buildOrgCategorizer(state, orgRef)
-		const memberCategories: Map<string, OrgProvinceCategory> = (() => {
+		const orgCategorizers = buildOrgCategorizer(frame, orgRef)
+		const memberCategories: Map<number, OrgProvinceCategory> = (() => {
 			if (!orgCategorizers) {
 				return new Map(
-					Array.from(state.nations.entries())
-						.filter(([, nation]) => nation.organizations.has(orgId))
-						.map(([tag]) => [tag, { categoryId: "member", striped: false }]),
+					Array.from(frame.nations.values())
+						.filter((nation) =>
+							nation.organizations.some(
+								(organization) => organization.orgId === orgId,
+							),
+						)
+						.map((nation) => [
+							nation.id,
+							{ categoryId: "member", striped: false },
+						]),
 				)
 			}
 			if (orgId !== "HSA") {
 				return ORGANIZATION_CATEGORIES.listOrgMembers({
-					state,
+					frame,
 					categorize: orgCategorizers.categorize,
 				})
 			}
-			const categories = new Map<string, OrgProvinceCategory>()
-			for (const site of state.organizationSites.values()) {
+			const categories = new Map<number, OrgProvinceCategory>()
+			for (const site of frame.organizations) {
 				if (
 					site.orgId !== orgId ||
 					(site.role !== "kontor" && site.role !== "trade_branch")
 				)
 					continue
-				const owner = state.provinces.get(site.provinceId)?.owner
-				if (owner)
+				const owner = frame.provinceNation[site.province]
+				if (owner >= 0)
 					categories.set(owner, { categoryId: "tradePost", striped: true })
 			}
-			for (const [tag, nation] of state.nations) {
-				if (nation.organizations.has(orgId)) {
-					categories.set(tag, { categoryId: "member", striped: false })
+			for (const nation of frame.nations.values()) {
+				if (
+					nation.organizations.some(
+						(organization) => organization.orgId === orgId,
+					)
+				) {
+					categories.set(nation.id, { categoryId: "member", striped: false })
 				}
 			}
 			return categories
@@ -330,10 +329,10 @@ export function useOrganizationWikiData(
 			),
 		)
 		const members = Array.from(memberCategories.entries())
-			.map(([memberTag, memberCategory]) => {
+			.map(([memberId, memberCategory]) => {
 				const categoryDef = categoryLabelById.get(memberCategory.categoryId)
 				return {
-					...nationMention(memberTag),
+					...nationMention(memberId),
 					striped: memberCategory.striped,
 					category: categoryDef
 						? {
@@ -348,46 +347,31 @@ export function useOrganizationWikiData(
 			.sort((a, b) => a.name.localeCompare(b.name))
 
 		// Member-territory province count over time -- recomputed with a fresh
-		// full fold at each transition date (see collectOrgMemberProvinceRawIds)
+		// frame at each transition date
 		// since, unlike a nation's own owned-province count, this can't be
 		// tracked incrementally from the timeline events above alone (HSA
 		// territory changes with member nations' wars, not just membership).
-		const transitionDates = Array.from(
+		const transitionDays = Array.from(
 			new Set(timelineEvents.map((event) => event.date)),
 		).sort((a, b) => a - b)
-		const countHistory: WikiCountHistoryPoint[] = transitionDates.map(
-			(date) => {
-				const foldedAtDate = FOLD.fold({
-					data: engine.data,
-					time: date,
-					options: {
-						provinceIds: engine.cache.provinceIds,
-						nationTags: engine.cache.nationTags,
-					},
-				})
-				return {
-					date,
-					count: FOLD.collectOrgMemberProvinceRawIds({
-						state: foldedAtDate,
-						orgId,
-					}).size,
-				}
-			},
-		)
-		if (
-			countHistory.length === 0 ||
-			countHistory[0].date > earthHistory.minDays
-		) {
+		const countHistory: WikiCountHistoryPoint[] = transitionDays.map((day) => ({
+			date: day,
+			count: FRAME.orgMemberProvinces({
+				frame: HISTORY.frameAt({
+					state: earthHistory.state,
+					timeMs: day * 86_400_000,
+				}),
+				orgId,
+			}).size,
+		}))
+		const minDay = daysFromMs(record.minTimeMs)
+		if (countHistory.length === 0 || countHistory[0].date > minDay) {
 			countHistory.unshift({
-				date: earthHistory.minDays,
-				count: FOLD.collectOrgMemberProvinceRawIds({
-					state: FOLD.fold({
-						data: engine.data,
-						time: earthHistory.minDays,
-						options: {
-							provinceIds: engine.cache.provinceIds,
-							nationTags: engine.cache.nationTags,
-						},
+				date: minDay,
+				count: FRAME.orgMemberProvinces({
+					frame: HISTORY.frameAt({
+						state: earthHistory.state,
+						timeMs: record.minTimeMs,
 					}),
 					orgId,
 				}).size,
@@ -397,15 +381,11 @@ export function useOrganizationWikiData(
 		// Current member territory, for the stat block and Environmental/
 		// Demographics distributions -- the exact same province set the map's
 		// striped border draws, so the numbers always agree with what's shown.
-		const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
-			state,
+		const memberProvinceIndexes = FRAME.orgMemberProvinces({
+			frame,
 			orgId,
 		})
-		const provinceIndexes: number[] = []
-		for (const rawId of memberProvinceRawIds) {
-			const compact = earthImportRawIdToCompact?.get(rawId)
-			if (compact !== undefined) provinceIndexes.push(compact)
-		}
+		const provinceIndexes = [...memberProvinceIndexes]
 		const ownedProvinceIndexes = new Set(provinceIndexes)
 		const regionIndexes: number[] = []
 		const regionProvince = world.provinces?.regionProvince
@@ -431,7 +411,9 @@ export function useOrganizationWikiData(
 		})
 
 		const cultureDistribution = buildStringIdDistributionForProvinces({
-			idByProvince: frame.cultureByProvince,
+			idByProvince: Array.from(frame.provinceCulture, (id) =>
+				id < 0 ? null : (frame.cultures[id]?.key ?? null),
+			),
 			provinceIndexes,
 			nameById: earthHistory.cultureNameById ?? undefined,
 			colorById: earthHistory.cultureColorById ?? undefined,
@@ -439,7 +421,9 @@ export function useOrganizationWikiData(
 			fallbackColor: "rgb(148, 163, 184)",
 		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
-			idByProvince: frame.religionByProvince,
+			idByProvince: Array.from(frame.provinceReligion, (id) =>
+				id < 0 ? null : (frame.religions[id]?.key ?? null),
+			),
 			provinceIndexes,
 			nameById: earthHistory.religionNameById ?? undefined,
 			colorById: earthHistory.religionColorById ?? undefined,
@@ -491,23 +475,25 @@ export function useOrganizationWikiData(
 			topographyDistribution,
 			showObservedDistributions,
 			countHistory,
-			dateRangeStart: earthHistory.minDays,
-			dateRangeEnd: earthHistory.maxDays,
-			currentDate: earthHistory.selectedDays,
-			currentDateLabel: DATE.formatHistoryDays(earthHistory.selectedDays),
+			dateRangeStart: daysFromMs(record.minTimeMs),
+			dateRangeEnd: daysFromMs(record.maxTimeMs),
+			currentDate: daysFromMs(frame.timeMs),
+			currentDateLabel: DATE.formatHistoryDays(daysFromMs(frame.timeMs)),
 			timelineEvents,
 			onBack: () => setSelectedWikiOrganizationId(null),
 			onSelectNation: (targetTag: string) => {
-				focusOrgNation(targetTag)
-				setSelectedWikiNationTag(targetTag)
+				const id = Number(targetTag)
+				focusOrgNation(id)
+				setSelectedWikiNationId(id)
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
 					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 				})
 			},
-			onSelectDate: earthHistory.setSelectedDays,
-			onSelectWar: (warId: string) => {
+			onSelectDate: (day: number) =>
+				earthHistory.setSelectedTimeMs(day * 86_400_000),
+			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
 		}
@@ -515,12 +501,11 @@ export function useOrganizationWikiData(
 		selectedWikiOrganizationId,
 		world,
 		earthHistory.query,
-		earthHistory.engine,
-		earthHistory.selectedDays,
-		earthHistory.setSelectedDays,
-		earthHistory.minDays,
-		earthHistory.maxDays,
-		earthHistory.nationReference,
+		earthHistory.state,
+		earthHistory.selectedTimeMs,
+		earthHistory.setSelectedTimeMs,
+		earthHistory.minTimeMs,
+		earthHistory.maxTimeMs,
 		earthHistory.organizationReference,
 		earthHistory.cultureNameById,
 		earthHistory.cultureColorById,
@@ -532,7 +517,7 @@ export function useOrganizationWikiData(
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
-		setSelectedWikiNationTag,
+		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		buildOrgCategorizer,

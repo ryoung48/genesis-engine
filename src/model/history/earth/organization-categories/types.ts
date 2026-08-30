@@ -1,4 +1,4 @@
-import type { FoldedState } from "@/model/history/earth/fold/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
 
 export interface OrgCategory {
 	id: string
@@ -40,17 +40,15 @@ export interface OrgCategorySchema {
 	 * GenesisView.tsx's resolveOrgProvinceColor, which learned this the hard
 	 * way -- HRE map mode was visibly slow before categorization got
 	 * precomputed once per province instead of once per region). */
-	createCategorizer: (state: FoldedState) => OrgCategorizer
+	createCategorizer: (frame: WorldFrame) => OrgCategorizer
 }
 
-export type OrgCategorizer = (
-	rawProvinceId: number,
-) => OrgProvinceCategory | null
+export type OrgCategorizer = (province: number) => OrgProvinceCategory | null
 
 export interface ListOrgMembersParams {
-	state: FoldedState
+	frame: WorldFrame
 	categorize: (
-		rawProvinceId: number,
+		province: number,
 	) => { categoryId: string; striped: boolean } | null
 }
 

@@ -15,11 +15,11 @@ import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/
  */
 
 export function warMention(war: {
-	warId: string
+	id: number
 	name: string
 }): NationTimelineEvent["wars"][number] {
 	return {
-		id: war.warId,
+		id: war.id,
 		name: war.name,
 		color: "#b91c1c",
 	}

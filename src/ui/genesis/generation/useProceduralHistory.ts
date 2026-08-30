@@ -2,10 +2,8 @@ import { useCallback, useRef, useState } from "react"
 import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { HistoryNote } from "@/model/history/generated/state/types"
-import type {
-	GenesisWorkerRequest,
-	SerializedHistoryFrame,
-} from "@/model/worker-protocol/types"
+import type { WorldFrame } from "@/model/history/world-frame/types"
+import type { GenesisWorkerRequest } from "@/model/worker-protocol/types"
 import type { ProceduralHistoryInput } from "@/ui/genesis/view/types"
 import type { WikiCountHistoryPoint } from "@/ui/wiki/shared/WikiTimeline"
 /**
@@ -21,7 +19,7 @@ export function useProceduralHistory(input: ProceduralHistoryInput) {
 	const { workerRef } = input
 
 	const [proceduralHistoryFrame, setProceduralHistoryFrame] =
-		useState<SerializedHistoryFrame | null>(null)
+		useState<WorldFrame | null>(null)
 	const [proceduralHistoryTimeMs, setProceduralHistoryTimeMs] = useState(
 		800 * STATE.yearMs,
 	)
@@ -45,18 +43,14 @@ export function useProceduralHistory(input: ProceduralHistoryInput) {
 	}, [])
 
 	const recordProceduralFrame = useCallback(
-		(
-			timeMs: number,
-			frame: SerializedHistoryFrame,
-			newEvents: HistoryNote[],
-		) => {
+		(timeMs: number, frame: WorldFrame, newEvents: HistoryNote[]) => {
 			if (newEvents.length > 0) {
 				proceduralHistoryEventsRef.current =
 					proceduralHistoryEventsRef.current.concat(newEvents)
 			}
 			const days = HISTORY_DAYS.historyMsToDays(timeMs)
 			const counts = new Map<number, number>()
-			for (const nationId of frame.assignment) {
+			for (const nationId of frame.provinceNation) {
 				if (nationId < 0) continue
 				counts.set(nationId, (counts.get(nationId) ?? 0) + 1)
 			}

@@ -2,11 +2,10 @@ import { useMemo } from "react"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { COLOR } from "@/model/history/earth/color"
-import type { RawWarParticipantEvent } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
-import { FOLD } from "@/model/history/earth/fold"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
@@ -43,9 +42,7 @@ import {
 	eventComment,
 	formatRebelName,
 	formatRulerStatLabel,
-	isRebelTag,
 	joinWithAnd,
-	normalizeTimelineTag,
 	paletteColorForDynasty,
 	pushTimelineEvent,
 	subjectRelationDescription,
@@ -69,7 +66,7 @@ export function useNationWikiData(
 	input: NationWikiDataInput,
 ): NationWikiData | null {
 	const {
-		selectedWikiNationTag,
+		selectedWikiNationId,
 		world,
 		worldForDisplay,
 		earthHistory,
@@ -77,7 +74,7 @@ export function useNationWikiData(
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
-		setSelectedWikiNationTag,
+		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		sceneRef,
@@ -85,37 +82,41 @@ export function useNationWikiData(
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	return useMemo<NationWikiData | null>(() => {
 		if (
-			!selectedWikiNationTag ||
+			selectedWikiNationId === null ||
 			!world?.isEarthImport ||
-			!earthHistory.engine ||
+			!earthHistory.state ||
 			!earthHistory.query ||
 			!worldForDisplay
 		)
 			return null
-		const tag = selectedWikiNationTag
-		const { frame, state } = earthHistory.query
-		const nationId = frame.nationIds.get(tag) ?? -1
-		if (nationId < 0) return null
+		const frame = earthHistory.query.frame
+		const record = earthHistory.state.record
+		if (record.origin !== "earth") return null
+		const nationList = record.nations
+		const daysFromMs = (timeMs: number) => timeMs / 86_400_000
+		const datedEvents = <Event extends { timeMs: number }>(events: Event[]) =>
+			events.map((event) => ({ ...event, date: daysFromMs(event.timeMs) }))
+		const wars = record.events.wars.map((war) => ({
+			...war,
+			events: datedEvents(war.events),
+			battles: datedEvents(war.battles),
+		}))
+		const nationId = selectedWikiNationId
+		if (nationId < 0 || nationId >= nationList.length) return null
 
 		const provinceIndexes: number[] = []
-		const provinceCountByNationTag = new Map<string, number>()
-		const tagByNationId = new Map<number, string>()
-		for (const [nationTag, id] of frame.nationIds) {
-			tagByNationId.set(id, nationTag)
-		}
-		for (let p = 0; p < frame.assignment.length; p++) {
-			const assignedNationId = frame.assignment[p]
+		const provinceCountByNationId = new Map<number, number>()
+		for (let p = 0; p < frame.provinceNation.length; p++) {
+			const assignedNationId = frame.provinceNation[p]
+			if (assignedNationId < 0) continue
 			if (assignedNationId === nationId) provinceIndexes.push(p)
-			const assignedTag = tagByNationId.get(assignedNationId)
-			if (assignedTag) {
-				provinceCountByNationTag.set(
-					assignedTag,
-					(provinceCountByNationTag.get(assignedTag) ?? 0) + 1,
-				)
-			}
+			provinceCountByNationId.set(
+				assignedNationId,
+				(provinceCountByNationId.get(assignedNationId) ?? 0) + 1,
+			)
 		}
-		const hasOwnedProvinces = (otherTag: string): boolean =>
-			(provinceCountByNationTag.get(otherTag) ?? 0) > 0
+		const hasOwnedProvinces = (otherId: number): boolean =>
+			(provinceCountByNationId.get(otherId) ?? 0) > 0
 		const ownedProvinceIndexes = new Set(provinceIndexes)
 		const regionIndexes: number[] = []
 		const regionProvince = world.provinces?.regionProvince
@@ -143,133 +144,133 @@ export function useNationWikiData(
 				)
 			: 0
 
-		const nationState = state.nations.get(tag)
-		const resolveNationName = (otherTag: string): string =>
-			isRebelTag(otherTag)
-				? "Rebels"
-				: (state.nations.get(otherTag)?.currentName ??
-					earthHistory.nationReference?.get(otherTag)?.name ??
-					frame.names[frame.nationIds.get(otherTag) ?? -1] ??
-					otherTag)
-		// Matches the actual "nations" map-mode fill exactly (see
-		// earth-history-region-colors.ts's buildNationColorByTag) -- real EU4
-		// reference color when known, the same neutral gray fallback
-		// otherwise. hashColorForKey is a different, hash-based scheme used
-		// only for hover swatches when no reference color exists; using it
-		// here would make this swatch not match the map.
-		const resolveNationColor = (otherTag: string): string => {
-			if (isRebelTag(otherTag)) return "#020617"
-			const ref = earthHistory.nationReference?.get(otherTag)
-			return ref
+		const nationState = frame.nations.get(nationId)
+		const resolveNationName = (otherId: number): string =>
+			frame.nations.get(otherId)?.name ??
+			nationList[otherId]?.name ??
+			`nation ${otherId}`
+		// Matches the actual "nations" map-mode fill exactly (Nation.color) --
+		// real EU4 reference color when known, neutral gray otherwise.
+		const resolveNationColor = (otherId: number): string => {
+			const n = frame.nations.get(otherId) ?? nationList[otherId]
+			return n
 				? COLOR.rgb01ToCss([
-						ref.color[0] / 255,
-						ref.color[1] / 255,
-						ref.color[2] / 255,
+						n.color[0] / 255,
+						n.color[1] / 255,
+						n.color[2] / 255,
 					])
 				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
-		const title = resolveNationName(tag)
-		const color = resolveNationColor(tag)
+		const title = resolveNationName(nationId)
+		const color = resolveNationColor(nationId)
 		const governmentSubtype =
 			GOVERNMENT.formatEarthHistoryGovernmentReformLabel({
 				governmentReform: nationState?.governmentReform,
 			})
 		const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
-			governmentType: nationState?.governmentType ?? null,
+			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
 		})
 		const currentRulerPayload =
-			earthHistory.engine.data.nationEvents[tag]?.events
+			record.events.nationEvents[nationId]?.events
 				.filter(
 					(event) =>
 						event.kind === "rulerChange" &&
-						event.date <= earthHistory.selectedDays,
+						event.timeMs <= earthHistory.selectedTimeMs,
 				)
 				.at(-1)?.payload ?? null
 		const rulerLabel = nationState?.ruler
 			? formatRulerStatLabel(
 					currentRulerPayload,
 					nationState.ruler.name,
-					earthHistory.selectedDays,
+					earthHistory.selectedTimeMs,
 				)
 			: null
 		const dynastyName =
 			(typeof currentRulerPayload?.dynasty === "string"
 				? currentRulerPayload.dynasty
 				: nationState?.ruler?.dynasty) ?? null
-		const activeConflicts = state.activeWars
-			.filter((war) => war.attackers.has(tag) || war.defenders.has(tag))
+		const activeConflicts = frame.wars
+			.filter(
+				(war) =>
+					war.attackers.includes(nationId) || war.defenders.includes(nationId),
+			)
 			.map((war) => ({
-				warId: war.warId,
+				warId: war.id,
 				name: war.name,
-				side: war.attackers.has(tag)
+				side: war.attackers.includes(nationId)
 					? ("attacker" as const)
 					: ("defender" as const),
 			}))
 			.sort((a, b) => a.name.localeCompare(b.name))
 
 		// "Dependency" here covers every cross-nation political tie the Earth
-		// engine tracks (fold.ts's FoldedNationState) -- overlord/vassals is
+		// frame tracks -- overlord/vassals is
 		// the literal subject hierarchy, union/allies/guarantees/marriages aren't strictly
 		// dependencies but share the same "line per relation type, links to
 		// other nations" shape so they're folded in here too.
-		const subjectDependencyGroups = new Map<string, string[]>()
-		for (const subjectTag of nationState?.vassals ?? []) {
-			if (!hasOwnedProvinces(subjectTag)) continue
+		const subjectDependencyGroups = new Map<string, number[]>()
+		for (const subjectId of nationState?.relations.vassals ?? []) {
+			if (!hasOwnedProvinces(subjectId)) continue
 			const subjectType =
-				nationState?.vassalSubjectTypes.get(subjectTag) ?? "vassal"
+				nationState?.relations.vassalSubjectTypes.find(
+					(entry) => entry.nationId === subjectId,
+				)?.subjectType ?? "vassal"
 			const label = subjectTypeGroupLabel(subjectType)
 			const subjects = subjectDependencyGroups.get(label) ?? []
-			subjects.push(subjectTag)
+			subjects.push(subjectId)
 			subjectDependencyGroups.set(label, subjects)
 		}
-		const dependencyGroups: Array<[string, string[]]> = [
+		const dependencyGroups: Array<[string, number[]]> = [
 			[
 				"Overlord",
-				nationState?.overlord && hasOwnedProvinces(nationState.overlord)
-					? [nationState.overlord]
+				nationState?.relations.overlord !== undefined &&
+				nationState.relations.overlord >= 0 &&
+				hasOwnedProvinces(nationState.relations.overlord)
+					? [nationState.relations.overlord]
 					: [],
 			],
 			...subjectDependencyGroups,
 			[
 				"Union (Senior)",
-				nationState?.unionSeniorOf
-					? Array.from(nationState.unionSeniorOf).filter(hasOwnedProvinces)
+				nationState?.relations.unionSeniorOf
+					? nationState.relations.unionSeniorOf.filter(hasOwnedProvinces)
 					: [],
 			],
 			[
 				"Union (Junior)",
-				nationState?.unionJuniorPartner &&
-				hasOwnedProvinces(nationState.unionJuniorPartner)
-					? [nationState.unionJuniorPartner]
+				nationState?.relations.unionJuniorPartner !== undefined &&
+				nationState.relations.unionJuniorPartner >= 0 &&
+				hasOwnedProvinces(nationState.relations.unionJuniorPartner)
+					? [nationState.relations.unionJuniorPartner]
 					: [],
 			],
 			[
 				"Allies",
-				nationState?.allies
-					? Array.from(nationState.allies).filter(hasOwnedProvinces)
+				nationState?.relations.allies
+					? nationState.relations.allies.filter(hasOwnedProvinces)
 					: [],
 			],
 			[
 				"Guarantees",
-				nationState?.guarantees
-					? Array.from(nationState.guarantees).filter(hasOwnedProvinces)
+				nationState?.relations.guarantees
+					? nationState.relations.guarantees.filter(hasOwnedProvinces)
 					: [],
 			],
 			[
 				"Royal Marriages",
-				nationState?.royalMarriages
-					? Array.from(nationState.royalMarriages).filter(hasOwnedProvinces)
+				nationState?.relations.royalMarriages
+					? nationState.relations.royalMarriages.filter(hasOwnedProvinces)
 					: [],
 			],
 		]
 		const dependencies = dependencyGroups
-			.map(([label, tags]) => ({
+			.map(([label, ids]) => ({
 				label,
-				nations: tags.map((otherTag) => ({
-					tag: otherTag,
-					name: resolveNationName(otherTag),
-					color: resolveNationColor(otherTag),
+				nations: ids.map((otherId) => ({
+					tag: String(otherId),
+					name: resolveNationName(otherId),
+					color: resolveNationColor(otherId),
 				})),
 			}))
 			.filter((group) => group.nations.length > 0)
@@ -284,8 +285,15 @@ export function useNationWikiData(
 					])
 				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
-		const organizationIds = new Set<string>(nationState?.organizations.keys())
-		if (state.hreMemberNations.has(tag)) organizationIds.add("HRE")
+		const organizationRoleById = new Map(
+			nationState?.organizations.map((organization) => [
+				organization.orgId,
+				organization.role,
+			]) ?? [],
+		)
+		const organizationIds = new Set<string>(organizationRoleById.keys())
+		if (FRAME.hreMemberNations({ frame }).has(nationId))
+			organizationIds.add("HRE")
 		const organizations = Array.from(organizationIds).map((orgId) => {
 			// A nation can hold enclave territory of an org without being
 			// genuinely "part of" it -- e.g. Venice's Terraferma stayed
@@ -294,14 +302,12 @@ export function useNationWikiData(
 			// transparent instead of a plain solid swatch, so the wiki
 			// doesn't silently overstate membership -- see
 			// collectOrgForeignHolderNations.
-			const striped = FOLD.collectOrgForeignHolderNations({ state, orgId }).has(
-				tag,
-			)
+			const striped = FRAME.orgForeignHolders({ frame, orgId }).has(nationId)
 			// For orgs whose categories split into rival sides (GG's
 			// Guelphs/Ghibellines) rather than just estate/site types, show
 			// which side this nation is on instead of the shared org name --
 			// see OrgCategory.factionLabel.
-			const role = nationState?.organizations.get(orgId)
+			const role = organizationRoleById.get(orgId)
 			const category = role
 				? ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.find(
 						(c) => c.id === role,
@@ -383,14 +389,12 @@ export function useNationWikiData(
 				),
 			})
 		}
-		const focusNation = (targetTag: string) => {
-			const targetId = frame.nationIds.get(targetTag)
-			const seedProvince =
-				targetId !== undefined ? frame.seeds[targetId] : undefined
+		const focusNation = (targetId: number) => {
+			const seedProvince = frame.nations.get(targetId)?.capitalProvince ?? -1
 			if (seedProvince === undefined || seedProvince < 0) return
 
 			let targetProvinceCount = 0
-			for (const assigned of frame.assignment) {
+			for (const assigned of frame.provinceNation) {
 				if (assigned === targetId) targetProvinceCount++
 			}
 			sceneRef.current?.focusOnProvince(seedProvince, {
@@ -399,35 +403,27 @@ export function useNationWikiData(
 			})
 		}
 
-		const eventNation = (otherTag: string, rebelType?: unknown) =>
-			isRebelTag(otherTag)
-				? {
-						tag: otherTag,
-						name: formatRebelName(rebelType),
-						color: "#020617",
-						link: false,
-					}
-				: {
-						tag: otherTag,
-						name: resolveNationName(otherTag),
-						color: resolveNationColor(otherTag),
-					}
+		const eventNation = (otherId: number, rebelType?: unknown) => ({
+			tag: String(otherId),
+			name: rebelType ? formatRebelName(rebelType) : resolveNationName(otherId),
+			color: resolveNationColor(otherId),
+			link: !rebelType,
+		})
 		const addNationMention = (
-			nations: NationTimelineEvent["nations"],
-			otherTag: string | null,
+			mentions: NationTimelineEvent["nations"],
+			otherId: number | null,
 			rebelType?: unknown,
 		) => {
 			if (
-				!otherTag ||
-				nations.some(
+				otherId === null ||
+				mentions.some(
 					(entry) =>
-						entry.tag === otherTag &&
-						(!isRebelTag(otherTag) ||
-							entry.name === formatRebelName(rebelType)),
+						entry.tag === String(otherId) &&
+						entry.name === eventNation(otherId, rebelType).name,
 				)
 			)
 				return
-			nations.push(eventNation(otherTag, rebelType))
+			mentions.push(eventNation(otherId, rebelType))
 		}
 		const provinceMention = (
 			rawId: string,
@@ -438,7 +434,8 @@ export function useNationWikiData(
 			return {
 				id: provinceId,
 				name:
-					earthHistory.provinceMeta?.get(rawId)?.name ?? `Province ${rawId}`,
+					earthHistory.state.provinceMeta[provinceId]?.name ??
+					`Province ${rawId}`,
 				color: getProvinceColor(provinceId) ?? fallbackColor,
 			}
 		}
@@ -448,25 +445,25 @@ export function useNationWikiData(
 		// span covers the transfer date is presumed to be that war's doing --
 		// same heuristic WarWikiPage's own territory section uses, just run
 		// against every war instead of one already-selected war.
-		const warSpans = earthHistory.engine.data.wars.map((war) => {
-			const sideByTag = new Map<string, "attacker" | "defender">()
-			for (const event of war.events) sideByTag.set(event.nationTag, event.side)
+		const warSpans = wars.map((war) => {
+			const sideById = new Map<number, "attacker" | "defender">()
+			for (const event of war.events) sideById.set(event.nationId, event.side)
 			const dates = war.events.map((event) => event.date)
 			return {
 				war,
-				sideByTag,
+				sideById,
 				dateRangeStart: dates.length > 0 ? Math.min(...dates) : Infinity,
 				dateRangeEnd: dates.length > 0 ? Math.max(...dates) : -Infinity,
 			}
 		})
 		const findWarForTransfer = (
 			date: number,
-			tagA: string,
-			tagB: string,
-		): { warId: string; name: string } | null => {
+			idA: number,
+			idB: number,
+		): { id: number; name: string } | null => {
 			for (const span of warSpans) {
 				if (date < span.dateRangeStart || date > span.dateRangeEnd) continue
-				if (!span.sideByTag.has(tagA) || !span.sideByTag.has(tagB)) continue
+				if (!span.sideById.has(idA) || !span.sideById.has(idB)) continue
 				return span.war
 			}
 			return null
@@ -474,12 +471,12 @@ export function useNationWikiData(
 		const ownedProvinceCountByDate = new Map<number, number>()
 		const territoryDeltasByDate = new Map<number, number>()
 		let timelineEvents: NationTimelineEvent[] = []
-		const nationEvents = earthHistory.engine.data.nationEvents[tag]
+		const nationEvents = record.events.nationEvents[nationId]
 		if (nationEvents) {
-			for (const [index, event] of nationEvents.events.entries()) {
-				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+			for (const [index, event] of datedEvents(nationEvents.events).entries()) {
+				const nations: NationTimelineEvent["nations"] = [eventNation(nationId)]
 				const provinces: NationTimelineEvent["provinces"] = []
-				const dateId = `nation:${tag}:${event.date}:${index}`
+				const dateId = `nation:${nationId}:${event.date}:${index}`
 				switch (event.kind) {
 					case "governmentChange": {
 						const governmentType = String(event.payload.governmentType ?? "")
@@ -583,7 +580,7 @@ export function useNationWikiData(
 							id: dateId,
 							date: event.date,
 							type: "Government",
-							description: `${title} changed name to ${String(event.payload.name ?? tag)}.`,
+							description: `${title} changed name to ${String(event.payload.name ?? nationId)}.`,
 							comment: eventComment(event.comment),
 							nations,
 						})
@@ -711,22 +708,6 @@ export function useNationWikiData(
 							nations,
 						})
 						break
-					case "rulerTrait":
-					case "heirTrait":
-					case "queenTrait":
-					case "clearTraits":
-						pushTimelineEvent(timelineEvents, {
-							id: dateId,
-							date: event.date,
-							type: "Trait",
-							description:
-								event.kind === "clearTraits"
-									? `${title} cleared ruler traits.`
-									: `${title} added ${formatPayloadLabel(payloadValue(event.payload, "traitId"))} ${event.kind.replace("Trait", "")} trait.`,
-							comment: eventComment(event.comment),
-							nations,
-						})
-						break
 					case "countryFlagSet":
 					case "countryFlagClear":
 					case "globalFlagSet":
@@ -781,15 +762,13 @@ export function useNationWikiData(
 			}
 		}
 
-		for (const [rawId, entry] of Object.entries(
-			earthHistory.engine.data.provinceEvents,
-		)) {
-			let owner = normalizeTimelineTag(entry.base.owner)
-			let controller = normalizeTimelineTag(entry.base.controller)
+		for (const [rawId, entry] of record.events.provinceEvents) {
+			let owner = entry.base.ownerId
+			let controller = entry.base.controllerId
 			let ownerRebelType: unknown
 			let controllerRebelType: unknown
 			const revoltTypeByDate = new Map<number, unknown>()
-			for (const event of entry.events) {
+			for (const event of datedEvents(entry.events)) {
 				if (
 					event.kind === "revolt" &&
 					event.payload.revolt &&
@@ -802,48 +781,50 @@ export function useNationWikiData(
 					)
 				}
 			}
-			if (owner === tag) {
+			if (owner === nationId) {
 				territoryDeltasByDate.set(
 					Number.NEGATIVE_INFINITY,
 					(territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0) + 1,
 				)
 			}
-			for (const [index, event] of entry.events.entries()) {
+			const isRebelId = (id: number) => id >= 0 && !!nationList[id]?.isRebel
+			for (const [index, event] of datedEvents(entry.events).entries()) {
 				const eventId = `province:${rawId}:${event.date}:${index}`
-				const nextTag = normalizeTimelineTag(event.payload.tag)
-				const nextRebelType = isRebelTag(nextTag)
+				const nextId = (event.payload.nationId as number | null) ?? null
+				const nextRebelType = isRebelId(nextId)
 					? revoltTypeByDate.get(event.date)
 					: undefined
-				const provinceColor = nextTag ? resolveNationColor(nextTag) : color
-				const province = provinceMention(rawId, provinceColor)
+				const provinceColor =
+					nextId !== null ? resolveNationColor(nextId) : color
+				const province = provinceMention(String(rawId), provinceColor)
 				const provinces = province ? [province] : []
-				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+				const nations: NationTimelineEvent["nations"] = [eventNation(nationId)]
 				if (event.kind === "owner") {
 					const previousOwnerRebelType = ownerRebelType
 					const otherRebelType =
-						nextTag === tag ? previousOwnerRebelType : nextRebelType
-					addNationMention(nations, nextTag, nextRebelType)
-					if (nextTag === tag || owner === tag) {
-						if (nextTag !== owner) {
-							const delta = nextTag === tag ? 1 : -1
+						nextId === nationId ? previousOwnerRebelType : nextRebelType
+					addNationMention(nations, nextId, nextRebelType)
+					if (nextId === nationId || owner === nationId) {
+						if (nextId !== owner) {
+							const delta = nextId === nationId ? 1 : -1
 							territoryDeltasByDate.set(
 								event.date,
 								(territoryDeltasByDate.get(event.date) ?? 0) + delta,
 							)
 						}
-						const otherTag = nextTag === tag ? owner : nextTag
+						const otherId = nextId === nationId ? owner : nextId
 						const war =
-							otherTag && !isRebelTag(otherTag)
-								? findWarForTransfer(event.date, tag, otherTag)
+							otherId !== null && !isRebelId(otherId)
+								? findWarForTransfer(event.date, nationId, otherId)
 								: null
 						const description =
-							nextTag === tag
+							nextId === nationId
 								? `${title} gained ${province?.name ?? `province ${rawId}`}${war ? ` (${war.name})` : ""}.`
-								: `${title} lost ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
+								: `${title} lost ${province?.name ?? `province ${rawId}`}${nextId !== null ? ` to ${eventNation(nextId, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
 						pushTimelineEvent(timelineEvents, {
 							id: eventId,
 							date: event.date,
-							type: nextTag === tag ? "Territory (+)" : "Territory (-)",
+							type: nextId === nationId ? "Territory (+)" : "Territory (-)",
 							description,
 							comment: eventComment(event.comment),
 							nations,
@@ -851,33 +832,33 @@ export function useNationWikiData(
 							wars: war ? [warMention(war)] : [],
 						})
 					}
-					owner = nextTag
-					ownerRebelType = isRebelTag(nextTag) ? nextRebelType : undefined
+					owner = nextId
+					ownerRebelType = isRebelId(nextId) ? nextRebelType : undefined
 				} else if (event.kind === "controller") {
 					const previousController = controller
 					const previousControllerRebelType = controllerRebelType
 					const otherRebelType =
-						nextTag === tag ? previousControllerRebelType : nextRebelType
-					addNationMention(nations, nextTag, nextRebelType)
-					if (nextTag === tag)
+						nextId === nationId ? previousControllerRebelType : nextRebelType
+					addNationMention(nations, nextId, nextRebelType)
+					if (nextId === nationId)
 						addNationMention(nations, previousController, otherRebelType)
 					if (
-						nextTag !== previousController &&
-						(nextTag === tag || previousController === tag)
+						nextId !== previousController &&
+						(nextId === nationId || previousController === nationId)
 					) {
-						const otherTag = nextTag === tag ? controller : nextTag
+						const otherId = nextId === nationId ? controller : nextId
 						const war =
-							otherTag && !isRebelTag(otherTag)
-								? findWarForTransfer(event.date, tag, otherTag)
+							otherId !== null && !isRebelId(otherId)
+								? findWarForTransfer(event.date, nationId, otherId)
 								: null
 						const description =
-							nextTag === tag
-								? `${title} took control of ${province?.name ?? `province ${rawId}`}${previousController ? ` from ${eventNation(previousController, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
-								: `${title} lost control of ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
+							nextId === nationId
+								? `${title} took control of ${province?.name ?? `province ${rawId}`}${previousController !== null ? ` from ${eventNation(previousController, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
+								: `${title} lost control of ${province?.name ?? `province ${rawId}`}${nextId !== null ? ` to ${eventNation(nextId, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
 						pushTimelineEvent(timelineEvents, {
 							id: eventId,
 							date: event.date,
-							type: nextTag === tag ? "Territory (+)" : "Territory (-)",
+							type: nextId === nationId ? "Territory (+)" : "Territory (-)",
 							description,
 							comment: eventComment(event.comment),
 							nations,
@@ -885,9 +866,9 @@ export function useNationWikiData(
 							wars: war ? [warMention(war)] : [],
 						})
 					}
-					controller = nextTag
-					controllerRebelType = isRebelTag(nextTag) ? nextRebelType : undefined
-				} else if (owner === tag && event.kind === "culture") {
+					controller = nextId
+					controllerRebelType = isRebelId(nextId) ? nextRebelType : undefined
+				} else if (owner === nationId && event.kind === "culture") {
 					const cultureId = String(event.payload.cultureId ?? "")
 					const culture = cultureMention(earthHistory, cultureId)
 					pushTimelineEvent(timelineEvents, {
@@ -900,7 +881,7 @@ export function useNationWikiData(
 						provinces,
 						cultures: [culture],
 					})
-				} else if (owner === tag && event.kind === "religion") {
+				} else if (owner === nationId && event.kind === "religion") {
 					const religionId = String(event.payload.religionId ?? "")
 					const religion = religionMention(earthHistory, religionId)
 					pushTimelineEvent(timelineEvents, {
@@ -913,7 +894,7 @@ export function useNationWikiData(
 						provinces,
 						religions: [religion],
 					})
-				} else if (owner === tag && event.kind === "hre") {
+				} else if (owner === nationId && event.kind === "hre") {
 					const joined = Boolean(event.payload.member)
 					pushTimelineEvent(timelineEvents, {
 						id: eventId,
@@ -931,16 +912,17 @@ export function useNationWikiData(
 			}
 		}
 
-		for (const [index, event] of earthHistory.engine.data.diplomacy.entries()) {
-			const firstTag = normalizeTimelineTag(event.payload.firstTag)
-			const secondTag = normalizeTimelineTag(event.payload.secondTag)
-			if (firstTag !== tag && secondTag !== tag) continue
-			const otherTag = firstTag === tag ? secondTag : firstTag
-			const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
-			addNationMention(nations, otherTag)
-			const otherName = otherTag
-				? resolveNationName(otherTag)
-				: "another nation"
+		for (const [index, event] of datedEvents(
+			record.events.diplomacy,
+		).entries()) {
+			const firstId = event.firstId
+			const secondId = event.secondId
+			if (firstId !== nationId && secondId !== nationId) continue
+			const otherId = firstId === nationId ? secondId : firstId
+			const nations: NationTimelineEvent["nations"] = [eventNation(nationId)]
+			addNationMention(nations, otherId)
+			const otherName =
+				otherId >= 0 ? resolveNationName(otherId) : "another nation"
 			const starts = event.kind.endsWith("Start")
 			if (event.kind === "emperorStart" || event.kind === "emperorEnd") {
 				// firstTag is always the emperor tag, secondTag is "HLR" (the
@@ -979,30 +961,30 @@ export function useNationWikiData(
 					title,
 					otherName,
 					isStart: starts,
-					isOverlordPage: firstTag === tag,
+					isOverlordPage: firstId === nationId,
 					subjectType:
 						event.kind === "vassalStart" || event.kind === "vassalEnd"
 							? "vassal"
-							: event.payload.subjectType,
+							: event.subjectType,
 				})
 			} else if (event.kind === "guaranteeStart") {
 				description =
-					firstTag === tag
+					firstId === nationId
 						? `${title} guaranteed ${otherName}.`
 						: `${title} received a guarantee from ${otherName}.`
 			} else if (event.kind === "guaranteeEnd") {
 				description =
-					firstTag === tag
+					firstId === nationId
 						? `${title} stopped guaranteeing ${otherName}.`
 						: `${title} lost ${otherName}'s guarantee.`
 			} else if (event.kind === "unionStart") {
 				description =
-					firstTag === tag
+					firstId === nationId
 						? `${title} gained ${otherName} as a junior partner in a personal union.`
 						: `${title} became junior partner in a personal union under ${otherName}.`
 			} else if (event.kind === "unionEnd") {
 				description =
-					firstTag === tag
+					firstId === nationId
 						? `${title}'s personal union over ${otherName} ended.`
 						: `${title} left the personal union under ${otherName}.`
 			} else {
@@ -1017,13 +999,12 @@ export function useNationWikiData(
 			})
 		}
 
-		for (const [
-			index,
-			event,
-		] of earthHistory.engine.data.organizationEvents.entries()) {
+		for (const [index, event] of datedEvents(
+			record.events.organizationEvents,
+		).entries()) {
 			if (
 				(event.kind !== "join" && event.kind !== "leave") ||
-				event.nationTag !== tag
+				event.nationId !== nationId
 			)
 				continue
 			const orgId = event.payload.orgId
@@ -1036,21 +1017,21 @@ export function useNationWikiData(
 				description: joined
 					? `${title} joined the ${org.name}.`
 					: `${title} left the ${org.name}.`,
-				nations: [eventNation(tag)],
+				nations: [eventNation(nationId)],
 				organizations: [org],
 			})
 		}
 
-		for (const war of earthHistory.engine.data.wars) {
-			const participants = new Map<string, "attacker" | "defender">()
+		for (const war of wars) {
+			const participants = new Map<number, "attacker" | "defender">()
 			for (const event of war.events)
-				participants.set(event.nationTag, event.side)
+				participants.set(event.nationId, event.side)
 			// Multiple nations often join/leave on the same date (a shared
 			// peace treaty, allies declaring together) -- group by
 			// (date, kind) the same way WarWikiPage does, so this nation's
 			// entry reads as "X, Y, and Z entered War against A and B"
 			// instead of only naming this nation.
-			const eventGroups = new Map<string, RawWarParticipantEvent[]>()
+			const eventGroups = new Map<string, typeof war.events>()
 			for (const event of war.events) {
 				const key = `${event.date}:${event.kind}`
 				const group = eventGroups.get(key)
@@ -1058,23 +1039,23 @@ export function useNationWikiData(
 				else eventGroups.set(key, [event])
 			}
 			for (const [key, group] of eventGroups) {
-				if (!group.some((event) => event.nationTag === tag)) continue
+				if (!group.some((event) => event.nationId === nationId)) continue
 				const date = group[0].date
 				const kind = group[0].kind
 				const comment = group.find((event) => event.comment)?.comment
-				const attackerTags = group
+				const attackerIds = group
 					.filter((event) => event.side === "attacker")
-					.map((event) => event.nationTag)
-				const defenderTags = group
+					.map((event) => event.nationId)
+				const defenderIds = group
 					.filter((event) => event.side === "defender")
-					.map((event) => event.nationTag)
+					.map((event) => event.nationId)
 				const nations: NationTimelineEvent["nations"] = []
-				for (const nationTag of [...attackerTags, ...defenderTags])
-					addNationMention(nations, nationTag)
+				for (const id of [...attackerIds, ...defenderIds])
+					addNationMention(nations, id)
 				let description: string
 				if (kind === "warStart") {
-					const attackerNames = attackerTags.map(resolveNationName)
-					const defenderNames = defenderTags.map(resolveNationName)
+					const attackerNames = attackerIds.map(resolveNationName)
+					const defenderNames = defenderIds.map(resolveNationName)
 					if (attackerNames.length > 0 && defenderNames.length > 0) {
 						description = `${joinWithAnd(attackerNames)} entered ${war.name} against ${joinWithAnd(defenderNames)}.`
 					} else {
@@ -1083,29 +1064,27 @@ export function useNationWikiData(
 						// existing opponents so "against" still shows up.
 						const joiningSide =
 							attackerNames.length > 0 ? "attacker" : "defender"
-						const joiningTags =
-							attackerNames.length > 0 ? attackerTags : defenderTags
+						const joiningIds =
+							attackerNames.length > 0 ? attackerIds : defenderIds
 						const joiningNames =
 							attackerNames.length > 0 ? attackerNames : defenderNames
-						const opponentTags = Array.from(participants.entries())
+						const opponentIds = Array.from(participants.entries())
 							.filter(
-								([opponentTag, side]) =>
-									side !== joiningSide && !joiningTags.includes(opponentTag),
+								([opponentId, side]) =>
+									side !== joiningSide && !joiningIds.includes(opponentId),
 							)
-							.map(([opponentTag]) => opponentTag)
-						for (const opponentTag of opponentTags)
-							addNationMention(nations, opponentTag)
-						const opponentNames = opponentTags.map(resolveNationName)
+							.map(([opponentId]) => opponentId)
+						for (const opponentId of opponentIds)
+							addNationMention(nations, opponentId)
+						const opponentNames = opponentIds.map(resolveNationName)
 						description = `${joinWithAnd(joiningNames)} entered ${war.name}${opponentNames.length > 0 ? ` against ${joinWithAnd(opponentNames)}` : ""}.`
 					}
 				} else {
-					const names = [...attackerTags, ...defenderTags].map(
-						resolveNationName,
-					)
+					const names = [...attackerIds, ...defenderIds].map(resolveNationName)
 					description = `${joinWithAnd(names)} left ${war.name}.`
 				}
 				pushTimelineEvent(timelineEvents, {
-					id: `war:${war.warId}:${key}`,
+					id: `war:${war.id}:${key}`,
 					date,
 					type: kind === "warStart" ? "War (+)" : "War (-)",
 					description,
@@ -1115,19 +1094,24 @@ export function useNationWikiData(
 				})
 			}
 			for (const [index, battle] of war.battles.entries()) {
-				const isAttacker = battle.attacker.country === tag
-				const isDefender = battle.defender.country === tag
+				const isAttacker = battle.attacker.countryId === nationId
+				const isDefender = battle.defender.countryId === nationId
 				if (!isAttacker && !isDefender) continue
 				const opponent = isAttacker ? battle.defender : battle.attacker
 				const won = isAttacker ? battle.attackerWon : !battle.attackerWon
-				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
-				addNationMention(nations, opponent.country)
-				const province = battle.locationProvinceId
-					? provinceMention(battle.locationProvinceId, "#94a3b8")
-					: null
-				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${resolveNationName(opponent.country)} (${war.name}).`
+				const nations: NationTimelineEvent["nations"] = [eventNation(nationId)]
+				addNationMention(nations, opponent.countryId)
+				const province =
+					battle.locationProvinceId !== null
+						? provinceMention(String(battle.locationProvinceId), "#94a3b8")
+						: null
+				const opponentName =
+					opponent.countryId !== null
+						? resolveNationName(opponent.countryId)
+						: "unknown"
+				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${opponentName} (${war.name}).`
 				pushTimelineEvent(timelineEvents, {
-					id: `warBattle:${war.warId}:${battle.date}:${index}`,
+					id: `warBattle:${war.id}:${battle.date}:${index}`,
 					date: battle.date,
 					type: won ? "Battle (+)" : "Battle (-)",
 					description,
@@ -1150,15 +1134,16 @@ export function useNationWikiData(
 		// simulation start, then the running count at each ownership change.
 		// ownedProvinceCountByDate iterates in ascending date order because it
 		// was filled from sorted dates above.
+		const minDay = daysFromMs(earthHistory.minTimeMs)
 		const provinceHistory: Array<{ date: number; count: number }> = [
 			{
-				date: earthHistory.minDays,
+				date: minDay,
 				count: territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0,
 			},
 		]
 		for (const [date, count] of ownedProvinceCountByDate) {
-			if (date <= earthHistory.minDays) {
-				provinceHistory[0] = { date: earthHistory.minDays, count }
+			if (date <= minDay) {
+				provinceHistory[0] = { date: minDay, count }
 			} else {
 				provinceHistory.push({ date, count })
 			}
@@ -1202,7 +1187,7 @@ export function useNationWikiData(
 			}
 			const mergedType = mergedTerritoryType(group)
 			mergedTimelineEvents.push({
-				id: `territory:${tag}:${date}:merged`,
+				id: `territory:${nationId}:${date}:merged`,
 				date,
 				dateLabel: DATE.formatHistoryDays(date),
 				type: mergedType,
@@ -1224,7 +1209,7 @@ export function useNationWikiData(
 				continue
 			}
 			mergedTimelineEvents.push({
-				id: `culture:${tag}:${date}:merged`,
+				id: `culture:${nationId}:${date}:merged`,
 				date,
 				dateLabel: DATE.formatHistoryDays(date),
 				type: "Culture",
@@ -1246,7 +1231,7 @@ export function useNationWikiData(
 				continue
 			}
 			mergedTimelineEvents.push({
-				id: `religion:${tag}:${date}:merged`,
+				id: `religion:${nationId}:${date}:merged`,
 				date,
 				dateLabel: DATE.formatHistoryDays(date),
 				type: "Religion",
@@ -1268,7 +1253,9 @@ export function useNationWikiData(
 		)
 
 		const cultureDistribution = buildStringIdDistributionForProvinces({
-			idByProvince: frame.cultureByProvince,
+			idByProvince: Array.from(frame.provinceCulture, (id) =>
+				id >= 0 ? (frame.cultures[id]?.key ?? null) : null,
+			),
 			provinceIndexes,
 			nameById: earthHistory.cultureNameById ?? undefined,
 			colorById: earthHistory.cultureColorById ?? undefined,
@@ -1276,7 +1263,9 @@ export function useNationWikiData(
 			fallbackColor: "rgb(148, 163, 184)",
 		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
-			idByProvince: frame.religionByProvince,
+			idByProvince: Array.from(frame.provinceReligion, (id) =>
+				id >= 0 ? (frame.religions[id]?.key ?? null) : null,
+			),
 			provinceIndexes,
 			nameById: earthHistory.religionNameById ?? undefined,
 			colorById: earthHistory.religionColorById ?? undefined,
@@ -1329,40 +1318,41 @@ export function useNationWikiData(
 			topographyDistribution,
 			showObservedDistributions,
 			provinceHistory,
-			dateRangeStart: earthHistory.minDays,
-			dateRangeEnd: earthHistory.maxDays,
-			currentDate: earthHistory.selectedDays,
-			currentDateLabel: DATE.formatHistoryDays(earthHistory.selectedDays),
+			dateRangeStart: daysFromMs(earthHistory.minTimeMs),
+			dateRangeEnd: daysFromMs(earthHistory.maxTimeMs),
+			currentDate: daysFromMs(earthHistory.selectedTimeMs),
+			currentDateLabel: DATE.formatHistoryTimeMs(earthHistory.selectedTimeMs),
 			timelineEvents,
-			onBack: () => setSelectedWikiNationTag(null),
-			onFocusNation: () => focusNation(tag),
+			onBack: () => setSelectedWikiNationId(null),
+			onFocusNation: () => focusNation(nationId),
 			onSelectNation: (targetTag: string) => {
-				focusNation(targetTag)
-				setSelectedWikiNationTag(targetTag)
+				const id = Number(targetTag)
+				focusNation(id)
+				setSelectedWikiNationId(id)
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
 					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 				})
 			},
-			onSelectDate: earthHistory.setSelectedDays,
+			onSelectDate: (day: number) =>
+				earthHistory.setSelectedTimeMs(day * 86_400_000),
 			onSelectOrganization: (orgId: string) => {
 				setSelectedWikiOrganizationId(orgId)
 			},
-			onSelectWar: (warId: string) => {
+			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
 		}
 	}, [
-		selectedWikiNationTag,
+		selectedWikiNationId,
 		world,
 		earthHistory.query,
-		earthHistory.engine,
-		earthHistory.selectedDays,
-		earthHistory.setSelectedDays,
-		earthHistory.minDays,
-		earthHistory.maxDays,
-		earthHistory.nationReference,
+		earthHistory.state,
+		earthHistory.selectedTimeMs,
+		earthHistory.setSelectedTimeMs,
+		earthHistory.minTimeMs,
+		earthHistory.maxTimeMs,
 		earthHistory.organizationReference,
 		earthHistory.cultureNameById,
 		earthHistory.cultureColorById,
@@ -1374,7 +1364,7 @@ export function useNationWikiData(
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
-		setSelectedWikiNationTag,
+		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 	])

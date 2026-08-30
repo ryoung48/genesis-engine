@@ -36,9 +36,6 @@ FUZZY_NAME_MATCH_MIN_SIMILARITY = 0.85
 GHSL_FALLBACK_START_DAYS = -3_650_000
 SETTLEMENT_EVENT_KINDS = {
     "capitalName",
-    "baseTax",
-    "baseProduction",
-    "baseManpower",
     "citySize",
     "centerOfTrade",
     "isCity",
