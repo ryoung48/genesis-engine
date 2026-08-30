@@ -1,5 +1,5 @@
+import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { TEXT } from "@/model/shared/text"
-import { GENDER_SYSTEM } from "@/model/society/gender-system"
 import { LANGUAGE } from "@/model/society/language/languages"
 import type { Language } from "@/model/society/language/languages/types"
 import type {

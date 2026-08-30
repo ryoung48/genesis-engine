@@ -1,10 +1,25 @@
 import type {
 	HreMemberNationsParams,
 	IsOccupiedParams,
+	NationRelations,
 	OrgForeignHoldersParams,
 	OrgMemberProvincesParams,
 	ToRenderInputsParams,
 } from "@/model/history/world-frame/types"
+
+function emptyRelations(): NationRelations {
+	return {
+		overlord: -1,
+		vassals: [],
+		vassalSubjectTypes: [],
+		unionSeniorOf: [],
+		unionJuniorPartner: -1,
+		allies: [],
+		guarantees: [],
+		royalMarriages: [],
+		rivals: [],
+	}
+}
 
 function isOccupied({ frame, province }: IsOccupiedParams): boolean {
 	return (
@@ -100,6 +115,7 @@ function toRenderInputs({ frame }: ToRenderInputsParams) {
 }
 
 export const FRAME = {
+	emptyRelations,
 	isOccupied,
 	hreMemberNations,
 	orgMemberProvinces,

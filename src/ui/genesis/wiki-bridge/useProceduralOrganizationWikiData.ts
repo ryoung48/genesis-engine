@@ -1,13 +1,13 @@
 import { useMemo } from "react"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
-import { TEXT } from "@/model/shared/text"
 import {
 	ORGANIZATION_TITLE_COLORS,
 	ORGANIZATION_TITLE_LABELS,
 	ORGANIZATION_TITLE_ORDER,
-} from "@/model/society/organizations/titles"
-import { RELIGION } from "@/model/society/religion"
+} from "@/model/history/sim/organizations/titles"
+import { RELIGION } from "@/model/history/sim/religion"
+import { TEXT } from "@/model/shared/text"
 import {
 	buildPartitionDistribution,
 	colorFromPartition,

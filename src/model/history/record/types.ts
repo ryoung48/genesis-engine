@@ -138,7 +138,31 @@ export interface HistoryRecordCommon {
 	religions: PartitionRow[]
 }
 
-export interface ProceduralTimeline {}
+export interface ProceduralNationInit {
+	id: number
+	capitalProvince: number
+	government: string
+	governmentReform: string
+}
+
+// The single static frame of a procedurally generated history's initial
+// conditions. No time evolution yet -- record.minTimeMs === record.maxTimeMs
+// and every frameAt returns this same snapshot.
+export interface ProceduralInitialConditions {
+	provinceCount: number
+	provinceNation: Int32Array
+	provinceCulture: Int32Array
+	provinceReligion: Int32Array
+	provinceCultureBlendSecondary: Int32Array
+	provincePopulation: Float32Array
+	provincePopulationUrban: Float32Array
+	provinceDevelopment: Float32Array
+	nations: ProceduralNationInit[]
+}
+
+export interface ProceduralTimeline {
+	initial: ProceduralInitialConditions
+}
 
 export type HistoryRecord =
 	| (HistoryRecordCommon & { origin: "earth"; events: EarthHistoryEvents })

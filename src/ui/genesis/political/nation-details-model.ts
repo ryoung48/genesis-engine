@@ -2,7 +2,6 @@
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { TEXT } from "@/model/shared/text"
 import { ERAS } from "@/model/society/eras"
-import { RELIGION } from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
@@ -141,6 +140,7 @@ export function buildSelectedNationDetails(params: {
 	getNationName: (nationId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
+	getReligionName: (religionId: number) => string
 	getOrganizationName: (orgId: string) => string
 }): NationDetailsData | null {
 	const {
@@ -151,6 +151,7 @@ export function buildSelectedNationDetails(params: {
 		getNationName,
 		getCultureName,
 		getHeritageName,
+		getReligionName,
 		getOrganizationName,
 	} = params
 	if (
@@ -246,19 +247,8 @@ export function buildSelectedNationDetails(params: {
 				if (cultureId < 0) return -1
 				return world.religions?.assignment[cultureId] ?? -1
 			},
-			getLabel: (id) => {
-				const typeId = world.religionTypes?.[id] ?? -1
-				return typeId >= 0
-					? (RELIGION.religionTypeNames[typeId] ?? `Religion #${id}`)
-					: `Religion #${id}`
-			},
-			getColor: (id) => {
-				const typeId = world.religionTypes?.[id] ?? -1
-				if (typeId < 0) return colorFromPartition(world.religions, id)
-				const [r, g, b] =
-					RELIGION.religionTypeColors[typeId] ?? RELIGION.religionTypeColors[0]
-				return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
-			},
+			getLabel: getReligionName,
+			getColor: (id) => colorFromPartition(world.religions, id),
 		}),
 		climateDistribution: buildRegionZoneDistribution({
 			memberProvinces: memberProvinceSet,

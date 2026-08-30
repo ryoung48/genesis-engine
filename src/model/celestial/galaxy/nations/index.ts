@@ -5,7 +5,7 @@ import type {
 import { RNG } from "@/model/shared/random/rng"
 
 // Same size-tier weights/ranges as the province-based medieval nation
-// distribution (see society/nations/index.ts's NATION_PERCENTAGES and
+// distribution (see history/sim/nations/index.ts's NATION_PERCENTAGES and
 // eras/index.ts's nationBuckets) -- a galaxy's system count is the same
 // rough order of magnitude as a planet's province count, so the same
 // absolute bucket ranges produce the same "a few empires, many small
@@ -83,7 +83,7 @@ function spreadBucketSizes(
 	return sizes
 }
 
-/** Same shape as society/nations' buildNationPlan: converts the bucket
+/** Same shape as history/sim/nations' buildNationPlan: converts the bucket
  * percentages into a budget of systems per size tier, then spreads each
  * tier's budget across a count of nations sized within that tier's range. */
 function buildNationTargets(total: number): number[] {
@@ -353,7 +353,7 @@ function emptyResult(numSystems: number): GalaxyNations {
 
 /**
  * Partitions every non-edge system in a generated galaxy into nations, via
- * the same percentage-bucket/flood-fill shape as society/nations' province
+ * the same percentage-bucket/flood-fill shape as history/sim/nations' province
  * partition (see this file's own bucket comment), but over the galaxy's
  * hyperlane graph (GalaxyTopology.laneAdjOffset/laneAdjList, passed in as
  * adjOffset/adjList) so realms grow along travel routes, plus r_xy

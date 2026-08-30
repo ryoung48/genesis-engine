@@ -1,5 +1,4 @@
-import type { GovernmentMix } from "@/model/society/nations/types"
-import type { SocietyEra } from "@/model/society/types"
+import type { GovernmentMix, SocietyEra } from "@/model/society/types"
 
 export interface WavePercentileThresholdParams {
 	migrationWave: Float32Array
@@ -48,10 +47,10 @@ export interface EraConfig {
 	 * Procedural organizations to generate for this era, layered on top of the
 	 * normal nation partition. imperialPatchwork: shatter the largest eligible
 	 * (settled, wave >= 0) nation into an HRE-style patchwork of small member
-	 * states — see src/model/society/organizations/imperial-patchwork.
+	 * states — see src/model/history/sim/organizations/imperial-patchwork.
 	 * tradeLeague: shatter the largest eligible coastal republic into a flat
 	 * Hansa-style patchwork of small trade-city members — see
-	 * src/model/society/organizations/trade-league.
+	 * src/model/history/sim/organizations/trade-league.
 	 */
 	organizations?: {
 		imperialPatchwork?: boolean

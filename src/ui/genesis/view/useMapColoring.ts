@@ -6,10 +6,10 @@ import type { RawOrganizationReference } from "@/model/history/earth/data-source
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import { ORGANIZATION_TITLE_COLORS } from "@/model/history/sim/organizations/titles"
+import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
-import { ORGANIZATION_TITLE_COLORS } from "@/model/society/organizations/titles"
-import { RELIGION } from "@/model/society/religion"
 import type { OrganizationTitle } from "@/model/society/types"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
 import {
@@ -40,6 +40,8 @@ export function useMapColoring(input: MapColoringInput) {
 		worldForDisplay,
 		earthHistory,
 		historyFrame,
+		historyCultureColorById,
+		historyReligionColorById,
 		colorMode,
 		nationMode,
 		societyMode: populationMode,
@@ -360,7 +362,7 @@ export function useMapColoring(input: MapColoringInput) {
 			worldForDisplay.provinces &&
 			worldForDisplay.elevation_km
 		) {
-			const earthColors = computeEarthHistoryRegionColors({
+			const historyColors = computeEarthHistoryRegionColors({
 				colorMode,
 				nationMode,
 				populationMode,
@@ -369,10 +371,10 @@ export function useMapColoring(input: MapColoringInput) {
 				desolate: worldForDisplay.provinces.desolate,
 				elevationKm: worldForDisplay.elevation_km,
 				isLand: worldForDisplay.isLand,
-				religionColorById: earthHistory.religionColorById ?? undefined,
-				cultureColorById: earthHistory.cultureColorById ?? undefined,
+				religionColorById: historyReligionColorById ?? undefined,
+				cultureColorById: historyCultureColorById ?? undefined,
 			})
-			if (earthColors) return withOrgHighlight(earthColors)
+			if (historyColors) return withOrgHighlight(historyColors)
 		}
 		return withOrgHighlight(
 			computeRegionColors(
@@ -408,8 +410,8 @@ export function useMapColoring(input: MapColoringInput) {
 		selectedNationId,
 		windVectors,
 		dangerSubMode,
-		earthHistory.religionColorById,
-		earthHistory.cultureColorById,
+		historyReligionColorById,
+		historyCultureColorById,
 		historyFrame,
 		withOrgHighlight,
 		religionMode,

@@ -1,5 +1,3 @@
-import { GENDER_SYSTEM } from "@/model/society/gender-system"
-
 export interface GenesisProvinces {
 	/** Per-region province index (-1 = ocean/unassigned) */
 	regionProvince: Int32Array
@@ -104,10 +102,10 @@ export interface GenesisOrganizationMember {
  * - "imperialPatchwork": HRE-style -- eligible = largest settled
  *   (migrationWave >= 0) nation; one member (the largest) keeps the
  *   "emperor" title; rest get HRE estate titles. See
- *   src/model/society/organizations/imperial-patchwork.
+ *   src/model/history/sim/organizations/imperial-patchwork.
  * - "tradeLeague": Hansa-style -- eligible = largest coastal republic;
  *   members are flat ("member" title, no hierarchy), capped small (< 10
- *   provinces). See src/model/society/organizations/trade-league.
+ *   provinces). See src/model/history/sim/organizations/trade-league.
  */
 export interface GenesisOrganization {
 	id: string
@@ -202,7 +200,20 @@ export type GovernmentFamily =
 	| "theocracy"
 	| "colonial"
 
-export type CultureGenderSystem =
-	(typeof GENDER_SYSTEM.cultureGenderSystem)[keyof typeof GENDER_SYSTEM.cultureGenderSystem]
+// 0 = patriarchal, 1 = equal, 2 = matriarchal (see GENDER_SYSTEM.cultureGenderSystem)
+export type CultureGenderSystem = 0 | 1 | 2
 
 export type LeaderGender = "male" | "female"
+
+export interface GovernmentMix {
+	tribal: number
+	monarchy: number
+	republic: number
+	theocracy: number
+	/**
+	 * Target fraction of total province mass to convert to colonial government
+	 * via the post-pass. Drawn from tribal nations on different landmasses.
+	 * Does not need to be included in the tribal/monarchy/republic/theocracy sum.
+	 */
+	colonial?: number
+}

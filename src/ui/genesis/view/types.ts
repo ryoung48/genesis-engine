@@ -228,6 +228,12 @@ export type MapColoringInput = {
 	worldForDisplay: SerializedGenesisWorld | null
 	earthHistory: EarthHistoryTimeline
 	historyFrame: WorldFrame | null
+	/** Culture/religion key -> [r,g,b] 0-1 for the active history frame --
+	 * earthHistory's reference maps for Earth imports, the procedural timeline's
+	 * own PartitionRow colours otherwise. Feeds computeEarthHistoryRegionColors
+	 * so both modes share one rendering path. */
+	historyCultureColorById: Map<string, [number, number, number]> | null
+	historyReligionColorById: Map<string, [number, number, number]> | null
 	colorMode: ColorMode
 	nationMode: NationMapMode
 	societyMode: SocietyMapMode

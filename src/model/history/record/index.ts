@@ -14,9 +14,10 @@ import type {
 	OrganizationEventRecord,
 	ProvinceEventLog,
 } from "@/model/history/record/types"
+import { SIM_FRAME } from "@/model/history/sim/frame"
+import { FRAME } from "@/model/history/world-frame"
 import type {
 	NationFrame,
-	NationRelations,
 	OrganizationFrame,
 	PartitionRow,
 	WarFrame,
@@ -359,20 +360,6 @@ async function loadEarthState({
 	}
 }
 
-function emptyRelations(): NationRelations {
-	return {
-		overlord: -1,
-		vassals: [],
-		vassalSubjectTypes: [],
-		unionSeniorOf: [],
-		unionJuniorPartner: -1,
-		allies: [],
-		guarantees: [],
-		royalMarriages: [],
-		rivals: [],
-	}
-}
-
 interface NationCapitalAnchorParams {
 	capitalRaw: number
 	nationId: number
@@ -442,8 +429,8 @@ function nationCapitalAnchor({
 }
 
 function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
-	if (state.record.origin !== "earth")
-		throw new Error("Earth frame requested for procedural history")
+	if (state.record.origin === "procedural")
+		return SIM_FRAME.buildProceduralFrame({ state, timeMs })
 	const { record, provinceMap } = state
 	const count = provinceMap.compactToRealId.length
 	const provinceNation = new Int32Array(count).fill(-1)
@@ -553,7 +540,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			ruler,
 			birthTimeMs: identity.birthTimeMs,
 			deathTimeMs: identity.deathTimeMs,
-			relations: emptyRelations(),
+			relations: FRAME.emptyRelations(),
 			wealth: 0,
 			optimalWealth: 0,
 			isEmperor: false,

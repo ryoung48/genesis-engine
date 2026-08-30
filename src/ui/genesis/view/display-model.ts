@@ -1,4 +1,5 @@
 ﻿import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import { toPastelNationColor } from "@/ui/genesis/shared/region-colors/palette"
 
 export interface DisplayNationModel {
 	assignment: Int32Array
@@ -129,11 +130,16 @@ export function buildDisplayNationModel(
 		if (!colorById.has(nationId)) {
 			const colorIndex = province * 3
 			if (colorIndex + 2 < world.nations.colors.length) {
-				colorById.set(nationId, [
-					world.nations.colors[colorIndex],
-					world.nations.colors[colorIndex + 1],
-					world.nations.colors[colorIndex + 2],
-				])
+				// Pastel-softened to match NationFrame.color in the unified
+				// history render path (src/model/history/sim/record).
+				colorById.set(
+					nationId,
+					toPastelNationColor([
+						world.nations.colors[colorIndex],
+						world.nations.colors[colorIndex + 1],
+						world.nations.colors[colorIndex + 2],
+					]),
+				)
 			}
 		}
 	}

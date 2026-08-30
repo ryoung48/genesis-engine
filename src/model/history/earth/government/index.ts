@@ -128,6 +128,14 @@ function getEarthHistoryGovernmentColor(params: {
 	governmentType: string | null
 	governmentReform?: string | null
 }): [number, number, number] | null {
+	// Procedural histories pass a concrete GovernmentType string (e.g.
+	// "feudal_monarchy") rather than an EU4 family base -- colour it directly
+	// from the shared palette so one call site serves both modes.
+	const direct = params.governmentType
+		? GOVERNMENT_COLORS_BY_TYPE[params.governmentType as GovernmentType]
+		: undefined
+	if (direct) return [...direct] as [number, number, number]
+
 	const family = getEarthHistoryGovernmentFamily(params.governmentType)
 	if (!family) return null
 

@@ -56,6 +56,7 @@ import {
 } from "@/ui/genesis/generation/sliders"
 import { useEarthHistoryTimeline } from "@/ui/genesis/generation/useEarthHistoryTimeline"
 import { useProceduralHistory } from "@/ui/genesis/generation/useProceduralHistory"
+import { useProceduralHistoryTimeline } from "@/ui/genesis/generation/useProceduralHistoryTimeline"
 import { useWorldDistributions } from "@/ui/genesis/generation/useWorldDistributions"
 import { useWorldGeneration } from "@/ui/genesis/generation/useWorldGeneration"
 import {
@@ -480,9 +481,27 @@ export const GenesisView: React.FC<{
 	} = useProceduralHistory({
 		workerRef,
 	})
-	const historyFrame = world?.isEarthImport
+	// Unified static initial-conditions frame for procedural worlds
+	// (src/model/history/sim), rendered through the same path as Earth history.
+	// Deliberately NOT proceduralHistoryFrame: that is the retired
+	// history/generated snapshot the worker still ships in its "done" message
+	// (and updates on live-sim playback); it carries placeholder names,
+	// stringified government indices and a different partition id space, none
+	// of which line up with this render path's side-maps.
+	const proceduralTimeline = useProceduralHistoryTimeline(world, religionMode)
+	const isEarthHistory = !!world?.isEarthImport
+	const historyFrame = isEarthHistory
 		? (earthHistory.query?.frame ?? null)
-		: proceduralHistoryFrame
+		: (proceduralTimeline.query?.frame ?? null)
+	// The active history frame's culture/religion colour side-maps: Earth's
+	// reference maps, or the procedural timeline's own row colours -- so
+	// useMapColoring runs one path for both.
+	const historyCultureColorById = isEarthHistory
+		? earthHistory.cultureColorById
+		: proceduralTimeline.cultureColorById
+	const historyReligionColorById = isEarthHistory
+		? earthHistory.religionColorById
+		: proceduralTimeline.religionColorById
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
@@ -1031,6 +1050,8 @@ export const GenesisView: React.FC<{
 		worldForDisplay,
 		earthHistory,
 		historyFrame,
+		historyCultureColorById,
+		historyReligionColorById,
 		colorMode,
 		nationMode,
 		societyMode,
@@ -1413,6 +1434,7 @@ export const GenesisView: React.FC<{
 			getNationName,
 			getCultureName,
 			getHeritageName,
+			getReligionName,
 			getOrganizationName,
 		})
 	}, [
@@ -1421,6 +1443,7 @@ export const GenesisView: React.FC<{
 		getNationName,
 		getCultureName,
 		getHeritageName,
+		getReligionName,
 		getOrganizationName,
 		selectedNationId,
 		worldForDisplay,

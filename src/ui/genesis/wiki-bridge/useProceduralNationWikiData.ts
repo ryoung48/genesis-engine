@@ -14,7 +14,7 @@ import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
  * useNationWikiData but sourced from buildSelectedNationDetails rather than
  * the Earth-history fold engine. Procedural nations have no diplomatic-tie
  * (dependencies) data wired up yet; organizations are populated from
- * GenesisNationHierarchy.organizations (see src/model/society/organizations)
+ * GenesisNationHierarchy.organizations (see src/model/history/sim/organizations)
  * when the nation belongs to one, e.g. an Imperial Patchwork.
  */
 export function useProceduralNationWikiData(
