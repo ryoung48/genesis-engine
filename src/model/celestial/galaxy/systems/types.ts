@@ -27,6 +27,12 @@ export interface GalaxySystemParams {
 	 * own skipNaming) -- for bulk pre-generation of a whole galaxy's systems,
 	 * where naming's LANGUAGE.spawn cost is wasted until a system is opened. */
 	skipNaming?: boolean
+	/** [JUSTIFICATION] Only the galaxy pregen worker and the galaxy view's
+	 * open-system handlers know the capital set (Galaxy.nationSeeds); the
+	 * single-system editor has no galaxy/capitals. When true, this system's
+	 * PRIMARY star reserves a guaranteed procedural temperate homeworld
+	 * (MainWorldMode "temperate-native"). */
+	isCapital?: boolean
 }
 
 /** How a star relates to the star it orbits, mirroring galaxy-gen's

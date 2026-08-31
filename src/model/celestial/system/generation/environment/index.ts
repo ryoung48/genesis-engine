@@ -109,7 +109,7 @@ function buildBodyEnvironment(params: {
 // since it's independent of classification other than its description label.
 function buildForcedClassificationEnvironment(params: {
 	rng: ReturnType<typeof RNG.createRng>
-	classification: "jani-lithic" | "vesperian"
+	classification: "jani-lithic" | "vesperian" | "tectonic"
 	sizeClass: number
 	zone: Zone
 	deviation: number
@@ -118,6 +118,11 @@ function buildForcedClassificationEnvironment(params: {
 	massKg: number
 	isPrimaryWorld: boolean
 	starAgeGyr: number
+	/** [JUSTIFICATION] Only the galaxy capital-homeworld slot ("temperate-native"
+	 * main-world mode) sets this -- it forces a guaranteed standard non-tainted
+	 * breathable atmosphere and a liquid-water hydrosphere. The existing
+	 * star-lock reclassify caller wants the rolled outcome, so leaves it unset. */
+	homeworld?: boolean
 }): Pick<
 	SystemBody,
 	| "sizeClass"
@@ -147,6 +152,7 @@ function buildForcedClassificationEnvironment(params: {
 		isPrimaryWorld: params.isPrimaryWorld,
 		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
 		starAgeGyr: params.starAgeGyr,
+		homeworld: params.homeworld === true,
 	})
 	return {
 		sizeClass: params.sizeClass,

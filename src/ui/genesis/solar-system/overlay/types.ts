@@ -119,6 +119,12 @@ export interface SolarSystemOverlayParams {
 	 * import (which keeps its curated photo) or while no world has been
 	 * simulated yet. See useSolarSystemView's mainWorldSatelliteTexture. */
 	mainWorldTexture?: THREE.DataTexture | null
+	/** True for any non-Sol seed. Gates the animated swatch-tinted cloud-band
+	 * mesh that replaces every planet's (and every classified moon's) texture
+	 * in a procedurally generated system — the real Sol view keeps its curated
+	 * photographic/simulated surfaces. See buildSolarSystemOverlay's body
+	 * material selection and moon-orbit-overlay's cloudBandPalette. */
+	proceduralSystem: boolean
 	/** Set internally by buildSolarSystemOverlay's own recursive companion-star
 	 * call (never by an external caller) — true exactly when this star is
 	 * itself a companion orbiting another star. That other star is a sibling

@@ -5,13 +5,21 @@ import { GALAXY_IDENTITY } from "@/model/celestial/galaxy/galaxy-identity"
 import type { Galaxy } from "@/model/celestial/galaxy/types"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 
+// Nation-overlay defaults (unchanged). The cultures overlay passes higher
+// values via PartitionOverlayInput so its partition fills read closer to
+// their true palette color rather than a faint tint.
 const TINT_ALPHA = 0.4
 const BORDER_OPACITY = 0.85
+const CULTURE_TINT_ALPHA = 0.68
+const CULTURE_BORDER_OPACITY = 0.95
 // World-space half-width of each side of a border (so the whole stroke is
 // twice this) -- a fraction of the galaxy's own radius rather than a fixed
 // pixel size, so it stays visually consistent across galaxy sizes and zoom
 // levels (this is a real Mesh, not a screen-space line material).
 const BORDER_HALF_WIDTH_FRACTION = 0.0018
+// Diagonal culture-blend stripe wavelength, as a fraction of the galaxy's
+// own radius -- one light + one dark band per this much world distance.
+const STRIPE_PERIOD_FRACTION = 0.012
 // Neutral fallback fill/border color for any system with no nation
 // (r_edge/boundary systems) -- see this function's own doc comment on why
 // every cell, claimed or not, gets SOME fill rather than being left blank.
@@ -101,6 +109,47 @@ const TINT_FRAGMENT_SHADER = /* glsl */ `
 	${RADIAL_FADE_GLSL}
 	void main() {
 		gl_FragColor = vec4(vColor, uAlpha * radialFade());
+	}
+`
+
+// The fill mesh's own shader pair: the shared tint above plus a diagonal
+// border-bleed stripe. A cell whose system was flagged by the culture blend
+// pass (blendAmt > 0) alternates between its own color and its secondary
+// culture's color in world-space diagonal bands -- the galaxy-map analogue
+// of the planet map's culture-blend stripes. blendAmt is 0 (and blendColor
+// == color) for every cell in the nations overlay, so this reduces exactly
+// to TINT_* there.
+const FILL_VERTEX_SHADER = /* glsl */ `
+	attribute vec3 color;
+	attribute float siteDist;
+	attribute vec3 blendColor;
+	attribute float blendAmt;
+	varying vec3 vColor;
+	varying vec3 vBlendColor;
+	varying float vBlendAmt;
+	varying vec2 vPos;
+	varying float vSiteDist;
+	void main() {
+		vColor = color;
+		vBlendColor = blendColor;
+		vBlendAmt = blendAmt;
+		vPos = position.xy;
+		vSiteDist = siteDist;
+		gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+	}
+`
+
+const FILL_FRAGMENT_SHADER = /* glsl */ `
+	varying vec3 vColor;
+	varying vec3 vBlendColor;
+	varying float vBlendAmt;
+	uniform float uAlpha;
+	uniform float uStripeFreq;
+	${RADIAL_FADE_GLSL}
+	void main() {
+		float stripe = step(0.5, fract((vPos.x + vPos.y) * uStripeFreq));
+		vec3 c = mix(vColor, vBlendColor, stripe * step(0.0001, vBlendAmt));
+		gl_FragColor = vec4(c, uAlpha * radialFade());
 	}
 `
 
@@ -403,18 +452,43 @@ function buildChainRibbon(
 	}
 }
 
-export interface NationOverlayResult {
+export interface PartitionOverlayResult {
 	group: THREE.Group
 	dispose(): void
 }
 
+export interface PartitionOverlayInput {
+	galaxy: Pick<Galaxy, "numSystems" | "r_xy" | "r_edge" | "radius">
+	/** Partition index per system, -1 for edge/unassigned. */
+	assignment: Int32Array
+	/** Interleaved rgb (0-1) per partition. */
+	colors: Float32Array
+	/** Capital system index per partition. */
+	seeds: Int32Array
+	/** System count per partition. */
+	size: Int32Array
+	/** Display name for a partition index (nation vs. culture naming). */
+	labelText: (partitionIndex: number) => string
+	/** [JUSTIFICATION] Only the cultures overlay carries a border bleed; the
+	 * nations overlay passes nothing and every cell renders a flat fill. */
+	blend?: { secondary: Int32Array; weight: Float32Array }
+	/** [JUSTIFICATION] Both default to the nation-overlay values; the cultures
+	 * overlay overrides them to render more opaque. */
+	fillAlpha?: number
+	borderAlpha?: number
+	/** [JUSTIFICATION] Defaults on for nations; the cultures overlay turns the
+	 * two-toned border ribbons off and conveys boundaries via blend stripes. */
+	showBorders?: boolean
+}
+
 /**
- * Builds the galaxy nation overlay -- a flat color fill over every system's
- * own Voronoi cell (see GALAXY_NATIONS.build for the underlying per-system
- * nation assignment), a two-toned border strip along every cell edge where
- * the two neighboring systems belong to different nations (or one is
- * unclaimed), and one camera-facing name label per nation, centered on its
- * capital and sized by nation size.
+ * Builds a galaxy partition overlay (nations or cultures) -- a flat color
+ * fill over every system's own Voronoi cell, a two-toned border strip along
+ * every cell edge where the two neighboring systems belong to different
+ * partitions (or one is unassigned), and one camera-facing name label per
+ * partition, centered on its capital and sized by partition size. When
+ * `blend` is supplied (cultures), a flagged cell additionally renders
+ * diagonal secondary-color stripes.
  *
  * Loosely follows galaxy-gen's own scaled/renderer/geometry/nation-overlay.ts
  * (same d3-delaunay-based Voronoi approach, same "fill every cell, unclaimed
@@ -449,17 +523,22 @@ export interface NationOverlayResult {
  * orthographic projection (see GalaxyRendererThree's adjustCamera), so text
  * laid flat in the XY plane already faces it.
  */
-export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
+export function buildPartitionOverlay(
+	input: PartitionOverlayInput,
+): PartitionOverlayResult {
 	const {
-		numSystems,
-		r_xy,
-		r_edge,
-		nationAssignment,
-		nationColors,
-		nationSeeds,
-		nationSize,
-		radius,
-	} = galaxy
+		galaxy,
+		assignment,
+		colors: partitionColors,
+		seeds,
+		size,
+		blend,
+	} = input
+	const labelText = input.labelText
+	const fillAlpha = input.fillAlpha ?? TINT_ALPHA
+	const borderAlpha = input.borderAlpha ?? BORDER_OPACITY
+	const showBorders = input.showBorders ?? true
+	const { numSystems, r_xy, r_edge, radius } = galaxy
 
 	// Generous bbox for d3-delaunay's own clip -- just needs to comfortably
 	// exceed the fade zone below so nothing gets truncated before the shader
@@ -477,12 +556,13 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	const outerFadeStart = radius.max * OUTER_FADE_START_FRACTION
 	const outerFadeEnd = radius.max * OUTER_FADE_END_FRACTION
 	const borderHalfWidth = radius.max * BORDER_HALF_WIDTH_FRACTION
-	const colorFor = (nation: number): readonly [number, number, number] =>
-		nation >= 0
+	const stripeFreq = 1 / Math.max(radius.max * STRIPE_PERIOD_FRACTION, 1e-6)
+	const colorFor = (partition: number): readonly [number, number, number] =>
+		partition >= 0
 			? [
-					nationColors[3 * nation]!,
-					nationColors[3 * nation + 1]!,
-					nationColors[3 * nation + 2]!,
+					partitionColors[3 * partition]!,
+					partitionColors[3 * partition + 1]!,
+					partitionColors[3 * partition + 2]!,
 				]
 			: UNCLAIMED_COLOR
 
@@ -536,13 +616,13 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	const { triangles, halfedges } = delaunay
 	const { circumcenters } = voronoi
 	const rawBorderEdges: RawBorderEdge[] = []
-	for (let s = 0; s < halfedges.length; s++) {
+	for (let s = 0; showBorders && s < halfedges.length; s++) {
 		const opposite = halfedges[s]!
 		if (opposite === -1 || s >= opposite) continue
 		const sysA = triangles[s]!
 		const sysB = triangles[nextHalfedge(s)]!
-		const na = nationAssignment[sysA]!
-		const nb = nationAssignment[sysB]!
+		const na = assignment[sysA]!
+		const nb = assignment[sysB]!
 		if (na === nb) continue
 		const t1 = Math.floor(s / 3)
 		const t2 = Math.floor(opposite / 3)
@@ -616,15 +696,21 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 	const fillPositions: number[] = []
 	const fillColors: number[] = []
 	const fillDists: number[] = []
+	const fillBlendColors: number[] = []
+	const fillBlendAmts: number[] = []
 	for (let i = 0; i < numSystems; i++) {
-		const nation = nationAssignment[i]!
+		const partition = assignment[i]!
 		const polygon = voronoi.cellPolygon(i)
 		if (!polygon || polygon.length < 3) continue
 		const uniqueCount = isClosedPolygon(polygon)
 			? polygon.length - 1
 			: polygon.length
 		if (uniqueCount < 3) continue
-		const [r, g, b] = colorFor(nation)
+		const [r, g, b] = colorFor(partition)
+		const secondary =
+			blend && blend.secondary[i]! >= 0 ? blend.secondary[i]! : -1
+		const [br, bg, bb] = secondary >= 0 ? colorFor(secondary) : [r, g, b]
+		const blendAmt = secondary >= 0 ? blend!.weight[i]! : 0
 		const sx = r_xy[2 * i]!
 		const sy = r_xy[2 * i + 1]!
 		const [ax, ay] = polygon[0]!
@@ -633,7 +719,11 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 			const [bx, by] = polygon[v]!
 			const [ex, ey] = polygon[v + 1]!
 			fillPositions.push(ax, ay, 0, bx, by, 0, ex, ey, 0)
-			for (let k = 0; k < 3; k++) fillColors.push(r, g, b)
+			for (let k = 0; k < 3; k++) {
+				fillColors.push(r, g, b)
+				fillBlendColors.push(br, bg, bb)
+				fillBlendAmts.push(blendAmt)
+			}
 			fillDists.push(
 				da,
 				Math.hypot(bx - sx, by - sy),
@@ -675,58 +765,86 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 		"siteDist",
 		new THREE.BufferAttribute(Float32Array.from(fillDists), 1),
 	)
-	const fillMaterial = buildTintMaterial(TINT_ALPHA)
+	fillGeometry.setAttribute(
+		"blendColor",
+		new THREE.BufferAttribute(Float32Array.from(fillBlendColors), 3),
+	)
+	fillGeometry.setAttribute(
+		"blendAmt",
+		new THREE.BufferAttribute(Float32Array.from(fillBlendAmts), 1),
+	)
+	const fillMaterial = new THREE.ShaderMaterial({
+		uniforms: {
+			uAlpha: { value: fillAlpha },
+			uStripeFreq: { value: stripeFreq },
+			uInnerFadeStart: { value: innerFadeStart },
+			uInnerFadeEnd: { value: innerFadeEnd },
+			uOuterFadeStart: { value: outerFadeStart },
+			uOuterFadeEnd: { value: outerFadeEnd },
+			uSiteFadeStart: { value: siteFadeStart },
+			uSiteFadeEnd: { value: siteFadeEnd },
+		},
+		vertexShader: FILL_VERTEX_SHADER,
+		fragmentShader: FILL_FRAGMENT_SHADER,
+		transparent: true,
+		depthWrite: false,
+		depthTest: false,
+		side: THREE.DoubleSide,
+	})
 	const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial)
 	// Drawn first (behind hyperlanes/star points, which don't set an explicit
 	// renderOrder below 1 -- see lanes.ts/points.ts) regardless of depth,
 	// since depthTest is off above.
 	fillMesh.renderOrder = -1
 
-	const borderGeometry = new THREE.BufferGeometry()
-	borderGeometry.setAttribute(
-		"position",
-		new THREE.BufferAttribute(Float32Array.from(borderPositions), 3),
-	)
-	borderGeometry.setAttribute(
-		"color",
-		new THREE.BufferAttribute(Float32Array.from(borderColors), 3),
-	)
-	borderGeometry.setAttribute(
-		"siteDist",
-		new THREE.BufferAttribute(Float32Array.from(borderDists), 1),
-	)
-	const borderMaterial = buildTintMaterial(BORDER_OPACITY)
-	const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial)
-	// Drawn on top of the fill but still behind the star points/hyperlanes
-	// (renderOrder 2/3 -- see points.ts/lanes.ts).
-	borderMesh.renderOrder = 0
-
 	const group = new THREE.Group()
 	group.add(fillMesh)
-	group.add(borderMesh)
 
-	const nationCount = nationSize.length
+	let borderGeometry: THREE.BufferGeometry | null = null
+	let borderMaterial: THREE.ShaderMaterial | null = null
+	if (showBorders) {
+		borderGeometry = new THREE.BufferGeometry()
+		borderGeometry.setAttribute(
+			"position",
+			new THREE.BufferAttribute(Float32Array.from(borderPositions), 3),
+		)
+		borderGeometry.setAttribute(
+			"color",
+			new THREE.BufferAttribute(Float32Array.from(borderColors), 3),
+		)
+		borderGeometry.setAttribute(
+			"siteDist",
+			new THREE.BufferAttribute(Float32Array.from(borderDists), 1),
+		)
+		borderMaterial = buildTintMaterial(borderAlpha)
+		const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial)
+		// Drawn on top of the fill but still behind the star points/hyperlanes
+		// (renderOrder 2/3 -- see points.ts/lanes.ts).
+		borderMesh.renderOrder = 0
+		group.add(borderMesh)
+	}
+
+	const partitionCount = size.length
 	let maxSize = 1
-	for (let n = 0; n < nationCount; n++)
-		maxSize = Math.max(maxSize, nationSize[n]!)
+	for (let n = 0; n < partitionCount; n++) maxSize = Math.max(maxSize, size[n]!)
 	const baseFontSize = radius.max * LABEL_BASE_FONT_FRACTION
 
 	const labels: Text[] = []
-	for (let nation = 0; nation < nationCount; nation++) {
-		const size = nationSize[nation]!
-		if (size <= 0) continue
-		const capital = nationSeeds[nation]!
-		// sqrt keeps a handful of tiny nations from all reading as
+	for (let partition = 0; partition < partitionCount; partition++) {
+		const partitionSize = size[partition]!
+		if (partitionSize <= 0) continue
+		const capital = seeds[partition]!
+		// sqrt keeps a handful of tiny partitions from all reading as
 		// indistinguishably minimum-size next to one another, while the wide
 		// LABEL_MIN/MAX_FONT_SCALE spread (not the exponent) is what actually
-		// makes a size-1 nation's label read as clearly smaller than a
-		// hundreds-of-systems empire's.
-		const t = THREE.MathUtils.clamp(Math.sqrt(size / maxSize), 0, 1)
+		// makes a size-1 partition's label read as clearly smaller than a
+		// hundreds-of-systems one's.
+		const t = THREE.MathUtils.clamp(Math.sqrt(partitionSize / maxSize), 0, 1)
 		const fontSize =
 			baseFontSize *
 			(LABEL_MIN_FONT_SCALE + (LABEL_MAX_FONT_SCALE - LABEL_MIN_FONT_SCALE) * t)
 		const label = new Text()
-		label.text = GALAXY_IDENTITY.generateNationName(galaxy.seed, nation)
+		label.text = labelText(partition)
 		label.font = jedarFontUrl
 		label.fontWeight = 600
 		label.color = LABEL_COLOR
@@ -753,9 +871,43 @@ export function buildNationOverlay(galaxy: Galaxy): NationOverlayResult {
 		dispose() {
 			fillGeometry.dispose()
 			fillMaterial.dispose()
-			borderGeometry.dispose()
-			borderMaterial.dispose()
+			borderGeometry?.dispose()
+			borderMaterial?.dispose()
 			for (const label of labels) label.dispose()
 		},
 	}
+}
+
+/** The nations map mode: a flat per-nation fill, no border bleed. */
+export function buildNationOverlay(galaxy: Galaxy): PartitionOverlayResult {
+	return buildPartitionOverlay({
+		galaxy,
+		assignment: galaxy.nationAssignment,
+		colors: galaxy.nationColors,
+		seeds: galaxy.nationSeeds,
+		size: galaxy.nationSize,
+		labelText: (nation) =>
+			GALAXY_IDENTITY.generateNationName(galaxy.seed, nation),
+	})
+}
+
+/** The cultures map mode: per-culture fill (colored by heritage family --
+ * see GALAXY_CULTURES.build) plus diagonal border-bleed stripes. */
+export function buildCultureOverlay(galaxy: Galaxy): PartitionOverlayResult {
+	return buildPartitionOverlay({
+		galaxy,
+		assignment: galaxy.cultureAssignment,
+		colors: galaxy.cultureColors,
+		seeds: galaxy.cultureSeeds,
+		size: galaxy.cultureSize,
+		labelText: (culture) =>
+			GALAXY_IDENTITY.generateCultureName(galaxy.seed, culture),
+		blend: {
+			secondary: galaxy.cultureBlendSecondary,
+			weight: galaxy.cultureBlendWeight,
+		},
+		fillAlpha: CULTURE_TINT_ALPHA,
+		borderAlpha: CULTURE_BORDER_OPACITY,
+		showBorders: false,
+	})
 }

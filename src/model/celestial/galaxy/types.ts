@@ -77,6 +77,20 @@ export interface Galaxy {
 	nationSize: Int32Array
 	/** Interleaved rgb (0-1) per nation. */
 	nationColors: Float32Array
+	/** Culture index per system, -1 for edge/boundary systems -- see
+	 * GALAXY_CULTURES.build (mirrors history/sim's province culture pass). */
+	cultureAssignment: Int32Array
+	/** Capital system index per culture. */
+	cultureSeeds: Int32Array
+	/** System count per culture. */
+	cultureSize: Int32Array
+	/** Interleaved rgb (0-1) per culture -- a hue-shifted variant of its
+	 * heritage-family color. */
+	cultureColors: Float32Array
+	/** Per-system secondary (bleeding) culture index, -1 = no blend. */
+	cultureBlendSecondary: Int32Array
+	/** Per-system blend weight toward cultureBlendSecondary. */
+	cultureBlendWeight: Float32Array
 	radius: { min: number; max: number }
 	dimensions: { w: number; h: number }
 }

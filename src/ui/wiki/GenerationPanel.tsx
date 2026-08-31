@@ -63,6 +63,10 @@ interface GenerationPanelProps {
 	resetMainWorldToEarth?: () => void
 	mainWorldMode: MainWorldMode
 	setMainWorldMode: (v: MainWorldMode) => void
+	/** True when the current system was opened from the galaxy map -- passed
+	 * straight through to GenerationPlanetNavigator, which then hides the
+	 * Preview section and makes every stat read-only. */
+	fromGalaxy?: boolean
 	/** The main world's SystemBody entry regardless of where it lives -- a
 	 * top-level orbit, or (gas-giant-moon mode) a moon nested inside a
 	 * sibling's moons array, projected into a SystemBody-shaped view. See
@@ -146,6 +150,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	showRealSolNames,
 	mainWorldMode,
 	setMainWorldMode,
+	fromGalaxy,
 	mainWorldSystemBody,
 	updateMainWorldBody,
 	setSeed,
@@ -461,6 +466,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 					) : (
 						<>
 							<GenerationPlanetNavigator
+								fromGalaxy={fromGalaxy}
 								orbitBodies={orbitBodies}
 								systemBodies={systemBodies}
 								companionStars={companionStars}

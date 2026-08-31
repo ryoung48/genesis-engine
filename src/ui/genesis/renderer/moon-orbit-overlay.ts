@@ -9,6 +9,10 @@ import {
 	type Text,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
+import {
+	buildCloudBandMaterial,
+	swatchCloudBandPalette,
+} from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
 import {
 	BODY_VISUAL_BASE_RADIUS,
@@ -16,6 +20,10 @@ import {
 	layoutMoonOrbitPeriapsesForDisplay,
 	scaleBodyDiameterToVisualRadius,
 } from "@/ui/genesis/shared/moon-visual-scale"
+import {
+	CLASSIFICATION_COLOR,
+	ROCKY_SIBLING_COLOR,
+} from "@/ui/genesis/solar-system/overlay/constants"
 
 const MOON_COLORS_HEX = [0x0ea5e9, 0x8b5cf6, 0x10b981]
 const TWO_PI = 2 * Math.PI
@@ -116,33 +124,42 @@ function buildMoonMesh(
 	gridSpacing: number,
 	texturePath?: string,
 	cloudsTexturePath?: string,
+	/** When set, the moon renders the animated fbm cloud-band mesh tinted by
+	 * this palette instead of any photo texture -- see buildMoonOrbitOverlay's
+	 * proceduralSystem gate. */
+	cloudBandMaterial?: THREE.MeshStandardMaterial,
 ): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(radius, 24, 18)
-	let map: THREE.Texture
-	if (texturePath) {
-		map = loadMoonTexture(texturePath)
+	let mat: THREE.MeshStandardMaterial
+	if (cloudBandMaterial) {
+		mat = cloudBandMaterial
 	} else {
-		if (!sharedMoonTexture) {
-			sharedMoonTexture = textureLoader.load(
-				"/textures/celestial/sol/earth/moon.jpg",
-			)
-			sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
-			sharedMoonTexture.userData.sharedTexture = true
+		let map: THREE.Texture
+		if (texturePath) {
+			map = loadMoonTexture(texturePath)
+		} else {
+			if (!sharedMoonTexture) {
+				sharedMoonTexture = textureLoader.load(
+					"/textures/celestial/sol/earth/moon.jpg",
+				)
+				sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
+				sharedMoonTexture.userData.sharedTexture = true
+			}
+			map = sharedMoonTexture
 		}
-		map = sharedMoonTexture
+		mat = new THREE.MeshStandardMaterial({
+			map,
+			roughness: 1,
+			metalness: 0,
+		})
 	}
-	const mat = new THREE.MeshStandardMaterial({
-		map,
-		roughness: 1,
-		metalness: 0,
-	})
 	const mesh = new THREE.Mesh(geo, mat)
 	// A cloud shell, parented directly to the moon mesh so it inherits the
 	// same tilt/spin quaternion automatically -- see overlay.ts's planet
 	// clouds for the sibling-mesh + independently-tracked-quaternion version
 	// of this, which a moon doesn't need since it has no separate cloud-drift
 	// animation.
-	if (cloudsTexturePath) {
+	if (cloudsTexturePath && !cloudBandMaterial) {
 		const cloudsTexture = loadMoonTexture(cloudsTexturePath)
 		cloudsTexture.flipY = false
 		const cloudsMaterial = new THREE.MeshStandardMaterial({
@@ -283,6 +300,10 @@ export function buildMoonOrbitOverlay(
 	 * at all — unlike showRealNames (Sol-only real-name spoiler gate), this
 	 * is true for any generated moon name, Sol or not. */
 	namesEnabled: boolean = false,
+	/** True in a procedurally generated system -- a classified, untextured
+	 * moon then renders the swatch-tinted cloud-band mesh instead of the
+	 * shared grey moon photo. The real Sol view passes false. */
+	proceduralSystem: boolean = false,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 	if (moons.length === 0) {
@@ -393,6 +414,13 @@ export function buildMoonOrbitOverlay(
 
 		// --- Moon body ---
 		const moonR = moonDisplayRadii[i] ?? MIN_MOON_VISUAL_RADIUS
+		const cloudBandPalette =
+			proceduralSystem && moon.classification
+				? swatchCloudBandPalette({
+						hex:
+							CLASSIFICATION_COLOR[moon.classification] ?? ROCKY_SIBLING_COLOR,
+					})
+				: null
 		const moonMesh = buildMoonMesh(
 			moonR,
 			moonColor,
@@ -402,6 +430,9 @@ export function buildMoonOrbitOverlay(
 			gridSpacing,
 			moon.texturePath,
 			moon.cloudsTexturePath,
+			cloudBandPalette
+				? buildCloudBandMaterial({ seed: i + 1, palette: cloudBandPalette })
+				: undefined,
 		)
 		group.add(moonMesh)
 		moonMeshes.push(moonMesh)
@@ -514,6 +545,12 @@ export function buildMoonOrbitOverlay(
 	const spinAxis = new THREE.Vector3(0, 1, 0)
 	function setSpinHours(hours: number) {
 		for (const d of moonData) {
+			const cloudBandUniforms = (
+				d.moonMesh.material as THREE.MeshStandardMaterial
+			).userData.cloudBandUniforms as
+				| { giantCloudTime: { value: number } }
+				| undefined
+			if (cloudBandUniforms) cloudBandUniforms.giantCloudTime.value = hours
 			if (d.spinPeriodHours <= 0) continue
 			const angle = (hours / d.spinPeriodHours) * TWO_PI
 			spinQuat.setFromAxisAngle(spinAxis, angle)

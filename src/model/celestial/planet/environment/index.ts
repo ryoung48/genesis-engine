@@ -142,9 +142,25 @@ function classifyBody(params: {
 	}
 	if (group === "terrestrial") {
 		if (impactZone) return { group, classification: "acheronian" }
+		// jani-lithic / vesperian are the star-tide-locked terrestrial classes.
+		// A moon's `tidal` flag instead means "tidally close to its parent", so
+		// applying this branch to moons funnels every big close-in moon of an
+		// inner/epistellar planet into those classes. A moon instead gets a
+		// plain hot-world class: arid for an epistellar parent, or an
+		// arid/oceanic/tectonic roll for an inner one.
 		if (tidal) {
-			if (zone === "epistellar") return { group, classification: "jani-lithic" }
-			if (zone === "inner") return { group, classification: "vesperian" }
+			if (!isMoon) {
+				if (zone === "epistellar")
+					return { group, classification: "jani-lithic" }
+				if (zone === "inner") return { group, classification: "vesperian" }
+			} else if (zone === "epistellar") {
+				return { group, classification: "arid" }
+			} else if (zone === "inner") {
+				const roll = rng.randint(1, 6)
+				if (roll <= 2) return { group, classification: "arid" }
+				if (roll <= 4) return { group, classification: "oceanic" }
+				return { group, classification: "tectonic" }
+			}
 		}
 		if (zone === "epistellar") {
 			return {
@@ -290,6 +306,12 @@ function buildClassificationEnvironment(params: {
 	 * applyProtoHydrosphereSuppression/rollYouthAtmosphereCode above. */
 	proto?: boolean
 	primordial?: boolean
+	/** [JUSTIFICATION] Only the galaxy capital-homeworld slot sets this. Forces
+	 * a standard non-tainted breathable atmosphere (code 6) and a liquid-water
+	 * hydrosphere so a capital's guaranteed homeworld is genuinely friendly,
+	 * while still being a real roll for everything else (size, density, moons,
+	 * tilt, tide-lock). Every other caller leaves it unset. */
+	homeworld?: boolean
 }): {
 	density: DensityProfile | null
 	landCoverage: number
@@ -332,6 +354,9 @@ function buildClassificationEnvironment(params: {
 			hydrosphereCode,
 		})
 	}
+	if (params.homeworld === true) {
+		hydrosphereCode = MATH.clamp({ value: hydrosphereCode, lo: 5, hi: 10 })
+	}
 	const hydrosphere = HYDROSPHERE.buildProfile({
 		rng: params.rng,
 		code: hydrosphereCode,
@@ -343,16 +368,25 @@ function buildClassificationEnvironment(params: {
 					diameterKm: params.diameterKm,
 				})
 			: 0
-	const atmosphereCode = youth
-		? rollYouthAtmosphereCode({
-				rng: params.rng,
-				proto: params.proto === true,
-				sizeClass: params.sizeClass,
-			})
-		: rolledEnvironment.atmosphereCode
+	// The youth override rerolls a young world's atmosphere as a thin/primordial
+	// one -- but a classification that already rolled a dense, exotic, or gas
+	// code (10 exotic, 11 corrosive, 12 insidious, 14 gas) is meant to keep it,
+	// so leave those untouched and only reroll the rest.
+	const rolledAtmosphereCode = rolledEnvironment.atmosphereCode
+	const atmosphereCode =
+		youth && ![10, 11, 12, 14].includes(rolledAtmosphereCode)
+			? rollYouthAtmosphereCode({
+					rng: params.rng,
+					proto: params.proto === true,
+					sizeClass: params.sizeClass,
+				})
+			: rolledAtmosphereCode
+	// A capital homeworld always gets the plain standard breathable code (6),
+	// overriding whatever its tectonic assignment rolled (2-9, some tainted).
+	const finalAtmosphereCode = params.homeworld === true ? 6 : atmosphereCode
 	const atmosphere = ATMOSPHERE.codeToProfile({
 		rng: params.rng,
-		atmosphereCode,
+		atmosphereCode: finalAtmosphereCode,
 		params: {
 			chemistry: rolledEnvironment.chemistry ?? rolledEnvironment.composition,
 			sizeClass: params.sizeClass,

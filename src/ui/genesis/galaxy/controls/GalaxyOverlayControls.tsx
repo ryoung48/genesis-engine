@@ -13,14 +13,12 @@ const DISPLAY_FLAG_LABELS: Record<keyof PortedGalaxyDisplayFlags, string> = {
 	showStarOverlay: "Star Map",
 	showGalaxy: "Galaxy",
 	showDensityWaves: "Density-Wave Guides",
-	showNationOverlay: "Nations",
 }
 
 const DISPLAY_FLAG_KEYS: (keyof PortedGalaxyDisplayFlags)[] = [
 	"showStarOverlay",
 	"showGalaxy",
 	"showDensityWaves",
-	"showNationOverlay",
 ]
 
 interface GalaxyOverlayControlsProps {

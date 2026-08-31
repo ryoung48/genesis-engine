@@ -6,7 +6,7 @@ import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface RollAtmosphereInput {
 	rng: SharedRng
-	profile: Pick<AtmosphereProfile, "type" | "subtype">
+	profile: Pick<AtmosphereProfile, "type" | "subtype" | "unusual">
 	panthalassic: boolean
 }
 

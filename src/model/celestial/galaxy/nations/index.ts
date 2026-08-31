@@ -2,6 +2,7 @@ import type {
 	BuildGalaxyNationsParams,
 	GalaxyNations,
 } from "@/model/celestial/galaxy/nations/types"
+import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import { RNG } from "@/model/shared/random/rng"
 
 // Same size-tier weights/ranges as the province-based medieval nation
@@ -295,50 +296,15 @@ function compactZeroSizeNations(
 	sizes.push(...newSizes)
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-	const c = (1 - Math.abs(2 * l - 1)) * s
-	const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-	const m = l - c / 2
-	let r = 0
-	let g = 0
-	let b = 0
-	if (h < 60) {
-		r = c
-		g = x
-	} else if (h < 120) {
-		r = x
-		g = c
-	} else if (h < 180) {
-		g = c
-		b = x
-	} else if (h < 240) {
-		g = x
-		b = c
-	} else if (h < 300) {
-		r = x
-		b = c
-	} else {
-		r = c
-		b = x
-	}
-	return [r + m, g + m, b + m]
-}
-
+// Same golden-ratio HSL palette the history sim uses for every partition
+// (cultures/heritages/religions -- see graph-partition/index.ts), so the
+// galaxy nations overlay and the galaxy cultures overlay read as one family
+// of colors rather than two unrelated schemes.
 function buildNationColors(count: number, seed: number): Float32Array {
-	const colors = new Float32Array(count * 3)
-	const rng = RNG.createRng({ seed: seed ^ 0x5bd1e995 })
-	const goldenRatio = 0.618033988749895
-	let hue = rng.random()
-	for (let i = 0; i < count; i++) {
-		hue = (hue + goldenRatio) % 1
-		const sat = 0.55 + rng.random() * 0.3
-		const lit = 0.5 + rng.random() * 0.18
-		const [r, g, b] = hslToRgb(hue * 360, sat, lit)
-		colors[3 * i] = r
-		colors[3 * i + 1] = g
-		colors[3 * i + 2] = b
-	}
-	return colors
+	return GRAPH_PARTITION.generatePartitionColors({
+		count,
+		rng: RNG.createRng({ seed: seed ^ 0x5bd1e995 }),
+	})
 }
 
 function emptyResult(numSystems: number): GalaxyNations {

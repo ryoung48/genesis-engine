@@ -321,6 +321,7 @@ function emptyPartition(nodeCount: number): GenesisPartition {
 export const GRAPH_PARTITION = {
 	computeGraphPartition,
 	deriveChildColors,
+	generatePartitionColors,
 	hslToRgb,
 	rgbToHsl,
 	clamp01,

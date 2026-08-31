@@ -441,12 +441,19 @@ function forceCapitalsMainWorldCapable({
 	const out = createMutablePackedGalaxyStarData()
 	const systemStarOffset = new Int32Array(numSystems + 1)
 
+	// A capital's homeworld sits at its primary's HZ center -- a freak very
+	// young (proto/primordial) primary would give that world an unstable
+	// climate/seismology, so a capital's whole star tree (age is shared across
+	// a companion tree) is clamped to a settled main-sequence window.
+	const clampCapitalAge = (age: number): number => Math.min(8, Math.max(3, age))
+
 	for (let i = 0; i < numSystems; i++) {
 		const start = packed.systemStarOffset[i]!
 		const end = packed.systemStarOffset[i + 1]!
+		const isCapitalSystem = capitals.has(i)
 
 		if (
-			!capitals.has(i) ||
+			!isCapitalSystem ||
 			isLoneCapitalClassStar({ packed, systemIndex: i })
 		) {
 			for (let s = start; s < end; s++) {
@@ -458,7 +465,11 @@ function forceCapitalsMainWorldCapable({
 				out.deviation.push(packed.starDeviation[s]!)
 				out.eccentricity.push(packed.starEccentricity[s]!)
 				out.inclinationDeg.push(packed.starInclinationDeg[s]!)
-				out.age.push(packed.starAge[s]!)
+				out.age.push(
+					isCapitalSystem
+						? clampCapitalAge(packed.starAge[s]!)
+						: packed.starAge[s]!,
+				)
 				out.mass.push(packed.starMass[s]!)
 				out.diameter.push(packed.starDiameter[s]!)
 				out.temperature.push(packed.starTemperature[s]!)
@@ -484,7 +495,7 @@ function forceCapitalsMainWorldCapable({
 		out.deviation.push(0)
 		out.eccentricity.push(0)
 		out.inclinationDeg.push(0)
-		out.age.push(packed.starAge[start]!)
+		out.age.push(clampCapitalAge(packed.starAge[start]!))
 		out.mass.push(STAR.getStarMassSol(spectralInput))
 		out.diameter.push(STAR.getStarDiameterSol(spectralInput))
 		out.temperature.push(STAR.getStarTemperatureK(spectralInput))
@@ -590,16 +601,18 @@ function previewStars({
  * Generates every real star in a packed galaxy system, each with its own
  * fully generated planets/moons -- not just the primary. Reuses
  * SYSTEM_GENERATION.generateSystemBodies per star (the same per-system
- * pipeline a single-star system already uses), always with
+ * pipeline a single-star system already uses), normally with
  * `mainWorldMode: "procedural"` (see plans/galaxy-view-port.md) so no body
- * is ever forced into a guaranteed-habitable slot or cloned from Earth, and
- * always with a star-mass override derived from that star's own rolled
- * spectral class rather than generateSystemBodies' Sol-mass default.
+ * is ever forced into a guaranteed-habitable slot or cloned from Earth. The
+ * sole exception: a nation CAPITAL system's PRIMARY star uses
+ * `"temperate-native"`, which reserves the HZ-center slot for a normally
+ * rolled body constrained to friendly ranges (see MainWorldMode).
  */
 function generate({
 	galaxySeed,
 	systemIndex,
 	nationIndex = -1,
+	isCapital = false,
 	packed,
 	skipNaming,
 }: GalaxySystemParams & { packed?: PackedGalaxyStars }): GalaxySystem {
@@ -631,7 +644,10 @@ function generate({
 			hostStar: toHostStarAttributes(preview),
 			hasParent: preview.parentIndex !== null,
 			isEpistellarCompanion: preview.role === "epistellar",
-			mainWorldMode: "procedural",
+			mainWorldMode:
+				isCapital && preview.parentIndex === null
+					? "temperate-native"
+					: "procedural",
 			skipNaming,
 		})
 		return {

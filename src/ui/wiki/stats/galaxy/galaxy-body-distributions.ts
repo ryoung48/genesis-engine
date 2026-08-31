@@ -4,13 +4,29 @@ import type { OrbitBody } from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
 import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
+import type {
+	BodyClassificationSelection,
+	ClassifiedBodies,
+} from "@/ui/wiki/stats/galaxy/types"
 import { habitabilityCategoryLabel } from "@/ui/wiki/stats/orbit/formatters"
 
 const FALLBACK_COLOR = "#94a3b8"
 
-function collectPlanets(systems: readonly GalaxySystem[]): SystemBody[] {
+function isGalaxySystem(
+	value: GalaxySystem | OrbitBody | undefined,
+): value is GalaxySystem {
+	return value !== undefined && "stars" in value
+}
+
+function collectPlanets(
+	systems: readonly GalaxySystem[] | readonly SystemBody[],
+): SystemBody[] {
+	if (systems.length === 0 || !isGalaxySystem(systems[0])) {
+		return [...(systems as readonly SystemBody[])]
+	}
+	const galaxySystems = systems as readonly GalaxySystem[]
 	const planets: SystemBody[] = []
-	for (const system of systems) {
+	for (const system of galaxySystems) {
 		for (const star of system.stars) {
 			for (const body of star.bodies) {
 				if (body.classification !== "asteroid belt") planets.push(body)
@@ -20,9 +36,15 @@ function collectPlanets(systems: readonly GalaxySystem[]): SystemBody[] {
 	return planets
 }
 
-function collectMoons(systems: readonly GalaxySystem[]): MoonBody[] {
+function collectMoons(
+	systems: readonly GalaxySystem[] | readonly MoonBody[],
+): MoonBody[] {
+	if (systems.length === 0 || !isGalaxySystem(systems[0])) {
+		return [...(systems as readonly MoonBody[])]
+	}
+	const galaxySystems = systems as readonly GalaxySystem[]
 	const moons: MoonBody[] = []
-	for (const system of systems) {
+	for (const system of galaxySystems) {
 		for (const star of system.stars) {
 			for (const body of star.bodies) {
 				for (const moon of body.moons) {
@@ -34,13 +56,88 @@ function collectMoons(systems: readonly GalaxySystem[]): MoonBody[] {
 	return moons
 }
 
+export function collectBodiesByClassification(
+	selection: BodyClassificationSelection,
+): ClassifiedBodies {
+	const planets: SystemBody[] = []
+	const moons: MoonBody[] = []
+	for (const system of selection.systems) {
+		for (const star of system.stars) {
+			for (const body of star.bodies) {
+				if (
+					selection.bodyKind === "planet" &&
+					body.classification === selection.classification
+				)
+					planets.push(body)
+				if (selection.bodyKind === "moon") {
+					for (const moon of body.moons) {
+						if (moon.classification === selection.classification)
+							moons.push(moon)
+					}
+				}
+			}
+		}
+	}
+	return { planets, moons }
+}
+
+const SYSTEM_SIZE_CATEGORIES = [
+	{ label: "0–4 bodies", color: "#ede9fe", maximum: 4 },
+	{ label: "5–9 bodies", color: "#c4b5fd", maximum: 9 },
+	{ label: "10–14 bodies", color: "#a78bfa", maximum: 14 },
+	{ label: "15–19 bodies", color: "#8b5cf6", maximum: 19 },
+	{ label: "20–24 bodies", color: "#6d28d9", maximum: 24 },
+	{ label: "25+ bodies", color: "#4c1d95", maximum: Number.POSITIVE_INFINITY },
+] as const
+
+export function countSystemBodies(system: GalaxySystem): number {
+	let count = 0
+	for (const star of system.stars) {
+		count += star.bodies.length
+		for (const body of star.bodies) count += body.moons.length
+	}
+	return count
+}
+
+function systemSizeCategory(system: GalaxySystem): string {
+	const count = countSystemBodies(system)
+	return (
+		SYSTEM_SIZE_CATEGORIES.find((category) => count <= category.maximum)
+			?.label ?? "25+ bodies"
+	)
+}
+
+export function buildSystemSizeDistribution(
+	systems: readonly GalaxySystem[],
+): DistributionChartBucket[] {
+	const buckets = bucketBy(
+		systems,
+		systemSizeCategory,
+		(key) => key,
+		(key) =>
+			SYSTEM_SIZE_CATEGORIES.find((category) => category.label === key)
+				?.color ?? FALLBACK_COLOR,
+	)
+	return SYSTEM_SIZE_CATEGORIES.map((category) =>
+		buckets.find((bucket) => bucket.label === category.label),
+	).filter((bucket): bucket is DistributionChartBucket => bucket !== undefined)
+}
+
 // Planets + moons together, excluding whole asteroid-belt bodies -- the same
 // combined population galaxy-gen's Size/Eccentricity/AxialTilt/Rotation
 // charts draw from (window.galaxy.orbits filtered by group !== "asteroid
 // belt").
-function collectNonBeltBodies(systems: readonly GalaxySystem[]): OrbitBody[] {
+function collectNonBeltBodies(
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
+): OrbitBody[] {
+	if (systems.length === 0 || !isGalaxySystem(systems[0])) {
+		return (systems as readonly OrbitBody[]).filter(
+			(body) => body.group !== "asteroid belt",
+		)
+	}
+	const galaxySystems = systems as readonly GalaxySystem[]
 	const bodies: OrbitBody[] = []
-	for (const system of systems) {
+	for (const system of galaxySystems) {
 		for (const star of system.stars) {
 			for (const body of star.bodies) {
 				if (body.group !== "asteroid belt") bodies.push(body)
@@ -75,10 +172,16 @@ function bucketBy<T>(
 }
 
 export function buildPlanetClassificationDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly SystemBody[],
+): DistributionChartBucket[] {
+	return buildClassificationDistribution(collectPlanets(systems))
+}
+
+export function buildClassificationDistribution(
+	bodies: readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	return bucketBy(
-		collectPlanets(systems),
+		bodies,
 		(body) => body.classification,
 		(key) => key,
 		(key) => classificationSwatchColor(key) ?? FALLBACK_COLOR,
@@ -86,14 +189,9 @@ export function buildPlanetClassificationDistribution(
 }
 
 export function buildMoonClassificationDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly MoonBody[],
 ): DistributionChartBucket[] {
-	return bucketBy(
-		collectMoons(systems),
-		(moon) => moon.classification,
-		(key) => key,
-		(key) => classificationSwatchColor(key) ?? FALLBACK_COLOR,
-	)
+	return buildClassificationDistribution(collectMoons(systems))
 }
 
 // Ported from galaxy-gen's SIZE.colors/label (model/system/orbits/index.ts)
@@ -152,7 +250,7 @@ export function sizeSwatchColor(
 }
 
 export function buildSizeDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -202,7 +300,7 @@ export function eccentricitySwatchColor(eccentricity: number): string {
 }
 
 export function buildEccentricityDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -259,7 +357,7 @@ export function axialTiltSwatchColor(
 }
 
 export function buildAxialTiltDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -303,7 +401,7 @@ export function temperatureCategory(body: OrbitBody): string | undefined {
 }
 
 export function buildTemperatureDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -374,7 +472,7 @@ export function rotationSwatchColor(
 }
 
 export function buildRotationDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -448,7 +546,7 @@ export function atmosphereCategory(
 }
 
 export function buildAtmosphereDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -522,7 +620,7 @@ export function hydrosphereCategory(
 }
 
 export function buildHydrosphereDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectNonBeltBodies(systems),
@@ -563,8 +661,17 @@ const BIOSPHERE_LABEL: Record<number, string> = {
 	10: "Full Sapience",
 	11: "Bio-Engineered Life",
 }
+export const BIOSPHERE_CATEGORIES = Object.values(BIOSPHERE_LABEL)
+
+export function biosphereCategory(
+	body: Pick<OrbitBody, "biosphere">,
+): string | undefined {
+	const code = body.biosphere?.code
+	if (code === undefined) return undefined
+	return BIOSPHERE_LABEL[code] ?? `Code ${code}`
+}
 const BIOSPHERE_COLOR: Record<number, string> = {
-	0: "#f7fcf5",
+	0: "#e5e7eb",
 	1: "#e8f6e3",
 	2: "#d3eecd",
 	3: "#b7e2b1",
@@ -627,6 +734,9 @@ const HABITABILITY_CATEGORIES = [
 	{ label: habitabilityCategoryLabel(8), code: 8 },
 	{ label: habitabilityCategoryLabel(10), code: 10 },
 ] as const
+export const HABITABILITY_CATEGORY_LABELS = HABITABILITY_CATEGORIES.map(
+	(category) => category.label,
+)
 const HABITABILITY_CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
 	HABITABILITY_CATEGORIES.map((category, index) => [category.label, index]),
 )
@@ -701,7 +811,7 @@ export function moonOrbitRangeSwatchColor(
 }
 
 export function buildMoonOrbitRangeDistribution(
-	systems: readonly GalaxySystem[],
+	systems: readonly GalaxySystem[] | readonly MoonBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
 		collectMoons(systems),
@@ -720,13 +830,33 @@ export function buildMoonOrbitRangeDistribution(
 	)
 }
 
-export function buildBiosphereDistribution(
-	systems: readonly GalaxySystem[],
+export function buildMoonCountDistribution(
+	systems: readonly GalaxySystem[] | readonly SystemBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
-		collectNonBeltBodies(systems).filter(
-			(body) => (body.biosphere?.code ?? 0) > 0,
-		),
+		collectPlanets(systems),
+		(body) => (body.moons.length > 4 ? "5+" : body.moons.length.toString()),
+		(key) => `${key} moons`,
+		(key) =>
+			({
+				"0": "#e0f2fe",
+				"1": "#bae6fd",
+				"2": "#67e8f9",
+				"3": "#22d3ee",
+				"4": "#0891b2",
+				"5+": "#164e63",
+			})[key] ?? FALLBACK_COLOR,
+	)
+	return buckets.sort(
+		(a, b) => Number.parseInt(a.label, 10) - Number.parseInt(b.label, 10),
+	)
+}
+
+export function buildBiosphereDistribution(
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
+): DistributionChartBucket[] {
+	const buckets = bucketBy(
+		collectNonBeltBodies(systems),
 		(body) => body.biosphere?.code.toString(),
 		(key) => BIOSPHERE_LABEL[Number(key)] ?? `Code ${key}`,
 		(key) => BIOSPHERE_COLOR[Number(key)] ?? BIOSPHERE_OVERFLOW_COLOR,

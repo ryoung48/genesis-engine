@@ -199,7 +199,7 @@ function rollClassificationAssignment(params: {
 			const hydroRoll = rng.randint(1, 6)
 			return {
 				atmosphereCode: 13,
-				hydrosphereCode: hydroRoll <= 2 ? 0 : DICE.roll2d6(rng) - 1,
+				hydrosphereCode: hydroRoll <= 2 ? 0 : DICE.roll2d6(rng) - 2,
 				composition: "rocky",
 			}
 		}

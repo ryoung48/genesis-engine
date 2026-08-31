@@ -31,11 +31,14 @@ export interface PortedGalaxyDisplayFlags {
 	 * GalaxyRenderer's own decorative star particles, which stay on
 	 * unconditionally. */
 	showStarOverlay: boolean
-	/** Toggles the per-system nation color tint + capital name labels built by
-	 * nation-overlay.ts, from the old-model galaxy's own GALAXY_NATIONS
-	 * partition. */
-	showNationOverlay: boolean
 }
+
+/** Exclusive galaxy map mode -- "stars" shows neither partition overlay,
+ * "nations" / "cultures" show the matching one (see partition-overlay.ts).
+ * Replaces the old independent showNationOverlay toggle. */
+export type GalaxyMapMode = "stars" | "nations" | "cultures"
+
+export const DEFAULT_GALAXY_MAP_MODE: GalaxyMapMode = "nations"
 
 // Matches GalaxyRenderer's own initSimulation first preset exactly, so the
 // panel's initial values agree with what's actually on screen at mount.
@@ -67,7 +70,6 @@ export const DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS: PortedGalaxyDisplayFlags = {
 	showDensityWaves: false,
 	showGalaxy: true,
 	showStarOverlay: true,
-	showNationOverlay: true,
 }
 
 export function toGalaxyParam(p: PortedGalaxyParams): GalaxyParam {

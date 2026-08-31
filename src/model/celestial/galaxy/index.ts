@@ -1,3 +1,4 @@
+import { GALAXY_CULTURES } from "@/model/celestial/galaxy/cultures"
 import { GALAXY_NATIONS } from "@/model/celestial/galaxy/nations"
 import { GALAXY_PACKING } from "@/model/celestial/galaxy/packing"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
@@ -75,6 +76,17 @@ function spawn(
 	timings.push({ stage: "Nations", ms: performance.now() - t0 })
 	t0 = performance.now()
 
+	progressCb?.("Assigning cultures...", 80)
+	const cultures = GALAXY_CULTURES.build({
+		numSystems: size,
+		r_edge: packing.r_edge,
+		adjOffset: laneAdjOffset,
+		adjList: laneAdjList,
+		seed,
+	})
+	timings.push({ stage: "Cultures", ms: performance.now() - t0 })
+	t0 = performance.now()
+
 	progressCb?.("Rolling star trees...", 85)
 	const packedStars = GALAXY_SYSTEMS.forceCapitalsMainWorldCapable({
 		packed: GALAXY_SYSTEMS.buildPackedGalaxyStars({
@@ -104,6 +116,12 @@ function spawn(
 			nationSeeds: nations.seeds,
 			nationSize: nations.size,
 			nationColors: nations.colors,
+			cultureAssignment: cultures.assignment,
+			cultureSeeds: cultures.seeds,
+			cultureSize: cultures.size,
+			cultureColors: cultures.colors,
+			cultureBlendSecondary: cultures.blendSecondary,
+			cultureBlendWeight: cultures.blendWeight,
 			radius,
 			dimensions,
 		},

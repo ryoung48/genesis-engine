@@ -82,6 +82,7 @@ import {
 import { canHandlePlanetClick } from "@/ui/genesis/shared/measurement-click"
 import { computePlanetStats } from "@/ui/genesis/shared/planet-stats"
 import { formatDistance, rgbToCss } from "@/ui/genesis/shared/ui-format"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import { SolarSystemControls } from "@/ui/genesis/solar-system/SolarSystemControls"
 import { useSolarSystemBodies } from "@/ui/genesis/solar-system/useSolarSystemBodies"
 import { useSolarSystemView } from "@/ui/genesis/solar-system/useSolarSystemView"
@@ -1925,9 +1926,18 @@ export const GenesisView: React.FC<{
 	// same component -- load it into the solar-system state directly and
 	// switch back to the normal view.
 	const handleOpenGalaxySystem = useCallback(
-		(system: GalaxySystem) => {
+		(
+			system: GalaxySystem,
+			focus: OrbitAddress = { kind: "star", starIndex: 0 },
+		) => {
 			const [primary, ...companions] = system.stars
 			if (!primary) return
+			// A nation-capital system's primary carries a forced friendly
+			// homeworld (isMainWorld) -- useSolarSystemBodies re-rolls the body
+			// list from the star seed on load, so it has to re-roll in the same
+			// mode or that homeworld is silently dropped for a plain procedural
+			// slot. Any other galaxy system stays fully procedural.
+			const hasForcedHomeworld = primary.bodies.some((body) => body.isMainWorld)
 			// Sorted by orbitalDistanceAU so this array's order matches exactly
 			// what buildSolarSystemOverlay's composer sorts its own companions
 			// into (see overlay.ts) -- the two MUST agree, since starIndex
@@ -1959,7 +1969,7 @@ export const GenesisView: React.FC<{
 					orbits: star.bodies,
 				})),
 			})
-			setMainWorldMode("procedural")
+			setMainWorldMode(hasForcedHomeworld ? "temperate-native" : "procedural")
 			// Marks this system as galaxy-opened so the solar-system view shows
 			// its "back to galaxy" control (see SolarSystemControls' onBackToGalaxy
 			// and useSolarSystemBodies' galaxyOrigin).
@@ -1970,7 +1980,7 @@ export const GenesisView: React.FC<{
 			// Navigator, rather than leaving the camera wherever it was left
 			// pointed at from whatever was last focused before entering galaxy
 			// mode.
-			handleFocusBody({ kind: "star", starIndex: 0 })
+			requestAnimationFrame(() => handleFocusBody(focus))
 		},
 		[
 			setSolarSystem,
@@ -1999,6 +2009,7 @@ export const GenesisView: React.FC<{
 						resetMainWorldToEarth={resetMainWorldToEarth}
 						mainWorldMode={mainWorldMode}
 						setMainWorldMode={setMainWorldMode}
+						fromGalaxy={galaxyOrigin != null}
 						mainWorldSystemBody={mainWorldSystemBody}
 						updateMainWorldBody={updateMainWorldBody}
 						tidalSchedulePreview={tidalSchedulePreview}

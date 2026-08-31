@@ -219,6 +219,8 @@ function buildBodyStats({
 	luminositySol,
 	orbitalDistanceAU,
 	pressureBar,
+	readOnly,
+	estimateTempK,
 }: {
 	kind: "planet" | "moon"
 	group?: string
@@ -294,6 +296,17 @@ function buildBodyStats({
 	 * seasonality term. Defaults to 0 (vacuum) in the trace call when unset,
 	 * same as finalize()'s own convention. */
 	pressureBar?: number
+	/** [JUSTIFICATION] Only set for a system opened from the galaxy map -- its
+	 * bodies are fully rolled and nothing on the card is editable, so the
+	 * Temperature row renders as a read-only estimate (value + trace tooltip
+	 * on hover) instead of the greenhouse/albedo popover. Every other caller
+	 * leaves it unset. */
+	readOnly?: boolean
+	/** [JUSTIFICATION] The body's stored analytic temperature estimate
+	 * (temperatureEstimate.mean). Used as the Temperature row's value in
+	 * `readOnly` mode instead of the live EBM climate-preview mean; ignored
+	 * otherwise. */
+	estimateTempK?: number
 }): StatEntry[] {
 	const diameterRel = diameterKm / ORBIT_BODY.earthDiameterKm
 	const massRelEarth = massKg / ORBIT_BODY.earthMassKg
@@ -380,63 +393,16 @@ function buildBodyStats({
 					},
 				]
 			: []),
-		...(avgTempK !== undefined
+		...((readOnly ? (estimateTempK ?? avgTempK) : avgTempK) !== undefined
 			? [
-					{
-						label: "Temperature",
-						valuePrefix: formatAvgTempValue(avgTempK, unitSystem),
-						value: ` · ${describeTemperatureK(avgTempK)}`,
-						swatchColor: temperatureSwatchColor(avgTempK),
-						editor: {
-							label: "Temperature",
-							value: avgTempK,
-							min: avgTempK,
-							max: avgTempK,
-							step: 1,
-							display: formatAvgTempValue(avgTempK, unitSystem),
-							set: () => {
-								// unused -- editor.content overrides the default slider
-							},
-							content: (
-								<ContributionTooltipContent
-									items={[
-										{
-											label: "Greenhouse",
-											value: (greenhouseFactor ?? 0).toFixed(2),
-											tone: "warm" as const,
-											editor: greenhouseFactorEditor
-												? {
-														value: greenhouseFactor ?? 0,
-														min: greenhouseFactorEditor.min,
-														max: greenhouseFactorEditor.max,
-														step: greenhouseFactorEditor.step,
-														set: greenhouseFactorEditor.set,
-													}
-												: undefined,
-										},
-										...(albedo !== undefined
-											? [
-													{
-														label: "Albedo",
-														value: albedo.toFixed(3),
-														tone: "cool" as const,
-														editor: albedoEditor
-															? {
-																	value: albedo,
-																	min: albedoEditor.min,
-																	max: albedoEditor.max,
-																	step: albedoEditor.step,
-																	set: albedoEditor.set,
-																}
-															: undefined,
-													},
-												]
-											: []),
-									]}
-								/>
-							),
-						},
-						trailingHelp: buildTemperatureTraceTooltip({
+					(() => {
+						// A galaxy-opened body shows the analytic estimate
+						// (temperatureEstimate.mean, the value the trace tooltip
+						// breaks down), not the live EBM climate-preview mean.
+						const tempK = (
+							readOnly ? (estimateTempK ?? avgTempK) : avgTempK
+						) as number
+						const temperatureTrace = buildTemperatureTraceTooltip({
 							luminositySol,
 							orbitalDistanceAU,
 							eccentricity: eccentricity.value,
@@ -450,8 +416,77 @@ function buildBodyStats({
 							tideLock: dayLength?.tideLock,
 							seismologyTotal: seismology?.totalHeating,
 							group,
-						}),
-					},
+						})
+						const base = {
+							label: "Temperature",
+							valuePrefix: formatAvgTempValue(tempK, unitSystem),
+							value: ` · ${describeTemperatureK(tempK)}`,
+							swatchColor: temperatureSwatchColor(tempK),
+						}
+						// A galaxy-opened body is fully read-only: show the estimate
+						// value with the trace tooltip on hover, no greenhouse/albedo
+						// popover.
+						if (readOnly) {
+							return {
+								...base,
+								valueHelp: temperatureTrace,
+								valueHelpTarget: "prefix" as const,
+							}
+						}
+						return {
+							...base,
+							editor: {
+								label: "Temperature",
+								value: tempK,
+								min: tempK,
+								max: tempK,
+								step: 1,
+								display: formatAvgTempValue(tempK, unitSystem),
+								set: () => {
+									// unused -- editor.content overrides the default slider
+								},
+								content: (
+									<ContributionTooltipContent
+										items={[
+											{
+												label: "Greenhouse",
+												value: (greenhouseFactor ?? 0).toFixed(2),
+												tone: "warm" as const,
+												editor: greenhouseFactorEditor
+													? {
+															value: greenhouseFactor ?? 0,
+															min: greenhouseFactorEditor.min,
+															max: greenhouseFactorEditor.max,
+															step: greenhouseFactorEditor.step,
+															set: greenhouseFactorEditor.set,
+														}
+													: undefined,
+											},
+											...(albedo !== undefined
+												? [
+														{
+															label: "Albedo",
+															value: albedo.toFixed(3),
+															tone: "cool" as const,
+															editor: albedoEditor
+																? {
+																		value: albedo,
+																		min: albedoEditor.min,
+																		max: albedoEditor.max,
+																		step: albedoEditor.step,
+																		set: albedoEditor.set,
+																	}
+																: undefined,
+														},
+													]
+												: []),
+										]}
+									/>
+								),
+							},
+							trailingHelp: temperatureTrace,
+						}
+					})(),
 				]
 			: []),
 		...buildSeismologyStats(seismology, surfaceTidesM),
@@ -512,6 +547,8 @@ function buildMoonStats({
 	hydrosphereCode,
 	avgTempK,
 	unitSystem,
+	readOnly,
+	estimateTempK,
 	atmosphere,
 	albedo,
 	greenhouseFactor,
@@ -546,6 +583,12 @@ function buildMoonStats({
 	hydrosphereCode?: number
 	avgTempK?: number
 	unitSystem: UnitSystem
+	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
+	 * Temperature row to its read-only estimate form (see buildBodyStats). */
+	readOnly?: boolean
+	/** [JUSTIFICATION] The moon's stored analytic temperature estimate -- used
+	 * as the Temperature row's value in `readOnly` mode (see buildBodyStats). */
+	estimateTempK?: number
 	atmosphere?: AtmosphereProfile | null
 	albedo?: number
 	greenhouseFactor?: number
@@ -587,6 +630,8 @@ function buildMoonStats({
 	})
 	return buildBodyStats({
 		kind: "moon",
+		readOnly,
+		estimateTempK,
 		group,
 		classification,
 		sizeClass,
@@ -683,6 +728,9 @@ export function buildOrbitBodyStats(params: {
 	 * GenerationPlanetNavigator) pass it here so the range stays a stable,
 	 * balanced window instead of recentering on every edit. */
 	orbitalDistanceBaselineAU?: number
+	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
+	 * Temperature row to its read-only estimate form (see buildBodyStats). */
+	readOnly?: boolean
 }): StatEntry[] {
 	const {
 		body,
@@ -698,6 +746,7 @@ export function buildOrbitBodyStats(params: {
 		avgTempK,
 		unitSystem,
 		orbitalDistanceBaselineAU,
+		readOnly,
 	} = params
 	if (body.group === "asteroid belt") {
 		return [
@@ -740,6 +789,8 @@ export function buildOrbitBodyStats(params: {
 			: undefined
 	return buildBodyStats({
 		kind: "planet",
+		readOnly,
+		estimateTempK: body.temperatureEstimate?.mean,
 		group: body.group,
 		classification: body.classification,
 		sizeClass: body.sizeClass,
@@ -998,6 +1049,9 @@ export function buildOrbitMoonStats(params: {
 	 * for the Temperature row's info-icon trace breakdown. */
 	luminositySol?: number
 	orbitalDistanceAU?: number
+	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
+	 * Temperature row to its read-only estimate form (see buildBodyStats). */
+	readOnly?: boolean
 }): StatEntry[] {
 	const {
 		moon,
@@ -1010,6 +1064,7 @@ export function buildOrbitMoonStats(params: {
 		onUpdateMoon,
 		luminositySol,
 		orbitalDistanceAU,
+		readOnly,
 	} = params
 	const pd = moon.semiMajorAxisPlanetDiameters ?? pdOverride ?? 0
 	const gravityG = ORBIT_BODY.computeGravityG({
@@ -1029,6 +1084,8 @@ export function buildOrbitMoonStats(params: {
 		hydrosphereCode: moon.hydrosphereCode,
 		avgTempK,
 		unitSystem,
+		readOnly,
+		estimateTempK: moon.temperatureEstimate?.mean,
 		atmosphere: moon.atmosphere,
 		albedo: moon.albedo,
 		greenhouseFactor: moon.greenhouseFactor,

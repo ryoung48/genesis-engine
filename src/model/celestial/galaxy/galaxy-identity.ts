@@ -52,6 +52,35 @@ function generateNationName(seed: number, nationIndex: number): string {
 	)
 }
 
+/** Lazily-built cache of one spawned Language per culture, keyed by its
+ * `galaxy:${seed}:culture:${index}` spawn seed -- same shape/reasoning as
+ * nationLanguageCache above, kept separate so a culture and a nation that
+ * happen to share an index don't share a tongue. */
+const cultureLanguageCache = new Map<string, Language>()
+
+function cultureLanguage(seed: number, cultureIndex: number): Language {
+	const key = `galaxy:${seed}:culture:${cultureIndex}`
+	let lang = cultureLanguageCache.get(key)
+	if (!lang) {
+		lang = LANGUAGE.spawn(key)
+		cultureLanguageCache.set(key, lang)
+	}
+	return lang
+}
+
+/** One culture's own name, from its lazily-spawned language -- the galaxy
+ * culture-mode analogue of generateNationName. */
+function generateCultureName(seed: number, cultureIndex: number): string {
+	return TEXT.titleCase(
+		LANGUAGE.word.simple({
+			lang: cultureLanguage(seed, cultureIndex),
+			key: "region",
+			namespace: "culture",
+			slot: "culture",
+		}).word,
+	)
+}
+
 /** A star's name in the language of the nation that owns its system, so a
  * realm's worlds all read as belonging to the same tongue. The per-star
  * `slot` keeps each star in a nation deterministically distinct while
@@ -81,5 +110,6 @@ function generateSystemStarName({
 export const GALAXY_IDENTITY = {
 	generateGalaxyName,
 	generateNationName,
+	generateCultureName,
 	generateSystemStarName,
 }

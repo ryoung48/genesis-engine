@@ -229,7 +229,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	}
 
 	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
-		if (slot.isMainWorld && mainWorldMode !== "gas-giant-moon") {
+		if (
+			slot.isMainWorld &&
+			mainWorldMode !== "gas-giant-moon" &&
+			mainWorldMode !== "temperate-native"
+		) {
 			const orbitalDistanceAU = PLANET.deviationToAU({
 				deviation: slot.deviation,
 				luminositySol,
@@ -324,18 +328,25 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		// this slot becomes a normally-rolled jovian instead of a literal Earth
 		// clone, with one of its own normally-rolled moons promoted to be the
 		// main world below (see promoteMoonToMainWorld).
-		const isGasGiantMainWorld = slot.isMainWorld === true
-		const isPrimaryWorld = isGasGiantMainWorld
-		const group = isGasGiantMainWorld
-			? ("jovian" as const)
-			: ROLLS.rollOrbitGroup({
-					rng,
-					zone: slot.zone,
-					postStellar: deadStar,
-					starAgeGyr,
-					proto,
-					primordial,
-				})
+		const isGasGiantMainWorld =
+			slot.isMainWorld === true && mainWorldMode === "gas-giant-moon"
+		// The galaxy capital-homeworld slot: a normally rolled body, but forced
+		// into guaranteed-habitable ranges below (see "temperate-native").
+		const isHomeworld =
+			slot.isMainWorld === true && mainWorldMode === "temperate-native"
+		const isPrimaryWorld = isGasGiantMainWorld || isHomeworld
+		const group = isHomeworld
+			? ("terrestrial" as const)
+			: isGasGiantMainWorld
+				? ("jovian" as const)
+				: ROLLS.rollOrbitGroup({
+						rng,
+						zone: slot.zone,
+						postStellar: deadStar,
+						starAgeGyr,
+						proto,
+						primordial,
+					})
 		let orbitalDistanceAU = PLANET.deviationToAU({
 			deviation: slot.deviation,
 			luminositySol,
@@ -367,19 +378,23 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				orbitalDistanceAU = candidateAu
 			}
 		}
-		const sizeClass = ROLLS.rollSizeClass({ rng, group })
+		const sizeClass = isHomeworld
+			? rng.randint(7, 9)
+			: ROLLS.rollSizeClass({ rng, group })
 		const impactZone = impactZoneSlots.has(slot)
-		const classification = PLANET.classifyBody({
-			rng,
-			groupHint: group,
-			impactZone,
-			zone: slot.zone,
-			orbitalDistanceAU,
-			sizeClass,
-			isMoon: false,
-			tidal: false,
-			forceMeltball,
-		}).classification
+		const classification = isHomeworld
+			? ("tectonic" as const)
+			: PLANET.classifyBody({
+					rng,
+					groupHint: group,
+					impactZone,
+					zone: slot.zone,
+					orbitalDistanceAU,
+					sizeClass,
+					isMoon: false,
+					tidal: false,
+					forceMeltball,
+				}).classification
 		const assignment = PLANET.rollClassificationAssignment({
 			rng,
 			classification,
@@ -413,11 +428,23 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				? 0
 				: isGasGiantMainWorld
 					? EARTH_SEED.rotationHours
-					: ROLLS.rollSiderealDayHours({
-							rng,
-							isJovian: group === "jovian",
-							starAgeGyr,
-						})
+					: isHomeworld
+						? Math.max(
+								16,
+								Math.min(
+									40,
+									ROLLS.rollSiderealDayHours({
+										rng,
+										isJovian: false,
+										starAgeGyr,
+									}),
+								),
+							)
+						: ROLLS.rollSiderealDayHours({
+								rng,
+								isJovian: group === "jovian",
+								starAgeGyr,
+							})
 		// Moved up from this body's other orbital elements (previously rolled
 		// inline in the returned object below) because rollPlanetTideLock needs
 		// them as pre-lock inputs -- its own DM/roll may still adjust them
@@ -430,9 +457,18 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				? 0
 				: isGasGiantMainWorld
 					? EARTH_SEED.eccentricity
-					: ROLLS.rollEccentricity({ rng, orbitKind: "planet" })
+					: isHomeworld
+						? Math.min(
+								ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
+								0.05,
+							)
+						: ROLLS.rollEccentricity({ rng, orbitKind: "planet" })
 		const rolledAxialTiltDeg =
-			group === "asteroid belt" ? 0 : ROLLS.rollAxialTiltDeg(rng)
+			group === "asteroid belt"
+				? 0
+				: isHomeworld
+					? rng.uniform(10, 30)
+					: ROLLS.rollAxialTiltDeg(rng)
 		const rolledMoonCount =
 			group === "asteroid belt"
 				? 0
@@ -519,25 +555,39 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					)
 				})()
 			: moonsWithTideLocks
-		const environment = ENVIRONMENT.buildBodyEnvironment({
-			rng,
-			groupHint: group,
-			zone: slot.zone,
-			deviation: slot.deviation,
-			spectralClass,
-			diameterKm,
-			massKg,
-			orbitalDistanceAU,
-			isPrimaryWorld,
-			isMoon: false,
-			tidal: false,
-			forceMeltball,
-			assignment,
-			classified: { group, classification },
-			starAgeGyr,
-			proto,
-			primordial,
-		})
+		const environment = isHomeworld
+			? ENVIRONMENT.buildForcedClassificationEnvironment({
+					rng,
+					classification: "tectonic",
+					sizeClass,
+					zone: slot.zone,
+					deviation: slot.deviation,
+					spectralClass,
+					diameterKm,
+					massKg,
+					isPrimaryWorld: true,
+					starAgeGyr,
+					homeworld: true,
+				})
+			: ENVIRONMENT.buildBodyEnvironment({
+					rng,
+					groupHint: group,
+					zone: slot.zone,
+					deviation: slot.deviation,
+					spectralClass,
+					diameterKm,
+					massKg,
+					orbitalDistanceAU,
+					isPrimaryWorld,
+					isMoon: false,
+					tidal: false,
+					forceMeltball,
+					assignment,
+					classified: { group, classification },
+					starAgeGyr,
+					proto,
+					primordial,
+				})
 		// Ported from galaxy-gen's ROTATION.locks.get (see tide-lock.ts) -- may
 		// override this body's rotation/tilt/eccentricity entirely (a partial
 		// spin-down, a 3:2 resonance, or a full 1:1 lock to its star or to one
@@ -565,9 +615,18 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				orbitalPeriodDays,
 				baseSiderealDayHours: siderealDayHours,
 				moons: moonsWithTideLocks,
-				homeworld: false,
+				// A capital homeworld still rolls for tide lock, but `homeworld`
+				// forces a dm-0 "broke" reroll on any full 1:1 lock -- so a full
+				// lock is rare while a rolled partial spin-down / 3:2 resonance
+				// still applies.
+				homeworld: isHomeworld,
 				rerollEccentricity: () =>
-					ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
+					isHomeworld
+						? Math.min(
+								ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
+								0.05,
+							)
+						: ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
 			})
 			finalSiderealDayHours = tideLockResult.siderealDayHours
 			finalAxialTiltDeg = tideLockResult.axialTiltDeg
@@ -576,6 +635,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			tideLockTrace = tideLockResult.trace
 			if (
 				tideLockResult.starLocked &&
+				!isHomeworld &&
 				environment.group === "terrestrial" &&
 				environment.classification !== "acheronian"
 			) {
@@ -597,9 +657,16 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		return {
 			...finalEnvironment,
 			idx,
-			seed: `orbit-${siblingIdx + 1}`,
-			name: nameBody(`orbit-${siblingIdx}`),
-			isMainWorld: false,
+			seed: isHomeworld ? "main-world" : `orbit-${siblingIdx + 1}`,
+			name: isHomeworld
+				? nameBody("main-world")
+				: nameBody(`orbit-${siblingIdx}`),
+			isMainWorld: isHomeworld,
+			// A capital homeworld gets a preset full-sapience biosphere with no
+			// compatibility label -- identical shape to Earth's own seed
+			// (SOL_DATA's EARTH_SEED.biosphere) -- so seismology keeps it verbatim
+			// instead of re-rolling and tacking on a miscible/hybrid label.
+			biosphere: isHomeworld ? { code: 10, trace: [] } : undefined,
 			zone: slot.zone,
 			impactZone,
 			// texturePath/cloudsTexturePath are assigned later by

@@ -9,11 +9,15 @@ import type { SystemBody } from "@/model/celestial/system/types"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
+import { GalaxyMapModeControl } from "@/ui/genesis/galaxy/controls/GalaxyMapModeControl"
 import { GalaxyOverlayControls } from "@/ui/genesis/galaxy/controls/GalaxyOverlayControls"
 import { GalaxyRenderer } from "@/ui/genesis/galaxy/renderer/GalaxyRendererThree"
 import { updateClusterPositions } from "@/ui/genesis/galaxy/renderer/galaxy-scene/cluster"
 import { buildGalaxyLanes } from "@/ui/genesis/galaxy/renderer/galaxy-scene/lanes"
-import { buildNationOverlay } from "@/ui/genesis/galaxy/renderer/galaxy-scene/nation-overlay"
+import {
+	buildCultureOverlay,
+	buildNationOverlay,
+} from "@/ui/genesis/galaxy/renderer/galaxy-scene/partition-overlay"
 import { pickNearestSystem } from "@/ui/genesis/galaxy/renderer/galaxy-scene/picking"
 import {
 	BLACK_HOLE_POINT_SIZE_RATIO,
@@ -21,21 +25,26 @@ import {
 } from "@/ui/genesis/galaxy/renderer/galaxy-scene/points"
 import { recenterGalaxy } from "@/ui/genesis/galaxy/view/old-galaxy-overlay"
 import {
+	DEFAULT_GALAXY_MAP_MODE,
 	DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS,
 	DEFAULT_PORTED_GALAXY_PARAMS,
 	densityWaveShapeFor,
 	fromGalaxyParam,
+	type GalaxyMapMode,
 	type PortedGalaxyDisplayFlags,
 	type PortedGalaxyParams,
 	toGalaxyParam,
 } from "@/ui/genesis/galaxy/view/portedGalaxyParams"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import { PortedGalaxyPanel } from "@/ui/wiki/PortedGalaxyPanel"
 import {
 	atmosphereCategory,
+	biosphereCategory,
 	hydrosphereCategory,
 	temperatureCategory,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
+import { habitabilityCategoryLabel } from "@/ui/wiki/stats/orbit/formatters"
 
 const DEFAULT_SEED = 1
 const DEFAULT_SYSTEM_COUNT = 2000
@@ -114,7 +123,7 @@ function createWorker(
  * since the old model gives real neighbors/hyperlanes/known system count
  * that a raw star-particle index never had. */
 export const PortedGalaxyView: React.FC<{
-	onOpenSystem?: (system: GalaxySystem) => void
+	onOpenSystem?: (system: GalaxySystem, focus: OrbitAddress) => void
 }> = ({ onOpenSystem }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const rendererRef = useRef<GalaxyRenderer | null>(null)
@@ -125,6 +134,9 @@ export const PortedGalaxyView: React.FC<{
 	const nationOverlayRef = useRef<ReturnType<typeof buildNationOverlay> | null>(
 		null,
 	)
+	const cultureOverlayRef = useRef<ReturnType<
+		typeof buildCultureOverlay
+	> | null>(null)
 	const selectionPulseRef = useRef<SelectionPulse | null>(null)
 	// points.ts's own uSize uniform (see its own doc comment) is a fixed
 	// pixel size with no zoom attenuation, matching how the original
@@ -145,16 +157,15 @@ export const PortedGalaxyView: React.FC<{
 		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS.showStarOverlay,
 	)
 	// Same reasoning as showStarOverlayRef above -- read inside
-	// applyOldGalaxy's worker-callback closure so a freshly rebuilt nation
-	// overlay always picks up the current toggle state.
-	const showNationOverlayRef = useRef(
-		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS.showNationOverlay,
-	)
+	// applyOldGalaxy's worker-callback closure so a freshly rebuilt overlay
+	// picks up the current map mode ("stars" = neither overlay visible).
+	const mapModeRef = useRef<GalaxyMapMode>(DEFAULT_GALAXY_MAP_MODE)
 
 	const [params, setParams] = useState(DEFAULT_PORTED_GALAXY_PARAMS)
 	const [displayFlags, setDisplayFlags] = useState(
 		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS,
 	)
+	const [mapMode, setMapMode] = useState<GalaxyMapMode>(DEFAULT_GALAXY_MAP_MODE)
 	const [presetCount, setPresetCount] = useState(0)
 	const [selectedPresetIndex, setSelectedPresetIndex] = useState<number | null>(
 		0,
@@ -203,6 +214,11 @@ export const PortedGalaxyView: React.FC<{
 			nationOverlayRef.current.dispose()
 			nationOverlayRef.current = null
 		}
+		if (cultureOverlayRef.current) {
+			renderer.scene.remove(cultureOverlayRef.current.group)
+			cultureOverlayRef.current.dispose()
+			cultureOverlayRef.current = null
+		}
 
 		recenterGalaxy(nextGalaxy)
 		galaxyRef.current = nextGalaxy
@@ -223,9 +239,14 @@ export const PortedGalaxyView: React.FC<{
 		lanesRef.current = lanes
 
 		const nationOverlay = buildNationOverlay(nextGalaxy)
-		nationOverlay.group.visible = showNationOverlayRef.current
+		nationOverlay.group.visible = mapModeRef.current === "nations"
 		renderer.scene.add(nationOverlay.group)
 		nationOverlayRef.current = nationOverlay
+
+		const cultureOverlay = buildCultureOverlay(nextGalaxy)
+		cultureOverlay.group.visible = mapModeRef.current === "cultures"
+		renderer.scene.add(cultureOverlay.group)
+		cultureOverlayRef.current = cultureOverlay
 	}
 
 	const regenerate = (shapeParams: PortedGalaxyParams) => {
@@ -394,6 +415,11 @@ export const PortedGalaxyView: React.FC<{
 				nationOverlayRef.current.dispose()
 				nationOverlayRef.current = null
 			}
+			if (cultureOverlayRef.current) {
+				renderer.scene.remove(cultureOverlayRef.current.group)
+				cultureOverlayRef.current.dispose()
+				cultureOverlayRef.current = null
+			}
 			renderer.dispose()
 		}
 	}, [])
@@ -413,12 +439,6 @@ export const PortedGalaxyView: React.FC<{
 			if (renderer) renderer.showGalaxy = checked
 			return
 		}
-		if (key === "showNationOverlay") {
-			showNationOverlayRef.current = checked
-			if (nationOverlayRef.current)
-				nationOverlayRef.current.group.visible = checked
-			return
-		}
 		// showStarOverlay -- toggles the OLD packed-galaxy model's points/
 		// lanes visibility directly, not any GalaxyRenderer property (its own
 		// decorative stars stay on unconditionally, see the mount effect).
@@ -426,6 +446,15 @@ export const PortedGalaxyView: React.FC<{
 		if (pointsRef.current) pointsRef.current.points.visible = checked
 		if (pointsRef.current) pointsRef.current.blackHolePoints.visible = checked
 		if (lanesRef.current) lanesRef.current.visible = checked
+	}
+
+	const handleMapModeChange = (next: GalaxyMapMode) => {
+		setMapMode(next)
+		mapModeRef.current = next
+		if (nationOverlayRef.current)
+			nationOverlayRef.current.group.visible = next === "nations"
+		if (cultureOverlayRef.current)
+			cultureOverlayRef.current.group.visible = next === "cultures"
 	}
 
 	const handleTimeStepChange = (value: number) => {
@@ -470,8 +499,10 @@ export const PortedGalaxyView: React.FC<{
 				galaxySeed: currentGalaxy.seed,
 				systemIndex,
 				nationIndex: currentGalaxy.nationAssignment[systemIndex] ?? -1,
+				isCapital: currentGalaxy.nationSeeds.includes(systemIndex),
 				packed: currentGalaxy,
 			}),
+			{ kind: "star", starIndex: 0 },
 		)
 	}
 
@@ -510,9 +541,15 @@ export const PortedGalaxyView: React.FC<{
 				planetClassificationTemperaturePairs: system.stars.flatMap((star) =>
 					star.bodies.map((body) => ({
 						classification: body.classification,
+						zone: body.zone,
 						temperatureClass: temperatureCategory(body),
 						hydrosphereClass: hydrosphereCategory(body),
 						atmosphereClass: atmosphereCategory(body),
+						breathable: body.atmosphere?.breathable ?? false,
+						biosphereClass: biosphereCategory(body),
+						habitabilityClass: body.habitability
+							? habitabilityCategoryLabel(body.habitability.code)
+							: undefined,
 						specialCircumstances: specialCircumstances(body),
 					})),
 				),
@@ -520,9 +557,15 @@ export const PortedGalaxyView: React.FC<{
 					star.bodies.flatMap((body) =>
 						body.moons.map((moon) => ({
 							classification: moon.classification,
+							zone: moon.zone,
 							temperatureClass: temperatureCategory(moon),
 							hydrosphereClass: hydrosphereCategory(moon),
 							atmosphereClass: atmosphereCategory(moon),
+							breathable: moon.atmosphere?.breathable ?? false,
+							biosphereClass: biosphereCategory(moon),
+							habitabilityClass: moon.habitability
+								? habitabilityCategoryLabel(moon.habitability.code)
+								: undefined,
 							specialCircumstances: [] as SpecialCircumstance[],
 						})),
 					),
@@ -590,6 +633,20 @@ export const PortedGalaxyView: React.FC<{
 					systemSearchEntries={systemSearchEntries}
 					systemBodySearchEntries={systemBodySearchEntries}
 					onFocusSystem={focusSearchedSystem}
+					onOpenSystem={(systemIndex, focus) => {
+						const currentGalaxy = galaxyRef.current
+						if (!currentGalaxy || !onOpenSystem) return
+						onOpenSystem(
+							GALAXY_SYSTEMS.generate({
+								galaxySeed: currentGalaxy.seed,
+								systemIndex,
+								nationIndex: currentGalaxy.nationAssignment[systemIndex] ?? -1,
+								isCapital: currentGalaxy.nationSeeds.includes(systemIndex),
+								packed: currentGalaxy,
+							}),
+							focus,
+						)
+					}}
 					presetCount={presetCount}
 					selectedPresetIndex={selectedPresetIndex}
 					onSelectPreset={handleSelectPreset}
@@ -622,6 +679,10 @@ export const PortedGalaxyView: React.FC<{
 					onDisplayFlagChange={handleDisplayFlagChange}
 					timeStep={timeStep}
 					onTimeStepChange={handleTimeStepChange}
+				/>
+				<GalaxyMapModeControl
+					mode={mapMode}
+					onModeChange={handleMapModeChange}
 				/>
 				{!panelOpen ? (
 					<div className="absolute top-3 left-3 pointer-events-auto z-20">

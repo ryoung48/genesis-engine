@@ -35,6 +35,12 @@ function buildTransferList(galaxy: {
 	nationSeeds: Int32Array
 	nationSize: Int32Array
 	nationColors: Float32Array
+	cultureAssignment: Int32Array
+	cultureSeeds: Int32Array
+	cultureSize: Int32Array
+	cultureColors: Float32Array
+	cultureBlendSecondary: Int32Array
+	cultureBlendWeight: Float32Array
 }): Transferable[] {
 	return [
 		galaxy.r_xy.buffer,
@@ -61,6 +67,12 @@ function buildTransferList(galaxy: {
 		galaxy.nationSeeds.buffer,
 		galaxy.nationSize.buffer,
 		galaxy.nationColors.buffer,
+		galaxy.cultureAssignment.buffer,
+		galaxy.cultureSeeds.buffer,
+		galaxy.cultureSize.buffer,
+		galaxy.cultureColors.buffer,
+		galaxy.cultureBlendSecondary.buffer,
+		galaxy.cultureBlendWeight.buffer,
 	]
 }
 
@@ -81,6 +93,7 @@ self.onmessage = (event: MessageEvent<GalaxyWorkerRequest>) => {
 		let systems: GalaxySystem[] | undefined
 		if (message.params.pregenerateAllSystems) {
 			systems = []
+			const capitalSystems = new Set(galaxy.nationSeeds)
 			for (
 				let systemIndex = 0;
 				systemIndex < galaxy.numSystems;
@@ -92,6 +105,7 @@ self.onmessage = (event: MessageEvent<GalaxyWorkerRequest>) => {
 						galaxySeed: galaxy.seed,
 						systemIndex,
 						nationIndex: galaxy.nationAssignment[systemIndex] ?? -1,
+						isCapital: capitalSystems.has(systemIndex),
 						packed: galaxy,
 						skipNaming: true,
 					}),

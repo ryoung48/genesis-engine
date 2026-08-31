@@ -56,12 +56,18 @@ export interface HomeWorldParams {
  * "procedural": no slot is reserved at all -- deviation-0 is just another
  * inner-zone candidate, rolled the same as every other slot. Use this for
  * unconstrained generation (e.g. galaxy-scale systems) where no body should
- * be singled out as a guaranteed habitable "home world". */
+ * be singled out as a guaranteed habitable "home world".
+ * "temperate-native": reserves the deviation-0 slot like the non-procedural
+ * modes, but builds it as a NORMALLY ROLLED body forced into
+ * guaranteed-habitable ranges (tectonic, standard non-tainted atmosphere,
+ * sane tilt/eccentricity/rotation, liquid hydrosphere) -- a real roll, not
+ * an Earth clone. Used for galaxy nation-capital primary stars. */
 export type MainWorldMode =
 	| "earth-clone"
 	| "moon-system"
 	| "gas-giant-moon"
 	| "procedural"
+	| "temperate-native"
 
 export interface GenerateSystemBodiesParams {
 	seed: number

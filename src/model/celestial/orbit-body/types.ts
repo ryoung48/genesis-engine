@@ -68,6 +68,16 @@ export interface AtmosphereProfile {
 		| "unusual"
 		| "helium"
 		| "hydrogen"
+	/** Set only when subtype is "unusual" (code 15 / "F") -- the specific
+	 * flavour of the anomaly, ported from galaxy-gen's Atmosphere.unusual. */
+	unusual?:
+		| "ellipsoid"
+		| "layered"
+		| "high radiation"
+		| "steam"
+		| "storms"
+		| "tides"
+		| "seasonal"
 	/** Set only for otherwise-breathable/exotic profiles with contaminants. */
 	tainted?: boolean
 	/** Set only when the atmosphere table assigns a specific named hazard --

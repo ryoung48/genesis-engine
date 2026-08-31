@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { Popover } from "@/ui/components/composites/Popover"
@@ -13,25 +15,41 @@ import { Slider } from "@/ui/components/primitives/Slider"
 import { Surface } from "@/ui/components/primitives/Surface"
 import type { PortedGalaxyParams } from "@/ui/genesis/galaxy/view/portedGalaxyParams"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
+import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	ATMOSPHERE_CATEGORIES,
+	BIOSPHERE_CATEGORIES,
 	buildAtmosphereDistribution,
 	buildAxialTiltDistribution,
 	buildBiosphereDistribution,
 	buildEccentricityDistribution,
 	buildHydrosphereDistribution,
 	buildMoonClassificationDistribution,
+	buildMoonCountDistribution,
 	buildMoonOrbitRangeDistribution,
 	buildPlanetClassificationDistribution,
 	buildRotationDistribution,
 	buildSizeDistribution,
 	buildSystemHabitabilityDistribution,
+	buildSystemSizeDistribution,
 	buildTemperatureDistribution,
+	collectBodiesByClassification,
+	countSystemBodies,
+	HABITABILITY_CATEGORY_LABELS,
 	HYDROSPHERE_CATEGORIES,
 	TEMPERATURE_CATEGORIES,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
+import {
+	filterSystemIndices,
+	findBodyClassificationConditions,
+	hasBodyFilter,
+	hasBodyFilterForKind,
+	matchesBodyFilter,
+} from "@/ui/wiki/system-filter/evaluate-system-filter"
+import { SystemFilterBuilder } from "@/ui/wiki/system-filter/SystemFilterBuilder"
+import type { SystemFilterRoot } from "@/ui/wiki/system-filter/types"
 
 // The built-in preset table (GalaxyRendererThree.ts's initSimulation) has no
 // names of its own -- these are original descriptive labels picked from
@@ -87,9 +105,13 @@ const SPECIAL_CIRCUMSTANCE_OPTIONS: SpecialCircumstance[] = [
 
 interface GalaxyBodyClassificationTemperaturePair {
 	classification: string
+	zone: string | undefined
 	temperatureClass: string | undefined
 	hydrosphereClass: string | undefined
 	atmosphereClass: string | undefined
+	breathable: boolean
+	biosphereClass: string | undefined
+	habitabilityClass: string | undefined
 	specialCircumstances: SpecialCircumstance[]
 }
 
@@ -108,13 +130,23 @@ interface SystemSearchResult {
 
 interface SystemSearchResults {
 	matches: SystemSearchResult[]
+	matchingSystemIndices: number[]
+	isFiltered: boolean
 	total: number
 }
 
-type SystemSearchTab = "stars" | "planets" | "moons"
+type SystemSearchTab = "systems" | "stars" | "planets" | "moons"
+type SystemBodyCountComparator = "greaterThan" | "lessThan"
 
 const MIN_SYSTEM_COUNT = 50
 const MAX_SYSTEM_COUNT = 200_000
+const SEARCH_RESULTS_PER_PAGE = 5
+const EMPTY_SYSTEM_FILTER: SystemFilterRoot = {
+	kind: "group",
+	id: "root",
+	operator: "and",
+	nodes: [],
+}
 
 // Systems count spans too wide a range (50-200,000) for a slider to give
 // useful precision, so it gets a plain number input instead -- clamped to
@@ -262,6 +294,7 @@ interface PortedGalaxyPanelProps {
 	 * user has requested all systems be pre-generated. */
 	systemBodySearchEntries: GalaxySystemBodySearchEntry[] | null
 	onFocusSystem: (systemIndex: number) => void
+	onOpenSystem: (systemIndex: number, focus: OrbitAddress) => void
 	/** Built-in density-wave shape presets (see GalaxyRendererThree.ts's
 	 * initSimulation) -- drive the packing's own eccentricity/winding, not
 	 * the system count/radius/seed fields above. */
@@ -302,6 +335,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	systemSearchEntries,
 	systemBodySearchEntries,
 	onFocusSystem,
+	onOpenSystem,
 	presetCount,
 	selectedPresetIndex,
 	onSelectPreset,
@@ -309,11 +343,18 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	const [seedInput, setSeedInput] = useState(seed.toString(36).padStart(6, "0"))
 	const [isStatisticsExpanded, setIsStatisticsExpanded] = useState(false)
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+	const [isSearchResultsExpanded, setIsSearchResultsExpanded] = useState(false)
+	const [searchResultsPage, setSearchResultsPage] = useState(0)
+	const [advancedFilter, setAdvancedFilter] =
+		useState<SystemFilterRoot>(EMPTY_SYSTEM_FILTER)
 	const [searchTab, setSearchTab] = useState<SystemSearchTab>("stars")
 	const [spectralClassFilter, setSpectralClassFilter] = useState("all")
 	const [luminosityClassFilter, setLuminosityClassFilter] = useState("all")
 	const [starYouthFilter, setStarYouthFilter] = useState<StarYouthFilter>("all")
 	const [starCountFilter, setStarCountFilter] = useState<StarCountFilter>("all")
+	const [systemBodyCountComparator, setSystemBodyCountComparator] =
+		useState<SystemBodyCountComparator>("greaterThan")
+	const [systemBodyCount, setSystemBodyCount] = useState(10)
 	const [planetClassificationFilter, setPlanetClassificationFilter] =
 		useState("all")
 	const [moonClassificationFilter, setMoonClassificationFilter] =
@@ -463,47 +504,6 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			},
 		},
 	]
-	const spectralClassDistribution = useMemo(() => {
-		const counts = new Map<string, number>()
-		for (const entry of systemSearchEntries) {
-			for (const star of entry.stars) {
-				counts.set(
-					star.spectralClass,
-					(counts.get(star.spectralClass) ?? 0) + 1,
-				)
-			}
-		}
-		return Array.from(counts.entries())
-			.map(([spectralClass, count]) => ({
-				label: spectralClass,
-				count,
-				color:
-					SPECTRAL_CLASS_COLORS[
-						spectralClass as keyof typeof SPECTRAL_CLASS_COLORS
-					] ?? "#94a3b8",
-			}))
-			.sort((a, b) => b.count - a.count)
-	}, [systemSearchEntries])
-	const bodyDistributions = useMemo(() => {
-		if (!pregeneratedSystems || pregeneratedSystems.length === 0) return null
-		return {
-			planetClassification:
-				buildPlanetClassificationDistribution(pregeneratedSystems),
-			moonClassification:
-				buildMoonClassificationDistribution(pregeneratedSystems),
-			moonOrbitRange: buildMoonOrbitRangeDistribution(pregeneratedSystems),
-			size: buildSizeDistribution(pregeneratedSystems),
-			eccentricity: buildEccentricityDistribution(pregeneratedSystems),
-			axialTilt: buildAxialTiltDistribution(pregeneratedSystems),
-			rotation: buildRotationDistribution(pregeneratedSystems),
-			atmosphere: buildAtmosphereDistribution(pregeneratedSystems),
-			hydrosphere: buildHydrosphereDistribution(pregeneratedSystems),
-			biosphere: buildBiosphereDistribution(pregeneratedSystems),
-			temperature: buildTemperatureDistribution(pregeneratedSystems),
-			systemHabitability:
-				buildSystemHabitabilityDistribution(pregeneratedSystems),
-		}
-	}, [pregeneratedSystems])
 	const spectralClassOptions = useMemo(
 		() =>
 			[
@@ -700,14 +700,143 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			),
 		[systemBodySearchEntries],
 	)
+	const advancedFilterSystemIndices = useMemo(
+		() =>
+			filterSystemIndices(advancedFilter, {
+				systems: pregeneratedSystems,
+				starEntries: systemSearchEntries,
+				bodyEntries: systemBodySearchEntries,
+			}),
+		[
+			advancedFilter,
+			pregeneratedSystems,
+			systemSearchEntries,
+			systemBodySearchEntries,
+		],
+	)
+	const bodyClassificationSelections = useMemo(() => {
+		const advancedSelections = findBodyClassificationConditions(advancedFilter)
+		if (advancedSelections.length > 0) return advancedSelections
+		if (searchTab === "planets" && planetClassificationFilter !== "all") {
+			return [
+				{
+					bodyKind: "planet" as const,
+					classification: planetClassificationFilter,
+				},
+			]
+		}
+		if (searchTab === "moons" && moonClassificationFilter !== "all") {
+			return [
+				{ bodyKind: "moon" as const, classification: moonClassificationFilter },
+			]
+		}
+		return []
+	}, [
+		advancedFilter,
+		searchTab,
+		planetClassificationFilter,
+		moonClassificationFilter,
+	])
+	const hasPlanetClassSelection = bodyClassificationSelections.some(
+		(selection) => selection.bodyKind === "planet",
+	)
+	const hasMoonClassSelection = bodyClassificationSelections.some(
+		(selection) => selection.bodyKind === "moon",
+	)
+	const hasAdvancedBodyFilter = hasBodyFilter(advancedFilter)
+	const hasAdvancedPlanetFilter = hasBodyFilterForKind(advancedFilter, "planet")
+	const hasAdvancedMoonFilter = hasBodyFilterForKind(advancedFilter, "moon")
+	const firstMatchedAddress = (system: GalaxySystem): OrbitAddress => {
+		const entry = systemBodySearchEntries?.find(
+			(candidate) => candidate.systemIndex === system.systemIndex,
+		)
+		if (!entry || !hasAdvancedBodyFilter) return { kind: "star", starIndex: 0 }
+		let planetIndex = 0
+		let moonIndex = 0
+		for (const star of system.stars) {
+			for (const [bodyIdx, body] of star.bodies.entries()) {
+				const pair = entry.planetClassificationTemperaturePairs[planetIndex++]
+				if (
+					pair &&
+					hasAdvancedPlanetFilter &&
+					matchesBodyFilter(advancedFilter, "planet", pair)
+				)
+					return { kind: "body", starIndex: star.index, bodyIdx }
+				for (const [moonIdx, moon] of body.moons.entries()) {
+					const moonPair = entry.moonClassificationTemperaturePairs[moonIndex++]
+					if (
+						moon &&
+						moonPair &&
+						hasAdvancedMoonFilter &&
+						matchesBodyFilter(advancedFilter, "moon", moonPair)
+					)
+						return { kind: "moon", starIndex: star.index, bodyIdx, moonIdx }
+				}
+			}
+		}
+		return { kind: "star", starIndex: 0 }
+	}
 	const systemSearchResults = useMemo<SystemSearchResults>(() => {
+		if (advancedFilterSystemIndices !== null) {
+			return {
+				matches: advancedFilterSystemIndices.slice(0, 8).map((systemIndex) => {
+					const system = pregeneratedSystems?.find(
+						(entry) => entry.systemIndex === systemIndex,
+					)
+					return {
+						systemIndex,
+						match: system
+							? `${countSystemBodies(system).toLocaleString()} bodies`
+							: "Matches active rules",
+					}
+				}),
+				matchingSystemIndices: advancedFilterSystemIndices,
+				isFiltered: true,
+				total: advancedFilterSystemIndices.length,
+			}
+		}
+		if (searchTab === "systems") {
+			if (pregeneratedSystems === null)
+				return {
+					matches: [],
+					matchingSystemIndices: [],
+					isFiltered: false,
+					total: 0,
+				}
+			const matches = (pregeneratedSystems ?? []).flatMap((system) => {
+				const bodyCount = countSystemBodies(system)
+				const matchesComparator =
+					systemBodyCountComparator === "greaterThan"
+						? bodyCount > systemBodyCount
+						: bodyCount < systemBodyCount
+				if (!matchesComparator) return []
+				return [
+					{
+						systemIndex: system.systemIndex,
+						match: `${bodyCount} bodies`,
+					},
+				]
+			})
+			return {
+				matches: matches.slice(0, 8),
+				matchingSystemIndices: matches.map((match) => match.systemIndex),
+				isFiltered: true,
+				total: matches.length,
+			}
+		}
 		if (searchTab === "stars") {
 			const hasFilter =
 				spectralClassFilter !== "all" ||
 				luminosityClassFilter !== "all" ||
 				starYouthFilter !== "all" ||
 				starCountFilter !== "all"
-			if (!hasFilter) return { matches: [], total: 0 }
+			if (!hasFilter)
+				return {
+					matches: [],
+					matchingSystemIndices: [],
+					isFiltered: false,
+					total: 0,
+				}
 			const matches = systemSearchEntries.flatMap((entry) => {
 				if (!matchesStarCountFilter(entry.stars.length, starCountFilter))
 					return []
@@ -742,7 +871,12 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 						: `${classLabel} (${details.join(", ")})`
 				return [{ systemIndex: entry.systemIndex, match }]
 			})
-			return { matches: matches.slice(0, 8), total: matches.length }
+			return {
+				matches: matches.slice(0, 8),
+				matchingSystemIndices: matches.map((match) => match.systemIndex),
+				isFiltered: true,
+				total: matches.length,
+			}
 		}
 		const classificationFilter =
 			searchTab === "planets"
@@ -765,7 +899,12 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			atmosphereFilter === "all" &&
 			specialCircumstancesFilter === "all"
 		)
-			return { matches: [], total: 0 }
+			return {
+				matches: [],
+				matchingSystemIndices: [],
+				isFiltered: false,
+				total: 0,
+			}
 		const matches = (systemBodySearchEntries ?? [])
 			.filter((entry) => {
 				const pairs =
@@ -800,13 +939,21 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 					.filter((value) => value !== "all")
 					.join(" / "),
 			}))
-		return { matches: matches.slice(0, 8), total: matches.length }
+		return {
+			matches: matches.slice(0, 8),
+			matchingSystemIndices: matches.map((match) => match.systemIndex),
+			isFiltered: true,
+			total: matches.length,
+		}
 	}, [
 		searchTab,
+		advancedFilterSystemIndices,
 		spectralClassFilter,
 		luminosityClassFilter,
 		starYouthFilter,
 		starCountFilter,
+		systemBodyCountComparator,
+		systemBodyCount,
 		planetClassificationFilter,
 		moonClassificationFilter,
 		planetTemperatureFilter,
@@ -819,12 +966,173 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 		moonSpecialCircumstancesFilter,
 		systemSearchEntries,
 		systemBodySearchEntries,
+		pregeneratedSystems,
 	])
+	const filteredSystemIndices = useMemo(
+		() => new Set(systemSearchResults.matchingSystemIndices),
+		[systemSearchResults.matchingSystemIndices],
+	)
+	const spectralClassDistribution = useMemo(() => {
+		const counts = new Map<string, number>()
+		for (const entry of systemSearchEntries) {
+			if (
+				systemSearchResults.isFiltered &&
+				!filteredSystemIndices.has(entry.systemIndex)
+			)
+				continue
+			for (const star of entry.stars) {
+				counts.set(
+					star.spectralClass,
+					(counts.get(star.spectralClass) ?? 0) + 1,
+				)
+			}
+		}
+		return Array.from(counts.entries())
+			.map(([spectralClass, count]) => ({
+				label: spectralClass,
+				count,
+				color:
+					SPECTRAL_CLASS_COLORS[
+						spectralClass as keyof typeof SPECTRAL_CLASS_COLORS
+					] ?? "#94a3b8",
+			}))
+			.sort((a, b) => b.count - a.count)
+	}, [
+		systemSearchEntries,
+		systemSearchResults.isFiltered,
+		filteredSystemIndices,
+	])
+	const bodyDistributions = useMemo(() => {
+		if (!pregeneratedSystems || pregeneratedSystems.length === 0) return null
+		const systems = systemSearchResults.isFiltered
+			? pregeneratedSystems.filter((system) =>
+					filteredSystemIndices.has(system.systemIndex),
+				)
+			: pregeneratedSystems
+		const classifiedBodies = bodyClassificationSelections.map((selection) =>
+			collectBodiesByClassification({ systems, ...selection }),
+		)
+		const planets: SystemBody[] = []
+		const moons: MoonBody[] = []
+		if (hasAdvancedBodyFilter) {
+			for (const system of systems) {
+				const entry = systemBodySearchEntries?.find(
+					(candidate) => candidate.systemIndex === system.systemIndex,
+				)
+				if (!entry) continue
+				let planetIndex = 0
+				let moonIndex = 0
+				for (const star of system.stars) {
+					for (const body of star.bodies) {
+						const pair =
+							entry.planetClassificationTemperaturePairs[planetIndex++]
+						if (
+							hasAdvancedPlanetFilter &&
+							pair &&
+							matchesBodyFilter(advancedFilter, "planet", pair)
+						)
+							planets.push(body)
+						for (const moon of body.moons) {
+							const moonPair =
+								entry.moonClassificationTemperaturePairs[moonIndex++]
+							if (
+								hasAdvancedMoonFilter &&
+								moonPair &&
+								matchesBodyFilter(advancedFilter, "moon", moonPair)
+							)
+								moons.push(moon)
+						}
+					}
+				}
+			}
+		} else {
+			planets.push(...classifiedBodies.flatMap((bodies) => bodies.planets))
+			moons.push(...classifiedBodies.flatMap((bodies) => bodies.moons))
+		}
+		const bodies =
+			hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+				? [...planets, ...moons]
+				: systems
+		return {
+			systemSize: buildSystemSizeDistribution(systems),
+			planetClassification: buildPlanetClassificationDistribution(
+				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+					? planets
+					: systems,
+			),
+			moonClassification: buildMoonClassificationDistribution(
+				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+					? moons
+					: systems,
+			),
+			moonOrbitRange: buildMoonOrbitRangeDistribution(
+				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+					? moons
+					: systems,
+			),
+			moonCount: buildMoonCountDistribution(
+				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+					? planets
+					: systems,
+			),
+			size: buildSizeDistribution(bodies),
+			eccentricity: buildEccentricityDistribution(bodies),
+			axialTilt: buildAxialTiltDistribution(bodies),
+			rotation: buildRotationDistribution(bodies),
+			atmosphere: buildAtmosphereDistribution(bodies),
+			hydrosphere: buildHydrosphereDistribution(bodies),
+			biosphere: buildBiosphereDistribution(bodies),
+			temperature: buildTemperatureDistribution(bodies),
+			systemHabitability: buildSystemHabitabilityDistribution(systems),
+		}
+	}, [
+		pregeneratedSystems,
+		systemSearchResults.isFiltered,
+		filteredSystemIndices,
+		bodyClassificationSelections,
+		hasAdvancedBodyFilter,
+		advancedFilter,
+		systemBodySearchEntries,
+		hasAdvancedPlanetFilter,
+		hasAdvancedMoonFilter,
+	])
+	const searchResultsPageCount = Math.ceil(
+		systemSearchResults.total / SEARCH_RESULTS_PER_PAGE,
+	)
+	const visibleSearchResults = useMemo(() => {
+		const matchesBySystemIndex = new Map(
+			systemSearchResults.matches.map((match) => [match.systemIndex, match]),
+		)
+		const start = searchResultsPage * SEARCH_RESULTS_PER_PAGE
+		return systemSearchResults.matchingSystemIndices
+			.slice(start, start + SEARCH_RESULTS_PER_PAGE)
+			.map((systemIndex) => {
+				const match = matchesBySystemIndex.get(systemIndex)
+				if (match) return match
+				const system = pregeneratedSystems?.find(
+					(entry) => entry.systemIndex === systemIndex,
+				)
+				return {
+					systemIndex,
+					match: system
+						? `${countSystemBodies(system).toLocaleString()} bodies`
+						: "Matches active rules",
+				}
+			})
+	}, [
+		pregeneratedSystems,
+		searchResultsPage,
+		systemSearchResults.matches,
+		systemSearchResults.matchingSystemIndices,
+	])
+	useEffect(() => {
+		setSearchResultsPage(0)
+	}, [])
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3">
-				<div className="rounded-2xl bg-slate-50 px-3 py-3 space-y-3">
+				<div className="flex flex-col gap-3 rounded-2xl bg-slate-50 px-3 py-3">
 					<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
 						<WikiPageHeader
 							title={name}
@@ -937,15 +1245,29 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 						<ProgressBar label={generationLabel} percent={generationProgress} />
 					) : null}
 
-					<div className="rounded-lg border border-slate-200 bg-white p-2.5">
+					<div className="order-2 rounded-lg border border-slate-200 bg-white p-2.5">
 						<DisclosureButton
-							label="Statistics"
+							label={
+								systemSearchResults.isFiltered
+									? `Statistics (${systemSearchResults.total.toLocaleString()} systems)`
+									: "Statistics"
+							}
 							expanded={isStatisticsExpanded}
 							onClick={() => setIsStatisticsExpanded((current) => !current)}
 						/>
 						{isStatisticsExpanded ? (
 							<div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
-								{spectralClassDistribution.length > 0 ? (
+								{bodyDistributions &&
+								bodyClassificationSelections.length === 0 ? (
+									<DistributionChart
+										title="System Size"
+										buckets={bodyDistributions.systemSize}
+										variant="compact"
+										showTotal={false}
+									/>
+								) : null}
+								{bodyClassificationSelections.length === 0 &&
+								spectralClassDistribution.length > 0 ? (
 									<DistributionChart
 										title="Stars"
 										buckets={spectralClassDistribution}
@@ -955,24 +1277,38 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 								) : null}
 								{bodyDistributions ? (
 									<>
-										<DistributionChart
-											title="Planets"
-											buckets={bodyDistributions.planetClassification}
-											variant="compact"
-											showTotal={false}
-										/>
-										<DistributionChart
-											title="Moons"
-											buckets={bodyDistributions.moonClassification}
-											variant="compact"
-											showTotal={false}
-										/>
-										<DistributionChart
-											title="Moon Orbit"
-											buckets={bodyDistributions.moonOrbitRange}
-											variant="compact"
-											showTotal={false}
-										/>
+										{bodyClassificationSelections.length === 0 ||
+										hasPlanetClassSelection ? (
+											<DistributionChart
+												title="Planets"
+												buckets={bodyDistributions.planetClassification}
+												variant="compact"
+												showTotal={false}
+											/>
+										) : null}
+										{bodyClassificationSelections.length === 0 ||
+										hasMoonClassSelection ? (
+											<>
+												<DistributionChart
+													title="Moons"
+													buckets={bodyDistributions.moonClassification}
+													variant="compact"
+													showTotal={false}
+												/>
+												<DistributionChart
+													title="Moon Count"
+													buckets={bodyDistributions.moonCount}
+													variant="compact"
+													showTotal={false}
+												/>
+												<DistributionChart
+													title="Moon Orbit"
+													buckets={bodyDistributions.moonOrbitRange}
+													variant="compact"
+													showTotal={false}
+												/>
+											</>
+										) : null}
 										<DistributionChart
 											title="Size"
 											buckets={bodyDistributions.size}
@@ -1037,282 +1373,448 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 						) : null}
 					</div>
 
-					<div className="rounded-lg border border-slate-200 bg-white p-2.5">
+					<div className="order-1 rounded-lg border border-slate-200 bg-white p-2.5">
 						<DisclosureButton
-							label="Find systems"
+							label="Filter systems"
 							expanded={isSearchExpanded}
 							onClick={() => setIsSearchExpanded((current) => !current)}
 						/>
 						{isSearchExpanded ? (
 							<div className="mt-2 border-t border-slate-100 pt-2 space-y-2">
-								<div className="flex gap-0 border-b border-slate-100">
-									{(["stars", "planets", "moons"] as const).map((tab) => (
-										<button
-											key={tab}
-											type="button"
-											onClick={() => setSearchTab(tab)}
-											className={`px-2 pb-1.5 text-[10px] font-medium capitalize transition-colors border-b-2 ${
-												searchTab === tab
-													? "border-slate-700 text-slate-900"
-													: "border-transparent text-slate-400 hover:text-slate-600"
-											}`}
-										>
-											{tab}
-										</button>
-									))}
-								</div>
-								{searchTab === "stars" ? (
-									<div className="grid grid-cols-2 gap-1.5">
-										<select
-											value={spectralClassFilter}
-											onChange={(event) =>
-												setSpectralClassFilter(event.target.value)
-											}
-											disabled={generating || systemSearchEntries.length === 0}
-											aria-label="Spectral class"
-											className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-										>
-											<option value="all">Any spectral class</option>
-											{spectralClassOptions.map((value) => (
-												<option key={value} value={value}>
-													{value}
-												</option>
-											))}
-										</select>
-										<select
-											value={luminosityClassFilter}
-											onChange={(event) =>
-												setLuminosityClassFilter(event.target.value)
-											}
-											disabled={generating || systemSearchEntries.length === 0}
-											aria-label="Luminosity class"
-											className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-										>
-											<option value="all">Any luminosity class</option>
-											{luminosityClassOptions.map((value) => (
-												<option key={value} value={value}>
-													{value}
-												</option>
-											))}
-										</select>
-										<select
-											value={starCountFilter}
-											onChange={(event) =>
-												setStarCountFilter(
-													event.target.value as StarCountFilter,
-												)
-											}
-											disabled={generating || starCountOptions.length === 0}
-											aria-label="Star count"
-											className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-										>
-											<option value="all">Any star count</option>
-											{starCountOptions.map((bucket) => (
-												<option key={bucket} value={bucket}>
-													{bucket} star{bucket === "1" ? "" : "s"}
-												</option>
-											))}
-										</select>
-										<select
-											value={starYouthFilter}
-											onChange={(event) =>
-												setStarYouthFilter(
-													event.target.value as StarYouthFilter,
-												)
-											}
-											disabled={generating || starYouthOptions.length === 0}
-											aria-label="Star age"
-											className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-										>
-											<option value="all">Any star age</option>
-											{starYouthOptions.includes("proto") ? (
-												<option value="proto">Proto (very young)</option>
-											) : null}
-											{starYouthOptions.includes("primordial") ? (
-												<option value="primordial">Primordial (young)</option>
-											) : null}
-										</select>
+								<SystemFilterBuilder
+									value={advancedFilter}
+									onChange={setAdvancedFilter}
+									disabled={generating}
+									options={{
+										spectralClasses: spectralClassOptions,
+										luminosityClasses: luminosityClassOptions,
+										planetClassifications: planetClassificationOptions,
+										planetZones: ["epistellar", "inner", "outer"],
+										moonClassifications: moonClassificationOptions,
+										temperatureClasses: TEMPERATURE_CATEGORIES,
+										hydrosphereClasses: HYDROSPHERE_CATEGORIES,
+										atmosphereClasses: ["Breathable", ...ATMOSPHERE_CATEGORIES],
+										biosphereClasses: BIOSPHERE_CATEGORIES,
+										habitabilityClasses: HABITABILITY_CATEGORY_LABELS,
+										specialCircumstances: SPECIAL_CIRCUMSTANCE_OPTIONS,
+									}}
+								/>
+								<div className="hidden">
+									<div className="flex gap-0 border-b border-slate-100">
+										{(["systems", "stars", "planets", "moons"] as const).map(
+											(tab) => (
+												<button
+													key={tab}
+													type="button"
+													onClick={() => setSearchTab(tab)}
+													className={`px-2 pb-1.5 text-[10px] font-medium capitalize transition-colors border-b-2 ${
+														searchTab === tab
+															? "border-slate-700 text-slate-900"
+															: "border-transparent text-slate-400 hover:text-slate-600"
+													}`}
+												>
+													{tab}
+												</button>
+											),
+										)}
 									</div>
-								) : (
-									<>
-										<div className="grid grid-cols-2 gap-1.5">
-											<select
-												value={
-													searchTab === "planets"
-														? planetClassificationFilter
-														: moonClassificationFilter
-												}
-												onChange={(event) => {
-													if (searchTab === "planets")
-														setPlanetClassificationFilter(event.target.value)
-													else setMoonClassificationFilter(event.target.value)
-												}}
-												disabled={
-													generating || systemBodySearchEntries === null
-												}
-												aria-label={`${searchTab} classification`}
-												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-											>
-												<option value="all">Any classification</option>
-												{(searchTab === "planets"
-													? planetClassificationOptions
-													: moonClassificationOptions
-												).map((value) => (
-													<option key={value} value={value}>
-														{value}
-													</option>
-												))}
-											</select>
-											<select
-												value={
-													searchTab === "planets"
-														? planetTemperatureFilter
-														: moonTemperatureFilter
-												}
-												onChange={(event) => {
-													if (searchTab === "planets")
-														setPlanetTemperatureFilter(event.target.value)
-													else setMoonTemperatureFilter(event.target.value)
-												}}
-												disabled={
-													generating || systemBodySearchEntries === null
-												}
-												aria-label={`${searchTab} temperature class`}
-												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-											>
-												<option value="all">Any temperature</option>
-												{(searchTab === "planets"
-													? planetTemperatureOptions
-													: moonTemperatureOptions
-												).map((value) => (
-													<option key={value} value={value}>
-														{value}
-													</option>
-												))}
-											</select>
-										</div>
-										<div className="grid grid-cols-2 gap-1.5">
-											<select
-												value={
-													searchTab === "planets"
-														? planetHydrosphereFilter
-														: moonHydrosphereFilter
-												}
-												onChange={(event) => {
-													if (searchTab === "planets")
-														setPlanetHydrosphereFilter(event.target.value)
-													else setMoonHydrosphereFilter(event.target.value)
-												}}
-												disabled={
-													generating || systemBodySearchEntries === null
-												}
-												aria-label={`${searchTab} hydrosphere`}
-												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-											>
-												<option value="all">Any hydrosphere</option>
-												{(searchTab === "planets"
-													? planetHydrosphereOptions
-													: moonHydrosphereOptions
-												).map((value) => (
-													<option key={value} value={value}>
-														{value}
-													</option>
-												))}
-											</select>
-											<select
-												value={
-													searchTab === "planets"
-														? planetAtmosphereFilter
-														: moonAtmosphereFilter
-												}
-												onChange={(event) => {
-													if (searchTab === "planets")
-														setPlanetAtmosphereFilter(event.target.value)
-													else setMoonAtmosphereFilter(event.target.value)
-												}}
-												disabled={
-													generating || systemBodySearchEntries === null
-												}
-												aria-label={`${searchTab} atmosphere`}
-												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-											>
-												<option value="all">Any atmosphere</option>
-												{(searchTab === "planets"
-													? planetAtmosphereOptions
-													: moonAtmosphereOptions
-												).map((value) => (
-													<option key={value} value={value}>
-														{value}
-													</option>
-												))}
-											</select>
-										</div>
-										<div className="grid grid-cols-2 gap-1.5">
-											<select
-												value={
-													searchTab === "planets"
-														? planetSpecialCircumstancesFilter
-														: moonSpecialCircumstancesFilter
-												}
-												onChange={(event) => {
-													if (searchTab === "planets")
-														setPlanetSpecialCircumstancesFilter(
-															event.target.value,
+									{searchTab === "systems" ? (
+										<>
+											<div className="grid grid-cols-2 gap-1.5">
+												<select
+													value={systemBodyCountComparator}
+													onChange={(event) =>
+														setSystemBodyCountComparator(
+															event.target.value as SystemBodyCountComparator,
 														)
-													else
-														setMoonSpecialCircumstancesFilter(
+													}
+													disabled={generating || pregeneratedSystems === null}
+													aria-label="System body count comparison"
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												>
+													<option value="greaterThan">More than</option>
+													<option value="lessThan">Fewer than</option>
+												</select>
+												<input
+													type="number"
+													min="0"
+													step="1"
+													value={systemBodyCount}
+													onChange={(event) => {
+														const count = Number.parseInt(
 															event.target.value,
+															10,
 														)
-												}}
-												disabled={
-													generating || systemBodySearchEntries === null
-												}
-												aria-label={`${searchTab} special circumstances`}
-												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
-											>
-												<option value="all">Any special circumstances</option>
-												{(searchTab === "planets"
-													? planetSpecialCircumstancesOptions
-													: moonSpecialCircumstancesOptions
-												).map((value) => (
-													<option key={value} value={value}>
-														{value}
-													</option>
-												))}
-											</select>
-										</div>
-										{systemBodySearchEntries === null ? (
+														setSystemBodyCount(
+															Number.isFinite(count) ? Math.max(0, count) : 0,
+														)
+													}}
+													disabled={generating || pregeneratedSystems === null}
+													aria-label="System body count"
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												/>
+											</div>
 											<p className="text-[10px] text-slate-500">
-												Generate with “Pre-generate all systems” enabled to
-												search bodies.
+												Counts bodies and moons across companion-star systems.
 											</p>
-										) : null}
-									</>
-								)}
-								{systemSearchResults.total > 0 ? (
-									<>
-										<p className="text-[10px] text-slate-500">
-											{systemSearchResults.total.toLocaleString()} matching
-											systems
-										</p>
-										<div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-											{systemSearchResults.matches.map(
-												({ systemIndex, match }) => (
-													<button
-														key={systemIndex}
-														type="button"
-														onClick={() => onFocusSystem(systemIndex)}
-														className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs text-slate-700 transition-colors hover:bg-slate-50"
-													>
-														<span>{match}</span>
-														<span className="font-mono text-[10px] text-slate-400">
-															System #{systemIndex + 1}
-														</span>
-													</button>
-												),
-											)}
+											{pregeneratedSystems === null ? (
+												<p className="text-[10px] text-slate-500">
+													Generate with “Pre-generate all systems” enabled to
+													search system size.
+												</p>
+											) : null}
+										</>
+									) : searchTab === "stars" ? (
+										<div className="grid grid-cols-2 gap-1.5">
+											<select
+												value={spectralClassFilter}
+												onChange={(event) =>
+													setSpectralClassFilter(event.target.value)
+												}
+												disabled={
+													generating || systemSearchEntries.length === 0
+												}
+												aria-label="Spectral class"
+												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+											>
+												<option value="all">Any spectral class</option>
+												{spectralClassOptions.map((value) => (
+													<option key={value} value={value}>
+														{value}
+													</option>
+												))}
+											</select>
+											<select
+												value={luminosityClassFilter}
+												onChange={(event) =>
+													setLuminosityClassFilter(event.target.value)
+												}
+												disabled={
+													generating || systemSearchEntries.length === 0
+												}
+												aria-label="Luminosity class"
+												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+											>
+												<option value="all">Any luminosity class</option>
+												{luminosityClassOptions.map((value) => (
+													<option key={value} value={value}>
+														{value}
+													</option>
+												))}
+											</select>
+											<select
+												value={starCountFilter}
+												onChange={(event) =>
+													setStarCountFilter(
+														event.target.value as StarCountFilter,
+													)
+												}
+												disabled={generating || starCountOptions.length === 0}
+												aria-label="Star count"
+												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+											>
+												<option value="all">Any star count</option>
+												{starCountOptions.map((bucket) => (
+													<option key={bucket} value={bucket}>
+														{bucket} star{bucket === "1" ? "" : "s"}
+													</option>
+												))}
+											</select>
+											<select
+												value={starYouthFilter}
+												onChange={(event) =>
+													setStarYouthFilter(
+														event.target.value as StarYouthFilter,
+													)
+												}
+												disabled={generating || starYouthOptions.length === 0}
+												aria-label="Star age"
+												className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+											>
+												<option value="all">Any star age</option>
+												{starYouthOptions.includes("proto") ? (
+													<option value="proto">Proto (very young)</option>
+												) : null}
+												{starYouthOptions.includes("primordial") ? (
+													<option value="primordial">Primordial (young)</option>
+												) : null}
+											</select>
 										</div>
-									</>
+									) : (
+										<>
+											<div className="grid grid-cols-2 gap-1.5">
+												<select
+													value={
+														searchTab === "planets"
+															? planetClassificationFilter
+															: moonClassificationFilter
+													}
+													onChange={(event) => {
+														if (searchTab === "planets")
+															setPlanetClassificationFilter(event.target.value)
+														else setMoonClassificationFilter(event.target.value)
+													}}
+													disabled={
+														generating || systemBodySearchEntries === null
+													}
+													aria-label={`${searchTab} classification`}
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												>
+													<option value="all">Any classification</option>
+													{(searchTab === "planets"
+														? planetClassificationOptions
+														: moonClassificationOptions
+													).map((value) => (
+														<option key={value} value={value}>
+															{value}
+														</option>
+													))}
+												</select>
+												<select
+													value={
+														searchTab === "planets"
+															? planetTemperatureFilter
+															: moonTemperatureFilter
+													}
+													onChange={(event) => {
+														if (searchTab === "planets")
+															setPlanetTemperatureFilter(event.target.value)
+														else setMoonTemperatureFilter(event.target.value)
+													}}
+													disabled={
+														generating || systemBodySearchEntries === null
+													}
+													aria-label={`${searchTab} temperature class`}
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												>
+													<option value="all">Any temperature</option>
+													{(searchTab === "planets"
+														? planetTemperatureOptions
+														: moonTemperatureOptions
+													).map((value) => (
+														<option key={value} value={value}>
+															{value}
+														</option>
+													))}
+												</select>
+											</div>
+											<div className="grid grid-cols-2 gap-1.5">
+												<select
+													value={
+														searchTab === "planets"
+															? planetHydrosphereFilter
+															: moonHydrosphereFilter
+													}
+													onChange={(event) => {
+														if (searchTab === "planets")
+															setPlanetHydrosphereFilter(event.target.value)
+														else setMoonHydrosphereFilter(event.target.value)
+													}}
+													disabled={
+														generating || systemBodySearchEntries === null
+													}
+													aria-label={`${searchTab} hydrosphere`}
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												>
+													<option value="all">Any hydrosphere</option>
+													{(searchTab === "planets"
+														? planetHydrosphereOptions
+														: moonHydrosphereOptions
+													).map((value) => (
+														<option key={value} value={value}>
+															{value}
+														</option>
+													))}
+												</select>
+												<select
+													value={
+														searchTab === "planets"
+															? planetAtmosphereFilter
+															: moonAtmosphereFilter
+													}
+													onChange={(event) => {
+														if (searchTab === "planets")
+															setPlanetAtmosphereFilter(event.target.value)
+														else setMoonAtmosphereFilter(event.target.value)
+													}}
+													disabled={
+														generating || systemBodySearchEntries === null
+													}
+													aria-label={`${searchTab} atmosphere`}
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												>
+													<option value="all">Any atmosphere</option>
+													{(searchTab === "planets"
+														? planetAtmosphereOptions
+														: moonAtmosphereOptions
+													).map((value) => (
+														<option key={value} value={value}>
+															{value}
+														</option>
+													))}
+												</select>
+											</div>
+											<div className="grid grid-cols-2 gap-1.5">
+												<select
+													value={
+														searchTab === "planets"
+															? planetSpecialCircumstancesFilter
+															: moonSpecialCircumstancesFilter
+													}
+													onChange={(event) => {
+														if (searchTab === "planets")
+															setPlanetSpecialCircumstancesFilter(
+																event.target.value,
+															)
+														else
+															setMoonSpecialCircumstancesFilter(
+																event.target.value,
+															)
+													}}
+													disabled={
+														generating || systemBodySearchEntries === null
+													}
+													aria-label={`${searchTab} special circumstances`}
+													className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-100"
+												>
+													<option value="all">Any special circumstances</option>
+													{(searchTab === "planets"
+														? planetSpecialCircumstancesOptions
+														: moonSpecialCircumstancesOptions
+													).map((value) => (
+														<option key={value} value={value}>
+															{value}
+														</option>
+													))}
+												</select>
+											</div>
+											{systemBodySearchEntries === null ? (
+												<p className="text-[10px] text-slate-500">
+													Generate with “Pre-generate all systems” enabled to
+													search bodies.
+												</p>
+											) : null}
+										</>
+									)}
+								</div>
+								{systemSearchResults.total > 0 ? (
+									<div className="border-t border-slate-100 pt-2">
+										<DisclosureButton
+											label={`${systemSearchResults.total.toLocaleString()} matching systems`}
+											expanded={isSearchResultsExpanded}
+											onClick={() =>
+												setIsSearchResultsExpanded((current) => !current)
+											}
+										/>
+										{isSearchResultsExpanded ? (
+											<>
+												<div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+													<table className="w-full text-left text-[10px] text-slate-600">
+														<thead className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-400">
+															<tr>
+																<th className="px-2 py-1 font-medium">
+																	System
+																</th>
+																<th className="px-2 py-1 font-medium">Match</th>
+																<th className="w-8 px-2 py-1" />
+															</tr>
+														</thead>
+														<tbody>
+															{visibleSearchResults.map(
+																({ systemIndex, match }) => (
+																	<tr
+																		key={systemIndex}
+																		onClick={() => onFocusSystem(systemIndex)}
+																		className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+																	>
+																		<td className="px-2 py-1.5 font-mono text-slate-700">
+																			#{systemIndex + 1}
+																		</td>
+																		<td className="max-w-0 truncate px-2 py-1.5 text-slate-400">
+																			{match}
+																		</td>
+																		<td className="px-1 py-1 text-right">
+																			<button
+																				type="button"
+																				onClick={(event) => {
+																					event.stopPropagation()
+																					onFocusSystem(systemIndex)
+																				}}
+																				title="Zoom to system"
+																				aria-label="Zoom to system"
+																				className="px-1 text-slate-400 hover:text-slate-700"
+																			>
+																				◎
+																			</button>
+																			<button
+																				type="button"
+																				onClick={(event) => {
+																					event.stopPropagation()
+																					const system =
+																						pregeneratedSystems?.find(
+																							(entry) =>
+																								entry.systemIndex ===
+																								systemIndex,
+																						)
+																					if (system)
+																						onOpenSystem(
+																							systemIndex,
+																							firstMatchedAddress(system),
+																						)
+																				}}
+																				title="Open solar system"
+																				aria-label="Open solar system"
+																				className="px-1 text-slate-400 hover:text-slate-700"
+																			>
+																				◉
+																			</button>
+																		</td>
+																	</tr>
+																),
+															)}
+														</tbody>
+													</table>
+												</div>
+												{searchResultsPageCount > 1 ? (
+													<div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+														<button
+															type="button"
+															onClick={() =>
+																setSearchResultsPage((page) =>
+																	Math.max(0, page - 1),
+																)
+															}
+															disabled={searchResultsPage === 0}
+															className="rounded px-1.5 py-0.5 hover:bg-slate-100 disabled:text-slate-200"
+														>
+															Previous
+														</button>
+														<span>
+															Page {searchResultsPage + 1} of{" "}
+															{searchResultsPageCount}
+														</span>
+														<button
+															type="button"
+															onClick={() =>
+																setSearchResultsPage((page) =>
+																	Math.min(
+																		searchResultsPageCount - 1,
+																		page + 1,
+																	),
+																)
+															}
+															disabled={
+																searchResultsPage === searchResultsPageCount - 1
+															}
+															className="rounded px-1.5 py-0.5 hover:bg-slate-100 disabled:text-slate-200"
+														>
+															Next
+														</button>
+													</div>
+												) : null}
+											</>
+										) : null}
+									</div>
 								) : null}
 							</div>
 						) : null}

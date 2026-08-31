@@ -252,6 +252,7 @@ export function GenerationPlanetNavigator({
 	generateContent,
 	generating,
 	previewContainer,
+	fromGalaxy,
 }: {
 	orbitBodies?: SystemBody[]
 	systemBodies?: SystemBody[]
@@ -332,6 +333,12 @@ export function GenerationPlanetNavigator({
 	 * component would otherwise put it inline. Falls back to inline
 	 * rendering if unset. */
 	previewContainer?: HTMLElement | null
+	/** True when this system was opened from the galaxy map (see
+	 * useSolarSystemBodies' galaxyOrigin). Its bodies are fully procedurally
+	 * rolled: the Preview section is hidden, no stat value is editable, and
+	 * Temperature renders as a read-only estimate with the trace tooltip on
+	 * hover of the value. */
+	fromGalaxy?: boolean
 }) {
 	// The solar-lock UI button that used setObliquity was removed; kept as a
 	// prop for now since GenesisView still threads it through.
@@ -1038,6 +1045,10 @@ export function GenerationPlanetNavigator({
 					emptyChildrenLabel: "No child orbits.",
 				}
 			const isMainWorld = body.isMainWorld
+			// The main world's stat card is only editable when the system was
+			// hand-authored -- a galaxy-opened system's bodies are fully rolled
+			// and read-only, exactly like a sibling planet.
+			const editableMainWorld = isMainWorld && !fromGalaxy
 			const bodyStarParams = starParamsFor(selection.starIndex)
 			const parentBody = nestedMainWorldSelected
 				? getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
@@ -1164,6 +1175,7 @@ export function GenerationPlanetNavigator({
 					starLuminositySol: bodyStarParams.starLuminositySol,
 					avgTempK,
 					unitSystem,
+					readOnly: fromGalaxy,
 					orbitalDistanceBaselineAU: isMainWorld
 						? orbitalDistanceBaselineAU
 						: undefined,
@@ -1186,7 +1198,7 @@ export function GenerationPlanetNavigator({
 								bodyIdx: selection.bodyIdx,
 								moonIdx: moonIndex,
 							}),
-						onSetLock: isMainWorld
+						onSetLock: editableMainWorld
 							? (lock) => {
 									setTideLock(lock)
 									const siderealDayHours = resolveBodyTideLockSiderealDayHours(
@@ -1207,15 +1219,17 @@ export function GenerationPlanetNavigator({
 									: undefined,
 							),
 					}),
-					isMainWorld,
-					pressureSlider: isMainWorld ? pressureSlider : undefined,
+					isMainWorld: editableMainWorld,
+					pressureSlider: editableMainWorld ? pressureSlider : undefined,
 					landCoverageEditor:
-						isMainWorld && seed !== SOL_DATA.solSeed
+						editableMainWorld && seed !== SOL_DATA.solSeed
 							? surfaceStats[0]?.editor
 							: undefined,
-					substellarLonSlider: isMainWorld ? substellarLonSlider : undefined,
-					onToggleSpin: isMainWorld ? onToggleSpin : undefined,
-					onUpdateBody: isMainWorld
+					substellarLonSlider: editableMainWorld
+						? substellarLonSlider
+						: undefined,
+					onToggleSpin: editableMainWorld ? onToggleSpin : undefined,
+					onUpdateBody: editableMainWorld
 						? (updater) => {
 								const updated = updater(body)
 								if (updated.diameterKm !== body.diameterKm)
@@ -1447,6 +1461,7 @@ export function GenerationPlanetNavigator({
 					moon,
 					avgTempK,
 					unitSystem,
+					readOnly: fromGalaxy,
 					luminositySol: moonStarParams.starLuminositySol,
 					orbitalDistanceAU: parentOrbitalDistanceAU,
 					tideLockStat: buildTideLockStat({
@@ -1609,6 +1624,7 @@ export function GenerationPlanetNavigator({
 		hostStar?.diameterSol,
 		hostStar?.temperatureK,
 		hostStar,
+		fromGalaxy,
 	])
 
 	return (
@@ -1671,7 +1687,7 @@ export function GenerationPlanetNavigator({
 				</div>
 			</Surface>
 
-			{viewModel.dataContent
+			{viewModel.dataContent && !fromGalaxy
 				? (() => {
 						const preview = (
 							<Surface

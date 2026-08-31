@@ -114,6 +114,12 @@ export function buildPressureAtmosphereProfile(
 export function formatAtmosphereSuffix(atmosphere: AtmosphereProfile): string {
 	if (atmosphere.type === "vacuum") return "Vacuum"
 	if (atmosphere.type === "trace") return "Trace"
+	// Code 14 ("Low"/E) and 15 ("Unusual"/F) are otherwise-breathable
+	// profiles distinguished only by their code -- see galaxy-gen's code-13
+	// branch. Name them explicitly rather than showing a bare "Breathable".
+	if (atmosphere.code === 14) return "Low"
+	if (atmosphere.code === 15)
+		return atmosphere.unusual ? `Unusual (${atmosphere.unusual})` : "Unusual"
 	if (atmosphere.type === "breathable") return "Breathable"
 	if (atmosphere.type === "corrosive") return "Corrosive"
 	if (atmosphere.type === "insidious") return "Insidious"

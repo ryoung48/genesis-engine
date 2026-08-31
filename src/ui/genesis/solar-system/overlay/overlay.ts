@@ -11,6 +11,11 @@ import {
 	sizeNameLabel,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
+import {
+	buildCloudBandMaterial,
+	type CloudBandPalette,
+	swatchCloudBandPalette,
+} from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
 import {
 	buildMoonOrbitOverlay,
@@ -67,295 +72,6 @@ import type {
 const COMPANION_ORBIT_GAP_FACTOR = 0.4
 const COMPANION_ORBIT_LINE_COLOR = 0xfbbf24
 
-type CloudBandPalette = {
-	top: THREE.Color
-	bot: THREE.Color
-	mid1: THREE.Color
-	mid2: THREE.Color
-	mid3: THREE.Color
-}
-
-// Deterministic 0-1 hash of a float seed -- lets a body's hue variation be
-// derived straight from its own seed (body.idx) without storing anything.
-function hash01(n: number): number {
-	const s = Math.sin(n * 12.9898) * 43758.5453
-	return s - Math.floor(s)
-}
-
-/** The ported shader's own original hardcoded palette (white/black bands
- * over a brown-tan-orange mid range) was: mid1 (0.1,0.2,0.0) -- hue ~0.25
- * (olive/yellow-green), s=1, l=0.1; mid2/mid3 (0.7,0.4,0.3)/(1.0,0.4,0.2) --
- * hue ~0.04 (orange), s=0.4/1.0, l=0.5/0.6. Reproduced here in HSL, keeping
- * every band's saturation/lightness and their ~0.21 relative hue offset
- * (mid1 vs. mid2/mid3) exactly as authored, but with the base hue rolled
- * per body across an orange -> yellow -> green range instead of fixed at
- * orange, so helians read as a family of related-but-varied worlds. */
-function helianNormalPalette(seed: number): CloudBandPalette {
-	const hue = 0.04 + hash01(seed * 3.77 + 0.41) * 0.29
-	return {
-		top: new THREE.Color(1, 1, 1),
-		bot: new THREE.Color(0, 0, 0),
-		mid1: new THREE.Color().setHSL((hue + 0.21) % 1, 1.0, 0.1),
-		mid2: new THREE.Color().setHSL(hue, 0.4, 0.5),
-		mid3: new THREE.Color().setHSL(hue, 1.0, 0.6),
-	}
-}
-
-/** A "burning" helian (very high estimated temperature) -- red to deep-orange
- * bands instead of the normal brown/tan. Same per-body hue-rolling technique
- * as helianNormalPalette above, spanning red through deep orange (hue 0 to
- * ~0.08), with every band sharing the SAME hue (no relative per-band
- * offset) -- `top` (the brightest band, mixed in over a large fraction of
- * the visible surface -- see giantCloudColor's `pos>0` mix) is what a
- * viewer mostly perceives as "the" color, and an earlier version's relative
- * hue offset on top plus its high lightness made every body read as orange
- * regardless of the rolled hue (lighter warm colors shift toward orange
- * perceptually). Kept dark and saturated rather than light and pale, so the
- * rolled hue itself (not lightness) is what reads as red vs. orange. */
-function helianBurningPalette(seed: number): CloudBandPalette {
-	const hue = hash01(seed * 4.91 + 1.23) * 0.08
-	return {
-		top: new THREE.Color().setHSL(hue, 0.55, 0.55),
-		bot: new THREE.Color().setHSL(hue, 1.0, 0.02),
-		mid1: new THREE.Color().setHSL(hue, 0.9, 0.14),
-		mid2: new THREE.Color().setHSL(hue, 1.0, 0.28),
-		mid3: new THREE.Color().setHSL(hue, 1.0, 0.38),
-	}
-}
-
-/** An "icy" helian (very low estimated temperature) -- very light blue mixed
- * with white, instead of the normal palette's dark-to-black shadow bands
- * (which would read as dirty soot rather than ice on a cold world). */
-const HELIAN_PALETTE_ICY: CloudBandPalette = {
-	top: new THREE.Color(1, 1, 1),
-	bot: new THREE.Color().setHSL(0.58, 0.35, 0.55),
-	mid1: new THREE.Color().setHSL(0.56, 0.3, 0.68),
-	mid2: new THREE.Color().setHSL(0.58, 0.2, 0.82),
-	mid3: new THREE.Color(1, 1, 1),
-}
-
-/** A hydrogen-envelope helian -- pale warm gold/cream haze, distinct from
- * both the normal brown/tan and the helium palette below. */
-const HELIAN_PALETTE_HYDROGEN: CloudBandPalette = {
-	top: new THREE.Color(1, 1, 1),
-	bot: new THREE.Color().setHSL(0.11, 0.4, 0.18),
-	mid1: new THREE.Color().setHSL(0.1, 0.35, 0.3),
-	mid2: new THREE.Color().setHSL(0.13, 0.55, 0.6),
-	mid3: new THREE.Color().setHSL(0.14, 0.7, 0.78),
-}
-
-/** A helium-envelope helian -- pale violet/lavender haze, distinct from the
- * hydrogen palette above. */
-const HELIAN_PALETTE_HELIUM: CloudBandPalette = {
-	top: new THREE.Color(1, 1, 1),
-	bot: new THREE.Color().setHSL(0.76, 0.35, 0.2),
-	mid1: new THREE.Color().setHSL(0.77, 0.3, 0.32),
-	mid2: new THREE.Color().setHSL(0.79, 0.4, 0.62),
-	mid3: new THREE.Color().setHSL(0.8, 0.5, 0.8),
-}
-
-// Matches TEMPERATURE.describe's own "frozen" cutoff (environment/
-// temperature/index.ts) -- reused below for any classification's own
-// frozen-state palette, not just helian's, since it's the game's general
-// climate-band convention rather than something helian-specific.
-const FROZEN_CLIMATE_MAX_K = 223
-// Matches TEMPERATURE.describe's own "burning" cutoff (same file) -- the
-// game's general climate-band threshold. An earlier version of this constant
-// instead matched the old helian-hot *texture*'s literal ">500C" (773.15K)
-// override, which is a much higher, texture-specific bar than what the game
-// itself already labels "burning" -- a body the UI calls burning at, say,
-// 400K was landing on the normal palette here instead of red/orange.
-const HELIAN_BURNING_MIN_K = 353.15
-
-function helianCloudPalette(
-	seed: number,
-	meanTemperatureK: number | undefined,
-	atmosphereSubtype: string | undefined,
-): CloudBandPalette {
-	// Mirrors pickGeneratedBodyTextures' own helian precedence (generation/
-	// texture/index.ts): burning-hot overrides everything else (a burning
-	// hydrogen/helium helian still reads as burning, not as its gas), then
-	// the atmosphere's own gas composition, then icy, then the normal range.
-	if (
-		meanTemperatureK !== undefined &&
-		meanTemperatureK >= HELIAN_BURNING_MIN_K
-	)
-		return helianBurningPalette(seed)
-	if (atmosphereSubtype === "hydrogen") return HELIAN_PALETTE_HYDROGEN
-	if (atmosphereSubtype === "helium") return HELIAN_PALETTE_HELIUM
-	if (
-		meanTemperatureK !== undefined &&
-		meanTemperatureK <= FROZEN_CLIMATE_MAX_K
-	)
-		return HELIAN_PALETTE_ICY
-	return helianNormalPalette(seed)
-}
-
-/** A panthalassic (deep-ocean) world's normal-temperature palette -- a rich,
- * saturated blue instead of helian's brown/tan, reflecting open ocean rather
- * than a thick gas envelope. Rolls the base hue per body (same technique as
- * helianNormalPalette above) across a teal -> deep-blue range instead of a
- * single fixed blue, keeping each band's original saturation/lightness and
- * relative hue offset from the original fixed palette (bot/mid1 slightly
- * higher hue than mid3, mid2 in between). */
-function panthalassicDeepPalette(seed: number): CloudBandPalette {
-	const hue = 0.45 + hash01(seed * 2.13 + 0.87) * 0.2
-	return {
-		top: new THREE.Color(1, 1, 1),
-		bot: new THREE.Color().setHSL(hue + 0.04, 0.75, 0.08),
-		mid1: new THREE.Color().setHSL(hue + 0.05, 0.7, 0.16),
-		mid2: new THREE.Color().setHSL(hue + 0.02, 0.75, 0.32),
-		mid3: new THREE.Color().setHSL(hue, 0.85, 0.48),
-	}
-}
-
-function panthalassicCloudPalette(
-	seed: number,
-	meanTemperatureK: number | undefined,
-): CloudBandPalette {
-	// Same icy palette as a frozen helian -- the ask here is specifically
-	// "same icy light blue/white as frozen helians", not a distinct frozen
-	// ocean-world look of its own.
-	if (
-		meanTemperatureK !== undefined &&
-		meanTemperatureK <= FROZEN_CLIMATE_MAX_K
-	)
-		return HELIAN_PALETTE_ICY
-	return panthalassicDeepPalette(seed)
-}
-
-/** Procedural fbm cloud-band material -- see this function's own header
- * comment further up the file for the full port rationale. Originally built
- * for jovians (see git history), now used for helian bodies instead (their
- * atmosphereCode is always the "thick" value -- see PLANET.classifyBody's
- * helian case in dice-table/index.ts -- so no separate thickness gate is
- * needed here). `seed` still varies the noise-domain offset per body (so
- * multiple helians don't show identical band placement); `palette` is now
- * an explicit fixed choice (helianCloudPalette's temperature buckets) rather
- * than a per-body random roll, since the ask here is specific named colors
- * per temperature category, not continuous variety. */
-function buildAtmosphericCloudBandMaterial(
-	seed: number,
-	palette: CloudBandPalette,
-): THREE.MeshStandardMaterial {
-	const uniforms = { giantCloudTime: { value: 0 } }
-	const material = new THREE.MeshStandardMaterial({
-		roughness: 1,
-		metalness: 0,
-	})
-	// Stashed here (rather than threading a new PlacedBody field through)
-	// purely so setSpinHours below can find and drive this material's own
-	// cloud-animation clock every frame -- onBeforeCompile's own `shader`
-	// object is a fresh copy Three creates at compile time, not something
-	// callers can reach back into later.
-	material.userData.giantCloudUniforms = uniforms
-	material.onBeforeCompile = (shader) => {
-		shader.uniforms.giantCloudTime = uniforms.giantCloudTime
-		shader.uniforms.giantSeed = { value: seed }
-		shader.uniforms.giantColTop = { value: palette.top }
-		shader.uniforms.giantColBot = { value: palette.bot }
-		shader.uniforms.giantColMid1 = { value: palette.mid1 }
-		shader.uniforms.giantColMid2 = { value: palette.mid2 }
-		shader.uniforms.giantColMid3 = { value: palette.mid3 }
-		shader.vertexShader = shader.vertexShader
-			.replace(
-				"#include <common>",
-				"#include <common>\nvarying vec3 vGiantObjectPosition;",
-			)
-			.replace(
-				"#include <begin_vertex>",
-				"#include <begin_vertex>\nvGiantObjectPosition = position;",
-			)
-		shader.fragmentShader = shader.fragmentShader
-			.replace(
-				"#include <common>",
-				`
-				#include <common>
-				varying vec3 vGiantObjectPosition;
-				uniform float giantCloudTime;
-				uniform float giantSeed;
-				uniform vec3 giantColTop;
-				uniform vec3 giantColBot;
-				uniform vec3 giantColMid1;
-				uniform vec3 giantColMid2;
-				uniform vec3 giantColMid3;
-				#define GIANT_NUM_NOISE_OCTAVES 10
-				#define GIANT_PLANET_SIZE 0.75
-
-				float giantHash(float p) {
-					p = fract(p * 0.011);
-					p *= p + 7.5;
-					p *= p + p;
-					return fract(p);
-				}
-				float giantNoise(vec3 x) {
-					const vec3 step = vec3(110.0, 241.0, 171.0);
-					vec3 i = floor(x);
-					vec3 f = fract(x);
-					float n = dot(i, step);
-					vec3 u = f * f * (3.0 - 2.0 * f);
-					return mix(
-						mix(
-							mix(giantHash(n + dot(step, vec3(0.0, 0.0, 0.0))), giantHash(n + dot(step, vec3(1.0, 0.0, 0.0))), u.x),
-							mix(giantHash(n + dot(step, vec3(0.0, 1.0, 0.0))), giantHash(n + dot(step, vec3(1.0, 1.0, 0.0))), u.x),
-							u.y
-						),
-						mix(
-							mix(giantHash(n + dot(step, vec3(0.0, 0.0, 1.0))), giantHash(n + dot(step, vec3(1.0, 0.0, 1.0))), u.x),
-							mix(giantHash(n + dot(step, vec3(0.0, 1.0, 1.0))), giantHash(n + dot(step, vec3(1.0, 1.0, 1.0))), u.x),
-							u.y
-						),
-						u.z
-					);
-				}
-				float giantFbm(vec3 x) {
-					float v = 0.0;
-					float a = 0.5;
-					vec3 shift = vec3(100.0);
-					for (int i = 0; i < GIANT_NUM_NOISE_OCTAVES; ++i) {
-						v += a * giantNoise(x);
-						x = x * 2.0 + shift;
-						a *= 0.5;
-					}
-					return v;
-				}
-				float giantMax3(vec3 v) { return max(max(v.x, v.y), v.z); }
-				mat3 giantBandRotation(float theta) {
-					return mat3(
-						cos(theta), 0.0, sin(theta),
-						0.0, 1.0, 0.0,
-						-sin(theta), 0.0, cos(theta)
-					);
-				}
-				vec3 giantCloudColor(vec3 objectPosition, float t, float seed, vec3 colTop, vec3 colBot, vec3 colMid1, vec3 colMid2, vec3 colMid3) {
-					mat3 rot = giantBandRotation(t * 0.15);
-					vec3 X = rot * (objectPosition * GIANT_PLANET_SIZE)
-						+ vec3(seed * 17.3, seed * 11.7, seed * 29.1);
-
-					vec3 q = vec3(giantFbm(X + 0.025 * t), giantFbm(X), giantFbm(X));
-					vec3 r = vec3(giantFbm(X + 1.0 * q + 0.01 * t), giantFbm(X + q), giantFbm(X + q));
-					float v = giantFbm(X + 5.0 * r + t * 0.005);
-
-					vec3 colMid = mix(colMid1, colMid2, clamp(r, 0.0, 1.0));
-					colMid = mix(colMid, colMid3, clamp(q, 0.0, 1.0));
-
-					float pos = v * 2.0 - 1.0;
-					vec3 color = mix(colMid, colTop, clamp(vec3(pos), 0.0, 1.0));
-					color = mix(color, colBot, clamp(vec3(-pos), 0.0, 1.0));
-					color = color / giantMax3(color);
-					color = (clamp(0.4 * pow(v, 3.0) + pow(v, 2.0) + 0.5 * v, 0.0, 1.0) * 0.9 + 0.1) * color;
-					return color;
-				}
-				`,
-			)
-			.replace(
-				"#include <map_fragment>",
-				"diffuseColor.rgb = giantCloudColor(normalize(vGiantObjectPosition), giantCloudTime, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
-			)
-	}
-	return material
-}
-
 /**
  * Builds one star's full worth of orbiting bodies -- the star mesh/glow/
  * light, every sibling+main-world body (with its own nested moon overlay),
@@ -393,6 +109,7 @@ export function buildSolarSystemOverlay(
 		namesEnabled,
 		starName,
 		mainWorldTexture,
+		proceduralSystem,
 		isCompanion,
 	} = params
 	// A companion's own recursive build always passes companions: [], so it
@@ -871,63 +588,70 @@ export function buildSolarSystemOverlay(
 		// The main world's own simulated terrain/vegetation, standing in for
 		// its static texturePath image -- see mainWorldTexture's doc comment.
 		const mainWorldSatelliteMap = body.isMainWorld ? mainWorldTexture : null
-		const material = mainWorldSatelliteMap
-			? new THREE.MeshStandardMaterial({
-					map: mainWorldSatelliteMap,
-					roughness: 1,
-					metalness: 0,
-				})
-			: isPanthalassic
-				? buildAtmosphericCloudBandMaterial(
-						body.idx,
-						panthalassicCloudPalette(body.idx, body.temperatureEstimate?.mean),
-					)
-				: isHelian
-					? buildAtmosphericCloudBandMaterial(
-							body.idx,
-							helianCloudPalette(
-								body.idx,
-								body.temperatureEstimate?.mean,
-								body.atmosphere?.subtype,
-							),
-						)
-					: texturePath
+		// A body's exact 2D-UI class swatch (CLASSIFICATION_COLOR) -- the base
+		// color the cloud-band palette is derived from. A continent-free
+		// vesperian world swaps its gold land tint for full-ocean blue since
+		// there's no land left to tint; tectonic always keeps its green, no
+		// exceptions.
+		const bodySwatchHex =
+			body.classification === "vesperian" && (body.hydrosphereCode ?? 0) >= 10
+				? FULL_OCEAN_COLOR
+				: (CLASSIFICATION_COLOR[body.classification] ??
+					(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR))
+		// Helian/panthalassic bodies always render the animated fbm cloud-band
+		// mesh; in a procedurally generated system every other non-belt body
+		// (the main world included) does too, in place of any texture. Every
+		// case is tinted by the body's exact class swatch -- no temperature or
+		// per-body variation. The real Sol view keeps its curated textures for
+		// everything except helian/panthalassic.
+		const cloudBandPalette: CloudBandPalette | null =
+			isHelian || isPanthalassic || proceduralSystem
+				? swatchCloudBandPalette({ hex: bodySwatchHex })
+				: null
+		const material = cloudBandPalette
+			? buildCloudBandMaterial({ seed: body.idx, palette: cloudBandPalette })
+			: mainWorldSatelliteMap
+				? new THREE.MeshStandardMaterial({
+						map: mainWorldSatelliteMap,
+						roughness: 1,
+						metalness: 0,
+					})
+				: texturePath
+					? new THREE.MeshStandardMaterial({
+							map: loadBodyTexture(texturePath),
+							roughness: 1,
+							metalness: 0,
+						})
+					: isGasGiant
 						? new THREE.MeshStandardMaterial({
-								map: loadBodyTexture(texturePath),
+								map: loadBodyTexture(
+									"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
+								),
 								roughness: 1,
 								metalness: 0,
 							})
-						: isGasGiant
-							? new THREE.MeshStandardMaterial({
-									map: loadBodyTexture(
-										"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
-									),
-									roughness: 1,
-									metalness: 0,
-								})
-							: new THREE.MeshStandardMaterial({
-									color:
-										(body.classification === "tectonic" ||
-											body.classification === "vesperian") &&
-										(body.hydrosphereCode ?? 0) >= 10
-											? FULL_OCEAN_COLOR
-											: (CLASSIFICATION_COLOR[body.classification] ??
-												(body.isMainWorld
-													? MAIN_WORLD_COLOR
-													: ROCKY_SIBLING_COLOR)),
-									roughness: 0.9,
-									metalness: 0,
-								})
+						: new THREE.MeshStandardMaterial({
+								color: bodySwatchHex,
+								roughness: 0.9,
+								metalness: 0,
+							})
 		const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), material)
 		// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
 		// XY (Z-north) — textured bodies need the same quarter-turn so their
 		// maps don't render "on their side". Untextured rocky spheres looked
 		// fine before because the solid-color material had no visible poles.
-		if (isGasGiant || texturePath) mesh.rotation.x = Math.PI / 2
+		// Cloud-band meshes are sampled in normalized object space and band
+		// their noise about local Y -- a quarter-turn about X would tilt those
+		// bands pole-first, so only the textured-map path gets the pole fix.
+		if ((isGasGiant || texturePath) && !cloudBandPalette)
+			mesh.rotation.x = Math.PI / 2
 		mesh.scale.setScalar(sceneRadius)
 		bodyGroup.add(mesh)
 		let cloudsMesh: THREE.Mesh | undefined
-		if (body.cloudsTexturePath) {
+		// The procedural cloud-band mesh already bakes its own banding into the
+		// surface -- a separate translucent cloud-texture shell on top of it
+		// just muddies that, so it's skipped whenever the body renders one.
+		if (body.cloudsTexturePath && !cloudBandPalette) {
 			const cloudsTexture = loadBodyTexture(body.cloudsTexturePath)
 			// boostCloudAlphaMap below flips its V sample to match a texture
 			// stored north-row-first (see cloud-material.ts); loadBodyTexture
@@ -1019,6 +743,7 @@ export function buildSolarSystemOverlay(
 			showRealNames,
 			body.isMainWorld ? "Luna" : undefined,
 			namesEnabled,
+			proceduralSystem,
 		)
 		moonState.group.scale.setScalar(sceneRadius)
 		bodyGroup.add(moonState.group)
@@ -1168,6 +893,7 @@ export function buildSolarSystemOverlay(
 			showRealNames,
 			p.body.isMainWorld ? "Luna" : undefined,
 			namesEnabled,
+			proceduralSystem,
 		)
 		p.moonState.group.scale.setScalar(p.sceneRadius)
 		p.bodyGroup.add(p.moonState.group)
@@ -1789,12 +1515,12 @@ export function buildSolarSystemOverlay(
 			blackHoleDiskMaterial.uniforms.time.value = hours
 		}
 		for (const p of placed) {
-			const giantCloudUniforms = (
+			const cloudBandUniforms = (
 				p.mesh?.material as THREE.MeshStandardMaterial | undefined
-			)?.userData.giantCloudUniforms as
+			)?.userData.cloudBandUniforms as
 				| { giantCloudTime: { value: number } }
 				| undefined
-			if (giantCloudUniforms) giantCloudUniforms.giantCloudTime.value = hours
+			if (cloudBandUniforms) cloudBandUniforms.giantCloudTime.value = hours
 			if (
 				!p.isBelt &&
 				p.mesh &&
