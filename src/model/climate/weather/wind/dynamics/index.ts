@@ -2,8 +2,8 @@ import type {
 	DynamicCorrectionInput,
 	SolveDynamicsInput,
 } from "@/model/climate/weather/wind/dynamics/types"
-import { buildGrid, sampleGrid } from "@/model/climate/weather/wind/grid/index";
-import type { DynamicsGrid } from "@/model/climate/weather/wind/grid/types";
+import { GRID } from "@/model/climate/weather/wind/grid"
+import type { LatLonGrid } from "@/model/climate/weather/wind/grid/types"
 
 // Steady linear shallow-water (Gill-Matsuno) balance on a coarse lat-lon
 // grid. The pressure template is the forcing: without dynamics the solved
@@ -12,7 +12,6 @@ import type { DynamicsGrid } from "@/model/climate/weather/wind/grid/types";
 // the response east-west (Rossby west of a heat low, Kelvin east of it),
 // which is what closes anticyclones over basins and piles cross-equatorial
 // flow against western boundaries.
-const GRID_DEG = 2
 const ITERATIONS = 150
 const RELAX = 0.6
 const TOLERANCE = 1e-6
@@ -23,10 +22,10 @@ function solve({
 	friction,
 	coriolisScale,
 	waveCoupling,
-}: SolveDynamicsInput): DynamicsGrid {
+}: SolveDynamicsInput): LatLonGrid {
 	const { lonBins, latBins } = forcing
 	const P0 = forcing.values
-	const d = GRID_DEG * DEG2RAD
+	const d = GRID.deg * DEG2RAD
 	const eps = friction
 	const cosRow = new Float32Array(latBins)
 	const fRow = new Float32Array(latBins)
@@ -34,10 +33,10 @@ function solve({
 	const fFace = new Float32Array(latBins)
 	const diag = new Float32Array(latBins)
 	for (let j = 0; j < latBins; j++) {
-		const lat = (-90 + (j + 0.5) * GRID_DEG) * DEG2RAD
+		const lat = (-90 + (j + 0.5) * GRID.deg) * DEG2RAD
 		cosRow[j] = Math.cos(lat)
 		fRow[j] = coriolisScale * Math.sin(lat)
-		const latFace = (-90 + (j + 1) * GRID_DEG) * DEG2RAD
+		const latFace = (-90 + (j + 1) * GRID.deg) * DEG2RAD
 		cosFace[j] = Math.cos(latFace)
 		fFace[j] = coriolisScale * Math.sin(latFace)
 		const a = eps / (eps * eps + fRow[j] * fRow[j])
@@ -118,13 +117,13 @@ function correction({
 	coriolisScale,
 	waveCoupling,
 }: DynamicCorrectionInput): Float32Array {
-	const forcing = buildGrid({ latDeg, lonDeg, values: pressure })
+	const forcing = GRID.build({ latDeg, lonDeg, values: pressure })
 	const solved = solve({ forcing, friction, coriolisScale, waveCoupling })
 	const delta = new Float32Array(solved.values.length)
 	for (let idx = 0; idx < delta.length; idx++) {
 		delta[idx] = solved.values[idx] - forcing.values[idx]
 	}
-	return sampleGrid({
+	return GRID.sample({
 		grid: { lonBins: solved.lonBins, latBins: solved.latBins, values: delta },
 		latDeg,
 		lonDeg,

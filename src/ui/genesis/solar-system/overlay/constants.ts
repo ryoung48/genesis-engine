@@ -118,6 +118,25 @@ export const STAR_COLOR_BY_CLASS: Record<SpectralClass, string> = {
 	BH: "#090909",
 }
 
+// Sphere tessellation tiers for planet meshes, selected per frame from a
+// body's apparent size (see updateLevelOfDetail). The low tier is enough for
+// a body a few pixels across but shows an obviously polygonal silhouette
+// once the camera flies in, which is exactly when the higher tiers cost
+// nothing -- only one or two bodies can fill the screen at a time. Each tier
+// is a shared unit sphere reused by every body at that tier, so this also
+// replaces the per-body geometry every mesh used to allocate.
+export const BODY_LOD_SEGMENTS: readonly { width: number; height: number }[] = [
+	{ width: 24, height: 18 },
+	{ width: 48, height: 32 },
+	{ width: 96, height: 64 },
+]
+
+// A body's projected radius as a fraction of the viewport's half-height, at
+// or above which it moves up to the next tessellation tier. Indexed to
+// BODY_LOD_SEGMENTS from tier 1 up (tier 0 is the floor and needs no
+// threshold).
+export const BODY_LOD_THRESHOLDS: readonly number[] = [0.05, 0.22]
+
 // Golden angle — an irrational fraction of a full turn, so successive bodies
 // land at well-spread-out starting angles instead of clustering.
 export const GOLDEN_ANGLE_RAD = Math.PI * (3 - Math.sqrt(5))

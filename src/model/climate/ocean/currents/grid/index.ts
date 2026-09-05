@@ -7,12 +7,14 @@ import { RAIN } from "@/model/climate/precipitation/rain"
 import { MESH } from "@/model/mesh"
 import { RNG } from "@/model/shared/random/rng"
 
+const OCEAN_GRID_CELLS = 8192
+
 function build(input: OceanGridInput): OceanGrid {
 	const mesh =
-		input.mesh.numRegions <= 8192
+		input.mesh.numRegions <= OCEAN_GRID_CELLS
 			? input.mesh
 			: MESH.buildSphereMesh({
-					n: 8192,
+					n: OCEAN_GRID_CELLS,
 					jitter: 0,
 					rng: RNG.createRng({ seed: 1 }),
 				})

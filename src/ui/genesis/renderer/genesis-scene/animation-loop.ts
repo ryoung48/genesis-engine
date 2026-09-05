@@ -19,7 +19,7 @@ export interface AnimationLoopControllerDeps {
 	stepFocusTween: () => void
 	stepPulse: () => void
 	stepSolarSystemFocusTween: () => void
-	renderSolarSystemWithLensing: () => void
+	renderSolarSystemView: () => void
 	updateSolarTerminatorLabels: (radius: number) => void
 }
 
@@ -73,8 +73,9 @@ export function createAnimationLoopController(
 				// Body-name labels don't rotate with anything else in the scene
 				// (bodyGroups only ever translate), so they need their own
 				// per-frame billboard update to keep facing the camera.
+				ctx.solarSystemOverlayState?.updateLevelOfDetail(ctx.camera)
 				ctx.solarSystemOverlayState?.updateLabelOrientations(ctx.camera)
-				deps.renderSolarSystemWithLensing()
+				deps.renderSolarSystemView()
 				return keepAnimating
 			}
 

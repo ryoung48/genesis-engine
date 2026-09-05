@@ -223,9 +223,6 @@ function runPostElevationPipeline(
 	record("Post: moisture advection", t0)
 	onProgress?.("Post: moisture advection", 50)
 
-	// Attached ahead of the ocean stage so an Earth import drives its currents
-	// with the observed wind field rather than the procedural one, matching how
-	// observed temperature and rainfall feed the classification below.
 	let observedWind: GenesisWorld["observedWind"] | undefined
 	if (
 		realWindUMonthly &&
@@ -250,10 +247,6 @@ function runPostElevationPipeline(
 		})
 		observedWind = windHolder.observedWind
 	}
-	const observedOceanWind =
-		observedWind?.real_u_monthly && observedWind.real_v_monthly
-			? { u: observedWind.real_u_monthly, v: observedWind.real_v_monthly }
-			: null
 
 	// ── Ocean SST ────────────────────────────────────────
 	t0 = performance.now()
@@ -262,15 +255,17 @@ function runPostElevationPipeline(
 		isLand,
 		landmarks: currentLandmarks,
 		params,
-		climate,
-		elevation_km,
-		wind: observedOceanWind,
+		distCoast,
+		monthlyTEQ,
+		eastAdv,
+		westAdv,
 	})
 	OCEAN_CURRENTS.applySSTToClimate({
 		mesh,
 		climate,
 		isLand,
 		oceanCurrents,
+		isLocked: params.tideLock?.type === "solar",
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	record("Post: ocean SST", t0)
@@ -327,6 +322,7 @@ function runPostElevationPipeline(
 			climate,
 			isLand,
 			oceanCurrents,
+			isLocked: params.tideLock?.type === "solar",
 		})
 		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		record("Post: drain arid closed water", t0)
@@ -463,6 +459,7 @@ function runPostElevationPipeline(
 		climate,
 		isLand,
 		oceanCurrents,
+		isLocked: params.tideLock?.type === "solar",
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({

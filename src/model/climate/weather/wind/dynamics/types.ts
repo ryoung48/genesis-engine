@@ -1,7 +1,7 @@
-import { DynamicsGrid } from "@/model/climate/weather/wind/grid/types";
+import type { LatLonGrid } from "@/model/climate/weather/wind/grid/types"
 
 export type SolveDynamicsInput = {
-	forcing: DynamicsGrid
+	forcing: LatLonGrid
 	friction: number
 	coriolisScale: number
 	waveCoupling: number

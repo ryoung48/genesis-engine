@@ -1,4 +1,4 @@
-export type DynamicsGrid = {
+export type LatLonGrid = {
 	lonBins: number
 	latBins: number
 	values: Float32Array
@@ -11,7 +11,7 @@ export type BuildGridInput = {
 }
 
 export type SampleGridInput = {
-	grid: DynamicsGrid
+	grid: LatLonGrid
 	latDeg: Float32Array
 	lonDeg: Float32Array
 }

@@ -19,8 +19,7 @@
 		"knip": "knip --fix",
 		"check:underscore-unused": "node scripts/quality/check-underscore-unused.mjs",
 		"fix:import-aliases": "node scripts/quality/fix-import-aliases.mjs",
-		"check:optional-attributes": "node scripts/quality/check-optional-attributes.mjs",
-		"enforcer": "node scripts/quality/enforcer.mjs"
+		"check:optional-attributes": "node scripts/quality/check-optional-attributes.mjs"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",

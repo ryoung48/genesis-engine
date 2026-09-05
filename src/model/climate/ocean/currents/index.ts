@@ -1,172 +1,180 @@
-import { OCEAN_CIRCULATION } from "@/model/climate/ocean/currents/circulation"
-import { OCEAN_GRID } from "@/model/climate/ocean/currents/grid"
-import { OCEAN_HEAT } from "@/model/climate/ocean/currents/heat"
+import { COASTAL_BLEED } from "@/model/climate/ocean/coastal-bleed"
+import { OCEAN_CURRENT_DISPLAY } from "@/model/climate/ocean/currents/display"
+import type {
+	BuildOceanCurrentGridParams,
+	ObservedOceanCurrentGridParams,
+} from "@/model/climate/ocean/currents/display/types"
 import type {
 	ApplySSTToClimateParams,
-	BuildOceanCurrentGridParams,
+	BandInput,
+	CoastSideInput,
 	ComputeSSTParams,
-	CurrentDisplayInput,
-	ObservedOceanCurrentGridParams,
+	RotatingSSTParams,
 } from "@/model/climate/ocean/currents/types"
+import { LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
-import { WIND } from "@/model/climate/weather/wind"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { MATH } from "@/model/shared/math/core"
+import { UNITS } from "@/model/shared/units"
 
-const SST_ANOMALY_SATURATION_C = 4
+const CURRENT_EFFECT_MONTHS = 12
 
-function computeSST(input: ComputeSSTParams): GenesisOceanCurrents {
-	const { mesh, isLand, climate, landmarks, params, elevation_km } = input
+const MODELED_SST_SATURATION_C = 9
+
+const CURRENT_STRENGTH_SCALE = 1.5
+
+const WEST_BAND_C_TABLE = [-0.5, -1, -5, -2.5, 1, 4, 5, 6, 2, 0].map(
+	(v) => v * CURRENT_STRENGTH_SCALE,
+)
+const westBandC = (dist: number) =>
+	MATH.piecewise({
+		domain: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
+		range: WEST_BAND_C_TABLE,
+		x: dist,
+	})
+
+const EAST_BAND_C_TABLE = [0.2, 1, 2, 3, -2, -5, -3, -1.5, 0, 0].map(
+	(v) => v * CURRENT_STRENGTH_SCALE,
+)
+const eastBandC = (dist: number) =>
+	MATH.piecewise({
+		domain: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
+		range: EAST_BAND_C_TABLE,
+		x: dist,
+	})
+
+const bandC = ({ dist, coastSide }: BandInput): number =>
+	coastSide < 0 ? westBandC(dist) : coastSide > 0 ? eastBandC(dist) : 0
+
+const COAST_DECAY_KM = 800
+
+const LANDMARK_TYPE_CONTINENT = 0
+
+function computeCoastSide({
+	mesh,
+	isLand,
+	isLake,
+	landmarks,
+	eastAdv,
+	westAdv,
+	avgEdgeKm,
+}: CoastSideInput): Int8Array {
 	const N = mesh.numRegions
-	const ocean = Uint8Array.from(isLand, (land, r) =>
-		!land &&
-		landmarks.type[landmarks.regionLandmark[r]] !== LANDMARKS.landmarkTypeLake
-			? 1
-			: 0,
-	)
-	const grid = OCEAN_GRID.build({
+	const { adjOffset, adjList } = mesh
+	const coastSide = new Int8Array(N)
+	const dist = new Int32Array(N).fill(-1)
+	const queue = new Int32Array(N)
+	let head = 0
+	let tail = 0
+
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		const landmark = landmarks.regionLandmark[r]
+		if (landmark < 0 || landmarks.type[landmark] !== LANDMARK_TYPE_CONTINENT)
+			continue
+		const side = eastAdv[r] > westAdv[r] ? 1 : -1
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
+			coastSide[nb] = side
+			dist[nb] = 0
+			queue[tail++] = nb
+		}
+	}
+
+	const maxHops = Math.max(1, Math.round(COAST_DECAY_KM / avgEdgeKm))
+	while (head < tail) {
+		const r = queue[head++]
+		if (dist[r] >= maxHops) continue
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
+			dist[nb] = dist[r] + 1
+			coastSide[nb] = coastSide[r]
+			queue[tail++] = nb
+		}
+	}
+
+	return coastSide
+}
+
+function computeRotatingSST({
+	mesh,
+	isLand,
+	distCoast,
+	landmarks,
+	monthlyTEQ,
+	eastAdv,
+	westAdv,
+	planetRadiusKm,
+}: RotatingSSTParams): GenesisOceanCurrents {
+	const N = mesh.numRegions
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
+	const isLake = new Uint8Array(N)
+	for (let r = 0; r < N; r++) {
+		const landmark = landmarks.regionLandmark[r]
+		if (landmark < 0 || isLand[r]) continue
+		if (landmarks.type[landmark] === LANDMARKS.landmarkTypeLake) isLake[r] = 1
+	}
+
+	const coastSide = computeCoastSide({
 		mesh,
-		ocean,
-		climate,
-		elevation: elevation_km,
-		radius: params.planetRadiusKm * 1000,
+		isLand,
+		isLake,
+		landmarks,
+		eastAdv,
+		westAdv,
+		avgEdgeKm,
 	})
-	const n = grid.mesh.numRegions
-	const wind = { u: new Float32Array(n * 12), v: new Float32Array(n * 12) }
-	for (let month = 0; month < 12; month++) {
-		if (input.wind) {
-			for (let r = 0; r < n; r++) {
-				const source = month * N + grid.source[r]
-				wind.u[month * n + r] = Number.isFinite(input.wind.u[source])
-					? input.wind.u[source]
-					: 0
-				wind.v[month * n + r] = Number.isFinite(input.wind.v[source])
-					? input.wind.v[source]
-					: 0
-			}
-		} else {
-			for (let r = 0; r < n; r++)
-				if (
-					!Number.isFinite(
-						grid.climate.temperature_monthly[month * n + r] +
-							grid.climate.temperature_monthly_nolapse[month * n + r] +
-							grid.climate.temperature_avg[r] +
-							grid.elevation[r],
-					)
-				)
-					throw new Error(
-						`Invalid downsample r=${r} source=${grid.source[r]} month=${month} temp=${grid.climate.temperature_monthly[month * n + r]} avg=${grid.climate.temperature_avg[r]} elev=${grid.elevation[r]}`,
-					)
-			const vectors = WIND.computeWindVectors({
-				mesh: grid.mesh,
-				climate: grid.climate,
-				elevation_km: grid.elevation,
-				params,
-				month,
+	const { latDeg, regionBin } = RAIN.getClimateGeometry(mesh)
+
+	const sstMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
+	const sst = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) continue
+		const side = coastSide[r]
+		if (side === 0) continue
+		const decay = COASTAL_BLEED.decay(distCoast[r])
+		if (decay <= 0) continue
+		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+			const teq = monthlyTEQ[month][regionBin[r]]
+			const dist = Math.abs(latDeg[r] - teq)
+			const anomalyC = bandC({ dist, coastSide: side }) * decay
+			const value = MATH.clamp({
+				value: anomalyC / MODELED_SST_SATURATION_C,
+				lo: -1,
+				hi: 1,
 			})
-			for (let r = 0; r < n; r++) {
-				wind.u[month * n + r] = vectors.windU[r] * vectors.windSpeed[r]
-				wind.v[month * n + r] = vectors.windV[r] * vectors.windSpeed[r]
-			}
+			sstMonthly[month * N + r] = value
+			sst[r] += value / CURRENT_EFFECT_MONTHS
 		}
 	}
-	const circulation = OCEAN_CIRCULATION.solve({ grid, params, wind })
-	const heat = OCEAN_HEAT.solve({
-		grid,
-		circulation,
-		yearSeconds: params.daysPerYear * params.hoursPerDay * 3600,
+
+	const landBleed = COASTAL_BLEED.apply({
+		mesh,
+		isLand,
+		isLake,
+		oceanValue: sst,
+		avgEdgeKm,
 	})
-	const { edgeEastward, edgeNorthward } = RAIN.getClimateGeometry(grid.mesh)
-	const landDelta = new Float32Array(n * 12)
-	let source = new Float64Array(n),
-		target = new Float64Array(n)
-	for (let month = 0; month < 12; month++) {
-		source.fill(0)
-		for (let r = 0; r < n; r++)
-			if (grid.ocean[r]) source[r] = heat.delta[month * n + r]
-		for (let pass = 0; pass < 40; pass++) {
-			for (let r = 0; r < n; r++) {
-				if (grid.ocean[r]) {
-					target[r] = source[r]
-					continue
-				}
-				const i = month * n + r
-				let weighted = 0,
-					total = 0
-				for (
-					let j = grid.mesh.adjOffset[r];
-					j < grid.mesh.adjOffset[r + 1];
-					j++
-				) {
-					const speed = Math.max(
-						0,
-						-wind.u[i] * edgeEastward[j] - wind.v[i] * edgeNorthward[j],
-					)
-					if (speed <= 0) continue
-					const distance =
-						grid.mesh.neighborDist[j] * params.planetRadiusKm * 1000
-					weighted +=
-						speed *
-						source[grid.mesh.adjList[j]] *
-						Math.exp(-distance / (speed * 2 * 86400))
-					total += speed
-				}
-				target[r] = total > 0 ? weighted / total : 0
-			}
-			;[source, target] = [target, source]
-		}
-		landDelta.set(source, month * n)
+	for (let r = 0; r < N; r++) if (isLand[r]) sst[r] = landBleed[r]
+
+	for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+		const monthOcean = sstMonthly.subarray(month * N, (month + 1) * N)
+		const monthBleed = COASTAL_BLEED.apply({
+			mesh,
+			isLand,
+			isLake,
+			oceanValue: monthOcean,
+			avgEdgeKm,
+		})
+		for (let r = 0; r < N; r++)
+			if (isLand[r]) sstMonthly[month * N + r] = monthBleed[r]
 	}
-	const sst = new Float32Array(N),
-		sstMonthly = new Float32Array(N * 12)
-	const uMonthly = new Float32Array(N * 12),
-		vMonthly = new Float32Array(N * 12)
-	const temperatureDeltaMonthly = new Float32Array(N * 12)
-	const { latDeg } = RAIN.getClimateGeometry(mesh)
-	const bands = new Int32Array(N)
-	for (let r = 0; r < N; r++)
-		bands[r] = Math.max(0, Math.min(89, Math.floor((latDeg[r] + 90) / 2)))
-	for (let month = 0; month < 12; month++) {
-		const sums = new Float64Array(90),
-			counts = new Float64Array(90)
-		for (let r = 0; r < N; r++) {
-			const cell = grid.region[r],
-				i = month * N + r
-			if (cell >= 0) {
-				const ci = month * n + cell
-				if (ocean[r] && grid.ocean[cell]) {
-					uMonthly[i] = circulation.u[ci]
-					vMonthly[i] = circulation.v[ci]
-					temperatureDeltaMonthly[i] = heat.delta[ci]
-				} else if (isLand[r]) temperatureDeltaMonthly[i] = landDelta[ci]
-			}
-			if (ocean[r]) {
-				sums[bands[r]] +=
-					climate.temperature_monthly[i] + temperatureDeltaMonthly[i]
-				counts[bands[r]]++
-			}
-		}
-		for (let r = 0; r < N; r++) {
-			const i = month * N + r
-			if (ocean[r])
-				sstMonthly[i] =
-					(climate.temperature_monthly[i] +
-						temperatureDeltaMonthly[i] -
-						sums[bands[r]] / counts[bands[r]]) /
-					SST_ANOMALY_SATURATION_C
-			sst[r] += sstMonthly[i] / 12
-		}
-	}
-	return {
-		sst,
-		sstMonthly,
-		uMonthly,
-		vMonthly,
-		temperatureDeltaMonthly,
-		ocean,
-		circulationCycleError: circulation.cycleError,
-		heatCycleError: heat.cycleError,
-	}
+
+	return { sst, sstMonthly }
 }
 
 function applySSTToClimate({
@@ -174,109 +182,41 @@ function applySSTToClimate({
 	climate,
 	isLand,
 	oceanCurrents,
+	isLocked,
 }: ApplySSTToClimateParams): void {
-	const n = mesh.numRegions
-	for (let r = 0; r < n; r++) {
-		if (!isLand[r] && !oceanCurrents.ocean[r]) continue
-		let total = 0
-		for (let month = 0; month < 12; month++) {
-			const i = month * n + r
-			climate.temperature_monthly[i] += oceanCurrents.temperatureDeltaMonthly[i]
-			climate.temperature_monthly_nolapse[i] +=
-				oceanCurrents.temperatureDeltaMonthly[i]
-			total += climate.temperature_monthly[i]
+	const N = mesh.numRegions
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		let annualSum = 0
+		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+			const delta =
+				oceanCurrents.sstMonthly[month * N + r] *
+				(isLocked ? 6 * 0.68 : MODELED_SST_SATURATION_C)
+			const updated = climate.temperature_monthly[month * N + r] + delta
+			climate.temperature_monthly[month * N + r] = updated
+			annualSum += updated
 		}
-		climate.temperature_avg[r] = total / 12
+		climate.temperature_avg[r] = annualSum / CURRENT_EFFECT_MONTHS
 	}
 }
 
-function buildGrid({
-	mesh,
-	isLand,
-	u,
-	v,
-	scalar,
-	ocean,
-	month,
-}: CurrentDisplayInput) {
-	const n = mesh.numRegions
-	const currentU = new Float32Array(n),
-		currentV = new Float32Array(n),
-		speed = new Float32Array(n),
-		warmth = new Float32Array(n)
-	const first = month !== undefined && month >= 0 && month < 12 ? month : 0
-	const end = month !== undefined && month >= 0 && month < 12 ? month + 1 : 12
-	for (let r = 0; r < n; r++) {
-		if (isLand[r] || (ocean && !ocean[r])) continue
-		let count = 0,
-			scalarCount = 0
-		for (let m = first; m < end; m++) {
-			const i = m * n + r
-			if (u && v && Number.isFinite(u[i]) && Number.isFinite(v[i])) {
-				currentU[r] += u[i]
-				currentV[r] += v[i]
-				count++
-			}
-			if (scalar && Number.isFinite(scalar[i])) {
-				warmth[r] += scalar[i]
-				scalarCount++
-			}
-		}
-		if (count) {
-			currentU[r] /= count
-			currentV[r] /= count
-		}
-		if (scalarCount)
-			warmth[r] = Math.max(-1, Math.min(1, warmth[r] / scalarCount))
-		speed[r] = Math.hypot(currentU[r], currentV[r])
-	}
-	return WIND.rasterizeVectorGrid({
-		mesh,
-		vectorU: currentU,
-		vectorV: currentV,
-		vectorSpeed: speed,
-		options: {
-			scalar: warmth,
-			allowCell: (r) => !isLand[r] && (!ocean || !!ocean[r]) && speed[r] > 0,
-			isBlockedRegion: (r) => !!isLand[r] || !!(ocean && !ocean[r]),
-		},
-	})
+function computeSST(input: ComputeSSTParams): GenesisOceanCurrents {
+	return input.params.tideLock?.type === "solar"
+		? LOCKED_OCEAN_CURRENTS.computeLockedSST(input)
+		: computeRotatingSST({
+				...input,
+				planetRadiusKm: input.params.planetRadiusKm,
+			})
 }
 
-function buildOceanCurrentGrid({
-	mesh,
-	isLand,
-	oceanCurrents,
-	month,
-}: BuildOceanCurrentGridParams) {
-	return buildGrid({
-		mesh,
-		isLand,
-		u: oceanCurrents.uMonthly,
-		v: oceanCurrents.vMonthly,
-		scalar: oceanCurrents.sstMonthly,
-		ocean: oceanCurrents.ocean,
-		month,
-	})
+function buildOceanCurrentGrid(input: BuildOceanCurrentGridParams) {
+	return OCEAN_CURRENT_DISPLAY.buildOceanCurrentGrid(input)
 }
 
-function observedOceanCurrentGridForMonth({
-	mesh,
-	isLand,
-	observedCurrent,
-	month,
-}: ObservedOceanCurrentGridParams) {
-	return buildGrid({
-		mesh,
-		isLand,
-		u: observedCurrent?.real_u_monthly,
-		v: observedCurrent?.real_v_monthly,
-		scalar: observedCurrent?.real_sst_anomaly_monthly?.map(
-			(value) => value / SST_ANOMALY_SATURATION_C,
-		),
-		ocean: undefined,
-		month,
-	})
+function observedOceanCurrentGridForMonth(
+	input: ObservedOceanCurrentGridParams,
+) {
+	return OCEAN_CURRENT_DISPLAY.observedOceanCurrentGridForMonth(input)
 }
 
 export const OCEAN_CURRENTS = {
@@ -284,5 +224,5 @@ export const OCEAN_CURRENTS = {
 	applySSTToClimate,
 	buildOceanCurrentGrid,
 	observedOceanCurrentGridForMonth,
-	sstAnomalySaturationC: SST_ANOMALY_SATURATION_C,
+	sstAnomalySaturationC: MODELED_SST_SATURATION_C,
 }

@@ -1,5 +1,12 @@
-import type { BuildGridInput, DynamicsGrid, SampleGridInput } from "@/model/climate/weather/wind/grid/types";
-import { GRID_DEG } from "@/model/climate/weather/wind/dynamics/index";
+import type {
+	BuildGridInput,
+	LatLonGrid,
+	SampleGridInput,
+} from "@/model/climate/weather/wind/grid/types"
+
+// Coarse lat-lon grid the large-scale solvers run on, with the mesh-to-grid
+// averaging and grid-to-mesh bilinear sampling both solvers share.
+const GRID_DEG = 2
 
 function gridIndex({
 	lonBins,
@@ -13,7 +20,7 @@ function gridIndex({
 	return j * lonBins + (((i % lonBins) + lonBins) % lonBins)
 }
 
-function buildGrid({ latDeg, lonDeg, values }: BuildGridInput): DynamicsGrid {
+function buildGrid({ latDeg, lonDeg, values }: BuildGridInput): LatLonGrid {
 	const lonBins = Math.round(360 / GRID_DEG)
 	const latBins = Math.round(180 / GRID_DEG)
 	const sum = new Float64Array(lonBins * latBins)
@@ -92,4 +99,11 @@ function sampleGrid({ grid, latDeg, lonDeg }: SampleGridInput): Float32Array {
 			(p00 * (1 - tx) + p10 * tx) * (1 - ty) + (p01 * (1 - tx) + p11 * tx) * ty
 	}
 	return out
+}
+
+export const GRID = {
+	deg: GRID_DEG,
+	index: gridIndex,
+	build: buildGrid,
+	sample: sampleGrid,
 }

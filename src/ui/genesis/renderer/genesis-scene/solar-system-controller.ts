@@ -33,13 +33,12 @@ export function createSolarSystemController(
 	ctx: GenesisContext,
 	deps: SolarSystemControllerDeps,
 ) {
-	// The black-hole material composites additively with normal depth
-	// testing (see buildSolarSystemOverlay) instead of needing a captured
-	// copy of the previous frame to distort -- so this is just a normal
-	// single-pass render, same as any other scene. The name stays (call
-	// sites/deps still reference it) even though the "lensing" render-target
-	// dance it used to do is gone.
-	function renderSolarSystemWithLensing() {
+	// The black-hole material composites additively with normal depth testing
+	// (see buildSolarSystemOverlay) instead of needing a captured copy of the
+	// previous frame to distort, and the star's glow comes from its own corona
+	// shells rather than a post-process -- so this is just a normal
+	// single-pass render, same as any other scene.
+	function renderSolarSystemView() {
 		ctx.renderer.render(ctx.scene, ctx.camera)
 	}
 
@@ -277,7 +276,7 @@ export function createSolarSystemController(
 	}
 
 	return {
-		renderSolarSystemWithLensing,
+		renderSolarSystemView,
 		stepSolarSystemFocusTween,
 		focusOnSystemBody,
 		setMoonOrbitOverlay,

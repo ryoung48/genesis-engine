@@ -73,52 +73,47 @@ function solve({
 		}
 		landSize.set(seed, tail)
 	}
-	const merged = new Map<number, number>()
-	const resolve = (mass: number): number => {
-		let root = mass
-		while (merged.has(root)) root = merged.get(root) as number
-		return root
-	}
+	// A cell touching two landmasses belongs to whichever it touches most; the
+	// other keeps its own value through its remaining coast. Fusing the two
+	// instead cascades -- one strait-width cell welds two continents, which
+	// welds their neighbours in turn -- until every coast on the planet shares
+	// a single value and no net flow can pass through any strait.
+	const touching = new Map<number, number>()
 	for (let r = 0; r < n; r++) {
 		if (!grid.ocean[r]) continue
+		touching.clear()
 		for (let j = grid.mesh.adjOffset[r]; j < grid.mesh.adjOffset[r + 1]; j++) {
 			const nb = grid.mesh.adjList[j]
 			if (grid.ocean[nb]) continue
-			const mass = resolve(land[nb])
+			touching.set(land[nb], (touching.get(land[nb]) ?? 0) + 1)
+		}
+		for (const [mass, count] of touching) {
 			if (shore[r] < 0) {
 				shore[r] = mass
 				continue
 			}
-			// One cell touching two landmasses closes the gap between them: at this
-			// resolution nothing can flow through, so they act as one obstacle.
-			const held = resolve(shore[r])
-			if (held !== mass) {
-				merged.set(mass, held)
-				landSize.set(
-					held,
-					(landSize.get(held) ?? 0) + (landSize.get(mass) ?? 0),
-				)
-			}
+			const held = touching.get(shore[r]) as number
+			if (
+				count > held ||
+				(count === held &&
+					(landSize.get(mass) ?? 0) > (landSize.get(shore[r]) ?? 0))
+			)
+				shore[r] = mass
 		}
 	}
 	let anchor = -1
 	for (const [mass, size] of landSize)
-		if (
-			!merged.has(mass) &&
-			(anchor < 0 || size > (landSize.get(anchor) as number))
-		)
-			anchor = mass
+		if (anchor < 0 || size > (landSize.get(anchor) as number)) anchor = mass
 	// An island whose surrounding passage the mesh cannot resolve carries no
 	// throughflow of its own, so it shares the anchor's value rather than
 	// adding a free constant the solve would have to invent a transport for.
 	const smallestIsland = n * ISLAND_FRACTION
-	for (const [mass, size] of landSize)
-		if (!merged.has(mass) && mass !== anchor && size < smallestIsland)
-			merged.set(mass, anchor)
+	for (let r = 0; r < n; r++)
+		if (shore[r] >= 0 && (landSize.get(shore[r]) as number) < smallestIsland)
+			shore[r] = anchor
 	const coasts = new Map<number, number[]>()
 	for (let r = 0; r < n; r++) {
 		if (!grid.ocean[r] || shore[r] < 0) continue
-		shore[r] = resolve(shore[r])
 		if (shore[r] === anchor) continue
 		const cells = coasts.get(shore[r])
 		if (cells) cells.push(r)

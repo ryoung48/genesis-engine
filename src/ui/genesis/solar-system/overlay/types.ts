@@ -147,6 +147,11 @@ export interface SolarSystemOverlayState {
 		bodies: SystemBody[],
 		mainWorldTexture?: THREE.DataTexture | null,
 	): boolean
+	/** Re-selects each body's sphere tessellation from its apparent on-screen
+	 * size — call this every frame the solar-system view is active, alongside
+	 * updateLabelOrientations. Cheap when nothing changed: it only touches a
+	 * mesh whose tier actually crossed a threshold this frame. */
+	updateLevelOfDetail(camera: THREE.PerspectiveCamera): void
 	/** Re-billboards every visible name label to face the camera — call this
 	 * every frame the solar-system view is active (labels don't rotate with
 	 * anything else in the scene, so there's no other hook that keeps them
@@ -181,12 +186,25 @@ export interface PlacedBody {
 	isBelt: boolean
 	bodyGroup?: THREE.Group
 	mesh?: THREE.Mesh
+	/** [JUSTIFICATION] Limb-scattering shell, absent for an airless or
+	 * vacuum/trace body and for every belt -- the same "this body has no such
+	 * mesh" optionality as `mesh`/`cloudsMesh`/`ringMesh` beside it, which is
+	 * how absence is spelled here since the project builds with
+	 * strictNullChecks off and an explicit null would widen to `any`. Typed
+	 * concretely because setDay writes its sunDirection uniform each time the
+	 * body moves. */
+	atmosphereMesh?: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>
 	cloudsMesh?: THREE.Mesh
 	ringMesh?: THREE.Mesh
 	orbitLine?: THREE.Line
 	meshRestQuaternion?: THREE.Quaternion
 	baseQuaternion?: THREE.Quaternion
 	moonState?: MoonOrbitState
+	/** Which shared tessellation tier this body's mesh currently draws from
+	 * (see updateLevelOfDetail) — starts at the tier the build path assigns,
+	 * so a first frame that picks the same one correctly does nothing. Always
+	 * 0 for a belt, which has no mesh to tessellate. */
+	lodTier: number
 	nameLabel?: Text
 	nameLeader?: THREE.Line
 	orbitRadius: number

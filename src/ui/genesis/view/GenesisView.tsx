@@ -1177,6 +1177,7 @@ export const GenesisView: React.FC<{
 			mesh: world.mesh,
 			isLand: world.isLand,
 			oceanCurrents: world.oceanCurrents,
+			params: world.params,
 			month: currentMonth > 0 ? currentMonth - 1 : undefined,
 		})
 	}, [world, showOceanCurrents, showRealOceanCurrents, currentMonth])

@@ -1,12 +1,14 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js"
+import { buildAtmosphereMaterial } from "@/ui/genesis/renderer/atmosphere-material"
 import {
 	boostCloudAlphaMap,
 	createMapCloudMaterial,
 } from "@/ui/genesis/renderer/cloud-material"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { createPlaceholderSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
+import { configureBodyTextureAnisotropy } from "@/ui/genesis/solar-system/overlay/textures"
 
 const GLOBE_CLOUD_RADIUS = 1.035
 
@@ -43,6 +45,11 @@ export function buildGenesisSceneSetup(
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 	renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
+	// Body textures are sampled at extremely grazing angles near a sphere's
+	// limb, where isotropic filtering collapses the whole visible edge into a
+	// smear. The maximum is a GPU capability, so it can only be read once a
+	// renderer exists.
+	configureBodyTextureAnisotropy(renderer.capabilities.getMaxAnisotropy())
 
 	const scene = new THREE.Scene()
 	scene.background = new THREE.Color(0x030308)
@@ -131,40 +138,14 @@ export function buildGenesisSceneSetup(
 
 	// Atmosphere
 	const atmosGeo = new THREE.SphereGeometry(1.12, 48, 36)
-	const atmosMat = new THREE.ShaderMaterial({
-		uniforms: {
-			atmosphereColor: { value: new THREE.Color(0.52, 0.68, 0.98) },
-			sunDirection: { value: sun.position.clone().normalize() },
-			atmosphereStrength: { value: 1.0 },
-		},
-		vertexShader: `
-			varying vec3 vWorldNormal;
-			varying vec3 vWorldPosition;
-			void main() {
-				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-				vWorldPosition = worldPosition.xyz;
-				vWorldNormal = normalize(mat3(modelMatrix) * normal);
-				gl_Position = projectionMatrix * viewMatrix * worldPosition;
-			}
-		`,
-		fragmentShader: `
-			uniform vec3 atmosphereColor;
-			uniform vec3 sunDirection;
-			uniform float atmosphereStrength;
-			varying vec3 vWorldNormal;
-			varying vec3 vWorldPosition;
-			void main() {
-				vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-				float rim = pow(1.0 - max(dot(viewDir, normalize(vWorldNormal)), 0.0), 5.0);
-				float daylight = smoothstep(-0.15, 0.65, dot(normalize(vWorldNormal), normalize(sunDirection)));
-				float alpha = rim * mix(0.03, 0.18, daylight) * atmosphereStrength;
-				gl_FragColor = vec4(atmosphereColor, alpha);
-			}
-		`,
-		transparent: true,
-		side: THREE.BackSide,
-		depthWrite: false,
+	const atmosMat = buildAtmosphereMaterial({
+		color: new THREE.Color(0.52, 0.68, 0.98),
+		strength: 1,
+		// 0 keeps this view's long-standing evenly-spread band; the
+		// solar-system shells concentrate theirs against the limb instead.
+		limbConcentration: 0,
 	})
+	atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
 	const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat)
 	globeGroup.add(atmosMesh)
 

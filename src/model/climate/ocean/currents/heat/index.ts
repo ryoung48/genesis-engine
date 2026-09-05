@@ -4,7 +4,8 @@ import type {
 } from "@/model/climate/ocean/currents/heat/types"
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 
-const THERMOCLINE_CONTRAST = 8
+const THERMOCLINE_DESCENT = 0.5
+const MAX_THERMOCLINE_CONTRAST = 12
 const AIR_SEA_RESTORING = 10
 
 function solve({ grid, circulation, yearSeconds }: OceanHeatInput): OceanHeat {
@@ -24,14 +25,21 @@ function solve({ grid, circulation, yearSeconds }: OceanHeatInput): OceanHeat {
 			formation.set(grid.body[r], average)
 	}
 	// Divergence entrains water from just below the mixed layer, not from the
-	// abyss: the thermocline sits a fixed contrast below the local surface,
-	// floored at the temperature the body forms its deep water at.
+	// abyss, so the entrained temperature lies part of the way from the local
+	// surface down to the temperature the body forms its deep water at. As a
+	// fraction rather than a fixed contrast it follows the stratification: a
+	// sharp shallow tropical thermocline, almost none under a polar surface
+	// already near freezing.
 	for (let r = 0; r < n; r++) {
 		if (!grid.ocean[r]) continue
-		deep[r] = Math.max(
-			Math.max(-1.8, formation.get(grid.body[r]) as number),
-			grid.climate.temperature_avg[r] - THERMOCLINE_CONTRAST,
-		)
+		const source = Math.max(-1.8, formation.get(grid.body[r]) as number)
+		const average = grid.climate.temperature_avg[r]
+		deep[r] =
+			average -
+			Math.min(
+				THERMOCLINE_DESCENT * Math.max(0, average - source),
+				MAX_THERMOCLINE_CONTRAST,
+			)
 	}
 	// Restoring toward the baseline, which is already the equilibrium the
 	// atmosphere holds without ocean transport -- so this damps only what the

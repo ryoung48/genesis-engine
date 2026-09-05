@@ -38,16 +38,9 @@ export interface GenesisRainfall {
 }
 
 export interface GenesisOceanCurrents {
-	// SST anomaly relative to the monthly zonal mean, divided by the display scale.
+	// Normalized heuristic coastal anomaly, with a fading land influence.
 	sst: Float32Array
 	sstMonthly: Float32Array
-	// Physical eastward/northward surface velocity in m/s, month-major.
-	uMonthly: Float32Array
-	vMonthly: Float32Array
-	temperatureDeltaMonthly: Float32Array
-	ocean: Uint8Array
-	circulationCycleError: number
-	heatCycleError: number
 }
 
 export interface GenesisHydrology {

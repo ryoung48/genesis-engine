@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { MOON } from "@/model/celestial/moons"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { buildBodyAtmosphereShell } from "@/ui/genesis/renderer/atmosphere-shell"
 import {
 	createNameLabel,
 	createNameLeaderLine,
@@ -276,6 +277,13 @@ export interface MoonOrbitState {
 	 * the same method on SolarSystemOverlayState for why this needs its own
 	 * per-frame hook. */
 	updateLabelOrientations?(camera: THREE.PerspectiveCamera): void
+	/** Relights every moon atmosphere shell from `direction` (world space,
+	 * pointing from the body toward its star). The parent planet's own
+	 * direction is passed straight through: a moon orbits several orders of
+	 * magnitude closer to its planet than the planet does to its star, so the
+	 * two differ by a negligible fraction of a degree. No-op when no moon in
+	 * this system has a renderable atmosphere. */
+	setAtmosphereSunDirection?(direction: THREE.Vector3): void
 }
 
 export function buildMoonOrbitOverlay(
@@ -353,6 +361,10 @@ export function buildMoonOrbitOverlay(
 	})
 
 	const moonMeshes: THREE.Mesh[] = []
+	const moonAtmosphereShells: THREE.Mesh<
+		THREE.SphereGeometry,
+		THREE.ShaderMaterial
+	>[] = []
 	const moonData: Array<{
 		a: number
 		b: number
@@ -436,6 +448,22 @@ export function buildMoonOrbitOverlay(
 		)
 		group.add(moonMesh)
 		moonMeshes.push(moonMesh)
+
+		// Parented to the moon mesh, like its cloud shell -- moon geometry
+		// bakes its radius in rather than scaling a unit sphere, so the shell
+		// is sized in the same absolute units. Inheriting the mesh's tilt/spin
+		// is harmless: the shell is a sphere, and the shader works from world
+		// normals either way.
+		const moonAtmosphere = buildBodyAtmosphereShell({
+			atmosphere: moon.atmosphere,
+			bodySwatchHex:
+				CLASSIFICATION_COLOR[moon.classification] ?? ROCKY_SIBLING_COLOR,
+			sceneRadius: moonR,
+		})
+		if (moonAtmosphere) {
+			moonMesh.add(moonAtmosphere)
+			moonAtmosphereShells.push(moonAtmosphere)
+		}
 
 		// Name label — a translate-only anchor (not the moonMesh itself, which
 		// rotates via axial tilt + spin) so the label/leader don't inherit
@@ -592,6 +620,12 @@ export function buildMoonOrbitOverlay(
 		}
 	}
 
+	function setAtmosphereSunDirection(direction: THREE.Vector3) {
+		for (const shell of moonAtmosphereShells) {
+			shell.material.uniforms.sunDirection.value.copy(direction)
+		}
+	}
+
 	return {
 		group,
 		setDay,
@@ -600,5 +634,6 @@ export function buildMoonOrbitOverlay(
 		setSpinHours,
 		getMoonIndexForMesh,
 		updateLabelOrientations,
+		setAtmosphereSunDirection,
 	}
 }

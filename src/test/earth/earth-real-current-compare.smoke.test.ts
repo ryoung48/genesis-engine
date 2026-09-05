@@ -2,20 +2,12 @@ import { describe, expect, it } from "vitest"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import type { GenesisParams } from "@/model/pipelines/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
 
-const LAT_BANDS = [
-	{ label: "0-5 (equatorial)", lo: 0, hi: 5 },
-	{ label: "5-15 (tropics)", lo: 5, hi: 15 },
-	{ label: "15-30 (subtropics)", lo: 15, hi: 30 },
-	{ label: "30-45 (midlatitude)", lo: 30, hi: 45 },
-	{ label: "45-60 (southern ocean)", lo: 45, hi: 60 },
-	{ label: "60-90 (polar)", lo: 60, hi: 90 },
-]
-
-describe("wind-driven ocean circulation against Earth climatology", () => {
-	it("compares monthly vectors and SST with GODAS and OISST", () => {
+describe("restored heuristic ocean model", () => {
+	it("reports OISST error and restores the original land-only thermal influence", () => {
 		const earth = loadEarthGrayscale("earth.png")
 		const coastline = loadEarthGrayscale("coastline-mask.png")
 		const lake = loadEarthGrayscale("lake-mask.png")
@@ -52,140 +44,114 @@ describe("wind-driven ocean circulation against Earth climatology", () => {
 				craters: 0,
 			},
 		})
-		const sample = (name: string) => {
-			const raster = loadEarthMonthlyRaster(name)
-			return OBSERVED_EARTH.sampleMonthlyFloatRaster({
-				mesh: world.mesh,
-				raster: raster.monthly,
-				rasterW: raster.width,
-				rasterH: raster.height,
-				months: raster.months,
-				scale: raster.scale,
-				nodata: raster.nodata,
-			})
-		}
-		const observedU = sample("earth-real-current-u"),
-			observedV = sample("earth-real-current-v"),
-			observedSst = sample("earth-real-sst-anomaly")
-		// The pipeline forces an Earth import's currents with the observed wind
-		// field, so this measures the ocean model alone.
+		const raster = loadEarthMonthlyRaster("earth-real-sst-anomaly")
+		const observed = OBSERVED_EARTH.sampleMonthlyFloatRaster({
+			mesh: world.mesh,
+			raster: raster.monthly,
+			rasterW: raster.width,
+			rasterH: raster.height,
+			months: raster.months,
+			scale: raster.scale,
+			nodata: raster.nodata,
+		})
 		const currents = world.oceanCurrents!
 		const n = world.mesh.numRegions
-		const bands = LAT_BANDS.map((band) => ({
-			band,
-			count: 0,
-			squared: 0,
-			zeroSquared: 0,
-			cosine: 0,
-			directional: 0,
-			speed: 0,
-			observedSpeed: 0,
-			sstSquared: 0,
-			sstZero: 0,
-			sstCount: 0,
-		}))
-		let maxSpeed = 0
-		for (let i = 0; i < observedU.length; i++) {
-			const r = i % n
-			if (!currents.ocean[r]) {
-				expect(currents.uMonthly[i]).toBe(0)
-				expect(currents.vMonthly[i]).toBe(0)
-				continue
-			}
-			const u = currents.uMonthly[i],
-				v = currents.vMonthly[i]
-			expect(Number.isFinite(u + v + currents.temperatureDeltaMonthly[i])).toBe(
-				true,
-			)
-			const speed = Math.hypot(u, v),
-				observedSpeed = Math.hypot(observedU[i], observedV[i])
-			maxSpeed = Math.max(maxSpeed, speed)
-			const latitude = Math.abs(
-				(Math.asin(world.mesh.r_xyz[3 * r + 2]) * 180) / Math.PI,
-			)
-			const bucket = bands.find(
-				({ band }) => latitude >= band.lo && latitude < band.hi,
-			)
-			if (!bucket) continue
-			if (Number.isFinite(observedSpeed)) {
-				bucket.count++
-				bucket.squared += (u - observedU[i]) ** 2 + (v - observedV[i]) ** 2
-				bucket.zeroSquared += observedSpeed ** 2
-				bucket.speed += speed
-				bucket.observedSpeed += observedSpeed
-				if (speed > 0.02 && observedSpeed > 0.02) {
-					bucket.cosine +=
-						(u * observedU[i] + v * observedV[i]) / (speed * observedSpeed)
-					bucket.directional++
+		expect(OCEAN_CURRENTS.sstAnomalySaturationC).toBe(9)
+		expect(currents.sstMonthly.length).toBe(n * 12)
+		const climate = {
+			...world.climate,
+			temperature_monthly: new Float32Array(n * 12).fill(10),
+			temperature_avg: new Float32Array(n).fill(10),
+		}
+		OCEAN_CURRENTS.applySSTToClimate({
+			mesh: world.mesh,
+			climate,
+			isLand: world.isLand,
+			oceanCurrents: currents,
+			isLocked: false,
+		})
+		let count = 0,
+			squared = 0,
+			northAtlantic = 0,
+			northCount = 0
+		for (let r = 0; r < n; r++) {
+			let mean = 0
+			const lat = (Math.asin(world.mesh.r_xyz[3 * r + 2]) * 180) / Math.PI
+			const lon =
+				(Math.atan2(world.mesh.r_xyz[3 * r + 1], world.mesh.r_xyz[3 * r]) *
+					180) /
+				Math.PI
+			for (let m = 0; m < 12; m++) {
+				const i = m * n + r,
+					value = currents.sstMonthly[i]
+				expect(Number.isFinite(value)).toBe(true)
+				expect(Math.abs(value)).toBeLessThanOrEqual(1)
+				mean += value / 12
+				expect(climate.temperature_monthly[i]).toBeCloseTo(
+					10 + (world.isLand[r] ? value * 9 : 0),
+					4,
+				)
+				if (!world.isLand[r] && Number.isFinite(observed[i])) {
+					squared += (value * 9 - observed[i]) ** 2
+					count++
+					if (lat >= 52 && lat <= 65 && lon >= -25 && lon <= 5) {
+						northAtlantic += value * 9
+						northCount++
+					}
 				}
 			}
-			if (Number.isFinite(observedSst[i])) {
-				bucket.sstCount++
-				bucket.sstSquared +=
-					(currents.sstMonthly[i] * OCEAN_CURRENTS.sstAnomalySaturationC -
-						observedSst[i]) **
-					2
-				bucket.sstZero += observedSst[i] ** 2
-			}
+			expect(currents.sst[r]).toBeCloseTo(mean, 5)
 		}
-		const total = bands.reduce(
-			(sum, bucket) => ({
-				count: sum.count + bucket.count,
-				squared: sum.squared + bucket.squared,
-				zeroSquared: sum.zeroSquared + bucket.zeroSquared,
-				cosine: sum.cosine + bucket.cosine,
-				directional: sum.directional + bucket.directional,
-				speed: sum.speed + bucket.speed,
-				observedSpeed: sum.observedSpeed + bucket.observedSpeed,
-				sstSquared: sum.sstSquared + bucket.sstSquared,
-				sstZero: sum.sstZero + bucket.sstZero,
-				sstCount: sum.sstCount + bucket.sstCount,
-			}),
-			{
-				count: 0,
-				squared: 0,
-				zeroSquared: 0,
-				cosine: 0,
-				directional: 0,
-				speed: 0,
-				observedSpeed: 0,
-				sstSquared: 0,
-				sstZero: 0,
-				sstCount: 0,
-			},
-		)
-		for (const bucket of [
-			...bands.map((entry) => ({ label: entry.band.label, ...entry })),
-			{ label: "global", ...total },
-		])
-			process.stdout.write(
-				`${bucket.label.padEnd(22)} speed=${(bucket.speed / bucket.count).toFixed(4)} observed=${(bucket.observedSpeed / bucket.count).toFixed(4)} cosine=${(bucket.cosine / bucket.directional).toFixed(3)} vectorRMSE=${Math.sqrt(bucket.squared / bucket.count).toFixed(4)} restingRMSE=${Math.sqrt(bucket.zeroSquared / bucket.count).toFixed(4)} sstRMSE=${Math.sqrt(bucket.sstSquared / bucket.sstCount).toFixed(3)} zonalSstRMSE=${Math.sqrt(bucket.sstZero / bucket.sstCount).toFixed(3)}
-`,
+		expect(count).toBeGreaterThan(1000)
+		expect(northCount).toBeGreaterThan(100)
+		expect(northAtlantic / northCount).toBeGreaterThan(0.5)
+		const lockedParams: GenesisParams = {
+			...world.params,
+			tideLock: { type: "solar", target: 0 },
+			substellarLon: 0,
+			eccentricity: 0,
+			obliquity: 0,
+		}
+		const locked = OCEAN_CURRENTS.computeSST({
+			mesh: world.mesh,
+			isLand: world.isLand,
+			landmarks: world.landmarks!,
+			distCoast: new Float32Array(n),
+			monthlyTEQ: [],
+			eastAdv: new Float32Array(n),
+			westAdv: new Float32Array(n),
+			params: lockedParams,
+		})
+		climate.temperature_monthly.fill(10)
+		OCEAN_CURRENTS.applySSTToClimate({
+			mesh: world.mesh,
+			climate,
+			isLand: world.isLand,
+			oceanCurrents: locked,
+			isLocked: true,
+		})
+		for (let i = 0; i < n * 12; i++) {
+			const r = i % n
+			expect(locked.sstMonthly[i]).toBeCloseTo(locked.sst[r], 5)
+			expect(climate.temperature_monthly[i]).toBeCloseTo(
+				10 + (world.isLand[r] ? locked.sstMonthly[i] * 6 * 0.68 : 0),
+				4,
 			)
+		}
+		for (const params of [world.params, lockedParams]) {
+			const display = OCEAN_CURRENTS.buildOceanCurrentGrid({
+				mesh: world.mesh,
+				isLand: world.isLand,
+				oceanCurrents: params === lockedParams ? locked : currents,
+				month: 0,
+				params,
+			})
+			expect(display.u.every(Number.isFinite)).toBe(true)
+			expect(display.v.every(Number.isFinite)).toBe(true)
+			expect(display.speed.some((value) => value > 0)).toBe(true)
+		}
 		process.stdout.write(
-			`maxSpeed=${maxSpeed.toFixed(3)} cycleError=${currents.circulationCycleError.toExponential(2)} heatCycleError=${currents.heatCycleError.toExponential(2)}
-`,
+			`Heuristic OISST anomaly RMSE=${Math.sqrt(squared / count).toFixed(3)} C; North Atlantic anomaly=${(northAtlantic / northCount).toFixed(3)} C\n`,
 		)
-		expect(total.count).toBeGreaterThan(10000)
-		expect(maxSpeed).toBeLessThan(5)
-		expect(currents.heatCycleError).toBeLessThan(0.02)
-		// Skill, not agreement: the model has to beat the two null hypotheses --
-		// a motionless ocean for the vectors, and a purely zonal SST for the heat
-		// transport. Thresholds carry a little headroom over measured values.
-		expect(Math.sqrt(total.squared / total.count)).toBeLessThan(
-			Math.sqrt(total.zeroSquared / total.count),
-		)
-		expect(total.cosine / total.directional).toBeGreaterThan(0.65)
-		expect(Math.sqrt(total.sstSquared / total.sstCount)).toBeLessThan(
-			Math.sqrt(total.sstZero / total.sstCount),
-		)
-		// The Southern Ocean and the polar cap still sit level with the zonal
-		// baseline: both want a sea-ice treatment the model does not have yet.
-		for (const bucket of bands.slice(0, 4))
-			expect([
-				bucket.band.label,
-				Math.sqrt(bucket.sstSquared / bucket.sstCount) <
-					Math.sqrt(bucket.sstZero / bucket.sstCount),
-			]).toEqual([bucket.band.label, true])
 	})
 })

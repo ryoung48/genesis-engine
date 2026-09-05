@@ -117,7 +117,7 @@ export function createGenesisScene(
 		stepFocusTween: () => stepFocusTween(),
 		stepPulse: () => stepPulse(),
 		stepSolarSystemFocusTween: () => stepSolarSystemFocusTween(),
-		renderSolarSystemWithLensing: () => renderSolarSystemWithLensing(),
+		renderSolarSystemView: () => renderSolarSystemView(),
 		updateSolarTerminatorLabels: (radius) =>
 			updateSolarTerminatorLabels(radius),
 	})
@@ -216,7 +216,7 @@ export function createGenesisScene(
 		updateOverlayVisibility: () => updateOverlayVisibility(),
 	})
 	const {
-		renderSolarSystemWithLensing,
+		renderSolarSystemView,
 		stepSolarSystemFocusTween,
 		focusOnSystemBody,
 		setMoonOrbitOverlay,

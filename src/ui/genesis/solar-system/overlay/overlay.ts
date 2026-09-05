@@ -4,6 +4,7 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { uiPalette } from "@/ui/components/tokens"
+import { buildBodyAtmosphereShell } from "@/ui/genesis/renderer/atmosphere-shell"
 import {
 	createNameLabel,
 	createNameLeaderLine,
@@ -24,6 +25,10 @@ import {
 	perifocalBasis,
 	solveKepler,
 } from "@/ui/genesis/renderer/moon-orbit-overlay"
+import {
+	buildStarSurfaceLayers,
+	STAR_GLOW_RADIUS_SCALE,
+} from "@/ui/genesis/renderer/star-surface-material"
 import { scaleBodyDiameterToVisualRadius } from "@/ui/genesis/shared/moon-visual-scale"
 import {
 	buildAsteroidField,
@@ -33,6 +38,8 @@ import {
 	BELT_SCENE_RADIUS,
 	BELT_WIDTH_MIN,
 	BELT_WIDTH_RATIO,
+	BODY_LOD_SEGMENTS,
+	BODY_LOD_THRESHOLDS,
 	CLASSIFICATION_COLOR,
 	DEG2RAD,
 	FULL_OCEAN_COLOR,
@@ -53,7 +60,6 @@ import {
 import {
 	createStarGlowTexture,
 	loadBodyTexture,
-	loadGrayscaleSunTexture,
 } from "@/ui/genesis/solar-system/overlay/textures"
 import type {
 	OrbitAddress,
@@ -71,6 +77,22 @@ import type {
 // ORBIT_GAP_STAR_RADII, one level up.
 const COMPANION_ORBIT_GAP_FACTOR = 0.4
 const COMPANION_ORBIT_LINE_COLOR = 0xfbbf24
+
+// One shared unit sphere per tessellation tier, reused by every body mesh
+// (and cloud shell) currently at that tier -- see BODY_LOD_SEGMENTS. Kept at
+// module scope, and flagged so an overlay's own dispose() traversal leaves
+// them alone, exactly like the shared body textures.
+const sharedBodyGeometries: THREE.SphereGeometry[] = []
+
+function bodyGeometryForTier(tier: number): THREE.SphereGeometry {
+	const existing = sharedBodyGeometries[tier]
+	if (existing) return existing
+	const segments = BODY_LOD_SEGMENTS[tier]!
+	const geometry = new THREE.SphereGeometry(1, segments.width, segments.height)
+	geometry.userData.sharedGeometry = true
+	sharedBodyGeometries[tier] = geometry
+	return geometry
+}
 
 /**
  * Builds one star's full worth of orbiting bodies -- the star mesh/glow/
@@ -189,28 +211,35 @@ export function buildSolarSystemOverlay(
 				? "/textures/celestial/generated/dwarfs/T.png"
 				: "/textures/celestial/generated/dwarfs/Y.png"
 	const whiteDwarfTexturePath = "/textures/celestial/generated/dwarfs/D.png"
-	// A real photographic sun texture (NASA-derived, via Solar System Scope),
-	// desaturated then tinted per spectral class — see loadGrayscaleSunTexture.
-	const standardStarMaterial = new THREE.MeshBasicMaterial({
-		color: isBlackHole
-			? 0x000000
-			: isBrownDwarf || isWhiteDwarf
-				? 0xffffff
-				: starColor,
-		map: isBrownDwarf
-			? loadBodyTexture(brownDwarfTexturePath)
-			: isWhiteDwarf
-				? loadBodyTexture(whiteDwarfTexturePath)
-				: null,
-	})
-	const starMaterial = standardStarMaterial
-	const surfaceTextureLoad =
-		isBlackHole || isNeutronStar || isWhiteDwarf || isBrownDwarf
-			? { cancel: (): void => undefined }
-			: loadGrayscaleSunTexture((texture) => {
-					standardStarMaterial.map = texture
-					standardStarMaterial.needsUpdate = true
-				})
+	// An ordinary star renders as a live photosphere: domain-warped fbm
+	// granulation plus its own corona shell (see star-surface-material.ts),
+	// which is why it needs no surface texture at all. The exotic remnants and
+	// brown dwarfs below aren't photospheres in any meaningful sense and keep
+	// their own flat textured/tinted materials and the sprite halo.
+	const hasPhotosphere =
+		!isBlackHole && !isNeutronStar && !isWhiteDwarf && !isBrownDwarf
+	const starSurfaceLayers = hasPhotosphere
+		? buildStarSurfaceLayers({
+				spectralClass: renderSpectralClass,
+				tint: starColor,
+				diameterSol: starDiameterSol,
+			})
+		: null
+	const starMaterial: THREE.Material =
+		starSurfaceLayers?.surface ??
+		new THREE.MeshBasicMaterial({
+			color: isBlackHole
+				? 0x000000
+				: isBrownDwarf || isWhiteDwarf
+					? 0xffffff
+					: starColor,
+			map: isBrownDwarf
+				? loadBodyTexture(brownDwarfTexturePath)
+				: isWhiteDwarf
+					? loadBodyTexture(whiteDwarfTexturePath)
+					: null,
+		})
+
 	const starMesh = new THREE.Mesh(
 		new THREE.SphereGeometry(
 			isBlackHole
@@ -229,6 +258,21 @@ export function buildSolarSystemOverlay(
 	// mesh elsewhere in this renderer.
 	starMesh.rotation.x = Math.PI / 2
 	group.add(starMesh)
+	if (starSurfaceLayers) {
+		// A unit sphere scaled to the star, so the corona tracks it if
+		// starRadius is ever recomputed.
+		const coronaMesh = new THREE.Mesh(
+			new THREE.SphereGeometry(1, 48, 32),
+			starSurfaceLayers.glow,
+		)
+		coronaMesh.scale.setScalar(starRadius * STAR_GLOW_RADIUS_SCALE)
+		// Decorative: a raycast hit here must not resolve to the star, or it
+		// would swallow clicks aimed at anything behind the corona.
+		coronaMesh.raycast = () => {
+			// Intentionally inert -- see doc above.
+		}
+		group.add(coronaMesh)
+	}
 	let blackHoleDiskMaterial: THREE.ShaderMaterial | null = null
 	let blackHoleMesh: THREE.Mesh | null = null
 	const HOLE_RADIUS = 0.3
@@ -460,7 +504,7 @@ export function buildSolarSystemOverlay(
 	glowSprite.scale.setScalar(
 		starRadius * (isBlackHole ? 2 : isNeutronStar || isWhiteDwarf ? 5 : 3),
 	)
-	if (!isBlackHole && !isBrownDwarf) group.add(glowSprite)
+	if (!isBlackHole && !isBrownDwarf && !starSurfaceLayers) group.add(glowSprite)
 	else {
 		glowTexture.dispose()
 		glowSprite.material.dispose()
@@ -561,6 +605,7 @@ export function buildSolarSystemOverlay(
 				sceneRadius: BELT_SCENE_RADIUS,
 				moonSystemOuterRadius: BELT_SCENE_RADIUS,
 				isBelt: true,
+				lodTier: 0,
 				orbitRadius: 0,
 				meanAnomalyAtEpoch,
 			}
@@ -635,7 +680,7 @@ export function buildSolarSystemOverlay(
 								roughness: 0.9,
 								metalness: 0,
 							})
-		const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), material)
+		const mesh = new THREE.Mesh(bodyGeometryForTier(0), material)
 		// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
 		// XY (Z-north) — textured bodies need the same quarter-turn so their
 		// maps don't render "on their side". Untextured rocky spheres looked
@@ -670,15 +715,21 @@ export function buildSolarSystemOverlay(
 				metalness: 0,
 			})
 			boostCloudAlphaMap(cloudsMaterial)
-			cloudsMesh = new THREE.Mesh(
-				new THREE.SphereGeometry(1, 24, 18),
-				cloudsMaterial,
-			)
+			cloudsMesh = new THREE.Mesh(bodyGeometryForTier(0), cloudsMaterial)
 			cloudsMesh.rotation.x = Math.PI / 2
 			cloudsMesh.scale.setScalar(sceneRadius * 1.025)
 			cloudsMesh.renderOrder = 2
 			bodyGroup.add(cloudsMesh)
 		}
+		// Drawn after the surface and any cloud shell (renderOrder 3 against
+		// the cloud shell's 2), so the limb glow reads as sitting above both.
+		const atmosphereMesh = buildBodyAtmosphereShell({
+			atmosphere: body.atmosphere,
+			bodySwatchHex,
+			sceneRadius,
+		})
+		if (atmosphereMesh) bodyGroup.add(atmosphereMesh)
+
 		let ringMesh: THREE.Mesh | undefined
 		if (body.rings) {
 			const ringGeometry = new THREE.RingGeometry(
@@ -778,8 +829,10 @@ export function buildSolarSystemOverlay(
 			sceneRadius,
 			moonSystemOuterRadius,
 			isBelt: false,
+			lodTier: 0,
 			bodyGroup,
 			mesh,
+			atmosphereMesh,
 			cloudsMesh,
 			ringMesh,
 			meshRestQuaternion: mesh.quaternion.clone(),
@@ -1336,6 +1389,8 @@ export function buildSolarSystemOverlay(
 		return centerFacingAngle - substellarLonRad
 	}
 
+	const sunDirectionToStar = new THREE.Vector3()
+
 	function setDay(day: number) {
 		currentDay = day
 		for (const p of placed) {
@@ -1363,6 +1418,18 @@ export function buildSolarSystemOverlay(
 				p.kepler.Q,
 			)
 			p.bodyGroup.position.copy(pos)
+			// The star sits at this group's origin, so the direction from the
+			// body back to it is just its negated position. Directions are
+			// unaffected by the group's own translation (a companion star's
+			// mount), so this is already the world-space direction the shader
+			// wants.
+			sunDirectionToStar.copy(pos).negate().normalize()
+			p.atmosphereMesh?.material.uniforms.sunDirection.value.copy(
+				sunDirectionToStar,
+			)
+			// Moons reuse their planet's direction -- see
+			// setAtmosphereSunDirection's own doc for why that is exact enough.
+			p.moonState?.setAtmosphereSunDirection?.(sunDirectionToStar)
 			p.moonState?.setDay(day)
 		}
 		for (const c of placedCompanions) {
@@ -1389,7 +1456,6 @@ export function buildSolarSystemOverlay(
 	setDay(initialDay)
 
 	function dispose() {
-		surfaceTextureLoad.cancel()
 		for (const p of placed) p.moonState?.dispose()
 		for (const c of placedCompanions) c.overlay.dispose()
 		// troika Text's own dispose() releases its SDF glyph atlas/font
@@ -1403,7 +1469,11 @@ export function buildSolarSystemOverlay(
 		}
 		group.traverse((obj) => {
 			if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
-				obj.geometry.dispose()
+				// Body/cloud meshes share one unit sphere per tessellation tier
+				// across every overlay ever built (see bodyGeometryForTier), so
+				// disposing one here would break every other body still using it
+				// -- same reasoning as the shared body textures just below.
+				if (!obj.geometry.userData.sharedGeometry) obj.geometry.dispose()
 				const materials = Array.isArray(obj.material)
 					? obj.material
 					: [obj.material]
@@ -1438,6 +1508,40 @@ export function buildSolarSystemOverlay(
 	}
 
 	const suggestedCameraDistance = previousOuterEdge * 2.2
+
+	const lodWorldPosition = new THREE.Vector3()
+
+	// Bodies are drawn from a shared low-tessellation sphere by default, which
+	// is indistinguishable from a smooth one until a body actually fills part
+	// of the screen — at which point its silhouette turns visibly polygonal.
+	// Apparent size is what decides that, not distance alone: a jovian and a
+	// dwarf at the same range need different tiers. Only one or two bodies can
+	// be large on screen at once, so the higher tiers cost close to nothing.
+	function updateLevelOfDetail(camera: THREE.PerspectiveCamera): void {
+		const halfHeightTangent = Math.tan((camera.fov * DEG2RAD) / 2)
+		for (const p of placed) {
+			if (p.isBelt || !p.mesh || !p.bodyGroup) continue
+			p.bodyGroup.getWorldPosition(lodWorldPosition)
+			const distance = camera.position.distanceTo(lodWorldPosition)
+			// The body's projected radius as a fraction of the viewport's
+			// half-height — resolution-independent, and correct for any fov.
+			const relativeRadius =
+				p.sceneRadius / Math.max(distance * halfHeightTangent, 1e-6)
+			let tier = 0
+			while (
+				tier < BODY_LOD_THRESHOLDS.length &&
+				relativeRadius >= BODY_LOD_THRESHOLDS[tier]!
+			) {
+				tier++
+			}
+			if (p.lodTier === tier) continue
+			p.lodTier = tier
+			const geometry = bodyGeometryForTier(tier)
+			p.mesh.geometry = geometry
+			if (p.cloudsMesh) p.cloudsMesh.geometry = geometry
+		}
+		for (const c of placedCompanions) c.overlay.updateLevelOfDetail(camera)
+	}
 
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
 		if (starNameLabel && starNameLeader) {
@@ -1511,6 +1615,7 @@ export function buildSolarSystemOverlay(
 
 	function setSpinHours(hours: number) {
 		currentSpinHours = hours
+		starSurfaceLayers?.setSpinHours(hours)
 		if (blackHoleDiskMaterial) {
 			blackHoleDiskMaterial.uniforms.time.value = hours
 		}
@@ -1612,6 +1717,16 @@ export function buildSolarSystemOverlay(
 			if (p.body.group !== nextBody.group) return false
 			if (!!p.body.rings !== !!nextBody.rings) return false
 			if (p.body.texturePath !== nextBody.texturePath) return false
+			// The atmosphere shell's colour, thickness and strength are all
+			// baked in at build time, so an edited atmosphere needs a full
+			// rebuild rather than the in-place update below.
+			if (p.body.atmosphere?.type !== nextBody.atmosphere?.type) return false
+			if (p.body.atmosphere?.pressureBar !== nextBody.atmosphere?.pressureBar) {
+				return false
+			}
+			if (p.body.atmosphere?.tainted !== nextBody.atmosphere?.tainted) {
+				return false
+			}
 			if (p.body.cloudsTexturePath !== nextBody.cloudsTexturePath) return false
 			p.body = nextBody
 			if (!p.isBelt) rebuildMoonState(p)
@@ -1635,6 +1750,7 @@ export function buildSolarSystemOverlay(
 		suggestedCameraDistance,
 		setDay,
 		updateBodies,
+		updateLevelOfDetail,
 		dispose,
 		getBodyFocus,
 		setSpinHours,

@@ -1,6 +1,7 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
 import { DYNAMICS } from "@/model/climate/weather/wind/dynamics"
+import { SHALLOW_WATER } from "@/model/climate/weather/wind/shallow-water"
 import type {
 	CellSegment,
 	ComputeWindVectorsInput,
@@ -277,6 +278,20 @@ const POLAR_TROUGH_LAND_AMPLITUDE = 0
 // gravity-wave speed over friction, in template units): how much a
 // convergent low fills before the flow into it stops.
 const WAVE_COUPLING = 0.002
+// Which large-scale solver reshapes the template before the surface balance.
+const LARGE_SCALE_SOLVER: "linear" | "shallow-water" = "linear"
+const EARTH_POLAR_CORIOLIS = 1.458e-4
+// Western-boundary flow: along the western edge of an ocean basin the
+// surface flow carries an along-boundary component toward the summer pole,
+// the stand-in for the western intensification a steady balance cannot
+// produce (cross-equatorial jets near the equator, the poleward western
+// flank of the summer subtropical anticyclone). It decays eastward over
+// the ocean and is turned in the Coriolis sense.
+const BOUNDARY_FLOW_MS = 8
+const BOUNDARY_TURN_DEG = 30
+const BOUNDARY_DECAY_BINS = 3
+const BOUNDARY_REACH_BINS = 6
+const BOUNDARY_LAND_MIN = 0.5
 const DEG2RAD = Math.PI / 180
 
 function cellBoundaries({
@@ -565,6 +580,7 @@ function computeWindVectors({
 		sinLat: sinLatArr,
 		edgeEastward,
 		edgeNorthward,
+		regionBin,
 	} = RAIN.getClimateGeometry(mesh)
 
 	const hoursPerDay = params?.hoursPerDay ?? TIME.hoursPerDay
@@ -657,15 +673,76 @@ function computeWindVectors({
 		hoursPerDay,
 	})
 	const { lonDeg } = RAIN.getClimateGeometry(mesh)
-	const dynamic = DYNAMICS.correction({
-		latDeg,
-		lonDeg,
-		pressure,
-		friction: FRICTION,
-		coriolisScale: coriolisSign * omegaRatio,
-		waveCoupling: WAVE_COUPLING,
-	})
-	for (let r = 0; r < N; r++) pressure[r] += dynamic[r]
+	// Large-scale flow: either a steady linear correction to the pressure the
+	// per-cell balance then sees, or a time-stepped shallow-water surface wind
+	// whose coarse pressure is removed from the per-cell balance so only the
+	// sub-grid part (coastal heat lows, terrain) is added locally.
+	let largeScaleU: Float32Array | null = null
+	let largeScaleV: Float32Array | null = null
+	if (LARGE_SCALE_SOLVER === "shallow-water") {
+		const sw = SHALLOW_WATER.surfaceWind({
+			latDeg,
+			lonDeg,
+			pressure,
+			elevation_km,
+			planetRadiusM: planetRadiusKm * 1000,
+			coriolisPolar: coriolisSign * omegaRatio * EARTH_POLAR_CORIOLIS,
+		})
+		largeScaleU = sw.u
+		largeScaleV = sw.v
+		for (let r = 0; r < N; r++) pressure[r] -= sw.coarsePressure[r]
+	} else {
+		const dynamic = DYNAMICS.correction({
+			latDeg,
+			lonDeg,
+			pressure,
+			friction: FRICTION,
+			coriolisScale: coriolisSign * omegaRatio,
+			waveCoupling: WAVE_COUPLING,
+		})
+		for (let r = 0; r < N; r++) pressure[r] += dynamic[r]
+	}
+	const rawPerMs = 1 / (SPEED_SCALE * radiusFactor * pressureFactor)
+
+	// Land fraction on a coarse lat-lon grid and, per cell, how far east of a
+	// western land boundary it sits.
+	const lonBinCount = teqByLon.length
+	const latBinCount = OCEAN_BINS
+	const landCount = new Float32Array(lonBinCount * latBinCount)
+	const cellCount = new Float32Array(lonBinCount * latBinCount)
+	for (let r = 0; r < N; r++) {
+		const idx = oceanBinOf(latDeg[r]) * lonBinCount + regionBin[r]
+		cellCount[idx]++
+		if (elevation_km[r] > 0) landCount[idx]++
+	}
+	const landFracAt = (latBin: number, lonBin: number) => {
+		const idx =
+			latBin * lonBinCount +
+			(((lonBin % lonBinCount) + lonBinCount) % lonBinCount)
+		return cellCount[idx] > 0 ? landCount[idx] / cellCount[idx] : 0
+	}
+	const boundaryStrength = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const latBin = oceanBinOf(latDeg[r])
+		const own = landFracAt(latBin, regionBin[r])
+		if (own >= BOUNDARY_LAND_MIN) {
+			// A coastal land cell is a western boundary only with ocean east of it.
+			const eastIsOcean =
+				landFracAt(latBin, regionBin[r] + 1) < BOUNDARY_LAND_MIN ? 1 : 0
+			boundaryStrength[r] = (1 - own) * eastIsOcean
+			continue
+		}
+		for (let k = 1; k <= BOUNDARY_REACH_BINS; k++) {
+			if (landFracAt(latBin, regionBin[r] - k) < BOUNDARY_LAND_MIN) continue
+			boundaryStrength[r] = Math.exp(-(k - 1) / BOUNDARY_DECAY_BINS)
+			break
+		}
+	}
+	const declination = hasMonth ? climate.declination_monthly[month] : 0
+	const obliquity = Math.max(1, Math.abs(params?.obliquity ?? 23.4))
+	const seasonSign = Math.sign(declination)
+	const seasonMag = Math.min(1, Math.abs(declination) / obliquity)
+	const boundaryTurn = BOUNDARY_TURN_DEG * DEG2RAD
 
 	const windU = new Float32Array(N)
 	const windV = new Float32Array(N)
@@ -734,6 +811,24 @@ function computeWindVectors({
 		const roughness = surface ? surfaceWindFactor({ r, surface }) : 1
 		let u = bl.u * roughness
 		let v = bl.v * roughness
+		if (seasonSign !== 0 && boundaryStrength[r] > 0) {
+			const lat = latDeg[r]
+			const tropical = Math.exp(-((lat / (0.5 * hw)) ** 2))
+			const summerSide = Math.sign(lat) === seasonSign ? 1 : 0
+			const subtropical =
+				summerSide * Math.exp(-(((Math.abs(lat) - hw) / (hw / 3)) ** 2))
+			const weight = Math.min(1, tropical + subtropical)
+			const speed =
+				BOUNDARY_FLOW_MS * seasonMag * weight * boundaryStrength[r] * rawPerMs
+			const east =
+				seasonSign * Math.sign(lat) * coriolisSign * Math.sin(boundaryTurn)
+			u += speed * east * roughness
+			v += speed * seasonSign * Math.cos(boundaryTurn) * roughness
+		}
+		if (largeScaleU && largeScaleV) {
+			u += largeScaleU[r] * rawPerMs * roughness
+			v += largeScaleV[r] * rawPerMs * roughness
+		}
 
 		// Katabatic drainage: over cold sloped surfaces (ice sheets, high
 		// plateaus) dense surface air is pushed downhill. It is a shallow,

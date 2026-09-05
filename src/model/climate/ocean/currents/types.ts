@@ -1,5 +1,3 @@
-import type { GenesisObservedCurrent } from "@/model/climate/observed-earth/types"
-import type { MonthlyOceanWind } from "@/model/climate/ocean/currents/circulation/types"
 import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
@@ -7,44 +5,33 @@ import type {
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
-
-export type ComputeSSTParams = {
+export type RotatingSSTParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
+	distCoast: Float32Array
 	landmarks: GenesisLandmarks
-	climate: GenesisClimate
-	elevation_km: Float32Array
-	params: GenesisParams
-	wind: MonthlyOceanWind | null
+	monthlyTEQ: Float32Array[]
+	eastAdv: Float32Array
+	westAdv: Float32Array
+	planetRadiusKm: number
 }
-
+export type ComputeSSTParams = Omit<RotatingSSTParams, "planetRadiusKm"> & {
+	params: GenesisParams
+}
 export type ApplySSTToClimateParams = {
 	mesh: SphereMesh
 	climate: GenesisClimate
 	isLand: Uint8Array
 	oceanCurrents: GenesisOceanCurrents
+	isLocked: boolean
 }
-
-export type BuildOceanCurrentGridParams = {
+export type CoastSideInput = {
 	mesh: SphereMesh
 	isLand: Uint8Array
-	oceanCurrents: GenesisOceanCurrents
-	month: number | undefined
+	isLake: Uint8Array
+	landmarks: ComputeSSTParams["landmarks"]
+	eastAdv: Float32Array
+	westAdv: Float32Array
+	avgEdgeKm: number
 }
-
-export type ObservedOceanCurrentGridParams = {
-	mesh: SphereMesh
-	isLand: Uint8Array
-	observedCurrent: GenesisObservedCurrent | undefined
-	month: number | undefined
-}
-
-export type CurrentDisplayInput = {
-	mesh: SphereMesh
-	isLand: Uint8Array
-	u: Float32Array | undefined
-	v: Float32Array | undefined
-	scalar: Float32Array | undefined
-	ocean: Uint8Array | undefined
-	month: number | undefined
-}
+export type BandInput = { dist: number; coastSide: number }
