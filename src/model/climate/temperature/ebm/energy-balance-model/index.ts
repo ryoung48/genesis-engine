@@ -31,6 +31,7 @@ export class EnergyBalanceModel {
 	temperature_min: number[] = []
 	temperature_max: number[] = []
 	land_fraction: number[] = []
+	ice_elevation_offsets_k: number[][] = []
 
 	/** Land and ocean within a latitude band are simulated as two independent
 	 * thermal columns, not one land-fraction-blended average. A blended
@@ -177,25 +178,46 @@ export class EnergyBalanceModel {
 
 	private seedPerLatitudeEquilibrium(): void {
 		const { grid, surface } = CONSTANTS.embConstants
-		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
+		const baseAlbedo = this.config.albedo ?? surface.ALBEDO.BASE
+		const iceAlbedo = this.config.iceAlbedo ?? surface.ALBEDO.ICE
+		const couplingFactor = Math.min(
+			1,
+			Math.sqrt(Math.max(0, this.config.pressure ?? 1.0)),
+		)
+		const albedoEstimate = new Array(grid.NUM_LAT).fill(baseAlbedo)
 		const lower = new Array(grid.NUM_LAT)
 		const diag = new Array(grid.NUM_LAT)
 		const upper = new Array(grid.NUM_LAT)
 		const rhs = new Array(grid.NUM_LAT)
-		for (let i = 0; i < grid.NUM_LAT; i++) {
-			const meanAbsorbed =
-				UTILS.meanOf(this.insolation[i]) * (1 - albedoEstimate) +
-				this.internalHeatFlux
-			lower[i] = -this.lowerCoef[i]
-			upper[i] = -this.upperCoef[i]
-			diag[i] = this.olrB + this.lowerCoef[i] + this.upperCoef[i]
-			rhs[i] = meanAbsorbed - this.olrA + this.olrB * this.olrTRef
+		let meanTemps: number[] = []
+		// Iterate the seed so ice albedo and equilibrium temperature agree:
+		// polar bands whose annual balance supports ice start cold instead of
+		// in the ice-free branch they could never leave.
+		for (let iter = 0; iter < 6; iter++) {
+			for (let i = 0; i < grid.NUM_LAT; i++) {
+				const meanAbsorbed =
+					UTILS.meanOf(this.insolation[i]) * (1 - albedoEstimate[i]) +
+					this.internalHeatFlux
+				lower[i] = -this.lowerCoef[i]
+				upper[i] = -this.upperCoef[i]
+				diag[i] = this.olrB + this.lowerCoef[i] + this.upperCoef[i]
+				rhs[i] = meanAbsorbed - this.olrA + this.olrB * this.olrTRef
+			}
+			meanTemps = UTILS.solveTridiagonal({ lower, diag, upper, rhs })
+			if (this.config.iceAlbedoFeedback === false) break
+			for (let i = 0; i < grid.NUM_LAT; i++) {
+				albedoEstimate[i] = ALBEDO.iceAlbedoAt({
+					temperatureK: meanTemps[i],
+					baseAlbedo,
+					iceAlbedo,
+					couplingFactor,
+				})
+			}
 		}
 		// Equilibrium here is a pure conduction/radiation balance -- it doesn't
 		// depend on heat capacity, so land and ocean columns start from the
 		// same seed (heat capacity only affects how fast/slow each column
 		// responds afterward, which is exactly the point of splitting them).
-		const meanTemps = UTILS.solveTridiagonal({ lower, diag, upper, rhs })
 		for (let i = 0; i < grid.NUM_LAT; i++) {
 			this.temperature_land[i].fill(meanTemps[i])
 			this.temperature_ocean[i].fill(meanTemps[i])
@@ -336,6 +358,7 @@ export class EnergyBalanceModel {
 			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
 			pressure: this.config.pressure,
 			zenithOffset,
+			iceElevationOffsetsK: this.ice_elevation_offsets_k,
 		})
 		ALBEDO.update({
 			albedo: this.albedo_ocean,
@@ -354,6 +377,10 @@ export class EnergyBalanceModel {
 		const pressure = this.config.pressure ?? 1.0
 		const pressureCapFactor = Math.pow(pressure, 0.7)
 		this.land_fraction = this.config.landFraction || ALBEDO.landFraction()
+		this.ice_elevation_offsets_k = (
+			this.config.landElevationQuantilesKm ??
+			Array.from({ length: grid.NUM_LAT }, () => [0])
+		).map((kms) => kms.map((km) => km * thermal.ICE_LAPSE_RATE_K_PER_KM))
 
 		this.computeGreenhouseOLR()
 
@@ -411,6 +438,7 @@ export class EnergyBalanceModel {
 			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
 			pressure: this.config.pressure,
 			zenithOffset: initialZenithOffset,
+			iceElevationOffsetsK: this.ice_elevation_offsets_k,
 		})
 		ALBEDO.update({
 			albedo: this.albedo_ocean,

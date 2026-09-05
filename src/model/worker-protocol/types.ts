@@ -1,5 +1,6 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
+import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { HistoryNote } from "@/model/history/generated/state/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
@@ -40,6 +41,7 @@ interface SerializedGenesisClimate {
 	temperature_monthly_nolapse: Float32Array
 	temperature_monthly_range: Float32Array
 	insolation_monthly: Float32Array
+	declination_monthly: Float32Array
 	pet_monthly: Float32Array
 	daylight_hours_monthly: Float32Array
 	landFraction: number[]
@@ -191,10 +193,8 @@ export interface SerializedGenesisWorld {
 		basinId: Int32Array
 		waterLevel: Float32Array
 	}
-	oceanCurrents?: {
-		sst: Float32Array
-		sstMonthly: Float32Array
-	}
+	// [JUSTIFICATION] Absent from worlds that have not completed climate generation.
+	oceanCurrents?: GenesisOceanCurrents
 	provinces?: SerializedProvinces
 	locations?: SerializedLocations
 	nations?: SerializedNationHierarchy

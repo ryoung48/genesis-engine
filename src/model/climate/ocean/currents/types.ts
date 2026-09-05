@@ -1,22 +1,21 @@
+import type { GenesisObservedCurrent } from "@/model/climate/observed-earth/types"
+import type { MonthlyOceanWind } from "@/model/climate/ocean/currents/circulation/types"
 import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
 } from "@/model/climate/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 
 export type ComputeSSTParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
-	distCoast: Float32Array
 	landmarks: GenesisLandmarks
-	monthlyTEQ: Float32Array[]
-	/** RAIN.computeAdvection's per-region east/west moisture-advection split
-	 * -- which channel dominates a coastal cell (trade winds vs westerlies)
-	 * determines its current facing, not a separate geographic bearing. */
-	eastAdv: Float32Array
-	westAdv: Float32Array
-	planetRadiusKm?: number
+	climate: GenesisClimate
+	elevation_km: Float32Array
+	params: GenesisParams
+	wind: MonthlyOceanWind | null
 }
 
 export type ApplySSTToClimateParams = {
@@ -28,23 +27,24 @@ export type ApplySSTToClimateParams = {
 
 export type BuildOceanCurrentGridParams = {
 	mesh: SphereMesh
-	sst: Float32Array
 	isLand: Uint8Array
-	latDeg: Float32Array
-	lonDeg: Float32Array
-	reverseCirculation?: boolean
-	planetRadiusKm?: number
+	oceanCurrents: GenesisOceanCurrents
+	month: number | undefined
 }
 
 export type ObservedOceanCurrentGridParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
-	observedCurrent:
-		| {
-				real_u_monthly?: Float32Array
-				real_v_monthly?: Float32Array
-				real_sst_anomaly_monthly?: Float32Array
-		  }
-		| undefined
-	month?: number
+	observedCurrent: GenesisObservedCurrent | undefined
+	month: number | undefined
+}
+
+export type CurrentDisplayInput = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	u: Float32Array | undefined
+	v: Float32Array | undefined
+	scalar: Float32Array | undefined
+	ocean: Uint8Array | undefined
+	month: number | undefined
 }

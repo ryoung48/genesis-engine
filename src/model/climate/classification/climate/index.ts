@@ -2,6 +2,7 @@ import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import type {
 	ApplyDtrToClimateMinMaxParams,
+	ComputeLandElevationParams,
 	ComputeLandFractionParams,
 	ComputeMonthlyDaylightHoursParams,
 	ComputeTemperatureParams,
@@ -28,6 +29,10 @@ function getStellarCls(params: GenesisParams): MainSequenceClass {
 const NUM_LAT = CONSTANTS.embConstants.grid.NUM_LAT
 
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+// Share of the EBM land column a coastal land cell gets, and the e-folding
+// distance over which maritime influence fades inland.
+const COAST_LAND_WEIGHT = 0.5
+const MARITIME_REACH_KM = 400
 
 const LAT_STEP_INV = (NUM_LAT - 1) / 180
 
@@ -80,10 +85,13 @@ function computeLandFraction({
 	const landCount = new Float64Array(NUM_LAT)
 	const totalCount = new Float64Array(NUM_LAT)
 
+	// Meshes are density-refined (coasts, land), so a cell count over-weights
+	// land; weight each cell by its approximate area instead.
 	for (let r = 0; r < mesh.numRegions; r++) {
+		const area = cellAreaWeight({ mesh, r })
 		const band = latBandByRegion[r]
-		totalCount[band]++
-		if (isLand[r]) landCount[band]++
+		totalCount[band] += area
+		if (isLand[r]) landCount[band] += area
 	}
 
 	const landFraction: number[] = new Array(NUM_LAT)
@@ -92,6 +100,54 @@ function computeLandFraction({
 		landFraction[i] = Math.min(frac, 0.8) // cap at 0.8 matching existing EBM
 	}
 	return landFraction
+}
+
+function cellAreaWeight({ mesh, r }: { mesh: SphereMesh; r: number }): number {
+	let spacing = 0
+	let n = 0
+	for (let j = mesh.adjOffset[r], jEnd = mesh.adjOffset[r + 1]; j < jEnd; j++) {
+		spacing += mesh.neighborDist[j]
+		n++
+	}
+	return n > 0 ? (spacing / n) ** 2 : 0
+}
+
+const LAND_ELEVATION_QUANTILES = [0.125, 0.375, 0.625, 0.875]
+
+function computeLandElevationQuantilesKm({
+	mesh,
+	isLand,
+	elevation_km,
+}: ComputeLandElevationParams): number[][] {
+	const { latBandByRegion } = getMeshLatitudeGeometry(mesh)
+	const cells: { km: number; area: number }[][] = Array.from(
+		{ length: NUM_LAT },
+		(): { km: number; area: number }[] => [],
+	)
+	for (let r = 0; r < mesh.numRegions; r++) {
+		if (!isLand[r]) continue
+		cells[latBandByRegion[r]].push({
+			km: Math.max(0, elevation_km[r]),
+			area: cellAreaWeight({ mesh, r }),
+		})
+	}
+	return cells.map((band) => {
+		if (band.length === 0) return LAND_ELEVATION_QUANTILES.map(() => 0)
+		band.sort((a, b) => a.km - b.km)
+		const total = band.reduce((sum, c) => sum + c.area, 0)
+		let cumulative = 0
+		let index = 0
+		return LAND_ELEVATION_QUANTILES.map((q) => {
+			while (
+				index < band.length - 1 &&
+				cumulative + band[index].area < q * total
+			) {
+				cumulative += band[index].area
+				index++
+			}
+			return band[index].km
+		})
+	})
 }
 
 function computeMonthlyDaylightHours({
@@ -207,6 +263,10 @@ function computeTemperature({
 		pressure: params.pressure ?? 1.0,
 		radius: params.planetRadiusKm * 1000,
 		landFraction,
+		landElevationQuantilesKm:
+			isLand && elevation_km
+				? computeLandElevationQuantilesKm({ mesh, isLand, elevation_km })
+				: undefined,
 		albedo: params.albedo,
 		greenhouseFactor: params.greenhouseFactor,
 		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
@@ -215,33 +275,54 @@ function computeTemperature({
 	const daylight_hours_monthly = computeMonthlyDaylightHours({ mesh, params })
 	// Build interpolation ranges: latitude bands → zonal temperature, range, and insolation
 	let dayStart = 0
-	const monthlyRanges: number[][] = new Array(12)
-	const monthlyRangeRanges: number[][] = new Array(12)
+	const monthlyLand: number[][] = new Array(12)
+	const monthlyOcean: number[][] = new Array(12)
+	const monthlyLandRange: number[][] = new Array(12)
+	const monthlyOceanRange: number[][] = new Array(12)
 	const monthlyInsolRanges: number[][] = new Array(12)
+	const declination_monthly = new Float32Array(12)
+	const monthMean = (row: number[], start: number, end: number) => {
+		let sum = 0
+		for (let d = start; d < end; d++) sum += row[d]
+		return sum / (end - start)
+	}
+	const monthRange = (row: number[], start: number, end: number) => {
+		let min = Infinity
+		let max = -Infinity
+		for (let d = start; d < end; d++) {
+			if (row[d] < min) min = row[d]
+			if (row[d] > max) max = row[d]
+		}
+		return max - min
+	}
 	for (let m = 0; m < 12; m++) {
 		const start = dayStart
 		const end = start + MONTH_DAY_COUNTS[m]
 		dayStart = end
-		monthlyRanges[m] = ebm.temperature.map((row) => {
-			let sum = 0
-			for (let d = start; d < end; d++) sum += row[d]
-			return sum / (end - start)
-		})
-		monthlyRangeRanges[m] = ebm.temperature.map((row) => {
-			let min = Infinity,
-				max = -Infinity
-			for (let d = start; d < end; d++) {
-				if (row[d] < min) min = row[d]
-				if (row[d] > max) max = row[d]
-			}
-			return max - min
-		})
-		monthlyInsolRanges[m] = ebm.insolation.map((row) => {
-			let sum = 0
-			for (let d = start; d < end; d++) sum += row[d]
-			return sum / (end - start)
-		})
+		declination_monthly[m] =
+			(monthMean(ebm.declination, start, end) * 180) / Math.PI
+		monthlyLand[m] = ebm.temperature_land.map((row) =>
+			monthMean(row, start, end),
+		)
+		monthlyOcean[m] = ebm.temperature_ocean.map((row) =>
+			monthMean(row, start, end),
+		)
+		monthlyLandRange[m] = ebm.temperature_land.map((row) =>
+			monthRange(row, start, end),
+		)
+		monthlyOceanRange[m] = ebm.temperature_ocean.map((row) =>
+			monthRange(row, start, end),
+		)
+		monthlyInsolRanges[m] = ebm.insolation.map((row) =>
+			monthMean(row, start, end),
+		)
 	}
+	const annualMean = (row: number[]) => monthMean(row, 0, row.length)
+	const annualAmplitude = (row: number[]) => monthRange(row, 0, row.length) / 2
+	const annualLand = ebm.temperature_land.map(annualMean)
+	const annualOcean = ebm.temperature_ocean.map(annualMean)
+	const annualLandAmplitude = ebm.temperature_land.map(annualAmplitude)
+	const annualOceanAmplitude = ebm.temperature_ocean.map(annualAmplitude)
 
 	const N = mesh.numRegions
 	const temperature_avg = new Float32Array(N)
@@ -254,10 +335,7 @@ function computeTemperature({
 	const pet_monthly = new Float32Array(N * 12)
 
 	const gravityRatio = params.planetRadiusKm / 6371
-	const LAPSE_RATE = 6.5 * gravityRatio // °C per km, scaled by surface gravity
-
-	// Convert ocean distance from km to miles for continentality model
-	const KM_TO_MI = 0.621371
+	const LAPSE_RATE = 5.5 * gravityRatio // °C per km, scaled by surface gravity
 
 	for (let r = 0; r < N; r++) {
 		const z = mesh.r_xyz[3 * r + 2]
@@ -265,37 +343,51 @@ function computeTemperature({
 		const hKm = elevation_km
 			? elevation_km[r]
 			: ELEVATION.elevToHeightKm({ elev: elevation[r] })
-		const lapseCorrection = isLand?.[r] ? hKm * LAPSE_RATE : 0
+		const land = isLand?.[r] ?? hKm > 0
+		const lapseCorrection = land ? hKm * LAPSE_RATE : 0
 
-		const annualAvg =
-			interpolateLatBand({ range: ebm.temperature_avg, latDeg }) -
-			lapseCorrection
-
-		// Continentality: scale seasonal deviation from annual mean
-		// Ocean (0 mi): factor ≈ 0.78 (damped), coast (~300 mi): factor ≈ 1.0, deep inland: → 1.75
-		// Taper toward poles: less solar energy = lower ceiling for continental amplification
-		const distMiles = oceanDist ? oceanDist[r] * KM_TO_MI : 0
-		const absLat = Math.abs(latDeg)
-		const polarTaper = absLat > 55 ? 1 - (absLat - 55) / 35 : 1 // linear fade 55°–90°
-		const maxAmplitude = 1 * Math.max(0, polarTaper)
-		const inertiaFactor = oceanDist
-			? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000)
-			: 1
+		// Land cells take the EBM land column's phase with an amplitude that
+		// shrinks toward the ocean column's near the coast: maritime air damps
+		// the swing but does not delay it the way the slab ocean's own lag would.
+		const distKm = oceanDist?.[r] ?? 0
+		const landWeight = land
+			? COAST_LAND_WEIGHT +
+				(1 - COAST_LAND_WEIGHT) * (1 - Math.exp(-distKm / MARITIME_REACH_KM))
+			: 0
+		const oceanMean = interpolateLatBand({ range: annualOcean, latDeg })
+		const landMean = interpolateLatBand({ range: annualLand, latDeg })
+		const oceanAmplitude = interpolateLatBand({
+			range: annualOceanAmplitude,
+			latDeg,
+		})
+		const landAmplitude = interpolateLatBand({
+			range: annualLandAmplitude,
+			latDeg,
+		})
+		const amplitudeScale =
+			landAmplitude > 1e-6
+				? landWeight + (1 - landWeight) * (oceanAmplitude / landAmplitude)
+				: 1
+		const meanNoLapse = oceanMean + landWeight * (landMean - oceanMean)
 
 		for (let month = 0; month < 12; month++) {
-			const zonalMonthNoLapse = interpolateLatBand({
-				range: monthlyRanges[month],
+			const ocean = interpolateLatBand({ range: monthlyOcean[month], latDeg })
+			const landCol = interpolateLatBand({ range: monthlyLand[month], latDeg })
+			const noLapse = land
+				? meanNoLapse + amplitudeScale * (landCol - landMean)
+				: ocean
+			temperature_monthly[month * N + r] = noLapse - lapseCorrection
+			temperature_monthly_nolapse[month * N + r] = noLapse
+			const oceanRange = interpolateLatBand({
+				range: monthlyOceanRange[month],
 				latDeg,
 			})
-			const zonalMonth = zonalMonthNoLapse - lapseCorrection
-			temperature_monthly[month * N + r] =
-				annualAvg + (zonalMonth - annualAvg) * inertiaFactor
-			temperature_monthly_nolapse[month * N + r] =
-				annualAvg + lapseCorrection + (zonalMonth - annualAvg) * inertiaFactor
-			// Range scales with continentality; insolation is purely astronomical
+			const landRange = interpolateLatBand({
+				range: monthlyLandRange[month],
+				latDeg,
+			})
 			temperature_monthly_range[month * N + r] =
-				interpolateLatBand({ range: monthlyRangeRanges[month], latDeg }) *
-				inertiaFactor
+				oceanRange + landWeight * (landRange - oceanRange)
 			insolation_monthly[month * N + r] = interpolateLatBand({
 				range: monthlyInsolRanges[month],
 				latDeg,
@@ -337,6 +429,7 @@ function computeTemperature({
 		temperature_monthly_nolapse,
 		temperature_monthly_range,
 		insolation_monthly,
+		declination_monthly,
 		pet_monthly,
 		daylight_hours_monthly,
 		landFraction,

@@ -4,7 +4,11 @@ import { MATH } from "@/model/shared/math/core"
 const itczScale = (x: number) =>
 	MATH.piecewise({ domain: [0, 0.15, 0.4, 1], range: [1, 1, 0.15, 0], x })
 const subsidenceScale = (x: number) =>
-	MATH.piecewise({ domain: [10 / 30, 18 / 30, 32 / 30, 40 / 30], range: [0, 0.85, 0.85, 0], x })
+	MATH.piecewise({
+		domain: [10 / 30, 18 / 30, 32 / 30, 40 / 30],
+		range: [0, 0.85, 0.85, 0],
+		x,
+	})
 const eastStormScale = (x: number) =>
 	MATH.piecewise({ domain: [0 / 30, 25 / 30, 80 / 30], range: [0, 0.8, 1], x })
 const westerliesScale = (x: number) =>
@@ -22,10 +26,15 @@ function computeWeight(
 	const subsidenceDist = Math.abs(cellLat - subsidenceTeq) / hadley
 	const moisture = Math.max(eastMoisture, westMoisture)
 	const itcz = itczScale(dist) * moisture
-	const suppression = 1 - MATH.clamp({ value: subsidenceScale(subsidenceDist), lo: 0, hi: 1 })
+	const suppression =
+		1 - MATH.clamp({ value: subsidenceScale(subsidenceDist), lo: 0, hi: 1 })
 	const eastStorms = eastStormScale(dist) * eastMoisture
 	const westerlies = westerliesScale(dist) * westMoisture * suppression
-	return MATH.clamp({ value: Math.max(itcz * suppression, eastStorms, westerlies), lo: 0, hi: 1 })
+	return MATH.clamp({
+		value: Math.max(itcz * suppression, eastStorms, westerlies),
+		lo: 0,
+		hi: 1,
+	})
 }
 
 describe("scratch", () => {

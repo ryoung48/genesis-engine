@@ -85,30 +85,20 @@ const embConstants = {
 		GREENHOUSE_FACTOR: 0.7005100711248814,
 	},
 	thermal: {
-		// Sourced from VPlanet's POISE module (peer-reviewed EBM,
-		// examples/EarthClimate/earth.in): dHeatCapWater(4.428e6 J/m^3/K) *
-		// dMixingDepth(70m) = 3.0996e8 J/m^2/K for ocean, dHeatCapLand=1.55e7
-		// J/m^2/K for land directly. The old values (4e7 ocean, 1e7 land) left
-		// land's raw seasonal swing far too large (mid-lat land hit +41C in
-		// July with no feedback active, vs a real ~20C) -- see
-		// earth-real-temperature-compare.smoke.test.ts's by-latitude-band
-		// bias. Re-fit GREENHOUSE_FACTOR whenever these change (see its own
-		// comment).
-		OCEAN_HEAT_CAPACITY: 4.428e6 * 70,
-		LAND_HEAT_CAPACITY: 1.55e7,
+		// Tuned against WorldClim monthly land temperature (see
+		// earth-real-temperature-compare.smoke.test.ts): land peaks ~30 days
+		// after the solstice with interior-like seasonal ranges, the slab ocean
+		// (4.428e6 J/m^3/K water over the mixing depth) swings ~7C at 45N.
+		OCEAN_HEAT_CAPACITY: 4.428e6 * 25,
+		LAND_HEAT_CAPACITY: 8e6,
 		ICE_LIMIT: 273.15 - 10,
-		// Sourced from the same VPlanet POISE reference (dNuLandWater in
-		// examples/EarthClimate/earth.in) as OCEAN/LAND_HEAT_CAPACITY above --
-		// a W/m^2/K heat-exchange coefficient between the land and water
-		// columns AT THE SAME LATITUDE, scaled by each column's areal
-		// fraction (see energy-balance-model's stepTemperature). Without
-		// this, land and ocean only interact through the final land-
-		// fraction-weighted output blend, never during the solve itself --
-		// land's much smaller heat capacity then lets a whole latitude band
-		// of land cool independently of its much more thermally-stable
-		// ocean neighbor, which is what let land run away by ~70C across
-		// an AU step that barely moved the (properly-coupled) ocean at all.
-		LAND_WATER_COUPLING: 0.8,
+		ICE_LAPSE_RATE_K_PER_KM: 6.5,
+		// W/m^2/K heat exchange between the land and water columns AT THE SAME
+		// LATITUDE, scaled by each column's areal fraction (see
+		// energy-balance-model's stepTemperature). It is what keeps a land
+		// column's seasonal swing from running away from its ocean neighbor;
+		// tuned so mid-latitude and sub-arctic land ranges both match WorldClim.
+		LAND_WATER_COUPLING: 2.0,
 	},
 	orbital: {
 		OBLIQUITY: 23.5,

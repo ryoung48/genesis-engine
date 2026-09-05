@@ -409,6 +409,12 @@ function buildRegionSpatialIndex(mesh: {
 				if (best >= 0 && !sawBucket) break
 				if (best >= 0 && ring > 0 && bestD < ring * ring * 1e-4) break
 			}
+			if (best < 0) {
+				for (let r = 0; r < mesh.numRegions; r++) {
+					const d = (r_xyz[3*r]-qx)**2+(r_xyz[3*r+1]-qy)**2+(r_xyz[3*r+2]-qz)**2
+					if (d < bestD) { bestD = d; best = r }
+				}
+			}
 			return best
 		},
 	}

@@ -6,31 +6,24 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
 
 // NOTE ON COMPARABILITY:
-// The model's wind field (WIND.computeWindVectors) is a coarse geostrophic /
-// ageostrophic blend driven by a *synthesized* pressure field: a hard-coded
-// Hadley-cell pressure template keyed off latitude + hoursPerDay
-// (bgPressureForRotation/CELL_BOUNDARY_PRESSURES), perturbed by a small
-// thermal anomaly term derived from the model's own (already-idealized)
-// temperature field, then smoothed. It has no concept of real orography's
-// dynamical effect on airflow (Tibetan Plateau/Rockies deflection), monsoon
-// land-sea heating asymmetry, ENSO, jet streaks, or actual observed pressure
-// systems -- it only sees terrain through a surface-drag multiplier (canopy/
-// slope/coastal fetch) applied *after* direction+raw-speed are computed.
-// Calibration is likewise global and statistical, not physical: speed is
-// rescaled so the 90th-percentile pressure-gradient cell maps to ~10 m/s,
-// then scaled by log(hoursPerDay) and 1/sqrt(surfacePressure) fudge factors.
+// The model's wind field (WIND.computeWindVectors) solves a steady
+// boundary-layer balance (friction + Coriolis against a pressure-gradient
+// force) on a synthesized pressure field: a Hadley/Ferrel/polar template whose
+// trough follows the surface thermal equator (pulled toward the sub-solar
+// latitude over land, i.e. monsoons) and whose ridges shift only weakly,
+// plus a small sea-level temperature anomaly term, plus Coriolis-deflected
+// katabatic drainage off perennial ice. It has no transient storms, jet
+// streaks, ENSO, or orographic channeling (Somali jet), and only sees
+// terrain through orographic blocking and a surface-drag multiplier.
 //
 // The comparison data (earth-real-wind-u/v, derived from NCEP/NCAR reanalysis
-// 10m monthly wind) is an actual assimilation of decades of real observations
-// and captures monsoons, jet streams, orographic channeling, etc.
+// 10m monthly wind) is an actual assimilation of decades of real observations.
 //
-// So: agreement on the big zonal-mean structure (easterly trades in the
-// tropics, westerlies in the midlatitudes, polar easterlies, sign flips at
-// ~30N/S and ~60N/S) is a meaningful check that the model's circulation is
-// "Earth-like." Cell-by-cell direction/speed agreement is NOT expected to be
-// tight the way EBM temperature is -- there is no mechanism in the model for
-// regional wind features, so per-cell errors here mostly measure "how much
-// regional detail is the model missing," not "is the model broken."
+// So: agreement on the big zonal-mean structure (easterly trades, midlatitude
+// westerlies, Antarctic coastal easterlies, monsoon reversals) is the
+// meaningful check. Per-cell direction agreement is bounded by the missing
+// regional dynamics; treat the pooled direction cosine as "how much regional
+// detail is missing," not "is the model broken."
 
 const LAT_BANDS = [
 	{ label: "60N-90N (polar E)", lo: 60, hi: 90 },
