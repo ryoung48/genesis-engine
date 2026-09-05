@@ -48,7 +48,6 @@ export interface GenesisOceanCurrents {
 	ocean: Uint8Array
 	circulationCycleError: number
 	heatCycleError: number
-	spinupYears: number
 }
 
 export interface GenesisHydrology {

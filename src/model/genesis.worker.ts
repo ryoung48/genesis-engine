@@ -461,8 +461,12 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	}
 	if (world.oceanCurrents) {
 		add(world.oceanCurrents.sst.buffer, world.oceanCurrents.sstMonthly.buffer)
-		add(world.oceanCurrents.uMonthly.buffer, world.oceanCurrents.vMonthly.buffer,
-			world.oceanCurrents.temperatureDeltaMonthly.buffer, world.oceanCurrents.ocean.buffer)
+		add(
+			world.oceanCurrents.uMonthly.buffer,
+			world.oceanCurrents.vMonthly.buffer,
+			world.oceanCurrents.temperatureDeltaMonthly.buffer,
+			world.oceanCurrents.ocean.buffer,
+		)
 	}
 	if (world.cycloneRisk) add(world.cycloneRisk.buffer)
 	if (world.tornadoRisk) add(world.tornadoRisk.buffer)

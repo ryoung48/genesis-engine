@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "format": "int16-month-major",
+  "compression": "gzip",
+  "field": "oisst_monthly_sst_c",
+  "width": 360,
+  "height": 180,
+  "months": 12,
+  "scale": 0.01,
+  "nodata": -32768,
+  "source": "NOAA OISST v2 \u2014 monthly mean sea-surface temperature (1991-2020), Celsius",
+  "bin": "earth-real-sst.bin.gz"
+}

@@ -17,6 +17,5 @@ export type OceanCirculation = {
 	v: Float32Array
 	transportU: Float32Array
 	transportV: Float32Array
-	spinupYears: number
 	cycleError: number
 }

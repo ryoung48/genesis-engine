@@ -77,6 +77,5 @@ export type WindGrid = FlowGrid
 export type CellSegment = {
 	k: number
 	hemisphere: number
-	ridgeScale: number
 	t: number
 }

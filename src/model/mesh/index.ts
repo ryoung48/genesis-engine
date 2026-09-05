@@ -411,8 +411,14 @@ function buildRegionSpatialIndex(mesh: {
 			}
 			if (best < 0) {
 				for (let r = 0; r < mesh.numRegions; r++) {
-					const d = (r_xyz[3*r]-qx)**2+(r_xyz[3*r+1]-qy)**2+(r_xyz[3*r+2]-qz)**2
-					if (d < bestD) { bestD = d; best = r }
+					const d =
+						(r_xyz[3 * r] - qx) ** 2 +
+						(r_xyz[3 * r + 1] - qy) ** 2 +
+						(r_xyz[3 * r + 2] - qz) ** 2
+					if (d < bestD) {
+						bestD = d
+						best = r
+					}
 				}
 			}
 			return best

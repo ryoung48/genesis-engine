@@ -223,10 +223,48 @@ function runPostElevationPipeline(
 	record("Post: moisture advection", t0)
 	onProgress?.("Post: moisture advection", 50)
 
-	// ── Ocean SST ────────────────────────────────────────────────────────
+	// Attached ahead of the ocean stage so an Earth import drives its currents
+	// with the observed wind field rather than the procedural one, matching how
+	// observed temperature and rainfall feed the classification below.
+	let observedWind: GenesisWorld["observedWind"] | undefined
+	if (
+		realWindUMonthly &&
+		realWindVMonthly &&
+		realWindWidth &&
+		realWindHeight &&
+		realWindMonths &&
+		realWindScale !== undefined &&
+		realWindNoData !== undefined
+	) {
+		const windHolder: { observedWind?: GenesisWorld["observedWind"] } = {}
+		OBSERVED_EARTH.attachObservedEarthWind({
+			mesh,
+			world: windHolder,
+			realWindUMonthly,
+			realWindVMonthly,
+			realWindWidth,
+			realWindHeight,
+			realWindMonths,
+			realWindScale,
+			realWindNoData,
+		})
+		observedWind = windHolder.observedWind
+	}
+	const observedOceanWind =
+		observedWind?.real_u_monthly && observedWind.real_v_monthly
+			? { u: observedWind.real_u_monthly, v: observedWind.real_v_monthly }
+			: null
+
+	// ── Ocean SST ────────────────────────────────────────
 	t0 = performance.now()
 	const oceanCurrents = OCEAN_CURRENTS.computeSST({
-		mesh, isLand, landmarks: currentLandmarks, params, climate, elevation_km, wind: null,
+		mesh,
+		isLand,
+		landmarks: currentLandmarks,
+		params,
+		climate,
+		elevation_km,
+		wind: observedOceanWind,
 	})
 	OCEAN_CURRENTS.applySSTToClimate({
 		mesh,
@@ -548,30 +586,6 @@ function runPostElevationPipeline(
 			realDtrNoData,
 		})
 		observedDtr = dtrHolder.observedDtr
-	}
-	let observedWind: GenesisWorld["observedWind"] | undefined
-	if (
-		realWindUMonthly &&
-		realWindVMonthly &&
-		realWindWidth &&
-		realWindHeight &&
-		realWindMonths &&
-		realWindScale !== undefined &&
-		realWindNoData !== undefined
-	) {
-		const windHolder: { observedWind?: GenesisWorld["observedWind"] } = {}
-		OBSERVED_EARTH.attachObservedEarthWind({
-			mesh,
-			world: windHolder,
-			realWindUMonthly,
-			realWindVMonthly,
-			realWindWidth,
-			realWindHeight,
-			realWindMonths,
-			realWindScale,
-			realWindNoData,
-		})
-		observedWind = windHolder.observedWind
 	}
 	let observedCurrent: GenesisWorld["observedCurrent"] | undefined
 	if (

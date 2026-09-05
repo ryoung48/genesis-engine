@@ -395,24 +395,6 @@ function computeTemperature({
 		}
 	}
 
-	// ── Ocean SST noise: break up straight latitude bands ──────────────
-	// Applied only to ocean cells; amplitude tapers toward equator and poles.
-	if (isLand) {
-		TEMPERATURE_SHARED.applyTemperatureNoise({
-			mesh,
-			N,
-			seed: params.seed ?? 0,
-			temperature_monthly,
-			temperature_monthly_nolapse,
-			computeTaper: (...coordinates: [number, number, number, number]) =>
-				Math.min(1, Math.abs(coordinates[3]) / 0.35),
-			includeCell: (r) => !isLand[r],
-			temperature_avg,
-			temperature_min,
-			temperature_max,
-		})
-	}
-
 	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
 		temperature_monthly,
 		temperature_avg,

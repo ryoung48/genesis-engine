@@ -4,6 +4,9 @@ import type {
 } from "@/model/climate/ocean/currents/heat/types"
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 
+const THERMOCLINE_CONTRAST = 8
+const AIR_SEA_RESTORING = 10
+
 function solve({ grid, circulation, yearSeconds }: OceanHeatInput): OceanHeat {
 	const n = grid.mesh.numRegions
 	const delta = new Float32Array(12 * n)
@@ -12,33 +15,30 @@ function solve({ grid, circulation, yearSeconds }: OceanHeatInput): OceanHeat {
 	const tendency = new Float64Array(n),
 		divergence = new Float64Array(n)
 	const deep = new Float64Array(n)
-	const basin = new Int32Array(n).fill(-1)
-	const queue = new Int32Array(n)
-	const neighbours: number[][] = Array.from({ length: n }, (): number[] => [])
-	for (let e = 0; e < grid.a.length; e++) {
-		neighbours[grid.a[e]].push(grid.b[e])
-		neighbours[grid.b[e]].push(grid.a[e])
+	const formation = new Map<number, number>()
+	for (let r = 0; r < n; r++) {
+		if (!grid.ocean[r]) continue
+		const coldest = formation.get(grid.body[r])
+		const average = grid.climate.temperature_avg[r]
+		if (coldest === undefined || average < coldest)
+			formation.set(grid.body[r], average)
 	}
-	for (let seed = 0; seed < n; seed++) {
-		if (!grid.ocean[seed] || basin[seed] >= 0) continue
-		let head = 0,
-			tail = 1,
-			coldest = Infinity
-		queue[0] = seed
-		basin[seed] = seed
-		while (head < tail) {
-			const r = queue[head++]
-			coldest = Math.min(coldest, grid.climate.temperature_avg[r])
-			for (const nb of neighbours[r])
-				if (basin[nb] < 0) {
-					basin[nb] = seed
-					queue[tail++] = nb
-				}
-		}
-		// Deep water is a reservoir at the basin's cold formation temperature.
-		for (let k = 0; k < tail; k++) deep[queue[k]] = Math.max(-1.8, coldest)
+	// Divergence entrains water from just below the mixed layer, not from the
+	// abyss: the thermocline sits a fixed contrast below the local surface,
+	// floored at the temperature the body forms its deep water at.
+	for (let r = 0; r < n; r++) {
+		if (!grid.ocean[r]) continue
+		deep[r] = Math.max(
+			Math.max(-1.8, formation.get(grid.body[r]) as number),
+			grid.climate.temperature_avg[r] - THERMOCLINE_CONTRAST,
+		)
 	}
-	const relaxation = 20 / CONSTANTS.embConstants.thermal.OCEAN_HEAT_CAPACITY
+	// Restoring toward the baseline, which is already the equilibrium the
+	// atmosphere holds without ocean transport -- so this damps only what the
+	// transport itself moves. At a full air-sea flux feedback it damps twice
+	// and flattens the anomaly the rest of the model exists to produce.
+	const relaxation =
+		AIR_SEA_RESTORING / CONSTANTS.embConstants.thermal.OCEAN_HEAT_CAPACITY
 	const diffusion = 500
 	const flux = new Float64Array(grid.a.length)
 	const rates = new Float64Array(n)
@@ -58,10 +58,10 @@ function solve({ grid, circulation, yearSeconds }: OceanHeatInput): OceanHeat {
 				flux[e] =
 					0.5 *
 					grid.width[e] *
-					(circulation.u[ia] * grid.eastA[e] +
-						circulation.v[ia] * grid.northA[e] +
-						circulation.u[ib] * grid.eastB[e] +
-						circulation.v[ib] * grid.northB[e])
+					(circulation.transportU[ia] * grid.eastA[e] +
+						circulation.transportV[ia] * grid.northA[e] +
+						circulation.transportU[ib] * grid.eastB[e] +
+						circulation.transportV[ib] * grid.northB[e])
 				divergence[a] += flux[e]
 				divergence[b] -= flux[e]
 				const mixing = (diffusion * grid.width[e]) / grid.distance[e]

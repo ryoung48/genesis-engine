@@ -1,5 +1,6 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
+import { DYNAMICS } from "@/model/climate/weather/wind/dynamics"
 import type {
 	CellSegment,
 	ComputeWindVectorsInput,
@@ -226,7 +227,18 @@ function computeWindGrid({
 	})
 }
 
-const CELL_BOUNDARY_PRESSURES = [-1.0, 1.0, -0.7, -0.4, -0.55, -0.45]
+// Cell boundaries from the surface trough outward: subtropical ridge,
+// polar front, then further alternating boundaries for fast rotators whose
+// cells are narrow enough to fit more of them.
+const NUM_BOUNDARIES = 6
+// Geostrophic scaling: the sea-level pressure contrast across a circulation
+// cell is proportional to the zonal-mean temperature contrast across it
+// (template units per degree C). Thermally direct cells (Hadley, polar)
+// raise pressure toward their cold side; the eddy-driven indirect cell
+// (Ferrel) lowers it.
+const DIRECT_CELL_PRESSURE_PER_C = 0.15
+const INDIRECT_CELL_PRESSURE_PER_C = 0.15
+const POLAR_CELL_PRESSURE_PER_C = 0.1
 // Each successive cell boundary is progressively less coupled to the thermal
 // equator: the ITCZ trough follows it fully, the subtropical ridges only
 // partially, the polar front barely at all.
@@ -244,13 +256,6 @@ const SPEED_SCALE = 0.55
 // Longitude smoothing (in 3-degree bins) of the surface trough. Narrower
 // than the rain module's so monsoon troughs over summer continents survive.
 const TROUGH_HALF_WINDOW_BINS = 5
-// Low heat capacity lets the trough over land follow the sub-solar latitude
-// (monsoon) instead of the sea-surface temperature maximum.
-const LAND_TROUGH_PULL = 0.5
-// A narrow summer-hemisphere cell keeps even less of the ridge than its width
-// alone implies: summer continents replace the subtropical high with a
-// thermal low, so its amplitude falls off faster than linearly.
-const SUMMER_RIDGE_EXPONENT = 2
 // Broad high terrain heats the air above it more than free-atmosphere lapse
 // implies (the elevated heat source that builds the Tibetan heat low), so
 // the trough sees a warmer sea-level-reduced surface there in the warm season.
@@ -264,14 +269,38 @@ const HEAT_LOW_THRESHOLD_C = 5
 // Ice sheets have a large sea-level-reduced anomaly that means nothing at the
 // surface, so a heat low needs the actual surface to be warm.
 const HEAT_LOW_MIN_SURFACE_C = 5
-// The land trough lags the sun by about a month (monsoon onset follows the
-// solstice).
-const LAND_TROUGH_LAG_MONTHS = 1
 // Fraction of the subtropical ridge / polar-front trough amplitude kept where
 // the boundary's latitude band is entirely land; the rest is ocean-only.
 const RIDGE_LAND_AMPLITUDE = 0.6
 const POLAR_TROUGH_LAND_AMPLITUDE = 0
+// Strength of the mass-conservation feedback on the template (the squared
+// gravity-wave speed over friction, in template units): how much a
+// convergent low fills before the flow into it stops.
+const WAVE_COUPLING = 0.002
 const DEG2RAD = Math.PI / 180
+
+function cellBoundaries({
+	teq,
+	hw,
+	hemisphere,
+}: {
+	teq: number
+	hw: number
+	hemisphere: number
+}): number[] {
+	const offsets: number[] = []
+	let lo = 0
+	for (let k = 0; k < NUM_BOUNDARIES - 1; k++) {
+		const coupling = BOUNDARY_TEQ_COUPLING ** (k + 1)
+		const hi = Math.max(
+			lo + 1,
+			(k + 1) * hw + hemisphere * teq * (coupling - 1),
+		)
+		offsets.push(hi)
+		lo = hi
+	}
+	return offsets
+}
 
 function cellSegment({
 	lat,
@@ -284,90 +313,59 @@ function cellSegment({
 }): CellSegment {
 	const s = lat >= teq ? 1 : -1
 	const d = s * (lat - teq)
+	const offsets = cellBoundaries({ teq, hw, hemisphere: s })
+	const lastCell = offsets.length - 1
 	let lo = 0
-	const lastCell = CELL_BOUNDARY_PRESSURES.length - 2
 	for (let k = 0; k <= lastCell; k++) {
-		const coupling = BOUNDARY_TEQ_COUPLING ** (k + 1)
-		const hi = Math.max(lo + 1, (k + 1) * hw + s * teq * (coupling - 1))
+		const hi = offsets[k]
 		if (d <= hi || k === lastCell) {
 			return {
 				k,
 				hemisphere: s,
-				ridgeScale: hi < hw ? (hi / hw) ** SUMMER_RIDGE_EXPONENT : hi / hw,
 				t: MATH.smoothstep({ edge0: lo, edge1: hi, x: d }),
 			}
 		}
 		lo = hi
 	}
-	return { k: lastCell, hemisphere: s, ridgeScale: 1, t: 1 }
+	return { k: lastCell, hemisphere: s, t: 1 }
+}
+
+function cellPressurePerC(k: number): number {
+	if (k === 1) return DIRECT_CELL_PRESSURE_PER_C
+	if (k === 2) return -INDIRECT_CELL_PRESSURE_PER_C
+	return k % 2 === 1 ? POLAR_CELL_PRESSURE_PER_C : -POLAR_CELL_PRESSURE_PER_C
 }
 
 function boundaryPressure({
+	base,
 	k,
-	ridgeScale,
 	oceanFrac,
 }: {
+	base: number
 	k: number
-	ridgeScale: number
 	oceanFrac: number
 }): number {
-	const base = CELL_BOUNDARY_PRESSURES[k]
 	if (k === 0) return base
-	// The Hadley cell reaching across the equator (winter hemisphere) is the
-	// strong one: its ridge scales with the width it spans, so the narrow
-	// summer cell stays weak.
-	const seasonal = k === 1 ? ridgeScale : 1
 	// The subtropical ridge and the polar-front trough are ocean features:
 	// over land the surface temperature swings far more than the cells'
 	// dynamics assume, so their template amplitude is held only over ocean.
 	const landAmplitude =
 		k === 1 ? RIDGE_LAND_AMPLITUDE : k === 2 ? POLAR_TROUGH_LAND_AMPLITUDE : 1
-	return base * seasonal * (landAmplitude + (1 - landAmplitude) * oceanFrac)
+	return base * (landAmplitude + (1 - landAmplitude) * oceanFrac)
 }
 
 function computeTroughByLon({
 	mesh,
 	seaLevelTemps,
-	elevation_km,
-	sunLat,
 }: {
 	mesh: SphereMesh
 	seaLevelTemps: Float32Array
-	elevation_km: Float32Array
-	sunLat: number
 }): Float32Array {
-	const trough = RAIN.computeThermalEquator({
+	return RAIN.computeThermalEquator({
 		mesh,
 		temps: seaLevelTemps,
 		halfWindowBins: TROUGH_HALF_WINDOW_BINS,
 	})
-	const bins = trough.length
-	const { latDeg, regionBin } = RAIN.getClimateGeometry(mesh)
-	// Only land lying between the sea-surface trough and the sub-solar
-	// latitude can carry the trough poleward: the Sahara does, the Caribbean
-	// does not.
-	const landCount = new Int32Array(bins)
-	const cellCount = new Int32Array(bins)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		const bin = regionBin[r]
-		const lo = Math.min(trough[bin], sunLat)
-		const hi = Math.max(trough[bin], sunLat)
-		if (latDeg[r] < lo || latDeg[r] > hi) continue
-		cellCount[bin]++
-		if (elevation_km[r] > 0) landCount[bin]++
-	}
-	for (let i = 0; i < bins; i++) {
-		let land = 0
-		let cells = 0
-		for (let d = -TROUGH_HALF_WINDOW_BINS; d <= TROUGH_HALF_WINDOW_BINS; d++) {
-			const j = (((i + d) % bins) + bins) % bins
-			land += landCount[j]
-			cells += cellCount[j]
-		}
-		const landFrac = cells > 0 ? land / cells : 0
-		trough[i] += LAND_TROUGH_PULL * landFrac * (sunLat - trough[i])
-	}
-	return trough
 }
 
 function computePressureField({
@@ -407,11 +405,20 @@ function computePressureField({
 	for (let i = 0; i < LAT_BINS; i++) {
 		latBinMean[i] = latBinCount[i] > 0 ? latBinSum[i] / latBinCount[i] : 15
 	}
+	const zonalMeanAt = (lat: number) => {
+		const x = Math.max(
+			0,
+			Math.min(LAT_BINS - 1, ((lat + 90) / 180) * LAT_BINS - 0.5),
+		)
+		const i0 = Math.floor(x)
+		const i1 = Math.min(LAT_BINS - 1, i0 + 1)
+		return latBinMean[i0] + (latBinMean[i1] - latBinMean[i0]) * (x - i0)
+	}
 
 	// Ocean fraction per (longitude bin, hemisphere, cell boundary): the cells
 	// whose nearest boundary is k contribute to boundary k's land-sea mix.
 	const lonBins = teqByLon.length
-	const boundaries = CELL_BOUNDARY_PRESSURES.length
+	const boundaries = NUM_BOUNDARIES
 	const segments: CellSegment[] = new Array(N)
 	const slot = ({
 		bin,
@@ -462,21 +469,44 @@ function computePressureField({
 		}
 	}
 
+	// Boundary pressures per (longitude bin, hemisphere) accumulated outward
+	// from the trough, each cell adding its temperature contrast times its
+	// direct/indirect coefficient.
+	const boundaryBase = new Float32Array(lonBins * 2 * boundaries)
+	for (let bin = 0; bin < lonBins; bin++) {
+		const teq = teqByLon[bin]
+		for (const hemisphere of [-1, 1]) {
+			const offsets = cellBoundaries({ teq, hw, hemisphere })
+			let pressureAt = 0
+			let latPrev = teq
+			for (let k = 1; k < boundaries; k++) {
+				const latK = Math.max(
+					-90,
+					Math.min(90, teq + hemisphere * offsets[k - 1]),
+				)
+				const contrast = zonalMeanAt(latPrev) - zonalMeanAt(latK)
+				pressureAt += cellPressurePerC(k) * contrast
+				boundaryBase[slot({ bin, hemisphere, k })] = pressureAt
+				latPrev = latK
+			}
+		}
+	}
+
 	const pressure = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const lat = latDeg[r]
 		const seg = segments[r]
-		const fracAt = (k: number) =>
-			oceanFrac[slot({ bin: regionBin[r], hemisphere: seg.hemisphere, k })]
+		const at = (k: number) =>
+			slot({ bin: regionBin[r], hemisphere: seg.hemisphere, k })
 		const pLo = boundaryPressure({
+			base: boundaryBase[at(seg.k)],
 			k: seg.k,
-			ridgeScale: seg.ridgeScale,
-			oceanFrac: fracAt(seg.k),
+			oceanFrac: oceanFrac[at(seg.k)],
 		})
 		const pHi = boundaryPressure({
+			base: boundaryBase[at(seg.k + 1)],
 			k: seg.k + 1,
-			ridgeScale: seg.ridgeScale,
-			oceanFrac: fracAt(seg.k + 1),
+			oceanFrac: oceanFrac[at(seg.k + 1)],
 		})
 		const bgPressure = pLo + (pHi - pLo) * seg.t
 		// Warm-relative-to-zonal-mean surfaces (summer continents) are thermal
@@ -547,6 +577,12 @@ function computeWindVectors({
 		? -1
 		: 1
 	const floorSin = Math.sin(DEG2RAD * hw * EQUATORIAL_FLOOR_FRACTION)
+	// Template gradients are per radian, so the same pressure contrast spread
+	// over a larger planet drives weaker winds. Thinner atmospheres have less
+	// air mass resisting the same forcing; 1 bar is neutral.
+	const radiusFactor = UNITS.defaultPlanetRadiusKm / planetRadiusKm
+	const pressureFactor =
+		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
 
 	const hasMonth = month !== undefined && month >= 0 && month < 12
 	const temps = hasMonth
@@ -567,9 +603,6 @@ function computeWindVectors({
 		}
 	}
 
-	const sunLat = hasMonth
-		? climate.declination_monthly[(month - LAND_TROUGH_LAG_MONTHS + 12) % 12]
-		: 0
 	const { latDeg } = RAIN.getClimateGeometry(mesh)
 	const OCEAN_BINS = 60
 	const oceanBinOf = (lat: number) =>
@@ -614,8 +647,6 @@ function computeWindVectors({
 	const teqByLon = computeTroughByLon({
 		mesh,
 		seaLevelTemps: troughTemps,
-		elevation_km,
-		sunLat,
 	})
 	const pressure = computePressureField({
 		mesh,
@@ -625,6 +656,16 @@ function computeWindVectors({
 		teqByLon,
 		hoursPerDay,
 	})
+	const { lonDeg } = RAIN.getClimateGeometry(mesh)
+	const dynamic = DYNAMICS.correction({
+		latDeg,
+		lonDeg,
+		pressure,
+		friction: FRICTION,
+		coriolisScale: coriolisSign * omegaRatio,
+		waveCoupling: WAVE_COUPLING,
+	})
+	for (let r = 0; r < N; r++) pressure[r] += dynamic[r]
 
 	const windU = new Float32Array(N)
 	const windV = new Float32Array(N)
@@ -755,12 +796,6 @@ function computeWindVectors({
 		}
 	}
 
-	// Template gradients are per radian, so the same pressure contrast spread
-	// over a larger planet drives weaker winds. Thinner atmospheres have less
-	// air mass resisting the same forcing; 1 bar is neutral.
-	const radiusFactor = UNITS.defaultPlanetRadiusKm / planetRadiusKm
-	const pressureFactor =
-		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		windSpeed[r] = rawSpeed[r] * SPEED_SCALE * radiusFactor * pressureFactor

@@ -8,13 +8,15 @@ import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
 // NOTE ON COMPARABILITY:
 // The model's wind field (WIND.computeWindVectors) solves a steady
 // boundary-layer balance (friction + Coriolis against a pressure-gradient
-// force) on a synthesized pressure field: a Hadley/Ferrel/polar template whose
-// trough follows the surface thermal equator (pulled toward the sub-solar
-// latitude over land, i.e. monsoons) and whose ridges shift only weakly,
-// plus a small sea-level temperature anomaly term, plus Coriolis-deflected
-// katabatic drainage off perennial ice. It has no transient storms, jet
-// streaks, ENSO, or orographic channeling (Somali jet), and only sees
-// terrain through orographic blocking and a surface-drag multiplier.
+// force) on a synthesized pressure field: a Hadley/Ferrel/polar template
+// whose trough follows the surface thermal equator, whose subtropical ridge
+// and polar-front trough are held only over ocean, plus continental heat
+// lows and a sea-level temperature anomaly term, passed through a steady
+// linear shallow-water (Gill-Matsuno) solve so mass conservation and the
+// beta effect reshape it, plus Coriolis-deflected katabatic drainage off
+// perennial ice. It has no transient storms, jet streaks, ENSO, or a
+// western-boundary dynamic (Somali jet), and only sees terrain through
+// orographic blocking and a surface-drag multiplier.
 //
 // The comparison data (earth-real-wind-u/v, derived from NCEP/NCAR reanalysis
 // 10m monthly wind) is an actual assimilation of decades of real observations.

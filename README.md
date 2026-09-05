@@ -104,3 +104,5 @@ claude --resume dd4a09d1-7bb7-413f-b47e-3690724a15bc
 5. Somali jet / orographic channeling (large). Arabia's +2.3 westerly and several other coastal jets need flow steering along mountain barriers, which is a different kind of term than anything in the model. I'd leave this unless you want per-region fidelity beyond the zonal-mean structure.
 
 Why South China stops here. The southerly component now appears, but the easterly persists because the cell template places the summer ridge poleward of the 25N trough, right over South China. Real July flow there is the western flank of the Pacific subtropical high, an ocean feature east of the coast that the zonal template has no longitude structure for. Closing it needs the template to carry a longitude-dependent ridge, which is a structural change rather than a tuning one. I'd put that with the polar-front ocean-fraction item if you want to go further.
+
+2. Add the nonlinear term to the solver. Advection of momentum is what makes boundary jets and closed gyres appear. It's a few extra lines in the iteration but changes the convergence behaviour, so it needs testing.

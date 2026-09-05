@@ -45,7 +45,18 @@ function computeSST(input: ComputeSSTParams): GenesisOceanCurrents {
 					: 0
 			}
 		} else {
-			for (let r = 0; r < n; r++) if (!Number.isFinite(grid.climate.temperature_monthly[month*n+r]+grid.climate.temperature_monthly_nolapse[month*n+r]+grid.climate.temperature_avg[r]+grid.elevation[r])) throw new Error(`Invalid downsample r=${r} source=${grid.source[r]} month=${month} temp=${grid.climate.temperature_monthly[month*n+r]} avg=${grid.climate.temperature_avg[r]} elev=${grid.elevation[r]}`)
+			for (let r = 0; r < n; r++)
+				if (
+					!Number.isFinite(
+						grid.climate.temperature_monthly[month * n + r] +
+							grid.climate.temperature_monthly_nolapse[month * n + r] +
+							grid.climate.temperature_avg[r] +
+							grid.elevation[r],
+					)
+				)
+					throw new Error(
+						`Invalid downsample r=${r} source=${grid.source[r]} month=${month} temp=${grid.climate.temperature_monthly[month * n + r]} avg=${grid.climate.temperature_avg[r]} elev=${grid.elevation[r]}`,
+					)
 			const vectors = WIND.computeWindVectors({
 				mesh: grid.mesh,
 				climate: grid.climate,
@@ -155,7 +166,6 @@ function computeSST(input: ComputeSSTParams): GenesisOceanCurrents {
 		ocean,
 		circulationCycleError: circulation.cycleError,
 		heatCycleError: heat.cycleError,
-		spinupYears: circulation.spinupYears,
 	}
 }
 
