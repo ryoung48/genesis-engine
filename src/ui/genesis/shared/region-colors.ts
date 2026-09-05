@@ -148,7 +148,7 @@ export function computeRegionColors(
 	dtrMonth: number,
 	currentMonth: number,
 	viewMode: "globe" | "map" = "globe",
-	showElevation = true,
+	_showElevation = true,
 	_occupiedRegions?: Set<number>,
 	_activeWars?: readonly PoliticalMapWar[] | null,
 	selectedNationId?: number | null,
@@ -294,9 +294,6 @@ export function computeRegionColors(
 			colorMode === "temperatureDelta") &&
 		world.climate
 	) {
-		const darkenMapWaterTemperature =
-			(colorMode === "temperature" || colorMode === "realTemperature") &&
-			(viewMode === "map" || !showElevation)
 		const temps =
 			colorMode === "realTemperature"
 				? temperatureMonth === 0
@@ -318,12 +315,14 @@ export function computeRegionColors(
 								(temperatureMonth - 1) * N,
 								temperatureMonth * N,
 							)
+		const alwaysBlueOcean =
+			colorMode === "temperature" || colorMode === "realTemperature"
 		for (let r = 0; r < N; r++) {
-			// Earth imports color the ocean with the same flat blue rain uses
-			// (oceanRgb) rather than the temperature gradient -- real sea-surface
-			// temperature isn't modeled here, so letting ocean cells take the
-			// land temperature palette just shows noisy, misleading color.
-			if (world.isEarthImport && isOceanRegion(r)) {
+			// The ocean isn't colored by the temperature gradient -- real
+			// sea-surface temperature isn't modeled here, so letting ocean cells
+			// take the land temperature palette just shows noisy, misleading
+			// color. Matches how Earth imports have always rendered ocean.
+			if (alwaysBlueOcean && isOceanRegion(r)) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -339,10 +338,9 @@ export function computeRegionColors(
 					: colorMode === "temperatureDiff"
 						? temperatureDifferenceColor(temps?.[r] ?? 0)
 						: temperatureColor(temps?.[r] ?? world.climate.temperature_avg[r])
-			const factor = darkenMapWaterTemperature && isOceanRegion(r) ? 0.74 : 1
-			rgb[3 * r] = cr * factor
-			rgb[3 * r + 1] = cg * factor
-			rgb[3 * r + 2] = cb * factor
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
 		}
 		return rgb
 	}

@@ -398,19 +398,28 @@ function computeWindVectors({
 		// Effective Coriolis: sign flipped for retrograde rotation
 		const effSinLat = coriolisSign * sinLatArr[r]
 
-		// Pressure gradient in (east, north) from neighbor differences
+		// Pressure gradient and terrain gradient in (east, north) from neighbor
+		// differences (same crude directional-derivative estimate for both).
 		let gradPEast = 0
 		let gradPNorth = 0
+		let gradEEast = 0
+		let gradENorth = 0
 		let count = 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const dP = pressure[adjList[j]] - pressure[r]
+			const nb = adjList[j]
+			const dP = pressure[nb] - pressure[r]
 			gradPEast += dP * edgeEastward[j]
 			gradPNorth += dP * edgeNorthward[j]
+			const dE = elevation_km[nb] - elevation_km[r]
+			gradEEast += dE * edgeEastward[j]
+			gradENorth += dE * edgeNorthward[j]
 			count++
 		}
 		if (count > 0) {
 			gradPEast /= count
 			gradPNorth /= count
+			gradEEast /= count
+			gradENorth /= count
 		}
 
 		// Geostrophic: perpendicular to ∇P, Coriolis-deflected
@@ -434,11 +443,58 @@ function computeWindVectors({
 			edge1: geoTransitionLat,
 			x: absLat,
 		})
-		const u = geoWeight * windGeoEast + 0.3 * windFricEast
-		const v = geoWeight * windGeoNorth + geoWeight * 0.3 * windFricNorth
+		let u = geoWeight * windGeoEast + 0.3 * windFricEast
+		let v = geoWeight * windGeoNorth + geoWeight * 0.3 * windFricNorth
 
 		// Raw speed proxy = pressure gradient magnitude (same for both geo+friction)
-		rawSpeed[r] = Math.hypot(gradPEast, gradPNorth)
+		let rawSpd = Math.hypot(gradPEast, gradPNorth)
+
+		// --- Terrain effects on airflow -------------------------------------
+		// The synthesized pressure field only sees latitude + a weak thermal
+		// anomaly, so on its own the wind flows straight over mountain ranges
+		// and ice sheets. Two corrections, both keyed off the local elevation
+		// gradient (points uphill):
+		const slopeMag = Math.hypot(gradEEast, gradENorth)
+		if (slopeMag > 1e-6 && elevation_km[r] > 0) {
+			const gEastHat = gradEEast / slopeMag
+			const gNorthHat = gradENorth / slopeMag
+
+			// 1. Orographic blocking: air moving into rising terrain is partly
+			//    stopped and steered along the contour rather than lifted over.
+			const upComp = u * gEastHat + v * gNorthHat
+			if (upComp > 0) {
+				const block = MATH.smoothstep({ edge0: 0.015, edge1: 0.2, x: slopeMag })
+				// Along-contour tangent (ĝ rotated +90°), oriented to match flow.
+				const tEast = -gNorthHat
+				const tNorth = gEastHat
+				const s = u * tEast + v * tNorth >= 0 ? 1 : -1
+				u += block * (-0.7 * upComp * gEastHat + 0.35 * upComp * s * tEast)
+				v += block * (-0.7 * upComp * gNorthHat + 0.35 * upComp * s * tNorth)
+			}
+
+			// 2. Katabatic drainage: over cold, sloped surfaces (ice sheets,
+			//    high plateaus) dense surface air flows downhill regardless of
+			//    the pressure field. Magnitude is expressed in the same
+			//    |∇P|-like units as the geostrophic/friction wind above and
+			//    saturates with slope so steep ice-sheet margins don't explode
+			//    the speed calibration.
+			const coldFactor = MATH.smoothstep({
+				edge0: -12,
+				edge1: -30,
+				x: temps[r],
+			})
+			if (coldFactor > 0 && elevation_km[r] > 0.2) {
+				const kMag =
+					0.055 *
+					coldFactor *
+					MATH.smoothstep({ edge0: 0.01, edge1: 0.12, x: slopeMag })
+				u += -gEastHat * kMag
+				v += -gNorthHat * kMag
+				rawSpd += kMag
+			}
+		}
+
+		rawSpeed[r] = rawSpd
 
 		const mag = Math.hypot(u, v)
 		if (mag > 1e-9) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { WIND } from "@/model/climate/weather/wind"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
@@ -99,123 +100,163 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 
 		expect(world.observedWind?.real_u_monthly).toBeDefined()
 
-		const { windU, windV, windSpeed } = WIND.computeWindVectors({
-			mesh: world.mesh,
-			climate: world.climate,
-			elevation_km: world.elevation_km,
-			params: world.params,
-			surface: {
-				vegetation: world.vegetation,
-				topography: world.topography,
-				slopeScore: world.slopeScore,
-				oceanDist: world.oceanDist,
-			},
-		})
-
-		const {
-			windU: obsU,
-			windV: obsV,
-			windSpeed: obsSpeed,
-		} = WIND.observedWindVectorsForMonth({
-			observedWind: world.observedWind,
-			numRegions: world.mesh.numRegions,
-		})
-
 		const r_xyz = world.mesh.r_xyz
 		function latDegAt(r: number): number {
 			const z = r_xyz[r * 3 + 2]
 			return (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
 		}
 
-		let n = 0
-		let sumSpeedDiff = 0
-		let sumAbsSpeedDiff = 0
-		let sumSpeedSq = 0
-		let sumCos = 0 // mean cosine similarity of direction unit vectors (1 = same dir, -1 = opposite)
-		let sumAngleErr = 0 // mean absolute angular error in degrees
+		const topography = world.topography
+		function isLand(r: number): boolean {
+			const t = topography[r]
+			return t !== CLASSIFICATION.topoOcean && t !== CLASSIFICATION.topoLake
+		}
 
-		const bandStats = LAT_BANDS.map((b) => ({
-			...b,
+		type Acc = {
+			n: number
+			sumSpeedDiff: number
+			sumAbsSpeedDiff: number
+			sumSpeedSq: number
+			sumCos: number
+			sumAngleErr: number
+			nParity: number // cos > 0 : model wind within 90deg of observed
+			nZonalSign: number // sign(modelU) === sign(obsU) : east/west parity
+			nMeridSign: number // sign(modelV) === sign(obsV) : north/south parity
+		}
+		const newAcc = (): Acc => ({
 			n: 0,
-			sumU: 0,
-			sumV: 0,
-			sumObsU: 0,
-			sumObsV: 0,
 			sumSpeedDiff: 0,
+			sumAbsSpeedDiff: 0,
+			sumSpeedSq: 0,
 			sumCos: 0,
-		}))
+			sumAngleErr: 0,
+			nParity: 0,
+			nZonalSign: 0,
+			nMeridSign: 0,
+		})
 
-		for (let r = 0; r < world.mesh.numRegions; r++) {
-			const oSpeed = obsSpeed[r]
-			if (!Number.isFinite(oSpeed) || oSpeed <= 1e-9) continue // nodata or calm
-
-			const mu = windU[r]
-			const mv = windV[r]
-			const ou = obsU[r]
-			const ov = obsV[r]
-			const mSpeed = windSpeed[r]
-
-			n++
-			const speedDiff = mSpeed - oSpeed
-			sumSpeedDiff += speedDiff
-			sumAbsSpeedDiff += Math.abs(speedDiff)
-			sumSpeedSq += speedDiff * speedDiff
-
-			const cos = mu * ou + mv * ov // both are unit vectors
-			sumCos += cos
-			const angleErr =
+		type Sample = {
+			mu: number
+			mv: number
+			ou: number
+			ov: number
+			mSpeed: number
+			oSpeed: number
+		}
+		function fold(acc: Acc, s: Sample): void {
+			acc.n++
+			const speedDiff = s.mSpeed - s.oSpeed
+			acc.sumSpeedDiff += speedDiff
+			acc.sumAbsSpeedDiff += Math.abs(speedDiff)
+			acc.sumSpeedSq += speedDiff * speedDiff
+			const cos = s.mu * s.ou + s.mv * s.ov // both are unit vectors
+			acc.sumCos += cos
+			acc.sumAngleErr +=
 				(Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
-			sumAngleErr += angleErr
-
-			const lat = latDegAt(r)
-			const band = bandStats.find((b) => lat >= b.lo && lat < b.hi)
-			if (band) {
-				band.n++
-				// Accumulate real (speed-scaled) vectors so the band mean shows the
-				// dominant zonal direction, not just the unit-vector average.
-				band.sumU += mu * mSpeed
-				band.sumV += mv * mSpeed
-				band.sumObsU += ou * oSpeed
-				band.sumObsV += ov * oSpeed
-				band.sumSpeedDiff += speedDiff
-				band.sumCos += cos
+			if (cos > 0) acc.nParity++
+			if (Math.sign(s.mu) === Math.sign(s.ou)) acc.nZonalSign++
+			if (Math.sign(s.mv) === Math.sign(s.ov)) acc.nMeridSign++
+		}
+		function summarize(acc: Acc): Record<string, number> {
+			const d = Math.max(1, acc.n)
+			return {
+				cells: acc.n,
+				meanSpeedBiasMs: Number((acc.sumSpeedDiff / d).toFixed(2)),
+				meanAbsSpeedErrorMs: Number((acc.sumAbsSpeedDiff / d).toFixed(2)),
+				rmseSpeedMs: Number(Math.sqrt(acc.sumSpeedSq / d).toFixed(2)),
+				meanDirectionCos: Number((acc.sumCos / d).toFixed(3)),
+				meanAngleErrDeg: Number((acc.sumAngleErr / d).toFixed(1)),
+				parityRate_within90deg: Number((acc.nParity / d).toFixed(3)),
+				zonalSignMatch_EW: Number((acc.nZonalSign / d).toFixed(3)),
+				meridSignMatch_NS: Number((acc.nMeridSign / d).toFixed(3)),
 			}
 		}
 
-		const meanSpeedBias = sumSpeedDiff / Math.max(1, n)
-		const meanAbsSpeedError = sumAbsSpeedDiff / Math.max(1, n)
-		const rmseSpeed = Math.sqrt(sumSpeedSq / Math.max(1, n))
-		const meanCos = sumCos / Math.max(1, n)
-		const meanAngleErrDeg = sumAngleErr / Math.max(1, n)
+		const N = world.mesh.numRegions
+		const surface = {
+			vegetation: world.vegetation,
+			topography: world.topography,
+			slopeScore: world.slopeScore,
+			oceanDist: world.oceanDist,
+		}
+		const months = world.observedWind?.real_u_monthly
+			? Math.round(world.observedWind.real_u_monthly.length / N)
+			: 12
+		const MONTH_LABELS = [
+			"Jan",
+			"Feb",
+			"Mar",
+			"Apr",
+			"May",
+			"Jun",
+			"Jul",
+			"Aug",
+			"Sep",
+			"Oct",
+			"Nov",
+			"Dec",
+		]
 
-		console.info("Cells compared", n, "of", world.mesh.numRegions)
-		console.info("Overall model vs NCEP/NCAR wind (annual mean)")
-		console.table({
-			meanSpeedBiasMs: Number(meanSpeedBias.toFixed(2)),
-			meanAbsSpeedErrorMs: Number(meanAbsSpeedError.toFixed(2)),
-			rmseSpeedMs: Number(rmseSpeed.toFixed(2)),
-			meanDirectionCos: Number(meanCos.toFixed(3)),
-			meanAngleErrDeg: Number(meanAngleErrDeg.toFixed(1)),
-		})
+		const overall = newAcc()
+		const bandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
+		const perMonthRows: Record<string, number | string>[] = []
+
+		for (let m = 0; m < months; m++) {
+			const { windU, windV, windSpeed } = WIND.computeWindVectors({
+				mesh: world.mesh,
+				climate: world.climate,
+				elevation_km: world.elevation_km,
+				params: world.params,
+				month: m,
+				surface,
+			})
+			const {
+				windU: obsU,
+				windV: obsV,
+				windSpeed: obsSpeed,
+			} = WIND.observedWindVectorsForMonth({
+				observedWind: world.observedWind,
+				numRegions: N,
+				month: m,
+			})
+
+			const monthAcc = newAcc()
+			for (let r = 0; r < N; r++) {
+				if (!isLand(r)) continue // land-only comparison
+				const oSpeed = obsSpeed[r]
+				if (!Number.isFinite(oSpeed) || oSpeed <= 1e-9) continue // nodata or calm
+
+				const s: Sample = {
+					mu: windU[r],
+					mv: windV[r],
+					ou: obsU[r],
+					ov: obsV[r],
+					mSpeed: windSpeed[r],
+					oSpeed,
+				}
+				fold(monthAcc, s)
+				fold(overall, s)
+				const lat = latDegAt(r)
+				const band = bandAcc.find((b) => lat >= b.lo && lat < b.hi)
+				if (band) fold(band.acc, s)
+			}
+			perMonthRows.push({
+				month: MONTH_LABELS[m] ?? String(m),
+				...summarize(monthAcc),
+			})
+		}
 
 		console.info(
-			"By latitude band -- mean zonal (east+) / meridional (north+) m/s, model vs observed",
+			"Model vs NCEP/NCAR wind -- LAND ONLY, per calendar month (monthly model wind vs monthly reanalysis)",
 		)
-		console.table(
-			bandStats.map((b) => ({
-				band: b.label,
-				cells: b.n,
-				modelU: b.n > 0 ? Number((b.sumU / b.n).toFixed(2)) : NaN,
-				obsU: b.n > 0 ? Number((b.sumObsU / b.n).toFixed(2)) : NaN,
-				modelV: b.n > 0 ? Number((b.sumV / b.n).toFixed(2)) : NaN,
-				obsV: b.n > 0 ? Number((b.sumObsV / b.n).toFixed(2)) : NaN,
-				meanSpeedBiasMs:
-					b.n > 0 ? Number((b.sumSpeedDiff / b.n).toFixed(2)) : NaN,
-				meanDirectionCos: b.n > 0 ? Number((b.sumCos / b.n).toFixed(3)) : NaN,
-			})),
-		)
+		console.table(perMonthRows)
 
-		expect(n).toBeGreaterThan(0)
-		expect(Number.isFinite(meanSpeedBias)).toBe(true)
+		console.info("All months pooled, land only")
+		console.table(summarize(overall))
+
+		console.info("All months pooled, land only, by latitude band")
+		console.table(bandAcc.map((b) => ({ band: b.label, ...summarize(b.acc) })))
+
+		expect(overall.n).toBeGreaterThan(0)
 	}, 600_000)
 })

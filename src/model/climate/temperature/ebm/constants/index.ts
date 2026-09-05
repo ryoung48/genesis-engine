@@ -67,7 +67,22 @@ const embConstants = {
 		// Re-bisected in earth-import-greenhouse-refit.smoke.test.ts against the
 		// real imported Earth's land-only WorldClim mean, 0.6321 was leaving a
 		// +2.19C land warm bias; 0.6038 zeroes it (land-only bias 0.000C).
-		GREENHOUSE_FACTOR: 0.6038,
+		//
+		// 0.6038 -> 0.6972: greenhouse-moisture switched from a hand-tuned
+		// floor/ceiling multiplier to VPlanet POISE's actual SMS09-shaped
+		// local greenhouse law (trapping strength ~ T^3, anchored at Earth's
+		// 288K global mean -- see greenhouse-moisture's module doc). That
+		// shape traps much less at the cold poles than the old flat 0.5
+		// floor did, cooling the global land-only mean; re-bisected in
+		// earth-import-greenhouse-refit.smoke.test.ts to re-zero that global
+		// bias (0.000C) without touching the T^3 shape itself.
+		//
+		// 0.6972 -> 0.7005: energy-balance-model's computeDiffusionCoefficients
+		// switched from an unexplained mid-latitude-peaked diffusion profile
+		// to POISE's actual flat default (see its own comment), which barely
+		// shifts the global land-only bias but noticeably narrows the pole-
+		// to-equator spread -- re-bisected to keep the bias at 0.000C.
+		GREENHOUSE_FACTOR: 0.7005100711248814,
 	},
 	thermal: {
 		// Sourced from VPlanet's POISE module (peer-reviewed EBM,

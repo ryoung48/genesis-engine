@@ -67,6 +67,18 @@ export class EnergyBalanceModel {
 		this.config = config
 	}
 
+	// VPlanet POISE's default (bMEPDiff/bDiffRot/bHadley all off -- see
+	// poise.c's dDiffCoeff handling) uses ONE flat diffusion coefficient
+	// (0.44) at every latitude, not a latitude-shaped profile. Our previous
+	// diffuser() instead peaked at mid-latitudes (~45deg) and dipped at BOTH
+	// the equator and the poles -- starving poleward heat transport exactly
+	// where the pole needs it most, and starving equatorial outflow exactly
+	// where the tropics need to shed heat, which widened the modeled pole-
+	// to-equator spread well past Earth's real range. Matching POISE's flat
+	// default removes that self-inflicted spread without touching the
+	// (already Earth-fit) OLR/greenhouse side of the model.
+	private static readonly DIFFUSION_COEFFICIENT = 0.44
+
 	private computeDiffusionCoefficients(): void {
 		const { grid, time, planet } = CONSTANTS.embConstants
 		const hoursPerDay = this.config.time?.HOURS_PER_DAY || time.HOURS_PER_DAY
@@ -75,15 +87,11 @@ export class EnergyBalanceModel {
 			planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
 		const radiusFactor = radiusRatio * radiusRatio
 		const pressureFactor = Math.pow(this.config.pressure ?? 1.0, 0.5)
-		const diffuser = (latDeg: number) => {
-			const absLat = Math.abs(latDeg)
-			return (
-				(0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) *
-				radiusFactor *
-				pressureFactor *
-				rotationFactor
-			)
-		}
+		const diffuser =
+			EnergyBalanceModel.DIFFUSION_COEFFICIENT *
+			radiusFactor *
+			pressureFactor *
+			rotationFactor
 
 		this.lowerCoef = new Array(grid.NUM_LAT).fill(0)
 		this.upperCoef = new Array(grid.NUM_LAT).fill(0)
@@ -91,10 +99,7 @@ export class EnergyBalanceModel {
 		for (let k = 1; k < grid.NUM_LAT; k++) {
 			const xBoundary = 0.5 * (this.sin_lats[k] + this.sin_lats[k - 1])
 			const cos2LatBoundary = 1 - xBoundary * xBoundary
-			const dBar =
-				0.5 *
-				cos2LatBoundary *
-				(diffuser(this.lats_deg[k]) + diffuser(this.lats_deg[k - 1]))
+			const dBar = cos2LatBoundary * diffuser
 			const sinDiff = this.sin_lats[k] - this.sin_lats[k - 1]
 			const boundaryCoef = Math.abs(sinDiff) > 0 ? dBar / sinDiff : 0
 
@@ -132,26 +137,41 @@ export class EnergyBalanceModel {
 	}
 
 	// Cold/dry columns trap less longwave than the planet-wide greenhouseFactor
-	// assumes (see greenhouse-moisture's module doc) -- re-derive local A/B
-	// around the SAME global olrTRef but with a temperature-scaled effective
-	// greenhouseFactor, using that column's own previous-step temperature as
-	// the moisture proxy. Falls back to the plain global olrA/olrB when
-	// iceAlbedoFeedback is off (real Sol bodies fit their greenhouseFactor
-	// directly against known behavior; layering more synthetic feedback on
-	// top would fight that fit, same reasoning as iceAlbedoFeedback itself).
+	// assumes (see greenhouse-moisture's module doc, modeled on VPlanet
+	// POISE's SMS09 OLR formula) -- OLR(T) = sigma*T^4/(1+g(T)) is Newton-
+	// linearized around THIS column's own current temperature (not the
+	// planet's global olrTRef), matching how VPlanet re-evaluates its OLR
+	// formula and slope fresh every step from the column's own previous
+	// temperature. Falls back to the plain global olrA/olrB (linearized
+	// around olrTRef) when iceAlbedoFeedback is off (real Sol bodies fit
+	// their greenhouseFactor directly against known behavior; layering more
+	// synthetic feedback on top would fight that fit, same reasoning as
+	// iceAlbedoFeedback itself).
 	private localOlrCoefficients(temperatureK: number): {
 		olrA: number
 		olrB: number
+		olrTRef: number
 	} {
 		if ((this.config.iceAlbedoFeedback ?? true) === false) {
-			return { olrA: this.olrA, olrB: this.olrB }
+			return { olrA: this.olrA, olrB: this.olrB, olrTRef: this.olrTRef }
 		}
-		const g =
-			this.baseGreenhouseFactor *
-			GREENHOUSE_MOISTURE.moistureGreenhouseMultiplier(temperatureK)
+		const g = GREENHOUSE_MOISTURE.localGreenhouseFactor({
+			temperatureK,
+			baseGreenhouseFactor: this.baseGreenhouseFactor,
+		})
+		const dgdT = GREENHOUSE_MOISTURE.localGreenhouseFactorDerivative({
+			temperatureK,
+			baseGreenhouseFactor: this.baseGreenhouseFactor,
+		})
+		const t3 = temperatureK ** 3
+		const t4 = t3 * temperatureK
+		const denom = 1 + g
+		const olrAtT = (this.sigma * t4) / denom
+		const olrSlope = (this.sigma * (4 * t3 * denom - t4 * dgdT)) / denom ** 2
 		return {
-			olrA: (this.sigma * this.olrTRef ** 4) / (1 + g),
-			olrB: (4 * this.sigma * this.olrTRef ** 3) / (1 + g),
+			olrA: olrAtT - olrSlope * temperatureK,
+			olrB: olrSlope,
+			olrTRef: 0,
 		}
 	}
 
@@ -226,8 +246,10 @@ export class EnergyBalanceModel {
 			// temperature -- land and ocean at the same latitude can end up
 			// with different effective greenhouse strength once one is
 			// colder/dryer than the other.
-			const { olrA, olrB } = this.localOlrCoefficients(temperature[i][tIdx])
-			olr[i][tIdx] = olrA + olrB * (temperature[i][tIdx] - this.olrTRef)
+			const { olrA, olrB, olrTRef } = this.localOlrCoefficients(
+				temperature[i][tIdx],
+			)
+			olr[i][tIdx] = olrA + olrB * (temperature[i][tIdx] - olrTRef)
 			diagSelf[i] =
 				heatCapacity[i] +
 				dt * (this.lowerCoef[i] + this.upperCoef[i]) +
@@ -236,7 +258,7 @@ export class EnergyBalanceModel {
 				heatCapacity[i] * temperature[i][tIdx] +
 				dt * absorbed -
 				dt * olrA +
-				dt * olrB * this.olrTRef
+				dt * olrB * olrTRef
 		}
 
 		return { diagSelf, rhs }

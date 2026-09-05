@@ -343,13 +343,13 @@ function applySSTToClimate({
 	// actually this region's coldest.
 	const N = mesh.numRegions
 	for (let r = 0; r < N; r++) {
-		const landScale = isLand[r] ? LAND_CURRENT_EFFECT_SCALE : 1
+		if (!isLand[r]) continue
 		let annualSum = 0
 		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
 			const delta =
 				oceanCurrents.sstMonthly[month * N + r] *
 				MODELED_SST_SATURATION_C *
-				landScale
+				LAND_CURRENT_EFFECT_SCALE
 			const updated = climate.temperature_monthly[month * N + r] + delta
 			climate.temperature_monthly[month * N + r] = updated
 			annualSum += updated

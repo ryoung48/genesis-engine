@@ -1,4 +1,4 @@
-import { MATH } from "@/model/shared/math/core"
+import type { LocalGreenhouseParams } from "@/model/climate/temperature/ebm/greenhouse-moisture/types"
 
 // Cold, dry air holds far less water vapor than warm air (Clausius-Clapeyron),
 // and water vapor is the dominant greenhouse contributor -- so a column's
@@ -9,29 +9,44 @@ import { MATH } from "@/model/shared/math/core"
 // tropics and the dry poles, and once a body's climate is disaggregated into
 // separately-evolving columns (see energy-balance-model's land/ocean split),
 // reusing that single average everywhere overstates the poles' own trapping
-// and produces an ANTARCTICA-style warm bias. Moist-EBM literature (e.g. Roe
-// & Baker's Snowball feedback analysis, moist-EBM polar amplification papers)
-// instead ties the longwave feedback to local temperature.
+// and produces an ANTARCTICA-style warm bias.
 //
-// DRY_REF_K/MOIST_REF_K bracket where this transition happens: below
-// DRY_REF_K (roughly Antarctic-interior-cold), a column keeps only DRY_FLOOR
-// of the full greenhouse strength (the well-mixed-gas floor, e.g. CO2, that
-// doesn't depend on local humidity); at/above MOIST_REF_K (a warm temperate
-// day), it gets the full, water-vapor-saturated strength the planet's
-// greenhouseFactor was fit against.
-const DRY_REF_K = 230
-const MOIST_REF_K = 288
-const DRY_FLOOR = 0.5
+// Shaped directly after VPlanet POISE's default OLR model (Spiegel, Menou &
+// Scharf 2009 -- see poise.c's fdOLRsms09): optical depth tau = 0.79*(T/
+// 273.15)^3, OLR = sigma*T^4/(1+0.75*tau). Because tau grows as T^3, trapping
+// falls off steeply at cold poles and rises smoothly into hot tropics from
+// ONE continuous formula -- no hand-tuned floor/ceiling breakpoints needed to
+// fake the same effect. Reparameterized here through the planet's own fitted
+// greenhouseFactor (rather than SMS09's fixed 0.79 coefficient) so the cubic
+// law is anchored at G_REFERENCE_TEMPERATURE_K -- Earth's actual global-mean
+// surface temperature -- which is exactly where GREENHOUSE_FACTOR was fit
+// (see CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR), so the fit's
+// meaning ("trapping strength at Earth's mean temperature") still holds.
+const G_REFERENCE_TEMPERATURE_K = 288
 
-function moistureGreenhouseMultiplier(temperatureK: number): number {
-	const warmthFraction = MATH.smoothstep({
-		edge0: DRY_REF_K,
-		edge1: MOIST_REF_K,
-		x: temperatureK,
-	})
-	return DRY_FLOOR + (1 - DRY_FLOOR) * warmthFraction
+function localGreenhouseFactor(params: LocalGreenhouseParams): number {
+	const { temperatureK, baseGreenhouseFactor } = params
+	const ratio = temperatureK / G_REFERENCE_TEMPERATURE_K
+	return baseGreenhouseFactor * ratio * ratio * ratio
+}
+
+// d/dT of localGreenhouseFactor -- needed alongside the OLR value itself so
+// energy-balance-model can Newton-linearize OLR(T) = sigma*T^4/(1+g(T))
+// around each column's own current temperature every step (product rule:
+// g depends on T too, not just the T^4 term).
+function localGreenhouseFactorDerivative(
+	params: LocalGreenhouseParams,
+): number {
+	const { temperatureK, baseGreenhouseFactor } = params
+	return (
+		(3 * baseGreenhouseFactor * temperatureK * temperatureK) /
+		(G_REFERENCE_TEMPERATURE_K *
+			G_REFERENCE_TEMPERATURE_K *
+			G_REFERENCE_TEMPERATURE_K)
+	)
 }
 
 export const GREENHOUSE_MOISTURE = {
-	moistureGreenhouseMultiplier,
+	localGreenhouseFactor,
+	localGreenhouseFactorDerivative,
 }
