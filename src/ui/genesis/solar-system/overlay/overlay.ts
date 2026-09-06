@@ -221,6 +221,7 @@ export function buildSolarSystemOverlay(
 	const starSurfaceLayers = hasPhotosphere
 		? buildStarSurfaceLayers({
 				spectralClass: renderSpectralClass,
+				isGiant,
 				tint: starColor,
 				diameterSol: starDiameterSol,
 			})

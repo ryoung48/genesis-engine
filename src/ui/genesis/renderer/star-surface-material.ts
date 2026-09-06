@@ -1,63 +1,71 @@
 import * as THREE from "three"
 import type { SpectralClass } from "@/model/celestial/star/types"
 
-// Hand-authored photosphere palette per spectral class: the colour the fbm
-// mixes between white (its hottest granules) and `deep` (its coolest lanes).
+// Hand-authored photosphere palette per spectral class: the fbm mixes
+// between `hot` (its brightest granules) and `mid`, then toward `deep` (its
+// coolest lanes).
 //
-// Authored rather than derived from the star's spectral tint. Deriving it
-// was tried twice and failed both times: blending toward the tint pushed
-// channels past 1.0 and flattened the granulation, and rebuilding from the
-// tint's HUE turned G-class stars a sickly yellow-green, because a yellow
-// hue at low lightness is olive. A real G photosphere reads orange, so these
-// are picked to look right rather than to follow from the tint.
+// These are chosen for how they LOOK, not for blackbody accuracy. The pale
+// classes (O/B/A/F) hold a single hue across all three stops -- matching
+// their classification swatch in constants.ts -- and only vary in lightness,
+// so the fbm reads as one coloured disc with granule texture rather than the
+// dark navy lanes an accuracy-driven ramp produced. `deep` stays at roughly
+// 0.4-0.5 of `mid`'s brightness: enough contrast for the granulation to
+// show, not so much that the lanes turn to shadow.
 //
 // Values are raw linear components (the THREE.Color(r, g, b) form, NOT hex),
 // matching the article's own (1, 0.4, 0) / (1, 0, 0) convention -- a hex
-// literal would be converted from sRGB and land far darker. G is exactly the
-// article's pair.
+// literal would be converted from sRGB and land far darker.
 //
-// Every entry pins its DOMINANT channel at 1.0 in both mid and deep, varying
-// only the other two. That is the rule that makes the article's G work, and
-// breaking it is what made the others muddy: brown is simply dark orange, so
-// letting red fall to 0.8 or 0.6 in a warm star's `deep` drags the whole ramp
-// through brown as the fbm mixes toward it. Holding the dominant channel at
-// full keeps a warm star reading orange-to-red and a hot one blue-to-white,
-// with the noise varying saturation rather than muddying hue.
+// `gain` is per class because the tone mapping compresses hard above ~1.0: a
+// pale palette at the warm classes' 1.6 lands wholly inside that region and
+// flattens to featureless white.
 //
-// Warmth falls monotonically F > G > K > M by design. An earlier pass had G
-// rendering redder than K and barely less red than M, because G kept the
-// article's raw (1, 0.4, 0) while K and M were picked independently.
-//
-// `gain` is per class rather than one shared constant because the tone
-// mapping compresses hard above ~1.0: a pale palette multiplied by the warm
-// classes' 1.6 lands wholly inside that compressed region, where granulation
-// flattens to featureless white -- which is what made A-class stars a blank
-// disc. Paler classes therefore use a lower gain; they already sit near white
-// and need no lifting to read as bright.
-type StarPalette = { mid: THREE.Color; deep: THREE.Color; gain: number }
+// Two orderings are load-bearing and were both inverted at some point, so
+// check them if these are retuned: blue cast falls O > B > A > F, and warmth
+// (green/red at the darkest lane) falls F > G > K > M.
+type StarPalette = {
+	hot: THREE.Color
+	mid: THREE.Color
+	deep: THREE.Color
+	gain: number
+}
 
 const palette = (
+	hot: [number, number, number],
 	mid: [number, number, number],
 	deep: [number, number, number],
 	gain: number,
 ): StarPalette => ({
+	hot: new THREE.Color(...hot),
 	mid: new THREE.Color(...mid),
 	deep: new THREE.Color(...deep),
 	gain,
 })
 
 const STAR_PALETTE_BY_CLASS: Partial<Record<SpectralClass, StarPalette>> = {
-	O: palette([0.18, 0.42, 1.0], [0.0, 0.1, 1.0], 1.15),
-	B: palette([0.3, 0.5, 1.0], [0.04, 0.2, 1.0], 1.15),
-	// The one entry that does not pin a channel at 1.0: an A-class star is
-	// near-white, so it has no dominant channel to hold, and its noise reads
-	// as luminance rather than hue.
-	A: palette([0.4, 0.48, 0.92], [0.11, 0.22, 0.68], 1.2),
-	F: palette([1.0, 0.72, 0.34], [1.0, 0.4, 0.06], 1.4),
-	G: palette([1.0, 0.56, 0.14], [1.0, 0.2, 0.0], 1.6),
-	K: palette([1.0, 0.34, 0.03], [1.0, 0.06, 0.0], 1.6),
-	M: palette([1.0, 0.2, 0.0], [1.0, 0.0, 0.0], 1.6),
+	// swatch #7cc6ff -- azure, held across all three stops
+	O: palette([0.82, 0.93, 1.0], [0.42, 0.68, 1.0], [0.17, 0.35, 0.72], 1.15),
+	// swatch #d8eeff -- pale ice blue
+	B: palette([0.94, 0.98, 1.0], [0.72, 0.86, 1.0], [0.42, 0.58, 0.85], 1.08),
+	// swatch #ffffff -- white with the faintest cool cast in the lanes
+	A: palette([1.0, 1.0, 1.0], [0.87, 0.91, 0.98], [0.55, 0.62, 0.78], 1.0),
+	// swatch #fffcd3 -- warm ivory, hue kept out of orange/brown
+	F: palette([1.0, 1.0, 0.97], [1.0, 0.97, 0.79], [0.66, 0.58, 0.36], 1.05),
+	G: palette([1.0, 1.0, 1.0], [1.0, 0.56, 0.14], [1.0, 0.2, 0.0], 1.6),
+	K: palette([1.0, 1.0, 1.0], [1.0, 0.34, 0.03], [1.0, 0.06, 0.0], 1.6),
+	M: palette([1.0, 0.97, 0.9], [1.0, 0.2, 0.0], [1.0, 0.0, 0.0], 1.6),
 }
+
+// Giants read as an M-class star scaled up, whatever their spectral class:
+// the luminosity class dominates their appearance, so a G-class giant should
+// not render as a yellow main-sequence disc.
+const GIANT_PALETTE = palette(
+	[1.0, 0.95, 0.85],
+	[1.0, 0.16, 0.0],
+	[0.95, 0.0, 0.0],
+	1.55,
+)
 
 // Only the ordinary main-sequence classes above ever reach this material --
 // remnants and brown dwarfs use their own flat materials -- so this fallback
@@ -78,6 +86,12 @@ const HOURS_TO_SHADER_TIME = 4
 const BASE_NOISE_SCALE = 5
 const MIN_NOISE_SCALE = 3
 const MAX_NOISE_SCALE = 15
+// Giants get a deliberately COARSE surface rather than the very fine one
+// their huge diameter would otherwise select. That is both what makes them
+// read as "an M-class star, much bigger" instead of a differently-textured
+// object, and what really happens: a red giant's convection cells are so
+// large that only a handful span the whole visible disc.
+const GIANT_NOISE_SCALE = 2.5
 
 // Radius, as a multiple of the star's own, for the corona shell, plus the
 // strength it contributes. The article specifies neither -- it gives the
@@ -97,6 +111,9 @@ const GLOW_STRENGTH = 0.55
 export type StarSurfaceLayersInput = {
 	/** Selects the photosphere palette -- see STAR_PALETTE_BY_CLASS. */
 	spectralClass: SpectralClass
+	/** Overrides the palette with GIANT_PALETTE and holds the granulation
+	 * coarse -- see GIANT_NOISE_SCALE. */
+	isGiant: boolean
 	/** The star's overall spectral colour, used for the corona halo only. */
 	tint: THREE.Color
 	/** The star's true diameter in Sol diameters, used only to scale
@@ -243,21 +260,24 @@ export function buildStarSurfaceLayers(
 ): StarSurfaceLayers {
 	const time = { value: 0 }
 	const tint = input.tint.clone()
-	const starPalette =
-		STAR_PALETTE_BY_CLASS[input.spectralClass] ?? DEFAULT_STAR_PALETTE
-	const { mid: midColor, deep: deepColor } = starPalette
-	const noiseScale = Math.min(
-		MAX_NOISE_SCALE,
-		Math.max(
-			MIN_NOISE_SCALE,
-			BASE_NOISE_SCALE * Math.sqrt(Math.max(0.01, input.diameterSol)),
-		),
-	)
+	const starPalette = input.isGiant
+		? GIANT_PALETTE
+		: (STAR_PALETTE_BY_CLASS[input.spectralClass] ?? DEFAULT_STAR_PALETTE)
+	const { hot: hotColor, mid: midColor, deep: deepColor } = starPalette
+	const noiseScale = input.isGiant
+		? GIANT_NOISE_SCALE
+		: Math.min(
+				MAX_NOISE_SCALE,
+				Math.max(
+					MIN_NOISE_SCALE,
+					BASE_NOISE_SCALE * Math.sqrt(Math.max(0.01, input.diameterSol)),
+				),
+			)
 
 	const surface = new THREE.ShaderMaterial({
 		uniforms: {
 			time,
-			hotColor: { value: new THREE.Color(0xffffff) },
+			hotColor: { value: hotColor },
 			midColor: { value: midColor },
 			deepColor: { value: deepColor },
 			gain: { value: starPalette.gain },
@@ -318,10 +338,10 @@ export function buildStarSurfaceLayers(
 			}
 		`,
 		transparent: true,
-		// Additive, unlike the rim shell below: a corona is emitted light, and
-		// everything behind it here is starfield or empty space rather than
-		// the star's own surface, so there is no granulation for it to wash
-		// out -- only background for it to correctly glow over.
+		// Additive: a corona is emitted light, and being a BackSide shell it
+		// only ever covers starfield or empty space rather than the star's own
+		// surface -- so there is no granulation for it to wash out, only
+		// background for it to correctly glow over.
 		blending: THREE.AdditiveBlending,
 		depthWrite: false,
 		side: THREE.BackSide,
