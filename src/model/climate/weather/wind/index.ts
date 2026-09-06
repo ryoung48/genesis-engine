@@ -1,101 +1,20 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
 import { DYNAMICS } from "@/model/climate/weather/wind/dynamics"
+import { ROUGHNESS } from "@/model/climate/weather/wind/roughness"
 import { SHALLOW_WATER } from "@/model/climate/weather/wind/shallow-water"
+import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import type {
 	CellSegment,
 	ComputeWindVectorsInput,
 	FlowGrid,
 	RasterizeVectorGridInput,
 	WindGrid,
-	WindSurface,
 } from "@/model/climate/weather/wind/types"
-import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import type { SphereMesh } from "@/model/mesh/types"
 import { MATH } from "@/model/shared/math/core"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
-
-function vegetationDragFactor(biomeCode: number | undefined): number {
-	switch (biomeCode) {
-		case 1:
-			return 1.03 // desert — bare sand/rock, low roughness
-		case 2:
-			return 1.0 // sparse
-		case 3:
-			return 0.93 // grasslands
-		case 4:
-			return 0.84 // woods
-		case 5:
-			return 0.75 // forest
-		case 6:
-			return 0.66 // jungle — dense multi-layer canopy
-		default:
-			return 1.0
-	}
-}
-
-function topographyWindFactor({
-	topoCode,
-	slope,
-}: {
-	topoCode: number | undefined
-	slope: number
-}): number {
-	let base: number
-	switch (topoCode) {
-		case CLASSIFICATION.topoFlat:
-			base = 1.0
-			break
-		case CLASSIFICATION.topoMarsh:
-			base = 0.93
-			break
-		case CLASSIFICATION.topoHill:
-			base = 0.88
-			break
-		case CLASSIFICATION.topoPlateau:
-			base = 0.93
-			break
-		case CLASSIFICATION.topoMountain:
-			base = 0.58
-			break
-		case CLASSIFICATION.topoOcean:
-			base = 1.1
-			break
-		case CLASSIFICATION.topoLake:
-			base = 1.08
-			break
-		default:
-			base = 1.0
-			break
-	}
-	return base * (1.0 - 0.12 * slope)
-}
-
-function surfaceWindFactor({
-	r,
-	surface,
-}: {
-	r: number
-	surface: WindSurface
-}): number {
-	const topoCode = surface.topography?.[r]
-	const isWater =
-		topoCode === CLASSIFICATION.topoOcean ||
-		topoCode === CLASSIFICATION.topoLake
-	const slope = surface.slopeScore?.[r] ?? 0
-
-	const vegFactor = isWater
-		? 1.0
-		: vegetationDragFactor(surface.vegetation?.[r])
-	const topoFactor = topographyWindFactor({ topoCode, slope })
-	// Sea-breeze / fetch bonus: up to +12 % at coast, decaying over ~800 km inland.
-	const coastalFactor = isWater
-		? 1.0
-		: 1.0 + 0.12 * Math.exp(-(surface.oceanDist?.[r] ?? 0) / 800.0)
-
-	return vegFactor * topoFactor * coastalFactor
-}
 
 function rasterizeVectorGrid({
 	mesh,
@@ -279,7 +198,12 @@ const POLAR_TROUGH_LAND_AMPLITUDE = 0
 // convergent low fills before the flow into it stops.
 const WAVE_COUPLING = 0.002
 // Which large-scale solver reshapes the template before the surface balance.
-const LARGE_SCALE_SOLVER: "linear" | "shallow-water" = "linear"
+// "simple" bypasses this module entirely and runs the original
+// pressure-gradient model in ./simple, which has no iterative solver and is
+// the fast path for the climate pipeline; "linear" and "shallow-water" trade
+// speed for the mass-conservation feedback that closes ocean anticyclones and
+// piles cross-equatorial flow against western boundaries.
+const LARGE_SCALE_SOLVER: "simple" | "linear" | "shallow-water" = "simple"
 const EARTH_POLAR_CORIOLIS = 1.458e-4
 // Western-boundary flow: along the western edge of an ocean basin the
 // surface flow carries an along-boundary component toward the summer pole,
@@ -573,6 +497,16 @@ function computeWindVectors({
 			surface,
 		})
 	}
+	if (LARGE_SCALE_SOLVER === "simple") {
+		return SIMPLE_WIND.computeWindVectors({
+			mesh,
+			climate,
+			elevation_km,
+			params,
+			month,
+			surface,
+		})
+	}
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
 	const {
@@ -808,7 +742,7 @@ function computeWindVectors({
 			}
 		}
 		const bl = balance({ friction: FRICTION, forceEast, forceNorth })
-		const roughness = surface ? surfaceWindFactor({ r, surface }) : 1
+		const roughness = surface ? ROUGHNESS.surfaceFactor({ r, surface }) : 1
 		let u = bl.u * roughness
 		let v = bl.v * roughness
 		if (seasonSign !== 0 && boundaryStrength[r] > 0) {
