@@ -263,7 +263,6 @@ function runPostElevationPipeline(
 	OCEAN_CURRENTS.applySSTToClimate({
 		mesh,
 		climate,
-		isLand,
 		oceanCurrents,
 		isLocked: params.tideLock?.type === "solar",
 	})
@@ -320,7 +319,6 @@ function runPostElevationPipeline(
 		OCEAN_CURRENTS.applySSTToClimate({
 			mesh,
 			climate,
-			isLand,
 			oceanCurrents,
 			isLocked: params.tideLock?.type === "solar",
 		})
@@ -457,7 +455,6 @@ function runPostElevationPipeline(
 	OCEAN_CURRENTS.applySSTToClimate({
 		mesh,
 		climate,
-		isLand,
 		oceanCurrents,
 		isLocked: params.tideLock?.type === "solar",
 	})

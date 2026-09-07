@@ -66,7 +66,6 @@ describe("restored heuristic ocean model", () => {
 		OCEAN_CURRENTS.applySSTToClimate({
 			mesh: world.mesh,
 			climate,
-			isLand: world.isLand,
 			oceanCurrents: currents,
 			isLocked: false,
 		})
@@ -87,10 +86,7 @@ describe("restored heuristic ocean model", () => {
 				expect(Number.isFinite(value)).toBe(true)
 				expect(Math.abs(value)).toBeLessThanOrEqual(1)
 				mean += value / 12
-				expect(climate.temperature_monthly[i]).toBeCloseTo(
-					10 + (world.isLand[r] ? value * 9 : 0),
-					4,
-				)
+				expect(climate.temperature_monthly[i]).toBeCloseTo(10 + value * 9, 4)
 				if (!world.isLand[r] && Number.isFinite(observed[i])) {
 					squared += (value * 9 - observed[i]) ** 2
 					count++
@@ -126,7 +122,6 @@ describe("restored heuristic ocean model", () => {
 		OCEAN_CURRENTS.applySSTToClimate({
 			mesh: world.mesh,
 			climate,
-			isLand: world.isLand,
 			oceanCurrents: locked,
 			isLocked: true,
 		})
@@ -134,7 +129,7 @@ describe("restored heuristic ocean model", () => {
 			const r = i % n
 			expect(locked.sstMonthly[i]).toBeCloseTo(locked.sst[r], 5)
 			expect(climate.temperature_monthly[i]).toBeCloseTo(
-				10 + (world.isLand[r] ? locked.sstMonthly[i] * 6 * 0.68 : 0),
+				10 + locked.sstMonthly[i] * 6 * 0.68,
 				4,
 			)
 		}

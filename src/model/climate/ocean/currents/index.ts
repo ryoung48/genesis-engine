@@ -6,8 +6,8 @@ import type {
 } from "@/model/climate/ocean/currents/display/types"
 import type {
 	ApplySSTToClimateParams,
-	BandInput,
-	CoastSideInput,
+	CoastInfluence,
+	CoastInfluenceInput,
 	ComputeSSTParams,
 	RotatingSSTParams,
 } from "@/model/climate/ocean/currents/types"
@@ -44,14 +44,22 @@ const eastBandC = (dist: number) =>
 		x: dist,
 	})
 
-const bandC = ({ dist, coastSide }: BandInput): number =>
-	coastSide < 0 ? westBandC(dist) : coastSide > 0 ? eastBandC(dist) : 0
-
 const COAST_DECAY_KM = 800
+
+// Where an east-coast and a west-coast boundary-current regime reach the same
+// water with comparable strength (a confluence, e.g. Gulf Stream vs Labrador),
+// their opposed anomalies are averaged, then scaled down by up to this fraction
+// as the two influences approach parity.
+const CONFLUENCE_DAMPING = 0.6
 
 const LANDMARK_TYPE_CONTINENT = 0
 
-function computeCoastSide({
+// One weighted multi-source flood per regime: seed every continental coast cell
+// that faces that regime at weight 1, then ramp linearly to 0 over COAST_DECAY_KM
+// of ocean. Nearest coast wins a cell's weight (FIFO order settles it). Unlike
+// the old winner-take-all sign, both regimes can reach the same water, which is
+// what lets computeRotatingSST blend and damp opposed currents where they meet.
+function computeCoastInfluence({
 	mesh,
 	isLand,
 	isLake,
@@ -59,44 +67,51 @@ function computeCoastSide({
 	eastAdv,
 	westAdv,
 	avgEdgeKm,
-}: CoastSideInput): Int8Array {
+}: CoastInfluenceInput): CoastInfluence {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const coastSide = new Int8Array(N)
-	const dist = new Int32Array(N).fill(-1)
-	const queue = new Int32Array(N)
-	let head = 0
-	let tail = 0
-
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue
-		const landmark = landmarks.regionLandmark[r]
-		if (landmark < 0 || landmarks.type[landmark] !== LANDMARK_TYPE_CONTINENT)
-			continue
-		const side = eastAdv[r] > westAdv[r] ? 1 : -1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
-			coastSide[nb] = side
-			dist[nb] = 0
-			queue[tail++] = nb
-		}
-	}
-
 	const maxHops = Math.max(1, Math.round(COAST_DECAY_KM / avgEdgeKm))
-	while (head < tail) {
-		const r = queue[head++]
-		if (dist[r] >= maxHops) continue
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
-			dist[nb] = dist[r] + 1
-			coastSide[nb] = coastSide[r]
-			queue[tail++] = nb
+	const queue = new Int32Array(N)
+
+	const floodFromCoasts = (regime: 1 | -1): Float32Array => {
+		const influence = new Float32Array(N)
+		const hop = new Int32Array(N).fill(-1)
+		let head = 0
+		let tail = 0
+
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r]) continue
+			const landmark = landmarks.regionLandmark[r]
+			if (landmark < 0 || landmarks.type[landmark] !== LANDMARK_TYPE_CONTINENT)
+				continue
+			if ((eastAdv[r] > westAdv[r] ? 1 : -1) !== regime) continue
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (isLand[nb] || isLake[nb] || hop[nb] >= 0) continue
+				hop[nb] = 0
+				influence[nb] = 1
+				queue[tail++] = nb
+			}
 		}
+
+		while (head < tail) {
+			const r = queue[head++]
+			if (hop[r] >= maxHops) continue
+			const nextHop = hop[r] + 1
+			const weight = 1 - nextHop / maxHops
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (isLand[nb] || isLake[nb] || hop[nb] >= 0) continue
+				hop[nb] = nextHop
+				influence[nb] = weight
+				queue[tail++] = nb
+			}
+		}
+
+		return influence
 	}
 
-	return coastSide
+	return { east: floodFromCoasts(1), west: floodFromCoasts(-1) }
 }
 
 function computeRotatingSST({
@@ -118,7 +133,7 @@ function computeRotatingSST({
 		if (landmarks.type[landmark] === LANDMARKS.landmarkTypeLake) isLake[r] = 1
 	}
 
-	const coastSide = computeCoastSide({
+	const coastInfluence = computeCoastInfluence({
 		mesh,
 		isLand,
 		isLake,
@@ -134,14 +149,36 @@ function computeRotatingSST({
 
 	for (let r = 0; r < N; r++) {
 		if (isLand[r] || isLake[r]) continue
-		const side = coastSide[r]
-		if (side === 0) continue
+		const westReach = coastInfluence.west[r]
+		const eastReach = coastInfluence.east[r]
+		const maxReach = Math.max(westReach, eastReach)
+		if (maxReach <= 1e-3) continue
 		const decay = COASTAL_BLEED.decay(distCoast[r])
 		if (decay <= 0) continue
+		const totalReach = westReach + eastReach
+		const minReach = Math.min(westReach, eastReach)
+		// A confluence is near-shore of BOTH regimes at once: minReach is high
+		// only when the farther of the two coasts is still close. Elsewhere a
+		// cell takes its dominant regime's band unchanged — a current wrapping a
+		// continental tip into the other regime's far field does not blend.
+		const blendMix = MATH.smoothstep({ edge0: 0.62, edge1: 0.82, x: minReach })
+		// Within that confluence, averaging the opposed bands already softens
+		// the anomaly; this pulls it down further as the two reaches near parity.
+		const opposition = minReach / maxReach
+		const confluenceScale =
+			1 -
+			CONFLUENCE_DAMPING *
+				MATH.smoothstep({ edge0: 0.4, edge1: 0.9, x: opposition })
+		const dominantBand = westReach >= eastReach ? westBandC : eastBandC
 		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
 			const teq = monthlyTEQ[month][regionBin[r]]
 			const dist = Math.abs(latDeg[r] - teq)
-			const anomalyC = bandC({ dist, coastSide: side }) * decay
+			const confluenceC =
+				((westReach * westBandC(dist) + eastReach * eastBandC(dist)) /
+					totalReach) *
+				confluenceScale
+			const anomalyC =
+				(dominantBand(dist) * (1 - blendMix) + confluenceC * blendMix) * decay
 			const value = MATH.clamp({
 				value: anomalyC / MODELED_SST_SATURATION_C,
 				lo: -1,
@@ -180,19 +217,17 @@ function computeRotatingSST({
 function applySSTToClimate({
 	mesh,
 	climate,
-	isLand,
 	oceanCurrents,
 	isLocked,
 }: ApplySSTToClimateParams): void {
 	const N = mesh.numRegions
+	const anomalyScaleC = isLocked ? 6 * 0.68 : MODELED_SST_SATURATION_C
 	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue
 		let annualSum = 0
 		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			const delta =
-				oceanCurrents.sstMonthly[month * N + r] *
-				(isLocked ? 6 * 0.68 : MODELED_SST_SATURATION_C)
-			const updated = climate.temperature_monthly[month * N + r] + delta
+			const updated =
+				climate.temperature_monthly[month * N + r] +
+				oceanCurrents.sstMonthly[month * N + r] * anomalyScaleC
 			climate.temperature_monthly[month * N + r] = updated
 			annualSum += updated
 		}
