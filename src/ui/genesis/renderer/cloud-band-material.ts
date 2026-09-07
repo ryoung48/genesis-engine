@@ -39,23 +39,20 @@ export function swatchCloudBandPalette(input: {
  * giant shader (see git history). `seed` varies the noise-domain offset per
  * body so multiple bodies don't show identical band placement; `palette` is
  * the class-swatch palette from swatchCloudBandPalette.
- * The animation clock lives in `material.userData.cloudBandUniforms` -- the
- * caller's per-frame spin hook finds and drives it there, since
- * onBeforeCompile's own `shader` object is a fresh copy Three creates at
- * compile time that callers can't reach back into later. */
+ * The pattern is a pure function of object-space position -- no time input,
+ * so it never churns or drifts. The body's rotation (sidereal spin, or a
+ * fixed facing for a tide-locked body) comes entirely from the mesh
+ * quaternion, exactly as it does for a texture-mapped body. */
 export function buildCloudBandMaterial(input: {
 	seed: number
 	palette: CloudBandPalette
 }): THREE.MeshStandardMaterial {
 	const { seed, palette } = input
-	const uniforms = { giantCloudTime: { value: 0 } }
 	const material = new THREE.MeshStandardMaterial({
 		roughness: 1,
 		metalness: 0,
 	})
-	material.userData.cloudBandUniforms = uniforms
 	material.onBeforeCompile = (shader) => {
-		shader.uniforms.giantCloudTime = uniforms.giantCloudTime
 		shader.uniforms.giantSeed = { value: seed }
 		shader.uniforms.giantColTop = { value: palette.top }
 		shader.uniforms.giantColBot = { value: palette.bot }
@@ -77,7 +74,6 @@ export function buildCloudBandMaterial(input: {
 				`
 				#include <common>
 				varying vec3 vGiantObjectPosition;
-				uniform float giantCloudTime;
 				uniform float giantSeed;
 				uniform vec3 giantColTop;
 				uniform vec3 giantColBot;
@@ -125,21 +121,13 @@ export function buildCloudBandMaterial(input: {
 					return v;
 				}
 				float giantMax3(vec3 v) { return max(max(v.x, v.y), v.z); }
-				mat3 giantBandRotation(float theta) {
-					return mat3(
-						cos(theta), 0.0, sin(theta),
-						0.0, 1.0, 0.0,
-						-sin(theta), 0.0, cos(theta)
-					);
-				}
-				vec3 giantCloudColor(vec3 objectPosition, float t, float seed, vec3 colTop, vec3 colBot, vec3 colMid1, vec3 colMid2, vec3 colMid3) {
-					mat3 rot = giantBandRotation(t * 0.15);
-					vec3 X = rot * (objectPosition * GIANT_PLANET_SIZE)
+				vec3 giantCloudColor(vec3 objectPosition, float seed, vec3 colTop, vec3 colBot, vec3 colMid1, vec3 colMid2, vec3 colMid3) {
+					vec3 X = objectPosition * GIANT_PLANET_SIZE
 						+ vec3(seed * 17.3, seed * 11.7, seed * 29.1);
 
-					vec3 q = vec3(giantFbm(X + 0.025 * t), giantFbm(X), giantFbm(X));
-					vec3 r = vec3(giantFbm(X + 1.0 * q + 0.01 * t), giantFbm(X + q), giantFbm(X + q));
-					float v = giantFbm(X + 5.0 * r + t * 0.005);
+					vec3 q = vec3(giantFbm(X));
+					vec3 r = vec3(giantFbm(X + q));
+					float v = giantFbm(X + 5.0 * r);
 
 					vec3 colMid = mix(colMid1, colMid2, clamp(r, 0.0, 1.0));
 					colMid = mix(colMid, colMid3, clamp(q, 0.0, 1.0));
@@ -155,7 +143,7 @@ export function buildCloudBandMaterial(input: {
 			)
 			.replace(
 				"#include <map_fragment>",
-				"diffuseColor.rgb = giantCloudColor(normalize(vGiantObjectPosition), giantCloudTime, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
+				"diffuseColor.rgb = giantCloudColor(normalize(vGiantObjectPosition), giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
 			)
 	}
 	return material

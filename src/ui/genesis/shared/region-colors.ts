@@ -315,20 +315,7 @@ export function computeRegionColors(
 								(temperatureMonth - 1) * N,
 								temperatureMonth * N,
 							)
-		const alwaysBlueOcean =
-			colorMode === "temperature" || colorMode === "realTemperature"
 		for (let r = 0; r < N; r++) {
-			// The ocean isn't colored by the temperature gradient -- real
-			// sea-surface temperature isn't modeled here, so letting ocean cells
-			// take the land temperature palette just shows noisy, misleading
-			// color. Matches how Earth imports have always rendered ocean.
-			if (alwaysBlueOcean && isOceanRegion(r)) {
-				const [cr, cg, cb] = oceanRgb(r)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-				continue
-			}
 			const [cr, cg, cb] =
 				colorMode === "temperatureDelta"
 					? temperatureDeltaColor(

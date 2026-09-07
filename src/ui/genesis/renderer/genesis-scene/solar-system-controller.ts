@@ -44,6 +44,9 @@ export function createSolarSystemController(
 
 	function stepSolarSystemFocusTween() {
 		if (!ctx.solarSystemFocusTween) return
+		if (ctx.solarSystemFocusTween.t0 === 0) {
+			ctx.solarSystemFocusTween.t0 = performance.now()
+		}
 		const u = Math.min(
 			1,
 			(performance.now() - ctx.solarSystemFocusTween.t0) /
@@ -85,7 +88,8 @@ export function createSolarSystemController(
 		if (!Number.isFinite(dir.x) || dir.lengthSq() === 0) dir.set(0, 0, 1)
 		const camTo = focus.position.clone().add(dir.multiplyScalar(distance))
 		ctx.solarSystemFocusTween = {
-			t0: performance.now(),
+			// Stamped on the first step, not here -- see the field's doc in context.ts.
+			t0: 0,
 			duration: opts?.durationMs ?? 900,
 			camFrom: ctx.camera.position.clone(),
 			camTo,

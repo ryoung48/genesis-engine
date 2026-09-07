@@ -271,6 +271,12 @@ export interface GenesisContext {
 	savedCameraPosition: THREE.Vector3 | null
 	savedControlsTarget: THREE.Vector3 | null
 	solarSystemFocusTween: {
+		// 0 until the first stepSolarSystemFocusTween call stamps it with
+		// performance.now(). Deferred because a heavy React commit (focus-
+		// dependent preview recomputes) can run between the double-click that
+		// creates this tween and its first animation frame -- timing from
+		// creation would let that stall consume the whole 900ms and snap the
+		// camera straight to the end.
 		t0: number
 		duration: number
 		camFrom: THREE.Vector3

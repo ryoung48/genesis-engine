@@ -1288,7 +1288,6 @@ export function GenerationPlanetNavigator({
 							daysPerYear={body.orbitalPeriodDays}
 							hoursPerDay={body.siderealDayHours}
 							planetRadiusKm={body.diameterKm / 2}
-							planetMassKg={body.massKg}
 							isSolarLocked={isApproxSolarLocked(
 								body.siderealDayHours,
 								body.orbitalPeriodDays,

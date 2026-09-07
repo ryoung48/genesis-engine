@@ -683,13 +683,17 @@ export function buildSolarSystemOverlay(
 							})
 		const mesh = new THREE.Mesh(bodyGeometryForTier(0), material)
 		// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
-		// XY (Z-north) — textured bodies need the same quarter-turn so their
-		// maps don't render "on their side". Untextured rocky spheres looked
-		// fine before because the solid-color material had no visible poles.
-		// Cloud-band meshes are sampled in normalized object space and band
-		// their noise about local Y -- a quarter-turn about X would tilt those
-		// bands pole-first, so only the textured-map path gets the pole fix.
-		if ((isGasGiant || texturePath) && !cloudBandPalette)
+		// XY (Z-north) — a body needs this quarter-turn to bring its geometry
+		// pole (and texture "north") onto world +Z. Every downstream rotation
+		// system assumes it: the sidereal spin axis (bodySpinAxis = local Y,
+		// applied after baseQuaternion), the axial-tilt axis (an in-plane
+		// perifocal vector), and solarLockedSpinAngle (which works in the
+		// geometry-local frame via inverseBaseQuat). Cloud-band meshes band
+		// their noise about object-space Y, so this same turn also carries
+		// those bands onto north — they stay latitudinal, just correctly
+		// oriented. Untextured solid-color rocky spheres have no visible poles
+		// and no locked face to show, so they're left alone.
+		if (isGasGiant || texturePath || cloudBandPalette)
 			mesh.rotation.x = Math.PI / 2
 		mesh.scale.setScalar(sceneRadius)
 		bodyGroup.add(mesh)
@@ -1621,12 +1625,6 @@ export function buildSolarSystemOverlay(
 			blackHoleDiskMaterial.uniforms.time.value = hours
 		}
 		for (const p of placed) {
-			const cloudBandUniforms = (
-				p.mesh?.material as THREE.MeshStandardMaterial | undefined
-			)?.userData.cloudBandUniforms as
-				| { giantCloudTime: { value: number } }
-				| undefined
-			if (cloudBandUniforms) cloudBandUniforms.giantCloudTime.value = hours
 			if (
 				!p.isBelt &&
 				p.mesh &&

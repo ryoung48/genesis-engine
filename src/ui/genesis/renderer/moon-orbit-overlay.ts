@@ -377,6 +377,7 @@ export function buildMoonOrbitOverlay(
 		moonMesh: THREE.Mesh
 		baseQuaternion: THREE.Quaternion
 		spinPeriodHours: number
+		lockedToParent: boolean
 		nameLabelAnchor?: THREE.Group
 		nameLabel?: Text
 		nameLeader?: THREE.Line
@@ -499,12 +500,42 @@ export function buildMoonOrbitOverlay(
 			moonMesh,
 			baseQuaternion: moonMesh.quaternion.clone(),
 			spinPeriodHours: moon.siderealDayHours,
+			lockedToParent: moon.tideLock?.type === "planet",
 			nameLabelAnchor,
 			nameLabel,
 			nameLeader,
 			localRadius: moonR,
 		})
 	})
+
+	const spinQuat = new THREE.Quaternion()
+	const spinAxis = new THREE.Vector3(0, 1, 0)
+	let currentSpinHours = 0
+	// A moon locked to its parent planet must keep the same face toward it for
+	// every day of its orbit -- the free (hours / siderealDayHours) spin below
+	// can't guarantee that: the two are driven by independent sliders, an
+	// eccentric orbit's true anomaly outruns a uniform spin, and nothing ties
+	// the epoch phase of one to the other. So for a locked moon the spin angle
+	// is solved directly from its current orbital position instead, exactly as
+	// solarLockedSpinAngle does for a star-locked planet. The parent sits at
+	// this overlay's local origin (moon positions from orbitPoint are in that
+	// same frame), so the direction to it is just the moon's negated position;
+	// baseQuaternion (pole correction + axial tilt) takes that into the mesh's
+	// local frame, where the near-face points down local +X and the spin axis
+	// is local +Y.
+	const toParentLocal = new THREE.Vector3()
+	const inverseMoonBaseQuat = new THREE.Quaternion()
+	function moonLockedSpinAngle(d: (typeof moonData)[number]): number | null {
+		if (!d.lockedToParent) return null
+		toParentLocal.copy(d.moonMesh.position).negate()
+		inverseMoonBaseQuat.copy(d.baseQuaternion).conjugate()
+		toParentLocal.applyQuaternion(inverseMoonBaseQuat)
+		// The +PI turns the moon's FAR side away from the parent: on the moon
+		// textures used here (Luna's moon.jpg especially) the sub-parent point
+		// sits half a turn from where SphereGeometry's UV puts local +X, so
+		// without this a tide-locked Luna shows its far side to Earth.
+		return Math.atan2(-toParentLocal.z, toParentLocal.x) + Math.PI
+	}
 
 	function setDay(day: number) {
 		for (const d of moonData) {
@@ -515,6 +546,10 @@ export function buildMoonOrbitOverlay(
 			d.moonMesh.position.copy(pos)
 			d.nameLabelAnchor?.position.copy(pos)
 		}
+		// A locked moon's facing depends on its just-updated orbital position,
+		// not on currentSpinHours -- refresh it so a date-only change keeps it
+		// pointed at the parent.
+		setSpinHours(currentSpinHours)
 	}
 
 	setDay(initialDay)
@@ -569,18 +604,12 @@ export function buildMoonOrbitOverlay(
 		}
 	}
 
-	const spinQuat = new THREE.Quaternion()
-	const spinAxis = new THREE.Vector3(0, 1, 0)
 	function setSpinHours(hours: number) {
+		currentSpinHours = hours
 		for (const d of moonData) {
-			const cloudBandUniforms = (
-				d.moonMesh.material as THREE.MeshStandardMaterial
-			).userData.cloudBandUniforms as
-				| { giantCloudTime: { value: number } }
-				| undefined
-			if (cloudBandUniforms) cloudBandUniforms.giantCloudTime.value = hours
-			if (d.spinPeriodHours <= 0) continue
-			const angle = (hours / d.spinPeriodHours) * TWO_PI
+			const lockedAngle = moonLockedSpinAngle(d)
+			if (lockedAngle === null && d.spinPeriodHours <= 0) continue
+			const angle = lockedAngle ?? (hours / d.spinPeriodHours) * TWO_PI
 			spinQuat.setFromAxisAngle(spinAxis, angle)
 			d.moonMesh.quaternion.copy(d.baseQuaternion).multiply(spinQuat)
 		}

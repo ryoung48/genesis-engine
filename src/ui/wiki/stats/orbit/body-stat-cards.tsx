@@ -1236,7 +1236,6 @@ export function buildMoonPreviewDataProps(params: {
 		daysPerYear: climateDaysPerYear,
 		hoursPerDay: climateHoursPerDay,
 		planetRadiusKm: params.moon.diameterKm / 2,
-		planetMassKg: params.moon.massKg,
 		isSolarLocked: params.moon.tideLock?.type === "solar",
 		spectralClass: params.spectralClass,
 		starSubtype: params.starSubtype,

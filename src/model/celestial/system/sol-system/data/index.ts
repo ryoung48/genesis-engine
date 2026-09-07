@@ -181,7 +181,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		seaLevel: 1,
 		maxElevation: 6000,
 		/** Real Earth Bond albedo (NASA planetary fact sheet). */
-		albedo: 0.3,
+		albedo: 0.31,
 		/** Same value as, and always bisected together with, ebm/constants
 		 * index.ts's GREENHOUSE_FACTOR -- both are fit against the real
 		 * imported Earth world's own land-only WorldClim bias (zeroed
