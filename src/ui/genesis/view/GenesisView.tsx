@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import { WIND } from "@/model/climate/weather/wind"
@@ -11,6 +12,7 @@ import { DATE } from "@/model/history/earth/date"
 import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { StageTiming } from "@/model/pipelines/types"
+import { UNITS } from "@/model/shared/units"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
@@ -1173,12 +1175,31 @@ export const GenesisView: React.FC<{
 			})
 		}
 		if (!world.oceanCurrents) return null
+		const N = world.mesh.numRegions
+		const sst =
+			currentMonth > 0
+				? world.oceanCurrents.sstMonthly.subarray(
+						(currentMonth - 1) * N,
+						currentMonth * N,
+					)
+				: world.oceanCurrents.sst
+		if (world.params.tideLock?.type === "solar") {
+			return LOCKED_OCEAN_CURRENTS.buildLockedOceanCurrentGrid({
+				mesh: world.mesh,
+				sst,
+				isLand: world.isLand,
+				planetRadiusKm: world.params.planetRadiusKm,
+			})
+		}
+		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		return OCEAN_CURRENTS.buildOceanCurrentGrid({
 			mesh: world.mesh,
+			sst,
 			isLand: world.isLand,
-			oceanCurrents: world.oceanCurrents,
-			params: world.params,
-			month: currentMonth > 0 ? currentMonth - 1 : undefined,
+			latDeg,
+			lonDeg,
+			reverseCirculation: UNITS.isRetrogradeObliquity(world.params.obliquity),
+			planetRadiusKm: world.params.planetRadiusKm,
 		})
 	}, [world, showOceanCurrents, showRealOceanCurrents, currentMonth])
 

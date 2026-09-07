@@ -4,11 +4,6 @@ export interface EBMConfig {
 	orbital: typeof CONSTANTS.embConstants.orbital
 	stellar?: typeof CONSTANTS.embConstants.stellar
 	landFraction?: number[]
-	// [JUSTIFICATION] Absent for bodies without a mesh; the land column then
-	// sits at sea level for its ice criterion. Per band, area-weighted
-	// elevation quantiles of the land so an ice sheet sharing a band with
-	// lowlands only freezes its own share.
-	landElevationQuantilesKm?: number[][]
 	radius?: number
 	pressure?: number
 	/**

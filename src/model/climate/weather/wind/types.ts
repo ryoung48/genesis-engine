@@ -64,7 +64,6 @@ export interface ComputeWindVectorsInput {
 		| "eccentricity"
 		| "perihelion"
 		| "pressure"
-		| "planetRadiusKm"
 	>
 	/** Omit to calculate annual-average wind vectors. */
 	month?: number
@@ -73,9 +72,3 @@ export interface ComputeWindVectorsInput {
 }
 
 export type WindGrid = FlowGrid
-
-export type CellSegment = {
-	k: number
-	hemisphere: number
-	t: number
-}

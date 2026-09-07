@@ -464,10 +464,6 @@ function computeTidalTemperature({
 		temperature_monthly_nolapse,
 		temperature_monthly_range,
 		insolation_monthly,
-		declination_monthly: Float32Array.from(
-			monthlyDeclination,
-			(rad) => (rad * 180) / Math.PI,
-		),
 		pet_monthly,
 		daylight_hours_monthly,
 		landFraction,

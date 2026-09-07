@@ -26,9 +26,6 @@ export type ComputeThermalEquatorParams = {
 	temps: Float32Array
 	/** Omitted to use the standard 120 longitude bins. */
 	numBins?: number
-	// [JUSTIFICATION] Omitted to use the wide default smoothing window
-	// (rain); the wind trough needs a narrower window to keep monsoon shifts.
-	halfWindowBins?: number
 }
 
 export type ComputeAdvectionParams = {

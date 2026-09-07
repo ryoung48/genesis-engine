@@ -23,12 +23,6 @@ export type ApplyDtrToClimateMinMaxParams = {
 	N: number
 }
 
-export type ComputeLandElevationParams = {
-	mesh: SphereMesh
-	isLand: Uint8Array
-	elevation_km: Float32Array
-}
-
 export type ComputeTemperatureParams = {
 	mesh: SphereMesh
 	elevation: Float32Array

@@ -11,13 +11,18 @@ import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { CLOUD_COVER_TEMPERATURE_MODIFIER } from "@/model/climate/temperature/cloud-cover-modifier"
 import { DTR } from "@/model/climate/temperature/dtr"
-import type { GenesisRainfall } from "@/model/climate/types"
+import type {
+	GenesisClimate,
+	GenesisOceanCurrents,
+	GenesisRainfall,
+} from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
@@ -30,6 +35,7 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import { PROVINCES } from "@/model/geography/terrain/provinces"
 import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import type { SphereMesh } from "@/model/mesh/types"
 import type {
 	PostPipelineInput,
 	PostPipelineOutput,
@@ -44,6 +50,31 @@ import type { ProvincePopulation } from "@/model/society/population/types"
 import type { GenesisProvinces } from "@/model/society/types"
 
 const LAKE_RETENTION_THRESHOLD = 100
+
+/** Applies a previously computed ocean-current SST field to climate,
+ * dispatching to the tidally locked model (substellar-distance banded) or
+ * the rotating model (ITCZ-distance banded) depending on tideLock. Kept as
+ * a single call site since the pipeline reapplies the same, already-
+ * computed oceanCurrents each time it recomputes climate from scratch. */
+function applyOceanCurrentsToClimate(params: {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	oceanCurrents: GenesisOceanCurrents
+	isLocked: boolean
+}): void {
+	const { mesh, climate, isLand, oceanCurrents, isLocked } = params
+	if (isLocked) {
+		LOCKED_OCEAN_CURRENTS.applyLockedSSTToClimate({
+			mesh,
+			climate,
+			isLand,
+			oceanCurrents,
+		})
+	} else {
+		OCEAN_CURRENTS.applySSTToClimate({ mesh, climate, isLand, oceanCurrents })
+	}
+}
 
 function reconcileClosedWaterBodies(params: {
 	isLand: Uint8Array
@@ -223,48 +254,33 @@ function runPostElevationPipeline(
 	record("Post: moisture advection", t0)
 	onProgress?.("Post: moisture advection", 50)
 
-	let observedWind: GenesisWorld["observedWind"] | undefined
-	if (
-		realWindUMonthly &&
-		realWindVMonthly &&
-		realWindWidth &&
-		realWindHeight &&
-		realWindMonths &&
-		realWindScale !== undefined &&
-		realWindNoData !== undefined
-	) {
-		const windHolder: { observedWind?: GenesisWorld["observedWind"] } = {}
-		OBSERVED_EARTH.attachObservedEarthWind({
-			mesh,
-			world: windHolder,
-			realWindUMonthly,
-			realWindVMonthly,
-			realWindWidth,
-			realWindHeight,
-			realWindMonths,
-			realWindScale,
-			realWindNoData,
-		})
-		observedWind = windHolder.observedWind
-	}
-
-	// ── Ocean SST ────────────────────────────────────────
+	// ── Ocean SST ────────────────────────────────────────────────────────
 	t0 = performance.now()
-	const oceanCurrents = OCEAN_CURRENTS.computeSST({
-		mesh,
-		isLand,
-		landmarks: currentLandmarks,
-		params,
-		distCoast,
-		monthlyTEQ,
-		eastAdv,
-		westAdv,
-	})
-	OCEAN_CURRENTS.applySSTToClimate({
+	const isLockedOcean = params.tideLock?.type === "solar"
+	const oceanCurrents = isLockedOcean
+		? LOCKED_OCEAN_CURRENTS.computeLockedSST({
+				mesh,
+				isLand,
+				distCoast,
+				landmarks: currentLandmarks,
+				params,
+			})
+		: OCEAN_CURRENTS.computeSST({
+				mesh,
+				isLand,
+				distCoast,
+				landmarks: currentLandmarks,
+				monthlyTEQ,
+				eastAdv,
+				westAdv,
+				planetRadiusKm: params.planetRadiusKm,
+			})
+	applyOceanCurrentsToClimate({
 		mesh,
 		climate,
+		isLand,
 		oceanCurrents,
-		isLocked: params.tideLock?.type === "solar",
+		isLocked: isLockedOcean,
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	record("Post: ocean SST", t0)
@@ -316,11 +332,12 @@ function runPostElevationPipeline(
 				temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 			})
 		}
-		OCEAN_CURRENTS.applySSTToClimate({
+		applyOceanCurrentsToClimate({
 			mesh,
 			climate,
+			isLand,
 			oceanCurrents,
-			isLocked: params.tideLock?.type === "solar",
+			isLocked: isLockedOcean,
 		})
 		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		record("Post: drain arid closed water", t0)
@@ -452,11 +469,12 @@ function runPostElevationPipeline(
 			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 		})
 	}
-	OCEAN_CURRENTS.applySSTToClimate({
+	applyOceanCurrentsToClimate({
 		mesh,
 		climate,
+		isLand,
 		oceanCurrents,
-		isLocked: params.tideLock?.type === "solar",
+		isLocked: isLockedOcean,
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
@@ -580,6 +598,30 @@ function runPostElevationPipeline(
 			realDtrNoData,
 		})
 		observedDtr = dtrHolder.observedDtr
+	}
+	let observedWind: GenesisWorld["observedWind"] | undefined
+	if (
+		realWindUMonthly &&
+		realWindVMonthly &&
+		realWindWidth &&
+		realWindHeight &&
+		realWindMonths &&
+		realWindScale !== undefined &&
+		realWindNoData !== undefined
+	) {
+		const windHolder: { observedWind?: GenesisWorld["observedWind"] } = {}
+		OBSERVED_EARTH.attachObservedEarthWind({
+			mesh,
+			world: windHolder,
+			realWindUMonthly,
+			realWindVMonthly,
+			realWindWidth,
+			realWindHeight,
+			realWindMonths,
+			realWindScale,
+			realWindNoData,
+		})
+		observedWind = windHolder.observedWind
 	}
 	let observedCurrent: GenesisWorld["observedCurrent"] | undefined
 	if (

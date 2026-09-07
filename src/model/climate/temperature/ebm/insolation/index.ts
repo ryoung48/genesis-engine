@@ -2,10 +2,6 @@ import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import type { InsolationComputeParams } from "@/model/climate/temperature/ebm/insolation/types"
 import { TIME } from "@/model/shared/time"
 
-// March equinox falls ~22% of the way through the year (day 80 of 365) when
-// day 0 is the first day of the year.
-const EQUINOX_YEAR_FRACTION = 80 / 365
-
 function clampAcosInput(value: number): number {
 	return Math.max(-1, Math.min(1, value))
 }
@@ -27,7 +23,7 @@ export const INSOLATION = {
 		const PI = Math.PI
 		const longP = perihelionRad + PI
 		const ecc = orbital.ECCENTRICITY
-		const equinoxOffsetRad = 2 * Math.PI * EQUINOX_YEAR_FRACTION
+		const equinoxOffsetRad = (40 * 2 * Math.PI) / time.DAYS_PER_YEAR
 		let trueL = -equinoxOffsetRad
 		let trueA = trueL - longP
 

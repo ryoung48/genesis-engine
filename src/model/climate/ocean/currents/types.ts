@@ -4,36 +4,47 @@ import type {
 } from "@/model/climate/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import type { GenesisParams } from "@/model/pipelines/types"
-export type RotatingSSTParams = {
+
+export type ComputeSSTParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
 	distCoast: Float32Array
 	landmarks: GenesisLandmarks
 	monthlyTEQ: Float32Array[]
+	/** RAIN.computeAdvection's per-region east/west moisture-advection split
+	 * -- which channel dominates a coastal cell (trade winds vs westerlies)
+	 * determines its current facing, not a separate geographic bearing. */
 	eastAdv: Float32Array
 	westAdv: Float32Array
-	planetRadiusKm: number
+	planetRadiusKm?: number
 }
-export type ComputeSSTParams = Omit<RotatingSSTParams, "planetRadiusKm"> & {
-	params: GenesisParams
-}
+
 export type ApplySSTToClimateParams = {
 	mesh: SphereMesh
 	climate: GenesisClimate
+	isLand: Uint8Array
 	oceanCurrents: GenesisOceanCurrents
-	isLocked: boolean
 }
-export type CoastInfluenceInput = {
+
+export type BuildOceanCurrentGridParams = {
+	mesh: SphereMesh
+	sst: Float32Array
+	isLand: Uint8Array
+	latDeg: Float32Array
+	lonDeg: Float32Array
+	reverseCirculation?: boolean
+	planetRadiusKm?: number
+}
+
+export type ObservedOceanCurrentGridParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
-	isLake: Uint8Array
-	landmarks: ComputeSSTParams["landmarks"]
-	eastAdv: Float32Array
-	westAdv: Float32Array
-	avgEdgeKm: number
+	observedCurrent:
+		| {
+				real_u_monthly?: Float32Array
+				real_v_monthly?: Float32Array
+				real_sst_anomaly_monthly?: Float32Array
+		  }
+		| undefined
+	month?: number
 }
-// Per-regime coastal reach at an ocean cell, each normalized to [0, 1]: how
-// strongly the nearest east-facing and west-facing continental coasts project
-// their boundary-current regimes here. Both non-negligible marks a confluence.
-export type CoastInfluence = { west: Float32Array; east: Float32Array }

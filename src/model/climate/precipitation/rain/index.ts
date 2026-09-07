@@ -50,7 +50,7 @@ const eastMoistureWinBias = (absLat: number, hadley: number): number => {
 // verified against WorldClim) while the peak itself matches or slightly
 // exceeds the old curve's.
 const itczScale = (x: number) =>
-	MATH.piecewise({ domain: [0, 0.15, 0.4, 1], range: [1, 1, 0.8, 0], x })
+	MATH.piecewise({ domain: [0, 0.15, 0.4, 1], range: [1, 1, 0.15, 0], x })
 
 // Hadley-cell subsidence: no suppression until 10°/hadleyWidth off the
 // thermal equator, ramps to near-full suppression by 18°, holds through 32°,
@@ -60,7 +60,7 @@ const itczScale = (x: number) =>
 // rain through rather than going bone-dry.
 const subsidenceScale = (x: number) =>
 	MATH.piecewise({
-		domain: [10 / 30, 18 / 30, 30 / 30, 40 / 30],
+		domain: [10 / 30, 18 / 30, 32 / 30, 40 / 30],
 		range: [0, 0.85, 0.85, 0],
 		x,
 	})
@@ -69,10 +69,10 @@ const subsidenceScale = (x: number) =>
 // now ramp in from 0° and reach full strength by 25° instead of 10°/35°;
 // westerlies now onset at 30° and peak at 40° instead of 40°/50°.
 const eastStormScale = (x: number) =>
-	MATH.piecewise({ domain: [25 / 30, 30 / 30, 80 / 30], range: [0, 1, 1], x })
+	MATH.piecewise({ domain: [0 / 30, 25 / 30, 80 / 30], range: [0, 0.8, 1], x })
 
 const westerliesScale = (x: number) =>
-	MATH.piecewise({ domain: [32 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
+	MATH.piecewise({ domain: [35 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
 
 // Windward orographic lift: keyed off the target cell's `slopeScore` — the
 // same [0, 1] mesh-relative slope value shown in the hover panel
@@ -194,7 +194,6 @@ function computeTEQBins({
 	mesh,
 	temps,
 	numBins,
-	halfWindowBins,
 }: Required<ComputeThermalEquatorParams>): {
 	binMaxTemp: Float32Array
 	smoothLat: Float32Array
@@ -225,7 +224,7 @@ function computeTEQBins({
 	for (let i = 0; i < numBins; i++) {
 		let sum = 0
 		let count = 0
-		for (let d = -halfWindowBins; d <= halfWindowBins; d++) {
+		for (let d = -TEQ_HALF_WIN; d <= TEQ_HALF_WIN; d++) {
 			const j = (((i + d) % numBins) + numBins) % numBins
 			if (binMaxTemp[j] !== -Infinity) {
 				sum += binMaxLat[j]
@@ -242,23 +241,16 @@ function computeThermalEquator({
 	mesh,
 	temps,
 	numBins = TEQ_NUM_BINS,
-	halfWindowBins = TEQ_HALF_WIN,
 }: ComputeThermalEquatorParams): Float32Array {
-	return computeTEQBins({ mesh, temps, numBins, halfWindowBins }).smoothLat
+	return computeTEQBins({ mesh, temps, numBins }).smoothLat
 }
 
 function computeThermalEquatorLine({
 	mesh,
 	temps,
 	numBins = TEQ_NUM_BINS,
-	halfWindowBins = TEQ_HALF_WIN,
 }: ComputeThermalEquatorParams): [number, number][] | null {
-	const { binMaxTemp, smoothLat } = computeTEQBins({
-		mesh,
-		temps,
-		numBins,
-		halfWindowBins,
-	})
+	const { binMaxTemp, smoothLat } = computeTEQBins({ mesh, temps, numBins })
 	const points: [number, number][] = []
 	for (let i = 0; i < numBins; i++) {
 		if (binMaxTemp[i] === -Infinity) continue
@@ -645,8 +637,8 @@ function computeWeight({
 	// year-round instead of dragging north/south with the monsoon.
 	const subsidenceDist =
 		Math.abs(cellLat - (subsidenceTeq + bandOffsetDeg)) / hadley
-	const itczE = itczScale(dist) * eastMoisture
-	const itczW = itczScale(dist) * westMoisture
+	const moisture = Math.max(eastMoisture, westMoisture)
+	const itcz = itczScale(dist) * moisture
 	const suppression =
 		1 - MATH.clamp({ value: subsidenceScale(subsidenceDist), lo: 0, hi: 1 })
 	const eastStorms = eastStormScale(dist) * eastMoisture
@@ -656,7 +648,7 @@ function computeWeight({
 	// escaping it entirely.
 	const westerlies = westerliesScale(dist) * westMoisture * suppression
 	return MATH.clamp({
-		value: Math.max(itczW * suppression, itczE, eastStorms, westerlies),
+		value: Math.max(itcz * suppression, eastStorms, westerlies),
 		lo: 0,
 		hi: 1,
 	})

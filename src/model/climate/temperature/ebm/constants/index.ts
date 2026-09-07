@@ -67,38 +67,33 @@ const embConstants = {
 		// Re-bisected in earth-import-greenhouse-refit.smoke.test.ts against the
 		// real imported Earth's land-only WorldClim mean, 0.6321 was leaving a
 		// +2.19C land warm bias; 0.6038 zeroes it (land-only bias 0.000C).
-		//
-		// 0.6038 -> 0.6972: greenhouse-moisture switched from a hand-tuned
-		// floor/ceiling multiplier to VPlanet POISE's actual SMS09-shaped
-		// local greenhouse law (trapping strength ~ T^3, anchored at Earth's
-		// 288K global mean -- see greenhouse-moisture's module doc). That
-		// shape traps much less at the cold poles than the old flat 0.5
-		// floor did, cooling the global land-only mean; re-bisected in
-		// earth-import-greenhouse-refit.smoke.test.ts to re-zero that global
-		// bias (0.000C) without touching the T^3 shape itself.
-		//
-		// 0.6972 -> 0.7005: energy-balance-model's computeDiffusionCoefficients
-		// switched from an unexplained mid-latitude-peaked diffusion profile
-		// to POISE's actual flat default (see its own comment), which barely
-		// shifts the global land-only bias but noticeably narrows the pole-
-		// to-equator spread -- re-bisected to keep the bias at 0.000C.
-		GREENHOUSE_FACTOR: 0.7005100711248814,
+		GREENHOUSE_FACTOR: 0.6038,
 	},
 	thermal: {
-		// Tuned against WorldClim monthly land temperature (see
-		// earth-real-temperature-compare.smoke.test.ts): land peaks ~30 days
-		// after the solstice with interior-like seasonal ranges, the slab ocean
-		// (4.428e6 J/m^3/K water over the mixing depth) swings ~7C at 45N.
-		OCEAN_HEAT_CAPACITY: 4.428e6 * 25,
-		LAND_HEAT_CAPACITY: 8e6,
+		// Sourced from VPlanet's POISE module (peer-reviewed EBM,
+		// examples/EarthClimate/earth.in): dHeatCapWater(4.428e6 J/m^3/K) *
+		// dMixingDepth(70m) = 3.0996e8 J/m^2/K for ocean, dHeatCapLand=1.55e7
+		// J/m^2/K for land directly. The old values (4e7 ocean, 1e7 land) left
+		// land's raw seasonal swing far too large (mid-lat land hit +41C in
+		// July with no feedback active, vs a real ~20C) -- see
+		// earth-real-temperature-compare.smoke.test.ts's by-latitude-band
+		// bias. Re-fit GREENHOUSE_FACTOR whenever these change (see its own
+		// comment).
+		OCEAN_HEAT_CAPACITY: 4.428e6 * 70,
+		LAND_HEAT_CAPACITY: 1.55e7,
 		ICE_LIMIT: 273.15 - 10,
-		ICE_LAPSE_RATE_K_PER_KM: 6.5,
-		// W/m^2/K heat exchange between the land and water columns AT THE SAME
-		// LATITUDE, scaled by each column's areal fraction (see
-		// energy-balance-model's stepTemperature). It is what keeps a land
-		// column's seasonal swing from running away from its ocean neighbor;
-		// tuned so mid-latitude and sub-arctic land ranges both match WorldClim.
-		LAND_WATER_COUPLING: 2.0,
+		// Sourced from the same VPlanet POISE reference (dNuLandWater in
+		// examples/EarthClimate/earth.in) as OCEAN/LAND_HEAT_CAPACITY above --
+		// a W/m^2/K heat-exchange coefficient between the land and water
+		// columns AT THE SAME LATITUDE, scaled by each column's areal
+		// fraction (see energy-balance-model's stepTemperature). Without
+		// this, land and ocean only interact through the final land-
+		// fraction-weighted output blend, never during the solve itself --
+		// land's much smaller heat capacity then lets a whole latitude band
+		// of land cool independently of its much more thermally-stable
+		// ocean neighbor, which is what let land run away by ~70C across
+		// an AU step that barely moved the (properly-coupled) ocean at all.
+		LAND_WATER_COUPLING: 0.8,
 	},
 	orbital: {
 		OBLIQUITY: 23.5,

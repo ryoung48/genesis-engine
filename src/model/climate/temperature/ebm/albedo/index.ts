@@ -3,9 +3,6 @@ import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { MATH } from "@/model/shared/math/core"
 
 const ICE_TRANSITION_HALF_WIDTH_K = 8
-// Perennial ice needs a colder year than seasonal snow needs a cold day: an
-// ice sheet survives where the annual mean sits this far below ICE_LIMIT.
-const PERENNIAL_ICE_OFFSET_K = 14
 
 function iceAlbedoAt(params: IceAlbedoAtParams): number {
 	const { temperatureK, baseAlbedo, iceAlbedo, couplingFactor } = params
@@ -21,7 +18,6 @@ function iceAlbedoAt(params: IceAlbedoAtParams): number {
 }
 
 export const ALBEDO = {
-	iceAlbedoAt,
 	landFraction: () => {
 		return Array.from(
 			{ length: CONSTANTS.embConstants.grid.NUM_LAT },
@@ -66,10 +62,6 @@ export const ALBEDO = {
 		 * the flat iceAlbedo regardless of sun angle). Omit for no correction.
 		 */
 		zenithOffset?: readonly number[]
-		/** Per-latitude coolings (K) of the surfaces the ice criterion sees,
-		 * one per land elevation quantile; the albedo is averaged over them
-		 * while the column itself stays at sea level. */
-		iceElevationOffsetsK?: readonly (readonly number[])[]
 	}): void => {
 		const {
 			albedo,
@@ -80,7 +72,6 @@ export const ALBEDO = {
 			iceAlbedoFeedback,
 			pressure,
 			zenithOffset,
-			iceElevationOffsetsK,
 		} = params
 		const { surface } = CONSTANTS.embConstants
 		const base = baseAlbedo ?? surface.ALBEDO.BASE
@@ -89,33 +80,15 @@ export const ALBEDO = {
 
 		for (let i = 0; i < CONSTANTS.embConstants.grid.NUM_LAT; i++) {
 			const localBase = base + (zenithOffset?.[i] ?? 0)
-			// Ice persists where the year as a whole is cold (ice sheets keep
-			// their albedo through a summer above freezing), and seasonal snow
-			// still follows the instantaneous temperature: whichever is colder.
-			const row = temperature[i]
-			let annualSum = 0
-			for (let d = 0; d < row.length; d++) annualSum += row[d]
-			const annualMeanK = annualSum / row.length
-			if (iceAlbedoFeedback === false) {
-				albedo[i][time] = localBase
-				continue
-			}
-			// Elevation only enters the perennial branch: ice sheets sit on high
-			// ground, while seasonal snow is judged at the column's own level.
-			const offsets = iceElevationOffsetsK?.[i] ?? [0]
-			let sum = 0
-			for (const offset of offsets) {
-				sum += iceAlbedoAt({
-					temperatureK: Math.min(
-						row[time],
-						annualMeanK + PERENNIAL_ICE_OFFSET_K - offset,
-					),
-					baseAlbedo: localBase,
-					iceAlbedo: ice,
-					couplingFactor,
-				})
-			}
-			albedo[i][time] = sum / offsets.length
+			albedo[i][time] =
+				(iceAlbedoFeedback ?? true)
+					? iceAlbedoAt({
+							temperatureK: temperature[i][time],
+							baseAlbedo: localBase,
+							iceAlbedo: ice,
+							couplingFactor,
+						})
+					: localBase
 		}
 	},
 }

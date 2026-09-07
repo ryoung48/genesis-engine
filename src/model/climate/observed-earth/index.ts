@@ -24,11 +24,8 @@ function sampleMonthlyFloatRaster({
 
 		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
 		const lon = Math.atan2(y, x)
-		const px = (lon / Math.PI + 1) * 0.5 * rasterW - 0.5
-		const py = Math.max(
-			0,
-			Math.min(rasterH - 1, (0.5 - lat / Math.PI) * rasterH - 0.5),
-		)
+		const px = (lon / Math.PI + 1) * 0.5 * rasterW
+		const py = (0.5 - lat / Math.PI) * rasterH
 
 		const x0 = Math.floor(px)
 		const y0 = Math.floor(py)

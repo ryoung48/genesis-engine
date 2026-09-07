@@ -229,7 +229,12 @@ function serializeWorld(
 					minFlow: world.rivers.minFlow,
 				}
 			: world.rivers,
-		oceanCurrents: world.oceanCurrents,
+		oceanCurrents: world.oceanCurrents
+			? {
+					sst: world.oceanCurrents.sst,
+					sstMonthly: world.oceanCurrents.sstMonthly,
+				}
+			: undefined,
 		provinces: world.provinces,
 		locations: world.locations,
 		nations: world.nations,
@@ -428,7 +433,6 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.climate.temperature_monthly_nolapse.buffer,
 			world.climate.temperature_monthly_range.buffer,
 			world.climate.insolation_monthly.buffer,
-			world.climate.declination_monthly.buffer,
 			world.climate.pet_monthly.buffer,
 			world.climate.daylight_hours_monthly.buffer,
 		)
