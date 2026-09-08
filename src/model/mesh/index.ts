@@ -315,6 +315,70 @@ function buildSphereMesh({
 		t_xyz[3 * t + 2] = cz
 	}
 
+	// Per-region solid angle: each region's Voronoi cell is the spherical
+	// polygon whose vertices are the circumcenters of its incident triangles.
+	// Fan-triangulate from the region center and sum spherical-triangle areas
+	// via Van Oosterom-Strackee. Steradians on the unit sphere (sums to 4pi);
+	// multiply by planetRadiusKm**2 for km**2. Adaptive meshes pack smaller
+	// cells onto land, so a uniform 4pi/numRegions is wrong there.
+	const regionArea = new Float32Array(numRegions)
+	for (let r = 0; r < numRegions; r++) {
+		const s0 = r_s[r]
+		if (s0 === -1) continue
+		const ax = r_xyz[3 * r],
+			ay = r_xyz[3 * r + 1],
+			az = r_xyz[3 * r + 2]
+		let fx = 0,
+			fy = 0,
+			fz = 0
+		let px = 0,
+			py = 0,
+			pz = 0
+		let seen = 0
+		let solid = 0
+		let s = s0
+		do {
+			const t = (s / 3) | 0
+			const vx = t_xyz[3 * t],
+				vy = t_xyz[3 * t + 1],
+				vz = t_xyz[3 * t + 2]
+			if (seen === 0) {
+				fx = vx
+				fy = vy
+				fz = vz
+			} else {
+				const crx = py * vz - pz * vy
+				const cry = pz * vx - px * vz
+				const crz = px * vy - py * vx
+				const numer = Math.abs(ax * crx + ay * cry + az * crz)
+				const denom =
+					1 +
+					(ax * px + ay * py + az * pz) +
+					(px * vx + py * vy + pz * vz) +
+					(vx * ax + vy * ay + vz * az)
+				solid += 2 * Math.atan2(numer, denom)
+			}
+			px = vx
+			py = vy
+			pz = vz
+			seen++
+			s = nextSide(hes[s])
+		} while (s !== s0)
+		if (seen >= 3) {
+			const crx = py * fz - pz * fy
+			const cry = pz * fx - px * fz
+			const crz = px * fy - py * fx
+			const numer = Math.abs(ax * crx + ay * cry + az * crz)
+			const denom =
+				1 +
+				(ax * px + ay * py + az * pz) +
+				(px * fx + py * fy + pz * fz) +
+				(fx * ax + fy * ay + fz * az)
+			solid += 2 * Math.atan2(numer, denom)
+		}
+		regionArea[r] = solid
+	}
+
 	return {
 		numRegions,
 		numTriangles,
@@ -326,6 +390,7 @@ function buildSphereMesh({
 		adjOffset,
 		adjList,
 		neighborDist,
+		regionArea,
 		s_begin_r,
 		s_end_r,
 		s_inner_t,

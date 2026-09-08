@@ -1,13 +1,6 @@
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
-import type {
-	EccentricAnomalyParams,
-	InsolationComputeParams,
-} from "@/model/climate/temperature/ebm/insolation/types"
+import type { InsolationComputeParams } from "@/model/climate/temperature/ebm/insolation/types"
 import { TIME } from "@/model/shared/time"
-
-// March equinox falls ~22% of the way through the year (day 80 of 365) when
-// day 0 is the first day of the year.
-const EQUINOX_YEAR_FRACTION = 80 / 365
 
 function clampAcosInput(value: number): number {
 	return Math.max(-1, Math.min(1, value))
@@ -16,31 +9,30 @@ function clampAcosInput(value: number): number {
 export const INSOLATION = {
 	compute: (params: InsolationComputeParams) => {
 		const { lats, orbital, stellarOverride } = params
-		const { time, stellar: defaultStellar } = CONSTANTS.embConstants
+		const { time, stellar: defaultStellar, grid } = CONSTANTS.embConstants
 		const stellar = stellarOverride || defaultStellar
-		const samples = params.sampleCount ?? time.DAYS_PER_YEAR
-		const _insolation: number[][] = new Array(lats.length)
+		const _insolation: number[][] = new Array(grid.NUM_LAT)
 			.fill(0)
-			.map(() => new Array(samples).fill(0))
-		const _daylight_hours: number[][] = new Array(lats.length)
+			.map(() => new Array(time.DAYS_PER_YEAR).fill(0))
+		const _daylight_hours: number[][] = new Array(grid.NUM_LAT)
 			.fill(0)
-			.map(() => new Array(samples).fill(0))
-		const _declination: number[] = new Array(samples).fill(0)
+			.map(() => new Array(time.DAYS_PER_YEAR).fill(0))
+		const _declination: number[] = new Array(time.DAYS_PER_YEAR).fill(0)
 		const obliquityRad = (orbital.OBLIQUITY * Math.PI) / 180
 		const perihelionRad = (orbital.PERIHELION * Math.PI) / 180
 		const PI = Math.PI
 		const longP = perihelionRad + PI
 		const ecc = orbital.ECCENTRICITY
-		const equinoxOffsetRad = 2 * Math.PI * EQUINOX_YEAR_FRACTION
-		let trueL =
-			params.startSolarLongitudeDegrees === undefined
-				? -equinoxOffsetRad
-				: (params.startSolarLongitudeDegrees * Math.PI) / 180
+		const equinoxOffsetRad = (40 * 2 * Math.PI) / time.DAYS_PER_YEAR
+		let trueL = -equinoxOffsetRad
 		let trueA = trueL - longP
 
 		while (trueA < 0) trueA += 2 * PI
 
-		const calcEccFromTrue = (p: EccentricAnomalyParams): number => {
+		const calcEccFromTrue = (p: {
+			trueAnomaly: number
+			eccentricity: number
+		}): number => {
 			const { trueAnomaly, eccentricity } = p
 			const acosInput = clampAcosInput(
 				(eccentricity + Math.cos(trueAnomaly)) /
@@ -59,9 +51,9 @@ export const INSOLATION = {
 			Math.pow(stellar.T_SUN, 4) *
 			(Math.pow(stellar.R_SUN, 2) / Math.pow(stellar.AU, 2))
 
-		for (let day = 0; day < samples; day++) {
+		for (let day = 0; day < time.DAYS_PER_YEAR; day++) {
 			if (day !== 0) {
-				meanL += (2 * PI) / samples
+				meanL += (2 * PI) / time.DAYS_PER_YEAR
 				const meanA = meanL - longP
 				eccA = meanA
 				for (let iter = 0; iter < 10; iter++) {
@@ -88,7 +80,7 @@ export const INSOLATION = {
 			const cosDeclination = Math.cos(declination)
 			_declination[day] = declination
 
-			for (let i = 0; i < lats.length; i++) {
+			for (let i = 0; i < grid.NUM_LAT; i++) {
 				const lat = lats[i]
 				const cosH0 = -Math.tan(lat) * Math.tan(declination)
 				const sConst = s0 / (astroDist * astroDist)
@@ -109,6 +101,8 @@ export const INSOLATION = {
 								Math.cos(lat) * cosDeclination * Math.sin(hourAngle))) /
 						PI
 				}
+
+				_insolation[i][day] = Math.floor(_insolation[i][day])
 			}
 		}
 

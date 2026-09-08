@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { STATE } from "@/model/history/generated/state"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
@@ -229,6 +230,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			craters: 0,
 			maxElevation,
 			pressure,
+			albedo: mainWorldSystemBody?.albedo,
+			greenhouseFactor: mainWorldSystemBody?.greenhouseFactor,
 			seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 		}),
 		[
@@ -380,6 +383,16 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				daysPerYear,
 				hoursPerDay,
 				pressure,
+				// Real Earth values, not the live sliders -- this path is
+				// Earth-only (see callers). Prefer the live mainWorldSystemBody
+				// (matches whatever GenerationPanel's own preview is showing,
+				// including any live edits) and fall back to the static defaults
+				// only if it isn't available yet.
+				albedo:
+					mainWorldSystemBody?.albedo ?? SOL_SYSTEM.solMainWorldDefaults.albedo,
+				greenhouseFactor:
+					mainWorldSystemBody?.greenhouseFactor ??
+					SOL_SYSTEM.solMainWorldDefaults.greenhouseFactor,
 				seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 				tideLock,
 				substellarLon,
@@ -451,6 +464,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			substellarLon,
 			seaLevel,
 			pressure,
+			mainWorldSystemBody?.albedo,
+			mainWorldSystemBody?.greenhouseFactor,
 			mainWorldSystemBody?.seismology?.totalHeating,
 			generationCallbacks,
 			maxElevation,

@@ -72,7 +72,7 @@ function applyOceanCurrentsToClimate(params: {
 			oceanCurrents,
 		})
 	} else {
-		OCEAN_CURRENTS.applySSTToClimate({ mesh, climate, isLand, oceanCurrents })
+		// OCEAN_CURRENTS.applySSTToClimate({ mesh, climate, isLand, oceanCurrents })
 	}
 }
 
@@ -1022,8 +1022,8 @@ function runPostElevationPipeline(
 		lakeCoastal,
 		riverVisible: rivers.visible,
 		seed: params.seed,
+		mesh,
 		planetRadiusKm: params.planetRadiusKm,
-		numRegions: N,
 		eraTargetPopulation: eraConfig.targetPopulation,
 		migrationWave: migration.migrationWave,
 		settlementWave: actualSettlementWave,

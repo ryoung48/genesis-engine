@@ -246,6 +246,7 @@ export const SpaceEngineClimatePreview: React.FC<
 					columnValues={columnValues}
 					columnLabels={columnLabels}
 					colorForValue={colorForValue}
+					datasetLabel={(lat: number) => `Lat ${lat.toFixed(1)}°`}
 					rowTickLabel={(lat: number) => `${lat.toFixed(0)}°`}
 					tooltipLabel={({ rowValue, columnIndex, value }) =>
 						`Lat ${rowValue.toFixed(1)}°, day ${Math.round(

@@ -18,6 +18,8 @@ export interface SphereMesh {
 	adjList: Int32Array
 	/** Per-edge Euclidean distance between adjacent region centers */
 	neighborDist: Float32Array
+	/** Per-region Voronoi cell solid angle in steradians (sums to 4pi); x planetRadiusKm**2 for km**2 */
+	regionArea: Float32Array
 	/** For each side s, the region where the side begins */
 	s_begin_r: Int32Array
 	/** For each side s, the region where the side ends */

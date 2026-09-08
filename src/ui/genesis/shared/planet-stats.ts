@@ -67,11 +67,17 @@ export function computePlanetStats(
 	let landAreaKm2: number | null = null
 	let landPercent: number | null = null
 	if (world?.elevation) {
-		let landCells = 0
+		// Area-weighted, not cell-counted: the Earth import packs more, smaller
+		// cells onto land, so a raw cell fraction overstates land coverage.
+		const regionArea = world.mesh.regionArea
+		let landArea = 0
+		let totalArea = 0
 		for (let i = 0; i < world.elevation.length; i++) {
-			if (world.elevation[i] > 0) landCells++
+			const a = regionArea[i]
+			totalArea += a
+			if (world.elevation[i] > 0) landArea += a
 		}
-		landPercent = (landCells / Math.max(1, world.elevation.length)) * 100
+		landPercent = totalArea > 0 ? (landArea / totalArea) * 100 : 0
 		landAreaKm2 = surfaceAreaKm2 * (landPercent / 100)
 	}
 

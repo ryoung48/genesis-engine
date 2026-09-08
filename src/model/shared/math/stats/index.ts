@@ -34,22 +34,21 @@ function computeOceanDistanceBFS({
 	// local mesh resolution) — the Black Sea is still meaningfully "a big
 	// body of water" for climate/continentality purposes even if the
 	// Bosphorus isn't resolved as a connected channel at this mesh density.
-	const meanCellAreaKm2 =
-		(4 * Math.PI * planetRadiusKm * planetRadiusKm) / numRegions
+	const regionAreaKm2 = UNITS.regionAreasKm2({ mesh, planetRadiusKm })
 	const componentId = new Int32Array(numRegions).fill(-1)
-	const componentSizes: number[] = []
+	const componentAreaKm2: number[] = []
 	const scratch: number[] = []
 	for (let r = 0; r < numRegions; r++) {
 		if (isLand[r] || componentId[r] >= 0) continue
-		const id = componentSizes.length
+		const id = componentAreaKm2.length
 		scratch.length = 0
 		scratch.push(r)
 		componentId[r] = id
-		let size = 0
+		let areaKm2 = 0
 		let head = 0
 		while (head < scratch.length) {
 			const curr = scratch[head++]
-			size++
+			areaKm2 += regionAreaKm2[curr]
 			for (let j = adjOffset[curr], jEnd = adjOffset[curr + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
 				if (isLand[nb] || componentId[nb] >= 0) continue
@@ -57,16 +56,12 @@ function computeOceanDistanceBFS({
 				scratch.push(nb)
 			}
 		}
-		componentSizes.push(size)
+		componentAreaKm2.push(areaKm2)
 	}
 
 	for (let r = 0; r < numRegions; r++) {
 		if (isLand[r]) continue
-		if (
-			componentSizes[componentId[r]] * meanCellAreaKm2 <
-			SEA_AREA_THRESHOLD_KM2
-		)
-			continue
+		if (componentAreaKm2[componentId[r]] < SEA_AREA_THRESHOLD_KM2) continue
 		dist[r] = 0
 		queue.push(0, r)
 	}
@@ -197,17 +192,17 @@ function computeCoastDistances({
 }
 
 function countContinents({ mesh, isLand }: CountContinentsParams): number {
-	const { numRegions, adjOffset, adjList } = mesh
-	let totalLand = 0
+	const { numRegions, adjOffset, adjList, regionArea } = mesh
+	let totalLandArea = 0
 	for (let r = 0; r < numRegions; r++) {
-		if (isLand[r]) totalLand++
+		if (isLand[r]) totalLandArea += regionArea[r]
 	}
-	if (totalLand === 0) return 0
+	if (totalLandArea === 0) return 0
 
-	// A land mass counts as a continent when it contains at least 5% of all
-	// land cells. This scales naturally with planet land coverage and avoids
-	// classifying every small island chain as its own continent.
-	const minCells = Math.ceil(totalLand * 0.05)
+	// A land mass counts as a continent when it holds at least 5% of all land
+	// area. Area-weighted, not cell-counted: imported meshes pack more, smaller
+	// cells onto land, so a raw count inflates coastline-dense landmasses.
+	const minArea = totalLandArea * 0.05
 	const visited = new Uint8Array(numRegions)
 	let count = 0
 
@@ -215,10 +210,10 @@ function countContinents({ mesh, isLand }: CountContinentsParams): number {
 		if (visited[start] || !isLand[start]) continue
 		const queue = [start]
 		visited[start] = 1
-		let size = 0
+		let area = 0
 		for (let i = 0; i < queue.length; i++) {
 			const r = queue[i]
-			size++
+			area += regionArea[r]
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
 				if (!visited[nb] && isLand[nb]) {
@@ -227,7 +222,7 @@ function countContinents({ mesh, isLand }: CountContinentsParams): number {
 				}
 			}
 		}
-		if (size >= minCells) count++
+		if (area >= minArea) count++
 	}
 
 	return count

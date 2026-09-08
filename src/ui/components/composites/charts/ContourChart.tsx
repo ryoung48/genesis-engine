@@ -8,6 +8,9 @@ interface ContourChartProps {
 	columnValues: readonly number[]
 	columnLabels: readonly string[]
 	colorForValue: (value: number) => string
+	// [JUSTIFICATION] Per-row series label; the filled-contour rendering has no
+	// per-row series, so it is accepted for call-site parity but unused.
+	datasetLabel?: (rowValue: number, rowIndex: number) => string
 	rowTickLabel?: (rowValue: number, rowIndex: number) => string
 	tooltipLabel?: (params: {
 		rowValue: number

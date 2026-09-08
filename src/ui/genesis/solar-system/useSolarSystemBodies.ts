@@ -74,11 +74,9 @@ function moonToMainWorldView(moon: MoonBody, parent: SystemBody): SystemBody {
 }
 
 // Inverse of moonToMainWorldView -- writes an updated view's MoonBody-
-// compatible fields back onto the original moon, dropping the fields the
-// view synthesized or derived from its star-relative projection:
-// orbitalDistanceAU/gravityG/moons/seed/rings don't exist on MoonBody, and
-// orbitalPeriodDays/zone are star-relative on the view but planet-relative
-// on the moon (see updateBodyOrbitalDistance) -- keep the moon's own.
+// compatible fields back onto the original moon, dropping the
+// SystemBody-only fields the view synthesized (orbitalDistanceAU, gravityG,
+// moons, seed, rings) that don't exist on MoonBody.
 function applyMainWorldViewToMoon(
 	updatedView: SystemBody,
 	originalMoon: MoonBody,
@@ -89,6 +87,9 @@ function applyMainWorldViewToMoon(
 		moons: _moons,
 		seed: _seed,
 		rings: _rings,
+		// orbitalPeriodDays/zone on the view are star-relative (see
+		// updateBodyOrbitalDistance); a moon's own are planet-relative -- keep
+		// the moon's rather than writing the view's projection back.
 		orbitalPeriodDays: _orbitalPeriodDays,
 		zone: _zone,
 		...moonFields
@@ -358,6 +359,8 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 				prev?.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
 			seaLevel: prev?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 			maxElevation: 6000,
+			albedo: SOL_SYSTEM.solMainWorldDefaults.albedo,
+			greenhouseFactor: SOL_SYSTEM.solMainWorldDefaults.greenhouseFactor,
 		}
 		return SYSTEM_GENERATION.generateSystemBodies({
 			seed: seed,
@@ -519,6 +522,9 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	const orbitalDistanceAU =
 		mainWorldSystemBody?.orbitalDistanceAU ??
 		DEFAULT_WORLD_PARAMS.orbitalDistanceAU
+	// Editing the semi-major axis also recomputes the derived orbital period
+	// (Kepler) and habitable-zone position, so a moved AU slider actually
+	// changes the calendar length / EBM year and the zone label.
 	const setOrbitalDistanceAU = useCallback(
 		(value: number) =>
 			updateMainWorldBody((body) =>
@@ -538,6 +544,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			updateMainWorldBody((body) => ({ ...body, siderealDayHours: value })),
 		[updateMainWorldBody],
 	)
+
 	// Re-clamps the current ageGyr to a new class/subtype's main-sequence-
 	// lifespan bounds -- ageGyr is a plain, always-valid stored value (see
 	// SolarSystemState's doc), so whichever setter changes what "valid" means
@@ -608,11 +615,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		[clampAgeGyrForStar],
 	)
 
-	// Changing star class/subtype re-rolls the whole system (including the
-	// main world) from the same seed -- generatedSystemBodies already
-	// depends on spectralClass/starSubtype, and deviation 0 is always exactly
-	// the new star's HZ center by construction (see generateSystemBodies), so
-	// no separate "preserve HZ position" math is needed here anymore.
 	const tideLock = mainWorldSystemBody?.tideLock ?? null
 	const setTideLock = useCallback(
 		(lock: TideLock | null) =>

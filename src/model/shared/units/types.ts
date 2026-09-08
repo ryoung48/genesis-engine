@@ -9,6 +9,11 @@ export interface MeanEdgeLengthKmParams {
 	planetRadiusKm?: number
 }
 
+export interface RegionAreasKm2Params {
+	mesh: Pick<SphereMesh, "numRegions" | "regionArea">
+	planetRadiusKm?: number
+}
+
 export interface RegionPathLengthKmParams {
 	r_xyz: Float32Array
 	pathRegions: ArrayLike<number>

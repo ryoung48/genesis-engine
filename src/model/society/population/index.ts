@@ -7,6 +7,7 @@ import type {
 	ComputePopulationParams,
 	ComputeProvinceHabitabilityParams,
 	PlaceCradlesParams,
+	ProvinceAreasKm2Params,
 	ProvincePopulation,
 } from "@/model/society/population/types"
 
@@ -67,6 +68,21 @@ function computeProvinceHabitability({
 	return habitability
 }
 
+function _provinceAreasKm2({
+	mesh,
+	regionProvince,
+	provinceCount,
+	planetRadiusKm,
+}: ProvinceAreasKm2Params): Float64Array {
+	const regionAreaKm2 = UNITS.regionAreasKm2({ mesh, planetRadiusKm })
+	const out = new Float64Array(provinceCount)
+	for (let r = 0; r < regionProvince.length; r++) {
+		const p = regionProvince[r]
+		if (p >= 0) out[p] += regionAreaKm2[r]
+	}
+	return out
+}
+
 function computePopulation({
 	provinces,
 	landmarks,
@@ -77,8 +93,8 @@ function computePopulation({
 	lakeCoastal,
 	riverVisible,
 	seed,
+	mesh,
 	planetRadiusKm,
-	numRegions,
 	eraTargetPopulation,
 	migrationWave,
 	settlementWave,
@@ -101,15 +117,22 @@ function computePopulation({
 
 	const effectiveSettlementWave = settlementWave ?? 1.0
 
-	// Compute global habitability score (mirrors WORLD.habitability)
-	// = sum(province.land * cellArea * habitability) / 1e8
-	const N = numRegions ?? 100000
-	const sphereAreaKm2 = 4 * Math.PI * (planetRadiusKm ?? 6371) ** 2
-	const cellAreaKm2 = sphereAreaKm2 / N
+	// Global habitability score = sum over land of cellArea * habitability,
+	// normalized. Per-province mean cell area (area / land-region count) so the
+	// adaptive Earth import — which packs more, smaller cells onto land — no
+	// longer inflates the score; identical to a uniform 4piR**2/N on an even mesh.
+	const radiusKm = planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
+	const provinceAreaKm2 = _provinceAreasKm2({
+		mesh,
+		regionProvince: provinces.regionProvince,
+		provinceCount: count,
+		planetRadiusKm: radiusKm,
+	})
 
 	let habitabilityScore = 0
 	for (let i = 0; i < count; i++) {
-		habitabilityScore += cellAreaKm2 * habitability[i]
+		const meanCellAreaKm2 = provinceAreaKm2[i] / Math.max(1, provinces.size[i])
+		habitabilityScore += meanCellAreaKm2 * habitability[i]
 	}
 	habitabilityScore /= 81234131.618
 
@@ -267,13 +290,11 @@ function computeMigration({
 
 	// Find the most habitable non-desolate landmass.
 	const landmassHab = new Map<number, number>()
-	const landmassSize = new Map<number, number>()
 	for (let p = 0; p < count; p++) {
 		if (desolate[p]) continue
 		const lm = landmassId[p]
 		if (lm < 0) continue
 		landmassHab.set(lm, (landmassHab.get(lm) ?? 0) + habitability[p])
-		landmassSize.set(lm, (landmassSize.get(lm) ?? 0) + size[p])
 	}
 
 	let bestLandmass = -1
@@ -300,9 +321,14 @@ function computeMigration({
 	}
 
 	// Number of cradles scales with continent area; cap at 5.
-	const sphereAreaKm2 = 4 * Math.PI * planetRadiusKm ** 2
-	const cellAreaKm2 = sphereAreaKm2 / N
-	const continentAreaKm2 = (landmassSize.get(bestLandmass) ?? 1) * cellAreaKm2
+	const provinceAreaKm2 = _provinceAreasKm2({
+		mesh,
+		regionProvince,
+		provinceCount: count,
+		planetRadiusKm,
+	})
+	let continentAreaKm2 = 0
+	for (const p of continentProvinces) continentAreaKm2 += provinceAreaKm2[p]
 	const numCradles = Math.max(
 		1,
 		Math.min(5, Math.round(continentAreaKm2 / KM2_PER_CRADLE)),

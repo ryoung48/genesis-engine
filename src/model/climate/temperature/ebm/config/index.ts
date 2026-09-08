@@ -1,72 +1,124 @@
-import type { EBMConfig } from "@/model/climate/temperature/ebm/config/types"
+import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 
-const earthClimate = {
-	orbital: { OBLIQUITY: 23.44, ECCENTRICITY: 0.0167, PERIHELION: 102.94719 },
-	stellar: {
-		SIGMA: 5.670367e-8,
-		T_SUN: (3.846e26 / (4 * Math.PI * 6.9634e8 ** 2 * 5.670367e-8)) ** 0.25,
-		R_SUN: 6.9634e8,
-		AU: 1.00000011 * 1.495978707e11,
-	},
-	time: { YEAR_LENGTH_DAYS: 3.155815248432e7 / 86400, HOURS_PER_DAY: 24 },
-	discretization: {
-		latitudeCount: 150,
-		latitudeGrid: "equal-area",
-		samplesPerYear: 60,
-		insolationDays: 365,
-		startSolarLongitudeDegrees: -90,
-	},
-	// The pinned EarthClimate input inherits POISE's 0.34 default, despite its README.
-	landFraction: new Array(150).fill(0.34),
-	landWaterCoupling: 0.8,
-	seasonalSurface: {
-		planckA: 203.3,
-		planckB: 2.09,
-		diffusion: 0.58,
-		landAlbedo: 0.363,
-		waterAlbedo: 0.263,
-		iceAlbedo: 0.6,
-		landHeatCapacity: 1.55e7,
-		waterHeatCapacity: 4.428e6 * 70,
-		iceDepositionRate: 2.25e-5,
-		ablationFactor: 2.3,
-		iceResetYears: 4,
-	},
-} satisfies EBMConfig
-
-const iceBelts = {
-	...earthClimate,
-	orbital: { OBLIQUITY: 55, ECCENTRICITY: 0, PERIHELION: 0 },
-	stellar: { ...earthClimate.stellar, AU: 1.02 * 1.495978707e11 },
-	time: {
-		...earthClimate.time,
-		YEAR_LENGTH_DAYS:
-			earthClimate.time.YEAR_LENGTH_DAYS * (1.02 / 1.00000011) ** 1.5,
-	},
-	discretization: {
-		...earthClimate.discretization,
-		latitudeCount: 151,
-		samplesPerYear: 80,
-		insolationDays: 376,
-	},
-	landFraction: new Array(151).fill(0.34),
-} satisfies EBMConfig
-
-// World generation runs the EBM on real, variable per-latitude land fractions
-// (from the mesh), not earthClimate's uniform 0.34. Under variable land,
-// earthClimate's strong ice-albedo feedback ice-locks the ~55%-land
-// mid-latitude bands -- cold winters accumulate ice, the ice albedo reflects
-// the summer sun, summer stays frozen -- which drags the tundra line ~15
-// degrees equatorward. This variant softens the feedback (lower ice albedo,
-// faster summer ablation) so the zonal profile stays realistic under real
-// geography. The pinned earthClimate is untouched (VPLanet parity test).
-const pipeline = {
-	...earthClimate,
-	seasonalSurface: {
-		...earthClimate.seasonalSurface,
-		iceAlbedo: 0.45,
-		ablationFactor: 3.5,
-	},
-} satisfies EBMConfig
-
-export const CONFIG = { earthClimate, iceBelts, pipeline }
+export interface EBMConfig {
+	orbital: typeof CONSTANTS.embConstants.orbital
+	stellar?: typeof CONSTANTS.embConstants.stellar
+	landFraction?: number[]
+	radius?: number
+	pressure?: number
+	/**
+	 * Bond albedo, 0..1 -- a single value for the whole body (no land/ocean
+	 * blend), e.g. Mercury's real 0.088. Used whenever the local temperature
+	 * is above the ice threshold; below it, iceAlbedo applies instead.
+	 * Defaults to EMB_CONSTANTS.surface.ALBEDO.BASE (0.35, an Earth default).
+	 */
+	albedo?: number
+	/**
+	 * Ice-cap albedo, 0..1, used below the local ice threshold (same
+	 * temperature-driven branch as before). Defaults to
+	 * EMB_CONSTANTS.surface.ALBEDO.ICE (0.65, an Earth default).
+	 */
+	iceAlbedo?: number
+	/**
+	 * Fraction (0 and up, unbounded above) representing how strongly the
+	 * atmosphere dampens outgoing longwave radiation -- 0 for a vacuum world
+	 * (Mercury), larger for a thicker/more potent greenhouse atmosphere
+	 * (Venus's real ~92 bar CO2 atmosphere needs a very large value to
+	 * reproduce its actual ~737K surface temp). Replaces the old
+	 * pressure-driven OLR_A/OLR_B formula (which grew unboundedly as
+	 * pressure->0, one of the two independent causes of the EBM's old
+	 * Mercury-divergence bug). See computeGreenhouseOLR() for the
+	 * T_eq = T_blackbody*(1+greenhouseFactor/4) relationship this drives.
+	 *
+	 * There's no formula deriving this from pressure/composition -- each real
+	 * body's value here is individually fit so EBM's simulated average matches
+	 * its actual known surface temperature (see sol-system.ts's
+	 * SolPlanetSeed.greenhouseFactor). A linear scale from one body's fitted
+	 * value won't reliably predict another's; thick and thin atmospheres
+	 * don't relate to a blackbody baseline the same way. Defaults to
+	 * EMB_CONSTANTS.surface.GREENHOUSE_FACTOR (Earth's fitted value) when
+	 * unset.
+	 */
+	greenhouseFactor?: number
+	/**
+	 * Intrinsic thermal emission temperature (K) from a body's own residual
+	 * formation heat -- relevant for young and/or massive gas giants (real
+	 * Jupiter/Saturn radiate meaningfully more energy than they receive from
+	 * the Sun; Uranus is the outlier with almost none). 0 for anything without
+	 * a known internal heat excess (all terrestrial planets and moons).
+	 *
+	 * Combined with solar heating as an added flux (sigma*T^4), not as a raw
+	 * temperature -- both are independent radiative sources, and radiative
+	 * fluxes add, temperatures don't (T_total^4 = T_solar^4 + T_internal^4,
+	 * not T_total = T_solar + T_internal). Applied uniformly across every
+	 * latitude/day, unlike solar insolation, since internal heat emerges from
+	 * the core rather than being intercepted from one direction.
+	 *
+	 * A commonly-cited world-builder estimate for this is
+	 * T_internal = 80 * sqrt(massEarths) / ageGyr -- see sol-system.ts's
+	 * SolPlanetSeed for the fitted per-body values that used it as a
+	 * starting point (still individually adjusted against each body's real
+	 * known temperature, same as greenhouseFactor).
+	 */
+	internalHeatTempK?: number
+	time?: {
+		YEAR_LENGTH_DAYS?: number
+		HOURS_PER_DAY?: number
+	}
+	/**
+	 * Enables the smooth, temperature-driven ice/snow albedo transition (see
+	 * albedo.ts's iceAlbedoAt). Defaults to true. Set false for bodies whose
+	 * `albedo` is already a real, empirically-measured whole-body Bond albedo
+	 * (every case in sol-bodies-refit.smoke.test.ts) -- synthetic ice modeling
+	 * would override that known value instead of refining it.
+	 */
+	iceAlbedoFeedback?: boolean
+	/**
+	 * Ported from galaxy-gen's TEMPERATURE.finalize seismologyMod -- a body's
+	 * geologic/tidal heating (system-seismology.ts's SeismologyProfile.
+	 * totalHeating, itself ported from galaxy-gen's SEISMOLOGY.total and on
+	 * the same Kelvin-equivalent flux scale), applied as
+	 * (T_solve^4 + seismologyTotalHeatingK^4)^0.25 to every cell AFTER
+	 * runModel()'s full diffusive/seasonal solve has already converged.
+	 *
+	 * Deliberately NOT folded in like internalHeatTempK (which participates
+	 * in computeGreenhouseOLR's blackbody linearization and every step's
+	 * absorbed flux, so it reshapes the whole equilibrium -- ice-albedo
+	 * feedback, seasonal amplitude, latitude diffusion, all of it). Unlike
+	 * internal formation heat, seismology.totalHeating is a coarse,
+	 * dice-driven worldbuilder figure (tidal stress, age/size-based residual
+	 * heat), not a calibrated physical constant -- galaxy-gen itself only
+	 * ever adds it as one final algebraic bump on an already-computed mean
+	 * temperature, never inside a spatial energy-balance solve (it doesn't
+	 * have one). A uniform post-solve bump is the equivalent operation here:
+	 * every latitude/day gets the same floor-raise, with no interaction with
+	 * the dynamics that produced the pre-bump field.
+	 *
+	 * 0 (no bump) for the overwhelming majority of bodies -- old, low-stress
+	 * worlds sit in system-seismology.ts's "dead" heating regime, and this
+	 * only matters for geologically/tidally active worlds (e.g. an Io-analog
+	 * moon).
+	 *
+	 * Callers should NOT pass this for a jovian: computeResidualHeating's
+	 * stress formula (sizeClass - starAgeGyr + moonSizeClassTotal, squared)
+	 * was tuned for rocky/icy geologic stress, and a jovian's huge sizeClass
+	 * (16-18) plus several sizeable moons routinely produces a totalHeating
+	 * of 100-400+ -- large enough that (T_solve^4 + that^4)^0.25 alone
+	 * exceeds Jupiter/Saturn/Uranus/Neptune's real known temperature even at
+	 * greenhouseFactor's floor of 0, since greenhouseFactor can only ever
+	 * warm a body above its blackbody-with-albedo temperature, never cool it
+	 * below. Jovians already get real internal heat correctly, and
+	 * individually, via their own fitted internalHeatTempK -- see
+	 * sol-bodies-refit.smoke.test.ts's failed attempt to refit
+	 * greenhouseFactor against a jovian with this bump included, in git
+	 * history, for the numbers.
+	 */
+	seismologyTotalHeatingK?: number
+	/**
+	 * Heat-exchange coefficient (W/m^2/K) between the land and water columns
+	 * AT THE SAME LATITUDE -- see thermal.LAND_WATER_COUPLING's own comment
+	 * for why this exists. Defaults to that constant (VPlanet POISE's fitted
+	 * Earth value) when unset.
+	 */
+	landWaterCoupling?: number
+}

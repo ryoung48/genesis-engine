@@ -142,7 +142,11 @@ interface ImportParams {
 	substellarLon?: number
 	perihelion?: number
 	pressure?: number
-	/** [JUSTIFICATION] See GenesisParams.seismologyTotalHeatingK. */
+	/** Real per-body EBM overrides -- see GenesisParams.albedo/greenhouseFactor
+	 * doc. Pass both for a known real body (e.g. importing the real Earth
+	 * heightmap); leave unset for a generic imported heightmap. */
+	albedo?: number
+	greenhouseFactor?: number
 	seismologyTotalHeatingK?: number
 }
 

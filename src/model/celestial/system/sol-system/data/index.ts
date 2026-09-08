@@ -168,7 +168,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		densityEarthRelative: 1,
 		densityDescription: "Rock and Metal",
 		rotationHours: 23.93447232,
-		tiltDeg: 23.44,
+		tiltDeg: 23.5,
 		eccentricity: 0.0167,
 		inclinationDeg: 7.25,
 		longitudeOfAscendingNodeDeg: 180,
@@ -176,9 +176,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		// The EBM uses a body-fixed seasonal angle, not this HGI-frame value.
 		lsAphelionDeg: 102,
 		landDistribution: 0.25,
-		// Matches VPLanet POISE's EarthClimate land fraction (CONFIG.earthClimate),
-		// so the default Earth preview reproduces that benchmark.
-		landCoverage: 0.34,
+		landCoverage: 0.3,
 		continentSizeVariety: 0.35,
 		seaLevel: 1,
 		maxElevation: 6000,

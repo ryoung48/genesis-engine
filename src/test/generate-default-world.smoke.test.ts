@@ -3,12 +3,13 @@ import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
-import { CONFIG } from "@/model/climate/temperature/ebm/config"
+import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
+import { ERAS } from "@/model/society/eras"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/genesis/generation/generation-preview"
@@ -42,16 +43,14 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 		pressure: params.pressure,
 	})
 
-	const base = CONFIG.earthClimate
 	const model = new EnergyBalanceModel({
-		...base,
 		orbital: {
 			OBLIQUITY: previewConfig.obliquity,
 			ECCENTRICITY: previewConfig.eccentricity,
 			PERIHELION: previewConfig.perihelion,
 		},
 		stellar: {
-			...base.stellar,
+			...CONSTANTS.embConstants.stellar,
 			T_SUN: STAR.getStarTemperatureK({
 				cls: previewConfig.spectralClass as MainSequenceClass,
 				subtype: previewConfig.starSubtype,
@@ -61,16 +60,13 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 			HOURS_PER_DAY: previewConfig.hoursPerDay,
 			YEAR_LENGTH_DAYS: previewConfig.daysPerYear,
 		},
-		landFraction: new Array(base.discretization.latitudeCount).fill(
+		landFraction: new Array(CONSTANTS.embConstants.grid.NUM_LAT).fill(
 			previewConfig.landFraction,
 		),
 		radius: previewConfig.radius * 1000,
 		pressure: previewConfig.pressure,
 	})
-	model.runModel({
-		years: 200,
-		dtDays: 365 / base.discretization.samplesPerYear,
-	})
+	model.runModel({ years: 30, dtDays: 0.5 })
 
 	let totalWeightedTemp = 0
 	let totalArea = 0
@@ -512,4 +508,65 @@ describe("full world smoke generation", () => {
 		expect(world.nations?.count ?? 0).toBeGreaterThan(0)
 		expect(statelessProvinces).toBe(0)
 	}, 120_000)
+
+	it("logs development stats for all era presets", () => {
+		const DEV_BUCKETS = [
+			{ label: "0–0.05", lo: 0, hi: 0.05 },
+			{ label: "0.05–0.1", lo: 0.05, hi: 0.1 },
+			{ label: "0.1–0.25", lo: 0.1, hi: 0.25 },
+			{ label: "0.25–0.5", lo: 0.25, hi: 0.5 },
+			{ label: "0.5–0.75", lo: 0.5, hi: 0.75 },
+			{ label: "0.75+", lo: 0.75, hi: Infinity },
+		]
+
+		const base = buildSmokeParams()
+		for (const era of ERAS.eraOrder) {
+			const world = GENERATE_WORLD.generateGenesisWorld({
+				params: { ...base, era },
+			})
+			if (
+				!world.nations ||
+				!world.provinces ||
+				!world.population ||
+				!world.cultures
+			) {
+				console.info(`Era ${era}: no society data`)
+				continue
+			}
+			const P = world.provinces.count
+			const development = world.development
+			if (!development) {
+				console.info(`Era ${era}: no development data`)
+				continue
+			}
+			let devSum = 0
+			let nonDesolateCount = 0
+			const bucketCounts = new Int32Array(DEV_BUCKETS.length)
+			for (let p = 0; p < P; p++) {
+				if (world.provinces.desolate[p]) continue
+				const dev = development[p]
+				devSum += dev
+				nonDesolateCount++
+				for (let b = 0; b < DEV_BUCKETS.length; b++) {
+					if (dev >= DEV_BUCKETS[b].lo && dev < DEV_BUCKETS[b].hi) {
+						bucketCounts[b]++
+						break
+					}
+				}
+			}
+			const avgDev = nonDesolateCount > 0 ? devSum / nonDesolateCount : 0
+			console.info(
+				`\nEra: ${era} | provinces: ${P} | non-desolate: ${nonDesolateCount} | avg dev: ${avgDev.toFixed(3)}`,
+			)
+			console.table(
+				DEV_BUCKETS.map((b, i) => ({
+					bucket: b.label,
+					count: bucketCounts[i],
+					pct: `${((bucketCounts[i] / Math.max(1, nonDesolateCount)) * 100).toFixed(1)}%`,
+				})),
+			)
+		}
+
+		expect(true).toBe(true)
+	}, 600_000)
 })

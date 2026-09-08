@@ -96,9 +96,7 @@ function buildPreviewChartProps(
 				}) =>
 					`Eq Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} W/m²`,
 			}
-		// Tidally locked worlds have no seasonal ice-mass balance; this slot
-		// keeps showing daylight for them.
-		case "ice":
+		case "daylight":
 			return {
 				matrix: preview.daylight,
 				colorForValue: buildNormalizedDaylightColorFn(preview.daylight),
@@ -150,6 +148,7 @@ export const LockedClimatePreview: React.FC<LockedClimatePreviewProps> = ({
 			columnValues={preview.columnValues}
 			columnLabels={preview.columnLabels}
 			colorForValue={chartProps.colorForValue}
+			datasetLabel={(lon: number) => `Eq Lon ${lon.toFixed(1)}°`}
 			rowTickLabel={(lon: number) => `${lon.toFixed(0)}°`}
 			tooltipLabel={chartProps.tooltipLabel}
 			legendTitle={chartProps.legendTitle}

@@ -217,7 +217,6 @@ export function GenerationPlanetNavigator({
 	currentFocus,
 	companionStars,
 	hostStar,
-	generatedWorldAvgTempK,
 	mainWorldSystemBody,
 	updateMainWorldBody,
 	surfaceTidesM,
@@ -266,10 +265,6 @@ export function GenerationPlanetNavigator({
 	 * equivalent for them. */
 	companionStars?: CompanionStar[]
 	hostStar?: HostStarAttributes
-	/** Generated world's global mean surface temperature (K). When set and the
-	 * main world is selected, it replaces the standalone EBM preview estimate
-	 * on the Temperature stat row. */
-	generatedWorldAvgTempK?: number
 	currentFocus?: OrbitAddress | null
 	/** The main world's SystemBody entry wherever it lives -- see
 	 * useSolarSystemBodies' mainWorldSystemBody/moonToMainWorldView. */
@@ -502,6 +497,10 @@ export function GenerationPlanetNavigator({
 				landCoverage: probeMoon.landCoverage,
 				planetRadiusKm: probeMoon.diameterKm / 2,
 				pressureBar: probeMoon.atmosphere?.pressureBar ?? 0,
+				albedo: probeMoon.albedo,
+				greenhouseFactor: probeMoon.greenhouseFactor,
+				internalHeatTempK: undefined,
+				seismologyTotalHeatingK: probeMoon.seismology?.totalHeating,
 				substellarLon: probeMoon.substellarLon ?? 0,
 			}
 		}
@@ -525,6 +524,20 @@ export function GenerationPlanetNavigator({
 				landCoverage: probeBody.landCoverage,
 				planetRadiusKm: probeBody.diameterKm / 2,
 				pressureBar: probeBody.atmosphere?.pressureBar ?? 0,
+				albedo: probeBody.albedo,
+				greenhouseFactor: probeBody.greenhouseFactor,
+				internalHeatTempK: probeBody.internalHeatTempK,
+				// Excluded for jovians -- their real internalHeatTempK is
+				// individually fitted against Jupiter/Saturn/Uranus/Neptune's actual
+				// temperatures, and system-seismology.ts's residual-heating formula
+				// (tuned for rocky/icy geologic stress, not gas-giant internal heat)
+				// produces values so large for a jovian's huge sizeClass that no
+				// greenhouseFactor can compensate -- see ebm/index.ts's
+				// EBMConfig.seismologyTotalHeatingK doc.
+				seismologyTotalHeatingK:
+					probeBody.group === "jovian"
+						? undefined
+						: probeBody.seismology?.totalHeating,
 				substellarLon: probeBody.substellarLon ?? 0,
 			}
 		}
@@ -543,21 +556,17 @@ export function GenerationPlanetNavigator({
 			landCoverage: 0.3,
 			planetRadiusKm: 6371,
 			pressureBar: 1,
+			albedo: undefined,
+			greenhouseFactor: undefined,
+			internalHeatTempK: undefined,
+			seismologyTotalHeatingK: undefined,
 			substellarLon: 0,
 		}
 	}, [probeBody, probeMoon, spectralClass, starSubtype, probeHostStar])
 	const probedAvgTempK = useAvgTempKPreview(probeConfig)
-	// Once a world has been generated, the main world's Temperature row shows
-	// that world's actual global mean rather than re-running the standalone EBM
-	// preview estimate (which is a knife-edge near Earth's orbit).
-	const selectedIsMainWorld = probeMoon
-		? probeMoon.isMainWorld === true
-		: probeBody?.isMainWorld === true
 	const avgTempK =
 		selection.kind === "body" || selection.kind === "moon"
-			? selectedIsMainWorld && generatedWorldAvgTempK !== undefined
-				? generatedWorldAvgTempK
-				: probedAvgTempK
+			? probedAvgTempK
 			: undefined
 	useEffect(() => {
 		if (!currentFocus) return
@@ -1294,6 +1303,14 @@ export function GenerationPlanetNavigator({
 							substellarLon={body.substellarLon ?? 0}
 							landCoverage={body.landCoverage}
 							atmosphere={body.atmosphere}
+							albedo={body.albedo}
+							greenhouseFactor={body.greenhouseFactor}
+							internalHeatTempK={body.internalHeatTempK}
+							seismologyTotalHeatingK={
+								body.group === "jovian"
+									? undefined
+									: body.seismology?.totalHeating
+							}
 							generationPreviewTab={generationPreviewTab}
 							onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 							unitSystem={unitSystem}

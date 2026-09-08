@@ -407,6 +407,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		world.mesh.adjOffset.buffer,
 		world.mesh.adjList.buffer,
 		world.mesh.neighborDist.buffer,
+		world.mesh.regionArea.buffer,
 		world.mesh.s_begin_r.buffer,
 		world.mesh.s_end_r.buffer,
 		world.mesh.s_inner_t.buffer,

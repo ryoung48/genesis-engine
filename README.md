@@ -97,6 +97,8 @@ codex resume 019f8775-0271-7a70-8d80-a58fe1d0b10b
 
 claude --resume 4bc48604-7335-4e3b-a1c5-87270824c9e0 --dangerously-skip-permissions
 
+~\AppData\Local\Temp\claude\C--Users-rayou-projects-nexus-chaos-machine\f0b6021 
+
 
 claude --resume dd4a09d1-7bb7-413f-b47e-3690724a15bc
 2. East Asian trough (small, wind only). South China is the last big monsoon miss. The trough over 105-120E needs to sit at 35-45N in July. Two cheap options: widen the trough smoothing window so Tibet's heat reaches those longitudes, or let the plateau term weight by terrain area within the window rather than per-cell height. About an hour, measurable on the S China row.

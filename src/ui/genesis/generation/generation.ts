@@ -265,6 +265,9 @@ export function generateWorld(
 		pastaGintThreshold:
 			overrides?.pastaGintThreshold ?? currentParams.pastaGintThreshold,
 		pressure: overrides?.pressure ?? currentParams.pressure,
+		albedo: overrides?.albedo ?? currentParams.albedo,
+		greenhouseFactor:
+			overrides?.greenhouseFactor ?? currentParams.greenhouseFactor,
 		tideLock,
 		substellarLon: overrides?.substellarLon ?? currentParams.substellarLon,
 		jitter: overrides?.jitter ?? currentParams.jitter,
@@ -457,6 +460,8 @@ export function importHeightmap(
 			daysPerYear: importParams.daysPerYear as number,
 			hoursPerDay: importParams.hoursPerDay as number,
 			pressure: importParams.pressure as number,
+			albedo: importParams.albedo,
+			greenhouseFactor: importParams.greenhouseFactor,
 			tideLock: importParams.tideLock,
 			substellarLon: importParams.substellarLon as number,
 			terrainWarp: importParams.terrainWarp as number,

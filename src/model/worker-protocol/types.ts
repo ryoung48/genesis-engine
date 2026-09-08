@@ -22,6 +22,7 @@ interface SerializedSphereMesh {
 	adjOffset: Int32Array
 	adjList: Int32Array
 	neighborDist: Float32Array
+	regionArea: Float32Array
 	s_begin_r: Int32Array
 	s_end_r: Int32Array
 	s_inner_t: Int32Array
@@ -43,7 +44,6 @@ interface SerializedGenesisClimate {
 	pet_monthly: Float32Array
 	daylight_hours_monthly: Float32Array
 	landFraction: number[]
-	globalMeanTempC?: number
 	/** [JUSTIFICATION] Cached cloud cover is absent from worlds generated before this cache was introduced. */
 	cloud_cover_monthly?: Float32Array
 	/** [JUSTIFICATION] Observed-input cloud cover is only available for imported Earth worlds. */

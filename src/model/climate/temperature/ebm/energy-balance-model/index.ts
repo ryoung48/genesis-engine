@@ -1,36 +1,17 @@
-import type { EBMConfig } from "@/model/climate/temperature/ebm/config/types"
+import { ALBEDO } from "@/model/climate/temperature/ebm/albedo"
+import type { EBMConfig } from "@/model/climate/temperature/ebm/config"
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import type {
-	ColumnTerms,
-	ColumnTermsParams,
 	RunModelParams,
 	StepTemperatureParams,
 } from "@/model/climate/temperature/ebm/energy-balance-model/types"
+import { GREENHOUSE_MOISTURE } from "@/model/climate/temperature/ebm/greenhouse-moisture"
 import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
-import { SEASONAL_SURFACE } from "@/model/climate/temperature/ebm/seasonal-surface"
 import { UTILS } from "@/model/climate/temperature/ebm/utils"
 import type { Matrix2x2 } from "@/model/climate/temperature/ebm/utils/types"
 import { TIME } from "@/model/shared/time"
 
-// Planck reference temperature for the fixed linear OLR law (POISE fdOLRsms09
-// linearization): OLR = planckA + planckB * (T - 273.15).
-const PLANCK_REF_K = 273.15
-
-// Owns the mutable thermal columns and seasonal history for one independent integration.
 export class EnergyBalanceModel {
-	private currentLand: number[] = []
-	private currentOcean: number[] = []
-	private iceMass: number[] = []
-	ice_mass_balance: number[][] = []
-	ice_mass: number[][] = []
-	converged = false
-	yearsRun = 0
-	private get latitudeCount() {
-		return this.config.discretization.latitudeCount
-	}
-	private get samplesPerYear() {
-		return this.config.discretization.samplesPerYear
-	}
 	lats: number[] = []
 	lats_deg: number[] = []
 	sin_lats: number[] = []
@@ -39,12 +20,27 @@ export class EnergyBalanceModel {
 	dx: number[] = []
 	insolation: number[][] = []
 	daylightHours: number[][] = []
+	/** Solar declination (radians) per day of year -- used only for the
+	 * zenith-angle albedo correction below. */
 	declination: number[] = []
+	/** Land-fraction-weighted blend of temperature_land/temperature_ocean --
+	 * the only field external callers should read. Populated once runModel()
+	 * finishes; empty/unused mid-run. */
 	temperature: number[][] = []
 	temperature_avg: number[] = []
 	temperature_min: number[] = []
 	temperature_max: number[] = []
 	land_fraction: number[] = []
+
+	/** Land and ocean within a latitude band are simulated as two independent
+	 * thermal columns, not one land-fraction-blended average. A blended
+	 * column freezes (and ice-albedo-locks) as soon as the BAND MEAN dips
+	 * below the ice threshold, even in bands that are mostly open ocean --
+	 * which erases the real mechanism (ocean thermal inertia keeping water
+	 * open through a long polar night) that high-obliquity climate studies
+	 * rely on to avoid a runaway snowball. Each column gets its own heat
+	 * capacity and its own ice/albedo state; only the FINAL output blends
+	 * them back into one number per band. */
 	heat_capacity_land: number[] = []
 	heat_capacity_ocean: number[] = []
 	temperature_land: number[][] = []
@@ -59,15 +55,27 @@ export class EnergyBalanceModel {
 	lowerCoef: number[] = []
 	upperCoef: number[] = []
 
-	private olrA = 0
-	private olrB = 0
+	olrTRef = 288
+	olrA = 0
+	olrB = 0
+	equilibriumGuess = 288
+	internalHeatFlux = 0
+	private sigma = 5.67e-8
+	private baseGreenhouseFactor = 0
 
 	constructor(config: EBMConfig) {
 		this.config = config
 	}
 
+	// VPlanet POISE (poise.c's dDiffCoeff handling) uses ONE flat diffusion
+	// coefficient at every latitude, not a latitude-shaped profile. The old
+	// diffuser() peaked at mid-latitudes (~45deg) and dipped at both the
+	// equator and the poles, which stretched the pole-to-equator spread past
+	// Earth's real range. Re-fit GREENHOUSE_FACTOR whenever this changes.
+	private static readonly DIFFUSION_COEFFICIENT = 0.55
+
 	private computeDiffusionCoefficients(): void {
-		const { time, planet } = CONSTANTS.embConstants
+		const { grid, time, planet } = CONSTANTS.embConstants
 		const hoursPerDay = this.config.time?.HOURS_PER_DAY || time.HOURS_PER_DAY
 		const rotationFactor = Math.pow(hoursPerDay / TIME.hoursPerDay, 0.5)
 		const radiusRatio =
@@ -75,16 +83,16 @@ export class EnergyBalanceModel {
 		const radiusFactor = radiusRatio * radiusRatio
 		const pressureFactor = Math.pow(this.config.pressure ?? 1.0, 0.5)
 		const diffuser =
-			this.config.seasonalSurface.diffusion *
+			EnergyBalanceModel.DIFFUSION_COEFFICIENT *
 			radiusFactor *
 			pressureFactor *
 			rotationFactor
 
-		this.lowerCoef = new Array(this.latitudeCount).fill(0)
-		this.upperCoef = new Array(this.latitudeCount).fill(0)
+		this.lowerCoef = new Array(grid.NUM_LAT).fill(0)
+		this.upperCoef = new Array(grid.NUM_LAT).fill(0)
 
-		for (let k = 1; k < this.latitudeCount; k++) {
-			const xBoundary = this.sin_lat_bounds[k]
+		for (let k = 1; k < grid.NUM_LAT; k++) {
+			const xBoundary = 0.5 * (this.sin_lats[k] + this.sin_lats[k - 1])
 			const cos2LatBoundary = 1 - xBoundary * xBoundary
 			const dBar = cos2LatBoundary * diffuser
 			const sinDiff = this.sin_lats[k] - this.sin_lats[k - 1]
@@ -100,10 +108,85 @@ export class EnergyBalanceModel {
 	}
 
 	private computeGreenhouseOLR(): void {
-		this.olrA = this.config.seasonalSurface.planckA
-		this.olrB = this.config.seasonalSurface.planckB
+		const { stellar: defaultStellar, surface } = CONSTANTS.embConstants
+		const stellar = this.config.stellar || defaultStellar
+		const greenhouseFactor =
+			this.config.greenhouseFactor ?? surface.GREENHOUSE_FACTOR
+		const s0 =
+			stellar.SIGMA *
+			stellar.T_SUN ** 4 *
+			((stellar.R_SUN * stellar.R_SUN) / (stellar.AU * stellar.AU))
+		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
+		const internalHeatTempK = this.config.internalHeatTempK ?? 0
+		this.internalHeatFlux = stellar.SIGMA * internalHeatTempK ** 4
+		const meanSolarFlux = (s0 * (1 - albedoEstimate)) / 4
+		const blackbodyTemp =
+			((meanSolarFlux + this.internalHeatFlux) / stellar.SIGMA) ** 0.25
+
+		this.olrTRef = blackbodyTemp
+		this.olrB = (4 * stellar.SIGMA * this.olrTRef ** 3) / (1 + greenhouseFactor)
+		this.olrA = (stellar.SIGMA * this.olrTRef ** 4) / (1 + greenhouseFactor)
+		this.equilibriumGuess = this.olrTRef * (1 + greenhouseFactor / 4)
+		this.sigma = stellar.SIGMA
+		this.baseGreenhouseFactor = greenhouseFactor
 	}
 
+	// Cold/dry columns trap less longwave than the planet-wide greenhouseFactor
+	// assumes (see greenhouse-moisture's module doc) -- re-derive local A/B
+	// around the SAME global olrTRef but with a temperature-scaled effective
+	// greenhouseFactor, using that column's own previous-step temperature as
+	// the moisture proxy. Falls back to the plain global olrA/olrB when
+	// iceAlbedoFeedback is off (real Sol bodies fit their greenhouseFactor
+	// directly against known behavior; layering more synthetic feedback on
+	// top would fight that fit, same reasoning as iceAlbedoFeedback itself).
+	private localOlrCoefficients(temperatureK: number): {
+		olrA: number
+		olrB: number
+	} {
+		if ((this.config.iceAlbedoFeedback ?? true) === false) {
+			return { olrA: this.olrA, olrB: this.olrB }
+		}
+		const g =
+			this.baseGreenhouseFactor *
+			GREENHOUSE_MOISTURE.moistureGreenhouseMultiplier(temperatureK)
+		return {
+			olrA: (this.sigma * this.olrTRef ** 4) / (1 + g),
+			olrB: (4 * this.sigma * this.olrTRef ** 3) / (1 + g),
+		}
+	}
+
+	private seedPerLatitudeEquilibrium(): void {
+		const { grid, surface } = CONSTANTS.embConstants
+		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
+		const lower = new Array(grid.NUM_LAT)
+		const diag = new Array(grid.NUM_LAT)
+		const upper = new Array(grid.NUM_LAT)
+		const rhs = new Array(grid.NUM_LAT)
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			const meanAbsorbed =
+				UTILS.meanOf(this.insolation[i]) * (1 - albedoEstimate) +
+				this.internalHeatFlux
+			lower[i] = -this.lowerCoef[i]
+			upper[i] = -this.upperCoef[i]
+			diag[i] = this.olrB + this.lowerCoef[i] + this.upperCoef[i]
+			rhs[i] = meanAbsorbed - this.olrA + this.olrB * this.olrTRef
+		}
+		// Equilibrium here is a pure conduction/radiation balance -- it doesn't
+		// depend on heat capacity, so land and ocean columns start from the
+		// same seed (heat capacity only affects how fast/slow each column
+		// responds afterward, which is exactly the point of splitting them).
+		const meanTemps = UTILS.solveTridiagonal({ lower, diag, upper, rhs })
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			this.temperature_land[i].fill(meanTemps[i])
+			this.temperature_ocean[i].fill(meanTemps[i])
+		}
+	}
+
+	// VPlanet POISE's seasonal albedo correction (fvAlbedoSeasonal): surfaces
+	// reflect more at low sun angles (grazing incidence), so ice-free albedo
+	// isn't flat across the year -- it wobbles with solar geometry. `zenith`
+	// here is their simplified noon-zenith proxy (|lat - declination|), not a
+	// true zenith angle, matching what they actually use.
 	private zenithOffsetForDay(dayIdx: number): number[] {
 		const declination = this.declination[dayIdx]
 		return this.lats.map((lat) => {
@@ -113,39 +196,63 @@ export class EnergyBalanceModel {
 		})
 	}
 
+	// Land and water fractions are clamped away from the extremes before
+	// dividing -- a latitude band that's 100% ocean (or 100% land) would
+	// otherwise blow up its own coupling coefficient (see thermal.
+	// LAND_WATER_COUPLING's comment for why the coupling is scaled by
+	// 1/fraction in the first place).
 	private static readonly MIN_LAND_WATER_FRACTION = 0.1
 
-	private buildColumnTerms(params: ColumnTermsParams): ColumnTerms {
+	// Builds the same diag/rhs terms stepColumn used to compute standalone --
+	// heat capacity stays dt-unscaled while diffusion/OLR (and, in
+	// stepTemperature, the land/water coupling) are all dt-scaled flux terms.
+	private buildColumnTerms(params: {
+		tIdx: number
+		dt: number
+		heatCapacity: readonly number[]
+		temperature: number[][]
+		albedo: number[][]
+		olr: number[][]
+	}): { diagSelf: number[]; rhs: number[] } {
 		const { tIdx, dt, heatCapacity, temperature, albedo, olr } = params
-		const diagSelf = new Array(this.latitudeCount)
-		const rhs = new Array(this.latitudeCount)
+		const { grid } = CONSTANTS.embConstants
+		const diagSelf = new Array(grid.NUM_LAT)
+		const rhs = new Array(grid.NUM_LAT)
 
-		for (let i = 0; i < this.latitudeCount; i++) {
-			const absorbed = this.insolation[i][tIdx] * (1 - albedo[i][tIdx])
-			olr[i][tIdx] = this.olrA + this.olrB * (temperature[i] - PLANCK_REF_K)
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			const absorbed =
+				this.insolation[i][tIdx] * (1 - albedo[i][tIdx]) + this.internalHeatFlux
+			// Local A/B derived from THIS column's own previous-step
+			// temperature -- land and ocean at the same latitude can end up
+			// with different effective greenhouse strength once one is
+			// colder/dryer than the other.
+			const { olrA, olrB } = this.localOlrCoefficients(temperature[i][tIdx])
+			olr[i][tIdx] = olrA + olrB * (temperature[i][tIdx] - this.olrTRef)
 			diagSelf[i] =
 				heatCapacity[i] +
 				dt * (this.lowerCoef[i] + this.upperCoef[i]) +
-				dt * this.olrB
+				dt * olrB
 			rhs[i] =
-				heatCapacity[i] * temperature[i] +
+				heatCapacity[i] * temperature[i][tIdx] +
 				dt * absorbed -
-				dt * this.olrA +
-				dt * this.olrB * PLANCK_REF_K
+				dt * olrA +
+				dt * olrB * this.olrTRef
 		}
 
 		return { diagSelf, rhs }
 	}
 
-	private stepTemperature(params: StepTemperatureParams): void {
+	stepTemperature(params: StepTemperatureParams): void {
 		const { tIdx, dt, lower, upper } = params
-		const nu = this.config.landWaterCoupling
+		const { grid, time, thermal } = CONSTANTS.embConstants
+		const nextIdx = (tIdx + 1) % time.DAYS_PER_YEAR
+		const nu = this.config.landWaterCoupling ?? thermal.LAND_WATER_COUPLING
 
 		const land = this.buildColumnTerms({
 			tIdx,
 			dt,
 			heatCapacity: this.heat_capacity_land,
-			temperature: this.currentLand,
+			temperature: this.temperature_land,
 			albedo: this.albedo_land,
 			olr: this.olr_land,
 		})
@@ -153,15 +260,15 @@ export class EnergyBalanceModel {
 			tIdx,
 			dt,
 			heatCapacity: this.heat_capacity_ocean,
-			temperature: this.currentOcean,
+			temperature: this.temperature_ocean,
 			albedo: this.albedo_ocean,
 			olr: this.olr_ocean,
 		})
 
-		const diag: Matrix2x2[] = new Array(this.latitudeCount)
-		const rhsLand = new Array(this.latitudeCount)
-		const rhsWater = new Array(this.latitudeCount)
-		for (let i = 0; i < this.latitudeCount; i++) {
+		const diag: Matrix2x2[] = new Array(grid.NUM_LAT)
+		const rhsLand = new Array(grid.NUM_LAT)
+		const rhsWater = new Array(grid.NUM_LAT)
+		for (let i = 0; i < grid.NUM_LAT; i++) {
 			const landFrac = Math.min(
 				1 - EnergyBalanceModel.MIN_LAND_WATER_FRACTION,
 				Math.max(
@@ -192,136 +299,63 @@ export class EnergyBalanceModel {
 			rhsLand,
 			rhsWater,
 		})
-		const seasonal = this.config.seasonalSurface
-		const snowball = solved.water.every((temperature) => temperature <= 271.15)
-		for (let i = 0; i < this.latitudeCount; i++) {
-			const ice = SEASONAL_SURFACE.step({
-				temperatureK: solved.land[i],
-				iceMass: this.iceMass[i],
-				dt,
-				snowball,
-				config: seasonal,
-			})
-			solved.land[i] = ice.temperatureK
-			this.iceMass[i] = ice.iceMass
-			this.ice_mass_balance[i][tIdx] += ice.massBalance * dt
-			this.ice_mass[i][tIdx] = ice.iceMass
-			this.temperature_land[i][tIdx] = solved.land[i]
-			this.temperature_ocean[i][tIdx] = solved.water[i]
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			this.temperature_land[i][nextIdx] = solved.land[i]
+			this.temperature_ocean[i][nextIdx] = solved.water[i]
 		}
-		this.currentLand = solved.land
-		this.currentOcean = solved.water
+
+		const zenithOffset = this.zenithOffsetForDay(nextIdx)
+		ALBEDO.update({
+			albedo: this.albedo_land,
+			temperature: this.temperature_land,
+			time: nextIdx,
+			baseAlbedo: this.config.albedo,
+			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
+			zenithOffset,
+		})
+		ALBEDO.update({
+			albedo: this.albedo_ocean,
+			temperature: this.temperature_ocean,
+			time: nextIdx,
+			baseAlbedo: this.config.albedo,
+			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
+			zenithOffset,
+		})
 	}
 
-	private updateAlbedo(tIdx: number) {
-		const seasonal = this.config.seasonalSurface
-		// POISE carries the previous step's zenith correction within each year.
-		const zenithOffset = this.zenithOffsetForDay(Math.max(0, tIdx - 1))
-		for (let i = 0; i < this.latitudeCount; i++) {
-			this.albedo_land[i][tIdx] = SEASONAL_SURFACE.albedo({
-				temperatureK: this.currentLand[i],
-				iceMass: this.iceMass[i],
-				baseAlbedo: seasonal.landAlbedo,
-				iceAlbedo: seasonal.iceAlbedo,
-				zenithOffset: zenithOffset[i],
-			})
-			this.albedo_ocean[i][tIdx] = SEASONAL_SURFACE.albedo({
-				temperatureK: this.currentOcean[i],
-				iceMass: 0,
-				baseAlbedo: seasonal.waterAlbedo,
-				iceAlbedo: seasonal.iceAlbedo,
-				zenithOffset: zenithOffset[i],
-			})
-		}
-	}
-
-	private initModel() {
-		if (
-			!Number.isInteger(this.latitudeCount) ||
-			this.latitudeCount < 2 ||
-			!Number.isInteger(this.samplesPerYear) ||
-			this.samplesPerYear < 1
-		) {
-			throw new Error(
-				"EBM requires at least two latitudes and one seasonal sample",
-			)
-		}
-		const cycleYears = this.config.seasonalSurface.iceResetYears
-		if (!Number.isInteger(cycleYears) || cycleYears < 1)
-			throw new Error("Ice reset years must be a positive integer")
-		if (
-			this.config.landFraction &&
-			(this.config.landFraction.length !== this.latitudeCount ||
-				this.config.landFraction.some(
-					(fraction) =>
-						!Number.isFinite(fraction) || fraction < 0 || fraction > 1,
-				))
-		) {
-			throw new Error(
-				"Land fractions must match the latitude grid and lie between zero and one",
-			)
-		}
-		for (const values of [
-			this.lats,
-			this.lats_deg,
-			this.sin_lats,
-			this.lat_bounds,
-			this.sin_lat_bounds,
-			this.dx,
-			this.heat_capacity_land,
-			this.heat_capacity_ocean,
-			this.temperature,
-			this.temperature_land,
-			this.temperature_ocean,
-			this.albedo_land,
-			this.albedo_ocean,
-			this.olr_land,
-			this.olr_ocean,
-			this.ice_mass,
-			this.ice_mass_balance,
-		])
-			values.length = 0
-		this.iceMass = new Array(this.latitudeCount).fill(0)
-		this.converged = false
-		this.yearsRun = 0
+	initModel() {
+		const { grid, thermal } = CONSTANTS.embConstants
 		const pressure = this.config.pressure ?? 1.0
 		const pressureCapFactor = Math.pow(pressure, 0.7)
-		this.land_fraction =
-			this.config.landFraction ?? new Array(this.latitudeCount).fill(0.34)
+		this.land_fraction = this.config.landFraction || ALBEDO.landFraction()
 
 		this.computeGreenhouseOLR()
 
-		for (let i = 0; i < this.latitudeCount; i++) {
-			const lat =
-				this.config.discretization.latitudeGrid === "equal-area"
-					? Math.asin(-1 + (2 * i + 1) / this.latitudeCount)
-					: -Math.PI / 2 + (Math.PI * i) / (this.latitudeCount - 1)
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			const lat = -Math.PI / 2 + (Math.PI * i) / (grid.NUM_LAT - 1)
 			this.lats.push(lat)
 			this.lats_deg.push(UTILS.radiansToDegrees(lat))
 			this.sin_lats.push(Math.sin(lat))
 		}
 
-		for (let i = 0; i < this.latitudeCount + 1; i++) {
-			const latBound =
-				this.config.discretization.latitudeGrid === "equal-area"
-					? Math.asin(-1 + (2 * i) / this.latitudeCount)
-					: i === 0
-						? -Math.PI / 2
-						: i === this.latitudeCount
-							? Math.PI / 2
-							: (this.lats[i - 1] + this.lats[i]) / 2
+		for (let i = 0; i < grid.NUM_LAT + 1; i++) {
+			const latBound = -Math.PI / 2 + (Math.PI * i) / grid.NUM_LAT
 			this.lat_bounds.push(latBound)
 			this.sin_lat_bounds.push(Math.sin(latBound))
 		}
 
-		const daysPerYear = this.samplesPerYear
-		for (let i = 0; i < this.latitudeCount; i++) {
+		const daysPerYear = CONSTANTS.embConstants.time.DAYS_PER_YEAR
+		for (let i = 0; i < grid.NUM_LAT; i++) {
 			this.dx.push(this.sin_lat_bounds[i + 1] - this.sin_lat_bounds[i])
 			this.heat_capacity_land.push(
-				this.config.seasonalSurface.landHeatCapacity * pressureCapFactor,
+				thermal.LAND_HEAT_CAPACITY * pressureCapFactor,
 			)
 			this.heat_capacity_ocean.push(
-				this.config.seasonalSurface.waterHeatCapacity * pressureCapFactor,
+				thermal.OCEAN_HEAT_CAPACITY * pressureCapFactor,
 			)
 			this.temperature.push(new Array(daysPerYear).fill(0))
 			this.temperature_land.push(new Array(daysPerYear).fill(0))
@@ -330,8 +364,6 @@ export class EnergyBalanceModel {
 			this.albedo_ocean.push(new Array(daysPerYear).fill(0))
 			this.olr_land.push(new Array(daysPerYear).fill(0))
 			this.olr_ocean.push(new Array(daysPerYear).fill(0))
-			this.ice_mass.push(new Array(daysPerYear).fill(0))
-			this.ice_mass_balance.push(new Array(daysPerYear).fill(0))
 		}
 
 		this.computeDiffusionCoefficients()
@@ -340,97 +372,106 @@ export class EnergyBalanceModel {
 			lats: this.lats,
 			orbital: this.config.orbital,
 			stellarOverride: this.config.stellar,
-			sampleCount: this.config.discretization.insolationDays,
-			startSolarLongitudeDegrees:
-				this.config.discretization.startSolarLongitudeDegrees,
 		})
-		const forcingDays = [...Array(daysPerYear).keys()].map((i) =>
-			Math.floor((i * _declination.length) / daysPerYear),
-		)
-		this.insolation = _insolation.map((row) =>
-			forcingDays.map((day) => row[day]),
-		)
-		this.daylightHours = _daylight_hours.map((row) =>
-			forcingDays.map((day) => row[day]),
-		)
-		this.declination = forcingDays.map((day) => _declination[day])
+		this.insolation = _insolation
+		this.daylightHours = _daylight_hours
+		this.declination = _declination
 
-		for (const row of [...this.temperature_land, ...this.temperature_ocean])
-			row.fill(288)
-		this.currentLand = this.temperature_land.map((row) => row[0])
-		this.currentOcean = this.temperature_ocean.map((row) => row[0])
+		this.seedPerLatitudeEquilibrium()
+
+		const initialZenithOffset = this.zenithOffsetForDay(0)
+		ALBEDO.update({
+			albedo: this.albedo_land,
+			temperature: this.temperature_land,
+			time: 0,
+			baseAlbedo: this.config.albedo,
+			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
+			zenithOffset: initialZenithOffset,
+		})
+		ALBEDO.update({
+			albedo: this.albedo_ocean,
+			temperature: this.temperature_ocean,
+			time: 0,
+			baseAlbedo: this.config.albedo,
+			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
+			zenithOffset: initialZenithOffset,
+		})
 	}
 
 	runModel(params: RunModelParams): void {
 		const { years, dtDays } = params
-		if (
-			!Number.isInteger(years) ||
-			years < 1 ||
-			!Number.isFinite(dtDays) ||
-			dtDays <= 0
-		) {
-			throw new Error("EBM requires integer years >= 1 and finite dtDays > 0")
-		}
 		this.initModel()
-		const samples = this.samplesPerYear
-		const secondsPerSample =
-			((this.config.time?.YEAR_LENGTH_DAYS ??
-				CONSTANTS.embConstants.time.DAYS_PER_YEAR) *
-				TIME.secondsPerDay) /
-			samples
-		const stepsPerSample = Math.max(
-			1,
-			Math.ceil(
-				CONSTANTS.embConstants.time.DAYS_PER_YEAR / samples / dtDays - 1e-12,
-			),
-		)
-		const dt = secondsPerSample / stepsPerSample
-		const lower = this.lowerCoef.map((value) => -dt * value)
-		const upper = this.upperCoef.map((value) => -dt * value)
-		const cycleYears = this.config.seasonalSurface.iceResetYears
-		let lastTempLand = this.temperature_land.map((row) => row.slice())
-		let lastTempOcean = this.temperature_ocean.map((row) => row.slice())
-		for (let year = 0; year < years; year++) {
-			if (year % cycleYears === 0) this.iceMass.fill(0)
-			for (let tIdx = 0; tIdx < samples; tIdx++) {
-				for (const row of this.ice_mass_balance) row[tIdx] = 0
-				for (let substep = 0; substep < stepsPerSample; substep++) {
-					this.updateAlbedo(tIdx)
-					this.stepTemperature({ tIdx, dt, lower, upper })
-				}
-				for (const row of this.ice_mass_balance) row[tIdx] /= secondsPerSample
-			}
-			this.yearsRun = year + 1
-			if (this.yearsRun % cycleYears !== 0) continue
-			let delta = 0
-			for (let i = 0; i < this.latitudeCount; i++) {
-				for (let j = 0; j < samples; j++) {
-					delta = Math.max(
-						delta,
-						Math.abs(lastTempLand[i][j] - this.temperature_land[i][j]),
-						Math.abs(lastTempOcean[i][j] - this.temperature_ocean[i][j]),
-					)
-				}
-			}
-			if (delta < 0.001) {
-				this.converged = true
-				break
-			}
-			lastTempLand = this.temperature_land.map((row) => row.slice())
-			lastTempOcean = this.temperature_ocean.map((row) => row.slice())
+		const { grid, time } = CONSTANTS.embConstants
+		const yearLengthDays =
+			this.config.time?.YEAR_LENGTH_DAYS || time.DAYS_PER_YEAR
+		const secondsPerSampleDay =
+			(yearLengthDays / time.DAYS_PER_YEAR) * TIME.secondsPerDay
+		const dt = dtDays * secondsPerSampleDay
+		const stepsPerDay = Math.floor(1 / dtDays)
+		const totalSteps = time.DAYS_PER_YEAR * stepsPerDay * years
+		let lastTempLand = this.temperature_land.map((row) => row.map(() => 0))
+		let lastTempOcean = this.temperature_ocean.map((row) => row.map(() => 0))
+
+		const lower = new Array(grid.NUM_LAT)
+		const upper = new Array(grid.NUM_LAT)
+		for (let i = 0; i < grid.NUM_LAT; i++) {
+			lower[i] = -dt * this.lowerCoef[i]
+			upper[i] = -dt * this.upperCoef[i]
 		}
 
-		for (const row of [...this.temperature_land, ...this.temperature_ocean]) {
+		// Land and ocean each converge (or fail to) at their own pace -- a
+		// thin land column responds almost immediately, while a deep ocean
+		// column can take many simulated years to stop drifting. Both must
+		// settle before the run is considered converged.
+		for (let step = 0; step < totalSteps; step++) {
+			const day = Math.floor(step / stepsPerDay)
+			const tIdx = day % time.DAYS_PER_YEAR
+			if (step % Math.floor(totalSteps / 10) === 0) {
+				let delta = 0
+				for (let i = 0; i < grid.NUM_LAT; i++) {
+					for (let j = 0; j < time.DAYS_PER_YEAR; j++) {
+						delta += Math.abs(lastTempLand[i][j] - this.temperature_land[i][j])
+						delta += Math.abs(
+							lastTempOcean[i][j] - this.temperature_ocean[i][j],
+						)
+					}
+				}
+				lastTempLand = this.temperature_land.map((row) => row.slice())
+				lastTempOcean = this.temperature_ocean.map((row) => row.slice())
+				if (delta < 5) break
+			}
+			this.stepTemperature({ tIdx, dt, lower, upper })
+		}
+
+		for (const row of this.temperature_land) {
 			for (let i = 0; i < row.length; i++) {
-				if (!Number.isFinite(row[i]))
-					throw new Error("EBM produced non-finite temperature")
-				row[i] = UTILS.kelvinToCelsius(row[i])
+				row[i] = UTILS.kelvinToCelsius(Number.isNaN(row[i]) ? 0 : row[i])
+			}
+		}
+		for (const row of this.temperature_ocean) {
+			for (let i = 0; i < row.length; i++) {
+				row[i] = UTILS.kelvinToCelsius(Number.isNaN(row[i]) ? 0 : row[i])
 			}
 		}
 
-		for (let i = 0; i < this.latitudeCount; i++) {
+		const seismologyTotalHeatingK = this.config.seismologyTotalHeatingK ?? 0
+		if (seismologyTotalHeatingK > 0) {
+			const seismology4 = seismologyTotalHeatingK ** 4
+			for (const row of [...this.temperature_land, ...this.temperature_ocean]) {
+				for (let i = 0; i < row.length; i++) {
+					const kelvin = UTILS.celsiusToKelvin(row[i])
+					row[i] = UTILS.kelvinToCelsius((kelvin ** 4 + seismology4) ** 0.25)
+				}
+			}
+		}
+
+		for (let i = 0; i < grid.NUM_LAT; i++) {
 			const landFrac = this.land_fraction[i]
-			for (let d = 0; d < this.samplesPerYear; d++) {
+			for (let d = 0; d < time.DAYS_PER_YEAR; d++) {
 				this.temperature[i][d] =
 					landFrac * this.temperature_land[i][d] +
 					(1 - landFrac) * this.temperature_ocean[i][d]

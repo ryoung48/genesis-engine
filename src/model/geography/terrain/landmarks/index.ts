@@ -36,8 +36,10 @@ function computeLandmarks({
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 
+	const { regionArea } = mesh
 	const regionLandmark = new Int32Array(N).fill(-1)
 	const sizes: number[] = []
+	const areaFractions: number[] = []
 	const isWater: boolean[] = []
 	const queue: number[] = []
 	let landmarkId = 0
@@ -48,6 +50,7 @@ function computeLandmarks({
 		const water = !isLand[r]
 		isWater.push(water)
 		let size = 0
+		let area = 0
 
 		queue.length = 0
 		queue.push(r)
@@ -57,6 +60,7 @@ function computeLandmarks({
 		while (head < queue.length) {
 			const curr = queue[head++]
 			size++
+			area += regionArea[curr]
 			for (let j = adjOffset[curr], jEnd = adjOffset[curr + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
 				if (regionLandmark[nb] >= 0) continue
@@ -67,15 +71,18 @@ function computeLandmarks({
 		}
 
 		sizes.push(size)
+		areaFractions.push(area / (4 * Math.PI))
 		landmarkId++
 	}
 
 	const count = landmarkId
 
-	// Classify by size relative to total
+	// Classify by share of total surface area, not cell count: imported meshes
+	// pack more, smaller cells onto land, which would promote islands to
+	// continents and demote oceans to seas.
 	const type = new Uint8Array(count)
 	for (let i = 0; i < count; i++) {
-		const ratio = sizes[i] / N
+		const ratio = areaFractions[i]
 		if (isWater[i]) {
 			if (ratio >= 0.01) type[i] = landmarkTypeOcean
 			else if (ratio >= 0.001) type[i] = landmarkTypeSea

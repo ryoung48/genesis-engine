@@ -1,12 +1,13 @@
 import type {
 	MeanEdgeLengthKmParams,
+	RegionAreasKm2Params,
 	RegionDistanceKmParams,
 	RegionPathLengthKmParams,
 } from "@/model/shared/units/types"
 
 const defaultPlanetRadiusKm = 6371
 
-const defaultObliquityDeg = 23.44
+const defaultObliquityDeg = 23.5
 
 const defaultEccentricity = 0.0167
 
@@ -43,6 +44,16 @@ function meanEdgeLengthKm({
 	for (let i = 0; i < mesh.neighborDist.length; i++)
 		edgeSum += mesh.neighborDist[i]
 	return (edgeSum / Math.max(1, mesh.neighborDist.length)) * planetRadiusKm
+}
+
+function regionAreasKm2({
+	mesh,
+	planetRadiusKm = defaultPlanetRadiusKm,
+}: RegionAreasKm2Params): Float64Array {
+	const r2 = planetRadiusKm * planetRadiusKm
+	const out = new Float64Array(mesh.numRegions)
+	for (let r = 0; r < mesh.numRegions; r++) out[r] = mesh.regionArea[r] * r2
+	return out
 }
 
 function regionPathLengthKm({
@@ -90,6 +101,7 @@ export const UNITS = {
 	isRetrogradeObliquity,
 	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
+	regionAreasKm2,
 	regionPathLengthKm,
 	regionDistanceKm,
 }

@@ -17,6 +17,13 @@ export interface ComputeMigrationParams {
 	numRegions?: number
 }
 
+export interface ProvinceAreasKm2Params {
+	mesh: SphereMesh
+	regionProvince: Int32Array
+	provinceCount: number
+	planetRadiusKm: number
+}
+
 export interface PlaceCradlesParams {
 	continentProvinces: number[]
 	normHab: Float32Array
@@ -48,8 +55,8 @@ export interface ComputePopulationParams {
 	lakeCoastal: Uint8Array
 	riverVisible: Uint8Array
 	seed: number
+	mesh: SphereMesh
 	planetRadiusKm?: number
-	numRegions?: number
 	eraTargetPopulation?: number
 	migrationWave?: Float32Array
 	settlementWave?: number

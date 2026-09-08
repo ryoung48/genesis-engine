@@ -5,6 +5,7 @@ import type {
 } from "@/model/geography/terrain/rivers/types"
 import { MATH } from "@/model/shared/math/core"
 import { MinHeap } from "@/model/shared/min-heap"
+import { UNITS } from "@/model/shared/units"
 
 function polylineLengthKm({ line, radiusKm }: PolylineLengthKmParams): number {
 	let sum = 0
@@ -38,8 +39,11 @@ function computeRivers({
 	const { adjOffset, adjList, r_xyz } = mesh
 	const DEG = 180 / Math.PI
 	const radiusKm = params?.planetRadiusKm ?? 6371
-	const radiusM = radiusKm * 1000
-	const cellAreaM2 = (4 * Math.PI * radiusM * radiusM) / Math.max(1, N)
+	// Per-cell area: adaptive meshes pack more, smaller cells onto land, so a
+	// uniform 4piR**2/N would overstate discharge from every land cell.
+	const regionAreaKm2 = UNITS.regionAreasKm2({ mesh, planetRadiusKm: radiusKm })
+	const cellAreaM2 = new Float64Array(N)
+	for (let r = 0; r < N; r++) cellAreaM2[r] = regionAreaKm2[r] * 1e6
 	const secondsPerYear =
 		(params?.daysPerYear ?? 365) * (params?.hoursPerDay ?? 24) * 3600
 
@@ -137,7 +141,7 @@ function computeRivers({
 			const baseflowMm = baseflowMonthly[idx]
 			const totalMm = runoffMm + baseflowMm
 			flowToTarget[r] =
-				totalMm > 0 ? ((totalMm / 1000) * cellAreaM2) / secondsPerMonth : 0
+				totalMm > 0 ? ((totalMm / 1000) * cellAreaM2[r]) / secondsPerMonth : 0
 			const pet = climate.pet_monthly[idx]
 			const loss =
 				0.001 +
@@ -214,7 +218,10 @@ function computeRivers({
 	for (let i = 0; i < landCount; i++) landFlows[i] = flow[processOrder[i]]
 	landFlows.sort()
 
-	const landCoverage = landCount / N
+	let landArea = 0
+	for (let i = 0; i < landCount; i++)
+		landArea += mesh.regionArea[processOrder[i]]
+	const landCoverage = landArea / (4 * Math.PI)
 	const majorRiverFraction = (() => {
 		if (landCoverage <= 0.3) return 0.05
 		if (landCoverage >= 0.9) return 0.01
