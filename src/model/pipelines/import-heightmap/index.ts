@@ -289,7 +289,10 @@ function importGenesisWorld({
 		numPlates: plateIds.length,
 		landDistribution: 0.25,
 		continentSizeVariety: 0,
-		landCoverage: 0.3,
+		// Earth import: the EBM land fraction is rescaled to this global value
+		// (see CLIMATE.computeTemperature). 0.34 matches VPLanet POISE's
+		// EarthClimate, which the fixed OLR is calibrated against.
+		landCoverage: 0.34,
 		jitter: params.jitter,
 		roughness: 0,
 		terrainWarp: params.terrainWarp,
@@ -313,8 +316,6 @@ function importGenesisWorld({
 		substellarLon: params.substellarLon ?? UNITS.defaultSubstellarLon,
 		perihelion: params.perihelion ?? UNITS.defaultPerihelion,
 		pressure: params.pressure ?? 1.0,
-		albedo: params.albedo,
-		greenhouseFactor: params.greenhouseFactor,
 		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
 	}
 

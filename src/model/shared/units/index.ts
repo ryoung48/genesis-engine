@@ -6,7 +6,7 @@ import type {
 
 const defaultPlanetRadiusKm = 6371
 
-const defaultObliquityDeg = 23.5
+const defaultObliquityDeg = 23.44
 
 const defaultEccentricity = 0.0167
 

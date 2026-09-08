@@ -75,6 +75,18 @@ const plasmaStops = palette(
 	"#f0f921",
 )
 
+const bluesStops = palette(
+	"#f7fbff",
+	"#deebf7",
+	"#c6dbef",
+	"#9ecae1",
+	"#6baed6",
+	"#4292c6",
+	"#2171b5",
+	"#08519c",
+	"#08306b",
+)
+
 const spectralStops = palette(
 	"#5e4fa2",
 	"#3288bd",
@@ -96,4 +108,5 @@ export const COLOR_PALETTES = {
 	ylOrRdStops,
 	plasmaStops,
 	spectralStops,
+	bluesStops,
 }

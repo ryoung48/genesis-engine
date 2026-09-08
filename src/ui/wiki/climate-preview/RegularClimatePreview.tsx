@@ -1,14 +1,17 @@
 import React from "react"
 import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
-import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
+import { ContourChart } from "@/ui/components/composites/charts/ContourChart"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import {
 	formatTemperature,
 	rgbToCss,
 	type UnitSystem,
 } from "@/ui/genesis/shared/ui-format"
-import type { RegularClimatePreviewData } from "@/ui/wiki/climate-preview/types"
+import type {
+	HeatmapTooltipParams,
+	RegularClimatePreviewData,
+} from "@/ui/wiki/climate-preview/types"
 
 interface RegularClimatePreviewProps {
 	preview: RegularClimatePreviewData
@@ -17,13 +20,8 @@ interface RegularClimatePreviewProps {
 	daysPerYear?: number
 }
 
-/**
- * Normalized (min..max of this specific matrix, not a fixed Celsius scale)
- * Spectral color function -- unlike temperatureColor's fixed absolute
- * breakpoints (tuned for Earth-like -73..80C), this always spans the full
- * gradient across whatever range is actually on screen, so an extreme body
- * (Mercury, Venus) doesn't just render as a solid block of the hottest color.
- */
+// Spans the full gradient across whatever range is on screen (not a fixed
+// Celsius scale), so an extreme body doesn't render as one solid color.
 function buildNormalizedTemperatureColorFn(
 	matrix: readonly (readonly number[])[],
 ): (value: number) => string {
@@ -51,38 +49,14 @@ function buildNormalizedTemperatureColorFn(
 		)
 }
 
-function buildNormalizedDaylightColorFn(
-	matrix: readonly (readonly number[])[],
-): (value: number) => string {
-	let min = Infinity
-	let max = -Infinity
-	for (const row of matrix) {
-		for (const value of row) {
-			if (value < min) min = value
-			if (value > max) max = value
-		}
-	}
-	return (value: number) =>
-		rgbToCss(
-			COLOR_INTERPOLATION.sampleColorStops({
-				stops: COLOR_PALETTES.purplesStops,
-				t: COLOR_INTERPOLATION.mapLinear({
-					value,
-					domainStart: min,
-					domainEnd: max,
-					rangeStart: 1,
-					rangeEnd: 0,
-					clamp: true,
-				}),
-			}),
-		)
-}
-
-function buildPreviewChartProps(
-	preview: RegularClimatePreviewData,
-	activeTab: GenerationPreviewTab,
-	unitSystem: UnitSystem,
-) {
+function buildPreviewChartProps(params: {
+	preview: RegularClimatePreviewData
+	activeTab: GenerationPreviewTab
+	unitSystem: UnitSystem
+}) {
+	const { preview, activeTab, unitSystem } = params
+	const dayLabel = (columnIndex: number) =>
+		preview.columnLabels[columnIndex] ?? `${columnIndex}`
 	switch (activeTab) {
 		case "insolation":
 			return {
@@ -94,33 +68,26 @@ function buildPreviewChartProps(
 				formatLegendValue: (value: number) => `${value.toFixed(0)} W/m²`,
 				tooltipLabel: ({
 					rowValue,
-					columnValue,
+					columnIndex,
 					value,
-				}: {
-					rowValue: number
-					columnValue: number
-					value: number
-				}) =>
-					`Lat ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} W/m²`,
+				}: HeatmapTooltipParams) =>
+					`Lat ${rowValue.toFixed(1)}°, Day ${dayLabel(columnIndex)}: ${value.toFixed(1)} W/m²`,
 			}
-		case "daylight":
+		case "ice":
 			return {
-				matrix: preview.daylight,
+				matrix: preview.iceMassBalance,
 				columnValues: preview.columnValues,
 				columnLabels: preview.columnLabels,
-				colorForValue: buildNormalizedDaylightColorFn(preview.daylight),
-				legendTitle: "Daylight",
-				formatLegendValue: (value: number) => `${value.toFixed(1)} hrs`,
+				colorForValue: preview.iceBalanceColorFn,
+				legendTitle: `Ice mass balance${preview.converged ? "" : " · not converged"}`,
+				formatLegendValue: (value: number) =>
+					`${value.toExponential(1)} kg/m²/s`,
 				tooltipLabel: ({
 					rowValue,
-					columnValue,
+					columnIndex,
 					value,
-				}: {
-					rowValue: number
-					columnValue: number
-					value: number
-				}) =>
-					`Lat ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} hrs`,
+				}: HeatmapTooltipParams) =>
+					`Lat ${rowValue.toFixed(1)}°, Day ${dayLabel(columnIndex)}: ${value.toExponential(2)} kg/m²/s`,
 			}
 		default:
 			return {
@@ -133,14 +100,10 @@ function buildPreviewChartProps(
 					formatTemperature(value, unitSystem, 1, { compact: true }),
 				tooltipLabel: ({
 					rowValue,
-					columnValue,
+					columnIndex,
 					value,
-				}: {
-					rowValue: number
-					columnValue: number
-					value: number
-				}) =>
-					`Lat ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${formatTemperature(value, unitSystem, 1, { compact: true })}`,
+				}: HeatmapTooltipParams) =>
+					`Lat ${rowValue.toFixed(1)}°, Day ${dayLabel(columnIndex)}: ${formatTemperature(value, unitSystem, 1, { compact: true })}`,
 			}
 	}
 }
@@ -150,16 +113,15 @@ export const RegularClimatePreview: React.FC<RegularClimatePreviewProps> = ({
 	activeTab,
 	unitSystem,
 }) => {
-	const chartProps = buildPreviewChartProps(preview, activeTab, unitSystem)
+	const chartProps = buildPreviewChartProps({ preview, activeTab, unitSystem })
 
 	return (
-		<HeatmapChart
+		<ContourChart
 			matrix={chartProps.matrix}
 			rowValues={preview.lats}
 			columnValues={chartProps.columnValues}
 			columnLabels={chartProps.columnLabels}
 			colorForValue={chartProps.colorForValue}
-			datasetLabel={(lat: number) => `Lat ${lat.toFixed(1)}°`}
 			rowTickLabel={(lat: number) => `${lat.toFixed(0)}°`}
 			tooltipLabel={chartProps.tooltipLabel}
 			legendTitle={chartProps.legendTitle}

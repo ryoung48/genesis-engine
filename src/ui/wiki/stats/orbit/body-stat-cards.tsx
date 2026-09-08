@@ -20,7 +20,7 @@ import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
 import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
-import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
+import { estimateAlbedo } from "@/ui/wiki/climate-preview/useSpaceEnginePreview"
 import {
 	atmosphereSwatchColor,
 	axialTiltSwatchColor,
@@ -1246,9 +1246,6 @@ export function buildMoonPreviewDataProps(params: {
 		substellarLon: params.moon.substellarLon ?? 0,
 		landCoverage: params.moon.landCoverage,
 		atmosphere: params.moon.atmosphere,
-		albedo: params.moon.albedo,
-		greenhouseFactor: params.moon.greenhouseFactor,
-		seismologyTotalHeatingK: params.moon.seismology?.totalHeating,
 		generationPreviewTab: params.generationPreviewTab,
 		onSelectGenerationPreviewTab: params.onSelectGenerationPreviewTab,
 		unitSystem: params.unitSystem,

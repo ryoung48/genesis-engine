@@ -43,6 +43,7 @@ interface SerializedGenesisClimate {
 	pet_monthly: Float32Array
 	daylight_hours_monthly: Float32Array
 	landFraction: number[]
+	globalMeanTempC?: number
 	/** [JUSTIFICATION] Cached cloud cover is absent from worlds generated before this cache was introduced. */
 	cloud_cover_monthly?: Float32Array
 	/** [JUSTIFICATION] Observed-input cloud cover is only available for imported Earth worlds. */

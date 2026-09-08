@@ -13,6 +13,10 @@ export interface GenesisClimate {
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
 	landFraction: number[] // 36-band land fraction used by EBM
+	/** [JUSTIFICATION] Mean of temperature_avg over all cells (°C), i.e. the
+	 * final per-cell field after lapse/continentality/noise. Set only by the
+	 * non-tidally-locked path; the tidally-locked path omits it. */
+	globalMeanTempC?: number
 	/** CLOUD_COVER.estimate's modeled proxy, [month * numRegions + region],
 	 * cached once (by the cloud-cover temperature modifier, which already
 	 * computes it for every cell/month) so hover/map display don't each

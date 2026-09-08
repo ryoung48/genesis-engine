@@ -72,7 +72,7 @@ const eastStormScale = (x: number) =>
 	MATH.piecewise({ domain: [0 / 30, 25 / 30, 80 / 30], range: [0, 0.8, 1], x })
 
 const westerliesScale = (x: number) =>
-	MATH.piecewise({ domain: [35 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
+	MATH.piecewise({ domain: [25 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
 
 // Windward orographic lift: keyed off the target cell's `slopeScore` — the
 // same [0, 1] mesh-relative slope value shown in the hover panel

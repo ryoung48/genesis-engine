@@ -24,7 +24,10 @@ import { UNITS } from "@/model/shared/units"
 import type { SocietyEra } from "@/model/society/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import type { SolarSystemBodiesInput } from "@/ui/genesis/view/types"
-import { updateBodyDiameter } from "@/ui/wiki/stats/orbit/body-mutations"
+import {
+	updateBodyDiameter,
+	updateBodyOrbitalDistance,
+} from "@/ui/wiki/stats/orbit/body-mutations"
 import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters"
 import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 
@@ -71,9 +74,11 @@ function moonToMainWorldView(moon: MoonBody, parent: SystemBody): SystemBody {
 }
 
 // Inverse of moonToMainWorldView -- writes an updated view's MoonBody-
-// compatible fields back onto the original moon, dropping the
-// SystemBody-only fields the view synthesized (orbitalDistanceAU, gravityG,
-// moons, seed, rings) that don't exist on MoonBody.
+// compatible fields back onto the original moon, dropping the fields the
+// view synthesized or derived from its star-relative projection:
+// orbitalDistanceAU/gravityG/moons/seed/rings don't exist on MoonBody, and
+// orbitalPeriodDays/zone are star-relative on the view but planet-relative
+// on the moon (see updateBodyOrbitalDistance) -- keep the moon's own.
 function applyMainWorldViewToMoon(
 	updatedView: SystemBody,
 	originalMoon: MoonBody,
@@ -84,6 +89,8 @@ function applyMainWorldViewToMoon(
 		moons: _moons,
 		seed: _seed,
 		rings: _rings,
+		orbitalPeriodDays: _orbitalPeriodDays,
+		zone: _zone,
 		...moonFields
 	} = updatedView
 	return { ...originalMoon, ...moonFields }
@@ -351,8 +358,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 				prev?.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
 			seaLevel: prev?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 			maxElevation: 6000,
-			albedo: SOL_SYSTEM.solMainWorldDefaults.albedo,
-			greenhouseFactor: SOL_SYSTEM.solMainWorldDefaults.greenhouseFactor,
 		}
 		return SYSTEM_GENERATION.generateSystemBodies({
 			seed: seed,
@@ -502,13 +507,29 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			updateMainWorldBody((body) => ({ ...body, eccentricity: value })),
 		[updateMainWorldBody],
 	)
+	const effectiveStarClass: MainSequenceClass = STAR.isValidSpectralClass(
+		spectralClass,
+	)
+		? spectralClass
+		: STAR.defaultSpectralClass
+	const effectiveStarMassSol = STAR.getStarMassSol({
+		cls: effectiveStarClass,
+		subtype: starSubtype,
+	})
 	const orbitalDistanceAU =
 		mainWorldSystemBody?.orbitalDistanceAU ??
 		DEFAULT_WORLD_PARAMS.orbitalDistanceAU
 	const setOrbitalDistanceAU = useCallback(
 		(value: number) =>
-			updateMainWorldBody((body) => ({ ...body, orbitalDistanceAU: value })),
-		[updateMainWorldBody],
+			updateMainWorldBody((body) =>
+				updateBodyOrbitalDistance(
+					body,
+					value,
+					effectiveStarMassSol,
+					systemSeismologyContext.starLuminositySol,
+				),
+			),
+		[updateMainWorldBody, effectiveStarMassSol, systemSeismologyContext],
 	)
 	const hoursPerDay =
 		mainWorldSystemBody?.siderealDayHours ?? DEFAULT_WORLD_PARAMS.hoursPerDay
@@ -517,12 +538,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			updateMainWorldBody((body) => ({ ...body, siderealDayHours: value })),
 		[updateMainWorldBody],
 	)
-	const effectiveStarClass: MainSequenceClass = STAR.isValidSpectralClass(
-		spectralClass,
-	)
-		? spectralClass
-		: STAR.defaultSpectralClass
-
 	// Re-clamps the current ageGyr to a new class/subtype's main-sequence-
 	// lifespan bounds -- ageGyr is a plain, always-valid stored value (see
 	// SolarSystemState's doc), so whichever setter changes what "valid" means
@@ -598,10 +613,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	// depends on spectralClass/starSubtype, and deviation 0 is always exactly
 	// the new star's HZ center by construction (see generateSystemBodies), so
 	// no separate "preserve HZ position" math is needed here anymore.
-	const effectiveStarMassSol = STAR.getStarMassSol({
-		cls: effectiveStarClass,
-		subtype: starSubtype,
-	})
 	const tideLock = mainWorldSystemBody?.tideLock ?? null
 	const setTideLock = useCallback(
 		(lock: TideLock | null) =>

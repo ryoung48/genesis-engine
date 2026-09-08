@@ -334,6 +334,7 @@ function applySSTToClimate({
 	isLand,
 	oceanCurrents,
 }: ApplySSTToClimateParams): void {
+	return
 	// temperature_min/max are deliberately left untouched here -- they get
 	// fully recomputed later by CLIMATE.applyDtrToClimateMinMax straight from
 	// temperature_monthly (which this function mutates in place), so they'll

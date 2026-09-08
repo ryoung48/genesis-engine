@@ -85,6 +85,9 @@ interface GenerationPanelProps {
 	 * Passed straight through to GenerationPlanetNavigator. */
 	companionStars?: CompanionStar[]
 	hostStar?: HostStarAttributes
+	/** Generated world's global mean surface temperature (K); shown on the
+	 * main world's stat card once a world exists. */
+	generatedWorldAvgTempK?: number
 	/** Focuses the 3D solar-system view's camera on any addressed node. */
 	onFocusBody?: (address: OrbitAddress) => void
 	currentFocus?: OrbitAddress | null
@@ -161,6 +164,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	systemBodies,
 	companionStars,
 	hostStar,
+	generatedWorldAvgTempK,
 	onFocusBody,
 	currentFocus,
 	daysPerYear,
@@ -471,6 +475,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								systemBodies={systemBodies}
 								companionStars={companionStars}
 								hostStar={hostStar}
+								generatedWorldAvgTempK={generatedWorldAvgTempK}
 								onFocusBody={onFocusBody}
 								currentFocus={currentFocus}
 								mainWorldSystemBody={mainWorldSystemBody}

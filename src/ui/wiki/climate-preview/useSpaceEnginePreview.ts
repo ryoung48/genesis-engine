@@ -8,7 +8,18 @@ import type {
 	SpaceEngineDiurnalField,
 	SpaceEngineSeasonalField,
 } from "@/model/climate/temperature/spaceengine/types"
-import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
+
+// Ocean/land Bond-albedo blend by land coverage, for the Space Engine preview
+// and stat-card display when a body has no measured Bond albedo.
+const OCEAN_ALBEDO_ESTIMATE = 0.25
+const LAND_ALBEDO_ESTIMATE = 0.35
+
+export function estimateAlbedo(landCoverage: number): number {
+	return (
+		OCEAN_ALBEDO_ESTIMATE * (1 - landCoverage) +
+		LAND_ALBEDO_ESTIMATE * landCoverage
+	)
+}
 
 /** Newtonian gravitational constant, m³·kg⁻¹·s⁻². */
 const G = 6.6743e-11

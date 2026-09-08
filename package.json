@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite",
 		"typecheck": "tsc -b",
+		"test:ebm:vplanet": "vitest run --project smoke src/test/earth/vplanet-ebm.smoke.test.ts",
 		"build": "tsc -b && vite build",
 		"lint": "biome check --write --unsafe",
 		"preview": "vite preview",
@@ -24,6 +25,7 @@
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",
 		"chart.js": "^4.5.1",
+		"d3-contour": "^4.0.2",
 		"d3-delaunay": "^6.0.4",
 		"delaunator": "^5.0.1",
 		"gl-matrix": "^3.4.4",
@@ -36,6 +38,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.11",
+		"@types/d3-contour": "^3.0.6",
 		"@types/d3-delaunay": "^6.0.4",
 		"@types/node": "^24.10.1",
 		"@types/react": "^19.2.5",

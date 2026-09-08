@@ -1,7 +1,7 @@
 import React from "react"
 import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
-import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
+import { ContourChart } from "@/ui/components/composites/charts/ContourChart"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import {
 	formatTemperature,
@@ -96,7 +96,9 @@ function buildPreviewChartProps(
 				}) =>
 					`Eq Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} W/m²`,
 			}
-		case "daylight":
+		// Tidally locked worlds have no seasonal ice-mass balance; this slot
+		// keeps showing daylight for them.
+		case "ice":
 			return {
 				matrix: preview.daylight,
 				colorForValue: buildNormalizedDaylightColorFn(preview.daylight),
@@ -142,13 +144,12 @@ export const LockedClimatePreview: React.FC<LockedClimatePreviewProps> = ({
 	const chartProps = buildPreviewChartProps(preview, activeTab, unitSystem)
 
 	return (
-		<HeatmapChart
+		<ContourChart
 			matrix={chartProps.matrix}
 			rowValues={preview.longitudes}
 			columnValues={preview.columnValues}
 			columnLabels={preview.columnLabels}
 			colorForValue={chartProps.colorForValue}
-			datasetLabel={(lon: number) => `Eq Lon ${lon.toFixed(1)}°`}
 			rowTickLabel={(lon: number) => `${lon.toFixed(0)}°`}
 			tooltipLabel={chartProps.tooltipLabel}
 			legendTitle={chartProps.legendTitle}

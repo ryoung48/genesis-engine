@@ -14,7 +14,7 @@ import { Line } from "react-chartjs-2"
 import type { SpaceEngineDiurnalField } from "@/model/climate/temperature/spaceengine/types"
 import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
-import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
+import { ContourChart } from "@/ui/components/composites/charts/ContourChart"
 import { uiChartPalette } from "@/ui/components/tokens"
 import {
 	formatTemperature,
@@ -240,13 +240,12 @@ export const SpaceEngineClimatePreview: React.FC<
 	return (
 		<div className="flex h-full min-h-0 flex-col gap-1">
 			<div className="flex min-h-0 flex-1 flex-col">
-				<HeatmapChart
+				<ContourChart
 					matrix={seasonal.zonalMeanC}
 					rowValues={seasonal.latsDeg}
 					columnValues={columnValues}
 					columnLabels={columnLabels}
 					colorForValue={colorForValue}
-					datasetLabel={(lat: number) => `Lat ${lat.toFixed(1)}°`}
 					rowTickLabel={(lat: number) => `${lat.toFixed(0)}°`}
 					tooltipLabel={({ rowValue, columnIndex, value }) =>
 						`Lat ${rowValue.toFixed(1)}°, day ${Math.round(

@@ -701,6 +701,21 @@ export const GenesisView: React.FC<{
 		}
 	}, [colorMode, debugMapModes, nationMode])
 
+	// Generated world's global mean surface temperature (K) -- the mean of the
+	// final per-cell temperature field. Shown on the main world's stat card once
+	// a world exists, in place of the standalone EBM preview estimate.
+	const generatedWorldAvgTempK = useMemo(() => {
+		const climate = world?.climate
+		if (!climate) return undefined
+		if (climate.globalMeanTempC !== undefined)
+			return climate.globalMeanTempC + 273.15
+		const temps = climate.temperature_avg
+		if (!temps || temps.length === 0) return undefined
+		let sum = 0
+		for (let i = 0; i < temps.length; i++) sum += temps[i]
+		return sum / temps.length + 273.15
+	}, [world])
+
 	const worldForDisplay = useMemo(() => {
 		const displayWorld = buildDisplayWorld({ world })
 		if (!displayWorld) return null
@@ -2018,6 +2033,7 @@ export const GenesisView: React.FC<{
 						systemBodies={systemBodies}
 						companionStars={solarSystem.companionStars}
 						hostStar={hostStar}
+						generatedWorldAvgTempK={generatedWorldAvgTempK}
 						onFocusBody={handleFocusBody}
 						currentFocus={currentFocus}
 						daysPerYear={daysPerYear}

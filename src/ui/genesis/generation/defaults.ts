@@ -12,7 +12,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	numPlates: 80,
 	landDistribution: 1 - SOL_SYSTEM.solMainWorldDefaults.landConcentration,
 	continentSizeVariety: 0.35,
-	landCoverage: 0.3,
+	landCoverage: SOL_SYSTEM.solMainWorldDefaults.landCoverage,
 	roughness: 0.4,
 	planetRadiusKm: SOL_SYSTEM.solMainWorldDefaults.planetRadiusKm,
 	obliquity: SOL_SYSTEM.solMainWorldDefaults.obliquity,
