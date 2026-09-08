@@ -3,8 +3,9 @@ import type {
 	ClimateGeometry,
 	ComputeAdvectionParams,
 	ComputeMonthlyRainParams,
-	ComputeRainWeightParams,
 	ComputeThermalEquatorParams,
+	SeasonalRainCurveParams,
+	SubsidenceFactorParams,
 } from "@/model/climate/precipitation/rain/types"
 import { RAIN as LOCKED_RAIN } from "@/model/climate/precipitation/tidal-locked"
 import { RAIN_SHARED } from "@/model/climate/shared/rain"
@@ -36,43 +37,53 @@ const eastMoistureWinBias = (absLat: number, hadley: number): number => {
 	return norm >= 20 / 30 && norm <= 30 / 30 ? 1.05 : 1.05
 }
 
-// Full strength out to 0.15 hadley-widths (was a straight ramp starting at
-// 0, dropping to 0.7 by 0.26), then a steeper drop to near-zero by 0.65
-// (was 0.93) -- makes monsoon-driven regions swing harder between "in the
-// migrating rain band" and "out of it" as the ITCZ shifts seasonally,
-// instead of a smooth rise and fall. Keeping the near-zero-distance months
-// at full strength (rather than an immediate falloff) was necessary: an
-// earlier version that dropped right away from x=0 sharpened the seasonal
-// swing but also dragged down the near-peak months along with the
-// off-peak ones, making already-too-dry wet-tropical regions (e.g. the
-// Amazon) drier overall on top of more seasonal -- this plateau shape
-// widens the swing (~45% bigger peak-to-trough range in the Amazon,
-// verified against WorldClim) while the peak itself matches or slightly
-// exceeds the old curve's.
+// Migrating rain band: full strength within 0.15 hadley-widths of the month's
+// thermal equator, dropping to near-zero by 0.4. `x` is the |cellLat - teq|
+// distance already normalized to hadley-cell units, so a cell moves in and out
+// of the band purely from the ITCZ's seasonal north/south swing.
 const itczScale = (x: number) =>
 	MATH.piecewise({ domain: [0, 0.15, 0.4, 1], range: [1, 1, 0.15, 0], x })
 
-// Hadley-cell subsidence: no suppression until 10°/hadleyWidth off the
-// thermal equator, ramps to near-full suppression by 18°, holds through 32°,
-// and releases back to zero by 40° (standard 24h day; scales with hadleyWidth
-// since dist is already normalized to hadley-cell units). Peak is 0.9, not
-// 1.0, so even the driest subtropical belt keeps a small trickle of ITCZ
-// rain through rather than going bone-dry.
-const subsidenceScale = (x: number) =>
+// West-facing coasts, winter storm track: onsets at 25°/hadleyWidth off the
+// month's thermal equator and peaks at 40°, so a mid-latitude west coast is
+// wettest when the band has receded toward the opposite hemisphere (local
+// winter) — the Mediterranean/maritime winter-rain regime.
+const westerliesScale = (x: number) =>
+	MATH.piecewise({ domain: [25 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
+
+// East-facing coasts, trade-wind convergence: full strength while the month's
+// thermal equator is within ~0.25 hadley-widths of the cell (local wet season),
+// then a steep drop to a near-dry tail once the band has pulled into the
+// opposite hemisphere. Steep enough that a tropical east coast gets a genuine
+// savanna dry season; the humid-subtropical floor below keeps higher-latitude
+// east coasts (Cfa) wet year-round. Replaces the old eastStormScale, which grew
+// with distance from the band and left east coasts near-flat.
+const eastProximityScale = (x: number) =>
 	MATH.piecewise({
-		domain: [10 / 30, 18 / 30, 32 / 30, 40 / 30],
-		range: [0, 0.85, 0.85, 0],
+		domain: [0, 0.25, 0.6, 1.4, 2.6],
+		range: [1, 1, 0.38, 0.14, 0.08],
 		x,
 	})
 
-// Shifted 10° closer to the thermal equator (standard 24h day): east storms
-// now ramp in from 0° and reach full strength by 25° instead of 10°/35°;
-// westerlies now onset at 30° and peak at 40° instead of 40°/50°.
-const eastStormScale = (x: number) =>
-	MATH.piecewise({ domain: [0 / 30, 25 / 30, 80 / 30], range: [0, 0.8, 1], x })
+// Dry-season floor under the east-coast term, by |latitude|: 0 through the deep
+// tropics so a savanna east coast can swing to a real dry season, rising to
+// ~0.45 by the subtropics where east coasts are humid-subtropical (Cfa, no dry
+// season). West coasts are unaffected.
+const eastHumidFloor = (absLatDeg: number) =>
+	MATH.piecewise({ domain: [16, 27, 40], range: [0, 0.32, 0.46], x: absLatDeg })
 
-const westerliesScale = (x: number) =>
-	MATH.piecewise({ domain: [25 / 30, 40 / 30, 80 / 30], range: [0, 1, 0.8], x })
+// Hadley-cell subsidence: no suppression until 10°/hadleyWidth off the
+// thermal equator, ramps to near-full suppression by 18°, holds through 34°,
+// and releases back to zero by 44° (standard 24h day; scales with hadleyWidth
+// since dist is already normalized to hadley-cell units). Peak is 0.96, not
+// 1.0, so the driest subtropical west coasts keep only a bare trickle of rain
+// rather than going fully bone-dry.
+const subsidenceScale = (x: number) =>
+	MATH.piecewise({
+		domain: [10 / 30, 18 / 30, 34 / 30, 44 / 30],
+		range: [0, 0.96, 0.96, 0],
+		x,
+	})
 
 // Windward orographic lift: keyed off the target cell's `slopeScore` — the
 // same [0, 1] mesh-relative slope value shown in the hover panel
@@ -618,40 +629,55 @@ function computeAdvection({
 	return annual
 }
 
-function computeWeight({
+// Calibrates the rain model (annual vapour-capacity budget × advected moisture
+// × subsidence × seasonal shape) to the WorldClim land-precipitation mean. The
+// seasonal shape is normalized to sum 1 so it only redistributes the year; the
+// annual throttle the old itcz/storm/westerly blend applied through its
+// sub-unity factors has to come back as this one scalar. Tuned against
+// src/test/earth/earth-real-rain-compare.
+const EMPIRICAL_RAIN_SCALE = 0.75
+
+// Dimensionless seasonal-shape term for one month: how strongly this cell's
+// coast is in the rain given where that month's thermal equator sits. Tropics
+// track the migrating band directly (itczScale); west coasts also pick up the
+// winter storm track, east coasts the trade-wind convergence. The caller
+// multiplies the 12 monthly values by each month's vapour capacity and
+// normalizes to sum 1 — the year's precipitation shape falls out of the ITCZ's
+// seasonal swing rather than a hardcoded table.
+function seasonalRainCurve({
 	cellLat,
+	absLat,
+	coast,
 	teq,
-	subsidenceTeq = teq,
-	eastMoisture,
-	westMoisture,
+	bandOffsetDeg,
 	hoursPerDay,
-	bandOffsetDeg = 0,
-}: ComputeRainWeightParams): number {
+}: SeasonalRainCurveParams): number {
 	const hadley = hadleyWidth(hoursPerDay)
 	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
-	// Subtropical highs (what actually drives desert suppression) don't swing
-	// with the ITCZ's full seasonal migration the way the rain band itself
-	// does — they're a much more stable, rotation-driven feature. Measuring
-	// suppression from a separately-damped teq (subsidenceTeq, blended toward
-	// the annual mean by the caller) keeps the dry belt roughly in place
-	// year-round instead of dragging north/south with the monsoon.
+	const coastTerm =
+		coast === "west"
+			? westerliesScale(dist)
+			: Math.max(eastProximityScale(dist), eastHumidFloor(absLat))
+	return Math.max(itczScale(dist), coastTerm)
+}
+
+// Hadley subsidence factor in [0, 1] — the one term kept from the old
+// itcz/storm rain-weight blend. 1 = no suppression, ~0.15 in the driest
+// subtropical belt. Measured from a thermal equator blended toward the annual
+// mean by the caller so the dry belt stays roughly fixed year-round instead of
+// dragging with the monsoon.
+function subsidenceFactor({
+	cellLat,
+	subsidenceTeq,
+	hoursPerDay,
+	bandOffsetDeg,
+}: SubsidenceFactorParams): number {
+	const hadley = hadleyWidth(hoursPerDay)
 	const subsidenceDist =
 		Math.abs(cellLat - (subsidenceTeq + bandOffsetDeg)) / hadley
-	const moisture = Math.max(eastMoisture, westMoisture)
-	const itcz = itczScale(dist) * moisture
-	const suppression =
+	return (
 		1 - MATH.clamp({ value: subsidenceScale(subsidenceDist), lo: 0, hi: 1 })
-	const eastStorms = eastStormScale(dist) * eastMoisture
-	// Unlike the trade-wind easterlies, westerlies at these latitudes pass
-	// through the same subtropical-high subsidence belt that suppresses the
-	// ITCZ, so they're damped by the same suppression factor rather than
-	// escaping it entirely.
-	const westerlies = westerliesScale(dist) * westMoisture * suppression
-	return MATH.clamp({
-		value: Math.max(itcz * suppression, eastStorms, westerlies),
-		lo: 0,
-		hi: 1,
-	})
+	)
 }
 
 function computeMonthlyRain({
@@ -684,31 +710,16 @@ function computeMonthlyRain({
 	const { landRegions, landNeighborOffset, landNeighborList } =
 		RAIN_SHARED.buildRegionGraph({ mesh, mask: rainRegionMask })
 
-	const teqPerMonth: Float32Array[] =
-		monthlyTEQ ??
-		(() => {
-			const result: Float32Array[] = new Array(12)
-			for (let month = 0; month < 12; month++) {
-				result[month] = computeThermalEquator({
-					mesh,
-					temps: climate.temperature_monthly.subarray(
-						month * N,
-						(month + 1) * N,
-					),
-				})
-			}
-			return result
-		})()
-
 	// Subtropical-high position for subsidence: anchored to the annual-mean
-	// thermal equator rather than the monthly one, since the descending branch
-	// of the Hadley cell that drives desert suppression is a stable,
-	// rotation-driven feature that doesn't track the ITCZ's full seasonal
-	// swing the way the rain band itself does (see computeWeight).
+	// thermal equator so the descending branch of the Hadley cell that drives
+	// desert suppression stays a stable, rotation-driven feature that doesn't
+	// track the ITCZ's full seasonal swing (see subsidenceFactor).
 	const annualTeq = computeThermalEquator({
 		mesh,
 		temps: climate.temperature_avg,
 	})
+
+	const hoursPerDay = params?.hoursPerDay ?? 24
 
 	const monthly = new Float32Array(N * 12)
 	const boundaryWarpDeg = RAIN_SHARED.computeRainBandWarpField({
@@ -721,30 +732,69 @@ function computeMonthlyRain({
 		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
 		const w = reverseCirculation ? eastAdv[r] : westAdv[r]
 		const bin = regionBin[r]
-		// computeWeight clamps its own output to [0,1] as a safety net for the
-		// normal itcz/subsidence/storm blend. Windward orographic lift can push
-		// e/w above 1 (see computeAdvection's localMoisture) — that overflow
-		// wouldn't survive the clamp otherwise, so it's re-applied here as an
-		// uncapped multiplier on the final mm value, scoped only to cells that
-		// actually earned it via lift.
+		// The `east` advection channel is trade-wind moisture landing on
+		// east-facing coasts; `west` is westerly moisture landing on
+		// west-facing coasts. computeAdvection zeroes one of the pair, so the
+		// larger channel is both the coast facing and the moisture supply.
+		const moisture = Math.max(e, w)
+		const coast: "east" | "west" = w > e ? "west" : "east"
+		// Windward orographic lift can push e/w above 1 (see computeAdvection's
+		// localMoisture); re-applied here as an uncapped multiplier on the mm
+		// value, scoped to cells that actually earned it via lift.
 		const liftOverflow = Math.max(1, e, w)
+
+		// Seasonal shape, TEQ-derived: for each month, the coast's rain-band
+		// exposure (seasonalRainCurve, driven by that month's thermal-equator
+		// latitude) times the month's vapour capacity. Normalized to sum 1, so
+		// it only redistributes the annual total across the year. The annual
+		// vapour-capacity budget is the same 12 ceilingScale values summed.
+		const seasonWeights = new Float32Array(12)
+		let capacityBudget = 0
+		let seasonSum = 0
 		for (let month = 0; month < 12; month++) {
-			const teq = teqPerMonth[month][bin]
-			const weight = computeWeight({
+			const capacity = RAIN_SHARED.ceilingScale(
+				climate.temperature_monthly[month * N + r],
+			)
+			capacityBudget += capacity
+			const exposure = seasonalRainCurve({
 				cellLat: latDeg[r],
-				teq,
-				subsidenceTeq: annualTeq[bin],
-				eastMoisture: e,
-				westMoisture: w,
-				hoursPerDay: params?.hoursPerDay ?? 24,
+				absLat: Math.abs(latDeg[r]),
+				coast,
+				teq: monthlyTEQ[month][bin],
 				bandOffsetDeg: boundaryWarpDeg[r],
+				hoursPerDay,
 			})
-			const monthTemp = climate.temperature_monthly[month * N + r]
-			monthly[month * N + r] =
-				weight *
-				RAIN_SHARED.ceilingScale(monthTemp) *
-				pressureRainFactor *
-				liftOverflow
+			const weight = exposure * capacity
+			seasonWeights[month] = weight
+			seasonSum += weight
+		}
+		if (seasonSum > 0) {
+			for (let month = 0; month < 12; month++) seasonWeights[month] /= seasonSum
+		}
+
+		// Subtropical-high subsidence only bites on west-facing coasts — the
+		// subsiding eastern-ocean-boundary branch of the Hadley cell is where
+		// the great deserts sit (Atacama, Namib, Baja, west Australia). East
+		// coasts at the same latitudes stay humid on trade-wind/monsoon inflow,
+		// so they take no suppression.
+		const suppression =
+			coast === "west"
+				? subsidenceFactor({
+						cellLat: latDeg[r],
+						subsidenceTeq: annualTeq[bin],
+						hoursPerDay,
+						bandOffsetDeg: boundaryWarpDeg[r],
+					})
+				: 1
+		const annualMm =
+			EMPIRICAL_RAIN_SCALE *
+			capacityBudget *
+			moisture *
+			suppression *
+			pressureRainFactor *
+			liftOverflow
+		for (let month = 0; month < 12; month++) {
+			monthly[month * N + r] = annualMm * seasonWeights[month]
 		}
 	}
 

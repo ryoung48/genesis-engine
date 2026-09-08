@@ -57,22 +57,21 @@ export type ComputeAdvectionParams = {
 	slopeScore?: Float32Array
 }
 
-export type ComputeRainWeightParams = {
+export type SeasonalRainCurveParams = {
 	cellLat: number
+	absLat: number
+	coast: "east" | "west"
+	/** This month's thermal-equator latitude for the cell's longitude bin. */
 	teq: number
-	/** Omitted to fall back to `teq` (no seasonal damping applied). */
-	subsidenceTeq?: number
-	eastMoisture: number
-	westMoisture: number
+	bandOffsetDeg: number
+	hoursPerDay: number
+}
+
+export type SubsidenceFactorParams = {
+	cellLat: number
+	subsidenceTeq: number
 	hoursPerDay: number
 	bandOffsetDeg: number
-	/**
-	 * Signed land/sea thermal-contrast index in [-1, 1] for this cell/month
-	 * (see `computeMonsoonIndex`). Positive = continental thermal low drawing
-	 * maritime air onshore (wet monsoon); negative = continental high pushing
-	 * air offshore (dry season). Omitted to disable the monsoon term.
-	 */
-	monsoon?: number
 }
 
 export type ComputeMonthlyRainParams = {
@@ -83,8 +82,8 @@ export type ComputeMonthlyRainParams = {
 	isLand: Uint8Array
 	/** Omitted only in callers without generation settings. */
 	params?: GenesisParams
-	/** Omitted to derive thermal equator fields from monthly temperatures. */
-	monthlyTEQ?: Float32Array[]
+	/** Per-month thermal-equator latitude by longitude bin (12 entries). */
+	monthlyTEQ: Float32Array[]
 	/** Omitted when coastal distance does not influence rainfall. */
 	distCoast?: Float32Array
 	/** Omitted when landmarks do not alter the rain mask. */
