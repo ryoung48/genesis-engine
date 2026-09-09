@@ -29,6 +29,6 @@ export type ComputeTemperatureParams = {
 	landFraction: number[]
 	params: GenesisParams
 	oceanDist?: Float32Array
-	isLand?: Uint8Array
+	isLand: Uint8Array
 	elevation_km?: Float32Array
 }

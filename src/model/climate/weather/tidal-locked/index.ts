@@ -1,78 +1,9 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { ComputeLockedWindVectorsParams } from "@/model/climate/weather/tidal-locked/types"
-import type { WindSurface } from "@/model/climate/weather/wind/types"
+import { ROUGHNESS } from "@/model/climate/weather/wind/roughness"
 import { MATH } from "@/model/shared/math/core"
 import { UNITS } from "@/model/shared/units"
-
-function surfaceWindFactor({
-	r,
-	surface,
-}: {
-	r: number
-	surface: WindSurface
-}): number {
-	const TOPO_OCEAN = 5
-	const TOPO_LAKE = 6
-	const topoCode = surface.topography?.[r]
-	const isWater = topoCode === TOPO_OCEAN || topoCode === TOPO_LAKE
-	const slope = surface.slopeScore?.[r] ?? 0
-
-	let vegFactor = 1.0
-	if (!isWater) {
-		switch (surface.vegetation?.[r]) {
-			case 1:
-				vegFactor = 1.03
-				break
-			case 2:
-				vegFactor = 1.0
-				break
-			case 3:
-				vegFactor = 0.93
-				break
-			case 4:
-				vegFactor = 0.84
-				break
-			case 5:
-				vegFactor = 0.75
-				break
-			case 6:
-				vegFactor = 0.66
-				break
-		}
-	}
-
-	let topoBase = 1.0
-	switch (topoCode) {
-		case 0:
-			topoBase = 1.0
-			break // FLAT
-		case 4:
-			topoBase = 0.93
-			break // MARSH
-		case 1:
-			topoBase = 0.88
-			break // HILL
-		case 2:
-			topoBase = 0.93
-			break // PLATEAU
-		case 3:
-			topoBase = 0.58
-			break // MOUNTAIN
-		case TOPO_OCEAN:
-			topoBase = 1.1
-			break
-		case TOPO_LAKE:
-			topoBase = 1.08
-			break
-	}
-	const topoFactor = topoBase * (1.0 - 0.12 * slope)
-	const coastalFactor = isWater
-		? 1.0
-		: 1.0 + 0.12 * Math.exp(-(surface.oceanDist?.[r] ?? 0) / 800.0)
-
-	return vegFactor * topoFactor * coastalFactor
-}
 
 function computeLockedWindVectors({
 	mesh,
@@ -259,7 +190,9 @@ function computeLockedWindVectors({
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const base = (rawSpeed[r] / ref) * 10 * pressureFactor
-		windSpeed[r] = surface ? base * surfaceWindFactor({ r, surface }) : base
+		windSpeed[r] = surface
+			? base * ROUGHNESS.surfaceFactor({ r, surface })
+			: base
 	}
 
 	return { windU, windV, pressure, windSpeed }

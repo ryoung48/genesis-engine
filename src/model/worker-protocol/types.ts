@@ -41,6 +41,7 @@ interface SerializedGenesisClimate {
 	temperature_monthly_nolapse: Float32Array
 	temperature_monthly_range: Float32Array
 	insolation_monthly: Float32Array
+	declination_monthly: Float32Array
 	pet_monthly: Float32Array
 	daylight_hours_monthly: Float32Array
 	landFraction: number[]

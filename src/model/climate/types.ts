@@ -10,6 +10,7 @@ export interface GenesisClimate {
 	temperature_monthly_nolapse: Float32Array // flattened [month * numRegions + region] mean °C before terrain lapse correction
 	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temperature range °C
 	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²
+	declination_monthly: Float32Array // per-month sub-solar latitude in degrees
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
 	landFraction: number[] // 36-band land fraction used by EBM

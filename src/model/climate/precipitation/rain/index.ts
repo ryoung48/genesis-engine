@@ -97,8 +97,8 @@ const orographicLiftScale = (slope: number) =>
 
 const hadleyWidth = (x: number) =>
 	MATH.piecewise({
-		domain: [6, 12, 24, 48, 96, 192, 384],
-		range: [18, 25, 30, 40, 55, 65, 70],
+		domain: [6, 12, 24, 48, 96, 192, 384, 2000],
+		range: [18, 25, 30, 40, 55, 65, 70, 88],
 		x,
 	})
 const climateGeometryCache = new WeakMap<SphereMesh, ClimateGeometry>()
@@ -205,6 +205,7 @@ function computeTEQBins({
 	mesh,
 	temps,
 	numBins,
+	halfWindowBins,
 }: Required<ComputeThermalEquatorParams>): {
 	binMaxTemp: Float32Array
 	smoothLat: Float32Array
@@ -235,7 +236,7 @@ function computeTEQBins({
 	for (let i = 0; i < numBins; i++) {
 		let sum = 0
 		let count = 0
-		for (let d = -TEQ_HALF_WIN; d <= TEQ_HALF_WIN; d++) {
+		for (let d = -halfWindowBins; d <= halfWindowBins; d++) {
 			const j = (((i + d) % numBins) + numBins) % numBins
 			if (binMaxTemp[j] !== -Infinity) {
 				sum += binMaxLat[j]
@@ -252,16 +253,23 @@ function computeThermalEquator({
 	mesh,
 	temps,
 	numBins = TEQ_NUM_BINS,
+	halfWindowBins = TEQ_HALF_WIN,
 }: ComputeThermalEquatorParams): Float32Array {
-	return computeTEQBins({ mesh, temps, numBins }).smoothLat
+	return computeTEQBins({ mesh, temps, numBins, halfWindowBins }).smoothLat
 }
 
 function computeThermalEquatorLine({
 	mesh,
 	temps,
 	numBins = TEQ_NUM_BINS,
+	halfWindowBins = TEQ_HALF_WIN,
 }: ComputeThermalEquatorParams): [number, number][] | null {
-	const { binMaxTemp, smoothLat } = computeTEQBins({ mesh, temps, numBins })
+	const { binMaxTemp, smoothLat } = computeTEQBins({
+		mesh,
+		temps,
+		numBins,
+		halfWindowBins,
+	})
 	const points: [number, number][] = []
 	for (let i = 0; i < numBins; i++) {
 		if (binMaxTemp[i] === -Infinity) continue
