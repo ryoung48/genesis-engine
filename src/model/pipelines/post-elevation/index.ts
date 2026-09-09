@@ -507,6 +507,7 @@ function runPostElevationPipeline(
 		hydrology,
 		dtrMonthly: dtr_monthly,
 		oceanDist,
+		isLand,
 		isTidallyLocked: params.tideLock?.type === "solar",
 	})
 	record("Post: cloud cover temperature modifier", t0)

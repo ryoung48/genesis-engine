@@ -22,6 +22,7 @@ function applyCloudCoverTemperatureModifier({
 	hydrology,
 	dtrMonthly,
 	oceanDist,
+	isLand,
 	isTidallyLocked,
 }: CloudCoverTemperatureModifierParams): void {
 	const N = oceanDist.length
@@ -51,6 +52,7 @@ function applyCloudCoverTemperatureModifier({
 				isTidallyLocked,
 			})
 			cloudCoverMonthly[idx] = cloudFraction
+			if (!isLand[r]) continue
 			if (intensity === 0) continue
 
 			// +1 (max warming) at <=20% cloud cover (clear), -1 (max cooling) at

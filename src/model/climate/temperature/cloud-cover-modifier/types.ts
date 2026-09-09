@@ -18,5 +18,6 @@ export interface CloudCoverTemperatureModifierParams {
 	}
 	dtrMonthly: Float32Array
 	oceanDist: Float32Array
+	isLand: Uint8Array
 	isTidallyLocked?: boolean
 }
