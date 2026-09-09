@@ -11,7 +11,6 @@ import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
 import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
-import { UTILS } from "@/model/climate/temperature/ebm/utils"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { GenesisClimate } from "@/model/climate/types"
 import { ELEVATION } from "@/model/geography/terrain/elevation"
@@ -216,12 +215,8 @@ function computeTemperature({
 	const daylight_hours_monthly = computeMonthlyDaylightHours({ mesh, params })
 	// Build interpolation ranges: latitude bands → zonal temperature, range, and insolation
 	let dayStart = 0
-	const temperatures = [ebm.temperature_land, ebm.temperature_ocean]
-	const temperatureAverages = temperatures.map((temperature) =>
-		temperature.map((row) => UTILS.meanOf(row)),
-	)
-	const monthlyRanges: number[][][] = new Array(12)
-	const monthlyRangeRanges: number[][][] = new Array(12)
+	const monthlyRanges: number[][] = new Array(12)
+	const monthlyRangeRanges: number[][] = new Array(12)
 	const monthlyInsolRanges: number[][] = new Array(12)
 	const declination_monthly = new Float32Array(12)
 	for (let m = 0; m < 12; m++) {
@@ -231,24 +226,20 @@ function computeTemperature({
 		let declSum = 0
 		for (let d = start; d < end; d++) declSum += ebm.declination[d]
 		declination_monthly[m] = (declSum / (end - start)) * (180 / Math.PI)
-		monthlyRanges[m] = temperatures.map((temperature) =>
-			temperature.map((row) => {
-				let sum = 0
-				for (let d = start; d < end; d++) sum += row[d]
-				return sum / (end - start)
-			}),
-		)
-		monthlyRangeRanges[m] = temperatures.map((temperature) =>
-			temperature.map((row) => {
-				let min = Infinity,
-					max = -Infinity
-				for (let d = start; d < end; d++) {
-					if (row[d] < min) min = row[d]
-					if (row[d] > max) max = row[d]
-				}
-				return max - min
-			}),
-		)
+		monthlyRanges[m] = ebm.temperature.map((row) => {
+			let sum = 0
+			for (let d = start; d < end; d++) sum += row[d]
+			return sum / (end - start)
+		})
+		monthlyRangeRanges[m] = ebm.temperature.map((row) => {
+			let min = Infinity,
+				max = -Infinity
+			for (let d = start; d < end; d++) {
+				if (row[d] < min) min = row[d]
+				if (row[d] > max) max = row[d]
+			}
+			return max - min
+		})
 		monthlyInsolRanges[m] = ebm.insolation.map((row) => {
 			let sum = 0
 			for (let d = start; d < end; d++) sum += row[d]
@@ -278,15 +269,11 @@ function computeTemperature({
 		const hKm = elevation_km
 			? elevation_km[r]
 			: ELEVATION.elevToHeightKm({ elev: elevation[r] })
-		const isLandCell = isLand[r] === 1
-		const temperatureKind = isLandCell ? 0 : 1
-		const lapseCorrection = isLandCell ? hKm * LAPSE_RATE : 0
+		const lapseCorrection = isLand[r] === 1 ? hKm * LAPSE_RATE : 0
 
 		const annualAvg =
-			interpolateLatBand({
-				range: temperatureAverages[temperatureKind],
-				latDeg,
-			}) - lapseCorrection
+			interpolateLatBand({ range: ebm.temperature_avg, latDeg }) -
+			lapseCorrection
 
 		// Continentality: scale seasonal deviation from annual mean
 		// Ocean (0 mi): factor ≈ 0.78 (damped), coast (~300 mi): factor ≈ 1.0, deep inland: → 1.75
@@ -294,14 +281,14 @@ function computeTemperature({
 		const distMiles = oceanDist ? oceanDist[r] * KM_TO_MI : 0
 		const absLat = Math.abs(latDeg)
 		const polarTaper = absLat > 55 ? 1 - (absLat - 55) / 35 : 1 // linear fade 55°–90°
-		const maxAmplitude = 1 * Math.max(0, polarTaper)
+		const maxAmplitude = 0.5 * Math.max(0, polarTaper)
 		const inertiaFactor = oceanDist
 			? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000)
 			: 1
 
 		for (let month = 0; month < 12; month++) {
 			const zonalMonthNoLapse = interpolateLatBand({
-				range: monthlyRanges[month][temperatureKind],
+				range: monthlyRanges[month],
 				latDeg,
 			})
 			const zonalMonth = zonalMonthNoLapse - lapseCorrection
@@ -311,10 +298,8 @@ function computeTemperature({
 				annualAvg + lapseCorrection + (zonalMonth - annualAvg) * inertiaFactor
 			// Range scales with continentality; insolation is purely astronomical
 			temperature_monthly_range[month * N + r] =
-				interpolateLatBand({
-					range: monthlyRangeRanges[month][temperatureKind],
-					latDeg,
-				}) * inertiaFactor
+				interpolateLatBand({ range: monthlyRangeRanges[month], latDeg }) *
+				inertiaFactor
 			insolation_monthly[month * N + r] = interpolateLatBand({
 				range: monthlyInsolRanges[month],
 				latDeg,

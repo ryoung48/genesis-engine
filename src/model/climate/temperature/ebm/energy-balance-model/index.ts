@@ -67,12 +67,7 @@ export class EnergyBalanceModel {
 		this.config = config
 	}
 
-	// VPlanet POISE (poise.c's dDiffCoeff handling) uses ONE flat diffusion
-	// coefficient at every latitude, not a latitude-shaped profile. The old
-	// diffuser() peaked at mid-latitudes (~45deg) and dipped at both the
-	// equator and the poles, which stretched the pole-to-equator spread past
-	// Earth's real range. Re-fit GREENHOUSE_FACTOR whenever this changes.
-	private static readonly DIFFUSION_COEFFICIENT = 0.55
+	private static readonly DIFFUSION_COEFFICIENT = 0.5
 
 	private computeDiffusionCoefficients(): void {
 		const { grid, time, planet } = CONSTANTS.embConstants

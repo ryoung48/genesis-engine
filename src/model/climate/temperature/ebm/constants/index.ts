@@ -73,7 +73,7 @@ const embConstants = {
 		// flat 0.44 default. Flat diffusion transports slightly less heat
 		// poleward on net here, leaving a -0.88C land-only cold bias at 0.6038;
 		// re-bisected (same test) to 0.6101 to re-zero it.
-		GREENHOUSE_FACTOR: 0.57,
+		GREENHOUSE_FACTOR: 0.596,
 	},
 	thermal: {
 		// Sourced from VPlanet's POISE module (peer-reviewed EBM,

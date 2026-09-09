@@ -2,8 +2,8 @@ import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import type { CloudCoverTemperatureModifierParams } from "@/model/climate/temperature/cloud-cover-modifier/types"
 import { MATH } from "@/model/shared/math/core"
 
-const HOT_LOW_CLOUD_WARMING_C = 8
-const HOT_HIGH_CLOUD_COOLING_C = 5
+const HOT_LOW_CLOUD_WARMING_C = 4
+const HOT_HIGH_CLOUD_COOLING_C = 2.5
 const INTENSITY_CAP_TEMP_C = 20
 
 /**

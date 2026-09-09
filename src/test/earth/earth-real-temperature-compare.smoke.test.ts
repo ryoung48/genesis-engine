@@ -41,6 +41,13 @@ const SAHARA_BOUNDS = {
 	maxLon: 35,
 }
 
+const SIBERIA_BOUNDS = {
+	minLat: 50,
+	maxLat: 70,
+	minLon: 60,
+	maxLon: 140,
+}
+
 describe("EBM temperature vs observed Earth climate (land only)", () => {
 	it("imports the real Earth heightmap and compares modeled vs WorldClim land temperatures", () => {
 		const earth = loadEarthGrayscale("earth.png")
@@ -493,6 +500,9 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		let saharaNoLapseSum = 0
 		let saharaObservedSum = 0
 		let saharaElevationSum = 0
+		let siberiaCells = 0
+		let siberiaModeledSum = 0
+		let siberiaObservedSum = 0
 
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if (!isLand[r]) continue
@@ -524,6 +534,16 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 				saharaObservedSum += observed
 				saharaElevationSum += elevation_km[r]
 			}
+			if (
+				lat >= SIBERIA_BOUNDS.minLat &&
+				lat < SIBERIA_BOUNDS.maxLat &&
+				lon >= SIBERIA_BOUNDS.minLon &&
+				lon < SIBERIA_BOUNDS.maxLon
+			) {
+				siberiaCells++
+				siberiaModeledSum += climate.temperature_avg[r]
+				siberiaObservedSum += observed
+			}
 			const band = bandStats.find((b) => lat >= b.lo && lat < b.hi)
 			if (band) {
 				band.n++
@@ -552,17 +572,86 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		const meanBiasC = sumDiff / Math.max(1, n)
 		const meanAbsErrorC = sumAbsDiff / Math.max(1, n)
 		const rmseC = Math.sqrt(sumSq / Math.max(1, n))
+		const realMonthly = climate.real_temperature_monthly!
+		let monthlyAbsError = 0
+		let monthlyCount = 0
+		let siberiaMonthlyDiffSum = 0
+		let siberiaMonthlyCount = 0
+		const siberiaMonthlyModeledSum = new Float64Array(12)
+		const siberiaMonthlyObservedSum = new Float64Array(12)
+		const siberiaMonthlyCounts = new Uint32Array(12)
+		for (let r = 0; r < mesh.numRegions; r++) {
+			if (!isLand[r]) continue
+			const lat = latDegAt(r)
+			const lon = (Math.atan2(r_xyz[r * 3 + 1], r_xyz[r * 3]) * 180) / Math.PI
+			for (let month = 0; month < 12; month++) {
+				const index = month * mesh.numRegions + r
+				if (!Number.isFinite(realMonthly[index])) continue
+				monthlyAbsError += Math.abs(
+					climate.temperature_monthly[index] - realMonthly[index],
+				)
+				monthlyCount++
+				if (
+					lat >= SIBERIA_BOUNDS.minLat &&
+					lat < SIBERIA_BOUNDS.maxLat &&
+					lon >= SIBERIA_BOUNDS.minLon &&
+					lon < SIBERIA_BOUNDS.maxLon
+				) {
+					siberiaMonthlyDiffSum +=
+						climate.temperature_monthly[index] - realMonthly[index]
+					siberiaMonthlyCount++
+					siberiaMonthlyModeledSum[month] += climate.temperature_monthly[index]
+					siberiaMonthlyObservedSum[month] += realMonthly[index]
+					siberiaMonthlyCounts[month]++
+				}
+			}
+		}
+		const monthlyMeanAbsErrorC = monthlyAbsError / Math.max(1, monthlyCount)
 
 		console.info("Land cells compared", n, "of", mesh.numRegions)
 		console.info("Overall EBM vs WorldClim (land only, annual mean)")
 		console.table({
 			meanBiasC: Number(meanBiasC.toFixed(2)),
 			meanAbsErrorC: Number(meanAbsErrorC.toFixed(2)),
+			monthlyMeanAbsErrorC: Number(monthlyMeanAbsErrorC.toFixed(4)),
 			rmseC: Number(rmseC.toFixed(2)),
 			tooWarmPct: Number(((tooWarm / Math.max(1, n)) * 100).toFixed(1)),
 			tooColdPct: Number(((tooCold / Math.max(1, n)) * 100).toFixed(1)),
 			justRightPct: Number(((justRight / Math.max(1, n)) * 100).toFixed(1)),
 		})
+		console.info("Siberia diagnostic (50–70°N, 60–140°E; land only)")
+		console.table({
+			cells: siberiaCells,
+			modeledC: Number((siberiaModeledSum / siberiaCells).toFixed(2)),
+			observedC: Number((siberiaObservedSum / siberiaCells).toFixed(2)),
+			biasC: Number(
+				((siberiaModeledSum - siberiaObservedSum) / siberiaCells).toFixed(2),
+			),
+			monthlyBiasC: Number(
+				(siberiaMonthlyDiffSum / siberiaMonthlyCount).toFixed(2),
+			),
+		})
+		console.table(
+			Array.from({ length: 12 }, (_, month) => ({
+				month: month + 1,
+				modeledC: Number(
+					(
+						siberiaMonthlyModeledSum[month] / siberiaMonthlyCounts[month]
+					).toFixed(2),
+				),
+				observedC: Number(
+					(
+						siberiaMonthlyObservedSum[month] / siberiaMonthlyCounts[month]
+					).toFixed(2),
+				),
+				biasC: Number(
+					(
+						siberiaMonthlyModeledSum[month] / siberiaMonthlyCounts[month] -
+						siberiaMonthlyObservedSum[month] / siberiaMonthlyCounts[month]
+					).toFixed(2),
+				),
+			})),
+		)
 
 		console.info("By latitude band (bias = model minus observed, °C)")
 		console.table(
