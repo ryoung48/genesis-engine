@@ -233,16 +233,20 @@ const BOUNDARY_TURN_DEG = 30
 const BOUNDARY_DECAY_BINS = 3
 const BOUNDARY_REACH_BINS = 6
 const BOUNDARY_LAND_MIN = 0.5
-// Eastern-boundary flow: along the eastern edge of an ocean basin (a
-// continent's west coast) the surface wind on the eastern flank of the
-// subtropical anticyclone is equatorward alongshore -- the upwelling-
-// favorable regime (California, Iberia, Chile, Namibia). A steady
-// pressure-balance template smooths the high's eastern edge against the coast
-// and underplays it, so it is added explicitly, mirroring the western-boundary
-// term but pointing toward the summer equator with a slight onshore friction
-// turn. Peaks through the summer-hemisphere subtropical belt.
+// Eastern-boundary flow: along a continent's west coast, the surface wind on
+// the eastern flank of the oceanic subtropical high is equatorward alongshore
+// -- the upwelling regime (California, Iberia, Chile, Namibia). The pressure
+// template smooths the high's eastern edge against the coast and underplays
+// it, so it is added explicitly. It is GATED on a real subtropical high
+// actually sitting offshore (pressure a few bins west above the zonal mean):
+// a monsoon coast (western India, Somalia) has an offshore trough instead and
+// its onshore-poleward summer jet must not be pushed the other way.
 const EAST_BOUNDARY_FLOW_MS = 6
 const EAST_BOUNDARY_TURN_DEG = 20
+// Offshore pressure anomaly (template units above the latitude's zonal mean)
+// at which the eastern-boundary term reaches full strength; it is zero where
+// the offshore pressure is at or below the zonal mean.
+const EAST_BOUNDARY_HIGH_FULL = 0.15
 const DEG2RAD = Math.PI / 180
 
 function cellBoundaries({
@@ -721,33 +725,72 @@ function computeWindVectors({
 			(((lonBin % lonBinCount) + lonBinCount) % lonBinCount)
 		return cellCount[idx] > 0 ? landCount[idx] / cellCount[idx] : 0
 	}
+
+	// Coarse ocean pressure per (latBin, lonBin) and its zonal mean, for the
+	// eastern-boundary gate: only apply the west-coast term where a real
+	// subtropical high sits offshore (pressure west of the coast above the
+	// zonal mean), not where a monsoon trough does.
+	const oceanPSum = new Float64Array(lonBinCount * latBinCount)
+	const oceanPCnt = new Float32Array(lonBinCount * latBinCount)
+	for (let r = 0; r < N; r++) {
+		if (elevation_km[r] > 0) continue
+		const idx = oceanBinOf(latDeg[r]) * lonBinCount + regionBin[r]
+		oceanPSum[idx] += pressure[r]
+		oceanPCnt[idx]++
+	}
+	const latPMean = new Float32Array(latBinCount)
+	for (let lb = 0; lb < latBinCount; lb++) {
+		let s = 0
+		let c = 0
+		for (let xb = 0; xb < lonBinCount; xb++) {
+			const idx = lb * lonBinCount + xb
+			if (oceanPCnt[idx] > 0) {
+				s += oceanPSum[idx]
+				c += oceanPCnt[idx]
+			}
+		}
+		latPMean[lb] = c > 0 ? s / c : 0
+	}
+	const oceanPAt = (latBin: number, lonBin: number) => {
+		const idx =
+			latBin * lonBinCount +
+			(((lonBin % lonBinCount) + lonBinCount) % lonBinCount)
+		return oceanPCnt[idx] > 0
+			? oceanPSum[idx] / oceanPCnt[idx]
+			: latPMean[latBin]
+	}
+
 	const boundaryStrength = new Float32Array(N)
 	const eastBoundaryStrength = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const latBin = oceanBinOf(latDeg[r])
 		const own = landFracAt(latBin, regionBin[r])
 		if (own >= BOUNDARY_LAND_MIN) {
-			// Coastal land: a western ocean boundary with ocean to the east, an
-			// eastern ocean boundary (west coast) with ocean to the west.
+			// A coastal land cell is a western boundary only with ocean east of it.
 			const eastIsOcean =
 				landFracAt(latBin, regionBin[r] + 1) < BOUNDARY_LAND_MIN ? 1 : 0
+			boundaryStrength[r] = (1 - own) * eastIsOcean
 			const westIsOcean =
 				landFracAt(latBin, regionBin[r] - 1) < BOUNDARY_LAND_MIN ? 1 : 0
-			boundaryStrength[r] = (1 - own) * eastIsOcean
-			eastBoundaryStrength[r] = (1 - own) * westIsOcean
+			if (westIsOcean) {
+				// Offshore pressure anomaly a couple bins west of the coast.
+				const offshore =
+					(oceanPAt(latBin, regionBin[r] - 2) +
+						oceanPAt(latBin, regionBin[r] - 3)) *
+					0.5
+				const highFactor = MATH.smoothstep({
+					edge0: 0,
+					edge1: EAST_BOUNDARY_HIGH_FULL,
+					x: offshore - latPMean[latBin],
+				})
+				eastBoundaryStrength[r] = (1 - own) * highFactor
+			}
 			continue
 		}
 		for (let k = 1; k <= BOUNDARY_REACH_BINS; k++) {
-			if (landFracAt(latBin, regionBin[r] - k) >= BOUNDARY_LAND_MIN) {
-				boundaryStrength[r] = Math.exp(-(k - 1) / BOUNDARY_DECAY_BINS)
-				break
-			}
-		}
-		for (let k = 1; k <= BOUNDARY_REACH_BINS; k++) {
-			if (landFracAt(latBin, regionBin[r] + k) >= BOUNDARY_LAND_MIN) {
-				eastBoundaryStrength[r] = Math.exp(-(k - 1) / BOUNDARY_DECAY_BINS)
-				break
-			}
+			if (landFracAt(latBin, regionBin[r] - k) < BOUNDARY_LAND_MIN) continue
+			boundaryStrength[r] = Math.exp(-(k - 1) / BOUNDARY_DECAY_BINS)
+			break
 		}
 	}
 	const declination = hasMonth ? climate.declination_monthly[month] : 0
@@ -840,8 +883,9 @@ function computeWindVectors({
 		}
 		if (seasonSign !== 0 && eastBoundaryStrength[r] > 0) {
 			const lat = latDeg[r]
-			// Equatorward alongshore, peaked through the summer-hemisphere
-			// subtropical belt; a slight onshore turn toward the continental low.
+			// Equatorward alongshore on the summer-hemisphere subtropical west
+			// coast, with a slight onshore friction turn. Only fires where the
+			// offshore-high gate (eastBoundaryStrength) is non-zero.
 			const summerSide = Math.sign(lat) === seasonSign ? 1 : 0
 			const weight =
 				summerSide * Math.exp(-(((Math.abs(lat) - 0.9 * hw) / (0.7 * hw)) ** 2))
