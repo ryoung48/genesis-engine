@@ -2,6 +2,10 @@ import type {
 	RasterIndex,
 	RasterVector,
 } from "@/model/climate/ocean/currents/sverdrup/raster/types"
+import type {
+	StommelOperator,
+	StommelSolution,
+} from "@/model/climate/ocean/currents/sverdrup/stommel/types"
 
 export type SverdrupWind = {
 	windU: Float32Array
@@ -29,38 +33,6 @@ export type CurlParams = {
 	planet: SverdrupPlanet
 }
 
-export type BarrierMaskParams = {
-	ocean: Uint8Array
-	continent: Float32Array
-}
-
-export type StreamfunctionParams = {
-	curl: Float32Array
-	ocean: Uint8Array
-	barrier: Uint8Array
-	planet: SverdrupPlanet
-}
-
-export type StreamfunctionResult = {
-	psi: Float32Array
-	interior: Float32Array
-	channel: Float32Array
-}
-
-export type ChannelJetParams = {
-	tau: RasterVector
-	ocean: Uint8Array
-	channel: Float32Array
-	planet: SverdrupPlanet
-}
-
-export type WesternBoundaryParams = {
-	segment: number[]
-	boundary: Float32Array
-	widthCells: number
-	channelWeight: number
-}
-
 export type GeostrophicParams = {
 	psi: Float32Array
 	ocean: Uint8Array
@@ -82,20 +54,22 @@ export type EkmanResult = {
 export type SurfaceCurrentParams = {
 	geostrophic: RasterVector
 	drift: RasterVector
-	jet: Float32Array
 	ocean: Uint8Array
 }
 
 export type SolveCirculationParams = {
 	index: RasterIndex
-	barrier: Uint8Array
 	wind: SverdrupWind
 	planet: SverdrupPlanet
+	operator: StommelOperator
+	// [JUSTIFICATION] Successive months differ only in the forcing, so each
+	// solve starts from the previous month's answer; null on the first.
+	guess: Float64Array | null
 }
 
 export type Circulation = {
 	flow: RasterVector
-	interior: Float32Array
 	divergence: Float32Array
 	thermoclineDepth: Float32Array
+	solution: StommelSolution
 }

@@ -42,13 +42,26 @@ solve).
   fields, so the overlay draws the solver's own current. The legacy band model
   and the tidally locked model fill the same fields from their SST gradient
   (`ocean/surface-flow`), the rotating one with the corrected rotation.
-- **Streamfunction.** Integrated westward from each basin's eastern wall,
-  wrapping across the dateline. Walls are land runs of 3+ cells or any
-  continent landmark (so Panama blocks, small islands don't). A Munk-width
-  boundary layer `(A/beta)^(1/3)` brings `psi` back to zero at the western
-  wall — that is the western boundary current. Rows whose longest open-water
-  run approaches the globe blend into a circumpolar-channel solution
-  (180 -> 300 deg), and `psi` tapers to zero from 70 to 80 deg.
+- **Streamfunction, as a sparse linear solve.** The steady linear barotropic
+  balance `R lap(psi) + J(psi, f) = curl(tau)/rho` -- with `J(psi, f) = beta
+  d(psi)/dx` -- discretised five-point over wet cells only and handed to
+  BiCGSTAB (`sverdrup/stommel`). Land never becomes an unknown, so `psi = 0`
+  on every coast falls out of the numbering itself.
+
+  **This deleted all the basin detection.** No `barrierMask`, no wall search,
+  no segment scan, no `channelWeight` blend, no post-hoc western-boundary
+  exponential, no polar taper. Gyres, western boundary currents and the
+  circumpolar jet are all just what the operator produces, which is what
+  arbitrary continents need: the western boundary current is a property of the
+  solution rather than a shape multiplied onto it, and the ACC emerges with no
+  channel term at all.
+
+  The drag `R` sets the Stommel layer `R/beta`. A physical layer (~50 km) is
+  far narrower than a 1-degree cell, so it is instead set to two cells -- a
+  resolution floor, not a physical claim -- written as `2 Omega dlambda cos^2`
+  so it follows the planet's rotation and the raster's spacing. That also fixes
+  the cell Peclet number at 1/2, well inside the stability limit of 2, so
+  centred differencing needs no upwinding.
 - **Transport depth is the reduced-gravity layer, not a constant.** The
   Sverdrup transport rides in the warm upper layer, so that layer's own
   thickness converts it to a surface speed: a subtropical gyre centre, where
@@ -58,12 +71,6 @@ solve).
   Where the layer thins past its at-rest thickness (subpolar gyres, the
   circumpolar channel) it no longer confines the flow, which goes barotropic,
   so `h_E` is the floor.
-- **Circumpolar channel jet.** A zonally unblocked row has no walls to hold up
-  a pressure gradient, and the channel branch of `psi` has its row-mean removed,
-  so the Sverdrup solution carries *no net zonal transport at all* -- the model
-  had no ACC, only Ekman drift and wiggles. The wind's zonal momentum is
-  dissipated against the water instead: `rho_w C_d u^2 = tau_x` on the row-mean
-  zonal stress, faded in by the same `channelWeight` and polar taper.
 - **Physical units, no percentile normalization.** Wind stress
   `rho_air C_d |U| U` in Pa with air density scaled by surface pressure;
   transport from the planet's own `beta = 2 Omega cos(lat)/a`; Ekman transport
@@ -83,30 +90,45 @@ solve).
 
 ## Where it stands
 
-| Metric (vs GODAS/OISST, procedural winds) | Start | Now |
-| --- | ---: | ---: |
-| Current direction, 15-60 deg | -0.18 | 0.45 |
-| Regions with a positive direction score | 0/14 | 12/13 |
-| Regions with correct SST sign | 6/10 | 9/10 |
-| ACC peak speed (obs 0.30 m/s) | 1.89 m/s (artifact) | 0.48 m/s |
-
-The ACC, measured across this session only (the "Start" column above predates
-it, and no per-region direction score was recorded then):
-
-| ACC 45-60S | Before the channel jet | Now | Observed |
+| Metric (vs GODAS/OISST, procedural winds) | Start | Sverdrup | Stommel solve |
 | --- | ---: | ---: | ---: |
-| direction score | 0.12 | 0.44 | -- |
-| mean u | 0.032 | 0.092 | 0.090 m/s |
-| mean v | 0.006 | 0.003 | 0.055 m/s |
-| peak speed | 0.61 | 0.48 | 0.30 m/s |
+| Current direction, 15-60 deg | -0.18 | 0.45 | **0.57** |
+| Regions with a positive direction score | 0/14 | 12/13 | **13/13** |
+| Regions with correct SST sign | 6/10 | 9/10 | 9/10 |
+| SST correlation, 15-60 deg | -0.07 | -0.11 | -0.05 |
 
-The zonal speed is now essentially exact, but **the meridional component got
-smaller, not larger** -- the jet is zonal by construction, so it raised `u` to
-the right magnitude and contributed nothing to `v`. The real ACC meanders:
-(0.090, 0.055) points 31 degrees north of due east, because it is steered by
-bathymetry the model does not have. A purely zonal ACC therefore cannot score
-above cos(31) = 0.86 in this box whatever else improves, and the remaining gap
-from 0.44 is meander structure, not speed.
+Under observed wind, which is where the ocean model is judged on its own
+(`earth-current-obswind.diagnostic.smoke.test.ts`): direction 0.60 -> **0.68**,
+SST correlation 0.25 -> **0.39**.
+
+Every region improved or held. The largest: N Atlantic Drift -0.39 -> 0.03 (the
+last negative one), N Eq Current Pac 0.07 -> 0.44, ACC 0.44 -> 0.67, Agulhas
+0.80 -> 0.91, Humboldt 0.59 -> 0.69. The ACC is the notable one, since the
+channel jet that used to carry it is gone -- the solve produces a circumpolar
+current on its own, and its mean u is 0.039 against 0.090 observed where the
+jet had been tuned to 0.092.
+
+**Speeds are now systematically low** (Gulf Stream peak 0.13 against 0.49,
+Agulhas 0.09 against 0.53). Two causes, both known: the two-cell drag is ~4x
+the physical Stommel width, and procedural wind stress is about half observed.
+Direction is what the ocean model controls and what the floors hold.
+
+The ACC across this session (the "Start" column above predates it, and no
+per-region direction score was recorded then):
+
+| ACC 45-60S | Sverdrup | + channel jet | Stommel solve | Observed |
+| --- | ---: | ---: | ---: | ---: |
+| direction score | 0.12 | 0.44 | 0.67 | -- |
+| mean u | 0.032 | 0.092 | 0.039 | 0.090 m/s |
+| mean v | 0.006 | 0.003 | 0.007 | 0.055 m/s |
+| peak speed | 0.61 | 0.48 | 0.43 | 0.30 m/s |
+
+The jet had been tuned to match `u` almost exactly while contributing nothing
+meridional; the solve scores far better on direction with less than half the
+zonal speed, because it gets the *structure* right rather than the magnitude.
+`v` is still an order of magnitude short: the real ACC meanders -- (0.090,
+0.055) points 31 degrees north of due east -- because it is steered by
+bathymetry the model does not have.
 
 Removing the fixed 100 m transport depth also removed a compensation: it had
 been fitted against winds whose stress is roughly half of observed, so the two
@@ -135,8 +157,9 @@ Four things came out of it:
 - **The North Atlantic Drift and the North Pacific equatorial current are
   purely wind.** Both jump to ~0.95 with observed winds; there is nothing to
   fix on the ocean side for either.
-- **The ACC was the one region observed winds did not help** -- which is what
-  led to the channel jet above.
+- **The ACC was the one region observed winds did not help.** That first led
+  to a hand-built channel jet; the Stommel solve now produces a circumpolar
+  current on its own and scores better than the jet did, so the jet is gone.
 - **Surface speed ran 2-3x too fast under realistic forcing** (Brazil 0.353
   against 0.098 observed, Agulhas 0.576 against 0.232) -- which is what led to
   the thermocline transport depth.
@@ -147,20 +170,20 @@ Four things came out of it:
   the upwelling itself creates, and `sst-anomaly` consumes the flow without
   ever feeding back into it.
 
-## The barotropic attempt
+## The time-dependent barotropic attempt
 
-`psi` is integrated row by row with no meridional coupling, so each row carries
-an independent integration error and `u = -d(psi)/dy` differentiates straight
-across it. `PSI_SMOOTHING_PASSES` only papers over that (2 -> 4 is +0.04 global
-direction, 2 -> 6 is +0.06). The real fix is to stop reducing the vorticity
-equation and solve it: spin a rotating ocean up under the wind and let gyres,
-boundary currents and the circumpolar jet fall out of one budget, with no basin
-detection at all -- which is what arbitrary continents want.
+Before the steady solve above, the same goal was attempted with a time-stepped
+nonlinear barotropic vorticity model -- `dq/dt + J(psi, q+f) = curl(tau)/(rho H)
++ A lap(q) - r q` -- spun up from rest each month. It reached the same
+structural result (no basin detection) and is parked, unmerged, on the
+`ocean-barotropic-vorticity` branch. The steady solve supersedes it: it is
+cheaper, it converges unconditionally, and it needs no time step, no
+spin-up, no polar filter and no stability analysis.
 
-That is built and parked on the `ocean-barotropic-vorticity` branch, not
-merged. It runs, and it deletes `barrierMask`, the wall search, `channelWeight`
-and `applyWesternBoundary` outright. Six real defects were found and fixed
-getting that far:
+The nonlinear term is the one thing it had that the steady solve does not, so
+it is where inertial recirculation and jet separation would have to come from
+if those are ever wanted. Six real defects were found and fixed getting it as
+far as it went, all worth knowing before anyone tries again:
 
 - **The polar metric.** `dt` sized off the 70-degree spacing while the raster's
   cos(85) cap makes the true polar spacing 9.7 km -- an instant NaN. The zonal
@@ -190,12 +213,11 @@ fraction climbs 7.6% -> 12.3% -> 19.5% -> 29.3%. Coarsening mangles narrow
 seas, straits and island chains, so the coarse operator stops approximating the
 fine one, which is the assumption the whole method rests on.
 
-Finishing it needs Galerkin coarse operators (`A_c = R A P`, derived from the
-fine operator instead of rediscretised on a coarsened mask) or an algebraic
-method -- or a Krylov solver, which needs no coarse grids at all and is
-indifferent to mask shape. Latency, ocean solve only, 12 months: 2.4 s for the
-Sverdrup model here, 9.5 s barotropic with point relaxation, 20.5 s with the
-(still wrong) multigrid.
+The Krylov solver the steady formulation now uses is the resolution of this:
+it needs no coarse grids at all and so is completely indifferent to mask shape.
+Latency, ocean solve only, 12 months: 2.2 s for the old row integration, 9.5 s
+time-stepped with point relaxation, 20.5 s with the (still wrong) multigrid,
+and 9.1 s for the steady sparse solve that shipped.
 
 ## Tried and rejected
 
@@ -248,16 +270,25 @@ Sverdrup model here, 9.5 s barotropic with point relaxation, 20.5 s with the
   upwelled deficit (should follow the planet's surface-to-deep contrast), the
   100 m surface depth and 0.02 m/s^2 reduced gravity (stratification), the
   50 m Ekman depth, and the water properties in `ocean/mixed-layer`.
-- **The ACC does not meander.** The channel jet is zonal by construction, so
-  the model's circumpolar current has almost no meridional component (0.003
-  against 0.055 observed) and cannot score above cos(31) = 0.86 in the
-  45-60S box however much the speed improves. Meanders come from topographic
-  steering, so this is the same missing bathymetry that forced a drag closure
-  rather than form drag in the first place -- the one change that would fix
-  both.
-- **`OCEAN_DRAG_COEFFICIENT` and the 900 m thermocline cap** are the two
-  constants the channel jet and transport depth added; both should follow the
-  planet rather than sit at Earth values.
+- **The ACC does not meander** (v = 0.007 against 0.055 observed), and the
+  drag is linear where the real balance is form drag on topography. Both are
+  the same missing bathymetry.
+- **Convergence and runtime.** BiCGSTAB over 42787 wet cells: with Jacobi,
+  ~1580 iterations/month to 1e-6; one symmetric Gauss-Seidel sweep cuts that to
+  ~230 for 12.8 s. Tolerance 1e-4 gives bit-identical skill to 1e-8 and halves
+  it again: **9.1 s for 12 months**, against 2.2 s for the old row integration.
+  Two SSOR sweeps cut iterations 5x more but cost 5x per iteration, a wash.
+  A stronger preconditioner (ILU(0)) is the next thing to try, since iteration
+  count rather than per-iteration cost is what is left.
+- **The equatorial band got worse**, not better (direction 0.22 -> 0.06 under
+  observed wind). The Stommel balance degenerates as `beta d(psi)/dx` stops
+  being the leading term near the equator, which is the one place this
+  formulation is known not to apply.
+- **`STOMMEL_LAYER_CELLS` is a resolution floor, not physics.** Two cells is
+  ~4x the real Stommel width and damps every current; one cell scored worse
+  (direction 0.68 -> 0.64, ACC speed 0.270 against 0.114 observed), so the
+  answer is finer resolution rather than less drag. The 900 m thermocline cap
+  is the other constant that should follow the planet.
 - **No non-Earth test.** A sanity smoke test on a slow rotator, a retrograde
   world, a small planet and a water world (finite, bounded, gyres turning the
   right way) would catch regressions the Earth test cannot.

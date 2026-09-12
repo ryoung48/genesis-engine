@@ -1,5 +1,7 @@
 # Wind
 
+Follow-up: [pressure/circulation diagnosis with observed Earth temperatures](wind-pressure-diagnostics.md) identifies a seasonal-calendar mismatch and isolates the western-boundary flow contribution. The original investigation below predates those controlled experiments.
+
 Changes to `src/model/climate/weather/wind` driven by the ocean-current work,
 and what the Earth comparison says about them. Ocean-side work is in
 `ocean-currents.md`; land temperature MAE is `README.md`.

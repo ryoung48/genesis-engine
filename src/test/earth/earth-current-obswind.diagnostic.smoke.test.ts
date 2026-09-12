@@ -4,6 +4,7 @@ import { SVERDRUP_CIRCULATION } from "@/model/climate/ocean/currents/sverdrup/ci
 import type { SverdrupPlanet } from "@/model/climate/ocean/currents/sverdrup/circulation/types"
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import { SVERDRUP_SST_ANOMALY } from "@/model/climate/ocean/currents/sverdrup/sst-anomaly"
+import { STOMMEL } from "@/model/climate/ocean/currents/sverdrup/stommel"
 import { MIXED_LAYER } from "@/model/climate/ocean/mixed-layer"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
@@ -150,25 +151,10 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 			landmarks: world.landmarks,
 			type: "lake",
 		})
-		const isContinent = LANDMARKS.regionTypeMask({
-			landmarks: world.landmarks,
-			type: "continent",
-		})
 		const isOcean = new Uint8Array(N)
-		const continentValue = new Float32Array(N)
-		for (let r = 0; r < N; r++) {
+		for (let r = 0; r < N; r++)
 			isOcean[r] = !world.isLand[r] && !isLake[r] ? 1 : 0
-			continentValue[r] = isContinent[r]
-		}
 		const index = SVERDRUP_RASTER.buildIndex({ latDeg, lonDeg, isOcean })
-		const barrier = SVERDRUP_CIRCULATION.barrierMask({
-			ocean: index.ocean,
-			continent: SVERDRUP_RASTER.average({
-				index,
-				values: continentValue,
-				include: world.isLand,
-			}),
-		})
 		const planet: SverdrupPlanet = {
 			coriolisSign: UNITS.isRetrogradeObliquity(world.params.obliquity)
 				? -1
@@ -183,18 +169,33 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 		const flowU = new Float32Array(N)
 		const flowV = new Float32Array(N)
 		const sstC = new Float32Array(N)
+		const operator = STOMMEL.build({ ocean: index.ocean, planet })
+		console.log(`OBSW unknowns=${operator.count}`)
+		let guess: Float64Array | null = null
+		let totalIterations = 0
+		let worstResidual = 0
 		const startedMs = Date.now()
 		for (let month = 0; month < MONTHS; month++) {
 			const circulation = SVERDRUP_CIRCULATION.solve({
 				index,
-				barrier,
 				wind: WIND.observedWindVectorsForMonth({
 					observedWind: world.observedWind,
 					numRegions: N,
 					month,
 				}),
 				planet,
+				operator,
+				guess,
 			})
+			guess = circulation.solution.state
+			totalIterations += circulation.solution.iterations
+			worstResidual = Math.max(worstResidual, circulation.solution.residual)
+			guess = circulation.solution.state
+			totalIterations += circulation.solution.iterations
+			worstResidual = Math.max(worstResidual, circulation.solution.residual)
+			console.log(
+				`OBSW month ${month} iterations=${circulation.solution.iterations} residual=${circulation.solution.residual.toExponential(2)}`,
+			)
 			const anomaly = SVERDRUP_SST_ANOMALY.solve({
 				index,
 				circulation,
@@ -222,7 +223,9 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 				sstC[r] += monthSst[r] / MONTHS
 			}
 		}
-		console.log(`OBSW solve ms=${Date.now() - startedMs} (12 months)`)
+		console.log(
+			`OBSW solve ms=${Date.now() - startedMs} (12 months) iterations=${totalIterations} worstResidual=${worstResidual.toExponential(2)}`,
+		)
 
 		const annualMean = (monthly: Float32Array | undefined) => {
 			const out = new Float32Array(N).fill(Number.NaN)

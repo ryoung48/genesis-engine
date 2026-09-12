@@ -3,6 +3,7 @@ import { SVERDRUP_CIRCULATION } from "@/model/climate/ocean/currents/sverdrup/ci
 import type { SverdrupPlanet } from "@/model/climate/ocean/currents/sverdrup/circulation/types"
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import { SVERDRUP_SST_ANOMALY } from "@/model/climate/ocean/currents/sverdrup/sst-anomaly"
+import { STOMMEL } from "@/model/climate/ocean/currents/sverdrup/stommel"
 import type {
 	ComputeSverdrupSSTParams,
 	MonthSolve,
@@ -21,7 +22,6 @@ const SEA_LEVEL_AIR_DENSITY_KG_M3 = 1.225
 
 function solveMonth({
 	index,
-	barrier,
 	wind,
 	isOcean,
 	latDeg,
@@ -29,12 +29,15 @@ function solveMonth({
 	temperature,
 	planet,
 	sstSaturationC,
+	operator,
+	guess,
 }: MonthSolveParams): MonthSolve {
 	const circulation = SVERDRUP_CIRCULATION.solve({
 		index,
-		barrier,
 		wind,
 		planet,
+		operator,
+		guess,
 	})
 	const anomaly = SVERDRUP_SST_ANOMALY.solve({
 		index,
@@ -59,6 +62,9 @@ function solveMonth({
 		sst,
 		flowU: sampleOcean(circulation.flow.x),
 		flowV: sampleOcean(circulation.flow.y),
+		state: circulation.solution.state,
+		iterations: circulation.solution.iterations,
+		residual: circulation.solution.residual,
 	}
 }
 
@@ -77,23 +83,10 @@ function computeSST({
 }: ComputeSverdrupSSTParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const isLake = LANDMARKS.regionTypeMask({ landmarks, type: "lake" })
-	const isContinent = LANDMARKS.regionTypeMask({ landmarks, type: "continent" })
 	const isOcean = new Uint8Array(N)
-	const continentValue = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		isOcean[r] = !isLand[r] && !isLake[r] ? 1 : 0
-		continentValue[r] = isContinent[r]
-	}
+	for (let r = 0; r < N; r++) isOcean[r] = !isLand[r] && !isLake[r] ? 1 : 0
 	const { latDeg, lonDeg } = RAIN.getClimateGeometry(mesh)
 	const index = SVERDRUP_RASTER.buildIndex({ latDeg, lonDeg, isOcean })
-	const barrier = SVERDRUP_CIRCULATION.barrierMask({
-		ocean: index.ocean,
-		continent: SVERDRUP_RASTER.average({
-			index,
-			values: continentValue,
-			include: isLand,
-		}),
-	})
 	const planet: SverdrupPlanet = {
 		coriolisSign: UNITS.isRetrogradeObliquity(params.obliquity) ? -1 : 1,
 		rotationRateRadS: (2 * Math.PI) / (params.hoursPerDay * 3600),
@@ -105,6 +98,8 @@ function computeSST({
 		gyreStrength: 1 - WIND.rotationCollapse(params.hoursPerDay),
 	}
 
+	const operator = STOMMEL.build({ ocean: index.ocean, planet })
+	let guess: Float64Array | null = null
 	const sst = new Float32Array(N)
 	const flowU = new Float32Array(N)
 	const flowV = new Float32Array(N)
@@ -121,7 +116,6 @@ function computeSST({
 		})
 		const result = solveMonth({
 			index,
-			barrier,
 			wind: monthWind,
 			isOcean,
 			latDeg,
@@ -132,7 +126,10 @@ function computeSST({
 			),
 			planet,
 			sstSaturationC,
+			operator,
+			guess,
 		})
+		guess = result.state
 		sstMonthly.set(result.sst, month * N)
 		flowUMonthly.set(result.flowU, month * N)
 		flowVMonthly.set(result.flowV, month * N)

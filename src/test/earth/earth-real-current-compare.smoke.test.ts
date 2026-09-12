@@ -30,13 +30,13 @@ const BOXES: Box[] = [
 
 const MIN_OBSERVED_SPEED_MS = 0.02
 
-// Regression floors against the procedural winds, whose trades run at about
-// a third of observed strength and whose North Atlantic westerly jet sits
-// ~5-8 degrees too far south. That leaves the North Atlantic Drift inside the
-// subpolar gyre (flowing west, SST cold) and eastern-boundary upwelling weak.
-// Raise these as the wind model improves.
-const MIN_POSITIVE_DIRECTION_REGIONS = 12
-const MIN_GLOBAL_DIRECTION_SKILL = 0.3
+// Regression floors against the procedural winds, whose subtropical belt runs
+// at 0.6-0.75 of observed speed (0.4-0.55 in stress), which is what still
+// holds eastern-boundary upwelling and every boundary-current speed down.
+// Direction is what the ocean model itself controls, so that is what these
+// hold; raise them as the wind model improves.
+const MIN_POSITIVE_DIRECTION_REGIONS = 13
+const MIN_GLOBAL_DIRECTION_SKILL = 0.5
 const MIN_CORRECT_SST_SIGNS = 9
 
 // Procedural surface currents and SST anomalies on the imported Earth,
