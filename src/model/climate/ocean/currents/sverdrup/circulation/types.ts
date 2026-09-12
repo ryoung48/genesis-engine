@@ -2,10 +2,6 @@ import type {
 	RasterIndex,
 	RasterVector,
 } from "@/model/climate/ocean/currents/sverdrup/raster/types"
-import type {
-	StommelOperator,
-	StommelSolution,
-} from "@/model/climate/ocean/currents/sverdrup/stommel/types"
 
 export type SverdrupWind = {
 	windU: Float32Array
@@ -57,19 +53,26 @@ export type SurfaceCurrentParams = {
 	ocean: Uint8Array
 }
 
-export type SolveCirculationParams = {
+export type ForcingParams = {
 	index: RasterIndex
 	wind: SverdrupWind
 	planet: SverdrupPlanet
-	operator: StommelOperator
-	// [JUSTIFICATION] Successive months differ only in the forcing, so each
-	// solve starts from the previous month's answer; null on the first.
-	guess: Float64Array | null
+}
+
+export type Forcing = {
+	tau: RasterVector
+	curl: Float32Array
+}
+
+export type SurfaceParams = {
+	index: RasterIndex
+	tau: RasterVector
+	psi: Float32Array
+	planet: SverdrupPlanet
 }
 
 export type Circulation = {
 	flow: RasterVector
 	divergence: Float32Array
 	thermoclineDepth: Float32Array
-	solution: StommelSolution
 }

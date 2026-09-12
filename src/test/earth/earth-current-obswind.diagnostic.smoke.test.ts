@@ -171,12 +171,11 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 		const sstC = new Float32Array(N)
 		const operator = STOMMEL.build({ ocean: index.ocean, planet })
 		console.log(`OBSW unknowns=${operator.count}`)
-		let guess: Float64Array | null = null
-		let totalIterations = 0
-		let worstResidual = 0
 		const startedMs = Date.now()
+		const monthlyTau = []
+		const monthlyCurl = []
 		for (let month = 0; month < MONTHS; month++) {
-			const circulation = SVERDRUP_CIRCULATION.solve({
+			const forcing = SVERDRUP_CIRCULATION.forcing({
 				index,
 				wind: WIND.observedWindVectorsForMonth({
 					observedWind: world.observedWind,
@@ -184,18 +183,21 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 					month,
 				}),
 				planet,
-				operator,
-				guess,
 			})
-			guess = circulation.solution.state
-			totalIterations += circulation.solution.iterations
-			worstResidual = Math.max(worstResidual, circulation.solution.residual)
-			guess = circulation.solution.state
-			totalIterations += circulation.solution.iterations
-			worstResidual = Math.max(worstResidual, circulation.solution.residual)
-			console.log(
-				`OBSW month ${month} iterations=${circulation.solution.iterations} residual=${circulation.solution.residual.toExponential(2)}`,
-			)
+			monthlyTau.push(forcing.tau)
+			monthlyCurl.push(forcing.curl)
+		}
+		const seasonal = STOMMEL.solveSeasonal({ operator, monthlyCurl, planet })
+		console.log(
+			`OBSW seasonal solves=${seasonal.solves} iterations=${seasonal.iterations}`,
+		)
+		for (let month = 0; month < MONTHS; month++) {
+			const circulation = SVERDRUP_CIRCULATION.surface({
+				index,
+				tau: monthlyTau[month],
+				psi: seasonal.monthlyPsi[month],
+				planet,
+			})
 			const anomaly = SVERDRUP_SST_ANOMALY.solve({
 				index,
 				circulation,
@@ -223,9 +225,7 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 				sstC[r] += monthSst[r] / MONTHS
 			}
 		}
-		console.log(
-			`OBSW solve ms=${Date.now() - startedMs} (12 months) iterations=${totalIterations} worstResidual=${worstResidual.toExponential(2)}`,
-		)
+		console.log(`OBSW solve ms=${Date.now() - startedMs} (12 months)`)
 
 		const annualMean = (monthly: Float32Array | undefined) => {
 			const out = new Float32Array(N).fill(Number.NaN)

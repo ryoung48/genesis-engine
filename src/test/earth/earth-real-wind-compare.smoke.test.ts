@@ -217,6 +217,10 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		type Acc = {
 			n: number
 			sumVectorErr: number
+			sumModelU: number
+			sumModelV: number
+			sumObsU: number
+			sumObsV: number
 			sumModelSpeed: number
 			sumObsSpeed: number
 			sumSpeedDiff: number
@@ -231,6 +235,10 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		const newAcc = (): Acc => ({
 			n: 0,
 			sumVectorErr: 0,
+			sumModelU: 0,
+			sumModelV: 0,
+			sumObsU: 0,
+			sumObsV: 0,
 			sumModelSpeed: 0,
 			sumObsSpeed: 0,
 			sumSpeedDiff: 0,
@@ -253,6 +261,10 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		}
 		function fold(acc: Acc, s: Sample): void {
 			acc.n++
+			acc.sumModelU += s.mu * s.mSpeed
+			acc.sumModelV += s.mv * s.mSpeed
+			acc.sumObsU += s.ou * s.oSpeed
+			acc.sumObsV += s.ov * s.oSpeed
 			acc.sumVectorErr += Math.hypot(
 				s.mu * s.mSpeed - s.ou * s.oSpeed,
 				s.mv * s.mSpeed - s.ov * s.oSpeed,
@@ -275,6 +287,10 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			const d = Math.max(1, acc.n)
 			return {
 				cells: acc.n,
+				modelU: Number((acc.sumModelU / d).toFixed(3)),
+				modelV: Number((acc.sumModelV / d).toFixed(3)),
+				observedU: Number((acc.sumObsU / d).toFixed(3)),
+				observedV: Number((acc.sumObsV / d).toFixed(3)),
 				meanVectorErrorMs: Number((acc.sumVectorErr / d).toFixed(3)),
 				speedRatio: Number(
 					(acc.sumModelSpeed / Math.max(1e-9, acc.sumObsSpeed)).toFixed(2),
@@ -319,6 +335,26 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		const bandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
 		const oceanBandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
 		const oceanOverall = newAcc()
+		const regionalAcc = [
+			...TROUGH_BASINS.flatMap((basin) =>
+				[10, 30].map((width) => ({
+					label: `${basin.label} ${width}S-${width}N`,
+					lon: basin.lon,
+					lo: -width,
+					hi: width,
+				})),
+			),
+			...OCEAN_BASINS.map((basin) => ({
+				label: `${basin.label} westerlies`,
+				lon: basin.lon,
+				lo: basin.side === 1 ? 30 : -60,
+				hi: basin.side === 1 ? 60 : -30,
+			})),
+		].map((region) => ({
+			...region,
+			acc: newAcc(),
+			monthly: Array.from({ length: months }, () => newAcc()),
+		}))
 		const annualModelU = new Float64Array(N)
 		const annualObsU = new Float64Array(N)
 		const annualObsCount = new Int32Array(N)
@@ -435,6 +471,16 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 					const band = oceanBandAcc.find((b) => lat >= b.lo && lat < b.hi)
 					if (band) fold(band.acc, s)
 					fold(oceanOverall, s)
+					for (const region of regionalAcc) {
+						if (
+							lat < region.lo ||
+							lat >= region.hi ||
+							!inLonRange({ lon: lonDeg[r], range: region.lon })
+						)
+							continue
+						fold(region.acc, s)
+						fold(region.monthly[m], s)
+					}
 					annualModelU[r] += windU[r] * windSpeed[r]
 					annualObsU[r] += obsU[r] * oSpeed
 					annualModelV[r] += windV[r] * windSpeed[r]
@@ -484,6 +530,22 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 
 		console.info("All months pooled, OCEAN only")
 		console.table(summarize(oceanOverall))
+		console.info(
+			"REGIONAL_WIND_JSON",
+			JSON.stringify({
+				temperatureSource,
+				regions: regionalAcc.map((region) => ({
+					region: region.label,
+					longitude: region.lon,
+					latitude: [region.lo, region.hi],
+					pooled: summarize(region.acc),
+					monthly: region.monthly.map((acc, month) => ({
+						month: MONTH_LABELS[month],
+						...summarize(acc),
+					})),
+				})),
+			}),
+		)
 
 		// Trough latitude: where the monthly north-south wind turns from
 		// southerly to northerly going north, taking the strongest convergence.

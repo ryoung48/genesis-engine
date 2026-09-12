@@ -56,6 +56,20 @@ solve).
   solution rather than a shape multiplied onto it, and the ACC emerges with no
   channel term at all.
 
+  **The operator is identical for all twelve months; only the forcing changes.**
+  Since the system is linear, the year's curl is written as a mean plus one
+  annual harmonic and the response of each mode solved separately, then
+  recombined per month: `psi(t) = psi_0 + psi_c cos(wt) + psi_s sin(wt)`. Three
+  solves instead of twelve, and the reconstruction is exact -- the only
+  approximation is how well three modes represent the forcing, which is
+  measured, not assumed. Against solving all twelve: direction and SST
+  correlation are unchanged to two decimals and the ACC moves 0.74 -> 0.73.
+  Mean-only (one solve) does lose SST correlation, 0.39 -> 0.36.
+
+  Everything downstream of `psi` stays per-month, because none of it is linear
+  in `psi`: the thermocline takes a square root, the surface speed divides by
+  it and is capped.
+
   The drag `R` sets the Stommel layer `R/beta`. A physical layer (~50 km) is
   far narrower than a 1-degree cell, so it is instead set to two cells -- a
   resolution floor, not a physical claim -- written as `2 Omega dlambda cos^2`
@@ -273,13 +287,22 @@ and 9.1 s for the steady sparse solve that shipped.
 - **The ACC does not meander** (v = 0.007 against 0.055 observed), and the
   drag is linear where the real balance is form drag on topography. Both are
   the same missing bathymetry.
-- **Convergence and runtime.** BiCGSTAB over 42787 wet cells: with Jacobi,
-  ~1580 iterations/month to 1e-6; one symmetric Gauss-Seidel sweep cuts that to
-  ~230 for 12.8 s. Tolerance 1e-4 gives bit-identical skill to 1e-8 and halves
-  it again: **9.1 s for 12 months**, against 2.2 s for the old row integration.
-  Two SSOR sweeps cut iterations 5x more but cost 5x per iteration, a wash.
-  A stronger preconditioner (ILU(0)) is the next thing to try, since iteration
-  count rather than per-iteration cost is what is left.
+- **Further solver work has little headroom left.** The 3.5 s splits as ~1.9 s
+  fixed (twelve wind fields, twelve surface steps, twelve SST-anomaly
+  Gauss-Seidel solves) and ~1.6 s of Krylov, measured by the slope across
+  harmonic counts: 2.6 s at 1 solve, 3.5 s at 3, 5.4 s at 5, so 3.66 ms per
+  iteration on a 1.91 s intercept. ILU(0) could take at best a second off the
+  total. The **SST anomaly solve is now a peer cost** to the current solve --
+  200 Gauss-Seidel sweeps x 12 months over 65160 cells -- and is the better
+  target.
+- **A sparse direct factorisation** is tempting at 43k unknowns (factor once,
+  twelve backsolves) but the natural ordering has bandwidth ~360, so banded LU
+  is ~5.6e9 flops; it needs nested-dissection or AMD ordering to pay, which is
+  a lot of machinery for under a second of headroom.
+- **Halving the solve resolution** interacts badly with the drag: the Stommel
+  layer is already only two cells, and a coarser grid at the same cell count
+  means a physically wider layer. One cell measured worse than two, so this
+  trades accuracy for time in the direction already known to hurt.
 - **The equatorial band got worse**, not better (direction 0.22 -> 0.06 under
   observed wind). The Stommel balance degenerates as `beta d(psi)/dx` stops
   being the leading term near the equator, which is the one place this

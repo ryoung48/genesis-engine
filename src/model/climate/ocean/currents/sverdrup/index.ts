@@ -22,22 +22,20 @@ const SEA_LEVEL_AIR_DENSITY_KG_M3 = 1.225
 
 function solveMonth({
 	index,
-	wind,
+	tau,
+	psi,
 	isOcean,
 	latDeg,
 	lonDeg,
 	temperature,
 	planet,
 	sstSaturationC,
-	operator,
-	guess,
 }: MonthSolveParams): MonthSolve {
-	const circulation = SVERDRUP_CIRCULATION.solve({
+	const circulation = SVERDRUP_CIRCULATION.surface({
 		index,
-		wind,
+		tau,
+		psi,
 		planet,
-		operator,
-		guess,
 	})
 	const anomaly = SVERDRUP_SST_ANOMALY.solve({
 		index,
@@ -62,9 +60,6 @@ function solveMonth({
 		sst,
 		flowU: sampleOcean(circulation.flow.x),
 		flowV: sampleOcean(circulation.flow.y),
-		state: circulation.solution.state,
-		iterations: circulation.solution.iterations,
-		residual: circulation.solution.residual,
 	}
 }
 
@@ -99,24 +94,40 @@ function computeSST({
 	}
 
 	const operator = STOMMEL.build({ ocean: index.ocean, planet })
-	let guess: Float64Array | null = null
 	const sst = new Float32Array(N)
 	const flowU = new Float32Array(N)
 	const flowV = new Float32Array(N)
 	const sstMonthly = new Float32Array(N * MONTHS)
 	const flowUMonthly = new Float32Array(N * MONTHS)
 	const flowVMonthly = new Float32Array(N * MONTHS)
+
+	// Every month shares the same operator and differs only in its forcing, so
+	// the year's wind stress is gathered first and the streamfunction solved in
+	// temporal Fourier modes rather than twelve times over.
+	const monthlyTau = []
+	const monthlyCurl = []
 	for (let month = 0; month < MONTHS; month++) {
-		const monthWind = WIND.computeWindVectors({
-			mesh,
-			climate,
-			elevation_km,
-			params,
-			month,
+		const forcing = SVERDRUP_CIRCULATION.forcing({
+			index,
+			wind: WIND.computeWindVectors({
+				mesh,
+				climate,
+				elevation_km,
+				params,
+				month,
+			}),
+			planet,
 		})
+		monthlyTau.push(forcing.tau)
+		monthlyCurl.push(forcing.curl)
+	}
+	const seasonal = STOMMEL.solveSeasonal({ operator, monthlyCurl, planet })
+
+	for (let month = 0; month < MONTHS; month++) {
 		const result = solveMonth({
 			index,
-			wind: monthWind,
+			tau: monthlyTau[month],
+			psi: seasonal.monthlyPsi[month],
 			isOcean,
 			latDeg,
 			lonDeg,
@@ -126,10 +137,7 @@ function computeSST({
 			),
 			planet,
 			sstSaturationC,
-			operator,
-			guess,
 		})
-		guess = result.state
 		sstMonthly.set(result.sst, month * N)
 		flowUMonthly.set(result.flowU, month * N)
 		flowVMonthly.set(result.flowV, month * N)

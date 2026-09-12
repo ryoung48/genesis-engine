@@ -38,6 +38,18 @@ export type StommelSolution = {
 	residual: number
 }
 
+export type SolveSeasonalParams = {
+	operator: StommelOperator
+	monthlyCurl: Float32Array[]
+	planet: SverdrupPlanet
+}
+
+export type SeasonalSolution = {
+	monthlyPsi: Float32Array[]
+	solves: number
+	iterations: number
+}
+
 export type ApplyOperatorParams = {
 	operator: StommelOperator
 	source: Float64Array

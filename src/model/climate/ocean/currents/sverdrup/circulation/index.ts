@@ -3,14 +3,15 @@ import type {
 	CurlParams,
 	EkmanParams,
 	EkmanResult,
+	Forcing,
+	ForcingParams,
 	GeostrophicParams,
-	SolveCirculationParams,
 	SurfaceCurrentParams,
+	SurfaceParams,
 	WindStressParams,
 } from "@/model/climate/ocean/currents/sverdrup/circulation/types"
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import type { RasterVector } from "@/model/climate/ocean/currents/sverdrup/raster/types"
-import { STOMMEL } from "@/model/climate/ocean/currents/sverdrup/stommel"
 import { THERMOCLINE } from "@/model/climate/ocean/currents/sverdrup/thermocline"
 
 const W = SVERDRUP_RASTER.width
@@ -186,31 +187,25 @@ function surfaceCurrent({
 	return { x, y }
 }
 
-function solve({
-	index,
-	wind,
-	planet,
-	operator,
-	guess,
-}: SolveCirculationParams): Circulation {
-	const { ocean } = index
+// The wind's contribution: stress and its curl. Split out from the surface
+// step because the curl of all twelve months is needed before any of them can
+// be solved -- see STOMMEL.solveSeasonal.
+function forcing({ index, wind, planet }: ForcingParams): Forcing {
 	const tau = windStress({ index, wind, planet })
-	const solution = STOMMEL.solve({
-		operator,
-		curl: curl({ tau, planet }),
-		planet,
-		guess,
-	})
-	const thermoclineDepth = THERMOCLINE.depth({
-		interior: solution.psi,
-		ocean,
-		planet,
-	})
+	return { tau, curl: curl({ tau, planet }) }
+}
+
+// Everything downstream of psi. None of it is linear in psi -- the thermocline
+// takes a square root, the surface speed divides by it and is capped -- so it
+// stays per-month even though the psi solve itself is shared.
+function surface({ index, tau, psi, planet }: SurfaceParams): Circulation {
+	const { ocean } = index
+	const thermoclineDepth = THERMOCLINE.depth({ interior: psi, ocean, planet })
 	const { drift, divergence } = ekman({ tau, ocean, planet })
 	return {
 		flow: surfaceCurrent({
 			geostrophic: geostrophic({
-				psi: solution.psi,
+				psi,
 				ocean,
 				depth: thermoclineDepth,
 				planet,
@@ -220,10 +215,10 @@ function solve({
 		}),
 		divergence,
 		thermoclineDepth,
-		solution,
 	}
 }
 
 export const SVERDRUP_CIRCULATION = {
-	solve,
+	forcing,
+	surface,
 }
