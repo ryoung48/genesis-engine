@@ -89,6 +89,7 @@ import {
 	buildDisplayNationModel,
 	buildDisplayWorld,
 } from "@/ui/genesis/view/display-model"
+import type { WorldWindStatsCache } from "@/ui/genesis/view/types"
 import { useGenesisSceneSync } from "@/ui/genesis/view/useGenesisSceneSync"
 import { useMapColoring } from "@/ui/genesis/view/useMapColoring"
 import { useMapExport } from "@/ui/genesis/view/useMapExport"
@@ -118,6 +119,10 @@ export const GenesisView: React.FC<{
 	const sceneRef = useRef<GenesisScene | null>(null)
 	const workerRef = useRef<Worker | null>(null)
 	const lastWorldRef = useRef<SerializedGenesisWorld | null>(null)
+	const windStatsCacheRef = useRef<WorldWindStatsCache>({
+		world: null,
+		values: new Map(),
+	})
 	const hoverCardRef = useRef<HTMLDivElement>(null)
 	const viewPrefsStorageKey = sessionNamespace
 		? `${VIEW_PREFS_STORAGE_KEY}:${sessionNamespace}`
@@ -996,6 +1001,12 @@ export const GenesisView: React.FC<{
 
 	const windStats = useMemo(() => {
 		if (!world?.climate) return null
+		if (windStatsCacheRef.current.world !== world) {
+			windStatsCacheRef.current = { world, values: new Map() }
+		}
+		const source = showRealWind ? "observed" : "generated"
+		const cached = windStatsCacheRef.current.values.get(source)
+		if (cached) return cached
 		const vectors = showRealWind
 			? WIND.observedWindVectorsForMonth({
 					observedWind: world.observedWind,
@@ -1021,7 +1032,9 @@ export const GenesisView: React.FC<{
 			sum += s
 			if (s > max) max = s
 		}
-		return { avg: speeds.length > 0 ? sum / speeds.length : 0, max }
+		const stats = { avg: speeds.length > 0 ? sum / speeds.length : 0, max }
+		windStatsCacheRef.current.values.set(source, stats)
+		return stats
 	}, [world, showRealWind])
 
 	// Resolves the per-org category schema (organization-categories.ts) into

@@ -202,6 +202,29 @@ export type WorldDisplayDataInput = {
 	earthHistoryPlaying: boolean
 }
 
+export type WindVectorData = ReturnType<typeof WIND.computeWindVectors>
+
+export type MonthlyWindData = Pick<
+	WindVectorData,
+	"windU" | "windV" | "windSpeed"
+>
+
+export type WindStats = {
+	avg: number
+	max: number
+}
+
+export type WorldWindStatsCache = {
+	world: SerializedGenesisWorld | null
+	values: Map<"generated" | "observed", WindStats>
+}
+
+export type WorldWindCache = {
+	world: SerializedGenesisWorld | null
+	vectors: Map<string, WindVectorData>
+	monthly: Map<"generated" | "observed", MonthlyWindData[]>
+}
+
 export type WorldDistributionsInput = {
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null

@@ -354,3 +354,41 @@ current solve uses, not fewer sweeps and not over-relaxation.
 - **Tidally locked display**: `buildLockedOceanCurrentGrid` draws flow as the
   SST gradient rotated 90 degrees while its original comment described the raw
   warm-to-cold gradient. Behaviour was preserved; the intent is undecided.
+
+
+
+Yes — "skill" is direction only (a speed-weighted cosine similarity between model and observed vectors, range -1 to 1; it doesn't say anything about magnitude). Speed and SST are separate columns in the same output, both printed as raw values against real. From the rerun:
+
+┌──────────────────┬─────────────────┬────────────────────────┬─────────────────────┐
+│      Region      │ dir skill (obs) │ speed obs / real (m/s) │ SST obs / real (°C) │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ Gulf Stream      │            0.94 │          0.062 / 0.167 │         1.68 / 1.65 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ Kuroshio         │            0.75 │          0.058 / 0.148 │         0.77 / 0.45 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ Brazil           │            0.94 │          0.130 / 0.098 │         1.71 / 1.37 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ Agulhas          │            0.94 │          0.143 / 0.232 │         1.36 / 3.08 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ E Australian     │            0.92 │          0.107 / 0.153 │         2.19 / 2.49 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ N Atlantic Drift │            0.93 │          0.029 / 0.063 │         0.15 / 3.39 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ California       │            0.41 │          0.023 / 0.051 │       -1.41 / -4.43 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ Canary           │            0.85 │          0.033 / 0.064 │       -1.62 / -2.99 │
+├──────────────────┼─────────────────┼──────────────────┤
+│ Benguela         │            0.28 │          0.046 / 0.095 │       -3.14 / -5.68 │
+├──────────────────┼─────────────────┼──────────────────┤
+│ Humboldt         │            0.44 │          0.043 / 0.055 │       -2.42 / -4.44 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤                       N Eq Current Atl │            0.95 │    -0.36 / -1.82 │
+├──────────────────┼─────────────────┼────────────────────────┼─────────────────────┤
+│ N Eq Current Pac │            0.98 │          0.109 / 0.169 │         0.48 / 0.91 │                       ─────────────────┼─────────────────┼──────────────────┤
+│ ACC 45-60S       │            0.73 │          0.143 / 0.114 │        -0.17 / 0.34 │
+└──────────────────┴─────────────────┴────────────────────────┴─────────────────────┘                       
+Reading it by metric:
+
+- Direction: almost solved except the two eastern-boundary upwelling zones (California 0.41, Benguela 0.28) the tropical/mid-lat currents that ride 0.75, Humboldt 0.44).
+- Speed: undershoots real almost everywhere, often by 2-3x (Gulf Stream 0.062 vs 0.167, N Atlantic Drift 0.0vs 0.063, Agulhas 0.143 vs 0.232, N Eq eptions run too fast: Brazil (0.130 vs0.098) and ACC (0.143 vs 0.114).                                                                          SST: this is the worst-tracking metric ry and high-latitude cold/warm region isoff by 2-6°C — N Atlantic Drift is barely warm at all (0.15 vs 3.39 real), Benguela and Humboldt are only ~half the observed cold anomaly (-3.14/ is less than half the observed warmth(1.36/3.08), and the ACC even has the wrong sign (-0.17 vs +0.34 real). Direction and speed being close doesn't carry over to SST at all — that's the metric the doc's midlat correlation (0.39) is scoring, and it's genuinely the weakest link even with co
+
+So: direction is mostly solved (outside two eastern-boundary zones), speed is a consistent 2-3x undershoot, and SST magnitude/sign is the biggest residual error across nearly every region.

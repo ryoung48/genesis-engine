@@ -54,7 +54,10 @@ import { getMapModePrimary } from "@/ui/genesis/shared/map-modes"
 import { rgbToCss, windDirectionLabel } from "@/ui/genesis/shared/ui-format"
 import { usePlaybackSampledValue } from "@/ui/genesis/shared/usePlaybackSampledValue"
 import { createDisplayNames } from "@/ui/genesis/view/display-names"
-import type { WorldDisplayDataInput } from "@/ui/genesis/view/types"
+import type {
+	WorldDisplayDataInput,
+	WorldWindCache,
+} from "@/ui/genesis/view/types"
 /**
  * Derives everything the map surface and the hover InfoPanel display from the
  * current world: every hover readout, the world's display name lookups and
@@ -85,6 +88,18 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	// overlay (color mode variants, wind, ocean currents) instead of each
 	// having its own toggle.
 	const showRealWind = dataVariant === "observed"
+	const windCacheRef = useRef<WorldWindCache>({
+		world: null,
+		vectors: new Map(),
+		monthly: new Map(),
+	})
+	if (windCacheRef.current.world !== world) {
+		windCacheRef.current = {
+			world,
+			vectors: new Map(),
+			monthly: new Map(),
+		}
+	}
 
 	const hoverElevationKm = getHoverElevationKm(hoverInfo, worldForDisplay)
 	const hoverTopography = getHoverTopography(hoverInfo, worldForDisplay)
@@ -370,26 +385,31 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 			return null
 		const month =
 			resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
-		if (showRealWind) {
-			return WIND.observedWindVectorsForMonth({
-				observedWind: world.observedWind,
-				numRegions: world.mesh.numRegions,
-				month,
-			})
-		}
-		return WIND.computeWindVectors({
-			mesh: world.mesh,
-			climate: world.climate,
-			elevation_km: world.elevation_km,
-			params: world.params,
-			month,
-			surface: {
-				vegetation: world.vegetation,
-				topography: world.topography,
-				slopeScore: world.slopeScore,
-				oceanDist: world.oceanDist,
-			},
-		})
+		const source = showRealWind ? "observed" : "generated"
+		const cacheKey = `${source}:${month ?? "annual"}`
+		const cached = windCacheRef.current.vectors.get(cacheKey)
+		if (cached) return cached
+		const vectors = showRealWind
+			? WIND.observedWindVectorsForMonth({
+					observedWind: world.observedWind,
+					numRegions: world.mesh.numRegions,
+					month,
+				})
+			: WIND.computeWindVectors({
+					mesh: world.mesh,
+					climate: world.climate,
+					elevation_km: world.elevation_km,
+					params: world.params,
+					month,
+					surface: {
+						vegetation: world.vegetation,
+						topography: world.topography,
+						slopeScore: world.slopeScore,
+						oceanDist: world.oceanDist,
+					},
+				})
+		windCacheRef.current.vectors.set(cacheKey, vectors)
+		return vectors
 	}, [world, showWindArrows, showRealWind, colorMode, resolvedClimateMonth])
 
 	// Monthly wind: computed lazily across setTimeout ticks when wind is active
@@ -407,23 +427,35 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 			setMonthlyWindReady(false)
 			return
 		}
+		const source = showRealWind ? "observed" : "generated"
+		const cached = windCacheRef.current.monthly.get(source)
+		if (cached) {
+			monthlyWindRef.current = cached
+			setMonthlyWindReady(true)
+			return
+		}
 		if (showRealWind) {
 			const numRegions = world.mesh.numRegions
-			monthlyWindRef.current = Array.from({ length: 12 }, (_, m) =>
+			const monthly = Array.from({ length: 12 }, (_, m) =>
 				WIND.observedWindVectorsForMonth({
 					observedWind: world.observedWind,
 					numRegions,
 					month: m,
 				}),
 			)
+			windCacheRef.current.monthly.set(source, monthly)
+			monthlyWindRef.current = monthly
 			setMonthlyWindReady(true)
 			return
 		}
 		const results: typeof monthlyWindRef.current = []
 		setMonthlyWindReady(false)
 		let m = 0
+		let cancelled = false
 		const tick = () => {
+			if (cancelled) return
 			if (m >= 12) {
+				windCacheRef.current.monthly.set(source, results)
 				monthlyWindRef.current = results
 				setMonthlyWindReady(true)
 				return
@@ -447,6 +479,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		}
 		setTimeout(tick, 0)
 		return () => {
+			cancelled = true
 			setMonthlyWindReady(false)
 		}
 	}, [world, windActive, showRealWind])

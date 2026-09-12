@@ -75,6 +75,7 @@ function computeSST({
 	landmarks,
 	sstSaturationC,
 	params,
+	onWindProfile,
 }: ComputeSverdrupSSTParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const isLake = LANDMARKS.regionTypeMask({ landmarks, type: "lake" })
@@ -106,21 +107,26 @@ function computeSST({
 	// temporal Fourier modes rather than twelve times over.
 	const monthlyTau = []
 	const monthlyCurl = []
+	let windDurationMs = 0
 	for (let month = 0; month < MONTHS; month++) {
+		const windStartMs = performance.now()
+		const wind = WIND.computeWindVectors({
+			mesh,
+			climate,
+			elevation_km,
+			params,
+			month,
+		})
+		windDurationMs += performance.now() - windStartMs
 		const forcing = SVERDRUP_CIRCULATION.forcing({
 			index,
-			wind: WIND.computeWindVectors({
-				mesh,
-				climate,
-				elevation_km,
-				params,
-				month,
-			}),
+			wind,
 			planet,
 		})
 		monthlyTau.push(forcing.tau)
 		monthlyCurl.push(forcing.curl)
 	}
+	onWindProfile(windDurationMs)
 	const seasonal = STOMMEL.solveSeasonal({ operator, monthlyCurl, planet })
 
 	for (let month = 0; month < MONTHS; month++) {

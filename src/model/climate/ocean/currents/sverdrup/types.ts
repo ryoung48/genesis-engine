@@ -29,6 +29,7 @@ export type ComputeSverdrupSSTParams = {
 	landmarks: GenesisLandmarks
 	sstSaturationC: number
 	params: SverdrupParams
+	onWindProfile: (durationMs: number) => void
 }
 
 export type MonthSolveParams = {

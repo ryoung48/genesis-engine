@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { beforeAll, describe, expect, it } from "vitest"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
 import { WIND } from "@/model/climate/weather/wind"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import type { GenesisWorld } from "@/model/pipelines/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
 
@@ -77,68 +78,180 @@ const MAX_LAND_MEAN_ABS_SPEED_ERROR_MS = 1.4
 // https://ssd.jpl.nasa.gov/planets/approx_pos.html
 const EARTH_JANUARY_START_SOLAR_LONGITUDE_DEGREES = 280.38
 
+type SharedEarth = {
+	world: GenesisWorld
+	latDeg: Float32Array
+	lonDeg: Float32Array
+	isLand: Uint8Array
+	isOcean: Uint8Array
+	bandIdx: Int8Array
+	troughBasinIdx: Int8Array
+	regionMask: Uint8Array[]
+}
+
+const REGION_DEFS: Array<{
+	label: string
+	lon: [number, number]
+	lo: number
+	hi: number
+}> = [
+	...TROUGH_BASINS.flatMap((basin) =>
+		[10, 30].map((width) => ({
+			label: `${basin.label} ${width}S-${width}N`,
+			lon: basin.lon,
+			lo: -width,
+			hi: width,
+		})),
+	),
+	...OCEAN_BASINS.map((basin) => ({
+		label: `${basin.label} westerlies`,
+		lon: basin.lon,
+		lo: basin.side === 1 ? 30 : -60,
+		hi: basin.side === 1 ? 60 : -30,
+	})),
+]
+
+function lonInRange(params: { lon: number; range: [number, number] }): boolean {
+	const { lon, range } = params
+	return range[0] <= range[1]
+		? lon >= range[0] && lon <= range[1]
+		: lon >= range[0] || lon <= range[1]
+}
+
+function bandIndexForLat(params: { lat: number }): number {
+	const { lat } = params
+	if (lat >= 90 || lat < -90) return -1
+	return 5 - Math.min(5, Math.max(0, Math.floor((lat + 90) / 30)))
+}
+
+let SHARED: SharedEarth | undefined
+
+function getShared(): SharedEarth {
+	const shared = SHARED
+	if (!shared) throw new Error("Earth fixtures not initialized")
+	return shared
+}
+
+beforeAll(() => {
+	const earth = loadEarthGrayscale("earth.png")
+	const coastline = loadEarthGrayscale("coastline-mask.png")
+	const lake = loadEarthGrayscale("lake-mask.png")
+	const realWindU = loadEarthMonthlyRaster("earth-real-wind-u")
+	const realWindV = loadEarthMonthlyRaster("earth-real-wind-v")
+
+	const world = IMPORT_HEIGHTMAP.importGenesisWorld({
+		params: {
+			seed: 14963991,
+			numPoints: DEFAULT_WORLD_PARAMS.numPoints,
+			jitter: DEFAULT_WORLD_PARAMS.jitter,
+			grayscale: earth.grayscale,
+			imageWidth: earth.width,
+			imageHeight: earth.height,
+			coastlineMask: coastline.grayscale,
+			maskWidth: coastline.width,
+			maskHeight: coastline.height,
+			lakeMask: lake.grayscale,
+			lakeMaskWidth: lake.width,
+			lakeMaskHeight: lake.height,
+			realWindUMonthly: realWindU.monthly,
+			realWindVMonthly: realWindV.monthly,
+			realWindWidth: realWindU.width,
+			realWindHeight: realWindU.height,
+			realWindMonths: realWindU.months,
+			realWindScale: realWindU.scale,
+			realWindNoData: realWindU.nodata,
+			terrainWarp: 0,
+			smoothing: 0,
+			hydraulicErosion: 0,
+			thermalErosion: 0,
+			ridgeSharpening: 0,
+			glacialErosion: 0,
+			seaLevel: DEFAULT_WORLD_PARAMS.seaLevel,
+			volcanism: 1,
+			craters: 0,
+			maxElevation: DEFAULT_WORLD_PARAMS.maxElevation,
+			planetRadiusKm: DEFAULT_WORLD_PARAMS.planetRadiusKm,
+			obliquity: DEFAULT_WORLD_PARAMS.obliquity,
+			eccentricity: DEFAULT_WORLD_PARAMS.eccentricity,
+			spectralClass: DEFAULT_WORLD_PARAMS.spectralClass,
+			starSubtype: DEFAULT_WORLD_PARAMS.starSubtype,
+			orbitalDistanceAU: DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
+			daysPerYear: DEFAULT_WORLD_PARAMS.daysPerYear,
+			hoursPerDay: DEFAULT_WORLD_PARAMS.hoursPerDay,
+			substellarLon: DEFAULT_WORLD_PARAMS.substellarLon,
+			perihelion: DEFAULT_WORLD_PARAMS.perihelion,
+			pressure: DEFAULT_WORLD_PARAMS.pressure,
+			skipUnneededStages: true,
+		},
+	})
+
+	const N = world.mesh.numRegions
+	const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
+	const isLand = new Uint8Array(N)
+	const isOcean = new Uint8Array(N)
+	const bandIdx = new Int8Array(N)
+	const troughBasinIdx = new Int8Array(N).fill(-1)
+	const regionMask = REGION_DEFS.map(() => new Uint8Array(N))
+	for (let r = 0; r < N; r++) {
+		const t = world.topography[r]
+		const land =
+			t !== CLASSIFICATION.topoOcean && t !== CLASSIFICATION.topoLake ? 1 : 0
+		isLand[r] = land
+		const ocean = t === CLASSIFICATION.topoOcean ? 1 : 0
+		isOcean[r] = ocean
+		const lat = latDeg[r]
+		bandIdx[r] = bandIndexForLat({ lat })
+		if (ocean === 1) {
+			const lon = lonDeg[r]
+			for (let b = 0; b < TROUGH_BASINS.length; b++) {
+				if (lonInRange({ lon, range: TROUGH_BASINS[b].lon })) {
+					troughBasinIdx[r] = b
+					break
+				}
+			}
+			for (let g = 0; g < REGION_DEFS.length; g++) {
+				const region = REGION_DEFS[g]
+				if (
+					lat >= region.lo &&
+					lat < region.hi &&
+					lonInRange({ lon, range: region.lon })
+				) {
+					regionMask[g][r] = 1
+				}
+			}
+		}
+	}
+	SHARED = {
+		world,
+		latDeg,
+		lonDeg,
+		isLand,
+		isOcean,
+		bandIdx,
+		troughBasinIdx,
+		regionMask,
+	}
+}, 600_000)
+
 describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 	it.each([
 		"modeled",
 		"observed",
 	] as const)("compares generated wind using %s temperatures against reanalysis", (temperatureSource) => {
-		const earth = loadEarthGrayscale("earth.png")
-		const coastline = loadEarthGrayscale("coastline-mask.png")
-		const lake = loadEarthGrayscale("lake-mask.png")
-		const realWindU = loadEarthMonthlyRaster("earth-real-wind-u")
-		const realWindV = loadEarthMonthlyRaster("earth-real-wind-v")
-
-		const world = IMPORT_HEIGHTMAP.importGenesisWorld({
-			params: {
-				seed: 14963991,
-				numPoints: DEFAULT_WORLD_PARAMS.numPoints,
-				jitter: DEFAULT_WORLD_PARAMS.jitter,
-				grayscale: earth.grayscale,
-				imageWidth: earth.width,
-				imageHeight: earth.height,
-				coastlineMask: coastline.grayscale,
-				maskWidth: coastline.width,
-				maskHeight: coastline.height,
-				lakeMask: lake.grayscale,
-				lakeMaskWidth: lake.width,
-				lakeMaskHeight: lake.height,
-				realWindUMonthly: realWindU.monthly,
-				realWindVMonthly: realWindV.monthly,
-				realWindWidth: realWindU.width,
-				realWindHeight: realWindU.height,
-				realWindMonths: realWindU.months,
-				realWindScale: realWindU.scale,
-				realWindNoData: realWindU.nodata,
-				// Zeroed, not DEFAULT_WORLD_PARAMS -- those are tuned for shaping
-				// synthetic noise into plausible terrain. A real Earth heightmap
-				// already IS realistic terrain; warping/smoothing/eroding it distorts
-				// real elevation instead of preserving it.
-				terrainWarp: 0,
-				smoothing: 0,
-				hydraulicErosion: 0,
-				thermalErosion: 0,
-				ridgeSharpening: 0,
-				glacialErosion: 0,
-				seaLevel: DEFAULT_WORLD_PARAMS.seaLevel,
-				volcanism: 1,
-				craters: 0,
-				maxElevation: DEFAULT_WORLD_PARAMS.maxElevation,
-				planetRadiusKm: DEFAULT_WORLD_PARAMS.planetRadiusKm,
-				obliquity: DEFAULT_WORLD_PARAMS.obliquity,
-				eccentricity: DEFAULT_WORLD_PARAMS.eccentricity,
-				spectralClass: DEFAULT_WORLD_PARAMS.spectralClass,
-				starSubtype: DEFAULT_WORLD_PARAMS.starSubtype,
-				orbitalDistanceAU: DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
-				daysPerYear: DEFAULT_WORLD_PARAMS.daysPerYear,
-				hoursPerDay: DEFAULT_WORLD_PARAMS.hoursPerDay,
-				substellarLon: DEFAULT_WORLD_PARAMS.substellarLon,
-				perihelion: DEFAULT_WORLD_PARAMS.perihelion,
-				pressure: DEFAULT_WORLD_PARAMS.pressure,
-			},
-		})
+		const {
+			world,
+			latDeg,
+			lonDeg,
+			isLand: isLandArr,
+			isOcean: isOceanArr,
+			bandIdx,
+			troughBasinIdx,
+			regionMask,
+		} = getShared()
 
 		expect(world.observedWind?.real_u_monthly).toBeDefined()
 
+		let climate = world.climate
 		if (temperatureSource === "observed") {
 			const raster = loadEarthMonthlyRaster("earth-real-temperature")
 			const monthly = OBSERVED_EARTH.sampleMonthlyFloatRaster({
@@ -190,7 +303,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			expect(declinationMonthly[1]).toBeLessThan(-11)
 			expect(declinationMonthly[5]).toBeGreaterThan(22)
 			expect(declinationMonthly[8]).toBeGreaterThan(0)
-			world.climate = {
+			climate = {
 				...world.climate,
 				temperature_monthly: monthly,
 				temperature_monthly_nolapse: seaLevel,
@@ -200,18 +313,6 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			console.info("Observed-temperature calendar declination, Jan–Dec", [
 				...declinationMonthly,
 			])
-		}
-
-		const r_xyz = world.mesh.r_xyz
-		function latDegAt(r: number): number {
-			const z = r_xyz[r * 3 + 2]
-			return (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
-		}
-
-		const topography = world.topography
-		function isLand(r: number): boolean {
-			const t = topography[r]
-			return t !== CLASSIFICATION.topoOcean && t !== CLASSIFICATION.topoLake
 		}
 
 		type Acc = {
@@ -335,22 +436,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		const bandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
 		const oceanBandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
 		const oceanOverall = newAcc()
-		const regionalAcc = [
-			...TROUGH_BASINS.flatMap((basin) =>
-				[10, 30].map((width) => ({
-					label: `${basin.label} ${width}S-${width}N`,
-					lon: basin.lon,
-					lo: -width,
-					hi: width,
-				})),
-			),
-			...OCEAN_BASINS.map((basin) => ({
-				label: `${basin.label} westerlies`,
-				lon: basin.lon,
-				lo: basin.side === 1 ? 30 : -60,
-				hi: basin.side === 1 ? 60 : -30,
-			})),
-		].map((region) => ({
+		const regionalAcc = REGION_DEFS.map((region) => ({
 			...region,
 			acc: newAcc(),
 			monthly: Array.from({ length: months }, () => newAcc()),
@@ -366,17 +452,6 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 
 		// Monthly north-south ocean wind by 2-degree latitude bin per basin, to
 		// find the surface trough where the trades converge.
-		const { lonDeg } = RAIN.getClimateGeometry(world.mesh)
-		const inLonRange = ({
-			lon,
-			range,
-		}: {
-			lon: number
-			range: [number, number]
-		}) =>
-			range[0] <= range[1]
-				? lon >= range[0] && lon <= range[1]
-				: lon >= range[0] || lon <= range[1]
 		const troughSums = TROUGH_BASINS.map(() => ({
 			model: new Float64Array(months * TROUGH_BINS),
 			observed: new Float64Array(months * TROUGH_BINS),
@@ -400,7 +475,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			let count = 0
 			for (let i = 0; i < teq.length; i++) {
 				const lon = -180 + ((i + 0.5) * 360) / teq.length
-				if (!inLonRange({ lon, range }) || !Number.isFinite(teq[i])) continue
+				if (!lonInRange({ lon, range }) || !Number.isFinite(teq[i])) continue
 				sum += teq[i]
 				count++
 			}
@@ -412,7 +487,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			const windStartedMs = performance.now()
 			const { windU, windV, windSpeed } = WIND.computeWindVectors({
 				mesh: world.mesh,
-				climate: world.climate,
+				climate,
 				elevation_km: world.elevation_km,
 				params: world.params,
 				month: m,
@@ -429,7 +504,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 				month: m,
 			})
 
-			const seaLevel = world.climate.temperature_monthly_nolapse.subarray(
+			const seaLevel = climate.temperature_monthly_nolapse.subarray(
 				m * N,
 				(m + 1) * N,
 			)
@@ -468,21 +543,16 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 					mSpeed: windSpeed[r],
 					oSpeed,
 				}
-				if (!isLand(r)) {
-					if (topography[r] !== CLASSIFICATION.topoOcean) continue
-					const lat = latDegAt(r)
-					const band = oceanBandAcc.find((b) => lat >= b.lo && lat < b.hi)
-					if (band) fold(band.acc, s)
+				const band = bandIdx[r]
+				if (isLandArr[r] === 0) {
+					if (isOceanArr[r] === 0) continue
+					const lat = latDeg[r]
+					if (band >= 0) fold(oceanBandAcc[band].acc, s)
 					fold(oceanOverall, s)
-					for (const region of regionalAcc) {
-						if (
-							lat < region.lo ||
-							lat >= region.hi ||
-							!inLonRange({ lon: lonDeg[r], range: region.lon })
-						)
-							continue
-						fold(region.acc, s)
-						fold(region.monthly[m], s)
+					for (let g = 0; g < regionalAcc.length; g++) {
+						if (regionMask[g][r] === 0) continue
+						fold(regionalAcc[g].acc, s)
+						fold(regionalAcc[g].monthly[m], s)
 					}
 					annualModelU[r] += windU[r] * windSpeed[r]
 					annualObsU[r] += obsU[r] * oSpeed
@@ -492,22 +562,20 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 					annualObsSpeed[r] += oSpeed
 					annualObsCount[r]++
 					const troughBin = Math.floor((lat - TROUGH_MIN_LAT) / TROUGH_BIN_DEG)
-					if (troughBin >= 0 && troughBin < TROUGH_BINS)
-						for (let b = 0; b < TROUGH_BASINS.length; b++) {
-							if (!inLonRange({ lon: lonDeg[r], range: TROUGH_BASINS[b].lon }))
-								continue
+					if (troughBin >= 0 && troughBin < TROUGH_BINS) {
+						const b = troughBasinIdx[r]
+						if (b >= 0) {
 							const idx = m * TROUGH_BINS + troughBin
 							troughSums[b].model[idx] += windV[r] * windSpeed[r]
 							troughSums[b].observed[idx] += obsV[r] * oSpeed
 							troughSums[b].count[idx]++
 						}
+					}
 					continue
 				}
 				fold(monthAcc, s)
 				fold(overall, s)
-				const lat = latDegAt(r)
-				const band = bandAcc.find((b) => lat >= b.lo && lat < b.hi)
-				if (band) fold(band.acc, s)
+				if (band >= 0) fold(bandAcc[band].acc, s)
 			}
 			perMonthRows.push({
 				month: MONTH_LABELS[m] ?? String(m),
@@ -635,30 +703,47 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 
 		// Annual-mean ocean zonal wind by latitude per basin: where the trades
 		// peak, where they give way to westerlies (the subtropical ridge), and
-		// where the westerly jet peaks.
+		// where the westerly jet peaks. Single pass over regions fills every
+		// basin/lat-bin instead of rescanning N for each bin.
 		const profileRows: Record<string, number | string>[] = []
-		for (const basin of OCEAN_BASINS) {
-			const inLon = (lon: number) =>
-				basin.lon[0] <= basin.lon[1]
-					? lon >= basin.lon[0] && lon <= basin.lon[1]
-					: lon >= basin.lon[0] || lon <= basin.lon[1]
-			const lats = Array.from({ length: 15 }, (_, i) => basin.side * i * 5)
-			const profile = (source: "model" | "observed") =>
-				lats.map((lat) => {
-					let sum = 0
-					let count = 0
-					for (let r = 0; r < N; r++) {
-						if (annualObsCount[r] === 0 || !inLon(lonDeg[r])) continue
-						if (Math.abs(latDegAt(r) - lat) > 2.5) continue
-						sum +=
-							(source === "model" ? annualModelU[r] : annualObsU[r]) /
-							annualObsCount[r]
-						count++
-					}
-					return count > 0 ? sum / count : Number.NaN
-				})
+		const PROFILE_BINS = 15
+		const profileModelSum = OCEAN_BASINS.map(
+			() => new Float64Array(PROFILE_BINS),
+		)
+		const profileObsSum = OCEAN_BASINS.map(() => new Float64Array(PROFILE_BINS))
+		const profileCount = OCEAN_BASINS.map(() => new Int32Array(PROFILE_BINS))
+		for (let r = 0; r < N; r++) {
+			const count = annualObsCount[r]
+			if (count === 0) continue
+			const lat = latDeg[r]
+			const lon = lonDeg[r]
+			const modelU = annualModelU[r] / count
+			const obsU = annualObsU[r] / count
+			for (let b = 0; b < OCEAN_BASINS.length; b++) {
+				const basin = OCEAN_BASINS[b]
+				if (!lonInRange({ lon, range: basin.lon })) continue
+				if (basin.side === 1 ? lat < -2.5 : lat > 2.5) continue
+				const center = Math.round((basin.side * lat) / 5)
+				for (let k = center - 1; k <= center + 1; k++) {
+					if (k < 0 || k >= PROFILE_BINS) continue
+					if (Math.abs(lat - basin.side * k * 5) > 2.5) continue
+					profileModelSum[b][k] += modelU
+					profileObsSum[b][k] += obsU
+					profileCount[b][k]++
+				}
+			}
+		}
+		for (let b = 0; b < OCEAN_BASINS.length; b++) {
+			const basin = OCEAN_BASINS[b]
+			const lats = Array.from(
+				{ length: PROFILE_BINS },
+				(_, i) => basin.side * i * 5,
+			)
 			for (const source of ["model", "observed"] as const) {
-				const u = profile(source)
+				const sums = source === "model" ? profileModelSum[b] : profileObsSum[b]
+				const u = lats.map((_, i) =>
+					profileCount[b][i] > 0 ? sums[i] / profileCount[b][i] : Number.NaN,
+				)
 				let trade = 0
 				for (let i = 0; i < lats.length && Math.abs(lats[i]) <= 30; i++)
 					if (u[i] < u[trade]) trade = i
@@ -688,42 +773,48 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			lo: -60 + i * 10,
 			hi: -50 + i * 10,
 		}))
-		const steadinessRows = steadinessBands.map((band) => {
-			let modelSteadiness = 0
-			let observedSteadiness = 0
-			let modelVector = 0
-			let observedVector = 0
-			let angleError = 0
-			let n = 0
-			for (let r = 0; r < N; r++) {
-				const count = annualObsCount[r]
-				if (count === 0) continue
-				const lat = latDegAt(r)
-				if (lat < band.lo || lat >= band.hi) continue
-				const mu = annualModelU[r] / count
-				const mv = annualModelV[r] / count
-				const ou = annualObsU[r] / count
-				const ov = annualObsV[r] / count
-				const mVec = Math.hypot(mu, mv)
-				const oVec = Math.hypot(ou, ov)
-				modelSteadiness += mVec / Math.max(1e-9, annualModelSpeed[r] / count)
-				observedSteadiness += oVec / Math.max(1e-9, annualObsSpeed[r] / count)
-				modelVector += mVec
-				observedVector += oVec
-				const cos = (mu * ou + mv * ov) / Math.max(1e-9, mVec * oVec)
-				angleError +=
-					(Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
-				n++
-			}
-			const d = Math.max(1, n)
+		const steadinessModel = new Float64Array(12)
+		const steadinessObserved = new Float64Array(12)
+		const steadinessModelVector = new Float64Array(12)
+		const steadinessObservedVector = new Float64Array(12)
+		const steadinessAngle = new Float64Array(12)
+		const steadinessCount = new Int32Array(12)
+		for (let r = 0; r < N; r++) {
+			const count = annualObsCount[r]
+			if (count === 0) continue
+			const lat = latDeg[r]
+			const band = Math.floor((lat + 60) / 10)
+			if (band < 0 || band >= 12) continue
+			const mu = annualModelU[r] / count
+			const mv = annualModelV[r] / count
+			const ou = annualObsU[r] / count
+			const ov = annualObsV[r] / count
+			const mVec = Math.hypot(mu, mv)
+			const oVec = Math.hypot(ou, ov)
+			steadinessModel[band] +=
+				mVec / Math.max(1e-9, annualModelSpeed[r] / count)
+			steadinessObserved[band] +=
+				oVec / Math.max(1e-9, annualObsSpeed[r] / count)
+			steadinessModelVector[band] += mVec
+			steadinessObservedVector[band] += oVec
+			const cos = (mu * ou + mv * ov) / Math.max(1e-9, mVec * oVec)
+			steadinessAngle[band] +=
+				(Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
+			steadinessCount[band]++
+		}
+		const steadinessRows = steadinessBands.map((band, i) => {
+			const d = Math.max(1, steadinessCount[i])
 			return {
 				band: band.label,
-				modelSteadiness: Number((modelSteadiness / d).toFixed(2)),
-				observedSteadiness: Number((observedSteadiness / d).toFixed(2)),
+				modelSteadiness: Number((steadinessModel[i] / d).toFixed(2)),
+				observedSteadiness: Number((steadinessObserved[i] / d).toFixed(2)),
 				annualVectorRatio: Number(
-					(modelVector / Math.max(1e-9, observedVector)).toFixed(2),
+					(
+						steadinessModelVector[i] /
+						Math.max(1e-9, steadinessObservedVector[i])
+					).toFixed(2),
 				),
-				annualVectorAngleErrDeg: Number((angleError / d).toFixed(1)),
+				annualVectorAngleErrDeg: Number((steadinessAngle[i] / d).toFixed(1)),
 			}
 		})
 		console.info("Annual ocean wind steadiness and annual-vector error")

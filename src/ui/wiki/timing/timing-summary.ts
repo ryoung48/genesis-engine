@@ -19,6 +19,17 @@ const POST_TIMING_PREFIX = "Post:"
 
 const COMPUTE_ROUTES_PREFIX = "computeRoutes:"
 
+interface ParseTimingEntriesParams {
+	timings: StageTiming[] | null | undefined
+	filter: (stage: string) => boolean
+}
+
+interface GetTimingSummaryParams {
+	timings: StageTiming[] | null | undefined
+	filter: (stage: string) => boolean
+	pinnedEntries: TimingEntry[]
+}
+
 function stripTimingPrefix(stage: string): string {
 	if (stage.startsWith("genesis:")) return stage.slice("genesis:".length)
 	if (stage.startsWith(`${POST_TIMING_PREFIX} `))
@@ -28,10 +39,10 @@ function stripTimingPrefix(stage: string): string {
 	return stage
 }
 
-function parseTimingEntries(
-	timings: StageTiming[] | null | undefined,
-	filter: (stage: string) => boolean,
-): TimingEntry[] {
+function parseTimingEntries({
+	timings,
+	filter,
+}: ParseTimingEntriesParams): TimingEntry[] {
 	if (!timings?.length) return []
 
 	return timings
@@ -43,20 +54,25 @@ function parseTimingEntries(
 		.filter((entry): entry is TimingEntry => entry !== null)
 }
 
-export function getGenerationTimingSummary(
-	timings?: StageTiming[] | null,
-): TimingSummary | null {
-	const orderedEntries = parseTimingEntries(
-		timings,
-		(stage) =>
-			!stage.startsWith(POST_TIMING_PREFIX) &&
-			!stage.startsWith(COMPUTE_ROUTES_PREFIX),
-	).sort((a, b) => b.ms - a.ms)
+function getTimingSummary({
+	timings,
+	filter,
+	pinnedEntries,
+}: GetTimingSummaryParams): TimingSummary | null {
+	const orderedEntries = [
+		...parseTimingEntries({ timings, filter }),
+		...pinnedEntries,
+	].sort((a, b) => b.ms - a.ms)
 
 	if (!orderedEntries.length) return null
 
-	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
-	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
+	const pinnedLabels = new Set(pinnedEntries.map((entry) => entry.label))
+	const largeEntries = orderedEntries.filter(
+		(entry) => entry.ms >= 100 || pinnedLabels.has(entry.label),
+	)
+	const otherEntries = orderedEntries.filter(
+		(entry) => entry.ms < 100 && !pinnedLabels.has(entry.label),
+	)
 	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
 	const entries =
 		otherMs > 0
@@ -70,56 +86,39 @@ export function getGenerationTimingSummary(
 		otherEntries,
 		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
 	}
+}
+
+export function getGenerationTimingSummary(
+	timings?: StageTiming[] | null,
+): TimingSummary | null {
+	const computeRoutesSummary = getComputeRoutesTimingSummary(timings)
+	return getTimingSummary({
+		timings,
+		filter: (stage) =>
+			!stage.startsWith(POST_TIMING_PREFIX) &&
+			!stage.startsWith(COMPUTE_ROUTES_PREFIX),
+		pinnedEntries: computeRoutesSummary
+			? [{ label: "computeRoutes", ms: computeRoutesSummary.totalMs }]
+			: [],
+	})
 }
 
 export function getPostTimingSummary(
 	timings?: StageTiming[] | null,
 ): TimingSummary | null {
-	const orderedEntries = parseTimingEntries(timings, (stage) =>
-		stage.startsWith(POST_TIMING_PREFIX),
-	).sort((a, b) => b.ms - a.ms)
-
-	if (!orderedEntries.length) return null
-
-	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
-	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
-	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
-	const entries =
-		otherMs > 0
-			? [...largeEntries, { label: "Other", ms: otherMs }]
-			: largeEntries
-
-	entries.sort((a, b) => b.ms - a.ms)
-
-	return {
-		entries,
-		otherEntries,
-		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
-	}
+	return getTimingSummary({
+		timings,
+		filter: (stage) => stage.startsWith(POST_TIMING_PREFIX),
+		pinnedEntries: [],
+	})
 }
 
 export function getComputeRoutesTimingSummary(
 	timings?: StageTiming[] | null,
 ): TimingSummary | null {
-	const orderedEntries = parseTimingEntries(timings, (stage) =>
-		stage.startsWith(COMPUTE_ROUTES_PREFIX),
-	).sort((a, b) => b.ms - a.ms)
-
-	if (!orderedEntries.length) return null
-
-	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
-	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
-	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
-	const entries =
-		otherMs > 0
-			? [...largeEntries, { label: "Other", ms: otherMs }]
-			: largeEntries
-
-	entries.sort((a, b) => b.ms - a.ms)
-
-	return {
-		entries,
-		otherEntries,
-		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
-	}
+	return getTimingSummary({
+		timings,
+		filter: (stage) => stage.startsWith(COMPUTE_ROUTES_PREFIX),
+		pinnedEntries: [],
+	})
 }

@@ -17,6 +17,7 @@ export type ComputeSSTParams = {
 	climate: GenesisClimate
 	elevation_km: Float32Array
 	params: SverdrupParams
+	onWindProfile: (durationMs: number) => void
 }
 
 export type ComputeCoastSideParams = {

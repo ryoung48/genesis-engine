@@ -162,6 +162,7 @@ function computeSST({
 	climate,
 	elevation_km,
 	params,
+	onWindProfile,
 }: ComputeSSTParams): GenesisOceanCurrents {
 	if (CURRENT_SOLVER === "sverdrup") {
 		return SVERDRUP_CURRENTS.computeSST({
@@ -172,6 +173,7 @@ function computeSST({
 			landmarks,
 			sstSaturationC: MODELED_SST_SATURATION_C,
 			params,
+			onWindProfile,
 		})
 	}
 	const N = mesh.numRegions
