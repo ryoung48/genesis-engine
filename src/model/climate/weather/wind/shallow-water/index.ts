@@ -3,7 +3,9 @@ import type {
 	IntegrateInput,
 	ShallowWaterInput,
 	ShallowWaterState,
+	ShallowWaterWind,
 } from "@/model/climate/weather/wind/shallow-water/types"
+import { MATH } from "@/model/shared/math/core"
 
 // Time-stepped nonlinear shallow-water model of the large-scale flow on the
 // coarse lat-lon grid, in physical units. The pressure template is the
@@ -12,14 +14,25 @@ import type {
 // replaces the template. Unlike the steady linear solve this carries the
 // vorticity budget in time, which is what boundary jets and closed gyres
 // come from.
-const GEOPOTENTIAL_PER_TEMPLATE = 1000
+// Defines one pressure-template unit as a geopotential perturbation at one bar.
+// Atmospheric pressure scales it before integration, matching the wind model's
+// existing pressure response without embedding a particular planet's geography.
+const GEOPOTENTIAL_PER_TEMPLATE_AT_ONE_BAR = 275
 const WAVE_SPEED = 25
 const FRICTION_DAYS = 2
 const RELAX_DAYS = 2
 const VISCOSITY = 5e5
 const SPINUP_DAYS = 10
+const MIN_SPINUP_TIMESCALES = 3.5
+const RESIDUAL_CHECK_STEPS = 8
+const CONVERGED_CHECKS = 3
+const RESIDUAL_TOLERANCE = 0.13
 const MAX_DT = 1800
-const CFL = 0.5
+const CFL = 0.6
+const MIN_TERRAIN_TRANSPORT = 0.15
+const TERRAIN_BLOCKING_ONSET = 0.15
+const TERRAIN_BLOCKING_FULL = 0.65
+const TERRAIN_DRAG_MULTIPLIER = 8
 // Zonal structure poleward of this latitude is damped toward the zonal mean
 // so the converging meridians do not set the time step.
 const POLAR_FILTER_LAT = 70
@@ -29,8 +42,10 @@ const DAY = 86400
 
 function integrate({
 	forcing,
+	terrain,
 	planetRadiusM,
 	coriolisPolar,
+	pressureScale,
 }: IntegrateInput): ShallowWaterState {
 	const { lonBins, latBins } = forcing
 	const n = lonBins * latBins
@@ -73,24 +88,72 @@ function integrate({
 	const steps = Math.ceil((SPINUP_DAYS * DAY) / dt)
 
 	const phi0 = new Float32Array(n)
+	let phiScale = 0
 	for (let idx = 0; idx < n; idx++) {
-		phi0[idx] = forcing.values[idx] * GEOPOTENTIAL_PER_TEMPLATE
+		phi0[idx] =
+			forcing.values[idx] * GEOPOTENTIAL_PER_TEMPLATE_AT_ONE_BAR * pressureScale
+		phiScale = Math.max(phiScale, Math.abs(phi0[idx]))
 	}
+	phiScale = Math.max(phiScale, 1)
 	const phi = Float32Array.from(phi0)
 	const u = new Float32Array(n)
 	const v = new Float32Array(n)
 	const uNew = new Float32Array(n)
 	const vNew = new Float32Array(n)
+	const terrainBlock = new Float32Array(n)
+	const transportDepth = new Float32Array(n)
+	let maxElevationKm = 0
+	for (let idx = 0; idx < n; idx++)
+		maxElevationKm = Math.max(maxElevationKm, terrain.values[idx])
+	for (let idx = 0; idx < n; idx++) {
+		const relativeElevation =
+			maxElevationKm > 0 ? Math.max(0, terrain.values[idx]) / maxElevationKm : 0
+		const block = MATH.smoothstep({
+			edge0: TERRAIN_BLOCKING_ONSET,
+			edge1: TERRAIN_BLOCKING_FULL,
+			x: relativeElevation,
+		})
+		terrainBlock[idx] = block
+		transportDepth[idx] = 1 - (1 - MIN_TERRAIN_TRANSPORT) * block
+	}
 	const east = new Int32Array(lonBins)
 	const west = new Int32Array(lonBins)
 	for (let i = 0; i < lonBins; i++) {
 		east[i] = (i + 1) % lonBins
 		west[i] = (i - 1 + lonBins) % lonBins
 	}
-	const vAt = (idx: number, j: number) =>
-		j < 0 || j >= latBins - 1 ? 0 : v[idx]
-
+	const zonalTransport = new Float32Array(n)
+	const meridionalTransport = new Float32Array(n)
+	for (let j = 0; j < latBins; j++) {
+		const row = j * lonBins
+		const up = row + lonBins
+		for (let i = 0; i < lonBins; i++) {
+			const idx = row + i
+			zonalTransport[idx] = Math.min(
+				transportDepth[idx],
+				transportDepth[row + east[i]],
+			)
+			if (j < latBins - 1)
+				meridionalTransport[idx] = Math.min(
+					transportDepth[idx],
+					transportDepth[up + i],
+				)
+		}
+	}
+	const minimumSteps = Math.ceil(
+		(MIN_SPINUP_TIMESCALES * Math.max(FRICTION_DAYS, RELAX_DAYS) * DAY) / dt,
+	)
+	let completedSteps = 0
+	let convergedSteps = 0
+	let residual = Number.POSITIVE_INFINITY
 	for (let step = 0; step < steps; step++) {
+		const nextCompletedSteps = step + 1
+		const measureResidual =
+			(nextCompletedSteps >= minimumSteps &&
+				(nextCompletedSteps - minimumSteps) % RESIDUAL_CHECK_STEPS === 0) ||
+			nextCompletedSteps === steps
+		let velocityChangeSquared = 0
+		let geopotentialChangeSquared = 0
 		for (let j = 0; j < latBins; j++) {
 			const row = j * lonBins
 			const up = j < latBins - 1 ? row + lonBins : row
@@ -103,12 +166,14 @@ function integrate({
 				const iw = west[i]
 				const vBar =
 					0.25 *
-					(vAt(idx, j) +
-						vAt(row + ie, j) +
-						vAt(down + i, j - 1) +
-						vAt(down + ie, j - 1))
+					((j < latBins - 1 ? v[idx] + v[row + ie] : 0) +
+						(j > 0 ? v[down + i] + v[down + ie] : 0))
 				const phiX = (phi[row + ie] - phi[idx]) / dxRow
 				const uc = u[idx]
+				const terrainDrag =
+					eps *
+					TERRAIN_DRAG_MULTIPLIER *
+					Math.max(terrainBlock[idx], terrainBlock[row + ie])
 				const adv =
 					(uc * (u[row + ie] - u[row + iw])) / (2 * dxRow) +
 					(vBar * (u[up + i] - u[down + i])) / (2 * dx) -
@@ -116,9 +181,12 @@ function integrate({
 				const lap =
 					(u[row + ie] - 2 * uc + u[row + iw]) / (dxRow * dxRow) +
 					(u[up + i] - 2 * uc + u[down + i]) / (dx * dx)
-				uNew[idx] =
+				const nextU =
 					(uc + dt * (f * vBar - phiX - ADVECTION * adv + VISCOSITY * lap)) /
-					(1 + dt * eps)
+					(1 + dt * (eps + terrainDrag))
+				uNew[idx] = nextU
+				if (measureResidual)
+					velocityChangeSquared += (nextU - uc) * (nextU - uc)
 			}
 		}
 		for (let j = 0; j < latBins - 1; j++) {
@@ -134,8 +202,12 @@ function integrate({
 					0.25 * (uNew[idx] + uNew[row + iw] + uNew[up + i] + uNew[up + iw])
 				const phiY = (phi[up + i] - phi[idx]) / dx
 				const vc = v[idx]
-				const vN = vAt(up + i, j + 1)
-				const vS = vAt(row - lonBins + i, j - 1)
+				const terrainDrag =
+					eps *
+					TERRAIN_DRAG_MULTIPLIER *
+					Math.max(terrainBlock[idx], terrainBlock[up + i])
+				const vN = j < latBins - 2 ? v[up + i] : 0
+				const vS = j > 0 ? v[row - lonBins + i] : 0
 				const adv =
 					(uBar * (v[row + ie] - v[row + iw])) / (2 * dxRow) +
 					(vc * (vN - vS)) / (2 * dx) +
@@ -143,9 +215,12 @@ function integrate({
 				const lap =
 					(v[row + ie] - 2 * vc + v[row + iw]) / (dxRow * dxRow) +
 					(vN - 2 * vc + vS) / (dx * dx)
-				vNew[idx] =
+				const nextV =
 					(vc + dt * (-f * uBar - phiY - ADVECTION * adv + VISCOSITY * lap)) /
-					(1 + dt * eps)
+					(1 + dt * (eps + terrainDrag))
+				vNew[idx] = nextV
+				if (measureResidual)
+					velocityChangeSquared += (nextV - vc) * (nextV - vc)
 			}
 		}
 		vNew.fill(0, (latBins - 1) * lonBins, n)
@@ -160,12 +235,21 @@ function integrate({
 			for (let i = 0; i < lonBins; i++) {
 				const idx = row + i
 				const div =
-					(u[idx] - u[row + west[i]]) / dxRow +
-					((j < latBins - 1 ? v[idx] * cN : 0) -
-						(j > 0 ? v[idx - lonBins] * cS : 0)) /
+					(u[idx] * zonalTransport[idx] -
+						u[row + west[i]] * zonalTransport[row + west[i]]) /
+						dxRow +
+					((j < latBins - 1 ? v[idx] * cN * meridionalTransport[idx] : 0) -
+						(j > 0
+							? v[idx - lonBins] * cS * meridionalTransport[idx - lonBins]
+							: 0)) /
 						(dx * c)
-				phi[idx] =
+				const previousPhi = phi[idx]
+				const nextPhi =
 					(phi[idx] + dt * (-c2 * div + gamma * phi0[idx])) / (1 + dt * gamma)
+				phi[idx] = nextPhi
+				if (measureResidual)
+					geopotentialChangeSquared +=
+						(nextPhi - previousPhi) * (nextPhi - previousPhi)
 			}
 		}
 		for (let j = 0; j < latBins; j++) {
@@ -184,10 +268,30 @@ function integrate({
 			mp /= lonBins
 			const w = filter[j]
 			for (let i = 0; i < lonBins; i++) {
-				u[row + i] += w * (mu - u[row + i])
-				v[row + i] += w * (mv - v[row + i])
-				phi[row + i] += w * (mp - phi[row + i])
+				const idx = row + i
+				const uChange = w * (mu - u[idx])
+				const vChange = w * (mv - v[idx])
+				const phiChange = w * (mp - phi[idx])
+				u[idx] += uChange
+				v[idx] += vChange
+				phi[idx] += phiChange
+				if (measureResidual) {
+					velocityChangeSquared += uChange * uChange + vChange * vChange
+					geopotentialChangeSquared += phiChange * phiChange
+				}
 			}
+		}
+		completedSteps = nextCompletedSteps
+		if (measureResidual) {
+			const velocityChange = Math.sqrt(velocityChangeSquared / (2 * n))
+			const geopotentialChange = Math.sqrt(geopotentialChangeSquared / n)
+			residual = Math.max(
+				(velocityChange * FRICTION_DAYS * DAY) / (dt * WAVE_SPEED),
+				(geopotentialChange * RELAX_DAYS * DAY) / (dt * phiScale),
+			)
+			if (residual < RESIDUAL_TOLERANCE) convergedSteps++
+			else convergedSteps = 0
+			if (convergedSteps >= CONVERGED_CHECKS) break
 		}
 	}
 	for (let idx = 0; idx < n; idx++) {
@@ -200,23 +304,33 @@ function integrate({
 				phi: phi0,
 				u: new Float32Array(n),
 				v: new Float32Array(n),
-				steps,
+				steps: completedSteps,
 				dt,
+				residual,
 			}
 		}
 	}
-	return { lonBins, latBins, phi, u, v, steps, dt }
+	return { lonBins, latBins, phi, u, v, steps: completedSteps, dt, residual }
 }
 
 function solveMonth({
 	latDeg,
 	lonDeg,
 	pressure,
+	elevation_km,
 	planetRadiusM,
 	coriolisPolar,
+	pressureScale,
 }: ShallowWaterInput): { forcing: Float32Array; state: ShallowWaterState } {
 	const forcing = GRID.build({ latDeg, lonDeg, values: pressure })
-	const state = integrate({ forcing, planetRadiusM, coriolisPolar })
+	const terrain = GRID.build({ latDeg, lonDeg, values: elevation_km })
+	const state = integrate({
+		forcing,
+		terrain,
+		planetRadiusM,
+		coriolisPolar,
+		pressureScale,
+	})
 	return { forcing: forcing.values, state }
 }
 
@@ -230,11 +344,7 @@ const EKMAN_ANGLE_OCEAN_DEG = 20
 const EKMAN_FACTOR_LAND = 0.35
 const EKMAN_ANGLE_LAND_DEG = 35
 
-function surfaceWind(input: ShallowWaterInput): {
-	u: Float32Array
-	v: Float32Array
-	coarsePressure: Float32Array
-} {
+function surfaceWind(input: ShallowWaterInput): ShallowWaterWind {
 	const { forcing, state } = solveMonth(input)
 	const { lonBins, latBins } = state
 	const grid = (values: Float32Array) => ({ lonBins, latBins, values })
@@ -284,7 +394,12 @@ function surfaceWind(input: ShallowWaterInput): {
 		uS[r] = layer.factor * (u * layer.cosA - turn * v * layer.sinA)
 		vS[r] = layer.factor * (turn * u * layer.sinA + v * layer.cosA)
 	}
-	return { u: uS, v: vS, coarsePressure }
+	return {
+		u: uS,
+		v: vS,
+		coarsePressure,
+		steps: state.steps,
+	}
 }
 
 export const SHALLOW_WATER = {

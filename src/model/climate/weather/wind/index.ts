@@ -1,10 +1,8 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
-import { DYNAMICS } from "@/model/climate/weather/wind/dynamics"
 import { OCEAN_INERTIA } from "@/model/climate/weather/wind/ocean-inertia"
 import { ROUGHNESS } from "@/model/climate/weather/wind/roughness"
 import { SHALLOW_WATER } from "@/model/climate/weather/wind/shallow-water"
-import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import { SURFACE_BALANCE } from "@/model/climate/weather/wind/surface-balance"
 import { TORQUE_BALANCE } from "@/model/climate/weather/wind/torque-balance"
 import type {
@@ -195,7 +193,7 @@ const SPEED_SCALE = 0.45
 // continental friction or blocking to interrupt it -- the Roaring Forties.
 // Scales up ocean-cell wind speed with the zonal ocean fraction at that
 // latitude; broken-up basins (the NH westerlies) get little of it.
-const OPEN_OCEAN_FETCH_BOOST = 0.7
+const OPEN_OCEAN_FETCH_BOOST = 2
 // Longitude smoothing (in 3-degree bins) of the surface trough. Narrower
 // than the rain module's so monsoon troughs over summer continents survive.
 const TROUGH_HALF_WINDOW_BINS = 5
@@ -226,18 +224,6 @@ const COLLAPSE_HOURS_EDGE0 = 60
 const COLLAPSE_HOURS_EDGE1 = 300
 const COLLAPSE_TILT_EDGE0 = 50
 const COLLAPSE_TILT_EDGE1 = 75
-// Strength of the mass-conservation feedback on the template (the squared
-// gravity-wave speed over friction, in template units): how much a
-// convergent low fills before the flow into it stops.
-const WAVE_COUPLING = 0.002
-// Which large-scale solver reshapes the template before the surface balance.
-// "linear" adds the mass-conservation feedback that closes ocean anticyclones
-// and piles cross-equatorial flow against western boundaries, via a direct
-// spectral solve of the steady balance (./dynamics) that costs only a few ms.
-// "simple" bypasses this module and runs the original pressure-gradient model
-// in ./simple with no large-scale feedback; "shallow-water" is the same
-// feedback from a time-stepped nonlinear integration, far more expensive.
-const LARGE_SCALE_SOLVER: "simple" | "linear" | "shallow-water" = "linear"
 const EARTH_POLAR_CORIOLIS = 1.458e-4
 // Western-boundary flow: along the western edge of an ocean basin the
 // surface flow carries an along-boundary component toward the summer pole,
@@ -596,16 +582,6 @@ function computeWindVectors({
 			surface,
 		})
 	}
-	if (LARGE_SCALE_SOLVER === "simple") {
-		return SIMPLE_WIND.computeWindVectors({
-			mesh,
-			climate,
-			elevation_km,
-			params,
-			month,
-			surface,
-		})
-	}
 	const N = mesh.numRegions
 	const {
 		absLatDeg,
@@ -791,25 +767,9 @@ function computeWindVectors({
 		if (hemisphere[r] > 0) northHadley[r] = components.hadley[r]
 		else southHadley[r] = components.hadley[r]
 	}
-	// The steady linear large-scale correction is linear in pressure, so it is
-	// applied to each component before they are recombined.
-	const withDynamics = (field: Float32Array) => {
-		if (LARGE_SCALE_SOLVER === "shallow-water") return field
-		const dynamic = DYNAMICS.correction({
-			latDeg,
-			lonDeg,
-			pressure: field,
-			friction: FRICTION,
-			coriolisScale: coriolisSign * omegaRatio,
-			waveCoupling: WAVE_COUPLING,
-		})
-		const out = new Float32Array(N)
-		for (let r = 0; r < N; r++) out[r] = field[r] + dynamic[r]
-		return out
-	}
-	const restPressure = withDynamics(components.rest)
-	const northPressure = withDynamics(northHadley)
-	const southPressure = withDynamics(southHadley)
+	const restPressure = components.rest
+	const northPressure = northHadley
+	const southPressure = southHadley
 	const hadleyScale = TORQUE_BALANCE.hadleyScales({
 		mesh,
 		rest: restPressure,
@@ -827,25 +787,20 @@ function computeWindVectors({
 			hadleyScale.north * northPressure[r] +
 			hadleyScale.south * southPressure[r]
 
-	// Large-scale flow: either a steady linear correction to the pressure the
-	// per-cell balance then sees, or a time-stepped shallow-water surface wind
-	// whose coarse pressure is removed from the per-cell balance so only the
-	// sub-grid part (coastal heat lows, terrain) is added locally.
-	let largeScaleU: Float32Array | null = null
-	let largeScaleV: Float32Array | null = null
-	if (LARGE_SCALE_SOLVER === "shallow-water") {
-		const sw = SHALLOW_WATER.surfaceWind({
-			latDeg,
-			lonDeg,
-			pressure,
-			elevation_km,
-			planetRadiusM: planetRadiusKm * 1000,
-			coriolisPolar: coriolisSign * omegaRatio * EARTH_POLAR_CORIOLIS,
-		})
-		largeScaleU = sw.u
-		largeScaleV = sw.v
-		for (let r = 0; r < N; r++) pressure[r] -= sw.coarsePressure[r]
-	}
+	// The shallow-water flow carries the coarse pressure response. Keep only
+	// the mesh-scale residual for the local balance below.
+	const largeScale = SHALLOW_WATER.surfaceWind({
+		latDeg,
+		lonDeg,
+		pressure,
+		elevation_km,
+		planetRadiusM: planetRadiusKm * 1000,
+		coriolisPolar: coriolisSign * omegaRatio * EARTH_POLAR_CORIOLIS,
+		pressureScale: pressureFactor,
+	})
+	const localPressure = new Float32Array(N)
+	for (let r = 0; r < N; r++)
+		localPressure[r] = pressure[r] - largeScale.coarsePressure[r]
 
 	// Land fraction on a coarse lat-lon grid and, per cell, how far east of a
 	// western land boundary it sits.
@@ -946,7 +901,7 @@ function computeWindVectors({
 	// Pressure gradient in template units per radian; terrain slope in km/km.
 	const pressureGradient = SURFACE_BALANCE.meshGradient({
 		mesh,
-		field: pressure,
+		field: localPressure,
 	})
 	const elevationGradient = SURFACE_BALANCE.meshGradient({
 		mesh,
@@ -1004,10 +959,8 @@ function computeWindVectors({
 			u += speed * Math.sin(eastBoundaryTurn) * roughness
 			v -= speed * Math.sign(lat) * Math.cos(eastBoundaryTurn) * roughness
 		}
-		if (largeScaleU && largeScaleV) {
-			u += largeScaleU[r] * rawPerMs * roughness
-			v += largeScaleV[r] * rawPerMs * roughness
-		}
+		u += largeScale.u[r] * rawPerMs * roughness
+		v += largeScale.v[r] * rawPerMs * roughness
 
 		// Katabatic drainage: over cold sloped surfaces (ice sheets, high
 		// plateaus) dense surface air is pushed downhill. It is a shallow,

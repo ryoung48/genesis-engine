@@ -407,7 +407,9 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			return count > 0 ? sum / count : Number.NaN
 		}
 
+		let windSolveMs = 0
 		for (let m = 0; m < months; m++) {
+			const windStartedMs = performance.now()
 			const { windU, windV, windSpeed } = WIND.computeWindVectors({
 				mesh: world.mesh,
 				climate: world.climate,
@@ -416,6 +418,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 				month: m,
 				surface,
 			})
+			windSolveMs += performance.now() - windStartedMs
 			const {
 				windU: obsU,
 				windV: obsV,
@@ -511,6 +514,9 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 				...summarize(monthAcc),
 			})
 		}
+		console.info(
+			`Wind solve time: ${windSolveMs.toFixed(0)} ms for ${months} months`,
+		)
 
 		console.info(
 			"Model vs NCEP/NCAR wind -- LAND ONLY, per calendar month (monthly model wind vs monthly reanalysis)",

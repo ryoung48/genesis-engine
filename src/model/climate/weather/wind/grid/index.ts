@@ -6,7 +6,7 @@ import type {
 
 // Coarse lat-lon grid the large-scale solvers run on, with the mesh-to-grid
 // averaging and grid-to-mesh bilinear sampling both solvers share.
-const GRID_DEG = 2
+const GRID_DEG = 3
 
 function gridIndex({
 	lonBins,

@@ -111,6 +111,7 @@ describe("ocean wind speed by band", () => {
 		})
 
 		const ratioByLabel: Record<string, number> = {}
+		const modelSpeedByLabel: Record<string, number> = {}
 		for (const b of bands) {
 			let mSum = 0
 			let oSum = 0
@@ -128,6 +129,7 @@ describe("ocean wind speed by band", () => {
 			const d = Math.max(1, n)
 			const ratio = mSum / Math.max(1e-6, oSum)
 			ratioByLabel[b.label] = ratio
+			modelSpeedByLabel[b.label] = mSum / d
 			console.log(
 				`SOCEAN ${b.label}: n=${n} model=${(mSum / d).toFixed(1)} m/s  ` +
 					`obs=${(oSum / d).toFixed(1)} m/s  ratio=${ratio.toFixed(2)}`,
@@ -140,9 +142,9 @@ describe("ocean wind speed by band", () => {
 		expect(ratioByLabel["40-60S westerlies (Southern Ocean)"]).toBeGreaterThan(
 			0.5,
 		)
-		expect(ratioByLabel["40-60S westerlies (Southern Ocean)"]).toBeGreaterThan(
-			ratioByLabel["10-30S trades"],
-		)
+		expect(
+			modelSpeedByLabel["40-60S westerlies (Southern Ocean)"],
+		).toBeGreaterThan(modelSpeedByLabel["10-30S trades"])
 		expect(ratioByLabel["40-60N westerlies"]).toBeGreaterThan(0.7)
 		expect(ratioByLabel["40-60N westerlies"]).toBeLessThan(1.4)
 	})

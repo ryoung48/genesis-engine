@@ -1,5 +1,97 @@
 # Wind
 
+## Shallow-water follow-up
+
+The nonlinear shallow-water solver is now the active large-scale wind solver.
+Its former `1000` geopotential-per-template conversion over-accelerated the
+flow and ignored atmospheric pressure. The conversion is now 275 m2/s2 per
+template unit at one bar and is multiplied by the same pressure response used
+by the local wind balance. This is a model-unit calibration; radius and
+rotation still enter through the physical shallow-water equations.
+
+Shallow mode now keeps total pressure separate from the coarse-grid residual.
+Previously it returned the residual as if it were total pressure and used that
+residual to gate eastern-boundary flow. The local balance receives the residual,
+while pressure diagnostics and the offshore-high gate receive total pressure.
+
+The uninterrupted-ocean fetch response was increased without using a
+hemisphere or Earth latitude condition. On the Earth comparison this makes the
+modeled 40-60S ocean belt faster than the modeled southern trades while keeping
+its observed-speed ratio at 0.71.
+
+Mountain elevation now enters the coarse shallow-water equations as reduced
+transport depth and added form drag. The blocking thresholds are normalized to
+the world's own relief, so ranges redirect mass transport without Earth-specific
+locations or elevations. A synthetic north-south ridge test shows less flow
+through the ridge and more flow around its ends. At the current 2-degree grid,
+the Earth comparison took about 2-3% longer in a direct before/after run.
+
+With observed Earth temperature input, compared with the preceding linear
+solver:
+
+| Metric | Linear | Shallow water |
+| --- | ---: | ---: |
+| Ocean vector error | 3.201 m/s | 3.189 m/s |
+| Ocean speed ratio | 0.83 | 0.90 |
+| Ocean mean absolute speed error | 2.07 m/s | 2.01 m/s |
+| Ocean direction cosine | 0.448 | 0.440 |
+
+### Steady-solver experiment
+
+A controlled observed-temperature ablation kept forcing, terrain, surface
+conversion, fetch adjustment, and scoring unchanged:
+
+| Solver | Vector error | Speed ratio | Speed MAE | Direction cosine | Test time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Full shallow water | 3.189 m/s | 0.90 | 2.01 m/s | 0.440 | 52.3 s |
+| No momentum advection | 3.206 m/s | 0.89 | 2.02 m/s | 0.436 | 48.1 s |
+| No advection or viscosity | 3.235 m/s | 0.91 | 2.04 m/s | 0.435 | 39.5 s |
+| Terrain-aware steady prototype | 3.250 m/s | 0.93 | 2.03 m/s | 0.436 | 40.8 s |
+| Existing exact spectral solve, current fetch | 3.221 m/s | 0.86 | 2.06 m/s | 0.448 | 38.1 s |
+
+The experiment supports global steady coupling as a promising optimization,
+but does not support replacing shallow water yet. Advection and viscosity each
+make small measurable improvements, and the attempted variable-coefficient
+steady discretization lost more accuracy than it saved. Its first unpreconditioned
+linear solve also stalled on sharp terrain; diagonal preconditioning fixed
+convergence, and terrain-normal form drag recovered synthetic ridge diversion,
+but the Earth score remained worse. The prototype was therefore not retained.
+
+The next steady implementation should extend the existing spectral operator or
+use it as a preconditioner for longitude-varying terrain. It must beat the full
+solver's 3.189 m/s vector error, retain the ridge-diversion test, and reduce the
+observed-temperature test time before replacing shallow water.
+
+### Runtime follow-up
+
+The explicit solver now checks its normalized RMS equation tendency every eight
+steps after 3.5 times the slower drag or radiative-relaxation timescale and stops
+after three converged checks. That is seven days with the current two-day
+timescales, but scales when those inputs become planet-derived. Checking
+intermittently avoids adding a full residual cost to every timestep. The
+gravity-wave CFL was increased from 0.5 to 0.6, which remains below the
+two-dimensional C-grid stability limit for the current update.
+
+The large-scale grid was changed from 2 degrees to 3 degrees. The mesh-level
+residual still restores local pressure and terrain structure. Direct runs of
+the twelve-month observed-temperature comparison were:
+
+| Large-scale grid | Wind time | Ocean vector error | Direction cosine |
+| --- | ---: | ---: | ---: |
+| 2 degrees | 12.67 s | 3.190 m/s | 0.440 |
+| 3 degrees | 9.39 s | 3.211 m/s | 0.440 |
+| 4 degrees | 8.48 s | 3.229 m/s | 0.441 |
+
+The 3-degree grid is retained because it reaches the sub-10-second target with
+about half the accuracy loss of the 4-degree grid. It retains at least 15%
+cross-range suppression and 5% around-range acceleration in the synthetic
+mountain test.
+
+The remaining important mismatch is torque calibration: Hadley pressure is
+still balanced with the steady local response before the nonlinear solver runs.
+A future iteration should measure torque from shallow-water surface stress and
+adjust the Hadley components against that response.
+
 Follow-up: [pressure/circulation diagnosis with observed Earth temperatures](wind-pressure-diagnostics.md) identifies a seasonal-calendar mismatch and isolates the western-boundary flow contribution. The original investigation below predates those controlled experiments.
 
 Changes to `src/model/climate/weather/wind` driven by the ocean-current work,

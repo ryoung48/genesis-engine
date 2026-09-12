@@ -7,6 +7,7 @@ export type ShallowWaterInput = {
 	elevation_km: Float32Array
 	planetRadiusM: number
 	coriolisPolar: number
+	pressureScale: number
 }
 
 export type ShallowWaterState = {
@@ -17,10 +18,20 @@ export type ShallowWaterState = {
 	v: Float32Array
 	steps: number
 	dt: number
+	residual: number
+}
+
+export type ShallowWaterWind = {
+	u: Float32Array
+	v: Float32Array
+	coarsePressure: Float32Array
+	steps: number
 }
 
 export type IntegrateInput = {
 	forcing: LatLonGrid
+	terrain: LatLonGrid
 	planetRadiusM: number
 	coriolisPolar: number
+	pressureScale: number
 }
