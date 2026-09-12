@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
@@ -40,6 +41,35 @@ const LAT_BANDS = [
 	{ label: "30S-60S (westerlies)", lo: -60, hi: -30 },
 	{ label: "60S-90S (polar E)", lo: -90, hi: -60 },
 ]
+
+const OCEAN_BASINS: Array<{
+	label: string
+	lon: [number, number]
+	side: 1 | -1
+}> = [
+	{ label: "North Atlantic", lon: [-60, -10], side: 1 },
+	{ label: "North Pacific", lon: [150, -130], side: 1 },
+	{ label: "South Pacific", lon: [-170, -80], side: -1 },
+	{ label: "South Indian", lon: [50, 110], side: -1 },
+]
+
+const TROUGH_BASINS: Array<{ label: string; lon: [number, number] }> = [
+	{ label: "Atlantic", lon: [-40, -10] },
+	{ label: "East Pacific", lon: [-140, -90] },
+	{ label: "West Pacific", lon: [140, 180] },
+	{ label: "Indian", lon: [50, 90] },
+]
+const TROUGH_MIN_LAT = -30
+const TROUGH_BIN_DEG = 2
+const TROUGH_BINS = 30
+
+// Regression floors. Ocean trades are held up by surface torque balance
+// against the model's own westerlies; they stay short of observed because the
+// model has no transient storms adding to midlatitude surface drag.
+const MIN_OCEAN_TRADE_SPEED_RATIO = 0.75
+const MIN_OCEAN_WESTERLY_SPEED_RATIO = 0.85
+const MAX_OCEAN_WESTERLY_SPEED_RATIO = 1.2
+const MAX_LAND_MEAN_ABS_SPEED_ERROR_MS = 1.4
 
 describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 	it("imports the real Earth heightmap and compares modeled vs reanalysis surface wind", () => {
@@ -114,6 +144,9 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 
 		type Acc = {
 			n: number
+			sumVectorErr: number
+			sumModelSpeed: number
+			sumObsSpeed: number
 			sumSpeedDiff: number
 			sumAbsSpeedDiff: number
 			sumSpeedSq: number
@@ -125,6 +158,9 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		}
 		const newAcc = (): Acc => ({
 			n: 0,
+			sumVectorErr: 0,
+			sumModelSpeed: 0,
+			sumObsSpeed: 0,
 			sumSpeedDiff: 0,
 			sumAbsSpeedDiff: 0,
 			sumSpeedSq: 0,
@@ -145,6 +181,12 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		}
 		function fold(acc: Acc, s: Sample): void {
 			acc.n++
+			acc.sumVectorErr += Math.hypot(
+				s.mu * s.mSpeed - s.ou * s.oSpeed,
+				s.mv * s.mSpeed - s.ov * s.oSpeed,
+			)
+			acc.sumModelSpeed += s.mSpeed
+			acc.sumObsSpeed += s.oSpeed
 			const speedDiff = s.mSpeed - s.oSpeed
 			acc.sumSpeedDiff += speedDiff
 			acc.sumAbsSpeedDiff += Math.abs(speedDiff)
@@ -161,6 +203,10 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 			const d = Math.max(1, acc.n)
 			return {
 				cells: acc.n,
+				meanVectorErrorMs: Number((acc.sumVectorErr / d).toFixed(3)),
+				speedRatio: Number(
+					(acc.sumModelSpeed / Math.max(1e-9, acc.sumObsSpeed)).toFixed(2),
+				),
 				meanSpeedBiasMs: Number((acc.sumSpeedDiff / d).toFixed(2)),
 				meanAbsSpeedErrorMs: Number((acc.sumAbsSpeedDiff / d).toFixed(2)),
 				rmseSpeedMs: Number(Math.sqrt(acc.sumSpeedSq / d).toFixed(2)),
@@ -199,7 +245,59 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 
 		const overall = newAcc()
 		const bandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
+		const oceanBandAcc = LAT_BANDS.map((b) => ({ ...b, acc: newAcc() }))
+		const oceanOverall = newAcc()
+		const annualModelU = new Float64Array(N)
+		const annualObsU = new Float64Array(N)
+		const annualObsCount = new Int32Array(N)
+		const annualModelV = new Float64Array(N)
+		const annualObsV = new Float64Array(N)
+		const annualModelSpeed = new Float64Array(N)
+		const annualObsSpeed = new Float64Array(N)
 		const perMonthRows: Record<string, number | string>[] = []
+
+		// Monthly north-south ocean wind by 2-degree latitude bin per basin, to
+		// find the surface trough where the trades converge.
+		const { lonDeg } = RAIN.getClimateGeometry(world.mesh)
+		const inLonRange = ({
+			lon,
+			range,
+		}: {
+			lon: number
+			range: [number, number]
+		}) =>
+			range[0] <= range[1]
+				? lon >= range[0] && lon <= range[1]
+				: lon >= range[0] || lon <= range[1]
+		const troughSums = TROUGH_BASINS.map(() => ({
+			model: new Float64Array(months * TROUGH_BINS),
+			observed: new Float64Array(months * TROUGH_BINS),
+			count: new Int32Array(months * TROUGH_BINS),
+		}))
+		// The model's own thermal equators per basin and month: land-inclusive
+		// (what the wind template's trough follows) and ocean-only (what its
+		// subtropical ridge follows).
+		const basinTeq = TROUGH_BASINS.map(() => ({
+			full: [] as number[],
+			ocean: [] as number[],
+		}))
+		const basinMean = ({
+			teq,
+			range,
+		}: {
+			teq: Float32Array
+			range: [number, number]
+		}) => {
+			let sum = 0
+			let count = 0
+			for (let i = 0; i < teq.length; i++) {
+				const lon = -180 + ((i + 0.5) * 360) / teq.length
+				if (!inLonRange({ lon, range }) || !Number.isFinite(teq[i])) continue
+				sum += teq[i]
+				count++
+			}
+			return count > 0 ? sum / count : Number.NaN
+		}
 
 		for (let m = 0; m < months; m++) {
 			const { windU, windV, windSpeed } = WIND.computeWindVectors({
@@ -220,9 +318,34 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 				month: m,
 			})
 
+			const seaLevel = world.climate.temperature_monthly_nolapse.subarray(
+				m * N,
+				(m + 1) * N,
+			)
+			const oceanOnly = new Float32Array(N)
+			for (let r = 0; r < N; r++)
+				oceanOnly[r] =
+					world.elevation_km[r] > 0 ? Number.NEGATIVE_INFINITY : seaLevel[r]
+			const fullTeq = RAIN.computeThermalEquator({
+				mesh: world.mesh,
+				temps: seaLevel,
+				halfWindowBins: 5,
+			})
+			const oceanTeq = RAIN.computeThermalEquator({
+				mesh: world.mesh,
+				temps: oceanOnly,
+			})
+			for (let b = 0; b < TROUGH_BASINS.length; b++) {
+				basinTeq[b].full.push(
+					basinMean({ teq: fullTeq, range: TROUGH_BASINS[b].lon }),
+				)
+				basinTeq[b].ocean.push(
+					basinMean({ teq: oceanTeq, range: TROUGH_BASINS[b].lon }),
+				)
+			}
+
 			const monthAcc = newAcc()
 			for (let r = 0; r < N; r++) {
-				if (!isLand(r)) continue // land-only comparison
 				const oSpeed = obsSpeed[r]
 				if (!Number.isFinite(oSpeed) || oSpeed <= 1e-9) continue // nodata or calm
 
@@ -233,6 +356,31 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 					ov: obsV[r],
 					mSpeed: windSpeed[r],
 					oSpeed,
+				}
+				if (!isLand(r)) {
+					if (topography[r] !== CLASSIFICATION.topoOcean) continue
+					const lat = latDegAt(r)
+					const band = oceanBandAcc.find((b) => lat >= b.lo && lat < b.hi)
+					if (band) fold(band.acc, s)
+					fold(oceanOverall, s)
+					annualModelU[r] += windU[r] * windSpeed[r]
+					annualObsU[r] += obsU[r] * oSpeed
+					annualModelV[r] += windV[r] * windSpeed[r]
+					annualObsV[r] += obsV[r] * oSpeed
+					annualModelSpeed[r] += windSpeed[r]
+					annualObsSpeed[r] += oSpeed
+					annualObsCount[r]++
+					const troughBin = Math.floor((lat - TROUGH_MIN_LAT) / TROUGH_BIN_DEG)
+					if (troughBin >= 0 && troughBin < TROUGH_BINS)
+						for (let b = 0; b < TROUGH_BASINS.length; b++) {
+							if (!inLonRange({ lon: lonDeg[r], range: TROUGH_BASINS[b].lon }))
+								continue
+							const idx = m * TROUGH_BINS + troughBin
+							troughSums[b].model[idx] += windV[r] * windSpeed[r]
+							troughSums[b].observed[idx] += obsV[r] * oSpeed
+							troughSums[b].count[idx]++
+						}
+					continue
 				}
 				fold(monthAcc, s)
 				fold(overall, s)
@@ -257,6 +405,208 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		console.info("All months pooled, land only, by latitude band")
 		console.table(bandAcc.map((b) => ({ band: b.label, ...summarize(b.acc) })))
 
+		console.info("All months pooled, OCEAN only, by latitude band")
+		console.table(
+			oceanBandAcc.map((b) => ({ band: b.label, ...summarize(b.acc) })),
+		)
+
+		console.info("All months pooled, OCEAN only")
+		console.table(summarize(oceanOverall))
+
+		// Trough latitude: where the monthly north-south wind turns from
+		// southerly to northerly going north, taking the strongest convergence.
+		const troughLat = (v: number[]) => {
+			let best = -1
+			let bestConvergence = 0
+			for (let i = 0; i < v.length - 1; i++) {
+				if (!(v[i] > 0 && v[i + 1] <= 0)) continue
+				if (v[i] - v[i + 1] > bestConvergence) {
+					bestConvergence = v[i] - v[i + 1]
+					best = i
+				}
+			}
+			if (best < 0) return Number.NaN
+			const lat = TROUGH_MIN_LAT + (best + 0.5) * TROUGH_BIN_DEG
+			return lat + (TROUGH_BIN_DEG * v[best]) / (v[best] - v[best + 1])
+		}
+		const troughRows: Record<string, number | string>[] = []
+		const troughByBasin = TROUGH_BASINS.map((basin, b) => {
+			const model: number[] = []
+			const observed: number[] = []
+			for (let m = 0; m < months; m++) {
+				const profile = (source: "model" | "observed") =>
+					Array.from({ length: TROUGH_BINS }, (_, i) => {
+						const idx = m * TROUGH_BINS + i
+						const count = troughSums[b].count[idx]
+						return count > 0 ? troughSums[b][source][idx] / count : 0
+					})
+				model.push(troughLat(profile("model")))
+				observed.push(troughLat(profile("observed")))
+			}
+			return { basin: basin.label, model, observed }
+		})
+		for (let m = 0; m < months; m++) {
+			const row: Record<string, number | string> = {
+				month: MONTH_LABELS[m] ?? String(m),
+			}
+			for (const basin of troughByBasin)
+				row[basin.basin] =
+					`${basin.model[m].toFixed(1)} / ${basin.observed[m].toFixed(1)}`
+			troughRows.push(row)
+		}
+		console.info("Ocean surface trough latitude by month (model / observed)")
+		console.table(troughRows)
+		console.table(
+			troughByBasin.map((basin) => {
+				const finite = (xs: number[]) => xs.filter(Number.isFinite)
+				const stats = (xs: number[]) => ({
+					mean: finite(xs).reduce((s, x) => s + x, 0) / finite(xs).length,
+					range: Math.max(...finite(xs)) - Math.min(...finite(xs)),
+					southMonths: xs.filter((x) => x < 0).length,
+				})
+				const model = stats(basin.model)
+				const observed = stats(basin.observed)
+				return {
+					basin: basin.basin,
+					modelMeanLat: Number(model.mean.toFixed(1)),
+					observedMeanLat: Number(observed.mean.toFixed(1)),
+					modelRange: Number(model.range.toFixed(1)),
+					observedRange: Number(observed.range.toFixed(1)),
+					modelMonthsSouth: model.southMonths,
+					observedMonthsSouth: observed.southMonths,
+				}
+			}),
+		)
+
+		console.info(
+			"Model thermal equator by month (land-inclusive / ocean-only), deg",
+		)
+		console.table(
+			Array.from({ length: months }, (_, m) => ({
+				month: MONTH_LABELS[m] ?? String(m),
+				...Object.fromEntries(
+					TROUGH_BASINS.map((basin, b) => [
+						basin.label,
+						`${basinTeq[b].full[m].toFixed(1)} / ${basinTeq[b].ocean[m].toFixed(1)}`,
+					]),
+				),
+			})),
+		)
+
+		// Annual-mean ocean zonal wind by latitude per basin: where the trades
+		// peak, where they give way to westerlies (the subtropical ridge), and
+		// where the westerly jet peaks.
+		const profileRows: Record<string, number | string>[] = []
+		for (const basin of OCEAN_BASINS) {
+			const inLon = (lon: number) =>
+				basin.lon[0] <= basin.lon[1]
+					? lon >= basin.lon[0] && lon <= basin.lon[1]
+					: lon >= basin.lon[0] || lon <= basin.lon[1]
+			const lats = Array.from({ length: 15 }, (_, i) => basin.side * i * 5)
+			const profile = (source: "model" | "observed") =>
+				lats.map((lat) => {
+					let sum = 0
+					let count = 0
+					for (let r = 0; r < N; r++) {
+						if (annualObsCount[r] === 0 || !inLon(lonDeg[r])) continue
+						if (Math.abs(latDegAt(r) - lat) > 2.5) continue
+						sum +=
+							(source === "model" ? annualModelU[r] : annualObsU[r]) /
+							annualObsCount[r]
+						count++
+					}
+					return count > 0 ? sum / count : Number.NaN
+				})
+			for (const source of ["model", "observed"] as const) {
+				const u = profile(source)
+				let trade = 0
+				for (let i = 0; i < lats.length && Math.abs(lats[i]) <= 30; i++)
+					if (u[i] < u[trade]) trade = i
+				let ridge = trade
+				while (ridge < lats.length - 1 && !(u[ridge] >= 0)) ridge++
+				let jet = ridge
+				for (let i = ridge; i < lats.length; i++) if (u[i] > u[jet]) jet = i
+				profileRows.push({
+					basin: basin.label,
+					source,
+					tradeLat: lats[trade],
+					tradeU: Number(u[trade].toFixed(2)),
+					ridgeLat: lats[ridge],
+					jetLat: lats[jet],
+					jetU: Number(u[jet].toFixed(2)),
+				})
+			}
+		}
+		console.info("Annual ocean zonal wind structure by basin")
+		console.table(profileRows)
+
+		// Steadiness = |annual-mean vector| / annual-mean speed per cell: 1 for
+		// a wind that never changes direction, near 0 for one that reverses
+		// with the seasons.
+		const steadinessBands = Array.from({ length: 12 }, (_, i) => ({
+			label: `${-60 + i * 10}..${-50 + i * 10}`,
+			lo: -60 + i * 10,
+			hi: -50 + i * 10,
+		}))
+		const steadinessRows = steadinessBands.map((band) => {
+			let modelSteadiness = 0
+			let observedSteadiness = 0
+			let modelVector = 0
+			let observedVector = 0
+			let angleError = 0
+			let n = 0
+			for (let r = 0; r < N; r++) {
+				const count = annualObsCount[r]
+				if (count === 0) continue
+				const lat = latDegAt(r)
+				if (lat < band.lo || lat >= band.hi) continue
+				const mu = annualModelU[r] / count
+				const mv = annualModelV[r] / count
+				const ou = annualObsU[r] / count
+				const ov = annualObsV[r] / count
+				const mVec = Math.hypot(mu, mv)
+				const oVec = Math.hypot(ou, ov)
+				modelSteadiness += mVec / Math.max(1e-9, annualModelSpeed[r] / count)
+				observedSteadiness += oVec / Math.max(1e-9, annualObsSpeed[r] / count)
+				modelVector += mVec
+				observedVector += oVec
+				const cos = (mu * ou + mv * ov) / Math.max(1e-9, mVec * oVec)
+				angleError +=
+					(Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
+				n++
+			}
+			const d = Math.max(1, n)
+			return {
+				band: band.label,
+				modelSteadiness: Number((modelSteadiness / d).toFixed(2)),
+				observedSteadiness: Number((observedSteadiness / d).toFixed(2)),
+				annualVectorRatio: Number(
+					(modelVector / Math.max(1e-9, observedVector)).toFixed(2),
+				),
+				annualVectorAngleErrDeg: Number((angleError / d).toFixed(1)),
+			}
+		})
+		console.info("Annual ocean wind steadiness and annual-vector error")
+		console.table(steadinessRows)
+
 		expect(overall.n).toBeGreaterThan(0)
+		const ocean = Object.fromEntries(
+			oceanBandAcc.map((b) => [b.label, summarize(b.acc)]),
+		)
+		expect(ocean["0-30N (trades)"].speedRatio).toBeGreaterThan(
+			MIN_OCEAN_TRADE_SPEED_RATIO,
+		)
+		expect(ocean["0-30S (trades)"].speedRatio).toBeGreaterThan(
+			MIN_OCEAN_TRADE_SPEED_RATIO,
+		)
+		expect(ocean["30N-60N (westerlies)"].speedRatio).toBeGreaterThan(
+			MIN_OCEAN_WESTERLY_SPEED_RATIO,
+		)
+		expect(ocean["30N-60N (westerlies)"].speedRatio).toBeLessThan(
+			MAX_OCEAN_WESTERLY_SPEED_RATIO,
+		)
+		expect(summarize(overall).meanAbsSpeedErrorMs).toBeLessThanOrEqual(
+			MAX_LAND_MEAN_ABS_SPEED_ERROR_MS,
+		)
 	}, 600_000)
 })

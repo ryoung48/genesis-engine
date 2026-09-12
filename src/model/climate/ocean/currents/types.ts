@@ -1,3 +1,4 @@
+import type { SverdrupParams } from "@/model/climate/ocean/currents/sverdrup/types"
 import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
@@ -11,12 +12,21 @@ export type ComputeSSTParams = {
 	distCoast: Float32Array
 	landmarks: GenesisLandmarks
 	monthlyTEQ: Float32Array[]
-	/** RAIN.computeAdvection's per-region east/west moisture-advection split
-	 * -- which channel dominates a coastal cell (trade winds vs westerlies)
-	 * determines its current facing, not a separate geographic bearing. */
 	eastAdv: Float32Array
 	westAdv: Float32Array
-	planetRadiusKm?: number
+	climate: GenesisClimate
+	elevation_km: Float32Array
+	params: SverdrupParams
+}
+
+export type ComputeCoastSideParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isLake: Uint8Array
+	isContinent: Uint8Array
+	eastAdv: Float32Array
+	westAdv: Float32Array
+	avgEdgeKm: number
 }
 
 export type ApplySSTToClimateParams = {
@@ -28,12 +38,9 @@ export type ApplySSTToClimateParams = {
 
 export type BuildOceanCurrentGridParams = {
 	mesh: SphereMesh
-	sst: Float32Array
 	isLand: Uint8Array
-	latDeg: Float32Array
-	lonDeg: Float32Array
-	reverseCirculation?: boolean
-	planetRadiusKm?: number
+	oceanCurrents: GenesisOceanCurrents
+	month: number
 }
 
 export type ObservedOceanCurrentGridParams = {

@@ -32,7 +32,8 @@ export type ApplyLockedSSTToClimateParams = {
 
 export type BuildLockedOceanCurrentGridParams = {
 	mesh: SphereMesh
-	sst: Float32Array
 	isLand: Uint8Array
-	planetRadiusKm?: number
+	oceanCurrents: GenesisOceanCurrents
+	month: number
+	planetRadiusKm: number
 }

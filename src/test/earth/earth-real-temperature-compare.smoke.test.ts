@@ -1,4 +1,5 @@
 import fs from "node:fs"
+import { gunzipSync } from "node:zlib"
 import { describe, expect, it } from "vitest"
 import { STAR } from "@/model/celestial/star"
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
@@ -12,6 +13,7 @@ import {
 	loadEarthMonthlyRaster,
 	loadEarthRiverLines,
 } from "./assets"
+import type { VplanetReference } from "./vplanet/types"
 
 const LAT_BANDS = [
 	{ label: "60N–90N", lo: 60, hi: 90 },
@@ -60,6 +62,16 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		const realWindU = loadEarthMonthlyRaster("earth-real-wind-u")
 		const realWindV = loadEarthMonthlyRaster("earth-real-wind-v")
 		const realCloudCover = loadEarthMonthlyRaster("earth-real-cloud-cover")
+		const vplanet: VplanetReference = JSON.parse(
+			gunzipSync(
+				fs.readFileSync(
+					"src/test/earth/fixtures/vplanet-earth-climate.json.gz",
+				),
+			).toString(),
+		)
+		expect(vplanet.revision).toBe("dd55da7e1ff063f0ea7048f91c9d2d97d6ba9a5d")
+		expect(vplanet.latitudeDegrees).toHaveLength(150)
+		expect(vplanet.temperature).toHaveLength(60)
 
 		const world = IMPORT_HEIGHTMAP.importGenesisWorld({
 			params: {
@@ -575,6 +587,46 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		const realMonthly = climate.real_temperature_monthly!
 		let monthlyAbsError = 0
 		let monthlyCount = 0
+		let vplanetAnnualAbsError = 0
+		let vplanetMonthlyAbsError = 0
+		let vplanetCount = 0
+		const vplanetAnnualByLatitude = vplanet.latitudeDegrees.map(
+			(_, latitudeIndex) =>
+				vplanet.temperature.reduce(
+					(sum, temperatures) => sum + temperatures[latitudeIndex],
+					0,
+				) / vplanet.temperature.length,
+		)
+		const vplanetMonthlyByLatitude = Array.from(
+			{ length: 12 },
+			() => new Float64Array(vplanet.latitudeDegrees.length),
+		)
+		let calendarDay = 0
+		const monthDayCounts = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+		for (let month = 0; month < monthDayCounts.length; month++) {
+			for (let day = 0; day < monthDayCounts[month]; day++) {
+				const daysSinceSolstice = (calendarDay + day + 0.5 - 354 + 365) % 365
+				const samplePosition =
+					(daysSinceSolstice * vplanet.temperature.length) / 365 - 1
+				const lowerPosition = Math.floor(samplePosition)
+				const fraction = samplePosition - lowerPosition
+				const lowerSample =
+					(lowerPosition + vplanet.temperature.length) %
+					vplanet.temperature.length
+				const upperSample = (lowerSample + 1) % vplanet.temperature.length
+				for (
+					let latitudeIndex = 0;
+					latitudeIndex < vplanet.latitudeDegrees.length;
+					latitudeIndex++
+				) {
+					const lower = vplanet.temperature[lowerSample][latitudeIndex]
+					const upper = vplanet.temperature[upperSample][latitudeIndex]
+					vplanetMonthlyByLatitude[month][latitudeIndex] +=
+						(lower + (upper - lower) * fraction) / monthDayCounts[month]
+				}
+			}
+			calendarDay += monthDayCounts[month]
+		}
 		let siberiaMonthlyDiffSum = 0
 		let siberiaMonthlyCount = 0
 		const siberiaMonthlyModeledSum = new Float64Array(12)
@@ -583,10 +635,35 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if (!isLand[r]) continue
 			const lat = latDegAt(r)
+			let upperLatitudeIndex = vplanet.latitudeDegrees.findIndex(
+				(latitude) => latitude >= lat,
+			)
+			if (upperLatitudeIndex < 1) upperLatitudeIndex = 1
+			if (upperLatitudeIndex >= vplanet.latitudeDegrees.length)
+				upperLatitudeIndex = vplanet.latitudeDegrees.length - 1
+			const lowerLatitudeIndex = upperLatitudeIndex - 1
+			const latitudeFraction =
+				(lat - vplanet.latitudeDegrees[lowerLatitudeIndex]) /
+				(vplanet.latitudeDegrees[upperLatitudeIndex] -
+					vplanet.latitudeDegrees[lowerLatitudeIndex])
+			const vplanetAnnual =
+				vplanetAnnualByLatitude[lowerLatitudeIndex] +
+				(vplanetAnnualByLatitude[upperLatitudeIndex] -
+					vplanetAnnualByLatitude[lowerLatitudeIndex]) *
+					latitudeFraction
+			if (Number.isFinite(realAvg[r]))
+				vplanetAnnualAbsError += Math.abs(vplanetAnnual - realAvg[r])
 			const lon = (Math.atan2(r_xyz[r * 3 + 1], r_xyz[r * 3]) * 180) / Math.PI
 			for (let month = 0; month < 12; month++) {
 				const index = month * mesh.numRegions + r
 				if (!Number.isFinite(realMonthly[index])) continue
+				const vplanetMonthly =
+					vplanetMonthlyByLatitude[month][lowerLatitudeIndex] +
+					(vplanetMonthlyByLatitude[month][upperLatitudeIndex] -
+						vplanetMonthlyByLatitude[month][lowerLatitudeIndex]) *
+						latitudeFraction
+				vplanetMonthlyAbsError += Math.abs(vplanetMonthly - realMonthly[index])
+				vplanetCount++
 				monthlyAbsError += Math.abs(
 					climate.temperature_monthly[index] - realMonthly[index],
 				)
@@ -607,6 +684,12 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			}
 		}
 		const monthlyMeanAbsErrorC = monthlyAbsError / Math.max(1, monthlyCount)
+		expect(monthlyMeanAbsErrorC).toBeLessThan(3.75)
+		expect(meanAbsErrorC).toBeLessThan(3.1)
+		const vplanetAnnualMeanAbsErrorC = vplanetAnnualAbsError / Math.max(1, n)
+		const vplanetMonthlyMeanAbsErrorC =
+			vplanetMonthlyAbsError / Math.max(1, vplanetCount)
+		expect(vplanetCount).toBe(monthlyCount)
 
 		console.info("Land cells compared", n, "of", mesh.numRegions)
 		console.info("Overall EBM vs WorldClim (land only, annual mean)")
@@ -618,6 +701,12 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			tooWarmPct: Number(((tooWarm / Math.max(1, n)) * 100).toFixed(1)),
 			tooColdPct: Number(((tooCold / Math.max(1, n)) * 100).toFixed(1)),
 			justRightPct: Number(((justRight / Math.max(1, n)) * 100).toFixed(1)),
+		})
+		console.info("Native VPLanet POISE vs WorldClim (same land cells)")
+		console.table({
+			revision: vplanet.revision.slice(0, 12),
+			meanAbsErrorC: Number(vplanetAnnualMeanAbsErrorC.toFixed(2)),
+			monthlyMeanAbsErrorC: Number(vplanetMonthlyMeanAbsErrorC.toFixed(4)),
 		})
 		console.info("Siberia diagnostic (50–70°N, 60–140°E; land only)")
 		console.table({
