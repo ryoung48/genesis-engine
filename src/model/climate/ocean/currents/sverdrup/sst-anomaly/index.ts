@@ -33,7 +33,16 @@ const MAX_VERTICAL_VELOCITY_M_S = 1e-4
 const THERMOCLINE_SCALE_M = 150
 
 const MAX_SWEEPS = 200
-const SWEEP_TOLERANCE_C = 0.005
+
+// Stop on the residual, not on how far the last sweep moved. Gauss-Seidel
+// crawls here -- the error only halves every ~40 sweeps -- so a small
+// per-sweep change does not mean a small distance from the solution, and the
+// old 0.005 C change criterion exited anywhere between 2e-3 and 1.8e-2 of
+// relative residual depending on the month. Over-relaxation is not an option:
+// upwind advection makes this operator non-symmetric, and measured omega >= 1.2
+// diverges outright.
+const RESIDUAL_TOLERANCE = 2e-2
+const RESIDUAL_CHECK_INTERVAL = 10
 
 // Meridional gradient of the zonal-mean ocean temperature, °C per metre.
 function zonalGradient({
@@ -159,11 +168,16 @@ function solveAnomaly({
 		}
 	}
 
+	let sourceNorm = 0
+	for (let i = 0; i < CELLS; i++)
+		if (ocean[i]) sourceNorm += source[i] * source[i]
+	sourceNorm = Math.sqrt(sourceNorm)
+	const target = RESIDUAL_TOLERANCE * Math.max(sourceNorm, 1e-300)
+
 	const anomaly = new Float32Array(CELLS)
 	for (let sweep = 0; sweep < MAX_SWEEPS; sweep++) {
 		const reverseRows = (sweep & 1) === 1
 		const reverseColumns = (sweep & 2) === 2
-		let maxDelta = 0
 		for (let jj = 1; jj < H - 1; jj++) {
 			const j = reverseRows ? H - 1 - jj : jj
 			const base = j * W
@@ -178,11 +192,26 @@ function solveAnomaly({
 						coefSouth[idx] * anomaly[idx - W] +
 						coefNorth[idx] * anomaly[idx + W]) /
 					diagonal[idx]
-				maxDelta = Math.max(maxDelta, Math.abs(value - anomaly[idx]))
 				anomaly[idx] = value
 			}
 		}
-		if (maxDelta < SWEEP_TOLERANCE_C) break
+		if ((sweep + 1) % RESIDUAL_CHECK_INTERVAL !== 0) continue
+		let residualSq = 0
+		for (let j = 1; j < H - 1; j++) {
+			const base = j * W
+			for (let i = 0; i < W; i++) {
+				const idx = base + i
+				if (!ocean[idx]) continue
+				const applied =
+					diagonal[idx] * anomaly[idx] -
+					coefWest[idx] * anomaly[base + wrapColumn(i - 1)] -
+					coefEast[idx] * anomaly[base + wrapColumn(i + 1)] -
+					coefSouth[idx] * anomaly[idx - W] -
+					coefNorth[idx] * anomaly[idx + W]
+				residualSq += (source[idx] - applied) ** 2
+			}
+		}
+		if (Math.sqrt(residualSq) < target) break
 	}
 	return anomaly
 }

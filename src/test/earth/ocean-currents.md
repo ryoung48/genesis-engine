@@ -233,6 +233,39 @@ Latency, ocean solve only, 12 months: 2.2 s for the old row integration, 9.5 s
 time-stepped with point relaxation, 20.5 s with the (still wrong) multigrid,
 and 9.1 s for the steady sparse solve that shipped.
 
+## The SST anomaly solver, measured
+
+It is a peer cost to the current solve, and none of the obvious speedups work.
+Against a 4000-sweep reference:
+
+| Gauss-Seidel sweeps | ms | RMS | max |
+| --- | ---: | ---: | ---: |
+| 20 | 308 | 0.108 | 2.63 C |
+| 40 | 436 | 0.049 | 1.66 C |
+| 80 | 764 | 0.017 | 0.56 C |
+| 200 | 1816 | 0.0045 | 0.085 C |
+
+- **Sweeps cannot simply be cut.** The error only halves every ~40 sweeps
+  (spectral radius ~0.983), so 80 sweeps is 6x worse than 200, not
+  indistinguishable. The 200 was always a cap, not a count: the old criterion
+  exited after 86-190 sweeps.
+- **SOR diverges.** omega = 1.2 reaches 2.3e3 C and omega >= 1.4 gives NaN.
+  Upwind advection makes the operator non-symmetric, and the Ostrowski-Reich
+  guarantee for omega > 1 only covers symmetric positive-definite matrices, so
+  classical over-relaxation has no basis here.
+- **The evaluation metrics cannot see any of it.** 80 sweeps and 400 sweeps
+  both give SST correlation 0.39 / -0.05 and identical box values. This solver
+  can only be tuned on field error, never on the metrics.
+- **What did change** is the stopping rule. It used to break on how far the
+  last sweep moved, which for a solver that crawls is not a distance from the
+  solution: it exited anywhere between 2e-3 and 1.8e-2 of relative residual
+  depending on the month. It now stops on the residual itself, so the accuracy
+  is the same every month and is a number that can be stated. Speed is
+  unchanged (3.5 s -> 3.3 s).
+
+If real speed is ever wanted here, the answer is the same Krylov machinery the
+current solve uses, not fewer sweeps and not over-relaxation.
+
 ## Tried and rejected
 
 - **Percentile normalization of the flow field** (the original behaviour). It
