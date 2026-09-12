@@ -273,7 +273,9 @@ function runPostElevationPipeline(
 				monthlyTEQ,
 				eastAdv,
 				westAdv,
-				planetRadiusKm: params.planetRadiusKm,
+				climate,
+				elevation_km,
+				params,
 			})
 	applyOceanCurrentsToClimate({
 		mesh,

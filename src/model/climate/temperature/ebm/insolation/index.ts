@@ -11,20 +11,25 @@ export const INSOLATION = {
 		const { lats, orbital, stellarOverride } = params
 		const { time, stellar: defaultStellar, grid } = CONSTANTS.embConstants
 		const stellar = stellarOverride || defaultStellar
-		const _insolation: number[][] = new Array(grid.NUM_LAT)
+		const sampleCount = params.sampleCount ?? time.DAYS_PER_YEAR
+		const latitudeCount = params.sampleCount ? lats.length : grid.NUM_LAT
+		const _insolation: number[][] = new Array(latitudeCount)
 			.fill(0)
-			.map(() => new Array(time.DAYS_PER_YEAR).fill(0))
-		const _daylight_hours: number[][] = new Array(grid.NUM_LAT)
+			.map(() => new Array(sampleCount).fill(0))
+		const _daylight_hours: number[][] = new Array(latitudeCount)
 			.fill(0)
-			.map(() => new Array(time.DAYS_PER_YEAR).fill(0))
-		const _declination: number[] = new Array(time.DAYS_PER_YEAR).fill(0)
+			.map(() => new Array(sampleCount).fill(0))
+		const _declination: number[] = new Array(sampleCount).fill(0)
 		const obliquityRad = (orbital.OBLIQUITY * Math.PI) / 180
 		const perihelionRad = (orbital.PERIHELION * Math.PI) / 180
 		const PI = Math.PI
 		const longP = perihelionRad + PI
 		const ecc = orbital.ECCENTRICITY
 		const equinoxOffsetRad = (40 * 2 * Math.PI) / time.DAYS_PER_YEAR
-		let trueL = -equinoxOffsetRad
+		let trueL =
+			params.startSolarLongitudeDegrees === undefined
+				? -equinoxOffsetRad
+				: (params.startSolarLongitudeDegrees * Math.PI) / 180
 		let trueA = trueL - longP
 
 		while (trueA < 0) trueA += 2 * PI
@@ -51,9 +56,9 @@ export const INSOLATION = {
 			Math.pow(stellar.T_SUN, 4) *
 			(Math.pow(stellar.R_SUN, 2) / Math.pow(stellar.AU, 2))
 
-		for (let day = 0; day < time.DAYS_PER_YEAR; day++) {
+		for (let day = 0; day < sampleCount; day++) {
 			if (day !== 0) {
-				meanL += (2 * PI) / time.DAYS_PER_YEAR
+				meanL += (2 * PI) / sampleCount
 				const meanA = meanL - longP
 				eccA = meanA
 				for (let iter = 0; iter < 10; iter++) {
@@ -80,7 +85,7 @@ export const INSOLATION = {
 			const cosDeclination = Math.cos(declination)
 			_declination[day] = declination
 
-			for (let i = 0; i < grid.NUM_LAT; i++) {
+			for (let i = 0; i < latitudeCount; i++) {
 				const lat = lats[i]
 				const cosH0 = -Math.tan(lat) * Math.tan(declination)
 				const sConst = s0 / (astroDist * astroDist)
@@ -102,7 +107,8 @@ export const INSOLATION = {
 						PI
 				}
 
-				_insolation[i][day] = Math.floor(_insolation[i][day])
+				if (params.sampleCount === undefined)
+					_insolation[i][day] = Math.floor(_insolation[i][day])
 			}
 		}
 

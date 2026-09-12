@@ -30,6 +30,11 @@ export interface ComputeLandmarksParams {
 	isLand: Uint8Array
 }
 
+export interface RegionTypeMaskParams {
+	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
+	type: LandmarkType
+}
+
 export interface IncrementCountParams {
 	counts: Map<number, number>
 	key: number

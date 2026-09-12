@@ -19,5 +19,6 @@ export interface CloudCoverTemperatureModifierParams {
 	dtrMonthly: Float32Array
 	oceanDist: Float32Array
 	isLand: Uint8Array
+	// [JUSTIFICATION] Ordinary rotating worlds use the default cloud estimator.
 	isTidallyLocked?: boolean
 }

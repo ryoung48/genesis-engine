@@ -1,13 +1,17 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
 import { DYNAMICS } from "@/model/climate/weather/wind/dynamics"
+import { OCEAN_INERTIA } from "@/model/climate/weather/wind/ocean-inertia"
 import { ROUGHNESS } from "@/model/climate/weather/wind/roughness"
 import { SHALLOW_WATER } from "@/model/climate/weather/wind/shallow-water"
 import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
+import { SURFACE_BALANCE } from "@/model/climate/weather/wind/surface-balance"
+import { TORQUE_BALANCE } from "@/model/climate/weather/wind/torque-balance"
 import type {
 	CellSegment,
 	ComputeWindVectorsInput,
 	FlowGrid,
+	PressureComponents,
 	RasterizeVectorGridInput,
 	WindGrid,
 } from "@/model/climate/weather/wind/types"
@@ -161,10 +165,23 @@ const INDIRECT_CELL_PRESSURE_PER_C = 0.22
 const POLAR_CELL_PRESSURE_PER_C = 0.15
 // Each successive cell boundary is progressively less coupled to the thermal
 // equator: the ITCZ trough follows it fully, the subtropical ridges only
-// partially, the polar front barely at all.
+// partially, the polar front barely at all. The trough follows the full
+// thermal equator, monsoon troughs over summer continents included; the
+// ridges and beyond follow the ocean thermal equator, since a hot summer
+// continent pulls the trough poleward but not the oceanic subtropical highs.
 const BOUNDARY_TEQ_COUPLING = 0.35
 // Boundary-layer friction relative to Earth's Coriolis parameter at the pole.
 const FRICTION = 0.3
+// Storm gustiness as a fraction of the thermal wind across one scale height,
+// R_d |dT/dy| / f (~20 m/s in Earth's midlatitudes), giving ~5 m/s of surface
+// gust spread in the storm tracks. It adds to the surface drag the torque
+// balance sees, not to the mean wind. R_d assumes Earth-like (N2/O2) air.
+const STORM_GUST_THERMAL_WIND_FRACTION = 0.25
+const DRY_AIR_GAS_CONSTANT_J_KG_K = 287
+const MAX_STORM_GUST_MS = 10
+// Fraction of the Hadley width (from the thermal equator) at which storm
+// gustiness starts fading in; it is full at the Hadley edge.
+const STORM_TRACK_ONSET_HADLEY_FRACTION = 0.75
 // Inside the deep tropics the surface flow is set by upstream momentum rather
 // than the vanishing local Coriolis, so the effective Coriolis is floored at
 // this fraction of a Hadley-cell width.
@@ -249,12 +266,24 @@ const EAST_BOUNDARY_TURN_DEG = 20
 const EAST_BOUNDARY_HIGH_FULL = 0.15
 const DEG2RAD = Math.PI / 180
 
+// Rotation's share of cell collapse: 0 for Earth-like rotation, 1 once the
+// day is long enough that Coriolis no longer organises the circulation.
+function rotationCollapse(hoursPerDay: number): number {
+	return MATH.smoothstep({
+		edge0: COLLAPSE_HOURS_EDGE0,
+		edge1: COLLAPSE_HOURS_EDGE1,
+		x: hoursPerDay,
+	})
+}
+
 function cellBoundaries({
 	teq,
+	ridgeTeq,
 	hw,
 	hemisphere,
 }: {
 	teq: number
+	ridgeTeq: number
 	hw: number
 	hemisphere: number
 }): number[] {
@@ -264,7 +293,7 @@ function cellBoundaries({
 		const coupling = BOUNDARY_TEQ_COUPLING ** (k + 1)
 		const hi = Math.max(
 			lo + 1,
-			(k + 1) * hw + hemisphere * teq * (coupling - 1),
+			(k + 1) * hw + hemisphere * (coupling * ridgeTeq - teq),
 		)
 		offsets.push(hi)
 		lo = hi
@@ -275,15 +304,17 @@ function cellBoundaries({
 function cellSegment({
 	lat,
 	teq,
+	ridgeTeq,
 	hw,
 }: {
 	lat: number
 	teq: number
+	ridgeTeq: number
 	hw: number
 }): CellSegment {
 	const s = lat >= teq ? 1 : -1
 	const d = s * (lat - teq)
-	const offsets = cellBoundaries({ teq, hw, hemisphere: s })
+	const offsets = cellBoundaries({ teq, ridgeTeq, hw, hemisphere: s })
 	const lastCell = offsets.length - 1
 	let lo = 0
 	for (let k = 0; k <= lastCell; k++) {
@@ -359,6 +390,7 @@ function computePressureField({
 	elevation_km,
 	heatLow,
 	teqByLon,
+	ridgeTeqByLon,
 	hoursPerDay,
 	cellCollapse,
 }: {
@@ -367,9 +399,10 @@ function computePressureField({
 	elevation_km: Float32Array
 	heatLow: Float32Array
 	teqByLon: Float32Array
+	ridgeTeqByLon: Float32Array
 	hoursPerDay: number
 	cellCollapse: number
-}): Float32Array {
+}): PressureComponents {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const { latDeg, regionBin } = RAIN.getClimateGeometry(mesh)
@@ -422,6 +455,7 @@ function computePressureField({
 		const seg = cellSegment({
 			lat: latDeg[r],
 			teq: teqByLon[regionBin[r]],
+			ridgeTeq: ridgeTeqByLon[regionBin[r]],
 			hw,
 		})
 		segments[r] = seg
@@ -462,8 +496,9 @@ function computePressureField({
 	const boundaryBase = new Float32Array(lonBins * 2 * boundaries)
 	for (let bin = 0; bin < lonBins; bin++) {
 		const teq = teqByLon[bin]
+		const ridgeTeq = ridgeTeqByLon[bin]
 		for (const hemisphere of [-1, 1]) {
-			const offsets = cellBoundaries({ teq, hw, hemisphere })
+			const offsets = cellBoundaries({ teq, ridgeTeq, hw, hemisphere })
 			let pressureAt = 0
 			let latPrev = teq
 			for (let k = 1; k < boundaries; k++) {
@@ -479,7 +514,12 @@ function computePressureField({
 		}
 	}
 
-	const pressure = new Float32Array(N)
+	// The Hadley component rises from the trough to the ridge across the
+	// Hadley cell and stays flat at the ridge value poleward of it, so scaling
+	// it by surface torque balance changes only the trades, not the Ferrel and
+	// polar gradients. The rest is whatever remains of the full template.
+	const hadley = new Float32Array(N)
+	const rest = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const lat = latDeg[r]
 		const seg = segments[r]
@@ -497,31 +537,40 @@ function computePressureField({
 			oceanFrac: oceanFrac[at(seg.k + 1)],
 			cellCollapse,
 		})
-		const bgPressure = pLo + (pHi - pLo) * seg.t
+		const ridge = boundaryPressure({
+			base: boundaryBase[at(1)],
+			k: 1,
+			oceanFrac: oceanFrac[at(1)],
+			cellCollapse,
+		})
 		// Warm-relative-to-zonal-mean surfaces (summer continents) are thermal
 		// lows, cold ones (winter continents) thermal highs. Uses sea-level-
 		// reduced temperature so plateaus register as heat sources instead of
 		// as spurious cold highs.
 		const thermalAnomaly =
 			(-THERMAL_COUPLING * (seaLevelTemps[r] - latBinMean[latBinOf(lat)])) / 15
-		pressure[r] = bgPressure + thermalAnomaly + heatLow[r]
+		hadley[r] = seg.k === 0 ? ridge * seg.t : ridge
+		rest[r] =
+			pLo + (pHi - pLo) * seg.t - hadley[r] + thermalAnomaly + heatLow[r]
 	}
 
 	const buf = new Float32Array(N)
-	for (let pass = 0; pass < 4; pass++) {
-		for (let r = 0; r < N; r++) {
-			let sum = pressure[r]
-			let count = 1
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				sum += pressure[adjList[j]]
-				count++
+	for (const field of [hadley, rest]) {
+		for (let pass = 0; pass < 4; pass++) {
+			for (let r = 0; r < N; r++) {
+				let sum = field[r]
+				let count = 1
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					sum += field[adjList[j]]
+					count++
+				}
+				buf[r] = sum / count
 			}
-			buf[r] = sum / count
+			field.set(buf)
 		}
-		pressure.set(buf)
 	}
 
-	return pressure
+	return { hadley, rest }
 }
 
 function computeWindVectors({
@@ -558,12 +607,9 @@ function computeWindVectors({
 		})
 	}
 	const N = mesh.numRegions
-	const { adjOffset, adjList, neighborDist } = mesh
 	const {
 		absLatDeg,
 		sinLat: sinLatArr,
-		edgeEastward,
-		edgeNorthward,
 		regionBin,
 	} = RAIN.getClimateGeometry(mesh)
 
@@ -578,11 +624,7 @@ function computeWindVectors({
 	const uprightTilt = axialTilt > 180 ? 360 - axialTilt : axialTilt
 	const effTilt = uprightTilt > 90 ? 180 - uprightTilt : uprightTilt
 	const cellCollapse = Math.max(
-		MATH.smoothstep({
-			edge0: COLLAPSE_HOURS_EDGE0,
-			edge1: COLLAPSE_HOURS_EDGE1,
-			x: hoursPerDay,
-		}),
+		rotationCollapse(hoursPerDay),
 		MATH.smoothstep({
 			edge0: COLLAPSE_TILT_EDGE0,
 			edge1: COLLAPSE_TILT_EDGE1,
@@ -602,6 +644,7 @@ function computeWindVectors({
 	const radiusFactor = UNITS.defaultPlanetRadiusKm / planetRadiusKm
 	const pressureFactor =
 		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
+	const rawPerMs = 1 / (SPEED_SCALE * radiusFactor * pressureFactor)
 
 	const hasMonth = month !== undefined && month >= 0 && month < 12
 	const temps = hasMonth
@@ -647,13 +690,28 @@ function computeWindVectors({
 		}
 		oceanZonal[i] = oceanCount[j] > 0 ? oceanSum[j] / oceanCount[j] : 15
 	}
+	// The ocean surface the trough follows carries the mixed layer's thermal
+	// inertia, which damps and delays the oceanic ITCZ's seasonal swing; the
+	// EBM's monthly ocean temperature responds too quickly. The subtropical
+	// ridge (and the cells poleward of it) stays on the monthly temperature.
+	const daysPerYear = params?.daysPerYear ?? UNITS.defaultDaysPerYear
+	const surfaceTemps = hasMonth
+		? OCEAN_INERTIA.laggedSeaLevelTemps({
+				climate,
+				elevation_km,
+				month,
+				monthSeconds: (daysPerYear * hoursPerDay * 3600) / 12,
+			})
+		: seaLevelTemps
 	const troughTemps = new Float32Array(N)
+	const oceanTemps = new Float32Array(N)
 	const heatLow = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const warmSeason = MATH.clamp01((temps[r] - climate.temperature_avg[r]) / 8)
 		troughTemps[r] =
-			seaLevelTemps[r] +
+			surfaceTemps[r] +
 			PLATEAU_HEAT_PER_KM * Math.max(0, elevation_km[r]) * warmSeason
+		oceanTemps[r] = elevation_km[r] > 0 ? -Infinity : seaLevelTemps[r]
 		const anomaly = troughTemps[r] - oceanZonal[oceanBinOf(latDeg[r])]
 		const warmSurface = MATH.smoothstep({
 			edge0: HEAT_LOW_MIN_SURFACE_C,
@@ -667,16 +725,108 @@ function computeWindVectors({
 		mesh,
 		seaLevelTemps: troughTemps,
 	})
-	const pressure = computePressureField({
+	const ridgeTeqByLon = RAIN.computeThermalEquator({ mesh, temps: oceanTemps })
+	const components = computePressureField({
 		mesh,
 		seaLevelTemps,
 		elevation_km,
 		heatLow,
 		teqByLon,
+		ridgeTeqByLon,
 		hoursPerDay,
 		cellCollapse,
 	})
 	const { lonDeg } = RAIN.getClimateGeometry(mesh)
+
+	// Storm-track gustiness: baroclinic eddies carry a share of the thermal
+	// wind across one scale height, R_d |dT/dy| / f, so gusts grow with the
+	// meridional temperature gradient (per metre, so planet size matters) and
+	// with slower rotation (larger eddies), and vanish with the storm tracks
+	// when the cells collapse.
+	const binDeg = 180 / OCEAN_BINS
+	const metersPerDeg = planetRadiusKm * 1000 * DEG2RAD
+	const rotationRate = (2 * Math.PI) / (hoursPerDay * 3600)
+	const gustByBin = new Float32Array(OCEAN_BINS)
+	for (let i = 0; i < OCEAN_BINS; i++) {
+		const lo = Math.max(0, i - 1)
+		const hi = Math.min(OCEAN_BINS - 1, i + 1)
+		const gradientPerM =
+			Math.abs(oceanZonal[hi] - oceanZonal[lo]) /
+			((hi - lo) * binDeg * metersPerDeg)
+		const binLat = -90 + (i + 0.5) * binDeg
+		const f =
+			2 *
+			rotationRate *
+			Math.max(Math.abs(Math.sin(binLat * DEG2RAD)), floorSin)
+		const thermalWind = (DRY_AIR_GAS_CONSTANT_J_KG_K * gradientPerM) / f
+		const gustMs =
+			Math.min(
+				MAX_STORM_GUST_MS,
+				STORM_GUST_THERMAL_WIND_FRACTION * thermalWind,
+			) *
+			(1 - cellCollapse)
+		gustByBin[i] = gustMs * rawPerMs
+	}
+	const gust = new Float32Array(N)
+	const coriolis = new Float32Array(N)
+	const hemisphere = new Int8Array(N)
+	const northHadley = new Float32Array(N)
+	const southHadley = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const effSin = Math.max(
+			Math.abs(sinLatArr[r]),
+			floorSin * MATH.smoothstep({ edge0: 0, edge1: 5, x: absLatDeg[r] }),
+		)
+		coriolis[r] = coriolisSign * Math.sign(sinLatArr[r]) * effSin * omegaRatio
+		hemisphere[r] = latDeg[r] >= teqByLon[regionBin[r]] ? 1 : -1
+		// Baroclinic storms live poleward of the Hadley cell, whose flow is
+		// steady; the gust fades in across its edge.
+		gust[r] =
+			gustByBin[oceanBinOf(latDeg[r])] *
+			MATH.smoothstep({
+				edge0: STORM_TRACK_ONSET_HADLEY_FRACTION * hw,
+				edge1: hw,
+				x: Math.abs(latDeg[r] - teqByLon[regionBin[r]]),
+			})
+		if (hemisphere[r] > 0) northHadley[r] = components.hadley[r]
+		else southHadley[r] = components.hadley[r]
+	}
+	// The steady linear large-scale correction is linear in pressure, so it is
+	// applied to each component before they are recombined.
+	const withDynamics = (field: Float32Array) => {
+		if (LARGE_SCALE_SOLVER === "shallow-water") return field
+		const dynamic = DYNAMICS.correction({
+			latDeg,
+			lonDeg,
+			pressure: field,
+			friction: FRICTION,
+			coriolisScale: coriolisSign * omegaRatio,
+			waveCoupling: WAVE_COUPLING,
+		})
+		const out = new Float32Array(N)
+		for (let r = 0; r < N; r++) out[r] = field[r] + dynamic[r]
+		return out
+	}
+	const restPressure = withDynamics(components.rest)
+	const northPressure = withDynamics(northHadley)
+	const southPressure = withDynamics(southHadley)
+	const hadleyScale = TORQUE_BALANCE.hadleyScales({
+		mesh,
+		rest: restPressure,
+		north: northPressure,
+		south: southPressure,
+		coriolis,
+		friction: FRICTION,
+		hemisphere,
+		gust,
+	})
+	const pressure = new Float32Array(N)
+	for (let r = 0; r < N; r++)
+		pressure[r] =
+			restPressure[r] +
+			hadleyScale.north * northPressure[r] +
+			hadleyScale.south * southPressure[r]
+
 	// Large-scale flow: either a steady linear correction to the pressure the
 	// per-cell balance then sees, or a time-stepped shallow-water surface wind
 	// whose coarse pressure is removed from the per-cell balance so only the
@@ -695,18 +845,7 @@ function computeWindVectors({
 		largeScaleU = sw.u
 		largeScaleV = sw.v
 		for (let r = 0; r < N; r++) pressure[r] -= sw.coarsePressure[r]
-	} else {
-		const dynamic = DYNAMICS.correction({
-			latDeg,
-			lonDeg,
-			pressure,
-			friction: FRICTION,
-			coriolisScale: coriolisSign * omegaRatio,
-			waveCoupling: WAVE_COUPLING,
-		})
-		for (let r = 0; r < N; r++) pressure[r] += dynamic[r]
 	}
-	const rawPerMs = 1 / (SPEED_SCALE * radiusFactor * pressureFactor)
 
 	// Land fraction on a coarse lat-lon grid and, per cell, how far east of a
 	// western land boundary it sits.
@@ -804,66 +943,33 @@ function computeWindVectors({
 	const windV = new Float32Array(N)
 	const rawSpeed = new Float32Array(N)
 
+	// Pressure gradient in template units per radian; terrain slope in km/km.
+	const pressureGradient = SURFACE_BALANCE.meshGradient({
+		mesh,
+		field: pressure,
+	})
+	const elevationGradient = SURFACE_BALANCE.meshGradient({
+		mesh,
+		field: elevation_km,
+	})
+
 	for (let r = 0; r < N; r++) {
-		const absLat = absLatDeg[r]
-		const sinLat = sinLatArr[r]
-
-		// Pressure gradient (template units per radian) and terrain slope
-		// (km per km) in (east, north) from neighbor differences.
-		let gradPEast = 0
-		let gradPNorth = 0
-		let gradEEast = 0
-		let gradENorth = 0
-		let count = 0
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			const dist = Math.max(neighborDist[j], 1e-6)
-			const dP = (pressure[nb] - pressure[r]) / dist
-			gradPEast += dP * edgeEastward[j]
-			gradPNorth += dP * edgeNorthward[j]
-			const dE = (elevation_km[nb] - elevation_km[r]) / (dist * planetRadiusKm)
-			gradEEast += dE * edgeEastward[j]
-			gradENorth += dE * edgeNorthward[j]
-			count++
-		}
-		if (count > 0) {
-			gradPEast /= count
-			gradPNorth /= count
-			gradEEast /= count
-			gradENorth /= count
-		}
-
-		const forceEast = -gradPEast
-		const forceNorth = -gradPNorth
+		const forceEast = -pressureGradient.east[r]
+		const forceNorth = -pressureGradient.north[r]
+		const gradEEast = elevationGradient.east[r] / planetRadiusKm
+		const gradENorth = elevationGradient.north[r] / planetRadiusKm
 
 		const slopeMag = Math.hypot(gradEEast, gradENorth)
 		const gEastHat = slopeMag > 1e-9 ? gradEEast / slopeMag : 0
 		const gNorthHat = slopeMag > 1e-9 ? gradENorth / slopeMag : 0
 
-		// Steady boundary-layer balance: friction*V + f k×V = F. Friction
-		// turns the flow across isobars toward low pressure, Coriolis turns it
-		// along them; the cross-isobar angle is atan(friction/f).
-		const effSin = Math.max(
-			Math.abs(sinLat),
-			floorSin * MATH.smoothstep({ edge0: 0, edge1: 5, x: absLat }),
-		)
-		const f = coriolisSign * Math.sign(sinLat) * effSin * omegaRatio
-		const balance = ({
-			friction,
+		const f = coriolis[r]
+		const bl = SURFACE_BALANCE.balance({
+			friction: FRICTION,
+			coriolis: f,
 			forceEast,
 			forceNorth,
-		}: {
-			friction: number
-			forceEast: number
-			forceNorth: number
-		}) => {
-			const denom = friction * friction + f * f
-			return {
-				u: (friction * forceEast + f * forceNorth) / denom,
-				v: (friction * forceNorth - f * forceEast) / denom,
-			}
-		}
-		const bl = balance({ friction: FRICTION, forceEast, forceNorth })
+		})
 		const roughness = surface ? ROUGHNESS.surfaceFactor({ r, surface }) : 1
 		let u = bl.u * roughness
 		let v = bl.v * roughness
@@ -928,8 +1034,9 @@ function computeWindVectors({
 				coldFactor *
 				MATH.smoothstep({ edge0: 0.0001, edge1: 0.0013, x: slopeMag })
 			if (kMag > 0) {
-				const k = balance({
+				const k = SURFACE_BALANCE.balance({
 					friction: KATABATIC_FRICTION,
+					coriolis: f,
 					forceEast: -gEastHat * kMag,
 					forceNorth: -gNorthHat * kMag,
 				})
@@ -1062,4 +1169,5 @@ export const WIND = {
 	computeWindGrid,
 	computeWindVectors,
 	observedWindVectorsForMonth,
+	rotationCollapse,
 }

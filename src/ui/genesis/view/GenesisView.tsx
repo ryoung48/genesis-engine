@@ -12,7 +12,6 @@ import { DATE } from "@/model/history/earth/date"
 import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { StageTiming } from "@/model/pipelines/types"
-import { UNITS } from "@/model/shared/units"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
@@ -1175,31 +1174,20 @@ export const GenesisView: React.FC<{
 			})
 		}
 		if (!world.oceanCurrents) return null
-		const N = world.mesh.numRegions
-		const sst =
-			currentMonth > 0
-				? world.oceanCurrents.sstMonthly.subarray(
-						(currentMonth - 1) * N,
-						currentMonth * N,
-					)
-				: world.oceanCurrents.sst
 		if (world.params.tideLock?.type === "solar") {
 			return LOCKED_OCEAN_CURRENTS.buildLockedOceanCurrentGrid({
 				mesh: world.mesh,
-				sst,
 				isLand: world.isLand,
+				oceanCurrents: world.oceanCurrents,
+				month: currentMonth,
 				planetRadiusKm: world.params.planetRadiusKm,
 			})
 		}
-		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		return OCEAN_CURRENTS.buildOceanCurrentGrid({
 			mesh: world.mesh,
-			sst,
 			isLand: world.isLand,
-			latDeg,
-			lonDeg,
-			reverseCirculation: UNITS.isRetrogradeObliquity(world.params.obliquity),
-			planetRadiusKm: world.params.planetRadiusKm,
+			oceanCurrents: world.oceanCurrents,
+			month: currentMonth,
 		})
 	}, [world, showOceanCurrents, showRealOceanCurrents, currentMonth])
 

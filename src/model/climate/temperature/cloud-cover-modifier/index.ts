@@ -6,16 +6,6 @@ const HOT_LOW_CLOUD_WARMING_C = 4
 const HOT_HIGH_CLOUD_COOLING_C = 2.5
 const INTENSITY_CAP_TEMP_C = 20
 
-/**
- * Cloud cover damps or amplifies monthly temperature: clear skies push a
- * warm region hotter and a cold region colder, while overcast skies do the
- * opposite. Sign and effect strength are both driven by the region's
- * *annual average* temperature (not the individual month's), scaling
- * linearly with distance from 0°C, reaching its cap at |avg temp| >= 25°C
- * and vanishing at avg temp === 0. Uses modeled (procedural) temperature
- * only, never earth-observed. Also caches the estimated cloud fraction
- * itself onto climate.cloud_cover_monthly for hover/map reuse.
- */
 function applyCloudCoverTemperatureModifier({
 	climate,
 	rainfall,

@@ -100,12 +100,4 @@ claude --resume 4bc48604-7335-4e3b-a1c5-87270824c9e0 --dangerously-skip-permissi
 ~\AppData\Local\Temp\claude\C--Users-rayou-projects-nexus-chaos-machine\f0b6021 
 
 
-claude --resume dd4a09d1-7bb7-413f-b47e-3690724a15bc
-2. East Asian trough (small, wind only). South China is the last big monsoon miss. The trough over 105-120E needs to sit at 35-45N in July. Two cheap options: widen the trough smoothing window so Tibet's heat reaches those longitudes, or let the plateau term weight by terrain area within the window rather than per-cell height. About an hour, measurable on the S China row.
-3. NH polar band (medium, temperature side). Direction cosine there is 0.08, effectively random, on 15% of land cells. Cause: the EBM's 60-90N temperatures are zonally flat, so no Icelandic low / Siberian high contrast exists for the thermal anomaly to act on. The fix is a winter land-sea contrast at high latitude, which the land/ocean column split now makes possible: land cells already cool more than ocean in winter, so this may partly be a matter of raising the wind's thermal coupling only poleward of the polar front, where the anomaly is real signal rather than noise.
-4. Southern westerlies speed (small). 30S-60S is 1.25 m/s slow with good direction. Deepening the polar-front trough by the zonal ocean fraction at that latitude is the physical mechanism and generic across planets. About an hour.
-5. Somali jet / orographic channeling (large). Arabia's +2.3 westerly and several other coastal jets need flow steering along mountain barriers, which is a different kind of term than anything in the model. I'd leave this unless you want per-region fidelity beyond the zonal-mean structure.
-
-Why South China stops here. The southerly component now appears, but the easterly persists because the cell template places the summer ridge poleward of the 25N trough, right over South China. Real July flow there is the western flank of the Pacific subtropical high, an ocean feature east of the coast that the zonal template has no longitude structure for. Closing it needs the template to carry a longitude-dependent ridge, which is a structural change rather than a tuning one. I'd put that with the polar-front ocean-fraction item if you want to go further.
-
-2. Add the nonlinear term to the solver. Advection of momentum is what makes boundary jets and closed gyres appear. It's a few extra lines in the iteration but changes the convergence behaviour, so it needs testing.
+claude --resume e60f57a7-0a1d-47d6-b7f2-70d6c833590d

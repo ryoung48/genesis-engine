@@ -38,14 +38,12 @@ export interface GenesisRainfall {
 }
 
 export interface GenesisOceanCurrents {
-	/** Per-cell modeled SST anomaly vs zonal mean, -1..+1: latitude/coast-facing
-	 * band strength × distance-from-ITCZ × distance-from-coast falloff. Ocean
-	 * cells only carry the real signal; land cells hold a cosmetic fade of the
-	 * nearest ocean value for visual continuity at the coastline. Purely a
-	 * display quantity -- does not feed back into climate.temperature. */
-	sst: Float32Array
-	/** Per-cell monthly SST anomaly, flattened [month * numRegions + region]. */
-	sstMonthly: Float32Array
+	sst: Float32Array // per-cell SST anomaly vs zonal mean, normalized -1..+1
+	sstMonthly: Float32Array // [month * N + r]
+	flowU: Float32Array // per-cell eastward surface current, ~m/s
+	flowV: Float32Array // per-cell northward surface current, ~m/s
+	flowUMonthly: Float32Array // [month * N + r]
+	flowVMonthly: Float32Array // [month * N + r]
 }
 
 export interface GenesisHydrology {

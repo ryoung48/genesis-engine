@@ -11,6 +11,7 @@ import { UTILS } from "@/model/climate/temperature/ebm/utils"
 import type { Matrix2x2 } from "@/model/climate/temperature/ebm/utils/types"
 import { TIME } from "@/model/shared/time"
 
+// Owns mutable land/water columns and integration buffers across solver timesteps.
 export class EnergyBalanceModel {
 	lats: number[] = []
 	lats_deg: number[] = []
@@ -20,27 +21,13 @@ export class EnergyBalanceModel {
 	dx: number[] = []
 	insolation: number[][] = []
 	daylightHours: number[][] = []
-	/** Solar declination (radians) per day of year -- used only for the
-	 * zenith-angle albedo correction below. */
 	declination: number[] = []
-	/** Land-fraction-weighted blend of temperature_land/temperature_ocean --
-	 * the only field external callers should read. Populated once runModel()
-	 * finishes; empty/unused mid-run. */
 	temperature: number[][] = []
 	temperature_avg: number[] = []
 	temperature_min: number[] = []
 	temperature_max: number[] = []
 	land_fraction: number[] = []
 
-	/** Land and ocean within a latitude band are simulated as two independent
-	 * thermal columns, not one land-fraction-blended average. A blended
-	 * column freezes (and ice-albedo-locks) as soon as the BAND MEAN dips
-	 * below the ice threshold, even in bands that are mostly open ocean --
-	 * which erases the real mechanism (ocean thermal inertia keeping water
-	 * open through a long polar night) that high-obliquity climate studies
-	 * rely on to avoid a runaway snowball. Each column gets its own heat
-	 * capacity and its own ice/albedo state; only the FINAL output blends
-	 * them back into one number per band. */
 	heat_capacity_land: number[] = []
 	heat_capacity_ocean: number[] = []
 	temperature_land: number[][] = []

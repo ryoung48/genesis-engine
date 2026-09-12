@@ -7,6 +7,11 @@ export interface MeshLatitudeGeometry {
 	latBandByRegion: Uint8Array
 }
 
+export interface LatBandInterpolationParams {
+	range: number[]
+	latDeg: number
+}
+
 export type ComputeLandFractionParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
@@ -28,7 +33,9 @@ export type ComputeTemperatureParams = {
 	elevation: Float32Array
 	landFraction: number[]
 	params: GenesisParams
+	// [JUSTIFICATION] Callers without coast distances use the zonal seasonal cycle.
 	oceanDist?: Float32Array
 	isLand: Uint8Array
+	// [JUSTIFICATION] Procedural terrain can derive height from normalized elevation.
 	elevation_km?: Float32Array
 }

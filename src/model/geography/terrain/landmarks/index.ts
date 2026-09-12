@@ -3,6 +3,7 @@ import type {
 	GenesisLandmarks,
 	IncrementCountParams,
 	LandmarkType,
+	RegionTypeMaskParams,
 } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import { IDENTITY_SEEDS } from "@/model/shared/random/identity-seeds"
@@ -198,10 +199,21 @@ function assignLandmarkIdentity(params: {
 	}
 }
 
+function regionTypeMask({ landmarks, type }: RegionTypeMaskParams): Uint8Array {
+	const code = landmarkTypes.indexOf(type)
+	const mask = new Uint8Array(landmarks.regionLandmark.length)
+	for (let r = 0; r < mask.length; r++) {
+		const landmark = landmarks.regionLandmark[r]
+		if (landmark >= 0 && landmarks.type[landmark] === code) mask[r] = 1
+	}
+	return mask
+}
+
 export const LANDMARKS = {
 	landmarkTypes,
 	landmarkTypeOcean,
 	computeLandmarks,
+	regionTypeMask,
 	assignLandmarkIdentity,
 	landmarkTypeSea,
 	landmarkTypeLake,
