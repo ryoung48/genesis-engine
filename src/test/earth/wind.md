@@ -10,6 +10,19 @@ and what the Earth comparison says about them. Ocean-side work is in
 pnpm vitest run --project smoke src/test/earth/earth-real-wind-compare.smoke.test.ts --reporter verbose
 ```
 
+The comparison runs both modeled-temperature and observed-temperature cases.
+The observed case uses WorldClim/NCEP monthly air temperatures, preserves the
+existing terrain correction when constructing sea-level temperatures, and
+recomputes annual means. It derives solar declination through `INSOLATION`
+with an explicit nominal January 1 solar longitude of 280.38 degrees, based on
+JPL's J2000 Earth orbital elements, then averages daily samples over non-leap
+calendar months. This is a conditional wind diagnostic; the modeled-temperature
+case retains the generated climate's own temperature and declination inputs.
+
+`src/test/insolation-phase.smoke.test.ts` checks phase shifts on a circular
+orbit, zero tilt at several starting phases, and unequal season lengths on
+eccentric orbits. The default planetary epoch and wind coefficients are unchanged.
+
 Observed NCEP winds are compared against, never fed in. The wind model also
 receives no SST or ocean-current input: wind drives the ocean one way, and
 there is no coupling loop. Anything the real atmosphere gets from ocean

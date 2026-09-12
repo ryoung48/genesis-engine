@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
+import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { RAIN } from "@/model/climate/precipitation/rain"
+import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
 import { WIND } from "@/model/climate/weather/wind"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
@@ -71,8 +73,15 @@ const MIN_OCEAN_WESTERLY_SPEED_RATIO = 0.85
 const MAX_OCEAN_WESTERLY_SPEED_RATIO = 1.2
 const MAX_LAND_MEAN_ABS_SPEED_ERROR_MS = 1.4
 
+// Nominal January 1 noon phase from JPL's J2000 Earth orbital elements:
+// https://ssd.jpl.nasa.gov/planets/approx_pos.html
+const EARTH_JANUARY_START_SOLAR_LONGITUDE_DEGREES = 280.38
+
 describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
-	it("imports the real Earth heightmap and compares modeled vs reanalysis surface wind", () => {
+	it.each([
+		"modeled",
+		"observed",
+	] as const)("compares generated wind using %s temperatures against reanalysis", (temperatureSource) => {
 		const earth = loadEarthGrayscale("earth.png")
 		const coastline = loadEarthGrayscale("coastline-mask.png")
 		const lake = loadEarthGrayscale("lake-mask.png")
@@ -129,6 +138,69 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		})
 
 		expect(world.observedWind?.real_u_monthly).toBeDefined()
+
+		if (temperatureSource === "observed") {
+			const raster = loadEarthMonthlyRaster("earth-real-temperature")
+			const monthly = OBSERVED_EARTH.sampleMonthlyFloatRaster({
+				mesh: world.mesh,
+				raster: raster.monthly,
+				rasterW: raster.width,
+				rasterH: raster.height,
+				months: raster.months,
+				scale: raster.scale,
+				nodata: raster.nodata,
+			})
+			const regionCount = world.mesh.numRegions
+			expect(raster.months).toBe(12)
+			expect(monthly.every(Number.isFinite)).toBe(true)
+			const seaLevel = new Float32Array(monthly.length)
+			const annual = new Float32Array(regionCount)
+			for (let month = 0; month < 12; month++) {
+				for (let r = 0; r < regionCount; r++) {
+					const idx = month * regionCount + r
+					const terrainCorrection =
+						world.climate.temperature_monthly_nolapse[idx] -
+						world.climate.temperature_monthly[idx]
+					seaLevel[idx] = monthly[idx] + terrainCorrection
+					annual[r] += monthly[idx] / 12
+				}
+			}
+			const { _declination: dailyDeclination } = INSOLATION.compute({
+				lats: [0],
+				orbital: {
+					OBLIQUITY: world.params.obliquity,
+					ECCENTRICITY: world.params.eccentricity,
+					PERIHELION: world.params.perihelion,
+				},
+				sampleCount: 365,
+				startSolarLongitudeDegrees: EARTH_JANUARY_START_SOLAR_LONGITUDE_DEGREES,
+			})
+			const declinationMonthly = new Float32Array(12)
+			let calendarDay = 0
+			for (let month = 0; month < 12; month++) {
+				const days = new Date(Date.UTC(2001, month + 1, 0)).getUTCDate()
+				let sum = 0
+				for (let day = 0; day < days; day++)
+					sum += dailyDeclination[calendarDay + day]
+				declinationMonthly[month] = (sum / days) * (180 / Math.PI)
+				calendarDay += days
+			}
+			expect(calendarDay).toBe(dailyDeclination.length)
+			expect(declinationMonthly[0]).toBeLessThan(-19)
+			expect(declinationMonthly[1]).toBeLessThan(-11)
+			expect(declinationMonthly[5]).toBeGreaterThan(22)
+			expect(declinationMonthly[8]).toBeGreaterThan(0)
+			world.climate = {
+				...world.climate,
+				temperature_monthly: monthly,
+				temperature_monthly_nolapse: seaLevel,
+				temperature_avg: annual,
+				declination_monthly: declinationMonthly,
+			}
+			console.info("Observed-temperature calendar declination, Jan–Dec", [
+				...declinationMonthly,
+			])
+		}
 
 		const r_xyz = world.mesh.r_xyz
 		function latDegAt(r: number): number {
