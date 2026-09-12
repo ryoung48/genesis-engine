@@ -88,9 +88,25 @@ solve).
 | Current direction, 15-60 deg | -0.18 | 0.45 |
 | Regions with a positive direction score | 0/14 | 12/13 |
 | Regions with correct SST sign | 6/10 | 9/10 |
-| ACC direction score | -0.18 | 0.44 |
-| ACC mean u (obs 0.090 m/s) | -- | 0.092 m/s |
 | ACC peak speed (obs 0.30 m/s) | 1.89 m/s (artifact) | 0.48 m/s |
+
+The ACC, measured across this session only (the "Start" column above predates
+it, and no per-region direction score was recorded then):
+
+| ACC 45-60S | Before the channel jet | Now | Observed |
+| --- | ---: | ---: | ---: |
+| direction score | 0.12 | 0.44 | -- |
+| mean u | 0.032 | 0.092 | 0.090 m/s |
+| mean v | 0.006 | 0.003 | 0.055 m/s |
+| peak speed | 0.61 | 0.48 | 0.30 m/s |
+
+The zonal speed is now essentially exact, but **the meridional component got
+smaller, not larger** -- the jet is zonal by construction, so it raised `u` to
+the right magnitude and contributed nothing to `v`. The real ACC meanders:
+(0.090, 0.055) points 31 degrees north of due east, because it is steered by
+bathymetry the model does not have. A purely zonal ACC therefore cannot score
+above cos(31) = 0.86 in this box whatever else improves, and the remaining gap
+from 0.44 is meander structure, not speed.
 
 Removing the fixed 100 m transport depth also removed a compensation: it had
 been fitted against winds whose stress is roughly half of observed, so the two
@@ -232,6 +248,13 @@ Sverdrup model here, 9.5 s barotropic with point relaxation, 20.5 s with the
   upwelled deficit (should follow the planet's surface-to-deep contrast), the
   100 m surface depth and 0.02 m/s^2 reduced gravity (stratification), the
   50 m Ekman depth, and the water properties in `ocean/mixed-layer`.
+- **The ACC does not meander.** The channel jet is zonal by construction, so
+  the model's circumpolar current has almost no meridional component (0.003
+  against 0.055 observed) and cannot score above cos(31) = 0.86 in the
+  45-60S box however much the speed improves. Meanders come from topographic
+  steering, so this is the same missing bathymetry that forced a drag closure
+  rather than form drag in the first place -- the one change that would fix
+  both.
 - **`OCEAN_DRAG_COEFFICIENT` and the 900 m thermocline cap** are the two
   constants the channel jet and transport depth added; both should follow the
   planet rather than sit at Earth values.
