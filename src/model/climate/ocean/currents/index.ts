@@ -3,8 +3,11 @@ import { SVERDRUP_CURRENTS } from "@/model/climate/ocean/currents/sverdrup"
 import type {
 	ApplySSTToClimateParams,
 	BuildOceanCurrentGridParams,
-	ComputeSSTParams,
+	ComputeCurrentsParams,
+	FillEquatorialBandParams,
 	ObservedOceanCurrentGridParams,
+	ScaleFlowPairParams,
+	SmoothWarmthParams,
 } from "@/model/climate/ocean/currents/types"
 import { SURFACE_FLOW } from "@/model/climate/ocean/surface-flow"
 import { RAIN } from "@/model/climate/precipitation/rain"
@@ -40,9 +43,10 @@ const SST_ANOMALY_SATURATION_C = 4
 // output shares SST_ANOMALY_SATURATION_C with the observed overlay rather
 // than needing its own inflated ceiling.
 
-// SVERDRUP_CURRENTS.computeSST requires a saturation to normalize its own
-// output, but only that output's SIGN is read below (see computeSST) --
-// clamping to [-1,1] never changes sign, so this value is otherwise
+// SVERDRUP_CURRENTS.computeCurrents requires a saturation to normalize its
+// own output, but only that output's SIGN is read below (see
+// computeCurrents) -- clamping to [-1,1] never changes sign, so this value
+// is otherwise
 // arbitrary.
 const SVERDRUP_CLASSIFICATION_SATURATION_C = 9
 
@@ -62,8 +66,20 @@ const SVERDRUP_CLASSIFICATION_SATURATION_C = 9
 // to trust (12 and 0 for warm; 30 and 0 for cold) and are tapered toward zero
 // instead, matching both real distant-pole current weakening and the
 // original tables' own tail behavior.
+//
+// The raw bins at 60/70 degrees were 2.45/2.67 -- an increase past the 50-
+// degree peak (2.94), driven by a small sample (n=628 at 70 degrees, likely
+// a couple of strong high-latitude currents like the Norwegian Coastal
+// Current) rather than a real trend: mean SST-anomaly magnitude should decay
+// with distance from the ITCZ, not bump back up, and high-latitude cells
+// land in exactly this range (|lat|>=60 averages ~70 degrees from the ITCZ),
+// so the raw bump read as poles being implausibly as warm as the tropics'
+// strongest currents. Pooled with isotonic regression (sample-weighted) over
+// the 50/60/70-degree bins to enforce the expected monotonic decay from the
+// peak outward, without discarding the real data: pooled 60/70 = (2.45*1978
+// + 2.67*628) / (1978+628) = 2.50.
 const WARM_BAND_C_TABLE = [
-	1.23, 1.35, 1.49, 1.69, 2.11, 2.94, 2.45, 2.67, 1.3, 0,
+	1.23, 1.35, 1.49, 1.69, 2.11, 2.94, 2.5, 2.5, 1.25, 0,
 ]
 const warmBandC = (dist: number) =>
 	MATH.piecewise({
@@ -92,6 +108,25 @@ const COAST_DECAY_KM = 800
 const coastDecay = (distCoastKm: number) =>
 	1 - MATH.smoothstep({ edge0: 0, edge1: COAST_DECAY_KM, x: distCoastKm })
 
+// Sverdrup's own dynamics are known-wrong within this band, not just weak:
+// the Stommel/Sverdrup balance's leading term (beta d(psi)/dx) is driven by
+// the Coriolis parameter f, which the circulation module already floors at 8
+// degrees latitude (EKMAN_MIN_LAT_DEG in circulation/index.ts) because the
+// balance itself breaks down as f -> 0, not because the real signal is small
+// there. Verified directly: the western equatorial Pacific -- the real warm
+// pool, the warmest ocean water on Earth -- classifies mostly COLD in this
+// band (up to 71% of cells within 5-10 degrees of the equator), a large,
+// spatially coherent wrong-way result, not noise a smoothing pass could
+// clean up. A step below where the data actually stops being wrong (5-10
+// degrees was only 5% cold).
+//
+// Rather than leaving this band blank (conspicuously empty right where the
+// most famous SST pattern on Earth sits), fillEquatorialBand below
+// propagates the classification in from just outside the band, where
+// sverdrup's dynamics are valid -- still never trusting the band's own
+// computed sign, but giving a spatially continuous answer instead of a void.
+const EQUATORIAL_EXCLUSION_LAT_DEG = 10
+
 // sverdrup's raw current speed runs 2-10x below real GODAS speed in most
 // boundary-current regions (no bathymetry/nonlinear-eddy term, see
 // src/test/earth/ocean-currents.md), weak enough that on the display map many
@@ -107,10 +142,101 @@ const DISPLAY_FLOW_SPEED_SCALE = 3
 // floor to, e.g. land) are left at zero.
 const DISPLAY_FLOW_SPEED_FLOOR_MS = 0.05
 
-function scaleFlowPair(
-	u: Float32Array,
-	v: Float32Array,
-): { u: Float32Array; v: Float32Array } {
+// A region can be mostly one classification with a noisy minority of cells
+// sverdrup calls the other way (e.g. N Atlantic Drift, Antarctic coastal
+// water) -- since sign alone decides which table applies and gets its full
+// value (see computeSST), that minority's full-strength opposite-sign
+// contribution can cancel much of the majority's, diluting the whole
+// region's mean well below the table's actual value at that distance. This
+// checkerboard-like noise turns out to be a background property of the
+// whole approach (present, to varying degree, under any wind model -- see
+// src/test/earth/ocean-currents.md) rather than something isolated to one
+// region, so it needs a real kernel, not a couple of ad hoc passes: measured
+// sign-flip rate between adjacent ocean cells drops with ring width (0 rings
+// raw: Antarctica 7.7%, NAD 28.4%; 2 rings: 5.8%/18.5%; 3 rings: 5.4%/12.3%)
+// but flattens out past 3 rings (4 rings: 5.1%/12.3%), so 3 is the point
+// past which more smoothing buys little further cleanup for the added cost.
+const WARMTH_SMOOTHING_RINGS = 3
+
+function smoothWarmth({
+	mesh,
+	warmth,
+	isOcean,
+}: SmoothWarmthParams): Float32Array {
+	const N = mesh.numRegions
+	const out = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!isOcean[r]) continue
+		const seen = new Set<number>([r])
+		let frontier = [r]
+		for (let ring = 0; ring < WARMTH_SMOOTHING_RINGS; ring++) {
+			const next: number[] = []
+			for (const cur of frontier) {
+				for (
+					let j = mesh.adjOffset[cur], jEnd = mesh.adjOffset[cur + 1];
+					j < jEnd;
+					j++
+				) {
+					const nb = mesh.adjList[j]
+					if (!isOcean[nb] || seen.has(nb)) continue
+					seen.add(nb)
+					next.push(nb)
+				}
+			}
+			frontier = next
+		}
+		let sum = 0
+		for (const idx of seen) sum += warmth[idx]
+		out[r] = sum / seen.size
+	}
+	return out
+}
+
+// Multi-source BFS flood fill, propagating each trusted (|lat| >=
+// EQUATORIAL_EXCLUSION_LAT_DEG) cell's warmth inward to the excluded band --
+// the same value-diffusion idea SVERDRUP_RASTER.fillGaps and
+// COASTAL_BLEED.fillLand already use elsewhere in this codebase to cover a
+// masked/unreliable region from its nearest trustworthy neighbours, rather
+// than leaving it blank.
+function fillEquatorialBand({
+	mesh,
+	warmth,
+	latDeg,
+	isOcean,
+}: FillEquatorialBandParams): Float32Array {
+	const N = mesh.numRegions
+	const out = warmth.slice()
+	const filled = new Uint8Array(N)
+	const queue = new Int32Array(N)
+	let head = 0
+	let tail = 0
+	for (let r = 0; r < N; r++) {
+		if (!isOcean[r] || Math.abs(latDeg[r]) < EQUATORIAL_EXCLUSION_LAT_DEG)
+			continue
+		filled[r] = 1
+		queue[tail++] = r
+	}
+	while (head < tail) {
+		const r = queue[head++]
+		for (
+			let j = mesh.adjOffset[r], jEnd = mesh.adjOffset[r + 1];
+			j < jEnd;
+			j++
+		) {
+			const nb = mesh.adjList[j]
+			if (!isOcean[nb] || filled[nb]) continue
+			out[nb] = out[r]
+			filled[nb] = 1
+			queue[tail++] = nb
+		}
+	}
+	return out
+}
+
+function scaleFlowPair({ u, v }: ScaleFlowPairParams): {
+	u: Float32Array
+	v: Float32Array
+} {
 	const outU = new Float32Array(u.length)
 	const outV = new Float32Array(v.length)
 	for (let i = 0; i < u.length; i++) {
@@ -125,7 +251,7 @@ function scaleFlowPair(
 	return { u: outU, v: outV }
 }
 
-function computeSST({
+function computeCurrents({
 	mesh,
 	isLand,
 	distCoast,
@@ -134,7 +260,8 @@ function computeSST({
 	climate,
 	elevation_km,
 	params,
-}: ComputeSSTParams): GenesisOceanCurrents {
+	observedWind,
+}: ComputeCurrentsParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const avgEdgeKm = UNITS.meanEdgeLengthKm({
 		mesh,
@@ -147,7 +274,7 @@ function computeSST({
 	// is used as-is -- sverdrup's own wind-driven circulation is a real
 	// current field, not a proxy needing a calibrated substitute the way its
 	// SST magnitude does.
-	const sverdrupCurrents = SVERDRUP_CURRENTS.computeSST({
+	const sverdrupCurrents = SVERDRUP_CURRENTS.computeCurrents({
 		mesh,
 		climate,
 		elevation_km,
@@ -155,8 +282,21 @@ function computeSST({
 		landmarks,
 		sstSaturationC: SVERDRUP_CLASSIFICATION_SATURATION_C,
 		params,
+		observedWind,
 	})
-	const warmth = sverdrupCurrents.sst
+	const isOcean = new Uint8Array(N)
+	for (let r = 0; r < N; r++) isOcean[r] = !isLand[r] && !isLake[r] ? 1 : 0
+	const smoothedWarmth = smoothWarmth({
+		mesh,
+		warmth: sverdrupCurrents.sst,
+		isOcean,
+	})
+	const warmth = fillEquatorialBand({
+		mesh,
+		warmth: smoothedWarmth,
+		latDeg,
+		isOcean,
+	})
 
 	const sstMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
 	const sst = new Float32Array(N)
@@ -187,14 +327,14 @@ function computeSST({
 
 	COASTAL_BLEED.fillLand({ mesh, isLand, isLake, avgEdgeKm, sst, sstMonthly })
 
-	const annualFlow = scaleFlowPair(
-		sverdrupCurrents.flowU,
-		sverdrupCurrents.flowV,
-	)
-	const monthlyFlow = scaleFlowPair(
-		sverdrupCurrents.flowUMonthly,
-		sverdrupCurrents.flowVMonthly,
-	)
+	const annualFlow = scaleFlowPair({
+		u: sverdrupCurrents.flowU,
+		v: sverdrupCurrents.flowV,
+	})
+	const monthlyFlow = scaleFlowPair({
+		u: sverdrupCurrents.flowUMonthly,
+		v: sverdrupCurrents.flowVMonthly,
+	})
 	return {
 		sst,
 		sstMonthly,
@@ -346,7 +486,7 @@ function observedOceanCurrentGridForMonth({
 }
 
 export const OCEAN_CURRENTS = {
-	computeSST,
+	computeCurrents,
 	applySSTToClimate,
 	buildOceanCurrentGrid,
 	observedOceanCurrentGridForMonth,

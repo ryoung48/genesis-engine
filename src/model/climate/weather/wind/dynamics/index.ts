@@ -1,6 +1,8 @@
 import type {
 	DynamicCorrectionInput,
+	DynamicsWind,
 	SolveDynamicsInput,
+	SurfaceWindInput,
 } from "@/model/climate/weather/wind/dynamics/types"
 import { GRID } from "@/model/climate/weather/wind/grid"
 import type { LatLonGrid } from "@/model/climate/weather/wind/grid/types"
@@ -21,6 +23,16 @@ import type { LatLonGrid } from "@/model/climate/weather/wind/grid/types"
 // periodic, so the transform is evaluated directly; a mixed-radix FFT would
 // matter only on a much finer grid.
 const DEG2RAD = Math.PI / 180
+// Same dimensionless per-radian friction as the local boundary-layer balance
+// (SURFACE_BALANCE.balance) elsewhere in wind/full -- this solver's phi is in
+// the same template-unit, per-radian convention (no explicit planet radius),
+// so its output plugs into the same friction+Coriolis relation directly.
+const FRICTION = 0.3
+// Mass-conservation coupling between the pressure correction and the
+// divergence of its own friction/Coriolis response. Earth-calibrated against
+// the wind comparison; not derived from a physical wave speed since phi is a
+// template-unit field, not real geopotential.
+const WAVE_COUPLING = 0.05
 
 function solve({
 	forcing,
@@ -292,6 +304,79 @@ function correction({
 	})
 }
 
+// Cell-centred (east, north) velocity from the solved phi field via the same
+// steady friction+Coriolis balance used throughout wind/full and wind/simple
+// (SURFACE_BALANCE.balance), applied to phi's own per-radian gradient instead
+// of the mesh's -- direction cosines aren't needed since a lat-lon grid's
+// east/north axes are already the coordinate axes.
+function velocityFromPhi({
+	phi,
+	coriolisScale,
+}: {
+	phi: LatLonGrid
+	coriolisScale: number
+}): { u: LatLonGrid; v: LatLonGrid } {
+	const { lonBins, latBins, values } = phi
+	const d = GRID.deg * DEG2RAD
+	const u = new Float32Array(lonBins * latBins)
+	const v = new Float32Array(lonBins * latBins)
+	for (let j = 0; j < latBins; j++) {
+		const lat = (-90 + (j + 0.5) * GRID.deg) * DEG2RAD
+		const cosLat = Math.max(Math.cos(lat), 1e-3)
+		const f = coriolisScale * Math.sin(lat)
+		const denom = FRICTION * FRICTION + f * f
+		const jN = Math.min(latBins - 1, j + 1)
+		const jS = Math.max(0, j - 1)
+		const latSpan = (jN - jS) * d || 1
+		for (let i = 0; i < lonBins; i++) {
+			const row = j * lonBins
+			const ie = (i + 1) % lonBins
+			const iw = (i - 1 + lonBins) % lonBins
+			const dPhiDLon = (values[row + ie] - values[row + iw]) / (2 * d * cosLat)
+			const dPhiDLat =
+				(values[jN * lonBins + i] - values[jS * lonBins + i]) / latSpan
+			const forceEast = -dPhiDLon
+			const forceNorth = -dPhiDLat
+			const idx = row + i
+			u[idx] = (FRICTION * forceEast + f * forceNorth) / denom
+			v[idx] = (FRICTION * forceNorth - f * forceEast) / denom
+		}
+	}
+	return {
+		u: { lonBins, latBins, values: u },
+		v: { lonBins, latBins, values: v },
+	}
+}
+
+// Drop-in alternative to SHALLOW_WATER.surfaceWind: an exact direct solve of
+// the same steady balance instead of explicit time-marching to convergence.
+// Output is in the same raw, per-radian units as the local balance (no
+// GEOPOTENTIAL_PER_TEMPLATE_AT_ONE_BAR/pressureScale conversion, no
+// rawPerMs rescale needed downstream) since phi never leaves template units.
+// Terrain (form drag, blocking) isn't modelled -- this is the fast, less
+// physically complete alternative, not a replacement for shallow water.
+function surfaceWind({
+	latDeg,
+	lonDeg,
+	pressure,
+	coriolisScale,
+}: SurfaceWindInput): DynamicsWind {
+	const forcing = GRID.build({ latDeg, lonDeg, values: pressure })
+	const phi = solve({
+		forcing,
+		friction: FRICTION,
+		coriolisScale,
+		waveCoupling: WAVE_COUPLING,
+	})
+	const { u, v } = velocityFromPhi({ phi, coriolisScale })
+	return {
+		u: GRID.sample({ grid: u, latDeg, lonDeg }),
+		v: GRID.sample({ grid: v, latDeg, lonDeg }),
+		coarsePressure: GRID.sample({ grid: forcing, latDeg, lonDeg }),
+	}
+}
+
 export const DYNAMICS = {
 	correction,
+	surfaceWind,
 }

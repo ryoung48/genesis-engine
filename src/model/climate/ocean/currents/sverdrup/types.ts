@@ -29,6 +29,13 @@ export type ComputeSverdrupSSTParams = {
 	landmarks: GenesisLandmarks
 	sstSaturationC: number
 	params: SverdrupParams
+	// [JUSTIFICATION] Only diagnostics substituting real GODAS/NCEP wind for
+	// comparison need this; omitting it keeps today's procedural-wind
+	// behavior unchanged.
+	observedWind?: {
+		real_u_monthly?: Float32Array
+		real_v_monthly?: Float32Array
+	}
 }
 
 export type MonthSolveParams = {

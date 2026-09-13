@@ -10,5 +10,6 @@ const RELAXATION_SECONDS =
 export const MIXED_LAYER = {
 	depthM: DEPTH_M,
 	seawaterDensityKgM3: SEAWATER_DENSITY_KG_M3,
+	seawaterHeatCapacityJKgK: SEAWATER_HEAT_CAPACITY_J_KG_K,
 	relaxationSeconds: RELAXATION_SECONDS,
 }

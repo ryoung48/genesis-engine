@@ -115,7 +115,7 @@ describe("Earth ocean currents vs GODAS/OISST", () => {
 		// Sverdrup is a standalone module, not wired into the shipping pipeline
 		// (see src/test/earth/ocean-currents.md), so this floor has to resolve it
 		// directly rather than read world.oceanCurrents.
-		const currents = SVERDRUP_CURRENTS.computeSST({
+		const currents = SVERDRUP_CURRENTS.computeCurrents({
 			mesh: world.mesh,
 			climate: world.climate,
 			elevation_km: world.elevation_km,

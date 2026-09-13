@@ -1,30 +1,20 @@
 import { describe, expect, it } from "vitest"
 import { SVERDRUP_CIRCULATION } from "@/model/climate/ocean/currents/sverdrup/circulation"
 import type { SverdrupPlanet } from "@/model/climate/ocean/currents/sverdrup/circulation/types"
+import { SVERDRUP_HEAT_CARRIER } from "@/model/climate/ocean/currents/sverdrup/heat-carrier"
+import { SVERDRUP_OVERTURNING } from "@/model/climate/ocean/currents/sverdrup/overturning"
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import { SVERDRUP_SST_ANOMALY } from "@/model/climate/ocean/currents/sverdrup/sst-anomaly"
 import { STOMMEL } from "@/model/climate/ocean/currents/sverdrup/stommel"
 import { MIXED_LAYER } from "@/model/climate/ocean/mixed-layer"
 import { RAIN } from "@/model/climate/precipitation/rain"
+import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { WIND } from "@/model/climate/weather/wind"
-import { FULL_WIND } from "@/model/climate/weather/wind/full"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { UNITS } from "@/model/shared/units"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
-
-// DIAGNOSTIC ONLY -- asserts nothing about accuracy, and nothing here gates a
-// build. Drives the SST-anomaly solve with the real GODAS current substituted
-// for the model's own modeled flow (divergence and thermocline depth stay
-// modeled, since GODAS has neither), holding the heat-solve physics --
-// advection scheme, diffusivity, the fixed upwelling deficit, the mixed-layer
-// relaxation time, the modeled background temperature gradient -- exactly as
-// shipped. `ceiling` is what the SST solver produces given a perfect current;
-// `model` is what it produces given this model's own (procedural-wind) flow.
-// The gap between `ceiling` and `real` is the heat-solve's own error, isolated
-// from the current solve's error; the gap between `model` and `ceiling` is
-// how much of today's SST error the current solve's own inaccuracy explains.
 
 type Box = { name: string; lat: [number, number]; lon: [number, number] }
 
@@ -45,15 +35,21 @@ const BOXES: Box[] = [
 ]
 
 const MONTHS = 12
+const FEEDBACK_PASSES = 2
+const RELEASE_YEARS = 1
+const EXPORT_SPEED_M_S = 0.05
+const OVERTURNING_YEARS = 50
 
-describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
-	it("reports the current-solve/heat-solve error split", () => {
+describe("surface-fed heat carrier (diagnostic)", () => {
+	it("transports surface heat under observed wind", () => {
 		const earth = loadEarthGrayscale("earth.png")
 		const coastline = loadEarthGrayscale("coastline-mask.png")
 		const lake = loadEarthGrayscale("lake-mask.png")
 		const currentU = loadEarthMonthlyRaster("earth-real-current-u")
 		const currentV = loadEarthMonthlyRaster("earth-real-current-v")
 		const sstAnomaly = loadEarthMonthlyRaster("earth-real-sst-anomaly")
+		const realWindU = loadEarthMonthlyRaster("earth-real-wind-u")
+		const realWindV = loadEarthMonthlyRaster("earth-real-wind-v")
 
 		const world = IMPORT_HEIGHTMAP.importGenesisWorld({
 			params: {
@@ -82,6 +78,13 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 				realSstAnomalyMonths: sstAnomaly.months,
 				realSstAnomalyScale: sstAnomaly.scale,
 				realSstAnomalyNoData: sstAnomaly.nodata,
+				realWindUMonthly: realWindU.monthly,
+				realWindVMonthly: realWindV.monthly,
+				realWindWidth: realWindU.width,
+				realWindHeight: realWindU.height,
+				realWindMonths: realWindU.months,
+				realWindScale: realWindU.scale,
+				realWindNoData: realWindU.nodata,
 				terrainWarp: 0,
 				smoothing: 0,
 				hydraulicErosion: 0,
@@ -107,10 +110,27 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 		})
 
 		const N = world.mesh.numRegions
+		const annualMean = (monthly: Float32Array) => {
+			const out = new Float32Array(N).fill(Number.NaN)
+			for (let r = 0; r < N; r++) {
+				let sum = 0
+				let count = 0
+				for (let month = 0; month < MONTHS; month++) {
+					const value = monthly[month * N + r]
+					if (!Number.isFinite(value)) continue
+					sum += value
+					count++
+				}
+				if (count > 0) out[r] = sum / count
+			}
+			return out
+		}
 		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		const observed = world.observedCurrent
-		if (!observed?.real_u_monthly || !observed.real_v_monthly)
-			throw new Error("Earth import is missing ocean-current data")
+		if (!observed?.real_sst_anomaly_monthly)
+			throw new Error("Earth import is missing SST-anomaly data")
+		if (!world.observedWind)
+			throw new Error("Earth import is missing observed-wind data")
 
 		const isLake = LANDMARKS.regionTypeMask({
 			landmarks: world.landmarks,
@@ -120,6 +140,16 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 		for (let r = 0; r < N; r++)
 			isOcean[r] = !world.isLand[r] && !isLake[r] ? 1 : 0
 		const index = SVERDRUP_RASTER.buildIndex({ latDeg, lonDeg, isOcean })
+		const annualInsolation = SVERDRUP_RASTER.average({
+			index,
+			values: annualMean(world.climate.insolation_monthly),
+			include: isOcean,
+		})
+		const annualTemperature = SVERDRUP_RASTER.average({
+			index,
+			values: annualMean(world.climate.temperature_monthly),
+			include: isOcean,
+		})
 		const planet: SverdrupPlanet = {
 			coriolisSign: UNITS.isRetrogradeObliquity(world.params.obliquity)
 				? -1
@@ -130,16 +160,21 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 			seawaterDensityKgM3: MIXED_LAYER.seawaterDensityKgM3,
 			gyreStrength: 1 - WIND.rotationCollapse(world.params.hoursPerDay),
 		}
+		const releaseSeconds = RELEASE_YEARS * world.params.daysPerYear * 86_400
+		const overturning = SVERDRUP_OVERTURNING.temperatureDriven({
+			ocean: index.ocean,
+			temperatureC: annualTemperature,
+			planet,
+			turnoverSeconds: OVERTURNING_YEARS * world.params.daysPerYear * 86_400,
+		})
 
 		const operator = STOMMEL.build({ ocean: index.ocean, planet })
 		const monthlyTau = []
 		const monthlyCurl = []
 		for (let month = 0; month < MONTHS; month++) {
-			const wind = FULL_WIND.computeWindVectors({
-				mesh: world.mesh,
-				climate: world.climate,
-				elevation_km: world.elevation_km,
-				params: world.params,
+			const wind = WIND.observedWindVectorsForMonth({
+				observedWind: world.observedWind,
+				numRegions: N,
 				month,
 			})
 			const forcing = SVERDRUP_CIRCULATION.forcing({ index, wind, planet })
@@ -148,21 +183,23 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 		}
 		const seasonal = STOMMEL.solveSeasonal({ operator, monthlyCurl, planet })
 
-		const modelSstC = new Float32Array(N)
-		const ceilingSstC = new Float32Array(N)
+		const baselineSstC = new Float32Array(N)
+		const surfaceFedSstC = new Float32Array(N)
+		let maxSolverConservationError = 0
+		let annualPickupPowerW = 0
 		for (let month = 0; month < MONTHS; month++) {
 			const temperature = world.climate.temperature_monthly.subarray(
 				month * N,
 				(month + 1) * N,
 			)
-			const circulation = SVERDRUP_CIRCULATION.surface({
+			let circulation = SVERDRUP_CIRCULATION.surface({
 				index,
 				tau: monthlyTau[month],
 				psi: seasonal.monthlyPsi[month],
 				planet,
 				sstAnomaly: null,
 			})
-			const modelAnomaly = SVERDRUP_SST_ANOMALY.solve({
+			let baselineAnomaly = SVERDRUP_SST_ANOMALY.solve({
 				index,
 				circulation,
 				temperature,
@@ -170,42 +207,83 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 				planet,
 				upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
 			})
+			for (let pass = 1; pass < FEEDBACK_PASSES; pass++) {
+				circulation = SVERDRUP_CIRCULATION.surface({
+					index,
+					tau: monthlyTau[month],
+					psi: seasonal.monthlyPsi[month],
+					planet,
+					sstAnomaly: baselineAnomaly,
+				})
+				baselineAnomaly = SVERDRUP_SST_ANOMALY.solve({
+					index,
+					circulation,
+					temperature,
+					isOcean,
+					planet,
+					upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
+				})
+			}
 
-			const realU = new Float32Array(N)
-			const realV = new Float32Array(N)
-			const validReal = new Uint8Array(N)
-			for (let r = 0; r < N; r++) {
-				const u = observed.real_u_monthly[month * N + r]
-				const v = observed.real_v_monthly[month * N + r]
-				if (!isOcean[r] || !Number.isFinite(u) || !Number.isFinite(v)) continue
-				realU[r] = u
-				realV[r] = v
-				validReal[r] = 1
-			}
-			const ceilingCirculation = {
-				flow: {
-					x: SVERDRUP_RASTER.average({
-						index,
-						values: realU,
-						include: validReal,
-					}),
-					y: SVERDRUP_RASTER.average({
-						index,
-						values: realV,
-						include: validReal,
-					}),
-				},
-				geostrophic: circulation.geostrophic,
-				divergence: circulation.divergence,
-				thermoclineDepth: circulation.thermoclineDepth,
-			}
-			const ceilingAnomaly = SVERDRUP_SST_ANOMALY.solve({
+			const temperatureGradient = SVERDRUP_SST_ANOMALY.zonalGradient({
 				index,
-				circulation: ceilingCirculation,
 				temperature,
 				isOcean,
 				planet,
+			})
+			const { advective, vertical } = SVERDRUP_SST_ANOMALY.heatSource({
+				circulation,
+				ocean: index.ocean,
+				temperatureGradient,
 				upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
+			})
+			const baseSource = new Float32Array(index.ocean.length)
+			for (let idx = 0; idx < baseSource.length; idx++)
+				baseSource[idx] = advective[idx] + vertical[idx]
+			const carrierFlow = {
+				x: circulation.flow.x.slice(),
+				y: circulation.flow.y.slice(),
+			}
+			for (let idx = 0; idx < carrierFlow.x.length; idx++) {
+				carrierFlow.x[idx] += overturning.upperLimb.x[idx]
+				carrierFlow.y[idx] += overturning.upperLimb.y[idx]
+			}
+			const transported = SVERDRUP_HEAT_CARRIER.transport({
+				flow: carrierFlow,
+				ocean: index.ocean,
+				insolationWm2: annualInsolation,
+				planet,
+				releaseSeconds,
+				albedo:
+					world.params.albedo ?? CONSTANTS.embConstants.surface.ALBEDO.BASE,
+				heatCapacityJm2K:
+					MIXED_LAYER.seawaterDensityKgM3 *
+					MIXED_LAYER.seawaterHeatCapacityJKgK *
+					MIXED_LAYER.depthM,
+				exportSpeedMps: EXPORT_SPEED_M_S,
+			})
+			maxSolverConservationError = Math.max(
+				maxSolverConservationError,
+				transported.solverConservationError,
+			)
+			annualPickupPowerW += transported.pickupPowerW / MONTHS
+			const surfaceFedSource = baseSource.slice()
+			for (let idx = 0; idx < surfaceFedSource.length; idx++)
+				surfaceFedSource[idx] +=
+					transported.releaseCPerS[idx] - transported.pickupCPerS[idx]
+			const relaxationSeconds = new Float32Array(index.ocean.length).fill(
+				MIXED_LAYER.relaxationSeconds,
+			)
+			const surfaceFedAnomaly = SVERDRUP_SST_ANOMALY.solveAnomaly({
+				flow: circulation.flow,
+				ocean: index.ocean,
+				source: surfaceFedSource,
+				planet,
+				relaxationSeconds,
+			})
+			SVERDRUP_SST_ANOMALY.removeZonalMean({
+				field: surfaceFedAnomaly,
+				ocean: index.ocean,
 			})
 
 			const sampleOcean = (field: Float32Array) =>
@@ -216,41 +294,23 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 					lonDeg,
 					include: isOcean,
 				})
-			const monthModel = sampleOcean(modelAnomaly)
-			const monthCeiling = sampleOcean(ceilingAnomaly)
+			const monthBaseline = sampleOcean(baselineAnomaly)
+			const monthSurfaceFed = sampleOcean(surfaceFedAnomaly)
 			for (let r = 0; r < N; r++) {
-				modelSstC[r] += monthModel[r] / MONTHS
-				ceilingSstC[r] += monthCeiling[r] / MONTHS
+				baselineSstC[r] += monthBaseline[r] / MONTHS
+				surfaceFedSstC[r] += monthSurfaceFed[r] / MONTHS
 			}
 		}
 
-		const annualMean = (monthly: Float32Array | undefined) => {
-			const out = new Float32Array(N).fill(Number.NaN)
-			if (!monthly) return out
-			for (let r = 0; r < N; r++) {
-				let sum = 0
-				let count = 0
-				for (let m = 0; m < MONTHS; m++) {
-					const value = monthly[m * N + r]
-					if (!Number.isFinite(value)) continue
-					sum += value
-					count++
-				}
-				if (count > 0) out[r] = sum / count
-			}
-			return out
-		}
-		const obsSst = annualMean(observed.real_sst_anomaly_monthly)
+		const observedSstC = annualMean(observed.real_sst_anomaly_monthly)
 		const mean = (values: number[]) =>
 			values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
-
 		const regionsIn = (box: Box) => {
 			const regions: number[] = []
 			for (let r = 0; r < N; r++) {
-				if (world.isLand[r]) continue
+				if (world.isLand[r] || !Number.isFinite(observedSstC[r])) continue
 				if (latDeg[r] < box.lat[0] || latDeg[r] > box.lat[1]) continue
 				if (lonDeg[r] < box.lon[0] || lonDeg[r] > box.lon[1]) continue
-				if (!Number.isFinite(obsSst[r])) continue
 				regions.push(r)
 			}
 			return regions
@@ -259,37 +319,41 @@ describe("SST-anomaly solve driven by real GODAS current (diagnostic)", () => {
 		for (const box of BOXES) {
 			const regions = regionsIn(box)
 			console.log(
-				`SSTCEIL ${box.name.padEnd(17)} ` +
-					`model=${mean(regions.map((r) => modelSstC[r])).toFixed(2)} ` +
-					`ceiling=${mean(regions.map((r) => ceilingSstC[r])).toFixed(2)} ` +
-					`real=${mean(regions.map((r) => obsSst[r])).toFixed(2)}`,
+				`HEATCARRIER ${box.name.padEnd(17)} ` +
+					`baseline=${mean(regions.map((r) => baselineSstC[r])).toFixed(2)} ` +
+					`surfaceFed=${mean(regions.map((r) => surfaceFedSstC[r])).toFixed(2)} ` +
+					`real=${mean(regions.map((r) => observedSstC[r])).toFixed(2)}`,
 			)
 		}
 
 		const midLatitudes: number[] = []
 		for (let r = 0; r < N; r++) {
-			if (world.isLand[r] || !Number.isFinite(obsSst[r])) continue
+			if (world.isLand[r] || !Number.isFinite(observedSstC[r])) continue
 			const absLat = Math.abs(latDeg[r])
 			if (absLat >= 15 && absLat <= 60) midLatitudes.push(r)
 		}
 		const correlation = (model: Float32Array) => {
 			const modelMean = mean(midLatitudes.map((r) => model[r]))
-			const observedMean = mean(midLatitudes.map((r) => obsSst[r]))
-			let cov = 0
-			let varModel = 0
-			let varObserved = 0
+			const observedMean = mean(midLatitudes.map((r) => observedSstC[r]))
+			let covariance = 0
+			let modelVariance = 0
+			let observedVariance = 0
 			for (const r of midLatitudes) {
-				cov += (model[r] - modelMean) * (obsSst[r] - observedMean)
-				varModel += (model[r] - modelMean) ** 2
-				varObserved += (obsSst[r] - observedMean) ** 2
+				covariance += (model[r] - modelMean) * (observedSstC[r] - observedMean)
+				modelVariance += (model[r] - modelMean) ** 2
+				observedVariance += (observedSstC[r] - observedMean) ** 2
 			}
-			return cov / Math.sqrt(varModel * varObserved)
+			return covariance / Math.sqrt(modelVariance * observedVariance)
 		}
 		console.log(
-			`SSTCEIL global 15-60 sst r model=${correlation(modelSstC).toFixed(2)} ` +
-				`ceiling=${correlation(ceilingSstC).toFixed(2)}`,
+			`HEATCARRIER global 15-60 sst r baseline=${correlation(baselineSstC).toFixed(2)} ` +
+				`surfaceFed=${correlation(surfaceFedSstC).toFixed(2)} ` +
+				`pickup=${(annualPickupPowerW / 1e15).toFixed(2)}PW ` +
+				`overturnMax=${overturning.maxUpperSpeedMps.toFixed(3)}m/s ` +
+				`solverConservationError=${maxSolverConservationError.toExponential(2)}`,
 		)
 
 		expect(midLatitudes.length).toBeGreaterThan(0)
+		expect(maxSolverConservationError).toBeLessThan(1e-2)
 	})
 }, 600_000)

@@ -159,7 +159,7 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 		// Sverdrup is a standalone module, not wired into the shipping pipeline,
 		// so `proc` (this model under the world's own procedural wind) has to be
 		// resolved directly rather than read off world.oceanCurrents.
-		const procedural = SVERDRUP_CURRENTS.computeSST({
+		const procedural = SVERDRUP_CURRENTS.computeCurrents({
 			mesh: world.mesh,
 			climate: world.climate,
 			elevation_km: world.elevation_km,

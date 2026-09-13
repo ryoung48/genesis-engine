@@ -27,6 +27,18 @@ const wrapColumn = SVERDRUP_RASTER.wrapColumn
 
 const STRESS_SMOOTHING_PASSES = 2
 
+// Grid-scale checkerboard noise in the surface flow -- confirmed to exist
+// under any wind model, worst in weak-signal regions where it can flip the
+// SST-anomaly sign (see src/test/earth/ocean-currents.md) -- comes mostly
+// from the flow field itself, not the SST-anomaly solve or its own
+// convergence: smoothing this the same way windStress() already smooths tau
+// cut the sign-flip rate in a calm open-ocean control region from 2.2% to
+// 0.2% and modestly helped Antarctica (2.3% to 2.1%). It did not fix N
+// Atlantic Drift's own artifact, which is a coherent, larger-scale full-wind
+// feature rather than grid-scale noise -- smoothing here treats the
+// background noise floor, not that separate issue.
+const FLOW_SMOOTHING_PASSES = 3
+
 // Bulk-formula drag for wind stress over open water.
 const AIR_DRAG_COEFFICIENT = 1.3e-3
 
@@ -295,7 +307,18 @@ function surfaceCurrent({
 		x[i] = u * scale
 		y[i] = v * scale
 	}
-	return { x, y }
+	return {
+		x: SVERDRUP_RASTER.smooth({
+			field: x,
+			mask: ocean,
+			passes: FLOW_SMOOTHING_PASSES,
+		}),
+		y: SVERDRUP_RASTER.smooth({
+			field: y,
+			mask: ocean,
+			passes: FLOW_SMOOTHING_PASSES,
+		}),
+	}
 }
 
 // The wind's contribution: stress and its curl. Split out from the surface
@@ -325,6 +348,18 @@ function surface({
 		: wind
 	return {
 		flow: surfaceCurrent({ geostrophic: geo, drift, ocean }),
+		geostrophic: {
+			x: SVERDRUP_RASTER.smooth({
+				field: geo.x,
+				mask: ocean,
+				passes: FLOW_SMOOTHING_PASSES,
+			}),
+			y: SVERDRUP_RASTER.smooth({
+				field: geo.y,
+				mask: ocean,
+				passes: FLOW_SMOOTHING_PASSES,
+			}),
+		},
 		divergence,
 		thermoclineDepth,
 	}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { SVERDRUP_CIRCULATION } from "@/model/climate/ocean/currents/sverdrup/circulation"
 import type { SverdrupPlanet } from "@/model/climate/ocean/currents/sverdrup/circulation/types"
+import { SVERDRUP_HEAT_TRANSPORT } from "@/model/climate/ocean/currents/sverdrup/heat-transport"
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import { SVERDRUP_SST_ANOMALY } from "@/model/climate/ocean/currents/sverdrup/sst-anomaly"
 import { STOMMEL } from "@/model/climate/ocean/currents/sverdrup/stommel"
+import { THERMOCLINE } from "@/model/climate/ocean/currents/sverdrup/thermocline"
 import { MIXED_LAYER } from "@/model/climate/ocean/mixed-layer"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
@@ -48,6 +50,20 @@ const BOXES: Box[] = [
 ]
 
 const MONTHS = 12
+const ATLANTIC_OVERTURNING_M3_S = 17.5e6
+const ATLANTIC_OVERTURNING_SOUTH_LAT_DEG = 25
+const ATLANTIC_OVERTURNING_NORTH_LAT_DEG = 60
+const ATLANTIC_OVERTURNING_WEST_LON_DEG = -80
+const ATLANTIC_OVERTURNING_EAST_LON_DEG = 20
+const ATLANTIC_HEAT_SOURCE_SOUTH_LAT_DEG = 10
+const ATLANTIC_HEAT_SOURCE_NORTH_LAT_DEG = 25
+const ATLANTIC_HEAT_SOURCE_WEST_LON_DEG = -80
+const ATLANTIC_HEAT_SOURCE_EAST_LON_DEG = -20
+const ATLANTIC_HEAT_SINK_SOUTH_LAT_DEG = 45
+const ATLANTIC_HEAT_SINK_NORTH_LAT_DEG = 60
+const ATLANTIC_HEAT_SINK_WEST_LON_DEG = -60
+const ATLANTIC_HEAT_SINK_EAST_LON_DEG = 10
+const NORTH_ATLANTIC_HEAT_CONVERGENCE_W = 0.36e15
 // Mirrors FEEDBACK_PASSES in sverdrup/index.ts -- reimplements the per-month
 // solve loop by hand to get at intermediate fields, so it has to replicate
 // the same fixed-point iteration.
@@ -166,6 +182,81 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 		const advSstC = new Float32Array(N)
 		const vertSstC = new Float32Array(N)
 		const bothSstC = new Float32Array(N)
+		const fixedTransportSstC = new Float32Array(N)
+		const thermoclineTransportSstC = new Float32Array(N)
+		const overturningTransportSstC = new Float32Array(N)
+		const overturningHeatSstC = new Float32Array(N)
+		const fixedLayerDepthM = new Float32Array(CELLS).fill(
+			THERMOCLINE.easternDepthM,
+		)
+		const zeroTransport = {
+			x: new Float32Array(CELLS),
+			y: new Float32Array(CELLS),
+		}
+		const atlanticTransport = {
+			x: new Float32Array(CELLS),
+			y: new Float32Array(CELLS),
+		}
+		const metersPerDeg = planet.radiusM * (Math.PI / 180)
+		const atlanticHeatSource = new Uint8Array(CELLS)
+		const atlanticHeatSink = new Uint8Array(CELLS)
+		let sourceAreaM2 = 0
+		let sinkAreaM2 = 0
+		for (let j = 0; j < SVERDRUP_RASTER.height; j++) {
+			const lat = j - 90
+			const rowCellAreaM2 =
+				metersPerDeg * metersPerDeg * SVERDRUP_RASTER.rowCos[j]
+			for (let i = 0; i < SVERDRUP_RASTER.width; i++) {
+				const idx = j * SVERDRUP_RASTER.width + i
+				if (!index.ocean[idx]) continue
+				const lon = i - 180
+				if (
+					lat >= ATLANTIC_HEAT_SOURCE_SOUTH_LAT_DEG &&
+					lat <= ATLANTIC_HEAT_SOURCE_NORTH_LAT_DEG &&
+					lon >= ATLANTIC_HEAT_SOURCE_WEST_LON_DEG &&
+					lon <= ATLANTIC_HEAT_SOURCE_EAST_LON_DEG
+				) {
+					atlanticHeatSource[idx] = 1
+					sourceAreaM2 += rowCellAreaM2
+				}
+				if (
+					lat >= ATLANTIC_HEAT_SINK_SOUTH_LAT_DEG &&
+					lat <= ATLANTIC_HEAT_SINK_NORTH_LAT_DEG &&
+					lon >= ATLANTIC_HEAT_SINK_WEST_LON_DEG &&
+					lon <= ATLANTIC_HEAT_SINK_EAST_LON_DEG
+				) {
+					atlanticHeatSink[idx] = 1
+					sinkAreaM2 += rowCellAreaM2
+				}
+			}
+		}
+		if (sourceAreaM2 <= 0 || sinkAreaM2 <= 0)
+			throw new Error("Atlantic overturning heat regions contain no ocean")
+		for (
+			let j = ATLANTIC_OVERTURNING_SOUTH_LAT_DEG + 90;
+			j <= ATLANTIC_OVERTURNING_NORTH_LAT_DEG + 90;
+			j++
+		) {
+			let widthM = 0
+			for (
+				let i = ATLANTIC_OVERTURNING_WEST_LON_DEG + 180;
+				i <= ATLANTIC_OVERTURNING_EAST_LON_DEG + 180;
+				i++
+			) {
+				const idx = j * SVERDRUP_RASTER.width + i
+				if (index.ocean[idx]) widthM += metersPerDeg * SVERDRUP_RASTER.rowCos[j]
+			}
+			if (widthM <= 0) continue
+			const transportPerWidth = ATLANTIC_OVERTURNING_M3_S / widthM
+			for (
+				let i = ATLANTIC_OVERTURNING_WEST_LON_DEG + 180;
+				i <= ATLANTIC_OVERTURNING_EAST_LON_DEG + 180;
+				i++
+			) {
+				const idx = j * SVERDRUP_RASTER.width + i
+				if (index.ocean[idx]) atlanticTransport.y[idx] = transportPerWidth
+			}
+		}
 		for (let month = 0; month < MONTHS; month++) {
 			const temperature = world.climate.temperature_monthly.subarray(
 				month * N,
@@ -226,6 +317,20 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 			})
 			const both = new Float32Array(CELLS)
 			for (let i = 0; i < CELLS; i++) both[i] = advective[i] + vertical[i]
+			const heatTransportM3CPerS =
+				NORTH_ATLANTIC_HEAT_CONVERGENCE_W /
+				(MIXED_LAYER.seawaterDensityKgM3 * MIXED_LAYER.seawaterHeatCapacityJKgK)
+			const sourceCoolingCPerS =
+				heatTransportM3CPerS / (MIXED_LAYER.depthM * sourceAreaM2)
+			const sinkWarmingCPerS =
+				heatTransportM3CPerS / (MIXED_LAYER.depthM * sinkAreaM2)
+			const overturningHeatSource = both.slice()
+			for (let idx = 0; idx < CELLS; idx++) {
+				if (atlanticHeatSource[idx])
+					overturningHeatSource[idx] -= sourceCoolingCPerS
+				if (atlanticHeatSink[idx])
+					overturningHeatSource[idx] += sinkWarmingCPerS
+			}
 
 			const relaxationSeconds = new Float32Array(CELLS).fill(
 				MIXED_LAYER.relaxationSeconds,
@@ -251,6 +356,13 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 				planet,
 				relaxationSeconds,
 			})
+			const overturningHeatAnomaly = SVERDRUP_SST_ANOMALY.solveAnomaly({
+				flow: circulation.flow,
+				ocean: index.ocean,
+				source: overturningHeatSource,
+				planet,
+				relaxationSeconds,
+			})
 			SVERDRUP_SST_ANOMALY.removeZonalMean({
 				field: advAnomaly,
 				ocean: index.ocean,
@@ -262,6 +374,49 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 			SVERDRUP_SST_ANOMALY.removeZonalMean({
 				field: bothAnomaly,
 				ocean: index.ocean,
+			})
+			SVERDRUP_SST_ANOMALY.removeZonalMean({
+				field: overturningHeatAnomaly,
+				ocean: index.ocean,
+			})
+			const fixedTransportAnomaly = SVERDRUP_HEAT_TRANSPORT.solve({
+				index,
+				circulation,
+				psi: seasonal.monthlyPsi[month],
+				additionalTransport: zeroTransport,
+				temperature,
+				isOcean,
+				planet,
+				layerDepthM: fixedLayerDepthM,
+				upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
+			})
+			const thermoclineLayerDepthM = new Float32Array(CELLS)
+			for (let idx = 0; idx < CELLS; idx++)
+				thermoclineLayerDepthM[idx] = Math.max(
+					THERMOCLINE.easternDepthM,
+					circulation.thermoclineDepth[idx],
+				)
+			const thermoclineTransportAnomaly = SVERDRUP_HEAT_TRANSPORT.solve({
+				index,
+				circulation,
+				psi: seasonal.monthlyPsi[month],
+				additionalTransport: zeroTransport,
+				temperature,
+				isOcean,
+				planet,
+				layerDepthM: thermoclineLayerDepthM,
+				upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
+			})
+			const overturningTransportAnomaly = SVERDRUP_HEAT_TRANSPORT.solve({
+				index,
+				circulation,
+				psi: seasonal.monthlyPsi[month],
+				additionalTransport: atlanticTransport,
+				temperature,
+				isOcean,
+				planet,
+				layerDepthM: fixedLayerDepthM,
+				upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
 			})
 
 			const sampleOcean = (field: Float32Array) =>
@@ -275,10 +430,18 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 			const monthAdv = sampleOcean(advAnomaly)
 			const monthVert = sampleOcean(vertAnomaly)
 			const monthBoth = sampleOcean(bothAnomaly)
+			const monthFixedTransport = sampleOcean(fixedTransportAnomaly)
+			const monthThermoclineTransport = sampleOcean(thermoclineTransportAnomaly)
+			const monthOverturningTransport = sampleOcean(overturningTransportAnomaly)
+			const monthOverturningHeat = sampleOcean(overturningHeatAnomaly)
 			for (let r = 0; r < N; r++) {
 				advSstC[r] += monthAdv[r] / MONTHS
 				vertSstC[r] += monthVert[r] / MONTHS
 				bothSstC[r] += monthBoth[r] / MONTHS
+				fixedTransportSstC[r] += monthFixedTransport[r] / MONTHS
+				thermoclineTransportSstC[r] += monthThermoclineTransport[r] / MONTHS
+				overturningTransportSstC[r] += monthOverturningTransport[r] / MONTHS
+				overturningHeatSstC[r] += monthOverturningHeat[r] / MONTHS
 			}
 		}
 
@@ -321,6 +484,10 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 					`adv=${mean(regions.map((r) => advSstC[r])).toFixed(2)} ` +
 					`vert=${mean(regions.map((r) => vertSstC[r])).toFixed(2)} ` +
 					`both=${mean(regions.map((r) => bothSstC[r])).toFixed(2)} ` +
+					`transport100=${mean(regions.map((r) => fixedTransportSstC[r])).toFixed(2)} ` +
+					`transportH=${mean(regions.map((r) => thermoclineTransportSstC[r])).toFixed(2)} ` +
+					`transportAMOC=${mean(regions.map((r) => overturningTransportSstC[r])).toFixed(2)} ` +
+					`heatAMOC=${mean(regions.map((r) => overturningHeatSstC[r])).toFixed(2)} ` +
 					`real=${mean(regions.map((r) => obsSst[r])).toFixed(2)}`,
 			)
 		}
@@ -347,7 +514,11 @@ describe("SST-anomaly source decomposition (diagnostic)", () => {
 		console.log(
 			`SSTSRC global 15-60 sst r adv=${correlation(advSstC).toFixed(2)} ` +
 				`vert=${correlation(vertSstC).toFixed(2)} ` +
-				`both=${correlation(bothSstC).toFixed(2)}`,
+				`both=${correlation(bothSstC).toFixed(2)} ` +
+				`transport100=${correlation(fixedTransportSstC).toFixed(2)} ` +
+				`transportH=${correlation(thermoclineTransportSstC).toFixed(2)} ` +
+				`transportAMOC=${correlation(overturningTransportSstC).toFixed(2)} ` +
+				`heatAMOC=${correlation(overturningHeatSstC).toFixed(2)}`,
 		)
 
 		expect(midLatitudes.length).toBeGreaterThan(0)

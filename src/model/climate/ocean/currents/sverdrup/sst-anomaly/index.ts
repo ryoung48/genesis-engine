@@ -1,4 +1,5 @@
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
+import { SVERDRUP_SCALAR_SOLVE } from "@/model/climate/ocean/currents/sverdrup/scalar-solve"
 import type {
 	AnomalySolveParams,
 	BackgroundGradient,
@@ -7,6 +8,7 @@ import type {
 	SourceTerms,
 	ZonalGradientParams,
 	ZonalMeanParams,
+	ZonalMeanTemperatureParams,
 } from "@/model/climate/ocean/currents/sverdrup/sst-anomaly/types"
 import { THERMOCLINE } from "@/model/climate/ocean/currents/sverdrup/thermocline"
 import { MIXED_LAYER } from "@/model/climate/ocean/mixed-layer"
@@ -46,14 +48,11 @@ const MAX_SWEEPS = 200
 const RESIDUAL_TOLERANCE = 2e-2
 const RESIDUAL_CHECK_INTERVAL = 10
 
-// Meridional gradient of the zonal-mean ocean temperature, °C per metre.
-function zonalGradient({
+function zonalMeanTemperature({
 	index,
 	temperature,
 	isOcean,
-	planet,
-}: ZonalGradientParams): Float64Array {
-	const metersPerDeg = planet.radiusM * DEG2RAD
+}: ZonalMeanTemperatureParams): Float64Array {
 	const sum = new Float64Array(H)
 	const count = new Float64Array(H)
 	for (let r = 0; r < temperature.length; r++) {
@@ -81,6 +80,18 @@ function zonalGradient({
 				4
 		mean = next
 	}
+	return mean
+}
+
+// Meridional gradient of the zonal-mean ocean temperature, °C per metre.
+function zonalGradient({
+	index,
+	temperature,
+	isOcean,
+	planet,
+}: ZonalGradientParams): Float64Array {
+	const metersPerDeg = planet.radiusM * DEG2RAD
+	const mean = zonalMeanTemperature({ index, temperature, isOcean })
 	const gradient = new Float64Array(H)
 	for (let j = 0; j < H; j++) {
 		const south = Math.max(0, j - 1)
@@ -214,52 +225,18 @@ function solveAnomaly({
 		}
 	}
 
-	let sourceNorm = 0
-	for (let i = 0; i < CELLS; i++)
-		if (ocean[i]) sourceNorm += source[i] * source[i]
-	sourceNorm = Math.sqrt(sourceNorm)
-	const target = RESIDUAL_TOLERANCE * Math.max(sourceNorm, 1e-300)
-
-	const anomaly = new Float32Array(CELLS)
-	for (let sweep = 0; sweep < MAX_SWEEPS; sweep++) {
-		const reverseRows = (sweep & 1) === 1
-		const reverseColumns = (sweep & 2) === 2
-		for (let jj = 1; jj < H - 1; jj++) {
-			const j = reverseRows ? H - 1 - jj : jj
-			const base = j * W
-			for (let ii = 0; ii < W; ii++) {
-				const i = reverseColumns ? W - 1 - ii : ii
-				const idx = base + i
-				if (!ocean[idx]) continue
-				const value =
-					(source[idx] +
-						coefWest[idx] * anomaly[base + wrapColumn(i - 1)] +
-						coefEast[idx] * anomaly[base + wrapColumn(i + 1)] +
-						coefSouth[idx] * anomaly[idx - W] +
-						coefNorth[idx] * anomaly[idx + W]) /
-					diagonal[idx]
-				anomaly[idx] = value
-			}
-		}
-		if ((sweep + 1) % RESIDUAL_CHECK_INTERVAL !== 0) continue
-		let residualSq = 0
-		for (let j = 1; j < H - 1; j++) {
-			const base = j * W
-			for (let i = 0; i < W; i++) {
-				const idx = base + i
-				if (!ocean[idx]) continue
-				const applied =
-					diagonal[idx] * anomaly[idx] -
-					coefWest[idx] * anomaly[base + wrapColumn(i - 1)] -
-					coefEast[idx] * anomaly[base + wrapColumn(i + 1)] -
-					coefSouth[idx] * anomaly[idx - W] -
-					coefNorth[idx] * anomaly[idx + W]
-				residualSq += (source[idx] - applied) ** 2
-			}
-		}
-		if (Math.sqrt(residualSq) < target) break
-	}
-	return anomaly
+	return SVERDRUP_SCALAR_SOLVE.solve({
+		ocean,
+		source,
+		west: coefWest,
+		east: coefEast,
+		south: coefSouth,
+		north: coefNorth,
+		diagonal,
+		maxSweeps: MAX_SWEEPS,
+		residualTolerance: RESIDUAL_TOLERANCE,
+		residualCheckInterval: RESIDUAL_CHECK_INTERVAL,
+	})
 }
 
 function removeZonalMean({ field, ocean }: ZonalMeanParams): void {
@@ -317,6 +294,7 @@ function solve({
 
 export const SVERDRUP_SST_ANOMALY = {
 	solve,
+	zonalMeanTemperature,
 	zonalGradient,
 	backgroundGradient,
 	heatSource,

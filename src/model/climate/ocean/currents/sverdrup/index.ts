@@ -93,8 +93,11 @@ function solveMonth({
 // Wind-driven surface circulation (Sverdrup gyres with western boundary
 // currents, plus Ekman drift) and the SST anomaly it produces by carrying
 // water across the background meridional temperature gradient and by Ekman
-// upwelling, from each month's wind.
-function computeSST({
+// upwelling, from each month's wind. Wind is procedural by default (whatever
+// WIND.computeWindVectors currently dispatches to); pass `observedWind` to
+// drive this off real GODAS/NCEP wind instead, for isolating ocean-model
+// error from wind-model error -- see src/test/earth/ocean-currents.md.
+function computeCurrents({
 	mesh,
 	climate,
 	elevation_km,
@@ -102,6 +105,7 @@ function computeSST({
 	landmarks,
 	sstSaturationC,
 	params,
+	observedWind,
 }: ComputeSverdrupSSTParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const isLake = LANDMARKS.regionTypeMask({ landmarks, type: "lake" })
@@ -134,17 +138,10 @@ function computeSST({
 	const monthlyTau = []
 	const monthlyCurl = []
 	for (let month = 0; month < MONTHS; month++) {
-		const forcing = SVERDRUP_CIRCULATION.forcing({
-			index,
-			wind: WIND.computeWindVectors({
-				mesh,
-				climate,
-				elevation_km,
-				params,
-				month,
-			}),
-			planet,
-		})
+		const wind = observedWind
+			? WIND.observedWindVectorsForMonth({ observedWind, numRegions: N, month })
+			: WIND.computeWindVectors({ mesh, climate, elevation_km, params, month })
+		const forcing = SVERDRUP_CIRCULATION.forcing({ index, wind, planet })
 		monthlyTau.push(forcing.tau)
 		monthlyCurl.push(forcing.curl)
 	}
@@ -190,5 +187,5 @@ function computeSST({
 }
 
 export const SVERDRUP_CURRENTS = {
-	computeSST,
+	computeCurrents,
 }

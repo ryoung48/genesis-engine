@@ -83,6 +83,13 @@ export type SurfaceParams = {
 
 export type Circulation = {
 	flow: RasterVector
+	// The geostrophic (Sverdrup-transport) component alone, without Ekman
+	// drift -- the wind-direct surface response Ekman theory decays away
+	// within its own layer depth (EKMAN_DEPTH_M), so it doesn't apply below
+	// it. Exposed for callers needing a subsurface current (e.g. the
+	// two-layer model's deep reservoir advection), since `flow` is the
+	// surface total (geostrophic + Ekman drift) meant for the mixed layer.
+	geostrophic: RasterVector
 	divergence: Float32Array
 	thermoclineDepth: Float32Array
 }

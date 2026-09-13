@@ -1,6 +1,6 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
-import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
+import { FULL_WIND } from "@/model/climate/weather/wind/full"
 import type {
 	ComputeWindVectorsInput,
 	FlowGrid,
@@ -144,9 +144,12 @@ function computeWindGrid({
 // Rotation's share of cell collapse: 0 for Earth-like rotation, 1 once the
 // day is long enough that Coriolis no longer organises the circulation.
 // Shared by the wind models and by the ocean gyres, which fade on the same
-// signal.
-const COLLAPSE_HOURS_EDGE0 = 60
-const COLLAPSE_HOURS_EDGE1 = 300
+// signal. Anchored to the GCM staging: the polar cell is gone structurally
+// by 4 days (the boundary table carries that, not this curve), and this
+// curve fades the Ferrel-to-pole remnant from full strength at 4 days to
+// nothing at 16 days, when a single Hadley cell dominates each hemisphere.
+const COLLAPSE_HOURS_EDGE0 = 96
+const COLLAPSE_HOURS_EDGE1 = 384
 function rotationCollapse(hoursPerDay: number): number {
 	return MATH.smoothstep({
 		edge0: COLLAPSE_HOURS_EDGE0,
@@ -155,11 +158,14 @@ function rotationCollapse(hoursPerDay: number): number {
 	})
 }
 
-// Production wind model: the original pressure-gradient model (`wind/simple`)
-// is the world-gen pipeline's fast path. The full atmospheric-dynamics model
-// under active development (`wind/full`, torque balance + shallow water) is a
-// standalone module, not wired in here -- see wind/full/index.ts and
-// src/test/earth/wind.md.
+// Production wind model: the full atmospheric-dynamics model (`wind/full`,
+// Hadley/Ferrel/polar pressure template + surface torque balance + shallow-
+// water large-scale solver) drives the world-gen pipeline. `wind/simple`
+// (the original pressure-gradient model) is the fast fallback path and
+// remains available as a standalone import for callers that need it. See
+// wind/full/index.ts and src/test/earth/wind.md for the model's own accuracy
+// numbers and cost -- swapping this in trades wind/simple's speed for
+// wind/full's Earth-comparison accuracy.
 function computeWindVectors(input: ComputeWindVectorsInput): {
 	windU: Float32Array
 	windV: Float32Array
@@ -169,7 +175,7 @@ function computeWindVectors(input: ComputeWindVectorsInput): {
 	if (input.params?.tideLock?.type === "solar") {
 		return LOCKED_WIND.computeLockedWindVectors(input)
 	}
-	return SIMPLE_WIND.computeWindVectors(input)
+	return FULL_WIND.computeWindVectors(input)
 }
 
 /** Builds the same {windU, windV, pressure, windSpeed} shape as

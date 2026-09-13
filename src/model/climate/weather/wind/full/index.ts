@@ -1,7 +1,13 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
 import type {
+	CellBoundariesGenerator,
+	CellBoundariesResult,
+	CellPressureAtBoundaryGenerator,
 	CellSegment,
+	ComputeWindVectorsWithLargeScaleInput,
+	LargeScaleSolver,
+	OuterBoundaryBaseInput,
 	PressureComponents,
 } from "@/model/climate/weather/wind/full/types"
 import { OCEAN_INERTIA } from "@/model/climate/weather/wind/ocean-inertia"
@@ -26,8 +32,10 @@ import { UNITS } from "@/model/shared/units"
 
 // Cell boundaries from the surface trough outward: subtropical ridge,
 // polar front, then further alternating boundaries for fast rotators whose
-// cells are narrow enough to fit more of them.
-const NUM_BOUNDARIES = 6
+// cells are narrow enough to fit more of them. Eight offsets so the fastest
+// tabulated rotators (the 1/4-day GCM row's eight boundaries) fit; entries
+// past the pole clamp to no-ops, so slow rotators and Earth are unaffected.
+const NUM_BOUNDARIES = 9
 // Geostrophic scaling: the sea-level pressure contrast across a circulation
 // cell is proportional to the zonal-mean temperature contrast across it
 // (template units per degree C). Thermally direct cells (Hadley, polar)
@@ -43,6 +51,27 @@ const POLAR_CELL_PRESSURE_PER_C = 0.15
 // ridges and beyond follow the ocean thermal equator, since a hot summer
 // continent pulls the trough poleward but not the oceanic subtropical highs.
 const BOUNDARY_TEQ_COUPLING = 0.35
+// GCM cell-boundary latitudes past the Hadley edge (Read et al., via the
+// worldbuilding-pasta rotation table), log-interpolated in day length. b1
+// (the Hadley edge itself) reuses the fitted hadleyWidth table, which
+// matches that source point for point; these rows cover b2..b8 at day
+// lengths of 1/4, 1/2, 1, 2, 4, 8 and 16 days. Tails of 90+ clamp to no-ops
+// past the pole (zero temperature contrast), staging cell loss the way the
+// GCMs show it: the polar cell gone by 4 days, one Ferrel band to the pole,
+// full collapse left to cellCollapse.
+const OUTER_BASE_DAY_ANCHORS = [6, 12, 24, 48, 96, 192, 384]
+const OUTER_BASES: number[][] = [
+	[21, 40, 60, 70, 90, 90, 90],
+	[26, 55, 90, 90, 90, 90, 90],
+	[33, 70, 120, 120, 120, 120, 120],
+	[41, 90, 150, 150, 150, 150, 150],
+	[49, 180, 180, 180, 180, 180, 180],
+	[56, 210, 210, 210, 210, 210, 210],
+	[64, 240, 240, 240, 240, 240, 240],
+]
+const LOG_OUTER_BASE_DAY_ANCHORS = OUTER_BASE_DAY_ANCHORS.map((h) =>
+	Math.log(h),
+)
 // Boundary-layer friction relative to Earth's Coriolis parameter at the pole.
 const FRICTION = 0.3
 // Storm gustiness as a fraction of the thermal wind across one scale height,
@@ -123,17 +152,36 @@ const EAST_BOUNDARY_TURN_DEG = 20
 // at which the eastern-boundary term reaches full strength; it is zero where
 // the offshore pressure is at or below the zonal mean.
 const EAST_BOUNDARY_HIGH_FULL = 0.15
+// Equatorial superrotation: on slow rotators upper-atmosphere momentum
+// transfer drives flow faster than the surface rotates, showing up as
+// westerlies at the equator. Gated on cellCollapse, so Earth-strength
+// rotation (collapse 0) is untouched. No GCM surface number pins the
+// strength, so it merely offsets collapsed-trade strength (~3 m/s) rather
+// than claiming a magnitude.
+const SUPERROTATION_FLOW_MS = 3
+const SUPERROTATION_WIDTH_DEG = 15
 const DEG2RAD = Math.PI / 180
+
+function outerBase({
+	boundaryIndex,
+	hoursPerDay,
+}: OuterBoundaryBaseInput): number {
+	return MATH.piecewise({
+		domain: LOG_OUTER_BASE_DAY_ANCHORS,
+		range: OUTER_BASES[boundaryIndex],
+		x: Math.log(hoursPerDay),
+	})
+}
 
 function cellBoundaries({
 	teq,
 	ridgeTeq,
-	hw,
+	bases,
 	hemisphere,
 }: {
 	teq: number
 	ridgeTeq: number
-	hw: number
+	bases: number[]
 	hemisphere: number
 }): number[] {
 	const offsets: number[] = []
@@ -142,7 +190,7 @@ function cellBoundaries({
 		const coupling = BOUNDARY_TEQ_COUPLING ** (k + 1)
 		const hi = Math.max(
 			lo + 1,
-			(k + 1) * hw + hemisphere * (coupling * ridgeTeq - teq),
+			bases[k] + hemisphere * (coupling * ridgeTeq - teq),
 		)
 		offsets.push(hi)
 		lo = hi
@@ -157,11 +205,11 @@ function cellBoundaries({
 function cellBoundariesTable({
 	teqByLon,
 	ridgeTeqByLon,
-	hw,
+	bases,
 }: {
 	teqByLon: Float32Array
 	ridgeTeqByLon: Float32Array
-	hw: number
+	bases: number[]
 }): Float32Array {
 	const lonBins = teqByLon.length
 	const stride = NUM_BOUNDARIES - 1
@@ -170,7 +218,12 @@ function cellBoundariesTable({
 		const teq = teqByLon[bin]
 		const ridgeTeq = ridgeTeqByLon[bin]
 		for (const hemisphere of [-1, 1]) {
-			const offsets = cellBoundaries({ teq, ridgeTeq, hw, hemisphere })
+			const offsets = cellBoundaries({
+				teq,
+				ridgeTeq,
+				bases,
+				hemisphere,
+			})
 			const rowStart = (bin * 2 + (hemisphere > 0 ? 1 : 0)) * stride
 			for (let k = 0; k < stride; k++) table[rowStart + k] = offsets[k]
 		}
@@ -178,20 +231,41 @@ function cellBoundariesTable({
 	return table
 }
 
+// Default boundary-count/spacing: the fixed geometric-coupling template.
+// Alternative generators (e.g. a physically-derived cell count reacting to
+// rotation speed) can be injected via ComputeWindVectorsWithLargeScaleInput's
+// cellBoundariesGenerator, matching largeScaleSolver's injection pattern.
+const standardCellBoundaries: CellBoundariesGenerator = ({
+	teqByLon,
+	ridgeTeqByLon,
+	hw,
+	hoursPerDay,
+}): CellBoundariesResult => {
+	const bases = [hw]
+	for (let k = 0; k < OUTER_BASES.length; k++)
+		bases.push(outerBase({ boundaryIndex: k, hoursPerDay }))
+	return {
+		offsets: cellBoundariesTable({ teqByLon, ridgeTeqByLon, bases }),
+		boundaryCount: NUM_BOUNDARIES,
+	}
+}
+
 function cellSegment({
 	lat,
 	teq,
 	bin,
 	boundaryOffsets,
+	boundaryCount,
 }: {
 	lat: number
 	teq: number
 	bin: number
 	boundaryOffsets: Float32Array
+	boundaryCount: number
 }): CellSegment {
 	const s = lat >= teq ? 1 : -1
 	const d = s * (lat - teq)
-	const stride = NUM_BOUNDARIES - 1
+	const stride = boundaryCount - 1
 	const rowStart = (bin * 2 + (s > 0 ? 1 : 0)) * stride
 	const lastCell = stride - 1
 	let lo = 0
@@ -209,13 +283,18 @@ function cellSegment({
 	return { k: lastCell, hemisphere: s, t: 1 }
 }
 
-function cellPressurePerC({
+// Default boundary-value generator: the fixed, hand-fit per-degree-C
+// coefficients, accumulated from the previous boundary (this template's small,
+// fixed cell count doesn't telescope-cancel; see wind/full/physical-cells for
+// a generator built for many cells, which can't use this cumulative approach).
+// An alternative can be injected via ComputeWindVectorsWithLargeScaleInput's
+// cellPressureAtBoundaryGenerator, matching cellBoundariesGenerator's pattern.
+const standardCellPressureAtBoundary: CellPressureAtBoundaryGenerator = ({
 	k,
 	cellCollapse,
-}: {
-	k: number
-	cellCollapse: number
-}): number {
+	previousPressureAt,
+	contrastFromPrev,
+}): number => {
 	let perC: number
 	if (k === 1) perC = DIRECT_CELL_PRESSURE_PER_C
 	else if (k === 2) perC = -INDIRECT_CELL_PRESSURE_PER_C
@@ -223,7 +302,9 @@ function cellPressurePerC({
 		perC = k % 2 === 1 ? POLAR_CELL_PRESSURE_PER_C : -POLAR_CELL_PRESSURE_PER_C
 	// Collapsed circulation: every cell is thermally direct, so pressure rises
 	// monotonically from the thermal equator to the cold pole.
-	return (1 - cellCollapse) * perC + cellCollapse * DIRECT_CELL_PRESSURE_PER_C
+	const blended =
+		(1 - cellCollapse) * perC + cellCollapse * DIRECT_CELL_PRESSURE_PER_C
+	return previousPressureAt + blended * contrastFromPrev
 }
 
 function boundaryPressure({
@@ -270,7 +351,10 @@ function computePressureField({
 	teqByLon,
 	ridgeTeqByLon,
 	hoursPerDay,
+	planetRadiusKm,
 	cellCollapse,
+	cellBoundariesGenerator,
+	cellPressureAtBoundaryGenerator,
 }: {
 	mesh: SphereMesh
 	seaLevelTemps: Float32Array
@@ -279,7 +363,10 @@ function computePressureField({
 	teqByLon: Float32Array
 	ridgeTeqByLon: Float32Array
 	hoursPerDay: number
+	planetRadiusKm: number
 	cellCollapse: number
+	cellBoundariesGenerator: CellBoundariesGenerator
+	cellPressureAtBoundaryGenerator: CellPressureAtBoundaryGenerator
 }): PressureComponents {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
@@ -313,10 +400,19 @@ function computePressureField({
 		return latBinMean[i0] + (latBinMean[i1] - latBinMean[i0]) * (x - i0)
 	}
 
+	const { offsets: boundaryOffsets, boundaryCount } = cellBoundariesGenerator({
+		teqByLon,
+		ridgeTeqByLon,
+		hw,
+		hoursPerDay,
+		planetRadiusKm,
+		latBinMean,
+	})
+
 	// Ocean fraction per (longitude bin, hemisphere, cell boundary): the cells
 	// whose nearest boundary is k contribute to boundary k's land-sea mix.
 	const lonBins = teqByLon.length
-	const boundaries = NUM_BOUNDARIES
+	const boundaries = boundaryCount
 	const segments: CellSegment[] = new Array(N)
 	const slot = ({
 		bin,
@@ -327,7 +423,6 @@ function computePressureField({
 		hemisphere: number
 		k: number
 	}) => (bin * 2 + (hemisphere > 0 ? 1 : 0)) * boundaries + k
-	const boundaryOffsets = cellBoundariesTable({ teqByLon, ridgeTeqByLon, hw })
 	const oceanCount = new Float32Array(lonBins * 2 * boundaries)
 	const cellCount = new Float32Array(lonBins * 2 * boundaries)
 	for (let r = 0; r < N; r++) {
@@ -336,6 +431,7 @@ function computePressureField({
 			teq: teqByLon[regionBin[r]],
 			bin: regionBin[r],
 			boundaryOffsets,
+			boundaryCount,
 		})
 		segments[r] = seg
 		const nearest = seg.t < 0.5 ? seg.k : seg.k + 1
@@ -373,7 +469,7 @@ function computePressureField({
 	// from the trough, each cell adding its temperature contrast times its
 	// direct/indirect coefficient.
 	const boundaryBase = new Float32Array(lonBins * 2 * boundaries)
-	const offsetsStride = NUM_BOUNDARIES - 1
+	const offsetsStride = boundaryCount - 1
 	for (let bin = 0; bin < lonBins; bin++) {
 		const teq = teqByLon[bin]
 		for (const hemisphere of [-1, 1]) {
@@ -385,8 +481,16 @@ function computePressureField({
 					-90,
 					Math.min(90, teq + hemisphere * boundaryOffsets[offsetsRow + k - 1]),
 				)
-				const contrast = zonalMeanAt(latPrev) - zonalMeanAt(latK)
-				pressureAt += cellPressurePerC({ k, cellCollapse }) * contrast
+				pressureAt = cellPressureAtBoundaryGenerator({
+					k,
+					cellCollapse,
+					latPrev,
+					latK,
+					teq,
+					previousPressureAt: pressureAt,
+					contrastFromPrev: zonalMeanAt(latPrev) - zonalMeanAt(latK),
+					contrastFromTrough: zonalMeanAt(teq) - zonalMeanAt(latK),
+				})
 				boundaryBase[slot({ bin, hemisphere, k })] = pressureAt
 				latPrev = latK
 			}
@@ -452,14 +556,48 @@ function computePressureField({
 	return { hadley, rest }
 }
 
-function computeWindVectors({
+// Shallow-water large-scale solver, an explicit time-march to a quasi-steady
+// state. This is the default: see wind.md for its Earth-comparison numbers.
+const shallowWaterSolver: LargeScaleSolver = ({
+	latDeg,
+	lonDeg,
+	pressure,
+	elevation_km,
+	planetRadiusKm,
+	coriolisSign,
+	omegaRatio,
+	pressureFactor,
+	rawPerMs,
+}) => {
+	const raw = SHALLOW_WATER.surfaceWind({
+		latDeg,
+		lonDeg,
+		pressure,
+		elevation_km,
+		planetRadiusM: planetRadiusKm * 1000,
+		coriolisPolar: coriolisSign * omegaRatio * EARTH_POLAR_CORIOLIS,
+		pressureScale: pressureFactor,
+	})
+	const u = new Float32Array(raw.u.length)
+	const v = new Float32Array(raw.v.length)
+	for (let i = 0; i < u.length; i++) {
+		u[i] = raw.u[i] * rawPerMs
+		v[i] = raw.v[i] * rawPerMs
+	}
+	return { u, v, coarsePressure: raw.coarsePressure }
+}
+
+function computeWindVectorsWithLargeScale({
 	mesh,
 	climate,
 	elevation_km,
 	params,
 	month,
 	surface,
-}: ComputeWindVectorsInput): {
+	largeScaleSolver,
+	cellBoundariesGenerator = standardCellBoundaries,
+	cellPressureAtBoundaryGenerator = standardCellPressureAtBoundary,
+}: ComputeWindVectorsWithLargeScaleInput): {
 	windU: Float32Array
 	windV: Float32Array
 	pressure: Float32Array
@@ -593,7 +731,10 @@ function computeWindVectors({
 		teqByLon,
 		ridgeTeqByLon,
 		hoursPerDay,
+		planetRadiusKm,
 		cellCollapse,
+		cellBoundariesGenerator,
+		cellPressureAtBoundaryGenerator,
 	})
 	const { lonDeg } = RAIN.getClimateGeometry(mesh)
 
@@ -670,16 +811,18 @@ function computeWindVectors({
 			hadleyScale.north * northPressure[r] +
 			hadleyScale.south * southPressure[r]
 
-	// The shallow-water flow carries the coarse pressure response. Keep only
+	// The large-scale solver carries the coarse pressure response. Keep only
 	// the mesh-scale residual for the local balance below.
-	const largeScale = SHALLOW_WATER.surfaceWind({
+	const largeScale = largeScaleSolver({
 		latDeg,
 		lonDeg,
 		pressure,
 		elevation_km,
-		planetRadiusM: planetRadiusKm * 1000,
-		coriolisPolar: coriolisSign * omegaRatio * EARTH_POLAR_CORIOLIS,
-		pressureScale: pressureFactor,
+		planetRadiusKm,
+		coriolisSign,
+		omegaRatio,
+		pressureFactor,
+		rawPerMs,
 	})
 	const localPressure = new Float32Array(N)
 	for (let r = 0; r < N; r++)
@@ -845,8 +988,17 @@ function computeWindVectors({
 			u += speed * Math.sin(eastBoundaryTurn) * roughness
 			v -= speed * Math.sign(lat) * Math.cos(eastBoundaryTurn) * roughness
 		}
-		u += largeScale.u[r] * rawPerMs * roughness
-		v += largeScale.v[r] * rawPerMs * roughness
+		if (cellCollapse > 0) {
+			const lat = latDeg[r]
+			const speed =
+				SUPERROTATION_FLOW_MS *
+				cellCollapse *
+				Math.exp(-((lat / SUPERROTATION_WIDTH_DEG) ** 2)) *
+				rawPerMs
+			u += speed * coriolisSign * roughness
+		}
+		u += largeScale.u[r] * roughness
+		v += largeScale.v[r] * roughness
 
 		// Katabatic drainage: over cold sloped surfaces (ice sheets, high
 		// plateaus) dense surface air is pushed downhill. It is a shallow,
@@ -937,6 +1089,19 @@ function computeWindVectors({
 	return { windU, windV, pressure, windSpeed }
 }
 
+function computeWindVectors(input: ComputeWindVectorsInput): {
+	windU: Float32Array
+	windV: Float32Array
+	pressure: Float32Array
+	windSpeed: Float32Array
+} {
+	return computeWindVectorsWithLargeScale({
+		...input,
+		largeScaleSolver: shallowWaterSolver,
+	})
+}
+
 export const FULL_WIND = {
 	computeWindVectors,
+	computeWindVectorsWithLargeScale,
 }

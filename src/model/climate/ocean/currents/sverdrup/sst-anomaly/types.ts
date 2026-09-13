@@ -14,6 +14,12 @@ export type ZonalGradientParams = {
 	planet: SverdrupPlanet
 }
 
+export type ZonalMeanTemperatureParams = {
+	index: RasterIndex
+	temperature: Float32Array
+	isOcean: Uint8Array
+}
+
 export type BackgroundGradient = {
 	x: Float32Array
 	y: Float32Array
