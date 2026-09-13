@@ -20,6 +20,14 @@ import { UNITS } from "@/model/shared/units"
 const MONTHS = 12
 const SEA_LEVEL_AIR_DENSITY_KG_M3 = 1.225
 
+// The SST anomaly now feeds a baroclinic term back into the flow (see
+// SVERDRUP_CIRCULATION.baroclinic), so flow and anomaly have to be solved as
+// a fixed point rather than once each: pass 0 is wind-only, each later pass
+// re-solves the flow from the previous pass's anomaly and re-solves the
+// anomaly from that flow. One correction pass is what this measures against;
+// more bought negligible further movement at 200 Gauss-Seidel sweeps a pass.
+const FEEDBACK_PASSES = 2
+
 function solveMonth({
 	index,
 	tau,
@@ -31,19 +39,38 @@ function solveMonth({
 	planet,
 	sstSaturationC,
 }: MonthSolveParams): MonthSolve {
-	const circulation = SVERDRUP_CIRCULATION.surface({
+	let circulation = SVERDRUP_CIRCULATION.surface({
 		index,
 		tau,
 		psi,
 		planet,
+		sstAnomaly: null,
 	})
-	const anomaly = SVERDRUP_SST_ANOMALY.solve({
+	let anomaly = SVERDRUP_SST_ANOMALY.solve({
 		index,
 		circulation,
 		temperature,
 		isOcean,
 		planet,
+		upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
 	})
+	for (let pass = 1; pass < FEEDBACK_PASSES; pass++) {
+		circulation = SVERDRUP_CIRCULATION.surface({
+			index,
+			tau,
+			psi,
+			planet,
+			sstAnomaly: anomaly,
+		})
+		anomaly = SVERDRUP_SST_ANOMALY.solve({
+			index,
+			circulation,
+			temperature,
+			isOcean,
+			planet,
+			upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
+		})
+	}
 	const sampleOcean = (field: Float32Array) =>
 		SVERDRUP_RASTER.sample({
 			field,
@@ -75,7 +102,6 @@ function computeSST({
 	landmarks,
 	sstSaturationC,
 	params,
-	onWindProfile,
 }: ComputeSverdrupSSTParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const isLake = LANDMARKS.regionTypeMask({ landmarks, type: "lake" })
@@ -107,26 +133,21 @@ function computeSST({
 	// temporal Fourier modes rather than twelve times over.
 	const monthlyTau = []
 	const monthlyCurl = []
-	let windDurationMs = 0
 	for (let month = 0; month < MONTHS; month++) {
-		const windStartMs = performance.now()
-		const wind = WIND.computeWindVectors({
-			mesh,
-			climate,
-			elevation_km,
-			params,
-			month,
-		})
-		windDurationMs += performance.now() - windStartMs
 		const forcing = SVERDRUP_CIRCULATION.forcing({
 			index,
-			wind,
+			wind: WIND.computeWindVectors({
+				mesh,
+				climate,
+				elevation_km,
+				params,
+				month,
+			}),
 			planet,
 		})
 		monthlyTau.push(forcing.tau)
 		monthlyCurl.push(forcing.curl)
 	}
-	onWindProfile(windDurationMs)
 	const seasonal = STOMMEL.solveSeasonal({ operator, monthlyCurl, planet })
 
 	for (let month = 0; month < MONTHS; month++) {

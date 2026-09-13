@@ -1,4 +1,5 @@
-import type { SurfaceFactorInput } from "@/model/climate/weather/wind/roughness/types"
+import type { SurfaceFactorFieldInput } from "@/model/climate/weather/wind/roughness/types"
+import type { WindSurface } from "@/model/climate/weather/wind/types"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 
 // Surface drag on the near-ground wind, shared by every wind model (the
@@ -61,7 +62,13 @@ function topographyWindFactor({
 	return base * (1.0 - 0.12 * slope)
 }
 
-function surfaceFactor({ r, surface }: SurfaceFactorInput): number {
+function surfaceFactorAt({
+	r,
+	surface,
+}: {
+	r: number
+	surface: WindSurface
+}): number {
 	const topoCode = surface.topography?.[r]
 	const isWater =
 		topoCode === CLASSIFICATION.topoOcean ||
@@ -80,6 +87,24 @@ function surfaceFactor({ r, surface }: SurfaceFactorInput): number {
 	return vegFactor * topoFactor * coastalFactor
 }
 
+// Terrain-only, so it never changes across the months of a single world --
+// every wind model calls this once per cell per month, so caching per
+// `surface` object (the same reference is reused all year) turns 12 redundant
+// full-field computations into 1.
+const surfaceFactorFieldCache = new WeakMap<WindSurface, Float32Array>()
+
+function surfaceFactorField({
+	N,
+	surface,
+}: SurfaceFactorFieldInput): Float32Array {
+	const cached = surfaceFactorFieldCache.get(surface)
+	if (cached) return cached
+	const factors = new Float32Array(N)
+	for (let r = 0; r < N; r++) factors[r] = surfaceFactorAt({ r, surface })
+	surfaceFactorFieldCache.set(surface, factors)
+	return factors
+}
+
 export const ROUGHNESS = {
-	surfaceFactor,
+	surfaceFactorField,
 }

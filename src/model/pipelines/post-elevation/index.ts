@@ -271,8 +271,6 @@ function runPostElevationPipeline(
 				distCoast,
 				landmarks: currentLandmarks,
 				monthlyTEQ,
-				eastAdv,
-				westAdv,
 				climate,
 				elevation_km,
 				params,

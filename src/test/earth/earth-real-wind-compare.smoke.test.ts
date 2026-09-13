@@ -3,6 +3,7 @@ import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
 import { WIND } from "@/model/climate/weather/wind"
+import { FULL_WIND } from "@/model/climate/weather/wind/full"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import type { GenesisWorld } from "@/model/pipelines/types"
@@ -10,7 +11,7 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
 
 // NOTE ON COMPARABILITY:
-// The model's wind field (WIND.computeWindVectors) solves a steady
+// The model's wind field (FULL_WIND.computeWindVectors) solves a steady
 // boundary-layer balance (friction + Coriolis against a pressure-gradient
 // force) on a synthesized pressure field: a Hadley/Ferrel/polar template
 // whose trough follows the surface thermal equator and whose cell
@@ -180,8 +181,6 @@ beforeAll(() => {
 			hoursPerDay: DEFAULT_WORLD_PARAMS.hoursPerDay,
 			substellarLon: DEFAULT_WORLD_PARAMS.substellarLon,
 			perihelion: DEFAULT_WORLD_PARAMS.perihelion,
-			pressure: DEFAULT_WORLD_PARAMS.pressure,
-			skipUnneededStages: true,
 		},
 	})
 
@@ -485,7 +484,7 @@ describe("model wind vs observed Earth wind (NCEP/NCAR)", () => {
 		let windSolveMs = 0
 		for (let m = 0; m < months; m++) {
 			const windStartedMs = performance.now()
-			const { windU, windV, windSpeed } = WIND.computeWindVectors({
+			const { windU, windV, windSpeed } = FULL_WIND.computeWindVectors({
 				mesh: world.mesh,
 				climate,
 				elevation_km: world.elevation_km,

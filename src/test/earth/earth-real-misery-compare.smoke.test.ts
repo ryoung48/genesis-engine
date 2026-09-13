@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
-import { WIND } from "@/model/climate/weather/wind"
+import { FULL_WIND } from "@/model/climate/weather/wind/full"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
@@ -109,7 +109,7 @@ describe("model MI vs observed Earth MI (misery index / apparent temperature)", 
 		const realHumidityAvg = world.observedHumidity!.real_annual!
 		const observedWindSpeedMonthly = world.observedWind!.real_speed_monthly!
 
-		const { windSpeed: modeledWindSpeed } = WIND.computeWindVectors({
+		const { windSpeed: modeledWindSpeed } = FULL_WIND.computeWindVectors({
 			mesh,
 			climate,
 			elevation_km: world.elevation_km,

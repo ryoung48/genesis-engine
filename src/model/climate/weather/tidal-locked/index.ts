@@ -187,12 +187,13 @@ function computeLockedWindVectors({
 	const ref = Math.max(pct90, 1e-6)
 	const pressureFactor =
 		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
+	const roughnessField = surface
+		? ROUGHNESS.surfaceFactorField({ N, surface })
+		: undefined
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const base = (rawSpeed[r] / ref) * 10 * pressureFactor
-		windSpeed[r] = surface
-			? base * ROUGHNESS.surfaceFactor({ r, surface })
-			: base
+		windSpeed[r] = roughnessField ? base * roughnessField[r] : base
 	}
 
 	return { windU, windV, pressure, windSpeed }

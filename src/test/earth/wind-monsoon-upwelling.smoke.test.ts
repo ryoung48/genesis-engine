@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
+import { FULL_WIND } from "@/model/climate/weather/wind/full"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
@@ -69,7 +70,7 @@ describe("upwelling vs monsoon west coasts", () => {
 			topo[r] !== CLASSIFICATION.topoOcean &&
 			topo[r] !== CLASSIFICATION.topoLake
 
-		const model = WIND.computeWindVectors({
+		const model = FULL_WIND.computeWindVectors({
 			mesh: world.mesh,
 			climate: world.climate,
 			elevation_km: world.elevation_km,

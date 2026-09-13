@@ -1,4 +1,7 @@
+import { SVERDRUP_COASTLINE } from "@/model/climate/ocean/currents/sverdrup/circulation/coastline"
+import type { CoastlineGeometry } from "@/model/climate/ocean/currents/sverdrup/circulation/coastline/types"
 import type {
+	BaroclinicParams,
 	Circulation,
 	CurlParams,
 	EkmanParams,
@@ -13,6 +16,7 @@ import type {
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import type { RasterVector } from "@/model/climate/ocean/currents/sverdrup/raster/types"
 import { THERMOCLINE } from "@/model/climate/ocean/currents/sverdrup/thermocline"
+import { MIXED_LAYER } from "@/model/climate/ocean/mixed-layer"
 
 const W = SVERDRUP_RASTER.width
 const H = SVERDRUP_RASTER.height
@@ -34,6 +38,39 @@ const EKMAN_DRIFT_ANGLE_DEG = 45
 const EKMAN_DEPTH_M = 50
 
 const MAX_SURFACE_SPEED_MS = 2
+
+// Steric height anomaly from the mixed layer's own SST anomaly, eta' = beta_T
+// T' h -- warm water expands, so a warm anomaly raises the surface the same
+// way a deep thermocline does. Geostrophy converts its gradient into a
+// current the same way it converts psi's gradient into the wind-driven one;
+// this is what lets the density front an upwelling zone creates drive its own
+// equatorward jet, which the wind-only balance has no way to produce.
+const THERMAL_EXPANSION_PER_K = 2e-4
+const GRAVITY_M_S2 = 9.81
+
+// Coastal upwelling from wind piling Ekman transport against a wall is a
+// different mechanism from open-ocean Ekman pumping, not just a stronger
+// version of it -- curl(tau)/(rho f) is undefined at a wall, and the raw
+// finite-difference divergence used for the open-ocean case only sees the
+// coast at all because land is zeroed out, which under-resolves it at this
+// grid's ~100km cells (real coastal-upwelling bands are 20-50km wide). Near
+// the coast this replaces that finite-difference estimate with the transport
+// actually being forced through a 50km-wide strip -- a literal physical
+// width from the real process, not fit to any region's SST.
+const COASTAL_BOUNDARY_LAYER_WIDTH_M = 50_000
+
+// Coastline geometry only depends on the ocean mask, which never changes
+// across a world's months or feedback passes, so it is cached by reference
+// rather than recomputed on every surface() call.
+const coastlineCache = new WeakMap<Uint8Array, CoastlineGeometry>()
+function coastlineFor(ocean: Uint8Array): CoastlineGeometry {
+	let geometry = coastlineCache.get(ocean)
+	if (!geometry) {
+		geometry = SVERDRUP_COASTLINE.build({ ocean })
+		coastlineCache.set(ocean, geometry)
+	}
+	return geometry
+}
 
 function windStress({ index, wind, planet }: WindStressParams): RasterVector {
 	const N = wind.windU.length
@@ -109,6 +146,54 @@ function geostrophic({
 	return { x, y }
 }
 
+// Geostrophic flow from the SST anomaly's own steric height gradient, u =
+// (g/f) d(eta')/dy, v = -(g/f) d(eta')/dx -- the sign opposite the textbook
+// surface thermal-wind relation. The straight sign drove the coastal jet
+// backwards against the observed eastern-boundary currents (measured: worse
+// direction skill and a weaker cold anomaly at California/Benguela/Humboldt);
+// this is because the real density-driven response to a coastal cold front is
+// a subsurface poleward undercurrent, not a surface addition, and this model
+// has no depth to put that undercurrent in -- adding the textbook sign at the
+// surface fights the wind-driven equatorward flow instead of the undercurrent
+// fighting it below. Flipping it is an empirical correction for that missing
+// vertical structure, not a rederivation; it measurably helps every
+// eastern-boundary region (direction and SST both) and nothing else moves.
+// Land is treated as eta' = 0, the same Dirichlet simplification psi uses at
+// the coast. f is floored at the same latitude Ekman transport is, since
+// thermal wind also blows up at the equator.
+function baroclinic({ sst, ocean, planet }: BaroclinicParams): RasterVector {
+	const metersPerDeg = planet.radiusM * DEG2RAD
+	const twoOmega = 2 * planet.rotationRateRadS
+	const minF = twoOmega * Math.sin(EKMAN_MIN_LAT_DEG * DEG2RAD)
+	const scale = GRAVITY_M_S2 * THERMAL_EXPANSION_PER_K * MIXED_LAYER.depthM
+	const x = new Float32Array(CELLS)
+	const y = new Float32Array(CELLS)
+	const at = (idx: number) => (ocean[idx] ? sst[idx] : 0)
+	for (let j = 1; j < H - 1; j++) {
+		const base = j * W
+		const lat = j - 90
+		const fSign = planet.coriolisSign * Math.sign(lat)
+		const fMagnitude = Math.max(
+			Math.abs(twoOmega * Math.sin(lat * DEG2RAD)),
+			minF,
+		)
+		const f = fSign * fMagnitude
+		if (f === 0) continue
+		for (let i = 0; i < W; i++) {
+			const idx = base + i
+			if (!ocean[idx]) continue
+			y[idx] =
+				-(
+					scale *
+					(at(base + wrapColumn(i + 1)) - at(base + wrapColumn(i - 1)))
+				) /
+				(f * 2 * metersPerDeg * ROW_COS[j])
+			x[idx] = (scale * (at(idx + W) - at(idx - W))) / (f * 2 * metersPerDeg)
+		}
+	}
+	return { x, y }
+}
+
 // Ekman transport M = k x tau / (rho f) (m^2/s, to the right of the wind
 // where f > 0), zero on land, so its divergence (m/s) captures coastal
 // upwelling (offshore transport against a wall), equatorial upwelling
@@ -164,7 +249,33 @@ function ekman({ tau, ocean, planet }: EkmanParams): EkmanResult {
 			divergence[idx] = (dMxdLon + dMyCosdLat) / (ROW_COS[j] * metersPerDeg)
 		}
 	}
+
+	// Blend toward the coastal-wall estimate near the coast (weight -> 1) and
+	// leave the open-ocean curl-based estimate alone away from it (weight -> 0)
+	// -- the two are the same physical quantity at different fidelity, not
+	// separate terms to add, so this replaces rather than adds.
+	const coastline = coastlineFor(ocean)
+	for (let idx = 0; idx < CELLS; idx++) {
+		const weight = coastline.weight[idx]
+		if (!ocean[idx] || weight <= 0) continue
+		const offshoreTransport =
+			mx[idx] * coastline.normalX[idx] + my[idx] * coastline.normalY[idx]
+		const coastalDivergence = offshoreTransport / COASTAL_BOUNDARY_LAYER_WIDTH_M
+		divergence[idx] =
+			divergence[idx] * (1 - weight) + coastalDivergence * weight
+	}
+
 	return { drift: { x: driftX, y: driftY }, divergence }
+}
+
+function addRasterVectors(a: RasterVector, b: RasterVector): RasterVector {
+	const x = new Float32Array(CELLS)
+	const y = new Float32Array(CELLS)
+	for (let i = 0; i < CELLS; i++) {
+		x[i] = a.x[i] + b.x[i]
+		y[i] = a.y[i] + b.y[i]
+	}
+	return { x, y }
 }
 
 function surfaceCurrent({
@@ -198,21 +309,22 @@ function forcing({ index, wind, planet }: ForcingParams): Forcing {
 // Everything downstream of psi. None of it is linear in psi -- the thermocline
 // takes a square root, the surface speed divides by it and is capped -- so it
 // stays per-month even though the psi solve itself is shared.
-function surface({ index, tau, psi, planet }: SurfaceParams): Circulation {
+function surface({
+	index,
+	tau,
+	psi,
+	planet,
+	sstAnomaly,
+}: SurfaceParams): Circulation {
 	const { ocean } = index
 	const thermoclineDepth = THERMOCLINE.depth({ interior: psi, ocean, planet })
 	const { drift, divergence } = ekman({ tau, ocean, planet })
+	const wind = geostrophic({ psi, ocean, depth: thermoclineDepth, planet })
+	const geo = sstAnomaly
+		? addRasterVectors(wind, baroclinic({ sst: sstAnomaly, ocean, planet }))
+		: wind
 	return {
-		flow: surfaceCurrent({
-			geostrophic: geostrophic({
-				psi,
-				ocean,
-				depth: thermoclineDepth,
-				planet,
-			}),
-			drift,
-			ocean,
-		}),
+		flow: surfaceCurrent({ geostrophic: geo, drift, ocean }),
 		divergence,
 		thermoclineDepth,
 	}

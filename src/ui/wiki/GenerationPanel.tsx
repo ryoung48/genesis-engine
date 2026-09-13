@@ -426,7 +426,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										<GenerationTimingChart
 											entries={generationTimingSummary.entries}
 											onBarClick={(label) => {
-												if (label === "post-pipeline" && postTimingSummary)
+												if (
+													(label === "post-pipeline" ||
+														label === "Post-elevation pipeline") &&
+													postTimingSummary
+												)
 													setTimingDrillDown("post")
 												else if (
 													label === "computeRoutes" &&

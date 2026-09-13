@@ -8,6 +8,7 @@ import type { HistoryState } from "@/model/history/generated/state/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import type { StageTiming } from "@/model/pipelines/types"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
 import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import type { RouteWorldInput } from "@/model/society/infrastructure/trade/routing/types"
@@ -39,6 +40,71 @@ let simulationRunning = false
 // Index into historyState.events already sent to the main thread, so each
 // "sim-progress" only carries newly-pushed events instead of the whole log.
 let historyEventCursor = 0
+
+function getProgressLabel(label: string): string {
+	switch (label) {
+		case "Building sphere mesh...":
+			return "Mesh setup"
+		case "mesh":
+			return "Mesh"
+		case "coarse-plates":
+			return "Coarse plates"
+		case "project":
+			return "Project plates"
+		case "smooth-plates":
+			return "Smooth plates"
+		case "super-plates":
+			return "Super plates"
+		case "collision":
+			return "Plate collision"
+		case "distance-fields":
+			return "Distance fields"
+		case "peak-compression":
+			return "Peak compression"
+		case "coastDist":
+			return "Coast distance"
+		case "oceanDist":
+		case "import:oceanDist":
+			return "Ocean distance"
+		case "post-pipeline":
+		case "import:post-pipeline":
+			return "World features"
+		case "urbanization":
+			return "Cities"
+		case "Post: climate":
+			return "Temperature"
+		case "Post: thermal equator":
+			return "Thermal equator"
+		case "Post: moisture advection":
+			return "Moisture"
+		case "Post: dtr + pet":
+			return "DTR + PET"
+		case "Post: observed Earth climate":
+			return "Earth climate"
+		case "Post: pasta climate":
+			return "Climate bands"
+		case "Post: climate zones":
+			return "Climate zones"
+		case "Post: koppen climate":
+			return "Köppen climate"
+		case "Post: trade goods":
+			return "Trade goods"
+		case "import:mesh":
+			return "Import mesh"
+		case "import:heightmap":
+			return "Heightmap"
+		case "import:post":
+			return "Terrain"
+		case "import:plates":
+			return "Plates"
+		case "import:society":
+			return "Society"
+		case "Initializing history":
+			return "History"
+	}
+	const shortLabel = label.startsWith("Post: ") ? label.slice(6) : label
+	return `${shortLabel[0].toUpperCase()}${shortLabel.slice(1)}`
+}
 
 function buildFrameTransferList(frame: WorldFrame): Transferable[] {
 	return [
@@ -800,10 +866,21 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		return
 	}
 
+	const progressTimings: StageTiming[] = []
+	let previousProgress: { label: string; startedAt: number } | null = null
 	const progressCb = (label: string, pct?: number) => {
+		const progressLabel = getProgressLabel(label)
+		const now = performance.now()
+		if (previousProgress) {
+			progressTimings.push({
+				Stage: previousProgress.label,
+				ms: (now - previousProgress.startedAt).toFixed(1),
+			})
+		}
+		previousProgress = { label: progressLabel, startedAt: now }
 		self.postMessage({
 			type: "progress",
-			label,
+			label: progressLabel,
 			pct,
 		} satisfies GenesisWorkerResponse)
 	}
@@ -869,6 +946,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 
 		lastGeneratedWorld = clonePathfindSeedWorld(generated)
 
+		generated.timings = progressTimings
 		const world = attachPrecomputedGeometry(serializeWorld(generated))
 		progressCb("Done", 100)
 		const frame = historyState

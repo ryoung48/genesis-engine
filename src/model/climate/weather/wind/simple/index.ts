@@ -405,6 +405,9 @@ function computeWindVectors({
 	const windU = new Float32Array(N)
 	const windV = new Float32Array(N)
 	const rawSpeed = new Float32Array(N)
+	const roughnessField = surface
+		? ROUGHNESS.surfaceFactorField({ N, surface })
+		: undefined
 
 	for (let r = 0; r < N; r++) {
 		const absLat = absLatDeg[r]
@@ -466,7 +469,7 @@ function computeWindVectors({
 			}
 		}
 		const bl = balance({ friction: FRICTION, forceEast, forceNorth })
-		const roughness = surface ? ROUGHNESS.surfaceFactor({ r, surface }) : 1
+		const roughness = roughnessField ? roughnessField[r] : 1
 		let u = bl.u * roughness
 		let v = bl.v * roughness
 

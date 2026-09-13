@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest"
-import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { SVERDRUP_CURRENTS } from "@/model/climate/ocean/currents/sverdrup"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
+
+// Matches the saturation this model used when it still shipped in
+// production; only used here to round-trip through the same [-1,1]
+// normalization computeSST returns.
+const SST_SATURATION_C = 9
 
 type Box = {
 	name: string
@@ -105,9 +110,20 @@ describe("Earth ocean currents vs GODAS/OISST", () => {
 		const N = world.mesh.numRegions
 		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		const observed = world.observedCurrent
-		const currents = world.oceanCurrents
-		if (!observed?.real_u_monthly || !observed.real_v_monthly || !currents)
+		if (!observed?.real_u_monthly || !observed.real_v_monthly)
 			throw new Error("Earth import is missing ocean-current data")
+		// Sverdrup is a standalone module, not wired into the shipping pipeline
+		// (see src/test/earth/ocean-currents.md), so this floor has to resolve it
+		// directly rather than read world.oceanCurrents.
+		const currents = SVERDRUP_CURRENTS.computeSST({
+			mesh: world.mesh,
+			climate: world.climate,
+			elevation_km: world.elevation_km,
+			isLand: world.isLand,
+			landmarks: world.landmarks,
+			sstSaturationC: SST_SATURATION_C,
+			params: world.params,
+		})
 
 		const annualMean = (monthly: Float32Array | undefined) => {
 			const out = new Float32Array(N).fill(Number.NaN)
@@ -128,9 +144,7 @@ describe("Earth ocean currents vs GODAS/OISST", () => {
 		const obsU = annualMean(observed.real_u_monthly)
 		const obsV = annualMean(observed.real_v_monthly)
 		const obsSst = annualMean(observed.real_sst_anomaly_monthly)
-		const sstC = currents.sst.map(
-			(value) => value * OCEAN_CURRENTS.sstAnomalySaturationC,
-		)
+		const sstC = currents.sst.map((value) => value * SST_SATURATION_C)
 		const mean = (values: number[]) =>
 			values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
 

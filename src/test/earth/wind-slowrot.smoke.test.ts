@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { RAIN } from "@/model/climate/precipitation/rain"
-import { WIND } from "@/model/climate/weather/wind"
+import { FULL_WIND } from "@/model/climate/weather/wind/full"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale } from "./assets"
@@ -58,7 +58,7 @@ describe("cell collapse for slow rotators", () => {
 			const world = build(hoursPerDay, obliquity)
 			const N = world.mesh.numRegions
 			const { latDeg } = RAIN.getClimateGeometry(world.mesh)
-			const { pressure } = WIND.computeWindVectors({
+			const { pressure } = FULL_WIND.computeWindVectors({
 				mesh: world.mesh,
 				climate: world.climate,
 				elevation_km: world.elevation_km,

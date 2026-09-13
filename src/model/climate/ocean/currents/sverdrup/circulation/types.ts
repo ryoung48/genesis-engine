@@ -36,6 +36,12 @@ export type GeostrophicParams = {
 	planet: SverdrupPlanet
 }
 
+export type BaroclinicParams = {
+	sst: Float32Array
+	ocean: Uint8Array
+	planet: SverdrupPlanet
+}
+
 export type EkmanParams = {
 	tau: RasterVector
 	ocean: Uint8Array
@@ -69,6 +75,10 @@ export type SurfaceParams = {
 	tau: RasterVector
 	psi: Float32Array
 	planet: SverdrupPlanet
+	// [JUSTIFICATION] null on a month's first pass, before any SST anomaly has
+	// been solved for -- the baroclinic term it drives is then zero rather than
+	// undefined, so the first pass is exactly the wind-only circulation.
+	sstAnomaly: Float32Array | null
 }
 
 export type Circulation = {

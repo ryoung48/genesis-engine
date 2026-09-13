@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest"
-import { SVERDRUP_CURRENTS } from "@/model/climate/ocean/currents/sverdrup"
 import { SVERDRUP_CIRCULATION } from "@/model/climate/ocean/currents/sverdrup/circulation"
 import type { SverdrupPlanet } from "@/model/climate/ocean/currents/sverdrup/circulation/types"
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
@@ -15,23 +14,20 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { loadEarthGrayscale, loadEarthMonthlyRaster } from "./assets"
 
 // DIAGNOSTIC ONLY -- asserts nothing about accuracy, and nothing here gates a
-// build. It drives the ocean solver with observed NCEP winds so ocean error
-// can be separated from the wind error feeding it. The Sverdrup/Ekman model
-// this exercises is a standalone module (currents/sverdrup), not wired into
-// the shipping world-gen pipeline -- see src/test/earth/ocean-currents.md.
-// Tuning ocean physics against procedural winds is how the old fixed 100 m
-// transport depth came to cancel a ~2x wind-stress deficit instead of being
-// right, so `proc` below re-solves this same model under the world's own
-// procedural wind directly, rather than reading it off the shipping pipeline.
+// build. The SST-anomaly source is two physically distinct terms summed
+// together before the Gauss-Seidel solve ever sees them: horizontal
+// advection across the background meridional gradient (`advective`), and
+// Ekman upwelling/downwelling gated by thermocline depth (`vertical`). The
+// final SST alone can't say which one is responsible for a region's error --
+// a region could be wrong because upwelling is too weak, or because
+// horizontal advection is fighting it to a standstill, and both would look
+// the same in the combined number. This solves each term alone (plus the
+// combined baseline, as a check that summing the two solves matches
+// SVERDRUP_SST_ANOMALY.solve's own combined solve) to tell them apart.
 //
-// `obs` drives the solver with observed wind, `proc` drives it with the
-// procedural wind, `real` is GODAS/OISST. Ocean physics is doing its job when
-// the `obs` column is good; the obs-to-proc gap is the wind model's backlog.
-
-// Matches production's old sstSaturationC for this model -- only used here to
-// round-trip through the same [-1,1] normalization computeSST returns, so it
-// cancels out except for clipping at the same ceiling production once did.
-const SST_SATURATION_C = 9
+// Same configuration as the other current diagnostics for comparability:
+// observed NCEP wind, the two-pass baroclinic fixed point sverdrup/index.ts
+// ships with, real GODAS/OISST compared against but never fed in.
 
 type Box = { name: string; lat: [number, number]; lon: [number, number] }
 
@@ -51,39 +47,14 @@ const BOXES: Box[] = [
 	{ name: "ACC 45-60S", lat: [-60, -45], lon: [-180, 180] },
 ]
 
-const MIN_OBSERVED_SPEED_MS = 0.02
-const BAND_DEG = 10
-const MIN_BAND_CELLS = 50
 const MONTHS = 12
-// Mirrors FEEDBACK_PASSES in sverdrup/index.ts -- this diagnostic reimplements
-// the per-month solve loop by hand to get at intermediate fields, so it has to
-// replicate that same fixed-point iteration.
+// Mirrors FEEDBACK_PASSES in sverdrup/index.ts -- reimplements the per-month
+// solve loop by hand to get at intermediate fields, so it has to replicate
+// the same fixed-point iteration.
 const FEEDBACK_PASSES = 2
 
-type Band = {
-	num: number
-	den: number
-	modelSpeed: number
-	observedSpeed: number
-	speedCount: number
-	sstAbsError: number
-	sstBias: number
-	sstCount: number
-}
-
-const emptyBand = (): Band => ({
-	num: 0,
-	den: 0,
-	modelSpeed: 0,
-	observedSpeed: 0,
-	speedCount: 0,
-	sstAbsError: 0,
-	sstBias: 0,
-	sstCount: 0,
-})
-
-describe("ocean currents driven by observed wind (diagnostic)", () => {
-	it("reports the wind/ocean error split", () => {
+describe("SST-anomaly source decomposition (diagnostic)", () => {
+	it("reports advective vs vertical contribution per region", () => {
 		const earth = loadEarthGrayscale("earth.png")
 		const coastline = loadEarthGrayscale("coastline-mask.png")
 		const lake = loadEarthGrayscale("lake-mask.png")
@@ -154,20 +125,8 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 		const N = world.mesh.numRegions
 		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		const observed = world.observedCurrent
-		if (!observed?.real_u_monthly || !observed.real_v_monthly)
-			throw new Error("Earth import is missing ocean-current data")
-		// Sverdrup is a standalone module, not wired into the shipping pipeline,
-		// so `proc` (this model under the world's own procedural wind) has to be
-		// resolved directly rather than read off world.oceanCurrents.
-		const procedural = SVERDRUP_CURRENTS.computeSST({
-			mesh: world.mesh,
-			climate: world.climate,
-			elevation_km: world.elevation_km,
-			isLand: world.isLand,
-			landmarks: world.landmarks,
-			sstSaturationC: SST_SATURATION_C,
-			params: world.params,
-		})
+		if (!observed?.real_sst_anomaly_monthly)
+			throw new Error("Earth import is missing SST-anomaly data")
 
 		const isLake = LANDMARKS.regionTypeMask({
 			landmarks: world.landmarks,
@@ -188,36 +147,35 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 			gyreStrength: 1 - WIND.rotationCollapse(world.params.hoursPerDay),
 		}
 
-		const flowU = new Float32Array(N)
-		const flowV = new Float32Array(N)
-		const sstC = new Float32Array(N)
 		const operator = STOMMEL.build({ ocean: index.ocean, planet })
-		console.log(`OBSW unknowns=${operator.count}`)
-		const startedMs = Date.now()
 		const monthlyTau = []
 		const monthlyCurl = []
 		for (let month = 0; month < MONTHS; month++) {
-			const forcing = SVERDRUP_CIRCULATION.forcing({
-				index,
-				wind: WIND.observedWindVectorsForMonth({
-					observedWind: world.observedWind,
-					numRegions: N,
-					month,
-				}),
-				planet,
+			const wind = WIND.observedWindVectorsForMonth({
+				observedWind: world.observedWind,
+				numRegions: N,
+				month,
 			})
+			const forcing = SVERDRUP_CIRCULATION.forcing({ index, wind, planet })
 			monthlyTau.push(forcing.tau)
 			monthlyCurl.push(forcing.curl)
 		}
 		const seasonal = STOMMEL.solveSeasonal({ operator, monthlyCurl, planet })
-		console.log(
-			`OBSW seasonal solves=${seasonal.solves} iterations=${seasonal.iterations}`,
-		)
+
+		const CELLS = SVERDRUP_RASTER.width * SVERDRUP_RASTER.height
+		const advSstC = new Float32Array(N)
+		const vertSstC = new Float32Array(N)
+		const bothSstC = new Float32Array(N)
 		for (let month = 0; month < MONTHS; month++) {
 			const temperature = world.climate.temperature_monthly.subarray(
 				month * N,
 				(month + 1) * N,
 			)
+
+			// Converge the same two-pass fixed point the production model uses,
+			// on the combined (both-terms) anomaly, so the flow this decomposes
+			// is the actual flow the model ships -- not a flow that never saw
+			// feedback.
 			let circulation = SVERDRUP_CIRCULATION.surface({
 				index,
 				tau: monthlyTau[month],
@@ -225,7 +183,7 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 				planet,
 				sstAnomaly: null,
 			})
-			let anomaly = SVERDRUP_SST_ANOMALY.solve({
+			let combinedAnomaly = SVERDRUP_SST_ANOMALY.solve({
 				index,
 				circulation,
 				temperature,
@@ -239,9 +197,9 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 					tau: monthlyTau[month],
 					psi: seasonal.monthlyPsi[month],
 					planet,
-					sstAnomaly: anomaly,
+					sstAnomaly: combinedAnomaly,
 				})
-				anomaly = SVERDRUP_SST_ANOMALY.solve({
+				combinedAnomaly = SVERDRUP_SST_ANOMALY.solve({
 					index,
 					circulation,
 					temperature,
@@ -250,6 +208,62 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 					upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
 				})
 			}
+
+			// Decompose the converged month's own source and solve each term
+			// alone. Each still gets removeZonalMean applied, to match what
+			// solve() reports and what the OISST anomaly is itself defined against.
+			const temperatureGradient = SVERDRUP_SST_ANOMALY.zonalGradient({
+				index,
+				temperature,
+				isOcean,
+				planet,
+			})
+			const { advective, vertical } = SVERDRUP_SST_ANOMALY.heatSource({
+				circulation,
+				ocean: index.ocean,
+				temperatureGradient,
+				upwelledDeficitC: SVERDRUP_SST_ANOMALY.upwelledDeficitC,
+			})
+			const both = new Float32Array(CELLS)
+			for (let i = 0; i < CELLS; i++) both[i] = advective[i] + vertical[i]
+
+			const relaxationSeconds = new Float32Array(CELLS).fill(
+				MIXED_LAYER.relaxationSeconds,
+			)
+			const advAnomaly = SVERDRUP_SST_ANOMALY.solveAnomaly({
+				flow: circulation.flow,
+				ocean: index.ocean,
+				source: advective,
+				planet,
+				relaxationSeconds,
+			})
+			const vertAnomaly = SVERDRUP_SST_ANOMALY.solveAnomaly({
+				flow: circulation.flow,
+				ocean: index.ocean,
+				source: vertical,
+				planet,
+				relaxationSeconds,
+			})
+			const bothAnomaly = SVERDRUP_SST_ANOMALY.solveAnomaly({
+				flow: circulation.flow,
+				ocean: index.ocean,
+				source: both,
+				planet,
+				relaxationSeconds,
+			})
+			SVERDRUP_SST_ANOMALY.removeZonalMean({
+				field: advAnomaly,
+				ocean: index.ocean,
+			})
+			SVERDRUP_SST_ANOMALY.removeZonalMean({
+				field: vertAnomaly,
+				ocean: index.ocean,
+			})
+			SVERDRUP_SST_ANOMALY.removeZonalMean({
+				field: bothAnomaly,
+				ocean: index.ocean,
+			})
+
 			const sampleOcean = (field: Float32Array) =>
 				SVERDRUP_RASTER.sample({
 					field,
@@ -258,16 +272,15 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 					lonDeg,
 					include: isOcean,
 				})
-			const monthU = sampleOcean(circulation.flow.x)
-			const monthV = sampleOcean(circulation.flow.y)
-			const monthSst = sampleOcean(anomaly)
+			const monthAdv = sampleOcean(advAnomaly)
+			const monthVert = sampleOcean(vertAnomaly)
+			const monthBoth = sampleOcean(bothAnomaly)
 			for (let r = 0; r < N; r++) {
-				flowU[r] += monthU[r] / MONTHS
-				flowV[r] += monthV[r] / MONTHS
-				sstC[r] += monthSst[r] / MONTHS
+				advSstC[r] += monthAdv[r] / MONTHS
+				vertSstC[r] += monthVert[r] / MONTHS
+				bothSstC[r] += monthBoth[r] / MONTHS
 			}
 		}
-		console.log(`OBSW solve ms=${Date.now() - startedMs} (12 months)`)
 
 		const annualMean = (monthly: Float32Array | undefined) => {
 			const out = new Float32Array(N).fill(Number.NaN)
@@ -285,10 +298,7 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 			}
 			return out
 		}
-		const obsU = annualMean(observed.real_u_monthly)
-		const obsV = annualMean(observed.real_v_monthly)
 		const obsSst = annualMean(observed.real_sst_anomaly_monthly)
-		const procSst = procedural.sst.map((value) => value * SST_SATURATION_C)
 		const mean = (values: number[]) =>
 			values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
 
@@ -298,110 +308,36 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 				if (world.isLand[r]) continue
 				if (latDeg[r] < box.lat[0] || latDeg[r] > box.lat[1]) continue
 				if (lonDeg[r] < box.lon[0] || lonDeg[r] > box.lon[1]) continue
-				if (!Number.isFinite(obsU[r]) || !Number.isFinite(obsV[r])) continue
+				if (!Number.isFinite(obsSst[r])) continue
 				regions.push(r)
 			}
 			return regions
 		}
-		const directionSkill = (
-			regions: number[],
-			u: Float32Array,
-			v: Float32Array,
-		) => {
-			let num = 0
-			let den = 0
-			for (const r of regions) {
-				const observedSpeed = Math.hypot(obsU[r], obsV[r])
-				const modelSpeed = Math.hypot(u[r], v[r])
-				if (observedSpeed < MIN_OBSERVED_SPEED_MS || modelSpeed < 1e-9) continue
-				num += (u[r] * obsU[r] + v[r] * obsV[r]) / modelSpeed
-				den += observedSpeed
-			}
-			return den > 0 ? num / den : Number.NaN
-		}
 
 		for (const box of BOXES) {
 			const regions = regionsIn(box)
-			const withSst = regions.filter((r) => Number.isFinite(obsSst[r]))
-			const speed = (u: Float32Array, v: Float32Array) =>
-				mean(regions.map((r) => Math.hypot(u[r], v[r])))
 			console.log(
-				`OBSW ${box.name.padEnd(17)} ` +
-					`skill obs=${directionSkill(regions, flowU, flowV).toFixed(2)} proc=${directionSkill(regions, procedural.flowU, procedural.flowV).toFixed(2)} | ` +
-					`speed obs=${speed(flowU, flowV).toFixed(3)} proc=${speed(procedural.flowU, procedural.flowV).toFixed(3)} real=${speed(obsU, obsV).toFixed(3)} | ` +
-					`sst obs=${mean(withSst.map((r) => sstC[r])).toFixed(2)} proc=${mean(withSst.map((r) => procSst[r])).toFixed(2)} real=${mean(withSst.map((r) => obsSst[r])).toFixed(2)}`,
-			)
-		}
-
-		const bandsFor = (
-			u: Float32Array,
-			v: Float32Array,
-			sst: Float32Array | number[],
-		) => {
-			const bands = new Map<number, Band>()
-			for (let r = 0; r < N; r++) {
-				if (world.isLand[r]) continue
-				if (!Number.isFinite(obsU[r]) || !Number.isFinite(obsV[r])) continue
-				const key = Math.floor(latDeg[r] / BAND_DEG) * BAND_DEG
-				let band = bands.get(key)
-				if (!band) {
-					band = emptyBand()
-					bands.set(key, band)
-				}
-				const observedSpeed = Math.hypot(obsU[r], obsV[r])
-				const modelSpeed = Math.hypot(u[r], v[r])
-				if (observedSpeed >= MIN_OBSERVED_SPEED_MS && modelSpeed >= 1e-9) {
-					band.num += (u[r] * obsU[r] + v[r] * obsV[r]) / modelSpeed
-					band.den += observedSpeed
-					band.modelSpeed += modelSpeed
-					band.observedSpeed += observedSpeed
-					band.speedCount++
-				}
-				if (Number.isFinite(obsSst[r])) {
-					band.sstAbsError += Math.abs(sst[r] - obsSst[r])
-					band.sstBias += sst[r] - obsSst[r]
-					band.sstCount++
-				}
-			}
-			return bands
-		}
-		const obsBands = bandsFor(flowU, flowV, sstC)
-		const procBands = bandsFor(procedural.flowU, procedural.flowV, procSst)
-
-		console.log(
-			"OBSWBAND  lat      n | dir obs  proc | ratio obs proc | sstMAE obs proc",
-		)
-		for (const key of [...obsBands.keys()].sort((a, b) => b - a)) {
-			const o = obsBands.get(key)
-			const p = procBands.get(key)
-			if (!o || !p || o.speedCount < MIN_BAND_CELLS) continue
-			const ratio = (band: Band) =>
-				band.modelSpeed / Math.max(1e-9, band.observedSpeed)
-			const dir = (band: Band) =>
-				band.den > 0 ? band.num / band.den : Number.NaN
-			const mae = (band: Band) => band.sstAbsError / Math.max(1, band.sstCount)
-			console.log(
-				`OBSWBAND ${String(key).padStart(4)} ${String(o.speedCount).padStart(6)} | ` +
-					`${dir(o).toFixed(2).padStart(7)} ${dir(p).toFixed(2).padStart(5)} | ` +
-					`${ratio(o).toFixed(2).padStart(9)} ${ratio(p).toFixed(2).padStart(4)} | ` +
-					`${mae(o).toFixed(2).padStart(9)} ${mae(p).toFixed(2).padStart(4)}`,
+				`SSTSRC ${box.name.padEnd(17)} ` +
+					`adv=${mean(regions.map((r) => advSstC[r])).toFixed(2)} ` +
+					`vert=${mean(regions.map((r) => vertSstC[r])).toFixed(2)} ` +
+					`both=${mean(regions.map((r) => bothSstC[r])).toFixed(2)} ` +
+					`real=${mean(regions.map((r) => obsSst[r])).toFixed(2)}`,
 			)
 		}
 
 		const midLatitudes: number[] = []
 		for (let r = 0; r < N; r++) {
-			if (world.isLand[r] || !Number.isFinite(obsU[r])) continue
+			if (world.isLand[r] || !Number.isFinite(obsSst[r])) continue
 			const absLat = Math.abs(latDeg[r])
 			if (absLat >= 15 && absLat <= 60) midLatitudes.push(r)
 		}
-		const correlation = (model: Float32Array | number[]) => {
-			const pairs = midLatitudes.filter((r) => Number.isFinite(obsSst[r]))
-			const modelMean = mean(pairs.map((r) => model[r]))
-			const observedMean = mean(pairs.map((r) => obsSst[r]))
+		const correlation = (model: Float32Array) => {
+			const modelMean = mean(midLatitudes.map((r) => model[r]))
+			const observedMean = mean(midLatitudes.map((r) => obsSst[r]))
 			let cov = 0
 			let varModel = 0
 			let varObserved = 0
-			for (const r of pairs) {
+			for (const r of midLatitudes) {
 				cov += (model[r] - modelMean) * (obsSst[r] - observedMean)
 				varModel += (model[r] - modelMean) ** 2
 				varObserved += (obsSst[r] - observedMean) ** 2
@@ -409,9 +345,9 @@ describe("ocean currents driven by observed wind (diagnostic)", () => {
 			return cov / Math.sqrt(varModel * varObserved)
 		}
 		console.log(
-			`OBSW global 15-60 skill obs=${directionSkill(midLatitudes, flowU, flowV).toFixed(2)} ` +
-				`proc=${directionSkill(midLatitudes, procedural.flowU, procedural.flowV).toFixed(2)} | ` +
-				`sst r obs=${correlation(sstC).toFixed(2)} proc=${correlation(procSst).toFixed(2)}`,
+			`SSTSRC global 15-60 sst r adv=${correlation(advSstC).toFixed(2)} ` +
+				`vert=${correlation(vertSstC).toFixed(2)} ` +
+				`both=${correlation(bothSstC).toFixed(2)}`,
 		)
 
 		expect(midLatitudes.length).toBeGreaterThan(0)

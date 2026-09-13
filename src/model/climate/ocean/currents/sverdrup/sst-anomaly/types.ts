@@ -14,10 +14,21 @@ export type ZonalGradientParams = {
 	planet: SverdrupPlanet
 }
 
+export type BackgroundGradient = {
+	x: Float32Array
+	y: Float32Array
+}
+
 export type HeatSourceParams = {
 	circulation: Circulation
 	ocean: Uint8Array
 	temperatureGradient: Float64Array
+	upwelledDeficitC: number
+}
+
+export type SourceTerms = {
+	advective: Float32Array
+	vertical: Float32Array
 }
 
 export type AnomalySolveParams = {
@@ -25,6 +36,7 @@ export type AnomalySolveParams = {
 	ocean: Uint8Array
 	source: Float32Array
 	planet: SverdrupPlanet
+	relaxationSeconds: Float32Array
 }
 
 export type ZonalMeanParams = {
@@ -38,4 +50,5 @@ export type SolveSstAnomalyParams = {
 	temperature: Float32Array
 	isOcean: Uint8Array
 	planet: SverdrupPlanet
+	upwelledDeficitC: number
 }

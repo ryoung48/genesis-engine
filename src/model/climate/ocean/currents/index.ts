@@ -3,7 +3,6 @@ import { SVERDRUP_CURRENTS } from "@/model/climate/ocean/currents/sverdrup"
 import type {
 	ApplySSTToClimateParams,
 	BuildOceanCurrentGridParams,
-	ComputeCoastSideParams,
 	ComputeSSTParams,
 	ObservedOceanCurrentGridParams,
 } from "@/model/climate/ocean/currents/types"
@@ -18,82 +17,73 @@ import { UNITS } from "@/model/shared/units"
 
 const CURRENT_EFFECT_MONTHS = 12
 
-// Which SST model computeSST runs. "sverdrup" derives the surface current
-// from a wind-driven Sverdrup/Ekman circulation and the SST anomaly from the
-// heat that current carries plus Ekman upwelling (see ./sverdrup). "band" is
-// the older coast-facing warm/cold table indexed by distance from the ITCZ,
-// with its flow read off the SST gradient.
-const CURRENT_SOLVER: "band" | "sverdrup" = "sverdrup"
+// Production SST model: this coast-facing warm/cold table indexed by
+// distance from the ITCZ (see computeSST below) is the world-gen pipeline's
+// fast path for magnitude, derived from real GODAS/OISST (see the table's own
+// comment). Which side of the table applies at each cell -- warm western-
+// boundary current or cold eastern-boundary upwelling -- comes from
+// SVERDRUP_CURRENTS' own wind-driven circulation rather than a land-side
+// heuristic (see the sverdrup call in computeSST): its SST-anomaly sign is
+// exactly that classification, computed directly from physics instead of
+// inferred from moisture-advection asymmetry, so it generalizes to any
+// coastline/wind combination the same heuristic couldn't. Only sverdrup's
+// sign is used, not its magnitude -- its raw magnitude is 2-10x too weak
+// without a vertical/heat-content layer (see src/test/earth/ocean-
+// currents.md), which the calibrated table below supplies instead.
 
 // SST anomaly (°C vs zonal mean) at which the observed (NOAA) overlay's
 // warm/cold color scale saturates to ±1 -- tuned to the magnitude of real
 // western-boundary currents like the Gulf Stream/Kuroshio.
 const SST_ANOMALY_SATURATION_C = 4
 
-// Separate saturation constant for the modeled bandC table below: bandC's
-// own peak values intentionally exceed real SST-anomaly magnitudes, so
-// reusing SST_ANOMALY_SATURATION_C here would clamp the strongest bands to
-// ±1 in every month of the year -- a value permanently pinned at its ceiling
-// has zero headroom left for the ITCZ's monthly drift to move it, which
-// flattens out the very seasonal signal that drift is supposed to provide.
-// Sized against bandC's own max (see CURRENT_STRENGTH_SCALE below).
-const MODELED_SST_SATURATION_C = 9
+// bandC's table (below) is itself real-anomaly-scale now, so the modeled
+// output shares SST_ANOMALY_SATURATION_C with the observed overlay rather
+// than needing its own inflated ceiling.
 
-// bandC's raw table values (below) were originally fit small enough that,
-// even combined with LAND_CURRENT_EFFECT_SCALE at its own ceiling, coastal
-// regions whose real climate is dominated by a strong western-boundary
-// current (e.g. Scotland/Norway under the North Atlantic Current's real
-// influence) came out with an ANNUAL-MEAN cold bias of several degrees --
-// verified directly against WorldClim (Norway ~4.8C short, Scotland ~4.9C
-// short). This scales the whole table up to close most of that gap.
-// Deliberately NOT scaled all the way to fully closing it (a ~2.2x scale
-// closed the annual mean almost exactly but pushed summer months into a
-// 2-3C overshoot and cost ~6.5% on the global land RMSE vs WorldClim,
-// since the real current's warming effect is winter-weighted -- ocean
-// thermal inertia matters most when land would otherwise radiate away heat
-// fast in low-sun winter, not in summer when direct insolation already
-// dominates -- and this uniform per-month scale can't reproduce that
-// asymmetry, only shift the whole seasonal curve up equally). 1.5x was
-// chosen as the point past which further scale bought rapidly diminishing
-// annual-mean improvement at rapidly increasing summer-overshoot cost; a
-// winter-weighted seasonal profile (rather than a flat scale) would be the
-// real fix if this needs to close further -- see
-// earth-real-temperature-compare.smoke.test.ts for the global regression
-// check (RMSE 4.49 -> 4.56, ~1.6%, at this value).
-const CURRENT_STRENGTH_SCALE = 1.5
+// SVERDRUP_CURRENTS.computeSST requires a saturation to normalize its own
+// output, but only that output's SIGN is read below (see computeSST) --
+// clamping to [-1,1] never changes sign, so this value is otherwise
+// arbitrary.
+const SVERDRUP_CLASSIFICATION_SATURATION_C = 9
 
-// West-facing coast SST anomaly by distance from the (monthly) ITCZ, °C --
-// cold eastern-boundary upwelling close to the ITCZ (Peru/Benguela/
-// California), warming into the subpolar westerlies further away. Indexed
-// by ITCZ distance rather than absolute latitude so the whole curve -- not
-// just a separate wobble on top of it -- migrates with the ITCZ's monthly
-// drift; that drift is the sole source of seasonality, there's no separate
-// per-month table or scaling term.
-const WEST_BAND_C_TABLE = [-0.5, -1, -5, -2.5, 1, 4, 5, 6, 2, 0].map(
-	(v) => v * CURRENT_STRENGTH_SCALE,
-)
-const westBandC = (dist: number) =>
+// Real warm/cold-current SST anomaly by distance from the (monthly, OBSERVED)
+// thermal equator, °C -- binned directly from GODAS/OISST: for every ocean
+// cell/month with real current speed >= 0.15 m/s (so only cells actually
+// part of a real current count, not open-ocean noise), split by the real
+// anomaly's own sign and averaged per 10-degree ITCZ-distance bucket. Unlike
+// the old hand-fit west/east-facing-coast tables (which needed a separate
+// CURRENT_STRENGTH_SCALE fudge to close a WorldClim land-temperature gap),
+// these are the magnitudes real currents actually reach, not a proxy tuned
+// indirectly through a downstream fit. Indexed by ITCZ distance rather than
+// absolute latitude so the whole curve -- not just a wobble on top of it --
+// migrates with the ITCZ's monthly drift; that drift is the sole source of
+// seasonality, there's no separate per-month table or scaling term. The last
+// two buckets (80, 90 degrees) had too few current-speed-qualifying samples
+// to trust (12 and 0 for warm; 30 and 0 for cold) and are tapered toward zero
+// instead, matching both real distant-pole current weakening and the
+// original tables' own tail behavior.
+const WARM_BAND_C_TABLE = [
+	1.23, 1.35, 1.49, 1.69, 2.11, 2.94, 2.45, 2.67, 1.3, 0,
+]
+const warmBandC = (dist: number) =>
 	MATH.piecewise({
 		domain: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
-		range: WEST_BAND_C_TABLE,
+		range: WARM_BAND_C_TABLE,
 		x: dist,
 	})
 
-// East-facing coast SST anomaly by distance from the (monthly) ITCZ, °C --
-// warm western-boundary currents (Gulf Stream/Kuroshio/Agulhas) close to the
-// ITCZ, cooling into the subpolar gyres further away.
-const EAST_BAND_C_TABLE = [0.2, 1, 2, 3, -2, -5, -3, -1.5, 0, 0].map(
-	(v) => v * CURRENT_STRENGTH_SCALE,
-)
-const eastBandC = (dist: number) =>
+const COLD_BAND_C_TABLE = [
+	-1.13, -1.74, -1.6, -1.91, -3.01, -2.75, -2.76, -2.43, -1.2, 0,
+]
+const coldBandC = (dist: number) =>
 	MATH.piecewise({
 		domain: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
-		range: EAST_BAND_C_TABLE,
+		range: COLD_BAND_C_TABLE,
 		x: dist,
 	})
 
-const bandC = (dist: number, coastSide: number): number =>
-	coastSide < 0 ? westBandC(dist) : coastSide > 0 ? eastBandC(dist) : 0
+const bandC = (dist: number, side: number): number =>
+	side < 0 ? coldBandC(dist) : side > 0 ? warmBandC(dist) : 0
 
 // Coast-hugging falloff -- currents/upwelling are a coastal phenomenon, not
 // a whole-basin gyre, so the signal fades to nothing by ~800km offshore.
@@ -102,53 +92,37 @@ const COAST_DECAY_KM = 800
 const coastDecay = (distCoastKm: number) =>
 	1 - MATH.smoothstep({ edge0: 0, edge1: COAST_DECAY_KM, x: distCoastKm })
 
-// East/west facing (+1/-1) of the nearest continental coast for ocean cells
-// within range of one. Facing is read from RAIN's east/west moisture-advection
-// split on the adjacent land cell -- that split is only differentiated on
-// land -- and propagated outward into the ocean.
-function computeCoastSide({
-	mesh,
-	isLand,
-	isLake,
-	isContinent,
-	eastAdv,
-	westAdv,
-	avgEdgeKm,
-}: ComputeCoastSideParams): Int8Array {
-	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const coastSide = new Int8Array(N)
-	const dist = new Int32Array(N).fill(-1)
-	const queue = new Int32Array(N)
-	let head = 0
-	let tail = 0
+// sverdrup's raw current speed runs 2-10x below real GODAS speed in most
+// boundary-current regions (no bathymetry/nonlinear-eddy term, see
+// src/test/earth/ocean-currents.md), weak enough that on the display map many
+// real currents are barely distinguishable from open-ocean drift. Display-
+// only legibility, not a physics fit.
+const DISPLAY_FLOW_SPEED_SCALE = 3
 
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r] || !isContinent[r]) continue
-		const side = eastAdv[r] > westAdv[r] ? 1 : -1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
-			coastSide[nb] = side
-			dist[nb] = 0
-			queue[tail++] = nb
-		}
+// A multiplier alone can't rescue a current whose underlying signal is
+// already near zero (e.g. N Atlantic Drift) -- multiplying ~0 stays ~0. This
+// adds a flat floor on top of the scale to every cell with a defined
+// direction, so even the weakest classified currents read as visibly moving
+// rather than static; cells with exactly zero flow (no direction to give a
+// floor to, e.g. land) are left at zero.
+const DISPLAY_FLOW_SPEED_FLOOR_MS = 0.05
+
+function scaleFlowPair(
+	u: Float32Array,
+	v: Float32Array,
+): { u: Float32Array; v: Float32Array } {
+	const outU = new Float32Array(u.length)
+	const outV = new Float32Array(v.length)
+	for (let i = 0; i < u.length; i++) {
+		const su = u[i] * DISPLAY_FLOW_SPEED_SCALE
+		const sv = v[i] * DISPLAY_FLOW_SPEED_SCALE
+		const speed = Math.hypot(su, sv)
+		if (speed <= 0) continue
+		const boost = (speed + DISPLAY_FLOW_SPEED_FLOOR_MS) / speed
+		outU[i] = su * boost
+		outV[i] = sv * boost
 	}
-
-	const maxHops = Math.max(1, Math.round(COAST_DECAY_KM / avgEdgeKm))
-	while (head < tail) {
-		const r = queue[head++]
-		if (dist[r] >= maxHops) continue
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
-			dist[nb] = dist[r] + 1
-			coastSide[nb] = coastSide[r]
-			queue[tail++] = nb
-		}
-	}
-
-	return coastSide
+	return { u: outU, v: outV }
 }
 
 function computeSST({
@@ -157,48 +131,43 @@ function computeSST({
 	distCoast,
 	landmarks,
 	monthlyTEQ,
-	eastAdv,
-	westAdv,
 	climate,
 	elevation_km,
 	params,
-	onWindProfile,
 }: ComputeSSTParams): GenesisOceanCurrents {
-	if (CURRENT_SOLVER === "sverdrup") {
-		return SVERDRUP_CURRENTS.computeSST({
-			mesh,
-			climate,
-			elevation_km,
-			isLand,
-			landmarks,
-			sstSaturationC: MODELED_SST_SATURATION_C,
-			params,
-			onWindProfile,
-		})
-	}
 	const N = mesh.numRegions
 	const avgEdgeKm = UNITS.meanEdgeLengthKm({
 		mesh,
 		planetRadiusKm: params.planetRadiusKm,
 	})
 	const isLake = LANDMARKS.regionTypeMask({ landmarks, type: "lake" })
-	const coastSide = computeCoastSide({
-		mesh,
-		isLand,
-		isLake,
-		isContinent: LANDMARKS.regionTypeMask({ landmarks, type: "continent" }),
-		eastAdv,
-		westAdv,
-		avgEdgeKm,
-	})
 	const { latDeg, regionBin } = RAIN.getClimateGeometry(mesh)
+
+	// Sign feeds the table lookup below (see the module comment above); flow
+	// is used as-is -- sverdrup's own wind-driven circulation is a real
+	// current field, not a proxy needing a calibrated substitute the way its
+	// SST magnitude does.
+	const sverdrupCurrents = SVERDRUP_CURRENTS.computeSST({
+		mesh,
+		climate,
+		elevation_km,
+		isLand,
+		landmarks,
+		sstSaturationC: SVERDRUP_CLASSIFICATION_SATURATION_C,
+		params,
+	})
+	const warmth = sverdrupCurrents.sst
 
 	const sstMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
 	const sst = new Float32Array(N)
 
 	for (let r = 0; r < N; r++) {
 		if (isLand[r] || isLake[r]) continue
-		const side = coastSide[r]
+		// Sign only, not magnitude: sverdrup's own SST anomaly is 2-10x too weak
+		// to use as a strength multiplier (that would just reintroduce the
+		// weakness the calibrated table below exists to avoid). Any classified
+		// cell -- warm or cold, however marginal -- gets the table's full value.
+		const side = Math.sign(warmth[r])
 		if (side === 0) continue
 		const decay = coastDecay(distCoast[r])
 		if (decay <= 0) continue
@@ -207,7 +176,7 @@ function computeSST({
 			const dist = Math.abs(latDeg[r] - teq)
 			const anomalyC = bandC(dist, side) * decay
 			const value = MATH.clamp({
-				value: anomalyC / MODELED_SST_SATURATION_C,
+				value: anomalyC / SST_ANOMALY_SATURATION_C,
 				lo: -1,
 				hi: 1,
 			})
@@ -218,24 +187,29 @@ function computeSST({
 
 	COASTAL_BLEED.fillLand({ mesh, isLand, isLake, avgEdgeKm, sst, sstMonthly })
 
-	const circulation = UNITS.isRetrogradeObliquity(params.obliquity) ? -1 : 1
-	const fSign = new Int8Array(N)
-	for (let r = 0; r < N; r++) fSign[r] = (latDeg[r] >= 0 ? 1 : -1) * circulation
+	const annualFlow = scaleFlowPair(
+		sverdrupCurrents.flowU,
+		sverdrupCurrents.flowV,
+	)
+	const monthlyFlow = scaleFlowPair(
+		sverdrupCurrents.flowUMonthly,
+		sverdrupCurrents.flowVMonthly,
+	)
 	return {
 		sst,
 		sstMonthly,
-		...SURFACE_FLOW.fromSstFields({ mesh, isLand, fSign, sst, sstMonthly }),
+		flowU: annualFlow.u,
+		flowV: annualFlow.v,
+		flowUMonthly: monthlyFlow.u,
+		flowVMonthly: monthlyFlow.v,
 	}
 }
 
 // Land cells only get the cosmetic coastal bleed of the nearest ocean sst,
-// not a separately-modeled inland transport -- was 0.68 (bleed weaker than
-// the water's own effect), raised to 1 (full bleed-through, matched to open
-// water) as part of closing the UK/Norway-style annual-mean cold bias (see
-// CURRENT_STRENGTH_SCALE) -- 1 is the physically-defensible ceiling for this
+// not a separately-modeled inland transport -- 1 is full bleed-through,
+// matched to open water, and the physically-defensible ceiling for this
 // constant (land literally receiving MORE than the adjacent water's own
-// current strength would have no physical basis), so the remaining gap after
-// maxing this out came from CURRENT_STRENGTH_SCALE instead.
+// current strength would have no physical basis).
 const LAND_CURRENT_EFFECT_SCALE = 1
 
 // Kept separate from computeSST so the pipeline can re-apply the same SST
@@ -260,7 +234,7 @@ function applySSTToClimate({
 		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
 			const delta =
 				oceanCurrents.sstMonthly[month * N + r] *
-				MODELED_SST_SATURATION_C *
+				SST_ANOMALY_SATURATION_C *
 				landScale
 			const updated = climate.temperature_monthly[month * N + r] + delta
 			climate.temperature_monthly[month * N + r] = updated
@@ -376,5 +350,5 @@ export const OCEAN_CURRENTS = {
 	applySSTToClimate,
 	buildOceanCurrentGrid,
 	observedOceanCurrentGridForMonth,
-	sstAnomalySaturationC: MODELED_SST_SATURATION_C,
+	sstAnomalySaturationC: SST_ANOMALY_SATURATION_C,
 }

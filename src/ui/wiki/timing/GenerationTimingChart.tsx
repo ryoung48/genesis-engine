@@ -8,7 +8,7 @@ import {
 	LinearScale,
 	Tooltip,
 } from "chart.js"
-import React, { useMemo } from "react"
+import React, { useMemo, useRef } from "react"
 import { Bar } from "react-chartjs-2"
 import { uiChartPalette } from "@/ui/components/tokens"
 import {
@@ -22,6 +22,7 @@ export const GenerationTimingChart: React.FC<{
 	entries: TimingEntry[]
 	onBarClick?: (label: string) => void
 }> = ({ entries, onBarClick }) => {
+	const chartRef = useRef<ChartJS<"bar">>(null)
 	const chartState = useMemo(() => {
 		if (!entries.length) return null
 
@@ -96,6 +97,19 @@ export const GenerationTimingChart: React.FC<{
 		}
 	}, [entries, onBarClick])
 
+	const onBarDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+		const chart = chartRef.current
+		if (!chart || !onBarClick) return
+
+		const [element] = chart.getElementsAtEventForMode(
+			event.nativeEvent,
+			"nearest",
+			{ intersect: true },
+			false,
+		)
+		if (element) onBarClick(entries[element.index]?.label ?? "")
+	}
+
 	if (!chartState) {
 		return (
 			<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
@@ -107,8 +121,8 @@ export const GenerationTimingChart: React.FC<{
 	}
 
 	return (
-		<div style={{ height: chartState.height }}>
-			<Bar data={chartState.data} options={chartState.options} />
+		<div onDoubleClick={onBarDoubleClick} style={{ height: chartState.height }}>
+			<Bar ref={chartRef} data={chartState.data} options={chartState.options} />
 		</div>
 	)
 }

@@ -1,8 +1,10 @@
 import { SVERDRUP_RASTER } from "@/model/climate/ocean/currents/sverdrup/raster"
 import type {
 	AnomalySolveParams,
+	BackgroundGradient,
 	HeatSourceParams,
 	SolveSstAnomalyParams,
+	SourceTerms,
 	ZonalGradientParams,
 	ZonalMeanParams,
 } from "@/model/climate/ocean/currents/sverdrup/sst-anomaly/types"
@@ -88,22 +90,67 @@ function zonalGradient({
 	return gradient
 }
 
+// The full 2D background temperature field's own gradient, unlike
+// zonalGradient which averages away every degree of longitude before
+// differentiating -- that reduction assumes the background ocean only varies
+// with latitude, so it has no zonal (east-west) component for u to advect
+// across at all, and heatSource's advective term never reads flow.x for
+// exactly that reason. This is the un-reduced alternative a diagnostic can
+// pair with u to test that assumption; production still uses zonalGradient.
+function backgroundGradient({
+	index,
+	temperature,
+	isOcean,
+	planet,
+}: ZonalGradientParams): BackgroundGradient {
+	const metersPerDeg = planet.radiusM * DEG2RAD
+	const field = SVERDRUP_RASTER.smooth({
+		field: SVERDRUP_RASTER.average({
+			index,
+			values: temperature,
+			include: isOcean,
+		}),
+		mask: null,
+		passes: ZONAL_SMOOTHING_PASSES,
+	})
+	const x = new Float32Array(CELLS)
+	const y = new Float32Array(CELLS)
+	for (let j = 1; j < H - 1; j++) {
+		const base = j * W
+		for (let i = 0; i < W; i++) {
+			const idx = base + i
+			x[idx] =
+				(field[base + wrapColumn(i + 1)] - field[base + wrapColumn(i - 1)]) /
+				(2 * metersPerDeg * ROW_COS[j])
+			y[idx] = (field[idx + W] - field[idx - W]) / (2 * metersPerDeg)
+		}
+	}
+	return { x, y }
+}
+
 // Heating (°C/s) from carrying water across the background meridional
 // temperature gradient, plus Ekman upwelling cooling that only bites where
-// the thermocline is shallow enough for upwelling to reach cold water.
+// the thermocline is shallow enough for upwelling to reach cold water. Kept
+// as two named terms rather than one pre-summed field so the two physically
+// distinct mechanisms -- horizontal advection, vertical upwelling/downwelling
+// -- can be told apart (SVERDRUP_SST_ANOMALY.solve sums them for the real
+// solve; a diagnostic can solve each alone to see which one a region's error
+// actually comes from).
 function heatSource({
 	circulation,
 	ocean,
 	temperatureGradient,
-}: HeatSourceParams): Float32Array {
+	upwelledDeficitC,
+}: HeatSourceParams): SourceTerms {
 	const { flow, divergence, thermoclineDepth } = circulation
-	const source = new Float32Array(CELLS)
+	const advective = new Float32Array(CELLS)
+	const vertical = new Float32Array(CELLS)
 	for (let j = 0; j < H; j++) {
 		for (let i = 0; i < W; i++) {
 			const idx = j * W + i
 			if (!ocean[idx]) continue
 			const deficit =
-				UPWELLED_DEFICIT_C *
+				upwelledDeficitC *
 				Math.exp(
 					-(thermoclineDepth[idx] - THERMOCLINE.easternDepthM) /
 						THERMOCLINE_SCALE_M,
@@ -113,15 +160,15 @@ function heatSource({
 				lo: -MAX_VERTICAL_VELOCITY_M_S,
 				hi: MAX_VERTICAL_VELOCITY_M_S,
 			})
-			const vertical =
+			advective[idx] = -flow.y[idx] * temperatureGradient[j]
+			vertical[idx] =
 				w > 0
 					? (-w * deficit) / MIXED_LAYER.depthM
-					: (-w * UPWELLED_DEFICIT_C * DOWNWELLING_WARMING_FRACTION) /
+					: (-w * upwelledDeficitC * DOWNWELLING_WARMING_FRACTION) /
 						MIXED_LAYER.depthM
-			source[idx] = -flow.y[idx] * temperatureGradient[j] + vertical
 		}
 	}
-	return source
+	return { advective, vertical }
 }
 
 // Steady SST anomaly T' from u.grad(T') + T'/tau = source - kappa lap(T'),
@@ -132,10 +179,9 @@ function solveAnomaly({
 	ocean,
 	source,
 	planet,
+	relaxationSeconds,
 }: AnomalySolveParams): Float32Array {
 	const dy = planet.radiusM * DEG2RAD
-	// The anomaly relaxes toward zero on the mixed layer's thermal timescale.
-	const relaxation = 1 / MIXED_LAYER.relaxationSeconds
 	const coefWest = new Float32Array(CELLS)
 	const coefEast = new Float32Array(CELLS)
 	const coefSouth = new Float32Array(CELLS)
@@ -160,7 +206,7 @@ function solveAnomaly({
 			if (j < H - 2 && ocean[idx + W])
 				coefNorth[idx] = Math.max(0, -v) / dy + diffusionY
 			diagonal[idx] =
-				relaxation +
+				1 / relaxationSeconds[idx] +
 				coefWest[idx] +
 				coefEast[idx] +
 				coefSouth[idx] +
@@ -239,9 +285,10 @@ function solve({
 	temperature,
 	isOcean,
 	planet,
+	upwelledDeficitC,
 }: SolveSstAnomalyParams): Float32Array {
 	const { ocean } = index
-	const source = heatSource({
+	const { advective, vertical } = heatSource({
 		circulation,
 		ocean,
 		temperatureGradient: zonalGradient({
@@ -250,12 +297,19 @@ function solve({
 			isOcean,
 			planet,
 		}),
+		upwelledDeficitC,
 	})
+	const source = new Float32Array(CELLS)
+	for (let i = 0; i < CELLS; i++) source[i] = advective[i] + vertical[i]
+	const relaxationSeconds = new Float32Array(CELLS).fill(
+		MIXED_LAYER.relaxationSeconds,
+	)
 	const anomaly = solveAnomaly({
 		flow: circulation.flow,
 		ocean,
 		source,
 		planet,
+		relaxationSeconds,
 	})
 	removeZonalMean({ field: anomaly, ocean })
 	return anomaly
@@ -263,4 +317,10 @@ function solve({
 
 export const SVERDRUP_SST_ANOMALY = {
 	solve,
+	zonalGradient,
+	backgroundGradient,
+	heatSource,
+	solveAnomaly,
+	removeZonalMean,
+	upwelledDeficitC: UPWELLED_DEFICIT_C,
 }

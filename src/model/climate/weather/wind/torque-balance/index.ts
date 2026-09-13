@@ -11,7 +11,12 @@ import type {
 
 const MIN_HADLEY_SCALE = 0.5
 const MAX_HADLEY_SCALE = 3
-const BISECTION_STEPS = 24
+// Illinois-modified regula falsi: on this smooth, monotonic torque curve it
+// converges superlinearly (typically a handful of steps to below tolerance),
+// while still bracketing the root like bisection does, so a stalled step
+// can't diverge outside [lo, hi] the way unguarded secant/Newton could.
+const ROOT_STEPS_MAX = 20
+const ROOT_BRACKET_TOLERANCE = 1e-6
 const BALANCE_ROUNDS = 2
 
 function componentWinds({
@@ -61,7 +66,7 @@ function hemisphereTorque({
 }
 
 // Stronger Hadley pressure means stronger easterly trades and a more negative
-// torque, so bisect for the scale where this hemisphere's torque vanishes.
+// torque, so find the scale where this hemisphere's torque vanishes.
 function balanceSide({ scales, side, ...components }: BalanceSideParams) {
 	const torqueAt = (scale: number) =>
 		hemisphereTorque({
@@ -74,12 +79,30 @@ function balanceSide({ scales, side, ...components }: BalanceSideParams) {
 		})
 	let lo = MIN_HADLEY_SCALE
 	let hi = MAX_HADLEY_SCALE
-	if (torqueAt(lo) <= 0) return lo
-	if (torqueAt(hi) >= 0) return hi
-	for (let step = 0; step < BISECTION_STEPS; step++) {
-		const mid = (lo + hi) / 2
-		if (torqueAt(mid) > 0) lo = mid
-		else hi = mid
+	let fLo = torqueAt(lo)
+	if (fLo <= 0) return lo
+	let fHi = torqueAt(hi)
+	if (fHi >= 0) return hi
+	// `stall` tracks which side has repeated without the bracket moving on the
+	// other side; the Illinois correction halves that side's function value so
+	// regula falsi can't stagnate against a flat end of the bracket.
+	let stall = 0
+	for (let step = 0; step < ROOT_STEPS_MAX; step++) {
+		if (hi - lo < ROOT_BRACKET_TOLERANCE) break
+		const mid = (fLo * hi - fHi * lo) / (fLo - fHi)
+		const fMid = torqueAt(mid)
+		if (fMid === 0) return mid
+		if (fMid > 0) {
+			lo = mid
+			fLo = fMid
+			if (stall === 1) fHi *= 0.5
+			stall = 1
+		} else {
+			hi = mid
+			fHi = fMid
+			if (stall === -1) fLo *= 0.5
+			stall = -1
+		}
 	}
 	return (lo + hi) / 2
 }
