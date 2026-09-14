@@ -136,7 +136,10 @@ const seasonality = (
 		Math.max(0, tilt + rotation + geography),
 	)
 	const seasonalityDenominator = 1 + atmospheric
-	return seasonalityNumerator / seasonalityDenominator
+	// Capped below 1: at exactly 1 the cold branch gets zero luminosity and
+	// its temperature collapses to absolute zero (seen on Pallas, whose 84°
+	// tilt saturates the numerator) -- no real body has a 0K night side.
+	return Math.min(0.99, seasonalityNumerator / seasonalityDenominator)
 }
 
 const temperatureRange = (
@@ -282,6 +285,12 @@ function traceDelta(params: {
 	atmospheric: number
 	eccentricity: number
 	seismology: number
+	/** Raw physical inputs behind the transformed tilt/rotation/geography
+	 * factors above, for display -- the factors themselves are
+	 * model-internal (sin tilt, sqrt day length, hydro mapping). */
+	tiltLabel: string
+	rotationLabel: string
+	geographyLabel: string
 }): { baseline: number; trace: TemperatureTraceEntry[] } {
 	const {
 		luminosity,
@@ -294,6 +303,9 @@ function traceDelta(params: {
 		atmospheric,
 		eccentricity,
 		seismology,
+		tiltLabel,
+		rotationLabel,
+		geographyLabel,
 	} = params
 
 	const deltaF = (
@@ -395,18 +407,21 @@ function traceDelta(params: {
 	deltaContrib.seismology /= Ndelta
 
 	const trace: TemperatureTraceEntry[] = [
-		{ value: deltaContrib.tilt, description: `tilt (${tilt.toFixed(2)})` },
+		{
+			value: deltaContrib.tilt,
+			description: `tilt (${tiltLabel})`,
+		},
 		{
 			value: deltaContrib.rotation,
-			description: `rotation (${rotation.toFixed(2)})`,
+			description: `rotation (${rotationLabel})`,
 		},
 		{
 			value: deltaContrib.geography,
-			description: `geography (${geography.toFixed(2)})`,
+			description: `geography (${geographyLabel})`,
 		},
 		{
 			value: deltaContrib.atmospheric,
-			description: `atmospheric (${atmospheric.toFixed(2)})`,
+			description: `atmospheric (${atmospheric.toFixed(2)} bar)`,
 		},
 		{
 			value: deltaContrib.eccentricity,
@@ -571,6 +586,12 @@ function trace(params: FinalizeTemperatureInput): TemperatureTraceResult {
 			atmospheric: pressureBar,
 			eccentricity,
 			seismology: effectiveSeismology,
+			tiltLabel: `${axialTiltDeg.toFixed(1)}°`,
+			rotationLabel:
+				tideLock?.type === "solar"
+					? "locked"
+					: `${siderealDayHours.toFixed(1)}h`,
+			geographyLabel: `hydro ${hydrosphereCode}`,
 		}),
 	}
 }

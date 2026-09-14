@@ -17,6 +17,7 @@ export interface MoonPlacementInput {
 	deviation: number
 	spectralClass: SpectralClass
 	starAgeGyr: number
+	luminositySol: number
 	massKg: number
 	moonSlotName: string
 	nameBody: (slot: string) => string

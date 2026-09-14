@@ -66,6 +66,14 @@ export interface RollMoonCountInput extends MoonRngInput {
 	parentGroup: ParentOrbitGroup
 	parentSizeClass: number
 	orbitalDistanceAU: number
+	/** Book's Significant Moon Quantity DM-1-per-die (p. 54): true when any of
+	 * "adjacent to a companion," "adjacent to a Close/Near star unavailability
+	 * range," or "adjacent to the outermost range of a Close/Near/Far star"
+	 * applies -- collapsed into one flag since the book applies only one DM
+	 * regardless of how many of its conditions hold. [JUSTIFICATION] Only a
+	 * multi-star caller has a companion to be adjacent to; every single-star
+	 * caller omits this (equivalent to false). */
+	nearCompanionExclusion?: boolean
 }
 export interface RollMoonEccentricityInput extends MoonRngInput {
 	range: MoonOrbitRange
@@ -79,6 +87,13 @@ export interface GenerateMoonsInput {
 	orbitalDistanceAU: number
 	starMassKg: number /** Defaults to terrestrial when omitted for ordinary rocky parents. */
 	parentGroup?: ParentOrbitGroup
+	/** The parent planet's own luminositySol/starAgeGyr -- a moon uses the
+	 * exact same book Terrestrial Composition/Density roll (ROLLS.
+	 * pickDensityEarthRelative) as any other rocky body, keyed off its own
+	 * size and its parent's position relative to HZCO, not a separate
+	 * ad hoc density range. */
+	luminositySol: number
+	starAgeGyr: number
 }
 
 // Fallback for any moon that doesn't get a rolled/authored atmosphere of its

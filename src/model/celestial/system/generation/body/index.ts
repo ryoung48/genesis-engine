@@ -81,6 +81,67 @@ function promoteMoonToMainWorld(params: {
 	}
 }
 
+// A zone's fixed deviation pool can put a slot closer to the star than its
+// own MAO allows (most often an M dwarf's epistellar zone, whose whole
+// habitable-zone-scaled range can sit inside its dust-clearing radius), or
+// farther out than a multi-star host's Hill-sphere stability ceiling allows
+// (see maxOrbitalDistanceAU) -- both filtered out here, before any slot is
+// even sampled, rather than clamping an already-rolled slot after the fact.
+// If every deviation in a zone falls outside [minAU, maxAU] for this star,
+// the zone is illegal for it and contributes no slots at all (rng.sample
+// naturally returns fewer than requested from a shorter, or empty, pool).
+function filterDeviationsInRange({
+	deviations,
+	luminositySol,
+	minAU,
+	maxAU,
+}: {
+	deviations: readonly number[]
+	luminositySol: number
+	minAU: number
+	maxAU: number
+}): number[] {
+	return deviations.filter((deviation) => {
+		const au = PLANET.deviationToAU({ deviation, luminositySol })
+		return au >= minAU && au <= maxAU
+	})
+}
+
+// Book's Significant Moon Quantity DM (p. 54) triggers when a planet's own
+// slot is "adjacent" to a companion star's unavailability range or to a
+// companion-driven outer ceiling -- "adjacent" means literally "within the
+// spread distance," so this measures against this exact slot's own
+// spreadOrbitNumber (Stage 8's real, post-exclusion-zone-growth spread),
+// not an approximation.
+function isAdjacentToCompanionExclusion({
+	orbitalDistanceAU,
+	spreadOrbitNumber,
+	companionExclusionZonesAU,
+	maxOrbitalDistanceAU,
+}: {
+	orbitalDistanceAU: number
+	spreadOrbitNumber: number
+	companionExclusionZonesAU: { minAU: number; maxAU: number }[]
+	maxOrbitalDistanceAU: number
+}): boolean {
+	const orbitNumber = ORBIT_BODY.auToOrbitNumber({ au: orbitalDistanceAU })
+	const isNear = (otherOrbitNumber: number) =>
+		Math.abs(orbitNumber - otherOrbitNumber) <= spreadOrbitNumber
+	if (
+		companionExclusionZonesAU.some(
+			(zone) =>
+				isNear(ORBIT_BODY.auToOrbitNumber({ au: zone.minAU })) ||
+				isNear(ORBIT_BODY.auToOrbitNumber({ au: zone.maxAU })),
+		)
+	) {
+		return true
+	}
+	return (
+		Number.isFinite(maxOrbitalDistanceAU) &&
+		isNear(ORBIT_BODY.auToOrbitNumber({ au: maxOrbitalDistanceAU }))
+	)
+}
+
 /**
  * Generates the rest of the (single-star) solar system around the already-
  * generated main world: a handful of sibling asteroid belts/planets/gas
@@ -114,6 +175,23 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		hostStar?.massSol !== undefined
 			? hostStar.massSol * ORBIT_BODY.solarMassKg
 			: (starMassKgOverride ?? ORBIT_BODY.solarMassKg)
+	// Book's Minimum Allowable Orbit# (p. 19013 glossary entry): the closest a
+	// world can form, inside of which the star's own dust-clearing has swept
+	// the zone clear. Used below to filter each zone's deviation pool before
+	// any slot is even sampled, rather than clamping an already-rolled slot
+	// after the fact -- see filterDeviationsInRange.
+	const maoAu =
+		hostStar?.mao ??
+		STAR.getStarMAO({
+			cls: tableSpectralClass,
+			subtype: starSubtype,
+		})
+	// Hill-sphere stability ceiling for a multi-star host (see
+	// GenerateSystemBodiesParams.maxOrbitalDistanceAU's doc) -- absent (no
+	// ceiling) for every single-star caller.
+	const maxOrbitalDistanceAU =
+		params.maxOrbitalDistanceAU ?? Number.POSITIVE_INFINITY
+	const companionExclusionZonesAU = params.companionExclusionZonesAU ?? []
 
 	// Every non-Sol system gets its own procedurally generated language (see
 	// LANGUAGE.spawn/planet-name.ts), used to name every sibling planet and
@@ -139,18 +217,14 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				)
 			: ""
 
-	const blackHole = spectralClass === "BH"
-	const yBrownDwarf = spectralClass === "Y"
 	const neutronStar = spectralClass === "NS"
-	const brownDwarf =
-		spectralClass === "L" || spectralClass === "T" || yBrownDwarf
-	const deadStar = spectralClass === "D" || neutronStar || blackHole
+	const brownDwarf = STAR.isBrownDwarf(spectralClass)
+	const deadStar = STAR.isPostStellar(spectralClass)
 	if (
-		blackHole ||
-		yBrownDwarf ||
-		params.isEpistellarCompanion === true ||
-		(params.hasParent === true && rng.uniform(0, 1) > 0.5) ||
-		(deadStar && rng.uniform(0, 1) > 0.2)
+		params.orbitSlots === undefined &&
+		(params.isEpistellarCompanion === true ||
+			(params.hasParent === true && rng.uniform(0, 1) > 0.5) ||
+			(deadStar && rng.uniform(0, 1) > 0.2))
 	) {
 		return []
 	}
@@ -161,35 +235,82 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			: rng.randint(1, deadStar || brownDwarf ? 1 : 3)
 	const outerCount = rng.randint(1, deadStar || brownDwarf ? 2 : 5)
 
-	const slots: Slot[] = [
-		...rng
-			.sample(ENVIRONMENT.epistellarDeviations, epistellarCount)
-			.map((deviation) => ({ zone: "epistellar" as const, deviation })),
-		// One inner slot is reserved for the main world (deviation 0, the
-		// "temperate" slot -- always exactly the HZ center, see deviationToAU) --
-		// same guarantee galaxy-gen gives its homeworld -- for every mode except
-		// "procedural", which skips the reservation entirely so deviation-0 is
-		// just another inner-zone candidate like any other (no guaranteed
-		// habitable body). Unlike every other slot, a reserved slot isn't rolled
-		// at all: see the isMainWorld branch below, which builds it according to
-		// mainWorldMode.
-		...(mainWorldMode === "procedural"
-			? []
-			: [{ zone: "inner" as const, deviation: 0, isMainWorld: true }]),
-		...rng
-			.sample(
-				mainWorldMode === "procedural"
-					? ENVIRONMENT.innerDeviations
-					: ENVIRONMENT.innerDeviations.filter((d) => d !== 0),
-				mainWorldMode === "procedural"
-					? innerCount
-					: Math.max(0, innerCount - 1),
-			)
-			.map((deviation) => ({ zone: "inner" as const, deviation })),
-		...rng
-			.sample(ENVIRONMENT.outerDeviations, outerCount)
-			.map((deviation) => ({ zone: "outer" as const, deviation })),
-	]
+	// Filtered per-zone before sampling -- see filterDeviationsInRange. A
+	// zone left with no legal deviations for this star (typically epistellar,
+	// around a dim enough host, for the MAO floor; or an outer zone pushed
+	// past a tight multi-star ceiling) simply contributes no slots:
+	// rng.sample already returns fewer than requested from a shorter, or
+	// empty, pool.
+	const epistellarPool = filterDeviationsInRange({
+		deviations: ENVIRONMENT.epistellarDeviations,
+		luminositySol,
+		minAU: maoAu,
+		maxAU: maxOrbitalDistanceAU,
+	})
+	const innerPool = filterDeviationsInRange({
+		deviations:
+			mainWorldMode === "procedural"
+				? ENVIRONMENT.innerDeviations
+				: ENVIRONMENT.innerDeviations.filter((d) => d !== 0),
+		luminositySol,
+		minAU: maoAu,
+		maxAU: maxOrbitalDistanceAU,
+	})
+	const outerPool = filterDeviationsInRange({
+		deviations: ENVIRONMENT.outerDeviations,
+		luminositySol,
+		minAU: maoAu,
+		maxAU: maxOrbitalDistanceAU,
+	})
+
+	const slots: Slot[] = params.orbitSlots
+		? params.orbitSlots
+				.filter((slot) => slot.type !== "empty")
+				.map((slot) => ({
+					zone: slot.zone!,
+					deviation: slot.deviation!,
+					orbitalDistanceAU: slot.orbitalDistanceAU!,
+					groupHint:
+						slot.type === "gas-giant"
+							? "jovian"
+							: slot.type === "belt"
+								? "asteroid belt"
+								: ROLLS.rollTerrestrialSubgroup({ rng, zone: slot.zone! }),
+					trojanCount: slot.trojanCount,
+					// Mirrors the legacy deviation-0 reservation, which was skipped
+					// entirely under "procedural" (no guaranteed habitable body) --
+					// only a non-"procedural" mode forces the baseline slot's body.
+					isMainWorld: mainWorldMode !== "procedural" && slot.isBaseline,
+					anomalousOrbitType: slot.anomalousOrbitType,
+					spreadOrbitNumber: slot.spreadOrbitNumber,
+				}))
+		: [
+				...rng
+					.sample(epistellarPool, epistellarCount)
+					.map((deviation) => ({ zone: "epistellar" as const, deviation })),
+				// One inner slot is reserved for the main world (deviation 0, the
+				// "temperate" slot -- always exactly the HZ center, see deviationToAU) --
+				// same guarantee galaxy-gen gives its homeworld -- for every mode except
+				// "procedural", which skips the reservation entirely so deviation-0 is
+				// just another inner-zone candidate like any other (no guaranteed
+				// habitable body). Unlike every other slot, a reserved slot isn't rolled
+				// at all: see the isMainWorld branch below, which builds it according to
+				// mainWorldMode.
+				...(mainWorldMode === "procedural"
+					? []
+					: [{ zone: "inner" as const, deviation: 0, isMainWorld: true }]),
+				...rng
+					.sample(
+						innerPool,
+						mainWorldMode === "procedural"
+							? innerCount
+							: Math.max(0, innerCount - 1),
+					)
+					.map((deviation) => ({ zone: "inner" as const, deviation })),
+				...rng
+					.sample(outerPool, outerCount)
+					.map((deviation) => ({ zone: "outer" as const, deviation })),
+			]
 
 	const starMassSol =
 		hostStar?.massSol ??
@@ -205,8 +326,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// derived inline rather than stored, since nothing outside this generation
 	// pass needs them (see rollOrbitGroup's asteroid-belt weight boost and
 	// buildBodyEnvironment's hydrosphere/atmosphere youth override below).
-	const proto = starAgeGyr < 0.01 && starMassSol < 8
-	const primordial = starAgeGyr < 0.1
+	const proto = STAR.isProto({ ageGyr: starAgeGyr, massSol: starMassSol })
+	const primordial = STAR.isPrimordial({ ageGyr: starAgeGyr })
 
 	// Ported from galaxy-gen's impactZone (stars/index.ts) -- a giant
 	// (luminosityClass "III") or white dwarf ("D") host star's innermost few
@@ -288,6 +409,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				parentGroup: "terrestrial",
 				parentSizeClass: earthSizeClass,
 				orbitalDistanceAU,
+				nearCompanionExclusion: isAdjacentToCompanionExclusion({
+					orbitalDistanceAU,
+					spreadOrbitNumber: slot.spreadOrbitNumber ?? 0,
+					companionExclusionZonesAU,
+					maxOrbitalDistanceAU,
+				}),
 			})
 			const moonSlotName = `orbit-${siblingIdx}`
 			const rolledMoons = MOON_PLACEMENT.place({
@@ -303,6 +430,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				deviation: slot.deviation,
 				spectralClass,
 				starAgeGyr,
+				luminositySol,
 				massKg: builtMainWorld.massKg,
 				moonSlotName,
 				nameBody,
@@ -339,18 +467,22 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			? ("terrestrial" as const)
 			: isGasGiantMainWorld
 				? ("jovian" as const)
-				: ROLLS.rollOrbitGroup({
+				: (slot.groupHint ??
+					ROLLS.rollOrbitGroup({
 						rng,
 						zone: slot.zone,
 						postStellar: deadStar,
 						starAgeGyr,
 						proto,
 						primordial,
-					})
+					}))
 		let orbitalDistanceAU = PLANET.deviationToAU({
 			deviation: slot.deviation,
 			luminositySol,
 		})
+		if (slot.orbitalDistanceAU !== undefined) {
+			orbitalDistanceAU = slot.orbitalDistanceAU
+		}
 		// Ported from galaxy-gen's forced-meltball roll (orbits/index.ts) -- a
 		// close-in epistellar dwarf beyond the star's dust-clearing boundary
 		// (getStarMAO) can get shoved into a scorching orbit instead of
@@ -367,12 +499,6 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				kelvinTemp: rng.uniform(1000, 2000),
 				luminositySol,
 			})
-			const maoAu =
-				hostStar?.mao ??
-				STAR.getStarMAO({
-					cls: tableSpectralClass,
-					subtype: starSubtype,
-				})
 			if (candidateAu > maoAu) {
 				forceMeltball = true
 				orbitalDistanceAU = candidateAu
@@ -412,7 +538,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						rng,
 						group,
 						classification,
-						composition: assignment.composition,
+						sizeClass,
+						orbitalDistanceAU,
+						luminositySol,
+						starAgeGyr,
 					})
 		const massKg =
 			group === "asteroid belt"
@@ -452,6 +581,17 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		const orbitalPeriodDays =
 			STAR.getKeplerYearYears({ orbitalDistanceAU, massSol: starMassSol }) *
 			DAYS_PER_YEAR
+		// Book's Anomalous Orbit Type table (p. 50-51): +2 for random/inclined/
+		// retrograde, +5 for eccentric, applied to this slot's eccentricity
+		// roll -- see rollEccentricity's anomalyEccentricityDM.
+		const anomalyEccentricityDM =
+			slot.anomalousOrbitType === "eccentric"
+				? 5
+				: slot.anomalousOrbitType === "random" ||
+						slot.anomalousOrbitType === "inclined" ||
+						slot.anomalousOrbitType === "retrograde"
+					? 2
+					: 0
 		const eccentricity =
 			group === "asteroid belt"
 				? 0
@@ -462,7 +602,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 								ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
 								0.05,
 							)
-						: ROLLS.rollEccentricity({ rng, orbitKind: "planet" })
+						: ROLLS.rollEccentricity({
+								rng,
+								orbitKind: "planet",
+								anomalyEccentricityDM,
+							})
 		const rolledAxialTiltDeg =
 			group === "asteroid belt"
 				? 0
@@ -477,6 +621,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						parentGroup: group,
 						parentSizeClass: sizeClass,
 						orbitalDistanceAU,
+						nearCompanionExclusion: isAdjacentToCompanionExclusion({
+							orbitalDistanceAU,
+							spreadOrbitNumber: slot.spreadOrbitNumber ?? 0,
+							companionExclusionZonesAU,
+							maxOrbitalDistanceAU,
+						}),
 					})
 		// The gas-giant-moon slot always needs at least one moon to promote.
 		const moonCount = isGasGiantMainWorld
@@ -496,6 +646,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			deviation: slot.deviation,
 			spectralClass,
 			starAgeGyr,
+			luminositySol,
 			massKg,
 			moonSlotName,
 			nameBody,
@@ -520,6 +671,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					deviation: slot.deviation,
 					spectralClass,
 					starAgeGyr,
+					luminositySol,
 					massKg,
 					moonSlotName,
 					nameBody,
@@ -695,8 +847,17 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			// roll for two conceptually distinct purposes.
 			lsAphelionDeg: rng.uniform(0, 360),
 			axialTiltDeg: finalAxialTiltDeg,
+			// Book's Inclined/Retrograde Orbit procedures (p. 51) use their own
+			// inclination formula instead of the ordinary Inclination table --
+			// retrograde adds 90 degrees on top (see rollAnomalousInclinationDeg).
 			inclinationDeg:
-				group === "asteroid belt" ? 0 : ORBIT_BODY.rollInclinationDeg(rng),
+				group === "asteroid belt"
+					? 0
+					: slot.anomalousOrbitType === "inclined"
+						? ROLLS.rollAnomalousInclinationDeg({ rng })
+						: slot.anomalousOrbitType === "retrograde"
+							? ROLLS.rollAnomalousInclinationDeg({ rng }) + 90
+							: ORBIT_BODY.rollInclinationDeg(rng),
 			longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
 			tideLock,
 			tideLockStatus: PLANET.deriveTideLockStatus({
@@ -758,7 +919,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				rng,
 				group: "dwarf",
 				classification,
-				composition: assignment.composition,
+				sizeClass,
+				orbitalDistanceAU: belt.orbitalDistanceAU,
+				luminositySol,
+				starAgeGyr,
 			})
 			const massKg = ORBIT_BODY.massKgFromEarthRelativeDensity({
 				diameterKm,
@@ -829,29 +993,28 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	}
 	bodies.push(...beltDwarfs)
 
-	// Trojan orbits: a very small chance for a body to share another body's
-	// Orbit# instead of its own, sitting 60° ahead (leading, 1d6 1-3) or behind
-	// (trailing, 1d6 4-6) it at the Lagrange point -- flagged via `trojan` so
-	// these are easy to find later.
-	const TROJAN_CHANCE = 1 / 500
-	for (const body of bodies) {
-		if (
-			body.isMainWorld ||
-			body.group === "asteroid belt" ||
-			body.beltOfIdx !== undefined
-		)
-			continue
-		if (rng.uniform(0, 1) > TROJAN_CHANCE) continue
-		const shareOrbitWith = bodies.filter(
-			(other) => other !== body && !other.isMainWorld,
-		)
-		if (shareOrbitWith.length === 0) continue
-		const target = rng.choice(shareOrbitWith)
-		body.orbitalDistanceAU = target.orbitalDistanceAU
-		body.orbitalPeriodDays = target.orbitalPeriodDays
-		body.trojan = true
-		body.trojanOffsetDeg = rng.randint(1, 6) <= 3 ? -60 : 60
-		body.trojanOfIdx = target.idx
+	if (params.orbitSlots !== undefined) {
+		const trojans: SystemBody[] = []
+		for (const [slotIndex, slot] of slots.entries()) {
+			const host = bodies[slotIndex]
+			if (!host || slot.trojanCount === undefined) continue
+			for (let trojanIndex = 0; trojanIndex < slot.trojanCount; trojanIndex++) {
+				const idx = bodies.length + trojans.length
+				trojans.push({
+					...host,
+					idx,
+					seed: `trojan-${host.idx}-${trojanIndex + 1}`,
+					name: nameBody(`trojan-${host.idx}-${trojanIndex + 1}`),
+					massKg: host.massKg / 2,
+					gravityG: host.gravityG / 2,
+					moons: [],
+					trojan: true,
+					trojanOffsetDeg: rng.randint(1, 6) <= 3 ? -60 : 60,
+					trojanOfIdx: host.idx,
+				})
+			}
+		}
+		bodies.push(...trojans)
 	}
 
 	// Surface-tide heating is itself just a display/classification refinement

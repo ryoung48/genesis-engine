@@ -101,7 +101,7 @@ export type OrbitChemistry =
 	| "chlorine"
 
 export type OrbitComposition = "rocky" | "ice" | "metallic" | "gas"
-type OrbitZone = "epistellar" | "inner" | "outer"
+export type OrbitZone = "epistellar" | "inner" | "outer"
 
 interface HydrosphereSurfaceComponent {
 	pct: number
@@ -164,6 +164,18 @@ export interface BiosphereProfile {
 	code: number
 	trace: TemperatureTraceEntry[]
 	label?: "remnants" | "engineered" | "miscible" | "hybrid" | "immiscible"
+}
+
+export interface CloudCoverProfile {
+	coverFraction: number
+	description: string
+}
+
+export interface MagneticFieldProfile {
+	/** 1.0 == Earth's own field strength, under magnetic-field/index.ts's
+	 * calibration. */
+	fieldIndex: number
+	description: string
 }
 
 export interface SeismologyProfile {
@@ -280,6 +292,13 @@ export interface OrbitBody {
 	/** Unset until applySystemSeismology runs after bodies and moon orbits
 	 * have been assembled. */
 	seismology?: SeismologyProfile
+	/** [JUSTIFICATION] Computed alongside seismology, once density/mass/
+	 * siderealDayHours are known -- unset until applySystemSeismology runs. */
+	magneticField?: MagneticFieldProfile
+	/** [JUSTIFICATION] Computed alongside seismology, once landCoverage/
+	 * atmosphere/temperatureEstimate are known -- unset until
+	 * applySystemSeismology runs. */
+	cloudCover?: CloudCoverProfile
 	/** Ported from galaxy-gen's TEMPERATURE.finalize -- a closed-form mean/
 	 * high/low estimate computed right after seismology.totalHeating is
 	 * known (see system-seismology.ts's applyBodySeismology/
@@ -305,4 +324,12 @@ export interface OrbitBody {
 	continentSizeVariety?: number
 	seaLevel?: number
 	maxElevation?: number
+}
+
+export interface AUToOrbitNumberInput {
+	au: number
+}
+
+export interface OrbitNumberToAUInput {
+	orbitNumber: number
 }

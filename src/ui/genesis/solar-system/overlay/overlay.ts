@@ -46,6 +46,7 @@ import {
 	GOLDEN_ANGLE_RAD,
 	MAIN_WORLD_COLOR,
 	ORBIT_GAP_STAR_RADII,
+	ORBIT_LINE_COLOR_BY_ZONE,
 	ORBIT_SEGMENTS,
 	PLANET_SCENE_RADIUS,
 	ROCKY_SIBLING_COLOR,
@@ -76,7 +77,6 @@ import type {
 // conversion -- this constant is just the companion-scale equivalent of
 // ORBIT_GAP_STAR_RADII, one level up.
 const COMPANION_ORBIT_GAP_FACTOR = 0.4
-const COMPANION_ORBIT_LINE_COLOR = 0xfbbf24
 
 // One shared unit sphere per tessellation tier, reused by every body mesh
 // (and cloud shell) currently at that tier -- see BODY_LOD_SEGMENTS. Kept at
@@ -874,7 +874,7 @@ export function buildSolarSystemOverlay(
 			const orbitLine = new THREE.Line(
 				new THREE.BufferGeometry(),
 				new THREE.LineBasicMaterial({
-					color: COMPANION_ORBIT_LINE_COLOR,
+					color: ORBIT_LINE_COLOR_BY_ZONE[companion.role],
 					transparent: true,
 					opacity: 0.35,
 					depthWrite: false,
@@ -1285,7 +1285,7 @@ export function buildSolarSystemOverlay(
 		const orbitLine = new THREE.Line(
 			new THREE.BufferGeometry().setFromPoints(orbitPoints),
 			new THREE.LineBasicMaterial({
-				color: hostsMainWorld(p) ? 0x93c5fd : 0x94a3b8,
+				color: ORBIT_LINE_COLOR_BY_ZONE[p.body.zone ?? "distant"],
 				transparent: true,
 				opacity: hostsMainWorld(p) ? 0.75 : 0.5,
 				depthWrite: false,

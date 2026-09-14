@@ -1,13 +1,14 @@
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import type {
-	OrbitClassification,
-	OrbitGroup,
-} from "@/model/celestial/orbit-body/types"
+import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
 import type { Zone } from "@/model/celestial/planet/types"
+import { STAR } from "@/model/celestial/star"
 import type {
-	DensityComposition,
+	PickDensityEarthRelativeInput,
+	RollAnomalousInclinationDegInput,
 	RollEccentricityInput,
 	RollPlanetRingsInput,
+	RollTerrestrialCompositionInput,
+	TerrestrialCompositionCategory,
 } from "@/model/celestial/system/generation/rolls/types"
 import type { RingProfile } from "@/model/celestial/system/types"
 import { DICE } from "@/model/shared/random/dice"
@@ -83,6 +84,29 @@ function rollOrbitGroup({
 	return selected
 }
 
+// Same dwarf/terrestrial/helian relative weights rollOrbitGroup already
+// used for these three groups (terrestrial favored in the inner zone) --
+// scoped to just this three-way split since Stage 8 (galaxy/systems/
+// index.ts) now decides gas-giant/belt/terrestrial counts itself from the
+// book's own World Types and Quantities roll; this only resolves what kind
+// of rocky world a slot Stage 8 already booked as "terrestrial" turns out
+// to be.
+function rollTerrestrialSubgroup({
+	rng,
+	zone,
+}: {
+	rng: ReturnType<typeof RNG.createRng>
+	zone: Zone
+}): OrbitGroup {
+	return (
+		rng.weightedChoice([
+			{ v: "dwarf" as const, w: 2 },
+			{ v: "terrestrial" as const, w: zone === "inner" ? 3 : 2 },
+			{ v: "helian" as const, w: 1 },
+		]) ?? "terrestrial"
+	)
+}
+
 function rollSizeClass({
 	rng,
 	group,
@@ -109,12 +133,11 @@ function rollDiameterKmFromSizeClass({
 	return rng.uniform(minKm, maxKm)
 }
 
-// Ported from galaxy-gen's getDensityFromTable/calculateDensity (orbits/groups.ts):
-// composition (ice/rocky/metallic) picks a weighted density category, then a
-// 2d6-2 roll indexes one of 11 specific values within that category -- a
-// triangular distribution clustered around the category's middle, instead of
-// a flat uniform range.
-const DENSITY_TABLE: Record<string, number[]> = {
+// Book's Terrestrial Density table (p. 72), verbatim -- indexed by a plain
+// 2D-2 roll (0-10) within whichever TerrestrialCompositionCategory
+// rollTerrestrialComposition picks. No DMs; the book itself notes the
+// Referee may interpolate linearly between values for extra variance.
+const DENSITY_TABLE: Record<TerrestrialCompositionCategory, number[]> = {
 	"Exotic Ice": [
 		0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.3, 0.33,
 	],
@@ -135,85 +158,97 @@ const DENSITY_TABLE: Record<string, number[]> = {
 	],
 }
 
-function classificationToComposition(
-	classification: OrbitClassification,
-): DensityComposition {
-	if (
-		classification === "snowball" ||
-		classification === "panthalassic" ||
-		classification === "helian"
-	) {
-		return "ice"
-	}
-	if (
-		classification === "telluric" ||
-		classification === "meltball" ||
-		classification === "stygian" ||
-		classification === "acheronian" ||
-		classification === "asphodelian"
-	) {
-		return "metallic"
-	}
-	return "rocky"
-}
-
-function rollDensityFromComposition({
+// Book's Terrestrial Composition table (p. 71-72), verbatim: 2D + DMs for
+// size (Size 0-4 -1, Size 6-9 +1, Size A-F, i.e. sizeClass 10-15, +3),
+// position relative to HZCO (at/inside it +1; beyond it -1, and another -1
+// per full Orbit# further out), and old systems (age > 10 Gyr, -1). This
+// table -- not this codebase's own climate Classification -- is what
+// actually determines a rocky body's composition/density in the book; the
+// two are independent rolls on independent inputs.
+function rollTerrestrialComposition({
 	rng,
-	composition,
-}: {
-	rng: ReturnType<typeof RNG.createRng>
-	composition: DensityComposition
-}): number {
-	const description = rng.weightedChoice([
-		{ v: "Exotic Ice", w: composition === "ice" ? 1 : 0 },
-		{ v: "Mostly Ice", w: composition === "ice" ? 5 : 0 },
-		{ v: "Mostly Rock", w: composition === "rocky" ? 3 : 0 },
-		{
-			v: "Rock and Metal",
-			w: composition === "metallic" || composition === "rocky" ? 4 : 0,
-		},
-		{ v: "Mostly Metal", w: composition === "metallic" ? 5 : 0 },
-		{ v: "Compressed Metal", w: composition === "metallic" ? 1 : 0 },
-	])
-	const densityRoll = DICE.roll2d6(rng) - 2
-	return DENSITY_TABLE[description as string][densityRoll]
+	sizeClass,
+	orbitalDistanceAU,
+	luminositySol,
+	starAgeGyr,
+}: RollTerrestrialCompositionInput): TerrestrialCompositionCategory {
+	const sizeDM =
+		sizeClass <= 4 ? -1 : sizeClass <= 5 ? 0 : sizeClass <= 9 ? 1 : 3
+	const orbitNumber = ORBIT_BODY.auToOrbitNumber({ au: orbitalDistanceAU })
+	const hzcOrbitNumber = ORBIT_BODY.auToOrbitNumber({
+		au: STAR.getHabitableZoneAU(luminositySol),
+	})
+	const positionDM =
+		orbitNumber <= hzcOrbitNumber
+			? 1
+			: -1 - Math.floor(orbitNumber - hzcOrbitNumber)
+	const ageDM = starAgeGyr > 10 ? -1 : 0
+	const roll = DICE.roll2d6(rng) + sizeDM + positionDM + ageDM
+	if (roll <= -4) return "Exotic Ice"
+	if (roll <= 2) return "Mostly Ice"
+	if (roll <= 6) return "Mostly Rock"
+	if (roll <= 11) return "Rock and Metal"
+	if (roll <= 14) return "Mostly Metal"
+	return "Compressed Metal"
 }
 
 function pickDensityEarthRelative({
 	rng,
 	group,
 	classification,
-	composition,
-}: {
-	rng: ReturnType<typeof RNG.createRng>
-	group: OrbitGroup
-	classification: OrbitClassification
-	/** Omitted before classification has produced a composition; the
-	 * classification table then provides the density-roll category. */
-	composition?: string
-}): number {
+	sizeClass,
+	orbitalDistanceAU,
+	luminositySol,
+	starAgeGyr,
+}: PickDensityEarthRelativeInput): number {
 	if (group === "jovian" || classification === "chthonian") {
 		return rng.uniform(0.08, 0.35)
 	}
-	const densityComposition: DensityComposition =
-		composition === "ice" ||
-		composition === "rocky" ||
-		composition === "metallic"
-			? composition
-			: classificationToComposition(classification)
-	return rollDensityFromComposition({ rng, composition: densityComposition })
+	const compositionCategory = rollTerrestrialComposition({
+		rng,
+		sizeClass,
+		orbitalDistanceAU,
+		luminositySol,
+		starAgeGyr,
+	})
+	const densityRoll = DICE.roll2d6(rng) - 2
+	return DENSITY_TABLE[compositionCategory][densityRoll]!
 }
 
-// Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts). A
-// companion star gets the source's +2 modifier; a planet has no modifier.
-function rollEccentricity({ rng, orbitKind }: RollEccentricityInput): number {
-	const roll = DICE.roll2d6(rng) + (orbitKind === "companion-star" ? 2 : 0)
+// Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts), plus
+// the book's own Eccentricity Values DM table (p. 27-28) for companion
+// stars: DM+2 for any stellar orbit, DM+1 per star an object orbits beyond
+// the first (starsOrbitedBeyondFirst), DM-1 for an old, tight-orbiting
+// binary (oldTightOrbit). A planet has none of these DMs.
+function rollEccentricity({
+	rng,
+	orbitKind,
+	starsOrbitedBeyondFirst = 0,
+	oldTightOrbit = false,
+	anomalyEccentricityDM = 0,
+}: RollEccentricityInput): number {
+	const dm =
+		(orbitKind === "companion-star" ? 2 : 0) +
+		starsOrbitedBeyondFirst -
+		(oldTightOrbit ? 1 : 0) +
+		anomalyEccentricityDM
+	const roll = DICE.roll2d6(rng) + dm
 	if (roll <= 5) return 0
 	if (roll <= 7) return rng.uniform(0.01, 0.03)
 	if (roll <= 9) return rng.uniform(0.04, 0.09)
 	if (roll <= 10) return rng.uniform(0.1, 0.35)
 	if (roll <= 11) return rng.uniform(0.15, 0.65)
 	return rng.uniform(0.4, 0.9)
+}
+
+// Book's Inclined Orbit procedure (p. 51): "Determine inclination by
+// rolling 1D+2 x 10 degrees and possibly adding d10 for additional
+// variance." Retrograde reuses this and adds 90 degrees (p. 51) -- see
+// callers.
+function rollAnomalousInclinationDeg({
+	rng,
+}: RollAnomalousInclinationDegInput): number {
+	return (rng.randint(1, 6) + 2) * 10 + rng.randint(0, 9)
 }
 
 // Ported from galaxy-gen's MATH.tilt.compute (non-homeworld branch).
@@ -294,8 +329,10 @@ function rollSiderealDayHours({
 
 export const ROLLS = {
 	rollOrbitGroup,
+	rollTerrestrialSubgroup,
 	rollSizeClass,
 	rollDiameterKmFromSizeClass,
+	rollAnomalousInclinationDeg,
 	pickDensityEarthRelative,
 	rollEccentricity,
 	rollAxialTiltDeg,

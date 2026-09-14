@@ -3,6 +3,12 @@ export interface TraceTooltipEntry {
 	description: string
 }
 
+export interface TraceTooltipFooterEntry {
+	colorValue: number
+	description: string
+	valueLabel: string
+}
+
 interface TraceTooltipContentProps {
 	title: string
 	trace: TraceTooltipEntry[]
@@ -12,6 +18,9 @@ interface TraceTooltipContentProps {
 	formatValue?: (value: number) => string
 	finalLabel: string
 	finalValue: number
+	/** [JUSTIFICATION] Only temperature ranges need high/low values between
+	 * their factor breakdown and final delta; other trace tooltips do not. */
+	footerEntries?: TraceTooltipFooterEntry[]
 	emptyMessage?: string
 	/** "signed" (default): positive is good (green), negative is bad (red) --
 	 * for game modifiers like tidal-lock DM. "temperature": positive is hot
@@ -49,6 +58,7 @@ export function TraceTooltipContent({
 	formatValue = defaultFormatValue,
 	finalLabel,
 	finalValue,
+	footerEntries = [],
 	emptyMessage = "No adjustments applied",
 	colorScheme = "signed",
 }: TraceTooltipContentProps) {
@@ -76,6 +86,22 @@ export function TraceTooltipContent({
 			) : (
 				<div className="text-[10px] text-slate-400">{emptyMessage}</div>
 			)}
+			{footerEntries.length > 0 ? (
+				<div className="space-y-1 border-t border-slate-100 pt-1.5">
+					{footerEntries.map((entry) => (
+						<div
+							key={entry.description}
+							className="flex items-center gap-1.5 text-[10px] text-slate-600"
+						>
+							<span
+								className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(entry.colorValue, colorScheme)}`}
+							/>
+							<span className="flex-1">{entry.description}</span>
+							<span className="font-mono">{entry.valueLabel}</span>
+						</div>
+					))}
+				</div>
+			) : null}
 			<div className="flex items-center gap-1.5 border-t border-slate-100 pt-1.5 text-[10px] font-medium text-slate-700">
 				<span
 					className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(finalValue, colorScheme)}`}

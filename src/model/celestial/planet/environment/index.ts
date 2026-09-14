@@ -339,6 +339,24 @@ function buildClassificationEnvironment(params: {
 			spectralClass: params.spectralClass,
 			isPrimaryWorld: params.isPrimaryWorld,
 		})
+	// Computed up front (density doesn't depend on anything derived below)
+	// so the rare Carbon relabel -- see DENSITY.buildProfile's own doc -- can
+	// also steer the atmosphere roll further down: a carbon-rich world has
+	// too little free oxygen for a breathable atmosphere. A main world (either
+	// the system's designated primary world or the galaxy capital's homeworld
+	// slot) is never eligible -- omitting hostSpectralClass collapses to the
+	// same "never carbon" case as any other non-eligible host.
+	const density = DENSITY.buildProfile({
+		rng: params.rng,
+		massKg: params.massKg,
+		diameterKm: params.diameterKm,
+		classification: params.classification,
+		hostSpectralClass:
+			params.isPrimaryWorld || params.homeworld === true
+				? undefined
+				: params.spectralClass,
+	})
+	const isCarbonWorld = density?.description === "Carbon"
 	const youth =
 		params.group !== "asteroid belt" &&
 		params.group !== "jovian" &&
@@ -383,10 +401,10 @@ function buildClassificationEnvironment(params: {
 			: rolledAtmosphereCode
 	// A capital homeworld always gets the plain standard breathable code (6),
 	// overriding whatever its tectonic assignment rolled (2-9, some tainted).
-	const finalAtmosphereCode = params.homeworld === true ? 6 : atmosphereCode
-	const atmosphere = ATMOSPHERE.codeToProfile({
+	const homeworldAtmosphereCode = params.homeworld === true ? 6 : atmosphereCode
+	const rolledAtmosphere = ATMOSPHERE.codeToProfile({
 		rng: params.rng,
-		atmosphereCode: finalAtmosphereCode,
+		atmosphereCode: homeworldAtmosphereCode,
 		params: {
 			chemistry: rolledEnvironment.chemistry ?? rolledEnvironment.composition,
 			sizeClass: params.sizeClass,
@@ -398,6 +416,33 @@ function buildClassificationEnvironment(params: {
 			starAgeGyr: params.starAgeGyr,
 		},
 	})
+	// A carbon-rich world (see isCarbonWorld above) has too little free
+	// oxygen for a breathable atmosphere -- never overrides the guaranteed
+	// habitable homeworld slot. Checked against the resolved profile rather
+	// than the pre-roll code: code 13 ("Dense High") can itself resolve to a
+	// breathable composition (final code 13/14/15), not just codes 2-9.
+	// Redirected to Exotic (10) rather than left breathable, with the
+	// chemistry hint switched to methane/hydrocarbon-flavored.
+	const forcedNonBreathable =
+		isCarbonWorld &&
+		params.homeworld !== true &&
+		rolledAtmosphere?.breathable === true
+	const atmosphere = forcedNonBreathable
+		? ATMOSPHERE.codeToProfile({
+				rng: params.rng,
+				atmosphereCode: 10,
+				params: {
+					chemistry: "methane",
+					sizeClass: params.sizeClass,
+					deviation: params.deviation,
+					hydrosphereCode,
+					gravityG,
+					classification: params.classification,
+					isPrimaryWorld: params.isPrimaryWorld,
+					starAgeGyr: params.starAgeGyr,
+				},
+			})
+		: rolledAtmosphere
 	const greenhouseFactor =
 		params.group === "jovian"
 			? GREENHOUSE_ESTIMATE.rollGasGiantGreenhouseFactor(params.rng)
@@ -417,11 +462,7 @@ function buildClassificationEnvironment(params: {
 		hydrosphereCode,
 	})
 	return {
-		density: DENSITY.buildProfile({
-			massKg: params.massKg,
-			diameterKm: params.diameterKm,
-			classification: params.classification,
-		}),
+		density,
 		landCoverage: 1 - HYDROSPHERE.waterFraction(hydrosphere),
 		hydrosphereCode,
 		hydrosphere,

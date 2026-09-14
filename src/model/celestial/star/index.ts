@@ -1,3 +1,4 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	BlackbodyFractionInput,
 	InterpolateSeriesInput,
@@ -12,6 +13,8 @@ import type {
 	RollStarAgeInput,
 	SpectralClass,
 	StandardLuminosityClass,
+	StarPrimordialInput,
+	StarProtoInput,
 	StarSpectralInput,
 } from "@/model/celestial/star/types"
 import {
@@ -493,6 +496,38 @@ function isHotterThanParent(
 	return candidate.subtype < parent.subtype
 }
 
+// Same mass formula rollStarAttributes uses for an ordinary (non-exotic)
+// star -- rollUnconstrainedStarType only ever returns a regular O-M class,
+// never D/NS/BH/brown dwarf, so none of rollStarAttributes' other mass
+// branches apply here. See resolveCompanionType's Random-vs-parent mass
+// check for why this needs to be the real mass, not a luminosity-class
+// ordering guess.
+function estimateMainSequenceMassSol({
+	spectralClass,
+	luminosityClass,
+	subtype,
+}: {
+	spectralClass: MainSequenceClass
+	luminosityClass: LuminosityClass
+	subtype: number
+}): number {
+	const physicalLuminosityClass = toPhysicalLuminosityClass(
+		spectralClass,
+		luminosityClass,
+	)
+	const range = FULL_SPECTRAL_RANGES[spectralClass]
+	const domainLength =
+		physicalLuminosityClass === "V"
+			? STAR_DOMAIN_LENGTH
+			: COMPACT_STAR_DOMAIN_LENGTH
+	const idx = mapSubtypeToSpectralPosition(subtype, range)
+	return fullInterpolateSeries(
+		idx,
+		starMassByLuminosityClass[physicalLuminosityClass],
+		domainLength,
+	)
+}
+
 const isPostStellar = (spectralClass: SpectralClass): boolean =>
 	spectralClass === "D" || spectralClass === "NS" || spectralClass === "BH"
 
@@ -517,11 +552,17 @@ const POST_STELLAR_MIN_MASS_SOL: Record<"D" | "NS" | "BH", number> = {
  * The Non-Primary Star Determination table's 2D+DM roll: which of
  * Random/Lesser/Sibling/Twin/Other applies, keyed by column (Secondary for
  * this codebase's inner/outer/distant StarRoles, Companion for epistellar,
- * Post-Stellar whenever the parent is D/NS/BH regardless of role). "Other"
- * on the Secondary/Companion columns rerolls once on the other of those two
- * columns (the book: "roll again on the other column"); "Other" on the
- * Post-Stellar column has no swap partner and resolves directly via the
- * table's own Other column (D* / D / BD), read here off the same row.
+ * Post-Stellar whenever the parent is D/NS/BH regardless of role). The
+ * printed table has a fourth column, literally named "Other" (D-star, D, or
+ * BD across all eleven rows, see NON_PRIMARY_OTHER_COLUMN) -- "Other: Roll
+ * again on the other column" (p. 30) means a fresh 2D+DM roll resolved
+ * against THAT column, not a swap between Secondary and Companion. [Bug fix]
+ * this used to swap Secondary<->Companion instead, which could only ever
+ * land back on rows 0-1 (the only rows either of those columns can produce
+ * "other" from), so the Other column's own BD entries at rows 6-10 were
+ * unreachable dead code -- no companion star could ever roll a fresh L/T/Y
+ * brown dwarf this way. A single extra roll always resolves it now, since
+ * the Other column has no "other" outcome of its own to chain into.
  */
 const NON_PRIMARY_TABLE: Record<
 	"secondary" | "companion" | "post-stellar",
@@ -592,21 +633,14 @@ function rollNonPrimaryMethod(
 	rng: SharedRng,
 	column: NonPrimaryStarColumn | "post-stellar",
 	dm: number,
-	swapped = false,
 ): NonPrimaryStarMethod {
 	const roll = DICE.roll2d6(rng) + dm
 	const rowIndex = nonPrimaryRowIndex(roll)
 	const result = NON_PRIMARY_TABLE[column][rowIndex]!
 	if (result !== "other") return result
-	if (column === "post-stellar" || swapped) {
-		return { exotic: NON_PRIMARY_OTHER_COLUMN[rowIndex]! }
-	}
-	return rollNonPrimaryMethod(
-		rng,
-		column === "secondary" ? "companion" : "secondary",
-		dm,
-		true,
-	)
+	const otherRoll = DICE.roll2d6(rng) + dm
+	const otherRowIndex = nonPrimaryRowIndex(otherRoll)
+	return { exotic: NON_PRIMARY_OTHER_COLUMN[otherRowIndex]! }
 }
 
 interface ResolvedCompanionType {
@@ -624,10 +658,14 @@ interface ResolvedCompanionType {
 
 /** Lesser: same class, one type cooler, subtype rerolled. The lesser of an
  * M-type is another M-type (rerolled subtype); if that reroll comes out
- * hotter than the parent's own subtype, it demotes to a brown dwarf
- * instead. Class IV (subgiant) lesser results that would be too cool for
- * Class IV fall back to an ordinary Class V lesser. Post-stellar chain:
- * BH -> NS -> WD -> BD. */
+ * COOLER than the parent's own subtype (a higher subtype number -- see
+ * applySibling's own G8+3->K1 worked example for why higher subtype means
+ * cooler, not hotter), it demotes to a brown dwarf instead -- book's own
+ * literal condition (p. 29), [Bug fix] previously inverted (checked hotter,
+ * not cooler), which let this "Lesser" come out hotter and more massive
+ * than the parent it was supposed to be lesser than. Class IV (subgiant)
+ * lesser results that would be too cool for Class IV fall back to an
+ * ordinary Class V lesser. Post-stellar chain: BH -> NS -> WD -> BD. */
 function applyLesser(
 	rng: SharedRng,
 	parent: ParentStarLike,
@@ -648,7 +686,7 @@ function applyLesser(
 	}
 	if (parent.spectralClass === "D") {
 		return {
-			spectralClass: rng.choice(["L", "T"] as const),
+			spectralClass: rng.choice(["L", "T", "Y"] as const),
 			luminosityClass: "V",
 			subtype: rng.randint(0, 9),
 		}
@@ -659,13 +697,21 @@ function applyLesser(
 	const coolerIndex = Math.min(parentIndex + 1, mainSequenceClasses.length - 1)
 	const spectralClass = mainSequenceClasses[coolerIndex]!
 	const subtype = rng.randint(0, 9)
+	// Book (p. 29): "The lesser of a M-type star is another M-type star, but
+	// if this second star has a HIGHER subtype than its parent [i.e. cooler,
+	// since subtype increases toward the next-cooler class -- see applySibling's
+	// own G8+3->K1 worked example], it is a brown dwarf instead." [Bug fix]
+	// this used to check `subtype < parent.subtype` (hotter, not cooler) --
+	// inverted from the book's literal condition, which let a "Lesser" of an
+	// M-class parent come out *hotter and more massive* than the parent it
+	// was supposed to be lesser than.
 	if (
 		spectralClass === "M" &&
 		parent.spectralClass === "M" &&
-		subtype < parent.subtype
+		subtype > parent.subtype
 	) {
 		return {
-			spectralClass: rng.choice(["L", "T"] as const),
+			spectralClass: rng.choice(["L", "T", "Y"] as const),
 			luminosityClass: "V",
 			subtype: rng.randint(0, 9),
 		}
@@ -752,7 +798,7 @@ function applyTwin(
 /** Brown dwarfs "may only have additional 'stars' of the same type; all
  * brown dwarfs use the sibling result" -- forces Sibling ahead of any table
  * roll, skipping the 2D entirely. */
-function resolveCompanionType(
+function resolveCompanionTypeOnce(
 	rng: SharedRng,
 	parent: ParentStarLike,
 	column: NonPrimaryStarColumn,
@@ -797,10 +843,82 @@ function resolveCompanionType(
 	// hotness ladder, so the demotion check is skipped for them entirely --
 	// their Random result stands as an ordinary, independently-typed star.
 	const rolled = rollUnconstrainedStarType(rng, false)
-	if (!postStellarParent && isHotterThanParent(rolled, parent)) {
+	// [DEVIATION] The book's own literal check here is "hotter type/subtype"
+	// only -- but that compares temperature, not mass, and rollUnconstrained
+	// StarType's own giant sub-roll (~8% of Random results) can independently
+	// produce a giant/subgiant luminosity class regardless of spectral
+	// class/subtype. A same-or-cooler-spectral-type giant can still be
+	// dramatically MORE massive than a main-sequence parent (e.g. an M-type
+	// giant outmasses a K-type dwarf), which silently violates the book's own
+	// stated "key premise" for this whole table: "the primary star is the
+	// most massive... the companion of any [star] is assumed to be less
+	// massive than its parent" (p. 29). Checked directly against mass, not
+	// reconstructed from luminosity-class ordering, so it's exact regardless
+	// of which spectral/luminosity combination produced the excess.
+	const isMoreMassiveThanParent =
+		!postStellarParent && estimateMainSequenceMassSol(rolled) > parent.massSol
+	if (
+		!postStellarParent &&
+		(isHotterThanParent(rolled, parent) || isMoreMassiveThanParent)
+	) {
 		return applyLesser(rng, parent)
 	}
 	return rolled
+}
+
+const MAX_MASS_SAFETY_RETRIES = 4
+
+/** Book's own "key premise" for this whole table (p. 29): "the primary
+ * star is the most massive... the companion of any [Close/Near/Far/
+ * companion star] is assumed to be less massive than its parent." The
+ * individual method formulas above (Random's hotter-only check; Lesser/
+ * Sibling's M-class boundary handling) don't fully guarantee this on their
+ * own even once each is itself book-correct -- e.g. a "Lesser" of an
+ * M-class parent that rerolls hotter (not cooler) than the parent has
+ * nowhere else in the book's own text to go, so it stays hotter and more
+ * massive. This is the final backstop: retry the whole resolution a
+ * bounded number of times if it still comes out more massive than the
+ * parent, falling back to Lesser (which does at least normally step to a
+ * cooler class) each retry. Skipped for a post-stellar parent or an exotic
+ * (L/T/Y/D/NS/BH) result -- comparing mass across those regimes isn't what
+ * this premise is about, and the book's own System Age Adjustment section
+ * explicitly anticipates a post-stellar companion needing more mass than a
+ * same-system primary would otherwise imply. */
+function resolveCompanionType(
+	rng: SharedRng,
+	parent: ParentStarLike,
+	column: NonPrimaryStarColumn,
+): ResolvedCompanionType {
+	const postStellarParent = isPostStellar(parent.spectralClass)
+	let result = resolveCompanionTypeOnce(rng, parent, column)
+	if (postStellarParent) return result
+	for (let attempt = 0; attempt < MAX_MASS_SAFETY_RETRIES; attempt++) {
+		const spectralClass = result.spectralClass
+		if (!(mainSequenceClasses as readonly string[]).includes(spectralClass)) {
+			return result
+		}
+		const massSol =
+			result.massSolOverride ??
+			estimateMainSequenceMassSol({
+				spectralClass: spectralClass as MainSequenceClass,
+				luminosityClass: result.luminosityClass,
+				subtype: result.subtype,
+			}) * (result.massJitterFactor ?? 1)
+		if (massSol <= parent.massSol) return result
+		result = applyLesser(rng, parent)
+	}
+	// Every retry still came out too massive -- most likely a parent already
+	// sitting near the very bottom of the M-class mass range, where only a
+	// couple of the ten possible fresh Lesser subtypes are actually light
+	// enough. Force a brown dwarf rather than keep gambling on another
+	// uniform reroll: it's guaranteed lighter than any M-class star, and the
+	// book's own M-class Lesser rule already treats "cooler than M" as
+	// exactly this outcome.
+	return {
+		spectralClass: rng.choice(["L", "T", "Y"] as const),
+		luminosityClass: "V",
+		subtype: rng.randint(0, 9),
+	}
 }
 
 /** Independent post-death age progression for a companion that itself
@@ -876,12 +994,19 @@ export function rollStarAttributes(
 		if (rng.random() > 0.95 && !homeworld) {
 			spectralClass =
 				rng.weightedChoice([
-					// Brown dwarf tail: was L/T-only, missing Y entirely -- a
-					// standalone/primary star could never roll as a Y brown
-					// dwarf. Widened to match the companion Other-column exotic
-					// branch (resolveCompanionType above), which already draws
-					// evenly from all three.
-					{ v: rng.choice(["L", "T"] as const), w: 0.1 },
+					// [Bug fix] this used to be a single `{ v: rng.choice(["L",
+					// "T"]), w: 0.1 }` entry -- rng.choice was evaluated once at
+					// array-construction time, so its result was fixed before
+					// weightedChoice ever ran, and "Y" was never actually a
+					// reachable candidate despite the (stale) comment here
+					// claiming it had been added. Split into three real
+					// candidates, each getting an equal share of the same 0.1
+					// total weight the brown-dwarf tail always had, matching the
+					// companion Other-column exotic branch (resolveCompanionType
+					// above), which already draws evenly from all three.
+					{ v: "L" as const, w: 0.1 / 3 },
+					{ v: "T" as const, w: 0.1 / 3 },
+					{ v: "Y" as const, w: 0.1 / 3 },
 					{ v: "D" as const, w: 0.5 },
 					{ v: "NS" as const, w: 0.1 },
 					{ v: "BH" as const, w: 0.1 },
@@ -944,15 +1069,27 @@ export function rollStarAttributes(
 		? blackHoleRoll.luminositySol(rng)
 		: diameterSol ** 2 * (temperatureK / 5772) ** 4
 
+	// A black hole's own accretion disk (diameterSol, in solar diameters) can
+	// physically extend well past the flat 0.001 floor white dwarfs/neutron
+	// stars use -- e.g. a near-minimum-mass hole with a large diameter roll
+	// can reach ~0.05 AU, comfortably inside where a planet could otherwise
+	// land. MAO takes whichever is larger so a planet orbit is never placed
+	// inside the visible disk itself.
+	const blackHoleDiskRadiusAU =
+		(diameterSol * ORBIT_BODY.solarDiameterKm * 1000) /
+		ORBIT_BODY.astronomicalUnitM /
+		2
 	const mao = brownDwarf
 		? 0.005
-		: whiteDwarf || neutronStar || blackHole
+		: whiteDwarf || neutronStar
 			? 0.001
-			: fullInterpolateSeries(
-					idx,
-					starMAOByLuminosityClass[physicalLuminosityClass],
-					COMPACT_STAR_DOMAIN_LENGTH,
-				)
+			: blackHole
+				? Math.max(blackHoleDiskRadiusAU, 0.001)
+				: fullInterpolateSeries(
+						idx,
+						starMAOByLuminosityClass[physicalLuminosityClass],
+						COMPACT_STAR_DOMAIN_LENGTH,
+					)
 
 	const deadStar = whiteDwarf || neutronStar || blackHole
 	let ageGyr = parent?.ageGyr ?? 0
@@ -1157,6 +1294,13 @@ export const STAR = {
 	mainSequenceClasses,
 	isGiant,
 	isBrownDwarf,
+	isPostStellar,
+	isProto({ ageGyr, massSol }: StarProtoInput): boolean {
+		return ageGyr < 0.01 && massSol < 8
+	},
+	isPrimordial({ ageGyr }: StarPrimordialInput): boolean {
+		return ageGyr < 0.1
+	},
 	isPulsar,
 	isMagnetar,
 	getNeutronStarColor,

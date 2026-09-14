@@ -9,10 +9,12 @@ import type {
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
 import { BIOSPHERE } from "@/model/celestial/planet/biosphere"
+import { CLOUD_COVER } from "@/model/celestial/planet/cloud-cover"
 import { ENVIRONMENT } from "@/model/celestial/planet/environment"
 import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import { HABITABILITY } from "@/model/celestial/planet/habitability"
+import { MAGNETIC_FIELD } from "@/model/celestial/planet/magnetic-field"
 import { HEATING } from "@/model/celestial/planet/seismology/heating"
 import { RECLASSIFY } from "@/model/celestial/planet/seismology/reclassify"
 import type {
@@ -156,6 +158,8 @@ function withBiosphere(params: {
 	starAgeGyr: number
 	atmosphere?: AtmosphereProfile | null
 	temperatureMeanK: number
+	temperatureHighK: number
+	temperatureLowK: number
 	hydrosphereCode?: number
 	classification: OrbitClassification
 	impactZone?: boolean
@@ -172,6 +176,8 @@ function withBiosphere(params: {
 		starAgeGyr: params.starAgeGyr,
 		atmosphere: params.atmosphere,
 		temperatureMeanK: params.temperatureMeanK,
+		temperatureHighK: params.temperatureHighK,
+		temperatureLowK: params.temperatureLowK,
 		hydrosphereCode: params.hydrosphereCode,
 		classification: params.classification,
 		impactZone: params.impactZone,
@@ -179,11 +185,6 @@ function withBiosphere(params: {
 	})
 }
 
-// Ported from galaxy-gen's DESIRABILITY.habitability -- run alongside
-// withBiosphere, right after withTemperatureEstimate since it needs
-// temperatureEstimate.mean/high/low plus gravityG/hydrosphereCode/atmosphere/
-// seismology. Shared by the body and moon seismology passes, and by
-// applySystemSeismology's body reclassify branch.
 function withHabitability(params: {
 	sizeClass: number
 	atmosphere?: AtmosphereProfile | null
@@ -260,6 +261,8 @@ function applyBodySeismology(params: {
 		starAgeGyr,
 		atmosphere: body.atmosphere,
 		temperatureMeanK: temperatureEstimate.mean,
+		temperatureHighK: temperatureEstimate.high,
+		temperatureLowK: temperatureEstimate.low,
 		hydrosphereCode,
 		classification: body.classification,
 		impactZone: body.impactZone,
@@ -279,6 +282,19 @@ function applyBodySeismology(params: {
 		seismologyTotal: totalHeating,
 		surfaceTidesHeating,
 	})
+	const magneticField = MAGNETIC_FIELD.compute({
+		densityDescription: body.density?.description,
+		densityEarthRelative,
+		massKg: body.massKg,
+		siderealDayHours: body.siderealDayHours,
+		starAgeGyr,
+	})
+	const cloudCover = CLOUD_COVER.compute({
+		waterFraction: 1 - body.landCoverage,
+		temperatureMeanK: temperatureEstimate.mean,
+		atmosphereType: (convertedAtmosphere ?? body.atmosphere)?.type,
+		pressureBar: (convertedAtmosphere ?? body.atmosphere)?.pressureBar,
+	})
 	const generatedTextures = withGeneratedTextures({
 		classification: body.classification,
 		hydrosphereCode,
@@ -297,6 +313,8 @@ function applyBodySeismology(params: {
 		temperatureEstimate,
 		biosphere,
 		habitability,
+		magneticField,
+		cloudCover,
 		texturePath: generatedTextures.texturePath,
 		cloudsTexturePath: generatedTextures.cloudsTexturePath,
 	}
@@ -396,6 +414,8 @@ function applyMoonSeismology(params: {
 		starAgeGyr,
 		atmosphere: resolvedAtmosphere,
 		temperatureMeanK: temperatureEstimate.mean,
+		temperatureHighK: temperatureEstimate.high,
+		temperatureLowK: temperatureEstimate.low,
 		hydrosphereCode,
 		classification: nextClassification,
 		impactZone: moon.impactZone,
@@ -419,6 +439,21 @@ function applyMoonSeismology(params: {
 		surfaceTidesHeating,
 	})
 
+	const resolvedDensity = rerolled?.density ?? moon.density
+	const magneticField = MAGNETIC_FIELD.compute({
+		densityDescription: resolvedDensity?.description,
+		densityEarthRelative: resolvedDensity?.earthRelative,
+		massKg: moon.massKg,
+		siderealDayHours: moon.siderealDayHours,
+		starAgeGyr,
+	})
+	const resolvedLandCoverage = rerolled?.landCoverage ?? moon.landCoverage
+	const cloudCover = CLOUD_COVER.compute({
+		waterFraction: 1 - resolvedLandCoverage,
+		temperatureMeanK: temperatureEstimate.mean,
+		atmosphereType: (convertedAtmosphere ?? resolvedAtmosphere)?.type,
+		pressureBar: (convertedAtmosphere ?? resolvedAtmosphere)?.pressureBar,
+	})
 	// withGeneratedTextures itself only ever preserves an authored Sol path
 	// (see its own doc) -- a previously generated one is always re-derived
 	// fresh here regardless of shouldReclassify, so there's no need to gate
@@ -435,13 +470,13 @@ function applyMoonSeismology(params: {
 		...moon,
 		group: nextGroup,
 		classification: nextClassification,
-		density: rerolled?.density ?? moon.density,
+		density: resolvedDensity,
 		subtype: rerolled?.subtype ?? moon.subtype,
 		composition: rerolled?.composition ?? moon.composition,
 		chemistry: rerolled?.chemistry ?? moon.chemistry,
 		hydrosphereCode,
 		hydrosphere: hydrosphere ?? rerolled?.hydrosphere ?? moon.hydrosphere,
-		landCoverage: rerolled?.landCoverage ?? moon.landCoverage,
+		landCoverage: resolvedLandCoverage,
 		atmosphere: convertedAtmosphere ?? resolvedAtmosphere,
 		greenhouseFactor: resolvedGreenhouseFactor,
 		seismology: {
@@ -454,6 +489,8 @@ function applyMoonSeismology(params: {
 		temperatureEstimate,
 		biosphere,
 		habitability,
+		magneticField,
+		cloudCover,
 		texturePath: generatedTextures.texturePath,
 		cloudsTexturePath: generatedTextures.cloudsTexturePath,
 	}
@@ -559,6 +596,8 @@ function applySystemSeismology(params: {
 			starAgeGyr: params.starAgeGyr,
 			atmosphere: rerolled.atmosphere,
 			temperatureMeanK: temperatureEstimate.mean,
+			temperatureHighK: temperatureEstimate.high,
+			temperatureLowK: temperatureEstimate.low,
 			hydrosphereCode,
 			classification: nextClassification,
 			impactZone: seismologyBody.impactZone,
@@ -577,6 +616,19 @@ function applySystemSeismology(params: {
 			tideLockedToStar: seismologyBody.tideLock?.type === "solar",
 			seismologyTotal: seismologyBody.seismology?.totalHeating ?? 0,
 			surfaceTidesHeating: seismologyBody.seismology?.surfaceTidesHeating ?? 0,
+		})
+		const magneticField = MAGNETIC_FIELD.compute({
+			densityDescription: rerolled.density?.description,
+			densityEarthRelative: rerolled.density?.earthRelative,
+			massKg: seismologyBody.massKg,
+			siderealDayHours: seismologyBody.siderealDayHours,
+			starAgeGyr: params.starAgeGyr,
+		})
+		const cloudCover = CLOUD_COVER.compute({
+			waterFraction: 1 - rerolled.landCoverage,
+			temperatureMeanK: temperatureEstimate.mean,
+			atmosphereType: (convertedAtmosphere ?? rerolled.atmosphere)?.type,
+			pressureBar: (convertedAtmosphere ?? rerolled.atmosphere)?.pressureBar,
 		})
 		// No existingTexturePath/existingCloudsTexturePath here: this branch
 		// only runs when the classification just changed (see the
@@ -607,6 +659,8 @@ function applySystemSeismology(params: {
 			temperatureEstimate,
 			biosphere,
 			habitability,
+			magneticField,
+			cloudCover,
 			texturePath: generatedTextures.texturePath,
 			cloudsTexturePath: generatedTextures.cloudsTexturePath,
 		}

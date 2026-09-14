@@ -13,9 +13,11 @@ const MARGIN = 6
  * (overflow-y-auto), which clips any absolute content that pokes past its
  * own box on either edge. A portal escapes that clipping entirely rather
  * than trying to guess a safe direction, and it never needs its own scroll:
- * position is computed from the trigger's actual bounding rect and flips
- * up/down (and clamps horizontally) to whichever side actually has room in
- * the current viewport. */
+ * position is computed from the trigger's actual bounding rect, preferring
+ * above the trigger (matching every other stat-grid tooltip, which opens
+ * upward) and falling back below only when there is no room above, with
+ * horizontal clamping to whichever side actually has room in the current
+ * viewport. */
 export function FloatingTooltip({ content, children }: FloatingTooltipProps) {
 	const [visible, setVisible] = useState(false)
 	const triggerRef = useRef<HTMLSpanElement>(null)
@@ -33,8 +35,7 @@ export function FloatingTooltip({ content, children }: FloatingTooltipProps) {
 		const triggerRect = trigger.getBoundingClientRect()
 		const panelRect = panel.getBoundingClientRect()
 
-		const spaceBelow = window.innerHeight - triggerRect.bottom
-		const openUp = spaceBelow < panelRect.height + MARGIN
+		const openUp = triggerRect.top >= panelRect.height + MARGIN
 		const top = openUp
 			? triggerRect.top - panelRect.height - MARGIN
 			: triggerRect.bottom + MARGIN

@@ -1,6 +1,8 @@
 import type {
+	AUToOrbitNumberInput,
 	DensityFromMassAndDiameterInput,
 	MassFromDensityInput,
+	OrbitNumberToAUInput,
 	SizeClassToDiameterRangeInput,
 } from "@/model/celestial/orbit-body/types"
 import { DICE } from "@/model/shared/random/dice"
@@ -17,6 +19,15 @@ const solarDiameterKm = 1_391_400
 const solarMassKg = 1.989e30
 const astronomicalUnitM = 1.496e11
 const gravitationalConstantM3KgS2 = 6.674e-11
+const distanceByOrbitNumber = [
+	0, 0.4, 0.7, 1, 1.6, 2.8, 5.2, 10, 20, 40, 77, 154, 308, 615, 1230, 2500,
+	4900, 9800, 19500, 39500, 78700,
+]
+const differenceByOrbitNumber = [
+	0.4, 0.3, 0.3, 0.6, 1.2, 2.4, 4.8, 10, 20, 37, 77, 154, 307, 615, 1270, 2400,
+	4900, 9700, 20000, 39200,
+]
+const maxOrbitNumber = distanceByOrbitNumber.length - 1
 const ROCKY_SIZE_DIAMETER_BANDS_KM = [
 	[400, 800],
 	[1000, 2000],
@@ -37,6 +48,30 @@ const ROCKY_SIZE_DIAMETER_BANDS_KM = [
 ] as const
 
 export const ORBIT_BODY = {
+	orbitNumberToAU({ orbitNumber }: OrbitNumberToAUInput): number {
+		if (Number.isNaN(orbitNumber) || orbitNumber <= 0) return 0
+		if (orbitNumber >= maxOrbitNumber) {
+			return distanceByOrbitNumber[maxOrbitNumber]!
+		}
+		const wholeOrbitNumber = Math.floor(orbitNumber)
+		const distance = distanceByOrbitNumber[wholeOrbitNumber]!
+		const difference = differenceByOrbitNumber[wholeOrbitNumber]!
+		return distance + difference * (orbitNumber - wholeOrbitNumber)
+	},
+
+	auToOrbitNumber({ au }: AUToOrbitNumberInput): number {
+		if (Number.isNaN(au) || au <= 0) return 0
+		const maxDistance = distanceByOrbitNumber[maxOrbitNumber]!
+		if (au >= maxDistance) return maxOrbitNumber
+		for (let orbitNumber = 0; orbitNumber < maxOrbitNumber; orbitNumber++) {
+			const distance = distanceByOrbitNumber[orbitNumber]!
+			const difference = differenceByOrbitNumber[orbitNumber]!
+			const nextDistance = distance + difference
+			if (au <= nextDistance) return orbitNumber + (au - distance) / difference
+		}
+		return maxOrbitNumber
+	},
+
 	sizeClassToDiameterRangeKm({
 		sizeClass,
 	}: SizeClassToDiameterRangeInput): [number, number] {

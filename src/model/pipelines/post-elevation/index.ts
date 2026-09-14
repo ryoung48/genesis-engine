@@ -772,6 +772,15 @@ function runPostElevationPipeline(
 			),
 			orbitalDistanceAU: params.orbitalDistanceAU,
 			starMassKg,
+			// This moon exists only to estimate a tidal schedule -- its own
+			// composition/density doesn't reach the user, so a Sol-like default
+			// is fine rather than threading real star attributes through this
+			// terrain pipeline.
+			luminositySol: STAR.getStarLuminositySolExtended({
+				cls,
+				subtype: params.starSubtype ?? 5,
+			}),
+			starAgeGyr: 4.6,
 		}),
 		params,
 	})

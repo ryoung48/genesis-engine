@@ -7,6 +7,7 @@ import type {
 	HostStarAttributes,
 	MainSequenceClass,
 } from "@/model/celestial/star/types"
+import type { OrbitSlot } from "@/model/celestial/system/generation/orbit-placement/types"
 
 /** Inputs used to hydrate the authored Sol main world or a generated world. */
 export interface HomeWorldParams {
@@ -88,6 +89,24 @@ export interface GenerateSystemBodiesParams {
 	 * stable orbits, so such a star unconditionally gets none -- see the
 	 * epistellarCompanion branch below. */
 	isEpistellarCompanion?: boolean
+	/** Hill-sphere stability ceiling (AU) beyond which this star's own gravity
+	 * no longer dominates over its closest stellar neighbor's -- see the book's
+	 * Available Orbits "Alternate Multi-Star Orbit Determination" (pp. 40-41)
+	 * and GALAXY_SYSTEMS.computeMaxOrbitalDistanceAU, which derives it from the
+	 * real star tree. [JUSTIFICATION] Only a multi-star caller (GALAXY_SYSTEMS)
+	 * has other stars to derive this from; every other caller is a single-star
+	 * system with no ceiling to apply. */
+	maxOrbitalDistanceAU?: number
+	/** This star's own direct-child companion stars' separation bands (AU) --
+	 * used for the book's Significant Moon Quantity DM ("planet is an orbital
+	 * slot adjacent to a companion" / "adjacent to a Close or Near star
+	 * unavailability range," p. 54). [JUSTIFICATION] Only a multi-star caller
+	 * (GALAXY_SYSTEMS) has companion stars to derive this from; every other
+	 * caller has none. */
+	companionExclusionZonesAU?: { minAU: number; maxAU: number }[]
+	/** [JUSTIFICATION] The standalone and authored-system callers have no
+	 * Stage 2-9 allocation yet; galaxy generation supplies the completed slots. */
+	orbitSlots?: OrbitSlot[]
 	/** Overrides the traditional G2V Sol-equivalent star every generated
 	 * system otherwise gets -- omit for that default. */
 	spectralClass?: MainSequenceClass

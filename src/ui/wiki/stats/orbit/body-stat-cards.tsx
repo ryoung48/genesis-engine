@@ -8,26 +8,36 @@ import type {
 } from "@/model/celestial/orbit-body/types"
 import type { BiosphereProfile } from "@/model/celestial/planet/biosphere/types"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
-import type { FinalizeTemperatureInput } from "@/model/celestial/planet/environment/temperature/types"
+import type {
+	FinalizeTemperatureInput,
+	TemperatureFinalizeResult,
+} from "@/model/celestial/planet/environment/temperature/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { SurfaceTidesBreakdown } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
 import { Slider } from "@/ui/components/primitives/Slider"
+import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
-import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
+import { formatTemperatureDelta } from "@/ui/genesis/shared/ui-format"
+import {
+	classificationSwatchColor,
+	orbitZoneSwatchColor,
+} from "@/ui/genesis/solar-system/overlay/constants"
 import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
 import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
 	atmosphereSwatchColor,
 	axialTiltSwatchColor,
 	biosphereSwatchColor,
+	compositionSwatchColor,
 	eccentricitySwatchColor,
 	habitabilitySwatchColor,
 	hydrosphereSwatchColor,
+	moonOrbitRangeSwatchColor,
 	rotationSwatchColor,
 	sizeSwatchColor,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
@@ -40,7 +50,8 @@ import {
 import {
 	buildPressureAtmosphereProfile,
 	describeTemperatureK,
-	formatAtmosphereLabel,
+	formatAtmosphereHazard,
+	formatAtmosphereLabelParts,
 	formatAtmosphereSuffix,
 	formatAvgTempValue,
 	formatBiosphereLabelParts,
@@ -110,7 +121,7 @@ function buildOrbitalShapeEditor(
 // it -- see that function's own doc for why). Returns undefined whenever any
 // input needed to run the trace isn't known yet (e.g. albedo/greenhouse not
 // yet rolled, or luminosity/AU not threaded through for this card).
-function buildTemperatureTraceTooltip(params: {
+function buildTemperatureTraceTooltips(params: {
 	luminositySol?: number
 	orbitalDistanceAU?: number
 	eccentricity: number
@@ -124,7 +135,16 @@ function buildTemperatureTraceTooltip(params: {
 	tideLock?: TideLock | null
 	seismologyTotal?: number
 	group?: string
-}): React.ReactNode | undefined {
+}):
+	| {
+			mean: React.ReactNode
+			delta: React.ReactNode
+			/** Live analytic estimate from the same current inputs -- lets callers
+			 * show headline numbers that stay in sync with tuned sliders instead of
+			 * the generation-time stored estimate. */
+			estimate: TemperatureFinalizeResult
+	  }
+	| undefined {
 	if (
 		params.luminositySol === undefined ||
 		params.orbitalDistanceAU === undefined
@@ -132,7 +152,7 @@ function buildTemperatureTraceTooltip(params: {
 		return undefined
 	if (params.albedo === undefined || params.greenhouseFactor === undefined)
 		return undefined
-	const { mean } = TEMPERATURE.trace({
+	const { mean, delta } = TEMPERATURE.trace({
 		luminositySol: params.luminositySol,
 		orbitalDistanceAU: params.orbitalDistanceAU,
 		eccentricity: params.eccentricity,
@@ -149,22 +169,66 @@ function buildTemperatureTraceTooltip(params: {
 	})
 	const finalMeanC =
 		mean.baseline + mean.trace.reduce((sum, entry) => sum + entry.value, 0)
-	return (
-		<TraceTooltipContent
-			title="Temperature Estimate"
-			trace={[
-				{
-					value: mean.baseline,
-					description: `baseline (${(mean.baseline + 273.15).toFixed(0)}K reference)`,
-				},
-				...mean.trace,
-			]}
-			formatValue={(value) => `${value > 0 ? "+" : ""}${value.toFixed(1)}°C`}
-			finalLabel="Estimated Mean"
-			finalValue={finalMeanC}
-			colorScheme="temperature"
-		/>
-	)
+	const finalDeltaC =
+		delta.baseline + delta.trace.reduce((sum, entry) => sum + entry.value, 0)
+	const estimate = TEMPERATURE.finalize({
+		luminositySol: params.luminositySol,
+		orbitalDistanceAU: params.orbitalDistanceAU,
+		eccentricity: params.eccentricity,
+		albedo: params.albedo,
+		greenhouseFactor: params.greenhouseFactor,
+		hydrosphereCode: params.hydrosphereCode ?? 0,
+		pressureBar: params.pressureBar ?? 0,
+		axialTiltDeg: params.axialTiltDeg,
+		orbitalPeriodDays: params.orbitalPeriodDays,
+		siderealDayHours: params.siderealDayHours,
+		tideLock: params.tideLock,
+		seismologyTotal: params.seismologyTotal ?? 0,
+		group: (params.group ?? "terrestrial") as FinalizeTemperatureInput["group"],
+	})
+	const highC = estimate.high - 273.15
+	const lowC = estimate.low - 273.15
+	return {
+		estimate,
+		mean: (
+			<TraceTooltipContent
+				title="Temperature Estimate"
+				trace={[
+					{
+						value: mean.baseline,
+						description: `baseline (${(mean.baseline + 273.15).toFixed(0)}K reference)`,
+					},
+					...mean.trace,
+				]}
+				formatValue={(value) => `${value > 0 ? "+" : ""}${value.toFixed(1)}°C`}
+				finalLabel="Estimated Mean"
+				finalValue={finalMeanC}
+				colorScheme="temperature"
+			/>
+		),
+		delta: (
+			<TraceTooltipContent
+				title="Temperature Δ Factors"
+				trace={delta.trace}
+				formatValue={(value) => `${value > 0 ? "+" : ""}${value.toFixed(1)}°C`}
+				finalLabel="Final Δ"
+				finalValue={finalDeltaC}
+				footerEntries={[
+					{
+						colorValue: highC,
+						description: "Estimated High",
+						valueLabel: `${highC.toFixed(1)}°C`,
+					},
+					{
+						colorValue: lowC,
+						description: "Estimated Low",
+						valueLabel: `${lowC.toFixed(1)}°C`,
+					},
+				]}
+				colorScheme="temperature"
+			/>
+		),
+	}
 }
 
 function buildGroupClassStat(
@@ -183,6 +247,33 @@ function buildGroupClassStat(
 			swatchColor: classificationSwatchColor(classification),
 		},
 	]
+}
+
+function buildAtmosphereStat(
+	atmosphere: AtmosphereProfile | null | undefined,
+): StatEntry {
+	const parts = formatAtmosphereLabelParts(atmosphere)
+	const hazard = formatAtmosphereHazard(atmosphere)
+	return {
+		label: "Atmosphere",
+		value: parts.base,
+		swatchColor: atmosphereSwatchColor(atmosphere?.code),
+		valueAction: parts.qualifier ? (
+			hazard ? (
+				<span>
+					{" ("}
+					<Tooltip content={hazard} position="top" align="end">
+						<span className="cursor-help border-b border-dotted border-slate-300">
+							{parts.qualifier}
+						</span>
+					</Tooltip>
+					{")"}
+				</span>
+			) : (
+				` (${parts.qualifier})`
+			)
+		) : undefined,
+	}
 }
 
 function buildBodyStats({
@@ -221,8 +312,8 @@ function buildBodyStats({
 	pressureBar,
 	readOnly,
 	estimateTempK,
+	estimateTempDeltaK,
 }: {
-	kind: "planet" | "moon"
 	group?: string
 	classification?: string
 	/** Shown as a " · Size N" suffix on the Radius row rather than its own
@@ -235,6 +326,10 @@ function buildBodyStats({
 		editor?: StatEntry["editor"]
 		/** Shown as a " · <suffix>" after the distance. */
 		rangeLabel?: string
+		/** Swatch tint for rangeLabel -- the body's orbit zone (epistellar/
+		 * inner/outer) or a moon's orbit band (inner/middle/outer/extreme).
+		 * Omitted (not just falsy) when rangeLabel itself is unset. */
+		rangeSwatchColor?: string
 	}
 	orbitalPeriodDays: number
 	/** null omits the Sidereal/Solar Day (+ tide-lock) block entirely --
@@ -302,11 +397,13 @@ function buildBodyStats({
 	 * on hover) instead of the greenhouse/albedo popover. Every other caller
 	 * leaves it unset. */
 	readOnly?: boolean
-	/** [JUSTIFICATION] The body's stored analytic temperature estimate
-	 * (temperatureEstimate.mean). Used as the Temperature row's value in
-	 * `readOnly` mode instead of the live EBM climate-preview mean; ignored
-	 * otherwise. */
+	/** [JUSTIFICATION] The body's generation-time analytic temperature
+	 * estimate (temperatureEstimate.mean). Fallback for the Temperature
+	 * row's value in `readOnly` mode when the live estimate can't run
+	 * (missing trace inputs); ignored otherwise. Generation still owns
+	 * this value for its own consumers -- the card only displays it. */
 	estimateTempK?: number
+	estimateTempDeltaK: number | null
 }): StatEntry[] {
 	const diameterRel = diameterKm / ORBIT_BODY.earthDiameterKm
 	const massRelEarth = massKg / ORBIT_BODY.earthMassKg
@@ -322,6 +419,7 @@ function buildBodyStats({
 			valuePrefix: semiMajorAxisLabel,
 			value: semiMajorAxis.rangeLabel ? ` · ${semiMajorAxis.rangeLabel}` : "",
 			editor: semiMajorAxis.editor,
+			swatchColor: semiMajorAxis.rangeSwatchColor,
 		},
 		...(dayLength
 			? []
@@ -374,6 +472,7 @@ function buildBodyStats({
 					{
 						label: "Density",
 						value: `${densityEarthRelative.toFixed(2)} rhoE${densityDescription ? ` · ${densityDescription}` : ""}`,
+						swatchColor: compositionSwatchColor(densityDescription),
 					},
 				]
 			: []),
@@ -396,13 +495,7 @@ function buildBodyStats({
 		...((readOnly ? (estimateTempK ?? avgTempK) : avgTempK) !== undefined
 			? [
 					(() => {
-						// A galaxy-opened body shows the analytic estimate
-						// (temperatureEstimate.mean, the value the trace tooltip
-						// breaks down), not the live EBM climate-preview mean.
-						const tempK = (
-							readOnly ? (estimateTempK ?? avgTempK) : avgTempK
-						) as number
-						const temperatureTrace = buildTemperatureTraceTooltip({
+						const temperatureTraces = buildTemperatureTraceTooltips({
 							luminositySol,
 							orbitalDistanceAU,
 							eccentricity: eccentricity.value,
@@ -417,24 +510,64 @@ function buildBodyStats({
 							seismologyTotal: seismology?.totalHeating,
 							group,
 						})
+						// A galaxy-opened body shows the analytic estimate (the
+						// value the trace tooltip breaks down), not the live EBM
+						// climate-preview mean. Derived live from the current
+						// inputs so tuned sliders move it -- identical to the
+						// stored temperatureEstimate for a static body, which
+						// generation still computes for its own consumers
+						// (biosphere, boil-off, habitability).
+						const liveEstimate = temperatureTraces?.estimate
+						const tempK = (
+							readOnly
+								? (liveEstimate?.mean ?? estimateTempK ?? avgTempK)
+								: avgTempK
+						) as number
 						const base = {
 							label: "Temperature",
 							valuePrefix: formatAvgTempValue(tempK, unitSystem),
 							value: ` · ${describeTemperatureK(tempK)}`,
 							swatchColor: temperatureSwatchColor(tempK),
 						}
+						// Live delta badge -- same live-vs-stored preference as
+						// tempK above, so the badge and the row value move
+						// together when greenhouse/albedo are tuned.
+						const shownDeltaK = liveEstimate?.deltaK ?? estimateTempDeltaK
+						const deltaBadge =
+							shownDeltaK !== null ? (
+								<>
+									<span> · </span>
+									<Tooltip
+										content={
+											temperatureTraces?.delta ??
+											"Temperature delta breakdown unavailable"
+										}
+										position="top"
+										align="end"
+									>
+										<span className="cursor-help border-b border-dotted border-slate-300">
+											Δ{" "}
+											{formatTemperatureDelta(shownDeltaK, unitSystem, 0, {
+												compact: true,
+											})}
+										</span>
+									</Tooltip>
+								</>
+							) : undefined
 						// A galaxy-opened body is fully read-only: show the estimate
 						// value with the trace tooltip on hover, no greenhouse/albedo
 						// popover.
 						if (readOnly) {
 							return {
 								...base,
-								valueHelp: temperatureTrace,
+								valueAction: deltaBadge,
+								valueHelp: temperatureTraces?.mean,
 								valueHelpTarget: "prefix" as const,
 							}
 						}
 						return {
 							...base,
+							valueAction: deltaBadge,
 							editor: {
 								label: "Temperature",
 								value: tempK,
@@ -484,7 +617,7 @@ function buildBodyStats({
 									/>
 								),
 							},
-							trailingHelp: temperatureTrace,
+							trailingHelp: temperatureTraces?.mean,
 						}
 					})(),
 				]
@@ -549,6 +682,7 @@ function buildMoonStats({
 	unitSystem,
 	readOnly,
 	estimateTempK,
+	estimateTempDeltaK,
 	atmosphere,
 	albedo,
 	greenhouseFactor,
@@ -589,6 +723,7 @@ function buildMoonStats({
 	/** [JUSTIFICATION] The moon's stored analytic temperature estimate -- used
 	 * as the Temperature row's value in `readOnly` mode (see buildBodyStats). */
 	estimateTempK?: number
+	estimateTempDeltaK: number | null
 	atmosphere?: AtmosphereProfile | null
 	albedo?: number
 	greenhouseFactor?: number
@@ -629,9 +764,9 @@ function buildMoonStats({
 		onSet: editors?.substellarLon,
 	})
 	return buildBodyStats({
-		kind: "moon",
 		readOnly,
 		estimateTempK,
+		estimateTempDeltaK,
 		group,
 		classification,
 		sizeClass,
@@ -643,6 +778,7 @@ function buildMoonStats({
 			rangeLabel: orbitRange
 				? formatClassificationLabel(orbitRange)
 				: undefined,
+			rangeSwatchColor: moonOrbitRangeSwatchColor(orbitRange),
 		},
 		orbitalPeriodDays,
 		dayLength: parentOrbitalPeriodDays
@@ -669,13 +805,7 @@ function buildMoonStats({
 		densityEarthRelative,
 		densityDescription,
 		atmosphereStat:
-			atmosphere !== undefined
-				? {
-						label: "Atmosphere",
-						value: formatAtmosphereLabel(atmosphere),
-						swatchColor: atmosphereSwatchColor(atmosphere?.code),
-					}
-				: undefined,
+			atmosphere !== undefined ? buildAtmosphereStat(atmosphere) : undefined,
 		landCoverage,
 		hydrosphereCode,
 		avgTempK,
@@ -788,9 +918,9 @@ export function buildOrbitBodyStats(params: {
 					}) as StatEntry)
 			: undefined
 	return buildBodyStats({
-		kind: "planet",
 		readOnly,
 		estimateTempK: body.temperatureEstimate?.mean,
+		estimateTempDeltaK: body.temperatureEstimate?.deltaK ?? null,
 		group: body.group,
 		classification: body.classification,
 		sizeClass: body.sizeClass,
@@ -799,6 +929,7 @@ export function buildOrbitBodyStats(params: {
 			unit: "AU",
 			precision: 3,
 			rangeLabel: body.zone ? formatClassificationLabel(body.zone) : undefined,
+			rangeSwatchColor: body.zone ? orbitZoneSwatchColor(body.zone) : undefined,
 			editor: onUpdateBody
 				? {
 						label: "Semi Major Axis",
@@ -973,11 +1104,7 @@ export function buildOrbitBodyStats(params: {
 						buildPressureAtmosphereProfile(pressureSlider.value).code,
 					),
 				}
-			: {
-					label: "Atmosphere",
-					value: formatAtmosphereLabel(body.atmosphere),
-					swatchColor: atmosphereSwatchColor(body.atmosphere?.code),
-				},
+			: buildAtmosphereStat(body.atmosphere),
 		landCoverage: body.landCoverage,
 		hydrosphereCode: body.hydrosphereCode,
 		avgTempK,
@@ -1086,6 +1213,7 @@ export function buildOrbitMoonStats(params: {
 		unitSystem,
 		readOnly,
 		estimateTempK: moon.temperatureEstimate?.mean,
+		estimateTempDeltaK: moon.temperatureEstimate?.deltaK ?? null,
 		atmosphere: moon.atmosphere,
 		albedo: moon.albedo,
 		greenhouseFactor: moon.greenhouseFactor,

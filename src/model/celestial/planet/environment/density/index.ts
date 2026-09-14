@@ -5,28 +5,59 @@ import type {
 	DensityProfileInput,
 	RollAlbedoInput,
 } from "@/model/celestial/planet/environment/density/types"
+import type { SpectralClass } from "@/model/celestial/star/types"
 import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
 
+// [DEVIATION] Not book-sourced -- a rare, purely cosmetic override on top
+// of an already-rolled silicate-range density (never its own density
+// value): real carbon-world models put carbide/graphite worlds in roughly
+// the same density range as ordinary silicate worlds of the same mass, so
+// this only relabels Mostly Rock / Rock and Metal results -- a
+// metal-dominated interior implies a differentiated iron core, which a
+// carbon-rich bulk composition shouldn't have. Gated on a young-ish
+// galactic population being more likely to have the high carbon-to-oxygen
+// protoplanetary disks carbon worlds need -- approximated here by simply
+// excluding O/B/A hosts (those stars are always young by virtue of their
+// short main-sequence lifespan, but so is plenty of the G-M population;
+// this is a coarse exclusion, not a real metallicity model).
+const CARBON_WORLD_CHANCE = 0.03
+const CARBON_EXCLUDED_HOST_CLASSES: readonly SpectralClass[] = ["O", "B", "A"]
+
 function describeDensity({
+	rng,
 	earthRelative,
 	classification,
+	hostSpectralClass,
 }: DensityDescriptionInput): string {
 	if (classification === "jovian" || classification === "chthonian") {
 		return "Hydrogen-Helium Envelope"
 	}
 	if (earthRelative < 0.18) return "Exotic Ice"
 	if (earthRelative < 0.5) return "Mostly Ice"
-	if (earthRelative < 0.82) return "Mostly Rock"
-	if (earthRelative < 1.15) return "Rock and Metal"
-	if (earthRelative < 1.5) return "Mostly Metal"
-	return "Compressed Metal"
+	const rockOrMetal =
+		earthRelative < 0.82
+			? "Mostly Rock"
+			: earthRelative < 1.15
+				? "Rock and Metal"
+				: earthRelative < 1.5
+					? "Mostly Metal"
+					: "Compressed Metal"
+	const carbonEligible =
+		(rockOrMetal === "Mostly Rock" || rockOrMetal === "Rock and Metal") &&
+		rng !== undefined &&
+		hostSpectralClass !== undefined &&
+		!CARBON_EXCLUDED_HOST_CLASSES.includes(hostSpectralClass)
+	if (carbonEligible && rng.uniform(0, 1) < CARBON_WORLD_CHANCE) return "Carbon"
+	return rockOrMetal
 }
 
 function buildDensityProfile({
+	rng,
 	massKg,
 	diameterKm,
 	classification,
+	hostSpectralClass,
 }: DensityProfileInput): DensityProfile | null {
 	if (massKg <= 0 || diameterKm <= 0) return null
 	const diameterEarths = diameterKm / ORBIT_BODY.earthDiameterKm
@@ -34,7 +65,12 @@ function buildDensityProfile({
 	const earthRelative = massEarths / diameterEarths ** 3
 	return {
 		earthRelative,
-		description: describeDensity({ earthRelative, classification }),
+		description: describeDensity({
+			rng,
+			earthRelative,
+			classification,
+			hostSpectralClass,
+		}),
 	}
 }
 

@@ -4,7 +4,7 @@ import type {
 	HostStarAttributes,
 	SpectralClass,
 } from "@/model/celestial/star/types"
-import type { SystemBody } from "@/model/celestial/system/types"
+import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 import type { MoonOrbitState } from "@/ui/genesis/renderer/moon-orbit-overlay"
 
 /** Addresses any node in a solar system's orbit tree -- the parent of any
@@ -51,6 +51,7 @@ export interface AsteroidFieldData {
  * anchored heuristic scaling planets use. */
 export interface CompanionOverlayParams {
 	star: SolarSystemOverlayParams
+	role: CompanionStar["role"]
 	orbitalDistanceAU: number
 	orbitalPeriodDays: number
 	eccentricity: number

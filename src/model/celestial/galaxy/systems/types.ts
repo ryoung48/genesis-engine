@@ -3,6 +3,9 @@ import type {
 	LuminosityClass,
 	SpectralClass,
 } from "@/model/celestial/star/types"
+import type { AnomalousOrbitReservation } from "@/model/celestial/system/generation/anomalous-orbits/types"
+import type { WorldTypeAllocation } from "@/model/celestial/system/generation/world-type-allocation/types"
+import type { WorldTypeCounts } from "@/model/celestial/system/generation/world-type-counts/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 
 export interface GalaxySystemSeedParams {
@@ -68,15 +71,7 @@ export interface StarPreview extends HostStarAttributes {
 	 * planet can't form inside of. Fixed constants for brown dwarfs (0.005)
 	 * and degenerate/compact objects (0.001) rather than interpolated -- see
 	 * STAR.rollStarAttributes. */
-	/** Distance from the star it orbits, as a habitable-zone deviation (same
-	 * units PLANET.deviationToAU takes) -- 0 for the primary. Rolled once per
-	 * companion from a continuous range specific to its role (see
-	 * GALAXY_SYSTEMS.rollStarTree's ROLE_DEVIATION_RANGE), independently of
-	 * the discrete deviation pool its parent's own planets sample from -- a
-	 * shared pool would let a companion land on the exact same deviation (and
-	 * therefore the exact same orbitalDistanceAU) as one of its parent's real
-	 * planets. */
-	deviation: number
+	orbitalDistanceAU: number
 	/** Orbital eccentricity around the parent star; 0 for the primary. */
 	eccentricity: number
 	/** Orbital inclination around the parent star; 0 for the primary. */
@@ -97,9 +92,8 @@ export interface GalaxyStar extends HostStarAttributes {
 	 * this should be ready to render "D"/"NS"/"BH"/"L"/"T"/"Y", not just
 	 * O-M. */
 	bodies: SystemBody[]
-	/** Distance from the star it orbits (its parent's own habitable-zone
-	 * deviation-to-AU mapping, same as any planet uses) -- 0 for the
-	 * primary, which has no parent to orbit. */
+	/** Distance from the star it orbits, in AU -- 0 for the primary, which
+	 * has no parent to orbit. Copied straight from StarPreview.orbitalDistanceAU. */
 	orbitalDistanceAU: number
 	/** Kepler period around its parent, using the parent's mass -- 0 for the
 	 * primary. */
@@ -108,6 +102,7 @@ export interface GalaxyStar extends HostStarAttributes {
 	eccentricity: number
 	/** Orbital inclination around the parent star; 0 for the primary. */
 	inclinationDeg: number
+	worldTypeAllocation: WorldTypeAllocation
 }
 
 export interface GalaxySystem {
@@ -118,6 +113,8 @@ export interface GalaxySystem {
 	seed: number
 	/** stars[0] is always the primary. */
 	stars: GalaxyStar[]
+	worldTypeCounts: WorldTypeCounts
+	anomalousOrbitReservations: AnomalousOrbitReservation[]
 }
 
 /** Growable columnar accumulator for GALAXY_SYSTEMS.appendPackedSystemStarData
@@ -131,7 +128,7 @@ export interface MutablePackedGalaxyStarData {
 	spectralClass: number[]
 	luminosityClass: number[]
 	subtype: number[]
-	deviation: number[]
+	orbitalDistanceAU: number[]
 	eccentricity: number[]
 	inclinationDeg: number[]
 	age: number[]
@@ -167,8 +164,8 @@ export interface PackedGalaxyStars {
 	 * kept as Float32 (not Uint8 like galaxy-gen's integer-subtype encoding)
 	 * since this repo rolls a continuous subtype, not a single digit. */
 	starSubtype: Float32Array
-	/** Companion orbit deviation per star; 0 for a system's primary. */
-	starDeviation: Float32Array
+	/** Companion orbit distance in AU per star; 0 for a system's primary. */
+	starOrbitalDistanceAU: Float32Array
 	/** Companion orbit eccentricity; 0 for a system's primary. */
 	starEccentricity: Float32Array
 	/** Companion orbit inclination in degrees; 0 for a system's primary. */
@@ -193,7 +190,7 @@ export interface PackedSystemStarSlice {
 	spectralClass: Uint8Array
 	luminosityClass: Uint8Array
 	subtype: Float32Array
-	deviation: Float32Array
+	orbitalDistanceAU: Float32Array
 	eccentricity: Float32Array
 	inclinationDeg: Float32Array
 	age: Float32Array

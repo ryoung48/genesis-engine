@@ -7,21 +7,16 @@ export type { BiosphereProfile as HabitabilityProfile }
 
 export interface HabitabilityInput {
 	sizeClass: number
+	// [JUSTIFICATION] Vacuum bodies carry no profile; absent counts as code 0.
 	atmosphere?: AtmosphereProfile | null
 	hydrosphereCode: number
 	temperatureMeanK: number
 	temperatureHighK: number
 	temperatureLowK: number
-	gravityG: number
-	/** Set only when tide-locked to the star -- a locked moon/planet's own
-	 * lock (to a moon or to its parent planet) doesn't count, mirroring
-	 * galaxy-gen's `orbit.lock?.type === "star"` check. */
+	// [JUSTIFICATION] Book's undefined-gravity DM applies when gravity was never computed.
+	gravityG?: number
+	// [JUSTIFICATION] Only star locks penalize; absent means not star-locked.
 	tideLockedToStar?: boolean
-	/** Total seismic heating (residual + tidal + surface tides) -- galaxy-gen's
-	 * SEISMOLOGY.total. */
 	seismologyTotal: number
-	/** Theoretical-max equilibrium surface tide -- stands in for galaxy-gen's
-	 * tides.stress (sum of per-moon tidal effect), which chaos-machine has no
-	 * equivalent list for. */
 	surfaceTidesHeating: number
 }

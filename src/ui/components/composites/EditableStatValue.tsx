@@ -27,14 +27,14 @@ export interface StatEntry {
 	valueHelpTarget?: "all" | "prefix"
 	editor?: StatEditor
 	valueAction?: ReactNode
-	/** Rendered at the far right, after the value (and valueAction) -- e.g. a
+	/** Rendered right after the value, before valueAction -- e.g. a
 	 * help-circle icon with its own hover tooltip -- distinct from valueHelp
 	 * (which puts the tooltip on the value itself) since some values already
 	 * carry a different hover/click meaning (e.g. an editable dropdown
 	 * target) and need the detail breakdown parked somewhere that doesn't
-	 * compete for the same hover/click target. Tooltip opens downward (not
-	 * up) since this sits at the top of a scrollable stats panel, where an
-	 * upward tooltip gets clipped by the panel's own edge. */
+	 * compete for the same hover/click target. Tooltip prefers opening
+	 * upward (falling back downward only without room above) via
+	 * FloatingTooltip's body portal, so the panel's own edge never clips it. */
 	trailingHelp?: ReactNode
 	/** A small color swatch shown immediately before the value (e.g. a
 	 * planet's classification color, or a star's spectral-class color) --
@@ -76,22 +76,18 @@ export function TrailingHelpIcon({ content }: { content: ReactNode }) {
 export function EditableStatValue({ stat }: { stat: StatEntry }) {
 	const [visible, setVisible] = useState(false)
 	const editor = stat.editor
-	const valueNode = (
-		<>
-			{stat.valuePrefix && <>{stat.valuePrefix} </>}
-			{stat.value}
-			{stat.valueAction}
-		</>
-	)
+	const helpIcon = stat.trailingHelp ? (
+		<TrailingHelpIcon content={stat.trailingHelp} />
+	) : null
 
 	if (!editor) {
 		return (
 			<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
 				{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
-				{valueNode}
-				{stat.trailingHelp ? (
-					<TrailingHelpIcon content={stat.trailingHelp} />
-				) : null}
+				{stat.valuePrefix && <>{stat.valuePrefix} </>}
+				{stat.value}
+				{helpIcon}
+				{stat.valueAction}
 			</span>
 		)
 	}
@@ -132,10 +128,8 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 				)}
 			</Popover>
 			{stat.valuePrefix && <span>{stat.value}</span>}
+			{helpIcon}
 			{stat.valueAction}
-			{stat.trailingHelp ? (
-				<TrailingHelpIcon content={stat.trailingHelp} />
-			) : null}
 		</span>
 	)
 }

@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react"
-import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
+import type {
+	GalaxyStar,
+	GalaxySystem,
+} from "@/model/celestial/galaxy/systems/types"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { DistributionChart } from "@/ui/components/composites/DistributionChart"
@@ -24,6 +27,7 @@ import {
 	buildAtmosphereDistribution,
 	buildAxialTiltDistribution,
 	buildBiosphereDistribution,
+	buildCompositionDistribution,
 	buildEccentricityDistribution,
 	buildHydrosphereDistribution,
 	buildMoonClassificationDistribution,
@@ -35,6 +39,7 @@ import {
 	buildSystemHabitabilityDistribution,
 	buildSystemSizeDistribution,
 	buildTemperatureDistribution,
+	COMPOSITION_CATEGORIES,
 	collectBodiesByClassification,
 	countSystemBodies,
 	HABITABILITY_CATEGORY_LABELS,
@@ -46,7 +51,9 @@ import {
 	findBodyClassificationConditions,
 	hasBodyFilter,
 	hasBodyFilterForKind,
+	hasStarAttributeFilter,
 	matchesBodyFilter,
+	matchesStarFilter,
 } from "@/ui/wiki/system-filter/evaluate-system-filter"
 import { SystemFilterBuilder } from "@/ui/wiki/system-filter/SystemFilterBuilder"
 import type { SystemFilterRoot } from "@/ui/wiki/system-filter/types"
@@ -83,6 +90,26 @@ interface GalaxySystemSearchEntry {
 	stars: GalaxySystemSearchStar[]
 }
 
+interface AdvancedStarFilterMatchInput {
+	star: GalaxyStar
+	filter: SystemFilterRoot
+}
+
+function matchesAdvancedStarFilter({
+	star,
+	filter,
+}: AdvancedStarFilterMatchInput): boolean {
+	return matchesStarFilter({
+		node: filter,
+		star: {
+			spectralClass: star.spectralClass,
+			luminosityClass: star.luminosityClass,
+			proto: star.ageGyr < 0.01 && star.massSol < 8,
+			primordial: star.ageGyr < 0.1,
+		},
+	})
+}
+
 type StarYouthFilter = "all" | "proto" | "primordial"
 type StarCountFilter = "all" | "1" | "2" | "3" | "4+"
 
@@ -105,6 +132,7 @@ const SPECIAL_CIRCUMSTANCE_OPTIONS: SpecialCircumstance[] = [
 
 interface GalaxyBodyClassificationTemperaturePair {
 	classification: string
+	compositionClass: string | undefined
 	zone: string | undefined
 	temperatureClass: string | undefined
 	hydrosphereClass: string | undefined
@@ -121,6 +149,37 @@ interface GalaxySystemBodySearchEntry {
 	moonClassifications: string[]
 	planetClassificationTemperaturePairs: GalaxyBodyClassificationTemperaturePair[]
 	moonClassificationTemperaturePairs: GalaxyBodyClassificationTemperaturePair[]
+}
+
+interface SimpleBodyFilter {
+	classification: string
+	temperature: string
+	hydrosphere: string
+	atmosphere: string
+	specialCircumstances: string
+}
+
+function matchesSimpleBodyFilter({
+	pair,
+	filter,
+}: {
+	pair: GalaxyBodyClassificationTemperaturePair
+	filter: SimpleBodyFilter
+}): boolean {
+	return (
+		(filter.classification === "all" ||
+			pair.classification === filter.classification) &&
+		(filter.temperature === "all" ||
+			pair.temperatureClass === filter.temperature) &&
+		(filter.hydrosphere === "all" ||
+			pair.hydrosphereClass === filter.hydrosphere) &&
+		(filter.atmosphere === "all" ||
+			pair.atmosphereClass === filter.atmosphere) &&
+		(filter.specialCircumstances === "all" ||
+			pair.specialCircumstances.includes(
+				filter.specialCircumstances as SpecialCircumstance,
+			))
+	)
 }
 
 interface SystemSearchResult {
@@ -612,6 +671,16 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			].sort(),
 		[systemBodySearchEntries],
 	)
+	const bodyClassificationOptions = useMemo(
+		() =>
+			[
+				...new Set([
+					...planetClassificationOptions,
+					...moonClassificationOptions,
+				]),
+			].sort(),
+		[planetClassificationOptions, moonClassificationOptions],
+	)
 	const planetTemperatureOptions = useMemo(
 		() =>
 			TEMPERATURE_CATEGORIES.filter((category) =>
@@ -746,33 +815,48 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	const hasAdvancedBodyFilter = hasBodyFilter(advancedFilter)
 	const hasAdvancedPlanetFilter = hasBodyFilterForKind(advancedFilter, "planet")
 	const hasAdvancedMoonFilter = hasBodyFilterForKind(advancedFilter, "moon")
+	const hasAdvancedStarFilter = hasStarAttributeFilter(advancedFilter)
+	// The tab-based search UI (searchTab and its per-tab classification/
+	// temperature/etc dropdowns) is currently rendered inside a `hidden` div
+	// further down this file -- unreachable, so the rule-builder (advancedFilter)
+	// is the only live source of a search match. This only ever resolves
+	// against advancedFilter for that reason; see the `hidden` wrapper's own
+	// plan note for the tab UI's dead-code status generally.
 	const firstMatchedAddress = (system: GalaxySystem): OrbitAddress => {
 		const entry = systemBodySearchEntries?.find(
 			(candidate) => candidate.systemIndex === system.systemIndex,
 		)
-		if (!entry || !hasAdvancedBodyFilter) return { kind: "star", starIndex: 0 }
-		let planetIndex = 0
-		let moonIndex = 0
-		for (const star of system.stars) {
-			for (const [bodyIdx, body] of star.bodies.entries()) {
-				const pair = entry.planetClassificationTemperaturePairs[planetIndex++]
-				if (
-					pair &&
-					hasAdvancedPlanetFilter &&
-					matchesBodyFilter(advancedFilter, "planet", pair)
-				)
-					return { kind: "body", starIndex: star.index, bodyIdx }
-				for (const [moonIdx, moon] of body.moons.entries()) {
-					const moonPair = entry.moonClassificationTemperaturePairs[moonIndex++]
+		if (entry && hasAdvancedBodyFilter) {
+			let planetIndex = 0
+			let moonIndex = 0
+			for (const star of system.stars) {
+				for (const [bodyIdx, body] of star.bodies.entries()) {
+					const pair = entry.planetClassificationTemperaturePairs[planetIndex++]
 					if (
-						moon &&
-						moonPair &&
-						hasAdvancedMoonFilter &&
-						matchesBodyFilter(advancedFilter, "moon", moonPair)
+						pair &&
+						hasAdvancedPlanetFilter &&
+						matchesBodyFilter(advancedFilter, "planet", pair)
 					)
-						return { kind: "moon", starIndex: star.index, bodyIdx, moonIdx }
+						return { kind: "body", starIndex: star.index, bodyIdx }
+					for (const [moonIdx, moon] of body.moons.entries()) {
+						const moonPair =
+							entry.moonClassificationTemperaturePairs[moonIndex++]
+						if (
+							moon &&
+							moonPair &&
+							hasAdvancedMoonFilter &&
+							matchesBodyFilter(advancedFilter, "moon", moonPair)
+						)
+							return { kind: "moon", starIndex: star.index, bodyIdx, moonIdx }
+					}
 				}
 			}
+		}
+		if (hasAdvancedStarFilter) {
+			const matchingStar = system.stars.find((star) =>
+				matchesAdvancedStarFilter({ star, filter: advancedFilter }),
+			)
+			if (matchingStar) return { kind: "star", starIndex: matchingStar.index }
 		}
 		return { kind: "star", starIndex: 0 }
 	}
@@ -905,26 +989,21 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 				isFiltered: false,
 				total: 0,
 			}
+		const simpleFilter: SimpleBodyFilter = {
+			classification: classificationFilter,
+			temperature: temperatureFilter,
+			hydrosphere: hydrosphereFilter,
+			atmosphere: atmosphereFilter,
+			specialCircumstances: specialCircumstancesFilter,
+		}
 		const matches = (systemBodySearchEntries ?? [])
 			.filter((entry) => {
 				const pairs =
 					searchTab === "planets"
 						? entry.planetClassificationTemperaturePairs
 						: entry.moonClassificationTemperaturePairs
-				return pairs.some(
-					(pair) =>
-						(classificationFilter === "all" ||
-							pair.classification === classificationFilter) &&
-						(temperatureFilter === "all" ||
-							pair.temperatureClass === temperatureFilter) &&
-						(hydrosphereFilter === "all" ||
-							pair.hydrosphereClass === hydrosphereFilter) &&
-						(atmosphereFilter === "all" ||
-							pair.atmosphereClass === atmosphereFilter) &&
-						(specialCircumstancesFilter === "all" ||
-							pair.specialCircumstances.includes(
-								specialCircumstancesFilter as SpecialCircumstance,
-							)),
+				return pairs.some((pair) =>
+					matchesSimpleBodyFilter({ pair, filter: simpleFilter }),
 				)
 			})
 			.map((entry) => ({
@@ -981,6 +1060,11 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			)
 				continue
 			for (const star of entry.stars) {
+				if (
+					hasAdvancedStarFilter &&
+					!matchesStarFilter({ node: advancedFilter, star })
+				)
+					continue
 				counts.set(
 					star.spectralClass,
 					(counts.get(star.spectralClass) ?? 0) + 1,
@@ -1001,6 +1085,8 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 		systemSearchEntries,
 		systemSearchResults.isFiltered,
 		filteredSystemIndices,
+		hasAdvancedStarFilter,
+		advancedFilter,
 	])
 	const bodyDistributions = useMemo(() => {
 		if (!pregeneratedSystems || pregeneratedSystems.length === 0) return null
@@ -1009,6 +1095,21 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 					filteredSystemIndices.has(system.systemIndex),
 				)
 			: pregeneratedSystems
+		const stars = systems.flatMap((system) =>
+			system.stars.filter(
+				(star) =>
+					!hasAdvancedStarFilter ||
+					matchesAdvancedStarFilter({ star, filter: advancedFilter }),
+			),
+		)
+		const scopedPlanets = stars
+			.flatMap((star) => star.bodies)
+			.filter((body) => body.classification !== "asteroid belt")
+		const scopedMoons = scopedPlanets
+			.flatMap((body) => body.moons)
+			.filter((moon) => moon.classification !== "asteroid belt")
+		const scopedPlanetSet = new Set(scopedPlanets)
+		const scopedMoonSet = new Set(scopedMoons)
 		const classifiedBodies = bodyClassificationSelections.map((selection) =>
 			collectBodiesByClassification({ systems, ...selection }),
 		)
@@ -1023,10 +1124,14 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 				let planetIndex = 0
 				let moonIndex = 0
 				for (const star of system.stars) {
+					const matchesStar =
+						!hasAdvancedStarFilter ||
+						matchesAdvancedStarFilter({ star, filter: advancedFilter })
 					for (const body of star.bodies) {
 						const pair =
 							entry.planetClassificationTemperaturePairs[planetIndex++]
 						if (
+							matchesStar &&
 							hasAdvancedPlanetFilter &&
 							pair &&
 							matchesBodyFilter(advancedFilter, "planet", pair)
@@ -1036,6 +1141,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 							const moonPair =
 								entry.moonClassificationTemperaturePairs[moonIndex++]
 							if (
+								matchesStar &&
 								hasAdvancedMoonFilter &&
 								moonPair &&
 								matchesBodyFilter(advancedFilter, "moon", moonPair)
@@ -1046,32 +1152,55 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 				}
 			}
 		} else {
-			planets.push(...classifiedBodies.flatMap((bodies) => bodies.planets))
-			moons.push(...classifiedBodies.flatMap((bodies) => bodies.moons))
+			if (bodyClassificationSelections.length === 0) {
+				planets.push(...scopedPlanets)
+				moons.push(...scopedMoons)
+			} else {
+				planets.push(
+					...classifiedBodies
+						.flatMap((bodies) => bodies.planets)
+						.filter((body) => scopedPlanetSet.has(body)),
+				)
+				moons.push(
+					...classifiedBodies
+						.flatMap((bodies) => bodies.moons)
+						.filter((moon) => scopedMoonSet.has(moon)),
+				)
+			}
 		}
 		const bodies =
-			hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+			hasAdvancedBodyFilter ||
+			hasAdvancedStarFilter ||
+			bodyClassificationSelections.length > 0
 				? [...planets, ...moons]
 				: systems
 		return {
 			systemSize: buildSystemSizeDistribution(systems),
 			planetClassification: buildPlanetClassificationDistribution(
-				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+				hasAdvancedBodyFilter ||
+					hasAdvancedStarFilter ||
+					bodyClassificationSelections.length > 0
 					? planets
 					: systems,
 			),
 			moonClassification: buildMoonClassificationDistribution(
-				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+				hasAdvancedBodyFilter ||
+					hasAdvancedStarFilter ||
+					bodyClassificationSelections.length > 0
 					? moons
 					: systems,
 			),
 			moonOrbitRange: buildMoonOrbitRangeDistribution(
-				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+				hasAdvancedBodyFilter ||
+					hasAdvancedStarFilter ||
+					bodyClassificationSelections.length > 0
 					? moons
 					: systems,
 			),
 			moonCount: buildMoonCountDistribution(
-				hasAdvancedBodyFilter || bodyClassificationSelections.length > 0
+				hasAdvancedBodyFilter ||
+					hasAdvancedStarFilter ||
+					bodyClassificationSelections.length > 0
 					? planets
 					: systems,
 			),
@@ -1080,6 +1209,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			axialTilt: buildAxialTiltDistribution(bodies),
 			rotation: buildRotationDistribution(bodies),
 			atmosphere: buildAtmosphereDistribution(bodies),
+			composition: buildCompositionDistribution(bodies),
 			hydrosphere: buildHydrosphereDistribution(bodies),
 			biosphere: buildBiosphereDistribution(bodies),
 			temperature: buildTemperatureDistribution(bodies),
@@ -1091,6 +1221,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 		filteredSystemIndices,
 		bodyClassificationSelections,
 		hasAdvancedBodyFilter,
+		hasAdvancedStarFilter,
 		advancedFilter,
 		systemBodySearchEntries,
 		hasAdvancedPlanetFilter,
@@ -1316,6 +1447,12 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 											showTotal={false}
 										/>
 										<DistributionChart
+											title="Composition"
+											buckets={bodyDistributions.composition}
+											variant="compact"
+											showTotal={false}
+										/>
+										<DistributionChart
 											title="Eccentricity"
 											buckets={bodyDistributions.eccentricity}
 											variant="compact"
@@ -1388,9 +1525,9 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 									options={{
 										spectralClasses: spectralClassOptions,
 										luminosityClasses: luminosityClassOptions,
-										planetClassifications: planetClassificationOptions,
-										planetZones: ["epistellar", "inner", "outer"],
-										moonClassifications: moonClassificationOptions,
+										classifications: bodyClassificationOptions,
+										zones: ["epistellar", "inner", "outer"],
+										compositionClasses: COMPOSITION_CATEGORIES,
 										temperatureClasses: TEMPERATURE_CATEGORIES,
 										hydrosphereClasses: HYDROSPHERE_CATEGORIES,
 										atmosphereClasses: ["Breathable", ...ATMOSPHERE_CATEGORIES],

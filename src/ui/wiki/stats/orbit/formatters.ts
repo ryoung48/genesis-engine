@@ -61,11 +61,22 @@ export function formatClassificationLabel(classification: string): string {
 		.join(" ")
 }
 
+export function formatAtmosphereLabelParts(
+	atmosphere: AtmosphereProfile | null | undefined,
+): { base: string; qualifier?: string } {
+	if (!atmosphere) return { base: "Vacuum" }
+	const parts = formatAtmosphereSuffixParts(atmosphere)
+	return {
+		base: `${formatPressureBar(atmosphere.pressureBar)} · ${parts.base}`,
+		qualifier: parts.qualifier,
+	}
+}
+
 export function formatAtmosphereLabel(
 	atmosphere: AtmosphereProfile | null | undefined,
 ): string {
-	if (!atmosphere) return "Vacuum"
-	return `${formatPressureBar(atmosphere.pressureBar)} · ${formatAtmosphereSuffix(atmosphere)}`
+	const parts = formatAtmosphereLabelParts(atmosphere)
+	return parts.qualifier ? `${parts.base} (${parts.qualifier})` : parts.base
 }
 
 export function buildPressureAtmosphereProfile(
@@ -111,23 +122,46 @@ export function buildPressureAtmosphereProfile(
 	}
 }
 
-export function formatAtmosphereSuffix(atmosphere: AtmosphereProfile): string {
-	if (atmosphere.type === "vacuum") return "Vacuum"
-	if (atmosphere.type === "trace") return "Trace"
+export function formatAtmosphereSuffixParts(atmosphere: AtmosphereProfile): {
+	base: string
+	qualifier?: string
+} {
+	if (atmosphere.type === "vacuum") return { base: "Vacuum" }
+	if (atmosphere.type === "trace") return { base: "Trace" }
 	// Code 14 ("Low"/E) and 15 ("Unusual"/F) are otherwise-breathable
 	// profiles distinguished only by their code -- see galaxy-gen's code-13
 	// branch. Name them explicitly rather than showing a bare "Breathable".
-	if (atmosphere.code === 14) return "Low"
+	if (atmosphere.code === 14) return { base: "Low" }
 	if (atmosphere.code === 15)
-		return atmosphere.unusual ? `Unusual (${atmosphere.unusual})` : "Unusual"
-	if (atmosphere.type === "breathable") return "Breathable"
-	if (atmosphere.type === "corrosive") return "Corrosive"
-	if (atmosphere.type === "insidious") return "Insidious"
+		return {
+			base: atmosphere.unusual ? `Unusual (${atmosphere.unusual})` : "Unusual",
+		}
+	if (atmosphere.type === "breathable")
+		return atmosphere.tainted
+			? { base: "Breathable", qualifier: "Tainted" }
+			: { base: "Breathable" }
+	if (atmosphere.type === "corrosive") return { base: "Corrosive" }
+	if (atmosphere.type === "insidious") return { base: "Insidious" }
 	if (atmosphere.type === "gas" && atmosphere.subtype === "helium")
-		return "Helium"
+		return { base: "Helium" }
 	if (atmosphere.type === "gas" && atmosphere.subtype === "hydrogen")
-		return "Hydrogen"
-	return "Exotic"
+		return { base: "Hydrogen" }
+	return atmosphere.tainted
+		? { base: "Exotic", qualifier: "Irritant" }
+		: { base: "Exotic" }
+}
+
+export function formatAtmosphereSuffix(atmosphere: AtmosphereProfile): string {
+	const parts = formatAtmosphereSuffixParts(atmosphere)
+	return parts.qualifier ? `${parts.base} (${parts.qualifier})` : parts.base
+}
+
+export function formatAtmosphereHazard(
+	atmosphere: AtmosphereProfile | null | undefined,
+): string | undefined {
+	if (!atmosphere?.tainted) return undefined
+	if (!atmosphere.hazard) return undefined
+	return formatClassificationLabel(atmosphere.hazard)
 }
 
 export function formatPressureBar(pressureBar: number): string {

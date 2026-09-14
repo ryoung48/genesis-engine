@@ -13,6 +13,8 @@ export interface BiosphereInput {
 	/** Null/undefined (e.g. an asteroid belt) is treated as vacuum (code 0). */
 	atmosphere?: AtmosphereProfile | null
 	temperatureMeanK: number
+	temperatureHighK: number
+	temperatureLowK: number
 	hydrosphereCode?: number
 	classification: OrbitClassification
 	impactZone?: boolean

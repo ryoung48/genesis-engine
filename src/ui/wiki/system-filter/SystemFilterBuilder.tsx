@@ -21,21 +21,16 @@ const FIELD_LABELS: Record<SystemFilterField, string> = {
 	starLuminosityClass: "Star luminosity class",
 	starYouth: "Star age",
 	starCount: "Star count",
-	planetClassification: "Planet classification",
-	planetZone: "Planet zone",
-	planetTemperature: "Planet temperature",
-	planetHydrosphere: "Planet hydrosphere",
-	planetAtmosphere: "Planet atmosphere",
-	planetBiosphere: "Planet biosphere",
-	planetHabitability: "Planet habitability",
-	planetSpecialCircumstance: "Planet special circumstance",
-	moonClassification: "Moon classification",
-	moonTemperature: "Moon temperature",
-	moonHydrosphere: "Moon hydrosphere",
-	moonAtmosphere: "Moon atmosphere",
-	moonBiosphere: "Moon biosphere",
-	moonHabitability: "Moon habitability",
-	moonSpecialCircumstance: "Moon special circumstance",
+	bodyType: "Body type",
+	bodyClassification: "Body classification",
+	bodyComposition: "Body composition",
+	bodyZone: "Body zone",
+	bodyTemperature: "Body temperature",
+	bodyHydrosphere: "Body hydrosphere",
+	bodyAtmosphere: "Body atmosphere",
+	bodyBiosphere: "Body biosphere",
+	bodyHabitability: "Body habitability",
+	bodySpecialCircumstance: "Body special circumstance",
 }
 
 const FIELDS = Object.keys(FIELD_LABELS) as SystemFilterField[]
@@ -77,29 +72,25 @@ function optionsForField(
 			return ["proto", "primordial"]
 		case "starCount":
 			return ["1", "2", "3", "4+"]
-		case "planetClassification":
-			return options.planetClassifications
-		case "planetZone":
-			return options.planetZones
-		case "moonClassification":
-			return options.moonClassifications
-		case "planetTemperature":
-		case "moonTemperature":
+		case "bodyType":
+			return ["planet", "moon"]
+		case "bodyClassification":
+			return options.classifications
+		case "bodyZone":
+			return options.zones
+		case "bodyComposition":
+			return options.compositionClasses
+		case "bodyTemperature":
 			return options.temperatureClasses
-		case "planetHydrosphere":
-		case "moonHydrosphere":
+		case "bodyHydrosphere":
 			return options.hydrosphereClasses
-		case "planetAtmosphere":
-		case "moonAtmosphere":
+		case "bodyAtmosphere":
 			return options.atmosphereClasses
-		case "planetBiosphere":
-		case "moonBiosphere":
+		case "bodyBiosphere":
 			return options.biosphereClasses
-		case "planetHabitability":
-		case "moonHabitability":
+		case "bodyHabitability":
 			return options.habitabilityClasses
-		case "planetSpecialCircumstance":
-		case "moonSpecialCircumstance":
+		case "bodySpecialCircumstance":
 			return options.specialCircumstances
 		case "systemBodyCount":
 			return []

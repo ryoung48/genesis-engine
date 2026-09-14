@@ -41,6 +41,7 @@ import { PortedGalaxyPanel } from "@/ui/wiki/PortedGalaxyPanel"
 import {
 	atmosphereCategory,
 	biosphereCategory,
+	compositionCategory,
 	hydrosphereCategory,
 	temperatureCategory,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
@@ -541,6 +542,7 @@ export const PortedGalaxyView: React.FC<{
 				planetClassificationTemperaturePairs: system.stars.flatMap((star) =>
 					star.bodies.map((body) => ({
 						classification: body.classification,
+						compositionClass: compositionCategory(body),
 						zone: body.zone,
 						temperatureClass: temperatureCategory(body),
 						hydrosphereClass: hydrosphereCategory(body),
@@ -557,6 +559,7 @@ export const PortedGalaxyView: React.FC<{
 					star.bodies.flatMap((body) =>
 						body.moons.map((moon) => ({
 							classification: moon.classification,
+							compositionClass: compositionCategory(moon),
 							zone: moon.zone,
 							temperatureClass: temperatureCategory(moon),
 							hydrosphereClass: hydrosphereCategory(moon),

@@ -9,21 +9,16 @@ export type SystemFilterField =
 	| "starLuminosityClass"
 	| "starYouth"
 	| "starCount"
-	| "planetClassification"
-	| "planetZone"
-	| "planetTemperature"
-	| "planetHydrosphere"
-	| "planetAtmosphere"
-	| "planetBiosphere"
-	| "planetHabitability"
-	| "planetSpecialCircumstance"
-	| "moonClassification"
-	| "moonTemperature"
-	| "moonHydrosphere"
-	| "moonAtmosphere"
-	| "moonBiosphere"
-	| "moonHabitability"
-	| "moonSpecialCircumstance"
+	| "bodyType"
+	| "bodyClassification"
+	| "bodyComposition"
+	| "bodyZone"
+	| "bodyTemperature"
+	| "bodyHydrosphere"
+	| "bodyAtmosphere"
+	| "bodyBiosphere"
+	| "bodyHabitability"
+	| "bodySpecialCircumstance"
 
 export interface SystemFilterCondition {
 	kind: "condition"
@@ -51,6 +46,7 @@ export interface SystemFilterRoot {
 
 export interface SystemFilterBodyPair {
 	classification: string
+	compositionClass: string | undefined
 	zone: string | undefined
 	temperatureClass: string | undefined
 	hydrosphereClass: string | undefined
@@ -74,6 +70,16 @@ export interface SystemFilterStar {
 	primordial: boolean
 }
 
+export interface SystemFilterStarMatchInput {
+	star: SystemFilterStar
+	condition: SystemFilterCondition
+}
+
+export interface SystemFilterStarNodeMatchInput {
+	node: SystemFilterNode
+	star: SystemFilterStar
+}
+
 export interface SystemFilterStarEntry {
 	systemIndex: number
 	stars: SystemFilterStar[]
@@ -88,9 +94,9 @@ export interface SystemFilterData {
 export interface SystemFilterOptions {
 	spectralClasses: string[]
 	luminosityClasses: string[]
-	planetClassifications: string[]
-	planetZones: readonly string[]
-	moonClassifications: string[]
+	classifications: string[]
+	zones: readonly string[]
+	compositionClasses: readonly string[]
 	temperatureClasses: readonly string[]
 	hydrosphereClasses: readonly string[]
 	atmosphereClasses: readonly string[]

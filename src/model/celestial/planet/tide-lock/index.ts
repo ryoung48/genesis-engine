@@ -1,4 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type {
 	MoonTideLockResult,
@@ -69,48 +70,6 @@ function deriveTideLockStatus(params: {
 	return undefined
 }
 
-// Ported from galaxy-gen's MATH.orbits.fromAU (utilities/math/index.ts) -- a
-// Titius-Bode-like orbit-number/AU lookup, used only as a coarse "how far out
-// is this" distance-modifier proxy for the star tide-lock roll below.
-// Independent of the star's actual luminosity/habitable zone, same as
-// upstream -- it's a flavor scale, not a physical one.
-const ORBIT_AU_TABLE: [orbit: number, au: number][] = [
-	[0, 0],
-	[1, 0.4],
-	[2, 0.7],
-	[3, 1.0],
-	[4, 1.6],
-	[5, 2.8],
-	[6, 5.2],
-	[7, 10],
-	[8, 20],
-	[9, 40],
-	[10, 77],
-	[11, 154],
-	[12, 308],
-	[13, 615],
-	[14, 1230],
-	[15, 2500],
-	[16, 4900],
-	[17, 9800],
-	[18, 19500],
-	[19, 39500],
-]
-
-function orbitNumberFromAU(au: number): number {
-	const first = ORBIT_AU_TABLE[0]!
-	if (au <= first[1]) return first[0]
-	for (let i = 1; i < ORBIT_AU_TABLE.length; i++) {
-		const [orbitHi, auHi] = ORBIT_AU_TABLE[i]!
-		const [orbitLo, auLo] = ORBIT_AU_TABLE[i - 1]!
-		if (au <= auHi) {
-			const t = (au - auLo) / (auHi - auLo)
-			return orbitLo + t * (orbitHi - orbitLo)
-		}
-	}
-	return ORBIT_AU_TABLE[ORBIT_AU_TABLE.length - 1]![0]
-}
-
 // Ported from galaxy-gen's ROTATION.locks.general (orbits/rotation/index.ts)
 // -- how hard THIS body itself resists being spun down, independent of what
 // it might lock to.
@@ -154,7 +113,9 @@ function rollStarLockDM(params: {
 	const dm = createDmCollector()
 	dm.add(-4, "Star modifier")
 
-	const orbitNumber = orbitNumberFromAU(params.orbitalDistanceAU)
+	const orbitNumber = ORBIT_BODY.auToOrbitNumber({
+		au: params.orbitalDistanceAU,
+	})
 	const orbitNote = `Distance (orbit #${orbitNumber.toFixed(1)})`
 	if (orbitNumber < 1) dm.add(4 + Math.floor(10 * (1 - orbitNumber)), orbitNote)
 	else if (orbitNumber < 2) dm.add(4, orbitNote)

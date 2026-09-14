@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { ParentStarLike } from "@/model/celestial/star/types"
 import { RNG } from "@/model/shared/random/rng"
@@ -11,6 +12,52 @@ function isPostStellar(spectralClass: string): boolean {
 }
 
 describe("Non-Primary Star Determination table", () => {
+	it("uses the book's discrete Orbit# ranges for unadjusted companion stars", () => {
+		const foundRoles = new Set<string>()
+		for (let seed = 1; seed <= 10000 && foundRoles.size < 4; seed++) {
+			const stars = GALAXY_SYSTEMS.previewStars({
+				galaxySeed: seed,
+				systemIndex: 0,
+			})
+			if (stars.length !== 2) continue
+			const primary = stars[0]!
+			const companion = stars[1]!
+			if (
+				companion.role === "primary" ||
+				(companion.role === "epistellar" &&
+					STAR.isGiant(primary.luminosityClass))
+			) {
+				continue
+			}
+			const orbitNumber = ORBIT_BODY.auToOrbitNumber({
+				au: companion.orbitalDistanceAU,
+			})
+			if (companion.role === "epistellar") {
+				expect(orbitNumber).toBeGreaterThanOrEqual(0.05)
+				expect(orbitNumber).toBeLessThanOrEqual(0.65)
+				expect(orbitNumber * 100).toBeCloseTo(Math.round(orbitNumber * 100))
+			} else if (companion.role === "inner") {
+				expect(
+					[0.5, 1, 2, 3, 4, 5].some(
+						(expected) => Math.abs(orbitNumber - expected) < 1e-9,
+					),
+				).toBe(true)
+			} else if (companion.role === "outer") {
+				expect(orbitNumber).toBeCloseTo(Math.round(orbitNumber))
+				expect(orbitNumber).toBeGreaterThanOrEqual(6)
+				expect(orbitNumber).toBeLessThanOrEqual(11)
+			} else {
+				expect(orbitNumber).toBeCloseTo(Math.round(orbitNumber))
+				expect(orbitNumber).toBeGreaterThanOrEqual(12)
+				expect(orbitNumber).toBeLessThanOrEqual(17)
+			}
+			foundRoles.add(companion.role)
+		}
+		expect(foundRoles).toEqual(
+			new Set(["epistellar", "inner", "outer", "distant"]),
+		)
+	})
+
 	it("allows a standalone root/primary star to roll as a Y brown dwarf", () => {
 		let sawStandaloneY = false
 		for (let seed = 1; seed <= 20000 && !sawStandaloneY; seed++) {
@@ -125,6 +172,61 @@ describe("Non-Primary Star Determination table", () => {
 			}
 		}
 		expect(sawTwin).toBe(true)
+	})
+
+	it("a companion of a main-sequence dwarf primary is never more massive than it (book p. 29 'key premise')", () => {
+		for (let seed = 1; seed <= 20000; seed++) {
+			const rng = RNG.createRng({ seed })
+			const parent: ParentStarLike = {
+				spectralClass: "K",
+				luminosityClass: "V",
+				subtype: 5,
+				massSol: 0.7,
+				ageGyr: 5,
+			}
+			const rolled = STAR.rollStarAttributes(
+				rng,
+				parent,
+				undefined,
+				"secondary",
+			)
+			if (isPostStellar(rolled.spectralClass)) continue
+			expect(rolled.massSol).toBeLessThanOrEqual(parent.massSol)
+		}
+	})
+
+	it("a Random companion roll that independently lands on a giant luminosity class never survives as more massive than a tiny dwarf parent", () => {
+		// An M8 V parent (0.1 Msun, near the bottom of the main sequence) means
+		// essentially *any* giant/subgiant result would violate the book's "key
+		// premise" (p. 29) if accepted as-is -- so a fully-working fix should
+		// mean no giant survives here at all, not just that surviving giants
+		// happen to be light enough.
+		let sawGiant = false
+		for (let seed = 1; seed <= 20000; seed++) {
+			const rng = RNG.createRng({ seed })
+			const parent: ParentStarLike = {
+				spectralClass: "M",
+				luminosityClass: "V",
+				subtype: 8,
+				massSol: 0.1,
+				ageGyr: 5,
+			}
+			const rolled = STAR.rollStarAttributes(
+				rng,
+				parent,
+				undefined,
+				"secondary",
+			)
+			if (
+				isPostStellar(rolled.spectralClass) ||
+				STAR.isBrownDwarf(rolled.spectralClass)
+			) {
+				continue
+			}
+			if (STAR.isGiant(rolled.luminosityClass)) sawGiant = true
+			expect(rolled.massSol).toBeLessThanOrEqual(parent.massSol)
+		}
+		expect(sawGiant).toBe(false)
 	})
 
 	it("a post-stellar companion can bump the whole system's age above the primary's own roll", () => {

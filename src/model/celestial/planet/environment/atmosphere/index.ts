@@ -141,10 +141,27 @@ function atmosphereCodeToProfile({
 			breathable: true,
 		}
 	} else if (code === 10) {
-		let roll = DICE.roll2d5(rng)
-		if (params.sizeClass <= 4) roll -= 2
+		// Book's Exotic Atmosphere Subtype table (p. 86), 2D6 + DMs: Size 2-4
+		// DM-2; Orbit less than HZCO-1 DM-2 (this star's own deviation>=1.5,
+		// i.e. closer than HZC, stands in for "less than HZCO-1" -- the
+		// codebase's continuous deviation scale predates a literal per-Orbit#
+		// comparison, so the book's asymmetric -1/+2 Orbit# thresholds are both
+		// approximated by the same +-1.5 deviation magnitude); Orbit greater
+		// than HZCO+2 DM+2 (deviation<=-1.5, farther than HZC); Runaway
+		// greenhouse result DM+4 (the "telluric" classification is this
+		// codebase's own runaway-greenhouse/Venus-like outcome -- see the
+		// identical DM on the Corrosive/Insidious table just below). [Bug fix]
+		// this used to roll 2D5 (a die this codebase invents nowhere else) with
+		// a Size DM applied for sizeClass<=4 (book says 2-4 only) and no
+		// runaway-greenhouse DM at all -- both replaced with the book's own
+		// numbers, and the roll-to-type table below now matches the book's
+		// literal per-value row (2D5's narrower 2-10 range meant "very dense"
+		// was never actually reachable before).
+		let roll = DICE.roll2d6(rng)
+		if (params.sizeClass >= 2 && params.sizeClass <= 4) roll -= 2
 		if (params.deviation >= 1.5) roll -= 2
 		if (params.deviation <= -1.5) roll += 2
+		if (params.classification === "telluric") roll += 4
 		if (roll <= 2) {
 			profile = {
 				code,
@@ -153,14 +170,14 @@ function atmosphereCodeToProfile({
 				tainted: true,
 				breathable: false,
 			}
-		} else if (roll <= 3) {
+		} else if (roll === 3) {
 			profile = {
 				code,
 				type: "exotic",
 				subtype: "very thin",
 				breathable: false,
 			}
-		} else if (roll <= 4) {
+		} else if (roll === 4) {
 			profile = {
 				code,
 				type: "exotic",
@@ -168,14 +185,21 @@ function atmosphereCodeToProfile({
 				tainted: true,
 				breathable: false,
 			}
-		} else if (roll <= 5) {
+		} else if (roll === 5) {
 			profile = {
 				code,
 				type: "exotic",
 				subtype: "thin",
 				breathable: false,
 			}
-		} else if (roll <= 6) {
+		} else if (roll === 6) {
+			profile = {
+				code,
+				type: "exotic",
+				subtype: "standard",
+				breathable: false,
+			}
+		} else if (roll === 7) {
 			profile = {
 				code,
 				type: "exotic",
@@ -183,26 +207,45 @@ function atmosphereCodeToProfile({
 				tainted: true,
 				breathable: false,
 			}
-		} else if (roll <= 8) {
+		} else if (roll === 8) {
 			profile = {
 				code,
 				type: "exotic",
-				subtype: "standard",
+				subtype: "dense",
 				breathable: false,
 			}
-		} else if (roll <= 9) {
+		} else if (roll === 9) {
 			profile = {
 				code,
 				type: "exotic",
 				subtype: "dense",
 				tainted: true,
+				breathable: false,
+			}
+		} else if (roll === 10 || roll === 13) {
+			profile = {
+				code,
+				type: "exotic",
+				subtype: "very dense",
+				breathable: false,
+			}
+		} else if (roll === 12) {
+			// Book's own "Occasionally Corrosive" row: flip straight to the
+			// corrosive atmosphere type (code B/11) rather than approximating it
+			// as a tainted exotic.
+			profile = {
+				code: 11,
+				type: "corrosive",
+				subtype: "very dense",
 				breathable: false,
 			}
 		} else {
+			// roll 11 and 14+ (both plain "Irritant").
 			profile = {
 				code,
 				type: "exotic",
-				subtype: "dense",
+				subtype: "very dense",
+				tainted: true,
 				breathable: false,
 			}
 		}

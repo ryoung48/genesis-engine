@@ -18,6 +18,8 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 		orbitalDistanceAU: params.orbitalDistanceAU,
 		starMassKg: params.starMassKg,
 		parentGroup: params.group,
+		luminositySol: params.luminositySol,
+		starAgeGyr: params.starAgeGyr,
 	})
 	return moons
 		.map((moon, moonIdx) => {

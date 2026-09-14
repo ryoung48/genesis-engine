@@ -15,6 +15,12 @@ import {
 	type RollMoonSizeClassInput,
 } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+// A moon is exactly as "terrestrial" as any planet for density purposes
+// (book: "These tables are suitable for terrestrial worlds from Size S to
+// Size F") -- reused directly rather than duplicated, so the two can never
+// drift apart. See pickDensityEarthRelative's classification param doc
+// below for why a moon here never needs its own real classification.
+import { ROLLS } from "@/model/celestial/system/generation/rolls"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
@@ -243,6 +249,7 @@ export const MOON = {
 		parentGroup,
 		parentSizeClass,
 		orbitalDistanceAU,
+		nearCompanionExclusion = false,
 	}: RollMoonCountInput): number {
 		if (parentGroup === "asteroid belt") return 0
 		let roll = rollDie({ rng, sides: 6 }) + 2
@@ -266,12 +273,15 @@ export const MOON = {
 				rollDie({ rng, sides: 6 }) -
 				6
 
-		// Ported from galaxy-gen's `MATH.orbits.fromAU(orbit.au) < 1` (orbits/
-		// moons/index.ts) -- fromAU linearly interpolates AU to a "orbit number"
-		// scale where orbit 0 = 0 AU and orbit 1 = 0.4 AU (utilities/math/
-		// index.ts's orbitAUMapping), so `< 1` on that scale is exactly `< 0.4`
-		// AU, not `< 0.5`.
-		if (orbitalDistanceAU < 0.4) {
+		// Book's Significant Moon Quantity DM-1-per-die (p. 54): applies once
+		// (never stacked) if this planet's Orbit# is below 1.0 -- ported from
+		// galaxy-gen's `MATH.orbits.fromAU(orbit.au) < 1` (orbits/moons/
+		// index.ts), where orbit 1 = 0.4 AU (utilities/math/index.ts's
+		// orbitAUMapping), so `< 1` on that scale is exactly `< 0.4` AU -- OR if
+		// this slot is adjacent to a companion/companion-driven unavailability
+		// range (nearCompanionExclusion, resolved by the caller). "Only one DM
+		// can apply regardless of the number of conditions."
+		if (orbitalDistanceAU < 0.4 || nearCompanionExclusion) {
 			roll -=
 				parentSizeClass > 16
 					? 4
@@ -312,6 +322,8 @@ export const MOON = {
 		orbitalDistanceAU,
 		starMassKg,
 		parentGroup = "terrestrial",
+		luminositySol,
+		starAgeGyr,
 	}: GenerateMoonsInput): MoonBody[] {
 		if (count <= 0) return []
 
@@ -358,18 +370,32 @@ export const MOON = {
 		for (let i = 0; i < count; i++) {
 			const sizeClass = rollMoonSizeClass({ rng, parentSizeClass, parentGroup })
 			const diameterKm = rollMoonDiameterKm({ rng, sizeClass })
-			const massKg =
+			// A moon above sizeClass 15 is jovian-family (galaxy-gen's own
+			// moon-spawn branch, mirrored in buildMoonEnvironment's groupHint),
+			// same density range as any other jovian. Otherwise this is the exact
+			// same book Terrestrial Composition/Density roll every rocky planet
+			// uses -- "group"/"classification" are fixed to their non-jovian,
+			// non-chthonian defaults here on purpose: this branch never reaches
+			// the jovian-family classification chthonian requires, and
+			// composition/density no longer depends on classification at all
+			// otherwise (see pickDensityEarthRelative), so the moon's real,
+			// not-yet-known classification isn't needed to roll its density.
+			const densityEarthRelative =
 				sizeClass > 15
-					? ORBIT_BODY.massKgFromEarthRelativeDensity({
-							diameterKm,
-							densityEarthRelative: rng.uniform(0.08, 0.35),
+					? rng.uniform(0.08, 0.35)
+					: ROLLS.pickDensityEarthRelative({
+							rng,
+							group: "terrestrial",
+							classification: "tectonic",
+							sizeClass,
+							orbitalDistanceAU,
+							luminositySol,
+							starAgeGyr,
 						})
-					: (() => {
-							const moonRadiusM = diameterKm * 500
-							const moonVol =
-								(4 / 3) * Math.PI * moonRadiusM * moonRadiusM * moonRadiusM
-							return moonVol * rng.uniform(2200, 4000)
-						})()
+			const massKg = ORBIT_BODY.massKgFromEarthRelativeDensity({
+				diameterKm,
+				densityEarthRelative,
+			})
 			const moonRadiusM = diameterKm * 500
 			const rochePd =
 				MECHANICS.rocheLimitM({

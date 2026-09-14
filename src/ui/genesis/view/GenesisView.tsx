@@ -1939,6 +1939,16 @@ export const GenesisView: React.FC<{
 			// mode or that homeworld is silently dropped for a plain procedural
 			// slot. Any other galaxy system stays fully procedural.
 			const hasForcedHomeworld = primary.bodies.some((body) => body.isMainWorld)
+			// The galaxy already ran BODY_GENERATION.generateSystemBodies for this
+			// exact system (with orbitSlots/companion-exclusion params the plain
+			// useSolarSystemBodies regeneration below doesn't have access to), so
+			// primary.bodies is authoritative. Without this, the seed change here
+			// would trigger useSolarSystemBodies' own generatedSystemBodies sync
+			// effect to immediately re-roll a DIFFERENT body list from just the
+			// seed, silently swapping out the system that was actually opened
+			// (and any `focus` address computed against the galaxy's bodies would
+			// then point at the wrong body, or none at all).
+			skipNextGeneratedSystemBodiesSyncRef.current = true
 			// Sorted by orbitalDistanceAU so this array's order matches exactly
 			// what buildSolarSystemOverlay's composer sorts its own companions
 			// into (see overlay.ts) -- the two MUST agree, since starIndex
@@ -1977,11 +1987,20 @@ export const GenesisView: React.FC<{
 			setGalaxyOrigin({ systemIndex: system.systemIndex })
 			setSolarSystemViewActive(true)
 			setGalaxyModeActive(false)
-			// Zoom/focus the primary star on both the 3D view and the wiki
+			// Zoom/focus the matched body on both the 3D view and the wiki
 			// Navigator, rather than leaving the camera wherever it was left
 			// pointed at from whatever was last focused before entering galaxy
-			// mode.
-			requestAnimationFrame(() => handleFocusBody(focus))
+			// mode. Called synchronously (not via requestAnimationFrame) so its
+			// setPendingFocus/setCurrentFocus batch into the SAME commit as the
+			// setSolarSystem call above -- see useSolarSystemView's
+			// wasFocusedOnMainWorldRef doc comment for why a same-commit focus
+			// update is required: on a later, separate commit it would race the
+			// overlay-rebuild effect (which always runs first only within a
+			// shared commit) and could focusOnSystemBody against the stale
+			// pre-regeneration overlay, silently no-op'ing and leaving the camera
+			// wherever setSolarSystemActive's activation snap left it (the
+			// primary star).
+			handleFocusBody(focus)
 		},
 		[
 			setSolarSystem,
@@ -1989,6 +2008,7 @@ export const GenesisView: React.FC<{
 			setGalaxyOrigin,
 			setSolarSystemViewActive,
 			handleFocusBody,
+			skipNextGeneratedSystemBodiesSyncRef,
 		],
 	)
 

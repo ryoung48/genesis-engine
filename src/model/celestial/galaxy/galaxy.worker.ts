@@ -22,7 +22,7 @@ function buildTransferList(galaxy: {
 	starSpectralClass: Uint8Array
 	starLuminosityClass: Uint8Array
 	starSubtype: Float32Array
-	starDeviation: Float32Array
+	starOrbitalDistanceAU: Float32Array
 	starEccentricity: Float32Array
 	starInclinationDeg: Float32Array
 	starAge: Float32Array
@@ -54,7 +54,7 @@ function buildTransferList(galaxy: {
 		galaxy.starSpectralClass.buffer,
 		galaxy.starLuminosityClass.buffer,
 		galaxy.starSubtype.buffer,
-		galaxy.starDeviation.buffer,
+		galaxy.starOrbitalDistanceAU.buffer,
 		galaxy.starEccentricity.buffer,
 		galaxy.starInclinationDeg.buffer,
 		galaxy.starAge.buffer,

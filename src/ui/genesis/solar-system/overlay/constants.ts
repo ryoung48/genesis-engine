@@ -1,6 +1,9 @@
-import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
+import type {
+	OrbitClassification,
+	OrbitZone,
+} from "@/model/celestial/orbit-body/types"
 import type { SpectralClass } from "@/model/celestial/star/types"
-import type { SystemBody } from "@/model/celestial/system/types"
+import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 import { BODY_VISUAL_BASE_RADIUS } from "@/ui/genesis/shared/moon-visual-scale"
 
 export const DEG2RAD = Math.PI / 180
@@ -37,6 +40,12 @@ export const BELT_VERTICAL_RATIO = 0.35
 // ROCKY_SIBLING_COLOR for anything else.
 export const MAIN_WORLD_COLOR = 0x3b82f6
 export const ROCKY_SIBLING_COLOR = 0x9ca3af
+export const ORBIT_LINE_COLOR_BY_ZONE: Record<CompanionStar["role"], number> = {
+	epistellar: 0xfb923c,
+	inner: 0xfacc15,
+	outer: 0x7dd3fc,
+	distant: 0x94a3b8,
+}
 // Solid-color fallback for a tectonic/vesperian body whose hydrosphereCode is
 // 10-11 ("no continents" full ocean) -- deliberately close to Earth's ocean
 // blue rather than that classification's usual land-tinted
@@ -91,6 +100,16 @@ export function classificationSwatchColor(
 		? CLASSIFICATION_COLOR[classification as OrbitClassification]
 		: undefined
 	return hex === undefined ? null : `#${hex.toString(16).padStart(6, "0")}`
+}
+
+/** Converts ORBIT_LINE_COLOR_BY_ZONE's Three.js hex numbers into CSS hex
+ * strings for the wiki's Semi Major Axis swatch -- the same
+ * epistellar/inner/outer/distant palette the 3D scene uses for zone-colored
+ * orbit lines. A body with no rolled zone (e.g. an asteroid belt slot) shows
+ * the "distant" fallback tint. */
+export function orbitZoneSwatchColor(zone: OrbitZone | undefined): string {
+	const hex = ORBIT_LINE_COLOR_BY_ZONE[zone ?? "distant"]
+	return `#${hex.toString(16).padStart(6, "0")}`
 }
 
 export const GROUP_LABEL: Record<SystemBody["group"], string> = {

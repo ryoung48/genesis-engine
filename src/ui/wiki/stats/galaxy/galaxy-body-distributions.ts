@@ -566,6 +566,62 @@ const ATMOSPHERE_CODE_OF: Record<string, number> = Object.fromEntries(
 	]),
 )
 
+// Book's Terrestrial Composition table (p. 71-72) categories, already
+// computed on every rocky body's density.description -- "Hydrogen-Helium
+// Envelope" covers jovian/chthonian bodies, which skip that table entirely
+// (see DENSITY.buildProfile's describeDensity).
+export const COMPOSITION_CATEGORIES = [
+	"Exotic Ice",
+	"Mostly Ice",
+	"Mostly Rock",
+	"Rock and Metal",
+	"Mostly Metal",
+	"Compressed Metal",
+	"Carbon",
+	"Hydrogen-Helium Envelope",
+] as const
+
+const COMPOSITION_COLOR: Record<string, string> = {
+	"Exotic Ice": "#dbeafe",
+	"Mostly Ice": "#93c5fd",
+	"Mostly Rock": "#a8a29e",
+	"Rock and Metal": "#78716c",
+	"Mostly Metal": "#57534e",
+	"Compressed Metal": "#292524",
+	Carbon: "#44403c",
+	"Hydrogen-Helium Envelope": "#d8b4fe",
+}
+
+export function compositionSwatchColor(
+	description: string | undefined,
+): string | undefined {
+	if (description === undefined) return undefined
+	return COMPOSITION_COLOR[description] ?? FALLBACK_COLOR
+}
+
+export function compositionCategory(
+	body: Pick<OrbitBody, "density">,
+): string | undefined {
+	return body.density?.description
+}
+
+export function buildCompositionDistribution(
+	systems: readonly GalaxySystem[] | readonly OrbitBody[],
+): DistributionChartBucket[] {
+	const buckets = bucketBy(
+		collectNonBeltBodies(systems),
+		compositionCategory,
+		(key) => key,
+		(key) => COMPOSITION_COLOR[key] ?? FALLBACK_COLOR,
+	)
+	const order = new Map<string, number>(
+		COMPOSITION_CATEGORIES.map((category, index) => [category, index]),
+	)
+	return buckets.sort(
+		(a, b) => (order.get(a.label) ?? 99) - (order.get(b.label) ?? 99),
+	)
+}
+
 // Ported from galaxy-gen's HYDROSPHERE.color (model/system/orbits/
 // hydrosphere/index.ts), indexed directly by code rather than by iteration
 // order.

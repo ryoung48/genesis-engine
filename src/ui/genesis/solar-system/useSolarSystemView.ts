@@ -59,6 +59,7 @@ function buildCompanionOverlayParams(
 			starName: companion.starName,
 			proceduralSystem: true,
 		},
+		role: companion.role,
 		orbitalDistanceAU: companion.orbitalDistanceAU,
 		orbitalPeriodDays: companion.orbitalPeriodDays,
 		eccentricity: companion.eccentricity,

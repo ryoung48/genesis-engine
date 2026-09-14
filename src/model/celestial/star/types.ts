@@ -127,3 +127,12 @@ export interface RollStarAgeInput {
 	rng: Pick<SharedRng, "randint" | "uniform">
 	massSol: number
 }
+
+export interface StarProtoInput {
+	ageGyr: number
+	massSol: number
+}
+
+export interface StarPrimordialInput {
+	ageGyr: number
+}

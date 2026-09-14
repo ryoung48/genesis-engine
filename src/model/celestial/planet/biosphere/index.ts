@@ -23,6 +23,8 @@ function get(params: BiosphereInput): BiosphereResult {
 		rng,
 		starAgeGyr,
 		temperatureMeanK,
+		temperatureHighK,
+		temperatureLowK,
 		classification,
 		impactZone,
 		isMainWorld,
@@ -68,12 +70,14 @@ function get(params: BiosphereInput): BiosphereResult {
 	else if (starAgeGyr < 3) add(-4, "system age less than 3 Gyrs")
 	else if (starAgeGyr < 4) add(-2, "system age less than 4 Gyrs")
 
-	// Temperature modifiers
+	if (temperatureMeanK < 253) add(-4, "freezing conditions")
+	if (temperatureLowK < 253) add(-2, "too cold")
+	if (temperatureMeanK > 323) add(-4, "burning conditions")
+	if (temperatureHighK > 323) add(-2, "too hot")
+	if (temperatureMeanK >= 279 && temperatureMeanK <= 303)
+		add(2, "temperate climate")
+
 	const climate = TEMPERATURE.describe(temperatureMeanK)
-	if (climate === "burning") add(-6, "burning conditions")
-	else if (climate === "temperate") add(2, "temperate conditions")
-	else if (climate === "cold") add(-2, "cold conditions")
-	else if (climate === "frozen") add(-6, "frozen conditions")
 
 	if (climate === "frozen" && hydrosphereCode < 10 && hydrosphereCode > 1) {
 		add(2, "subsurface oceans")
@@ -85,17 +89,6 @@ function get(params: BiosphereInput): BiosphereResult {
 		const collapse = rng.randint(0, 8)
 		trace.push({ value: -(value - collapse), description: "rare sapience" })
 		value = collapse
-	}
-
-	const hostile =
-		climate === "burning" ||
-		climate === "frozen" ||
-		atmosphere.code === 11 ||
-		atmosphere.code === 12 ||
-		atmosphere.code === 0 ||
-		atmosphere.code === 1
-	if (hostile && value > 5) {
-		value = DICE.rollDice({ rng, count: 2, sides: 4 }) - 2
 	}
 
 	if (starAgeGyr < 0.1 || classification === "asteroid belt") value = 0

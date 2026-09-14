@@ -55,8 +55,8 @@ export interface Galaxy {
 	starLuminosityClass: Uint8Array
 	/** Continuous 0-10 spectral subtype per star. */
 	starSubtype: Float32Array
-	/** Companion orbit deviation per star; 0 for a system's primary. */
-	starDeviation: Float32Array
+	/** Companion orbit distance in AU per star; 0 for a system's primary. */
+	starOrbitalDistanceAU: Float32Array
 	/** Companion orbit eccentricity; 0 for a system's primary. */
 	starEccentricity: Float32Array
 	/** Companion orbit inclination in degrees; 0 for a system's primary. */

@@ -25,6 +25,7 @@ import {
 	CLASSIFICATION_COLOR,
 	ROCKY_SIBLING_COLOR,
 } from "@/ui/genesis/solar-system/overlay/constants"
+import { moonOrbitRangeSwatchColor } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 
 const MOON_COLORS_HEX = [0x0ea5e9, 0x8b5cf6, 0x10b981]
 const TWO_PI = 2 * Math.PI
@@ -409,7 +410,17 @@ export function buildMoonOrbitOverlay(
 		// moves independently.
 		const { Q: tiltAxis } = perifocalBasis(Omega, inc, 0)
 		const moonColor = MOON_COLORS_HEX[i % MOON_COLORS_HEX.length]
-		const lineColor = moonColor
+		// Orbit line is tinted by inner/middle/outer/extreme band (same
+		// orange/green/blue/purple palette as the wiki's moon-orbit-range
+		// distribution chart) rather than cycling through moonColor -- falls
+		// back to that cycling tint only for a moon whose orbitRange hasn't
+		// been assigned yet.
+		const rangeColorHex = moon.orbitRange
+			? moonOrbitRangeSwatchColor(moon.orbitRange)
+			: undefined
+		const lineColor = rangeColorHex
+			? Number.parseInt(rangeColorHex.slice(1), 16)
+			: moonColor
 
 		// --- Orbit path ---
 		const pathPoints: THREE.Vector3[] = []

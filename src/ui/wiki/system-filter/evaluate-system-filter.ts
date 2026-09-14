@@ -7,37 +7,88 @@ import {
 	TEMPERATURE_CATEGORIES,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 import type {
+	SystemFilterBodyEntry,
 	SystemFilterBodyPair,
 	SystemFilterCondition,
 	SystemFilterData,
+	SystemFilterGroup,
 	SystemFilterNode,
 	SystemFilterRoot,
+	SystemFilterStarMatchInput,
+	SystemFilterStarNodeMatchInput,
 } from "@/ui/wiki/system-filter/types"
+
+function bodyKindsInGroup(group: SystemFilterGroup): ("planet" | "moon")[] {
+	let kinds: ("planet" | "moon")[] = ["planet", "moon"]
+	for (const child of group.nodes) {
+		if (child.kind !== "condition" || child.field !== "bodyType") continue
+		if (child.comparison === "isNot") {
+			kinds = kinds.filter((kind) => kind !== child.value)
+		} else {
+			kinds = kinds.filter((kind) => kind === child.value)
+		}
+	}
+	return kinds
+}
 
 export function findBodyClassificationConditions(
 	node: SystemFilterNode,
 ): { bodyKind: "planet" | "moon"; classification: string }[] {
 	if (node.kind === "group") {
-		return node.nodes.flatMap(findBodyClassificationConditions)
+		if (node.operator === "or") {
+			return node.nodes.flatMap(findBodyClassificationConditions)
+		}
+		const kinds = bodyKindsInGroup(node)
+		const direct = node.nodes.flatMap((child) =>
+			child.kind === "condition" &&
+			child.field === "bodyClassification" &&
+			typeof child.value === "string"
+				? kinds.map((bodyKind) => ({
+						bodyKind,
+						classification: child.value as string,
+					}))
+				: [],
+		)
+		const nested = node.nodes
+			.filter((child) => child.kind === "group")
+			.flatMap(findBodyClassificationConditions)
+		return [...direct, ...nested]
 	}
-	if (node.field === "planetClassification" && typeof node.value === "string") {
-		return [{ bodyKind: "planet", classification: node.value }]
-	}
-	if (node.field === "moonClassification" && typeof node.value === "string") {
-		return [{ bodyKind: "moon", classification: node.value }]
+	if (node.field === "bodyClassification" && typeof node.value === "string") {
+		return [
+			{ bodyKind: "planet", classification: node.value },
+			{ bodyKind: "moon", classification: node.value },
+		]
 	}
 	return []
 }
 
 function isBodyField(field: SystemFilterCondition["field"]): boolean {
-	return field.startsWith("planet") || field.startsWith("moon")
+	return field.startsWith("body")
 }
 
-function isMatchingBodyKind(
-	field: SystemFilterCondition["field"],
-	bodyKind: "planet" | "moon",
-): boolean {
-	return field.startsWith(bodyKind)
+function taggedBodyPairs(entry: SystemFilterBodyEntry): {
+	kind: "planet" | "moon"
+	pair: SystemFilterBodyPair
+}[] {
+	return [
+		...entry.planetClassificationTemperaturePairs.map((pair) => ({
+			kind: "planet" as const,
+			pair,
+		})),
+		...entry.moonClassificationTemperaturePairs.map((pair) => ({
+			kind: "moon" as const,
+			pair,
+		})),
+	]
+}
+
+function isStarAttributeField(field: SystemFilterCondition["field"]): boolean {
+	return (
+		field === "starSpectralClass" ||
+		field === "starLuminosityClass" ||
+		field === "starYouth"
+	)
 }
 
 export function hasBodyFilter(node: SystemFilterNode): boolean {
@@ -50,9 +101,14 @@ export function hasBodyFilterForKind(
 	node: SystemFilterNode,
 	bodyKind: "planet" | "moon",
 ): boolean {
-	return node.kind === "condition"
-		? isMatchingBodyKind(node.field, bodyKind)
-		: node.nodes.some((child) => hasBodyFilterForKind(child, bodyKind))
+	if (node.kind === "condition") {
+		if (!isBodyField(node.field)) return false
+		if (node.field !== "bodyType") return true
+		return node.comparison === "isNot"
+			? node.value !== bodyKind
+			: node.value === bodyKind
+	}
+	return node.nodes.some((child) => hasBodyFilterForKind(child, bodyKind))
 }
 
 export function matchesBodyFilter(
@@ -61,17 +117,21 @@ export function matchesBodyFilter(
 	pair: SystemFilterBodyPair,
 ): boolean {
 	if (node.kind === "condition") {
-		return !isMatchingBodyKind(node.field, bodyKind)
+		return !isBodyField(node.field)
 			? true
-			: matchesBodyPair(pair, node)
+			: matchesBodyPair(pair, node, bodyKind)
 	}
-	const bodyNodes = node.nodes.filter((child) =>
-		hasBodyFilterForKind(child, bodyKind),
-	)
+	const bodyNodes = node.nodes.filter(hasBodyFilter)
 	if (bodyNodes.length === 0) return true
 	return node.operator === "and"
 		? bodyNodes.every((child) => matchesBodyFilter(child, bodyKind, pair))
 		: bodyNodes.some((child) => matchesBodyFilter(child, bodyKind, pair))
+}
+
+export function hasStarAttributeFilter(node: SystemFilterNode): boolean {
+	return node.kind === "condition"
+		? isStarAttributeField(node.field)
+		: node.nodes.some(hasStarAttributeFilter)
 }
 
 function matchesCategory(
@@ -99,56 +159,89 @@ function matchesValue(
 		: actual === condition.value
 }
 
+function matchesStar({ star, condition }: SystemFilterStarMatchInput): boolean {
+	switch (condition.field) {
+		case "starSpectralClass":
+			return matchesValue(star.spectralClass, condition)
+		case "starLuminosityClass":
+			return matchesValue(star.luminosityClass, condition)
+		case "starYouth":
+			return condition.comparison === "isNot"
+				? !(condition.value === "proto" ? star.proto : star.primordial)
+				: condition.value === "proto"
+					? star.proto
+					: star.primordial
+		default:
+			return false
+	}
+}
+
+export function matchesStarFilter({
+	node,
+	star,
+}: SystemFilterStarNodeMatchInput): boolean {
+	if (node.kind === "condition") {
+		return (
+			!isStarAttributeField(node.field) ||
+			matchesStar({ star, condition: node })
+		)
+	}
+	const starNodes = node.nodes.filter(hasStarAttributeFilter)
+	if (starNodes.length === 0) return true
+	return node.operator === "and"
+		? starNodes.every((child) => matchesStarFilter({ node: child, star }))
+		: starNodes.some((child) => matchesStarFilter({ node: child, star }))
+}
+
 function matchesBodyPair(
 	pair: SystemFilterBodyPair,
 	condition: SystemFilterCondition,
+	pairKind: "planet" | "moon",
 ): boolean {
 	switch (condition.field) {
-		case "planetClassification":
-		case "moonClassification":
+		case "bodyType":
+			return matchesValue(pairKind, condition)
+		case "bodyClassification":
 			return matchesValue(pair.classification, condition)
-		case "planetZone":
+		case "bodyComposition":
+			if (pair.compositionClass === undefined) return false
+			return matchesValue(pair.compositionClass, condition)
+		case "bodyZone":
 			return condition.comparison === "isNot"
 				? pair.zone !== condition.value
 				: pair.zone === condition.value
-		case "planetTemperature":
-		case "moonTemperature":
+		case "bodyTemperature":
 			return matchesCategory(
 				pair.temperatureClass,
 				condition,
 				TEMPERATURE_CATEGORIES,
 			)
-		case "planetHydrosphere":
-		case "moonHydrosphere":
+		case "bodyHydrosphere":
 			return matchesCategory(
 				pair.hydrosphereClass,
 				condition,
 				HYDROSPHERE_CATEGORIES,
 			)
-		case "planetAtmosphere":
-		case "moonAtmosphere":
+		case "bodyAtmosphere":
 			if (condition.value === "Breathable") return pair.breathable
 			return matchesCategory(
 				pair.atmosphereClass,
 				condition,
 				ATMOSPHERE_CATEGORIES,
 			)
-		case "planetBiosphere":
-		case "moonBiosphere":
+		case "bodyBiosphere":
 			return matchesCategory(
 				pair.biosphereClass,
 				condition,
 				BIOSPHERE_CATEGORIES,
 			)
-		case "planetHabitability":
-		case "moonHabitability":
+		case "bodyHabitability":
 			return matchesCategory(
 				pair.habitabilityClass,
 				condition,
 				HABITABILITY_CATEGORY_LABELS,
 			)
-		case "planetSpecialCircumstance":
-		case "moonSpecialCircumstance":
+		case "bodySpecialCircumstance":
 			return condition.comparison === "isNot"
 				? !pair.specialCircumstances.includes(condition.value as never)
 				: pair.specialCircumstances.includes(condition.value as never)
@@ -181,19 +274,9 @@ function matchesCondition(
 	if (stars) {
 		switch (condition.field) {
 			case "starSpectralClass":
-				return stars.some((star) => matchesValue(star.spectralClass, condition))
 			case "starLuminosityClass":
-				return stars.some((star) =>
-					matchesValue(star.luminosityClass, condition),
-				)
 			case "starYouth":
-				return stars.some((star) =>
-					condition.comparison === "isNot"
-						? !(condition.value === "proto" ? star.proto : star.primordial)
-						: condition.value === "proto"
-							? star.proto
-							: star.primordial,
-				)
+				return stars.some((star) => matchesStar({ star, condition }))
 			case "starCount": {
 				const matchesCount =
 					condition.value === "4+"
@@ -207,10 +290,9 @@ function matchesCondition(
 		(entry) => entry.systemIndex === systemIndex,
 	)
 	if (!bodyEntry) return false
-	const pairs = condition.field.startsWith("planet")
-		? bodyEntry.planetClassificationTemperaturePairs
-		: bodyEntry.moonClassificationTemperaturePairs
-	return pairs.some((pair) => matchesBodyPair(pair, condition))
+	return taggedBodyPairs(bodyEntry).some(({ kind, pair }) =>
+		matchesBodyPair(pair, condition, kind),
+	)
 }
 
 function matchesNode(
@@ -223,33 +305,37 @@ function matchesNode(
 	if (node.nodes.length === 0) return true
 	if (node.operator === "or")
 		return node.nodes.some((child) => matchesNode(child, data, systemIndex))
-	const planetConditions = node.nodes.filter(
-		(child) => child.kind === "condition" && child.field.startsWith("planet"),
+	const bodyConditions = node.nodes.filter(
+		(child) => child.kind === "condition" && isBodyField(child.field),
 	) as SystemFilterCondition[]
-	const moonConditions = node.nodes.filter(
-		(child) => child.kind === "condition" && child.field.startsWith("moon"),
-	) as SystemFilterCondition[]
+	const starNodes = node.nodes.filter(hasStarAttributeFilter)
 	const remainingNodes = node.nodes.filter(
 		(child) =>
 			child.kind === "group" ||
-			(!child.field.startsWith("planet") && !child.field.startsWith("moon")),
+			(!isBodyField(child.field) && !isStarAttributeField(child.field)),
 	)
+	const stars = data.starEntries.find(
+		(entry) => entry.systemIndex === systemIndex,
+	)?.stars
 	const bodyEntry = data.bodyEntries?.find(
 		(entry) => entry.systemIndex === systemIndex,
 	)
-	const matchesPlanets =
-		planetConditions.length === 0 ||
-		bodyEntry?.planetClassificationTemperaturePairs.some((pair) =>
-			planetConditions.every((condition) => matchesBodyPair(pair, condition)),
-		) === true
-	const matchesMoons =
-		moonConditions.length === 0 ||
-		bodyEntry?.moonClassificationTemperaturePairs.some((pair) =>
-			moonConditions.every((condition) => matchesBodyPair(pair, condition)),
+	const matchesBodies =
+		bodyConditions.length === 0 ||
+		(bodyEntry !== undefined &&
+			taggedBodyPairs(bodyEntry).some(({ kind, pair }) =>
+				bodyConditions.every((condition) =>
+					matchesBodyPair(pair, condition, kind),
+				),
+			))
+	const matchesStars =
+		starNodes.length === 0 ||
+		stars?.some((star) =>
+			starNodes.every((node) => matchesStarFilter({ node, star })),
 		) === true
 	return (
-		matchesPlanets &&
-		matchesMoons &&
+		matchesBodies &&
+		matchesStars &&
 		remainingNodes.every((child) => matchesNode(child, data, systemIndex))
 	)
 }
