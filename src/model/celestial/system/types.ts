@@ -8,6 +8,46 @@ export interface RingProfile {
 	opacity: number
 }
 
+// World Builder's Handbook p. 74's Belt Composition Percentages -- m-type
+// (metallic), s-type (stony), c-type (icy/carbonaceous), and whatever's left
+// over as otherPct once those three are resolved (see ASTEROID_BELT.rollProfile).
+export interface BeltComposition {
+	mTypePct: number
+	sTypePct: number
+	cTypePct: number
+	otherPct: number
+}
+
+// World Builder's Handbook pp. 72-75's full Planetoid Belt Characteristics --
+// only set for a SystemBody with group "asteroid belt".
+export interface BeltProfile {
+	/** Total width of the belt, in Orbit# units, centred on the belt's own
+	 * orbitalDistanceAU -- p. 73's Belt Span. */
+	spanOrbitNumber: number
+	composition: BeltComposition
+	/** Relative factor for the volume of bodies comprising the belt -- p. 73's
+	 * Belt Bulk. Always at least 1. */
+	bulk: number
+	/** 2-12 -- p. 73's Belt Resource Rating. */
+	resourceRating: number
+}
+
+// Not a World Builder's Handbook mechanic -- a homebrew proxy for how exposed
+// a body is to asteroid/planetoid bombardment, layering the book's own
+// belt-bulk factor (more material in the belt) onto orbital proximity
+// (closer to the belt, more of its debris crosses this body's path). See
+// IMPACT_EXPOSURE.computeForBody. Not set for a body with group "asteroid
+// belt" itself.
+export interface ImpactExposure {
+	/** Orbit# distance to the nearest planetoid belt in the system -- null
+	 * when the system has no belts at all. */
+	nearestBeltOrbitNumberDistance: number | null
+	/** nearestBelt.bulk / (1 + nearestBeltOrbitNumberDistance) -- unitless,
+	 * relative to other bodies in the same generated galaxy only. 0 when the
+	 * system has no belts. */
+	score: number
+}
+
 type GeneratedBodyFields =
 	| "sizeClass"
 	| "density"
@@ -73,6 +113,10 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		 * ring radius instead of its own independently packed orbit slot. See
 		 * Ceres/Pallas in sol-system/data/index.ts. */
 		beltOfIdx?: number
+		/** Only set for group "asteroid belt" -- see BeltProfile. */
+		belt?: BeltProfile
+		/** Not set for group "asteroid belt" itself -- see ImpactExposure. */
+		impactExposure?: ImpactExposure
 	}
 
 import type {

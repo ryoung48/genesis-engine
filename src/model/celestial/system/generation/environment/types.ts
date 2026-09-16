@@ -29,4 +29,14 @@ export interface Slot {
 	 * this is what that adjacency check measures against. A legacy slot has
 	 * no spread concept at all. */
 	spreadOrbitNumber?: number
+	/** [JUSTIFICATION] Only Stage 8 has a real ordered slot list to check
+	 * neighbors against -- the book's Belt Span DM-1 (p. 73) triggers when the
+	 * adjacent inner/outer orbital slot holds a gas giant. A legacy slot has
+	 * no neighbor concept at all. */
+	hasAdjacentGasGiant?: boolean
+	/** [JUSTIFICATION] Only Stage 8 has a real ordered slot list to check
+	 * position within -- the book's Belt Span DM+3 (p. 73) triggers when the
+	 * belt occupies the system's outermost orbital slot. A legacy slot has no
+	 * "outermost" concept at all. */
+	isOutermostOrbitSlot?: boolean
 }

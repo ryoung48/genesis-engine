@@ -1102,9 +1102,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 					matchesAdvancedStarFilter({ star, filter: advancedFilter }),
 			),
 		)
-		const scopedPlanets = stars
-			.flatMap((star) => star.bodies)
-			.filter((body) => body.classification !== "asteroid belt")
+		const scopedPlanets = stars.flatMap((star) => star.bodies)
 		const scopedMoons = scopedPlanets
 			.flatMap((body) => body.moons)
 			.filter((moon) => moon.classification !== "asteroid belt")
@@ -1411,7 +1409,7 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 										{bodyClassificationSelections.length === 0 ||
 										hasPlanetClassSelection ? (
 											<DistributionChart
-												title="Planets"
+												title="Planets & Belts"
 												buckets={bodyDistributions.planetClassification}
 												variant="compact"
 												showTotal={false}

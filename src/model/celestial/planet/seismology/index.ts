@@ -14,6 +14,7 @@ import { ENVIRONMENT } from "@/model/celestial/planet/environment"
 import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import { HABITABILITY } from "@/model/celestial/planet/habitability"
+import { LIGHT } from "@/model/celestial/planet/light"
 import { MAGNETIC_FIELD } from "@/model/celestial/planet/magnetic-field"
 import { HEATING } from "@/model/celestial/planet/seismology/heating"
 import { RECLASSIFY } from "@/model/celestial/planet/seismology/reclassify"
@@ -22,6 +23,7 @@ import type {
 	SeismologyProfile,
 } from "@/model/celestial/planet/seismology/types"
 import type { Zone } from "@/model/celestial/planet/types"
+import { WEATHER } from "@/model/celestial/planet/weather"
 import type { SpectralClass } from "@/model/celestial/star/types"
 import { TEXTURE } from "@/model/celestial/system/generation/texture"
 import type { SystemBody } from "@/model/celestial/system/types"
@@ -169,6 +171,7 @@ function withBiosphere(params: {
 	 * biosphere (see SOL_DATA's Earth seed / EARTH_SEED.biosphere) that must
 	 * survive the seismology pass unchanged instead of being re-rolled. */
 	preset?: BiosphereProfile
+	asteroidImpacts?: boolean
 }): { biosphere: BiosphereProfile; atmosphere?: AtmosphereProfile } {
 	if (params.preset) return { biosphere: params.preset }
 	return BIOSPHERE.get({
@@ -182,6 +185,7 @@ function withBiosphere(params: {
 		classification: params.classification,
 		impactZone: params.impactZone,
 		isMainWorld: params.isMainWorld,
+		asteroidImpacts: params.asteroidImpacts,
 	})
 }
 
@@ -196,6 +200,7 @@ function withHabitability(params: {
 	tideLockedToStar?: boolean
 	seismologyTotal: number
 	surfaceTidesHeating: number
+	asteroidImpacts?: boolean
 }): BiosphereProfile {
 	return HABITABILITY.get(params)
 }
@@ -269,6 +274,7 @@ function applyBodySeismology(params: {
 		isMainWorld: body.isMainWorld,
 		seed: seedForBody(body),
 		preset: body.biosphere,
+		asteroidImpacts: body.asteroidImpacts,
 	})
 	const habitability = withHabitability({
 		sizeClass: body.sizeClass,
@@ -281,6 +287,7 @@ function applyBodySeismology(params: {
 		tideLockedToStar: body.tideLock?.type === "solar",
 		seismologyTotal: totalHeating,
 		surfaceTidesHeating,
+		asteroidImpacts: body.asteroidImpacts,
 	})
 	const magneticField = MAGNETIC_FIELD.compute({
 		densityDescription: body.density?.description,
@@ -294,6 +301,23 @@ function applyBodySeismology(params: {
 		temperatureMeanK: temperatureEstimate.mean,
 		atmosphereType: (convertedAtmosphere ?? body.atmosphere)?.type,
 		pressureBar: (convertedAtmosphere ?? body.atmosphere)?.pressureBar,
+	})
+	const light = LIGHT.computeLightProfile({
+		luminositySol: starLuminositySol,
+		orbitalDistanceAU: body.orbitalDistanceAU,
+		cloudCoverFraction: cloudCover.coverFraction,
+	})
+	const weather = WEATHER.computeProfile({
+		pressureBar: (convertedAtmosphere ?? body.atmosphere)?.pressureBar ?? 0,
+		siderealDayHours: body.siderealDayHours,
+		axialTiltDeg: body.axialTiltDeg,
+		orbitalPeriodDays: body.orbitalPeriodDays,
+		eccentricity: body.eccentricity,
+		diameterKm: body.diameterKm,
+		group: body.group,
+		orbitalDistanceAU: body.orbitalDistanceAU,
+		luminositySol: starLuminositySol,
+		totalHeating,
 	})
 	const generatedTextures = withGeneratedTextures({
 		classification: body.classification,
@@ -315,6 +339,8 @@ function applyBodySeismology(params: {
 		habitability,
 		magneticField,
 		cloudCover,
+		light,
+		weather,
 		texturePath: generatedTextures.texturePath,
 		cloudsTexturePath: generatedTextures.cloudsTexturePath,
 	}
@@ -422,6 +448,7 @@ function applyMoonSeismology(params: {
 		isMainWorld: moon.isMainWorld,
 		seed: seedForMoon({ parent, moon }),
 		preset: moon.biosphere,
+		asteroidImpacts: moon.asteroidImpacts,
 	})
 	const habitability = withHabitability({
 		sizeClass,
@@ -437,6 +464,7 @@ function applyMoonSeismology(params: {
 		tideLockedToStar: moon.tideLock?.type === "solar",
 		seismologyTotal: totalHeating,
 		surfaceTidesHeating,
+		asteroidImpacts: moon.asteroidImpacts,
 	})
 
 	const resolvedDensity = rerolled?.density ?? moon.density
@@ -453,6 +481,29 @@ function applyMoonSeismology(params: {
 		temperatureMeanK: temperatureEstimate.mean,
 		atmosphereType: (convertedAtmosphere ?? resolvedAtmosphere)?.type,
 		pressureBar: (convertedAtmosphere ?? resolvedAtmosphere)?.pressureBar,
+	})
+	// A moon shares its parent planet's star-orbit rather than having its own
+	// -- same convention withTemperatureEstimate already uses above
+	// (parent.orbitalDistanceAU/eccentricity, not the moon's own).
+	const light = LIGHT.computeLightProfile({
+		luminositySol: starLuminositySol,
+		orbitalDistanceAU: parent.orbitalDistanceAU,
+		cloudCoverFraction: cloudCover.coverFraction,
+	})
+	// Tilt/rotation/atmosphere are the moon's own, but the season-driving
+	// year is its parent's orbit around the star, not the moon's own short
+	// orbit around the parent -- same convention as light above.
+	const weather = WEATHER.computeProfile({
+		pressureBar: (convertedAtmosphere ?? resolvedAtmosphere)?.pressureBar ?? 0,
+		siderealDayHours: moon.siderealDayHours,
+		axialTiltDeg: moon.axialTiltDeg,
+		orbitalPeriodDays: parent.orbitalPeriodDays,
+		eccentricity: parent.eccentricity,
+		diameterKm: moon.diameterKm,
+		group: nextGroup,
+		orbitalDistanceAU: parent.orbitalDistanceAU,
+		luminositySol: starLuminositySol,
+		totalHeating,
 	})
 	// withGeneratedTextures itself only ever preserves an authored Sol path
 	// (see its own doc) -- a previously generated one is always re-derived
@@ -491,6 +542,8 @@ function applyMoonSeismology(params: {
 		habitability,
 		magneticField,
 		cloudCover,
+		light,
+		weather,
 		texturePath: generatedTextures.texturePath,
 		cloudsTexturePath: generatedTextures.cloudsTexturePath,
 	}

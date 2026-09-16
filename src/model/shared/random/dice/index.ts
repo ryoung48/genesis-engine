@@ -15,8 +15,13 @@ function roll3d6(rng: Pick<SharedRng, "randint">): number {
 	return rollDice({ rng, count: 3, sides: 6 })
 }
 
+function rollD3(rng: Pick<SharedRng, "randint">): number {
+	return Math.ceil(rng.randint(1, 6) / 2)
+}
+
 export const DICE = {
 	rollDice,
 	roll2d6,
 	roll3d6,
+	rollD3,
 }

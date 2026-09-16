@@ -1,5 +1,4 @@
 import type {
-	HillSphereInput,
 	KeplerEquationInput,
 	MoonPeriodBounds,
 	MoonPeriodBoundsInput,
@@ -14,13 +13,6 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { TIME } from "@/model/shared/time"
 
 const TWO_PI = 2 * Math.PI
-function hillSphereM({
-	planetOrbitalDistanceM,
-	planetMassKg,
-	starMassKg,
-}: HillSphereInput): number {
-	return planetOrbitalDistanceM * Math.cbrt(planetMassKg / (3 * starMassKg))
-}
 
 function solveKeplersEquation({
 	meanAnomalyRad,
@@ -151,7 +143,11 @@ function moonPeriodBoundsDay({
 		moonMassKg: moon.massKg,
 		moonDiameterM,
 	})
-	const hill = hillSphereM({ planetOrbitalDistanceM, planetMassKg, starMassKg })
+	const hill = ORBIT_BODY.hillSphereM({
+		planetOrbitalDistanceM,
+		planetMassKg,
+		starMassKg,
+	})
 	const maxStable = 0.5 * hill
 	if (roche >= maxStable) return { minDays: 0, maxDays: 0, valid: false }
 	const periodFromDist = (distM: number) =>
@@ -195,7 +191,6 @@ function keplerMoonPositionCartesian({
 }
 
 export const MECHANICS = {
-	hillSphereM,
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
 	moonOrbitalPeriodDaysFromSemiMajorAxisM,

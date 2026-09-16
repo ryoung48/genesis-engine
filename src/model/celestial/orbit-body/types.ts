@@ -171,6 +171,39 @@ export interface CloudCoverProfile {
 	description: string
 }
 
+// Kept local for the same reason as TemperatureEstimate/BiosphereProfile
+// above -- structurally identical to planet/light/types.ts's LightProfile.
+export interface LightProfile {
+	irradianceRelativeToEarth: number
+	apparentMagnitude: number
+	effectiveApparentMagnitude: number
+	poorlyLit: boolean
+	looksDark: boolean
+}
+
+// Kept local for the same reason as TemperatureEstimate/BiosphereProfile
+// above -- structurally identical to planet/weather/types.ts's
+// WeatherProfile. See planet/weather's own doc for what's deliberately
+// excluded and why.
+export interface WeatherProfile {
+	stormHazard: boolean
+	/** Relative to Earth's own ~10 km/h global-mean near-surface wind speed
+	 * (real climatological baseline, not a book or blog-post figure). */
+	windSpeedRelative: number
+	windSpeedKmh: number
+	/** Dynamic-pressure-style force (density x velocity^2, using pressureBar
+	 * as the density proxy), relative to Earth. Undefined for a jovian: it
+	 * has no solid surface for wind to push against, so "force" has no
+	 * meaningful reference point the way it does for a rocky world. */
+	windForce?: number
+	/** windSpeedKmh crosses the real Beaufort "Gale" threshold (~62 km/h).
+	 * Undefined for a jovian: every real gas giant is already extreme by
+	 * this standard (Jupiter alone is hundreds of km/h), so the flag can't
+	 * meaningfully discriminate within that group the way it can for a
+	 * rocky world -- same exclusion pattern as windForce. */
+	strongWinds?: boolean
+}
+
 export interface MagneticFieldProfile {
 	/** 1.0 == Earth's own field strength, under magnetic-field/index.ts's
 	 * calibration. */
@@ -226,6 +259,13 @@ export interface OrbitBody {
 	 * re-deriving it from classification. A moon inherits its parent planet's
 	 * value unchanged. Absent for a hand-authored/incomplete body. */
 	impactZone?: boolean
+	/** True when this body's orbit (accounting for eccentricity) overlaps any
+	 * planetoid belt's span in the system -- see ASTEROID_BELT.crossesAnyBelt.
+	 * Not set for a body with group "asteroid belt" itself. A moon inherits
+	 * its parent planet's value unchanged, since it shares its parent's
+	 * star-orbit rather than having its own. Absent for a hand-authored/
+	 * incomplete body. */
+	asteroidImpacts?: boolean
 	hydrosphereCode?: number
 	hydrosphere?: HydrosphereProfile
 	/** Fraction of surface covered by land, 0..1 */
@@ -299,6 +339,13 @@ export interface OrbitBody {
 	 * atmosphere/temperatureEstimate are known -- unset until
 	 * applySystemSeismology runs. */
 	cloudCover?: CloudCoverProfile
+	/** [JUSTIFICATION] Computed alongside seismology, once cloudCover and
+	 * temperatureEstimate are known -- unset until applySystemSeismology
+	 * runs. */
+	light?: LightProfile
+	/** [JUSTIFICATION] Computed alongside seismology -- unset until
+	 * applySystemSeismology runs. */
+	weather?: WeatherProfile
 	/** Ported from galaxy-gen's TEMPERATURE.finalize -- a closed-form mean/
 	 * high/low estimate computed right after seismology.totalHeating is
 	 * known (see system-seismology.ts's applyBodySeismology/
@@ -332,4 +379,15 @@ export interface AUToOrbitNumberInput {
 
 export interface OrbitNumberToAUInput {
 	orbitNumber: number
+}
+
+export interface HillSphereInput {
+	planetOrbitalDistanceM: number
+	planetMassKg: number
+	starMassKg: number
+}
+
+export interface SeasonalTiltFactorInput {
+	axialTiltDeg: number
+	orbitalPeriodDays: number
 }

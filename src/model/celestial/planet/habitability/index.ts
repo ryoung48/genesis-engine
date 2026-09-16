@@ -15,6 +15,7 @@ function get(params: HabitabilityInput): HabitabilityProfile {
 		tideLockedToStar,
 		seismologyTotal,
 		surfaceTidesHeating,
+		asteroidImpacts,
 	} = params
 	const atmosphereCode = params.atmosphere?.code ?? 0
 
@@ -108,6 +109,8 @@ function get(params: HabitabilityInput): HabitabilityProfile {
 	if (tides > 0) {
 		add(-tides, "extreme tides")
 	}
+
+	if (asteroidImpacts) add(-2, "frequent asteroid impacts")
 
 	return { code: Math.max(0, habitability), trace }
 }

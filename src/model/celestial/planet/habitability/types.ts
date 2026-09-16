@@ -19,4 +19,8 @@ export interface HabitabilityInput {
 	tideLockedToStar?: boolean
 	seismologyTotal: number
 	surfaceTidesHeating: number
+	/** True when this body (or, for a moon, its parent planet) crosses a
+	 * planetoid belt -- see ASTEROID_BELT.crossesAnyBelt. Not a World
+	 * Builder's Handbook mechanic. */
+	asteroidImpacts?: boolean
 }

@@ -1,11 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 
-export interface HillSphereInput {
-	planetOrbitalDistanceM: number
-	planetMassKg: number
-	starMassKg: number
-}
-
 export interface KeplerEquationInput {
 	meanAnomalyRad: number
 	eccentricity: number

@@ -28,6 +28,7 @@ function get(params: BiosphereInput): BiosphereResult {
 		classification,
 		impactZone,
 		isMainWorld,
+		asteroidImpacts,
 	} = params
 	const atmosphere = params.atmosphere ?? VACUUM_ATMOSPHERE
 	const hydrosphereCode = params.hydrosphereCode ?? 0
@@ -82,6 +83,8 @@ function get(params: BiosphereInput): BiosphereResult {
 	if (climate === "frozen" && hydrosphereCode < 10 && hydrosphereCode > 1) {
 		add(2, "subsurface oceans")
 	}
+
+	if (asteroidImpacts) add(-2, "frequent asteroid impacts")
 
 	let value = Math.max(0, base + modifier)
 

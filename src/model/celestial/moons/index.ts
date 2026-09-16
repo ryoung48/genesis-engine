@@ -335,7 +335,7 @@ export const MOON = {
 		const planetOrbitalDistanceM =
 			orbitalDistanceAU * ORBIT_BODY.astronomicalUnitM
 
-		const hill = MECHANICS.hillSphereM({
+		const hill = ORBIT_BODY.hillSphereM({
 			planetOrbitalDistanceM,
 			planetMassKg,
 			starMassKg,

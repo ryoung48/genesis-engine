@@ -1,3 +1,4 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	DeviationInput,
 	FinalizeTemperatureInput,
@@ -452,7 +453,6 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 		seismologyTotal,
 		group,
 	} = params
-	const periodYears = orbitalPeriodDays / 365.25
 
 	// Excluded for jovians -- see ebm/index.ts's EBMConfig.seismologyTotalHeatingK
 	// doc: system-seismology.ts's residual-heating formula is tuned for
@@ -475,7 +475,7 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 
 	const { tiltFactor, rotationFactor, geographicFactor } = seasonalFactors({
 		axialTiltDeg,
-		periodYears,
+		orbitalPeriodDays,
 		tideLock,
 		siderealDayHours,
 		hydrosphereCode,
@@ -510,23 +510,22 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 // this cheap, non-permutation part of the calculation.
 function seasonalFactors(params: {
 	axialTiltDeg: number
-	periodYears: number
+	orbitalPeriodDays: number
 	tideLock?: FinalizeTemperatureInput["tideLock"]
 	siderealDayHours: number
 	hydrosphereCode: number
 }): { tiltFactor: number; rotationFactor: number; geographicFactor: number } {
 	const {
 		axialTiltDeg,
-		periodYears,
+		orbitalPeriodDays,
 		tideLock,
 		siderealDayHours,
 		hydrosphereCode,
 	} = params
-	const tiltForFactor = axialTiltDeg > 90 ? 180 - axialTiltDeg : axialTiltDeg
-	let tiltFactor = Math.sin((tiltForFactor * Math.PI) / 180)
-	if (periodYears < 0.1) tiltFactor *= 0.5
-	else if (periodYears > 2) tiltFactor += Math.min(0.25, periodYears * 0.01)
-	tiltFactor = Math.min(1, tiltFactor)
+	const tiltFactor = ORBIT_BODY.computeSeasonalTiltFactor({
+		axialTiltDeg,
+		orbitalPeriodDays,
+	})
 
 	const rotationFactor =
 		tideLock?.type !== "solar" && siderealDayHours < 2500
@@ -562,7 +561,7 @@ function trace(params: FinalizeTemperatureInput): TemperatureTraceResult {
 	const effectiveSeismology = group === "jovian" ? 0 : seismologyTotal
 	const { tiltFactor, rotationFactor, geographicFactor } = seasonalFactors({
 		axialTiltDeg,
-		periodYears: orbitalPeriodDays / 365.25,
+		orbitalPeriodDays,
 		tideLock,
 		siderealDayHours,
 		hydrosphereCode,

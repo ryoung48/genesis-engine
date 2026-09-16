@@ -18,7 +18,7 @@ function isGalaxySystem(
 	return value !== undefined && "stars" in value
 }
 
-function collectPlanets(
+function collectStarBodies(
 	systems: readonly GalaxySystem[] | readonly SystemBody[],
 ): SystemBody[] {
 	if (systems.length === 0 || !isGalaxySystem(systems[0])) {
@@ -29,7 +29,7 @@ function collectPlanets(
 	for (const system of galaxySystems) {
 		for (const star of system.stars) {
 			for (const body of star.bodies) {
-				if (body.classification !== "asteroid belt") planets.push(body)
+				planets.push(body)
 			}
 		}
 	}
@@ -82,12 +82,11 @@ export function collectBodiesByClassification(
 }
 
 const SYSTEM_SIZE_CATEGORIES = [
-	{ label: "0–4 bodies", color: "#ede9fe", maximum: 4 },
-	{ label: "5–9 bodies", color: "#c4b5fd", maximum: 9 },
-	{ label: "10–14 bodies", color: "#a78bfa", maximum: 14 },
-	{ label: "15–19 bodies", color: "#8b5cf6", maximum: 19 },
-	{ label: "20–24 bodies", color: "#6d28d9", maximum: 24 },
-	{ label: "25+ bodies", color: "#4c1d95", maximum: Number.POSITIVE_INFINITY },
+	{ label: "0–9 bodies", color: "#ede9fe", maximum: 9 },
+	{ label: "10–19 bodies", color: "#c4b5fd", maximum: 19 },
+	{ label: "20–29 bodies", color: "#8b5cf6", maximum: 29 },
+	{ label: "30–39 bodies", color: "#6d28d9", maximum: 39 },
+	{ label: "40+ bodies", color: "#4c1d95", maximum: Number.POSITIVE_INFINITY },
 ] as const
 
 export function countSystemBodies(system: GalaxySystem): number {
@@ -103,7 +102,7 @@ function systemSizeCategory(system: GalaxySystem): string {
 	const count = countSystemBodies(system)
 	return (
 		SYSTEM_SIZE_CATEGORIES.find((category) => count <= category.maximum)
-			?.label ?? "25+ bodies"
+			?.label ?? "40+ bodies"
 	)
 }
 
@@ -174,7 +173,7 @@ function bucketBy<T>(
 export function buildPlanetClassificationDistribution(
 	systems: readonly GalaxySystem[] | readonly SystemBody[],
 ): DistributionChartBucket[] {
-	return buildClassificationDistribution(collectPlanets(systems))
+	return buildClassificationDistribution(collectStarBodies(systems))
 }
 
 export function buildClassificationDistribution(
@@ -890,7 +889,9 @@ export function buildMoonCountDistribution(
 	systems: readonly GalaxySystem[] | readonly SystemBody[],
 ): DistributionChartBucket[] {
 	const buckets = bucketBy(
-		collectPlanets(systems),
+		collectStarBodies(systems).filter(
+			(body) => body.classification !== "asteroid belt",
+		),
 		(body) => (body.moons.length > 4 ? "5+" : body.moons.length.toString()),
 		(key) => `${key} moons`,
 		(key) =>

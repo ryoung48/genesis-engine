@@ -7,9 +7,13 @@ import type {
 } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
+import { ASTEROID_BELT } from "@/model/celestial/system/generation/asteroid-belt"
+import type { BeltCrossingInput } from "@/model/celestial/system/generation/asteroid-belt/types"
 import type { BodyGenerationParams } from "@/model/celestial/system/generation/body/types"
 import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
 import type { Slot } from "@/model/celestial/system/generation/environment/types"
+import { IMPACT_EXPOSURE } from "@/model/celestial/system/generation/impact-exposure"
+import type { ImpactExposureBeltInput } from "@/model/celestial/system/generation/impact-exposure/types"
 import { MOON_PLACEMENT } from "@/model/celestial/system/generation/moon-placement"
 import { ROLLS } from "@/model/celestial/system/generation/rolls"
 import { SOL_SEED_BODIES } from "@/model/celestial/system/generation/sol-seed"
@@ -17,7 +21,7 @@ import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
-import type { SystemBody } from "@/model/celestial/system/types"
+import type { BeltProfile, SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RNG } from "@/model/shared/random/rng"
 import { TEXT } from "@/model/shared/text"
@@ -266,24 +270,38 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const slots: Slot[] = params.orbitSlots
 		? params.orbitSlots
 				.filter((slot) => slot.type !== "empty")
-				.map((slot) => ({
-					zone: slot.zone!,
-					deviation: slot.deviation!,
-					orbitalDistanceAU: slot.orbitalDistanceAU!,
-					groupHint:
-						slot.type === "gas-giant"
-							? "jovian"
-							: slot.type === "belt"
-								? "asteroid belt"
-								: ROLLS.rollTerrestrialSubgroup({ rng, zone: slot.zone! }),
-					trojanCount: slot.trojanCount,
-					// Mirrors the legacy deviation-0 reservation, which was skipped
-					// entirely under "procedural" (no guaranteed habitable body) --
-					// only a non-"procedural" mode forces the baseline slot's body.
-					isMainWorld: mainWorldMode !== "procedural" && slot.isBaseline,
-					anomalousOrbitType: slot.anomalousOrbitType,
-					spreadOrbitNumber: slot.spreadOrbitNumber,
-				}))
+				.map((slot) => {
+					// Book's Belt Span DMs (p. 73) key off the belt's physical
+					// neighbors, including empty orbits -- so this indexes into the
+					// full, unfiltered params.orbitSlots (still ordered ascending by
+					// orbitNumber), not the "empty"-filtered slots array above.
+					const orbitSlotIndex = params.orbitSlots!.indexOf(slot)
+					const innerNeighbor = params.orbitSlots![orbitSlotIndex - 1]
+					const outerNeighbor = params.orbitSlots![orbitSlotIndex + 1]
+					return {
+						zone: slot.zone!,
+						deviation: slot.deviation!,
+						orbitalDistanceAU: slot.orbitalDistanceAU!,
+						groupHint:
+							slot.type === "gas-giant"
+								? "jovian"
+								: slot.type === "belt"
+									? "asteroid belt"
+									: ROLLS.rollTerrestrialSubgroup({ rng, zone: slot.zone! }),
+						trojanCount: slot.trojanCount,
+						// Mirrors the legacy deviation-0 reservation, which was skipped
+						// entirely under "procedural" (no guaranteed habitable body) --
+						// only a non-"procedural" mode forces the baseline slot's body.
+						isMainWorld: mainWorldMode !== "procedural" && slot.isBaseline,
+						anomalousOrbitType: slot.anomalousOrbitType,
+						spreadOrbitNumber: slot.spreadOrbitNumber,
+						hasAdjacentGasGiant:
+							innerNeighbor?.type === "gas-giant" ||
+							outerNeighbor?.type === "gas-giant",
+						isOutermostOrbitSlot:
+							orbitSlotIndex === params.orbitSlots!.length - 1,
+					}
+				})
 		: [
 				...rng
 					.sample(epistellarPool, epistellarCount)
@@ -628,6 +646,19 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 							maxOrbitalDistanceAU,
 						}),
 					})
+		// World Builder's Handbook pp. 72-75's Planetoid Belt Characteristics.
+		const belt: BeltProfile | undefined =
+			group === "asteroid belt"
+				? ASTEROID_BELT.rollProfile({
+						rng,
+						orbitalDistanceAU,
+						luminositySol,
+						starAgeGyr,
+						spreadOrbitNumber: slot.spreadOrbitNumber,
+						hasAdjacentGasGiant: slot.hasAdjacentGasGiant ?? false,
+						isOutermostOrbitSlot: slot.isOutermostOrbitSlot ?? false,
+					})
+				: undefined
 		// The gas-giant-moon slot always needs at least one moon to promote.
 		const moonCount = isGasGiantMainWorld
 			? Math.max(1, rolledMoonCount)
@@ -829,6 +860,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			// use a stale pre-seismology climate estimate.
 			rings: ROLLS.rollPlanetRings({ rng, group: finalEnvironment.group }),
 			orbitalDistanceAU,
+			belt,
 			diameterKm,
 			massKg,
 			gravityG:
@@ -1017,12 +1049,52 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		bodies.push(...trojans)
 	}
 
+	// Every belt in the system contributes debris flux to every other body --
+	// not just belts a body's own eccentric orbit crosses -- so this is
+	// computed against the full, final belt list, after belt dwarfs/trojans
+	// are in place.
+	const finalizedBelts = bodies.filter(
+		(body): body is SystemBody & { belt: BeltProfile } =>
+			body.group === "asteroid belt" && body.belt !== undefined,
+	)
+	const beltsForImpactExposure: ImpactExposureBeltInput[] = finalizedBelts.map(
+		(belt) => ({
+			orbitalDistanceAU: belt.orbitalDistanceAU,
+			bulk: belt.belt.bulk,
+		}),
+	)
+	const beltsForCrossing: BeltCrossingInput[] = finalizedBelts.map((belt) => ({
+		orbitalDistanceAU: belt.orbitalDistanceAU,
+		spanOrbitNumber: belt.belt.spanOrbitNumber,
+	}))
+	const bodiesWithImpactExposure = bodies.map((body) => {
+		if (body.group === "asteroid belt") return body
+		// A moon shares its parent planet's star-orbit rather than having its
+		// own, so it inherits this unchanged -- same pattern as impactZone.
+		const asteroidImpacts = ASTEROID_BELT.crossesAnyBelt({
+			bodyOrbitalDistanceAU: body.orbitalDistanceAU,
+			bodyEccentricity: body.eccentricity,
+			belts: beltsForCrossing,
+		})
+		return {
+			...body,
+			impactExposure: IMPACT_EXPOSURE.computeForBody({
+				bodyOrbitalDistanceAU: body.orbitalDistanceAU,
+				belts: beltsForImpactExposure,
+			}),
+			asteroidImpacts,
+			moons: body.moons.map((moon) => ({ ...moon, asteroidImpacts })),
+		}
+	})
+
 	// Surface-tide heating is itself just a display/classification refinement
 	// on top of residual heating -- skipped under skipNaming along with naming,
 	// since a bulk pre-generation pass has no more use for it than for names
 	// until the system is actually opened (real generate always includes it).
 	return PLANET.applySystemSeismology({
-		bodies: bodies.sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU),
+		bodies: bodiesWithImpactExposure.sort(
+			(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
+		),
 		starAgeGyr,
 		starLuminositySol: luminositySol,
 		spectralClass,

@@ -1,8 +1,10 @@
 import type {
 	AUToOrbitNumberInput,
 	DensityFromMassAndDiameterInput,
+	HillSphereInput,
 	MassFromDensityInput,
 	OrbitNumberToAUInput,
+	SeasonalTiltFactorInput,
 	SizeClassToDiameterRangeInput,
 } from "@/model/celestial/orbit-body/types"
 import { DICE } from "@/model/shared/random/dice"
@@ -200,4 +202,34 @@ export const ORBIT_BODY = {
 	solarMassKg,
 	astronomicalUnitM,
 	gravitationalConstantM3KgS2,
+
+	hillSphereM({
+		planetOrbitalDistanceM,
+		planetMassKg,
+		starMassKg,
+	}: HillSphereInput): number {
+		return planetOrbitalDistanceM * Math.cbrt(planetMassKg / (3 * starMassKg))
+	},
+
+	/**
+	 * How much of a body's axial tilt actually manifests as a seasonal swing,
+	 * given how long its year is relative to the thermal lag of a season: a
+	 * short year (<0.1 yr) doesn't leave a season time to develop before it
+	 * flips, damping the effect; a long year (>2 yr) lets it fully develop,
+	 * with a small bonus capped at +0.25. Shared by planets and moons (a
+	 * moon's tilt/rotation are its own, but its season-driving year is its
+	 * parent's orbit around the star, not its own short orbit around the
+	 * parent -- see callers).
+	 */
+	computeSeasonalTiltFactor({
+		axialTiltDeg,
+		orbitalPeriodDays,
+	}: SeasonalTiltFactorInput): number {
+		const foldedTiltDeg = axialTiltDeg > 90 ? 180 - axialTiltDeg : axialTiltDeg
+		let tiltFactor = Math.sin((foldedTiltDeg * Math.PI) / 180)
+		const periodYears = orbitalPeriodDays / 365.25
+		if (periodYears < 0.1) tiltFactor *= 0.5
+		else if (periodYears > 2) tiltFactor += Math.min(0.25, periodYears * 0.01)
+		return Math.min(1, tiltFactor)
+	},
 }

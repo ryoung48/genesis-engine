@@ -19,6 +19,10 @@ export interface BiosphereInput {
 	classification: OrbitClassification
 	impactZone?: boolean
 	isMainWorld?: boolean
+	/** True when this body (or, for a moon, its parent planet) crosses a
+	 * planetoid belt -- see ASTEROID_BELT.crossesAnyBelt. Not a World
+	 * Builder's Handbook mechanic. */
+	asteroidImpacts?: boolean
 }
 
 export interface BiosphereResult {
