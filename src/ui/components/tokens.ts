@@ -1,14 +1,10 @@
-/** Palette entries for hardcoded per-domain colors that used to be inlined
- * as hex literals at each call site (war swatch, chart series, ...). */
 export const uiPalette = {
 	war: "#b91c1c",
 	giantStar: "#ef4444",
-	/** Shared accent used for "current date"/"active" reference markers
-	 * (WikiTimeline's current-date line, star-stats' active chip). */
+	moonHighland: "#c2c2c2",
+	martianHighland: "#d7724d",
 	accent: "#4f46e5",
 	activeDark: "#0f172a",
-	/** `Swatch` primitive's own defaults (striped/plain border, striped
-	 * fill's second color). */
 	swatch: {
 		stripeBackground: "rgba(15, 23, 42, 0.85)",
 		stripedBorder: "rgba(255, 255, 255, 0.15)",
@@ -16,14 +12,10 @@ export const uiPalette = {
 	},
 } as const
 
-/** Chart.js / inline-SVG chart palettes -- kept here instead of per-file
- * arrays/hex literals so all chart accents share one place to retint. */
 export const uiChartPalette = {
-	/** Rotating series colors for per-moon tidal-force lines. */
 	moon: ["#0ea5e9", "#8b5cf6", "#10b981"] as const,
 	solar: "#f59e0b",
 	total: "#1e293b",
-	/** Descending-emphasis tiers for the timing bar chart (rank 0, 1-3, 4+). */
 	timingTiers: ["#0f172a", "#1e293b", "#334155"] as const,
 	successFill: "rgba(22, 163, 74, 0.1)",
 	successStroke: "#16a34a",
@@ -33,7 +25,6 @@ export const uiChartPalette = {
 	gridLineTranslucent: "rgba(148, 163, 184, 0.2)",
 	referenceLine: "#94a3b8",
 	tooltipBg: "#ffffff",
-	/** Tone dots used by `ContributionTooltipContent`. */
 	tone: {
 		neutral: "bg-slate-500",
 		warm: "bg-amber-500",

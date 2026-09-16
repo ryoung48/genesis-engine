@@ -455,7 +455,11 @@ export function buildMoonOrbitOverlay(
 			moon.texturePath,
 			moon.cloudsTexturePath,
 			cloudBandPalette
-				? buildCloudBandMaterial({ seed: i + 1, palette: cloudBandPalette })
+				? buildCloudBandMaterial({
+						seed: i + 1,
+						palette: cloudBandPalette,
+						style: "cloudy",
+					})
 				: undefined,
 		)
 		group.add(moonMesh)

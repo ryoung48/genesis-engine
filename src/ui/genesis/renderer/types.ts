@@ -1,4 +1,5 @@
-﻿import type { MoonBody } from "@/model/celestial/moons/types"
+﻿import type * as THREE from "three"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WindArrowData } from "@/model/climate/weather/wind/types"
 import type {
 	Eu4ProvinceBorderGeometry,
@@ -22,6 +23,35 @@ import type {
 export type { WindArrowData }
 
 export type GenesisViewMode = "globe" | "map"
+
+export type CloudBandStyle = "cloudy" | "banded" | "venusian"
+
+export type CloudBandPalette = {
+	top: THREE.Color
+	bot: THREE.Color
+	mid1: THREE.Color
+	mid2: THREE.Color
+	mid3: THREE.Color
+	bandWarm: THREE.Color
+	bandCream: THREE.Color
+	bandDark: THREE.Color
+}
+
+export type CloudBandPaletteInput = {
+	hex: number
+}
+
+export type CloudBandMaterialInput = {
+	seed: number
+	palette: CloudBandPalette
+	style: CloudBandStyle
+}
+
+export type CraterMaterialInput = {
+	seed: number
+	color: string
+	style: "cratered" | "martian" | "snowball" | "meltball"
+}
 
 export interface GenesisHoverInfo {
 	region: number

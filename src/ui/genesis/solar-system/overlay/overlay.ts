@@ -14,7 +14,6 @@ import {
 } from "@/ui/genesis/renderer/body-name-label"
 import {
 	buildCloudBandMaterial,
-	type CloudBandPalette,
 	swatchCloudBandPalette,
 } from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
@@ -29,6 +28,7 @@ import {
 	buildStarSurfaceLayers,
 	STAR_GLOW_RADIUS_SCALE,
 } from "@/ui/genesis/renderer/star-surface-material"
+import type { CloudBandPalette } from "@/ui/genesis/renderer/types"
 import { scaleBodyDiameterToVisualRadius } from "@/ui/genesis/shared/moon-visual-scale"
 import {
 	buildAsteroidField,
@@ -655,7 +655,11 @@ export function buildSolarSystemOverlay(
 				? swatchCloudBandPalette({ hex: bodySwatchHex })
 				: null
 		const material = cloudBandPalette
-			? buildCloudBandMaterial({ seed: body.idx, palette: cloudBandPalette })
+			? buildCloudBandMaterial({
+					seed: body.idx,
+					palette: cloudBandPalette,
+					style: "cloudy",
+				})
 			: mainWorldSatelliteMap
 				? new THREE.MeshStandardMaterial({
 						map: mainWorldSatelliteMap,
