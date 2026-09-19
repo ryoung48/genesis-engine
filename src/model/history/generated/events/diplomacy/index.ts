@@ -392,7 +392,10 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 	const neighborSet = new Set(neighbors)
 
 	// Cleanup pass: drop non-neighbor relations to neutral
-	for (let other = 0; other < state.P; other++) {
+	const heldColumns = Array.from(state.relationColumns[nation]).sort(
+		(a, b) => a - b,
+	)
+	for (const other of heldColumns) {
 		if (other === nation || state.desolate[other]) continue
 		const rel = STATE.getRelation({ state, a: nation, b: other })
 		if (rel === STATE.rel.NONE || rel === STATE.rel.NEUTRAL) continue

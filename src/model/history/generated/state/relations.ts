@@ -24,14 +24,18 @@ export function getRulerRelation({
 	const P = state.P
 	const rels = state.relationsCurrent
 	const base = nation * P
-	for (let other = 0; other < P; other++) {
+	let ruler = -1
+	let rulerRelation: Relation = rel.NONE
+	for (const other of state.relationColumns[nation]) {
 		if (other === nation || state.desolate[other]) continue
+		if (ruler >= 0 && other > ruler) continue
 		const relation = rels[base + other] as Relation
 		if (relation === rel.OVERLORD || relation === rel.PU_SENIOR) {
-			return { ruler: other, relation }
+			ruler = other
+			rulerRelation = relation
 		}
 	}
-	return undefined
+	return ruler >= 0 ? { ruler, relation: rulerRelation } : undefined
 }
 
 export function getSovereign({ state, p }: GetSovereignParams): number {

@@ -272,6 +272,8 @@ const prov = {
 	},
 } as const
 
+const NEUTRAL_RELATION = 7
+
 function relationKey({ state, a, b }: RelationKeyParams): number {
 	return a * state.P + b
 }
@@ -320,6 +322,10 @@ const rel = {
 		if (time >= state.time) {
 			state.relationsCurrent[forwardKey] = flipped
 			state.relationsCurrent[backwardKey] = rel
+			if (flipped === NEUTRAL_RELATION) state.relationColumns[a].delete(b)
+			else state.relationColumns[a].add(b)
+			if (rel === NEUTRAL_RELATION) state.relationColumns[b].delete(a)
+			else state.relationColumns[b].add(a)
 		}
 	},
 } as const

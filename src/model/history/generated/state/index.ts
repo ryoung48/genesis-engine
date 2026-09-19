@@ -139,11 +139,15 @@ function getWarAllies({
 	DERIVE.ensureHierarchyClean(state)
 	const rels = state.relationsCurrent
 	const P = state.P
-	for (let i = 0; i < P; i++) {
+	const candidates: number[] = []
+	for (const i of state.relationColumns[nation]) {
 		if (i === nation || i === target) continue
+		if (!validRelMask[rels[nation * P + i] as Relation]) continue
+		candidates.push(i)
+	}
+	candidates.sort((a, b) => a - b)
+	for (const i of candidates) {
 		if (state.parentCurrent[i] >= 0 || state.sovereignCurrent[i] < 0) continue
-		const relation = rels[nation * P + i] as Relation
-		if (!validRelMask[relation]) continue
 		if ((rels[i * P + target] as Relation) === rel.ALLY) continue
 		allies.push(i)
 	}
@@ -636,6 +640,7 @@ function createHistoryState({
 		childList: new Int32Array(0),
 		sovereignCurrent: new Int32Array(P).fill(-1),
 		relationsCurrent: new Uint8Array(P * P).fill(rel.NEUTRAL),
+		relationColumns: Array.from({ length: P }, () => new Set<number>()),
 		hierarchyDirty: true,
 		hierarchyVersion: 0,
 		assignmentCurrent: new Int32Array(P).fill(-1),

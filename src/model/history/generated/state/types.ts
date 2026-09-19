@@ -92,6 +92,7 @@ export interface HistoryState {
 	childList: Int32Array
 	sovereignCurrent: Int32Array
 	relationsCurrent: Uint8Array
+	relationColumns: Set<number>[]
 	hierarchyDirty: boolean
 	hierarchyVersion: number
 	_nationAdjCache?: { offset: Int32Array; list: Int32Array }
