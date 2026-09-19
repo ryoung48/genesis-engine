@@ -241,3 +241,7 @@ export function buildMergedProvinceAttributeDescription(
 	]
 	return `${formatList(clauses)}.`
 }
+
+export function formatWealthCost(cost: number | null): string | null {
+	return cost === null ? null : `${cost.toFixed(1)} wealth`
+}

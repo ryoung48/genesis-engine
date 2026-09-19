@@ -15,6 +15,36 @@ export interface ComputeDevelopmentParams {
 	urbanPopulation: Float32Array
 }
 
+export interface RankSizesForNationParams {
+	governmentTypeIndex: number
+	totalPopulation: number
+	provinceCount: number
+}
+
+export interface SortByRankParams {
+	provinces: number[]
+	depth: ArrayLike<number>
+	habitability: ArrayLike<number>
+}
+
+export interface SpreadDevelopmentParams {
+	count: number
+	cityMin: number
+	desolate: Uint8Array
+	waterAccess: Uint8Array
+	urbanAt: (province: number) => number
+	sovereignAt: (province: number) => number
+	neighborsAt: (province: number) => Iterable<number>
+}
+
+export interface SpreadEntry {
+	province: number
+	dev: number
+	sourceNation: number
+	hops: number
+	stamp: number
+}
+
 export interface NationProfile {
 	U: number
 	q: number

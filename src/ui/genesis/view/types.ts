@@ -12,7 +12,7 @@ import type {
 	RawOrganizationReference,
 } from "@/model/history/earth/data-source/types"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
-import type { HistoryNote } from "@/model/history/generated/state/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
@@ -27,10 +27,9 @@ import type {
 	loadGenerationSessionSnapshotSync,
 } from "@/ui/genesis/generation/session-persistence"
 import type { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
-import type { useEarthHistoryTimeline } from "@/ui/genesis/generation/useEarthHistoryTimeline"
+import type { useHistoryTimeline } from "@/ui/genesis/generation/useHistoryTimeline"
 import type { StoredViewPrefs } from "@/ui/genesis/generation/view-prefs"
 import type { HoverInfo } from "@/ui/genesis/hover/hover"
-import type { buildSelectedNationDetails } from "@/ui/genesis/political/nation-details-model"
 import type { GenesisScene, GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
@@ -39,14 +38,12 @@ import type {
 	ReligionMapMode,
 	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
-import type { DisplayNationModel } from "@/ui/genesis/view/display-model"
-import type { WikiCountHistoryPoint } from "@/ui/wiki/shared/WikiTimeline"
 
 /** The live `GenesisScene` handle shared by every GenesisView concern hook. */
 export type SceneRef = RefObject<GenesisScene | null>
 
-/** Everything `useEarthHistoryTimeline` exposes, threaded into concern hooks. */
-export type EarthHistoryTimeline = ReturnType<typeof useEarthHistoryTimeline>
+/** Everything `useHistoryTimeline` exposes, threaded into concern hooks. */
+export type HistoryTimeline = ReturnType<typeof useHistoryTimeline>
 
 /**
  * Resolves the per-org category schema (organization-categories.ts) into a
@@ -72,8 +69,7 @@ export type NationWikiDataInput = WikiSelectionSetters & {
 	selectedWikiNationId: number | null
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
-	earthHistory: EarthHistoryTimeline
-	earthImportRawIdToCompact: Map<number, number> | null
+	history: HistoryTimeline
 	showObservedDistributions: boolean
 	planetName: string
 	getProvinceColor: (provinceId: number) => string | null
@@ -88,39 +84,9 @@ export type OrganizationWikiDataInput = NationWikiDataInput & {
 export type WarWikiDataInput = WikiSelectionSetters & {
 	selectedWikiWarId: number | null
 	world: SerializedGenesisWorld | null
-	earthHistory: EarthHistoryTimeline
-	earthImportRawIdToCompact: Map<number, number> | null
+	history: HistoryTimeline
 	planetName: string
 	getProvinceColor: (provinceId: number) => string | null
-	sceneRef: SceneRef
-}
-
-export type ProceduralNationWikiDataInput = {
-	world: SerializedGenesisWorld | null
-	selectedNation: ReturnType<typeof buildSelectedNationDetails>
-	planetName: string
-	proceduralHistoryTimeMs: number
-	proceduralHistoryEventsRef: RefObject<HistoryNote[]>
-	proceduralProvinceHistoryRef: RefObject<Map<number, WikiCountHistoryPoint[]>>
-	getNationName: (nationId: number) => string
-	getNationColor: (nationId: number) => string | null
-	setSelectedNationId: (nationId: number | null) => void
-	setSelectedWikiOrganizationId: (orgId: string | null) => void
-	onSelectNation: (nationId: number) => void
-	sceneRef: SceneRef
-}
-
-export type ProceduralOrganizationWikiDataInput = {
-	world: SerializedGenesisWorld | null
-	selectedWikiOrganizationId: string | null
-	planetName: string
-	getNationName: (nationId: number) => string
-	getNationColor: (nationId: number) => string | null
-	getCultureName: (cultureId: number) => string
-	getHeritageName: (heritageId: number) => string
-	getOrganizationName: (orgId: string) => string
-	setSelectedWikiOrganizationId: (orgId: string | null) => void
-	onSelectNation: (nationId: number) => void
 	sceneRef: SceneRef
 }
 
@@ -191,7 +157,6 @@ export type WorldDisplayDataInput = {
 	worldForDisplay: SerializedGenesisWorld | null
 	hoverInfo: HoverInfo | null
 	eu4HoverFillGeometry: Eu4ProvinceFillGeometry | null
-	nationModel: DisplayNationModel | null
 	colorMode: ColorMode
 	dataVariant: DataVariant
 	showWindArrows: boolean
@@ -228,10 +193,7 @@ export type WorldWindCache = {
 export type WorldDistributionsInput = {
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
-	earthHistory: EarthHistoryTimeline
-	nationModel: DisplayNationModel | null
-	nationProvinceCounts: Map<number, number>
-	colorMode: ColorMode
+	history: HistoryTimeline
 	dataVariant: DataVariant
 }
 
@@ -247,12 +209,11 @@ export type MapExportInput = {
 }
 
 export type MapColoringInput = {
-	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
-	earthHistory: EarthHistoryTimeline
+	history: HistoryTimeline
 	historyFrame: WorldFrame | null
 	/** Culture/religion key -> [r,g,b] 0-1 for the active history frame --
-	 * earthHistory's reference maps for Earth imports, the procedural timeline's
+	 * history's reference maps for Earth imports, the procedural timeline's
 	 * own PartitionRow colours otherwise. Feeds computeEarthHistoryRegionColors
 	 * so both modes share one rendering path. */
 	historyCultureColorById: Map<string, [number, number, number]> | null
@@ -264,21 +225,15 @@ export type MapColoringInput = {
 	viewMode: GenesisViewMode
 	showElevation: boolean
 	dangerSubMode: DangerSubMode
-	selectedNationId: number | null
 	selectedWikiOrganizationId: string | null
+	selectedWikiNationId: number | null
 	windVectors: ReturnType<typeof WIND.computeWindVectors> | null
-	earthImportRawIdToCompact: Map<number, number> | null
 	hoverProvince: number | null
 	labelsPlaybackActive: boolean
 	temperatureMonth: number
 	rainfallMonth: number
 	dtrMonth: number
 	currentMonth: number
-	/** Resolves a procedural organization's lazily-generated display name
-	 * (e.g. an Imperial Patchwork's "[Word] Empire") for the org-highlight
-	 * label -- Earth-import orgs get their name straight off
-	 * earthHistory.organizationReference instead, so this is unused there. */
-	getOrganizationName: (orgId: string) => string
 }
 
 export type WorldGenerationInput = {
@@ -298,15 +253,9 @@ export type WorldGenerationInput = {
 	setShowCoastlines: (show: boolean) => void
 	setSolarSystemViewActive: (active: boolean) => void
 	setPathfindingResult: (result: PathfindingResult | null) => void
-	setProceduralHistoryFrame: (frame: WorldFrame | null) => void
 	setProceduralHistoryPlaying: (playing: boolean) => void
-	setProceduralHistoryTimeMs: (timeMs: number) => void
-	resetProceduralHistoryAccumulation: () => void
-	recordProceduralFrame: (
-		timeMs: number,
-		frame: WorldFrame,
-		newEvents: HistoryNote[],
-	) => void
+	startProceduralJournal: (transactions: JournalTransaction[]) => void
+	recordProceduralJournal: (transactions: JournalTransaction[]) => void
 	seed: number
 	setSeed: (seed: number) => void
 	/** Flips the display data source -- an Earth-import Generate (seed ===
@@ -356,9 +305,9 @@ export type PathfindingResult = {
 export type GenesisSceneSyncInput = {
 	sceneRef: SceneRef
 	worldForDisplay: SerializedGenesisWorld | null
-	earthHistory: EarthHistoryTimeline
+	history: HistoryTimeline
 	hoverInfo: HoverInfo | null
-	selectedNationId: number | null
+	selectedWikiNationId: number | null
 	viewMode: GenesisViewMode
 	solarSystemViewActive: boolean
 	mapProjectionLatitude: number

@@ -201,7 +201,6 @@ export function createGenesisScene(
 		rebuildOverlays: () => rebuildOverlays(),
 	})
 	const {
-		focusOnNation,
 		focusOnProvince,
 		stepPulse,
 		stepFocusTween,
@@ -488,7 +487,6 @@ export function createGenesisScene(
 		setCloudsVisible,
 		setCoastlineOverlayVisible,
 		setFullAmbient,
-		focusOnNation,
 		focusOnProvince,
 		setMoonOrbitOverlay,
 		updateMoonOrbitOverlay,

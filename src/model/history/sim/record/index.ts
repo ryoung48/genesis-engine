@@ -2,15 +2,19 @@ import type { LonLat } from "@/model/history/earth/types"
 import type {
 	HistoryRecord,
 	HistoryState,
+	NationEventLog,
 	NationIdentity,
-	ProceduralNationInit,
+	OrganizationEventRecord,
+	ProvinceEventLog,
 	ProvinceMap,
 	ProvinceMeta,
 } from "@/model/history/record/types"
+import { TRANSLATOR } from "@/model/history/sim/record/translator"
 import type { BuildProceduralStateParams } from "@/model/history/sim/record/types"
 import type { PartitionRow } from "@/model/history/world-frame/types"
 import { ERAS } from "@/model/society/eras"
 import { NAMES } from "@/model/society/language/names"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 function scale255(value: number): number {
 	return Math.round(Math.max(0, Math.min(1, value)) * 255)
@@ -28,11 +32,9 @@ function partitionColor(params: {
 	]
 }
 
-// The pastel softening the procedural UI applies to raw generator nation
-// colours (toPastelNationColor, ui/genesis/shared/region-colors/palette.ts).
-// Baked into NationFrame.color here, and mirrored on the wiki swatch
-// (buildDisplayNationModel), so the shared history render path stays raw for
-// Earth while procedural nations keep their softer look on both.
+// The pastel softening applied to raw generator nation colours, baked into
+// NationFrame.color so the shared history render path stays raw for Earth
+// while procedural nations keep their softer look.
 const PASTEL_MIX = 0.52
 function pastelNationColor(params: {
 	colors: Float32Array
@@ -59,6 +61,7 @@ function buildProceduralRecord(
 	params: BuildProceduralStateParams,
 ): HistoryRecord {
 	const { world, startTimeMs } = params
+	const recordStartTimeMs = TRANSLATOR.recordTime(startTimeMs)
 	const provinceCount = world.provinces?.count ?? 0
 	const { nations, cultures, religions } = world
 	const names = NAMES.createWorldNames(world)
@@ -83,8 +86,7 @@ function buildProceduralRecord(
 			}))
 		: []
 
-	// nation id == raw partition index; a province's nation is its SOVEREIGN
-	// (matching the procedural display convention -- see buildDisplayWorld),
+	// nation id == raw partition index; a province's nation is its SOVEREIGN,
 	// found by mapping the sovereign-root province back to its nation index.
 	const nationIdByCapital = new Map<number, number>()
 	if (nations) {
@@ -110,27 +112,26 @@ function buildProceduralRecord(
 	const provinceCultureBlendSecondary =
 		cultures?.blendSecondary?.slice() ?? new Int32Array(provinceCount).fill(-1)
 
-	const nationInits: ProceduralNationInit[] = []
+	const nationEvents: NationEventLog[] = []
 	const nationIdentities: NationIdentity[] = []
 	if (nations) {
 		for (let id = 0; id < nations.seeds.length; id++) {
 			const capital = nations.seeds[id] ?? -1
 			const governmentType =
 				capital >= 0 ? (nations.governmentType?.[capital] ?? 0) : 0
-			nationInits.push({
-				id,
-				capitalProvince: capital,
-				// The concrete GovernmentType string; the unified history
-				// government palette (GOVERNMENT.getEarthHistoryGovernmentColor)
-				// resolves it directly.
-				government: ERAS.governmentTypes[governmentType] ?? "",
-				governmentReform: "",
+			nationEvents.push({
+				base: {
+					capitalProvinceId: capital,
+					initialGovernment: ERAS.governmentTypes[governmentType] ?? "",
+					reforms: [],
+				},
+				events: [],
 			})
 			nationIdentities.push({
 				id,
 				name: names.nation(capital),
 				color: pastelNationColor({ colors: nations.colors, id }),
-				birthTimeMs: startTimeMs,
+				birthTimeMs: recordStartTimeMs,
 				deathTimeMs: -1,
 				isRebel: false,
 				tag: null,
@@ -138,56 +139,113 @@ function buildProceduralRecord(
 		}
 	}
 
+	const provinceEvents = new Map<number, ProvinceEventLog>()
+	for (let province = 0; province < provinceCount; province++) {
+		provinceEvents.set(province, {
+			base: {
+				ownerId: provinceNation[province],
+				controllerId: provinceNation[province],
+				parentId: nations?.parent[province] ?? -1,
+				cultureId: provinceCulture[province],
+				cultureBlendSecondaryId: provinceCultureBlendSecondary[province],
+				religionId: provinceReligion[province],
+				inHolyRomanEmpire: false,
+			},
+			events: [],
+		})
+	}
+	const organizationEvents: OrganizationEventRecord[] = []
+	for (const organization of nations?.organizations ?? []) {
+		for (const member of organization.members) {
+			organizationEvents.push({
+				timeMs: recordStartTimeMs,
+				nationId: member.nationIndex,
+				kind: "join",
+				payload: { orgId: organization.id, role: member.title },
+			})
+		}
+		const capital = nations?.seeds[organization.leadNationIndex] ?? -1
+		if (capital >= 0)
+			organizationEvents.push({
+				timeMs: recordStartTimeMs,
+				provinceId: capital,
+				kind: "siteStart",
+				payload: {
+					orgId: organization.id,
+					name: organization.id,
+					role: "capital",
+				},
+			})
+	}
 	return {
 		origin: "procedural",
-		minTimeMs: startTimeMs,
-		maxTimeMs: startTimeMs,
+		minTimeMs: recordStartTimeMs,
+		maxTimeMs: recordStartTimeMs,
 		nations: nationIdentities,
 		cultures: cultureRows,
 		religions: religionRows,
-		timeline: {
-			initial: {
-				provinceCount,
-				provinceNation,
-				provinceCulture,
-				provinceReligion,
-				provinceCultureBlendSecondary,
-				provincePopulation: new Float32Array(provinceCount),
-				provincePopulationUrban: new Float32Array(provinceCount),
-				provinceDevelopment: new Float32Array(provinceCount),
-				nations: nationInits,
-			},
+		events: {
+			provinceEvents,
+			nationEvents,
+			wars: [],
+			diplomacy: [],
+			organizationEvents,
+			censuses: [],
 		},
+	}
+}
+
+function provinceLonLat({
+	world,
+	province,
+}: {
+	world: SerializedGenesisWorld
+	province: number
+}): LonLat {
+	const region = world.provinces?.seeds[province] ?? -1
+	if (region < 0) return { lon: 0, lat: 0 }
+	const { r_xyz } = world.mesh
+	const x = r_xyz[region * 3]
+	const y = r_xyz[region * 3 + 1]
+	const z = r_xyz[region * 3 + 2]
+	return {
+		lon: (Math.atan2(y, x) * 180) / Math.PI,
+		lat:
+			(Math.asin(Math.max(-1, Math.min(1, z / (Math.hypot(x, y, z) || 1)))) *
+				180) /
+			Math.PI,
 	}
 }
 
 function buildProceduralState(
 	params: BuildProceduralStateParams,
 ): HistoryState {
-	const provinceCount = params.world.provinces?.count ?? 0
-	const zeroCoords: LonLat[] = Array.from({ length: provinceCount }, () => ({
-		lon: 0,
-		lat: 0,
-	}))
+	const { world } = params
+	const provinceCount = world.provinces?.count ?? 0
+	const names = NAMES.createWorldNames(world)
 	return {
 		record: buildProceduralRecord(params),
 		frameCache: new Map(),
 		provinceMap: identityProvinceMap(provinceCount),
 		provinceMeta: Array.from(
 			{ length: provinceCount },
-			(): ProvinceMeta => ({
-				name: null,
+			(_, province): ProvinceMeta => ({
+				name: names.province(province),
 				wasteland: false,
 				area: null,
 				region: null,
 				superregion: null,
 			}),
 		),
-		provinceCoords: params.provinceCoords ?? zeroCoords,
+		provinceCoords: Array.from({ length: provinceCount }, (_, province) =>
+			provinceLonLat({ world, province }),
+		),
 	}
 }
 
 export const SIM_RECORD = {
 	buildProceduralRecord,
 	buildProceduralState,
+	createTranslator: TRANSLATOR.createTranslator,
+	appendJournal: TRANSLATOR.appendJournal,
 }

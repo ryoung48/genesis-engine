@@ -47,10 +47,3 @@ export const GOVERNMENT_COLORS_CSS: Record<number, string> = Object.fromEntries(
 		]
 	}),
 ) as Record<number, string>
-
-export function governmentColorForIndex(
-	index: number,
-): [number, number, number] {
-	const type = ERAS.governmentTypes[index] ?? "feudal_monarchy"
-	return GOVERNMENT_COLORS_BY_TYPE[type]
-}

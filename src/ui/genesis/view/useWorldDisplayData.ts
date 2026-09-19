@@ -73,7 +73,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		worldForDisplay,
 		hoverInfo,
 		eu4HoverFillGeometry,
-		nationModel,
 		colorMode,
 		dataVariant,
 		showWindArrows,
@@ -224,11 +223,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	const hoverRiver = getHoverRiver(hoverInfo, worldForDisplay)
 	const hoverTerrainFeature = getHoverTerrainFeature(hoverInfo, worldForDisplay)
 	const hoverOceanCurrents = getHoverOceanCurrents(hoverInfo, worldForDisplay)
-	const hoverNationId = useMemo(() => {
-		const assignment = nationModel?.assignment
-		if (hoverProvince === null || hoverProvince < 0 || !assignment) return null
-		return assignment[hoverProvince] ?? null
-	}, [nationModel, hoverProvince])
 	const worldNames = useMemo(
 		() => (world ? createDisplayNames(world) : null),
 		[world],
@@ -281,10 +275,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		religionLabelsArray,
 		350,
 		labelsPlaybackActive,
-	)
-	const getNationName = useCallback(
-		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
-		[worldNames],
 	)
 	const getProvinceName = useCallback(
 		(provinceId: number) =>
@@ -528,7 +518,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	})
 
 	return {
-		earthImportRawIdToCompact,
 		getCultureName,
 		getDynastyName,
 		getGlobeCameraDir,
@@ -536,7 +525,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		getReligionName,
 		getLandmarkName,
 		getLeaderName,
-		getNationName,
 		getOrganizationName,
 		getProvinceColor,
 		getProvinceName,
@@ -558,7 +546,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		hoverIsLand,
 		hoverLandmark,
 		hoverMisery,
-		hoverNationId,
 		hoverOccupation,
 		hoverOceanCurrents,
 		hoverOceanDist,

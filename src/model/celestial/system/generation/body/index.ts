@@ -374,7 +374,7 @@ function rollYouthBeltWrapper({
  * orbitalDistanceAU — siblings are generated around it, never replacing it.
  */
 function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
-	const { seed, mainWorldMode, starMassKgOverride } = params
+	const { seed, mainWorldMode, starMassKgOverride, exactHZC } = params
 	const hostStar = params.hostStar
 	const spectralClass =
 		hostStar?.spectralClass ?? params.spectralClass ?? STAR.defaultSpectralClass
@@ -501,10 +501,15 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					const orbitSlotIndex = params.orbitSlots!.indexOf(slot)
 					const innerNeighbor = params.orbitSlots![orbitSlotIndex - 1]
 					const outerNeighbor = params.orbitSlots![orbitSlotIndex + 1]
+					const pinBaselineToHZC =
+						exactHZC && mainWorldMode !== "procedural" && slot.isBaseline
+					const habitableZoneAU = STAR.getHabitableZoneAU(luminositySol)
 					return {
-						zone: slot.zone!,
-						deviation: slot.deviation!,
-						orbitalDistanceAU: slot.orbitalDistanceAU!,
+						zone: pinBaselineToHZC ? "inner" : slot.zone!,
+						deviation: pinBaselineToHZC ? 0 : slot.deviation!,
+						orbitalDistanceAU: pinBaselineToHZC
+							? habitableZoneAU
+							: slot.orbitalDistanceAU!,
 						groupHint:
 							slot.type === "gas-giant"
 								? "jovian"

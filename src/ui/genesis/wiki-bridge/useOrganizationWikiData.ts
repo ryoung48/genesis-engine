@@ -43,8 +43,7 @@ export function useOrganizationWikiData(
 		selectedWikiOrganizationId,
 		world,
 		worldForDisplay,
-		earthHistory,
-		earthImportRawIdToCompact,
+		history,
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
@@ -58,21 +57,19 @@ export function useOrganizationWikiData(
 	return useMemo<OrganizationWikiData | null>(() => {
 		if (
 			!selectedWikiOrganizationId ||
-			!world?.isEarthImport ||
-			!earthHistory.state ||
-			!earthHistory.query ||
+			!history.state ||
+			!history.query ||
 			!worldForDisplay
 		)
 			return null
 		const orgId = selectedWikiOrganizationId
-		const orgRef = earthHistory.organizationReference?.get(orgId)
+		const orgRef = history.organizationReference?.get(orgId)
 		if (!orgRef) return null
-		const record = earthHistory.state.record
-		if (record.origin !== "earth") return null
+		const record = history.state.record
 		// The WikiTimeline component works in whole days (like the procedural
 		// wiki); convert every timeMs value crossing that boundary.
 		const daysFromMs = (timeMs: number) => Math.floor(timeMs / 86_400_000)
-		const frame = earthHistory.query.frame
+		const frame = history.query.frame
 		const nations = record.nations
 		const focusOrgNation = (targetId: number) => {
 			const seedProvince = frame.nations.get(targetId)?.capitalProvince ?? -1
@@ -132,13 +129,12 @@ export function useOrganizationWikiData(
 		const provinceMention = (
 			rawId: string,
 		): NationTimelineEvent["provinces"][number] | null => {
-			const provinceId = earthImportRawIdToCompact?.get(Number(rawId))
+			const provinceId = history.state.provinceMap.realIdToCompact.get(rawId)
 			if (provinceId === undefined) return null
 			return {
 				id: provinceId,
 				name:
-					earthHistory.state.provinceMeta[provinceId]?.name ??
-					`Province ${rawId}`,
+					history.state.provinceMeta[provinceId]?.name ?? `Province ${rawId}`,
 				color: getProvinceColor(provinceId) ?? color,
 			}
 		}
@@ -358,7 +354,7 @@ export function useOrganizationWikiData(
 			date: day,
 			count: FRAME.orgMemberProvinces({
 				frame: HISTORY.frameAt({
-					state: earthHistory.state,
+					state: history.state,
 					timeMs: day * 86_400_000,
 				}),
 				orgId,
@@ -370,7 +366,7 @@ export function useOrganizationWikiData(
 				date: minDay,
 				count: FRAME.orgMemberProvinces({
 					frame: HISTORY.frameAt({
-						state: earthHistory.state,
+						state: history.state,
 						timeMs: record.minTimeMs,
 					}),
 					orgId,
@@ -400,7 +396,9 @@ export function useOrganizationWikiData(
 		const totalAreaKm2 = areaKm2
 			? provinceIndexes.reduce((sum, p) => sum + (areaKm2[p] ?? 0), 0)
 			: 0
-		const realPopulation = worldForDisplay.realPopulation?.population
+		const realPopulation =
+			worldForDisplay.realPopulation?.population ??
+			worldForDisplay.population?.population
 		const totalPopulation = realPopulation
 			? provinceIndexes.reduce((sum, p) => sum + (realPopulation[p] ?? 0), 0)
 			: 0
@@ -415,8 +413,8 @@ export function useOrganizationWikiData(
 				id < 0 ? null : (frame.cultures[id]?.key ?? null),
 			),
 			provinceIndexes,
-			nameById: earthHistory.cultureNameById ?? undefined,
-			colorById: earthHistory.cultureColorById ?? undefined,
+			nameById: history.cultureNameById ?? undefined,
+			colorById: history.cultureColorById ?? undefined,
 			rgbToCss,
 			fallbackColor: "rgb(148, 163, 184)",
 		})
@@ -425,8 +423,8 @@ export function useOrganizationWikiData(
 				id < 0 ? null : (frame.religions[id]?.key ?? null),
 			),
 			provinceIndexes,
-			nameById: earthHistory.religionNameById ?? undefined,
-			colorById: earthHistory.religionColorById ?? undefined,
+			nameById: history.religionNameById ?? undefined,
+			colorById: history.religionColorById ?? undefined,
 			rgbToCss,
 			fallbackColor: "rgb(148, 163, 184)",
 		})
@@ -492,7 +490,7 @@ export function useOrganizationWikiData(
 				})
 			},
 			onSelectDate: (day: number) =>
-				earthHistory.setSelectedTimeMs(day * 86_400_000),
+				history.setSelectedTimeMs(day * 86_400_000),
 			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
@@ -500,19 +498,18 @@ export function useOrganizationWikiData(
 	}, [
 		selectedWikiOrganizationId,
 		world,
-		earthHistory.query,
-		earthHistory.state,
-		earthHistory.selectedTimeMs,
-		earthHistory.setSelectedTimeMs,
-		earthHistory.minTimeMs,
-		earthHistory.maxTimeMs,
-		earthHistory.organizationReference,
-		earthHistory.cultureNameById,
-		earthHistory.cultureColorById,
-		earthHistory.religionNameById,
-		earthHistory.religionColorById,
-		earthHistory.provinceMeta,
-		earthImportRawIdToCompact,
+		history.query,
+		history.state,
+		history.selectedTimeMs,
+		history.setSelectedTimeMs,
+		history.minTimeMs,
+		history.maxTimeMs,
+		history.organizationReference,
+		history.cultureNameById,
+		history.cultureColorById,
+		history.religionNameById,
+		history.religionColorById,
+		history.provinceMeta,
 		worldForDisplay,
 		showObservedDistributions,
 		planetName,

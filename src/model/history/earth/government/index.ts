@@ -2,7 +2,9 @@ import type {
 	BlendRgbParams,
 	EarthHistoryGovernmentFamily,
 	GovernmentReformLabelParams,
+	HistoryGovernmentLabelParams,
 } from "@/model/history/earth/government/types"
+import { ERAS } from "@/model/society/eras"
 import type { GovernmentType } from "@/model/society/types"
 import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/genesis/political/government-colors"
 
@@ -105,6 +107,19 @@ function formatEarthHistoryGovernmentReformLabel({
 	return formatGovernmentReformLabel(normalized)
 }
 
+function formatHistoryGovernmentLabel({
+	governmentType,
+	governmentReform,
+}: HistoryGovernmentLabelParams): string | null {
+	const proceduralLabel = governmentType
+		? ERAS.governmentTypeLabels[governmentType as GovernmentType]
+		: undefined
+	return (
+		proceduralLabel ??
+		formatEarthHistoryGovernmentReformLabel({ governmentReform })
+	)
+}
+
 function getEarthHistoryGovernmentFamily(
 	governmentType: string | null,
 ): EarthHistoryGovernmentFamily | null {
@@ -182,4 +197,5 @@ export const GOVERNMENT = {
 	getEarthHistoryGovernmentColor,
 	formatEarthHistoryGovernmentReformLabel,
 	formatEarthHistoryGovernmentLabel,
+	formatHistoryGovernmentLabel,
 }

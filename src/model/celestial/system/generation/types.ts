@@ -114,6 +114,10 @@ export interface GenerateSystemBodiesParams {
 	/** How the temperate deviation-0 slot is built -- always reserves that
 	 * slot for a main world (see MainWorldMode). */
 	mainWorldMode: MainWorldMode
+	/** Pins the baseline slot to the exact habitable-zone center instead of
+	 * the book's rolled variance around it -- the wiki dice-button path sets
+	 * this so its forced main world always lands at deviation 0. */
+	exactHZC: boolean
 	/** Only consulted for the real Sol seed; ignored for other seeds. */
 	solMainWorldOverrides?: HomeWorldParams
 	/** Star mass used for moon-placement physics (Hill-sphere/orbit spacing).

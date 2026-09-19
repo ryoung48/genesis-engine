@@ -16,3 +16,8 @@ export interface NationColorsFromProvincesParams {
 	adjOffset: Int32Array
 	adjList: Int32Array
 }
+
+export interface NationColorForParams {
+	baseColor: [number, number, number]
+	neighborColors: [number, number, number][]
+}

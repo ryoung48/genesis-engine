@@ -1,7 +1,7 @@
 import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
-import type { EarthHistoryTimeline } from "@/ui/genesis/view/types"
+import type { HistoryTimeline } from "@/ui/genesis/view/types"
 import { paletteColorForDynasty } from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
@@ -10,7 +10,7 @@ import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/
  * builder -- each turns an id (war, org, culture, religion, dynasty) plus
  * the earth-history reference data into the small { id, name, color }
  * shape WikiTimeline events attach to a description. Split out of that file
- * (see plans/split-large-files.md #3); earthHistory is passed explicitly
+ * (see plans/split-large-files.md #3); history is passed explicitly
  * instead of captured by closure.
  */
 
@@ -26,11 +26,11 @@ export function warMention(war: {
 }
 
 export function organizationMention(
-	earthHistory: EarthHistoryTimeline,
+	history: HistoryTimeline,
 	orgId: string,
 	categoryId?: string,
 ): NationTimelineEvent["organizations"][number] {
-	const ref = earthHistory.organizationReference?.get(orgId)
+	const ref = history.organizationReference?.get(orgId)
 	const category = categoryId
 		? ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.find(
 				(c) => c.id === categoryId,
@@ -47,32 +47,31 @@ export function organizationMention(
 }
 
 export function cultureMention(
-	earthHistory: EarthHistoryTimeline,
+	history: HistoryTimeline,
 	cultureId: string,
 ): NationTimelineEvent["cultures"][number] {
 	return {
 		id: cultureId,
 		name:
-			earthHistory.cultureNameById?.get(cultureId) ??
-			cultureId.replace(/_/g, " "),
+			history.cultureNameById?.get(cultureId) ?? cultureId.replace(/_/g, " "),
 		color: rgbToCss(
-			earthHistory.cultureColorById?.get(cultureId) ??
+			history.cultureColorById?.get(cultureId) ??
 				COLOR.hashColorForKey(`culture:${cultureId}`),
 		),
 	}
 }
 
 export function religionMention(
-	earthHistory: EarthHistoryTimeline,
+	history: HistoryTimeline,
 	religionId: string,
 ): NationTimelineEvent["religions"][number] {
 	return {
 		id: religionId,
 		name:
-			earthHistory.religionNameById?.get(religionId) ??
+			history.religionNameById?.get(religionId) ??
 			religionId.replace(/_/g, " "),
 		color: rgbToCss(
-			earthHistory.religionColorById?.get(religionId) ??
+			history.religionColorById?.get(religionId) ??
 				COLOR.hashColorForKey(`religion:${religionId}`),
 		),
 	}

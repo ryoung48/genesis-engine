@@ -1,11 +1,9 @@
 /// <reference lib="webworker" />
 
-import { HISTORY } from "@/model/history/generated"
-import { HISTORY_RNG } from "@/model/history/generated/history-rng"
-import { SNAPSHOT } from "@/model/history/generated/snapshot"
-import { STATE } from "@/model/history/generated/state"
-import type { HistoryState } from "@/model/history/generated/state/types"
-import type { WorldFrame } from "@/model/history/world-frame/types"
+import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
+import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
+import { STATE } from "@/model/history/sim/engine/state"
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import type { StageTiming } from "@/model/pipelines/types"
@@ -26,20 +24,13 @@ import {
 
 declare const self: DedicatedWorkerGlobalScope
 
-// Live-play sim state: the sim only ever advances as far as "simulate" has
-// ticked it, never precomputed ahead of what's been played (see
-// PROCEDURAL-HISTORY-PLAN.md). historyState is (re)seeded at generate/import
-// time via initHistory (cheap - just seeds the start year, no simulateUntil).
+// Live-play sim state: the sim only advances as far as "simulate" has ticked
+// it. historyState is (re)seeded at generate/import time via initHistory.
 let historyState: HistoryState | null = null
 let historyRng: ReturnType<typeof HISTORY_RNG.createHistoryRng> | null = null
 let historyTime = 800 * STATE.yearMs
-// Earliest time the sim can be scrubbed back to -- the start year seeded by
-// initHistory. Set at generate/import time alongside historyTime.
-let historyStartTime = 800 * STATE.yearMs
 let simulationRunning = false
-// Index into historyState.events already sent to the main thread, so each
-// "sim-progress" only carries newly-pushed events instead of the whole log.
-let historyEventCursor = 0
+let historyJournalCursor = 0
 
 function getProgressLabel(label: string): string {
 	switch (label) {
@@ -106,18 +97,18 @@ function getProgressLabel(label: string): string {
 	return `${shortLabel[0].toUpperCase()}${shortLabel.slice(1)}`
 }
 
-function buildFrameTransferList(frame: WorldFrame): Transferable[] {
-	return [
-		frame.provinceNation.buffer,
-		frame.provinceController.buffer,
-		frame.provinceCulture.buffer,
-		frame.provinceReligion.buffer,
-		frame.provinceCultureBlendSecondary.buffer,
-		frame.provinceHre.buffer,
-		frame.provincePopulation.buffer,
-		frame.provincePopulationUrban.buffer,
-		frame.provinceDevelopment.buffer,
-	]
+function buildJournalTransferList(
+	journal: HistoryState["journal"],
+): Transferable[] {
+	return journal.flatMap((transaction) =>
+		transaction.census
+			? [
+					transaction.census.urban.buffer,
+					transaction.census.rural.buffer,
+					transaction.census.development.buffer,
+				]
+			: [],
+	)
 }
 
 async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
@@ -127,22 +118,20 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 	while (simulationRunning) {
 		try {
 			historyTime += tickMs
-			HISTORY.simulateUntil({
+			SIM_ENGINE.simulateUntil({
 				state: historyState,
 				targetTimeMs: historyTime,
 				rng: historyRng,
 				validate: false,
 			})
-			const frame = SNAPSHOT.buildWorldFrame({ state: historyState })
-			const newEvents = historyState.events.slice(historyEventCursor)
-			historyEventCursor = historyState.events.length
+			const journal = historyState.journal.slice(historyJournalCursor)
+			historyJournalCursor = historyState.journal.length
 			const progress: GenesisWorkerResponse = {
 				type: "sim-progress",
 				timeMs: historyTime,
-				frame,
-				newEvents,
+				journal,
 			}
-			self.postMessage(progress, buildFrameTransferList(frame))
+			self.postMessage(progress, buildJournalTransferList(journal))
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
 			self.postMessage({
@@ -729,30 +718,6 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		return
 	}
 
-	if (message.type === "snapshot-at") {
-		if (!historyState) {
-			self.postMessage({
-				type: "error",
-				message: "No world generated yet - generate a world first",
-			} satisfies GenesisWorkerResponse)
-			return
-		}
-		const time = Math.max(
-			historyStartTime,
-			Math.min(historyTime, message.timeMs),
-		)
-		const frame = SNAPSHOT.buildWorldFrame({ state: historyState, time })
-		self.postMessage(
-			{
-				type: "history-scrub",
-				timeMs: time,
-				frame,
-			} satisfies GenesisWorkerResponse,
-			buildFrameTransferList(frame),
-		)
-		return
-	}
-
 	if (message.type === "pathfind") {
 		if (!lastGeneratedWorld) {
 			self.postMessage({
@@ -911,9 +876,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		historyState = null
 		historyRng = null
 		historyTime = 800 * STATE.yearMs
-		historyStartTime = 800 * STATE.yearMs
 		simulationRunning = false
-		historyEventCursor = 0
+		historyJournalCursor = 0
 		if (
 			generated.nations &&
 			generated.provinces &&
@@ -925,7 +889,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		) {
 			progressCb("Initializing history", 95)
 			historyRng = HISTORY_RNG.createHistoryRng(generated.params.seed + 99999)
-			historyState = HISTORY.initHistory({
+			historyState = SIM_ENGINE.initHistory({
 				nations: generated.nations,
 				provinces: generated.provinces,
 				population: generated.population,
@@ -948,7 +912,6 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				settlementPortRegions: generated.settlementPortRegions,
 			})
 			historyTime = historyState.time
-			historyStartTime = historyState.time
 		}
 
 		lastGeneratedWorld = clonePathfindSeedWorld(generated)
@@ -956,14 +919,11 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		generated.timings = progressTimings
 		const world = attachPrecomputedGeometry(serializeWorld(generated))
 		progressCb("Done", 100)
-		const frame = historyState
-			? SNAPSHOT.buildWorldFrame({ state: historyState })
-			: undefined
+		const journal = historyState?.journal.slice() ?? []
+		historyJournalCursor = journal.length
 		self.postMessage(
-			{ type: "done", world, frame } satisfies GenesisWorkerResponse,
-			frame
-				? [...buildTransferList(world), ...buildFrameTransferList(frame)]
-				: buildTransferList(world),
+			{ type: "done", world, journal } satisfies GenesisWorkerResponse,
+			[...buildTransferList(world), ...buildJournalTransferList(journal)],
 		)
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error))

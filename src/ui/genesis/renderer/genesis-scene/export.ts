@@ -97,7 +97,7 @@ export function createExportController(
 			},
 			{
 				object: ctx.mapHierarchyOverlay,
-				visible: ctx.hierarchyOverlayNationId >= 0,
+				visible: ctx.hierarchyOverlaySpec !== null,
 			},
 			{ object: ctx.mapSettlements, visible: ctx.settlementsVisible },
 			{

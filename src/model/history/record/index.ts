@@ -4,8 +4,8 @@ import { NATIONS } from "@/model/history/earth/reference/nations"
 import type {
 	BuildEarthRecordParams,
 	CreateHistoryStateParams,
-	EarthHistoryEvents,
 	FrameAtParams,
+	HistoryEvents,
 	HistoryRecord,
 	HistoryState,
 	LoadEarthStateParams,
@@ -14,7 +14,6 @@ import type {
 	OrganizationEventRecord,
 	ProvinceEventLog,
 } from "@/model/history/record/types"
-import { SIM_FRAME } from "@/model/history/sim/frame"
 import { FRAME } from "@/model/history/world-frame"
 import type {
 	NationFrame,
@@ -55,10 +54,12 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 		const log: ProvinceEventLog = {
 			base: {
 				ownerId: baseOwnerId,
+				parentId: -1,
 				controllerId: nationId(entry.base.controller),
 				cultureId: entry.base.culture
 					? (cultureIdByKey.get(entry.base.culture) ?? -1)
 					: -1,
+				cultureBlendSecondaryId: -1,
 				religionId: entry.base.religion
 					? (religionIdByKey.get(entry.base.religion) ?? -1)
 					: -1,
@@ -150,7 +151,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 				.sort((a, b) => a.timeMs - b.timeMs),
 		}
 	}
-	const events: EarthHistoryEvents = {
+	const events: HistoryEvents = {
 		provinceEvents,
 		nationEvents,
 		wars: params.wars.map((war, id) => ({
@@ -184,10 +185,12 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 				attacker: {
 					...battle.attacker,
 					countryId: nationId(battle.attacker.country),
+					wealthCost: null as number | null,
 				},
 				defender: {
 					...battle.defender,
 					countryId: nationId(battle.defender.country),
+					wealthCost: null as number | null,
 				},
 			})),
 		})),
@@ -240,6 +243,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 				return events
 			}, [])
 			.sort((a, b) => a.timeMs - b.timeMs),
+		censuses: [],
 	}
 	const resolvedMinMs = minTimeMs === Infinity ? 0 : minTimeMs
 	return {
@@ -429,11 +433,10 @@ function nationCapitalAnchor({
 }
 
 function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
-	if (state.record.origin === "procedural")
-		return SIM_FRAME.buildProceduralFrame({ state, timeMs })
 	const { record, provinceMap } = state
 	const count = provinceMap.compactToRealId.length
 	const provinceNation = new Int32Array(count).fill(-1)
+	const provinceParent = new Int32Array(count).fill(-1)
 	const provinceController = new Int32Array(count).fill(-1)
 	const provinceCulture = new Int32Array(count).fill(-1)
 	const provinceReligion = new Int32Array(count).fill(-1)
@@ -444,6 +447,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		const log = record.events.provinceEvents.get(rawId)
 		if (!log) continue
 		let nation = log.base.ownerId
+		let parent = log.base.parentId
 		let controller = log.base.controllerId
 		let culture = log.base.cultureId
 		let religion = log.base.religionId
@@ -452,6 +456,8 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			if (event.timeMs > timeMs) break
 			if (event.kind === "owner")
 				nation = (event.payload.nationId as number | null) ?? -1
+			else if (event.kind === "parent")
+				parent = (event.payload.parentId as number | null) ?? -1
 			else if (event.kind === "controller")
 				controller = (event.payload.nationId as number | null) ?? -1
 			else if (event.kind === "culture")
@@ -461,8 +467,10 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			else if (event.kind === "hre") hre = event.payload.member as boolean
 		}
 		provinceNation[province] = nation
+		provinceParent[province] = parent
 		provinceController[province] = controller
 		provinceCulture[province] = culture
+		provinceCultureBlendSecondary[province] = log.base.cultureBlendSecondaryId
 		provinceReligion[province] = religion
 		provinceHre[province] = hre ? 1 : 0
 	}
@@ -561,6 +569,16 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 				(id) => id !== second.id,
 			)
 			second.relations.allies = second.relations.allies.filter(
+				(id) => id !== first.id,
+			)
+		} else if (event.kind === "rivalStart") {
+			first.relations.rivals.push(second.id)
+			second.relations.rivals.push(first.id)
+		} else if (event.kind === "rivalEnd") {
+			first.relations.rivals = first.relations.rivals.filter(
+				(id) => id !== second.id,
+			)
+			second.relations.rivals = second.relations.rivals.filter(
 				(id) => id !== first.id,
 			)
 		} else if (
@@ -683,25 +701,38 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			},
 		]
 	})
+	const census = record.events.censuses.findLast(
+		(entry) => entry.timeMs <= timeMs,
+	)
+	const provincePopulation = census?.rural.slice() ?? new Float32Array(count)
+	const provincePopulationUrban =
+		census?.urban.slice() ?? new Float32Array(count)
+	const provinceDevelopment =
+		census?.development.slice() ?? new Float32Array(count)
+	let totalPopulation = 0
+	for (let province = 0; province < count; province++)
+		totalPopulation +=
+			provincePopulation[province] + provincePopulationUrban[province]
 	return {
 		timeMs,
 		provinceCount: count,
 		provinceNation,
+		provinceParent,
 		provinceController,
 		provinceCulture,
 		provinceReligion,
 		provinceCultureBlendSecondary,
 		provinceHre,
-		provincePopulation: new Float32Array(count),
-		provincePopulationUrban: new Float32Array(count),
-		provinceDevelopment: new Float32Array(count),
+		provincePopulation,
+		provincePopulationUrban,
+		provinceDevelopment,
 		nations,
 		wars,
 		organizations,
 		cultures: record.cultures,
 		religions: record.religions,
 		nationCount: nations.size,
-		totalPopulation: 0,
+		totalPopulation,
 	}
 }
 

@@ -30,46 +30,6 @@ export function basinColor(id: number): [number, number, number] {
 	return [r, g, b]
 }
 
-export function getDynastyColor(id: number): [number, number, number] {
-	if (id < 0) return [0.35, 0.33, 0.32]
-	let h = (id * 2246822519) >>> 0
-	h ^= h >>> 15
-	const hue = (h % 360) / 360
-	const sat = 0.52 + ((h >>> 9) % 48) / 100
-	const light = 0.18 + ((h >>> 17) % 62) / 100
-	let r = light
-	let g = light
-	let b = light
-	if (sat > 0) {
-		const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat
-		const p = 2 * light - q
-		const hueToRgb = (t: number) => {
-			let x = t
-			if (x < 0) x += 1
-			if (x > 1) x -= 1
-			if (x < 1 / 6) return p + (q - p) * 6 * x
-			if (x < 1 / 2) return q
-			if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6
-			return p
-		}
-		r = hueToRgb(hue + 1 / 3)
-		g = hueToRgb(hue)
-		b = hueToRgb(hue - 1 / 3)
-	}
-	return [r, g, b]
-}
-
-export function toPastelNationColor(
-	color: readonly [number, number, number],
-): [number, number, number] {
-	const pastelMix = 0.52
-	return [
-		color[0] + (1 - color[0]) * pastelMix,
-		color[1] + (1 - color[1]) * pastelMix,
-		color[2] + (1 - color[2]) * pastelMix,
-	]
-}
-
 export function getTerrainFeatureColor(
 	feature: number,
 ): [number, number, number] | null {

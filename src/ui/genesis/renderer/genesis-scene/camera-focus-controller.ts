@@ -78,23 +78,6 @@ export function createCameraFocusController(
 		deps.requestRender()
 	}
 
-	function focusOnNation(
-		nationId: number,
-		opts?: { durationMs?: number; distanceScale?: number },
-	) {
-		if (!ctx.currentWorld?.nations || !ctx.currentWorld.provinces) return
-		if (nationId < 0) return
-		deps.setSelectedProvince(null)
-		// `nationId` from the UI is actually a sovereign province index
-		// (see GenesisView click handler — assignment = sovereign).
-		const province = nationId
-		if (province >= ctx.currentWorld.provinces.count) return
-		const region = ctx.currentWorld.provinces.seeds[province]
-		if (region < 0) return
-		focusOnRegion(region, opts)
-		startBorderPulse(province)
-	}
-
 	function focusOnProvince(
 		provinceId: number,
 		opts?: {
@@ -102,8 +85,7 @@ export function createCameraFocusController(
 			distanceScale?: number
 			/** "nation" highlights the whole nation's border instead of just
 			 * this one province's -- used when the caller is really focusing
-			 * on a nation (e.g. Earth import, which has no procedural nation
-			 * id to pass to focusOnNation) and only has a representative
+			 * on a nation and only has a representative
 			 * province to hand in. */
 			pulseTarget?: "nation" | "province"
 		},
@@ -208,12 +190,12 @@ export function createCameraFocusController(
 						ctx.elevationVisible,
 					)
 				: (() => {
-						if (!ctx.currentWorld.nations) return []
-						const nation = ctx.currentWorld.nations.assignment[province]
-						return nation < 0
+						const worldForBorders = deps.getWorldForBorders()
+						const nation = worldForBorders?.nations?.assignment[province]
+						return !worldForBorders || nation === undefined || nation < 0
 							? []
 							: collectNationBorderGlobePositions(
-									ctx.currentWorld,
+									worldForBorders,
 									nation,
 									0.003,
 									ctx.elevationVisible,
@@ -257,12 +239,12 @@ export function createCameraFocusController(
 						zBoost: 0.004,
 					})
 				: (() => {
-						if (!ctx.currentWorld.nations) return []
-						const nation = ctx.currentWorld.nations.assignment[province]
-						return nation < 0
+						const worldForBorders = deps.getWorldForBorders()
+						const nation = worldForBorders?.nations?.assignment[province]
+						return !worldForBorders || nation === undefined || nation < 0
 							? []
 							: collectNationBorderMapPositions({
-									world: ctx.currentWorld,
+									world: worldForBorders,
 									nation,
 									centerLongitudeDeg: ctx.currentMapCenterLongitudeDeg,
 									projectionLatitudeDeg: ctx.currentMapProjectionLatitudeDeg,
@@ -366,7 +348,6 @@ export function createCameraFocusController(
 
 	return {
 		focusOnRegion,
-		focusOnNation,
 		focusOnProvince,
 		clearPulse,
 		startBorderPulse,

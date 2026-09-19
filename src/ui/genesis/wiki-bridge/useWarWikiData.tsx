@@ -6,6 +6,7 @@ import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import type { WarWikiDataInput } from "@/ui/genesis/view/types"
+import { formatWealthCost } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import {
 	cleanEu4Identifier,
 	eventComment,
@@ -24,8 +25,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 	const {
 		selectedWikiWarId,
 		world,
-		earthHistory,
-		earthImportRawIdToCompact,
+		history,
 		planetName,
 		getProvinceColor,
 		setSelectedWikiNationId,
@@ -35,16 +35,10 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	return useMemo<WarWikiData | null>(() => {
-		if (
-			selectedWikiWarId === null ||
-			!world?.isEarthImport ||
-			!earthHistory.state ||
-			!earthHistory.query
-		)
+		if (selectedWikiWarId === null || !history.state || !history.query)
 			return null
-		const record = earthHistory.state.record
-		if (record.origin !== "earth") return null
-		const frame = earthHistory.query.frame
+		const record = history.state.record
+		const frame = history.query.frame
 		const war = record.events.wars.find(
 			(entry) => entry.id === selectedWikiWarId,
 		)
@@ -72,13 +66,12 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			rawId: string,
 			fallbackColor: string,
 		): NationTimelineEvent["provinces"][number] | null => {
-			const provinceId = earthImportRawIdToCompact?.get(Number(rawId))
+			const provinceId = history.state.provinceMap.realIdToCompact.get(rawId)
 			if (provinceId === undefined) return null
 			return {
 				id: provinceId,
 				name:
-					earthHistory.state.provinceMeta[provinceId]?.name ??
-					`Province ${rawId}`,
+					history.state.provinceMeta[provinceId]?.name ?? `Province ${rawId}`,
 				color: getProvinceColor(provinceId) ?? fallbackColor,
 			}
 		}
@@ -140,7 +133,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		// the selected date -- find each tag's most recent join/leave at or
 		// before that date and check whether it was a join. A tag with no
 		// qualifying event yet (hasn't joined) is treated as inactive too.
-		const currentDate = daysFromMs(earthHistory.selectedTimeMs)
+		const currentDate = daysFromMs(history.selectedTimeMs)
 		const eventsById = new Map<number, WarParticipantEventRecord[]>()
 		for (const event of war.events) {
 			const list = eventsById.get(event.nationId)
@@ -260,7 +253,13 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				winner.countryId >= 0 ? resolveNationName(winner.countryId) : "unknown"
 			const loserName =
 				loser.countryId >= 0 ? resolveNationName(loser.countryId) : "unknown"
-			const description = `${winnerName} defeated ${loserName} at the Battle of ${battle.name}.`
+			const winnerCost = formatWealthCost(winner.wealthCost)
+			const loserCost = formatWealthCost(loser.wealthCost)
+			const costs =
+				winnerCost && loserCost
+					? ` (cost: ${winnerName} ${winnerCost}, ${loserName} ${loserCost})`
+					: ""
+			const description = `${winnerName} defeated ${loserName} at the Battle of ${battle.name}${costs}.`
 			pushTimelineEvent(timelineEvents, {
 				id: `warBattle:${battle.timeMs}:${index}`,
 				date: daysFromMs(battle.timeMs),
@@ -413,7 +412,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			dateRangeStart,
 			dateRangeEnd,
 			currentDate,
-			currentDateLabel: DATE.formatHistoryTimeMs(earthHistory.selectedTimeMs),
+			currentDateLabel: DATE.formatHistoryTimeMs(history.selectedTimeMs),
 			onBack: () => setSelectedWikiWarId(null),
 			onSelectNation: (targetTag: string) => {
 				setSelectedWikiNationId(Number(targetTag))
@@ -424,7 +423,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				})
 			},
 			onSelectDate: (day: number) =>
-				earthHistory.setSelectedTimeMs(day * 86_400_000),
+				history.setSelectedTimeMs(day * 86_400_000),
 			onSelectOrganization: (orgId: string) => {
 				setSelectedWikiOrganizationId(orgId)
 			},
@@ -432,12 +431,11 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 	}, [
 		selectedWikiWarId,
 		world,
-		earthHistory.query,
-		earthHistory.state,
-		earthHistory.provinceMeta,
-		earthHistory.selectedTimeMs,
-		earthHistory.setSelectedTimeMs,
-		earthImportRawIdToCompact,
+		history.query,
+		history.state,
+		history.provinceMeta,
+		history.selectedTimeMs,
+		history.setSelectedTimeMs,
 		getProvinceColor,
 		planetName,
 		setSelectedWikiNationId,

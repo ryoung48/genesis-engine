@@ -149,6 +149,7 @@ describe("Orbit slot -> generated body integration", () => {
 				seed,
 				hostStar: SOL_LIKE_HOST_STAR,
 				mainWorldMode: "procedural",
+				exactHZC: false,
 				skipNaming: true,
 			})
 			const ordinaryBodies = bodies.filter(

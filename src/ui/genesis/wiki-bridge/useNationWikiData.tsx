@@ -31,6 +31,7 @@ import {
 	buildMergedTerritoryDescription,
 	formatPayloadLabel,
 	formatSignedValue,
+	formatWealthCost,
 	mergeById,
 	mergedTerritoryType,
 	mergeEventComments,
@@ -69,8 +70,7 @@ export function useNationWikiData(
 		selectedWikiNationId,
 		world,
 		worldForDisplay,
-		earthHistory,
-		earthImportRawIdToCompact,
+		history,
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
@@ -83,15 +83,13 @@ export function useNationWikiData(
 	return useMemo<NationWikiData | null>(() => {
 		if (
 			selectedWikiNationId === null ||
-			!world?.isEarthImport ||
-			!earthHistory.state ||
-			!earthHistory.query ||
+			!history.state ||
+			!history.query ||
 			!worldForDisplay
 		)
 			return null
-		const frame = earthHistory.query.frame
-		const record = earthHistory.state.record
-		if (record.origin !== "earth") return null
+		const frame = history.query.frame
+		const record = history.state.record
 		const nationList = record.nations
 		const daysFromMs = (timeMs: number) => timeMs / 86_400_000
 		const datedEvents = <Event extends { timeMs: number }>(events: Event[]) =>
@@ -132,11 +130,15 @@ export function useNationWikiData(
 		const totalAreaKm2 = areaKm2
 			? provinceIndexes.reduce((sum, p) => sum + (areaKm2[p] ?? 0), 0)
 			: 0
-		const realPopulation = worldForDisplay.realPopulation?.population
+		const realPopulation =
+			worldForDisplay.realPopulation?.population ??
+			worldForDisplay.population?.population
 		const totalPopulation = realPopulation
 			? provinceIndexes.reduce((sum, p) => sum + (realPopulation[p] ?? 0), 0)
 			: 0
-		const realUrbanPopulation = worldForDisplay.realUrbanPopulation?.population
+		const realUrbanPopulation =
+			worldForDisplay.realUrbanPopulation?.population ??
+			worldForDisplay.urbanPopulation
 		const totalUrbanPopulation = realUrbanPopulation
 			? provinceIndexes.reduce(
 					(sum, p) => sum + (realUrbanPopulation[p] ?? 0),
@@ -163,10 +165,10 @@ export function useNationWikiData(
 		}
 		const title = resolveNationName(nationId)
 		const color = resolveNationColor(nationId)
-		const governmentSubtype =
-			GOVERNMENT.formatEarthHistoryGovernmentReformLabel({
-				governmentReform: nationState?.governmentReform,
-			})
+		const governmentSubtype = GOVERNMENT.formatHistoryGovernmentLabel({
+			governmentType: nationState?.government ?? null,
+			governmentReform: nationState?.governmentReform,
+		})
 		const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
 			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
@@ -176,14 +178,14 @@ export function useNationWikiData(
 				.filter(
 					(event) =>
 						event.kind === "rulerChange" &&
-						event.timeMs <= earthHistory.selectedTimeMs,
+						event.timeMs <= history.selectedTimeMs,
 				)
 				.at(-1)?.payload ?? null
 		const rulerLabel = nationState?.ruler
 			? formatRulerStatLabel(
 					currentRulerPayload,
 					nationState.ruler.name,
-					earthHistory.selectedTimeMs,
+					history.selectedTimeMs,
 				)
 			: null
 		const dynastyName =
@@ -252,6 +254,12 @@ export function useNationWikiData(
 					: [],
 			],
 			[
+				"Rivals",
+				nationState?.relations.rivals
+					? nationState.relations.rivals.filter(hasOwnedProvinces)
+					: [],
+			],
+			[
 				"Guarantees",
 				nationState?.relations.guarantees
 					? nationState.relations.guarantees.filter(hasOwnedProvinces)
@@ -276,7 +284,7 @@ export function useNationWikiData(
 			.filter((group) => group.nations.length > 0)
 
 		const resolveOrganizationColor = (orgId: string): string => {
-			const ref = earthHistory.organizationReference?.get(orgId)
+			const ref = history.organizationReference?.get(orgId)
 			return ref
 				? COLOR.rgb01ToCss([
 						ref.color[0] / 255,
@@ -317,7 +325,7 @@ export function useNationWikiData(
 				id: orgId,
 				name:
 					category?.factionLabel ??
-					earthHistory.organizationReference?.get(orgId)?.name ??
+					history.organizationReference?.get(orgId)?.name ??
 					orgId,
 				color: category?.color
 					? COLOR.rgb01ToCss([
@@ -429,13 +437,12 @@ export function useNationWikiData(
 			rawId: string,
 			fallbackColor: string,
 		): NationTimelineEvent["provinces"][number] | null => {
-			const provinceId = earthImportRawIdToCompact?.get(Number(rawId))
+			const provinceId = history.state.provinceMap.realIdToCompact.get(rawId)
 			if (provinceId === undefined) return null
 			return {
 				id: provinceId,
 				name:
-					earthHistory.state.provinceMeta[provinceId]?.name ??
-					`Province ${rawId}`,
+					history.state.provinceMeta[provinceId]?.name ?? `Province ${rawId}`,
 				color: getProvinceColor(provinceId) ?? fallbackColor,
 			}
 		}
@@ -618,7 +625,7 @@ export function useNationWikiData(
 						const cultureId = String(
 							payloadValue(event.payload, "cultureId") ?? "",
 						)
-						const culture = cultureMention(earthHistory, cultureId)
+						const culture = cultureMention(history, cultureId)
 						const verb =
 							event.kind === "acceptedCultureAdd"
 								? "accepted"
@@ -643,7 +650,7 @@ export function useNationWikiData(
 								? String(payloadValue(event.payload, "religionId") ?? "")
 								: ""
 						const religion = religionId
-							? religionMention(earthHistory, religionId)
+							? religionMention(history, religionId)
 							: null
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
@@ -671,7 +678,7 @@ export function useNationWikiData(
 									: `${title} became an elector.`,
 							comment: eventComment(event.comment),
 							nations,
-							organizations: [organizationMention(earthHistory, "HRE")],
+							organizations: [organizationMention(history, "HRE")],
 						})
 						break
 					case "govRank":
@@ -870,7 +877,7 @@ export function useNationWikiData(
 					controllerRebelType = isRebelId(nextId) ? nextRebelType : undefined
 				} else if (owner === nationId && event.kind === "culture") {
 					const cultureId = String(event.payload.cultureId ?? "")
-					const culture = cultureMention(earthHistory, cultureId)
+					const culture = cultureMention(history, cultureId)
 					pushTimelineEvent(timelineEvents, {
 						id: eventId,
 						date: event.date,
@@ -883,7 +890,7 @@ export function useNationWikiData(
 					})
 				} else if (owner === nationId && event.kind === "religion") {
 					const religionId = String(event.payload.religionId ?? "")
-					const religion = religionMention(earthHistory, religionId)
+					const religion = religionMention(history, religionId)
 					pushTimelineEvent(timelineEvents, {
 						id: eventId,
 						date: event.date,
@@ -906,7 +913,7 @@ export function useNationWikiData(
 						comment: eventComment(event.comment),
 						nations,
 						provinces,
-						organizations: [organizationMention(earthHistory, "HRE")],
+						organizations: [organizationMention(history, "HRE")],
 					})
 				}
 			}
@@ -937,7 +944,7 @@ export function useNationWikiData(
 						? `${title} became Emperor of the Holy Roman Empire.`
 						: `${title}'s reign as Emperor of the Holy Roman Empire ended.`,
 					nations,
-					organizations: [organizationMention(earthHistory, "HRE")],
+					organizations: [organizationMention(history, "HRE")],
 				})
 				continue
 			}
@@ -947,9 +954,11 @@ export function useNationWikiData(
 					? "guarantee"
 					: event.kind.startsWith("royalMarriage")
 						? "royal marriage"
-						: event.kind.startsWith("union")
-							? "personal union"
-							: "dependency"
+						: event.kind.startsWith("rival")
+							? "rivalry"
+							: event.kind.startsWith("union")
+								? "personal union"
+								: "dependency"
 			let description: string
 			if (
 				event.kind === "vassalStart" ||
@@ -1008,7 +1017,7 @@ export function useNationWikiData(
 			)
 				continue
 			const orgId = event.payload.orgId
-			const org = organizationMention(earthHistory, orgId, event.payload.role)
+			const org = organizationMention(history, orgId, event.payload.role)
 			const joined = event.kind === "join"
 			pushTimelineEvent(timelineEvents, {
 				id: `organization:${orgId}:${event.date}:${index}`,
@@ -1109,7 +1118,10 @@ export function useNationWikiData(
 					opponent.countryId !== null
 						? resolveNationName(opponent.countryId)
 						: "unknown"
-				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${opponentName} (${war.name}).`
+				const cost = formatWealthCost(
+					(isAttacker ? battle.attacker : battle.defender).wealthCost,
+				)
+				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${opponentName} (${war.name})${cost ? `; cost ${cost}` : ""}.`
 				pushTimelineEvent(timelineEvents, {
 					id: `warBattle:${war.id}:${battle.date}:${index}`,
 					date: battle.date,
@@ -1134,7 +1146,7 @@ export function useNationWikiData(
 		// simulation start, then the running count at each ownership change.
 		// ownedProvinceCountByDate iterates in ascending date order because it
 		// was filled from sorted dates above.
-		const minDay = daysFromMs(earthHistory.minTimeMs)
+		const minDay = daysFromMs(history.minTimeMs)
 		const provinceHistory: Array<{ date: number; count: number }> = [
 			{
 				date: minDay,
@@ -1257,8 +1269,8 @@ export function useNationWikiData(
 				id >= 0 ? (frame.cultures[id]?.key ?? null) : null,
 			),
 			provinceIndexes,
-			nameById: earthHistory.cultureNameById ?? undefined,
-			colorById: earthHistory.cultureColorById ?? undefined,
+			nameById: history.cultureNameById ?? undefined,
+			colorById: history.cultureColorById ?? undefined,
 			rgbToCss,
 			fallbackColor: "rgb(148, 163, 184)",
 		})
@@ -1267,8 +1279,8 @@ export function useNationWikiData(
 				id >= 0 ? (frame.religions[id]?.key ?? null) : null,
 			),
 			provinceIndexes,
-			nameById: earthHistory.religionNameById ?? undefined,
-			colorById: earthHistory.religionColorById ?? undefined,
+			nameById: history.religionNameById ?? undefined,
+			colorById: history.religionColorById ?? undefined,
 			rgbToCss,
 			fallbackColor: "rgb(148, 163, 184)",
 		})
@@ -1318,10 +1330,10 @@ export function useNationWikiData(
 			topographyDistribution,
 			showObservedDistributions,
 			provinceHistory,
-			dateRangeStart: daysFromMs(earthHistory.minTimeMs),
-			dateRangeEnd: daysFromMs(earthHistory.maxTimeMs),
-			currentDate: daysFromMs(earthHistory.selectedTimeMs),
-			currentDateLabel: DATE.formatHistoryTimeMs(earthHistory.selectedTimeMs),
+			dateRangeStart: daysFromMs(history.minTimeMs),
+			dateRangeEnd: daysFromMs(history.maxTimeMs),
+			currentDate: daysFromMs(history.selectedTimeMs),
+			currentDateLabel: DATE.formatHistoryTimeMs(history.selectedTimeMs),
 			timelineEvents,
 			onBack: () => setSelectedWikiNationId(null),
 			onFocusNation: () => focusNation(nationId),
@@ -1336,7 +1348,7 @@ export function useNationWikiData(
 				})
 			},
 			onSelectDate: (day: number) =>
-				earthHistory.setSelectedTimeMs(day * 86_400_000),
+				history.setSelectedTimeMs(day * 86_400_000),
 			onSelectOrganization: (orgId: string) => {
 				setSelectedWikiOrganizationId(orgId)
 			},
@@ -1347,19 +1359,18 @@ export function useNationWikiData(
 	}, [
 		selectedWikiNationId,
 		world,
-		earthHistory.query,
-		earthHistory.state,
-		earthHistory.selectedTimeMs,
-		earthHistory.setSelectedTimeMs,
-		earthHistory.minTimeMs,
-		earthHistory.maxTimeMs,
-		earthHistory.organizationReference,
-		earthHistory.cultureNameById,
-		earthHistory.cultureColorById,
-		earthHistory.religionNameById,
-		earthHistory.religionColorById,
-		earthHistory.provinceMeta,
-		earthImportRawIdToCompact,
+		history.query,
+		history.state,
+		history.selectedTimeMs,
+		history.setSelectedTimeMs,
+		history.minTimeMs,
+		history.maxTimeMs,
+		history.organizationReference,
+		history.cultureNameById,
+		history.cultureColorById,
+		history.religionNameById,
+		history.religionColorById,
+		history.provinceMeta,
 		worldForDisplay,
 		showObservedDistributions,
 		planetName,

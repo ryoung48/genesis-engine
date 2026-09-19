@@ -1,0 +1,636 @@
+import { DATE } from "@/model/history/earth/date"
+import type {
+	HistoryEvent,
+	NationIdentity,
+	WarRecord,
+} from "@/model/history/record/types"
+import { COLORING } from "@/model/history/sim/nations/coloring"
+import type {
+	ActiveTie,
+	AppendJournalParams,
+	AppendNoteParams,
+	ApplyTransactionParams,
+	CreateTranslatorParams,
+	DescendantsParams,
+	IdentityForRootParams,
+	ProceduralTranslator,
+	ProjectTieParams,
+	UpdateTiesParams,
+} from "@/model/history/sim/record/translator/types"
+import { ERAS } from "@/model/society/eras"
+import { NAMES } from "@/model/society/language/names"
+
+const YEAR_MS = 365 * 86_400_000
+
+function recordTime(engineTimeMs: number): number {
+	return engineTimeMs - DATE.earthHistoryStartYear * YEAR_MS
+}
+
+function descendants({ children, province }: DescendantsParams): number[] {
+	const result: number[] = []
+	const stack = [province]
+	while (stack.length > 0) {
+		const current = stack.pop() as number
+		result.push(current)
+		for (const child of children[current]) stack.push(child)
+	}
+	return result
+}
+
+function rootOf({
+	translator,
+	province,
+}: {
+	translator: ProceduralTranslator
+	province: number
+}): number {
+	let current = province
+	while (translator.parent[current] >= 0) current = translator.parent[current]
+	return current
+}
+
+function pastelColor(
+	color: [number, number, number],
+): readonly [number, number, number] {
+	return color.map((value) =>
+		Math.round(Math.max(0, Math.min(1, value + (1 - value) * 0.52)) * 255),
+	) as [number, number, number]
+}
+
+function identityForRoot({
+	translator,
+	root,
+	timeMs,
+}: IdentityForRootParams): number {
+	const existing = translator.identityByRoot.get(root)
+	if (existing !== undefined) return existing
+	const { world, state } = translator
+	const colors = world.provinces?.colors
+	const baseColor: [number, number, number] = colors
+		? [colors[root * 3], colors[root * 3 + 1], colors[root * 3 + 2]]
+		: [0.5, 0.5, 0.5]
+	const neighbors = new Set<number>()
+	const provinces = descendants({
+		children: translator.children,
+		province: root,
+	})
+	const adjacency = world.provinces
+	if (adjacency) {
+		for (const province of provinces) {
+			for (
+				let edge = adjacency.adjOffset[province];
+				edge < adjacency.adjOffset[province + 1];
+				edge++
+			) {
+				const otherId = translator.owner[adjacency.adjList[edge]]
+				if (otherId >= 0) neighbors.add(otherId)
+			}
+		}
+	}
+	const rawColor = COLORING.nationColorFor({
+		baseColor,
+		neighborColors: [...neighbors]
+			.map((id) => translator.rawColors[id])
+			.filter((color) => color !== undefined),
+	})
+	const id = state.record.nations.length
+	const identity: NationIdentity = {
+		id,
+		name: translator.names.nation(root),
+		color: pastelColor(rawColor),
+		birthTimeMs: timeMs,
+		deathTimeMs: -1,
+		isRebel: false,
+		tag: null,
+	}
+	state.record.nations.push(identity)
+	state.record.events.nationEvents[id] = {
+		base: {
+			reforms: [],
+			capitalProvinceId: root,
+			initialGovernment:
+				ERAS.governmentTypes[world.nations?.governmentType?.[root] ?? 0] ?? "",
+		},
+		events: [],
+	}
+	translator.identityByRoot.set(root, id)
+	translator.rawColors.push(rawColor)
+	translator.ownedCount.push(0)
+	return id
+}
+
+function projectTie({
+	translator,
+	x,
+	y,
+	value,
+}: ProjectTieParams): ActiveTie | null {
+	if (translator.parent[x] >= 0 || translator.parent[y] >= 0) return null
+	const firstId = translator.owner[x]
+	const secondId = translator.owner[y]
+	if (firstId < 0 || secondId < 0 || firstId === secondId) return null
+	if (value === 2) return { kind: "vassal", firstId, secondId }
+	if (value === 11) return { kind: "colony", firstId, secondId }
+	if (value === 4) return { kind: "union", firstId, secondId }
+	if (value === 5 || value === 9) {
+		return {
+			kind: value === 5 ? "alliance" : "rival",
+			firstId: Math.min(firstId, secondId),
+			secondId: Math.max(firstId, secondId),
+		}
+	}
+	return null
+}
+
+function diplomacyKind({
+	tie,
+	ending,
+}: {
+	tie: ActiveTie
+	ending: boolean
+}): string {
+	const stem = tie.kind === "colony" ? "dependency" : tie.kind
+	return `${stem}${ending ? "End" : "Start"}`
+}
+
+function updateTies({ translator, pairs, timeMs }: UpdateTiesParams): void {
+	const { record } = translator.state
+	const count = translator.parent.length
+	for (const pair of pairs) {
+		const x = Math.floor(pair / count)
+		const y = pair % count
+		const next =
+			projectTie({
+				translator,
+				x,
+				y,
+				value: translator.relationCells.get(x * count + y) ?? 7,
+			}) ??
+			projectTie({
+				translator,
+				x: y,
+				y: x,
+				value: translator.relationCells.get(y * count + x) ?? 7,
+			})
+		const previous = translator.activeTies.get(pair)
+		if (
+			previous &&
+			(!next ||
+				previous.kind !== next.kind ||
+				previous.firstId !== next.firstId ||
+				previous.secondId !== next.secondId)
+		) {
+			record.events.diplomacy.push({
+				timeMs,
+				kind: diplomacyKind({ tie: previous, ending: true }),
+				firstId: previous.firstId,
+				secondId: previous.secondId,
+				subjectType: previous.kind === "colony" ? "colony" : null,
+			})
+			translator.activeTies.delete(pair)
+		}
+		if (
+			next &&
+			(!previous ||
+				previous.kind !== next.kind ||
+				previous.firstId !== next.firstId ||
+				previous.secondId !== next.secondId)
+		) {
+			record.events.diplomacy.push({
+				timeMs,
+				kind: diplomacyKind({ tie: next, ending: false }),
+				firstId: next.firstId,
+				secondId: next.secondId,
+				subjectType: next.kind === "colony" ? "colony" : null,
+			})
+			translator.activeTies.set(pair, next)
+		}
+	}
+}
+
+function coalitionChange({
+	translator,
+	coalition,
+	timeMs,
+}: {
+	translator: ProceduralTranslator
+	coalition: NonNullable<AppendNoteParams["coalition"]>
+	timeMs: number
+}): void {
+	const war = translator.state.record.events.wars[coalition.warId]
+	if (!war) return
+	const previous = translator.warCoalitions.get(coalition.warId) ?? {
+		attackers: new Set<number>(),
+		defenders: new Set<number>(),
+	}
+	const attackers = new Set(
+		coalition.attackers.map((root) =>
+			identityForRoot({ translator, root, timeMs }),
+		),
+	)
+	const defenders = new Set(
+		coalition.defenders.map((root) =>
+			identityForRoot({ translator, root, timeMs }),
+		),
+	)
+	for (const [side, current, next] of [
+		["attacker", previous.attackers, attackers],
+		["defender", previous.defenders, defenders],
+	] as const) {
+		for (const id of current)
+			if (!next.has(id))
+				war.events.push({
+					timeMs,
+					nationId: id,
+					kind: "warEnd",
+					side,
+					comment: null,
+				})
+		for (const id of next)
+			if (!current.has(id))
+				war.events.push({
+					timeMs,
+					nationId: id,
+					kind: "warStart",
+					side,
+					comment: null,
+				})
+	}
+	translator.warCoalitions.set(coalition.warId, { attackers, defenders })
+}
+
+function appendNote({
+	translator,
+	note,
+	timeMs,
+	coalition,
+}: AppendNoteParams): void {
+	const { record } = translator.state
+	const data = note.data
+	if (note.tag === "war started") {
+		const warId = data.war as number
+		const attacker = identityForRoot({
+			translator,
+			root: data.attacker as number,
+			timeMs,
+		})
+		const defender = identityForRoot({
+			translator,
+			root: data.defender as number,
+			timeMs,
+		})
+		for (const [root, id] of [
+			[data.attacker as number, attacker],
+			[data.defender as number, defender],
+		]) {
+			for (const province of descendants({
+				children: translator.children,
+				province: root,
+			})) {
+				if (
+					translator.world.provinces?.desolate[province] ||
+					translator.stateless[province] ||
+					translator.owner[province] >= 0
+				)
+					continue
+				translator.owner[province] = id
+				translator.ownedCount[id]++
+				record.events.provinceEvents.get(province)?.events.push({
+					timeMs,
+					kind: "owner",
+					payload: { nationId: id },
+					comment: null,
+				})
+				if (translator.occupation[province] < 0)
+					record.events.provinceEvents.get(province)?.events.push({
+						timeMs,
+						kind: "controller",
+						payload: { nationId: id },
+						comment: null,
+					})
+			}
+		}
+		const war: WarRecord = {
+			id: warId,
+			name: `${record.nations[attacker]?.name ?? "Unknown"}–${record.nations[defender]?.name ?? "Unknown"} War`,
+			casusBelli: "conquest",
+			warGoalType: "province",
+			warGoalId: defender,
+			warGoalProvinceId: data.defender as number,
+			rebel: coalition?.rebel ?? false,
+			events: [],
+			battles: [],
+		}
+		record.events.wars[warId] = war
+		if (coalition) coalitionChange({ translator, coalition, timeMs })
+	} else if (note.tag === "battle") {
+		const war = record.events.wars[data.war as number]
+		if (!war) return
+		if (coalition) coalitionChange({ translator, coalition, timeMs })
+		const attackerId =
+			translator.identityByRoot.get(data.attacker as number) ?? -1
+		const defenderId =
+			translator.identityByRoot.get(data.defender as number) ?? -1
+		const province = data.province as number
+		war.battles.push({
+			timeMs,
+			name: translator.names.province(province),
+			locationProvinceId: province,
+			attacker: {
+				countryId: attackerId,
+				commander: null,
+				infantry: null,
+				cavalry: null,
+				artillery: null,
+				losses: null,
+				wealthCost: data.attackerCost as number,
+			},
+			defender: {
+				countryId: defenderId,
+				commander: null,
+				infantry: null,
+				cavalry: null,
+				artillery: null,
+				losses: null,
+				wealthCost: data.defenderCost as number,
+			},
+			attackerWon: data.winner === data.attacker,
+			comment: null,
+		})
+	} else if (note.tag === "war ended") {
+		const warId = data.war as number
+		const war = record.events.wars[warId]
+		if (!war) return
+		const active = translator.warCoalitions.get(warId)
+		if (active) {
+			for (const id of active.attackers)
+				war.events.push({
+					timeMs,
+					nationId: id,
+					kind: "warEnd",
+					side: "attacker",
+					comment: (data.stalemate as string) ?? null,
+				})
+			for (const id of active.defenders)
+				war.events.push({
+					timeMs,
+					nationId: id,
+					kind: "warEnd",
+					side: "defender",
+					comment: (data.stalemate as string) ?? null,
+				})
+			translator.warCoalitions.delete(warId)
+		}
+	} else if (note.tag === "dynasty spread") {
+		const firstId = translator.identityByRoot.get(data.source as number)
+		const secondId = translator.identityByRoot.get(data.nation as number)
+		if (firstId !== undefined && secondId !== undefined)
+			record.events.diplomacy.push({
+				timeMs,
+				kind: "royalMarriageStart",
+				firstId,
+				secondId,
+				subjectType: null,
+			})
+	}
+}
+
+function createTranslator({
+	state,
+	world,
+}: CreateTranslatorParams): ProceduralTranslator {
+	const count = world.provinces?.count ?? 0
+	const parent = new Int32Array(count).fill(-1)
+	const owner = new Int32Array(count).fill(-1)
+	const occupation = new Int32Array(count).fill(-1)
+	const children = Array.from({ length: count }, () => new Set<number>())
+	const ownedCount = new Array<number>(state.record.nations.length).fill(0)
+	const stateless = new Uint8Array(count)
+	for (let province = 0; province < count; province++) {
+		const base = state.record.events.provinceEvents.get(province)?.base
+		parent[province] = base?.parentId ?? -1
+		owner[province] = base?.ownerId ?? -1
+		if (parent[province] >= 0) children[parent[province]].add(province)
+		if (owner[province] >= 0) ownedCount[owner[province]]++
+		if (
+			!world.provinces?.desolate[province] &&
+			(world.nations?.sovereign[province] ?? -1) < 0
+		)
+			stateless[province] = 1
+	}
+	const identityByRoot = new Map<number, number>()
+	const rawColors: Array<[number, number, number]> = []
+	for (let id = 0; id < (world.nations?.seeds.length ?? 0); id++) {
+		identityByRoot.set(world.nations!.seeds[id], id)
+		const colors = world.nations!.colors
+		rawColors.push([colors[id * 3], colors[id * 3 + 1], colors[id * 3 + 2]])
+	}
+	const translator: ProceduralTranslator = {
+		state,
+		world,
+		names: NAMES.createWorldNames(world),
+		parent,
+		owner,
+		occupation,
+		children,
+		identityByRoot,
+		rawColors,
+		relationCells: new Map(),
+		relationColumns: new Map(),
+		activeTies: new Map(),
+		warCoalitions: new Map(),
+		ownedCount,
+		stateless,
+	}
+	for (let province = 0; province < count; province++) {
+		const root = world.nations?.sovereign[province] ?? -1
+		if (root < 0 || owner[province] >= 0 || stateless[province]) continue
+		const id = identityForRoot({
+			translator,
+			root,
+			timeMs: state.record.minTimeMs,
+		})
+		owner[province] = id
+		ownedCount[id]++
+		const base = state.record.events.provinceEvents.get(province)?.base
+		if (base) {
+			base.ownerId = id
+			base.controllerId = id
+		}
+	}
+	return translator
+}
+
+function applyTransaction({
+	translator,
+	transaction,
+}: ApplyTransactionParams): void {
+	const { record } = translator.state
+	const timeMs = Math.max(record.minTimeMs, recordTime(transaction.timeMs))
+	record.maxTimeMs = Math.max(record.maxTimeMs, timeMs)
+	const count = translator.parent.length
+	const affected = new Set<number>()
+	const pairs = new Set<number>()
+	for (const change of transaction.parents) {
+		for (const province of descendants({
+			children: translator.children,
+			province: change.province,
+		}))
+			affected.add(province)
+		if (change.before < 0 || change.after < 0) {
+			for (const neighbor of translator.relationColumns.get(change.province) ??
+				[])
+				pairs.add(
+					Math.min(change.province, neighbor) * count +
+						Math.max(change.province, neighbor),
+				)
+		}
+	}
+	for (const change of transaction.parents) {
+		if (change.before >= 0)
+			translator.children[change.before].delete(change.province)
+		translator.parent[change.province] = change.after
+		const event: HistoryEvent = {
+			timeMs,
+			kind: "parent",
+			payload: { parentId: change.after },
+			comment: null,
+		}
+		record.events.provinceEvents.get(change.province)?.events.push(event)
+	}
+	for (const change of transaction.parents) {
+		if (change.after >= 0)
+			translator.children[change.after].add(change.province)
+	}
+	for (const change of transaction.parents) {
+		for (const province of descendants({
+			children: translator.children,
+			province: change.province,
+		}))
+			affected.add(province)
+	}
+	for (const province of affected) {
+		const root = rootOf({ translator, province })
+		const next =
+			translator.world.provinces?.desolate[province] ||
+			translator.stateless[province]
+				? -1
+				: identityForRoot({ translator, root, timeMs })
+		const previous = translator.owner[province]
+		if (next === previous) continue
+		if (previous >= 0 && --translator.ownedCount[previous] === 0)
+			record.nations[previous].deathTimeMs = timeMs
+		if (next >= 0) {
+			if (translator.ownedCount[next]++ === 0) {
+				record.nations[next].birthTimeMs = Math.min(
+					record.nations[next].birthTimeMs,
+					timeMs,
+				)
+				record.nations[next].deathTimeMs = -1
+			}
+		}
+		translator.owner[province] = next
+		record.events.provinceEvents.get(province)?.events.push({
+			timeMs,
+			kind: "owner",
+			payload: { nationId: next },
+			comment: null,
+		})
+		if (translator.occupation[province] < 0)
+			record.events.provinceEvents.get(province)?.events.push({
+				timeMs,
+				kind: "controller",
+				payload: { nationId: next },
+				comment: null,
+			})
+	}
+	for (const change of transaction.relations) {
+		const key = change.x * count + change.y
+		if (change.after === 7) {
+			translator.relationCells.delete(key)
+			translator.relationColumns.get(change.x)?.delete(change.y)
+		} else {
+			translator.relationCells.set(key, change.after)
+			let columns = translator.relationColumns.get(change.x)
+			if (!columns)
+				translator.relationColumns.set(change.x, (columns = new Set()))
+			columns.add(change.y)
+		}
+		pairs.add(
+			Math.min(change.x, change.y) * count + Math.max(change.x, change.y),
+		)
+	}
+	updateTies({ translator, pairs, timeMs })
+	const coalitions = transaction.coalitions.slice()
+	for (const note of transaction.notes) {
+		const coalition =
+			note.tag === "war started" || note.tag === "battle"
+				? (coalitions.find((entry) => entry.warId === note.data.war) ?? null)
+				: null
+		if (coalition) coalitions.splice(coalitions.indexOf(coalition), 1)
+		appendNote({
+			translator,
+			note,
+			timeMs: Math.max(record.minTimeMs, recordTime(note.time)),
+			coalition,
+		})
+	}
+	for (const change of transaction.occupations) {
+		translator.occupation[change.province] = change.after
+		const war = record.events.wars[change.after]
+		const controller =
+			change.after < 0
+				? translator.owner[change.province]
+				: (war?.events.find(
+						(event) => event.kind === "warStart" && event.side === "attacker",
+					)?.nationId ?? -1)
+		record.events.provinceEvents.get(change.province)?.events.push({
+			timeMs,
+			kind: "controller",
+			payload: { nationId: controller },
+			comment: null,
+		})
+	}
+	for (const ruler of transaction.rulers) {
+		const nationId = translator.identityByRoot.get(ruler.root)
+		if (nationId === undefined || ruler.nameSeed < 0) continue
+		const log = record.events.nationEvents[nationId]
+		if (!log) continue
+		const named = translator.names.ruler({
+			province: ruler.root,
+			nameSeed: ruler.nameSeed,
+		})
+		log.events.push({
+			timeMs,
+			kind: "rulerChange",
+			payload: {
+				name: ruler.regent ? "Regency Council" : named.name,
+				dynasty:
+					ruler.dynasty >= 0 ? translator.names.dynasty(ruler.dynasty) : null,
+				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
+				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
+				female: named.female,
+				regent: ruler.regent,
+			},
+			comment: null,
+		})
+	}
+	if (transaction.census)
+		record.events.censuses.push({
+			timeMs,
+			urban: transaction.census.urban,
+			rural: transaction.census.rural,
+			development: transaction.census.development,
+		})
+	translator.state.frameCache.clear()
+}
+
+function appendJournal({
+	translator,
+	transactions,
+}: AppendJournalParams): void {
+	for (const transaction of transactions)
+		applyTransaction({ translator, transaction })
+}
+
+export const TRANSLATOR = { createTranslator, appendJournal, recordTime }

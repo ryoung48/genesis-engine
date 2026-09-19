@@ -4,6 +4,7 @@ import type { WorldTypeAllocation } from "@/model/celestial/system/generation/wo
 export interface SingleStarBudgetInput {
 	seed: number
 	hostStar: HostStarAttributes
+	exactHZC: boolean
 }
 
 export interface SingleStarBudget {

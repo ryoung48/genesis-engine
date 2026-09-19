@@ -11,6 +11,8 @@ import type {
 	GetLanguageParams,
 	GetLeaderEntryParams,
 	GetReligionLanguageParams,
+	RulerName,
+	RulerNameParams,
 	SpawnSeededLanguageParams,
 } from "@/model/society/language/names/types"
 import { CultureGenderSystem } from "@/model/society/types"
@@ -104,6 +106,7 @@ export interface LanguageNames {
 	river(provinceIdx: number): string
 	mountain(provinceIdx: number): string
 	leader(provinceIdx: number, time: number): string
+	ruler(params: RulerNameParams): RulerName
 	dynasty(dynastyIdx: number): string
 	/** e.g. an Imperial Patchwork's "[Word] Empire" or a Trade League's
 	 * "[Word] League"/"[Word] Confederation" -- named off the lead member's
@@ -519,6 +522,31 @@ function createNames(context: LanguageNameContext): LanguageNames {
 			)
 			leaderEntry.name = name
 			return name
+		},
+		ruler: ({ province, nameSeed }: RulerNameParams): RulerName => {
+			const culture =
+				context.cultures[context.provinces[province]?.culture ?? -1]
+			const female =
+				GENDER_SYSTEM.resolveLeaderGender({
+					system: getCultureGenderSystem(culture),
+					seed: nameSeed,
+				}) === "female"
+			const lang = culture
+				? getCultureLanguage({
+						context,
+						cultureIdx: context.provinces[province].culture,
+					})
+				: null
+			if (!lang) return { name: `Ruler #${nameSeed}`, female }
+			const name = TEXT.titleCase(
+				LANGUAGE.word.simple({
+					lang,
+					key: female ? "female" : "male",
+					namespace: "leader",
+					slot: `leader:${province}:${nameSeed}`,
+				}).word,
+			)
+			return { name, female }
 		},
 		dynasty: (dynastyIdx: number) => {
 			const dynasty = context.dynasties?.[dynastyIdx]

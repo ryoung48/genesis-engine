@@ -296,6 +296,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 				spectralClass: cls,
 				starSubtype,
 				mainWorldMode,
+				exactHZC: true,
 				starAgeGyrOverride: starAgeGyr,
 			})
 		}
@@ -367,6 +368,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			spectralClass: cls,
 			starSubtype,
 			mainWorldMode: "earth-clone",
+			exactHZC: false,
 			solMainWorldOverrides,
 		})
 	}, [seed, spectralClass, starSubtype, mainWorldMode, starAgeGyr, hostStar])

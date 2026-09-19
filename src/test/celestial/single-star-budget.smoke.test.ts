@@ -5,6 +5,7 @@ describe("Single-star budget", () => {
 	it("runs the staged placement pipeline for a standalone host", () => {
 		const budget = SINGLE_STAR_BUDGET.roll({
 			seed: 1,
+			exactHZC: false,
 			hostStar: {
 				spectralClass: "G",
 				luminosityClass: "V",

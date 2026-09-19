@@ -37,7 +37,6 @@ export type {
 	ExportWidthPreset,
 	LabelMode,
 	MeasureMode,
-	OverlayControlsProps,
 	TopographySubMode,
 	VegetationSubMode,
 } from "./types"
@@ -153,6 +152,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
 	isEarthImport = false,
+	hasHierarchy,
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
 	const [societyExpanded, setSocietyExpanded] = React.useState(false)
@@ -365,6 +365,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									labelMode={labelMode}
 									setLabelMode={setLabelMode}
 									isEarthImport={isEarthImport}
+									hasHierarchy={hasHierarchy}
 								/>
 
 								<NationsModeSection

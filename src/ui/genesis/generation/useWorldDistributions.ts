@@ -8,12 +8,11 @@ import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
-import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-details-model"
+import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-size-distribution"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
-import { buildNationAdjacency } from "@/ui/genesis/view/display-model"
 import type { WorldDistributionsInput } from "@/ui/genesis/view/types"
 import { buildDistribution } from "@/ui/wiki/stats/nation/nation-distributions"
 
@@ -25,39 +24,26 @@ import { buildDistribution } from "@/ui/wiki/stats/nation/nation-distributions"
  * for Earth imports, the procedural snapshot otherwise).
  */
 export function useWorldDistributions(input: WorldDistributionsInput) {
-	const {
-		world,
-		worldForDisplay,
-		earthHistory,
-		nationModel,
-		nationProvinceCounts,
-		colorMode,
-		dataVariant,
-	} = input
+	const { world, worldForDisplay, history, dataVariant } = input
 
-	const earthNationProvinceCounts = useMemo(() => {
-		if (!world?.isEarthImport || !earthHistory.query) return null
+	const nationProvinceCounts = useMemo(() => {
 		const counts = new Map<number, number>()
-		for (const nationId of earthHistory.query.frame.provinceNation) {
+		if (!history.query) return counts
+		for (const nationId of history.query.frame.provinceNation) {
 			if (nationId < 0) continue
 			counts.set(nationId, (counts.get(nationId) ?? 0) + 1)
 		}
 		return counts
-	}, [world?.isEarthImport, earthHistory.query])
+	}, [history.query])
 
 	const earthGovernmentDistribution = useMemo(() => {
-		if (
-			!world?.isEarthImport ||
-			!earthHistory.query ||
-			!earthNationProvinceCounts
-		)
-			return null
-		const { nations } = earthHistory.query.frame
+		if (!world?.isEarthImport || !history.query) return null
+		const { nations } = history.query.frame
 		const counts = new Map<
 			(typeof GOVERNMENT.earthHistoryGovernmentFamilies)[number],
 			number
 		>()
-		for (const nationId of earthNationProvinceCounts.keys()) {
+		for (const nationId of nationProvinceCounts.keys()) {
 			const governmentType = nations.get(nationId)?.government ?? null
 			const family = GOVERNMENT.getEarthHistoryGovernmentFamily(governmentType)
 			if (!family) continue
@@ -68,48 +54,43 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 			count: counts.get(family) ?? 0,
 			color: rgbToCss(GOVERNMENT.earthHistoryGovernmentFamilyColors[family]),
 		}))
-	}, [world?.isEarthImport, earthHistory.query, earthNationProvinceCounts])
+	}, [world?.isEarthImport, history.query, nationProvinceCounts])
 
 	// Habitable provinces owned by nobody. On Earth import that is land EU4 has
 	// not colonised at the scrubbed date; procedurally it is the era's stateless
 	// land (see the neolithic/lateMedieval statehoodFraction). Desolate
 	// provinces are excluded -- they are uninhabitable, not merely unclaimed.
 	const unclaimedProvinceCount = useMemo(() => {
-		if (world?.isEarthImport && earthHistory.query) {
-			let unclaimed = 0
-			for (const nationId of earthHistory.query.frame.provinceNation) {
-				if (nationId < 0) unclaimed++
-			}
-			return unclaimed
-		}
-		const provinces = worldForDisplay?.provinces
-		const sovereign = worldForDisplay?.nations?.sovereign
-		if (!provinces || !sovereign) return 0
+		if (!history.query) return 0
+		const desolate = world?.isEarthImport
+			? null
+			: worldForDisplay?.provinces?.desolate
 		let unclaimed = 0
-		for (let province = 0; province < provinces.count; province++) {
-			if (provinces.desolate[province]) continue
-			if ((sovereign[province] ?? -1) < 0) unclaimed++
+		const { provinceNation } = history.query.frame
+		for (let province = 0; province < provinceNation.length; province++) {
+			if (desolate?.[province]) continue
+			if (provinceNation[province] < 0) unclaimed++
 		}
 		return unclaimed
-	}, [world?.isEarthImport, earthHistory.query, worldForDisplay])
+	}, [world?.isEarthImport, history.query, worldForDisplay])
 
 	const nationSizeDistribution = useMemo(
 		() =>
-			buildNationSizeDistribution(
-				earthNationProvinceCounts ?? nationProvinceCounts,
-				unclaimedProvinceCount,
-			),
-		[earthNationProvinceCounts, nationProvinceCounts, unclaimedProvinceCount],
+			buildNationSizeDistribution(nationProvinceCounts, unclaimedProvinceCount),
+		[nationProvinceCounts, unclaimedProvinceCount],
 	)
 
 	const governmentDistribution = useMemo(() => {
 		if (earthGovernmentDistribution) return earthGovernmentDistribution
 		const counts = new Array(ERAS.governmentTypes.length).fill(0)
-		const govType = worldForDisplay?.nations?.governmentType
-		if (govType && nationModel) {
-			for (const nationId of nationModel.counts.keys()) {
-				const t = govType[nationId] ?? 0
-				if (t >= 0 && t < counts.length) counts[t]++
+		if (history.query) {
+			const { nations } = history.query.frame
+			for (const nationId of nationProvinceCounts.keys()) {
+				const government = nations.get(nationId)?.government
+				const index = ERAS.governmentTypes.findIndex(
+					(key) => key === government,
+				)
+				if (index >= 0) counts[index]++
 			}
 		}
 		return ERAS.governmentTypes.map((key, i) => ({
@@ -117,46 +98,25 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 			count: counts[i] ?? 0,
 			color: GOVERNMENT_COLORS_CSS[i] ?? "rgb(148, 163, 184)",
 		}))
-	}, [
-		earthGovernmentDistribution,
-		worldForDisplay?.nations?.governmentType,
-		nationModel,
-	])
+	}, [earthGovernmentDistribution, history.query, nationProvinceCounts])
 
 	const religionTypeDistribution = useMemo(() => {
-		const world = worldForDisplay
-		const nationAssign = world?.nations?.assignment
-		const cultureAssign = world?.cultures?.assignment
-		const religionAssign = world?.religions?.assignment
-		const relTypes = world?.religionTypes
-		if (
-			!nationAssign ||
-			!cultureAssign ||
-			!religionAssign ||
-			!relTypes ||
-			!nationModel
-		)
-			return []
+		const relTypes = worldForDisplay?.religionTypes
+		if (!relTypes || !history.query) return []
+		const { provinceNation, provinceReligion } = history.query.frame
 
 		// Per-nation accumulator: religion type → province count
 		const nationBuckets = new Map<number, number[]>()
-		for (const nationId of nationModel.counts.keys()) {
-			nationBuckets.set(
-				nationId,
-				new Array<number>(RELIGION.religionTypeNames.length).fill(0),
-			)
-		}
-
-		for (let p = 0; p < nationAssign.length; p++) {
-			const nationId = nationAssign[p]
+		for (let p = 0; p < provinceNation.length; p++) {
+			const nationId = provinceNation[p]
 			if (nationId < 0) continue
-			const buckets = nationBuckets.get(nationId)
-			if (!buckets) continue
-
-			const cultureId = cultureAssign[p] ?? -1
-			if (cultureId < 0) continue
-			const religionId = religionAssign[cultureId] ?? -1
+			const religionId = provinceReligion[p]
 			if (religionId < 0) continue
+			let buckets = nationBuckets.get(nationId)
+			if (!buckets) {
+				buckets = new Array<number>(RELIGION.religionTypeNames.length).fill(0)
+				nationBuckets.set(nationId, buckets)
+			}
 			const type = relTypes[religionId] ?? 0
 			if (type >= 0 && type < buckets.length) buckets[type]++
 		}
@@ -187,27 +147,12 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 				}
 			})
 			.filter((bucket) => bucket.count > 0)
-	}, [
-		worldForDisplay?.nations?.assignment,
-		worldForDisplay?.cultures?.assignment,
-		worldForDisplay?.religions?.assignment,
-		worldForDisplay?.religionTypes,
-		nationModel,
-		worldForDisplay,
-	])
+	}, [worldForDisplay?.religionTypes, history.query])
 
 	// Wars and diplomatic relations were procedural-sim products; Earth import
-	// surfaces its own conflict data through earthHistory.
+	// surfaces its own conflict data through history.
 	const conflictDistribution = useMemo<DistributionBucket[]>(() => [], [])
 	const relationDistribution = useMemo<DistributionBucket[]>(() => [], [])
-
-	const nationAdjacency = useMemo(
-		() =>
-			colorMode === "nations" && nationModel && worldForDisplay
-				? buildNationAdjacency(nationModel.assignment, worldForDisplay)
-				: null,
-		[colorMode, nationModel, worldForDisplay],
-	)
 
 	// "Observed" sources the real-Earth-derived realClimateZones/realVegetation
 	// arrays (assignEarthClimateZones/assignVegetation run against actual
@@ -286,7 +231,6 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		climateDistribution,
 		conflictDistribution,
 		governmentDistribution,
-		nationAdjacency,
 		nationSizeDistribution,
 		relationDistribution,
 		religionTypeDistribution,

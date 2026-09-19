@@ -9,8 +9,7 @@ import { WIND } from "@/model/climate/weather/wind"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
-import { HISTORY_DAYS } from "@/model/history/generated/history-days"
-import { STATE } from "@/model/history/generated/state"
+import { STATE } from "@/model/history/sim/engine/state"
 import type { StageTiming } from "@/model/pipelines/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
@@ -53,9 +52,8 @@ import {
 	buildPlanetSliders,
 	buildTerrainSliders,
 } from "@/ui/genesis/generation/sliders"
-import { useEarthHistoryTimeline } from "@/ui/genesis/generation/useEarthHistoryTimeline"
+import { useHistoryTimeline } from "@/ui/genesis/generation/useHistoryTimeline"
 import { useProceduralHistory } from "@/ui/genesis/generation/useProceduralHistory"
-import { useProceduralHistoryTimeline } from "@/ui/genesis/generation/useProceduralHistoryTimeline"
 import { useWorldDistributions } from "@/ui/genesis/generation/useWorldDistributions"
 import { useWorldGeneration } from "@/ui/genesis/generation/useWorldGeneration"
 import {
@@ -67,7 +65,6 @@ import { InfoPanel } from "@/ui/genesis/hover/InfoPanel"
 import { OceanCurrentParticleCanvas } from "@/ui/genesis/particles/OceanCurrentParticleCanvas"
 import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { findEu4ProvinceForLonLat } from "@/ui/genesis/political/eu4-hover-province"
-import { buildSelectedNationDetails } from "@/ui/genesis/political/nation-details-model"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
@@ -80,15 +77,11 @@ import {
 } from "@/ui/genesis/shared/map-modes"
 import { canHandlePlanetClick } from "@/ui/genesis/shared/measurement-click"
 import { computePlanetStats } from "@/ui/genesis/shared/planet-stats"
-import { formatDistance, rgbToCss } from "@/ui/genesis/shared/ui-format"
+import { formatDistance } from "@/ui/genesis/shared/ui-format"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import { SolarSystemControls } from "@/ui/genesis/solar-system/SolarSystemControls"
 import { useSolarSystemBodies } from "@/ui/genesis/solar-system/useSolarSystemBodies"
 import { useSolarSystemView } from "@/ui/genesis/solar-system/useSolarSystemView"
-import {
-	buildDisplayNationModel,
-	buildDisplayWorld,
-} from "@/ui/genesis/view/display-model"
 import type { WorldWindStatsCache } from "@/ui/genesis/view/types"
 import { useGenesisSceneSync } from "@/ui/genesis/view/useGenesisSceneSync"
 import { useMapColoring } from "@/ui/genesis/view/useMapColoring"
@@ -97,8 +90,6 @@ import { useOverlayState } from "@/ui/genesis/view/useOverlayState"
 import { useWorldDisplayData } from "@/ui/genesis/view/useWorldDisplayData"
 import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
-import { useProceduralNationWikiData } from "@/ui/genesis/wiki-bridge/useProceduralNationWikiData"
-import { useProceduralOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useProceduralOrganizationWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
@@ -285,11 +276,8 @@ export const GenesisView: React.FC<{
 		useState<GenerationPreviewTab>(
 			initialGenerationSession?.generationPreviewTab ?? "climate",
 		)
-	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
-	// Left-panel "nation wiki page" selection for Earth-import worlds,
-	// identified by EU4 tag rather than a procedural nation id. Procedural
-	// worlds instead drive the wiki page off selectedNationId above (see
-	// proceduralNationWikiData).
+	// Left-panel "nation wiki page" selection, identified by history record
+	// nation id.
 	const [selectedWikiNationId, setSelectedWikiNationIdRaw] = useState<
 		number | null
 	>(null)
@@ -303,11 +291,6 @@ export const GenesisView: React.FC<{
 	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<number | null>(
 		null,
 	)
-	// selectedNationId (the procedural-world nation selection, set from map
-	// clicks) predates this three-way mutual exclusion and isn't part of it by
-	// default -- cleared here too so switching to the org/war wiki page on a
-	// procedural world doesn't leave proceduralNationWikiData non-null and
-	// stuck winning GenerationPanel's nationWiki-first render priority.
 	const setSelectedWikiNationId = useCallback((id: number | null) => {
 		setSelectedWikiOrganizationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
@@ -317,13 +300,11 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(orgId)
-		if (orgId !== null) setSelectedNationId(null)
 	}, [])
 	const setSelectedWikiWarId = useCallback((warId: number | null) => {
 		setSelectedWikiNationIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(null)
 		setSelectedWikiWarIdRaw(warId)
-		if (warId !== null) setSelectedNationId(null)
 	}, [])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
@@ -345,24 +326,35 @@ export const GenesisView: React.FC<{
 		[colorMode, geographyMode],
 	)
 
+	const {
+		handleToggleProceduralHistoryPlayback,
+		proceduralHistoryPlaying,
+		startProceduralJournal,
+		recordProceduralJournal,
+		journalTransactionsRef,
+		journalVersion,
+		setProceduralHistoryPlaying,
+	} = useProceduralHistory({ workerRef })
 	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
 	const simStartTimeMs = historyYearToTime(800)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
-	// Earth-imported worlds scrub real Gregorian dates via earthHistory's own
+	// Earth-imported worlds scrub real Gregorian dates via history's own
 	// slider. selectedTimeMs tracks it so Social's population/culture/heritage/
 	// religion counts follow the scrubber. historyDaysToYear/historyYearToTime share
 	// the same linear year axis, so this is a direct year-for-year mapping, not
 	// a rescale.
-	const earthHistory = useEarthHistoryTimeline(
-		world?.provinces,
-		!!world?.isEarthImport,
-	)
+	const history = useHistoryTimeline({
+		world,
+		religionMode,
+		journalTransactionsRef,
+		journalVersion,
+	})
 	useEffect(() => {
 		if (!world?.isEarthImport) return
 		setSelectedTimeMs(
-			historyYearToTime(DATE.historyTimeMsToYear(earthHistory.selectedTimeMs)),
+			historyYearToTime(DATE.historyTimeMsToYear(history.selectedTimeMs)),
 		)
-	}, [world?.isEarthImport, earthHistory.selectedTimeMs])
+	}, [world?.isEarthImport, history.selectedTimeMs])
 	const [earthRealPopulation, setEarthRealPopulation] =
 		useState<Eu4PopulationTimelineAsset | null>(null)
 	const [earthRealUrbanPopulation, setEarthRealUrbanPopulation] =
@@ -437,76 +429,35 @@ export const GenesisView: React.FC<{
 	const dtrMonth = resolvedClimateMonth
 	const currentMonth = resolvedClimateMonth
 	useEffect(() => {
-		if (!world?.isEarthImport || earthHistory.loading || !earthHistoryPlaying)
-			return
+		if (!world?.isEarthImport || history.loading || !earthHistoryPlaying) return
 		const timer = window.setInterval(() => {
-			earthHistory.setSelectedTimeMs((prev) => {
-				if (prev >= earthHistory.maxTimeMs) {
+			history.setSelectedTimeMs((prev) => {
+				if (prev >= history.maxTimeMs) {
 					setEarthHistoryPlaying(false)
 					return prev
 				}
-				const next = Math.min(prev + 365 * 86_400_000, earthHistory.maxTimeMs)
-				if (next >= earthHistory.maxTimeMs) setEarthHistoryPlaying(false)
+				const next = Math.min(prev + 365 * 86_400_000, history.maxTimeMs)
+				if (next >= history.maxTimeMs) setEarthHistoryPlaying(false)
 				return next
 			})
 		}, 1000)
 		return () => window.clearInterval(timer)
 	}, [
-		earthHistory.loading,
-		earthHistory.maxTimeMs,
-		earthHistory.setSelectedTimeMs,
+		history.loading,
+		history.maxTimeMs,
+		history.setSelectedTimeMs,
 		earthHistoryPlaying,
 		world?.isEarthImport,
 	])
 	useEffect(() => {
-		if (earthHistory.selectedTimeMs >= earthHistory.maxTimeMs) {
+		if (history.selectedTimeMs >= history.maxTimeMs) {
 			setEarthHistoryPlaying(false)
 		}
-	}, [earthHistory.maxTimeMs, earthHistory.selectedTimeMs])
+	}, [history.maxTimeMs, history.selectedTimeMs])
 
-	// --- Procedural (non-Earth-import) live-play history sim ---
-	// Unlike earthHistory (a precomputed fold scrubbable across the whole
-	// span), procedural worlds only ever exist as far as "simulate" has
-	// ticked them forward in the worker -- see PROCEDURAL-HISTORY-PLAN.md.
-	// There is no stored past: only the latest frame is kept, so the
-	// timeline below can't scrub backward, only play/pause at the sim's
-	// current time.
-	const {
-		handleToggleProceduralHistoryPlayback,
-		proceduralHistoryEventsRef,
-		proceduralHistoryFrame,
-		proceduralHistoryPlaying,
-		proceduralHistoryTimeMs,
-		proceduralProvinceHistoryRef,
-		recordProceduralFrame,
-		resetProceduralHistoryAccumulation,
-		setProceduralHistoryFrame,
-		setProceduralHistoryPlaying,
-		setProceduralHistoryTimeMs,
-	} = useProceduralHistory({
-		workerRef,
-	})
-	// Unified static initial-conditions frame for procedural worlds
-	// (src/model/history/sim), rendered through the same path as Earth history.
-	// Deliberately NOT proceduralHistoryFrame: that is the retired
-	// history/generated snapshot the worker still ships in its "done" message
-	// (and updates on live-sim playback); it carries placeholder names,
-	// stringified government indices and a different partition id space, none
-	// of which line up with this render path's side-maps.
-	const proceduralTimeline = useProceduralHistoryTimeline(world, religionMode)
-	const isEarthHistory = !!world?.isEarthImport
-	const historyFrame = isEarthHistory
-		? (earthHistory.query?.frame ?? null)
-		: (proceduralTimeline.query?.frame ?? null)
-	// The active history frame's culture/religion colour side-maps: Earth's
-	// reference maps, or the procedural timeline's own row colours -- so
-	// useMapColoring runs one path for both.
-	const historyCultureColorById = isEarthHistory
-		? earthHistory.cultureColorById
-		: proceduralTimeline.cultureColorById
-	const historyReligionColorById = isEarthHistory
-		? earthHistory.religionColorById
-		: proceduralTimeline.religionColorById
+	const historyFrame = history.query?.frame ?? null
+	const historyCultureColorById = history.cultureColorById
+	const historyReligionColorById = history.religionColorById
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
@@ -706,8 +657,30 @@ export const GenesisView: React.FC<{
 	}, [colorMode, debugMapModes, nationMode])
 
 	const worldForDisplay = useMemo(() => {
-		const displayWorld = buildDisplayWorld({ world })
+		const displayWorld = world
 		if (!displayWorld) return null
+		if (
+			!displayWorld.isEarthImport &&
+			history.query &&
+			displayWorld.population
+		) {
+			const frame = history.query.frame
+			const population = new Float32Array(frame.provinceCount)
+			for (let province = 0; province < frame.provinceCount; province++)
+				population[province] =
+					frame.provincePopulation[province] +
+					frame.provincePopulationUrban[province]
+			return {
+				...displayWorld,
+				population: {
+					...displayWorld.population,
+					population,
+					totalPopulation: frame.totalPopulation,
+				},
+				urbanPopulation: frame.provincePopulationUrban,
+				development: frame.provinceDevelopment,
+			}
+		}
 		const displayProvinces = attachEarthProvinceAreas({
 			provinces: displayWorld.provinces,
 			asset: earthRealPopulation,
@@ -718,7 +691,7 @@ export const GenesisView: React.FC<{
 						asset: earthRealPopulation,
 						provinces: displayProvinces,
 						syntheticPopulation: displayWorld.population?.population,
-						selectedDays: DATE.timeMsToDays(earthHistory.selectedTimeMs),
+						selectedDays: DATE.timeMsToDays(history.selectedTimeMs),
 					})
 				: null
 		const realUrbanPopulationSlice =
@@ -726,7 +699,7 @@ export const GenesisView: React.FC<{
 				? buildRealUrbanPopulationSlice({
 						asset: earthRealUrbanPopulation,
 						provinces: displayProvinces,
-						selectedDays: DATE.timeMsToDays(earthHistory.selectedTimeMs),
+						selectedDays: DATE.timeMsToDays(history.selectedTimeMs),
 					})
 				: null
 		const realSettlementSlice =
@@ -736,11 +709,11 @@ export const GenesisView: React.FC<{
 			displayProvinces.realIds
 				? (() => {
 						const nationCapitalProvinceIndices = new Set(
-							earthHistory.query?.renderInputs.seeds ?? [],
+							history.query?.renderInputs.seeds ?? [],
 						)
 						const population = buildGhslSettlementPopulationSlice(
 							eu4GhslSettlements,
-							DATE.timeMsToDays(earthHistory.selectedTimeMs),
+							DATE.timeMsToDays(history.selectedTimeMs),
 						)
 						if (!population) return null
 						const provinceCount = displayProvinces.count
@@ -756,23 +729,23 @@ export const GenesisView: React.FC<{
 							if (!settlement) continue
 							const name = resolveEu4ProvinceSettlementName({
 								settlement,
-								selectedDays: DATE.timeMsToDays(earthHistory.selectedTimeMs),
+								selectedDays: DATE.timeMsToDays(history.selectedTimeMs),
 							})
 							const anchorIndex = resolveEu4ProvinceSettlementCarrier({
 								settlement,
-								selectedDays: DATE.timeMsToDays(earthHistory.selectedTimeMs),
+								selectedDays: DATE.timeMsToDays(history.selectedTimeMs),
 							})
 							const populationIndex =
 								resolveEu4ProvinceSettlementPopulationCarrier({
 									settlement,
-									selectedDays: DATE.timeMsToDays(earthHistory.selectedTimeMs),
+									selectedDays: DATE.timeMsToDays(history.selectedTimeMs),
 									population,
 								})
 							const hasPopulation =
 								populationIndex !== null && population[populationIndex] > 0
 							const isCity = resolveEu4ProvinceSettlementIsCity({
 								settlement,
-								selectedDays: DATE.timeMsToDays(earthHistory.selectedTimeMs),
+								selectedDays: DATE.timeMsToDays(history.selectedTimeMs),
 							})
 							const isNationCapital =
 								nationCapitalProvinceIndices.has(compactIdx)
@@ -817,8 +790,8 @@ export const GenesisView: React.FC<{
 		earthRealUrbanPopulation,
 		eu4GhslSettlements,
 		eu4ProvinceSettlements,
-		earthHistory.selectedTimeMs,
-		earthHistory.query,
+		history.selectedTimeMs,
+		history.query,
 	])
 	useEffect(() => {
 		let cancelled = false
@@ -839,28 +812,13 @@ export const GenesisView: React.FC<{
 			cancelled = true
 		}
 	}, [worldForDisplay?.isEarthImport])
-	const earthHistoryFormatLabel = useCallback(
-		(timeValue: number) => earthHistory.formatLabel(timeValue),
-		[earthHistory.formatLabel],
+	const historyFormatLabel = useCallback(
+		(timeValue: number) => history.formatLabel(timeValue),
+		[history.formatLabel],
 	)
-	const nationModel = useMemo(
-		() => buildDisplayNationModel(worldForDisplay),
-		[worldForDisplay],
-	)
-	const nationProvinceCounts = useMemo(() => {
-		return nationModel?.counts ?? new Map<number, number>()
-	}, [nationModel])
-	const nationColorById = useMemo(
-		() => nationModel?.colorById ?? new Map<number, [number, number, number]>(),
-		[nationModel],
-	)
-	const getNationColor = useCallback(
-		(nationId: number): string | null => {
-			if (nationId < 0) return null
-			const color = nationColorById.get(nationId)
-			return color ? rgbToCss(color) : null
-		},
-		[nationColorById],
+	const hasHierarchy = useMemo(
+		() => history.query?.frame.provinceParent.some((p) => p >= 0) ?? false,
+		[history.query],
 	)
 	const drawerWorldPopulation = useMemo(() => {
 		if (
@@ -872,51 +830,34 @@ export const GenesisView: React.FC<{
 		}
 		// worldForDisplay.realPopulation is real, per-real-date data (built from
 		// earthRealPopulation/earthRealUrbanPopulation via
-		// earthHistory.selectedDays), so prefer it outright for Earth import
+		// history.selectedDays), so prefer it outright for Earth import
 		// rather than only when the map's own colorMode happens to be on the
 		// population overlay -- otherwise this pins to the static
 		// generation-time total regardless of the real-history slider.
 		if (worldForDisplay?.isEarthImport && worldForDisplay?.realPopulation) {
 			return worldForDisplay.realPopulation.totalPopulation
 		}
-		return world?.population?.totalPopulation ?? null
+		return worldForDisplay?.population?.totalPopulation ?? null
 	}, [
 		colorMode,
 		dataVariant,
 		worldForDisplay?.isEarthImport,
 		worldForDisplay?.realPopulation,
-		world?.population?.totalPopulation,
+		worldForDisplay?.population?.totalPopulation,
 	])
 
-	// Same underlying issue as drawerWorldPopulation above -- Earth import has
-	// no procedural timelineBundle to read culture/religion/war counts from,
-	// so for that path prefer earthHistory's own real per-date engine
-	// (already time-varying with the real-history slider) over the static
-	// procedural worldForDisplay fields used below.
-	const earthSocialCounts = useMemo(() => {
-		if (!world?.isEarthImport || !earthHistory.query) return null
-		const frame = earthHistory.query.frame
+	const historySocialCounts = useMemo(() => {
+		if (!history.query) return null
+		const frame = history.query.frame
 		return {
 			cultureCount: frame.cultures.length,
 			religionCount: frame.religions.length,
 			activeWarCount: frame.wars.length,
 		}
-	}, [world?.isEarthImport, earthHistory.query])
-
-	useEffect(() => {
-		if (!worldForDisplay) {
-			setSelectedNationId(null)
-			return
-		}
-		if (!worldForDisplay.nations || selectedNationId === null) return
-		if (selectedNationId < 0 || !nationProvinceCounts.has(selectedNationId)) {
-			setSelectedNationId(null)
-		}
-	}, [nationProvinceCounts, selectedNationId, worldForDisplay])
+	}, [history.query])
 
 	// --- Hover computations ---
 	const {
-		earthImportRawIdToCompact,
 		getCultureName,
 		getDynastyName,
 		getGlobeCameraDir,
@@ -924,8 +865,6 @@ export const GenesisView: React.FC<{
 		getReligionName,
 		getLandmarkName,
 		getLeaderName,
-		getNationName,
-		getOrganizationName,
 		getProvinceColor,
 		getProvinceName,
 		getRiverName,
@@ -946,7 +885,6 @@ export const GenesisView: React.FC<{
 		hoverIsLand,
 		hoverLandmark,
 		hoverMisery,
-		hoverNationId,
 		hoverOccupation,
 		hoverOceanCurrents,
 		hoverOceanDist,
@@ -982,7 +920,6 @@ export const GenesisView: React.FC<{
 		worldForDisplay,
 		hoverInfo,
 		eu4HoverFillGeometry,
-		nationModel,
 		colorMode,
 		dataVariant,
 		showWindArrows,
@@ -1039,18 +976,17 @@ export const GenesisView: React.FC<{
 	const {
 		buildOrgCategorizer,
 		cultureBlendOverlay,
-		earthHistoryHoverOverride,
-		earthHistorySceneLabelPartitions,
-		earthHistorySceneNationOverride,
+		historyHoverOverride,
+		historySceneLabelPartitions,
+		historySceneNationOverride,
 		nationFillColorForRawId,
 		occupationOverlay,
 		occupationStripeColorForRawId,
 		organizationHighlightSpec,
 		regionColors,
 	} = useMapColoring({
-		world,
 		worldForDisplay,
-		earthHistory,
+		history,
 		historyFrame,
 		historyCultureColorById,
 		historyReligionColorById,
@@ -1061,17 +997,15 @@ export const GenesisView: React.FC<{
 		viewMode,
 		showElevation,
 		dangerSubMode,
-		selectedNationId,
 		selectedWikiOrganizationId,
+		selectedWikiNationId,
 		windVectors,
-		earthImportRawIdToCompact,
 		hoverProvince,
 		labelsPlaybackActive,
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
 		currentMonth,
-		getOrganizationName,
 	})
 
 	useEffect(() => {
@@ -1105,13 +1039,13 @@ export const GenesisView: React.FC<{
 		// "Nations > Borders" and nation labels actually follow the scrubbed
 		// date and show real EU4 names instead of the static generation-time
 		// assignment and procedural names.
-		scene.setEarthHistoryNationOverride(earthHistorySceneNationOverride)
+		scene.setEarthHistoryNationOverride(historySceneNationOverride)
 		scene.setOrganizationHighlight(organizationHighlightSpec)
 		// Culture/religion LABELS are also placed from a different id space
 		// than the procedural world.cultures/world.heritages -- see
 		// earthHistoryLabelPartitions's doc comment in
 		// create-genesis-scene.ts.
-		scene.setEarthHistoryLabelPartitions(earthHistorySceneLabelPartitions)
+		scene.setEarthHistoryLabelPartitions(historySceneLabelPartitions)
 	}, [
 		colorMode,
 		nationMode,
@@ -1121,8 +1055,8 @@ export const GenesisView: React.FC<{
 		nationFillColorForRawId,
 		occupationStripeColorForRawId,
 		worldForDisplay,
-		earthHistorySceneNationOverride,
-		earthHistorySceneLabelPartitions,
+		historySceneNationOverride,
+		historySceneLabelPartitions,
 		organizationHighlightSpec,
 		selectedWikiOrganizationId,
 		cultureBlendOverlay,
@@ -1267,8 +1201,6 @@ export const GenesisView: React.FC<{
 				!canHandlePlanetClick(measureMode, {
 					hasWorld: !!worldForDisplay,
 					hasProvinces: !!worldForDisplay?.provinces,
-					hasNationModel: !!nationModel,
-					isEarthImport: !!worldForDisplay?.isEarthImport,
 				})
 			) {
 				return
@@ -1311,65 +1243,38 @@ export const GenesisView: React.FC<{
 				worldForDisplay.provinces.regionProvince[info.region] ?? -1
 
 			if (measureMode === "off") {
-				// Earth import routes clicks to the left-panel nation wiki page
-				// instead of the procedural right-side drawer -- see
-				// selectedWikiNationId's doc. Falls through to the procedural
-				// path below when there's no real EU4 mapping for this province
-				// (e.g. still loading) or no owner.
-				if (worldForDisplay.isEarthImport) {
-					// No procedural nations exist for Earth import (see
-					// derive-province-society.ts's isEarthImportRaster check), so
-					// nationModel is always null here -- never fall through to the
-					// procedural path below, which would crash on it. Just no-op
-					// until the real EU4 engine has loaded.
-					if (!earthHistory.state) return
-					// The procedural regionProvince[region] mapping is only an
-					// approximation for Earth import -- real EU4 province polygons
-					// don't align with the underlying mesh cells, so prefer a
-					// point-in-polygon lookup against the actual province vector
-					// geometry (same approach hoverProvince uses above), falling
-					// back to the approximate mapping only when that geometry
-					// isn't loaded yet.
-					let rawId: string | null = null
-					if (worldForDisplay.provinces?.realIds && eu4HoverFillGeometry) {
-						const base = info.region * 3
-						const r_xyz = worldForDisplay.mesh.r_xyz
-						const latDeg =
-							Math.asin(Math.max(-1, Math.min(1, r_xyz[base + 2]))) *
-							(180 / Math.PI)
-						const lonDeg =
-							Math.atan2(r_xyz[base + 1], r_xyz[base]) * (180 / Math.PI)
-						const rawProvinceId = findEu4ProvinceForLonLat(
-							eu4HoverFillGeometry,
-							lonDeg,
-							latDeg,
-						)
-						if (rawProvinceId !== null) rawId = String(rawProvinceId)
-					}
-					if (rawId === null && province >= 0) {
-						rawId = String(
-							earthHistory.state.provinceMap.compactToRealId[province],
-						)
-					}
-					const owner =
-						rawId === null
-							? null
-							: (() => {
-									const compact =
-										earthHistory.state.provinceMap.realIdToCompact.get(rawId)
-									const nationId =
-										compact === undefined
-											? -1
-											: (earthHistory.query?.frame.provinceNation[compact] ??
-												-1)
-									return nationId >= 0 ? nationId : null
-								})()
-					setSelectedWikiNationId(owner)
-					return
+				if (!history.state) return
+				const { provinceMap } = history.state
+				// Earth's real EU4 province polygons don't align with the underlying
+				// mesh cells, so prefer a point-in-polygon lookup against the actual
+				// province vector geometry (same approach hoverProvince uses),
+				// falling back to the regionProvince mapping.
+				let rawId: string | null = null
+				if (worldForDisplay.provinces?.realIds && eu4HoverFillGeometry) {
+					const base = info.region * 3
+					const r_xyz = worldForDisplay.mesh.r_xyz
+					const latDeg =
+						Math.asin(Math.max(-1, Math.min(1, r_xyz[base + 2]))) *
+						(180 / Math.PI)
+					const lonDeg =
+						Math.atan2(r_xyz[base + 1], r_xyz[base]) * (180 / Math.PI)
+					const rawProvinceId = findEu4ProvinceForLonLat(
+						eu4HoverFillGeometry,
+						lonDeg,
+						latDeg,
+					)
+					if (rawProvinceId !== null) rawId = String(rawProvinceId)
 				}
-				const nation =
-					province >= 0 ? (nationModel.assignment[province] ?? -1) : -1
-				setSelectedNationId(nation >= 0 ? nation : null)
+				if (rawId === null && province >= 0) {
+					rawId = String(provinceMap.compactToRealId[province])
+				}
+				const compact =
+					rawId === null ? undefined : provinceMap.realIdToCompact.get(rawId)
+				const nationId =
+					compact === undefined
+						? -1
+						: (history.query?.frame.provinceNation[compact] ?? -1)
+				setSelectedWikiNationId(nationId >= 0 ? nationId : null)
 				return
 			}
 
@@ -1404,60 +1309,21 @@ export const GenesisView: React.FC<{
 		window.addEventListener("keydown", handleKeyDown)
 		return () => window.removeEventListener("keydown", handleKeyDown)
 	}, [
-		nationModel,
 		measureMode,
 		pathfindingLand,
 		pathfindingSea,
 		worldForDisplay,
 		setMeasureMode,
-		earthHistory.state,
-		earthHistory.query,
+		history.state,
+		history.query,
 		eu4HoverFillGeometry,
 		setSelectedWikiNationId,
 	])
 
-	const selectedNation = useMemo(() => {
-		return buildSelectedNationDetails({
-			selectedNationId,
-			world: worldForDisplay,
-			nationModel,
-			getNationColor,
-			getNationName,
-			getCultureName,
-			getHeritageName,
-			getReligionName,
-			getOrganizationName,
-		})
-	}, [
-		nationModel,
-		getNationColor,
-		getNationName,
-		getCultureName,
-		getHeritageName,
-		getReligionName,
-		getOrganizationName,
-		selectedNationId,
-		worldForDisplay,
-	])
-	const handleWikiNationClick = useCallback((nationId: number) => {
-		// Clear any open org/war wiki selection too -- otherwise navigating from
-		// an org's member-list chip back to a nation page leaves
-		// selectedWikiOrganizationId set, and the org's map highlight never
-		// turns off (see setSelectedWikiOrganizationId's doc comment above).
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedNationId(nationId)
-		sceneRef.current?.focusOnNation(nationId)
-	}, [])
-	// Real per-nation province counts + government type for Earth import --
-	// same rationale as earthSocialCounts above: worldForDisplay.nations is
-	// static procedural data there, so build these straight from earthHistory's
-	// own real per-date engine instead.
 	const {
 		climateDistribution,
 		conflictDistribution,
 		governmentDistribution,
-		nationAdjacency,
 		nationSizeDistribution,
 		relationDistribution,
 		religionTypeDistribution,
@@ -1468,10 +1334,7 @@ export const GenesisView: React.FC<{
 	} = useWorldDistributions({
 		world,
 		worldForDisplay,
-		earthHistory,
-		nationModel,
-		nationProvinceCounts,
-		colorMode,
+		history,
 		dataVariant,
 	})
 
@@ -1556,9 +1419,9 @@ export const GenesisView: React.FC<{
 	useGenesisSceneSync({
 		sceneRef,
 		worldForDisplay,
-		earthHistory,
+		history,
 		hoverInfo,
-		selectedNationId,
+		selectedWikiNationId,
 		viewMode,
 		solarSystemViewActive,
 		mapProjectionLatitude,
@@ -1601,11 +1464,9 @@ export const GenesisView: React.FC<{
 		setShowCoastlines,
 		setSolarSystemViewActive,
 		setPathfindingResult,
-		setProceduralHistoryFrame,
 		setProceduralHistoryPlaying,
-		setProceduralHistoryTimeMs,
-		resetProceduralHistoryAccumulation,
-		recordProceduralFrame,
+		startProceduralJournal,
+		recordProceduralJournal,
 		seed,
 		setSeed,
 		setDataVariant: handleSetDataVariant,
@@ -1665,20 +1526,73 @@ export const GenesisView: React.FC<{
 	})
 
 	const handleToggleEarthHistoryPlayback = useCallback(() => {
-		if (earthHistory.loading) return
-		if (earthHistory.selectedTimeMs >= earthHistory.maxTimeMs) {
-			earthHistory.setSelectedTimeMs(earthHistory.minTimeMs)
+		if (history.loading) return
+		if (history.selectedTimeMs >= history.maxTimeMs) {
+			history.setSelectedTimeMs(history.minTimeMs)
 			setEarthHistoryPlaying(true)
 			return
 		}
 		setEarthHistoryPlaying((playing) => !playing)
 	}, [
-		earthHistory.loading,
-		earthHistory.maxTimeMs,
-		earthHistory.minTimeMs,
-		earthHistory.selectedTimeMs,
-		earthHistory.setSelectedTimeMs,
+		history.loading,
+		history.maxTimeMs,
+		history.minTimeMs,
+		history.selectedTimeMs,
+		history.setSelectedTimeMs,
 	])
+	const [proceduralReplayPlaying, setProceduralReplayPlaying] = useState(false)
+	useEffect(() => {
+		if (!proceduralReplayPlaying || world?.isEarthImport) return
+		const timer = window.setInterval(() => {
+			const next = Math.min(
+				history.selectedTimeMs + STATE.yearMs,
+				history.maxTimeMs,
+			)
+			history.setSelectedTimeMs(next)
+			if (next >= history.maxTimeMs) {
+				setProceduralReplayPlaying(false)
+				if (!proceduralHistoryPlaying) handleToggleProceduralHistoryPlayback()
+			}
+		}, 1000)
+		return () => window.clearInterval(timer)
+	}, [
+		proceduralReplayPlaying,
+		world?.isEarthImport,
+		history.selectedTimeMs,
+		history.maxTimeMs,
+		history.setSelectedTimeMs,
+		proceduralHistoryPlaying,
+		handleToggleProceduralHistoryPlayback,
+	])
+	const handleToggleHistoryPlayback = useCallback(() => {
+		if (world?.isEarthImport) {
+			handleToggleEarthHistoryPlayback()
+			return
+		}
+		if (proceduralReplayPlaying) {
+			setProceduralReplayPlaying(false)
+			return
+		}
+		if (history.selectedTimeMs < history.maxTimeMs) {
+			setProceduralReplayPlaying(true)
+			return
+		}
+		handleToggleProceduralHistoryPlayback()
+	}, [
+		world?.isEarthImport,
+		handleToggleEarthHistoryPlayback,
+		proceduralReplayPlaying,
+		history.selectedTimeMs,
+		history.maxTimeMs,
+		handleToggleProceduralHistoryPlayback,
+	])
+	const handleHistoryTimeChange = useCallback(
+		(timeMs: number) => {
+			if (!world?.isEarthImport) setProceduralReplayPlaying(false)
+			history.setSelectedTimeMs(timeMs)
+		},
+		[world?.isEarthImport, history.setSelectedTimeMs],
+	)
 
 	// --- Slider definitions ---
 	const planetSliders = buildPlanetSliders({
@@ -1728,8 +1642,7 @@ export const GenesisView: React.FC<{
 		selectedWikiNationId,
 		world,
 		worldForDisplay,
-		earthHistory,
-		earthImportRawIdToCompact,
+		history,
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
@@ -1739,41 +1652,11 @@ export const GenesisView: React.FC<{
 		sceneRef,
 	})
 
-	const proceduralNationWikiData = useProceduralNationWikiData({
-		world,
-		selectedNation,
-		planetName,
-		proceduralHistoryTimeMs,
-		proceduralHistoryEventsRef,
-		proceduralProvinceHistoryRef,
-		getNationName,
-		getNationColor,
-		setSelectedNationId,
-		setSelectedWikiOrganizationId,
-		onSelectNation: handleWikiNationClick,
-		sceneRef,
-	})
-
-	const proceduralOrganizationWikiData = useProceduralOrganizationWikiData({
-		world,
-		selectedWikiOrganizationId,
-		planetName,
-		getNationName,
-		getNationColor,
-		getCultureName,
-		getHeritageName,
-		getOrganizationName,
-		setSelectedWikiOrganizationId,
-		onSelectNation: handleWikiNationClick,
-		sceneRef,
-	})
-
 	const organizationWikiData = useOrganizationWikiData({
 		selectedWikiOrganizationId,
 		world,
 		worldForDisplay,
-		earthHistory,
-		earthImportRawIdToCompact,
+		history,
 		showObservedDistributions,
 		planetName,
 		getProvinceColor,
@@ -1788,8 +1671,7 @@ export const GenesisView: React.FC<{
 	const warWikiData = useWarWikiData({
 		selectedWikiWarId,
 		world,
-		earthHistory,
-		earthImportRawIdToCompact,
+		history,
 		planetName,
 		getProvinceColor,
 		setSelectedWikiNationId,
@@ -2063,13 +1945,13 @@ export const GenesisView: React.FC<{
 							planetName,
 							planetStats,
 							worldPopulation: drawerWorldPopulation,
-							activeWarCount: earthSocialCounts?.activeWarCount ?? null,
+							activeWarCount: historySocialCounts?.activeWarCount ?? null,
 							cultureCount:
-								earthSocialCounts?.cultureCount ??
+								historySocialCounts?.cultureCount ??
 								worldForDisplay?.cultures?.count ??
 								null,
 							religionCount:
-								earthSocialCounts?.religionCount ??
+								historySocialCounts?.religionCount ??
 								worldForDisplay?.religions?.count ??
 								null,
 							nationSizeDistribution,
@@ -2083,10 +1965,8 @@ export const GenesisView: React.FC<{
 							showObservedDistributions,
 							tradeGoodsDistribution,
 						}}
-						nationWiki={nationWikiData ?? proceduralNationWikiData}
-						organizationWiki={
-							organizationWikiData ?? proceduralOrganizationWikiData
-						}
+						nationWiki={nationWikiData}
+						organizationWiki={organizationWikiData}
 						warWiki={warWikiData}
 					/>
 				)}
@@ -2145,7 +2025,6 @@ export const GenesisView: React.FC<{
 								hoverIceSummary={hoverIceSummary}
 								hoverBiome={hoverBiome}
 								hoverProvince={hoverProvince}
-								hoverNationId={hoverNationId}
 								hoverOccupation={hoverOccupation}
 								hoverOceanDist={hoverOceanDist}
 								hoverDistCoast={hoverDistCoast}
@@ -2178,7 +2057,6 @@ export const GenesisView: React.FC<{
 								routes={worldForDisplay?.routes ?? null}
 								hoverCardRef={hoverCardRef}
 								getProvinceName={getProvinceName}
-								getNationName={getNationName}
 								getLeaderName={getLeaderName}
 								getDynastyName={getDynastyName}
 								getCultureName={getCultureName}
@@ -2186,21 +2064,7 @@ export const GenesisView: React.FC<{
 								getReligionName={getReligionName}
 								getLandmarkName={getLandmarkName}
 								getRiverName={getRiverName}
-								hoverNationAdjOffset={
-									colorMode === "nations"
-										? (nationAdjacency?.adjOffset ?? null)
-										: null
-								}
-								hoverNationAdjList={
-									colorMode === "nations"
-										? (nationAdjacency?.adjList ?? null)
-										: null
-								}
-								hoverNationCounts={
-									colorMode === "nations" ? nationProvinceCounts : null
-								}
-								relationAt={null}
-								earthHistoryHoverOverride={earthHistoryHoverOverride}
+								historyHoverOverride={historyHoverOverride}
 							/>
 						) : null}
 
@@ -2242,6 +2106,7 @@ export const GenesisView: React.FC<{
 						) : (
 							<OverlayControls
 								isEarthImport={worldForDisplay?.isEarthImport ?? false}
+								hasHierarchy={hasHierarchy}
 								onEnterSolarSystem={handleEnterSolarSystem}
 								overlaysExpanded={overlaysExpanded}
 								setOverlaysExpanded={setOverlaysExpanded}
@@ -2404,53 +2269,38 @@ export const GenesisView: React.FC<{
 							</FloatingPanel>
 						)}
 
-						{worldForDisplay?.isEarthImport ? (
+						{worldForDisplay && history.state ? (
 							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
 								<div className="pointer-events-auto">
 									<SimulationControls
-										selectedTimeMs={earthHistory.selectedTimeMs}
-										minTimeMs={earthHistory.minTimeMs}
-										maxTimeMs={earthHistory.maxTimeMs}
-										onTimeChange={earthHistory.setSelectedTimeMs}
+										selectedTimeMs={history.selectedTimeMs}
+										minTimeMs={history.minTimeMs}
+										maxTimeMs={history.maxTimeMs}
+										onTimeChange={handleHistoryTimeChange}
 										floating={false}
-										onPlayPause={handleToggleEarthHistoryPlayback}
-										simPlaying={earthHistoryPlaying}
-										formatLabel={earthHistoryFormatLabel}
+										onPlayPause={handleToggleHistoryPlayback}
+										simPlaying={
+											worldForDisplay.isEarthImport
+												? earthHistoryPlaying
+												: proceduralReplayPlaying ||
+													(proceduralHistoryPlaying &&
+														history.selectedTimeMs >= history.maxTimeMs)
+										}
+										formatLabel={historyFormatLabel}
 										stepValue={365 * 86_400_000}
 										playPauseLabels={{
 											play: "Start timeline",
 											pause: "Pause timeline",
 										}}
 										extraControls={
-											<EarthHistoryBookmarks
-												onSelect={earthHistory.setSelectedTimeMs}
-												selectedDate={earthHistory.selectedTimeMs}
-												placement="below"
-											/>
+											worldForDisplay.isEarthImport ? (
+												<EarthHistoryBookmarks
+													onSelect={history.setSelectedTimeMs}
+													selectedDate={history.selectedTimeMs}
+													placement="below"
+												/>
+											) : undefined
 										}
-									/>
-								</div>
-							</div>
-						) : null}
-						{worldForDisplay &&
-						!worldForDisplay.isEarthImport &&
-						proceduralHistoryFrame ? (
-							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
-								<div className="pointer-events-auto">
-									<SimulationControls
-										selectedTimeMs={proceduralHistoryTimeMs}
-										minTimeMs={proceduralHistoryTimeMs}
-										maxTimeMs={proceduralHistoryTimeMs}
-										onTimeChange={() => {
-											// Scrubbing is disabled while this control is pinned to one frame.
-										}}
-										floating={false}
-										onPlayPause={handleToggleProceduralHistoryPlayback}
-										simPlaying={proceduralHistoryPlaying}
-										formatLabel={(ms) =>
-											DATE.formatHistoryDays(HISTORY_DAYS.historyMsToDays(ms))
-										}
-										stepValue={STATE.yearMs}
 									/>
 								</div>
 							</div>

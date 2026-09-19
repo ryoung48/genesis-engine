@@ -4,8 +4,38 @@ import type {
 	NationRelations,
 	OrgForeignHoldersParams,
 	OrgMemberProvincesParams,
+	ProvinceDepthParams,
 	ToRenderInputsParams,
 } from "@/model/history/world-frame/types"
+
+const depthByFrame = new WeakMap<ProvinceDepthParams["frame"], Int32Array>()
+
+function provinceDepth({ frame }: ProvinceDepthParams): Int32Array {
+	const cached = depthByFrame.get(frame)
+	if (cached) return cached
+	const depth = new Int32Array(frame.provinceCount).fill(-1)
+	for (let province = 0; province < frame.provinceCount; province++) {
+		if (depth[province] >= 0) continue
+		const path: number[] = []
+		const seen = new Set<number>()
+		let current = province
+		while (
+			current >= 0 &&
+			current < frame.provinceCount &&
+			depth[current] < 0 &&
+			!seen.has(current)
+		) {
+			seen.add(current)
+			path.push(current)
+			current = frame.provinceParent[current]
+		}
+		let nextDepth =
+			current >= 0 && current < frame.provinceCount ? depth[current] + 1 : 0
+		while (path.length > 0) depth[path.pop() as number] = nextDepth++
+	}
+	depthByFrame.set(frame, depth)
+	return depth
+}
 
 function emptyRelations(): NationRelations {
 	return {
@@ -115,6 +145,7 @@ function toRenderInputs({ frame }: ToRenderInputsParams) {
 }
 
 export const FRAME = {
+	provinceDepth,
 	emptyRelations,
 	isOccupied,
 	hreMemberNations,

@@ -83,6 +83,14 @@ export interface OrgHighlightSpec {
 	memberProvinceCompactIndexes: Set<number>
 }
 
+export interface HierarchyOverlaySpec {
+	world: SerializedGenesisWorld
+	nationId: number
+	provinceNation: Int32Array
+	provinceParent: Int32Array
+	provinceDepth: Int32Array
+}
+
 export interface GenesisScene {
 	dispose(): void
 	resize(): void
@@ -140,10 +148,7 @@ export interface GenesisScene {
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: RiverData | null): void
 	setRiversVisible(visible: boolean): void
-	setHierarchyOverlay(
-		world: SerializedGenesisWorld | null,
-		selectedNationId: number,
-	): void
+	setHierarchyOverlay(spec: HierarchyOverlaySpec | null): void
 	setSunPosition(
 		month: number,
 		obliquityDeg: number,
@@ -158,10 +163,6 @@ export interface GenesisScene {
 	setCloudsVisible(visible: boolean): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
-	focusOnNation(
-		nationId: number,
-		opts?: { durationMs?: number; distanceScale?: number },
-	): void
 	focusOnProvince(
 		provinceId: number,
 		opts?: {

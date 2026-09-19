@@ -1217,6 +1217,7 @@ function generate({
 				isCapital && preview.parentIndex === null
 					? "temperate-native"
 					: "procedural",
+			exactHZC: false,
 			skipNaming,
 		})
 		return {

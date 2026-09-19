@@ -14,7 +14,11 @@ import { WORLD_TYPE_ALLOCATION } from "@/model/celestial/system/generation/world
 import { WORLD_TYPE_COUNTS } from "@/model/celestial/system/generation/world-type-counts"
 import { RNG } from "@/model/shared/random/rng"
 
-function roll({ seed, hostStar }: SingleStarBudgetInput): SingleStarBudget {
+function roll({
+	seed,
+	hostStar,
+	exactHZC,
+}: SingleStarBudgetInput): SingleStarBudget {
 	const worldTypeCounts = WORLD_TYPE_COUNTS.roll({
 		rng: RNG.createStringRng({ seed: `world-type-counts:${seed}` }),
 		primarySpectralClass: hostStar.spectralClass,
@@ -43,7 +47,7 @@ function roll({ seed, hostStar }: SingleStarBudgetInput): SingleStarBudget {
 		normalWorldCount: allocated.totalWorlds,
 	})
 	const totalWorlds = allocated.totalWorlds + emptyOrbitCount
-	const baselineNumber = BASELINE_NUMBER.roll({
+	const rolledBaselineNumber = BASELINE_NUMBER.roll({
 		rng: RNG.createStringRng({ seed: `baseline-number:${seed}:0` }),
 		totalWorlds,
 		otherStarCount: 0,
@@ -51,17 +55,24 @@ function roll({ seed, hostStar }: SingleStarBudgetInput): SingleStarBudget {
 		hostSpectralClass: hostStar.spectralClass,
 		hostLuminosityClass: hostStar.luminosityClass,
 	})
-	const minimumOrbitNumber = ORBIT_BODY.auToOrbitNumber({ au: hostStar.mao })
-	const baselineOrbitNumber = BASELINE_ORBIT.roll({
-		rng: RNG.createStringRng({ seed: `baseline-orbit:${seed}:0` }),
-		baselineNumber,
-		totalWorlds,
-		habitableZoneOrbitNumber: ORBIT_BODY.auToOrbitNumber({
-			au: STAR.getHabitableZoneAU(hostStar.luminositySol),
-		}),
-		minimumOrbitNumber,
-		maximumOrbitNumber: 20,
+	const baselineNumber =
+		exactHZC && rolledBaselineNumber !== null
+			? Math.min(totalWorlds, Math.max(1, rolledBaselineNumber))
+			: rolledBaselineNumber
+	const habitableZoneOrbitNumber = ORBIT_BODY.auToOrbitNumber({
+		au: STAR.getHabitableZoneAU(hostStar.luminositySol),
 	})
+	const minimumOrbitNumber = ORBIT_BODY.auToOrbitNumber({ au: hostStar.mao })
+	const baselineOrbitNumber = exactHZC
+		? habitableZoneOrbitNumber
+		: BASELINE_ORBIT.roll({
+				rng: RNG.createStringRng({ seed: `baseline-orbit:${seed}:0` }),
+				baselineNumber,
+				totalWorlds,
+				habitableZoneOrbitNumber,
+				minimumOrbitNumber,
+				maximumOrbitNumber: 20,
+			})
 	const anomalousOrbitReservations = ANOMALOUS_ORBITS.roll({
 		rng: RNG.createStringRng({ seed: `anomalous-orbits:${seed}` }),
 		terrestrialCount: worldTypeCounts.terrestrialCount,

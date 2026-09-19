@@ -50,3 +50,13 @@ export interface BuildLeaderSlotParams {
 	provinceIdx: number
 	entry: LanguageNameLeaderEntry
 }
+
+export interface RulerNameParams {
+	province: number
+	nameSeed: number
+}
+
+export interface RulerName {
+	name: string
+	female: boolean
+}

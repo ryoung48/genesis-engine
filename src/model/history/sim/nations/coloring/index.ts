@@ -2,6 +2,7 @@ import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import type {
 	ColorDistanceParams,
 	GroupByNationParams,
+	NationColorForParams,
 	NationColorsFromProvincesParams,
 } from "@/model/history/sim/nations/coloring/types"
 
@@ -47,39 +48,24 @@ function nationColorsFromProvinces(
 	const assigned = new Uint8Array(nationCount)
 
 	for (const nation of order) {
-		const candidates = buildNationColorCandidates(baseColors[nation])
-		let bestColor = baseColors[nation]
-		let bestScore = -Infinity
-		for (const candidate of candidates) {
-			let neighborPenalty = 0
-			let minNeighborDistance = Infinity
-			for (
-				let edge = adjOffset[nation], end = adjOffset[nation + 1];
-				edge < end;
-				edge++
-			) {
-				const neighbor = adjList[edge]
-				if (!assigned[neighbor]) continue
-				const nr = colors[3 * neighbor]
-				const ng = colors[3 * neighbor + 1]
-				const nb = colors[3 * neighbor + 2]
-				const distance = colorDistance({ a: candidate, b: [nr, ng, nb] })
-				minNeighborDistance = Math.min(minNeighborDistance, distance)
-				if (distance < 0.32) neighborPenalty += (0.32 - distance) * 4
-			}
-			const baseDistance = colorDistance({
-				a: candidate,
-				b: baseColors[nation],
-			})
-			const score =
-				(minNeighborDistance === Infinity ? 0.6 : minNeighborDistance * 3) -
-				baseDistance * 0.9 -
-				neighborPenalty
-			if (score > bestScore) {
-				bestScore = score
-				bestColor = candidate
-			}
+		const neighborColors: [number, number, number][] = []
+		for (
+			let edge = adjOffset[nation], end = adjOffset[nation + 1];
+			edge < end;
+			edge++
+		) {
+			const neighbor = adjList[edge]
+			if (!assigned[neighbor]) continue
+			neighborColors.push([
+				colors[3 * neighbor],
+				colors[3 * neighbor + 1],
+				colors[3 * neighbor + 2],
+			])
 		}
+		const bestColor = nationColorFor({
+			baseColor: baseColors[nation],
+			neighborColors,
+		})
 		colors[3 * nation] = bestColor[0]
 		colors[3 * nation + 1] = bestColor[1]
 		colors[3 * nation + 2] = bestColor[2]
@@ -91,6 +77,34 @@ function nationColorsFromProvinces(
 	}
 
 	return colors
+}
+
+function nationColorFor({
+	baseColor,
+	neighborColors,
+}: NationColorForParams): [number, number, number] {
+	const candidates = buildNationColorCandidates(baseColor)
+	let bestColor = baseColor
+	let bestScore = -Infinity
+	for (const candidate of candidates) {
+		let neighborPenalty = 0
+		let minNeighborDistance = Infinity
+		for (const neighborColor of neighborColors) {
+			const distance = colorDistance({ a: candidate, b: neighborColor })
+			minNeighborDistance = Math.min(minNeighborDistance, distance)
+			if (distance < 0.32) neighborPenalty += (0.32 - distance) * 4
+		}
+		const baseDistance = colorDistance({ a: candidate, b: baseColor })
+		const score =
+			(minNeighborDistance === Infinity ? 0.6 : minNeighborDistance * 3) -
+			baseDistance * 0.9 -
+			neighborPenalty
+		if (score > bestScore) {
+			bestScore = score
+			bestColor = candidate
+		}
+	}
+	return bestColor
 }
 
 function buildNationColorCandidates(
@@ -130,4 +144,5 @@ function colorDistance({ a, b }: ColorDistanceParams): number {
 export const COLORING = {
 	groupByNation,
 	nationColorsFromProvinces,
+	nationColorFor,
 }

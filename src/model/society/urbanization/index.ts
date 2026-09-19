@@ -6,6 +6,10 @@ import type {
 	ComputeDevelopmentParams,
 	NationProfile,
 	RankSizeCitiesParams,
+	RankSizesForNationParams,
+	SortByRankParams,
+	SpreadDevelopmentParams,
+	SpreadEntry,
 	UrbanizationInputs,
 	UrbanizationResult,
 } from "@/model/society/urbanization/types"
@@ -83,6 +87,131 @@ function urbanPopToDev(pop: number): number {
 
 const MAX_SPREAD_HOPS = 20
 
+function rankSizesForNation({
+	governmentTypeIndex,
+	totalPopulation,
+	provinceCount,
+}: RankSizesForNationParams): number[] {
+	const { U, q } = nationProfile(governmentTypeIndex)
+	const sizes = rankSizeCities({ urbanPop: totalPopulation * U, q })
+	return sizes.length > provinceCount ? sizes.slice(0, provinceCount) : sizes
+}
+
+// Shallowest first (the sovereign, depth 0, gets the capital city); ties go to
+// the more habitable province so deeper-ranked provinces still differ.
+function sortByRank({
+	provinces,
+	depth,
+	habitability,
+}: SortByRankParams): number[] {
+	return provinces.slice().sort((a, b) => {
+		if (depth[a] !== depth[b]) return depth[a] - depth[b]
+		return habitability[b] - habitability[a]
+	})
+}
+
+// Higher development first; among equal development a later insertion comes
+// first, and the seed cities keep their index order behind every insertion.
+function spreadEntryBefore(a: SpreadEntry, b: SpreadEntry): boolean {
+	if (a.dev !== b.dev) return a.dev > b.dev
+	return a.stamp > b.stamp
+}
+
+function pushSpreadEntry(heap: SpreadEntry[], entry: SpreadEntry): void {
+	heap.push(entry)
+	let i = heap.length - 1
+	while (i > 0) {
+		const parent = (i - 1) >> 1
+		if (!spreadEntryBefore(heap[i], heap[parent])) break
+		;[heap[i], heap[parent]] = [heap[parent], heap[i]]
+		i = parent
+	}
+}
+
+function popSpreadEntry(heap: SpreadEntry[]): SpreadEntry {
+	const top = heap[0]
+	const last = heap.pop() as SpreadEntry
+	if (heap.length > 0) {
+		heap[0] = last
+		let i = 0
+		for (;;) {
+			let best = i
+			const l = 2 * i + 1
+			const r = l + 1
+			if (l < heap.length && spreadEntryBefore(heap[l], heap[best])) best = l
+			if (r < heap.length && spreadEntryBefore(heap[r], heap[best])) best = r
+			if (best === i) break
+			;[heap[i], heap[best]] = [heap[best], heap[i]]
+			i = best
+		}
+	}
+	return top
+}
+
+// Development radiating from every city, strongest source first, decaying per
+// hop (faster across a border, slower into water-accessible provinces).
+function spreadDevelopment({
+	count,
+	cityMin,
+	desolate,
+	waterAccess,
+	urbanAt,
+	sovereignAt,
+	neighborsAt,
+}: SpreadDevelopmentParams): Float32Array {
+	const BASE_DECAY = 0.75
+	const FOREIGN_DECAY = 0.65
+	const WATER_ACCESS_BONUS = 1.1
+
+	const devFromCities = new Float32Array(count)
+	const seeds: SpreadEntry[] = []
+	for (let p = 0; p < count; p++) {
+		if (desolate[p]) continue
+		const urban = urbanAt(p)
+		if (urban < cityMin) continue
+		const dev = urbanPopToDev(urban)
+		devFromCities[p] = dev
+		seeds.push({
+			province: p,
+			dev,
+			sourceNation: sovereignAt(p),
+			hops: 0,
+			stamp: -seeds.length,
+		})
+	}
+
+	const heap: SpreadEntry[] = []
+	for (const seed of seeds) pushSpreadEntry(heap, seed)
+	let stamp = 0
+
+	while (heap.length > 0) {
+		const { province, dev, sourceNation, hops } = popSpreadEntry(heap)
+		if (dev < 0.01 || hops >= MAX_SPREAD_HOPS) continue
+
+		for (const nb of neighborsAt(province)) {
+			if (desolate[nb]) continue
+			const isForeign = sovereignAt(nb) !== sourceNation
+
+			let decay = isForeign ? FOREIGN_DECAY : BASE_DECAY
+			if (waterAccess[nb] === 1) decay *= WATER_ACCESS_BONUS
+
+			const spreadDev = dev * decay
+			if (spreadDev < 0.01) continue
+			if (devFromCities[nb] >= spreadDev) continue
+
+			devFromCities[nb] = spreadDev
+			pushSpreadEntry(heap, {
+				province: nb,
+				dev: spreadDev,
+				sourceNation,
+				hops: hops + 1,
+				stamp: ++stamp,
+			})
+		}
+	}
+	return devFromCities
+}
+
 function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 	const { count: P, desolate } = inputs.provinces
 	const { parent, depth, sovereign, governmentType } = inputs.nations
@@ -108,19 +237,12 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 		let totalPop = 0
 		for (const prov of provinces) totalPop += population[prov]
 
-		const { U, q } = nationProfile(governmentType?.[nation] ?? 1)
-		const urbanPop = totalPop * U
-
-		// Sort by hierarchy depth ascending (the sovereign, depth 0, gets the
-		// capital city), breaking ties by habitability so deeper-ranked
-		// provinces still differ meaningfully.
-		const sorted = provinces.slice().sort((a, b) => {
-			if (depth[a] !== depth[b]) return depth[a] - depth[b]
-			return habitability[b] - habitability[a]
+		const sorted = sortByRank({ provinces, depth, habitability })
+		const sizes = rankSizesForNation({
+			governmentTypeIndex: governmentType?.[nation] ?? 1,
+			totalPopulation: totalPop,
+			provinceCount: sorted.length,
 		})
-
-		let sizes = rankSizeCities({ urbanPop, q })
-		if (sizes.length > sorted.length) sizes = sizes.slice(0, sorted.length)
 
 		for (let idx = 0; idx < sorted.length; idx++) {
 			urbanPopulation[sorted[idx]] = sizes[idx] ?? 0
@@ -145,79 +267,21 @@ function computeDevelopment({
 	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(
 		inputs.params.era ?? "lateMedieval",
 	)
-	const BASE_DECAY = 0.75
-	const FOREIGN_DECAY = 0.65
-	const WATER_ACCESS_BONUS = 1.1
-
-	const cities: { province: number; dev: number; sourceNation: number }[] = []
+	const development = spreadDevelopment({
+		count: P,
+		cityMin,
+		desolate,
+		waterAccess,
+		urbanAt: (p) => urbanPopulation[p],
+		sovereignAt: (p) => sovereign[p],
+		neighborsAt: (p) => adjList.subarray(adjOffset[p], adjOffset[p + 1]),
+	})
 	for (let p = 0; p < P; p++) {
-		if (desolate[p]) continue
-		if (urbanPopulation[p] >= cityMin) {
-			cities.push({
-				province: p,
-				dev: urbanPopToDev(urbanPopulation[p]),
-				sourceNation: sovereign[p],
-			})
+		if (desolate[p]) {
+			development[p] = 0
+			continue
 		}
-	}
-
-	const devFromCities = new Float32Array(P)
-	const queue: {
-		province: number
-		dev: number
-		sourceNation: number
-		hops: number
-	}[] = cities.map((c) => ({ ...c, hops: 0 })).sort((a, b) => b.dev - a.dev)
-
-	for (const city of cities) devFromCities[city.province] = city.dev
-
-	while (queue.length > 0) {
-		const { province, dev, sourceNation, hops } = queue.shift()!
-		if (dev < 0.01 || hops >= MAX_SPREAD_HOPS) continue
-
-		for (
-			let i = adjOffset[province], end = adjOffset[province + 1];
-			i < end;
-			i++
-		) {
-			const nb = adjList[i]
-			if (desolate[nb]) continue
-			const isForeign = sovereign[nb] !== sourceNation
-			const hasWaterAccess = waterAccess[nb] === 1
-
-			let decay = isForeign ? FOREIGN_DECAY : BASE_DECAY
-			if (hasWaterAccess) decay *= WATER_ACCESS_BONUS
-
-			const spreadDev = dev * decay
-			if (spreadDev < 0.01) continue
-			if (devFromCities[nb] >= spreadDev) continue
-
-			devFromCities[nb] = spreadDev
-
-			// Insert maintaining descending-dev order.
-			let lo = 0
-			let hi = queue.length
-			while (lo < hi) {
-				const mid = (lo + hi) >>> 1
-				if (queue[mid].dev > spreadDev) lo = mid + 1
-				else hi = mid
-			}
-			queue.splice(lo, 0, {
-				province: nb,
-				dev: spreadDev,
-				sourceNation,
-				hops: hops + 1,
-			})
-		}
-	}
-
-	const development = new Float32Array(P)
-	for (let p = 0; p < P; p++) {
-		if (desolate[p]) continue
-		development[p] = Math.max(
-			devFromCities[p],
-			urbanPopToDev(urbanPopulation[p]),
-		)
+		development[p] = Math.max(development[p], urbanPopToDev(urbanPopulation[p]))
 	}
 	return development
 }
@@ -238,4 +302,8 @@ function computeUrbanization(inputs: UrbanizationInputs): UrbanizationResult {
 
 export const URBANIZATION = {
 	computeUrbanization,
+	rankSizesForNation,
+	sortByRank,
+	spreadDevelopment,
+	urbanPopToDev,
 }

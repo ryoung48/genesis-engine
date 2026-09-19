@@ -63,6 +63,7 @@ export interface WorldFrame {
 	timeMs: number
 	provinceCount: number
 	provinceNation: Int32Array
+	provinceParent: Int32Array
 	provinceController: Int32Array
 	provinceCulture: Int32Array
 	provinceReligion: Int32Array
@@ -114,5 +115,9 @@ export interface RenderInputs {
 }
 
 export interface ToRenderInputsParams {
+	frame: WorldFrame
+}
+
+export interface ProvinceDepthParams {
 	frame: WorldFrame
 }

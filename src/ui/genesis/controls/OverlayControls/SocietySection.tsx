@@ -24,6 +24,7 @@ export interface SocietySectionProps {
 	labelMode: LabelMode
 	setLabelMode: (v: LabelMode) => void
 	isEarthImport: boolean
+	hasHierarchy: boolean
 }
 
 export const SocietySection: React.FC<SocietySectionProps> = ({
@@ -41,6 +42,7 @@ export const SocietySection: React.FC<SocietySectionProps> = ({
 	labelMode,
 	setLabelMode,
 	isEarthImport,
+	hasHierarchy,
 }) => {
 	return (
 		<div>
@@ -51,11 +53,13 @@ export const SocietySection: React.FC<SocietySectionProps> = ({
 			/>
 			{societyExpanded && (
 				<div className="mt-1.5 space-y-1.5">
-					<ToggleRow
-						label="Hierarchy"
-						checked={showNationHierarchy}
-						onChange={setShowNationHierarchy}
-					/>
+					{hasHierarchy && (
+						<ToggleRow
+							label="Hierarchy"
+							checked={showNationHierarchy}
+							onChange={setShowNationHierarchy}
+						/>
+					)}
 					<ToggleRow
 						label="Borders"
 						checked={showNationBorders}

@@ -3,8 +3,7 @@ import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/t
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
-import type { HistoryNote } from "@/model/history/generated/state/types"
-import type { WorldFrame } from "@/model/history/world-frame/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
@@ -446,10 +445,6 @@ export type GenesisWorkerRequest =
 			type: "pause"
 	  }
 	| {
-			type: "snapshot-at"
-			timeMs: number
-	  }
-	| {
 			type: "compute-infrastructure"
 	  }
 
@@ -462,7 +457,7 @@ export type GenesisWorkerResponse =
 	| {
 			type: "done"
 			world: SerializedGenesisWorld
-			frame?: WorldFrame
+			journal: JournalTransaction[]
 	  }
 	| {
 			type: "error"
@@ -486,18 +481,5 @@ export type GenesisWorkerResponse =
 	| {
 			type: "sim-progress"
 			timeMs: number
-			frame: WorldFrame
-			/** Events pushed to HistoryState.events since the previous
-			 * "sim-progress" (or since init, for the first tick) -- lets the
-			 * main thread accumulate a running event log without resending the
-			 * whole history each tick. */
-			newEvents: HistoryNote[]
-	  }
-	| {
-			/** Reply to a "snapshot-at" request: a history frame reconstructed
-			 * from the field timelines at an arbitrary past time, for scrubbing
-			 * procedural worlds. Never advances the sim. */
-			type: "history-scrub"
-			timeMs: number
-			frame: WorldFrame
+			journal: JournalTransaction[]
 	  }

@@ -10,6 +10,11 @@ export interface BlendRgbParams {
 	t: number
 }
 
+export interface HistoryGovernmentLabelParams {
+	governmentType: string | null
+	governmentReform: string | null | undefined
+}
+
 export interface GovernmentReformLabelParams {
 	governmentReform: string | null | undefined
 }

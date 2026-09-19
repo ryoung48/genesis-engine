@@ -1,4 +1,3 @@
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { disposeGroup } from "@/ui/genesis/renderer/disposal"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
@@ -6,14 +5,12 @@ import {
 	buildGlobeHierarchyOverlay,
 	buildMapHierarchyOverlay,
 } from "@/ui/genesis/renderer/overlay-builders/hierarchy"
+import type { HierarchyOverlaySpec } from "@/ui/genesis/renderer/types"
 
 export interface HierarchyControllerDeps {
 	updateOverlayVisibility: () => void
 }
 
-/** Owns the settlement-hierarchy overlay (the parent/child lines drawn for
- * a selected nation's settlement tree). See
- * plans/genesis-scene-controller-split.md. */
 export function createHierarchyController(
 	ctx: GenesisContext,
 	deps: HierarchyControllerDeps,
@@ -23,17 +20,15 @@ export function createHierarchyController(
 		disposeGroup(ctx.scene, ctx.mapHierarchyOverlay)
 		ctx.globeHierarchyOverlay = null
 		ctx.mapHierarchyOverlay = null
-		if (!ctx.hierarchyOverlayWorld || ctx.hierarchyOverlayNationId < 0) return
+		if (!ctx.hierarchyOverlaySpec) return
 		ctx.globeHierarchyOverlay = buildGlobeHierarchyOverlay(
-			ctx.hierarchyOverlayWorld,
-			ctx.hierarchyOverlayNationId,
+			ctx.hierarchyOverlaySpec,
 			ctx.currentViewMode,
 			ctx.canvas,
 			ctx.elevationVisible,
 		)
 		ctx.mapHierarchyOverlay = buildMapHierarchyOverlay(
-			ctx.hierarchyOverlayWorld,
-			ctx.hierarchyOverlayNationId,
+			ctx.hierarchyOverlaySpec,
 			ctx.currentMapCenterLongitudeDeg,
 			ctx.currentMapProjectionLatitudeDeg,
 			ctx.currentViewMode,
@@ -47,12 +42,8 @@ export function createHierarchyController(
 		deps.updateOverlayVisibility()
 	}
 
-	function setHierarchyOverlay(
-		world: SerializedGenesisWorld | null,
-		selectedNationId: number,
-	) {
-		ctx.hierarchyOverlayWorld = world
-		ctx.hierarchyOverlayNationId = selectedNationId
+	function setHierarchyOverlay(spec: HierarchyOverlaySpec | null) {
+		ctx.hierarchyOverlaySpec = spec
 		rebuild()
 	}
 

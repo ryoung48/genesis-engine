@@ -24,8 +24,10 @@ export interface HistoryEvent {
 export interface ProvinceEventLog {
 	base: {
 		ownerId: number
+		parentId: number
 		controllerId: number
 		cultureId: number
+		cultureBlendSecondaryId: number
 		religionId: number
 		inHolyRomanEmpire: boolean
 	}
@@ -64,6 +66,7 @@ export interface BattleParticipant {
 	cavalry: number | null
 	artillery: number | null
 	losses: number | null
+	wealthCost: number | null
 }
 
 export interface Battle {
@@ -106,26 +109,28 @@ export type OrganizationEventRecord =
 	| OrgMembershipEventRecord
 	| OrgSiteEventRecord
 
-export interface EarthHistoryEvents {
+export interface CensusKeyframe {
+	timeMs: number
+	urban: Float32Array
+	rural: Float32Array
+	development: Float32Array
+}
+
+export interface HistoryEvents {
 	provinceEvents: Map<number, ProvinceEventLog>
 	nationEvents: (NationEventLog | undefined)[]
 	wars: WarRecord[]
 	diplomacy: DiplomacyEventRecord[]
 	organizationEvents: OrganizationEventRecord[]
+	censuses: CensusKeyframe[]
 }
 
 export interface NationIdentity {
 	id: number
 	name: string
 	color: readonly [number, number, number]
-	/** Earliest timeMs the nation appears as a province owner / in its own
-	 * country history. `record.minTimeMs` when it already exists at the start. */
 	birthTimeMs: number
-	/** timeMs the nation last lost its final province with no later re-grant, or
-	 * -1 if it still owns territory at `record.maxTimeMs`. */
 	deathTimeMs: number
-	/** EU4's generic rebel actor (`tag === "REB"`) -- rendered black, labelled
-	 * "Rebels" rather than by name. */
 	isRebel: boolean
 	tag: string | null
 }
@@ -138,38 +143,10 @@ export interface HistoryRecordCommon {
 	religions: PartitionRow[]
 }
 
-export interface ProceduralNationInit {
-	id: number
-	capitalProvince: number
-	government: string
-	governmentReform: string
+export type HistoryRecord = HistoryRecordCommon & {
+	origin: "earth" | "procedural"
+	events: HistoryEvents
 }
-
-// The single static frame of a procedurally generated history's initial
-// conditions. No time evolution yet -- record.minTimeMs === record.maxTimeMs
-// and every frameAt returns this same snapshot.
-export interface ProceduralInitialConditions {
-	provinceCount: number
-	provinceNation: Int32Array
-	provinceCulture: Int32Array
-	provinceReligion: Int32Array
-	provinceCultureBlendSecondary: Int32Array
-	provincePopulation: Float32Array
-	provincePopulationUrban: Float32Array
-	provinceDevelopment: Float32Array
-	nations: ProceduralNationInit[]
-}
-
-export interface ProceduralTimeline {
-	initial: ProceduralInitialConditions
-}
-
-export type HistoryRecord =
-	| (HistoryRecordCommon & { origin: "earth"; events: EarthHistoryEvents })
-	| (HistoryRecordCommon & {
-			origin: "procedural"
-			timeline: ProceduralTimeline
-	  })
 
 export interface ProvinceMeta {
 	name: string | null

@@ -41,6 +41,7 @@ function generateSystemBodies(params: GenerateSystemBodiesParams) {
 	const { worldTypeAllocation } = SINGLE_STAR_BUDGET.roll({
 		seed: params.seed,
 		hostStar: resolveHostStar(params),
+		exactHZC: params.exactHZC,
 	})
 	return BODY_GENERATION.generateSystemBodies({
 		...params,

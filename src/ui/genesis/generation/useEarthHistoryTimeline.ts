@@ -7,7 +7,7 @@ import { RELIGION_GROUPS } from "@/model/history/earth/reference/religion-groups
 import { HISTORY } from "@/model/history/record"
 import type { HistoryState } from "@/model/history/record/types"
 import { FRAME } from "@/model/history/world-frame"
-import type { GenesisProvinces } from "@/model/society/types"
+import type { EarthTimelineInput } from "@/ui/genesis/generation/types"
 
 /**
  * Owns the earth-history engine lifecycle and scrubber time for an
@@ -16,10 +16,10 @@ import type { GenesisProvinces } from "@/model/society/types"
  * on world.isEarthImport"). Returns null engine/frame until data loads or
  * when the world has no EU4 raw-id mapping (non-raster-import worlds).
  */
-export function useEarthHistoryTimeline(
-	provinces: GenesisProvinces | null | undefined,
-	isEarthImport: boolean,
-) {
+export function useEarthHistoryTimeline({
+	provinces,
+	isEarthImport,
+}: EarthTimelineInput) {
 	const [state, setState] = useState<HistoryState | null>(null)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(
 		DATE.earthHistoryDefaultStartTimeMs,

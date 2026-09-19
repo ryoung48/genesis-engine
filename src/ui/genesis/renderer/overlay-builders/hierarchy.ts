@@ -2,28 +2,26 @@ import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
 	appendProjectedSegment,
 	HIERARCHY_DEPTH_COLORS,
 	HierarchyNode,
 } from "@/ui/genesis/renderer/overlay-builders/shared"
-import type { GenesisViewMode } from "@/ui/genesis/renderer/types"
+import type {
+	GenesisViewMode,
+	HierarchyOverlaySpec,
+} from "@/ui/genesis/renderer/types"
 
-function collectHierarchyNodes(
-	world: SerializedGenesisWorld,
-	selectedNationId: number,
-): HierarchyNode[] | null {
-	if (!world.nations || !world.provinces) return null
-	const { assignment, depth, parent } = world.nations
+function collectHierarchyNodes(spec: HierarchyOverlaySpec): HierarchyNode[] {
+	const { world, nationId, provinceNation, provinceParent, provinceDepth } =
+		spec
 	const { seeds } = world.provinces
 	const { r_xyz } = world.mesh
-	const provinceCount = assignment.length
 	const nodes: HierarchyNode[] = []
 
-	for (let p = 0; p < provinceCount; p++) {
-		if (assignment[p] !== selectedNationId) continue
+	for (let p = 0; p < provinceNation.length; p++) {
+		if (provinceNation[p] !== nationId) continue
 		const seedRegion = seeds[p]
 		const len = Math.sqrt(
 			r_xyz[3 * seedRegion] ** 2 +
@@ -34,8 +32,8 @@ function collectHierarchyNodes(
 		nodes.push({
 			provinceId: p,
 			seedRegion,
-			depth: depth[p],
-			parentProvinceId: parent[p],
+			depth: provinceDepth[p],
+			parentProvinceId: provinceParent[p],
 			xyz: [
 				r_xyz[3 * seedRegion] * scale,
 				r_xyz[3 * seedRegion + 1] * scale,
@@ -70,14 +68,13 @@ function createCircleTexture(): THREE.CanvasTexture | null {
 }
 
 export function buildGlobeHierarchyOverlay(
-	world: SerializedGenesisWorld,
-	selectedNationId: number,
+	spec: HierarchyOverlaySpec,
 	viewMode: GenesisViewMode,
 	canvas: HTMLCanvasElement,
 	elevationVisible: boolean,
 ): THREE.Group | null {
-	const nodes = collectHierarchyNodes(world, selectedNationId)
-	if (!nodes || nodes.length === 0) return null
+	const nodes = collectHierarchyNodes(spec)
+	if (nodes.length === 0) return null
 
 	const provinceIndex = new Map<number, HierarchyNode>()
 	for (const node of nodes) provinceIndex.set(node.provinceId, node)
@@ -165,15 +162,14 @@ export function buildGlobeHierarchyOverlay(
 }
 
 export function buildMapHierarchyOverlay(
-	world: SerializedGenesisWorld,
-	selectedNationId: number,
+	spec: HierarchyOverlaySpec,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	viewMode: GenesisViewMode,
 	canvas: HTMLCanvasElement,
 ): THREE.Group | null {
-	const nodes = collectHierarchyNodes(world, selectedNationId)
-	if (!nodes || nodes.length === 0) return null
+	const nodes = collectHierarchyNodes(spec)
+	if (nodes.length === 0) return null
 
 	const provinceIndex = new Map<number, HierarchyNode>()
 	for (const node of nodes) provinceIndex.set(node.provinceId, node)

@@ -149,4 +149,5 @@ export interface OverlayControlsProps {
 	setShowDaylight?: (v: boolean) => void
 	onEnterSolarSystem?: () => void
 	isEarthImport?: boolean
+	hasHierarchy: boolean
 }

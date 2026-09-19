@@ -1,6 +1,5 @@
 ﻿import type { TideLock } from "@/model/celestial/orbit-body/types"
-import type { HistoryNote } from "@/model/history/generated/state/types"
-import type { WorldFrame } from "@/model/history/world-frame/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
@@ -110,6 +109,8 @@ export interface GenerationCallbacks {
 	setSeed: (v: number) => void
 	setWorld: (v: SerializedGenesisWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
+	onHistoryStart: (journal: JournalTransaction[]) => void
+	onHistoryJournal: (journal: JournalTransaction[]) => void
 	onGenerationComplete?: () => void
 	onPathfindResult?: (result: {
 		pathRegions: Int32Array
@@ -125,19 +126,6 @@ export interface GenerationCallbacks {
 		routes: SerializedGenesisWorld["routes"]
 		network: SerializedGenesisWorld["network"]
 	}) => void
-	/** The seed history frame attached to "done", if the generated world has
-	 * nations/provinces/population wired up for the live-play sim. */
-	onHistoryFrame?: (frame: WorldFrame) => void
-	/** Fired for each "sim-progress" tick emitted while a "simulate" request
-	 * is running in the worker. */
-	onSimProgress?: (
-		timeMs: number,
-		frame: WorldFrame,
-		newEvents: HistoryNote[],
-	) => void
-	/** Reply to a requestHistorySnapshot call: a frame reconstructed at an
-	 * arbitrary past time for scrubbing, without advancing the sim. */
-	onHistoryScrub?: (timeMs: number, frame: WorldFrame) => void
 }
 
 function createWorker(
@@ -195,15 +183,7 @@ function createWorker(
 			return
 		}
 		if (message.type === "sim-progress") {
-			callbacks.onSimProgress?.(
-				message.timeMs,
-				message.frame,
-				message.newEvents,
-			)
-			return
-		}
-		if (message.type === "history-scrub") {
-			callbacks.onHistoryScrub?.(message.timeMs, message.frame)
+			callbacks.onHistoryJournal(message.journal)
 			return
 		}
 	}
@@ -293,10 +273,10 @@ export function generateWorld(
 			callbacks,
 			(message, _w) => {
 				callbacks.setWorld(message.world)
+				callbacks.onHistoryStart(message.journal)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
-				if (message.frame) callbacks.onHistoryFrame?.(message.frame)
 				callbacks.onGenerationComplete?.()
 				// Keep the worker alive to serve pathfind requests.
 			},
@@ -313,17 +293,6 @@ export function requestInfrastructure(
 	workerRef: React.MutableRefObject<Worker | null>,
 ): void {
 	const request: GenesisWorkerRequest = { type: "compute-infrastructure" }
-	workerRef.current?.postMessage(request)
-}
-
-/** Asks the worker to reconstruct a history frame at an arbitrary past time
- * (clamped to what has been simulated). The result arrives via
- * onHistoryScrub. Used by the procedural history scrubber. */
-export function requestHistorySnapshot(
-	workerRef: React.MutableRefObject<Worker | null>,
-	timeMs: number,
-): void {
-	const request: GenesisWorkerRequest = { type: "snapshot-at", timeMs }
 	workerRef.current?.postMessage(request)
 }
 
@@ -481,10 +450,10 @@ export function importHeightmap(
 			callbacks,
 			(message, _w) => {
 				callbacks.setWorld(message.world)
+				callbacks.onHistoryStart(message.journal)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
-				if (message.frame) callbacks.onHistoryFrame?.(message.frame)
 				callbacks.onGenerationComplete?.()
 				// Keep worker alive for simulation
 			},

@@ -108,6 +108,7 @@ export const DATE = {
 	eu4DateToDays,
 	eu4DateToTimeMs,
 	timeMsToDays,
+	timeMsToEu4Date,
 	formatEu4Year,
 	formatHistoryDays,
 	formatHistoryTimeMs,

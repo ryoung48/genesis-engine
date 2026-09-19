@@ -44,10 +44,9 @@ import {
 import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
-	buildGovernmentDisplayData,
 	buildHoverChartData,
 	buildPastaMonthlyData,
-	buildProvinceDisplayData,
+	buildProvinceName,
 	buildTerrainFeatureSwatches,
 	buildTopographySwatchColor,
 	buildTradeGoodSwatchColor,
@@ -123,7 +122,6 @@ interface InfoPanelProps {
 	hoverIceSummary: string | null
 	hoverBiome: string | null
 	hoverProvince: number | null
-	hoverNationId: number | null
 	hoverOccupation: {
 		id: number
 		name: string
@@ -161,7 +159,6 @@ interface InfoPanelProps {
 	routes?: SerializedRoutes | null
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
 	getProvinceName?: (provinceId: number) => string
-	getNationName: (nationId: number) => string
 	getLeaderName?: (nationId: number, timeMs: number) => string
 	getDynastyName?: (dynastyId: number) => string
 	getCultureName: (cultureId: number) => string
@@ -169,16 +166,12 @@ interface InfoPanelProps {
 	getReligionName: (religionId: number) => string
 	getLandmarkName: (landmarkId: number) => string
 	getRiverName: (riverId: number) => string
-	hoverNationAdjOffset?: Int32Array | null
-	hoverNationAdjList?: Int32Array | null
-	hoverNationCounts?: Map<number, number> | null
-	relationAt?: ((a: number, b: number) => number) | null
 	/** Overrides the Nation/Government/Culture/Religion rows with real
 	 * history for the currently-scrubbed date. Resolved by the caller
 	 * (GenesisView); undefined when earth-history isn't active
 	 * for the hovered province, in which case the usual procedural builders
 	 * are used unchanged. */
-	earthHistoryHoverOverride?: {
+	historyHoverOverride?: {
 		nationName: string | null
 		nationColor: string | null
 		governmentLabel: string | null
@@ -227,7 +220,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverIceSummary,
 	hoverBiome,
 	hoverProvince,
-	hoverNationId,
 	hoverOceanDist,
 	hoverDistCoast,
 	hoverDistCoastKm,
@@ -256,13 +248,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	world,
 	routes,
 	hoverCardRef,
-	getNationName,
 	getCultureName,
 	getHeritageName,
 	getReligionName,
 	getLandmarkName,
 	getRiverName,
-	earthHistoryHoverOverride,
+	historyHoverOverride,
 }) => {
 	const activeBarIndex =
 		clockMonthMode === "monthly" ? clockMonth : displayMonth - 1
@@ -348,11 +339,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		dataVariant === "observed" &&
 		hoverOceanCurrents !== null &&
 		hoverOceanCurrents.sstAnomalyMonthly !== null
-	const { provinceName, provinceNation } = buildProvinceDisplayData({
-		hoverProvince,
-		hoverNationId,
-		world,
-	})
+	const provinceName = buildProvinceName({ hoverProvince, world })
 	const hoverProvinceDisplayId =
 		world?.isEarthImport &&
 		hoverProvince !== null &&
@@ -361,9 +348,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		hoverProvince < world.provinces.realIds.length
 			? world.provinces.realIds[hoverProvince]
 			: hoverProvince
-	const governmentDisplay = showSociety
-		? buildGovernmentDisplayData({ hoverNationId, world })
-		: null
 	const demographicModes: SocietyMapMode[] = [
 		"density",
 		"urban",
@@ -449,21 +433,21 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	// off world.cultures/religions) -- including suppressing them entirely
 	// for a province with no real owner/culture/religion data, rather than
 	// silently falling back to generation-time procedural values.
-	if (earthHistoryHoverOverride) {
-		if (earthHistoryHoverOverride.cultureName) {
+	if (historyHoverOverride) {
+		if (historyHoverOverride.cultureName) {
 			demographicEntryMap.set("Culture", {
 				label: "Culture",
-				value: earthHistoryHoverOverride.cultureName,
-				color: earthHistoryHoverOverride.cultureColor,
+				value: historyHoverOverride.cultureName,
+				color: historyHoverOverride.cultureColor,
 			})
 		} else {
 			demographicEntryMap.delete("Culture")
 		}
-		if (earthHistoryHoverOverride.religionName) {
+		if (historyHoverOverride.religionName) {
 			demographicEntryMap.set("Religion", {
 				label: "Religion",
-				value: earthHistoryHoverOverride.religionName,
-				color: earthHistoryHoverOverride.religionColor,
+				value: historyHoverOverride.religionName,
+				color: historyHoverOverride.religionColor,
 			})
 		} else {
 			demographicEntryMap.delete("Religion")
@@ -492,22 +476,19 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				)}
 				{showGeography && (
 					<>
-						{world?.isEarthImport && earthHistoryHoverOverride ? (
+						{world?.isEarthImport && historyHoverOverride ? (
 							<>
-								{earthHistoryHoverOverride.superregion && (
+								{historyHoverOverride.superregion && (
 									<Row
 										label="Superregion"
-										value={earthHistoryHoverOverride.superregion}
+										value={historyHoverOverride.superregion}
 									/>
 								)}
-								{earthHistoryHoverOverride.region && (
-									<Row
-										label="Region"
-										value={earthHistoryHoverOverride.region}
-									/>
+								{historyHoverOverride.region && (
+									<Row label="Region" value={historyHoverOverride.region} />
 								)}
-								{earthHistoryHoverOverride.area && (
-									<Row label="Area" value={earthHistoryHoverOverride.area} />
+								{historyHoverOverride.area && (
+									<Row label="Area" value={historyHoverOverride.area} />
 								)}
 							</>
 						) : (
@@ -795,44 +776,27 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				)}
 				{showSociety && hoverProvince !== null && hoverProvince >= 0 && (
 					<>
-						{(earthHistoryHoverOverride?.provinceName ?? provinceName) && (
+						{(historyHoverOverride?.provinceName ?? provinceName) && (
 							<SwatchRow
 								label="Province"
-								value={`#${hoverProvinceDisplayId} ${earthHistoryHoverOverride?.provinceName ?? provinceName ?? ""}`}
+								value={`#${hoverProvinceDisplayId} ${historyHoverOverride?.provinceName ?? provinceName ?? ""}`}
 								color={null}
 							/>
 						)}
-						{earthHistoryHoverOverride
-							? earthHistoryHoverOverride.nationName && (
-									<SwatchRow
-										label="Nation"
-										value={earthHistoryHoverOverride.nationName}
-										color={earthHistoryHoverOverride.nationColor}
-									/>
-								)
-							: provinceNation && (
-									<SwatchRow
-										label="Nation"
-										value={getNationName(provinceNation.id)}
-										color={provinceNation.color}
-									/>
-								)}
-						{earthHistoryHoverOverride
-							? earthHistoryHoverOverride.governmentLabel && (
-									<SwatchRow
-										label="Government"
-										value={earthHistoryHoverOverride.governmentLabel}
-										color={earthHistoryHoverOverride.governmentColor}
-									/>
-								)
-							: provinceNation &&
-								governmentDisplay && (
-									<SwatchRow
-										label="Government"
-										value={governmentDisplay.label}
-										color={governmentDisplay.color}
-									/>
-								)}
+						{historyHoverOverride?.nationName && (
+							<SwatchRow
+								label="Nation"
+								value={historyHoverOverride.nationName}
+								color={historyHoverOverride.nationColor}
+							/>
+						)}
+						{historyHoverOverride?.governmentLabel && (
+							<SwatchRow
+								label="Government"
+								value={historyHoverOverride.governmentLabel}
+								color={historyHoverOverride.governmentColor}
+							/>
+						)}
 					</>
 				)}
 				{showSociety && (

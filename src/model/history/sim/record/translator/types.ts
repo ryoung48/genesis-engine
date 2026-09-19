@@ -1,0 +1,74 @@
+import type { HistoryState } from "@/model/history/record/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
+import type { LanguageNames } from "@/model/society/language/names"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+
+export interface ActiveTie {
+	kind: "alliance" | "rival" | "vassal" | "colony" | "union"
+	firstId: number
+	secondId: number
+}
+
+export interface ProceduralTranslator {
+	state: HistoryState
+	world: SerializedGenesisWorld
+	names: LanguageNames
+	parent: Int32Array
+	owner: Int32Array
+	occupation: Int32Array
+	children: Set<number>[]
+	identityByRoot: Map<number, number>
+	rawColors: Array<[number, number, number]>
+	relationCells: Map<number, number>
+	relationColumns: Map<number, Set<number>>
+	activeTies: Map<number, ActiveTie>
+	warCoalitions: Map<number, { attackers: Set<number>; defenders: Set<number> }>
+	ownedCount: number[]
+	stateless: Uint8Array
+}
+
+export interface CreateTranslatorParams {
+	state: HistoryState
+	world: SerializedGenesisWorld
+}
+
+export interface AppendJournalParams {
+	translator: ProceduralTranslator
+	transactions: JournalTransaction[]
+}
+
+export interface ApplyTransactionParams {
+	translator: ProceduralTranslator
+	transaction: JournalTransaction
+}
+
+export interface DescendantsParams {
+	children: Set<number>[]
+	province: number
+}
+
+export interface IdentityForRootParams {
+	translator: ProceduralTranslator
+	root: number
+	timeMs: number
+}
+
+export interface ProjectTieParams {
+	translator: ProceduralTranslator
+	x: number
+	y: number
+	value: number
+}
+
+export interface UpdateTiesParams {
+	translator: ProceduralTranslator
+	pairs: Set<number>
+	timeMs: number
+}
+
+export interface AppendNoteParams {
+	translator: ProceduralTranslator
+	note: JournalTransaction["notes"][number]
+	timeMs: number
+	coalition: JournalTransaction["coalitions"][number] | null
+}

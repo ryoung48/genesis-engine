@@ -2,11 +2,9 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
-import { ERAS } from "@/model/society/eras"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/genesis/hover/hover"
-import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
 import {
 	getReligionColorForProvince,
 	getReligionIndexForProvince,
@@ -34,7 +32,6 @@ import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-den
 import {
 	getTerrainFeatureColor,
 	getTopographyColor,
-	toPastelNationColor,
 } from "@/ui/genesis/shared/region-colors/palette"
 import {
 	formatDensity,
@@ -60,15 +57,6 @@ interface HoverChartData {
 interface HoverPastaMonthlyData {
 	gdd: number[]
 	gint: number[]
-}
-
-interface HoverProvinceDisplayData {
-	provinceColor: string | null
-	provinceName: string | null
-	provinceNation: {
-		id: number
-		color: string | null
-	} | null
 }
 
 interface HoverDemographicDisplayData {
@@ -199,56 +187,17 @@ export function buildTerrainFeatureSwatches(
 	})
 }
 
-export function buildProvinceDisplayData(params: {
+export function buildProvinceName(params: {
 	hoverProvince: number | null
-	hoverNationId: number | null
 	world: SerializedGenesisWorld | null
-}): HoverProvinceDisplayData {
-	const { hoverProvince, hoverNationId, world } = params
-	const nationColor =
-		hoverNationId !== null &&
-		hoverNationId >= 0 &&
-		world?.nations?.colors &&
-		hoverNationId * 3 + 2 < world.nations.colors.length
-			? rgbToCss([
-					...toPastelNationColor([
-						world.nations.colors[hoverNationId * 3],
-						world.nations.colors[hoverNationId * 3 + 1],
-						world.nations.colors[hoverNationId * 3 + 2],
-					]),
-				])
-			: null
-	const provinceNation =
-		hoverProvince !== null &&
-		hoverProvince >= 0 &&
-		hoverNationId !== null &&
-		hoverNationId >= 0 &&
-		world?.nations &&
-		hoverProvince < world.nations.assignment.length
-			? {
-					id: hoverNationId,
-					color: nationColor,
-				}
-			: null
-	const provinceColor =
-		hoverProvince !== null &&
-		hoverProvince >= 0 &&
-		world?.provinces &&
-		hoverProvince * 3 + 2 < world.provinces.colors.length
-			? rgbToCss([
-					world.provinces.colors[hoverProvince * 3],
-					world.provinces.colors[hoverProvince * 3 + 1],
-					world.provinces.colors[hoverProvince * 3 + 2],
-				])
-			: null
-	const provinceName =
-		hoverProvince !== null &&
+}): string | null {
+	const { hoverProvince, world } = params
+	return hoverProvince !== null &&
 		hoverProvince >= 0 &&
 		world?.provinces?.names &&
 		hoverProvince < world.provinces.names.length
-			? world.provinces.names[hoverProvince]
-			: null
-	return { provinceColor, provinceName, provinceNation }
+		? world.provinces.names[hoverProvince]
+		: null
 }
 
 export function buildClimateSwatchColor(
@@ -494,30 +443,6 @@ export function buildDemographicDisplayData(params: {
 	}
 
 	return null
-}
-
-export function buildGovernmentDisplayData(params: {
-	hoverNationId: number | null
-	world: SerializedGenesisWorld | null
-}): { label: string; color: string } | null {
-	const { hoverNationId, world } = params
-	if (
-		hoverNationId === null ||
-		hoverNationId < 0 ||
-		!world?.nations?.governmentType ||
-		hoverNationId >= world.nations.governmentType.length
-	) {
-		return null
-	}
-	// governmentType is per-province (like leaderDynasty), so hoverNationId
-	// (a province index in the display system) indexes it directly.
-	const typeIndex = world.nations.governmentType[hoverNationId] ?? 4
-	const key = ERAS.governmentTypes[typeIndex]
-	const label = key ? (ERAS.governmentTypeLabels[key] ?? key) : "Kingdom"
-	return {
-		label,
-		color: GOVERNMENT_COLORS_CSS[typeIndex] ?? GOVERNMENT_COLORS_CSS[7],
-	}
 }
 
 /**

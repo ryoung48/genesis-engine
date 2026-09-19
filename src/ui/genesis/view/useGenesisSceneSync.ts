@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { DATE } from "@/model/history/earth/date"
+import { FRAME } from "@/model/history/world-frame"
 import {
 	buildGhslSettlementPopulationSlice,
 	topSettlementIndices,
@@ -16,9 +17,9 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	const {
 		sceneRef,
 		worldForDisplay,
-		earthHistory,
+		history,
 		hoverInfo,
-		selectedNationId,
+		selectedWikiNationId,
 		viewMode,
 		solarSystemViewActive,
 		mapProjectionLatitude,
@@ -54,12 +55,29 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showNationHierarchy && worldForDisplay && selectedNationId !== null) {
-			scene.setHierarchyOverlay(worldForDisplay, selectedNationId)
+		const frame = history.query?.frame
+		if (
+			showNationHierarchy &&
+			worldForDisplay?.provinces &&
+			frame &&
+			selectedWikiNationId !== null
+		) {
+			scene.setHierarchyOverlay({
+				world: worldForDisplay,
+				nationId: selectedWikiNationId,
+				provinceNation: frame.provinceNation,
+				provinceParent: frame.provinceParent,
+				provinceDepth: FRAME.provinceDepth({ frame }),
+			})
 		} else {
-			scene.setHierarchyOverlay(null, -1)
+			scene.setHierarchyOverlay(null)
 		}
-	}, [showNationHierarchy, worldForDisplay, selectedNationId])
+	}, [
+		showNationHierarchy,
+		worldForDisplay,
+		history.query,
+		selectedWikiNationId,
+	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setViewMode(viewMode)
@@ -154,7 +172,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		if (showInfrastructure && isEarthImportDisplay && eu4GhslSettlements) {
 			const population = buildGhslSettlementPopulationSlice(
 				eu4GhslSettlements,
-				DATE.timeMsToDays(earthHistory.selectedTimeMs),
+				DATE.timeMsToDays(history.selectedTimeMs),
 			)
 			const realSettlement = worldForDisplay?.realSettlement
 			const indices = realSettlement
@@ -164,17 +182,11 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 				: population
 					? topSettlementIndices(population, eu4GhslSettlements.provinceIds)
 					: []
-			// worldForDisplay.nations.seeds is stale procedural-world data --
-			// buildDisplayWorld overrides assignment/sovereign/colors/etc for
-			// earth-history playback but never seeds (display-model.ts), and
-			// the replay-based HistoryView it's built from doesn't compute
-			// capitals at all. earthHistory.query.frame comes from the
-			// separate fold-based engine (queryEarthHistory ->
-			// foldedStateToGenesisFrame) which *does* compute real,
-			// capital-preferring seeds per nation for the current date -- see
-			// adapter.ts's GenesisFrameFromHistory.seeds.
+			// worldForDisplay.nations.seeds is stale procedural-world data; the
+			// history frame carries the real, capital-preferring seeds per nation
+			// for the current date.
 			const capitalProvinceIds = new Set<number>()
-			const frameSeeds = earthHistory.query?.renderInputs.seeds
+			const frameSeeds = history.query?.renderInputs.seeds
 			const realIds = worldForDisplay?.provinces?.realIds
 			if (frameSeeds && realIds) {
 				for (const compactIdx of frameSeeds) {
@@ -200,8 +212,8 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		showInfrastructure,
 		isEarthImportDisplay,
 		eu4GhslSettlements,
-		earthHistory.selectedTimeMs,
-		earthHistory.query,
+		history.selectedTimeMs,
+		history.query,
 		worldForDisplay,
 	])
 

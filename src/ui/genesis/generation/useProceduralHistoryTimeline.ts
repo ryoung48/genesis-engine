@@ -1,12 +1,10 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { HISTORY } from "@/model/history/record"
-import type { HistoryState } from "@/model/history/record/types"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { PartitionRow } from "@/model/history/world-frame/types"
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import type { ReligionMapMode } from "@/ui/genesis/shared/map-modes"
+import type { ProceduralTimelineInput } from "@/ui/genesis/generation/types"
 
 // Procedural counterpart of useEarthHistoryTimeline. Builds the single static
 // initial-conditions HistoryState for a procedurally generated world on the
@@ -16,7 +14,8 @@ import type { ReligionMapMode } from "@/ui/genesis/shared/map-modes"
 // -> computeEarthHistoryRegionColors, the label overrides, the hover override)
 // consumes either mode with no branching. No time evolution yet:
 // minTimeMs === maxTimeMs.
-const PROCEDURAL_START_TIME_MS = 800 * 365 * 86_400_000
+const PROCEDURAL_START_TIME_MS = (800 - 2) * 365 * 86_400_000
+const PROCEDURAL_ENGINE_START_TIME_MS = 800 * 365 * 86_400_000
 
 function nameMap(rows: PartitionRow[]): Map<string, string> {
 	return new Map(rows.map((row) => [row.key, row.name]))
@@ -35,30 +34,55 @@ function colorMap(rows: PartitionRow[]): Map<string, [number, number, number]> {
 	)
 }
 
-export function useProceduralHistoryTimeline(
-	world: SerializedGenesisWorld | null,
-	religionMode: ReligionMapMode,
-) {
+export function useProceduralHistoryTimeline({
+	world,
+	religionMode,
+	journalTransactionsRef,
+	journalVersion,
+}: ProceduralTimelineInput) {
 	const isProcedural =
 		!!world && !world.isEarthImport && !!world.provinces && !!world.nations
 
-	const state = useMemo<HistoryState | null>(() => {
+	const [recordVersion, setRecordVersion] = useState(0)
+	const session = useMemo(() => {
 		if (!isProcedural || !world) return null
-		return SIM_RECORD.buildProceduralState({
+		const next = SIM_RECORD.buildProceduralState({
 			world,
-			startTimeMs: PROCEDURAL_START_TIME_MS,
-			provinceCoords: undefined,
+			startTimeMs: PROCEDURAL_ENGINE_START_TIME_MS,
 		})
-		// world identity is stable per generated world.
+		return {
+			state: next,
+			translator: SIM_RECORD.createTranslator({ state: next, world }),
+			progress: { transactionCount: 0, journalVersion: -1 },
+		}
 	}, [isProcedural, world])
+	const state = session?.state ?? null
+	useEffect(() => {
+		if (!session) return
+		const { state: sessionState, translator, progress } = session
+		if (progress.journalVersion === journalVersion) return
+		progress.journalVersion = journalVersion
+		const transactions = journalTransactionsRef.current.slice(
+			progress.transactionCount,
+		)
+		if (transactions.length === 0) return
+		const previousMax = sessionState.record.maxTimeMs
+		SIM_RECORD.appendJournal({ translator, transactions })
+		progress.transactionCount = journalTransactionsRef.current.length
+		setSelectedTimeMs((time) =>
+			time >= previousMax ? sessionState.record.maxTimeMs : time,
+		)
+		setRecordVersion((version) => version + 1)
+	}, [session, journalTransactionsRef, journalVersion])
 
 	const [selectedTimeMs, setSelectedTimeMs] = useState(PROCEDURAL_START_TIME_MS)
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recordVersion signals in-place record appends that frameAt cannot observe.
 	const query = useMemo(() => {
 		if (!state) return null
 		const frame = HISTORY.frameAt({ state, timeMs: selectedTimeMs })
 		return { frame, renderInputs: FRAME.toRenderInputs({ frame }) }
-	}, [state, selectedTimeMs])
+	}, [state, selectedTimeMs, recordVersion])
 
 	const cultureNameById = useMemo(
 		() => (state ? nameMap(state.record.cultures) : null),
@@ -102,6 +126,7 @@ export function useProceduralHistoryTimeline(
 
 	return {
 		state,
+		recordVersion,
 		selectedTimeMs,
 		setSelectedTimeMs,
 		query,

@@ -125,6 +125,7 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	readonly [SocietyMapMode, string]
 > = [
 	["density", "Population"],
+	["urban", "Urban"],
 	["development", "Development"],
 	["culture", "Culture"],
 	["religion", "Religion"],
@@ -137,39 +138,27 @@ const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	["migration", "Migration"],
 ]
 
-const EARTH_IMPORT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
-	readonly [SocietyMapMode, string]
-> = [["urban", "Urban"]]
-
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
 > = [
 	["borders", "Nations"],
 	["government", "Government"],
+	["dynasty", "Dynasty"],
 ]
 
 const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
-> = [["provinces", "Provinces"]]
-
-// Earth-import-only, but not a debug mode: dynasty coloring was fed by the
-// procedural history sim's leader timelines, which no longer exist, so on a
-// procedural world it would render blank. Earth import sources dynasties from
-// the earth-history engine instead.
-const EARTH_IMPORT_DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
-	readonly [NationMapMode, string]
-> = [["dynasty", "Dynasty"]]
+> = [
+	["provinces", "Provinces"],
+	["diplomacy", "Diplomacy"],
+]
 
 // Only meaningful for a real-Earth import (see world.isEarthImport). Province
 // boundaries/names come from imported real-world data rather than the
-// procedural BFS partition; diplomacy was fed by the procedural sim's relation
-// timelines, which are likewise gone.
+// procedural BFS partition.
 const EARTH_IMPORT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
-> = [
-	["earthProvinces", "Provinces (Real)"],
-	["diplomacy", "Diplomacy"],
-]
+> = [["earthProvinces", "Provinces (Real)"]]
 
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
 	return colorMode === "nations" ||
@@ -193,15 +182,14 @@ export function isDebugNationMode(nationMode: NationMapMode): boolean {
 }
 
 const EARTH_IMPORT_ONLY_NATION_MODES: ReadonlySet<NationMapMode> =
-	new Set<NationMapMode>([
-		...EARTH_IMPORT_DEFAULT_POLITICAL_MODE_OPTIONS.map(([mode]) => mode),
-		...EARTH_IMPORT_POLITICAL_MODE_OPTIONS.map(([mode]) => mode),
-	])
+	new Set<NationMapMode>(
+		EARTH_IMPORT_POLITICAL_MODE_OPTIONS.map(([mode]) => mode),
+	)
 
 /**
  * Falls back to "borders" when a persisted nation mode has no data source on
- * the current world — e.g. a saved "dynasty" pref carried into a procedural
- * world, whose leader and relation data went away with the history sim.
+ * the current world — e.g. a saved "earthProvinces" pref carried into a
+ * procedural world.
  */
 export function normalizeNationMapMode(
 	nationMode: NationMapMode,
@@ -242,18 +230,12 @@ export function getVisibleSocietyModeOptions(
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
-	if (isEarthImport) {
-		politicalOptions.push(...EARTH_IMPORT_DEFAULT_POLITICAL_MODE_OPTIONS)
-	}
 	if (debugEnabled && isEarthImport) {
 		politicalOptions.push(...EARTH_IMPORT_POLITICAL_MODE_OPTIONS)
 	}
 	const demographicOptions = debugEnabled
 		? [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS, ...DEBUG_DEMOGRAPHIC_MODE_OPTIONS]
 		: [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS]
-	if (isEarthImport) {
-		demographicOptions.splice(1, 0, ...EARTH_IMPORT_DEMOGRAPHIC_MODE_OPTIONS)
-	}
 	const trailingSocietyModes = new Set<SocietyMapMode>([
 		"density",
 		"urban",

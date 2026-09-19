@@ -23,6 +23,7 @@ import type {
 import type {
 	GenesisHoverInfo,
 	GenesisViewMode,
+	HierarchyOverlaySpec,
 	OrgHighlightSpec,
 	RiverData,
 	WindArrowData,
@@ -118,8 +119,7 @@ export interface GenesisContext {
 	// overlay-controllers/hierarchy.ts's state.
 	globeHierarchyOverlay: THREE.Group | null
 	mapHierarchyOverlay: THREE.Group | null
-	hierarchyOverlayNationId: number
-	hierarchyOverlayWorld: SerializedGenesisWorld | null
+	hierarchyOverlaySpec: HierarchyOverlaySpec | null
 
 	// overlay-controllers/settlements.ts's state.
 	globeSettlements: THREE.Group | null

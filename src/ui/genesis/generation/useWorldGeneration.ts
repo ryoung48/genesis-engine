@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import { STATE } from "@/model/history/generated/state"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
@@ -54,11 +53,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		setShowCoastlines,
 		setSolarSystemViewActive,
 		setPathfindingResult,
-		setProceduralHistoryFrame,
 		setProceduralHistoryPlaying,
-		setProceduralHistoryTimeMs,
-		resetProceduralHistoryAccumulation,
-		recordProceduralFrame,
+		startProceduralJournal,
+		recordProceduralJournal,
 		seed,
 		setSeed,
 		setDataVariant,
@@ -106,15 +103,13 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	const handleSetWorld = useCallback(
 		(w: SerializedGenesisWorld | null) => {
 			if (w === null) {
-				setProceduralHistoryFrame(null)
 				setProceduralHistoryPlaying(false)
-				setProceduralHistoryTimeMs(800 * STATE.yearMs)
-				resetProceduralHistoryAccumulation()
+				startProceduralJournal([])
 				infrastructureRequestedRef.current = false
 			}
 			setWorld(w)
 		},
-		[resetProceduralHistoryAccumulation],
+		[startProceduralJournal],
 	)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -126,13 +121,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			setSeed,
 			setWorld: handleSetWorld,
 			workerRef,
-			onHistoryFrame: (frame) => {
-				resetProceduralHistoryAccumulation()
-				recordProceduralFrame(frame.timeMs, frame, [])
-			},
-			onSimProgress: (timeMs, frame, newEvents) => {
-				recordProceduralFrame(timeMs, frame, newEvents)
-			},
+			onHistoryStart: startProceduralJournal,
+			onHistoryJournal: recordProceduralJournal,
 			onPathfindResult: (result) => {
 				if (result.reachable) {
 					const pathArray = Array.from(result.pathRegions)
@@ -163,13 +153,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				}
 			},
 			onInfrastructureResult: (result) => {
-				// Must merge onto the raw generation world (setWorld's own state),
-				// NOT lastWorldRef.current -- that ref tracks worldForDisplay, a
-				// derived copy whose assignment/colors/etc are overwritten for
-				// display purposes (see buildDisplayWorld). Spreading it back into
-				// setWorld corrupted world.nations, which showed up as some
-				// nations losing their color and rendering gray as soon as
-				// Infrastructure was toggled on.
 				setWorld((prev) =>
 					prev
 						? {
@@ -181,7 +164,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				)
 			},
 		}),
-		[handleSetWorld, resetProceduralHistoryAccumulation, recordProceduralFrame],
+		[handleSetWorld, startProceduralJournal, recordProceduralJournal],
 	)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
