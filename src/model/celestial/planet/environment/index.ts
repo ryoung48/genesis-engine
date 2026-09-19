@@ -16,7 +16,10 @@ import { DENSITY } from "@/model/celestial/planet/environment/density"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/environment/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { SpectralClass } from "@/model/celestial/star/types"
+import type {
+	LuminosityClass,
+	SpectralClass,
+} from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/temperature/ebm/greenhouse-estimate"
 import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
@@ -249,25 +252,49 @@ function applyProtoHydrosphereSuppression({
 	return hydrosphereCode
 }
 
-// Ported from galaxy-gen's ATMOSPHERE.youth (orbits/atmosphere/index.ts) --
-// replaces a young body's normally-rolled atmosphere code with its own size/
-// star-age-driven roll, skewed harder toward exotic/insidious outcomes at
-// proto ages (starAgeGyr<0.01) than at the broader primordial window
-// (starAgeGyr<0.1).
+// Book p. 226: a primordial-system body's atmosphere rolls the normal
+// 2D-7+Size formula with DM+2, then remaps the numeric result: 2-7 -> code A
+// (10, Exotic), 8-C -> code C (12, Insidious), D-F -> code F (15, Unusual),
+// G-H -> code H (17, this codebase's own "gas" sentinel -- see
+// rollProtoAtmosphereCode's identical G-H handling for why). Mirrors
+// rollProtoAtmosphereCode's shape exactly but with primordial's own smaller
+// DM and wider low bucket (2-7 vs. protostar's 2-5).
 function rollYouthAtmosphereCode({
 	rng,
-	proto,
 	sizeClass,
 }: {
 	rng: ReturnType<typeof RNG.createRng>
-	proto: boolean
 	sizeClass: number
 }): number {
-	const atmosphereMod = proto ? 4 : 2
-	const atmosphere = DICE.roll2d6(rng) - 7 + sizeClass + atmosphereMod
-	if (atmosphere >= 2 && atmosphere <= (proto ? 5 : 7)) return 10
-	if (atmosphere >= (proto ? 6 : 8) && atmosphere <= 11) return 12
-	return MATH.clamp({ value: atmosphere, lo: 0, hi: 14 })
+	const roll = DICE.roll2d6(rng) - 7 + sizeClass + 2
+	if (roll >= 2 && roll <= 7) return 10
+	if (roll >= 8 && roll <= 12) return 12
+	if (roll >= 13 && roll <= 15) return 15
+	if (roll >= 16) return 17
+	return MATH.clamp({ value: roll, lo: 0, hi: 9 })
+}
+
+// Book p. 224-225: a protostar-system body's atmosphere rolls the normal
+// 2D-7+Size formula (rollYouthAtmosphereCode's own base roll) with DM+4, then
+// remaps the numeric result: 2-5 -> code A (10, Exotic), 6-C -> code C (12,
+// Insidious), D-F -> code F (15, Unusual), G-H -> code H -- this codebase's
+// own 16/17 "gas" sentinel already covers a helium/hydrogen envelope
+// (rollProfile's own code===16/17 comment), so G-H's two-letter bucket maps
+// onto that existing pair via DICE's raw 16/17 split rather than collapsing
+// both to one value.
+function rollProtoAtmosphereCode({
+	rng,
+	sizeClass,
+}: {
+	rng: ReturnType<typeof RNG.createRng>
+	sizeClass: number
+}): number {
+	const roll = DICE.roll2d6(rng) - 7 + sizeClass + 4
+	if (roll >= 2 && roll <= 5) return 10
+	if (roll >= 6 && roll <= 12) return 12
+	if (roll >= 13 && roll <= 15) return 15
+	if (roll >= 16) return 17
+	return MATH.clamp({ value: roll, lo: 0, hi: 9 })
 }
 
 // Ported from galaxy-gen's TEMPERATURE.finalize albedo roll (orbits/
@@ -290,6 +317,12 @@ function buildClassificationEnvironment(params: {
 	diameterKm: number
 	massKg: number
 	isPrimaryWorld: boolean
+	/** [JUSTIFICATION] Only meaningful alongside spectralClass "NS" -- lets
+	 * ATMOSPHERE.codeToProfile detect a pulsar/magnetar host (World
+	 * Builder's Handbook p. 228) via STAR.isPulsar/isMagnetar, which key off
+	 * this exact pair. Omitted callers (moons, forced-classification
+	 * rerolls) never need the pulsar/magnetar taint override. */
+	luminosityClass?: LuminosityClass
 	/** Always explicit: primary worlds estimate their greenhouse factor while
 	 * every other generated world rolls it. */
 	greenhouseMode: "estimate" | "roll"
@@ -313,6 +346,12 @@ function buildClassificationEnvironment(params: {
 	 * tilt, tide-lock). Every other caller leaves it unset. */
 	homeworld?: boolean
 }): {
+	/** Echoes `params.classification`, unless the youth reclassification
+	 * below (any dwarf/terrestrial/helian body whose hydrosphere ends up
+	 * molten) overrides it -- see that check's own doc. Callers must use
+	 * this, not the classification they passed in, as the body's real final
+	 * classification. */
+	classification: OrbitClassification
 	density: DensityProfile | null
 	landCoverage: number
 	hydrosphereCode: number
@@ -375,6 +414,30 @@ function buildClassificationEnvironment(params: {
 	if (params.homeworld === true) {
 		hydrosphereCode = MATH.clamp({ value: hydrosphereCode, lo: 5, hi: 10 })
 	}
+	// Book pp. 224-227: any dwarf/terrestrial/helian body whose hydrosphere
+	// ends up molten (code 12) still reads as an accreting protoplanet, not
+	// whatever ordinary climate classification it rolled -- true regardless
+	// of whether the star is proto or primordial (or, in principle, any
+	// future "young star" case), since it's keyed on the actual outcome
+	// (hydrosphereCode) rather than the star-state flags. "meltball" is
+	// excluded: it's already its own distinct, deliberately-named
+	// classification (a forced close-in epistellar roll, unrelated to youth)
+	// that happens to also carry hydrosphereCode 12.
+	let classification = params.classification
+	if (
+		hydrosphereCode === 12 &&
+		classification !== "meltball" &&
+		(params.group === "dwarf" ||
+			params.group === "terrestrial" ||
+			params.group === "helian")
+	) {
+		classification =
+			params.group === "dwarf"
+				? "proto-dwarf"
+				: params.group === "terrestrial"
+					? "proto-terrestrial"
+					: "proto-helian"
+	}
 	const hydrosphere = HYDROSPHERE.buildProfile({
 		rng: params.rng,
 		code: hydrosphereCode,
@@ -393,11 +456,15 @@ function buildClassificationEnvironment(params: {
 	const rolledAtmosphereCode = rolledEnvironment.atmosphereCode
 	const atmosphereCode =
 		youth && ![10, 11, 12, 14].includes(rolledAtmosphereCode)
-			? rollYouthAtmosphereCode({
-					rng: params.rng,
-					proto: params.proto === true,
-					sizeClass: params.sizeClass,
-				})
+			? params.proto === true
+				? rollProtoAtmosphereCode({
+						rng: params.rng,
+						sizeClass: params.sizeClass,
+					})
+				: rollYouthAtmosphereCode({
+						rng: params.rng,
+						sizeClass: params.sizeClass,
+					})
 			: rolledAtmosphereCode
 	// A capital homeworld always gets the plain standard breathable code (6),
 	// overriding whatever its tectonic assignment rolled (2-9, some tainted).
@@ -414,6 +481,8 @@ function buildClassificationEnvironment(params: {
 			classification: params.classification,
 			isPrimaryWorld: params.isPrimaryWorld,
 			starAgeGyr: params.starAgeGyr,
+			starSpectralClass: params.spectralClass,
+			starLuminosityClass: params.luminosityClass ?? "V",
 		},
 	})
 	// A carbon-rich world (see isCarbonWorld above) has too little free
@@ -440,6 +509,8 @@ function buildClassificationEnvironment(params: {
 					classification: params.classification,
 					isPrimaryWorld: params.isPrimaryWorld,
 					starAgeGyr: params.starAgeGyr,
+					starSpectralClass: params.spectralClass,
+					starLuminosityClass: params.luminosityClass ?? "V",
 				},
 			})
 		: rolledAtmosphere
@@ -462,6 +533,7 @@ function buildClassificationEnvironment(params: {
 		hydrosphereCode,
 	})
 	return {
+		classification,
 		density,
 		landCoverage: 1 - HYDROSPHERE.waterFraction(hydrosphere),
 		hydrosphereCode,

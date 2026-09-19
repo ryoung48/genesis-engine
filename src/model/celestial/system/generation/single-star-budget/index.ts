@@ -24,6 +24,8 @@ function roll({ seed, hostStar }: SingleStarBudgetInput): SingleStarBudget {
 		isLoneStar: true,
 		systemPostStellarCount: STAR.isPostStellar(hostStar.spectralClass) ? 1 : 0,
 		systemStarCount: 1,
+		systemHasNeutronStar: hostStar.spectralClass === "NS",
+		systemHasBlackHole: hostStar.spectralClass === "BH",
 	})
 	const allocated = WORLD_TYPE_ALLOCATION.allocate({
 		worldTypeCounts,

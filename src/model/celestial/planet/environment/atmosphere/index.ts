@@ -3,6 +3,7 @@ import type {
 	AtmosphereCodeInput,
 	RollAtmosphereInput,
 } from "@/model/celestial/planet/environment/atmosphere/types"
+import { STAR } from "@/model/celestial/star"
 import { DICE } from "@/model/shared/random/dice"
 
 function rollAtmosphereBar({
@@ -31,11 +32,10 @@ function rollAtmosphereBar({
 }
 
 // Ported from galaxy-gen's ATMOSPHERE.taint (orbits/atmosphere/index.ts) --
-// rolls a specific named hazard for a tainted atmosphere. NOT ported: the
-// isExoticNeutronStar override that forces every non-vacuum/trace atmosphere
-// to "radioactive" regardless of tainted, since that needs the host star's
-// luminosityClass threaded all the way through classification and no caller
-// here has it yet.
+// rolls a specific named hazard for a tainted atmosphere. The isExoticNeutronStar
+// override (forcing "radioactive" regardless of tainted for a pulsar/magnetar
+// system, World Builder's Handbook p. 228) is handled separately in
+// atmosphereCodeToProfile below, once the host star's class is known there.
 function rollHazard({
 	rng,
 	profile,
@@ -358,6 +358,26 @@ function atmosphereCodeToProfile({
 			profile: completed,
 			starAgeGyr: params.starAgeGyr,
 		})
+	}
+	// Book p. 228: "all planets in orbit around a pulsar or magnetar have the
+	// radioactive taint or irritant... in addition to any other taints or
+	// irritants" -- forced on top regardless of whether the atmosphere was
+	// already tainted (a vacuum/trace atmosphere has no meaningful "taint"
+	// to carry a hazard on, so those are left alone).
+	if (
+		completed.type !== "vacuum" &&
+		completed.type !== "trace" &&
+		(STAR.isPulsar({
+			spectralClass: params.starSpectralClass,
+			luminosityClass: params.starLuminosityClass,
+		}) ||
+			STAR.isMagnetar({
+				spectralClass: params.starSpectralClass,
+				luminosityClass: params.starLuminosityClass,
+			}))
+	) {
+		completed.tainted = true
+		completed.hazard = "radioactive"
 	}
 	return completed
 }

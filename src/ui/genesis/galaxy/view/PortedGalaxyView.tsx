@@ -74,6 +74,7 @@ function specialCircumstances(body: SystemBody): SpecialCircumstance[] {
 		circumstances.push("Twin Moon")
 	}
 	if (body.beltOfIdx !== undefined) circumstances.push("Asteroid Body")
+	if (body.coOrbital) circumstances.push("Co-Orbital Planet")
 	return circumstances
 }
 

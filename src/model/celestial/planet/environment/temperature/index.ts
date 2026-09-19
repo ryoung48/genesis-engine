@@ -462,7 +462,7 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 	// applies before the EBM preview).
 	const effectiveSeismology = group === "jovian" ? 0 : seismologyTotal
 
-	const mean = temperatureBase(
+	let mean = temperatureBase(
 		luminositySol,
 		albedo,
 		greenhouseFactor,
@@ -487,7 +487,7 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 		pressureBar,
 	)
 
-	const { high, low, delta } = temperatureRange(
+	let { high, low, delta } = temperatureRange(
 		luminosityMod,
 		luminositySol,
 		albedo,
@@ -496,6 +496,20 @@ function finalize(params: FinalizeTemperatureInput): TemperatureFinalizeResult {
 		eccentricity,
 		effectiveSeismology,
 	)
+
+	// Book pp. 224/227: a world still under liquid magma oceans (hydrosphere
+	// code 12, whether already molten going in -- e.g. from
+	// applyProtoHydrosphereSuppression's still-accreting-crust check -- or
+	// just boiled off above) reads a surface temperature over 1500K. This is
+	// a strict superset of the boil-off check just above (which only
+	// guarantees mean > 1000K), applied unconditionally to every molten body
+	// rather than gated on proto, so the mechanic stays internally
+	// consistent instead of needing a second, proto-only special case.
+	if (hydrosphereCode === 12 || boiledOffHydrosphereCode !== undefined) {
+		mean = Math.max(1500, mean)
+		high = Math.max(1500, high)
+		low = Math.max(1500, low)
+	}
 
 	return {
 		mean,

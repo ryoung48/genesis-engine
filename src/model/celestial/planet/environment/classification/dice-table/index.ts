@@ -289,6 +289,22 @@ function rollClassificationAssignment(params: {
 				composition: "rocky",
 			}
 		}
+		// Unreachable in practice, kept only for this switch's exhaustiveness:
+		// nothing ever rolls a body's classification as one of these three --
+		// PLANET.buildClassificationEnvironment relabels an already-classified
+		// dwarf/terrestrial/helian body to one of these *after* the fact,
+		// whenever its hydrosphere ends up molten (World Builder's Handbook
+		// pp. 224-227), never before. If this ever executes, the values below
+		// are a reasonable molten/thin-atmosphere fallback, but it should not
+		// be possible to reach.
+		case "proto-dwarf":
+		case "proto-terrestrial":
+		case "proto-helian":
+			return {
+				atmosphereCode: 1,
+				hydrosphereCode: 12,
+				composition: "rocky",
+			}
 		case "panthalassic": {
 			const chemRoll = rng.randint(1, 6) + spectralChemMod
 			const secondChemRoll = DICE.roll2d6(rng)

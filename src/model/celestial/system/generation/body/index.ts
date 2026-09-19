@@ -9,7 +9,11 @@ import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
 import { ASTEROID_BELT } from "@/model/celestial/system/generation/asteroid-belt"
 import type { BeltCrossingInput } from "@/model/celestial/system/generation/asteroid-belt/types"
-import type { BodyGenerationParams } from "@/model/celestial/system/generation/body/types"
+import type {
+	BodyGenerationParams,
+	RollBeltResidentBodyInput,
+	RollYouthBeltWrapperInput,
+} from "@/model/celestial/system/generation/body/types"
 import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
 import type { Slot } from "@/model/celestial/system/generation/environment/types"
 import { IMPACT_EXPOSURE } from "@/model/celestial/system/generation/impact-exposure"
@@ -146,6 +150,220 @@ function isAdjacentToCompanionExclusion({
 	)
 }
 
+// Shared "roll a small body and place it in a belt" pipeline -- used by both
+// the natural Ceres/Pallas-style belt dwarf loop and the protostar size-cap
+// cascade (World Builder's Handbook p. 224), which differ only in group/
+// sizeClass/eccentricity DM, not in how a belt resident's own stats are
+// rolled.
+function rollBeltResidentBody({
+	rng,
+	group,
+	sizeClass,
+	zone,
+	orbitalDistanceAU,
+	luminositySol,
+	spectralClass,
+	luminosityClass,
+	starAgeGyr,
+	starMassSol,
+	proto,
+	primordial,
+	extraEccentricityDM = 0,
+}: RollBeltResidentBodyInput): Pick<
+	SystemBody,
+	| "group"
+	| "classification"
+	| "subtype"
+	| "composition"
+	| "chemistry"
+	| "hydrosphereCode"
+	| "hydrosphere"
+	| "landCoverage"
+	| "atmosphere"
+	| "greenhouseFactor"
+	| "albedo"
+	| "sizeClass"
+	| "density"
+	| "diameterKm"
+	| "massKg"
+	| "gravityG"
+	| "siderealDayHours"
+	| "eccentricity"
+	| "axialTiltDeg"
+	| "orbitalPeriodDays"
+	| "inclinationDeg"
+> {
+	const classification = PLANET.classifyBody({
+		rng,
+		groupHint: group,
+		impactZone: false,
+		zone,
+		orbitalDistanceAU,
+		sizeClass,
+		isMoon: false,
+		tidal: false,
+		forceMeltball: false,
+	}).classification
+	const assignment = PLANET.rollClassificationAssignment({
+		rng,
+		classification,
+		sizeClass,
+		zone,
+		deviation: 0,
+		spectralClass,
+		isPrimaryWorld: false,
+	})
+	const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
+	const densityEarthRelative = ROLLS.pickDensityEarthRelative({
+		rng,
+		group,
+		classification,
+		sizeClass,
+		orbitalDistanceAU,
+		luminositySol,
+		starAgeGyr,
+	})
+	const massKg = ORBIT_BODY.massKgFromEarthRelativeDensity({
+		diameterKm,
+		densityEarthRelative,
+	})
+	const siderealDayHours = ROLLS.rollSiderealDayHours({
+		rng,
+		isJovian: false,
+		starAgeGyr,
+	})
+	const eccentricity = ROLLS.rollEccentricity({
+		rng,
+		orbitKind: "planet",
+		protostar: proto,
+		primordial: primordial && !proto,
+		anomalyEccentricityDM: extraEccentricityDM,
+	})
+	const axialTiltDeg = ROLLS.rollAxialTiltDeg(rng)
+	const orbitalPeriodDays =
+		STAR.getKeplerYearYears({ orbitalDistanceAU, massSol: starMassSol }) *
+		DAYS_PER_YEAR
+	const environment = ENVIRONMENT.buildBodyEnvironment({
+		rng,
+		groupHint: group,
+		zone,
+		deviation: 0,
+		spectralClass,
+		luminosityClass,
+		diameterKm,
+		massKg,
+		orbitalDistanceAU,
+		isPrimaryWorld: false,
+		isMoon: false,
+		tidal: false,
+		forceMeltball: false,
+		assignment,
+		classified: { group, classification },
+		starAgeGyr,
+		proto,
+		primordial,
+	})
+	return {
+		...environment,
+		diameterKm,
+		massKg,
+		gravityG: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
+		siderealDayHours,
+		eccentricity,
+		axialTiltDeg,
+		orbitalPeriodDays,
+		inclinationDeg: ORBIT_BODY.rollInclinationDeg(rng),
+	}
+}
+
+// A belt spawned purely to hold a young-system slot's overflow -- either a
+// protostar slot's entire real content (book p. 224's co-located belts,
+// wrapping the slot unconditionally) or a primordial slot's size-cap cascade
+// overflow only (book p. 226, spawned solely to hold the cascade, alongside
+// -- not replacing -- the slot's own top-level body). Either way the belt
+// itself is a plain, contentless "asteroid belt" group body; whatever it
+// holds is linked in separately via beltOfIdx (see rollBeltResidentBody),
+// the same mechanism already used for Ceres/Pallas-style belt dwarfs.
+function rollYouthBeltWrapper({
+	rng,
+	zone,
+	deviation,
+	orbitalDistanceAU,
+	luminositySol,
+	spectralClass,
+	luminosityClass,
+	starAgeGyr,
+	spreadOrbitNumber,
+	hasAdjacentGasGiant,
+	isOutermostOrbitSlot,
+	primordial,
+}: RollYouthBeltWrapperInput): Pick<
+	SystemBody,
+	| "group"
+	| "classification"
+	| "subtype"
+	| "composition"
+	| "chemistry"
+	| "hydrosphereCode"
+	| "hydrosphere"
+	| "landCoverage"
+	| "atmosphere"
+	| "greenhouseFactor"
+	| "albedo"
+	| "sizeClass"
+	| "density"
+	| "belt"
+> {
+	const classification = PLANET.classifyBody({
+		rng,
+		groupHint: "asteroid belt",
+		impactZone: false,
+		zone,
+		orbitalDistanceAU,
+		sizeClass: -1,
+		isMoon: false,
+		tidal: false,
+		forceMeltball: false,
+	}).classification
+	const assignment = PLANET.rollClassificationAssignment({
+		rng,
+		classification,
+		sizeClass: -1,
+		zone,
+		deviation,
+		spectralClass,
+		isPrimaryWorld: false,
+	})
+	const environment = ENVIRONMENT.buildBodyEnvironment({
+		rng,
+		groupHint: "asteroid belt",
+		zone,
+		deviation,
+		spectralClass,
+		luminosityClass,
+		diameterKm: 0,
+		massKg: 0,
+		orbitalDistanceAU,
+		isPrimaryWorld: false,
+		isMoon: false,
+		tidal: false,
+		assignment,
+		classified: { group: "asteroid belt", classification },
+		starAgeGyr,
+	})
+	const belt = ASTEROID_BELT.rollProfile({
+		rng,
+		orbitalDistanceAU,
+		luminositySol,
+		starAgeGyr,
+		spreadOrbitNumber,
+		hasAdjacentGasGiant,
+		isOutermostOrbitSlot,
+		primordial,
+	})
+	return { ...environment, belt }
+}
+
 /**
  * Generates the rest of the (single-star) solar system around the already-
  * generated main world: a handful of sibling asteroid belts/planets/gas
@@ -160,6 +378,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const hostStar = params.hostStar
 	const spectralClass =
 		hostStar?.spectralClass ?? params.spectralClass ?? STAR.defaultSpectralClass
+	// Only ever meaningfully non-"V" for a dead-star host (a pulsar/magnetar
+	// neutron star uses "P"/"M" -- see STAR.isPulsar/isMagnetar) -- forwarded
+	// to the atmosphere pipeline for World Builder's Handbook p. 228's
+	// pulsar/magnetar radioactive-taint rule.
+	const luminosityClass = hostStar?.luminosityClass
 	const tableSpectralClass = STAR.isValidSpectralClass(spectralClass)
 		? spectralClass
 		: STAR.defaultSpectralClass
@@ -346,6 +569,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// buildBodyEnvironment's hydrosphere/atmosphere youth override below).
 	const proto = STAR.isProto({ ageGyr: starAgeGyr, massSol: starMassSol })
 	const primordial = STAR.isPrimordial({ ageGyr: starAgeGyr })
+	// Book's Protostar Systems chapter (p. 224-225) keys its age-tiered
+	// branching (gas-giant ring/size tiers, moon onset, terrestrial size cap)
+	// off the system's age in Myr, not Gyr -- kept as a single derived value
+	// here since every proto-specific roll below needs the same conversion.
+	const starAgeMyr = starAgeGyr * 1000
 
 	// Ported from galaxy-gen's impactZone (stars/index.ts) -- a giant
 	// (luminosityClass "III") or white dwarf ("D") host star's innermost few
@@ -367,6 +595,18 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		}
 	}
 
+	// Book pp. 224-227's protostar co-located belts, and both sections' own
+	// size-cap cascades and (primordial-only) extra co-orbital planet, all
+	// produce more `SystemBody` entries than the one-per-slot `bodies` array
+	// below has room for -- collected here (rather than pushed directly into
+	// `bodies`, which doesn't exist until the map below finishes) and
+	// appended afterward, the same pattern the existing beltDwarfs loop
+	// already uses for Ceres/Pallas-style belt residents. Every push
+	// reserves its own final `idx` as `slots.length + youthAppendages.length`
+	// at push time, so ordering here must exactly match the order this array
+	// is later concatenated onto `bodies` (see the `bodies.push(...)` below,
+	// which must run before beltDwarfs' own `bodies.length`-based idx math).
+	const youthAppendages: SystemBody[] = []
 	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
 		if (
 			slot.isMainWorld &&
@@ -481,6 +721,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		const isHomeworld =
 			slot.isMainWorld === true && mainWorldMode === "temperate-native"
 		const isPrimaryWorld = isGasGiantMainWorld || isHomeworld
+		// Book pp. 224-225: every protostar-system slot's real content gets
+		// wrapped in a co-located belt -- except the forced main-world slots
+		// (a literal Earth clone / promoted gas-giant moon has no book-proto
+		// treatment) and a slot that's already naturally an asteroid belt
+		// (nothing to wrap).
 		const group = isHomeworld
 			? ("terrestrial" as const)
 			: isGasGiantMainWorld
@@ -494,6 +739,18 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						proto,
 						primordial,
 					}))
+		const isProtoSlot =
+			proto && !isHomeworld && !isGasGiantMainWorld && group !== "asteroid belt"
+		// Book p. 226: a primordial slot's own top-level body is never
+		// belt-wrapped (unlike protostar) -- only its size-cap cascade (Stage
+		// PM4) and the independent 1-in-6 extra co-orbital planet (Stage PM5)
+		// add anything beyond the ordinary per-slot body.
+		const isPrimordialSlot =
+			primordial &&
+			!proto &&
+			!isHomeworld &&
+			!isGasGiantMainWorld &&
+			group !== "asteroid belt"
 		let orbitalDistanceAU = PLANET.deviationToAU({
 			deviation: slot.deviation,
 			luminositySol,
@@ -522,9 +779,42 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				orbitalDistanceAU = candidateAu
 			}
 		}
-		const sizeClass = isHomeworld
-			? rng.randint(7, 9)
-			: ROLLS.rollSizeClass({ rng, group })
+		// Book p. 224: under 2 Myr, a gas giant that has formed at all is
+		// "medium size or smaller" -- demote a rolled medium tier to small.
+		// Gas giants are exempt from the size-cap cascade below (jovian never
+		// hits the "difference between final size and current size as
+		// indicated by age" rule, which is stated as terrestrial/moon-only).
+		let sizeClass: number
+		let cascadeCount = 0
+		if (isHomeworld) {
+			sizeClass = rng.randint(7, 9)
+		} else if (group === "jovian") {
+			const rolled = ROLLS.rollSizeClass({ rng, group })
+			sizeClass = isProtoSlot && starAgeMyr < 2 && rolled === 17 ? 16 : rolled
+		} else if (isProtoSlot) {
+			// Book p. 224's terrestrial/moon size cap = system age in Myr, with
+			// a cascade of `1D-1`-smaller bodies for every unit the roll
+			// exceeds it -- sizeClass is clamped to the cap *before* diameter/
+			// density/mass/gravity are derived from it (see
+			// baseline-spread-placement-redesign.md's sibling plan doc), so
+			// every downstream physical quantity reflects the capped size, not
+			// the pre-clamp roll.
+			const capSizeClass = Math.max(0, Math.floor(starAgeMyr))
+			const rolled = ROLLS.rollSizeClass({ rng, group })
+			cascadeCount = Math.max(0, rolled - capSizeClass)
+			sizeClass = Math.min(rolled, capSizeClass)
+		} else if (isPrimordialSlot) {
+			// Book p. 226: identical size-cap formula to protostar's, but the
+			// cascade die is a plain `1D` (Stage PM4), not `1D-1` -- see the
+			// cascade-member loop below, which is the only place that
+			// distinction actually matters.
+			const capSizeClass = Math.max(0, Math.floor(starAgeMyr))
+			const rolled = ROLLS.rollSizeClass({ rng, group })
+			cascadeCount = Math.max(0, rolled - capSizeClass)
+			sizeClass = Math.min(rolled, capSizeClass)
+		} else {
+			sizeClass = ROLLS.rollSizeClass({ rng, group })
+		}
 		const impactZone = impactZoneSlots.has(slot)
 		const classification = isHomeworld
 			? ("tectonic" as const)
@@ -617,13 +907,20 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					? EARTH_SEED.eccentricity
 					: isHomeworld
 						? Math.min(
-								ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
+								ROLLS.rollEccentricity({
+									rng,
+									orbitKind: "planet",
+									protostar: proto,
+									primordial: primordial && !proto,
+								}),
 								0.05,
 							)
 						: ROLLS.rollEccentricity({
 								rng,
 								orbitKind: "planet",
 								anomalyEccentricityDM,
+								protostar: proto,
+								primordial: primordial && !proto,
 							})
 		const rolledAxialTiltDeg =
 			group === "asteroid belt"
@@ -631,8 +928,9 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				: isHomeworld
 					? rng.uniform(10, 30)
 					: ROLLS.rollAxialTiltDeg(rng)
+		// Book p. 224: under 2 Myr, "no significant moons have formed" yet.
 		const rolledMoonCount =
-			group === "asteroid belt"
+			group === "asteroid belt" || (isProtoSlot && starAgeMyr < 2)
 				? 0
 				: MOON.rollMoonCountForParent({
 						rng,
@@ -657,6 +955,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						spreadOrbitNumber: slot.spreadOrbitNumber,
 						hasAdjacentGasGiant: slot.hasAdjacentGasGiant ?? false,
 						isOutermostOrbitSlot: slot.isOutermostOrbitSlot ?? false,
+						primordial: primordial && !proto,
 					})
 				: undefined
 		// The gas-giant-moon slot always needs at least one moon to promote.
@@ -710,7 +1009,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				})
 			}
 		}
-		const idx = siblingIdx
+		// A proto-wrapped slot's real content isn't the top-level body returned
+		// for this slot position (the wrapping belt is, see the isProtoSlot
+		// branch at the end of this callback) -- it's appended to
+		// youthAppendages afterward, so its idx must anticipate that final
+		// position instead of this slot's own position.
+		const idx = isProtoSlot ? slots.length + youthAppendages.length : siblingIdx
 		const moonsWithTideLocks = MOON.attachParentTideLocks({
 			moons,
 			parentIdx: idx,
@@ -758,6 +1062,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					zone: slot.zone,
 					deviation: slot.deviation,
 					spectralClass,
+					luminosityClass,
 					diameterKm,
 					massKg,
 					orbitalDistanceAU,
@@ -806,10 +1111,20 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				rerollEccentricity: () =>
 					isHomeworld
 						? Math.min(
-								ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
+								ROLLS.rollEccentricity({
+									rng,
+									orbitKind: "planet",
+									protostar: proto,
+									primordial: primordial && !proto,
+								}),
 								0.05,
 							)
-						: ROLLS.rollEccentricity({ rng, orbitKind: "planet" }),
+						: ROLLS.rollEccentricity({
+								rng,
+								orbitKind: "planet",
+								protostar: proto,
+								primordial: primordial && !proto,
+							}),
 			})
 			finalSiderealDayHours = tideLockResult.siderealDayHours
 			finalAxialTiltDeg = tideLockResult.axialTiltDeg
@@ -837,7 +1152,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				})
 			}
 		}
-		return {
+		const memberBody: SystemBody = {
 			...finalEnvironment,
 			idx,
 			seed: isHomeworld ? "main-world" : `orbit-${siblingIdx + 1}`,
@@ -852,13 +1167,18 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			biosphere: isHomeworld ? { code: 10, trace: [] } : undefined,
 			zone: slot.zone,
 			impactZone,
+			beltOfIdx: isProtoSlot ? siblingIdx : undefined,
 			// texturePath/cloudsTexturePath are assigned later by
 			// PLANET.applySystemSeismology, once the body's real
 			// seismology-inclusive temperature (and any post-seismology
 			// hydrosphere/classification change) is known -- see
 			// seismology/index.ts's applyBodySeismology. Picking them here would
 			// use a stale pre-seismology climate estimate.
-			rings: ROLLS.rollPlanetRings({ rng, group: finalEnvironment.group }),
+			rings: ROLLS.rollPlanetRings({
+				rng,
+				group: finalEnvironment.group,
+				protostar: isProtoSlot,
+			}),
 			orbitalDistanceAU,
 			belt,
 			diameterKm,
@@ -902,7 +1222,272 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				tideLock?.type === "solar" ? rng.uniform(0, 360) : undefined,
 			moons: finalMoons,
 		}
+		if (isProtoSlot) {
+			// Book pp. 224-225: this slot's real content (memberBody, above)
+			// becomes a beltOfIdx-linked resident of a co-located belt instead of
+			// an independent top-level body, with one additional smaller
+			// resident per unit of size-cap difference (cascadeCount, computed
+			// alongside memberBody's own sizeClass above).
+			youthAppendages.push(memberBody)
+			for (let c = 0; c < cascadeCount; c++) {
+				// Book p. 224's cascade die is `1D-1`.
+				const cascadeSizeClass = Math.max(
+					0,
+					Math.floor(starAgeMyr) - (rng.randint(1, 6) - 1),
+				)
+				const cascadeIdx = slots.length + youthAppendages.length
+				const cascadeResident = rollBeltResidentBody({
+					rng,
+					group,
+					sizeClass: cascadeSizeClass,
+					zone: slot.zone,
+					orbitalDistanceAU,
+					luminositySol,
+					spectralClass,
+					luminosityClass,
+					starAgeGyr,
+					starMassSol,
+					proto,
+					primordial,
+					extraEccentricityDM: 2,
+				})
+				youthAppendages.push({
+					...cascadeResident,
+					idx: cascadeIdx,
+					seed: `orbit-${siblingIdx}-cascade-${c + 1}`,
+					name: nameBody(`orbit-${siblingIdx}-cascade-${c + 1}`),
+					isMainWorld: false,
+					zone: slot.zone,
+					impactZone: false,
+					beltOfIdx: siblingIdx,
+					// Spread variance -- a cascade member sits near, not exactly on,
+					// the slot's own orbital distance (book p. 224's "placed with
+					// spread variance").
+					orbitalDistanceAU: orbitalDistanceAU * rng.uniform(0.97, 1.03),
+					longitudeOfPerihelionDeg: rng.uniform(0, 360),
+					lsAphelionDeg: rng.uniform(0, 360),
+					longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+					tideLock: null,
+					tideLockStatus: PLANET.deriveTideLockStatus({
+						siderealDayHours: cascadeResident.siderealDayHours,
+						orbitalPeriodDays: cascadeResident.orbitalPeriodDays,
+						tideLock: null,
+					}),
+					tideLockTrace: [],
+					moons: [],
+				})
+			}
+			const wrapper = rollYouthBeltWrapper({
+				rng,
+				zone: slot.zone,
+				deviation: slot.deviation,
+				orbitalDistanceAU,
+				luminositySol,
+				spectralClass,
+				luminosityClass,
+				starAgeGyr,
+				spreadOrbitNumber: slot.spreadOrbitNumber,
+				hasAdjacentGasGiant: slot.hasAdjacentGasGiant ?? false,
+				isOutermostOrbitSlot: slot.isOutermostOrbitSlot ?? false,
+			})
+			return {
+				...wrapper,
+				idx: siblingIdx,
+				seed: `orbit-${siblingIdx + 1}`,
+				name: nameBody(`orbit-${siblingIdx}`),
+				isMainWorld: false,
+				biosphere: undefined,
+				zone: slot.zone,
+				impactZone,
+				rings: undefined,
+				orbitalDistanceAU,
+				diameterKm: 0,
+				massKg: 0,
+				gravityG: 0,
+				orbitalPeriodDays,
+				siderealDayHours: 0,
+				eccentricity: 0,
+				longitudeOfPerihelionDeg: rng.uniform(0, 360),
+				lsAphelionDeg: rng.uniform(0, 360),
+				axialTiltDeg: 0,
+				inclinationDeg: 0,
+				longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+				tideLock: null,
+				tideLockStatus: PLANET.deriveTideLockStatus({
+					siderealDayHours: 0,
+					orbitalPeriodDays,
+					tideLock: null,
+				}),
+				tideLockTrace: [],
+				substellarLon: undefined,
+				moons: [],
+			}
+		}
+		if (isPrimordialSlot) {
+			// Book p. 226: unlike protostar, memberBody stays this slot's own
+			// top-level body -- only the size-cap cascade's overflow (if any)
+			// needs a belt, spawned here purely to hold it.
+			if (cascadeCount > 0) {
+				const cascadeBeltIdx = slots.length + youthAppendages.length
+				const cascadeBeltWrapper = rollYouthBeltWrapper({
+					rng,
+					zone: slot.zone,
+					deviation: slot.deviation,
+					orbitalDistanceAU,
+					luminositySol,
+					spectralClass,
+					luminosityClass,
+					starAgeGyr,
+					spreadOrbitNumber: slot.spreadOrbitNumber,
+					hasAdjacentGasGiant: slot.hasAdjacentGasGiant ?? false,
+					isOutermostOrbitSlot: slot.isOutermostOrbitSlot ?? false,
+					primordial: true,
+				})
+				youthAppendages.push({
+					...cascadeBeltWrapper,
+					idx: cascadeBeltIdx,
+					seed: `orbit-${siblingIdx}-cascade-belt`,
+					name: nameBody(`orbit-${siblingIdx}-cascade-belt`),
+					isMainWorld: false,
+					biosphere: undefined,
+					zone: slot.zone,
+					impactZone: false,
+					rings: undefined,
+					orbitalDistanceAU,
+					diameterKm: 0,
+					massKg: 0,
+					gravityG: 0,
+					orbitalPeriodDays,
+					siderealDayHours: 0,
+					eccentricity: 0,
+					longitudeOfPerihelionDeg: rng.uniform(0, 360),
+					lsAphelionDeg: rng.uniform(0, 360),
+					axialTiltDeg: 0,
+					inclinationDeg: 0,
+					longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+					tideLock: null,
+					tideLockStatus: PLANET.deriveTideLockStatus({
+						siderealDayHours: 0,
+						orbitalPeriodDays,
+						tideLock: null,
+					}),
+					tideLockTrace: [],
+					substellarLon: undefined,
+					moons: [],
+				})
+				for (let c = 0; c < cascadeCount; c++) {
+					// Book p. 226's cascade die is a plain `1D` (no `-1`).
+					const cascadeSizeClass = Math.max(
+						0,
+						Math.floor(starAgeMyr) - rng.randint(1, 6),
+					)
+					const cascadeIdx = slots.length + youthAppendages.length
+					const cascadeResident = rollBeltResidentBody({
+						rng,
+						group,
+						sizeClass: cascadeSizeClass,
+						zone: slot.zone,
+						orbitalDistanceAU,
+						luminositySol,
+						spectralClass,
+						luminosityClass,
+						starAgeGyr,
+						starMassSol,
+						proto,
+						primordial,
+						extraEccentricityDM: 2,
+					})
+					youthAppendages.push({
+						...cascadeResident,
+						idx: cascadeIdx,
+						seed: `orbit-${siblingIdx}-cascade-${c + 1}`,
+						name: nameBody(`orbit-${siblingIdx}-cascade-${c + 1}`),
+						isMainWorld: false,
+						zone: slot.zone,
+						impactZone: false,
+						beltOfIdx: cascadeBeltIdx,
+						// Spread variance -- a cascade member sits near, not exactly
+						// on, the slot's own orbital distance (book p. 226's "placed
+						// with spread variance").
+						orbitalDistanceAU: orbitalDistanceAU * rng.uniform(0.97, 1.03),
+						longitudeOfPerihelionDeg: rng.uniform(0, 360),
+						lsAphelionDeg: rng.uniform(0, 360),
+						longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+						tideLock: null,
+						tideLockStatus: PLANET.deriveTideLockStatus({
+							siderealDayHours: cascadeResident.siderealDayHours,
+							orbitalPeriodDays: cascadeResident.orbitalPeriodDays,
+							tideLock: null,
+						}),
+						tideLockTrace: [],
+						moons: [],
+					})
+				}
+			}
+			// Book p. 226: independent of the cascade above, every gas-giant/
+			// terrestrial slot in a primordial system has a flat 1-in-6 chance
+			// of one more Size-1D planet sharing the same basic orbit. The
+			// book gives this new planet's size, not its group, so its group is
+			// derived from its own rolled size (PLANET.classifyGroup) rather
+			// than inherited from the host slot -- a "Size 1D" roll (1-6) never
+			// lands in this codebase's jovian sizeClass range (16-18), so a
+			// jovian slot's extra planet is never itself another gas giant.
+			if (
+				(group === "jovian" || group === "terrestrial") &&
+				rng.randint(1, 6) === 6
+			) {
+				const extraSizeClass = rng.randint(1, 6)
+				const extraGroup = PLANET.classifyGroup({
+					sizeClass: extraSizeClass,
+				})
+				const extraOrbitalDistanceAU = orbitalDistanceAU * rng.uniform(0.9, 1.1)
+				const extraIdx = slots.length + youthAppendages.length
+				const extraResident = rollBeltResidentBody({
+					rng,
+					group: extraGroup,
+					sizeClass: extraSizeClass,
+					zone: slot.zone,
+					orbitalDistanceAU: extraOrbitalDistanceAU,
+					luminositySol,
+					spectralClass,
+					luminosityClass,
+					starAgeGyr,
+					starMassSol,
+					proto,
+					primordial,
+					extraEccentricityDM: 3,
+				})
+				youthAppendages.push({
+					...extraResident,
+					idx: extraIdx,
+					seed: `orbit-${siblingIdx}-co-orbital`,
+					name: nameBody(`orbit-${siblingIdx}-co-orbital`),
+					isMainWorld: false,
+					zone: slot.zone,
+					impactZone: false,
+					coOrbital: true,
+					orbitalDistanceAU: extraOrbitalDistanceAU,
+					longitudeOfPerihelionDeg: rng.uniform(0, 360),
+					lsAphelionDeg: rng.uniform(0, 360),
+					longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+					tideLock: null,
+					tideLockStatus: PLANET.deriveTideLockStatus({
+						siderealDayHours: extraResident.siderealDayHours,
+						orbitalPeriodDays: extraResident.orbitalPeriodDays,
+						tideLock: null,
+					}),
+					tideLockTrace: [],
+					moons: [],
+				})
+			}
+		}
+		return memberBody
 	})
+	// Pushed before the belt-dwarf loop below so its own bodies.length-based
+	// idx math (dwarfIdx) already accounts for these -- see youthAppendages'
+	// own idx precomputation (slots.length + youthAppendages.length at push
+	// time) inside the map above, which this ordering keeps consistent.
+	bodies.push(...youthAppendages)
 
 	// Real-body asteroid-belt residents: an asteroid belt occasionally hosts
 	// one or two protoplanet-sized dwarf worlds embedded within it (a
@@ -926,73 +1511,22 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				{ v: 0, w: 8 },
 				{ v: 1, w: 2 },
 			])
-			const classification = PLANET.classifyBody({
-				rng,
-				groupHint: "dwarf",
-				impactZone: false,
-				zone: belt.zone,
-				orbitalDistanceAU: belt.orbitalDistanceAU,
-				sizeClass,
-				isMoon: false,
-				tidal: false,
-				forceMeltball: false,
-			}).classification
-			const assignment = PLANET.rollClassificationAssignment({
-				rng,
-				classification,
-				sizeClass,
-				zone: belt.zone,
-				deviation: 0,
-				spectralClass,
-				isPrimaryWorld: false,
-			})
-			const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
-			const densityEarthRelative = ROLLS.pickDensityEarthRelative({
+			const resident = rollBeltResidentBody({
 				rng,
 				group: "dwarf",
-				classification,
 				sizeClass,
+				zone: belt.zone,
 				orbitalDistanceAU: belt.orbitalDistanceAU,
 				luminositySol,
-				starAgeGyr,
-			})
-			const massKg = ORBIT_BODY.massKgFromEarthRelativeDensity({
-				diameterKm,
-				densityEarthRelative,
-			})
-			const siderealDayHours = ROLLS.rollSiderealDayHours({
-				rng,
-				isJovian: false,
-				starAgeGyr,
-			})
-			const eccentricity = ROLLS.rollEccentricity({ rng, orbitKind: "planet" })
-			const axialTiltDeg = ROLLS.rollAxialTiltDeg(rng)
-			const orbitalPeriodDays =
-				STAR.getKeplerYearYears({
-					orbitalDistanceAU: belt.orbitalDistanceAU,
-					massSol: starMassSol,
-				}) * DAYS_PER_YEAR
-			const environment = ENVIRONMENT.buildBodyEnvironment({
-				rng,
-				groupHint: "dwarf",
-				zone: belt.zone,
-				deviation: 0,
 				spectralClass,
-				diameterKm,
-				massKg,
-				orbitalDistanceAU: belt.orbitalDistanceAU,
-				isPrimaryWorld: false,
-				isMoon: false,
-				tidal: false,
-				forceMeltball: false,
-				assignment,
-				classified: { group: "dwarf", classification },
+				luminosityClass,
 				starAgeGyr,
+				starMassSol,
 				proto,
 				primordial,
 			})
 			beltDwarfs.push({
-				...environment,
+				...resident,
 				idx: dwarfIdx,
 				seed: `belt-${belt.idx}-dwarf-${i + 1}`,
 				name: nameBody(`belt-${belt.idx}-dwarf-${i + 1}`),
@@ -1001,21 +1535,13 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				impactZone: false,
 				beltOfIdx: belt.idx,
 				orbitalDistanceAU: belt.orbitalDistanceAU,
-				diameterKm,
-				massKg,
-				gravityG: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
-				orbitalPeriodDays,
-				siderealDayHours,
-				eccentricity,
 				longitudeOfPerihelionDeg: rng.uniform(0, 360),
 				lsAphelionDeg: rng.uniform(0, 360),
-				axialTiltDeg,
-				inclinationDeg: ORBIT_BODY.rollInclinationDeg(rng),
 				longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
 				tideLock: null,
 				tideLockStatus: PLANET.deriveTideLockStatus({
-					siderealDayHours,
-					orbitalPeriodDays,
+					siderealDayHours: resident.siderealDayHours,
+					orbitalPeriodDays: resident.orbitalPeriodDays,
 					tideLock: null,
 				}),
 				tideLockTrace: [],
@@ -1032,17 +1558,59 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			if (!host || slot.trojanCount === undefined) continue
 			for (let trojanIndex = 0; trojanIndex < slot.trojanCount; trojanIndex++) {
 				const idx = bodies.length + trojans.length
+				// A real trojan shares its target's orbit (same ellipse, offset
+				// ±60° in longitude), not the target's own physical identity --
+				// only the orbital elements below are cloned; everything else
+				// (size, classification, composition, atmosphere, rotation) is
+				// independently rolled via rollBeltResidentBody, the same
+				// pipeline every other independently-placed small body uses.
+				const trojanSizeClass = ROLLS.rollSizeClass({
+					rng,
+					group: host.group,
+				})
+				const resident = rollBeltResidentBody({
+					rng,
+					group: host.group,
+					sizeClass: trojanSizeClass,
+					zone: host.zone,
+					orbitalDistanceAU: host.orbitalDistanceAU,
+					luminositySol,
+					spectralClass,
+					luminosityClass,
+					starAgeGyr,
+					starMassSol,
+					proto,
+					primordial,
+				})
 				trojans.push({
-					...host,
+					...resident,
 					idx,
 					seed: `trojan-${host.idx}-${trojanIndex + 1}`,
 					name: nameBody(`trojan-${host.idx}-${trojanIndex + 1}`),
-					massKg: host.massKg / 2,
-					gravityG: host.gravityG / 2,
+					isMainWorld: false,
+					zone: host.zone,
+					impactZone: false,
 					moons: [],
 					trojan: true,
 					trojanOffsetDeg: rng.randint(1, 6) <= 3 ? -60 : 60,
 					trojanOfIdx: host.idx,
+					// Cloned orbital stats -- see the doc above.
+					orbitalDistanceAU: host.orbitalDistanceAU,
+					eccentricity: host.eccentricity,
+					inclinationDeg: host.inclinationDeg,
+					orbitalPeriodDays: host.orbitalPeriodDays,
+					longitudeOfPerihelionDeg: host.longitudeOfPerihelionDeg,
+					longitudeOfAscendingNodeDeg: host.longitudeOfAscendingNodeDeg,
+					lsAphelionDeg: rng.uniform(0, 360),
+					rings: ROLLS.rollPlanetRings({ rng, group: resident.group }),
+					tideLock: null,
+					tideLockStatus: PLANET.deriveTideLockStatus({
+						siderealDayHours: resident.siderealDayHours,
+						orbitalPeriodDays: host.orbitalPeriodDays,
+						tideLock: null,
+					}),
+					tideLockTrace: [],
+					substellarLon: undefined,
 				})
 			}
 		}

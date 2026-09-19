@@ -4,3 +4,4 @@ export type SpecialCircumstance =
 	| "Major Rings"
 	| "Twin Moon"
 	| "Asteroid Body"
+	| "Co-Orbital Planet"

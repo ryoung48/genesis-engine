@@ -1075,6 +1075,8 @@ function generate({
 			STAR.isPostStellar(star.spectralClass),
 		).length,
 		systemStarCount: previews.length,
+		systemHasNeutronStar: previews.some((star) => star.spectralClass === "NS"),
+		systemHasBlackHole: previews.some((star) => star.spectralClass === "BH"),
 	})
 	const maxOrbitalDistanceAUByIndex = previews.map((_, index) =>
 		computeMaxOrbitalDistanceAU({ index, previews }),

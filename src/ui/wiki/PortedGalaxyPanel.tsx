@@ -128,6 +128,7 @@ const SPECIAL_CIRCUMSTANCE_OPTIONS: SpecialCircumstance[] = [
 	"Major Rings",
 	"Twin Moon",
 	"Asteroid Body",
+	"Co-Orbital Planet",
 ]
 
 interface GalaxyBodyClassificationTemperaturePair {

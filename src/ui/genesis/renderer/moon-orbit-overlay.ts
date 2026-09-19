@@ -10,11 +10,8 @@ import {
 	type Text,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
-import {
-	buildCloudBandMaterial,
-	swatchCloudBandPalette,
-} from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
+import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -126,15 +123,15 @@ function buildMoonMesh(
 	gridSpacing: number,
 	texturePath?: string,
 	cloudsTexturePath?: string,
-	/** When set, the moon renders the animated fbm cloud-band mesh tinted by
-	 * this palette instead of any photo texture -- see buildMoonOrbitOverlay's
-	 * proceduralSystem gate. */
-	cloudBandMaterial?: THREE.MeshStandardMaterial,
+	/** When set, the moon renders this procedural shader material (chosen by
+	 * classification -- see buildProceduralBodyMaterial) instead of any photo
+	 * texture -- see buildMoonOrbitOverlay's proceduralSystem gate. */
+	proceduralMaterial?: THREE.MeshStandardMaterial,
 ): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(radius, 24, 18)
 	let mat: THREE.MeshStandardMaterial
-	if (cloudBandMaterial) {
-		mat = cloudBandMaterial
+	if (proceduralMaterial) {
+		mat = proceduralMaterial
 	} else {
 		let map: THREE.Texture
 		if (texturePath) {
@@ -161,7 +158,7 @@ function buildMoonMesh(
 	// clouds for the sibling-mesh + independently-tracked-quaternion version
 	// of this, which a moon doesn't need since it has no separate cloud-drift
 	// animation.
-	if (cloudsTexturePath && !cloudBandMaterial) {
+	if (cloudsTexturePath && !proceduralMaterial) {
 		const cloudsTexture = loadMoonTexture(cloudsTexturePath)
 		cloudsTexture.flipY = false
 		const cloudsMaterial = new THREE.MeshStandardMaterial({
@@ -438,13 +435,6 @@ export function buildMoonOrbitOverlay(
 
 		// --- Moon body ---
 		const moonR = moonDisplayRadii[i] ?? MIN_MOON_VISUAL_RADIUS
-		const cloudBandPalette =
-			proceduralSystem && moon.classification
-				? swatchCloudBandPalette({
-						hex:
-							CLASSIFICATION_COLOR[moon.classification] ?? ROCKY_SIBLING_COLOR,
-					})
-				: null
 		const moonMesh = buildMoonMesh(
 			moonR,
 			moonColor,
@@ -454,11 +444,13 @@ export function buildMoonOrbitOverlay(
 			gridSpacing,
 			moon.texturePath,
 			moon.cloudsTexturePath,
-			cloudBandPalette
-				? buildCloudBandMaterial({
+			proceduralSystem && moon.classification
+				? buildProceduralBodyMaterial({
 						seed: i + 1,
-						palette: cloudBandPalette,
-						style: "cloudy",
+						classification: moon.classification,
+						atmosphere: moon.atmosphere,
+						swatchHex:
+							CLASSIFICATION_COLOR[moon.classification] ?? ROCKY_SIBLING_COLOR,
 					})
 				: undefined,
 		)

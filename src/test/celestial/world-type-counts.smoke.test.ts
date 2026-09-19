@@ -15,6 +15,8 @@ describe("World type counts", () => {
 				isLoneStar: true,
 				systemPostStellarCount: 0,
 				systemStarCount: 1,
+				systemHasNeutronStar: false,
+				systemHasBlackHole: false,
 			})
 			expect(counts.gasGiantCount).toBeGreaterThanOrEqual(0)
 			expect(counts.gasGiantCount).toBeLessThanOrEqual(6)

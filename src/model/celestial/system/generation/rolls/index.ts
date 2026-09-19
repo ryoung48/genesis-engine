@@ -226,12 +226,16 @@ function rollEccentricity({
 	starsOrbitedBeyondFirst = 0,
 	oldTightOrbit = false,
 	anomalyEccentricityDM = 0,
+	protostar = false,
+	primordial = false,
 }: RollEccentricityInput): number {
 	const dm =
 		(orbitKind === "companion-star" ? 2 : 0) +
 		starsOrbitedBeyondFirst -
 		(oldTightOrbit ? 1 : 0) +
-		anomalyEccentricityDM
+		anomalyEccentricityDM +
+		(protostar ? 2 : 0) +
+		(primordial ? 1 : 0)
 	const roll = DICE.roll2d6(rng) + dm
 	if (roll <= 5) return 0
 	if (roll <= 7) return rng.uniform(0.01, 0.03)
@@ -277,18 +281,28 @@ function rollAxialTiltDeg(rng: ReturnType<typeof RNG.createRng>): number {
 // fainter, narrower band.
 const JOVIAN_RING_COLOR_CHOICES = [0xd8c69a, 0xcac2b0, 0xb8c4cf, 0xa89f8f]
 
+// Book p. 224: a protostar-system gas giant always has rings -- the "none"
+// weight is dropped from the jovian tier choice, but the geometry itself
+// still uses the same minor/complex bands as any other jovian (no vast/oversized
+// special-casing).
 function rollPlanetRings({
 	rng,
 	group,
+	protostar = false,
 }: RollPlanetRingsInput): RingProfile | undefined {
 	if (group === "asteroid belt" || group === "dwarf") return undefined
 	const tier =
 		group === "jovian"
-			? rng.weightedChoice([
-					{ v: "none", w: 6 },
-					{ v: "minor", w: 2 },
-					{ v: "complex", w: 1 },
-				] as const)
+			? protostar
+				? rng.weightedChoice([
+						{ v: "minor", w: 2 },
+						{ v: "complex", w: 1 },
+					] as const)
+				: rng.weightedChoice([
+						{ v: "none", w: 6 },
+						{ v: "minor", w: 2 },
+						{ v: "complex", w: 1 },
+					] as const)
 			: rng.randint(1, 100) === 1
 				? "minor"
 				: "none"

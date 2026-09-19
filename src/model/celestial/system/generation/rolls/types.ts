@@ -54,6 +54,17 @@ export interface RollEccentricityInput {
 	 * Anomalous Orbit Type table DM (p. 50-51): +2 for random/inclined/
 	 * retrograde, +5 for eccentric. Omitted for an ordinary planet. */
 	anomalyEccentricityDM?: number
+	/** [JUSTIFICATION] Only true inside a protostar system (p. 224) -- the
+	 * book's DM+2 to every orbit roll there. Omitted once the star has aged
+	 * past the protostar era. */
+	protostar?: boolean
+	/** [JUSTIFICATION] Only true inside a primordial (non-proto) system (p.
+	 * 226) -- the book's DM+1 to every orbit roll there. Never true
+	 * alongside `protostar`, since a proto star is never also primordial
+	 * once STAR.isProto/isPrimordial are treated as mutually exclusive (see
+	 * world-type-counts/index.ts's own precedence fix). Omitted once the
+	 * star has aged past the primordial era. */
+	primordial?: boolean
 }
 
 export interface RollAnomalousInclinationDegInput {
@@ -63,4 +74,8 @@ export interface RollAnomalousInclinationDegInput {
 export interface RollPlanetRingsInput {
 	rng: ReturnType<typeof RNG.createRng>
 	group: OrbitGroup
+	/** [JUSTIFICATION] Only meaningful for group "jovian" -- forces the book's
+	 * p. 224 "always has rings" protostar rule by dropping the "none" tier
+	 * weight. Omitted once the star has aged past the protostar era. */
+	protostar?: boolean
 }

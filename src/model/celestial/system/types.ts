@@ -115,6 +115,12 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		beltOfIdx?: number
 		/** Only set for group "asteroid belt" -- see BeltProfile. */
 		belt?: BeltProfile
+		/** True for World Builder's Handbook p. 226's primordial-system "extra
+		 * co-orbital planet" -- a fully independent body (its own size/
+		 * classification/eccentricity, not a beltOfIdx resident and not a
+		 * trojan) sharing its host slot's basic orbit via spread variance. Set
+		 * so these are easy to find later, the same reason `trojan` exists. */
+		coOrbital?: boolean
 		/** Not set for group "asteroid belt" itself -- see ImpactExposure. */
 		impactExposure?: ImpactExposure
 	}

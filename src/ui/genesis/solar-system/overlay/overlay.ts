@@ -12,10 +12,6 @@ import {
 	sizeNameLabel,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
-import {
-	buildCloudBandMaterial,
-	swatchCloudBandPalette,
-} from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
 import {
 	buildMoonOrbitOverlay,
@@ -24,11 +20,11 @@ import {
 	perifocalBasis,
 	solveKepler,
 } from "@/ui/genesis/renderer/moon-orbit-overlay"
+import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
 import {
 	buildStarSurfaceLayers,
 	STAR_GLOW_RADIUS_SCALE,
 } from "@/ui/genesis/renderer/star-surface-material"
-import type { CloudBandPalette } from "@/ui/genesis/renderer/types"
 import { scaleBodyDiameterToVisualRadius } from "@/ui/genesis/shared/moon-visual-scale"
 import {
 	buildAsteroidField,
@@ -650,15 +646,19 @@ export function buildSolarSystemOverlay(
 		// case is tinted by the body's exact class swatch -- no temperature or
 		// per-body variation. The real Sol view keeps its curated textures for
 		// everything except helian/panthalassic.
-		const cloudBandPalette: CloudBandPalette | null =
+		// Helian/panthalassic never get generated art at all (see
+		// texture/index.ts's pickGeneratedBodyTextures), so they always render
+		// the procedural material regardless of proceduralSystem; every other
+		// classification does too, but only in a procedurally generated system
+		// -- the real Sol view keeps its curated photo/simulated textures.
+		const usesProceduralMaterial =
 			isHelian || isPanthalassic || proceduralSystem
-				? swatchCloudBandPalette({ hex: bodySwatchHex })
-				: null
-		const material = cloudBandPalette
-			? buildCloudBandMaterial({
+		const material = usesProceduralMaterial
+			? buildProceduralBodyMaterial({
 					seed: body.idx,
-					palette: cloudBandPalette,
-					style: "cloudy",
+					classification: body.classification,
+					atmosphere: body.atmosphere,
+					swatchHex: bodySwatchHex,
 				})
 			: mainWorldSatelliteMap
 				? new THREE.MeshStandardMaterial({
@@ -697,7 +697,7 @@ export function buildSolarSystemOverlay(
 		// those bands onto north — they stay latitudinal, just correctly
 		// oriented. Untextured solid-color rocky spheres have no visible poles
 		// and no locked face to show, so they're left alone.
-		if (isGasGiant || texturePath || cloudBandPalette)
+		if (isGasGiant || texturePath || usesProceduralMaterial)
 			mesh.rotation.x = Math.PI / 2
 		mesh.scale.setScalar(sceneRadius)
 		bodyGroup.add(mesh)
@@ -705,7 +705,7 @@ export function buildSolarSystemOverlay(
 		// The procedural cloud-band mesh already bakes its own banding into the
 		// surface -- a separate translucent cloud-texture shell on top of it
 		// just muddies that, so it's skipped whenever the body renders one.
-		if (body.cloudsTexturePath && !cloudBandPalette) {
+		if (body.cloudsTexturePath && !usesProceduralMaterial) {
 			const cloudsTexture = loadBodyTexture(body.cloudsTexturePath)
 			// boostCloudAlphaMap below flips its V sample to match a texture
 			// stored north-row-first (see cloud-material.ts); loadBodyTexture

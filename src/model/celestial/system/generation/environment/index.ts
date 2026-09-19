@@ -6,7 +6,10 @@ import type {
 import { PLANET } from "@/model/celestial/planet"
 import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment/classification/dice-table/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { SpectralClass } from "@/model/celestial/star/types"
+import type {
+	LuminosityClass,
+	SpectralClass,
+} from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { RNG } from "@/model/shared/random/rng"
 
@@ -23,6 +26,10 @@ function buildBodyEnvironment(params: {
 	zone: Zone
 	deviation: number
 	spectralClass: SpectralClass
+	/** [JUSTIFICATION] See PLANET.buildClassificationEnvironment's identical
+	 * field -- forwarded straight through, only meaningful for a pulsar/
+	 * magnetar host. */
+	luminosityClass?: LuminosityClass
 	diameterKm: number
 	massKg: number
 	orbitalDistanceAU: number
@@ -73,6 +80,7 @@ function buildBodyEnvironment(params: {
 		zone: params.zone,
 		deviation: params.deviation,
 		spectralClass: params.spectralClass,
+		luminosityClass: params.luminosityClass,
 		diameterKm: params.diameterKm,
 		massKg: params.massKg,
 		isPrimaryWorld: params.isPrimaryWorld,
@@ -86,7 +94,7 @@ function buildBodyEnvironment(params: {
 		sizeClass,
 		density: environment.density,
 		group: body.group,
-		classification: body.classification,
+		classification: environment.classification,
 		subtype: environment.subtype,
 		composition: environment.composition,
 		chemistry: environment.chemistry,
@@ -249,7 +257,7 @@ function buildMoonEnvironment(params: {
 		sizeClass,
 		density: environment.density,
 		group: body.group,
-		classification: body.classification,
+		classification: environment.classification,
 		subtype: environment.subtype,
 		composition: environment.composition,
 		chemistry: environment.chemistry,

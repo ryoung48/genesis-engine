@@ -26,10 +26,17 @@ function _rollSpanOrbitNumber({
 	spreadOrbitNumber,
 	hasAdjacentGasGiant,
 	isOutermostOrbitSlot,
+	primordial = false,
 }: RollBeltSpanOrbitNumberInput): number {
 	const spread = spreadOrbitNumber ?? DICE.roll2d6(rng) * 0.1
 	const dm = (hasAdjacentGasGiant ? -1 : 0) + (isOutermostOrbitSlot ? 3 : 0)
-	return spread * ((DICE.roll2d6(rng) + dm) * 0.1)
+	const span = spread * ((DICE.roll2d6(rng) + dm) * 0.1)
+	// Book p. 226: "all planetoid belt spans are doubled and may overlap
+	// other planetary or planetoid belt orbits" in a primordial system --
+	// the overlap clause needs no separate mechanic, since the existing
+	// belt-crossing check (crossesAnyBelt below) already reacts to whatever
+	// span a belt reports.
+	return primordial ? span * 2 : span
 }
 
 const oneD5 = (rng: ReturnType<typeof RNG.createRng>) => rng.randint(1, 6) * 5
@@ -174,6 +181,7 @@ function rollProfile({
 	spreadOrbitNumber,
 	hasAdjacentGasGiant,
 	isOutermostOrbitSlot,
+	primordial,
 }: RollBeltProfileInput): BeltProfile {
 	const orbitNumber = ORBIT_BODY.auToOrbitNumber({ au: orbitalDistanceAU })
 	const hzcoOrbitNumber = ORBIT_BODY.auToOrbitNumber({
@@ -187,6 +195,7 @@ function rollProfile({
 			spreadOrbitNumber,
 			hasAdjacentGasGiant,
 			isOutermostOrbitSlot,
+			primordial,
 		}),
 		composition,
 		bulk,

@@ -11,6 +11,11 @@ export interface RollBeltProfileInput {
 	spreadOrbitNumber?: number
 	hasAdjacentGasGiant: boolean
 	isOutermostOrbitSlot: boolean
+	/** [JUSTIFICATION] Only true inside a primordial (non-proto) system (p.
+	 * 226) -- doubles the rolled span, per the book's "all planetoid belt
+	 * spans are doubled and may overlap other planetary or planetoid belt
+	 * orbits." Omitted once the star has aged past the primordial era. */
+	primordial?: boolean
 }
 
 export interface RollBeltSpanOrbitNumberInput {
@@ -21,6 +26,9 @@ export interface RollBeltSpanOrbitNumberInput {
 	spreadOrbitNumber?: number
 	hasAdjacentGasGiant: boolean
 	isOutermostOrbitSlot: boolean
+	/** [JUSTIFICATION] See RollBeltProfileInput's identical field -- forwarded
+	 * straight through. */
+	primordial?: boolean
 }
 
 export interface RollBeltCompositionInput {

@@ -2,6 +2,10 @@ import type {
 	AtmosphereProfile,
 	OrbitClassification,
 } from "@/model/celestial/orbit-body/types"
+import type {
+	LuminosityClass,
+	SpectralClass,
+} from "@/model/celestial/star/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface RollAtmosphereInput {
@@ -24,5 +28,12 @@ export interface AtmosphereCodeInput {
 		/** Drives rollHazard's "lifeless" branch (a young system's tainted
 		 * atmosphere can't have produced a biologic hazard yet). */
 		starAgeGyr: number
+		/** Book p. 228: "all planets in orbit around a pulsar or magnetar have
+		 * the radioactive taint or irritant... in addition to any other
+		 * taints or irritants" -- forces hazard "radioactive" (and tainted)
+		 * on top of whatever the normal roll produced when
+		 * STAR.isPulsar/isMagnetar is true for these. */
+		starSpectralClass: SpectralClass
+		starLuminosityClass: LuminosityClass
 	}
 }

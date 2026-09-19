@@ -81,6 +81,14 @@ export const CLASSIFICATION_COLOR: Partial<
 	meltball: 0xff625d,
 	oceanic: 0x1e90ff,
 	panthalassic: 0x4169e1,
+	// Protostar-system accreting protoplanets (World Builder's Handbook p.
+	// 224-225) -- lava-world fallback tints for when the meltball texture
+	// (see texture/index.ts's hydrosphereCode===12 check, which these always
+	// satisfy) hasn't loaded yet, in ascending "size reads as more atmosphere
+	// haze over the glow" order.
+	"proto-dwarf": 0xff4500,
+	"proto-terrestrial": 0xff6a1a,
+	"proto-helian": 0xffa347,
 	rockball: 0x8b7d7b,
 	snowball: 0xadd8e6,
 	stygian: 0x2f4f4f,

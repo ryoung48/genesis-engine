@@ -23,6 +23,8 @@ function rollProfiles(params: {
 				classification: params.classification,
 				isPrimaryWorld: false,
 				starAgeGyr: 5,
+				starSpectralClass: "G",
+				starLuminosityClass: "V",
 			},
 		})!
 		profiles.push(profile)
@@ -157,6 +159,8 @@ describe("Exotic Atmosphere Subtype (book p. 86)", () => {
 					classification: "tectonic",
 					isPrimaryWorld: false,
 					starAgeGyr: 5,
+					starSpectralClass: "G",
+					starLuminosityClass: "V",
 				},
 			})!
 			if (profile.type === "corrosive") {

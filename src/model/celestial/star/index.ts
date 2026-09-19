@@ -1153,7 +1153,9 @@ export function rollStarAttributes(
 		// long it will eventually live, so any non-evolved, non-dead star gets
 		// an independent chance here to be freshly formed regardless of mass.
 		// Skipped for giants/subgiants (already evolved, can't be freshly
-		// formed) and dead stars (already bumped older just above).
+		// formed) and dead stars (already bumped older just above). The proto
+		// landing value itself is book-literal: the Special and Unusual Object
+		// Age by Type table (p. 22) gives protostars `10 million years / 2d10`.
 		if (
 			!deadStar &&
 			(luminosityClass === "V" || luminosityClass === "VI") &&
@@ -1161,7 +1163,7 @@ export function rollStarAttributes(
 		) {
 			ageGyr =
 				rng.random() < YOUNG_STAR_PROTO_SHARE
-					? rng.uniform(0, 0.01)
+					? 0.01 / DICE.rollDice({ rng, count: 2, sides: 10 })
 					: rng.uniform(0.01, 0.1)
 		}
 		if (ageGyr > 14) ageGyr = rng.uniform(13, 14)
