@@ -3,6 +3,7 @@ import type {
 	ClimateGeometry,
 	ComputeAdvectionParams,
 	ComputeMonthlyRainParams,
+	ComputeMonthlyThermalEquatorsParams,
 	ComputeThermalEquatorParams,
 	SeasonalRainCurveParams,
 	SubsidenceFactorParams,
@@ -278,6 +279,21 @@ function computeThermalEquatorLine({
 	}
 	if (points.length > 0) points.push([points[0][0] + 360, points[0][1]])
 	return points.length > 2 ? points : null
+}
+
+function computeMonthlyThermalEquators({
+	mesh,
+	climate,
+}: ComputeMonthlyThermalEquatorsParams): Float32Array[] {
+	const N = mesh.numRegions
+	const monthlyTEQ: Float32Array[] = new Array(12)
+	for (let month = 0; month < 12; month++) {
+		monthlyTEQ[month] = computeThermalEquator({
+			mesh,
+			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+		})
+	}
+	return monthlyTEQ
 }
 
 function computeAdvection({
@@ -870,6 +886,7 @@ export const RAIN = {
 	hadleyWidth,
 	getClimateGeometry,
 	computeThermalEquator,
+	computeMonthlyThermalEquators,
 	computeThermalEquatorLine,
 	computeAdvection,
 	computeMonthlyRain,

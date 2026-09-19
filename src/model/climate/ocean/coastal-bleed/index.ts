@@ -3,11 +3,9 @@ import type {
 	FillLandParams,
 } from "@/model/climate/ocean/coastal-bleed/types"
 
-const LAND_FADE_KM = 600
+const LAND_FADE_KM = 1200
 const MIN_LAND_FADE_HOPS = 4
 
-// Cosmetic fade of an ocean-cell field onto adjacent land so the coastline
-// reads continuously in the overlay/hover.
 function bleedOntoLand({
 	mesh,
 	isLand,
@@ -18,6 +16,7 @@ function bleedOntoLand({
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const bleed = new Float32Array(N)
+	const coastalValue = new Float32Array(N)
 	const landFadeHops = Math.max(
 		MIN_LAND_FADE_HOPS,
 		Math.round(LAND_FADE_KM / avgEdgeKm),
@@ -40,6 +39,7 @@ function bleedOntoLand({
 		}
 		if (count === 0) continue
 		bleed[r] = sum / count
+		coastalValue[r] = bleed[r]
 		dist[r] = 0
 		queue[tail++] = r
 	}
@@ -53,7 +53,8 @@ function bleedOntoLand({
 			const nb = adjList[j]
 			if (isLand[nb] && dist[nb] === -1) {
 				dist[nb] = d
-				bleed[nb] = bleed[r] * fade
+				coastalValue[nb] = coastalValue[r]
+				bleed[nb] = coastalValue[r] * fade
 				queue[tail++] = nb
 			}
 		}

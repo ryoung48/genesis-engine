@@ -10,21 +10,19 @@ import { PASTA } from "@/model/climate/classification/pasta"
 import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
-import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { HEURISTIC_CURRENTS } from "@/model/climate/ocean/currents/heuristic"
 import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RAIN } from "@/model/climate/precipitation/rain"
+import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import { CLOUD_COVER_TEMPERATURE_MODIFIER } from "@/model/climate/temperature/cloud-cover-modifier"
 import { DTR } from "@/model/climate/temperature/dtr"
-import type {
-	GenesisClimate,
-	GenesisOceanCurrents,
-	GenesisRainfall,
-} from "@/model/climate/types"
+import type { GenesisRainfall } from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
+import { WIND } from "@/model/climate/weather/wind"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { HAZARDS } from "@/model/geography/terrain/hazards"
 import { LAKES } from "@/model/geography/terrain/lakes"
@@ -35,8 +33,8 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import { PROVINCES } from "@/model/geography/terrain/provinces"
 import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
-import type { SphereMesh } from "@/model/mesh/types"
 import type {
+	ApplyOceanCurrentsToClimateParams,
 	PostPipelineInput,
 	PostPipelineOutput,
 } from "@/model/pipelines/post-elevation/types"
@@ -51,18 +49,9 @@ import type { GenesisProvinces } from "@/model/society/types"
 
 const LAKE_RETENTION_THRESHOLD = 100
 
-/** Applies a previously computed ocean-current SST field to climate,
- * dispatching to the tidally locked model (substellar-distance banded) or
- * the rotating model (ITCZ-distance banded) depending on tideLock. Kept as
- * a single call site since the pipeline reapplies the same, already-
- * computed oceanCurrents each time it recomputes climate from scratch. */
-function applyOceanCurrentsToClimate(params: {
-	mesh: SphereMesh
-	climate: GenesisClimate
-	isLand: Uint8Array
-	oceanCurrents: GenesisOceanCurrents
-	isLocked: boolean
-}): void {
+function applyOceanCurrentsToClimate(
+	params: ApplyOceanCurrentsToClimateParams,
+): void {
 	const { mesh, climate, isLand, oceanCurrents, isLocked } = params
 	if (isLocked) {
 		LOCKED_OCEAN_CURRENTS.applyLockedSSTToClimate({
@@ -72,7 +61,14 @@ function applyOceanCurrentsToClimate(params: {
 			oceanCurrents,
 		})
 	} else {
-		// OCEAN_CURRENTS.applySSTToClimate({ mesh, climate, isLand, oceanCurrents })
+		TEMPERATURE_SHARED.applyOceanSst({
+			mesh,
+			climate,
+			isLand,
+			oceanCurrents,
+			saturationC: HEURISTIC_CURRENTS.sstAnomalySaturationC,
+			landScale: 1,
+		})
 	}
 }
 
@@ -215,18 +211,17 @@ function runPostElevationPipeline(
 	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
+	const wind = WIND.computeWindVectors({ mesh, climate, elevation_km, params })
+	record("Post: wind", t0)
+	onProgress?.("Post: wind", 43)
+
+	t0 = performance.now()
 	const currentLandmarks = LANDMARKS.computeLandmarks({ mesh, isLand })
 	record("Post: current landmarks", t0)
 
 	const N = mesh.numRegions
 	t0 = performance.now()
-	const monthlyTEQ: Float32Array[] = new Array(12)
-	for (let month = 0; month < 12; month++) {
-		monthlyTEQ[month] = RAIN.computeThermalEquator({
-			mesh,
-			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-		})
-	}
+	let monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 	record("Post: thermal equator", t0)
 	onProgress?.("Post: thermal equator", 44)
 
@@ -256,13 +251,6 @@ function runPostElevationPipeline(
 
 	// ── Ocean SST ────────────────────────────────────────────────────────
 	t0 = performance.now()
-	// Real NCEP wind, when this Earth-import world has it, is attached here
-	// (rather than down with the rest of "observed Earth climate" below)
-	// specifically so OCEAN_CURRENTS.computeCurrents can use it directly --
-	// real wind is both more accurate than any procedural model (see
-	// src/test/earth/ocean-currents.md) and skips the sverdrup solve's own
-	// twelve procedural-wind calls entirely, rather than computing procedural
-	// wind only to discard it.
 	let observedWind: GenesisWorld["observedWind"] | undefined
 	if (
 		realWindUMonthly &&
@@ -296,16 +284,15 @@ function runPostElevationPipeline(
 				landmarks: currentLandmarks,
 				params,
 			})
-		: OCEAN_CURRENTS.computeCurrents({
+		: HEURISTIC_CURRENTS.computeCurrents({
 				mesh,
 				isLand,
 				distCoast,
 				landmarks: currentLandmarks,
 				monthlyTEQ,
-				climate,
-				elevation_km,
-				params,
-				observedWind,
+				eastAdv,
+				westAdv,
+				planetRadiusKm: params.planetRadiusKm,
 			})
 	applyOceanCurrentsToClimate({
 		mesh,
@@ -315,6 +302,7 @@ function runPostElevationPipeline(
 		isLocked: isLockedOcean,
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 	record("Post: ocean SST", t0)
 
 	// ── Rainfall ───────────────────────────────────────────────────────
@@ -358,12 +346,6 @@ function runPostElevationPipeline(
 			isLand,
 			elevation_km,
 		})
-		for (let month = 0; month < 12; month++) {
-			monthlyTEQ[month] = RAIN.computeThermalEquator({
-				mesh,
-				temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-			})
-		}
 		applyOceanCurrentsToClimate({
 			mesh,
 			climate,
@@ -372,6 +354,7 @@ function runPostElevationPipeline(
 			isLocked: isLockedOcean,
 		})
 		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+		monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 		record("Post: drain arid closed water", t0)
 	}
 
@@ -398,13 +381,25 @@ function runPostElevationPipeline(
 	onProgress?.("Post: dtr + pet", 56)
 
 	t0 = performance.now()
-	const hydrology = HYDROLOGY.computeHydrologyFields({
+	let hydrology = HYDROLOGY.computeHydrologyFields({
 		climate,
 		rainfall,
 		isLand: riverLand,
 	})
 	record("Post: hydrology", t0)
 	onProgress?.("Post: hydrology", 57)
+
+	t0 = performance.now()
+	CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
+		climate,
+		rainfall,
+		hydrology,
+		dtrMonthly: dtr_monthly,
+		oceanDist,
+		isLand,
+		isTidallyLocked: params.tideLock?.type === "solar",
+	})
+	record("Post: clouds", t0)
 
 	// ── Rivers ─────────────────────────────────────────────────────────
 	// Real river/lake data (Earth import) replaces the whole procedural
@@ -495,12 +490,6 @@ function runPostElevationPipeline(
 		isLand,
 		elevation_km,
 	})
-	for (let month = 0; month < 12; month++) {
-		monthlyTEQ[month] = RAIN.computeThermalEquator({
-			mesh,
-			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-		})
-	}
 	applyOceanCurrentsToClimate({
 		mesh,
 		climate,
@@ -509,6 +498,7 @@ function runPostElevationPipeline(
 		isLocked: isLockedOcean,
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
 		mesh,
 		rainfall,
@@ -526,12 +516,14 @@ function runPostElevationPipeline(
 		dpm: params.daysPerYear / 12,
 	})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
+	hydrology = HYDROLOGY.computeHydrologyFields({
+		climate,
+		rainfall,
+		isLand: riverLand,
+	})
 	record("Post: landmarks + distances + temperature (post-lake)", t0)
 	onProgress?.("Post: landmarks", 62)
 
-	// ── Cloud cover temperature modifier ────────────────────────────────
-	// Clear skies amplify a month's temperature away from 0°C; overcast
-	// skies damp it back toward 0°C. Modeled temperature only.
 	t0 = performance.now()
 	CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
 		climate,
@@ -542,7 +534,7 @@ function runPostElevationPipeline(
 		isLand,
 		isTidallyLocked: params.tideLock?.type === "solar",
 	})
-	record("Post: cloud cover temperature modifier", t0)
+	record("Post: clouds (post-lake)", t0)
 
 	// ── Observed Earth climate (must run before pasta/vegetation so Earth
 	// imports classify vegetation from observed rather than procedural
@@ -1072,6 +1064,7 @@ function runPostElevationPipeline(
 
 	return {
 		climate,
+		wind,
 		observedCloudCover,
 		rainfall,
 		monthlyTEQ,

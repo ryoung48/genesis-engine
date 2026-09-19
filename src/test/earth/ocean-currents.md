@@ -1,12 +1,14 @@
 # Ocean currents
 
-The wind-driven ocean model (`src/model/climate/ocean/currents`) and what
-comparing it against real GODAS/OISST/NCEP data says about it. Wind-side work
-is in `wind.md`; land temperature MAE is `README.md`. Nothing here moves
-temperature either way: `OCEAN_CURRENTS.applySSTToClimate` is commented out in
-`post-elevation/index.ts`, so modeled SST is display-only.
+Production uses `HEURISTIC_CURRENTS` from
+`src/model/climate/ocean/currents/heuristic`, which classifies coasts from
+moisture advection and uses the original west/east SST bands. The wind-driven
+`OCEAN_CURRENTS` model remains available for diagnostics and direct callers.
+Wind-side work is in `wind.md`; land temperature MAE is `README.md`.
+The production heuristic SST anomaly now adjusts modeled temperature before
+rainfall and cloud cover are computed.
 
-`currents/index.ts` ships a hybrid: a coast-facing warm/cold table indexed by
+`currents/index.ts` provides a hybrid: a coast-facing warm/cold table indexed by
 distance from the ITCZ for SST *magnitude*, but which side of the table
 applies at each cell -- warm or cold -- comes from `SVERDRUP_CURRENTS`' own
 wind-driven circulation, not a land-side heuristic (see `computeCurrents`'s module

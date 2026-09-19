@@ -13,6 +13,7 @@ import type {
 	GenesisOceanCurrents,
 	GenesisRainfall,
 } from "@/model/climate/types"
+import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -113,6 +114,7 @@ export interface GenesisWorld {
 	isEarthImport?: boolean
 	timings?: StageTiming[]
 	climate: GenesisClimate
+	wind: WindVectors
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
 	observedCloudCover?: {
 		real_monthly: Float32Array
@@ -150,8 +152,7 @@ export interface GenesisWorld {
 	realPastaClimate?: Uint8Array
 	/** Per-cell pasta climate detail metrics for realPastaClimate — distinct from pastaDebug since observed and modeled temps/DTR differ. Earth-import only. */
 	realPastaDebug?: PastaDebug
-	/** Modeled SST anomaly (display-only, does not affect temperature). */
-	oceanCurrents?: GenesisOceanCurrents
+	oceanCurrents: GenesisOceanCurrents
 	/** Per-cell cyclone risk score in [0, 1]. */
 	cycloneRisk?: Float32Array
 	/** Per-cell tornado risk score in [0, 1]. */

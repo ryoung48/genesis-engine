@@ -1,6 +1,6 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
-import { FULL_WIND } from "@/model/climate/weather/wind/full"
+import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import type {
 	ComputeWindVectorsInput,
 	FlowGrid,
@@ -158,14 +158,6 @@ function rotationCollapse(hoursPerDay: number): number {
 	})
 }
 
-// Production wind model: the full atmospheric-dynamics model (`wind/full`,
-// Hadley/Ferrel/polar pressure template + surface torque balance + shallow-
-// water large-scale solver) drives the world-gen pipeline. `wind/simple`
-// (the original pressure-gradient model) is the fast fallback path and
-// remains available as a standalone import for callers that need it. See
-// wind/full/index.ts and src/test/earth/wind.md for the model's own accuracy
-// numbers and cost -- swapping this in trades wind/simple's speed for
-// wind/full's Earth-comparison accuracy.
 function computeWindVectors(input: ComputeWindVectorsInput): {
 	windU: Float32Array
 	windV: Float32Array
@@ -175,7 +167,7 @@ function computeWindVectors(input: ComputeWindVectorsInput): {
 	if (input.params?.tideLock?.type === "solar") {
 		return LOCKED_WIND.computeLockedWindVectors(input)
 	}
-	return FULL_WIND.computeWindVectors(input)
+	return SIMPLE_WIND.computeWindVectors(input)
 }
 
 /** Builds the same {windU, windV, pressure, windSpeed} shape as

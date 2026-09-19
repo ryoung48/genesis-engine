@@ -1,3 +1,7 @@
+import type {
+	GenesisClimate,
+	GenesisOceanCurrents,
+} from "@/model/climate/types"
 import type { SphereMesh } from "@/model/mesh/types"
 
 export type ApplyTemperatureNoiseParams = {
@@ -19,4 +23,13 @@ export type RecomputeAnnualTemperatureStatsParams = {
 	temperature_min: Float32Array
 	temperature_max: Float32Array
 	N: number
+}
+
+export type ApplyOceanSstParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	oceanCurrents: GenesisOceanCurrents
+	saturationC: number
+	landScale: number
 }

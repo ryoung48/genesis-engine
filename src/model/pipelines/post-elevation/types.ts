@@ -6,6 +6,7 @@ import type {
 	GenesisOceanCurrents,
 	GenesisRainfall,
 } from "@/model/climate/types"
+import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -16,6 +17,15 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { SphereMesh } from "@/model/mesh/types"
+
+export type ApplyOceanCurrentsToClimateParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	oceanCurrents: GenesisOceanCurrents
+	isLocked: boolean
+}
+
 import type {
 	GenesisParams,
 	GenesisWorld,
@@ -135,6 +145,7 @@ export interface PostPipelineInput {
 
 export interface PostPipelineOutput {
 	climate: GenesisClimate
+	wind: WindVectors
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
 	observedCloudCover?: {
 		real_monthly: Float32Array

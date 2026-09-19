@@ -1,4 +1,5 @@
 import type {
+	ApplyOceanSstParams,
 	ApplyTemperatureNoiseParams,
 	RecomputeAnnualTemperatureStatsParams,
 } from "@/model/climate/shared/temperature/types"
@@ -68,7 +69,32 @@ function recomputeAnnualTemperatureStats({
 	}
 }
 
+function applyOceanSst({
+	mesh,
+	climate,
+	isLand,
+	oceanCurrents,
+	saturationC,
+	landScale,
+}: ApplyOceanSstParams): void {
+	const N = mesh.numRegions
+	for (let r = 0; r < N; r++) {
+		const scale = isLand[r] ? landScale : 1
+		let annualSum = 0
+		for (let month = 0; month < 12; month++) {
+			const index = month * N + r
+			const updated =
+				climate.temperature_monthly[index] +
+				oceanCurrents.sstMonthly[index] * saturationC * scale
+			climate.temperature_monthly[index] = updated
+			annualSum += updated
+		}
+		climate.temperature_avg[r] = annualSum / 12
+	}
+}
+
 export const TEMPERATURE_SHARED = {
 	applyTemperatureNoise,
 	recomputeAnnualTemperatureStats,
+	applyOceanSst,
 }

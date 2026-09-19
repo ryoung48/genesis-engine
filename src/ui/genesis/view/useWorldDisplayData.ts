@@ -395,19 +395,21 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 					numRegions: world.mesh.numRegions,
 					month,
 				})
-			: WIND.computeWindVectors({
-					mesh: world.mesh,
-					climate: world.climate,
-					elevation_km: world.elevation_km,
-					params: world.params,
-					month,
-					surface: {
-						vegetation: world.vegetation,
-						topography: world.topography,
-						slopeScore: world.slopeScore,
-						oceanDist: world.oceanDist,
-					},
-				})
+			: month === undefined
+				? world.wind
+				: WIND.computeWindVectors({
+						mesh: world.mesh,
+						climate: world.climate,
+						elevation_km: world.elevation_km,
+						params: world.params,
+						month,
+						surface: {
+							vegetation: world.vegetation,
+							topography: world.topography,
+							slopeScore: world.slopeScore,
+							oceanDist: world.oceanDist,
+						},
+					})
 		windCacheRef.current.vectors.set(cacheKey, vectors)
 		return vectors
 	}, [world, showWindArrows, showRealWind, colorMode, resolvedClimateMonth])

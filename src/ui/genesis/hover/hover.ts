@@ -2,6 +2,7 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { HEURISTIC_CURRENTS } from "@/model/climate/ocean/currents/heuristic"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
@@ -901,7 +902,10 @@ export function getHoverOceanCurrents(
 	// Stored sst is normalized -1..+1 for the color scale; scale back up to an
 	// approximate °C anomaly so it reads on the same units/verbiage as the
 	// observed SST anomaly below.
-	const saturationC = OCEAN_CURRENTS.sstAnomalySaturationC
+	const saturationC =
+		world.params.tideLock?.type === "solar"
+			? OCEAN_CURRENTS.sstAnomalySaturationC
+			: HEURISTIC_CURRENTS.sstAnomalySaturationC
 	const monthlySst: number[] = []
 	for (let m = 0; m < 12; m++) {
 		monthlySst.push(world.oceanCurrents.sstMonthly[m * N + r] * saturationC)

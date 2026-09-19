@@ -31,6 +31,11 @@ export type ComputeThermalEquatorParams = {
 	halfWindowBins?: number
 }
 
+export type ComputeMonthlyThermalEquatorsParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+}
+
 export type ComputeAdvectionParams = {
 	mesh: SphereMesh
 	elevation: Float32Array

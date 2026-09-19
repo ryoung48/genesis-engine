@@ -6,6 +6,7 @@ import type {
 	ComputeLockedSSTParams,
 	LockedSSTParams,
 } from "@/model/climate/ocean/tidal-locked/types"
+import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { FlowGrid } from "@/model/climate/weather/wind/types"
@@ -151,21 +152,14 @@ function applyLockedSSTToClimate({
 	isLand,
 	oceanCurrents,
 }: ApplyLockedSSTToClimateParams): void {
-	const N = mesh.numRegions
-	for (let r = 0; r < N; r++) {
-		const landScale = isLand[r] ? LAND_CURRENT_EFFECT_SCALE : 1
-		let annualSum = 0
-		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			const delta =
-				oceanCurrents.sstMonthly[month * N + r] *
-				MODELED_SST_SATURATION_C *
-				landScale
-			const updated = climate.temperature_monthly[month * N + r] + delta
-			climate.temperature_monthly[month * N + r] = updated
-			annualSum += updated
-		}
-		climate.temperature_avg[r] = annualSum / CURRENT_EFFECT_MONTHS
-	}
+	TEMPERATURE_SHARED.applyOceanSst({
+		mesh,
+		climate,
+		isLand,
+		oceanCurrents,
+		saturationC: MODELED_SST_SATURATION_C,
+		landScale: LAND_CURRENT_EFFECT_SCALE,
+	})
 }
 
 // The locked SST signal only exists near coasts, so the display is limited

@@ -1012,18 +1012,7 @@ export const GenesisView: React.FC<{
 					observedWind: world.observedWind,
 					numRegions: world.mesh.numRegions,
 				})
-			: WIND.computeWindVectors({
-					mesh: world.mesh,
-					climate: world.climate,
-					elevation_km: world.elevation_km,
-					params: world.params,
-					surface: {
-						vegetation: world.vegetation,
-						topography: world.topography,
-						slopeScore: world.slopeScore,
-						oceanDist: world.oceanDist,
-					},
-				})
+			: world.wind
 		const speeds = vectors.windSpeed
 		let sum = 0
 		let max = 0

@@ -1,6 +1,7 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
+import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { HistoryNote } from "@/model/history/generated/state/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
@@ -74,6 +75,7 @@ export interface SerializedGenesisWorld {
 	timings?: StageTiming[]
 	continentCount: number
 	climate: SerializedGenesisClimate
+	wind: WindVectors
 	oceanDist: Float32Array
 	distCoast?: Float32Array
 	rainfall: {
@@ -194,7 +196,7 @@ export interface SerializedGenesisWorld {
 		basinId: Int32Array
 		waterLevel: Float32Array
 	}
-	oceanCurrents?: GenesisOceanCurrents
+	oceanCurrents: GenesisOceanCurrents
 	provinces?: SerializedProvinces
 	locations?: SerializedLocations
 	nations?: SerializedNationHierarchy

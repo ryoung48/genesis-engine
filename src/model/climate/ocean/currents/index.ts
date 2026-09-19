@@ -11,6 +11,7 @@ import type {
 } from "@/model/climate/ocean/currents/types"
 import { SURFACE_FLOW } from "@/model/climate/ocean/surface-flow"
 import { RAIN } from "@/model/climate/precipitation/rain"
+import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import { WIND } from "@/model/climate/weather/wind"
 import type { FlowGrid } from "@/model/climate/weather/wind/types"
@@ -20,9 +21,9 @@ import { UNITS } from "@/model/shared/units"
 
 const CURRENT_EFFECT_MONTHS = 12
 
-// Production SST model: this coast-facing warm/cold table indexed by
-// distance from the ITCZ (see computeSST below) is the world-gen pipeline's
-// fast path for magnitude, derived from real GODAS/OISST (see the table's own
+// This coast-facing warm/cold table indexed by
+// distance from the ITCZ is the hybrid model's magnitude path,
+// derived from real GODAS/OISST (see the table's own
 // comment). Which side of the table applies at each cell -- warm western-
 // boundary current or cold eastern-boundary upwelling -- comes from
 // SVERDRUP_CURRENTS' own wind-driven circulation rather than a land-side
@@ -360,28 +361,14 @@ function applySSTToClimate({
 	isLand,
 	oceanCurrents,
 }: ApplySSTToClimateParams): void {
-	// temperature_min/max are deliberately left untouched here -- they get
-	// fully recomputed later by CLIMATE.applyDtrToClimateMinMax straight from
-	// temperature_monthly (which this function mutates in place), so they'll
-	// correctly reflect this delta once that runs. Combining a separately
-	// tracked delta min/max into them here would be wrong regardless: the
-	// month with the coldest delta isn't necessarily the month that's
-	// actually this region's coldest.
-	const N = mesh.numRegions
-	for (let r = 0; r < N; r++) {
-		const landScale = isLand[r] ? LAND_CURRENT_EFFECT_SCALE : 1
-		let annualSum = 0
-		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			const delta =
-				oceanCurrents.sstMonthly[month * N + r] *
-				SST_ANOMALY_SATURATION_C *
-				landScale
-			const updated = climate.temperature_monthly[month * N + r] + delta
-			climate.temperature_monthly[month * N + r] = updated
-			annualSum += updated
-		}
-		climate.temperature_avg[r] = annualSum / CURRENT_EFFECT_MONTHS
-	}
+	TEMPERATURE_SHARED.applyOceanSst({
+		mesh,
+		climate,
+		isLand,
+		oceanCurrents,
+		saturationC: SST_ANOMALY_SATURATION_C,
+		landScale: LAND_CURRENT_EFFECT_SCALE,
+	})
 }
 
 function buildOceanCurrentGrid({

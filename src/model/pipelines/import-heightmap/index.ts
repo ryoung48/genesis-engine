@@ -578,6 +578,7 @@ function importGenesisWorld({
 		eu5Climate,
 		params: genesisParams,
 		climate: post.climate,
+		wind: post.wind,
 		oceanDist,
 		rainfall: post.rainfall,
 		hazards: post.hazards,

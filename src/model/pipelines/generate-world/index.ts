@@ -664,6 +664,7 @@ function generateGenesisWorld({
 		elevation_km,
 		params,
 		climate: post.climate,
+		wind: post.wind,
 		oceanDist,
 		rainfall: post.rainfall,
 		hazards: post.hazards,

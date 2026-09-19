@@ -74,3 +74,10 @@ export interface ComputeWindVectorsInput {
 }
 
 export type WindGrid = FlowGrid
+
+export type WindVectors = {
+	windU: Float32Array
+	windV: Float32Array
+	pressure: Float32Array
+	windSpeed: Float32Array
+}
