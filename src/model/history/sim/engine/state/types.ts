@@ -7,6 +7,7 @@ import type {
 } from "@/model/history/sim/engine/journal/types"
 import type { Relation } from "@/model/history/sim/engine/state"
 import type { SharedRng } from "@/model/shared/random/rng"
+import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
 import type {
 	Route,
 	RouteEdge,
@@ -82,6 +83,11 @@ export interface HistoryState {
 	relationColumns: Set<number>[]
 	hierarchyDirty: boolean
 	hierarchyVersion: number
+	titles: DejureTitles
+	titleMembers: TitleMembers
+	seatRank: Uint8Array
+	titleFounded: Uint8Array
+	titleLapseSince: Float64Array
 	_nationAdjCache?: { offset: Int32Array; list: Int32Array }
 	_nationAdjCacheVersion?: number
 
@@ -293,6 +299,47 @@ export interface RepartitionNationParams {
 	state: HistoryState
 	nation: number
 	subjects: number[]
+}
+
+export interface ApplyDerivedParentsParams {
+	state: HistoryState
+	nation: number
+	members: number[]
+}
+
+export interface ConsiderTitlesParams {
+	state: HistoryState
+	nation: number
+	rng: SharedRng
+}
+
+export interface FoundTitleForParams extends ConsiderTitlesParams {
+	tier: number
+}
+
+export interface DissolveLapsedParams {
+	state: HistoryState
+	nation: number
+}
+
+export interface TitleWealthBarParams {
+	state: HistoryState
+	tier: number
+}
+
+export interface RelinkNationsParams {
+	state: HistoryState
+	nations: Iterable<number>
+}
+
+export interface SettleTitleSetParams {
+	state: HistoryState
+	touched: Set<number>
+}
+
+export interface SettleProvincesParams {
+	state: HistoryState
+	provinces: number[]
 }
 
 export interface ReleaseSubjectRelationsParams {

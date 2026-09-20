@@ -1,6 +1,7 @@
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
+import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
 	BuildEarthRecordParams,
 	CreateHistoryStateParams,
@@ -244,6 +245,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 			}, [])
 			.sort((a, b) => a.timeMs - b.timeMs),
 		censuses: [],
+		titleEvents: [],
 	}
 	const resolvedMinMs = minTimeMs === Infinity ? 0 : minTimeMs
 	return {
@@ -266,6 +268,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 		cultures,
 		religions,
 		events,
+		titles: null,
 	}
 }
 
@@ -728,6 +731,14 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provincePopulation,
 		provincePopulationUrban,
 		provinceDevelopment,
+		titles: record.titles
+			? TITLE_RECORD.fold({
+					base: record.titles,
+					events: record.events.titleEvents,
+					provinceCount: count,
+					timeMs,
+				})
+			: null,
 		nations,
 		wars,
 		organizations,

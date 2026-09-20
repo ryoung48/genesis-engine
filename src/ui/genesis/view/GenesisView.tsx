@@ -1009,7 +1009,6 @@ export const GenesisView: React.FC<{
 		showElevation,
 		dangerSubMode,
 		selectedWikiOrganizationId,
-		selectedWikiNationId,
 		windVectors,
 		hoverProvince,
 		temperatureMonth,
@@ -1036,7 +1035,8 @@ export const GenesisView: React.FC<{
 		}
 		scene.setOccupationOverlay(
 			selectedWikiOrganizationId === "HRE" ||
-				(colorMode === "nations" && nationMode === "borders")
+				(colorMode === "nations" &&
+					(nationMode === "borders" || isTitlesNationMode(nationMode)))
 				? occupationOverlay
 				: getBaseMapMode(colorMode) === "population" &&
 						["culture", "heritage", "religion"].includes(populationMode)

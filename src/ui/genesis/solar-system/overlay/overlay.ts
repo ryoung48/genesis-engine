@@ -28,6 +28,7 @@ import {
 import { buildNeutronJets } from "@/ui/genesis/renderer/neutron-jets"
 import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
 import {
+	buildStarGlowMaterial,
 	buildStarSurfaceLayers,
 	STAR_GLOW_RADIUS_SCALE,
 } from "@/ui/genesis/renderer/star-surface-material"
@@ -48,6 +49,7 @@ import {
 	GOLDEN_ANGLE_RAD,
 	JOVIAN_COLOR_BY_ZONE,
 	MAIN_WORLD_COLOR,
+	NON_REALISTIC_STAR_PLANET_SIZE_MARGIN,
 	ORBIT_GAP_STAR_RADII,
 	ORBIT_LINE_COLOR_BY_ZONE,
 	ORBIT_SEGMENTS,
@@ -59,12 +61,10 @@ import {
 import {
 	bodyDisplayName,
 	bodySceneRadius,
+	maxNonRealisticPlanetSceneRadius,
 	measureBodyMoonSystemOuterRadius,
 } from "@/ui/genesis/solar-system/overlay/helpers"
-import {
-	createStarGlowTexture,
-	loadBodyTexture,
-} from "@/ui/genesis/solar-system/overlay/textures"
+import { loadBodyTexture } from "@/ui/genesis/solar-system/overlay/textures"
 import type {
 	OrbitAddress,
 	PlacedBody,
@@ -80,6 +80,7 @@ import type {
 // conversion -- this constant is just the companion-scale equivalent of
 // ORBIT_GAP_STAR_RADII, one level up.
 const COMPANION_ORBIT_GAP_FACTOR = 0.4
+const NEUTRON_STAR_SURFACE_FACTOR = 0.28
 
 // One shared unit sphere per tessellation tier, reused by every body mesh
 // (and cloud shell) currently at that tier -- see BODY_LOD_SEGMENTS. Kept at
@@ -136,6 +137,7 @@ export function buildSolarSystemOverlay(
 		mainWorldTexture,
 		proceduralSystem,
 		isCompanion,
+		minStarRadius,
 	} = params
 	// A companion's own recursive build always passes companions: [], so it
 	// can't see its sibling primary star that way -- isCompanion carries it.
@@ -183,7 +185,7 @@ export function buildSolarSystemOverlay(
 	// scale instead of being sized relative to the (resizable) main world.
 	// Non-realistic mode instead buckets by spectral class only, with no
 	// sizeClass equivalent to hand it — see getNonRealisticStarToPlanetRatio.
-	const starRadius = showRealisticSizes
+	const rawStarRadius = showRealisticSizes
 		? scaleBodyDiameterToVisualRadius(
 				starDiameterKm,
 				PLANET_SCENE_RADIUS,
@@ -209,6 +211,25 @@ export function buildSolarSystemOverlay(
 									cls: renderSpectralClass as (typeof STAR.mainSequenceClasses)[number],
 									subtype: starSubtype,
 								}))
+	let systemMaxPlanetRadius = maxNonRealisticPlanetSceneRadius(bodies)
+	for (const companion of companions) {
+		const companionMax = maxNonRealisticPlanetSceneRadius(companion.star.bodies)
+		if (companionMax > systemMaxPlanetRadius)
+			systemMaxPlanetRadius = companionMax
+	}
+	const nonRealisticStarFloor = Math.max(
+		systemMaxPlanetRadius * NON_REALISTIC_STAR_PLANET_SIZE_MARGIN,
+		minStarRadius ?? 0,
+	)
+	const nonRealisticVisibleFactor = isNeutronStar
+		? NEUTRON_STAR_SURFACE_FACTOR
+		: 1
+	const starRadius = showRealisticSizes
+		? rawStarRadius
+		: Math.max(rawStarRadius, nonRealisticStarFloor / nonRealisticVisibleFactor)
+	const companionMinStarRadius = showRealisticSizes
+		? undefined
+		: nonRealisticStarFloor
 	const starColorHex = isGiant
 		? uiPalette.giantStar
 		: (brownDwarfGlowSettings?.color ??
@@ -247,8 +268,8 @@ export function buildSolarSystemOverlay(
 			})
 		: null
 	if (brownDwarfMaterial) {
-		brownDwarfMaterial.emissive.set(brownDwarfGlowSettings!.color)
-		brownDwarfMaterial.emissiveIntensity = 0.18
+		brownDwarfMaterial.emissive.set(0xffffff)
+		brownDwarfMaterial.emissiveIntensity = 0.75
 	}
 	const starMaterial: THREE.Material =
 		starSurfaceLayers?.surface ??
@@ -259,7 +280,7 @@ export function buildSolarSystemOverlay(
 	const starSurfaceRadius = isBlackHole
 		? starRadius * 0.18
 		: isNeutronStar
-			? starRadius * 0.28
+			? starRadius * NEUTRON_STAR_SURFACE_FACTOR
 			: starRadius
 	const starMesh = new THREE.Mesh(
 		new THREE.SphereGeometry(starSurfaceRadius, 48, 32),
@@ -271,12 +292,20 @@ export function buildSolarSystemOverlay(
 	// mesh elsewhere in this renderer.
 	starMesh.rotation.x = Math.PI / 2
 	group.add(starMesh)
-	if (starSurfaceLayers) {
+	const haloMaterial =
+		starSurfaceLayers?.glow ??
+		(brownDwarfGlowSettings
+			? buildStarGlowMaterial({
+					tint: brownDwarfGlowSettings.haloTint,
+					strength: brownDwarfGlowSettings.haloOpacity,
+				})
+			: null)
+	if (haloMaterial) {
 		// A unit sphere scaled to the star, so the corona tracks it if
 		// starRadius is ever recomputed.
 		const coronaMesh = new THREE.Mesh(
 			new THREE.SphereGeometry(1, 48, 32),
-			starSurfaceLayers.glow,
+			haloMaterial,
 		)
 		coronaMesh.scale.setScalar(
 			starSurfaceRadius * STAR_GLOW_RADIUS_SCALE * (isNeutronStar ? 1.25 : 1),
@@ -493,34 +522,6 @@ export function buildSolarSystemOverlay(
 		group.add(neutronJets.group)
 	}
 
-	const glowTexture = createStarGlowTexture(
-		isBlackHole ? diskColorHex : renderedStarColorHex,
-	)
-	const glowSprite = new THREE.Sprite(
-		new THREE.SpriteMaterial({
-			map: glowTexture,
-			opacity: brownDwarfGlowSettings?.haloOpacity ?? 1,
-			transparent: true,
-			depthWrite: false,
-			blending: THREE.AdditiveBlending,
-		}),
-	)
-	glowSprite.scale.setScalar(
-		starRadius *
-			(isBlackHole
-				? 2
-				: isNeutronStar || isWhiteDwarf
-					? 5
-					: isBrownDwarf
-						? 2.8
-						: 3),
-	)
-	if (!isBlackHole && !starSurfaceLayers) group.add(glowSprite)
-	else {
-		glowTexture.dispose()
-		glowSprite.material.dispose()
-	}
-
 	// decay=0 keeps the light's intensity constant regardless of a body's
 	// orbital distance — with the physically-correct inverse-square falloff
 	// (decay=2) the star was too dim at typical distances to cast any visible
@@ -658,18 +659,9 @@ export function buildSolarSystemOverlay(
 					? FULL_OCEAN_COLOR
 					: (CLASSIFICATION_COLOR[body.classification] ??
 						(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR))
-		// Helian/panthalassic bodies always render the animated fbm cloud-band
-		// mesh; in a procedurally generated system every other non-belt body
-		// (the main world included) does too, in place of any texture. Every
-		// case uses its selected swatch. The real Sol view keeps its curated textures for
-		// everything except helian/panthalassic.
-		// Helian/panthalassic never get generated art at all (see
-		// texture/index.ts's pickGeneratedBodyTextures), so they always render
-		// the procedural material regardless of proceduralSystem; every other
-		// classification does too, but only in a procedurally generated system
-		// -- the real Sol view keeps its curated photo/simulated textures.
+		// Bodies without authored photos use shaders in Sol too.
 		const usesProceduralMaterial =
-			isHelian || isPanthalassic || proceduralSystem
+			isHelian || isPanthalassic || proceduralSystem || !texturePath
 		const material = usesProceduralMaterial
 			? buildProceduralBodyMaterial({
 					seed: body.idx,
@@ -887,6 +879,7 @@ export function buildSolarSystemOverlay(
 			const overlay = buildSolarSystemOverlay({
 				...companion.star,
 				isCompanion: true,
+				minStarRadius: companionMinStarRadius,
 			})
 			const mount = new THREE.Group()
 			mount.add(overlay.group)
@@ -1729,6 +1722,13 @@ export function buildSolarSystemOverlay(
 	) {
 		if (nextBodies.length !== placed.length) return false
 		if ((nextMainWorldTexture ?? null) !== (mainWorldTexture ?? null))
+			return false
+		if (
+			!showRealisticSizes &&
+			maxNonRealisticPlanetSceneRadius(nextBodies) *
+				NON_REALISTIC_STAR_PLANET_SIZE_MARGIN >
+				starRadius * (isNeutronStar ? NEUTRON_STAR_SURFACE_FACTOR : 1)
+		)
 			return false
 
 		for (let i = 0; i < placed.length; i++) {

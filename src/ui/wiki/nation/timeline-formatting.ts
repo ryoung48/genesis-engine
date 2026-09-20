@@ -44,6 +44,8 @@ export function timelineTypeColor(type: string): string {
 			return "#7c3aed"
 		case "Capital":
 			return "#2563eb"
+		case "Title":
+			return "#0e7490"
 		case "Ruler":
 			return "#db2777"
 		case "Heir":

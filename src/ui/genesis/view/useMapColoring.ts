@@ -9,6 +9,7 @@ import type { OrgCategorizer } from "@/model/history/earth/organization-categori
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
 import type { TitleTier } from "@/model/society/titles/types"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
@@ -21,6 +22,7 @@ import {
 	computeHistoryOccupationOverlay,
 	computeHistoryRegionColors,
 	computeOrgStripeOverlay,
+	computeTitleStripeOverlay,
 } from "@/ui/genesis/shared/history-region-colors"
 import type { NationMapMode } from "@/ui/genesis/shared/map-modes"
 import { computeRegionColors } from "@/ui/genesis/shared/region-colors"
@@ -70,7 +72,6 @@ export function useMapColoring(input: MapColoringInput) {
 		showElevation,
 		dangerSubMode,
 		selectedWikiOrganizationId,
-		selectedWikiNationId,
 		windVectors,
 		hoverProvince,
 		temperatureMonth,
@@ -349,7 +350,6 @@ export function useMapColoring(input: MapColoringInput) {
 				isLand: worldForDisplay.isLand,
 				religionColorById: historyReligionColorById ?? undefined,
 				cultureColorById: historyCultureColorById ?? undefined,
-				selectedNationId: selectedWikiNationId,
 				locations: worldForDisplay.locations ?? null,
 				organizationKindById,
 			})
@@ -391,7 +391,6 @@ export function useMapColoring(input: MapColoringInput) {
 		historyFrame,
 		withOrgHighlight,
 		religionMode,
-		selectedWikiNationId,
 		organizationKindById,
 	])
 
@@ -486,32 +485,47 @@ export function useMapColoring(input: MapColoringInput) {
 			religionId >= 0 ? (frame.religions[religionId] ?? null) : null
 		const religionName = religion?.name ?? null
 
-		const domainSizes = FRAME.provinceDomainSize({ frame })
-		const titleTier = (province: number) =>
-			TITLE_TIER_LABELS[TITLES.tierForSize({ size: domainSizes[province] })]
-		const hasTitle = owner !== null && frame.provinceParent[hoverProvince] >= -1
-		const titleLabel = hasTitle
-			? `${titleTier(hoverProvince)} · ${domainSizes[hoverProvince]} ${domainSizes[hoverProvince] === 1 ? "province" : "provinces"}`
-			: null
+		const titles = frame.titles
+		const seatTierLabel = (province: number): string => {
+			let best = 0
+			for (let title = 0; titles && title < titles.count; title++)
+				if (titles.seat[title] === province && titles.tier[title] > best)
+					best = titles.tier[title]
+			return best > 0
+				? `${TITLE_TIER_LABELS[TITLES.tierOrder[best]]} seat`
+				: TITLE_TIER_LABELS.county
+		}
+		const hasTitle = owner !== null && titles !== null
+		const titleLabel = hasTitle ? seatTierLabel(hoverProvince) : null
 		const realmTier = tierForNationMode(nationMode)
-		const tierRealms = realmTier
-			? FRAME.provinceTierRealm({ frame, tier: realmTier })
-			: null
-		const realmHolder = tierRealms?.[hoverProvince] ?? -1
-		const realmSize = tierRealms
-			? tierRealms.reduce(
-					(count, holder) => (holder === realmHolder ? count + 1 : count),
+		const tierRegion =
+			realmTier && titles
+				? DEJURE.tierRegion({
+						titles,
+						provinceCount: frame.provinceCount,
+						tier: TITLES.tierOrder.indexOf(realmTier),
+					})
+				: null
+		const realmTitle = tierRegion?.[hoverProvince] ?? -1
+		const realmSize = tierRegion
+			? tierRegion.reduce(
+					(count, title) => (title === realmTitle ? count + 1 : count),
 					0,
 				)
 			: 0
+		const realmSeat = titles && realmTitle >= 0 ? titles.seat[realmTitle] : -1
+		const realmHolder =
+			titles && realmTitle >= 0
+				? (frame.nations.get(titles.holder[realmTitle])?.name ?? "no one")
+				: null
 		const realmLabel =
-			realmTier && realmHolder >= 0
-				? `${TITLE_TIER_LABELS[realmTier]} of ${history.state.provinceMeta[realmHolder]?.name ?? `Province ${realmHolder}`} · ${realmSize} provinces`
+			realmTier && realmTitle >= 0
+				? `${TITLE_TIER_LABELS[realmTier]} of ${history.state.provinceMeta[realmSeat]?.name ?? `Province ${realmSeat}`} · ${realmSize} provinces · held by ${realmHolder}`
 				: null
 		const liegeProvince = frame.provinceParent[hoverProvince]
 		const liegeLabel =
 			hasTitle && liegeProvince >= 0
-				? `${history.state.provinceMeta[liegeProvince]?.name ?? `Province ${liegeProvince}`} · ${titleTier(liegeProvince)}`
+				? `${history.state.provinceMeta[liegeProvince]?.name ?? `Province ${liegeProvince}`} · ${seatTierLabel(liegeProvince)}`
 				: null
 		const religionColor = religion
 			? COLOR.rgb01ToCss(
@@ -584,10 +598,22 @@ export function useMapColoring(input: MapColoringInput) {
 				// bleeding through org territory coloring.
 				return null
 			}
-			return computeHistoryOccupationOverlay({
-				frame: history.query.frame,
-				regionProvince: worldForDisplay.provinces.regionProvince,
-			})
+			const holdingTier =
+				colorMode === "nations" ? tierForNationMode(nationMode) : null
+			const holdingStripes = holdingTier
+				? computeTitleStripeOverlay({
+						frame: history.query.frame,
+						regionProvince: worldForDisplay.provinces.regionProvince,
+						tier: holdingTier,
+					})
+				: null
+			return (
+				holdingStripes ??
+				computeHistoryOccupationOverlay({
+					frame: history.query.frame,
+					regionProvince: worldForDisplay.provinces.regionProvince,
+				})
+			)
 		}
 		return null
 	}, [
@@ -598,6 +624,8 @@ export function useMapColoring(input: MapColoringInput) {
 		history.organizationReference,
 		selectedWikiOrganizationId,
 		buildOrgCategorizer,
+		colorMode,
+		nationMode,
 	])
 
 	const occupationStripeColorForRawId = useMemo<null>(() => null, [])

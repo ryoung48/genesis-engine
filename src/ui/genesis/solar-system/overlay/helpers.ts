@@ -85,3 +85,13 @@ export function measureBodyMoonSystemOuterRadius(
 
 	return outerRadiusInMoonOverlayUnits * sceneRadius
 }
+
+export function maxNonRealisticPlanetSceneRadius(bodies: SystemBody[]): number {
+	let maxRadius = 0
+	for (const body of bodies) {
+		if (body.group === "asteroid belt") continue
+		const radius = bodySceneRadius(body.diameterKm, body.sizeClass, false)
+		if (radius > maxRadius) maxRadius = radius
+	}
+	return maxRadius
+}

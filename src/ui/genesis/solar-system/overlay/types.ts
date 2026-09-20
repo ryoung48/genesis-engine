@@ -134,6 +134,10 @@ export interface SolarSystemOverlayParams {
 	 * companion-of-a-companion nesting) and so can't see that sibling in its
 	 * own `companions.length`. See starLight.distance and systemAmbient. */
 	isCompanion?: boolean
+	// [JUSTIFICATION] Only set on the internal recursive companion call so a
+	// companion star stays bigger than the primary's planets too, not just its
+	// own; external callers never provide it.
+	minStarRadius?: number
 }
 
 export interface SolarSystemOverlayState {

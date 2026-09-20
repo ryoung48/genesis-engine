@@ -304,7 +304,8 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	)
 	const getDynastyName = useCallback(
 		(dynastyId: number) =>
-			worldNames?.dynasty(dynastyId) ?? `Dynasty #${dynastyId}`,
+			worldNames?.dynasty({ dynastyIdx: dynastyId, province: -1 }) ??
+			`Dynasty #${dynastyId}`,
 		[worldNames],
 	)
 	const getLandmarkName = useCallback(

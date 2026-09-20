@@ -123,9 +123,7 @@ function buildMoonMesh(
 	gridSpacing: number,
 	texturePath?: string,
 	cloudsTexturePath?: string,
-	/** When set, the moon renders this procedural shader material (chosen by
-	 * classification -- see buildProceduralBodyMaterial) instead of any photo
-	 * texture -- see buildMoonOrbitOverlay's proceduralSystem gate. */
+	// [JUSTIFICATION] Authored moon photos do not need a procedural material.
 	proceduralMaterial?: THREE.MeshStandardMaterial,
 ): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(radius, 24, 18)
@@ -444,7 +442,7 @@ export function buildMoonOrbitOverlay(
 			gridSpacing,
 			moon.texturePath,
 			moon.cloudsTexturePath,
-			proceduralSystem && moon.classification
+			(proceduralSystem || !moon.texturePath) && moon.classification
 				? buildProceduralBodyMaterial({
 						seed: i + 1,
 						classification: moon.classification,

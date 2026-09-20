@@ -624,19 +624,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			})
 			const mainWorldSeed: SolPlanetSeed = {
 				...EARTH_SEED,
-				// Never show the real Earth surface art on a procedurally generated
-				// "Earth clone" main world -- undefined here falls through to the
-				// normal generated-texture pipeline (seismology/index.ts), which
-				// picks tectonic/rockball art from the clone's real classification
-				// instead. isMainWorld bodies render via live simulated terrain
-				// regardless (see overlay.ts's mainWorldSatelliteMap), so
-				// texturePath itself is moot for them either way -- but
-				// cloudsTexturePath IS rendered unconditionally (not bypassed like
-				// texturePath is for isMainWorld), so keep Earth's real cloud layer
-				// here rather than falling through to a generated one. The literal
-				// Luna clone moon below is not isMainWorld and would otherwise
-				// render the real Moon photo directly, so its own texturePath still
-				// gets blanked.
+				// The Earth clone and its Luna clone use procedural surfaces.
 				texturePath: undefined,
 				seed: "main-world",
 				name: nameBody("main-world"),
@@ -1173,12 +1161,6 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			zone: slot.zone,
 			impactZone,
 			beltOfIdx: isProtoSlot ? siblingIdx : undefined,
-			// texturePath/cloudsTexturePath are assigned later by
-			// PLANET.applySystemSeismology, once the body's real
-			// seismology-inclusive temperature (and any post-seismology
-			// hydrosphere/classification change) is known -- see
-			// seismology/index.ts's applyBodySeismology. Picking them here would
-			// use a stale pre-seismology climate estimate.
 			rings: ROLLS.rollPlanetRings({
 				rng,
 				group: finalEnvironment.group,

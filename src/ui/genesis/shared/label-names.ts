@@ -1,9 +1,10 @@
-﻿import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
+import type { DynastyNameParams } from "@/model/society/language/names/types"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 interface LabelNameResolvers {
 	nation: (capitalProvince: number) => string
-	dynasty: (dynastyId: number) => string
+	dynasty: (params: DynastyNameParams) => string
 	province: (provinceIdx: number) => string
 	culture: (cultureId: number) => string
 	heritage: (heritageId: number) => string
@@ -110,7 +111,13 @@ export function buildNationDynastyLabelNames(
 		const capitalProvince = world.nations.seeds[i] ?? -1
 		const dynastyId =
 			capitalProvince >= 0 ? (world.leaderDynasty[capitalProvince] ?? -1) : -1
-		names[i] = dynastyId >= 0 ? resolvers.dynasty(dynastyId) : ""
+		names[i] =
+			dynastyId >= 0
+				? resolvers.dynasty({
+						dynastyIdx: dynastyId,
+						province: capitalProvince,
+					})
+				: ""
 	}
 	return names
 }

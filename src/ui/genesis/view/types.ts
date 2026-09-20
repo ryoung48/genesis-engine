@@ -226,7 +226,6 @@ export type MapColoringInput = {
 	showElevation: boolean
 	dangerSubMode: DangerSubMode
 	selectedWikiOrganizationId: string | null
-	selectedWikiNationId: number | null
 	windVectors: ReturnType<typeof WIND.computeWindVectors> | null
 	hoverProvince: number | null
 	temperatureMonth: number

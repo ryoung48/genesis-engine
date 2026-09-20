@@ -3,6 +3,7 @@ import { COLONIAL } from "@/model/history/sim/nations/colonial"
 import { COLORING } from "@/model/history/sim/nations/coloring"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
+import { TITLE_CLAIM } from "@/model/history/sim/nations/title-claim"
 import type {
 	BuildNationPlanParams,
 	ComputeNationsParams,
@@ -16,6 +17,8 @@ import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { IDENTITY_SEEDS } from "@/model/shared/random/identity-seeds"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
+import { DEJURE } from "@/model/society/dejure"
+import { HOLDING } from "@/model/society/dejure/holding"
 import { ERAS } from "@/model/society/eras"
 import { HIERARCHY } from "@/model/society/hierarchy"
 import type {
@@ -88,6 +91,15 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 	}
 	if (activeCount === 0) return emptyPartition(provinceCount)
 
+	const titles = DEJURE.build({
+		adjOffset: provinces.adjOffset,
+		adjList: provinces.adjList,
+		active,
+		habitability,
+		waterAccess,
+		provinceCount,
+	})
+	const titleMembers = DEJURE.membersOf({ titles, provinceCount })
 	const noise = new SimplexNoise(params.seed ^ 0xdeadbeef)
 	const plan = buildNationPlan({
 		total: activeCount,
@@ -125,26 +137,41 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		if (seedProvince < 0) continue
 
 		const nation = seeds.length
-		seeds.push(seedProvince)
-		sizes.push(1)
-		assignment[seedProvince] = nation
-		assigned++
+		const seedUnit = TITLE_CLAIM.unitFor({
+			titles,
+			members: titleMembers,
+			provinceCount,
+			assignment,
+			province: seedProvince,
+			remaining: target,
+		})
+		const root =
+			seedUnit.title >= 0 ? titles.seat[seedUnit.title] : seedProvince
+		seeds.push(root)
+		sizes.push(0)
 
 		const frontier = new Set<number>()
-		for (
-			let j = provinces.adjOffset[seedProvince],
-				jEnd = provinces.adjOffset[seedProvince + 1];
-			j < jEnd;
-			j++
-		) {
-			const nb = provinces.adjList[j]
-			if (active[nb] && assignment[nb] < 0) frontier.add(nb)
+		const claimUnit = (unit: number[]) => {
+			for (const province of unit) {
+				PLACEMENT.claimProvinceDynamic({
+					nation,
+					province,
+					active,
+					assignment,
+					sizes,
+					frontier,
+					adjOffset: provinces.adjOffset,
+					adjList: provinces.adjList,
+				})
+				assigned++
+			}
 		}
+		claimUnit(seedUnit.provinces)
 
 		while (sizes[nation] < target) {
 			const claim = PLACEMENT.bestClaim({
 				nation,
-				seedProvince,
+				seedProvince: root,
 				frontier,
 				active,
 				assignment,
@@ -158,22 +185,21 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				maxSpreadRad,
 			})
 			if (claim < 0) break
-			PLACEMENT.claimProvinceDynamic({
-				nation,
-				province: claim,
-				active,
-				assignment,
-				sizes,
-				frontier,
-				adjOffset: provinces.adjOffset,
-				adjList: provinces.adjList,
-			})
-			assigned++
+			claimUnit(
+				TITLE_CLAIM.unitFor({
+					titles,
+					members: titleMembers,
+					provinceCount,
+					assignment,
+					province: claim,
+					remaining: target - sizes[nation],
+				}).provinces,
+			)
 		}
 
 		const blockHops = Math.max(1, Math.round(Math.sqrt(target) * 0.5))
 		PLACEMENT.markBlocked({
-			start: seedProvince,
+			start: root,
 			hops: blockHops,
 			active,
 			blocked,
@@ -405,28 +431,39 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		nationCount,
 		provinceCount,
 	})
-	const parent = new Int32Array(provinceCount).fill(-1)
-	const depth = new Int32Array(provinceCount)
+	const ownerOf = new Int32Array(provinceCount).fill(-1)
+	for (let province = 0; province < provinceCount; province++)
+		if (assignment[province] >= 0)
+			ownerOf[province] = seeds[assignment[province]]
 	const urbanPop = new Float32Array(provinceCount)
-	for (let nation = 0; nation < nationCount; nation++) {
-		const members = nationMembers[nation]
-		const capital = seeds[nation]
-		const subjects = members.filter((province) => province !== capital)
-		if (subjects.length === 0) continue
-		HIERARCHY.rebalanceHierarchy({
-			capital,
-			members: Int32Array.from(subjects),
-			parent,
-			depth,
-			currentDepth: 0,
+	const allTitles = Array.from({ length: titles.count }, (_, title) => title)
+	let rank = DEJURE.seatRank({ titles, provinceCount, heldOnly: false })
+	for (let pass = 0; pass < 2; pass++) {
+		HOLDING.settleTitles({
+			titles,
+			members: titleMembers,
+			provinceCount,
+			ownerOf,
+			rank,
 			habitability,
 			urbanPop,
 			waterAccess,
-			adjOffset: provinces.adjOffset,
-			adjList: provinces.adjList,
-			provinceCount,
+			touched: allTitles,
 		})
+		rank = DEJURE.seatRank({ titles, provinceCount, heldOnly: true })
 	}
+	const parent = new Int32Array(provinceCount).fill(-1)
+	for (let nation = 0; nation < nationCount; nation++)
+		DEJURE.deriveParents({
+			titles,
+			provinceCount,
+			rank,
+			ownerOf,
+			members: nationMembers[nation],
+			root: seeds[nation],
+			parent,
+		})
+	const depth = DEJURE.depthOfParents({ parent })
 
 	const { childOffset, childList } = HIERARCHY.buildChildrenCSR({
 		parent,
@@ -441,6 +478,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		childOffset,
 		childList,
 		depth,
+		rank,
 		provinceCount,
 	})
 
@@ -670,6 +708,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		childList,
 		sovereign,
 		gravity,
+		titles,
 		governmentType,
 		nationColonizer,
 		organizations,
@@ -968,6 +1007,13 @@ function emptyPartition(nodeCount: number): GenesisNationHierarchy {
 		childList: new Int32Array(0),
 		sovereign: new Int32Array(nodeCount).fill(-1),
 		gravity: new Float32Array(nodeCount),
+		titles: {
+			count: 0,
+			tier: new Uint8Array(0),
+			seat: new Int32Array(0),
+			holder: new Int32Array(0),
+			regionOf: new Int32Array(0),
+		},
 		governmentType: new Uint8Array(nodeCount),
 		nationColonizer: new Int32Array(0),
 	}

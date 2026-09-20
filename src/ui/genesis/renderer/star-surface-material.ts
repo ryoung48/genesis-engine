@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import type { SpectralClass } from "@/model/celestial/star/types"
+import type { StarGlowMaterialInput } from "@/ui/genesis/renderer/types"
 
 // Hand-authored photosphere palette per spectral class: the fbm mixes
 // between `hot` (its brightest granules) and `mid`, then toward `deep` (its
@@ -108,7 +109,7 @@ const GIANT_NOISE_SCALE = 2.5
 // spread over an annulus wider than the star itself, was the original
 // blown-out halo.
 export const STAR_GLOW_RADIUS_SCALE = 1.9
-const GLOW_STRENGTH = 0.55
+export const STAR_GLOW_STRENGTH = 0.55
 
 export type StarSurfaceLayersInput = {
 	spectralClass: SpectralClass
@@ -248,11 +249,36 @@ const STAR_NOISE_CHUNK = `
 	}
 `
 
+export function buildStarGlowMaterial(
+	input: StarGlowMaterialInput,
+): THREE.ShaderMaterial {
+	return new THREE.ShaderMaterial({
+		uniforms: {
+			haloColor: { value: input.tint.clone() },
+			strength: { value: input.strength },
+		},
+		vertexShader: STAR_VERTEX_SHADER,
+		fragmentShader: `
+			uniform vec3 haloColor;
+			uniform float strength;
+			varying vec3 vNormalView;
+			varying vec3 vPosition;
+			void main() {
+				float intensity = pow(max(dot(vPosition, vNormalView), 0.), 4.);
+				gl_FragColor = vec4(haloColor, intensity * strength);
+			}
+		`,
+		transparent: true,
+		blending: THREE.AdditiveBlending,
+		depthWrite: false,
+		side: THREE.BackSide,
+	})
+}
+
 export function buildStarSurfaceLayers(
 	input: StarSurfaceLayersInput,
 ): StarSurfaceLayers {
 	const time = { value: 0 }
-	const tint = input.tint.clone()
 	const starPalette = input.isGiant
 		? GIANT_PALETTE
 		: (STAR_PALETTE_BY_CLASS[input.spectralClass] ?? DEFAULT_STAR_PALETTE)
@@ -328,33 +354,9 @@ export function buildStarSurfaceLayers(
 		`,
 	})
 
-	const glow = new THREE.ShaderMaterial({
-		uniforms: {
-			haloColor: { value: tint.clone() },
-			strength: { value: GLOW_STRENGTH },
-		},
-		vertexShader: STAR_VERTEX_SHADER,
-		fragmentShader: `
-			uniform vec3 haloColor;
-			uniform float strength;
-			varying vec3 vNormalView;
-			varying vec3 vPosition;
-			void main() {
-				// Positive only on back-facing geometry, peaking on the view axis
-				// -- so on a BackSide shell this is brightest directly behind the
-				// star and falls to nothing at the shell's own rim.
-				float intensity = pow(max(dot(vPosition, vNormalView), 0.), 4.);
-				gl_FragColor = vec4(haloColor, intensity * strength);
-			}
-		`,
-		transparent: true,
-		// Additive: a corona is emitted light, and being a BackSide shell it
-		// only ever covers starfield or empty space rather than the star's own
-		// surface -- so there is no granulation for it to wash out, only
-		// background for it to correctly glow over.
-		blending: THREE.AdditiveBlending,
-		depthWrite: false,
-		side: THREE.BackSide,
+	const glow = buildStarGlowMaterial({
+		tint: input.tint,
+		strength: STAR_GLOW_STRENGTH,
 	})
 
 	function setSpinHours(hours: number): void {

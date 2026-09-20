@@ -6,11 +6,6 @@ export interface DerivedCache {
 	wealthOptimal?: Map<number, number>
 }
 
-export interface NationMemberCountParams {
-	state: HistoryState
-	root: number
-}
-
 export interface DerivedLookupParams {
 	state: HistoryState
 	p: number

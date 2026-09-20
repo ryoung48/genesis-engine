@@ -1,4 +1,9 @@
-import { cleanEu4Identifier } from "@/ui/wiki/nation/timeline-formatting"
+import {
+	cleanEu4Identifier,
+	indefiniteArticle,
+	joinWithAnd,
+	pluralizeSubjectTypeLabel,
+} from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
 /**
@@ -75,14 +80,203 @@ export function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-export function mergedTerritoryType(events: NationTimelineEvent[]): string {
+export function mergedSignedType({
+	events,
+	label,
+}: {
+	events: NationTimelineEvent[]
+	label: string
+}): string {
 	const signs = new Set(
 		events
 			.map((event) => /\(([+-])\)$/.exec(event.type)?.[1])
 			.filter((sign): sign is string => sign !== undefined),
 	)
-	if (signs.size === 1) return `Territory (${Array.from(signs)[0]})`
-	return "Territory"
+	if (signs.size === 1) return `${label} (${Array.from(signs)[0]})`
+	return label
+}
+
+interface DiplomacyClause {
+	key: string
+	object: string
+	render: (objects: string[]) => string
+}
+
+function plural(count: number): boolean {
+	return count > 1
+}
+
+function relationPhrase({
+	relation,
+	count,
+}: {
+	relation: string
+	count: number
+}): string {
+	return plural(count)
+		? pluralizeSubjectTypeLabel(relation)
+		: `${indefiniteArticle(relation)} ${relation}`
+}
+
+const DIPLOMACY_PARSERS: Array<(predicate: string) => DiplomacyClause | null> =
+	[
+		(text) => {
+			const match =
+				/^gained (.+) as a junior partner in a personal union$/.exec(text)
+			return match
+				? {
+						key: "junior-gained",
+						object: match[1],
+						render: (objects) =>
+							`gained ${joinWithAnd(objects)} as ${plural(objects.length) ? "junior partners in personal unions" : "a junior partner in a personal union"}`,
+					}
+				: null
+		},
+		(text) => {
+			const match =
+				/^became junior partner in a personal union under (.+)$/.exec(text)
+			return match
+				? {
+						key: "junior-became",
+						object: match[1],
+						render: (objects) =>
+							`became junior partner in a personal union under ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^left the personal union under (.+)$/.exec(text)
+			return match
+				? {
+						key: "union-left",
+						object: match[1],
+						render: (objects) =>
+							`left the personal ${plural(objects.length) ? "unions" : "union"} under ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^(gained|lost) (.+) as an? (.+)$/.exec(text)
+			return match
+				? {
+						key: `${match[1]}:${match[3]}`,
+						object: match[2],
+						render: (objects) =>
+							`${match[1]} ${joinWithAnd(objects)} as ${relationPhrase({ relation: match[3], count: objects.length })}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^(became|stopped being) an? (.+) of (.+)$/.exec(text)
+			return match
+				? {
+						key: `${match[1]}:${match[2]}`,
+						object: match[3],
+						render: (objects) =>
+							`${match[1]} ${indefiniteArticle(match[2])} ${match[2]} of ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^(formed|ended) an? (.+) with (.+)$/.exec(text)
+			return match
+				? {
+						key: `${match[1]}:${match[2]}`,
+						object: match[3],
+						render: (objects) =>
+							`${match[1]} ${relationPhrase({ relation: match[2], count: objects.length })} with ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^guaranteed (.+)$/.exec(text)
+			return match
+				? {
+						key: "guaranteed",
+						object: match[1],
+						render: (objects) => `guaranteed ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^received a guarantee from (.+)$/.exec(text)
+			return match
+				? {
+						key: "guarantee-received",
+						object: match[1],
+						render: (objects) =>
+							`received ${plural(objects.length) ? "guarantees" : "a guarantee"} from ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^stopped guaranteeing (.+)$/.exec(text)
+			return match
+				? {
+						key: "guarantee-stopped",
+						object: match[1],
+						render: (objects) => `stopped guaranteeing ${joinWithAnd(objects)}`,
+					}
+				: null
+		},
+		(text) => {
+			const match = /^lost (.+)'s guarantee$/.exec(text)
+			return match
+				? {
+						key: "guarantee-lost",
+						object: match[1],
+						render: (objects) =>
+							plural(objects.length)
+								? `lost the guarantees of ${joinWithAnd(objects)}`
+								: `lost ${objects[0]}'s guarantee`,
+					}
+				: null
+		},
+	]
+
+export function buildMergedDiplomacyDescription({
+	events,
+	title,
+}: {
+	events: NationTimelineEvent[]
+	title: string
+}): string {
+	const prefix = `${title} `
+	const groups = new Map<
+		string,
+		{ objects: string[]; clause: DiplomacyClause }
+	>()
+	const fallbackClauses: string[] = []
+	const sentences: string[] = []
+	for (const event of events) {
+		if (!event.description.startsWith(prefix)) {
+			sentences.push(event.description)
+			continue
+		}
+		const predicate = event.description.slice(prefix.length).replace(/\.$/, "")
+		let clause: DiplomacyClause | null = null
+		for (const parse of DIPLOMACY_PARSERS) {
+			clause = parse(predicate)
+			if (clause) break
+		}
+		if (!clause) {
+			fallbackClauses.push(predicate)
+			continue
+		}
+		const group = groups.get(clause.key)
+		if (group) group.objects.push(clause.object)
+		else groups.set(clause.key, { objects: [clause.object], clause })
+	}
+	const clauses = [
+		...Array.from(groups.values(), (group) =>
+			group.clause.render(Array.from(new Set(group.objects))),
+		),
+		...fallbackClauses,
+	]
+	return [
+		...(clauses.length > 0 ? [`${title} ${clauses.join("; ")}.`] : []),
+		...sentences,
+	].join(" ")
 }
 
 export function buildMergedTerritoryDescription(

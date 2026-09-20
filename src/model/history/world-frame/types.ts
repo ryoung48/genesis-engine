@@ -1,4 +1,3 @@
-import type { TitleTier } from "@/model/society/titles/types"
 export interface Ruler {
 	name: string
 	dynasty: string | null
@@ -60,6 +59,14 @@ export interface OrganizationFrame {
 	province: number
 }
 
+export interface TitleFrame {
+	count: number
+	tier: Uint8Array
+	seat: Int32Array
+	holder: Int32Array
+	regionOf: Int32Array
+}
+
 export interface WorldFrame {
 	timeMs: number
 	provinceCount: number
@@ -73,6 +80,8 @@ export interface WorldFrame {
 	provincePopulation: Float32Array
 	provincePopulationUrban: Float32Array
 	provinceDevelopment: Float32Array
+	// [JUSTIFICATION] Earth frames have no de jure title layer.
+	titles: TitleFrame | null
 	nations: Map<number, NationFrame>
 	wars: WarFrame[]
 	organizations: OrganizationFrame[]
@@ -117,17 +126,4 @@ export interface RenderInputs {
 
 export interface ToRenderInputsParams {
 	frame: WorldFrame
-}
-
-export interface ProvinceDepthParams {
-	frame: WorldFrame
-}
-
-export interface ProvinceDomainParams {
-	frame: WorldFrame
-}
-
-export interface ProvinceTierRealmParams {
-	frame: WorldFrame
-	tier: TitleTier
 }

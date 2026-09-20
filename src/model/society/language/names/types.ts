@@ -51,6 +51,11 @@ export interface BuildLeaderSlotParams {
 	entry: LanguageNameLeaderEntry
 }
 
+export interface DynastyNameParams {
+	dynastyIdx: number
+	province: number
+}
+
 export interface RulerNameParams {
 	province: number
 	nameSeed: number

@@ -211,6 +211,8 @@ function runSuccession({
 		// Fix disconnected vassals
 		STATE.fixConnections({ state, nation: province, rng })
 	}
+
+	STATE.considerTitles({ state, nation: province, rng })
 }
 
 export const SUCCESSION = {

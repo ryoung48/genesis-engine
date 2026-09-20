@@ -210,7 +210,9 @@ export function buildCloudBandMaterial(
 			)
 			.replace(
 				"#include <map_fragment>",
-				"vec3 giantPosition = normalize(vGiantObjectPosition); diffuseColor.rgb = giantBandMode > 2.5 ? giantBrownDwarfColor(giantPosition) : giantBandMode > 1.5 ? giantVenusColor(giantPosition) : giantBandMode > 0.5 ? giantBandedColor(giantPosition) : giantCloudColor(giantPosition, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
+				`vec3 giantPosition = normalize(vGiantObjectPosition);
+				diffuseColor.rgb = giantBandMode > 2.5 ? giantBrownDwarfColor(giantPosition) : giantBandMode > 1.5 ? giantVenusColor(giantPosition) : giantBandMode > 0.5 ? giantBandedColor(giantPosition) : giantCloudColor(giantPosition, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);
+				if (giantBandMode > 2.5) totalEmissiveRadiance = diffuseColor.rgb * emissive.r;`,
 			)
 	}
 	return material

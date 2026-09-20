@@ -1,4 +1,5 @@
 import { MATH } from "@/model/shared/math/core"
+import { DEJURE } from "@/model/society/dejure"
 import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { GovernmentType } from "@/model/society/types"
@@ -97,15 +98,18 @@ function rankSizesForNation({
 	return sizes.length > provinceCount ? sizes.slice(0, provinceCount) : sizes
 }
 
-// Shallowest first (the sovereign, depth 0, gets the capital city); ties go to
-// the more habitable province so deeper-ranked provinces still differ.
+// The sovereign's seat gets the capital city, then the seats of the highest
+// titles, then everything else; ties go to the more habitable province.
 function sortByRank({
 	provinces,
-	depth,
+	root,
+	seatRank,
 	habitability,
 }: SortByRankParams): number[] {
+	const rankOf = (province: number) =>
+		province === root ? Number.POSITIVE_INFINITY : seatRank[province]
 	return provinces.slice().sort((a, b) => {
-		if (depth[a] !== depth[b]) return depth[a] - depth[b]
+		if (rankOf(a) !== rankOf(b)) return rankOf(b) - rankOf(a)
 		return habitability[b] - habitability[a]
 	})
 }
@@ -214,7 +218,12 @@ function spreadDevelopment({
 
 function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 	const { count: P, desolate } = inputs.provinces
-	const { parent, depth, sovereign, governmentType } = inputs.nations
+	const { parent, sovereign, governmentType, titles } = inputs.nations
+	const seatRank = DEJURE.seatRank({
+		titles,
+		provinceCount: inputs.provinces.count,
+		heldOnly: true,
+	})
 	const { population, habitability } = inputs.population
 	const urbanPopulation = new Float32Array(P)
 
@@ -237,7 +246,12 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 		let totalPop = 0
 		for (const prov of provinces) totalPop += population[prov]
 
-		const sorted = sortByRank({ provinces, depth, habitability })
+		const sorted = sortByRank({
+			provinces,
+			root: nation,
+			seatRank,
+			habitability,
+		})
 		const sizes = rankSizesForNation({
 			governmentTypeIndex: governmentType?.[nation] ?? 1,
 			totalPopulation: totalPop,

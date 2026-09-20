@@ -391,6 +391,12 @@ function nationBuffers(n: {
 	childList: Int32Array
 	sovereign: Int32Array
 	gravity: Float32Array
+	titles: {
+		tier: Uint8Array
+		seat: Int32Array
+		holder: Int32Array
+		regionOf: Int32Array
+	}
 	governmentType?: Uint8Array
 }): Transferable[] {
 	const nameSeeds = n.nameSeeds ?? new Int32Array(0)
@@ -403,6 +409,10 @@ function nationBuffers(n: {
 		n.childList.buffer as ArrayBuffer,
 		n.sovereign.buffer as ArrayBuffer,
 		n.gravity.buffer as ArrayBuffer,
+		n.titles.tier.buffer as ArrayBuffer,
+		n.titles.seat.buffer as ArrayBuffer,
+		n.titles.holder.buffer as ArrayBuffer,
+		n.titles.regionOf.buffer as ArrayBuffer,
 		...(n.governmentType ? [n.governmentType.buffer as ArrayBuffer] : []),
 	]
 }

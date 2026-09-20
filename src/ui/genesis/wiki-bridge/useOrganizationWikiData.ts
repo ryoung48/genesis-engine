@@ -13,6 +13,7 @@ import {
 } from "@/ui/genesis/renderer/focus"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
+import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
@@ -394,10 +395,10 @@ export function useOrganizationWikiData(
 				}
 			}
 		}
-		const areaKm2 = worldForDisplay.provinces?.areaKm2
-		const totalAreaKm2 = areaKm2
-			? provinceIndexes.reduce((sum, p) => sum + (areaKm2[p] ?? 0), 0)
-			: 0
+		const totalAreaKm2 = provinceIndexes.reduce(
+			(sum, p) => sum + getProvinceAreaKm2(worldForDisplay, p),
+			0,
+		)
 		const realPopulation =
 			worldForDisplay.realPopulation?.population ??
 			worldForDisplay.population?.population

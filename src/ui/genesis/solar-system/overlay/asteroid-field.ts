@@ -1,15 +1,10 @@
 import * as THREE from "three"
+import { buildCraterMaterial } from "@/ui/genesis/renderer/crater-material"
 import {
 	BELT_VERTICAL_RATIO,
 	TWO_PI,
 } from "@/ui/genesis/solar-system/overlay/constants"
-import { loadBodyTexture } from "@/ui/genesis/solar-system/overlay/textures"
 import type { AsteroidFieldData } from "@/ui/genesis/solar-system/overlay/types"
-
-const ASTEROID_TEXTURE_PATH =
-	"/textures/celestial/generated/asteroids/rocky/1.png"
-const ICE_ASTEROID_TEXTURE_PATH =
-	"/textures/celestial/generated/asteroids/ice/1.png"
 
 // Scatters a field of small, irregularly-scaled rocks around a belt's ring —
 // each on its own randomized circular sub-orbit (slightly jittered radius and
@@ -49,26 +44,13 @@ export function buildAsteroidField(
 		Math.sqrt(areaScaledCount / count),
 	)
 	const geometry = new THREE.IcosahedronGeometry(1, 0)
-	// Every instance shares this one texture (loadBodyTexture caches it) --
-	// the per-instance vertex color below still multiplies over it so each
-	// rock reads as a distinct shade/tint rather than an identical stamp.
-	const material = new THREE.MeshStandardMaterial({
-		color: 0xb0b0b0,
-		map: loadBodyTexture(
-			isOuterZone ? ICE_ASTEROID_TEXTURE_PATH : ASTEROID_TEXTURE_PATH,
-		),
-		roughness: 1,
-		metalness: 0,
-		// With daylight mode's dim 0.15 ambient (vs. the 2.6 non-daylight uses,
-		// which already fully lights every rock regardless of facing), each
-		// tiny rock's unlit hemisphere reads as near-black -- at this scale and
-		// instance count that makes roughly half the belt disappear instead of
-		// reading as a lit swarm. A small constant emissive floor keeps the
-		// dark side dimly visible without washing out the terminator lighting
-		// a planet-scale body gets elsewhere.
-		emissive: 0x2a2a2a,
-		emissiveIntensity: 0.6,
+	const material = buildCraterMaterial({
+		seed: isOuterZone ? 2 : 1,
+		color: isOuterZone ? "#dce7ed" : "#b0b0b0",
+		style: isOuterZone ? "snowball" : "cratered",
 	})
+	material.emissive.setHex(0x2a2a2a)
+	material.emissiveIntensity = 0.6
 	const mesh = new THREE.InstancedMesh(geometry, material, count)
 	const angles = new Float32Array(count)
 	const radii = new Float32Array(count)

@@ -199,6 +199,10 @@ function identityForRoot({
 	return id
 }
 
+function holderId({ translator, root, timeMs }: IdentityForRootParams): number {
+	return root < 0 ? -1 : identityForRoot({ translator, root, timeMs })
+}
+
 function projectTie({
 	translator,
 	x,
@@ -464,6 +468,42 @@ function appendNote({
 				})
 			translator.warCoalitions.delete(warId)
 		}
+	} else if (note.tag === "title passed") {
+		record.events.titleEvents.push({
+			timeMs,
+			kind: "passed",
+			title: data.title as number,
+			from: holderId({ translator, root: data.from as number, timeMs }),
+			to: holderId({ translator, root: data.to as number, timeMs }),
+		})
+	} else if (note.tag === "title created") {
+		record.events.titleEvents.push({
+			timeMs,
+			kind: "created",
+			title: data.title as number,
+			tier: data.tier as number,
+			seat: data.seat as number,
+			holder: holderId({ translator, root: data.holder as number, timeMs }),
+			children: data.children as number[],
+			ancestors: data.ancestors as number[],
+		})
+	} else if (note.tag === "title destroyed") {
+		record.events.titleEvents.push({
+			timeMs,
+			kind: "destroyed",
+			title: data.title as number,
+			children: data.children as number[],
+			ancestors: data.ancestors as number[],
+		})
+	} else if (note.tag === "capital moved") {
+		record.events.titleEvents.push({
+			timeMs,
+			kind: "moved",
+			title: data.title as number,
+			from: data.from as number,
+			to: data.to as number,
+			cause: data.cause as string,
+		})
 	} else if (note.tag === "dynasty spread") {
 		const firstId = translator.identityByRoot.get(data.source as number)
 		const secondId = translator.identityByRoot.get(data.nation as number)
@@ -715,7 +755,12 @@ function applyTransaction({
 			payload: {
 				name: ruler.regent ? "Regency Council" : named.name,
 				dynasty:
-					ruler.dynasty >= 0 ? translator.names.dynasty(ruler.dynasty) : null,
+					ruler.dynasty >= 0
+						? translator.names.dynasty({
+								dynastyIdx: ruler.dynasty,
+								province: ruler.root,
+							})
+						: null,
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
 				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
 				female: named.female,

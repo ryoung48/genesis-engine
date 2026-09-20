@@ -24,13 +24,6 @@ function hasThinAtmosphere(
 	return atmosphere.subtype === "thin" || atmosphere.subtype === "very thin"
 }
 
-/** Picks a body's procedural shader material by classification, for every
- * body rendered without a real/simulated photo texture -- a procedurally
- * generated system's siblings and main world, plus (regardless of system)
- * any helian/panthalassic body, which never gets generated art at all (see
- * texture/index.ts's pickGeneratedBodyTextures). Shared between
- * overlay.ts (planets) and moon-orbit-overlay.ts (moons) so the two don't
- * drift out of sync on which classification gets which look. */
 export function buildProceduralBodyMaterial(
 	input: ProceduralBodyMaterialInput,
 ): THREE.MeshStandardMaterial {

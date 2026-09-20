@@ -37,10 +37,13 @@ export type BrownDwarfClass = "L" | "T" | "Y"
 export type BrownDwarfGlowInput = {
 	spectralClass: BrownDwarfClass
 	subtype: number
+	// [JUSTIFICATION] Experiment swatches can override the class color.
+	color?: string
 }
 
 export type BrownDwarfGlow = {
 	color: string
+	haloTint: THREE.Color
 	haloOpacity: number
 	lightIntensity: number
 }
@@ -54,6 +57,11 @@ export type NeutronJetsInput = {
 export type NeutronJets = {
 	group: THREE.Group
 	dispose(): void
+}
+
+export type StarGlowMaterialInput = {
+	tint: THREE.Color
+	strength: number
 }
 
 export type CloudBandPalette = {

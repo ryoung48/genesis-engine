@@ -1,6 +1,6 @@
 ﻿import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
-function getProvinceAreaKm2(
+export function getProvinceAreaKm2(
 	world: SerializedGenesisWorld,
 	province: number,
 ): number {

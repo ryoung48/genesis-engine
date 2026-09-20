@@ -1,7 +1,6 @@
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
 	DevelopmentParams,
-	HierarchyDepthsParams,
 	InitPopulationParams,
 	RunPopulationParams,
 	UrbanizationParams,
@@ -24,24 +23,7 @@ function devToGrowthRate(dev: number): number {
 	})
 }
 
-function hierarchyDepths({ state }: HierarchyDepthsParams): Int32Array {
-	const depth = new Int32Array(state.P).fill(-1)
-	for (let p = 0; p < state.P; p++) {
-		const path: number[] = []
-		let current = p
-		while (depth[current] < 0 && state.parentCurrent[current] >= 0) {
-			path.push(current)
-			current = state.parentCurrent[current]
-		}
-		let next = depth[current] < 0 ? 0 : depth[current]
-		depth[current] = next
-		while (path.length > 0) depth[path.pop() as number] = ++next
-	}
-	return depth
-}
-
 function urbanization({ state, init }: UrbanizationParams): void {
-	const depth = hierarchyDepths({ state })
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p] || !STATE.isSovereign({ state, p })) continue
 
@@ -55,7 +37,8 @@ function urbanization({ state, init }: UrbanizationParams): void {
 
 		const sorted = URBANIZATION.sortByRank({
 			provinces,
-			depth,
+			root: p,
+			seatRank: state.seatRank,
 			habitability: state.habitability,
 		})
 		const sizes = URBANIZATION.rankSizesForNation({

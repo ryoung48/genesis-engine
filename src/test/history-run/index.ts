@@ -116,7 +116,7 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		`seed ${seed} era ${era} points ${numPoints} provinces ${engine.P} generation ${generationMs.toFixed(0)}ms init ${initMs.toFixed(0)}ms`,
 	)
 	log(
-		"year   tick  frame  nations  wars(rebel)  striped  occupied  recNations  provEvents  diploEvents",
+		"year   tick  frame  nations  wars(rebel)  striped  occupied  recNations  provEvents  diploEvents  titleEvents",
 	)
 
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
@@ -174,13 +174,14 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 			occupiedProvinces,
 			recordNations: state.record.nations.length,
 			provinceEvents,
+			titleEvents: state.record.events.titleEvents.length,
 			wars: state.record.events.wars.length,
 			diplomacyEvents: state.record.events.diplomacy.length,
 			population: frame.totalPopulation,
 		}
 		reports.push(report)
 		log(
-			`${String(year).padStart(4)} ${tickMs.toFixed(0).padStart(6)} ${frameMs.toFixed(0).padStart(6)} ${String(report.nations).padStart(8)} ${`${report.activeWars}(${report.activeRebelWars})`.padStart(12)} ${String(rebelStripedProvinces).padStart(8)} ${String(occupiedProvinces).padStart(9)} ${String(report.recordNations).padStart(11)} ${String(provinceEvents).padStart(11)} ${String(report.diplomacyEvents).padStart(12)}`,
+			`${String(year).padStart(4)} ${tickMs.toFixed(0).padStart(6)} ${frameMs.toFixed(0).padStart(6)} ${String(report.nations).padStart(8)} ${`${report.activeWars}(${report.activeRebelWars})`.padStart(12)} ${String(rebelStripedProvinces).padStart(8)} ${String(occupiedProvinces).padStart(9)} ${String(report.recordNations).padStart(11)} ${String(provinceEvents).padStart(11)} ${String(report.diplomacyEvents).padStart(12)} ${String(report.titleEvents).padStart(12)}`,
 		)
 	}
 

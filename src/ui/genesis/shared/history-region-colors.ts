@@ -2,8 +2,9 @@
 import { COLOR } from "@/model/history/earth/color"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
-import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import { DEJURE } from "@/model/society/dejure"
+import { TITLES } from "@/model/society/titles"
 import type { TitleTier } from "@/model/society/titles/types"
 import type { GenesisOrganization } from "@/model/society/types"
 import {
@@ -23,17 +24,6 @@ const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 
 type Rgb = [number, number, number]
 type OrganizationKind = GenesisOrganization["kind"]
-
-const DIPLOMACY_COLORS = {
-	self: [1, 1, 1],
-	subjectTie: [0.659, 0.333, 0.969],
-	union: [0.388, 0.4, 0.945],
-	ally: [0.231, 0.51, 0.965],
-	friendly: [0.133, 0.773, 0.369],
-	neutral: [0.788, 0.788, 0.788],
-	rival: [0.976, 0.451, 0.086],
-	war: [0.976, 0.22, 0.086],
-} as const satisfies Record<string, Rgb>
 
 const ORGANIZATION_COLORS = {
 	imperialPatchwork: [0.58, 0.29, 0.82],
@@ -56,43 +46,6 @@ function tierForTitlesMode(nationMode: NationMapMode): TitleTier | null {
 	}
 }
 
-function diplomacyColor(params: {
-	frame: WorldFrame
-	selectedNationId: number | null
-	other: number
-}): Rgb {
-	const { frame, selectedNationId, other } = params
-	const selected =
-		selectedNationId === null ? undefined : frame.nations.get(selectedNationId)
-	if (!selected || selectedNationId === null)
-		return [...DIPLOMACY_COLORS.neutral]
-	if (other === selectedNationId) return [...DIPLOMACY_COLORS.self]
-	const atWar = frame.wars.some(
-		(war) =>
-			(war.attackers.includes(selectedNationId) &&
-				war.defenders.includes(other)) ||
-			(war.defenders.includes(selectedNationId) &&
-				war.attackers.includes(other)),
-	)
-	if (atWar) return [...DIPLOMACY_COLORS.war]
-	const { relations } = selected
-	if (relations.overlord === other || relations.vassals.includes(other))
-		return [...DIPLOMACY_COLORS.subjectTie]
-	if (
-		relations.unionJuniorPartner === other ||
-		relations.unionSeniorOf.includes(other)
-	)
-		return [...DIPLOMACY_COLORS.union]
-	if (relations.allies.includes(other)) return [...DIPLOMACY_COLORS.ally]
-	if (relations.rivals.includes(other)) return [...DIPLOMACY_COLORS.rival]
-	if (
-		relations.guarantees.includes(other) ||
-		relations.royalMarriages.includes(other)
-	)
-		return [...DIPLOMACY_COLORS.friendly]
-	return [...DIPLOMACY_COLORS.neutral]
-}
-
 function organizationColor(params: {
 	frame: WorldFrame
 	owner: number
@@ -110,22 +63,6 @@ function organizationColor(params: {
 	return [...ORGANIZATION_COLORS.none]
 }
 
-/** Per Nation.id: fill color (0-1 RGB) from Nation.color (0-255). */
-/** Political/culture/religion/diplomacy map-mode coloring sourced from the
- * earth-history engine's folded state, for Earth-imported worlds. A sibling
- * to computeRegionColors in region-colors.ts rather than a branch inside it:
- * that function's "religion" mode is derived from a province's *culture*
- * index (world.religions.assignment[cultureIdx]), an assumption that holds
- * for the procedural generator (religion is a property of culture there)
- * but not for real EU4 history, where a province's religion is independent
- * of its culture (e.g. conversions). Reusing that indirection would silently
- * misrender religion, so this keeps its own small, direct implementation
- * instead. See docs/earth-history-plan.md "Map modes and hover gating".
- *
- * Returns null for any (colorMode, nationMode, populationMode) combination
- * this doesn't cover -- callers should fall back to computeRegionColors
- * (still correct for terrain/climate/density/etc, which aren't part of this
- * engine's scope). */
 export function computeHistoryRegionColors(params: {
 	colorMode: string
 	nationMode: NationMapMode
@@ -150,7 +87,6 @@ export function computeHistoryRegionColors(params: {
 	 * classification still shows through it; only the mode-specific color
 	 * is suppressed, since the overlay renders that more precisely). */
 	suppressFill?: boolean
-	selectedNationId: number | null
 	locations: Pick<GenesisLocations, "regionLocation"> | null
 	organizationKindById: ReadonlyMap<string, OrganizationKind>
 }): Float32Array | null {
@@ -166,7 +102,6 @@ export function computeHistoryRegionColors(params: {
 		religionColorById,
 		cultureColorById,
 		suppressFill,
-		selectedNationId,
 		locations,
 		organizationKindById,
 	} = params
@@ -177,7 +112,6 @@ export function computeHistoryRegionColors(params: {
 			nationMode === "government" ||
 			nationMode === "dynasty" ||
 			nationMode === "organizations" ||
-			nationMode === "diplomacy" ||
 			isTitlesNationMode(nationMode))
 	const isDemographic =
 		getBaseMapMode(colorMode as ColorMode) === "population" &&
@@ -194,18 +128,25 @@ export function computeHistoryRegionColors(params: {
 	if (!isPolitical && !isDemographic) return null
 
 	const titleTier = isPolitical ? tierForTitlesMode(nationMode) : null
-	const tierRealms = titleTier
-		? FRAME.provinceTierRealm({ frame, tier: titleTier })
-		: null
+	const titles = frame.titles
+	const tierIndex = titleTier ? TITLES.tierOrder.indexOf(titleTier) : 0
+	const tierRegion =
+		titleTier && titles
+			? DEJURE.tierRegion({
+					titles,
+					provinceCount: frame.provinceCount,
+					tier: tierIndex,
+				})
+			: null
 	const realmIndex = new Map<number, number>()
-	if (tierRealms) {
+	if (titles && titleTier) {
 		const perNation = new Map<number, number>()
-		for (let province = 0; province < frame.provinceCount; province++) {
-			if (tierRealms[province] !== province) continue
-			const owner = frame.provinceNation[province]
-			const next = perNation.get(owner) ?? 0
-			realmIndex.set(province, next)
-			perNation.set(owner, next + 1)
+		for (let title = 0; title < titles.count; title++) {
+			if (titles.tier[title] !== tierIndex) continue
+			const holder = titles.holder[title]
+			const next = perNation.get(holder) ?? 0
+			realmIndex.set(title, next)
+			perNation.set(holder, next + 1)
 		}
 	}
 	const nationBase = (id: number): [number, number, number] => {
@@ -320,16 +261,17 @@ export function computeHistoryRegionColors(params: {
 						elevationKm[r] ?? 0,
 					),
 				)
-			} else if (tierRealms) {
-				const holder = tierRealms[p]
+			} else if (tierRegion && titles) {
+				const title = tierRegion[p]
+				const holder = title < 0 ? -1 : titles.holder[title]
 				write(
 					r,
 					darkenPoliticalAtElevation(
 						holder < 0
 							? UNOWNED_GRAY
 							: tintNationColor({
-									base: nationBase(owner),
-									index: realmIndex.get(holder) ?? 0,
+									base: nationBase(holder),
+									index: realmIndex.get(title) ?? 0,
 								}),
 						elevationKm[r] ?? 0,
 					),
@@ -339,14 +281,6 @@ export function computeHistoryRegionColors(params: {
 					r,
 					darkenPoliticalAtElevation(
 						organizationColor({ frame, owner, organizationKindById }),
-						elevationKm[r] ?? 0,
-					),
-				)
-			} else if (nationMode === "diplomacy") {
-				write(
-					r,
-					darkenPoliticalAtElevation(
-						diplomacyColor({ frame, selectedNationId, other: owner }),
 						elevationKm[r] ?? 0,
 					),
 				)
@@ -448,6 +382,42 @@ export function computeHistoryOccupationOverlay(params: {
 		overlay[base + 1] = color[1]
 		overlay[base + 2] = color[2]
 		overlay[base + 3] = 1
+		hasAny = true
+	}
+	return hasAny ? overlay : null
+}
+
+export function computeTitleStripeOverlay(params: {
+	frame: WorldFrame
+	regionProvince: Int32Array
+	tier: TitleTier
+}): Float32Array | null {
+	const { frame, regionProvince, tier } = params
+	const { titles } = frame
+	if (!titles) return null
+	const tierRegion = DEJURE.tierRegion({
+		titles,
+		provinceCount: frame.provinceCount,
+		tier: TITLES.tierOrder.indexOf(tier),
+	})
+	const overlay = new Float32Array(regionProvince.length * 4)
+	let hasAny = false
+	for (let r = 0; r < regionProvince.length; r++) {
+		const p = regionProvince[r]
+		if (p < 0) continue
+		const owner = frame.provinceNation[p]
+		const title = tierRegion[p]
+		if (owner < 0 || title < 0) continue
+		const holder = titles.holder[title]
+		if (holder < 0 || holder === owner) continue
+		const nation = frame.nations.get(owner)
+		const color: [number, number, number] = nation
+			? [nation.color[0] / 255, nation.color[1] / 255, nation.color[2] / 255]
+			: COLOR.hashColorForKey(`nation:${owner}`)
+		overlay[r * 4] = color[0]
+		overlay[r * 4 + 1] = color[1]
+		overlay[r * 4 + 2] = color[2]
+		overlay[r * 4 + 3] = 1
 		hasAny = true
 	}
 	return hasAny ? overlay : null

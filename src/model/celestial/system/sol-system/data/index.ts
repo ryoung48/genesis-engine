@@ -364,9 +364,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		name: "Ceres",
 		group: "dwarf",
 		classification: "rockball",
-		// No real Ceres photo texture available yet -- reuses a generic
-		// rockball texture like every other unphotographed dwarf here.
-		texturePath: "/textures/celestial/generated/rockball/1.png",
 		parentBeltName: "Asteroid Belt",
 		au: 2.77,
 		diameterEarths: 939.4 / ORBIT_BODY.earthDiameterKm,
@@ -402,10 +399,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		name: "Pallas",
 		group: "dwarf",
 		classification: "rockball",
-		// No real Pallas photo texture available yet -- reuses a generic
-		// rockball texture (a different one than Ceres's, so the two don't
-		// render identically).
-		texturePath: "/textures/celestial/generated/rockball/3.png",
 		parentBeltName: "Asteroid Belt",
 		au: 2.77,
 		diameterEarths: 512 / ORBIT_BODY.earthDiameterKm,
@@ -660,7 +653,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				name: "Iapetus",
 				group: "dwarf",
 				classification: "snowball",
-				texturePath: "/textures/celestial/generated/rockball/3.png",
 				diameterEarths: 1469 / ORBIT_BODY.earthDiameterKm,
 				massEarths: 1.805e21 / ORBIT_BODY.earthMassKg,
 				gravityG: 0.02277,
@@ -732,7 +724,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				name: "Miranda",
 				group: "dwarf",
 				classification: "snowball",
-				texturePath: "/textures/celestial/generated/rockball/4.png",
 				diameterEarths: 471.6 / ORBIT_BODY.earthDiameterKm,
 				massEarths: 6.4e19 / ORBIT_BODY.earthMassKg,
 				gravityG: 0.00783,
@@ -887,7 +878,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				name: "Nereid",
 				group: "dwarf",
 				classification: "snowball",
-				texturePath: "/textures/celestial/generated/rockball/5.png",
 				diameterEarths: 340 / ORBIT_BODY.earthDiameterKm,
 				// Real mass/density are both poorly constrained (Voyager 2 never
 				// flew close) -- order-of-magnitude estimates, not tightly
@@ -1022,9 +1012,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		name: "Haumea",
 		group: "dwarf",
 		classification: "snowball",
-		// No real Haumea photo texture available -- generic rockball texture,
-		// same convention as Ceres/Pallas/Eris.
-		texturePath: "/textures/celestial/generated/rockball/6.png",
 		parentBeltName: "Kuiper Belt",
 		au: 43.13,
 		// Real Haumea is a strongly elongated triaxial ellipsoid (~2100 x 1680 x
@@ -1066,7 +1053,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				name: "Namaka",
 				group: "dwarf",
 				classification: "snowball",
-				texturePath: "/textures/celestial/generated/rockball/7.png",
 				diameterEarths: 170 / ORBIT_BODY.earthDiameterKm,
 				// Real mass/density are both poorly constrained -- these are
 				// order-of-magnitude estimates (assumed ~1 g/cm3 icy bulk
@@ -1101,7 +1087,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				name: "Hi'iaka",
 				group: "dwarf",
 				classification: "snowball",
-				texturePath: "/textures/celestial/generated/rockball/8.png",
 				diameterEarths: 310 / ORBIT_BODY.earthDiameterKm,
 				// Same estimate caveat as Namaka -- order-of-magnitude, not a
 				// tightly measured figure.
@@ -1132,9 +1117,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		name: "Makemake",
 		group: "dwarf",
 		classification: "snowball",
-		// No real Makemake photo texture available -- generic rockball
-		// texture.
-		texturePath: "/textures/celestial/generated/rockball/1.png",
 		parentBeltName: "Kuiper Belt",
 		au: 45.79,
 		diameterEarths: 1434 / ORBIT_BODY.earthDiameterKm,
@@ -1167,9 +1149,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		name: "Eris",
 		group: "dwarf",
 		classification: "snowball",
-		// No real Eris photo texture available -- reuses a generic rockball
-		// texture, same convention as Ceres/Pallas.
-		texturePath: "/textures/celestial/generated/rockball/4.png",
 		au: 67.78,
 		diameterEarths: 2326 / ORBIT_BODY.earthDiameterKm,
 		massEarths: 1.6466e22 / ORBIT_BODY.earthMassKg,
@@ -1206,7 +1185,6 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				name: "Dysnomia",
 				group: "dwarf",
 				classification: "snowball",
-				texturePath: "/textures/celestial/generated/rockball/5.png",
 				diameterEarths: 700 / ORBIT_BODY.earthDiameterKm,
 				// Real measured mass is imprecise (derived from a low, unexpected
 				// bulk density found by JWST in 2023, suggesting a giant-impact

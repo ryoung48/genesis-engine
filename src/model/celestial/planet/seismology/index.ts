@@ -22,66 +22,13 @@ import type {
 	SeedForMoonInput,
 	SeismologyProfile,
 } from "@/model/celestial/planet/seismology/types"
-import type { Zone } from "@/model/celestial/planet/types"
 import { WEATHER } from "@/model/celestial/planet/weather"
 import type { SpectralClass } from "@/model/celestial/star/types"
-import { TEXTURE } from "@/model/celestial/system/generation/texture"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { RNG } from "@/model/shared/random/rng"
 
-// Generated-texture selection needs the real, seismology-inclusive climate
-// estimate (and any post-seismology hydrosphere/classification change), so it
-// runs here rather than at initial body/moon construction time -- see
-// body/index.ts and moon-placement/index.ts's doc comments at their (removed)
-// former call sites. Never overrides an already-set texturePath/
-// cloudsTexturePath -- the real Sol seed bodies (sol-system/index.ts) flow
-// through this same applySystemSeismology pass but come in with their own
-// authored textures, which must survive untouched.
-function withGeneratedTextures(params: {
-	classification: OrbitClassification
-	hydrosphereCode: number
-	temperatureMeanK: number
-	seed: number
-	zone?: Zone
-	existingTexturePath?: string
-	existingCloudsTexturePath?: string
-}): { texturePath?: string; cloudsTexturePath?: string } {
-	// Only an authored Sol path (always under .../sol/...) is protected here --
-	// a previously *generated* path (.../generated/...) must always be
-	// re-derived from the current classification/hydrosphere/climate, not just
-	// preserved, or a body edited after its first pick (e.g. via the stat-
-	// editor UI's updateEditableSystemBody, which reruns seismology over a
-	// body that already carries the texture from its last pick) would keep a
-	// stale texture forever even after the edit pushes it into a different
-	// climate band -- the RNG seed here is deterministic per body, so
-	// re-deriving is stable (same inputs -> same pick) rather than flickering.
-	// texturePath/cloudsTexturePath are checked independently, not as a pair
-	// -- an Earth-clone main world blanks texturePath (isMainWorld bodies
-	// render via live simulated terrain, so a generated surface pick is fine)
-	// but keeps EARTH_SEED's real cloudsTexturePath (rendered unconditionally,
-	// unlike texturePath), so the two can legitimately disagree on whether
-	// they're authored.
-	const isAuthoredSolPath = (path: string | undefined): boolean =>
-		path?.startsWith("/textures/celestial/sol/") ?? false
-	if (isAuthoredSolPath(params.existingTexturePath)) {
-		return {
-			texturePath: params.existingTexturePath,
-			cloudsTexturePath: params.existingCloudsTexturePath,
-		}
-	}
-	const generated = TEXTURE.pickGeneratedBodyTextures({
-		rng: RNG.createRng({ seed: params.seed }),
-		classification: params.classification,
-		hydrosphereCode: params.hydrosphereCode,
-		climateBand: TEMPERATURE.describe(params.temperatureMeanK),
-		zone: params.zone,
-	})
-	return {
-		texturePath: generated.texturePath,
-		cloudsTexturePath: isAuthoredSolPath(params.existingCloudsTexturePath)
-			? params.existingCloudsTexturePath
-			: generated.cloudsTexturePath,
-	}
+function authoredSolPath(path: string | undefined): string | undefined {
+	return path?.startsWith("/textures/celestial/sol/") ? path : undefined
 }
 
 function seedForBody(body: SystemBody): number {
@@ -319,15 +266,6 @@ function applyBodySeismology(params: {
 		luminositySol: starLuminositySol,
 		totalHeating,
 	})
-	const generatedTextures = withGeneratedTextures({
-		classification: body.classification,
-		hydrosphereCode,
-		temperatureMeanK: temperatureEstimate.mean,
-		seed: seedForBody(body),
-		zone: body.zone,
-		existingTexturePath: body.texturePath,
-		existingCloudsTexturePath: body.cloudsTexturePath,
-	})
 	return {
 		...body,
 		hydrosphereCode,
@@ -341,8 +279,8 @@ function applyBodySeismology(params: {
 		cloudCover,
 		light,
 		weather,
-		texturePath: generatedTextures.texturePath,
-		cloudsTexturePath: generatedTextures.cloudsTexturePath,
+		texturePath: authoredSolPath(body.texturePath),
+		cloudsTexturePath: authoredSolPath(body.cloudsTexturePath),
 	}
 }
 
@@ -505,18 +443,6 @@ function applyMoonSeismology(params: {
 		luminositySol: starLuminositySol,
 		totalHeating,
 	})
-	// withGeneratedTextures itself only ever preserves an authored Sol path
-	// (see its own doc) -- a previously generated one is always re-derived
-	// fresh here regardless of shouldReclassify, so there's no need to gate
-	// this on it the way an earlier version of this code did.
-	const generatedTextures = withGeneratedTextures({
-		classification: nextClassification,
-		hydrosphereCode,
-		temperatureMeanK: temperatureEstimate.mean,
-		seed: seedForMoon({ parent, moon }),
-		existingTexturePath: moon.texturePath,
-		existingCloudsTexturePath: moon.cloudsTexturePath,
-	})
 	return {
 		...moon,
 		group: nextGroup,
@@ -544,8 +470,8 @@ function applyMoonSeismology(params: {
 		cloudCover,
 		light,
 		weather,
-		texturePath: generatedTextures.texturePath,
-		cloudsTexturePath: generatedTextures.cloudsTexturePath,
+		texturePath: authoredSolPath(moon.texturePath),
+		cloudsTexturePath: authoredSolPath(moon.cloudsTexturePath),
 	}
 }
 
@@ -683,19 +609,6 @@ function applySystemSeismology(params: {
 			atmosphereType: (convertedAtmosphere ?? rerolled.atmosphere)?.type,
 			pressureBar: (convertedAtmosphere ?? rerolled.atmosphere)?.pressureBar,
 		})
-		// No existingTexturePath/existingCloudsTexturePath here: this branch
-		// only runs when the classification just changed (see the
-		// nextClassification === currentClassification early return above), so
-		// seismologyBody's texture -- picked for the old classification -- is
-		// always stale and must be re-picked, not preserved (e.g. a body
-		// reclassified into snowball must lose any old savanna/oceanic clouds).
-		const generatedTextures = withGeneratedTextures({
-			classification: nextClassification,
-			hydrosphereCode,
-			temperatureMeanK: temperatureEstimate.mean,
-			seed: seedForBody(seismologyBody),
-			zone: seismologyBody.zone,
-		})
 		return {
 			...seismologyBody,
 			classification: nextClassification,
@@ -714,8 +627,8 @@ function applySystemSeismology(params: {
 			habitability,
 			magneticField,
 			cloudCover,
-			texturePath: generatedTextures.texturePath,
-			cloudsTexturePath: generatedTextures.cloudsTexturePath,
+			texturePath: authoredSolPath(seismologyBody.texturePath),
+			cloudsTexturePath: authoredSolPath(seismologyBody.cloudsTexturePath),
 		}
 	})
 }

@@ -12,11 +12,11 @@ import {
 import { buildCraterMaterial } from "@/ui/genesis/renderer/crater-material"
 import { buildNeutronJets } from "@/ui/genesis/renderer/neutron-jets"
 import {
+	buildStarGlowMaterial,
 	buildStarSurfaceLayers,
 	STAR_GLOW_RADIUS_SCALE,
 } from "@/ui/genesis/renderer/star-surface-material"
 import { STAR_COLOR_BY_CLASS } from "@/ui/genesis/solar-system/overlay/constants"
-import { createStarGlowTexture } from "@/ui/genesis/solar-system/overlay/textures"
 
 export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -53,8 +53,10 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 	scene.add(planet)
 	let starSurfaceLayers: ReturnType<typeof buildStarSurfaceLayers> | null = null
 	let coronaMesh: THREE.Mesh | null = null
-	let brownDwarfGlowSprite: THREE.Sprite | null = null
-	let brownDwarfGlowTexture: THREE.CanvasTexture | null = null
+	let brownDwarfGlowMesh: THREE.Mesh<
+		THREE.SphereGeometry,
+		THREE.ShaderMaterial
+	> | null = null
 	let activePointer: number | null = null
 	let previousX = 0
 	let previousY = 0
@@ -94,13 +96,11 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 	}
 
 	function clearBrownDwarfGlow(): void {
-		if (brownDwarfGlowSprite) {
-			planet.remove(brownDwarfGlowSprite)
-			brownDwarfGlowSprite.material.dispose()
-			brownDwarfGlowSprite = null
+		if (brownDwarfGlowMesh) {
+			planet.remove(brownDwarfGlowMesh)
+			brownDwarfGlowMesh.material.dispose()
+			brownDwarfGlowMesh = null
 		}
-		brownDwarfGlowTexture?.dispose()
-		brownDwarfGlowTexture = null
 	}
 
 	canvas.addEventListener("pointerdown", pointerDown)
@@ -152,21 +152,19 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 				planet.add(coronaMesh)
 			}
 			if (brownDwarfClass) {
-				brownDwarfGlowTexture = createStarGlowTexture(settings.color)
-				brownDwarfGlowSprite = new THREE.Sprite(
-					new THREE.SpriteMaterial({
-						map: brownDwarfGlowTexture,
-						opacity: brownDwarfGlow({
-							spectralClass: brownDwarfClass,
-							subtype: 5,
-						}).haloOpacity,
-						transparent: true,
-						depthWrite: false,
-						blending: THREE.AdditiveBlending,
+				const glow = brownDwarfGlow({
+					spectralClass: brownDwarfClass,
+					subtype: 5,
+					color: settings.color,
+				})
+				brownDwarfGlowMesh = new THREE.Mesh(
+					coronaGeometry,
+					buildStarGlowMaterial({
+						tint: glow.haloTint,
+						strength: glow.haloOpacity,
 					}),
 				)
-				brownDwarfGlowSprite.scale.setScalar(2.8)
-				planet.add(brownDwarfGlowSprite)
+				planet.add(brownDwarfGlowMesh)
 			}
 			const material =
 				settings.style === "sun" ||

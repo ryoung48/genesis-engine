@@ -17,6 +17,7 @@ import {
 
 export interface NationWikiData {
 	title: string
+	tierLabel: string
 	/** Same deterministic per-tag color the map fill/hover swatches use. */
 	color: string
 	planetTitle: string
@@ -81,7 +82,7 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 					meta={
 						<>
 							<Swatch color={nation.color} />
-							<span>Nation</span>
+							<span>{nation.tierLabel}</span>
 							<span>·</span>
 							<InlineTextButton
 								onClick={nation.onBack}

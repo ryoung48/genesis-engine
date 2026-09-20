@@ -8,6 +8,7 @@ import type {
 	ProvinceEventLog,
 	ProvinceMap,
 	ProvinceMeta,
+	TitleBase,
 } from "@/model/history/record/types"
 import { TRANSLATOR } from "@/model/history/sim/record/translator"
 import type { BuildProceduralStateParams } from "@/model/history/sim/record/types"
@@ -154,6 +155,17 @@ function buildProceduralRecord(
 			events: [],
 		})
 	}
+	const baseTitles: TitleBase | null = nations
+		? {
+				count: nations.titles.count,
+				tier: nations.titles.tier.slice(),
+				seat: nations.titles.seat.slice(),
+				holder: nations.titles.holder.map(
+					(root) => nationIdByCapital.get(root) ?? -1,
+				),
+				regionOf: nations.titles.regionOf.slice(),
+			}
+		: null
 	const organizationEvents: OrganizationEventRecord[] = []
 	for (const organization of nations?.organizations ?? []) {
 		for (const member of organization.members) {
@@ -191,7 +203,9 @@ function buildProceduralRecord(
 			diplomacy: [],
 			organizationEvents,
 			censuses: [],
+			titleEvents: [],
 		},
+		titles: baseTitles,
 	}
 }
 

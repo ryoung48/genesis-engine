@@ -116,6 +116,42 @@ export interface CensusKeyframe {
 	development: Float32Array
 }
 
+export interface TitleBase {
+	count: number
+	tier: Uint8Array
+	seat: Int32Array
+	holder: Int32Array
+	regionOf: Int32Array
+}
+
+export type TitleEventRecord =
+	| { timeMs: number; kind: "passed"; title: number; from: number; to: number }
+	| {
+			timeMs: number
+			kind: "moved"
+			title: number
+			from: number
+			to: number
+			cause: string
+	  }
+	| {
+			timeMs: number
+			kind: "created"
+			title: number
+			tier: number
+			seat: number
+			holder: number
+			children: number[]
+			ancestors: number[]
+	  }
+	| {
+			timeMs: number
+			kind: "destroyed"
+			title: number
+			children: number[]
+			ancestors: number[]
+	  }
+
 export interface HistoryEvents {
 	provinceEvents: Map<number, ProvinceEventLog>
 	nationEvents: (NationEventLog | undefined)[]
@@ -123,6 +159,7 @@ export interface HistoryEvents {
 	diplomacy: DiplomacyEventRecord[]
 	organizationEvents: OrganizationEventRecord[]
 	censuses: CensusKeyframe[]
+	titleEvents: TitleEventRecord[]
 }
 
 export interface NationIdentity {
@@ -146,6 +183,8 @@ export interface HistoryRecordCommon {
 export type HistoryRecord = HistoryRecordCommon & {
 	origin: "earth" | "procedural"
 	events: HistoryEvents
+	// [JUSTIFICATION] Earth records have no de jure title layer.
+	titles: TitleBase | null
 }
 
 export interface ProvinceMeta {

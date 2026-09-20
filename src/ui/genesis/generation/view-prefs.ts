@@ -122,7 +122,6 @@ const NATION_MAP_MODES = new Set<NationMapMode>([
 	"provinces",
 	"earthProvinces",
 	"dynasty",
-	"diplomacy",
 	"government",
 	"titlesBarony",
 	"titlesCounty",

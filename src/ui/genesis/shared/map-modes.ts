@@ -2,57 +2,6 @@ import type { LabelMode } from "@/ui/genesis/controls/OverlayControls"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 
-/**
- * MAP MODE HIERARCHY -- three tiers, each a distinct concept. Before adding a
- * new map mode, figure out which tier it actually belongs to; picking the
- * wrong one is the single most common mistake here (it was gotten wrong once
- * already, for the Organizations mode below -- see the git history around
- * that "organizations" NationMapMode value for the false starts).
- *
- * 1. PRIMARY (`MapModePrimary`, this file): "geography" vs. "society". The
- *    two big buttons at the very top of ModeBar. Adding a new one here is
- *    extremely rare -- almost nothing you're asked to add belongs at this
- *    tier.
- *
- * 2. MODE (`ColorMode` in shared/colors.ts, or `NationMapMode`/
- *    `PopulationMapMode` in this file): the actual map-mode buttons a user
- *    clicks in ModeBar's tray -- "Elevation", "Climate", "Nations",
- *    "Government", "Population", etc. Each one recolors the whole globe
- *    differently and is listed in one of this file's `*_MODE_OPTIONS`
- *    arrays (`DEFAULT_GEOGRAPHY_MODE_OPTIONS`, `DEFAULT_POLITICAL_MODE_
- *    OPTIONS`, `DEFAULT_DEMOGRAPHIC_MODE_OPTIONS`, ...) so it renders as a
- *    tray button. This is the tier for "an entirely new way to color the
- *    map that deserves its own button."
- *
- * 3. SUBMODE (e.g. `ClimateSubMode`/`TopographySubMode`/`VegetationSubMode`/
- *    `DangerSubMode` in controls/OverlayControls/types.ts, or
- *    `NationMapMode`'s own "organizations" value below): a variant of an
- *    *existing* mode, toggled from a `RadioGroup` inside a `*ModeSection.tsx`
- *    in controls/OverlayControls/ (e.g. ClimateModeSection, Topography
- *    ModeSection, NationsModeSection) -- NOT a ModeBar tray button. Two
- *    submode shapes exist, both already in use:
- *      - A genuine second ColorMode value under one tray button (Climate's
- *        "pasta"/"koppen" swap colorMode to "pastaClimate"/"koppenClimate"
- *        while the tray still shows one "Climate" button selected).
- *      - A second NationMapMode value that isn't listed in any
- *        `*_MODE_OPTIONS` array, so it never gets its own tray button, only
- *        reachable via its ModeSection's RadioGroup (Organizations: still a
- *        real `NationMapMode`, colored in region-colors.ts exactly like
- *        "borders"/"government", but selectable only from
- *        NationsModeSection's Normal/Organizations toggle -- see that
- *        component's doc comment).
- *    This is the tier for "a variant/overlay on an existing mode" -- if the
- *    ask is "add a toggle for X within Y", it's a submode of Y, not a new
- *    top-level mode button.
- *
- * Getting this right matters because `*_MODE_OPTIONS` arrays feed ModeBar's
- * tray directly -- adding a value there when it was meant to be a submode
- * clutters the tray with a button nobody asked for, and conversely a value
- * left out of every `*_MODE_OPTIONS` array (like "organizations" here) is
- * correctly invisible in the tray but must still be wired into whichever
- * `*ModeSection.tsx` is supposed to expose it, or it's unreachable entirely.
- */
-
 export type SocietyMapMode =
 	| "density"
 	| "urban"
@@ -94,7 +43,6 @@ export type NationMapMode =
 	| "provinces"
 	| "earthProvinces"
 	| "dynasty"
-	| "diplomacy"
 	| "government"
 	/** Not in DEFAULT_POLITICAL_MODE_OPTIONS (no ModeBar tray button) --
 	 * reachable only via NationsModeSection's Normal/Organizations toggle in
@@ -155,7 +103,6 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	readonly [SocietyMapMode, string]
 > = [
 	["density", "Population"],
-	["urban", "Urban"],
 	["development", "Development"],
 	["culture", "Culture"],
 	["religion", "Religion"],
@@ -164,6 +111,7 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	readonly [SocietyMapMode, string]
 > = [
+	["urban", "Urban"],
 	["heritage", "Heritage"],
 	["migration", "Migration"],
 ]
@@ -179,10 +127,7 @@ const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 
 const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
-> = [
-	["provinces", "Provinces"],
-	["diplomacy", "Diplomacy"],
-]
+> = [["provinces", "Provinces"]]
 
 // Only meaningful for a real-Earth import (see world.isEarthImport). Province
 // boundaries/names come from imported real-world data rather than the

@@ -16,6 +16,7 @@ import type {
 interface RealmBoundarySide {
 	r0: number
 	r1: number
+	landRegions: number[]
 	tInner: number
 	tOuter: number
 }
@@ -163,12 +164,22 @@ function forEachRealmBoundarySide(
 		if (opposite < 0 || side > opposite) continue
 		const r0 = s_begin_r[side]
 		const r1 = s_begin_r[opposite]
-		if (regionProvince[r0] < 0 || regionProvince[r1] < 0) continue
-		if (layer.regionRealm[r0] === layer.regionRealm[r1]) continue
+		const land0 = regionProvince[r0] >= 0
+		const land1 = regionProvince[r1] >= 0
+		if (!land0 && !land1) continue
+		if (land0 && land1) {
+			if (layer.regionRealm[r0] === layer.regionRealm[r1]) continue
+		} else if (layer.regionRealm[land0 ? r0 : r1] < 0) continue
 		const tInner = s_inner_t[side]
 		const tOuter = s_outer_t[side]
 		if (tInner < 0 || tOuter < 0) continue
-		visit({ r0, r1, tInner, tOuter })
+		visit({
+			r0,
+			r1,
+			landRegions: land0 && land1 ? [r0, r1] : [land0 ? r0 : r1],
+			tInner,
+			tOuter,
+		})
 	}
 }
 
@@ -208,8 +219,10 @@ export function buildGlobeRealmBorders(
 	const group = new THREE.Group()
 	spec.layers.forEach((layer, index) => {
 		const positions: number[] = []
-		forEachRealmBoundarySide(spec, layer, ({ r0, r1, tInner, tOuter }) => {
-			const averageElevation = (elevation[r0] + elevation[r1]) * 0.5
+		forEachRealmBoundarySide(spec, layer, ({ landRegions, tInner, tOuter }) => {
+			const averageElevation =
+				landRegions.reduce((sum, region) => sum + elevation[region], 0) /
+				landRegions.length
 			const elevationFactor = elevationVisible
 				? averageElevation > 0
 					? averageElevation * TERRAIN_ELEVATION_SCALE

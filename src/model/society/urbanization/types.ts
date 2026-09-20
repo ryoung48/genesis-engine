@@ -23,7 +23,8 @@ export interface RankSizesForNationParams {
 
 export interface SortByRankParams {
 	provinces: number[]
-	depth: ArrayLike<number>
+	root: number
+	seatRank: ArrayLike<number>
 	habitability: ArrayLike<number>
 }
 
@@ -58,7 +59,7 @@ export interface UrbanizationInputs {
 	>
 	nations: Pick<
 		GenesisNationHierarchy,
-		"parent" | "depth" | "sovereign" | "governmentType"
+		"parent" | "sovereign" | "governmentType" | "titles"
 	>
 	population: Pick<ProvincePopulation, "population" | "habitability">
 }

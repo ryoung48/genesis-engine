@@ -16,6 +16,7 @@ import {
 } from "@/ui/genesis/renderer/focus"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
+import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { NationWikiDataInput } from "@/ui/genesis/view/types"
@@ -27,17 +28,20 @@ import {
 	warMention,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
 import {
+	buildMergedDiplomacyDescription,
 	buildMergedProvinceAttributeDescription,
 	buildMergedTerritoryDescription,
 	formatPayloadLabel,
 	formatSignedValue,
 	formatWealthCost,
 	mergeById,
-	mergedTerritoryType,
+	mergedSignedType,
 	mergeEventComments,
 	mergeNations,
 	payloadValue,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
+import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
 import {
 	compareTimelineDateThenWarEnd,
@@ -121,10 +125,10 @@ export function useNationWikiData(
 			}
 		}
 
-		const areaKm2 = worldForDisplay.provinces?.areaKm2
-		const totalAreaKm2 = areaKm2
-			? provinceIndexes.reduce((sum, p) => sum + (areaKm2[p] ?? 0), 0)
-			: 0
+		const totalAreaKm2 = provinceIndexes.reduce(
+			(sum, p) => sum + getProvinceAreaKm2(worldForDisplay, p),
+			0,
+		)
 		const realPopulation =
 			worldForDisplay.realPopulation?.population ??
 			worldForDisplay.population?.population
@@ -333,7 +337,15 @@ export function useNationWikiData(
 			}
 		})
 
+		const titleSummary = TITLE_SUMMARY.describe({
+			record,
+			frame,
+			nationId,
+			provinceName: (province) =>
+				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
+		})
 		const stats = buildNationWikiStats({
+			liegeLabel: titleSummary.liege,
 			totalAreaKm2,
 			totalPopulation,
 			totalUrbanPopulation,
@@ -1129,6 +1141,24 @@ export function useNationWikiData(
 				})
 			}
 		}
+		for (const entry of TITLE_TIMELINE.build({
+			record,
+			nationId,
+			nationName: title,
+			provinceName: (province) =>
+				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
+		}))
+			pushTimelineEvent(timelineEvents, {
+				id: entry.id,
+				date: entry.date,
+				type: entry.type,
+				description: entry.description,
+				nations: [eventNation(nationId)],
+				provinces: entry.provinces.flatMap((province) => {
+					const mention = provinceMention(String(province), "#94a3b8")
+					return mention ? [mention] : []
+				}),
+			})
 		let ownedProvinceCount =
 			territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0
 		for (const date of Array.from(territoryDeltasByDate.keys())
@@ -1170,6 +1200,7 @@ export function useNationWikiData(
 		const territorialGroups = new Map<number, NationTimelineEvent[]>()
 		const cultureGroups = new Map<number, NationTimelineEvent[]>()
 		const religionGroups = new Map<number, NationTimelineEvent[]>()
+		const diplomacyGroups = new Map<number, NationTimelineEvent[]>()
 		for (const event of timelineEvents) {
 			if (event.type.startsWith("Territory")) {
 				const group = territorialGroups.get(event.date) ?? []
@@ -1183,6 +1214,10 @@ export function useNationWikiData(
 				const group = religionGroups.get(event.date) ?? []
 				group.push(event)
 				religionGroups.set(event.date, group)
+			} else if (event.type.startsWith("Diplomacy")) {
+				const group = diplomacyGroups.get(event.date) ?? []
+				group.push(event)
+				diplomacyGroups.set(event.date, group)
 			} else {
 				mergedTimelineEvents.push(event)
 			}
@@ -1192,7 +1227,7 @@ export function useNationWikiData(
 				mergedTimelineEvents.push(group[0])
 				continue
 			}
-			const mergedType = mergedTerritoryType(group)
+			const mergedType = mergedSignedType({ events: group, label: "Territory" })
 			mergedTimelineEvents.push({
 				id: `territory:${nationId}:${date}:merged`,
 				date,
@@ -1244,6 +1279,29 @@ export function useNationWikiData(
 				type: "Religion",
 				typeColor: timelineTypeColor("Religion"),
 				description: buildMergedProvinceAttributeDescription(group, "religion"),
+				comment: mergeEventComments(group),
+				nations: mergeNations(group.flatMap((event) => event.nations)),
+				provinces: mergeById(group.flatMap((event) => event.provinces)),
+				cultures: mergeById(group.flatMap((event) => event.cultures)),
+				religions: mergeById(group.flatMap((event) => event.religions)),
+				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				organizations: mergeById(group.flatMap((event) => event.organizations)),
+				wars: mergeById(group.flatMap((event) => event.wars)),
+			})
+		}
+		for (const [date, group] of diplomacyGroups) {
+			if (group.length === 1) {
+				mergedTimelineEvents.push(group[0])
+				continue
+			}
+			const mergedType = mergedSignedType({ events: group, label: "Diplomacy" })
+			mergedTimelineEvents.push({
+				id: `diplomacy:${nationId}:${date}:merged`,
+				date,
+				dateLabel: DATE.formatHistoryDays(date),
+				type: mergedType,
+				typeColor: timelineTypeColor(mergedType),
+				description: buildMergedDiplomacyDescription({ events: group, title }),
 				comment: mergeEventComments(group),
 				nations: mergeNations(group.flatMap((event) => event.nations)),
 				provinces: mergeById(group.flatMap((event) => event.provinces)),
@@ -1317,6 +1375,7 @@ export function useNationWikiData(
 			color,
 			planetTitle: planetName,
 			stats,
+			tierLabel: titleSummary.tier,
 			dependencies,
 			organizations,
 			cultureDistribution,

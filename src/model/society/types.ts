@@ -1,3 +1,5 @@
+import type { DejureTitles } from "@/model/society/dejure/types"
+
 export interface GenesisProvinces {
 	/** Per-region province index (-1 = ocean/unassigned) */
 	regionProvince: Int32Array
@@ -140,6 +142,8 @@ export interface GenesisNationHierarchy extends GenesisPartition {
 	sovereign: Int32Array
 	/** Per-province settlement gravity */
 	gravity: Float32Array
+	/** Fixed de jure title tree with current holders and seats */
+	titles: DejureTitles
 	/** Per-nation government type: 0=tribal, 1=monarchy, 2=republic, 3=theocracy */
 	governmentType?: Uint8Array
 	/** Per-nation colonizer index (-1 = sovereign, ≥0 = index of colonizing nation) */

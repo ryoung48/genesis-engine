@@ -20,6 +20,7 @@ export const MIN_MOON_VISUAL_RADIUS = 0.004
 // beyond any reasonable camera distance depending on spectral class.
 export const ORBIT_GAP_STAR_RADII = 1.5
 export const BELT_SCENE_RADIUS = 0.05
+export const NON_REALISTIC_STAR_PLANET_SIZE_MARGIN = 1.25
 // Real main-belt asteroids span roughly 2.1-3.3 AU around a ~2.77 AU center
 // -- an inner-to-outer radial spread of about 0.44x its own orbit radius, far
 // wider than a thin fixed-width ring. beltHalfWidth (overlay.ts) derives each
@@ -55,23 +56,9 @@ export const ORBIT_LINE_COLOR_BY_ZONE: Record<CompanionStar["role"], number> = {
 	outer: 0x7dd3fc,
 	distant: 0x94a3b8,
 }
-// Solid-color fallback for a tectonic/vesperian body whose hydrosphereCode is
-// 10-11 ("no continents" full ocean) -- deliberately close to Earth's ocean
-// blue rather than that classification's usual land-tinted
-// CLASSIFICATION_COLOR entry (tectonic's green, vesperian's gold), since
-// there's no land left to tint. See pickGeneratedBodyTextures's doc (texture/
-// index.ts) for why these bodies never get a texturePath at all.
+// Ocean worlds use blue instead of their classification's land tint.
 export const FULL_OCEAN_COLOR = 0x1b3d6d
-// Ported from galaxy-gen's ORBIT_CLASSIFICATION[type].color.primary (orbits/
-// classification.ts) -- used as the untextured solid-color fallback for any
-// body (main world or sibling) whose classification has no generated art
-// (see generate-system-bodies.ts's GENERATED_TEXTURE_FILES), instead of a
-// single flat color. Applies to the main world too, so an Earth-like
-// tectonic main world renders the same green a tectonic sibling would, not
-// a fixed "this is home" blue regardless of classification. Never applies
-// to a jovian in practice (jovians always get a texture -- either generated
-// art or the Jupiter photo fallback just below -- so they never reach this
-// branch), even though jovian is included below for completeness.
+// Base colors for procedural body materials.
 export const CLASSIFICATION_COLOR: Partial<
 	Record<OrbitClassification, number>
 > = {

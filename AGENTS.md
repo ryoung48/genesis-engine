@@ -48,6 +48,3 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 # UI Conventions
 - Keep business logic out of React components.
 - For any UI or UX work, follow `src/ui/components/UI.md`.
-
-# Rule violations
-- If a change surfaces a violation of any rule above that is out of scope to fix now, log it in a new plan under `./plans` describing what is violated, where, and what future work would resolve it — and explicitly call it out to the user in the response.

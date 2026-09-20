@@ -57,12 +57,6 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 						sizeClass: moonEnvironment.sizeClass,
 					}),
 			})
-			// texturePath/cloudsTexturePath are assigned later by
-			// PLANET.applySystemSeismology, once the moon's real
-			// seismology-inclusive temperature (and any post-seismology
-			// hydrosphere/classification change) is known -- see
-			// seismology/index.ts's applyMoonSeismology. Picking them here would
-			// use a stale pre-seismology climate estimate.
 			return ENVIRONMENT.enforceMoonTidalSafety({
 				rng: params.rng,
 				parentMassKg: params.massKg,

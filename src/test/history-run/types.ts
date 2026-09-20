@@ -25,6 +25,7 @@ export interface YearReport {
 	occupiedProvinces: number
 	recordNations: number
 	provinceEvents: number
+	titleEvents: number
 	wars: number
 	diplomacyEvents: number
 	population: number

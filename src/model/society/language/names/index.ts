@@ -6,6 +6,7 @@ import type {
 	BuildLeaderSlotParams,
 	BuildNamedGroupSlotParams,
 	BuildNationSlotParams,
+	DynastyNameParams,
 	GetCultureLanguageParams,
 	GetHeritageLanguageParams,
 	GetLanguageParams,
@@ -107,7 +108,7 @@ export interface LanguageNames {
 	mountain(provinceIdx: number): string
 	leader(provinceIdx: number, time: number): string
 	ruler(params: RulerNameParams): RulerName
-	dynasty(dynastyIdx: number): string
+	dynasty(params: DynastyNameParams): string
 	/** e.g. an Imperial Patchwork's "[Word] Empire" or a Trade League's
 	 * "[Word] League"/"[Word] Confederation" -- named off the lead member's
 	 * culture language. */
@@ -240,6 +241,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 	const riverNames = new Map<number, string>()
 	const mountainNames = new Map<number, string>()
 	const organizationNames = new Map<string, string>()
+	const dynastyNames = new Map<number, string>()
 	const organizationById = new Map(
 		context.organizations?.map((org) => [org.id, org]) ?? [],
 	)
@@ -269,6 +271,32 @@ function createNames(context: LanguageNameContext): LanguageNames {
 			}).word,
 		)
 		cache.set(index, name)
+		return name
+	}
+
+	// A dynasty has no home province of its own, so the first province that
+	// asks (the ruler's, when the record is built) fixes the culture whose
+	// language names it, and the name is cached from then on.
+	function cachedDynastyName({
+		dynastyIdx,
+		province,
+	}: DynastyNameParams): string {
+		const explicit = context.dynasties?.[dynastyIdx]
+		if (explicit) return explicit.name
+		const cached = dynastyNames.get(dynastyIdx)
+		if (cached) return cached
+		const lang =
+			province >= 0 ? getLanguage({ context, provinceIdx: province }) : null
+		if (!lang) return `Dynasty #${dynastyIdx}`
+		const name = TEXT.titleCase(
+			LANGUAGE.word.simple({
+				lang,
+				key: "male",
+				namespace: "dynasty",
+				slot: `dynasty:${dynastyIdx}`,
+			}).word,
+		)
+		dynastyNames.set(dynastyIdx, name)
 		return name
 	}
 
@@ -548,11 +576,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 			)
 			return { name, female }
 		},
-		dynasty: (dynastyIdx: number) => {
-			const dynasty = context.dynasties?.[dynastyIdx]
-			if (!dynasty) return `Dynasty #${dynastyIdx}`
-			return dynasty.name
-		},
+		dynasty: cachedDynastyName,
 		organization: cachedOrganizationName,
 		clear: () => {
 			provinceNames.clear()
@@ -564,6 +588,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 			riverNames.clear()
 			mountainNames.clear()
 			organizationNames.clear()
+			dynastyNames.clear()
 		},
 	}
 }

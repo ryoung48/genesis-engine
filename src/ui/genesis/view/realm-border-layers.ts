@@ -1,4 +1,5 @@
-import { FRAME } from "@/model/history/world-frame"
+import { DEJURE } from "@/model/society/dejure"
+import { TITLES } from "@/model/society/titles"
 import type { RealmBorderLayer } from "@/ui/genesis/renderer/types"
 import { TITLE_BORDER_TIERS } from "@/ui/genesis/shared/map-modes"
 import { TITLE_TIER_COLORS } from "@/ui/genesis/shared/title-colors"
@@ -57,10 +58,16 @@ function buildMarkerRegions({
 		for (let province = 0; province < frame.provinceCount; province++)
 			if (owned(province)) regions.push(seeds[province])
 	} else {
-		const realm = FRAME.provinceTierRealm({ frame, tier })
-		for (let province = 0; province < frame.provinceCount; province++)
-			if (realm[province] === province && owned(province))
-				regions.push(seeds[province])
+		const { titles } = frame
+		if (titles) {
+			const tierIndex = TITLES.tierOrder.indexOf(tier)
+			for (let title = 0; title < titles.count; title++) {
+				if (titles.tier[title] !== tierIndex || titles.holder[title] < 0)
+					continue
+				const seat = titles.seat[title]
+				if (owned(seat)) regions.push(seeds[seat])
+			}
+		}
 	}
 	return Int32Array.from(regions.filter((region) => region >= 0))
 }
@@ -75,9 +82,13 @@ function buildRegionRealms({
 	const { regionProvince } = world.provinces
 	const regionRealm = new Int32Array(regionProvince.length).fill(-1)
 	const realmByProvince =
-		tier === "barony" || tier === "county"
+		tier === "barony" || tier === "county" || !frame.titles
 			? null
-			: FRAME.provinceTierRealm({ frame, tier })
+			: DEJURE.tierRegion({
+					titles: frame.titles,
+					provinceCount: frame.provinceCount,
+					tier: TITLES.tierOrder.indexOf(tier),
+				})
 	for (let region = 0; region < regionProvince.length; region++) {
 		const province = regionProvince[region]
 		if (province < 0 || frame.provinceNation[province] < 0) continue

@@ -4,115 +4,8 @@ import type {
 	NationRelations,
 	OrgForeignHoldersParams,
 	OrgMemberProvincesParams,
-	ProvinceDepthParams,
-	ProvinceDomainParams,
-	ProvinceTierRealmParams,
 	ToRenderInputsParams,
 } from "@/model/history/world-frame/types"
-import { TITLES } from "@/model/society/titles"
-import type { TitleTier } from "@/model/society/titles/types"
-
-const depthByFrame = new WeakMap<ProvinceDepthParams["frame"], Int32Array>()
-
-function provinceDepth({ frame }: ProvinceDepthParams): Int32Array {
-	const cached = depthByFrame.get(frame)
-	if (cached) return cached
-	const depth = new Int32Array(frame.provinceCount).fill(-1)
-	for (let province = 0; province < frame.provinceCount; province++) {
-		if (depth[province] >= 0) continue
-		const path: number[] = []
-		const seen = new Set<number>()
-		let current = province
-		while (
-			current >= 0 &&
-			current < frame.provinceCount &&
-			depth[current] < 0 &&
-			!seen.has(current)
-		) {
-			seen.add(current)
-			path.push(current)
-			current = frame.provinceParent[current]
-		}
-		let nextDepth =
-			current >= 0 && current < frame.provinceCount ? depth[current] + 1 : 0
-		while (path.length > 0) depth[path.pop() as number] = nextDepth++
-	}
-	depthByFrame.set(frame, depth)
-	return depth
-}
-
-const domainSizeByFrame = new WeakMap<
-	ProvinceDomainParams["frame"],
-	Int32Array
->()
-
-function provinceDomainSize({ frame }: ProvinceDomainParams): Int32Array {
-	const cached = domainSizeByFrame.get(frame)
-	if (cached) return cached
-	const depth = provinceDepth({ frame })
-	const order = Array.from({ length: frame.provinceCount }, (_, i) => i).sort(
-		(a, b) => depth[b] - depth[a],
-	)
-	const size = new Int32Array(frame.provinceCount).fill(1)
-	for (const province of order) {
-		const parent = frame.provinceParent[province]
-		if (parent >= 0 && parent < frame.provinceCount)
-			size[parent] += size[province]
-	}
-	domainSizeByFrame.set(frame, size)
-	return size
-}
-
-const tierRealmByFrame = new WeakMap<
-	ProvinceDomainParams["frame"],
-	Map<TitleTier, Int32Array>
->()
-
-function provinceTierRealm({
-	frame,
-	tier,
-}: ProvinceTierRealmParams): Int32Array {
-	let byTier = tierRealmByFrame.get(frame)
-	if (!byTier) tierRealmByFrame.set(frame, (byTier = new Map()))
-	const cached = byTier.get(tier)
-	if (cached) return cached
-	const depth = provinceDepth({ frame })
-	const size = provinceDomainSize({ frame })
-	const tierIndex = TITLES.tierOrder.indexOf(tier)
-	const tierAt = (province: number) =>
-		TITLES.tierOrder.indexOf(TITLES.tierForSize({ size: size[province] }))
-	const capitalSize = new Int32Array(frame.provinceCount).fill(1)
-	for (let province = 0; province < frame.provinceCount; province++) {
-		const parent = frame.provinceParent[province]
-		if (
-			parent >= 0 &&
-			parent < frame.provinceCount &&
-			tierAt(province) < tierIndex
-		)
-			capitalSize[parent] += size[province]
-	}
-	const order = Array.from({ length: frame.provinceCount }, (_, i) => i).sort(
-		(a, b) => depth[a] - depth[b],
-	)
-	const realm = new Int32Array(frame.provinceCount).fill(-1)
-	for (const province of order) {
-		const provinceTier = tierAt(province)
-		if (provinceTier === tierIndex) {
-			realm[province] = province
-			continue
-		}
-		if (provinceTier > tierIndex) {
-			if (capitalSize[province] >= TITLES.minSizeForTier({ tier }))
-				realm[province] = province
-			continue
-		}
-		const parent = frame.provinceParent[province]
-		if (parent >= 0 && parent < frame.provinceCount)
-			realm[province] = realm[parent]
-	}
-	byTier.set(tier, realm)
-	return realm
-}
 
 function emptyRelations(): NationRelations {
 	return {
@@ -222,9 +115,6 @@ function toRenderInputs({ frame }: ToRenderInputsParams) {
 }
 
 export const FRAME = {
-	provinceDepth,
-	provinceDomainSize,
-	provinceTierRealm,
 	emptyRelations,
 	isOccupied,
 	hreMemberNations,

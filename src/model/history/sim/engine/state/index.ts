@@ -23,6 +23,11 @@ import {
 	deltaYear,
 	diffYears,
 } from "@/model/history/sim/engine/state/time"
+import {
+	applyDerivedParents,
+	considerTitles,
+	settleProvinces,
+} from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
 	CreateActiveWarParams,
@@ -50,7 +55,7 @@ import {
 	wealthCurrent,
 	wealthOptimal,
 } from "@/model/history/sim/engine/state/wealth"
-import { HIERARCHY } from "@/model/society/hierarchy"
+import { DEJURE } from "@/model/society/dejure"
 
 export const rel = {
 	NONE: 0,
@@ -68,6 +73,8 @@ export const rel = {
 } as const
 
 export type Relation = (typeof rel)[keyof typeof rel]
+const TITLE_CAPACITY = 4096
+
 const DAYS_PER_YEAR = 365
 
 const DAYS_PER_MONTH = 30
@@ -277,34 +284,14 @@ function repartitionNation({
 	const members = Array.from(
 		new Set(
 			[...subjects, ...getNationProvinces({ state, root: nation })].filter(
-				(p) => p !== nation && !state.desolate[p],
+				(p) => !state.desolate[p],
 			),
 		),
 	)
 	if (members.length === 0) return
-
-	const nextParent = state.parentCurrent.slice()
-	const nextDepth = new Int32Array(state.P)
-
-	nextParent[nation] = -1
-	for (const member of members) nextParent[member] = -1
-
-	HIERARCHY.rebalanceHierarchy({
-		capital: nation,
-		members: Int32Array.from(members),
-		parent: nextParent,
-		depth: nextDepth,
-		currentDepth: 0,
-		habitability: state.habitability,
-		urbanPop: state.popUrbanCurrent,
-		waterAccess: state.waterAccess,
-		adjOffset: state.provinceAdjOffset,
-		adjList: state.provinceAdjList,
-		provinceCount: state.P,
-	})
 	// Depose leaders of absorbed sovereigns before parents are rewritten
 	for (const p of subjects) {
-		if (!isSovereign({ state, p })) continue
+		if (p === nation || !isSovereign({ state, p })) continue
 		state.leaderRuntime.end[p] = state.time
 		state.leaderRuntime.idx[p]++
 		state.events.push({
@@ -313,18 +300,9 @@ function repartitionNation({
 			data: { nation: p, leader: state.leaderRuntime.idx[p] - 1 },
 		})
 	}
-	for (const member of members) {
-		FIELDS.prov.parent.set({ state, p: member, value: -1 })
-	}
-	FIELDS.prov.parent.set({ state, p: nation, value: -1 })
-	for (const member of members) {
-		FIELDS.prov.parent.set({
-			state,
-			p: member,
-			value: nextParent[member],
-		})
-	}
+	applyDerivedParents({ state, nation, members })
 	rebuildAssignment({ state })
+	settleProvinces({ state, provinces: members })
 }
 
 function releaseSubjectRelations({
@@ -655,6 +633,23 @@ function createHistoryState({
 		relationColumns: Array.from({ length: P }, () => new Set<number>()),
 		hierarchyDirty: true,
 		hierarchyVersion: 0,
+		titles: DEJURE.withCapacity({
+			titles: nations.titles,
+			capacity: nations.titles.count + TITLE_CAPACITY,
+		}),
+		titleMembers: DEJURE.membersOf({
+			titles: nations.titles,
+			provinceCount: P,
+		}),
+		seatRank: DEJURE.seatRank({
+			titles: nations.titles,
+			provinceCount: P,
+			heldOnly: true,
+		}),
+		titleFounded: new Uint8Array(nations.titles.count + TITLE_CAPACITY),
+		titleLapseSince: new Float64Array(
+			nations.titles.count + TITLE_CAPACITY,
+		).fill(-1),
 		assignmentCurrent: new Int32Array(P).fill(-1),
 		popRuralCurrent: new Float32Array(P),
 		popUrbanCurrent: new Float32Array(P),
@@ -880,4 +875,5 @@ export const STATE = {
 	provinceDistanceSq,
 	createHistoryState,
 	spawnLeader,
+	considerTitles,
 }

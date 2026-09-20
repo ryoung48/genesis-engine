@@ -1,7 +1,6 @@
 import type {
 	DerivedAtTimeParams,
 	DerivedLookupParams,
-	NationMemberCountParams,
 	WealthCurrentParams,
 } from "@/model/history/sim/engine/derive/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
@@ -81,17 +80,11 @@ function children({ state, p }: DerivedLookupParams): number[] {
 	return result
 }
 
-function nationMemberCount({ state, root }: NationMemberCountParams): number {
-	let count = 1
-	const stack: number[] = [root]
-	while (stack.length > 0) {
-		const current = stack.pop() as number
-		const start = state.childOffset[current]
-		const end = state.childOffset[current + 1]
-		count += end - start
-		for (let i = start; i < end; i++) stack.push(state.childList[i])
-	}
-	return count
+function isOverextended({ state, p }: DerivedLookupParams): boolean {
+	let vassalSeats = 0
+	for (const child of children({ state, p }))
+		if (state.seatRank[child] > 0) vassalSeats++
+	return HIERARCHY.isOverextended({ lordRank: state.seatRank[p], vassalSeats })
 }
 
 function gravity({ state, p, cache }: DerivedLookupParams): number {
@@ -103,9 +96,7 @@ function gravity({ state, p, cache }: DerivedLookupParams): number {
 	for (const child of members) {
 		value += gravity({ state, p: child, cache }) * TRIBUTE
 	}
-	const memberCount = nationMemberCount({ state, root: p })
-	if (members.length > HIERARCHY.maxFanoutForSize({ size: memberCount }))
-		value *= 0.9
+	if (isOverextended({ state, p })) value *= 0.9
 	cache?.gravity?.set(p, value)
 	return value
 }
@@ -137,13 +128,7 @@ function wealthCurrent({
 		collected +=
 			wealthCurrent({ state, p: child, cache, exclude, freedom }) * TRIBUTE
 	}
-	if (
-		directChildren.length >
-		HIERARCHY.maxFanoutForSize({
-			size: nationMemberCount({ state, root: p }),
-		})
-	)
-		collected *= 0.9
+	if (isOverextended({ state, p })) collected *= 0.9
 	if (!freedom && FIELDS.prov.parent.get({ state, p }) >= 0)
 		collected *= 1 - TRIBUTE
 
