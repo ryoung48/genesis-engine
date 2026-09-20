@@ -104,7 +104,7 @@ function gravity({ state, p, cache }: DerivedLookupParams): number {
 		value += gravity({ state, p: child, cache }) * TRIBUTE
 	}
 	const memberCount = nationMemberCount({ state, root: p })
-	if (members.length > HIERARCHY.maxFanoutForNationSize(memberCount))
+	if (members.length > HIERARCHY.maxFanoutForSize({ size: memberCount }))
 		value *= 0.9
 	cache?.gravity?.set(p, value)
 	return value
@@ -139,7 +139,9 @@ function wealthCurrent({
 	}
 	if (
 		directChildren.length >
-		HIERARCHY.maxFanoutForNationSize(nationMemberCount({ state, root: p }))
+		HIERARCHY.maxFanoutForSize({
+			size: nationMemberCount({ state, root: p }),
+		})
 	)
 		collected *= 0.9
 	if (!freedom && FIELDS.prov.parent.get({ state, p }) >= 0)

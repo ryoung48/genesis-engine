@@ -24,7 +24,6 @@ import {
 	diffYears,
 } from "@/model/history/sim/engine/state/time"
 import type {
-	AddTerritoryParams,
 	BuildProvinceXyzParams,
 	CreateActiveWarParams,
 	CreateHistoryStateParams,
@@ -38,6 +37,7 @@ import type {
 	ReleaseDisconnectedProvinceParams,
 	ReleaseProvinceParams,
 	ReleaseSubjectRelationsParams,
+	RepartitionNationParams,
 	ResolveWarParams,
 	SpawnLeaderParams,
 	StartWarParams,
@@ -198,8 +198,11 @@ function warThreat({
 }
 
 function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
+	const formerSovereign = getSovereign({ state, p })
 	FIELDS.prov.parent.set({ state, p, value: -1 })
 	rebuildAssignment({ state })
+	repartitionNation({ state, nation: formerSovereign, subjects: [] })
+	repartitionNation({ state, nation: p, subjects: [] })
 	spawnLeader({ state, p, rng })
 	state.heap.enqueue(
 		state.leaderRuntime.end[p],
@@ -266,7 +269,11 @@ function releaseDisconnectedProvince({
 	})
 }
 
-function addTerritory({ state, nation, subjects }: AddTerritoryParams): void {
+function repartitionNation({
+	state,
+	nation,
+	subjects,
+}: RepartitionNationParams): void {
 	const members = Array.from(
 		new Set(
 			[...subjects, ...getNationProvinces({ state, root: nation })].filter(
@@ -288,7 +295,6 @@ function addTerritory({ state, nation, subjects }: AddTerritoryParams): void {
 		parent: nextParent,
 		depth: nextDepth,
 		currentDepth: 0,
-		fanoutRanges: HIERARCHY.fanoutRangesForSize(members.length),
 		habitability: state.habitability,
 		urbanPop: state.popUrbanCurrent,
 		waterAccess: state.waterAccess,
@@ -537,11 +543,18 @@ function resolveWar({
 	stalemate,
 }: ResolveWarParams): void {
 	war.endTime = state.time
-	const transferred = (
+	const conquered = (
 		victory
 			? getNationProvinces({ state, root: war.defender })
 			: [...war.occupied]
 	).filter((p) => getSovereign({ state, p }) === war.defender)
+	const transferred = victory
+		? conquered
+		: Array.from(
+				new Set(
+					conquered.flatMap((root) => getNationProvinces({ state, root })),
+				),
+			)
 
 	for (const p of war.occupied) {
 		if (state.occupationCurrent[p] === war.idx) {
@@ -562,11 +575,13 @@ function resolveWar({
 		releaseSubjectRelations({ state, nation: war.defender })
 	}
 	if (transferred.length > 0) {
-		addTerritory({
+		repartitionNation({
 			state,
 			nation: war.attacker,
 			subjects: transferred,
 		})
+		if (isSovereign({ state, p: war.defender }))
+			repartitionNation({ state, nation: war.defender, subjects: [] })
 	}
 	if (!victory) fixConnections({ state, nation: war.defender, rng })
 	setRelation({ state, a: war.attacker, b: war.defender, rel: rel.SUSPICIOUS })

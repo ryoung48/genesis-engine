@@ -15,6 +15,10 @@ import type {
 	IdentityForRootParams,
 	ProceduralTranslator,
 	ProjectTieParams,
+	RebelNoteReasons,
+	RebelWar,
+	RebelWarOfParams,
+	ScanRebelNotesParams,
 	UpdateTiesParams,
 } from "@/model/history/sim/record/translator/types"
 import { ERAS } from "@/model/society/eras"
@@ -47,6 +51,82 @@ function rootOf({
 	let current = province
 	while (translator.parent[current] >= 0) current = translator.parent[current]
 	return current
+}
+
+function rebelWarOf({ translator, root }: RebelWarOfParams): RebelWar | null {
+	for (const war of translator.rebelWars.values())
+		if (war.defenderRoot === root && translator.parent[war.attackerRoot] < 0)
+			return war
+	return null
+}
+
+function nationLabel({
+	translator,
+	root,
+}: {
+	translator: ProceduralTranslator
+	root: number
+}): string {
+	const id = translator.identityByRoot.get(root)
+	return id === undefined
+		? translator.names.nation(root)
+		: (translator.state.record.nations[id]?.name ??
+				translator.names.nation(root))
+}
+
+// Registers and retires rebel wars from this transaction's notes before any
+// ownership is derived, and collects the reason text the record attaches to
+// each revolt and each rebel-war outcome.
+function scanRebelNotes({
+	translator,
+	transaction,
+}: ScanRebelNotesParams): RebelNoteReasons {
+	const reasons: RebelNoteReasons = {
+		revolts: new Map(),
+		outcomes: new Map(),
+		touchedRoots: new Set(),
+	}
+	for (const note of transaction.notes) {
+		if (note.tag === "rebellion") {
+			const cause = note.data.succession
+				? "succession"
+				: note.data.disconnected
+					? "disconnected"
+					: "threat"
+			reasons.revolts.set(
+				note.data.subject as number,
+				`Revolted against ${nationLabel({ translator, root: note.data.overlord as number })} (${cause})`,
+			)
+		} else if (note.tag === "war started") {
+			const warId = note.data.war as number
+			const coalition = transaction.coalitions.find(
+				(entry) => entry.warId === warId,
+			)
+			if (!coalition?.rebel) continue
+			translator.rebelWars.set(warId, {
+				attackerRoot: note.data.attacker as number,
+				defenderRoot: note.data.defender as number,
+			})
+			reasons.touchedRoots.add(note.data.defender as number)
+		} else if (note.tag === "war ended") {
+			const warId = note.data.war as number
+			const war = translator.rebelWars.get(warId)
+			if (!war) continue
+			const transferred = (note.data.transferred as number[]).length
+			reasons.outcomes.set(
+				war.defenderRoot,
+				note.data.stalemate === undefined &&
+					note.data.winner === note.data.attacker
+					? "Rebels defeated"
+					: transferred > 0
+						? `Partial reconquest (${transferred} provinces)`
+						: "Rebels held out",
+			)
+			reasons.touchedRoots.add(war.defenderRoot)
+			translator.rebelWars.delete(warId)
+		}
+	}
+	return reasons
 }
 
 function pastelColor(
@@ -294,6 +374,7 @@ function appendNote({
 				)
 					continue
 				translator.owner[province] = id
+				translator.controller[province] = id
 				translator.ownedCount[id]++
 				record.events.provinceEvents.get(province)?.events.push({
 					timeMs,
@@ -312,9 +393,11 @@ function appendNote({
 		}
 		const war: WarRecord = {
 			id: warId,
-			name: `${record.nations[attacker]?.name ?? "Unknown"}–${record.nations[defender]?.name ?? "Unknown"} War`,
-			casusBelli: "conquest",
-			warGoalType: "province",
+			name: coalition?.rebel
+				? `Suppression of the ${record.nations[defender]?.name ?? "Unknown"} Revolt`
+				: `${record.nations[attacker]?.name ?? "Unknown"}–${record.nations[defender]?.name ?? "Unknown"} War`,
+			casusBelli: coalition?.rebel ? "rebellion" : "conquest",
+			warGoalType: coalition?.rebel ? "rebellion" : "province",
 			warGoalId: defender,
 			warGoalProvinceId: data.defender as number,
 			rebel: coalition?.rebel ?? false,
@@ -402,6 +485,7 @@ function createTranslator({
 	const count = world.provinces?.count ?? 0
 	const parent = new Int32Array(count).fill(-1)
 	const owner = new Int32Array(count).fill(-1)
+	const controller = new Int32Array(count).fill(-1)
 	const occupation = new Int32Array(count).fill(-1)
 	const children = Array.from({ length: count }, () => new Set<number>())
 	const ownedCount = new Array<number>(state.record.nations.length).fill(0)
@@ -410,6 +494,7 @@ function createTranslator({
 		const base = state.record.events.provinceEvents.get(province)?.base
 		parent[province] = base?.parentId ?? -1
 		owner[province] = base?.ownerId ?? -1
+		controller[province] = base?.controllerId ?? -1
 		if (parent[province] >= 0) children[parent[province]].add(province)
 		if (owner[province] >= 0) ownedCount[owner[province]]++
 		if (
@@ -431,7 +516,9 @@ function createTranslator({
 		names: NAMES.createWorldNames(world),
 		parent,
 		owner,
+		controller,
 		occupation,
+		rebelWars: new Map(),
 		children,
 		identityByRoot,
 		rawColors,
@@ -451,6 +538,7 @@ function createTranslator({
 			timeMs: state.record.minTimeMs,
 		})
 		owner[province] = id
+		controller[province] = id
 		ownedCount[id]++
 		const base = state.record.events.provinceEvents.get(province)?.base
 		if (base) {
@@ -471,6 +559,7 @@ function applyTransaction({
 	const count = translator.parent.length
 	const affected = new Set<number>()
 	const pairs = new Set<number>()
+	const reasons = scanRebelNotes({ translator, transaction })
 	for (const change of transaction.parents) {
 		for (const province of descendants({
 			children: translator.children,
@@ -509,13 +598,29 @@ function applyTransaction({
 		}))
 			affected.add(province)
 	}
+	for (const [warId, war] of translator.rebelWars)
+		if (translator.parent[war.attackerRoot] >= 0) {
+			translator.rebelWars.delete(warId)
+			reasons.touchedRoots.add(war.defenderRoot)
+		}
+	for (const root of reasons.touchedRoots)
+		for (const province of descendants({
+			children: translator.children,
+			province: root,
+		}))
+			affected.add(province)
 	for (const province of affected) {
 		const root = rootOf({ translator, province })
+		const mask = rebelWarOf({ translator, root })
 		const next =
 			translator.world.provinces?.desolate[province] ||
 			translator.stateless[province]
 				? -1
-				: identityForRoot({ translator, root, timeMs })
+				: identityForRoot({
+						translator,
+						root: mask ? mask.attackerRoot : root,
+						timeMs,
+					})
 		const previous = translator.owner[province]
 		if (next === previous) continue
 		if (previous >= 0 && --translator.ownedCount[previous] === 0)
@@ -534,15 +639,8 @@ function applyTransaction({
 			timeMs,
 			kind: "owner",
 			payload: { nationId: next },
-			comment: null,
+			comment: reasons.outcomes.get(root) ?? reasons.revolts.get(root) ?? null,
 		})
-		if (translator.occupation[province] < 0)
-			record.events.provinceEvents.get(province)?.events.push({
-				timeMs,
-				kind: "controller",
-				payload: { nationId: next },
-				comment: null,
-			})
 	}
 	for (const change of transaction.relations) {
 		const key = change.x * count + change.y
@@ -575,20 +673,31 @@ function applyTransaction({
 			coalition,
 		})
 	}
-	for (const change of transaction.occupations) {
+	for (const change of transaction.occupations)
 		translator.occupation[change.province] = change.after
-		const war = record.events.wars[change.after]
-		const controller =
-			change.after < 0
-				? translator.owner[change.province]
-				: (war?.events.find(
+	const reconcile = new Set(affected)
+	for (const change of transaction.occupations) reconcile.add(change.province)
+	for (const province of reconcile) {
+		const occupyingWar = translator.occupation[province]
+		const root = rootOf({ translator, province })
+		const owner = translator.owner[province]
+		const next =
+			occupyingWar >= 0
+				? (record.events.wars[occupyingWar]?.events.find(
 						(event) => event.kind === "warStart" && event.side === "attacker",
 					)?.nationId ?? -1)
-		record.events.provinceEvents.get(change.province)?.events.push({
+				: owner >= 0 && rebelWarOf({ translator, root })
+					? identityForRoot({ translator, root, timeMs })
+					: owner
+		if (next === translator.controller[province]) continue
+		translator.controller[province] = next
+		record.events.provinceEvents.get(province)?.events.push({
 			timeMs,
 			kind: "controller",
-			payload: { nationId: controller },
-			comment: null,
+			payload: { nationId: next },
+			comment: rebelWarOf({ translator, root })
+				? (reasons.revolts.get(root) ?? null)
+				: null,
 		})
 	}
 	for (const ruler of transaction.rulers) {

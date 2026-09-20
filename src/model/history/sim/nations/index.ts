@@ -419,7 +419,6 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 			parent,
 			depth,
 			currentDepth: 0,
-			fanoutRanges: HIERARCHY.fanoutRangesForSize(sizes[nation]),
 			habitability,
 			urbanPop,
 			waterAccess,
@@ -443,7 +442,6 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		childList,
 		depth,
 		provinceCount,
-		fanoutRanges: HIERARCHY.hegemonFanout,
 	})
 
 	// Per-province government type — indexed by province like leaderDynasty.

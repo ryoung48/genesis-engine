@@ -3,6 +3,10 @@ export const uiPalette = {
 	giantStar: "#ef4444",
 	moonHighland: "#c2c2c2",
 	martianHighland: "#d7724d",
+	brownDwarfL: "#a95632",
+	brownDwarfT: "#895949",
+	brownDwarfY: "#685b60",
+	neutronStarGlow: "#8cecff",
 	accent: "#4f46e5",
 	activeDark: "#0f172a",
 	swatch: {

@@ -1,8 +1,10 @@
-﻿import { COLOR } from "@/model/history/earth/color"
+﻿import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import { COLOR } from "@/model/history/earth/color"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
-import type { Nation } from "@/model/history/earth/reference/nations/types"
+import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import type { TitleTier } from "@/model/society/titles/types"
 import type { GenesisOrganization } from "@/model/society/types"
 import {
 	darkenPoliticalAtElevation,
@@ -10,10 +12,12 @@ import {
 } from "@/ui/genesis/shared/color-helpers"
 import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
-import type {
-	NationMapMode,
-	SocietyMapMode,
+import {
+	isTitlesNationMode,
+	type NationMapMode,
+	type SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
+import { tintNationColor } from "@/ui/genesis/shared/title-colors"
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 
@@ -36,6 +40,21 @@ const ORGANIZATION_COLORS = {
 	tradeLeague: [0.16, 0.68, 0.38],
 	none: [0.82, 0.8, 0.78],
 } as const satisfies Record<string, Rgb>
+
+function tierForTitlesMode(nationMode: NationMapMode): TitleTier | null {
+	switch (nationMode) {
+		case "titlesDuchy":
+			return "duchy"
+		case "titlesKingdom":
+			return "kingdom"
+		case "titlesEmpire":
+			return "empire"
+		case "titlesHegemony":
+			return "hegemony"
+		default:
+			return null
+	}
+}
 
 function diplomacyColor(params: {
 	frame: WorldFrame
@@ -132,6 +151,7 @@ export function computeHistoryRegionColors(params: {
 	 * is suppressed, since the overlay renders that more precisely). */
 	suppressFill?: boolean
 	selectedNationId: number | null
+	locations: Pick<GenesisLocations, "regionLocation"> | null
 	organizationKindById: ReadonlyMap<string, OrganizationKind>
 }): Float32Array | null {
 	const {
@@ -147,6 +167,7 @@ export function computeHistoryRegionColors(params: {
 		cultureColorById,
 		suppressFill,
 		selectedNationId,
+		locations,
 		organizationKindById,
 	} = params
 
@@ -156,7 +177,8 @@ export function computeHistoryRegionColors(params: {
 			nationMode === "government" ||
 			nationMode === "dynasty" ||
 			nationMode === "organizations" ||
-			nationMode === "diplomacy")
+			nationMode === "diplomacy" ||
+			isTitlesNationMode(nationMode))
 	const isDemographic =
 		getBaseMapMode(colorMode as ColorMode) === "population" &&
 		(populationMode === "culture" || populationMode === "religion")
@@ -170,6 +192,28 @@ export function computeHistoryRegionColors(params: {
 	// that overlay was never implemented, which left the map solid gray for
 	// Model/Density on earth-import worlds.
 	if (!isPolitical && !isDemographic) return null
+
+	const titleTier = isPolitical ? tierForTitlesMode(nationMode) : null
+	const tierRealms = titleTier
+		? FRAME.provinceTierRealm({ frame, tier: titleTier })
+		: null
+	const realmIndex = new Map<number, number>()
+	if (tierRealms) {
+		const perNation = new Map<number, number>()
+		for (let province = 0; province < frame.provinceCount; province++) {
+			if (tierRealms[province] !== province) continue
+			const owner = frame.provinceNation[province]
+			const next = perNation.get(owner) ?? 0
+			realmIndex.set(province, next)
+			perNation.set(owner, next + 1)
+		}
+	}
+	const nationBase = (id: number): [number, number, number] => {
+		const nation = frame.nations.get(id)
+		return nation
+			? [nation.color[0] / 255, nation.color[1] / 255, nation.color[2] / 255]
+			: colorFor(`nation:${id}`)
+	}
 
 	const N = regionProvince.length
 	const rgb = new Float32Array(N * 3)
@@ -256,6 +300,40 @@ export function computeHistoryRegionColors(params: {
 						elevationKm[r] ?? 0,
 					),
 				)
+			} else if (nationMode === "titlesBarony") {
+				const location = locations?.regionLocation[r] ?? -1
+				write(
+					r,
+					darkenPoliticalAtElevation(
+						tintNationColor({
+							base: nationBase(owner),
+							index: location >= 0 ? location : p,
+						}),
+						elevationKm[r] ?? 0,
+					),
+				)
+			} else if (nationMode === "titlesCounty") {
+				write(
+					r,
+					darkenPoliticalAtElevation(
+						tintNationColor({ base: nationBase(owner), index: p }),
+						elevationKm[r] ?? 0,
+					),
+				)
+			} else if (tierRealms) {
+				const holder = tierRealms[p]
+				write(
+					r,
+					darkenPoliticalAtElevation(
+						holder < 0
+							? UNOWNED_GRAY
+							: tintNationColor({
+									base: nationBase(owner),
+									index: realmIndex.get(holder) ?? 0,
+								}),
+						elevationKm[r] ?? 0,
+					),
+				)
 			} else if (nationMode === "organizations") {
 				write(
 					r,
@@ -324,26 +402,6 @@ export function computeHistoryRegionColors(params: {
 	return rgb
 }
 
-/** Nation tag -> occupation-stripe color, colored black for anonymous EU4
- * rebel control (tag "REB" -- popular uprisings never tracked as a real war
- * in wars.json, unlike named secessionist wars such as the American Civil
- * War, which keep their real belligerent's color) and the controlling
- * nation's color otherwise. Shared by computeEarthHistoryOccupationOverlay
- * (per-region) and buildEarthHistoryOccupationStripeColorForRawId
- * (per-province-polygon) so both render the same controller the same
- * stripe color. */
-export function buildOccupationColorById(
-	nations: Nation[],
-): (id: number) => [number, number, number] {
-	const REBEL_BLACK: [number, number, number] = [0, 0, 0]
-	return (id: number) => {
-		const n = nations[id]
-		if (!n) return COLOR.hashColorForKey(`nation:${id}`)
-		if (n.isRebel) return REBEL_BLACK
-		return [n.color[0] / 255, n.color[1] / 255, n.color[2] / 255]
-	}
-}
-
 /** Occupation-stripe overlay for Earth-imported worlds: every province whose
  * controller differs from its owner (EU4's own convention for "occupied")
  * gets a stripe. Reads state.provinceStateById directly instead of going through
@@ -364,6 +422,15 @@ export function computeHistoryOccupationOverlay(params: {
 			: COLOR.hashColorForKey(`nation:${id}`)
 	}
 
+	const landholders = new Set<number>()
+	for (const owner of frame.provinceNation)
+		if (owner >= 0) landholders.add(owner)
+	const rebelHeld = new Set<number>()
+	for (const war of frame.wars)
+		if (war.rebel)
+			for (const id of war.defenders)
+				if (!landholders.has(id)) rebelHeld.add(id)
+
 	const N = regionProvince.length
 	const overlay = new Float32Array(N * 4)
 	let hasAny = false
@@ -373,7 +440,9 @@ export function computeHistoryOccupationOverlay(params: {
 		const owner = frame.provinceNation[p]
 		const controller = frame.provinceController[p]
 		if (owner < 0 || controller < 0 || owner === controller) continue
-		const color = colorForId(controller)
+		const color: [number, number, number] = rebelHeld.has(controller)
+			? [0, 0, 0]
+			: colorForId(controller)
 		const base = r * 4
 		overlay[base] = color[0]
 		overlay[base + 1] = color[1]

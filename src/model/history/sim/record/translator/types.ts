@@ -9,13 +9,36 @@ export interface ActiveTie {
 	secondId: number
 }
 
+export interface RebelWar {
+	attackerRoot: number
+	defenderRoot: number
+}
+
+export interface RebelNoteReasons {
+	revolts: Map<number, string>
+	outcomes: Map<number, string>
+	touchedRoots: Set<number>
+}
+
+export interface ScanRebelNotesParams {
+	translator: ProceduralTranslator
+	transaction: JournalTransaction
+}
+
+export interface RebelWarOfParams {
+	translator: ProceduralTranslator
+	root: number
+}
+
 export interface ProceduralTranslator {
 	state: HistoryState
 	world: SerializedGenesisWorld
 	names: LanguageNames
 	parent: Int32Array
 	owner: Int32Array
+	controller: Int32Array
 	occupation: Int32Array
+	rebelWars: Map<number, RebelWar>
 	children: Set<number>[]
 	identityByRoot: Map<number, number>
 	rawColors: Array<[number, number, number]>

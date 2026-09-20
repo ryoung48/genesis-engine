@@ -7,6 +7,10 @@ import {
 	createMapCloudMaterial,
 } from "@/ui/genesis/renderer/cloud-material"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
+import {
+	buildNebulaBackground,
+	sizeNebulaBackground,
+} from "@/ui/genesis/renderer/nebula-background"
 import { createPlaceholderSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
 import { configureBodyTextureAnisotropy } from "@/ui/genesis/solar-system/overlay/textures"
 
@@ -186,7 +190,14 @@ export function buildGenesisSceneSetup(
 		size: 1.2,
 		sizeAttenuation: false,
 	})
-	scene.add(new THREE.Points(starGeo, starMat))
+	const starPoints = new THREE.Points(starGeo, starMat)
+	scene.add(starPoints)
+
+	// Nebula skybox behind the solar-system view only -- hidden with
+	// solarSystemGroup everywhere else.
+	const nebulaBackground = buildNebulaBackground()
+	solarSystemGroup.add(nebulaBackground)
+	sizeNebulaBackground({ mesh: nebulaBackground, renderer })
 
 	return {
 		canvas,
@@ -214,6 +225,8 @@ export function buildGenesisSceneSetup(
 		cloudsVisible: false,
 		starGeo,
 		starMat,
+		starPoints,
+		nebulaBackground,
 		terrainMesh: null,
 		mapMesh: null,
 		terrainFaceToRegion: new Int32Array(0),
@@ -242,9 +255,9 @@ export function buildGenesisSceneSetup(
 		mapPathfindingLine: null,
 		globePathfindingDots: null,
 		mapPathfindingDots: null,
-		globeHierarchyOverlay: null,
-		mapHierarchyOverlay: null,
-		hierarchyOverlaySpec: null,
+		globeRealmBorders: null,
+		mapRealmBorders: null,
+		realmBordersSpec: null,
 		globeSettlements: null,
 		mapSettlements: null,
 		settlementLocations: null,

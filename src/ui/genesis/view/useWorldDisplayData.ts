@@ -52,7 +52,10 @@ import {
 } from "@/ui/genesis/shared/label-names"
 import { getMapModePrimary } from "@/ui/genesis/shared/map-modes"
 import { rgbToCss, windDirectionLabel } from "@/ui/genesis/shared/ui-format"
-import { usePlaybackSampledValue } from "@/ui/genesis/shared/usePlaybackSampledValue"
+import {
+	SCENE_REBUILD_THROTTLE_MS,
+	useThrottledValue,
+} from "@/ui/genesis/shared/useThrottledValue"
 import { createDisplayNames } from "@/ui/genesis/view/display-names"
 import type {
 	WorldDisplayDataInput,
@@ -80,7 +83,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
-		earthHistoryPlaying,
 	} = input
 
 	// A single Model/Observed/Diff radio drives every observed-vs-model
@@ -245,37 +247,36 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	const religionLabelsArray = useMemo(() => {
 		return buildReligionLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
-	const labelsPlaybackActive = earthHistoryPlaying
-	const sampledNationLabelsArray = usePlaybackSampledValue(
-		nationLabelsArray,
-		350,
-		labelsPlaybackActive,
-	)
-	const sampledDynastyLabelsArray = usePlaybackSampledValue(
-		dynastyLabelsArray,
-		350,
-		labelsPlaybackActive,
-	)
-	const sampledSettlementLabelsArray = usePlaybackSampledValue(
-		settlementLabelsArray,
-		350,
-		labelsPlaybackActive,
-	)
-	const sampledCultureLabelsArray = usePlaybackSampledValue(
-		cultureLabelsArray,
-		350,
-		labelsPlaybackActive,
-	)
-	const sampledHeritageLabelsArray = usePlaybackSampledValue(
-		heritageLabelsArray,
-		350,
-		labelsPlaybackActive,
-	)
-	const sampledReligionLabelsArray = usePlaybackSampledValue(
-		religionLabelsArray,
-		350,
-		labelsPlaybackActive,
-	)
+	const sampledNationLabelsArray = useThrottledValue({
+		value: nationLabelsArray,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: worldForDisplay?.mesh ?? null,
+	})
+	const sampledDynastyLabelsArray = useThrottledValue({
+		value: dynastyLabelsArray,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: worldForDisplay?.mesh ?? null,
+	})
+	const sampledSettlementLabelsArray = useThrottledValue({
+		value: settlementLabelsArray,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: worldForDisplay?.mesh ?? null,
+	})
+	const sampledCultureLabelsArray = useThrottledValue({
+		value: cultureLabelsArray,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: worldForDisplay?.mesh ?? null,
+	})
+	const sampledHeritageLabelsArray = useThrottledValue({
+		value: heritageLabelsArray,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: worldForDisplay?.mesh ?? null,
+	})
+	const sampledReligionLabelsArray = useThrottledValue({
+		value: religionLabelsArray,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: worldForDisplay?.mesh ?? null,
+	})
 	const getProvinceName = useCallback(
 		(provinceId: number) =>
 			worldNames?.province(provinceId) ?? `Province #${provinceId}`,
@@ -566,7 +567,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		hoverWindDir,
 		hoverWindMonthly,
 		hoverWindSpeed,
-		labelsPlaybackActive,
 		projectToScreen,
 		sampledCultureLabelsArray,
 		sampledDynastyLabelsArray,

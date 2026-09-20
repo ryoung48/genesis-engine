@@ -55,6 +55,8 @@ const STAR_PALETTE_BY_CLASS: Partial<Record<SpectralClass, StarPalette>> = {
 	G: palette([1.0, 1.0, 1.0], [1.0, 0.56, 0.14], [1.0, 0.2, 0.0], 1.6),
 	K: palette([1.0, 1.0, 1.0], [1.0, 0.34, 0.03], [1.0, 0.06, 0.0], 1.6),
 	M: palette([1.0, 0.97, 0.9], [1.0, 0.2, 0.0], [1.0, 0.0, 0.0], 1.6),
+	D: palette([1.0, 1.0, 1.0], [0.95, 0.98, 1.0], [0.76, 0.86, 0.97], 1.0),
+	NS: palette([1.0, 1.0, 1.0], [0.55, 0.9, 1.0], [0.13, 0.48, 0.75], 1.4),
 }
 
 // Giants read as an M-class star scaled up, whatever their spectral class:
@@ -109,15 +111,9 @@ export const STAR_GLOW_RADIUS_SCALE = 1.9
 const GLOW_STRENGTH = 0.55
 
 export type StarSurfaceLayersInput = {
-	/** Selects the photosphere palette -- see STAR_PALETTE_BY_CLASS. */
 	spectralClass: SpectralClass
-	/** Overrides the palette with GIANT_PALETTE and holds the granulation
-	 * coarse -- see GIANT_NOISE_SCALE. */
 	isGiant: boolean
-	/** The star's overall spectral colour, used for the corona halo only. */
 	tint: THREE.Color
-	/** The star's true diameter in Sol diameters, used only to scale
-	 * granulation frequency -- see BASE_NOISE_SCALE. */
 	diameterSol: number
 }
 
@@ -222,39 +218,36 @@ const STAR_NOISE_CHUNK = `
 		}
 		return v;
 	}
+
+	float starCellEdge(in vec3 pos) {
+		vec3 cell = floor(pos);
+		vec3 local = fract(pos);
+		float nearest = 2.0;
+		float second = 2.0;
+		for (int x = -1; x <= 1; ++x) {
+			for (int y = -1; y <= 1; ++y) {
+				for (int z = -1; z <= 1; ++z) {
+					vec3 neighbor = vec3(float(x), float(y), float(z));
+					vec3 feature = cell + neighbor;
+					feature = vec3(
+						starRandom(feature),
+						starRandom(feature + vec3(19.0)),
+						starRandom(feature + vec3(47.0))
+					);
+					float distanceToFeature = length(neighbor + feature - local);
+					if (distanceToFeature < nearest) {
+						second = nearest;
+						nearest = distanceToFeature;
+					} else {
+						second = min(second, distanceToFeature);
+					}
+				}
+			}
+		}
+		return 1.0 - smoothstep(0.015, 0.14, second - nearest);
+	}
 `
 
-/**
- * A star's photosphere, after Sangil Lee's "Create a realistic sun with
- * shaders". Two of that article's three layers are used:
- *
- * - `surface` is domain-warped fBm (an fBm whose sample point is itself
- *   offset by three more fBms) sampled on the star's own sphere, which is
- *   what produces convection-cell mottling rather than plain cloud noise.
- * - `glow` is a corona shell whose intensity peaks along the view axis, so
- *   the part left visible outside the star's silhouette reads as a halo. It
- *   writes its shape into alpha as the article's shader is written for, then
- *   blends additively, which is safe because a BackSide shell only ever
- *   covers background rather than the star's own surface.
- *
- * The article's third layer, a fresnel rim shell, is deliberately not used.
- * Its outer term peaks exactly where the view direction grazes the surface
- * -- that is, precisely at the shell's own silhouette -- so the layer is
- * brightest at its geometric boundary and then stops dead, drawing a
- * hard-edged ring around the star instead of a rim that falls off. Its inner
- * term has the opposite problem: it peaks at the CENTRE of the disc, laying
- * a flat wash over the whole photosphere that competes with the granulation.
- *
- * The article's single fixed palette is replaced here by one per spectral
- * class (see STAR_PALETTE_BY_CLASS), and its fixed noise frequency by one
- * that tracks stellar size (see BASE_NOISE_SCALE), so class and scale both
- * read instead of every star rendering an identical disc. A G-class star
- * still lands on exactly the article's own colours.
- *
- * The corona is its own mesh because it needs its own geometry scale and
- * face orientation -- see STAR_GLOW_RADIUS_SCALE and the `side` setting
- * below.
- */
 export function buildStarSurfaceLayers(
 	input: StarSurfaceLayersInput,
 ): StarSurfaceLayers {
@@ -263,16 +256,23 @@ export function buildStarSurfaceLayers(
 	const starPalette = input.isGiant
 		? GIANT_PALETTE
 		: (STAR_PALETTE_BY_CLASS[input.spectralClass] ?? DEFAULT_STAR_PALETTE)
+	const cellularSurface =
+		(input.spectralClass === "D" || input.spectralClass === "NS") &&
+		!input.isGiant
 	const { hot: hotColor, mid: midColor, deep: deepColor } = starPalette
-	const noiseScale = input.isGiant
-		? GIANT_NOISE_SCALE
-		: Math.min(
-				MAX_NOISE_SCALE,
-				Math.max(
-					MIN_NOISE_SCALE,
-					BASE_NOISE_SCALE * Math.sqrt(Math.max(0.01, input.diameterSol)),
-				),
-			)
+	const noiseScale = cellularSurface
+		? input.spectralClass === "NS"
+			? 22
+			: 32
+		: input.isGiant
+			? GIANT_NOISE_SCALE
+			: Math.min(
+					MAX_NOISE_SCALE,
+					Math.max(
+						MIN_NOISE_SCALE,
+						BASE_NOISE_SCALE * Math.sqrt(Math.max(0.01, input.diameterSol)),
+					),
+				)
 
 	const surface = new THREE.ShaderMaterial({
 		uniforms: {
@@ -282,6 +282,7 @@ export function buildStarSurfaceLayers(
 			deepColor: { value: deepColor },
 			gain: { value: starPalette.gain },
 			noiseScale: { value: noiseScale },
+			cellularSurface: { value: cellularSurface ? 1 : 0 },
 		},
 		vertexShader: STAR_VERTEX_SHADER,
 		fragmentShader: `
@@ -291,6 +292,7 @@ export function buildStarSurfaceLayers(
 			uniform vec3 deepColor;
 			uniform float gain;
 			uniform float noiseScale;
+			uniform float cellularSurface;
 			varying vec3 vNormalView;
 			varying vec3 vPosition;
 			varying vec3 vObjectPosition;
@@ -299,6 +301,14 @@ export function buildStarSurfaceLayers(
 
 			void main() {
 				vec3 st = vObjectPosition;
+				if (cellularSurface > 0.5) {
+					float mottling = starFbm(st, noiseScale * 0.2);
+					float veins = starCellEdge(st * noiseScale);
+					vec3 color = mix(deepColor, midColor, smoothstep(0.15, 0.7, mottling));
+					color = mix(color, hotColor, veins * 0.85);
+					gl_FragColor = vec4(gain * color, 1.0);
+					return;
+				}
 
 				// Domain warp: q displaces the sample point of the fbm below,
 				// which is what turns smooth noise into the curdled granulation

@@ -684,12 +684,14 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		}
 		if (attackers.size === 0 || defenders.size === 0) return []
 		const occupiedProvinces: number[] = []
-		for (let province = 0; province < count; province++)
-			if (
-				defenders.has(provinceNation[province]) &&
-				attackers.has(provinceController[province])
-			)
-				occupiedProvinces.push(province)
+		for (let province = 0; province < count; province++) {
+			const owner = provinceNation[province]
+			const controller = provinceController[province]
+			const held =
+				(defenders.has(owner) && attackers.has(controller)) ||
+				(war.rebel && attackers.has(owner) && defenders.has(controller))
+			if (held) occupiedProvinces.push(province)
+		}
 		return [
 			{
 				id: war.id,

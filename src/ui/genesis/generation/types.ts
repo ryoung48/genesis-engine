@@ -3,7 +3,7 @@ import type { JournalTransaction } from "@/model/history/sim/engine/journal/type
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { ReligionMapMode } from "@/ui/genesis/shared/map-modes"
 
-export interface ProceduralTimelineInput {
+export interface HistoryTimelineInput {
 	world: SerializedGenesisWorld | null
 	religionMode: ReligionMapMode
 	journalTransactionsRef: RefObject<JournalTransaction[]>
@@ -14,5 +14,3 @@ export interface EarthTimelineInput {
 	provinces: SerializedGenesisWorld["provinces"] | null | undefined
 	isEarthImport: boolean
 }
-
-export interface HistoryTimelineInput extends ProceduralTimelineInput {}

@@ -113,12 +113,11 @@ export function createOverlayVisibilityController(
 			ctx.mapMeasureDots.visible = showMap
 			if (ctx.mapMesh) ctx.mapMeasureDots.position.copy(ctx.mapMesh.position)
 		}
-		if (ctx.globeHierarchyOverlay)
-			ctx.globeHierarchyOverlay.visible = ctx.currentViewMode === "globe"
-		if (ctx.mapHierarchyOverlay) {
-			ctx.mapHierarchyOverlay.visible = showMap
-			if (ctx.mapMesh)
-				ctx.mapHierarchyOverlay.position.copy(ctx.mapMesh.position)
+		if (ctx.globeRealmBorders)
+			ctx.globeRealmBorders.visible = ctx.currentViewMode === "globe"
+		if (ctx.mapRealmBorders) {
+			ctx.mapRealmBorders.visible = showMap
+			if (ctx.mapMesh) ctx.mapRealmBorders.position.copy(ctx.mapMesh.position)
 		}
 		if (ctx.globeSettlements)
 			ctx.globeSettlements.visible =

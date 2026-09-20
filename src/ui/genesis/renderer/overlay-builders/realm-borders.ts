@@ -1,0 +1,296 @@
+import * as THREE from "three"
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
+import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
+import {
+	appendProjectedSegment,
+	TERRAIN_ELEVATION_SCALE,
+} from "@/ui/genesis/renderer/overlay-builders/shared"
+import type {
+	GenesisViewMode,
+	RealmBorderLayer,
+	RealmBordersSpec,
+} from "@/ui/genesis/renderer/types"
+
+interface RealmBoundarySide {
+	r0: number
+	r1: number
+	tInner: number
+	tOuter: number
+}
+
+const GLOBE_LAYER_RADIUS_STEP = 0.0008
+const MAP_LAYER_Z_STEP = 0.001
+const MARKER_OUTLINE_SCALE = 1.45
+const OUTLINE_COLOR = new THREE.Color(0.04, 0.04, 0.04)
+
+function createCircleTexture(): THREE.CanvasTexture | null {
+	if (typeof document === "undefined") return null
+	const size = 64
+	const canvas = document.createElement("canvas")
+	canvas.width = size
+	canvas.height = size
+	const context = canvas.getContext("2d")
+	if (!context) return null
+	context.beginPath()
+	context.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2)
+	context.fillStyle = "white"
+	context.fill()
+	return new THREE.CanvasTexture(canvas)
+}
+
+function createGlobeMarkers(
+	layer: RealmBorderLayer,
+	spec: RealmBordersSpec,
+	radiusFor: (region: number) => number,
+): THREE.Points[] {
+	if (layer.markerRegions.length === 0) return []
+	const { r_xyz } = spec.world.mesh
+	const positions = new Float32Array(layer.markerRegions.length * 3)
+	layer.markerRegions.forEach((region, index) => {
+		const x = r_xyz[3 * region]
+		const y = r_xyz[3 * region + 1]
+		const z = r_xyz[3 * region + 2]
+		const scale = radiusFor(region) / (Math.hypot(x, y, z) || 1)
+		positions[3 * index] = x * scale
+		positions[3 * index + 1] = y * scale
+		positions[3 * index + 2] = z * scale
+	})
+	const texture = createCircleTexture()
+	const make = (color: THREE.Color, size: number, order: number) => {
+		const geometry = new THREE.BufferGeometry()
+		geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+		const points = new THREE.Points(
+			geometry,
+			new THREE.PointsMaterial({
+				color,
+				size,
+				sizeAttenuation: true,
+				...(texture ? { map: texture, alphaTest: 0.5 } : {}),
+				transparent: true,
+				depthWrite: false,
+			}),
+		)
+		points.renderOrder = order
+		return points
+	}
+	return [
+		make(OUTLINE_COLOR, layer.globeMarkerSize * MARKER_OUTLINE_SCALE, 10),
+		make(
+			new THREE.Color(
+				layer.markerColor[0],
+				layer.markerColor[1],
+				layer.markerColor[2],
+			),
+			layer.globeMarkerSize,
+			11,
+		),
+	]
+}
+
+function createMapMarkers(
+	layer: RealmBorderLayer,
+	spec: RealmBordersSpec,
+	projection: ReturnType<typeof createMapProjection>,
+	z: number,
+): THREE.InstancedMesh[] {
+	if (layer.markerRegions.length === 0) return []
+	const { r_xyz } = spec.world.mesh
+	const count = layer.markerRegions.length
+	const geometry = new THREE.CircleGeometry(1, 20)
+	const fill = new THREE.InstancedMesh(
+		geometry,
+		new THREE.MeshBasicMaterial({
+			color: new THREE.Color(
+				layer.markerColor[0],
+				layer.markerColor[1],
+				layer.markerColor[2],
+			),
+			depthWrite: false,
+		}),
+		count,
+	)
+	const outline = new THREE.InstancedMesh(
+		geometry,
+		new THREE.MeshBasicMaterial({ color: OUTLINE_COLOR, depthWrite: false }),
+		count,
+	)
+	const matrix = new THREE.Matrix4()
+	const position = new THREE.Vector3()
+	const scale = new THREE.Vector3()
+	const rotation = new THREE.Quaternion()
+	layer.markerRegions.forEach((region, index) => {
+		const length =
+			Math.hypot(
+				r_xyz[3 * region],
+				r_xyz[3 * region + 1],
+				r_xyz[3 * region + 2],
+			) || 1
+		const geo = projection.projectCartesian(
+			r_xyz[3 * region] / length,
+			r_xyz[3 * region + 1] / length,
+			r_xyz[3 * region + 2] / length,
+		)
+		const projected = projection.projectRadians(geo.lon, geo.lat, z)
+		position.set(projected[0], projected[1], projected[2])
+		scale.set(layer.mapMarkerRadius, layer.mapMarkerRadius, 1)
+		fill.setMatrixAt(index, matrix.compose(position, rotation, scale))
+		position.z = z - 0.0002
+		scale.set(
+			layer.mapMarkerRadius * MARKER_OUTLINE_SCALE,
+			layer.mapMarkerRadius * MARKER_OUTLINE_SCALE,
+			1,
+		)
+		outline.setMatrixAt(index, matrix.compose(position, rotation, scale))
+	})
+	fill.instanceMatrix.needsUpdate = true
+	outline.instanceMatrix.needsUpdate = true
+	return [outline, fill]
+}
+
+function forEachRealmBoundarySide(
+	spec: RealmBordersSpec,
+	layer: RealmBorderLayer,
+	visit: (side: RealmBoundarySide) => void,
+) {
+	const { mesh, provinces } = spec.world
+	if (!provinces) return
+	const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t } = mesh
+	const { regionProvince } = provinces
+	for (let side = 0; side < numSides; side++) {
+		const opposite = halfedges[side]
+		if (opposite < 0 || side > opposite) continue
+		const r0 = s_begin_r[side]
+		const r1 = s_begin_r[opposite]
+		if (regionProvince[r0] < 0 || regionProvince[r1] < 0) continue
+		if (layer.regionRealm[r0] === layer.regionRealm[r1]) continue
+		const tInner = s_inner_t[side]
+		const tOuter = s_outer_t[side]
+		if (tInner < 0 || tOuter < 0) continue
+		visit({ r0, r1, tInner, tOuter })
+	}
+}
+
+function createBorderLines(
+	positions: number[],
+	layer: RealmBorderLayer,
+	canvas: HTMLCanvasElement,
+): LineSegments2 | null {
+	if (positions.length === 0) return null
+	const geometry = new LineSegmentsGeometry()
+	geometry.setPositions(positions)
+	const material = new LineMaterial({
+		color: new THREE.Color(layer.color[0], layer.color[1], layer.color[2]),
+		linewidth: layer.linewidth,
+		resolution: new THREE.Vector2(
+			canvas.clientWidth || 1,
+			canvas.clientHeight || 1,
+		),
+		transparent: true,
+		opacity: 1,
+		depthWrite: false,
+	})
+	const lines = new LineSegments2(geometry, material)
+	lines.computeLineDistances()
+	return lines
+}
+
+export function buildGlobeRealmBorders(
+	spec: RealmBordersSpec,
+	viewMode: GenesisViewMode,
+	canvas: HTMLCanvasElement,
+	elevationVisible: boolean,
+): THREE.Group | null {
+	const { elevation, mesh } = spec.world
+	const { t_xyz } = mesh
+	const baseRadius = elevationVisible ? 1.006 : 1.003
+	const group = new THREE.Group()
+	spec.layers.forEach((layer, index) => {
+		const positions: number[] = []
+		forEachRealmBoundarySide(spec, layer, ({ r0, r1, tInner, tOuter }) => {
+			const averageElevation = (elevation[r0] + elevation[r1]) * 0.5
+			const elevationFactor = elevationVisible
+				? averageElevation > 0
+					? averageElevation * TERRAIN_ELEVATION_SCALE
+					: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3
+				: 0
+			const radius =
+				baseRadius + GLOBE_LAYER_RADIUS_STEP * (index + 1) + elevationFactor
+			positions.push(
+				t_xyz[3 * tInner] * radius,
+				t_xyz[3 * tInner + 1] * radius,
+				t_xyz[3 * tInner + 2] * radius,
+				t_xyz[3 * tOuter] * radius,
+				t_xyz[3 * tOuter + 1] * radius,
+				t_xyz[3 * tOuter + 2] * radius,
+			)
+		})
+		const lines = createBorderLines(positions, layer, canvas)
+		if (lines) group.add(lines)
+		const markerRadius = (region: number) => {
+			const averageElevation = elevation[region]
+			const elevationFactor = elevationVisible
+				? averageElevation > 0
+					? averageElevation * TERRAIN_ELEVATION_SCALE
+					: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3
+				: 0
+			return (
+				baseRadius +
+				GLOBE_LAYER_RADIUS_STEP * (index + 1) +
+				0.0004 +
+				elevationFactor
+			)
+		}
+		for (const marker of createGlobeMarkers(layer, spec, markerRadius))
+			group.add(marker)
+	})
+	if (group.children.length === 0) return null
+	group.visible = viewMode === "globe"
+	return group
+}
+
+export function buildMapRealmBorders(
+	spec: RealmBordersSpec,
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	viewMode: GenesisViewMode,
+	canvas: HTMLCanvasElement,
+): THREE.Group | null {
+	const { t_xyz } = spec.world.mesh
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
+	const group = new THREE.Group()
+	spec.layers.forEach((layer, index) => {
+		const positions: number[] = []
+		const z = 0.02 + MAP_LAYER_Z_STEP * index
+		forEachRealmBoundarySide(spec, layer, ({ tInner, tOuter }) => {
+			const a = projection.projectCartesian(
+				t_xyz[3 * tInner],
+				t_xyz[3 * tInner + 1],
+				t_xyz[3 * tInner + 2],
+			)
+			const b = projection.projectCartesian(
+				t_xyz[3 * tOuter],
+				t_xyz[3 * tOuter + 1],
+				t_xyz[3 * tOuter + 2],
+			)
+			appendProjectedSegment(
+				positions,
+				projection,
+				{ lon: a.lon, lat: a.lat },
+				{ lon: b.lon, lat: b.lat },
+				z,
+			)
+		})
+		const lines = createBorderLines(positions, layer, canvas)
+		if (lines) group.add(lines)
+		for (const marker of createMapMarkers(layer, spec, projection, z + 0.0005))
+			group.add(marker)
+	})
+	if (group.children.length === 0) return null
+	group.visible = viewMode === "map"
+	return group
+}

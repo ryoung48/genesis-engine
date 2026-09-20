@@ -8,12 +8,14 @@ import type {
 } from "@/ui/genesis/controls/OverlayControls"
 import type { GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
-import type {
-	NationMapMode,
-	ReligionMapMode,
-	SocietyMapMode,
+import {
+	DEFAULT_GEOGRAPHY_MODE,
+	type NationMapMode,
+	type ReligionMapMode,
+	type SocietyMapMode,
+	TITLE_BORDER_TIERS,
+	type TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
-import { DEFAULT_GEOGRAPHY_MODE } from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
 export interface StoredViewPrefs {
@@ -33,7 +35,7 @@ export interface StoredViewPrefs {
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
-	showNationHierarchy: boolean
+	titleBorderTiers: TitleBorderTier[]
 	labelMode: LabelMode
 	showElevation: boolean
 	showThermalEquator: boolean
@@ -122,6 +124,12 @@ const NATION_MAP_MODES = new Set<NationMapMode>([
 	"dynasty",
 	"diplomacy",
 	"government",
+	"titlesBarony",
+	"titlesCounty",
+	"titlesDuchy",
+	"titlesKingdom",
+	"titlesEmpire",
+	"titlesHegemony",
 ])
 
 const SOCIETY_MAP_MODES = new Set<SocietyMapMode>([
@@ -154,7 +162,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showWireframe: false,
 	showGrid: true,
 	showNationBorders: false,
-	showNationHierarchy: false,
+	titleBorderTiers: [],
 	labelMode: {
 		nations: false,
 		dynasty: false,
@@ -224,6 +232,11 @@ function isUnitSystem(value: unknown): value is UnitSystem {
 
 function isMeasureMode(value: unknown): value is MeasureMode {
 	return typeof value === "string" && MEASURE_MODES.has(value as MeasureMode)
+}
+
+function parseTitleBorderTiers(value: unknown): TitleBorderTier[] {
+	if (!Array.isArray(value)) return []
+	return TITLE_BORDER_TIERS.filter((tier) => value.includes(tier))
 }
 
 function isLabelMode(value: unknown): value is LabelMode {
@@ -322,10 +335,7 @@ export function parseStoredViewPrefs(
 				parsed.showNationBorders,
 				DEFAULT_VIEW_PREFS.showNationBorders,
 			),
-			showNationHierarchy: readBoolean(
-				parsed.showNationHierarchy,
-				DEFAULT_VIEW_PREFS.showNationHierarchy,
-			),
+			titleBorderTiers: parseTitleBorderTiers(parsed.titleBorderTiers),
 			labelMode: parseLabelMode(parsed.labelMode),
 			showElevation: readBoolean(
 				parsed.showElevation,

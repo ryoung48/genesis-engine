@@ -58,8 +58,8 @@ export function createDisposeController(
 		disposeObject3D(ctx.scene, ctx.mapCoastlineOverlay)
 		disposeGroup(ctx.globeGroup, ctx.globeRivers)
 		disposeGroup(ctx.scene, ctx.mapRivers)
-		disposeGroup(ctx.globeGroup, ctx.globeHierarchyOverlay)
-		disposeGroup(ctx.scene, ctx.mapHierarchyOverlay)
+		disposeGroup(ctx.globeGroup, ctx.globeRealmBorders)
+		disposeGroup(ctx.scene, ctx.mapRealmBorders)
 		disposeGroup(ctx.globeGroup, ctx.globeSettlements)
 		disposeGroup(ctx.scene, ctx.mapSettlements)
 		disposeGroup(ctx.globeGroup, ctx.globeEu4Settlements)
@@ -85,6 +85,8 @@ export function createDisposeController(
 		ctx.atmosMat.dispose()
 		ctx.starGeo.dispose()
 		ctx.starMat.dispose()
+		ctx.scene.remove(ctx.starPoints)
+		disposeObject3D(ctx.solarSystemGroup, ctx.nebulaBackground)
 	}
 
 	return { dispose }

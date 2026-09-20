@@ -8,6 +8,10 @@ import {
 } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
 import { buildMoonOrbitOverlay } from "@/ui/genesis/renderer/moon-orbit-overlay"
 import {
+	setNebulaBackgroundSeed as applyNebulaBackgroundSeed,
+	frameNebulaBackground,
+} from "@/ui/genesis/renderer/nebula-background"
+import {
 	buildSolarSystemOverlay,
 	type OrbitAddress,
 	type SolarSystemOverlayParams,
@@ -39,6 +43,7 @@ export function createSolarSystemController(
 	// shells rather than a post-process -- so this is just a normal
 	// single-pass render, same as any other scene.
 	function renderSolarSystemView() {
+		frameNebulaBackground({ mesh: ctx.nebulaBackground, camera: ctx.camera })
 		ctx.renderer.render(ctx.scene, ctx.camera)
 	}
 
@@ -159,6 +164,9 @@ export function createSolarSystemController(
 		ctx.solarSystemGroup.visible = active
 		ctx.globeGroup.visible = !active
 		ctx.orbitGroup.visible = !active
+		// The nebula skybox carries its own starfield -- the shared point
+		// starfield would double it up, so it rests while this view is up.
+		ctx.starPoints.visible = !active
 		// ctx.mapMesh lives directly on `scene`, not inside ctx.globeGroup, since
 		// the flat-map view uses its own orthographic camera alongside the
 		// globe's perspective one -- so it needs its own visibility toggle here.
@@ -279,6 +287,14 @@ export function createSolarSystemController(
 		ctx.solarSystemFocusChangeHandler = handler
 	}
 
+	/** Tints the nebula backdrop toward the given system's own seed-derived
+	 * hue -- call alongside setSolarSystemOverlay, which doesn't itself
+	 * carry the seed. */
+	function setNebulaBackgroundSeed(seed: number) {
+		applyNebulaBackgroundSeed({ mesh: ctx.nebulaBackground, seed })
+		deps.requestRender()
+	}
+
 	return {
 		renderSolarSystemView,
 		stepSolarSystemFocusTween,
@@ -292,5 +308,6 @@ export function createSolarSystemController(
 		updateSolarSystemDay,
 		setSolarSystemSpinHours,
 		setSolarSystemFocusChangeHandler,
+		setNebulaBackgroundSeed,
 	}
 }

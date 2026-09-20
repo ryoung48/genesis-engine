@@ -241,3 +241,14 @@ export function pushTimelineEvent(
 export function rgb255ToCss(rgb: [number, number, number]): string {
 	return COLOR.rgb01ToCss([rgb[0] / 255, rgb[1] / 255, rgb[2] / 255])
 }
+
+function warEndRank(event: { type: string }): number {
+	return event.type === "War (-)" ? 1 : 0
+}
+
+export function compareTimelineDateThenWarEnd(
+	a: { date: number; type: string },
+	b: { date: number; type: string },
+): number {
+	return a.date - b.date || warEndRank(a) - warEndRank(b)
+}

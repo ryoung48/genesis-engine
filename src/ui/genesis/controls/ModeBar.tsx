@@ -16,9 +16,11 @@ import type {
 	SocietyMapOption,
 } from "@/ui/genesis/shared/map-modes"
 import {
+	DEFAULT_TITLES_MODE,
 	getMapModePrimary,
 	getVisibleGeographyModeOptions,
 	getVisibleSocietyModeOptions,
+	isTitlesNationMode,
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "@/ui/genesis/shared/map-modes"
 
@@ -130,7 +132,9 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						? societyMode
 						: colorMode === "timezone"
 							? "timezone"
-							: nationMode
+							: isTitlesNationMode(nationMode)
+								? "titles"
+								: nationMode
 				}
 				onChange={(mode) => {
 					if (mode === "timezone") {
@@ -151,6 +155,12 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						return
 					}
 					setColorMode("nations")
+					if (mode === "titles") {
+						setNationMode(
+							isTitlesNationMode(nationMode) ? nationMode : DEFAULT_TITLES_MODE,
+						)
+						return
+					}
 					setNationMode(mode)
 				}}
 				buttonClassName="px-1.5"

@@ -1,14 +1,22 @@
 import * as THREE from "three"
-import { uiChartPalette } from "@/ui/components/tokens"
+import { uiChartPalette, uiPalette } from "@/ui/components/tokens"
 import type {
 	PlanetPreview,
 	PlanetPreviewSettings,
 } from "@/ui/genesis/planet-renderer-experiment/types"
+import { brownDwarfGlow } from "@/ui/genesis/renderer/brown-dwarf-glow"
 import {
 	buildCloudBandMaterial,
 	swatchCloudBandPalette,
 } from "@/ui/genesis/renderer/cloud-band-material"
 import { buildCraterMaterial } from "@/ui/genesis/renderer/crater-material"
+import { buildNeutronJets } from "@/ui/genesis/renderer/neutron-jets"
+import {
+	buildStarSurfaceLayers,
+	STAR_GLOW_RADIUS_SCALE,
+} from "@/ui/genesis/renderer/star-surface-material"
+import { STAR_COLOR_BY_CLASS } from "@/ui/genesis/solar-system/overlay/constants"
+import { createStarGlowTexture } from "@/ui/genesis/solar-system/overlay/textures"
 
 export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -24,11 +32,29 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 	sunLight.position.set(-3, 2, 4)
 	scene.add(ambientLight, sunLight)
 	const geometry = new THREE.SphereGeometry(1, 96, 64)
+	const coronaGeometry = new THREE.SphereGeometry(
+		STAR_GLOW_RADIUS_SCALE,
+		48,
+		32,
+	)
 	const planet = new THREE.Group()
-	const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial())
+	const initialMaterial: THREE.Material = new THREE.MeshStandardMaterial()
+	const mesh = new THREE.Mesh(geometry, initialMaterial)
 	mesh.rotation.x = Math.PI / 2
 	planet.add(mesh)
+	const neutronColor = new THREE.Color(uiPalette.neutronStarGlow)
+	const neutronJets = buildNeutronJets({
+		color: neutronColor,
+		starRadius: 1,
+		beamLength: 3.6,
+	})
+	neutronJets.group.visible = false
+	planet.add(neutronJets.group)
 	scene.add(planet)
+	let starSurfaceLayers: ReturnType<typeof buildStarSurfaceLayers> | null = null
+	let coronaMesh: THREE.Mesh | null = null
+	let brownDwarfGlowSprite: THREE.Sprite | null = null
+	let brownDwarfGlowTexture: THREE.CanvasTexture | null = null
 	let activePointer: number | null = null
 	let previousX = 0
 	let previousY = 0
@@ -67,6 +93,16 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 		if (activePointer === event.pointerId) activePointer = null
 	}
 
+	function clearBrownDwarfGlow(): void {
+		if (brownDwarfGlowSprite) {
+			planet.remove(brownDwarfGlowSprite)
+			brownDwarfGlowSprite.material.dispose()
+			brownDwarfGlowSprite = null
+		}
+		brownDwarfGlowTexture?.dispose()
+		brownDwarfGlowTexture = null
+	}
+
 	canvas.addEventListener("pointerdown", pointerDown)
 	canvas.addEventListener("pointermove", pointerMove)
 	canvas.addEventListener("pointerup", pointerUp)
@@ -77,26 +113,91 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 
 	return {
 		setSettings(settings: PlanetPreviewSettings): void {
+			const isStar =
+				settings.style === "sun" ||
+				settings.style === "white-dwarf" ||
+				settings.style === "neutron-star"
+			const brownDwarfClass =
+				settings.style === "brown-dwarf-l"
+					? "L"
+					: settings.style === "brown-dwarf-t"
+						? "T"
+						: settings.style === "brown-dwarf-y"
+							? "Y"
+							: null
 			const oldMaterial = mesh.material
+			clearBrownDwarfGlow()
+			if (coronaMesh) planet.remove(coronaMesh)
+			starSurfaceLayers?.glow.dispose()
+			starSurfaceLayers = null
+			coronaMesh = null
+			if (isStar) {
+				const spectralClass =
+					settings.style === "sun"
+						? "G"
+						: settings.style === "white-dwarf"
+							? "D"
+							: "NS"
+				starSurfaceLayers = buildStarSurfaceLayers({
+					spectralClass,
+					isGiant: false,
+					tint:
+						settings.style === "neutron-star"
+							? neutronColor
+							: new THREE.Color(STAR_COLOR_BY_CLASS[spectralClass]),
+					diameterSol: 1,
+				})
+				coronaMesh = new THREE.Mesh(coronaGeometry, starSurfaceLayers.glow)
+				if (settings.style === "neutron-star") coronaMesh.scale.setScalar(1.25)
+				planet.add(coronaMesh)
+			}
+			if (brownDwarfClass) {
+				brownDwarfGlowTexture = createStarGlowTexture(settings.color)
+				brownDwarfGlowSprite = new THREE.Sprite(
+					new THREE.SpriteMaterial({
+						map: brownDwarfGlowTexture,
+						opacity: brownDwarfGlow({
+							spectralClass: brownDwarfClass,
+							subtype: 5,
+						}).haloOpacity,
+						transparent: true,
+						depthWrite: false,
+						blending: THREE.AdditiveBlending,
+					}),
+				)
+				brownDwarfGlowSprite.scale.setScalar(2.8)
+				planet.add(brownDwarfGlowSprite)
+			}
 			const material =
-				settings.style === "cratered" ||
-				settings.style === "martian" ||
-				settings.style === "snowball" ||
-				settings.style === "meltball"
-					? buildCraterMaterial({
-							seed: settings.seed,
-							color: settings.color,
-							style: settings.style,
-						})
-					: buildCloudBandMaterial({
-							seed: settings.seed,
-							style: settings.style,
-							palette: swatchCloudBandPalette({
-								hex: Number.parseInt(settings.color.slice(1), 16),
-							}),
-						})
+				settings.style === "sun" ||
+				settings.style === "white-dwarf" ||
+				settings.style === "neutron-star"
+					? starSurfaceLayers!.surface
+					: settings.style === "cratered" ||
+							settings.style === "martian" ||
+							settings.style === "snowball" ||
+							settings.style === "meltball"
+						? buildCraterMaterial({
+								seed: settings.seed,
+								color: settings.color,
+								style: settings.style,
+							})
+						: buildCloudBandMaterial({
+								seed: settings.seed,
+								style: settings.style,
+								palette: swatchCloudBandPalette({
+									hex: Number.parseInt(settings.color.slice(1), 16),
+								}),
+							})
 			mesh.material = material
 			oldMaterial.dispose()
+			neutronJets.group.visible = settings.style === "neutron-star"
+			camera.position.set(
+				0,
+				settings.style === "neutron-star" ? 11.8 : isStar ? 5.3 : 3.6,
+				0,
+			)
+			camera.lookAt(0, 0, 0)
 			render()
 		},
 		dispose(): void {
@@ -106,7 +207,11 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 			canvas.removeEventListener("pointerup", pointerUp)
 			canvas.removeEventListener("pointercancel", pointerUp)
 			geometry.dispose()
+			coronaGeometry.dispose()
+			neutronJets.dispose()
+			clearBrownDwarfGlow()
 			mesh.material.dispose()
+			starSurfaceLayers?.glow.dispose()
 			renderer.dispose()
 		},
 	}

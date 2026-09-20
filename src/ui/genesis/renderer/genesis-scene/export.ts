@@ -37,7 +37,7 @@ export function createExportController(
 			ctx.mapRivers,
 			ctx.mapMeasureLine,
 			ctx.mapMeasureDots,
-			ctx.mapHierarchyOverlay,
+			ctx.mapRealmBorders,
 			ctx.mapSettlements,
 			ctx.mapEu4Settlements,
 			ctx.mapInfrastructure,
@@ -71,7 +71,7 @@ export function createExportController(
 			{ object: ctx.globeMeasureDots, visible: false },
 			{ object: ctx.globePathfindingLine, visible: false },
 			{ object: ctx.globePathfindingDots, visible: false },
-			{ object: ctx.globeHierarchyOverlay, visible: false },
+			{ object: ctx.globeRealmBorders, visible: false },
 			{ object: ctx.globeSettlements, visible: false },
 			{ object: ctx.globeEu4Settlements, visible: false },
 			{ object: ctx.globeInfrastructure, visible: false },
@@ -96,8 +96,8 @@ export function createExportController(
 				visible: ctx.nationBordersVisible,
 			},
 			{
-				object: ctx.mapHierarchyOverlay,
-				visible: ctx.hierarchyOverlaySpec !== null,
+				object: ctx.mapRealmBorders,
+				visible: ctx.realmBordersSpec !== null,
 			},
 			{ object: ctx.mapSettlements, visible: ctx.settlementsVisible },
 			{

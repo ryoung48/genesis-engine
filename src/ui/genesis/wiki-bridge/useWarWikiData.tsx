@@ -9,6 +9,7 @@ import type { WarWikiDataInput } from "@/ui/genesis/view/types"
 import { formatWealthCost } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import {
 	cleanEu4Identifier,
+	compareTimelineDateThenWarEnd,
 	eventComment,
 	joinWithAnd,
 	pushTimelineEvent,
@@ -399,7 +400,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				provinces: group.provinces,
 			})
 		}
-		timelineEvents.sort((a, b) => a.date - b.date)
+		timelineEvents.sort(compareTimelineDateThenWarEnd)
 
 		return {
 			id: war.id,

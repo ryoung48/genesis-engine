@@ -6,6 +6,9 @@ export type PlanetTextureStyle =
 	| "martian"
 	| "snowball"
 	| "meltball"
+	| "sun"
+	| "white-dwarf"
+	| "neutron-star"
 
 export type PlanetPreviewSettings = {
 	seed: number

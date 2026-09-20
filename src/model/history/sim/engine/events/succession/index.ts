@@ -193,12 +193,13 @@ function runSuccession({
 				return !provinces.some((q) => state.occupationCurrent[q] >= 0)
 			})
 
-		const rebellionChance = 0.5
-		let rebelCount = 0
-		while (rebelCount < subjects.length && rng.random() < rebellionChance) {
-			const subject = subjects[rebelCount]
-			rebelCount++
-			if (FIELDS.prov.parent.get({ state, p: subject }) !== province) continue
+		const rebellionChance = 0.12
+		const subject = subjects[0]
+		if (
+			subject !== undefined &&
+			rng.random() < rebellionChance &&
+			FIELDS.prov.parent.get({ state, p: subject }) === province
+		) {
 			STATE.releaseProvince({ state, p: subject, rng })
 			state.events.push({
 				tag: "rebellion",

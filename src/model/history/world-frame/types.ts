@@ -1,3 +1,4 @@
+import type { TitleTier } from "@/model/society/titles/types"
 export interface Ruler {
 	name: string
 	dynasty: string | null
@@ -120,4 +121,13 @@ export interface ToRenderInputsParams {
 
 export interface ProvinceDepthParams {
 	frame: WorldFrame
+}
+
+export interface ProvinceDomainParams {
+	frame: WorldFrame
+}
+
+export interface ProvinceTierRealmParams {
+	frame: WorldFrame
+	tier: TitleTier
 }

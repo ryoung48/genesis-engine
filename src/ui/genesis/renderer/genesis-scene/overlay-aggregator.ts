@@ -21,7 +21,7 @@ export interface OverlayAggregatorControllerDeps {
 	applyWaterMaterialForMode: (mode: ColorMode) => void
 	rebuildNationBorders: () => void
 	rebuildSelectedProvinceBorder: () => void
-	rebuildHierarchy: () => void
+	rebuildRealmBorders: () => void
 	rebuildSettlementOverlay: () => void
 	rebuildEu4SettlementOverlay: () => void
 	rebuildTradeRouteOverlay: () => void
@@ -55,8 +55,8 @@ export function createOverlayAggregatorController(
 		disposeObject3D(ctx.scene, ctx.mapSelectedProvinceBorder)
 		disposeObject3D(ctx.globeGroup, ctx.pulseGlobe)
 		disposeObject3D(ctx.scene, ctx.pulseMap)
-		disposeGroup(ctx.globeGroup, ctx.globeHierarchyOverlay)
-		disposeGroup(ctx.scene, ctx.mapHierarchyOverlay)
+		disposeGroup(ctx.globeGroup, ctx.globeRealmBorders)
+		disposeGroup(ctx.scene, ctx.mapRealmBorders)
 		disposeGroup(ctx.globeGroup, ctx.globeSettlements)
 		disposeGroup(ctx.scene, ctx.mapSettlements)
 		disposeGroup(ctx.globeGroup, ctx.globeEu4Settlements)
@@ -86,8 +86,8 @@ export function createOverlayAggregatorController(
 		ctx.pulseGlobe = null
 		ctx.pulseMap = null
 		ctx.pulse = null
-		ctx.globeHierarchyOverlay = null
-		ctx.mapHierarchyOverlay = null
+		ctx.globeRealmBorders = null
+		ctx.mapRealmBorders = null
 		ctx.globeSettlements = null
 		ctx.mapSettlements = null
 		ctx.settlementsDirty = true
@@ -146,7 +146,7 @@ export function createOverlayAggregatorController(
 		deps.applyWaterMaterialForMode(ctx.currentColorMode)
 		deps.rebuildNationBorders()
 		deps.rebuildSelectedProvinceBorder()
-		deps.rebuildHierarchy()
+		deps.rebuildRealmBorders()
 		deps.rebuildSettlementOverlay()
 		deps.rebuildEu4SettlementOverlay()
 		deps.rebuildTradeRouteOverlay()

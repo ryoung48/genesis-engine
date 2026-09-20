@@ -5,6 +5,7 @@ import type {
 	NationMapMode,
 	ReligionMapMode,
 	SocietyMapMode,
+	TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
@@ -74,8 +75,8 @@ export interface OverlayControlsProps {
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
 	setShowNationBorders: (v: boolean) => void
-	showNationHierarchy: boolean
-	setShowNationHierarchy: (v: boolean) => void
+	titleBorderTiers: readonly TitleBorderTier[]
+	setTitleBorderTiers: (tiers: TitleBorderTier[]) => void
 	nationMode: NationMapMode
 	setNationMode: (v: NationMapMode) => void
 	populationMode: SocietyMapMode
@@ -149,5 +150,4 @@ export interface OverlayControlsProps {
 	setShowDaylight?: (v: boolean) => void
 	onEnterSolarSystem?: () => void
 	isEarthImport?: boolean
-	hasHierarchy: boolean
 }

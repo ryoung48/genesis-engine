@@ -64,6 +64,31 @@ export type SocietyMapMode =
 
 export type ReligionMapMode = "religions" | "types"
 
+export type TitlesNationMode =
+	| "titlesBarony"
+	| "titlesCounty"
+	| "titlesDuchy"
+	| "titlesKingdom"
+	| "titlesEmpire"
+	| "titlesHegemony"
+
+export type TitleBorderTier =
+	| "barony"
+	| "county"
+	| "duchy"
+	| "kingdom"
+	| "empire"
+	| "hegemony"
+
+export const TITLE_BORDER_TIERS: readonly TitleBorderTier[] = [
+	"barony",
+	"county",
+	"duchy",
+	"kingdom",
+	"empire",
+	"hegemony",
+]
+
 export type NationMapMode =
 	| "borders"
 	| "provinces"
@@ -75,8 +100,13 @@ export type NationMapMode =
 	 * reachable only via NationsModeSection's Normal/Organizations toggle in
 	 * OverlayControls, which appears while "borders" or this mode is active. */
 	| "organizations"
+	| TitlesNationMode
 
-export type SocietyMapOption = NationMapMode | SocietyMapMode | "timezone"
+export type SocietyMapOption =
+	| NationMapMode
+	| SocietyMapMode
+	| "timezone"
+	| "titles"
 
 export type MapModePrimary = "geography" | "society"
 
@@ -139,11 +169,12 @@ const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 ]
 
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
-	readonly [NationMapMode, string]
+	readonly [SocietyMapOption, string]
 > = [
 	["borders", "Nations"],
 	["government", "Government"],
 	["dynasty", "Dynasty"],
+	["titles", "Titles"],
 ]
 
 const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
@@ -174,6 +205,23 @@ export function isDebugGeographyMode(colorMode: ColorMode): boolean {
 	return DEBUG_GEOGRAPHY_MODE_OPTIONS.some(([mode]) => mode === colorMode)
 }
 
+const TITLES_NATION_MODES: readonly TitlesNationMode[] = [
+	"titlesBarony",
+	"titlesCounty",
+	"titlesDuchy",
+	"titlesKingdom",
+	"titlesEmpire",
+	"titlesHegemony",
+]
+
+export const DEFAULT_TITLES_MODE: TitlesNationMode = "titlesDuchy"
+
+export function isTitlesNationMode(
+	nationMode: NationMapMode,
+): nationMode is TitlesNationMode {
+	return (TITLES_NATION_MODES as readonly string[]).includes(nationMode)
+}
+
 export function isDebugNationMode(nationMode: NationMapMode): boolean {
 	return (
 		DEBUG_POLITICAL_MODE_OPTIONS.some(([mode]) => mode === nationMode) ||
@@ -198,6 +246,7 @@ export function normalizeNationMapMode(
 	if (!isEarthImport && EARTH_IMPORT_ONLY_NATION_MODES.has(nationMode)) {
 		return "borders"
 	}
+	if (isEarthImport && isTitlesNationMode(nationMode)) return "borders"
 	return nationMode
 }
 
@@ -230,6 +279,12 @@ export function getVisibleSocietyModeOptions(
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
+	if (isEarthImport) {
+		const titlesIndex = politicalOptions.findIndex(
+			([mode]) => mode === "titles",
+		)
+		if (titlesIndex >= 0) politicalOptions.splice(titlesIndex, 1)
+	}
 	if (debugEnabled && isEarthImport) {
 		politicalOptions.push(...EARTH_IMPORT_POLITICAL_MODE_OPTIONS)
 	}

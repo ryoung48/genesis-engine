@@ -67,23 +67,6 @@ export function unwrapLongitudeSequence(
 
 export const TERRAIN_ELEVATION_SCALE = 0.04
 
-// Per-depth colors: depth 0 = gold, 1 = orange, 2 = teal, 3 = blue, 4+ = purple
-export const HIERARCHY_DEPTH_COLORS: ReadonlyArray<[number, number, number]> = [
-	[1.0, 0.85, 0.2],
-	[0.93, 0.52, 0.14],
-	[0.2, 0.78, 0.55],
-	[0.25, 0.55, 0.9],
-	[0.68, 0.32, 0.88],
-]
-
-export interface HierarchyNode {
-	provinceId: number
-	seedRegion: number
-	depth: number
-	parentProvinceId: number
-	xyz: [number, number, number]
-}
-
 export interface NationBoundarySide {
 	r0: number
 	r1: number

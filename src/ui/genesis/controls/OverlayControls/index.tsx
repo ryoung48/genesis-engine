@@ -26,6 +26,7 @@ import { MeasureSection } from "./MeasureSection"
 import { NationsModeSection } from "./NationsModeSection"
 import { ReligionModeSection } from "./ReligionModeSection"
 import { SocietySection } from "./SocietySection"
+import { TitlesModeSection } from "./TitlesModeSection"
 import { TopographyModeSection } from "./TopographyModeSection"
 import type { OverlayControlsProps } from "./types"
 import { VegetationModeSection } from "./VegetationModeSection"
@@ -77,8 +78,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowGrid,
 	showNationBorders,
 	setShowNationBorders,
-	showNationHierarchy,
-	setShowNationHierarchy,
+	titleBorderTiers,
+	setTitleBorderTiers,
 	nationMode,
 	setNationMode,
 	populationMode,
@@ -152,7 +153,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
 	isEarthImport = false,
-	hasHierarchy,
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
 	const [societyExpanded, setSocietyExpanded] = React.useState(false)
@@ -353,8 +353,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								<SocietySection
 									societyExpanded={societyExpanded}
 									setSocietyExpanded={setSocietyExpanded}
-									showNationHierarchy={showNationHierarchy}
-									setShowNationHierarchy={setShowNationHierarchy}
 									showNationBorders={showNationBorders}
 									setShowNationBorders={setShowNationBorders}
 									showInfrastructure={showInfrastructure}
@@ -365,10 +363,18 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									labelMode={labelMode}
 									setLabelMode={setLabelMode}
 									isEarthImport={isEarthImport}
-									hasHierarchy={hasHierarchy}
 								/>
 
 								<NationsModeSection
+									colorMode={colorMode}
+									nationMode={nationMode}
+									setNationMode={setNationMode}
+									nationsExpanded={nationsExpanded}
+									setNationsExpanded={setNationsExpanded}
+								/>
+								<TitlesModeSection
+									titleBorderTiers={titleBorderTiers}
+									setTitleBorderTiers={setTitleBorderTiers}
 									colorMode={colorMode}
 									nationMode={nationMode}
 									setNationMode={setNationMode}

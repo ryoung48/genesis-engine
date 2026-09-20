@@ -12,6 +12,11 @@ import {
 	sizeNameLabel,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
+import { brownDwarfGlow } from "@/ui/genesis/renderer/brown-dwarf-glow"
+import {
+	buildCloudBandMaterial,
+	swatchCloudBandPalette,
+} from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
 import {
 	buildMoonOrbitOverlay,
@@ -20,6 +25,7 @@ import {
 	perifocalBasis,
 	solveKepler,
 } from "@/ui/genesis/renderer/moon-orbit-overlay"
+import { buildNeutronJets } from "@/ui/genesis/renderer/neutron-jets"
 import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
 import {
 	buildStarSurfaceLayers,
@@ -40,6 +46,7 @@ import {
 	DEG2RAD,
 	FULL_OCEAN_COLOR,
 	GOLDEN_ANGLE_RAD,
+	JOVIAN_COLOR_BY_ZONE,
 	MAIN_WORLD_COLOR,
 	ORBIT_GAP_STAR_RADII,
 	ORBIT_LINE_COLOR_BY_ZONE,
@@ -143,7 +150,19 @@ export function buildSolarSystemOverlay(
 	const isBlackHole = renderSpectralClass === "BH"
 	const isNeutronStar = renderSpectralClass === "NS"
 	const isWhiteDwarf = renderSpectralClass === "D"
-	const isBrownDwarf = ["L", "T", "Y"].includes(renderSpectralClass)
+	const brownDwarfClass =
+		renderSpectralClass === "L" ||
+		renderSpectralClass === "T" ||
+		renderSpectralClass === "Y"
+			? renderSpectralClass
+			: null
+	const isBrownDwarf = brownDwarfClass !== null
+	const brownDwarfGlowSettings = brownDwarfClass
+		? brownDwarfGlow({
+				spectralClass: brownDwarfClass,
+				subtype: hostStar?.subtype ?? starSubtype,
+			})
+		: null
 	const isGiant = STAR.isGiant(hostStar?.luminosityClass ?? "V")
 	const rolledStarDiameterSol =
 		hostStar?.diameterSol ??
@@ -192,7 +211,9 @@ export function buildSolarSystemOverlay(
 								}))
 	const starColorHex = isGiant
 		? uiPalette.giantStar
-		: (STAR_COLOR_BY_CLASS[renderSpectralClass] ?? "#fff772")
+		: (brownDwarfGlowSettings?.color ??
+			STAR_COLOR_BY_CLASS[renderSpectralClass] ??
+			"#fff772")
 	// Profiles created before active disks were made mandatory retain zero
 	// luminosity in persisted sessions; render them as active immediately too.
 	const blackHoleLuminositySol = hostStar?.luminositySol || 1
@@ -200,53 +221,48 @@ export function buildSolarSystemOverlay(
 	const diskColorHex = isBlackHole ? "#ff9b54" : starColorHex
 	const renderedStarColorHex = isNeutronStar ? "#dbeafe" : starColorHex
 	const starColor = new THREE.Color(renderedStarColorHex)
-	const brownDwarfTexturePath =
-		renderSpectralClass === "L"
-			? "/textures/celestial/generated/dwarfs/L.png"
-			: renderSpectralClass === "T"
-				? "/textures/celestial/generated/dwarfs/T.png"
-				: "/textures/celestial/generated/dwarfs/Y.png"
-	const whiteDwarfTexturePath = "/textures/celestial/generated/dwarfs/D.png"
-	// An ordinary star renders as a live photosphere: domain-warped fbm
-	// granulation plus its own corona shell (see star-surface-material.ts),
-	// which is why it needs no surface texture at all. The exotic remnants and
-	// brown dwarfs below aren't photospheres in any meaningful sense and keep
-	// their own flat textured/tinted materials and the sprite halo.
-	const hasPhotosphere =
-		!isBlackHole && !isNeutronStar && !isWhiteDwarf && !isBrownDwarf
-	const starSurfaceLayers = hasPhotosphere
-		? buildStarSurfaceLayers({
-				spectralClass: renderSpectralClass,
-				isGiant,
-				tint: starColor,
-				diameterSol: starDiameterSol,
+	const starSurfaceLayers =
+		!isBlackHole && !isBrownDwarf
+			? buildStarSurfaceLayers({
+					spectralClass: renderSpectralClass,
+					isGiant,
+					tint: isNeutronStar
+						? new THREE.Color(uiPalette.neutronStarGlow)
+						: starColor,
+					diameterSol: starDiameterSol,
+				})
+			: null
+	const brownDwarfMaterial = brownDwarfClass
+		? buildCloudBandMaterial({
+				seed: Math.round(starSubtype * 997 + starDiameterSol * 101),
+				style:
+					brownDwarfClass === "L"
+						? "brown-dwarf-l"
+						: brownDwarfClass === "T"
+							? "brown-dwarf-t"
+							: "brown-dwarf-y",
+				palette: swatchCloudBandPalette({
+					hex: Number.parseInt(brownDwarfGlowSettings!.color.slice(1), 16),
+				}),
 			})
 		: null
+	if (brownDwarfMaterial) {
+		brownDwarfMaterial.emissive.set(brownDwarfGlowSettings!.color)
+		brownDwarfMaterial.emissiveIntensity = 0.18
+	}
 	const starMaterial: THREE.Material =
 		starSurfaceLayers?.surface ??
+		brownDwarfMaterial ??
 		new THREE.MeshBasicMaterial({
-			color: isBlackHole
-				? 0x000000
-				: isBrownDwarf || isWhiteDwarf
-					? 0xffffff
-					: starColor,
-			map: isBrownDwarf
-				? loadBodyTexture(brownDwarfTexturePath)
-				: isWhiteDwarf
-					? loadBodyTexture(whiteDwarfTexturePath)
-					: null,
+			color: isBlackHole ? 0x000000 : starColor,
 		})
-
+	const starSurfaceRadius = isBlackHole
+		? starRadius * 0.18
+		: isNeutronStar
+			? starRadius * 0.28
+			: starRadius
 	const starMesh = new THREE.Mesh(
-		new THREE.SphereGeometry(
-			isBlackHole
-				? starRadius * 0.18
-				: isNeutronStar
-					? starRadius * 0.28
-					: starRadius,
-			48,
-			32,
-		),
+		new THREE.SphereGeometry(starSurfaceRadius, 48, 32),
 		starMaterial,
 	)
 	// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
@@ -262,7 +278,9 @@ export function buildSolarSystemOverlay(
 			new THREE.SphereGeometry(1, 48, 32),
 			starSurfaceLayers.glow,
 		)
-		coronaMesh.scale.setScalar(starRadius * STAR_GLOW_RADIUS_SCALE)
+		coronaMesh.scale.setScalar(
+			starSurfaceRadius * STAR_GLOW_RADIUS_SCALE * (isNeutronStar ? 1.25 : 1),
+		)
 		// Decorative: a raycast hit here must not resolve to the star, or it
 		// would swallow clicks aimed at anything behind the corona.
 		coronaMesh.raycast = () => {
@@ -467,24 +485,12 @@ export function buildSolarSystemOverlay(
 		group.add(blackHoleMesh)
 	}
 	if (isNeutronStar) {
-		const beamLength = starRadius * 5
-		const beamMaterial = new THREE.MeshBasicMaterial({
-			color: 0x60a5fa,
-			transparent: true,
-			opacity: 0.18,
-			blending: THREE.AdditiveBlending,
-			depthWrite: false,
-			side: THREE.DoubleSide,
+		const neutronJets = buildNeutronJets({
+			color: new THREE.Color(uiPalette.neutronStarGlow),
+			starRadius: starSurfaceRadius,
+			beamLength: starRadius * 5,
 		})
-		for (const direction of [-1, 1]) {
-			const beam = new THREE.Mesh(
-				new THREE.ConeGeometry(starRadius * 0.32, beamLength, 32, 1, true),
-				beamMaterial,
-			)
-			beam.rotation.x = direction * Math.PI * 0.5
-			beam.position.z = direction * beamLength * 0.5
-			group.add(beam)
-		}
+		group.add(neutronJets.group)
 	}
 
 	const glowTexture = createStarGlowTexture(
@@ -493,15 +499,23 @@ export function buildSolarSystemOverlay(
 	const glowSprite = new THREE.Sprite(
 		new THREE.SpriteMaterial({
 			map: glowTexture,
+			opacity: brownDwarfGlowSettings?.haloOpacity ?? 1,
 			transparent: true,
 			depthWrite: false,
 			blending: THREE.AdditiveBlending,
 		}),
 	)
 	glowSprite.scale.setScalar(
-		starRadius * (isBlackHole ? 2 : isNeutronStar || isWhiteDwarf ? 5 : 3),
+		starRadius *
+			(isBlackHole
+				? 2
+				: isNeutronStar || isWhiteDwarf
+					? 5
+					: isBrownDwarf
+						? 2.8
+						: 3),
 	)
-	if (!isBlackHole && !isBrownDwarf && !starSurfaceLayers) group.add(glowSprite)
+	if (!isBlackHole && !starSurfaceLayers) group.add(glowSprite)
 	else {
 		glowTexture.dispose()
 		glowSprite.material.dispose()
@@ -523,12 +537,7 @@ export function buildSolarSystemOverlay(
 					: isWhiteDwarf
 						? 2.8
 						: isBrownDwarf
-							? // Y dwarfs shared L/T's flat 0.5, reading as effectively
-								// dark next to them -- bumped up so a Y primary still
-								// visibly lights its own system.
-								renderSpectralClass === "Y"
-								? 0.9
-								: 0.5
+							? brownDwarfGlowSettings!.lightIntensity
 							: 2.4
 			: 0,
 		0,
@@ -630,21 +639,29 @@ export function buildSolarSystemOverlay(
 		// The main world's own simulated terrain/vegetation, standing in for
 		// its static texturePath image -- see mainWorldTexture's doc comment.
 		const mainWorldSatelliteMap = body.isMainWorld ? mainWorldTexture : null
-		// A body's exact 2D-UI class swatch (CLASSIFICATION_COLOR) -- the base
-		// color the cloud-band palette is derived from. A continent-free
+		// The class swatch is the base color for most procedural surfaces;
+		// generated jovians pick a color from their orbital-zone palette. A continent-free
 		// vesperian world swaps its gold land tint for full-ocean blue since
 		// there's no land left to tint; tectonic always keeps its green, no
 		// exceptions.
+		const jovianPalette = JOVIAN_COLOR_BY_ZONE[body.zone ?? "outer"]
+		const jovianColor =
+			jovianPalette[
+				Math.abs(Math.floor(body.orbitalDistanceAU * 1000) + body.idx * 37) %
+					jovianPalette.length
+			]!
 		const bodySwatchHex =
-			body.classification === "vesperian" && (body.hydrosphereCode ?? 0) >= 10
-				? FULL_OCEAN_COLOR
-				: (CLASSIFICATION_COLOR[body.classification] ??
-					(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR))
+			proceduralSystem && isGasGiant
+				? jovianColor
+				: body.classification === "vesperian" &&
+						(body.hydrosphereCode ?? 0) >= 10
+					? FULL_OCEAN_COLOR
+					: (CLASSIFICATION_COLOR[body.classification] ??
+						(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR))
 		// Helian/panthalassic bodies always render the animated fbm cloud-band
 		// mesh; in a procedurally generated system every other non-belt body
 		// (the main world included) does too, in place of any texture. Every
-		// case is tinted by the body's exact class swatch -- no temperature or
-		// per-body variation. The real Sol view keeps its curated textures for
+		// case uses its selected swatch. The real Sol view keeps its curated textures for
 		// everything except helian/panthalassic.
 		// Helian/panthalassic never get generated art at all (see
 		// texture/index.ts's pickGeneratedBodyTextures), so they always render

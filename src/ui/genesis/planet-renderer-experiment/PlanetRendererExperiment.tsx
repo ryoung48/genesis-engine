@@ -24,11 +24,22 @@ export function PlanetRendererExperiment() {
 	const [cloudColor, setCloudColor] = useState(initialColor)
 	const [moonColor, setMoonColor] = useState<string>(initialMoonColor)
 	const [martianColor, setMartianColor] = useState<string>(initialMartianColor)
+	const [brownDwarfLColor, setBrownDwarfLColor] = useState<string>(
+		uiPalette.brownDwarfL,
+	)
+	const [brownDwarfTColor, setBrownDwarfTColor] = useState<string>(
+		uiPalette.brownDwarfT,
+	)
+	const [brownDwarfYColor, setBrownDwarfYColor] = useState<string>(
+		uiPalette.brownDwarfY,
+	)
 	const [snowballColor, setSnowballColor] =
 		useState<string>(initialSnowballColor)
 	const [meltballColor, setMeltballColor] =
 		useState<string>(initialMeltballColor)
 	const [style, setStyle] = useState<PlanetTextureStyle>("cloudy")
+	const isStarStyle =
+		style === "sun" || style === "white-dwarf" || style === "neutron-star"
 	const color =
 		style === "cratered"
 			? moonColor
@@ -38,7 +49,13 @@ export function PlanetRendererExperiment() {
 					? snowballColor
 					: style === "meltball"
 						? meltballColor
-						: cloudColor
+						: style === "brown-dwarf-l"
+							? brownDwarfLColor
+							: style === "brown-dwarf-t"
+								? brownDwarfTColor
+								: style === "brown-dwarf-y"
+									? brownDwarfYColor
+									: cloudColor
 
 	useEffect(() => {
 		const canvas = canvasRef.current
@@ -88,6 +105,7 @@ export function PlanetRendererExperiment() {
 				<Button
 					tone="overlay"
 					size="md"
+					disabled={isStarStyle}
 					onClick={() =>
 						setSeed(
 							(current) =>
@@ -108,6 +126,12 @@ export function PlanetRendererExperiment() {
 					>
 						<option value="cloudy">Cloudy</option>
 						<option value="banded">Gas giant bands</option>
+						<option value="sun">Sun shader</option>
+						<option value="white-dwarf">D white dwarf</option>
+						<option value="neutron-star">Neutron star</option>
+						<option value="brown-dwarf-l">L brown dwarf</option>
+						<option value="brown-dwarf-t">T brown dwarf</option>
+						<option value="brown-dwarf-y">Y brown dwarf</option>
 						<option value="venusian">Venusian haze</option>
 						<option value="cratered">Cratered moon</option>
 						<option value="snowball">Frozen snowball moon</option>
@@ -119,6 +143,7 @@ export function PlanetRendererExperiment() {
 					<span>Base color</span>
 					<input
 						type="color"
+						disabled={isStarStyle}
 						value={color}
 						onChange={(event) =>
 							style === "cratered"
@@ -129,7 +154,13 @@ export function PlanetRendererExperiment() {
 										? setSnowballColor(event.target.value)
 										: style === "meltball"
 											? setMeltballColor(event.target.value)
-											: setCloudColor(event.target.value)
+											: style === "brown-dwarf-l"
+												? setBrownDwarfLColor(event.target.value)
+												: style === "brown-dwarf-t"
+													? setBrownDwarfTColor(event.target.value)
+													: style === "brown-dwarf-y"
+														? setBrownDwarfYColor(event.target.value)
+														: setCloudColor(event.target.value)
 						}
 						aria-label="Base color"
 						className="h-9 w-12 cursor-pointer rounded-md border border-white/20 bg-transparent p-1"

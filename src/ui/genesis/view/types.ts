@@ -37,6 +37,7 @@ import type {
 	NationMapMode,
 	ReligionMapMode,
 	SocietyMapMode,
+	TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
 
 /** The live `GenesisScene` handle shared by every GenesisView concern hook. */
@@ -164,7 +165,6 @@ export type WorldDisplayDataInput = {
 	temperatureMonth: number
 	rainfallMonth: number
 	dtrMonth: number
-	earthHistoryPlaying: boolean
 }
 
 export type WindVectorData = ReturnType<typeof WIND.computeWindVectors>
@@ -229,7 +229,6 @@ export type MapColoringInput = {
 	selectedWikiNationId: number | null
 	windVectors: ReturnType<typeof WIND.computeWindVectors> | null
 	hoverProvince: number | null
-	labelsPlaybackActive: boolean
 	temperatureMonth: number
 	rainfallMonth: number
 	dtrMonth: number
@@ -307,14 +306,14 @@ export type GenesisSceneSyncInput = {
 	worldForDisplay: SerializedGenesisWorld | null
 	history: HistoryTimeline
 	hoverInfo: HoverInfo | null
-	selectedWikiNationId: number | null
 	viewMode: GenesisViewMode
 	solarSystemViewActive: boolean
 	mapProjectionLatitude: number
 	setDraftMapProjectionLatitude: (latitude: number) => void
 	exportCenterLongitude: number
 	showNationBorders: boolean
-	showNationHierarchy: boolean
+	titleBorderTiers: readonly TitleBorderTier[]
+	sceneFrame: WorldFrame | null
 	showWireframe: boolean
 	showCoastlines: boolean
 	showGrid: boolean
@@ -329,4 +328,12 @@ export type GenesisSceneSyncInput = {
 	sampledCultureLabelsArray: string[] | null
 	sampledHeritageLabelsArray: string[] | null
 	sampledReligionLabelsArray: string[] | null
+}
+
+export interface BuildRealmBorderLayersParams {
+	frame: WorldFrame
+	world: SerializedGenesisWorld & {
+		provinces: NonNullable<SerializedGenesisWorld["provinces"]>
+	}
+	tiers: readonly TitleBorderTier[]
 }

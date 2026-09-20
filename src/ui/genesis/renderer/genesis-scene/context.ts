@@ -23,8 +23,8 @@ import type {
 import type {
 	GenesisHoverInfo,
 	GenesisViewMode,
-	HierarchyOverlaySpec,
 	OrgHighlightSpec,
+	RealmBordersSpec,
 	RiverData,
 	WindArrowData,
 } from "@/ui/genesis/renderer/types"
@@ -71,6 +71,12 @@ export interface GenesisContext {
 	cloudsVisible: boolean
 	starGeo: THREE.BufferGeometry
 	starMat: THREE.PointsMaterial
+	/** Shared point starfield -- hidden while the solar-system view is up
+	 * (the nebula skybox carries its own stars there). */
+	starPoints: THREE.Points
+	/** Screen-space nebula skybox behind the solar-system view only (lives
+	 * in solarSystemGroup, so its visibility follows that view). */
+	nebulaBackground: THREE.Mesh
 
 	// terrain-controller.ts's state -- also read by many not-yet-extracted
 	// overlay functions still in create-genesis-scene.ts, which is why it
@@ -116,10 +122,10 @@ export interface GenesisContext {
 	globePathfindingDots: THREE.Group | null
 	mapPathfindingDots: THREE.Group | null
 
-	// overlay-controllers/hierarchy.ts's state.
-	globeHierarchyOverlay: THREE.Group | null
-	mapHierarchyOverlay: THREE.Group | null
-	hierarchyOverlaySpec: HierarchyOverlaySpec | null
+	// overlay-controllers/realm-borders.ts's state.
+	globeRealmBorders: THREE.Group | null
+	mapRealmBorders: THREE.Group | null
+	realmBordersSpec: RealmBordersSpec | null
 
 	// overlay-controllers/settlements.ts's state.
 	globeSettlements: THREE.Group | null

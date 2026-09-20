@@ -72,12 +72,18 @@ import {
 	DEFAULT_GEOGRAPHY_MODE,
 	isDebugGeographyMode,
 	isDebugNationMode,
+	isTitlesNationMode,
 	normalizeGeographyColorMode,
 	normalizeNationMapMode,
+	type TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
 import { canHandlePlanetClick } from "@/ui/genesis/shared/measurement-click"
 import { computePlanetStats } from "@/ui/genesis/shared/planet-stats"
 import { formatDistance } from "@/ui/genesis/shared/ui-format"
+import {
+	SCENE_REBUILD_THROTTLE_MS,
+	useThrottledValue,
+} from "@/ui/genesis/shared/useThrottledValue"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import { SolarSystemControls } from "@/ui/genesis/solar-system/SolarSystemControls"
 import { useSolarSystemBodies } from "@/ui/genesis/solar-system/useSolarSystemBodies"
@@ -92,6 +98,8 @@ import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
+
+const NO_TITLE_BORDER_TIERS: readonly TitleBorderTier[] = []
 
 export const GenesisView: React.FC<{
 	/** Scopes this instance's localStorage session/view-prefs entries so an
@@ -195,7 +203,7 @@ export const GenesisView: React.FC<{
 		setShowGrid,
 		setShowInfrastructure,
 		setShowNationBorders,
-		setShowNationHierarchy,
+		setTitleBorderTiers,
 		setShowOceanCurrents,
 		setShowPet,
 		setShowRivers,
@@ -223,7 +231,7 @@ export const GenesisView: React.FC<{
 		showGrid,
 		showInfrastructure,
 		showNationBorders,
-		showNationHierarchy,
+		titleBorderTiers,
 		showOceanCurrents,
 		showPet,
 		showRivers,
@@ -816,10 +824,6 @@ export const GenesisView: React.FC<{
 		(timeValue: number) => history.formatLabel(timeValue),
 		[history.formatLabel],
 	)
-	const hasHierarchy = useMemo(
-		() => history.query?.frame.provinceParent.some((p) => p >= 0) ?? false,
-		[history.query],
-	)
 	const drawerWorldPopulation = useMemo(() => {
 		if (
 			getBaseMapMode(colorMode) === "population" &&
@@ -905,7 +909,6 @@ export const GenesisView: React.FC<{
 		hoverWindDir,
 		hoverWindMonthly,
 		hoverWindSpeed,
-		labelsPlaybackActive,
 		projectToScreen,
 		sampledCultureLabelsArray,
 		sampledDynastyLabelsArray,
@@ -927,7 +930,6 @@ export const GenesisView: React.FC<{
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
-		earthHistoryPlaying,
 	})
 
 	// A single Model/Observed/Diff radio drives every observed-vs-model
@@ -962,6 +964,15 @@ export const GenesisView: React.FC<{
 		windStatsCacheRef.current.values.set(source, stats)
 		return stats
 	}, [world, showRealWind])
+
+	// The scene rebuilds borders and labels whenever its world object changes, and
+	// worldForDisplay gets a new identity for every history frame, so the scene
+	// sees it throttled. A new generated world commits immediately.
+	const sceneWorld = useThrottledValue({
+		value: worldForDisplay,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: world,
+	})
 
 	// Resolves the per-org category schema (organization-categories.ts) into
 	// a ready-to-use categorizer + color lookup for one folded state --
@@ -1001,7 +1012,6 @@ export const GenesisView: React.FC<{
 		selectedWikiNationId,
 		windVectors,
 		hoverProvince,
-		labelsPlaybackActive,
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
@@ -1011,7 +1021,7 @@ export const GenesisView: React.FC<{
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (!worldForDisplay) {
+		if (!sceneWorld) {
 			scene.updateWorld(null)
 			scene.setOccupationOverlay(null)
 			lastWorldRef.current = null
@@ -1020,9 +1030,9 @@ export const GenesisView: React.FC<{
 		scene.setDisplayColors(colorMode, regionColors)
 		scene.setNationFillColorForRawId(nationFillColorForRawId)
 		scene.setNationOccupationStripeColorForRawId(occupationStripeColorForRawId)
-		if (lastWorldRef.current !== worldForDisplay) {
-			scene.updateWorld(worldForDisplay)
-			lastWorldRef.current = worldForDisplay
+		if (lastWorldRef.current !== sceneWorld) {
+			scene.updateWorld(sceneWorld)
+			lastWorldRef.current = sceneWorld
 		}
 		scene.setOccupationOverlay(
 			selectedWikiOrganizationId === "HRE" ||
@@ -1054,7 +1064,7 @@ export const GenesisView: React.FC<{
 		regionColors,
 		nationFillColorForRawId,
 		occupationStripeColorForRawId,
-		worldForDisplay,
+		sceneWorld,
 		historySceneNationOverride,
 		historySceneLabelPartitions,
 		organizationHighlightSpec,
@@ -1416,19 +1426,32 @@ export const GenesisView: React.FC<{
 		return () => cancelAnimationFrame(rafId)
 	}, [measureStart, measureEnd, world])
 
+	const sceneFrame = useThrottledValue({
+		value: history.query?.frame ?? null,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: world,
+	})
+	const activeTitleBorderTiers = useMemo(
+		() =>
+			colorMode === "nations" && isTitlesNationMode(nationMode)
+				? titleBorderTiers
+				: NO_TITLE_BORDER_TIERS,
+		[colorMode, nationMode, titleBorderTiers],
+	)
+
 	useGenesisSceneSync({
 		sceneRef,
-		worldForDisplay,
+		worldForDisplay: sceneWorld,
 		history,
 		hoverInfo,
-		selectedWikiNationId,
 		viewMode,
 		solarSystemViewActive,
 		mapProjectionLatitude,
 		setDraftMapProjectionLatitude,
 		exportCenterLongitude,
 		showNationBorders,
-		showNationHierarchy,
+		titleBorderTiers: activeTitleBorderTiers,
+		sceneFrame,
 		showWireframe,
 		showCoastlines,
 		showGrid,
@@ -1685,10 +1708,10 @@ export const GenesisView: React.FC<{
 	const planetStats = useMemo(
 		() =>
 			computePlanetStats(
-				// worldForDisplay, not world: for an Earth import it carries the
+				// sceneWorld, not world: for an Earth import it carries the
 				// per-province areaKm2 attached by attachEarthProvinceAreas, which
 				// Avg Province Area averages directly.
-				worldForDisplay ?? world,
+				sceneWorld ?? world,
 				{
 					obliquity,
 					eccentricity,
@@ -1710,6 +1733,7 @@ export const GenesisView: React.FC<{
 				unitSystem,
 			),
 		[
+			sceneWorld,
 			daysPerYear,
 			eccentricity,
 			substellarLon,
@@ -1724,7 +1748,6 @@ export const GenesisView: React.FC<{
 			seaLevel,
 			unitSystem,
 			world,
-			worldForDisplay,
 			windStats,
 			dataVariant,
 		],
@@ -2106,7 +2129,6 @@ export const GenesisView: React.FC<{
 						) : (
 							<OverlayControls
 								isEarthImport={worldForDisplay?.isEarthImport ?? false}
-								hasHierarchy={hasHierarchy}
 								onEnterSolarSystem={handleEnterSolarSystem}
 								overlaysExpanded={overlaysExpanded}
 								setOverlaysExpanded={setOverlaysExpanded}
@@ -2143,8 +2165,8 @@ export const GenesisView: React.FC<{
 								setShowGrid={setShowGrid}
 								showNationBorders={showNationBorders}
 								setShowNationBorders={setShowNationBorders}
-								showNationHierarchy={showNationHierarchy}
-								setShowNationHierarchy={setShowNationHierarchy}
+								titleBorderTiers={titleBorderTiers}
+								setTitleBorderTiers={setTitleBorderTiers}
 								nationMode={nationMode}
 								setNationMode={setNationMode}
 								populationMode={populationMode}
@@ -2220,7 +2242,7 @@ export const GenesisView: React.FC<{
 									setShowRivers(false)
 									setShowThermalEquator(false)
 									setShowNationBorders(false)
-									setShowNationHierarchy(false)
+									setTitleBorderTiers([])
 									setLabelMode({
 										nations: false,
 										dynasty: false,

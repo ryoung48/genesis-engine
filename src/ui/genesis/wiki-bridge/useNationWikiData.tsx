@@ -40,6 +40,7 @@ import {
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
 import {
+	compareTimelineDateThenWarEnd,
 	eventComment,
 	formatRebelName,
 	formatRulerStatLabel,
@@ -57,12 +58,6 @@ import {
 } from "@/ui/wiki/stats/nation/nation-distributions"
 import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
 
-/**
- * Builds the left-panel nation wiki page for Earth-imported worlds, sourced
- * from the earth-history fold engine at the currently scrubbed date. Returns
- * null for procedural worlds (see useProceduralNationWikiData) and while the
- * engine is still loading.
- */
 export function useNationWikiData(
 	input: NationWikiDataInput,
 ): NationWikiData | null {
@@ -1261,7 +1256,8 @@ export function useNationWikiData(
 		}
 		timelineEvents = mergedTimelineEvents
 		timelineEvents.sort(
-			(a, b) => a.date - b.date || a.type.localeCompare(b.type),
+			(a, b) =>
+				compareTimelineDateThenWarEnd(a, b) || a.type.localeCompare(b.type),
 		)
 
 		const cultureDistribution = buildStringIdDistributionForProvinces({

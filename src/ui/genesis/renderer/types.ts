@@ -24,7 +24,37 @@ export type { WindArrowData }
 
 export type GenesisViewMode = "globe" | "map"
 
-export type CloudBandStyle = "cloudy" | "banded" | "venusian"
+export type CloudBandStyle =
+	| "cloudy"
+	| "banded"
+	| "venusian"
+	| "brown-dwarf-l"
+	| "brown-dwarf-t"
+	| "brown-dwarf-y"
+
+export type BrownDwarfClass = "L" | "T" | "Y"
+
+export type BrownDwarfGlowInput = {
+	spectralClass: BrownDwarfClass
+	subtype: number
+}
+
+export type BrownDwarfGlow = {
+	color: string
+	haloOpacity: number
+	lightIntensity: number
+}
+
+export type NeutronJetsInput = {
+	color: THREE.Color
+	starRadius: number
+	beamLength: number
+}
+
+export type NeutronJets = {
+	group: THREE.Group
+	dispose(): void
+}
 
 export type CloudBandPalette = {
 	top: THREE.Color
@@ -83,12 +113,19 @@ export interface OrgHighlightSpec {
 	memberProvinceCompactIndexes: Set<number>
 }
 
-export interface HierarchyOverlaySpec {
+export interface RealmBorderLayer {
+	regionRealm: Int32Array
+	color: readonly [number, number, number]
+	linewidth: number
+	markerRegions: Int32Array
+	markerColor: readonly [number, number, number]
+	globeMarkerSize: number
+	mapMarkerRadius: number
+}
+
+export interface RealmBordersSpec {
 	world: SerializedGenesisWorld
-	nationId: number
-	provinceNation: Int32Array
-	provinceParent: Int32Array
-	provinceDepth: Int32Array
+	layers: RealmBorderLayer[]
 }
 
 export interface GenesisScene {
@@ -148,7 +185,7 @@ export interface GenesisScene {
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: RiverData | null): void
 	setRiversVisible(visible: boolean): void
-	setHierarchyOverlay(spec: HierarchyOverlaySpec | null): void
+	setRealmBorders(spec: RealmBordersSpec | null): void
 	setSunPosition(
 		month: number,
 		obliquityDeg: number,
@@ -223,6 +260,9 @@ export interface GenesisScene {
 	setSolarSystemActive(active: boolean): void
 	setSolarSystemOverlay(params: SolarSystemOverlayParams | null): void
 	updateSolarSystemOverlay(params: SolarSystemOverlayParams | null): void
+	/** Tints the solar-system nebula backdrop toward the given system's own
+	 * seed-derived hue -- call alongside setSolarSystemOverlay. */
+	setNebulaBackgroundSeed(seed: number): void
 	updateSolarSystemDay(day: number): void
 	/** Spins every body/moon mesh around its own axis for the solar-system
 	 * view's rotation clock — independent of updateSolarSystemDay. */

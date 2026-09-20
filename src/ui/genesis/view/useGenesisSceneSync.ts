@@ -1,10 +1,10 @@
 import { useEffect } from "react"
 import { DATE } from "@/model/history/earth/date"
-import { FRAME } from "@/model/history/world-frame"
 import {
 	buildGhslSettlementPopulationSlice,
 	topSettlementIndices,
 } from "@/ui/genesis/generation/earth-assets"
+import { buildRealmBorderLayers } from "@/ui/genesis/view/realm-border-layers"
 import type { GenesisSceneSyncInput } from "@/ui/genesis/view/types"
 /**
  * Pushes UI state into the live GenesisScene: hovered region, border and
@@ -19,14 +19,14 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		worldForDisplay,
 		history,
 		hoverInfo,
-		selectedWikiNationId,
 		viewMode,
 		solarSystemViewActive,
 		mapProjectionLatitude,
 		setDraftMapProjectionLatitude,
 		exportCenterLongitude,
 		showNationBorders,
-		showNationHierarchy,
+		titleBorderTiers,
+		sceneFrame,
 		showWireframe,
 		showCoastlines,
 		showGrid,
@@ -55,29 +55,23 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		const frame = history.query?.frame
 		if (
-			showNationHierarchy &&
 			worldForDisplay?.provinces &&
-			frame &&
-			selectedWikiNationId !== null
+			sceneFrame &&
+			titleBorderTiers.length > 0
 		) {
-			scene.setHierarchyOverlay({
+			scene.setRealmBorders({
 				world: worldForDisplay,
-				nationId: selectedWikiNationId,
-				provinceNation: frame.provinceNation,
-				provinceParent: frame.provinceParent,
-				provinceDepth: FRAME.provinceDepth({ frame }),
+				layers: buildRealmBorderLayers({
+					frame: sceneFrame,
+					world: { ...worldForDisplay, provinces: worldForDisplay.provinces },
+					tiers: titleBorderTiers,
+				}),
 			})
 		} else {
-			scene.setHierarchyOverlay(null)
+			scene.setRealmBorders(null)
 		}
-	}, [
-		showNationHierarchy,
-		worldForDisplay,
-		history.query,
-		selectedWikiNationId,
-	])
+	}, [worldForDisplay, sceneFrame, titleBorderTiers])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setViewMode(viewMode)

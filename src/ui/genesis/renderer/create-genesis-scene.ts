@@ -8,7 +8,6 @@ import { createInteractionController } from "@/ui/genesis/renderer/genesis-scene
 import { createLightingController } from "@/ui/genesis/renderer/genesis-scene/lighting-controller"
 import { createOverlayAggregatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-aggregator"
 import { createCoastlineController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/coastline"
-import { createHierarchyController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/hierarchy"
 import { createInfrastructureController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/infrastructure"
 import {
 	createLabelsController,
@@ -17,6 +16,7 @@ import {
 import { createMeasurementController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/measurement"
 import { createNationBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/nation-borders"
 import { createPathfindingController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/pathfinding"
+import { createRealmBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/realm-borders"
 import { createRiversWindThermalController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/rivers-wind-thermal"
 import { createSettlementsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/settlements"
 import { createSolarTerminatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/solar-terminator"
@@ -28,6 +28,7 @@ import type { MapExportDependencies } from "@/ui/genesis/renderer/genesis-scene/
 import { createViewStateController } from "@/ui/genesis/renderer/genesis-scene/view-state-controller"
 import { createNationLabelPools } from "@/ui/genesis/renderer/nation-label-overlay/pool"
 import { disposeScriptTextureCache } from "@/ui/genesis/renderer/nation-script-overlay"
+import { sizeNebulaBackground } from "@/ui/genesis/renderer/nebula-background"
 import type { GenesisScene } from "@/ui/genesis/renderer/types"
 
 const CONTROL_SETTLE_FRAMES = 2
@@ -142,10 +143,10 @@ export function createGenesisScene(
 		mapCamera.updateProjectionMatrix()
 	}
 
-	const hierarchyController = createHierarchyController(context, {
+	const realmBordersController = createRealmBordersController(context, {
 		updateOverlayVisibility: () => updateOverlayVisibility(),
 	})
-	const setHierarchyOverlay = hierarchyController.setHierarchyOverlay
+	const setRealmBorders = realmBordersController.setRealmBorders
 
 	const settlementsController = createSettlementsController(context, {
 		updateOverlayVisibility: () => updateOverlayVisibility(),
@@ -227,6 +228,7 @@ export function createGenesisScene(
 		updateSolarSystemDay,
 		setSolarSystemSpinHours,
 		setSolarSystemFocusChangeHandler,
+		setNebulaBackgroundSeed,
 	} = solarSystemController
 
 	const interactionController = createInteractionController(context, {
@@ -281,7 +283,7 @@ export function createGenesisScene(
 			applyWaterMaterialForMode: (mode) => applyWaterMaterialForMode(mode),
 			rebuildNationBorders: () => rebuildNationBorders(),
 			rebuildSelectedProvinceBorder: () => rebuildSelectedProvinceBorder(),
-			rebuildHierarchy: () => hierarchyController.rebuild(),
+			rebuildRealmBorders: () => realmBordersController.rebuild(),
 			rebuildSettlementOverlay: () => rebuildSettlementOverlay(),
 			rebuildEu4SettlementOverlay: () => rebuildEu4SettlementOverlay(),
 			rebuildTradeRouteOverlay: () => rebuildTradeRouteOverlay(),
@@ -334,6 +336,7 @@ export function createGenesisScene(
 		for (const mat of context.pulseMaterials) mat.resolution.set(w, h)
 		for (const mat of context.infrastructureMaterials) mat.resolution.set(w, h)
 		for (const mat of context.nationBorderMaterials) mat.resolution.set(w, h)
+		sizeNebulaBackground({ mesh: context.nebulaBackground, renderer })
 		if (context.selectedProvince >= 0) rebuildSelectedProvinceBorder()
 		requestRender()
 	}
@@ -462,7 +465,7 @@ export function createGenesisScene(
 		setWindArrows,
 		setRivers,
 		setRiversVisible,
-		setHierarchyOverlay,
+		setRealmBorders,
 		setSettlements,
 		setSettlementsVisible,
 		setEu4Settlements,
@@ -498,5 +501,6 @@ export function createGenesisScene(
 		setSolarSystemSpinHours,
 		focusOnSystemBody,
 		setSolarSystemFocusChangeHandler,
+		setNebulaBackgroundSeed,
 	}
 }

@@ -17,6 +17,7 @@ import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
 import {
+	compareTimelineDateThenWarEnd,
 	pushTimelineEvent,
 	rgb255ToCss,
 } from "@/ui/wiki/nation/timeline-formatting"
@@ -263,7 +264,8 @@ export function useOrganizationWikiData(
 			}
 		}
 		timelineEvents.sort(
-			(a, b) => a.date - b.date || a.type.localeCompare(b.type),
+			(a, b) =>
+				compareTimelineDateThenWarEnd(a, b) || a.type.localeCompare(b.type),
 		)
 		// Nation-level membership, generic across every org: derived straight
 		// from the org's own category schema (organization-categories.ts) via

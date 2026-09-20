@@ -1,38 +1,84 @@
 import type {
 	BuildChildrenCSRParams,
 	BuildSovereignParams,
-	FanoutRanges,
+	FanoutForSizeParams,
+	FanoutLevel,
 	HierarchyProvinceScoreParams,
+	MaxGroupSizeParams,
 	PartitionMembersParams,
+	TakeCapitalMembersParams,
 } from "@/model/society/hierarchy/types"
+import { TITLES } from "@/model/society/titles"
+import type { TitleTier } from "@/model/society/titles/types"
 import type { GenesisNationHierarchy } from "@/model/society/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
-const DUCHY_FANOUT: FanoutRanges = []
-
-const KINGDOM_FANOUT: FanoutRanges = [[2, 6, 4]]
-
-const EMPIRE_FANOUT: FanoutRanges = [
-	[3, 8, 15],
-	[2, 6, 4],
-]
-
-const hegemonFanout: FanoutRanges = [
-	[3, 8, 80],
-	[3, 8, 15],
-	[2, 6, 4],
-]
-
-function fanoutRangesForSize(size: number): FanoutRanges {
-	if (size >= 251) return hegemonFanout
-	if (size >= 50) return EMPIRE_FANOUT
-	if (size >= 10) return KINGDOM_FANOUT
-	return DUCHY_FANOUT
+// Direct child realms of a realm, by the realm's own title tier. A province is
+// a county, so counties and duchies are flat (a duchy's members are counties);
+// every higher tier splits into groups sized for the tier below it.
+const FANOUT_BY_TIER: Record<TitleTier, FanoutLevel | null> = {
+	county: null,
+	duchy: null,
+	kingdom: [2, 7, 4],
+	empire: [3, 7, 15],
+	hegemony: [2, 6, 120],
 }
 
-function maxFanoutForNationSize(size: number): number {
-	const ranges = fanoutRangesForSize(size)
-	return ranges[0]?.[1] ?? Infinity
+function fanoutForSize({ size }: FanoutForSizeParams): FanoutLevel | null {
+	return FANOUT_BY_TIER[TITLES.tierForSize({ size })]
+}
+
+function maxFanoutForSize({ size }: FanoutForSizeParams): number {
+	const fanout = fanoutForSize({ size })
+	if (!fanout) return Number.POSITIVE_INFINITY
+	const [, maxChildRealms, capitalRealmSize] = fanout
+	const capitalChildren = fanoutForSize({ size: capitalRealmSize })
+		? maxFanoutForSize({ size: capitalRealmSize })
+		: capitalRealmSize - 1
+	return maxChildRealms + capitalChildren
+}
+
+function groupSizeCap({
+	realmSize,
+	groupCount,
+	memberCount,
+}: MaxGroupSizeParams): number {
+	const belowTier =
+		TITLES.minSizeForTier({ tier: TITLES.tierForSize({ size: realmSize }) }) - 1
+	return belowTier * groupCount >= memberCount
+		? belowTier
+		: Math.ceil((memberCount * 1.2) / groupCount)
+}
+
+function takeCapitalMembers({
+	capital,
+	members,
+	adjOffset,
+	adjList,
+	provinceCount,
+	count,
+}: TakeCapitalMembersParams): Int32Array {
+	const inMembers = new Uint8Array(provinceCount)
+	for (let i = 0; i < members.length; i++) inMembers[members[i]] = 1
+	const seen = new Uint8Array(provinceCount)
+	seen[capital] = 1
+	const queue = [capital]
+	const taken: number[] = []
+	for (let head = 0; head < queue.length && taken.length < count; head++) {
+		const province = queue[head]
+		for (
+			let j = adjOffset[province];
+			j < adjOffset[province + 1] && taken.length < count;
+			j++
+		) {
+			const neighbor = adjList[j]
+			if (seen[neighbor] || !inMembers[neighbor]) continue
+			seen[neighbor] = 1
+			queue.push(neighbor)
+			taken.push(neighbor)
+		}
+	}
+	return Int32Array.from(taken)
 }
 
 const TRIBUTE = 0.25
@@ -60,6 +106,7 @@ function partitionMembers({
 	adjOffset,
 	adjList,
 	provinceCount,
+	maxGroupSize,
 	habitability,
 	urbanPop,
 	waterAccess,
@@ -99,6 +146,7 @@ function partitionMembers({
 				region.head++
 			}
 			if (region.head >= region.frontier.length) continue
+			if (region.members.length >= maxGroupSize) continue
 			if (region.members.length < bestSize) {
 				bestSize = region.members.length
 				bestRegion = i
@@ -156,6 +204,7 @@ function partitionMembers({
 			adjOffset,
 			adjList,
 			provinceCount,
+			maxGroupSize,
 			habitability,
 			urbanPop,
 			waterAccess,
@@ -173,7 +222,6 @@ function rebalanceHierarchy(params: {
 	parent: Int32Array<ArrayBufferLike>
 	depth: Int32Array<ArrayBufferLike>
 	currentDepth: number
-	fanoutRanges: FanoutRanges
 	habitability: Float32Array<ArrayBufferLike>
 	urbanPop: Float32Array<ArrayBufferLike>
 	waterAccess: Uint8Array<ArrayBufferLike>
@@ -183,11 +231,10 @@ function rebalanceHierarchy(params: {
 }): void {
 	const {
 		capital,
-		members,
+		members: allMembers,
 		parent,
 		depth,
 		currentDepth,
-		fanoutRanges,
 		habitability,
 		urbanPop,
 		waterAccess,
@@ -195,17 +242,37 @@ function rebalanceHierarchy(params: {
 		adjList,
 		provinceCount,
 	} = params
-	if (members.length === 0) return
+	if (allMembers.length === 0) return
 
-	if (currentDepth >= fanoutRanges.length) {
-		for (let i = 0; i < members.length; i++) {
-			parent[members[i]] = capital
-			depth[members[i]] = currentDepth + 1
+	const fanout = fanoutForSize({ size: allMembers.length + 1 })
+	if (!fanout) {
+		for (let i = 0; i < allMembers.length; i++) {
+			parent[allMembers[i]] = capital
+			depth[allMembers[i]] = currentDepth + 1
 		}
 		return
 	}
 
-	const [minK, maxK, targetGroupSize] = fanoutRanges[currentDepth]
+	const [minK, maxK, targetGroupSize] = fanout
+
+	const capitalMembers = takeCapitalMembers({
+		capital,
+		members: allMembers,
+		adjOffset,
+		adjList,
+		provinceCount,
+		count: Math.min(targetGroupSize - 1, allMembers.length - minK),
+	})
+	let members = allMembers
+	if (capitalMembers.length > 0) {
+		rebalanceHierarchy({ ...params, members: capitalMembers })
+		const inCapital = new Uint8Array(provinceCount)
+		for (let i = 0; i < capitalMembers.length; i++)
+			inCapital[capitalMembers[i]] = 1
+		members = allMembers.filter((province) => !inCapital[province])
+	}
+	if (members.length === 0) return
+
 	const rawK = Math.round(members.length / targetGroupSize)
 	const k = Math.min(members.length, Math.max(minK, Math.min(maxK, rawK)))
 
@@ -214,7 +281,7 @@ function rebalanceHierarchy(params: {
 	// placed by actual graph-hop distance, not angular distance.
 	const traversable = new Uint8Array(provinceCount)
 	traversable[capital] = 1
-	for (let i = 0; i < members.length; i++) traversable[members[i]] = 1
+	for (let i = 0; i < allMembers.length; i++) traversable[allMembers[i]] = 1
 
 	// Farthest-first seed selection using multi-source BFS graph distance.
 	// First seed: most habitable member.
@@ -295,6 +362,11 @@ function rebalanceHierarchy(params: {
 		adjOffset,
 		adjList,
 		provinceCount,
+		maxGroupSize: groupSizeCap({
+			realmSize: allMembers.length + 1,
+			groupCount: k,
+			memberCount: members.length,
+		}),
 		habitability,
 		urbanPop,
 		waterAccess,
@@ -313,7 +385,6 @@ function rebalanceHierarchy(params: {
 				parent,
 				depth,
 				currentDepth: currentDepth + 1,
-				fanoutRanges,
 				habitability,
 				urbanPop,
 				waterAccess,
@@ -376,17 +447,10 @@ function computeGravity(params: {
 	childList: Int32Array<ArrayBufferLike>
 	depth: Int32Array<ArrayBufferLike>
 	provinceCount: number
-	fanoutRanges: FanoutRanges
 }): Float32Array {
-	const {
-		habitability,
-		childOffset,
-		childList,
-		depth,
-		provinceCount,
-		fanoutRanges,
-	} = params
+	const { habitability, childOffset, childList, depth, provinceCount } = params
 	const gravity = new Float32Array(provinceCount)
+	const domainSize = new Int32Array(provinceCount).fill(1)
 
 	let maxDepth = 0
 	for (let p = 0; p < provinceCount; p++) {
@@ -412,8 +476,9 @@ function computeGravity(params: {
 		const childEnd = childOffset[province + 1]
 		for (let j = childStart; j < childEnd; j++) {
 			score += gravity[childList[j]] * TRIBUTE
+			domainSize[province] += domainSize[childList[j]]
 		}
-		const maxChildren = fanoutRanges[depth[province]]?.[1] ?? 100
+		const maxChildren = maxFanoutForSize({ size: domainSize[province] })
 		const overextended = childEnd - childStart > maxChildren ? OVEREXTENSION : 1
 		gravity[province] = score * overextended
 	}
@@ -422,9 +487,8 @@ function computeGravity(params: {
 }
 
 export const HIERARCHY = {
-	hegemonFanout,
-	fanoutRangesForSize,
-	maxFanoutForNationSize,
+	fanoutForSize,
+	maxFanoutForSize,
 	rebalanceHierarchy,
 	buildChildrenCSR,
 	buildSovereign,

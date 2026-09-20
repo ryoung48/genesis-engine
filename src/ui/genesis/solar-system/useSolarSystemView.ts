@@ -261,6 +261,9 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 					}
 				: null,
 		)
+		if (solarSystemViewActive && systemBodiesRef.current.length > 0) {
+			sceneRef.current?.setNebulaBackgroundSeed(seed)
+		}
 	}, [
 		solarSystemViewActive,
 		effectiveDaysPerYear,

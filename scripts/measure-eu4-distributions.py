@@ -2,7 +2,6 @@
 from the historical EU4 event log (public/earth-history/events/*.json) and
 writes calibration targets to public/earth-history/reference/history-targets.json.
 
-See PROCEDURAL-HISTORY-PLAN.md section 5 "Calibration against EU4 data".
 The generator consumes this JSON as its tuning table, rescaling ratios to the
 generated planet's land area and province count; rerunning this script over a
 generated log's provinces/nations JSON (if exported in the same shape) gives a

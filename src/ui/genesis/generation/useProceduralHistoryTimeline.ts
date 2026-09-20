@@ -4,7 +4,7 @@ import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { PartitionRow } from "@/model/history/world-frame/types"
-import type { ProceduralTimelineInput } from "@/ui/genesis/generation/types"
+import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 
 // Procedural counterpart of useEarthHistoryTimeline. Builds the single static
 // initial-conditions HistoryState for a procedurally generated world on the
@@ -39,7 +39,7 @@ export function useProceduralHistoryTimeline({
 	religionMode,
 	journalTransactionsRef,
 	journalVersion,
-}: ProceduralTimelineInput) {
+}: HistoryTimelineInput) {
 	const isProcedural =
 		!!world && !world.isEarthImport && !!world.provinces && !!world.nations
 

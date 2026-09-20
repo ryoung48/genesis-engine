@@ -1,6 +1,6 @@
 import type { CensusKeyframe } from "@/model/history/record/types"
 import type {
-	HistoryNote,
+	EngineNote,
 	HistoryState,
 } from "@/model/history/sim/engine/state/types"
 
@@ -40,7 +40,7 @@ export interface JournalTransaction {
 	occupations: JournalProvinceChange[]
 	coalitions: JournalCoalition[]
 	rulers: JournalRuler[]
-	notes: HistoryNote[]
+	notes: EngineNote[]
 	census: CensusKeyframe | null
 }
 

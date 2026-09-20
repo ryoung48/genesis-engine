@@ -51,11 +51,17 @@ export function buildCloudBandMaterial(
 		roughness: 1,
 		metalness: 0,
 	})
+	const bandMode = {
+		cloudy: 0,
+		banded: 1,
+		venusian: 2,
+		"brown-dwarf-l": 3,
+		"brown-dwarf-t": 4,
+		"brown-dwarf-y": 5,
+	}[style]
 	material.onBeforeCompile = (shader) => {
 		shader.uniforms.giantSeed = { value: seed % 24 }
-		shader.uniforms.giantBandMode = {
-			value: style === "banded" ? 1 : style === "venusian" ? 2 : 0,
-		}
+		shader.uniforms.giantBandMode = { value: bandMode }
 		shader.uniforms.giantColTop = { value: palette.top }
 		shader.uniforms.giantColBot = { value: palette.bot }
 		shader.uniforms.giantColMid1 = { value: palette.mid1 }
@@ -155,14 +161,31 @@ export function buildCloudBandMaterial(
 					float latitude = objectPosition.y + (flow - 0.5) * 0.11;
 					vec3 stretchedPosition = vec3(objectPosition.x * 0.5, latitude * 5.0, objectPosition.z * 0.5);
 					vec3 cloudy = giantCloudColor(stretchedPosition, textureSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);
-					float bandFrequency = mix(7.0, 18.0, giantHash(giantSeed * 0.79 + 11.3));
-					float bandPhase = giantHash(giantSeed * 0.53 + 37.1) * 6.2831853;
-					float bandShape = latitude * bandFrequency + bandPhase + flow * 2.0;
-					float broad = 0.5 + 0.42 * sin(bandShape)
-						+ 0.08 * sin(bandShape * 2.0 + giantSeed * 0.17);
-					vec3 zone = mix(giantBandDark, giantBandWarm, broad);
-					zone = mix(zone, giantBandCream, pow(broad, 8.0));
-					return mix(zone, cloudy, 0.45);
+				float bandFrequency = mix(7.0, 18.0, giantHash(giantSeed * 0.79 + 11.3));
+				float bandPhase = giantHash(giantSeed * 0.53 + 37.1) * 6.2831853;
+				float bandShape = latitude * bandFrequency + bandPhase + flow * 2.0;
+				float broad = 0.5 + 0.42 * sin(bandShape)
+					+ 0.08 * sin(bandShape * 2.0 + giantSeed * 0.17);
+				vec3 bandDeep = mix(giantBandDark, giantBandWarm, 0.45);
+				vec3 zone = mix(bandDeep, giantBandWarm, broad);
+				zone = mix(zone, giantBandCream, pow(broad, 8.0));
+				float bandContrast = mix(0.06, 1.0, giantHash(giantSeed * 0.91 + 5.7));
+				vec3 banded = mix(zone, cloudy, 0.45);
+				return mix(giantBandWarm, banded, bandContrast);
+				}
+				vec3 giantBrownDwarfColor(vec3 objectPosition) {
+					vec3 offset = vec3(giantSeed * 17.3, giantSeed * 11.7, giantSeed * 29.1);
+					float flow = giantFbm(objectPosition * vec3(3.0, 1.0, 3.0) + offset);
+					float latitude = objectPosition.y + (flow - 0.5) * 0.12;
+					float broad = 0.5 + 0.35 * sin(latitude * 10.0 + flow * 2.0 + giantSeed);
+					float streaks = giantFbm(vec3(objectPosition.x * 4.0, latitude * 6.0, objectPosition.z * 4.0) + offset);
+					float detail = giantFbm(vec3(objectPosition.x * 12.0, latitude * 16.0, objectPosition.z * 12.0) + offset + vec3(47.0));
+					float cloud = mix(broad, streaks, 0.55) + (detail - 0.5) * 0.25;
+					float brightness = giantBandMode > 4.5 ? 1.15 : giantBandMode > 3.5 ? 1.08 : 1.0;
+					float highlight = giantBandMode > 4.5 ? 0.4 : giantBandMode > 3.5 ? 0.55 : 0.7;
+					vec3 color = mix(giantColBot * 0.55, giantColMid1, smoothstep(0.2, 0.68, cloud));
+					color = mix(color, giantColTop, smoothstep(0.58, 0.82, cloud) * highlight);
+					return color * brightness;
 				}
 				vec3 giantVenusColor(vec3 objectPosition) {
 					vec3 offset = vec3(giantSeed * 17.3, giantSeed * 11.7, giantSeed * 29.1);
@@ -187,7 +210,7 @@ export function buildCloudBandMaterial(
 			)
 			.replace(
 				"#include <map_fragment>",
-				"vec3 giantPosition = normalize(vGiantObjectPosition); diffuseColor.rgb = giantBandMode > 1.5 ? giantVenusColor(giantPosition) : giantBandMode > 0.5 ? giantBandedColor(giantPosition) : giantCloudColor(giantPosition, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
+				"vec3 giantPosition = normalize(vGiantObjectPosition); diffuseColor.rgb = giantBandMode > 2.5 ? giantBrownDwarfColor(giantPosition) : giantBandMode > 1.5 ? giantVenusColor(giantPosition) : giantBandMode > 0.5 ? giantBandedColor(giantPosition) : giantCloudColor(giantPosition, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);",
 			)
 	}
 	return material

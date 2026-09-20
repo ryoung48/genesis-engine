@@ -9,6 +9,8 @@ import type { OrgCategorizer } from "@/model/history/earth/organization-categori
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import { TITLES } from "@/model/society/titles"
+import type { TitleTier } from "@/model/society/titles/types"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
 import {
 	miseryColor,
@@ -20,9 +22,15 @@ import {
 	computeHistoryRegionColors,
 	computeOrgStripeOverlay,
 } from "@/ui/genesis/shared/history-region-colors"
+import type { NationMapMode } from "@/ui/genesis/shared/map-modes"
 import { computeRegionColors } from "@/ui/genesis/shared/region-colors"
-import { usePlaybackSampledValue } from "@/ui/genesis/shared/usePlaybackSampledValue"
+import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
+import {
+	SCENE_REBUILD_THROTTLE_MS,
+	useThrottledValue,
+} from "@/ui/genesis/shared/useThrottledValue"
 import type { MapColoringInput } from "@/ui/genesis/view/types"
+
 /**
  * Computes everything that colors the map surface: the per-region base fill
  * for the active map mode, the occupation/organization stripe overlays, the
@@ -32,6 +40,21 @@ import type { MapColoringInput } from "@/ui/genesis/view/types"
  * usePlaybackSampledValue so timeline playback doesn't rebuild borders and
  * label textures on every tick.
  */
+function tierForNationMode(nationMode: NationMapMode): TitleTier | null {
+	switch (nationMode) {
+		case "titlesDuchy":
+			return "duchy"
+		case "titlesKingdom":
+			return "kingdom"
+		case "titlesEmpire":
+			return "empire"
+		case "titlesHegemony":
+			return "hegemony"
+		default:
+			return null
+	}
+}
+
 export function useMapColoring(input: MapColoringInput) {
 	const {
 		worldForDisplay,
@@ -50,7 +73,6 @@ export function useMapColoring(input: MapColoringInput) {
 		selectedWikiNationId,
 		windVectors,
 		hoverProvince,
-		labelsPlaybackActive,
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
@@ -83,10 +105,7 @@ export function useMapColoring(input: MapColoringInput) {
 		},
 		[],
 	)
-	const historyRenderInputs = useMemo(
-		() => (historyFrame ? FRAME.toRenderInputs({ frame: historyFrame }) : null),
-		[historyFrame],
-	)
+	const historyRenderInputs = history.query?.renderInputs ?? null
 
 	// Recolors provinces belonging to the currently-open org's wiki page,
 	// entirely at region level -- eu4-province-borders-fills.json's real
@@ -331,6 +350,7 @@ export function useMapColoring(input: MapColoringInput) {
 				religionColorById: historyReligionColorById ?? undefined,
 				cultureColorById: historyCultureColorById ?? undefined,
 				selectedNationId: selectedWikiNationId,
+				locations: worldForDisplay.locations ?? null,
 				organizationKindById,
 			})
 			if (historyColors) return withOrgHighlight(historyColors)
@@ -465,6 +485,34 @@ export function useMapColoring(input: MapColoringInput) {
 		const religion =
 			religionId >= 0 ? (frame.religions[religionId] ?? null) : null
 		const religionName = religion?.name ?? null
+
+		const domainSizes = FRAME.provinceDomainSize({ frame })
+		const titleTier = (province: number) =>
+			TITLE_TIER_LABELS[TITLES.tierForSize({ size: domainSizes[province] })]
+		const hasTitle = owner !== null && frame.provinceParent[hoverProvince] >= -1
+		const titleLabel = hasTitle
+			? `${titleTier(hoverProvince)} · ${domainSizes[hoverProvince]} ${domainSizes[hoverProvince] === 1 ? "province" : "provinces"}`
+			: null
+		const realmTier = tierForNationMode(nationMode)
+		const tierRealms = realmTier
+			? FRAME.provinceTierRealm({ frame, tier: realmTier })
+			: null
+		const realmHolder = tierRealms?.[hoverProvince] ?? -1
+		const realmSize = tierRealms
+			? tierRealms.reduce(
+					(count, holder) => (holder === realmHolder ? count + 1 : count),
+					0,
+				)
+			: 0
+		const realmLabel =
+			realmTier && realmHolder >= 0
+				? `${TITLE_TIER_LABELS[realmTier]} of ${history.state.provinceMeta[realmHolder]?.name ?? `Province ${realmHolder}`} · ${realmSize} provinces`
+				: null
+		const liegeProvince = frame.provinceParent[hoverProvince]
+		const liegeLabel =
+			hasTitle && liegeProvince >= 0
+				? `${history.state.provinceMeta[liegeProvince]?.name ?? `Province ${liegeProvince}`} · ${titleTier(liegeProvince)}`
+				: null
 		const religionColor = religion
 			? COLOR.rgb01ToCss(
 					religion.color.map((component) => component / 255) as [
@@ -488,8 +536,17 @@ export function useMapColoring(input: MapColoringInput) {
 			area,
 			region,
 			superregion,
+			titleLabel: worldForDisplay?.isEarthImport ? null : titleLabel,
+			liegeLabel: worldForDisplay?.isEarthImport ? null : liegeLabel,
+			realmLabel: worldForDisplay?.isEarthImport ? null : realmLabel,
 		}
-	}, [history.state, history.query, hoverProvince])
+	}, [
+		history.state,
+		history.query,
+		hoverProvince,
+		worldForDisplay?.isEarthImport,
+		nationMode,
+	])
 
 	const occupationOverlay = useMemo(() => {
 		if (
@@ -643,47 +700,51 @@ export function useMapColoring(input: MapColoringInput) {
 
 		return null
 	}, [worldForDisplay, populationMode, religionMode])
-	const historySceneNationOverride = usePlaybackSampledValue(
-		historyFrame && historyRenderInputs
-			? {
-					assignment: historyRenderInputs.assignment,
-					seeds: historyRenderInputs.seeds,
-					names:
-						colorMode === "nations" && nationMode === "dynasty"
-							? (() => {
-									const dynastyNames = new Array<string>(
-										historyRenderInputs.names.length,
-									).fill("")
-									for (const nation of historyFrame.nations.values()) {
-										const dynasty = nation.ruler?.dynasty
-										if (dynasty) dynastyNames[nation.id] = dynasty
-									}
-									return dynastyNames
-								})()
-							: historyRenderInputs.names,
-				}
-			: null,
-		350,
-		labelsPlaybackActive,
-	)
-	const historySceneLabelPartitions = usePlaybackSampledValue(
-		historyFrame && historyRenderInputs
-			? {
-					culture: {
-						assignment: historyRenderInputs.cultureAssignment,
-						count: historyFrame.cultures.length,
-						names: historyFrame.cultures.map((culture) => culture.name),
-					},
-					religion: {
-						assignment: historyRenderInputs.religionAssignment,
-						count: historyFrame.religions.length,
-						names: historyFrame.religions.map((religion) => religion.name),
-					},
-				}
-			: null,
-		350,
-		labelsPlaybackActive,
-	)
+	const historySceneNationOverrideRaw = useMemo(() => {
+		if (!historyFrame || !historyRenderInputs) return null
+		return {
+			assignment: historyRenderInputs.assignment,
+			seeds: historyRenderInputs.seeds,
+			names:
+				colorMode === "nations" && nationMode === "dynasty"
+					? (() => {
+							const dynastyNames = new Array<string>(
+								historyRenderInputs.names.length,
+							).fill("")
+							for (const nation of historyFrame.nations.values()) {
+								const dynasty = nation.ruler?.dynasty
+								if (dynasty) dynastyNames[nation.id] = dynasty
+							}
+							return dynastyNames
+						})()
+					: historyRenderInputs.names,
+		}
+	}, [historyFrame, historyRenderInputs, colorMode, nationMode])
+	const historySceneNationOverride = useThrottledValue({
+		value: historySceneNationOverrideRaw,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: null,
+	})
+	const historySceneLabelPartitionsRaw = useMemo(() => {
+		if (!historyFrame || !historyRenderInputs) return null
+		return {
+			culture: {
+				assignment: historyRenderInputs.cultureAssignment,
+				count: historyFrame.cultures.length,
+				names: historyFrame.cultures.map((culture) => culture.name),
+			},
+			religion: {
+				assignment: historyRenderInputs.religionAssignment,
+				count: historyFrame.religions.length,
+				names: historyFrame.religions.map((religion) => religion.name),
+			},
+		}
+	}, [historyFrame, historyRenderInputs])
+	const historySceneLabelPartitions = useThrottledValue({
+		value: historySceneLabelPartitionsRaw,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: null,
+	})
 
 	// Map territory highlight (HRE, Hanseatic League, ...) -- recomputed on
 	// every timeline scrub tick since membership is derived fresh from
@@ -691,10 +752,10 @@ export function useMapColoring(input: MapColoringInput) {
 	// setOrganizationHighlight rebuilds nation BORDERS and LABELS (border
 	// tracing + label-texture regeneration, both far more expensive than a
 	// region-color array fill) whenever the spec reference changes, so this
-	// is throttled through usePlaybackSampledValue exactly like
+	// is throttled through useThrottledValue exactly like
 	// historySceneNationOverride/LabelPartitions just above -- without
 	// it, an open org wiki page rebuilt borders+labels every single tick
-	// instead of at most once per 350ms during playback.
+	// instead of at most once per throttle interval.
 	const organizationHighlightSpecRaw = useMemo<OrgHighlightSpec | null>(() => {
 		if (
 			!selectedWikiOrganizationId ||
@@ -715,11 +776,11 @@ export function useMapColoring(input: MapColoringInput) {
 			memberProvinceCompactIndexes,
 		}
 	}, [selectedWikiOrganizationId, history.query, history.organizationReference])
-	const organizationHighlightSpec = usePlaybackSampledValue(
-		organizationHighlightSpecRaw,
-		350,
-		labelsPlaybackActive,
-	)
+	const organizationHighlightSpec = useThrottledValue({
+		value: organizationHighlightSpecRaw,
+		intervalMs: SCENE_REBUILD_THROTTLE_MS,
+		resetKey: null,
+	})
 
 	return {
 		buildOrgCategorizer,

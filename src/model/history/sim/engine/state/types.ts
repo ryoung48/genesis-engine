@@ -61,7 +61,7 @@ interface LeaderRuntime {
 	nameSeed: Int32Array
 }
 
-export interface HistoryNote {
+export interface EngineNote {
 	tag: string
 	time: number
 	data: Record<string, number | number[] | string | boolean | undefined>
@@ -133,7 +133,7 @@ export interface HistoryState {
 	governmentType: Uint8Array
 
 	wars: War[]
-	events: HistoryNote[]
+	events: EngineNote[]
 	journal: JournalTransaction[]
 	pendingJournal: PendingJournal
 	nextDynasty: number
@@ -289,7 +289,7 @@ export interface ReleaseDisconnectedProvinceParams {
 	rng: SharedRng
 }
 
-export interface AddTerritoryParams {
+export interface RepartitionNationParams {
 	state: HistoryState
 	nation: number
 	subjects: number[]

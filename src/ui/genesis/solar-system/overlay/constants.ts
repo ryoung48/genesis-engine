@@ -40,6 +40,15 @@ export const BELT_VERTICAL_RATIO = 0.35
 // ROCKY_SIBLING_COLOR for anything else.
 export const MAIN_WORLD_COLOR = 0x3b82f6
 export const ROCKY_SIBLING_COLOR = 0x9ca3af
+
+export const JOVIAN_COLOR_BY_ZONE: Record<OrbitZone, readonly number[]> = {
+	epistellar: [0xc4774c, 0x9b564d, 0xaa6c78],
+	inner: [0xd6b688, 0xb69673, 0xc28f77],
+	outer: [
+		0xc9a878, 0xdcc787, 0x4d78b4, 0xc9a878, 0xdcc787, 0x4d78b4, 0xc9a878,
+		0xdcc787, 0x4d78b4, 0x84c7c5,
+	],
+}
 export const ORBIT_LINE_COLOR_BY_ZONE: Record<CompanionStar["role"], number> = {
 	epistellar: 0xfb923c,
 	inner: 0xfacc15,

@@ -190,6 +190,9 @@ interface InfoPanelProps {
 		area: string | null
 		region: string | null
 		superregion: string | null
+		titleLabel: string | null
+		liegeLabel: string | null
+		realmLabel: string | null
 	}
 }
 
@@ -796,6 +799,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={historyHoverOverride.governmentLabel}
 								color={historyHoverOverride.governmentColor}
 							/>
+						)}
+						{historyHoverOverride?.titleLabel && (
+							<Row label="Title" value={historyHoverOverride.titleLabel} />
+						)}
+						{historyHoverOverride?.liegeLabel && (
+							<Row label="Liege" value={historyHoverOverride.liegeLabel} />
+						)}
+						{historyHoverOverride?.realmLabel && (
+							<Row label="Realm" value={historyHoverOverride.realmLabel} />
 						)}
 					</>
 				)}
