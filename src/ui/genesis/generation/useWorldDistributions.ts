@@ -93,11 +93,13 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 				if (index >= 0) counts[index]++
 			}
 		}
-		return ERAS.governmentTypes.map((key, i) => ({
-			label: ERAS.governmentTypeLabels[key],
-			count: counts[i] ?? 0,
-			color: GOVERNMENT_COLORS_CSS[i] ?? "rgb(148, 163, 184)",
-		}))
+		return ERAS.governmentTypes
+			.map((key, i) => ({
+				label: ERAS.governmentTypeLabels[key],
+				count: counts[i] ?? 0,
+				color: GOVERNMENT_COLORS_CSS[i] ?? "rgb(148, 163, 184)",
+			}))
+			.filter((bucket) => bucket.count > 0)
 	}, [earthGovernmentDistribution, history.query, nationProvinceCounts])
 
 	const religionTypeDistribution = useMemo(() => {

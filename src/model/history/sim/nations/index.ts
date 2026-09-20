@@ -67,6 +67,10 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		habitability,
 		r_xyz,
 	} = params
+	const governmentMix =
+		params.government?.model === "blend" ? params.government.mix : undefined
+	const sizedGovernment =
+		params.government?.model === "sized" ? params.government : undefined
 	const maxSpreadRad =
 		MAX_NATION_SPREAD_KM /
 		(params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm)
@@ -298,7 +302,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 	let organizationPlan: ReturnType<
 		typeof IMPERIAL_PATCHWORK.buildImperialPatchwork
 	> = null
-	if (params.buildImperialPatchwork && params.governmentMix) {
+	if (params.buildImperialPatchwork && governmentMix) {
 		organizationPlan = IMPERIAL_PATCHWORK.buildImperialPatchwork({
 			provinces,
 			assignment,
@@ -336,7 +340,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 	const tradeLeaguePlans: NonNullable<
 		ReturnType<typeof TRADE_LEAGUE.buildTradeLeague>
 	>[] = []
-	if (params.buildTradeLeague && params.governmentMix) {
+	if (params.buildTradeLeague && governmentMix) {
 		for (let i = 0; i < TRADE_LEAGUE_COUNT; i++) {
 			// Nations already in the Imperial Patchwork or an earlier Trade
 			// League this loop placed are off-limits -- an org member can't be
@@ -359,7 +363,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				provinceContinent,
 				maxSpreadRad,
 				seed: params.seed + i,
-				governmentMix: params.governmentMix,
+				governmentMix: governmentMix,
 				governmentSizeWeight: params.governmentSizeWeight ?? 0.55,
 				statehoodFraction: params.statehoodFraction ?? 0.75,
 				excludeNations,
@@ -487,7 +491,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 	const governmentType = new Uint8Array(provinceCount)
 	const nationColonizer = new Int32Array(nationCount).fill(-1)
 	const organizations: GenesisOrganization[] = []
-	if (params.governmentMix && nationCount > 0) {
+	if (governmentMix && nationCount > 0) {
 		const sizeWeight = params.governmentSizeWeight ?? 0.55
 		const statehoodFraction = params.statehoodFraction ?? 0.75
 		const patchworkMemberSet = organizationPlan
@@ -501,14 +505,14 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		// is zeroed here (GOVERNMENT.assignGovernmentType renormalizes across
 		// the remaining three) rather than reusing the era's own mix.
 		const tradeLeagueGovernmentMix: GovernmentMix | undefined =
-			params.governmentMix && { ...params.governmentMix, tribal: 0 }
+			governmentMix && { ...governmentMix, tribal: 0 }
 		const nationGovType = new Uint8Array(nationCount)
 		for (let i = 0; i < nationCount; i++) {
 			const eraMix = patchworkMemberSet?.has(i)
 				? IMPERIAL_PATCHWORK_GOVERNMENT_MIX
 				: tradeLeagueMemberSet.has(i)
-					? (tradeLeagueGovernmentMix ?? params.governmentMix)
-					: params.governmentMix
+					? (tradeLeagueGovernmentMix ?? governmentMix)
+					: governmentMix
 			nationGovType[i] = GOVERNMENT.assignGovernmentType({
 				nationIndex: i,
 				capitalProvince: seeds[i],
@@ -531,7 +535,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				// resolved with one direct weighted draw over monarchy/republic/
 				// theocracy (same tribal-zeroed mix), each mapped to a
 				// representative subtype.
-				const mix = tradeLeagueGovernmentMix ?? params.governmentMix
+				const mix = tradeLeagueGovernmentMix ?? governmentMix
 				const family =
 					RNG.createRng({ seed: params.seed + i * 7919 }).weightedChoice([
 						{ v: "monarchy" as const, w: mix.monarchy },
@@ -579,7 +583,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				}
 			}
 		}
-		if ((params.governmentMix.colonial ?? 0) > 0) {
+		if ((governmentMix.colonial ?? 0) > 0) {
 			COLONIAL.assignColonialRelations({
 				nationCount,
 				nationGovType,
@@ -587,7 +591,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				assignment,
 				seeds,
 				size,
-				colonialFraction: params.governmentMix.colonial!,
+				colonialFraction: governmentMix.colonial!,
 				waterAccess,
 				habitability,
 				provinceSeeds: provinces.seeds,
@@ -677,6 +681,36 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				"[NATIONS] Trade League: skipped (no coastal, non-tribal nation was large enough to shatter)",
 			)
 		}
+	} else if (sizedGovernment && nationCount > 0) {
+		const nationGovType = GOVERNMENT.assignSizedNations({
+			sizeShares: sizedGovernment.sizeShares,
+			sizes,
+			seeds,
+			nationMembers,
+			urbanPop,
+			habitability,
+			waterAccess,
+			migrationWave: params.migrationWave,
+			seed: params.seed,
+		})
+		const resolved = GOVERNMENT.assignVassalMarks({
+			markShares: sizedGovernment.markShares,
+			nationGovernment: nationGovType,
+			assignment,
+			sizes,
+			parent,
+			depth,
+			childOffset,
+			childList,
+			adjOffset: provinces.adjOffset,
+			adjList: provinces.adjList,
+			migrationWave: params.migrationWave,
+			habitability,
+			waterAccess,
+			urbanPop,
+		})
+		for (let p = 0; p < provinceCount; p++)
+			if (assignment[p] >= 0) governmentType[p] = resolved[p]
 	} else if (params.buildImperialPatchwork || params.buildTradeLeague) {
 		console.log(
 			"[NATIONS] Imperial Patchwork / Trade League: skipped (governmentMix not supplied)",

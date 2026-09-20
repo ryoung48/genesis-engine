@@ -1,7 +1,11 @@
-import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
+import type {
+	AtmosphereHazard,
+	AtmosphereProfile,
+} from "@/model/celestial/orbit-body/types"
 import type {
 	AtmosphereCodeInput,
 	RollAtmosphereInput,
+	RollHazardInput,
 } from "@/model/celestial/planet/environment/atmosphere/types"
 import { STAR } from "@/model/celestial/star"
 import { DICE } from "@/model/shared/random/dice"
@@ -36,15 +40,11 @@ function rollAtmosphereBar({
 // override (forcing "radioactive" regardless of tainted for a pulsar/magnetar
 // system, World Builder's Handbook p. 228) is handled separately in
 // atmosphereCodeToProfile below, once the host star's class is known there.
-function rollHazard({
+function rollHazards({
 	rng,
 	profile,
 	starAgeGyr,
-}: {
-	rng: RollAtmosphereInput["rng"]
-	profile: Pick<AtmosphereProfile, "type" | "subtype">
-	starAgeGyr: number
-}): AtmosphereProfile["hazard"] {
+}: RollHazardInput): AtmosphereHazard[] {
 	const breathable = profile.type === "breathable"
 	const lifeless =
 		profile.type === "vacuum" ||
@@ -54,14 +54,29 @@ function rollHazard({
 	const extreme = !["thin", "standard", "dense"].includes(profile.subtype ?? "")
 	const low = breathable && profile.subtype === "thin"
 	const high = breathable && profile.subtype === "dense"
-	const roll = DICE.roll2d6(rng) + (low ? -2 : 0) + (high ? 2 : 0)
-	if (roll <= 2) return breathable && !extreme ? "low oxygen" : "gas mix"
-	if (roll === 3 || roll === 11) return "radioactive"
-	if (roll === 4 || roll === 9) return lifeless ? "gas mix" : "biologic"
-	if (roll === 5 || roll === 7) return "gas mix"
-	if (roll === 8) return "sulphur compounds"
-	if (roll === 10) return "particulates"
-	return breathable && !extreme ? "high oxygen" : "gas mix"
+	const hazards: AtmosphereHazard[] = []
+	while (hazards.length < 3) {
+		const roll = DICE.roll2d6(rng) + (low ? -2 : 0) + (high ? 2 : 0)
+		let kind: AtmosphereHazard["kind"]
+		if (roll <= 2)
+			kind =
+				breathable && !extreme && hazards.length === 0
+					? "low oxygen"
+					: "gas mix"
+		else if (roll === 3 || roll === 11) kind = "radioactive"
+		else if (roll === 4 || roll === 9) kind = lifeless ? "gas mix" : "biologic"
+		else if (roll === 5 || roll === 7) kind = "gas mix"
+		else if (roll === 6 || roll === 10) kind = "particulates"
+		else if (roll === 8) kind = "sulphur compounds"
+		else
+			kind =
+				breathable && !extreme && hazards.length === 0
+					? "high oxygen"
+					: "gas mix"
+		hazards.push({ kind })
+		if (roll !== 10) break
+	}
+	return hazards
 }
 
 function atmosphereCodeToProfile({
@@ -230,13 +245,19 @@ function atmosphereCodeToProfile({
 				breathable: false,
 			}
 		} else if (roll === 12) {
-			// Book's own "Occasionally Corrosive" row: flip straight to the
-			// corrosive atmosphere type (code B/11) rather than approximating it
-			// as a tainted exotic.
 			profile = {
-				code: 11,
-				type: "corrosive",
+				code,
+				type: "exotic",
 				subtype: "very dense",
+				tainted: true,
+				hazards: [
+					{
+						kind: "gas mix",
+						occasionallyCorrosive: true,
+						severity: Math.min(9, rng.randint(1, 6) + 6),
+						persistence: rng.randint(1, 6) + 1,
+					},
+				],
 				breathable: false,
 			}
 		} else {
@@ -352,8 +373,8 @@ function atmosphereCodeToProfile({
 			panthalassic: params.classification === "panthalassic",
 		}),
 	}
-	if (completed.tainted) {
-		completed.hazard = rollHazard({
+	if (completed.tainted && !completed.hazards) {
+		completed.hazards = rollHazards({
 			rng,
 			profile: completed,
 			starAgeGyr: params.starAgeGyr,
@@ -377,7 +398,12 @@ function atmosphereCodeToProfile({
 			}))
 	) {
 		completed.tainted = true
-		completed.hazard = "radioactive"
+		if (!completed.hazards?.some((hazard) => hazard.kind === "radioactive")) {
+			completed.hazards = [
+				...(completed.hazards ?? []),
+				{ kind: "radioactive" },
+			]
+		}
 	}
 	return completed
 }

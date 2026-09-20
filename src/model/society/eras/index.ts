@@ -41,6 +41,11 @@ const governmentTypes: GovernmentType[] = [
 	// colonial
 	"trading_company",
 	"settler_colony",
+	// high medieval
+	"tribal_government",
+	"feudal_government",
+	"bureaucratic_government",
+	"republic_government",
 ]
 
 const governmentTypeLabels: Record<GovernmentType, string> = {
@@ -69,6 +74,10 @@ const governmentTypeLabels: Record<GovernmentType, string> = {
 	dictatorial_rule: "Dictatorial Rule",
 	trading_company: "Trading Company",
 	settler_colony: "Settler Colony",
+	tribal_government: "Tribal",
+	feudal_government: "Feudal",
+	bureaucratic_government: "Bureaucratic",
+	republic_government: "Republic",
 }
 
 const governmentTypeFamily: Record<GovernmentType, GovernmentFamily> = {
@@ -97,6 +106,10 @@ const governmentTypeFamily: Record<GovernmentType, GovernmentFamily> = {
 	dictatorial_rule: "republic",
 	trading_company: "colonial",
 	settler_colony: "colonial",
+	tribal_government: "tribal",
+	feudal_government: "monarchy",
+	bureaucratic_government: "monarchy",
+	republic_government: "republic",
 }
 
 const nationBuckets: [number, number][] = [
@@ -108,6 +121,56 @@ const nationBuckets: [number, number][] = [
 	[2, 4],
 	[1, 1],
 ]
+
+const medievalBase: Pick<
+	EraConfig,
+	| "settlementFraction"
+	| "migrationFalloff"
+	| "statehoodFraction"
+	| "hasNations"
+	| "nationPercentages"
+	| "nationBuckets"
+	| "organizations"
+> = {
+	settlementFraction: 1.0,
+	migrationFalloff: 1.5,
+	statehoodFraction: 1.0,
+	hasNations: true,
+	// Measured directly from EU4 extended-timeline ownership folded to
+	// 1444.11.11 (public/earth-history/events/provinces.json): 711 nations
+	// holding 2,563 provinces. Share of *provinces* per size bucket --
+	// which is what buildNationPlan budgets against:
+	//   50+   4.4%   25-49 13.8%   10-24 25.7%
+	//   5-9  16.0%   2-4   27.3%   1     12.8%
+	// By nation count that is 46.1% [1], 37.3% [2-4], 9.1% [5-9],
+	// 5.9% [10-24], 1.4% [25-49], 0.1% [50+].
+	//
+	// These are taken as province shares rather than converted from count
+	// shares: the previous weights assumed the 50-250 bucket averaged 150
+	// provinces, which handed it 26.8% of all provinces. In 1444 the only
+	// nation above 49 is Ming at 113, so that bucket is really 4.4%.
+	// Rebalanced from the raw EU4-measured shares above: nation *count* skews
+	// heavily to the [1,1] bucket relative to its province mass (a size-1
+	// nation is 1 count per 1 province, while a [10,24] nation is 1 count per
+	// ~17 provinces), so trimming its mass share meaningfully thins out
+	// single-province nations and fills in the middle tiers by count.
+	// [1,1] trimmed further (0.1 -> 0.03) to cut the remaining
+	// singleton-nation count, with the freed mass spread across the other
+	// buckets in proportion to their existing share.
+	nationPercentages: MATH.normalize([
+		0.0, 0.4907, 0.1099, 0.1638, 0.1235, 0.0847, 0.03,
+	]),
+	nationBuckets: [
+		[251, 600],
+		[50, 250],
+		[25, 49],
+		[10, 24],
+		[5, 9],
+		[2, 4],
+		[1, 1],
+	],
+	organizations: { imperialPatchwork: false, tradeLeague: false },
+}
 
 const eraConfigs: Record<SocietyEra, EraConfig> = {
 	paleolithic: {
@@ -122,7 +185,11 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		hasNations: false,
 		nationPercentages: [],
 		nationBuckets: [],
-		governmentMix: { tribal: 1.0, monarchy: 0, republic: 0, theocracy: 0 },
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: { tribal: 1.0, monarchy: 0, republic: 0, theocracy: 0 },
+		},
 		governmentSizeWeight: 1.0,
 	},
 	neolithic: {
@@ -137,11 +204,15 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		// Only tiny chiefdoms (1–4 provinces)
 		nationPercentages: MATH.normalize([0, 0, 0, 0, 0.15, 0.35, 0.5]),
 		nationBuckets: nationBuckets,
-		governmentMix: {
-			tribal: 0.92,
-			monarchy: 0.07,
-			republic: 0,
-			theocracy: 0.01,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.92,
+				monarchy: 0.07,
+				republic: 0,
+				theocracy: 0.01,
+			},
 		},
 		// Size almost entirely determines gov — tiny chiefdoms are all tribal
 		governmentSizeWeight: 0.9,
@@ -161,11 +232,15 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 			0.0, 0.0, 0.128, 0.1176, 0.218, 0.3426, 0.1938,
 		]),
 		nationBuckets: nationBuckets,
-		governmentMix: {
-			tribal: 0.62,
-			monarchy: 0.31,
-			republic: 0.01,
-			theocracy: 0.06,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.62,
+				monarchy: 0.31,
+				republic: 0.01,
+				theocracy: 0.06,
+			},
 		},
 		// Size still strongly predicts gov; first city-state republics appear but rare
 		governmentSizeWeight: 0.75,
@@ -185,11 +260,15 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 			0.4524, 0.1595, 0.0393, 0.0723, 0.1116, 0.1212, 0.0436,
 		]),
 		nationBuckets: nationBuckets,
-		governmentMix: {
-			tribal: 0.56,
-			monarchy: 0.36,
-			republic: 0.01,
-			theocracy: 0.07,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.56,
+				monarchy: 0.36,
+				republic: 0.01,
+				theocracy: 0.07,
+			},
 		},
 		// Size still the primary signal; coastal republics (Athens, Carthage) emerge
 		governmentSizeWeight: 0.65,
@@ -198,52 +277,49 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		id: "lateMedieval",
 		label: "Late Medieval",
 		targetPopulation: 300e6,
-		settlementFraction: 1.0,
-		migrationFalloff: 1.5,
-		statehoodFraction: 1.0,
-		hasNations: true,
-		// Measured directly from EU4 extended-timeline ownership folded to
-		// 1444.11.11 (public/earth-history/events/provinces.json): 711 nations
-		// holding 2,563 provinces. Share of *provinces* per size bucket --
-		// which is what buildNationPlan budgets against:
-		//   50+   4.4%   25-49 13.8%   10-24 25.7%
-		//   5-9  16.0%   2-4   27.3%   1     12.8%
-		// By nation count that is 46.1% [1], 37.3% [2-4], 9.1% [5-9],
-		// 5.9% [10-24], 1.4% [25-49], 0.1% [50+].
-		//
-		// These are taken as province shares rather than converted from count
-		// shares: the previous weights assumed the 50-250 bucket averaged 150
-		// provinces, which handed it 26.8% of all provinces. In 1444 the only
-		// nation above 49 is Ming at 113, so that bucket is really 4.4%.
-		// Rebalanced from the raw EU4-measured shares above: nation *count* skews
-		// heavily to the [1,1] bucket relative to its province mass (a size-1
-		// nation is 1 count per 1 province, while a [10,24] nation is 1 count per
-		// ~17 provinces), so trimming its mass share meaningfully thins out
-		// single-province nations and fills in the middle tiers by count.
-		// [1,1] trimmed further (0.1 -> 0.03) to cut the remaining
-		// singleton-nation count, with the freed mass spread across the other
-		// buckets in proportion to their existing share.
-		nationPercentages: MATH.normalize([
-			0.0, 0.4907, 0.1099, 0.1638, 0.1235, 0.0847, 0.03,
-		]),
-		nationBuckets: [
-			[251, 600],
-			[50, 250],
-			[25, 49],
-			[10, 24],
-			[5, 9],
-			[2, 4],
-			[1, 1],
-		],
-		governmentMix: {
-			tribal: 0.44,
-			monarchy: 0.48,
-			republic: 0.02,
-			theocracy: 0.06,
+		...medievalBase,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.44,
+				monarchy: 0.48,
+				republic: 0.02,
+				theocracy: 0.06,
+			},
 		},
 		// Size and era roughly equal; geography (coast → republic) meaningful
 		governmentSizeWeight: 0.55,
-		organizations: { imperialPatchwork: false, tradeLeague: false },
+	},
+	highMedieval: {
+		id: "highMedieval",
+		label: "High Medieval",
+		targetPopulation: 300e6,
+		...medievalBase,
+		startYear: 1066,
+		government: {
+			model: "sized",
+			sizeShares: [
+				{ maxSize: 1, tribal: 0.53, feudal: 0.47, bureaucratic: 0 },
+				{ maxSize: 4, tribal: 0.3, feudal: 0.7, bureaucratic: 0 },
+				{ maxSize: 9, tribal: 0.26, feudal: 0.74, bureaucratic: 0 },
+				{ maxSize: 24, tribal: 0.03, feudal: 0.9, bureaucratic: 0.07 },
+				{ maxSize: Infinity, tribal: 0.15, feudal: 0.75, bureaucratic: 0.1 },
+			],
+			markShares: {
+				tribalInFeudal: [
+					{ maxSize: 1, share: 0 },
+					{ maxSize: 4, share: 0.05 },
+					{ maxSize: 24, share: 0.13 },
+					{ maxSize: Infinity, share: 0.05 },
+				],
+				feudalInTribal: 0.08,
+				maxPocketShare: 0.2,
+				republic: 0.004,
+				theocracy: 0.01,
+			},
+		},
+		governmentSizeWeight: 0.55,
 	},
 	earlyModern: {
 		id: "earlyModern",
@@ -259,12 +335,16 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 			0.4524, 0.1595, 0.0787, 0.0904, 0.0595, 0.1053, 0.0542,
 		]),
 		nationBuckets: nationBuckets,
-		governmentMix: {
-			tribal: 0.45,
-			monarchy: 0.42,
-			republic: 0.07,
-			theocracy: 0.06,
-			colonial: 0.04,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.45,
+				monarchy: 0.42,
+				republic: 0.07,
+				theocracy: 0.06,
+				colonial: 0.04,
+			},
 		},
 		// Era ideology starts to matter more; mercantile republics spread beyond size norms
 		governmentSizeWeight: 0.45,
@@ -283,12 +363,16 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 			0.5322, 0.2502, 0.0617, 0.0567, 0.0467, 0.0375, 0.015,
 		]),
 		nationBuckets: nationBuckets,
-		governmentMix: {
-			tribal: 0.12,
-			monarchy: 0.55,
-			republic: 0.27,
-			theocracy: 0.06,
-			colonial: 0.12,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.12,
+				monarchy: 0.55,
+				republic: 0.27,
+				theocracy: 0.06,
+				colonial: 0.12,
+			},
 		},
 		// Ideology (nationalism, constitutionalism) increasingly overrides size
 		governmentSizeWeight: 0.3,
@@ -307,18 +391,22 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 			0.405, 0.2856, 0.1174, 0.1241, 0.0466, 0.0143, 0.007,
 		]),
 		nationBuckets: nationBuckets,
-		governmentMix: {
-			tribal: 0.0,
-			monarchy: 0.15,
-			republic: 0.8,
-			theocracy: 0.05,
+		startYear: 800,
+		government: {
+			model: "blend",
+			mix: {
+				tribal: 0.0,
+				monarchy: 0.15,
+				republic: 0.8,
+				theocracy: 0.05,
+			},
 		},
 		// Era ideology dominates; Vatican, Monaco are republics/monarchies not because of size
 		governmentSizeWeight: 0.15,
 	},
 }
 
-const defaultEra: SocietyEra = "lateMedieval"
+const defaultEra: SocietyEra = "highMedieval"
 
 function getEraConfig(era?: SocietyEra): EraConfig {
 	return eraConfigs[era ?? defaultEra]
@@ -329,6 +417,7 @@ const eraOrder: SocietyEra[] = [
 	"neolithic",
 	"bronze",
 	"iron",
+	"highMedieval",
 	"lateMedieval",
 	"earlyModern",
 	"industrial",

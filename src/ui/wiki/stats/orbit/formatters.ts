@@ -160,8 +160,14 @@ export function formatAtmosphereHazard(
 	atmosphere: AtmosphereProfile | null | undefined,
 ): string | undefined {
 	if (!atmosphere?.tainted) return undefined
-	if (!atmosphere.hazard) return undefined
-	return formatClassificationLabel(atmosphere.hazard)
+	if (!atmosphere.hazards?.length) return undefined
+	return atmosphere.hazards
+		.map((hazard) =>
+			"occasionallyCorrosive" in hazard
+				? `Occasionally corrosive gas mix (severity ${hazard.severity}, persistence ${hazard.persistence})`
+				: formatClassificationLabel(hazard.kind),
+		)
+		.join(", ")
 }
 
 export function formatPressureBar(pressureBar: number): string {

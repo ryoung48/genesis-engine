@@ -14,6 +14,12 @@ export interface RollAtmosphereInput {
 	panthalassic: boolean
 }
 
+export interface RollHazardInput {
+	rng: SharedRng
+	profile: Pick<AtmosphereProfile, "type" | "subtype">
+	starAgeGyr: number
+}
+
 export interface AtmosphereCodeInput {
 	rng: SharedRng
 	atmosphereCode: number

@@ -1,10 +1,11 @@
 import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import type {
 	AssignReligionTypesParams,
 	ComputeReligionFamiliesParams,
 	ComputeReligionsParams,
 } from "@/model/history/sim/religion/types"
-import type { GenesisPartition } from "@/model/society/types"
+import type { GenesisPartition, GovernmentFamily } from "@/model/society/types"
 
 const religionTypeNames = [
 	"Animistic",
@@ -36,12 +37,16 @@ const INDUSTRIAL_SIZE_WEIGHT_MAX = 0.3
 const CULTURES_PER_RELIGION = 6
 const RELIGIONS_PER_FAMILY = 3
 
+const FAMILY_CATEGORY: Record<GovernmentFamily, number> = {
+	tribal: 0,
+	monarchy: 1,
+	republic: 2,
+	theocracy: 3,
+	colonial: 2,
+}
+
 function govTypeToCategory(gov: number): number {
-	if (gov <= 3) return 0 // tribal
-	if (gov <= 7) return 1 // monarchy
-	if (gov <= 12 || gov === 17 || gov === 18) return 2 // republic
-	if (gov <= 16) return 3 // theocracy
-	return 2 // colonial → republic-ish
+	return FAMILY_CATEGORY[GOVERNMENT.govFamilyOfIndex(gov)]
 }
 
 function computeReligions({

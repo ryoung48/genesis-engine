@@ -1,4 +1,5 @@
 import { MinHeap } from "@/model/shared/min-heap"
+import { ERAS } from "@/model/society/eras"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
 import {
 	appendLandRoutes,
@@ -34,7 +35,7 @@ function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	}
 	return {
 		P: provinces.count,
-		era: input.params.era ?? "lateMedieval",
+		era: input.params.era ?? ERAS.defaultEra,
 		desolate: provinces.desolate,
 		stateless,
 		regionProvince: provinces.regionProvince,

@@ -28,6 +28,7 @@ export interface ProvinceEventLog {
 		controllerId: number
 		cultureId: number
 		cultureBlendSecondaryId: number
+		governmentId: number
 		religionId: number
 		inHolyRomanEmpire: boolean
 	}

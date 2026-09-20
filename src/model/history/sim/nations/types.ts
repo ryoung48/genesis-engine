@@ -1,5 +1,5 @@
+import type { EraGovernment } from "@/model/society/eras/types"
 import type { GenesisProvinces } from "@/model/society/types"
-import { GovernmentMix } from "@/model/society/types"
 
 export interface IntegerMassParams {
 	total: number
@@ -39,12 +39,12 @@ export interface ComputeNationsParams {
 	/** [JUSTIFICATION] era-specific province-size ranges for nation buckets; omitted callers fall back to ERAS.nationBuckets */
 	nationBuckets?: [number, number][]
 	/** [JUSTIFICATION] government assignment is an optional feature — omitted entirely for callers that don't model government type */
-	governmentMix?: GovernmentMix
+	government?: EraGovernment
 	/**
 	 * 0–1: how much nation size drives government type vs. era ideology.
 	 * 1.0 = size prior dominates (ancient). 0.0 = era mix dominates (modern).
 	 * Also scales spatial modifier strength.
-	 * [JUSTIFICATION] only meaningful when governmentMix is supplied; defaults to 0.55 otherwise
+	 * [JUSTIFICATION] only meaningful when government is supplied; defaults to 0.55 otherwise
 	 */
 	governmentSizeWeight?: number
 	/**
@@ -57,18 +57,18 @@ export interface ComputeNationsParams {
 	 * Era statehood fraction (0–1). The frontier→tribal skew represents proximity
 	 * to stateless societies; as statehood approaches 1.0 (no stateless land left,
 	 * e.g. information age) the skew fades to zero.
-	 * [JUSTIFICATION] only meaningful when governmentMix is supplied; defaults to 0.75 otherwise
+	 * [JUSTIFICATION] only meaningful when government is supplied; defaults to 0.75 otherwise
 	 */
 	statehoodFraction?: number
 	/**
-	 * When true (and governmentMix is supplied), shatter the largest eligible
+	 * When true (and a blend government is supplied), shatter the largest eligible
 	 * nation into an HRE-style Imperial Patchwork organization after the main
 	 * partition finishes. See src/model/history/sim/organizations/imperial-patchwork.
 	 * [JUSTIFICATION] most eras don't want this; era config opts in explicitly
 	 */
 	buildImperialPatchwork?: boolean
 	/**
-	 * When true (and governmentMix is supplied), shatter the largest eligible
+	 * When true (and a blend government is supplied), shatter the largest eligible
 	 * coastal republic into a flat, non-hierarchical Trade League organization
 	 * after the main partition finishes (and after any Imperial Patchwork --
 	 * see the buildImperialPatchwork branch, which runs first). See

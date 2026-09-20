@@ -1,17 +1,18 @@
 import type { SettlementEraTuning } from "@/model/society/settlement-tuning/types"
 import type { SocietyEra } from "@/model/society/types"
 
-const LATE_MEDIEVAL_TUNING: SettlementEraTuning = {
+const MEDIEVAL_TUNING: SettlementEraTuning = {
 	townMin: 1_000,
 	cityMin: 8_000,
 }
 
 const ERA_TUNING: Record<SocietyEra, SettlementEraTuning> = {
-	paleolithic: LATE_MEDIEVAL_TUNING,
-	neolithic: LATE_MEDIEVAL_TUNING,
-	bronze: LATE_MEDIEVAL_TUNING,
-	iron: LATE_MEDIEVAL_TUNING,
-	lateMedieval: LATE_MEDIEVAL_TUNING,
+	paleolithic: MEDIEVAL_TUNING,
+	neolithic: MEDIEVAL_TUNING,
+	bronze: MEDIEVAL_TUNING,
+	iron: MEDIEVAL_TUNING,
+	highMedieval: MEDIEVAL_TUNING,
+	lateMedieval: MEDIEVAL_TUNING,
 	earlyModern: {
 		townMin: 2_000,
 		cityMin: 12_000,
@@ -29,7 +30,7 @@ const ERA_TUNING: Record<SocietyEra, SettlementEraTuning> = {
 function getSettlementEraTuning(
 	era: SocietyEra | undefined,
 ): SettlementEraTuning {
-	return era ? (ERA_TUNING[era] ?? LATE_MEDIEVAL_TUNING) : LATE_MEDIEVAL_TUNING
+	return era ? (ERA_TUNING[era] ?? MEDIEVAL_TUNING) : MEDIEVAL_TUNING
 }
 
 function getSettlementRenderThresholds(

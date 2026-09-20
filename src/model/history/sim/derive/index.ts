@@ -75,7 +75,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 						eraActiveMask: eraStatehoodMask,
 						nationPercentages: eraConfig.nationPercentages,
 						nationBuckets: eraConfig.nationBuckets,
-						governmentMix: eraConfig.governmentMix,
+						government: eraConfig.government,
 						governmentSizeWeight: eraConfig.governmentSizeWeight,
 						migrationWave: population.migrationWave,
 						statehoodFraction: eraConfig.statehoodFraction,

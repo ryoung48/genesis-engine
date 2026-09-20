@@ -21,7 +21,7 @@ const DEFAULT_SEED = 14963991
 const DEFAULT_YEARS = 50
 
 function optionsFromEnv({ env, log }: EnvParams): HistoryRunOptions {
-	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
+	const era = (env.HISTORY_ERA ?? ERAS.defaultEra) as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
 	return {

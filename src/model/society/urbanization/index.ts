@@ -52,6 +52,12 @@ const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 	// colonial
 	trading_company: { U: 0.3, q: 1.3 }, // chartered company rule, single dominant port
 	settler_colony: { U: 0.15, q: 1.0 }, // sparse frontier settlement, moderate primacy
+
+	// high medieval — reuse the nearest existing profile
+	tribal_government: { U: 0.025, q: 1.0 },
+	feudal_government: { U: 0.05, q: 0.85 },
+	bureaucratic_government: { U: 0.12, q: 1.2 },
+	republic_government: { U: 0.2, q: 1.1 },
 }
 
 function nationProfile(governmentTypeIndex: number): NationProfile {
@@ -279,7 +285,7 @@ function computeDevelopment({
 	} = inputs.provinces
 	const { sovereign } = inputs.nations
 	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(
-		inputs.params.era ?? "lateMedieval",
+		inputs.params.era ?? ERAS.defaultEra,
 	)
 	const development = spreadDevelopment({
 		count: P,

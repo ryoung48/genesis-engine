@@ -54,7 +54,8 @@ function get(params: BiosphereInput): BiosphereResult {
 	else if (atmosphere.code === 12) add(-6, "very hostile atmosphere")
 	else if (atmosphere.code >= 15) add(-5, "unusual or gaseous atmosphere")
 
-	if (atmosphere.hazard === "low oxygen") add(-1, "low oxygen")
+	if (atmosphere.hazards?.some((hazard) => hazard.kind === "low oxygen"))
+		add(-1, "low oxygen")
 
 	// Hydrographic modifiers
 	if (hydrosphereCode === 0) add(-4, "lack of accessible water")
@@ -96,10 +97,14 @@ function get(params: BiosphereInput): BiosphereResult {
 
 	if (starAgeGyr < 0.1 || classification === "asteroid belt") value = 0
 
-	const oxygenHazard =
-		atmosphere.hazard === "low oxygen" || atmosphere.hazard === "high oxygen"
+	const oxygenHazard = atmosphere.hazards?.some(
+		(hazard) => hazard.kind === "low oxygen" || hazard.kind === "high oxygen",
+	)
 
-	if (value <= 0 && atmosphere.hazard === "biologic") {
+	if (
+		value <= 0 &&
+		atmosphere.hazards?.some((hazard) => hazard.kind === "biologic")
+	) {
 		trace.push({ value: 1 - value, description: "biologic hazard" })
 		value = 1
 	} else if (value <= 0 && oxygenHazard) {

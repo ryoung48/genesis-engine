@@ -58,7 +58,9 @@ function get(params: HabitabilityInput): HabitabilityProfile {
 		add(-1, "thin, tainted (standard), dense atmospheres")
 	}
 
-	if (params.atmosphere?.hazard === "low oxygen") {
+	if (
+		params.atmosphere?.hazards?.some((hazard) => hazard.kind === "low oxygen")
+	) {
 		add(-2, "low oxygen taint")
 	}
 

@@ -34,9 +34,10 @@ const LABEL_COLOR = "#f8fafc"
 const LABEL_MIN_FONT_SCALE = 0.35
 const LABEL_MAX_FONT_SCALE = 2.6
 const LABEL_BASE_FONT_FRACTION = 0.008
-// How far above its capital star each nation label sits, as a multiple of
-// that label's own font size.
-const LABEL_VERTICAL_OFFSET_SCALE = 0.9
+// Fixed clearance above the capital marker plus half the label height,
+// so small labels clear the fixed-size marker and large labels sit closer.
+const LABEL_VERTICAL_BASE_FRACTION = 0.006
+const LABEL_VERTICAL_OFFSET_SCALE = 0.6
 
 // No geometric clip is applied to a cell's polygon or a border segment (see
 // this file's own build doc comment on why a real boundary/gap-edge system's
@@ -979,12 +980,11 @@ export function buildPartitionOverlay(
 		label.textRenderingMode = "distanceField"
 		label.renderOrder = 5
 		label.frustumCulled = false
-		// Nudge the label up off its capital star so the glyphs don't sit
-		// directly on top of the star point -- scaled by the label's own font
-		// size so larger labels clear proportionally.
 		label.position.set(
 			r_xy[2 * capital]!,
-			r_xy[2 * capital + 1]! + fontSize * LABEL_VERTICAL_OFFSET_SCALE,
+			r_xy[2 * capital + 1]! +
+				radius.max * LABEL_VERTICAL_BASE_FRACTION +
+				fontSize * LABEL_VERTICAL_OFFSET_SCALE,
 			1,
 		)
 		group.add(label)

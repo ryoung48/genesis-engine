@@ -50,6 +50,24 @@ export interface MassFromDensityInput {
 	densityEarthRelative: number
 }
 
+export type AtmosphereHazard =
+	| {
+			kind:
+				| "biologic"
+				| "radioactive"
+				| "gas mix"
+				| "low oxygen"
+				| "high oxygen"
+				| "particulates"
+				| "sulphur compounds"
+	  }
+	| {
+			kind: "gas mix"
+			occasionallyCorrosive: true
+			severity: number
+			persistence: number
+	  }
+
 export interface AtmosphereProfile {
 	code: number
 	pressureBar: number
@@ -83,16 +101,8 @@ export interface AtmosphereProfile {
 		| "seasonal"
 	/** Set only for otherwise-breathable/exotic profiles with contaminants. */
 	tainted?: boolean
-	/** Set only when the atmosphere table assigns a specific named hazard --
-	 * see ATMOSPHERE.rollHazard (ported from galaxy-gen's ATMOSPHERE.taint). */
-	hazard?:
-		| "biologic"
-		| "radioactive"
-		| "gas mix"
-		| "low oxygen"
-		| "high oxygen"
-		| "particulates"
-		| "sulphur compounds"
+	// [JUSTIFICATION] Unaffected atmospheres and authored profiles have no rolled hazards.
+	hazards?: AtmosphereHazard[]
 	breathable: boolean
 }
 

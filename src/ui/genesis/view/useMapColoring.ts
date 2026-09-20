@@ -10,6 +10,7 @@ import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import { DEJURE } from "@/model/society/dejure"
+import { ERAS } from "@/model/society/eras"
 import { TITLES } from "@/model/society/titles"
 import type { TitleTier } from "@/model/society/titles/types"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
@@ -462,6 +463,27 @@ export function useMapColoring(input: MapColoringInput) {
 			governmentColorRgb ?? GOVERNMENT.earthHistoryNoGovernmentColor,
 		)
 
+		const localGovernment =
+			ERAS.governmentTypes[frame.provinceGovernment[hoverProvince]] ?? null
+		const hasLocalGovernment =
+			nationState !== null &&
+			localGovernment !== null &&
+			localGovernment !== nationState.government
+		const localGovernmentLabel = hasLocalGovernment
+			? GOVERNMENT.formatHistoryGovernmentLabel({
+					governmentType: localGovernment,
+					governmentReform: null,
+				})
+			: null
+		const localGovernmentColorRgb = hasLocalGovernment
+			? GOVERNMENT.getEarthHistoryGovernmentColor({
+					governmentType: localGovernment,
+				})
+			: null
+		const localGovernmentColor = localGovernmentColorRgb
+			? COLOR.rgb01ToCss(localGovernmentColorRgb)
+			: null
+
 		const cultureId = frame.provinceCulture[hoverProvince]
 		const culture = cultureId >= 0 ? (frame.cultures[cultureId] ?? null) : null
 		const cultureName = culture?.name ?? null
@@ -542,6 +564,8 @@ export function useMapColoring(input: MapColoringInput) {
 			nationColor,
 			governmentLabel,
 			governmentColor,
+			localGovernmentLabel,
+			localGovernmentColor,
 			cultureName,
 			cultureColor,
 			religionName,
