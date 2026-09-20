@@ -2,6 +2,7 @@ import Delaunator from "delaunator"
 import type {
 	GalaxyTopology,
 	GalaxyTopologyParams,
+	LaneGraphParams,
 } from "@/model/celestial/galaxy/topology/types"
 import { RNG } from "@/model/shared/random/rng"
 
@@ -56,13 +57,10 @@ function buildCSR({
  * pair list from buildHyperlanes), deduped and undirected. Nation territory
  * spreads along this instead of the full Delaunay adjacency so realms follow
  * travel routes. */
-function buildLaneCSR({
-	lanes,
-	numSystems,
-}: {
-	lanes: Int32Array
-	numSystems: number
-}): { laneAdjOffset: Int32Array; laneAdjList: Int32Array } {
+function buildLaneCSR({ lanes, numSystems }: LaneGraphParams): {
+	laneAdjOffset: Int32Array
+	laneAdjList: Int32Array
+} {
 	const neighbors: Set<number>[] = Array.from(
 		{ length: numSystems },
 		() => new Set<number>(),
@@ -286,4 +284,4 @@ function build({
 	return { adjOffset, adjList, lanes, laneCount, laneAdjOffset, laneAdjList }
 }
 
-export const GALAXY_TOPOLOGY = { build }
+export const GALAXY_TOPOLOGY = { build, buildLaneCSR }

@@ -1,10 +1,22 @@
 import { GALAXY_CULTURES } from "@/model/celestial/galaxy/cultures"
 import { GALAXY_NATIONS } from "@/model/celestial/galaxy/nations"
 import { GALAXY_PACKING } from "@/model/celestial/galaxy/packing"
+import { SECTORS } from "@/model/celestial/galaxy/sectors"
+import type {
+	RebuildSectorsParams,
+	Sector,
+} from "@/model/celestial/galaxy/sectors/types"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
 import { GALAXY_TOPOLOGY } from "@/model/celestial/galaxy/topology"
 import type {
 	Galaxy,
+	GalaxyAssignSectorLeaderAction,
+	GalaxyCapitalAction,
+	GalaxyColonyAction,
+	GalaxyColonyLossAction,
+	GalaxyCreateSectorAction,
+	GalaxyMoveSectorCapitalAction,
+	GalaxyOwnershipAction,
 	GalaxyParams,
 	GalaxyStageTiming,
 } from "@/model/celestial/galaxy/types"
@@ -98,6 +110,32 @@ function spawn(
 		galaxySeed: seed,
 	})
 	timings.push({ stage: "Star tree packing", ms: performance.now() - t0 })
+	const sectorAnchors = SECTORS.seedProvisionalAnchors({
+		ownership: nations.assignment,
+		empireCapitals: nations.seeds,
+		laneAdjOffset,
+		laneAdjList,
+		seed,
+	})
+	const initialSectors: Sector[] = sectorAnchors.map((colony, id) => ({
+		id,
+		empireId: colony.empireId,
+		capitalColonyId: colony.id,
+		leaderId: null as number | null,
+		core: !colony.provisional,
+	}))
+	const sectorState = SECTORS.rebuild({
+		state: {
+			colonies: sectorAnchors,
+			sectors: initialSectors,
+			assignment: new Int32Array(size).fill(-1),
+			nextSectorId: initialSectors.length,
+		},
+		ownership: nations.assignment,
+		empireCapitals: nations.seeds,
+		laneAdjOffset,
+		laneAdjList,
+	})
 
 	progressCb?.("Done", 100)
 
@@ -116,6 +154,7 @@ function spawn(
 			nationSeeds: nations.seeds,
 			nationSize: nations.size,
 			nationColors: nations.colors,
+			sectorState,
 			cultureAssignment: cultures.assignment,
 			cultureSeeds: cultures.seeds,
 			cultureSize: cultures.size,
@@ -129,4 +168,121 @@ function spawn(
 	}
 }
 
-export const GALAXY = { spawn }
+function sectorInputs(galaxy: Galaxy): RebuildSectorsParams {
+	const { laneAdjOffset, laneAdjList } = GALAXY_TOPOLOGY.buildLaneCSR({
+		lanes: galaxy.lanes,
+		numSystems: galaxy.numSystems,
+	})
+	return {
+		state: galaxy.sectorState,
+		ownership: galaxy.nationAssignment,
+		empireCapitals: galaxy.nationSeeds,
+		laneAdjOffset,
+		laneAdjList,
+	}
+}
+
+function colonize({ galaxy, colony }: GalaxyColonyAction): Galaxy {
+	return {
+		...galaxy,
+		sectorState: SECTORS.colonize({ ...sectorInputs(galaxy), colony }),
+	}
+}
+
+function loseColony({ galaxy, colonyId }: GalaxyColonyLossAction): Galaxy {
+	return {
+		...galaxy,
+		sectorState: SECTORS.loseColony({ ...sectorInputs(galaxy), colonyId }),
+	}
+}
+
+function changeOwnership({
+	galaxy,
+	systemId,
+	empireId,
+}: GalaxyOwnershipAction): Galaxy {
+	if (
+		systemId < 0 ||
+		systemId >= galaxy.numSystems ||
+		galaxy.r_edge[systemId] ||
+		empireId < -1 ||
+		empireId >= galaxy.nationSeeds.length
+	)
+		throw new Error("Invalid territory change")
+	const ownership = galaxy.nationAssignment.slice()
+	const previous = ownership[systemId]!
+	if (previous === empireId) return galaxy
+	const nationSize = galaxy.nationSize.slice()
+	if (previous >= 0) nationSize[previous]!--
+	if (empireId >= 0) nationSize[empireId]!++
+	const sectorState = SECTORS.changeOwnership({
+		...sectorInputs(galaxy),
+		ownership,
+		systemId,
+		empireId,
+	})
+	return { ...galaxy, nationAssignment: ownership, nationSize, sectorState }
+}
+
+function moveEmpireCapital({
+	galaxy,
+	empireId,
+	systemId,
+}: GalaxyCapitalAction): Galaxy {
+	const empireCapitals = galaxy.nationSeeds.slice()
+	const sectorState = SECTORS.moveEmpireCapital({
+		...sectorInputs(galaxy),
+		empireCapitals,
+		empireId,
+		systemId,
+	})
+	return { ...galaxy, nationSeeds: empireCapitals, sectorState }
+}
+
+function createSector({ galaxy, colonyId }: GalaxyCreateSectorAction): Galaxy {
+	return {
+		...galaxy,
+		sectorState: SECTORS.create({ ...sectorInputs(galaxy), colonyId }),
+	}
+}
+
+function moveSectorCapital({
+	galaxy,
+	colonyId,
+	sectorId,
+}: GalaxyMoveSectorCapitalAction): Galaxy {
+	return {
+		...galaxy,
+		sectorState: SECTORS.moveCapital({
+			...sectorInputs(galaxy),
+			colonyId,
+			sectorId,
+		}),
+	}
+}
+
+function assignSectorLeader({
+	galaxy,
+	sectorId,
+	leaderId,
+}: GalaxyAssignSectorLeaderAction): Galaxy {
+	return {
+		...galaxy,
+		sectorState: SECTORS.assignLeader({
+			state: galaxy.sectorState,
+			sectorId,
+			leaderId,
+		}),
+	}
+}
+
+export const GALAXY = {
+	spawn,
+	colonize,
+	loseColony,
+	changeOwnership,
+	moveEmpireCapital,
+	createSector,
+	moveSectorCapital,
+	assignSectorLeader,
+}

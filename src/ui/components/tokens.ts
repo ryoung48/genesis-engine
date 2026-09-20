@@ -8,6 +8,9 @@ export const uiPalette = {
 	brownDwarfY: "#685b60",
 	neutronStarGlow: "#8cecff",
 	accent: "#4f46e5",
+	sectorBoundary: "#cbd5e1",
+	sectorCapital: "#38bdf8",
+	nationCapital: "#fbbf24",
 	activeDark: "#0f172a",
 	swatch: {
 		stripeBackground: "rgba(15, 23, 42, 0.85)",
@@ -58,6 +61,8 @@ export const uiTokens = {
 		inverse: "text-white",
 		inverseMuted: "text-slate-400",
 		inverseSubtle: "text-slate-500",
+		sectorCapital: "text-sky-400",
+		nationCapital: "text-amber-400",
 	},
 	radius: {
 		sm: "rounded-md",

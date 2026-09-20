@@ -4,6 +4,7 @@ import { Text } from "troika-three-text"
 import { GALAXY_IDENTITY } from "@/model/celestial/galaxy/galaxy-identity"
 import type { Galaxy } from "@/model/celestial/galaxy/types"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
+import { uiPalette } from "@/ui/components/tokens"
 
 // Nation-overlay defaults (unchanged). The cultures overlay passes higher
 // values via PartitionOverlayInput so its partition fills read closer to
@@ -17,6 +18,8 @@ const CULTURE_BORDER_OPACITY = 0.95
 // pixel size, so it stays visually consistent across galaxy sizes and zoom
 // levels (this is a real Mesh, not a screen-space line material).
 const BORDER_HALF_WIDTH_FRACTION = 0.0018
+const SECTOR_BORDER_HALF_WIDTH_FRACTION = 0.0015
+const SECTOR_DOT_PERIOD_FRACTION = 0.008
 // Diagonal culture-blend stripe wavelength, as a fraction of the galaxy's
 // own radius -- one light + one dark band per this much world distance.
 const STRIPE_PERIOD_FRACTION = 0.012
@@ -109,6 +112,37 @@ const TINT_FRAGMENT_SHADER = /* glsl */ `
 	${RADIAL_FADE_GLSL}
 	void main() {
 		gl_FragColor = vec4(vColor, uAlpha * radialFade());
+	}
+`
+
+const SECTOR_VERTEX_SHADER = /* glsl */ `
+	attribute float siteDist;
+	attribute float chainDistance;
+	attribute float across;
+	varying vec2 vPos;
+	varying float vSiteDist;
+	varying float vChainDistance;
+	varying float vAcross;
+	void main() {
+		vPos = position.xy;
+		vSiteDist = siteDist;
+		vChainDistance = chainDistance;
+		vAcross = across;
+		gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+	}
+`
+
+const SECTOR_FRAGMENT_SHADER = /* glsl */ `
+	varying float vChainDistance;
+	varying float vAcross;
+	uniform vec3 uColor;
+	uniform float uPeriod;
+	uniform float uHalfWidth;
+	${RADIAL_FADE_GLSL}
+	void main() {
+		float along = mod(vChainDistance, uPeriod) - uPeriod * 0.5;
+		float dot = 1.0 - smoothstep(uHalfWidth * 0.7, uHalfWidth, length(vec2(along, vAcross * uHalfWidth)));
+		gl_FragColor = vec4(uColor, dot * 0.7 * radialFade());
 	}
 `
 
@@ -479,6 +513,8 @@ export interface PartitionOverlayInput {
 	/** [JUSTIFICATION] Defaults on for nations; the cultures overlay turns the
 	 * two-toned border ribbons off and conveys boundaries via blend stripes. */
 	showBorders?: boolean
+	// [JUSTIFICATION] Only the nations overlay renders sector boundaries.
+	sectorAssignment?: Int32Array
 }
 
 /**
@@ -538,6 +574,7 @@ export function buildPartitionOverlay(
 	const fillAlpha = input.fillAlpha ?? TINT_ALPHA
 	const borderAlpha = input.borderAlpha ?? BORDER_OPACITY
 	const showBorders = input.showBorders ?? true
+	const sectorAssignment = input.sectorAssignment
 	const { numSystems, r_xy, r_edge, radius } = galaxy
 
 	// Generous bbox for d3-delaunay's own clip -- just needs to comfortably
@@ -616,6 +653,7 @@ export function buildPartitionOverlay(
 	const { triangles, halfedges } = delaunay
 	const { circumcenters } = voronoi
 	const rawBorderEdges: RawBorderEdge[] = []
+	const rawSectorEdges: RawBorderEdge[] = []
 	for (let s = 0; showBorders && s < halfedges.length; s++) {
 		const opposite = halfedges[s]!
 		if (opposite === -1 || s >= opposite) continue
@@ -623,7 +661,10 @@ export function buildPartitionOverlay(
 		const sysB = triangles[nextHalfedge(s)]!
 		const na = assignment[sysA]!
 		const nb = assignment[sysB]!
-		if (na === nb) continue
+		const sa = sectorAssignment?.[sysA] ?? -1
+		const sb = sectorAssignment?.[sysB] ?? -1
+		const sectorBoundary = na >= 0 && na === nb && sa !== sb
+		if (na === nb && !sectorBoundary) continue
 		const t1 = Math.floor(s / 3)
 		const t2 = Math.floor(opposite / 3)
 		const seg = clipSegment(
@@ -645,10 +686,12 @@ export function buildPartitionOverlay(
 		// in the same (regionLo, regionHi) pair-group has a directly
 		// comparable/averageable perpendicular regardless of which of
 		// sysA/sysB happened to own which region.
-		const regionLo = Math.min(na, nb)
-		const regionHi = Math.max(na, nb)
-		const loSys = na === regionLo ? sysA : sysB
-		const hiSys = na === regionLo ? sysB : sysA
+		const borderA = na === nb ? sa : na
+		const borderB = na === nb ? sb : nb
+		const regionLo = Math.min(borderA, borderB)
+		const regionHi = Math.max(borderA, borderB)
+		const loSys = borderA === regionLo ? sysA : sysB
+		const hiSys = borderA === regionLo ? sysB : sysA
 		let dirX = r_xy[2 * loSys]! - r_xy[2 * hiSys]!
 		let dirY = r_xy[2 * loSys + 1]! - r_xy[2 * hiSys + 1]!
 		const dirLen = Math.hypot(dirX, dirY) || 1
@@ -663,7 +706,7 @@ export function buildPartitionOverlay(
 		const d1 = Math.hypot(seg[0] - sax, seg[1] - say)
 		const d2 = Math.hypot(seg[2] - sax, seg[3] - say)
 
-		rawBorderEdges.push({
+		const edge: RawBorderEdge = {
 			p1x: seg[0],
 			p1y: seg[1],
 			p2x: seg[2],
@@ -674,7 +717,9 @@ export function buildPartitionOverlay(
 			dirY,
 			d1,
 			d2,
-		})
+		}
+		if (na !== nb) rawBorderEdges.push(edge)
+		else rawSectorEdges.push(edge)
 	}
 
 	const borderPositions: number[] = []
@@ -690,6 +735,41 @@ export function buildPartitionOverlay(
 			borderColors,
 			borderDists,
 		)
+	}
+	const sectorPositions: number[] = []
+	const sectorColors: number[] = []
+	const sectorDists: number[] = []
+	const sectorChainDistances: number[] = []
+	const sectorAcross: number[] = []
+	for (const chain of buildBorderChains(rawSectorEdges)) {
+		buildChainRibbon(
+			chain,
+			radius.max * SECTOR_BORDER_HALF_WIDTH_FRACTION,
+			[1, 1, 1],
+			[1, 1, 1],
+			sectorPositions,
+			sectorColors,
+			sectorDists,
+		)
+		let distance = 0
+		for (let index = 0; index < chain.vertices.length - 1; index++) {
+			const a = chain.vertices[index]!
+			const b = chain.vertices[index + 1]!
+			const next = distance + Math.hypot(b.x - a.x, b.y - a.y)
+			for (let side = 0; side < 2; side++) {
+				sectorChainDistances.push(
+					distance,
+					next,
+					next,
+					distance,
+					next,
+					distance,
+				)
+				const direction = side === 0 ? 1 : -1
+				sectorAcross.push(0, 0, direction, 0, direction, direction)
+			}
+			distance = next
+		}
 	}
 
 	// --- polygon fill ---
@@ -823,6 +903,51 @@ export function buildPartitionOverlay(
 		borderMesh.renderOrder = 0
 		group.add(borderMesh)
 	}
+	let sectorGeometry: THREE.BufferGeometry | null = null
+	let sectorMaterial: THREE.ShaderMaterial | null = null
+	if (sectorAssignment) {
+		sectorGeometry = new THREE.BufferGeometry()
+		sectorGeometry.setAttribute(
+			"position",
+			new THREE.BufferAttribute(Float32Array.from(sectorPositions), 3),
+		)
+		sectorGeometry.setAttribute(
+			"siteDist",
+			new THREE.BufferAttribute(Float32Array.from(sectorDists), 1),
+		)
+		sectorGeometry.setAttribute(
+			"chainDistance",
+			new THREE.BufferAttribute(Float32Array.from(sectorChainDistances), 1),
+		)
+		sectorGeometry.setAttribute(
+			"across",
+			new THREE.BufferAttribute(Float32Array.from(sectorAcross), 1),
+		)
+		sectorMaterial = new THREE.ShaderMaterial({
+			uniforms: {
+				uColor: { value: new THREE.Color(uiPalette.sectorBoundary) },
+				uPeriod: { value: radius.max * SECTOR_DOT_PERIOD_FRACTION },
+				uHalfWidth: {
+					value: radius.max * SECTOR_BORDER_HALF_WIDTH_FRACTION,
+				},
+				uInnerFadeStart: { value: innerFadeStart },
+				uInnerFadeEnd: { value: innerFadeEnd },
+				uOuterFadeStart: { value: outerFadeStart },
+				uOuterFadeEnd: { value: outerFadeEnd },
+				uSiteFadeStart: { value: siteFadeStart },
+				uSiteFadeEnd: { value: siteFadeEnd },
+			},
+			vertexShader: SECTOR_VERTEX_SHADER,
+			fragmentShader: SECTOR_FRAGMENT_SHADER,
+			transparent: true,
+			depthWrite: false,
+			depthTest: false,
+			side: THREE.DoubleSide,
+		})
+		const mesh = new THREE.Mesh(sectorGeometry, sectorMaterial)
+		mesh.renderOrder = 0.5
+		group.add(mesh)
+	}
 
 	const partitionCount = size.length
 	let maxSize = 1
@@ -873,6 +998,8 @@ export function buildPartitionOverlay(
 			fillMaterial.dispose()
 			borderGeometry?.dispose()
 			borderMaterial?.dispose()
+			sectorGeometry?.dispose()
+			sectorMaterial?.dispose()
 			for (const label of labels) label.dispose()
 		},
 	}
@@ -888,6 +1015,7 @@ export function buildNationOverlay(galaxy: Galaxy): PartitionOverlayResult {
 		size: galaxy.nationSize,
 		labelText: (nation) =>
 			GALAXY_IDENTITY.generateNationName(galaxy.seed, nation),
+		sectorAssignment: galaxy.sectorState.assignment,
 	})
 }
 
@@ -910,4 +1038,77 @@ export function buildCultureOverlay(galaxy: Galaxy): PartitionOverlayResult {
 		borderAlpha: CULTURE_BORDER_OPACITY,
 		showBorders: false,
 	})
+}
+
+interface LineMarkerInput {
+	positions: readonly number[]
+	color: string
+}
+
+function buildLineMarkers(input: LineMarkerInput): PartitionOverlayResult {
+	const geometry = new THREE.BufferGeometry()
+	geometry.setAttribute(
+		"position",
+		new THREE.BufferAttribute(Float32Array.from(input.positions), 3),
+	)
+	const material = new THREE.LineBasicMaterial({
+		color: input.color,
+		depthTest: false,
+		transparent: true,
+		opacity: 1,
+	})
+	const markers = new THREE.LineSegments(geometry, material)
+	markers.renderOrder = 4
+	const group = new THREE.Group()
+	group.add(markers)
+	return {
+		group,
+		dispose() {
+			geometry.dispose()
+			material.dispose()
+		},
+	}
+}
+
+export function buildSectorCapitalMarkers(
+	galaxy: Galaxy,
+): PartitionOverlayResult {
+	const positions: number[] = []
+	const outer = galaxy.radius.max * 0.005
+	const arm = outer * 0.65
+	const nationCapitals = new Set(galaxy.nationSeeds)
+	for (const sector of galaxy.sectorState.sectors) {
+		const colony = galaxy.sectorState.colonies.find(
+			(candidate) => candidate.id === sector.capitalColonyId,
+		)
+		if (!colony) continue
+		if (nationCapitals.has(colony.systemId)) continue
+		const x = galaxy.r_xy[2 * colony.systemId]!
+		const y = galaxy.r_xy[2 * colony.systemId + 1]!
+		for (const sx of [-1, 1]) {
+			for (const sy of [-1, 1]) {
+				const cx = x + sx * outer
+				const cy = y + sy * outer
+				positions.push(cx - sx * arm, cy, 0, cx, cy, 0)
+				positions.push(cx, cy, 0, cx, cy - sy * arm, 0)
+			}
+		}
+	}
+	return buildLineMarkers({ positions, color: uiPalette.sectorCapital })
+}
+
+export function buildNationCapitalMarkers(
+	galaxy: Galaxy,
+): PartitionOverlayResult {
+	const positions: number[] = []
+	const radius = galaxy.radius.max * 0.005
+	for (const seed of galaxy.nationSeeds) {
+		const x = galaxy.r_xy[2 * seed]!
+		const y = galaxy.r_xy[2 * seed + 1]!
+		positions.push(x + radius, y, 0, x, y + radius, 0)
+		positions.push(x, y + radius, 0, x - radius, y, 0)
+		positions.push(x - radius, y, 0, x, y - radius, 0)
+		positions.push(x, y - radius, 0, x + radius, y, 0)
+	}
+	return buildLineMarkers({ positions, color: uiPalette.nationCapital })
 }

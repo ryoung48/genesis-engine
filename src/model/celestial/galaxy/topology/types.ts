@@ -24,3 +24,8 @@ export interface GalaxyTopology {
 	 * undirected). Nation territory spreads along this. */
 	laneAdjList: Int32Array
 }
+
+export interface LaneGraphParams {
+	lanes: Int32Array
+	numSystems: number
+}

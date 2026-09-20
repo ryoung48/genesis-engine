@@ -16,7 +16,9 @@ import { updateClusterPositions } from "@/ui/genesis/galaxy/renderer/galaxy-scen
 import { buildGalaxyLanes } from "@/ui/genesis/galaxy/renderer/galaxy-scene/lanes"
 import {
 	buildCultureOverlay,
+	buildNationCapitalMarkers,
 	buildNationOverlay,
+	buildSectorCapitalMarkers,
 } from "@/ui/genesis/galaxy/renderer/galaxy-scene/partition-overlay"
 import { pickNearestSystem } from "@/ui/genesis/galaxy/renderer/galaxy-scene/picking"
 import {
@@ -139,6 +141,12 @@ export const PortedGalaxyView: React.FC<{
 	const cultureOverlayRef = useRef<ReturnType<
 		typeof buildCultureOverlay
 	> | null>(null)
+	const sectorMarkersRef = useRef<ReturnType<
+		typeof buildSectorCapitalMarkers
+	> | null>(null)
+	const nationMarkersRef = useRef<ReturnType<
+		typeof buildNationCapitalMarkers
+	> | null>(null)
 	const selectionPulseRef = useRef<SelectionPulse | null>(null)
 	// points.ts's own uSize uniform (see its own doc comment) is a fixed
 	// pixel size with no zoom attenuation, matching how the original
@@ -221,6 +229,16 @@ export const PortedGalaxyView: React.FC<{
 			cultureOverlayRef.current.dispose()
 			cultureOverlayRef.current = null
 		}
+		if (sectorMarkersRef.current) {
+			renderer.scene.remove(sectorMarkersRef.current.group)
+			sectorMarkersRef.current.dispose()
+			sectorMarkersRef.current = null
+		}
+		if (nationMarkersRef.current) {
+			renderer.scene.remove(nationMarkersRef.current.group)
+			nationMarkersRef.current.dispose()
+			nationMarkersRef.current = null
+		}
 
 		recenterGalaxy(nextGalaxy)
 		galaxyRef.current = nextGalaxy
@@ -249,6 +267,12 @@ export const PortedGalaxyView: React.FC<{
 		cultureOverlay.group.visible = mapModeRef.current === "cultures"
 		renderer.scene.add(cultureOverlay.group)
 		cultureOverlayRef.current = cultureOverlay
+		const sectorMarkers = buildSectorCapitalMarkers(nextGalaxy)
+		renderer.scene.add(sectorMarkers.group)
+		sectorMarkersRef.current = sectorMarkers
+		const nationMarkers = buildNationCapitalMarkers(nextGalaxy)
+		renderer.scene.add(nationMarkers.group)
+		nationMarkersRef.current = nationMarkers
 	}
 
 	const regenerate = (shapeParams: PortedGalaxyParams) => {
@@ -421,6 +445,16 @@ export const PortedGalaxyView: React.FC<{
 				renderer.scene.remove(cultureOverlayRef.current.group)
 				cultureOverlayRef.current.dispose()
 				cultureOverlayRef.current = null
+			}
+			if (sectorMarkersRef.current) {
+				renderer.scene.remove(sectorMarkersRef.current.group)
+				sectorMarkersRef.current.dispose()
+				sectorMarkersRef.current = null
+			}
+			if (nationMarkersRef.current) {
+				renderer.scene.remove(nationMarkersRef.current.group)
+				nationMarkersRef.current.dispose()
+				nationMarkersRef.current = null
 			}
 			renderer.dispose()
 		}

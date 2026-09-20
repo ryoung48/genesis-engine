@@ -1,3 +1,8 @@
+import type {
+	Colony,
+	SectorState,
+} from "@/model/celestial/galaxy/sectors/types"
+
 export interface GalaxyStageTiming {
 	stage: string
 	ms: number
@@ -77,6 +82,7 @@ export interface Galaxy {
 	nationSize: Int32Array
 	/** Interleaved rgb (0-1) per nation. */
 	nationColors: Float32Array
+	sectorState: SectorState
 	/** Culture index per system, -1 for edge/boundary systems -- see
 	 * GALAXY_CULTURES.build (mirrors history/sim's province culture pass). */
 	cultureAssignment: Int32Array
@@ -93,4 +99,42 @@ export interface Galaxy {
 	cultureBlendWeight: Float32Array
 	radius: { min: number; max: number }
 	dimensions: { w: number; h: number }
+}
+
+export interface GalaxyColonyAction {
+	galaxy: Galaxy
+	colony: Colony
+}
+
+export interface GalaxyColonyLossAction {
+	galaxy: Galaxy
+	colonyId: number
+}
+
+export interface GalaxyOwnershipAction {
+	galaxy: Galaxy
+	systemId: number
+	empireId: number
+}
+
+export interface GalaxyCapitalAction {
+	galaxy: Galaxy
+	empireId: number
+	systemId: number
+}
+
+export interface GalaxyCreateSectorAction {
+	galaxy: Galaxy
+	colonyId: number
+}
+
+export interface GalaxyMoveSectorCapitalAction
+	extends GalaxyCreateSectorAction {
+	sectorId: number
+}
+
+export interface GalaxyAssignSectorLeaderAction {
+	galaxy: Galaxy
+	sectorId: number
+	leaderId: number | null
 }

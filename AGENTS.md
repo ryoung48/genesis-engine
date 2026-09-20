@@ -48,3 +48,27 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 # UI Conventions
 - Keep business logic out of React components.
 - For any UI or UX work, follow `src/ui/components/UI.md`.
+
+# Plans
+- All plans live in the `plans/` folder as files. Do not keep plans only in chat or scatter them elsewhere.
+- Once a plan is fully implemented, move its file to `plans/archive/`.
+
+# Parallel Agents
+- Other agents are often working in this repo at the same time. Uncommitted changes you didn't make, including ones related to your work, are probably theirs: don't panic, don't revert or clean them up.
+- Stick to the files your task needs.
+- Never run commands that change working-tree state or interrupt other agents: `git stash`, `git checkout`, `git switch`, `git restore`, `git reset`, `git clean`, or anything similar.
+
+# Simulation Scopes
+Work is tagged `:history`, `:climate` or `:galaxy`; the tag decides which implementation and tests you touch. If the request has no tag, infer the scope from the task, and ask if it is still ambiguous.
+
+- `:history` — historical simulation.
+  - Model: `src/model/history`
+  - Tests: `src/test/history-run/index.ts`
+- `:climate` — climate simulation.
+  - Model: `src/model/climate`
+  - Tests: `src/test/earth`
+- `:galaxy` — galactic / celestial simulation.
+  - Model: `src/model/celestial`
+  - Tests: `src/test/celestial`
+
+Do not edit code or tests from one scope while working on the other unless the task explicitly spans both.

@@ -3,6 +3,7 @@
 import { GALAXY } from "@/model/celestial/galaxy"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
+import type { Galaxy } from "@/model/celestial/galaxy/types"
 import type {
 	GalaxyWorkerRequest,
 	GalaxyWorkerResponse,
@@ -10,38 +11,7 @@ import type {
 
 declare const self: DedicatedWorkerGlobalScope
 
-function buildTransferList(galaxy: {
-	r_xy: Float32Array
-	r_edge: Uint8Array
-	adjOffset: Int32Array
-	adjList: Int32Array
-	lanes: Int32Array
-	systemStarOffset: Int32Array
-	starParent: Int32Array
-	starRole: Uint8Array
-	starSpectralClass: Uint8Array
-	starLuminosityClass: Uint8Array
-	starSubtype: Float32Array
-	starOrbitalDistanceAU: Float32Array
-	starEccentricity: Float32Array
-	starInclinationDeg: Float32Array
-	starAge: Float32Array
-	starMass: Float32Array
-	starDiameter: Float32Array
-	starTemperature: Float32Array
-	starLuminosity: Float32Array
-	starMao: Float32Array
-	nationAssignment: Int32Array
-	nationSeeds: Int32Array
-	nationSize: Int32Array
-	nationColors: Float32Array
-	cultureAssignment: Int32Array
-	cultureSeeds: Int32Array
-	cultureSize: Int32Array
-	cultureColors: Float32Array
-	cultureBlendSecondary: Int32Array
-	cultureBlendWeight: Float32Array
-}): Transferable[] {
+function buildTransferList(galaxy: Galaxy): Transferable[] {
 	return [
 		galaxy.r_xy.buffer,
 		galaxy.r_edge.buffer,
@@ -67,6 +37,7 @@ function buildTransferList(galaxy: {
 		galaxy.nationSeeds.buffer,
 		galaxy.nationSize.buffer,
 		galaxy.nationColors.buffer,
+		galaxy.sectorState.assignment.buffer,
 		galaxy.cultureAssignment.buffer,
 		galaxy.cultureSeeds.buffer,
 		galaxy.cultureSize.buffer,
