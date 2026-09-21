@@ -13,6 +13,7 @@ export interface PersonTable {
 	birth: Float32Array
 	death: Float32Array
 	deathSerial: Uint8Array
+	deathCause: Uint8Array
 	health: Uint8Array
 	father: Int32Array
 	mother: Int32Array
@@ -99,11 +100,6 @@ export interface PersonAtParams {
 	people: PeopleState
 	person: number
 	time: number
-}
-
-export interface ChildrenOfParams {
-	people: PeopleState
-	parent: number
 }
 
 export interface KinPairParams {

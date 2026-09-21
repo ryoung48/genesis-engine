@@ -1,4 +1,5 @@
 import { FERTILITY } from "@/model/history/sim/people/fertility"
+import { KIN } from "@/model/history/sim/people/kin"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { MARRIAGE } from "@/model/history/sim/people/marriage"
@@ -6,7 +7,6 @@ import type {
 	AddPersonParams,
 	ApplyDeathParams,
 	AssignSeatParams,
-	ChildrenOfParams,
 	CompactAliveParams,
 	CreatePeopleParams,
 	EndLifeParams,
@@ -23,6 +23,7 @@ import type {
 import { ARRAY } from "@/model/shared/array"
 
 const UNSET = -1
+const DAYS_PER_YEAR = 365
 
 function createPeople({
 	capacity,
@@ -45,6 +46,7 @@ function createPeople({
 			birth: new Float32Array(size),
 			death: new Float32Array(size),
 			deathSerial: new Uint8Array(size),
+			deathCause: new Uint8Array(size),
 			health: new Uint8Array(size),
 			father: new Int32Array(size),
 			mother: new Int32Array(size),
@@ -137,6 +139,7 @@ function growPersons(table: PersonTable): void {
 		"birth",
 		"death",
 		"deathSerial",
+		"deathCause",
 		"health",
 		"father",
 		"mother",
@@ -212,14 +215,8 @@ function addPerson({
 	table.nextSiblingMother[id] = UNSET
 	table.nextBirth[id] = Number.NEGATIVE_INFINITY
 	table.peak[id] = 0
-	if (father >= 0) {
-		table.nextSiblingFather[id] = table.firstChild[father]
-		table.firstChild[father] = id
-	}
-	if (mother >= 0) {
-		table.nextSiblingMother[id] = table.firstChild[mother]
-		table.firstChild[mother] = id
-	}
+	table.deathCause[id] = 0
+	KIN.link({ kin: table, child: id })
 	if (death === Number.POSITIVE_INFINITY) table.alive[table.aliveCount++] = id
 	return id
 }
@@ -244,21 +241,6 @@ function aliveAt({ people, person, time }: PersonAtParams): boolean {
 		table.birth[person] <= time &&
 		table.death[person] > time
 	)
-}
-
-function childrenOf({ people, parent }: ChildrenOfParams): number[] {
-	const table = people.persons
-	const children: number[] = []
-	if (parent < 0 || parent >= table.count) return children
-	let child = table.firstChild[parent]
-	while (child >= 0) {
-		children.push(child)
-		child =
-			table.sex[parent] === 0
-				? table.nextSiblingFather[child]
-				: table.nextSiblingMother[child]
-	}
-	return children
 }
 
 function closeKin({ people, a, b }: KinPairParams): boolean {
@@ -336,6 +318,11 @@ function runYear({
 		const person = persons.alive[i]
 		if (persons.death[person] < from + 1) continue
 		const result = LIFESPAN.checkYear({ people, person, from, rng })
+		if (result.newBand !== result.oldBand)
+			PEOPLE_LOG.append({
+				log: people.log,
+				...PEOPLE_LOG.healthRow({ persons, person, time: from }),
+			})
 		if (result.death === undefined) continue
 		endLife({ people, person, time: result.death })
 		deaths.push({
@@ -344,7 +331,7 @@ function runYear({
 			serial: persons.deathSerial[person],
 		})
 	}
-	const weddings = MARRIAGE.market({
+	const { weddings, arrivals } = MARRIAGE.market({
 		people,
 		from,
 		sovereignOfResidence,
@@ -353,6 +340,21 @@ function runYear({
 		neighbors,
 		rng,
 	})
+	for (const person of arrivals) {
+		PEOPLE_LOG.append({
+			log: people.log,
+			...PEOPLE_LOG.arrivalRow({
+				persons,
+				person,
+				time: from,
+				ageDays: Math.round((from - persons.birth[person]) * DAYS_PER_YEAR),
+			}),
+		})
+		PEOPLE_LOG.append({
+			log: people.log,
+			...PEOPLE_LOG.healthRow({ persons, person, time: from }),
+		})
+	}
 	const pregnancies = [] as PeopleYearResult["pregnancies"]
 	const scheduled = new Set<number>()
 	for (let i = 0; i < persons.aliveCount; i++) {
@@ -409,7 +411,6 @@ export const PEOPLE = {
 	removeSeat,
 	addPerson,
 	aliveAt,
-	childrenOf,
 	closeKin,
 	standingOf,
 	isRuler,

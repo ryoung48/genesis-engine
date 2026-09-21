@@ -9,6 +9,7 @@ import type {
 	PregnancyOutcome,
 	TwinChanceParams,
 } from "@/model/history/sim/people/fertility/types"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 
 const CHILD_LIMIT = [1, 2, 3, 5, 5, 8]
 const MONTH = 1 / 12
@@ -212,7 +213,10 @@ function birth({ people, pregnancy, rng }: BirthParams): BirthResult {
 	}
 	const motherDied =
 		outcome === "mother_dies" || outcome === "mother_and_child_die"
-	if (motherDied) PEOPLE.endLife({ people, person: mother, time: due })
+	if (motherDied) {
+		PEOPLE.endLife({ people, person: mother, time: due })
+		persons.deathCause[mother] = PEOPLE_LOG.CHILDBIRTH_MARK
+	}
 	return { children, motherDied }
 }
 

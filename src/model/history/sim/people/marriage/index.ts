@@ -3,6 +3,7 @@ import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import type {
 	EndMarriageParams,
 	MarketParams,
+	MarketResult,
 	MarriageAtParams,
 	MarriageCandidate,
 	MarriageKind,
@@ -123,7 +124,7 @@ function market({
 	standing,
 	neighbors,
 	rng,
-}: MarketParams): Wedding[] {
+}: MarketParams): MarketResult {
 	const persons = people.persons
 	const womenByRealm = new Map<number, number[]>()
 	const men: number[] = []
@@ -200,6 +201,7 @@ function market({
 	)
 	const matched = new Set<number>()
 	const weddings: Wedding[] = []
+	const arrivals: number[] = []
 	for (const candidate of candidates) {
 		if (matched.has(candidate.husband) || matched.has(candidate.wife)) continue
 		const time = from + rng.random()
@@ -250,6 +252,7 @@ function market({
 			residence,
 			rng,
 		})
+		arrivals.push(outsider)
 		weddings.push({
 			husband: sex === 1 ? person : outsider,
 			wife: sex === 1 ? outsider : person,
@@ -257,7 +260,7 @@ function market({
 		})
 		matched.add(person)
 	}
-	return weddings
+	return { weddings, arrivals }
 }
 
 export const MARRIAGE = { activeMarriage, canMarry, marry, endMarriage, market }

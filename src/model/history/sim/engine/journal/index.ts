@@ -1,12 +1,15 @@
 import type {
 	FlushJournalParams,
+	FlushPeopleJournalParams,
 	JournalRelationChange,
 	PendingJournal,
 	RecordCoalitionParams,
 	RecordProvinceChangeParams,
 	RecordProvinceParams,
 	RecordRelationParams,
+	TransferListParams,
 } from "@/model/history/sim/engine/journal/types"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 
 function pending(): PendingJournal {
 	return {
@@ -150,9 +153,50 @@ function flush({
 			rulers,
 			notes,
 			census: keyframe,
+			people:
+				state.people && rulers.length > 0
+					? PEOPLE_LOG.drain({ log: state.people.log })
+					: [],
 		})
 	}
 	state.pendingJournal = pending()
+}
+
+function flushPeople({ state }: FlushPeopleJournalParams): void {
+	if (!state.people) return
+	const people = PEOPLE_LOG.drain({ log: state.people.log })
+	if (people.length === 0) return
+	state.journal.push({
+		timeMs: state.time,
+		parents: [],
+		relations: [],
+		occupations: [],
+		coalitions: [],
+		rulers: [],
+		notes: [],
+		census: null,
+		people,
+	})
+}
+
+function transferList({ journal }: TransferListParams): Transferable[] {
+	return journal.flatMap((transaction) => [
+		...(transaction.census
+			? [
+					transaction.census.urban.buffer,
+					transaction.census.rural.buffer,
+					transaction.census.development.buffer,
+				]
+			: []),
+		...transaction.people.flatMap((chunk) => [
+			chunk.time.buffer,
+			chunk.kind.buffer,
+			chunk.a.buffer,
+			chunk.b.buffer,
+			chunk.c.buffer,
+			chunk.d.buffer,
+		]),
+	])
 }
 
 export const JOURNAL = {
@@ -162,4 +206,6 @@ export const JOURNAL = {
 	relation,
 	coalition,
 	flush,
+	flushPeople,
+	transferList,
 }

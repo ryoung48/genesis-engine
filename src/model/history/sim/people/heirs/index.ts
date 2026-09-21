@@ -6,13 +6,14 @@ import type {
 	LineParams,
 	OrderedParams,
 } from "@/model/history/sim/people/heirs/types"
+import { KIN } from "@/model/history/sim/people/kin"
 
 function siblings({ people, person, gender }: KinGroupParams): number[] {
 	const persons = people.persons
 	const found = new Set<number>()
 	for (const parent of [persons.father[person], persons.mother[person]]) {
 		if (parent < 0) continue
-		for (const child of PEOPLE.childrenOf({ people, parent })) {
+		for (const child of KIN.childrenOf({ kin: people.persons, parent })) {
 			if (child !== person) found.add(child)
 		}
 	}
@@ -47,7 +48,7 @@ function descendants({
 	const result: number[] = []
 	const children = ordered({
 		people,
-		persons: PEOPLE.childrenOf({ people, parent: person }),
+		persons: KIN.childrenOf({ kin: people.persons, parent: person }),
 		gender,
 	})
 	for (const child of children) {
@@ -100,7 +101,7 @@ function of({ people, dying, time, law, gender }: HeirsOfParams): HeirResult {
 			? []
 			: ordered({
 					people,
-					persons: PEOPLE.childrenOf({ people, parent: dying }),
+					persons: KIN.childrenOf({ kin: people.persons, parent: dying }),
 					gender,
 				}).filter(
 					(child) =>

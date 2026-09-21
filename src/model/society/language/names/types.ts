@@ -53,15 +53,11 @@ export interface BuildLeaderSlotParams {
 
 export interface DynastyNameParams {
 	dynastyIdx: number
-	province: number
+	culture: number
 }
 
-export interface RulerNameParams {
-	province: number
-	nameSeed: number
-}
-
-export interface RulerName {
-	name: string
-	female: boolean
+export interface PersonNameParams {
+	personId: number
+	culture: number
+	sex: 0 | 1
 }

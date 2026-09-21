@@ -30,6 +30,7 @@ import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-pr
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
+import type { WikiRef } from "@/ui/genesis/wiki-stack/types"
 import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
 import {
 	type NationWikiData,
@@ -40,6 +41,10 @@ import {
 	type OrganizationWikiData,
 	OrganizationWikiPage,
 } from "@/ui/wiki/organization/OrganizationWikiPage"
+import {
+	type PersonWikiData,
+	PersonWikiPage,
+} from "@/ui/wiki/person/PersonWikiPage"
 import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
 import { GenerationTimingChart } from "@/ui/wiki/timing/GenerationTimingChart"
 import {
@@ -137,6 +142,12 @@ interface GenerationPanelProps {
 	 * nationWiki/organizationWiki above -- mutually exclusive with both (see
 	 * GenesisView's selection state). */
 	warWiki: WarWikiData | null
+	/** When set (a person has been opened from a nation ruler or another
+	 * person's kin), this wiki page replaces the navigator like the pages
+	 * above. */
+	personWiki: PersonWikiData | null
+	/** The kind of the page on top of the wiki stack, or null for the planet. */
+	wikiKind: WikiRef["kind"] | null
 }
 
 export const GenerationPanel: React.FC<GenerationPanelProps> = ({
@@ -195,6 +206,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	nationWiki,
 	organizationWiki,
 	warWiki,
+	personWiki,
+	wikiKind,
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
@@ -461,12 +474,14 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3">
 				<div className="rounded-2xl bg-slate-50 px-3 py-3 space-y-3">
-					{nationWiki ? (
+					{wikiKind === "nation" && nationWiki ? (
 						<NationWikiPage nation={nationWiki} />
-					) : organizationWiki ? (
+					) : wikiKind === "organization" && organizationWiki ? (
 						<OrganizationWikiPage organization={organizationWiki} />
-					) : warWiki ? (
+					) : wikiKind === "war" && warWiki ? (
 						<WarWikiPage war={warWiki} />
+					) : wikiKind === "person" && personWiki ? (
+						<PersonWikiPage person={personWiki} />
 					) : (
 						<>
 							<GenerationPlanetNavigator

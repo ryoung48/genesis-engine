@@ -1,10 +1,11 @@
-import { useMemo } from "react"
+import { type ReactNode, useMemo } from "react"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
@@ -42,6 +43,7 @@ import {
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
 import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
+import { WIKI_STACK } from "@/ui/genesis/wiki-stack"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
 import {
 	compareTimelineDateThenWarEnd,
@@ -71,11 +73,11 @@ export function useNationWikiData(
 		worldForDisplay,
 		history,
 		showObservedDistributions,
-		planetName,
 		getProvinceColor,
-		setSelectedWikiNationId,
-		setSelectedWikiOrganizationId,
-		setSelectedWikiWarId,
+		backTitle,
+		names,
+		openWikiPage,
+		backWikiPage,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -359,13 +361,56 @@ export function useNationWikiData(
 		const rulerStat = stats.find((stat) => stat.label === "Ruler")
 		if (rulerStat && nationState?.ruler) {
 			const rulerSuffix = rulerLabel ? `· ${rulerLabel}` : ""
+			const rulerPersonId =
+				typeof currentRulerPayload?.personId === "number" &&
+				PEOPLE_RECORD.has({
+					record: record.people,
+					person: currentRulerPayload.personId,
+				})
+					? currentRulerPayload.personId
+					: null
+			const openPerson = (personId: number, name: string) =>
+				openWikiPage({ kind: "person", id: personId, title: name })
+			let rulerNode: ReactNode = <span>{nationState.ruler.name}</span>
+			if (rulerPersonId !== null && names) {
+				const personName = names.person({
+					personId: rulerPersonId,
+					culture: record.people.culture[rulerPersonId],
+					sex: record.people.sex[rulerPersonId] as 0 | 1,
+				})
+				rulerNode =
+					currentRulerPayload?.regent === true ? (
+						<span>
+							{nationState.ruler.name} for{" "}
+							<InlineTextButton
+								onClick={() => openPerson(rulerPersonId, personName)}
+							>
+								{personName}
+							</InlineTextButton>
+						</span>
+					) : (
+						<InlineTextButton
+							onClick={() => openPerson(rulerPersonId, personName)}
+						>
+							{nationState.ruler.name}
+						</InlineTextButton>
+					)
+			}
 			if (dynastyName) {
 				rulerStat.value = ""
 				rulerStat.valueAction = (
 					<span className="inline-flex items-center gap-1">
-						<span>{nationState.ruler.name}</span>
+						{rulerNode}
 						<Swatch color={paletteColorForDynasty(dynastyName)} />
 						<span>{dynastyName}</span>
+						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
+					</span>
+				)
+			} else if (rulerPersonId !== null && names) {
+				rulerStat.value = ""
+				rulerStat.valueAction = (
+					<span className="inline-flex items-center gap-1">
+						{rulerNode}
 						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
 					</span>
 				)
@@ -393,7 +438,13 @@ export function useNationWikiData(
 								>
 									<SideIcon className="h-2.5 w-2.5 text-slate-400" />
 									<InlineTextButton
-										onClick={() => setSelectedWikiWarId(conflict.warId)}
+										onClick={() =>
+											openWikiPage({
+												kind: "war",
+												id: conflict.warId,
+												title: conflict.name,
+											})
+										}
 									>
 										{conflict.name}
 									</InlineTextButton>
@@ -537,6 +588,7 @@ export function useNationWikiData(
 						const isInterregnum = /^interregnum$/i.test(
 							String(event.payload.name ?? "").trim(),
 						)
+						const rulerPerson = event.payload.personId
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -547,6 +599,21 @@ export function useNationWikiData(
 							comment: eventComment(event.comment),
 							nations,
 							dynasties: isInterregnum ? [] : person.dynasties,
+							people:
+								typeof rulerPerson === "number" &&
+								event.payload.regent !== true &&
+								PEOPLE_RECORD.has({
+									record: record.people,
+									person: rulerPerson,
+								})
+									? [
+											{
+												id: rulerPerson,
+												name: String(event.payload.name),
+												color: person.dynasties[0]?.color ?? "#94a3b8",
+											},
+										]
+									: undefined,
 						})
 						break
 					}
@@ -1373,7 +1440,7 @@ export function useNationWikiData(
 		return {
 			title,
 			color,
-			planetTitle: planetName,
+			backTitle,
 			stats,
 			tierLabel: titleSummary.tier,
 			dependencies,
@@ -1390,12 +1457,12 @@ export function useNationWikiData(
 			currentDate: daysFromMs(history.selectedTimeMs),
 			currentDateLabel: DATE.formatHistoryTimeMs(history.selectedTimeMs),
 			timelineEvents,
-			onBack: () => setSelectedWikiNationId(null),
+			onBack: backWikiPage,
 			onFocusNation: () => focusNation(nationId),
 			onSelectNation: (targetTag: string) => {
 				const id = Number(targetTag)
 				focusNation(id)
-				setSelectedWikiNationId(id)
+				openWikiPage(WIKI_STACK.nationRef({ record: history.state.record, id }))
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
@@ -1404,11 +1471,20 @@ export function useNationWikiData(
 			},
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
+			onSelectPerson: (personId: number, name: string) => {
+				openWikiPage({ kind: "person", id: personId, title: name })
+			},
 			onSelectOrganization: (orgId: string) => {
-				setSelectedWikiOrganizationId(orgId)
+				openWikiPage({
+					kind: "organization",
+					id: orgId,
+					title: history.organizationReference?.get(orgId)?.name ?? orgId,
+				})
 			},
 			onSelectWar: (warId: number) => {
-				setSelectedWikiWarId(warId)
+				openWikiPage(
+					WIKI_STACK.warRef({ record: history.state.record, id: warId }),
+				)
 			},
 		}
 	}, [
@@ -1428,10 +1504,10 @@ export function useNationWikiData(
 		history.provinceMeta,
 		worldForDisplay,
 		showObservedDistributions,
-		planetName,
+		backTitle,
+		names,
 		getProvinceColor,
-		setSelectedWikiNationId,
-		setSelectedWikiOrganizationId,
-		setSelectedWikiWarId,
+		openWikiPage,
+		backWikiPage,
 	])
 }

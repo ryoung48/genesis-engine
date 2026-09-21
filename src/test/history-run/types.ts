@@ -1,4 +1,5 @@
 import type { HistoryState as RecordState } from "@/model/history/record/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { HistoryState as EngineState } from "@/model/history/sim/engine/state/types"
 import type { Pregnancy } from "@/model/history/sim/people/fertility/types"
 import type { Wedding } from "@/model/history/sim/people/marriage/types"
@@ -6,6 +7,7 @@ import type { ScheduledDeath } from "@/model/history/sim/people/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import type { SocietyEra } from "@/model/society/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 export interface HistoryRunOptions {
 	seed: number
@@ -29,6 +31,23 @@ export interface CreateEngineParams {
 	seed: number
 	era: SocietyEra
 	numPoints: number
+}
+
+export interface BuildRunParams {
+	seed: number
+	era: SocietyEra
+	numPoints: number
+	years: number
+}
+
+export interface BuiltRun {
+	engine: EngineState
+	world: SerializedGenesisWorld
+	state: RecordState
+}
+
+export interface CountPeopleRowsParams {
+	transactions: JournalTransaction[]
 }
 
 export interface CreatedEngine {

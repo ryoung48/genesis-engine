@@ -32,7 +32,7 @@ interface WarWikiParticipant {
 export interface WarWikiData {
 	id: number
 	name: string
-	planetTitle: string
+	backTitle: string
 	/** Human-readable date range, e.g. "1618.5.23 – 1648.10.24" -- always
 	 * day-precise since wars.json's own warStart/warEnd events always carry
 	 * a real date (no year-only fallback needed here, unlike a merged
@@ -117,7 +117,7 @@ export function WarWikiPage({ war }: { war: WarWikiData }) {
 							<span>{war.dateRangeLabel}</span>
 							<span>·</span>
 							<InlineTextButton onClick={war.onBack} className="text-slate-500">
-								{war.planetTitle}
+								{war.backTitle}
 							</InlineTextButton>
 						</>
 					}

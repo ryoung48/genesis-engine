@@ -1,5 +1,5 @@
 import { expect, it } from "vitest"
-import { PEOPLE } from "@/model/history/sim/people"
+import { KIN } from "@/model/history/sim/people/kin"
 import { MARRIAGE } from "@/model/history/sim/people/marriage"
 import { HISTORY_RUN } from "@/test/history-run"
 
@@ -23,7 +23,7 @@ it("keeps ruler families married and in the planned size range", () => {
 				rulers++
 				if (MARRIAGE.activeMarriage({ people, person: ruler, time: year }) >= 0)
 					married++
-				kids += PEOPLE.childrenOf({ people, parent: ruler }).filter(
+				kids += KIN.childrenOf({ kin: people.persons, parent: ruler }).filter(
 					(child) => persons.death[child] > year,
 				).length
 			}

@@ -36,6 +36,11 @@ export interface MarketParams {
 	rng: SharedRng
 }
 
+export interface MarketResult {
+	weddings: Wedding[]
+	arrivals: number[]
+}
+
 export interface Wedding {
 	husband: number
 	wife: number

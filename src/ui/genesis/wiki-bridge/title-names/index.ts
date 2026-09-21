@@ -13,4 +13,17 @@ function nameSeats({ record }: NameSeatsParams): Int32Array {
 	return seats
 }
 
-export const TITLE_NAMES = { nameSeats }
+function tiers({ record }: NameSeatsParams): Uint8Array {
+	const base = record.titles
+	if (!base) return new Uint8Array(0)
+	const created = record.events.titleEvents.filter(
+		(event) => event.kind === "created",
+	)
+	const result = new Uint8Array(base.count + created.length)
+	result.set(base.tier)
+	for (const event of created)
+		if (event.kind === "created") result[event.title] = event.tier
+	return result
+}
+
+export const TITLE_NAMES = { nameSeats, tiers }

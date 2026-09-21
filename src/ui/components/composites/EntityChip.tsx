@@ -29,7 +29,7 @@ export const EntityChip: React.FC<EntityChipProps> = ({
 	title,
 	trailing,
 }) => {
-	const content = (
+	const label = (
 		<>
 			<Swatch
 				color={color}
@@ -38,25 +38,27 @@ export const EntityChip: React.FC<EntityChipProps> = ({
 				className="shrink-0"
 			/>
 			<span>{name}</span>
-			{trailing}
 		</>
 	)
 	const className = `inline-flex items-center gap-1 align-baseline${dimmed ? " opacity-40" : ""}`
 	if (!onClick) {
 		return (
 			<span className={className} title={title}>
-				{content}
+				{label}
+				{trailing}
 			</span>
 		)
 	}
 	return (
-		<InlineTextButton
-			onClick={onClick}
-			className={className}
-			title={title}
-			type="button"
-		>
-			{content}
-		</InlineTextButton>
+		<span className={className} title={title}>
+			<InlineTextButton
+				onClick={onClick}
+				type="button"
+				className="inline-flex items-center gap-1"
+			>
+				{label}
+			</InlineTextButton>
+			{trailing}
+		</span>
 	)
 }

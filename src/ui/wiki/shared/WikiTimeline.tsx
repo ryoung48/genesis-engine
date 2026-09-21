@@ -31,6 +31,8 @@ export interface WikiTimelineEvent {
 	/** Wars (wars.json) mentioned in this event's description -- clicking
 	 * navigates to that war's wiki page via refs.onSelectWar. */
 	wars: Array<{ id: number; name: string; color: string }>
+	// [JUSTIFICATION] Only person pages and pages that link rulers name people in events.
+	people?: Array<{ id: number; name: string; color: string }>
 }
 
 interface WikiTimelineRefs {
@@ -38,6 +40,8 @@ interface WikiTimelineRefs {
 	onSelectProvince: (provinceId: number) => void
 	onSelectOrganization: (orgId: string) => void
 	onSelectWar: (warId: number) => void
+	// [JUSTIFICATION] Only pages that can open a person page pass it; elsewhere a person mention stays plain text.
+	onSelectPerson?: (personId: number, name: string) => void
 	onSelectDate: (date: number) => void
 }
 
@@ -112,6 +116,13 @@ function renderLinkedTimelineText(
 				color: string
 				id: number
 		  }
+		| {
+				kind: "person"
+				key: string
+				name: string
+				color: string
+				id: number
+		  }
 		| { kind: "label"; key: string; name: string; color: string }
 	> = [
 		...event.nations.map((entry) => ({
@@ -143,6 +154,15 @@ function renderLinkedTimelineText(
 			color: entry.color,
 			id: entry.id,
 		})),
+		...(refs.onSelectPerson
+			? (event.people ?? []).map((entry) => ({
+					kind: "person" as const,
+					key: `person:${entry.id}`,
+					name: entry.name,
+					color: entry.color,
+					id: entry.id,
+				}))
+			: []),
 		...event.cultures.map((entry) => ({
 			kind: "label" as const,
 			key: `culture:${entry.id}`,
@@ -254,6 +274,8 @@ function renderLinkedTimelineText(
 						else if (mention.kind === "province")
 							refs.onSelectProvince(mention.id)
 						else if (mention.kind === "war") refs.onSelectWar(mention.id)
+						else if (mention.kind === "person")
+							refs.onSelectPerson?.(mention.id, mention.name)
 						else refs.onSelectOrganization(mention.id)
 					}}
 				/>,
@@ -353,6 +375,7 @@ function CountHistoryChart({
 	countHistory,
 	countChartLabel,
 	countUnitLabel,
+	formatValue,
 	dateRangeStart,
 	dateRangeEnd,
 	currentDate,
@@ -362,6 +385,7 @@ function CountHistoryChart({
 	countHistory: WikiCountHistoryPoint[]
 	countChartLabel: string
 	countUnitLabel: string
+	formatValue: (value: number) => string
 	dateRangeStart: number
 	dateRangeEnd: number
 	currentDate: number
@@ -500,7 +524,7 @@ function CountHistoryChart({
 				</span>
 				<div className="flex items-center gap-1.5">
 					<span className="font-mono text-[8px] text-slate-400">
-						0–{maxCount}
+						{formatValue(0)}–{formatValue(maxCount)}
 					</span>
 					<div className="flex items-center gap-0.5">
 						<button
@@ -596,7 +620,9 @@ function CountHistoryChart({
 							left: `${Math.min(85, Math.max(15, xPct(hoverDate)))}%`,
 						}}
 					>
-						<span className="font-semibold">{countAt(hoverDate)}</span>
+						<span className="font-semibold">
+							{formatValue(countAt(hoverDate))}
+						</span>
 						<span className="text-slate-300">
 							{" "}
 							{countUnitLabel} · {DATE.formatHistoryDays(hoverDate)}
@@ -665,6 +691,8 @@ interface WikiTimelineSectionProps {
 	countChartLabel: string
 	/** Unit word for the hover tooltip, e.g. "provinces". */
 	countUnitLabel: string
+	// [JUSTIFICATION] Only the person chart maps a value to a name; other pages print the integer.
+	formatValue?: (value: number) => string
 	dateRangeStart: number
 	dateRangeEnd: number
 	currentDate: number
@@ -680,6 +708,7 @@ export function WikiTimelineSection({
 	countHistory,
 	countChartLabel,
 	countUnitLabel,
+	formatValue = String,
 	dateRangeStart,
 	dateRangeEnd,
 	currentDate,
@@ -702,6 +731,7 @@ export function WikiTimelineSection({
 				countHistory={countHistory}
 				countChartLabel={countChartLabel}
 				countUnitLabel={countUnitLabel}
+				formatValue={formatValue}
 				dateRangeStart={dateRangeStart}
 				dateRangeEnd={dateRangeEnd}
 				currentDate={currentDate}

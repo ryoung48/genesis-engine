@@ -1,5 +1,6 @@
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
+import { KIN } from "@/model/history/sim/people/kin"
 import { SUCCESSION_LAW } from "@/model/history/sim/succession-law"
 import { DEJURE } from "@/model/society/dejure"
 import type {
@@ -46,7 +47,7 @@ function line({ people, person }: LineParams): Set<number> {
 	const queue = [person]
 	while (queue.length > 0) {
 		const next = queue.pop() as number
-		for (const child of PEOPLE.childrenOf({ people, parent: next }))
+		for (const child of KIN.childrenOf({ kin: people.persons, parent: next }))
 			if (!found.has(child)) {
 				found.add(child)
 				queue.push(child)
@@ -60,7 +61,7 @@ function siblingsOf({ people, person }: LineParams): number[] {
 	const found: number[] = []
 	for (const parent of [table.father[person], table.mother[person]])
 		if (parent >= 0)
-			for (const child of PEOPLE.childrenOf({ people, parent }))
+			for (const child of KIN.childrenOf({ kin: people.persons, parent }))
 				if (child !== person) found.push(child)
 	return found
 }
@@ -80,7 +81,7 @@ function expectedBranch({
 	gender,
 }: ExpectedBranchParams): ExpectedBranch {
 	const groups: [ExpectedBranch["kind"], number[]][] = [
-		["child", PEOPLE.childrenOf({ people, parent: dying })],
+		["child", KIN.childrenOf({ kin: people.persons, parent: dying })],
 		["sibling", siblingsOf({ people, person: dying })],
 		["uncle", unclesOf({ people, person: dying })],
 	]
@@ -97,7 +98,7 @@ function expectedBranch({
 function livingKin({ people, person, time, gender }: KinParams): number[] {
 	const kin = new Set<number>()
 	const groups = [
-		PEOPLE.childrenOf({ people, parent: person }),
+		KIN.childrenOf({ kin: people.persons, parent: person }),
 		siblingsOf({ people, person }),
 		unclesOf({ people, person }),
 	]
@@ -293,7 +294,7 @@ function checkDivision({
 		)
 	const juniors =
 		branch.kind === "child"
-			? PEOPLE.childrenOf({ people, parent: snapshot.person }).filter(
+			? KIN.childrenOf({ kin: people.persons, parent: snapshot.person }).filter(
 					(child) =>
 						child !== holder &&
 						PEOPLE.aliveAt({ people, person: child, time: snapshot.time }),

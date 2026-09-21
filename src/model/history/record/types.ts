@@ -8,6 +8,7 @@ import type {
 import type { Eu4ProvinceMap } from "@/model/history/earth/import/eu4-province-map/types"
 import type { Nation } from "@/model/history/earth/reference/nations/types"
 import type { LonLat } from "@/model/history/earth/types"
+import type { PeopleRecord } from "@/model/history/record/people/types"
 import type {
 	PartitionRow,
 	WorldFrame,
@@ -126,7 +127,14 @@ export interface TitleBase {
 }
 
 export type TitleEventRecord =
-	| { timeMs: number; kind: "passed"; title: number; from: number; to: number }
+	| {
+			timeMs: number
+			kind: "passed"
+			title: number
+			from: number
+			to: number
+			cause: string
+	  }
 	| {
 			timeMs: number
 			kind: "moved"
@@ -186,6 +194,7 @@ export type HistoryRecord = HistoryRecordCommon & {
 	events: HistoryEvents
 	// [JUSTIFICATION] Earth records have no de jure title layer.
 	titles: TitleBase | null
+	people: PeopleRecord
 }
 
 export interface ProvinceMeta {

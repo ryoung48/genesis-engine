@@ -172,6 +172,7 @@ function initHistory(params: {
 	seedColonyRelations({ state, nations: params.nations })
 
 	JOURNAL.flush({ state, noteCursor: 0, census: true, initial: true })
+	JOURNAL.flushPeople({ state })
 	return state
 }
 
@@ -287,6 +288,7 @@ function simulateUntil({
 }: SimulateUntilParams): void {
 	processEventsUntil({ state, targetTime: targetTimeMs, rng, validate })
 	state.time = targetTimeMs
+	JOURNAL.flushPeople({ state })
 }
 
 export const SIM_ENGINE = {

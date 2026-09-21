@@ -1,4 +1,5 @@
 import { DATE } from "@/model/history/earth/date"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
 	HistoryEvent,
 	NationIdentity,
@@ -471,6 +472,7 @@ function appendNote({
 			title: data.title as number,
 			from: data.from as number,
 			to: data.to as number,
+			cause: data.cause as string,
 		})
 	} else if (note.tag === "title created") {
 		record.events.titleEvents.push({
@@ -590,6 +592,8 @@ function applyTransaction({
 	transaction,
 }: ApplyTransactionParams): void {
 	const { record } = translator.state
+	for (const chunk of transaction.people)
+		PEOPLE_RECORD.append({ record: record.people, chunk })
 	const timeMs = Math.max(record.minTimeMs, recordTime(transaction.timeMs))
 	record.maxTimeMs = Math.max(record.maxTimeMs, timeMs)
 	const count = translator.parent.length
@@ -741,26 +745,29 @@ function applyTransaction({
 		if (nationId === undefined || ruler.nameSeed < 0) continue
 		const log = record.events.nationEvents[nationId]
 		if (!log) continue
-		const named = translator.names.ruler({
-			province: ruler.root,
-			nameSeed: ruler.nameSeed,
+		const people = record.people
+		const name = translator.names.person({
+			personId: ruler.nameSeed,
+			culture: people.culture[ruler.nameSeed],
+			sex: people.sex[ruler.nameSeed] as 0 | 1,
 		})
 		log.events.push({
 			timeMs,
 			kind: "rulerChange",
 			payload: {
-				name: ruler.regent ? "Regency Council" : named.name,
+				name: ruler.regent ? "Regency Council" : name,
 				dynasty:
 					ruler.dynasty >= 0
 						? translator.names.dynasty({
 								dynastyIdx: ruler.dynasty,
-								province: ruler.root,
+								culture: people.dynastyCulture.get(ruler.dynasty) ?? -1,
 							})
 						: null,
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
 				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
-				female: named.female,
+				female: people.sex[ruler.nameSeed] === 1,
 				regent: ruler.regent,
+				personId: ruler.nameSeed,
 			},
 			comment: null,
 		})

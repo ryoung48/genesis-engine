@@ -3,13 +3,31 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { STATE } from "@/model/history/sim/engine/state"
 import { UNNAMED } from "@/model/history/sim/heirs/types"
 import { PEOPLE } from "@/model/history/sim/people"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
 	InstallRulerParams,
+	LogSeatParams,
 	ReleaseModeParams,
 	ReseatRulersParams,
 	RulerMove,
 	VacateRulerParams,
 } from "@/model/history/sim/ruler/types"
+
+const FOUNDER_AGE_YEARS = 30
+const DAYS_PER_YEAR = 365
+
+function logSeat({ state, person, seat, gained }: LogSeatParams): void {
+	if (!state.people) return
+	PEOPLE_LOG.append({
+		log: state.people.log,
+		...PEOPLE_LOG.seatRow({
+			time: state.time / STATE.yearMs,
+			person,
+			seat,
+			gained,
+		}),
+	})
+}
 
 function install({
 	state,
@@ -21,22 +39,43 @@ function install({
 }: InstallRulerParams): void {
 	if (state.people) {
 		const people = state.people
+		const now = state.time / STATE.yearMs
 		const person =
 			heir === UNNAMED
 				? PEOPLE.addPerson({
 						people,
 						sex: 0,
-						birth: state.time / STATE.yearMs - 30,
+						birth: now - FOUNDER_AGE_YEARS,
 						dynasty,
 						culture: state.culture[seat],
 						residence: seat,
 						rng,
 					})
 				: heir
-		if (people.holderOfSeat[seat] >= 0 && people.holderOfSeat[seat] !== person)
+		if (heir === UNNAMED) {
+			PEOPLE_LOG.append({
+				log: people.log,
+				...PEOPLE_LOG.arrivalRow({
+					persons: people.persons,
+					person,
+					time: now,
+					ageDays: FOUNDER_AGE_YEARS * DAYS_PER_YEAR,
+				}),
+			})
+			PEOPLE_LOG.append({
+				log: people.log,
+				...PEOPLE_LOG.healthRow({ persons: people.persons, person, time: now }),
+			})
+		}
+		const holder = people.holderOfSeat[seat]
+		if (holder >= 0 && holder !== person) {
 			PEOPLE.removeSeat({ people, seat })
-		if (people.holderOfSeat[seat] < 0)
+			logSeat({ state, person: holder, seat, gained: false })
+		}
+		if (people.holderOfSeat[seat] < 0) {
 			PEOPLE.assignSeat({ people, person, seat, seatRank: state.seatRank })
+			logSeat({ state, person, seat, gained: true })
+		}
 		state.leaderRuntime.idx[seat]++
 		state.leaderRuntime.birth[seat] =
 			people.persons.birth[person] * STATE.yearMs
@@ -67,7 +106,11 @@ function install({
 }
 
 function vacate({ state, seat }: VacateRulerParams): void {
-	if (state.people) PEOPLE.removeSeat({ people: state.people, seat })
+	if (state.people) {
+		const holder = state.people.holderOfSeat[seat]
+		PEOPLE.removeSeat({ people: state.people, seat })
+		if (holder >= 0) logSeat({ state, person: holder, seat, gained: false })
+	}
 	state.leaderRuntime.idx[seat]++
 	state.leaderRuntime.birth[seat] = 0
 	state.leaderRuntime.end[seat] = 0
@@ -137,13 +180,15 @@ function reseat({ state, rulers }: ReseatRulersParams): void {
 		if (state.leaderNameSeedCurrent[move.to] >= 0)
 			throw new Error("Ruler seat collision")
 		state.leaderRuntime.idx[move.to]++
-		if (state.people && move.person >= 0)
+		if (state.people && move.person >= 0) {
 			PEOPLE.assignSeat({
 				people: state.people,
 				person: move.person,
 				seat: move.to,
 				seatRank: state.seatRank,
 			})
+			logSeat({ state, person: move.person, seat: move.to, gained: true })
+		}
 		state.leaderRuntime.birth[move.to] = move.birth
 		state.leaderRuntime.end[move.to] = move.end
 		state.leaderRuntime.targetUrban[move.to] = move.targetUrban

@@ -7,6 +7,7 @@ import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import type { WarWikiDataInput } from "@/ui/genesis/view/types"
 import { formatWealthCost } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { WIKI_STACK } from "@/ui/genesis/wiki-stack"
 import {
 	cleanEu4Identifier,
 	compareTimelineDateThenWarEnd,
@@ -27,11 +28,10 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		selectedWikiWarId,
 		world,
 		history,
-		planetName,
+		backTitle,
 		getProvinceColor,
-		setSelectedWikiNationId,
-		setSelectedWikiOrganizationId,
-		setSelectedWikiWarId,
+		openWikiPage,
+		backWikiPage,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -105,7 +105,14 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				value: "",
 				valueAction: (
 					<InlineTextButton
-						onClick={() => setSelectedWikiNationId(Number(target.tag))}
+						onClick={() =>
+							openWikiPage(
+								WIKI_STACK.nationRef({
+									record: history.state.record,
+									id: Number(target.tag),
+								}),
+							)
+						}
 					>
 						{target.name}
 					</InlineTextButton>
@@ -405,7 +412,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		return {
 			id: war.id,
 			name: war.name,
-			planetTitle: planetName,
+			backTitle,
 			dateRangeLabel,
 			stats,
 			participants,
@@ -414,9 +421,14 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			dateRangeEnd,
 			currentDate,
 			currentDateLabel: DATE.formatHistoryTimeMs(history.selectedTimeMs),
-			onBack: () => setSelectedWikiWarId(null),
+			onBack: backWikiPage,
 			onSelectNation: (targetTag: string) => {
-				setSelectedWikiNationId(Number(targetTag))
+				openWikiPage(
+					WIKI_STACK.nationRef({
+						record: history.state.record,
+						id: Number(targetTag),
+					}),
+				)
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
@@ -426,7 +438,11 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
 			onSelectOrganization: (orgId: string) => {
-				setSelectedWikiOrganizationId(orgId)
+				openWikiPage({
+					kind: "organization",
+					id: orgId,
+					title: history.organizationReference?.get(orgId)?.name ?? orgId,
+				})
 			},
 		}
 	}, [
@@ -438,9 +454,8 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		history.selectedTimeMs,
 		history.setSelectedTimeMs,
 		getProvinceColor,
-		planetName,
-		setSelectedWikiNationId,
-		setSelectedWikiOrganizationId,
-		setSelectedWikiWarId,
+		backTitle,
+		openWikiPage,
+		backWikiPage,
 	])
 }
