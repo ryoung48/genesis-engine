@@ -38,12 +38,6 @@ export interface EraConfig {
 	id: SocietyEra
 	label: string
 	startYear: number
-	succession: {
-		partitionShares: readonly [number, number, number]
-		climbHazard: number
-		singleHeirHazard: number
-		singleHeirUnlockYear: number
-	}
 	/** Target world population at habitabilityScore = 1 */
 	targetPopulation: number
 	/**

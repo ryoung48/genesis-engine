@@ -2,7 +2,6 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { DIPLOMACY } from "@/model/history/sim/engine/events/diplomacy"
-import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { TAX } from "@/model/history/sim/engine/events/tax"
@@ -18,8 +17,6 @@ import type {
 } from "@/model/history/sim/engine/simulation/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import { SUCCESSION_LAW } from "@/model/history/sim/succession-law"
-import { VASSALAGE } from "@/model/history/sim/vassalage"
 import type { StageTiming } from "@/model/pipelines/types"
 import { ERAS } from "@/model/society/eras"
 import type { ProvincePopulation } from "@/model/society/population/types"
@@ -111,28 +108,6 @@ function initHistory(params: {
 				era: params.era,
 			}),
 	})
-	timed({
-		label: "initHistory:grantTitles",
-		timings: params.timings,
-		fn: () => {
-			VASSALAGE.grantInitial({ state, seed: params.seed, rng })
-			for (let root = 0; root < state.P; root++) {
-				if (
-					state.desolate[root] ||
-					state.stateless[root] ||
-					state.parentCurrent[root] >= 0
-				)
-					continue
-				STATE.applyDerivedParents({
-					state,
-					nation: root,
-					members: STATE.getNationProvinces({ state, root }),
-				})
-			}
-		},
-	})
-	SUCCESSION_LAW.initial({ state, seed: params.seed })
-	state.heap.enqueue(state.time + STATE.yearMs, EVENT_HEAP.evt.LAW_YEAR, 0)
 
 	// Seed colony dependencies before init passes so subordinate colonies are
 	// excluded from independent diplomacy and subject formation.
@@ -142,11 +117,6 @@ function initHistory(params: {
 		label: "initHistory:initDiplomacy",
 		timings: params.timings,
 		fn: () => DIPLOMACY.initDiplomacy({ state, rng }),
-	})
-	timed({
-		label: "initHistory:people",
-		timings: params.timings,
-		fn: () => PEOPLE_EVENTS.init({ state, seed: params.seed, years: 500 }),
 	})
 	timed({
 		label: "initHistory:initWar",
@@ -236,26 +206,6 @@ function processEventsUntil({
 				}
 				break
 			}
-			case EVENT_HEAP.evt.LAW_YEAR:
-				SUCCESSION_LAW.climb({ state, rng })
-				state.heap.enqueue(
-					state.time + STATE.yearMs,
-					EVENT_HEAP.evt.LAW_YEAR,
-					0,
-				)
-				break
-			case EVENT_HEAP.evt.PEOPLE_YEAR:
-				PEOPLE_EVENTS.runYear({ state, id: 0 })
-				break
-			case EVENT_HEAP.evt.BIRTH:
-				PEOPLE_EVENTS.birth({ state, id: dataBuf[0] })
-				break
-			case EVENT_HEAP.evt.WEDDING:
-				PEOPLE_EVENTS.wedding({ state, id: dataBuf[0], wife: dataBuf[1] })
-				break
-			case EVENT_HEAP.evt.DEATH:
-				PEOPLE_EVENTS.death({ state, id: dataBuf[0], serial: dataBuf[1] })
-				break
 		}
 		JOURNAL.flush({
 			state,

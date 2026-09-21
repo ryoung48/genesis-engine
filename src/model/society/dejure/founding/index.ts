@@ -34,11 +34,7 @@ function fullyHeldChildren({
 }: FullyHeldChildrenParams): number[] {
 	const result: number[] = []
 	for (let title = 0; title < titles.count; title++) {
-		if (
-			titles.tier[title] !== tier - 1 ||
-			titles.holder[title] < 0 ||
-			ownerOf[titles.holder[title]] !== holder
-		)
+		if (titles.tier[title] !== tier - 1 || titles.holder[title] !== holder)
 			continue
 		if (!wholeHeld({ members, ownerOf, holder, title })) continue
 		if (orphansOnly) {
@@ -99,10 +95,6 @@ function found({
 	for (const province of provinces) {
 		const old = titles.regionOf[(tier - 1) * provinceCount + province]
 		if (old >= 0) sources.add(old)
-		for (let slot = tier; slot < TIER_SLOTS; slot++) {
-			const above = titles.regionOf[slot * provinceCount + province]
-			if (above >= 0) sources.add(above)
-		}
 		titles.regionOf[(tier - 1) * provinceCount + province] = title
 		for (let i = 0; i < ancestors.length; i++)
 			titles.regionOf[(tier + i) * provinceCount + province] = ancestors[i]

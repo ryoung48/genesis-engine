@@ -69,16 +69,6 @@ function flush({
 	initial,
 }: FlushJournalParams): void {
 	const pendingJournal = state.pendingJournal
-	if (
-		!initial &&
-		!census &&
-		noteCursor === state.events.length &&
-		pendingJournal.parents.size === 0 &&
-		pendingJournal.relations.size === 0 &&
-		pendingJournal.occupations.size === 0 &&
-		pendingJournal.coalitions.length === 0
-	)
-		return
 	const parents = [...pendingJournal.parents.values()].filter(
 		(change) => change.before !== change.after,
 	)

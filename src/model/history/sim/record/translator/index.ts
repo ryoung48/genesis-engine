@@ -199,6 +199,10 @@ function identityForRoot({
 	return id
 }
 
+function holderId({ translator, root, timeMs }: IdentityForRootParams): number {
+	return root < 0 ? -1 : identityForRoot({ translator, root, timeMs })
+}
+
 function projectTie({
 	translator,
 	x,
@@ -469,8 +473,8 @@ function appendNote({
 			timeMs,
 			kind: "passed",
 			title: data.title as number,
-			from: data.from as number,
-			to: data.to as number,
+			from: holderId({ translator, root: data.from as number, timeMs }),
+			to: holderId({ translator, root: data.to as number, timeMs }),
 		})
 	} else if (note.tag === "title created") {
 		record.events.titleEvents.push({
@@ -479,7 +483,7 @@ function appendNote({
 			title: data.title as number,
 			tier: data.tier as number,
 			seat: data.seat as number,
-			holder: data.holder as number,
+			holder: holderId({ translator, root: data.holder as number, timeMs }),
 			children: data.children as number[],
 			ancestors: data.ancestors as number[],
 		})

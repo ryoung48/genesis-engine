@@ -1,4 +1,3 @@
-import { TITLE_RECORD } from "@/model/history/record/titles"
 import { TITLES } from "@/model/society/titles"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
 import { TITLE_NAMES } from "@/ui/genesis/wiki-bridge/title-names"
@@ -27,10 +26,7 @@ function describe({
 	const capital = nation?.capitalProvince ?? -1
 	const held: number[] = []
 	for (let title = 0; title < titles.count; title++)
-		if (
-			TITLE_RECORD.realmOf({ frame, holder: titles.holder[title] }) === nationId
-		)
-			held.push(title)
+		if (titles.holder[title] === nationId) held.push(title)
 	let top = -1
 	for (const title of held) {
 		const better =
@@ -57,10 +53,7 @@ function describe({
 	for (let level = topTier + 1; level <= TIER_SLOTS && anchor >= 0; level++) {
 		const parent = titles.regionOf[(level - 1) * frame.provinceCount + anchor]
 		if (parent < 0) continue
-		const holder = TITLE_RECORD.realmOf({
-			frame,
-			holder: titles.holder[parent],
-		})
+		const holder = titles.holder[parent]
 		if (holder >= 0 && holder !== nationId)
 			return {
 				tier,

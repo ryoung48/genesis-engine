@@ -68,6 +68,11 @@ export interface SeedSharedDynastiesParams {
 	rng: SharedRng
 }
 
+export interface SeedInitialPersonalUnionsParams {
+	state: HistoryState
+	rng: SharedRng
+}
+
 export interface InitDiplomacyParams {
 	state: HistoryState
 	rng: SharedRng

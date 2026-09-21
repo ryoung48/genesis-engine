@@ -15,7 +15,6 @@ import type {
 	TitleWealthBarParams,
 } from "@/model/history/sim/engine/state/types"
 import { wealthCurrent } from "@/model/history/sim/engine/state/wealth"
-import { RULER } from "@/model/history/sim/ruler"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import { HOLDING } from "@/model/society/dejure/holding"
@@ -41,15 +40,13 @@ function applyDerivedParents({
 	DEJURE.deriveParents({
 		titles: state.titles,
 		provinceCount: state.P,
+		rank: state.seatRank,
 		ownerOf,
 		members,
 		root: nation,
 		parent: next,
 	})
 	FIELDS.prov.parent.set({ state, p: nation, value: -1 })
-	for (const member of members)
-		if (member !== nation && state.parentCurrent[member] >= 0)
-			FIELDS.prov.parent.set({ state, p: member, value: -1 })
 	const ordered = members
 		.filter((member) => member !== nation)
 		.sort((a, b) => state.seatRank[b] - state.seatRank[a] || a - b)
@@ -89,14 +86,10 @@ function settleTitleSet({ state, touched }: SettleTitleSetParams): void {
 		titles: state.titles,
 		provinceCount: state.P,
 		heldOnly: true,
-		ownerOf: state.sovereignCurrent,
 	})
 	const affected = new Set<number>()
-	const affectedRulers = new Set<number>()
 	for (const change of changes) {
 		if (change.kind === "passed") {
-			affectedRulers.add(change.from)
-			affectedRulers.add(change.to)
 			state.events.push({
 				tag: "title passed",
 				time: state.time,
@@ -106,7 +99,6 @@ function settleTitleSet({ state, touched }: SettleTitleSetParams): void {
 			affected.add(change.to)
 			affected.add(state.sovereignCurrent[state.titles.seat[change.title]])
 		} else {
-			affectedRulers.add(state.titles.holder[change.title])
 			state.events.push({
 				tag: "capital moved",
 				time: state.time,
@@ -121,16 +113,11 @@ function settleTitleSet({ state, touched }: SettleTitleSetParams): void {
 			affected.add(state.sovereignCurrent[change.to])
 		}
 	}
-	RULER.reseat({ state, rulers: affectedRulers })
 	relinkNations({ state, nations: affected })
 }
 
-function settleProvinces({
-	state,
-	provinces,
-	titles,
-}: SettleProvincesParams): void {
-	const touched = new Set<number>(titles)
+function settleProvinces({ state, provinces }: SettleProvincesParams): void {
+	const touched = new Set<number>()
 	for (const province of provinces)
 		for (let tier = 1; tier <= TIER_SLOTS; tier++) {
 			const title = DEJURE.titleAt({
@@ -153,7 +140,6 @@ function refreshTitleIndex({ state }: DissolveLapsedParams): void {
 		titles: state.titles,
 		provinceCount: state.P,
 		heldOnly: true,
-		ownerOf: state.sovereignCurrent,
 	})
 }
 
@@ -161,7 +147,7 @@ function titleWealthBar({ state, tier }: TitleWealthBarParams): number {
 	const holders = new Set<number>()
 	for (let title = 0; title < state.titles.count; title++)
 		if (state.titles.tier[title] >= tier && state.titles.holder[title] >= 0)
-			holders.add(state.sovereignCurrent[state.titles.holder[title]])
+			holders.add(state.titles.holder[title])
 	if (holders.size === 0) return Number.NEGATIVE_INFINITY
 	const wealth = [...holders]
 		.map((p) => wealthCurrent({ state, p }))

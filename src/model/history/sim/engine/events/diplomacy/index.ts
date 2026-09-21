@@ -9,6 +9,7 @@ import type {
 	ProcessVassalDiplomacyParams,
 	RollTransitionParams,
 	RunDiplomacyParams,
+	SeedInitialPersonalUnionsParams,
 	SeedInitialVassalsParams,
 	SeedNeighborRelationsParams,
 	SeedSharedDynastiesParams,
@@ -291,6 +292,8 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 
 const SHARED_DYNASTY_SEED_CHANCE = 0.25
 
+const PERSONAL_UNION_SEED_CHANCE = SHARED_DYNASTY_SEED_CHANCE / 5
+
 function seedSharedDynasties({ state, rng }: SeedSharedDynastiesParams): void {
 	for (let nation = 0; nation < state.P; nation++) {
 		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
@@ -326,11 +329,52 @@ function seedSharedDynasties({ state, rng }: SeedSharedDynastiesParams): void {
 	}
 }
 
+function seedInitialPersonalUnions({
+	state,
+	rng,
+}: SeedInitialPersonalUnionsParams): void {
+	for (let nation = 0; nation < state.P; nation++) {
+		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
+			continue
+		if (STATE.getRulerRelation({ state, nation })) continue
+		for (const nb of STATE.getNationNeighbors({ state, nation })) {
+			if (nb <= nation) continue
+			if (STATE.getRulerRelation({ state, nation: nb })) continue
+			const rel = STATE.getRelation({ state, a: nation, b: nb })
+			if (rel !== STATE.rel.FRIENDLY && rel !== STATE.rel.ALLY) continue
+			if (
+				FIELDS.prov.leader.dynasty.get({ state, p: nation }) !==
+				FIELDS.prov.leader.dynasty.get({ state, p: nb })
+			)
+				continue
+			if (rng.random() >= PERSONAL_UNION_SEED_CHANCE) continue
+
+			const [senior, junior] =
+				STATE.wealthOptimal({ state, p: nation }) >=
+				STATE.wealthOptimal({ state, p: nb })
+					? [nation, nb]
+					: [nb, nation]
+			STATE.setRelation({
+				state,
+				a: junior,
+				b: senior,
+				rel: STATE.rel.PU_JUNIOR,
+			})
+			state.events.push({
+				tag: "personal union formed",
+				time: state.time,
+				data: { junior, senior },
+			})
+		}
+	}
+}
+
 function initDiplomacy({ state, rng }: InitDiplomacyParams): void {
 	seedSubjectRelations(state)
 	seedNeighborRelations({ state, rng })
 	seedInitialVassals({ state, rng })
 	seedSharedDynasties({ state, rng })
+	seedInitialPersonalUnions({ state, rng })
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		nextEvent({ state, province: p, rng, years: rng.uniform(0, 8) })

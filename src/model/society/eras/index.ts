@@ -172,13 +172,6 @@ const medievalBase: Pick<
 	organizations: { imperialPatchwork: false, tradeLeague: false },
 }
 
-const succession = {
-	partitionShares: [0.24, 0.34, 0.44],
-	climbHazard: 0.0042,
-	singleHeirHazard: 0.02,
-	singleHeirUnlockYear: 1200,
-} as const
-
 const eraConfigs: Record<SocietyEra, EraConfig> = {
 	paleolithic: {
 		id: "paleolithic",
@@ -193,7 +186,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		nationPercentages: [],
 		nationBuckets: [],
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: { tribal: 1.0, monarchy: 0, republic: 0, theocracy: 0 },
@@ -213,7 +205,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		nationPercentages: MATH.normalize([0, 0, 0, 0, 0.15, 0.35, 0.5]),
 		nationBuckets: nationBuckets,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {
@@ -242,7 +233,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		]),
 		nationBuckets: nationBuckets,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {
@@ -271,7 +261,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		]),
 		nationBuckets: nationBuckets,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {
@@ -290,7 +279,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		targetPopulation: 300e6,
 		...medievalBase,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {
@@ -309,7 +297,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		targetPopulation: 300e6,
 		...medievalBase,
 		startYear: 1066,
-		succession,
 		government: {
 			model: "sized",
 			sizeShares: [
@@ -349,7 +336,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		]),
 		nationBuckets: nationBuckets,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {
@@ -378,7 +364,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		]),
 		nationBuckets: nationBuckets,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {
@@ -407,7 +392,6 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		]),
 		nationBuckets: nationBuckets,
 		startYear: 800,
-		succession,
 		government: {
 			model: "blend",
 			mix: {

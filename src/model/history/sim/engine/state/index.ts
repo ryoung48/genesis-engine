@@ -55,10 +55,6 @@ import {
 	wealthCurrent,
 	wealthOptimal,
 } from "@/model/history/sim/engine/state/wealth"
-import { UNNAMED } from "@/model/history/sim/heirs/types"
-import { RELIGION } from "@/model/history/sim/religion"
-import { RULER } from "@/model/history/sim/ruler"
-import { SUCCESSION_LAW } from "@/model/history/sim/succession-law"
 import { DEJURE } from "@/model/society/dejure"
 import { ERAS } from "@/model/society/eras"
 
@@ -209,27 +205,19 @@ function warThreat({
 	return 1 - atk / (atk + def)
 }
 
-function releaseProvince({
-	state,
-	p,
-	rng,
-	leader,
-}: ReleaseProvinceParams): void {
+function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
 	const formerSovereign = getSovereign({ state, p })
 	FIELDS.prov.parent.set({ state, p, value: -1 })
 	rebuildAssignment({ state })
 	repartitionNation({ state, nation: formerSovereign, subjects: [] })
 	repartitionNation({ state, nation: p, subjects: [] })
-	if (leader === "spawn")
-		RULER.install({
-			state,
-			seat: p,
-			heir: UNNAMED,
-			dynasty: state.nextDynasty++,
-			rng,
-			initial: false,
-		})
-	SUCCESSION_LAW.forNewSovereign({ state, nation: p, former: formerSovereign })
+	spawnLeader({ state, p, rng })
+	state.heap.enqueue(
+		state.leaderRuntime.end[p],
+		EVENT_HEAP.evt.SUCCESSION,
+		p,
+		state.leaderRuntime.idx[p],
+	)
 }
 
 function isProvinceConnectedToParent({
@@ -277,12 +265,7 @@ function releaseDisconnectedProvince({
 			value: -1,
 		})
 	}
-	releaseProvince({
-		state,
-		p: province,
-		rng,
-		leader: RULER.releaseMode({ state, seat: province }),
-	})
+	releaseProvince({ state, p: province, rng })
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
@@ -308,30 +291,19 @@ function repartitionNation({
 	)
 	if (members.length === 0) return
 	// Depose leaders of absorbed sovereigns before parents are rewritten
-	const orphaned: number[] = []
 	for (const p of subjects) {
 		if (p === nation || !isSovereign({ state, p })) continue
-		const leader = state.leaderRuntime.idx[p]
-		RULER.vacate({ state, seat: p })
-		for (let title = 0; title < state.titles.count; title++)
-			if (state.titles.holder[title] === p) {
-				state.titles.holder[title] = -1
-				orphaned.push(title)
-				state.events.push({
-					tag: "title passed",
-					time: state.time,
-					data: { title, from: p, to: -1, cause: "deposed" },
-				})
-			}
+		state.leaderRuntime.end[p] = state.time
+		state.leaderRuntime.idx[p]++
 		state.events.push({
 			tag: "ruler deposed",
 			time: state.time,
-			data: { nation: p, leader },
+			data: { nation: p, leader: state.leaderRuntime.idx[p] - 1 },
 		})
 	}
 	applyDerivedParents({ state, nation, members })
 	rebuildAssignment({ state })
-	settleProvinces({ state, provinces: members, titles: orphaned })
+	settleProvinces({ state, provinces: members })
 }
 
 function releaseSubjectRelations({
@@ -555,16 +527,13 @@ function resolveWar({
 			? getNationProvinces({ state, root: war.defender })
 			: [...war.occupied]
 	).filter((p) => getSovereign({ state, p }) === war.defender)
-	const attackerSovereign = isSovereign({ state, p: war.attacker })
-	const transferred = !attackerSovereign
-		? []
-		: victory
-			? conquered
-			: Array.from(
-					new Set(
-						conquered.flatMap((root) => getNationProvinces({ state, root })),
-					),
-				)
+	const transferred = victory
+		? conquered
+		: Array.from(
+				new Set(
+					conquered.flatMap((root) => getNationProvinces({ state, root })),
+				),
+			)
 
 	for (const p of war.occupied) {
 		if (state.occupationCurrent[p] === war.idx) {
@@ -678,9 +647,6 @@ function createHistoryState({
 			provinceCount: P,
 			heldOnly: true,
 		}),
-		people: null,
-		peoplePregnancies: [],
-		peopleRng: null,
 		titleFounded: new Uint8Array(nations.titles.count + TITLE_CAPACITY),
 		titleLapseSince: new Float64Array(
 			nations.titles.count + TITLE_CAPACITY,
@@ -719,13 +685,8 @@ function createHistoryState({
 		religion: religions?.assignment.slice() ?? new Int32Array(P).fill(-1),
 		religionCount: religions?.count ?? 0,
 		religionColors: religions?.colors.slice() ?? new Float32Array(0),
-		religionGenderDoctrines: RELIGION.assignGenderDoctrines({
-			religionCount: religions?.count ?? 0,
-		}),
 		nationColors: nations.colors.slice(),
 		governmentType: nations.governmentType?.slice() ?? new Uint8Array(P),
-		successionLaw: new Uint8Array(P),
-		genderLaw: new Uint8Array(P),
 		wars: [],
 		events: [],
 		journal: [],
@@ -792,14 +753,7 @@ function createHistoryState({
 		if (provinces.desolate[p]) continue
 		if (state.stateless[p]) continue
 		if (nations.parent[p] >= 0) continue
-		RULER.install({
-			state,
-			seat: p,
-			heir: UNNAMED,
-			dynasty: -1,
-			rng,
-			initial: true,
-		})
+		spawnLeader({ state, p, rng })
 	}
 	initDynasties({ state, rng })
 	rebuildAssignment({ state })
@@ -922,6 +876,5 @@ export const STATE = {
 	provinceDistanceSq,
 	createHistoryState,
 	spawnLeader,
-	applyDerivedParents,
 	considerTitles,
 }

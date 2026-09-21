@@ -1,5 +1,4 @@
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
-import { DIVISION } from "@/model/history/sim/engine/events/succession/division"
 import type {
 	ClaimParams,
 	InitSuccessionParams,
@@ -9,23 +8,12 @@ import type {
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import { HEIRS } from "@/model/history/sim/heirs"
-import { NO_HEIR, UNNAMED } from "@/model/history/sim/heirs/types"
-import { RULER } from "@/model/history/sim/ruler"
-import { SUCCESSION_LAW } from "@/model/history/sim/succession-law"
-import { DEJURE } from "@/model/society/dejure"
 
 function initSuccession({ state }: InitSuccessionParams): void {
-	if (state.people) return
-	const rulers = new Set<number>()
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		if (STATE.isSovereign({ state, p })) rulers.add(p)
-	}
-	for (let title = 0; title < state.titles.count; title++)
-		if (state.titles.holder[title] >= 0) rulers.add(state.titles.holder[title])
-	for (const p of rulers) {
-		if (state.leaderNameSeedCurrent[p] < 0) continue
+		if (!STATE.isSovereign({ state, p })) continue
+		// Schedule succession at leader's death
 		state.heap.enqueue(
 			state.leaderRuntime.end[p],
 			EVENT_HEAP.evt.SUCCESSION,
@@ -163,80 +151,68 @@ function runSuccession({
 	leaderIdx,
 	rng,
 }: RunSuccessionParams): void {
+	// Check if this is still the current leader
 	if (state.leaderRuntime.idx[province] !== leaderIdx) return
-	const sovereign = STATE.isSovereign({ state, p: province })
-	const realm = state.sovereignCurrent[province]
-	if (!sovereign && !state.titles.holder.includes(province)) return
-	const dynasty = state.leaderDynCurrent[province]
-	const dyingPerson = state.people?.holderOfSeat[province] ?? -1
-	const law = SUCCESSION_LAW.lawOf({ state, nation: realm })
-	const heirs = HEIRS.of({ state, dying: province, law, rng })
-	if (heirs.primary === NO_HEIR && !sovereign) {
-		const liege = state.parentCurrent[province]
-		if (liege < 0) throw new Error("Vassal without a liege")
-		RULER.vacate({ state, seat: province })
-		for (let title = 0; title < state.titles.count; title++) {
-			if (state.titles.holder[title] !== province) continue
-			state.titles.holder[title] = liege
+	// Belt-and-suspenders: only sovereign provinces have leaders
+	if (!STATE.isSovereign({ state, p: province })) return
+
+	// Spawn new leader
+	STATE.spawnLeader({ state, p: province, rng })
+
+	state.events.push({
+		tag: "succession",
+		time: state.time,
+		data: {
+			nation: province,
+			leader: leaderIdx,
+			successor: state.leaderRuntime.idx[province],
+		},
+	})
+
+	// Schedule next succession
+	state.heap.enqueue(
+		state.leaderRuntime.end[province],
+		EVENT_HEAP.evt.SUCCESSION,
+		province,
+		state.leaderRuntime.idx[province],
+	)
+
+	// Regency check
+	regency({ state, p: province })
+
+	// Compute claim and handle PU formation
+	claim({ state, p: province, rng })
+
+	// Random subject rebellions during succession
+	const overlord = FIELDS.prov.parent.get({ state, p: province })
+	if (overlord < 0 && STATE.getChildren({ state, p: province }).length > 0) {
+		const subjects = rng
+			.shuffle(STATE.getChildren({ state, p: province }))
+			.filter((s: number) => {
+				const provinces = STATE.getNationProvinces({ state, root: s })
+				return !provinces.some((q) => state.occupationCurrent[q] >= 0)
+			})
+
+		const rebellionChance = 0.12
+		const subject = subjects[0]
+		if (
+			subject !== undefined &&
+			rng.random() < rebellionChance &&
+			FIELDS.prov.parent.get({ state, p: subject }) === province
+		) {
+			STATE.releaseProvince({ state, p: subject, rng })
 			state.events.push({
-				tag: "title passed",
+				tag: "rebellion",
 				time: state.time,
-				data: { title, from: province, to: liege, cause: "escheat" },
+				data: { overlord: province, subject, succession: true },
 			})
 		}
-	} else {
-		RULER.install({
-			state,
-			seat: province,
-			heir: heirs.primary === NO_HEIR ? UNNAMED : heirs.primary,
-			dynasty: heirs.primary === NO_HEIR ? state.nextDynasty++ : dynasty,
-			rng,
-			initial: false,
-		})
-		state.events.push({
-			tag: sovereign ? "succession" : "ruler succession",
-			time: state.time,
-			data: {
-				nation: province,
-				leader: leaderIdx,
-				successor: state.leaderRuntime.idx[province],
-			},
-		})
-		regency({ state, p: province })
-		if (heirs.primary === NO_HEIR)
-			FIELDS.prov.leader.claim.set({ state, p: province, value: 1 })
-		else {
-			if (state.people) {
-				const child =
-					state.people.persons.father[heirs.primary] === dyingPerson ||
-					state.people.persons.mother[heirs.primary] === dyingPerson
-				FIELDS.prov.leader.claim.set({
-					state,
-					p: province,
-					value: child ? 3 : 2,
-				})
-			} else if (sovereign) claim({ state, p: province, rng })
-			DIVISION.divide({
-				state,
-				dying: province,
-				juniors: heirs.juniors,
-				law,
-				rng,
-			})
-		}
+
+		// Fix disconnected vassals
+		STATE.fixConnections({ state, nation: province, rng })
 	}
-	state.seatRank = DEJURE.seatRank({
-		titles: state.titles,
-		provinceCount: state.P,
-		heldOnly: true,
-		ownerOf: state.sovereignCurrent,
-	})
-	STATE.applyDerivedParents({
-		state,
-		nation: realm,
-		members: STATE.getNationProvinces({ state, root: realm }),
-	})
-	STATE.considerTitles({ state, nation: realm, rng })
+
+	STATE.considerTitles({ state, nation: province, rng })
 }
 
 export const SUCCESSION = {
