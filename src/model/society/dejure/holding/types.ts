@@ -39,6 +39,7 @@ export interface MinToHoldParams {
 }
 
 export interface NextHolderParams {
+	current: number
 	counts: ShareCounts
 	tier: number
 }

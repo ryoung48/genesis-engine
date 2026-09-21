@@ -9,6 +9,9 @@ import type {
 } from "@/model/society/dejure/holding/types"
 import { TITLES } from "@/model/society/titles"
 
+const KEEP_SHARE = 0.5
+const CHALLENGE_SHARE = 0.25
+
 function minToHold({ tier, total }: MinToHoldParams): number {
 	return Math.min(
 		total,
@@ -29,13 +32,24 @@ function shareCounts({
 	return { total: members.offset[title + 1] - members.offset[title], byOwner }
 }
 
-function nextHolder({ counts, tier }: NextHolderParams): number {
-	const need = Math.max(
-		minToHold({ tier, total: counts.total }),
-		Math.floor(counts.total / 2) + 1,
-	)
-	for (const [owner, count] of counts.byOwner) if (count >= need) return owner
-	return -1
+function nextHolder({ current, counts, tier }: NextHolderParams): number {
+	const need = minToHold({ tier, total: counts.total })
+	const held = current >= 0 ? (counts.byOwner.get(current) ?? 0) : 0
+	if (held >= need && held >= counts.total * KEEP_SHARE) return current
+	let best = -1
+	let bestCount = 0
+	for (const [owner, count] of counts.byOwner)
+		if (count > bestCount || (count === bestCount && owner < best)) {
+			best = owner
+			bestCount = count
+		}
+	const challenges =
+		best >= 0 &&
+		bestCount >= need &&
+		bestCount > held &&
+		(held < need || bestCount >= counts.total * CHALLENGE_SHARE)
+	if (challenges) return best
+	return held >= need ? current : -1
 }
 
 function bestSeat({
@@ -69,7 +83,10 @@ function settleTitle(params: SettleTitleParams): TitleChange[] {
 	const { titles, ownerOf, title } = params
 	const changes: TitleChange[] = []
 	const previous = titles.holder[title]
+	const liveHolder =
+		previous >= 0 && ownerOf[previous] === previous ? previous : -1
 	const holder = nextHolder({
+		current: liveHolder,
 		counts: shareCounts(params),
 		tier: titles.tier[title],
 	})
