@@ -338,14 +338,12 @@ export function useNationWikiData(
 		})
 
 		const titleSummary = TITLE_SUMMARY.describe({
-			record,
 			frame,
 			nationId,
 			provinceName: (province) =>
 				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
 		})
 		const stats = buildNationWikiStats({
-			liegeLabel: titleSummary.liege,
 			totalAreaKm2,
 			totalPopulation,
 			totalUrbanPopulation,
@@ -1390,6 +1388,7 @@ export function useNationWikiData(
 			currentDate: daysFromMs(history.selectedTimeMs),
 			currentDateLabel: DATE.formatHistoryTimeMs(history.selectedTimeMs),
 			timelineEvents,
+			regions: titleSummary.regions,
 			onBack: () => setSelectedWikiNationId(null),
 			onFocusNation: () => focusNation(nationId),
 			onSelectNation: (targetTag: string) => {

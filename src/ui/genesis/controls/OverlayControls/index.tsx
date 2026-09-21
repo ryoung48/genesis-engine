@@ -77,7 +77,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	showGrid,
 	setShowGrid,
 	showNationBorders,
+	showDistrictBorders,
 	setShowNationBorders,
+	setShowDistrictBorders,
 	titleBorderTiers,
 	setTitleBorderTiers,
 	nationMode,
@@ -354,7 +356,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									societyExpanded={societyExpanded}
 									setSocietyExpanded={setSocietyExpanded}
 									showNationBorders={showNationBorders}
+									showDistrictBorders={showDistrictBorders}
 									setShowNationBorders={setShowNationBorders}
+									setShowDistrictBorders={setShowDistrictBorders}
 									showInfrastructure={showInfrastructure}
 									setShowInfrastructure={setShowInfrastructure}
 									colorMode={colorMode}

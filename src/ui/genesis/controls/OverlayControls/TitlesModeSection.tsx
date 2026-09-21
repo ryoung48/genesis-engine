@@ -58,6 +58,7 @@ export const TitlesModeSection: React.FC<TitlesModeSectionProps> = ({
 							{ value: "titlesKingdom" as const, label: "Kingdom" },
 							{ value: "titlesEmpire" as const, label: "Empire" },
 							{ value: "titlesHegemony" as const, label: "Hegemony" },
+							{ value: "titlesRanks" as const, label: "Ranks" },
 						]}
 						value={nationMode}
 						onChange={(v) => setNationMode(v)}

@@ -4,6 +4,7 @@ import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
+	InfrastructureResult,
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
 
@@ -122,10 +123,7 @@ export interface GenerationCallbacks {
 	}) => void
 	/** Fired when a "compute-infrastructure" request completes -- see
 	 * requestInfrastructure below. */
-	onInfrastructureResult?: (result: {
-		routes: SerializedGenesisWorld["routes"]
-		network: SerializedGenesisWorld["network"]
-	}) => void
+	onInfrastructureResult?: (result: InfrastructureResult) => void
 }
 
 function createWorker(

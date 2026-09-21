@@ -35,6 +35,7 @@ export interface StoredViewPrefs {
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
+	showDistrictBorders: boolean
 	titleBorderTiers: TitleBorderTier[]
 	labelMode: LabelMode
 	showElevation: boolean
@@ -129,6 +130,7 @@ const NATION_MAP_MODES = new Set<NationMapMode>([
 	"titlesKingdom",
 	"titlesEmpire",
 	"titlesHegemony",
+	"titlesRanks",
 ])
 
 const SOCIETY_MAP_MODES = new Set<SocietyMapMode>([
@@ -161,6 +163,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showWireframe: false,
 	showGrid: true,
 	showNationBorders: false,
+	showDistrictBorders: false,
 	titleBorderTiers: [],
 	labelMode: {
 		nations: false,
@@ -333,6 +336,10 @@ export function parseStoredViewPrefs(
 			showNationBorders: readBoolean(
 				parsed.showNationBorders,
 				DEFAULT_VIEW_PREFS.showNationBorders,
+			),
+			showDistrictBorders: readBoolean(
+				parsed.showDistrictBorders,
+				DEFAULT_VIEW_PREFS.showDistrictBorders,
 			),
 			titleBorderTiers: parseTitleBorderTiers(parsed.titleBorderTiers),
 			labelMode: parseLabelMode(parsed.labelMode),

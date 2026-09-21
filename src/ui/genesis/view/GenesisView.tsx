@@ -11,7 +11,10 @@ import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/
 import { DATE } from "@/model/history/earth/date"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { StageTiming } from "@/model/pipelines/types"
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import type {
+	InfrastructureResult,
+	SerializedGenesisWorld,
+} from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
 import {
@@ -139,6 +142,8 @@ export const GenesisView: React.FC<{
 
 	// Core state
 	const [world, setWorld] = useState<SerializedGenesisWorld | null>(null)
+	const [infrastructure, setInfrastructure] =
+		useState<InfrastructureResult | null>(null)
 	const [generationTimings, setGenerationTimings] = useState<
 		StageTiming[] | null
 	>(null)
@@ -203,6 +208,7 @@ export const GenesisView: React.FC<{
 		setShowGrid,
 		setShowInfrastructure,
 		setShowNationBorders,
+		setShowDistrictBorders,
 		setTitleBorderTiers,
 		setShowOceanCurrents,
 		setShowPet,
@@ -231,6 +237,7 @@ export const GenesisView: React.FC<{
 		showGrid,
 		showInfrastructure,
 		showNationBorders,
+		showDistrictBorders,
 		titleBorderTiers,
 		showOceanCurrents,
 		showPet,
@@ -1242,7 +1249,7 @@ export const GenesisView: React.FC<{
 							endRegion: info.region,
 							allowLand: pathfindingLand,
 							allowSea: pathfindingSea,
-							network: worldForDisplay.network ?? null,
+							network: infrastructure?.network ?? null,
 						})
 					}
 				}
@@ -1323,6 +1330,7 @@ export const GenesisView: React.FC<{
 		pathfindingLand,
 		pathfindingSea,
 		worldForDisplay,
+		infrastructure,
 		setMeasureMode,
 		history.state,
 		history.query,
@@ -1450,6 +1458,7 @@ export const GenesisView: React.FC<{
 		setDraftMapProjectionLatitude,
 		exportCenterLongitude,
 		showNationBorders,
+		showDistrictBorders,
 		titleBorderTiers: activeTitleBorderTiers,
 		sceneFrame,
 		showWireframe,
@@ -1457,6 +1466,7 @@ export const GenesisView: React.FC<{
 		showGrid,
 		gridSpacing,
 		showInfrastructure,
+		infrastructure,
 		showElevation,
 		eu4GhslSettlements,
 		labelMode,
@@ -1482,6 +1492,7 @@ export const GenesisView: React.FC<{
 		workerRef,
 		lastWorldRef,
 		setWorld,
+		setInfrastructure,
 		setSelectedTimeMs,
 		simStartTimeMs,
 		setShowCoastlines,
@@ -2077,7 +2088,7 @@ export const GenesisView: React.FC<{
 								clockMonth={clockMonth}
 								unitSystem={unitSystem}
 								world={worldForDisplay}
-								routes={worldForDisplay?.routes ?? null}
+								routes={infrastructure?.routes ?? null}
 								hoverCardRef={hoverCardRef}
 								getProvinceName={getProvinceName}
 								getLeaderName={getLeaderName}
@@ -2164,7 +2175,9 @@ export const GenesisView: React.FC<{
 								showGrid={showGrid}
 								setShowGrid={setShowGrid}
 								showNationBorders={showNationBorders}
+								showDistrictBorders={showDistrictBorders}
 								setShowNationBorders={setShowNationBorders}
+								setShowDistrictBorders={setShowDistrictBorders}
 								titleBorderTiers={titleBorderTiers}
 								setTitleBorderTiers={setTitleBorderTiers}
 								nationMode={nationMode}
@@ -2242,6 +2255,7 @@ export const GenesisView: React.FC<{
 									setShowRivers(false)
 									setShowThermalEquator(false)
 									setShowNationBorders(false)
+									setShowDistrictBorders(false)
 									setTitleBorderTiers([])
 									setLabelMode({
 										nations: false,

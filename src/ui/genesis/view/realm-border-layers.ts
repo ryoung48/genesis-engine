@@ -1,11 +1,17 @@
+import { FRAME } from "@/model/history/world-frame"
 import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
 import type { RealmBorderLayer } from "@/ui/genesis/renderer/types"
 import { TITLE_BORDER_TIERS } from "@/ui/genesis/shared/map-modes"
 import { TITLE_TIER_COLORS } from "@/ui/genesis/shared/title-colors"
-import type { BuildRealmBorderLayersParams } from "@/ui/genesis/view/types"
+import type {
+	BuildDistrictBorderLayerParams,
+	BuildRealmBorderLayersParams,
+} from "@/ui/genesis/view/types"
 
 const BARONY_BORDER_COLOR: [number, number, number] = [0.08, 0.08, 0.08]
+const DISTRICT_BORDER_COLOR: [number, number, number] = [0.05, 0.05, 0.05]
+const DISTRICT_LINE_WIDTH = 1.8
 const BORDER_DARKEN = 0.2
 
 const LINE_WIDTHS = {
@@ -106,14 +112,51 @@ export function buildRealmBorderLayers({
 	tiers,
 }: BuildRealmBorderLayersParams): RealmBorderLayer[] {
 	return TITLE_BORDER_TIERS.filter((tier) => tiers.includes(tier)).map(
-		(tier) => ({
+		(tier): RealmBorderLayer => ({
 			regionRealm: buildRegionRealms({ frame, world, tier }),
 			color: tierColor(tier),
 			linewidth: LINE_WIDTHS[tier],
+			dashed: false,
+			regionGroup: null,
 			markerRegions: buildMarkerRegions({ frame, world, tier }),
 			markerColor: markerFillColor(tier),
 			globeMarkerSize: MARKER_SIZES[tier].globe,
 			mapMarkerRadius: MARKER_SIZES[tier].map,
 		}),
 	)
+}
+
+export function buildDistrictBorderLayer({
+	frame,
+	world,
+}: BuildDistrictBorderLayerParams): RealmBorderLayer | null {
+	const reports = FRAME.directReports({ frame })
+	if (reports.length === 0) return null
+	const seats = new Set(reports.map((report) => report.seat))
+	const { regionProvince } = world.provinces
+	const regionRealm = new Int32Array(regionProvince.length).fill(-1)
+	const regionGroup = new Int32Array(regionProvince.length).fill(-1)
+	for (let region = 0; region < regionProvince.length; region++) {
+		const province = regionProvince[region]
+		if (province < 0) continue
+		const nation = frame.provinceNation[province]
+		const capital = frame.nations.get(nation)?.capitalProvince ?? -1
+		if (capital < 0) continue
+		let current = province
+		while (current >= 0 && current !== capital && !seats.has(current))
+			current = frame.provinceParent[current]
+		regionRealm[region] = seats.has(current) ? current : capital
+		regionGroup[region] = nation
+	}
+	return {
+		regionRealm,
+		color: DISTRICT_BORDER_COLOR,
+		linewidth: DISTRICT_LINE_WIDTH,
+		dashed: true,
+		regionGroup,
+		markerRegions: new Int32Array(0),
+		markerColor: DISTRICT_BORDER_COLOR,
+		globeMarkerSize: 0,
+		mapMarkerRadius: 0,
+	}
 }

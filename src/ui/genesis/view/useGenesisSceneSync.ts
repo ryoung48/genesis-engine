@@ -4,7 +4,10 @@ import {
 	buildGhslSettlementPopulationSlice,
 	topSettlementIndices,
 } from "@/ui/genesis/generation/earth-assets"
-import { buildRealmBorderLayers } from "@/ui/genesis/view/realm-border-layers"
+import {
+	buildDistrictBorderLayer,
+	buildRealmBorderLayers,
+} from "@/ui/genesis/view/realm-border-layers"
 import type { GenesisSceneSyncInput } from "@/ui/genesis/view/types"
 /**
  * Pushes UI state into the live GenesisScene: hovered region, border and
@@ -25,6 +28,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		setDraftMapProjectionLatitude,
 		exportCenterLongitude,
 		showNationBorders,
+		showDistrictBorders,
 		titleBorderTiers,
 		sceneFrame,
 		showWireframe,
@@ -32,6 +36,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		showGrid,
 		gridSpacing,
 		showInfrastructure,
+		infrastructure,
 		showElevation,
 		eu4GhslSettlements,
 		labelMode,
@@ -55,23 +60,24 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (
-			worldForDisplay?.provinces &&
-			sceneFrame &&
-			titleBorderTiers.length > 0
-		) {
-			scene.setRealmBorders({
-				world: worldForDisplay,
-				layers: buildRealmBorderLayers({
-					frame: sceneFrame,
-					world: { ...worldForDisplay, provinces: worldForDisplay.provinces },
-					tiers: titleBorderTiers,
-				}),
-			})
-		} else {
+		if (!worldForDisplay?.provinces || !sceneFrame) {
 			scene.setRealmBorders(null)
+			return
 		}
-	}, [worldForDisplay, sceneFrame, titleBorderTiers])
+		const world = { ...worldForDisplay, provinces: worldForDisplay.provinces }
+		const layers = buildRealmBorderLayers({
+			frame: sceneFrame,
+			world,
+			tiers: titleBorderTiers,
+		})
+		const administrative = showDistrictBorders
+			? buildDistrictBorderLayer({ frame: sceneFrame, world })
+			: null
+		if (administrative) layers.push(administrative)
+		scene.setRealmBorders(
+			layers.length > 0 ? { world: worldForDisplay, layers } : null,
+		)
+	}, [worldForDisplay, sceneFrame, titleBorderTiers, showDistrictBorders])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setViewMode(viewMode)
@@ -143,16 +149,12 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (
-			showInfrastructure &&
-			!isEarthImportDisplay &&
-			worldForDisplay?.network
-		) {
-			scene.setInfrastructure(worldForDisplay.network)
+		if (showInfrastructure && !isEarthImportDisplay && infrastructure) {
+			scene.setInfrastructure(infrastructure.network)
 		} else {
 			scene.setInfrastructure(null)
 		}
-	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay])
+	}, [showInfrastructure, isEarthImportDisplay, infrastructure])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setEu4SettlementsVisible(

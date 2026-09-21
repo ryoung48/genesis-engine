@@ -8,6 +8,7 @@ import {
 	TERRAIN_ELEVATION_SCALE,
 } from "@/ui/genesis/renderer/overlay-builders/shared"
 import type {
+	CreateBorderLinesParams,
 	GenesisViewMode,
 	RealmBorderLayer,
 	RealmBordersSpec,
@@ -17,12 +18,15 @@ interface RealmBoundarySide {
 	r0: number
 	r1: number
 	landRegions: number[]
-	tInner: number
-	tOuter: number
+	from: number
+	to: number
 }
 
 const GLOBE_LAYER_RADIUS_STEP = 0.0008
 const MAP_LAYER_Z_STEP = 0.001
+const GLOBE_DASH_SIZE = 0.005
+const MAP_DASH_SIZE = 0.003
+const DASH_GAP_RATIO = 0.5
 const MARKER_OUTLINE_SCALE = 1.45
 const OUTLINE_COLOR = new THREE.Color(0.04, 0.04, 0.04)
 
@@ -150,6 +154,36 @@ function createMapMarkers(
 	return [outline, fill]
 }
 
+function chainBoundarySides(sides: RealmBoundarySide[]): RealmBoundarySide[] {
+	const incident = new Map<number, number[]>()
+	sides.forEach((side, index) => {
+		for (const vertex of [side.from, side.to]) {
+			const list = incident.get(vertex)
+			if (list) list.push(index)
+			else incident.set(vertex, [index])
+		}
+	})
+	const used = new Uint8Array(sides.length)
+	const ordered: RealmBoundarySide[] = []
+	const walk = (startIndex: number, startVertex: number) => {
+		let index = startIndex
+		let vertex = startVertex
+		while (index >= 0) {
+			used[index] = 1
+			const side = sides[index]
+			const forward = side.from === vertex
+			ordered.push(forward ? side : { ...side, from: side.to, to: side.from })
+			vertex = forward ? side.to : side.from
+			index = incident.get(vertex)?.find((candidate) => !used[candidate]) ?? -1
+		}
+	}
+	for (const [vertex, list] of incident)
+		if (list.length === 1 && !used[list[0]]) walk(list[0], vertex)
+	for (let index = 0; index < sides.length; index++)
+		if (!used[index]) walk(index, sides[index].from)
+	return ordered
+}
+
 function forEachRealmBoundarySide(
 	spec: RealmBordersSpec,
 	layer: RealmBorderLayer,
@@ -159,6 +193,7 @@ function forEachRealmBoundarySide(
 	if (!provinces) return
 	const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t } = mesh
 	const { regionProvince } = provinces
+	const sides: RealmBoundarySide[] = []
 	for (let side = 0; side < numSides; side++) {
 		const opposite = halfedges[side]
 		if (opposite < 0 || side > opposite) continue
@@ -168,26 +203,38 @@ function forEachRealmBoundarySide(
 		const land1 = regionProvince[r1] >= 0
 		if (!land0 && !land1) continue
 		if (land0 && land1) {
-			if (layer.regionRealm[r0] === layer.regionRealm[r1]) continue
-		} else if (layer.regionRealm[land0 ? r0 : r1] < 0) continue
-		const tInner = s_inner_t[side]
-		const tOuter = s_outer_t[side]
-		if (tInner < 0 || tOuter < 0) continue
-		visit({
+			const realm0 = layer.regionRealm[r0]
+			const realm1 = layer.regionRealm[r1]
+			if (realm0 === realm1) continue
+			if (
+				layer.regionGroup &&
+				(realm0 < 0 ||
+					realm1 < 0 ||
+					layer.regionGroup[r0] !== layer.regionGroup[r1])
+			)
+				continue
+		} else if (layer.regionGroup || layer.regionRealm[land0 ? r0 : r1] < 0)
+			continue
+		const from = s_inner_t[side]
+		const to = s_outer_t[side]
+		if (from < 0 || to < 0) continue
+		sides.push({
 			r0,
 			r1,
 			landRegions: land0 && land1 ? [r0, r1] : [land0 ? r0 : r1],
-			tInner,
-			tOuter,
+			from,
+			to,
 		})
 	}
+	for (const side of chainBoundarySides(sides)) visit(side)
 }
 
-function createBorderLines(
-	positions: number[],
-	layer: RealmBorderLayer,
-	canvas: HTMLCanvasElement,
-): LineSegments2 | null {
+function createBorderLines({
+	positions,
+	layer,
+	canvas,
+	dashSize,
+}: CreateBorderLinesParams): LineSegments2 | null {
 	if (positions.length === 0) return null
 	const geometry = new LineSegmentsGeometry()
 	geometry.setPositions(positions)
@@ -201,6 +248,9 @@ function createBorderLines(
 		transparent: true,
 		opacity: 1,
 		depthWrite: false,
+		dashed: layer.dashed,
+		dashSize,
+		gapSize: dashSize * DASH_GAP_RATIO,
 	})
 	const lines = new LineSegments2(geometry, material)
 	lines.computeLineDistances()
@@ -219,7 +269,7 @@ export function buildGlobeRealmBorders(
 	const group = new THREE.Group()
 	spec.layers.forEach((layer, index) => {
 		const positions: number[] = []
-		forEachRealmBoundarySide(spec, layer, ({ landRegions, tInner, tOuter }) => {
+		forEachRealmBoundarySide(spec, layer, ({ landRegions, from, to }) => {
 			const averageElevation =
 				landRegions.reduce((sum, region) => sum + elevation[region], 0) /
 				landRegions.length
@@ -231,15 +281,20 @@ export function buildGlobeRealmBorders(
 			const radius =
 				baseRadius + GLOBE_LAYER_RADIUS_STEP * (index + 1) + elevationFactor
 			positions.push(
-				t_xyz[3 * tInner] * radius,
-				t_xyz[3 * tInner + 1] * radius,
-				t_xyz[3 * tInner + 2] * radius,
-				t_xyz[3 * tOuter] * radius,
-				t_xyz[3 * tOuter + 1] * radius,
-				t_xyz[3 * tOuter + 2] * radius,
+				t_xyz[3 * from] * radius,
+				t_xyz[3 * from + 1] * radius,
+				t_xyz[3 * from + 2] * radius,
+				t_xyz[3 * to] * radius,
+				t_xyz[3 * to + 1] * radius,
+				t_xyz[3 * to + 2] * radius,
 			)
 		})
-		const lines = createBorderLines(positions, layer, canvas)
+		const lines = createBorderLines({
+			positions,
+			layer,
+			canvas,
+			dashSize: GLOBE_DASH_SIZE,
+		})
 		if (lines) group.add(lines)
 		const markerRadius = (region: number) => {
 			const averageElevation = elevation[region]
@@ -279,16 +334,16 @@ export function buildMapRealmBorders(
 	spec.layers.forEach((layer, index) => {
 		const positions: number[] = []
 		const z = 0.02 + MAP_LAYER_Z_STEP * index
-		forEachRealmBoundarySide(spec, layer, ({ tInner, tOuter }) => {
+		forEachRealmBoundarySide(spec, layer, ({ from, to }) => {
 			const a = projection.projectCartesian(
-				t_xyz[3 * tInner],
-				t_xyz[3 * tInner + 1],
-				t_xyz[3 * tInner + 2],
+				t_xyz[3 * from],
+				t_xyz[3 * from + 1],
+				t_xyz[3 * from + 2],
 			)
 			const b = projection.projectCartesian(
-				t_xyz[3 * tOuter],
-				t_xyz[3 * tOuter + 1],
-				t_xyz[3 * tOuter + 2],
+				t_xyz[3 * to],
+				t_xyz[3 * to + 1],
+				t_xyz[3 * to + 2],
 			)
 			appendProjectedSegment(
 				positions,
@@ -298,7 +353,12 @@ export function buildMapRealmBorders(
 				z,
 			)
 		})
-		const lines = createBorderLines(positions, layer, canvas)
+		const lines = createBorderLines({
+			positions,
+			layer,
+			canvas,
+			dashSize: MAP_DASH_SIZE,
+		})
 		if (lines) group.add(lines)
 		for (const marker of createMapMarkers(layer, spec, projection, z + 0.0005))
 			group.add(marker)

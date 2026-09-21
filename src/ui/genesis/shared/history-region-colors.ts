@@ -18,7 +18,10 @@ import {
 	type NationMapMode,
 	type SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
-import { tintNationColor } from "@/ui/genesis/shared/title-colors"
+import {
+	TITLE_TIER_COLORS,
+	tintNationColor,
+} from "@/ui/genesis/shared/title-colors"
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 
@@ -149,6 +152,14 @@ export function computeHistoryRegionColors(params: {
 			perNation.set(holder, next + 1)
 		}
 	}
+	const seatRank =
+		isPolitical && nationMode === "titlesRanks" && titles
+			? DEJURE.seatRank({
+					titles,
+					provinceCount: frame.provinceCount,
+					heldOnly: true,
+				})
+			: new Uint8Array(frame.provinceCount)
 	const nationBase = (id: number): [number, number, number] => {
 		const nation = frame.nations.get(id)
 		return nation
@@ -258,6 +269,14 @@ export function computeHistoryRegionColors(params: {
 					r,
 					darkenPoliticalAtElevation(
 						tintNationColor({ base: nationBase(owner), index: p }),
+						elevationKm[r] ?? 0,
+					),
+				)
+			} else if (nationMode === "titlesRanks") {
+				write(
+					r,
+					darkenPoliticalAtElevation(
+						[...TITLE_TIER_COLORS[TITLES.tierOrder[seatRank[p]]]],
 						elevationKm[r] ?? 0,
 					),
 				)

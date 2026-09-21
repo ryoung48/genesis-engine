@@ -125,10 +125,20 @@ export interface RealmBorderLayer {
 	regionRealm: Int32Array
 	color: readonly [number, number, number]
 	linewidth: number
+	dashed: boolean
+	// [JUSTIFICATION] Tier layers draw every realm change, including against unowned land; only district layers restrict drawing to boundaries within one group.
+	regionGroup: Int32Array | null
 	markerRegions: Int32Array
 	markerColor: readonly [number, number, number]
 	globeMarkerSize: number
 	mapMarkerRadius: number
+}
+
+export interface CreateBorderLinesParams {
+	positions: number[]
+	layer: RealmBorderLayer
+	canvas: HTMLCanvasElement
+	dashSize: number
 }
 
 export interface RealmBordersSpec {

@@ -20,6 +20,7 @@ export type TitlesNationMode =
 	| "titlesKingdom"
 	| "titlesEmpire"
 	| "titlesHegemony"
+	| "titlesRanks"
 
 export type TitleBorderTier =
 	| "barony"
@@ -157,6 +158,7 @@ const TITLES_NATION_MODES: readonly TitlesNationMode[] = [
 	"titlesKingdom",
 	"titlesEmpire",
 	"titlesHegemony",
+	"titlesRanks",
 ]
 
 export const DEFAULT_TITLES_MODE: TitlesNationMode = "titlesDuchy"

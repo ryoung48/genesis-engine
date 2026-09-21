@@ -52,8 +52,6 @@ export function buildNationWikiStats(params: {
 	rulerLabel?: string | null
 	governmentSubtype: string | null
 	governmentColor: string | null
-	// [JUSTIFICATION] An independent nation with no holder above it has no liege row.
-	liegeLabel: string | null
 }): StatEntry[] {
 	const {
 		totalAreaKm2,
@@ -63,7 +61,6 @@ export function buildNationWikiStats(params: {
 		rulerLabel,
 		governmentSubtype,
 		governmentColor,
-		liegeLabel,
 	} = params
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
 	return [
@@ -84,6 +81,5 @@ export function buildNationWikiStats(params: {
 			value: governmentSubtype ?? "Unknown",
 			swatchColor: governmentColor,
 		},
-		...(liegeLabel !== null ? [{ label: "Liege", value: liegeLabel }] : []),
 	]
 }

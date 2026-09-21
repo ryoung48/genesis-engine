@@ -301,8 +301,7 @@ function createBatchedLine(
 		opacity: style.opacity,
 		depthWrite: false,
 		dashed: style.dashed,
-		dashSize: style.dashed ? SEA_ROUTE_DASH_STYLE.dashSize : undefined,
-		gapSize: style.dashed ? SEA_ROUTE_DASH_STYLE.gapSize : undefined,
+		...(style.dashed ? SEA_ROUTE_DASH_STYLE : {}),
 	})
 	material.userData.baseWidth = style.baseWidth
 	material.resolution.set(resolution.width, resolution.height)

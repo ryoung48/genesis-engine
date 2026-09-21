@@ -268,8 +268,6 @@ export interface SerializedGenesisWorld {
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
 	settlementPortRegions?: Int32Array
-	routes?: SerializedRoutes
-	network?: SerializedNetwork
 	/** Terrain/map geometry for the default display state (colorMode
 	 * "terrain", no region colors, elevation on, map centered at lon/lat 0),
 	 * computed once in genesis.worker.ts so the main thread doesn't have to
@@ -298,6 +296,11 @@ export interface SerializedNetwork {
 	kind: Uint8Array
 	usage: Int32Array
 	weight: Float32Array
+}
+
+export interface InfrastructureResult {
+	routes: SerializedRoutes
+	network: SerializedNetwork
 }
 
 export type GenesisWorkerRequest =
@@ -473,11 +476,7 @@ export type GenesisWorkerResponse =
 			travelDays: number
 			reachable: boolean
 	  }
-	| {
-			type: "infrastructure-result"
-			routes: SerializedRoutes
-			network: SerializedNetwork
-	  }
+	| ({ type: "infrastructure-result" } & InfrastructureResult)
 	| {
 			type: "sim-progress"
 			timeMs: number

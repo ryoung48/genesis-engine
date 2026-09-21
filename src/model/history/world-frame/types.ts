@@ -100,6 +100,21 @@ export interface HreMemberNationsParams {
 	frame: WorldFrame
 }
 
+export interface NationFrameParams {
+	frame: WorldFrame
+	nationId: number
+}
+
+export interface DirectReport {
+	seat: number
+	title: number
+	nation: number
+}
+
+export interface DirectReportsParams {
+	frame: WorldFrame
+}
+
 export interface OrgMemberProvincesParams {
 	frame: WorldFrame
 	orgId: string

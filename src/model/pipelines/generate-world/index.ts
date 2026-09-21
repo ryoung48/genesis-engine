@@ -714,8 +714,6 @@ function generateGenesisWorld({
 		settlementPortRegions: provinceSociety.settlementPortRegions,
 		urbanPopulation: urbanization.urbanPopulation,
 		development: urbanization.development,
-		routes: undefined,
-		network: undefined,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: STATS.countContinents({ mesh, isLand }),
 		monthlyTEQ: post.monthlyTEQ,

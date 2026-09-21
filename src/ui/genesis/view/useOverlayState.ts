@@ -112,6 +112,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showNationBorders, setShowNationBorders] = useState(
 		initialViewPrefs.showNationBorders,
 	)
+	const [showDistrictBorders, setShowDistrictBorders] = useState(
+		initialViewPrefs.showDistrictBorders,
+	)
 	const [titleBorderTiers, setTitleBorderTiers] = useState(
 		initialViewPrefs.titleBorderTiers,
 	)
@@ -229,6 +232,7 @@ export function useOverlayState(input: OverlayStateInput) {
 				showWireframe,
 				showGrid,
 				showNationBorders,
+				showDistrictBorders,
 				titleBorderTiers,
 				labelMode,
 				showElevation,
@@ -297,6 +301,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showGrid,
 		showInfrastructure,
 		showNationBorders,
+		showDistrictBorders,
 		titleBorderTiers,
 		labelMode,
 		showElevation,
@@ -382,6 +387,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowGrid,
 		setShowInfrastructure,
 		setShowNationBorders,
+		setShowDistrictBorders,
 		setTitleBorderTiers,
 		setShowOceanCurrents,
 		setShowPet,
@@ -411,6 +417,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showGrid,
 		showInfrastructure,
 		showNationBorders,
+		showDistrictBorders,
 		titleBorderTiers,
 		showOceanCurrents,
 		showPet,

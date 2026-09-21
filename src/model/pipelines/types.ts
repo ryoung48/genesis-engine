@@ -27,10 +27,6 @@ import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
-import type {
-	Route,
-	RouteEdge,
-} from "@/model/society/infrastructure/transport/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
@@ -212,10 +208,6 @@ export interface GenesisWorld {
 	urbanPopulation?: Float32Array
 	/** Per-province development in [0, 1] from the urbanization stage. */
 	development?: Float32Array
-	/** Trade and road routes between settlements. */
-	routes?: Route[]
-	/** Deduplicated route network edges, for rendering and pathfinding. */
-	network?: RouteEdge[]
 	continentCount: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]

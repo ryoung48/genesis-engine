@@ -13,7 +13,9 @@ export interface SocietySectionProps {
 	societyExpanded: boolean
 	setSocietyExpanded: (v: boolean | ((prev: boolean) => boolean)) => void
 	showNationBorders: boolean
+	showDistrictBorders: boolean
 	setShowNationBorders: (v: boolean) => void
+	setShowDistrictBorders: (v: boolean) => void
 	showInfrastructure: boolean
 	setShowInfrastructure: (v: boolean) => void
 	colorMode: ColorMode
@@ -29,6 +31,8 @@ export const SocietySection: React.FC<SocietySectionProps> = ({
 	setSocietyExpanded,
 	showNationBorders,
 	setShowNationBorders,
+	showDistrictBorders,
+	setShowDistrictBorders,
 	showInfrastructure,
 	setShowInfrastructure,
 	colorMode,
@@ -51,6 +55,11 @@ export const SocietySection: React.FC<SocietySectionProps> = ({
 						label="Borders"
 						checked={showNationBorders}
 						onChange={setShowNationBorders}
+					/>
+					<ToggleRow
+						label="Districts"
+						checked={showDistrictBorders}
+						onChange={setShowDistrictBorders}
 					/>
 					<ToggleRow
 						label="Infrastructure"

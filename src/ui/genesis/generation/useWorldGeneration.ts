@@ -48,6 +48,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		workerRef,
 		lastWorldRef,
 		setWorld,
+		setInfrastructure,
 		setSelectedTimeMs,
 		simStartTimeMs,
 		setShowCoastlines,
@@ -106,6 +107,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				setProceduralHistoryPlaying(false)
 				startProceduralJournal([])
 				infrastructureRequestedRef.current = false
+				setInfrastructure(null)
 			}
 			setWorld(w)
 		},
@@ -152,17 +154,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 					sceneRef.current?.setPathfindingOverlay(null, null, null)
 				}
 			},
-			onInfrastructureResult: (result) => {
-				setWorld((prev) =>
-					prev
-						? {
-								...prev,
-								routes: result.routes,
-								network: result.network,
-							}
-						: prev,
-				)
-			},
+			onInfrastructureResult: setInfrastructure,
 		}),
 		[handleSetWorld, startProceduralJournal, recordProceduralJournal],
 	)
@@ -588,7 +580,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleRequestInfrastructure = useCallback(() => {
 		if (infrastructureRequestedRef.current) return
-		if (!lastWorldRef.current || lastWorldRef.current.network) return
+		if (!lastWorldRef.current) return
 		infrastructureRequestedRef.current = true
 		requestInfrastructure(workerRef)
 	}, [])

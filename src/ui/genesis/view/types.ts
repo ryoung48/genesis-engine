@@ -15,7 +15,10 @@ import type { OrgCategorizer } from "@/model/history/earth/organization-categori
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { SocietyEra } from "@/model/society/types"
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import type {
+	InfrastructureResult,
+	SerializedGenesisWorld,
+} from "@/model/worker-protocol/types"
 import type {
 	DangerSubMode,
 	LabelMode,
@@ -246,6 +249,7 @@ export type WorldGenerationInput = {
 					prev: SerializedGenesisWorld | null,
 			  ) => SerializedGenesisWorld | null),
 	) => void
+	setInfrastructure: (infrastructure: InfrastructureResult | null) => void
 	setSelectedTimeMs: (timeMs: number) => void
 	simStartTimeMs: number
 	setShowCoastlines: (show: boolean) => void
@@ -311,6 +315,7 @@ export type GenesisSceneSyncInput = {
 	setDraftMapProjectionLatitude: (latitude: number) => void
 	exportCenterLongitude: number
 	showNationBorders: boolean
+	showDistrictBorders: boolean
 	titleBorderTiers: readonly TitleBorderTier[]
 	sceneFrame: WorldFrame | null
 	showWireframe: boolean
@@ -318,6 +323,7 @@ export type GenesisSceneSyncInput = {
 	showGrid: boolean
 	gridSpacing: number
 	showInfrastructure: boolean
+	infrastructure: InfrastructureResult | null
 	showElevation: boolean
 	eu4GhslSettlements: Eu4GhslSettlementAsset | null
 	labelMode: LabelMode
@@ -336,3 +342,8 @@ export interface BuildRealmBorderLayersParams {
 	}
 	tiers: readonly TitleBorderTier[]
 }
+
+export type BuildDistrictBorderLayerParams = Pick<
+	BuildRealmBorderLayersParams,
+	"frame" | "world"
+>

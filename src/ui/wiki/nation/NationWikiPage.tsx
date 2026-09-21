@@ -58,6 +58,12 @@ export interface NationWikiData {
 	currentDate: number
 	currentDateLabel: string
 	timelineEvents: WikiTimelineEvent[]
+	regions: Array<{
+		province: number
+		provinceName: string
+		tier: string
+		color: string
+	}>
 	onBack: () => void
 	/** Zooms the 3D view to this nation without changing wiki selection. */
 	onFocusNation: () => void
@@ -203,6 +209,28 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 					onSelectDate: nation.onSelectDate,
 				}}
 			/>
+
+			{nation.regions.length > 0 ? (
+				<WikiSection title="Administrative Regions">
+					<div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 font-mono text-[9px] text-slate-700">
+						{nation.regions.map((region, index) => (
+							<React.Fragment key={region.province}>
+								<EntityChip
+									name={region.provinceName}
+									color={region.color}
+									onClick={() => nation.onSelectProvince(region.province)}
+									trailing={
+										<span className="text-slate-400">({region.tier})</span>
+									}
+								/>
+								{index < nation.regions.length - 1 ? (
+									<span className="text-slate-400">,&nbsp;</span>
+								) : null}
+							</React.Fragment>
+						))}
+					</div>
+				</WikiSection>
+			) : null}
 		</div>
 	)
 }

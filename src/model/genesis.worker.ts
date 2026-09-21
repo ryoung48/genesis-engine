@@ -324,8 +324,6 @@ function serializeWorld(
 		settlementRegions: world.settlementRegions,
 		settlementWaterLandmarks: world.settlementWaterLandmarks,
 		settlementPortRegions: world.settlementPortRegions,
-		routes: world.routes ? TRANSPORT.packRoutes(world.routes) : undefined,
-		network: world.network ? TRANSPORT.packNetwork(world.network) : undefined,
 	}
 }
 
@@ -619,24 +617,6 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.settlementRegions) add(world.settlementRegions.buffer)
 	if (world.settlementWaterLandmarks) add(world.settlementWaterLandmarks.buffer)
 	if (world.settlementPortRegions) add(world.settlementPortRegions.buffer)
-	if (world.routes) {
-		add(
-			world.routes.fromProvince.buffer,
-			world.routes.toProvince.buffer,
-			world.routes.kind.buffer,
-			world.routes.pathOffsets.buffer,
-			world.routes.pathRegions.buffer,
-		)
-	}
-	if (world.network) {
-		add(
-			world.network.fromRegion.buffer,
-			world.network.toRegion.buffer,
-			world.network.kind.buffer,
-			world.network.usage.buffer,
-			world.network.weight.buffer,
-		)
-	}
 	if (world.provinces) add(...provinceBuffers(world.provinces))
 	if (world.locations) add(...locationBuffers(world.locations))
 	if (world.rivers) {

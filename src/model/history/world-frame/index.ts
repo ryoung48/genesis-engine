@@ -1,6 +1,9 @@
 import type {
+	DirectReport,
+	DirectReportsParams,
 	HreMemberNationsParams,
 	IsOccupiedParams,
+	NationFrameParams,
 	NationRelations,
 	OrgForeignHoldersParams,
 	OrgMemberProvincesParams,
@@ -35,6 +38,40 @@ function hreMemberNations({ frame }: HreMemberNationsParams): Set<number> {
 		if (frame.provinceHre[province] && nationId >= 0) nations.add(nationId)
 	}
 	return nations
+}
+
+function heldTitles({ frame, nationId }: NationFrameParams): number[] {
+	const held: number[] = []
+	if (!frame.titles) return held
+	for (let title = 0; title < frame.titles.count; title++)
+		if (frame.titles.holder[title] === nationId) held.push(title)
+	return held
+}
+
+function directReports({ frame }: DirectReportsParams): DirectReport[] {
+	const { titles } = frame
+	if (!titles) return []
+	const bestAtSeat = new Map<number, number>()
+	for (let title = 0; title < titles.count; title++) {
+		const seat = titles.seat[title]
+		if (
+			seat < 0 ||
+			titles.holder[title] < 0 ||
+			titles.holder[title] !== frame.provinceNation[seat]
+		)
+			continue
+		const best = bestAtSeat.get(seat)
+		if (best === undefined || titles.tier[title] > titles.tier[best])
+			bestAtSeat.set(seat, title)
+	}
+	const reports: DirectReport[] = []
+	for (const [seat, title] of bestAtSeat) {
+		const nation = titles.holder[title]
+		const capital = frame.nations.get(nation)?.capitalProvince ?? -1
+		if (capital >= 0 && frame.provinceParent[seat] === capital)
+			reports.push({ seat, title, nation })
+	}
+	return reports
 }
 
 function orgMemberProvinces({
@@ -118,6 +155,8 @@ export const FRAME = {
 	emptyRelations,
 	isOccupied,
 	hreMemberNations,
+	heldTitles,
+	directReports,
 	orgMemberProvinces,
 	orgForeignHolders,
 	toRenderInputs,

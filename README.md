@@ -90,6 +90,7 @@ tvizni
 h8jpmj
 kxbh64
 iidgeg
+cqobr8
 
 claude --resume a404dfe6-6132-4ad9-b386-0c162f2c8f5c << hist
 claude --resume 743a3b51-aab0-4458-bd92-dc66828b5a32 << monsoons
