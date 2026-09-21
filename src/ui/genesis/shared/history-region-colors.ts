@@ -4,7 +4,6 @@ import { GOVERNMENT } from "@/model/history/earth/government"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import { DEJURE } from "@/model/society/dejure"
-import { ERAS } from "@/model/society/eras"
 import { TITLES } from "@/model/society/titles"
 import type { TitleTier } from "@/model/society/titles/types"
 import type { GenesisOrganization } from "@/model/society/types"
@@ -216,13 +215,9 @@ export function computeHistoryRegionColors(params: {
 			}
 			if (nationMode === "government") {
 				const nation = frame.nations.get(owner)
-				const localGovernment =
-					ERAS.governmentTypes[frame.provinceGovernment[p]] ?? null
 				const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
-					governmentType: localGovernment ?? nation?.government ?? null,
-					governmentReform: localGovernment
-						? undefined
-						: nation?.governmentReform,
+					governmentType: nation?.government ?? null,
+					governmentReform: nation?.governmentReform,
 				})
 				write(
 					r,

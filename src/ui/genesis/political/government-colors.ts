@@ -36,11 +36,6 @@ export const GOVERNMENT_COLORS_BY_TYPE: Record<
 	// colonial
 	trading_company: [0.902, 0.329, 0.239],
 	settler_colony: [0.961, 0.549, 0.502],
-	// high medieval
-	tribal_government: [0.85, 0.5, 0.15],
-	feudal_government: [0.25, 0.45, 0.82],
-	bureaucratic_government: [0.86, 0.72, 0.16],
-	republic_government: [0.2, 0.68, 0.32],
 }
 
 export const GOVERNMENT_COLORS_CSS: Record<number, string> = Object.fromEntries(

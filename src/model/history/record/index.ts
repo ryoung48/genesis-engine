@@ -61,7 +61,6 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 					? (cultureIdByKey.get(entry.base.culture) ?? -1)
 					: -1,
 				cultureBlendSecondaryId: -1,
-				governmentId: -1,
 				religionId: entry.base.religion
 					? (religionIdByKey.get(entry.base.religion) ?? -1)
 					: -1,
@@ -445,7 +444,6 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 	const provinceCulture = new Int32Array(count).fill(-1)
 	const provinceReligion = new Int32Array(count).fill(-1)
 	const provinceCultureBlendSecondary = new Int32Array(count).fill(-1)
-	const provinceGovernment = new Int32Array(count).fill(-1)
 	const provinceHre = new Uint8Array(count)
 	for (let province = 0; province < count; province++) {
 		const rawId = provinceMap.compactToRealId[province]
@@ -477,7 +475,6 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provinceCulture[province] = culture
 		provinceCultureBlendSecondary[province] = log.base.cultureBlendSecondaryId
 		provinceReligion[province] = religion
-		provinceGovernment[province] = log.base.governmentId
 		provinceHre[province] = hre ? 1 : 0
 	}
 
@@ -730,7 +727,6 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provinceCulture,
 		provinceReligion,
 		provinceCultureBlendSecondary,
-		provinceGovernment,
 		provinceHre,
 		provincePopulation,
 		provincePopulationUrban,

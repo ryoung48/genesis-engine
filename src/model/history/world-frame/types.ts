@@ -76,7 +76,6 @@ export interface WorldFrame {
 	provinceCulture: Int32Array
 	provinceReligion: Int32Array
 	provinceCultureBlendSecondary: Int32Array
-	provinceGovernment: Int32Array
 	provinceHre: Uint8Array
 	provincePopulation: Float32Array
 	provincePopulationUrban: Float32Array

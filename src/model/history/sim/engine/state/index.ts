@@ -56,7 +56,6 @@ import {
 	wealthOptimal,
 } from "@/model/history/sim/engine/state/wealth"
 import { DEJURE } from "@/model/society/dejure"
-import { ERAS } from "@/model/society/eras"
 
 export const rel = {
 	NONE: 0,
@@ -605,7 +604,7 @@ function createHistoryState({
 	regionAdjOffset,
 	regionAdjList,
 	regionIsLand,
-	era = ERAS.defaultEra,
+	era = "lateMedieval",
 }: CreateHistoryStateParams): HistoryState {
 	const P = provinces.count
 	const startTime = startYear * yearMs

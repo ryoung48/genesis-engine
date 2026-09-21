@@ -1,9 +1,7 @@
-import { SIZED_NATIONS } from "@/model/history/sim/nations/government/sized-nations"
 import type {
 	AssignGovernmentTypeParams,
 	RefineGovernmentSubtypeParams,
 } from "@/model/history/sim/nations/government/types"
-import { VASSAL_MARKS } from "@/model/history/sim/nations/government/vassal-marks"
 import { ERAS } from "@/model/society/eras"
 import type { GovernmentFamily, GovernmentType } from "@/model/society/types"
 
@@ -317,6 +315,4 @@ export const GOVERNMENT = {
 	getGovIdx,
 	govFamilyOfIndex,
 	assignGovernmentType,
-	assignSizedNations: SIZED_NATIONS.assign,
-	assignVassalMarks: VASSAL_MARKS.assign,
 }

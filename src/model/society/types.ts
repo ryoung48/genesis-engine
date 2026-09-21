@@ -159,7 +159,6 @@ export type SocietyEra =
 	| "neolithic"
 	| "bronze"
 	| "iron"
-	| "highMedieval"
 	| "lateMedieval"
 	| "earlyModern"
 	| "industrial"
@@ -197,11 +196,6 @@ export type GovernmentType =
 	// colonial (27–28) — assigned by post-pass, not the normal gov mix
 	| "trading_company" // 27: chartered company rule — earlyModern+, coastal
 	| "settler_colony"
-	// high medieval set (29–32) — assigned by the sized batch model, not the blend mix
-	| "tribal_government"
-	| "feudal_government"
-	| "bureaucratic_government"
-	| "republic_government"
 
 export type GovernmentFamily =
 	| "tribal"

@@ -6,38 +6,9 @@ export interface WavePercentileThresholdParams {
 	fraction: number
 }
 
-export interface SizedGovernmentShare {
-	maxSize: number
-	tribal: number
-	feudal: number
-	bureaucratic: number
-}
-
-export interface SizedMarkShare {
-	maxSize: number
-	share: number
-}
-
-export interface SizedMarkShares {
-	tribalInFeudal: SizedMarkShare[]
-	feudalInTribal: number
-	maxPocketShare: number
-	republic: number
-	theocracy: number
-}
-
-export type EraGovernment =
-	| { model: "blend"; mix: GovernmentMix }
-	| {
-			model: "sized"
-			sizeShares: SizedGovernmentShare[]
-			markShares: SizedMarkShares
-	  }
-
 export interface EraConfig {
 	id: SocietyEra
 	label: string
-	startYear: number
 	/** Target world population at habitabilityScore = 1 */
 	targetPopulation: number
 	/**
@@ -60,12 +31,11 @@ export interface EraConfig {
 	/** Province-count size ranges; aligns with nationPercentages indices */
 	nationBuckets: [number, number][]
 	/**
-	 * "blend": fraction of nations assigned each government type. Tribal nations
-	 * tend to be small (1–4 provinces); state governments larger. Based on EU4
-	 * extended-timeline nation-count distributions.
-	 * "sized": per-size-bucket shares plus vassal marks, assigned as a batch.
+	 * Fraction of nations assigned each government type.
+	 * Tribal nations tend to be small (1–4 provinces); state governments larger.
+	 * Based on EU4 extended-timeline nation-count distributions.
 	 */
-	government: EraGovernment
+	governmentMix: GovernmentMix
 	/**
 	 * How much nation size drives government type vs. era ideology (0–1).
 	 * 1.0 = size alone determines government (ancient world: large=monarchy, tiny=tribal).

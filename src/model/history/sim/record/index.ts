@@ -149,7 +149,6 @@ function buildProceduralRecord(
 				parentId: nations?.parent[province] ?? -1,
 				cultureId: provinceCulture[province],
 				cultureBlendSecondaryId: provinceCultureBlendSecondary[province],
-				governmentId: nations?.governmentType?.[province] ?? -1,
 				religionId: provinceReligion[province],
 				inHolyRomanEmpire: false,
 			},

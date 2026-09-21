@@ -176,8 +176,6 @@ interface InfoPanelProps {
 		nationColor: string | null
 		governmentLabel: string | null
 		governmentColor: string | null
-		localGovernmentLabel: string | null
-		localGovernmentColor: string | null
 		cultureName: string | null
 		cultureColor: string | null
 		religionName: string | null
@@ -800,13 +798,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								label="Government"
 								value={historyHoverOverride.governmentLabel}
 								color={historyHoverOverride.governmentColor}
-							/>
-						)}
-						{historyHoverOverride?.localGovernmentLabel && (
-							<SwatchRow
-								label="Local government"
-								value={historyHoverOverride.localGovernmentLabel}
-								color={historyHoverOverride.localGovernmentColor}
 							/>
 						)}
 						{historyHoverOverride?.titleLabel && (

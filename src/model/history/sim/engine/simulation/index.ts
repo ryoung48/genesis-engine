@@ -18,7 +18,6 @@ import type {
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { StageTiming } from "@/model/pipelines/types"
-import { ERAS } from "@/model/society/eras"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
@@ -82,7 +81,7 @@ function initHistory(params: {
 	settlementPortRegions?: Int32Array
 	timings?: StageTiming[]
 }): HistoryState {
-	const startYear = params.startYear ?? ERAS.getEraConfig(params.era).startYear
+	const startYear = params.startYear ?? 800
 	const rng = HISTORY_RNG.createHistoryRng(params.seed + 99999)
 	const state = timed({
 		label: "initHistory:createHistoryState",
