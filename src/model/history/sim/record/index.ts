@@ -161,9 +161,7 @@ function buildProceduralRecord(
 				count: nations.titles.count,
 				tier: nations.titles.tier.slice(),
 				seat: nations.titles.seat.slice(),
-				holder: nations.titles.holder.map(
-					(root) => nationIdByCapital.get(root) ?? -1,
-				),
+				holder: nations.titles.holder.slice(),
 				regionOf: nations.titles.regionOf.slice(),
 			}
 		: null

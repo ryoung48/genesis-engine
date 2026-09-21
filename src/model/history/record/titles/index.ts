@@ -2,6 +2,8 @@ import type {
 	ApplyTitleEventParams,
 	CreateTitleFrameParams,
 	FoldTitlesParams,
+	HolderRealmAtParams,
+	HolderRealmParams,
 } from "@/model/history/record/titles/types"
 import type { TitleFrame } from "@/model/history/world-frame/types"
 
@@ -78,4 +80,23 @@ function fold({
 	return frame
 }
 
-export const TITLE_RECORD = { fold }
+function realmOf({ frame, holder }: HolderRealmParams): number {
+	return holder < 0 || holder >= frame.provinceCount
+		? -1
+		: frame.provinceNation[holder]
+}
+
+function realmAt({ record, holder, timeMs }: HolderRealmAtParams): number {
+	if (holder < 0) return -1
+	const log = record.events.provinceEvents.get(holder)
+	if (!log) return -1
+	let realm = log.base.ownerId
+	for (const event of log.events) {
+		if (event.timeMs > timeMs) break
+		if (event.kind === "owner")
+			realm = (event.payload.nationId as number | null) ?? -1
+	}
+	return realm
+}
+
+export const TITLE_RECORD = { fold, realmOf, realmAt }

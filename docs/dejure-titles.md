@@ -34,7 +34,7 @@ Result: `count`, `tier`, `seat`, `holder` (all `-1` at first) and `regionOf`.
 
 Holders are stored state. A title is re-settled whenever ownership of one of its provinces changes, highest tier first.
 
-- The holder is the owner (sovereign) with a strict majority of the region's provinces.
+- Settling has two steps. The realm is the owner (sovereign) with a strict majority of the region's provinces. The holder is a ruler inside that realm: the sovereign itself or a vassal ruler granted the title by `VASSALAGE`. A demesne lookup stays inside the province's own realm.
 - The holder also needs at least the tier's minimum size, capped at the region's total size.
 - If no owner qualifies, the title is vacant (`holder = -1`).
 - A holder change emits a `title passed` event.
@@ -59,8 +59,10 @@ A founded title lapses when the nation holds fewer than 2 fully held children fo
 
 ## Nation vs its subordinates
 
-- A nation is a sovereign realm. Its id is its root province id, so relations, leaders and wars are indexed by it. Only sovereigns hold titles, and they hold every title at every tier where they have the majority.
-- Provinces below the root hold no titles. They get only a `parent` link, derived from held titles.
+- A nation is a sovereign realm. Its id is its root province id, so relations, leaders and wars are indexed by it.
+- Duchy-and-above titles can be held by vassal rulers. A ruler's id is the seat province of its highest title (`RULER.reseat` moves its leader state and rewrites `titles.holder` when that changes), so a sovereign's id never moves and a vassal that breaks away becomes a nation with the same id and keeps its person (`RULER.releaseMode`).
+- Counties are not held separately. Provinces that hold no title seat get only a `parent` link, derived from held titles.
+- Succession law (`confederate`, `partition`, `high_partition`, `single_heir`) is per sovereign and drawn by `SUCCESSION_LAW`; the heir comes from `HEIRS.of`, which reads the kin graph when people exist. When a vassal line ends, its titles revert to the liege; an independent line gets a new ruler with a new dynasty.
 
 ## Derived liege tree (`DEJURE.deriveParents`)
 
@@ -91,7 +93,7 @@ Similar:
 
 Different:
 
-- Holders are sovereigns chosen by majority ownership, not characters granted titles. No vassal contracts, grants or usurpation.
+- Realms are chosen by majority ownership. Vassal holders come from generated grants and succession division, not from vassal contracts, and there is no usurpation or county-level holder.
 - The liege tree is derived, not chosen.
 - No de jure drift. The tree changes only when titles are founded or dissolved.
 - Founding is a wealth-gated random roll instead of a decision with a cost.

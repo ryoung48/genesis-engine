@@ -12,6 +12,7 @@ import type {
 } from "@/model/history/sim/engine/events/war/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
+import { RULER } from "@/model/history/sim/ruler"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
@@ -282,7 +283,12 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			exclude: nation,
 		})
 		if (threat <= 0.4) continue
-		STATE.releaseProvince({ state, p: nation, rng })
+		STATE.releaseProvince({
+			state,
+			p: nation,
+			rng,
+			leader: RULER.releaseMode({ state, seat: nation }),
+		})
 		STATE.fixConnections({ state, nation, rng })
 		seedWarStage({
 			state,
@@ -345,7 +351,12 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 					time: state.time,
 					data: { overlord: sovereignNation, subject: nation },
 				})
-				STATE.releaseProvince({ state, p: nation, rng })
+				STATE.releaseProvince({
+					state,
+					p: nation,
+					rng,
+					leader: RULER.releaseMode({ state, seat: nation }),
+				})
 				if (rng.random() > threat) {
 					STATE.startWar({
 						state,

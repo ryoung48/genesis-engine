@@ -72,12 +72,14 @@ export interface SeatRankParams {
 	titles: DejureTitles
 	provinceCount: number
 	heldOnly: boolean
+	// [JUSTIFICATION] Generation has no live sovereign ownership yet.
+	ownerOf?: Int32Array
 }
 
 export interface LiegeOfParams {
 	titles: DejureTitles
 	provinceCount: number
-	rank: Uint8Array
+	holderTier: Uint8Array
 	ownerOf: Int32Array
 	province: number
 	root: number
@@ -86,7 +88,6 @@ export interface LiegeOfParams {
 export interface DeriveParentsParams {
 	titles: DejureTitles
 	provinceCount: number
-	rank: Uint8Array
 	ownerOf: Int32Array
 	members: ArrayLike<number>
 	root: number

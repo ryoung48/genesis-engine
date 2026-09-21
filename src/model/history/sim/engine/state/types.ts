@@ -6,6 +6,8 @@ import type {
 	PendingJournal,
 } from "@/model/history/sim/engine/journal/types"
 import type { Relation } from "@/model/history/sim/engine/state"
+import type { Pregnancy } from "@/model/history/sim/people/fertility/types"
+import type { PeopleState } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
 import type {
@@ -86,6 +88,9 @@ export interface HistoryState {
 	titles: DejureTitles
 	titleMembers: TitleMembers
 	seatRank: Uint8Array
+	people: PeopleState | null
+	peoplePregnancies: Pregnancy[]
+	peopleRng: SharedRng | null
 	titleFounded: Uint8Array
 	titleLapseSince: Float64Array
 	_nationAdjCache?: { offset: Int32Array; list: Int32Array }
@@ -134,9 +139,12 @@ export interface HistoryState {
 	religion: Int32Array
 	religionCount: number
 	religionColors: Float32Array
+	religionGenderDoctrines: Uint8Array
 	nationColors: Float32Array
 	/** Per-province government type index into GOVERNMENT_TYPES (eras.ts) */
 	governmentType: Uint8Array
+	successionLaw: Uint8Array
+	genderLaw: Uint8Array
 
 	wars: War[]
 	events: EngineNote[]
@@ -281,6 +289,7 @@ export interface ReleaseProvinceParams {
 	state: HistoryState
 	p: number
 	rng: SharedRng
+	leader: "keep" | "spawn"
 }
 
 export interface IsProvinceConnectedToParentParams {
@@ -340,6 +349,7 @@ export interface SettleTitleSetParams {
 export interface SettleProvincesParams {
 	state: HistoryState
 	provinces: number[]
+	titles: number[]
 }
 
 export interface ReleaseSubjectRelationsParams {

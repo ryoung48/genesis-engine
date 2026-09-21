@@ -42,3 +42,12 @@ export interface NextHolderParams {
 	counts: ShareCounts
 	tier: number
 }
+
+export interface HolderInParams {
+	titles: DejureTitles
+	provinceCount: number
+	ownerOf: Int32Array
+	title: number
+	previous: number
+	realm: number
+}

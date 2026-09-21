@@ -284,6 +284,7 @@ function seatRank({
 	titles,
 	provinceCount,
 	heldOnly,
+	ownerOf,
 }: SeatRankParams): Uint8Array {
 	const rank = new Uint8Array(provinceCount)
 	for (let title = 0; title < titles.count; title++) {
@@ -291,6 +292,16 @@ function seatRank({
 		const seat = titles.seat[title]
 		if (seat >= 0 && titles.tier[title] > rank[seat])
 			rank[seat] = titles.tier[title]
+		if (heldOnly) {
+			const holder = titles.holder[title]
+			if (holder >= 0 && titles.tier[title] > rank[holder])
+				rank[holder] = titles.tier[title]
+			if (holder >= 0 && ownerOf) {
+				const sovereign = ownerOf[holder]
+				if (sovereign >= 0 && titles.tier[title] > rank[sovereign])
+					rank[sovereign] = titles.tier[title]
+			}
+		}
 	}
 	return rank
 }
@@ -298,23 +309,20 @@ function seatRank({
 function liegeOf({
 	titles,
 	provinceCount,
-	rank,
+	holderTier,
 	ownerOf,
 	province,
 	root,
 }: LiegeOfParams): number {
 	if (province === root) return -1
 	const owner = ownerOf[province]
+	const minimumTier = holderTier[province]
 	for (let tier = 1; tier <= TIER_SLOTS; tier++) {
+		if (tier <= minimumTier) continue
 		const title = titleAt({ titles, provinceCount, tier, province })
 		if (title < 0 || titles.holder[title] < 0) continue
-		const seat = titles.seat[title]
-		if (
-			seat !== province &&
-			ownerOf[seat] === owner &&
-			rank[seat] > rank[province]
-		)
-			return seat
+		const holder = titles.holder[title]
+		if (holder !== province && ownerOf[holder] === owner) return holder
 	}
 	return root
 }
@@ -322,18 +330,23 @@ function liegeOf({
 function deriveParents({
 	titles,
 	provinceCount,
-	rank,
 	ownerOf,
 	members,
 	root,
 	parent,
 }: DeriveParentsParams): void {
+	const holderTier = new Uint8Array(provinceCount)
+	for (let title = 0; title < titles.count; title++) {
+		const holder = titles.holder[title]
+		if (holder >= 0 && titles.tier[title] > holderTier[holder])
+			holderTier[holder] = titles.tier[title]
+	}
 	for (let i = 0; i < members.length; i++) {
 		const province = members[i]
 		parent[province] = liegeOf({
 			titles,
 			provinceCount,
-			rank,
+			holderTier,
 			ownerOf,
 			province,
 			root,

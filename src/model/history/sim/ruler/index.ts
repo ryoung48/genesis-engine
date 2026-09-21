@@ -1,0 +1,190 @@
+import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { FIELDS } from "@/model/history/sim/engine/fields"
+import { STATE } from "@/model/history/sim/engine/state"
+import { UNNAMED } from "@/model/history/sim/heirs/types"
+import { PEOPLE } from "@/model/history/sim/people"
+import type {
+	InstallRulerParams,
+	ReleaseModeParams,
+	ReseatRulersParams,
+	RulerMove,
+	VacateRulerParams,
+} from "@/model/history/sim/ruler/types"
+
+function install({
+	state,
+	seat,
+	heir,
+	dynasty,
+	rng,
+	initial,
+}: InstallRulerParams): void {
+	if (state.people) {
+		const people = state.people
+		const person =
+			heir === UNNAMED
+				? PEOPLE.addPerson({
+						people,
+						sex: 0,
+						birth: state.time / STATE.yearMs - 30,
+						dynasty,
+						culture: state.culture[seat],
+						residence: seat,
+						rng,
+					})
+				: heir
+		if (people.holderOfSeat[seat] >= 0 && people.holderOfSeat[seat] !== person)
+			PEOPLE.removeSeat({ people, seat })
+		if (people.holderOfSeat[seat] < 0)
+			PEOPLE.assignSeat({ people, person, seat, seatRank: state.seatRank })
+		state.leaderRuntime.idx[seat]++
+		state.leaderRuntime.birth[seat] =
+			people.persons.birth[person] * STATE.yearMs
+		state.leaderRuntime.end[seat] = Number.POSITIVE_INFINITY
+		FIELDS.prov.leader.nameSeed.set({ state, p: seat, value: person })
+		FIELDS.prov.leader.dynasty.set({
+			state,
+			p: seat,
+			value: people.persons.dynasty[person],
+		})
+		FIELDS.prov.leader.birthYear.set({
+			state,
+			p: seat,
+			value: people.persons.birth[person],
+		})
+		return
+	}
+	if (heir !== UNNAMED) throw new Error("Person ruler before backfill")
+	STATE.spawnLeader({ state, p: seat, rng })
+	FIELDS.prov.leader.dynasty.set({ state, p: seat, value: dynasty })
+	if (!initial)
+		state.heap.enqueue(
+			state.leaderRuntime.end[seat],
+			EVENT_HEAP.evt.SUCCESSION,
+			seat,
+			state.leaderRuntime.idx[seat],
+		)
+}
+
+function vacate({ state, seat }: VacateRulerParams): void {
+	if (state.people) PEOPLE.removeSeat({ people: state.people, seat })
+	state.leaderRuntime.idx[seat]++
+	state.leaderRuntime.birth[seat] = 0
+	state.leaderRuntime.end[seat] = 0
+	FIELDS.prov.leader.dynasty.set({ state, p: seat, value: -1 })
+	FIELDS.prov.leader.nameSeed.set({ state, p: seat, value: -1 })
+	FIELDS.prov.leader.claim.set({ state, p: seat, value: 0 })
+	FIELDS.prov.leader.birthYear.set({ state, p: seat, value: -1 })
+}
+
+function releaseMode({ state, seat }: ReleaseModeParams): "keep" | "spawn" {
+	return state.leaderNameSeedCurrent[seat] >= 0 ? "keep" : "spawn"
+}
+
+function reseat({ state, rulers }: ReseatRulersParams): void {
+	const moves: RulerMove[] = []
+	for (const ruler of rulers) {
+		if (
+			ruler < 0 ||
+			ruler >= state.P ||
+			state.leaderNameSeedCurrent[ruler] < 0 ||
+			(state.parentCurrent[ruler] < 0 && !state.stateless[ruler])
+		)
+			continue
+		let best = -1
+		let bestTier = -1
+		let bestSize = -1
+		for (let title = 0; title < state.titles.count; title++) {
+			if (state.titles.holder[title] !== ruler) continue
+			const tier = state.titles.tier[title]
+			const size =
+				state.titleMembers.offset[title + 1] - state.titleMembers.offset[title]
+			if (
+				tier > bestTier ||
+				(tier === bestTier && size > bestSize) ||
+				(tier === bestTier && size === bestSize && title < best)
+			) {
+				best = title
+				bestTier = tier
+				bestSize = size
+			}
+		}
+		if (best < 0) {
+			vacate({ state, seat: ruler })
+			continue
+		}
+		const to = state.titles.seat[best]
+		if (to === ruler) continue
+		moves.push({
+			from: ruler,
+			to,
+			person: state.people?.holderOfSeat[ruler] ?? -1,
+			birth: state.leaderRuntime.birth[ruler],
+			end: state.leaderRuntime.end[ruler],
+			nameSeed: state.leaderNameSeedCurrent[ruler],
+			dynasty: state.leaderDynCurrent[ruler],
+			claim: state.leaderClaimCurrent[ruler],
+			targetUrban: state.leaderRuntime.targetUrban[ruler],
+		})
+	}
+	const targets = new Set<number>()
+	for (const move of moves) {
+		if (targets.has(move.to)) throw new Error("Two rulers share a new seat")
+		targets.add(move.to)
+	}
+	for (const move of moves) vacate({ state, seat: move.from })
+	for (const move of moves) {
+		if (state.leaderNameSeedCurrent[move.to] >= 0)
+			throw new Error("Ruler seat collision")
+		state.leaderRuntime.idx[move.to]++
+		if (state.people && move.person >= 0)
+			PEOPLE.assignSeat({
+				people: state.people,
+				person: move.person,
+				seat: move.to,
+				seatRank: state.seatRank,
+			})
+		state.leaderRuntime.birth[move.to] = move.birth
+		state.leaderRuntime.end[move.to] = move.end
+		state.leaderRuntime.targetUrban[move.to] = move.targetUrban
+		FIELDS.prov.leader.nameSeed.set({
+			state,
+			p: move.to,
+			value: move.nameSeed,
+		})
+		FIELDS.prov.leader.dynasty.set({
+			state,
+			p: move.to,
+			value: move.dynasty,
+		})
+		FIELDS.prov.leader.claim.set({ state, p: move.to, value: move.claim })
+		FIELDS.prov.leader.birthYear.set({
+			state,
+			p: move.to,
+			value: move.birth / STATE.yearMs,
+		})
+		if (!state.people)
+			state.heap.enqueue(
+				move.end,
+				EVENT_HEAP.evt.SUCCESSION,
+				move.to,
+				state.leaderRuntime.idx[move.to],
+			)
+		for (let title = 0; title < state.titles.count; title++)
+			if (state.titles.holder[title] === move.from) {
+				state.titles.holder[title] = move.to
+				state.events.push({
+					tag: "title passed",
+					time: state.time,
+					data: {
+						title,
+						from: move.from,
+						to: move.to,
+						cause: "reseat",
+					},
+				})
+			}
+	}
+}
+
+export const RULER = { install, vacate, reseat, releaseMode }

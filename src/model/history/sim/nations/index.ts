@@ -461,7 +461,6 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		DEJURE.deriveParents({
 			titles,
 			provinceCount,
-			rank,
 			ownerOf,
 			members: nationMembers[nation],
 			root: seeds[nation],

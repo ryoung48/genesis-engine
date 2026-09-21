@@ -1,5 +1,9 @@
-import type { TitleBase, TitleEventRecord } from "@/model/history/record/types"
-import type { TitleFrame } from "@/model/history/world-frame/types"
+import type {
+	HistoryRecord,
+	TitleBase,
+	TitleEventRecord,
+} from "@/model/history/record/types"
+import type { TitleFrame, WorldFrame } from "@/model/history/world-frame/types"
 
 export interface FoldTitlesParams {
 	base: TitleBase
@@ -17,4 +21,15 @@ export interface ApplyTitleEventParams {
 	frame: TitleFrame
 	provinceCount: number
 	event: TitleEventRecord
+}
+
+export interface HolderRealmParams {
+	frame: WorldFrame
+	holder: number
+}
+
+export interface HolderRealmAtParams {
+	record: HistoryRecord
+	holder: number
+	timeMs: number
 }

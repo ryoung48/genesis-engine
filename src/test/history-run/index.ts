@@ -10,6 +10,8 @@ import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
+	CreatedEngine,
+	CreateEngineParams,
 	EnvParams,
 	HistoryRunOptions,
 	HistoryRunSummary,
@@ -55,8 +57,26 @@ function countEngine({ engine }: { engine: EngineState }): {
 	}
 }
 
-function run(options: HistoryRunOptions): HistoryRunSummary {
-	const { seed, era, numPoints, years, log } = options
+function countAlivePeople({
+	engine,
+	year,
+}: {
+	engine: EngineState
+	year: number
+}): number {
+	const persons = engine.people?.persons
+	if (!persons) return 0
+	let alive = 0
+	for (let person = 0; person < persons.count; person++)
+		if (persons.birth[person] <= year && persons.death[person] > year) alive++
+	return alive
+}
+
+function createEngine({
+	seed,
+	era,
+	numPoints,
+}: CreateEngineParams): CreatedEngine {
 	const generationStart = performance.now()
 	const generated = GENERATE_WORLD.generateGenesisWorld({
 		params: {
@@ -104,6 +124,27 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		settlementWaterLandmarks: generated.settlementWaterLandmarks,
 		settlementPortRegions: generated.settlementPortRegions,
 	})
+	return {
+		generated,
+		engine,
+		generationMs,
+		initMs: performance.now() - initStart,
+	}
+}
+
+function run(options: HistoryRunOptions): HistoryRunSummary {
+	const { seed, era, numPoints, years, log } = options
+	const {
+		generated,
+		engine,
+		generationMs,
+		initMs: engineInitMs,
+	} = createEngine({
+		seed,
+		era,
+		numPoints,
+	})
+	const initStart = performance.now()
 	const world = generated as unknown as SerializedGenesisWorld
 	const state = SIM_RECORD.buildProceduralState({
 		world,
@@ -111,12 +152,12 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	})
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-	const initMs = performance.now() - initStart
+	const initMs = engineInitMs + performance.now() - initStart
 	log(
 		`seed ${seed} era ${era} points ${numPoints} provinces ${engine.P} generation ${generationMs.toFixed(0)}ms init ${initMs.toFixed(0)}ms`,
 	)
 	log(
-		"year   tick  frame  nations  wars(rebel)  striped  occupied  recNations  provEvents  diploEvents  titleEvents",
+		"year   tick  frame  nations  wars(rebel)  striped  occupied  recNations  provEvents  diploEvents  titleEvents  people  logRows",
 	)
 
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
@@ -132,6 +173,17 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 			rng,
 			validate: false,
 		})
+		if (engine.people) {
+			const people = engine.people
+			for (let seat = 0; seat < engine.P; seat++) {
+				const holder = people.holderOfSeat[seat]
+				if (holder < 0) continue
+				if (people.persons.death[holder] <= year)
+					throw new Error(`Dead person ${holder} holds seat ${seat} in ${year}`)
+				if (engine.leaderNameSeedCurrent[seat] !== holder)
+					throw new Error(`Leader and person disagree at seat ${seat}`)
+			}
+		}
 		SIM_RECORD.appendJournal({
 			translator,
 			transactions: engine.journal.slice(cursor),
@@ -144,6 +196,7 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		const frame = HISTORY.frameAt({ state, timeMs: state.record.maxTimeMs })
 		const frameMs = performance.now() - frameStart
 
+		options.onYear?.({ engine, record: state, frame, year })
 		const landholders = new Set<number>()
 		for (const owner of frame.provinceNation)
 			if (owner >= 0) landholders.add(owner)
@@ -165,6 +218,7 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		for (const log of state.record.events.provinceEvents.values())
 			provinceEvents += log.events.length
 		const counts = countEngine({ engine })
+		const peopleAlive = countAlivePeople({ engine, year })
 		const report: YearReport = {
 			year,
 			tickMs,
@@ -178,10 +232,17 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 			wars: state.record.events.wars.length,
 			diplomacyEvents: state.record.events.diplomacy.length,
 			population: frame.totalPopulation,
+			peopleAlive,
+			peopleLogRows: engine.people
+				? engine.people.log.completed.reduce(
+						(rows, chunk) => rows + chunk.count,
+						engine.people.log.active.count,
+					)
+				: 0,
 		}
 		reports.push(report)
 		log(
-			`${String(year).padStart(4)} ${tickMs.toFixed(0).padStart(6)} ${frameMs.toFixed(0).padStart(6)} ${String(report.nations).padStart(8)} ${`${report.activeWars}(${report.activeRebelWars})`.padStart(12)} ${String(rebelStripedProvinces).padStart(8)} ${String(occupiedProvinces).padStart(9)} ${String(report.recordNations).padStart(11)} ${String(provinceEvents).padStart(11)} ${String(report.diplomacyEvents).padStart(12)} ${String(report.titleEvents).padStart(12)}`,
+			`${String(year).padStart(4)} ${tickMs.toFixed(0).padStart(6)} ${frameMs.toFixed(0).padStart(6)} ${String(report.nations).padStart(8)} ${`${report.activeWars}(${report.activeRebelWars})`.padStart(12)} ${String(rebelStripedProvinces).padStart(8)} ${String(occupiedProvinces).padStart(9)} ${String(report.recordNations).padStart(11)} ${String(provinceEvents).padStart(11)} ${String(report.diplomacyEvents).padStart(12)} ${String(report.titleEvents).padStart(12)} ${String(report.peopleAlive).padStart(7)} ${String(report.peopleLogRows).padStart(8)}`,
 		)
 	}
 
@@ -199,4 +260,4 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	return summary
 }
 
-export const HISTORY_RUN = { optionsFromEnv, run }
+export const HISTORY_RUN = { optionsFromEnv, createEngine, run }

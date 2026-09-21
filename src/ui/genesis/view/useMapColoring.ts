@@ -6,6 +6,7 @@ import type { RawOrganizationReference } from "@/model/history/earth/data-source
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import { TITLE_RECORD } from "@/model/history/record/titles"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
@@ -538,7 +539,12 @@ export function useMapColoring(input: MapColoringInput) {
 		const realmSeat = titles && realmTitle >= 0 ? titles.seat[realmTitle] : -1
 		const realmHolder =
 			titles && realmTitle >= 0
-				? (frame.nations.get(titles.holder[realmTitle])?.name ?? "no one")
+				? (frame.nations.get(
+						TITLE_RECORD.realmOf({
+							frame,
+							holder: titles.holder[realmTitle],
+						}),
+					)?.name ?? "no one")
 				: null
 		const realmLabel =
 			realmTier && realmTitle >= 0

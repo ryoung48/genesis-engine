@@ -2,6 +2,7 @@
 import { COLOR } from "@/model/history/earth/color"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import { TITLE_RECORD } from "@/model/history/record/titles"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import { DEJURE } from "@/model/society/dejure"
 import { ERAS } from "@/model/society/eras"
@@ -144,7 +145,10 @@ export function computeHistoryRegionColors(params: {
 		const perNation = new Map<number, number>()
 		for (let title = 0; title < titles.count; title++) {
 			if (titles.tier[title] !== tierIndex) continue
-			const holder = titles.holder[title]
+			const holder = TITLE_RECORD.realmOf({
+				frame,
+				holder: titles.holder[title],
+			})
 			const next = perNation.get(holder) ?? 0
 			realmIndex.set(title, next)
 			perNation.set(holder, next + 1)
@@ -268,7 +272,10 @@ export function computeHistoryRegionColors(params: {
 				)
 			} else if (tierRegion && titles) {
 				const title = tierRegion[p]
-				const holder = title < 0 ? -1 : titles.holder[title]
+				const holder =
+					title < 0
+						? -1
+						: TITLE_RECORD.realmOf({ frame, holder: titles.holder[title] })
 				write(
 					r,
 					darkenPoliticalAtElevation(
@@ -413,7 +420,10 @@ export function computeTitleStripeOverlay(params: {
 		const owner = frame.provinceNation[p]
 		const title = tierRegion[p]
 		if (owner < 0 || title < 0) continue
-		const holder = titles.holder[title]
+		const holder = TITLE_RECORD.realmOf({
+			frame,
+			holder: titles.holder[title],
+		})
 		if (holder < 0 || holder === owner) continue
 		const nation = frame.nations.get(owner)
 		const color: [number, number, number] = nation

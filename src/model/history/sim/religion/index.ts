@@ -1,6 +1,7 @@
 import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import type {
+	AssignGenderDoctrinesParams,
 	AssignReligionTypesParams,
 	ComputeReligionFamiliesParams,
 	ComputeReligionsParams,
@@ -15,6 +16,18 @@ const religionTypeNames = [
 	"Non-theistic",
 	"Non-religious",
 ] as const
+
+const religionGenderDoctrineNames = [
+	"male_dominated",
+	"equal",
+	"female_dominated",
+] as const
+
+function assignGenderDoctrines({
+	religionCount,
+}: AssignGenderDoctrinesParams): Uint8Array {
+	return new Uint8Array(religionCount)
+}
 
 const religionTypeColors: readonly (readonly [number, number, number])[] = [
 	[0.401, 0.839, 0.401], // 0: animistic
@@ -212,8 +225,10 @@ function assignReligionTypes(params: AssignReligionTypesParams): Uint8Array {
 
 export const RELIGION = {
 	religionTypeNames,
+	religionGenderDoctrineNames,
 	religionTypeColors,
 	computeReligions,
 	computeReligionFamilies,
 	assignReligionTypes,
+	assignGenderDoctrines,
 }

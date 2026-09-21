@@ -1,5 +1,6 @@
 import { DEJURE } from "@/model/society/dejure"
 import type {
+	HolderInParams,
 	MinToHoldParams,
 	NextHolderParams,
 	SettleTitleParams,
@@ -38,6 +39,21 @@ function nextHolder({ counts, tier }: NextHolderParams): number {
 	return -1
 }
 
+function holderIn({
+	titles,
+	provinceCount,
+	ownerOf,
+	title,
+	previous,
+	realm,
+}: HolderInParams): number {
+	if (realm < 0 || previous < 0 || ownerOf[previous] !== realm) return realm
+	const seatInRegion =
+		titles.regionOf[(titles.tier[title] - 1) * provinceCount + previous] ===
+		title
+	return seatInRegion ? previous : realm
+}
+
 function bestSeat({
 	titles,
 	members,
@@ -48,12 +64,13 @@ function bestSeat({
 	waterAccess,
 	title,
 	holder,
-}: SettleTitleParams & { holder: number }): number {
+	exclude,
+}: SettleTitleParams & { holder: number; exclude: number }): number {
 	let best = -1
 	let bestKey = Number.NEGATIVE_INFINITY
 	for (let i = members.offset[title]; i < members.offset[title + 1]; i++) {
 		const province = members.list[i]
-		if (ownerOf[province] !== holder) continue
+		if (ownerOf[province] !== holder || province === exclude) continue
 		const key =
 			rank[province] * 1000 +
 			DEJURE.seatScore({ province, habitability, urbanPop, waterAccess })
@@ -69,21 +86,29 @@ function settleTitle(params: SettleTitleParams): TitleChange[] {
 	const { titles, ownerOf, title } = params
 	const changes: TitleChange[] = []
 	const previous = titles.holder[title]
-	const holder = nextHolder({
+	const realm = nextHolder({
 		counts: shareCounts(params),
 		tier: titles.tier[title],
+	})
+	const holder = holderIn({
+		titles,
+		provinceCount: params.provinceCount,
+		ownerOf,
+		title,
+		previous,
+		realm,
 	})
 	if (holder !== previous) {
 		titles.holder[title] = holder
 		changes.push({ kind: "passed", title, from: previous, to: holder })
 	}
-	if (holder < 0) return changes
+	if (realm < 0) return changes
 	const seat = titles.seat[title]
 	const seatInRegion =
 		titles.regionOf[(titles.tier[title] - 1) * params.provinceCount + seat] ===
 		title
-	if (ownerOf[seat] === holder && seatInRegion) return changes
-	const moved = bestSeat({ ...params, holder })
+	if (ownerOf[seat] === realm && seatInRegion) return changes
+	const moved = bestSeat({ ...params, holder: realm, exclude: -1 })
 	if (moved === seat) return changes
 	titles.seat[title] = moved
 	changes.push({
@@ -106,4 +131,4 @@ function settleTitles({
 	return ordered.flatMap((title) => settleTitle({ ...params, title }))
 }
 
-export const HOLDING = { settleTitles }
+export const HOLDING = { settleTitles, bestSeat }

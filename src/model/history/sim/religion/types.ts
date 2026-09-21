@@ -5,6 +5,15 @@ export interface ComputeReligionsParams {
 	seed: number
 }
 
+export type ReligionGenderDoctrine =
+	| "male_dominated"
+	| "equal"
+	| "female_dominated"
+
+export interface AssignGenderDoctrinesParams {
+	religionCount: number
+}
+
 export interface ComputeReligionFamiliesParams {
 	religions: GenesisPartition
 	seed: number

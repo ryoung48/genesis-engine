@@ -1,3 +1,4 @@
+import { TITLE_RECORD } from "@/model/history/record/titles"
 import { TITLES } from "@/model/society/titles"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
 import { TITLE_NAMES } from "@/ui/genesis/wiki-bridge/title-names"
@@ -17,14 +18,21 @@ const CAUSE_TEXT: Record<string, string> = {
 const SINGULARS = ["", "duchy", "kingdom", "empire", "hegemony"]
 const PLURALS = ["", "duchies", "kingdoms", "empires", "hegemonies"]
 
-function startingHoldings({ base, nationId }: StartingHoldingsParams): {
+function startingHoldings({ base, record, nationId }: StartingHoldingsParams): {
 	top: number
 	others: string
 } {
 	let top = -1
 	const counts = new Array<number>(SINGULARS.length).fill(0)
 	for (let title = 0; title < base.count; title++) {
-		if (base.holder[title] !== nationId) continue
+		if (
+			TITLE_RECORD.realmAt({
+				record,
+				holder: base.holder[title],
+				timeMs: record.minTimeMs,
+			}) !== nationId
+		)
+			continue
 		counts[base.tier[title]]++
 		if (top < 0 || base.tier[title] > base.tier[top]) top = title
 	}
@@ -62,7 +70,7 @@ function build({
 		`${TITLE_TIER_LABELS[TITLES.tierOrder[tier[title]]]} of ${provinceName(nameSeat[title])}`
 
 	const entries: TitleTimelineEntry[] = []
-	const startHoldings = startingHoldings({ base, nationId })
+	const startHoldings = startingHoldings({ base, record, nationId })
 	if (startHoldings.top >= 0)
 		entries.push({
 			id: `title:start:${nationId}`,
@@ -75,11 +83,35 @@ function build({
 		const date = event.timeMs / MS_PER_DAY
 		const id = `title:${event.title}:${event.kind}:${index}`
 		if (event.kind === "passed") {
+			const fromRealm = TITLE_RECORD.realmAt({
+				record,
+				holder: event.from,
+				timeMs: event.timeMs,
+			})
+			const toRealm = TITLE_RECORD.realmAt({
+				record,
+				holder: event.to,
+				timeMs: event.timeMs,
+			})
+			if (fromRealm !== toRealm && toRealm === nationId)
+				entries.push({
+					id,
+					date,
+					type: "Title",
+					description: `${nationName} gained the ${label(event.title)}.`,
+					provinces: [nameSeat[event.title]],
+				})
 			holder[event.title] = event.to
 		} else if (event.kind === "created") {
 			tier[event.title] = event.tier
 			holder[event.title] = event.holder
-			if (event.holder === nationId)
+			if (
+				TITLE_RECORD.realmAt({
+					record,
+					holder: event.holder,
+					timeMs: event.timeMs,
+				}) === nationId
+			)
 				entries.push({
 					id,
 					date,
@@ -88,7 +120,13 @@ function build({
 					provinces: [event.seat],
 				})
 		} else if (event.kind === "destroyed") {
-			if (holder[event.title] === nationId)
+			if (
+				TITLE_RECORD.realmAt({
+					record,
+					holder: holder[event.title],
+					timeMs: event.timeMs,
+				}) === nationId
+			)
 				entries.push({
 					id,
 					date,
@@ -97,7 +135,13 @@ function build({
 					provinces: [nameSeat[event.title]],
 				})
 			holder[event.title] = -1
-		} else if (holder[event.title] === nationId) {
+		} else if (
+			TITLE_RECORD.realmAt({
+				record,
+				holder: holder[event.title],
+				timeMs: event.timeMs,
+			}) === nationId
+		) {
 			entries.push({
 				id,
 				date,

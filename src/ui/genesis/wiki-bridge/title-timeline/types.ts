@@ -17,5 +17,6 @@ export interface TitleTimelineEntry {
 
 export interface StartingHoldingsParams {
 	base: TitleBase
+	record: HistoryRecord
 	nationId: number
 }
