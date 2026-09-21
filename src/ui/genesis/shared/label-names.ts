@@ -115,7 +115,7 @@ export function buildNationDynastyLabelNames(
 			dynastyId >= 0
 				? resolvers.dynasty({
 						dynastyIdx: dynastyId,
-						culture: world.cultures?.assignment[capitalProvince] ?? -1,
+						province: capitalProvince,
 					})
 				: ""
 	}

@@ -1,7 +1,6 @@
 /// <reference lib="webworker" />
 
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
-import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
@@ -98,6 +97,20 @@ function getProgressLabel(label: string): string {
 	return `${shortLabel[0].toUpperCase()}${shortLabel.slice(1)}`
 }
 
+function buildJournalTransferList(
+	journal: HistoryState["journal"],
+): Transferable[] {
+	return journal.flatMap((transaction) =>
+		transaction.census
+			? [
+					transaction.census.urban.buffer,
+					transaction.census.rural.buffer,
+					transaction.census.development.buffer,
+				]
+			: [],
+	)
+}
+
 async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 	if (!historyState || !historyRng) return
 	simulationRunning = true
@@ -118,7 +131,7 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 				timeMs: historyTime,
 				journal,
 			}
-			self.postMessage(progress, JOURNAL.transferList({ journal }))
+			self.postMessage(progress, buildJournalTransferList(journal))
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
 			self.postMessage({
@@ -920,7 +933,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		historyJournalCursor = journal.length
 		self.postMessage(
 			{ type: "done", world, journal } satisfies GenesisWorkerResponse,
-			[...buildTransferList(world), ...JOURNAL.transferList({ journal })],
+			[...buildTransferList(world), ...buildJournalTransferList(journal)],
 		)
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error))

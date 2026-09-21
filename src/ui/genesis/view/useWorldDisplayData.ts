@@ -304,7 +304,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	)
 	const getDynastyName = useCallback(
 		(dynastyId: number) =>
-			worldNames?.dynasty({ dynastyIdx: dynastyId, culture: -1 }) ??
+			worldNames?.dynasty({ dynastyIdx: dynastyId, province: -1 }) ??
 			`Dynasty #${dynastyId}`,
 		[worldNames],
 	)
@@ -520,7 +520,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	})
 
 	return {
-		worldNames,
 		getCultureName,
 		getDynastyName,
 		getGlobeCameraDir,

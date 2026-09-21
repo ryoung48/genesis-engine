@@ -1,5 +1,4 @@
 import type { LonLat } from "@/model/history/earth/types"
-import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
 	HistoryRecord,
 	HistoryState,
@@ -206,7 +205,6 @@ function buildProceduralRecord(
 			titleEvents: [],
 		},
 		titles: baseTitles,
-		people: PEOPLE_RECORD.create(),
 	}
 }
 

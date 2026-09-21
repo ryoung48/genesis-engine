@@ -12,7 +12,8 @@ import type {
 	GetLanguageParams,
 	GetLeaderEntryParams,
 	GetReligionLanguageParams,
-	PersonNameParams,
+	RulerName,
+	RulerNameParams,
 	SpawnSeededLanguageParams,
 } from "@/model/society/language/names/types"
 import { CultureGenderSystem } from "@/model/society/types"
@@ -106,7 +107,7 @@ export interface LanguageNames {
 	river(provinceIdx: number): string
 	mountain(provinceIdx: number): string
 	leader(provinceIdx: number, time: number): string
-	person(params: PersonNameParams): string
+	ruler(params: RulerNameParams): RulerName
 	dynasty(params: DynastyNameParams): string
 	/** e.g. an Imperial Patchwork's "[Word] Empire" or a Trade League's
 	 * "[Word] League"/"[Word] Confederation" -- named off the lead member's
@@ -273,18 +274,19 @@ function createNames(context: LanguageNameContext): LanguageNames {
 		return name
 	}
 
-	// A dynasty is named by the language of its first member's culture, and the
-	// name is cached from then on.
+	// A dynasty has no home province of its own, so the first province that
+	// asks (the ruler's, when the record is built) fixes the culture whose
+	// language names it, and the name is cached from then on.
 	function cachedDynastyName({
 		dynastyIdx,
-		culture,
+		province,
 	}: DynastyNameParams): string {
 		const explicit = context.dynasties?.[dynastyIdx]
 		if (explicit) return explicit.name
 		const cached = dynastyNames.get(dynastyIdx)
 		if (cached) return cached
 		const lang =
-			culture >= 0 ? getCultureLanguage({ context, cultureIdx: culture }) : null
+			province >= 0 ? getLanguage({ context, provinceIdx: province }) : null
 		if (!lang) return `Dynasty #${dynastyIdx}`
 		const name = TEXT.titleCase(
 			LANGUAGE.word.simple({
@@ -549,20 +551,30 @@ function createNames(context: LanguageNameContext): LanguageNames {
 			leaderEntry.name = name
 			return name
 		},
-		person: ({ personId, culture, sex }: PersonNameParams): string => {
-			const lang =
-				culture >= 0
-					? getCultureLanguage({ context, cultureIdx: culture })
-					: null
-			if (!lang) return `Person #${personId}`
-			return TEXT.titleCase(
+		ruler: ({ province, nameSeed }: RulerNameParams): RulerName => {
+			const culture =
+				context.cultures[context.provinces[province]?.culture ?? -1]
+			const female =
+				GENDER_SYSTEM.resolveLeaderGender({
+					system: getCultureGenderSystem(culture),
+					seed: nameSeed,
+				}) === "female"
+			const lang = culture
+				? getCultureLanguage({
+						context,
+						cultureIdx: context.provinces[province].culture,
+					})
+				: null
+			if (!lang) return { name: `Ruler #${nameSeed}`, female }
+			const name = TEXT.titleCase(
 				LANGUAGE.word.simple({
 					lang,
-					key: sex === 1 ? "female" : "male",
-					namespace: "person",
-					slot: `person:${personId}`,
+					key: female ? "female" : "male",
+					namespace: "leader",
+					slot: `leader:${province}:${nameSeed}`,
 				}).word,
 			)
+			return { name, female }
 		},
 		dynasty: cachedDynastyName,
 		organization: cachedOrganizationName,

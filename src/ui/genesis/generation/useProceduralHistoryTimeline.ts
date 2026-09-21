@@ -1,18 +1,9 @@
-import {
-	type SetStateAction,
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from "react"
-import { DATE } from "@/model/history/earth/date"
+import { useEffect, useMemo, useState } from "react"
 import { HISTORY } from "@/model/history/record"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { PartitionRow } from "@/model/history/world-frame/types"
-import { ERAS } from "@/model/society/eras"
-import { historyYearToTime } from "@/ui/genesis/generation/history-time"
 import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 
 // Procedural counterpart of useEarthHistoryTimeline. Builds the single static
@@ -23,6 +14,9 @@ import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 // -> computeEarthHistoryRegionColors, the label overrides, the hover override)
 // consumes either mode with no branching. No time evolution yet:
 // minTimeMs === maxTimeMs.
+const PROCEDURAL_START_TIME_MS = (800 - 2) * 365 * 86_400_000
+const PROCEDURAL_ENGINE_START_TIME_MS = 800 * 365 * 86_400_000
+
 function nameMap(rows: PartitionRow[]): Map<string, string> {
 	return new Map(rows.map((row) => [row.key, row.name]))
 }
@@ -49,24 +43,19 @@ export function useProceduralHistoryTimeline({
 	const isProcedural =
 		!!world && !world.isEarthImport && !!world.provinces && !!world.nations
 
-	const startYear = ERAS.getEraConfig(world?.params.era).startYear
-	const engineStartTimeMs = historyYearToTime(startYear)
-	const recordStartTimeMs = historyYearToTime(
-		startYear - DATE.earthHistoryStartYear,
-	)
 	const [recordVersion, setRecordVersion] = useState(0)
 	const session = useMemo(() => {
 		if (!isProcedural || !world) return null
 		const next = SIM_RECORD.buildProceduralState({
 			world,
-			startTimeMs: engineStartTimeMs,
+			startTimeMs: PROCEDURAL_ENGINE_START_TIME_MS,
 		})
 		return {
 			state: next,
 			translator: SIM_RECORD.createTranslator({ state: next, world }),
 			progress: { transactionCount: 0, journalVersion: -1 },
 		}
-	}, [isProcedural, world, engineStartTimeMs])
+	}, [isProcedural, world])
 	const state = session?.state ?? null
 	useEffect(() => {
 		if (!session) return
@@ -80,26 +69,13 @@ export function useProceduralHistoryTimeline({
 		const previousMax = sessionState.record.maxTimeMs
 		SIM_RECORD.appendJournal({ translator, transactions })
 		progress.transactionCount = journalTransactionsRef.current.length
-		setUnclampedSelectedTimeMs((time) =>
+		setSelectedTimeMs((time) =>
 			time >= previousMax ? sessionState.record.maxTimeMs : time,
 		)
 		setRecordVersion((version) => version + 1)
 	}, [session, journalTransactionsRef, journalVersion])
 
-	const [selectedTimeMs, setUnclampedSelectedTimeMs] =
-		useState(recordStartTimeMs)
-	const minTimeMs = state?.record.minTimeMs ?? recordStartTimeMs
-	// biome-ignore lint/correctness/useExhaustiveDependencies: a new world session restarts the scrubber at its own start.
-	useEffect(() => {
-		setUnclampedSelectedTimeMs(recordStartTimeMs)
-	}, [session])
-	const setSelectedTimeMs = useCallback(
-		(next: SetStateAction<number>) =>
-			setUnclampedSelectedTimeMs((previous) =>
-				Math.max(minTimeMs, typeof next === "function" ? next(previous) : next),
-			),
-		[minTimeMs],
-	)
+	const [selectedTimeMs, setSelectedTimeMs] = useState(PROCEDURAL_START_TIME_MS)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: recordVersion signals in-place record appends that frameAt cannot observe.
 	const query = useMemo(() => {
@@ -155,8 +131,8 @@ export function useProceduralHistoryTimeline({
 		setSelectedTimeMs,
 		query,
 		nations: state?.record.nations ?? null,
-		minTimeMs,
-		maxTimeMs: state?.record.maxTimeMs ?? recordStartTimeMs,
+		minTimeMs: state?.record.minTimeMs ?? PROCEDURAL_START_TIME_MS,
+		maxTimeMs: state?.record.maxTimeMs ?? PROCEDURAL_START_TIME_MS,
 		cultureColorById,
 		religionColorById,
 		cultureNameById,

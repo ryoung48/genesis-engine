@@ -7,8 +7,6 @@ import type {
 	RollLifeYearParams,
 } from "@/model/history/sim/people/lifespan/types"
 
-const BAND_NAMES = ["Dying", "Grave", "Poor", "Fair", "Good", "Robust"]
-
 function healthBand(health: number): number {
 	if (health <= 0) return 0
 	if (health < 8) return 1
@@ -72,9 +70,4 @@ function trajectory({
 	throw new Error("Could not generate a living person")
 }
 
-export const LIFESPAN = {
-	bandNames: BAND_NAMES,
-	healthBand,
-	checkYear,
-	trajectory,
-}
+export const LIFESPAN = { healthBand, checkYear, trajectory }

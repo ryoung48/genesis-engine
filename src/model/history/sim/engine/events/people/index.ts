@@ -103,16 +103,19 @@ function birth({ state, id }: PeopleEventParams): void {
 	const pregnancy = state.peoplePregnancies[id]
 	if (!pregnancy) return
 	const result = FERTILITY.birth({ people, pregnancy, rng })
-	const time = state.time / STATE.yearMs
 	for (const child of result.children) {
 		const persons = people.persons
 		PEOPLE_LOG.append({
 			log: people.log,
-			...PEOPLE_LOG.birthRow({ persons, person: child, time }),
-		})
-		PEOPLE_LOG.append({
-			log: people.log,
-			...PEOPLE_LOG.healthRow({ persons, person: child, time }),
+			time: state.time / STATE.yearMs,
+			kind: "birth",
+			a: child,
+			b: persons.father[child],
+			c: persons.mother[child],
+			d:
+				(persons.dynasty[child] << 11) |
+				(persons.culture[child] << 1) |
+				persons.sex[child],
 		})
 	}
 	if (result.motherDied)
@@ -132,7 +135,12 @@ function wedding({ state, id: husband, wife }: WeddingEventParams): void {
 	if (marriage < 0) return
 	PEOPLE_LOG.append({
 		log: people.log,
-		...PEOPLE_LOG.weddingRow({ time, husband, wife }),
+		time,
+		kind: "wedding",
+		a: husband,
+		b: wife,
+		c: 0,
+		d: 0,
 	})
 }
 
@@ -157,7 +165,12 @@ function death({ state, id: person, serial }: DeathEventParams): void {
 		})
 	PEOPLE_LOG.append({
 		log: people.log,
-		...PEOPLE_LOG.deathRow({ persons: people.persons, person, time }),
+		time,
+		kind: "death",
+		a: person,
+		b: 0,
+		c: 0,
+		d: 0,
 	})
 }
 

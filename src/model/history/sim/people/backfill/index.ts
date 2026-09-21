@@ -3,18 +3,17 @@ import type {
 	BackfillContext,
 	BackfillCoupleParams,
 	BackfillFamilyParams,
+	BackfillLogRow,
 	BackfillParams,
 	BackfillPersonParams,
 	BackfillResult,
 	BackfillSeatParams,
 	ValidateBackfillParams,
-	WriteBackfillLogParams,
 } from "@/model/history/sim/people/backfill/types"
 import { FERTILITY } from "@/model/history/sim/people/fertility"
 import { HEIRS } from "@/model/history/sim/people/heirs"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import type { PeopleLogRow } from "@/model/history/sim/people/log/types"
 import { MARRIAGE } from "@/model/history/sim/people/marriage"
 import { RNG } from "@/model/shared/random/rng"
 
@@ -351,47 +350,50 @@ function create({
 	for (const pregnancy of pending)
 		people.pendingPregnancies.set(pregnancy.mother, pregnancy)
 	validate({ people, start, seats: orderedSeats })
-	writeLog({ people, start })
+	writeLog(people)
 	return { people, pending }
 }
 
-function logRank(row: PeopleLogRow): number {
-	if (row.kind === "birth") return 0
-	if (row.kind === "health") return 1
-	if (row.kind === "wedding") return 2
-	if (row.kind === "seat") return row.c === 1 ? 3 : 5
-	return 4
-}
-
-function writeLog({ people, start }: WriteBackfillLogParams): void {
-	const rows: PeopleLogRow[] = []
+function writeLog(people: BackfillResult["people"]): void {
+	const rows: BackfillLogRow[] = []
 	const persons = people.persons
 	for (let person = 0; person < persons.count; person++) {
-		rows.push(
-			PEOPLE_LOG.birthRow({ persons, person, time: persons.birth[person] }),
-		)
+		rows.push({
+			time: persons.birth[person],
+			kind: "birth",
+			a: person,
+			b: persons.father[person],
+			c: persons.mother[person],
+			d:
+				(persons.dynasty[person] << 11) |
+				(persons.culture[person] << 1) |
+				persons.sex[person],
+		})
 		if (Number.isFinite(persons.death[person]))
-			rows.push(
-				PEOPLE_LOG.deathRow({ persons, person, time: persons.death[person] }),
-			)
-		else rows.push(PEOPLE_LOG.healthRow({ persons, person, time: start }))
+			rows.push({
+				time: persons.death[person],
+				kind: "death",
+				a: person,
+				b: 0,
+				c: 0,
+				d: 0,
+			})
 	}
 	const marriages = people.marriages
 	for (let marriage = 0; marriage < marriages.count; marriage++) {
-		rows.push(
-			PEOPLE_LOG.weddingRow({
-				time: marriages.start[marriage],
-				husband: marriages.husband[marriage],
-				wife: marriages.wife[marriage],
-			}),
-		)
+		rows.push({
+			time: marriages.start[marriage],
+			kind: "wedding",
+			a: marriages.husband[marriage],
+			b: marriages.wife[marriage],
+			c: 0,
+			d: 0,
+		})
 	}
-	for (let seat = 0; seat < people.holderOfSeat.length; seat++) {
-		const person = people.holderOfSeat[seat]
-		if (person >= 0)
-			rows.push(PEOPLE_LOG.seatRow({ time: start, person, seat, gained: true }))
-	}
-	rows.sort((a, b) => a.time - b.time || logRank(a) - logRank(b) || a.a - b.a)
+	const rank = { birth: 0, wedding: 1, death: 2, health: 3 }
+	rows.sort(
+		(a, b) => a.time - b.time || rank[a.kind] - rank[b.kind] || a.a - b.a,
+	)
 	for (const row of rows) PEOPLE_LOG.append({ log: people.log, ...row })
 }
 

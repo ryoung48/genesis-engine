@@ -10,9 +10,6 @@ import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
-	BuildRunParams,
-	BuiltRun,
-	CountPeopleRowsParams,
 	CreatedEngine,
 	CreateEngineParams,
 	EnvParams,
@@ -75,13 +72,6 @@ function countAlivePeople({
 	return alive
 }
 
-function countPeopleRows({ transactions }: CountPeopleRowsParams): number {
-	let rows = 0
-	for (const transaction of transactions)
-		for (const chunk of transaction.people) rows += chunk.count
-	return rows
-}
-
 function createEngine({
 	seed,
 	era,
@@ -142,34 +132,6 @@ function createEngine({
 	}
 }
 
-function build({ seed, era, numPoints, years }: BuildRunParams): BuiltRun {
-	const { generated, engine } = createEngine({ seed, era, numPoints })
-	const world = generated as unknown as SerializedGenesisWorld
-	const state = SIM_RECORD.buildProceduralState({
-		world,
-		startTimeMs: engine.time,
-	})
-	const translator = SIM_RECORD.createTranslator({ state, world })
-	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
-	let cursor = engine.journal.length
-	const start = engine.time / STATE.yearMs
-	for (let step = 1; step <= years; step++) {
-		SIM_ENGINE.simulateUntil({
-			state: engine,
-			targetTimeMs: (start + step) * STATE.yearMs,
-			rng,
-			validate: false,
-		})
-		SIM_RECORD.appendJournal({
-			translator,
-			transactions: engine.journal.slice(cursor),
-		})
-		cursor = engine.journal.length
-	}
-	return { engine, world, state }
-}
-
 function run(options: HistoryRunOptions): HistoryRunSummary {
 	const { seed, era, numPoints, years, log } = options
 	const {
@@ -190,7 +152,6 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	})
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-	let peopleLogRows = countPeopleRows({ transactions: engine.journal })
 	const initMs = engineInitMs + performance.now() - initStart
 	log(
 		`seed ${seed} era ${era} points ${numPoints} provinces ${engine.P} generation ${generationMs.toFixed(0)}ms init ${initMs.toFixed(0)}ms`,
@@ -223,9 +184,10 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 					throw new Error(`Leader and person disagree at seat ${seat}`)
 			}
 		}
-		const transactions = engine.journal.slice(cursor)
-		SIM_RECORD.appendJournal({ translator, transactions })
-		peopleLogRows += countPeopleRows({ transactions })
+		SIM_RECORD.appendJournal({
+			translator,
+			transactions: engine.journal.slice(cursor),
+		})
 		cursor = engine.journal.length
 		const tickMs = performance.now() - tickStart
 
@@ -271,7 +233,12 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 			diplomacyEvents: state.record.events.diplomacy.length,
 			population: frame.totalPopulation,
 			peopleAlive,
-			peopleLogRows,
+			peopleLogRows: engine.people
+				? engine.people.log.completed.reduce(
+						(rows, chunk) => rows + chunk.count,
+						engine.people.log.active.count,
+					)
+				: 0,
 		}
 		reports.push(report)
 		log(
@@ -293,4 +260,4 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	return summary
 }
 
-export const HISTORY_RUN = { optionsFromEnv, createEngine, build, run }
+export const HISTORY_RUN = { optionsFromEnv, createEngine, run }

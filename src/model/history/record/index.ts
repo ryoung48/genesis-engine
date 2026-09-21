@@ -1,7 +1,6 @@
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
-import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
 	BuildEarthRecordParams,
@@ -271,7 +270,6 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 		religions,
 		events,
 		titles: null,
-		people: PEOPLE_RECORD.create(),
 	}
 }
 

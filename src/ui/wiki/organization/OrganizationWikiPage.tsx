@@ -52,7 +52,7 @@ export interface OrganizationWikiData {
 	/** Same swatch color as the map/nation-wiki convention -- from
 	 * reference/organizations.json's `color`. */
 	color: string
-	backTitle: string
+	planetTitle: string
 	stats: StatEntry[]
 	/** Current members as of currentDate, alphabetized -- includes striped
 	 * associate categories like HRE's foreign holders and HSA's trade posts
@@ -187,7 +187,7 @@ export function OrganizationWikiPage({
 								onClick={organization.onBack}
 								className="text-slate-500"
 							>
-								{organization.backTitle}
+								{organization.planetTitle}
 							</InlineTextButton>
 						</>
 					}

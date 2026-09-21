@@ -100,12 +100,7 @@ function settleTitleSet({ state, touched }: SettleTitleSetParams): void {
 			state.events.push({
 				tag: "title passed",
 				time: state.time,
-				data: {
-					title: change.title,
-					from: change.from,
-					to: change.to,
-					cause: "holding",
-				},
+				data: { title: change.title, from: change.from, to: change.to },
 			})
 			affected.add(change.from)
 			affected.add(change.to)

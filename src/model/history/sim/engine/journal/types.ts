@@ -3,7 +3,6 @@ import type {
 	EngineNote,
 	HistoryState,
 } from "@/model/history/sim/engine/state/types"
-import type { PeopleLogChunk } from "@/model/history/sim/people/log/types"
 
 interface JournalProvinceChange {
 	province: number
@@ -43,7 +42,6 @@ export interface JournalTransaction {
 	rulers: JournalRuler[]
 	notes: EngineNote[]
 	census: CensusKeyframe | null
-	people: PeopleLogChunk[]
 }
 
 export interface PendingJournal {
@@ -79,14 +77,6 @@ export interface RecordCoalitionParams {
 	rebel: boolean
 	attackers: number[]
 	defenders: number[]
-}
-
-export interface TransferListParams {
-	journal: JournalTransaction[]
-}
-
-export interface FlushPeopleJournalParams {
-	state: HistoryState
 }
 
 export interface FlushJournalParams {

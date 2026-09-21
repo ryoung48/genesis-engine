@@ -14,7 +14,6 @@ import type {
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
-import type { LanguageNames } from "@/model/society/language/names"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
@@ -40,7 +39,6 @@ import type {
 	SocietyMapMode,
 	TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
-import type { WikiNavigation } from "@/ui/genesis/wiki-stack/types"
 
 /** The live `GenesisScene` handle shared by every GenesisView concern hook. */
 export type SceneRef = RefObject<GenesisScene | null>
@@ -61,13 +59,20 @@ export type OrgCategorizerBuilder = (
 	categoryColor: (categoryId: string) => [number, number, number]
 } | null
 
-export type NationWikiDataInput = WikiNavigation & {
+/** Wiki page selection setters -- mutually exclusive, see useWikiSelection. */
+export type WikiSelectionSetters = {
+	setSelectedWikiNationId: (id: number | null) => void
+	setSelectedWikiOrganizationId: (orgId: string | null) => void
+	setSelectedWikiWarId: (warId: number | null) => void
+}
+
+export type NationWikiDataInput = WikiSelectionSetters & {
 	selectedWikiNationId: number | null
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
 	history: HistoryTimeline
 	showObservedDistributions: boolean
-	names: LanguageNames | null
+	planetName: string
 	getProvinceColor: (provinceId: number) => string | null
 	sceneRef: SceneRef
 }
@@ -77,18 +82,11 @@ export type OrganizationWikiDataInput = NationWikiDataInput & {
 	buildOrgCategorizer: OrgCategorizerBuilder
 }
 
-export type WarWikiDataInput = WikiNavigation & {
+export type WarWikiDataInput = WikiSelectionSetters & {
 	selectedWikiWarId: number | null
 	world: SerializedGenesisWorld | null
 	history: HistoryTimeline
-	getProvinceColor: (provinceId: number) => string | null
-	sceneRef: SceneRef
-}
-
-export type PersonWikiDataInput = WikiNavigation & {
-	selectedWikiPersonId: number | null
-	history: HistoryTimeline
-	names: LanguageNames | null
+	planetName: string
 	getProvinceColor: (provinceId: number) => string | null
 	sceneRef: SceneRef
 }

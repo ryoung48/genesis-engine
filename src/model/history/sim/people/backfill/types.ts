@@ -1,4 +1,5 @@
 import type { Pregnancy } from "@/model/history/sim/people/fertility/types"
+import type { PeopleLogKind } from "@/model/history/sim/people/log/types"
 import type { PeopleState } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
@@ -72,7 +73,11 @@ export interface ValidateBackfillParams {
 	seats: BackfillSeat[]
 }
 
-export interface WriteBackfillLogParams {
-	people: PeopleState
-	start: number
+export interface BackfillLogRow {
+	time: number
+	kind: PeopleLogKind
+	a: number
+	b: number
+	c: number
+	d: number
 }

@@ -10,13 +10,6 @@ export interface InstallRulerParams {
 	initial: boolean
 }
 
-export interface LogSeatParams {
-	state: HistoryState
-	person: number
-	seat: number
-	gained: boolean
-}
-
 export interface ReleaseModeParams {
 	state: HistoryState
 	seat: number

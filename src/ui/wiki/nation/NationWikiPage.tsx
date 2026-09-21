@@ -20,7 +20,7 @@ export interface NationWikiData {
 	tierLabel: string
 	/** Same deterministic per-tag color the map fill/hover swatches use. */
 	color: string
-	backTitle: string
+	planetTitle: string
 	stats: StatEntry[]
 	/** Political ties (overlord/vassals/union/allies) -- one row per
 	 * relation type, each a comma-separated list of clickable nation
@@ -71,8 +71,6 @@ export interface NationWikiData {
 	onSelectOrganization: (orgId: string) => void
 	/** Switches the page to a war's wiki page. */
 	onSelectWar: (warId: number) => void
-	/** Switches the page to a person's wiki page. */
-	onSelectPerson: (personId: number, name: string) => void
 }
 
 export function NationWikiPage({ nation }: { nation: NationWikiData }) {
@@ -90,7 +88,7 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 								onClick={nation.onBack}
 								className="text-slate-500"
 							>
-								{nation.backTitle}
+								{nation.planetTitle}
 							</InlineTextButton>
 						</>
 					}
@@ -202,7 +200,6 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 					onSelectProvince: nation.onSelectProvince,
 					onSelectOrganization: nation.onSelectOrganization,
 					onSelectWar: nation.onSelectWar,
-					onSelectPerson: nation.onSelectPerson,
 					onSelectDate: nation.onSelectDate,
 				}}
 			/>

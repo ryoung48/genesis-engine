@@ -12,15 +12,6 @@ export const uiPalette = {
 	sectorCapital: "#38bdf8",
 	nationCapital: "#fbbf24",
 	activeDark: "#0f172a",
-	// Worst-to-best match for LIFESPAN's health band index (Dying..Robust).
-	healthBands: [
-		"#dc2626",
-		"#ea580c",
-		"#f59e0b",
-		"#84cc16",
-		"#16a34a",
-		"#059669",
-	] as const,
 	swatch: {
 		stripeBackground: "rgba(15, 23, 42, 0.85)",
 		stripedBorder: "rgba(255, 255, 255, 0.15)",

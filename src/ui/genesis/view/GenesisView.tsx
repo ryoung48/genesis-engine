@@ -11,7 +11,6 @@ import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/
 import { DATE } from "@/model/history/earth/date"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { StageTiming } from "@/model/pipelines/types"
-import { ERAS } from "@/model/society/eras"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
@@ -97,10 +96,7 @@ import { useOverlayState } from "@/ui/genesis/view/useOverlayState"
 import { useWorldDisplayData } from "@/ui/genesis/view/useWorldDisplayData"
 import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
-import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
-import { WIKI_STACK } from "@/ui/genesis/wiki-stack"
-import type { WikiRef } from "@/ui/genesis/wiki-stack/types"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
 const NO_TITLE_BORDER_TIERS: readonly TitleBorderTier[] = []
@@ -288,23 +284,36 @@ export const GenesisView: React.FC<{
 		useState<GenerationPreviewTab>(
 			initialGenerationSession?.generationPreviewTab ?? "climate",
 		)
-	const [wikiStack, setWikiStack] = useState<WikiRef[]>([])
-	const {
-		nationId: selectedWikiNationId,
-		organizationId: selectedWikiOrganizationId,
-		warId: selectedWikiWarId,
-		personId: selectedWikiPersonId,
-	} = WIKI_STACK.selection({ stack: wikiStack })
-	const openWikiPage = useCallback((ref: WikiRef) => {
-		setWikiStack((stack) => WIKI_STACK.open({ stack, ref }))
+	// Left-panel "nation wiki page" selection, identified by history record
+	// nation id.
+	const [selectedWikiNationId, setSelectedWikiNationIdRaw] = useState<
+		number | null
+	>(null)
+	// International organization wiki page selection (e.g. "HRE"/"HSA") --
+	// mutually exclusive with the nation wiki page above; selecting either
+	// clears the other so GenerationPanel only ever renders one at a time.
+	const [selectedWikiOrganizationId, setSelectedWikiOrganizationIdRaw] =
+		useState<string | null>(null)
+	// War wiki page selection (wars.json warId) -- also mutually exclusive
+	// with the nation/organization wiki pages above.
+	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<number | null>(
+		null,
+	)
+	const setSelectedWikiNationId = useCallback((id: number | null) => {
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiNationIdRaw(id)
 	}, [])
-	const backWikiPage = useCallback(() => {
-		setWikiStack((stack) => WIKI_STACK.back({ stack }))
+	const setSelectedWikiOrganizationId = useCallback((orgId: string | null) => {
+		setSelectedWikiNationIdRaw(null)
+		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiOrganizationIdRaw(orgId)
 	}, [])
-	// biome-ignore lint/correctness/useExhaustiveDependencies: a new world reuses person ids, so any stacked page is dropped when the world changes.
-	useEffect(() => {
-		setWikiStack([])
-	}, [world])
+	const setSelectedWikiWarId = useCallback((warId: number | null) => {
+		setSelectedWikiNationIdRaw(null)
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(warId)
+	}, [])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
 	)
@@ -335,9 +344,7 @@ export const GenesisView: React.FC<{
 		setProceduralHistoryPlaying,
 	} = useProceduralHistory({ workerRef })
 	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
-	const simStartTimeMs = historyYearToTime(
-		ERAS.getEraConfig(world?.params.era).startYear,
-	)
+	const simStartTimeMs = historyYearToTime(800)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	// Earth-imported worlds scrub real Gregorian dates via history's own
 	// slider. selectedTimeMs tracks it so Social's population/culture/heritage/
@@ -909,7 +916,6 @@ export const GenesisView: React.FC<{
 		sampledReligionLabelsArray,
 		sampledNationLabelsArray,
 		sampledSettlementLabelsArray,
-		worldNames,
 		windVectors,
 	} = useWorldDisplayData({
 		sceneRef,
@@ -1278,16 +1284,7 @@ export const GenesisView: React.FC<{
 					compact === undefined
 						? -1
 						: (history.query?.frame.provinceNation[compact] ?? -1)
-				setWikiStack(
-					nationId >= 0
-						? [
-								WIKI_STACK.nationRef({
-									record: history.state.record,
-									id: nationId,
-								}),
-							]
-						: [],
-				)
+				setSelectedWikiNationId(nationId >= 0 ? nationId : null)
 				return
 			}
 
@@ -1330,6 +1327,7 @@ export const GenesisView: React.FC<{
 		history.state,
 		history.query,
 		eu4HoverFillGeometry,
+		setSelectedWikiNationId,
 	])
 
 	const {
@@ -1663,22 +1661,17 @@ export const GenesisView: React.FC<{
 	// for the same body.
 	const planetName = mainWorldSystemBody?.name || "Main World"
 
-	const backTitle = WIKI_STACK.backTitle({
-		stack: wikiStack,
-		planetTitle: planetName,
-	})
-
 	const nationWikiData = useNationWikiData({
 		selectedWikiNationId,
 		world,
 		worldForDisplay,
 		history,
 		showObservedDistributions,
-		names: worldNames,
+		planetName,
 		getProvinceColor,
-		backTitle,
-		openWikiPage,
-		backWikiPage,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
 		sceneRef,
 	})
 
@@ -1688,12 +1681,12 @@ export const GenesisView: React.FC<{
 		worldForDisplay,
 		history,
 		showObservedDistributions,
-		names: worldNames,
+		planetName,
 		getProvinceColor,
 		selectedWikiNationId,
-		backTitle,
-		openWikiPage,
-		backWikiPage,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
 		buildOrgCategorizer,
 		sceneRef,
 	})
@@ -1702,21 +1695,11 @@ export const GenesisView: React.FC<{
 		selectedWikiWarId,
 		world,
 		history,
+		planetName,
 		getProvinceColor,
-		backTitle,
-		openWikiPage,
-		backWikiPage,
-		sceneRef,
-	})
-
-	const personWikiData = usePersonWikiData({
-		selectedWikiPersonId,
-		history,
-		names: worldNames,
-		getProvinceColor,
-		backTitle,
-		openWikiPage,
-		backWikiPage,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
 		sceneRef,
 	})
 
@@ -2008,8 +1991,6 @@ export const GenesisView: React.FC<{
 						nationWiki={nationWikiData}
 						organizationWiki={organizationWikiData}
 						warWiki={warWikiData}
-						personWiki={personWikiData}
-						wikiKind={WIKI_STACK.top({ stack: wikiStack })?.kind ?? null}
 					/>
 				)}
 

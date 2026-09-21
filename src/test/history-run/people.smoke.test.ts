@@ -3,7 +3,6 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { BACKFILL } from "@/model/history/sim/people/backfill"
 import { FERTILITY } from "@/model/history/sim/people/fertility"
 import { HEIRS } from "@/model/history/sim/people/heirs"
-import { KIN } from "@/model/history/sim/people/kin"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { MARRIAGE } from "@/model/history/sim/people/marriage"
@@ -65,12 +64,8 @@ describe("dynastic people", () => {
 			culture: 0,
 			residence: 10,
 		})
-		expect(KIN.childrenOf({ kin: people.persons, parent: father })).toEqual([
-			child,
-		])
-		expect(KIN.childrenOf({ kin: people.persons, parent: mother })).toEqual([
-			child,
-		])
+		expect(PEOPLE.childrenOf({ people, parent: father })).toEqual([child])
+		expect(PEOPLE.childrenOf({ people, parent: mother })).toEqual([child])
 		expect(PEOPLE.closeKin({ people, a: father, b: child })).toBe(true)
 		expect(PEOPLE.closeKin({ people, a: mother, b: secondMother })).toBe(false)
 		MARRIAGE.endMarriage({

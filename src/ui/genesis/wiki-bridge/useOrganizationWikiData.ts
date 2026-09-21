@@ -17,7 +17,6 @@ import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
-import { WIKI_STACK } from "@/ui/genesis/wiki-stack"
 import {
 	compareTimelineDateThenWarEnd,
 	pushTimelineEvent,
@@ -48,10 +47,11 @@ export function useOrganizationWikiData(
 		worldForDisplay,
 		history,
 		showObservedDistributions,
-		backTitle,
+		planetName,
 		getProvinceColor,
-		openWikiPage,
-		backWikiPage,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
 		buildOrgCategorizer,
 		sceneRef,
 	} = input
@@ -466,7 +466,7 @@ export function useOrganizationWikiData(
 			id: orgId,
 			name: orgRef.name,
 			color,
-			backTitle,
+			planetTitle: planetName,
 			stats,
 			members,
 			cultureDistribution,
@@ -481,11 +481,11 @@ export function useOrganizationWikiData(
 			currentDate: daysFromMs(frame.timeMs),
 			currentDateLabel: DATE.formatHistoryDays(daysFromMs(frame.timeMs)),
 			timelineEvents,
-			onBack: backWikiPage,
+			onBack: () => setSelectedWikiOrganizationId(null),
 			onSelectNation: (targetTag: string) => {
 				const id = Number(targetTag)
 				focusOrgNation(id)
-				openWikiPage(WIKI_STACK.nationRef({ record, id }))
+				setSelectedWikiNationId(id)
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
@@ -495,7 +495,7 @@ export function useOrganizationWikiData(
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
 			onSelectWar: (warId: number) => {
-				openWikiPage(WIKI_STACK.warRef({ record, id: warId }))
+				setSelectedWikiWarId(warId)
 			},
 		}
 	}, [
@@ -515,10 +515,11 @@ export function useOrganizationWikiData(
 		history.provinceMeta,
 		worldForDisplay,
 		showObservedDistributions,
-		backTitle,
+		planetName,
 		getProvinceColor,
-		openWikiPage,
-		backWikiPage,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
 		buildOrgCategorizer,
 	])
 }
