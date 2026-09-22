@@ -11,6 +11,10 @@ export interface AssignGovernmentTypeParams {
 	migrationWave: Float32Array | undefined
 	statehoodFraction: number
 	seed: number
+	/** [JUSTIFICATION] only eras that cap republic size supply this; others leave it unset */
+	maxRepublicSize?: number
+	/** [JUSTIFICATION] only eras that cap theocracy size supply this; others leave it unset */
+	maxTheocracySize?: number
 }
 
 export interface RefineGovernmentSubtypeParams {

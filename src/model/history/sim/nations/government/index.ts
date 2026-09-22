@@ -32,6 +32,8 @@ function assignGovernmentType({
 	migrationWave,
 	statehoodFraction,
 	seed,
+	maxRepublicSize,
+	maxTheocracySize,
 }: AssignGovernmentTypeParams): number {
 	// Look up size prior
 	const prior =
@@ -110,6 +112,13 @@ function assignGovernmentType({
 		theocracy += coreBoost * 0.15
 		tribal -= coreBoost
 	}
+
+	// Oversized nations cannot draw a capped family — the weight is zeroed
+	// after all spatial modifiers so geography cannot resurrect it.
+	if (maxRepublicSize !== undefined && nationSize > maxRepublicSize)
+		republic = 0
+	if (maxTheocracySize !== undefined && nationSize > maxTheocracySize)
+		theocracy = 0
 
 	// Clamp negatives and renormalize
 	tribal = Math.max(0, tribal)

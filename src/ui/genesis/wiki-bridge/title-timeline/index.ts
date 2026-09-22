@@ -9,11 +9,6 @@ import type {
 
 const MS_PER_DAY = 86_400_000
 
-const CAUSE_TEXT: Record<string, string> = {
-	"seat lost": "after losing its seat",
-	"title passed": "on gaining the title",
-}
-
 const SINGULARS = ["", "duchy", "kingdom", "empire", "hegemony"]
 const PLURALS = ["", "duchies", "kingdoms", "empires", "hegemonies"]
 
@@ -97,16 +92,6 @@ function build({
 					provinces: [nameSeat[event.title]],
 				})
 			holder[event.title] = -1
-		} else if (holder[event.title] === nationId) {
-			entries.push({
-				id,
-				date,
-				type: "Capital",
-				description:
-					`${nationName} moved the capital of the ${label(event.title)} from ${provinceName(event.from)} to ${provinceName(event.to)} ${CAUSE_TEXT[event.cause] ?? ""}`.trim() +
-					".",
-				provinces: [event.from, event.to],
-			})
 		}
 	})
 	return entries

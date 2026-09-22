@@ -362,6 +362,8 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				governmentMix: params.governmentMix,
 				governmentSizeWeight: params.governmentSizeWeight ?? 0.55,
 				statehoodFraction: params.statehoodFraction ?? 0.75,
+				maxRepublicSize: params.maxRepublicSize,
+				maxTheocracySize: params.maxTheocracySize,
 				excludeNations,
 			})
 			if (!plan) break
@@ -520,6 +522,8 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				migrationWave: params.migrationWave,
 				statehoodFraction,
 				seed: params.seed,
+				maxRepublicSize: params.maxRepublicSize,
+				maxTheocracySize: params.maxTheocracySize,
 			})
 			if (
 				tradeLeagueMemberSet.has(i) &&

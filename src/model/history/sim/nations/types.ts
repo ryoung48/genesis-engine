@@ -48,6 +48,18 @@ export interface ComputeNationsParams {
 	 */
 	governmentSizeWeight?: number
 	/**
+	 * Max province count allowed a republic-family government; larger nations
+	 * fall back to the remaining families.
+	 * [JUSTIFICATION] only meaningful when governmentMix is supplied and the era caps republic size; defaults to uncapped otherwise
+	 */
+	maxRepublicSize?: number
+	/**
+	 * Max province count allowed a theocracy-family government; larger nations
+	 * fall back to the remaining families.
+	 * [JUSTIFICATION] only meaningful when governmentMix is supplied and the era caps theocracy size; defaults to uncapped otherwise
+	 */
+	maxTheocracySize?: number
+	/**
 	 * Per-province migration wave (0 = settlement cradle, 1 = frontier).
 	 * Frontier nations skew tribal; core nations skew toward established states.
 	 * [JUSTIFICATION] not every pipeline computes a migration wave; the frontier/core tribal skew is simply skipped when absent

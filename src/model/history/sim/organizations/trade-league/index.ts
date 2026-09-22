@@ -29,6 +29,10 @@ export interface TradeLeagueParams {
 	governmentMix: GovernmentMix
 	governmentSizeWeight: number
 	statehoodFraction: number
+	/** [JUSTIFICATION] only eras that cap republic size supply this; others leave it unset */
+	maxRepublicSize?: number
+	/** [JUSTIFICATION] only eras that cap theocracy size supply this; others leave it unset */
+	maxTheocracySize?: number
 	/** Nation indices already belonging to some other organization (Imperial
 	 * Patchwork, or an earlier Trade League placed this same call) -- never
 	 * eligible to be shattered again. */
@@ -81,6 +85,8 @@ function buildTradeLeague(params: TradeLeagueParams): TradeLeagueResult | null {
 		governmentMix,
 		governmentSizeWeight,
 		statehoodFraction,
+		maxRepublicSize,
+		maxTheocracySize,
 		seed,
 		excludeNations,
 	} = params
@@ -129,6 +135,8 @@ function buildTradeLeague(params: TradeLeagueParams): TradeLeagueResult | null {
 			migrationWave,
 			statehoodFraction,
 			seed,
+			maxRepublicSize,
+			maxTheocracySize,
 		})
 		return GOVERNMENT.govFamilyOfIndex(probedGovType) !== "tribal"
 	}

@@ -77,6 +77,8 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 						nationBuckets: eraConfig.nationBuckets,
 						governmentMix: eraConfig.governmentMix,
 						governmentSizeWeight: eraConfig.governmentSizeWeight,
+						maxRepublicSize: eraConfig.maxRepublicSize,
+						maxTheocracySize: eraConfig.maxTheocracySize,
 						migrationWave: population.migrationWave,
 						statehoodFraction: eraConfig.statehoodFraction,
 						buildImperialPatchwork: eraConfig.organizations?.imperialPatchwork,

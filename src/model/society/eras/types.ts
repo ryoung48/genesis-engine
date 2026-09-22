@@ -44,6 +44,18 @@ export interface EraConfig {
 	 */
 	governmentSizeWeight: number
 	/**
+	 * Max province count allowed a republic-family government; larger nations
+	 * fall back to the remaining families.
+	 * [JUSTIFICATION] only lateMedieval caps republic size; other eras leave it unset
+	 */
+	maxRepublicSize?: number
+	/**
+	 * Max province count allowed a theocracy-family government; larger nations
+	 * fall back to the remaining families.
+	 * [JUSTIFICATION] only lateMedieval caps theocracy size; other eras leave it unset
+	 */
+	maxTheocracySize?: number
+	/**
 	 * Procedural organizations to generate for this era, layered on top of the
 	 * normal nation partition. imperialPatchwork: shatter the largest eligible
 	 * (settled, wave >= 0) nation into an HRE-style patchwork of small member

@@ -237,12 +237,14 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		],
 		governmentMix: {
 			tribal: 0.44,
-			monarchy: 0.48,
-			republic: 0.02,
+			monarchy: 0.49,
+			republic: 0.01,
 			theocracy: 0.06,
 		},
 		// Size and era roughly equal; geography (coast → republic) meaningful
 		governmentSizeWeight: 0.55,
+		maxRepublicSize: 40,
+		maxTheocracySize: 40,
 		organizations: { imperialPatchwork: false, tradeLeague: false },
 	},
 	earlyModern: {
