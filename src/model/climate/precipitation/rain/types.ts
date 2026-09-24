@@ -68,7 +68,7 @@ export type ComputeAdvectionParams = {
 export type SeasonalRainCurveParams = {
 	cellLat: number
 	absLat: number
-	coast: "east" | "west"
+	westShare: number
 	/** This month's thermal-equator latitude for the cell's longitude bin. */
 	teq: number
 	bandOffsetDeg: number
