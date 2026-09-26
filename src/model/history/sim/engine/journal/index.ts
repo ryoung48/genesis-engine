@@ -76,6 +76,10 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 		treasury: Float32Array.from(roots, (p) => state.treasuryCurrent[p]),
 		revenue: Float32Array.from(roots, (p) => state.revenueCurrent[p]),
 		manpower: Float32Array.from(roots, (p) => state.manpowerCurrent[p]),
+		budgets: roots.map((p) => {
+			const budget = state.treasuryBudgetCurrent.get(p)
+			return budget ? { ...budget } : null
+		}),
 	}
 }
 
@@ -169,6 +173,13 @@ function flush({
 				economy: censusEconomy(state),
 			}
 		: null
+	if (census)
+		for (const budget of state.treasuryBudgetCurrent.values()) {
+			budget.plunder = 0
+			budget.succession = 0
+			budget.reserveAdjustment = 0
+			budget.otherChangesTotal = 0
+		}
 	const people = peopleRows(state)
 	if (
 		people.persons.length > 0 ||

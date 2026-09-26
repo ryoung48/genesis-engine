@@ -46,7 +46,7 @@ function nationEconomy({
 	nationId,
 }: NationFrameParams): NationEconomy | null {
 	if (!frame.economy) return null
-	const { roots, treasury, revenue, manpower } = frame.economy
+	const { roots, treasury, revenue, manpower, budgets } = frame.economy
 	for (let index = 0; index < roots.length; index++) {
 		const root = roots[index]
 		if (
@@ -57,6 +57,10 @@ function nationEconomy({
 				treasury: treasury[index],
 				revenue: revenue[index],
 				manpower: manpower[index],
+				budget: budgets[index],
+				treasuryChange: budgets[index]
+					? budgets[index].annualBalance + budgets[index].otherChangesTotal
+					: 0,
 			}
 	}
 	return null

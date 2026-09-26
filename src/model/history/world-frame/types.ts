@@ -1,4 +1,5 @@
 import type { CensusEconomy } from "@/model/history/record/types"
+import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 
 export interface Ruler {
 	name: string
@@ -73,6 +74,8 @@ export interface NationEconomy {
 	treasury: number
 	revenue: number
 	manpower: number
+	budget: TreasuryBudget | null
+	treasuryChange: number
 }
 
 export interface WorldFrame {

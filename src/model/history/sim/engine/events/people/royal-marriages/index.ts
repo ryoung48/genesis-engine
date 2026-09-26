@@ -1,7 +1,9 @@
 import type {
 	BirthParents,
 	BirthParentsParams,
+	PairKeyParams,
 	RehomeParams,
+	ReviewParams,
 	SeedRoyalMarriagesParams,
 	WeddingParams,
 } from "@/model/history/sim/engine/events/people/royal-marriages/types"
@@ -20,11 +22,14 @@ const UNALLIABLE = new Set<Relation>([
 	STATE.rel.PU_SENIOR,
 	STATE.rel.PU_JUNIOR,
 	STATE.rel.COLONY,
-	STATE.rel.ALLY,
 ])
 
+function pairKey({ state, a, b }: PairKeyParams): number {
+	return Math.min(a, b) * state.P + Math.max(a, b)
+}
+
 // A marriage between the ruling families of two realms that marry for
-// alliance makes them allies.
+// alliance makes them allies, or binds an alliance they already have.
 function allianceFromWedding({ state, wedding }: WeddingParams): void {
 	const people = state.people
 	const { a, b, realmA, realmB } = wedding
@@ -39,12 +44,41 @@ function allianceFromWedding({ state, wedding }: WeddingParams): void {
 	if (!PEOPLE.family({ people, person: rulerA }).includes(a)) return
 	if (!PEOPLE.family({ people, person: rulerB }).includes(b)) return
 	if (UNALLIABLE.has(STATE.getRelation({ state, a: realmA, b: realmB }))) return
+	const key = pairKey({ state, a: realmA, b: realmB })
+	if (people.marriageAlliances.has(key)) return
 	STATE.setRelation({ state, a: realmA, b: realmB, rel: STATE.rel.ALLY })
+	people.marriageAlliances.set(key, { first: realmA, second: realmB })
 	state.events.push({
 		tag: "marriage alliance",
 		time: state.time,
 		data: { first: realmA, second: realmB, spouses: [a, b] },
 	})
+}
+
+// A marriage alliance ends once no living marriage joins the two ruling
+// families, or the realms stop being sovereign allies. The alliance itself
+// stays and drifts like any other.
+function review({ state }: ReviewParams): void {
+	const people = state.people
+	const time = state.time / STATE.yearMs
+	for (const [key, { first, second }] of people.marriageAlliances) {
+		const rulerA = people.rulerOf[first]
+		const rulerB = people.rulerOf[second]
+		const holds =
+			STATE.isSovereign({ state, p: first }) &&
+			STATE.isSovereign({ state, p: second }) &&
+			rulerA >= 0 &&
+			rulerB >= 0 &&
+			STATE.getRelation({ state, a: first, b: second }) === STATE.rel.ALLY &&
+			PEOPLE.tiedByMarriage({ people, a: rulerA, b: rulerB, time })
+		if (holds) continue
+		people.marriageAlliances.delete(key)
+		state.events.push({
+			tag: "marriage alliance ended",
+			time: state.time,
+			data: { first, second },
+		})
+	}
 }
 
 // Parents the bride could plausibly have in another ruling house: as the
@@ -133,4 +167,4 @@ function seed({ state, rng }: SeedRoyalMarriagesParams): void {
 	}
 }
 
-export const ROYAL_MARRIAGES = { allianceFromWedding, seed }
+export const ROYAL_MARRIAGES = { allianceFromWedding, seed, review }

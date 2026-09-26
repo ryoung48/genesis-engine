@@ -219,6 +219,7 @@ function processEventsUntil({
 				break
 			case EVENT_HEAP.evt.CENSUS:
 				POPULATION.runPopulation({ state, previousTime: time2 })
+				TAX.previewBudget({ state })
 				break
 			case EVENT_HEAP.evt.RAID:
 				RAID.runRaid({ state, nation: dataBuf[0], rng })

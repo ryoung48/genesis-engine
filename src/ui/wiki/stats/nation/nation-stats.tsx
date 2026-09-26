@@ -1,6 +1,8 @@
 import type { NationEconomy } from "@/model/history/world-frame/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
 import { uiPalette } from "@/ui/components/tokens"
+import type { BuildNationWikiStatsParams } from "@/ui/wiki/stats/nation/types"
 
 function treasuryHealthColor(economy: NationEconomy): string {
 	if (economy.treasury < 0) return uiPalette.treasury.critical
@@ -26,14 +28,16 @@ export function formatCount(value: number): string {
 	return Math.round(value).toLocaleString()
 }
 
-export function formatSilver(grams: number): string {
-	const magnitude = Math.abs(grams)
-	const sign = grams < 0 ? "-" : ""
-	if (magnitude >= 1_000_000)
-		return `${sign}${(magnitude / 1_000_000).toFixed(magnitude >= 10_000_000 ? 0 : 1)} t`
-	if (magnitude >= 1_000)
-		return `${sign}${Math.round(magnitude / 1_000).toLocaleString("en-US")} kg`
-	return `${sign}${Math.round(magnitude)} g`
+export function formatDucats(value: number): string {
+	const magnitude = Math.abs(value)
+	if (magnitude > 0 && magnitude < 0.0001)
+		return `${value.toPrecision(2)} ducats`
+	const digits = magnitude >= 10 ? 1 : magnitude >= 1 ? 2 : 4
+	return `${value.toLocaleString("en-US", { maximumFractionDigits: digits })} ducats`
+}
+
+function formatSignedDucats(value: number): string {
+	return `${value > 0 ? "+" : ""}${formatDucats(value)}`
 }
 
 export function formatAreaKm2(areaKm2: number): string {
@@ -66,17 +70,9 @@ function formatUrbanization(
 	return `${percent.toFixed(0)}%`
 }
 
-export function buildNationWikiStats(params: {
-	territoryBasis: "owned" | "controlled"
-	totalAreaKm2: number
-	totalPopulation: number
-	totalUrbanPopulation: number
-	provinceCount: number
-	rulerLabel?: string | null
-	governmentSubtype: string | null
-	governmentColor: string | null
-	economy: NationEconomy | null
-}): StatEntry[] {
+export function buildNationWikiStats(
+	params: BuildNationWikiStatsParams,
+): StatEntry[] {
 	const {
 		territoryBasis,
 		totalAreaKm2,
@@ -87,6 +83,7 @@ export function buildNationWikiStats(params: {
 		governmentSubtype,
 		governmentColor,
 		economy,
+		yearLabel,
 	} = params
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
 	return [
@@ -114,11 +111,44 @@ export function buildNationWikiStats(params: {
 			? [
 					{
 						label: "Treasury",
-						value:
-							economy.revenue > 0
-								? `${Math.round((economy.treasury / economy.revenue) * (200 / 0.6))}% of reserve capacity`
-								: "No annual revenue",
-						help: "Scaled to the treasury's reserve cap, which displays as 200%. Red is debt or under 50%, amber is 50–149%, and green is 150% or more.",
+						value: formatDucats(economy.treasury),
+						help: "Treasury health relative to reserve capacity. Red is a negative balance or below 50%, amber is 50–149%, and green is 150% or more.",
+						valueHelp: economy.budget ? (
+							<TraceTooltipContent
+								title={`${yearLabel} treasury ${economy.budget.settled ? "changes" : "estimate"}`}
+								trace={[
+									{
+										value: economy.budget.taxes,
+										description: "Taxes",
+									},
+									{
+										value: economy.budget.civilExpenses,
+										description: "Civil expenses",
+									},
+									{
+										value: economy.budget.armyExpenses,
+										description:
+											economy.budget.tradition === "paid"
+												? "Army upkeep"
+												: "War gifts",
+									},
+									{ value: economy.budget.plunder, description: "Plunder" },
+									{
+										value: economy.budget.succession,
+										description: "Realm split",
+									},
+									{
+										value: economy.budget.reserveAdjustment,
+										description: "Reserve limit adjustment",
+									},
+								].filter((entry) => entry.value !== 0)}
+								formatValue={formatSignedDucats}
+								finalLabel="Net treasury change"
+								finalValue={economy.treasuryChange}
+							/>
+						) : (
+							"No annual settlement recorded yet"
+						),
 						swatchColor: treasuryHealthColor(economy),
 					},
 					{ label: "Manpower", value: `${formatCount(economy.manpower)} men` },

@@ -3,6 +3,7 @@ import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
+import { PEOPLE } from "@/model/history/sim/people"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -48,6 +49,32 @@ it("records rulers, their families and seat tenures consistently", () => {
 	for (const marriage of people.marriages) {
 		expect(people.persons.has(marriage.husband)).toBe(true)
 		expect(people.persons.has(marriage.wife)).toBe(true)
+	}
+
+	const rootOf = new Map<number, number>()
+	for (const [root, nationId] of translator.identityByRoot)
+		rootOf.set(nationId, root)
+	const activeMarriages = new Map<string, [number, number]>()
+	for (const event of state.record.events.diplomacy) {
+		if (!event.kind.startsWith("royalMarriage")) continue
+		const key = `${Math.min(event.firstId, event.secondId)}:${Math.max(event.firstId, event.secondId)}`
+		if (event.kind === "royalMarriageStart")
+			activeMarriages.set(key, [event.firstId, event.secondId])
+		else activeMarriages.delete(key)
+	}
+	for (const [first, second] of activeMarriages.values()) {
+		const rulerA = engine.people.rulerOf[rootOf.get(first) ?? -1] ?? -1
+		const rulerB = engine.people.rulerOf[rootOf.get(second) ?? -1] ?? -1
+		expect(
+			rulerA >= 0 &&
+				rulerB >= 0 &&
+				PEOPLE.tiedByMarriage({
+					people: engine.people,
+					a: rulerA,
+					b: rulerB,
+					time: engine.time / STATE.yearMs,
+				}),
+		).toBe(true)
 	}
 
 	const timeMs = state.record.maxTimeMs

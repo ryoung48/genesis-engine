@@ -1,4 +1,5 @@
 import { expect, it } from "vitest"
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -26,7 +27,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 	if (weak === undefined) return
 	engine.manpowerCurrent[weak] = 1
 	engine.manpowerCurrent[war.defender] = 1_000_000
-	engine.treasuryCurrent[war.defender] = 1_000_000_000_000
+	engine.treasuryCurrent[war.defender] =
+		1_000_000_000_000 * ECONOMY.ducatsPerGram
 	const smallerWar: War = {
 		idx: engine.wars.length,
 		attacker: war.attacker,

@@ -26,6 +26,7 @@ function init({ state, rng }: PeopleEventParams): void {
 function runYear({ state, rng }: PeopleEventParams): void {
 	DISTRICTS.settle({ state, rng })
 	DISTRICTS.grant({ state, rng })
+	ROYAL_MARRIAGES.review({ state })
 	PATRICIANS.settle({ state, rng })
 	const people = state.people
 	const rulers: number[] = []

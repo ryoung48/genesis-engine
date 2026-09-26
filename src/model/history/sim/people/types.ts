@@ -51,6 +51,9 @@ export interface PeopleState {
 	patricians: Map<number, number[]>
 	// Successive shared rulers of each personal-union junior realm.
 	unionGenerations: Map<number, number>
+	// Realm pairs allied by a marriage between their ruling families, keyed by
+	// the lower realm times the province count plus the higher.
+	marriageAlliances: Map<number, MarriageAlliance>
 	log: PeopleLog
 	nextDynasty: number
 }
@@ -121,6 +124,11 @@ export interface RunPeopleYearParams {
 	royal: (realm: number) => boolean
 	sovereigns: number[]
 	rng: SharedRng
+}
+
+export interface MarriageAlliance {
+	first: number
+	second: number
 }
 
 export interface CrossWedding {

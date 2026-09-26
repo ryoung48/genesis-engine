@@ -37,6 +37,7 @@ function create(provinceCount: number): PeopleState {
 		rulerOf: new Int32Array(provinceCount).fill(-1),
 		patricians: new Map(),
 		unionGenerations: new Map(),
+		marriageAlliances: new Map(),
 		log: { persons: [], marriages: [], seats: [] },
 		nextDynasty: 0,
 	}

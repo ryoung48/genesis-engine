@@ -2,7 +2,7 @@ import type {
 	BuildRaidTimelineParams,
 	RaidTimelineEntry,
 } from "@/ui/genesis/wiki-bridge/raid-timeline/types"
-import { formatSilver } from "@/ui/wiki/stats/nation/nation-stats"
+import { formatDucats } from "@/ui/wiki/stats/nation/nation-stats"
 
 const MS_PER_DAY = 86_400_000
 
@@ -21,7 +21,7 @@ function build({
 		const other = nationNameOf(asRaider ? raid.victimId : raid.raiderId)
 		const haul =
 			raid.loot > 0
-				? `carrying off ${formatSilver(raid.loot)} of silver`
+				? `carrying off ${formatDucats(raid.loot)}`
 				: "finding little worth taking"
 		const description = asRaider
 			? raid.success

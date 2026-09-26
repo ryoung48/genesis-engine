@@ -11,6 +11,16 @@ export interface WeddingParams {
 	wedding: CrossWedding
 }
 
+export interface PairKeyParams {
+	state: HistoryState
+	a: number
+	b: number
+}
+
+export interface ReviewParams {
+	state: HistoryState
+}
+
 export interface SeedRoyalMarriagesParams {
 	state: HistoryState
 	rng: SharedRng

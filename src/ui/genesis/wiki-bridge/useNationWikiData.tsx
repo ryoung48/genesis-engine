@@ -368,6 +368,7 @@ export function useNationWikiData(
 			provinceName: (province) =>
 				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
 		})
+		const economy = FRAME.nationEconomy({ frame, nationId })
 		const stats = buildNationWikiStats({
 			territoryBasis,
 			totalAreaKm2,
@@ -379,7 +380,11 @@ export function useNationWikiData(
 			governmentColor: governmentColor
 				? COLOR.rgb01ToCss(governmentColor)
 				: null,
-			economy: FRAME.nationEconomy({ frame, nationId }),
+			economy,
+			yearLabel: DATE.formatEu4Year(
+				economy?.budget?.year ??
+					DATE.historyTimeMsToYear(history.selectedTimeMs),
+			),
 		})
 		const rulerStat = stats.find((stat) => stat.label === "Ruler")
 		if (rulerStat && nationState?.ruler) {
@@ -1069,12 +1074,30 @@ export function useNationWikiData(
 			} else {
 				description = `${title} ${starts ? "formed" : "ended"} a ${relation} with ${otherName}.`
 			}
+			// A procedural royal marriage names the couple whose wedding made it.
+			const couple = (event.spouses ?? []).flatMap((personId) => {
+				const person = record.people?.persons.get(personId)
+				return person
+					? [
+							{
+								id: personId,
+								name: person.name,
+								color: person.house
+									? paletteColorForDynasty(person.house)
+									: uiPalette.person.noHouse,
+							},
+						]
+					: []
+			})
+			if (couple.length === 2)
+				description = `${description.slice(0, -1)}: ${couple[0].name} married ${couple[1].name}.`
 			pushTimelineEvent(timelineEvents, {
 				id: `diplomacy:${event.date}:${index}`,
 				date: event.date,
 				type: starts ? "Diplomacy (+)" : "Diplomacy (-)",
 				description,
 				nations,
+				people: couple,
 			})
 		}
 

@@ -11,9 +11,11 @@ import type { RealmCacheEntry } from "@/model/history/sim/engine/state/types"
 import { MATH } from "@/model/shared/math/core"
 import { ERAS } from "@/model/society/eras"
 
+const DUCATS_PER_GRAM = 2.4 / 650_000
+
 const OUTPUT_CURVE = {
 	domain: [0, 0.25, 0.65, 0.95],
-	range: [150, 250, 450, 700],
+	range: [150, 250, 450, 700].map((grams) => grams * DUCATS_PER_GRAM),
 }
 
 const LEVY_RATE: Record<ArmyTradition, number> = {
@@ -22,8 +24,6 @@ const LEVY_RATE: Record<ArmyTradition, number> = {
 	steppe: 0.12,
 }
 
-// Placeholder for court, administration, church grants, fortification
-// upkeep and debt service: spent every year before anything reaches the army.
 const CIVIL_EXPENSE_SHARE = 0.7
 
 const MAX_RESERVE_YEARS = 2
@@ -154,6 +154,7 @@ function initEconomy({ state }: InitEconomyParams): void {
 }
 
 export const ECONOMY = {
+	ducatsPerGram: DUCATS_PER_GRAM,
 	provinceOutput,
 	revenue,
 	realmKnowledge,

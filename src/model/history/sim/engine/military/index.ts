@@ -1,5 +1,6 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
+import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
@@ -23,9 +24,9 @@ import type {
 import { STATE } from "@/model/history/sim/engine/state"
 import { MATH } from "@/model/shared/math/core"
 
-const SOLDIER_PAY = 1000
+const SOLDIER_PAY = 1000 * ECONOMY.ducatsPerGram
 
-const PEACE_UPKEEP = 5
+const PEACE_UPKEEP = 5 * ECONOMY.ducatsPerGram
 
 const ALLY_COMMITMENT = 0.5
 
@@ -63,7 +64,7 @@ const BASE_MUSTER = 0.1
 
 const GIFT_BONUS = 0.2
 
-const GIFT_PER_WARRIOR = 100
+const GIFT_PER_WARRIOR = 100 * ECONOMY.ducatsPerGram
 
 const DISLOYALTY = 0.5
 
@@ -439,17 +440,26 @@ function plunder({
 		p: loser,
 		value: loserTreasury - treasuryLoot,
 	})
+	const loserBudget = TREASURY_BUDGET.get({ state, p: loser })
+	loserBudget.plunder -= treasuryLoot
+	loserBudget.otherChangesTotal -= treasuryLoot
 	const crownLoot =
 		(outputLoot + treasuryLoot) *
 		CROWN_LOOT_SHARE[ECONOMY.armyTradition({ state, p: raider })]
+	const raiderTreasury = FIELDS.prov.treasury.get({ state, p: raider })
+	const creditedTreasury = Math.min(
+		ECONOMY.reserveCap({ state, p: raider }),
+		raiderTreasury + crownLoot,
+	)
 	FIELDS.prov.treasury.set({
 		state,
 		p: raider,
-		value: Math.min(
-			ECONOMY.reserveCap({ state, p: raider }),
-			FIELDS.prov.treasury.get({ state, p: raider }) + crownLoot,
-		),
+		value: creditedTreasury,
 	})
+	const creditedLoot = creditedTreasury - raiderTreasury
+	const raiderBudget = TREASURY_BUDGET.get({ state, p: raider })
+	raiderBudget.plunder += creditedLoot
+	raiderBudget.otherChangesTotal += creditedLoot
 	return crownLoot
 }
 

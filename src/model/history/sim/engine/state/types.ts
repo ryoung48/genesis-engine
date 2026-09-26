@@ -1,4 +1,5 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
+import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { EventHeap } from "@/model/history/sim/engine/event-heap"
 import type {
 	JournalTransaction,
@@ -111,8 +112,9 @@ export interface HistoryState {
 	// Bumped at each census; with hierarchyVersion it keys realmCache.
 	censusVersion: number
 	realmCache: Map<number, RealmCacheEntry>
-	// Grams of silver and levyable men; meaningful only on sovereign roots.
+	// Ducats and levyable men; meaningful only on sovereign roots.
 	treasuryCurrent: Float64Array
+	treasuryBudgetCurrent: Map<number, TreasuryBudget>
 	manpowerCurrent: Float64Array
 	deploymentUpdateTime: Float64Array
 	revenueCurrent: Float64Array

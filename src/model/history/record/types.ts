@@ -9,6 +9,7 @@ import type { Eu4ProvinceMap } from "@/model/history/earth/import/eu4-province-m
 import type { Nation } from "@/model/history/earth/reference/nations/types"
 import type { LonLat } from "@/model/history/earth/types"
 import type { PeopleRecord } from "@/model/history/record/people/types"
+import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type {
 	PartitionRow,
 	WorldFrame,
@@ -50,6 +51,9 @@ export interface DiplomacyEventRecord {
 	firstId: number
 	secondId: number
 	subjectType: string | null
+	// [JUSTIFICATION] Only a procedural royal marriage names the married
+	// couple; every other event has no people.
+	spouses?: [number, number]
 }
 
 export interface WarParticipantEventRecord {
@@ -119,13 +123,12 @@ export interface CensusKeyframe {
 	economy: CensusEconomy
 }
 
-// Parallel arrays over sovereign root provinces: grams of silver, grams per
-// year and men.
 export interface CensusEconomy {
 	roots: Int32Array
 	treasury: Float32Array
 	revenue: Float32Array
 	manpower: Float32Array
+	budgets: Array<TreasuryBudget | null>
 }
 
 export interface TitleBase {

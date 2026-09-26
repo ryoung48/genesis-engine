@@ -1,4 +1,5 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
+import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
@@ -143,6 +144,9 @@ function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
 		Math.max(0, FIELDS.prov.treasury.get({ state, p: formerSovereign })) * share
 	FIELDS.prov.manpower.set({ state, p, value: manpower })
 	FIELDS.prov.treasury.set({ state, p, value: treasury })
+	const releasedBudget = TREASURY_BUDGET.get({ state, p })
+	releasedBudget.succession += treasury
+	releasedBudget.otherChangesTotal += treasury
 	FIELDS.prov.manpower.set({
 		state,
 		p: formerSovereign,
@@ -153,6 +157,9 @@ function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
 		p: formerSovereign,
 		value: FIELDS.prov.treasury.get({ state, p: formerSovereign }) - treasury,
 	})
+	const formerBudget = TREASURY_BUDGET.get({ state, p: formerSovereign })
+	formerBudget.succession -= treasury
+	formerBudget.otherChangesTotal -= treasury
 	FIELDS.prov.parent.set({ state, p, value: -1 })
 	rebuildAssignment({ state })
 	repartitionNation({ state, nation: formerSovereign, subjects: [] })
@@ -623,6 +630,7 @@ function createHistoryState({
 		censusVersion: 0,
 		realmCache: new Map(),
 		treasuryCurrent: new Float64Array(P),
+		treasuryBudgetCurrent: new Map(),
 		manpowerCurrent: new Float64Array(P),
 		deploymentUpdateTime: new Float64Array(P).fill(-1),
 		revenueCurrent: new Float64Array(P),

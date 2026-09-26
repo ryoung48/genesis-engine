@@ -283,7 +283,7 @@ function updateTies({ translator, pairs, timeMs }: UpdateTiesParams): void {
 				subjectType: previous.kind === "colony" ? "colony" : null,
 			})
 			translator.activeTies.delete(pair)
-			// A marriage alliance lapses with the alliance it made.
+			// A marriage alliance also lapses if its alliance ends first.
 			const marriage = translator.royalMarriages.get(pair)
 			if (previous.kind === "alliance" && marriage) {
 				record.events.diplomacy.push({
@@ -567,6 +567,22 @@ function appendNote({
 			kind: "royalMarriageStart",
 			firstId,
 			secondId,
+			subjectType: null,
+			spouses: data.spouses as [number, number],
+		})
+	} else if (note.tag === "marriage alliance ended") {
+		const count = translator.parent.length
+		const a = data.first as number
+		const b = data.second as number
+		const pair = Math.min(a, b) * count + Math.max(a, b)
+		const marriage = translator.royalMarriages.get(pair)
+		if (!marriage) return
+		translator.royalMarriages.delete(pair)
+		record.events.diplomacy.push({
+			timeMs,
+			kind: "royalMarriageEnd",
+			firstId: marriage.firstId,
+			secondId: marriage.secondId,
 			subjectType: null,
 		})
 	} else if (note.tag === "capital moved") {
