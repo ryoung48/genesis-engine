@@ -34,6 +34,15 @@ export interface InitWarParams {
 	rng: SharedRng
 }
 
+export interface RebelParams {
+	state: HistoryState
+	overlord: number
+	subject: number
+	laxity: number
+	succession: boolean
+	rng: SharedRng
+}
+
 export interface RunWarParams {
 	state: HistoryState
 	nation: number

@@ -79,6 +79,7 @@ export function useNationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPersonId,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -264,7 +265,16 @@ export function useNationWikiData(
 			[
 				"Allies",
 				nationState?.relations.allies
-					? nationState.relations.allies.filter(hasOwnedProvinces)
+					? nationState.relations.allies.filter(
+							(otherId) =>
+								hasOwnedProvinces(otherId) &&
+								// A procedural royal marriage is itself an alliance; list it once,
+								// under Royal Marriages.
+								!(
+									record.origin === "procedural" &&
+									nationState.relations.royalMarriages.includes(otherId)
+								),
+						)
 					: [],
 			],
 			[
@@ -374,13 +384,31 @@ export function useNationWikiData(
 		const rulerStat = stats.find((stat) => stat.label === "Ruler")
 		if (rulerStat && nationState?.ruler) {
 			const rulerSuffix = rulerLabel ? `· ${rulerLabel}` : ""
-			if (dynastyName) {
+			const rulerPerson =
+				typeof currentRulerPayload?.person === "number"
+					? currentRulerPayload.person
+					: -1
+			const rulerName =
+				rulerPerson >= 0 ? (
+					<InlineTextButton
+						onClick={() => setSelectedWikiPersonId(rulerPerson)}
+					>
+						{nationState.ruler.name}
+					</InlineTextButton>
+				) : (
+					<span>{nationState.ruler.name}</span>
+				)
+			if (dynastyName || rulerPerson >= 0) {
 				rulerStat.value = ""
 				rulerStat.valueAction = (
 					<span className="inline-flex items-center gap-1">
-						<span>{nationState.ruler.name}</span>
-						<Swatch color={paletteColorForDynasty(dynastyName)} />
-						<span>{dynastyName}</span>
+						{rulerName}
+						{dynastyName ? (
+							<>
+								<Swatch color={paletteColorForDynasty(dynastyName)} />
+								<span>{dynastyName}</span>
+							</>
+						) : null}
 						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
 					</span>
 				)
@@ -563,6 +591,7 @@ export function useNationWikiData(
 							comment: eventComment(event.comment),
 							nations,
 							dynasties: isInterregnum ? [] : person.dynasties,
+							people: isInterregnum ? [] : person.people,
 						})
 						break
 					}
@@ -942,12 +971,30 @@ export function useNationWikiData(
 			}
 		}
 
+		// A marriage alliance starts and ends with its alliance; show one row.
+		const diplomacyPairKey = (event: {
+			timeMs: number
+			kind: string
+			firstId: number
+			secondId: number
+		}) =>
+			`${event.timeMs}:${Math.min(event.firstId, event.secondId)}:${Math.max(event.firstId, event.secondId)}:${event.kind.endsWith("Start")}`
+		const royalMarriageKeys = new Set(
+			record.events.diplomacy
+				.filter((event) => event.kind.startsWith("royalMarriage"))
+				.map(diplomacyPairKey),
+		)
 		for (const [index, event] of datedEvents(
 			record.events.diplomacy,
 		).entries()) {
 			const firstId = event.firstId
 			const secondId = event.secondId
 			if (firstId !== nationId && secondId !== nationId) continue
+			if (
+				event.kind.startsWith("alliance") &&
+				royalMarriageKeys.has(diplomacyPairKey(event))
+			)
+				continue
 			const otherId = firstId === nationId ? secondId : firstId
 			const nations: NationTimelineEvent["nations"] = [eventNation(nationId)]
 			addNationMention(nations, otherId)
@@ -1279,6 +1326,7 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
+				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		for (const [date, group] of cultureGroups) {
@@ -1301,6 +1349,7 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
+				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		for (const [date, group] of religionGroups) {
@@ -1323,6 +1372,7 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
+				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		for (const [date, group] of diplomacyGroups) {
@@ -1346,6 +1396,7 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
+				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		timelineEvents = mergedTimelineEvents
@@ -1448,6 +1499,9 @@ export function useNationWikiData(
 			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
+			onSelectPerson: (personId: number) => {
+				setSelectedWikiPersonId(personId)
+			},
 		}
 	}, [
 		selectedWikiNationId,
@@ -1471,5 +1525,6 @@ export function useNationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPersonId,
 	])
 }

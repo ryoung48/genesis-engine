@@ -36,6 +36,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPersonId,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -428,6 +429,9 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			onSelectOrganization: (orgId: string) => {
 				setSelectedWikiOrganizationId(orgId)
 			},
+			onSelectPerson: (personId: number) => {
+				setSelectedWikiPersonId(personId)
+			},
 		}
 	}, [
 		selectedWikiWarId,
@@ -442,5 +446,6 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPersonId,
 	])
 }

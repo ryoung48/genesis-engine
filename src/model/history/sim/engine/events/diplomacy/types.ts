@@ -32,13 +32,6 @@ export interface ProcessVassalDiplomacyParams {
 	rng: SharedRng
 }
 
-export interface ProcessPersonalUnionDiplomacyParams {
-	state: HistoryState
-	junior: number
-	senior: number
-	rng: SharedRng
-}
-
 export interface NextEventParams {
 	state: HistoryState
 	province: number
@@ -63,16 +56,6 @@ export interface SeedInitialVassalsParams {
 	rng: SharedRng
 }
 
-export interface SeedSharedDynastiesParams {
-	state: HistoryState
-	rng: SharedRng
-}
-
-export interface SeedInitialPersonalUnionsParams {
-	state: HistoryState
-	rng: SharedRng
-}
-
 export interface InitDiplomacyParams {
 	state: HistoryState
 	rng: SharedRng
@@ -82,4 +65,10 @@ export interface RunDiplomacyParams {
 	state: HistoryState
 	nation: number
 	rng: SharedRng
+}
+
+export interface MarriageBoundParams {
+	state: HistoryState
+	a: number
+	b: number
 }

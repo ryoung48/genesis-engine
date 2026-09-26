@@ -26,11 +26,44 @@ interface JournalCoalition {
 
 interface JournalRuler {
 	root: number
+	person: number
 	nameSeed: number
 	dynasty: number
 	birthTimeMs: number
 	deathTimeMs: number
 	regent: boolean
+}
+
+export interface JournalPerson {
+	id: number
+	sex: number
+	birthTimeMs: number
+	deathTimeMs: number
+	father: number
+	mother: number
+	dynasty: number
+	nameSeed: number
+	home: number
+}
+
+export interface JournalMarriage {
+	husband: number
+	wife: number
+	startTimeMs: number
+}
+
+// A seat (sovereign root or district) changing holder; -1 leaves it empty.
+export interface JournalSeat {
+	seat: number
+	person: number
+	// A throne (sovereign root) rather than a district, after the event.
+	sovereign: boolean
+}
+
+export interface JournalPeople {
+	persons: JournalPerson[]
+	marriages: JournalMarriage[]
+	seats: JournalSeat[]
 }
 
 export interface JournalTransaction {
@@ -40,6 +73,7 @@ export interface JournalTransaction {
 	occupations: JournalProvinceChange[]
 	coalitions: JournalCoalition[]
 	rulers: JournalRuler[]
+	people: JournalPeople
 	notes: EngineNote[]
 	census: CensusKeyframe | null
 }

@@ -6,6 +6,7 @@ import type {
 	InitWarParams,
 	ListWarTargetsParams,
 	NextEventParams,
+	RebelParams,
 	RunWarParams,
 	SeedInterstateWarsParams,
 	SeedRebellionsParams,
@@ -293,7 +294,8 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 		if (
 			parent < 0 ||
 			parent !== STATE.getSovereign({ state, p: nation }) ||
-			state.seatRank[nation] === 0
+			state.seatRank[nation] === 0 ||
+			state.people.rulerOf[nation] < 0
 		)
 			continue
 		directSubjects.push(nation)
@@ -337,6 +339,37 @@ function initWar({ state, rng }: InitWarParams): void {
 	seedRebellions({ state, rng })
 }
 
+// A district breaks away when its threat clears the threshold, lowered by
+// `laxity` when the crown is weak.
+function rebel({
+	state,
+	overlord,
+	subject,
+	laxity,
+	succession,
+	rng,
+}: RebelParams): boolean {
+	const threat = MILITARY.rebellionThreat({ state, overlord, subject })
+	if (threat <= REBELLION_THRESHOLD - laxity || rng.random() >= threat)
+		return false
+	state.events.push({
+		tag: "rebellion",
+		time: state.time,
+		data: { overlord, subject, succession },
+	})
+	STATE.releaseProvince({ state, p: subject, rng })
+	if (rng.random() > threat)
+		STATE.startWar({
+			state,
+			attacker: overlord,
+			defender: subject,
+			rng,
+			rebel: true,
+		})
+	STATE.fixConnections({ state, nation: subject, rng })
+	return true
+}
+
 function runWar({ state, nation, rng }: RunWarParams): void {
 	const parent = FIELDS.prov.parent.get({ state, p: nation })
 	const sovereignNation = STATE.getSovereign({ state, p: nation })
@@ -362,33 +395,21 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 				})
 			}
 		}
-	} else if (parent === sovereignNation && state.seatRank[nation] > 0) {
-		// Titled direct subject of the sovereign — consider rebellion
-		if (DERIVE.provinceWars({ state, p: sovereignNation }).length === 0) {
-			const threat = MILITARY.rebellionThreat({
+	} else if (
+		parent === sovereignNation &&
+		state.seatRank[nation] > 0 &&
+		state.people.rulerOf[nation] >= 0
+	) {
+		// A great vassal's district — consider rebellion
+		if (DERIVE.provinceWars({ state, p: sovereignNation }).length === 0)
+			rebel({
 				state,
 				overlord: sovereignNation,
 				subject: nation,
+				laxity: 0,
+				succession: false,
+				rng,
 			})
-			if (threat > REBELLION_THRESHOLD && rng.random() < threat) {
-				state.events.push({
-					tag: "rebellion",
-					time: state.time,
-					data: { overlord: sovereignNation, subject: nation },
-				})
-				STATE.releaseProvince({ state, p: nation, rng })
-				if (rng.random() > threat) {
-					STATE.startWar({
-						state,
-						attacker: sovereignNation,
-						defender: nation,
-						rng,
-						rebel: true,
-					})
-				}
-				STATE.fixConnections({ state, nation, rng })
-			}
-		}
 	}
 
 	const frontFactor = STATE.isSovereign({ state, p: nation })
@@ -414,4 +435,5 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 export const WAR = {
 	initWar,
 	runWar,
+	rebel,
 }

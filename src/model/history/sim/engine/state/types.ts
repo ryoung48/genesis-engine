@@ -5,6 +5,7 @@ import type {
 	PendingJournal,
 } from "@/model/history/sim/engine/journal/types"
 import type { Relation } from "@/model/history/sim/engine/state"
+import type { PeopleState } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
 import type {
@@ -146,6 +147,7 @@ export interface HistoryState {
 	habitability: Float32Array
 	culture: Int32Array
 	cultureCount: number
+	cultureGenderSystems: Uint8Array
 	cultureColors: Float32Array
 	religion: Int32Array
 	religionCount: number
@@ -159,7 +161,7 @@ export interface HistoryState {
 	events: EngineNote[]
 	journal: JournalTransaction[]
 	pendingJournal: PendingJournal
-	nextDynasty: number
+	people: PeopleState
 	heap: EventHeap
 	leaderRuntime: LeaderRuntime
 	routes: Route[]
@@ -372,14 +374,60 @@ export interface CreateHistoryStateParams {
 	era?: SocietyEra
 }
 
-export interface SpawnLeaderParams {
+export interface OriginOfParams {
 	state: HistoryState
-	p: number
-	rng: SharedRng
-	end?: number
+	realm: number
 }
 
-export interface InitDynastiesParams {
+export interface InstallRulerParams {
 	state: HistoryState
+	p: number
+	person: number
+	claim: number
+}
+
+export interface FoundRulerParams {
+	state: HistoryState
+	p: number
+	age: number
+	claim: number
 	rng: SharedRng
+}
+
+export interface UnionRealmParams {
+	state: HistoryState
+	p: number
+}
+
+export interface UnionPairParams {
+	state: HistoryState
+	junior: number
+	senior: number
+}
+
+export interface UnionRulerParams {
+	state: HistoryState
+	p: number
+	person: number
+}
+
+export interface RealmPairParams {
+	state: HistoryState
+	a: number
+	b: number
+}
+
+export interface UniteParams {
+	state: HistoryState
+	a: number
+	b: number
+	ruler: number
+	// The same person now rules both realms, counting toward a merge.
+	shared: boolean
+}
+
+export interface UnionLink {
+	senior: number
+	junior: number
+	merge: boolean
 }

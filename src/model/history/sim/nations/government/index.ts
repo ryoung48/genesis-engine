@@ -1,6 +1,7 @@
 import type {
 	AssignGovernmentTypeParams,
 	RefineGovernmentSubtypeParams,
+	SuccessionSystem,
 } from "@/model/history/sim/nations/government/types"
 import { ERAS } from "@/model/society/eras"
 import type { GovernmentFamily, GovernmentType } from "@/model/society/types"
@@ -320,8 +321,54 @@ const SIZE_GOV_PRIORS: Array<{
 	},
 ]
 
+const SUCCESSION_SYSTEM: Record<GovernmentType, SuccessionSystem> = {
+	chiefdom: "single_heir",
+	tribal_monarchy: "single_heir",
+	feudal_monarchy: "single_heir",
+	absolute_monarchy: "single_heir",
+	constitutional_monarchy: "single_heir",
+	dynastic_signoria: "single_heir",
+	imperial_cult: "single_heir",
+	elective_monarchy: "election",
+	tribal_federation: "election",
+	native_council: "election",
+	steppe_horde: "election",
+	oligarchic_republic: "election",
+	pirate_republic: "election",
+	peasant_republic: "election",
+	presidential_republic: "election",
+	parliamentary_republic: "election",
+	theocracy: "appointment",
+	monastic_state: "appointment",
+	warlord_state: "appointment",
+	trading_company: "appointment",
+	settler_colony: "appointment",
+	socialist_state: "appointment",
+	military_junta: "appointment",
+	fascist_state: "appointment",
+	dictatorial_rule: "appointment",
+}
+
+function successionOfIndex(index: number): SuccessionSystem {
+	const type = ERAS.governmentTypes[index]
+	return type ? SUCCESSION_SYSTEM[type] : "single_heir"
+}
+
+// Royal marriages bind realms only where a house holds the throne: single-heir
+// realms and non-republican elections. Republic and appointed rulers marry
+// privately.
+function marriageAlliancesOfIndex(index: number): boolean {
+	const system = successionOfIndex(index)
+	return (
+		system === "single_heir" ||
+		(system === "election" && govFamilyOfIndex(index) !== "republic")
+	)
+}
+
 export const GOVERNMENT = {
+	marriageAlliancesOfIndex,
 	getGovIdx,
 	govFamilyOfIndex,
+	successionOfIndex,
 	assignGovernmentType,
 }

@@ -40,6 +40,10 @@ import {
 	type OrganizationWikiData,
 	OrganizationWikiPage,
 } from "@/ui/wiki/organization/OrganizationWikiPage"
+import {
+	type PersonWikiData,
+	PersonWikiPage,
+} from "@/ui/wiki/person/PersonWikiPage"
 import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
 import { GenerationTimingChart } from "@/ui/wiki/timing/GenerationTimingChart"
 import {
@@ -137,6 +141,10 @@ interface GenerationPanelProps {
 	 * nationWiki/organizationWiki above -- mutually exclusive with both (see
 	 * GenesisView's selection state). */
 	warWiki: WarWikiData | null
+	/** When set (a person has been selected via a nation's ruler or a
+	 * timeline mention), this wiki page replaces the navigator the same way --
+	 * mutually exclusive with the pages above. */
+	personWiki: PersonWikiData | null
 }
 
 export const GenerationPanel: React.FC<GenerationPanelProps> = ({
@@ -195,6 +203,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	nationWiki,
 	organizationWiki,
 	warWiki,
+	personWiki,
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
@@ -467,6 +476,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						<OrganizationWikiPage organization={organizationWiki} />
 					) : warWiki ? (
 						<WarWikiPage war={warWiki} />
+					) : personWiki ? (
+						<PersonWikiPage person={personWiki} />
 					) : (
 						<>
 							<GenerationPlanetNavigator

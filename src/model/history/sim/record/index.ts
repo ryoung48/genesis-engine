@@ -1,4 +1,5 @@
 import type { LonLat } from "@/model/history/earth/types"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
 	HistoryRecord,
 	HistoryState,
@@ -191,6 +192,7 @@ function buildProceduralRecord(
 	}
 	return {
 		origin: "procedural",
+		people: PEOPLE_RECORD.create(),
 		minTimeMs: recordStartTimeMs,
 		maxTimeMs: recordStartTimeMs,
 		nations: nationIdentities,

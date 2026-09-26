@@ -39,6 +39,9 @@ export interface WikiTimelineEvent {
 	/** Wars (wars.json) mentioned in this event's description -- clicking
 	 * navigates to that war's wiki page via refs.onSelectWar. */
 	wars: Array<{ id: number; name: string; color: string }>
+	/** Simulated people mentioned in the description -- clicking opens that
+	 * person's wiki page via refs.onSelectPerson. */
+	people: Array<{ id: number; name: string; color: string }>
 }
 
 interface WikiTimelineRefs {
@@ -46,6 +49,7 @@ interface WikiTimelineRefs {
 	onSelectProvince: (provinceId: number) => void
 	onSelectOrganization: (orgId: string) => void
 	onSelectWar: (warId: number) => void
+	onSelectPerson: (personId: number) => void
 	onSelectDate: (date: number) => void
 }
 
@@ -121,6 +125,13 @@ function renderLinkedTimelineText(
 				color: string
 				id: number
 		  }
+		| {
+				kind: "person"
+				key: string
+				name: string
+				color: string
+				id: number
+		  }
 		| { kind: "label"; key: string; name: string; color: string }
 	> = [
 		...event.nations.map((entry) => ({
@@ -149,6 +160,13 @@ function renderLinkedTimelineText(
 		...event.wars.map((entry) => ({
 			kind: "war" as const,
 			key: `war:${entry.id}`,
+			name: entry.name,
+			color: entry.color,
+			id: entry.id,
+		})),
+		...event.people.map((entry) => ({
+			kind: "person" as const,
+			key: `person:${entry.id}`,
 			name: entry.name,
 			color: entry.color,
 			id: entry.id,
@@ -266,6 +284,7 @@ function renderLinkedTimelineText(
 						else if (mention.kind === "province")
 							refs.onSelectProvince(mention.id)
 						else if (mention.kind === "war") refs.onSelectWar(mention.id)
+						else if (mention.kind === "person") refs.onSelectPerson(mention.id)
 						else refs.onSelectOrganization(mention.id)
 					}}
 				/>,

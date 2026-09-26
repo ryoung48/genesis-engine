@@ -1,5 +1,6 @@
 import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { uiPalette } from "@/ui/components/tokens"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { HistoryTimeline } from "@/ui/genesis/view/types"
 import { paletteColorForDynasty } from "@/ui/wiki/nation/timeline-formatting"
@@ -90,14 +91,29 @@ export function dynastyMention(
 export function personDisplay(payload: Record<string, unknown>): {
 	description: string
 	dynasties: NationTimelineEvent["dynasties"]
+	people: NationTimelineEvent["people"]
 } {
 	const name = String(payload.name ?? payload.monarchName ?? "unknown")
 	const dynasty =
 		typeof payload.dynasty === "string" && payload.dynasty.trim()
 			? payload.dynasty
 			: null
+	// Simulated rulers carry their person id and link to their wiki page.
+	const person = typeof payload.person === "number" ? payload.person : -1
 	return {
 		description: dynasty ? `${name} ${dynasty}` : name,
 		dynasties: dynasty ? [dynastyMention(dynasty)] : [],
+		people:
+			person >= 0
+				? [
+						{
+							id: person,
+							name,
+							color: dynasty
+								? paletteColorForDynasty(dynasty)
+								: uiPalette.person.noHouse,
+						},
+					]
+				: [],
 	}
 }

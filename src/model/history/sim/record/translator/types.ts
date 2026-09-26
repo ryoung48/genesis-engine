@@ -45,6 +45,8 @@ export interface ProceduralTranslator {
 	relationCells: Map<number, number>
 	relationColumns: Map<number, Set<number>>
 	activeTies: Map<number, ActiveTie>
+	// Marriage alliances by province pair, ended when their alliance ends.
+	royalMarriages: Map<number, RoyalMarriage>
 	warCoalitions: Map<number, { attackers: Set<number>; defenders: Set<number> }>
 	ownedCount: number[]
 	stateless: Uint8Array
@@ -94,4 +96,14 @@ export interface AppendNoteParams {
 	note: JournalTransaction["notes"][number]
 	timeMs: number
 	coalition: JournalTransaction["coalitions"][number] | null
+}
+
+export interface RoyalMarriage {
+	firstId: number
+	secondId: number
+}
+
+export interface PersonNameParams {
+	translator: ProceduralTranslator
+	person: number
 }

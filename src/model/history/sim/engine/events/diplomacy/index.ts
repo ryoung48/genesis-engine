@@ -5,21 +5,20 @@ import type {
 	CanVassalizeParams,
 	ClassifyInitialNeighborRelationParams,
 	InitDiplomacyParams,
+	MarriageBoundParams,
 	NextEventParams,
-	ProcessPersonalUnionDiplomacyParams,
 	ProcessVassalDiplomacyParams,
 	RollTransitionParams,
 	RunDiplomacyParams,
-	SeedInitialPersonalUnionsParams,
 	SeedInitialVassalsParams,
 	SeedNeighborRelationsParams,
-	SeedSharedDynastiesParams,
 	SyncVassalRelationsParams,
 } from "@/model/history/sim/engine/events/diplomacy/types"
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
+import { PEOPLE } from "@/model/history/sim/people"
 import type { WeightedValue } from "@/model/shared/random/rng"
 
 const LADDER_STATES = [
@@ -153,35 +152,24 @@ function processVassalDiplomacy({
 	}
 }
 
-function processPersonalUnionDiplomacy({
-	state,
-	junior,
-	senior,
-	rng,
-}: ProcessPersonalUnionDiplomacyParams): void {
-	syncVassalRelations({ state, vassal: junior, overlord: senior })
-
-	const threat = MILITARY.threat({ state, attacker: senior, defender: junior })
-	if (threat <= 0.6) return
-
-	// Break union
-	STATE.setRelation({ state, a: junior, b: senior, rel: STATE.rel.SUSPICIOUS })
-	state.events.push({
-		tag: "personal union ended",
-		time: state.time,
-		data: { junior, senior },
-	})
-
-	const counterWarChance = 0.7 * (1 - threat)
-	if (rng.random() < counterWarChance) {
-		STATE.startWar({
-			state,
-			attacker: senior,
-			defender: junior,
-			rng,
-			rebel: false,
+// An alliance holds while the two ruling families stay joined by a living
+// marriage.
+function marriageBound({ state, a, b }: MarriageBoundParams): boolean {
+	const people = state.people
+	const rulerA = people.rulerOf[a]
+	const rulerB = people.rulerOf[b]
+	return (
+		rulerA >= 0 &&
+		rulerB >= 0 &&
+		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[a]) &&
+		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[b]) &&
+		PEOPLE.tiedByMarriage({
+			people,
+			a: rulerA,
+			b: rulerB,
+			time: state.time / STATE.yearMs,
 		})
-	}
+	)
 }
 
 function nextEvent({ state, province, rng, years }: NextEventParams): void {
@@ -292,91 +280,10 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 	}
 }
 
-const SHARED_DYNASTY_SEED_CHANCE = 0.25
-
-const PERSONAL_UNION_SEED_CHANCE = SHARED_DYNASTY_SEED_CHANCE / 5
-
-function seedSharedDynasties({ state, rng }: SeedSharedDynastiesParams): void {
-	for (let nation = 0; nation < state.P; nation++) {
-		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
-			continue
-		for (const nb of STATE.getNationNeighbors({ state, nation })) {
-			if (nb <= nation) continue
-			const rel = STATE.getRelation({ state, a: nation, b: nb })
-			if (rel !== STATE.rel.FRIENDLY && rel !== STATE.rel.ALLY) continue
-			if (rng.random() >= SHARED_DYNASTY_SEED_CHANCE) continue
-
-			const [senior, junior] =
-				ECONOMY.revenue({ state, p: nation }) >=
-				ECONOMY.revenue({ state, p: nb })
-					? [nation, nb]
-					: [nb, nation]
-			const seniorDynasty = FIELDS.prov.leader.dynasty.get({ state, p: senior })
-			if (
-				seniorDynasty === FIELDS.prov.leader.dynasty.get({ state, p: junior })
-			)
-				continue
-
-			FIELDS.prov.leader.dynasty.set({
-				state,
-				p: junior,
-				value: seniorDynasty,
-			})
-			state.events.push({
-				tag: "dynasty spread",
-				time: state.time,
-				data: { nation: junior, source: senior, dynasty: seniorDynasty },
-			})
-		}
-	}
-}
-
-function seedInitialPersonalUnions({
-	state,
-	rng,
-}: SeedInitialPersonalUnionsParams): void {
-	for (let nation = 0; nation < state.P; nation++) {
-		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
-			continue
-		if (STATE.getRulerRelation({ state, nation })) continue
-		for (const nb of STATE.getNationNeighbors({ state, nation })) {
-			if (nb <= nation) continue
-			if (STATE.getRulerRelation({ state, nation: nb })) continue
-			const rel = STATE.getRelation({ state, a: nation, b: nb })
-			if (rel !== STATE.rel.FRIENDLY && rel !== STATE.rel.ALLY) continue
-			if (
-				FIELDS.prov.leader.dynasty.get({ state, p: nation }) !==
-				FIELDS.prov.leader.dynasty.get({ state, p: nb })
-			)
-				continue
-			if (rng.random() >= PERSONAL_UNION_SEED_CHANCE) continue
-
-			const [senior, junior] =
-				ECONOMY.revenue({ state, p: nation }) >=
-				ECONOMY.revenue({ state, p: nb })
-					? [nation, nb]
-					: [nb, nation]
-			STATE.setRelation({
-				state,
-				a: junior,
-				b: senior,
-				rel: STATE.rel.PU_JUNIOR,
-			})
-			state.events.push({
-				tag: "personal union formed",
-				time: state.time,
-				data: { junior, senior },
-			})
-		}
-	}
-}
-
 function initDiplomacy({ state, rng }: InitDiplomacyParams): void {
 	seedSubjectRelations(state)
 	seedNeighborRelations({ state, rng })
 	seedInitialVassals({ state, rng })
-	seedSharedDynasties({ state, rng })
-	seedInitialPersonalUnions({ state, rng })
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		nextEvent({ state, province: p, rng, years: rng.uniform(0, 8) })
@@ -428,7 +335,12 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 		if (!STATE.isSovereign({ state, p: nb })) continue
 		const rel = STATE.getRelation({ state, a: nation, b: nb })
 
-		if (rel === STATE.rel.OVERLORD || rel === STATE.rel.PU_SENIOR) continue
+		if (
+			rel === STATE.rel.OVERLORD ||
+			rel === STATE.rel.PU_SENIOR ||
+			rel === STATE.rel.PU_JUNIOR
+		)
+			continue
 		if (rel === STATE.rel.WAR) continue
 		if (rel === STATE.rel.COLONY) continue // colonizer's view of a distant colony
 
@@ -437,10 +349,8 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 			continue
 		}
 
-		if (rel === STATE.rel.PU_JUNIOR) {
-			processPersonalUnionDiplomacy({ state, junior: nb, senior: nation, rng })
+		if (rel === STATE.rel.ALLY && marriageBound({ state, a: nation, b: nb }))
 			continue
-		}
 
 		const next = rollTransition({ current: rel, rng })
 		if (next === rel) continue

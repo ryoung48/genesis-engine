@@ -26,3 +26,5 @@ export interface RefineGovernmentSubtypeParams {
 	sizeWeight: number
 	r: number
 }
+
+export type SuccessionSystem = "single_heir" | "election" | "appointment"

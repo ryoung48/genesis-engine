@@ -50,6 +50,10 @@ export function timelineTypeColor(type: string): string {
 			return "#0e7490"
 		case "Ruler":
 			return "#db2777"
+		case "Family":
+			return "#be185d"
+		case "Life":
+			return "#475569"
 		case "Heir":
 		case "Queen":
 		case "Leader":
@@ -219,6 +223,7 @@ export function pushTimelineEvent(
 		dynasties?: WikiTimelineEvent["dynasties"]
 		organizations?: WikiTimelineEvent["organizations"]
 		wars?: WikiTimelineEvent["wars"]
+		people?: WikiTimelineEvent["people"]
 	},
 ) {
 	events.push({
@@ -237,6 +242,7 @@ export function pushTimelineEvent(
 		dynasties: params.dynasties ?? [],
 		organizations: params.organizations ?? [],
 		wars: params.wars ?? [],
+		people: params.people ?? [],
 	})
 }
 

@@ -67,6 +67,7 @@ export type WikiSelectionSetters = {
 	setSelectedWikiNationId: (id: number | null) => void
 	setSelectedWikiOrganizationId: (orgId: string | null) => void
 	setSelectedWikiWarId: (warId: number | null) => void
+	setSelectedWikiPersonId: (personId: number | null) => void
 }
 
 export type NationWikiDataInput = WikiSelectionSetters & {
@@ -91,6 +92,13 @@ export type WarWikiDataInput = WikiSelectionSetters & {
 	history: HistoryTimeline
 	planetName: string
 	getProvinceColor: (provinceId: number) => string | null
+	sceneRef: SceneRef
+}
+
+export type PersonWikiDataInput = WikiSelectionSetters & {
+	selectedWikiPersonId: number | null
+	history: HistoryTimeline
+	planetName: string
 	sceneRef: SceneRef
 }
 

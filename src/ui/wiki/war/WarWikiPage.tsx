@@ -54,6 +54,7 @@ export interface WarWikiData {
 	onSelectProvince: (provinceId: number) => void
 	onSelectDate: (date: number) => void
 	onSelectOrganization: (orgId: string) => void
+	onSelectPerson: (personId: number) => void
 }
 
 function NationLink({
@@ -159,6 +160,7 @@ export function WarWikiPage({ war }: { war: WarWikiData }) {
 					onSelectProvince: war.onSelectProvince,
 					onSelectOrganization: war.onSelectOrganization,
 					onSelectWar: () => undefined,
+					onSelectPerson: war.onSelectPerson,
 					onSelectDate: war.onSelectDate,
 				}}
 			/>

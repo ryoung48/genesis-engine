@@ -50,6 +50,7 @@ export function useOrganizationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPersonId,
 		buildOrgCategorizer,
 		sceneRef,
 	} = input
@@ -491,6 +492,9 @@ export function useOrganizationWikiData(
 			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
+			onSelectPerson: (personId: number) => {
+				setSelectedWikiPersonId(personId)
+			},
 		}
 	}, [
 		selectedWikiOrganizationId,
@@ -514,6 +518,7 @@ export function useOrganizationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPersonId,
 		buildOrgCategorizer,
 	])
 }

@@ -79,6 +79,8 @@ export interface NationWikiData {
 	onSelectOrganization: (orgId: string) => void
 	/** Switches the page to a war's wiki page. */
 	onSelectWar: (warId: number) => void
+	/** Switches the page to a simulated person's wiki page. */
+	onSelectPerson: (personId: number) => void
 }
 
 export function NationWikiPage({ nation }: { nation: NationWikiData }) {
@@ -220,6 +222,7 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 					onSelectProvince: nation.onSelectProvince,
 					onSelectOrganization: nation.onSelectOrganization,
 					onSelectWar: nation.onSelectWar,
+					onSelectPerson: nation.onSelectPerson,
 					onSelectDate: nation.onSelectDate,
 				}}
 			/>

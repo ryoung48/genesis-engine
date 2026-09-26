@@ -3,6 +3,7 @@ import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { DIPLOMACY } from "@/model/history/sim/engine/events/diplomacy"
+import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
@@ -140,6 +141,12 @@ function initHistory(params: {
 		timings: params.timings,
 		fn: () => DIPLOMACY.initDiplomacy({ state, rng }),
 	})
+	// Districts are granted before war seeding: only districts can rebel.
+	timed({
+		label: "initHistory:initPeople",
+		timings: params.timings,
+		fn: () => PEOPLE_EVENTS.init({ state, rng }),
+	})
 	timed({
 		label: "initHistory:initWar",
 		timings: params.timings,
@@ -215,6 +222,9 @@ function processEventsUntil({
 				break
 			case EVENT_HEAP.evt.RAID:
 				RAID.runRaid({ state, nation: dataBuf[0], rng })
+				break
+			case EVENT_HEAP.evt.PEOPLE_YEAR:
+				PEOPLE_EVENTS.runYear({ state, rng })
 				break
 			case EVENT_HEAP.evt.DIPLOMACY:
 				DIPLOMACY.runDiplomacy({ state, nation: dataBuf[0], rng })

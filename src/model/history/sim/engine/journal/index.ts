@@ -1,6 +1,7 @@
 import type { CensusEconomy } from "@/model/history/record/types"
 import type {
 	FlushJournalParams,
+	JournalPeople,
 	JournalRelationChange,
 	PendingJournal,
 	RecordCoalitionParams,
@@ -8,6 +9,7 @@ import type {
 	RecordProvinceParams,
 	RecordRelationParams,
 } from "@/model/history/sim/engine/journal/types"
+import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 
 function pending(): PendingJournal {
@@ -77,6 +79,35 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 	}
 }
 
+function peopleRows(state: HistoryState): JournalPeople {
+	const { persons: table, log } = state.people
+	const rows: JournalPeople = {
+		persons: log.persons.map((id) => ({
+			id,
+			sex: table.sex[id],
+			birthTimeMs: table.birth[id] * yearMs,
+			deathTimeMs: table.death[id] * yearMs,
+			father: table.father[id],
+			mother: table.mother[id],
+			dynasty: table.dynasty[id],
+			nameSeed: table.nameSeed[id],
+			home: table.home[id],
+		})),
+		marriages: log.marriages.map((marriage) => ({
+			husband: marriage.husband,
+			wife: marriage.wife,
+			startTimeMs: marriage.start * yearMs,
+		})),
+		seats: log.seats.map(({ seat, person }) => ({
+			seat,
+			person,
+			sovereign: state.parentCurrent[seat] < 0,
+		})),
+	}
+	state.people.log = { persons: [], marriages: [], seats: [] }
+	return rows
+}
+
 function flush({
 	state,
 	noteCursor,
@@ -109,7 +140,6 @@ function flush({
 	for (const note of notes) {
 		if (
 			note.tag === "succession" ||
-			note.tag === "dynasty spread" ||
 			note.tag === "regency started" ||
 			note.tag === "regency ended"
 		)
@@ -121,6 +151,7 @@ function flush({
 		)
 		.map((root) => ({
 			root,
+			person: state.people.rulerOf[root],
 			nameSeed: state.leaderNameSeedCurrent[root],
 			dynasty: state.leaderDynCurrent[root],
 			birthTimeMs: state.leaderRuntime.birth[root],
@@ -138,7 +169,11 @@ function flush({
 				economy: censusEconomy(state),
 			}
 		: null
+	const people = peopleRows(state)
 	if (
+		people.persons.length > 0 ||
+		people.marriages.length > 0 ||
+		people.seats.length > 0 ||
 		parents.length > 0 ||
 		relations.length > 0 ||
 		occupations.length > 0 ||
@@ -154,6 +189,7 @@ function flush({
 			occupations,
 			coalitions: pendingJournal.coalitions,
 			rulers,
+			people,
 			notes,
 			census: keyframe,
 		})

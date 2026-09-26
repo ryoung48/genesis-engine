@@ -1,4 +1,5 @@
 import { DATE } from "@/model/history/earth/date"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
 	HistoryEvent,
 	NationIdentity,
@@ -13,6 +14,7 @@ import type {
 	CreateTranslatorParams,
 	DescendantsParams,
 	IdentityForRootParams,
+	PersonNameParams,
 	ProceduralTranslator,
 	ProjectTieParams,
 	RebelNoteReasons,
@@ -74,6 +76,10 @@ function nationLabel({
 				translator.names.nation(root))
 }
 
+function personName({ translator, person }: PersonNameParams): string | null {
+	return translator.state.record.people?.persons.get(person)?.name ?? null
+}
+
 // Registers and retires rebel wars from this transaction's notes before any
 // ownership is derived, and collects the reason text the record attaches to
 // each revolt and each rebel-war outcome.
@@ -94,9 +100,13 @@ function scanRebelNotes({
 					: note.data.succession
 						? "succession"
 						: "threat"
+			const pretender = personName({
+				translator,
+				person: (note.data.pretender as number | undefined) ?? -1,
+			})
 			reasons.revolts.set(
 				note.data.subject as number,
-				`Revolted against ${nationLabel({ translator, root: note.data.overlord as number })} (${cause})`,
+				`Revolted against ${nationLabel({ translator, root: note.data.overlord as number })} (${cause}${pretender ? `, for ${pretender}` : ""})`,
 			)
 		} else if (note.tag === "war started") {
 			const warId = note.data.war as number
@@ -273,6 +283,18 @@ function updateTies({ translator, pairs, timeMs }: UpdateTiesParams): void {
 				subjectType: previous.kind === "colony" ? "colony" : null,
 			})
 			translator.activeTies.delete(pair)
+			// A marriage alliance lapses with the alliance it made.
+			const marriage = translator.royalMarriages.get(pair)
+			if (previous.kind === "alliance" && marriage) {
+				record.events.diplomacy.push({
+					timeMs,
+					kind: "royalMarriageEnd",
+					firstId: marriage.firstId,
+					secondId: marriage.secondId,
+					subjectType: null,
+				})
+				translator.royalMarriages.delete(pair)
+			}
 		}
 		if (
 			next &&
@@ -530,6 +552,23 @@ function appendNote({
 			children: data.children as number[],
 			ancestors: data.ancestors as number[],
 		})
+	} else if (note.tag === "marriage alliance") {
+		const firstId = translator.identityByRoot.get(data.first as number)
+		const secondId = translator.identityByRoot.get(data.second as number)
+		if (firstId === undefined || secondId === undefined) return
+		const count = translator.parent.length
+		const a = data.first as number
+		const b = data.second as number
+		const pair = Math.min(a, b) * count + Math.max(a, b)
+		if (translator.royalMarriages.has(pair)) return
+		translator.royalMarriages.set(pair, { firstId, secondId })
+		record.events.diplomacy.push({
+			timeMs,
+			kind: "royalMarriageStart",
+			firstId,
+			secondId,
+			subjectType: null,
+		})
 	} else if (note.tag === "capital moved") {
 		record.events.titleEvents.push({
 			timeMs,
@@ -539,17 +578,6 @@ function appendNote({
 			to: data.to as number,
 			cause: data.cause as string,
 		})
-	} else if (note.tag === "dynasty spread") {
-		const firstId = translator.identityByRoot.get(data.source as number)
-		const secondId = translator.identityByRoot.get(data.nation as number)
-		if (firstId !== undefined && secondId !== undefined)
-			record.events.diplomacy.push({
-				timeMs,
-				kind: "royalMarriageStart",
-				firstId,
-				secondId,
-				subjectType: null,
-			})
 	}
 }
 
@@ -600,6 +628,7 @@ function createTranslator({
 		relationCells: new Map(),
 		relationColumns: new Map(),
 		activeTies: new Map(),
+		royalMarriages: new Map(),
 		warCoalitions: new Map(),
 		ownedCount,
 		stateless,
@@ -631,6 +660,26 @@ function applyTransaction({
 	const { record } = translator.state
 	const timeMs = Math.max(record.minTimeMs, recordTime(transaction.timeMs))
 	record.maxTimeMs = Math.max(record.maxTimeMs, timeMs)
+	if (record.people)
+		PEOPLE_RECORD.append({
+			record: record.people,
+			rows: transaction.people,
+			timeMs,
+			recordTime,
+			describe: ({ person, houseHome }) => ({
+				name: translator.names.ruler({
+					province: person.home,
+					nameSeed: person.nameSeed,
+				}).name,
+				house:
+					person.dynasty >= 0
+						? translator.names.dynasty({
+								dynastyIdx: person.dynasty,
+								province: houseHome,
+							})
+						: null,
+			}),
+		})
 	const count = translator.parent.length
 	const affected = new Set<number>()
 	const pairs = new Set<number>()
@@ -780,8 +829,11 @@ function applyTransaction({
 		if (nationId === undefined || ruler.nameSeed < 0) continue
 		const log = record.events.nationEvents[nationId]
 		if (!log) continue
+		// Names follow the person's birth realm and the house's first home, so
+		// a ruler keeps one name across every throne they hold.
+		const person = record.people?.persons.get(ruler.person)
 		const named = translator.names.ruler({
-			province: ruler.root,
+			province: person?.home ?? ruler.root,
 			nameSeed: ruler.nameSeed,
 		})
 		log.events.push({
@@ -793,13 +845,15 @@ function applyTransaction({
 					ruler.dynasty >= 0
 						? translator.names.dynasty({
 								dynastyIdx: ruler.dynasty,
-								province: ruler.root,
+								province:
+									record.people?.dynastyHome.get(ruler.dynasty) ?? ruler.root,
 							})
 						: null,
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
 				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
 				female: named.female,
 				regent: ruler.regent,
+				person: ruler.person,
 			},
 			comment: null,
 		})

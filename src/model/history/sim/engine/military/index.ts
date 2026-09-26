@@ -191,7 +191,11 @@ function rebellionThreat({
 	const share = ECONOMY.subtreeManpower({ state, p: subject })
 	let league = 0
 	for (const vassal of STATE.getChildren({ state, p: overlord }))
-		if (vassal !== subject && state.seatRank[vassal] > 0)
+		if (
+			vassal !== subject &&
+			state.seatRank[vassal] > 0 &&
+			state.people.rulerOf[vassal] >= 0
+		)
 			league += ECONOMY.subtreeManpower({ state, p: vassal })
 	const loyalty =
 		ECONOMY.armyTradition({ state, p: overlord }) === "paid"

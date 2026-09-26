@@ -1,5 +1,16 @@
 import type { NationEconomy } from "@/model/history/world-frame/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { uiPalette } from "@/ui/components/tokens"
+
+function treasuryHealthColor(economy: NationEconomy): string {
+	if (economy.treasury < 0) return uiPalette.treasury.critical
+	if (economy.revenue <= 0) return uiPalette.nationCapital
+	const reserveCapacityPercent =
+		(economy.treasury / economy.revenue) * (200 / 0.6)
+	if (reserveCapacityPercent >= 150) return uiPalette.treasury.healthy
+	if (reserveCapacityPercent >= 50) return uiPalette.treasury.caution
+	return uiPalette.treasury.critical
+}
 
 export function formatCount(value: number): string {
 	if (!Number.isFinite(value) || value <= 0) return "0"
@@ -104,13 +115,11 @@ export function buildNationWikiStats(params: {
 					{
 						label: "Treasury",
 						value:
-							economy.treasury < 0
-								? `${formatSilver(-economy.treasury)} of silver in debt`
-								: `${formatSilver(economy.treasury)} of silver`,
-					},
-					{
-						label: "Revenue",
-						value: `${formatSilver(economy.revenue)} of silver per year`,
+							economy.revenue > 0
+								? `${Math.round((economy.treasury / economy.revenue) * (200 / 0.6))}% of reserve capacity`
+								: "No annual revenue",
+						help: "Scaled to the treasury's reserve cap, which displays as 200%. Red is debt or under 50%, amber is 50–149%, and green is 150% or more.",
+						swatchColor: treasuryHealthColor(economy),
 					},
 					{ label: "Manpower", value: `${formatCount(economy.manpower)} men` },
 				]

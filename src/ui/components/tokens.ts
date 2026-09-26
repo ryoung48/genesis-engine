@@ -1,5 +1,10 @@
 export const uiPalette = {
 	war: "#b91c1c",
+	treasury: {
+		critical: "#b91c1c",
+		caution: "#f59e0b",
+		healthy: "#22c55e",
+	},
 	giantStar: "#ef4444",
 	moonHighland: "#c2c2c2",
 	martianHighland: "#d7724d",
@@ -13,6 +18,15 @@ export const uiPalette = {
 	nationCapital: "#fbbf24",
 	rebel: "#000000",
 	activeDark: "#0f172a",
+	person: {
+		noHouse: "#94a3b8",
+		health: {
+			Good: "#22c55e",
+			Fair: "#84cc16",
+			Poor: "#f59e0b",
+			Grave: "#b91c1c",
+		},
+	},
 	swatch: {
 		stripeBackground: "rgba(15, 23, 42, 0.85)",
 		stripedBorder: "rgba(255, 255, 255, 0.15)",
