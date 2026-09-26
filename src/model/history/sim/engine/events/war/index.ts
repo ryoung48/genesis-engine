@@ -63,17 +63,29 @@ function listWarTargets({ state, nation }: ListWarTargetsParams): {
 	const wars = DERIVE.provinceWars({ state, p: nation })
 		.map((idx: number) => state.wars[idx])
 		.filter((w) => w.endTime === undefined)
-
-	return STATE.getNationNeighbors({ state, nation }).map((nb) => {
-		const rel = STATE.getRelation({ state, a: nation, b: nb }) as Relation
-		return {
-			n: nb,
-			threshold: ATTACK_THRESHOLD[rel] ?? 0,
-			w: MILITARY.threat({ state, attacker: nation, defender: nb }),
-			hasWar: wars.some((w) => w.defender === nb || w.attacker === nb),
-			d: STATE.provinceDistanceSq({ state, a: nation, b: nb }),
-		}
-	})
+	return STATE.getNationNeighbors({ state, nation })
+		.filter(
+			(nb) =>
+				!DERIVE.provinceWars({ state, p: nb }).some((idx) => {
+					const war = state.wars[idx]
+					return (
+						war.rebel &&
+						war.endTime === undefined &&
+						war.defender === nb &&
+						war.attacker !== nation
+					)
+				}),
+		)
+		.map((nb) => {
+			const rel = STATE.getRelation({ state, a: nation, b: nb }) as Relation
+			return {
+				n: nb,
+				threshold: ATTACK_THRESHOLD[rel] ?? 0,
+				w: MILITARY.threat({ state, attacker: nation, defender: nb }),
+				hasWar: wars.some((w) => w.defender === nb || w.attacker === nb),
+				d: STATE.provinceDistanceSq({ state, a: nation, b: nb }),
+			}
+		})
 }
 
 function getDefenderOccupationCandidates({

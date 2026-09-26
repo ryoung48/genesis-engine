@@ -19,7 +19,15 @@ export interface WikiTimelineEvent {
 	description: string
 	comment?: string
 	plainTextRanges?: Array<{ start: number; end: number }>
-	nations: Array<{ tag: string; name: string; color: string; link?: boolean }>
+	nations: Array<{
+		tag: string
+		name: string
+		color: string
+		// [JUSTIFICATION] Only rebel mentions use a striped swatch.
+		striped?: boolean
+		// [JUSTIFICATION] Some historical rebel actors have no nation wiki page.
+		link?: boolean
+	}>
 	provinces: Array<{ id: number; name: string; color: string }>
 	cultures: Array<{ id: string; name: string; color: string }>
 	religions: Array<{ id: string; name: string; color: string }>
@@ -94,6 +102,7 @@ function renderLinkedTimelineText(
 				key: string
 				name: string
 				color: string
+				striped: boolean | undefined
 				tag: string
 				link: boolean
 		  }
@@ -119,6 +128,7 @@ function renderLinkedTimelineText(
 			key: `nation:${entry.tag}`,
 			name: entry.name,
 			color: entry.color,
+			striped: entry.striped,
 			tag: entry.tag,
 			link: entry.link !== false,
 		})),
@@ -241,6 +251,7 @@ function renderLinkedTimelineText(
 					key={`${mention.key}:${key++}`}
 					name={mention.name}
 					color={mention.color}
+					striped={mention.kind === "nation" && mention.striped}
 				/>,
 			)
 		} else {
@@ -249,6 +260,7 @@ function renderLinkedTimelineText(
 					key={`${mention.key}:${key++}`}
 					name={mention.name}
 					color={mention.color}
+					striped={mention.kind === "nation" && mention.striped}
 					onClick={() => {
 						if (mention.kind === "nation") refs.onSelectNation(mention.tag)
 						else if (mention.kind === "province")

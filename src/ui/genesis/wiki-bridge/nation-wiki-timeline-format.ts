@@ -447,7 +447,7 @@ export function formatBattleForce(
 	].filter((count): count is number => count !== null)
 	if (troops.length === 0) return null
 	const army = troops.reduce((sum, count) => sum + count, 0)
-	const men = `${Math.round(army).toLocaleString("en-US")} men`
+	const men = `${Math.round(army).toLocaleString("en-US")} men engaged`
 	if (participant.losses === null) return men
 	const lost = Math.round((army * participant.losses) / 100)
 	return `${men}, ${lost.toLocaleString("en-US")} lost`

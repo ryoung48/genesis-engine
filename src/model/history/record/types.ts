@@ -74,6 +74,8 @@ export interface Battle {
 	locationProvinceId: number
 	attacker: BattleParticipant
 	defender: BattleParticipant
+	attackerDeployed: number | null
+	defenderDeployed: number | null
 	attackerWon: boolean
 	comment: string | null
 }

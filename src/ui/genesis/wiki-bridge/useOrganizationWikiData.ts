@@ -7,18 +7,16 @@ import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-cate
 import type { OrgProvinceCategory } from "@/model/history/earth/organization-categories/types"
 import { HISTORY } from "@/model/history/record"
 import { FRAME } from "@/model/history/world-frame"
-import {
-	nationFocusDistanceScale,
-	SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
-} from "@/ui/genesis/renderer/focus"
+import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
+import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
 import {
-	compareTimelineDateThenWarEnd,
+	compareTimelineDayThenType,
 	pushTimelineEvent,
 	rgb255ToCss,
 } from "@/ui/wiki/nation/timeline-formatting"
@@ -74,15 +72,11 @@ export function useOrganizationWikiData(
 		const frame = history.query.frame
 		const nations = record.nations
 		const focusOrgNation = (targetId: number) => {
-			const seedProvince = frame.nations.get(targetId)?.capitalProvince ?? -1
-			if (seedProvince < 0) return
-			let targetProvinceCount = 0
-			for (const assigned of frame.provinceNation) {
-				if (assigned === targetId) targetProvinceCount++
-			}
-			sceneRef.current?.focusOnProvince(seedProvince, {
-				distanceScale: nationFocusDistanceScale(targetProvinceCount),
-				pulseTarget: "nation",
+			focusWikiNation({
+				frame,
+				wars: record.events.wars,
+				targetId,
+				sceneRef,
 			})
 		}
 		const resolveNationName = (id: number): string =>
@@ -266,7 +260,7 @@ export function useOrganizationWikiData(
 		}
 		timelineEvents.sort(
 			(a, b) =>
-				compareTimelineDateThenWarEnd(a, b) || a.type.localeCompare(b.type),
+				compareTimelineDayThenType(a, b) || a.type.localeCompare(b.type),
 		)
 		// Nation-level membership, generic across every org: derived straight
 		// from the org's own category schema (organization-categories.ts) via

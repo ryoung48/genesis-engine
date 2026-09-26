@@ -22,6 +22,10 @@ import {
 	collectProvinceBorderGlobePositions,
 	collectProvinceBorderMapPositions,
 } from "@/ui/genesis/renderer/province-overlay"
+import type {
+	BorderPulseParams,
+	FocusOnProvinceOptions,
+} from "@/ui/genesis/renderer/types"
 
 export interface CameraFocusControllerDeps {
 	requestRender: () => void
@@ -78,18 +82,7 @@ export function createCameraFocusController(
 		deps.requestRender()
 	}
 
-	function focusOnProvince(
-		provinceId: number,
-		opts?: {
-			durationMs?: number
-			distanceScale?: number
-			/** "nation" highlights the whole nation's border instead of just
-			 * this one province's -- used when the caller is really focusing
-			 * on a nation and only has a representative
-			 * province to hand in. */
-			pulseTarget?: "nation" | "province"
-		},
-	) {
+	function focusOnProvince(provinceId: number, opts?: FocusOnProvinceOptions) {
 		if (!ctx.currentWorld?.provinces) return
 		if (provinceId < 0 || provinceId >= ctx.currentWorld.provinces.count) {
 			deps.setSelectedProvince(null)
@@ -108,7 +101,11 @@ export function createCameraFocusController(
 			return
 		}
 		focusOnRegion(region, opts)
-		startBorderPulse(provinceId, pulseTarget)
+		startBorderPulse({
+			province: provinceId,
+			target: pulseTarget,
+			assignment: opts?.pulseAssignment ?? null,
+		})
 	}
 
 	function clearPulse() {
@@ -145,12 +142,21 @@ export function createCameraFocusController(
 		return line
 	}
 
-	function startBorderPulse(
-		province: number,
-		target: "nation" | "province" = "nation",
-	) {
+	function startBorderPulse({
+		province,
+		target,
+		assignment,
+	}: BorderPulseParams) {
 		clearPulse()
 		if (!ctx.currentWorld) return
+		const borderWorld = deps.getWorldForBorders()
+		const pulseWorld =
+			assignment && borderWorld?.nations
+				? {
+						...borderWorld,
+						nations: { ...borderWorld.nations, assignment },
+					}
+				: borderWorld
 		const lineWidth = target === "province" ? 5 : 4
 		const useEu4Vectors =
 			ctx.currentWorld.isEarthImport && ctx.cachedEu4BorderGeometry
@@ -167,7 +173,7 @@ export function createCameraFocusController(
 							1.006,
 						)
 				: (() => {
-						const worldForBorders = deps.getWorldForBorders()
+						const worldForBorders = pulseWorld
 						const nation = worldForBorders?.nations?.assignment[province]
 						if (nation === undefined || nation < 0) return []
 						const realIdToNation = worldForBorders
@@ -190,7 +196,7 @@ export function createCameraFocusController(
 						ctx.elevationVisible,
 					)
 				: (() => {
-						const worldForBorders = deps.getWorldForBorders()
+						const worldForBorders = pulseWorld
 						const nation = worldForBorders?.nations?.assignment[province]
 						return !worldForBorders || nation === undefined || nation < 0
 							? []
@@ -213,7 +219,7 @@ export function createCameraFocusController(
 							z: 0.007,
 						})
 				: (() => {
-						const worldForBorders = deps.getWorldForBorders()
+						const worldForBorders = pulseWorld
 						const nation = worldForBorders?.nations?.assignment[province]
 						if (nation === undefined || nation < 0) return []
 						const realIdToNation = worldForBorders
@@ -239,7 +245,7 @@ export function createCameraFocusController(
 						zBoost: 0.004,
 					})
 				: (() => {
-						const worldForBorders = deps.getWorldForBorders()
+						const worldForBorders = pulseWorld
 						const nation = worldForBorders?.nations?.assignment[province]
 						return !worldForBorders || nation === undefined || nation < 0
 							? []

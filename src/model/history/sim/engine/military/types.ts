@@ -41,6 +41,12 @@ export interface CoalitionMember {
 	force: number
 }
 
+export interface DeploymentAssignment {
+	war: War
+	opponent: number
+	primary: boolean
+}
+
 export interface FightParams {
 	state: HistoryState
 	war: War
@@ -53,6 +59,8 @@ export interface BattleResult {
 	winChance: number
 	attackerArmy: number
 	defenderArmy: number
+	attackerDeployed: number
+	defenderDeployed: number
 	attackerLossShare: number
 	defenderLossShare: number
 }
@@ -65,6 +73,7 @@ export interface ApplyLossesParams {
 
 export interface LossShareParams {
 	ratio: number
+	multiplier: number
 	rng: SharedRng
 }
 

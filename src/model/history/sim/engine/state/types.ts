@@ -38,6 +38,7 @@ export interface War {
 	startTime: number
 	endTime?: number
 	rebel: boolean
+	deployed: Record<number, number>
 	/** Provinces currently occupied by the attacker in this war. */
 	occupied: number[]
 }
@@ -112,6 +113,7 @@ export interface HistoryState {
 	// Grams of silver and levyable men; meaningful only on sovereign roots.
 	treasuryCurrent: Float64Array
 	manpowerCurrent: Float64Array
+	deploymentUpdateTime: Float64Array
 	revenueCurrent: Float64Array
 	// Time until which a plundered province yields no output loot.
 	plunderedUntil: Float64Array
@@ -153,6 +155,7 @@ export interface HistoryState {
 	governmentType: Uint8Array
 
 	wars: War[]
+	activeWarIds: Set<number>
 	events: EngineNote[]
 	journal: JournalTransaction[]
 	pendingJournal: PendingJournal

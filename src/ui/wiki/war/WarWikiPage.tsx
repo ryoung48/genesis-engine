@@ -17,6 +17,7 @@ interface WarWikiNationMention {
 	tag: string
 	name: string
 	color: string
+	striped: boolean
 	/** Whether this nation is currently a war participant at the wiki's
 	 * selected date -- false for a nation that hasn't joined yet or has
 	 * already left/made peace, which the Participants panel grays out
@@ -27,6 +28,7 @@ interface WarWikiNationMention {
 interface WarWikiParticipant {
 	side: "attacker" | "defender"
 	nations: WarWikiNationMention[]
+	totalStrength: number | null
 }
 
 export interface WarWikiData {
@@ -66,6 +68,7 @@ function NationLink({
 		<EntityChip
 			name={nation.name}
 			color={nation.color}
+			striped={nation.striped}
 			dimmed={!active}
 			title={active ? undefined : "Not a participant at the selected date"}
 			onClick={() => onSelectNation(nation.tag)}
@@ -87,7 +90,10 @@ function ParticipantGroup({
 }) {
 	if (group.nations.length === 0) return null
 	return (
-		<ChipGroup label={SIDE_LABELS[group.side]} count={group.nations.length}>
+		<ChipGroup
+			label={`${SIDE_LABELS[group.side]}${group.totalStrength === null ? "" : ` · ${Math.round(group.totalStrength).toLocaleString("en-US")} men`}`}
+			count={group.nations.length}
+		>
 			{group.nations.map((nation) => (
 				<NationLink
 					key={nation.tag}

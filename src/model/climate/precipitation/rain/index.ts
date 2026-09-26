@@ -678,16 +678,17 @@ const EMPIRICAL_RAIN_SCALE = 0.75
 function seasonalRainCurve({
 	cellLat,
 	absLat,
-	westShare,
+	coast,
 	teq,
 	bandOffsetDeg,
 	hoursPerDay,
 }: SeasonalRainCurveParams): number {
 	const hadley = hadleyWidth(hoursPerDay)
 	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
-	const eastTerm = Math.max(eastProximityScale(dist), eastHumidFloor(absLat))
 	const coastTerm =
-		eastTerm * (1 - westShare) + westerliesScale(dist) * westShare
+		coast === "west"
+			? westerliesScale(dist)
+			: Math.max(eastProximityScale(dist), eastHumidFloor(absLat))
 	return Math.max(itczScale(dist), coastTerm)
 }
 
@@ -750,7 +751,6 @@ function computeMonthlyRain({
 	})
 
 	const hoursPerDay = params?.hoursPerDay ?? 24
-	const hadley = hadleyWidth(hoursPerDay)
 
 	const monthly = new Float32Array(N * 12)
 	const boundaryWarpDeg = RAIN_SHARED.computeRainBandWarpField({
@@ -769,19 +769,6 @@ function computeMonthlyRain({
 		// larger channel is both the coast facing and the moisture supply.
 		const moisture = Math.max(e, w)
 		const coast: "east" | "west" = w > e ? "west" : "east"
-		const squaredEast = e * e
-		const squaredWest = w * w
-		const squaredTotal = squaredEast + squaredWest
-		const squaredWestShare =
-			squaredTotal > 0 ? squaredWest / squaredTotal : coast === "west" ? 1 : 0
-		const annualDist =
-			Math.abs(latDeg[r] - (annualTeq[bin] + boundaryWarpDeg[r])) / hadley
-		const hadleyBlend =
-			1 - MATH.smoothstep({ edge0: 34 / 30, edge1: 44 / 30, x: annualDist })
-		const categoricalWestShare = coast === "west" ? 1 : 0
-		const westShare =
-			categoricalWestShare +
-			(squaredWestShare - categoricalWestShare) * hadleyBlend
 		// Windward orographic lift can push e/w above 1 (see computeAdvection's
 		// localMoisture); re-applied here as an uncapped multiplier on the mm
 		// value, scoped to cells that actually earned it via lift.
@@ -803,7 +790,7 @@ function computeMonthlyRain({
 			const exposure = seasonalRainCurve({
 				cellLat: latDeg[r],
 				absLat: Math.abs(latDeg[r]),
-				westShare,
+				coast,
 				teq: monthlyTEQ[month][bin],
 				bandOffsetDeg: boundaryWarpDeg[r],
 				hoursPerDay,
@@ -816,22 +803,15 @@ function computeMonthlyRain({
 			for (let month = 0; month < 12; month++) seasonWeights[month] /= seasonSum
 		}
 
-		// Subtropical-high subsidence follows the squared west-channel share.
-		// East-dominant cells at or below 0.4 remain unsuppressed, west-dominant
-		// cells at or above 0.6 receive the full dry-belt effect, and mixed cells
-		// transition smoothly between those outcomes.
-		const westSuppression = subsidenceFactor({
-			cellLat: latDeg[r],
-			subsidenceTeq: annualTeq[bin],
-			hoursPerDay,
-			bandOffsetDeg: boundaryWarpDeg[r],
-		})
-		const suppressionShare = MATH.smoothstep({
-			edge0: 0.4,
-			edge1: 0.6,
-			x: westShare,
-		})
-		const suppression = 1 + (westSuppression - 1) * suppressionShare
+		const suppression =
+			coast === "west"
+				? subsidenceFactor({
+						cellLat: latDeg[r],
+						subsidenceTeq: annualTeq[bin],
+						hoursPerDay,
+						bandOffsetDeg: boundaryWarpDeg[r],
+					})
+				: 1
 		const annualMm =
 			EMPIRICAL_RAIN_SCALE *
 			capacityBudget *

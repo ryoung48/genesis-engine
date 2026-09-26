@@ -335,6 +335,13 @@ function startWar({
 	rng,
 	rebel,
 }: StartWarParams): void {
+	if (
+		DERIVE.provinceWars({ state, p: attacker }).some((idx) => {
+			const war = state.wars[idx]
+			return war.endTime === undefined && war.defender === attacker
+		})
+	)
+		return
 	createActiveWar({ state, attacker, defender, rng, options: { rebel } })
 }
 
@@ -362,9 +369,11 @@ function createActiveWar({
 		defender,
 		startTime,
 		rebel: options.rebel ?? false,
+		deployed: {},
 		occupied: [],
 	}
 	state.wars.push(war)
+	state.activeWarIds.add(war.idx)
 	state.provinceWars[attacker].push(war.idx)
 	state.provinceWars[defender].push(war.idx)
 	FIELDS.rel.set({
@@ -463,6 +472,7 @@ function resolveWar({
 	stalemate,
 }: ResolveWarParams): void {
 	war.endTime = state.time
+	state.activeWarIds.delete(war.idx)
 	const conquered = (
 		victory
 			? getNationProvinces({ state, root: war.defender })
@@ -602,6 +612,7 @@ function createHistoryState({
 		realmCache: new Map(),
 		treasuryCurrent: new Float64Array(P),
 		manpowerCurrent: new Float64Array(P),
+		deploymentUpdateTime: new Float64Array(P).fill(-1),
 		revenueCurrent: new Float64Array(P),
 		plunderedUntil: new Float64Array(P),
 		leaderDynCurrent: new Int32Array(P).fill(-1),
@@ -635,6 +646,7 @@ function createHistoryState({
 		nationColors: nations.colors.slice(),
 		governmentType: nations.governmentType?.slice() ?? new Uint8Array(P),
 		wars: [],
+		activeWarIds: new Set(),
 		events: [],
 		journal: [],
 		pendingJournal: JOURNAL.pending(),

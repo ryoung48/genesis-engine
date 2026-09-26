@@ -250,9 +250,30 @@ function warEndRank(event: { type: string }): number {
 	return event.type === "War (-)" ? 1 : 0
 }
 
-export function compareTimelineDateThenWarEnd(
+const TIMELINE_TYPE_ORDER: Record<string, number> = {
+	Title: 0,
+	Ruler: 1,
+	Heir: 1,
+	Queen: 1,
+	Leader: 1,
+	Diplomacy: 2,
+	War: 3,
+	Battle: 3,
+	Territory: 4,
+}
+
+function timelineTypeRank(type: string): number {
+	return TIMELINE_TYPE_ORDER[type.replace(/\s+\([+-]\)$/, "")] ?? 5
+}
+
+export function compareTimelineDayThenType(
 	a: { date: number; type: string },
 	b: { date: number; type: string },
 ): number {
-	return a.date - b.date || warEndRank(a) - warEndRank(b)
+	return (
+		Math.floor(a.date) - Math.floor(b.date) ||
+		timelineTypeRank(a.type) - timelineTypeRank(b.type) ||
+		a.date - b.date ||
+		warEndRank(a) - warEndRank(b)
+	)
 }

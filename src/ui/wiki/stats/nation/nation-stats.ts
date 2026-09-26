@@ -56,6 +56,7 @@ function formatUrbanization(
 }
 
 export function buildNationWikiStats(params: {
+	territoryBasis: "owned" | "controlled"
 	totalAreaKm2: number
 	totalPopulation: number
 	totalUrbanPopulation: number
@@ -66,6 +67,7 @@ export function buildNationWikiStats(params: {
 	economy: NationEconomy | null
 }): StatEntry[] {
 	const {
+		territoryBasis,
 		totalAreaKm2,
 		totalPopulation,
 		totalUrbanPopulation,
@@ -78,11 +80,14 @@ export function buildNationWikiStats(params: {
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
 	return [
 		{
-			label: "Total Area",
+			label: territoryBasis === "controlled" ? "Controlled Area" : "Total Area",
 			value: `${formatAreaKm2(totalAreaKm2)} · ${provinceCount.toLocaleString()} Province${provinceCount === 1 ? "" : "s"}`,
 		},
 		{
-			label: "Population",
+			label:
+				territoryBasis === "controlled"
+					? "Controlled Population"
+					: "Population",
 			valuePrefix: formatCount(totalPopulation),
 			value: ` · ${formatDensity(density)} · ${formatUrbanization(totalUrbanPopulation, totalPopulation)} urbanized`,
 		},

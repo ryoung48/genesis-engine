@@ -11,6 +11,7 @@ export const uiPalette = {
 	sectorBoundary: "#cbd5e1",
 	sectorCapital: "#38bdf8",
 	nationCapital: "#fbbf24",
+	rebel: "#000000",
 	activeDark: "#0f172a",
 	swatch: {
 		stripeBackground: "rgba(15, 23, 42, 0.85)",

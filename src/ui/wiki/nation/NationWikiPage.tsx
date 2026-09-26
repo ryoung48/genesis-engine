@@ -7,6 +7,7 @@ import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
+import { uiPalette } from "@/ui/components/tokens"
 import { GpsFocusButton, renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	type WikiCountHistoryPoint,
@@ -17,6 +18,7 @@ import {
 
 export interface NationWikiData {
 	title: string
+	territoryBasis: "owned" | "controlled"
 	tierLabel: string
 	/** Same deterministic per-tag color the map fill/hover swatches use. */
 	color: string
@@ -87,7 +89,15 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 					title={nation.title}
 					meta={
 						<>
-							<Swatch color={nation.color} />
+							<Swatch
+								color={
+									nation.territoryBasis === "controlled"
+										? uiPalette.rebel
+										: nation.color
+								}
+								striped={nation.territoryBasis === "controlled"}
+								stripeBackground="transparent"
+							/>
 							<span>{nation.tierLabel}</span>
 							<span>·</span>
 							<InlineTextButton
@@ -194,7 +204,11 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 
 			<WikiTimelineSection
 				countHistory={nation.provinceHistory}
-				countChartLabel="Provinces over time"
+				countChartLabel={
+					nation.territoryBasis === "controlled"
+						? "Owned provinces over time"
+						: "Provinces over time"
+				}
 				countUnitLabel="provinces"
 				dateRangeStart={nation.dateRangeStart}
 				dateRangeEnd={nation.dateRangeEnd}

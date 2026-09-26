@@ -24,6 +24,23 @@ export type { WindArrowData }
 
 export type GenesisViewMode = "globe" | "map"
 
+export interface FocusOnProvinceOptions {
+	// [JUSTIFICATION] Callers can use the standard focus animation duration.
+	durationMs?: number
+	// [JUSTIFICATION] Callers can use the standard focus distance.
+	distanceScale?: number
+	// [JUSTIFICATION] Province focus is the default when no nation pulse is requested.
+	pulseTarget?: "nation" | "province"
+	// [JUSTIFICATION] Active rebels need a controller-based outline while the map keeps owner-based borders.
+	pulseAssignment?: Int32Array
+}
+
+export interface BorderPulseParams {
+	province: number
+	target: "nation" | "province"
+	assignment: Int32Array | null
+}
+
 export type CloudBandStyle =
 	| "cloudy"
 	| "banded"
@@ -218,14 +235,7 @@ export interface GenesisScene {
 	setCloudsVisible(visible: boolean): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
-	focusOnProvince(
-		provinceId: number,
-		opts?: {
-			durationMs?: number
-			distanceScale?: number
-			pulseTarget?: "nation" | "province"
-		},
-	): void
+	focusOnProvince(provinceId: number, opts?: FocusOnProvinceOptions): void
 	setSettlements(urbanPop: Float32Array | null): void
 	setSettlementsVisible(visible: boolean): void
 	setEu4Settlements(

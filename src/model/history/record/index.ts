@@ -3,6 +3,7 @@ import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
 import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
+	Battle,
 	BuildEarthRecordParams,
 	CreateHistoryStateParams,
 	FrameAtParams,
@@ -178,20 +179,24 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 					]
 				})
 				.sort((a, b) => a.timeMs - b.timeMs),
-			battles: war.battles.map((battle) => ({
-				...battle,
-				comment: battle.comment ?? null,
-				locationProvinceId: provinceId(battle.locationProvinceId),
-				timeMs: timeMs(battle.date),
-				attacker: {
-					...battle.attacker,
-					countryId: nationId(battle.attacker.country),
-				},
-				defender: {
-					...battle.defender,
-					countryId: nationId(battle.defender.country),
-				},
-			})),
+			battles: war.battles.map(
+				(battle): Battle => ({
+					...battle,
+					comment: battle.comment ?? null,
+					locationProvinceId: provinceId(battle.locationProvinceId),
+					timeMs: timeMs(battle.date),
+					attacker: {
+						...battle.attacker,
+						countryId: nationId(battle.attacker.country),
+					},
+					defender: {
+						...battle.defender,
+						countryId: nationId(battle.defender.country),
+					},
+					attackerDeployed: null,
+					defenderDeployed: null,
+				}),
+			),
 		})),
 		diplomacy: params.diplomacy
 			.flatMap((event) => {

@@ -10,16 +10,18 @@ import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import {
-	nationFocusDistanceScale,
-	SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
-} from "@/ui/genesis/renderer/focus"
+import { uiPalette } from "@/ui/components/tokens"
+import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { NationWikiDataInput } from "@/ui/genesis/view/types"
+import {
+	focusWikiNation,
+	rebelControlledNationIds,
+} from "@/ui/genesis/wiki-bridge/nation-focus"
 import {
 	cultureMention,
 	organizationMention,
@@ -45,7 +47,7 @@ import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
 import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
 import {
-	compareTimelineDateThenWarEnd,
+	compareTimelineDayThenType,
 	eventComment,
 	formatRebelName,
 	formatRulerStatLabel,
@@ -102,12 +104,24 @@ export function useNationWikiData(
 		const nationId = selectedWikiNationId
 		if (nationId < 0 || nationId >= nationList.length) return null
 
+		const rebelControllerIds = rebelControlledNationIds({
+			frame,
+			wars: record.events.wars,
+		})
+		const territoryBasis = rebelControllerIds.has(nationId)
+			? "controlled"
+			: "owned"
+		const provinceAssignmentForNation = (id: number): Int32Array =>
+			rebelControllerIds.has(id)
+				? frame.provinceController
+				: frame.provinceNation
+		const selectedAssignments = provinceAssignmentForNation(nationId)
 		const provinceIndexes: number[] = []
 		const provinceCountByNationId = new Map<number, number>()
 		for (let p = 0; p < frame.provinceNation.length; p++) {
+			if (selectedAssignments[p] === nationId) provinceIndexes.push(p)
 			const assignedNationId = frame.provinceNation[p]
 			if (assignedNationId < 0) continue
-			if (assignedNationId === nationId) provinceIndexes.push(p)
 			provinceCountByNationId.set(
 				assignedNationId,
 				(provinceCountByNationId.get(assignedNationId) ?? 0) + 1,
@@ -115,12 +129,12 @@ export function useNationWikiData(
 		}
 		const hasOwnedProvinces = (otherId: number): boolean =>
 			(provinceCountByNationId.get(otherId) ?? 0) > 0
-		const ownedProvinceIndexes = new Set(provinceIndexes)
+		const selectedProvinceIndexes = new Set(provinceIndexes)
 		const regionIndexes: number[] = []
 		const regionProvince = world.provinces?.regionProvince
 		if (regionProvince) {
 			for (let region = 0; region < regionProvince.length; region++) {
-				if (ownedProvinceIndexes.has(regionProvince[region])) {
+				if (selectedProvinceIndexes.has(regionProvince[region])) {
 					regionIndexes.push(region)
 				}
 			}
@@ -345,6 +359,7 @@ export function useNationWikiData(
 				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
 		})
 		const stats = buildNationWikiStats({
+			territoryBasis,
 			totalAreaKm2,
 			totalPopulation,
 			totalUrbanPopulation,
@@ -405,25 +420,26 @@ export function useNationWikiData(
 			})
 		}
 		const focusNation = (targetId: number) => {
-			const seedProvince = frame.nations.get(targetId)?.capitalProvince ?? -1
-			if (seedProvince === undefined || seedProvince < 0) return
-
-			let targetProvinceCount = 0
-			for (const assigned of frame.provinceNation) {
-				if (assigned === targetId) targetProvinceCount++
-			}
-			sceneRef.current?.focusOnProvince(seedProvince, {
-				distanceScale: nationFocusDistanceScale(targetProvinceCount),
-				pulseTarget: "nation",
+			focusWikiNation({
+				frame,
+				wars: record.events.wars,
+				targetId,
+				sceneRef,
 			})
 		}
 
-		const eventNation = (otherId: number, rebelType?: unknown) => ({
-			tag: String(otherId),
-			name: rebelType ? formatRebelName(rebelType) : resolveNationName(otherId),
-			color: resolveNationColor(otherId),
-			link: !rebelType,
-		})
+		const eventNation = (otherId: number, rebelType?: unknown) => {
+			const striped = rebelControllerIds.has(otherId)
+			return {
+				tag: String(otherId),
+				name: rebelType
+					? formatRebelName(rebelType)
+					: resolveNationName(otherId),
+				color: striped ? uiPalette.rebel : resolveNationColor(otherId),
+				striped,
+				link: !rebelType,
+			}
+		}
 		const addNationMention = (
 			mentions: NationTimelineEvent["nations"],
 			otherId: number | null,
@@ -1335,7 +1351,7 @@ export function useNationWikiData(
 		timelineEvents = mergedTimelineEvents
 		timelineEvents.sort(
 			(a, b) =>
-				compareTimelineDateThenWarEnd(a, b) || a.type.localeCompare(b.type),
+				compareTimelineDayThenType(a, b) || a.type.localeCompare(b.type),
 		)
 
 		const cultureDistribution = buildStringIdDistributionForProvinces({
@@ -1392,6 +1408,7 @@ export function useNationWikiData(
 
 		return {
 			title,
+			territoryBasis,
 			color,
 			planetTitle: planetName,
 			stats,

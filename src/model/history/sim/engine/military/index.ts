@@ -8,6 +8,7 @@ import type {
 	BattleResult,
 	CoalitionMember,
 	CoalitionParams,
+	DeploymentAssignment,
 	FightParams,
 	LossShareParams,
 	NationParams,
@@ -28,11 +29,19 @@ const PEACE_UPKEEP = 5
 
 const ALLY_COMMITMENT = 0.5
 
+const DEPLOYMENT_RECOVERY_PER_YEAR = 0.25
+
+const MINIMUM_DEPLOYMENT_SHARE = 0.2
+
 const DEFENDER_BONUS = 1.2
 
 const LOSS_BASE = 0.1
 
 const LOSS_CAP = 0.6
+
+const LOSER_LOSS_MULTIPLIER = 1.5
+
+const WINNER_LOSS_MULTIPLIER = 0.75
 
 const EXHAUSTION_MANPOWER: Record<ArmyTradition, number> = {
 	paid: 0.25,
@@ -200,25 +209,100 @@ function rebellionThreat({
 	})
 }
 
-function coalition({ state, war, side }: CoalitionParams): CoalitionMember[] {
-	return side === "attacker"
-		? sideMembers({
+function deploymentAssignments({
+	state,
+	nation,
+}: NationParams): DeploymentAssignment[] {
+	const assignments: DeploymentAssignment[] = []
+	for (const idx of state.activeWarIds) {
+		const war = state.wars[idx]
+		if (war.attacker === nation) {
+			assignments.push({ war, opponent: war.defender, primary: true })
+		} else if (war.defender === nation) {
+			assignments.push({ war, opponent: war.attacker, primary: true })
+		} else if (
+			STATE.getWarAllies({
 				state,
 				nation: war.attacker,
 				type: "offensive",
 				target: war.defender,
-			})
-		: sideMembers({
+			}).includes(nation)
+		) {
+			assignments.push({ war, opponent: war.defender, primary: false })
+		} else if (
+			STATE.getWarAllies({
 				state,
 				nation: war.defender,
 				type: "defensive",
 				target: war.attacker,
-			})
+			}).includes(nation)
+		) {
+			assignments.push({ war, opponent: war.attacker, primary: false })
+		}
+	}
+	return assignments
 }
 
-function lossShare({ ratio, rng }: LossShareParams): number {
+function rebalanceDeployments({ state, nation }: NationParams): void {
+	const assignments = deploymentAssignments({ state, nation })
+	if (assignments.length === 0) return
+	const primary = assignments.some((assignment) => assignment.primary)
+	const capacity = fielded({ state, nation }) * (primary ? 1 : ALLY_COMMITMENT)
+	const deployed = assignments.reduce(
+		(sum, assignment) => sum + (assignment.war.deployed[nation] ?? 0),
+		0,
+	)
+	const initialized = assignments.some(
+		(assignment) => assignment.war.deployed[nation] !== undefined,
+	)
+	const years = Math.max(
+		0,
+		(state.time - state.deploymentUpdateTime[nation]) / STATE.yearMs,
+	)
+	const recovery = Math.min(1, DEPLOYMENT_RECOVERY_PER_YEAR * years)
+	const budget = initialized
+		? Math.min(capacity, deployed + Math.max(0, capacity - deployed) * recovery)
+		: capacity
+	const weights = assignments.map(
+		(assignment) =>
+			Math.max(MIN_FORCE, fielded({ state, nation: assignment.opponent })) *
+			(assignment.primary ? 1 : ALLY_COMMITMENT),
+	)
+	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
+	for (let i = 0; i < assignments.length; i++) {
+		assignments[i].war.deployed[nation] =
+			budget *
+			(MINIMUM_DEPLOYMENT_SHARE / assignments.length +
+				((1 - MINIMUM_DEPLOYMENT_SHARE) * weights[i]) / totalWeight)
+	}
+	state.deploymentUpdateTime[nation] = state.time
+}
+
+function coalition({ state, war, side }: CoalitionParams): CoalitionMember[] {
+	const nation = side === "attacker" ? war.attacker : war.defender
+	const target = side === "attacker" ? war.defender : war.attacker
+	const allies = STATE.getWarAllies({
+		state,
+		nation,
+		type: side === "attacker" ? "offensive" : "defensive",
+		target,
+	})
+	const members = [nation, ...allies].map((participant) => {
+		rebalanceDeployments({ state, nation: participant })
+		return { nation: participant, force: war.deployed[participant] ?? 0 }
+	})
+	const total = totalForce(members)
+	const cap = logistics({ state, nation })
+	if (total <= cap) return members
+	return members.map((member) => ({
+		...member,
+		force: (member.force * cap) / total,
+	}))
+}
+
+function lossShare({ ratio, multiplier, rng }: LossShareParams): number {
 	return MATH.clamp({
-		value: LOSS_BASE * ratio * rng.uniform(0.7, 1.3),
+		value: LOSS_BASE * ratio * multiplier * rng.uniform(0.7, 1.3),
 		lo: 0,
 		hi: LOSS_CAP,
 	})
@@ -228,11 +312,17 @@ function totalForce(members: CoalitionMember[]): number {
 	return members.reduce((sum, member) => sum + member.force, 0)
 }
 
-function applyLosses({ state, members, losses }: ApplyLossesParams): void {
+function applyLosses({
+	state,
+	members,
+	losses,
+}: ApplyLossesParams): Map<number, number> {
+	const byNation = new Map<number, number>()
 	const total = totalForce(members)
-	if (total <= 0 || losses <= 0) return
+	if (total <= 0 || losses <= 0) return byNation
 	for (const { nation, force: committed } of members) {
 		const share = (losses * committed) / total
+		byNation.set(nation, share)
 		FIELDS.prov.manpower.set({
 			state,
 			p: nation,
@@ -254,6 +344,7 @@ function applyLosses({ state, members, losses }: ApplyLossesParams): void {
 				value: FIELDS.prov.population.rural.get({ state, p }) * scale,
 			})
 	}
+	return byNation
 }
 
 function fight({ state, war, eventAttacker, rng }: FightParams): BattleResult {
@@ -273,25 +364,47 @@ function fight({ state, war, eventAttacker, rng }: FightParams): BattleResult {
 	const ratio = attackerWon
 		? effectiveAttack / effectiveDefense
 		: effectiveDefense / effectiveAttack
-	const loserShare = lossShare({ ratio, rng })
-	const winnerShare = lossShare({ ratio: 1 / ratio, rng })
+	const loserShare = lossShare({
+		ratio,
+		multiplier: LOSER_LOSS_MULTIPLIER,
+		rng,
+	})
+	const winnerShare = lossShare({
+		ratio: 1 / ratio,
+		multiplier: WINNER_LOSS_MULTIPLIER,
+		rng,
+	})
 	const attackerLossShare = attackerWon ? winnerShare : loserShare
 	const defenderLossShare = attackerWon ? loserShare : winnerShare
-	applyLosses({
+	const attackerLosses = applyLosses({
 		state,
 		members: attackers,
 		losses: attackerArmy * attackerLossShare,
 	})
-	applyLosses({
+	const defenderLosses = applyLosses({
 		state,
 		members: defenders,
 		losses: defenderArmy * defenderLossShare,
 	})
+	for (const [nation, losses] of attackerLosses)
+		war.deployed[nation] = Math.max(0, (war.deployed[nation] ?? 0) - losses)
+	for (const [nation, losses] of defenderLosses)
+		war.deployed[nation] = Math.max(0, (war.deployed[nation] ?? 0) - losses)
+	const attackerDeployed = attackers.reduce(
+		(sum, member) => sum + (war.deployed[member.nation] ?? 0),
+		0,
+	)
+	const defenderDeployed = defenders.reduce(
+		(sum, member) => sum + (war.deployed[member.nation] ?? 0),
+		0,
+	)
 	return {
 		attackerWon,
 		winChance,
 		attackerArmy,
 		defenderArmy,
+		attackerDeployed,
+		defenderDeployed,
 		attackerLossShare,
 		defenderLossShare,
 	}
@@ -349,8 +462,8 @@ function raid({
 	const defense = Math.max(MIN_FORCE, response * DEFENDER_BONUS)
 	const success = rng.random() < 1 - squareShare({ a: attack, b: defense })
 	const ratio = success ? attack / defense : defense / attack
-	const loserShare = lossShare({ ratio, rng })
-	const winnerShare = lossShare({ ratio: 1 / ratio, rng })
+	const loserShare = lossShare({ ratio, multiplier: 1, rng })
+	const winnerShare = lossShare({ ratio: 1 / ratio, multiplier: 1, rng })
 	const raiderLosses = raiderParty * (success ? winnerShare : loserShare)
 	const victimLosses = response * (success ? loserShare : winnerShare)
 	applyLosses({

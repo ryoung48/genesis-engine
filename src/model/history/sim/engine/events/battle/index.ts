@@ -167,6 +167,8 @@ function runBattle({
 			victoryDegree,
 			attackerArmy: Math.round(result.attackerArmy),
 			defenderArmy: Math.round(result.defenderArmy),
+			attackerDeployed: Math.round(result.attackerDeployed),
+			defenderDeployed: Math.round(result.defenderDeployed),
 			attackerLosses: 100 * result.attackerLossShare,
 			defenderLosses: 100 * result.defenderLossShare,
 			plunder: loot,

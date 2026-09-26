@@ -396,11 +396,32 @@ function appendNote({
 					})
 			}
 		}
+		let civilWar = false
+		if (coalition?.rebel) {
+			const areaByProvince =
+				translator.world.provinces?.areaKm2 ?? translator.world.provinces?.size
+			let overlordArea = 0
+			for (let province = 0; province < translator.owner.length; province++) {
+				if (translator.owner[province] === attacker)
+					overlordArea += areaByProvince?.[province] ?? 0
+			}
+			let rebelArea = 0
+			for (const province of descendants({
+				children: translator.children,
+				province: data.defender as number,
+			})) {
+				if (translator.owner[province] === attacker)
+					rebelArea += areaByProvince?.[province] ?? 0
+			}
+			civilWar = overlordArea > 0 && rebelArea * 2 > overlordArea
+		}
 		const war: WarRecord = {
 			id: warId,
-			name: coalition?.rebel
-				? `Suppression of the ${record.nations[defender]?.name ?? "Unknown"} Revolt`
-				: `${record.nations[attacker]?.name ?? "Unknown"}–${record.nations[defender]?.name ?? "Unknown"} War`,
+			name: civilWar
+				? `${record.nations[attacker]?.name ?? "Unknown"} Civil War`
+				: coalition?.rebel
+					? `Suppression of the ${record.nations[defender]?.name ?? "Unknown"} Revolt`
+					: `${record.nations[attacker]?.name ?? "Unknown"}–${record.nations[defender]?.name ?? "Unknown"} War`,
 			casusBelli: coalition?.rebel ? "rebellion" : "conquest",
 			warGoalType: coalition?.rebel ? "rebellion" : "province",
 			warGoalId: defender,
@@ -440,6 +461,8 @@ function appendNote({
 				artillery: null,
 				losses: data.defenderLosses as number,
 			},
+			attackerDeployed: data.attackerDeployed as number,
+			defenderDeployed: data.defenderDeployed as number,
 			attackerWon: data.winner === data.attacker,
 			comment: null,
 		})

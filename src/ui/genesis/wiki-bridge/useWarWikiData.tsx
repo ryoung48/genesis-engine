@@ -1,15 +1,19 @@
 import { useMemo } from "react"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
-import type { WarParticipantEventRecord } from "@/model/history/record/types"
+import type {
+	Battle,
+	WarParticipantEventRecord,
+} from "@/model/history/record/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
-import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
+import { uiPalette } from "@/ui/components/tokens"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import type { WarWikiDataInput } from "@/ui/genesis/view/types"
+import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
 import { formatBattleForce } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import {
 	cleanEu4Identifier,
-	compareTimelineDateThenWarEnd,
+	compareTimelineDayThenType,
 	eventComment,
 	joinWithAnd,
 	pushTimelineEvent,
@@ -58,11 +62,24 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 					])
 				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
-		const nationMention = (id: number) => ({
-			tag: String(id),
-			name: resolveNationName(id),
-			color: resolveNationColor(id),
-		})
+		const nationMention = (id: number) => {
+			const striped = war.rebel && id === war.warGoalId
+			return {
+				tag: String(id),
+				name: resolveNationName(id),
+				color: striped ? uiPalette.rebel : resolveNationColor(id),
+				striped,
+			}
+		}
+		const selectNation = (targetId: number) => {
+			focusWikiNation({
+				frame,
+				wars: record.events.wars,
+				targetId,
+				sceneRef,
+			})
+			setSelectedWikiNationId(targetId)
+		}
 		const provinceMention = (
 			rawId: string,
 			fallbackColor: string,
@@ -88,46 +105,11 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		const dateRangeLabel = `${DATE.formatHistoryDays(dateRangeStart)} – ${DATE.formatHistoryDays(dateRangeEnd)}`
 
 		const stats: StatEntry[] = []
-		if (war.warGoalType)
-			stats.push({
-				label: "War Goal",
-				value: cleanEu4Identifier(war.warGoalType),
-			})
 		if (war.casusBelli)
 			stats.push({
 				label: "Casus Belli",
 				value: cleanEu4Identifier(war.casusBelli),
 			})
-		if (war.warGoalId >= 0) {
-			const target = nationMention(war.warGoalId)
-			stats.push({
-				label: "War Goal Target",
-				value: "",
-				valueAction: (
-					<InlineTextButton
-						onClick={() => setSelectedWikiNationId(Number(target.tag))}
-					>
-						{target.name}
-					</InlineTextButton>
-				),
-			})
-		} else if (war.warGoalProvinceId >= 0) {
-			const province = provinceMention(String(war.warGoalProvinceId), "#94a3b8")
-			if (province) {
-				stats.push({
-					label: "War Goal Target",
-					value: "",
-					valueAction: (
-						<InlineTextButton
-							onClick={() => sceneRef.current?.focusOnProvince(province.id)}
-						>
-							{province.name}
-						</InlineTextButton>
-					),
-				})
-			}
-		}
-		if (war.rebel) stats.push({ label: "Type", value: "Rebellion" })
 
 		// A nation stays listed under whichever side it last held (sideByTag
 		// above), but whether it's actually *in* the war right now depends on
@@ -166,8 +148,26 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		})
 
 		const sideOrder: Array<"attacker" | "defender"> = ["attacker", "defender"]
+		const latestBattle = war.battles.reduce<Battle | null>(
+			(latest, battle) =>
+				battle.timeMs <= history.selectedTimeMs &&
+				(latest === null || battle.timeMs > latest.timeMs)
+					? battle
+					: latest,
+			null,
+		)
+		const strengthBySide = new Map<"attacker" | "defender", number>()
+		if (latestBattle) {
+			const attackerSide = sideById.get(latestBattle.attacker.countryId)
+			const defenderSide = sideById.get(latestBattle.defender.countryId)
+			if (attackerSide && latestBattle.attackerDeployed !== null)
+				strengthBySide.set(attackerSide, latestBattle.attackerDeployed)
+			if (defenderSide && latestBattle.defenderDeployed !== null)
+				strengthBySide.set(defenderSide, latestBattle.defenderDeployed)
+		}
 		const participants: WarWikiData["participants"] = sideOrder.map((side) => ({
 			side,
+			totalStrength: strengthBySide.get(side) ?? null,
 			nations: Array.from(sideById.entries())
 				.filter(([, idSide]) => idSide === side)
 				.map(([nationId]) => nationId)
@@ -400,7 +400,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				provinces: group.provinces,
 			})
 		}
-		timelineEvents.sort(compareTimelineDateThenWarEnd)
+		timelineEvents.sort(compareTimelineDayThenType)
 
 		return {
 			id: war.id,
@@ -416,7 +416,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			currentDateLabel: DATE.formatHistoryTimeMs(history.selectedTimeMs),
 			onBack: () => setSelectedWikiWarId(null),
 			onSelectNation: (targetTag: string) => {
-				setSelectedWikiNationId(Number(targetTag))
+				selectNation(Number(targetTag))
 			},
 			onSelectProvince: (provinceId: number) => {
 				sceneRef.current?.focusOnProvince(provinceId, {
