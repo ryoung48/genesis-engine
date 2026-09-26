@@ -53,6 +53,13 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 - All plans live in the `plans/` folder as files. Do not keep plans only in chat or scatter them elsewhere.
 - Once a plan is fully implemented, move its file to `plans/archive/`.
 
+# Plan Review
+- Sometimes you will be asked to review a plan. Make sure you understand the objective of the plan. Reviews should look for:
+  - Incoherence: contradictions between sections, steps that don't follow from the stated goal, or references to things the plan never defines.
+  - Over-engineering: abstractions, phases, or generality beyond what the problem requires.
+  - Vague requirements: steps or acceptance criteria that can't be implemented or verified without guessing.
+  - Module structure: where applicable, check that the plan lays out modules, submodules, and where each piece of code lives.
+
 # Parallel Agents
 - Other agents are often working in this repo at the same time. Uncommitted changes you didn't make, including ones related to your work, are probably theirs: don't panic, don't revert or clean them up.
 - Stick to the files your task needs.
