@@ -31,6 +31,16 @@ export function getNationProvinces({
 	return result
 }
 
+export function getNationPopulation({
+	state,
+	root,
+}: GetNationProvincesParams): number {
+	let total = 0
+	for (const p of getNationProvinces({ state, root }))
+		total += state.popRuralCurrent[p] + state.popUrbanCurrent[p]
+	return total
+}
+
 export function getNationNeighbors({
 	state,
 	nation,

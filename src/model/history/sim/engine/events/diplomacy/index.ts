@@ -1,3 +1,4 @@
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
 	CanBeRivalsParams,
@@ -16,6 +17,7 @@ import type {
 	SyncVassalRelationsParams,
 } from "@/model/history/sim/engine/events/diplomacy/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { WeightedValue } from "@/model/shared/random/rng"
@@ -29,9 +31,9 @@ const LADDER_STATES = [
 ] as const
 
 const INITIAL_RELATION_POOL: ReadonlyArray<WeightedValue<Relation>> = [
-	{ v: STATE.rel.RIVAL, w: 8 },
-	{ v: STATE.rel.SUSPICIOUS, w: 20 },
-	{ v: STATE.rel.NEUTRAL, w: 42 },
+	{ v: STATE.rel.RIVAL, w: 3 },
+	{ v: STATE.rel.SUSPICIOUS, w: 10 },
+	{ v: STATE.rel.NEUTRAL, w: 57 },
 	{ v: STATE.rel.FRIENDLY, w: 22 },
 	{ v: STATE.rel.ALLY, w: 8 },
 ]
@@ -63,9 +65,9 @@ function rollTransition({ current, rng }: RollTransitionParams): Relation {
 }
 
 function canBeRivals({ state, a, b }: CanBeRivalsParams): boolean {
-	const aW = STATE.wealthOptimal({ state, p: a })
-	const bW = STATE.wealthOptimal({ state, p: b })
-	const ratio = Math.min(aW, bW) / Math.max(aW, bW)
+	const aR = ECONOMY.revenue({ state, p: a })
+	const bR = ECONOMY.revenue({ state, p: b })
+	const ratio = Math.min(aR, bR) / Math.max(aR, bR)
 	return ratio >= 0.8
 }
 
@@ -74,11 +76,11 @@ function canVassalize({
 	a,
 	b,
 }: CanVassalizeParams): { vassal: number; overlord: number } | null {
-	const aW = STATE.wealthOptimal({ state, p: a })
-	const bW = STATE.wealthOptimal({ state, p: b })
-	const ratio = Math.min(aW, bW) / Math.max(aW, bW)
+	const aR = ECONOMY.revenue({ state, p: a })
+	const bR = ECONOMY.revenue({ state, p: b })
+	const ratio = Math.min(aR, bR) / Math.max(aR, bR)
 	if (ratio >= 0.5) return null
-	return aW <= bW ? { vassal: a, overlord: b } : { vassal: b, overlord: a }
+	return aR <= bR ? { vassal: a, overlord: b } : { vassal: b, overlord: a }
 }
 
 function syncVassalRelations({
@@ -118,7 +120,7 @@ function processVassalDiplomacy({
 }: ProcessVassalDiplomacyParams): void {
 	syncVassalRelations({ state, vassal, overlord })
 
-	const threat = STATE.warThreat({
+	const threat = MILITARY.threat({
 		state,
 		attacker: overlord,
 		defender: vassal,
@@ -159,7 +161,7 @@ function processPersonalUnionDiplomacy({
 }: ProcessPersonalUnionDiplomacyParams): void {
 	syncVassalRelations({ state, vassal: junior, overlord: senior })
 
-	const threat = STATE.warThreat({ state, attacker: senior, defender: junior })
+	const threat = MILITARY.threat({ state, attacker: senior, defender: junior })
 	if (threat <= 0.6) return
 
 	// Break union
@@ -274,9 +276,9 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 			)
 				continue
 			if (STATE.getRulerRelation({ state, nation: neighbor })) continue
-			const aW = STATE.wealthOptimal({ state, p: nation })
-			const bW = STATE.wealthOptimal({ state, p: neighbor })
-			const ratio = aW / Math.max(1, bW)
+			const aR = ECONOMY.revenue({ state, p: nation })
+			const bR = ECONOMY.revenue({ state, p: neighbor })
+			const ratio = aR / Math.max(1, bR)
 			if (ratio >= VASSAL_SEED_RATIO) continue
 			if (rng.random() >= VASSAL_SEED_CHANCE) continue
 			STATE.setRelation({
@@ -305,8 +307,8 @@ function seedSharedDynasties({ state, rng }: SeedSharedDynastiesParams): void {
 			if (rng.random() >= SHARED_DYNASTY_SEED_CHANCE) continue
 
 			const [senior, junior] =
-				STATE.wealthOptimal({ state, p: nation }) >=
-				STATE.wealthOptimal({ state, p: nb })
+				ECONOMY.revenue({ state, p: nation }) >=
+				ECONOMY.revenue({ state, p: nb })
 					? [nation, nb]
 					: [nb, nation]
 			const seniorDynasty = FIELDS.prov.leader.dynasty.get({ state, p: senior })
@@ -350,8 +352,8 @@ function seedInitialPersonalUnions({
 			if (rng.random() >= PERSONAL_UNION_SEED_CHANCE) continue
 
 			const [senior, junior] =
-				STATE.wealthOptimal({ state, p: nation }) >=
-				STATE.wealthOptimal({ state, p: nb })
+				ECONOMY.revenue({ state, p: nation }) >=
+				ECONOMY.revenue({ state, p: nb })
 					? [nation, nb]
 					: [nb, nation]
 			STATE.setRelation({
@@ -443,7 +445,7 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 		const next = rollTransition({ current: rel, rng })
 		if (next === rel) continue
 
-		// Ally → vassalize if wealth ratio < 50%
+		// Ally → vassalize if revenue ratio < 50%
 		if (next === STATE.rel.ALLY) {
 			const pair = canVassalize({ state, a: nation, b: nb })
 			if (pair) {

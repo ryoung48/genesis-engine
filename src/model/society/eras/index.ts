@@ -197,34 +197,22 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	lateMedieval: {
 		id: "lateMedieval",
 		label: "Late Medieval",
-		targetPopulation: 300e6,
+		targetPopulation: 285e6,
 		settlementFraction: 1.0,
 		migrationFalloff: 1.5,
 		statehoodFraction: 1.0,
 		hasNations: true,
-		// Measured directly from EU4 extended-timeline ownership folded to
-		// 1444.11.11 (public/earth-history/events/provinces.json): 711 nations
-		// holding 2,563 provinces. Share of *provinces* per size bucket --
-		// which is what buildNationPlan budgets against:
-		//   50+   4.4%   25-49 13.8%   10-24 25.7%
-		//   5-9  16.0%   2-4   27.3%   1     12.8%
-		// By nation count that is 46.1% [1], 37.3% [2-4], 9.1% [5-9],
-		// 5.9% [10-24], 1.4% [25-49], 0.1% [50+].
-		//
-		// These are taken as province shares rather than converted from count
-		// shares: the previous weights assumed the 50-250 bucket averaged 150
-		// provinces, which handed it 26.8% of all provinces. In 1444 the only
-		// nation above 49 is Ming at 113, so that bucket is really 4.4%.
-		// Rebalanced from the raw EU4-measured shares above: nation *count* skews
-		// heavily to the [1,1] bucket relative to its province mass (a size-1
-		// nation is 1 count per 1 province, while a [10,24] nation is 1 count per
-		// ~17 provinces), so trimming its mass share meaningfully thins out
-		// single-province nations and fills in the middle tiers by count.
-		// [1,1] trimmed further (0.1 -> 0.03) to cut the remaining
-		// singleton-nation count, with the freed mass spread across the other
-		// buckets in proportion to their existing share.
+		// Default worlds start in 867, so the size mix follows EU4 extended-timeline
+		// ownership at 867.1.1 (public/earth-history/events/provinces.json): 464
+		// nations holding 2,280 provinces. Share of provinces per EU4 size bucket,
+		// 867 vs 1444.11.11 (711 nations, 2,563 provinces):
+		//   50+   14.8% vs  4.4%   25-49 17.2% vs 13.8%   10-24 19.0% vs 25.7%
+		//   5-9   21.6% vs 16.0%   2-4   19.4% vs 27.3%   1      7.9% vs 12.8%
+		// The weights are the earlier 1444-derived weights (which already adjust
+		// for the sim's smaller provinces and trim single-province nations)
+		// scaled bucket by bucket by the 867/1444 share ratio, then normalized.
 		nationPercentages: MATH.normalize([
-			0.0, 0.4907, 0.1099, 0.1638, 0.1235, 0.0847, 0.03,
+			0.0, 1.6505, 0.137, 0.1211, 0.1667, 0.0602, 0.0185,
 		]),
 		nationBuckets: [
 			[251, 600],

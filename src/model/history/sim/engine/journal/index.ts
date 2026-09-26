@@ -1,3 +1,4 @@
+import type { CensusEconomy } from "@/model/history/record/types"
 import type {
 	FlushJournalParams,
 	JournalRelationChange,
@@ -7,6 +8,7 @@ import type {
 	RecordProvinceParams,
 	RecordRelationParams,
 } from "@/model/history/sim/engine/journal/types"
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
 
 function pending(): PendingJournal {
 	return {
@@ -60,6 +62,19 @@ function coalition({
 	defenders,
 }: RecordCoalitionParams): void {
 	state.pendingJournal.coalitions.push({ warId, rebel, attackers, defenders })
+}
+
+function censusEconomy(state: HistoryState): CensusEconomy {
+	const roots: number[] = []
+	for (let p = 0; p < state.P; p++)
+		if (!state.desolate[p] && !state.stateless[p] && state.parentCurrent[p] < 0)
+			roots.push(p)
+	return {
+		roots: Int32Array.from(roots),
+		treasury: Float32Array.from(roots, (p) => state.treasuryCurrent[p]),
+		revenue: Float32Array.from(roots, (p) => state.revenueCurrent[p]),
+		manpower: Float32Array.from(roots, (p) => state.manpowerCurrent[p]),
+	}
 }
 
 function flush({
@@ -120,6 +135,7 @@ function flush({
 				urban: state.popUrbanCurrent.slice(),
 				rural: state.popRuralCurrent.slice(),
 				development: state.developmentCurrent.slice(),
+				economy: censusEconomy(state),
 			}
 		: null
 	if (

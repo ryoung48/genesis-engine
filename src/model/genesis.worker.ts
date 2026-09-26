@@ -28,7 +28,7 @@ declare const self: DedicatedWorkerGlobalScope
 // it. historyState is (re)seeded at generate/import time via initHistory.
 let historyState: HistoryState | null = null
 let historyRng: ReturnType<typeof HISTORY_RNG.createHistoryRng> | null = null
-let historyTime = 800 * STATE.yearMs
+let historyTime = STATE.defaultStartYear * STATE.yearMs
 let simulationRunning = false
 let historyJournalCursor = 0
 
@@ -865,7 +865,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 
 		historyState = null
 		historyRng = null
-		historyTime = 800 * STATE.yearMs
+		historyTime = STATE.defaultStartYear * STATE.yearMs
 		simulationRunning = false
 		historyJournalCursor = 0
 		if (

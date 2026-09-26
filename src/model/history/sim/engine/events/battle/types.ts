@@ -1,13 +1,7 @@
 import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
-export type VictoryDegree =
-	| "decisive"
-	| "victory"
-	| "pyrrhic"
-	| "close"
-	| "defeat"
-	| "crushing"
+export type VictoryDegree = "decisive" | "victory" | "pyrrhic"
 
 export interface RunBattleParams {
 	state: HistoryState
@@ -17,14 +11,8 @@ export interface RunBattleParams {
 	rng: SharedRng
 }
 
-export interface ExhaustedParams {
-	state: HistoryState
-	nation: number
-}
-
 export interface GetVictoryDegreeParams {
-	margin: number
-	isWinner: boolean
+	lossRatio: number
 }
 
 export interface FindInvasionTargetParams {

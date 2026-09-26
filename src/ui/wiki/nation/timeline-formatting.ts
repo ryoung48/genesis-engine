@@ -40,6 +40,8 @@ export function timelineTypeColor(type: string): string {
 			return "#ea580c"
 		case "Battle":
 			return "#b91c1c"
+		case "Raid":
+			return "#9a3412"
 		case "Government":
 			return "#7c3aed"
 		case "Capital":

@@ -31,15 +31,16 @@ import {
 	buildMergedDiplomacyDescription,
 	buildMergedProvinceAttributeDescription,
 	buildMergedTerritoryDescription,
+	formatBattleForce,
 	formatPayloadLabel,
 	formatSignedValue,
-	formatWealthCost,
 	mergeById,
 	mergedSignedType,
 	mergeEventComments,
 	mergeNations,
 	payloadValue,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { RAID_TIMELINE } from "@/ui/genesis/wiki-bridge/raid-timeline"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
 import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
@@ -353,6 +354,7 @@ export function useNationWikiData(
 			governmentColor: governmentColor
 				? COLOR.rgb01ToCss(governmentColor)
 				: null,
+			economy: FRAME.nationEconomy({ frame, nationId }),
 		})
 		const rulerStat = stats.find((stat) => stat.label === "Ruler")
 		if (rulerStat && nationState?.ruler) {
@@ -1123,10 +1125,10 @@ export function useNationWikiData(
 					opponent.countryId !== null
 						? resolveNationName(opponent.countryId)
 						: "unknown"
-				const cost = formatWealthCost(
-					(isAttacker ? battle.attacker : battle.defender).wealthCost,
+				const force = formatBattleForce(
+					isAttacker ? battle.attacker : battle.defender,
 				)
-				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${opponentName} (${war.name})${cost ? `; cost ${cost}` : ""}.`
+				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${opponentName} (${war.name})${force ? `; ${force}` : ""}.`
 				pushTimelineEvent(timelineEvents, {
 					id: `warBattle:${war.id}:${battle.date}:${index}`,
 					date: battle.date,
@@ -1138,6 +1140,26 @@ export function useNationWikiData(
 					wars: [warMention(war)],
 				})
 			}
+		}
+		for (const entry of RAID_TIMELINE.build({
+			record,
+			nationId,
+			nationName: title,
+			nationNameOf: resolveNationName,
+			provinceName: (province) =>
+				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
+		})) {
+			const nations: NationTimelineEvent["nations"] = [eventNation(nationId)]
+			addNationMention(nations, entry.otherNationId)
+			const province = provinceMention(String(entry.province), "#94a3b8")
+			pushTimelineEvent(timelineEvents, {
+				id: entry.id,
+				date: entry.date,
+				type: entry.type,
+				description: entry.description,
+				nations,
+				provinces: province ? [province] : [],
+			})
 		}
 		for (const entry of TITLE_TIMELINE.build({
 			record,

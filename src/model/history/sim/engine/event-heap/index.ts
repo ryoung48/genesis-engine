@@ -6,6 +6,7 @@ const evt = {
 	CENSUS: 4,
 	DIPLOMACY: 5,
 	REGENCY: 6,
+	RAID: 7,
 } as const
 
 type EventType = (typeof evt)[keyof typeof evt]

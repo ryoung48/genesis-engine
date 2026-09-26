@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { HISTORY } from "@/model/history/record"
+import { STATE } from "@/model/history/sim/engine/state"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
@@ -14,8 +15,9 @@ import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 // -> computeEarthHistoryRegionColors, the label overrides, the hover override)
 // consumes either mode with no branching. No time evolution yet:
 // minTimeMs === maxTimeMs.
-const PROCEDURAL_START_TIME_MS = (800 - 2) * 365 * 86_400_000
-const PROCEDURAL_ENGINE_START_TIME_MS = 800 * 365 * 86_400_000
+const PROCEDURAL_START_TIME_MS = (STATE.defaultStartYear - 2) * 365 * 86_400_000
+const PROCEDURAL_ENGINE_START_TIME_MS =
+	STATE.defaultStartYear * 365 * 86_400_000
 
 function nameMap(rows: PartitionRow[]): Map<string, string> {
 	return new Map(rows.map((row) => [row.key, row.name]))

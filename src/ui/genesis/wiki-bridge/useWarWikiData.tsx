@@ -6,7 +6,7 @@ import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import type { WarWikiDataInput } from "@/ui/genesis/view/types"
-import { formatWealthCost } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { formatBattleForce } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import {
 	cleanEu4Identifier,
 	compareTimelineDateThenWarEnd,
@@ -254,13 +254,13 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				winner.countryId >= 0 ? resolveNationName(winner.countryId) : "unknown"
 			const loserName =
 				loser.countryId >= 0 ? resolveNationName(loser.countryId) : "unknown"
-			const winnerCost = formatWealthCost(winner.wealthCost)
-			const loserCost = formatWealthCost(loser.wealthCost)
-			const costs =
-				winnerCost && loserCost
-					? ` (cost: ${winnerName} ${winnerCost}, ${loserName} ${loserCost})`
+			const winnerForce = formatBattleForce(winner)
+			const loserForce = formatBattleForce(loser)
+			const forces =
+				winnerForce && loserForce
+					? ` (${winnerName}: ${winnerForce}; ${loserName}: ${loserForce})`
 					: ""
-			const description = `${winnerName} defeated ${loserName} at the Battle of ${battle.name}${costs}.`
+			const description = `${winnerName} defeated ${loserName} at the Battle of ${battle.name}${forces}.`
 			pushTimelineEvent(timelineEvents, {
 				id: `warBattle:${battle.timeMs}:${index}`,
 				date: daysFromMs(battle.timeMs),

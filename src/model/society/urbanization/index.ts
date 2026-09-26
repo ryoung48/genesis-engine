@@ -88,13 +88,17 @@ function urbanPopToDev(pop: number): number {
 
 const MAX_SPREAD_HOPS = 20
 
+const MAX_URBAN_SHARE = 0.85
+
 function rankSizesForNation({
 	governmentTypeIndex,
 	totalPopulation,
 	provinceCount,
+	urbanFactor,
 }: RankSizesForNationParams): number[] {
 	const { U, q } = nationProfile(governmentTypeIndex)
-	const sizes = rankSizeCities({ urbanPop: totalPopulation * U, q })
+	const share = Math.min(MAX_URBAN_SHARE, U * urbanFactor)
+	const sizes = rankSizeCities({ urbanPop: totalPopulation * share, q })
 	return sizes.length > provinceCount ? sizes.slice(0, provinceCount) : sizes
 }
 
@@ -256,6 +260,7 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 			governmentTypeIndex: governmentType?.[nation] ?? 1,
 			totalPopulation: totalPop,
 			provinceCount: sorted.length,
+			urbanFactor: 1,
 		})
 
 		for (let idx = 0; idx < sorted.length; idx++) {

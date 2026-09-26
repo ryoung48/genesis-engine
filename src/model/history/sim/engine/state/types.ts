@@ -1,5 +1,4 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
-import type { DerivedCache } from "@/model/history/sim/engine/derive/types"
 import type { EventHeap } from "@/model/history/sim/engine/event-heap"
 import type {
 	JournalTransaction,
@@ -97,10 +96,15 @@ export interface HistoryState {
 	popRuralCurrent: Float32Array
 	popUrbanCurrent: Float32Array
 	developmentCurrent: Float32Array
-	consumptionCurrent: Float32Array
-	// Battle costs accumulate at double precision; consumptionCurrent is the
-	// float32 view every reader sees.
-	consumptionExact: Float64Array
+	// 0 = iron age, 1 = late medieval, 2 = early modern, 3 = industrial, 4 = information.
+	knowledgeCurrent: Float32Array
+	knowledgeBaseline: number
+	// Grams of silver and levyable men; meaningful only on sovereign roots.
+	treasuryCurrent: Float64Array
+	manpowerCurrent: Float64Array
+	revenueCurrent: Float64Array
+	// Time until which a plundered province yields no output loot.
+	plunderedUntil: Float64Array
 	leaderDynCurrent: Int32Array
 	leaderNameSeedCurrent: Int32Array
 	leaderClaimCurrent: Uint8Array
@@ -156,22 +160,6 @@ export interface QueueBattleEventParams {
 	attacker: number
 	defender: number
 	time: number
-}
-
-export interface WealthCurrentParams {
-	state: HistoryState
-	p: number
-	exclude?: number
-	freedom?: boolean
-	cache?: DerivedCache
-}
-
-export interface WarStrengthCoalitionParams {
-	state: HistoryState
-	attacker: number
-	defender: number
-	exclude?: number
-	cache?: DerivedCache
 }
 
 export interface ResolveWarParams {
@@ -251,30 +239,11 @@ export interface GetProvinceNeighborsParams {
 	p: number
 }
 
-export interface WealthOptimalParams {
-	state: HistoryState
-	p: number
-}
-
-export interface WarStrengthSoloParams {
-	state: HistoryState
-	p: number
-	exclude?: number
-	cache?: DerivedCache
-}
-
 export interface GetWarAlliesParams {
 	state: HistoryState
 	nation: number
 	type: "offensive" | "defensive"
 	target: number
-}
-
-export interface WarThreatParams {
-	state: HistoryState
-	attacker: number
-	defender: number
-	exclude?: number
 }
 
 export interface ReleaseProvinceParams {
@@ -311,6 +280,7 @@ export interface ConsiderTitlesParams {
 	state: HistoryState
 	nation: number
 	rng: SharedRng
+	revenueOf: (nation: number) => number
 }
 
 export interface FoundTitleForParams extends ConsiderTitlesParams {
@@ -322,9 +292,10 @@ export interface DissolveLapsedParams {
 	nation: number
 }
 
-export interface TitleWealthBarParams {
+export interface TitleRevenueBarParams {
 	state: HistoryState
 	tier: number
+	revenueOf: (nation: number) => number
 }
 
 export interface RelinkNationsParams {

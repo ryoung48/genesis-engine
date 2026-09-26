@@ -87,12 +87,13 @@ function scanRebelNotes({
 		touchedRoots: new Set(),
 	}
 	for (const note of transaction.notes) {
-		if (note.tag === "rebellion") {
-			const cause = note.data.succession
-				? "succession"
-				: note.data.disconnected
+		if (note.tag === "rebellion" || note.tag === "province released") {
+			const cause =
+				note.tag === "province released"
 					? "disconnected"
-					: "threat"
+					: note.data.succession
+						? "succession"
+						: "threat"
 			reasons.revolts.set(
 				note.data.subject as number,
 				`Revolted against ${nationLabel({ translator, root: note.data.overlord as number })} (${cause})`,
@@ -426,23 +427,34 @@ function appendNote({
 			attacker: {
 				countryId: attackerId,
 				commander: null,
-				infantry: null,
+				infantry: data.attackerArmy as number,
 				cavalry: null,
 				artillery: null,
-				losses: null,
-				wealthCost: data.attackerCost as number,
+				losses: data.attackerLosses as number,
 			},
 			defender: {
 				countryId: defenderId,
 				commander: null,
-				infantry: null,
+				infantry: data.defenderArmy as number,
 				cavalry: null,
 				artillery: null,
-				losses: null,
-				wealthCost: data.defenderCost as number,
+				losses: data.defenderLosses as number,
 			},
 			attackerWon: data.winner === data.attacker,
 			comment: null,
+		})
+	} else if (note.tag === "raid") {
+		record.events.raids.push({
+			timeMs,
+			raiderId: translator.identityByRoot.get(data.raider as number) ?? -1,
+			victimId: translator.identityByRoot.get(data.victim as number) ?? -1,
+			provinceId: data.province as number,
+			success: data.success as boolean,
+			loot: data.loot as number,
+			raiderParty: data.raiderParty as number,
+			response: data.response as number,
+			raiderLosses: data.raiderLosses as number,
+			victimLosses: data.victimLosses as number,
 		})
 	} else if (note.tag === "war ended") {
 		const warId = data.war as number
@@ -775,6 +787,7 @@ function applyTransaction({
 			urban: transaction.census.urban,
 			rural: transaction.census.rural,
 			development: transaction.census.development,
+			economy: transaction.census.economy,
 		})
 	translator.state.frameCache.clear()
 }

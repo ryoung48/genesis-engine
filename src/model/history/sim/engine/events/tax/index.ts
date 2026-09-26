@@ -1,65 +1,17 @@
-import { DERIVE } from "@/model/history/sim/engine/derive"
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
 	InitTaxParams,
-	PeaceFractionParams,
 	RunTaxParams,
+	ScheduleTaxParams,
 } from "@/model/history/sim/engine/events/tax/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 
-function peaceFraction({
-	state,
-	nation,
-	previous,
-}: PeaceFractionParams): number {
-	const start = previous
-	const end = state.time
-	const duration = end - start
-	if (duration <= 0) return 1
+const MANPOWER_RECOVERY = 0.1
 
-	const wars = DERIVE.provinceWars({ state, p: nation })
-		.map((idx: number) => state.wars[idx])
-		.filter((w) => w.startTime <= end)
-
-	let warTime = 0
-	for (const war of wars) {
-		const warStart = Math.max(war.startTime, start)
-		const warEnd = Math.min(war.endTime ?? end, end)
-		if (warStart < warEnd) warTime += warEnd - warStart
-	}
-
-	return Math.max(0, duration - warTime) / duration
-}
-
-function initTax({ state }: InitTaxParams): void {
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-		state.heap.enqueue(
-			state.time + STATE.yearMs,
-			EVENT_HEAP.evt.TAX,
-			p,
-			0,
-			0,
-			0,
-			state.time,
-		)
-	}
-}
-
-function runTax({ state, nation, previousTime }: RunTaxParams): void {
-	const peace = peaceFraction({ state, nation, previous: previousTime })
-	const recovered = STATE.wealthOptimal({ state, p: nation }) * 0.1 * peace
-	FIELDS.prov.consumption.set({
-		state,
-		p: nation,
-		value: Math.max(
-			0,
-			FIELDS.prov.consumption.get({ state, p: nation }) - recovered,
-		),
-	})
-
-	// Schedule next tax event
+function scheduleTax({ state, nation }: ScheduleTaxParams): void {
 	state.heap.enqueue(
 		state.time + STATE.yearMs,
 		EVENT_HEAP.evt.TAX,
@@ -69,6 +21,53 @@ function runTax({ state, nation, previousTime }: RunTaxParams): void {
 		0,
 		state.time,
 	)
+}
+
+function initTax({ state }: InitTaxParams): void {
+	for (let p = 0; p < state.P; p++) {
+		if (state.desolate[p]) continue
+		scheduleTax({ state, nation: p })
+	}
+}
+
+function runTax({ state, nation, previousTime }: RunTaxParams): void {
+	scheduleTax({ state, nation })
+	if (!STATE.isSovereign({ state, p: nation })) return
+
+	const yearFraction = (state.time - previousTime) / STATE.yearMs
+	const maxManpower = ECONOMY.maxManpower({ state, p: nation })
+	const upkeep = MILITARY.upkeep({ state, nation })
+	const discretionary = ECONOMY.discretionaryRevenue({ state, p: nation })
+	FIELDS.prov.revenue.set({
+		state,
+		p: nation,
+		value: ECONOMY.revenue({ state, p: nation }),
+	})
+	const floor =
+		ECONOMY.armyTradition({ state, p: nation }) === "paid"
+			? Number.NEGATIVE_INFINITY
+			: 0
+	FIELDS.prov.treasury.set({
+		state,
+		p: nation,
+		value: Math.max(
+			floor,
+			Math.min(
+				ECONOMY.reserveCap({ state, p: nation }),
+				FIELDS.prov.treasury.get({ state, p: nation }) +
+					(discretionary - upkeep) * yearFraction,
+			),
+		),
+	})
+	const manpower = FIELDS.prov.manpower.get({ state, p: nation })
+	FIELDS.prov.manpower.set({
+		state,
+		p: nation,
+		value: Math.min(
+			maxManpower,
+			manpower + (maxManpower - manpower) * MANPOWER_RECOVERY * yearFraction,
+		),
+	})
 }
 
 export const TAX = {

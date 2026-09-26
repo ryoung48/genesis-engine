@@ -1,3 +1,4 @@
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
 	ClaimParams,
@@ -8,6 +9,10 @@ import type {
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+
+// Great-vassal revolts cluster at successions; realms with many titled
+// subjects face more of them.
+const SUCCESSION_REVOLT_PER_VASSAL = 0.05
 
 function initSuccession({ state }: InitSuccessionParams): void {
 	for (let p = 0; p < state.P; p++) {
@@ -81,11 +86,10 @@ function claim({ state, p, rng }: ClaimParams): void {
 			return
 		}
 
-		// Sort by wealth, take the wealthiest neighbor
+		// Sort by revenue, take the richest neighbor
 		candidates.sort(
 			(a, b) =>
-				STATE.wealthOptimal({ state, p: b }) -
-				STATE.wealthOptimal({ state, p: a }),
+				ECONOMY.revenue({ state, p: b }) - ECONOMY.revenue({ state, p: a }),
 		)
 		const senior = candidates[0]
 		const seniorDynasty = FIELDS.prov.leader.dynasty.get({ state, p: senior })
@@ -189,11 +193,13 @@ function runSuccession({
 		const subjects = rng
 			.shuffle(STATE.getChildren({ state, p: province }))
 			.filter((s: number) => {
+				if (state.seatRank[s] === 0) return false
 				const provinces = STATE.getNationProvinces({ state, root: s })
 				return !provinces.some((q) => state.occupationCurrent[q] >= 0)
 			})
 
-		const rebellionChance = 0.12
+		const rebellionChance =
+			1 - (1 - SUCCESSION_REVOLT_PER_VASSAL) ** subjects.length
 		const subject = subjects[0]
 		if (
 			subject !== undefined &&
@@ -212,7 +218,12 @@ function runSuccession({
 		STATE.fixConnections({ state, nation: province, rng })
 	}
 
-	STATE.considerTitles({ state, nation: province, rng })
+	STATE.considerTitles({
+		state,
+		nation: province,
+		rng,
+		revenueOf: (nation) => ECONOMY.revenue({ state, p: nation }),
+	})
 }
 
 export const SUCCESSION = {

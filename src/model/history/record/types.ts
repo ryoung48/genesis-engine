@@ -66,7 +66,6 @@ export interface BattleParticipant {
 	cavalry: number | null
 	artillery: number | null
 	losses: number | null
-	wealthCost: number | null
 }
 
 export interface Battle {
@@ -114,6 +113,16 @@ export interface CensusKeyframe {
 	urban: Float32Array
 	rural: Float32Array
 	development: Float32Array
+	economy: CensusEconomy
+}
+
+// Parallel arrays over sovereign root provinces: grams of silver, grams per
+// year and men.
+export interface CensusEconomy {
+	roots: Int32Array
+	treasury: Float32Array
+	revenue: Float32Array
+	manpower: Float32Array
 }
 
 export interface TitleBase {
@@ -152,6 +161,19 @@ export type TitleEventRecord =
 			ancestors: number[]
 	  }
 
+export interface RaidRecord {
+	timeMs: number
+	raiderId: number
+	victimId: number
+	provinceId: number
+	success: boolean
+	loot: number
+	raiderParty: number
+	response: number
+	raiderLosses: number
+	victimLosses: number
+}
+
 export interface HistoryEvents {
 	provinceEvents: Map<number, ProvinceEventLog>
 	nationEvents: (NationEventLog | undefined)[]
@@ -160,6 +182,7 @@ export interface HistoryEvents {
 	organizationEvents: OrganizationEventRecord[]
 	censuses: CensusKeyframe[]
 	titleEvents: TitleEventRecord[]
+	raids: RaidRecord[]
 }
 
 export interface NationIdentity {

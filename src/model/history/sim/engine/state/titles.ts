@@ -12,9 +12,8 @@ import type {
 	RelinkNationsParams,
 	SettleProvincesParams,
 	SettleTitleSetParams,
-	TitleWealthBarParams,
+	TitleRevenueBarParams,
 } from "@/model/history/sim/engine/state/types"
-import { wealthCurrent } from "@/model/history/sim/engine/state/wealth"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import { HOLDING } from "@/model/society/dejure/holding"
@@ -143,16 +142,18 @@ function refreshTitleIndex({ state }: DissolveLapsedParams): void {
 	})
 }
 
-function titleWealthBar({ state, tier }: TitleWealthBarParams): number {
+function titleRevenueBar({
+	state,
+	tier,
+	revenueOf,
+}: TitleRevenueBarParams): number {
 	const holders = new Set<number>()
 	for (let title = 0; title < state.titles.count; title++)
 		if (state.titles.tier[title] >= tier && state.titles.holder[title] >= 0)
 			holders.add(state.titles.holder[title])
 	if (holders.size === 0) return Number.NEGATIVE_INFINITY
-	const wealth = [...holders]
-		.map((p) => wealthCurrent({ state, p }))
-		.sort((a, b) => a - b)
-	return wealth[Math.floor(wealth.length / 4)]
+	const revenue = [...holders].map(revenueOf).sort((a, b) => a - b)
+	return revenue[Math.floor(revenue.length / 4)]
 }
 
 function foundTitleFor({
@@ -160,6 +161,7 @@ function foundTitleFor({
 	nation,
 	tier,
 	rng,
+	revenueOf,
 }: FoundTitleForParams): boolean {
 	const children = FOUNDING.fullyHeldChildren({
 		titles: state.titles,
@@ -171,7 +173,7 @@ function foundTitleFor({
 		orphansOnly: true,
 	})
 	if (children.length < MIN_FOUNDING_CHILDREN) return false
-	if (wealthCurrent({ state, p: nation }) < titleWealthBar({ state, tier }))
+	if (revenueOf(nation) < titleRevenueBar({ state, tier, revenueOf }))
 		return false
 	const claim = state.leaderClaimCurrent[nation]
 	if (rng.random() >= BASE_FOUNDING_CHANCE + CLAIM_FOUNDING_CHANCE * claim)
@@ -271,10 +273,15 @@ function dissolveLapsed({ state, nation }: DissolveLapsedParams): void {
 	}
 }
 
-function considerTitles({ state, nation, rng }: ConsiderTitlesParams): void {
+function considerTitles({
+	state,
+	nation,
+	rng,
+	revenueOf,
+}: ConsiderTitlesParams): void {
 	dissolveLapsed({ state, nation })
 	for (let tier = FIRST_FOUNDED_TIER; tier <= TIER_SLOTS; tier++)
-		if (foundTitleFor({ state, nation, tier, rng })) break
+		if (foundTitleFor({ state, nation, tier, rng, revenueOf })) break
 }
 
 export { applyDerivedParents, considerTitles, settleProvinces }

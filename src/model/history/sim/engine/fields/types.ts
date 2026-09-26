@@ -18,12 +18,6 @@ export interface ProvSetParams {
 	value: number
 }
 
-export interface ProvDeltaParams {
-	state: HistoryState
-	p: number
-	delta: number
-}
-
 export interface RelGetParams {
 	state: HistoryState
 	a: number

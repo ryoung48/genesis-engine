@@ -3,6 +3,7 @@ import type {
 	DirectReportsParams,
 	HreMemberNationsParams,
 	IsOccupiedParams,
+	NationEconomy,
 	NationFrameParams,
 	NationRelations,
 	OrgForeignHoldersParams,
@@ -38,6 +39,27 @@ function hreMemberNations({ frame }: HreMemberNationsParams): Set<number> {
 		if (frame.provinceHre[province] && nationId >= 0) nations.add(nationId)
 	}
 	return nations
+}
+
+function nationEconomy({
+	frame,
+	nationId,
+}: NationFrameParams): NationEconomy | null {
+	if (!frame.economy) return null
+	const { roots, treasury, revenue, manpower } = frame.economy
+	for (let index = 0; index < roots.length; index++) {
+		const root = roots[index]
+		if (
+			frame.provinceNation[root] === nationId &&
+			frame.provinceParent[root] < 0
+		)
+			return {
+				treasury: treasury[index],
+				revenue: revenue[index],
+				manpower: manpower[index],
+			}
+	}
+	return null
 }
 
 function heldTitles({ frame, nationId }: NationFrameParams): number[] {
@@ -152,6 +174,7 @@ function toRenderInputs({ frame }: ToRenderInputsParams) {
 }
 
 export const FRAME = {
+	nationEconomy,
 	emptyRelations,
 	isOccupied,
 	hreMemberNations,

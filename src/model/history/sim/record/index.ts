@@ -204,6 +204,7 @@ function buildProceduralRecord(
 			organizationEvents,
 			censuses: [],
 			titleEvents: [],
+			raids: [],
 		},
 		titles: baseTitles,
 	}

@@ -1,14 +1,17 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { DIPLOMACY } from "@/model/history/sim/engine/events/diplomacy"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
+import { RAID } from "@/model/history/sim/engine/events/raid"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
+import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import type {
 	ProcessEventsUntilParams,
 	SeedColonyRelationsParams,
@@ -18,6 +21,7 @@ import type {
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { StageTiming } from "@/model/pipelines/types"
+import { ERAS } from "@/model/society/eras"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
@@ -81,7 +85,7 @@ function initHistory(params: {
 	settlementPortRegions?: Int32Array
 	timings?: StageTiming[]
 }): HistoryState {
-	const startYear = params.startYear ?? 800
+	const startYear = params.startYear ?? STATE.defaultStartYear
 	const rng = HISTORY_RNG.createHistoryRng(params.seed + 99999)
 	const state = timed({
 		label: "initHistory:createHistoryState",
@@ -108,10 +112,29 @@ function initHistory(params: {
 			}),
 	})
 
+	// The year curve is calibrated on late-medieval worlds; worlds generated for
+	// other eras keep their era's level unless given an explicit start year.
+	state.knowledgeBaseline =
+		params.startYear === undefined && state.era !== ERAS.defaultEra
+			? KNOWLEDGE.eraBaseline(state.era)
+			: KNOWLEDGE.yearBaseline(startYear)
+
 	// Seed colony dependencies before init passes so subordinate colonies are
 	// excluded from independent diplomacy and subject formation.
 	seedColonyRelations({ state, nations: params.nations })
 
+	// Population runs first: diplomacy and war seeding compare revenue and
+	// armies, which read development, knowledge and the seeded economy.
+	timed({
+		label: "initHistory:initPopulation",
+		timings: params.timings,
+		fn: () => POPULATION.initPopulation({ state }),
+	})
+	timed({
+		label: "initHistory:initEconomy",
+		timings: params.timings,
+		fn: () => ECONOMY.initEconomy({ state }),
+	})
 	timed({
 		label: "initHistory:initDiplomacy",
 		timings: params.timings,
@@ -133,9 +156,9 @@ function initHistory(params: {
 		fn: () => TAX.initTax({ state }),
 	})
 	timed({
-		label: "initHistory:initPopulation",
+		label: "initHistory:initRaid",
 		timings: params.timings,
-		fn: () => POPULATION.initPopulation({ state }),
+		fn: () => RAID.initRaid({ state, rng }),
 	})
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
@@ -189,6 +212,9 @@ function processEventsUntil({
 				break
 			case EVENT_HEAP.evt.CENSUS:
 				POPULATION.runPopulation({ state, previousTime: time2 })
+				break
+			case EVENT_HEAP.evt.RAID:
+				RAID.runRaid({ state, nation: dataBuf[0], rng })
 				break
 			case EVENT_HEAP.evt.DIPLOMACY:
 				DIPLOMACY.runDiplomacy({ state, nation: dataBuf[0], rng })

@@ -19,6 +19,7 @@ export interface RankSizesForNationParams {
 	governmentTypeIndex: number
 	totalPopulation: number
 	provinceCount: number
+	urbanFactor: number
 }
 
 export interface SortByRankParams {

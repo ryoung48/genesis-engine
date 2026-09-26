@@ -1,5 +1,4 @@
 import type {
-	ExhaustedParams,
 	FindInvasionTargetParams,
 	FindReconquestTargetParams,
 	GetVictoryDegreeParams,
@@ -8,39 +7,15 @@ import type {
 } from "@/model/history/sim/engine/events/battle/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 
-const EXHAUSTION_THRESHOLD = 0.25
-
-function exhausted({ state, nation }: ExhaustedParams): boolean {
-	const optimal = STATE.wealthOptimal({ state, p: nation })
-	return (
-		STATE.warStrengthSolo({ state, p: nation }) < optimal * EXHAUSTION_THRESHOLD
-	)
-}
-
 function getVictoryDegree({
-	margin,
-	isWinner,
+	lossRatio,
 }: GetVictoryDegreeParams): VictoryDegree {
-	if (isWinner) {
-		if (margin > 0.66) return "decisive"
-		if (margin > 0.33) return "victory"
-		return "pyrrhic"
-	} else {
-		if (margin > 0.66) return "crushing"
-		if (margin > 0.33) return "defeat"
-		return "close"
-	}
-}
-
-const COST_MULTIPLIERS: Record<VictoryDegree, number> = {
-	decisive: 0.5,
-	victory: 0.75,
-	pyrrhic: 1.25,
-	close: 1.0,
-	defeat: 1.25,
-	crushing: 1.5,
+	if (lossRatio > 3) return "decisive"
+	if (lossRatio > 1.5) return "victory"
+	return "pyrrhic"
 }
 
 function findInvasionTarget({
@@ -137,31 +112,28 @@ function runBattle({
 		],
 	})
 
-	const odds =
-		1 -
-		STATE.warThreat({ state, attacker: war.attacker, defender: war.defender })
-	const outcome = rng.random() < odds
-	const margin = rng.uniform(0, 1)
-
-	const attackerWon = outcome
-	const attackerDegree = getVictoryDegree({ margin, isWinner: attackerWon })
-	const defenderDegree = getVictoryDegree({ margin, isWinner: !attackerWon })
-
-	const baseCost = STATE.wealthOptimal({ state, p: target }) * 0.5
-	const attackerCost = baseCost * COST_MULTIPLIERS[attackerDegree]
-	const defenderCost = baseCost * COST_MULTIPLIERS[defenderDegree]
-
-	// Distribute costs (simplified — no ally cost distribution for now)
-	FIELDS.prov.consumption.delta({
-		state,
-		p: war.attacker,
-		delta: attackerCost,
+	const result = MILITARY.fight({ state, war, eventAttacker, rng })
+	const outcome = result.attackerWon
+	const winnerShare = outcome
+		? result.attackerLossShare
+		: result.defenderLossShare
+	const loserShare = outcome
+		? result.defenderLossShare
+		: result.attackerLossShare
+	const victoryDegree = getVictoryDegree({
+		lossRatio: loserShare / Math.max(1e-6, winnerShare),
 	})
-	FIELDS.prov.consumption.delta({
-		state,
-		p: war.defender,
-		delta: defenderCost,
-	})
+
+	const loot =
+		outcome && !restoration
+			? MILITARY.plunder({
+					state,
+					raider: eventAttacker,
+					loser: eventDefender,
+					province: target,
+					sack: target === war.defender,
+				})
+			: 0
 
 	if (outcome) {
 		if (restoration) {
@@ -182,7 +154,6 @@ function runBattle({
 		}
 	}
 
-	const winnerDegree = attackerWon ? attackerDegree : defenderDegree
 	state.events.push({
 		tag: "battle",
 		time: state.time,
@@ -192,16 +163,18 @@ function runBattle({
 			attacker: eventAttacker,
 			defender: eventDefender,
 			winner: outcome ? eventAttacker : eventDefender,
-			odds,
-			margin,
-			victoryDegree: winnerDegree,
-			attackerCost,
-			defenderCost,
+			odds: result.winChance,
+			victoryDegree,
+			attackerArmy: Math.round(result.attackerArmy),
+			defenderArmy: Math.round(result.defenderArmy),
+			attackerLosses: 100 * result.attackerLossShare,
+			defenderLosses: 100 * result.defenderLossShare,
+			plunder: loot,
 		},
 	})
 
-	const atkExhausted = exhausted({ state, nation: war.attacker })
-	const defExhausted = exhausted({ state, nation: war.defender })
+	const atkExhausted = MILITARY.exhausted({ state, nation: war.attacker })
+	const defExhausted = MILITARY.exhausted({ state, nation: war.defender })
 
 	const occupiedCount = war.occupied.length
 

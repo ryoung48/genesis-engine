@@ -1,3 +1,4 @@
+import type { NationEconomy } from "@/model/history/world-frame/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 
 export function formatCount(value: number): string {
@@ -12,6 +13,16 @@ export function formatCount(value: number): string {
 		return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, "")}K`
 	}
 	return Math.round(value).toLocaleString()
+}
+
+export function formatSilver(grams: number): string {
+	const magnitude = Math.abs(grams)
+	const sign = grams < 0 ? "-" : ""
+	if (magnitude >= 1_000_000)
+		return `${sign}${(magnitude / 1_000_000).toFixed(magnitude >= 10_000_000 ? 0 : 1)} t`
+	if (magnitude >= 1_000)
+		return `${sign}${Math.round(magnitude / 1_000).toLocaleString("en-US")} kg`
+	return `${sign}${Math.round(magnitude)} g`
 }
 
 export function formatAreaKm2(areaKm2: number): string {
@@ -52,6 +63,7 @@ export function buildNationWikiStats(params: {
 	rulerLabel?: string | null
 	governmentSubtype: string | null
 	governmentColor: string | null
+	economy: NationEconomy | null
 }): StatEntry[] {
 	const {
 		totalAreaKm2,
@@ -61,6 +73,7 @@ export function buildNationWikiStats(params: {
 		rulerLabel,
 		governmentSubtype,
 		governmentColor,
+		economy,
 	} = params
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
 	return [
@@ -81,5 +94,21 @@ export function buildNationWikiStats(params: {
 			value: governmentSubtype ?? "Unknown",
 			swatchColor: governmentColor,
 		},
+		...(economy
+			? [
+					{
+						label: "Treasury",
+						value:
+							economy.treasury < 0
+								? `${formatSilver(-economy.treasury)} of silver in debt`
+								: `${formatSilver(economy.treasury)} of silver`,
+					},
+					{
+						label: "Revenue",
+						value: `${formatSilver(economy.revenue)} of silver per year`,
+					},
+					{ label: "Manpower", value: `${formatCount(economy.manpower)} men` },
+				]
+			: []),
 	]
 }

@@ -1,3 +1,4 @@
+import type { BattleParticipant } from "@/model/history/record/types"
 import {
 	cleanEu4Identifier,
 	indefiniteArticle,
@@ -436,6 +437,18 @@ export function buildMergedProvinceAttributeDescription(
 	return `${formatList(clauses)}.`
 }
 
-export function formatWealthCost(cost: number | null): string | null {
-	return cost === null ? null : `${cost.toFixed(1)} wealth`
+export function formatBattleForce(
+	participant: BattleParticipant,
+): string | null {
+	const troops = [
+		participant.infantry,
+		participant.cavalry,
+		participant.artillery,
+	].filter((count): count is number => count !== null)
+	if (troops.length === 0) return null
+	const army = troops.reduce((sum, count) => sum + count, 0)
+	const men = `${Math.round(army).toLocaleString("en-US")} men`
+	if (participant.losses === null) return men
+	const lost = Math.round((army * participant.losses) / 100)
+	return `${men}, ${lost.toLocaleString("en-US")} lost`
 }

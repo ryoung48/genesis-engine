@@ -186,12 +186,10 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 				attacker: {
 					...battle.attacker,
 					countryId: nationId(battle.attacker.country),
-					wealthCost: null as number | null,
 				},
 				defender: {
 					...battle.defender,
 					countryId: nationId(battle.defender.country),
-					wealthCost: null as number | null,
 				},
 			})),
 		})),
@@ -246,6 +244,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 			.sort((a, b) => a.timeMs - b.timeMs),
 		censuses: [],
 		titleEvents: [],
+		raids: [],
 	}
 	const resolvedMinMs = minTimeMs === Infinity ? 0 : minTimeMs
 	return {
@@ -731,6 +730,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provincePopulation,
 		provincePopulationUrban,
 		provinceDevelopment,
+		economy: census?.economy ?? null,
 		titles: record.titles
 			? TITLE_RECORD.fold({
 					base: record.titles,

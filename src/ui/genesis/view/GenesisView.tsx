@@ -351,7 +351,7 @@ export const GenesisView: React.FC<{
 		setProceduralHistoryPlaying,
 	} = useProceduralHistory({ workerRef })
 	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
-	const simStartTimeMs = historyYearToTime(800)
+	const simStartTimeMs = historyYearToTime(STATE.defaultStartYear)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	// Earth-imported worlds scrub real Gregorian dates via history's own
 	// slider. selectedTimeMs tracks it so Social's population/culture/heritage/

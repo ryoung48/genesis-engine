@@ -1,13 +1,8 @@
 import type {
 	DerivedAtTimeParams,
 	DerivedLookupParams,
-	WealthCurrentParams,
 } from "@/model/history/sim/engine/derive/types"
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import { HIERARCHY } from "@/model/society/hierarchy"
-
-const TRIBUTE = 0.25
 
 function ensureHierarchyClean(state: HistoryState): void {
 	if (!state.hierarchyDirty) return
@@ -80,62 +75,6 @@ function children({ state, p }: DerivedLookupParams): number[] {
 	return result
 }
 
-function isOverextended({ state, p }: DerivedLookupParams): boolean {
-	let vassalSeats = 0
-	for (const child of children({ state, p }))
-		if (state.seatRank[child] > 0) vassalSeats++
-	return HIERARCHY.isOverextended({ lordRank: state.seatRank[p], vassalSeats })
-}
-
-function gravity({ state, p, cache }: DerivedLookupParams): number {
-	const cached = cache?.gravity?.get(p)
-	if (cached !== undefined) return cached
-
-	const members = children({ state, p })
-	let value = state.habitability[p]
-	for (const child of members) {
-		value += gravity({ state, p: child, cache }) * TRIBUTE
-	}
-	if (isOverextended({ state, p })) value *= 0.9
-	cache?.gravity?.set(p, value)
-	return value
-}
-
-function wealthOptimal({ state, p, cache }: DerivedLookupParams): number {
-	const cached = cache?.wealthOptimal?.get(p)
-	if (cached !== undefined) return cached
-	const value = gravity({ state, p, cache })
-	cache?.wealthOptimal?.set(p, value)
-	return value
-}
-
-function wealthCurrent({
-	state,
-	p,
-	cache,
-	exclude,
-	freedom = false,
-}: WealthCurrentParams): number {
-	const key = `${p}:${exclude ?? -1}:${freedom ? 1 : 0}`
-	const cached = cache?.wealthCurrent?.get(key)
-	if (cached !== undefined) return cached
-
-	let collected =
-		state.habitability[p] - FIELDS.prov.consumption.get({ state, p })
-	const directChildren = children({ state, p })
-	for (const child of directChildren) {
-		if (child === exclude) continue
-		collected +=
-			wealthCurrent({ state, p: child, cache, exclude, freedom }) * TRIBUTE
-	}
-	if (isOverextended({ state, p })) collected *= 0.9
-	if (!freedom && FIELDS.prov.parent.get({ state, p }) >= 0)
-		collected *= 1 - TRIBUTE
-
-	cache?.wealthCurrent?.set(key, collected)
-	return collected
-}
-
 function nationAdjacency({ state }: DerivedAtTimeParams): {
 	offset: Int32Array
 	list: Int32Array
@@ -189,8 +128,6 @@ export const DERIVE = {
 	ensureHierarchyClean,
 	sovereign,
 	children,
-	wealthOptimal,
-	wealthCurrent,
 	nationAdjacency,
 	provinceWars,
 }

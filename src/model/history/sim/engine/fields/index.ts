@@ -1,5 +1,4 @@
 import type {
-	ProvDeltaParams,
 	ProvGetParams,
 	ProvSetParams,
 	RelationKeyParams,
@@ -73,17 +72,34 @@ const prov = {
 			state.developmentCurrent[p] = value
 		},
 	},
-	consumption: {
-		get: ({ state, p }: ProvGetParams) => state.consumptionCurrent[p],
+	knowledge: {
+		get: ({ state, p }: ProvGetParams) => state.knowledgeCurrent[p],
 		set: ({ state, p, value }: ProvSetParams) => {
-			state.consumptionExact[p] = value
-			state.consumptionCurrent[p] = value
+			state.knowledgeCurrent[p] = value
 		},
-		delta: ({ state, p, delta }: ProvDeltaParams) => {
-			const next = state.consumptionExact[p] + delta
-			state.consumptionExact[p] = next
-			state.consumptionCurrent[p] = next
-			return next
+	},
+	treasury: {
+		get: ({ state, p }: ProvGetParams) => state.treasuryCurrent[p],
+		set: ({ state, p, value }: ProvSetParams) => {
+			state.treasuryCurrent[p] = value
+		},
+	},
+	manpower: {
+		get: ({ state, p }: ProvGetParams) => state.manpowerCurrent[p],
+		set: ({ state, p, value }: ProvSetParams) => {
+			state.manpowerCurrent[p] = value
+		},
+	},
+	revenue: {
+		get: ({ state, p }: ProvGetParams) => state.revenueCurrent[p],
+		set: ({ state, p, value }: ProvSetParams) => {
+			state.revenueCurrent[p] = value
+		},
+	},
+	plunderedUntil: {
+		get: ({ state, p }: ProvGetParams) => state.plunderedUntil[p],
+		set: ({ state, p, value }: ProvSetParams) => {
+			state.plunderedUntil[p] = value
 		},
 	},
 	leader: {

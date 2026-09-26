@@ -1,11 +1,11 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
-import type { DerivedCache } from "@/model/history/sim/engine/derive/types"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import {
 	getChildren,
 	getNationNeighbors,
+	getNationPopulation,
 	getNationProvinces,
 	getProvinceNeighbors,
 	rebuildAssignment,
@@ -47,14 +47,7 @@ import type {
 	SpawnLeaderParams,
 	StartWarParams,
 	War,
-	WarStrengthCoalitionParams,
-	WarStrengthSoloParams,
-	WarThreatParams,
 } from "@/model/history/sim/engine/state/types"
-import {
-	wealthCurrent,
-	wealthOptimal,
-} from "@/model/history/sim/engine/state/wealth"
 import { DEJURE } from "@/model/society/dejure"
 
 export const rel = {
@@ -76,6 +69,8 @@ export type Relation = (typeof rel)[keyof typeof rel]
 const TITLE_CAPACITY = 4096
 
 const DAYS_PER_YEAR = 365
+
+const DEFAULT_START_YEAR = 867
 
 const DAYS_PER_MONTH = 30
 
@@ -100,27 +95,6 @@ function buildProvinceXyz({
 		out[dst + 2] = r_xyz[src + 2]
 	}
 	return out
-}
-
-function makeDerivedCache(): DerivedCache {
-	return {
-		gravity: new Map(),
-		wealthCurrent: new Map(),
-		wealthOptimal: new Map(),
-	}
-}
-
-function warStrengthSolo({
-	state,
-	p,
-	exclude,
-	cache,
-}: WarStrengthSoloParams): number {
-	const curr = Math.max(
-		0.1,
-		wealthCurrent({ state, p, exclude, freedom: exclude === p, cache }),
-	)
-	return curr / (1 + DERIVE.provinceWars({ state, p }).length)
 }
 
 function getWarAllies({
@@ -155,57 +129,29 @@ function getWarAllies({
 	return allies
 }
 
-function warStrengthCoalition({
-	state,
-	attacker,
-	defender,
-	exclude,
-	cache,
-}: WarStrengthCoalitionParams): { attacker: number; defender: number } {
-	const c = cache ?? makeDerivedCache()
-	const atkAllies = getWarAllies({
-		state,
-		nation: attacker,
-		type: "offensive",
-		target: defender,
-	})
-	const defAllies = getWarAllies({
-		state,
-		nation: defender,
-		type: "defensive",
-		target: attacker,
-	})
-	let atk = warStrengthSolo({ state, p: attacker, exclude, cache: c })
-	let def = warStrengthSolo({ state, p: defender, exclude, cache: c })
-	for (const ally of atkAllies)
-		atk +=
-			warStrengthSolo({ state, p: ally, exclude: undefined, cache: c }) * 0.5
-	for (const ally of defAllies)
-		def +=
-			warStrengthSolo({ state, p: ally, exclude: undefined, cache: c }) * 0.5
-	return { attacker: atk, defender: def }
-}
-
-function warThreat({
-	state,
-	attacker,
-	defender,
-	exclude,
-}: WarThreatParams): number {
-	const strength = warStrengthCoalition({
-		state,
-		attacker,
-		defender,
-		exclude,
-		cache: makeDerivedCache(),
-	})
-	const atk = strength.attacker ** 2
-	const def = strength.defender ** 2
-	return 1 - atk / (atk + def)
-}
-
 function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
 	const formerSovereign = getSovereign({ state, p })
+	const formerPopulation = getNationPopulation({ state, root: formerSovereign })
+	const share =
+		formerPopulation > 0
+			? getNationPopulation({ state, root: p }) / formerPopulation
+			: 0
+	const manpower =
+		FIELDS.prov.manpower.get({ state, p: formerSovereign }) * share
+	const treasury =
+		Math.max(0, FIELDS.prov.treasury.get({ state, p: formerSovereign })) * share
+	FIELDS.prov.manpower.set({ state, p, value: manpower })
+	FIELDS.prov.treasury.set({ state, p, value: treasury })
+	FIELDS.prov.manpower.set({
+		state,
+		p: formerSovereign,
+		value: FIELDS.prov.manpower.get({ state, p: formerSovereign }) - manpower,
+	})
+	FIELDS.prov.treasury.set({
+		state,
+		p: formerSovereign,
+		value: FIELDS.prov.treasury.get({ state, p: formerSovereign }) - treasury,
+	})
 	FIELDS.prov.parent.set({ state, p, value: -1 })
 	rebuildAssignment({ state })
 	repartitionNation({ state, nation: formerSovereign, subjects: [] })
@@ -266,13 +212,9 @@ function releaseDisconnectedProvince({
 	}
 	releaseProvince({ state, p: province, rng })
 	state.events.push({
-		tag: "rebellion",
+		tag: "province released",
 		time: state.time,
-		data: {
-			overlord,
-			subject: province,
-			disconnected: true,
-		},
+		data: { overlord, subject: province },
 	})
 }
 
@@ -654,8 +596,12 @@ function createHistoryState({
 		popRuralCurrent: new Float32Array(P),
 		popUrbanCurrent: new Float32Array(P),
 		developmentCurrent: new Float32Array(P),
-		consumptionCurrent: new Float32Array(P),
-		consumptionExact: new Float64Array(P),
+		knowledgeCurrent: new Float32Array(P),
+		knowledgeBaseline: 0,
+		treasuryCurrent: new Float64Array(P),
+		manpowerCurrent: new Float64Array(P),
+		revenueCurrent: new Float64Array(P),
+		plunderedUntil: new Float64Array(P),
 		leaderDynCurrent: new Int32Array(P).fill(-1),
 		leaderNameSeedCurrent: new Int32Array(P).fill(-1),
 		leaderClaimCurrent: new Uint8Array(P),
@@ -740,7 +686,6 @@ function createHistoryState({
 			value: population.population[p] * 0.05,
 		})
 		FIELDS.prov.development.set({ state, p, value: 0 })
-		FIELDS.prov.consumption.set({ state, p, value: 0 })
 		FIELDS.prov.leader.dynasty.set({ state, p, value: -1 })
 		FIELDS.prov.leader.nameSeed.set({ state, p, value: -1 })
 		FIELDS.prov.leader.claim.set({ state, p, value: 0 })
@@ -850,6 +795,7 @@ export const STATE = {
 	rel,
 	getWarAllies,
 	yearMs,
+	defaultStartYear: DEFAULT_START_YEAR,
 	deltaYear,
 	deltaMonth,
 	diffYears,
@@ -861,11 +807,9 @@ export const STATE = {
 	isSovereign,
 	getChildren,
 	getNationProvinces,
+	getNationPopulation,
 	getNationNeighbors,
 	getProvinceNeighbors,
-	wealthOptimal,
-	warStrengthSolo,
-	warThreat,
 	releaseProvince,
 	fixConnections,
 	startWar,

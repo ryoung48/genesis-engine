@@ -1,3 +1,5 @@
+import type { CensusEconomy } from "@/model/history/record/types"
+
 export interface Ruler {
 	name: string
 	dynasty: string | null
@@ -67,6 +69,12 @@ export interface TitleFrame {
 	regionOf: Int32Array
 }
 
+export interface NationEconomy {
+	treasury: number
+	revenue: number
+	manpower: number
+}
+
 export interface WorldFrame {
 	timeMs: number
 	provinceCount: number
@@ -80,6 +88,8 @@ export interface WorldFrame {
 	provincePopulation: Float32Array
 	provincePopulationUrban: Float32Array
 	provinceDevelopment: Float32Array
+	// [JUSTIFICATION] Earth records carry no census, so they have no economy.
+	economy: CensusEconomy | null
 	// [JUSTIFICATION] Earth frames have no de jure title layer.
 	titles: TitleFrame | null
 	nations: Map<number, NationFrame>
