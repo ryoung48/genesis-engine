@@ -1,3 +1,5 @@
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import type { SocietyEra } from "@/model/society/types"
 
 export interface HistoryRunOptions {
@@ -39,4 +41,17 @@ export interface HistoryRunSummary {
 	generationMs: number
 	initMs: number
 	reports: YearReport[]
+}
+
+export interface CreateEngineParams {
+	seed: number
+	era: SocietyEra
+	numPoints: number
+}
+
+export interface CreatedEngine {
+	generated: ReturnType<typeof GENERATE_WORLD.generateGenesisWorld>
+	engine: HistoryState
+	generationMs: number
+	engineMs: number
 }

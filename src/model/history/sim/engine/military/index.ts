@@ -75,10 +75,7 @@ const CROWN_LOOT_SHARE: Record<ArmyTradition, number> = {
 }
 
 function realmKnowledge({ state, nation }: NationParams): number {
-	return KNOWLEDGE.realmKnowledge({
-		state,
-		provinces: STATE.getNationProvinces({ state, root: nation }),
-	})
+	return ECONOMY.realmKnowledge({ state, p: nation })
 }
 
 function payPerSoldier({ state, nation }: NationParams): number {

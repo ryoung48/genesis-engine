@@ -196,6 +196,7 @@ function initPopulation({ state }: InitPopulationParams): void {
 }
 
 function runPopulation({ state, previousTime }: RunPopulationParams): void {
+	state.censusVersion++
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 
 	KNOWLEDGE.advanceKnowledge({ state, yearFraction })

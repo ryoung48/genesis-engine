@@ -10,6 +10,8 @@ import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
+	CreatedEngine,
+	CreateEngineParams,
 	EnvParams,
 	HistoryRunOptions,
 	HistoryRunSummary,
@@ -55,8 +57,11 @@ function countEngine({ engine }: { engine: EngineState }): {
 	}
 }
 
-function run(options: HistoryRunOptions): HistoryRunSummary {
-	const { seed, era, numPoints, years, log } = options
+function createEngine({
+	seed,
+	era,
+	numPoints,
+}: CreateEngineParams): CreatedEngine {
 	const generationStart = performance.now()
 	const generated = GENERATE_WORLD.generateGenesisWorld({
 		params: {
@@ -81,7 +86,7 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	)
 		throw new Error("Generated world has no society data to run history on")
 
-	const initStart = performance.now()
+	const engineStart = performance.now()
 	const engine = SIM_ENGINE.initHistory({
 		nations,
 		provinces,
@@ -104,6 +109,22 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		settlementWaterLandmarks: generated.settlementWaterLandmarks,
 		settlementPortRegions: generated.settlementPortRegions,
 	})
+	return {
+		generated,
+		engine,
+		generationMs,
+		engineMs: performance.now() - engineStart,
+	}
+}
+
+function run(options: HistoryRunOptions): HistoryRunSummary {
+	const { seed, era, numPoints, years, log } = options
+	const { generated, engine, generationMs, engineMs } = createEngine({
+		seed,
+		era,
+		numPoints,
+	})
+	const recordStart = performance.now()
 	const world = generated as unknown as SerializedGenesisWorld
 	const state = SIM_RECORD.buildProceduralState({
 		world,
@@ -111,7 +132,7 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	})
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-	const initMs = performance.now() - initStart
+	const initMs = engineMs + performance.now() - recordStart
 	log(
 		`seed ${seed} era ${era} points ${numPoints} provinces ${engine.P} generation ${generationMs.toFixed(0)}ms init ${initMs.toFixed(0)}ms`,
 	)
@@ -199,4 +220,4 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	return summary
 }
 
-export const HISTORY_RUN = { optionsFromEnv, run }
+export const HISTORY_RUN = { optionsFromEnv, run, createEngine }

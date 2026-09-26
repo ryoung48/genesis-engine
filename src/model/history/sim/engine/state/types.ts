@@ -67,6 +67,13 @@ export interface EngineNote {
 	data: Record<string, number | number[] | string | boolean | undefined>
 }
 
+export interface RealmCacheEntry {
+	hierarchyVersion: number
+	censusVersion: number
+	knowledge: number
+	revenue: number
+}
+
 export interface HistoryState {
 	P: number
 	time: number
@@ -99,6 +106,9 @@ export interface HistoryState {
 	// 0 = iron age, 1 = late medieval, 2 = early modern, 3 = industrial, 4 = information.
 	knowledgeCurrent: Float32Array
 	knowledgeBaseline: number
+	// Bumped at each census; with hierarchyVersion it keys realmCache.
+	censusVersion: number
+	realmCache: Map<number, RealmCacheEntry>
 	// Grams of silver and levyable men; meaningful only on sovereign roots.
 	treasuryCurrent: Float64Array
 	manpowerCurrent: Float64Array

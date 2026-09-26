@@ -1,3 +1,4 @@
+import { DERIVE } from "@/model/history/sim/engine/derive"
 import type {
 	ArmyTradition,
 	EconomyLookupParams,
@@ -6,6 +7,7 @@ import type {
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { STATE } from "@/model/history/sim/engine/state"
+import type { RealmCacheEntry } from "@/model/history/sim/engine/state/types"
 import { MATH } from "@/model/shared/math/core"
 import { ERAS } from "@/model/society/eras"
 
@@ -59,15 +61,39 @@ function provinceOutput({ state, p }: EconomyLookupParams): number {
 	)
 }
 
-function revenue({ state, p }: EconomyLookupParams): number {
+function realm({ state, p }: EconomyLookupParams): RealmCacheEntry {
+	DERIVE.ensureHierarchyClean(state)
+	const cached = state.realmCache.get(p)
+	if (
+		cached &&
+		cached.hierarchyVersion === state.hierarchyVersion &&
+		cached.censusVersion === state.censusVersion
+	)
+		return cached
 	const provinces = realmProvinces({ state, p })
-	const extraction = KNOWLEDGE.extractionRate({
-		knowledge: KNOWLEDGE.realmKnowledge({ state, provinces }),
-	})
+	const knowledge = KNOWLEDGE.realmKnowledge({ state, provinces })
 	let output = 0
 	for (const province of provinces)
 		output += provinceOutput({ state, p: province })
-	return output * extraction * COLLECTION_SHARE[armyTradition({ state, p })]
+	const entry = {
+		hierarchyVersion: state.hierarchyVersion,
+		censusVersion: state.censusVersion,
+		knowledge,
+		revenue:
+			output *
+			KNOWLEDGE.extractionRate({ knowledge }) *
+			COLLECTION_SHARE[armyTradition({ state, p })],
+	}
+	state.realmCache.set(p, entry)
+	return entry
+}
+
+function revenue({ state, p }: EconomyLookupParams): number {
+	return realm({ state, p }).revenue
+}
+
+function realmKnowledge({ state, p }: EconomyLookupParams): number {
+	return realm({ state, p }).knowledge
 }
 
 function discretionaryRevenue({ state, p }: EconomyLookupParams): number {
@@ -130,6 +156,7 @@ function initEconomy({ state }: InitEconomyParams): void {
 export const ECONOMY = {
 	provinceOutput,
 	revenue,
+	realmKnowledge,
 	discretionaryRevenue,
 	reserveCap,
 	treasuryFill,
