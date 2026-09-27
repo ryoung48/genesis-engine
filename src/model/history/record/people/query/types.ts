@@ -59,13 +59,16 @@ export type PersonEventKind =
 	| "became regent"
 	| "left regency"
 	| "regent appointed"
+	| "miscarriage"
+	| "stillborn child"
 	| "died"
+	| "died in childbirth"
 
 export interface PersonEvent {
 	timeMs: number
 	kind: PersonEventKind
-	// Spouse, child, seat or regent the event concerns; -1 for birth and
-	// death.
+	// Spouse, child, seat or regent the event concerns, or the father of a
+	// lost pregnancy; -1 for birth and death.
 	other: number
 	// The tenure a seat or regency event belongs to; -1 for other kinds.
 	tenure: number

@@ -123,10 +123,11 @@ function runSuccession({
 		return
 	}
 
+	const dying = state.people.rulerOf[province]
 	const choice = SUCCESSION_SYSTEMS.choose({
 		state,
 		realm: province,
-		dying: state.people.rulerOf[province],
+		dying,
 		rng,
 	})
 	if (choice.heir >= 0)
@@ -154,6 +155,8 @@ function runSuccession({
 			nation: province,
 			leader: leaderIdx,
 			successor: state.leaderRuntime.idx[province],
+			dying,
+			claim: choice.claim,
 		},
 	})
 

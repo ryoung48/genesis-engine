@@ -5,3 +5,8 @@ export interface PeopleEventParams {
 	state: HistoryState
 	rng: SharedRng
 }
+
+export interface EndEarlyParams {
+	state: HistoryState
+	person: number
+}

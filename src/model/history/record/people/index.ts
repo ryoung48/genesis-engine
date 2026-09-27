@@ -16,10 +16,11 @@ function create(): PeopleRecord {
 		regentsOfSeat: new Map(),
 		regentsOfWard: new Map(),
 		dynastyHome: new Map(),
+		pregnanciesOf: new Map(),
 	}
 }
 
-function pushIndex({ index, key, value }: PushIndexParams): void {
+function pushIndex<T>({ index, key, value }: PushIndexParams<T>): void {
 	const list = index.get(key)
 	if (list) list.push(value)
 	else index.set(key, [value])
@@ -48,6 +49,16 @@ function append({
 			if (parent >= 0)
 				pushIndex({ index: record.childrenOf, key: parent, value: row.id })
 	}
+	for (const { id, deathTimeMs } of rows.deaths) {
+		const person = record.persons.get(id)
+		if (person) person.deathTimeMs = recordTime(deathTimeMs)
+	}
+	for (const { mother, father, timeMs, outcome } of rows.pregnancies)
+		pushIndex({
+			index: record.pregnanciesOf,
+			key: mother,
+			value: { father, timeMs: recordTime(timeMs), outcome },
+		})
 	for (const row of rows.marriages) {
 		const index = record.marriages.length
 		record.marriages.push({ ...row, startTimeMs: recordTime(row.startTimeMs) })

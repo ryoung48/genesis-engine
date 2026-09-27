@@ -1,4 +1,5 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
+import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import type {
 	AddPersonParams,
 	GenderPreference,
@@ -8,8 +9,11 @@ import type {
 	PersonAtParams,
 	PersonRefParams,
 	PreferenceParams,
+	RaiseParams,
 	SetRegentParams,
 	SetRulerParams,
+	ShortenLifeParams,
+	SpawnParams,
 	ThroneParams,
 	VacateParams,
 } from "@/model/history/sim/people/types"
@@ -33,6 +37,9 @@ function create(provinceCount: number): PeopleState {
 			marriedAt: [],
 			home: [],
 			recorded: [],
+			fertility: [],
+			peak: [],
+			nextBirth: [],
 		},
 		alive: [],
 		rulerOf: new Int32Array(provinceCount).fill(-1),
@@ -41,7 +48,13 @@ function create(provinceCount: number): PeopleState {
 		marriageAlliances: new Map(),
 		regencies: new Map(),
 		deposed: new Map(),
-		log: { persons: [], marriages: [], seats: [] },
+		log: {
+			persons: [],
+			marriages: [],
+			seats: [],
+			deaths: [],
+			pregnancies: [],
+		},
 		nextDynasty: 0,
 	}
 }
@@ -57,6 +70,7 @@ function add({
 	culture,
 	nameSeed,
 	realm,
+	fertility,
 }: AddPersonParams): number {
 	const table = people.persons
 	const id = table.sex.length
@@ -76,6 +90,9 @@ function add({
 	table.marriedAt.push(-1)
 	table.home.push(realm)
 	table.recorded.push(false)
+	table.fertility.push(fertility)
+	table.peak.push(0)
+	table.nextBirth.push(0)
 	if (father >= 0) table.children[father].push(id)
 	if (mother >= 0) table.children[mother].push(id)
 	people.alive.push(id)
@@ -85,6 +102,31 @@ function add({
 	)
 		record({ people, person: id })
 	return id
+}
+
+function spawn({
+	people,
+	sex,
+	birth,
+	father,
+	mother,
+	dynasty,
+	origin,
+	rng,
+}: SpawnParams): number {
+	return add({
+		people,
+		sex,
+		birth,
+		death: LIFESPAN.deathAt({ birth, from: birth, rng }),
+		father,
+		mother,
+		dynasty,
+		culture: origin.culture,
+		nameSeed: nameSeed({ sex, genderSystem: origin.genderSystem, rng }),
+		realm: origin.realm,
+		fertility: 0.5 + 0.1 * rng.random(),
+	})
 }
 
 // Only seat holders and their close family reach the history record.
@@ -118,10 +160,18 @@ function recordFamily({ people, person }: PersonRefParams): void {
 		record({ people, person: member })
 }
 
-function setRuler({ people, seat, person }: SetRulerParams): void {
+// A seat's standing is its title tier plus one: 1 for a county seat, up to 5
+// for a hegemony. Family size follows the highest standing ever held.
+function raise({ people, person, rank }: RaiseParams): void {
+	people.persons.peak[person] = Math.max(people.persons.peak[person], rank + 1)
+}
+
+function setRuler({ people, seat, person, rank }: SetRulerParams): void {
 	people.rulerOf[seat] = person
 	people.log.seats.push({ seat, person, ward: -1 })
-	if (person >= 0) recordFamily({ people, person })
+	if (person < 0) return
+	raise({ people, person, rank })
+	recordFamily({ people, person })
 }
 
 function setRegent({ people, seat, person, ward }: SetRegentParams): void {
@@ -157,20 +207,20 @@ function preference({ genderSystem }: PreferenceParams): GenderPreference {
 		: "male"
 }
 
-function enthrone({ people, person, seat, realm }: ThroneParams): void {
+function enthrone({ people, person, seat, realm, rank }: ThroneParams): void {
 	const table = people.persons
 	table.throne[person] = seat
 	table.realm[person] = realm
 	const spouse = table.spouse[person]
 	if (spouse >= 0 && table.throne[spouse] < 0) table.realm[spouse] = realm
-	setRuler({ people, seat, person })
+	setRuler({ people, seat, person, rank })
 }
 
 function vacate({ people, seat }: VacateParams): void {
 	const person = people.rulerOf[seat]
 	if (person < 0) return
 	if (people.persons.throne[person] === seat) people.persons.throne[person] = -1
-	setRuler({ people, seat, person: -1 })
+	setRuler({ people, seat, person: -1, rank: 0 })
 }
 
 // A ruler with their children and siblings: the house whose marriages bind
@@ -183,6 +233,15 @@ function family({ people, person }: PersonRefParams): number[] {
 			for (const sibling of table.children[parent])
 				if (sibling !== person) members.push(sibling)
 	return members
+}
+
+// Only childbirth moves a death date, and only earlier.
+function shortenLife({ people, person, time }: ShortenLifeParams): boolean {
+	if (time >= people.persons.death[person]) return false
+	people.persons.death[person] = time
+	if (people.persons.recorded[person])
+		people.log.deaths.push({ person, death: time })
+	return true
 }
 
 function tiedByMarriage({ people, a, b, time }: MarriageTieParams): boolean {
@@ -209,10 +268,12 @@ export const PEOPLE = {
 	family,
 	tiedByMarriage,
 	create,
-	add,
+	spawn,
 	aliveAt,
 	nameSeed,
 	preference,
 	enthrone,
 	vacate,
+	raise,
+	shortenLife,
 }

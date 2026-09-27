@@ -121,8 +121,24 @@ function peopleRows(state: HistoryState): JournalPeople {
 						: "district",
 			ward,
 		})),
+		deaths: log.deaths.map(({ person, death }) => ({
+			id: person,
+			deathTimeMs: death * yearMs,
+		})),
+		pregnancies: log.pregnancies.map(({ mother, father, time, outcome }) => ({
+			mother,
+			father,
+			timeMs: time * yearMs,
+			outcome,
+		})),
 	}
-	state.people.log = { persons: [], marriages: [], seats: [] }
+	state.people.log = {
+		persons: [],
+		marriages: [],
+		seats: [],
+		deaths: [],
+		pregnancies: [],
+	}
 	return rows
 }
 
@@ -197,6 +213,8 @@ function flush({
 		people.persons.length > 0 ||
 		people.marriages.length > 0 ||
 		people.seats.length > 0 ||
+		people.deaths.length > 0 ||
+		people.pregnancies.length > 0 ||
 		parents.length > 0 ||
 		relations.length > 0 ||
 		occupations.length > 0 ||

@@ -2,7 +2,11 @@ import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { PATRICIANS } from "@/model/history/sim/engine/events/people/patricians"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
-import type { PeopleEventParams } from "@/model/history/sim/engine/events/people/types"
+import type {
+	EndEarlyParams,
+	PeopleEventParams,
+} from "@/model/history/sim/engine/events/people/types"
+import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { FAMILY } from "@/model/history/sim/people/family"
@@ -14,6 +18,24 @@ function nextYear({ state }: PeopleEventParams): void {
 		0,
 		0,
 	)
+}
+
+// A death moved earlier: the person's reigns end and their regencies pass on
+// at the new date.
+function endEarly({ state, person }: EndEarlyParams): void {
+	const people = state.people
+	for (let seat = 0; seat < state.P; seat++) {
+		if (people.rulerOf[seat] !== person) continue
+		if (!STATE.isSovereign({ state, p: seat })) continue
+		state.leaderRuntime.end[seat] = Math.max(
+			state.time,
+			people.persons.death[person] * STATE.yearMs,
+		)
+		STATE.scheduleSuccession({ state, p: seat })
+	}
+	for (const [realm, regency] of people.regencies)
+		if (regency.regent === person)
+			REGENCY.scheduleRegentDeath({ state, realm, regent: person })
 }
 
 function init({ state, rng }: PeopleEventParams): void {
@@ -38,7 +60,7 @@ function runYear({ state, rng }: PeopleEventParams): void {
 			sovereigns.push(people.rulerOf[seat])
 	}
 	for (const heads of people.patricians.values()) rulers.push(...heads)
-	const weddings = FAMILY.runYear({
+	const { weddings, shortened } = FAMILY.runYear({
 		people,
 		time: state.time / STATE.yearMs,
 		rulers,
@@ -53,6 +75,7 @@ function runYear({ state, rng }: PeopleEventParams): void {
 			GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[realm]),
 		rng,
 	})
+	for (const person of shortened) endEarly({ state, person })
 	for (const wedding of weddings) {
 		ROYAL_MARRIAGES.allianceFromWedding({ state, wedding })
 		if (people.rulerOf[wedding.realmA] === wedding.a)

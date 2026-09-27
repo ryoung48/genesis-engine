@@ -58,6 +58,7 @@ function settle({ state, rng }: PatricianParams): void {
 					origin: STATE.originOf({ state, realm }),
 					time,
 					age: rng.uniform(25, 60),
+					rank: 0,
 					rng,
 				}),
 			)

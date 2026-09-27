@@ -2,19 +2,18 @@ import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { PEOPLE } from "@/model/history/sim/people"
 import type {
 	AdultParams,
-	BearParams,
-	ChildDynastyParams,
 	MarryParams,
 	MatchInParams,
 	MatchParams,
-	NewPersonParams,
 	OutsiderParams,
 	Seeker,
 } from "@/model/history/sim/people/family/types"
+import { FERTILITY } from "@/model/history/sim/people/fertility"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import type {
 	CrossWedding,
 	FoundHouseParams,
+	PeopleYear,
 	RunPeopleYearParams,
 	Sex,
 } from "@/model/history/sim/people/types"
@@ -26,85 +25,6 @@ const ROYAL_FOREIGN_CHANCE = 0.8
 const FOREIGN_MATCH_CHANCE = 0.3
 const ROYAL_WAIT_AGE = 25
 const MARRIED_FOUNDER_CHANCE = 0.85
-
-function fertility(age: number): number {
-	if (age < 16 || age >= 45) return 0
-	if (age < 20) return 0.3
-	if (age < 30) return 0.35
-	if (age < 35) return 0.28
-	if (age < 40) return 0.18
-	return 0.07
-}
-
-function newPerson({
-	people,
-	sex,
-	birth,
-	father,
-	mother,
-	dynasty,
-	origin,
-	rng,
-}: NewPersonParams): number {
-	return PEOPLE.add({
-		people,
-		sex,
-		birth,
-		death: LIFESPAN.deathAt({ sex, birth, from: birth, rng }),
-		father,
-		mother,
-		dynasty,
-		culture: origin.culture,
-		nameSeed: PEOPLE.nameSeed({
-			sex,
-			genderSystem: origin.genderSystem,
-			rng,
-		}),
-		realm: origin.realm,
-	})
-}
-
-function childDynasty({
-	people,
-	mother,
-	father,
-	origin,
-}: ChildDynastyParams): number {
-	const table = people.persons
-	const [first, second] =
-		origin.genderSystem === GENDER_SYSTEM.cultureGenderSystem.MATRIARCHAL
-			? [mother, father]
-			: [father, mother]
-	return table.dynasty[first] >= 0
-		? table.dynasty[first]
-		: table.dynasty[second]
-}
-
-function bear({
-	people,
-	mother,
-	father,
-	from,
-	until,
-	origin,
-	rng,
-}: BearParams): void {
-	const table = people.persons
-	for (let t = from; t < until; t++) {
-		if (table.death[mother] <= t || table.death[father] <= t) return
-		if (rng.random() >= fertility(t - table.birth[mother])) continue
-		newPerson({
-			people,
-			sex: rng.random() < 0.5 ? 0 : 1,
-			birth: t + rng.random() * Math.min(1, until - t),
-			father,
-			mother,
-			dynasty: childDynasty({ people, mother, father, origin }),
-			origin,
-			rng,
-		})
-	}
-}
 
 function marry({ people, a, b, time }: MarryParams): void {
 	const table = people.persons
@@ -136,7 +56,7 @@ function outsider({
 		sex === 1
 			? Math.max(15, partnerAge - rng.uniform(0, 8))
 			: partnerAge + rng.uniform(0, 8)
-	const spouse = newPerson({
+	const spouse = PEOPLE.spawn({
 		people,
 		sex,
 		birth: time - age,
@@ -147,7 +67,6 @@ function outsider({
 		rng,
 	})
 	table.death[spouse] = LIFESPAN.deathAt({
-		sex,
 		birth: time - age,
 		from: time,
 		rng,
@@ -157,7 +76,14 @@ function outsider({
 	return spouse
 }
 
-function found({ people, origin, time, age, rng }: FoundHouseParams): number {
+function found({
+	people,
+	origin,
+	time,
+	age,
+	rank,
+	rng,
+}: FoundHouseParams): number {
 	const table = people.persons
 	const dynasty = people.nextDynasty++
 	const birth = time - age
@@ -168,7 +94,7 @@ function found({ people, origin, time, age, rng }: FoundHouseParams): number {
 		}) === "female"
 			? 1
 			: 0
-	const father = newPerson({
+	const father = PEOPLE.spawn({
 		people,
 		sex: 0,
 		birth: birth - rng.uniform(20, 40),
@@ -182,7 +108,8 @@ function found({ people, origin, time, age, rng }: FoundHouseParams): number {
 		birth,
 		time - rng.uniform(0, Math.min(age, 30)),
 	)
-	const mother = newPerson({
+	PEOPLE.raise({ people, person: father, rank })
+	const mother = PEOPLE.spawn({
 		people,
 		sex: 1,
 		birth: birth - rng.uniform(17, 32),
@@ -193,13 +120,12 @@ function found({ people, origin, time, age, rng }: FoundHouseParams): number {
 		rng,
 	})
 	table.death[mother] = LIFESPAN.deathAt({
-		sex: 1,
 		birth: table.birth[mother],
 		from: birth,
 		rng,
 	})
 	marry({ people, a: father, b: mother, time: birth - 1 })
-	const founder = newPerson({
+	const founder = PEOPLE.spawn({
 		people,
 		sex,
 		birth,
@@ -209,16 +135,9 @@ function found({ people, origin, time, age, rng }: FoundHouseParams): number {
 		origin,
 		rng,
 	})
-	table.death[founder] = LIFESPAN.deathAt({ sex, birth, from: time, rng })
-	bear({
-		people,
-		mother,
-		father,
-		from: table.birth[mother] + 17,
-		until: time,
-		origin,
-		rng,
-	})
+	table.death[founder] = LIFESPAN.deathAt({ birth, from: time, rng })
+	PEOPLE.raise({ people, person: founder, rank })
+	FERTILITY.siblings({ people, child: founder, until: time, origin, rng })
 	if (age >= 18 && rng.random() < MARRIED_FOUNDER_CHANCE) {
 		const wedding = Math.min(time, birth + rng.uniform(16, 25))
 		const spouse = outsider({
@@ -229,12 +148,13 @@ function found({ people, origin, time, age, rng }: FoundHouseParams): number {
 			rng,
 		})
 		const [wife, husband] = sex === 1 ? [founder, spouse] : [spouse, founder]
-		bear({
+		FERTILITY.bear({
 			people,
 			mother: wife,
 			father: husband,
 			from: wedding,
 			until: time,
+			survives: wife === founder ? time : wedding,
 			origin,
 			rng,
 		})
@@ -327,7 +247,7 @@ function runYear({
 	royal,
 	sovereigns,
 	rng,
-}: RunPeopleYearParams): CrossWedding[] {
+}: RunPeopleYearParams): PeopleYear {
 	const table = people.persons
 	const crowned = new Set(sovereigns)
 	people.alive = people.alive.filter((person) => table.death[person] > time)
@@ -401,23 +321,28 @@ function runYear({
 		})
 	}
 
+	const shortened: number[] = []
 	for (const mother of [...people.alive]) {
 		if (table.sex[mother] !== 1) continue
 		const father = table.spouse[mother]
 		if (father < 0) continue
 		if (!line.has(mother) && !line.has(father)) continue
 		if (!PEOPLE.aliveAt({ people, person: mother, time })) continue
-		bear({
-			people,
-			mother,
-			father,
-			from: time,
-			until: time + 1,
-			origin: originOf(table.realm[mother]),
-			rng,
-		})
+		if (
+			FERTILITY.bear({
+				people,
+				mother,
+				father,
+				from: time,
+				until: time + 1,
+				survives: time,
+				origin: originOf(table.realm[mother]),
+				rng,
+			})
+		)
+			shortened.push(mother)
 	}
-	return weddings
+	return { weddings, shortened }
 }
 
 export const FAMILY = { found, runYear }

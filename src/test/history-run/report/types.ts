@@ -37,6 +37,25 @@ export interface CenturyReport {
 	raidSuccessShare: number
 	revenuePerHead: number
 	regency: RegencyReport
+	people: PeopleReport
+}
+
+export interface PeopleReport {
+	successions: number
+	// Children ever born to sovereign rulers who died in the window.
+	birthsPerRuler: number
+	// Share of those rulers with no child alive at their death.
+	childlessShare: number
+	newHouseShare: number
+	minorShare: number
+	childbirthDeaths: number
+	twinBirths: number
+	alive: number
+	msPerYear: number
+}
+
+export interface PeopleReportParams extends WindowParams {
+	peopleMs: number
 }
 
 export interface RegencyReport {

@@ -1,5 +1,8 @@
 import type { HistoryState } from "@/model/history/record/types"
-import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
+import type {
+	JournalDeath,
+	JournalTransaction,
+} from "@/model/history/sim/engine/journal/types"
 import type { LanguageNames } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
@@ -101,6 +104,11 @@ export interface AppendNoteParams {
 export interface RoyalMarriage {
 	firstId: number
 	secondId: number
+}
+
+export interface RulerDeathParams {
+	translator: ProceduralTranslator
+	death: JournalDeath
 }
 
 export interface PersonNameParams {

@@ -20,6 +20,7 @@ import type {
 	RebelNoteReasons,
 	RebelWar,
 	RebelWarOfParams,
+	RulerDeathParams,
 	ScanRebelNotesParams,
 	UpdateTiesParams,
 } from "@/model/history/sim/record/translator/types"
@@ -83,6 +84,27 @@ function personName({ translator, person }: PersonNameParams): string | null {
 // Registers and retires rebel wars from this transaction's notes before any
 // ownership is derived, and collects the reason text the record attaches to
 // each revolt and each rebel-war outcome.
+// A reigning ruler whose death moved earlier: the reign's last ruler entry
+// carries the new death date.
+function moveRulerDeath({ translator, death }: RulerDeathParams): void {
+	const { record } = translator.state
+	for (const index of record.people?.tenuresOf.get(death.id) ?? []) {
+		const tenure = record.people?.tenures[index]
+		if (!tenure || tenure.kind !== "ruler" || tenure.endTimeMs !== Infinity)
+			continue
+		const nationId = translator.identityByRoot.get(tenure.seat)
+		if (nationId === undefined) continue
+		const entry = record.events.nationEvents[nationId]?.events.findLast(
+			(event) =>
+				event.kind === "rulerChange" && event.payload.person === death.id,
+		)
+		if (entry)
+			entry.payload.deathDate = DATE.timeMsToEu4Date(
+				recordTime(death.deathTimeMs),
+			)
+	}
+}
+
 function scanRebelNotes({
 	translator,
 	transaction,
@@ -723,6 +745,8 @@ function applyTransaction({
 						: null,
 			}),
 		})
+	for (const death of transaction.people.deaths)
+		moveRulerDeath({ translator, death })
 	const count = translator.parent.length
 	const affected = new Set<number>()
 	const pairs = new Set<number>()

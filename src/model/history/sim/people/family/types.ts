@@ -1,19 +1,5 @@
-import type {
-	PeopleState,
-	RealmOrigin,
-	Sex,
-} from "@/model/history/sim/people/types"
+import type { PeopleState, RealmOrigin } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
-
-export interface BearParams {
-	people: PeopleState
-	mother: number
-	father: number
-	from: number
-	until: number
-	origin: RealmOrigin
-	rng: SharedRng
-}
 
 export interface MarryParams {
 	people: PeopleState
@@ -26,24 +12,6 @@ export interface OutsiderParams {
 	people: PeopleState
 	partner: number
 	time: number
-	origin: RealmOrigin
-	rng: SharedRng
-}
-
-export interface ChildDynastyParams {
-	people: PeopleState
-	mother: number
-	father: number
-	origin: RealmOrigin
-}
-
-export interface NewPersonParams {
-	people: PeopleState
-	sex: Sex
-	birth: number
-	father: number
-	mother: number
-	dynasty: number
 	origin: RealmOrigin
 	rng: SharedRng
 }

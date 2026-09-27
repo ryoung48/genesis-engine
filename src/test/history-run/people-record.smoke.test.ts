@@ -1,4 +1,5 @@
 import { expect, it } from "vitest"
+import { DATE } from "@/model/history/earth/date"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
@@ -22,12 +23,26 @@ it("records rulers, their families and seat tenures consistently", () => {
 	})
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
-	SIM_ENGINE.simulateUntil({
-		state: engine,
-		targetTimeMs: engine.time + STATE.deltaYear(30),
-		rng,
-		validate: false,
-	})
+	const start = engine.time
+	for (let year = 1; year <= 30; year++) {
+		SIM_ENGINE.simulateUntil({
+			state: engine,
+			targetTimeMs: start + STATE.deltaYear(year),
+			rng,
+			validate: false,
+		})
+		for (let seat = 0; seat < engine.P; seat++) {
+			const ruler = engine.people.rulerOf[seat]
+			if (ruler < 0 || !STATE.isSovereign({ state: engine, p: seat })) continue
+			expect(
+				PEOPLE.aliveAt({
+					people: engine.people,
+					person: ruler,
+					time: engine.time / STATE.yearMs,
+				}),
+			).toBe(true)
+		}
+	}
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
 	const people = state.record.people
 	expect(people).not.toBeNull()
@@ -99,6 +114,31 @@ it("records rulers, their families and seat tenures consistently", () => {
 		expect(claim.generation).toBeLessThan(2)
 		expect(people.persons.has(claim.claimant)).toBe(true)
 	}
+
+	const offsetMs = DATE.earthHistoryStartYear * STATE.yearMs
+	for (const [id, person] of people.persons)
+		expect(
+			Math.abs(person.deathTimeMs + offsetMs - table.death[id] * STATE.yearMs),
+		).toBeLessThan(1)
+
+	for (const note of engine.events)
+		if (note.tag === "succession")
+			expect(
+				Math.abs(
+					note.time - table.death[note.data.dying as number] * STATE.yearMs,
+				),
+			).toBeLessThan(1)
+
+	const timelineKinds = new Set<string>()
+	for (const mother of people.pregnanciesOf.keys())
+		for (const event of PERSON_QUERY.timeline({
+			people,
+			id: mother,
+			timeMs: state.record.maxTimeMs,
+		}))
+			timelineKinds.add(event.kind)
+	for (const kind of ["miscarriage", "stillborn child", "died in childbirth"])
+		expect(timelineKinds.has(kind)).toBe(true)
 
 	const timeMs = state.record.maxTimeMs
 	for (let seat = 0; seat < engine.P; seat++) {

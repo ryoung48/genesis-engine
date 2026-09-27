@@ -1,5 +1,6 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
+import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -10,6 +11,8 @@ import type {
 	CenturyReport,
 	EngineParams,
 	HistoryReportOptions,
+	PeopleReport,
+	PeopleReportParams,
 	RegencyReport,
 	RegencyReportParams,
 	ReportEnvParams,
@@ -152,6 +155,72 @@ function regencyReport({
 	return report
 }
 
+function peopleReport({
+	engine,
+	from,
+	to,
+	peopleMs,
+}: PeopleReportParams): PeopleReport {
+	const table = engine.people.persons
+	const events = eventsIn({ engine, from, to })
+	const minors = new Set(
+		events
+			.filter((note) => note.tag === "regency started")
+			.map((note) => `${note.data.nation}:${note.data.leader}`),
+	)
+	const successions = events.filter((note) => note.tag === "succession")
+	let births = 0
+	let childless = 0
+	let newHouse = 0
+	let minor = 0
+	for (const note of successions) {
+		const dying = note.data.dying as number
+		const time = note.time / STATE.yearMs
+		births += table.children[dying].length
+		if (
+			!table.children[dying].some(
+				(child) => table.birth[child] <= time && table.death[child] > time,
+			)
+		)
+			childless++
+		if (note.data.claim === 0) newHouse++
+		if (minors.has(`${note.data.nation}:${note.data.successor}`)) minor++
+	}
+	let childbirthDeaths = 0
+	for (const transaction of engine.journal)
+		for (const row of transaction.people.pregnancies)
+			if (
+				row.outcome === "childbirth death" &&
+				row.timeMs >= from * STATE.yearMs &&
+				row.timeMs < to * STATE.yearMs
+			)
+				childbirthDeaths++
+	let twinBirths = 0
+	for (let person = 0; person < table.birth.length; person++) {
+		const mother = table.mother[person]
+		if (mother < 0 || table.birth[person] < from || table.birth[person] >= to)
+			continue
+		if (
+			table.children[mother].some(
+				(child) => child < person && table.birth[child] === table.birth[person],
+			)
+		)
+			twinBirths++
+	}
+	const count = Math.max(1, successions.length)
+	return {
+		successions: successions.length,
+		birthsPerRuler: births / count,
+		childlessShare: childless / count,
+		newHouseShare: newHouse / count,
+		minorShare: minor / count,
+		childbirthDeaths,
+		twinBirths,
+		alive: engine.people.alive.length,
+		msPerYear: peopleMs / Math.max(1, to - from),
+	}
+}
+
 function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	const { engine } = HISTORY_RUN.createEngine({
 		seed,
@@ -165,6 +234,13 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	let startSovereigns = sovereigns({ engine }).length
 	let atWarYears = 0
 	let sampledYears = 0
+	let peopleMs = 0
+	const runPeopleYear = PEOPLE_EVENTS.runYear
+	PEOPLE_EVENTS.runYear = (params) => {
+		const t0 = performance.now()
+		runPeopleYear(params)
+		peopleMs += performance.now() - t0
+	}
 	for (let year = start + 1; year <= start + options.years; year++) {
 		SIM_ENGINE.simulateUntil({
 			state: engine,
@@ -213,12 +289,15 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 				Math.max(1, raids.length),
 			revenuePerHead: revenue / Math.max(1, pop),
 			regency: regencyReport({ engine, from, to: year, top: topSet }),
+			people: peopleReport({ engine, from, to: year, peopleMs }),
 		})
 		from = year
 		startSovereigns = endSovereigns.length
 		atWarYears = 0
 		sampledYears = 0
+		peopleMs = 0
 	}
+	PEOPLE_EVENTS.runYear = runPeopleYear
 	return reports
 }
 
@@ -241,6 +320,13 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		for (const { from, to, regency: g } of reports)
 			options.log(
 				`${`${from}-${to}`.padEnd(11)} ${String(g.regencies).padStart(9)} ${`${(100 * g.councilShare).toFixed(0)}%`.padStart(8)} ${`${g.usurpationsByUncle}/${g.usurpationsByProtector}`.padStart(17)} ${`${(100 * g.largestRebellionRegencyShare).toFixed(0)}%`.padStart(24)} ${`${(100 * g.preSuccessionRebellionShare).toFixed(0)}%`.padStart(17)} ${`${g.restorationAttempts}/${g.restorationBacked}/${g.restorationRevolts}`.padStart(26)} ${String(g.claimsLapsed).padStart(7)}`,
+			)
+		options.log(
+			"period      successions  births/ruler  childless  new house  minor  childbirth deaths  twins  alive  people ms/yr",
+		)
+		for (const { from, to, people: h } of reports)
+			options.log(
+				`${`${from}-${to}`.padEnd(11)} ${String(h.successions).padStart(11)} ${h.birthsPerRuler.toFixed(2).padStart(13)} ${`${(100 * h.childlessShare).toFixed(1)}%`.padStart(10)} ${`${(100 * h.newHouseShare).toFixed(1)}%`.padStart(10)} ${`${(100 * h.minorShare).toFixed(1)}%`.padStart(6)} ${String(h.childbirthDeaths).padStart(18)} ${String(h.twinBirths).padStart(6)} ${String(h.alive).padStart(6)} ${h.msPerYear.toFixed(1).padStart(13)}`,
 			)
 	}
 	return results

@@ -236,6 +236,22 @@ export function usePersonWikiData(
 					description: `${person.name} died aged ${ageAt(person, event.timeMs)}.`,
 					people: selfMentions,
 				})
+			} else if (
+				event.kind === "miscarriage" ||
+				event.kind === "stillborn child" ||
+				event.kind === "died in childbirth"
+			) {
+				pushTimelineEvent(timelineEvents, {
+					...base,
+					type: "Family",
+					description:
+						event.kind === "miscarriage"
+							? `${person.name} suffered a miscarriage.`
+							: event.kind === "stillborn child"
+								? `${person.name} gave birth to a stillborn child.`
+								: `${person.name} died in childbirth aged ${ageAt(person, event.timeMs)}.`,
+					people: selfMentions,
+				})
 			} else if (event.kind === "married" || event.kind === "child born") {
 				const other = mention(event.other)
 				if (!other) continue

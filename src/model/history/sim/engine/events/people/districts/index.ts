@@ -79,6 +79,7 @@ function newHolder({ state, seat, relativeFirst, rng }: HolderParams): number {
 		origin: { ...origin, realm: sovereign },
 		time: now(state),
 		age: rng.uniform(18, 55),
+		rank: state.seatRank[seat],
 		rng,
 	})
 }
@@ -90,6 +91,7 @@ function install({ state, seat, person }: InstallDistrictParams): void {
 		person,
 		seat,
 		realm: state.sovereignCurrent[seat],
+		rank: state.seatRank[seat],
 	})
 }
 

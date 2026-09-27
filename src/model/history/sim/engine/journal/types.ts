@@ -3,7 +3,10 @@ import type {
 	EngineNote,
 	HistoryState,
 } from "@/model/history/sim/engine/state/types"
-import type { RegentKind } from "@/model/history/sim/people/types"
+import type {
+	PregnancyLoss,
+	RegentKind,
+} from "@/model/history/sim/people/types"
 
 interface JournalProvinceChange {
 	province: number
@@ -68,10 +71,25 @@ export interface JournalSeat {
 	ward: number
 }
 
+export interface JournalPregnancy {
+	mother: number
+	father: number
+	timeMs: number
+	outcome: PregnancyLoss
+}
+
+// A recorded person whose death moved earlier.
+export interface JournalDeath {
+	id: number
+	deathTimeMs: number
+}
+
 export interface JournalPeople {
 	persons: JournalPerson[]
 	marriages: JournalMarriage[]
 	seats: JournalSeat[]
+	deaths: JournalDeath[]
+	pregnancies: JournalPregnancy[]
 }
 
 export interface JournalTransaction {

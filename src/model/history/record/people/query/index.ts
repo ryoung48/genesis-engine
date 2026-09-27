@@ -108,10 +108,25 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 			other: regency.person,
 			tenure: index,
 		})
+	let childbirth = false
+	for (const pregnancy of params.people.pregnanciesOf.get(params.id) ?? []) {
+		if (pregnancy.timeMs > params.timeMs) continue
+		if (pregnancy.outcome === "childbirth death") {
+			childbirth = true
+			continue
+		}
+		events.push({
+			timeMs: pregnancy.timeMs,
+			kind:
+				pregnancy.outcome === "miscarriage" ? "miscarriage" : "stillborn child",
+			other: pregnancy.father,
+			tenure: -1,
+		})
+	}
 	if (person.deathTimeMs !== null)
 		events.push({
 			timeMs: person.deathTimeMs,
-			kind: "died",
+			kind: childbirth ? "died in childbirth" : "died",
 			other: -1,
 			tenure: -1,
 		})

@@ -97,18 +97,24 @@ function bindsTo({ state, realm, other }: BindsToParams): boolean {
 	)
 }
 
-// Records the regent and schedules their replacement at their death.
+// Schedules the regent's replacement at their death.
+function scheduleRegentDeath({ state, realm, regent }: RegentDiedParams): void {
+	state.heap.enqueue(
+		// A millisecond past the death, so the regent reads as dead when the
+		// order is re-run and cannot be chosen again.
+		Math.ceil(state.people.persons.death[regent] * STATE.yearMs) + 1,
+		EVENT_HEAP.evt.REGENT_DEATH,
+		realm,
+		regent,
+	)
+}
+
 function appoint({ state, realm, ward, choice }: AppointParams): void {
 	const people = state.people
 	people.regencies.set(realm, { ward, ...choice })
 	PEOPLE.setRegent({ people, seat: realm, person: choice.regent, ward })
 	if (choice.regent >= 0)
-		state.heap.enqueue(
-			people.persons.death[choice.regent] * STATE.yearMs,
-			EVENT_HEAP.evt.REGENT_DEATH,
-			realm,
-			choice.regent,
-		)
+		scheduleRegentDeath({ state, realm, regent: choice.regent })
 }
 
 function begin({ state, realm, choice }: BeginParams): void {
@@ -215,5 +221,6 @@ export const REGENCY = {
 	end,
 	comeOfAge,
 	regentDied,
+	scheduleRegentDeath,
 	review,
 }

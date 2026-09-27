@@ -22,6 +22,12 @@ export interface PersonTable {
 	// Realm at birth; names are drawn from its culture.
 	home: number[]
 	recorded: boolean[]
+	// Base fertility, 0.5 to 0.6.
+	fertility: number[]
+	// Highest seat standing ever held; 0 for none.
+	peak: number[]
+	// Earliest next conception: the last pregnancy's end plus a rest.
+	nextBirth: number[]
 }
 
 export interface PeopleLogMarriage {
@@ -55,12 +61,31 @@ export interface DeposedClaim {
 	tried: boolean
 }
 
+export type PregnancyLoss = "miscarriage" | "stillbirth" | "childbirth death"
+
+export interface PeopleLogPregnancy {
+	mother: number
+	father: number
+	// When the pregnancy ended.
+	time: number
+	outcome: PregnancyLoss
+}
+
+export interface PeopleLogDeath {
+	person: number
+	death: number
+}
+
 // Rows the journal has not yet taken: newly recorded people, marriages
-// between recorded people, and seat holder changes.
+// between recorded people, seat holder changes, recorded people whose death
+// moved earlier, and recorded mothers' pregnancies that bore no living child
+// or killed the mother.
 export interface PeopleLog {
 	persons: number[]
 	marriages: PeopleLogMarriage[]
 	seats: PeopleLogSeat[]
+	deaths: PeopleLogDeath[]
+	pregnancies: PeopleLogPregnancy[]
 }
 
 export interface PeopleState {
@@ -93,6 +118,18 @@ export interface AddPersonParams {
 	culture: number
 	nameSeed: number
 	realm: number
+	fertility: number
+}
+
+export interface SpawnParams {
+	people: PeopleState
+	sex: Sex
+	birth: number
+	father: number
+	mother: number
+	dynasty: number
+	origin: RealmOrigin
+	rng: SharedRng
 }
 
 export interface PersonAtParams {
@@ -117,6 +154,8 @@ export interface FoundHouseParams {
 	origin: RealmOrigin
 	time: number
 	age: number
+	// Tier of the seat the house is founded for; sets its family size.
+	rank: number
 	rng: SharedRng
 }
 
@@ -125,12 +164,27 @@ export interface ThroneParams {
 	person: number
 	seat: number
 	realm: number
+	// The seat's title tier (`seatRank`).
+	rank: number
 }
 
 export interface SetRulerParams {
 	people: PeopleState
 	seat: number
 	person: number
+	rank: number
+}
+
+export interface RaiseParams {
+	people: PeopleState
+	person: number
+	rank: number
+}
+
+export interface ShortenLifeParams {
+	people: PeopleState
+	person: number
+	time: number
 }
 
 export interface SetRegentParams {
@@ -156,6 +210,12 @@ export interface RunPeopleYearParams {
 	royal: (realm: number) => boolean
 	sovereigns: number[]
 	rng: SharedRng
+}
+
+export interface PeopleYear {
+	weddings: CrossWedding[]
+	// People whose death date moved earlier this year.
+	shortened: number[]
 }
 
 export interface MarriageAlliance {

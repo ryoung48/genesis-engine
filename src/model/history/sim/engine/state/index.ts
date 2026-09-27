@@ -939,12 +939,18 @@ function installRuler({ state, p, person, claim }: InstallRulerParams): void {
 	let merge = -1
 	if (other >= 0 && other !== p && isSovereign({ state, p: other })) {
 		const link = unite({ state, a: p, b: other, ruler: person, shared: true })
-		PEOPLE.setRuler({ people, seat: p, person })
+		PEOPLE.setRuler({ people, seat: p, person, rank: state.seatRank[p] })
 		table.throne[person] = link.senior
 		table.realm[person] = link.senior
 		if (link.merge) merge = link.junior
 	} else {
-		PEOPLE.enthrone({ people, person, seat: p, realm: p })
+		PEOPLE.enthrone({
+			people,
+			person,
+			seat: p,
+			realm: p,
+			rank: state.seatRank[p],
+		})
 		uniteCouple({ state, p, person })
 	}
 	state.leaderRuntime.idx[p]++
@@ -967,6 +973,7 @@ function foundRuler({ state, p, age, claim, rng }: FoundRulerParams): void {
 		origin: originOf({ state, realm: p }),
 		time: state.time / yearMs,
 		age,
+		rank: state.seatRank[p],
 		rng,
 	})
 	installRuler({ state, p, person, claim })

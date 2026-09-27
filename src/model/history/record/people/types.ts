@@ -3,6 +3,7 @@ import type {
 	JournalPerson,
 	SeatKind,
 } from "@/model/history/sim/engine/journal/types"
+import type { PregnancyLoss } from "@/model/history/sim/people/types"
 
 export interface RecordPerson {
 	id: number
@@ -36,6 +37,12 @@ export interface RecordMarriage {
 	startTimeMs: number
 }
 
+export interface RecordPregnancy {
+	father: number
+	timeMs: number
+	outcome: PregnancyLoss
+}
+
 export interface RecordTenure {
 	person: number
 	seat: number
@@ -59,6 +66,8 @@ export interface PeopleRecord {
 	regentsOfWard: Map<number, number[]>
 	// Home realm of each house's first recorded member; house names use it.
 	dynastyHome: Map<number, number>
+	// Pregnancies that bore no living child or killed the mother, by mother.
+	pregnanciesOf: Map<number, RecordPregnancy[]>
 }
 
 export interface AppendPeopleParams {
@@ -69,8 +78,8 @@ export interface AppendPeopleParams {
 	describe: (params: DescribePersonParams) => PersonNames
 }
 
-export interface PushIndexParams {
-	index: Map<number, number[]>
+export interface PushIndexParams<T> {
+	index: Map<number, T[]>
 	key: number
-	value: number
+	value: T
 }
