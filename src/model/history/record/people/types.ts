@@ -1,6 +1,7 @@
 import type {
 	JournalPeople,
 	JournalPerson,
+	SeatKind,
 } from "@/model/history/sim/engine/journal/types"
 
 export interface RecordPerson {
@@ -38,7 +39,9 @@ export interface RecordMarriage {
 export interface RecordTenure {
 	person: number
 	seat: number
-	sovereign: boolean
+	kind: SeatKind
+	// The child a regent governs for; -1 for other kinds.
+	ward: number
 	startTimeMs: number
 	endTimeMs: number
 }
@@ -50,7 +53,10 @@ export interface PeopleRecord {
 	marriagesOf: Map<number, number[]>
 	tenures: RecordTenure[]
 	tenuresOf: Map<number, number[]>
+	// Ruler and district tenures of each seat; regents are kept apart.
 	tenuresOfSeat: Map<number, number[]>
+	regentsOfSeat: Map<number, number[]>
+	regentsOfWard: Map<number, number[]>
 	// Home realm of each house's first recorded member; house names use it.
 	dynastyHome: Map<number, number>
 }

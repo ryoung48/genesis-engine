@@ -139,13 +139,7 @@ export function formatRulerStatLabel(
 		selectedTimeMs,
 	)
 	if (ageLabel) parts.push(ageLabel)
-	if (
-		payload?.regent === true ||
-		/^(regency council|interregnum)$/i.test(rulerName.trim())
-	) {
-		if (payload?.regent === true) parts.push("Regent")
-		return parts.join(" · ")
-	}
+	if (/^interregnum$/i.test(rulerName.trim())) return parts.join(" · ")
 	parts.push(payload?.female === true ? "♀" : "♂")
 	return parts.join(" · ")
 }

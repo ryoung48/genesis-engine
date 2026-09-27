@@ -7,6 +7,7 @@ import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
+import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
@@ -226,22 +227,25 @@ function processEventsUntil({
 				break
 			case EVENT_HEAP.evt.PEOPLE_YEAR:
 				PEOPLE_EVENTS.runYear({ state, rng })
+				SUCCESSION.runYear({ state, rng })
 				break
 			case EVENT_HEAP.evt.DIPLOMACY:
 				DIPLOMACY.runDiplomacy({ state, nation: dataBuf[0], rng })
 				break
-			case EVENT_HEAP.evt.REGENCY: {
-				const province = dataBuf[0]
-				const leader = dataBuf[1]
-				if (state.leaderRuntime.idx[province] === leader) {
-					state.events.push({
-						tag: "regency ended",
-						time: state.time,
-						data: { nation: province, leader },
-					})
-				}
+			case EVENT_HEAP.evt.REGENT_DEATH:
+				REGENCY.regentDied({
+					state,
+					realm: dataBuf[0],
+					regent: dataBuf[1],
+				})
 				break
-			}
+			case EVENT_HEAP.evt.REGENCY:
+				REGENCY.comeOfAge({
+					state,
+					realm: dataBuf[0],
+					leader: dataBuf[1],
+				})
+				break
 		}
 		JOURNAL.flush({
 			state,

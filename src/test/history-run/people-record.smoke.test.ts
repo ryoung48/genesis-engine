@@ -39,7 +39,10 @@ it("records rulers, their families and seat tenures consistently", () => {
 			expect(people.persons.has(event.payload.person as number)).toBe(true)
 		}
 
-	for (const tenures of people.tenuresOfSeat.values())
+	for (const tenures of [
+		...people.tenuresOfSeat.values(),
+		...people.regentsOfSeat.values(),
+	])
 		for (let i = 1; i < tenures.length; i++) {
 			const previous = people.tenures[tenures[i - 1]]
 			const next = people.tenures[tenures[i]]
@@ -75,6 +78,26 @@ it("records rulers, their families and seat tenures consistently", () => {
 					time: engine.time / STATE.yearMs,
 				}),
 		).toBe(true)
+	}
+
+	const years = engine.time / STATE.yearMs
+	const table = engine.people.persons
+	for (let seat = 0; seat < engine.P; seat++) {
+		const holder = engine.people.rulerOf[seat]
+		if (holder < 0 || STATE.isSovereign({ state: engine, p: seat })) continue
+		if (table.throne[holder] !== seat) continue
+		expect(years - table.birth[holder]).toBeGreaterThanOrEqual(16)
+	}
+	for (const [realm, regency] of engine.people.regencies)
+		if (regency.regent >= 0) {
+			expect(people.persons.has(regency.regent)).toBe(true)
+			expect(years - table.birth[regency.regent]).toBeGreaterThanOrEqual(16)
+			if (engine.people.rulerOf[realm] === regency.ward)
+				expect(table.death[regency.regent]).toBeGreaterThan(years)
+		}
+	for (const claim of engine.people.deposed.values()) {
+		expect(claim.generation).toBeLessThan(2)
+		expect(people.persons.has(claim.claimant)).toBe(true)
 	}
 
 	const timeMs = state.record.maxTimeMs

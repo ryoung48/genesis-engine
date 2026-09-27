@@ -49,6 +49,7 @@ import type {
 	ReleaseSubjectRelationsParams,
 	RepartitionNationParams,
 	ResolveWarParams,
+	ScheduleSuccessionParams,
 	StartWarParams,
 	UnionLink,
 	UnionPairParams,
@@ -176,6 +177,11 @@ function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
 	)
 		installRuler({ state, p, person: vassal, claim: FOUNDER_CLAIM })
 	else foundRuler({ state, p, age: rulerAge(rng), claim: FOUNDER_CLAIM, rng })
+	scheduleSuccession({ state, p })
+}
+
+// Schedules the ruler's succession at their death.
+function scheduleSuccession({ state, p }: ScheduleSuccessionParams): void {
 	state.heap.enqueue(
 		state.leaderRuntime.end[p],
 		EVENT_HEAP.evt.SUCCESSION,
@@ -995,6 +1001,7 @@ export const STATE = {
 	createHistoryState,
 	originOf,
 	installRuler,
+	scheduleSuccession,
 	canUnite,
 	uniteCouple,
 	foundRuler,

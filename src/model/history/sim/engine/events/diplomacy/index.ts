@@ -14,6 +14,7 @@ import type {
 	SeedNeighborRelationsParams,
 	SyncVassalRelationsParams,
 } from "@/model/history/sim/engine/events/diplomacy/types"
+import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
@@ -153,7 +154,8 @@ function processVassalDiplomacy({
 }
 
 // An alliance holds while the two ruling families stay joined by a living
-// marriage.
+// marriage, or while one realm's regent parent was born into the other's
+// ruling house.
 function marriageBound({ state, a, b }: MarriageBoundParams): boolean {
 	const people = state.people
 	const rulerA = people.rulerOf[a]
@@ -163,12 +165,14 @@ function marriageBound({ state, a, b }: MarriageBoundParams): boolean {
 		rulerB >= 0 &&
 		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[a]) &&
 		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[b]) &&
-		PEOPLE.tiedByMarriage({
+		(PEOPLE.tiedByMarriage({
 			people,
 			a: rulerA,
 			b: rulerB,
 			time: state.time / STATE.yearMs,
-		})
+		}) ||
+			REGENCY.bindsTo({ state, realm: a, other: b }) ||
+			REGENCY.bindsTo({ state, realm: b, other: a }))
 	)
 }
 

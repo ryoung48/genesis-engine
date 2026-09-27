@@ -1,6 +1,7 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import type {
 	GetDefenderOccupationCandidatesParams,
 	InitWarParams,
@@ -375,8 +376,8 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 	const sovereignNation = STATE.getSovereign({ state, p: nation })
 	const rulerRelation = STATE.getRulerRelation({ state, nation })
 
-	// Only independent nations can act
-	if (parent < 0 && !rulerRelation) {
+	// Only independent nations with a strong crown start wars
+	if (parent < 0 && !rulerRelation && !REGENCY.weak({ state, realm: nation })) {
 		const viable = listWarTargets({ state, nation }).filter(
 			(t) => t.threshold > 0 && t.w < t.threshold && !t.hasWar,
 		)
@@ -406,7 +407,9 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 				state,
 				overlord: sovereignNation,
 				subject: nation,
-				laxity: 0,
+				laxity: REGENCY.weak({ state, realm: sovereignNation })
+					? REGENCY.laxity
+					: 0,
 				succession: false,
 				rng,
 			})

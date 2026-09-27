@@ -72,6 +72,21 @@ export interface ContestParams {
 	rng: SharedRng
 }
 
+export interface ChallengeParams {
+	state: HistoryState
+	realm: number
+	incumbent: number
+	claimant: number
+	rng: SharedRng
+}
+
+export interface ContestResult {
+	// The claimant won the pretender share of the districts.
+	backed: boolean
+	// District seat that rises for the claimant, or -1.
+	seat: number
+}
+
 export interface TallyResult {
 	votes: number[]
 	// Index of the candidate each elector backed, in elector order.

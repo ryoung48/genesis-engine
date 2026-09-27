@@ -97,9 +97,11 @@ function scanRebelNotes({
 			const cause =
 				note.tag === "province released"
 					? "disconnected"
-					: note.data.succession
-						? "succession"
-						: "threat"
+					: note.data.restoration
+						? "restoration"
+						: note.data.succession
+							? "succession"
+							: "threat"
 			const pretender = personName({
 				translator,
 				person: (note.data.pretender as number | undefined) ?? -1,
@@ -585,6 +587,21 @@ function appendNote({
 			secondId: marriage.secondId,
 			subjectType: null,
 		})
+	} else if (REGENCY_EVENTS[note.tag]) {
+		const nationId = translator.identityByRoot.get(data.nation as number)
+		if (nationId === undefined) return
+		if (note.tag === "regency ended" && data.cause !== "age") return
+		record.events.nationEvents[nationId]?.events.push({
+			timeMs,
+			kind: "regency",
+			payload: {
+				event: REGENCY_EVENTS[note.tag],
+				ward: data.ward as number,
+				regent: data.regent as number,
+				regentKind: data.kind as string,
+			},
+			comment: null,
+		})
 	} else if (note.tag === "capital moved") {
 		record.events.titleEvents.push({
 			timeMs,
@@ -595,6 +612,16 @@ function appendNote({
 			cause: data.cause as string,
 		})
 	}
+}
+
+// Engine notes that reach a nation's timeline as regency rows. Only a
+// regency that ends with the child coming of age gets an end row: the
+// other endings already show as a succession, a usurpation or a loss.
+const REGENCY_EVENTS: Record<string, string> = {
+	"regency started": "started",
+	"regency ended": "ended",
+	"regent changed": "changed",
+	usurpation: "usurpation",
 }
 
 function createTranslator({
@@ -852,11 +879,14 @@ function applyTransaction({
 			province: person?.home ?? ruler.root,
 			nameSeed: ruler.nameSeed,
 		})
+		const previous = log.events.findLast(
+			(event) => event.kind === "rulerChange",
+		)
 		log.events.push({
 			timeMs,
 			kind: "rulerChange",
 			payload: {
-				name: ruler.regent ? "Regency Council" : named.name,
+				name: named.name,
 				dynasty:
 					ruler.dynasty >= 0
 						? translator.names.dynasty({
@@ -868,8 +898,11 @@ function applyTransaction({
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
 				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
 				female: named.female,
-				regent: ruler.regent,
 				person: ruler.person,
+				newRuler: previous?.payload.person !== ruler.person,
+				regency: ruler.regency,
+				regent: ruler.regent,
+				regentName: personName({ translator, person: ruler.regent }),
 			},
 			comment: null,
 		})

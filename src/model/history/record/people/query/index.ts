@@ -1,13 +1,14 @@
 import type {
 	PersonAtParams,
 	PersonEvent,
-	PersonHealth,
 	PersonView,
 	SeatAtParams,
 	SpouseView,
 	TenureView,
 } from "@/model/history/record/people/query/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
+import { HEALTH } from "@/model/history/sim/people/health"
+import type { HealthBand } from "@/model/history/sim/people/health/types"
 
 function until(time: number, timeMs: number): number | null {
 	return time <= timeMs ? time : null
@@ -30,17 +31,21 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 			endTimeMs: until(Math.min(person.deathTimeMs, partnerDeath), timeMs),
 		})
 	}
-	const tenures: TenureView[] = []
-	for (const index of people.tenuresOf.get(id) ?? []) {
-		const tenure = people.tenures[index]
-		if (tenure.startTimeMs > timeMs) continue
-		tenures.push({
-			seat: tenure.seat,
-			sovereign: tenure.sovereign,
-			startTimeMs: tenure.startTimeMs,
-			endTimeMs: until(tenure.endTimeMs, timeMs),
+	const tenureViews = (indices: number[]) =>
+		indices.flatMap((index): TenureView[] => {
+			const tenure = people.tenures[index]
+			if (tenure.startTimeMs > timeMs) return []
+			return [
+				{
+					seat: tenure.seat,
+					kind: tenure.kind,
+					ward: tenure.ward,
+					startTimeMs: tenure.startTimeMs,
+					endTimeMs: until(tenure.endTimeMs, timeMs),
+					person: tenure.person,
+				},
+			]
 		})
-	}
 	return {
 		...person,
 		father: people.persons.has(person.father) ? person.father : -1,
@@ -55,7 +60,8 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 				),
 			),
 		].filter((sibling) => sibling !== id && bornBy(sibling)),
-		tenures,
+		tenures: tenureViews(people.tenuresOf.get(id) ?? []),
+		regents: tenureViews(people.regentsOfWard.get(id) ?? []),
 	}
 }
 
@@ -63,50 +69,64 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 	const person = view(params)
 	if (!person) return []
 	const events: PersonEvent[] = [
-		{ timeMs: person.birthTimeMs, kind: "born", other: -1 },
+		{ timeMs: person.birthTimeMs, kind: "born", other: -1, tenure: -1 },
 	]
 	for (const spouse of person.spouses)
 		events.push({
 			timeMs: spouse.startTimeMs,
 			kind: "married",
 			other: spouse.person,
+			tenure: -1,
 		})
 	for (const child of person.children)
 		events.push({
 			timeMs: params.people.persons.get(child)?.birthTimeMs ?? 0,
 			kind: "child born",
 			other: child,
+			tenure: -1,
 		})
-	for (const tenure of person.tenures) {
+	for (const [index, tenure] of person.tenures.entries()) {
+		const regent = tenure.kind === "regent"
 		events.push({
 			timeMs: tenure.startTimeMs,
-			kind: "took seat",
+			kind: regent ? "became regent" : "took seat",
 			other: tenure.seat,
+			tenure: index,
 		})
 		if (tenure.endTimeMs !== null && tenure.endTimeMs !== person.deathTimeMs)
 			events.push({
 				timeMs: tenure.endTimeMs,
-				kind: "left seat",
+				kind: regent ? "left regency" : "left seat",
 				other: tenure.seat,
+				tenure: index,
 			})
 	}
+	for (const [index, regency] of person.regents.entries())
+		events.push({
+			timeMs: regency.startTimeMs,
+			kind: "regent appointed",
+			other: regency.person,
+			tenure: index,
+		})
 	if (person.deathTimeMs !== null)
-		events.push({ timeMs: person.deathTimeMs, kind: "died", other: -1 })
+		events.push({
+			timeMs: person.deathTimeMs,
+			kind: "died",
+			other: -1,
+			tenure: -1,
+		})
 	return events.sort((a, b) => a.timeMs - b.timeMs)
 }
 
-// Health is read back from the fixed death date: a long life declines over
-// its last years, while an early death comes on suddenly.
-function health({ people, id, timeMs }: PersonAtParams): PersonHealth | null {
+function health({ people, id, timeMs }: PersonAtParams): HealthBand | null {
 	const person = people.persons.get(id)
 	if (!person || person.birthTimeMs > timeMs || person.deathTimeMs <= timeMs)
 		return null
-	const yearsLeft = (person.deathTimeMs - timeMs) / yearMs
-	const ageAtDeath = (person.deathTimeMs - person.birthTimeMs) / yearMs
-	if (yearsLeft < 0.5) return "Grave"
-	if (yearsLeft < 2 && ageAtDeath >= 40) return "Poor"
-	if (yearsLeft < 6 && ageAtDeath >= 50) return "Fair"
-	return "Good"
+	return HEALTH.band({
+		birth: person.birthTimeMs / yearMs,
+		death: person.deathTimeMs / yearMs,
+		time: timeMs / yearMs,
+	})
 }
 
 function holder({ people, seat, timeMs }: SeatAtParams): number {

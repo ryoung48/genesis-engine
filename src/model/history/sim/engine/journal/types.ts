@@ -3,6 +3,7 @@ import type {
 	EngineNote,
 	HistoryState,
 } from "@/model/history/sim/engine/state/types"
+import type { RegentKind } from "@/model/history/sim/people/types"
 
 interface JournalProvinceChange {
 	province: number
@@ -31,7 +32,9 @@ interface JournalRuler {
 	dynasty: number
 	birthTimeMs: number
 	deathTimeMs: number
-	regent: boolean
+	// -1 when no regent, or a regency council, governs.
+	regent: number
+	regency: RegentKind | null
 }
 
 export interface JournalPerson {
@@ -52,12 +55,17 @@ export interface JournalMarriage {
 	startTimeMs: number
 }
 
-// A seat (sovereign root or district) changing holder; -1 leaves it empty.
+export type SeatKind = "ruler" | "district" | "regent"
+
+// A seat (sovereign root or district) changing holder or regent; -1 leaves it
+// empty.
 export interface JournalSeat {
 	seat: number
 	person: number
-	// A throne (sovereign root) rather than a district, after the event.
-	sovereign: boolean
+	// A throne is a sovereign root after the event.
+	kind: SeatKind
+	// The child a regent governs for; -1 for other kinds.
+	ward: number
 }
 
 export interface JournalPeople {

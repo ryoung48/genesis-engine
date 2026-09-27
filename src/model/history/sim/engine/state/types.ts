@@ -381,6 +381,11 @@ export interface OriginOfParams {
 	realm: number
 }
 
+export interface ScheduleSuccessionParams {
+	state: HistoryState
+	p: number
+}
+
 export interface InstallRulerParams {
 	state: HistoryState
 	p: number

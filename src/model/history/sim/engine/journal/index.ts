@@ -12,6 +12,14 @@ import type {
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 
+const RULER_TAGS = new Set([
+	"succession",
+	"regency started",
+	"regency ended",
+	"regent changed",
+	"usurpation",
+])
+
 function pending(): PendingJournal {
 	return {
 		parents: new Map(),
@@ -102,10 +110,16 @@ function peopleRows(state: HistoryState): JournalPeople {
 			wife: marriage.wife,
 			startTimeMs: marriage.start * yearMs,
 		})),
-		seats: log.seats.map(({ seat, person }) => ({
+		seats: log.seats.map(({ seat, person, ward }) => ({
 			seat,
 			person,
-			sovereign: state.parentCurrent[seat] < 0,
+			kind:
+				ward >= 0
+					? "regent"
+					: state.parentCurrent[seat] < 0
+						? "ruler"
+						: "district",
+			ward,
 		})),
 	}
 	state.people.log = { persons: [], marriages: [], seats: [] }
@@ -142,16 +156,15 @@ function flush({
 	for (const change of parents)
 		if (change.after < 0) rulerRoots.add(change.province)
 	for (const note of notes) {
-		if (
-			note.tag === "succession" ||
-			note.tag === "regency started" ||
-			note.tag === "regency ended"
-		)
-			rulerRoots.add(note.data.nation as number)
+		if (RULER_TAGS.has(note.tag)) rulerRoots.add(note.data.nation as number)
 	}
 	const rulers = [...rulerRoots]
 		.filter(
-			(root) => root >= 0 && root < state.P && state.parentCurrent[root] < 0,
+			(root) =>
+				root >= 0 &&
+				root < state.P &&
+				state.parentCurrent[root] < 0 &&
+				state.people.rulerOf[root] >= 0,
 		)
 		.map((root) => ({
 			root,
@@ -160,9 +173,8 @@ function flush({
 			dynasty: state.leaderDynCurrent[root],
 			birthTimeMs: state.leaderRuntime.birth[root],
 			deathTimeMs: state.leaderRuntime.end[root],
-			regent: notes.some(
-				(note) => note.tag === "regency started" && note.data.nation === root,
-			),
+			regent: state.people.regencies.get(root)?.regent ?? -1,
+			regency: state.people.regencies.get(root)?.kind ?? null,
 		}))
 	const keyframe = census
 		? {

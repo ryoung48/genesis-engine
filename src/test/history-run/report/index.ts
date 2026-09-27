@@ -10,6 +10,8 @@ import type {
 	CenturyReport,
 	EngineParams,
 	HistoryReportOptions,
+	RegencyReport,
+	RegencyReportParams,
 	ReportEnvParams,
 	RunSeedParams,
 	UnionJuniorsParams,
@@ -80,6 +82,76 @@ function eventsIn({ engine, from, to }: WindowParams) {
 	return engine.events.filter((event) => event.time >= lo && event.time < hi)
 }
 
+const PRE_SUCCESSION_YEARS = 2
+
+function regencyReport({
+	engine,
+	from,
+	to,
+	top,
+}: RegencyReportParams): RegencyReport {
+	const lo = from * STATE.yearMs
+	const hi = to * STATE.yearMs
+	const regencies = new Set<number>()
+	const report: RegencyReport = {
+		regencies: 0,
+		councilShare: 0,
+		usurpationsByUncle: 0,
+		usurpationsByProtector: 0,
+		largestRebellionRegencyShare: 0,
+		preSuccessionRebellionShare: 0,
+		restorationAttempts: 0,
+		restorationBacked: 0,
+		restorationRevolts: 0,
+		claimsLapsed: 0,
+	}
+	let councils = 0
+	let largestRebellions = 0
+	let largestDuringRegency = 0
+	const rebellionTimes = new Map<number, number[]>()
+	let rebellions = 0
+	let preSuccession = 0
+	for (const note of engine.events) {
+		if (note.time >= hi) break
+		const nation = note.data.nation as number
+		if (note.tag === "regency started") regencies.add(nation)
+		else if (note.tag === "regency ended") regencies.delete(nation)
+		else if (note.tag === "succession" && note.time >= lo) {
+			const pending = rebellionTimes.get(nation) ?? []
+			preSuccession += pending.filter(
+				(time) => note.time - time <= PRE_SUCCESSION_YEARS * STATE.yearMs,
+			).length
+			rebellionTimes.delete(nation)
+		}
+		if (note.time < lo) continue
+		if (note.tag === "regency started") {
+			report.regencies++
+			if (note.data.regent === -1) councils++
+		} else if (note.tag === "usurpation") {
+			if (note.data.kind === "protector") report.usurpationsByProtector++
+			else report.usurpationsByUncle++
+		} else if (note.tag === "rebellion") {
+			const overlord = note.data.overlord as number
+			rebellions++
+			const pending = rebellionTimes.get(overlord)
+			if (pending) pending.push(note.time)
+			else rebellionTimes.set(overlord, [note.time])
+			if (!top.has(overlord)) continue
+			largestRebellions++
+			if (regencies.has(overlord)) largestDuringRegency++
+		} else if (note.tag === "restoration attempt") {
+			report.restorationAttempts++
+			if (note.data.backed) report.restorationBacked++
+			if (note.data.revolt) report.restorationRevolts++
+		} else if (note.tag === "claim lapsed") report.claimsLapsed++
+	}
+	report.councilShare = councils / Math.max(1, report.regencies)
+	report.largestRebellionRegencyShare =
+		largestDuringRegency / Math.max(1, largestRebellions)
+	report.preSuccessionRebellionShare = preSuccession / Math.max(1, rebellions)
+	return report
+}
+
 function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	const { engine } = HISTORY_RUN.createEngine({
 		seed,
@@ -140,6 +212,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 				raids.filter((event) => event.data.success).length /
 				Math.max(1, raids.length),
 			revenuePerHead: revenue / Math.max(1, pop),
+			regency: regencyReport({ engine, from, to: year, top: topSet }),
 		})
 		from = year
 		startSovereigns = endSovereigns.length
@@ -161,6 +234,13 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		for (const r of reports)
 			options.log(
 				`${`${r.from}-${r.to}`.padEnd(11)} ${String(r.sovereigns).padStart(10)} ${r.warsPerSovereign.toFixed(2).padStart(9)} ${String(r.rebellions).padStart(11)} ${`${(100 * r.largestAtWarShare).toFixed(0)}%`.padStart(13)} ${r.rebellionsPerLargest.toFixed(2).padStart(13)} ${r.unionJuniorsPerLargest.toFixed(1).padStart(13)} ${String(r.raids).padStart(6)} ${`${(100 * r.raidSuccessShare).toFixed(0)}%`.padStart(9)} ${`${r.revenuePerHead.toFixed(6)} D`.padStart(13)}`,
+			)
+		options.log(
+			"period      regencies  council  usurp uncle/prot  top20 rebels in regency  pre-death rebels  restore try/backed/revolt  lapsed",
+		)
+		for (const { from, to, regency: g } of reports)
+			options.log(
+				`${`${from}-${to}`.padEnd(11)} ${String(g.regencies).padStart(9)} ${`${(100 * g.councilShare).toFixed(0)}%`.padStart(8)} ${`${g.usurpationsByUncle}/${g.usurpationsByProtector}`.padStart(17)} ${`${(100 * g.largestRebellionRegencyShare).toFixed(0)}%`.padStart(24)} ${`${(100 * g.preSuccessionRebellionShare).toFixed(0)}%`.padStart(17)} ${`${g.restorationAttempts}/${g.restorationBacked}/${g.restorationRevolts}`.padStart(26)} ${String(g.claimsLapsed).padStart(7)}`,
 			)
 	}
 	return results

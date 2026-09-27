@@ -1,4 +1,5 @@
 import type { PeopleRecord } from "@/model/history/record/people/types"
+import type { SeatKind } from "@/model/history/sim/engine/journal/types"
 
 export interface PersonAtParams {
 	people: PeopleRecord
@@ -21,10 +22,13 @@ export interface SpouseView {
 
 export interface TenureView {
 	seat: number
-	sovereign: boolean
+	kind: SeatKind
+	// The child a regent governs for; -1 for other kinds.
+	ward: number
 	startTimeMs: number
 	// [JUSTIFICATION] A seat still held at the queried time has no end.
 	endTimeMs: number | null
+	person: number
 }
 
 export interface PersonView {
@@ -42,9 +46,9 @@ export interface PersonView {
 	children: number[]
 	siblings: number[]
 	tenures: TenureView[]
+	// Regents who governed for this person as a child ruler.
+	regents: TenureView[]
 }
-
-export type PersonHealth = "Good" | "Fair" | "Poor" | "Grave"
 
 export type PersonEventKind =
 	| "born"
@@ -52,11 +56,17 @@ export type PersonEventKind =
 	| "child born"
 	| "took seat"
 	| "left seat"
+	| "became regent"
+	| "left regency"
+	| "regent appointed"
 	| "died"
 
 export interface PersonEvent {
 	timeMs: number
 	kind: PersonEventKind
-	// Spouse, child or seat the event concerns; -1 for birth and death.
+	// Spouse, child, seat or regent the event concerns; -1 for birth and
+	// death.
 	other: number
+	// The tenure a seat or regency event belongs to; -1 for other kinds.
+	tenure: number
 }

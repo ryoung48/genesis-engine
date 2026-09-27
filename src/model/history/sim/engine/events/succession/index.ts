@@ -1,11 +1,14 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
-import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import type {
 	InitSuccessionParams,
 	PretenderParams,
-	RegencyParams,
+	RealmParams,
+	RealmRngParams,
 	RunSuccessionParams,
+	RunYearParams,
 	WeakCrownParams,
 } from "@/model/history/sim/engine/events/succession/types"
 import { WAR } from "@/model/history/sim/engine/events/war"
@@ -15,73 +18,78 @@ import { PEOPLE } from "@/model/history/sim/people"
 
 const MAX_CLAIM = 3
 const WEAK_CLAIM_LAXITY = 0.05
-const MINOR_LAXITY = 0.1
+// Yearly chance that an ambitious regent seizes the throne, doubled for a
+// kinsman who holds a district of the realm.
+const USURP_CHANCE = 0.03
+// A usurping kinsman keeps the house's claim; a lord protector has none.
+const KINSMAN_USURPER_CLAIM = 1
+const RESTORED_CLAIM = 3
 
 function initSuccession({ state }: InitSuccessionParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		if (!STATE.isSovereign({ state, p })) continue
-		// Schedule succession at leader's death
-		state.heap.enqueue(
-			state.leaderRuntime.end[p],
-			EVENT_HEAP.evt.SUCCESSION,
-			p,
-			state.leaderRuntime.idx[p],
-		)
+		STATE.scheduleSuccession({ state, p })
+		REGENCY.startMinority({ state, realm: p })
 	}
 }
 
-function regency({ state, p }: RegencyParams): void {
-	const age = STATE.diffYears({
-		a: state.time,
-		b: state.leaderRuntime.birth[p],
-	})
-	if (age < 16 && STATE.isSovereign({ state, p })) {
-		state.events.push({
-			tag: "regency started",
-			time: state.time,
-			data: {
-				nation: p,
-				leader: state.leaderRuntime.idx[p],
-				age: Math.round(age),
-			},
-		})
-		const regencyEndTime = state.leaderRuntime.birth[p] + STATE.deltaYear(16)
-		if (regencyEndTime < state.leaderRuntime.end[p]) {
-			state.heap.enqueue(
-				regencyEndTime,
-				EVENT_HEAP.evt.REGENCY,
-				p,
-				state.leaderRuntime.idx[p],
-			)
-		}
-	}
-}
-
-// A passed-over claimant holding a district takes it out of the realm and fights
-// for the throne.
-function pretenderRevolt({ state, realm, seat, rng }: PretenderParams): void {
+// A passed-over claimant, or a deposed ruler's line, takes a district out of
+// the realm and fights for the throne. The claimant rules the rebel realm even
+// when the district was a backer's.
+function pretenderRevolt({
+	state,
+	realm,
+	seat,
+	pretender,
+	restoration,
+	rng,
+}: PretenderParams): void {
 	if (seat < 0 || FIELDS.prov.parent.get({ state, p: seat }) !== realm) return
-	const pretender = state.people.rulerOf[seat]
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
-		data: { overlord: realm, subject: seat, succession: true, pretender },
+		data: {
+			overlord: realm,
+			subject: seat,
+			succession: true,
+			pretender,
+			restoration,
+		},
 	})
 	STATE.releaseProvince({ state, p: seat, rng })
+	if (state.people.rulerOf[seat] !== pretender) {
+		STATE.installRuler({
+			state,
+			p: seat,
+			person: pretender,
+			claim: RESTORED_CLAIM,
+		})
+		STATE.scheduleSuccession({ state, p: seat })
+	}
 	STATE.startWar({ state, attacker: realm, defender: seat, rng, rebel: true })
 	STATE.fixConnections({ state, nation: realm, rng })
 }
 
+function restore({ state, realm, rng }: RealmRngParams): void {
+	const revolt = RESTORATION.attempt({ state, realm, rng })
+	if (revolt)
+		pretenderRevolt({
+			state,
+			realm,
+			seat: revolt.seat,
+			pretender: revolt.claimant,
+			restoration: true,
+			rng,
+		})
+}
+
 // Each district re-tests its rebellion threat when the crown changes hands; the
-// bar drops for a child ruler or a weak claim. At most one district breaks away.
+// bar drops for a weak crown or a weak claim. At most one district breaks away.
 function weakCrownRevolt({ state, realm, claim, rng }: WeakCrownParams): void {
-	const age = STATE.diffYears({
-		a: state.time,
-		b: state.leaderRuntime.birth[realm],
-	})
 	const laxity =
-		WEAK_CLAIM_LAXITY * (MAX_CLAIM - claim) + (age < 16 ? MINOR_LAXITY : 0)
+		WEAK_CLAIM_LAXITY * (MAX_CLAIM - claim) +
+		(REGENCY.weak({ state, realm }) ? REGENCY.laxity : 0)
 	const districts = rng
 		.shuffle(STATE.getChildren({ state, p: realm }))
 		.filter(
@@ -109,6 +117,7 @@ function runSuccession({
 	rng,
 }: RunSuccessionParams): void {
 	if (state.leaderRuntime.idx[province] !== leaderIdx) return
+	REGENCY.end({ state, realm: province, cause: "death" })
 	if (!STATE.isSovereign({ state, p: province })) {
 		PEOPLE.vacate({ people: state.people, seat: province })
 		return
@@ -148,20 +157,20 @@ function runSuccession({
 		},
 	})
 
-	// Schedule next succession
-	state.heap.enqueue(
-		state.leaderRuntime.end[province],
-		EVENT_HEAP.evt.SUCCESSION,
-		province,
-		state.leaderRuntime.idx[province],
-	)
-
-	// Regency check
-	regency({ state, p: province })
+	STATE.scheduleSuccession({ state, p: province })
+	REGENCY.startMinority({ state, realm: province })
 
 	if (choice.pretenderSeat >= 0)
-		pretenderRevolt({ state, realm: province, seat: choice.pretenderSeat, rng })
+		pretenderRevolt({
+			state,
+			realm: province,
+			seat: choice.pretenderSeat,
+			pretender: state.people.rulerOf[choice.pretenderSeat],
+			restoration: false,
+			rng,
+		})
 	else weakCrownRevolt({ state, realm: province, claim: choice.claim, rng })
+	restore({ state, realm: province, rng })
 
 	STATE.considerTitles({
 		state,
@@ -171,7 +180,58 @@ function runSuccession({
 	})
 }
 
+function usurpChance({ state, realm }: RealmParams): number {
+	const regency = REGENCY.active({ state, realm })
+	if (!regency) return 0
+	if (regency.kind === "protector") return USURP_CHANCE
+	if (regency.kind !== "relative") return 0
+	const seat = state.people.persons.throne[regency.regent]
+	return seat >= 0 && state.parentCurrent[seat] === realm
+		? 2 * USURP_CHANCE
+		: USURP_CHANCE
+}
+
+// The regent takes the throne and the child lives on as the realm's deposed
+// claimant. A lord protector's own house takes the crown, and their district
+// passes to it.
+function usurp({ state, realm, rng }: RealmRngParams): void {
+	const regency = REGENCY.active({ state, realm })
+	if (!regency) return
+	const { regent, ward, kind } = regency
+	const people = state.people
+	const district = people.persons.throne[regent]
+	REGENCY.end({ state, realm, cause: "usurpation" })
+	state.events.push({
+		tag: "usurpation",
+		time: state.time,
+		data: { nation: realm, regent, ward, kind },
+	})
+	if (kind === "protector" && district >= 0)
+		PEOPLE.vacate({ people, seat: district })
+	const claim = kind === "relative" ? KINSMAN_USURPER_CLAIM : 0
+	STATE.installRuler({ state, p: realm, person: regent, claim })
+	RESTORATION.depose({ state, realm, claimant: ward })
+	STATE.scheduleSuccession({ state, p: realm })
+	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })
+	STATE.considerTitles({
+		state,
+		nation: realm,
+		rng,
+		revenueOf: (nation) => ECONOMY.revenue({ state, p: nation }),
+	})
+}
+
+function runYear({ state, rng }: RunYearParams): void {
+	REGENCY.review({ state })
+	for (const realm of [...state.people.regencies.keys()]) {
+		const chance = usurpChance({ state, realm })
+		if (chance > 0 && rng.random() < chance) usurp({ state, realm, rng })
+	}
+	for (const realm of RESTORATION.due({ state })) restore({ state, realm, rng })
+}
+
 export const SUCCESSION = {
 	initSuccession,
 	runSuccession,
+	runYear,
 }

@@ -1,8 +1,10 @@
 import type {
 	Candidate,
 	CandidateParams,
+	ChallengeParams,
 	ChooseParams,
 	ContestParams,
+	ContestResult,
 	ElectableParams,
 	Elector,
 	MarriageTieParams,
@@ -160,7 +162,13 @@ function tally({
 
 // The district rulers split between the heir and a contender; with enough backing
 // the contender's own district, or their strongest backer's, rises for them.
-function contest({ state, realm, heir, rival, rng }: ContestParams): number {
+function contest({
+	state,
+	realm,
+	heir,
+	rival,
+	rng,
+}: ContestParams): ContestResult {
 	const electors = districtsOf({ state, realm })
 	const { votes, choices } = tally({
 		state,
@@ -170,8 +178,9 @@ function contest({ state, realm, heir, rival, rng }: ContestParams): number {
 	})
 	const total = votes[0] + votes[1]
 	const share = total > 0 ? votes[1] / total : 0
-	if (share < PRETENDER_SHARE || rng.random() >= share) return -1
-	if (rival.seat >= 0) return rival.seat
+	const backed = share >= PRETENDER_SHARE
+	if (!backed || rng.random() >= share) return { backed, seat: -1 }
+	if (rival.seat >= 0) return { backed, seat: rival.seat }
 	let backer = -1
 	for (let i = 0; i < electors.length; i++)
 		if (
@@ -179,7 +188,11 @@ function contest({ state, realm, heir, rival, rng }: ContestParams): number {
 			(backer < 0 || electors[i].weight > electors[backer].weight)
 		)
 			backer = i
-	return backer < 0 ? -1 : state.people.persons.throne[electors[backer].person]
+	return {
+		backed,
+		seat:
+			backer < 0 ? -1 : state.people.persons.throne[electors[backer].person],
+	}
 }
 
 // A succession is disputed when the heir rules another realm, is a child or
@@ -196,6 +209,47 @@ function disputed({ state, realm, person }: ElectableParams): boolean {
 	)
 }
 
+// The adult holder of the realm's largest district, or -1.
+function strongestDistrict({ state, realm }: RealmParams): number {
+	const strongest = districtsOf({ state, realm })
+		.filter((f) => adultAvailable({ state, person: f.person }))
+		.sort((a, b) => b.weight - a.weight || a.person - b.person)[0]
+	return strongest?.person ?? -1
+}
+
+// A claimant contests an incumbent before the realm's district holders.
+function challenge({
+	state,
+	realm,
+	incumbent,
+	claimant,
+	rng,
+}: ChallengeParams): ContestResult {
+	const districts = districtsOf({ state, realm })
+	if (districts.length === 0) return { backed: false, seat: -1 }
+	const claimantDistrict = districts.find((f) => f.person === claimant)
+	const totalWeight = districts.reduce((sum, f) => sum + f.weight, 0)
+	return contest({
+		state,
+		realm,
+		rng,
+		heir: candidate({
+			state,
+			person: incumbent,
+			seat: -1,
+			totalWeight,
+			weight: 0,
+		}),
+		rival: candidate({
+			state,
+			person: claimant,
+			seat: claimantDistrict ? state.people.persons.throne[claimant] : -1,
+			totalWeight,
+			weight: claimantDistrict?.weight ?? 0,
+		}),
+	})
+}
+
 function singleHeir({
 	state,
 	realm,
@@ -203,7 +257,6 @@ function singleHeir({
 	rng,
 }: ChooseParams): SuccessionChoice {
 	const people = state.people
-	const table = people.persons
 	const preference = preferenceOf({ state, realm })
 	const { heir, relation } = HEIRS.of({
 		people,
@@ -212,16 +265,10 @@ function singleHeir({
 		preference,
 		eligible: (person) => inheritable({ state, realm, person }),
 	})
-	const districts = districtsOf({ state, realm })
-	if (heir < 0) {
-		const strongest = districts
-			.filter((f) => adultAvailable({ state, person: f.person }))
-			.sort((a, b) => b.weight - a.weight || a.person - b.person)[0]
-		return { ...NEW_HOUSE, heir: strongest?.person ?? -1 }
-	}
+	if (heir < 0)
+		return { ...NEW_HOUSE, heir: strongestDistrict({ state, realm }) }
 	const choice = { heir, claim: HEIR_CLAIM[relation], pretenderSeat: -1 }
-	if (districts.length === 0 || !disputed({ state, realm, person: heir }))
-		return choice
+	if (!disputed({ state, realm, person: heir })) return choice
 	const rival = HEIRS.of({
 		people,
 		dying,
@@ -231,29 +278,15 @@ function singleHeir({
 			person !== heir && electable({ state, realm, person }),
 	}).heir
 	if (rival < 0) return choice
-	const rivalDistrict = districts.find((f) => f.person === rival)
-	const totalWeight = districts.reduce((sum, f) => sum + f.weight, 0)
 	return {
 		...choice,
-		pretenderSeat: contest({
+		pretenderSeat: challenge({
 			state,
 			realm,
+			incumbent: heir,
+			claimant: rival,
 			rng,
-			heir: candidate({
-				state,
-				person: heir,
-				seat: -1,
-				totalWeight,
-				weight: 0,
-			}),
-			rival: candidate({
-				state,
-				person: rival,
-				seat: rivalDistrict ? table.throne[rival] : -1,
-				totalWeight,
-				weight: rivalDistrict?.weight ?? 0,
-			}),
-		}),
+		}).seat,
 	}
 }
 
@@ -355,4 +388,12 @@ function choose(params: ChooseParams): SuccessionChoice {
 	return singleHeir(params)
 }
 
-export const SUCCESSION_SYSTEMS = { choose }
+export const SUCCESSION_SYSTEMS = {
+	choose,
+	challenge,
+	strongestDistrict,
+	adultAvailable,
+	available,
+	preferenceOf,
+	adultAge: ADULT_AGE,
+}

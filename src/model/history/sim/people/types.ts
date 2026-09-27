@@ -33,6 +33,26 @@ export interface PeopleLogMarriage {
 export interface PeopleLogSeat {
 	seat: number
 	person: number
+	// The child a regent governs for; -1 for a seat holder's row.
+	ward: number
+}
+
+export type RegentKind = "parent" | "relative" | "protector" | "council"
+
+export interface Regency {
+	ward: number
+	// -1 for a regency council.
+	regent: number
+	kind: RegentKind
+}
+
+// A deposed ruler, or their heir, who may try to retake the throne.
+export interface DeposedClaim {
+	claimant: number
+	// 0 for the deposed ruler, 1 for their heir.
+	generation: number
+	// The claimant has made their coming-of-age attempt.
+	tried: boolean
 }
 
 // Rows the journal has not yet taken: newly recorded people, marriages
@@ -54,6 +74,10 @@ export interface PeopleState {
 	// Realm pairs allied by a marriage between their ruling families, keyed by
 	// the lower realm times the province count plus the higher.
 	marriageAlliances: Map<number, MarriageAlliance>
+	// Sovereign realms governed by a regent, by realm.
+	regencies: Map<number, Regency>
+	// Claims of deposed rulers, by the realm they lost.
+	deposed: Map<number, DeposedClaim>
 	log: PeopleLog
 	nextDynasty: number
 }
@@ -107,6 +131,14 @@ export interface SetRulerParams {
 	people: PeopleState
 	seat: number
 	person: number
+}
+
+export interface SetRegentParams {
+	people: PeopleState
+	seat: number
+	// -1 ends the regent's tenure.
+	person: number
+	ward: number
 }
 
 export interface VacateParams {

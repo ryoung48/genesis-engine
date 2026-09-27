@@ -13,6 +13,8 @@ function create(): PeopleRecord {
 		tenures: [],
 		tenuresOf: new Map(),
 		tenuresOfSeat: new Map(),
+		regentsOfSeat: new Map(),
+		regentsOfWard: new Map(),
 		dynastyHome: new Map(),
 	}
 }
@@ -52,8 +54,10 @@ function append({
 		pushIndex({ index: record.marriagesOf, key: row.husband, value: index })
 		pushIndex({ index: record.marriagesOf, key: row.wife, value: index })
 	}
-	for (const { seat, person, sovereign } of rows.seats) {
-		const open = record.tenuresOfSeat.get(seat)?.at(-1)
+	for (const { seat, person, kind, ward } of rows.seats) {
+		const ofSeat =
+			kind === "regent" ? record.regentsOfSeat : record.tenuresOfSeat
+		const open = ofSeat.get(seat)?.at(-1)
 		if (open !== undefined && record.tenures[open].endTimeMs === Infinity) {
 			if (record.tenures[open].person === person) continue
 			record.tenures[open].endTimeMs = timeMs
@@ -63,12 +67,15 @@ function append({
 		record.tenures.push({
 			person,
 			seat,
-			sovereign,
+			kind,
+			ward,
 			startTimeMs: timeMs,
 			endTimeMs: Infinity,
 		})
 		pushIndex({ index: record.tenuresOf, key: person, value: index })
-		pushIndex({ index: record.tenuresOfSeat, key: seat, value: index })
+		pushIndex({ index: ofSeat, key: seat, value: index })
+		if (kind === "regent")
+			pushIndex({ index: record.regentsOfWard, key: ward, value: index })
 	}
 }
 

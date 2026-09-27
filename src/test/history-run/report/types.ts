@@ -36,6 +36,28 @@ export interface CenturyReport {
 	raids: number
 	raidSuccessShare: number
 	revenuePerHead: number
+	regency: RegencyReport
+}
+
+export interface RegencyReport {
+	regencies: number
+	councilShare: number
+	usurpationsByUncle: number
+	usurpationsByProtector: number
+	// Share of rebellions against the largest realms that broke out while
+	// the overlord was under a regency.
+	largestRebellionRegencyShare: number
+	// Share of all rebellions that broke out within two years before the
+	// overlord's next succession.
+	preSuccessionRebellionShare: number
+	restorationAttempts: number
+	restorationBacked: number
+	restorationRevolts: number
+	claimsLapsed: number
+}
+
+export interface RegencyReportParams extends WindowParams {
+	top: Set<number>
 }
 
 export interface UnionJuniorsParams extends EngineParams {

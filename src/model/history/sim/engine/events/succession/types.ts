@@ -5,11 +5,6 @@ export interface InitSuccessionParams {
 	state: HistoryState
 }
 
-export interface RegencyParams {
-	state: HistoryState
-	p: number
-}
-
 export interface RunSuccessionParams {
 	state: HistoryState
 	province: number
@@ -17,10 +12,29 @@ export interface RunSuccessionParams {
 	rng: SharedRng
 }
 
+export interface RunYearParams {
+	state: HistoryState
+	rng: SharedRng
+}
+
 export interface PretenderParams {
 	state: HistoryState
 	realm: number
 	seat: number
+	pretender: number
+	// A deposed ruler's line pressing its claim.
+	restoration: boolean
+	rng: SharedRng
+}
+
+export interface RealmParams {
+	state: HistoryState
+	realm: number
+}
+
+export interface RealmRngParams {
+	state: HistoryState
+	realm: number
 	rng: SharedRng
 }
 

@@ -8,6 +8,7 @@ import type {
 	PersonAtParams,
 	PersonRefParams,
 	PreferenceParams,
+	SetRegentParams,
 	SetRulerParams,
 	ThroneParams,
 	VacateParams,
@@ -38,6 +39,8 @@ function create(provinceCount: number): PeopleState {
 		patricians: new Map(),
 		unionGenerations: new Map(),
 		marriageAlliances: new Map(),
+		regencies: new Map(),
+		deposed: new Map(),
 		log: { persons: [], marriages: [], seats: [] },
 		nextDynasty: 0,
 	}
@@ -117,8 +120,13 @@ function recordFamily({ people, person }: PersonRefParams): void {
 
 function setRuler({ people, seat, person }: SetRulerParams): void {
 	people.rulerOf[seat] = person
-	people.log.seats.push({ seat, person })
+	people.log.seats.push({ seat, person, ward: -1 })
 	if (person >= 0) recordFamily({ people, person })
+}
+
+function setRegent({ people, seat, person, ward }: SetRegentParams): void {
+	people.log.seats.push({ seat, person, ward })
+	record({ people, person })
 }
 
 function aliveAt({ people, person, time }: PersonAtParams): boolean {
@@ -197,6 +205,7 @@ export const PEOPLE = {
 	record,
 	recordFamily,
 	setRuler,
+	setRegent,
 	family,
 	tiedByMarriage,
 	create,

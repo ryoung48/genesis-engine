@@ -116,7 +116,8 @@ function settle({ state, rng }: DistrictParams): void {
 			dying: holder,
 			time,
 			preference: PEOPLE.preference(STATE.originOf({ state, realm: seat })),
-			eligible: (person) => table.throne[person] < 0,
+			eligible: (person) =>
+				table.throne[person] < 0 && time - table.birth[person] >= ADULT_AGE,
 		}).heir
 		install({
 			state,

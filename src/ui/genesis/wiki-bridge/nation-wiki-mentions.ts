@@ -3,6 +3,10 @@ import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-cate
 import { uiPalette } from "@/ui/components/tokens"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { HistoryTimeline } from "@/ui/genesis/view/types"
+import type {
+	RecordPersonMentionParams,
+	RegentRoleParams,
+} from "@/ui/genesis/wiki-bridge/types"
 import { paletteColorForDynasty } from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
@@ -86,6 +90,53 @@ export function dynastyMention(
 		name: dynasty,
 		color: paletteColorForDynasty(dynasty),
 	}
+}
+
+export function recordPersonMention({
+	people,
+	person,
+}: RecordPersonMentionParams): NationTimelineEvent["people"][number] | null {
+	const row = people?.persons.get(person)
+	return row
+		? {
+				id: person,
+				name: row.name,
+				color: row.house
+					? paletteColorForDynasty(row.house)
+					: uiPalette.person.noHouse,
+			}
+		: null
+}
+
+// How a regent stands to the child they govern for, read from the recorded
+// family: parent, sibling, parent's sibling, else a kinsman or a protector.
+export function regentRole({
+	people,
+	regent,
+	ward,
+	kind,
+}: RegentRoleParams): string | null {
+	const regentRow = people?.persons.get(regent)
+	const wardRow = people?.persons.get(ward)
+	if (!regentRow || !wardRow) return null
+	const female = regentRow.sex === 1
+	const parents = [wardRow.father, wardRow.mother].filter((id) => id >= 0)
+	if (parents.includes(regent)) return female ? "mother" : "father"
+	if ([regentRow.father, regentRow.mother].some((id) => parents.includes(id)))
+		return female ? "sister" : "brother"
+	const grandparents = parents.flatMap((id) => {
+		const parent = people?.persons.get(id)
+		return parent ? [parent.father, parent.mother] : []
+	})
+	if (
+		[regentRow.father, regentRow.mother].some(
+			(id) => id >= 0 && grandparents.includes(id),
+		)
+	)
+		return female ? "aunt" : "uncle"
+	if (kind === "relative") return female ? "kinswoman" : "kinsman"
+	if (kind === "protector") return female ? "lady protector" : "lord protector"
+	return null
 }
 
 export function personDisplay(payload: Record<string, unknown>): {

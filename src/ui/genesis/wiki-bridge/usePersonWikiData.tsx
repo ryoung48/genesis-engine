@@ -147,7 +147,20 @@ export function usePersonWikiData(
 			const span = `${dateLabel(tenure.startTimeMs)} – ${
 				tenure.endTimeMs === null ? "" : dateLabel(tenure.endTimeMs)
 			}`
-			if (tenure.sovereign)
+			if (tenure.kind === "regent") {
+				const ward = people.persons.get(tenure.ward)
+				return nation
+					? {
+							key: `regent:${tenure.seat}:${tenure.startTimeMs}`,
+							name: `Regent of ${seatLabel(tenure.seat, tenure.startTimeMs, true)}`,
+							color: nation.color,
+							dimmed: tenure.endTimeMs !== null,
+							title: `Regent${ward ? ` for ${ward.name}` : ""}, ${span}`,
+							onClick: () => selectNation(nation.tag),
+						}
+					: null
+			}
+			if (tenure.kind === "ruler")
 				return nation
 					? {
 							key: `seat:${tenure.seat}:${tenure.startTimeMs}`,
@@ -188,6 +201,7 @@ export function usePersonWikiData(
 
 		const timelineEvents: WikiTimelineEvent[] = []
 		const fullTimeMs = state.record.maxTimeMs
+		const fullView = PERSON_QUERY.view({ people, id, timeMs: fullTimeMs })
 		const self = mention(id)
 		const selfMentions = self ? [self] : []
 		for (const [index, event] of PERSON_QUERY.timeline({
@@ -234,9 +248,41 @@ export function usePersonWikiData(
 							: `${other.name} was born to ${person.name}.`,
 					people: [...selfMentions, other],
 				})
+			} else if (event.kind === "regent appointed") {
+				const regent = mention(event.other)
+				if (!regent) continue
+				const tenure = fullView?.regents[event.tenure]
+				const nation = tenure ? nationAt(tenure.seat, event.timeMs) : null
+				pushTimelineEvent(timelineEvents, {
+					...base,
+					type: "Ruler",
+					description: `${regent.name} became regent${nation ? ` of ${nation.name}` : ""} for ${person.name}.`,
+					people: [...selfMentions, regent],
+					nations: nation ? [nation] : [],
+				})
+			} else if (
+				event.kind === "became regent" ||
+				event.kind === "left regency"
+			) {
+				const tenure = fullView?.tenures[event.tenure]
+				const ward = mention(tenure?.ward ?? -1)
+				const at =
+					event.kind === "became regent" ? event.timeMs : event.timeMs - DAY_MS
+				const nation = nationAt(event.other, at)
+				const place = seatLabel(event.other, at, true)
+				pushTimelineEvent(timelineEvents, {
+					...base,
+					type: "Ruler",
+					description:
+						event.kind === "became regent"
+							? `${person.name} became regent of ${place}${ward ? ` for ${ward.name}` : ""}.`
+							: `${person.name}'s regency of ${place} ended.`,
+					people: ward ? [...selfMentions, ward] : selfMentions,
+					nations: nation ? [nation] : [],
+				})
 			} else {
-				const tenure = view.tenures.find((entry) => entry.seat === event.other)
-				const sovereign = tenure?.sovereign ?? true
+				const tenure = fullView?.tenures[event.tenure]
+				const sovereign = tenure?.kind !== "district"
 				const nation = nationAt(
 					event.other,
 					event.kind === "took seat" ? event.timeMs : event.timeMs - DAY_MS,

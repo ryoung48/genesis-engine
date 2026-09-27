@@ -5,6 +5,7 @@ import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { yearMs } from "@/model/history/sim/engine/state/time"
 import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
@@ -26,6 +27,8 @@ import {
 	cultureMention,
 	organizationMention,
 	personDisplay,
+	recordPersonMention,
+	regentRole,
 	religionMention,
 	warMention,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
@@ -403,6 +406,51 @@ export function useNationWikiData(
 				) : (
 					<span>{nationState.ruler.name}</span>
 				)
+			const regentPerson =
+				typeof currentRulerPayload?.regent === "number"
+					? currentRulerPayload.regent
+					: -1
+			const regentRow = record.people?.persons.get(regentPerson)
+			const regentRelation = regentRole({
+				people: record.people,
+				regent: regentPerson,
+				ward: rulerPerson,
+				kind: String(currentRulerPayload?.regency ?? ""),
+			})
+			const regentLabel = regentRow
+				? [
+						regentRelation ? `(${regentRelation})` : null,
+						String(
+							Math.floor(
+								(history.selectedTimeMs - regentRow.birthTimeMs) / yearMs,
+							),
+						),
+						regentRow.sex === 1 ? "♀" : "♂",
+					]
+						.filter((part) => part !== null)
+						.join(" · ")
+				: ""
+			if (currentRulerPayload?.regency)
+				stats.splice(
+					stats.indexOf(rulerStat) + 1,
+					0,
+					regentRow
+						? {
+								label: "Regent",
+								value: "",
+								valueAction: (
+									<span className="inline-flex items-center gap-1">
+										<InlineTextButton
+											onClick={() => setSelectedWikiPersonId(regentPerson)}
+										>
+											{regentRow.name}
+										</InlineTextButton>
+										<span>{regentLabel}</span>
+									</span>
+								),
+							}
+						: { label: "Regent", value: "Regency Council" },
+				)
 			if (dynastyName || rulerPerson >= 0) {
 				rulerStat.value = ""
 				rulerStat.valueAction = (
@@ -581,7 +629,45 @@ export function useNationWikiData(
 						}
 						break
 					}
+					case "regency": {
+						const mention = (key: string) =>
+							recordPersonMention({
+								people: record.people,
+								person: Number(event.payload[key] ?? -1),
+							})
+						const ward = mention("ward")
+						const regent = mention("regent")
+						const wardName = ward?.name ?? "the child ruler"
+						const role = regentRole({
+							people: record.people,
+							regent: regent?.id ?? -1,
+							ward: ward?.id ?? -1,
+							kind: String(event.payload.regentKind ?? ""),
+						})
+						const regentName = regent
+							? `${regent.name}${role ? ` (${role})` : ""}`
+							: "A regency council"
+						const kind = String(event.payload.event ?? "")
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Ruler",
+							description:
+								kind === "usurpation"
+									? `${regentName} usurped the throne of ${title} from ${wardName}.`
+									: kind === "ended"
+										? `${wardName} came of age and the regency of ${title} ended.`
+										: `${regentName} ${kind === "changed" ? "took over as" : "became"} regent of ${title} for ${wardName}.`,
+							comment: eventComment(event.comment),
+							nations,
+							people: [ward, regent].flatMap((person) =>
+								person ? [person] : [],
+							),
+						})
+						break
+					}
 					case "rulerChange": {
+						if (event.payload.newRuler === false) break
 						const person = personDisplay(event.payload)
 						const isInterregnum = /^interregnum$/i.test(
 							String(event.payload.name ?? "").trim(),
@@ -1075,19 +1161,9 @@ export function useNationWikiData(
 				description = `${title} ${starts ? "formed" : "ended"} a ${relation} with ${otherName}.`
 			}
 			// A procedural royal marriage names the couple whose wedding made it.
-			const couple = (event.spouses ?? []).flatMap((personId) => {
-				const person = record.people?.persons.get(personId)
-				return person
-					? [
-							{
-								id: personId,
-								name: person.name,
-								color: person.house
-									? paletteColorForDynasty(person.house)
-									: uiPalette.person.noHouse,
-							},
-						]
-					: []
+			const couple = (event.spouses ?? []).flatMap((person) => {
+				const mention = recordPersonMention({ people: record.people, person })
+				return mention ? [mention] : []
 			})
 			if (couple.length === 2)
 				description = `${description.slice(0, -1)}: ${couple[0].name} married ${couple[1].name}.`
