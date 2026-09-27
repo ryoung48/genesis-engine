@@ -1,18 +1,22 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { PEOPLE } from "@/model/history/sim/people"
+import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import type {
 	AdultParams,
 	MarryParams,
 	MatchInParams,
 	MatchParams,
+	MinorSeekersParams,
 	OutsiderParams,
 	Seeker,
+	SeekMatchesParams,
 } from "@/model/history/sim/people/family/types"
 import { FERTILITY } from "@/model/history/sim/people/fertility"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import type {
-	CrossWedding,
+	CrossMatch,
 	FoundHouseParams,
+	PeopleMatches,
 	PeopleYear,
 	RunPeopleYearParams,
 	Sex,
@@ -167,7 +171,7 @@ function seeksSpouse({ people, person, time }: AdultParams): boolean {
 	const age = time - table.birth[person]
 	const adult =
 		table.sex[person] === 1 ? age >= 16 && age < 40 : age >= 18 && age < 50
-	if (!adult) return false
+	if (!adult || table.betrothed[person] >= 0) return false
 	const spouse = table.spouse[person]
 	return spouse < 0 || table.death[spouse] <= time
 }
@@ -179,6 +183,7 @@ function matchIn({
 	matched,
 	realms,
 	royalOnly,
+	fits,
 }: MatchInParams): number {
 	const table = people.persons
 	for (const realm of realms) {
@@ -187,6 +192,7 @@ function matchIn({
 			if (matched.has(other.person)) continue
 			if (royalOnly && !other.royalBlood) continue
 			if (table.sex[other.person] === table.sex[seeker.person]) continue
+			if (!fits(other.person)) continue
 			return other.person
 		}
 	}
@@ -201,6 +207,7 @@ function foreignMatch({
 	pool,
 	matched,
 	neighborsOf,
+	fits,
 	rng,
 }: MatchParams): number {
 	const near = rng.shuffle([...neighborsOf(seeker.realm)])
@@ -217,6 +224,7 @@ function foreignMatch({
 				matched,
 				realms,
 				royalOnly,
+				fits,
 			})
 			if (found >= 0) return found
 		}
@@ -238,18 +246,149 @@ function wed({ people, a, b, time }: MarryParams): void {
 	marry({ people, a, b, time })
 }
 
+// Royal children of alliance-marrying realms seek a betrothal from 12, as the
+// CK3 AI does.
+function minorSeekers({
+	people,
+	time,
+	sovereigns,
+	royal,
+	chance,
+	rng,
+}: MinorSeekersParams): number[] {
+	const table = people.persons
+	const seen = new Set<number>()
+	const minors: number[] = []
+	for (const ruler of sovereigns)
+		for (const person of PEOPLE.family({ people, person: ruler })) {
+			if (seen.has(person)) continue
+			seen.add(person)
+			const age = time - table.birth[person]
+			if (age < BETROTHAL.minAge || age >= BETROTHAL.adultAge) continue
+			if (!PEOPLE.aliveAt({ people, person, time })) continue
+			if (table.spouse[person] >= 0 || table.betrothed[person] >= 0) continue
+			if (!royal(table.realm[person])) continue
+			if (rng.random() < chance) minors.push(person)
+		}
+	return minors
+}
+
+// A match with a minor is a betrothal, made only between ruling families that
+// it allies and within the age gap; a match of two adults is a wedding.
+function seekMatches({
+	people,
+	time,
+	seekers,
+	sovereigns,
+	minorChance,
+	neighborsOf,
+	originOf,
+	royal,
+	alliable,
+	rng,
+}: SeekMatchesParams): PeopleMatches {
+	const table = people.persons
+	const crowned = new Set(sovereigns)
+	const pool = new Map<number, Seeker[]>()
+	const all: Seeker[] = [
+		...seekers,
+		...minorSeekers({
+			people,
+			time,
+			sovereigns,
+			royal,
+			chance: minorChance,
+			rng,
+		}),
+	].map((person) => ({
+		person,
+		realm: table.realm[person],
+		royalBlood:
+			crowned.has(person) ||
+			crowned.has(table.father[person]) ||
+			crowned.has(table.mother[person]),
+	}))
+	for (const seeker of all) {
+		const list = pool.get(seeker.realm)
+		if (list) list.push(seeker)
+		else pool.set(seeker.realm, [seeker])
+	}
+	const ageOf = (person: number) => time - table.birth[person]
+	const matched = new Set<number>()
+	const matches: PeopleMatches = { weddings: [], betrothals: [] }
+	for (const seeker of all) {
+		if (matched.has(seeker.person)) continue
+		matched.add(seeker.person)
+		const age = ageOf(seeker.person)
+		const fits = (partner: number) => {
+			const other = ageOf(partner)
+			if (Math.min(age, other) >= BETROTHAL.adultAge) return true
+			return (
+				Math.min(age, other) >= BETROTHAL.minAge &&
+				Math.abs(age - other) <= BETROTHAL.maxAgeGap &&
+				alliable({
+					a: seeker.person,
+					b: partner,
+					realmA: seeker.realm,
+					realmB: table.realm[partner],
+				})
+			)
+		}
+		const isRoyal = royal(seeker.realm)
+		const partner =
+			rng.random() < (isRoyal ? ROYAL_FOREIGN_CHANCE : FOREIGN_MATCH_CHANCE)
+				? foreignMatch({
+						people,
+						seeker,
+						pool,
+						matched,
+						neighborsOf,
+						fits,
+						rng,
+					})
+				: -1
+		if (partner >= 0) {
+			matched.add(partner)
+			const match = {
+				a: seeker.person,
+				b: partner,
+				realmA: seeker.realm,
+				realmB: table.realm[partner],
+			}
+			if (Math.min(age, ageOf(partner)) < BETROTHAL.adultAge) {
+				BETROTHAL.betroth({ people, a: seeker.person, b: partner, time })
+				matches.betrothals.push(match)
+			} else {
+				matches.weddings.push(match)
+				wed({ people, a: seeker.person, b: partner, time })
+			}
+			continue
+		}
+		if (isRoyal && age < ROYAL_WAIT_AGE) {
+			matched.delete(seeker.person)
+			continue
+		}
+		outsider({
+			people,
+			partner: seeker.person,
+			time,
+			origin: originOf(seeker.realm),
+			rng,
+		})
+	}
+	return matches
+}
+
 function runYear({
 	people,
 	time,
 	rulers,
-	neighborsOf,
-	originOf,
-	royal,
 	sovereigns,
 	rng,
+	...realms
 }: RunPeopleYearParams): PeopleYear {
 	const table = people.persons
-	const crowned = new Set(sovereigns)
+	BETROTHAL.releaseDead({ people, time })
 	people.alive = people.alive.filter((person) => table.death[person] > time)
 	const stamp = Math.floor(time)
 	const line = new Set<number>()
@@ -267,59 +406,28 @@ function runYear({
 		}
 	}
 
-	const seekers: Seeker[] = []
-	const pool = new Map<number, Seeker[]>()
+	const weddings: CrossMatch[] = []
+	for (const { a, b } of BETROTHAL.fulfil({ people, time })) {
+		weddings.push({ a, b, realmA: table.realm[a], realmB: table.realm[b] })
+		wed({ people, a, b, time })
+	}
+	const seekers: number[] = []
 	for (const person of people.alive) {
 		if (table.scopeYear[person] !== stamp) continue
 		if (!PEOPLE.aliveAt({ people, person, time })) continue
 		if (!seeksSpouse({ people, person, time })) continue
-		if (rng.random() >= MARRIAGE_CHANCE) continue
-		const seeker = {
-			person,
-			realm: table.realm[person],
-			royalBlood:
-				crowned.has(person) ||
-				crowned.has(table.father[person]) ||
-				crowned.has(table.mother[person]),
-		}
-		seekers.push(seeker)
-		const list = pool.get(seeker.realm)
-		if (list) list.push(seeker)
-		else pool.set(seeker.realm, [seeker])
+		if (rng.random() < MARRIAGE_CHANCE) seekers.push(person)
 	}
-	const matched = new Set<number>()
-	const weddings: CrossWedding[] = []
-	for (const seeker of seekers) {
-		if (matched.has(seeker.person)) continue
-		matched.add(seeker.person)
-		const isRoyal = royal(seeker.realm)
-		const partner =
-			rng.random() < (isRoyal ? ROYAL_FOREIGN_CHANCE : FOREIGN_MATCH_CHANCE)
-				? foreignMatch({ people, seeker, pool, matched, neighborsOf, rng })
-				: -1
-		if (partner >= 0) {
-			matched.add(partner)
-			weddings.push({
-				a: seeker.person,
-				b: partner,
-				realmA: seeker.realm,
-				realmB: table.realm[partner],
-			})
-			wed({ people, a: seeker.person, b: partner, time })
-			continue
-		}
-		if (isRoyal && time - table.birth[seeker.person] < ROYAL_WAIT_AGE) {
-			matched.delete(seeker.person)
-			continue
-		}
-		outsider({
-			people,
-			partner: seeker.person,
-			time,
-			origin: originOf(seeker.realm),
-			rng,
-		})
-	}
+	const matches = seekMatches({
+		people,
+		time,
+		seekers,
+		sovereigns,
+		minorChance: MARRIAGE_CHANCE,
+		rng,
+		...realms,
+	})
+	weddings.push(...matches.weddings)
 
 	const shortened: number[] = []
 	for (const mother of [...people.alive]) {
@@ -336,13 +444,13 @@ function runYear({
 				from: time,
 				until: time + 1,
 				survives: time,
-				origin: originOf(table.realm[mother]),
+				origin: realms.originOf(table.realm[mother]),
 				rng,
 			})
 		)
 			shortened.push(mother)
 	}
-	return { weddings, shortened }
+	return { weddings, betrothals: matches.betrothals, shortened }
 }
 
-export const FAMILY = { found, runYear }
+export const FAMILY = { found, seekMatches, runYear }

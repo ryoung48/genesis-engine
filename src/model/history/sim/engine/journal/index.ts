@@ -131,6 +131,17 @@ function peopleRows(state: HistoryState): JournalPeople {
 			timeMs: time * yearMs,
 			outcome,
 		})),
+		betrothals: log.betrothals.map(({ a, b, time }) => ({
+			a,
+			b,
+			timeMs: time * yearMs,
+		})),
+		betrothalEnds: log.betrothalEnds.map(({ a, b, time, cause }) => ({
+			a,
+			b,
+			timeMs: time * yearMs,
+			cause,
+		})),
 	}
 	state.people.log = {
 		persons: [],
@@ -138,6 +149,8 @@ function peopleRows(state: HistoryState): JournalPeople {
 		seats: [],
 		deaths: [],
 		pregnancies: [],
+		betrothals: [],
+		betrothalEnds: [],
 	}
 	return rows
 }
@@ -215,6 +228,8 @@ function flush({
 		people.seats.length > 0 ||
 		people.deaths.length > 0 ||
 		people.pregnancies.length > 0 ||
+		people.betrothals.length > 0 ||
+		people.betrothalEnds.length > 0 ||
 		parents.length > 0 ||
 		relations.length > 0 ||
 		occupations.length > 0 ||

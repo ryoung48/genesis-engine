@@ -1,5 +1,6 @@
 import type {
 	AppendPeopleParams,
+	BetrothalPairParams,
 	PeopleRecord,
 	PushIndexParams,
 } from "@/model/history/record/people/types"
@@ -17,6 +18,8 @@ function create(): PeopleRecord {
 		regentsOfWard: new Map(),
 		dynastyHome: new Map(),
 		pregnanciesOf: new Map(),
+		betrothals: [],
+		betrothalsOf: new Map(),
 	}
 }
 
@@ -24,6 +27,15 @@ function pushIndex<T>({ index, key, value }: PushIndexParams<T>): void {
 	const list = index.get(key)
 	if (list) list.push(value)
 	else index.set(key, [value])
+}
+
+function openBetrothal({ record, a, b }: BetrothalPairParams): number {
+	for (const index of record.betrothalsOf.get(a) ?? []) {
+		const betrothal = record.betrothals[index]
+		if (betrothal.cause === null && (betrothal.a === b || betrothal.b === b))
+			return index
+	}
+	return -1
 }
 
 function append({
@@ -59,7 +71,30 @@ function append({
 			key: mother,
 			value: { father, timeMs: recordTime(timeMs), outcome },
 		})
+	for (const { a, b, timeMs: startMs } of rows.betrothals) {
+		const index = record.betrothals.length
+		record.betrothals.push({
+			a,
+			b,
+			startTimeMs: recordTime(startMs),
+			endTimeMs: Infinity,
+			cause: null,
+		})
+		pushIndex({ index: record.betrothalsOf, key: a, value: index })
+		pushIndex({ index: record.betrothalsOf, key: b, value: index })
+	}
+	for (const { a, b, timeMs: endMs, cause } of rows.betrothalEnds) {
+		const index = openBetrothal({ record, a, b })
+		if (index < 0) continue
+		record.betrothals[index].endTimeMs = recordTime(endMs)
+		record.betrothals[index].cause = cause
+	}
 	for (const row of rows.marriages) {
+		const betrothal = openBetrothal({ record, a: row.husband, b: row.wife })
+		if (betrothal >= 0) {
+			record.betrothals[betrothal].endTimeMs = recordTime(row.startTimeMs)
+			record.betrothals[betrothal].cause = "married"
+		}
 		const index = record.marriages.length
 		record.marriages.push({ ...row, startTimeMs: recordTime(row.startTimeMs) })
 		pushIndex({ index: record.marriagesOf, key: row.husband, value: index })

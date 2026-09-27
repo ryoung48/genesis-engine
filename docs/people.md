@@ -1,6 +1,6 @@
 # People (`:history`)
 
-Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `fertility/`, `heirs/`, `lifespan/`, `health/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
+Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
 
 People are the cause behind realm events, not a population. Only ruling houses are simulated: a few thousand people on the default map.
 
@@ -14,7 +14,7 @@ A person is **recorded** (sent to the history record and wiki) when they hold a 
 
 ## What is tracked per person
 
-`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, whether they are recorded, base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
+`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, betrothed partner and betrothal time (-1 without one), whether they are recorded, base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
 State-level maps in `PeopleState`:
 
@@ -26,13 +26,13 @@ State-level maps in `PeopleState`:
 | `marriageAlliances` | Realm pairs allied by a royal marriage. |
 | `regencies` | Realm → `{ ward, regent (-1 = council), kind }`. |
 | `deposed` | Realm → `{ claimant, generation, tried }` for deposed rulers' lines. |
-| `log` | Rows since the last journal flush: new recorded persons, marriages, seat changes (ruler, district or regent), recorded persons whose death moved earlier, and recorded mothers' lost pregnancies and childbirth deaths. |
+| `log` | Rows since the last journal flush: new recorded persons, marriages, betrothals made and broken, seat changes (ruler, district or regent), recorded persons whose death moved earlier, and recorded mothers' lost pregnancies and childbirth deaths. |
 
 ## Life
 
 - **Death is fixed at birth** (`LIFESPAN.deathAt`). Yearly hazard: 10% under 1, 3% under 5, 0.5% under 16, then 1.2% under 40 for both sexes, then Gompertz ageing (1.2% × e^(0.09 × (age − 40))). Nobody lives past 100.
 - **Only childbirth moves a death date**, and only earlier (`PEOPLE.shortenLife`). A recorded person's new date goes to the record as a `deaths` row. A sovereign ruler's succession, and a regent's replacement, are rescheduled to the new date; everything else reads the person table live.
-- **Health is read back from the death date** (`HEALTH.band`): Grave in the last half year, Poor in the last 2 years of a life ending at 40+, Fair in the last 6 years of a life ending at 50+, else Good.
+- **Health is read back from the death date** (`HEALTH.band`): Grave in the last half year, Poor in the last 2 years of a life ending at 40+, Fair in the last 6 years of a life ending at 50+, else Good. A mother whose pregnancy will kill her reads Poor or Grave during it, which gives a reigning queen a weak crown in her last months.
 - **Births** come from pregnancies (see Pregnancy). Only couples where one spouse is a ruler or a ruler's child keep having children.
 - **Dynasty** follows the father, or the mother in matriarchal cultures. It falls back to the other parent when the first has none. Dynasties spread only through births.
 - **Names** are drawn from the home culture. The name seed is redrawn until the name's gender matches the person's sex.
@@ -58,24 +58,39 @@ State-level maps in `PeopleState`:
 
 Founders are used for starting rulers, new houses taking a throne, new district holders and new patrician houses.
 
-Starting ruler ages: 1–10 (weight 1), 11–15 (2), 16–30 (5), 31–50 (4), 51–65 (1). About a fifth start as children.
+Starting ruler ages: 1–10 (weight 0.4), 11–15 (0.2), 16–30 (5), 31–50 (4), 51–65 (1). About 6% start as children, close to the 4–6% share of child rulers once successions settle.
 
 ## Marriage
 
 Once a year (`FAMILY.runYear`) for rulers, their children and their siblings:
 
-1. **Who seeks.** Unmarried or widowed women 16–39 and men 18–49; each seeks with 35% chance that year.
+1. **Who seeks.** Unmarried or widowed women 16–39 and men 18–49 who are not betrothed; each seeks with 35% chance that year. Royal children aged 12–15 also seek (see Betrothal).
 2. **Foreign or home.** Families of realms that marry for alliance (single heir, or non-republic election) look abroad 80% of the time; others 30%.
 3. **Foreign search.** Neighbouring realms first, then neighbours' neighbours, among that year's other seekers of the opposite sex. *Royal blood* (a sovereign ruler or their child) looks for royal blood across both rings before settling for a lesser house. The spouse moves to the ruler's realm, or else to the husband's.
-4. **Waiting.** Royals of alliance-marrying realms who find no foreign match and are under 25 stay single and try again next year.
+4. **Waiting.** Royals of alliance-marrying realms who find no foreign match and are under 25 (minors included) stay single and try again next year.
 5. **Home match.** Otherwise they marry a made-up outsider of no house from their own culture: a wife up to 8 years younger (at least 15), a husband up to 8 years older.
+
+A foreign match where either party is under 16 is a betrothal, not a wedding (see Betrothal).
 
 At the start, 40% of married kings in alliance-marrying realms have their queen re-parented into a neighbouring ruling house, as that ruler's sister or daughter when the ages fit (`ROYAL_MARRIAGES.seed`).
 
+## Betrothal
+
+Royal houses promise their children before they come of age, as in CK3 (`BETROTHAL`, matched by `FAMILY.seekMatches`).
+
+- **Who.** Members of a sovereign ruler's family (the ruler, children, siblings) aged 12–15 in alliance-marrying realms, unmarried and unbetrothed, seek with 35% chance a year. They never take a home match.
+- **Match.** The same foreign rings. When either party is a minor, both must be 12+, at most 5 years apart, and the pair must pass the marriage-alliance check (`ROYAL_MARRIAGES.alliable`). A betrothal is always an alliance match.
+- **Result.** Either party under 16 makes a betrothal (`betrothed` and `betrothedAt` on both); two adults wed as before. The betrothal forms or binds the marriage alliance at once.
+- **Fulfilment.** Each yearly pass weds every living pair where both are 16+, by the usual host rule. Heiress unions apply. Betrothed men therefore marry at 16.
+- **Breaking.** Only two causes:
+  - *death*: either party died (checked at the start of the yearly marriages);
+  - *alliance*: the review finds no marriage alliance between the pair's realms (war, lost sovereignty, a government that stops marrying for alliance, or a succession that moves the betrothed out of the ruler's family). A betrothal whose alliance cannot form is broken at once.
+- **Start.** After `ROYAL_MARRIAGES.seed`, every royal minor seeks once, under the same rules. The world opens with about a third fewer standing betrothals than it holds at years 20–30.
+
 ## Alliances from marriage
 
-- A wedding between the ruling families (ruler, children, siblings) of two sovereign, alliance-marrying realms makes them allies, unless they are at war or in a subject or union bond. The note is `marriage alliance`.
-- While a living marriage joins the two ruling families, the alliance does not re-roll in diplomacy. When no such marriage is left, the marriage alliance ends and the alliance drifts like any other.
+- A wedding or betrothal between the ruling families (ruler, children, siblings) of two sovereign, alliance-marrying realms makes them allies, unless they are at war or in a subject or union bond. The note is `marriage alliance`.
+- While a living marriage or betrothal joins the two ruling families, the alliance does not re-roll in diplomacy. When none is left, the marriage alliance ends, its betrothals are broken, and the alliance drifts like any other.
 - A regent parent born into another ruling house holds the alliance with that house's realm the same way while she governs.
 
 ## Districts
@@ -155,22 +170,26 @@ Each electoral republic keeps 3–5 patrician house heads (the count is fixed pe
 
 The yearly `PEOPLE_YEAR` event runs, in order:
 1. district inheritance and new grants;
-2. the marriage-alliance review;
+2. the marriage-alliance review, which also breaks betrothals left without an alliance;
 3. patrician upkeep;
-4. marriages and the coming year's pregnancies, then rescheduled successions for rulers who will die in childbirth, then marriage alliances and heiress unions from that year's weddings;
+4. betrothals broken by death, fulfilled betrothals, marriages and betrothals, the coming year's pregnancies, then rescheduled successions and regent replacements for those who will die in childbirth, then marriage alliances from that year's betrothals and weddings, and heiress unions;
 5. the regency review, usurpation rolls and restoration.
 
 Successions, coming of age and rebellions run on their own events at the exact time.
 
 ## Record and wiki
 
-- **Journal.** Each flush carries new recorded persons, marriages and seat rows. A seat row's kind is `ruler`, `district` or `regent`; a regent row also names the ward.
-- **Record.** `PEOPLE_RECORD` builds persons, marriages and tenures, indexed by person, by seat and by ward. Regent tenures are kept apart from holder tenures on the same seat.
-- **Queries.** `PERSON_QUERY` gives the person view, the timeline, the seat holder at a time, and health.
+- **Journal.** Each flush carries new recorded persons, marriages, seat rows, `deaths`, `pregnancies`, `betrothals` and `betrothalEnds` rows:
+  - a seat row's kind is `ruler`, `district` or `regent`, and a regent row also names the ward;
+  - a `deaths` row gives a recorded person's earlier death date;
+  - a `pregnancies` row is a recorded mother's miscarriage, stillbirth or childbirth death;
+  - `betrothals` and `betrothalEnds` (cause `death` or `alliance`) cover recorded pairs; a fulfilled betrothal ends in its marriage row.
+- **Record.** `PEOPLE_RECORD` builds persons, marriages and tenures, indexed by person, by seat and by ward. Regent tenures are kept apart from holder tenures on the same seat. `deaths` rows update the person's death date, pregnancy outcomes are indexed by mother, and betrothals by person (`betrothalsOf`, with start, end and cause). A reigning ruler's `rulerChange` entry on the nation timeline also gets the new death date.
+- **Queries.** `PERSON_QUERY` gives the person view, the timeline, the seat holder at a time, and health. On a mother's timeline, "miscarriage" and "stillborn child" are added, and "died in childbirth" replaces "died". "betrothed" and, for an alliance break, "betrothal broken" are added. The person page shows them as Family rows, and a "Betrothed" chip group while a betrothal stands.
 - **Nation timelines.** Only realm-level person events reach them:
   - successions;
   - regency start, coming of age, regent change and usurpation;
-  - marriage alliances (one row per royal marriage and its alliance);
+  - marriage alliances (one row per royal marriage and its alliance; the row says "was betrothed to" when the couple had not yet married);
   - unions;
   - pretender and restoration revolts.
 

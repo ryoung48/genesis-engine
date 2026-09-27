@@ -1,4 +1,8 @@
-import type { PeopleState, RealmOrigin } from "@/model/history/sim/people/types"
+import type {
+	MarriageRealms,
+	PeopleState,
+	RealmOrigin,
+} from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface MarryParams {
@@ -29,6 +33,8 @@ export interface MatchParams {
 	pool: Map<number, Seeker[]>
 	matched: Set<number>
 	neighborsOf: (realm: number) => readonly number[]
+	// The seeker would accept this partner.
+	fits: (partner: number) => boolean
 	rng: SharedRng
 }
 
@@ -45,4 +51,25 @@ export interface MatchInParams {
 	matched: Set<number>
 	realms: number[]
 	royalOnly: boolean
+	fits: (partner: number) => boolean
+}
+
+export interface SeekMatchesParams extends MarriageRealms {
+	people: PeopleState
+	time: number
+	// Adults who seek this year; royal minors are drawn here.
+	seekers: number[]
+	sovereigns: number[]
+	// Chance that an eligible royal minor seeks this year.
+	minorChance: number
+	rng: SharedRng
+}
+
+export interface MinorSeekersParams {
+	people: PeopleState
+	time: number
+	sovereigns: number[]
+	royal: (realm: number) => boolean
+	chance: number
+	rng: SharedRng
 }

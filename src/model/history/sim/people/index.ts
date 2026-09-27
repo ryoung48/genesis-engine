@@ -40,6 +40,8 @@ function create(provinceCount: number): PeopleState {
 			fertility: [],
 			peak: [],
 			nextBirth: [],
+			betrothed: [],
+			betrothedAt: [],
 		},
 		alive: [],
 		rulerOf: new Int32Array(provinceCount).fill(-1),
@@ -54,6 +56,8 @@ function create(provinceCount: number): PeopleState {
 			seats: [],
 			deaths: [],
 			pregnancies: [],
+			betrothals: [],
+			betrothalEnds: [],
 		},
 		nextDynasty: 0,
 	}
@@ -93,6 +97,8 @@ function add({
 	table.fertility.push(fertility)
 	table.peak.push(0)
 	table.nextBirth.push(0)
+	table.betrothed.push(-1)
+	table.betrothedAt.push(-1)
 	if (father >= 0) table.children[father].push(id)
 	if (mother >= 0) table.children[mother].push(id)
 	people.alive.push(id)
@@ -244,19 +250,19 @@ function shortenLife({ people, person, time }: ShortenLifeParams): boolean {
 	return true
 }
 
+// A living marriage or betrothal joins the two rulers' families.
 function tiedByMarriage({ people, a, b, time }: MarriageTieParams): boolean {
 	const table = people.persons
 	const other = new Set(family({ people, person: b }))
-	for (const member of family({ people, person: a })) {
-		const spouse = table.spouse[member]
-		if (
-			spouse >= 0 &&
-			other.has(spouse) &&
-			aliveAt({ people, person: member, time }) &&
-			aliveAt({ people, person: spouse, time })
-		)
-			return true
-	}
+	for (const member of family({ people, person: a }))
+		for (const partner of [table.spouse[member], table.betrothed[member]])
+			if (
+				partner >= 0 &&
+				other.has(partner) &&
+				aliveAt({ people, person: member, time }) &&
+				aliveAt({ people, person: partner, time })
+			)
+				return true
 	return false
 }
 

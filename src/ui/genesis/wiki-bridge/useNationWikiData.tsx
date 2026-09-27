@@ -5,6 +5,7 @@ import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
@@ -1160,13 +1161,21 @@ export function useNationWikiData(
 			} else {
 				description = `${title} ${starts ? "formed" : "ended"} a ${relation} with ${otherName}.`
 			}
-			// A procedural royal marriage names the couple whose wedding made it.
+			// A procedural royal marriage names the couple whose wedding or
+			// betrothal made it.
 			const couple = (event.spouses ?? []).flatMap((person) => {
 				const mention = recordPersonMention({ people: record.people, person })
 				return mention ? [mention] : []
 			})
-			if (couple.length === 2)
-				description = `${description.slice(0, -1)}: ${couple[0].name} married ${couple[1].name}.`
+			if (couple.length === 2 && record.people) {
+				const married = PERSON_QUERY.married({
+					people: record.people,
+					a: couple[0].id,
+					b: couple[1].id,
+					timeMs: event.timeMs,
+				})
+				description = `${description.slice(0, -1)}: ${couple[0].name} ${married ? "married" : "was betrothed to"} ${couple[1].name}.`
+			}
 			pushTimelineEvent(timelineEvents, {
 				id: `diplomacy:${event.date}:${index}`,
 				date: event.date,

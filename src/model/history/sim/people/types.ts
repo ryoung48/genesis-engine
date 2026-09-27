@@ -1,3 +1,4 @@
+import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export type Sex = 0 | 1
@@ -28,6 +29,10 @@ export interface PersonTable {
 	peak: number[]
 	// Earliest next conception: the last pregnancy's end plus a rest.
 	nextBirth: number[]
+	// The promised partner, or -1; always set on both parties.
+	betrothed: number[]
+	// When the betrothal was made; -1 without one.
+	betrothedAt: number[]
 }
 
 export interface PeopleLogMarriage {
@@ -71,21 +76,35 @@ export interface PeopleLogPregnancy {
 	outcome: PregnancyLoss
 }
 
+export interface PeopleLogBetrothal {
+	a: number
+	b: number
+	time: number
+}
+
+export interface PeopleLogBetrothalEnd extends PeopleLogBetrothal {
+	cause: BetrothalEndCause
+}
+
 export interface PeopleLogDeath {
 	person: number
 	death: number
 }
 
-// Rows the journal has not yet taken: newly recorded people, marriages
-// between recorded people, seat holder changes, recorded people whose death
-// moved earlier, and recorded mothers' pregnancies that bore no living child
-// or killed the mother.
+// Rows the journal has not yet taken: newly recorded people, marriages and
+// betrothals between recorded people, seat holder changes, recorded people
+// whose death moved earlier, and recorded mothers' pregnancies that bore no
+// living child or killed the mother.
 export interface PeopleLog {
 	persons: number[]
 	marriages: PeopleLogMarriage[]
 	seats: PeopleLogSeat[]
 	deaths: PeopleLogDeath[]
 	pregnancies: PeopleLogPregnancy[]
+	betrothals: PeopleLogBetrothal[]
+	// Betrothals released by death or a broken alliance; a fulfilled one ends
+	// in its marriage row instead.
+	betrothalEnds: PeopleLogBetrothalEnd[]
 }
 
 export interface PeopleState {
@@ -200,22 +219,32 @@ export interface VacateParams {
 	seat: number
 }
 
-export interface RunPeopleYearParams {
-	people: PeopleState
-	time: number
-	rulers: number[]
+// The realm-level rules the marriage market reads from the engine.
+export interface MarriageRealms {
 	neighborsOf: (realm: number) => readonly number[]
 	originOf: (realm: number) => RealmOrigin
 	// Realms whose ruling houses marry abroad for alliance.
 	royal: (realm: number) => boolean
+	// The match would form or bind a marriage alliance.
+	alliable: (match: CrossMatch) => boolean
+}
+
+export interface RunPeopleYearParams extends MarriageRealms {
+	people: PeopleState
+	time: number
+	rulers: number[]
 	sovereigns: number[]
 	rng: SharedRng
 }
 
-export interface PeopleYear {
-	weddings: CrossWedding[]
+export interface PeopleYear extends PeopleMatches {
 	// People whose death date moved earlier this year.
 	shortened: number[]
+}
+
+export interface PeopleMatches {
+	weddings: CrossMatch[]
+	betrothals: CrossMatch[]
 }
 
 export interface MarriageAlliance {
@@ -223,7 +252,7 @@ export interface MarriageAlliance {
 	second: number
 }
 
-export interface CrossWedding {
+export interface CrossMatch {
 	a: number
 	b: number
 	realmA: number

@@ -3,6 +3,7 @@ import type {
 	JournalPerson,
 	SeatKind,
 } from "@/model/history/sim/engine/journal/types"
+import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
 import type { PregnancyLoss } from "@/model/history/sim/people/types"
 
 export interface RecordPerson {
@@ -37,6 +38,19 @@ export interface RecordMarriage {
 	startTimeMs: number
 }
 
+// A betrothal that ended in its marriage has the wedding as its end.
+export type RecordBetrothalEnd = BetrothalEndCause | "married"
+
+export interface RecordBetrothal {
+	a: number
+	b: number
+	startTimeMs: number
+	// Infinity while the betrothal stands.
+	endTimeMs: number
+	// [JUSTIFICATION] A standing betrothal has no end cause yet.
+	cause: RecordBetrothalEnd | null
+}
+
 export interface RecordPregnancy {
 	father: number
 	timeMs: number
@@ -68,6 +82,8 @@ export interface PeopleRecord {
 	dynastyHome: Map<number, number>
 	// Pregnancies that bore no living child or killed the mother, by mother.
 	pregnanciesOf: Map<number, RecordPregnancy[]>
+	betrothals: RecordBetrothal[]
+	betrothalsOf: Map<number, number[]>
 }
 
 export interface AppendPeopleParams {
@@ -82,4 +98,10 @@ export interface PushIndexParams<T> {
 	index: Map<number, T[]>
 	key: number
 	value: T
+}
+
+export interface BetrothalPairParams {
+	record: PeopleRecord
+	a: number
+	b: number
 }

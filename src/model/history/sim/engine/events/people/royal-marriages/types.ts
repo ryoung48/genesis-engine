@@ -1,14 +1,14 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type {
-	CrossWedding,
+	CrossMatch,
 	PeopleState,
 	RealmOrigin,
 } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
-export interface WeddingParams {
+export interface AllianceMatchParams {
 	state: HistoryState
-	wedding: CrossWedding
+	match: CrossMatch
 }
 
 export interface PairKeyParams {

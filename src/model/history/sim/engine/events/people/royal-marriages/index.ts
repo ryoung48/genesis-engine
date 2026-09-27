@@ -1,15 +1,16 @@
 import type {
+	AllianceMatchParams,
 	BirthParents,
 	BirthParentsParams,
 	PairKeyParams,
 	RehomeParams,
 	ReviewParams,
 	SeedRoyalMarriagesParams,
-	WeddingParams,
 } from "@/model/history/sim/engine/events/people/royal-marriages/types"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
+import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 
 // Share of starting kings in alliance-marrying realms whose queen comes from a
 // neighbouring ruling house.
@@ -28,24 +29,32 @@ function pairKey({ state, a, b }: PairKeyParams): number {
 	return Math.min(a, b) * state.P + Math.max(a, b)
 }
 
-// A marriage between the ruling families of two realms that marry for
-// alliance makes them allies, or binds an alliance they already have.
-function allianceFromWedding({ state, wedding }: WeddingParams): void {
+// A match between the ruling families of two realms that marry for alliance,
+// neither at war nor in a subject or union bond, can ally them.
+function alliable({ state, match }: AllianceMatchParams): boolean {
 	const people = state.people
-	const { a, b, realmA, realmB } = wedding
+	const { a, b, realmA, realmB } = match
 	for (const realm of [realmA, realmB]) {
-		if (!STATE.isSovereign({ state, p: realm })) return
+		if (!STATE.isSovereign({ state, p: realm })) return false
 		if (!GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[realm]))
-			return
+			return false
 	}
 	const rulerA = people.rulerOf[realmA]
 	const rulerB = people.rulerOf[realmB]
-	if (rulerA < 0 || rulerB < 0) return
-	if (!PEOPLE.family({ people, person: rulerA }).includes(a)) return
-	if (!PEOPLE.family({ people, person: rulerB }).includes(b)) return
-	if (UNALLIABLE.has(STATE.getRelation({ state, a: realmA, b: realmB }))) return
+	if (rulerA < 0 || rulerB < 0) return false
+	if (!PEOPLE.family({ people, person: rulerA }).includes(a)) return false
+	if (!PEOPLE.family({ people, person: rulerB }).includes(b)) return false
+	return !UNALLIABLE.has(STATE.getRelation({ state, a: realmA, b: realmB }))
+}
+
+// A marriage or betrothal between such families makes the realms allies, or
+// binds an alliance they already have. Returns whether an alliance holds.
+function allianceFromMatch({ state, match }: AllianceMatchParams): boolean {
+	const people = state.people
+	if (!alliable({ state, match })) return false
+	const { a, b, realmA, realmB } = match
 	const key = pairKey({ state, a: realmA, b: realmB })
-	if (people.marriageAlliances.has(key)) return
+	if (people.marriageAlliances.has(key)) return true
 	STATE.setRelation({ state, a: realmA, b: realmB, rel: STATE.rel.ALLY })
 	people.marriageAlliances.set(key, { first: realmA, second: realmB })
 	state.events.push({
@@ -53,11 +62,14 @@ function allianceFromWedding({ state, wedding }: WeddingParams): void {
 		time: state.time,
 		data: { first: realmA, second: realmB, spouses: [a, b] },
 	})
+	return true
 }
 
-// A marriage alliance ends once no living marriage joins the two ruling
-// families, or the realms stop being sovereign allies. The alliance itself
-// stays and drifts like any other.
+// A marriage alliance ends once no living marriage or betrothal joins the two
+// ruling families, or the realms stop being sovereign allies. The alliance
+// itself stays and drifts like any other. A living betrothal with no marriage
+// alliance between its realms is broken; one with a dead party is left for
+// the death release.
 function review({ state }: ReviewParams): void {
 	const people = state.people
 	const time = state.time / STATE.yearMs
@@ -78,6 +90,23 @@ function review({ state }: ReviewParams): void {
 			time: state.time,
 			data: { first, second },
 		})
+	}
+	const table = people.persons
+	for (const person of people.alive) {
+		const partner = table.betrothed[person]
+		if (partner < person) continue
+		if (
+			!PEOPLE.aliveAt({ people, person, time }) ||
+			!PEOPLE.aliveAt({ people, person: partner, time })
+		)
+			continue
+		const key = pairKey({
+			state,
+			a: table.realm[person],
+			b: table.realm[partner],
+		})
+		if (!people.marriageAlliances.has(key))
+			BETROTHAL.release({ people, person, time, cause: "alliance" })
 	}
 }
 
@@ -158,13 +187,13 @@ function seed({ state, rng }: SeedRoyalMarriagesParams): void {
 				origin: STATE.originOf({ state, realm: other }),
 				rng,
 			})
-			allianceFromWedding({
+			allianceFromMatch({
 				state,
-				wedding: { a: king, b: queen, realmA: realm, realmB: other },
+				match: { a: king, b: queen, realmA: realm, realmB: other },
 			})
 			break
 		}
 	}
 }
 
-export const ROYAL_MARRIAGES = { allianceFromWedding, seed, review }
+export const ROYAL_MARRIAGES = { alliable, allianceFromMatch, seed, review }

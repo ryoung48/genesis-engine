@@ -11,7 +11,7 @@ import type { RealmCacheEntry } from "@/model/history/sim/engine/state/types"
 import { MATH } from "@/model/shared/math/core"
 import { ERAS } from "@/model/society/eras"
 
-const DUCATS_PER_GRAM = 2.4 / 650_000
+const DUCATS_PER_GRAM = 1 / 50_000
 
 const OUTPUT_CURVE = {
 	domain: [0, 0.25, 0.65, 0.95],

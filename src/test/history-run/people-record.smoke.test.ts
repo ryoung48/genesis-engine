@@ -1,13 +1,61 @@
 import { expect, it } from "vitest"
 import { DATE } from "@/model/history/earth/date"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
+import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
+
+// Checked after each yearly pass. Both columns agree, no betrothed person has a living spouse, every pair was
+// made between 12+ parties within the age gap with one under 16, is wed within
+// a yearly pass of coming of age, and stands on a marriage alliance.
+function expectBetrothals(engine: HistoryState): void {
+	const people = engine.people
+	const table = people.persons
+	const time = engine.time / STATE.yearMs
+	for (const person of people.alive) {
+		const partner = table.betrothed[person]
+		if (partner < 0) continue
+		expect(table.betrothed[partner]).toBe(person)
+		expect(table.betrothedAt[partner]).toBe(table.betrothedAt[person])
+		if (table.death[person] <= time || table.death[partner] <= time) continue
+		const spouse = table.spouse[person]
+		expect(spouse < 0 || table.death[spouse] <= time).toBe(true)
+		const made = table.betrothedAt[person]
+		const ages = [made - table.birth[person], made - table.birth[partner]]
+		expect(Math.min(...ages)).toBeGreaterThanOrEqual(BETROTHAL.minAge)
+		expect(Math.min(...ages)).toBeLessThan(BETROTHAL.adultAge)
+		expect(Math.abs(ages[0] - ages[1])).toBeLessThanOrEqual(BETROTHAL.maxAgeGap)
+		expect(
+			Math.min(time - table.birth[person], time - table.birth[partner]),
+		).toBeLessThan(BETROTHAL.adultAge + 1)
+		const realmA = table.realm[person]
+		const realmB = table.realm[partner]
+		expect(STATE.getRelation({ state: engine, a: realmA, b: realmB })).not.toBe(
+			STATE.rel.WAR,
+		)
+		expect(
+			people.marriageAlliances.has(
+				Math.min(realmA, realmB) * engine.P + Math.max(realmA, realmB),
+			),
+		).toBe(true)
+	}
+	for (const { first, second } of people.marriageAlliances.values()) {
+		const rulerA = people.rulerOf[first]
+		const rulerB = people.rulerOf[second]
+		expect(
+			rulerA >= 0 &&
+				rulerB >= 0 &&
+				PEOPLE.tiedByMarriage({ people, a: rulerA, b: rulerB, time }),
+		).toBe(true)
+	}
+}
 
 it("records rulers, their families and seat tenures consistently", () => {
 	const seed = 14963991
@@ -24,6 +72,19 @@ it("records rulers, their families and seat tenures consistently", () => {
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	const start = engine.time
+	expectBetrothals(engine)
+	expect(
+		engine.people.alive.some(
+			(person) => engine.people.persons.betrothed[person] >= 0,
+		),
+	).toBe(true)
+	const runPeopleYear = PEOPLE_EVENTS.runYear
+	let passes = 0
+	PEOPLE_EVENTS.runYear = (params) => {
+		runPeopleYear(params)
+		expectBetrothals(params.state)
+		passes++
+	}
 	for (let year = 1; year <= 30; year++) {
 		SIM_ENGINE.simulateUntil({
 			state: engine,
@@ -43,6 +104,8 @@ it("records rulers, their families and seat tenures consistently", () => {
 			).toBe(true)
 		}
 	}
+	PEOPLE_EVENTS.runYear = runPeopleYear
+	expect(passes).toBe(30)
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
 	const people = state.record.people
 	expect(people).not.toBeNull()
@@ -101,6 +164,13 @@ it("records rulers, their families and seat tenures consistently", () => {
 		const holder = engine.people.rulerOf[seat]
 		if (holder < 0 || STATE.isSovereign({ state: engine, p: seat })) continue
 		if (table.throne[holder] !== seat) continue
+		// An absorbed realm's ruler, possibly a child, keeps the seat as a district.
+		const granted = (people.tenuresOf.get(holder) ?? []).some(
+			(index) =>
+				people.tenures[index].seat === seat &&
+				people.tenures[index].kind === "district",
+		)
+		if (!granted) continue
 		expect(years - table.birth[holder]).toBeGreaterThanOrEqual(16)
 	}
 	for (const [realm, regency] of engine.people.regencies)
@@ -137,7 +207,20 @@ it("records rulers, their families and seat tenures consistently", () => {
 			timeMs: state.record.maxTimeMs,
 		}))
 			timelineKinds.add(event.kind)
-	for (const kind of ["miscarriage", "stillborn child", "died in childbirth"])
+	for (const person of people.betrothalsOf.keys())
+		for (const event of PERSON_QUERY.timeline({
+			people,
+			id: person,
+			timeMs: state.record.maxTimeMs,
+		}))
+			timelineKinds.add(event.kind)
+	for (const kind of [
+		"miscarriage",
+		"stillborn child",
+		"died in childbirth",
+		"betrothed",
+		"betrothal broken",
+	])
 		expect(timelineKinds.has(kind)).toBe(true)
 
 	const timeMs = state.record.maxTimeMs

@@ -3,6 +3,7 @@ import type {
 	EngineNote,
 	HistoryState,
 } from "@/model/history/sim/engine/state/types"
+import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
 import type {
 	PregnancyLoss,
 	RegentKind,
@@ -78,6 +79,16 @@ export interface JournalPregnancy {
 	outcome: PregnancyLoss
 }
 
+export interface JournalBetrothal {
+	a: number
+	b: number
+	timeMs: number
+}
+
+export interface JournalBetrothalEnd extends JournalBetrothal {
+	cause: BetrothalEndCause
+}
+
 // A recorded person whose death moved earlier.
 export interface JournalDeath {
 	id: number
@@ -90,6 +101,8 @@ export interface JournalPeople {
 	seats: JournalSeat[]
 	deaths: JournalDeath[]
 	pregnancies: JournalPregnancy[]
+	betrothals: JournalBetrothal[]
+	betrothalEnds: JournalBetrothalEnd[]
 }
 
 export interface JournalTransaction {

@@ -252,7 +252,12 @@ export function usePersonWikiData(
 								: `${person.name} died in childbirth aged ${ageAt(person, event.timeMs)}.`,
 					people: selfMentions,
 				})
-			} else if (event.kind === "married" || event.kind === "child born") {
+			} else if (
+				event.kind === "married" ||
+				event.kind === "betrothed" ||
+				event.kind === "betrothal broken" ||
+				event.kind === "child born"
+			) {
 				const other = mention(event.other)
 				if (!other) continue
 				pushTimelineEvent(timelineEvents, {
@@ -261,7 +266,11 @@ export function usePersonWikiData(
 					description:
 						event.kind === "married"
 							? `${person.name} married ${other.name}.`
-							: `${other.name} was born to ${person.name}.`,
+							: event.kind === "betrothed"
+								? `${person.name} was betrothed to ${other.name}.`
+								: event.kind === "betrothal broken"
+									? `${person.name}'s betrothal to ${other.name} was broken.`
+									: `${other.name} was born to ${person.name}.`,
 					people: [...selfMentions, other],
 				})
 			} else if (event.kind === "regent appointed") {
@@ -347,6 +356,14 @@ export function usePersonWikiData(
 				{
 					label: "Spouses",
 					chips: chips(view.spouses.map((spouse) => spouse.person)),
+				},
+				{
+					label: "Betrothed",
+					chips: chips(
+						view.betrothals
+							.filter((betrothal) => betrothal.endTimeMs === null)
+							.map((betrothal) => betrothal.person),
+					),
 				},
 				{ label: "Children", chips: chips(view.children) },
 			],

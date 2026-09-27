@@ -748,11 +748,13 @@ function createHistoryState({
 
 const FOUNDER_CLAIM = 3
 
+// Children are about as common among starting rulers as among reigning ones
+// once successions settle, 4-6%.
 function rulerAge(rng: SharedRng): number {
 	return (
 		rng.weightedChoice([
-			{ v: rng.uniform(1, 10), w: 1 },
-			{ v: rng.uniform(11, 15), w: 2 },
+			{ v: rng.uniform(1, 10), w: 0.4 },
+			{ v: rng.uniform(11, 15), w: 0.2 },
 			{ v: rng.uniform(16, 30), w: 5 },
 			{ v: rng.uniform(31, 50), w: 4 },
 			{ v: rng.uniform(51, 65), w: 1 },
@@ -886,7 +888,7 @@ function unite({ state, a, b, ruler, shared }: UniteParams): UnionLink {
 	state.events.push({
 		tag: "personal union formed",
 		time: state.time,
-		data: { junior, senior, ruler },
+		data: { junior, senior, ruler, shared },
 	})
 	return { senior, junior, merge: false }
 }

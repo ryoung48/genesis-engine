@@ -38,6 +38,53 @@ export interface CenturyReport {
 	revenuePerHead: number
 	regency: RegencyReport
 	people: PeopleReport
+	marriage: MarriageReport
+}
+
+export interface MarriageReport {
+	alliancesFormed: number
+	alliancesStanding: number
+	// Mean age at first marriage of sovereign rulers' children, by sex.
+	firstMarriageAge: [number, number]
+	marriedAbroadShare: number
+	heiressUnions: number
+	betrothalsMade: number
+	betrothalsFulfilled: number
+	betrothalsBrokenByDeath: number
+	betrothalsBrokenByAlliance: number
+}
+
+export type BetrothalOutcome = "made" | "married" | "death" | "alliance"
+
+export interface BetrothalChange {
+	time: number
+	outcome: BetrothalOutcome
+}
+
+export interface FirstMarriage {
+	time: number
+	sex: number
+	age: number
+	abroad: boolean
+}
+
+export interface MarriageTracker {
+	crowned: Set<number>
+	seen: Set<number>
+	marriages: FirstMarriage[]
+	// Standing betrothals by their lower party, as of the last sample.
+	betrothed: Map<number, number>
+	betrothals: BetrothalChange[]
+	// Standing betrothals after init, then at each yearly sample.
+	standing: number[]
+}
+
+export interface TrackMarriagesParams extends EngineParams {
+	tracker: MarriageTracker
+}
+
+export interface MarriageReportParams extends WindowParams {
+	tracker: MarriageTracker
 }
 
 export interface PeopleReport {

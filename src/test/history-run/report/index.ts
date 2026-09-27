@@ -8,15 +8,20 @@ import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import type {
+	BetrothalOutcome,
 	CenturyReport,
 	EngineParams,
 	HistoryReportOptions,
+	MarriageReport,
+	MarriageReportParams,
+	MarriageTracker,
 	PeopleReport,
 	PeopleReportParams,
 	RegencyReport,
 	RegencyReportParams,
 	ReportEnvParams,
 	RunSeedParams,
+	TrackMarriagesParams,
 	UnionJuniorsParams,
 	WindowParams,
 } from "@/test/history-run/report/types"
@@ -221,6 +226,103 @@ function peopleReport({
 	}
 }
 
+function standingBetrothals({ engine }: EngineParams): Map<number, number> {
+	const people = engine.people
+	const table = people.persons
+	const time = engine.time / STATE.yearMs
+	const pairs = new Map<number, number>()
+	for (const person of people.alive) {
+		const partner = table.betrothed[person]
+		if (partner > person && table.death[person] > time)
+			pairs.set(person, partner)
+	}
+	return pairs
+}
+
+// Sovereign rulers' children are seen at their first yearly sample as married.
+// Betrothals are compared with the previous sample: a pair that is gone was
+// fulfilled if the two married, else broken by a death or by its alliance.
+function trackMarriages({ engine, tracker }: TrackMarriagesParams): void {
+	const people = engine.people
+	const table = people.persons
+	const time = engine.time / STATE.yearMs
+	const pairs = standingBetrothals({ engine })
+	for (const [person, partner] of pairs)
+		if (tracker.betrothed.get(person) !== partner)
+			tracker.betrothals.push({ time, outcome: "made" })
+	for (const [person, partner] of tracker.betrothed) {
+		if (pairs.get(person) === partner) continue
+		tracker.betrothals.push({
+			time,
+			outcome:
+				table.spouse[person] === partner
+					? "married"
+					: Math.min(table.death[person], table.death[partner]) <= time
+						? "death"
+						: "alliance",
+		})
+	}
+	tracker.betrothed = pairs
+	tracker.standing.push(pairs.size)
+	for (const p of sovereigns({ engine }))
+		if (people.rulerOf[p] >= 0) tracker.crowned.add(people.rulerOf[p])
+	for (const person of people.alive) {
+		const spouse = table.spouse[person]
+		if (spouse < 0 || tracker.seen.has(person)) continue
+		tracker.seen.add(person)
+		if (
+			!tracker.crowned.has(table.father[person]) &&
+			!tracker.crowned.has(table.mother[person])
+		)
+			continue
+		tracker.marriages.push({
+			time: table.marriedAt[person],
+			sex: table.sex[person],
+			age: table.marriedAt[person] - table.birth[person],
+			abroad: table.home[spouse] !== table.home[person],
+		})
+	}
+}
+
+function marriageReport({
+	engine,
+	from,
+	to,
+	tracker,
+}: MarriageReportParams): MarriageReport {
+	const events = eventsIn({ engine, from, to })
+	const betrothals = (outcome: BetrothalOutcome) =>
+		tracker.betrothals.filter(
+			(change) =>
+				change.outcome === outcome && change.time > from && change.time <= to,
+		).length
+	const marriages = tracker.marriages.filter(
+		(marriage) => marriage.time >= from && marriage.time < to,
+	)
+	const meanAge = (sex: number) => {
+		const ages = marriages
+			.filter((marriage) => marriage.sex === sex)
+			.map((marriage) => marriage.age)
+		return ages.reduce((sum, age) => sum + age, 0) / Math.max(1, ages.length)
+	}
+	return {
+		alliancesFormed: events.filter((note) => note.tag === "marriage alliance")
+			.length,
+		alliancesStanding: engine.people.marriageAlliances.size,
+		firstMarriageAge: [meanAge(0), meanAge(1)],
+		marriedAbroadShare:
+			marriages.filter((marriage) => marriage.abroad).length /
+			Math.max(1, marriages.length),
+		heiressUnions: events.filter(
+			(note) => note.tag === "personal union formed" && !note.data.shared,
+		).length,
+		betrothalsMade: betrothals("made"),
+		betrothalsFulfilled: betrothals("married"),
+		betrothalsBrokenByDeath: betrothals("death"),
+		betrothalsBrokenByAlliance: betrothals("alliance"),
+	}
+}
+
 function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	const { engine } = HISTORY_RUN.createEngine({
 		seed,
@@ -235,6 +337,15 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	let atWarYears = 0
 	let sampledYears = 0
 	let peopleMs = 0
+	const startBetrothals = standingBetrothals({ engine })
+	const tracker: MarriageTracker = {
+		crowned: new Set(),
+		seen: new Set(),
+		marriages: [],
+		betrothed: startBetrothals,
+		betrothals: [],
+		standing: [startBetrothals.size],
+	}
 	const runPeopleYear = PEOPLE_EVENTS.runYear
 	PEOPLE_EVENTS.runYear = (params) => {
 		const t0 = performance.now()
@@ -248,6 +359,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 			rng,
 			validate: false,
 		})
+		trackMarriages({ engine, tracker })
 		for (const p of largest({ engine })) {
 			sampledYears++
 			if (engine.provinceWars[p].length > 0) atWarYears++
@@ -290,6 +402,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 			revenuePerHead: revenue / Math.max(1, pop),
 			regency: regencyReport({ engine, from, to: year, top: topSet }),
 			people: peopleReport({ engine, from, to: year, peopleMs }),
+			marriage: marriageReport({ engine, from, to: year, tracker }),
 		})
 		from = year
 		startSovereigns = endSovereigns.length
@@ -298,6 +411,10 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 		peopleMs = 0
 	}
 	PEOPLE_EVENTS.runYear = runPeopleYear
+	const settled = tracker.standing.slice(20, 31)
+	options.log(
+		`seed ${seed} betrothals standing: ${tracker.standing[0]} at start, ${(settled.reduce((sum, count) => sum + count, 0) / Math.max(1, settled.length)).toFixed(1)} mean over years 20-30`,
+	)
 	return reports
 }
 
@@ -327,6 +444,13 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		for (const { from, to, people: h } of reports)
 			options.log(
 				`${`${from}-${to}`.padEnd(11)} ${String(h.successions).padStart(11)} ${h.birthsPerRuler.toFixed(2).padStart(13)} ${`${(100 * h.childlessShare).toFixed(1)}%`.padStart(10)} ${`${(100 * h.newHouseShare).toFixed(1)}%`.padStart(10)} ${`${(100 * h.minorShare).toFixed(1)}%`.padStart(6)} ${String(h.childbirthDeaths).padStart(18)} ${String(h.twinBirths).padStart(6)} ${String(h.alive).padStart(6)} ${h.msPerYear.toFixed(1).padStart(13)}`,
+			)
+		options.log(
+			"period      alliances made  standing  first wed m/f  wed abroad  heiress unions  betrothed  fulfilled  broken death/alliance",
+		)
+		for (const { from, to, marriage: m } of reports)
+			options.log(
+				`${`${from}-${to}`.padEnd(11)} ${String(m.alliancesFormed).padStart(14)} ${String(m.alliancesStanding).padStart(9)} ${`${m.firstMarriageAge[0].toFixed(1)}/${m.firstMarriageAge[1].toFixed(1)}`.padStart(14)} ${`${(100 * m.marriedAbroadShare).toFixed(0)}%`.padStart(11)} ${String(m.heiressUnions).padStart(15)} ${String(m.betrothalsMade).padStart(10)} ${String(m.betrothalsFulfilled).padStart(10)} ${`${m.betrothalsBrokenByDeath}/${m.betrothalsBrokenByAlliance}`.padStart(23)}`,
 			)
 	}
 	return results

@@ -1,9 +1,19 @@
-import type { PeopleRecord } from "@/model/history/record/people/types"
+import type {
+	PeopleRecord,
+	RecordBetrothalEnd,
+} from "@/model/history/record/people/types"
 import type { SeatKind } from "@/model/history/sim/engine/journal/types"
 
 export interface PersonAtParams {
 	people: PeopleRecord
 	id: number
+	timeMs: number
+}
+
+export interface CoupleAtParams {
+	people: PeopleRecord
+	a: number
+	b: number
 	timeMs: number
 }
 
@@ -18,6 +28,15 @@ export interface SpouseView {
 	startTimeMs: number
 	// [JUSTIFICATION] A marriage still standing at the queried time has no end.
 	endTimeMs: number | null
+}
+
+export interface BetrothalView {
+	person: number
+	startTimeMs: number
+	// [JUSTIFICATION] A betrothal still standing at the queried time has no end.
+	endTimeMs: number | null
+	// [JUSTIFICATION] A betrothal still standing at the queried time has no end.
+	cause: RecordBetrothalEnd | null
 }
 
 export interface TenureView {
@@ -43,6 +62,7 @@ export interface PersonView {
 	nameSeed: number
 	home: number
 	spouses: SpouseView[]
+	betrothals: BetrothalView[]
 	children: number[]
 	siblings: number[]
 	tenures: TenureView[]
@@ -53,6 +73,8 @@ export interface PersonView {
 export type PersonEventKind =
 	| "born"
 	| "married"
+	| "betrothed"
+	| "betrothal broken"
 	| "child born"
 	| "took seat"
 	| "left seat"
@@ -67,8 +89,8 @@ export type PersonEventKind =
 export interface PersonEvent {
 	timeMs: number
 	kind: PersonEventKind
-	// Spouse, child, seat or regent the event concerns, or the father of a
-	// lost pregnancy; -1 for birth and death.
+	// Spouse, betrothed, child, seat or regent the event concerns, or the
+	// father of a lost pregnancy; -1 for birth and death.
 	other: number
 	// The tenure a seat or regency event belongs to; -1 for other kinds.
 	tenure: number
