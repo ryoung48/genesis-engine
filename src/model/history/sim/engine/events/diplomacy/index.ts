@@ -18,7 +18,6 @@ import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
-import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import type { WeightedValue } from "@/model/shared/random/rng"
@@ -189,15 +188,6 @@ function nextEvent({ state, province, rng, years }: NextEventParams): void {
 	)
 }
 
-function seedSubjectRelations(state: HistoryState): void {
-	for (let nation = 0; nation < state.P; nation++) {
-		if (state.desolate[nation]) continue
-		const overlord = state.parentCurrent[nation]
-		if (overlord < 0) continue
-		STATE.setRelation({ state, a: nation, b: overlord, rel: STATE.rel.VASSAL })
-	}
-}
-
 function classifyInitialNeighborRelation({
 	state,
 	a,
@@ -208,6 +198,8 @@ function classifyInitialNeighborRelation({
 	if (relation === STATE.rel.RIVAL && !canBeRivals({ state, a, b })) {
 		relation = STATE.rel.SUSPICIOUS
 	}
+	if (relation === STATE.rel.ALLY && !STATE.canAlly({ state, a, b }))
+		relation = STATE.rel.FRIENDLY
 	return relation
 }
 
@@ -286,7 +278,6 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 }
 
 function initDiplomacy({ state, rng }: InitDiplomacyParams): void {
-	seedSubjectRelations(state)
 	seedNeighborRelations({ state, rng })
 	seedInitialVassals({ state, rng })
 	for (let p = 0; p < state.P; p++) {
@@ -357,7 +348,7 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 		if (rel === STATE.rel.ALLY && marriageBound({ state, a: nation, b: nb }))
 			continue
 
-		const next = rollTransition({ current: rel, rng })
+		let next = rollTransition({ current: rel, rng })
 		if (next === rel) continue
 
 		// Ally → vassalize if revenue ratio < 50%
@@ -387,6 +378,10 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 				}
 			}
 		}
+
+		if (next === STATE.rel.ALLY && !STATE.canAlly({ state, a: nation, b: nb }))
+			next = STATE.rel.FRIENDLY
+		if (next === rel) continue
 
 		// Rival size-gate
 		if (next === STATE.rel.RIVAL && !canBeRivals({ state, a: nation, b: nb })) {

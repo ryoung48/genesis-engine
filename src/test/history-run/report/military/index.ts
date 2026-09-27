@@ -21,6 +21,7 @@ import type {
 	RatioParams,
 	SampleParams,
 	SummarizeParams,
+	TreasuryRole,
 	WarEnding,
 	WarEndingParams,
 } from "@/test/history-run/report/military/types"
@@ -28,6 +29,7 @@ import type {
 const TRADITIONS: ArmyTradition[] = ["settled", "tribal", "steppe"]
 
 const BANDS: DistanceBand[] = ["near", "mid", "far"]
+const ROLES: TreasuryRole[] = ["vassal", "overlord", "free"]
 
 const RELATION_NAMES = Object.fromEntries(
 	Object.entries(STATE.rel).map(([name, value]) => [value, name]),
@@ -61,6 +63,8 @@ function emptyWindow(): MilitaryWindow {
 		counterWars: 0,
 		vassalSamples: 0,
 		vassalPairs: 0,
+		alliances: 0,
+		invalidAlliances: 0,
 		relationPairs: {},
 		completed: [],
 		battles: [],
@@ -71,6 +75,8 @@ function emptyWindow(): MilitaryWindow {
 			maintenance: 0,
 			army: 0,
 			leakage: 0,
+			tributePaid: 0,
+			tributeReceived: 0,
 			unpaid: 0,
 		})),
 		treasury: byTradition(() => ({
@@ -82,6 +88,20 @@ function emptyWindow(): MilitaryWindow {
 			nonPositiveSurplus: 0,
 			nonPositiveNegative: 0,
 		})),
+		treasuryByRole: Object.fromEntries(
+			ROLES.map((role) => [
+				role,
+				{
+					ratios: [] as number[],
+					positiveYears: 0,
+					negative: 0,
+					aboveSafe: 0,
+					aboveFiveSafe: 0,
+					nonPositiveSurplus: 0,
+					nonPositiveNegative: 0,
+				},
+			]),
+		) as MilitaryWindow["treasuryByRole"],
 		treasuryByBand: { near: [], mid: [], far: [] },
 		warStartTreasury: [],
 		sacks: [],
@@ -333,6 +353,7 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 	TAX.runTax = (params) => {
 		const { state, nation, previousTime } = params
 		const sovereign = STATE.isSovereign({ state, p: nation })
+		const overlord = STATE.diplomaticOverlord({ state, nation })
 		const yearFraction = (state.time - previousTime) / STATE.yearMs
 		const nominal = sovereign
 			? MILITARY.upkeep({ state, nation }) * yearFraction
@@ -347,6 +368,12 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 		fiscal.army -= budget.armyExpenses
 		fiscal.leakage += probe.leakage({ state, p: nation })
 		fiscal.unpaid += Math.max(0, nominal + budget.armyExpenses)
+		if (budget.tribute < 0) {
+			fiscal.tributePaid -= budget.tribute
+			tracker.window.fiscal[
+				ECONOMY.armyTradition({ state, p: overlord })
+			].tributeReceived -= budget.tribute
+		}
 	}
 	return {
 		tracker,
@@ -387,10 +414,24 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 		const surplus = tracker.probe.surplus({ state: engine, p: nation })
 		const safe = tracker.probe.safe({ state: engine, p: nation })
 		const totals = window.treasury[tradition]
+		const role: TreasuryRole =
+			STATE.diplomaticOverlord({ state: engine, nation }) >= 0
+				? "vassal"
+				: [...engine.relationColumns[nation]].some(
+							(other) =>
+								STATE.diplomaticOverlord({ state: engine, nation: other }) ===
+								nation,
+						)
+					? "overlord"
+					: "free"
+		const roleTotals = window.treasuryByRole[role]
 		if (surplus > 0 && safe > 0) {
 			totals.positiveYears++
+			roleTotals.positiveYears++
 			totals.ratios.push(treasury / safe)
+			roleTotals.ratios.push(treasury / safe)
 			if (treasury < 0) totals.negative++
+			if (treasury < 0) roleTotals.negative++
 			if (treasury > safe) totals.aboveSafe++
 			if (treasury > 5 * safe) totals.aboveFiveSafe++
 			window.treasuryByBand[distanceBand({ engine, nation })].push(
@@ -436,6 +477,19 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 				STATE.rel.VASSAL
 			)
 				window.vassalPairs++
+		for (const other of engine.relationColumns[nation]) {
+			if (
+				other <= nation ||
+				engine.desolate[other] ||
+				!STATE.isSovereign({ state: engine, p: other }) ||
+				STATE.getRelation({ state: engine, a: nation, b: other }) !==
+					STATE.rel.ALLY
+			)
+				continue
+			window.alliances++
+			if (!STATE.canAlly({ state: engine, a: nation, b: other }))
+				window.invalidAlliances++
+		}
 		for (const other of STATE.getNationNeighbors({ state: engine, nation })) {
 			if (other < nation) continue
 			const name =
@@ -487,8 +541,17 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		report[`fiscal.armyShare.${tradition}`] = fiscal.army / revenue
 		report[`fiscal.leakageShare.${tradition}`] = fiscal.leakage / revenue
 		report[`fiscal.unpaidShare.${tradition}`] = fiscal.unpaid / revenue
+		report[`fiscal.tributePaidShare.${tradition}`] =
+			fiscal.tributePaid / revenue
+		report[`fiscal.tributeReceivedShare.${tradition}`] =
+			fiscal.tributeReceived / revenue
 		report[`fiscal.netShare.${tradition}`] =
-			(fiscal.revenue - fiscal.maintenance - fiscal.army - fiscal.leakage) /
+			(fiscal.revenue -
+				fiscal.maintenance -
+				fiscal.army -
+				fiscal.leakage -
+				fiscal.tributePaid +
+				fiscal.tributeReceived) /
 			revenue
 		const treasury = window.treasury[tradition]
 		const positive = Math.max(1, treasury.positiveYears)
@@ -512,6 +575,20 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 			starts.map((start) => start.inSafe),
 		)
 	}
+	for (const role of ROLES) {
+		const totals = window.treasuryByRole[role]
+		report[`treasury.ratio.p50.role.${role}`] = median(totals.ratios)
+		report[`treasury.negativeShare.role.${role}`] =
+			totals.negative / Math.max(1, totals.positiveYears)
+		report[`treasury.roleYears.${role}`] = totals.positiveYears
+	}
+	report["fiscal.tributeImbalance"] = Math.abs(
+		TRADITIONS.reduce(
+			(sum, t) =>
+				sum + window.fiscal[t].tributePaid - window.fiscal[t].tributeReceived,
+			0,
+		),
+	)
 	for (const band of BANDS) {
 		report[`treasury.ratio.p50.${band}`] = median(window.treasuryByBand[band])
 		report[`treasury.bandYears.${band}`] = window.treasuryByBand[band].length
@@ -525,6 +602,11 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	const totalSovereigns =
 		TRADITIONS.reduce((sum, t) => sum + window.sovereignYears[t], 0) / 100
 	report["vassalageEnded.n"] = window.vassalageEnded
+	report["vassals.mean"] =
+		window.vassalPairs / Math.max(1, window.vassalSamples)
+	report["alliances.mean"] =
+		window.alliances / Math.max(1, window.vassalSamples)
+	report["alliances.invalid"] = window.invalidAlliances
 	report["vassalageEnded.perVassal"] =
 		window.vassalageEnded /
 		Math.max(1e-9, window.vassalPairs / Math.max(1, window.vassalSamples))

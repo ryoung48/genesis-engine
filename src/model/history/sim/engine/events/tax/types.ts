@@ -9,6 +9,8 @@ export interface RecordBudgetParams {
 
 export interface Settlement {
 	treasury: number
+	tribute: number
+	overlord: number
 }
 
 export interface InitTaxParams {

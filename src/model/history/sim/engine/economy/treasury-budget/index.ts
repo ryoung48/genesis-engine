@@ -8,12 +8,14 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 	if (!budget) {
 		budget = {
 			taxes: 0,
+			tribute: 0,
 			stateMaintenance: 0,
 			armyExpenses: 0,
 			wartimeRates: false,
 			treasuryLeakage: 0,
 			annualBalance: 0,
 			plunder: 0,
+			tributeReceived: 0,
 			succession: 0,
 			otherChangesTotal: 0,
 			treasurySafe: 0,

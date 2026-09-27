@@ -189,6 +189,14 @@ export function buildNationWikiStats(
 									},
 									{ value: economy.budget.plunder, description: "Plunder" },
 									{
+										value: economy.budget.tribute,
+										description: "Tribute to overlord",
+									},
+									{
+										value: economy.budget.tributeReceived,
+										description: "Tribute from vassals",
+									},
+									{
 										value: economy.budget.succession,
 										description: "Realm split",
 									},

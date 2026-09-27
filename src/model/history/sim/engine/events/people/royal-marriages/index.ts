@@ -34,6 +34,7 @@ function pairKey({ state, a, b }: PairKeyParams): number {
 function alliable({ state, match }: AllianceMatchParams): boolean {
 	const people = state.people
 	const { a, b, realmA, realmB } = match
+	if (!STATE.canAlly({ state, a: realmA, b: realmB })) return false
 	for (const realm of [realmA, realmB]) {
 		if (!STATE.isSovereign({ state, p: realm })) return false
 		if (!GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[realm]))

@@ -13,6 +13,8 @@ import {
 	validateLiveHierarchy,
 } from "@/model/history/sim/engine/state/hierarchy"
 import {
+	canAlly,
+	diplomaticOverlord,
 	getRelation,
 	getRulerRelation,
 	getSovereign,
@@ -427,14 +429,14 @@ function createActiveWar({
 	state.activeWarIds.add(war.idx)
 	state.provinceWars[attacker].push(war.idx)
 	state.provinceWars[defender].push(war.idx)
-	FIELDS.rel.set({
+	setRelation({
 		state,
 		a: attacker,
 		b: defender,
 		rel: rel.WAR,
 	})
 	if (startTime < state.time) {
-		FIELDS.rel.set({
+		setRelation({
 			state,
 			a: attacker,
 			b: defender,
@@ -1034,6 +1036,8 @@ export const STATE = {
 	validateLiveHierarchy,
 	getRelation,
 	setRelation,
+	canAlly,
+	diplomaticOverlord,
 	getRulerRelation,
 	getSovereign,
 	isSovereign,

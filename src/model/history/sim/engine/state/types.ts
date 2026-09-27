@@ -241,6 +241,12 @@ export interface GetRulerRelationParams {
 	nation: number
 }
 
+export interface CanAllyParams {
+	state: HistoryState
+	a: number
+	b: number
+}
+
 export interface GetSovereignParams {
 	state: HistoryState
 	p: number

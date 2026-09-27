@@ -8,6 +8,7 @@ import type {
 } from "@/model/history/sim/engine/state/types"
 
 export type DistanceBand = "near" | "mid" | "far"
+export type TreasuryRole = "vassal" | "overlord" | "free"
 
 export type WarEnding = "capital" | "settlement" | "stalemate" | "exhaustion"
 
@@ -51,6 +52,8 @@ export interface FiscalTotals {
 	maintenance: number
 	army: number
 	leakage: number
+	tributePaid: number
+	tributeReceived: number
 	unpaid: number
 }
 
@@ -91,6 +94,8 @@ export interface MilitaryWindow {
 	counterWars: number
 	vassalSamples: number
 	vassalPairs: number
+	alliances: number
+	invalidAlliances: number
 	relationPairs: Record<string, number>
 	completed: CompletedWar[]
 	battles: BattleSample[]
@@ -98,6 +103,7 @@ export interface MilitaryWindow {
 	raids: Record<ArmyTradition, RaidTotals>
 	fiscal: Record<ArmyTradition, FiscalTotals>
 	treasury: Record<ArmyTradition, TreasuryTotals>
+	treasuryByRole: Record<TreasuryRole, TreasuryTotals>
 	treasuryByBand: Record<DistanceBand, number[]>
 	warStartTreasury: WarStartTreasury[]
 	sacks: number[]

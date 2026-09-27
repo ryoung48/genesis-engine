@@ -16,6 +16,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 const MANPOWER_RECOVERY = 0.1
 
 const LEAKAGE_RATE = 0.04
+const TRIBUTE_SHARE = 0.1
 
 // Chiefs cannot spend what their treasury does not hold: tribal and steppe
 // realms pay maintenance, then warriors, only from cash in hand.
@@ -26,12 +27,14 @@ function settle({
 	settled,
 }: RecordBudgetParams): Settlement {
 	const revenue = ECONOMY.revenue({ state, p: nation }) * yearFraction
+	const overlord = STATE.diplomaticOverlord({ state, nation })
+	const tribute = overlord >= 0 ? TRIBUTE_SHARE * revenue : 0
 	const maintenance =
 		ECONOMY.stateMaintenance({ state, p: nation }) * yearFraction
 	const upkeep = MILITARY.upkeep({ state, nation }) * yearFraction
 	const opening = FIELDS.prov.treasury.get({ state, p: nation })
 	const tradition = ECONOMY.armyTradition({ state, p: nation })
-	const cash = opening + revenue
+	const cash = opening + revenue - tribute
 	const maintenancePaid =
 		tradition === "settled"
 			? maintenance
@@ -54,16 +57,18 @@ function settle({
 	)
 	const budget = TREASURY_BUDGET.get({ state, p: nation })
 	budget.taxes = revenue
+	budget.tribute = tribute > 0 ? -tribute : 0
 	budget.stateMaintenance = -maintenancePaid
 	budget.armyExpenses = -armyPaid
 	budget.wartimeRates = MILITARY.atWar({ state, nation })
 	budget.treasuryLeakage = -leakage
-	budget.annualBalance = revenue - maintenancePaid - armyPaid - leakage
+	budget.annualBalance =
+		revenue - tribute - maintenancePaid - armyPaid - leakage
 	budget.treasurySafe = safe
 	budget.tradition = tradition
 	budget.settled = settled
 	budget.year = DATE.historyTimeMsToYear(state.time)
-	return { treasury: beforeLeakage - leakage }
+	return { treasury: beforeLeakage - leakage, tribute, overlord }
 }
 
 function previewBudget({ state }: InitTaxParams): void {
@@ -101,13 +106,28 @@ function runTax({ state, nation, previousTime }: RunTaxParams): void {
 
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 	const maxManpower = ECONOMY.maxManpower({ state, p: nation })
-	const { treasury } = settle({ state, nation, yearFraction, settled: true })
+	const { treasury, tribute, overlord } = settle({
+		state,
+		nation,
+		yearFraction,
+		settled: true,
+	})
 	FIELDS.prov.revenue.set({
 		state,
 		p: nation,
 		value: ECONOMY.revenue({ state, p: nation }),
 	})
 	FIELDS.prov.treasury.set({ state, p: nation, value: treasury })
+	if (overlord >= 0 && tribute > 0) {
+		FIELDS.prov.treasury.set({
+			state,
+			p: overlord,
+			value: FIELDS.prov.treasury.get({ state, p: overlord }) + tribute,
+		})
+		const budget = TREASURY_BUDGET.get({ state, p: overlord })
+		budget.tributeReceived += tribute
+		budget.otherChangesTotal += tribute
+	}
 	FIELDS.prov.maxManpower.set({ state, p: nation, value: maxManpower })
 	const manpower = FIELDS.prov.manpower.get({ state, p: nation })
 	FIELDS.prov.manpower.set({

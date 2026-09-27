@@ -231,6 +231,7 @@ function flush({
 	if (census)
 		for (const budget of state.treasuryBudgetCurrent.values()) {
 			budget.plunder = 0
+			budget.tributeReceived = 0
 			budget.succession = 0
 			budget.otherChangesTotal = 0
 		}
