@@ -1,21 +1,26 @@
 import type {
+	BattleTarget,
 	FindInvasionTargetParams,
 	FindReconquestTargetParams,
-	GetVictoryDegreeParams,
+	NextBattleTimeParams,
+	ResolveTargetParams,
 	RunBattleParams,
-	VictoryDegree,
 } from "@/model/history/sim/engine/events/battle/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
-import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
+import { TERRAIN } from "@/model/history/sim/engine/terrain"
 
-function getVictoryDegree({
-	lossRatio,
-}: GetVictoryDegreeParams): VictoryDegree {
-	if (lossRatio > 3) return "decisive"
-	if (lossRatio > 1.5) return "victory"
-	return "pyrrhic"
+const WINNER_INITIATIVE = 0.7
+
+const NEXT_BATTLE_MONTHS: Record<BattleOutcome, [number, number]> = {
+	inconclusive: [3, 8],
+	normal: [2, 10],
+	decisive: [1, 4],
+	rout: [1, 4],
+	uncontested: [1, 4],
+	empty: [1, 4],
 }
 
 function findInvasionTarget({
@@ -49,11 +54,43 @@ function findReconquestTarget({
 	return war.occupied.length > 0 ? war.occupied[war.occupied.length - 1] : null
 }
 
+function targetFor({
+	state,
+	war,
+	attacker,
+	rng,
+}: ResolveTargetParams): number | null {
+	return attacker === war.attacker
+		? findInvasionTarget({ state, war, rng })
+		: findReconquestTarget({ war })
+}
+
+// Occupation and sovereignty can change between queueing and fighting, so the
+// queued attacker's target is found when the battle runs; if it has none, the
+// other side takes the initiative.
+function resolveTarget({
+	state,
+	war,
+	attacker,
+	rng,
+}: ResolveTargetParams): BattleTarget | null {
+	const defender = attacker === war.attacker ? war.defender : war.attacker
+	const target = targetFor({ state, war, attacker, rng })
+	if (target !== null) return { attacker, defender, province: target }
+	const swapped = targetFor({ state, war, attacker: defender, rng })
+	if (swapped === null) return null
+	return { attacker: defender, defender: attacker, province: swapped }
+}
+
+function nextBattleTime({ state, outcome, rng }: NextBattleTimeParams): number {
+	const [lo, hi] = NEXT_BATTLE_MONTHS[outcome]
+	return state.time + STATE.deltaMonth(rng.uniform(lo, hi))
+}
+
 function runBattle({
 	state,
 	warIdx,
 	eventAttacker,
-	eventDefender,
 	rng,
 }: RunBattleParams): void {
 	const war = state.wars[warIdx]
@@ -73,12 +110,8 @@ function runBattle({
 		return
 	}
 
-	const restoration = war.attacker === eventDefender
-	const target = restoration
-		? findReconquestTarget({ war })
-		: findInvasionTarget({ state, war, rng })
-
-	if (target === null) {
+	const battle = resolveTarget({ state, war, attacker: eventAttacker, rng })
+	if (battle === null) {
 		STATE.resolveWar({
 			state,
 			war,
@@ -88,54 +121,42 @@ function runBattle({
 		})
 		return
 	}
-	JOURNAL.coalition({
-		state,
-		warId: war.idx,
-		rebel: war.rebel,
-		attackers: [
-			war.attacker,
-			...STATE.getWarAllies({
-				state,
-				nation: war.attacker,
-				type: "offensive",
-				target: war.defender,
-			}),
-		],
-		defenders: [
-			war.defender,
-			...STATE.getWarAllies({
-				state,
-				nation: war.defender,
-				type: "defensive",
-				target: war.attacker,
-			}),
-		],
-	})
+	const { attacker, defender, province: target } = battle
+	const restoration = war.attacker === defender
+	MILITARY.logCoalition({ state, war })
 
-	const result = MILITARY.fight({ state, war, eventAttacker, rng })
-	const outcome = result.attackerWon
-	const winnerShare = outcome
-		? result.attackerLossShare
-		: result.defenderLossShare
-	const loserShare = outcome
-		? result.defenderLossShare
-		: result.attackerLossShare
-	const victoryDegree = getVictoryDegree({
-		lossRatio: loserShare / Math.max(1e-6, winnerShare),
+	const terrain = TERRAIN.battlefield({ state, p: target })
+	const result = MILITARY.fight({
+		state,
+		war,
+		eventAttacker: attacker,
+		defense: terrain.defense,
+		rng,
 	})
+	if (result.outcome === "empty") {
+		STATE.resolveWar({
+			state,
+			war,
+			rng,
+			victory: false,
+			stalemate: "no troops on either side",
+		})
+		return
+	}
+	const progress = result.attackerWon && result.outcome !== "inconclusive"
 
 	const loot =
-		outcome && !restoration
+		progress && !restoration
 			? MILITARY.plunder({
 					state,
-					raider: eventAttacker,
-					loser: eventDefender,
+					raider: attacker,
+					loser: defender,
 					province: target,
 					sack: target === war.defender,
 				})
 			: 0
 
-	if (outcome) {
+	if (progress) {
 		if (restoration) {
 			FIELDS.prov.occupation.set({
 				state,
@@ -154,21 +175,35 @@ function runBattle({
 		}
 	}
 
+	const winner = result.attackerWon ? attacker : defender
+	const loser = result.attackerWon ? defender : attacker
 	state.events.push({
 		tag: "battle",
 		time: state.time,
 		data: {
 			war: war.idx,
 			province: target,
-			attacker: eventAttacker,
-			defender: eventDefender,
-			winner: outcome ? eventAttacker : eventDefender,
-			odds: result.winChance,
-			victoryDegree,
+			attacker,
+			defender,
+			winner,
+			result: result.outcome,
+			initialResult: result.initialOutcome,
+			preBattleWinProbability: result.preBattleWinProbability,
+			powerShare: result.powerShare,
+			topography: terrain.topography,
+			vegetation: terrain.vegetation,
+			waterTarget: terrain.water,
+			terrainDefense: terrain.defense,
+			loserShortfall: result.loserShortfall,
 			attackerArmy: Math.round(result.attackerArmy),
 			defenderArmy: Math.round(result.defenderArmy),
 			attackerDeployed: Math.round(result.attackerDeployed),
 			defenderDeployed: Math.round(result.defenderDeployed),
+			deployedNations: result.deployments.map((member) => member.nation),
+			deployedTroops: result.deployments.map((member) =>
+				Math.round(member.force),
+			),
+			deployedRelations: result.relations,
 			attackerLosses: 100 * result.attackerLossShare,
 			defenderLosses: 100 * result.defenderLossShare,
 			plunder: loot,
@@ -179,10 +214,11 @@ function runBattle({
 	const defExhausted = MILITARY.exhausted({ state, nation: war.defender })
 
 	const occupiedCount = war.occupied.length
+	const time = nextBattleTime({ state, outcome: result.outcome, rng })
 
-	if (outcome && restoration && occupiedCount === 0) {
+	if (progress && restoration && occupiedCount === 0) {
 		STATE.resolveWar({ state, war, rng })
-	} else if (outcome && target === war.defender) {
+	} else if (progress && target === war.defender) {
 		STATE.resolveWar({ state, war, rng, victory: true })
 	} else if (atkExhausted && defExhausted) {
 		STATE.resolveWar({
@@ -192,25 +228,30 @@ function runBattle({
 			victory: false,
 			stalemate: "both nations exhausted",
 		})
-	} else if (eventAttacker === war.attacker && occupiedCount === 0) {
+	} else if (attacker === war.attacker && occupiedCount === 0) {
 		if (atkExhausted) {
 			STATE.resolveWar({ state, war, rng })
 		} else {
+			// A beaten offensive that holds nothing regroups before trying again.
 			STATE.queueBattleEvent({
 				state,
 				warIdx: war.idx,
 				attacker: war.attacker,
-				defender: war.defender,
-				time: state.time + STATE.deltaMonth(rng.uniform(4, 24)),
+				time: result.attackerWon
+					? time
+					: nextBattleTime({ state, outcome: "inconclusive", rng }),
 			})
 		}
 	} else {
+		const next =
+			result.outcome === "uncontested" || rng.random() < WINNER_INITIATIVE
+				? winner
+				: loser
 		STATE.queueBattleEvent({
 			state,
 			warIdx: war.idx,
-			attacker: outcome ? eventAttacker : eventDefender,
-			defender: outcome ? eventDefender : eventAttacker,
-			time: state.time + STATE.deltaMonth(rng.uniform(4, 24)),
+			attacker: next,
+			time,
 		})
 	}
 }

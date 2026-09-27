@@ -7,6 +7,7 @@ import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/typ
 import type {
 	PregnancyLoss,
 	RegentKind,
+	SeatChangeReason,
 } from "@/model/history/sim/people/types"
 
 interface JournalProvinceChange {
@@ -70,6 +71,7 @@ export interface JournalSeat {
 	kind: SeatKind
 	// The child a regent governs for; -1 for other kinds.
 	ward: number
+	reason: SeatChangeReason
 }
 
 export interface JournalPregnancy {

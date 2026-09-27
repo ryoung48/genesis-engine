@@ -1,4 +1,7 @@
-import type { CensusEconomy } from "@/model/history/record/types"
+import type {
+	CensusDeployment,
+	CensusEconomy,
+} from "@/model/history/record/types"
 import type {
 	FlushJournalParams,
 	JournalPeople,
@@ -84,6 +87,16 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 		treasury: Float32Array.from(roots, (p) => state.treasuryCurrent[p]),
 		revenue: Float32Array.from(roots, (p) => state.revenueCurrent[p]),
 		manpower: Float32Array.from(roots, (p) => state.manpowerCurrent[p]),
+		maxManpower: Float32Array.from(roots, (p) => state.maxManpowerCurrent[p]),
+		army: Float32Array.from(roots, (p) => state.armySizeCurrent[p]),
+		deployments: roots.map((p) => {
+			const rows: CensusDeployment[] = []
+			for (const warId of state.activeWarIds) {
+				const troops = state.wars[warId].deployed[p] ?? 0
+				if (troops > 0) rows.push({ warId, troops })
+			}
+			return rows
+		}),
 		budgets: roots.map((p) => {
 			const budget = state.treasuryBudgetCurrent.get(p)
 			return budget ? { ...budget } : null
@@ -110,9 +123,10 @@ function peopleRows(state: HistoryState): JournalPeople {
 			wife: marriage.wife,
 			startTimeMs: marriage.start * yearMs,
 		})),
-		seats: log.seats.map(({ seat, person, ward }) => ({
+		seats: log.seats.map(({ seat, person, ward, reason }) => ({
 			seat,
 			person,
+			reason,
 			kind:
 				ward >= 0
 					? "regent"
@@ -218,7 +232,6 @@ function flush({
 		for (const budget of state.treasuryBudgetCurrent.values()) {
 			budget.plunder = 0
 			budget.succession = 0
-			budget.reserveAdjustment = 0
 			budget.otherChangesTotal = 0
 		}
 	const people = peopleRows(state)

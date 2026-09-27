@@ -172,16 +172,22 @@ function raise({ people, person, rank }: RaiseParams): void {
 	people.persons.peak[person] = Math.max(people.persons.peak[person], rank + 1)
 }
 
-function setRuler({ people, seat, person, rank }: SetRulerParams): void {
+function setRuler({
+	people,
+	seat,
+	person,
+	rank,
+	reason,
+}: SetRulerParams): void {
 	people.rulerOf[seat] = person
-	people.log.seats.push({ seat, person, ward: -1 })
+	people.log.seats.push({ seat, person, ward: -1, reason })
 	if (person < 0) return
 	raise({ people, person, rank })
 	recordFamily({ people, person })
 }
 
 function setRegent({ people, seat, person, ward }: SetRegentParams): void {
-	people.log.seats.push({ seat, person, ward })
+	people.log.seats.push({ seat, person, ward, reason: "unknown" })
 	record({ people, person })
 }
 
@@ -213,20 +219,27 @@ function preference({ genderSystem }: PreferenceParams): GenderPreference {
 		: "male"
 }
 
-function enthrone({ people, person, seat, realm, rank }: ThroneParams): void {
+function enthrone({
+	people,
+	person,
+	seat,
+	realm,
+	rank,
+	reason,
+}: ThroneParams): void {
 	const table = people.persons
 	table.throne[person] = seat
 	table.realm[person] = realm
 	const spouse = table.spouse[person]
 	if (spouse >= 0 && table.throne[spouse] < 0) table.realm[spouse] = realm
-	setRuler({ people, seat, person, rank })
+	setRuler({ people, seat, person, rank, reason })
 }
 
-function vacate({ people, seat }: VacateParams): void {
+function vacate({ people, seat, reason }: VacateParams): void {
 	const person = people.rulerOf[seat]
 	if (person < 0) return
 	if (people.persons.throne[person] === seat) people.persons.throne[person] = -1
-	setRuler({ people, seat, person: -1, rank: 0 })
+	setRuler({ people, seat, person: -1, rank: 0, reason })
 }
 
 // A ruler with their children and siblings: the house whose marriages bind

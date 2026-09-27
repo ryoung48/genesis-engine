@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
@@ -7,6 +8,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import type {
 	BetrothalOutcome,
 	CenturyReport,
@@ -44,6 +46,8 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 		era,
 		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
 		years: Number(env.HISTORY_YEARS ?? DEFAULT_YEARS),
+		startYear: env.HISTORY_START ? Number(env.HISTORY_START) : undefined,
+		outPath: env.HISTORY_OUT ?? "",
 		log,
 	}
 }
@@ -328,6 +332,11 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 		seed,
 		era: options.era,
 		numPoints: options.numPoints,
+		startYear: options.startYear,
+	})
+	const military = MILITARY_REPORT.attach({
+		engine,
+		probe: MILITARY_REPORT.fiscalProbe,
 	})
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	const start = Math.round(engine.time / STATE.yearMs)
@@ -360,6 +369,11 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 			validate: false,
 		})
 		trackMarriages({ engine, tracker })
+		MILITARY_REPORT.sample({
+			engine,
+			tracker: military.tracker,
+			sampleRelations: (year - start) % 10 === 0,
+		})
 		for (const p of largest({ engine })) {
 			sampledYears++
 			if (engine.provinceWars[p].length > 0) atWarYears++
@@ -403,6 +417,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 			regency: regencyReport({ engine, from, to: year, top: topSet }),
 			people: peopleReport({ engine, from, to: year, peopleMs }),
 			marriage: marriageReport({ engine, from, to: year, tracker }),
+			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 		})
 		from = year
 		startSovereigns = endSovereigns.length
@@ -411,6 +426,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 		peopleMs = 0
 	}
 	PEOPLE_EVENTS.runYear = runPeopleYear
+	military.detach()
 	const settled = tracker.standing.slice(20, 31)
 	options.log(
 		`seed ${seed} betrothals standing: ${tracker.standing[0]} at start, ${(settled.reduce((sum, count) => sum + count, 0) / Math.max(1, settled.length)).toFixed(1)} mean over years 20-30`,
@@ -452,7 +468,13 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 			options.log(
 				`${`${from}-${to}`.padEnd(11)} ${String(m.alliancesFormed).padStart(14)} ${String(m.alliancesStanding).padStart(9)} ${`${m.firstMarriageAge[0].toFixed(1)}/${m.firstMarriageAge[1].toFixed(1)}`.padStart(14)} ${`${(100 * m.marriedAbroadShare).toFixed(0)}%`.padStart(11)} ${String(m.heiressUnions).padStart(15)} ${String(m.betrothalsMade).padStart(10)} ${String(m.betrothalsFulfilled).padStart(10)} ${`${m.betrothalsBrokenByDeath}/${m.betrothalsBrokenByAlliance}`.padStart(23)}`,
 			)
+		MILITARY_REPORT.log({ reports, log: options.log })
 	}
+	if (options.outPath)
+		writeFileSync(
+			options.outPath,
+			JSON.stringify(Object.fromEntries(results), null, 1),
+		)
 	return results
 }
 

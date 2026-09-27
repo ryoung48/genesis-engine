@@ -57,17 +57,23 @@ function pretenderRevolt({
 			restoration,
 		},
 	})
-	STATE.releaseProvince({ state, p: seat, rng })
+	STATE.releaseProvince({
+		state,
+		p: seat,
+		rng,
+		reason: restoration ? "restoration" : "rebellion",
+	})
 	if (state.people.rulerOf[seat] !== pretender) {
 		STATE.installRuler({
 			state,
 			p: seat,
 			person: pretender,
 			claim: RESTORED_CLAIM,
+			reason: restoration ? "restoration" : "rebellion",
 		})
 		STATE.scheduleSuccession({ state, p: seat })
 	}
-	STATE.startWar({ state, attacker: realm, defender: seat, rng, rebel: true })
+	WAR.start({ state, attacker: realm, defender: seat, rng, rebel: true })
 	STATE.fixConnections({ state, nation: realm, rng })
 }
 
@@ -119,7 +125,11 @@ function runSuccession({
 	if (state.leaderRuntime.idx[province] !== leaderIdx) return
 	REGENCY.end({ state, realm: province, cause: "death" })
 	if (!STATE.isSovereign({ state, p: province })) {
-		PEOPLE.vacate({ people: state.people, seat: province })
+		PEOPLE.vacate({
+			people: state.people,
+			seat: province,
+			reason: "succession",
+		})
 		return
 	}
 
@@ -136,6 +146,7 @@ function runSuccession({
 			p: province,
 			person: choice.heir,
 			claim: choice.claim,
+			reason: "succession",
 		})
 	else
 		STATE.foundRuler({
@@ -143,6 +154,7 @@ function runSuccession({
 			p: province,
 			age: rng.uniform(20, 50),
 			claim: choice.claim,
+			reason: "succession",
 			rng,
 		})
 	// A union junior can merge into its senior while taking the new ruler.
@@ -210,9 +222,15 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 		data: { nation: realm, regent, ward, kind },
 	})
 	if (kind === "protector" && district >= 0)
-		PEOPLE.vacate({ people, seat: district })
+		PEOPLE.vacate({ people, seat: district, reason: "usurpation" })
 	const claim = kind === "relative" ? KINSMAN_USURPER_CLAIM : 0
-	STATE.installRuler({ state, p: realm, person: regent, claim })
+	STATE.installRuler({
+		state,
+		p: realm,
+		person: regent,
+		claim,
+		reason: "usurpation",
+	})
 	RESTORATION.depose({ state, realm, claimant: ward })
 	STATE.scheduleSuccession({ state, p: realm })
 	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })

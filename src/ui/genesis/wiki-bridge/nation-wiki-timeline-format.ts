@@ -1,4 +1,4 @@
-import type { BattleParticipant } from "@/model/history/record/types"
+import type { Battle, BattleParticipant } from "@/model/history/record/types"
 import {
 	cleanEu4Identifier,
 	indefiniteArticle,
@@ -6,13 +6,6 @@ import {
 	pluralizeSubjectTypeLabel,
 } from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
-
-/**
- * Pure formatting/merging helpers used by useNationWikiData's timeline-event
- * builder. Split out of that file (see plans/split-large-files.md #3) since
- * none of these depend on the hook's per-render closures -- each takes its
- * inputs (events, a title, a payload) explicitly.
- */
 
 export function mergeById<T extends { id: string | number }>(items: T[]): T[] {
 	const seen = new Set<string | number>()
@@ -451,4 +444,26 @@ export function formatBattleForce(
 	if (participant.losses === null) return men
 	const lost = Math.round((army * participant.losses) / 100)
 	return `${men}, ${lost.toLocaleString("en-US")} lost`
+}
+
+export function battleVerb(battle: Battle): string {
+	switch (battle.simulated?.outcome) {
+		case "inconclusive":
+			return "held the field against"
+		case "decisive":
+			return "decisively defeated"
+		case "rout":
+			return "routed"
+		case "uncontested":
+			return "met no resistance from"
+		default:
+			return "defeated"
+	}
+}
+
+export function battleDetail(battle: Battle): string {
+	const simulated = battle.simulated
+	if (!simulated) return ""
+	const odds = Math.round(100 * simulated.preBattleWinProbability)
+	return ` Fought on ${simulated.topography} ${simulated.vegetation}; the attacker's odds were ${odds}% beforehand.`
 }

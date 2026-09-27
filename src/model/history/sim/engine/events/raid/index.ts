@@ -72,7 +72,7 @@ function richestBorderProvince({
 function runRaid({ state, nation, rng }: RunRaidParams): void {
 	scheduleRaid({ state, nation, years: 1 })
 	if (!STATE.isSovereign({ state, p: nation })) return
-	if (ECONOMY.armyTradition({ state, p: nation }) === "paid") return
+	if (ECONOMY.armyTradition({ state, p: nation }) === "settled") return
 	const chance =
 		RAID_CHANCE * (1 - 0.5 * ECONOMY.treasuryFill({ state, p: nation }))
 	if (rng.random() >= chance) return

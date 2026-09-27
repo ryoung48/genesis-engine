@@ -897,6 +897,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				regionAdjList: generated.mesh.adjList,
 				regionIsLand: generated.isLand,
 				planetRadiusKm: generated.params.planetRadiusKm,
+				topography: generated.topography ?? null,
+				vegetation: generated.vegetation ?? null,
 				settlementRegions: generated.settlementRegions,
 				settlementWaterLandmarks: generated.settlementWaterLandmarks,
 				settlementPortRegions: generated.settlementPortRegions,

@@ -1,4 +1,8 @@
-import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
+import type {
+	GetWarAlliesParams,
+	HistoryState,
+	War,
+} from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export type WarSide = "attacker" | "defender"
@@ -8,14 +12,19 @@ export interface NationParams {
 	nation: number
 }
 
+export interface CostPerManYearParams extends NationParams {
+	grams: number
+}
+
 export interface SideMembersParams extends NationParams {
 	type: "offensive" | "defensive"
 	target: number
 }
 
-export interface SquareShareParams {
+export interface ForceShareParams {
 	a: number
 	b: number
+	k: number
 }
 
 export interface ThreatParams {
@@ -41,28 +50,89 @@ export interface CoalitionMember {
 	force: number
 }
 
+export interface Coalition {
+	members: CoalitionMember[]
+	// Share of the coalition's assigned troops still missing from its deployment.
+	shortfall: number
+}
+
+export interface MemberDeploymentsParams {
+	war: War
+	members: CoalitionMember[]
+}
+
 export interface DeploymentAssignment {
 	war: War
 	opponent: number
-	primary: boolean
 }
 
 export interface FightParams {
 	state: HistoryState
 	war: War
 	eventAttacker: number
+	defense: number
 	rng: SharedRng
 }
 
-export interface BattleResult {
-	attackerWon: boolean
-	winChance: number
-	attackerArmy: number
-	defenderArmy: number
+export type BattleOutcome =
+	| "inconclusive"
+	| "normal"
+	| "decisive"
+	| "rout"
+	| "uncontested"
+	| "empty"
+
+export interface RecordArmiesParams {
+	state: HistoryState
+}
+
+export interface LeadRelationsParams {
+	state: HistoryState
+	coalitions: Coalition[]
+}
+
+export interface DeploymentsOfParams {
+	state: HistoryState
+	war: War
+	attackers: Coalition
+	defenders: Coalition
+}
+
+export interface BattleDeployments {
 	attackerDeployed: number
 	defenderDeployed: number
+	// Each coalition member's deployed troops after the battle.
+	deployments: CoalitionMember[]
+	// Each member's relation from its coalition's lead, -1 for the lead.
+	relations: number[]
+}
+
+export interface WarAlliesParams extends GetWarAlliesParams {
+	// Null when estimating a war that has not started.
+	war: War | null
+}
+
+export interface LogCoalitionParams {
+	state: HistoryState
+	war: War
+}
+
+export interface MobilizeParams {
+	state: HistoryState
+	war: War
+}
+
+export interface BattleResult extends BattleDeployments {
+	outcome: BattleOutcome
+	initialOutcome: BattleOutcome
+	attackerWon: boolean
+	preBattleWinProbability: number
+	powerShare: number
+	attackerArmy: number
+	defenderArmy: number
 	attackerLossShare: number
 	defenderLossShare: number
+	loserShortfall: number
 }
 
 export interface ApplyLossesParams {

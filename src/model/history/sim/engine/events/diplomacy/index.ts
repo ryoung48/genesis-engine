@@ -15,6 +15,7 @@ import type {
 	SyncVassalRelationsParams,
 } from "@/model/history/sim/engine/events/diplomacy/types"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { WAR } from "@/model/history/sim/engine/events/war"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
@@ -143,7 +144,7 @@ function processVassalDiplomacy({
 	// Probabilistic counter-war
 	const counterWarChance = 0.7 * (1 - threat)
 	if (rng.random() < counterWarChance) {
-		STATE.startWar({
+		WAR.start({
 			state,
 			attacker: overlord,
 			defender: vassal,

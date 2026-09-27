@@ -4,6 +4,7 @@ import { NATIONS } from "@/model/history/earth/reference/nations"
 import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
 	Battle,
+	BattleContribution,
 	BuildEarthRecordParams,
 	CreateHistoryStateParams,
 	FrameAtParams,
@@ -179,6 +180,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 					]
 				})
 				.sort((a, b) => a.timeMs - b.timeMs),
+			mobilization: [] as BattleContribution[],
 			battles: war.battles.map(
 				(battle): Battle => ({
 					...battle,
@@ -195,6 +197,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 					},
 					attackerDeployed: null,
 					defenderDeployed: null,
+					simulated: null,
 				}),
 			),
 		})),

@@ -14,6 +14,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import type {
 	ProcessEventsUntilParams,
 	SeedColonyRelationsParams,
@@ -23,6 +24,7 @@ import type {
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { StageTiming } from "@/model/pipelines/types"
+import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
@@ -81,7 +83,10 @@ function initHistory(params: {
 	regionAdjOffset?: Int32Array
 	regionAdjList?: Int32Array
 	regionIsLand?: Uint8Array
+	// [JUSTIFICATION] Worlds without a custom planet size use Earth's radius.
 	planetRadiusKm?: number
+	topography: Uint8Array | null
+	vegetation: Uint8Array | null
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
 	settlementPortRegions?: Int32Array
@@ -111,6 +116,9 @@ function initHistory(params: {
 				regionAdjList: params.regionAdjList,
 				regionIsLand: params.regionIsLand,
 				era: params.era,
+				planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
+				topography: params.topography,
+				vegetation: params.vegetation,
 			}),
 	})
 
@@ -171,6 +179,7 @@ function initHistory(params: {
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
 
+	MILITARY.recordArmies({ state })
 	JOURNAL.flush({ state, noteCursor: 0, census: true, initial: true })
 	return state
 }
@@ -199,7 +208,6 @@ function processEventsUntil({
 					state,
 					warIdx: dataBuf[0],
 					eventAttacker: dataBuf[1],
-					eventDefender: dataBuf[2],
 					rng,
 				})
 				break
@@ -221,6 +229,7 @@ function processEventsUntil({
 			case EVENT_HEAP.evt.CENSUS:
 				POPULATION.runPopulation({ state, previousTime: time2 })
 				TAX.previewBudget({ state })
+				MILITARY.recordArmies({ state })
 				break
 			case EVENT_HEAP.evt.RAID:
 				RAID.runRaid({ state, nation: dataBuf[0], rng })

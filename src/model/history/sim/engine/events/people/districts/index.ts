@@ -85,13 +85,14 @@ function newHolder({ state, seat, relativeFirst, rng }: HolderParams): number {
 }
 
 function install({ state, seat, person }: InstallDistrictParams): void {
-	PEOPLE.vacate({ people: state.people, seat })
+	PEOPLE.vacate({ people: state.people, seat, reason: "district grant" })
 	PEOPLE.enthrone({
 		people: state.people,
 		person,
 		seat,
 		realm: state.sovereignCurrent[seat],
 		rank: state.seatRank[seat],
+		reason: "district grant",
 	})
 }
 
@@ -103,7 +104,7 @@ function settle({ state, rng }: DistrictParams): void {
 		const holder = people.rulerOf[seat]
 		if (holder < 0 || STATE.isSovereign({ state, p: seat })) continue
 		if (!isDistrictSeat({ state, seat })) {
-			PEOPLE.vacate({ people, seat })
+			PEOPLE.vacate({ people, seat, reason: "territorial change" })
 			continue
 		}
 		if (

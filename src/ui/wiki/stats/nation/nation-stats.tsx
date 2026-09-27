@@ -1,17 +1,63 @@
 import type { NationEconomy } from "@/model/history/world-frame/types"
+import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
+import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { uiPalette } from "@/ui/components/tokens"
-import type { BuildNationWikiStatsParams } from "@/ui/wiki/stats/nation/types"
+import type {
+	ArmyStatParams,
+	BuildNationWikiStatsParams,
+} from "@/ui/wiki/stats/nation/types"
 
 function treasuryHealthColor(economy: NationEconomy): string {
 	if (economy.treasury < 0) return uiPalette.treasury.critical
-	if (economy.revenue <= 0) return uiPalette.nationCapital
-	const reserveCapacityPercent =
-		(economy.treasury / economy.revenue) * (200 / 0.6)
-	if (reserveCapacityPercent >= 150) return uiPalette.treasury.healthy
-	if (reserveCapacityPercent >= 50) return uiPalette.treasury.caution
+	if (economy.treasurySafe <= 0) return uiPalette.nationCapital
+	const surplusYearsPercent = (economy.treasury / economy.treasurySafe) * 200
+	if (surplusYearsPercent >= 150) return uiPalette.treasury.healthy
+	if (surplusYearsPercent >= 50) return uiPalette.treasury.caution
 	return uiPalette.treasury.critical
+}
+
+const MANPOWER_STOPS = [
+	uiPalette.treasury.critical,
+	uiPalette.treasury.caution,
+	uiPalette.treasury.healthy,
+].map(COLOR_INTERPOLATION.cssColorToRgb)
+
+function manpowerColor(economy: NationEconomy): string | null {
+	if (economy.maxManpower <= 0) return null
+	return COLOR_INTERPOLATION.rgbToCss(
+		COLOR_INTERPOLATION.sampleColorStops({
+			stops: MANPOWER_STOPS,
+			t: economy.manpower / economy.maxManpower,
+		}),
+	)
+}
+
+function armyStat({ economy, warName, yearLabel }: ArmyStatParams): StatEntry {
+	const deployed = economy.deployments.reduce(
+		(sum, deployment) => sum + deployment.troops,
+		0,
+	)
+	return {
+		label: "Army",
+		valuePrefix: `${formatCount(economy.army)} men ·`,
+		value: `${formatCount(deployed)} deployed`,
+		valueHelp:
+			economy.deployments.length > 0 ? (
+				<TraceTooltipContent
+					title={`${yearLabel} deployments`}
+					trace={economy.deployments.map((deployment) => ({
+						value: deployment.troops,
+						description: warName(deployment.warId),
+					}))}
+					formatValue={formatCount}
+					finalLabel="Total deployed"
+					finalValue={deployed}
+				/>
+			) : undefined,
+		valueHelpTarget: "suffix",
+	}
 }
 
 export function formatCount(value: number): string {
@@ -83,6 +129,7 @@ export function buildNationWikiStats(
 		governmentSubtype,
 		governmentColor,
 		economy,
+		warName,
 		yearLabel,
 	} = params
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
@@ -112,7 +159,6 @@ export function buildNationWikiStats(
 					{
 						label: "Treasury",
 						value: formatDucats(economy.treasury),
-						help: "Treasury health relative to reserve capacity. Red is a negative balance or below 50%, amber is 50–149%, and green is 150% or more.",
 						valueHelp: economy.budget ? (
 							<TraceTooltipContent
 								title={`${yearLabel} treasury ${economy.budget.settled ? "changes" : "estimate"}`}
@@ -122,24 +168,29 @@ export function buildNationWikiStats(
 										description: "Taxes",
 									},
 									{
-										value: economy.budget.civilExpenses,
-										description: "Civil expenses",
+										value: economy.budget.stateMaintenance,
+										description: "State maintenance",
 									},
 									{
 										value: economy.budget.armyExpenses,
-										description:
-											economy.budget.tradition === "paid"
-												? "Army upkeep"
-												: "War gifts",
+										description: "Army maintenance",
+										icon: economy.budget.wartimeRates ? (
+											<span
+												className="inline-flex items-center"
+												title="Charged at wartime rates"
+											>
+												<SwordCrossIcon className="block h-2.5 w-2.5 text-rose-500" />
+											</span>
+										) : undefined,
+									},
+									{
+										value: economy.budget.treasuryLeakage,
+										description: "Treasury leakage",
 									},
 									{ value: economy.budget.plunder, description: "Plunder" },
 									{
 										value: economy.budget.succession,
 										description: "Realm split",
-									},
-									{
-										value: economy.budget.reserveAdjustment,
-										description: "Reserve limit adjustment",
 									},
 								].filter((entry) => entry.value !== 0)}
 								formatValue={formatSignedDucats}
@@ -151,7 +202,12 @@ export function buildNationWikiStats(
 						),
 						swatchColor: treasuryHealthColor(economy),
 					},
-					{ label: "Manpower", value: `${formatCount(economy.manpower)} men` },
+					{
+						label: "Manpower",
+						value: `${formatCount(economy.manpower)} men${economy.maxManpower > 0 ? ` · ${Math.round((100 * economy.manpower) / economy.maxManpower)}% of ${formatCount(economy.maxManpower)}` : ""}`,
+						swatchColor: manpowerColor(economy),
+					},
+					armyStat({ economy, warName, yearLabel }),
 				]
 			: []),
 	]

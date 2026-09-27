@@ -47,6 +47,8 @@ export interface CreateEngineParams {
 	seed: number
 	era: SocietyEra
 	numPoints: number
+	// [JUSTIFICATION] Omitted, the engine starts at its default year and era level.
+	startYear?: number
 }
 
 export interface CreatedEngine {

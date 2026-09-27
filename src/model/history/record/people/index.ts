@@ -100,13 +100,14 @@ function append({
 		pushIndex({ index: record.marriagesOf, key: row.husband, value: index })
 		pushIndex({ index: record.marriagesOf, key: row.wife, value: index })
 	}
-	for (const { seat, person, kind, ward } of rows.seats) {
+	for (const { seat, person, kind, ward, reason } of rows.seats) {
 		const ofSeat =
 			kind === "regent" ? record.regentsOfSeat : record.tenuresOfSeat
 		const open = ofSeat.get(seat)?.at(-1)
 		if (open !== undefined && record.tenures[open].endTimeMs === Infinity) {
 			if (record.tenures[open].person === person) continue
 			record.tenures[open].endTimeMs = timeMs
+			record.tenures[open].endReason = reason
 		}
 		if (person < 0) continue
 		const index = record.tenures.length
@@ -117,6 +118,7 @@ function append({
 			ward,
 			startTimeMs: timeMs,
 			endTimeMs: Infinity,
+			endReason: null,
 		})
 		pushIndex({ index: record.tenuresOf, key: person, value: index })
 		pushIndex({ index: ofSeat, key: seat, value: index })

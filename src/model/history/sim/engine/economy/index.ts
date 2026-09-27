@@ -3,6 +3,7 @@ import type {
 	ArmyTradition,
 	EconomyLookupParams,
 	InitEconomyParams,
+	TravelDaysParams,
 } from "@/model/history/sim/engine/economy/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
@@ -19,18 +20,26 @@ const OUTPUT_CURVE = {
 }
 
 const LEVY_RATE: Record<ArmyTradition, number> = {
-	paid: 0.02,
+	settled: 0.02,
 	tribal: 0.05,
 	steppe: 0.12,
 }
 
-const CIVIL_EXPENSE_SHARE = 0.7
+const STATE_MAINTENANCE_SHARE = 0.35
 
-const MAX_RESERVE_YEARS = 2
+const TRAVEL_KM_PER_DAY = 30
+
+const DISTANCE_REFERENCE_DAYS = 30
+
+const DISTANCE_COST = 0.15
+
+const DISTANCE_EXPONENT = 0.7
+
+const SAFE_TREASURY_YEARS = 2
 
 // Chiefs collected tribute and gifts, not taxes through an administration.
 const COLLECTION_SHARE: Record<ArmyTradition, number> = {
-	paid: 1,
+	settled: 1,
 	tribal: 1 / 3,
 	steppe: 1 / 3,
 }
@@ -61,6 +70,22 @@ function provinceOutput({ state, p }: EconomyLookupParams): number {
 	)
 }
 
+function travelDays({ state, capital, p }: TravelDaysParams): number {
+	const chord = Math.sqrt(STATE.provinceDistanceSq({ state, a: capital, b: p }))
+	const distanceKm =
+		2 * state.planetRadiusKm * Math.asin(Math.min(1, chord / 2))
+	return distanceKm / TRAVEL_KM_PER_DAY
+}
+
+function distanceMultiplier({ state, capital, p }: TravelDaysParams): number {
+	return (
+		1 +
+		DISTANCE_COST *
+			(travelDays({ state, capital, p }) / DISTANCE_REFERENCE_DAYS) **
+				DISTANCE_EXPONENT
+	)
+}
+
 function realm({ state, p }: EconomyLookupParams): RealmCacheEntry {
 	DERIVE.ensureHierarchyClean(state)
 	const cached = state.realmCache.get(p)
@@ -72,17 +97,31 @@ function realm({ state, p }: EconomyLookupParams): RealmCacheEntry {
 		return cached
 	const provinces = realmProvinces({ state, p })
 	const knowledge = KNOWLEDGE.realmKnowledge({ state, provinces })
+	const collected =
+		KNOWLEDGE.extractionRate({ knowledge }) *
+		COLLECTION_SHARE[armyTradition({ state, p })]
 	let output = 0
-	for (const province of provinces)
-		output += provinceOutput({ state, p: province })
+	let population = 0
+	let revenue = 0
+	let stateMaintenance = 0
+	for (const province of provinces) {
+		const provinceOut = provinceOutput({ state, p: province })
+		const provinceRevenue = provinceOut * collected
+		output += provinceOut
+		population += provincePopulation({ state, p: province })
+		revenue += provinceRevenue
+		stateMaintenance +=
+			provinceRevenue *
+			STATE_MAINTENANCE_SHARE *
+			distanceMultiplier({ state, capital: p, p: province })
+	}
 	const entry = {
 		hierarchyVersion: state.hierarchyVersion,
 		censusVersion: state.censusVersion,
 		knowledge,
-		revenue:
-			output *
-			KNOWLEDGE.extractionRate({ knowledge }) *
-			COLLECTION_SHARE[armyTradition({ state, p })],
+		revenue,
+		stateMaintenance,
+		outputPerHead: population > 0 ? output / population / DUCATS_PER_GRAM : 0,
 	}
 	state.realmCache.set(p, entry)
 	return entry
@@ -96,19 +135,28 @@ function realmKnowledge({ state, p }: EconomyLookupParams): number {
 	return realm({ state, p }).knowledge
 }
 
-function discretionaryRevenue({ state, p }: EconomyLookupParams): number {
-	return revenue({ state, p }) * (1 - CIVIL_EXPENSE_SHARE)
+function stateMaintenance({ state, p }: EconomyLookupParams): number {
+	return realm({ state, p }).stateMaintenance
 }
 
-function reserveCap({ state, p }: EconomyLookupParams): number {
-	return MAX_RESERVE_YEARS * discretionaryRevenue({ state, p })
+function surplus({ state, p }: EconomyLookupParams): number {
+	const entry = realm({ state, p })
+	return entry.revenue - entry.stateMaintenance
+}
+
+function outputPerHead({ state, p }: EconomyLookupParams): number {
+	return realm({ state, p }).outputPerHead
+}
+
+function treasurySafe({ state, p }: EconomyLookupParams): number {
+	return SAFE_TREASURY_YEARS * Math.max(0, surplus({ state, p }))
 }
 
 function treasuryFill({ state, p }: EconomyLookupParams): number {
-	const cap = reserveCap({ state, p })
-	if (cap <= 0) return 0
+	const safe = treasurySafe({ state, p })
+	if (safe <= 0) return 0
 	return MATH.clamp({
-		value: FIELDS.prov.treasury.get({ state, p }) / cap,
+		value: FIELDS.prov.treasury.get({ state, p }) / safe,
 		lo: 0,
 		hi: 1,
 	})
@@ -119,7 +167,7 @@ function armyTradition({ state, p }: EconomyLookupParams): ArmyTradition {
 	if (type === "steppe_horde") return "steppe"
 	return type && ERAS.governmentTypeFamily[type] === "tribal"
 		? "tribal"
-		: "paid"
+		: "settled"
 }
 
 function maxManpower({ state, p }: EconomyLookupParams): number {
@@ -146,9 +194,10 @@ function initEconomy({ state }: InitEconomyParams): void {
 		FIELDS.prov.treasury.set({
 			state,
 			p,
-			value: discretionaryRevenue({ state, p }),
+			value: Math.max(0, surplus({ state, p })),
 		})
 		FIELDS.prov.manpower.set({ state, p, value: maxManpower({ state, p }) })
+		FIELDS.prov.maxManpower.set({ state, p, value: maxManpower({ state, p }) })
 		FIELDS.prov.revenue.set({ state, p, value: revenue({ state, p }) })
 	}
 }
@@ -158,8 +207,12 @@ export const ECONOMY = {
 	provinceOutput,
 	revenue,
 	realmKnowledge,
-	discretionaryRevenue,
-	reserveCap,
+	travelDays,
+	distanceMultiplier,
+	stateMaintenance,
+	surplus,
+	outputPerHead,
+	treasurySafe,
 	treasuryFill,
 	armyTradition,
 	maxManpower,

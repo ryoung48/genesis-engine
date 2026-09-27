@@ -3,6 +3,7 @@ import type {
 	JournalDeath,
 	JournalTransaction,
 } from "@/model/history/sim/engine/journal/types"
+import type { EngineNote } from "@/model/history/sim/engine/state/types"
 import type { LanguageNames } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
@@ -114,4 +115,9 @@ export interface RulerDeathParams {
 export interface PersonNameParams {
 	translator: ProceduralTranslator
 	person: number
+}
+
+export interface ContributionsParams {
+	translator: ProceduralTranslator
+	data: EngineNote["data"]
 }

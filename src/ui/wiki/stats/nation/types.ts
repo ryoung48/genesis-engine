@@ -1,5 +1,11 @@
 import type { NationEconomy } from "@/model/history/world-frame/types"
 
+export interface ArmyStatParams {
+	economy: NationEconomy
+	warName: (warId: number) => string
+	yearLabel: string
+}
+
 export interface BuildNationWikiStatsParams {
 	territoryBasis: "owned" | "controlled"
 	totalAreaKm2: number
@@ -11,5 +17,6 @@ export interface BuildNationWikiStatsParams {
 	governmentSubtype: string | null
 	governmentColor: string | null
 	economy: NationEconomy | null
+	warName: (warId: number) => string
 	yearLabel: string
 }

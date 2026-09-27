@@ -1,6 +1,10 @@
+import type { ReactNode } from "react"
+
 export interface TraceTooltipEntry {
 	value: number
 	description: string
+	// [JUSTIFICATION] Only entries that flag a special condition replace their dot with an icon.
+	icon?: ReactNode
 }
 
 export interface TraceTooltipFooterEntry {
@@ -50,6 +54,25 @@ const dotColor = (value: number, colorScheme: "signed" | "temperature") => {
 	return value > 0 ? colors.positive : value < 0 ? colors.negative : colors.zero
 }
 
+interface MarkerProps {
+	value: number
+	colorScheme: "signed" | "temperature"
+	// [JUSTIFICATION] Rows without a special condition show the plain dot.
+	icon?: ReactNode
+}
+
+function Marker({ value, colorScheme, icon }: MarkerProps) {
+	return (
+		<span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+			{icon ?? (
+				<span
+					className={`h-1.5 w-1.5 rounded-full ${dotColor(value, colorScheme)}`}
+				/>
+			)}
+		</span>
+	)
+}
+
 const defaultFormatValue = (value: number) => `${value > 0 ? "+" : ""}${value}`
 
 export function TraceTooltipContent({
@@ -75,8 +98,10 @@ export function TraceTooltipContent({
 							key={`${entry.description}:${idx}`}
 							className="flex items-center gap-1.5 text-[10px] text-slate-600"
 						>
-							<span
-								className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(entry.value, colorScheme)}`}
+							<Marker
+								value={entry.value}
+								colorScheme={colorScheme}
+								icon={entry.icon}
 							/>
 							<span className="flex-1">{entry.description}</span>
 							<span className="font-mono">{formatValue(entry.value)}</span>
@@ -93,9 +118,7 @@ export function TraceTooltipContent({
 							key={entry.description}
 							className="flex items-center gap-1.5 text-[10px] text-slate-600"
 						>
-							<span
-								className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(entry.colorValue, colorScheme)}`}
-							/>
+							<Marker value={entry.colorValue} colorScheme={colorScheme} />
 							<span className="flex-1">{entry.description}</span>
 							<span className="font-mono">{entry.valueLabel}</span>
 						</div>
@@ -103,9 +126,7 @@ export function TraceTooltipContent({
 				</div>
 			) : null}
 			<div className="flex items-center gap-1.5 border-t border-slate-100 pt-1.5 text-[10px] font-medium text-slate-700">
-				<span
-					className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor(finalValue, colorScheme)}`}
-				/>
+				<Marker value={finalValue} colorScheme={colorScheme} />
 				<span className="flex-1">{finalLabel}</span>
 				<span className="font-mono">{formatValue(finalValue)}</span>
 			</div>

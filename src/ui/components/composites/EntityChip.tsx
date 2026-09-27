@@ -13,6 +13,8 @@ interface EntityChipProps {
 	/** Visually de-emphasizes a chip that isn't currently active/relevant
 	 * (e.g. a war participant who hasn't joined yet at the selected date). */
 	dimmed?: boolean
+	// [JUSTIFICATION] Only lead entities in a list are emphasized.
+	emphasized?: boolean
 	title?: string
 	trailing?: React.ReactNode
 }
@@ -26,6 +28,7 @@ export const EntityChip: React.FC<EntityChipProps> = ({
 	onClick,
 	striped,
 	dimmed,
+	emphasized,
 	title,
 	trailing,
 }) => {
@@ -37,7 +40,7 @@ export const EntityChip: React.FC<EntityChipProps> = ({
 				stripeBackground="transparent"
 				className="shrink-0"
 			/>
-			<span>{name}</span>
+			<span className={emphasized ? "font-semibold" : undefined}>{name}</span>
 			{trailing}
 		</>
 	)

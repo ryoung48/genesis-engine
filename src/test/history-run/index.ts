@@ -61,6 +61,7 @@ function createEngine({
 	seed,
 	era,
 	numPoints,
+	startYear,
 }: CreateEngineParams): CreatedEngine {
 	const generationStart = performance.now()
 	const generated = GENERATE_WORLD.generateGenesisWorld({
@@ -99,12 +100,15 @@ function createEngine({
 		religions: generated.religions,
 		era: generated.params.era,
 		seed: generated.params.seed,
+		startYear,
 		landmarks: generated.landmarks,
 		regionProvince: provinces.regionProvince,
 		regionAdjOffset: generated.mesh.adjOffset,
 		regionAdjList: generated.mesh.adjList,
 		regionIsLand: generated.isLand,
 		planetRadiusKm: generated.params.planetRadiusKm,
+		topography: generated.topography ?? null,
+		vegetation: generated.vegetation ?? null,
 		settlementRegions: generated.settlementRegions,
 		settlementWaterLandmarks: generated.settlementWaterLandmarks,
 		settlementPortRegions: generated.settlementPortRegions,

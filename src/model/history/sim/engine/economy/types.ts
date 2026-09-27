@@ -5,8 +5,14 @@ export interface EconomyLookupParams {
 	p: number
 }
 
+export interface TravelDaysParams {
+	state: HistoryState
+	capital: number
+	p: number
+}
+
 export interface InitEconomyParams {
 	state: HistoryState
 }
 
-export type ArmyTradition = "paid" | "tribal" | "steppe"
+export type ArmyTradition = "settled" | "tribal" | "steppe"

@@ -34,6 +34,8 @@ import {
 	warMention,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
 import {
+	battleDetail,
+	battleVerb,
 	buildMergedDiplomacyDescription,
 	buildMergedProvinceAttributeDescription,
 	buildMergedTerritoryDescription,
@@ -385,6 +387,7 @@ export function useNationWikiData(
 				? COLOR.rgb01ToCss(governmentColor)
 				: null,
 			economy,
+			warName: (warId) => record.events.wars[warId]?.name ?? `War ${warId}`,
 			yearLabel: DATE.formatEu4Year(
 				economy?.budget?.year ??
 					DATE.historyTimeMsToYear(history.selectedTimeMs),
@@ -456,13 +459,11 @@ export function useNationWikiData(
 				rulerStat.value = ""
 				rulerStat.valueAction = (
 					<span className="inline-flex items-center gap-1">
-						{rulerName}
 						{dynastyName ? (
-							<>
-								<Swatch color={paletteColorForDynasty(dynastyName)} />
-								<span>{dynastyName}</span>
-							</>
+							<Swatch color={paletteColorForDynasty(dynastyName)} />
 						) : null}
+						{rulerName}
+						{dynastyName ? <span>{dynastyName}</span> : null}
 						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
 					</span>
 				)
@@ -1299,7 +1300,9 @@ export function useNationWikiData(
 				const force = formatBattleForce(
 					isAttacker ? battle.attacker : battle.defender,
 				)
-				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${opponentName} (${war.name})${force ? `; ${force}` : ""}.`
+				const winnerName = won ? title : opponentName
+				const loserName = won ? opponentName : title
+				const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name} (${war.name})${force ? `; ${title}: ${force}` : ""}.${battleDetail(battle)}`
 				pushTimelineEvent(timelineEvents, {
 					id: `warBattle:${war.id}:${battle.date}:${index}`,
 					date: battle.date,

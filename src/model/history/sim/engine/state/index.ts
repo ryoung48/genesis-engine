@@ -58,6 +58,7 @@ import type {
 	UniteParams,
 	War,
 } from "@/model/history/sim/engine/state/types"
+import { TERRAIN } from "@/model/history/sim/engine/terrain"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { FAMILY } from "@/model/history/sim/people/family"
@@ -125,14 +126,31 @@ function getWarAllies({
 	}
 	candidates.sort((a, b) => a - b)
 	for (const i of candidates) {
-		if (state.parentCurrent[i] >= 0 || state.sovereignCurrent[i] < 0) continue
-		if ((rels[i * P + target] as Relation) === rel.ALLY) continue
+		if (
+			state.desolate[i] ||
+			state.parentCurrent[i] >= 0 ||
+			state.sovereignCurrent[i] < 0
+		)
+			continue
+		// Nobody fights its own ally or the realm that rules it.
+		const towardTarget = rels[i * P + target] as Relation
+		if (
+			towardTarget === rel.ALLY ||
+			towardTarget === rel.OVERLORD ||
+			towardTarget === rel.PU_SENIOR
+		)
+			continue
 		allies.push(i)
 	}
 	return allies
 }
 
-function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
+function releaseProvince({
+	state,
+	p,
+	rng,
+	reason,
+}: ReleaseProvinceParams): void {
 	const formerSovereign = getSovereign({ state, p })
 	const formerPopulation = getNationPopulation({ state, root: formerSovereign })
 	const share =
@@ -175,8 +193,16 @@ function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
 			time: state.time / yearMs,
 		})
 	)
-		installRuler({ state, p, person: vassal, claim: FOUNDER_CLAIM })
-	else foundRuler({ state, p, age: rulerAge(rng), claim: FOUNDER_CLAIM, rng })
+		installRuler({ state, p, person: vassal, claim: FOUNDER_CLAIM, reason })
+	else
+		foundRuler({
+			state,
+			p,
+			age: rulerAge(rng),
+			claim: FOUNDER_CLAIM,
+			rng,
+			reason,
+		})
 	scheduleSuccession({ state, p })
 }
 
@@ -235,7 +261,7 @@ function releaseDisconnectedProvince({
 			value: -1,
 		})
 	}
-	releaseProvince({ state, p: province, rng })
+	releaseProvince({ state, p: province, rng, reason: "territorial change" })
 	state.events.push({
 		tag: "province released",
 		time: state.time,
@@ -359,25 +385,24 @@ function startWar({
 	defender,
 	rng,
 	rebel,
-}: StartWarParams): void {
+}: StartWarParams): War | null {
 	if (
 		DERIVE.provinceWars({ state, p: attacker }).some((idx) => {
 			const war = state.wars[idx]
 			return war.endTime === undefined && war.defender === attacker
 		})
 	)
-		return
-	createActiveWar({ state, attacker, defender, rng, options: { rebel } })
+		return null
+	return createActiveWar({ state, attacker, defender, rng, options: { rebel } })
 }
 
 function queueBattleEvent({
 	state,
 	warIdx,
 	attacker,
-	defender,
 	time,
 }: QueueBattleEventParams): void {
-	state.heap.enqueue(time, EVENT_HEAP.evt.BATTLE, warIdx, attacker, defender)
+	state.heap.enqueue(time, EVENT_HEAP.evt.BATTLE, warIdx, attacker)
 }
 
 function createActiveWar({
@@ -396,6 +421,7 @@ function createActiveWar({
 		rebel: options.rebel ?? false,
 		deployed: {},
 		occupied: [],
+		allies: new Set(),
 	}
 	state.wars.push(war)
 	state.activeWarIds.add(war.idx)
@@ -431,29 +457,6 @@ function createActiveWar({
 			war: war.idx,
 		},
 	})
-	JOURNAL.coalition({
-		state,
-		warId: war.idx,
-		rebel: war.rebel,
-		attackers: [
-			attacker,
-			...getWarAllies({
-				state,
-				nation: attacker,
-				type: "offensive",
-				target: defender,
-			}),
-		],
-		defenders: [
-			defender,
-			...getWarAllies({
-				state,
-				nation: defender,
-				type: "defensive",
-				target: attacker,
-			}),
-		],
-	})
 	const occupied = Array.from(
 		new Set(
 			(options.occupied ?? []).filter(
@@ -483,8 +486,7 @@ function createActiveWar({
 		state,
 		warIdx: war.idx,
 		attacker,
-		defender,
-		time: options.nextBattleTime ?? state.time + deltaMonth(rng.uniform(1, 6)),
+		time: options.nextBattleTime ?? state.time + deltaMonth(rng.uniform(1, 4)),
 	})
 	return war
 }
@@ -582,8 +584,16 @@ function createHistoryState({
 	regionAdjList,
 	regionIsLand,
 	era = "lateMedieval",
+	planetRadiusKm,
+	topography,
+	vegetation,
 }: CreateHistoryStateParams): HistoryState {
 	const P = provinces.count
+	const terrain = TERRAIN.provinceTerrain({
+		topography,
+		vegetation,
+		seeds: provinces.seeds,
+	})
 	const startTime = startYear * yearMs
 	const waterAccessLevels = waterAccess ?? new Uint8Array(P)
 	const stateless = new Uint8Array(P)
@@ -638,6 +648,8 @@ function createHistoryState({
 		treasuryCurrent: new Float64Array(P),
 		treasuryBudgetCurrent: new Map(),
 		manpowerCurrent: new Float64Array(P),
+		maxManpowerCurrent: new Float64Array(P),
+		armySizeCurrent: new Float64Array(P),
 		deploymentUpdateTime: new Float64Array(P).fill(-1),
 		revenueCurrent: new Float64Array(P),
 		plunderedUntil: new Float64Array(P),
@@ -662,6 +674,9 @@ function createHistoryState({
 		regionIsLand: regionIsLand?.slice() ?? new Uint8Array(0),
 		r_xyz: r_xyz.slice(),
 		province_xyz: buildProvinceXyz({ provinceSeeds: provinces.seeds, r_xyz }),
+		planetRadiusKm,
+		provinceTopography: terrain.topography,
+		provinceVegetation: terrain.vegetation,
 		habitability: population.habitability.slice(),
 		culture: cultures.assignment.slice(),
 		cultureCount: cultures.count,
@@ -739,7 +754,14 @@ function createHistoryState({
 		if (provinces.desolate[p]) continue
 		if (state.stateless[p]) continue
 		if (nations.parent[p] >= 0) continue
-		foundRuler({ state, p, age: rulerAge(rng), claim: FOUNDER_CLAIM, rng })
+		foundRuler({
+			state,
+			p,
+			age: rulerAge(rng),
+			claim: FOUNDER_CLAIM,
+			rng,
+			reason: "unknown",
+		})
 	}
 	rebuildAssignment({ state })
 
@@ -919,7 +941,7 @@ function mergeUnion({ state, junior, senior }: UnionPairParams): void {
 	setRelation({ state, a: junior, b: senior, rel: rel.NEUTRAL })
 	state.people.unionGenerations.delete(junior)
 	releaseSubjectRelations({ state, nation: junior })
-	PEOPLE.vacate({ people: state.people, seat: junior })
+	PEOPLE.vacate({ people: state.people, seat: junior, reason: "union" })
 	state.events.push({
 		tag: "personal union merged",
 		time: state.time,
@@ -932,16 +954,28 @@ function mergeUnion({ state, junior, senior }: UnionPairParams): void {
 	})
 }
 
-function installRuler({ state, p, person, claim }: InstallRulerParams): void {
+function installRuler({
+	state,
+	p,
+	person,
+	claim,
+	reason,
+}: InstallRulerParams): void {
 	const people = state.people
 	const table = people.persons
 	const other = table.throne[person]
 	breakUnions({ state, p, person })
-	PEOPLE.vacate({ people, seat: p })
+	PEOPLE.vacate({ people, seat: p, reason })
 	let merge = -1
 	if (other >= 0 && other !== p && isSovereign({ state, p: other })) {
 		const link = unite({ state, a: p, b: other, ruler: person, shared: true })
-		PEOPLE.setRuler({ people, seat: p, person, rank: state.seatRank[p] })
+		PEOPLE.setRuler({
+			people,
+			seat: p,
+			person,
+			rank: state.seatRank[p],
+			reason,
+		})
 		table.throne[person] = link.senior
 		table.realm[person] = link.senior
 		if (link.merge) merge = link.junior
@@ -952,6 +986,7 @@ function installRuler({ state, p, person, claim }: InstallRulerParams): void {
 			seat: p,
 			realm: p,
 			rank: state.seatRank[p],
+			reason,
 		})
 		uniteCouple({ state, p, person })
 	}
@@ -969,7 +1004,14 @@ function installRuler({ state, p, person, claim }: InstallRulerParams): void {
 		mergeUnion({ state, junior: merge, senior: table.throne[person] })
 }
 
-function foundRuler({ state, p, age, claim, rng }: FoundRulerParams): void {
+function foundRuler({
+	state,
+	p,
+	age,
+	claim,
+	rng,
+	reason,
+}: FoundRulerParams): void {
 	const person = FAMILY.found({
 		people: state.people,
 		origin: originOf({ state, realm: p }),
@@ -978,7 +1020,7 @@ function foundRuler({ state, p, age, claim, rng }: FoundRulerParams): void {
 		rank: state.seatRank[p],
 		rng,
 	})
-	installRuler({ state, p, person, claim })
+	installRuler({ state, p, person, claim, reason })
 }
 
 export const STATE = {

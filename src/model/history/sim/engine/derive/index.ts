@@ -97,7 +97,9 @@ function nationAdjacency({ state }: DerivedAtTimeParams): {
 			i < state.provinceAdjOffset[p + 1];
 			i++
 		) {
-			const b = sovereign({ state, p: state.provinceAdjList[i] })
+			const neighbor = state.provinceAdjList[i]
+			if (state.desolate[neighbor]) continue
+			const b = sovereign({ state, p: neighbor })
 			if (a !== b) neighborSets.get(a)?.add(b)
 		}
 	}

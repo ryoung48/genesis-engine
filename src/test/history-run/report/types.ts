@@ -1,11 +1,15 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
+import type { MilitaryReport } from "@/test/history-run/report/military/types"
 
 export interface HistoryReportOptions {
 	seeds: number[]
 	era: SocietyEra
 	numPoints: number
 	years: number
+	// [JUSTIFICATION] Omitted, runs start at the engine's default year.
+	startYear?: number
+	outPath: string
 	log: (line: string) => void
 }
 
@@ -39,6 +43,7 @@ export interface CenturyReport {
 	regency: RegencyReport
 	people: PeopleReport
 	marriage: MarriageReport
+	military: MilitaryReport
 }
 
 export interface MarriageReport {

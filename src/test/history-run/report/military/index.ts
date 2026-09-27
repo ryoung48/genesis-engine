@@ -1,0 +1,765 @@
+import { ECONOMY } from "@/model/history/sim/engine/economy"
+import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
+import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
+import { TAX } from "@/model/history/sim/engine/events/tax"
+import { MILITARY } from "@/model/history/sim/engine/military"
+import { STATE } from "@/model/history/sim/engine/state"
+import type { EngineNote } from "@/model/history/sim/engine/state/types"
+import type {
+	AttachedTracker,
+	AttachParams,
+	BattleSample,
+	DistanceBand,
+	DistanceBandParams,
+	ExhaustionFloorParams,
+	FiscalProbe,
+	LogMilitaryParams,
+	MilitaryReport,
+	MilitaryWindow,
+	ObserveNoteParams,
+	QuantileParams,
+	RatioParams,
+	SampleParams,
+	SummarizeParams,
+	WarEnding,
+	WarEndingParams,
+} from "@/test/history-run/report/military/types"
+
+const TRADITIONS: ArmyTradition[] = ["settled", "tribal", "steppe"]
+
+const BANDS: DistanceBand[] = ["near", "mid", "far"]
+
+const RELATION_NAMES = Object.fromEntries(
+	Object.entries(STATE.rel).map(([name, value]) => [value, name]),
+) as Record<number, string>
+
+const LONG_PEACE_YEARS = 20
+
+const FISCAL_PROBE: FiscalProbe = {
+	surplus: ECONOMY.surplus,
+	safe: ECONOMY.treasurySafe,
+	maintenance: ({ state, p }) =>
+		-TREASURY_BUDGET.get({ state, p }).stateMaintenance,
+	leakage: ({ state, p }) => -TREASURY_BUDGET.get({ state, p }).treasuryLeakage,
+}
+
+function byTradition<T>(make: () => T): Record<ArmyTradition, T> {
+	return { settled: make(), tribal: make(), steppe: make() }
+}
+
+function emptyWindow(): MilitaryWindow {
+	return {
+		sovereignYears: byTradition(() => 0),
+		atWarYears: byTradition(() => 0),
+		armyShare: byTradition<number[]>(() => []),
+		armySize: byTradition<number[]>(() => []),
+		deployed: byTradition<number[]>(() => []),
+		manpowerAfterWar: byTradition<number[]>(() => []),
+		warStarts: byTradition(() => 0),
+		rebellions: byTradition(() => 0),
+		vassalageEnded: 0,
+		counterWars: 0,
+		vassalSamples: 0,
+		vassalPairs: 0,
+		relationPairs: {},
+		completed: [],
+		battles: [],
+		repeatStrength: [],
+		raids: byTradition(() => ({ count: 0, success: 0, loot: 0, atSafe: 0 })),
+		fiscal: byTradition(() => ({
+			revenue: 0,
+			maintenance: 0,
+			army: 0,
+			leakage: 0,
+			unpaid: 0,
+		})),
+		treasury: byTradition(() => ({
+			ratios: [] as number[],
+			positiveYears: 0,
+			negative: 0,
+			aboveSafe: 0,
+			aboveFiveSafe: 0,
+			nonPositiveSurplus: 0,
+			nonPositiveNegative: 0,
+		})),
+		treasuryByBand: { near: [], mid: [], far: [] },
+		warStartTreasury: [],
+		sacks: [],
+		firstBattleSettled: 0,
+		firstBattleBelowExhaustion: 0,
+		longPeaceSettled: 0,
+		longPeaceNegative: 0,
+		recoveryYears: [],
+		recoveryCensored: 0,
+	}
+}
+
+function quantile({ values, q }: QuantileParams): number {
+	if (values.length === 0) return Number.NaN
+	const sorted = [...values].sort((a, b) => a - b)
+	const position = (sorted.length - 1) * q
+	const lo = Math.floor(position)
+	const hi = Math.ceil(position)
+	return sorted[lo] + (sorted[hi] - sorted[lo]) * (position - lo)
+}
+
+function median(values: number[]): number {
+	return quantile({ values, q: 0.5 })
+}
+
+function p90(values: number[]): number {
+	return quantile({ values, q: 0.9 })
+}
+
+function ratio({ count, total }: RatioParams): number {
+	return count / Math.max(1, total)
+}
+
+function share(flags: boolean[]): number {
+	return flags.filter(Boolean).length / Math.max(1, flags.length)
+}
+
+function distanceBand({ engine, nation }: DistanceBandParams): DistanceBand {
+	let weighted = 0
+	let total = 0
+	for (const p of STATE.getNationProvinces({ state: engine, root: nation })) {
+		if (engine.desolate[p]) continue
+		const output = ECONOMY.provinceOutput({ state: engine, p })
+		weighted +=
+			output * ECONOMY.travelDays({ state: engine, capital: nation, p })
+		total += output
+	}
+	const days = total > 0 ? weighted / total : 0
+	if (days < 30) return "near"
+	return days < 90 ? "mid" : "far"
+}
+
+function exhaustionFloor({
+	engine,
+	nation,
+	probe,
+}: ExhaustionFloorParams): number {
+	return -0.5 * Math.max(0, probe.surplus({ state: engine, p: nation }))
+}
+
+function observeBattle({ engine, tracker, note }: ObserveNoteParams): void {
+	const data = note.data
+	const warIdx = data.war as number
+	const war = engine.wars[warIdx]
+	const window = tracker.window
+	const attackerArmy = data.attackerArmy as number
+	const defenderArmy = data.defenderArmy as number
+	const effectiveDefense =
+		defenderArmy * ((data.terrainDefense as number | undefined) ?? 1.2)
+	const attackerWon = data.winner === data.attacker
+	const sample: BattleSample = {
+		attackerWon,
+		attackerLossPct: data.attackerLosses as number,
+		defenderLossPct: data.defenderLosses as number,
+		weakerWon:
+			attackerArmy === effectiveDefense
+				? null
+				: attackerArmy < effectiveDefense
+					? attackerWon
+					: !attackerWon,
+		result: (data.result as string | undefined) ?? "n/a",
+		initial: (data.initialResult as string | undefined) ?? "n/a",
+		routed: (data.result as string | undefined) === "rout",
+		shortfall: (data.loserShortfall as number | undefined) ?? 0,
+		topography: (data.topography as string | undefined) ?? "n/a",
+		vegetation: (data.vegetation as string | undefined) ?? "n/a",
+		water: (data.waterTarget as boolean | undefined) ?? false,
+		knowledge: Math.floor(
+			ECONOMY.realmKnowledge({ state: engine, p: data.attacker as number }),
+		),
+		casualties:
+			(attackerArmy * (data.attackerLosses as number)) / 100 +
+			(defenderArmy * (data.defenderLosses as number)) / 100,
+	}
+	window.battles.push(sample)
+	if (!tracker.warTradition.has(warIdx)) return
+	tracker.warBattles.set(warIdx, (tracker.warBattles.get(warIdx) ?? 0) + 1)
+	const strength = data.attacker === war.attacker ? attackerArmy : defenderArmy
+	const previous = tracker.lastStrength.get(warIdx)
+	if (previous !== undefined && previous > 0)
+		window.repeatStrength.push(strength / previous)
+	tracker.lastStrength.set(warIdx, strength)
+	if (
+		attackerWon &&
+		data.province === war.defender &&
+		data.attacker === war.attacker
+	) {
+		const loserRevenue = ECONOMY.revenue({ state: engine, p: war.defender })
+		if (loserRevenue > 0)
+			window.sacks.push((data.plunder as number) / loserRevenue)
+	}
+	if (tracker.firstBattle.has(warIdx)) return
+	tracker.firstBattle.add(warIdx)
+	for (const nation of [war.attacker, war.defender]) {
+		if (ECONOMY.armyTradition({ state: engine, p: nation }) !== "settled")
+			continue
+		window.firstBattleSettled++
+		if (
+			engine.treasuryCurrent[nation] <
+			exhaustionFloor({ engine, nation, probe: tracker.probe })
+		)
+			window.firstBattleBelowExhaustion++
+	}
+}
+
+function warEnding({ engine, note }: WarEndingParams): WarEnding {
+	const data = note.data
+	const war = engine.wars[data.war as number]
+	const transferred = data.transferred as number[]
+	if (transferred.includes(war.defender)) return "capital"
+	if (data.stalemate === "both nations exhausted") return "exhaustion"
+	if (data.stalemate !== undefined) return "stalemate"
+	if (
+		MILITARY.exhausted({ state: engine, nation: war.attacker }) ||
+		MILITARY.exhausted({ state: engine, nation: war.defender })
+	)
+		return "exhaustion"
+	return "settlement"
+}
+
+function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
+	const window = tracker.window
+	const data = note.data
+	if (note.tag === "war started") {
+		if (note.time < engine.time) return
+		const attacker = data.attacker as number
+		const defender = data.defender as number
+		const tradition = ECONOMY.armyTradition({ state: engine, p: attacker })
+		tracker.warTradition.set(data.war as number, tradition)
+		window.warStarts[tradition]++
+		if (
+			tracker.vassalageEnded.some(
+				(ended) =>
+					ended.time === note.time &&
+					ended.data.overlord === attacker &&
+					ended.data.vassal === defender,
+			)
+		)
+			window.counterWars++
+		for (const nation of [attacker, defender]) {
+			tracker.recovering.delete(nation)
+			const surplus = tracker.probe.surplus({ state: engine, p: nation })
+			const safe = tracker.probe.safe({ state: engine, p: nation })
+			if (surplus <= 0 || safe <= 0) continue
+			window.warStartTreasury.push({
+				tradition: ECONOMY.armyTradition({ state: engine, p: nation }),
+				band: distanceBand({ engine, nation }),
+				inSurplus: engine.treasuryCurrent[nation] / surplus,
+				inSafe: engine.treasuryCurrent[nation] / safe,
+			})
+		}
+	} else if (note.tag === "rebellion") {
+		if (note.time < engine.time) return
+		window.rebellions[
+			ECONOMY.armyTradition({ state: engine, p: data.overlord as number })
+		]++
+	} else if (note.tag === "vassalage ended") {
+		window.vassalageEnded++
+		tracker.vassalageEnded = tracker.vassalageEnded.filter(
+			(ended) => ended.time === note.time,
+		)
+		tracker.vassalageEnded.push(note)
+	} else if (note.tag === "battle") {
+		observeBattle({ engine, tracker, note })
+	} else if (note.tag === "raid") {
+		const raider = data.raider as number
+		const raids =
+			window.raids[ECONOMY.armyTradition({ state: engine, p: raider })]
+		raids.count++
+		if (!data.success) return
+		raids.success++
+		raids.loot += data.loot as number
+		const safe = tracker.probe.safe({ state: engine, p: raider })
+		if (safe > 0 && engine.treasuryCurrent[raider] >= safe * (1 - 1e-9))
+			raids.atSafe++
+	} else if (note.tag === "war ended") {
+		const warIdx = data.war as number
+		const war = engine.wars[warIdx]
+		for (const nation of [war.attacker, war.defender]) {
+			if (!STATE.isSovereign({ state: engine, p: nation })) continue
+			const tradition = ECONOMY.armyTradition({ state: engine, p: nation })
+			const max = ECONOMY.maxManpower({ state: engine, p: nation })
+			if (max > 0)
+				window.manpowerAfterWar[tradition].push(
+					engine.manpowerCurrent[nation] / max,
+				)
+			if (
+				tradition !== "settled" &&
+				engine.treasuryCurrent[nation] <
+					tracker.probe.safe({ state: engine, p: nation })
+			)
+				tracker.recovering.set(nation, note.time)
+		}
+		const tradition = tracker.warTradition.get(warIdx)
+		if (tradition === undefined) return
+		window.completed.push({
+			years: (note.time - war.startTime) / STATE.yearMs,
+			tradition,
+			attackerWon: data.winner === war.attacker,
+			ending: warEnding({ engine, note }),
+			rebel: war.rebel,
+			rebelIndependent: war.rebel && data.winner === war.defender,
+		})
+		tracker.warTradition.delete(warIdx)
+		tracker.warBattles.delete(warIdx)
+		tracker.lastStrength.delete(warIdx)
+	}
+}
+
+function attach({ engine, probe }: AttachParams): AttachedTracker {
+	const tracker = {
+		probe,
+		warTradition: new Map(),
+		warBattles: new Map(),
+		lastStrength: new Map(),
+		firstBattle: new Set<number>(),
+		vassalageEnded: [] as EngineNote[],
+		recovering: new Map(),
+		peaceYears: new Map(),
+		window: emptyWindow(),
+	}
+	const events = engine.events
+	const push = events.push.bind(events)
+	events.push = (...notes) => {
+		for (const note of notes) observeNote({ engine, tracker, note })
+		return push(...notes)
+	}
+	const runTax = TAX.runTax
+	TAX.runTax = (params) => {
+		const { state, nation, previousTime } = params
+		const sovereign = STATE.isSovereign({ state, p: nation })
+		const yearFraction = (state.time - previousTime) / STATE.yearMs
+		const nominal = sovereign
+			? MILITARY.upkeep({ state, nation }) * yearFraction
+			: 0
+		runTax(params)
+		if (!sovereign) return
+		const budget = TREASURY_BUDGET.get({ state, p: nation })
+		const fiscal =
+			tracker.window.fiscal[ECONOMY.armyTradition({ state, p: nation })]
+		fiscal.revenue += budget.taxes
+		fiscal.maintenance += probe.maintenance({ state, p: nation })
+		fiscal.army -= budget.armyExpenses
+		fiscal.leakage += probe.leakage({ state, p: nation })
+		fiscal.unpaid += Math.max(0, nominal + budget.armyExpenses)
+	}
+	return {
+		tracker,
+		detach: () => {
+			TAX.runTax = runTax
+			events.push = push
+		},
+	}
+}
+
+function sample({ engine, tracker, sampleRelations }: SampleParams): void {
+	const window = tracker.window
+	for (let nation = 0; nation < engine.P; nation++) {
+		if (
+			engine.desolate[nation] ||
+			engine.stateless[nation] ||
+			!STATE.isSovereign({ state: engine, p: nation })
+		)
+			continue
+		const tradition = ECONOMY.armyTradition({ state: engine, p: nation })
+		const population = STATE.getNationPopulation({
+			state: engine,
+			root: nation,
+		})
+		const army = MILITARY.armySize({ state: engine, nation })
+		const atWar = engine.provinceWars[nation].length > 0
+		window.sovereignYears[tradition]++
+		window.armySize[tradition].push(army)
+		if (population > 0) window.armyShare[tradition].push(army / population)
+		if (atWar) {
+			window.atWarYears[tradition]++
+			let deployed = 0
+			for (const idx of engine.activeWarIds)
+				deployed += engine.wars[idx].deployed[nation] ?? 0
+			window.deployed[tradition].push(deployed)
+		}
+		const treasury = engine.treasuryCurrent[nation]
+		const surplus = tracker.probe.surplus({ state: engine, p: nation })
+		const safe = tracker.probe.safe({ state: engine, p: nation })
+		const totals = window.treasury[tradition]
+		if (surplus > 0 && safe > 0) {
+			totals.positiveYears++
+			totals.ratios.push(treasury / safe)
+			if (treasury < 0) totals.negative++
+			if (treasury > safe) totals.aboveSafe++
+			if (treasury > 5 * safe) totals.aboveFiveSafe++
+			window.treasuryByBand[distanceBand({ engine, nation })].push(
+				treasury / safe,
+			)
+		} else {
+			totals.nonPositiveSurplus++
+			if (treasury < 0) totals.nonPositiveNegative++
+		}
+		const peace = atWar ? 0 : (tracker.peaceYears.get(nation) ?? 0) + 1
+		tracker.peaceYears.set(nation, peace)
+		if (peace >= LONG_PEACE_YEARS && tradition === "settled") {
+			window.longPeaceSettled++
+			if (treasury < 0) window.longPeaceNegative++
+		}
+	}
+	for (const [nation, since] of tracker.recovering) {
+		if (
+			!STATE.isSovereign({ state: engine, p: nation }) ||
+			engine.provinceWars[nation].length > 0
+		) {
+			window.recoveryCensored++
+			tracker.recovering.delete(nation)
+		} else if (
+			engine.treasuryCurrent[nation] >=
+			tracker.probe.safe({ state: engine, p: nation }) * (1 - 1e-9)
+		) {
+			window.recoveryYears.push((engine.time - since) / STATE.yearMs)
+			tracker.recovering.delete(nation)
+		}
+	}
+	if (!sampleRelations) return
+	window.vassalSamples++
+	for (let nation = 0; nation < engine.P; nation++) {
+		if (
+			engine.desolate[nation] ||
+			!STATE.isSovereign({ state: engine, p: nation })
+		)
+			continue
+		for (const other of engine.relationColumns[nation])
+			if (
+				STATE.getRelation({ state: engine, a: other, b: nation }) ===
+				STATE.rel.VASSAL
+			)
+				window.vassalPairs++
+		for (const other of STATE.getNationNeighbors({ state: engine, nation })) {
+			if (other < nation) continue
+			const name =
+				RELATION_NAMES[
+					STATE.getRelation({ state: engine, a: nation, b: other })
+				]
+			window.relationPairs[name] = (window.relationPairs[name] ?? 0) + 1
+		}
+	}
+}
+
+function summarize({ tracker }: SummarizeParams): MilitaryReport {
+	const window = tracker.window
+	const report: MilitaryReport = {}
+	for (const tradition of TRADITIONS) {
+		const years = window.sovereignYears[tradition]
+		const sovereigns = years / 100
+		report[`sovereignYears.${tradition}`] = years
+		report[`activeWarShare.${tradition}`] =
+			window.atWarYears[tradition] / Math.max(1, years)
+		report[`armyShare.p50.${tradition}`] = median(window.armyShare[tradition])
+		report[`armyShare.p90.${tradition}`] = p90(window.armyShare[tradition])
+		report[`armySize.p50.${tradition}`] = median(window.armySize[tradition])
+		report[`armySize.p90.${tradition}`] = p90(window.armySize[tradition])
+		report[`deployed.p50.${tradition}`] = median(window.deployed[tradition])
+		report[`deployed.p90.${tradition}`] = p90(window.deployed[tradition])
+		report[`manpowerAfterWar.p50.${tradition}`] = median(
+			window.manpowerAfterWar[tradition],
+		)
+		report[`warStarts.n.${tradition}`] = window.warStarts[tradition]
+		report[`warStarts.perSovereign.${tradition}`] =
+			window.warStarts[tradition] / Math.max(1e-9, sovereigns)
+		report[`rebellions.n.${tradition}`] = window.rebellions[tradition]
+		report[`rebellions.perSovereign.${tradition}`] =
+			window.rebellions[tradition] / Math.max(1e-9, sovereigns)
+		const raids = window.raids[tradition]
+		report[`raids.n.${tradition}`] = raids.count
+		report[`raids.successShare.${tradition}`] =
+			raids.success / Math.max(1, raids.count)
+		report[`raids.lootPerSuccess.${tradition}`] =
+			raids.loot / Math.max(1, raids.success)
+		report[`raids.atSafeShare.${tradition}`] =
+			raids.atSafe / Math.max(1, raids.success)
+		const fiscal = window.fiscal[tradition]
+		const revenue = Math.max(1e-12, fiscal.revenue)
+		report[`fiscal.revenue.${tradition}`] = fiscal.revenue
+		report[`fiscal.maintenanceShare.${tradition}`] =
+			fiscal.maintenance / revenue
+		report[`fiscal.armyShare.${tradition}`] = fiscal.army / revenue
+		report[`fiscal.leakageShare.${tradition}`] = fiscal.leakage / revenue
+		report[`fiscal.unpaidShare.${tradition}`] = fiscal.unpaid / revenue
+		report[`fiscal.netShare.${tradition}`] =
+			(fiscal.revenue - fiscal.maintenance - fiscal.army - fiscal.leakage) /
+			revenue
+		const treasury = window.treasury[tradition]
+		const positive = Math.max(1, treasury.positiveYears)
+		report[`treasury.ratio.p50.${tradition}`] = median(treasury.ratios)
+		report[`treasury.negativeShare.${tradition}`] = treasury.negative / positive
+		report[`treasury.aboveSafeShare.${tradition}`] =
+			treasury.aboveSafe / positive
+		report[`treasury.aboveFiveSafeShare.${tradition}`] =
+			treasury.aboveFiveSafe / positive
+		report[`treasury.nonPositiveSurplusYears.${tradition}`] =
+			treasury.nonPositiveSurplus
+		report[`treasury.nonPositiveNegativeShare.${tradition}`] =
+			treasury.nonPositiveNegative / Math.max(1, treasury.nonPositiveSurplus)
+		const starts = window.warStartTreasury.filter(
+			(start) => start.tradition === tradition,
+		)
+		report[`warStartTreasury.inSurplus.p50.${tradition}`] = median(
+			starts.map((start) => start.inSurplus),
+		)
+		report[`warStartTreasury.inSafe.p50.${tradition}`] = median(
+			starts.map((start) => start.inSafe),
+		)
+	}
+	for (const band of BANDS) {
+		report[`treasury.ratio.p50.${band}`] = median(window.treasuryByBand[band])
+		report[`treasury.bandYears.${band}`] = window.treasuryByBand[band].length
+		const starts = window.warStartTreasury.filter(
+			(start) => start.band === band,
+		)
+		report[`warStartTreasury.inSafe.p50.${band}`] = median(
+			starts.map((start) => start.inSafe),
+		)
+	}
+	const totalSovereigns =
+		TRADITIONS.reduce((sum, t) => sum + window.sovereignYears[t], 0) / 100
+	report["vassalageEnded.n"] = window.vassalageEnded
+	report["vassalageEnded.perVassal"] =
+		window.vassalageEnded /
+		Math.max(1e-9, window.vassalPairs / Math.max(1, window.vassalSamples))
+	report["counterWars.n"] = window.counterWars
+	const relationTotal = Object.values(window.relationPairs).reduce(
+		(sum, count) => sum + count,
+		0,
+	)
+	for (const [name, count] of Object.entries(window.relationPairs))
+		report[`relationShare.${name}`] = count / Math.max(1, relationTotal)
+	report["warStarts.n"] = TRADITIONS.reduce(
+		(sum, t) => sum + window.warStarts[t],
+		0,
+	)
+	report["warStarts.perSovereign"] =
+		report["warStarts.n"] / Math.max(1e-9, totalSovereigns)
+	const completed = window.completed
+	const settledLed = completed.filter((war) => war.tradition === "settled")
+	report["wars.completed.n"] = completed.length
+	report["wars.years.p50"] = median(completed.map((war) => war.years))
+	report["wars.years.p90"] = p90(completed.map((war) => war.years))
+	report["wars.settled.completed.n"] = settledLed.length
+	report["wars.settled.years.p50"] = median(settledLed.map((war) => war.years))
+	report["wars.settled.years.p90"] = p90(settledLed.map((war) => war.years))
+	report["wars.attackerWinShare"] = share(
+		completed.map((war) => war.attackerWon),
+	)
+	for (const ending of ["capital", "settlement", "stalemate", "exhaustion"]) {
+		report[`wars.ending.${ending}`] = share(
+			completed.map((war) => war.ending === ending),
+		)
+		report[`wars.settled.ending.${ending}`] = share(
+			settledLed.map((war) => war.ending === ending),
+		)
+	}
+	const rebelWars = completed.filter((war) => war.rebel)
+	report["rebelWars.completed.n"] = rebelWars.length
+	report["rebelWars.independent.n"] = rebelWars.filter(
+		(war) => war.rebelIndependent,
+	).length
+	report["rebelWars.successShare"] = ratio({
+		count: report["rebelWars.independent.n"],
+		total: rebelWars.length,
+	})
+	const battles = window.battles
+	report["battles.n"] = battles.length
+	report["battles.perCompletedWar"] =
+		battles.length / Math.max(1, completed.length)
+	report["battles.attackerWinShare"] = share(
+		battles.map((battle) => battle.attackerWon),
+	)
+	report["battles.attackerLossPct.p50"] = median(
+		battles.map((battle) => battle.attackerLossPct),
+	)
+	report["battles.defenderLossPct.p50"] = median(
+		battles.map((battle) => battle.defenderLossPct),
+	)
+	report["battles.casualties"] = battles.reduce(
+		(sum, battle) => sum + battle.casualties,
+		0,
+	)
+	const uneven = battles.filter((battle) => battle.weakerWon !== null)
+	report["battles.weaker.n"] = uneven.length
+	report["battles.weaker.wins"] = uneven.filter(
+		(battle) => battle.weakerWon,
+	).length
+	report["battles.weakerWinShare"] = ratio({
+		count: report["battles.weaker.wins"],
+		total: uneven.length,
+	})
+	report["battles.repeatStrength.p50"] = median(window.repeatStrength)
+	report["battles.waterTargets"] = battles.filter(
+		(battle) => battle.water,
+	).length
+	for (const result of [
+		"inconclusive",
+		"normal",
+		"decisive",
+		"rout",
+		"uncontested",
+	]) {
+		report[`battles.result.${result}`] = share(
+			battles.map((battle) => battle.result === result),
+		)
+		const initial = battles.filter((battle) => battle.initial === result)
+		if (initial.length > 0)
+			report[`battles.routShare.initial.${result}`] = share(
+				initial.map((battle) => battle.routed),
+			)
+	}
+	const contested = battles.filter((battle) => battle.result !== "uncontested")
+	report["battles.routShare"] = share(contested.map((battle) => battle.routed))
+	for (const [label, lo, hi] of [
+		["none", 0, 1e-9],
+		["low", 1e-9, 0.25],
+		["high", 0.25, 2],
+	] as const) {
+		const band = contested.filter(
+			(battle) => battle.shortfall >= lo && battle.shortfall < hi,
+		)
+		report[`battles.routShare.shortfall.${label}`] = share(
+			band.map((battle) => battle.routed),
+		)
+	}
+	const terrains = new Set(battles.map((battle) => battle.topography))
+	for (const topography of terrains) {
+		const group = battles.filter((battle) => battle.topography === topography)
+		report[`battles.byTopography.${topography}.n`] = group.length
+		report[`battles.byTopography.${topography}.attackerWinShare`] = share(
+			group.map((battle) => battle.attackerWon),
+		)
+	}
+	const vegetations = new Set(battles.map((battle) => battle.vegetation))
+	for (const vegetation of vegetations) {
+		const group = battles.filter((battle) => battle.vegetation === vegetation)
+		report[`battles.byVegetation.${vegetation}.n`] = group.length
+		report[`battles.byVegetation.${vegetation}.attackerWinShare`] = share(
+			group.map((battle) => battle.attackerWon),
+		)
+	}
+	const levels = new Set(battles.map((battle) => battle.knowledge))
+	for (const level of levels) {
+		const group = battles.filter((battle) => battle.knowledge === level)
+		report[`battles.byKnowledge.${level}.n`] = group.length
+		report[`battles.byKnowledge.${level}.attackerWinShare`] = share(
+			group.map((battle) => battle.attackerWon),
+		)
+	}
+	report["sacks.n"] = window.sacks.length
+	report["sacks.inRevenue.p50"] = median(window.sacks)
+	report["firstBattle.settled.n"] = window.firstBattleSettled
+	report["firstBattle.paidBelowExhaustionShare"] = ratio({
+		count: window.firstBattleBelowExhaustion,
+		total: window.firstBattleSettled,
+	})
+	report["longPeace.settled.n"] = window.longPeaceSettled
+	report["longPeace.paidNegativeShare"] = ratio({
+		count: window.longPeaceNegative,
+		total: window.longPeaceSettled,
+	})
+	report["recovery.n"] = window.recoveryYears.length
+	report["recovery.years.p50"] = median(window.recoveryYears)
+	report["recovery.censored"] = window.recoveryCensored
+	tracker.window = emptyWindow()
+	return report
+}
+
+const LOG_GROUPS: [string, string[]][] = [
+	[
+		"army",
+		[
+			"armyShare.p50",
+			"armyShare.p90",
+			"armySize.p50",
+			"deployed.p50",
+			"manpowerAfterWar.p50",
+		],
+	],
+	[
+		"conflict",
+		[
+			"warStarts.perSovereign",
+			"rebellions.perSovereign",
+			"activeWarShare",
+			"raids.n",
+			"raids.successShare",
+		],
+	],
+	[
+		"fiscal",
+		[
+			"fiscal.maintenanceShare",
+			"fiscal.armyShare",
+			"fiscal.leakageShare",
+			"fiscal.netShare",
+			"treasury.ratio.p50",
+			"treasury.negativeShare",
+			"treasury.aboveFiveSafeShare",
+		],
+	],
+]
+
+const LOG_TOTALS = [
+	"warStarts.n",
+	"wars.completed.n",
+	"wars.years.p50",
+	"wars.years.p90",
+	"wars.settled.years.p50",
+	"wars.attackerWinShare",
+	"wars.ending.stalemate",
+	"wars.ending.exhaustion",
+	"rebelWars.successShare",
+	"battles.n",
+	"battles.attackerWinShare",
+	"battles.weakerWinShare",
+	"battles.routShare",
+	"vassalageEnded.n",
+	"counterWars.n",
+	"firstBattle.paidBelowExhaustionShare",
+	"longPeace.paidNegativeShare",
+	"recovery.years.p50",
+]
+
+function format(value: number | undefined): string {
+	if (value === undefined || Number.isNaN(value)) return "-"
+	if (Math.abs(value) >= 1000) return value.toFixed(0)
+	if (Math.abs(value) >= 10) return value.toFixed(1)
+	if (Math.abs(value) >= 0.01 || value === 0) return value.toFixed(3)
+	return value.toExponential(2)
+}
+
+function log({ reports, log: write }: LogMilitaryParams): void {
+	for (const [group, keys] of LOG_GROUPS) {
+		write(`${group} by tradition (settled/tribal/steppe)`)
+		for (const { from, to, military } of reports)
+			write(
+				`${`${from}-${to}`.padEnd(11)} ${keys
+					.map(
+						(key) =>
+							`${key}=${TRADITIONS.map((t) => format(military[`${key}.${t}`])).join("/")}`,
+					)
+					.join("  ")}`,
+			)
+	}
+	write("military totals")
+	for (const { from, to, military } of reports)
+		write(
+			`${`${from}-${to}`.padEnd(11)} ${LOG_TOTALS.map((key) => `${key}=${format(military[key])}`).join("  ")}`,
+		)
+}
+
+export const MILITARY_REPORT = {
+	fiscalProbe: FISCAL_PROBE,
+	attach,
+	sample,
+	summarize,
+	log,
+}

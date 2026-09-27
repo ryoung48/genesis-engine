@@ -6,7 +6,10 @@ import type {
 	PendingJournal,
 } from "@/model/history/sim/engine/journal/types"
 import type { Relation } from "@/model/history/sim/engine/state"
-import type { PeopleState } from "@/model/history/sim/people/types"
+import type {
+	PeopleState,
+	SeatChangeReason,
+} from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
 import type {
@@ -43,6 +46,9 @@ export interface War {
 	deployed: Record<number, number>
 	/** Provinces currently occupied by the attacker in this war. */
 	occupied: number[]
+	// Allies in the war's last logged coalition; they stay until exhausted,
+	// while newcomers must also be out of debt to join.
+	allies: Set<number>
 }
 
 interface ActiveWarOptions {
@@ -75,6 +81,9 @@ export interface RealmCacheEntry {
 	censusVersion: number
 	knowledge: number
 	revenue: number
+	stateMaintenance: number
+	// Grams of silver of output per resident, before extraction.
+	outputPerHead: number
 }
 
 export interface HistoryState {
@@ -116,6 +125,9 @@ export interface HistoryState {
 	treasuryCurrent: Float64Array
 	treasuryBudgetCurrent: Map<number, TreasuryBudget>
 	manpowerCurrent: Float64Array
+	maxManpowerCurrent: Float64Array
+	// Field army size at the last census; the live value is MILITARY.armySize.
+	armySizeCurrent: Float64Array
 	deploymentUpdateTime: Float64Array
 	revenueCurrent: Float64Array
 	// Time until which a plundered province yields no output loot.
@@ -146,6 +158,10 @@ export interface HistoryState {
 	regionIsLand: Uint8Array
 	r_xyz: Float32Array
 	province_xyz: Float32Array
+	planetRadiusKm: number
+	// Genesis topography and vegetation codes at each province's seed region.
+	provinceTopography: Uint8Array
+	provinceVegetation: Uint8Array
 	habitability: Float32Array
 	culture: Int32Array
 	cultureCount: number
@@ -175,7 +191,6 @@ export interface QueueBattleEventParams {
 	state: HistoryState
 	warIdx: number
 	attacker: number
-	defender: number
 	time: number
 }
 
@@ -267,6 +282,7 @@ export interface ReleaseProvinceParams {
 	state: HistoryState
 	p: number
 	rng: SharedRng
+	reason: SeatChangeReason
 }
 
 export interface IsProvinceConnectedToParentParams {
@@ -374,6 +390,9 @@ export interface CreateHistoryStateParams {
 	regionAdjList?: Int32Array
 	regionIsLand?: Uint8Array
 	era?: SocietyEra
+	planetRadiusKm: number
+	topography: Uint8Array | null
+	vegetation: Uint8Array | null
 }
 
 export interface OriginOfParams {
@@ -391,6 +410,7 @@ export interface InstallRulerParams {
 	p: number
 	person: number
 	claim: number
+	reason: SeatChangeReason
 }
 
 export interface FoundRulerParams {
@@ -399,6 +419,7 @@ export interface FoundRulerParams {
 	age: number
 	claim: number
 	rng: SharedRng
+	reason: SeatChangeReason
 }
 
 export interface UnionRealmParams {

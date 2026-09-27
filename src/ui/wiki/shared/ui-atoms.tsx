@@ -40,24 +40,38 @@ export function renderStatGrid(stats: StatEntry[]) {
 				<span className="text-[9px] text-slate-400">{stat.label}</span>
 			)}
 			<div className="flex">
-				{stat.valueHelp && stat.valueHelpTarget !== "prefix" ? (
-					<UITooltip content={stat.valueHelp} position="top" align="center">
-						<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
-							<EditableStatValue stat={stat} />
-						</span>
-					</UITooltip>
-				) : stat.valueHelp &&
-					stat.valueHelpTarget === "prefix" &&
-					!stat.editor &&
-					stat.valuePrefix ? (
-					<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
+				{stat.valueHelp &&
+				stat.valueHelpTarget !== "prefix" &&
+				stat.valueHelpTarget !== "suffix" ? (
+					<span className="inline-flex items-center gap-1">
 						{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
 						<UITooltip content={stat.valueHelp} position="top" align="center">
 							<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
-								{stat.valuePrefix}
+								<EditableStatValue stat={{ ...stat, swatchColor: null }} />
 							</span>
 						</UITooltip>
-						<span>{stat.value}</span>
+					</span>
+				) : stat.valueHelp && !stat.editor && stat.valuePrefix ? (
+					<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
+						{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
+						{stat.valueHelpTarget === "prefix" ? (
+							<UITooltip content={stat.valueHelp} position="top" align="center">
+								<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
+									{stat.valuePrefix}
+								</span>
+							</UITooltip>
+						) : (
+							<span>{stat.valuePrefix}</span>
+						)}
+						{stat.valueHelpTarget === "suffix" ? (
+							<UITooltip content={stat.valueHelp} position="top" align="center">
+								<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
+									{stat.value}
+								</span>
+							</UITooltip>
+						) : (
+							<span>{stat.value}</span>
+						)}
 						{stat.valueAction}
 						{stat.trailingHelp ? (
 							<TrailingHelpIcon content={stat.trailingHelp} />

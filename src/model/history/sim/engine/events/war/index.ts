@@ -16,6 +16,7 @@ import type {
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { type Relation, STATE } from "@/model/history/sim/engine/state"
+import type { StartWarParams } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
@@ -176,13 +177,9 @@ function seedWarStage({
 					? rng.uniform(1, 3)
 					: rng.uniform(0.05, 0.75),
 		)
-	const nextBattleTime =
-		state.time +
-		(lateStage
-			? STATE.deltaMonth(rng.uniform(0.25, 1.5))
-			: STATE.deltaMonth(rng.uniform(1, 4)))
+	const nextBattleTime = state.time + STATE.deltaMonth(rng.uniform(1, 4))
 
-	STATE.createActiveWar({
+	const war = STATE.createActiveWar({
 		state,
 		attacker,
 		defender,
@@ -204,6 +201,7 @@ function seedWarStage({
 				rng.uniform(0.5, 0.9) *
 				(lateStage ? 0.7 : 1),
 		})
+	MILITARY.mobilize({ state, war })
 }
 
 function seedInterstateWars({ state, rng }: SeedInterstateWarsParams): void {
@@ -317,7 +315,12 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			subject: nation,
 		})
 		if (threat <= REBELLION_THRESHOLD) continue
-		STATE.releaseProvince({ state, p: nation, rng })
+		STATE.releaseProvince({
+			state,
+			p: nation,
+			rng,
+			reason: "territorial change",
+		})
 		STATE.fixConnections({ state, nation, rng })
 		seedWarStage({
 			state,
@@ -329,6 +332,12 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 		})
 		seeded++
 	}
+}
+
+// Armies take the field when a war is declared.
+function start(params: StartWarParams): void {
+	const war = STATE.startWar(params)
+	if (war) MILITARY.mobilize({ state: params.state, war })
 }
 
 function initWar({ state, rng }: InitWarParams): void {
@@ -358,9 +367,9 @@ function rebel({
 		time: state.time,
 		data: { overlord, subject, succession },
 	})
-	STATE.releaseProvince({ state, p: subject, rng })
+	STATE.releaseProvince({ state, p: subject, rng, reason: "rebellion" })
 	if (rng.random() > threat)
-		STATE.startWar({
+		start({
 			state,
 			attacker: overlord,
 			defender: subject,
@@ -387,7 +396,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
 			if (rng.random() > closest.w) {
-				STATE.startWar({
+				start({
 					state,
 					attacker: nation,
 					defender: closest.n,
@@ -436,6 +445,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 }
 
 export const WAR = {
+	start,
 	initWar,
 	runWar,
 	rebel,

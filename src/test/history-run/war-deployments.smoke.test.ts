@@ -37,6 +37,7 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		rebel: false,
 		deployed: {},
 		occupied: [],
+		allies: new Set(),
 	}
 	engine.wars.push(smallerWar)
 	engine.activeWarIds.add(smallerWar.idx)
@@ -44,10 +45,11 @@ it("weights shared deployments and carries losses into the next battle", () => {
 	engine.provinceWars[weak].push(smallerWar.idx)
 
 	const rng = HISTORY_RNG.createHistoryRng(42)
-	MILITARY.fight({
+	const first = MILITARY.fight({
 		state: engine,
 		war,
 		eventAttacker: war.attacker,
+		defense: 1,
 		rng,
 	})
 	expect(war.deployed[war.attacker]).toBeGreaterThan(
@@ -58,17 +60,16 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		0,
 	)
 	expect(committed).toBeLessThanOrEqual(engine.manpowerCurrent[war.attacker])
-	const attackerAfterFirst = war.deployed[war.attacker]
-	const defenderAfterFirst = war.deployed[war.defender]
-	MILITARY.fight({
+	const second = MILITARY.fight({
 		state: engine,
 		war,
 		eventAttacker: war.attacker,
+		defense: 1,
 		rng,
 	})
 
-	expect(war.deployed[war.attacker]).toBeLessThan(attackerAfterFirst)
-	expect(war.deployed[war.defender]).toBeLessThan(defenderAfterFirst)
+	expect(second.attackerArmy).toBeLessThan(first.attackerArmy)
+	expect(second.defenderArmy).toBeLessThan(first.defenderArmy)
 }, 120_000)
 
 it("changes each side's losses when the battle outcome changes", () => {
@@ -86,21 +87,23 @@ it("changes each side's losses when the battle outcome changes", () => {
 	if (!winningWar) return
 	const losingWar = losing.wars[winningWar.idx]
 	const winRng = HISTORY_RNG.createHistoryRng(42)
-	winRng.random = () => 0
+	winRng.random = () => 1
 	winRng.uniform = () => 1
 	const lossRng = HISTORY_RNG.createHistoryRng(42)
-	lossRng.random = () => 1
+	lossRng.random = () => 0
 	lossRng.uniform = () => 1
 	const victory = MILITARY.fight({
 		state: winning,
 		war: winningWar,
 		eventAttacker: winningWar.attacker,
+		defense: 1,
 		rng: winRng,
 	})
 	const defeat = MILITARY.fight({
 		state: losing,
 		war: losingWar,
 		eventAttacker: losingWar.attacker,
+		defense: 1,
 		rng: lossRng,
 	})
 

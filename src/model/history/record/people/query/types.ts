@@ -3,6 +3,7 @@ import type {
 	RecordBetrothalEnd,
 } from "@/model/history/record/people/types"
 import type { SeatKind } from "@/model/history/sim/engine/journal/types"
+import type { SeatChangeReason } from "@/model/history/sim/people/types"
 
 export interface PersonAtParams {
 	people: PeopleRecord
@@ -48,6 +49,7 @@ export interface TenureView {
 	// [JUSTIFICATION] A seat still held at the queried time has no end.
 	endTimeMs: number | null
 	person: number
+	endReason: SeatChangeReason | null
 }
 
 export interface PersonView {
@@ -94,4 +96,6 @@ export interface PersonEvent {
 	other: number
 	// The tenure a seat or regency event belongs to; -1 for other kinds.
 	tenure: number
+	// [JUSTIFICATION] Only seat departures have an end reason.
+	endReason?: SeatChangeReason
 }

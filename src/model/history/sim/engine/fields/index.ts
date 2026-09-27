@@ -96,6 +96,12 @@ const prov = {
 			state.revenueCurrent[p] = value
 		},
 	},
+	maxManpower: {
+		get: ({ state, p }: ProvGetParams) => state.maxManpowerCurrent[p],
+		set: ({ state, p, value }: ProvSetParams) => {
+			state.maxManpowerCurrent[p] = value
+		},
+	},
 	plunderedUntil: {
 		get: ({ state, p }: ProvGetParams) => state.plunderedUntil[p],
 		set: ({ state, p, value }: ProvSetParams) => {

@@ -10,6 +10,7 @@ import type { Nation } from "@/model/history/earth/reference/nations/types"
 import type { LonLat } from "@/model/history/earth/types"
 import type { PeopleRecord } from "@/model/history/record/people/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
+import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import type {
 	PartitionRow,
 	WorldFrame,
@@ -73,6 +74,25 @@ export interface BattleParticipant {
 	losses: number | null
 }
 
+export type ParticipantRole = "vassal" | "overlord" | "union partner" | "ally"
+
+export interface BattleContribution {
+	countryId: number
+	troops: number
+	// Relation to the side's lead; null for the lead and for Earth wars.
+	role: ParticipantRole | null
+}
+
+export interface SimulatedBattle {
+	// Each coalition member's deployed troops after the battle.
+	contributions: BattleContribution[]
+	outcome: BattleOutcome
+	preBattleWinProbability: number
+	powerShare: number
+	topography: string
+	vegetation: string
+}
+
 export interface Battle {
 	timeMs: number
 	name: string
@@ -83,6 +103,8 @@ export interface Battle {
 	defenderDeployed: number | null
 	attackerWon: boolean
 	comment: string | null
+	// Null for recorded Earth battles, which carry no simulated roll.
+	simulated: SimulatedBattle | null
 }
 
 export interface WarRecord {
@@ -95,6 +117,8 @@ export interface WarRecord {
 	rebel: boolean
 	events: WarParticipantEventRecord[]
 	battles: Battle[]
+	// Each realm's troops when the war was declared; empty for Earth wars.
+	mobilization: BattleContribution[]
 }
 
 export interface OrgMembershipEventRecord {
@@ -123,11 +147,20 @@ export interface CensusKeyframe {
 	economy: CensusEconomy
 }
 
+export interface CensusDeployment {
+	warId: number
+	troops: number
+}
+
 export interface CensusEconomy {
 	roots: Int32Array
 	treasury: Float32Array
 	revenue: Float32Array
 	manpower: Float32Array
+	maxManpower: Float32Array
+	army: Float32Array
+	// Each realm's deployed troops per active war.
+	deployments: CensusDeployment[][]
 	budgets: Array<TreasuryBudget | null>
 }
 

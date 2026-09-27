@@ -8,13 +8,16 @@ export interface TreasuryBudgetLookupParams {
 
 export interface TreasuryBudget {
 	taxes: number
-	civilExpenses: number
+	stateMaintenance: number
 	armyExpenses: number
+	// Army maintenance was charged at wartime rates.
+	wartimeRates: boolean
+	treasuryLeakage: number
 	annualBalance: number
 	plunder: number
 	succession: number
-	reserveAdjustment: number
 	otherChangesTotal: number
+	treasurySafe: number
 	tradition: ArmyTradition
 	settled: boolean
 	year: number

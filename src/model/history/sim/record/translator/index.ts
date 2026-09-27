@@ -1,16 +1,21 @@
 import { DATE } from "@/model/history/earth/date"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
+	BattleContribution,
 	HistoryEvent,
 	NationIdentity,
+	ParticipantRole,
 	WarRecord,
 } from "@/model/history/record/types"
+import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
+import { STATE } from "@/model/history/sim/engine/state"
 import { COLORING } from "@/model/history/sim/nations/coloring"
 import type {
 	ActiveTie,
 	AppendJournalParams,
 	AppendNoteParams,
 	ApplyTransactionParams,
+	ContributionsParams,
 	CreateTranslatorParams,
 	DescendantsParams,
 	IdentityForRootParams,
@@ -390,6 +395,25 @@ function coalitionChange({
 	translator.warCoalitions.set(coalition.warId, { attackers, defenders })
 }
 
+const ROLE_BY_RELATION: Record<number, ParticipantRole> = {
+	[STATE.rel.VASSAL]: "vassal",
+	[STATE.rel.OVERLORD]: "overlord",
+	[STATE.rel.PU_SENIOR]: "union partner",
+	[STATE.rel.PU_JUNIOR]: "union partner",
+	[STATE.rel.ALLY]: "ally",
+}
+
+function contributions({
+	translator,
+	data,
+}: ContributionsParams): BattleContribution[] {
+	return (data.deployedNations as number[]).map((nation, index) => ({
+		countryId: translator.identityByRoot.get(nation) ?? -1,
+		troops: (data.deployedTroops as number[])[index],
+		role: ROLE_BY_RELATION[(data.deployedRelations as number[])[index]] ?? null,
+	}))
+}
+
 function appendNote({
 	translator,
 	note,
@@ -475,9 +499,14 @@ function appendNote({
 			rebel: coalition?.rebel ?? false,
 			events: [],
 			battles: [],
+			mobilization: [],
 		}
 		record.events.wars[warId] = war
 		if (coalition) coalitionChange({ translator, coalition, timeMs })
+	} else if (note.tag === "war mobilized") {
+		const war = record.events.wars[data.war as number]
+		if (!war) return
+		war.mobilization = contributions({ translator, data })
 	} else if (note.tag === "battle") {
 		const war = record.events.wars[data.war as number]
 		if (!war) return
@@ -511,6 +540,14 @@ function appendNote({
 			defenderDeployed: data.defenderDeployed as number,
 			attackerWon: data.winner === data.attacker,
 			comment: null,
+			simulated: {
+				contributions: contributions({ translator, data }),
+				outcome: data.result as BattleOutcome,
+				preBattleWinProbability: data.preBattleWinProbability as number,
+				powerShare: data.powerShare as number,
+				topography: data.topography as string,
+				vegetation: data.vegetation as string,
+			},
 		})
 	} else if (note.tag === "raid") {
 		record.events.raids.push({

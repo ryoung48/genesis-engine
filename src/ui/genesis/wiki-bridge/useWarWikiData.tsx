@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
+import { HISTORY } from "@/model/history/record"
 import type {
 	Battle,
 	WarParticipantEventRecord,
@@ -10,7 +11,11 @@ import { uiPalette } from "@/ui/components/tokens"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import type { WarWikiDataInput } from "@/ui/genesis/view/types"
 import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
-import { formatBattleForce } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import {
+	battleDetail,
+	battleVerb,
+	formatBattleForce,
+} from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import {
 	cleanEu4Identifier,
 	compareTimelineDayThenType,
@@ -26,6 +31,16 @@ import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
  * Mutually exclusive with the nation and organization wiki pages -- see
  * useWikiSelection.
  */
+interface ActiveAtParams {
+	nationId: number
+	timeMs: number
+}
+
+interface SideMember {
+	nationId: number
+	side: "attacker" | "defender"
+}
+
 export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 	const {
 		selectedWikiWarId,
@@ -119,63 +134,127 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		// qualifying event yet (hasn't joined) is treated as inactive too.
 		const currentDate = daysFromMs(history.selectedTimeMs)
 		const eventsById = new Map<number, WarParticipantEventRecord[]>()
-		for (const event of war.events) {
+		for (const event of [...war.events].sort((a, b) => a.timeMs - b.timeMs)) {
 			const list = eventsById.get(event.nationId)
 			if (list) list.push(event)
 			else eventsById.set(event.nationId, [event])
 		}
-		const isActiveAtCurrentDate = (nationId: number): boolean => {
-			const events = eventsById.get(nationId)
-			if (!events) return false
+		const isActiveAt = ({ nationId, timeMs }: ActiveAtParams): boolean => {
 			let active = false
-			for (const event of [...events].sort((a, b) => a.timeMs - b.timeMs)) {
-				if (daysFromMs(event.timeMs) > currentDate) break
+			for (const event of eventsById.get(nationId) ?? []) {
+				if (event.timeMs > timeMs) break
 				active = event.kind === "warStart"
 			}
 			return active
 		}
-		// Outside the war's own span entirely (viewing history well before it
-		// started or long after it ended), graying out participants who
-		// "haven't joined yet" or "already left" reads as broken rather than
-		// informative -- only apply the per-nation check while the selected
-		// date actually falls within the war.
-		const dateWithinWar =
-			currentDate >= dateRangeStart && currentDate <= dateRangeEnd
-		const participantMention = (
-			nationId: number,
-		): WarWikiData["participants"][number]["nations"][number] => ({
-			...nationMention(nationId),
-			active: !dateWithinWar || isActiveAtCurrentDate(nationId),
-		})
-
+		// Outside the war the panel shows the war's own opening or closing
+		// line-up rather than the selected date's.
+		const startMs = Math.min(...war.events.map((event) => event.timeMs))
+		const endMs = Math.max(...war.events.map((event) => event.timeMs))
+		const ended = Array.from(eventsById.values()).every(
+			(events) => events[events.length - 1].kind === "warEnd",
+		)
+		const afterEnd = ended && history.selectedTimeMs >= endMs
+		const leftAtEnd = (nationId: number): boolean => {
+			const last = eventsById.get(nationId)?.at(-1)
+			return last?.kind === "warEnd" && last.timeMs === endMs
+		}
+		const panelTimeMs =
+			history.selectedTimeMs < startMs
+				? startMs
+				: afterEnd
+					? endMs - 1
+					: history.selectedTimeMs
+		const battleCutoffMs = afterEnd ? endMs : panelTimeMs
+		const panelFrame =
+			panelTimeMs === history.selectedTimeMs
+				? frame
+				: HISTORY.frameAt({ state: history.state, timeMs: panelTimeMs })
 		const sideOrder: Array<"attacker" | "defender"> = ["attacker", "defender"]
 		const latestBattle = war.battles.reduce<Battle | null>(
 			(latest, battle) =>
-				battle.timeMs <= history.selectedTimeMs &&
+				battle.timeMs <= battleCutoffMs &&
 				(latest === null || battle.timeMs > latest.timeMs)
 					? battle
 					: latest,
 			null,
 		)
+		// Before the first battle the panel shows each realm's troops at the
+		// war's declaration.
+		const contributions = latestBattle
+			? (latestBattle.simulated?.contributions ?? [])
+			: war.mobilization
+		const contributionById = new Map(
+			contributions.map((contribution) => [
+				contribution.countryId,
+				contribution,
+			]),
+		)
+		const leadBySide = new Map(
+			sideOrder.flatMap((side) => {
+				const first = war.events
+					.filter((event) => event.side === side && event.kind === "warStart")
+					.reduce<WarParticipantEventRecord | null>(
+						(earliest, event) =>
+							earliest === null || event.timeMs < earliest.timeMs
+								? event
+								: earliest,
+						null,
+					)
+				return first ? [[side, first.nationId] as const] : []
+			}),
+		)
+		const roleTowardLead = ({ nationId, side }: SideMember): string | null => {
+			const lead = leadBySide.get(side)
+			const relations =
+				lead === undefined ? null : panelFrame.nations.get(lead)?.relations
+			if (lead === nationId || !relations) return null
+			if (relations.vassals.includes(nationId)) return "vassal"
+			if (relations.overlord === nationId) return "overlord"
+			if (
+				relations.unionSeniorOf.includes(nationId) ||
+				relations.unionJuniorPartner === nationId
+			)
+				return "union partner"
+			if (relations.allies.includes(nationId)) return "ally"
+			return null
+		}
+		const participantMention = ({
+			nationId,
+			side,
+		}: SideMember): WarWikiData["participants"][number]["nations"][number] => ({
+			...nationMention(nationId),
+			lead: leadBySide.get(side) === nationId,
+			role: contributionById.has(nationId)
+				? (contributionById.get(nationId)?.role ?? null)
+				: roleTowardLead({ nationId, side }),
+			troops: contributionById.get(nationId)?.troops ?? null,
+		})
 		const strengthBySide = new Map<"attacker" | "defender", number>()
-		if (latestBattle) {
-			const attackerSide = sideById.get(latestBattle.attacker.countryId)
-			const defenderSide = sideById.get(latestBattle.defender.countryId)
-			if (attackerSide && latestBattle.attackerDeployed !== null)
-				strengthBySide.set(attackerSide, latestBattle.attackerDeployed)
-			if (defenderSide && latestBattle.defenderDeployed !== null)
-				strengthBySide.set(defenderSide, latestBattle.defenderDeployed)
+		for (const contribution of contributions) {
+			const side = sideById.get(contribution.countryId)
+			if (side)
+				strengthBySide.set(
+					side,
+					(strengthBySide.get(side) ?? 0) + contribution.troops,
+				)
 		}
 		const participants: WarWikiData["participants"] = sideOrder.map((side) => ({
 			side,
 			totalStrength: strengthBySide.get(side) ?? null,
 			nations: Array.from(sideById.entries())
-				.filter(([, idSide]) => idSide === side)
-				.map(([nationId]) => nationId)
-				.sort((a, b) =>
-					resolveNationName(a).localeCompare(resolveNationName(b)),
+				.filter(
+					([nationId, idSide]) =>
+						idSide === side &&
+						(afterEnd
+							? leftAtEnd(nationId)
+							: isActiveAt({ nationId, timeMs: panelTimeMs })),
 				)
-				.map(participantMention),
+				.map(([nationId]) => participantMention({ nationId, side }))
+				.sort(
+					(a, b) =>
+						(b.troops ?? -1) - (a.troops ?? -1) || a.name.localeCompare(b.name),
+				),
 		}))
 
 		const timelineEvents: NationTimelineEvent[] = []
@@ -261,7 +340,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				winnerForce && loserForce
 					? ` (${winnerName}: ${winnerForce}; ${loserName}: ${loserForce})`
 					: ""
-			const description = `${winnerName} defeated ${loserName} at the Battle of ${battle.name}${forces}.`
+			const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name}${forces}.${battleDetail(battle)}`
 			pushTimelineEvent(timelineEvents, {
 				id: `warBattle:${battle.timeMs}:${index}`,
 				date: daysFromMs(battle.timeMs),
@@ -410,6 +489,10 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			dateRangeLabel,
 			stats,
 			participants,
+			participantsAsOf:
+				panelTimeMs === history.selectedTimeMs
+					? null
+					: DATE.formatHistoryDays(daysFromMs(afterEnd ? endMs : startMs)),
 			timelineEvents,
 			dateRangeStart,
 			dateRangeEnd,

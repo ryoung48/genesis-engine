@@ -44,9 +44,20 @@ export interface PeopleLogMarriage {
 export interface PeopleLogSeat {
 	seat: number
 	person: number
+	reason: SeatChangeReason
 	// The child a regent governs for; -1 for a seat holder's row.
 	ward: number
 }
+
+export type SeatChangeReason =
+	| "succession"
+	| "usurpation"
+	| "rebellion"
+	| "restoration"
+	| "union"
+	| "territorial change"
+	| "district grant"
+	| "unknown"
 
 export type RegentKind = "parent" | "relative" | "protector" | "council"
 
@@ -185,6 +196,7 @@ export interface ThroneParams {
 	realm: number
 	// The seat's title tier (`seatRank`).
 	rank: number
+	reason: SeatChangeReason
 }
 
 export interface SetRulerParams {
@@ -192,6 +204,7 @@ export interface SetRulerParams {
 	seat: number
 	person: number
 	rank: number
+	reason: SeatChangeReason
 }
 
 export interface RaiseParams {
@@ -217,6 +230,7 @@ export interface SetRegentParams {
 export interface VacateParams {
 	people: PeopleState
 	seat: number
+	reason: SeatChangeReason
 }
 
 // The realm-level rules the marriage market reads from the engine.

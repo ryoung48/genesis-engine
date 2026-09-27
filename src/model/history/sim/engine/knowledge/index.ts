@@ -195,18 +195,10 @@ function extractionRate({ knowledge }: KnowledgeLevelParams): number {
 	})
 }
 
-function campaignShare({ knowledge }: KnowledgeLevelParams): number {
-	return MATH.piecewise({
-		domain: [1, 2, 3],
-		range: [0.33, 0.65, 1],
-		x: knowledge,
-	})
-}
-
 function maxFieldArmy({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
 		domain: [0, 1, 2, 3, 4],
-		range: [25_000, 40_000, 80_000, 200_000, 1_500_000],
+		range: [25_000, 40_000, 120_000, 400_000, 1_500_000],
 		x: knowledge,
 	})
 }
@@ -228,7 +220,6 @@ export const KNOWLEDGE = {
 	maxCitySize,
 	productivity,
 	extractionRate,
-	campaignShare,
 	maxFieldArmy,
 	realmKnowledge,
 	eraBaseline,

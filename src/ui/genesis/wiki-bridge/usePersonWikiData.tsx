@@ -318,6 +318,22 @@ export function usePersonWikiData(
 				const place = seatLabel(event.other, at, sovereign)
 				const district =
 					rankAt(event.other, at, false) === null ? place : `the ${place}`
+				const reason =
+					event.endReason === "succession"
+						? "after a succession"
+						: event.endReason === "usurpation"
+							? "in a usurpation"
+							: event.endReason === "rebellion"
+								? "after a rebellion"
+								: event.endReason === "restoration"
+									? "after a restoration"
+									: event.endReason === "union"
+										? "when the realms united"
+										: event.endReason === "territorial change"
+											? "after a territorial change"
+											: event.endReason === "district grant"
+												? "when the seat was granted"
+												: ""
 				pushTimelineEvent(timelineEvents, {
 					...base,
 					type: "Ruler",
@@ -327,7 +343,7 @@ export function usePersonWikiData(
 								? `${person.name} became ruler of ${place}.`
 								: `${person.name} was granted ${district}${nation ? ` in ${nation.name}` : ""}.`
 							: sovereign
-								? `${person.name} lost the throne of ${place}.`
+								? `${person.name} lost the throne of ${place}${reason ? ` ${reason}` : ""}.`
 								: `${person.name} lost ${district}.`,
 					people: selfMentions,
 					nations: nation ? [nation] : [],

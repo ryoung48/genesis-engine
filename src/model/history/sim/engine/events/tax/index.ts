@@ -5,9 +5,9 @@ import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
 	InitTaxParams,
 	RecordBudgetParams,
-	RecordedBudget,
 	RunTaxParams,
 	ScheduleTaxParams,
+	Settlement,
 } from "@/model/history/sim/engine/events/tax/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
@@ -15,25 +15,55 @@ import { STATE } from "@/model/history/sim/engine/state"
 
 const MANPOWER_RECOVERY = 0.1
 
-function recordBudget({
+const LEAKAGE_RATE = 0.04
+
+// Chiefs cannot spend what their treasury does not hold: tribal and steppe
+// realms pay maintenance, then warriors, only from cash in hand.
+function settle({
 	state,
 	nation,
 	yearFraction,
 	settled,
-}: RecordBudgetParams): RecordedBudget {
-	const upkeep = MILITARY.upkeep({ state, nation })
-	const revenue = ECONOMY.revenue({ state, p: nation })
-	const discretionary = ECONOMY.discretionaryRevenue({ state, p: nation })
+}: RecordBudgetParams): Settlement {
+	const revenue = ECONOMY.revenue({ state, p: nation }) * yearFraction
+	const maintenance =
+		ECONOMY.stateMaintenance({ state, p: nation }) * yearFraction
+	const upkeep = MILITARY.upkeep({ state, nation }) * yearFraction
+	const opening = FIELDS.prov.treasury.get({ state, p: nation })
+	const tradition = ECONOMY.armyTradition({ state, p: nation })
+	const cash = opening + revenue
+	const maintenancePaid =
+		tradition === "settled"
+			? maintenance
+			: Math.min(maintenance, Math.max(0, cash))
+	const armyPaid =
+		tradition === "settled"
+			? upkeep
+			: Math.min(upkeep, Math.max(0, cash - maintenancePaid))
+	const beforeLeakage = cash - maintenancePaid - armyPaid
+	const safe = ECONOMY.treasurySafe({ state, p: nation })
+	const annualLeakage =
+		safe > 0
+			? safe *
+				LEAKAGE_RATE *
+				Math.max(0, Math.max(0, beforeLeakage) / safe - 1) ** 2
+			: Number.POSITIVE_INFINITY
+	const leakage = Math.min(
+		Math.max(0, beforeLeakage),
+		annualLeakage * yearFraction,
+	)
 	const budget = TREASURY_BUDGET.get({ state, p: nation })
-	budget.taxes = revenue * yearFraction
-	budget.civilExpenses = -(revenue - discretionary) * yearFraction
-	budget.armyExpenses = -upkeep * yearFraction
-	budget.annualBalance =
-		budget.taxes + budget.civilExpenses + budget.armyExpenses
-	budget.tradition = ECONOMY.armyTradition({ state, p: nation })
+	budget.taxes = revenue
+	budget.stateMaintenance = -maintenancePaid
+	budget.armyExpenses = -armyPaid
+	budget.wartimeRates = MILITARY.atWar({ state, nation })
+	budget.treasuryLeakage = -leakage
+	budget.annualBalance = revenue - maintenancePaid - armyPaid - leakage
+	budget.treasurySafe = safe
+	budget.tradition = tradition
 	budget.settled = settled
 	budget.year = DATE.historyTimeMsToYear(state.time)
-	return { budget, revenue, discretionary, upkeep }
+	return { treasury: beforeLeakage - leakage }
 }
 
 function previewBudget({ state }: InitTaxParams): void {
@@ -41,7 +71,7 @@ function previewBudget({ state }: InitTaxParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (!STATE.isSovereign({ state, p })) continue
 		if (state.treasuryBudgetCurrent.get(p)?.year === year) continue
-		recordBudget({ state, nation: p, yearFraction: 1, settled: false })
+		settle({ state, nation: p, yearFraction: 1, settled: false })
 	}
 }
 
@@ -71,36 +101,14 @@ function runTax({ state, nation, previousTime }: RunTaxParams): void {
 
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 	const maxManpower = ECONOMY.maxManpower({ state, p: nation })
-	const { budget, revenue, discretionary, upkeep } = recordBudget({
-		state,
-		nation,
-		yearFraction,
-		settled: true,
-	})
+	const { treasury } = settle({ state, nation, yearFraction, settled: true })
 	FIELDS.prov.revenue.set({
 		state,
 		p: nation,
-		value: revenue,
+		value: ECONOMY.revenue({ state, p: nation }),
 	})
-	const floor =
-		ECONOMY.armyTradition({ state, p: nation }) === "paid"
-			? Number.NEGATIVE_INFINITY
-			: 0
-	const unsettledTreasury =
-		FIELDS.prov.treasury.get({ state, p: nation }) +
-		(discretionary - upkeep) * yearFraction
-	const settledTreasury = Math.max(
-		floor,
-		Math.min(ECONOMY.reserveCap({ state, p: nation }), unsettledTreasury),
-	)
-	const reserveAdjustment = settledTreasury - unsettledTreasury
-	budget.reserveAdjustment += reserveAdjustment
-	budget.otherChangesTotal += reserveAdjustment
-	FIELDS.prov.treasury.set({
-		state,
-		p: nation,
-		value: settledTreasury,
-	})
+	FIELDS.prov.treasury.set({ state, p: nation, value: treasury })
+	FIELDS.prov.maxManpower.set({ state, p: nation, value: maxManpower })
 	const manpower = FIELDS.prov.manpower.get({ state, p: nation })
 	FIELDS.prov.manpower.set({
 		state,

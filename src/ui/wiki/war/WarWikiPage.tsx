@@ -12,17 +12,20 @@ import {
 	type WikiTimelineEvent,
 	WikiTimelineSection,
 } from "@/ui/wiki/shared/WikiTimeline"
+import { formatCount } from "@/ui/wiki/stats/nation/nation-stats"
 
 interface WarWikiNationMention {
 	tag: string
 	name: string
 	color: string
 	striped: boolean
-	/** Whether this nation is currently a war participant at the wiki's
-	 * selected date -- false for a nation that hasn't joined yet or has
-	 * already left/made peace, which the Participants panel grays out
-	 * instead of hiding (its side membership doesn't change). */
-	active?: boolean
+	// The side's first belligerent, emphasized in the participant list.
+	lead: boolean
+	// Relation to the side's lead at the selected date, e.g. "ally" or "vassal".
+	role: string | null
+	// Deployed troops after the latest battle at the selected date; null
+	// before any battle, for Earth wars, or when absent from that battle.
+	troops: number | null
 }
 
 interface WarWikiParticipant {
@@ -42,6 +45,9 @@ export interface WarWikiData {
 	dateRangeLabel: string
 	stats: StatEntry[]
 	participants: WarWikiParticipant[]
+	// Set when the selected date is outside the war, so the panel shows the
+	// war's opening or closing line-up as of this date instead.
+	participantsAsOf: string | null
 	/** warStart/warEnd (join/leave) plus territory-exchange events between
 	 * participants, in chronological order -- see WikiTimelineSection. */
 	timelineEvents: WikiTimelineEvent[]
@@ -64,14 +70,12 @@ function NationLink({
 	nation: WarWikiNationMention
 	onSelectNation: (tag: string) => void
 }) {
-	const active = nation.active ?? true
 	return (
 		<EntityChip
 			name={nation.name}
 			color={nation.color}
 			striped={nation.striped}
-			dimmed={!active}
-			title={active ? undefined : "Not a participant at the selected date"}
+			emphasized={nation.lead}
 			onClick={() => onSelectNation(nation.tag)}
 		/>
 	)
@@ -89,18 +93,28 @@ function ParticipantGroup({
 	group: WarWikiParticipant
 	onSelectNation: (tag: string) => void
 }) {
-	if (group.nations.length === 0) return null
 	return (
 		<ChipGroup
-			label={`${SIDE_LABELS[group.side]}${group.totalStrength === null ? "" : ` · ${Math.round(group.totalStrength).toLocaleString("en-US")} men`}`}
+			label={`${SIDE_LABELS[group.side]}${group.totalStrength === null ? "" : ` · ${formatCount(group.totalStrength)} men`}`}
 			count={group.nations.length}
 		>
 			{group.nations.map((nation) => (
-				<NationLink
+				<div
 					key={nation.tag}
-					nation={nation}
-					onSelectNation={onSelectNation}
-				/>
+					className="flex w-full min-w-0 items-center justify-between gap-2"
+				>
+					<span className="flex min-w-0 items-center gap-1">
+						<NationLink nation={nation} onSelectNation={onSelectNation} />
+						{nation.role === null ? null : (
+							<span className="text-slate-400">({nation.role})</span>
+						)}
+					</span>
+					{nation.troops === null ? null : (
+						<span className="shrink-0 text-slate-500">
+							{formatCount(nation.troops)}
+						</span>
+					)}
+				</div>
 			))}
 		</ChipGroup>
 	)
@@ -135,14 +149,22 @@ export function WarWikiPage({ war }: { war: WarWikiData }) {
 			</Surface>
 
 			{war.participants.some((group) => group.nations.length > 0) ? (
-				<div className="rounded-xl border border-t border-slate-200 divide-y divide-slate-200 bg-white px-3 py-2.5">
-					{war.participants.map((group) => (
-						<ParticipantGroup
-							key={group.side}
-							group={group}
-							onSelectNation={war.onSelectNation}
-						/>
-					))}
+				<div className="rounded-xl border border-slate-200 bg-white py-2.5">
+					{war.participantsAsOf === null ? null : (
+						<div className="mb-1.5 px-3 text-[8px] uppercase tracking-[0.1em] text-slate-400">
+							As of {war.participantsAsOf}
+						</div>
+					)}
+					<div className="grid grid-cols-2 divide-x divide-slate-200 [&>*]:px-3">
+						{war.participants.map((group) => (
+							<div key={group.side}>
+								<ParticipantGroup
+									group={group}
+									onSelectNation={war.onSelectNation}
+								/>
+							</div>
+						))}
+					</div>
 				</div>
 			) : null}
 

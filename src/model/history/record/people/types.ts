@@ -4,7 +4,10 @@ import type {
 	SeatKind,
 } from "@/model/history/sim/engine/journal/types"
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
-import type { PregnancyLoss } from "@/model/history/sim/people/types"
+import type {
+	PregnancyLoss,
+	SeatChangeReason,
+} from "@/model/history/sim/people/types"
 
 export interface RecordPerson {
 	id: number
@@ -65,6 +68,7 @@ export interface RecordTenure {
 	ward: number
 	startTimeMs: number
 	endTimeMs: number
+	endReason: SeatChangeReason | null
 }
 
 export interface PeopleRecord {
