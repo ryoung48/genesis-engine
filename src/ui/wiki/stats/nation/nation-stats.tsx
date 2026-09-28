@@ -197,6 +197,18 @@ export function buildNationWikiStats(
 										description: "Tribute from vassals",
 									},
 									{
+										value: economy.budget.indemnity,
+										description: "War indemnity paid",
+									},
+									{
+										value: economy.budget.indemnityReceived,
+										description: "War indemnity received",
+									},
+									{
+										value: economy.budget.boughtPeace,
+										description: "Bought peace",
+									},
+									{
 										value: economy.budget.succession,
 										description: "Realm split",
 									},

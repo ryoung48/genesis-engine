@@ -493,27 +493,9 @@ function createActiveWar({
 	return war
 }
 
-function resolveWar({
-	state,
-	war,
-	rng,
-	victory,
-	stalemate,
-}: ResolveWarParams): void {
+function resolveWar({ state, war, transferred }: ResolveWarParams): void {
 	war.endTime = state.time
 	state.activeWarIds.delete(war.idx)
-	const conquered = (
-		victory
-			? getNationProvinces({ state, root: war.defender })
-			: [...war.occupied]
-	).filter((p) => getSovereign({ state, p }) === war.defender)
-	const transferred = victory
-		? conquered
-		: Array.from(
-				new Set(
-					conquered.flatMap((root) => getNationProvinces({ state, root })),
-				),
-			)
 
 	for (const p of war.occupied) {
 		if (state.occupationCurrent[p] === war.idx) {
@@ -530,9 +512,6 @@ function resolveWar({
 	removeWar(war.attacker)
 	removeWar(war.defender)
 
-	if (victory) {
-		releaseSubjectRelations({ state, nation: war.defender })
-	}
 	if (transferred.length > 0) {
 		repartitionNation({
 			state,
@@ -542,21 +521,6 @@ function resolveWar({
 		if (isSovereign({ state, p: war.defender }))
 			repartitionNation({ state, nation: war.defender, subjects: [] })
 	}
-	if (!victory) fixConnections({ state, nation: war.defender, rng })
-	setRelation({ state, a: war.attacker, b: war.defender, rel: rel.SUSPICIOUS })
-
-	state.events.push({
-		tag: "war ended",
-		time: state.time,
-		data: {
-			war: war.idx,
-			attacker: war.attacker,
-			defender: war.defender,
-			winner: transferred.length > 0 ? war.attacker : war.defender,
-			transferred,
-			stalemate,
-		},
-	})
 }
 
 function provinceDistanceSq({ state, a, b }: ProvinceDistanceSqParams): number {
@@ -691,6 +655,8 @@ function createHistoryState({
 		nationColors: nations.colors.slice(),
 		governmentType: nations.governmentType?.slice() ?? new Uint8Array(P),
 		wars: [],
+		truces: new Map(),
+		indemnities: [],
 		activeWarIds: new Set(),
 		events: [],
 		journal: [],
@@ -1052,6 +1018,8 @@ export const STATE = {
 	queueBattleEvent,
 	createActiveWar,
 	resolveWar,
+	repartitionNation,
+	releaseSubjectRelations,
 	provinceDistanceSq,
 	createHistoryState,
 	originOf,

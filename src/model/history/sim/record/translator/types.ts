@@ -18,13 +18,14 @@ export interface RebelWar {
 	defenderRoot: number
 }
 
-export interface RebelNoteReasons {
+export interface OwnerNoteReasons {
 	revolts: Map<number, string>
 	outcomes: Map<number, string>
+	annexations: Map<number, string>
 	touchedRoots: Set<number>
 }
 
-export interface ScanRebelNotesParams {
+export interface ScanOwnerNotesParams {
 	translator: ProceduralTranslator
 	transaction: JournalTransaction
 }

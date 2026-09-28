@@ -19,14 +19,14 @@ import type {
 	CreateTranslatorParams,
 	DescendantsParams,
 	IdentityForRootParams,
+	OwnerNoteReasons,
 	PersonNameParams,
 	ProceduralTranslator,
 	ProjectTieParams,
-	RebelNoteReasons,
 	RebelWar,
 	RebelWarOfParams,
 	RulerDeathParams,
-	ScanRebelNotesParams,
+	ScanOwnerNotesParams,
 	UpdateTiesParams,
 } from "@/model/history/sim/record/translator/types"
 import { ERAS } from "@/model/society/eras"
@@ -110,13 +110,14 @@ function moveRulerDeath({ translator, death }: RulerDeathParams): void {
 	}
 }
 
-function scanRebelNotes({
+function scanOwnerNotes({
 	translator,
 	transaction,
-}: ScanRebelNotesParams): RebelNoteReasons {
-	const reasons: RebelNoteReasons = {
+}: ScanOwnerNotesParams): OwnerNoteReasons {
+	const reasons: OwnerNoteReasons = {
 		revolts: new Map(),
 		outcomes: new Map(),
+		annexations: new Map(),
 		touchedRoots: new Set(),
 	}
 	for (const note of transaction.notes) {
@@ -155,15 +156,20 @@ function scanRebelNotes({
 			const transferred = (note.data.transferred as number[]).length
 			reasons.outcomes.set(
 				war.defenderRoot,
-				note.data.stalemate === undefined &&
-					note.data.winner === note.data.attacker
+				note.data.outcome === "restoration"
 					? "Rebels defeated"
-					: transferred > 0
-						? `Partial reconquest (${transferred} provinces)`
-						: "Rebels held out",
+					: note.data.outcome === "independence"
+						? transferred > 0
+							? `Rebels won independence (${transferred} provinces reconquered)`
+							: "Rebels won independence"
+						: "Rebellion lapsed",
 			)
 			reasons.touchedRoots.add(war.defenderRoot)
 			translator.rebelWars.delete(warId)
+		} else if (note.tag === "peaceful annexation") {
+			const comment = `${nationLabel({ translator, root: note.data.defender as number })} was peacefully annexed by ${nationLabel({ translator, root: note.data.attacker as number })}`
+			for (const province of note.data.provinces as number[])
+				reasons.annexations.set(province, comment)
 		}
 	}
 	return reasons
@@ -566,6 +572,31 @@ function appendNote({
 		const warId = data.war as number
 		const war = record.events.wars[warId]
 		if (!war) return
+		const attacker =
+			record.nations[
+				translator.identityByRoot.get(data.attacker as number) ?? -1
+			]?.name ?? "Unknown"
+		const defender =
+			record.nations[
+				translator.identityByRoot.get(data.defender as number) ?? -1
+			]?.name ?? "Unknown"
+		const transferred = (data.transferred as number[]).length
+		const comment =
+			data.outcome === "white peace"
+				? "White peace"
+				: data.outcome === "annexation"
+					? "Annexed"
+					: data.outcome === "restoration"
+						? `${attacker} restored control over ${defender}`
+						: data.outcome === "cession"
+							? `Ceded ${transferred} provinces`
+							: data.outcome === "indemnity"
+								? `${attacker} owes ${defender} 10% of its revenue for 5 years`
+								: data.outcome === "bought peace"
+									? `${defender} paid ${attacker} ${Math.round(data.payment as number)} ducats for peace`
+									: data.outcome === "independence"
+										? `${defender} won independence from ${attacker}${transferred > 0 ? ` after ceding ${transferred} provinces` : ""}`
+										: `The war lapsed: ${data.winner === data.attacker ? defender : attacker} no longer rules a realm`
 		const active = translator.warCoalitions.get(warId)
 		if (active) {
 			for (const id of active.attackers)
@@ -574,7 +605,7 @@ function appendNote({
 					nationId: id,
 					kind: "warEnd",
 					side: "attacker",
-					comment: (data.stalemate as string) ?? null,
+					comment,
 				})
 			for (const id of active.defenders)
 				war.events.push({
@@ -582,7 +613,7 @@ function appendNote({
 					nationId: id,
 					kind: "warEnd",
 					side: "defender",
-					comment: (data.stalemate as string) ?? null,
+					comment,
 				})
 			translator.warCoalitions.delete(warId)
 		}
@@ -661,6 +692,17 @@ function appendNote({
 			},
 			comment: null,
 		})
+	} else if (note.tag === "peaceful annexation") {
+		const annexerId = translator.identityByRoot.get(data.attacker as number)
+		const annexedId = translator.identityByRoot.get(data.defender as number)
+		if (annexerId === undefined || annexedId === undefined) return
+		for (const nationId of [annexerId, annexedId])
+			record.events.nationEvents[nationId]?.events.push({
+				timeMs,
+				kind: "peacefulAnnexation",
+				payload: { annexerId, annexedId },
+				comment: null,
+			})
 	} else if (note.tag === "capital moved") {
 		record.events.titleEvents.push({
 			timeMs,
@@ -787,7 +829,7 @@ function applyTransaction({
 	const count = translator.parent.length
 	const affected = new Set<number>()
 	const pairs = new Set<number>()
-	const reasons = scanRebelNotes({ translator, transaction })
+	const reasons = scanOwnerNotes({ translator, transaction })
 	for (const change of transaction.parents) {
 		for (const province of descendants({
 			children: translator.children,
@@ -867,7 +909,11 @@ function applyTransaction({
 			timeMs,
 			kind: "owner",
 			payload: { nationId: next },
-			comment: reasons.outcomes.get(root) ?? reasons.revolts.get(root) ?? null,
+			comment:
+				reasons.annexations.get(province) ??
+				reasons.outcomes.get(root) ??
+				reasons.revolts.get(root) ??
+				null,
 		})
 	}
 	for (const change of transaction.relations) {

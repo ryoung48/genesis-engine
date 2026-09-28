@@ -190,6 +190,7 @@ describe("treasury leakage", () => {
 		const nation = sovereigns().find(
 			(p) =>
 				ECONOMY.armyTradition({ state: engine, p }) === "settled" &&
+				STATE.diplomaticOverlord({ state: engine, nation: p }) < 0 &&
 				ECONOMY.treasurySafe({ state: engine, p }) > 0,
 		)
 		if (nation === undefined) throw new Error("no settled realm")

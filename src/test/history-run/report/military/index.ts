@@ -1,6 +1,8 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
+import type { PeaceOutcome } from "@/model/history/sim/engine/events/peace/types"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -61,6 +63,7 @@ function emptyWindow(): MilitaryWindow {
 		rebellions: byTradition(() => 0),
 		vassalageEnded: 0,
 		counterWars: 0,
+		peacefulAnnexations: 0,
 		vassalSamples: 0,
 		vassalPairs: 0,
 		alliances: 0,
@@ -77,6 +80,8 @@ function emptyWindow(): MilitaryWindow {
 			leakage: 0,
 			tributePaid: 0,
 			tributeReceived: 0,
+			indemnityPaid: 0,
+			indemnityReceived: 0,
 			unpaid: 0,
 		})),
 		treasury: byTradition(() => ({
@@ -230,10 +235,12 @@ function observeBattle({ engine, tracker, note }: ObserveNoteParams): void {
 function warEnding({ engine, note }: WarEndingParams): WarEnding {
 	const data = note.data
 	const war = engine.wars[data.war as number]
-	const transferred = data.transferred as number[]
-	if (transferred.includes(war.defender)) return "capital"
-	if (data.stalemate === "both nations exhausted") return "exhaustion"
-	if (data.stalemate !== undefined) return "stalemate"
+	if (data.reason === "capital taken") return "capital"
+	if (data.reason === "both exhausted") return "exhaustion"
+	if (
+		["no target", "no troops", "not sovereign"].includes(data.reason as string)
+	)
+		return "stalled"
 	if (
 		MILITARY.exhausted({ state: engine, nation: war.attacker }) ||
 		MILITARY.exhausted({ state: engine, nation: war.defender })
@@ -278,6 +285,8 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 		window.rebellions[
 			ECONOMY.armyTradition({ state: engine, p: data.overlord as number })
 		]++
+	} else if (note.tag === "peaceful annexation") {
+		window.peacefulAnnexations++
 	} else if (note.tag === "vassalage ended") {
 		window.vassalageEnded++
 		tracker.vassalageEnded = tracker.vassalageEnded.filter(
@@ -322,6 +331,8 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 			tradition,
 			attackerWon: data.winner === war.attacker,
 			ending: warEnding({ engine, note }),
+			outcome: data.outcome as PeaceOutcome,
+			payment: data.payment as number,
 			rebel: war.rebel,
 			rebelIndependent: war.rebel && data.winner === war.defender,
 		})
@@ -354,6 +365,14 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 		const { state, nation, previousTime } = params
 		const sovereign = STATE.isSovereign({ state, p: nation })
 		const overlord = STATE.diplomaticOverlord({ state, nation })
+		const receivers = state.indemnities
+			.filter(
+				(entry) =>
+					entry.payer === nation &&
+					entry.until > state.time &&
+					STATE.isSovereign({ state, p: entry.receiver }),
+			)
+			.map((entry) => entry.receiver)
 		const yearFraction = (state.time - previousTime) / STATE.yearMs
 		const nominal = sovereign
 			? MILITARY.upkeep({ state, nation }) * yearFraction
@@ -373,6 +392,13 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 			tracker.window.fiscal[
 				ECONOMY.armyTradition({ state, p: overlord })
 			].tributeReceived -= budget.tribute
+		}
+		if (budget.indemnity < 0) {
+			fiscal.indemnityPaid -= budget.indemnity
+			for (const receiver of receivers)
+				tracker.window.fiscal[
+					ECONOMY.armyTradition({ state, p: receiver })
+				].indemnityReceived += PEACE.indemnityShare * budget.taxes
 		}
 	}
 	return {
@@ -545,13 +571,19 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 			fiscal.tributePaid / revenue
 		report[`fiscal.tributeReceivedShare.${tradition}`] =
 			fiscal.tributeReceived / revenue
+		report[`fiscal.indemnityPaidShare.${tradition}`] =
+			fiscal.indemnityPaid / revenue
+		report[`fiscal.indemnityReceivedShare.${tradition}`] =
+			fiscal.indemnityReceived / revenue
 		report[`fiscal.netShare.${tradition}`] =
 			(fiscal.revenue -
 				fiscal.maintenance -
 				fiscal.army -
 				fiscal.leakage -
 				fiscal.tributePaid +
-				fiscal.tributeReceived) /
+				fiscal.tributeReceived -
+				fiscal.indemnityPaid +
+				fiscal.indemnityReceived) /
 			revenue
 		const treasury = window.treasury[tradition]
 		const positive = Math.max(1, treasury.positiveYears)
@@ -611,6 +643,7 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		window.vassalageEnded /
 		Math.max(1e-9, window.vassalPairs / Math.max(1, window.vassalSamples))
 	report["counterWars.n"] = window.counterWars
+	report["peacefulAnnexations.n"] = window.peacefulAnnexations
 	const relationTotal = Object.values(window.relationPairs).reduce(
 		(sum, count) => sum + count,
 		0,
@@ -634,7 +667,7 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	report["wars.attackerWinShare"] = share(
 		completed.map((war) => war.attackerWon),
 	)
-	for (const ending of ["capital", "settlement", "stalemate", "exhaustion"]) {
+	for (const ending of ["capital", "settlement", "stalled", "exhaustion"]) {
 		report[`wars.ending.${ending}`] = share(
 			completed.map((war) => war.ending === ending),
 		)
@@ -642,6 +675,33 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 			settledLed.map((war) => war.ending === ending),
 		)
 	}
+	for (const outcome of [
+		"annexation",
+		"restoration",
+		"cession",
+		"indemnity",
+		"bought peace",
+		"white peace",
+		"independence",
+		"lapsed",
+	])
+		report[`wars.outcome.${outcome}`] = share(
+			completed.map((war) => war.outcome === outcome),
+		)
+	for (const tradition of TRADITIONS) {
+		const wars = completed.filter((war) => war.tradition === tradition)
+		report[`wars.outcome.bought peace.${tradition}`] = share(
+			wars.map((war) => war.outcome === "bought peace"),
+		)
+	}
+	report["wars.indemnityPerCentury"] = TRADITIONS.reduce(
+		(sum, tradition) => sum + window.fiscal[tradition].indemnityPaid,
+		0,
+	)
+	report["wars.boughtPeacePerCentury"] = completed.reduce(
+		(sum, war) => sum + (war.outcome === "bought peace" ? war.payment : 0),
+		0,
+	)
 	const rebelWars = completed.filter((war) => war.rebel)
 	report["rebelWars.completed.n"] = rebelWars.length
 	report["rebelWars.independent.n"] = rebelWars.filter(
@@ -796,7 +856,7 @@ const LOG_TOTALS = [
 	"wars.years.p90",
 	"wars.settled.years.p50",
 	"wars.attackerWinShare",
-	"wars.ending.stalemate",
+	"wars.ending.stalled",
 	"wars.ending.exhaustion",
 	"rebelWars.successShare",
 	"battles.n",
@@ -805,6 +865,7 @@ const LOG_TOTALS = [
 	"battles.routShare",
 	"vassalageEnded.n",
 	"counterWars.n",
+	"peacefulAnnexations.n",
 	"firstBattle.paidBelowExhaustionShare",
 	"longPeace.paidNegativeShare",
 	"recovery.years.p50",

@@ -133,7 +133,9 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`):
 **Disputes.** A single-heir succession is disputed when the heir rules elsewhere, is under 16, or is of the sex the culture passes over, and an adult of the preferred sex stands next in line.
 - The district holders split between the heir and the rival. With at least 40% backing, and then with a chance equal to that share, the rival's district (or their strongest backer's) revolts with the rival as pretender.
 - A losing election candidate who holds a district and won 40% also revolts.
-- Otherwise every succession re-tests each district's rebellion threshold, lowered by 0.05 per missing claim point and by 0.1 under a weak crown. At most one district breaks away.
+- Otherwise the weak-crown rebellion check runs.
+
+How revolts break away and how their wars end is in [rebellion](rebellion.md).
 
 ## Personal unions
 
@@ -152,7 +154,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`):
   3. the strongest district holder (lord protector);
   4. otherwise a regency council with no person.
 - **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere is replaced at the yearly check.
-- **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and gets +0.1 rebellion laxity. It still defends and answers calls.
+- **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and its districts rebel more easily ([rebellion](rebellion.md)). It still defends and answers calls.
 - **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs.
 
 ## Restoration

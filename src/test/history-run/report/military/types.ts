@@ -2,6 +2,7 @@ import type {
 	ArmyTradition,
 	EconomyLookupParams,
 } from "@/model/history/sim/engine/economy/types"
+import type { PeaceOutcome } from "@/model/history/sim/engine/events/peace/types"
 import type {
 	EngineNote,
 	HistoryState,
@@ -10,7 +11,7 @@ import type {
 export type DistanceBand = "near" | "mid" | "far"
 export type TreasuryRole = "vassal" | "overlord" | "free"
 
-export type WarEnding = "capital" | "settlement" | "stalemate" | "exhaustion"
+export type WarEnding = "capital" | "settlement" | "stalled" | "exhaustion"
 
 export type MilitaryReport = Record<string, number>
 
@@ -26,6 +27,8 @@ export interface CompletedWar {
 	tradition: ArmyTradition
 	attackerWon: boolean
 	ending: WarEnding
+	outcome: PeaceOutcome
+	payment: number
 	rebel: boolean
 	rebelIndependent: boolean
 }
@@ -54,6 +57,8 @@ export interface FiscalTotals {
 	leakage: number
 	tributePaid: number
 	tributeReceived: number
+	indemnityPaid: number
+	indemnityReceived: number
 	unpaid: number
 }
 
@@ -92,6 +97,7 @@ export interface MilitaryWindow {
 	rebellions: Record<ArmyTradition, number>
 	vassalageEnded: number
 	counterWars: number
+	peacefulAnnexations: number
 	vassalSamples: number
 	vassalPairs: number
 	alliances: number

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest"
+import { beforeAll, describe, expect, it, vi } from "vitest"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
@@ -237,6 +237,51 @@ describe("battle odds", () => {
 })
 
 describe("battle progress", () => {
+	it("rolls to end an offensive after a defensive rout", () => {
+		const fight = vi.spyOn(MILITARY, "fight").mockReturnValue({
+			outcome: "rout",
+			initialOutcome: "decisive",
+			attackerWon: false,
+			preBattleWinProbability: 0.5,
+			powerShare: 0.1,
+			attackerArmy: 1000,
+			defenderArmy: 1000,
+			attackerDeployed: 1000,
+			defenderDeployed: 1000,
+			deployments: [],
+			relations: [],
+			attackerLossShare: 0.2,
+			defenderLossShare: 0.01,
+			loserShortfall: 0,
+		})
+		const exhausted = vi.spyOn(MILITARY, "exhausted").mockReturnValue(false)
+		for (const [roll, settled] of [
+			[0.5, true],
+			[0.9, false],
+		] as const) {
+			setup()
+			const rng = HISTORY_RNG.createHistoryRng(7)
+			rng.random = () => roll
+			BATTLE.runBattle({
+				state: engine,
+				warIdx: war.idx,
+				eventAttacker: war.attacker,
+				rng,
+			})
+			expect(war.endTime !== undefined).toBe(settled)
+			if (settled)
+				expect(
+					engine.events.find(
+						(event) =>
+							event.tag === "war ended" &&
+							event.data.reason === "offensive repelled",
+					),
+				).toBeDefined()
+		}
+		fight.mockRestore()
+		exhausted.mockRestore()
+	}, 120_000)
+
 	function battleWith(values: number[]) {
 		setup()
 		reset({ attack: 1000, defend: 1000 })
@@ -258,7 +303,8 @@ describe("battle progress", () => {
 				notes.some(
 					(n) =>
 						n.tag === "war ended" &&
-						(n.data.transferred as number[]).length > 0,
+						((n.data.transferred as number[]).length > 0 ||
+							n.data.outcome === "bought peace"),
 				),
 		}
 	}

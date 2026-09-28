@@ -1,7 +1,9 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { SUBMISSION } from "@/model/history/sim/engine/events/war/submission"
 import type {
 	GetDefenderOccupationCandidatesParams,
 	InitWarParams,
@@ -69,6 +71,7 @@ function listWarTargets({ state, nation }: ListWarTargetsParams): {
 	return STATE.getNationNeighbors({ state, nation })
 		.filter(
 			(nb) =>
+				!PEACE.inTruce({ state, a: nation, b: nb }) &&
 				!DERIVE.provinceWars({ state, p: nb }).some((idx) => {
 					const war = state.wars[idx]
 					return (
@@ -86,7 +89,11 @@ function listWarTargets({ state, nation }: ListWarTargetsParams): {
 				threshold: ATTACK_THRESHOLD[rel] ?? 0,
 				w: MILITARY.threat({ state, attacker: nation, defender: nb }),
 				hasWar: wars.some((w) => w.defender === nb || w.attacker === nb),
-				d: STATE.provinceDistanceSq({ state, a: nation, b: nb }),
+				d: Math.min(
+					...STATE.getNationProvinces({ state, root: nb }).map((p) =>
+						STATE.provinceDistanceSq({ state, a: nation, b: p }),
+					),
+				),
 			}
 		})
 }
@@ -336,6 +343,15 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 
 // Armies take the field when a war is declared.
 function start(params: StartWarParams): void {
+	if (
+		!params.rebel &&
+		PEACE.inTruce({
+			state: params.state,
+			a: params.attacker,
+			b: params.defender,
+		})
+	)
+		return
 	const war = STATE.startWar(params)
 	if (war) MILITARY.mobilize({ state: params.state, war })
 }
@@ -395,7 +411,16 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 			// Favor closer viable opponents, matching the old history model.
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
-			if (rng.random() > closest.w) {
+			if (
+				rng.random() > closest.w &&
+				!SUBMISSION.offer({
+					state,
+					attacker: nation,
+					defender: closest.n,
+					threat: closest.w,
+					rng,
+				})
+			) {
 				start({
 					state,
 					attacker: nation,

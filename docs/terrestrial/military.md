@@ -1,6 +1,6 @@
 # Armies and battles (`:history`)
 
-Code: army economy and combat in `src/model/history/sim/engine/military`; army and manpower limits in `engine/economy` and `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war`; scheduled battles in `engine/events/battle`.
+Code: army economy and combat in `src/model/history/sim/engine/military`; army and manpower limits in `engine/economy` and `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`.
 
 Armies are abstract strength values. The simulation tracks manpower, field logistics, treasury support, war deployments, casualties, and occupied provinces; it does not track individual soldiers, units, or commanders.
 
@@ -90,9 +90,12 @@ Each coalition's total deployment is capped by the lead belligerent's logistics 
 | Trigger | Rule |
 | --- | --- |
 | Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and reduced manpower. |
-| Initial rebellions | Seeded among eligible great districts whose threat against the sovereign exceeds 0.55. |
-| Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor if threat is below its relation threshold. |
-| Later rebellion | Eligible district may break away if threat exceeds 0.55 (reduced when the crown is weak); its sovereign must not already be at war. |
+| Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor (by distance from its capital to the neighbor's closest province) if threat is below its relation threshold. |
+| Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 50% chance: it is annexed as if its capital had fallen, with no war. |
+
+A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
+
+Rebellions have their own triggers, threat and endings; see [rebellion](rebellion.md).
 
 Interstate attacks do not target allies, subjects, or union partners. Threat is calculated by cubed force share, with no terrain or defender bonus:
 
@@ -107,7 +110,7 @@ threat = defender force³ / (attacker force³ + defender force³)
 | Neutral | 0.45 |
 | Friendly | 0.1 |
 
-Other relations have threshold 0 and are excluded by the eligibility rules. Rebellion threat compares the overlord's remaining force with the subject's estimated manpower share plus 25% of eligible sibling vassals' shares, scaled by a levy and treasury-dependent loyalty factor. It uses the same cubed force share formula.
+Other relations have threshold 0 and are excluded by the eligibility rules.
 
 ## Battle resolution
 
@@ -155,21 +158,43 @@ R = loser casualties / loser troops + 0.15 × |X| + 0.20 × deployment shortfall
 rout chance = 1 / (1 + e^(−20 × (R − 0.40)))
 ```
 
-Deployment shortfall is the share of the loser's assigned troops not yet deployed. A routed loser loses a further 5–20% of its remaining troops. The rout midpoint was calibrated to 0.40 so that about a third of contested battles rout; real battles are lopsided. An inconclusive battle without a rout blocks all progress: no plunder, sack, occupation, restoration, or capital victory. If one side has no troops, the other wins uncontested with no losses; if neither does, the war ends in stalemate.
+Deployment shortfall is the share of the loser's assigned troops not yet deployed. A routed loser loses a further 5–20% of its remaining troops. The rout midpoint was calibrated to 0.40 so that about a third of contested battles rout; real battles are lopsided. An inconclusive battle without a rout blocks all progress: no plunder, sack, occupation, restoration, or capital victory. If one side has no troops, the other wins uncontested with no losses; if neither does, the war ends (`no troops`).
 
 Battle casualties reduce manpower and each realm's rural population proportionally. The battle record stores the result, pre-battle win probability, power share, terrain, knowledge-capped troops, deployments, losses, target province, and plunder.
 
 ## Occupation and war settlement
 
-| End condition | Result |
-| --- | --- |
-| Attacker wins at defender capital | Attacker victory; defender territory transfers to attacker. |
-| Both sides exhausted | Stalemate; occupied defender territory transfers. |
-| Attacker exhausted before taking territory | War ends without conquest. |
-| No legal target or either belligerent loses sovereignty | Stalemate. |
-| Rebellion restoration wins and clears final occupied province | Rebellion war ends. |
+Code: war endings are checked after each battle in `engine/events/battle`; the terms are set in `engine/events/peace` (`PEACE.terms`, `PEACE.conclude`). This section covers conquest wars; rebel wars have their own endings (see [rebellion](rebellion.md#endings)).
 
-Occupied provinces belong to one war and are cleared when it ends. A fully conquered defender releases its subject relations; transferred provinces are repartitioned under the attacker. A stalemate transfers only provinces occupied by that war. The war record logs the winner, transferred provinces, and stalemate reason.
+A war ends when the first of these holds, in this order:
+
+| Reason | When |
+| --- | --- |
+| `not sovereign` | Before a battle, either war leader is no longer sovereign. |
+| `no target` | Neither side has a legal target. |
+| `no troops` | Neither side has troops in the field. |
+| `occupation restored` | The defender wins back the last occupied province. |
+| `capital taken` | The attacker wins at the defender's capital. |
+| `both exhausted` | Both war leaders are exhausted. |
+| `offensive spent` | The attacker holds nothing and is exhausted after its own attack. |
+| `offensive repelled` | The attacker holds nothing and has just lost its own attack. The defender then ends the war with 40% chance after a decisive win, 75% after a rout and 90% after an uncontested win; otherwise the attacker regroups for 3–8 months and tries again. |
+| `peace bought` | Any other battle, if the defender can afford a buy-off and accepts it (50% chance). |
+
+The reason then sets the terms:
+
+| Terms | When | Result |
+| --- | --- | --- |
+| **Lapsed** | `not sovereign` | Nothing changes hands; the leader still sovereign counts as the winner. |
+| **Bought peace** | `peace bought` | The defender pays the attacker; no land moves. |
+| **Annexation** | `capital taken` | The defender's whole realm goes to the attacker, and the defender's subject relations are released. |
+| **Cession** | Any other ending while the attacker occupies land | The attacker keeps the occupied provinces. |
+| **Indemnity** or **white peace** | `occupation restored`, `offensive spent` or `offensive repelled`, with nothing occupied | The defender wins. It gets an indemnity with a chance that rises with its strength (see below); otherwise white peace. |
+| **White peace** | Any other ending with nothing occupied (`both exhausted`, `no target`, `no troops`) | Nothing changes hands. |
+
+- **Buy-off.** Offered only in a conquest war where the attacker occupies land and the defender's battle share (`MILITARY.threat`) is below 0.01. The price is `(1 − threat) × 20 × occupied share of the defender's output × defender revenue`, discounted to 60% against tribal and steppe attackers. The defender must hold that much in its treasury.
+- **Indemnity chance.** `0.1 + 0.8 × max(0, 2 × threat − 1)`, where `threat` is the defender's battle share when the war ends: 10% for an even or weaker defender, rising to 90% for an overwhelming one. An indemnity makes the attacker pay the defender 10% of its revenue each year for 5 years, as long as the defender stays sovereign.
+- **After every ending,** the two leaders become Suspicious and sign a 10-year truce. Occupations from the war are cleared, transferred provinces are repartitioned under their new realm, and the defender's remaining land is reconnected unless it was annexed.
+- **Record.** The `war ended` note logs the winner, reason, outcome, transferred provinces, and any payment and payer. The war page shows the outcome as text: "Annexed", "Ceded n provinces", "White peace", "X owes Y 10% of its revenue for 5 years", "Y paid X n ducats for peace", or, for a lapsed war, "The war lapsed: X no longer rules a realm".
 
 ## Plunder and raids
 

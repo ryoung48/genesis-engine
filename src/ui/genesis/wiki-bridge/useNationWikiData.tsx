@@ -668,6 +668,23 @@ export function useNationWikiData(
 						})
 						break
 					}
+					case "peacefulAnnexation": {
+						const annexerId = Number(event.payload.annexerId)
+						const annexedId = Number(event.payload.annexedId)
+						addNationMention(
+							nations,
+							nationId === annexerId ? annexedId : annexerId,
+						)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Annexation",
+							description: `${eventNation(annexedId).name} was peacefully annexed by ${eventNation(annexerId).name}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					}
 					case "rulerChange": {
 						if (event.payload.newRuler === false) break
 						const person = personDisplay(event.payload)

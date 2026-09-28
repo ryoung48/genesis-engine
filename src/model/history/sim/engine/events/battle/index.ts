@@ -6,6 +6,7 @@ import type {
 	ResolveTargetParams,
 	RunBattleParams,
 } from "@/model/history/sim/engine/events/battle/types"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
@@ -13,6 +14,11 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
 
 const WINNER_INITIATIVE = 0.7
+const DEFENSIVE_SETTLEMENT_CHANCE: Partial<Record<BattleOutcome, number>> = {
+	decisive: 0.4,
+	rout: 0.75,
+	uncontested: 0.9,
+}
 
 const NEXT_BATTLE_MONTHS: Record<BattleOutcome, [number, number]> = {
 	inconclusive: [3, 8],
@@ -100,25 +106,13 @@ function runBattle({
 		!STATE.isSovereign({ state, p: war.attacker }) ||
 		!STATE.isSovereign({ state, p: war.defender })
 	) {
-		STATE.resolveWar({
-			state,
-			war,
-			rng,
-			victory: false,
-			stalemate: "nations no longer sovereign",
-		})
+		PEACE.conclude({ state, war, rng, reason: "not sovereign" })
 		return
 	}
 
 	const battle = resolveTarget({ state, war, attacker: eventAttacker, rng })
 	if (battle === null) {
-		STATE.resolveWar({
-			state,
-			war,
-			rng,
-			victory: false,
-			stalemate: "no valid target found",
-		})
+		PEACE.conclude({ state, war, rng, reason: "no target" })
 		return
 	}
 	const { attacker, defender, province: target } = battle
@@ -134,13 +128,7 @@ function runBattle({
 		rng,
 	})
 	if (result.outcome === "empty") {
-		STATE.resolveWar({
-			state,
-			war,
-			rng,
-			victory: false,
-			stalemate: "no troops on either side",
-		})
+		PEACE.conclude({ state, war, rng, reason: "no troops" })
 		return
 	}
 	const progress = result.attackerWon && result.outcome !== "inconclusive"
@@ -212,27 +200,28 @@ function runBattle({
 
 	const atkExhausted = MILITARY.exhausted({ state, nation: war.attacker })
 	const defExhausted = MILITARY.exhausted({ state, nation: war.defender })
+	const defensiveSettlementChance =
+		DEFENSIVE_SETTLEMENT_CHANCE[result.outcome] ?? 0
 
 	const occupiedCount = war.occupied.length
 	const time = nextBattleTime({ state, outcome: result.outcome, rng })
 
 	if (progress && restoration && occupiedCount === 0) {
-		STATE.resolveWar({ state, war, rng })
+		PEACE.conclude({ state, war, rng, reason: "occupation restored" })
 	} else if (progress && target === war.defender) {
-		STATE.resolveWar({ state, war, rng, victory: true })
+		PEACE.conclude({ state, war, rng, reason: "capital taken" })
 	} else if (atkExhausted && defExhausted) {
-		STATE.resolveWar({
-			state,
-			war,
-			rng,
-			victory: false,
-			stalemate: "both nations exhausted",
-		})
+		PEACE.conclude({ state, war, rng, reason: "both exhausted" })
 	} else if (attacker === war.attacker && occupiedCount === 0) {
 		if (atkExhausted) {
-			STATE.resolveWar({ state, war, rng })
+			PEACE.conclude({ state, war, rng, reason: "offensive spent" })
+		} else if (
+			!result.attackerWon &&
+			defensiveSettlementChance > 0 &&
+			rng.random() < defensiveSettlementChance
+		) {
+			PEACE.conclude({ state, war, rng, reason: "offensive repelled" })
 		} else {
-			// A beaten offensive that holds nothing regroups before trying again.
 			STATE.queueBattleEvent({
 				state,
 				warIdx: war.idx,
@@ -242,6 +231,8 @@ function runBattle({
 					: nextBattleTime({ state, outcome: "inconclusive", rng }),
 			})
 		}
+	} else if (PEACE.acceptBuyoff({ state, war, rng })) {
+		PEACE.conclude({ state, war, rng, reason: "peace bought" })
 	} else {
 		const next =
 			result.outcome === "uncontested" || rng.random() < WINNER_INITIATIVE

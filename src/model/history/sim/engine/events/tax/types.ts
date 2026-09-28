@@ -9,8 +9,13 @@ export interface RecordBudgetParams {
 
 export interface Settlement {
 	treasury: number
-	tribute: number
-	overlord: number
+	levies: Levy[]
+}
+
+export interface Levy {
+	receiver: number
+	amount: number
+	kind: "tribute" | "indemnity"
 }
 
 export interface InitTaxParams {

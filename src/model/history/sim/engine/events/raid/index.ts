@@ -1,5 +1,6 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
 import type {
 	InitRaidParams,
 	RaidNationParams,
@@ -54,6 +55,7 @@ function richestBorderProvince({
 			if (state.desolate[province] || state.stateless[province]) continue
 			const victim = STATE.getSovereign({ state, p: province })
 			if (victim === nation) continue
+			if (PEACE.inTruce({ state, a: nation, b: victim })) continue
 			if (
 				PROTECTED_RELATIONS.has(
 					STATE.getRelation({ state, a: nation, b: victim }),

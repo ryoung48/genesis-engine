@@ -9,6 +9,7 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 		budget = {
 			taxes: 0,
 			tribute: 0,
+			indemnity: 0,
 			stateMaintenance: 0,
 			armyExpenses: 0,
 			wartimeRates: false,
@@ -16,6 +17,8 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 			annualBalance: 0,
 			plunder: 0,
 			tributeReceived: 0,
+			indemnityReceived: 0,
+			boughtPeace: 0,
 			succession: 0,
 			otherChangesTotal: 0,
 			treasurySafe: 0,

@@ -2,8 +2,10 @@ import { DATE } from "@/model/history/earth/date"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
 import type {
 	InitTaxParams,
+	Levy,
 	RecordBudgetParams,
 	RunTaxParams,
 	ScheduleTaxParams,
@@ -28,13 +30,36 @@ function settle({
 }: RecordBudgetParams): Settlement {
 	const revenue = ECONOMY.revenue({ state, p: nation }) * yearFraction
 	const overlord = STATE.diplomaticOverlord({ state, nation })
-	const tribute = overlord >= 0 ? TRIBUTE_SHARE * revenue : 0
+	const levies: Levy[] = []
+	if (overlord >= 0)
+		levies.push({
+			receiver: overlord,
+			amount: TRIBUTE_SHARE * revenue,
+			kind: "tribute",
+		})
+	for (const indemnity of state.indemnities)
+		if (
+			indemnity.payer === nation &&
+			indemnity.until > state.time &&
+			STATE.isSovereign({ state, p: indemnity.receiver })
+		)
+			levies.push({
+				receiver: indemnity.receiver,
+				amount: PEACE.indemnityShare * revenue,
+				kind: "indemnity",
+			})
+	const tribute = levies
+		.filter((levy) => levy.kind === "tribute")
+		.reduce((sum, levy) => sum + levy.amount, 0)
+	const indemnity = levies
+		.filter((levy) => levy.kind === "indemnity")
+		.reduce((sum, levy) => sum + levy.amount, 0)
 	const maintenance =
 		ECONOMY.stateMaintenance({ state, p: nation }) * yearFraction
 	const upkeep = MILITARY.upkeep({ state, nation }) * yearFraction
 	const opening = FIELDS.prov.treasury.get({ state, p: nation })
 	const tradition = ECONOMY.armyTradition({ state, p: nation })
-	const cash = opening + revenue - tribute
+	const cash = opening + revenue - tribute - indemnity
 	const maintenancePaid =
 		tradition === "settled"
 			? maintenance
@@ -58,17 +83,18 @@ function settle({
 	const budget = TREASURY_BUDGET.get({ state, p: nation })
 	budget.taxes = revenue
 	budget.tribute = tribute > 0 ? -tribute : 0
+	budget.indemnity = indemnity > 0 ? -indemnity : 0
 	budget.stateMaintenance = -maintenancePaid
 	budget.armyExpenses = -armyPaid
 	budget.wartimeRates = MILITARY.atWar({ state, nation })
 	budget.treasuryLeakage = -leakage
 	budget.annualBalance =
-		revenue - tribute - maintenancePaid - armyPaid - leakage
+		revenue - tribute - indemnity - maintenancePaid - armyPaid - leakage
 	budget.treasurySafe = safe
 	budget.tradition = tradition
 	budget.settled = settled
 	budget.year = DATE.historyTimeMsToYear(state.time)
-	return { treasury: beforeLeakage - leakage, tribute, overlord }
+	return { treasury: beforeLeakage - leakage, levies }
 }
 
 function previewBudget({ state }: InitTaxParams): void {
@@ -102,11 +128,18 @@ function initTax({ state }: InitTaxParams): void {
 
 function runTax({ state, nation, previousTime }: RunTaxParams): void {
 	scheduleTax({ state, nation })
+	state.indemnities = state.indemnities.filter(
+		(entry) =>
+			entry.payer !== nation ||
+			(entry.until > state.time &&
+				STATE.isSovereign({ state, p: entry.payer }) &&
+				STATE.isSovereign({ state, p: entry.receiver })),
+	)
 	if (!STATE.isSovereign({ state, p: nation })) return
 
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 	const maxManpower = ECONOMY.maxManpower({ state, p: nation })
-	const { treasury, tribute, overlord } = settle({
+	const { treasury, levies } = settle({
 		state,
 		nation,
 		yearFraction,
@@ -118,15 +151,17 @@ function runTax({ state, nation, previousTime }: RunTaxParams): void {
 		value: ECONOMY.revenue({ state, p: nation }),
 	})
 	FIELDS.prov.treasury.set({ state, p: nation, value: treasury })
-	if (overlord >= 0 && tribute > 0) {
+	for (const levy of levies) {
 		FIELDS.prov.treasury.set({
 			state,
-			p: overlord,
-			value: FIELDS.prov.treasury.get({ state, p: overlord }) + tribute,
+			p: levy.receiver,
+			value:
+				FIELDS.prov.treasury.get({ state, p: levy.receiver }) + levy.amount,
 		})
-		const budget = TREASURY_BUDGET.get({ state, p: overlord })
-		budget.tributeReceived += tribute
-		budget.otherChangesTotal += tribute
+		const budget = TREASURY_BUDGET.get({ state, p: levy.receiver })
+		if (levy.kind === "tribute") budget.tributeReceived += levy.amount
+		else budget.indemnityReceived += levy.amount
+		budget.otherChangesTotal += levy.amount
 	}
 	FIELDS.prov.maxManpower.set({ state, p: nation, value: maxManpower })
 	const manpower = FIELDS.prov.manpower.get({ state, p: nation })

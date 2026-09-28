@@ -51,6 +51,12 @@ export interface War {
 	allies: Set<number>
 }
 
+export interface Indemnity {
+	payer: number
+	receiver: number
+	until: number
+}
+
 interface ActiveWarOptions {
 	rebel?: boolean
 	startTime?: number
@@ -175,6 +181,8 @@ export interface HistoryState {
 	governmentType: Uint8Array
 
 	wars: War[]
+	truces: Map<number, number>
+	indemnities: Indemnity[]
 	activeWarIds: Set<number>
 	events: EngineNote[]
 	journal: JournalTransaction[]
@@ -197,9 +205,7 @@ export interface QueueBattleEventParams {
 export interface ResolveWarParams {
 	state: HistoryState
 	war: War
-	rng: SharedRng
-	victory?: boolean
-	stalemate?: string
+	transferred: number[]
 }
 
 export interface DiffYearsParams {

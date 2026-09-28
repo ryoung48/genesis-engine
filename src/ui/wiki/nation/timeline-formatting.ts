@@ -27,6 +27,7 @@ export function cleanEu4Identifier(id: string): string {
 export function timelineTypeColor(type: string): string {
 	switch (type.replace(/\s+\([+-]\)$/, "")) {
 		case "Territory":
+		case "Annexation":
 			return "#16a34a"
 		case "Province":
 			return "#0891b2"

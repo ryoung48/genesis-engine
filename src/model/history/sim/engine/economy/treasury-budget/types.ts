@@ -9,6 +9,7 @@ export interface TreasuryBudgetLookupParams {
 export interface TreasuryBudget {
 	taxes: number
 	tribute: number
+	indemnity: number
 	stateMaintenance: number
 	armyExpenses: number
 	// Army maintenance was charged at wartime rates.
@@ -17,6 +18,8 @@ export interface TreasuryBudget {
 	annualBalance: number
 	plunder: number
 	tributeReceived: number
+	indemnityReceived: number
+	boughtPeace: number
 	succession: number
 	otherChangesTotal: number
 	treasurySafe: number

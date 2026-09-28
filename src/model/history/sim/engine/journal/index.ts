@@ -232,6 +232,8 @@ function flush({
 		for (const budget of state.treasuryBudgetCurrent.values()) {
 			budget.plunder = 0
 			budget.tributeReceived = 0
+			budget.indemnityReceived = 0
+			budget.boughtPeace = 0
 			budget.succession = 0
 			budget.otherChangesTotal = 0
 		}
