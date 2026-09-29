@@ -91,6 +91,11 @@ export interface LeadRelationsParams {
 	coalitions: Coalition[]
 }
 
+export interface MemberRolesParams {
+	war: War
+	coalitions: Coalition[]
+}
+
 export interface DeploymentsOfParams {
 	state: HistoryState
 	war: War
@@ -105,6 +110,7 @@ export interface BattleDeployments {
 	deployments: CoalitionMember[]
 	// Each member's relation from its coalition's lead, -1 for the lead.
 	relations: number[]
+	roles: ("backer" | null)[]
 }
 
 export interface WarAlliesParams extends GetWarAlliesParams {

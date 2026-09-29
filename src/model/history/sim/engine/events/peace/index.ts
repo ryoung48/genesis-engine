@@ -1,19 +1,22 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
+import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
+import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
 import type {
 	AcceptBuyoffParams,
 	BuyoffParams,
 	ConcludeParams,
 	PeaceParams,
 	PeaceTerms,
-	TruceParams,
 } from "@/model/history/sim/engine/events/peace/types"
+import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
+import { BACKING } from "@/model/history/sim/engine/events/war/backing"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
+import { PEOPLE } from "@/model/history/sim/people"
 
-const TRUCE_YEARS = 10
 const INDEMNITY_SHARE = 0.1
 const INDEMNITY_YEARS = 5
 const LAND_VALUE_YEARS = 20
@@ -27,21 +30,8 @@ const CASH_DISCOUNT: Record<ArmyTradition, number> = {
 	steppe: 0.6,
 }
 
-function truceKey({ state, a, b }: TruceParams): number {
-	return Math.min(a, b) * state.P + Math.max(a, b)
-}
-
-function inTruce(params: TruceParams): boolean {
-	const key = truceKey(params)
-	const expiry = params.state.truces.get(key)
-	if (expiry === undefined) return false
-	if (expiry > params.state.time) return true
-	params.state.truces.delete(key)
-	return false
-}
-
 function buyoff({ state, war }: BuyoffParams): number {
-	if (war.rebel || war.occupied.length === 0) return 0
+	if (war.goal !== "conquest" || war.occupied.length === 0) return 0
 	const threat = MILITARY.threat({
 		state,
 		attacker: war.attacker,
@@ -94,16 +84,56 @@ function indemnityChance({ state, war }: BuyoffParams): number {
 }
 
 function terms({ state, war, reason }: PeaceParams): PeaceTerms {
-	const base = { transferred: [] as number[], payment: 0, payer: -1 }
+	const base = {
+		transferred: [] as number[],
+		receiver: war.attacker,
+		payment: 0,
+		payer: -1,
+	}
 	if (reason === "not sovereign") {
 		const attacker = STATE.isSovereign({ state, p: war.attacker })
 		const defender = STATE.isSovereign({ state, p: war.defender })
-		if (war.rebel && !attacker && defender)
-			return { ...base, outcome: "independence", winner: war.defender }
+		const { rebels, crown } = STATE.warSides({ war })
+		if (
+			war.goal !== "conquest" &&
+			!STATE.isSovereign({ state, p: crown }) &&
+			STATE.isSovereign({ state, p: rebels })
+		)
+			return { ...base, outcome: "independence", winner: rebels }
 		return {
 			...base,
 			outcome: "lapsed",
 			winner: attacker ? war.attacker : defender ? war.defender : -1,
+		}
+	}
+	if (war.goal === "throne") {
+		if (reason === "capital taken")
+			return {
+				...base,
+				outcome: "regime change",
+				winner: war.attacker,
+				receiver: war.defender,
+				transferred: STATE.getNationProvinces({ state, root: war.attacker }),
+			}
+		if (war.occupied.length > 0)
+			return {
+				...base,
+				outcome: "cession",
+				winner: war.attacker,
+				transferred: Array.from(
+					new Set(
+						war.occupied.flatMap((root) =>
+							STATE.getNationProvinces({ state, root }),
+						),
+					),
+				).filter((p) => STATE.getSovereign({ state, p }) === war.defender),
+			}
+		return {
+			...base,
+			outcome: "submission",
+			winner: war.defender,
+			receiver: war.defender,
+			transferred: STATE.getNationProvinces({ state, root: war.attacker }),
 		}
 	}
 	if (reason === "peace bought")
@@ -117,15 +147,15 @@ function terms({ state, war, reason }: PeaceParams): PeaceTerms {
 	if (reason === "capital taken")
 		return {
 			...base,
-			outcome: war.rebel ? "restoration" : "annexation",
+			outcome: war.goal === "independence" ? "restoration" : "annexation",
 			winner: war.attacker,
 			transferred: STATE.getNationProvinces({ state, root: war.defender }),
 		}
 	if (war.occupied.length > 0)
 		return {
 			...base,
-			outcome: war.rebel ? "independence" : "cession",
-			winner: war.rebel ? war.defender : war.attacker,
+			outcome: war.goal === "independence" ? "independence" : "cession",
+			winner: war.goal === "independence" ? war.defender : war.attacker,
 			transferred: Array.from(
 				new Set(
 					war.occupied.flatMap((root) =>
@@ -134,7 +164,7 @@ function terms({ state, war, reason }: PeaceParams): PeaceTerms {
 				),
 			).filter((p) => STATE.getSovereign({ state, p }) === war.defender),
 		}
-	if (war.rebel)
+	if (war.goal === "independence")
 		return { ...base, outcome: "independence", winner: war.defender }
 	if (
 		reason === "occupation restored" ||
@@ -153,6 +183,12 @@ function terms({ state, war, reason }: PeaceParams): PeaceTerms {
 
 function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 	let result = terms({ state, war, reason })
+	const claimant = state.people.rulerOf[war.attacker]
+	const claim = state.leaderClaimCurrent[war.attacker]
+	const deposed =
+		state.people.rulerOf[war.defender] >= 0
+			? state.people.rulerOf[war.defender]
+			: war.originalCrownRuler
 	if (
 		result.outcome === "indemnity" &&
 		rng.random() >= indemnityChance({ state, war })
@@ -160,6 +196,8 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 		result = { ...result, outcome: "white peace", payer: -1 }
 	if (result.outcome === "annexation" || result.outcome === "restoration")
 		STATE.releaseSubjectRelations({ state, nation: war.defender })
+	if (result.outcome === "regime change" || result.outcome === "submission")
+		STATE.releaseSubjectRelations({ state, nation: war.attacker })
 	if (result.outcome === "indemnity")
 		state.indemnities.push({
 			payer: war.attacker,
@@ -181,19 +219,42 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 			budget.otherChangesTotal += amount
 		}
 	}
-	STATE.resolveWar({ state, war, transferred: result.transferred })
-	if (result.outcome !== "annexation" && result.outcome !== "restoration")
+	STATE.resolveWar({
+		state,
+		war,
+		transferred: result.transferred,
+		receiver: result.receiver,
+	})
+	if (result.outcome === "regime change" && claimant >= 0)
+		OVERTHROW.enthrone({ state, war, claimant, claim, deposed, rng })
+	if (result.outcome === "submission")
+		PEOPLE.vacate({
+			people: state.people,
+			seat: war.attacker,
+			reason: "rebellion",
+		})
+	BACKING.repay({ state, war, outcome: result.outcome })
+	DISPOSITION.afterWar({ state, war, outcome: result.outcome })
+	if (
+		result.outcome !== "annexation" &&
+		result.outcome !== "restoration" &&
+		result.outcome !== "regime change" &&
+		result.outcome !== "submission"
+	)
 		STATE.fixConnections({ state, nation: war.defender, rng })
 	STATE.setRelation({
 		state,
 		a: war.attacker,
 		b: war.defender,
-		rel: STATE.rel.SUSPICIOUS,
+		rel: STATE.rel.NONE,
 	})
-	state.truces.set(
-		truceKey({ state, a: war.attacker, b: war.defender }),
-		state.time + STATE.deltaYear(TRUCE_YEARS),
-	)
+	STATE.setDisposition({
+		state,
+		a: war.attacker,
+		b: war.defender,
+		disposition: STATE.disp.SUSPICIOUS,
+	})
+	TRUCE.sign({ state, a: war.attacker, b: war.defender })
 	state.events.push({
 		tag: "war ended",
 		time: state.time,
@@ -215,7 +276,6 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 export const PEACE = {
 	conclude,
 	terms,
-	inTruce,
 	buyoff,
 	acceptBuyoff,
 	indemnityShare: INDEMNITY_SHARE,

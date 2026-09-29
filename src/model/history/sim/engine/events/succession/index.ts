@@ -1,4 +1,5 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
+import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
@@ -41,6 +42,7 @@ function pretenderRevolt({
 	state,
 	realm,
 	seat,
+	supportingSeats,
 	pretender,
 	restoration,
 	rng,
@@ -52,14 +54,16 @@ function pretenderRevolt({
 		data: {
 			overlord: realm,
 			subject: seat,
+			goal: "throne",
 			succession: true,
 			pretender,
 			restoration,
 		},
 	})
-	STATE.releaseProvince({
+	STATE.releaseFaction({
 		state,
 		p: seat,
+		supporters: supportingSeats,
 		rng,
 		reason: restoration ? "restoration" : "rebellion",
 	})
@@ -73,7 +77,7 @@ function pretenderRevolt({
 		})
 		STATE.scheduleSuccession({ state, p: seat })
 	}
-	WAR.start({ state, attacker: realm, defender: seat, rng, rebel: true })
+	WAR.start({ state, attacker: seat, defender: realm, rng, goal: "throne" })
 	STATE.fixConnections({ state, nation: realm, rng })
 }
 
@@ -84,6 +88,7 @@ function restore({ state, realm, rng }: RealmRngParams): void {
 			state,
 			realm,
 			seat: revolt.seat,
+			supportingSeats: revolt.supportingSeats,
 			pretender: revolt.claimant,
 			restoration: true,
 			rng,
@@ -180,6 +185,7 @@ function runSuccession({
 			state,
 			realm: province,
 			seat: choice.pretenderSeat,
+			supportingSeats: choice.supportingSeats,
 			pretender: state.people.rulerOf[choice.pretenderSeat],
 			restoration: false,
 			rng,
@@ -224,15 +230,14 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 	if (kind === "protector" && district >= 0)
 		PEOPLE.vacate({ people, seat: district, reason: "usurpation" })
 	const claim = kind === "relative" ? KINSMAN_USURPER_CLAIM : 0
-	STATE.installRuler({
+	OVERTHROW.seize({
 		state,
-		p: realm,
+		realm,
 		person: regent,
 		claim,
+		deposed: ward,
 		reason: "usurpation",
 	})
-	RESTORATION.depose({ state, realm, claimant: ward })
-	STATE.scheduleSuccession({ state, p: realm })
 	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })
 	STATE.considerTitles({
 		state,

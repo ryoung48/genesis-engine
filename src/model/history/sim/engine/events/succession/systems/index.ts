@@ -40,6 +40,7 @@ const NEW_HOUSE: SuccessionChoice = {
 	heir: -1,
 	claim: HEIR_CLAIM.none,
 	pretenderSeat: -1,
+	supportingSeats: [],
 }
 
 function now(state: HistoryState): number {
@@ -179,8 +180,13 @@ function contest({
 	const total = votes[0] + votes[1]
 	const share = total > 0 ? votes[1] / total : 0
 	const backed = share >= PRETENDER_SHARE
-	if (!backed || rng.random() >= share) return { backed, seat: -1 }
-	if (rival.seat >= 0) return { backed, seat: rival.seat }
+	if (!backed || rng.random() >= share)
+		return { backed, share, seat: -1, supportingSeats: [] }
+	const supportingSeats = electors.flatMap((elector, i) =>
+		choices[i] === 1 ? [state.people.persons.throne[elector.person]] : [],
+	)
+	if (rival.seat >= 0)
+		return { backed, share, seat: rival.seat, supportingSeats }
 	let backer = -1
 	for (let i = 0; i < electors.length; i++)
 		if (
@@ -190,8 +196,10 @@ function contest({
 			backer = i
 	return {
 		backed,
+		share,
 		seat:
 			backer < 0 ? -1 : state.people.persons.throne[electors[backer].person],
+		supportingSeats,
 	}
 }
 
@@ -226,7 +234,8 @@ function challenge({
 	rng,
 }: ChallengeParams): ContestResult {
 	const districts = districtsOf({ state, realm })
-	if (districts.length === 0) return { backed: false, seat: -1 }
+	if (districts.length === 0)
+		return { backed: false, share: 0, seat: -1, supportingSeats: [] }
 	const claimantDistrict = districts.find((f) => f.person === claimant)
 	const totalWeight = districts.reduce((sum, f) => sum + f.weight, 0)
 	return contest({
@@ -267,7 +276,12 @@ function singleHeir({
 	})
 	if (heir < 0)
 		return { ...NEW_HOUSE, heir: strongestDistrict({ state, realm }) }
-	const choice = { heir, claim: HEIR_CLAIM[relation], pretenderSeat: -1 }
+	const choice: SuccessionChoice = {
+		heir,
+		claim: HEIR_CLAIM[relation],
+		pretenderSeat: -1,
+		supportingSeats: [],
+	}
 	if (!disputed({ state, realm, person: heir })) return choice
 	const rival = HEIRS.of({
 		people,
@@ -278,15 +292,17 @@ function singleHeir({
 			person !== heir && electable({ state, realm, person }),
 	}).heir
 	if (rival < 0) return choice
+	const contest = challenge({
+		state,
+		realm,
+		incumbent: heir,
+		claimant: rival,
+		rng,
+	})
 	return {
 		...choice,
-		pretenderSeat: challenge({
-			state,
-			realm,
-			incumbent: heir,
-			claimant: rival,
-			rng,
-		}).seat,
+		pretenderSeat: contest.seat,
+		supportingSeats: contest.supportingSeats,
 	}
 }
 
@@ -313,7 +329,12 @@ function election(params: ChooseParams): SuccessionChoice {
 				.map((person) => ({ person, weight: 1 }))
 		: districtsOf({ state, realm })
 	if (electors.length === 0)
-		return { heir: late, claim: ELECTED_CLAIM, pretenderSeat: -1 }
+		return {
+			heir: late,
+			claim: ELECTED_CLAIM,
+			pretenderSeat: -1,
+			supportingSeats: [],
+		}
 	const totalWeight = electors.reduce((sum, e) => sum + e.weight, 0)
 	const candidates: Candidate[] = []
 	if (late >= 0)
@@ -344,24 +365,37 @@ function election(params: ChooseParams): SuccessionChoice {
 		late >= 0
 			? [...electors, { person: late, weight: totalWeight / electors.length }]
 			: electors
-	const { votes } = tally({ state, electors: voters, candidates, republic })
+	const { votes, choices } = tally({
+		state,
+		electors: voters,
+		candidates,
+		republic,
+	})
 	let winner = 0
 	for (let i = 1; i < candidates.length; i++)
 		if (votes[i] > votes[winner]) winner = i
 	const total = votes.reduce((sum, v) => sum + v, 0)
 	let pretenderSeat = -1
+	let pretenderIndex = -1
 	if (!republic && total > 0)
 		for (let i = 0; i < candidates.length; i++)
 			if (
 				i !== winner &&
 				candidates[i].seat >= 0 &&
 				votes[i] / total >= PRETENDER_SHARE
-			)
+			) {
 				pretenderSeat = candidates[i].seat
+				pretenderIndex = i
+			}
 	return {
 		heir: candidates[winner].person,
 		claim: ELECTED_CLAIM,
 		pretenderSeat,
+		supportingSeats: electors.flatMap((elector, i) =>
+			choices[i] === pretenderIndex
+				? [state.people.persons.throne[elector.person]]
+				: [],
+		),
 	}
 }
 
@@ -375,7 +409,12 @@ function appointment({ state, realm, rng }: ChooseParams): SuccessionChoice {
 		for (const kin of [person, ...table.children[person]])
 			if (electable({ state, realm, person: kin })) pool.push(kin)
 	if (pool.length === 0) return NEW_HOUSE
-	return { heir: rng.choice(pool), claim: APPOINTED_CLAIM, pretenderSeat: -1 }
+	return {
+		heir: rng.choice(pool),
+		claim: APPOINTED_CLAIM,
+		pretenderSeat: -1,
+		supportingSeats: [],
+	}
 }
 
 function choose(params: ChooseParams): SuccessionChoice {

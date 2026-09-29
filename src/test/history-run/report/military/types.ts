@@ -6,6 +6,8 @@ import type { PeaceOutcome } from "@/model/history/sim/engine/events/peace/types
 import type {
 	EngineNote,
 	HistoryState,
+	Relation,
+	WarGoal,
 } from "@/model/history/sim/engine/state/types"
 
 export type DistanceBand = "near" | "mid" | "far"
@@ -14,6 +16,10 @@ export type TreasuryRole = "vassal" | "overlord" | "free"
 export type WarEnding = "capital" | "settlement" | "stalled" | "exhaustion"
 
 export type MilitaryReport = Record<string, number>
+
+export interface TieKindParams {
+	tie: Relation
+}
 
 export interface FiscalProbe {
 	surplus: (params: EconomyLookupParams) => number
@@ -29,7 +35,9 @@ export interface CompletedWar {
 	ending: WarEnding
 	outcome: PeaceOutcome
 	payment: number
-	rebel: boolean
+	goal: WarGoal
+	backers: number
+	inVassal: boolean
 	rebelIndependent: boolean
 }
 
@@ -95,12 +103,41 @@ export interface MilitaryWindow {
 	manpowerAfterWar: Record<ArmyTradition, number[]>
 	warStarts: Record<ArmyTradition, number>
 	rebellions: Record<ArmyTradition, number>
+	rebellionsByGoal: Record<
+		"independence" | "throne",
+		Record<ArmyTradition, number>
+	>
+	backingRepaid: Record<
+		"vassal" | "alliance" | "trusted" | "disposition",
+		number
+	>
+	backersViaOverlord: number
+	backersOverlord: number
+	backersDisloyalVassal: number
+	tributeWithheld: number
+	callsRefused: number
+	dispositionAid: number
+	dispositionAbandoned: number
+	throneVassalFreed: number
+	vassalsChained: number
+	tiePairs: Record<string, number>
+	firstTiePairs: Record<string, number>
+	lastTiePairs: Record<string, number>
+	dispositionPairs: Record<string, number>
+	vassalDispositionPairs: Record<string, number>
+	lastDispositionPairs: Record<string, number>
+	lastVassalDispositionPairs: Record<string, number>
 	vassalageEnded: number
+	vassalageEndedByDisposition: Record<string, number>
+	vassalageEndedByCause: Record<string, number>
 	counterWars: number
 	peacefulAnnexations: number
 	vassalSamples: number
 	vassalPairs: number
 	alliances: number
+	alliancesFormed: number
+	alliancesEnded: number
+	vassalsFormed: number
 	invalidAlliances: number
 	relationPairs: Record<string, number>
 	completed: CompletedWar[]
@@ -124,6 +161,7 @@ export interface MilitaryWindow {
 export interface MilitaryTracker {
 	probe: FiscalProbe
 	warTradition: Map<number, ArmyTradition>
+	warInVassal: Map<number, boolean>
 	warBattles: Map<number, number>
 	lastStrength: Map<number, number>
 	firstBattle: Set<number>

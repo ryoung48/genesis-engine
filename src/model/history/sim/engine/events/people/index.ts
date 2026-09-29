@@ -130,6 +130,7 @@ function runYear({ state, rng }: PeopleEventParams): void {
 	})
 	for (const person of shortened) endEarly({ state, person })
 	settleMatches({ state, matches })
+	ROYAL_MARRIAGES.review({ state })
 	nextYear({ state, rng })
 }
 

@@ -21,6 +21,7 @@ const RULER_TAGS = new Set([
 	"regency ended",
 	"regent changed",
 	"usurpation",
+	"regime change",
 ])
 
 function pending(): PendingJournal {
@@ -70,11 +71,11 @@ function relation({ state, x, y, before, after }: RecordRelationParams): void {
 function coalition({
 	state,
 	warId,
-	rebel,
+	goal,
 	attackers,
 	defenders,
 }: RecordCoalitionParams): void {
-	state.pendingJournal.coalitions.push({ warId, rebel, attackers, defenders })
+	state.pendingJournal.coalitions.push({ warId, goal, attackers, defenders })
 }
 
 function censusEconomy(state: HistoryState): CensusEconomy {

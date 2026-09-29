@@ -91,26 +91,27 @@ Each coalition's total deployment is capped by the lead belligerent's logistics 
 | --- | --- |
 | Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and reduced manpower. |
 | Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor (by distance from its capital to the neighbor's closest province) if threat is below its relation threshold. |
-| Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 50% chance: it is annexed as if its capital had fallen, with no war. |
+| Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed as if its capital had fallen, with no war. |
 
 A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
 
 Rebellions have their own triggers, threat and endings; see [rebellion](rebellion.md).
 
-Interstate attacks do not target allies, subjects, or union partners. Threat is calculated by cubed force share, with no terrain or defender bonus:
+Interstate attacks exclude every formal tie, including alliances, subject bonds, unions, colonies and active wars. Threat is calculated by cubed force share, with no terrain or defender bonus:
 
 ```text
 threat = defender force³ / (attacker force³ + defender force³)
 ```
 
-| Relation | Attack threshold |
+| Disposition | Attack threshold |
 | --- | ---: |
 | Rival | 0.8 |
 | Suspicious | 0.6 |
 | Neutral | 0.45 |
 | Friendly | 0.1 |
+| Trusted | 0 |
 
-Other relations have threshold 0 and are excluded by the eligibility rules.
+Formal ties are excluded before the disposition threshold is checked.
 
 ## Battle resolution
 

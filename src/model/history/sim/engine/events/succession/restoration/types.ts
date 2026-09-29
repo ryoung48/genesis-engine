@@ -17,6 +17,7 @@ export interface AttemptParams {
 export interface RestorationRevolt {
 	claimant: number
 	seat: number
+	supportingSeats: number[]
 }
 
 export interface DueParams {

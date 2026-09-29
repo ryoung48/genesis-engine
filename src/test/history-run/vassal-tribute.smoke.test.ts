@@ -26,8 +26,7 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 	if (sibling === undefined) throw new Error("too few sovereigns")
 	for (const a of [r, s, x, y, sibling])
 		for (const b of [r, s, x, y, sibling])
-			if (a < b)
-				STATE.setRelation({ state: engine, a, b, rel: STATE.rel.NEUTRAL })
+			if (a < b) STATE.setRelation({ state: engine, a, b, rel: STATE.rel.NONE })
 	for (const nation of [r, s, x, y, sibling]) {
 		const ruler = STATE.getRulerRelation({ state: engine, nation })
 		if (ruler)
@@ -35,7 +34,7 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 				state: engine,
 				a: nation,
 				b: ruler.ruler,
-				rel: STATE.rel.NEUTRAL,
+				rel: STATE.rel.NONE,
 			})
 	}
 	for (let p = 0; p < engine.P; p++)
@@ -49,9 +48,7 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 	STATE.setRelation({ state: engine, a: s, b: y, rel: STATE.rel.ALLY })
 	STATE.setRelation({ state: engine, a: s, b: r, rel: STATE.rel.VASSAL })
 	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(STATE.rel.ALLY)
-	expect(STATE.getRelation({ state: engine, a: s, b: y })).toBe(
-		STATE.rel.FRIENDLY,
-	)
+	expect(STATE.getRelation({ state: engine, a: s, b: y })).toBe(STATE.rel.NONE)
 	expect(STATE.diplomaticOverlord({ state: engine, nation: s })).toBe(r)
 	expect(
 		ROYAL_MARRIAGES.alliable({
@@ -92,6 +89,25 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 	expect(
 		FIELDS.prov.treasury.get({ state: engine, p: r }) - before,
 	).toBeCloseTo(-payer.tribute, 8)
+	STATE.setDisposition({
+		state: engine,
+		a: s,
+		b: r,
+		disposition: STATE.disp.RIVAL,
+	})
+	engine.time += STATE.yearMs
+	TAX.runTax({
+		state: engine,
+		nation: s,
+		previousTime: engine.time - STATE.yearMs,
+	})
+	expect(TREASURY_BUDGET.get({ state: engine, p: s }).tribute).toBe(0)
+	STATE.setDisposition({
+		state: engine,
+		a: s,
+		b: r,
+		disposition: STATE.disp.NEUTRAL,
+	})
 
 	STATE.setRelation({ state: engine, a: sibling, b: r, rel: STATE.rel.VASSAL })
 	expect(STATE.canAlly({ state: engine, a: s, b: sibling })).toBe(true)
@@ -100,22 +116,18 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 		state: engine,
 		a: sibling,
 		b: r,
-		rel: STATE.rel.FRIENDLY,
+		rel: STATE.rel.NONE,
 	})
 	expect(STATE.getRelation({ state: engine, a: s, b: sibling })).toBe(
-		STATE.rel.FRIENDLY,
+		STATE.rel.NONE,
 	)
 	STATE.setRelation({ state: engine, a: y, b: s, rel: STATE.rel.VASSAL })
 	STATE.setRelation({ state: engine, a: y, b: x, rel: STATE.rel.ALLY })
 	const marriageKey = Math.min(s, x) * engine.P + Math.max(s, x)
 	engine.people.marriageAlliances.set(marriageKey, { first: s, second: x })
-	STATE.setRelation({ state: engine, a: r, b: x, rel: STATE.rel.FRIENDLY })
-	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(
-		STATE.rel.FRIENDLY,
-	)
-	expect(STATE.getRelation({ state: engine, a: y, b: x })).toBe(
-		STATE.rel.FRIENDLY,
-	)
+	STATE.setRelation({ state: engine, a: r, b: x, rel: STATE.rel.NONE })
+	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(STATE.rel.NONE)
+	expect(STATE.getRelation({ state: engine, a: y, b: x })).toBe(STATE.rel.NONE)
 	ROYAL_MARRIAGES.review({ state: engine })
 	expect(engine.people.marriageAlliances.has(marriageKey)).toBe(false)
 	STATE.setRelation({ state: engine, a: r, b: x, rel: STATE.rel.ALLY })
@@ -126,11 +138,9 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 		defender: x,
 		rng: HISTORY_RNG.createHistoryRng(2718),
 	})
-	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(
-		STATE.rel.FRIENDLY,
-	)
+	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(STATE.rel.NONE)
 
-	STATE.setRelation({ state: engine, a: s, b: r, rel: STATE.rel.FRIENDLY })
+	STATE.setRelation({ state: engine, a: s, b: r, rel: STATE.rel.NONE })
 	STATE.setRelation({ state: engine, a: s, b: r, rel: STATE.rel.PU_JUNIOR })
 	expect(STATE.diplomaticOverlord({ state: engine, nation: s })).toBe(-1)
 	engine.time += STATE.yearMs
@@ -140,7 +150,7 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 		previousTime: engine.time - STATE.yearMs,
 	})
 	expect(TREASURY_BUDGET.get({ state: engine, p: s }).tribute).toBe(0)
-	STATE.setRelation({ state: engine, a: s, b: r, rel: STATE.rel.FRIENDLY })
+	STATE.setRelation({ state: engine, a: s, b: r, rel: STATE.rel.NONE })
 	STATE.setRelation({ state: engine, a: r, b: s, rel: STATE.rel.COLONY })
 	expect(STATE.diplomaticOverlord({ state: engine, nation: s })).toBe(-1)
 	engine.time += STATE.yearMs

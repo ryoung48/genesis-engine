@@ -2,6 +2,7 @@ import { DATE } from "@/model/history/earth/date"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
 import type {
 	InitTaxParams,
@@ -31,11 +32,17 @@ function settle({
 	const revenue = ECONOMY.revenue({ state, p: nation }) * yearFraction
 	const overlord = STATE.diplomaticOverlord({ state, nation })
 	const levies: Levy[] = []
-	if (overlord >= 0)
+	if (overlord >= 0 && VASSALAGE.pays({ state, vassal: nation, overlord }))
 		levies.push({
 			receiver: overlord,
 			amount: TRIBUTE_SHARE * revenue,
 			kind: "tribute",
+		})
+	else if (settled && overlord >= 0)
+		state.events.push({
+			tag: "tribute withheld",
+			time: state.time,
+			data: { vassal: nation, overlord },
 		})
 	for (const indemnity of state.indemnities)
 		if (

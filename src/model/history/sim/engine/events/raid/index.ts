@@ -1,6 +1,6 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
-import { PEACE } from "@/model/history/sim/engine/events/peace"
+import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
 import type {
 	InitRaidParams,
 	RaidNationParams,
@@ -11,12 +11,13 @@ import type {
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
+import type { Relation } from "@/model/history/sim/engine/state/types"
 
 const RAID_CHANCE = 0.6
 
 const RAID_GRUDGE = 0.3
 
-const PROTECTED_RELATIONS = new Set<number>([
+const PROTECTED_RELATIONS = new Set<Relation>([
 	STATE.rel.WAR,
 	STATE.rel.ALLY,
 	STATE.rel.VASSAL,
@@ -55,7 +56,7 @@ function richestBorderProvince({
 			if (state.desolate[province] || state.stateless[province]) continue
 			const victim = STATE.getSovereign({ state, p: province })
 			if (victim === nation) continue
-			if (PEACE.inTruce({ state, a: nation, b: victim })) continue
+			if (TRUCE.active({ state, a: nation, b: victim })) continue
 			if (
 				PROTECTED_RELATIONS.has(
 					STATE.getRelation({ state, a: nation, b: victim }),
@@ -87,17 +88,17 @@ function runRaid({ state, nation, rng }: RunRaidParams): void {
 		province: target.province,
 		rng,
 	})
-	const relation = STATE.getRelation({ state, a: target.victim, b: nation })
+	const relation = STATE.getDisposition({ state, a: target.victim, b: nation })
 	if (
-		relation !== STATE.rel.SUSPICIOUS &&
-		relation !== STATE.rel.RIVAL &&
+		relation !== STATE.disp.SUSPICIOUS &&
+		relation !== STATE.disp.RIVAL &&
 		rng.random() < RAID_GRUDGE
 	)
-		STATE.setRelation({
+		STATE.setDisposition({
 			state,
 			a: target.victim,
 			b: nation,
-			rel: STATE.rel.SUSPICIOUS,
+			disposition: STATE.disp.SUSPICIOUS,
 		})
 	state.events.push({
 		tag: "raid",

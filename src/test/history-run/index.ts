@@ -53,7 +53,7 @@ function countEngine({ engine }: { engine: EngineState }): {
 	return {
 		nations,
 		activeWars: active.length,
-		activeRebelWars: active.filter((war) => war.rebel).length,
+		activeRebelWars: active.filter((war) => war.goal !== "conquest").length,
 	}
 }
 

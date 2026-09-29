@@ -21,11 +21,14 @@ export type PeaceOutcome =
 	| "white peace"
 	| "independence"
 	| "lapsed"
+	| "regime change"
+	| "submission"
 
 export interface PeaceTerms {
 	outcome: PeaceOutcome
 	winner: number
 	transferred: number[]
+	receiver: number
 	payment: number
 	payer: number
 }
@@ -38,12 +41,6 @@ export interface PeaceParams {
 
 export interface ConcludeParams extends PeaceParams {
 	rng: SharedRng
-}
-
-export interface TruceParams {
-	state: HistoryState
-	a: number
-	b: number
 }
 
 export interface BuyoffParams {

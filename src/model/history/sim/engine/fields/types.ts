@@ -1,5 +1,8 @@
-import type { Relation } from "@/model/history/sim/engine/state"
-import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type {
+	Disposition,
+	HistoryState,
+	Relation,
+} from "@/model/history/sim/engine/state/types"
 
 export interface RelationKeyParams {
 	state: HistoryState
@@ -29,4 +32,13 @@ export interface RelSetParams {
 	a: number
 	b: number
 	rel: Relation
+}
+
+export interface DispSetParams {
+	state: HistoryState
+	a: number
+	b: number
+	disposition: Disposition
+	// [JUSTIFICATION] The state setter can omit the cause for direct fixture writes.
+	cause?: string
 }

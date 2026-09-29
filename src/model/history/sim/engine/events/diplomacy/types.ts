@@ -1,19 +1,15 @@
-import type { Relation } from "@/model/history/sim/engine/state"
-import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type {
+	Disposition,
+	HistoryState,
+} from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface RollTransitionParams {
-	current: Relation
+	current: Disposition
 	rng: SharedRng
 }
 
 export interface CanBeRivalsParams {
-	state: HistoryState
-	a: number
-	b: number
-}
-
-export interface CanVassalizeParams {
 	state: HistoryState
 	a: number
 	b: number
@@ -37,13 +33,6 @@ export interface NextEventParams {
 	province: number
 	rng: SharedRng
 	years?: number
-}
-
-export interface ClassifyInitialNeighborRelationParams {
-	state: HistoryState
-	a: number
-	b: number
-	rng: SharedRng
 }
 
 export interface SeedNeighborRelationsParams {

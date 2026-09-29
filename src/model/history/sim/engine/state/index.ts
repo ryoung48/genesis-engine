@@ -15,10 +15,12 @@ import {
 import {
 	canAlly,
 	diplomaticOverlord,
+	getDisposition,
 	getRelation,
 	getRulerRelation,
 	getSovereign,
 	isSovereign,
+	setDisposition,
 	setRelation,
 } from "@/model/history/sim/engine/state/relations"
 import {
@@ -34,6 +36,7 @@ import {
 } from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
+	ClearRealmDiplomacyParams,
 	CreateActiveWarParams,
 	CreateHistoryStateParams,
 	FixConnectionsParams,
@@ -47,6 +50,7 @@ import type {
 	QueueBattleEventParams,
 	RealmPairParams,
 	ReleaseDisconnectedProvinceParams,
+	ReleaseFactionParams,
 	ReleaseProvinceParams,
 	ReleaseSubjectRelationsParams,
 	RepartitionNationParams,
@@ -59,6 +63,8 @@ import type {
 	UnionRulerParams,
 	UniteParams,
 	War,
+	WarSides,
+	WarSidesParams,
 } from "@/model/history/sim/engine/state/types"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
@@ -69,21 +75,23 @@ import type { SharedRng } from "@/model/shared/random/rng"
 import { DEJURE } from "@/model/society/dejure"
 
 export const rel = {
-	NONE: 0,
-	OVERLORD: 1,
-	VASSAL: 2,
-	PU_SENIOR: 3,
-	PU_JUNIOR: 4,
-	ALLY: 5,
-	FRIENDLY: 6,
-	NEUTRAL: 7,
-	SUSPICIOUS: 8,
-	RIVAL: 9,
-	WAR: 10,
-	COLONY: 11,
+	NONE: "NONE",
+	OVERLORD: "OVERLORD",
+	VASSAL: "VASSAL",
+	PU_SENIOR: "PU_SENIOR",
+	PU_JUNIOR: "PU_JUNIOR",
+	ALLY: "ALLY",
+	WAR: "WAR",
+	COLONY: "COLONY",
 } as const
 
-export type Relation = (typeof rel)[keyof typeof rel]
+export const disp = {
+	RIVAL: "RIVAL",
+	SUSPICIOUS: "SUSPICIOUS",
+	NEUTRAL: "NEUTRAL",
+	FRIENDLY: "FRIENDLY",
+	TRUSTED: "TRUSTED",
+} as const
 const TITLE_CAPACITY = 4096
 
 const DEFAULT_START_YEAR = 867
@@ -109,21 +117,20 @@ function getWarAllies({
 	type,
 	target,
 }: GetWarAlliesParams): number[] {
-	const validRelMask = new Uint8Array(11)
-	validRelMask[rel.OVERLORD] = 1
-	validRelMask[rel.VASSAL] = 1
-	validRelMask[rel.PU_SENIOR] = 1
-	validRelMask[rel.PU_JUNIOR] = 1
-	if (type === "defensive") validRelMask[rel.ALLY] = 1
-
 	const allies: number[] = []
 	DERIVE.ensureHierarchyClean(state)
-	const rels = state.relationsCurrent
-	const P = state.P
 	const candidates: number[] = []
 	for (const i of state.relationColumns[nation]) {
 		if (i === nation || i === target) continue
-		if (!validRelMask[rels[nation * P + i] as Relation]) continue
+		const tie = getRelation({ state, a: nation, b: i })
+		if (
+			tie !== rel.OVERLORD &&
+			tie !== rel.VASSAL &&
+			tie !== rel.PU_SENIOR &&
+			tie !== rel.PU_JUNIOR &&
+			!(type === "defensive" && tie === rel.ALLY)
+		)
+			continue
 		candidates.push(i)
 	}
 	candidates.sort((a, b) => a - b)
@@ -135,7 +142,7 @@ function getWarAllies({
 		)
 			continue
 		// Nobody fights its own ally or the realm that rules it.
-		const towardTarget = rels[i * P + target] as Relation
+		const towardTarget = getRelation({ state, a: i, b: target })
 		if (
 			towardTarget === rel.ALLY ||
 			towardTarget === rel.OVERLORD ||
@@ -147,17 +154,33 @@ function getWarAllies({
 	return allies
 }
 
-function releaseProvince({
+function releaseFaction({
 	state,
 	p,
 	rng,
 	reason,
-}: ReleaseProvinceParams): void {
+	supporters,
+}: ReleaseFactionParams): void {
 	const formerSovereign = getSovereign({ state, p })
+	const supportingProvinces = [...new Set(supporters)]
+		.filter(
+			(seat) =>
+				seat !== p &&
+				FIELDS.prov.parent.get({ state, p: seat }) === formerSovereign,
+		)
+		.flatMap((seat) => getNationProvinces({ state, root: seat }))
 	const formerPopulation = getNationPopulation({ state, root: formerSovereign })
 	const share =
 		formerPopulation > 0
-			? getNationPopulation({ state, root: p }) / formerPopulation
+			? (getNationPopulation({ state, root: p }) +
+					supportingProvinces.reduce(
+						(sum, province) =>
+							sum +
+							state.popRuralCurrent[province] +
+							state.popUrbanCurrent[province],
+						0,
+					)) /
+				formerPopulation
 			: 0
 	const manpower =
 		FIELDS.prov.manpower.get({ state, p: formerSovereign }) * share
@@ -184,7 +207,8 @@ function releaseProvince({
 	FIELDS.prov.parent.set({ state, p, value: -1 })
 	rebuildAssignment({ state })
 	repartitionNation({ state, nation: formerSovereign, subjects: [] })
-	repartitionNation({ state, nation: p, subjects: [] })
+	repartitionNation({ state, nation: p, subjects: supportingProvinces })
+	clearRealmDiplomacy({ state, nation: p })
 	const vassal = state.people.rulerOf[p]
 	if (
 		vassal >= 0 &&
@@ -206,6 +230,10 @@ function releaseProvince({
 			reason,
 		})
 	scheduleSuccession({ state, p })
+}
+
+function releaseProvince(params: ReleaseProvinceParams): void {
+	releaseFaction({ ...params, supporters: [] })
 }
 
 // Schedules the ruler's succession at their death.
@@ -276,6 +304,9 @@ function repartitionNation({
 	nation,
 	subjects,
 }: RepartitionNationParams): void {
+	const absorbed = subjects.filter(
+		(p) => p !== nation && isSovereign({ state, p }),
+	)
 	const members = Array.from(
 		new Set(
 			[...subjects, ...getNationProvinces({ state, root: nation })].filter(
@@ -298,6 +329,21 @@ function repartitionNation({
 	applyDerivedParents({ state, nation, members })
 	rebuildAssignment({ state })
 	settleProvinces({ state, provinces: members })
+	for (const subject of absorbed)
+		if (!isSovereign({ state, p: subject }))
+			clearRealmDiplomacy({ state, nation: subject })
+}
+
+function clearRealmDiplomacy({
+	state,
+	nation,
+}: ClearRealmDiplomacyParams): void {
+	for (const other of [...state.relationColumns[nation]]) {
+		if (other === nation) continue
+		if (getRelation({ state, a: nation, b: other }) !== rel.WAR)
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
+		setDisposition({ state, a: nation, b: other, disposition: disp.NEUTRAL })
+	}
 }
 
 function releaseSubjectRelations({
@@ -307,15 +353,10 @@ function releaseSubjectRelations({
 	for (let other = 0; other < state.P; other++) {
 		if (other === nation || state.desolate[other]) continue
 		const relation = getRelation({ state, a: nation, b: other })
-		if (
-			relation === rel.NEUTRAL ||
-			relation === rel.NONE ||
-			relation === rel.WAR
-		)
-			continue
+		if (relation === rel.NONE || relation === rel.WAR) continue
 
 		if (relation === rel.VASSAL) {
-			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
 			state.events.push({
 				tag: "vassalage ended",
 				time: state.time,
@@ -325,7 +366,7 @@ function releaseSubjectRelations({
 		}
 
 		if (relation === rel.OVERLORD) {
-			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
 			state.events.push({
 				tag: "vassalage ended",
 				time: state.time,
@@ -335,7 +376,7 @@ function releaseSubjectRelations({
 		}
 
 		if (relation === rel.PU_JUNIOR) {
-			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
 			state.events.push({
 				tag: "personal union ended",
 				time: state.time,
@@ -345,7 +386,7 @@ function releaseSubjectRelations({
 		}
 
 		if (relation === rel.PU_SENIOR) {
-			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
 			state.events.push({
 				tag: "personal union ended",
 				time: state.time,
@@ -386,7 +427,7 @@ function startWar({
 	attacker,
 	defender,
 	rng,
-	rebel,
+	goal,
 }: StartWarParams): War | null {
 	if (
 		DERIVE.provinceWars({ state, p: attacker }).some((idx) => {
@@ -395,7 +436,15 @@ function startWar({
 		})
 	)
 		return null
-	return createActiveWar({ state, attacker, defender, rng, options: { rebel } })
+	return createActiveWar({ state, attacker, defender, rng, options: { goal } })
+}
+
+function warSides({ war }: WarSidesParams): WarSides {
+	if (war.goal === "throne")
+		return { rebels: war.attacker, crown: war.defender }
+	if (war.goal === "independence")
+		return { rebels: war.defender, crown: war.attacker }
+	return { rebels: -1, crown: -1 }
 }
 
 function queueBattleEvent({
@@ -420,7 +469,11 @@ function createActiveWar({
 		attacker,
 		defender,
 		startTime,
-		rebel: options.rebel ?? false,
+		goal: options.goal ?? "conquest",
+		backers: [],
+		refusedCalls: new Set(),
+		originalCrownRuler:
+			options.goal === "throne" ? state.people.rulerOf[defender] : -1,
 		deployed: {},
 		occupied: [],
 		allies: new Set(),
@@ -493,7 +546,12 @@ function createActiveWar({
 	return war
 }
 
-function resolveWar({ state, war, transferred }: ResolveWarParams): void {
+function resolveWar({
+	state,
+	war,
+	transferred,
+	receiver,
+}: ResolveWarParams): void {
 	war.endTime = state.time
 	state.activeWarIds.delete(war.idx)
 
@@ -515,11 +573,12 @@ function resolveWar({ state, war, transferred }: ResolveWarParams): void {
 	if (transferred.length > 0) {
 		repartitionNation({
 			state,
-			nation: war.attacker,
+			nation: receiver,
 			subjects: transferred,
 		})
-		if (isSovereign({ state, p: war.defender }))
-			repartitionNation({ state, nation: war.defender, subjects: [] })
+		const loser = receiver === war.attacker ? war.defender : war.attacker
+		if (isSovereign({ state, p: loser }))
+			repartitionNation({ state, nation: loser, subjects: [] })
 	}
 }
 
@@ -582,7 +641,8 @@ function createHistoryState({
 		childOffset: new Int32Array(P + 1),
 		childList: new Int32Array(0),
 		sovereignCurrent: new Int32Array(P).fill(-1),
-		relationsCurrent: new Uint8Array(P * P).fill(rel.NEUTRAL),
+		relationsCurrent: new Uint8Array(P * P),
+		dispositionsCurrent: new Uint8Array(P * P).fill(2),
 		relationColumns: Array.from({ length: P }, () => new Set<number>()),
 		hierarchyDirty: true,
 		hierarchyVersion: 0,
@@ -774,7 +834,9 @@ function unionPartners({ state, p }: UnionRealmParams): number[] {
 }
 
 function endUnion({ state, junior, senior }: UnionPairParams): void {
-	setRelation({ state, a: junior, b: senior, rel: rel.FRIENDLY })
+	setRelation({ state, a: junior, b: senior, rel: rel.NONE })
+	if (getDisposition({ state, a: junior, b: senior }) === disp.TRUSTED)
+		setDisposition({ state, a: junior, b: senior, disposition: disp.FRIENDLY })
 	state.people.unionGenerations.delete(junior)
 	state.events.push({
 		tag: "personal union ended",
@@ -906,7 +968,7 @@ function uniteCouple({ state, p, person }: UnionRulerParams): void {
 }
 
 function mergeUnion({ state, junior, senior }: UnionPairParams): void {
-	setRelation({ state, a: junior, b: senior, rel: rel.NEUTRAL })
+	setRelation({ state, a: junior, b: senior, rel: rel.NONE })
 	state.people.unionGenerations.delete(junior)
 	releaseSubjectRelations({ state, nation: junior })
 	PEOPLE.vacate({ people: state.people, seat: junior, reason: "union" })
@@ -993,6 +1055,7 @@ function foundRuler({
 
 export const STATE = {
 	rel,
+	disp,
 	getWarAllies,
 	yearMs,
 	defaultStartYear: DEFAULT_START_YEAR,
@@ -1001,7 +1064,9 @@ export const STATE = {
 	diffYears,
 	validateLiveHierarchy,
 	getRelation,
+	getDisposition,
 	setRelation,
+	setDisposition,
 	canAlly,
 	diplomaticOverlord,
 	getRulerRelation,
@@ -1013,8 +1078,10 @@ export const STATE = {
 	getNationNeighbors,
 	getProvinceNeighbors,
 	releaseProvince,
+	releaseFaction,
 	fixConnections,
 	startWar,
+	warSides,
 	queueBattleEvent,
 	createActiveWar,
 	resolveWar,

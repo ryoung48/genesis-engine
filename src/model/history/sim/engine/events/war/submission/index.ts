@@ -2,7 +2,7 @@ import type { OfferParams } from "@/model/history/sim/engine/events/war/submissi
 import { STATE } from "@/model/history/sim/engine/state"
 
 const SUBMISSION_THREAT = 0.05
-const SUBMISSION_CHANCE = 0.5
+const SUBMISSION_CHANCE = 0.25
 
 // A realm facing a hopeless war may yield its crown before the war starts.
 function offer({

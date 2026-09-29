@@ -1,86 +1,39 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
 import type {
 	CanBeRivalsParams,
-	CanVassalizeParams,
-	ClassifyInitialNeighborRelationParams,
 	InitDiplomacyParams,
 	MarriageBoundParams,
 	NextEventParams,
 	ProcessVassalDiplomacyParams,
-	RollTransitionParams,
 	RunDiplomacyParams,
 	SeedInitialVassalsParams,
 	SeedNeighborRelationsParams,
 	SyncVassalRelationsParams,
 } from "@/model/history/sim/engine/events/diplomacy/types"
+import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import { type Relation, STATE } from "@/model/history/sim/engine/state"
+import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
-import type { WeightedValue } from "@/model/shared/random/rng"
 
-const LADDER_STATES = [
-	STATE.rel.RIVAL,
-	STATE.rel.SUSPICIOUS,
-	STATE.rel.NEUTRAL,
-	STATE.rel.FRIENDLY,
-	STATE.rel.ALLY,
-] as const
-
-const INITIAL_RELATION_POOL: ReadonlyArray<WeightedValue<Relation>> = [
-	{ v: STATE.rel.RIVAL, w: 3 },
-	{ v: STATE.rel.SUSPICIOUS, w: 10 },
-	{ v: STATE.rel.NEUTRAL, w: 57 },
-	{ v: STATE.rel.FRIENDLY, w: 22 },
-	{ v: STATE.rel.ALLY, w: 8 },
-]
-
-const TRANSITION_MATRIX: Record<Relation, number[] | undefined> = {
-	[STATE.rel.NONE]: undefined,
-	[STATE.rel.OVERLORD]: undefined,
-	[STATE.rel.VASSAL]: undefined,
-	[STATE.rel.PU_SENIOR]: undefined,
-	[STATE.rel.PU_JUNIOR]: undefined,
-	[STATE.rel.RIVAL]: [0.65, 0.25, 0.08, 0.02, 0.0],
-	[STATE.rel.SUSPICIOUS]: [0.18, 0.5, 0.22, 0.05, 0.05],
-	[STATE.rel.NEUTRAL]: [0.05, 0.18, 0.5, 0.15, 0.12],
-	[STATE.rel.FRIENDLY]: [0.02, 0.1, 0.2, 0.45, 0.23],
-	[STATE.rel.ALLY]: [0.01, 0.04, 0.1, 0.2, 0.65],
-	[STATE.rel.WAR]: undefined,
-	[STATE.rel.COLONY]: undefined,
-}
-
-function rollTransition({ current, rng }: RollTransitionParams): Relation {
-	const row = TRANSITION_MATRIX[current]
-	if (!row) return current
-	let roll = rng.random()
-	for (let i = 0; i < row.length; i++) {
-		roll -= row[i]
-		if (roll <= 0) return LADDER_STATES[i]
-	}
-	return LADDER_STATES[LADDER_STATES.length - 1]
-}
+const PACT_CHANCE = 0.03
+const DISSOLVE_CHANCE = {
+	TRUSTED: 0,
+	FRIENDLY: 0.1,
+	NEUTRAL: 0.35,
+	SUSPICIOUS: 0.7,
+	RIVAL: 1,
+} as const
 
 function canBeRivals({ state, a, b }: CanBeRivalsParams): boolean {
 	const aR = ECONOMY.revenue({ state, p: a })
 	const bR = ECONOMY.revenue({ state, p: b })
 	const ratio = Math.min(aR, bR) / Math.max(aR, bR)
 	return ratio >= 0.8
-}
-
-function canVassalize({
-	state,
-	a,
-	b,
-}: CanVassalizeParams): { vassal: number; overlord: number } | null {
-	const aR = ECONOMY.revenue({ state, p: a })
-	const bR = ECONOMY.revenue({ state, p: b })
-	const ratio = Math.min(aR, bR) / Math.max(aR, bR)
-	if (ratio >= 0.5) return null
-	return aR <= bR ? { vassal: a, overlord: b } : { vassal: b, overlord: a }
 }
 
 function syncVassalRelations({
@@ -101,13 +54,21 @@ function syncVassalRelations({
 		)
 			continue
 
-		const overlordRel = STATE.getRelation({ state, a: overlord, b: nb })
+		const overlordRel = STATE.getDisposition({ state, a: overlord, b: nb })
 		if (
-			overlordRel === STATE.rel.SUSPICIOUS ||
-			overlordRel === STATE.rel.WAR ||
-			overlordRel === STATE.rel.RIVAL
+			overlordRel === STATE.disp.SUSPICIOUS ||
+			STATE.getRelation({ state, a: overlord, b: nb }) === STATE.rel.WAR ||
+			overlordRel === STATE.disp.RIVAL
 		) {
-			STATE.setRelation({ state, a: vassal, b: nb, rel: STATE.rel.SUSPICIOUS })
+			const current = STATE.getDisposition({ state, a: vassal, b: nb })
+			if (current !== STATE.disp.RIVAL)
+				DISPOSITION.set({
+					state,
+					a: vassal,
+					b: nb,
+					value: STATE.disp.SUSPICIOUS,
+					cause: "vassal sync",
+				})
 		}
 	}
 }
@@ -125,20 +86,10 @@ function processVassalDiplomacy({
 		attacker: overlord,
 		defender: vassal,
 	})
-	if (threat <= 0.4) return
+	if (!VASSALAGE.breaks({ state, vassal, overlord, threat })) return
 
 	// Break vassalage
-	STATE.setRelation({
-		state,
-		a: vassal,
-		b: overlord,
-		rel: STATE.rel.SUSPICIOUS,
-	})
-	state.events.push({
-		tag: "vassalage ended",
-		time: state.time,
-		data: { vassal, overlord },
-	})
+	VASSALAGE.release({ state, vassal, overlord, cause: "diplomacy" })
 
 	// Probabilistic counter-war
 	const counterWarChance = 0.7 * (1 - threat)
@@ -148,7 +99,7 @@ function processVassalDiplomacy({
 			attacker: overlord,
 			defender: vassal,
 			rng,
-			rebel: false,
+			goal: "conquest",
 		})
 	}
 }
@@ -188,21 +139,6 @@ function nextEvent({ state, province, rng, years }: NextEventParams): void {
 	)
 }
 
-function classifyInitialNeighborRelation({
-	state,
-	a,
-	b,
-	rng,
-}: ClassifyInitialNeighborRelationParams): Relation {
-	let relation = rng.weightedChoice(INITIAL_RELATION_POOL) ?? STATE.rel.NEUTRAL
-	if (relation === STATE.rel.RIVAL && !canBeRivals({ state, a, b })) {
-		relation = STATE.rel.SUSPICIOUS
-	}
-	if (relation === STATE.rel.ALLY && !STATE.canAlly({ state, a, b }))
-		relation = STATE.rel.FRIENDLY
-	return relation
-}
-
 function seedNeighborRelations({
 	state,
 	rng,
@@ -222,15 +158,29 @@ function seedNeighborRelations({
 			const existing = STATE.getRelation({ state, a: nation, b: neighbor })
 			if (existing === STATE.rel.COLONY || existing === STATE.rel.OVERLORD)
 				continue
-			const relation = classifyInitialNeighborRelation({
+			let disposition = DISPOSITION.seed({ rng })
+			if (
+				disposition === STATE.disp.RIVAL &&
+				!canBeRivals({ state, a: nation, b: neighbor })
+			)
+				disposition = STATE.disp.SUSPICIOUS
+			DISPOSITION.set({
 				state,
 				a: nation,
 				b: neighbor,
-				rng,
+				value: disposition,
+				cause: "seed",
 			})
-			if (relation !== STATE.rel.NEUTRAL) {
-				STATE.setRelation({ state, a: nation, b: neighbor, rel: relation })
-			}
+			if (
+				disposition === STATE.disp.TRUSTED &&
+				STATE.canAlly({ state, a: nation, b: neighbor })
+			)
+				STATE.setRelation({
+					state,
+					a: nation,
+					b: neighbor,
+					rel: STATE.rel.ALLY,
+				})
 		}
 	}
 }
@@ -266,11 +216,11 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 			const ratio = aR / Math.max(1, bR)
 			if (ratio >= VASSAL_SEED_RATIO) continue
 			if (rng.random() >= VASSAL_SEED_CHANCE) continue
-			STATE.setRelation({
+			VASSALAGE.bind({
 				state,
-				a: nation,
-				b: neighbor,
-				rel: STATE.rel.VASSAL,
+				vassal: nation,
+				overlord: neighbor,
+				cause: "seed",
 			})
 			break
 		}
@@ -291,112 +241,70 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 		nextEvent({ state, province: nation, rng })
 		return
 	}
-
-	const neighbors = STATE.getNationNeighbors({ state, nation })
-	const neighborSet = new Set(neighbors)
-
-	// Cleanup pass: drop non-neighbor relations to neutral
-	const heldColumns = Array.from(state.relationColumns[nation]).sort(
+	const neighborSet = new Set(STATE.getNationNeighbors({ state, nation }))
+	const partners = [...state.relationColumns[nation]]
+	for (const other of partners) {
+		if (other === nation || neighborSet.has(other)) continue
+		if (STATE.getRelation({ state, a: nation, b: other }) === STATE.rel.NONE)
+			DISPOSITION.set({
+				state,
+				a: nation,
+				b: other,
+				value: STATE.disp.NEUTRAL,
+				cause: "distant",
+			})
+	}
+	const candidates = [...new Set([...neighborSet, ...partners])].sort(
 		(a, b) => a - b,
 	)
-	for (const other of heldColumns) {
-		if (other === nation || state.desolate[other]) continue
-		const rel = STATE.getRelation({ state, a: nation, b: other })
-		if (rel === STATE.rel.NONE || rel === STATE.rel.NEUTRAL) continue
+	for (const other of candidates) {
 		if (
-			rel === STATE.rel.VASSAL ||
-			rel === STATE.rel.OVERLORD ||
-			rel === STATE.rel.PU_SENIOR ||
-			rel === STATE.rel.PU_JUNIOR ||
-			rel === STATE.rel.COLONY
+			other === nation ||
+			state.desolate[other] ||
+			!STATE.isSovereign({ state, p: other })
 		)
 			continue
-
-		if (!neighborSet.has(other) || !STATE.isSovereign({ state, p: other })) {
-			STATE.setRelation({ state, a: nation, b: other, rel: STATE.rel.NEUTRAL })
-		}
-	}
-
-	// Rival size-gate decay
-	for (const nb of neighbors) {
-		if (!STATE.isSovereign({ state, p: nb })) continue
-		const rel = STATE.getRelation({ state, a: nation, b: nb })
-		if (rel === STATE.rel.RIVAL && !canBeRivals({ state, a: nation, b: nb })) {
-			STATE.setRelation({ state, a: nation, b: nb, rel: STATE.rel.SUSPICIOUS })
-		}
-	}
-
-	// Standard diplomacy transitions
-	for (const nb of neighbors) {
-		if (!STATE.isSovereign({ state, p: nb })) continue
-		const rel = STATE.getRelation({ state, a: nation, b: nb })
-
+		const tie = STATE.getRelation({ state, a: nation, b: other })
+		if (tie === STATE.rel.WAR) continue
+		if (tie === STATE.rel.NONE && !neighborSet.has(other)) continue
+		const current = STATE.getDisposition({ state, a: nation, b: other })
+		const bound =
+			tie === STATE.rel.ALLY && marriageBound({ state, a: nation, b: other })
+		let formedVassal = false
 		if (
-			rel === STATE.rel.OVERLORD ||
-			rel === STATE.rel.PU_SENIOR ||
-			rel === STATE.rel.PU_JUNIOR
+			tie === STATE.rel.NONE &&
+			neighborSet.has(other) &&
+			current === STATE.disp.TRUSTED &&
+			rng.random() < PACT_CHANCE
+		) {
+			const pair = VASSALAGE.pair({ state, a: nation, b: other })
+			if (pair)
+				formedVassal = VASSALAGE.bind({ state, ...pair, cause: "diplomacy" })
+			if (!formedVassal && STATE.canAlly({ state, a: nation, b: other }))
+				STATE.setRelation({ state, a: nation, b: other, rel: STATE.rel.ALLY })
+		}
+		if (
+			tie === STATE.rel.ALLY &&
+			!bound &&
+			rng.random() < DISSOLVE_CHANCE[current]
 		)
-			continue
-		if (rel === STATE.rel.WAR) continue
-		if (rel === STATE.rel.COLONY) continue // colonizer's view of a distant colony
-
-		if (rel === STATE.rel.VASSAL) {
-			processVassalDiplomacy({ state, vassal: nb, overlord: nation, rng })
-			continue
-		}
-
-		if (rel === STATE.rel.ALLY && marriageBound({ state, a: nation, b: nb }))
-			continue
-
-		let next = rollTransition({ current: rel, rng })
-		if (next === rel) continue
-
-		// Ally → vassalize if revenue ratio < 50%
-		if (next === STATE.rel.ALLY) {
-			const pair = canVassalize({ state, a: nation, b: nb })
-			if (pair) {
-				// Subject relations are relation-only; do not infer them from territory.
-				if (
-					!STATE.getRulerRelation({ state, nation: pair.vassal }) &&
-					!STATE.getRulerRelation({ state, nation: pair.overlord })
-				) {
-					STATE.setRelation({
-						state,
-						a: pair.vassal,
-						b: pair.overlord,
-						rel: STATE.rel.VASSAL,
-					})
-					state.events.push({
-						tag: "vassalized",
-						time: state.time,
-						data: {
-							vassal: pair.vassal,
-							overlord: pair.overlord,
-						},
-					})
-					continue
-				}
-			}
-		}
-
-		if (next === STATE.rel.ALLY && !STATE.canAlly({ state, a: nation, b: nb }))
-			next = STATE.rel.FRIENDLY
-		if (next === rel) continue
-
-		// Rival size-gate
-		if (next === STATE.rel.RIVAL && !canBeRivals({ state, a: nation, b: nb })) {
-			if (rel !== STATE.rel.SUSPICIOUS) {
-				STATE.setRelation({
-					state,
-					a: nation,
-					b: nb,
-					rel: STATE.rel.SUSPICIOUS,
-				})
-			}
-			continue
-		}
-
-		STATE.setRelation({ state, a: nation, b: nb, rel: next })
+			STATE.setRelation({ state, a: nation, b: other, rel: STATE.rel.NONE })
+		DISPOSITION.drift({ state, a: nation, b: other, rng, bound })
+		if (
+			STATE.getRelation({ state, a: nation, b: other }) === STATE.rel.NONE &&
+			STATE.getDisposition({ state, a: nation, b: other }) ===
+				STATE.disp.RIVAL &&
+			!canBeRivals({ state, a: nation, b: other })
+		)
+			DISPOSITION.set({
+				state,
+				a: nation,
+				b: other,
+				value: STATE.disp.SUSPICIOUS,
+				cause: "size gate",
+			})
+		if (tie === STATE.rel.VASSAL && !formedVassal)
+			processVassalDiplomacy({ state, vassal: other, overlord: nation, rng })
 	}
 
 	nextEvent({ state, province: nation, rng })

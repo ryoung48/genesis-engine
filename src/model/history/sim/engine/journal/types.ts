@@ -2,6 +2,7 @@ import type { CensusKeyframe } from "@/model/history/record/types"
 import type {
 	EngineNote,
 	HistoryState,
+	WarGoal,
 } from "@/model/history/sim/engine/state/types"
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
 import type {
@@ -25,7 +26,7 @@ export interface JournalRelationChange {
 
 interface JournalCoalition {
 	warId: number
-	rebel: boolean
+	goal: WarGoal
 	attackers: number[]
 	defenders: number[]
 }
@@ -149,7 +150,7 @@ export interface RecordRelationParams {
 export interface RecordCoalitionParams {
 	state: HistoryState
 	warId: number
-	rebel: boolean
+	goal: WarGoal
 	attackers: number[]
 	defenders: number[]
 }

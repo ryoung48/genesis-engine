@@ -7,7 +7,8 @@ import type {
 	ReviewParams,
 	SeedRoyalMarriagesParams,
 } from "@/model/history/sim/engine/events/people/royal-marriages/types"
-import { type Relation, STATE } from "@/model/history/sim/engine/state"
+import { STATE } from "@/model/history/sim/engine/state"
+import type { Relation } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
@@ -57,6 +58,12 @@ function allianceFromMatch({ state, match }: AllianceMatchParams): boolean {
 	const key = pairKey({ state, a: realmA, b: realmB })
 	if (people.marriageAlliances.has(key)) return true
 	STATE.setRelation({ state, a: realmA, b: realmB, rel: STATE.rel.ALLY })
+	STATE.setDisposition({
+		state,
+		a: realmA,
+		b: realmB,
+		disposition: STATE.disp.TRUSTED,
+	})
 	people.marriageAlliances.set(key, { first: realmA, second: realmB })
 	state.events.push({
 		tag: "marriage alliance",

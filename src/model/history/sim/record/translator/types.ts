@@ -8,14 +8,14 @@ import type { LanguageNames } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 export interface ActiveTie {
-	kind: "alliance" | "rival" | "vassal" | "colony" | "union"
+	kind: "alliance" | "vassal" | "colony" | "union"
 	firstId: number
 	secondId: number
 }
 
 export interface RebelWar {
-	attackerRoot: number
-	defenderRoot: number
+	rebelRoot: number
+	crownRoot: number
 }
 
 export interface OwnerNoteReasons {

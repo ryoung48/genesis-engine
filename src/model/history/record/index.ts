@@ -582,16 +582,6 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			second.relations.allies = second.relations.allies.filter(
 				(id) => id !== first.id,
 			)
-		} else if (event.kind === "rivalStart") {
-			first.relations.rivals.push(second.id)
-			second.relations.rivals.push(first.id)
-		} else if (event.kind === "rivalEnd") {
-			first.relations.rivals = first.relations.rivals.filter(
-				(id) => id !== second.id,
-			)
-			second.relations.rivals = second.relations.rivals.filter(
-				(id) => id !== first.id,
-			)
 		} else if (
 			event.kind === "vassalStart" ||
 			event.kind === "dependencyStart"

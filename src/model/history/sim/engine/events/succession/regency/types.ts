@@ -1,7 +1,12 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { RegentKind } from "@/model/history/sim/people/types"
 
-export type RegencyEndCause = "age" | "death" | "usurpation" | "lost"
+export type RegencyEndCause =
+	| "age"
+	| "death"
+	| "usurpation"
+	| "lost"
+	| "overthrown"
 
 export interface RegentChoice {
 	// -1 for a regency council.

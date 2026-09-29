@@ -1,4 +1,5 @@
 import type {
+	DispSetParams,
 	ProvGetParams,
 	ProvSetParams,
 	RelationKeyParams,
@@ -6,7 +7,10 @@ import type {
 	RelSetParams,
 } from "@/model/history/sim/engine/fields/types"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
-import type { Relation } from "@/model/history/sim/engine/state"
+import type {
+	Disposition,
+	Relation,
+} from "@/model/history/sim/engine/state/types"
 
 function parentWouldCycle({ state, p, value }: ProvSetParams): boolean {
 	let current = value
@@ -162,7 +166,37 @@ const prov = {
 	},
 } as const
 
-const NEUTRAL_RELATION = 7
+export const RELATION_CODE: Record<Relation, number> = {
+	NONE: 0,
+	OVERLORD: 1,
+	VASSAL: 2,
+	PU_SENIOR: 3,
+	PU_JUNIOR: 4,
+	ALLY: 5,
+	WAR: 10,
+	COLONY: 11,
+}
+export const DISPOSITION_CODE: Record<Disposition, number> = {
+	RIVAL: 0,
+	SUSPICIOUS: 1,
+	NEUTRAL: 2,
+	FRIENDLY: 3,
+	TRUSTED: 4,
+}
+const RELATION_NAME: Record<number, Relation> = Object.fromEntries(
+	Object.entries(RELATION_CODE).map(([name, code]) => [code, name]),
+) as Record<number, Relation>
+const DISPOSITION_NAME: Record<number, Disposition> = Object.fromEntries(
+	Object.entries(DISPOSITION_CODE).map(([name, code]) => [code, name]),
+) as Record<number, Disposition>
+
+export function decodeRelation(code: number): Relation {
+	return RELATION_NAME[code] ?? "NONE"
+}
+
+export function decodeDisposition(code: number): Disposition {
+	return DISPOSITION_NAME[code] ?? "NEUTRAL"
+}
 
 function relationKey({ state, a, b }: RelationKeyParams): number {
 	return a * state.P + b
@@ -170,16 +204,16 @@ function relationKey({ state, a, b }: RelationKeyParams): number {
 
 function flipRelation(rel: Relation): Relation {
 	switch (rel) {
-		case 1: // OVERLORD → VASSAL
-			return 2
-		case 2: // VASSAL → OVERLORD
-			return 1
-		case 3: // PU_SENIOR → PU_JUNIOR
-			return 4
-		case 4: // PU_JUNIOR → PU_SENIOR
-			return 3
-		case 11: // COLONY → OVERLORD (colonies share the OVERLORD senior side)
-			return 1
+		case "OVERLORD":
+			return "VASSAL"
+		case "VASSAL":
+			return "OVERLORD"
+		case "PU_SENIOR":
+			return "PU_JUNIOR"
+		case "PU_JUNIOR":
+			return "PU_SENIOR"
+		case "COLONY":
+			return "OVERLORD"
 		default:
 			return rel
 	}
@@ -187,37 +221,73 @@ function flipRelation(rel: Relation): Relation {
 
 const rel = {
 	get: ({ state, a, b }: RelGetParams): Relation =>
-		state.relationsCurrent[a * state.P + b] as Relation,
+		decodeRelation(state.relationsCurrent[a * state.P + b]),
 	set: ({ state, a, b, rel }: RelSetParams): void => {
 		const forwardKey = relationKey({ state, a, b })
 		const backwardKey = relationKey({ state, a: b, b: a })
 		const flipped = flipRelation(rel)
-		if (state.relationsCurrent[forwardKey] !== flipped)
+		if (state.relationsCurrent[forwardKey] !== RELATION_CODE[flipped])
 			JOURNAL.relation({
 				state,
 				x: a,
 				y: b,
 				before: state.relationsCurrent[forwardKey],
-				after: flipped,
+				after: RELATION_CODE[flipped],
 			})
-		if (state.relationsCurrent[backwardKey] !== rel)
+		if (state.relationsCurrent[backwardKey] !== RELATION_CODE[rel])
 			JOURNAL.relation({
 				state,
 				x: b,
 				y: a,
 				before: state.relationsCurrent[backwardKey],
-				after: rel,
+				after: RELATION_CODE[rel],
 			})
-		state.relationsCurrent[forwardKey] = flipped
-		state.relationsCurrent[backwardKey] = rel
-		if (flipped === NEUTRAL_RELATION) state.relationColumns[a].delete(b)
-		else state.relationColumns[a].add(b)
-		if (rel === NEUTRAL_RELATION) state.relationColumns[b].delete(a)
-		else state.relationColumns[b].add(a)
+		state.relationsCurrent[forwardKey] = RELATION_CODE[flipped]
+		state.relationsCurrent[backwardKey] = RELATION_CODE[rel]
+		const held =
+			rel !== "NONE" ||
+			state.dispositionsCurrent[forwardKey] !== DISPOSITION_CODE.NEUTRAL
+		if (held) {
+			state.relationColumns[a].add(b)
+			state.relationColumns[b].add(a)
+		} else {
+			state.relationColumns[a].delete(b)
+			state.relationColumns[b].delete(a)
+		}
+	},
+} as const
+
+const disp = {
+	get: ({ state, a, b }: RelGetParams): Disposition =>
+		decodeDisposition(state.dispositionsCurrent[relationKey({ state, a, b })]),
+	set: ({ state, a, b, disposition, cause }: DispSetParams): void => {
+		const forward = relationKey({ state, a, b })
+		const backward = relationKey({ state, a: b, b: a })
+		const before = decodeDisposition(state.dispositionsCurrent[forward])
+		if (before === disposition) return
+		const code = DISPOSITION_CODE[disposition]
+		state.dispositionsCurrent[forward] = code
+		state.dispositionsCurrent[backward] = code
+		const held =
+			code !== DISPOSITION_CODE.NEUTRAL ||
+			state.relationsCurrent[forward] !== RELATION_CODE.NONE
+		if (held) {
+			state.relationColumns[a].add(b)
+			state.relationColumns[b].add(a)
+		} else {
+			state.relationColumns[a].delete(b)
+			state.relationColumns[b].delete(a)
+		}
+		state.events.push({
+			tag: "disposition changed",
+			time: state.time,
+			data: { a, b, before, after: disposition, cause },
+		})
 	},
 } as const
 
 export const FIELDS = {
 	prov,
 	rel,
+	disp,
 }

@@ -74,7 +74,12 @@ export interface BattleParticipant {
 	losses: number | null
 }
 
-export type ParticipantRole = "vassal" | "overlord" | "union partner" | "ally"
+export type ParticipantRole =
+	| "vassal"
+	| "overlord"
+	| "union partner"
+	| "ally"
+	| "backer"
 
 export interface BattleContribution {
 	countryId: number

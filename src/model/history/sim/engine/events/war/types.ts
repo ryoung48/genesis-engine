@@ -54,6 +54,6 @@ export interface SeedWarStageParams {
 	attacker: number
 	defender: number
 	rng: SharedRng
-	rebel: boolean
+	goal: "conquest" | "independence"
 	forceOccupied: boolean
 }

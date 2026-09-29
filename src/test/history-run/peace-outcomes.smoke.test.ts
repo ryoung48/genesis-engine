@@ -1,12 +1,16 @@
 import { expect, it, vi } from "vitest"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
+import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
+import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
+import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
+import { PEOPLE } from "@/model/history/sim/people"
 import { HISTORY_RUN } from "@/test/history-run"
 
 function setup() {
@@ -41,17 +45,346 @@ function setup() {
 	return { state, rng, war, child }
 }
 
+function setupThrone() {
+	const { state, rng, war, child } = setup()
+	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
+	const crown = war.defender
+	const deposed = state.people.rulerOf[crown]
+	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	const claimant = state.people.rulerOf[child]
+	const throneWar = STATE.createActiveWar({
+		state,
+		attacker: child,
+		defender: crown,
+		rng,
+		options: { goal: "throne" },
+	})
+	MILITARY.mobilize({ state, war: throneWar })
+	return { state, rng, war: throneWar, crown, child, claimant, deposed }
+}
+
+it("enthrones a victorious claimant and preserves a restoration claim", () => {
+	const { state, rng, war, crown, child, claimant, deposed } = setupThrone()
+	const terms = PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	expect(terms.outcome).toBe("regime change")
+	expect(terms.receiver).toBe(crown)
+	expect(state.people.rulerOf[crown]).toBe(claimant)
+	expect(state.people.deposed.get(crown)?.claimant).toBe(deposed)
+	expect(STATE.isSovereign({ state, p: child })).toBe(false)
+})
+
+it("submits a claimant whose offensive ends without land", () => {
+	const { state, rng, war, crown, child, claimant } = setupThrone()
+	const terms = PEACE.conclude({ state, war, rng, reason: "offensive spent" })
+	expect(terms.outcome).toBe("submission")
+	expect(state.people.rulerOf[crown]).not.toBe(claimant)
+	expect(STATE.isSovereign({ state, p: child })).toBe(false)
+	expect(state.people.persons.throne[claimant]).toBe(-1)
+})
+
+it("joins supporting districts, their land and their manpower to a throne claimant", () => {
+	const { state, rng } = setup()
+	let crown = -1
+	let seats: number[] = []
+	const time = state.time / STATE.yearMs
+	for (let p = 0; p < state.P; p++) {
+		const ruler = state.people.rulerOf[p]
+		if (
+			!STATE.isSovereign({ state, p }) ||
+			state.provinceWars[p].length > 0 ||
+			ruler < 0
+		)
+			continue
+		const eligible = STATE.getChildren({ state, p }).filter((seat) => {
+			const holder = state.people.rulerOf[seat]
+			return (
+				state.seatRank[seat] > 0 &&
+				holder >= 0 &&
+				state.people.persons.throne[holder] === seat &&
+				PEOPLE.aliveAt({ people: state.people, person: holder, time })
+			)
+		})
+		if (
+			eligible.length < 2 ||
+			eligible.some((seat) => state.people.rulerOf[seat] === ruler) ||
+			state.people.persons.dynasty[state.people.rulerOf[eligible[0]]] < 0
+		)
+			continue
+		crown = p
+		seats = eligible
+		break
+	}
+	if (crown < 0) throw new Error("no realm with supporting districts")
+	const claimant = state.people.rulerOf[seats[0]]
+	const incumbent = state.people.rulerOf[crown]
+	const dynasty = state.people.persons.dynasty[claimant]
+	state.people.persons.dynasty[incumbent] = -1
+	for (const seat of seats)
+		state.people.persons.dynasty[state.people.rulerOf[seat]] = dynasty
+	rng.random = () => 0
+	const contest = SUCCESSION_SYSTEMS.challenge({
+		state,
+		realm: crown,
+		incumbent,
+		claimant,
+		rng,
+	})
+	expect(contest.seat).toBe(seats[0])
+	expect(contest.supportingSeats).toEqual(seats)
+	const crownPopulation = STATE.getNationPopulation({ state, root: crown })
+	const supportingPopulation = seats.reduce(
+		(sum, seat) => sum + STATE.getNationPopulation({ state, root: seat }),
+		0,
+	)
+	const manpower = FIELDS.prov.manpower.get({ state, p: crown })
+	const seeks = vi
+		.spyOn(OVERTHROW, "seeks")
+		.mockReturnValue(contest.supportingSeats)
+	try {
+		expect(
+			WAR.rebel({
+				state,
+				overlord: crown,
+				subject: contest.seat,
+				laxity: 1,
+				succession: false,
+				rng,
+			}),
+		).toBe(true)
+	} finally {
+		seeks.mockRestore()
+	}
+	for (const seat of seats)
+		expect(STATE.getSovereign({ state, p: seat })).toBe(contest.seat)
+	expect(STATE.getNationPopulation({ state, root: contest.seat })).toBeCloseTo(
+		supportingPopulation,
+	)
+	expect(FIELDS.prov.manpower.get({ state, p: contest.seat })).toBeCloseTo(
+		manpower * (supportingPopulation / crownPopulation),
+	)
+	const war = state.wars.at(-1)
+	if (!war) throw new Error("no throne war")
+	PEACE.conclude({ state, war, rng, reason: "offensive spent" })
+	for (const seat of seats)
+		expect(STATE.getSovereign({ state, p: seat })).toBe(crown)
+})
+
+it("signs a truce with the former crown when a district breaks away without war", () => {
+	const { state, rng, war, child } = setup()
+	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
+	const crown = war.defender
+	const active = state.activeWarIds.size
+	const seeks = vi.spyOn(OVERTHROW, "seeks").mockReturnValue([])
+	try {
+		rng.random = () => 0
+		expect(
+			WAR.rebel({
+				state,
+				overlord: crown,
+				subject: child,
+				laxity: 1,
+				succession: false,
+				rng,
+			}),
+		).toBe(true)
+		expect(STATE.isSovereign({ state, p: child })).toBe(true)
+		expect(TRUCE.active({ state, a: crown, b: child })).toBe(true)
+		expect(state.activeWarIds.size).toBe(active)
+	} finally {
+		seeks.mockRestore()
+	}
+})
+
+it("remembers the original crown ruler when the throne is vacant", () => {
+	const { state, rng, war, crown, deposed } = setupThrone()
+	PEOPLE.vacate({ people: state.people, seat: crown, reason: "succession" })
+	state.people.persons.death[deposed] = state.time / STATE.yearMs - 1
+	PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	expect(state.people.deposed.get(crown)?.claimant).toBe(deposed)
+})
+
+it("makes a mid-war usurper the deposed claimant", () => {
+	const { state, rng, war, crown } = setupThrone()
+	STATE.foundRuler({
+		state,
+		p: crown,
+		age: 35,
+		claim: 0,
+		rng,
+		reason: "usurpation",
+	})
+	const usurper = state.people.rulerOf[crown]
+	PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	expect(state.people.deposed.get(crown)?.claimant).toBe(usurper)
+})
+
+it("lets a disloyal overlord back a throne claimant and keeps the bond after victory", () => {
+	const { state, rng, war, child } = setup()
+	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
+	const crown = war.defender
+	const overlord = war.attacker
+	state.truces.clear()
+	STATE.setRelation({ state, a: crown, b: overlord, rel: STATE.rel.VASSAL })
+	STATE.setDisposition({
+		state,
+		a: crown,
+		b: overlord,
+		disposition: STATE.disp.RIVAL,
+	})
+	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	rng.random = () => 0
+	WAR.start({ state, attacker: child, defender: crown, rng, goal: "throne" })
+	const throneWar = state.wars.at(-1)
+	if (!throneWar) throw new Error("no throne war")
+	expect(throneWar.backers).toContain(overlord)
+	expect(throneWar.allies.has(overlord)).toBe(true)
+	const coalition = state.pendingJournal.coalitions.findLast(
+		(entry) => entry.warId === throneWar.idx,
+	)
+	expect(coalition?.attackers).toContain(overlord)
+	expect(coalition?.defenders).not.toContain(overlord)
+	const mobilized = state.events.findLast(
+		(note) => note.tag === "war mobilized",
+	)
+	const index = (mobilized?.data.deployedNations as number[]).indexOf(overlord)
+	expect((mobilized?.data.deployedRoles as (string | null)[])[index]).toBe(
+		"backer",
+	)
+	const battle = MILITARY.fight({
+		state,
+		war: throneWar,
+		eventAttacker: child,
+		defense: 1,
+		rng,
+	})
+	const battleIndex = battle.deployments.findIndex(
+		(member) => member.nation === overlord,
+	)
+	expect(battle.roles[battleIndex]).toBe("backer")
+	PEACE.conclude({ state, war: throneWar, rng, reason: "capital taken" })
+	expect(STATE.getRelation({ state, a: crown, b: overlord })).toBe(
+		STATE.rel.OVERLORD,
+	)
+	expect(STATE.getDisposition({ state, a: crown, b: overlord })).toBe(
+		STATE.disp.TRUSTED,
+	)
+})
+
+it("renounces vassalage when the overlord loses with the crown", () => {
+	const { state, rng, war, child } = setup()
+	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
+	const crown = war.defender
+	const overlord = war.attacker
+	state.truces.clear()
+	STATE.setRelation({ state, a: crown, b: overlord, rel: STATE.rel.VASSAL })
+	STATE.setDisposition({
+		state,
+		a: crown,
+		b: overlord,
+		disposition: STATE.disp.NEUTRAL,
+	})
+	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	rng.random = () => 1
+	WAR.start({ state, attacker: child, defender: crown, rng, goal: "throne" })
+	const throneWar = state.wars.at(-1)
+	if (!throneWar) throw new Error("no throne war")
+	expect(throneWar.allies.has(overlord)).toBe(true)
+	expect(throneWar.backers).not.toContain(overlord)
+	PEACE.conclude({ state, war: throneWar, rng, reason: "capital taken" })
+	expect(STATE.getRelation({ state, a: crown, b: overlord })).toBe(
+		STATE.rel.NONE,
+	)
+	expect(STATE.getDisposition({ state, a: crown, b: overlord })).toBe(
+		STATE.disp.SUSPICIOUS,
+	)
+	expect(state.events).toContainEqual(
+		expect.objectContaining({
+			tag: "vassalage ended",
+			data: expect.objectContaining({
+				vassal: crown,
+				overlord,
+				cause: "regime change",
+			}),
+		}),
+	)
+})
+
+it("repays a Rival vassal backer without ending its bond", () => {
+	const { state, rng, war, child } = setup()
+	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
+	const crown = war.defender
+	const vassal = war.attacker
+	state.truces.clear()
+	STATE.setRelation({ state, a: vassal, b: crown, rel: STATE.rel.VASSAL })
+	STATE.setDisposition({
+		state,
+		a: vassal,
+		b: crown,
+		disposition: STATE.disp.RIVAL,
+	})
+	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	rng.random = () => 0
+	WAR.start({ state, attacker: child, defender: crown, rng, goal: "throne" })
+	const throneWar = state.wars.at(-1)
+	if (!throneWar) throw new Error("no throne war")
+	expect(throneWar.backers).toContain(vassal)
+	const coalition = state.pendingJournal.coalitions.findLast(
+		(entry) => entry.warId === throneWar.idx,
+	)
+	expect(coalition?.attackers).toContain(vassal)
+	expect(coalition?.defenders).not.toContain(vassal)
+	PEACE.conclude({ state, war: throneWar, rng, reason: "capital taken" })
+	expect(STATE.getRelation({ state, a: vassal, b: crown })).toBe(
+		STATE.rel.OVERLORD,
+	)
+	expect(STATE.getDisposition({ state, a: vassal, b: crown })).toBe(
+		STATE.disp.TRUSTED,
+	)
+})
+
 it("annexes after a capital falls and signs a truce", () => {
 	const { state, rng, war } = setup()
 	const terms = PEACE.conclude({ state, war, rng, reason: "capital taken" })
 	expect(terms.outcome).toBe("annexation")
 	expect(STATE.isSovereign({ state, p: war.defender })).toBe(false)
-	expect(PEACE.inTruce({ state, a: war.attacker, b: war.defender })).toBe(true)
+	expect(TRUCE.active({ state, a: war.attacker, b: war.defender })).toBe(true)
+})
+
+it("keeps formal ties and shared dispositions independent", () => {
+	const { state, war } = setup()
+	STATE.setRelation({
+		state,
+		a: war.attacker,
+		b: war.defender,
+		rel: STATE.rel.ALLY,
+	})
+	STATE.setDisposition({
+		state,
+		a: war.attacker,
+		b: war.defender,
+		disposition: STATE.disp.RIVAL,
+	})
+	expect(STATE.getRelation({ state, a: war.attacker, b: war.defender })).toBe(
+		STATE.rel.ALLY,
+	)
+	expect(
+		STATE.getDisposition({ state, a: war.defender, b: war.attacker }),
+	).toBe(STATE.disp.RIVAL)
+	STATE.setRelation({
+		state,
+		a: war.attacker,
+		b: war.defender,
+		rel: STATE.rel.NONE,
+	})
+	expect(
+		STATE.getDisposition({ state, a: war.attacker, b: war.defender }),
+	).toBe(STATE.disp.RIVAL)
+	expect(state.relationColumns[war.attacker].has(war.defender)).toBe(true)
 })
 
 it("calls a full rebel reconquest restoration", () => {
 	const { state, rng, war, child } = setup()
-	war.rebel = true
+	war.goal = "independence"
 	const terms = PEACE.conclude({ state, war, rng, reason: "capital taken" })
 	expect(terms.outcome).toBe("restoration")
 	expect(terms.transferred).toContain(war.defender)
@@ -61,7 +394,7 @@ it("calls a full rebel reconquest restoration", () => {
 
 it("keeps rebels independent after partial reconquest", () => {
 	const { state, rng, war, child } = setup()
-	war.rebel = true
+	war.goal = "independence"
 	war.occupied.push(child)
 	FIELDS.prov.occupation.set({ state, p: child, value: war.idx })
 	const terms = PEACE.conclude({ state, war, rng, reason: "both exhausted" })
@@ -205,7 +538,7 @@ it("weights defender indemnities by force advantage", () => {
 
 it("gives rebels independence when they hold out and blocks ordinary renewed war", () => {
 	const { state, rng, war } = setup()
-	war.rebel = true
+	war.goal = "independence"
 	const terms = PEACE.conclude({
 		state,
 		war,
@@ -220,7 +553,7 @@ it("gives rebels independence when they hold out and blocks ordinary renewed war
 		attacker: war.attacker,
 		defender: war.defender,
 		rng,
-		rebel: false,
+		goal: "conquest",
 	})
 	expect(state.wars).toHaveLength(count)
 	WAR.start({
@@ -228,7 +561,7 @@ it("gives rebels independence when they hold out and blocks ordinary renewed war
 		attacker: war.attacker,
 		defender: war.defender,
 		rng,
-		rebel: true,
+		goal: "independence",
 	})
 	expect(state.wars).toHaveLength(count + 1)
 })
@@ -237,14 +570,14 @@ it("lets the same leaders fight again after the truce expires", () => {
 	const { state, rng, war } = setup()
 	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
 	state.time += STATE.deltaYear(10)
-	expect(PEACE.inTruce({ state, a: war.attacker, b: war.defender })).toBe(false)
+	expect(TRUCE.active({ state, a: war.attacker, b: war.defender })).toBe(false)
 	const count = state.wars.length
 	WAR.start({
 		state,
 		attacker: war.attacker,
 		defender: war.defender,
 		rng,
-		rebel: false,
+		goal: "conquest",
 	})
 	expect(state.wars).toHaveLength(count + 1)
 })

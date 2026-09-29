@@ -117,7 +117,11 @@ function attempt({
 	})
 	if (contest.seat < 0) return null
 	people.deposed.delete(realm)
-	return { claimant, seat: contest.seat }
+	return {
+		claimant,
+		seat: contest.seat,
+		supportingSeats: contest.supportingSeats,
+	}
 }
 
 export const RESTORATION = { depose, due, attempt }

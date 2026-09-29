@@ -131,11 +131,11 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`):
 - 0: new house or lord protector.
 
 **Disputes.** A single-heir succession is disputed when the heir rules elsewhere, is under 16, or is of the sex the culture passes over, and an adult of the preferred sex stands next in line.
-- The district holders split between the heir and the rival. With at least 40% backing, and then with a chance equal to that share, the rival's district (or their strongest backer's) revolts with the rival as pretender.
+- The district holders split between the heir and the rival. With at least 40% backing, and then with a chance equal to that share, the rival's district (or their strongest backer's) leads a revolt with the rival as pretender. Every district that backed the rival joins it.
 - A losing election candidate who holds a district and won 40% also revolts.
 - Otherwise the weak-crown rebellion check runs.
 
-How revolts break away and how their wars end is in [rebellion](rebellion.md).
+Disputed succession pretenders fight for the throne; a victory replaces the ruler. The war rules are in [rebellion](rebellion.md).
 
 ## Personal unions
 
@@ -154,14 +154,14 @@ How revolts break away and how their wars end is in [rebellion](rebellion.md).
   3. the strongest district holder (lord protector);
   4. otherwise a regency council with no person.
 - **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere is replaced at the yearly check.
-- **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and its districts rebel more easily ([rebellion](rebellion.md)). It still defends and answers calls.
+- **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and its districts rebel more easily ([rebellion](rebellion.md)). It still defends; diplomatic disposition governs subject calls.
 - **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs.
 
 ## Restoration
 
-- **The claim.** A deposed child becomes the realm's claimant. On their death the claim passes to their eldest child (generation 1). After that it lapses.
+- **The claim.** A deposed child or the ruler overthrown in a [throne war](rebellion.md#throne-wars) becomes the realm's claimant. On their death the claim passes to their eldest child (generation 1). After that it lapses.
 - **When they try.** Once on coming of age, and at every later succession, with chance 50% (generation 0) or 25% (generation 1). The chance doubles against a child ruler or a ruler with claim ≤ 1.
-- **Contest.** The same district contest as a disputed succession. If it succeeds, a district revolts with the claimant ruling the rebel realm (a `rebellion` note marked `restoration`).
+- **Contest.** The same district contest as a disputed succession. If it succeeds, a district leads the revolt with the claimant ruling the rebel realm (a `rebellion` note marked `restoration`); its district backers join it in a throne war.
 - **End of the claim.** A revolt uses it up. It also ends if the claimant takes the throne, or lapses if the realm stops being sovereign.
 
 ## Patricians

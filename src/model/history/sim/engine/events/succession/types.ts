@@ -21,6 +21,7 @@ export interface PretenderParams {
 	state: HistoryState
 	realm: number
 	seat: number
+	supportingSeats: number[]
 	pretender: number
 	// A deposed ruler's line pressing its claim.
 	restoration: boolean

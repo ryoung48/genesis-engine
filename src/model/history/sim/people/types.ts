@@ -54,6 +54,7 @@ export type SeatChangeReason =
 	| "usurpation"
 	| "rebellion"
 	| "restoration"
+	| "regime change"
 	| "union"
 	| "territorial change"
 	| "district grant"

@@ -192,6 +192,7 @@ function runBattle({
 				Math.round(member.force),
 			),
 			deployedRelations: result.relations,
+			deployedRoles: result.roles,
 			attackerLosses: 100 * result.attackerLossShare,
 			defenderLosses: 100 * result.defenderLossShare,
 			plunder: loot,

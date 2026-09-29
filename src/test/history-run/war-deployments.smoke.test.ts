@@ -13,7 +13,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		numPoints: 30000,
 	})
 	const war = engine.wars.find(
-		(candidate) => candidate.endTime === undefined && !candidate.rebel,
+		(candidate) =>
+			candidate.endTime === undefined && candidate.goal === "conquest",
 	)
 	expect(war).toBeDefined()
 	if (!war) return
@@ -34,7 +35,10 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		attacker: war.attacker,
 		defender: weak,
 		startTime: engine.time,
-		rebel: false,
+		goal: "conquest",
+		backers: [],
+		refusedCalls: new Set(),
+		originalCrownRuler: -1,
 		deployed: {},
 		occupied: [],
 		allies: new Set(),
@@ -81,7 +85,8 @@ it("changes each side's losses when the battle outcome changes", () => {
 	const winning = HISTORY_RUN.createEngine(options).engine
 	const losing = HISTORY_RUN.createEngine(options).engine
 	const winningWar = winning.wars.find(
-		(candidate) => candidate.endTime === undefined && !candidate.rebel,
+		(candidate) =>
+			candidate.endTime === undefined && candidate.goal === "conquest",
 	)
 	expect(winningWar).toBeDefined()
 	if (!winningWar) return

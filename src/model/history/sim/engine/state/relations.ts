@@ -1,15 +1,15 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
-import { FIELDS } from "@/model/history/sim/engine/fields"
-import {
-	type Relation,
-	rel as relationKind,
-} from "@/model/history/sim/engine/state/index"
+import { decodeRelation, FIELDS } from "@/model/history/sim/engine/fields"
+import { rel as relationKind } from "@/model/history/sim/engine/state/index"
 import type {
 	CanAllyParams,
+	Disposition,
 	GetRelationParams,
 	GetRulerRelationParams,
 	GetSovereignParams,
 	IsSovereignParams,
+	Relation,
+	SetDispositionParams,
 	SetRelationParams,
 } from "@/model/history/sim/engine/state/types"
 
@@ -17,10 +17,34 @@ export function getRelation({ state, a, b }: GetRelationParams): Relation {
 	return FIELDS.rel.get({ state, a, b })
 }
 
+export function getDisposition({
+	state,
+	a,
+	b,
+}: GetRelationParams): Disposition {
+	return FIELDS.disp.get({ state, a, b })
+}
+
+export function setDisposition(params: SetDispositionParams): void {
+	FIELDS.disp.set(params)
+}
+
 export function setRelation({ state, a, b, rel }: SetRelationParams): void {
 	const old = getRelation({ state, a: b, b: a })
 	if (old === rel) return
 	FIELDS.rel.set({ state, a, b, rel })
+	if (old === relationKind.ALLY && rel !== relationKind.ALLY)
+		state.events.push({
+			tag: "alliance ended",
+			time: state.time,
+			data: { a, b },
+		})
+	if (old !== relationKind.ALLY && rel === relationKind.ALLY)
+		state.events.push({
+			tag: "alliance formed",
+			time: state.time,
+			data: { a, b },
+		})
 	if (isSubjectLink(old) || isSubjectLink(rel)) {
 		pruneAlliances({ state, nation: a })
 		pruneAlliances({ state, nation: b })
@@ -82,8 +106,11 @@ function pruneAlliances({ state, nation }: GetRulerRelationParams): void {
 		if (
 			getRelation({ state, a: nation, b: other }) === relationKind.ALLY &&
 			!canAlly({ state, a: nation, b: other })
-		)
-			setRelation({ state, a: nation, b: other, rel: relationKind.FRIENDLY })
+		) {
+			setRelation({ state, a: nation, b: other, rel: relationKind.NONE })
+			if (getDisposition({ state, a: nation, b: other }) === "TRUSTED")
+				setDisposition({ state, a: nation, b: other, disposition: "FRIENDLY" })
+		}
 }
 
 export function getRulerRelation({
@@ -98,7 +125,7 @@ export function getRulerRelation({
 	for (const other of state.relationColumns[nation]) {
 		if (other === nation || state.desolate[other]) continue
 		if (ruler >= 0 && other > ruler) continue
-		const relation = rels[base + other] as Relation
+		const relation = decodeRelation(rels[base + other])
 		if (
 			relation === relationKind.OVERLORD ||
 			relation === relationKind.PU_SENIOR

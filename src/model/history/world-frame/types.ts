@@ -18,7 +18,6 @@ export interface NationRelations {
 	allies: number[]
 	guarantees: number[]
 	royalMarriages: number[]
-	rivals: number[]
 }
 
 export interface NationFrame {

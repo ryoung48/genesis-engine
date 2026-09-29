@@ -2,7 +2,8 @@ import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
-import { FIELDS } from "@/model/history/sim/engine/fields"
+import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
+import { FIELDS, RELATION_CODE } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import type {
@@ -22,6 +23,7 @@ import type {
 	LogCoalitionParams,
 	LossShareParams,
 	MemberDeploymentsParams,
+	MemberRolesParams,
 	MobilizeParams,
 	NationParams,
 	PlunderParams,
@@ -203,12 +205,55 @@ function upkeep({ state, nation }: NationParams): number {
 // An exhausted realm makes a separate peace: it neither joins nor stays in
 // its partners' wars.
 function warAllies({ war, ...params }: WarAlliesParams): number[] {
-	return STATE.getWarAllies(params).filter(
-		(ally) =>
+	const ordinary = STATE.getWarAllies(params)
+	const { rebels } = war ? STATE.warSides({ war }) : { rebels: -1 }
+	const candidates =
+		params.nation === rebels && war
+			? [...new Set([...ordinary, ...war.backers])]
+			: ordinary
+	return candidates.filter((ally) => {
+		if (!STATE.isSovereign({ state: params.state, p: ally })) return false
+		if (war?.backers.includes(ally) && params.nation !== rebels) return false
+		if (war && !war.backers.includes(ally)) {
+			const tie = STATE.getRelation({
+				state: params.state,
+				a: params.nation,
+				b: ally,
+			})
+			const disposition = STATE.getDisposition({
+				state: params.state,
+				a: params.nation,
+				b: ally,
+			})
+			const answers =
+				tie === STATE.rel.ALLY
+					? disposition !== STATE.disp.RIVAL &&
+						disposition !== STATE.disp.SUSPICIOUS
+					: tie !== STATE.rel.VASSAL ||
+						VASSALAGE.answers({
+							state: params.state,
+							overlord: params.nation,
+							vassal: ally,
+							attacking: params.type === "offensive",
+						})
+			if (!answers) {
+				if (!war.refusedCalls.has(ally)) {
+					war.refusedCalls.add(ally)
+					params.state.events.push({
+						tag: "call refused",
+						time: params.state.time,
+						data: { war: war.idx, nation: ally, leader: params.nation },
+					})
+				}
+				return false
+			}
+		}
+		return (
 			!exhausted({ state: params.state, nation: ally }) &&
 			(war?.allies.has(ally) ||
-				FIELDS.prov.treasury.get({ state: params.state, p: ally }) >= 0),
-	)
+				FIELDS.prov.treasury.get({ state: params.state, p: ally }) >= 0)
+		)
+	})
 }
 
 function logCoalition({ state, war }: LogCoalitionParams): void {
@@ -230,7 +275,7 @@ function logCoalition({ state, war }: LogCoalitionParams): void {
 	JOURNAL.coalition({
 		state,
 		warId: war.idx,
-		rebel: war.rebel,
+		goal: war.goal,
 		attackers: [war.attacker, ...attackers],
 		defenders: [war.defender, ...defenders],
 	})
@@ -502,11 +547,24 @@ function leadRelations({ state, coalitions }: LeadRelationsParams): number[] {
 		members.map((member) =>
 			member.nation === members[0].nation
 				? -1
-				: STATE.getRelation({
-						state,
-						a: members[0].nation,
-						b: member.nation,
-					}),
+				: RELATION_CODE[
+						STATE.getRelation({
+							state,
+							a: members[0].nation,
+							b: member.nation,
+						})
+					],
+		),
+	)
+}
+
+function memberRoles({
+	war,
+	coalitions,
+}: MemberRolesParams): ("backer" | null)[] {
+	return coalitions.flatMap(({ members }) =>
+		members.map((member) =>
+			war.backers.includes(member.nation) ? "backer" : null,
 		),
 	)
 }
@@ -524,6 +582,7 @@ function deploymentsOf({
 		defenderDeployed: totalForce(defending),
 		deployments: [...attacking, ...defending],
 		relations: leadRelations({ state, coalitions: [attackers, defenders] }),
+		roles: memberRoles({ war, coalitions: [attackers, defenders] }),
 	}
 }
 
@@ -548,6 +607,7 @@ function mobilize({ state, war }: MobilizeParams): void {
 			deployedNations: members.map((member) => member.nation),
 			deployedTroops: members.map((member) => Math.round(member.force)),
 			deployedRelations: leadRelations({ state, coalitions }),
+			deployedRoles: memberRoles({ war, coalitions }),
 		},
 	})
 }

@@ -5,7 +5,6 @@ import type {
 	JournalTransaction,
 	PendingJournal,
 } from "@/model/history/sim/engine/journal/types"
-import type { Relation } from "@/model/history/sim/engine/state"
 import type {
 	PeopleState,
 	SeatChangeReason,
@@ -28,12 +27,29 @@ export interface RebuildAssignmentParams {
 	state: HistoryState
 }
 
+export type WarGoal = "conquest" | "independence" | "throne"
+export type Relation =
+	| "NONE"
+	| "OVERLORD"
+	| "VASSAL"
+	| "PU_SENIOR"
+	| "PU_JUNIOR"
+	| "ALLY"
+	| "WAR"
+	| "COLONY"
+export type Disposition =
+	| "RIVAL"
+	| "SUSPICIOUS"
+	| "NEUTRAL"
+	| "FRIENDLY"
+	| "TRUSTED"
+
 export interface StartWarParams {
 	state: HistoryState
 	attacker: number
 	defender: number
 	rng: SharedRng
-	rebel: boolean
+	goal: WarGoal
 }
 
 export interface War {
@@ -42,9 +58,11 @@ export interface War {
 	defender: number
 	startTime: number
 	endTime?: number
-	rebel: boolean
+	goal: WarGoal
+	backers: number[]
+	refusedCalls: Set<number>
+	originalCrownRuler: number
 	deployed: Record<number, number>
-	/** Provinces currently occupied by the attacker in this war. */
 	occupied: number[]
 	// Allies in the war's last logged coalition; they stay until exhausted,
 	// while newcomers must also be out of debt to join.
@@ -58,13 +76,15 @@ export interface Indemnity {
 }
 
 interface ActiveWarOptions {
-	rebel?: boolean
+	// [JUSTIFICATION] Fixtures and seeded wars default to conquest.
+	goal?: WarGoal
 	startTime?: number
 	nextBattleTime?: number
 	occupied?: number[]
 	rebellion?: {
 		overlord: number
 		subject: number
+		goal: WarGoal
 	}
 }
 
@@ -79,7 +99,10 @@ interface LeaderRuntime {
 export interface EngineNote {
 	tag: string
 	time: number
-	data: Record<string, number | number[] | string | boolean | undefined>
+	data: Record<
+		string,
+		number | number[] | string | (string | null)[] | boolean | undefined
+	>
 }
 
 export interface RealmCacheEntry {
@@ -104,6 +127,7 @@ export interface HistoryState {
 	childList: Int32Array
 	sovereignCurrent: Int32Array
 	relationsCurrent: Uint8Array
+	dispositionsCurrent: Uint8Array
 	relationColumns: Set<number>[]
 	hierarchyDirty: boolean
 	hierarchyVersion: number
@@ -206,6 +230,16 @@ export interface ResolveWarParams {
 	state: HistoryState
 	war: War
 	transferred: number[]
+	receiver: number
+}
+
+export interface WarSidesParams {
+	war: War
+}
+
+export interface WarSides {
+	rebels: number
+	crown: number
 }
 
 export interface DiffYearsParams {
@@ -240,6 +274,15 @@ export interface SetRelationParams {
 	a: number
 	b: number
 	rel: Relation
+}
+
+export interface SetDispositionParams {
+	state: HistoryState
+	a: number
+	b: number
+	disposition: Disposition
+	// [JUSTIFICATION] Low-level state fixtures can set a disposition without an event cause.
+	cause?: string
 }
 
 export interface GetRulerRelationParams {
@@ -297,6 +340,10 @@ export interface ReleaseProvinceParams {
 	reason: SeatChangeReason
 }
 
+export interface ReleaseFactionParams extends ReleaseProvinceParams {
+	supporters: number[]
+}
+
 export interface IsProvinceConnectedToParentParams {
 	state: HistoryState
 	province: number
@@ -313,6 +360,11 @@ export interface RepartitionNationParams {
 	state: HistoryState
 	nation: number
 	subjects: number[]
+}
+
+export interface ClearRealmDiplomacyParams {
+	state: HistoryState
+	nation: number
 }
 
 export interface ApplyDerivedParentsParams {

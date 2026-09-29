@@ -284,12 +284,6 @@ export function useNationWikiData(
 					: [],
 			],
 			[
-				"Rivals",
-				nationState?.relations.rivals
-					? nationState.relations.rivals.filter(hasOwnedProvinces)
-					: [],
-			],
-			[
 				"Guarantees",
 				nationState?.relations.guarantees
 					? nationState.relations.guarantees.filter(hasOwnedProvinces)
@@ -1134,11 +1128,9 @@ export function useNationWikiData(
 					? "guarantee"
 					: event.kind.startsWith("royalMarriage")
 						? "royal marriage"
-						: event.kind.startsWith("rival")
-							? "rivalry"
-							: event.kind.startsWith("union")
-								? "personal union"
-								: "dependency"
+						: event.kind.startsWith("union")
+							? "personal union"
+							: "dependency"
 			let description: string
 			if (
 				event.kind === "vassalStart" ||

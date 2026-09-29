@@ -21,7 +21,6 @@ function emptyRelations(): NationRelations {
 		allies: [],
 		guarantees: [],
 		royalMarriages: [],
-		rivals: [],
 	}
 }
 

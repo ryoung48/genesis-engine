@@ -14,6 +14,7 @@ export interface SuccessionChoice {
 	claim: number
 	// District seat of a losing claimant who rises as pretender, or -1.
 	pretenderSeat: number
+	supportingSeats: number[]
 }
 
 export interface Elector {
@@ -83,8 +84,10 @@ export interface ChallengeParams {
 export interface ContestResult {
 	// The claimant won the pretender share of the districts.
 	backed: boolean
+	share: number
 	// District seat that rises for the claimant, or -1.
 	seat: number
+	supportingSeats: number[]
 }
 
 export interface TallyResult {

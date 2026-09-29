@@ -23,6 +23,7 @@ import type {
 	RatioParams,
 	SampleParams,
 	SummarizeParams,
+	TieKindParams,
 	TreasuryRole,
 	WarEnding,
 	WarEndingParams,
@@ -35,9 +36,19 @@ const ROLES: TreasuryRole[] = ["vassal", "overlord", "free"]
 
 const RELATION_NAMES = Object.fromEntries(
 	Object.entries(STATE.rel).map(([name, value]) => [value, name]),
-) as Record<number, string>
+) as Record<string, string>
 
 const LONG_PEACE_YEARS = 20
+
+function tieKind({
+	tie,
+}: TieKindParams): "alliance" | "vassal" | "union" | "war" | null {
+	if (tie === STATE.rel.ALLY) return "alliance"
+	if (tie === STATE.rel.VASSAL || tie === STATE.rel.OVERLORD) return "vassal"
+	if (tie === STATE.rel.PU_JUNIOR || tie === STATE.rel.PU_SENIOR) return "union"
+	if (tie === STATE.rel.WAR) return "war"
+	return null
+}
 
 const FISCAL_PROBE: FiscalProbe = {
 	surplus: ECONOMY.surplus,
@@ -61,12 +72,38 @@ function emptyWindow(): MilitaryWindow {
 		manpowerAfterWar: byTradition<number[]>(() => []),
 		warStarts: byTradition(() => 0),
 		rebellions: byTradition(() => 0),
+		rebellionsByGoal: {
+			independence: byTradition(() => 0),
+			throne: byTradition(() => 0),
+		},
+		backingRepaid: { vassal: 0, alliance: 0, trusted: 0, disposition: 0 },
+		backersViaOverlord: 0,
+		backersOverlord: 0,
+		backersDisloyalVassal: 0,
+		tributeWithheld: 0,
+		callsRefused: 0,
+		dispositionAid: 0,
+		dispositionAbandoned: 0,
+		throneVassalFreed: 0,
+		vassalsChained: 0,
+		tiePairs: {},
+		firstTiePairs: {},
+		lastTiePairs: {},
+		dispositionPairs: {},
+		vassalDispositionPairs: {},
+		lastDispositionPairs: {},
+		lastVassalDispositionPairs: {},
 		vassalageEnded: 0,
+		vassalageEndedByDisposition: {},
+		vassalageEndedByCause: {},
 		counterWars: 0,
 		peacefulAnnexations: 0,
 		vassalSamples: 0,
 		vassalPairs: 0,
 		alliances: 0,
+		alliancesFormed: 0,
+		alliancesEnded: 0,
+		vassalsFormed: 0,
 		invalidAlliances: 0,
 		relationPairs: {},
 		completed: [],
@@ -258,6 +295,13 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 		const defender = data.defender as number
 		const tradition = ECONOMY.armyTradition({ state: engine, p: attacker })
 		tracker.warTradition.set(data.war as number, tradition)
+		const startedWar = engine.wars[data.war as number]
+		const crown = STATE.warSides({ war: startedWar }).crown
+		tracker.warInVassal.set(
+			data.war as number,
+			crown >= 0 &&
+				STATE.diplomaticOverlord({ state: engine, nation: crown }) >= 0,
+		)
 		window.warStarts[tradition]++
 		if (
 			tracker.vassalageEnded.some(
@@ -282,13 +326,56 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 		}
 	} else if (note.tag === "rebellion") {
 		if (note.time < engine.time) return
-		window.rebellions[
-			ECONOMY.armyTradition({ state: engine, p: data.overlord as number })
+		const tradition = ECONOMY.armyTradition({
+			state: engine,
+			p: data.overlord as number,
+		})
+		window.rebellions[tradition]++
+		window.rebellionsByGoal[data.goal === "throne" ? "throne" : "independence"][
+			tradition
 		]++
+	} else if (note.tag === "backing repaid") {
+		window.backingRepaid[data.pact as keyof typeof window.backingRepaid]++
+	} else if (note.tag === "rebels backed") {
+		if (data.via === "overlord") window.backersViaOverlord++
+		if (
+			data.backer ===
+			STATE.diplomaticOverlord({ state: engine, nation: data.crown as number })
+		)
+			window.backersOverlord++
+		if (
+			STATE.diplomaticOverlord({
+				state: engine,
+				nation: data.backer as number,
+			}) === data.crown
+		)
+			window.backersDisloyalVassal++
+	} else if (note.tag === "tribute withheld") {
+		window.tributeWithheld++
+	} else if (note.tag === "alliance formed") {
+		window.alliancesFormed++
+	} else if (note.tag === "alliance ended") {
+		window.alliancesEnded++
+	} else if (note.tag === "vassalized") {
+		window.vassalsFormed++
+	} else if (note.tag === "call refused") {
+		window.callsRefused++
+	} else if (note.tag === "disposition changed") {
+		if (data.cause === "aid") window.dispositionAid++
+		if (data.cause === "abandoned") window.dispositionAbandoned++
 	} else if (note.tag === "peaceful annexation") {
 		window.peacefulAnnexations++
 	} else if (note.tag === "vassalage ended") {
 		window.vassalageEnded++
+		const cause = typeof data.cause === "string" ? data.cause : "structural"
+		window.vassalageEndedByCause[cause] =
+			(window.vassalageEndedByCause[cause] ?? 0) + 1
+		if (typeof data.disposition === "string") {
+			const level = data.disposition
+			window.vassalageEndedByDisposition[level] =
+				(window.vassalageEndedByDisposition[level] ?? 0) + 1
+		}
+		if (data.cause === "regime change") window.throneVassalFreed++
 		tracker.vassalageEnded = tracker.vassalageEnded.filter(
 			(ended) => ended.time === note.time,
 		)
@@ -333,10 +420,14 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 			ending: warEnding({ engine, note }),
 			outcome: data.outcome as PeaceOutcome,
 			payment: data.payment as number,
-			rebel: war.rebel,
-			rebelIndependent: war.rebel && data.winner === war.defender,
+			goal: war.goal,
+			backers: war.backers.length,
+			inVassal: tracker.warInVassal.get(warIdx) ?? false,
+			rebelIndependent:
+				war.goal === "independence" && data.winner === war.defender,
 		})
 		tracker.warTradition.delete(warIdx)
+		tracker.warInVassal.delete(warIdx)
 		tracker.warBattles.delete(warIdx)
 		tracker.lastStrength.delete(warIdx)
 	}
@@ -346,6 +437,7 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 	const tracker = {
 		probe,
 		warTradition: new Map(),
+		warInVassal: new Map(),
 		warBattles: new Map(),
 		lastStrength: new Map(),
 		firstBattle: new Set<number>(),
@@ -353,6 +445,26 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 		recovering: new Map(),
 		peaceYears: new Map(),
 		window: emptyWindow(),
+	}
+	const initial = tracker.window.firstTiePairs
+	for (let nation = 0; nation < engine.P; nation++) {
+		if (
+			engine.desolate[nation] ||
+			!STATE.isSovereign({ state: engine, p: nation })
+		)
+			continue
+		for (const other of engine.relationColumns[nation]) {
+			if (
+				other <= nation ||
+				engine.desolate[other] ||
+				!STATE.isSovereign({ state: engine, p: other })
+			)
+				continue
+			const kind = tieKind({
+				tie: STATE.getRelation({ state: engine, a: nation, b: other }),
+			})
+			if (kind) initial[kind] = (initial[kind] ?? 0) + 1
+		}
 	}
 	const events = engine.events
 	const push = events.push.bind(events)
@@ -491,6 +603,9 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 	}
 	if (!sampleRelations) return
 	window.vassalSamples++
+	const beforeTies = { ...window.tiePairs }
+	const beforeDispositions = { ...window.dispositionPairs }
+	const beforeVassalDispositions = { ...window.vassalDispositionPairs }
 	for (let nation = 0; nation < engine.P; nation++) {
 		if (
 			engine.desolate[nation] ||
@@ -501,23 +616,42 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 			if (
 				STATE.getRelation({ state: engine, a: other, b: nation }) ===
 				STATE.rel.VASSAL
-			)
+			) {
 				window.vassalPairs++
+				const level = STATE.getDisposition({
+					state: engine,
+					a: nation,
+					b: other,
+				})
+				window.vassalDispositionPairs[level] =
+					(window.vassalDispositionPairs[level] ?? 0) + 1
+				if (STATE.diplomaticOverlord({ state: engine, nation: other }) >= 0)
+					window.vassalsChained++
+			}
 		for (const other of engine.relationColumns[nation]) {
 			if (
 				other <= nation ||
 				engine.desolate[other] ||
-				!STATE.isSovereign({ state: engine, p: other }) ||
-				STATE.getRelation({ state: engine, a: nation, b: other }) !==
-					STATE.rel.ALLY
+				!STATE.isSovereign({ state: engine, p: other })
 			)
 				continue
+			const tie = STATE.getRelation({ state: engine, a: nation, b: other })
+			const kind = tieKind({ tie })
+			if (kind) window.tiePairs[kind] = (window.tiePairs[kind] ?? 0) + 1
+			if (tie !== STATE.rel.ALLY) continue
 			window.alliances++
 			if (!STATE.canAlly({ state: engine, a: nation, b: other }))
 				window.invalidAlliances++
 		}
 		for (const other of STATE.getNationNeighbors({ state: engine, nation })) {
 			if (other < nation) continue
+			const disposition = STATE.getDisposition({
+				state: engine,
+				a: nation,
+				b: other,
+			})
+			window.dispositionPairs[disposition] =
+				(window.dispositionPairs[disposition] ?? 0) + 1
 			const name =
 				RELATION_NAMES[
 					STATE.getRelation({ state: engine, a: nation, b: other })
@@ -525,6 +659,25 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 			window.relationPairs[name] = (window.relationPairs[name] ?? 0) + 1
 		}
 	}
+	const censusTies = Object.fromEntries(
+		Object.entries(window.tiePairs).map(([kind, count]) => [
+			kind,
+			count - (beforeTies[kind] ?? 0),
+		]),
+	)
+	window.lastTiePairs = censusTies
+	window.lastDispositionPairs = Object.fromEntries(
+		Object.entries(window.dispositionPairs).map(([level, count]) => [
+			level,
+			count - (beforeDispositions[level] ?? 0),
+		]),
+	)
+	window.lastVassalDispositionPairs = Object.fromEntries(
+		Object.entries(window.vassalDispositionPairs).map(([level, count]) => [
+			level,
+			count - (beforeVassalDispositions[level] ?? 0),
+		]),
+	)
 }
 
 function summarize({ tracker }: SummarizeParams): MilitaryReport {
@@ -549,6 +702,9 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		report[`warStarts.perSovereign.${tradition}`] =
 			window.warStarts[tradition] / Math.max(1e-9, sovereigns)
 		report[`rebellions.n.${tradition}`] = window.rebellions[tradition]
+		for (const goal of ["independence", "throne"] as const)
+			report[`rebellions.${goal}.n.${tradition}`] =
+				window.rebellionsByGoal[goal][tradition]
 		report[`rebellions.perSovereign.${tradition}`] =
 			window.rebellions[tradition] / Math.max(1e-9, sovereigns)
 		const raids = window.raids[tradition]
@@ -634,11 +790,32 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	const totalSovereigns =
 		TRADITIONS.reduce((sum, t) => sum + window.sovereignYears[t], 0) / 100
 	report["vassalageEnded.n"] = window.vassalageEnded
+	for (const [cause, count] of Object.entries(window.vassalageEndedByCause))
+		report[`vassalage.ended.cause.${cause}`] = count
 	report["vassals.mean"] =
 		window.vassalPairs / Math.max(1, window.vassalSamples)
 	report["alliances.mean"] =
 		window.alliances / Math.max(1, window.vassalSamples)
 	report["alliances.invalid"] = window.invalidAlliances
+	const sovereignYears = Math.max(1, totalSovereigns * 100)
+	report["ties.alliance.formed.perSovereignYear"] =
+		window.alliancesFormed / sovereignYears
+	report["ties.alliance.ended.perSovereignYear"] =
+		window.alliancesEnded / sovereignYears
+	report["ties.vassal.formed.perSovereignYear"] =
+		window.vassalsFormed / sovereignYears
+	const vassalTiesEnded = Math.max(
+		0,
+		(window.firstTiePairs.vassal ?? 0) +
+			window.vassalsFormed -
+			(window.lastTiePairs.vassal ?? 0),
+	)
+	report["ties.vassal.ended.perSovereignYear"] =
+		vassalTiesEnded / sovereignYears
+	report["vassalage.ended.implicit.n"] = Math.max(
+		0,
+		vassalTiesEnded - window.vassalageEnded,
+	)
 	report["vassalageEnded.perVassal"] =
 		window.vassalageEnded /
 		Math.max(1e-9, window.vassalPairs / Math.max(1, window.vassalSamples))
@@ -702,7 +879,9 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		(sum, war) => sum + (war.outcome === "bought peace" ? war.payment : 0),
 		0,
 	)
-	const rebelWars = completed.filter((war) => war.rebel)
+	const rebelWars = completed.filter((war) => war.goal === "independence")
+	const allRebelWars = completed.filter((war) => war.goal !== "conquest")
+	const throneWars = completed.filter((war) => war.goal === "throne")
 	report["rebelWars.completed.n"] = rebelWars.length
 	report["rebelWars.independent.n"] = rebelWars.filter(
 		(war) => war.rebelIndependent,
@@ -711,6 +890,87 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		count: report["rebelWars.independent.n"],
 		total: rebelWars.length,
 	})
+	report["throneWars.completed.n"] = throneWars.length
+	for (const [outcome, name] of [
+		["regime change", "regimeChange"],
+		["submission", "submission"],
+		["cession", "cession"],
+	] as const)
+		report[`throneWars.${name}.n`] = throneWars.filter(
+			(war) => war.outcome === outcome,
+		).length
+	report["rebelWars.backed.share"] = share(
+		allRebelWars.map((war) => war.backers > 0),
+	)
+	report["backers.perBackedWar"] =
+		allRebelWars.reduce((sum, war) => sum + war.backers, 0) /
+		Math.max(1, allRebelWars.filter((war) => war.backers > 0).length)
+	for (const backed of [true, false]) {
+		const wars = allRebelWars.filter((war) => war.backers > 0 === backed)
+		report[`rebelWars.successShare.${backed ? "backed" : "unbacked"}`] = share(
+			wars.map(
+				(war) =>
+					war.outcome === "independence" ||
+					war.outcome === "regime change" ||
+					(war.outcome === "cession" && war.goal === "throne"),
+			),
+		)
+	}
+	report["rebelWars.inVassal.n"] = allRebelWars.filter(
+		(war) => war.inVassal,
+	).length
+	report["backers.viaOverlord.n"] = window.backersViaOverlord
+	report["backers.overlord.n"] = window.backersOverlord
+	report["backers.disloyalVassal.n"] = window.backersDisloyalVassal
+	report["throneWars.vassalFreed.n"] = window.throneVassalFreed
+	for (const [pact, count] of Object.entries(window.backingRepaid))
+		report[`backing.repaid.${pact}.n`] = count
+	report["tribute.withheld.n"] = window.tributeWithheld
+	report["calls.refused.n"] = window.callsRefused
+	report["disposition.aid.n"] = window.dispositionAid
+	report["disposition.abandoned.n"] = window.dispositionAbandoned
+	report["vassals.chained.n"] =
+		window.vassalsChained / Math.max(1, window.vassalSamples)
+	for (const [level, count] of Object.entries(
+		window.vassalageEndedByDisposition,
+	))
+		report[`vassalage.ended.perVassalYear.${level.toLowerCase()}`] =
+			count / Math.max(1, window.vassalDispositionPairs[level] ?? 0)
+	for (const [kind, count] of Object.entries(window.tiePairs))
+		report[`ties.${kind}.n`] = count / Math.max(1, window.vassalSamples)
+	for (const kind of ["alliance", "vassal", "union", "war"])
+		for (const [time, counts] of [
+			["initial", window.firstTiePairs],
+			["horizon", window.lastTiePairs],
+		] as const)
+			report[`ties.${kind}.${time}.n`] = counts[kind] ?? 0
+	const dispositionTotal = Object.values(window.dispositionPairs).reduce(
+		(sum, n) => sum + n,
+		0,
+	)
+	for (const [level, count] of Object.entries(window.dispositionPairs))
+		report[`dispositions.${level.toLowerCase()}.share`] =
+			count / Math.max(1, dispositionTotal)
+	const horizonDispositionTotal = Object.values(
+		window.lastDispositionPairs,
+	).reduce((sum, n) => sum + n, 0)
+	for (const [level, count] of Object.entries(window.lastDispositionPairs))
+		report[`dispositions.${level.toLowerCase()}.horizon.share`] =
+			count / Math.max(1, horizonDispositionTotal)
+	const vassalDispositionTotal = Object.values(
+		window.vassalDispositionPairs,
+	).reduce((sum, n) => sum + n, 0)
+	for (const [level, count] of Object.entries(window.vassalDispositionPairs))
+		report[`vassals.disposition.${level.toLowerCase()}.share`] =
+			count / Math.max(1, vassalDispositionTotal)
+	const horizonVassalDispositionTotal = Object.values(
+		window.lastVassalDispositionPairs,
+	).reduce((sum, n) => sum + n, 0)
+	for (const [level, count] of Object.entries(
+		window.lastVassalDispositionPairs,
+	))
+		report[`vassals.disposition.${level.toLowerCase()}.horizon.share`] =
+			count / Math.max(1, horizonVassalDispositionTotal)
 	const battles = window.battles
 	report["battles.n"] = battles.length
 	report["battles.perCompletedWar"] =
@@ -811,6 +1071,7 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	report["recovery.years.p50"] = median(window.recoveryYears)
 	report["recovery.censored"] = window.recoveryCensored
 	tracker.window = emptyWindow()
+	tracker.window.firstTiePairs = window.lastTiePairs
 	return report
 }
 

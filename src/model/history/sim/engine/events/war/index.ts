@@ -1,8 +1,10 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
-import { PEACE } from "@/model/history/sim/engine/events/peace"
+import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
+import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { BACKING } from "@/model/history/sim/engine/events/war/backing"
 import { SUBMISSION } from "@/model/history/sim/engine/events/war/submission"
 import type {
 	GetDefenderOccupationCandidatesParams,
@@ -17,8 +19,11 @@ import type {
 } from "@/model/history/sim/engine/events/war/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import { type Relation, STATE } from "@/model/history/sim/engine/state"
-import type { StartWarParams } from "@/model/history/sim/engine/state/types"
+import { STATE } from "@/model/history/sim/engine/state"
+import type {
+	Disposition,
+	StartWarParams,
+} from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
@@ -31,19 +36,12 @@ const FRONT_PROVINCES = 15
 
 const MAX_FRONT_FACTOR = 4
 
-const ATTACK_THRESHOLD: Record<number, number> = {
-	[STATE.rel.WAR]: 0,
-	[STATE.rel.RIVAL]: 0.8,
-	[STATE.rel.SUSPICIOUS]: 0.6,
-	[STATE.rel.NEUTRAL]: 0.45,
-	[STATE.rel.FRIENDLY]: 0.1,
-	[STATE.rel.ALLY]: 0,
-	[STATE.rel.VASSAL]: 0,
-	[STATE.rel.OVERLORD]: 0,
-	[STATE.rel.PU_SENIOR]: 0,
-	[STATE.rel.PU_JUNIOR]: 0,
-	[STATE.rel.NONE]: 0,
-	[STATE.rel.COLONY]: 0,
+const ATTACK_THRESHOLD: Record<Disposition, number> = {
+	[STATE.disp.RIVAL]: 0.8,
+	[STATE.disp.SUSPICIOUS]: 0.6,
+	[STATE.disp.NEUTRAL]: 0.45,
+	[STATE.disp.FRIENDLY]: 0.1,
+	[STATE.disp.TRUSTED]: 0,
 }
 
 function nextEvent({ state, province, rng, years }: NextEventParams): void {
@@ -71,22 +69,24 @@ function listWarTargets({ state, nation }: ListWarTargetsParams): {
 	return STATE.getNationNeighbors({ state, nation })
 		.filter(
 			(nb) =>
-				!PEACE.inTruce({ state, a: nation, b: nb }) &&
+				!TRUCE.active({ state, a: nation, b: nb }) &&
 				!DERIVE.provinceWars({ state, p: nb }).some((idx) => {
 					const war = state.wars[idx]
 					return (
-						war.rebel &&
+						war.goal !== "conquest" &&
 						war.endTime === undefined &&
-						war.defender === nb &&
-						war.attacker !== nation
+						STATE.warSides({ war }).rebels === nb &&
+						war.attacker !== nation &&
+						war.defender !== nation
 					)
 				}),
 		)
 		.map((nb) => {
-			const rel = STATE.getRelation({ state, a: nation, b: nb }) as Relation
+			const tie = STATE.getRelation({ state, a: nation, b: nb })
+			const disposition = STATE.getDisposition({ state, a: nation, b: nb })
 			return {
 				n: nb,
-				threshold: ATTACK_THRESHOLD[rel] ?? 0,
+				threshold: tie === STATE.rel.NONE ? ATTACK_THRESHOLD[disposition] : 0,
 				w: MILITARY.threat({ state, attacker: nation, defender: nb }),
 				hasWar: wars.some((w) => w.defender === nb || w.attacker === nb),
 				d: Math.min(
@@ -144,9 +144,10 @@ function seedWarStage({
 	attacker,
 	defender,
 	rng,
-	rebel,
+	goal,
 	forceOccupied,
 }: SeedWarStageParams): void {
+	const rebel = goal !== "conquest"
 	const occupationCandidates = getDefenderOccupationCandidates({
 		state,
 		attacker,
@@ -192,13 +193,16 @@ function seedWarStage({
 		defender,
 		rng,
 		options: {
-			rebel,
+			goal,
 			startTime,
 			nextBattleTime,
 			occupied,
-			rebellion: rebel ? { overlord: attacker, subject: defender } : undefined,
+			rebellion: rebel
+				? { overlord: attacker, subject: defender, goal }
+				: undefined,
 		},
 	})
+	if (war.goal !== "conquest") BACKING.recruit({ state, war, rng })
 	for (const nation of [attacker, defender])
 		FIELDS.prov.manpower.set({
 			state,
@@ -283,7 +287,7 @@ function seedInterstateWars({ state, rng }: SeedInterstateWarsParams): void {
 			attacker: nation,
 			defender: target.n,
 			rng,
-			rebel: false,
+			goal: "conquest",
 			forceOccupied,
 		})
 		if (forceOccupied) seededOccupiedWar = true
@@ -334,7 +338,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			attacker: sovereignNation,
 			defender: nation,
 			rng,
-			rebel: true,
+			goal: "independence",
 			forceOccupied: false,
 		})
 		seeded++
@@ -344,8 +348,8 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 // Armies take the field when a war is declared.
 function start(params: StartWarParams): void {
 	if (
-		!params.rebel &&
-		PEACE.inTruce({
+		params.goal === "conquest" &&
+		TRUCE.active({
 			state: params.state,
 			a: params.attacker,
 			b: params.defender,
@@ -353,7 +357,11 @@ function start(params: StartWarParams): void {
 	)
 		return
 	const war = STATE.startWar(params)
-	if (war) MILITARY.mobilize({ state: params.state, war })
+	if (war) {
+		if (war.goal !== "conquest")
+			BACKING.recruit({ state: params.state, war, rng: params.rng })
+		MILITARY.mobilize({ state: params.state, war })
+	}
 }
 
 function initWar({ state, rng }: InitWarParams): void {
@@ -378,21 +386,45 @@ function rebel({
 	const threat = MILITARY.rebellionThreat({ state, overlord, subject })
 	if (threat <= REBELLION_THRESHOLD - laxity || rng.random() >= threat)
 		return false
+	const supporters = OVERTHROW.seeks({
+		state,
+		realm: overlord,
+		holder: state.people.rulerOf[subject],
+		rng,
+	})
+	const throne = supporters.length > 0
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
-		data: { overlord, subject, succession },
+		data: {
+			overlord,
+			subject,
+			succession,
+			goal: throne ? "throne" : "independence",
+		},
 	})
-	STATE.releaseProvince({ state, p: subject, rng, reason: "rebellion" })
-	if (rng.random() > threat)
+	if (throne)
+		STATE.releaseFaction({
+			state,
+			p: subject,
+			supporters,
+			rng,
+			reason: "rebellion",
+		})
+	else STATE.releaseProvince({ state, p: subject, rng, reason: "rebellion" })
+	if (throne)
+		start({ state, attacker: subject, defender: overlord, rng, goal: "throne" })
+	else if (rng.random() > threat)
 		start({
 			state,
 			attacker: overlord,
 			defender: subject,
 			rng,
-			rebel: true,
+			goal: "independence",
 		})
-	STATE.fixConnections({ state, nation: subject, rng })
+	else TRUCE.sign({ state, a: overlord, b: subject })
+	if (throne) STATE.fixConnections({ state, nation: overlord, rng })
+	else STATE.fixConnections({ state, nation: subject, rng })
 	return true
 }
 
@@ -426,7 +458,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 					attacker: nation,
 					defender: closest.n,
 					rng,
-					rebel: false,
+					goal: "conquest",
 				})
 			}
 		}

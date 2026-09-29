@@ -250,6 +250,7 @@ describe("battle progress", () => {
 			defenderDeployed: 1000,
 			deployments: [],
 			relations: [],
+			roles: [],
 			attackerLossShare: 0.2,
 			defenderLossShare: 0.01,
 			loserShortfall: 0,
