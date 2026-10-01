@@ -19,11 +19,17 @@ export function getNationProvinces({
 	state,
 	root,
 }: GetNationProvincesParams): number[] {
+	DERIVE.ensureHierarchyClean(state)
 	const result = [root]
 	const stack = [root]
 	while (stack.length > 0) {
 		const current = stack.pop()!
-		for (const child of DERIVE.children({ state, p: current })) {
+		for (
+			let i = state.childOffset[current];
+			i < state.childOffset[current + 1];
+			i++
+		) {
+			const child = state.childList[i]
 			result.push(child)
 			stack.push(child)
 		}

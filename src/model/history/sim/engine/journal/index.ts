@@ -158,15 +158,13 @@ function peopleRows(state: HistoryState): JournalPeople {
 			cause,
 		})),
 	}
-	state.people.log = {
-		persons: [],
-		marriages: [],
-		seats: [],
-		deaths: [],
-		pregnancies: [],
-		betrothals: [],
-		betrothalEnds: [],
-	}
+	log.persons.length = 0
+	log.marriages.length = 0
+	log.seats.length = 0
+	log.deaths.length = 0
+	log.pregnancies.length = 0
+	log.betrothals.length = 0
+	log.betrothalEnds.length = 0
 	return rows
 }
 
@@ -177,6 +175,24 @@ function flush({
 	initial,
 }: FlushJournalParams): void {
 	const pendingJournal = state.pendingJournal
+	const log = state.people.log
+	if (
+		!initial &&
+		!census &&
+		state.events.length === noteCursor &&
+		pendingJournal.parents.size === 0 &&
+		pendingJournal.relations.size === 0 &&
+		pendingJournal.occupations.size === 0 &&
+		pendingJournal.coalitions.length === 0 &&
+		log.persons.length === 0 &&
+		log.marriages.length === 0 &&
+		log.seats.length === 0 &&
+		log.deaths.length === 0 &&
+		log.pregnancies.length === 0 &&
+		log.betrothals.length === 0 &&
+		log.betrothalEnds.length === 0
+	)
+		return
 	const parents = [...pendingJournal.parents.values()].filter(
 		(change) => change.before !== change.after,
 	)
@@ -267,7 +283,10 @@ function flush({
 			census: keyframe,
 		})
 	}
-	state.pendingJournal = pending()
+	pendingJournal.parents.clear()
+	pendingJournal.relations.clear()
+	pendingJournal.occupations.clear()
+	pendingJournal.coalitions = []
 }
 
 export const JOURNAL = {
