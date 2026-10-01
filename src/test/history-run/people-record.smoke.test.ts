@@ -1,5 +1,6 @@
 import { expect, it } from "vitest"
 import { DATE } from "@/model/history/earth/date"
+import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
@@ -230,6 +231,6 @@ it("records rulers, their families and seat tenures consistently", () => {
 		const view = PERSON_QUERY.view({ people, id: ruler, timeMs })
 		expect(view?.tenures.some((tenure) => tenure.endTimeMs === null)).toBe(true)
 		expect(PERSON_QUERY.health({ people, id: ruler, timeMs })).not.toBeNull()
-		expect(people.persons.get(ruler)?.name).toBeTruthy()
+		expect(PERSON_NAMES.person({ people, person: ruler })?.name).toBeTruthy()
 	}
 }, 600_000)

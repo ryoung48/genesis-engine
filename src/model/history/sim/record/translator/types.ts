@@ -1,4 +1,4 @@
-import type { HistoryState } from "@/model/history/record/types"
+import type { HistoryState, RevoltComment } from "@/model/history/record/types"
 import type {
 	JournalDeath,
 	JournalTransaction,
@@ -19,7 +19,7 @@ export interface RebelWar {
 }
 
 export interface OwnerNoteReasons {
-	revolts: Map<number, string>
+	revolts: Map<number, RevoltComment>
 	outcomes: Map<number, string>
 	annexations: Map<number, string>
 	touchedRoots: Set<number>
@@ -111,11 +111,6 @@ export interface RoyalMarriage {
 export interface RulerDeathParams {
 	translator: ProceduralTranslator
 	death: JournalDeath
-}
-
-export interface PersonNameParams {
-	translator: ProceduralTranslator
-	person: number
 }
 
 export interface ContributionsParams {

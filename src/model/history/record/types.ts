@@ -17,11 +17,20 @@ import type {
 } from "@/model/history/world-frame/types"
 import type { GenesisProvinces } from "@/model/society/types"
 
+export interface RevoltComment {
+	nation: string
+	cause: string
+	person: number
+	throne: boolean
+}
+
+export type HistoryComment = string | RevoltComment | null
+
 export interface HistoryEvent {
 	timeMs: number
 	kind: string
 	payload: Record<string, unknown>
-	comment: string | null
+	comment: HistoryComment
 }
 
 export interface ProvinceEventLog {

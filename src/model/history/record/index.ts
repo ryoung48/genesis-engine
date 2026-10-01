@@ -1,6 +1,7 @@
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
+import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
 	Battle,
@@ -8,6 +9,7 @@ import type {
 	BuildEarthRecordParams,
 	CreateHistoryStateParams,
 	FrameAtParams,
+	HistoryEvent,
 	HistoryEvents,
 	HistoryRecord,
 	HistoryState,
@@ -514,7 +516,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 				(reform) => !/^early_gov_reform_\d+$/.test(reform),
 			) ?? ""
 		let capitalRaw = log?.base.capitalProvinceId ?? -1
-		let ruler: NationFrame["ruler"] = null
+		let rulerPayload: HistoryEvent["payload"] | null = null
 		let isElector = false
 		for (const event of log?.events ?? []) {
 			if (event.timeMs > timeMs) break
@@ -533,11 +535,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 				governmentReform = ""
 			else if (event.kind === "capitalChange")
 				capitalRaw = (event.payload.provinceId as number | null) ?? -1
-			else if (event.kind === "rulerChange")
-				ruler = {
-					name: event.payload.name as string,
-					dynasty: (event.payload.dynasty as string | undefined) ?? null,
-				}
+			else if (event.kind === "rulerChange") rulerPayload = event.payload
 			else if (event.kind === "elector")
 				isElector = event.payload.elector as boolean
 		}
@@ -556,7 +554,9 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			capitalProvince,
 			government,
 			governmentReform,
-			ruler,
+			ruler: rulerPayload
+				? PERSON_NAMES.ruler({ people: record.people, payload: rulerPayload })
+				: null,
 			birthTimeMs: identity.birthTimeMs,
 			deathTimeMs: identity.deathTimeMs,
 			relations: FRAME.emptyRelations(),

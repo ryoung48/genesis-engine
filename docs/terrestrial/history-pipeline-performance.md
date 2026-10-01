@@ -42,3 +42,14 @@ The targeted history tests, `pnpm lint` and `pnpm typecheck` passed.
 The CPU profile attributes substantial simulation work to repeated military deployment/alliance calculations during budget previews. Those modules overlap the other agent's active military changes, so this branch leaves them alone. Person-name generation also accounts for a substantial translation cost. A later investigation could consider generating names on demand, after defining how record consumers access them. Frame reconstruction was only around one second of the 300-year runs and is a lower-priority target.
 
 Census keyframes and complete records still grow with history length. Compressing or thinning these would require an explicit decision about historical query fidelity; this change preserves all recorded history.
+## Lazy person names
+
+The follow-up change defers person and house names until display code requests them through `PERSON_NAMES`. Raw people keep their name seeds, birth realms and dynasty IDs. Ruler events retain person/regent IDs and dates; revolt comments retain their structured cause and pretender ID. Wiki consumers resolve those into the same labels and text as before.
+
+The resolver reuses the record builder's existing world-name generator, which captures the original culture context. Per-person labels are cached outside the record in a WeakMap, so raw records remain cloneable and collecting a record also releases its naming cache. Name requests return fresh person data with cached labels, so updated death dates remain visible. A frame creates only its current ruler's display view; reading a ruler's dynasty generates only the house label, while reading the ruler's name resolves and caches the person name. Repeated frame-label reads are also cached.
+
+For seed 14963991, 20,000 points and 100 years, translating the same journal took 2,184 ms before and 366 ms afterward, about 83% less time. The run recorded 6,167 people. Before display, ruler-name requests dropped from 6,748 to zero, and dynasty-name requests from 5,627 to zero. This measures journal translation, not whole-world generation. Resolving every person's labels afterward reproduced every baseline name and house, all ruler payloads and all revolt comments. The 100 yearly generation reports also matched, excluding timings.
+
+Tests cover deferred recording/frame construction/querying/cloning, per-person cache reuse, independent house resolution, updated person data, exact labels under reverse lookup order, Earth labels, structured revolt comments, person mentions and ruler descriptions, and a server-rendered person wiki hook. The existing family-record and streamed/batched record tests also pass. `pnpm lint` and `pnpm typecheck` pass.
+
+Local comparison data is in `verification/history-optimization/lazy-name-measurements.json`; the naming change is based on `d505ac1`.

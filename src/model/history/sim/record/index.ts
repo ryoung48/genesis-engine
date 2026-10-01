@@ -1,5 +1,6 @@
 import type { LonLat } from "@/model/history/earth/types"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
+import { PERSON_NAMES } from "@/model/history/record/people/names"
 import type {
 	HistoryRecord,
 	HistoryState,
@@ -190,7 +191,7 @@ function buildProceduralRecord(
 				},
 			})
 	}
-	return {
+	const record: HistoryRecord = {
 		origin: "procedural",
 		people: PEOPLE_RECORD.create(),
 		minTimeMs: recordStartTimeMs,
@@ -210,6 +211,9 @@ function buildProceduralRecord(
 		},
 		titles: baseTitles,
 	}
+	if (record.people)
+		PERSON_NAMES.initialize({ people: record.people, generator: names })
+	return record
 }
 
 function provinceLonLat({

@@ -1,6 +1,5 @@
 import type {
 	JournalPeople,
-	JournalPerson,
 	SeatKind,
 } from "@/model/history/sim/engine/journal/types"
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
@@ -19,20 +18,6 @@ export interface RecordPerson {
 	dynasty: number
 	nameSeed: number
 	home: number
-	name: string
-	// [JUSTIFICATION] Outsider spouses belong to no ruling house.
-	house: string | null
-}
-
-export interface PersonNames {
-	name: string
-	// [JUSTIFICATION] Outsider spouses belong to no ruling house.
-	house: string | null
-}
-
-export interface DescribePersonParams {
-	person: JournalPerson
-	houseHome: number
 }
 
 export interface RecordMarriage {
@@ -95,7 +80,6 @@ export interface AppendPeopleParams {
 	rows: JournalPeople
 	timeMs: number
 	recordTime: (engineTimeMs: number) => number
-	describe: (params: DescribePersonParams) => PersonNames
 }
 
 export interface PushIndexParams<T> {
