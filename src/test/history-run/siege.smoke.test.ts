@@ -362,7 +362,8 @@ describe("siege phases", () => {
 })
 
 describe("battle kinds and shared resolver", () => {
-	it("takes the urban siege increase entirely from open battles", () => {
+	it("chooses siege 95% of the time at the 2000-person urban threshold", () => {
+		state.popUrbanCurrent[1] = 2000
 		for (const river of [false, true]) {
 			state.riverByProvince[1] = Number(river)
 			const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
@@ -374,19 +375,19 @@ describe("battle kinds and shared resolver", () => {
 						.kind
 				]++
 			}
-			const total = river ? 1.02 : 0.9
-			expect(counts.open / 10000).toBeCloseTo(0.15 / total, 3)
-			expect(counts.siege / 10000).toBeCloseTo(0.7 / total, 3)
-			expect(counts.ambush / 10000).toBeCloseTo(0.05 / total, 3)
+			const fieldTotal = river ? 0.87 : 0.75
+			expect(counts.open / 10000).toBeCloseTo((0.05 * 0.7) / fieldTotal, 3)
+			expect(counts.siege).toBe(9500)
+			expect(counts.ambush / 10000).toBeCloseTo((0.05 * 0.05) / fieldTotal, 3)
 			expect(counts["river crossing"] / 10000).toBeCloseTo(
-				river ? 0.12 / total : 0,
+				river ? (0.05 * 0.12) / fieldTotal : 0,
 				3,
 			)
 		}
 	})
 	it("preserves the original distribution when a siege is ineligible", () => {
 		for (const river of [false, true])
-			for (const urban of [4999, 5000]) {
+			for (const urban of [1999, 2000]) {
 				state.riverByProvince[1] = Number(river)
 				state.popUrbanCurrent[1] = urban
 				const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
@@ -397,7 +398,7 @@ describe("battle kinds and shared resolver", () => {
 						BATTLE_KIND.choose({
 							state,
 							province: 1,
-							siegeEligible: urban < 5000,
+							siegeEligible: urban < 2000,
 							rng,
 						}).kind
 					]++

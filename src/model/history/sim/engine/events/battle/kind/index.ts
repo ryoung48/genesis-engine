@@ -11,13 +11,13 @@ const WEIGHTS: Record<BattleKind, number> = {
 	open: 0.7,
 	ambush: 0.05,
 	"river crossing": 0.12,
-	siege: 0.15,
+	siege: 0,
 }
-const SIEGE_OPEN_WEIGHT_TRANSFER = 0.55
+const SIEGE_CHANCE = 0.95
 const AMBUSH_DEFENDER_SHARE = 0.6
 const AMBUSH_BONUS = 1.3
 const RIVER_CROSSING_BONUS = 1.2
-const TOWN_URBAN_POPULATION = 5000
+const TOWN_URBAN_POPULATION = 2000
 function isTown({ state, province }: TownParams): boolean {
 	return state.popUrbanCurrent[province] >= TOWN_URBAN_POPULATION
 }
@@ -32,8 +32,8 @@ function choose({
 	if (siegeEligible && isTown({ state, province })) eligible.push("siege")
 	const weights = { ...WEIGHTS }
 	if (eligible.includes("siege")) {
-		weights.open -= SIEGE_OPEN_WEIGHT_TRANSFER
-		weights.siege += SIEGE_OPEN_WEIGHT_TRANSFER
+		const fieldWeight = eligible.reduce((sum, kind) => sum + weights[kind], 0)
+		weights.siege = (fieldWeight * SIEGE_CHANCE) / (1 - SIEGE_CHANCE)
 	}
 	let roll =
 		rng.random() * eligible.reduce((sum, kind) => sum + weights[kind], 0)
