@@ -3,11 +3,13 @@ import type {
 	ComputeHydrologyFieldsParams,
 	ComputeObservedAridityParams,
 	FillPetMonthlyHargreavesParams,
+	HydrologyCellsParams,
 	ObservedAridityResult,
 	PetMonthHargreavesParams,
 	RefreshClimatePetMonthlyParams,
 } from "@/model/climate/classification/hydrology/types"
 import type { GenesisHydrology } from "@/model/climate/types"
+import { PARALLEL } from "@/model/shared/parallel"
 
 function petMonthHargreaves({
 	tas,
@@ -95,22 +97,50 @@ function computeHydrologyFields({
 	isLand,
 }: ComputeHydrologyFieldsParams): GenesisHydrology {
 	const N = isLand.length
-	const aet_monthly = new Float32Array(12 * N)
-	const aridity_monthly = new Float32Array(12 * N)
-	const baseflow_monthly = new Float32Array(12 * N)
+	const aet = PARALLEL.shared(new Float32Array(12 * N))
+	const aridity = PARALLEL.shared(new Float32Array(12 * N))
+	const baseflow = PARALLEL.shared(new Float32Array(12 * N))
+	PARALLEL.mapCells({
+		task: "hydrologyCells",
+		kernel: hydrologyCells,
+		count: N,
+		payload: {
+			isLand: PARALLEL.shared(isLand),
+			rainMonthly: PARALLEL.shared(rainfall.monthly),
+			petMonthly: PARALLEL.shared(climate.pet_monthly),
+			aet_monthly: aet,
+			aridity_monthly: aridity,
+			baseflow_monthly: baseflow,
+		},
+	})
+	return {
+		aet_monthly: PARALLEL.local(aet),
+		aridity_monthly: PARALLEL.local(aridity),
+		baseflow_monthly: PARALLEL.local(baseflow),
+	}
+}
+
+function hydrologyCells({
+	start,
+	end,
+	isLand,
+	rainMonthly,
+	petMonthly,
+	aet_monthly,
+	aridity_monthly,
+	baseflow_monthly,
+}: HydrologyCellsParams): void {
+	const N = isLand.length
 	const rain = new Float64Array(12)
 	const petBuf = new Float64Array(12)
 	const aetBuf = new Float64Array(12)
-	const landRegions: number[] = []
-	for (let r = 0; r < N; r++) {
-		if (isLand[r]) landRegions.push(r)
-	}
 
-	for (const r of landRegions) {
+	for (let r = start; r < end; r++) {
+		if (!isLand[r]) continue
 		for (let m = 0; m < 12; m++) {
 			const idx = m * N + r
-			rain[m] = rainfall.monthly[idx]
-			petBuf[m] = climate.pet_monthly[idx]
+			rain[m] = rainMonthly[idx]
+			petBuf[m] = petMonthly[idx]
 		}
 		computeAetFromPet({ rain, petBuf, aetBuf })
 		for (let m = 0; m < 12; m++) {
@@ -141,8 +171,6 @@ function computeHydrologyFields({
 			baseflow_monthly[m * N + r] = baseflow
 		}
 	}
-
-	return { aet_monthly, aridity_monthly, baseflow_monthly }
 }
 
 function mergeWithModeledFallback(
@@ -221,5 +249,6 @@ export const HYDROLOGY = {
 	refreshClimatePetMonthly,
 	computeAetFromPet,
 	computeHydrologyFields,
+	hydrologyCells,
 	computeObservedAridity,
 }

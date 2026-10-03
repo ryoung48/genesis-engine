@@ -5,6 +5,7 @@ import type {
 } from "@/model/climate/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
+import type { CellRange } from "@/model/shared/parallel/types"
 
 export type GdmParams = {
 	temp: number
@@ -107,4 +108,29 @@ export type AssignPastaClimateParams = {
 	iceMinMonthly?: Float32Array
 	/** Omitted when no monthly maximum ice values have been computed. */
 	iceMaxMonthly?: Float32Array
+}
+
+export interface PastaZoneCellsParams extends CellRange {
+	isLand: Uint8Array
+	temperatureMonthly: Float32Array
+	temperatureMax: Float32Array
+	temperatureMin: Float32Array
+	insolationMonthly: Float32Array
+	rainfallMonthly: Float32Array
+	petMonthly: Float32Array
+	aetMonthly: Float32Array
+	iceThickness: Float32Array | null
+	iceMinMonthly: Float32Array | null
+	iceMaxMonthly: Float32Array | null
+	dpm: number
+	parFactor: number
+	gintThreshold: GenesisParams["pastaGintThreshold"]
+	zones: Uint8Array
+	gdd: Float32Array
+	gar: Float32Array
+	gint: Float32Array
+	gdd_monthly: Float32Array
+	gint_monthly: Float32Array
+	minT: Float32Array
+	maxT: Float32Array
 }

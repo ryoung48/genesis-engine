@@ -10,7 +10,9 @@ import type {
 	GddTotalParams,
 	GdmParams,
 	PastaDebug,
+	PastaZoneCellsParams,
 } from "@/model/climate/classification/pasta/types"
+import { PARALLEL } from "@/model/shared/parallel"
 
 const ZONE_COLOR_MAP = {
 	Ofi: [220, 245, 255],
@@ -614,24 +616,86 @@ function computePastaZones({
 	iceMaxMonthly,
 }: ComputePastaZonesParams): { zones: Uint8Array; debug: PastaDebug } {
 	const N = mesh.numRegions
-	const dpm = params.daysPerYear / 12
-	const output = new Uint8Array(N)
 	const cls = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
-	const parFactor = STAR.getStarPARFactor({ cls, subtype: params.starSubtype })
-
-	const debug: PastaDebug = {
-		gdd: new Float32Array(N),
-		gar: new Float32Array(N),
-		gint: new Float32Array(N),
-		gdd_monthly: new Float32Array(12 * N),
-		gint_monthly: new Float32Array(12 * N),
-		minT: new Float32Array(N),
-		maxT: new Float32Array(N),
+	const optional = (values: Float32Array | undefined) =>
+		values ? PARALLEL.shared(values) : null
+	const zones = PARALLEL.shared(new Uint8Array(N))
+	const fields = {
+		gdd: PARALLEL.shared(new Float32Array(N)),
+		gar: PARALLEL.shared(new Float32Array(N)),
+		gint: PARALLEL.shared(new Float32Array(N)),
+		gdd_monthly: PARALLEL.shared(new Float32Array(12 * N)),
+		gint_monthly: PARALLEL.shared(new Float32Array(12 * N)),
+		minT: PARALLEL.shared(new Float32Array(N)),
+		maxT: PARALLEL.shared(new Float32Array(N)),
 	}
+	PARALLEL.mapCells({
+		task: "pastaZoneCells",
+		kernel: pastaZoneCells,
+		count: N,
+		payload: {
+			isLand: PARALLEL.shared(isLand),
+			temperatureMonthly: PARALLEL.shared(temperatureMonthly),
+			temperatureMax: PARALLEL.shared(temperatureMax),
+			temperatureMin: PARALLEL.shared(temperatureMin),
+			insolationMonthly: PARALLEL.shared(insolationMonthly),
+			rainfallMonthly: PARALLEL.shared(rainfallMonthly),
+			petMonthly: PARALLEL.shared(petMonthly),
+			aetMonthly: PARALLEL.shared(aetMonthly),
+			iceThickness: optional(iceThickness),
+			iceMinMonthly: optional(iceMinMonthly),
+			iceMaxMonthly: optional(iceMaxMonthly),
+			dpm: params.daysPerYear / 12,
+			parFactor: STAR.getStarPARFactor({ cls, subtype: params.starSubtype }),
+			gintThreshold: params.pastaGintThreshold,
+			zones,
+			...fields,
+		},
+	})
+	return {
+		zones: PARALLEL.local(zones),
+		debug: {
+			gdd: PARALLEL.local(fields.gdd),
+			gar: PARALLEL.local(fields.gar),
+			gint: PARALLEL.local(fields.gint),
+			gdd_monthly: PARALLEL.local(fields.gdd_monthly),
+			gint_monthly: PARALLEL.local(fields.gint_monthly),
+			minT: PARALLEL.local(fields.minT),
+			maxT: PARALLEL.local(fields.maxT),
+		},
+	}
+}
 
-	// Pre-allocate all working buffers — reused for every region
+function pastaZoneCells({
+	start,
+	end,
+	isLand,
+	temperatureMonthly,
+	temperatureMax,
+	temperatureMin,
+	insolationMonthly,
+	rainfallMonthly,
+	petMonthly,
+	aetMonthly,
+	iceThickness,
+	iceMinMonthly,
+	iceMaxMonthly,
+	dpm,
+	parFactor,
+	gintThreshold,
+	zones,
+	gdd,
+	gar,
+	gint,
+	gdd_monthly,
+	gint_monthly,
+	minT,
+	maxT,
+}: PastaZoneCellsParams): void {
+	const N = isLand.length
+	// Working buffers, reused for every region
 	const temps = new Float64Array(12)
 	const rain = new Float64Array(12)
 	const insol = new Float64Array(12)
@@ -643,15 +707,15 @@ function computePastaZones({
 	const gddAccBuf = new Float64Array(12)
 	const giAccBuf = new Float64Array(12)
 
-	for (let r = 0; r < N; r++) {
+	for (let r = start; r < end; r++) {
 		for (let m = 0; m < 12; m++) {
 			temps[m] = temperatureMonthly[m * N + r]
 			insol[m] = insolationMonthly[m * N + r] * parFactor
 		}
 		const warmest = temperatureMax[r]
 		const coldest = temperatureMin[r]
-		debug.minT[r] = coldest
-		debug.maxT[r] = warmest
+		minT[r] = coldest
+		maxT[r] = warmest
 		if (!isLand[r]) {
 			// Ocean: skip AET/PET, only needs temps + insolation + ice
 			const result = classifyOcean({
@@ -667,7 +731,7 @@ function computePastaZones({
 				warmest,
 				coldest,
 			})
-			output[r] = result.zone
+			zones[r] = result.zone
 		} else {
 			for (let m = 0; m < 12; m++) {
 				const idx = m * N + r
@@ -688,22 +752,20 @@ function computePastaZones({
 				giAccBuf,
 				iceVal: iceThickness ? iceThickness[r] : 0,
 				dpm,
-				gintThreshold: params.pastaGintThreshold,
+				gintThreshold: gintThreshold,
 				warmest,
 				coldest,
 			})
-			output[r] = result.zone
-			debug.gdd[r] = result.gdd
-			debug.gar[r] = result.gar
-			debug.gint[r] = result.gint === Infinity ? 99999 : result.gint
+			zones[r] = result.zone
+			gdd[r] = result.gdd
+			gar[r] = result.gar
+			gint[r] = result.gint === Infinity ? 99999 : result.gint
 			for (let m = 0; m < 12; m++) {
-				debug.gdd_monthly[m * N + r] = mGDD[m]
-				debug.gint_monthly[m * N + r] = mGInt[m]
+				gdd_monthly[m * N + r] = mGDD[m]
+				gint_monthly[m * N + r] = mGInt[m]
 			}
 		}
 	}
-
-	return { zones: output, debug }
 }
 
 function assignPastaClimate({
@@ -816,6 +878,7 @@ function pastaClimateName(zoneCode: number): string {
 
 export const PASTA = {
 	pastaLabels,
+	pastaZoneCells,
 	assignPastaClimate,
 	assignEarthPastaClimate,
 	pastaClimateColor,

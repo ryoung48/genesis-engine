@@ -5,7 +5,9 @@ import type {
 	ComputeMonthlyRainParams,
 	ComputeMonthlyThermalEquatorsParams,
 	ComputeThermalEquatorParams,
+	MonthlyRainCellsParams,
 	SeasonalRainCurveParams,
+	SmoothRainMonthsParams,
 	SubsidenceFactorParams,
 } from "@/model/climate/precipitation/rain/types"
 import { RAIN as LOCKED_RAIN } from "@/model/climate/precipitation/tidal-locked"
@@ -16,6 +18,7 @@ import type { SphereMesh } from "@/model/mesh/types"
 import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { PriorityHeap } from "@/model/shared/min-heap"
+import { PARALLEL } from "@/model/shared/parallel"
 import { UNITS } from "@/model/shared/units"
 
 const DEG2RAD = Math.PI / 180
@@ -764,6 +767,145 @@ function subsidenceFactor({
 	)
 }
 
+const NOISE_FREQ1 = 3.5
+const NOISE_FREQ2 = 8.0
+const NOISE_AMP1 = 0.28
+const NOISE_AMP2 = 0.12
+
+function monthlyRainCells({
+	start,
+	end,
+	landRegions,
+	eastAdv,
+	westAdv,
+	regionBin,
+	latDeg,
+	temperatureMonthly,
+	monthlyTEQ,
+	annualTeq,
+	boundaryWarpDeg,
+	xyz,
+	seed,
+	hoursPerDay,
+	pressureRainFactor,
+	reverseCirculation,
+	monthly,
+}: MonthlyRainCellsParams): void {
+	const N = latDeg.length
+	const sn1 = new SimplexNoise(seed + 4001)
+	const sn2 = new SimplexNoise(seed + 4002)
+	for (let i = start; i < end; i++) {
+		const r = landRegions[i]
+		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
+		const w = reverseCirculation ? eastAdv[r] : westAdv[r]
+		const bin = regionBin[r]
+		// The `east` advection channel is trade-wind moisture landing on
+		// east-facing coasts; `west` is westerly moisture landing on
+		// west-facing coasts. computeAdvection zeroes one of the pair, so the
+		// larger channel is both the coast facing and the moisture supply.
+		const moisture = Math.max(e, w)
+		const coast: "east" | "west" = w > e ? "west" : "east"
+		// Windward orographic lift can push e/w above 1 (see computeAdvection's
+		// localMoisture); re-applied here as an uncapped multiplier on the mm
+		// value, scoped to cells that actually earned it via lift.
+		const liftOverflow = Math.max(1, e, w)
+
+		// Seasonal shape, TEQ-derived: for each month, the coast's rain-band
+		// exposure (seasonalRainCurve, driven by that month's thermal-equator
+		// latitude) times the month's vapour capacity. Normalized to sum 1, so
+		// it only redistributes the annual total across the year. The annual
+		// vapour-capacity budget is the same 12 ceilingScale values summed.
+		const seasonWeights = new Float32Array(12)
+		let capacityBudget = 0
+		let seasonSum = 0
+		for (let month = 0; month < 12; month++) {
+			const capacity = RAIN_SHARED.ceilingScale(
+				temperatureMonthly[month * N + r],
+			)
+			capacityBudget += capacity
+			const exposure = seasonalRainCurve({
+				cellLat: latDeg[r],
+				absLat: Math.abs(latDeg[r]),
+				coast,
+				teq: monthlyTEQ[month][bin],
+				bandOffsetDeg: boundaryWarpDeg[r],
+				hoursPerDay,
+			})
+			const weight = exposure * capacity
+			seasonWeights[month] = weight
+			seasonSum += weight
+		}
+		if (seasonSum > 0) {
+			for (let month = 0; month < 12; month++) seasonWeights[month] /= seasonSum
+		}
+
+		const suppression =
+			coast === "west"
+				? subsidenceFactor({
+						cellLat: latDeg[r],
+						subsidenceTeq: annualTeq[bin],
+						hoursPerDay,
+						bandOffsetDeg: boundaryWarpDeg[r],
+					})
+				: 1
+		const annualMm =
+			EMPIRICAL_RAIN_SCALE *
+			capacityBudget *
+			moisture *
+			suppression *
+			pressureRainFactor *
+			liftOverflow
+		for (let month = 0; month < 12; month++) {
+			monthly[month * N + r] = annualMm * seasonWeights[month]
+		}
+		// Precipitation noise: two octaves of simplex noise applied as a
+		// multiplicative factor (0.55-1.45), so dry areas stay dry and wet
+		// areas get organic variation.
+		const x = xyz[3 * r]
+		const y = xyz[3 * r + 1]
+		const z = xyz[3 * r + 2]
+		const n =
+			sn1.noise3D(x * NOISE_FREQ1, y * NOISE_FREQ1, z * NOISE_FREQ1) *
+				NOISE_AMP1 +
+			sn2.noise3D(x * NOISE_FREQ2, y * NOISE_FREQ2, z * NOISE_FREQ2) *
+				NOISE_AMP2
+		const factor = Math.max(0.55, Math.min(1.45, 1 + n))
+		for (let month = 0; month < 12; month++) monthly[month * N + r] *= factor
+	}
+}
+
+// Each month is smoothed from its own values only, so months are independent.
+function smoothRainMonths({
+	start,
+	end,
+	landRegions,
+	landNeighborOffset,
+	landNeighborList,
+	monthly,
+}: SmoothRainMonthsParams): void {
+	const N = monthly.length / 12
+	const smoothBuf = new Float32Array(N)
+	for (let month = start; month < end; month++) {
+		const offset = month * N
+		for (let pass = 0; pass < 3; pass++) {
+			for (let i = 0; i < landRegions.length; i++) {
+				const r = landRegions[i]
+				let sum = 0
+				const first = landNeighborOffset[i]
+				const last = landNeighborOffset[i + 1]
+				for (let j = first; j < last; j++)
+					sum += monthly[offset + landNeighborList[j]]
+				sum += monthly[offset + r]
+				smoothBuf[r] = sum / (last - first + 1)
+			}
+			for (let i = 0; i < landRegions.length; i++) {
+				const r = landRegions[i]
+				monthly[offset + r] = smoothBuf[r]
+			}
+		}
+	}
+}
+
 function computeMonthlyRain({
 	mesh,
 	climate,
@@ -805,125 +947,47 @@ function computeMonthlyRain({
 
 	const hoursPerDay = params?.hoursPerDay ?? 24
 
-	const monthly = new Float32Array(N * 12)
+	const monthly = PARALLEL.shared(new Float32Array(N * 12))
 	const boundaryWarpDeg = RAIN_SHARED.computeRainBandWarpField({
 		mesh,
 		seed: params?.seed ?? 0,
 		amplitudeDeg: 5.5,
 		regions: landRegions,
 	})
-	for (const r of landRegions) {
-		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
-		const w = reverseCirculation ? eastAdv[r] : westAdv[r]
-		const bin = regionBin[r]
-		// The `east` advection channel is trade-wind moisture landing on
-		// east-facing coasts; `west` is westerly moisture landing on
-		// west-facing coasts. computeAdvection zeroes one of the pair, so the
-		// larger channel is both the coast facing and the moisture supply.
-		const moisture = Math.max(e, w)
-		const coast: "east" | "west" = w > e ? "west" : "east"
-		// Windward orographic lift can push e/w above 1 (see computeAdvection's
-		// localMoisture); re-applied here as an uncapped multiplier on the mm
-		// value, scoped to cells that actually earned it via lift.
-		const liftOverflow = Math.max(1, e, w)
-
-		// Seasonal shape, TEQ-derived: for each month, the coast's rain-band
-		// exposure (seasonalRainCurve, driven by that month's thermal-equator
-		// latitude) times the month's vapour capacity. Normalized to sum 1, so
-		// it only redistributes the annual total across the year. The annual
-		// vapour-capacity budget is the same 12 ceilingScale values summed.
-		const seasonWeights = new Float32Array(12)
-		let capacityBudget = 0
-		let seasonSum = 0
-		for (let month = 0; month < 12; month++) {
-			const capacity = RAIN_SHARED.ceilingScale(
-				climate.temperature_monthly[month * N + r],
-			)
-			capacityBudget += capacity
-			const exposure = seasonalRainCurve({
-				cellLat: latDeg[r],
-				absLat: Math.abs(latDeg[r]),
-				coast,
-				teq: monthlyTEQ[month][bin],
-				bandOffsetDeg: boundaryWarpDeg[r],
-				hoursPerDay,
-			})
-			const weight = exposure * capacity
-			seasonWeights[month] = weight
-			seasonSum += weight
-		}
-		if (seasonSum > 0) {
-			for (let month = 0; month < 12; month++) seasonWeights[month] /= seasonSum
-		}
-
-		const suppression =
-			coast === "west"
-				? subsidenceFactor({
-						cellLat: latDeg[r],
-						subsidenceTeq: annualTeq[bin],
-						hoursPerDay,
-						bandOffsetDeg: boundaryWarpDeg[r],
-					})
-				: 1
-		const annualMm =
-			EMPIRICAL_RAIN_SCALE *
-			capacityBudget *
-			moisture *
-			suppression *
-			pressureRainFactor *
-			liftOverflow
-		for (let month = 0; month < 12; month++) {
-			monthly[month * N + r] = annualMm * seasonWeights[month]
-		}
-	}
-
-	// ── Precipitation noise: break up uniform rainfall bands ───────────
-	// Two octaves of simplex noise, applied as a multiplicative factor
-	// (0.55–1.45) so dry areas stay dry and wet areas get organic variation.
-	{
-		const seed = params?.seed ?? 0
-		const sn1 = new SimplexNoise(seed + 4001)
-		const sn2 = new SimplexNoise(seed + 4002)
-		const FREQ1 = 3.5
-		const FREQ2 = 8.0
-		const AMP1 = 0.28
-		const AMP2 = 0.12
-
-		for (const r of landRegions) {
-			const x = mesh.r_xyz[3 * r]
-			const y = mesh.r_xyz[3 * r + 1]
-			const z = mesh.r_xyz[3 * r + 2]
-			const n =
-				sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1 +
-				sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
-			// Multiplicative: clamp factor to [0.55, 1.45]
-			const factor = Math.max(0.55, Math.min(1.45, 1 + n))
-			for (let month = 0; month < 12; month++) {
-				monthly[month * N + r] *= factor
-			}
-		}
-	}
-
-	const smoothBuf = new Float32Array(N)
-	for (let pass = 0; pass < 3; pass++) {
-		for (let month = 0; month < 12; month++) {
-			const offset = month * N
-			for (let i = 0; i < landRegions.length; i++) {
-				const r = landRegions[i]
-				let sum = 0
-				const start = landNeighborOffset[i]
-				const end = landNeighborOffset[i + 1]
-				for (let j = start; j < end; j++) {
-					sum += monthly[offset + landNeighborList[j]]
-				}
-				sum += monthly[offset + r]
-				smoothBuf[r] = sum / (end - start + 1)
-			}
-			for (const r of landRegions) {
-				monthly[offset + r] = smoothBuf[r]
-			}
-		}
-	}
+	const landCells = PARALLEL.shared(Int32Array.from(landRegions))
+	PARALLEL.mapCells({
+		task: "monthlyRainCells",
+		kernel: monthlyRainCells,
+		count: landCells.length,
+		payload: {
+			landRegions: landCells,
+			eastAdv: PARALLEL.shared(eastAdv),
+			westAdv: PARALLEL.shared(westAdv),
+			regionBin: PARALLEL.shared(regionBin),
+			latDeg: PARALLEL.shared(latDeg),
+			temperatureMonthly: PARALLEL.shared(climate.temperature_monthly),
+			monthlyTEQ,
+			annualTeq,
+			boundaryWarpDeg: PARALLEL.shared(boundaryWarpDeg),
+			xyz: PARALLEL.shared(mesh.r_xyz),
+			seed: params?.seed ?? 0,
+			hoursPerDay,
+			pressureRainFactor,
+			reverseCirculation,
+			monthly,
+		},
+	})
+	PARALLEL.mapItems({
+		task: "smoothRainMonths",
+		kernel: smoothRainMonths,
+		count: 12,
+		payload: {
+			landRegions: landCells,
+			landNeighborOffset: PARALLEL.shared(landNeighborOffset),
+			landNeighborList: PARALLEL.shared(landNeighborList),
+			monthly,
+		},
+	})
 
 	const annual = new Float32Array(N)
 	for (const r of landRegions) {
@@ -934,10 +998,12 @@ function computeMonthlyRain({
 		annual[r] = sum
 	}
 
-	return { monthly, annual }
+	return { monthly: PARALLEL.local(monthly), annual }
 }
 
 export const RAIN = {
+	monthlyRainCells,
+	smoothRainMonths,
 	hadleyWidth,
 	getClimateGeometry,
 	computeThermalEquator,

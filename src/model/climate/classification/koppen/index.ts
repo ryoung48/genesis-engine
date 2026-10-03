@@ -1,4 +1,8 @@
-import type { AssignKoppenClimateParams } from "@/model/climate/classification/koppen/types"
+import type {
+	AssignKoppenClimateParams,
+	KoppenCellsParams,
+} from "@/model/climate/classification/koppen/types"
+import { PARALLEL } from "@/model/shared/parallel"
 
 const KOPPEN_CLASSES = [
 	{
@@ -173,13 +177,35 @@ function assignKoppenClimate({
 	rainfallMonthly,
 }: AssignKoppenClimateParams): Uint8Array {
 	const N = mesh.numRegions
-	const classes = new Uint8Array(N)
+	const classes = PARALLEL.shared(new Uint8Array(N))
+	PARALLEL.mapCells({
+		task: "koppenCells",
+		kernel: koppenCells,
+		count: N,
+		payload: {
+			isLand: PARALLEL.shared(isLand),
+			temperatureMonthly: PARALLEL.shared(temperatureMonthly),
+			rainfallMonthly: PARALLEL.shared(rainfallMonthly),
+			classes,
+		},
+	})
+	return PARALLEL.local(classes)
+}
 
-	// Reusable buffers — avoid per-cell allocations
+function koppenCells({
+	start,
+	end,
+	isLand,
+	temperatureMonthly,
+	rainfallMonthly,
+	classes,
+}: KoppenCellsParams): void {
+	const N = isLand.length
+	// Reusable buffers, avoiding per-cell allocations
 	const mTemps = new Float64Array(12)
 	const mRain = new Float64Array(12)
 
-	for (let r = 0; r < N; r++) {
+	for (let r = start; r < end; r++) {
 		if (!isLand[r]) continue
 
 		// Single-pass stats collection
@@ -292,8 +318,6 @@ function assignKoppenClimate({
 		const code = `D${precipLetter}${tempLetter}`
 		classes[r] = CLASS_ID[code] ?? CLASS_ID.Dfc
 	}
-
-	return classes
 }
 
 function koppenClimateColor(classId: number): [number, number, number] {
@@ -307,6 +331,7 @@ function koppenClimateName(classId: number): string {
 export const KOPPEN = {
 	koppenLabels,
 	assignKoppenClimate,
+	koppenCells,
 	koppenClimateColor,
 	koppenClimateName,
 }

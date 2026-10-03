@@ -1,5 +1,6 @@
 import type { GenesisClimate, GenesisRainfall } from "@/model/climate/types"
 import type { GenesisParams } from "@/model/pipelines/types"
+import type { CellRange } from "@/model/shared/parallel/types"
 
 export type FillPetMonthlyHargreavesParams = {
 	temperatureMonthly: Float32Array
@@ -59,4 +60,13 @@ export type ObservedAridityResult = {
 	pet_monthly: Float32Array
 	aet_monthly: Float32Array
 	aridity_monthly: Float32Array
+}
+
+export interface HydrologyCellsParams extends CellRange {
+	isLand: Uint8Array
+	rainMonthly: Float32Array
+	petMonthly: Float32Array
+	aet_monthly: Float32Array
+	aridity_monthly: Float32Array
+	baseflow_monthly: Float32Array
 }

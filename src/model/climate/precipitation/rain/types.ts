@@ -2,6 +2,7 @@ import type { GenesisClimate } from "@/model/climate/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
+import type { CellRange } from "@/model/shared/parallel/types"
 
 export interface ClimateGeometry {
 	latDeg: Float32Array
@@ -96,4 +97,29 @@ export type ComputeMonthlyRainParams = {
 	distCoast?: Float32Array
 	/** Omitted when landmarks do not alter the rain mask. */
 	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">
+}
+
+export interface MonthlyRainCellsParams extends CellRange {
+	landRegions: Int32Array
+	eastAdv: Float32Array
+	westAdv: Float32Array
+	regionBin: Int32Array
+	latDeg: Float32Array
+	temperatureMonthly: Float32Array
+	monthlyTEQ: Float32Array[]
+	annualTeq: Float32Array
+	boundaryWarpDeg: Float32Array
+	xyz: Float32Array
+	seed: number
+	hoursPerDay: number
+	pressureRainFactor: number
+	reverseCirculation: boolean
+	monthly: Float32Array
+}
+
+export interface SmoothRainMonthsParams extends CellRange {
+	landRegions: Int32Array
+	landNeighborOffset: Int32Array
+	landNeighborList: Int32Array
+	monthly: Float32Array
 }
