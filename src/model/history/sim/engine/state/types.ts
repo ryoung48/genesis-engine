@@ -140,10 +140,10 @@ export interface RealmCacheEntry {
 export interface ProvinceEconomyCache {
 	capital: Int32Array
 	distanceMultiplier: Float64Array
-	population: Float64Array
 	development: Float64Array
+	developmentFactor: Float64Array
 	knowledge: Float64Array
-	output: Float64Array
+	knowledgeFactor: Float64Array
 }
 
 export interface CandidatesRefresh {

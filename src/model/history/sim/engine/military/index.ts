@@ -724,6 +724,7 @@ function exhausted(params: NationParams): boolean {
 
 function initialize({ state }: RecordArmiesParams): void {
 	RECRUITMENT.initialize({ state })
+	state.realmCache.clear()
 	state.militaryReady = true
 }
 

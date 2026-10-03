@@ -30,43 +30,50 @@ const DISTANCE_EXPONENT = 0.7
 
 const SAFE_TREASURY_YEARS = 2
 
+// The settled provinces of a realm, in the same order as STATE.getNationProvinces.
 function realmProvinces({ state, p }: EconomyLookupParams): number[] {
-	return STATE.getNationProvinces({ state, root: p }).filter(
-		(province) => !state.desolate[province],
-	)
+	const { childOffset, childList, desolate } = state
+	const result = desolate[p] ? [] : [p]
+	const stack = [p]
+	while (stack.length > 0) {
+		const current = stack.pop() as number
+		for (let i = childOffset[current]; i < childOffset[current + 1]; i++) {
+			const child = childList[i]
+			if (!desolate[child]) result.push(child)
+			stack.push(child)
+		}
+	}
+	return result
 }
 
-function provincePopulation({ state, p }: EconomyLookupParams): number {
-	return (
-		FIELDS.prov.population.rural.get({ state, p }) +
-		FIELDS.prov.population.urban.get({ state, p })
-	)
-}
-
-function provinceOutput({ state, p }: EconomyLookupParams): number {
+// Output is population times a development factor times a knowledge factor.
+// The two factors change only at a census, so they are kept per province.
+function refreshOutputFactors({ state, p }: EconomyLookupParams): void {
 	const cache = state.provinceEconomyCache
-	const population = state.popRuralCurrent[p] + state.popUrbanCurrent[p]
 	const development = state.developmentCurrent[p]
 	const knowledge = state.knowledgeCurrent[p]
-	if (
-		cache.population[p] === population &&
-		cache.development[p] === development &&
-		cache.knowledge[p] === knowledge
-	)
-		return cache.output[p]
-	const output =
-		population *
-		MATH.piecewise({
+	if (cache.development[p] !== development) {
+		cache.development[p] = development
+		cache.developmentFactor[p] = MATH.piecewise({
 			domain: OUTPUT_CURVE.domain,
 			range: OUTPUT_CURVE.range,
 			x: development,
-		}) *
-		KNOWLEDGE.productivity({ knowledge })
-	cache.population[p] = population
-	cache.development[p] = development
-	cache.knowledge[p] = knowledge
-	cache.output[p] = output
-	return output
+		})
+	}
+	if (cache.knowledge[p] !== knowledge) {
+		cache.knowledge[p] = knowledge
+		cache.knowledgeFactor[p] = KNOWLEDGE.productivity({ knowledge })
+	}
+}
+
+function provinceOutput({ state, p }: EconomyLookupParams): number {
+	refreshOutputFactors({ state, p })
+	const cache = state.provinceEconomyCache
+	return (
+		(state.popRuralCurrent[p] + state.popUrbanCurrent[p]) *
+		cache.developmentFactor[p] *
+		cache.knowledgeFactor[p]
+	)
 }
 
 function travelDays({ state, capital, p }: TravelDaysParams): number {
@@ -94,8 +101,11 @@ function realm({ state, p }: EconomyLookupParams): RealmCacheEntry {
 	const cached = state.realmCache.get(p)
 	if (
 		cached &&
-		cached.hierarchyVersion === state.hierarchyVersion &&
-		cached.censusVersion === state.censusVersion
+		cached.censusVersion === state.censusVersion &&
+		// Once the military is running, every parent change drops the entries
+		// of both affected chains, so an unrelated hierarchy change elsewhere
+		// leaves this one valid.
+		(state.militaryReady || cached.hierarchyVersion === state.hierarchyVersion)
 	)
 		return cached
 	const entry = territory({ state, p, provinces: realmProvinces({ state, p }) })
@@ -106,20 +116,40 @@ function realm({ state, p }: EconomyLookupParams): RealmCacheEntry {
 function territory({ state, p, provinces }: TerritoryParams): RealmCacheEntry {
 	const knowledge = KNOWLEDGE.realmKnowledge({ state, provinces })
 	const collected = KNOWLEDGE.extractionRate({ knowledge })
+	const cache = state.provinceEconomyCache
+	const {
+		popRuralCurrent,
+		popUrbanCurrent,
+		developmentCurrent,
+		knowledgeCurrent,
+	} = state
 	let output = 0
 	let population = 0
 	let revenue = 0
 	let stateMaintenance = 0
-	for (const province of provinces) {
-		const provinceOut = provinceOutput({ state, p: province })
+	for (let i = 0; i < provinces.length; i++) {
+		const province = provinces[i]
+		const provincePopulation =
+			popRuralCurrent[province] + popUrbanCurrent[province]
+		if (
+			cache.development[province] !== developmentCurrent[province] ||
+			cache.knowledge[province] !== knowledgeCurrent[province]
+		)
+			refreshOutputFactors({ state, p: province })
+		const provinceOut =
+			provincePopulation *
+			cache.developmentFactor[province] *
+			cache.knowledgeFactor[province]
 		const provinceRevenue = provinceOut * collected
 		output += provinceOut
-		population += provincePopulation({ state, p: province })
+		population += provincePopulation
 		revenue += provinceRevenue
 		stateMaintenance +=
 			provinceRevenue *
 			STATE_MAINTENANCE_SHARE *
-			distanceMultiplier({ state, capital: p, p: province })
+			(cache.capital[province] === p
+				? cache.distanceMultiplier[province]
+				: distanceMultiplier({ state, capital: p, p: province }))
 	}
 	return {
 		population,
