@@ -48,3 +48,11 @@ export interface MatchParams {
 	current: SavedReport
 	previous: SavedReport
 }
+export interface LogDigest {
+	count: number
+	sha256: string
+}
+export interface LogDigester {
+	add: (entry: unknown) => void
+	value: () => LogDigest
+}

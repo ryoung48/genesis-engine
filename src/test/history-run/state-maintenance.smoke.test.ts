@@ -39,6 +39,10 @@ function twoPointState(days: number): HistoryState {
 			0,
 		]),
 		planetRadiusKm: UNITS.defaultPlanetRadiusKm,
+		provinceEconomyCache: {
+			capital: new Int32Array(2).fill(-1),
+			distanceMultiplier: new Float64Array(2),
+		},
 	} as HistoryState
 }
 

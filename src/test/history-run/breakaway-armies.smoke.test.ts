@@ -7,6 +7,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
+import type { RebelLogisticsObservation } from "@/test/history-run/report/military/rebel-logistics/types"
 
 let state: HistoryState
 let crown: number
@@ -108,7 +109,11 @@ describe("independent breakaway armies", () => {
 	})
 
 	it("retains individual rebel-war cap observations and disables subsequent wartime levy recovery", () => {
-		const diagnostics = REBEL_LOGISTICS_REPORT.attach({ engine: state })
+		const observations: RebelLogisticsObservation[] = []
+		const diagnostics = REBEL_LOGISTICS_REPORT.attach({
+			engine: state,
+			record: (observation) => observations.push(observation),
+		})
 		try {
 			const war = STATE.createActiveWar({
 				state,
@@ -119,7 +124,7 @@ describe("independent breakaway armies", () => {
 			})
 			MILITARY.mobilize({ state, war })
 			diagnostics.sample({ source: "annual" })
-			const rows = diagnostics.observations.filter((row) => row.war === war.idx)
+			const rows = observations.filter((row) => row.war === war.idx)
 			expect(rows.some((row) => row.role === "crown")).toBe(true)
 			expect(rows.some((row) => row.role === "rebel")).toBe(true)
 			for (const row of rows) {

@@ -146,6 +146,11 @@ export interface ProvinceEconomyCache {
 	output: Float64Array
 }
 
+export interface CandidatesRefresh {
+	hierarchyVersion: number
+	wars: number
+}
+
 export interface HistoryState {
 	riverByProvince: Uint8Array
 	P: number
@@ -205,8 +210,8 @@ export interface HistoryState {
 	militaryDiplomacyDirty: boolean
 	// Nations whose ties changed since candidates were last refreshed; only wars they lead need a refresh.
 	militaryDiplomacyNations: Set<number>
-	// Hierarchy version at which every active war's candidates were last refreshed.
-	militaryCandidatesVersion: number
+	// Hierarchy version and war count at which every active war's candidates were last refreshed.
+	militaryCandidatesRefresh: CandidatesRefresh
 	// Field army size at the last census; the live value is MILITARY.armySize.
 	armySizeCurrent: Float64Array
 	revenueCurrent: Float64Array

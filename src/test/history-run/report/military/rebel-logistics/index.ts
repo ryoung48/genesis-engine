@@ -65,8 +65,7 @@ function observation({
 	}
 }
 
-function attach({ engine }: AttachParams): AttachedDiagnostics {
-	const observations: RebelLogisticsObservation[] = []
+function attach({ engine, record }: AttachParams): AttachedDiagnostics {
 	const observe = (params: ObserveParams) => {
 		if (
 			params.war.goal === "conquest" ||
@@ -75,7 +74,7 @@ function attach({ engine }: AttachParams): AttachedDiagnostics {
 			!STATE.isSovereign({ state: engine, p: params.nation })
 		)
 			return
-		observations.push(observation(params))
+		record(observation(params))
 	}
 	const sample: AttachedDiagnostics["sample"] = ({ source }) => {
 		for (const idx of engine.activeWarIds) {
@@ -118,7 +117,6 @@ function attach({ engine }: AttachParams): AttachedDiagnostics {
 	}
 	sample({ source: "initial" })
 	return {
-		observations,
 		sample,
 		detach: () => {
 			RECRUITMENT.refresh = refresh

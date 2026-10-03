@@ -354,7 +354,34 @@ function runSeed({
 			numPoints: options.numPoints,
 			startYear: options.startYear,
 		})
-	const rebelLogistics = REBEL_LOGISTICS_REPORT.attach({ engine })
+	const logs = {
+		rebelLogistics: HISTORY_COMPARISON.digester(),
+		rebellionEvents: HISTORY_COMPARISON.digester(),
+		rebellionAttempts: HISTORY_COMPARISON.digester(),
+		armyReconstitutions: HISTORY_COMPARISON.digester(),
+		rebelWarOutcomes: HISTORY_COMPARISON.digester(),
+	}
+	let digestedEvents = 0
+	const digestEvents = () => {
+		for (; digestedEvents < engine.events.length; digestedEvents++) {
+			const note = engine.events[digestedEvents]
+			if (note.tag === "rebellion") logs.rebellionEvents.add(note)
+			else if (note.tag === "rebellion evaluated")
+				logs.rebellionAttempts.add(note)
+			else if (note.tag === "army reconstituted")
+				logs.armyReconstitutions.add(note)
+			else if (
+				note.tag === "war ended" &&
+				engine.wars[note.data.war as number].goal !== "conquest"
+			)
+				logs.rebelWarOutcomes.add(note)
+		}
+	}
+	const rebelLogistics = REBEL_LOGISTICS_REPORT.attach({
+		engine,
+		record: logs.rebelLogistics.add,
+	})
+	digestEvents()
 	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
 	const diagnostics = {
 		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
@@ -400,19 +427,11 @@ function runSeed({
 			}),
 		],
 		snapshots: [initial],
-		rebelLogistics: rebelLogistics.observations,
-		rebellionEvents: engine.events.filter((note) => note.tag === "rebellion"),
-		rebellionAttempts: engine.events.filter(
-			(note) => note.tag === "rebellion evaluated",
-		),
-		armyReconstitutions: engine.events.filter(
-			(note) => note.tag === "army reconstituted",
-		),
-		rebelWarOutcomes: engine.events.filter(
-			(note) =>
-				note.tag === "war ended" &&
-				engine.wars[note.data.war as number].goal !== "conquest",
-		),
+		rebelLogistics: logs.rebelLogistics.value(),
+		rebellionEvents: logs.rebellionEvents.value(),
+		rebellionAttempts: logs.rebellionAttempts.value(),
+		armyReconstitutions: logs.armyReconstitutions.value(),
+		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
 		wallMs: 0,
 		peakMemoryKb: 0,
@@ -422,20 +441,12 @@ function runSeed({
 		mkdirSync(dirname(options.outPath), { recursive: true })
 		diagnostics.wallMs = performance.now() - started
 		diagnostics.peakMemoryKb = process.resourceUsage().maxRSS
-		diagnostics.rebellionEvents = engine.events.filter(
-			(note) => note.tag === "rebellion",
-		)
-		diagnostics.rebellionAttempts = engine.events.filter(
-			(note) => note.tag === "rebellion evaluated",
-		)
-		diagnostics.armyReconstitutions = engine.events.filter(
-			(note) => note.tag === "army reconstituted",
-		)
-		diagnostics.rebelWarOutcomes = engine.events.filter(
-			(note) =>
-				note.tag === "war ended" &&
-				engine.wars[note.data.war as number].goal !== "conquest",
-		)
+		digestEvents()
+		diagnostics.rebelLogistics = logs.rebelLogistics.value()
+		diagnostics.rebellionEvents = logs.rebellionEvents.value()
+		diagnostics.rebellionAttempts = logs.rebellionAttempts.value()
+		diagnostics.armyReconstitutions = logs.armyReconstitutions.value()
+		diagnostics.rebelWarOutcomes = logs.rebelWarOutcomes.value()
 		saved[seed] = reports
 		seedDiagnostics[seed] = diagnostics
 		if (options.seeds.length === 1) saved.diagnostics = diagnostics

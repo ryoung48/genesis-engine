@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import {
 	existsSync,
 	readdirSync,
@@ -13,6 +14,8 @@ import type {
 	FlattenParams,
 	JsonObject,
 	JsonValue,
+	LogDigest,
+	LogDigester,
 	MatchParams,
 	MetricRow,
 	ReportPair,
@@ -166,6 +169,32 @@ function addRows({ before, after, section, period, rows }: RowsParams): void {
 		})
 }
 
+function digester(): LogDigester {
+	const hash = createHash("sha256")
+	let count = 0
+	return {
+		add: (entry) => {
+			hash.update(JSON.stringify(entry))
+			hash.update("\n")
+			count++
+		},
+		value: () => ({ count, sha256: hash.copy().digest("hex") }),
+	}
+}
+
+// Older reports saved each log in full; newer ones save only its digest.
+function logDigest(value: JsonValue | undefined): LogDigest | undefined {
+	if (Array.isArray(value)) {
+		const log = digester()
+		for (const entry of value) log.add(entry)
+		return log.value()
+	}
+	const saved = object(value)
+	return typeof saved.count === "number" && typeof saved.sha256 === "string"
+		? { count: saved.count, sha256: saved.sha256 }
+		: undefined
+}
+
 function byYear(value: JsonValue | undefined): Map<string, JsonObject> {
 	return new Map(
 		Array.isArray(value)
@@ -302,14 +331,14 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			"armyReconstitutions",
 			"rebelWarOutcomes",
 		]) {
-			const va = da[key]
-			const vb = db[key]
+			const va = logDigest(da[key])
+			const vb = logDigest(db[key])
 			rows.push({
 				section: "Raw diagnostics",
 				period: seed,
 				metric: `${key}.count`,
-				before: Array.isArray(va) ? va.length : undefined,
-				after: Array.isArray(vb) ? vb.length : undefined,
+				before: va?.count,
+				after: vb?.count,
 			})
 			rows.push({
 				section: "Raw diagnostics",
@@ -369,7 +398,7 @@ function html({ current, previous }: ReportPair): string {
 <h1>History benchmark comparison</h1><p>Current: ${link(current)}<br>Previous: ${previous ? link(previous) : "No earlier completed matching report found."}</p>
 ${!previous || !configMatches ? '<p class="warning">' + (!previous ? "First comparable run: values are shown without a baseline." : "Configuration differs or is missing from an older report. Review Configuration before interpreting changes as regressions.") + "</p>" : ""}
 <p>Simulation and diagnostics: ${simulationChanges.filter((row) => row.before !== undefined && row.after !== undefined).length.toLocaleString("en-US")} changed existing values, ${simulationChanges.filter((row) => row.before === undefined).length.toLocaleString("en-US")} added, ${simulationChanges.filter((row) => row.after === undefined).length.toLocaleString("en-US")} removed. Timing and memory: ${changed.filter((row) => row.section === "Performance").length.toLocaleString("en-US")} differences. Numerical changes show current minus previous. No increase or decrease is automatically judged better.</p>
-<p>Century statistics cover the full timeline. Annual rows include army totals, cohorts and concentration. Raw event logs and top-realm lists are checked for exact equality; their full contents remain in the linked JSON files. Performance values use milliseconds, except peakMemoryKb (KiB).</p>
+<p>Century statistics cover the full timeline. Annual rows include army totals, cohorts and concentration. Raw event logs are checked for exact equality by entry count and SHA-256 digest, and top-realm lists by value; the top-realm lists remain in the linked JSON files. Performance values use milliseconds, except peakMemoryKb (KiB).</p>
 <div class="controls"><label>Section <select id="section"><option value="">All sections</option>${[...new Set(rows.map((row) => row.section))].map((section) => `<option>${escapeHtml(section)}</option>`).join("")}</select></label><label>Search <input id="search" type="search" placeholder="Metric, seed or year"></label><label><input id="changed" type="checkbox" checked> Changes only</label><button id="prev">Previous page</button><button id="next">Next page</button><span id="count" aria-live="polite"></span></div>
 <div class="scroll"><table><thead><tr><th>Section</th><th>Seed / period</th><th>Metric</th><th>Previous</th><th>Current</th><th>Δ</th><th>Δ %</th></tr></thead><tbody id="rows"></tbody></table></div>
 <script type="application/json" id="data">${JSON.stringify(rows).replace(/</g, "\\u003c")}</script>
@@ -410,4 +439,4 @@ function write({ current, baseline }: CompareParams): string {
 	return outPath
 }
 
-export const HISTORY_COMPARISON = { write, files, read }
+export const HISTORY_COMPARISON = { write, files, read, digester }

@@ -153,12 +153,15 @@ function sameList<T>({ a, b }: SameListParams<T>): boolean {
 function refreshCandidates({ state }: StateParams): Set<number> {
 	DERIVE.ensureHierarchyClean(state)
 	const changed = new Set<number>()
+	const refreshed = state.militaryCandidatesRefresh
 	if (
 		!state.militaryDiplomacyDirty &&
-		state.militaryCandidatesVersion === state.hierarchyVersion
+		refreshed.hierarchyVersion === state.hierarchyVersion &&
+		refreshed.wars === state.wars.length
 	)
 		return changed
-	state.militaryCandidatesVersion = state.hierarchyVersion
+	refreshed.hierarchyVersion = state.hierarchyVersion
+	refreshed.wars = state.wars.length
 	const retied = state.militaryDiplomacyNations
 	for (const idx of state.activeWarIds) {
 		const war = state.wars[idx]

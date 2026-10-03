@@ -37,8 +37,10 @@ export interface RebelLogisticsObservation {
 
 export interface AttachParams {
 	engine: HistoryState
+	record: (observation: RebelLogisticsObservation) => void
 }
-export interface ObserveParams extends AttachParams {
+export interface ObserveParams {
+	engine: HistoryState
 	war: War
 	nation: number
 	source: ObservationSource
@@ -47,7 +49,6 @@ export interface SampleParams {
 	source: ObservationSource
 }
 export interface AttachedDiagnostics {
-	observations: RebelLogisticsObservation[]
 	sample: (params: SampleParams) => void
 	detach: () => void
 }

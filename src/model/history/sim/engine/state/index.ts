@@ -736,7 +736,7 @@ function createHistoryState({
 		militaryWarIndexStale: true,
 		militaryDiplomacyDirty: false,
 		militaryDiplomacyNations: new Set(),
-		militaryCandidatesVersion: -1,
+		militaryCandidatesRefresh: { hierarchyVersion: -1, wars: 0 },
 		armySizeCurrent: new Float64Array(P),
 		revenueCurrent: new Float64Array(P),
 		plunderedUntil: new Float64Array(P),

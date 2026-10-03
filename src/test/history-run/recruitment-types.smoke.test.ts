@@ -694,6 +694,7 @@ describe("military transitions and conservation", () => {
 				active.goal = "throne"
 				active.backers.push(supporter)
 				state.militaryDiplomacyDirty = true
+				state.militaryDiplomacyNations.add(active.attacker)
 			},
 		})
 		expect(active.participants[supporter]).toBe("attacker")
@@ -706,6 +707,7 @@ describe("military transitions and conservation", () => {
 			action: () => {
 				active.backers.length = 0
 				state.militaryDiplomacyDirty = true
+				state.militaryDiplomacyNations.add(active.attacker)
 			},
 		})
 		expect(active.participants[supporter]).toBeUndefined()
