@@ -768,6 +768,21 @@ function beforeRealmMutation({ state, provinces }: RealmMutationParams): void {
 	}
 }
 
+// One pass for the whole world, equivalent to beforeProvinceMutation on every settled province after a census bump.
+function beforeCensus({ state }: RecordArmiesParams): void {
+	if (!state.militaryReady) return
+	DERIVE.ensureHierarchyClean(state)
+	const advanced = new Uint8Array(state.P)
+	for (let p = 0; p < state.P; p++) {
+		if (state.desolate[p]) continue
+		const nation = state.sovereignCurrent[p]
+		if (nation < 0 || advanced[nation]) continue
+		advanced[nation] = 1
+		beforeMutation({ state, nation })
+	}
+	state.realmCache.clear()
+}
+
 function afterMutation({ state }: RecordArmiesParams): void {
 	if (state.militaryDepth === 0) reconcile({ state })
 }
@@ -799,7 +814,9 @@ function reconcile({ state }: RecordArmiesParams): void {
 	const changed = DEPLOYMENTS.reconcileParticipation({ state, wars })
 	const allocation = new Set([...changed, ...state.militaryAllocationDirty])
 	const rebalance = new Set(allocation)
-	for (const idx of state.activeWarIds) {
+	for (const idx of state.militaryStrengthDirty.size > 0
+		? state.activeWarIds
+		: []) {
 		const war = state.wars[idx]
 		for (const side of ["attacker", "defender"] as const) {
 			const opponent = side === "attacker" ? war.defender : war.attacker
@@ -903,6 +920,7 @@ export const MILITARY = {
 	mutate,
 	beforeMutation,
 	beforeProvinceMutation,
+	beforeCensus,
 	afterMutation,
 	validate,
 	armySize,

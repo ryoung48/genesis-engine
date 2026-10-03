@@ -1,4 +1,3 @@
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import type {
 	AdvanceKnowledgeParams,
 	InitKnowledgeParams,
@@ -117,13 +116,8 @@ function initKnowledge({ state }: InitKnowledgeParams): void {
 	const baseline = state.knowledgeBaseline
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		FIELDS.prov.knowledge.set({
-			state,
-			p,
-			value:
-				baseline +
-				INITIAL_LEAD * (FIELDS.prov.development.get({ state, p }) - meanDev),
-		})
+		state.knowledgeCurrent[p] =
+			baseline + INITIAL_LEAD * (state.developmentCurrent[p] - meanDev)
 	}
 }
 
@@ -155,11 +149,11 @@ function advanceKnowledge({
 	const next = state.knowledgeCurrent.slice()
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		const knowledge = FIELDS.prov.knowledge.get({ state, p })
+		const knowledge = state.knowledgeCurrent[p]
 		const drag = Math.max(0, 1 - (knowledge - worldKnowledge) / leadLimit)
 		const own =
 			selfAdvanceRate({ knowledge }) *
-			FIELDS.prov.development.get({ state, p }) *
+			state.developmentCurrent[p] *
 			Math.min(1, drag)
 		const sovereign = STATE.getSovereign({ state, p })
 		let pull = 0
@@ -170,7 +164,7 @@ function advanceKnowledge({
 		) {
 			const nb = state.provinceAdjList[i]
 			if (state.desolate[nb]) continue
-			const gap = FIELDS.prov.knowledge.get({ state, p: nb }) - knowledge
+			const gap = state.knowledgeCurrent[nb] - knowledge
 			if (gap <= 0) continue
 			const rate =
 				STATE.getSovereign({ state, p: nb }) === sovereign
@@ -181,8 +175,7 @@ function advanceKnowledge({
 		next[p] = knowledge + (own + pull) * yearFraction
 	}
 	for (let p = 0; p < state.P; p++)
-		if (!state.desolate[p])
-			FIELDS.prov.knowledge.set({ state, p, value: next[p] })
+		if (!state.desolate[p]) state.knowledgeCurrent[p] = next[p]
 }
 
 function growthRate({ knowledge }: KnowledgeLevelParams): number {

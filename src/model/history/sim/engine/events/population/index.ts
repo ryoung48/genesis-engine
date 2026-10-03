@@ -106,7 +106,7 @@ function urbanization({ state, init, yearFraction }: UrbanizationParams): void {
 			const target = targets[idx]
 			state.leaderRuntime.targetUrban[prov] = target
 			if (init) {
-				FIELDS.prov.population.urban.set({ state, p: prov, value: target })
+				state.popUrbanCurrent[prov] = target
 				continue
 			}
 			const urban = FIELDS.prov.population.urban.get({ state, p: prov })
@@ -115,24 +115,14 @@ function urbanization({ state, init, yearFraction }: UrbanizationParams): void {
 			const gap = target - urban
 			const adjustment =
 				Math.sign(gap) * Math.min(Math.abs(gap) * URBAN_GROWTH, maxAdjustment)
-			FIELDS.prov.population.urban.set({
-				state,
-				p: prov,
-				value: urban + adjustment,
-			})
+			state.popUrbanCurrent[prov] = urban + adjustment
 			migrants += adjustment
 		}
 		if (init || totalRural <= 0) continue
 
 		const ruralScale = Math.max(0, 1 - migrants / totalRural)
-		for (const prov of provinces) {
-			const rural = FIELDS.prov.population.rural.get({ state, p: prov })
-			FIELDS.prov.population.rural.set({
-				state,
-				p: prov,
-				value: rural * ruralScale,
-			})
-		}
+		for (const prov of provinces)
+			state.popRuralCurrent[prov] = state.popRuralCurrent[prov] * ruralScale
 	}
 }
 
@@ -163,20 +153,12 @@ function development({ state, init }: DevelopmentParams): void {
 		const targetDev = Math.max(devFromCities[p], localDev, floor)
 
 		if (init) {
-			FIELDS.prov.development.set({
-				state,
-				p,
-				value: targetDev,
-			})
+			state.developmentCurrent[p] = targetDev
 		} else {
-			const currentDev = FIELDS.prov.development.get({ state, p })
+			const currentDev = state.developmentCurrent[p]
 			const gap = targetDev - currentDev
 			const rate = gap > 0 ? DEV_RISE : DEV_FALL
-			FIELDS.prov.development.set({
-				state,
-				p,
-				value: currentDev + gap * rate,
-			})
+			state.developmentCurrent[p] = currentDev + gap * rate
 		}
 	}
 }
@@ -198,6 +180,7 @@ function initPopulation({ state }: InitPopulationParams): void {
 
 function runPopulation({ state, previousTime }: RunPopulationParams): void {
 	state.censusVersion++
+	MILITARY.beforeCensus({ state })
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 
 	KNOWLEDGE.advanceKnowledge({ state, yearFraction })
@@ -210,11 +193,8 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 				knowledge: FIELDS.prov.knowledge.get({ state, p }),
 			}) *
 				yearFraction
-		for (const field of [
-			FIELDS.prov.population.rural,
-			FIELDS.prov.population.urban,
-		])
-			field.set({ state, p, value: field.get({ state, p }) * growth })
+		state.popRuralCurrent[p] = state.popRuralCurrent[p] * growth
+		state.popUrbanCurrent[p] = state.popUrbanCurrent[p] * growth
 	}
 
 	urbanization({ state, init: false, yearFraction })
