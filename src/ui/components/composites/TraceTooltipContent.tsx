@@ -16,21 +16,18 @@ export interface TraceTooltipFooterEntry {
 interface TraceTooltipContentProps {
 	title: string
 	trace: TraceTooltipEntry[]
-	/** Formats each entry's signed value (and the final total) -- e.g.
-	 * `(v) => \`${v > 0 ? "+" : ""}${v}\`` for a plain DM, or with a "°C"
-	 * suffix for a temperature delta. Defaults to a plain signed integer. */
+	// [JUSTIFICATION] Callers can use the default signed integer formatter.
 	formatValue?: (value: number) => string
 	finalLabel: string
 	finalValue: number
-	/** [JUSTIFICATION] Only temperature ranges need high/low values between
-	 * their factor breakdown and final delta; other trace tooltips do not. */
+	// [JUSTIFICATION] Only temperature ranges need extra footer rows.
 	footerEntries?: TraceTooltipFooterEntry[]
+	// [JUSTIFICATION] Empty traces normally use the shared default message.
 	emptyMessage?: string
-	/** "signed" (default): positive is good (green), negative is bad (red) --
-	 * for game modifiers like tidal-lock DM. "temperature": positive is hot
-	 * (red), negative is cold (blue) -- for temperature deltas, where the
-	 * good/bad polarity doesn't apply. */
+	// [JUSTIFICATION] Temperature traces reverse the default good/bad polarity.
 	colorScheme?: "signed" | "temperature"
+	// [JUSTIFICATION] Treasury traces group accounting rows in supplied order; other traces rank values.
+	order?: "value" | "provided"
 }
 
 const dotColorBySchemeAndSign: Record<
@@ -84,8 +81,10 @@ export function TraceTooltipContent({
 	footerEntries = [],
 	emptyMessage = "No adjustments applied",
 	colorScheme = "signed",
+	order = "value",
 }: TraceTooltipContentProps) {
-	const sorted = [...trace].sort((a, b) => b.value - a.value)
+	const sorted =
+		order === "provided" ? trace : [...trace].sort((a, b) => b.value - a.value)
 	return (
 		<div className="w-52 space-y-2">
 			<div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">

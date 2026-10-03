@@ -1,4 +1,3 @@
-import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
@@ -215,7 +214,6 @@ function runSuccession({
 		state,
 		nation: province,
 		rng,
-		revenueOf: (nation) => ECONOMY.revenue({ state, p: nation }),
 	})
 }
 
@@ -261,7 +259,6 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 		state,
 		nation: realm,
 		rng,
-		revenueOf: (nation) => ECONOMY.revenue({ state, p: nation }),
 	})
 }
 

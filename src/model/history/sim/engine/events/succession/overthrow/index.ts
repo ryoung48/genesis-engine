@@ -1,4 +1,3 @@
-import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
 import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
 import type {
@@ -77,7 +76,6 @@ function enthrone({
 		state,
 		nation: realm,
 		rng,
-		revenueOf: (nation) => ECONOMY.revenue({ state, p: nation }),
 	})
 	REGENCY.startMinority({ state, realm })
 	const overlord = STATE.diplomaticOverlord({ state, nation: realm })

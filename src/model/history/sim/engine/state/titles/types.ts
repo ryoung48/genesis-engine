@@ -1,4 +1,4 @@
-import { HistoryState } from "@/model/history/sim/engine/state/types"
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface ApplyDerivedParentsParams {
@@ -11,7 +11,6 @@ export interface ConsiderTitlesParams {
 	state: HistoryState
 	nation: number
 	rng: SharedRng
-	revenueOf: (nation: number) => number
 }
 
 export interface DissolveLapsedParams {
@@ -38,8 +37,6 @@ export interface SettleTitleSetParams {
 	touched: Set<number>
 }
 
-export interface TitleRevenueBarParams {
-	state: HistoryState
-	tier: number
-	revenueOf: (nation: number) => number
+export interface OwnedChildCountParams extends DissolveLapsedParams {
+	title: number
 }

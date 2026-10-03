@@ -1,4 +1,5 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
+import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import {
 	getNationProvinces,
@@ -9,10 +10,10 @@ import type {
 	ConsiderTitlesParams,
 	DissolveLapsedParams,
 	FoundTitleForParams,
+	OwnedChildCountParams,
 	RelinkNationsParams,
 	SettleProvincesParams,
 	SettleTitleSetParams,
-	TitleRevenueBarParams,
 } from "@/model/history/sim/engine/state/titles/types"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
@@ -25,6 +26,11 @@ const MIN_FOUNDING_CHILDREN = 2
 const LAPSE_YEARS = 25
 const BASE_FOUNDING_CHANCE = 0.02
 const CLAIM_FOUNDING_CHANCE = 0.02
+const TITLE_CREATION_COST_DUCATS: Readonly<Record<number, number>> = {
+	2: 625 / 36,
+	3: 625 / 18,
+	4: 625 / 9,
+}
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000
 
 function applyDerivedParents({
@@ -142,26 +148,11 @@ function refreshTitleIndex({ state }: DissolveLapsedParams): void {
 	})
 }
 
-function titleRevenueBar({
-	state,
-	tier,
-	revenueOf,
-}: TitleRevenueBarParams): number {
-	const holders = new Set<number>()
-	for (let title = 0; title < state.titles.count; title++)
-		if (state.titles.tier[title] >= tier && state.titles.holder[title] >= 0)
-			holders.add(state.titles.holder[title])
-	if (holders.size === 0) return Number.NEGATIVE_INFINITY
-	const revenue = [...holders].map(revenueOf).sort((a, b) => a - b)
-	return revenue[Math.floor(revenue.length / 4)]
-}
-
 function foundTitleFor({
 	state,
 	nation,
 	tier,
 	rng,
-	revenueOf,
 }: FoundTitleForParams): boolean {
 	const children = FOUNDING.fullyHeldChildren({
 		titles: state.titles,
@@ -173,8 +164,9 @@ function foundTitleFor({
 		orphansOnly: true,
 	})
 	if (children.length < MIN_FOUNDING_CHILDREN) return false
-	if (revenueOf(nation) < titleRevenueBar({ state, tier, revenueOf }))
-		return false
+	const cost = TITLE_CREATION_COST_DUCATS[tier]
+	const treasury = FIELDS.prov.treasury.get({ state, p: nation })
+	if (treasury < cost) return false
 	const claim = state.leaderClaimCurrent[nation]
 	if (rng.random() >= BASE_FOUNDING_CHANCE + CLAIM_FOUNDING_CHANCE * claim)
 		return false
@@ -192,6 +184,10 @@ function foundTitleFor({
 		children,
 	})
 	if (!founded) return false
+	FIELDS.prov.treasury.set({ state, p: nation, value: treasury - cost })
+	const budget = TREASURY_BUDGET.get({ state, p: nation })
+	budget.titleCreationExpenses -= cost
+	budget.otherChangesTotal -= cost
 	state.titleFounded[founded.title] = 1
 	state.titleLapseSince[founded.title] = -1
 	refreshTitleIndex({ state, nation })
@@ -216,7 +212,7 @@ function ownedChildCount({
 	state,
 	nation,
 	title,
-}: DissolveLapsedParams & { title: number }): number {
+}: OwnedChildCountParams): number {
 	const tier = state.titles.tier[title]
 	return FOUNDING.fullyHeldChildren({
 		titles: state.titles,
@@ -273,15 +269,10 @@ function dissolveLapsed({ state, nation }: DissolveLapsedParams): void {
 	}
 }
 
-function considerTitles({
-	state,
-	nation,
-	rng,
-	revenueOf,
-}: ConsiderTitlesParams): void {
+function considerTitles({ state, nation, rng }: ConsiderTitlesParams): void {
 	dissolveLapsed({ state, nation })
 	for (let tier = FIRST_FOUNDED_TIER; tier <= TIER_SLOTS; tier++)
-		if (foundTitleFor({ state, nation, tier, rng, revenueOf })) break
+		if (foundTitleFor({ state, nation, tier, rng })) break
 }
 
 export const STATE_TITLES = {

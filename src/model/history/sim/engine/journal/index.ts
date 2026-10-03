@@ -259,6 +259,7 @@ function flush({
 			budget.indemnityReceived = 0
 			budget.boughtPeace = 0
 			budget.succession = 0
+			budget.titleCreationExpenses = 0
 			budget.otherChangesTotal = 0
 		}
 	const people = peopleRows(state)

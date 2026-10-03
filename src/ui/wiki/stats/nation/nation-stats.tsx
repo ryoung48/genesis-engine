@@ -163,6 +163,7 @@ export function buildNationWikiStats(
 						valueHelp: economy.budget ? (
 							<TraceTooltipContent
 								title={`${yearLabel} treasury ${economy.budget.settled ? "changes" : "estimate"}`}
+								order="provided"
 								trace={[
 									{
 										value: economy.budget.taxes,
@@ -206,6 +207,10 @@ export function buildNationWikiStats(
 									{
 										value: economy.budget.succession,
 										description: "Realm split",
+									},
+									{
+										value: economy.budget.titleCreationExpenses,
+										description: "Title creation",
 									},
 								].filter((entry) => entry.value !== 0)}
 								formatValue={formatSignedDucats}

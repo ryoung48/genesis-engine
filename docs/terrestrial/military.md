@@ -31,6 +31,10 @@ Both prices scale by `(realm output per resident / 450)^0.5` and the shared silv
 
 Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, distinguishing projected annual upkeep from settled interval expense. Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
 
+[Title creation](dejure-titles.md#founding-and-dissolving-founding-considertitles) is an immediate one-off cash expense recorded as the negative "Title creation" budget row, beside bought peace and realm splits. It contributes once through `otherChangesTotal`; recurring tax/army settlement and `annualBalance` exclude it. Tax previews and settlement preserve this accumulator. Census snapshots record it, then reset it for the next interval.
+
+One-off rows describe the preceding census interval under the frame's year heading. A dated founding appears on the title timeline at event time; its fee appears in the covering census afterward, then disappears from the next census. Frames between censuses retain the last recorded budget and cash. A payer with no census yet has no recorded economy, and a payer annexed before the next census never has a snapshot showing its fee. Prices and calibration uncertainty are documented in the title reference above.
+
 The safe treasury is twice positive civilian surplus. Positive cash above that reference leaks annually at `0.04 × safe × (treasury / safe − 1)^2`, bounded by available cash. Every crown receives one third of battle, sack, and raid loot. Peace buyoff demands and rebellion threat follow shared rules.
 
 ## Deployment and coalition strength

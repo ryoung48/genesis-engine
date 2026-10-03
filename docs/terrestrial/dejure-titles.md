@@ -1,6 +1,6 @@
 # De jure titles (`:history`)
 
-Code: `src/model/society/dejure` (`index.ts`, `holding/`, `founding/`), tier table in `src/model/society/titles`, runtime wiring in `src/model/history/sim/engine/state/titles.ts`, initial setup in `src/model/history/sim/nations/index.ts`.
+Code: `src/model/society/dejure` (`index.ts`, `holding/`, `founding/`), tier table in `src/model/society/titles`, runtime wiring in `src/model/history/sim/engine/state/titles/index.ts`, initial setup in `src/model/history/sim/nations/index.ts`.
 
 Titles are fixed regions of provinces. Who holds a title is separate state, computed from province ownership. The realm hierarchy (`parent`) is derived from held titles and their seats.
 
@@ -45,15 +45,29 @@ There is no hysteresis. The previous keep/challenge thresholds (holder keeps at 
 
 ## Founding and dissolving (`FOUNDING`, `considerTitles`)
 
-Only kingdom, empire and hegemony can be founded. A nation tries at most one tier per call, lowest first.
+Only kingdom, empire and hegemony can be founded. A nation tries tiers lowest first and founds at most one title per call. Attempts occur during succession and overthrow, not annually or through a player decision.
 
 A nation can found a title at tier `T` when:
 
 - It holds at least 2 tier `T-1` titles that it fully owns and that aren't already inside a fully held tier `T` region (`orphansOnly`).
-- Its wealth is at least the lower quartile of current holders at tier `T` or higher.
+- Its posted treasury cash covers the fixed establishment fee. Exact equality is sufficient; debt is ineligible. Pending army costs follow existing settlement rules.
 - A roll passes: 2% + 2% × leader claim.
 
 Founding merges those children's provinces into a new region, writes the new title into `regionOf` at tier `T` and all higher tiers, and picks the seat: the holder's root province if it's inside the region, otherwise the holder-owned province with the best rank and `seatScore`. It emits `title created`, re-settles the titles it replaced, and relinks the nation.
+
+Successful founding immediately debits cash once and records a negative `titleCreationExpenses` budget line. Failed rolls, invalid children and null founding results cost nothing. The fee replaces the former peer-revenue gate; cash-rich realms can found regardless of annual revenue.
+
+| Title | Establishment fee (ducats) | Silver equivalent |
+| --- | ---: | ---: |
+| Kingdom | 625 / 36 (about 17.361111) | 868.055556 kg |
+| Empire | 625 / 18 (about 34.722222) | 1,736.111111 kg |
+| Hegemony | 625 / 9 (about 69.444444) | 3,472.222222 kg |
+
+These are accepted gameplay calibration prices, not measured medieval coronation tariffs. The [mirrored CK3 title defines](https://github.com/jesec/ck3-mod-base/blob/master/base/game/common/defines/00_defines.txt#L913-L937) give base prices of 500, 1,000 and 2,000 gold. The [army defines](https://github.com/jesec/ck3-mod-base/blob/master/base/game/common/defines/00_defines.txt#L617-L629) give 0.003 gold per soldier; [military localization](https://github.com/jesec/ck3-mod-base/blob/master/base/game/localization/english/gui/militaryview_l_english.yml) identifies levy upkeep as monthly. Matching 0.036 gold per levy-year to this model's 62.5 g silver campaign levy-year at 450 g output per resident-year gives 15,625 / 9 g silver per CK3 gold. With `ECONOMY.ducatsPerGram = 1 / 50,000`, the fixed conversion is 5 / 144 ducats per gold. Preserve precision until display; future military upkeep changes do not change these fees.
+
+Equivalence of soldiers, service duration, equipment and provisioning between the two upkeep models is unverified. There is no demonstrated physical coin weight for a CK3 gold unit, so no additional bullion conversion applies. [John's 1199 chancery ordinance](https://sourcebooks.web.fordham.edu/source/1199Johnfees.asp), [Charles the Bold's ducal accounts](https://www.jstage.jst.go.jp/article/jsmes/8/0/8_26/_article/-char/en), and [Van Gelder's study of coronations and inaugurations](https://cris.vub.be/ws/portalfiles/portal/121350664/Van_Gelder_introduction.pdf) support expenditure on legal instruments, regalia, ceremony and political recognition in particular settings. They do not establish universal rank tariffs, doubling by rank, or expenses exclusive to founding. Keeping succession free is a gameplay scope choice.
+
+Generation, inheritance, conquest, automatic holder changes and acquisition of an existing or vacant title are free. Payment attaches to new creation, not its holder. Dissolution gives no refund; later refounding pays the full fee again, with no permanent paid flag. There is no ongoing upkeep, duchy founding, usurpation fee or discount.
 
 A founded title lapses when the nation holds fewer than 2 fully held children for 25 years (`LAPSE_YEARS`). It then emits `title destroyed` and the region is cleared. Generated titles never dissolve.
 
@@ -84,7 +98,7 @@ Rules to keep the hierarchy valid:
 
 Similar:
 
-- Tier ladder county → duchy → kingdom → empire, with hegemony added.
+- Tier ladder county → duchy → kingdom → empire → hegemony; the inspected CK3 defines also include hegemony.
 - Fixed de jure regions, separate from de facto holdings.
 - Each title has a capital seat, and titles are created by holding enough of the tier below.
 - Realm hierarchy follows the seats of held titles.
@@ -94,7 +108,7 @@ Different:
 - Holders are sovereigns chosen by majority ownership, not characters granted titles. No vassal contracts, grants or usurpation.
 - The liege tree is derived, not chosen.
 - No de jure drift. The tree changes only when titles are founded or dissolved.
-- Founding is a wealth-gated random roll instead of a decision with a cost.
+- Founding is a cash-gated random attempt with a fixed establishment fee instead of a player decision; CK3 prestige/piety requirements are not modeled.
 - Titles can be vacant.
 - No barony tier below county.
 
