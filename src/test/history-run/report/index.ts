@@ -440,7 +440,7 @@ function runSeed({
 		seedDiagnostics[seed] = diagnostics
 		if (options.seeds.length === 1) saved.diagnostics = diagnostics
 		else saved.diagnosticsBySeed = seedDiagnostics
-		const content = JSON.stringify(saved, null, 1)
+		const content = JSON.stringify(saved)
 		writeFileSync(options.outPath, content)
 		if (diagnostics.recruitment.at(-1)?.year === start + 500)
 			writeFileSync(options.outPath.replace(/\.json$/, "-500.json"), content)
