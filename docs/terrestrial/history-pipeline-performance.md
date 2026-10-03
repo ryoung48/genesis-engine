@@ -41,7 +41,9 @@ The targeted history tests, `pnpm lint` and `pnpm typecheck` passed.
 
 The CPU profile attributes substantial simulation work to repeated military deployment/alliance calculations during budget previews. Those modules overlap the other agent's active military changes, so this branch leaves them alone. Person-name generation also accounts for a substantial translation cost. A later investigation could consider generating names on demand, after defining how record consumers access them. Frame reconstruction was only around one second of the 300-year runs and is a lower-priority target.
 
-Census keyframes and complete records still grow with history length. Compressing or thinning these would require an explicit decision about historical query fidelity; this change preserves all recorded history.
+Census keyframes and complete records still grow with history length. Lossless compression could reduce their storage while retaining every recorded value; thinning would change historical query fidelity.
+
+The live worker and browser now release consumed journal batches, and scrub frames share their census arrays. See [History record memory](history-record-memory.md) for ownership rules, measurements and verification.
 ## Lazy person names
 
 The follow-up change defers person and house names until display code requests them through `PERSON_NAMES`. Raw people keep their name seeds, birth realms and dynasty IDs. Ruler events retain person/regent IDs and dates; revolt comments retain their structured cause and pretender ID. Wiki consumers resolve those into the same labels and text as before.

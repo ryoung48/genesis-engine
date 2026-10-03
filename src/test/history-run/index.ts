@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { HISTORY } from "@/model/history/record"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
+import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState as EngineState } from "@/model/history/sim/engine/state/types"
@@ -138,9 +139,8 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		startTimeMs: engine.time,
 	})
 	const translator = SIM_RECORD.createTranslator({ state, world })
-	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-	engine.journal.length = 0
-	engine.events.length = 0
+	SIM_RECORD.consumeJournal({ translator, transactions: engine.journal })
+	JOURNAL.releaseSent(engine)
 	const initMs = engineMs + performance.now() - recordStart
 	log(
 		`seed ${seed} era ${era} points ${numPoints} provinces ${engine.P} generation ${generationMs.toFixed(0)}ms init ${initMs.toFixed(0)}ms`,
@@ -161,12 +161,11 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 			rng,
 			validate: false,
 		})
-		SIM_RECORD.appendJournal({
+		SIM_RECORD.consumeJournal({
 			translator,
 			transactions: engine.journal,
 		})
-		engine.journal.length = 0
-		engine.events.length = 0
+		JOURNAL.releaseSent(engine)
 		const tickMs = performance.now() - tickStart
 
 		const frameStart = performance.now()

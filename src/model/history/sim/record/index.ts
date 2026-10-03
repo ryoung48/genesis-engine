@@ -13,6 +13,7 @@ import type {
 	TitleBase,
 } from "@/model/history/record/types"
 import { TRANSLATOR } from "@/model/history/sim/record/translator"
+import type { AppendJournalParams } from "@/model/history/sim/record/translator/types"
 import type { BuildProceduralStateParams } from "@/model/history/sim/record/types"
 import type { PartitionRow } from "@/model/history/world-frame/types"
 import { ERAS } from "@/model/society/eras"
@@ -264,9 +265,15 @@ function buildProceduralState(
 	}
 }
 
+function consumeJournal(params: AppendJournalParams): void {
+	TRANSLATOR.appendJournal(params)
+	params.transactions.length = 0
+}
+
 export const SIM_RECORD = {
 	buildProceduralRecord,
 	buildProceduralState,
 	createTranslator: TRANSLATOR.createTranslator,
 	appendJournal: TRANSLATOR.appendJournal,
+	consumeJournal,
 }

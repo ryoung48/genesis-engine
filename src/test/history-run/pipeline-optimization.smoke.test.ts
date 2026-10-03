@@ -96,10 +96,13 @@ it("builds the same complete record while releasing translated journal batches",
 	const streamed = SIM_RECORD.buildProceduralState({ world, startTimeMs })
 	const batched = SIM_RECORD.buildProceduralState({ world, startTimeMs })
 	const translator = SIM_RECORD.createTranslator({ state: streamed, world })
-	const all = engine.journal.slice()
-	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-	engine.journal.length = 0
-	engine.events.length = 0
+	const queue = structuredClone(engine.journal, {
+		transfer: JOURNAL.transferList(engine.journal),
+	})
+	const all = queue.slice()
+	JOURNAL.releaseSent(engine)
+	SIM_RECORD.consumeJournal({ translator, transactions: queue })
+	expect(queue).toHaveLength(0)
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	for (let year = 1; year <= 20; year++) {
 		SIM_ENGINE.simulateUntil({
@@ -108,19 +111,30 @@ it("builds the same complete record while releasing translated journal batches",
 			rng,
 			validate: false,
 		})
-		all.push(...engine.journal)
-		SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
-		engine.journal.length = 0
-		engine.events.length = 0
+		queue.push(
+			...structuredClone(engine.journal, {
+				transfer: JOURNAL.transferList(engine.journal),
+			}),
+		)
+		all.push(...queue)
+		JOURNAL.releaseSent(engine)
+		SIM_RECORD.consumeJournal({ translator, transactions: queue })
+		expect(queue).toHaveLength(0)
+		expect(engine.journal).toHaveLength(0)
+		expect(engine.events).toHaveLength(0)
 	}
 	SIM_RECORD.appendJournal({
 		translator: SIM_RECORD.createTranslator({ state: batched, world }),
 		transactions: all,
 	})
 	expect(streamed.record).toEqual(batched.record)
-	expect(
-		HISTORY.frameAt({ state: streamed, timeMs: streamed.record.maxTimeMs }),
-	).toEqual(
-		HISTORY.frameAt({ state: batched, timeMs: batched.record.maxTimeMs }),
-	)
+	for (const census of streamed.record.events.censuses.toReversed()) {
+		for (const timeMs of [census.timeMs, census.timeMs + STATE.yearMs / 2]) {
+			const frame = HISTORY.frameAt({ state: streamed, timeMs })
+			expect(frame).toEqual(HISTORY.frameAt({ state: batched, timeMs }))
+			expect(frame.provincePopulation).toBe(census.rural)
+			expect(frame.provincePopulationUrban).toBe(census.urban)
+			expect(frame.provinceDevelopment).toBe(census.development)
+		}
+	}
 })

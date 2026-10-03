@@ -709,11 +709,10 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 	const census = record.events.censuses.findLast(
 		(entry) => entry.timeMs <= timeMs,
 	)
-	const provincePopulation = census?.rural.slice() ?? new Float32Array(count)
-	const provincePopulationUrban =
-		census?.urban.slice() ?? new Float32Array(count)
-	const provinceDevelopment =
-		census?.development.slice() ?? new Float32Array(count)
+	// Census snapshots stay immutable and can be shared across scrub frames.
+	const provincePopulation = census?.rural ?? new Float32Array(count)
+	const provincePopulationUrban = census?.urban ?? new Float32Array(count)
+	const provinceDevelopment = census?.development ?? new Float32Array(count)
 	let totalPopulation = 0
 	for (let province = 0; province < count; province++)
 		totalPopulation +=

@@ -6,6 +6,7 @@ import type {
 	FlushJournalParams,
 	JournalPeople,
 	JournalRelationChange,
+	JournalTransaction,
 	PendingJournal,
 	RecordCoalitionParams,
 	RecordProvinceChangeParams,
@@ -297,6 +298,23 @@ function flush({
 	pendingJournal.coalitions = []
 }
 
+function transferList(journal: JournalTransaction[]): Transferable[] {
+	return journal.flatMap((transaction) =>
+		transaction.census
+			? [
+					transaction.census.urban.buffer,
+					transaction.census.rural.buffer,
+					transaction.census.development.buffer,
+				]
+			: [],
+	)
+}
+
+function releaseSent(state: HistoryState): void {
+	state.journal.length = 0
+	state.events.length = 0
+}
+
 export const JOURNAL = {
 	pending,
 	parent,
@@ -304,4 +322,6 @@ export const JOURNAL = {
 	relation,
 	coalition,
 	flush,
+	releaseSent,
+	transferList,
 }

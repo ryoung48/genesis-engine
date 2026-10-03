@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
+import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
@@ -30,7 +31,6 @@ let historyState: HistoryState | null = null
 let historyRng: ReturnType<typeof HISTORY_RNG.createHistoryRng> | null = null
 let historyTime = STATE.defaultStartYear * STATE.yearMs
 let simulationRunning = false
-let historyJournalCursor = 0
 
 function getProgressLabel(label: string): string {
 	switch (label) {
@@ -97,20 +97,6 @@ function getProgressLabel(label: string): string {
 	return `${shortLabel[0].toUpperCase()}${shortLabel.slice(1)}`
 }
 
-function buildJournalTransferList(
-	journal: HistoryState["journal"],
-): Transferable[] {
-	return journal.flatMap((transaction) =>
-		transaction.census
-			? [
-					transaction.census.urban.buffer,
-					transaction.census.rural.buffer,
-					transaction.census.development.buffer,
-				]
-			: [],
-	)
-}
-
 async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 	if (!historyState || !historyRng) return
 	simulationRunning = true
@@ -124,14 +110,14 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 				rng: historyRng,
 				validate: false,
 			})
-			const journal = historyState.journal.slice(historyJournalCursor)
-			historyJournalCursor = historyState.journal.length
+			const journal = historyState.journal
 			const progress: GenesisWorkerResponse = {
 				type: "sim-progress",
 				timeMs: historyTime,
 				journal,
 			}
-			self.postMessage(progress, buildJournalTransferList(journal))
+			self.postMessage(progress, JOURNAL.transferList(journal))
+			JOURNAL.releaseSent(historyState)
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
 			self.postMessage({
@@ -867,7 +853,6 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		historyRng = null
 		historyTime = STATE.defaultStartYear * STATE.yearMs
 		simulationRunning = false
-		historyJournalCursor = 0
 		if (
 			generated.nations &&
 			generated.provinces &&
@@ -911,12 +896,12 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		generated.timings = progressTimings
 		const world = attachPrecomputedGeometry(serializeWorld(generated))
 		progressCb("Done", 100)
-		const journal = historyState?.journal.slice() ?? []
-		historyJournalCursor = journal.length
+		const journal = historyState?.journal ?? []
 		self.postMessage(
 			{ type: "done", world, journal } satisfies GenesisWorkerResponse,
-			[...buildTransferList(world), ...buildJournalTransferList(journal)],
+			[...buildTransferList(world), ...JOURNAL.transferList(journal)],
 		)
+		if (historyState) JOURNAL.releaseSent(historyState)
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error))
 		self.postMessage({

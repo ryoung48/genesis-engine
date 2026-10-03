@@ -7,14 +7,6 @@ import { FRAME } from "@/model/history/world-frame"
 import type { PartitionRow } from "@/model/history/world-frame/types"
 import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 
-// Procedural counterpart of useEarthHistoryTimeline. Builds the single static
-// initial-conditions HistoryState for a procedurally generated world on the
-// main thread and returns the SAME bundle shape the Earth hook does -- a
-// HistoryState + query + the culture/religion colour and name side-maps keyed
-// by PartitionRow.key -- so the unified history rendering path (useMapColoring
-// -> computeEarthHistoryRegionColors, the label overrides, the hover override)
-// consumes either mode with no branching. No time evolution yet:
-// minTimeMs === maxTimeMs.
 const PROCEDURAL_START_TIME_MS = (STATE.defaultStartYear - 2) * 365 * 86_400_000
 const PROCEDURAL_ENGINE_START_TIME_MS =
 	STATE.defaultStartYear * 365 * 86_400_000
@@ -55,7 +47,7 @@ export function useProceduralHistoryTimeline({
 		return {
 			state: next,
 			translator: SIM_RECORD.createTranslator({ state: next, world }),
-			progress: { transactionCount: 0, journalVersion: -1 },
+			progress: { journalVersion: -1 },
 		}
 	}, [isProcedural, world])
 	const state = session?.state ?? null
@@ -64,13 +56,10 @@ export function useProceduralHistoryTimeline({
 		const { state: sessionState, translator, progress } = session
 		if (progress.journalVersion === journalVersion) return
 		progress.journalVersion = journalVersion
-		const transactions = journalTransactionsRef.current.slice(
-			progress.transactionCount,
-		)
+		const transactions = journalTransactionsRef.current
 		if (transactions.length === 0) return
 		const previousMax = sessionState.record.maxTimeMs
-		SIM_RECORD.appendJournal({ translator, transactions })
-		progress.transactionCount = journalTransactionsRef.current.length
+		SIM_RECORD.consumeJournal({ translator, transactions })
 		setSelectedTimeMs((time) =>
 			time >= previousMax ? sessionState.record.maxTimeMs : time,
 		)

@@ -41,10 +41,8 @@ export interface NationFrame {
 
 export interface PartitionRow {
 	id: number
-	/** Raw EU4 identifier (e.g. "shamanism", "swedish") -- the key raw event
-	 * data and the reference colour/name maps are keyed by. */
+	// Identifier shared by events and reference maps.
 	key: string
-	/** Display name from the reference data (e.g. "Fetishist", "Swedish"). */
 	name: string
 	color: readonly [number, number, number]
 }
