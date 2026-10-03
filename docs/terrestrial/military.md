@@ -1,6 +1,6 @@
 # Armies and battles (`:history`)
 
-Code: army economy and combat in `src/model/history/sim/engine/military`; recruitment and deployment operations in `engine/military`, field logistics in `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`.
+Code: army economy and combat in `src/model/history/sim/engine/military`; recruitment and deployment operations in `engine/military`, field logistics in `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`, kind selection in `battle/kind`, siege phases in `engine/events/siege`, and shared occupation and settlement checks in `battle/conquest`.
 
 Armies are aggregate troop counts. Combat strength is 0.75 per levy and 1 per regular; logistics, casualties, and recorded army sizes count soldiers. Affordability targets always use home upkeep prices; actual upkeep still follows peace/campaign deployment. The simulation tracks enrollment, field logistics, treasury support, war deployments, casualties, and occupied provinces; it does not track individual soldiers, units, or commanders.
 
@@ -10,7 +10,7 @@ Sovereign realms hold actual enrolled levies and regulars. Soldiers remain inhab
 
 Levy eligibility is 2% of population for nontribal governments and 5% for all tribal-family governments, including steppe hordes. A separate 10% combined population safety ceiling covers both types. Neither type receives priority when the shared budget or safety ceiling binds. Government family changes only levy eligibility and permission to initiate raids in this military/fiscal model.
 
-Let `B = 0.75 � max(0, civilian surplus)`. Requested levies equal population eligibility. Requested regulars equal `funding � B / regular home price`, using the full readiness budget without deducting levy costs first. Funding interpolates from 10% at knowledge 0.42 through 25% at 1.00 and 55% at 1.44 to 90% at 2.38. This defines requests rather than imposing a final composition.
+Let `B = 0.75 × max(0, civilian surplus)`. Requested levies equal population eligibility. Requested regulars equal `funding × B / regular home price`, using the full readiness budget without deducting levy costs first. Funding interpolates from 10% at knowledge 0.42 through 25% at 1.00 and 55% at 1.44 to 90% at 2.38. This defines requests rather than imposing a final composition.
 
 Calculate the requested combined headcount `N` and home upkeep `C`. Multiply both types by the same factor `min(1, B / C, safety ceiling / N, logistics limit / N)`, treating empty requests as zero targets. Thus budget, population, and logistics ceilings preserve the independently requested contribution of each type. Remaining readiness budget is `B` minus the combined capped home upkeep; savings do not generate additional requests.
 
@@ -77,12 +77,29 @@ Formal ties are excluded before the disposition threshold is checked.
 | After an inconclusive battle | 3–8 months. |
 | After a normal victory | 2–10 months. |
 | After a decisive victory, rout, or uncontested battle | 1–4 months. |
-| Next attacker | The winner with 70% probability, the loser with 30%. |
+| Next attacker | The winner with 70% probability, the loser with 30%; an uncontested winner always keeps initiative. |
 | War attacker holding nothing | Keeps attacking; after a loss it regroups for 3–8 months. |
 | Invasion target | Unoccupied defender province adjacent to attacker territory or that war's occupation. |
-| Rebellion restoration target | Most recently occupied province. |
+| Restoration target | Most recently occupied province. |
 | Target check | When the battle runs; if the queued attacker has no target but the other side does, they swap roles. |
 | No legal target for either side | War ends in stalemate. |
+
+### Battle types
+
+Once the target and encounter roles are resolved, the encounter becomes an `open` battle, `ambush`, `river crossing`, or `siege`. The encounter attacker can be the war's defender restoring an occupied province; bonuses follow encounter roles, not the original war declaration.
+
+| Kind | Selection | Advantage |
+| --- | --- | --- |
+| Open | Always eligible; field weight 0.70. | Terrain only. |
+| Ambush | Always eligible; field weight 0.05. | Ambusher gets ×1.3 combat strength; defender ambushes with 60% chance, attacker with 40%. |
+| River crossing | Eligible only when the target has a river; field weight 0.12. | Defender gets ×1.2 in addition to terrain. |
+| Siege | Target has at least 2,000 urban residents, a garrison of at least one troop, and besiegers stronger than the garrison. | Resolves through monthly phases, with wall defenses during assaults. |
+
+When siege is eligible, it has a 95% selection probability. The remaining 5% is split among eligible field kinds by their relative weights. Without an eligible siege, those weights normalize over field kinds alone: without a river, about 93.3% open and 6.7% ambush; with a river, about 80.5% open, 5.7% ambush and 13.8% river crossing. River presence comes from the province's stored generated river data; town eligibility uses current urban population.
+
+Open, ambush and river crossing resolve in one event. A siege starts without a field battle roll and suspends ordinary battles for that war until it ends. Each war can have one active siege.
+
+### Field combat
 
 The target province sets the defender's terrain bonus:
 
@@ -94,11 +111,12 @@ The target province sets the defender's terrain bonus:
 | Mountains | 20% | Jungle | 15% |
 | Marsh | 15% | | |
 
-Water codes at a land target count as flat grasslands. Terrain changes strength, never troop counts, and raids keep a flat 1.2 defense multiplier.
+Water codes at a land target count as flat grasslands. Terrain changes strength, never troop counts. The terrain multiplier is `T = 1 + topography bonus + vegetation bonus`; kind bonuses multiply it rather than replacing it. An attacking ambusher gets ×1.3 while the defender retains terrain; a defending ambusher gets `T × 1.3`; river-crossing defense is `T × 1.2`. Raids keep a flat 1.2 defense multiplier.
 
 ```text
-S_A = attacking coalition troops
-S_B = defending coalition troops × (1 + topography bonus + vegetation bonus)
+S_A = attacking coalition combat strength × attacker multiplier
+S_B = defending coalition combat strength × defender multiplier
+N_A, N_B = attacking and defending coalition soldier counts
 pre-battle win probability = S_A³ / (S_A³ + S_B³)
 
 X = ln(S_A / S_B) + ln(u / (1 − u)) / 3      u ~ U(0, 1)
@@ -117,11 +135,75 @@ rout chance = 1 / (1 + e^(−20 × (R − 0.40)))
 
 Deployment shortfall compares surviving commitments with their allocated participation-episode reference strength. Casualties and demobilization retain that reference until final peace. A routed loser loses a further 5–20% of its remaining troops. The rout midpoint was calibrated to 0.40 so that about a third of contested battles rout; real battles are lopsided. An inconclusive battle without a rout blocks all progress: no plunder, sack, occupation, restoration, or capital victory. If one side has no troops, the other wins uncontested with no losses; if neither does, the war ends (`no troops`).
 
-Battle casualties reduce enrolled troops and each realm's rural population proportionally. The battle record stores the result, pre-battle win probability, power share, terrain, knowledge-capped troops, deployments, losses, target province, and plunder.
+Battle casualties reduce enrolled troops and each realm's rural population proportionally. Losses split among participating members by headcount, then by each member's own levy/regular mix. The battle record stores the kind, ambushing side, initial and final results, pre-battle win probability, power share, terrain, knowledge-capped troops, deployments, losses, target province, and plunder. Both war and nation timelines name the ambusher or river crossing; open battles add no special clause.
+
+## Sieges
+
+### Garrison and field forces
+
+The starting garrison is `min(defending lead's levy eligibility × target urban population, 0.5 × defending coalition's physical deployed troops)`. Levy eligibility is the same 2% or 5% rate used for recruitment. The garrison is allocated proportionally among defending members and troop types, remains part of their deployment, and is not reduced by field logistics. Siege eligibility compares besiegers' logistics-capped combat strength with this garrison's strength.
+
+Each phase reads besiegers from current coalition deployments, so recruitment, allocation and membership changes affect them. Relief uses the defending coalition's deployments with the garrison subtracted **before** applying the field logistics cap. The garrison is reconciled to surviving commitments per troop type; departing coalition members leave the garrison without casualties.
+
+All siege losses use the same enrolled-troop, deployment and rural-population accounting as field battles. Garrison losses also shrink the stored garrison; relief losses belong to troops outside it. Attrition and disease are percentages of besiegers' logistics-capped soldier counts, charged as absolute losses to physical holdings. Siege clashes use the field combat resolver, including rout and pursuit, with deployment shortfall set to zero for both sides.
+
+### Monthly phases
+
+The first phase runs 30 days after the siege begins; subsequent phases are also 30 days apart. Each tick checks sovereignty and whether the target is still legally besieged, then reconciles the garrison. Invalid sieges lift. After 48 completed phases, a surviving siege lifts as `besiegers spent` on its next tick.
+
+Each phase then applies 1% besieger attrition. Besiegers below one soldier lift the siege, including when both sides are empty. Otherwise a garrison below one soldier capitulates. With both present, let `R = current besieger combat strength / current garrison combat strength`. If `R < 0.75`, the siege lifts as `besiegers spent`. Otherwise there is a 1% chance a traitor opens the gates, ending it as `betrayed`.
+
+If the siege continues, roll a d20 plus these modifiers:
+
+| Term | Modifier |
+| --- | ---: |
+| `R < 1.25` | −2 |
+| `1.25 ≤ R < 2` | 0 |
+| `2 ≤ R < 3` | +1 |
+| `3 ≤ R < 6` | +2 |
+| `R ≥ 6` | +3 |
+| Each breach | +2 |
+| Each distinct shortage | +1 |
+| Wearing down on phase `n` | `floor((n − 1) / 2)` |
+
+| Modified roll | Beat | Effect |
+| --- | --- | --- |
+| ≤3 or 6–9 | Stalemate | No dice effect or beat record. |
+| 4–5 | Disease | Besiegers lose another 4% of their troops. |
+| 10–11 | Supplies shortage | Garrison loses 3%; add supplies shortage. |
+| 12–13 | Food shortage | Garrison loses 5%; add food shortage. |
+| 14–15 | Water shortage | Garrison loses 5%; add water shortage. |
+| 16–17 | Breach | Add one breach; garrison loses 2%. |
+| 18–19 | Desertion | Garrison loses 10%. |
+| ≥20 | Surrender | Garrison capitulates. |
+
+Each shortage can occur once; repeats act as stalemates. Capitulation, including an emptied garrison, ends as `starved out` if any shortage has occurred and `surrendered` otherwise. Food and supply stocks are not tracked separately.
+
+If still standing, the phase checks a sortie, then an assault, then relief. The first terminal result ends the phase; a phase can otherwise record several beats.
+
+| Action | Trigger | Fight and effect |
+| --- | --- | --- |
+| Sortie | `R < 3`; chance `min(0.4, 0.1 + 0.1 × breaches)`. | 20% of the garrison attacks 20% of the camp, with ×1.3 ambush strength against terrain defense. A non-inconclusive garrison win repairs one breach, or burns the works for another 3% besieger loss if no breach exists. Losses can empty the garrison and cause capitulation. |
+| Assault | `R ≥ 1.5`; chance `min(0.9, 0.3 × breaches + desperation)`, where desperation is 0.5 if besieger strength is below 85% of its starting value, otherwise 0. | All besiegers attack the garrison; defense is `T × max(1, 1.5 − 0.15 × breaches)`. An emptied garrison or non-inconclusive besieger win ends as `stormed`. Otherwise a besieger loss lifts the siege as `repelled`; an inconclusive besieger win continues it. |
+| Relief | Relief combat strength is at least 25% of besieger strength; 6% chance per phase. | Relief attacks the besiegers, who receive terrain defense. A non-inconclusive relief win ends as `relieved`; otherwise the siege continues. |
+
+Ratios and forces are refreshed between these actions after losses. Destroying the garrison in an assault takes priority over the clash result, so even a lost or inconclusive assault can take the town.
+
+### Outcomes, occupation and records
+
+`surrendered`, `starved out`, `betrayed` and `stormed` take the province. In an invasion they occupy and plunder it; in restoration they clear occupation without plunder. A storm also removes 10% of current urban population and sacks an invaded province, even outside the capital. Other successful sieges sack only an invaded capital under the usual conquest rule. Capitulation and betrayal apply no additional garrison casualties.
+
+`relieved` and `lifted` make no territorial progress. Lift reasons are `repelled`, `besiegers spent`, `invalid` or `war ended`. Peace clears an active siege as `lifted (war ended)`; its queued tick then does nothing.
+
+Sieges ending in their own tick share occupation and settlement checks with field battles: a fall is handled as a normal attacker victory, while relief or lifting is handled as an inconclusive attacker loss. If the war continues, the next battle follows the corresponding delay and initiative rules above. During the siege, these post-combat checks wait until its end.
+
+Sieges are stored separately in `war.sieges`, with start and end times, completed phase count, outcome, lift reason, forces, deployment snapshots and ordered beats. Sorties, assaults and relief are siege beats rather than additional field battle records. War and nation timelines show the start, each logged beat, and the end with elapsed calendar duration in 30-day months (or days for shorter sieges). Running sieges have no end entry.
+
+Mobilization, field battles and siege events record physical deployments rather than logistics-capped attendance. The war troop panel uses the latest snapshot at or before its displayed date, with later recorded events winning timestamp ties, and labels it "troops as of" that snapshot's date. Attrition and changes during an unlogged stalemate phase appear at the next logged event; missing members do not fall back to older troop counts.
 
 ## Occupation and war settlement
 
-Code: war endings are checked after each battle in `engine/events/battle`; the terms are set in `engine/events/peace` (`PEACE.terms`, `PEACE.conclude`). This section covers conquest wars; rebel wars have their own endings (see [rebellion](rebellion.md#endings)).
+Code: occupation and war endings after field battles and siege endings share `engine/events/battle/conquest`; the terms are set in `engine/events/peace` (`PEACE.terms`, `PEACE.conclude`). This section covers conquest wars; rebel wars have their own endings (see [rebellion](rebellion.md#endings)).
 
 A war ends when the first of these holds, in this order:
 
@@ -167,6 +249,6 @@ Raids keep the squared force share and their own random loss shares (10% × forc
 
 ## Scope
 
-These rules describe the procedural `:history` simulation. Imported historical wars are translated into history records and do not run through this live army and battle engine.
+These rules describe the procedural `:history` simulation. Imported historical wars are translated into history records and do not run through this live army and battle engine; their battles have no simulated kind, and their siege lists are empty.
 
 Rebellion previews calculate each prospective territory with the same economy and recruitment formulas used after release. Crown territory excludes the departing subject; both armies use their own knowledge-derived limits. Potential support and the existing-war discount remain preview estimates.
