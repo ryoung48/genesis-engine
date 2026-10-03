@@ -212,6 +212,25 @@ function indexWars({ state }: StateParams): void {
 	state.militaryWarIndexStale = false
 }
 
+// True when touchedWars would find nothing: no refresh is pending and no touched nation is in an active war.
+function quiet({ state, nations }: NationsParams): boolean {
+	if (
+		state.militaryDiplomacyDirty ||
+		state.hierarchyDirty ||
+		state.militaryWarIndexStale ||
+		state.militaryCandidatesRefresh.hierarchyVersion !==
+			state.hierarchyVersion ||
+		state.militaryCandidatesRefresh.wars !== state.wars.length
+	)
+		return false
+	for (const nation of nations) {
+		const wars = state.militaryWarIndex.get(nation)
+		if (wars)
+			for (const idx of wars) if (state.activeWarIds.has(idx)) return false
+	}
+	return true
+}
+
 function touchedWars({ state, nations }: NationsParams): Set<number> {
 	const wars = refreshCandidates({ state })
 	if (wars.size > 0) state.militaryWarIndexStale = true
@@ -410,6 +429,7 @@ export const DEPLOYMENTS = {
 	available,
 	exhausted,
 	previewSide,
+	quiet,
 	touchedWars,
 	affected,
 	sideMembers,

@@ -11,12 +11,15 @@ import type {
 	GetDefenderOccupationCandidatesParams,
 	InitWarParams,
 	ListWarTargetsParams,
+	MeasureWarTargetParams,
 	NextEventParams,
 	RebelParams,
 	RunWarParams,
 	SeedInterstateWarsParams,
 	SeedRebellionsParams,
 	SeedWarStageParams,
+	WarCandidate,
+	WarTarget,
 } from "@/model/history/sim/engine/events/war/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
@@ -57,13 +60,10 @@ function nextEvent({ state, province, rng, years }: NextEventParams): void {
 	)
 }
 
-function listWarTargets({ state, nation }: ListWarTargetsParams): {
-	n: number
-	threshold: number
-	w: number
-	hasWar: boolean
-	d: number
-}[] {
+function listWarCandidates({
+	state,
+	nation,
+}: ListWarTargetsParams): WarCandidate[] {
 	const wars = DERIVE.provinceWars({ state, p: nation })
 		.map((idx: number) => state.wars[idx])
 		.filter((w) => w.endTime === undefined)
@@ -88,15 +88,25 @@ function listWarTargets({ state, nation }: ListWarTargetsParams): {
 			return {
 				n: nb,
 				threshold: tie === STATE.rel.NONE ? ATTACK_THRESHOLD[disposition] : 0,
-				w: MILITARY.threat({ state, attacker: nation, defender: nb }),
 				hasWar: wars.some((w) => w.defender === nb || w.attacker === nb),
-				d: Math.min(
-					...STATE.getNationProvinces({ state, root: nb }).map((p) =>
-						STATE.provinceDistanceSq({ state, a: nation, b: p }),
-					),
-				),
 			}
 		})
+}
+
+function measureWarTarget({
+	state,
+	nation,
+	candidate,
+}: MeasureWarTargetParams): WarTarget {
+	return {
+		...candidate,
+		w: MILITARY.threat({ state, attacker: nation, defender: candidate.n }),
+		d: Math.min(
+			...STATE.getNationProvinces({ state, root: candidate.n }).map((p) =>
+				STATE.provinceDistanceSq({ state, a: nation, b: p }),
+			),
+		),
+	}
 }
 
 function getDefenderOccupationCandidates({
@@ -251,8 +261,9 @@ function seedInterstateWars({ state, rng }: SeedInterstateWarsParams): void {
 		const nation = candidate.nation
 		if (engaged.size >= targetParticipants) break
 		if (engaged.has(nation)) continue
-		const targets = listWarTargets({ state, nation })
+		const targets = listWarCandidates({ state, nation })
 			.filter((target) => !target.hasWar && !engaged.has(target.n))
+			.map((candidate) => measureWarTarget({ state, nation, candidate }))
 			.filter((target) => {
 				const relation = STATE.getRelation({ state, a: nation, b: target.n })
 				return (
@@ -475,9 +486,10 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 
 	// Only independent nations with a strong crown start wars
 	if (parent < 0 && !rulerRelation && !REGENCY.weak({ state, realm: nation })) {
-		const viable = listWarTargets({ state, nation }).filter(
-			(t) => t.threshold > 0 && t.w < t.threshold && !t.hasWar,
-		)
+		const viable = listWarCandidates({ state, nation })
+			.filter((t) => t.threshold > 0 && !t.hasWar)
+			.map((candidate) => measureWarTarget({ state, nation, candidate }))
+			.filter((t) => t.w < t.threshold)
 
 		if (viable.length > 0) {
 			// Favor closer viable opponents, matching the old history model.

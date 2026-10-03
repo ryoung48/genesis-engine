@@ -13,6 +13,21 @@ export interface ListWarTargetsParams {
 	nation: number
 }
 
+export interface WarCandidate {
+	n: number
+	threshold: number
+	hasWar: boolean
+}
+
+export interface WarTarget extends WarCandidate {
+	w: number
+	d: number
+}
+
+export interface MeasureWarTargetParams extends ListWarTargetsParams {
+	candidate: WarCandidate
+}
+
 export interface GetDefenderOccupationCandidatesParams {
 	state: HistoryState
 	attacker: number

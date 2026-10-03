@@ -790,6 +790,15 @@ function afterMutation({ state }: RecordArmiesParams): void {
 function reconcile({ state }: RecordArmiesParams): void {
 	if (!state.militaryReady) return
 	const touched = state.militaryTouched
+	if (
+		state.militaryDirty.size === 0 &&
+		state.militaryAllocationDirty.size === 0 &&
+		state.militaryStrengthDirty.size === 0 &&
+		DEPLOYMENTS.quiet({ state, nations: touched })
+	) {
+		touched.clear()
+		return
+	}
 	for (const nation of state.militaryDirty) touched.add(nation)
 	for (const nation of state.militaryAllocationDirty) touched.add(nation)
 	for (const nation of state.militaryStrengthDirty) touched.add(nation)
