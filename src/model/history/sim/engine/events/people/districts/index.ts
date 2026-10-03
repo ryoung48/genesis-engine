@@ -3,6 +3,8 @@ import type {
 	GrantCandidate,
 	HolderParams,
 	InstallDistrictParams,
+	RevalidateParams,
+	SeatCheck,
 	SeatParams,
 } from "@/model/history/sim/engine/events/people/districts/types"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -84,27 +86,32 @@ function newHolder({ state, seat, relativeFirst, rng }: HolderParams): number {
 	})
 }
 
-function install({ state, seat, person }: InstallDistrictParams): void {
-	PEOPLE.vacate({ people: state.people, seat, reason: "district grant" })
+function install({ state, seat, person, reason }: InstallDistrictParams): void {
+	PEOPLE.vacate({ people: state.people, seat, reason })
 	PEOPLE.enthrone({
 		people: state.people,
 		person,
 		seat,
 		realm: state.sovereignCurrent[seat],
 		rank: state.seatRank[seat],
-		reason: "district grant",
+		reason,
 	})
 }
 
-function settle({ state, rng }: DistrictParams): void {
+// Checks each held, non-sovereign seat against the current hierarchy: a seat
+// that stopped being a district seat loses its holder, and a living holder of
+// a valid seat follows it to the realm that owns it now.
+function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 	const people = state.people
 	const table = people.persons
 	const time = now(state)
-	for (let seat = 0; seat < state.P; seat++) {
+	const checks: SeatCheck[] = []
+	for (const seat of seats) {
 		const holder = people.rulerOf[seat]
 		if (holder < 0 || STATE.isSovereign({ state, p: seat })) continue
 		if (!isDistrictSeat({ state, seat })) {
 			PEOPLE.vacate({ people, seat, reason: "territorial change" })
+			checks.push({ seat, holder, standing: "vacated" })
 			continue
 		}
 		if (
@@ -112,8 +119,22 @@ function settle({ state, rng }: DistrictParams): void {
 			PEOPLE.aliveAt({ people, person: holder, time })
 		) {
 			table.realm[holder] = state.sovereignCurrent[seat]
+			checks.push({ seat, holder, standing: "kept" })
 			continue
 		}
+		checks.push({ seat, holder, standing: "lapsed" })
+	}
+	return checks
+}
+
+function settle({ state, rng }: DistrictParams): void {
+	const people = state.people
+	const table = people.persons
+	const time = now(state)
+	for (let seat = 0; seat < state.P; seat++) {
+		const check = revalidate({ state, seats: [seat] })[0]
+		if (check?.standing !== "lapsed") continue
+		const holder = check.holder
 		const heir = HEIRS.of({
 			people,
 			dying: holder,
@@ -127,6 +148,7 @@ function settle({ state, rng }: DistrictParams): void {
 			seat,
 			person:
 				heir >= 0 ? heir : newHolder({ state, seat, relativeFirst: true, rng }),
+			reason: "district grant",
 		})
 	}
 }
@@ -189,8 +211,9 @@ function grant({ state, rng }: DistrictParams): void {
 					relativeFirst: rng.random() < NEW_GRANT_RELATIVE_CHANCE,
 					rng,
 				}),
+				reason: "district grant",
 			})
 	}
 }
 
-export const DISTRICTS = { settle, grant }
+export const DISTRICTS = { settle, grant, install, isDistrictSeat, revalidate }

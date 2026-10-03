@@ -18,6 +18,15 @@ export interface HeirResult {
 	relation: HeirRelation
 }
 
+export type HeirLineParams = HeirsOfParams
+
+// One child of the late ruler and the first eligible person of their line; -1
+// when the line has nobody.
+export interface HeirBranch {
+	branch: number
+	heir: number
+}
+
 export interface LineBase {
 	people: PeopleState
 	time: number

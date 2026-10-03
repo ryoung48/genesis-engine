@@ -49,6 +49,7 @@ export interface TenureView {
 	// [JUSTIFICATION] A seat still held at the queried time has no end.
 	endTimeMs: number | null
 	person: number
+	startReason: SeatChangeReason
 	endReason: SeatChangeReason | null
 }
 
@@ -96,6 +97,7 @@ export interface PersonEvent {
 	other: number
 	// The tenure a seat or regency event belongs to; -1 for other kinds.
 	tenure: number
-	// [JUSTIFICATION] Only seat departures have an end reason.
-	endReason?: SeatChangeReason
+	// [JUSTIFICATION] Only taking or leaving a seat has a reason, and a seat
+	// still held when its holder died has none for its end.
+	reason?: SeatChangeReason
 }

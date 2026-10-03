@@ -95,7 +95,15 @@ function append({
 		pushIndex({ index: record.marriagesOf, key: row.husband, value: index })
 		pushIndex({ index: record.marriagesOf, key: row.wife, value: index })
 	}
-	for (const { seat, person, kind, ward, reason } of rows.seats) {
+	// A seat that changes hands more than once in a transaction keeps only its
+	// last holder; the first change still closes the tenure that was open.
+	const lastChange = new Map<string, number>()
+	for (const [index, row] of rows.seats.entries())
+		lastChange.set(`${row.kind === "regent"}:${row.seat}`, index)
+	for (const [
+		index,
+		{ seat, person, kind, ward, reason },
+	] of rows.seats.entries()) {
 		const ofSeat =
 			kind === "regent" ? record.regentsOfSeat : record.tenuresOfSeat
 		const open = ofSeat.get(seat)?.at(-1)
@@ -104,8 +112,9 @@ function append({
 			record.tenures[open].endTimeMs = timeMs
 			record.tenures[open].endReason = reason
 		}
-		if (person < 0) continue
-		const index = record.tenures.length
+		if (person < 0 || lastChange.get(`${kind === "regent"}:${seat}`) !== index)
+			continue
+		const tenureIndex = record.tenures.length
 		record.tenures.push({
 			person,
 			seat,
@@ -113,12 +122,13 @@ function append({
 			ward,
 			startTimeMs: timeMs,
 			endTimeMs: Infinity,
+			startReason: reason,
 			endReason: null,
 		})
-		pushIndex({ index: record.tenuresOf, key: person, value: index })
-		pushIndex({ index: ofSeat, key: seat, value: index })
+		pushIndex({ index: record.tenuresOf, key: person, value: tenureIndex })
+		pushIndex({ index: ofSeat, key: seat, value: tenureIndex })
 		if (kind === "regent")
-			pushIndex({ index: record.regentsOfWard, key: ward, value: index })
+			pushIndex({ index: record.regentsOfWard, key: ward, value: tenureIndex })
 	}
 }
 

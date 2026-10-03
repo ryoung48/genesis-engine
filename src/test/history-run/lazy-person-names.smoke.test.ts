@@ -141,6 +141,7 @@ it("generates names only for requested display data and caches them without chan
 			cause: "restoration",
 			person: id,
 			throne: true,
+			late: -1,
 		}
 		expect(PERSON_NAMES.comment({ people, comment })).toBe(
 			`Revolted against Test kingdom (restoration, for ${expected.name}) to seize the throne`,

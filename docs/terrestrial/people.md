@@ -1,6 +1,6 @@
 # People (`:history`)
 
-Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
+Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `partition/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
 
 People are the cause behind realm events, not a population. Only ruling houses are simulated: a few thousand people on the default map.
 
@@ -99,6 +99,8 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 - **Who gets a new grant.** With 30% chance the ruler's closest adult, landless relative (never the heir apparent). Otherwise a new house aged 18–55.
 - **Inheritance.** A dead holder's district passes to their next *adult* heir who holds no seat, else by the grant rule. Minors never hold districts.
 - **Loss.** A district that stops being a direct titled subject is vacated.
+- **Revalidation.** `DISTRICTS.revalidate` is the per-seat check behind both rules: it vacates a seat that is no longer a district seat and moves a living holder of a valid seat to the realm that owns it now. The yearly pass runs it over every seat; a [partition](government.md#partition) runs it over the divided realm's seats in the same succession.
+- **Partition.** A new ruler's former district is vacated when the realm is divided. Seats taken or lost in a partition carry the seat reason `partition`: the heir's new seat, the district an heir or the primary gave up, and the seats displaced admins lose and take.
 
 ## Heirs
 
@@ -109,33 +111,11 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 
 The culture's gender preference sorts each group: patriarchal prefers sons, matriarchal prefers daughters, equal ignores sex. Callers pass an eligibility filter.
 
+`HEIRS.line` returns every child of a ruler in the same order, each with the first eligible person of that child's line (or none). A partition uses it to find one heir per child line.
+
 ## Succession
 
-The government type picks the system (`GOVERNMENT.successionOfIndex`):
-
-| System | Governments | Rule |
-|---|---|---|
-| Single heir | chiefdom, tribal / feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a personal union. With no heir, the strongest adult district holder takes it as a new house. |
-| Election | elective monarchy, tribal federation, native council, steppe horde, republics | See below. |
-| Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
-
-**Elections.**
-- *Electors.* In monarchies the district holders vote, weighted by district population. In republics the patrician heads vote, one vote each.
-- *Candidates.* The late ruler's house senior, plus the senior adults of the top 3 electors' houses (every elector's house in a republic).
-- *Votes.* Each elector backs their own house, then (outside republics) a house tied to theirs by marriage, else the strongest candidate: vote share, plus a bonus for age 25–60.
-
-**Claim**, by how the ruler took the throne, feeds title founding and weak-crown rebellions:
-- 3: child or founder, and a restored claimant;
-- 2: sibling or elected;
-- 1: other relative, appointed, or a usurping kinsman;
-- 0: new house or lord protector.
-
-**Disputes.** A single-heir succession is disputed when the heir rules elsewhere, is under 16, or is of the sex the culture passes over, and an adult of the preferred sex stands next in line.
-- The district holders split between the heir and the rival. With at least 40% backing, and then with a chance equal to that share, the rival's district (or their strongest backer's) leads a revolt with the rival as pretender. Every district that backed the rival joins it.
-- A losing election candidate who holds a district and won 40% also revolts.
-- Otherwise the weak-crown rebellion check runs.
-
-Disputed succession pretenders fight for the throne; a victory replaces the ruler. The war rules are in [rebellion](rebellion.md).
+How a realm passes on (the systems, elections, claim, disputes and the partition of tribal realms) is described in [government](government.md#succession).
 
 ## Personal unions
 
@@ -154,6 +134,7 @@ Disputed succession pretenders fight for the throne; a victory replaces the rule
   3. the strongest district holder (lord protector);
   4. otherwise a regency council with no person.
 - **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere is replaced at the yearly check.
+- **After a partition.** Regencies start once the partition's seating is final, for the new realms and then for the primary realm, and one review replaces any regent who became sovereign in it ([government](government.md#partition)).
 - **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and its districts rebel more easily ([rebellion](rebellion.md)). It still defends; diplomatic disposition governs subject calls.
 - **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs.
 
@@ -186,13 +167,15 @@ Successions, coming of age and rebellions run on their own events at the exact t
   - a `deaths` row gives a recorded person's earlier death date;
   - a `pregnancies` row is a recorded mother's miscarriage, stillbirth or childbirth death;
   - `betrothals` and `betrothalEnds` (cause `death` or `alliance`) cover recorded pairs; a fulfilled betrothal ends in its marriage row.
-- **Record.** `PEOPLE_RECORD` builds persons, marriages and tenures, indexed by person, by seat and by ward. Regent tenures are kept apart from holder tenures on the same seat. `deaths` rows update the person's death date, pregnancy outcomes are indexed by mother, and betrothals by person (`betrothalsOf`, with start, end and cause). A reigning ruler's `rulerChange` entry on the nation timeline also gets the new death date.
+- **Record.** `PEOPLE_RECORD` builds persons, marriages and tenures, indexed by person, by seat and by ward. A tenure keeps the reason it started and the reason it ended. A seat that changes hands more than once in one transaction keeps only its last holder. Regent tenures are kept apart from holder tenures on the same seat. `deaths` rows update the person's death date, pregnancy outcomes are indexed by mother, and betrothals by person (`betrothalsOf`, with start, end and cause). A reigning ruler's `rulerChange` entry on the nation timeline also gets the new death date.
 - **Queries.** `PERSON_QUERY` gives the person view, the timeline, the seat holder at a time, and health. On a mother's timeline, "miscarriage" and "stillborn child" are added, and "died in childbirth" replaces "died". "betrothed" and, for an alliance break, "betrothal broken" are added. The person page shows them as Family rows, and a "Betrothed" chip group while a betrothal stands.
 - **Nation timelines.** Only realm-level person events reach them:
   - successions;
+  - partitions: one Ruler row naming the late ruler, what the primary kept, the realm each junior heir received, and each district that passed to an heir realm;
   - regency start, coming of age, regent change and usurpation;
   - marriage alliances (one row per royal marriage and its alliance; the row says "was betrothed to" when the couple had not yet married);
   - unions;
   - pretender and restoration revolts.
 
   Everything else stays on the person page.
+- **Partition wording.** A realm created by a partition reads "Split from X in the partition of [late ruler]'s realm, under [heir]". On person pages a seat taken or lost in one reads "became ruler of Y in the partition of X", "took the seat of Z in the partition of X" or "lost Y in the partition of X". The nation stats show a Succession row: Single heir, Partition, Election or Appointment.

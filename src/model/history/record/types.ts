@@ -22,6 +22,8 @@ export interface RevoltComment {
 	cause: string
 	person: number
 	throne: boolean
+	// The ruler whose realm was divided; -1 outside a partition.
+	late: number
 }
 
 export type HistoryComment = string | RevoltComment | null

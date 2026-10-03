@@ -101,3 +101,5 @@ Different:
 ## Known drift
 
 Nations consolidate more than before the title layer: about 1023 → 826 over 100 years. See the deviations section of `plans/dejure-title-layer.md`.
+
+[Partition](government.md#partition) works against that consolidation in tribal land: on the 204,000-point benchmark (seed 14963991, 867–1800) the sovereign count ends at 441 instead of 277 and is 36–167 higher at every century mark, and the held share of kingdom titles seated in partitioning realms falls from 0.91–0.99 to 0.74–0.85. Figures from the 933-year report `stats/history/2026-10-03T18-12-34-411Z-multi-heir-partitions-full/`.

@@ -58,6 +58,7 @@ export type SeatChangeReason =
 	| "union"
 	| "territorial change"
 	| "district grant"
+	| "partition"
 	| "unknown"
 
 export type RegentKind = "parent" | "relative" | "protector" | "council"

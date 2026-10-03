@@ -5,6 +5,7 @@ import { dirname } from "node:path"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
+import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
@@ -19,6 +20,8 @@ import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
+import { PARTITION_REPORT } from "@/test/history-run/report/partition"
+import type { PartitionReport } from "@/test/history-run/report/partition/types"
 import type {
 	BetrothalOutcome,
 	CenturyReport,
@@ -433,6 +436,7 @@ function runSeed({
 		armyReconstitutions: logs.armyReconstitutions.value(),
 		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
+		partitionTotal: null as PartitionReport | null,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
@@ -484,6 +488,19 @@ function runSeed({
 		runPeopleYear(params)
 		peopleMs += performance.now() - t0
 	}
+	const partitions = PARTITION_REPORT.tracker()
+	partitions.cursor = engine.events.length
+	let divideMs = 0
+	let divideTotalMs = 0
+	const divide = PARTITION.divide
+	PARTITION.divide = (params) => {
+		const t0 = performance.now()
+		const created = divide(params)
+		const elapsed = performance.now() - t0
+		divideMs += elapsed
+		divideTotalMs += elapsed
+		return created
+	}
 	for (let year = start + 1; year <= start + options.years; year++) {
 		const tickStart = performance.now()
 		SIM_ENGINE.simulateUntil({
@@ -510,6 +527,7 @@ function runSeed({
 			diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
 			persist()
 		}
+		PARTITION_REPORT.observe({ engine, tracker: partitions })
 		trackMarriages({ engine, tracker })
 		MILITARY_REPORT.sample({
 			engine,
@@ -566,7 +584,23 @@ function runSeed({
 			}),
 			marriage: marriageReport({ engine, from, to: year, tracker }),
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
+			partitionState: PARTITION_REPORT.state({ engine }),
+			partition: PARTITION_REPORT.summarize({
+				engine,
+				tracker: partitions,
+				from,
+				to: year,
+				divideMs,
+			}),
 		})
+		if (year === start + options.years)
+			diagnostics.partitionTotal = PARTITION_REPORT.summarize({
+				engine,
+				tracker: partitions,
+				from: start,
+				to: year + 1,
+				divideMs: divideTotalMs,
+			})
 		diagnostics.completed = year === start + options.years
 		diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
 		persist()
@@ -581,8 +615,10 @@ function runSeed({
 		atWarYears = 0
 		sampledYears = 0
 		peopleMs = 0
+		divideMs = 0
 	}
 	PEOPLE_EVENTS.runYear = runPeopleYear
+	PARTITION.divide = divide
 	military.detach()
 	rebelLogistics.detach()
 	const settled = tracker.standing.slice(20, 31)
@@ -627,6 +663,13 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		for (const { from, to, marriage: m } of reports)
 			options.log(
 				`${`${from}-${to}`.padEnd(11)} ${String(m.alliancesFormed).padStart(14)} ${String(m.alliancesStanding).padStart(9)} ${`${m.firstMarriageAge[0].toFixed(1)}/${m.firstMarriageAge[1].toFixed(1)}`.padStart(14)} ${`${(100 * m.marriedAbroadShare).toFixed(0)}%`.padStart(11)} ${String(m.heiressUnions).padStart(15)} ${String(m.betrothalsMade).padStart(10)} ${String(m.betrothalsFulfilled).padStart(10)} ${`${m.betrothalsBrokenByDeath}/${m.betrothalsBrokenByAlliance}`.padStart(23)}`,
+			)
+		options.log(
+			"period      partitions  rate  skipped line/heir/seat  new realms p50/p90  primary share p50  eff realms p50  same tier  sibling wars/unions  fates merged/sibling/other/again  standing union/alone  divide ms",
+		)
+		for (const { from, to, partition: d } of reports)
+			options.log(
+				`${`${from}-${to}`.padEnd(11)} ${String(d.partitions).padStart(10)} ${`${(100 * d.rate).toFixed(0)}%`.padStart(5)} ${`${d.skipped["not child line"]}/${d.skipped["no junior heir"]}/${d.skipped["no free seat"]}`.padStart(23)} ${`${d.newRealms.p50}/${d.newRealms.p90}`.padStart(19)} ${d.primaryPopulationShare.p50.toFixed(2).padStart(18)} ${d.effectiveRealms.p50.toFixed(2).padStart(15)} ${`${(100 * d.sameTierShare).toFixed(0)}%`.padStart(10)} ${`${d.siblingWars}/${d.siblingUnions}`.padStart(20)} ${`${d.fates.mergedByUnion}/${d.fates.absorbedBySibling}/${d.fates.absorbedByOther}/${d.fates.partitionedAgain}`.padStart(33)} ${`${d.fates.standingInUnion}/${d.fates.standingAlone}`.padStart(21)} ${d.divideMs.toFixed(0).padStart(10)}`,
 			)
 		MILITARY_REPORT.log({ reports, log: options.log })
 	}

@@ -104,6 +104,11 @@ function ruler({ people, payload }: PersonPayloadParams): Ruler {
 function comment({ people, comment }: PersonCommentParams): string | null {
 	if (typeof comment === "string") return comment
 	if (comment === null) return null
+	if (comment.cause === "partition") {
+		const late = names({ people, person: comment.late })?.name
+		const heir = names({ people, person: comment.person })?.name
+		return `Split from ${comment.nation} in the partition of ${late ? `${late}'s` : "the late ruler's"} realm${heir ? `, under ${heir}` : ""}`
+	}
 	const pretender = names({ people, person: comment.person })?.name
 	return `Revolted against ${comment.nation} (${comment.cause}${pretender ? `, for ${pretender}` : ""})${comment.throne ? " to seize the throne" : ""}`
 }

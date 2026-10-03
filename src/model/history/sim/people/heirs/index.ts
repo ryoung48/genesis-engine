@@ -1,6 +1,8 @@
 import { PEOPLE } from "@/model/history/sim/people"
 import type {
 	AmongParams,
+	HeirBranch,
+	HeirLineParams,
 	HeirResult,
 	HeirsOfParams,
 	LineParams,
@@ -81,4 +83,30 @@ function of({
 	return { heir: -1, relation: "none" }
 }
 
-export const HEIRS = { of }
+// Every child's line in inheritance order, each with its own first heir.
+function line({
+	people,
+	dying,
+	time,
+	preference,
+	eligible,
+}: HeirLineParams): HeirBranch[] {
+	const seen = new Set<number>([dying])
+	return ordered({
+		people,
+		persons: [...people.persons.children[dying]],
+		preference,
+	}).map((branch) => ({
+		branch,
+		heir: firstInLine({
+			people,
+			time,
+			preference,
+			eligible,
+			seen,
+			person: branch,
+		}),
+	}))
+}
+
+export const HEIRS = { of, line }

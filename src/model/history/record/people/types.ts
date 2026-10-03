@@ -53,6 +53,7 @@ export interface RecordTenure {
 	ward: number
 	startTimeMs: number
 	endTimeMs: number
+	startReason: SeatChangeReason
 	endReason: SeatChangeReason | null
 }
 

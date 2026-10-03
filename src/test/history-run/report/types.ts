@@ -1,6 +1,10 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { MilitaryReport } from "@/test/history-run/report/military/types"
+import type {
+	PartitionReport,
+	PartitionStateReport,
+} from "@/test/history-run/report/partition/types"
 
 export interface HistoryReportOptions {
 	seeds: number[]
@@ -46,6 +50,8 @@ export interface CenturyReport {
 	people: PeopleReport
 	marriage: MarriageReport
 	military: MilitaryReport
+	partitionState: PartitionStateReport
+	partition: PartitionReport
 }
 
 export interface MarriageReport {

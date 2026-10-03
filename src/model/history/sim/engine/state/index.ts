@@ -1153,6 +1153,7 @@ export const STATE = {
 			state: params.state,
 			action: () => releaseFaction(params),
 		}),
+	isConnectedToParent: isProvinceConnectedToParent,
 	fixConnections: (params: FixConnectionsParams) =>
 		MILITARY.mutate({
 			state: params.state,

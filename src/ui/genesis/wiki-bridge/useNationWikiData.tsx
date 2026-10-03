@@ -9,7 +9,9 @@ import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import type { HistoryComment } from "@/model/history/record/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
+import { GOVERNMENT as SIM_GOVERNMENT } from "@/model/history/sim/nations/government"
 import { FRAME } from "@/model/history/world-frame"
+import type { GovernmentType } from "@/model/society/types"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
@@ -197,6 +199,13 @@ export function useNationWikiData(
 			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
 		})
+		const governmentIndex = record.people
+			? SIM_GOVERNMENT.getGovIdx()[nationState?.government as GovernmentType]
+			: undefined
+		const successionLabel =
+			governmentIndex === undefined
+				? null
+				: SIM_GOVERNMENT.successionLabelOfIndex(governmentIndex)
 		const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
 			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
@@ -393,6 +402,7 @@ export function useNationWikiData(
 			governmentColor: governmentColor
 				? COLOR.rgb01ToCss(governmentColor)
 				: null,
+			successionLabel,
 			economy,
 			warName: (warId) => record.events.wars[warId]?.name ?? `War ${warId}`,
 			yearLabel: DATE.formatEu4Year(
@@ -673,6 +683,46 @@ export function useNationWikiData(
 							comment: eventComment(event.comment),
 							nations,
 							people: [ward, regent].flatMap((person) =>
+								person ? [person] : [],
+							),
+						})
+						break
+					}
+					case "partition": {
+						const mention = (person: unknown) =>
+							recordPersonMention({
+								people: record.people,
+								person: Number(person ?? -1),
+							})
+						const late = mention(event.payload.late)
+						const primary = mention(event.payload.primary)
+						const heirs = (event.payload.heirs as number[]).map(mention)
+						const realms = event.payload.realms as number[]
+						const joinedRealms = event.payload.joinedRealms as number[]
+						for (const realm of realms) addNationMention(nations, realm)
+						const shares = [
+							`${primary?.name ?? "the heir"} kept ${title}`,
+							...heirs.map(
+								(heir, share) =>
+									`${heir?.name ?? "an heir"} received ${eventNation(realms[share]).name}`,
+							),
+						]
+						const joined = (event.payload.joinedDistricts as number[]).map(
+							(district, join) => {
+								const province = provinceMention(String(district), color)
+								if (province) provinces.push(province)
+								return ` The district of ${province?.name ?? `Province ${district}`} passed to ${eventNation(joinedRealms[join]).name}.`
+							},
+						)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Ruler",
+							description: `On the death of ${late?.name ?? "its ruler"} the realm was divided: ${shares.join("; ")}.${joined.join("")}`,
+							comment: eventComment(event.comment),
+							nations,
+							provinces,
+							people: [late, primary, ...heirs].flatMap((person) =>
 								person ? [person] : [],
 							),
 						})

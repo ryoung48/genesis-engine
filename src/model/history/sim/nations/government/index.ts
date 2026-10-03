@@ -354,6 +354,27 @@ function successionOfIndex(index: number): SuccessionSystem {
 	return type ? SUCCESSION_SYSTEM[type] : "single_heir"
 }
 
+// Realms held as the dynasty's patrimony are divided among the ruler's heirs.
+const PARTITIONS = new Set<GovernmentType>(["tribal_monarchy", "chiefdom"])
+
+function partitionsOfIndex(index: number): boolean {
+	const type = ERAS.governmentTypes[index]
+	return type !== undefined && PARTITIONS.has(type)
+}
+
+const SUCCESSION_LABEL: Record<SuccessionSystem, string> = {
+	single_heir: "Single heir",
+	election: "Election",
+	appointment: "Appointment",
+}
+
+// How the realm passes on, as shown in the nation's stats.
+function successionLabelOfIndex(index: number): string {
+	return partitionsOfIndex(index)
+		? "Partition"
+		: SUCCESSION_LABEL[successionOfIndex(index)]
+}
+
 // Royal marriages bind realms only where a house holds the throne: single-heir
 // realms and non-republican elections. Republic and appointed rulers marry
 // privately.
@@ -370,5 +391,7 @@ export const GOVERNMENT = {
 	getGovIdx,
 	govFamilyOfIndex,
 	successionOfIndex,
+	partitionsOfIndex,
+	successionLabelOfIndex,
 	assignGovernmentType,
 }

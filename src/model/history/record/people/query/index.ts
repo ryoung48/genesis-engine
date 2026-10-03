@@ -57,6 +57,7 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 					startTimeMs: tenure.startTimeMs,
 					endTimeMs: until(tenure.endTimeMs, timeMs),
 					person: tenure.person,
+					startReason: tenure.startReason,
 					endReason:
 						until(tenure.endTimeMs, timeMs) === null ? null : tenure.endReason,
 				},
@@ -124,6 +125,7 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 			kind: regent ? "became regent" : "took seat",
 			other: tenure.seat,
 			tenure: index,
+			...(regent ? {} : { reason: tenure.startReason }),
 		})
 		if (tenure.endTimeMs !== null && tenure.endTimeMs !== person.deathTimeMs)
 			events.push({
@@ -131,7 +133,7 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 				kind: regent ? "left regency" : "left seat",
 				other: tenure.seat,
 				tenure: index,
-				...(tenure.endReason ? { endReason: tenure.endReason } : {}),
+				...(tenure.endReason ? { reason: tenure.endReason } : {}),
 			})
 	}
 	for (const [index, regency] of person.regents.entries())

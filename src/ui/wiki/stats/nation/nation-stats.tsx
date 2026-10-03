@@ -125,6 +125,7 @@ export function buildNationWikiStats(
 		rulerLabel,
 		governmentSubtype,
 		governmentColor,
+		successionLabel,
 		economy,
 		warName,
 		yearLabel,
@@ -151,6 +152,9 @@ export function buildNationWikiStats(
 			value: governmentSubtype ?? "Unknown",
 			swatchColor: governmentColor,
 		},
+		...(successionLabel !== null
+			? [{ label: "Succession", value: successionLabel }]
+			: []),
 		...(economy
 			? [
 					{

@@ -1,5 +1,6 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
+import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
@@ -146,6 +147,8 @@ function runSuccession({
 		dying,
 		rng,
 	})
+	const primarySeat =
+		choice.heir >= 0 ? state.people.persons.throne[choice.heir] : -1
 	if (choice.heir >= 0)
 		STATE.installRuler({
 			state,
@@ -179,20 +182,34 @@ function runSuccession({
 	})
 
 	STATE.scheduleSuccession({ state, p: province })
-	REGENCY.startMinority({ state, realm: province })
-
-	if (choice.pretenderSeat >= 0)
-		pretenderRevolt({
+	// Regents are chosen once a partition's seating is final, and a realm that
+	// was divided among its heirs sees no succession revolt.
+	const divided =
+		PARTITION.divide({
 			state,
 			realm: province,
-			seat: choice.pretenderSeat,
-			supportingSeats: choice.supportingSeats,
-			pretender: state.people.rulerOf[choice.pretenderSeat],
-			restoration: false,
+			dying,
+			primary: state.people.rulerOf[province],
+			primarySeat,
 			rng,
-		})
-	else weakCrownRevolt({ state, realm: province, claim: choice.claim, rng })
-	restore({ state, realm: province, rng })
+		}) > 0
+	REGENCY.startMinority({ state, realm: province })
+
+	if (divided) REGENCY.review({ state })
+	else {
+		if (choice.pretenderSeat >= 0)
+			pretenderRevolt({
+				state,
+				realm: province,
+				seat: choice.pretenderSeat,
+				supportingSeats: choice.supportingSeats,
+				pretender: state.people.rulerOf[choice.pretenderSeat],
+				restoration: false,
+				rng,
+			})
+		else weakCrownRevolt({ state, realm: province, claim: choice.claim, rng })
+		restore({ state, realm: province, rng })
+	}
 
 	STATE.considerTitles({
 		state,

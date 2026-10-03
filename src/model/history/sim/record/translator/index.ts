@@ -137,7 +137,21 @@ function scanOwnerNotes({
 				cause,
 				person: (note.data.pretender as number | undefined) ?? -1,
 				throne: note.data.goal === "throne",
+				late: -1,
 			})
+		} else if (note.tag === "partition") {
+			const heirs = note.data.heirs as number[]
+			for (const [index, seat] of (note.data.seats as number[]).entries())
+				reasons.revolts.set(seat, {
+					nation: nationLabel({
+						translator,
+						root: note.data.nation as number,
+					}),
+					cause: "partition",
+					person: heirs[index],
+					throne: false,
+					late: note.data.dying as number,
+				})
 		} else if (note.tag === "war started") {
 			const warId = note.data.war as number
 			const coalition = transaction.coalitions.find(
@@ -815,6 +829,43 @@ function appendNote({
 				ward: data.ward as number,
 				regent: data.regent as number,
 				regentKind: data.kind as string,
+			},
+			comment: null,
+		})
+	} else if (note.tag === "partition") {
+		const nationId = translator.identityByRoot.get(data.nation as number)
+		if (nationId === undefined) return
+		const realmId = (root: number) => translator.identityByRoot.get(root) ?? -1
+		const realms = (data.seats as number[]).map(realmId)
+		// A new realm takes the divided realm's government, whatever its seat
+		// province carried before.
+		for (const id of realms) {
+			const log = record.events.nationEvents[id]
+			if (!log) continue
+			const current =
+				log.events.findLast((event) => event.kind === "governmentChange")
+					?.payload.governmentType ?? log.base.initialGovernment
+			if (current === data.government) continue
+			if (log.events.length === 0)
+				log.base.initialGovernment = data.government as string
+			else
+				log.events.push({
+					timeMs,
+					kind: "governmentChange",
+					payload: { governmentType: data.government },
+					comment: null,
+				})
+		}
+		record.events.nationEvents[nationId]?.events.push({
+			timeMs,
+			kind: "partition",
+			payload: {
+				late: data.dying,
+				primary: data.primary,
+				heirs: data.heirs,
+				realms,
+				joinedDistricts: data.joinedDistricts,
+				joinedRealms: (data.joinedRealms as number[]).map(realmId),
 			},
 			comment: null,
 		})

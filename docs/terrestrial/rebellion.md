@@ -34,8 +34,8 @@ Strength-tested candidates emit a `rebellion evaluated` diagnostic note before a
 | --- | --- | --- |
 | Seeded | At simulation start, for up to 1.25% of districts. The realm must not be at war. | Threat > 0.45. An independence war starts already under way. |
 | District's own war event | Every 8–16 years. The realm must not be at war. | Threat test, laxity 0.1 under a weak crown. An adult holder with enough backing may seek the throne; otherwise the district seeks independence. |
-| Weak crown | After every succession with no pretender, and after a lord protector usurps. Districts are tried in random order, and at most one breaks away. | Threat test, laxity 0.05 per missing claim point below 3, plus 0.1 under a weak crown. An adult holder with enough backing may seek the throne. |
-| Pretender | A disputed succession, a lost election or a restoration attempt ([people](people.md#succession), [restoration](people.md#restoration)). | District backing (below). No threat test. The seat must still be a direct district of the realm. A throne war always starts. |
+| Weak crown | After every succession with no pretender, and after a lord protector usurps. Skipped at a succession that [partitions](government.md#partition) the realm. Districts are tried in random order, and at most one breaks away. | Threat test, laxity 0.05 per missing claim point below 3, plus 0.1 under a weak crown. An adult holder with enough backing may seek the throne. |
+| Pretender | A disputed succession, a lost election or a restoration attempt ([government](government.md#succession), [restoration](people.md#restoration)). Skipped at a succession that partitions the realm; a deposed claim is kept for later. | District backing (below). No threat test. The seat must still be a direct district of the realm. A throne war always starts. |
 
 **Threat test.** The district breaks away when `threat > 0.45 − laxity`, and then only with chance equal to the threat.
 
@@ -59,6 +59,7 @@ District holders can favor a claimant, while foreign realms can fight beside the
 - **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
 - **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
 - **Cut-off land.** Crown provinces left without a connection to their parent are released as well. They are recorded as `province released` and shown as a "disconnected" revolt.
+- **Partition.** A [partition](government.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of higher title tier.
 
 ## The rebel war
 
@@ -114,6 +115,7 @@ A Rival vassal refuses its overlord's war call and withholds tribute. A Suspicio
 ## Record
 
 - **Revolt text.** Each revolt adds "Revolted against X (cause, for pretender)" to the rebel nation; a throne revolt adds "to seize the throne". The cause is `threat`, `succession`, `restoration` or `disconnected`.
+- **Split text.** A realm created by a partition reads "Split from X in the partition of [late ruler]'s realm, under [heir]" instead.
 - **War name.** An independence war is "Suppression of the X Revolt", or "X Civil War" when the rebel territory exceeds half the crown's area. A throne war is "X War of Succession", with casus belli `claim` and war goal `throne`.
 - **Outcome text.** When a rebel war ends, the rebel realm's territory changes carry a comment:
   - "Rebels defeated" when the crown takes the rebel capital (restoration);

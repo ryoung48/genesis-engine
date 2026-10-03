@@ -249,6 +249,12 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			after.people = { ...object(after.people) }
 			delete object(before.people).msPerYear
 			delete object(after.people).msPerYear
+			const beforeDivideMs = object(before.partition).divideMs
+			const afterDivideMs = object(after.partition).divideMs
+			if (before.partition) before.partition = { ...object(before.partition) }
+			if (after.partition) after.partition = { ...object(after.partition) }
+			delete object(before.partition).divideMs
+			delete object(after.partition).divideMs
 			delete before.from
 			delete before.to
 			delete after.from
@@ -267,6 +273,13 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 				period: `${seed} / ${period}`,
 				metric: "people.msPerYear",
 			})
+			rows.push({
+				before: beforeDivideMs,
+				after: afterDivideMs,
+				section: "Performance",
+				period: `${seed} / ${period}`,
+				metric: "partition.divideMs",
+			})
 		}
 		const da = previous ? diagnostics({ report: previous, seed }) : {}
 		const db = diagnostics({ report: current, seed })
@@ -275,6 +288,24 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			after: tickSummary(db.annualTicks),
 			section: "Performance",
 			period: seed,
+			rows,
+		})
+		const totalBefore = { ...object(da.partitionTotal) }
+		const totalAfter = { ...object(db.partitionTotal) }
+		rows.push({
+			before: totalBefore.divideMs,
+			after: totalAfter.divideMs,
+			section: "Performance",
+			period: seed,
+			metric: "partitionTotal.divideMs",
+		})
+		delete totalBefore.divideMs
+		delete totalAfter.divideMs
+		addRows({
+			before: totalBefore,
+			after: totalAfter,
+			section: "Century statistics",
+			period: `${seed} / whole run`,
 			rows,
 		})
 		for (const key of ["generationMs", "engineMs", "wallMs", "peakMemoryKb"])

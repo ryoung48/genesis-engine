@@ -323,20 +323,30 @@ export function usePersonWikiData(
 				const place = seatLabel(event.other, at, sovereign)
 				const district =
 					rankAt(event.other, at, false) === null ? place : `the ${place}`
+				const divided =
+					event.reason === "partition"
+						? nationAt(event.other, event.timeMs - DAY_MS)
+						: null
+				const partition =
+					event.reason !== "partition"
+						? ""
+						: divided
+							? ` in the partition of ${divided.name}`
+							: " in a partition"
 				const reason =
-					event.endReason === "succession"
+					event.reason === "succession"
 						? "after a succession"
-						: event.endReason === "usurpation"
+						: event.reason === "usurpation"
 							? "in a usurpation"
-							: event.endReason === "rebellion"
+							: event.reason === "rebellion"
 								? "after a rebellion"
-								: event.endReason === "restoration"
+								: event.reason === "restoration"
 									? "after a restoration"
-									: event.endReason === "union"
+									: event.reason === "union"
 										? "when the realms united"
-										: event.endReason === "territorial change"
+										: event.reason === "territorial change"
 											? "after a territorial change"
-											: event.endReason === "district grant"
+											: event.reason === "district grant"
 												? "when the seat was granted"
 												: ""
 				pushTimelineEvent(timelineEvents, {
@@ -345,13 +355,20 @@ export function usePersonWikiData(
 					description:
 						event.kind === "took seat"
 							? sovereign
-								? `${person.name} became ruler of ${place}.`
-								: `${person.name} was granted ${district}${nation ? ` in ${nation.name}` : ""}.`
+								? `${person.name} became ruler of ${place}${partition}.`
+								: partition
+									? `${person.name} took the seat of ${district}${partition}.`
+									: `${person.name} was granted ${district}${nation ? ` in ${nation.name}` : ""}.`
 							: sovereign
 								? `${person.name} lost the throne of ${place}${reason ? ` ${reason}` : ""}.`
-								: `${person.name} lost ${district}.`,
+								: `${person.name} lost ${district}${partition}.`,
 					people: selfMentions,
-					nations: nation ? [nation] : [],
+					nations: [nation, divided].flatMap((entry, index, all) =>
+						entry &&
+						all.findIndex((other) => other?.tag === entry.tag) === index
+							? [entry]
+							: [],
+					),
 					provinces: sovereign ? [] : [province],
 				})
 			}
