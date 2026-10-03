@@ -188,6 +188,7 @@ function peopleReport({
 	from,
 	to,
 	peopleMs,
+	childbirthDeathTimes,
 }: PeopleReportParams): PeopleReport {
 	const table = engine.people.persons
 	const events = eventsIn({ engine, from, to })
@@ -214,15 +215,9 @@ function peopleReport({
 		if (note.data.claim === 0) newHouse++
 		if (minors.has(`${note.data.nation}:${note.data.successor}`)) minor++
 	}
-	let childbirthDeaths = 0
-	for (const transaction of engine.journal)
-		for (const row of transaction.people.pregnancies)
-			if (
-				row.outcome === "childbirth death" &&
-				row.timeMs >= from * STATE.yearMs &&
-				row.timeMs < to * STATE.yearMs
-			)
-				childbirthDeaths++
+	const childbirthDeaths = childbirthDeathTimes.filter(
+		(time) => time >= from * STATE.yearMs && time < to * STATE.yearMs,
+	).length
 	let twinBirths = 0
 	for (let person = 0; person < table.birth.length; person++) {
 		const mother = table.mother[person]
@@ -451,6 +446,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	let atWarYears = 0
 	let sampledYears = 0
 	let peopleMs = 0
+	let childbirthDeathTimes: number[] = []
 	const startBetrothals = standingBetrothals({ engine })
 	const tracker: MarriageTracker = {
 		crowned: new Set(),
@@ -482,6 +478,11 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 				lateKnowledgeBand: options.lateKnowledgeBand,
 			}),
 		)
+		for (const transaction of engine.journal)
+			for (const row of transaction.people.pregnancies)
+				if (row.outcome === "childbirth death")
+					childbirthDeathTimes.push(row.timeMs)
+		engine.journal.length = 0
 		diagnostics.annualTicks.push(performance.now() - tickStart)
 		if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
 			diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
@@ -534,13 +535,22 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 				Math.max(1, raids.length),
 			revenuePerHead: revenue / Math.max(1, pop),
 			regency: regencyReport({ engine, from, to: year, top: topSet }),
-			people: peopleReport({ engine, from, to: year, peopleMs }),
+			people: peopleReport({
+				engine,
+				from,
+				to: year,
+				peopleMs,
+				childbirthDeathTimes,
+			}),
 			marriage: marriageReport({ engine, from, to: year, tracker }),
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 		})
 		persist()
 		options.log(
 			`seed ${seed} saved through ${year}; ${(diagnostics.wallMs / 1000).toFixed(1)}s`,
+		)
+		childbirthDeathTimes = childbirthDeathTimes.filter(
+			(time) => time >= year * STATE.yearMs,
 		)
 		from = year
 		startSovereigns = endSovereigns.length

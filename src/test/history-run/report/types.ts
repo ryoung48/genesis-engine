@@ -108,6 +108,7 @@ export interface PeopleReport {
 }
 
 export interface PeopleReportParams extends WindowParams {
+	childbirthDeathTimes: number[]
 	peopleMs: number
 }
 

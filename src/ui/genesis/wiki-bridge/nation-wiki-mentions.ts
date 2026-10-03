@@ -1,23 +1,16 @@
 import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { uiPalette } from "@/ui/components/tokens"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { HistoryTimeline } from "@/ui/genesis/view/types"
 import type {
+	PersonDisplayParams,
 	RecordPersonMentionParams,
 	RegentRoleParams,
 } from "@/ui/genesis/wiki-bridge/types"
 import { paletteColorForDynasty } from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
-
-/**
- * Mention-object builders used by useNationWikiData's timeline-event
- * builder -- each turns an id (war, org, culture, religion, dynasty) plus
- * the earth-history reference data into the small { id, name, color }
- * shape WikiTimeline events attach to a description. Split out of that file
- * (see plans/split-large-files.md #3); history is passed explicitly
- * instead of captured by closure.
- */
 
 export function warMention(war: {
 	id: number
@@ -96,7 +89,7 @@ export function recordPersonMention({
 	people,
 	person,
 }: RecordPersonMentionParams): NationTimelineEvent["people"][number] | null {
-	const row = people?.persons.get(person)
+	const row = PERSON_NAMES.person({ people, person })
 	return row
 		? {
 				id: person,
@@ -139,11 +132,15 @@ export function regentRole({
 	return null
 }
 
-export function personDisplay(payload: Record<string, unknown>): {
+export function personDisplay({
+	people,
+	payload: rawPayload,
+}: PersonDisplayParams): {
 	description: string
 	dynasties: NationTimelineEvent["dynasties"]
 	people: NationTimelineEvent["people"]
 } {
+	const payload = PERSON_NAMES.payload({ people, payload: rawPayload })
 	const name = String(payload.name ?? payload.monarchName ?? "unknown")
 	const dynasty =
 		typeof payload.dynasty === "string" && payload.dynasty.trim()

@@ -5,7 +5,9 @@ import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
+import type { HistoryComment } from "@/model/history/record/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
@@ -54,7 +56,7 @@ import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
 import {
 	compareTimelineDayThenType,
-	eventComment,
+	eventComment as formatEventComment,
 	formatRebelName,
 	formatRulerStatLabel,
 	joinWithAnd,
@@ -99,6 +101,10 @@ export function useNationWikiData(
 			return null
 		const frame = history.query.frame
 		const record = history.state.record
+		const eventComment = (comment: HistoryComment) =>
+			formatEventComment(
+				PERSON_NAMES.comment({ people: record.people, comment }),
+			)
 		const nationList = record.nations
 		const daysFromMs = (timeMs: number) => timeMs / 86_400_000
 		const datedEvents = <Event extends { timeMs: number }>(events: Event[]) =>
@@ -194,7 +200,7 @@ export function useNationWikiData(
 			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
 		})
-		const currentRulerPayload =
+		const rawRulerPayload =
 			record.events.nationEvents[nationId]?.events
 				.filter(
 					(event) =>
@@ -202,6 +208,12 @@ export function useNationWikiData(
 						event.timeMs <= history.selectedTimeMs,
 				)
 				.at(-1)?.payload ?? null
+		const currentRulerPayload = rawRulerPayload
+			? PERSON_NAMES.payload({
+					people: record.people,
+					payload: rawRulerPayload,
+				})
+			: null
 		const rulerLabel = nationState?.ruler
 			? formatRulerStatLabel(
 					currentRulerPayload,
@@ -408,7 +420,10 @@ export function useNationWikiData(
 				typeof currentRulerPayload?.regent === "number"
 					? currentRulerPayload.regent
 					: -1
-			const regentRow = record.people?.persons.get(regentPerson)
+			const regentRow = PERSON_NAMES.person({
+				people: record.people,
+				person: regentPerson,
+			})
 			const regentRelation = regentRole({
 				people: record.people,
 				regent: regentPerson,
@@ -681,7 +696,10 @@ export function useNationWikiData(
 					}
 					case "rulerChange": {
 						if (event.payload.newRuler === false) break
-						const person = personDisplay(event.payload)
+						const person = personDisplay({
+							people: record.people,
+							payload: event.payload,
+						})
 						const isInterregnum = /^interregnum$/i.test(
 							String(event.payload.name ?? "").trim(),
 						)
@@ -700,7 +718,10 @@ export function useNationWikiData(
 						break
 					}
 					case "heirChange": {
-						const person = personDisplay(event.payload)
+						const person = personDisplay({
+							people: record.people,
+							payload: event.payload,
+						})
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -713,7 +734,10 @@ export function useNationWikiData(
 						break
 					}
 					case "queenChange": {
-						const person = personDisplay(event.payload)
+						const person = personDisplay({
+							people: record.people,
+							payload: event.payload,
+						})
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -726,7 +750,10 @@ export function useNationWikiData(
 						break
 					}
 					case "leaderAdd": {
-						const person = personDisplay(event.payload)
+						const person = personDisplay({
+							people: record.people,
+							payload: event.payload,
+						})
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,

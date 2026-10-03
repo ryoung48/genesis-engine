@@ -20,7 +20,6 @@ import type {
 	DescendantsParams,
 	IdentityForRootParams,
 	OwnerNoteReasons,
-	PersonNameParams,
 	ProceduralTranslator,
 	ProjectTieParams,
 	RebelWar,
@@ -82,10 +81,6 @@ function nationLabel({
 				translator.names.nation(root))
 }
 
-function personName({ translator, person }: PersonNameParams): string | null {
-	return translator.state.record.people?.persons.get(person)?.name ?? null
-}
-
 // Registers and retires rebel wars from this transaction's notes before any
 // ownership is derived, and collects the reason text the record attaches to
 // each revolt and each rebel-war outcome.
@@ -130,14 +125,12 @@ function scanOwnerNotes({
 						: note.data.succession
 							? "succession"
 							: "threat"
-			const pretender = personName({
-				translator,
+			reasons.revolts.set(note.data.subject as number, {
+				nation: nationLabel({ translator, root: note.data.overlord as number }),
+				cause,
 				person: (note.data.pretender as number | undefined) ?? -1,
+				throne: note.data.goal === "throne",
 			})
-			reasons.revolts.set(
-				note.data.subject as number,
-				`Revolted against ${nationLabel({ translator, root: note.data.overlord as number })} (${cause}${pretender ? `, for ${pretender}` : ""})${note.data.goal === "throne" ? " to seize the throne" : ""}`,
-			)
 		} else if (note.tag === "war started") {
 			const warId = note.data.war as number
 			const coalition = transaction.coalitions.find(
@@ -871,19 +864,6 @@ function applyTransaction({
 			rows: transaction.people,
 			timeMs,
 			recordTime,
-			describe: ({ person, houseHome }) => ({
-				name: translator.names.ruler({
-					province: person.home,
-					nameSeed: person.nameSeed,
-				}).name,
-				house:
-					person.dynasty >= 0
-						? translator.names.dynasty({
-								dynastyIdx: person.dynasty,
-								province: houseHome,
-							})
-						: null,
-			}),
 		})
 	for (const death of transaction.people.deaths)
 		moveRulerDeath({ translator, death })
@@ -1040,13 +1020,6 @@ function applyTransaction({
 		if (nationId === undefined || ruler.nameSeed < 0) continue
 		const log = record.events.nationEvents[nationId]
 		if (!log) continue
-		// Names follow the person's birth realm and the house's first home, so
-		// a ruler keeps one name across every throne they hold.
-		const person = record.people?.persons.get(ruler.person)
-		const named = translator.names.ruler({
-			province: person?.home ?? ruler.root,
-			nameSeed: ruler.nameSeed,
-		})
 		const previous = log.events.findLast(
 			(event) => event.kind === "rulerChange",
 		)
@@ -1054,23 +1027,12 @@ function applyTransaction({
 			timeMs,
 			kind: "rulerChange",
 			payload: {
-				name: named.name,
-				dynasty:
-					ruler.dynasty >= 0
-						? translator.names.dynasty({
-								dynastyIdx: ruler.dynasty,
-								province:
-									record.people?.dynastyHome.get(ruler.dynasty) ?? ruler.root,
-							})
-						: null,
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
 				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
-				female: named.female,
 				person: ruler.person,
 				newRuler: previous?.payload.person !== ruler.person,
 				regency: ruler.regency,
 				regent: ruler.regent,
-				regentName: personName({ translator, person: ruler.regent }),
 			},
 			comment: null,
 		})

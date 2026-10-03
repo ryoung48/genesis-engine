@@ -2,6 +2,8 @@ import { useMemo } from "react"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { HISTORY } from "@/model/history/record"
+import { PERSON_NAMES } from "@/model/history/record/people/names"
+import type { NamedPerson } from "@/model/history/record/people/names/types"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import type { TenureView } from "@/model/history/record/people/query/types"
 import type { RecordPerson } from "@/model/history/record/people/types"
@@ -44,7 +46,10 @@ export function usePersonWikiData(
 		if (selectedWikiPersonId === null || !history.state) return null
 		const state = history.state
 		const people = state.record.people
-		const person = people?.persons.get(selectedWikiPersonId)
+		const person = PERSON_NAMES.person({
+			people: people ?? null,
+			person: selectedWikiPersonId,
+		})
 		if (!people || !person) return null
 		const id = selectedWikiPersonId
 		const selectedTimeMs = history.selectedTimeMs
@@ -56,18 +61,18 @@ export function usePersonWikiData(
 			DATE.formatHistoryDays(timeMs / DAY_MS)
 		const ageAt = (row: RecordPerson, timeMs: number) =>
 			Math.floor((timeMs - row.birthTimeMs) / yearMs)
-		const colorOf = (row: RecordPerson) =>
+		const colorOf = (row: NamedPerson) =>
 			row.house ? paletteColorForDynasty(row.house) : uiPalette.person.noHouse
 		const lifeLabel = (row: RecordPerson) =>
 			row.deathTimeMs <= selectedTimeMs
 				? `${dateLabel(row.birthTimeMs)} – ${dateLabel(row.deathTimeMs)}`
 				: `born ${dateLabel(row.birthTimeMs)}`
 		const mention = (personId: number) => {
-			const row = people.persons.get(personId)
+			const row = PERSON_NAMES.person({ people, person: personId })
 			return row ? { id: personId, name: row.name, color: colorOf(row) } : null
 		}
 		const personChip = (personId: number): PersonWikiChip | null => {
-			const row = people.persons.get(personId)
+			const row = PERSON_NAMES.person({ people, person: personId })
 			if (!row || row.birthTimeMs > viewTimeMs) return null
 			return {
 				key: `person:${personId}`,
@@ -148,7 +153,7 @@ export function usePersonWikiData(
 				tenure.endTimeMs === null ? "" : dateLabel(tenure.endTimeMs)
 			}`
 			if (tenure.kind === "regent") {
-				const ward = people.persons.get(tenure.ward)
+				const ward = PERSON_NAMES.person({ people, person: tenure.ward })
 				return nation
 					? {
 							key: `regent:${tenure.seat}:${tenure.startTimeMs}`,

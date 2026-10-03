@@ -25,3 +25,8 @@ export interface FocusWikiNationParams extends RebelControlledNationIdsParams {
 	targetId: number
 	sceneRef: SceneRef
 }
+
+export interface PersonDisplayParams {
+	people: PeopleRecord | null
+	payload: Record<string, unknown>
+}

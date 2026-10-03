@@ -136,6 +136,8 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	})
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
+	engine.journal.length = 0
+	engine.events.length = 0
 	const initMs = engineMs + performance.now() - recordStart
 	log(
 		`seed ${seed} era ${era} points ${numPoints} provinces ${engine.P} generation ${generationMs.toFixed(0)}ms init ${initMs.toFixed(0)}ms`,
@@ -146,7 +148,6 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	const startYear = engine.time / STATE.yearMs
-	let cursor = engine.journal.length
 	const reports: YearReport[] = []
 	for (let step = 1; step <= years; step++) {
 		const year = startYear + step
@@ -159,12 +160,12 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		})
 		SIM_RECORD.appendJournal({
 			translator,
-			transactions: engine.journal.slice(cursor),
+			transactions: engine.journal,
 		})
-		cursor = engine.journal.length
+		engine.journal.length = 0
+		engine.events.length = 0
 		const tickMs = performance.now() - tickStart
 
-		state.frameCache.clear()
 		const frameStart = performance.now()
 		const frame = HISTORY.frameAt({ state, timeMs: state.record.maxTimeMs })
 		const frameMs = performance.now() - frameStart

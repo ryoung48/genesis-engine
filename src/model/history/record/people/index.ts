@@ -43,17 +43,12 @@ function append({
 	rows,
 	timeMs,
 	recordTime,
-	describe,
 }: AppendPeopleParams): void {
 	for (const row of rows.persons) {
 		if (row.dynasty >= 0 && !record.dynastyHome.has(row.dynasty))
 			record.dynastyHome.set(row.dynasty, row.home)
 		record.persons.set(row.id, {
 			...row,
-			...describe({
-				person: row,
-				houseHome: record.dynastyHome.get(row.dynasty) ?? row.home,
-			}),
 			birthTimeMs: recordTime(row.birthTimeMs),
 			deathTimeMs: recordTime(row.deathTimeMs),
 		})
