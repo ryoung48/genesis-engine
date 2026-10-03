@@ -2,10 +2,7 @@ import { useMemo } from "react"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { HISTORY } from "@/model/history/record"
-import type {
-	Battle,
-	WarParticipantEventRecord,
-} from "@/model/history/record/types"
+import type { WarParticipantEventRecord } from "@/model/history/record/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { uiPalette } from "@/ui/components/tokens"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
@@ -16,6 +13,8 @@ import {
 	battleVerb,
 	formatBattleForce,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { SIEGE_TIMELINE } from "@/ui/genesis/wiki-bridge/siege-timeline"
+import { WAR_TROOP_SNAPSHOTS } from "@/ui/genesis/wiki-bridge/war-troop-snapshots"
 import {
 	cleanEu4Identifier,
 	compareTimelineDayThenType,
@@ -26,11 +25,6 @@ import {
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
 
-/**
- * Builds the war wiki page (wars.json warId) for Earth-imported worlds.
- * Mutually exclusive with the nation and organization wiki pages -- see
- * useWikiSelection.
- */
 interface ActiveAtParams {
 	nationId: number
 	timeMs: number
@@ -171,19 +165,13 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				? frame
 				: HISTORY.frameAt({ state: history.state, timeMs: panelTimeMs })
 		const sideOrder: Array<"attacker" | "defender"> = ["attacker", "defender"]
-		const latestBattle = war.battles.reduce<Battle | null>(
-			(latest, battle) =>
-				battle.timeMs <= battleCutoffMs &&
-				(latest === null || battle.timeMs > latest.timeMs)
-					? battle
-					: latest,
-			null,
-		)
-		// Before the first battle the panel shows each realm's troops at the
-		// war's declaration.
-		const contributions = latestBattle
-			? (latestBattle.simulated?.contributions ?? [])
-			: war.mobilization
+		const troopSnapshot = WAR_TROOP_SNAPSHOTS.latest({
+			war,
+			startTimeMs: startMs,
+			cutoffTimeMs: battleCutoffMs,
+		})
+		const contributions = troopSnapshot.contributions
+
 		const contributionById = new Map(
 			contributions.map((contribution) => [
 				contribution.countryId,
@@ -340,7 +328,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				winnerForce && loserForce
 					? ` (${winnerName}: ${winnerForce}; ${loserName}: ${loserForce})`
 					: ""
-			const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name}${forces}.${battleDetail(battle)}`
+			const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name}${forces}.${battleDetail({ battle, attackerName: resolveNationName(battle.attacker.countryId), defenderName: resolveNationName(battle.defender.countryId) })}`
 			pushTimelineEvent(timelineEvents, {
 				id: `warBattle:${battle.timeMs}:${index}`,
 				date: daysFromMs(battle.timeMs),
@@ -350,6 +338,27 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				nations: [battle.attacker.countryId, battle.defender.countryId].flatMap(
 					(id) => (id >= 0 ? [nationMention(id)] : []),
 				),
+				provinces: province ? [province] : [],
+			})
+		}
+
+		for (const entry of SIEGE_TIMELINE.build({
+			war,
+			viewpoint: null,
+			nationNameOf: resolveNationName,
+			provinceName: (province) =>
+				history.state.provinceMeta[province]?.name ?? `Province ${province}`,
+		})) {
+			const province = provinceMention(
+				String(entry.provinceId),
+				uiPalette.siege,
+			)
+			pushTimelineEvent(timelineEvents, {
+				...entry,
+				nations: [
+					nationMention(entry.besiegerId),
+					nationMention(entry.defenderId),
+				],
 				provinces: province ? [province] : [],
 			})
 		}
@@ -489,6 +498,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			dateRangeLabel,
 			stats,
 			participants,
+			troopsAsOf: DATE.formatHistoryTimeMs(troopSnapshot.timeMs),
 			participantsAsOf:
 				panelTimeMs === history.selectedTimeMs
 					? null

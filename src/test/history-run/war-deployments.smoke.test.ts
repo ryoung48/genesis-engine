@@ -31,6 +31,7 @@ it("weights shared deployments and carries losses into the next battle", () => {
 	engine.treasuryCurrent[war.defender] =
 		1_000_000_000_000 * ECONOMY.ducatsPerGram
 	const smallerWar: War = {
+		siege: null,
 		idx: engine.wars.length,
 		attacker: war.attacker,
 		defender: weak,
@@ -60,7 +61,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		state: engine,
 		war,
 		eventAttacker: war.attacker,
-		defense: 1,
+		attackerMultiplier: 1,
+		defenderMultiplier: 1,
 		rng,
 	})
 	expect(
@@ -86,7 +88,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		state: engine,
 		war,
 		eventAttacker: war.attacker,
-		defense: 1,
+		attackerMultiplier: 1,
+		defenderMultiplier: 1,
 		rng,
 	})
 
@@ -123,14 +126,16 @@ it("changes each side's losses when the battle outcome changes", () => {
 		state: winning,
 		war: winningWar,
 		eventAttacker: winningWar.attacker,
-		defense: 1,
+		attackerMultiplier: 1,
+		defenderMultiplier: 1,
 		rng: winRng,
 	})
 	const defeat = MILITARY.fight({
 		state: losing,
 		war: losingWar,
 		eventAttacker: losingWar.attacker,
-		defense: 1,
+		attackerMultiplier: 1,
+		defenderMultiplier: 1,
 		rng: lossRng,
 	})
 

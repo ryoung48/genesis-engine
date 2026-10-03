@@ -1,5 +1,6 @@
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
+import { uiPalette } from "@/ui/components/tokens"
 import type { WikiTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
 // EU4's own "no real value" sentinels, shared by the nation- and
@@ -39,6 +40,8 @@ export function timelineTypeColor(type: string): string {
 			return "#0d9488"
 		case "War":
 			return "#ea580c"
+		case "Siege":
+			return uiPalette.siege
 		case "Battle":
 			return "#b91c1c"
 		case "Raid":
@@ -260,6 +263,7 @@ const TIMELINE_TYPE_ORDER: Record<string, number> = {
 	Diplomacy: 2,
 	War: 3,
 	Battle: 3,
+	Siege: 3,
 	Territory: 4,
 }
 

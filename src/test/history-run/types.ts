@@ -57,3 +57,16 @@ export interface CreatedEngine {
 	generationMs: number
 	engineMs: number
 }
+
+export interface SiegeCalibrationScenario {
+	terrain: number
+	multiple: number
+	ratio: number
+	field: number
+	median: number
+	p99: number
+	max: number
+	failures: number
+	storms: number
+	outcomes: Record<string, number>
+}

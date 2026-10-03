@@ -1,7 +1,9 @@
 import { expect, it, vi } from "vitest"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
+import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
+import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { TAX } from "@/model/history/sim/engine/events/tax"
@@ -10,6 +12,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
+import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -63,6 +66,76 @@ function setupThrone() {
 	MILITARY.mobilize({ state, war: throneWar })
 	return { state, rng, war: throneWar, crown, child, claimant, deposed }
 }
+
+it("closes a siege exactly once at peace and consumes its queued tick without effects", () => {
+	const { state, war, rng } = setup()
+	state.heap = new EventHeap()
+	const garrison = structuredClone(war.deployed)
+	for (const nation of Object.keys(garrison).map(Number)) {
+		if (war.participants[nation] !== "defender") delete garrison[nation]
+		else {
+			garrison[nation].levy *= 0.1
+			garrison[nation].regular *= 0.1
+		}
+	}
+	SIEGE.begin({
+		state,
+		war,
+		siege: {
+			province: war.defender,
+			startTime: state.time,
+			phase: 0,
+			besieger: war.attacker,
+			besiegerSide: "attacker",
+			startBesiegerStrength: 1000,
+			garrison,
+			startGarrison: 100,
+			shortages: [],
+			breaches: 0,
+		},
+	})
+	expect(state.heap.peekType()).toBe(EVENT_HEAP.evt.SIEGE)
+	const heap = structuredClone(state.heap)
+	const nextTime = state.heap.peekTime()
+	const urban = state.popUrbanCurrent.slice()
+	const loot = vi.spyOn(MILITARY, "plunder")
+	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
+	expect(structuredClone(state.heap)).toEqual(heap)
+	expect(loot).not.toHaveBeenCalled()
+	expect(state.popUrbanCurrent).toEqual(urban)
+	expect(war.siege).toBeNull()
+	const endings = state.events.filter(
+		(note) => note.tag === "siege ended" && note.data.war === war.idx,
+	)
+	expect(endings).toHaveLength(1)
+	expect(endings[0].data).toMatchObject({
+		outcome: "lifted",
+		reason: "war ended",
+		phases: 0,
+	})
+	const casualties = structuredClone(state.militaryTotals.casualties)
+	const occupation = state.occupationCurrent.slice()
+	const random = vi.spyOn(rng, "random")
+	random.mockImplementation(() => {
+		throw new Error("stale siege consumed randomness")
+	})
+	SIM_ENGINE.simulateUntil({
+		state,
+		targetTimeMs: nextTime,
+		rng,
+		validate: false,
+	})
+	expect(state.heap.size).toBe(0)
+	expect(random).not.toHaveBeenCalled()
+	expect(state.militaryTotals.casualties).toEqual(casualties)
+	expect(state.occupationCurrent).toEqual(occupation)
+	expect(
+		state.events.filter(
+			(note) => note.tag === "siege ended" && note.data.war === war.idx,
+		),
+	).toHaveLength(1)
+	vi.restoreAllMocks()
+}, 120000)
 
 it("enthrones a victorious claimant and preserves a restoration claim", () => {
 	const { state, rng, war, crown, child, claimant, deposed } = setupThrone()
@@ -281,7 +354,8 @@ it("lets a disloyal overlord back a throne claimant and keeps the bond after vic
 		state,
 		war: throneWar,
 		eventAttacker: child,
-		defense: 1,
+		attackerMultiplier: 1,
+		defenderMultiplier: 1,
 		rng,
 	})
 	const battleIndex = battle.deployments.findIndex(

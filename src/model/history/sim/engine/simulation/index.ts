@@ -7,6 +7,7 @@ import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
+import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { TAX } from "@/model/history/sim/engine/events/tax"
@@ -207,7 +208,7 @@ function processEventsUntil({
 		const time2 = state.heap.peekTime2()
 		state.heap.dequeue()
 
-		if (type === EVENT_HEAP.evt.BATTLE)
+		if (type === EVENT_HEAP.evt.BATTLE || type === EVENT_HEAP.evt.SIEGE)
 			MILITARY.touch({ state, nation: state.wars[dataBuf[0]].attacker })
 		else if (
 			type === EVENT_HEAP.evt.CENSUS ||
@@ -220,6 +221,9 @@ function processEventsUntil({
 		switch (type) {
 			case EVENT_HEAP.evt.WAR:
 				WAR.runWar({ state, nation: dataBuf[0], rng })
+				break
+			case EVENT_HEAP.evt.SIEGE:
+				SIEGE.tick({ state, warIdx: dataBuf[0], rng })
 				break
 			case EVENT_HEAP.evt.BATTLE:
 				BATTLE.runBattle({

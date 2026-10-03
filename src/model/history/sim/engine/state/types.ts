@@ -61,11 +61,15 @@ export interface StartWarParams {
 	goal: WarGoal
 }
 
+import type { Siege } from "@/model/history/sim/engine/events/siege/types"
+
 export interface War {
+	siege: Siege | null
 	idx: number
 	attacker: number
 	defender: number
 	startTime: number
+	// [JUSTIFICATION] A running war has no end time until it is resolved.
 	endTime?: number
 	goal: WarGoal
 	backers: number[]
@@ -133,6 +137,7 @@ export interface RealmCacheEntry {
 }
 
 export interface HistoryState {
+	riverByProvince: Uint8Array
 	P: number
 	time: number
 	era: SocietyEra
@@ -231,7 +236,6 @@ export interface HistoryState {
 	religionCount: number
 	religionColors: Float32Array
 	nationColors: Float32Array
-	/** Per-province government type index into GOVERNMENT_TYPES (eras.ts) */
 	governmentType: Uint8Array
 
 	wars: War[]

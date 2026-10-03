@@ -8,12 +8,17 @@ import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { ARMY_STRENGTH } from "@/model/history/sim/engine/military/strength"
 import type {
 	ApplyLossesParams,
+	ApplyTroopLossesParams,
 	BattleDeployments,
 	BattleOutcome,
 	BattleResult,
+	CasualtiesParams,
+	ClashParams,
+	ClashResult,
 	Coalition,
 	CoalitionMember,
 	CoalitionParams,
+	DeploymentDataParams,
 	DeploymentsOfParams,
 	FightParams,
 	ForceShareParams,
@@ -248,12 +253,19 @@ function rebellionThreat(params: RebellionThreatParams): number {
 	return rebellionPreview(params).threat
 }
 
-function coalition({ state, war, side }: CoalitionParams): Coalition {
+function coalition({ state, war, side, excluded }: CoalitionParams): Coalition {
 	const nation = side === "attacker" ? war.attacker : war.defender
 	let intended = 0
 	const members = DEPLOYMENTS.sideMembers({ state, war, side }).map(
 		(participant) => {
-			const troops = war.deployed[participant] ?? { levy: 0, regular: 0 }
+			const deployed = war.deployed[participant] ?? { levy: 0, regular: 0 }
+			const troops = {
+				levy: Math.max(0, deployed.levy - (excluded[participant]?.levy ?? 0)),
+				regular: Math.max(
+					0,
+					deployed.regular - (excluded[participant]?.regular ?? 0),
+				),
+			}
 			const reference = state.militaryIntervals.get(participant)?.reference
 			intended += reference
 				? (reference.levy + reference.regular) *
@@ -301,24 +313,49 @@ function totalTroops(members: CoalitionMember[]): number {
 	return members.reduce((sum, member) => sum + member.levy + member.regular, 0)
 }
 
-function applyLosses({ state, members, losses, war }: ApplyLossesParams): void {
+function casualties({ members, losses }: CasualtiesParams) {
 	const total = totalTroops(members)
-	if (total <= 0 || losses <= 0) return
-	for (const { nation, levy, regular } of members) {
-		const committed = levy + regular
+	const result: ApplyTroopLossesParams["losses"] = {}
+	if (total <= 0 || losses <= 0) return result
+	const share = Math.min(1, losses / total)
+	for (const member of members)
+		result[member.nation] = {
+			levy: member.levy * share,
+			regular: member.regular * share,
+		}
+	return result
+}
+function applyLosses({ state, war, members, losses }: ApplyLossesParams): void {
+	applyTroopLosses({ state, war, losses: casualties({ members, losses }) })
+}
+function applyTroopLosses({
+	state,
+	losses,
+	war,
+}: ApplyTroopLossesParams): ApplyTroopLossesParams["losses"] {
+	const applied: ApplyTroopLossesParams["losses"] = {}
+	for (const [id, requested] of Object.entries(losses)) {
+		const nation = Number(id)
 		RECRUITMENT.advance({ state, nation })
 		const troops = war?.deployed[nation] ?? {
 			levy: state.levyCurrent[nation],
 			regular: state.regularCurrent[nation],
 		}
 		const enrolled = troops.levy + troops.regular
-		const share = Math.min(enrolled, (losses * committed) / total)
+		const share =
+			Math.min(troops.levy, requested.levy) +
+			Math.min(troops.regular, requested.regular)
 		if (share <= 0 || enrolled <= 0) continue
 		const interval = state.militaryIntervals.get(nation)
+		const actual = { levy: 0, regular: 0 }
 		for (const type of ["levy", "regular"] as const) {
 			const column = type === "levy" ? state.levyCurrent : state.regularCurrent
-			const loss = Math.min(column[nation], (share * troops[type]) / enrolled)
+			const loss = Math.min(
+				column[nation],
+				Math.min(troops[type], requested[type]),
+			)
 			column[nation] -= loss
+			actual[type] = loss
 			state.militaryTotals.casualties[type] += loss
 			if (interval) interval.casualties[type] += loss
 			if (war?.deployed[nation])
@@ -327,6 +364,7 @@ function applyLosses({ state, members, losses, war }: ApplyLossesParams): void {
 					war.deployed[nation][type] - loss,
 				)
 		}
+		applied[nation] = actual
 		state.militaryDirty.add(nation)
 		state.militaryAllocationDirty.add(nation)
 		state.militaryStrengthDirty.add(nation)
@@ -336,7 +374,7 @@ function applyLosses({ state, members, losses, war }: ApplyLossesParams): void {
 			0,
 		)
 		if (rural <= 0) continue
-		const scale = Math.max(0, 1 - share / rural)
+		const scale = Math.max(0, 1 - (actual.levy + actual.regular) / rural)
 		for (const p of provinces)
 			FIELDS.prov.population.rural.set({
 				state,
@@ -344,6 +382,7 @@ function applyLosses({ state, members, losses, war }: ApplyLossesParams): void {
 				value: state.popRuralCurrent[p] * scale,
 			})
 	}
+	return applied
 }
 
 function battleOutcome(margin: number): BattleOutcome {
@@ -418,44 +457,50 @@ function recordArmies({ state }: RecordArmiesParams): void {
 
 function mobilize({ state, war }: MobilizeParams): void {
 	logCoalition({ state })
-	const coalitions = [
-		coalition({ state, war, side: "attacker" }),
-		coalition({ state, war, side: "defender" }),
-	]
-	const members = coalitions.flatMap((side) => side.members)
 	state.events.push({
 		tag: "war mobilized",
 		time: state.time,
 		data: {
 			war: war.idx,
-			deployedNations: members.map((member) => member.nation),
-			deployedTroops: members.map((member) => member.levy + member.regular),
-			deployedLevies: members.map((member) => member.levy),
-			deployedRegulars: members.map((member) => member.regular),
-			deployedRelations: leadRelations({ state, coalitions }),
-			deployedRoles: memberRoles({ war, coalitions }),
+			...deploymentData({ state, war, attackerSide: "attacker" }),
 		},
 	})
 }
 
-function fight({
-	state,
-	war,
-	eventAttacker,
-	defense,
-	rng,
-}: FightParams): BattleResult {
-	const attackerSide = eventAttacker === war.attacker ? "attacker" : "defender"
-	const attackers = coalition({ state, war, side: attackerSide })
+function deploymentData({ state, war, attackerSide }: DeploymentDataParams) {
+	const attackers = coalition({ state, war, side: attackerSide, excluded: {} })
 	const defenders = coalition({
 		state,
 		war,
 		side: attackerSide === "attacker" ? "defender" : "attacker",
+		excluded: {},
 	})
-	const attackerArmy = totalTroops(attackers.members)
-	const defenderArmy = totalTroops(defenders.members)
-	const attackerForce = totalForce(attackers.members)
-	const defenderForce = totalForce(defenders.members)
+	const data = deploymentsOf({ state, war, attackers, defenders })
+	return {
+		deployedNations: data.deployments.map((member) => member.nation),
+		deployedTroops: data.deployments.map(
+			(member) => member.levy + member.regular,
+		),
+		deployedLevies: data.deployments.map((member) => member.levy),
+		deployedRegulars: data.deployments.map((member) => member.regular),
+		deployedRelations: data.relations,
+		deployedRoles: data.roles,
+	}
+}
+
+function clash({
+	attackers,
+	defenders,
+	attackerShortfall,
+	defenderShortfall,
+	attackerMultiplier,
+	defenderMultiplier,
+	rng,
+}: ClashParams): ClashResult {
+	const attackerArmy = totalTroops(attackers)
+	const defenderArmy = totalTroops(defenders)
+	const attackerForce = totalForce(attackers) * attackerMultiplier
+	const defenderForce = totalForce(defenders)
 	if (attackerArmy <= 0 || defenderArmy <= 0) {
 		const outcome =
 			attackerArmy <= 0 && defenderArmy <= 0 ? "empty" : "uncontested"
@@ -466,15 +511,12 @@ function fight({
 			attackerWon,
 			preBattleWinProbability: attackerWon ? 1 : 0,
 			powerShare: attackerWon ? 1 : 0,
-			attackerArmy,
-			defenderArmy,
-			...deploymentsOf({ state, war, attackers, defenders }),
-			attackerLossShare: 0,
-			defenderLossShare: 0,
+			attackerLosses: 0,
+			defenderLosses: 0,
 			loserShortfall: 0,
 		}
 	}
-	const defended = defenderForce * defense
+	const defended = defenderForce * defenderMultiplier
 	const u = MATH.clamp({
 		value: rng.random(),
 		lo: ROLL_EPSILON,
@@ -491,7 +533,7 @@ function fight({
 		defenderArmy * BATTLE_LOSS_SCALE * balance ** BATTLE_LOSS_EXPONENT
 	const loserArmy = attackerWon ? defenderArmy : attackerArmy
 	const loserCasualties = attackerWon ? defenderCasualties : attackerCasualties
-	const loserShortfall = attackerWon ? defenders.shortfall : attackers.shortfall
+	const loserShortfall = attackerWon ? defenderShortfall : attackerShortfall
 	const routScore =
 		loserCasualties / loserArmy +
 		ROUT_MARGIN_WEIGHT * margin +
@@ -504,18 +546,6 @@ function fight({
 		: 0
 	const attackerLosses = attackerCasualties + (attackerWon ? 0 : pursuit)
 	const defenderLosses = defenderCasualties + (attackerWon ? pursuit : 0)
-	applyLosses({
-		state,
-		war,
-		members: attackers.members,
-		losses: attackerLosses,
-	})
-	applyLosses({
-		state,
-		war,
-		members: defenders.members,
-		losses: defenderLosses,
-	})
 	const initialOutcome = battleOutcome(margin)
 	return {
 		outcome: routed ? "rout" : initialOutcome,
@@ -524,12 +554,60 @@ function fight({
 		preBattleWinProbability:
 			1 - forceShare({ a: attackerForce, b: defended, k: BATTLE_EXPONENT }),
 		powerShare: balance,
+		attackerLosses,
+		defenderLosses,
+		loserShortfall,
+	}
+}
+
+function fight({
+	state,
+	war,
+	eventAttacker,
+	attackerMultiplier,
+	defenderMultiplier,
+	rng,
+}: FightParams): BattleResult {
+	const attackerSide = eventAttacker === war.attacker ? "attacker" : "defender"
+	const attackers = coalition({ state, war, side: attackerSide, excluded: {} })
+	const defenders = coalition({
+		state,
+		war,
+		side: attackerSide === "attacker" ? "defender" : "attacker",
+		excluded: {},
+	})
+	const attackerArmy = totalTroops(attackers.members)
+	const defenderArmy = totalTroops(defenders.members)
+	const result = clash({
+		attackers: attackers.members,
+		defenders: defenders.members,
+		attackerShortfall: attackers.shortfall,
+		defenderShortfall: defenders.shortfall,
+		attackerMultiplier,
+		defenderMultiplier,
+		rng,
+	})
+	applyLosses({
+		state,
+		war,
+		members: attackers.members,
+		losses: result.attackerLosses,
+	})
+	applyLosses({
+		state,
+		war,
+		members: defenders.members,
+		losses: result.defenderLosses,
+	})
+	return {
+		...result,
 		attackerArmy,
 		defenderArmy,
+		attackerLossShare:
+			attackerArmy > 0 ? result.attackerLosses / attackerArmy : 0,
+		defenderLossShare:
+			defenderArmy > 0 ? result.defenderLosses / defenderArmy : 0,
 		...deploymentsOf({ state, war, attackers, defenders }),
-		attackerLossShare: attackerLosses / attackerArmy,
-		defenderLossShare: defenderLosses / defenderArmy,
-		loserShortfall,
 	}
 }
 
@@ -785,6 +863,13 @@ function validate({ state }: RecordArmiesParams): void {
 }
 
 export const MILITARY = {
+	totalTroops,
+	totalForce,
+	coalition,
+	clash,
+	casualties,
+	applyTroopLosses,
+	deploymentData,
 	initialize,
 	advance,
 	reconcile,

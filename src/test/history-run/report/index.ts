@@ -17,6 +17,7 @@ import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
 import type { KnowledgeSnapshot } from "@/test/history-run/report/knowledge/types"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
+import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import type {
@@ -362,6 +363,8 @@ function runSeed({
 	const rebelLogistics = REBEL_LOGISTICS_REPORT.attach({ engine })
 	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
 	const diagnostics = {
+		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
+		siegeLifecycle: BATTLEFIELD_REPORT.lifecycle({ engine }),
 		completed: false,
 		sourceHash: createHash("sha256")
 			.update(
@@ -560,6 +563,7 @@ function runSeed({
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 		})
 		diagnostics.completed = year === start + options.years
+		diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
 		persist()
 		options.log(
 			`seed ${seed} saved through ${year}; ${(diagnostics.wallMs / 1000).toFixed(1)}s`,

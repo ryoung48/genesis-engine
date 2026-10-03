@@ -112,7 +112,8 @@ describe("battle odds", () => {
 			state: engine,
 			war,
 			eventAttacker: war.attacker,
-			defense: 1,
+			attackerMultiplier: 1,
+			defenderMultiplier: 1,
 			rng: HISTORY_RNG.createHistoryRng(101),
 		})
 		expect(result.attackerArmy).toBe(100)
@@ -139,7 +140,8 @@ describe("battle odds", () => {
 				state: engine,
 				war,
 				eventAttacker: war.attacker,
-				defense: 1,
+				attackerMultiplier: 1,
+				defenderMultiplier: 1,
 				rng: HISTORY_RNG.createHistoryRng(102),
 			})
 			expect(result.attackerArmy).toBe(500)
@@ -167,7 +169,8 @@ describe("battle odds", () => {
 					state: engine,
 					war,
 					eventAttacker: war.attacker,
-					defense: 1,
+					attackerMultiplier: 1,
+					defenderMultiplier: 1,
 					rng,
 				})
 				expect(result.attackerArmy).toBeCloseTo(1000 * ratio, 6)
@@ -185,7 +188,8 @@ describe("battle odds", () => {
 			state: engine,
 			war,
 			eventAttacker: war.attacker,
-			defense: 1.3,
+			attackerMultiplier: 1,
+			defenderMultiplier: 1.3,
 			rng,
 		})
 		expect(result.attackerArmy).toBeCloseTo(3000, 6)
@@ -208,7 +212,8 @@ describe("battle odds", () => {
 				state: engine,
 				war,
 				eventAttacker: war.attacker,
-				defense: 1,
+				attackerMultiplier: 1,
+				defenderMultiplier: 1,
 				rng,
 			})
 			expect(result.loserShortfall).toBe(0)
@@ -231,7 +236,8 @@ describe("battle odds", () => {
 					state: engine,
 					war,
 					eventAttacker: war.attacker,
-					defense: 1,
+					attackerMultiplier: 1,
+					defenderMultiplier: 1,
 					rng,
 				})
 				const balance = result.powerShare
@@ -250,7 +256,8 @@ describe("battle odds", () => {
 			state: engine,
 			war,
 			eventAttacker: war.attacker,
-			defense: 1,
+			attackerMultiplier: 1,
+			defenderMultiplier: 1,
 			rng: sequenceRng([0.55, 0.99]),
 		})
 		const balance = held.powerShare
@@ -266,7 +273,8 @@ describe("battle odds", () => {
 			state: engine,
 			war,
 			eventAttacker: war.attacker,
-			defense: 1,
+			attackerMultiplier: 1,
+			defenderMultiplier: 1,
 			rng,
 		})
 		const base = 0.2 * routed.powerShare ** 1.5
@@ -281,7 +289,8 @@ describe("battle odds", () => {
 			state: engine,
 			war,
 			eventAttacker: war.attacker,
-			defense: 1,
+			attackerMultiplier: 1,
+			defenderMultiplier: 1,
 			rng: HISTORY_RNG.createHistoryRng(5),
 		})
 		expect(result.outcome).toBe("uncontested")
@@ -348,7 +357,7 @@ describe("battle progress", () => {
 			state: engine,
 			warIdx: war.idx,
 			eventAttacker: war.attacker,
-			rng: sequenceRng(values),
+			rng: sequenceRng([0, ...values]),
 		})
 		const notes = engine.events.slice(note)
 		return {

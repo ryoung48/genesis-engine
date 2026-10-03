@@ -5,8 +5,15 @@ import type {
 	HistoryEvent,
 	NationIdentity,
 	ParticipantRole,
+	SiegeBeat,
+	SiegeRecord,
 	WarRecord,
 } from "@/model/history/record/types"
+import type {
+	Ambusher,
+	BattleKind,
+} from "@/model/history/sim/engine/events/battle/kind/types"
+import type { SiegeBeatData } from "@/model/history/sim/engine/events/siege/types"
 import { RELATION_CODE } from "@/model/history/sim/engine/fields"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import { COLORING } from "@/model/history/sim/nations/coloring"
@@ -551,6 +558,7 @@ function appendNote({
 			rebel: coalition !== undefined && coalition.goal !== "conquest",
 			events: [],
 			battles: [],
+			sieges: [],
 			mobilization: [],
 		}
 		record.events.wars[warId] = war
@@ -593,6 +601,8 @@ function appendNote({
 			attackerWon: data.winner === data.attacker,
 			comment: null,
 			simulated: {
+				kind: data.kind as BattleKind,
+				ambusher: data.ambusher as Ambusher,
 				contributions: contributions({ translator, data }),
 				outcome: data.result as BattleOutcome,
 				preBattleWinProbability: data.preBattleWinProbability as number,
@@ -601,6 +611,68 @@ function appendNote({
 				vegetation: data.vegetation as string,
 			},
 		})
+	} else if (
+		note.tag === "siege started" ||
+		note.tag === "siege beat" ||
+		note.tag === "siege ended"
+	) {
+		const war = record.events.wars[data.war as number]
+		if (!war) return
+		if (coalition) coalitionChange({ translator, coalition, timeMs })
+		const troops = contributions({ translator, data })
+		if (note.tag === "siege started") {
+			war.sieges.push({
+				timeMs,
+				province: data.province as number,
+				besieger: translator.identityByRoot.get(data.besieger as number) ?? -1,
+				defender: translator.identityByRoot.get(data.defender as number) ?? -1,
+				besiegers: data.besiegers as number,
+				garrisonTroops: data.garrisonTroops as number,
+				contributions: troops,
+				beats: [],
+				outcome: null,
+				reason: null,
+				endTimeMs: null,
+				endContributions: null,
+				phases: null,
+			})
+		} else {
+			const siege = war.sieges.findLast(
+				(siege) => siege.outcome === null && siege.province === data.province,
+			)
+			if (!siege) return
+			if (note.tag === "siege ended") {
+				siege.outcome = data.outcome as SiegeRecord["outcome"]
+				siege.reason = data.reason as SiegeRecord["reason"]
+				siege.endTimeMs = timeMs
+				siege.endContributions = troops
+				siege.phases = data.phases as number
+			} else {
+				const beat = {
+					beat: data.beat,
+					...(data.beat === "breach"
+						? { breaches: data.breaches }
+						: data.beat === "sortie" ||
+								data.beat === "assault" ||
+								data.beat === "relief"
+							? {
+									won: data.won,
+									outcome: data.outcome,
+									powerShare: data.powerShare,
+									effect: data.effect,
+								}
+							: {}),
+				} as SiegeBeatData
+				siege.beats.push({
+					...beat,
+					timeMs,
+					phase: data.phase as number,
+					besiegerLosses: data.besiegerLosses as number,
+					garrisonLosses: data.garrisonLosses as number,
+					contributions: troops,
+				} as SiegeBeat)
+			}
+		}
 	} else if (note.tag === "raid") {
 		record.events.raids.push({
 			timeMs,
@@ -977,7 +1049,11 @@ function applyTransaction({
 	const coalitions = transaction.coalitions.slice()
 	for (const note of transaction.notes) {
 		const coalition =
-			note.tag === "war started" || note.tag === "battle"
+			note.tag === "war started" ||
+			note.tag === "battle" ||
+			note.tag === "siege started" ||
+			note.tag === "siege beat" ||
+			note.tag === "siege ended"
 				? (coalitions.find((entry) => entry.warId === note.data.war) ?? null)
 				: null
 		if (coalition) coalitions.splice(coalitions.indexOf(coalition), 1)

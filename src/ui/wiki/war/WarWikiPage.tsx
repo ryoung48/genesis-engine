@@ -5,7 +5,7 @@ import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { uiPalette } from "@/ui/components/tokens"
+import { uiPalette, uiTokens } from "@/ui/components/tokens"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	type WikiCountHistoryPoint,
@@ -38,18 +38,15 @@ export interface WarWikiData {
 	id: number
 	name: string
 	planetTitle: string
-	/** Human-readable date range, e.g. "1618.5.23 – 1648.10.24" -- always
-	 * day-precise since wars.json's own warStart/warEnd events always carry
-	 * a real date (no year-only fallback needed here, unlike a merged
-	 * conflicts.json record). */
+
 	dateRangeLabel: string
 	stats: StatEntry[]
 	participants: WarWikiParticipant[]
 	// Set when the selected date is outside the war, so the panel shows the
 	// war's opening or closing line-up as of this date instead.
 	participantsAsOf: string | null
-	/** warStart/warEnd (join/leave) plus territory-exchange events between
-	 * participants, in chronological order -- see WikiTimelineSection. */
+	troopsAsOf: string
+
 	timelineEvents: WikiTimelineEvent[]
 	dateRangeStart: number
 	dateRangeEnd: number
@@ -151,10 +148,18 @@ export function WarWikiPage({ war }: { war: WarWikiData }) {
 			{war.participants.some((group) => group.nations.length > 0) ? (
 				<div className="rounded-xl border border-slate-200 bg-white py-2.5">
 					{war.participantsAsOf === null ? null : (
-						<div className="mb-1.5 px-3 text-[8px] uppercase tracking-[0.1em] text-slate-400">
+						<div
+							className={`mb-1.5 px-3 ${uiTokens.type.labelSm} ${uiTokens.text.subtle}`}
+						>
 							As of {war.participantsAsOf}
 						</div>
 					)}
+					<div
+						className={`mb-1.5 px-3 ${uiTokens.type.labelSm} ${uiTokens.text.subtle}`}
+					>
+						Troops as of {war.troopsAsOf}
+					</div>
+
 					<div className="grid grid-cols-2 divide-x divide-slate-200 [&>*]:px-3">
 						{war.participants.map((group) => (
 							<div key={group.side}>

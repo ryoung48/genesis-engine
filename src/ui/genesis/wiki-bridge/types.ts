@@ -1,7 +1,13 @@
 import type { PeopleRecord } from "@/model/history/record/people/types"
-import type { WarRecord } from "@/model/history/record/types"
+import type { Battle, WarRecord } from "@/model/history/record/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { SceneRef } from "@/ui/genesis/view/types"
+
+export interface BattleDetailParams {
+	battle: Battle
+	attackerName: string
+	defenderName: string
+}
 
 export interface RecordPersonMentionParams {
 	people: PeopleRecord | null

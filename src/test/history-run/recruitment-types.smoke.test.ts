@@ -461,7 +461,8 @@ describe("military transitions and conservation", () => {
 				state,
 				war: active,
 				eventAttacker: nation,
-				defense: 1,
+				attackerMultiplier: 1,
+				defenderMultiplier: 1,
 				rng,
 			})
 			expect(result.attackerArmy).toBeCloseTo(500, 8)
@@ -762,7 +763,8 @@ describe("military transitions and conservation", () => {
 			state,
 			war: active,
 			eventAttacker: nation,
-			defense: 1,
+			attackerMultiplier: 1,
+			defenderMultiplier: 1,
 			rng,
 		})
 		expect(result.attackerWon).toBe(false)

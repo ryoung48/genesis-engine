@@ -48,6 +48,7 @@ export interface CoalitionParams {
 	state: HistoryState
 	war: War
 	side: WarSide
+	excluded: Record<number, Troops>
 }
 
 export interface CoalitionMember {
@@ -72,7 +73,8 @@ export interface FightParams {
 	state: HistoryState
 	war: War
 	eventAttacker: number
-	defense: number
+	attackerMultiplier: number
+	defenderMultiplier: number
 	rng: SharedRng
 }
 
@@ -179,4 +181,38 @@ export interface MutationParams<T> {
 export interface ProvinceMutationParams {
 	state: HistoryState
 	p: number
+}
+
+export interface CasualtiesParams {
+	members: CoalitionMember[]
+	losses: number
+}
+export interface ApplyTroopLossesParams {
+	state: HistoryState
+	war: War | null
+	losses: Record<number, Troops>
+}
+export interface DeploymentDataParams {
+	state: HistoryState
+	war: War
+	attackerSide: WarSide
+}
+export interface ClashParams {
+	attackers: CoalitionMember[]
+	defenders: CoalitionMember[]
+	attackerShortfall: number
+	defenderShortfall: number
+	attackerMultiplier: number
+	defenderMultiplier: number
+	rng: SharedRng
+}
+export interface ClashResult {
+	attackerWon: boolean
+	outcome: BattleOutcome
+	initialOutcome: BattleOutcome
+	powerShare: number
+	preBattleWinProbability: number
+	attackerLosses: number
+	defenderLosses: number
+	loserShortfall: number
 }

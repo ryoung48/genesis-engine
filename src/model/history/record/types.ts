@@ -99,7 +99,18 @@ export interface BattleContribution {
 	role: ParticipantRole | null
 }
 
+import type {
+	Ambusher,
+	BattleKind,
+} from "@/model/history/sim/engine/events/battle/kind/types"
+import type {
+	SiegeBeatData,
+	SiegeLiftReason,
+	SiegeOutcome,
+} from "@/model/history/sim/engine/events/siege/types"
 export interface SimulatedBattle {
+	kind: BattleKind
+	ambusher: Ambusher
 	// Each coalition member's deployed troops after the battle.
 	contributions: BattleContribution[]
 	outcome: BattleOutcome
@@ -133,6 +144,7 @@ export interface WarRecord {
 	rebel: boolean
 	events: WarParticipantEventRecord[]
 	battles: Battle[]
+	sieges: SiegeRecord[]
 	// Each realm's troops when the war was declared; empty for Earth wars.
 	mobilization: BattleContribution[]
 }
@@ -319,4 +331,27 @@ export interface LoadEarthStateParams {
 
 export interface LoadedEarthState {
 	state: HistoryState
+}
+
+export type SiegeBeat = SiegeBeatData & {
+	timeMs: number
+	phase: number
+	besiegerLosses: number
+	garrisonLosses: number
+	contributions: BattleContribution[]
+}
+export interface SiegeRecord {
+	timeMs: number
+	province: number
+	besieger: number
+	defender: number
+	besiegers: number
+	garrisonTroops: number
+	contributions: BattleContribution[]
+	beats: SiegeBeat[]
+	outcome: SiegeOutcome | null
+	reason: SiegeLiftReason | null
+	endTimeMs: number | null
+	endContributions: BattleContribution[] | null
+	phases: number | null
 }

@@ -1,4 +1,5 @@
 const evt = {
+	SIEGE: 10,
 	WAR: 0,
 	BATTLE: 1,
 	SUCCESSION: 2,
@@ -17,13 +18,13 @@ const INITIAL_CAPACITY = 1024
 
 const DATA_FIELDS = 4
 
+// Packed storage keeps the simulation event queue small while serving its next event in logarithmic time.
 export class EventHeap {
 	private _size = 0
 	private _capacity: number
 	private _time: Float64Array
 	private _type: Uint8Array
 	private _data: Int32Array
-	/** Auxiliary float64 for events that need a second time (e.g. census previous) */
 	private _time2: Float64Array
 
 	constructor(capacity = INITIAL_CAPACITY) {
@@ -42,7 +43,6 @@ export class EventHeap {
 		return this._size === 0
 	}
 
-	/** Peek at the front event's time */
 	peekTime(): number {
 		return this._time[0]
 	}
@@ -51,7 +51,6 @@ export class EventHeap {
 		return this._type[0] as EventType
 	}
 
-	/** Read the front event's data fields */
 	peekData(out: Int32Array): void {
 		const base = 0
 		out[0] = this._data[base]

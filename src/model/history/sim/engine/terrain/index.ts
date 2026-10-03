@@ -97,4 +97,8 @@ function battlefield({ state, p }: BattlefieldParams): Battlefield {
 	}
 }
 
-export const TERRAIN = { provinceTerrain, battlefield }
+export const TERRAIN = {
+	provinceTerrain,
+	battlefield,
+	hasRiver: ({ state, p }: BattlefieldParams) => state.riverByProvince[p] !== 0,
+}

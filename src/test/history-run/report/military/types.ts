@@ -40,6 +40,7 @@ export interface CompletedWar {
 }
 
 export interface BattleSample {
+	kind: string
 	attackerWon: boolean
 	attackerLossPct: number
 	defenderLossPct: number
@@ -93,6 +94,8 @@ export interface RaidTotals {
 }
 
 export interface MilitaryWindow {
+	siegeStarts: number
+	siegeEndings: { outcome: string; phases: number }[]
 	sovereignYears: Record<GovernmentFamily, number>
 	atWarYears: Record<GovernmentFamily, number>
 	armyShare: Record<GovernmentFamily, number[]>

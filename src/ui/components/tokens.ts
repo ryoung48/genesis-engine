@@ -1,5 +1,6 @@
 export const uiPalette = {
 	war: "#b91c1c",
+	siege: "#7f1d1d",
 	treasury: {
 		critical: "#b91c1c",
 		caution: "#f59e0b",

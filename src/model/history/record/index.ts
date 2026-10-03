@@ -18,6 +18,7 @@ import type {
 	NationEventLog,
 	OrganizationEventRecord,
 	ProvinceEventLog,
+	WarRecord,
 } from "@/model/history/record/types"
 import { FRAME } from "@/model/history/world-frame"
 import type {
@@ -183,6 +184,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 				})
 				.sort((a, b) => a.timeMs - b.timeMs),
 			mobilization: [] as BattleContribution[],
+			sieges: [] as WarRecord["sieges"],
 			battles: war.battles.map(
 				(battle): Battle => ({
 					...battle,

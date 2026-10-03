@@ -1,33 +1,17 @@
+import { CONQUEST } from "@/model/history/sim/engine/events/battle/conquest"
+import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
 import type {
 	BattleTarget,
 	FindInvasionTargetParams,
 	FindReconquestTargetParams,
-	NextBattleTimeParams,
 	ResolveTargetParams,
 	RunBattleParams,
 } from "@/model/history/sim/engine/events/battle/types"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
-import { FIELDS } from "@/model/history/sim/engine/fields"
+import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
-
-const WINNER_INITIATIVE = 0.7
-const DEFENSIVE_SETTLEMENT_CHANCE: Partial<Record<BattleOutcome, number>> = {
-	decisive: 0.4,
-	rout: 0.75,
-	uncontested: 0.9,
-}
-
-const NEXT_BATTLE_MONTHS: Record<BattleOutcome, [number, number]> = {
-	inconclusive: [3, 8],
-	normal: [2, 10],
-	decisive: [1, 4],
-	rout: [1, 4],
-	uncontested: [1, 4],
-	empty: [1, 4],
-}
 
 function findInvasionTarget({
 	state,
@@ -88,11 +72,6 @@ function resolveTarget({
 	return { attacker: defender, defender: attacker, province: swapped }
 }
 
-function nextBattleTime({ state, outcome, rng }: NextBattleTimeParams): number {
-	const [lo, hi] = NEXT_BATTLE_MONTHS[outcome]
-	return state.time + STATE.deltaMonth(rng.uniform(lo, hi))
-}
-
 function runBattle({
 	state,
 	warIdx,
@@ -100,7 +79,7 @@ function runBattle({
 	rng,
 }: RunBattleParams): void {
 	const war = state.wars[warIdx]
-	if (war.endTime !== undefined) return
+	if (war.endTime !== undefined || war.siege !== null) return
 
 	if (
 		!STATE.isSovereign({ state, p: war.attacker }) ||
@@ -116,138 +95,78 @@ function runBattle({
 		return
 	}
 	const { attacker, defender, province: target } = battle
-	const restoration = war.attacker === defender
 	MILITARY.logCoalition({ state })
 
+	const siege = SIEGE.prepare({ state, war, attacker, province: target })
+	const { kind, ambusher } = BATTLE_KIND.choose({
+		state,
+		province: target,
+		siegeEligible: siege !== null,
+		rng,
+	})
+	if (kind === "siege" && siege !== null) {
+		SIEGE.begin({ state, war, siege })
+		return
+	}
 	const terrain = TERRAIN.battlefield({ state, p: target })
 	const result = MILITARY.fight({
 		state,
 		war,
 		eventAttacker: attacker,
-		defense: terrain.defense,
+		...BATTLE_KIND.modifiers({ kind, ambusher, terrain }),
 		rng,
 	})
 	if (result.outcome === "empty") {
 		PEACE.conclude({ state, war, rng, reason: "no troops" })
 		return
 	}
-	const progress = result.attackerWon && result.outcome !== "inconclusive"
-
-	const loot =
-		progress && !restoration
-			? MILITARY.plunder({
-					state,
-					raider: attacker,
-					loser: defender,
+	CONQUEST.apply({
+		state,
+		war,
+		attacker,
+		defender,
+		province: target,
+		attackerWon: result.attackerWon,
+		outcome: result.outcome,
+		sack: false,
+		rng,
+		record: (loot) => {
+			state.events.push({
+				tag: "battle",
+				time: state.time,
+				data: {
+					war: war.idx,
+					kind,
+					ambusher,
 					province: target,
-					sack: target === war.defender,
-				})
-			: 0
-
-	if (progress) {
-		if (restoration) {
-			FIELDS.prov.occupation.set({
-				state,
-				p: target,
-				value: -1,
+					attacker,
+					defender,
+					winner: result.attackerWon ? attacker : defender,
+					result: result.outcome,
+					initialResult: result.initialOutcome,
+					preBattleWinProbability: result.preBattleWinProbability,
+					powerShare: result.powerShare,
+					topography: terrain.topography,
+					vegetation: terrain.vegetation,
+					waterTarget: terrain.water,
+					terrainDefense: terrain.defense,
+					loserShortfall: result.loserShortfall,
+					attackerArmy: Math.round(result.attackerArmy),
+					defenderArmy: Math.round(result.defenderArmy),
+					attackerDeployed: Math.round(result.attackerDeployed),
+					defenderDeployed: Math.round(result.defenderDeployed),
+					...MILITARY.deploymentData({
+						state,
+						war,
+						attackerSide: attacker === war.attacker ? "attacker" : "defender",
+					}),
+					attackerLosses: 100 * result.attackerLossShare,
+					defenderLosses: 100 * result.defenderLossShare,
+					plunder: loot,
+				},
 			})
-			const i = war.occupied.indexOf(target)
-			if (i >= 0) war.occupied.splice(i, 1)
-		} else {
-			FIELDS.prov.occupation.set({
-				state,
-				p: target,
-				value: war.idx,
-			})
-			if (!war.occupied.includes(target)) war.occupied.push(target)
-		}
-	}
-
-	const winner = result.attackerWon ? attacker : defender
-	const loser = result.attackerWon ? defender : attacker
-	state.events.push({
-		tag: "battle",
-		time: state.time,
-		data: {
-			war: war.idx,
-			province: target,
-			attacker,
-			defender,
-			winner,
-			result: result.outcome,
-			initialResult: result.initialOutcome,
-			preBattleWinProbability: result.preBattleWinProbability,
-			powerShare: result.powerShare,
-			topography: terrain.topography,
-			vegetation: terrain.vegetation,
-			waterTarget: terrain.water,
-			terrainDefense: terrain.defense,
-			loserShortfall: result.loserShortfall,
-			attackerArmy: Math.round(result.attackerArmy),
-			defenderArmy: Math.round(result.defenderArmy),
-			attackerDeployed: Math.round(result.attackerDeployed),
-			defenderDeployed: Math.round(result.defenderDeployed),
-			deployedNations: result.deployments.map((member) => member.nation),
-			deployedTroops: result.deployments.map(
-				(member) => member.levy + member.regular,
-			),
-			deployedLevies: result.deployments.map((member) => member.levy),
-			deployedRegulars: result.deployments.map((member) => member.regular),
-			deployedRelations: result.relations,
-			deployedRoles: result.roles,
-			attackerLosses: 100 * result.attackerLossShare,
-			defenderLosses: 100 * result.defenderLossShare,
-			plunder: loot,
 		},
 	})
-
-	const atkExhausted = MILITARY.exhausted({ state, nation: war.attacker })
-	const defExhausted = MILITARY.exhausted({ state, nation: war.defender })
-	const defensiveSettlementChance =
-		DEFENSIVE_SETTLEMENT_CHANCE[result.outcome] ?? 0
-
-	const occupiedCount = war.occupied.length
-	const time = nextBattleTime({ state, outcome: result.outcome, rng })
-
-	if (progress && restoration && occupiedCount === 0) {
-		PEACE.conclude({ state, war, rng, reason: "occupation restored" })
-	} else if (progress && target === war.defender) {
-		PEACE.conclude({ state, war, rng, reason: "capital taken" })
-	} else if (atkExhausted && defExhausted) {
-		PEACE.conclude({ state, war, rng, reason: "both exhausted" })
-	} else if (attacker === war.attacker && occupiedCount === 0) {
-		if (atkExhausted) {
-			PEACE.conclude({ state, war, rng, reason: "offensive spent" })
-		} else if (
-			!result.attackerWon &&
-			defensiveSettlementChance > 0 &&
-			rng.random() < defensiveSettlementChance
-		) {
-			PEACE.conclude({ state, war, rng, reason: "offensive repelled" })
-		} else {
-			STATE.queueBattleEvent({
-				state,
-				warIdx: war.idx,
-				attacker: war.attacker,
-				time: result.attackerWon
-					? time
-					: nextBattleTime({ state, outcome: "inconclusive", rng }),
-			})
-		}
-	} else if (PEACE.acceptBuyoff({ state, war, rng })) {
-		PEACE.conclude({ state, war, rng, reason: "peace bought" })
-	} else {
-		const next =
-			result.outcome === "uncontested" || rng.random() < WINNER_INITIATIVE
-				? winner
-				: loser
-		STATE.queueBattleEvent({
-			state,
-			warIdx: war.idx,
-			attacker: next,
-			time,
-		})
-	}
 }
 
 export const BATTLE = {

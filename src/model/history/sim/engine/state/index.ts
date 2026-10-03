@@ -1,6 +1,7 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
+import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
@@ -484,6 +485,7 @@ function createActiveWar({
 		refusedCalls: new Set(),
 		originalCrownRuler:
 			options.goal === "throne" ? state.people.rulerOf[defender] : -1,
+		siege: null,
 		deployed: {},
 		participants: {},
 		candidates: { attacker: [], defender: [] },
@@ -568,6 +570,7 @@ function resolveWar({
 	transferred,
 	receiver,
 }: ResolveWarParams): void {
+	SIEGE.end({ state, war, outcome: "lifted", reason: "war ended" })
 	for (const nation of Object.keys(war.participants).map(Number)) {
 		MILITARY.beforeMutation({ state, nation })
 		state.militaryAllocationDirty.add(nation)
@@ -657,7 +660,13 @@ function createHistoryState({
 				waterAccessLevels[province] = 1
 		}
 	}
+	const riverByProvince = new Uint8Array(P)
+	for (let r = 0; r < provinces.regionProvince.length; r++) {
+		const p = provinces.regionProvince[r]
+		if (p >= 0 && riverVisible[r]) riverByProvince[p] = 1
+	}
 	const state: HistoryState = {
+		riverByProvince,
 		P,
 		time: startTime,
 		era,

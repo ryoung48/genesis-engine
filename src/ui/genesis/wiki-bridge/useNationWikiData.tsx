@@ -51,6 +51,7 @@ import {
 	payloadValue,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import { RAID_TIMELINE } from "@/ui/genesis/wiki-bridge/raid-timeline"
+import { SIEGE_TIMELINE } from "@/ui/genesis/wiki-bridge/siege-timeline"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
 import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
@@ -1338,7 +1339,7 @@ export function useNationWikiData(
 				)
 				const winnerName = won ? title : opponentName
 				const loserName = won ? opponentName : title
-				const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name} (${war.name})${force ? `; ${title}: ${force}` : ""}.${battleDetail(battle)}`
+				const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name} (${war.name})${force ? `; ${title}: ${force}` : ""}.${battleDetail({ battle, attackerName: resolveNationName(battle.attacker.countryId), defenderName: resolveNationName(battle.defender.countryId) })}`
 				pushTimelineEvent(timelineEvents, {
 					id: `warBattle:${war.id}:${battle.date}:${index}`,
 					date: battle.date,
@@ -1351,6 +1352,28 @@ export function useNationWikiData(
 				})
 			}
 		}
+		for (const war of record.events.wars)
+			for (const entry of SIEGE_TIMELINE.build({
+				war,
+				viewpoint: nationId,
+				nationNameOf: resolveNationName,
+				provinceName: (province) =>
+					history.state.provinceMeta[province]?.name ?? `Province ${province}`,
+			})) {
+				const nations: NationTimelineEvent["nations"] = []
+				addNationMention(nations, entry.besiegerId)
+				addNationMention(nations, entry.defenderId)
+				const province = provinceMention(
+					String(entry.provinceId),
+					uiPalette.siege,
+				)
+				pushTimelineEvent(timelineEvents, {
+					...entry,
+					nations,
+					provinces: province ? [province] : [],
+					wars: [warMention(war)],
+				})
+			}
 		for (const entry of RAID_TIMELINE.build({
 			record,
 			nationId,

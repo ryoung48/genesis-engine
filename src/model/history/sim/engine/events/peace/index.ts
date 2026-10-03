@@ -9,6 +9,7 @@ import type {
 	PeaceParams,
 	PeaceTerms,
 } from "@/model/history/sim/engine/events/peace/types"
+import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { BACKING } from "@/model/history/sim/engine/events/war/backing"
 import { FIELDS } from "@/model/history/sim/engine/fields"
@@ -175,6 +176,7 @@ function terms({ state, war, reason }: PeaceParams): PeaceTerms {
 }
 
 function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
+	SIEGE.end({ state, war, outcome: "lifted", reason: "war ended" })
 	let result = terms({ state, war, reason })
 	const claimant = state.people.rulerOf[war.attacker]
 	const claim = state.leaderClaimCurrent[war.attacker]

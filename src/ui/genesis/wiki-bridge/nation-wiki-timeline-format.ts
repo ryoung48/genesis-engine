@@ -1,4 +1,5 @@
 import type { Battle, BattleParticipant } from "@/model/history/record/types"
+import type { BattleDetailParams } from "@/ui/genesis/wiki-bridge/types"
 import {
 	cleanEu4Identifier,
 	indefiniteArticle,
@@ -461,9 +462,19 @@ export function battleVerb(battle: Battle): string {
 	}
 }
 
-export function battleDetail(battle: Battle): string {
+export function battleDetail({
+	battle,
+	attackerName,
+	defenderName,
+}: BattleDetailParams): string {
 	const simulated = battle.simulated
 	if (!simulated) return ""
 	const odds = Math.round(100 * simulated.preBattleWinProbability)
-	return ` Fought on ${simulated.topography} ${simulated.vegetation}; the attacker's odds were ${odds}% beforehand.`
+	const kind =
+		simulated.kind === "ambush"
+			? ` ${simulated.ambusher === "attacker" ? attackerName : defenderName} ambushed the other side.`
+			: simulated.kind === "river crossing"
+				? " The attackers fought across a river."
+				: ""
+	return `${kind} Fought on ${simulated.topography} ${simulated.vegetation}; the attacker's odds were ${odds}% beforehand.`
 }

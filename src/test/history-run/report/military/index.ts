@@ -132,6 +132,8 @@ function emptyWindow(): MilitaryWindow {
 		relationPairs: {},
 		completed: [],
 		battles: [],
+		siegeStarts: 0,
+		siegeEndings: [],
 		repeatStrength: [],
 		raids: byFamily(() => ({ count: 0, success: 0, loot: 0, atSafe: 0 })),
 		fiscal: byFamily(() => ({
@@ -239,6 +241,7 @@ function observeBattle({ engine, tracker, note }: ObserveNoteParams): void {
 		defenderArmy * ((data.terrainDefense as number | undefined) ?? 1.2)
 	const attackerWon = data.winner === data.attacker
 	const sample: BattleSample = {
+		kind: data.kind as string,
 		attackerWon,
 		attackerLossPct: data.attackerLosses as number,
 		defenderLossPct: data.defenderLosses as number,
@@ -402,6 +405,13 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 			(ended) => ended.time === note.time,
 		)
 		tracker.vassalageEnded.push(note)
+	} else if (note.tag === "siege started") {
+		window.siegeStarts++
+	} else if (note.tag === "siege ended") {
+		window.siegeEndings.push({
+			outcome: data.outcome as string,
+			phases: data.phases as number,
+		})
 	} else if (note.tag === "battle") {
 		observeBattle({ engine, tracker, note })
 	} else if (note.tag === "raid") {
@@ -994,6 +1004,31 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 			count / Math.max(1, horizonVassalDispositionTotal)
 	const battles = window.battles
 	report["battles.n"] = battles.length
+	for (const kind of ["open", "ambush", "river crossing"])
+		report[`battles.kind.${kind}`] = battles.filter(
+			(battle) => battle.kind === kind,
+		).length
+	report["battles.kind.siege"] = window.siegeStarts
+	report["sieges.n"] = window.siegeStarts
+	report["sieges.completed.n"] = window.siegeEndings.length
+	report["sieges.phases.p50"] = median(
+		window.siegeEndings.map((siege) => siege.phases),
+	)
+	report["sieges.phases.p99"] = quantile({
+		values: window.siegeEndings.map((siege) => siege.phases),
+		q: 0.99,
+	})
+	for (const outcome of [
+		"surrendered",
+		"starved out",
+		"betrayed",
+		"stormed",
+		"relieved",
+		"lifted",
+	])
+		report[`sieges.outcome.${outcome}`] = window.siegeEndings.filter(
+			(siege) => siege.outcome === outcome,
+		).length
 	report["battles.perCompletedWar"] =
 		battles.length / Math.max(1, completed.length)
 	report["battles.attackerWinShare"] = share(
