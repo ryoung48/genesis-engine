@@ -87,7 +87,7 @@ const FIELD_ARMY_CURVE = {
 function populationMean({
 	state,
 	provinces,
-	value,
+	values,
 }: PopulationMeanParams): number {
 	let pop = 0
 	let mass = 0
@@ -95,7 +95,7 @@ function populationMean({
 		if (state.desolate[p]) continue
 		const provincePop = state.popRuralCurrent[p] + state.popUrbanCurrent[p]
 		pop += provincePop
-		mass += provincePop * value(p)
+		mass += provincePop * values[p]
 	}
 	return pop > 0 ? mass / pop : 0
 }
@@ -105,18 +105,14 @@ function allProvinces({ state }: InitKnowledgeParams): number[] {
 }
 
 function realmKnowledge({ state, provinces }: RealmKnowledgeParams): number {
-	return populationMean({
-		state,
-		provinces,
-		value: (p) => FIELDS.prov.knowledge.get({ state, p }),
-	})
+	return populationMean({ state, provinces, values: state.knowledgeCurrent })
 }
 
 function initKnowledge({ state }: InitKnowledgeParams): void {
 	const meanDev = populationMean({
 		state,
 		provinces: allProvinces({ state }),
-		value: (p) => FIELDS.prov.development.get({ state, p }),
+		values: state.developmentCurrent,
 	})
 	const baseline = state.knowledgeBaseline
 	for (let p = 0; p < state.P; p++) {
@@ -167,7 +163,12 @@ function advanceKnowledge({
 			Math.min(1, drag)
 		const sovereign = STATE.getSovereign({ state, p })
 		let pull = 0
-		for (const nb of STATE.getProvinceNeighbors({ state, p })) {
+		for (
+			let i = state.provinceAdjOffset[p];
+			i < state.provinceAdjOffset[p + 1];
+			i++
+		) {
+			const nb = state.provinceAdjList[i]
 			if (state.desolate[nb]) continue
 			const gap = FIELDS.prov.knowledge.get({ state, p: nb }) - knowledge
 			if (gap <= 0) continue

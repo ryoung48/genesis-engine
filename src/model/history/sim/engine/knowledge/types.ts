@@ -16,7 +16,7 @@ export interface KnowledgeLevelParams {
 export interface PopulationMeanParams {
 	state: HistoryState
 	provinces: Iterable<number>
-	value: (province: number) => number
+	values: Float32Array
 }
 
 export interface RealmKnowledgeParams {
