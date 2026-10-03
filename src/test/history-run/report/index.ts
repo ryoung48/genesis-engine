@@ -12,6 +12,8 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
+import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
 import type { KnowledgeSnapshot } from "@/test/history-run/report/knowledge/types"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
@@ -48,13 +50,14 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
 	const baselinePath =
-		"verification/history-recruitment-types/baseline-933.json"
+		"stats/history/2026-10-01T11-40-00-000Z-original-history-baseline/933.json"
 	const baseline = existsSync(baselinePath)
 		? JSON.parse(readFileSync(baselinePath, "utf8"))
 		: null
 	const endpoint = baseline?.diagnostics.snapshots.find(
 		(snapshot: KnowledgeSnapshot) => snapshot.year === 1800,
 	)
+	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
 	return {
 		lateKnowledgeBand: Number(
 			env.HISTORY_LATE_KNOWLEDGE ?? endpoint?.quantiles[4] ?? 2.38,
@@ -64,9 +67,10 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 			: DEFAULT_SEEDS,
 		era,
 		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
-		years: Number(env.HISTORY_YEARS ?? DEFAULT_YEARS),
+		years,
 		startYear: env.HISTORY_START ? Number(env.HISTORY_START) : undefined,
-		outPath: env.HISTORY_OUT ?? "",
+		outPath: HISTORY_OUTPUT.path({ env, years, kind: "report" }),
+		baselinePath: env.HISTORY_BASELINE ?? null,
 		log,
 	}
 }
@@ -341,7 +345,12 @@ function marriageReport({
 	}
 }
 
-function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
+function runSeed({
+	seed,
+	options,
+	saved,
+	seedDiagnostics,
+}: RunSeedParams): CenturyReport[] {
 	const started = performance.now()
 	const { engine, generated, generationMs, engineMs } =
 		HISTORY_RUN.createEngine({
@@ -353,6 +362,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	const rebelLogistics = REBEL_LOGISTICS_REPORT.attach({ engine })
 	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
 	const diagnostics = {
+		completed: false,
 		sourceHash: createHash("sha256")
 			.update(
 				execFileSync(
@@ -429,7 +439,11 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 				note.tag === "war ended" &&
 				engine.wars[note.data.war as number].goal !== "conquest",
 		)
-		const content = JSON.stringify({ [seed]: reports, diagnostics }, null, 1)
+		saved[seed] = reports
+		seedDiagnostics[seed] = diagnostics
+		if (options.seeds.length === 1) saved.diagnostics = diagnostics
+		else saved.diagnosticsBySeed = seedDiagnostics
+		const content = JSON.stringify(saved, null, 1)
 		writeFileSync(options.outPath, content)
 		if (diagnostics.recruitment.at(-1)?.year === start + 500)
 			writeFileSync(options.outPath.replace(/\.json$/, "-500.json"), content)
@@ -545,6 +559,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 			marriage: marriageReport({ engine, from, to: year, tracker }),
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 		})
+		diagnostics.completed = year === start + options.years
 		persist()
 		options.log(
 			`seed ${seed} saved through ${year}; ${(diagnostics.wallMs / 1000).toFixed(1)}s`,
@@ -570,8 +585,10 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 
 function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 	const results = new Map<number, CenturyReport[]>()
+	const saved: Record<string, unknown> = { expectedSeeds: options.seeds }
+	const seedDiagnostics: Record<string, unknown> = {}
 	for (const seed of options.seeds) {
-		const reports = runSeed({ seed, options })
+		const reports = runSeed({ seed, options, saved, seedDiagnostics })
 		results.set(seed, reports)
 		options.log(`seed ${seed}`)
 		options.log(
@@ -605,6 +622,10 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		MILITARY_REPORT.log({ reports, log: options.log })
 	}
 
+	if (options.outPath)
+		options.log(
+			`HTML comparison: ${HISTORY_COMPARISON.write({ current: options.outPath, baseline: options.baselinePath })}`,
+		)
 	return results
 }
 

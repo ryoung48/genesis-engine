@@ -11,6 +11,7 @@ export interface HistoryReportOptions {
 	// [JUSTIFICATION] Omitted, runs start at the engine's default year.
 	startYear?: number
 	outPath: string
+	baselinePath: string | null
 	log: (line: string) => void
 }
 
@@ -140,4 +141,6 @@ export interface UnionJuniorsParams extends EngineParams {
 export interface RunSeedParams {
 	seed: number
 	options: HistoryReportOptions
+	saved: Record<string, unknown>
+	seedDiagnostics: Record<string, unknown>
 }

@@ -1,4 +1,5 @@
-import { writeFileSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { HISTORY } from "@/model/history/record"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
@@ -9,6 +10,7 @@ import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import type {
 	CreatedEngine,
 	CreateEngineParams,
@@ -26,12 +28,13 @@ function optionsFromEnv({ env, log }: EnvParams): HistoryRunOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
+	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
 	return {
 		seed: Number(env.HISTORY_SEED ?? DEFAULT_SEED),
 		era,
 		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
-		years: Number(env.HISTORY_YEARS ?? DEFAULT_YEARS),
-		summaryPath: env.HISTORY_OUT ?? "",
+		years,
+		summaryPath: HISTORY_OUTPUT.path({ env, years, kind: "pipeline" }),
 		log,
 	}
 }
@@ -220,8 +223,10 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 		initMs,
 		reports,
 	}
-	if (options.summaryPath)
+	if (options.summaryPath) {
+		mkdirSync(dirname(options.summaryPath), { recursive: true })
 		writeFileSync(options.summaryPath, JSON.stringify(summary, null, 2))
+	}
 	return summary
 }
 

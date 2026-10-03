@@ -55,6 +55,18 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 - Once a plan is fully implemented, move its file to `plans/archive/`.
 - Every constant a plan introduces must be assigned a concrete value in the plan, with a citation (source, paper, dataset, or documented reasoning) explaining why that value makes sense. Plans must not leave constants as TBD, "tune later", or unvalued placeholders.
 
+# History benchmark baselines
+
+- The required history benchmark command is **`pnpm report:history`**, which runs `src/test/history-run/history-report.smoke.test.ts`. Use this script for every required history baseline and after-change comparison.
+- Every plan that impacts history must name the latest completed, applicable **detailed report produced by `pnpm report:history`** in `stats/history/` as its baseline. Pipeline reports from `pnpm gen:history` do not replace this required baseline or comparison report.
+- Reuse the saved baseline instead of running a fresh before-change benchmark. Record its exact path and configuration in the plan. Partial checkpoints and profiled runs are not substitutes for a completed equivalent baseline.
+- After implementation, run **`pnpm report:history`** with the baseline's seeds, era, point count, starting year, duration, knowledge-band threshold, and diagnostic/profiling settings. Configure these through `HISTORY_SEEDS`, `HISTORY_ERA`, `HISTORY_POINTS`, `HISTORY_START`, `HISTORY_YEARS`, and `HISTORY_LATE_KNOWLEDGE`. Compare simulation statistics separately from timing and memory, and explain intentional behavior changes and any regressions.
+- Save the completed report and its comparison in `stats/history/<UTC timestamp>-<short descriptive title>/`, and commit them with the implementation. Preserve previous reports. New folders use the run's start timestamp, not a commit ID, because the implementation and report are committed together.
+- The required detailed report filename is `<years>.json`. Set `HISTORY_TITLE` to describe the change, for example `$env:HISTORY_TITLE = 'army-logistics'`. The runner normalizes the title for filenames and supplies a default when it is omitted. Leave `HISTORY_OUT` unset so the report uses the standard stats folder. Timestamp format: `YYYY-MM-DDTHH-mm-ss-SSSZ`.
+- `pnpm report:history` automatically saves `<years>-diff.html` alongside the completed JSON, comparing against the latest earlier completed report with matching seeds, era, point count, start year, duration and recorded knowledge threshold. Set `HISTORY_BASELINE` to an exact saved JSON path to choose the baseline explicitly. Configuration differences and missing older metadata are flagged in the HTML; statistics are separated from timing and memory.
+- Regenerate a saved comparison without simulating: `pnpm diff:history <current.json> [previous.json]`. Omit the previous path to select it automatically, or use `pnpm diff:history --all` to generate comparisons for all saved detailed reports. Pipeline, profiled and partial reports are excluded from automatic baseline selection. Commit the generated HTML with its report.
+- Apply the same baseline, equivalent-report, comparison, and commit requirements to history changes made without a plan; this does not require creating a plan file.
+
 # Plan Review
 - Sometimes you will be asked to review a plan. Make sure you understand the objective of the plan. Reviews should look for:
   - Incoherence: contradictions between sections, steps that don't follow from the stated goal, or references to things the plan never defines.

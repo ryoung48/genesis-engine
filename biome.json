@@ -11,6 +11,8 @@
 			"!coverage/**",
 			"!.hotspot-baseline",
 			"!.hotspot-baseline/**",
+			"!.claude/worktrees",
+			"!.claude/worktrees/**",
 			"!scripts",
 			"!scripts/**",
 			"!public",
