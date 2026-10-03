@@ -9,6 +9,7 @@ import type {
 	MeshLatitudeGeometry,
 } from "@/model/climate/classification/climate/types"
 import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
+import type { EBMConfig } from "@/model/climate/temperature/ebm/config"
 import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
 import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
@@ -161,6 +162,27 @@ function applyDtrToClimateMinMax({
 	}
 }
 
+const SOLVED_MODEL_LIMIT = 4
+
+const solvedModels = new Map<string, EnergyBalanceModel>()
+
+// Generation re-derives temperature after lakes settle with the same planet
+// and land fractions, so a solved model is kept and reused instead of re-run.
+function solvedModel(config: EBMConfig): EnergyBalanceModel {
+	const key = JSON.stringify(config)
+	const solved = solvedModels.get(key)
+	if (solved) return solved
+	const model = new EnergyBalanceModel(config)
+	model.runModel({ years: 30, dtDays: 0.5 })
+	if (solvedModels.size >= SOLVED_MODEL_LIMIT)
+		for (const oldest of solvedModels.keys()) {
+			solvedModels.delete(oldest)
+			break
+		}
+	solvedModels.set(key, model)
+	return model
+}
+
 function computeTemperature({
 	mesh,
 	elevation,
@@ -192,7 +214,7 @@ function computeTemperature({
 	const monthlyRangeRanges: number[][] = new Array(12)
 	const monthlyInsolRanges: number[][] = new Array(12)
 	const declination_monthly = new Float32Array(12)
-	const ebm = new EnergyBalanceModel({
+	const ebm = solvedModel({
 		orbital: {
 			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
 			ECCENTRICITY: params.eccentricity,
@@ -215,7 +237,6 @@ function computeTemperature({
 		greenhouseFactor: params.greenhouseFactor,
 		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
 	})
-	ebm.runModel({ years: 30, dtDays: 0.5 })
 	const temperatureAvgByBand = ebm.temperature_avg
 	let dayStart = 0
 	for (let month = 0; month < 12; month++) {
