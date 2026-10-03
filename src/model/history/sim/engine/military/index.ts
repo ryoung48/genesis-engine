@@ -33,6 +33,7 @@ import type {
 	ProvinceMutationParams,
 	RaidParams,
 	RaidResult,
+	RealmMutationParams,
 	RebellionPreview,
 	RebellionThreatParams,
 	RecordArmiesParams,
@@ -375,12 +376,9 @@ function applyTroopLosses({
 		)
 		if (rural <= 0) continue
 		const scale = Math.max(0, 1 - (actual.levy + actual.regular) / rural)
-		for (const p of provinces)
-			FIELDS.prov.population.rural.set({
-				state,
-				p,
-				value: state.popRuralCurrent[p] * scale,
-			})
+		beforeRealmMutation({ state, provinces })
+		for (const p of provinces) state.popRuralCurrent[p] *= scale
+		afterMutation({ state })
 	}
 	return applied
 }
@@ -392,12 +390,12 @@ function battleOutcome(margin: number): BattleOutcome {
 
 function memberDeployments({
 	war,
-	members,
+	nations,
 }: MemberDeploymentsParams): CoalitionMember[] {
-	return members.map((member) => {
-		const troops = war.deployed[member.nation] ?? { levy: 0, regular: 0 }
+	return nations.map((nation) => {
+		const troops = war.deployed[nation] ?? { levy: 0, regular: 0 }
 		return {
-			nation: member.nation,
+			nation,
 			force: ARMY_STRENGTH.of(troops),
 			levy: troops.levy,
 			regular: troops.regular,
@@ -438,8 +436,14 @@ function deploymentsOf({
 	attackers,
 	defenders,
 }: DeploymentsOfParams): BattleDeployments {
-	const attacking = memberDeployments({ war, members: attackers.members })
-	const defending = memberDeployments({ war, members: defenders.members })
+	const attacking = memberDeployments({
+		war,
+		nations: attackers.members.map((member) => member.nation),
+	})
+	const defending = memberDeployments({
+		war,
+		nations: defenders.members.map((member) => member.nation),
+	})
 	return {
 		attackerDeployed: totalTroops(attacking),
 		defenderDeployed: totalTroops(defending),
@@ -468,13 +472,17 @@ function mobilize({ state, war }: MobilizeParams): void {
 }
 
 function deploymentData({ state, war, attackerSide }: DeploymentDataParams) {
-	const attackers = coalition({ state, war, side: attackerSide, excluded: {} })
-	const defenders = coalition({
-		state,
-		war,
-		side: attackerSide === "attacker" ? "defender" : "attacker",
-		excluded: {},
-	})
+	const [attackers, defenders] = (
+		attackerSide === "attacker"
+			? (["attacker", "defender"] as const)
+			: (["defender", "attacker"] as const)
+	).map((side) => ({
+		members: memberDeployments({
+			war,
+			nations: DEPLOYMENTS.sideMembers({ state, war, side }),
+		}),
+		shortfall: 0,
+	}))
 	const data = deploymentsOf({ state, war, attackers, defenders })
 	return {
 		deployedNations: data.deployments.map((member) => member.nation),
@@ -737,6 +745,23 @@ function beforeProvinceMutation({ state, p }: ProvinceMutationParams): void {
 			: STATE.getSovereign({ state, p })
 	if (nation >= 0) beforeMutation({ state, nation })
 	let current = p
+	while (current >= 0) {
+		state.realmCache.delete(current)
+		current = state.parentCurrent[current]
+	}
+}
+
+// One pass for a whole realm (root first), equivalent to beforeProvinceMutation on each province.
+function beforeRealmMutation({ state, provinces }: RealmMutationParams): void {
+	if (!state.militaryReady) return
+	const root = provinces[0]
+	const nation =
+		state.militaryDepth > 0
+			? state.sovereignCurrent[root]
+			: STATE.getSovereign({ state, p: root })
+	if (nation >= 0) beforeMutation({ state, nation })
+	for (const p of provinces) state.realmCache.delete(p)
+	let current = state.parentCurrent[root]
 	while (current >= 0) {
 		state.realmCache.delete(current)
 		current = state.parentCurrent[current]

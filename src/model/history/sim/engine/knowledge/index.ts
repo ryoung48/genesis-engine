@@ -39,6 +39,51 @@ const DOMESTIC_DIFFUSION = 0.04
 
 const FOREIGN_DIFFUSION = 0.015
 
+const SELF_ADVANCE_CURVE = {
+	domain: [0, 0.5, 1, 2, 3, 4],
+	range: [0.0015, 0.003, 0.005, 0.006, 0.009, 0.005],
+}
+
+const MAX_LEAD_CURVE = {
+	domain: [0.5, 1, 1.5, 2, 2.5],
+	range: [0.45, 0.55, 1.0, 1.6, 2.0],
+}
+
+const GROWTH_CURVE = {
+	domain: [0, 1, 2, 2.5, 3, 3.5, 4],
+	range: [0.0008, 0.001, 0.0025, 0.004, 0.008, 0.01, 0.005],
+}
+
+const URBAN_FACTOR_CURVE = {
+	domain: [0, 1, 2, 3, 4],
+	range: [0.7, 1, 1.1, 1.6, 4],
+}
+
+const DEVELOPMENT_FLOOR_CURVE = {
+	domain: [1, 2, 3, 4],
+	range: [0.05, 0.1, 0.25, 0.45],
+}
+
+const CITY_SIZE_CURVE = {
+	domain: [1, 2, 3, 3.5, 4],
+	range: [350_000, 550_000, 650_000, 1_600_000, 5_000_000],
+}
+
+const PRODUCTIVITY_CURVE = {
+	domain: [2, 3, 4],
+	range: [1, 1.3, 3],
+}
+
+const EXTRACTION_CURVE = {
+	domain: [1, 2, 3, 4],
+	range: [0.015, 0.03, 0.1, 0.15],
+}
+
+const FIELD_ARMY_CURVE = {
+	domain: [0, 1, 2, 3, 4],
+	range: [25_000, 40_000, 120_000, 400_000, 1_500_000],
+}
+
 function populationMean({
 	state,
 	provinces,
@@ -88,16 +133,16 @@ function initKnowledge({ state }: InitKnowledgeParams): void {
 
 function selfAdvanceRate({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [0, 0.5, 1, 2, 3, 4],
-		range: [0.0015, 0.003, 0.005, 0.006, 0.009, 0.005],
+		domain: SELF_ADVANCE_CURVE.domain,
+		range: SELF_ADVANCE_CURVE.range,
 		x: knowledge,
 	})
 }
 
 function maxLead({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [0.5, 1, 1.5, 2, 2.5],
-		range: [0.45, 0.55, 1.0, 1.6, 2.0],
+		domain: MAX_LEAD_CURVE.domain,
+		range: MAX_LEAD_CURVE.range,
 		x: knowledge,
 	})
 }
@@ -141,24 +186,24 @@ function advanceKnowledge({
 
 function growthRate({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [0, 1, 2, 2.5, 3, 3.5, 4],
-		range: [0.0008, 0.001, 0.0025, 0.004, 0.008, 0.01, 0.005],
+		domain: GROWTH_CURVE.domain,
+		range: GROWTH_CURVE.range,
 		x: knowledge,
 	})
 }
 
 function urbanFactor({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [0, 1, 2, 3, 4],
-		range: [0.7, 1, 1.1, 1.6, 4],
+		domain: URBAN_FACTOR_CURVE.domain,
+		range: URBAN_FACTOR_CURVE.range,
 		x: knowledge,
 	})
 }
 
 function developmentFloor({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [1, 2, 3, 4],
-		range: [0.05, 0.1, 0.25, 0.45],
+		domain: DEVELOPMENT_FLOOR_CURVE.domain,
+		range: DEVELOPMENT_FLOOR_CURVE.range,
 		x: knowledge,
 	})
 }
@@ -168,8 +213,8 @@ function maxCitySize({
 	realmPopulation,
 }: MaxCitySizeParams): number {
 	const base = MATH.piecewise({
-		domain: [1, 2, 3, 3.5, 4],
-		range: [350_000, 550_000, 650_000, 1_600_000, 5_000_000],
+		domain: CITY_SIZE_CURVE.domain,
+		range: CITY_SIZE_CURVE.range,
 		x: knowledge,
 	})
 	const realmFactor = Math.min(
@@ -181,24 +226,24 @@ function maxCitySize({
 
 function productivity({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [2, 3, 4],
-		range: [1, 1.3, 3],
+		domain: PRODUCTIVITY_CURVE.domain,
+		range: PRODUCTIVITY_CURVE.range,
 		x: knowledge,
 	})
 }
 
 function extractionRate({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [1, 2, 3, 4],
-		range: [0.015, 0.03, 0.1, 0.15],
+		domain: EXTRACTION_CURVE.domain,
+		range: EXTRACTION_CURVE.range,
 		x: knowledge,
 	})
 }
 
 function maxFieldArmy({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
-		domain: [0, 1, 2, 3, 4],
-		range: [25_000, 40_000, 120_000, 400_000, 1_500_000],
+		domain: FIELD_ARMY_CURVE.domain,
+		range: FIELD_ARMY_CURVE.range,
 		x: knowledge,
 	})
 }
@@ -208,7 +253,11 @@ function eraBaseline(era: SocietyEra): number {
 }
 
 function yearBaseline(year: number): number {
-	return MATH.piecewise({ ...YEAR_BASELINE, x: year })
+	return MATH.piecewise({
+		domain: YEAR_BASELINE.domain,
+		range: YEAR_BASELINE.range,
+		x: year,
+	})
 }
 
 export const KNOWLEDGE = {

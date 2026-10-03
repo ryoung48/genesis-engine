@@ -1,5 +1,4 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import { isSovereign } from "@/model/history/sim/engine/state/relations"
 import type {
 	GetChildrenParams,
@@ -112,9 +111,7 @@ export function validateLiveHierarchy({
 
 export function rebuildAssignment({ state }: RebuildAssignmentParams): void {
 	DERIVE.ensureHierarchyClean(state)
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-		const root = state.sovereignCurrent[p]
-		FIELDS.prov.assignment.set({ state, p, value: root })
-	}
+	const { desolate, sovereignCurrent, assignmentCurrent } = state
+	for (let p = 0; p < state.P; p++)
+		if (!desolate[p]) assignmentCurrent[p] = sovereignCurrent[p]
 }

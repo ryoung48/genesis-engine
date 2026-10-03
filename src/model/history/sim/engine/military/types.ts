@@ -66,7 +66,7 @@ export interface Coalition {
 
 export interface MemberDeploymentsParams {
 	war: War
-	members: CoalitionMember[]
+	nations: number[]
 }
 
 export interface FightParams {
@@ -181,6 +181,11 @@ export interface MutationParams<T> {
 export interface ProvinceMutationParams {
 	state: HistoryState
 	p: number
+}
+
+export interface RealmMutationParams {
+	state: HistoryState
+	provinces: number[]
 }
 
 export interface CasualtiesParams {

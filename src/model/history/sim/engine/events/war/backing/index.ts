@@ -123,6 +123,7 @@ function recruit({ state, war, rng }: RecruitParams): void {
 		if (rng.random() >= chance) continue
 		war.backers.push(nation)
 		state.militaryDiplomacyDirty = true
+		state.militaryDiplomacyNations.add(war.attacker)
 		chance *= BACKING_DECAY
 		state.events.push({
 			tag: "rebels backed",

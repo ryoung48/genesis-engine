@@ -87,34 +87,39 @@ function nationAdjacency({ state }: DerivedAtTimeParams): {
 		return state._nationAdjCache
 	}
 
-	const neighborSets = new Map<number, Set<number>>()
-	for (let p = 0; p < state.P; p++) {
-		const a = sovereign({ state, p })
-		if (state.desolate[p]) continue
-		if (!neighborSets.has(a)) neighborSets.set(a, new Set())
-		for (
-			let i = state.provinceAdjOffset[p];
-			i < state.provinceAdjOffset[p + 1];
-			i++
-		) {
-			const neighbor = state.provinceAdjList[i]
-			if (state.desolate[neighbor]) continue
-			const b = sovereign({ state, p: neighbor })
-			if (a !== b) neighborSets.get(a)?.add(b)
-		}
-	}
+	const P = state.P
+	const sov = state.sovereignCurrent
+	const desolate = state.desolate
+	const adjOffset = state.provinceAdjOffset
+	const adjList = state.provinceAdjList
+	const memberOffset = new Int32Array(P + 1)
+	for (let p = 0; p < P; p++)
+		if (!desolate[p]) memberOffset[(sov[p] >= 0 ? sov[p] : p) + 1]++
+	for (let p = 0; p < P; p++) memberOffset[p + 1] += memberOffset[p]
+	const members = new Int32Array(memberOffset[P])
+	const cursor = memberOffset.slice(0, P)
+	for (let p = 0; p < P; p++)
+		if (!desolate[p]) members[cursor[sov[p] >= 0 ? sov[p] : p]++] = p
 
-	const offset = new Int32Array(state.P + 1)
+	const offset = new Int32Array(P + 1)
+	const found = new Int32Array(adjList.length)
+	const seenBy = new Int32Array(P).fill(-1)
 	let total = 0
-	for (let p = 0; p < state.P; p++) {
-		total += neighborSets.get(p)?.size ?? 0
-		offset[p + 1] = total
+	for (let a = 0; a < P; a++) {
+		for (let m = memberOffset[a]; m < memberOffset[a + 1]; m++) {
+			const p = members[m]
+			for (let i = adjOffset[p]; i < adjOffset[p + 1]; i++) {
+				const neighbor = adjList[i]
+				if (desolate[neighbor]) continue
+				const b = sov[neighbor] >= 0 ? sov[neighbor] : neighbor
+				if (a === b || seenBy[b] === a) continue
+				seenBy[b] = a
+				found[total++] = b
+			}
+		}
+		offset[a + 1] = total
 	}
-	const list = new Int32Array(total)
-	for (let p = 0; p < state.P; p++) {
-		let index = offset[p]
-		for (const nb of neighborSets.get(p) ?? []) list[index++] = nb
-	}
+	const list = found.slice(0, total)
 
 	const value = { offset, list }
 	state._nationAdjCache = value

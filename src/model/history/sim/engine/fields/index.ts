@@ -257,6 +257,7 @@ const rel = {
 						after: RELATION_CODE[rel],
 					})
 				state.militaryDiplomacyDirty = true
+				state.militaryDiplomacyNations.add(a).add(b)
 				state.relationsCurrent[forwardKey] = RELATION_CODE[flipped]
 				state.relationsCurrent[backwardKey] = RELATION_CODE[rel]
 				const held =
@@ -286,6 +287,7 @@ const disp = {
 				const before = decodeDisposition(state.dispositionsCurrent[forward])
 				if (before === disposition) return
 				state.militaryDiplomacyDirty = true
+				state.militaryDiplomacyNations.add(a).add(b)
 				const code = DISPOSITION_CODE[disposition]
 				state.dispositionsCurrent[forward] = code
 				state.dispositionsCurrent[backward] = code

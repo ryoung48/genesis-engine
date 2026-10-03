@@ -183,6 +183,7 @@ function tick({ state, warIdx, rng }: TickParams): void {
 		return
 	}
 	siege.phase++
+	let troopsMoved = false
 	let besiegers = SIEGE_TROOPS.besiegersOf(params)
 	SIEGE_TROOPS.lose({
 		...params,
@@ -251,6 +252,7 @@ function tick({ state, warIdx, rng }: TickParams): void {
 			besiegerLosses: loss,
 			garrisonLosses: 0,
 		})
+		troopsMoved = true
 	} else if (roll >= 10 && roll <= 15) {
 		const shortage: Shortage =
 			roll <= 11 ? "supplies" : roll <= 13 ? "food" : "water"
@@ -275,6 +277,7 @@ function tick({ state, warIdx, rng }: TickParams): void {
 				besiegerLosses: 0,
 				garrisonLosses: loss,
 			})
+			troopsMoved = true
 		}
 	} else if (roll >= 16 && roll <= 19) {
 		const breach = roll <= 17
@@ -295,13 +298,15 @@ function tick({ state, warIdx, rng }: TickParams): void {
 			besiegerLosses: 0,
 			garrisonLosses: loss,
 		})
+		troopsMoved = true
 	}
 	if (SIEGE_TROOPS.empty(SIEGE_TROOPS.garrisonOf(siege))) {
 		capitulate()
 		return
 	}
 	const terrain = TERRAIN.battlefield({ state, p: siege.province })
-	besiegers = SIEGE_TROOPS.besiegersOf(params)
+	if (troopsMoved) besiegers = SIEGE_TROOPS.besiegersOf(params)
+	troopsMoved = false
 	garrison = SIEGE_TROOPS.garrisonOf(siege)
 	ratio = MILITARY.totalForce(besiegers) / MILITARY.totalForce(garrison)
 	if (
@@ -372,12 +377,13 @@ function tick({ state, warIdx, rng }: TickParams): void {
 			besiegerLosses,
 			garrisonLosses,
 		})
+		troopsMoved = true
 		if (SIEGE_TROOPS.empty(SIEGE_TROOPS.garrisonOf(siege))) {
 			capitulate()
 			return
 		}
 	}
-	besiegers = SIEGE_TROOPS.besiegersOf(params)
+	if (troopsMoved) besiegers = SIEGE_TROOPS.besiegersOf(params)
 	garrison = SIEGE_TROOPS.garrisonOf(siege)
 	ratio = MILITARY.totalForce(besiegers) / MILITARY.totalForce(garrison)
 	if (
@@ -443,8 +449,8 @@ function tick({ state, warIdx, rng }: TickParams): void {
 			})
 			return
 		}
+		besiegers = SIEGE_TROOPS.besiegersOf(params)
 	}
-	besiegers = SIEGE_TROOPS.besiegersOf(params)
 	const relief = MILITARY.coalition({
 		state,
 		war,

@@ -136,6 +136,16 @@ export interface RealmCacheEntry {
 	outputPerHead: number
 }
 
+// Per-province memo of economy terms, each keyed by the inputs it was computed from.
+export interface ProvinceEconomyCache {
+	capital: Int32Array
+	distanceMultiplier: Float64Array
+	population: Float64Array
+	development: Float64Array
+	knowledge: Float64Array
+	output: Float64Array
+}
+
 export interface HistoryState {
 	riverByProvince: Uint8Array
 	P: number
@@ -173,6 +183,7 @@ export interface HistoryState {
 	// Bumped at each census; with hierarchyVersion it keys realmCache.
 	censusVersion: number
 	realmCache: Map<number, RealmCacheEntry>
+	provinceEconomyCache: ProvinceEconomyCache
 	// Ducats and enrolled troops; meaningful only on sovereign roots.
 	treasuryCurrent: Float64Array
 	treasuryBudgetCurrent: Map<number, TreasuryBudget>
@@ -192,6 +203,10 @@ export interface HistoryState {
 	militaryWarIndex: Map<number, number[]>
 	militaryWarIndexStale: boolean
 	militaryDiplomacyDirty: boolean
+	// Nations whose ties changed since candidates were last refreshed; only wars they lead need a refresh.
+	militaryDiplomacyNations: Set<number>
+	// Hierarchy version at which every active war's candidates were last refreshed.
+	militaryCandidatesVersion: number
 	// Field army size at the last census; the live value is MILITARY.armySize.
 	armySizeCurrent: Float64Array
 	revenueCurrent: Float64Array

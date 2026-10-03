@@ -44,16 +44,29 @@ function provincePopulation({ state, p }: EconomyLookupParams): number {
 }
 
 function provinceOutput({ state, p }: EconomyLookupParams): number {
-	return (
-		provincePopulation({ state, p }) *
-		MATH.piecewise({
-			...OUTPUT_CURVE,
-			x: FIELDS.prov.development.get({ state, p }),
-		}) *
-		KNOWLEDGE.productivity({
-			knowledge: FIELDS.prov.knowledge.get({ state, p }),
-		})
+	const cache = state.provinceEconomyCache
+	const population = state.popRuralCurrent[p] + state.popUrbanCurrent[p]
+	const development = state.developmentCurrent[p]
+	const knowledge = state.knowledgeCurrent[p]
+	if (
+		cache.population[p] === population &&
+		cache.development[p] === development &&
+		cache.knowledge[p] === knowledge
 	)
+		return cache.output[p]
+	const output =
+		population *
+		MATH.piecewise({
+			domain: OUTPUT_CURVE.domain,
+			range: OUTPUT_CURVE.range,
+			x: development,
+		}) *
+		KNOWLEDGE.productivity({ knowledge })
+	cache.population[p] = population
+	cache.development[p] = development
+	cache.knowledge[p] = knowledge
+	cache.output[p] = output
+	return output
 }
 
 function travelDays({ state, capital, p }: TravelDaysParams): number {
@@ -64,12 +77,16 @@ function travelDays({ state, capital, p }: TravelDaysParams): number {
 }
 
 function distanceMultiplier({ state, capital, p }: TravelDaysParams): number {
-	return (
+	const cache = state.provinceEconomyCache
+	if (cache.capital[p] === capital) return cache.distanceMultiplier[p]
+	const multiplier =
 		1 +
 		DISTANCE_COST *
 			(travelDays({ state, capital, p }) / DISTANCE_REFERENCE_DAYS) **
 				DISTANCE_EXPONENT
-	)
+	cache.capital[p] = capital
+	cache.distanceMultiplier[p] = multiplier
+	return multiplier
 }
 
 function realm({ state, p }: EconomyLookupParams): RealmCacheEntry {
