@@ -13,6 +13,7 @@ const WEIGHTS: Record<BattleKind, number> = {
 	"river crossing": 0.12,
 	siege: 0.15,
 }
+const SIEGE_OPEN_WEIGHT_TRANSFER = 0.55
 const AMBUSH_DEFENDER_SHARE = 0.6
 const AMBUSH_BONUS = 1.3
 const RIVER_CROSSING_BONUS = 1.2
@@ -29,10 +30,15 @@ function choose({
 	const eligible: BattleKind[] = ["open", "ambush"]
 	if (TERRAIN.hasRiver({ state, p: province })) eligible.push("river crossing")
 	if (siegeEligible && isTown({ state, province })) eligible.push("siege")
+	const weights = { ...WEIGHTS }
+	if (eligible.includes("siege")) {
+		weights.open -= SIEGE_OPEN_WEIGHT_TRANSFER
+		weights.siege += SIEGE_OPEN_WEIGHT_TRANSFER
+	}
 	let roll =
-		rng.random() * eligible.reduce((sum, kind) => sum + WEIGHTS[kind], 0)
+		rng.random() * eligible.reduce((sum, kind) => sum + weights[kind], 0)
 	for (const kind of eligible) {
-		roll -= WEIGHTS[kind]
+		roll -= weights[kind]
 		if (roll < 0)
 			return {
 				kind,

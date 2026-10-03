@@ -362,6 +362,56 @@ describe("siege phases", () => {
 })
 
 describe("battle kinds and shared resolver", () => {
+	it("takes the urban siege increase entirely from open battles", () => {
+		for (const river of [false, true]) {
+			state.riverByProvince[1] = Number(river)
+			const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
+			const rng = HISTORY_RNG.createHistoryRng(2025)
+			for (let i = 0; i < 10000; i++) {
+				rng.random = () => (i + 0.5) / 10000
+				counts[
+					BATTLE_KIND.choose({ state, province: 1, siegeEligible: true, rng })
+						.kind
+				]++
+			}
+			const total = river ? 1.02 : 0.9
+			expect(counts.open / 10000).toBeCloseTo(0.15 / total, 3)
+			expect(counts.siege / 10000).toBeCloseTo(0.7 / total, 3)
+			expect(counts.ambush / 10000).toBeCloseTo(0.05 / total, 3)
+			expect(counts["river crossing"] / 10000).toBeCloseTo(
+				river ? 0.12 / total : 0,
+				3,
+			)
+		}
+	})
+	it("preserves the original distribution when a siege is ineligible", () => {
+		for (const river of [false, true])
+			for (const urban of [4999, 5000]) {
+				state.riverByProvince[1] = Number(river)
+				state.popUrbanCurrent[1] = urban
+				const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
+				const rng = HISTORY_RNG.createHistoryRng(2025)
+				for (let i = 0; i < 10000; i++) {
+					rng.random = () => (i + 0.5) / 10000
+					counts[
+						BATTLE_KIND.choose({
+							state,
+							province: 1,
+							siegeEligible: urban < 5000,
+							rng,
+						}).kind
+					]++
+				}
+				const total = river ? 0.87 : 0.75
+				expect(counts.open / 10000).toBeCloseTo(0.7 / total, 3)
+				expect(counts.ambush / 10000).toBeCloseTo(0.05 / total, 3)
+				expect(counts["river crossing"] / 10000).toBeCloseTo(
+					river ? 0.12 / total : 0,
+					3,
+				)
+				expect(counts.siege).toBe(0)
+			}
+	})
 	it("lets either equal-force ambusher win within the calibrated band", () => {
 		const members = [{ nation: 0, levy: 100, regular: 0, force: 75 }]
 		for (const ambusher of ["attacker", "defender"] as const) {
