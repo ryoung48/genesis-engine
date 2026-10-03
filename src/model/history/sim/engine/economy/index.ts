@@ -167,6 +167,7 @@ function initEconomy({ state }: InitEconomyParams): void {
 }
 
 export const ECONOMY = {
+	realm,
 	territory,
 	ducatsPerGram: DUCATS_PER_GRAM,
 	provinceOutput,

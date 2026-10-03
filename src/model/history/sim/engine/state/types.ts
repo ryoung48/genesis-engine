@@ -74,6 +74,9 @@ export interface War {
 	deployed: Record<number, Troops>
 	participants: Record<number, WarSide>
 	candidates: Record<WarSide, number[]>
+	// Whether each candidate passes the diplomatic part of a call to arms;
+	// refreshed with candidates.
+	callable: Record<WarSide, boolean[]>
 	candidatesHierarchyVersion: number
 	allocation: Record<number, number>
 	occupied: number[]
@@ -178,7 +181,11 @@ export interface HistoryState {
 	militaryStrengthDirty: Set<number>
 	militaryReady: boolean
 	militaryDepth: number
-	militaryReconcileTime: number
+	// Nations an event concerns; reconcile revisits only the wars they are in.
+	militaryTouched: Set<number>
+	// Active wars each nation leads, joins or may be called into.
+	militaryWarIndex: Map<number, number[]>
+	militaryWarIndexStale: boolean
 	militaryDiplomacyDirty: boolean
 	// Field army size at the last census; the live value is MILITARY.armySize.
 	armySizeCurrent: Float64Array

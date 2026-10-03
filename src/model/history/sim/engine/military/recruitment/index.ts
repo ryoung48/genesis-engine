@@ -4,6 +4,7 @@ import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { DEPLOYMENTS } from "@/model/history/sim/engine/military/deployments"
 import type {
 	NationParams,
+	RealmTargetCacheEntry,
 	ReconcileParams,
 	RecoveryParams,
 	RecoveryResult,
@@ -14,6 +15,7 @@ import type {
 	Troops,
 } from "@/model/history/sim/engine/military/recruitment/types"
 import { STATE } from "@/model/history/sim/engine/state"
+import type { RealmCacheEntry } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { MATH } from "@/model/shared/math/core"
 
@@ -72,15 +74,31 @@ function targets({
 	}
 }
 
+const realmTargetCache = new WeakMap<RealmCacheEntry, RealmTargetCacheEntry>()
+
 function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
-	return targets({
-		population: ECONOMY.realmPopulation({ state, p: nation }),
+	const realm = ECONOMY.realm({ state, p: nation })
+	const inputs: TargetParams = {
+		population: realm.population,
 		tribal:
 			GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) === "tribal",
-		knowledge: ECONOMY.realmKnowledge({ state, p: nation }),
-		surplus: ECONOMY.surplus({ state, p: nation }),
-		outputPerHead: ECONOMY.outputPerHead({ state, p: nation }),
-	})
+		knowledge: realm.knowledge,
+		surplus: realm.revenue - realm.stateMaintenance,
+		outputPerHead: realm.outputPerHead,
+	}
+	const cached = realmTargetCache.get(realm)
+	if (
+		cached &&
+		cached.inputs.population === inputs.population &&
+		cached.inputs.tribal === inputs.tribal &&
+		cached.inputs.knowledge === inputs.knowledge &&
+		cached.inputs.surplus === inputs.surplus &&
+		cached.inputs.outputPerHead === inputs.outputPerHead
+	)
+		return cached.targets
+	const computed = targets(inputs)
+	realmTargetCache.set(realm, { inputs, targets: computed })
+	return computed
 }
 
 function territoryTargets({
@@ -212,6 +230,7 @@ function advance({ state, nation }: NationParams): void {
 function refresh({ state, nation }: NationParams): void {
 	const interval = state.militaryIntervals.get(nation)
 	if (!interval) return
+	advance({ state, nation })
 	const target = realmTargets({ state, nation })
 	const assigned = DEPLOYMENTS.assignments({ state, nation })
 	const holdings = reconcile({

@@ -26,6 +26,11 @@ export interface RecruitmentTargets extends Troops {
 	campaign: Troops
 }
 
+export interface RealmTargetCacheEntry {
+	inputs: TargetParams
+	targets: RecruitmentTargets
+}
+
 export interface MilitaryInterval {
 	time: number
 	targets: Troops

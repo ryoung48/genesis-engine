@@ -207,6 +207,14 @@ function processEventsUntil({
 		const time2 = state.heap.peekTime2()
 		state.heap.dequeue()
 
+		if (type === EVENT_HEAP.evt.BATTLE)
+			MILITARY.touch({ state, nation: state.wars[dataBuf[0]].attacker })
+		else if (
+			type === EVENT_HEAP.evt.CENSUS ||
+			type === EVENT_HEAP.evt.PEOPLE_YEAR
+		)
+			MILITARY.touchAll({ state })
+		else MILITARY.touch({ state, nation: dataBuf[0] })
 		MILITARY.reconcile({ state })
 		state.militaryDepth++
 		switch (type) {

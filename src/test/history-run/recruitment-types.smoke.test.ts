@@ -598,11 +598,12 @@ describe("military transitions and conservation", () => {
 			defender: nations[2],
 			rng: HISTORY_RNG.createHistoryRng(23),
 		})
-		DEPLOYMENTS.affected({ state })
+		DEPLOYMENTS.touchedWars({ state, nations: new Set() })
+		const wars = new Set(state.activeWarIds)
 		const targets = vi.spyOn(RECRUITMENT, "realmTargets")
 		try {
 			const participants = [first.participants, second.participants]
-			expect(DEPLOYMENTS.reconcileParticipation({ state }).size).toBe(0)
+			expect(DEPLOYMENTS.reconcileParticipation({ state, wars }).size).toBe(0)
 			expect(first.participants).toBe(participants[0])
 			expect(second.participants).toBe(participants[1])
 			expect(first.participants[ally]).toBe("defender")
@@ -612,7 +613,9 @@ describe("military transitions and conservation", () => {
 			).toHaveLength(1)
 			state.treasuryCurrent[ally] = -1e9
 			targets.mockClear()
-			expect(DEPLOYMENTS.reconcileParticipation({ state }).has(ally)).toBe(true)
+			expect(
+				DEPLOYMENTS.reconcileParticipation({ state, wars }).has(ally),
+			).toBe(true)
 			expect(first.participants[ally]).toBeUndefined()
 			expect(second.participants[ally]).toBeUndefined()
 			expect(

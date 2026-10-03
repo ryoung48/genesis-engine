@@ -4,19 +4,39 @@ import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import type {
 	Assignment,
+	CallParams,
 	CandidateSideParams,
 	EligibleParams,
 	NationParams,
+	NationsParams,
+	ReadyParams,
+	SameListParams,
 	SideParams,
 	StateParams,
 	WarSide,
+	WarsParams,
 } from "@/model/history/sim/engine/military/deployments/types"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { ARMY_STRENGTH } from "@/model/history/sim/engine/military/strength"
 import { STATE } from "@/model/history/sim/engine/state"
 
+const NO_ASSIGNMENTS: Assignment[] = []
+
+const participantLists = new WeakMap<Record<number, WarSide>, number[]>()
+
+function participantNations(participants: Record<number, WarSide>): number[] {
+	let nations = participantLists.get(participants)
+	if (!nations) {
+		nations = Object.keys(participants).map(Number)
+		participantLists.set(participants, nations)
+	}
+	return nations
+}
+
 function assignments({ state, nation }: NationParams): Assignment[] {
-	return (state.militaryAssignments.get(nation) ?? []).filter(
+	const assigned = state.militaryAssignments.get(nation)
+	if (!assigned) return NO_ASSIGNMENTS
+	return assigned.filter(
 		({ war }) => war.endTime === undefined && !!war.participants[nation],
 	)
 }
@@ -59,15 +79,14 @@ function candidates({
 	].sort((a, b) => a - b)
 }
 
-function eligible({
+function answersCall({
 	state,
-	exhaustion,
 	nation,
 	leader,
 	target,
 	side,
 	war,
-}: EligibleParams): boolean {
+}: CallParams): boolean {
 	if (
 		nation === leader ||
 		nation === target ||
@@ -99,6 +118,10 @@ function eligible({
 		)
 			return false
 	}
+	return true
+}
+
+function ready({ state, nation, war, exhaustion }: ReadyParams): boolean {
 	let depleted = exhaustion.get(nation)
 	if (depleted === undefined) {
 		depleted = exhausted({ state, nation })
@@ -112,6 +135,10 @@ function eligible({
 	return !!war?.participants[nation] || treasury >= 0
 }
 
+function eligible(params: EligibleParams): boolean {
+	return answersCall(params) && ready(params)
+}
+
 function previewSide(params: CandidateSideParams): number[] {
 	const exhaustion = new Map<number, boolean>()
 	return candidates(params).filter((nation) =>
@@ -119,27 +146,77 @@ function previewSide(params: CandidateSideParams): number[] {
 	)
 }
 
-function affected({ state }: StateParams): Set<number> {
+function sameList<T>({ a, b }: SameListParams<T>): boolean {
+	return a.length === b.length && a.every((item, i) => item === b[i])
+}
+
+function refreshCandidates({ state }: StateParams): Set<number> {
 	DERIVE.ensureHierarchyClean(state)
-	const nations = new Set<number>()
+	const changed = new Set<number>()
 	for (const idx of state.activeWarIds) {
 		const war = state.wars[idx]
 		if (
-			state.militaryDiplomacyDirty ||
-			war.candidatesHierarchyVersion !== state.hierarchyVersion
-		) {
-			for (const side of ["attacker", "defender"] as const)
-				war.candidates[side] = candidates({
-					state,
-					leader: side === "attacker" ? war.attacker : war.defender,
-					target: side === "attacker" ? war.defender : war.attacker,
-					side,
-					war,
-				})
-			war.candidatesHierarchyVersion = state.hierarchyVersion
+			!state.militaryDiplomacyDirty &&
+			war.candidatesHierarchyVersion === state.hierarchyVersion
+		)
+			continue
+		for (const side of ["attacker", "defender"] as const) {
+			const leader = side === "attacker" ? war.attacker : war.defender
+			const target = side === "attacker" ? war.defender : war.attacker
+			const list = candidates({ state, leader, target, side, war })
+			const callable = list.map((nation) =>
+				answersCall({ state, nation, leader, target, side, war }),
+			)
+			if (
+				war.candidatesHierarchyVersion < 0 ||
+				!sameList({ a: list, b: war.candidates[side] }) ||
+				!sameList({ a: callable, b: war.callable[side] })
+			)
+				changed.add(idx)
+			war.candidates[side] = list
+			war.callable[side] = callable
 		}
-		for (const nation of Object.keys(war.participants))
-			nations.add(Number(nation))
+		war.candidatesHierarchyVersion = state.hierarchyVersion
+	}
+	return changed
+}
+
+function indexWars({ state }: StateParams): void {
+	state.militaryWarIndex.clear()
+	for (const idx of state.activeWarIds) {
+		const war = state.wars[idx]
+		for (const nation of [
+			war.attacker,
+			war.defender,
+			...participantNations(war.participants),
+			...war.candidates.attacker,
+			...war.candidates.defender,
+		]) {
+			const wars = state.militaryWarIndex.get(nation)
+			if (!wars) state.militaryWarIndex.set(nation, [idx])
+			else if (wars[wars.length - 1] !== idx) wars.push(idx)
+		}
+	}
+	state.militaryWarIndexStale = false
+}
+
+function touchedWars({ state, nations }: NationsParams): Set<number> {
+	const wars = refreshCandidates({ state })
+	if (wars.size > 0) state.militaryWarIndexStale = true
+	if (state.militaryWarIndexStale) indexWars({ state })
+	for (const nation of nations)
+		for (const idx of state.militaryWarIndex.get(nation) ?? [])
+			if (state.activeWarIds.has(idx)) wars.add(idx)
+	return wars
+}
+
+function affected({ state, wars }: WarsParams): Set<number> {
+	const nations = new Set<number>()
+	for (const idx of state.activeWarIds) {
+		if (!wars.has(idx)) continue
+		const war = state.wars[idx]
+		for (const nation of participantNations(war.participants))
+			nations.add(nation)
 		for (const side of ["attacker", "defender"] as const) {
 			const leader = side === "attacker" ? war.attacker : war.defender
 			nations.add(leader)
@@ -157,37 +234,43 @@ function sideMembers({ war, side }: SideParams): number[] {
 		.sort((a, b) => (a === lead ? -1 : b === lead ? 1 : a - b))
 }
 
-function reconcileParticipation({ state }: StateParams): Set<number> {
+function reconcileParticipation({ state, wars }: WarsParams): Set<number> {
 	const exhaustion = new Map<number, boolean>()
 	const changed = new Set<number>()
-	const desired = new Map<number, Record<number, WarSide>>()
-	const refused = new Map<number, Set<number>>()
 	for (const idx of state.activeWarIds) {
+		if (!wars.has(idx)) continue
 		const war = state.wars[idx]
+		const current = participantNations(war.participants)
 		if (
 			war.candidates.attacker.length === 0 &&
 			war.candidates.defender.length === 0 &&
-			Object.keys(war.participants).length === 2 &&
+			current.length === 2 &&
 			war.participants[war.attacker] === "attacker" &&
 			war.participants[war.defender] === "defender" &&
 			STATE.isSovereign({ state, p: war.attacker }) &&
 			STATE.isSovereign({ state, p: war.defender })
 		)
 			continue
-		const calls = { attacker: new Set<number>(), defender: new Set<number>() }
-		const refusals = new Set<number>()
+		const calls: Record<WarSide, number[]> = { attacker: [], defender: [] }
+		const refusals: number[] = []
 		for (const side of ["attacker", "defender"] as const) {
 			const leader = side === "attacker" ? war.attacker : war.defender
-			const target = side === "attacker" ? war.defender : war.attacker
-			if (STATE.isSovereign({ state, p: leader })) calls[side].add(leader)
-			for (const nation of war.candidates[side]) {
-				if (eligible({ state, nation, leader, target, side, war, exhaustion }))
-					calls[side].add(nation)
-				else refusals.add(nation)
+			if (STATE.isSovereign({ state, p: leader })) calls[side].push(leader)
+			const sideCandidates = war.candidates[side]
+			const callable = war.callable[side]
+			for (let i = 0; i < sideCandidates.length; i++) {
+				const nation = sideCandidates[i]
+				if (callable[i] && ready({ state, nation, war, exhaustion }))
+					calls[side].push(nation)
+				else if (!refusals.includes(nation)) refusals.push(nation)
 			}
 		}
 		let membership = war.participants
-		for (const nation of new Set([...calls.attacker, ...calls.defender])) {
+		const called = [
+			...calls.attacker,
+			...calls.defender.filter((nation) => !calls.attacker.includes(nation)),
+		]
+		for (const nation of called) {
 			let side: WarSide | undefined = war.participants[nation]
 			if (nation === war.attacker) side = "attacker"
 			else if (nation === war.defender) side = "defender"
@@ -196,35 +279,32 @@ function reconcileParticipation({ state }: StateParams): Set<number> {
 					STATE.warSides({ war }).rebels === war.attacker
 						? "attacker"
 						: "defender"
-			else if (!calls.attacker.has(nation) || !calls.defender.has(nation))
-				side = calls.attacker.has(nation) ? "attacker" : "defender"
+			else if (
+				!calls.attacker.includes(nation) ||
+				!calls.defender.includes(nation)
+			)
+				side = calls.attacker.includes(nation) ? "attacker" : "defender"
 			if (war.participants[nation] === side) continue
 			if (membership === war.participants) membership = { ...war.participants }
 			if (side) membership[nation] = side
 			else delete membership[nation]
 		}
-		for (const key in war.participants) {
-			if (calls.attacker.has(Number(key)) || calls.defender.has(Number(key)))
+		for (const nation of current) {
+			if (calls.attacker.includes(nation) || calls.defender.includes(nation))
 				continue
 			if (membership === war.participants) membership = { ...war.participants }
-			delete membership[Number(key)]
+			delete membership[nation]
 		}
-		if (membership !== war.participants) desired.set(idx, membership)
-		refused.set(idx, refusals)
-	}
-	for (const [idx, refusals] of refused) {
-		const war = state.wars[idx]
-		const membership = desired.get(idx)
-		if (membership) {
-			for (const key in war.participants) {
-				const nation = Number(key)
+		const updated = membership !== war.participants
+		if (updated) {
+			state.militaryWarIndexStale = true
+			for (const nation of current) {
 				if (war.participants[nation] === membership[nation]) continue
 				changed.add(nation)
 				delete war.deployed[nation]
 				delete war.allocation[nation]
 			}
-			for (const key in membership) {
-				const nation = Number(key)
+			for (const nation of participantNations(membership)) {
 				if (war.participants[nation]) continue
 				changed.add(nation)
 				delete war.deployed[nation]
@@ -232,22 +312,23 @@ function reconcileParticipation({ state }: StateParams): Set<number> {
 			}
 			war.participants = membership
 			war.allies = new Set(
-				Object.keys(membership)
-					.map(Number)
-					.filter(
-						(nation) => nation !== war.attacker && nation !== war.defender,
-					),
+				participantNations(membership).filter(
+					(nation) => nation !== war.attacker && nation !== war.defender,
+				),
 			)
 		}
+		let refusalsChanged = refusals.length !== war.refusedCalls.size
 		for (const nation of refusals)
-			if (!war.refusedCalls.has(nation))
+			if (!war.refusedCalls.has(nation)) {
+				refusalsChanged = true
 				state.events.push({
 					tag: "call refused",
 					time: state.time,
 					data: { war: idx, nation, leader: war.attacker },
 				})
-		war.refusedCalls = refusals
-		if (membership)
+			}
+		if (refusalsChanged) war.refusedCalls = new Set(refusals)
+		if (updated)
 			JOURNAL.coalition({
 				state,
 				warId: idx,
@@ -275,6 +356,7 @@ function reconcileParticipation({ state }: StateParams): Set<number> {
 }
 
 function rebalance({ state, nation }: NationParams): void {
+	RECRUITMENT.advance({ state, nation })
 	const assigned = assignments({ state, nation })
 	const interval = state.militaryIntervals.get(nation)
 	if (!interval) return
@@ -316,6 +398,7 @@ export const DEPLOYMENTS = {
 	available,
 	exhausted,
 	previewSide,
+	touchedWars,
 	affected,
 	sideMembers,
 	reconcileParticipation,

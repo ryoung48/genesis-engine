@@ -671,21 +671,29 @@ function afterMutation({ state }: RecordArmiesParams): void {
 
 function reconcile({ state }: RecordArmiesParams): void {
 	if (!state.militaryReady) return
+	const touched = state.militaryTouched
+	for (const nation of state.militaryDirty) touched.add(nation)
+	for (const nation of state.militaryAllocationDirty) touched.add(nation)
+	for (const nation of state.militaryStrengthDirty) touched.add(nation)
+	const wars = DEPLOYMENTS.touchedWars({ state, nations: touched })
+	touched.clear()
 	if (
-		state.militaryReconcileTime === state.time &&
-		!state.militaryDiplomacyDirty &&
+		wars.size === 0 &&
 		state.militaryDirty.size === 0 &&
-		state.militaryAllocationDirty.size === 0
-	)
+		state.militaryAllocationDirty.size === 0 &&
+		state.militaryStrengthDirty.size === 0
+	) {
+		state.militaryDiplomacyDirty = false
 		return
-	const affected = DEPLOYMENTS.affected({ state })
+	}
+	const affected = DEPLOYMENTS.affected({ state, wars })
 	for (const nation of state.militaryDirty) affected.add(nation)
 	for (const nation of affected) RECRUITMENT.advance({ state, nation })
 	const dirty = new Set(state.militaryDirty)
 	for (const nation of dirty)
 		if (STATE.isSovereign({ state, p: nation }))
 			RECRUITMENT.refresh({ state, nation })
-	const changed = DEPLOYMENTS.reconcileParticipation({ state })
+	const changed = DEPLOYMENTS.reconcileParticipation({ state, wars })
 	const allocation = new Set([...changed, ...state.militaryAllocationDirty])
 	const rebalance = new Set(allocation)
 	for (const idx of state.activeWarIds) {
@@ -705,7 +713,15 @@ function reconcile({ state }: RecordArmiesParams): void {
 	state.militaryStrengthDirty.clear()
 	state.militaryDirty.clear()
 	state.militaryDiplomacyDirty = false
-	state.militaryReconcileTime = state.time
+}
+
+function touch({ state, nation }: NationParams): void {
+	state.militaryTouched.add(nation)
+}
+
+function touchAll({ state }: RecordArmiesParams): void {
+	for (const idx of state.activeWarIds)
+		state.militaryTouched.add(state.wars[idx].attacker)
 }
 
 function mutate<T>({ state, action }: MutationParams<T>): T {
@@ -772,6 +788,8 @@ export const MILITARY = {
 	initialize,
 	advance,
 	reconcile,
+	touch,
+	touchAll,
 	mutate,
 	beforeMutation,
 	beforeProvinceMutation,

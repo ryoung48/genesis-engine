@@ -42,6 +42,7 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		deployed: {},
 		participants: {},
 		candidates: { attacker: [], defender: [] },
+		callable: { attacker: [], defender: [] },
 		candidatesHierarchyVersion: -1,
 		allocation: {},
 		occupied: [],
