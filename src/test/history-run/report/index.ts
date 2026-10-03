@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
@@ -15,7 +15,6 @@ import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
-import type { KnowledgeSnapshot } from "@/test/history-run/report/knowledge/types"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
@@ -46,22 +45,17 @@ const DEFAULT_SEEDS = [14963991]
 
 const DEFAULT_YEARS = 300
 
+// Year 1800 quantile from the original 933-year history baseline.
+const DEFAULT_LATE_KNOWLEDGE_BAND = 2.366478320318625
+
 function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
-	const baselinePath =
-		"stats/history/2026-10-01T11-40-00-000Z-original-history-baseline/933.json"
-	const baseline = existsSync(baselinePath)
-		? JSON.parse(readFileSync(baselinePath, "utf8"))
-		: null
-	const endpoint = baseline?.diagnostics.snapshots.find(
-		(snapshot: KnowledgeSnapshot) => snapshot.year === 1800,
-	)
 	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
 	return {
 		lateKnowledgeBand: Number(
-			env.HISTORY_LATE_KNOWLEDGE ?? endpoint?.quantiles[4] ?? 2.38,
+			env.HISTORY_LATE_KNOWLEDGE ?? DEFAULT_LATE_KNOWLEDGE_BAND,
 		),
 		seeds: env.HISTORY_SEEDS
 			? env.HISTORY_SEEDS.split(",").map(Number)
@@ -626,10 +620,12 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		MILITARY_REPORT.log({ reports, log: options.log })
 	}
 
-	if (options.outPath)
+	if (options.outPath) {
 		options.log(
 			`HTML comparison: ${HISTORY_COMPARISON.write({ current: options.outPath, baseline: options.baselinePath })}`,
 		)
+		HISTORY_OUTPUT.prune(options.outPath)
+	}
 	return results
 }
 

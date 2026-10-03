@@ -410,4 +410,4 @@ function write({ current, baseline }: CompareParams): string {
 	return outPath
 }
 
-export const HISTORY_COMPARISON = { write, files }
+export const HISTORY_COMPARISON = { write, files, read }
