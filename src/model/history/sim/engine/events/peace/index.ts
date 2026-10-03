@@ -1,6 +1,5 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
-import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
 import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
 import type {
@@ -24,11 +23,6 @@ const BUYOFF_THREAT = 0.01
 const BUYOFF_ACCEPTANCE = 0.5
 const MIN_INDEMNITY_CHANCE = 0.1
 const MAX_INDEMNITY_CHANCE = 0.9
-const CASH_DISCOUNT: Record<ArmyTradition, number> = {
-	settled: 1,
-	tribal: 0.6,
-	steppe: 0.6,
-}
 
 function buyoff({ state, war }: BuyoffParams): number {
 	if (war.goal !== "conquest" || war.occupied.length === 0) return 0
@@ -59,8 +53,7 @@ function buyoff({ state, war }: BuyoffParams): number {
 		(1 - threat) *
 		LAND_VALUE_YEARS *
 		(occupiedOutput / output) *
-		ECONOMY.revenue({ state, p: war.defender }) *
-		CASH_DISCOUNT[ECONOMY.armyTradition({ state, p: war.attacker })]
+		ECONOMY.revenue({ state, p: war.defender })
 	return ask > 0 && FIELDS.prov.treasury.get({ state, p: war.defender }) >= ask
 		? ask
 		: 0
@@ -274,7 +267,8 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 }
 
 export const PEACE = {
-	conclude,
+	conclude: (params: ConcludeParams) =>
+		MILITARY.mutate({ state: params.state, action: () => conclude(params) }),
 	terms,
 	buyoff,
 	acceptBuyoff,

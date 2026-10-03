@@ -1,4 +1,4 @@
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react"
+import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 
 interface FloatingTooltipProps {
@@ -8,17 +8,8 @@ interface FloatingTooltipProps {
 
 const MARGIN = 6
 
-/** Hover tooltip rendered into a document.body portal instead of an
- * absolutely-positioned sibling -- a stats panel is a scrollable container
- * (overflow-y-auto), which clips any absolute content that pokes past its
- * own box on either edge. A portal escapes that clipping entirely rather
- * than trying to guess a safe direction, and it never needs its own scroll:
- * position is computed from the trigger's actual bounding rect, preferring
- * above the trigger (matching every other stat-grid tooltip, which opens
- * upward) and falling back below only when there is no room above, with
- * horizontal clamping to whichever side actually has room in the current
- * viewport. */
 export function FloatingTooltip({ content, children }: FloatingTooltipProps) {
+	const tooltipId = useId()
 	const [visible, setVisible] = useState(false)
 	const triggerRef = useRef<HTMLSpanElement>(null)
 	const panelRef = useRef<HTMLDivElement>(null)
@@ -53,14 +44,35 @@ export function FloatingTooltip({ content, children }: FloatingTooltipProps) {
 		<span
 			ref={triggerRef}
 			className="relative inline-flex items-center"
+			aria-describedby={visible ? tooltipId : undefined}
+			onFocus={(event) => {
+				event.target.setAttribute("aria-describedby", tooltipId)
+				setVisible(true)
+			}}
+			onBlur={(event) => {
+				event.target.removeAttribute("aria-describedby")
+				setVisible(false)
+			}}
+			onKeyDown={(event) => {
+				if (event.key === "Escape") {
+					if (event.target instanceof HTMLElement)
+						event.target.removeAttribute("aria-describedby")
+					setVisible(false)
+				}
+			}}
 			onMouseEnter={() => setVisible(true)}
-			onMouseLeave={() => setVisible(false)}
+			onMouseLeave={(event) => {
+				if (!event.currentTarget.contains(document.activeElement))
+					setVisible(false)
+			}}
 		>
 			{children}
 			{visible
 				? createPortal(
 						<div
 							ref={panelRef}
+							id={tooltipId}
+							role="tooltip"
 							style={{
 								position: "fixed",
 								top: style?.top ?? -9999,

@@ -1,41 +1,26 @@
 import { beforeAll, describe, expect, it, vi } from "vitest"
-import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
+import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import type { SharedRng } from "@/model/shared/random/rng"
 import { HISTORY_RUN } from "@/test/history-run"
 
 let engine: HistoryState
 let war: War
-let manpower: Float64Array
+let levies: Float64Array
 let rural: Float32Array
 
 function isolated(p: number): boolean {
 	return (
 		!engine.desolate[p] &&
 		STATE.isSovereign({ state: engine, p }) &&
-		ECONOMY.armyTradition({ state: engine, p }) === "settled" &&
-		engine.provinceWars[p].length === 0 &&
-		MILITARY.armySize({ state: engine, nation: p }) > 3000
-	)
-}
-
-function alone({
-	nation,
-	target,
-}: {
-	nation: number
-	target: number
-}): boolean {
-	return (
-		STATE.getWarAllies({ state: engine, nation, type: "offensive", target })
-			.length === 0 &&
-		STATE.getWarAllies({ state: engine, nation, type: "defensive", target })
-			.length === 0
+		GOVERNMENT.govFamilyOfIndex(engine.governmentType[p]) !== "tribal" &&
+		MILITARY.armySize({ state: engine, nation: p }) > 0
 	)
 }
 
@@ -45,43 +30,62 @@ function setup(): void {
 		era: "lateMedieval",
 		numPoints: 30000,
 	}).engine
+	for (const id of [...engine.activeWarIds])
+		STATE.resolveWar({
+			state: engine,
+			war: engine.wars[id],
+			transferred: [],
+			receiver: engine.wars[id].attacker,
+		})
 	let attacker = -1
 	let defender = -1
 	for (let p = 0; p < engine.P && defender < 0; p++) {
 		if (!isolated(p)) continue
 		for (const nb of STATE.getNationNeighbors({ state: engine, nation: p }))
-			if (
-				isolated(nb) &&
-				alone({ nation: p, target: nb }) &&
-				alone({ nation: nb, target: p })
-			) {
+			if (isolated(nb)) {
 				attacker = p
 				defender = nb
 				break
 			}
 	}
 	if (defender < 0) throw new Error("no isolated settled neighbors")
+	for (const nation of [attacker, defender])
+		for (const other of [...engine.relationColumns[nation]])
+			STATE.setRelation({
+				state: engine,
+				a: nation,
+				b: other,
+				rel: STATE.rel.NONE,
+			})
 	war = STATE.createActiveWar({
 		state: engine,
 		attacker,
 		defender,
 		rng: HISTORY_RNG.createHistoryRng(1),
 	})
-	manpower = engine.manpowerCurrent.slice()
+	levies = engine.levyCurrent.slice()
 	rural = engine.popRuralCurrent.slice()
 }
 
 beforeAll(setup)
 
 function reset({ attack, defend }: { attack: number; defend: number }): void {
-	engine.manpowerCurrent.set(manpower)
+	engine.levyCurrent.set(levies)
 	engine.popRuralCurrent.set(rural)
-	engine.manpowerCurrent[war.attacker] = attack
-	engine.manpowerCurrent[war.defender] = defend
-	war.deployed[war.attacker] = attack
-	war.deployed[war.defender] = defend
-	engine.deploymentUpdateTime[war.attacker] = engine.time
-	engine.deploymentUpdateTime[war.defender] = engine.time
+	engine.levyCurrent[war.attacker] = attack
+	engine.levyCurrent[war.defender] = defend
+	war.deployed[war.attacker] = { levy: attack, regular: 0 }
+	war.deployed[war.defender] = { levy: defend, regular: 0 }
+	for (const nation of [war.attacker, war.defender]) {
+		engine.regularCurrent[nation] = 0
+		const interval = engine.militaryIntervals.get(nation)
+		if (!interval) throw new Error("missing interval")
+		interval.time = engine.time
+		interval.reference = { levy: engine.levyCurrent[nation], regular: 0 }
+		war.allocation[nation] = 1
+		war.participants[nation] = nation === war.attacker ? "attacker" : "defender"
+	}
+	engine.militaryDirty.clear()
 	engine.occupationCurrent.fill(-1)
 	war.occupied.length = 0
 	war.endTime = undefined
@@ -96,6 +100,56 @@ function sequenceRng(values: number[]): SharedRng {
 }
 
 describe("battle odds", () => {
+	it("weights levies at 0.75 and regulars at 1 while reporting soldier counts", () => {
+		reset({ attack: 100, defend: 0 })
+		engine.regularCurrent[war.defender] = 100
+		war.deployed[war.defender] = { levy: 0, regular: 100 }
+		engine.militaryIntervals.get(war.defender)!.reference = {
+			levy: 0,
+			regular: 100,
+		}
+		const result = MILITARY.fight({
+			state: engine,
+			war,
+			eventAttacker: war.attacker,
+			defense: 1,
+			rng: HISTORY_RNG.createHistoryRng(101),
+		})
+		expect(result.attackerArmy).toBe(100)
+		expect(result.defenderArmy).toBe(100)
+		expect(result.preBattleWinProbability).toBeCloseTo(
+			0.75 ** 3 / (1 + 0.75 ** 3),
+			12,
+		)
+		expect(engine.levyCurrent[war.attacker]).toBeCloseTo(
+			100 * (1 - result.attackerLossShare),
+			9,
+		)
+		expect(engine.regularCurrent[war.defender]).toBeCloseTo(
+			100 * (1 - result.defenderLossShare),
+			9,
+		)
+	})
+
+	it("caps battle attendance in soldiers before applying troop strength", () => {
+		reset({ attack: 1000, defend: 1000 })
+		const limit = vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockReturnValue(500)
+		try {
+			const result = MILITARY.fight({
+				state: engine,
+				war,
+				eventAttacker: war.attacker,
+				defense: 1,
+				rng: HISTORY_RNG.createHistoryRng(102),
+			})
+			expect(result.attackerArmy).toBe(500)
+			expect(result.defenderArmy).toBe(500)
+			expect(result.preBattleWinProbability).toBeCloseTo(0.5, 12)
+		} finally {
+			limit.mockRestore()
+		}
+	})
+
 	it("matches exponent-3 win probabilities analytically and empirically", () => {
 		const rng = HISTORY_RNG.createHistoryRng(99)
 		const expected: [number, number][] = [
@@ -286,7 +340,7 @@ describe("battle progress", () => {
 	function battleWith(values: number[]) {
 		setup()
 		reset({ attack: 1000, defend: 1000 })
-		engine.manpowerCurrent.set(manpower)
+		engine.levyCurrent.set(levies)
 		engine.provinceTopography.fill(0)
 		engine.provinceVegetation.fill(3)
 		const note = engine.events.length

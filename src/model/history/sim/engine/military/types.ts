@@ -1,19 +1,14 @@
+import type { WarSide } from "@/model/history/sim/engine/military/deployments/types"
 import type {
-	GetWarAlliesParams,
-	HistoryState,
-	War,
-} from "@/model/history/sim/engine/state/types"
+	RecruitmentTargets,
+	Troops,
+} from "@/model/history/sim/engine/military/recruitment/types"
+import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
-
-export type WarSide = "attacker" | "defender"
 
 export interface NationParams {
 	state: HistoryState
 	nation: number
-}
-
-export interface CostPerManYearParams extends NationParams {
-	grams: number
 }
 
 export interface SideMembersParams extends NationParams {
@@ -39,6 +34,16 @@ export interface RebellionThreatParams {
 	subject: number
 }
 
+export interface RebellionPreview {
+	crown: RecruitmentTargets
+	rebel: RecruitmentTargets
+	league: Troops
+	existingWars: number
+	crownStrength: number
+	rebelStrength: number
+	threat: number
+}
+
 export interface CoalitionParams {
 	state: HistoryState
 	war: War
@@ -46,24 +51,21 @@ export interface CoalitionParams {
 }
 
 export interface CoalitionMember {
+	levy: number
+	regular: number
 	nation: number
 	force: number
 }
 
 export interface Coalition {
 	members: CoalitionMember[]
-	// Share of the coalition's assigned troops still missing from its deployment.
+	// Missing share of the allocated participation-episode reference strength.
 	shortfall: number
 }
 
 export interface MemberDeploymentsParams {
 	war: War
 	members: CoalitionMember[]
-}
-
-export interface DeploymentAssignment {
-	war: War
-	opponent: number
 }
 
 export interface FightParams {
@@ -113,16 +115,6 @@ export interface BattleDeployments {
 	roles: ("backer" | null)[]
 }
 
-export interface WarAlliesParams extends GetWarAlliesParams {
-	// Null when estimating a war that has not started.
-	war: War | null
-}
-
-export interface LogCoalitionParams {
-	state: HistoryState
-	war: War
-}
-
 export interface MobilizeParams {
 	state: HistoryState
 	war: War
@@ -142,6 +134,7 @@ export interface BattleResult extends BattleDeployments {
 }
 
 export interface ApplyLossesParams {
+	war: War | null
 	state: HistoryState
 	members: CoalitionMember[]
 	losses: number
@@ -176,4 +169,14 @@ export interface RaidResult {
 	response: number
 	raiderLosses: number
 	victimLosses: number
+}
+
+export interface MutationParams<T> {
+	state: HistoryState
+	action: () => T
+}
+
+export interface ProvinceMutationParams {
+	state: HistoryState
+	p: number
 }

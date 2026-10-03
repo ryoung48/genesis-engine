@@ -46,26 +46,37 @@ function nationEconomy({
 }: NationFrameParams): NationEconomy | null {
 	if (!frame.economy) return null
 	const {
-		roots,
+		nations,
 		treasury,
 		revenue,
-		manpower,
-		maxManpower,
+		levy,
+		regular,
 		army,
 		deployments,
 		budgets,
 	} = frame.economy
-	for (let index = 0; index < roots.length; index++) {
-		const root = roots[index]
-		if (
-			frame.provinceNation[root] === nationId &&
-			frame.provinceParent[root] < 0
-		)
+	for (let index = 0; index < nations.length; index++) {
+		if (nations[index] === nationId) {
+			const deployedLevy = deployments[index].reduce(
+				(sum, deployment) => sum + deployment.levy,
+				0,
+			)
+			const deployedRegular = deployments[index].reduce(
+				(sum, deployment) => sum + deployment.regular,
+				0,
+			)
+			const deployed = deployedLevy + deployedRegular
 			return {
 				treasury: treasury[index],
 				revenue: revenue[index],
-				manpower: manpower[index],
-				maxManpower: maxManpower[index],
+				levy: levy[index],
+				regular: regular[index],
+				deployed,
+				deployedLevy,
+				deployedRegular,
+				deployedLevyPercent: deployed > 0 ? (100 * deployedLevy) / deployed : 0,
+				deployedRegularPercent:
+					deployed > 0 ? (100 * deployedRegular) / deployed : 0,
 				army: army[index],
 				deployments: deployments[index],
 				budget: budgets[index],
@@ -74,6 +85,7 @@ function nationEconomy({
 					? budgets[index].annualBalance + budgets[index].otherChangesTotal
 					: 0,
 			}
+		}
 	}
 	return null
 }

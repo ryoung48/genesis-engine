@@ -12,6 +12,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { Relation } from "@/model/history/sim/engine/state/types"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
 const RAID_CHANCE = 0.6
 
@@ -75,7 +76,8 @@ function richestBorderProvince({
 function runRaid({ state, nation, rng }: RunRaidParams): void {
 	scheduleRaid({ state, nation, years: 1 })
 	if (!STATE.isSovereign({ state, p: nation })) return
-	if (ECONOMY.armyTradition({ state, p: nation }) === "settled") return
+	if (GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) !== "tribal")
+		return
 	const chance =
 		RAID_CHANCE * (1 - 0.5 * ECONOMY.treasuryFill({ state, p: nation }))
 	if (rng.random() >= chance) return
@@ -119,5 +121,6 @@ function runRaid({ state, nation, rng }: RunRaidParams): void {
 
 export const RAID = {
 	initRaid,
-	runRaid,
+	runRaid: (params: RunRaidParams) =>
+		MILITARY.mutate({ state: params.state, action: () => runRaid(params) }),
 }

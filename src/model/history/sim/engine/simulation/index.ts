@@ -4,6 +4,7 @@ import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { DIPLOMACY } from "@/model/history/sim/engine/events/diplomacy"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
+import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
@@ -146,6 +147,11 @@ function initHistory(params: {
 		fn: () => ECONOMY.initEconomy({ state }),
 	})
 	timed({
+		label: "initHistory:initMilitary",
+		timings: params.timings,
+		fn: () => MILITARY.initialize({ state }),
+	})
+	timed({
 		label: "initHistory:initDiplomacy",
 		timings: params.timings,
 		fn: () => DIPLOMACY.initDiplomacy({ state, rng }),
@@ -179,6 +185,8 @@ function initHistory(params: {
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
 
+	ROYAL_MARRIAGES.review({ state })
+	MILITARY.reconcile({ state })
 	MILITARY.recordArmies({ state })
 	JOURNAL.flush({ state, noteCursor: 0, census: true, initial: true })
 	return state
@@ -199,6 +207,8 @@ function processEventsUntil({
 		const time2 = state.heap.peekTime2()
 		state.heap.dequeue()
 
+		MILITARY.reconcile({ state })
+		state.militaryDepth++
 		switch (type) {
 			case EVENT_HEAP.evt.WAR:
 				WAR.runWar({ state, nation: dataBuf[0], rng })
@@ -256,6 +266,8 @@ function processEventsUntil({
 				})
 				break
 		}
+		state.militaryDepth--
+		MILITARY.reconcile({ state })
 		JOURNAL.flush({
 			state,
 			noteCursor,
@@ -271,13 +283,6 @@ function processEventsUntil({
 	}
 }
 
-/** `validate` re-checks the province-parent hierarchy for cycles/corruption
- * after every single event -- invaluable for tracking down exactly which
- * event broke it, but O(P) per event, which dominates runtime at real-world
- * province counts (measured: ~600ms/year become the majority of wall time).
- * Leave off for real generation runs; the caller can still validate once at
- * the end (see validateLiveHierarchy) to catch corruption without paying
- * this cost after every event. */
 function simulateUntil({
 	state,
 	targetTimeMs,

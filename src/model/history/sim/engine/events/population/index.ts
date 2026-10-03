@@ -8,6 +8,7 @@ import type {
 } from "@/model/history/sim/engine/events/population/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import { URBANIZATION } from "@/model/society/urbanization"
@@ -233,5 +234,9 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 
 export const POPULATION = {
 	initPopulation,
-	runPopulation,
+	runPopulation: (params: RunPopulationParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => runPopulation(params),
+		}),
 }

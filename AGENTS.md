@@ -50,8 +50,10 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 - For any UI or UX work, follow `src/ui/components/UI.md`.
 
 # Plans
+- Do not create a plan file unless the user explicitly asks for one. Routine changes, fixes, verification runs, and follow-up work do not need new plan files.
 - All plans live in the `plans/` folder as files. Do not keep plans only in chat or scatter them elsewhere.
 - Once a plan is fully implemented, move its file to `plans/archive/`.
+- Every constant a plan introduces must be assigned a concrete value in the plan, with a citation (source, paper, dataset, or documented reasoning) explaining why that value makes sense. Plans must not leave constants as TBD, "tune later", or unvalued placeholders.
 
 # Plan Review
 - Sometimes you will be asked to review a plan. Make sure you understand the objective of the plan. Reviews should look for:
@@ -59,6 +61,7 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
   - Over-engineering: abstractions, phases, or generality beyond what the problem requires.
   - Vague requirements: steps or acceptance criteria that can't be implemented or verified without guessing.
   - Module structure: where applicable, check that the plan lays out modules, submodules, and where each piece of code lives.
+  - Unjustified constants: flag any constant without an assigned value, or whose value lacks a citation explaining why it makes sense.
 
 # Parallel Agents
 - Other agents are often working in this repo at the same time. Uncommitted changes you didn't make, including ones related to your work, are probably theirs: don't panic, don't revert or clean them up.

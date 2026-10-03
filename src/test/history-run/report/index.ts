@@ -1,14 +1,22 @@
-import { writeFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { createHash } from "node:crypto"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
+import type { KnowledgeSnapshot } from "@/test/history-run/report/knowledge/types"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
+import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
+import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import type {
 	BetrothalOutcome,
 	CenturyReport,
@@ -39,7 +47,18 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
+	const baselinePath =
+		"verification/history-recruitment-types/baseline-933.json"
+	const baseline = existsSync(baselinePath)
+		? JSON.parse(readFileSync(baselinePath, "utf8"))
+		: null
+	const endpoint = baseline?.diagnostics.snapshots.find(
+		(snapshot: KnowledgeSnapshot) => snapshot.year === 1800,
+	)
 	return {
+		lateKnowledgeBand: Number(
+			env.HISTORY_LATE_KNOWLEDGE ?? endpoint?.quantiles[4] ?? 2.38,
+		),
 		seeds: env.HISTORY_SEEDS
 			? env.HISTORY_SEEDS.split(",").map(Number)
 			: DEFAULT_SEEDS,
@@ -328,12 +347,98 @@ function marriageReport({
 }
 
 function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
-	const { engine } = HISTORY_RUN.createEngine({
+	const started = performance.now()
+	const { engine, generated, generationMs, engineMs } =
+		HISTORY_RUN.createEngine({
+			seed,
+			era: options.era,
+			numPoints: options.numPoints,
+			startYear: options.startYear,
+		})
+	const rebelLogistics = REBEL_LOGISTICS_REPORT.attach({ engine })
+	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
+	const diagnostics = {
+		sourceHash: createHash("sha256")
+			.update(
+				execFileSync(
+					"git",
+					[
+						"ls-files",
+						"--cached",
+						"--others",
+						"--exclude-standard",
+						"src/model/history",
+						"src/test/history-run",
+					],
+					{ encoding: "utf8" },
+				)
+					.trim()
+					.split("\n")
+					.sort()
+					.map((path) => path + "\n" + readFileSync(path.trim(), "utf8"))
+					.join("\n"),
+			)
+			.digest("hex"),
 		seed,
 		era: options.era,
-		numPoints: options.numPoints,
-		startYear: options.startYear,
-	})
+		requestedPoints: options.numPoints,
+		generatedPoints: generated.mesh.r_xyz.length / 3,
+		provinces: engine.P,
+		revision: execFileSync("git", ["rev-parse", "HEAD"], {
+			encoding: "utf8",
+		}).trim(),
+		generationMs,
+		engineMs,
+		initial,
+		lateKnowledgeBand: options.lateKnowledgeBand,
+		recruitment: [
+			RECRUITMENT_REPORT.snapshot({
+				engine,
+				lateKnowledgeBand: options.lateKnowledgeBand,
+			}),
+		],
+		snapshots: [initial],
+		rebelLogistics: rebelLogistics.observations,
+		rebellionEvents: engine.events.filter((note) => note.tag === "rebellion"),
+		rebellionAttempts: engine.events.filter(
+			(note) => note.tag === "rebellion evaluated",
+		),
+		armyReconstitutions: engine.events.filter(
+			(note) => note.tag === "army reconstituted",
+		),
+		rebelWarOutcomes: engine.events.filter(
+			(note) =>
+				note.tag === "war ended" &&
+				engine.wars[note.data.war as number].goal !== "conquest",
+		),
+		annualTicks: [] as number[],
+		wallMs: 0,
+		peakMemoryKb: 0,
+	}
+	const persist = () => {
+		if (!options.outPath) return
+		mkdirSync(dirname(options.outPath), { recursive: true })
+		diagnostics.wallMs = performance.now() - started
+		diagnostics.peakMemoryKb = process.resourceUsage().maxRSS
+		diagnostics.rebellionEvents = engine.events.filter(
+			(note) => note.tag === "rebellion",
+		)
+		diagnostics.rebellionAttempts = engine.events.filter(
+			(note) => note.tag === "rebellion evaluated",
+		)
+		diagnostics.armyReconstitutions = engine.events.filter(
+			(note) => note.tag === "army reconstituted",
+		)
+		diagnostics.rebelWarOutcomes = engine.events.filter(
+			(note) =>
+				note.tag === "war ended" &&
+				engine.wars[note.data.war as number].goal !== "conquest",
+		)
+		const content = JSON.stringify({ [seed]: reports, diagnostics }, null, 1)
+		writeFileSync(options.outPath, content)
+		if (diagnostics.recruitment.at(-1)?.year === start + 500)
+			writeFileSync(options.outPath.replace(/\.json$/, "-500.json"), content)
+	}
 	const military = MILITARY_REPORT.attach({
 		engine,
 		probe: MILITARY_REPORT.fiscalProbe,
@@ -362,12 +467,26 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 		peopleMs += performance.now() - t0
 	}
 	for (let year = start + 1; year <= start + options.years; year++) {
+		const tickStart = performance.now()
 		SIM_ENGINE.simulateUntil({
 			state: engine,
 			targetTimeMs: year * STATE.yearMs,
 			rng,
 			validate: false,
 		})
+		MILITARY.validate({ state: engine })
+		rebelLogistics.sample({ source: "annual" })
+		diagnostics.recruitment.push(
+			RECRUITMENT_REPORT.snapshot({
+				engine,
+				lateKnowledgeBand: options.lateKnowledgeBand,
+			}),
+		)
+		diagnostics.annualTicks.push(performance.now() - tickStart)
+		if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
+			diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
+			persist()
+		}
 		trackMarriages({ engine, tracker })
 		MILITARY_REPORT.sample({
 			engine,
@@ -376,7 +495,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 		})
 		for (const p of largest({ engine })) {
 			sampledYears++
-			if (engine.provinceWars[p].length > 0) atWarYears++
+			if (MILITARY.atWar({ state: engine, nation: p })) atWarYears++
 		}
 		if ((year - start) % 100 !== 0 && year !== start + options.years) continue
 		const top = largest({ engine })
@@ -419,6 +538,10 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 			marriage: marriageReport({ engine, from, to: year, tracker }),
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 		})
+		persist()
+		options.log(
+			`seed ${seed} saved through ${year}; ${(diagnostics.wallMs / 1000).toFixed(1)}s`,
+		)
 		from = year
 		startSovereigns = endSovereigns.length
 		atWarYears = 0
@@ -427,6 +550,7 @@ function runSeed({ seed, options }: RunSeedParams): CenturyReport[] {
 	}
 	PEOPLE_EVENTS.runYear = runPeopleYear
 	military.detach()
+	rebelLogistics.detach()
 	const settled = tracker.standing.slice(20, 31)
 	options.log(
 		`seed ${seed} betrothals standing: ${tracker.standing[0]} at start, ${(settled.reduce((sum, count) => sum + count, 0) / Math.max(1, settled.length)).toFixed(1)} mean over years 20-30`,
@@ -470,11 +594,7 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 			)
 		MILITARY_REPORT.log({ reports, log: options.log })
 	}
-	if (options.outPath)
-		writeFileSync(
-			options.outPath,
-			JSON.stringify(Object.fromEntries(results), null, 1),
-		)
+
 	return results
 }
 

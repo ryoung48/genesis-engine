@@ -10,30 +10,34 @@ A **district** is a seat whose parent is its sovereign (a direct report of the c
 
 ## Rebellion threat
 
-The threat compares the rebels' levy with what the crown can still field against them. It uses the cubed force share from [military](military.md#war-starts).
+The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and logistics. The crown's territory excludes the departing district. It uses the cubed force share from [military](military.md#war-starts).
 
 ```text
-share   = crown manpower × district subtree population / realm population
-league  = Σ share of the crown's other districts
-loyalty = 1 for settled realms, else 1 + 0.5 × (1 − treasury fill)
+crownTarget = recruitment targets for the remaining crown territory
+rebelTarget = recruitment targets for the departing district
+league      = sum of independent recruitment targets for other eligible districts
 
-crown   = min(crown force, crown manpower − share)
-rebels  = min(crown logistics cap, (share + 0.25 × league) × 0.9 × loyalty)
-threat  = rebels³ / (crown³ + rebels³)
+crown  = (0.75 * crownTarget.levy + crownTarget.regular) / (1 + existing crown wars)
+estimate = 0.9 * (rebelTarget + 0.25 * league), computed per troop type
+scale = min(1, rebel logistics cap / total estimated soldiers)
+rebels = scale * (0.75 * estimate.levy + estimate.regular)
+threat = rebels^3 / (crown^3 + rebels^3)
 ```
 
-Other districts count at 25% because they may join. A tribal or steppe crown with an empty treasury pays its warriors poorly, so up to 50% more of them follow the rebels.
+Other districts count at 25% because they may join; actual supporters are selected after the threat test. The preview is read-only. Actual release recalculates each army to full independent targets after territorial reassignment, including any supporters that actually join. Neither levies nor regulars transfer from the parent. Existing accrued expenses settle first; army increases and reductions are recorded as recruitment and demobilization. The release explicitly resets earlier depletion, while ordinary recruitment afterward retains the wartime levy restriction. The rule is shared across governments.
+
+Strength-tested candidates emit a `rebellion evaluated` diagnostic note before any release. It records both independent requests/targets, actual limiting constraints, crown enrollment, potential support, existing wars, final estimated strengths, threat, threshold/laxity, seeded/succession context, and acceptance or threshold/random rejection. A roll of `-1` means the existing short-circuit decision consumed no random draw. These notes do not change recruitment or decision rules. Pretender revolts that bypass the strength test are not strength-tested candidates.
 
 ## Triggers
 
 | Trigger | When | Test |
 | --- | --- | --- |
-| Seeded | At simulation start, for up to 1.25% of districts. The realm must not be at war. | Threat > 0.55. An independence war starts already under way. |
+| Seeded | At simulation start, for up to 1.25% of districts. The realm must not be at war. | Threat > 0.45. An independence war starts already under way. |
 | District's own war event | Every 8–16 years. The realm must not be at war. | Threat test, laxity 0.1 under a weak crown. An adult holder with enough backing may seek the throne; otherwise the district seeks independence. |
 | Weak crown | After every succession with no pretender, and after a lord protector usurps. Districts are tried in random order, and at most one breaks away. | Threat test, laxity 0.05 per missing claim point below 3, plus 0.1 under a weak crown. An adult holder with enough backing may seek the throne. |
 | Pretender | A disputed succession, a lost election or a restoration attempt ([people](people.md#succession), [restoration](people.md#restoration)). | District backing (below). No threat test. The seat must still be a direct district of the realm. A throne war always starts. |
 
-**Threat test.** The district breaks away when `threat > 0.55 − laxity`, and then only with chance equal to the threat.
+**Threat test.** The district breaks away when `threat > 0.45 − laxity`, and then only with chance equal to the threat.
 
 A **weak crown** is a realm under a regent, or whose ruler is in Poor or Grave health ([people](people.md#regencies)).
 
@@ -46,13 +50,13 @@ District holders can favor a claimant, while foreign realms can fight beside the
   - one tied to their house by marriage; otherwise
   - the stronger candidate. Strength is the candidate's district's share of the vote weight, plus 0.2 if they are aged 25–60. The incumbent counts no district weight.
 
-  With at least 40% backing, a pretender revolts with chance equal to that share. The claimant's own district, or failing that, their largest backer's, leads the rebellion. Every district that voted for the claimant joins that rebel realm with its land and share of the crown's manpower and treasury. A losing election candidate needs a district of their own and 40% of the vote. For a threat-based rebellion, an adult holder with at least 95% backing seeks the throne with 5% chance; the holder's district leads and their district backers join them.
+  With at least 40% backing, a pretender revolts with chance equal to that share. The claimant's own district, or failing that, their largest backer's, leads the rebellion. Every district that voted for the claimant joins that rebel realm with its land and share of the crown's enrolled troops and treasury. A losing election candidate needs a district of their own and 40% of the vote. For a threat-based rebellion, an adult holder with at least 95% backing seeks the throne with 5% chance; the holder's district leads and their district backers join them.
 - **Sibling districts in the threat.** The crown's other districts add 25% of their levy to the rebels' side of the threat formula. This estimate applies before a vote or breakaway; in a throne war, districts that actually back the claimant join the rebellion.
 - **Foreign backers.** At the start of either rebel war, sovereign enemies of the crown or its direct diplomatic overlord may join the rebels. Rival dispositions and active wars make enemies. A disloyal overlord may back a throne claimant against its vassal, and a Rival vassal may back rebels against its overlord. A candidate needs a nonnegative treasury, must not be exhausted, in truce with the realm it opposes, at war with the rebels, or protected by a formal tie to the crown (apart from those two disloyal subject cases). Candidates roll in random order: the first has a 50% chance, and every successful backer halves the chance for the next. Backers join the rebel coalition through mobilization and battles, subject to exhaustion and debt checks. If the rebels remain sovereign, backers are repaid largest first: a realm under half the backer's revenue may become its vassal; otherwise they form an alliance when allowed, or become Trusted. A successful throne claimant owes this debt as the crown's new ruler. Crushed rebels owe nothing.
 
 ## Breakaway
 
-- **Resources.** The rebel realm takes the crown's manpower and positive treasury in proportion to its population, including every supporting district in a throne war.
+- **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
 - **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
 - **Cut-off land.** Crown provinces left without a connection to their parent are released as well. They are recorded as `province released` and shown as a "disconnected" revolt.
 

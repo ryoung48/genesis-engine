@@ -75,8 +75,13 @@ export interface TitleFrame {
 export interface NationEconomy {
 	treasury: number
 	revenue: number
-	manpower: number
-	maxManpower: number
+	levy: number
+	regular: number
+	deployed: number
+	deployedLevy: number
+	deployedRegular: number
+	deployedLevyPercent: number
+	deployedRegularPercent: number
 	army: number
 	deployments: CensusDeployment[]
 	budget: TreasuryBudget | null

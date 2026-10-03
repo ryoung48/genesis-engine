@@ -1,11 +1,11 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
-import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
-import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
 import { FIELDS, RELATION_CODE } from "@/model/history/sim/engine/fields"
-import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
+import { DEPLOYMENTS } from "@/model/history/sim/engine/military/deployments"
+import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
+import { ARMY_STRENGTH } from "@/model/history/sim/engine/military/strength"
 import type {
 	ApplyLossesParams,
 	BattleDeployments,
@@ -14,51 +14,28 @@ import type {
 	Coalition,
 	CoalitionMember,
 	CoalitionParams,
-	CostPerManYearParams,
-	DeploymentAssignment,
 	DeploymentsOfParams,
 	FightParams,
 	ForceShareParams,
 	LeadRelationsParams,
-	LogCoalitionParams,
 	LossShareParams,
 	MemberDeploymentsParams,
 	MemberRolesParams,
 	MobilizeParams,
+	MutationParams,
 	NationParams,
 	PlunderParams,
+	ProvinceMutationParams,
 	RaidParams,
 	RaidResult,
+	RebellionPreview,
 	RebellionThreatParams,
 	RecordArmiesParams,
 	SideMembersParams,
 	ThreatParams,
-	WarAlliesParams,
 } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { MATH } from "@/model/shared/math/core"
-
-const PEACE_COST_GRAMS = 400
-
-const WAR_COST_GRAMS = 1250
-
-const REFERENCE_OUTPUT_GRAMS = 450
-
-const COST_OUTPUT_EXPONENT = 0.5
-
-// Tribal and steppe warriors bring lighter kit and serve for shares of the
-// spoils more than for continuous pay.
-const TRADITION_COST_SHARE: Record<ArmyTradition, number> = {
-	settled: 0.5,
-	tribal: 0.05,
-	steppe: 0.05,
-}
-
-const PEACE_ARMY_BUDGET_SHARE = 0.75
-
-const DEPLOYMENT_RECOVERY_PER_YEAR = 0.75
-
-const MINIMUM_DEPLOYMENT_SHARE = 0.2
 
 const DEFENDER_BONUS = 1.2
 
@@ -92,25 +69,11 @@ const PURSUIT_MIN = 0.05
 
 const PURSUIT_MAX = 0.2
 
-const EXHAUSTION_MANPOWER: Record<ArmyTradition, number> = {
-	settled: 0.25,
-	tribal: 0.8,
-	steppe: 0.8,
-}
-
-const EXHAUSTION_DEBT_YEARS = 0.5
-
 const MIN_FORCE = 1
 
 const SUBJECT_LEVY_SHARE = 0.9
 
 const LEAGUE_SHARE = 0.25
-
-const BASE_MUSTER = 0.1
-
-const GIFT_BONUS = 0.2
-
-const DISLOYALTY = 0.5
 
 const PLUNDER_OUTPUT_SHARE = 0.03
 
@@ -122,36 +85,8 @@ const RAID_PARTY_SHARE = 0.25
 
 const RESPONSE_SHARE = 0.15
 
-const CROWN_LOOT_SHARE: Record<ArmyTradition, number> = {
-	settled: 1 / 3,
-	tribal: 1,
-	steppe: 1,
-}
-
 function realmKnowledge({ state, nation }: NationParams): number {
 	return ECONOMY.realmKnowledge({ state, p: nation })
-}
-
-function costPerManYear({
-	state,
-	nation,
-	grams,
-}: CostPerManYearParams): number {
-	return (
-		grams *
-		TRADITION_COST_SHARE[ECONOMY.armyTradition({ state, p: nation })] *
-		(ECONOMY.outputPerHead({ state, p: nation }) / REFERENCE_OUTPUT_GRAMS) **
-			COST_OUTPUT_EXPONENT *
-		ECONOMY.ducatsPerGram
-	)
-}
-
-function peaceCost({ state, nation }: NationParams): number {
-	return costPerManYear({ state, nation, grams: PEACE_COST_GRAMS })
-}
-
-function warCost({ state, nation }: NationParams): number {
-	return costPerManYear({ state, nation, grams: WAR_COST_GRAMS })
 }
 
 function logistics({ state, nation }: NationParams): number {
@@ -161,124 +96,30 @@ function logistics({ state, nation }: NationParams): number {
 }
 
 function armySize({ state, nation }: NationParams): number {
-	const manpower = Math.max(0, FIELDS.prov.manpower.get({ state, p: nation }))
-	const price = peaceCost({ state, nation })
-	const affordable =
-		price > 0
-			? (PEACE_ARMY_BUDGET_SHARE *
-					Math.max(0, ECONOMY.surplus({ state, p: nation }))) /
-				price
-			: 0
-	const size = Math.min(logistics({ state, nation }), manpower, affordable)
-	if (ECONOMY.armyTradition({ state, p: nation }) === "settled") return size
-	return Math.min(
-		size,
-		manpower *
-			(BASE_MUSTER + GIFT_BONUS * ECONOMY.treasuryFill({ state, p: nation })),
-	)
+	return DEPLOYMENTS.available({ state, nation })
 }
 
-function force({ state, nation }: NationParams): number {
-	return (
-		armySize({ state, nation }) /
-		(1 + DERIVE.provinceWars({ state, p: nation }).length)
-	)
+function previewMember({ state, nation }: NationParams): CoalitionMember {
+	const divisor = 1 + DERIVE.provinceWars({ state, p: nation }).length
+	const troops = {
+		levy: state.levyCurrent[nation] / divisor,
+		regular: state.regularCurrent[nation] / divisor,
+	}
+	return { nation, ...troops, force: ARMY_STRENGTH.of(troops) }
 }
 
 // Allies and vassals fighting beside a war's lead are at war too.
 function atWar({ state, nation }: NationParams): boolean {
-	return (
-		DERIVE.provinceWars({ state, p: nation }).length > 0 ||
-		deploymentAssignments({ state, nation }).length > 0
-	)
+	return DEPLOYMENTS.assignments({ state, nation }).length > 0
 }
 
-function upkeep({ state, nation }: NationParams): number {
-	return (
-		armySize({ state, nation }) *
-		(atWar({ state, nation })
-			? warCost({ state, nation })
-			: peaceCost({ state, nation }))
-	)
+function upkeep(params: NationParams): number {
+	const expense = RECRUITMENT.upkeep(params)
+	return expense.levy + expense.regular
 }
 
-// An exhausted realm makes a separate peace: it neither joins nor stays in
-// its partners' wars.
-function warAllies({ war, ...params }: WarAlliesParams): number[] {
-	const ordinary = STATE.getWarAllies(params)
-	const { rebels } = war ? STATE.warSides({ war }) : { rebels: -1 }
-	const candidates =
-		params.nation === rebels && war
-			? [...new Set([...ordinary, ...war.backers])]
-			: ordinary
-	return candidates.filter((ally) => {
-		if (!STATE.isSovereign({ state: params.state, p: ally })) return false
-		if (war?.backers.includes(ally) && params.nation !== rebels) return false
-		if (war && !war.backers.includes(ally)) {
-			const tie = STATE.getRelation({
-				state: params.state,
-				a: params.nation,
-				b: ally,
-			})
-			const disposition = STATE.getDisposition({
-				state: params.state,
-				a: params.nation,
-				b: ally,
-			})
-			const answers =
-				tie === STATE.rel.ALLY
-					? disposition !== STATE.disp.RIVAL &&
-						disposition !== STATE.disp.SUSPICIOUS
-					: tie !== STATE.rel.VASSAL ||
-						VASSALAGE.answers({
-							state: params.state,
-							overlord: params.nation,
-							vassal: ally,
-							attacking: params.type === "offensive",
-						})
-			if (!answers) {
-				if (!war.refusedCalls.has(ally)) {
-					war.refusedCalls.add(ally)
-					params.state.events.push({
-						tag: "call refused",
-						time: params.state.time,
-						data: { war: war.idx, nation: ally, leader: params.nation },
-					})
-				}
-				return false
-			}
-		}
-		return (
-			!exhausted({ state: params.state, nation: ally }) &&
-			(war?.allies.has(ally) ||
-				FIELDS.prov.treasury.get({ state: params.state, p: ally }) >= 0)
-		)
-	})
-}
-
-function logCoalition({ state, war }: LogCoalitionParams): void {
-	const attackers = warAllies({
-		state,
-		war,
-		nation: war.attacker,
-		type: "offensive",
-		target: war.defender,
-	})
-	const defenders = warAllies({
-		state,
-		war,
-		nation: war.defender,
-		type: "defensive",
-		target: war.attacker,
-	})
-	war.allies = new Set([...attackers, ...defenders])
-	JOURNAL.coalition({
-		state,
-		warId: war.idx,
-		goal: war.goal,
-		attackers: [war.attacker, ...attackers],
-		defenders: [war.defender, ...defenders],
-	})
+function logCoalition({ state }: RecordArmiesParams): void {
+	reconcile({ state })
 }
 
 function sideMembers({
@@ -288,18 +129,23 @@ function sideMembers({
 	target,
 }: SideMembersParams): CoalitionMember[] {
 	const members = [
-		{ nation, force: force({ state, nation }) },
-		...warAllies({ state, war: null, nation, type, target }).map((ally) => ({
-			nation: ally,
-			force: force({ state, nation: ally }),
-		})),
+		previewMember({ state, nation }),
+		...DEPLOYMENTS.previewSide({
+			state,
+			war: null,
+			leader: nation,
+			side: type === "offensive" ? "attacker" : "defender",
+			target,
+		}).map((ally) => previewMember({ state, nation: ally })),
 	]
-	const total = totalForce(members)
+	const total = totalTroops(members)
 	const cap = logistics({ state, nation })
 	if (total <= cap) return members
 	return members.map((member) => ({
 		...member,
 		force: (member.force * cap) / total,
+		levy: (member.levy * cap) / total,
+		regular: (member.regular * cap) / total,
 	}))
 }
 
@@ -335,137 +181,96 @@ function threat({ state, attacker, defender }: ThreatParams): number {
 	})
 }
 
-function rebellionThreat({
+function rebellionPreview({
 	state,
 	overlord,
 	subject,
-}: RebellionThreatParams): number {
-	const share = ECONOMY.subtreeManpower({ state, p: subject })
-	let league = 0
+}: RebellionThreatParams): RebellionPreview {
+	const rebelProvinces = STATE.getNationProvinces({ state, root: subject })
+	const excluded = new Set(rebelProvinces)
+	const crownProvinces = STATE.getNationProvinces({
+		state,
+		root: overlord,
+	}).filter((p) => !excluded.has(p))
+	const rebel = RECRUITMENT.territoryTargets({
+		state,
+		nation: subject,
+		provinces: rebelProvinces,
+	})
+	const crown = RECRUITMENT.territoryTargets({
+		state,
+		nation: overlord,
+		provinces: crownProvinces,
+	})
+	const league = { levy: 0, regular: 0 }
 	for (const vassal of STATE.getChildren({ state, p: overlord }))
 		if (
 			vassal !== subject &&
 			state.seatRank[vassal] > 0 &&
 			state.people.rulerOf[vassal] >= 0
-		)
-			league += ECONOMY.subtreeManpower({ state, p: vassal })
-	const loyalty =
-		ECONOMY.armyTradition({ state, p: overlord }) === "settled"
-			? 1
-			: 1 + DISLOYALTY * (1 - ECONOMY.treasuryFill({ state, p: overlord }))
-	return forceShare({
-		a: Math.max(
-			MIN_FORCE,
-			Math.min(
-				force({ state, nation: overlord }),
-				FIELDS.prov.manpower.get({ state, p: overlord }) - share,
-			),
-		),
-		b: Math.max(
-			MIN_FORCE,
-			Math.min(
-				logistics({ state, nation: overlord }),
-				(share + LEAGUE_SHARE * league) * SUBJECT_LEVY_SHARE * loyalty,
-			),
-		),
-		k: BATTLE_EXPONENT,
-	})
-}
-
-function deploymentAssignments({
-	state,
-	nation,
-}: NationParams): DeploymentAssignment[] {
-	const assignments: DeploymentAssignment[] = []
-	for (const idx of state.activeWarIds) {
-		const war = state.wars[idx]
-		if (war.attacker === nation) {
-			assignments.push({ war, opponent: war.defender })
-		} else if (war.defender === nation) {
-			assignments.push({ war, opponent: war.attacker })
-		} else if (
-			warAllies({
-				state,
-				war,
-				nation: war.attacker,
-				type: "offensive",
-				target: war.defender,
-			}).includes(nation)
 		) {
-			assignments.push({ war, opponent: war.defender })
-		} else if (
-			warAllies({
-				state,
-				war,
-				nation: war.defender,
-				type: "defensive",
-				target: war.attacker,
-			}).includes(nation)
-		) {
-			assignments.push({ war, opponent: war.attacker })
+			const potential = RECRUITMENT.realmTargets({ state, nation: vassal })
+			league.levy += potential.levy
+			league.regular += potential.regular
 		}
+	const existingWars = DERIVE.provinceWars({ state, p: overlord }).length
+	const crownStrength = Math.max(
+		MIN_FORCE,
+		ARMY_STRENGTH.of(crown) / (1 + existingWars),
+	)
+	const rebelEstimate = {
+		levy: (rebel.levy + LEAGUE_SHARE * league.levy) * SUBJECT_LEVY_SHARE,
+		regular:
+			(rebel.regular + LEAGUE_SHARE * league.regular) * SUBJECT_LEVY_SHARE,
 	}
-	return assignments
+	const rebelCount = rebelEstimate.levy + rebelEstimate.regular
+	const rebelStrength = Math.max(
+		MIN_FORCE,
+		ARMY_STRENGTH.of(rebelEstimate) *
+			(rebelCount > 0 ? Math.min(1, rebel.logistics / rebelCount) : 1),
+	)
+	return {
+		crown,
+		rebel,
+		league,
+		existingWars,
+		crownStrength,
+		rebelStrength,
+		threat: forceShare({
+			a: crownStrength,
+			b: rebelStrength,
+			k: BATTLE_EXPONENT,
+		}),
+	}
 }
 
-function rebalanceDeployments({
-	state,
-	nation,
-}: NationParams): Map<number, number> {
-	const assigned = new Map<number, number>()
-	const assignments = deploymentAssignments({ state, nation })
-	if (assignments.length === 0) return assigned
-	const capacity = armySize({ state, nation })
-	const deployed = assignments.reduce(
-		(sum, assignment) => sum + (assignment.war.deployed[nation] ?? 0),
-		0,
-	)
-	const initialized = assignments.some(
-		(assignment) => assignment.war.deployed[nation] !== undefined,
-	)
-	const years = Math.max(
-		0,
-		(state.time - state.deploymentUpdateTime[nation]) / STATE.yearMs,
-	)
-	const recovery = Math.min(1, DEPLOYMENT_RECOVERY_PER_YEAR * years)
-	const budget = initialized
-		? Math.min(capacity, deployed + Math.max(0, capacity - deployed) * recovery)
-		: capacity
-	const weights = assignments.map((assignment) =>
-		Math.max(MIN_FORCE, armySize({ state, nation: assignment.opponent })),
-	)
-	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
-	for (let i = 0; i < assignments.length; i++) {
-		const share =
-			MINIMUM_DEPLOYMENT_SHARE / assignments.length +
-			((1 - MINIMUM_DEPLOYMENT_SHARE) * weights[i]) / totalWeight
-		assignments[i].war.deployed[nation] = budget * share
-		assigned.set(assignments[i].war.idx, capacity * share)
-	}
-	state.deploymentUpdateTime[nation] = state.time
-	return assigned
+function rebellionThreat(params: RebellionThreatParams): number {
+	return rebellionPreview(params).threat
 }
 
 function coalition({ state, war, side }: CoalitionParams): Coalition {
 	const nation = side === "attacker" ? war.attacker : war.defender
-	const target = side === "attacker" ? war.defender : war.attacker
-	const allies = warAllies({
-		state,
-		war,
-		nation,
-		type: side === "attacker" ? "offensive" : "defensive",
-		target,
-	})
-	let assigned = 0
-	const members = [nation, ...allies].map((participant) => {
-		assigned +=
-			rebalanceDeployments({ state, nation: participant }).get(war.idx) ?? 0
-		return { nation: participant, force: war.deployed[participant] ?? 0 }
-	})
-	const deployed = totalForce(members)
+	let intended = 0
+	const members = DEPLOYMENTS.sideMembers({ state, war, side }).map(
+		(participant) => {
+			const troops = war.deployed[participant] ?? { levy: 0, regular: 0 }
+			const reference = state.militaryIntervals.get(participant)?.reference
+			intended += reference
+				? (reference.levy + reference.regular) *
+					(war.allocation[participant] ?? 0)
+				: 0
+			return {
+				nation: participant,
+				force: ARMY_STRENGTH.of(troops),
+				levy: troops.levy,
+				regular: troops.regular,
+			}
+		},
+	)
+	const deployed = totalTroops(members)
 	const shortfall =
-		assigned > 0
-			? MATH.clamp({ value: 1 - deployed / assigned, lo: 0, hi: 1 })
+		intended > 0
+			? MATH.clamp({ value: 1 - deployed / intended, lo: 0, hi: 1 })
 			: 0
 	const cap = logistics({ state, nation })
 	if (deployed <= cap) return { members, shortfall }
@@ -473,6 +278,8 @@ function coalition({ state, war, side }: CoalitionParams): Coalition {
 		members: members.map((member) => ({
 			...member,
 			force: (member.force * cap) / deployed,
+			levy: (member.levy * cap) / deployed,
+			regular: (member.regular * cap) / deployed,
 		})),
 		shortfall,
 	}
@@ -490,39 +297,53 @@ function totalForce(members: CoalitionMember[]): number {
 	return members.reduce((sum, member) => sum + member.force, 0)
 }
 
-function applyLosses({
-	state,
-	members,
-	losses,
-}: ApplyLossesParams): Map<number, number> {
-	const byNation = new Map<number, number>()
-	const total = totalForce(members)
-	if (total <= 0 || losses <= 0) return byNation
-	for (const { nation, force: committed } of members) {
-		const share = (losses * committed) / total
-		byNation.set(nation, share)
-		FIELDS.prov.manpower.set({
-			state,
-			p: nation,
-			value: Math.max(
-				0,
-				FIELDS.prov.manpower.get({ state, p: nation }) - share,
-			),
-		})
+function totalTroops(members: CoalitionMember[]): number {
+	return members.reduce((sum, member) => sum + member.levy + member.regular, 0)
+}
+
+function applyLosses({ state, members, losses, war }: ApplyLossesParams): void {
+	const total = totalTroops(members)
+	if (total <= 0 || losses <= 0) return
+	for (const { nation, levy, regular } of members) {
+		const committed = levy + regular
+		RECRUITMENT.advance({ state, nation })
+		const troops = war?.deployed[nation] ?? {
+			levy: state.levyCurrent[nation],
+			regular: state.regularCurrent[nation],
+		}
+		const enrolled = troops.levy + troops.regular
+		const share = Math.min(enrolled, (losses * committed) / total)
+		if (share <= 0 || enrolled <= 0) continue
+		const interval = state.militaryIntervals.get(nation)
+		for (const type of ["levy", "regular"] as const) {
+			const column = type === "levy" ? state.levyCurrent : state.regularCurrent
+			const loss = Math.min(column[nation], (share * troops[type]) / enrolled)
+			column[nation] -= loss
+			state.militaryTotals.casualties[type] += loss
+			if (interval) interval.casualties[type] += loss
+			if (war?.deployed[nation])
+				war.deployed[nation][type] = Math.max(
+					0,
+					war.deployed[nation][type] - loss,
+				)
+		}
+		state.militaryDirty.add(nation)
+		state.militaryAllocationDirty.add(nation)
+		state.militaryStrengthDirty.add(nation)
 		const provinces = STATE.getNationProvinces({ state, root: nation })
-		let rural = 0
-		for (const p of provinces)
-			rural += FIELDS.prov.population.rural.get({ state, p })
+		const rural = provinces.reduce(
+			(sum, p) => sum + state.popRuralCurrent[p],
+			0,
+		)
 		if (rural <= 0) continue
 		const scale = Math.max(0, 1 - share / rural)
 		for (const p of provinces)
 			FIELDS.prov.population.rural.set({
 				state,
 				p,
-				value: FIELDS.prov.population.rural.get({ state, p }) * scale,
+				value: state.popRuralCurrent[p] * scale,
 			})
 	}
-	return byNation
 }
 
 function battleOutcome(margin: number): BattleOutcome {
@@ -534,14 +355,17 @@ function memberDeployments({
 	war,
 	members,
 }: MemberDeploymentsParams): CoalitionMember[] {
-	return members.map((member) => ({
-		nation: member.nation,
-		force: war.deployed[member.nation] ?? 0,
-	}))
+	return members.map((member) => {
+		const troops = war.deployed[member.nation] ?? { levy: 0, regular: 0 }
+		return {
+			nation: member.nation,
+			force: ARMY_STRENGTH.of(troops),
+			levy: troops.levy,
+			regular: troops.regular,
+		}
+	})
 }
 
-// Each member's relation from its coalition's lead (the first member), or -1
-// for the lead itself.
 function leadRelations({ state, coalitions }: LeadRelationsParams): number[] {
 	return coalitions.flatMap(({ members }) =>
 		members.map((member) =>
@@ -578,8 +402,8 @@ function deploymentsOf({
 	const attacking = memberDeployments({ war, members: attackers.members })
 	const defending = memberDeployments({ war, members: defenders.members })
 	return {
-		attackerDeployed: totalForce(attacking),
-		defenderDeployed: totalForce(defending),
+		attackerDeployed: totalTroops(attacking),
+		defenderDeployed: totalTroops(defending),
 		deployments: [...attacking, ...defending],
 		relations: leadRelations({ state, coalitions: [attackers, defenders] }),
 		roles: memberRoles({ war, coalitions: [attackers, defenders] }),
@@ -593,7 +417,7 @@ function recordArmies({ state }: RecordArmiesParams): void {
 }
 
 function mobilize({ state, war }: MobilizeParams): void {
-	logCoalition({ state, war })
+	logCoalition({ state })
 	const coalitions = [
 		coalition({ state, war, side: "attacker" }),
 		coalition({ state, war, side: "defender" }),
@@ -605,7 +429,9 @@ function mobilize({ state, war }: MobilizeParams): void {
 		data: {
 			war: war.idx,
 			deployedNations: members.map((member) => member.nation),
-			deployedTroops: members.map((member) => Math.round(member.force)),
+			deployedTroops: members.map((member) => member.levy + member.regular),
+			deployedLevies: members.map((member) => member.levy),
+			deployedRegulars: members.map((member) => member.regular),
 			deployedRelations: leadRelations({ state, coalitions }),
 			deployedRoles: memberRoles({ war, coalitions }),
 		},
@@ -626,8 +452,10 @@ function fight({
 		war,
 		side: attackerSide === "attacker" ? "defender" : "attacker",
 	})
-	const attackerArmy = totalForce(attackers.members)
-	const defenderArmy = totalForce(defenders.members)
+	const attackerArmy = totalTroops(attackers.members)
+	const defenderArmy = totalTroops(defenders.members)
+	const attackerForce = totalForce(attackers.members)
+	const defenderForce = totalForce(defenders.members)
 	if (attackerArmy <= 0 || defenderArmy <= 0) {
 		const outcome =
 			attackerArmy <= 0 && defenderArmy <= 0 ? "empty" : "uncontested"
@@ -646,14 +474,14 @@ function fight({
 			loserShortfall: 0,
 		}
 	}
-	const defended = defenderArmy * defense
+	const defended = defenderForce * defense
 	const u = MATH.clamp({
 		value: rng.random(),
 		lo: ROLL_EPSILON,
 		hi: 1 - ROLL_EPSILON,
 	})
 	const roll =
-		Math.log(attackerArmy / defended) + Math.log(u / (1 - u)) / BATTLE_EXPONENT
+		Math.log(attackerForce / defended) + Math.log(u / (1 - u)) / BATTLE_EXPONENT
 	const attackerWon = roll > 0
 	const balance = 1 / (1 + Math.exp(-roll))
 	const margin = Math.abs(roll)
@@ -676,25 +504,25 @@ function fight({
 		: 0
 	const attackerLosses = attackerCasualties + (attackerWon ? 0 : pursuit)
 	const defenderLosses = defenderCasualties + (attackerWon ? pursuit : 0)
-	for (const [nation, losses] of applyLosses({
+	applyLosses({
 		state,
+		war,
 		members: attackers.members,
 		losses: attackerLosses,
-	}))
-		war.deployed[nation] = Math.max(0, (war.deployed[nation] ?? 0) - losses)
-	for (const [nation, losses] of applyLosses({
+	})
+	applyLosses({
 		state,
+		war,
 		members: defenders.members,
 		losses: defenderLosses,
-	}))
-		war.deployed[nation] = Math.max(0, (war.deployed[nation] ?? 0) - losses)
+	})
 	const initialOutcome = battleOutcome(margin)
 	return {
 		outcome: routed ? "rout" : initialOutcome,
 		initialOutcome,
 		attackerWon,
 		preBattleWinProbability:
-			1 - forceShare({ a: attackerArmy, b: defended, k: BATTLE_EXPONENT }),
+			1 - forceShare({ a: attackerForce, b: defended, k: BATTLE_EXPONENT }),
 		powerShare: balance,
 		attackerArmy,
 		defenderArmy,
@@ -733,9 +561,7 @@ function plunder({
 	const loserBudget = TREASURY_BUDGET.get({ state, p: loser })
 	loserBudget.plunder -= treasuryLoot
 	loserBudget.otherChangesTotal -= treasuryLoot
-	const crownLoot =
-		(outputLoot + treasuryLoot) *
-		CROWN_LOOT_SHARE[ECONOMY.armyTradition({ state, p: raider })]
+	const crownLoot = (outputLoot + treasuryLoot) * (1 / 3)
 	FIELDS.prov.treasury.set({
 		state,
 		p: raider,
@@ -755,9 +581,26 @@ function raid({
 	rng,
 }: RaidParams): RaidResult {
 	const raiderParty = armySize({ state, nation: raider }) * RAID_PARTY_SHARE
-	const response = force({ state, nation: victim }) * RESPONSE_SHARE
-	const attack = Math.max(MIN_FORCE, raiderParty)
-	const defense = Math.max(MIN_FORCE, response * DEFENDER_BONUS)
+	const raiding = {
+		nation: raider,
+		levy: state.levyCurrent[raider] * RAID_PARTY_SHARE,
+		regular: state.regularCurrent[raider] * RAID_PARTY_SHARE,
+		force:
+			ARMY_STRENGTH.of({
+				levy: state.levyCurrent[raider],
+				regular: state.regularCurrent[raider],
+			}) * RAID_PARTY_SHARE,
+	}
+	const victimPreview = previewMember({ state, nation: victim })
+	const responding = {
+		nation: victim,
+		levy: victimPreview.levy * RESPONSE_SHARE,
+		regular: victimPreview.regular * RESPONSE_SHARE,
+		force: victimPreview.force * RESPONSE_SHARE,
+	}
+	const response = responding.levy + responding.regular
+	const attack = Math.max(MIN_FORCE, raiding.force)
+	const defense = Math.max(MIN_FORCE, responding.force * DEFENDER_BONUS)
 	const success =
 		rng.random() < 1 - forceShare({ a: attack, b: defense, k: RAID_EXPONENT })
 	const ratio = success ? attack / defense : defense / attack
@@ -767,13 +610,15 @@ function raid({
 	const victimLosses = response * (success ? loserShare : winnerShare)
 	applyLosses({
 		state,
-		members: [{ nation: raider, force: raiderParty }],
+		members: [raiding],
 		losses: raiderLosses,
+		war: null,
 	})
 	applyLosses({
 		state,
-		members: [{ nation: victim, force: response }],
+		members: [responding],
 		losses: victimLosses,
+		war: null,
 	})
 	return {
 		success,
@@ -787,32 +632,167 @@ function raid({
 	}
 }
 
-function exhausted({ state, nation }: NationParams): boolean {
-	const tradition = ECONOMY.armyTradition({ state, p: nation })
+function exhausted(params: NationParams): boolean {
+	return DEPLOYMENTS.exhausted(params)
+}
+
+function initialize({ state }: RecordArmiesParams): void {
+	RECRUITMENT.initialize({ state })
+	state.militaryReady = true
+}
+
+function advance(params: NationParams): void {
+	RECRUITMENT.advance(params)
+}
+
+function beforeMutation({ state, nation }: NationParams): void {
+	if (!state.militaryReady) return
+	RECRUITMENT.advance({ state, nation })
+	state.militaryDirty.add(nation)
+}
+
+function beforeProvinceMutation({ state, p }: ProvinceMutationParams): void {
+	if (!state.militaryReady) return
+	const nation =
+		state.militaryDepth > 0
+			? state.sovereignCurrent[p]
+			: STATE.getSovereign({ state, p })
+	if (nation >= 0) beforeMutation({ state, nation })
+	let current = p
+	while (current >= 0) {
+		state.realmCache.delete(current)
+		current = state.parentCurrent[current]
+	}
+}
+
+function afterMutation({ state }: RecordArmiesParams): void {
+	if (state.militaryDepth === 0) reconcile({ state })
+}
+
+function reconcile({ state }: RecordArmiesParams): void {
+	if (!state.militaryReady) return
 	if (
-		FIELDS.prov.manpower.get({ state, p: nation }) <
-		EXHAUSTION_MANPOWER[tradition] * ECONOMY.maxManpower({ state, p: nation })
+		state.militaryReconcileTime === state.time &&
+		!state.militaryDiplomacyDirty &&
+		state.militaryDirty.size === 0 &&
+		state.militaryAllocationDirty.size === 0
 	)
-		return true
-	return (
-		tradition === "settled" &&
-		FIELDS.prov.treasury.get({ state, p: nation }) <
-			-EXHAUSTION_DEBT_YEARS *
-				Math.max(0, ECONOMY.surplus({ state, p: nation }))
-	)
+		return
+	const affected = DEPLOYMENTS.affected({ state })
+	for (const nation of state.militaryDirty) affected.add(nation)
+	for (const nation of affected) RECRUITMENT.advance({ state, nation })
+	const dirty = new Set(state.militaryDirty)
+	for (const nation of dirty)
+		if (STATE.isSovereign({ state, p: nation }))
+			RECRUITMENT.refresh({ state, nation })
+	const changed = DEPLOYMENTS.reconcileParticipation({ state })
+	const allocation = new Set([...changed, ...state.militaryAllocationDirty])
+	const rebalance = new Set(allocation)
+	for (const idx of state.activeWarIds) {
+		const war = state.wars[idx]
+		for (const side of ["attacker", "defender"] as const) {
+			const opponent = side === "attacker" ? war.defender : war.attacker
+			if (state.militaryStrengthDirty.has(opponent))
+				for (const nation of DEPLOYMENTS.sideMembers({ state, war, side }))
+					rebalance.add(nation)
+		}
+	}
+	for (const nation of rebalance) DEPLOYMENTS.rebalance({ state, nation })
+	for (const nation of new Set([...dirty, ...rebalance]))
+		if (STATE.isSovereign({ state, p: nation }))
+			RECRUITMENT.refresh({ state, nation })
+	state.militaryAllocationDirty.clear()
+	state.militaryStrengthDirty.clear()
+	state.militaryDirty.clear()
+	state.militaryDiplomacyDirty = false
+	state.militaryReconcileTime = state.time
+}
+
+function mutate<T>({ state, action }: MutationParams<T>): T {
+	if (!state.militaryReady) return action()
+	const outer = state.militaryDepth === 0
+	if (outer) reconcile({ state })
+	state.militaryDepth++
+	try {
+		return action()
+	} finally {
+		state.militaryDepth--
+		if (outer) reconcile({ state })
+	}
+}
+
+function validate({ state }: RecordArmiesParams): void {
+	for (const [nation, interval] of state.militaryIntervals) {
+		const holdings = {
+			levy: state.levyCurrent[nation],
+			regular: state.regularCurrent[nation],
+		}
+		const assigned = DEPLOYMENTS.assignments({ state, nation })
+		for (const type of ["levy", "regular"] as const) {
+			for (const { war } of assigned) {
+				const troops = war.deployed[nation]
+				if (troops && (!Number.isFinite(troops[type]) || troops[type] < 0))
+					throw new Error("Invalid " + type + " commitment in realm " + nation)
+			}
+			const committed = assigned.reduce(
+				(sum, { war }) => sum + (war.deployed[nation]?.[type] ?? 0),
+				0,
+			)
+			if (
+				!Number.isFinite(holdings[type]) ||
+				holdings[type] < 0 ||
+				!Number.isFinite(interval.pending[type]) ||
+				interval.pending[type] < 0 ||
+				committed > holdings[type] + Math.max(1, holdings[type]) * 1e-9
+			)
+				throw new Error(
+					"Invalid " +
+						type +
+						" holdings/expense/commitments in realm " +
+						nation,
+				)
+		}
+		if (STATE.isSovereign({ state, p: nation })) {
+			const targets = RECRUITMENT.realmTargets({ state, nation })
+			if (
+				holdings.levy + holdings.regular >
+				targets.safety + Math.max(1, targets.safety) * 1e-9
+			)
+				throw new Error("Population safety ceiling exceeded in realm " + nation)
+			if (
+				holdings.levy + holdings.regular >
+				targets.logistics + Math.max(1, targets.logistics) * 1e-9
+			)
+				throw new Error("Army logistics ceiling exceeded in realm " + nation)
+		}
+	}
 }
 
 export const MILITARY = {
+	initialize,
+	advance,
+	reconcile,
+	mutate,
+	beforeMutation,
+	beforeProvinceMutation,
+	afterMutation,
+	validate,
 	armySize,
 	atWar,
 	upkeep,
-	plunder,
-	raid,
+	plunder: (params: PlunderParams) =>
+		mutate({ state: params.state, action: () => plunder(params) }),
+	raid: (params: RaidParams) =>
+		mutate({ state: params.state, action: () => raid(params) }),
 	threat,
 	rebellionThreat,
+	rebellionPreview,
 	mobilize,
 	logCoalition,
 	recordArmies,
-	fight,
+	fight: (params: FightParams) =>
+		mutate({ state: params.state, action: () => fight(params) }),
 	exhausted,
+	applyLosses: (params: ApplyLossesParams) =>
+		mutate({ state: params.state, action: () => applyLosses(params) }),
 }

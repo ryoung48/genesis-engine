@@ -7,6 +7,7 @@ export interface HistoryReportOptions {
 	era: SocietyEra
 	numPoints: number
 	years: number
+	lateKnowledgeBand: number
 	// [JUSTIFICATION] Omitted, runs start at the engine's default year.
 	startYear?: number
 	outPath: string

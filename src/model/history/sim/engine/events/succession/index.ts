@@ -14,6 +14,7 @@ import type {
 } from "@/model/history/sim/engine/events/succession/types"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
+import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 
@@ -258,6 +259,11 @@ function runYear({ state, rng }: RunYearParams): void {
 
 export const SUCCESSION = {
 	initSuccession,
-	runSuccession,
-	runYear,
+	runSuccession: (params: RunSuccessionParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => runSuccession(params),
+		}),
+	runYear: (params: RunYearParams) =>
+		MILITARY.mutate({ state: params.state, action: () => runYear(params) }),
 }

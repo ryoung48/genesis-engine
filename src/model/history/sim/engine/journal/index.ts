@@ -84,17 +84,24 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 		if (!state.desolate[p] && !state.stateless[p] && state.parentCurrent[p] < 0)
 			roots.push(p)
 	return {
-		roots: Int32Array.from(roots),
+		nations: Int32Array.from(roots),
 		treasury: Float32Array.from(roots, (p) => state.treasuryCurrent[p]),
 		revenue: Float32Array.from(roots, (p) => state.revenueCurrent[p]),
-		manpower: Float32Array.from(roots, (p) => state.manpowerCurrent[p]),
-		maxManpower: Float32Array.from(roots, (p) => state.maxManpowerCurrent[p]),
-		army: Float32Array.from(roots, (p) => state.armySizeCurrent[p]),
+		levy: Float32Array.from(roots, (p) => state.levyCurrent[p]),
+		regular: Float32Array.from(roots, (p) => state.regularCurrent[p]),
+		army: Float32Array.from(
+			roots,
+			(p) => state.levyCurrent[p] + state.regularCurrent[p],
+		),
 		deployments: roots.map((p) => {
 			const rows: CensusDeployment[] = []
 			for (const warId of state.activeWarIds) {
-				const troops = state.wars[warId].deployed[p] ?? 0
-				if (troops > 0) rows.push({ warId, troops })
+				const enrolled = state.wars[warId].deployed[p] ?? {
+					levy: 0,
+					regular: 0,
+				}
+				const troops = enrolled.levy + enrolled.regular
+				if (troops > 0) rows.push({ warId, troops, ...enrolled })
 			}
 			return rows
 		}),

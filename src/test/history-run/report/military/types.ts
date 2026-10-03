@@ -1,7 +1,4 @@
-import type {
-	ArmyTradition,
-	EconomyLookupParams,
-} from "@/model/history/sim/engine/economy/types"
+import type { EconomyLookupParams } from "@/model/history/sim/engine/economy/types"
 import type { PeaceOutcome } from "@/model/history/sim/engine/events/peace/types"
 import type {
 	EngineNote,
@@ -9,6 +6,7 @@ import type {
 	Relation,
 	WarGoal,
 } from "@/model/history/sim/engine/state/types"
+import type { GovernmentFamily } from "@/model/society/types"
 
 export type DistanceBand = "near" | "mid" | "far"
 export type TreasuryRole = "vassal" | "overlord" | "free"
@@ -30,7 +28,7 @@ export interface FiscalProbe {
 
 export interface CompletedWar {
 	years: number
-	tradition: ArmyTradition
+	government: GovernmentFamily
 	attackerWon: boolean
 	ending: WarEnding
 	outcome: PeaceOutcome
@@ -81,7 +79,7 @@ export interface TreasuryTotals {
 }
 
 export interface WarStartTreasury {
-	tradition: ArmyTradition
+	government: GovernmentFamily
 	band: DistanceBand
 	inSurplus: number
 	inSafe: number
@@ -95,17 +93,17 @@ export interface RaidTotals {
 }
 
 export interface MilitaryWindow {
-	sovereignYears: Record<ArmyTradition, number>
-	atWarYears: Record<ArmyTradition, number>
-	armyShare: Record<ArmyTradition, number[]>
-	armySize: Record<ArmyTradition, number[]>
-	deployed: Record<ArmyTradition, number[]>
-	manpowerAfterWar: Record<ArmyTradition, number[]>
-	warStarts: Record<ArmyTradition, number>
-	rebellions: Record<ArmyTradition, number>
+	sovereignYears: Record<GovernmentFamily, number>
+	atWarYears: Record<GovernmentFamily, number>
+	armyShare: Record<GovernmentFamily, number[]>
+	armySize: Record<GovernmentFamily, number[]>
+	deployed: Record<GovernmentFamily, number[]>
+	strengthAfterWar: Record<GovernmentFamily, number[]>
+	warStarts: Record<GovernmentFamily, number>
+	rebellions: Record<GovernmentFamily, number>
 	rebellionsByGoal: Record<
 		"independence" | "throne",
-		Record<ArmyTradition, number>
+		Record<GovernmentFamily, number>
 	>
 	backingRepaid: Record<
 		"vassal" | "alliance" | "trusted" | "disposition",
@@ -143,16 +141,16 @@ export interface MilitaryWindow {
 	completed: CompletedWar[]
 	battles: BattleSample[]
 	repeatStrength: number[]
-	raids: Record<ArmyTradition, RaidTotals>
-	fiscal: Record<ArmyTradition, FiscalTotals>
-	treasury: Record<ArmyTradition, TreasuryTotals>
+	raids: Record<GovernmentFamily, RaidTotals>
+	fiscal: Record<GovernmentFamily, FiscalTotals>
+	treasury: Record<GovernmentFamily, TreasuryTotals>
 	treasuryByRole: Record<TreasuryRole, TreasuryTotals>
 	treasuryByBand: Record<DistanceBand, number[]>
 	warStartTreasury: WarStartTreasury[]
 	sacks: number[]
-	firstBattleSettled: number
+	firstBattleRealm: number
 	firstBattleBelowExhaustion: number
-	longPeaceSettled: number
+	longPeaceRealm: number
 	longPeaceNegative: number
 	recoveryYears: number[]
 	recoveryCensored: number
@@ -160,7 +158,7 @@ export interface MilitaryWindow {
 
 export interface MilitaryTracker {
 	probe: FiscalProbe
-	warTradition: Map<number, ArmyTradition>
+	warGovernment: Map<number, GovernmentFamily>
 	warInVassal: Map<number, boolean>
 	warBattles: Map<number, number>
 	lastStrength: Map<number, number>

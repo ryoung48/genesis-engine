@@ -117,7 +117,7 @@ function runBattle({
 	}
 	const { attacker, defender, province: target } = battle
 	const restoration = war.attacker === defender
-	MILITARY.logCoalition({ state, war })
+	MILITARY.logCoalition({ state })
 
 	const terrain = TERRAIN.battlefield({ state, p: target })
 	const result = MILITARY.fight({
@@ -188,9 +188,11 @@ function runBattle({
 			attackerDeployed: Math.round(result.attackerDeployed),
 			defenderDeployed: Math.round(result.defenderDeployed),
 			deployedNations: result.deployments.map((member) => member.nation),
-			deployedTroops: result.deployments.map((member) =>
-				Math.round(member.force),
+			deployedTroops: result.deployments.map(
+				(member) => member.levy + member.regular,
 			),
+			deployedLevies: result.deployments.map((member) => member.levy),
+			deployedRegulars: result.deployments.map((member) => member.regular),
 			deployedRelations: result.relations,
 			deployedRoles: result.roles,
 			attackerLosses: 100 * result.attackerLossShare,
@@ -249,5 +251,6 @@ function runBattle({
 }
 
 export const BATTLE = {
-	runBattle,
+	runBattle: (params: RunBattleParams) =>
+		MILITARY.mutate({ state: params.state, action: () => runBattle(params) }),
 }

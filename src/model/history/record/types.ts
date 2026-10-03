@@ -82,6 +82,8 @@ export type ParticipantRole =
 	| "backer"
 
 export interface BattleContribution {
+	levy: number
+	regular: number
 	countryId: number
 	troops: number
 	// Relation to the side's lead; null for the lead and for Earth wars.
@@ -153,16 +155,18 @@ export interface CensusKeyframe {
 }
 
 export interface CensusDeployment {
+	levy: number
+	regular: number
 	warId: number
 	troops: number
 }
 
 export interface CensusEconomy {
-	roots: Int32Array
+	nations: Int32Array
 	treasury: Float32Array
 	revenue: Float32Array
-	manpower: Float32Array
-	maxManpower: Float32Array
+	levy: Float32Array
+	regular: Float32Array
 	army: Float32Array
 	// Each realm's deployed troops per active war.
 	deployments: CensusDeployment[][]

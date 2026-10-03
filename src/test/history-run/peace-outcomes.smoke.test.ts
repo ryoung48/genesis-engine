@@ -9,6 +9,7 @@ import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -82,7 +83,7 @@ it("submits a claimant whose offensive ends without land", () => {
 	expect(state.people.persons.throne[claimant]).toBe(-1)
 })
 
-it("joins supporting districts, their land and their manpower to a throne claimant", () => {
+it("joins supporting districts and recalculates both armies independently", () => {
 	const { state, rng } = setup()
 	let crown = -1
 	let seats: number[] = []
@@ -131,12 +132,14 @@ it("joins supporting districts, their land and their manpower to a throne claima
 	})
 	expect(contest.seat).toBe(seats[0])
 	expect(contest.supportingSeats).toEqual(seats)
-	const crownPopulation = STATE.getNationPopulation({ state, root: crown })
 	const supportingPopulation = seats.reduce(
 		(sum, seat) => sum + STATE.getNationPopulation({ state, root: seat }),
 		0,
 	)
-	const manpower = FIELDS.prov.manpower.get({ state, p: crown })
+	const levies = state.levyCurrent[crown]
+	const regulars = state.regularCurrent[crown]
+	const demobilized = { ...state.militaryIntervals.get(crown)!.demobilized }
+	const recruited = { ...state.militaryIntervals.get(crown)!.recruited }
 	const seeks = vi
 		.spyOn(OVERTHROW, "seeks")
 		.mockReturnValue(contest.supportingSeats)
@@ -159,9 +162,33 @@ it("joins supporting districts, their land and their manpower to a throne claima
 	expect(STATE.getNationPopulation({ state, root: contest.seat })).toBeCloseTo(
 		supportingPopulation,
 	)
-	expect(FIELDS.prov.manpower.get({ state, p: contest.seat })).toBeCloseTo(
-		manpower * (supportingPopulation / crownPopulation),
-	)
+	const released = state.militaryIntervals.get(contest.seat)!
+	const retained = state.militaryIntervals.get(crown)!
+	expect(
+		state.levyCurrent[contest.seat] +
+			state.levyCurrent[crown] +
+			released.demobilized.levy +
+			retained.demobilized.levy -
+			demobilized.levy -
+			released.recruited.levy -
+			retained.recruited.levy +
+			recruited.levy,
+	).toBeCloseTo(levies, 5)
+	expect(
+		state.regularCurrent[contest.seat] +
+			state.regularCurrent[crown] +
+			released.demobilized.regular +
+			retained.demobilized.regular -
+			demobilized.regular -
+			released.recruited.regular -
+			retained.recruited.regular +
+			recruited.regular,
+	).toBeCloseTo(regulars, 5)
+	for (const nation of [crown, contest.seat]) {
+		const target = RECRUITMENT.realmTargets({ state, nation })
+		expect(state.levyCurrent[nation]).toBeCloseTo(target.levy, 7)
+		expect(state.regularCurrent[nation]).toBeCloseTo(target.regular, 7)
+	}
 	const war = state.wars.at(-1)
 	if (!war) throw new Error("no throne war")
 	PEACE.conclude({ state, war, rng, reason: "offensive spent" })

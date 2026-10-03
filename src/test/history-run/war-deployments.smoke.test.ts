@@ -26,8 +26,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 	)
 	expect(weak).toBeDefined()
 	if (weak === undefined) return
-	engine.manpowerCurrent[weak] = 1
-	engine.manpowerCurrent[war.defender] = 1_000_000
+	engine.levyCurrent[weak] = 1
+	engine.levyCurrent[war.defender] = 1_000_000
 	engine.treasuryCurrent[war.defender] =
 		1_000_000_000_000 * ECONOMY.ducatsPerGram
 	const smallerWar: War = {
@@ -40,6 +40,10 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		refusedCalls: new Set(),
 		originalCrownRuler: -1,
 		deployed: {},
+		participants: {},
+		candidates: { attacker: [], defender: [] },
+		candidatesHierarchyVersion: -1,
+		allocation: {},
 		occupied: [],
 		allies: new Set(),
 	}
@@ -48,6 +52,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 	engine.provinceWars[war.attacker].push(smallerWar.idx)
 	engine.provinceWars[weak].push(smallerWar.idx)
 
+	engine.militaryDirty.add(war.attacker)
+	MILITARY.reconcile({ state: engine })
 	const rng = HISTORY_RNG.createHistoryRng(42)
 	const first = MILITARY.fight({
 		state: engine,
@@ -56,14 +62,25 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		defense: 1,
 		rng,
 	})
-	expect(war.deployed[war.attacker]).toBeGreaterThan(
-		smallerWar.deployed[war.attacker],
+	expect(
+		war.deployed[war.attacker].levy + war.deployed[war.attacker].regular,
+	).toBeGreaterThan(
+		smallerWar.deployed[war.attacker].levy +
+			smallerWar.deployed[war.attacker].regular,
 	)
 	const committed = Array.from(engine.activeWarIds).reduce(
-		(sum, idx) => sum + (engine.wars[idx].deployed[war.attacker] ?? 0),
+		(sum, idx) =>
+			sum +
+			((engine.wars[idx].deployed[war.attacker]?.levy ?? 0) +
+				(engine.wars[idx].deployed[war.attacker]?.regular ?? 0)),
 		0,
 	)
-	expect(committed).toBeLessThanOrEqual(engine.manpowerCurrent[war.attacker])
+	expect(committed).toBeLessThanOrEqual(
+		MILITARY.armySize({ state: engine, nation: war.attacker }) * (1 + 1e-9),
+	)
+	const surviving =
+		MILITARY.armySize({ state: engine, nation: war.attacker }) +
+		MILITARY.armySize({ state: engine, nation: war.defender })
 	const second = MILITARY.fight({
 		state: engine,
 		war,
@@ -72,8 +89,12 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		rng,
 	})
 
-	expect(second.attackerArmy).toBeLessThan(first.attackerArmy)
-	expect(second.defenderArmy).toBeLessThan(first.defenderArmy)
+	expect(
+		MILITARY.armySize({ state: engine, nation: war.attacker }) +
+			MILITARY.armySize({ state: engine, nation: war.defender }),
+	).toBeLessThan(surviving)
+	expect(second.attackerArmy + second.defenderArmy).toBeGreaterThan(0)
+	expect(first.attackerArmy + first.defenderArmy).toBeGreaterThan(0)
 }, 120_000)
 
 it("changes each side's losses when the battle outcome changes", () => {

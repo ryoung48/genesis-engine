@@ -33,3 +33,4 @@ audits
 .opencode
 scripts/planets/output/
 scripts/planets/tmp-*/
+verification/

@@ -1,4 +1,3 @@
-import type { ArmyTradition } from "@/model/history/sim/engine/economy/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 
 export interface TreasuryBudgetLookupParams {
@@ -12,8 +11,8 @@ export interface TreasuryBudget {
 	indemnity: number
 	stateMaintenance: number
 	armyExpenses: number
-	// Army maintenance was charged at wartime rates.
-	wartimeRates: boolean
+	levyExpenses: number
+	regularExpenses: number
 	treasuryLeakage: number
 	annualBalance: number
 	plunder: number
@@ -23,7 +22,6 @@ export interface TreasuryBudget {
 	succession: number
 	otherChangesTotal: number
 	treasurySafe: number
-	tradition: ArmyTradition
 	settled: boolean
 	year: number
 }

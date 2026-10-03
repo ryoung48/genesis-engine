@@ -15,4 +15,6 @@ export interface InitEconomyParams {
 	state: HistoryState
 }
 
-export type ArmyTradition = "settled" | "tribal" | "steppe"
+export interface TerritoryParams extends EconomyLookupParams {
+	provinces: number[]
+}

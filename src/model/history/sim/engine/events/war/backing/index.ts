@@ -122,6 +122,7 @@ function recruit({ state, war, rng }: RecruitParams): void {
 			continue
 		if (rng.random() >= chance) continue
 		war.backers.push(nation)
+		state.militaryDiplomacyDirty = true
 		chance *= BACKING_DECAY
 		state.events.push({
 			tag: "rebels backed",
@@ -201,4 +202,8 @@ function repay({ state, war, outcome }: RepayParams): void {
 	}
 }
 
-export const BACKING = { recruit, repay }
+export const BACKING = {
+	recruit: (params: RecruitParams) =>
+		MILITARY.mutate({ state: params.state, action: () => recruit(params) }),
+	repay,
+}

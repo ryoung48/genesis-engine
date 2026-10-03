@@ -437,6 +437,8 @@ function contributions({
 	return (data.deployedNations as number[]).map((nation, index) => ({
 		countryId: translator.identityByRoot.get(nation) ?? -1,
 		troops: (data.deployedTroops as number[])[index],
+		levy: (data.deployedLevies as number[])[index],
+		regular: (data.deployedRegulars as number[])[index],
 		role:
 			(data.deployedRoles as (ParticipantRole | null)[] | undefined)?.[index] ??
 			ROLE_BY_RELATION[(data.deployedRelations as number[])[index]] ??
@@ -452,7 +454,16 @@ function appendNote({
 }: AppendNoteParams): void {
 	const { record } = translator.state
 	const data = note.data
-	if (note.tag === "war started") {
+	if (note.tag === "troops demobilized") {
+		const nationId = translator.identityByRoot.get(data.nation as number)
+		if (nationId !== undefined)
+			record.events.nationEvents[nationId]?.events.push({
+				timeMs,
+				kind: "troopsDemobilized",
+				payload: { recruitment: data.type, troops: data.troops },
+				comment: null,
+			})
+	} else if (note.tag === "war started") {
 		const warId = data.war as number
 		const attacker = identityForRoot({
 			translator,
@@ -1070,7 +1081,12 @@ function applyTransaction({
 			urban: transaction.census.urban,
 			rural: transaction.census.rural,
 			development: transaction.census.development,
-			economy: transaction.census.economy,
+			economy: {
+				...transaction.census.economy,
+				nations: Int32Array.from(transaction.census.economy.nations, (root) =>
+					identityForRoot({ translator, root, timeMs }),
+				),
+			},
 		})
 	translator.state.frameCache.clear()
 }

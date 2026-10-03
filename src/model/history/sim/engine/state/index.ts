@@ -3,6 +3,8 @@ import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-bud
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
+import { MILITARY } from "@/model/history/sim/engine/military"
+import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import {
 	getChildren,
 	getNationNeighbors,
@@ -56,6 +58,8 @@ import type {
 	RepartitionNationParams,
 	ResolveWarParams,
 	ScheduleSuccessionParams,
+	SetDispositionParams,
+	SetRelationParams,
 	StartWarParams,
 	UnionLink,
 	UnionPairParams,
@@ -182,20 +186,13 @@ function releaseFaction({
 					)) /
 				formerPopulation
 			: 0
-	const manpower =
-		FIELDS.prov.manpower.get({ state, p: formerSovereign }) * share
+	RECRUITMENT.settleOwnership({ state, nation: formerSovereign })
 	const treasury =
 		Math.max(0, FIELDS.prov.treasury.get({ state, p: formerSovereign })) * share
-	FIELDS.prov.manpower.set({ state, p, value: manpower })
 	FIELDS.prov.treasury.set({ state, p, value: treasury })
 	const releasedBudget = TREASURY_BUDGET.get({ state, p })
 	releasedBudget.succession += treasury
 	releasedBudget.otherChangesTotal += treasury
-	FIELDS.prov.manpower.set({
-		state,
-		p: formerSovereign,
-		value: FIELDS.prov.manpower.get({ state, p: formerSovereign }) - manpower,
-	})
 	FIELDS.prov.treasury.set({
 		state,
 		p: formerSovereign,
@@ -208,6 +205,8 @@ function releaseFaction({
 	rebuildAssignment({ state })
 	repartitionNation({ state, nation: formerSovereign, subjects: [] })
 	repartitionNation({ state, nation: p, subjects: supportingProvinces })
+	RECRUITMENT.reconstitute({ state, nation: formerSovereign })
+	RECRUITMENT.reconstitute({ state, nation: p })
 	clearRealmDiplomacy({ state, nation: p })
 	const vassal = state.people.rulerOf[p]
 	if (
@@ -304,6 +303,15 @@ function repartitionNation({
 	nation,
 	subjects,
 }: RepartitionNationParams): void {
+	for (const root of new Set([
+		nation,
+		...subjects.map((p) => getSovereign({ state, p })),
+	]))
+		if (root >= 0) {
+			MILITARY.beforeMutation({ state, nation: root })
+			if (state.militaryReady)
+				RECRUITMENT.settleOwnership({ state, nation: root })
+		}
 	const absorbed = subjects.filter(
 		(p) => p !== nation && isSovereign({ state, p }),
 	)
@@ -315,6 +323,8 @@ function repartitionNation({
 		),
 	)
 	if (members.length === 0) return
+	for (const root of absorbed)
+		if (state.militaryReady) RECRUITMENT.disband({ state, nation: root })
 	// Depose leaders of absorbed sovereigns before parents are rewritten
 	for (const p of subjects) {
 		if (p === nation || !isSovereign({ state, p })) continue
@@ -475,11 +485,16 @@ function createActiveWar({
 		originalCrownRuler:
 			options.goal === "throne" ? state.people.rulerOf[defender] : -1,
 		deployed: {},
+		participants: {},
+		candidates: { attacker: [], defender: [] },
+		candidatesHierarchyVersion: -1,
+		allocation: {},
 		occupied: [],
 		allies: new Set(),
 	}
 	state.wars.push(war)
 	state.activeWarIds.add(war.idx)
+	state.militaryDiplomacyDirty = true
 	state.provinceWars[attacker].push(war.idx)
 	state.provinceWars[defender].push(war.idx)
 	setRelation({
@@ -552,8 +567,16 @@ function resolveWar({
 	transferred,
 	receiver,
 }: ResolveWarParams): void {
+	for (const nation of Object.keys(war.participants).map(Number)) {
+		MILITARY.beforeMutation({ state, nation })
+		state.militaryAllocationDirty.add(nation)
+	}
 	war.endTime = state.time
 	state.activeWarIds.delete(war.idx)
+	state.militaryDiplomacyDirty = true
+	war.participants = {}
+	war.deployed = {}
+	war.allocation = {}
 
 	for (const p of war.occupied) {
 		if (state.occupationCurrent[p] === war.idx) {
@@ -673,10 +696,26 @@ function createHistoryState({
 		realmCache: new Map(),
 		treasuryCurrent: new Float64Array(P),
 		treasuryBudgetCurrent: new Map(),
-		manpowerCurrent: new Float64Array(P),
-		maxManpowerCurrent: new Float64Array(P),
+		levyCurrent: new Float64Array(P),
+		regularCurrent: new Float64Array(P),
+		militaryIntervals: new Map(),
+		militaryAssignments: new Map(),
+		militaryTotals: {
+			recruited: { levy: 0, regular: 0 },
+			casualties: { levy: 0, regular: 0 },
+			demobilized: { levy: 0, regular: 0 },
+			settled: { levy: 0, regular: 0 },
+			levyReplacementsAtWar: 0,
+			fiscalDiscrepancy: 0,
+		},
+		militaryDirty: new Set(),
+		militaryAllocationDirty: new Set(),
+		militaryStrengthDirty: new Set(),
+		militaryReady: false,
+		militaryDepth: 0,
+		militaryReconcileTime: -1,
+		militaryDiplomacyDirty: false,
 		armySizeCurrent: new Float64Array(P),
-		deploymentUpdateTime: new Float64Array(P).fill(-1),
 		revenueCurrent: new Float64Array(P),
 		plunderedUntil: new Float64Array(P),
 		leaderDynCurrent: new Int32Array(P).fill(-1),
@@ -1065,8 +1104,13 @@ export const STATE = {
 	validateLiveHierarchy,
 	getRelation,
 	getDisposition,
-	setRelation,
-	setDisposition,
+	setRelation: (params: SetRelationParams) =>
+		MILITARY.mutate({ state: params.state, action: () => setRelation(params) }),
+	setDisposition: (params: SetDispositionParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => setDisposition(params),
+		}),
 	canAlly,
 	diplomaticOverlord,
 	getRulerRelation,
@@ -1077,23 +1121,55 @@ export const STATE = {
 	getNationPopulation,
 	getNationNeighbors,
 	getProvinceNeighbors,
-	releaseProvince,
-	releaseFaction,
-	fixConnections,
-	startWar,
+	releaseProvince: (params: ReleaseProvinceParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => releaseProvince(params),
+		}),
+	releaseFaction: (params: ReleaseFactionParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => releaseFaction(params),
+		}),
+	fixConnections: (params: FixConnectionsParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => fixConnections(params),
+		}),
+	startWar: (params: StartWarParams) =>
+		MILITARY.mutate({ state: params.state, action: () => startWar(params) }),
 	warSides,
 	queueBattleEvent,
-	createActiveWar,
-	resolveWar,
-	repartitionNation,
-	releaseSubjectRelations,
+	createActiveWar: (params: CreateActiveWarParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => createActiveWar(params),
+		}),
+	resolveWar: (params: ResolveWarParams) =>
+		MILITARY.mutate({ state: params.state, action: () => resolveWar(params) }),
+	repartitionNation: (params: RepartitionNationParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => repartitionNation(params),
+		}),
+	releaseSubjectRelations: (params: ReleaseSubjectRelationsParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => releaseSubjectRelations(params),
+		}),
 	provinceDistanceSq,
 	createHistoryState,
 	originOf,
-	installRuler,
+	installRuler: (params: InstallRulerParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => installRuler(params),
+		}),
 	scheduleSuccession,
 	canUnite,
-	uniteCouple,
-	foundRuler,
+	uniteCouple: (params: UnionRulerParams) =>
+		MILITARY.mutate({ state: params.state, action: () => uniteCouple(params) }),
+	foundRuler: (params: FoundRulerParams) =>
+		MILITARY.mutate({ state: params.state, action: () => foundRuler(params) }),
 	considerTitles,
 }

@@ -6,6 +6,15 @@ import type {
 	PendingJournal,
 } from "@/model/history/sim/engine/journal/types"
 import type {
+	Assignment,
+	WarSide,
+} from "@/model/history/sim/engine/military/deployments/types"
+import type {
+	MilitaryInterval,
+	MilitaryTotals,
+	Troops,
+} from "@/model/history/sim/engine/military/recruitment/types"
+import type {
 	PeopleState,
 	SeatChangeReason,
 } from "@/model/history/sim/people/types"
@@ -62,7 +71,11 @@ export interface War {
 	backers: number[]
 	refusedCalls: Set<number>
 	originalCrownRuler: number
-	deployed: Record<number, number>
+	deployed: Record<number, Troops>
+	participants: Record<number, WarSide>
+	candidates: Record<WarSide, number[]>
+	candidatesHierarchyVersion: number
+	allocation: Record<number, number>
 	occupied: number[]
 	// Allies in the war's last logged coalition; they stay until exhausted,
 	// while newcomers must also be out of debt to join.
@@ -106,6 +119,7 @@ export interface EngineNote {
 }
 
 export interface RealmCacheEntry {
+	population: number
 	hierarchyVersion: number
 	censusVersion: number
 	knowledge: number
@@ -151,14 +165,23 @@ export interface HistoryState {
 	// Bumped at each census; with hierarchyVersion it keys realmCache.
 	censusVersion: number
 	realmCache: Map<number, RealmCacheEntry>
-	// Ducats and levyable men; meaningful only on sovereign roots.
+	// Ducats and enrolled troops; meaningful only on sovereign roots.
 	treasuryCurrent: Float64Array
 	treasuryBudgetCurrent: Map<number, TreasuryBudget>
-	manpowerCurrent: Float64Array
-	maxManpowerCurrent: Float64Array
+	levyCurrent: Float64Array
+	regularCurrent: Float64Array
+	militaryIntervals: Map<number, MilitaryInterval>
+	militaryAssignments: Map<number, Assignment[]>
+	militaryTotals: MilitaryTotals
+	militaryDirty: Set<number>
+	militaryAllocationDirty: Set<number>
+	militaryStrengthDirty: Set<number>
+	militaryReady: boolean
+	militaryDepth: number
+	militaryReconcileTime: number
+	militaryDiplomacyDirty: boolean
 	// Field army size at the last census; the live value is MILITARY.armySize.
 	armySizeCurrent: Float64Array
-	deploymentUpdateTime: Float64Array
 	revenueCurrent: Float64Array
 	// Time until which a plundered province yields no output loot.
 	plunderedUntil: Float64Array

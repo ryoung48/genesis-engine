@@ -12,7 +12,8 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 			indemnity: 0,
 			stateMaintenance: 0,
 			armyExpenses: 0,
-			wartimeRates: false,
+			levyExpenses: 0,
+			regularExpenses: 0,
 			treasuryLeakage: 0,
 			annualBalance: 0,
 			plunder: 0,
@@ -22,7 +23,6 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 			succession: 0,
 			otherChangesTotal: 0,
 			treasurySafe: 0,
-			tradition: "settled",
 			settled: false,
 			year: Number.NEGATIVE_INFINITY,
 		}

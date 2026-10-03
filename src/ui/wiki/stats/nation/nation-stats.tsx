@@ -1,8 +1,6 @@
 import type { NationEconomy } from "@/model/history/world-frame/types"
-import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
-import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { uiPalette } from "@/ui/components/tokens"
 import type {
 	ArmyStatParams,
@@ -18,30 +16,11 @@ function treasuryHealthColor(economy: NationEconomy): string {
 	return uiPalette.treasury.critical
 }
 
-const MANPOWER_STOPS = [
-	uiPalette.treasury.critical,
-	uiPalette.treasury.caution,
-	uiPalette.treasury.healthy,
-].map(COLOR_INTERPOLATION.cssColorToRgb)
-
-function manpowerColor(economy: NationEconomy): string | null {
-	if (economy.maxManpower <= 0) return null
-	return COLOR_INTERPOLATION.rgbToCss(
-		COLOR_INTERPOLATION.sampleColorStops({
-			stops: MANPOWER_STOPS,
-			t: economy.manpower / economy.maxManpower,
-		}),
-	)
-}
-
 function armyStat({ economy, warName, yearLabel }: ArmyStatParams): StatEntry {
-	const deployed = economy.deployments.reduce(
-		(sum, deployment) => sum + deployment.troops,
-		0,
-	)
+	const deployed = economy.deployed
 	return {
-		label: "Army",
-		valuePrefix: `${formatCount(economy.army)} men ·`,
+		label: "Field army",
+		valuePrefix: `${formatCount(economy.army)} enrolled ·`,
 		value: `${formatCount(deployed)} deployed`,
 		valueHelp:
 			economy.deployments.length > 0 ? (
@@ -57,6 +36,24 @@ function armyStat({ economy, warName, yearLabel }: ArmyStatParams): StatEntry {
 				/>
 			) : undefined,
 		valueHelpTarget: "suffix",
+		trailingHelp: (
+			<TraceTooltipContent
+				title={`${yearLabel} field army composition`}
+				trace={[
+					{
+						value: economy.deployedLevy,
+						description: `Levies (${economy.deployedLevyPercent.toFixed(1)}%)`,
+					},
+					{
+						value: economy.deployedRegular,
+						description: `Regulars (${economy.deployedRegularPercent.toFixed(1)}%)`,
+					},
+				]}
+				formatValue={formatCount}
+				finalLabel="Deployed troops"
+				finalValue={deployed}
+			/>
+		),
 	}
 }
 
@@ -173,15 +170,9 @@ export function buildNationWikiStats(
 									},
 									{
 										value: economy.budget.armyExpenses,
-										description: "Army maintenance",
-										icon: economy.budget.wartimeRates ? (
-											<span
-												className="inline-flex items-center"
-												title="Charged at wartime rates"
-											>
-												<SwordCrossIcon className="block h-2.5 w-2.5 text-rose-500" />
-											</span>
-										) : undefined,
+										description: economy.budget.settled
+											? "Army maintenance (settled interval)"
+											: "Army maintenance (projected annual)",
 									},
 									{
 										value: economy.budget.treasuryLeakage,
@@ -221,11 +212,6 @@ export function buildNationWikiStats(
 							"No annual settlement recorded yet"
 						),
 						swatchColor: treasuryHealthColor(economy),
-					},
-					{
-						label: "Manpower",
-						value: `${formatCount(economy.manpower)} men${economy.maxManpower > 0 ? ` · ${Math.round((100 * economy.manpower) / economy.maxManpower)}% of ${formatCount(economy.maxManpower)}` : ""}`,
-						swatchColor: manpowerColor(economy),
 					},
 					armyStat({ economy, warName, yearLabel }),
 				]

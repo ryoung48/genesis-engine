@@ -5,6 +5,7 @@ import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { BACKING } from "@/model/history/sim/engine/events/war/backing"
+import { REBELLION_EVALUATION } from "@/model/history/sim/engine/events/war/rebellion-evaluation"
 import { SUBMISSION } from "@/model/history/sim/engine/events/war/submission"
 import type {
 	GetDefenderOccupationCandidatesParams,
@@ -30,7 +31,7 @@ const INTERSTATE_WAR_SEED_FRACTION = 0.025
 
 const REBELLION_SEED_FRACTION = 0.0125
 
-const REBELLION_THRESHOLD = 0.55
+const REBELLION_THRESHOLD = 0.45
 
 const FRONT_PROVINCES = 15
 
@@ -203,15 +204,24 @@ function seedWarStage({
 		},
 	})
 	if (war.goal !== "conquest") BACKING.recruit({ state, war, rng })
-	for (const nation of [attacker, defender])
-		FIELDS.prov.manpower.set({
+	MILITARY.reconcile({ state })
+	for (const nation of [attacker, defender]) {
+		const fraction = rng.uniform(0.5, 0.9) * (lateStage ? 0.7 : 1)
+		MILITARY.applyLosses({
 			state,
-			p: nation,
-			value:
-				ECONOMY.maxManpower({ state, p: nation }) *
-				rng.uniform(0.5, 0.9) *
-				(lateStage ? 0.7 : 1),
+			war: null,
+			members: [
+				{
+					nation,
+					force: MILITARY.armySize({ state, nation }),
+					levy: state.levyCurrent[nation],
+					regular: state.regularCurrent[nation],
+				},
+			],
+			losses: MILITARY.armySize({ state, nation }) * (1 - fraction),
 		})
+	}
+	MILITARY.reconcile({ state })
 	MILITARY.mobilize({ state, war })
 }
 
@@ -320,10 +330,23 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 		if (seeded >= targetRebellions) break
 		const sovereignNation = STATE.getSovereign({ state, p: nation })
 		if (DERIVE.provinceWars({ state, p: sovereignNation }).length > 0) continue
-		const threat = MILITARY.rebellionThreat({
+		const preview = MILITARY.rebellionPreview({
 			state,
 			overlord: sovereignNation,
 			subject: nation,
+		})
+		const threat = preview.threat
+		REBELLION_EVALUATION.record({
+			state,
+			overlord: sovereignNation,
+			subject: nation,
+			seeded: true,
+			succession: false,
+			laxity: 0,
+			threshold: REBELLION_THRESHOLD,
+			roll: -1,
+			decision: threat <= REBELLION_THRESHOLD ? "threshold" : "accepted",
+			preview,
 		})
 		if (threat <= REBELLION_THRESHOLD) continue
 		STATE.releaseProvince({
@@ -360,6 +383,7 @@ function start(params: StartWarParams): void {
 	if (war) {
 		if (war.goal !== "conquest")
 			BACKING.recruit({ state: params.state, war, rng: params.rng })
+		MILITARY.reconcile({ state: params.state })
 		MILITARY.mobilize({ state: params.state, war })
 	}
 }
@@ -383,9 +407,25 @@ function rebel({
 	succession,
 	rng,
 }: RebelParams): boolean {
-	const threat = MILITARY.rebellionThreat({ state, overlord, subject })
-	if (threat <= REBELLION_THRESHOLD - laxity || rng.random() >= threat)
-		return false
+	const preview = MILITARY.rebellionPreview({ state, overlord, subject })
+	const threat = preview.threat
+	const threshold = REBELLION_THRESHOLD - laxity
+	const roll = threat <= threshold ? -1 : rng.random()
+	const decision =
+		threat <= threshold ? "threshold" : roll >= threat ? "random" : "accepted"
+	REBELLION_EVALUATION.record({
+		state,
+		overlord,
+		subject,
+		seeded: false,
+		succession,
+		laxity,
+		threshold,
+		roll,
+		decision,
+		preview,
+	})
+	if (decision !== "accepted") return false
 	const supporters = OVERTHROW.seeks({
 		state,
 		realm: overlord,
@@ -502,8 +542,12 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 }
 
 export const WAR = {
-	start,
-	initWar,
-	runWar,
-	rebel,
+	start: (params: StartWarParams) =>
+		MILITARY.mutate({ state: params.state, action: () => start(params) }),
+	initWar: (params: InitWarParams) =>
+		MILITARY.mutate({ state: params.state, action: () => initWar(params) }),
+	runWar: (params: RunWarParams) =>
+		MILITARY.mutate({ state: params.state, action: () => runWar(params) }),
+	rebel: (params: RebelParams) =>
+		MILITARY.mutate({ state: params.state, action: () => rebel(params) }),
 }

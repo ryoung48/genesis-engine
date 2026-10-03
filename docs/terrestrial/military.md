@@ -1,95 +1,51 @@
 # Armies and battles (`:history`)
 
-Code: army economy and combat in `src/model/history/sim/engine/military`; army and manpower limits in `engine/economy` and `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`.
+Code: army economy and combat in `src/model/history/sim/engine/military`; recruitment and deployment operations in `engine/military`, field logistics in `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`.
 
-Armies are abstract strength values. The simulation tracks manpower, field logistics, treasury support, war deployments, casualties, and occupied provinces; it does not track individual soldiers, units, or commanders.
+Armies are aggregate troop counts. Combat strength is 0.75 per levy and 1 per regular; logistics, casualties, and recorded army sizes count soldiers. Affordability targets always use home upkeep prices; actual upkeep still follows peace/campaign deployment. The simulation tracks enrollment, field logistics, treasury support, war deployments, casualties, and occupied provinces; it does not track individual soldiers, units, or commanders.
 
-## Manpower and army traditions
+## Enrollment and recruitment
 
-| Tradition | Government | Levy rate | Revenue collection | Exhaustion threshold |
-| --- | --- | ---: | ---: | ---: |
-| Settled | Other governments | 2% | 100% | 25% of max manpower |
-| Tribal | Tribal family | 5% | 1/3 | 80% |
-| Steppe | Steppe horde | 12% | 1/3 | 80% |
+Sovereign realms hold actual enrolled levies and regulars. Soldiers remain inhabitants: recruitment does not remove population, demobilization does not grow it, and casualties reduce rural population once.
 
-```text
-maximum manpower = realm population × levy rate
-annual recovery = (maximum manpower − current manpower) × 0.10 × elapsed years
-```
+Levy eligibility is 2% of population for nontribal governments and 5% for all tribal-family governments, including steppe hordes. A separate 10% combined population safety ceiling covers both types. Neither type receives priority when the shared budget or safety ceiling binds. Government family changes only levy eligibility and permission to initiate raids in this military/fiscal model.
 
-Manpower starts at its maximum. Tax events restore 10% of the remaining gap per year; battle and raid casualties reduce it immediately.
+Let `B = 0.75 � max(0, civilian surplus)`. Requested levies equal population eligibility. Requested regulars equal `funding � B / regular home price`, using the full readiness budget without deducting levy costs first. Funding interpolates from 10% at knowledge 0.42 through 25% at 1.00 and 55% at 1.44 to 90% at 2.38. This defines requests rather than imposing a final composition.
+
+Calculate the requested combined headcount `N` and home upkeep `C`. Multiply both types by the same factor `min(1, B / C, safety ceiling / N, logistics limit / N)`, treating empty requests as zero targets. Thus budget, population, and logistics ceilings preserve the independently requested contribution of each type. Remaining readiness budget is `B` minus the combined capped home upkeep; savings do not generate additional requests.
+
+Initial armies receive their full affordable targets. Thereafter, levies close 10% of their target shortfall per peaceful year and zero during any recorded war participation. Regulars close 75% per year in peace or war. Exponential recovery makes these rates independent of time subdivision. Losses persist, target growth recruits gradually, and reduced targets demobilize excess without converting troops.
+
+The existing knowledge-based logistics limit caps total enrolled levies plus regulars as part of the common scaling above. Losses can still change actual composition, and raising a limit never refills troops instantly. Shrinking limits close the old expense interval before demobilization and commitment trimming. Coalition battle attendance retains its existing field limit; rebellion previews independently calculate both prospective realms. Reports identify the constraint that actually determines the common scale; a stricter budget or population ceiling does not count as logistics limiting the target.
 
 ## State maintenance and treasury
 
-Each sovereign's collected revenue `R` is the sum of its provinces' output × realm extraction rate × collection share. Every province costs 35% of its own revenue to administer, scaled by great-circle distance from the sovereign root province (its capital):
+Every government collects provincial output times the realm's knowledge-based extraction rate. Administration costs 35% of each province's collected revenue multiplied by `1 + 0.15 × (travel days / 30)^0.7`. Travel days are great-circle distance from the capital divided by 30 km/day. Civilian surplus is revenue less state maintenance.
 
-```text
-travel days = distance km / 30
-distance multiplier = 1 + 0.15 × (travel days / 30)^0.7
-state maintenance = Σ province revenue × 0.35 × distance multiplier
-civilian surplus D = R − state maintenance
-```
+| Recruitment | Home / peace maintenance | Campaign maintenance |
+| --- | ---: | ---: |
+| Levy | 20 g silver per soldier-year | 62.5 g silver per soldier-year |
+| Regular | 200 g silver per soldier-year | 625 g silver per soldier-year |
 
-At 0, 30, 60, 120, 240, and 365 days the multiplier is 1.00, 1.15, 1.24, 1.40, 1.64, and 1.86. All traditions pay state maintenance.
+Both prices scale by `(realm output per resident / 450)^0.5` and the shared silver-to-ducat conversion. Upkeep integrates actual soldier-years, including gradual replacements, over each peace/campaign interval. Only mobilized commitments pay campaign prices. Battle logistics caps do not reduce mobilized upkeep.
 
-There is no treasury cap. The safe treasury `T_safe = 2 × max(0, D)` is a reference level: after the year's revenue, maintenance, and army payment, a positive treasury above it leaks.
+Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, distinguishing projected annual upkeep from settled interval expense. Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
 
-```text
-annual leakage = T_safe × 0.04 × max(0, treasury / T_safe − 1)²
-```
-
-Leakage never exceeds the positive treasury; with `T_safe = 0` the whole positive treasury leaks. Treasury fill (`treasury / T_safe`, clamped to 0–1) drives tribal and steppe muster, raid chance, and overlord loyalty. New realms start with one year of `max(0, D)`.
-
-## Field army, logistics, and cost
-
-Realm knowledge sets the maximum field army:
-
-| Realm knowledge | Field army cap |
-| ---: | ---: |
-| 0 | 25,000 |
-| 1 | 40,000 |
-| 2 | 120,000 |
-| 3 | 400,000 |
-| 4 | 1,500,000 |
-
-Values between listed knowledge levels are interpolated. Soldier prices scale with the realm's output per resident `Y` (grams of silver before extraction):
-
-```text
-peace cost per man-year = 0.40 kg × tradition cost share × (Y / 450)^0.5
-war cost per man-year   = 1.25 kg × tradition cost share × (Y / 450)^0.5
-```
-
-| Tradition | Cost share |
-| --- | ---: |
-| Settled | 0.5 |
-| Tribal / steppe | 0.05 |
-
-Every tradition pays its army; tribal and steppe warriors cost less because they bring lighter kit and serve for spoils more than continuous pay. The settled cost share was calibrated at half the originally proposed price: at full price, early settled armies fell to about half their earlier size. Every tradition sizes its army from a peacetime budget of 75% of the civilian surplus, priced at the peace rate:
-
-```text
-army size = min(logistics cap, manpower, 0.75 × max(0, D) / peace cost)
-tribal/steppe army size = min(that, manpower × (0.10 + 0.20 × treasury fill))
-```
-
-Armies are charged at each tax settlement: the war rate on the whole field army while the realm fights in any war, as a lead, ally, or vassal, and the peace rate otherwise. Settled realms can borrow; tribal and steppe realms pay maintenance and then warriors only from cash in hand, so their treasury floors at zero. Settled realms are fiscally exhausted below `−0.5 × max(0, D)`.
+The safe treasury is twice positive civilian surplus. Positive cash above that reference leaks annually at `0.04 × safe × (treasury / safe − 1)^2`, bounded by available cash. Every crown receives one third of battle, sack, and raid loot. Peace buyoff demands and rebellion threat follow shared rules.
 
 ## Deployment and coalition strength
 
-```text
-per-war force = fielded force / (1 + number of active wars)
-```
+Active wars store membership separately from troop commitments. Leads remain participants even at zero strength. Allies, vassals, union partners, and rebellion backers enter or leave through reconciliation at explicit mutation/event boundaries. New supporters need nonnegative cash after pending upkeep; existing supporters may stay until fiscal or strength exhaustion. Queries and previews cannot change membership or recruit troops.
 
-A war's two leads fight with their coalitions. A lead's vassals, overlord, and union partners join on either side; its allies join only when it defends. Nobody joins against its own ally or the realm that rules it, uninhabited provinces never join, and an exhausted realm makes a separate peace and leaves. Allies already fighting stay until exhausted, but a realm joining or rejoining a war must be unexhausted and out of debt.
+The same holdings are shared across assignments. Opponent-weighted allocation splits 20% evenly and 80% by opposing strength, applying identical ratios to both types. Membership changes, losses, and explicit allocation mutations rebalance surviving troops. Ordinary advancement preserves stored fractions and recruits into them. Leaving one war releases commitments for the others; only final peace enables levy recovery.
 
-Armies mobilize when a war is declared: every coalition member deploys immediately, and the war record keeps each realm's declared strength and its relation to its side's lead. Every member commits its whole field army, split over every active war it fights in and rebalanced before each battle. The distribution weights each war by its opponent's field strength: a total of 20% is split evenly across assignments, and the remaining 80% is divided by weight. If capacity rises, deployments recover 75% of the remaining gap per year. Losses reduce both manpower and that war's deployment.
-
-Each coalition's total deployment is capped by the lead belligerent's logistics cap. When it exceeds the cap, all member deployments are scaled by the same ratio.
+Coalition battle attendance is capped by the lead's knowledge-based logistics, scaling both types equally. Enrollment can exceed attendance. Each continuous participation episode retains a per-type high-water reference initialized from actual holdings on first entry. Losses and demobilization cannot lower it. Allocated reference is the rout-shortfall denominator; surviving commitments are the numerator. Final peace clears the episode. Faction releases settle the old realm's accrued costs, then independently reset both armies to their own affordable, population-safe, logistics-capped levy and regular targets. No troops or military references transfer. Reset increases count as recruitment and decreases as demobilization; a release explicitly resets prior depletion, including during other wars. Ordinary wartime levy replacement remains disabled afterward.
 
 ## War starts
 
 | Trigger | Rule |
 | --- | --- |
-| Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and reduced manpower. |
+| Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and depleted troops. |
 | Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor (by distance from its capital to the neighbor's closest province) if threat is below its relation threshold. |
 | Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed as if its capital had fallen, with no war. |
 
@@ -159,9 +115,9 @@ R = loser casualties / loser troops + 0.15 × |X| + 0.20 × deployment shortfall
 rout chance = 1 / (1 + e^(−20 × (R − 0.40)))
 ```
 
-Deployment shortfall is the share of the loser's assigned troops not yet deployed. A routed loser loses a further 5–20% of its remaining troops. The rout midpoint was calibrated to 0.40 so that about a third of contested battles rout; real battles are lopsided. An inconclusive battle without a rout blocks all progress: no plunder, sack, occupation, restoration, or capital victory. If one side has no troops, the other wins uncontested with no losses; if neither does, the war ends (`no troops`).
+Deployment shortfall compares surviving commitments with their allocated participation-episode reference strength. Casualties and demobilization retain that reference until final peace. A routed loser loses a further 5–20% of its remaining troops. The rout midpoint was calibrated to 0.40 so that about a third of contested battles rout; real battles are lopsided. An inconclusive battle without a rout blocks all progress: no plunder, sack, occupation, restoration, or capital victory. If one side has no troops, the other wins uncontested with no losses; if neither does, the war ends (`no troops`).
 
-Battle casualties reduce manpower and each realm's rural population proportionally. The battle record stores the result, pre-battle win probability, power share, terrain, knowledge-capped troops, deployments, losses, target province, and plunder.
+Battle casualties reduce enrolled troops and each realm's rural population proportionally. The battle record stores the result, pre-battle win probability, power share, terrain, knowledge-capped troops, deployments, losses, target province, and plunder.
 
 ## Occupation and war settlement
 
@@ -192,7 +148,7 @@ The reason then sets the terms:
 | **Indemnity** or **white peace** | `occupation restored`, `offensive spent` or `offensive repelled`, with nothing occupied | The defender wins. It gets an indemnity with a chance that rises with its strength (see below); otherwise white peace. |
 | **White peace** | Any other ending with nothing occupied (`both exhausted`, `no target`, `no troops`) | Nothing changes hands. |
 
-- **Buy-off.** Offered only in a conquest war where the attacker occupies land and the defender's battle share (`MILITARY.threat`) is below 0.01. The price is `(1 − threat) × 20 × occupied share of the defender's output × defender revenue`, discounted to 60% against tribal and steppe attackers. The defender must hold that much in its treasury.
+- **Buy-off.** Offered only in a conquest war where the attacker occupies land and the defender's battle share (`MILITARY.threat`) is below 0.01. The price is `(1 − threat) × 20 × occupied share of the defender's output × defender revenue` for every government. The defender must hold that much in its treasury.
 - **Indemnity chance.** `0.1 + 0.8 × max(0, 2 × threat − 1)`, where `threat` is the defender's battle share when the war ends: 10% for an even or weaker defender, rising to 90% for an overwhelming one. An indemnity makes the attacker pay the defender 10% of its revenue each year for 5 years, as long as the defender stays sovereign.
 - **After every ending,** the two leaders become Suspicious and sign a 10-year truce. Occupations from the war are cleared, transferred provinces are repartitioned under their new realm, and the defender's remaining land is reconnected unless it was annexed.
 - **Record.** The `war ended` note logs the winner, reason, outcome, transferred provinces, and any payment and payer. The war page shows the outcome as text: "Annexed", "Ceded n provinces", "White peace", "X owes Y 10% of its revenue for 5 years", "Y paid X n ducats for peace", or, for a lapsed war, "The war lapsed: X no longer rules a realm".
@@ -203,8 +159,8 @@ The reason then sets the terms:
 | --- | --- |
 | Province plunder | 3% of annual province output; same province has a 5-year cooldown. |
 | Capital sack | Also takes 20% of the loser's positive treasury. |
-| Loot credited | Settled realm receives 1/3; tribal/steppe receives all, with no treasury ceiling. |
-| Raid party | 25% of raider's fielded strength. |
+| Loot credited | Every crown receives 1/3, with no treasury ceiling. |
+| Raid party | 25% of the raider's enrolled troops. |
 | Raid response | 15% of victim's per-war force, with the 1.2 defense multiplier. |
 
 Raids keep the squared force share and their own random loss shares (10% × force ratio, ×0.7–1.3, capped at 60%). Successful raids plunder province output but do not sack the victim's treasury.
@@ -212,3 +168,5 @@ Raids keep the squared force share and their own random loss shares (10% × forc
 ## Scope
 
 These rules describe the procedural `:history` simulation. Imported historical wars are translated into history records and do not run through this live army and battle engine.
+
+Rebellion previews calculate each prospective territory with the same economy and recruitment formulas used after release. Crown territory excludes the departing subject; both armies use their own knowledge-derived limits. Potential support and the existing-war discount remain preview estimates.

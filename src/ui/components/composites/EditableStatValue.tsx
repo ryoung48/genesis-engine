@@ -21,24 +21,11 @@ export interface StatEntry {
 	value: string
 	valuePrefix?: string
 	help?: string
-	/** Tooltip on the value itself (rather than the label) -- e.g. a
-	 * per-source contribution breakdown for a summed stat. */
 	valueHelp?: ReactNode
 	valueHelpTarget?: "all" | "prefix" | "suffix"
 	editor?: StatEditor
 	valueAction?: ReactNode
-	/** Rendered right after the value, before valueAction -- e.g. a
-	 * help-circle icon with its own hover tooltip -- distinct from valueHelp
-	 * (which puts the tooltip on the value itself) since some values already
-	 * carry a different hover/click meaning (e.g. an editable dropdown
-	 * target) and need the detail breakdown parked somewhere that doesn't
-	 * compete for the same hover/click target. Tooltip prefers opening
-	 * upward (falling back downward only without room above) via
-	 * FloatingTooltip's body portal, so the panel's own edge never clips it. */
 	trailingHelp?: ReactNode
-	/** A small color swatch shown immediately before the value (e.g. a
-	 * planet's classification color, or a star's spectral-class color) --
-	 * omitted/null renders no swatch. */
 	swatchColor?: string | null
 }
 
@@ -68,7 +55,13 @@ function splitNumericAndUnit(text: string): { numeric: string; unit: string } {
 export function TrailingHelpIcon({ content }: { content: ReactNode }) {
 	return (
 		<FloatingTooltip content={content}>
-			<InformationIcon className="h-3 w-3 shrink-0 cursor-help text-slate-400 hover:text-slate-600" />
+			<button
+				type="button"
+				aria-label="More information"
+				className="inline-flex cursor-help"
+			>
+				<InformationIcon className="h-3 w-3 shrink-0 text-slate-400 hover:text-slate-600" />
+			</button>
 		</FloatingTooltip>
 	)
 }

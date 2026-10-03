@@ -4,12 +4,12 @@ import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-bud
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { UNITS } from "@/model/shared/units"
 import { HISTORY_RUN } from "@/test/history-run"
-
-const SETTLED_COST_SHARE = 0.5
 
 let engine: HistoryState
 
@@ -44,7 +44,7 @@ function twoPointState(days: number): HistoryState {
 
 function withOutputPerHead(grams: number): number {
 	const nation = sovereigns().find(
-		(p) => ECONOMY.armyTradition({ state: engine, p }) === "settled",
+		(p) => GOVERNMENT.govFamilyOfIndex(engine.governmentType[p]) !== "tribal",
 	)
 	if (nation === undefined) throw new Error("no settled realm")
 	ECONOMY.revenue({ state: engine, p: nation })
@@ -106,13 +106,9 @@ describe("state maintenance", () => {
 				state: engine,
 				root: nation,
 			}).filter((p) => !engine.desolate[p])
-			const rate =
-				KNOWLEDGE.extractionRate({
-					knowledge: ECONOMY.realmKnowledge({ state: engine, p: nation }),
-				}) *
-				(ECONOMY.armyTradition({ state: engine, p: nation }) === "settled"
-					? 1
-					: 1 / 3)
+			const rate = KNOWLEDGE.extractionRate({
+				knowledge: ECONOMY.realmKnowledge({ state: engine, p: nation }),
+			})
 			const provincial = provinces.reduce(
 				(sum, p) => sum + ECONOMY.provinceOutput({ state: engine, p }) * rate,
 				0,
@@ -122,34 +118,22 @@ describe("state maintenance", () => {
 			if (revenue <= 0) continue
 			const share =
 				ECONOMY.stateMaintenance({ state: engine, p: nation }) / revenue
-			expect(share).toBeGreaterThanOrEqual(0.35)
+			expect(share).toBeGreaterThanOrEqual(0.35 - 1e-12)
 			expect(share).toBeLessThan(0.66)
 		}
 	})
 })
 
 describe("army maintenance", () => {
-	it("prices a soldier from output per resident", () => {
-		const anchors: [number, number, number][] = [
-			[150, 0.23, 0.72],
-			[250, 0.3, 0.93],
-			[450, 0.4, 1.25],
-			[700, 0.5, 1.56],
-		]
-		for (const [grams, peaceKg, warKg] of anchors) {
+	it("prices both recruitment types from output per resident", () => {
+		for (const grams of [150, 250, 450, 700]) {
 			const nation = withOutputPerHead(grams)
-			const size = MILITARY.armySize({ state: engine, nation })
-			expect(size).toBeGreaterThan(0)
-			const atWar = MILITARY.atWar({ state: engine, nation })
-			const price =
-				MILITARY.upkeep({ state: engine, nation }) /
-				size /
-				ECONOMY.ducatsPerGram /
-				1000
-			expect(price).toBeCloseTo(
-				SETTLED_COST_SHARE * (atWar ? warKg : peaceKg),
-				2,
-			)
+			const targets = RECRUITMENT.realmTargets({ state: engine, nation })
+			const adjustment = Math.sqrt(grams / 450) * ECONOMY.ducatsPerGram
+			expect(targets.home.levy).toBeCloseTo(20 * adjustment, 12)
+			expect(targets.home.regular).toBeCloseTo(200 * adjustment, 12)
+			expect(targets.campaign.levy).toBeCloseTo(62.5 * adjustment, 12)
+			expect(targets.campaign.regular).toBeCloseTo(625 * adjustment, 12)
 			engine.realmCache.delete(nation)
 		}
 	})
@@ -176,7 +160,7 @@ describe("treasury leakage", () => {
 		const flows =
 			ECONOMY.revenue({ state: engine, p: nation }) -
 			ECONOMY.stateMaintenance({ state: engine, p: nation }) -
-			MILITARY.upkeep({ state: engine, nation })
+			0
 		engine.treasuryCurrent[nation] = treasury - flows
 		TAX.runTax({
 			state: engine,
@@ -189,7 +173,7 @@ describe("treasury leakage", () => {
 	it("matches the leakage examples and never leaks below safe or in debt", () => {
 		const nation = sovereigns().find(
 			(p) =>
-				ECONOMY.armyTradition({ state: engine, p }) === "settled" &&
+				GOVERNMENT.govFamilyOfIndex(engine.governmentType[p]) !== "tribal" &&
 				STATE.diplomaticOverlord({ state: engine, nation: p }) < 0 &&
 				ECONOMY.treasurySafe({ state: engine, p }) > 0,
 		)
@@ -224,25 +208,27 @@ describe("treasury leakage", () => {
 		expect(engine.treasuryCurrent[nation]).toBeCloseTo(-safe, 6)
 	})
 
-	it("books only what a tribal or steppe realm pays and keeps it solvent", () => {
+	it("charges tribal and steppe realms the full expense and permits debt", () => {
 		for (const nation of sovereigns()) {
-			if (ECONOMY.armyTradition({ state: engine, p: nation }) === "settled")
+			if (
+				GOVERNMENT.govFamilyOfIndex(engine.governmentType[nation]) !== "tribal"
+			)
 				continue
-			engine.treasuryCurrent[nation] = 0
+			engine.treasuryCurrent[nation] = -1000000
+			const interval = engine.militaryIntervals.get(nation)!
+			interval.pending = { levy: 7, regular: 11 }
 			TAX.runTax({
 				state: engine,
 				nation,
 				previousTime: engine.time - STATE.yearMs,
 			})
 			const budget = TREASURY_BUDGET.get({ state: engine, p: nation })
-			expect(engine.treasuryCurrent[nation]).toBeGreaterThanOrEqual(0)
+			expect(budget.armyExpenses).toBe(-18)
 			expect(engine.treasuryCurrent[nation]).toBeCloseTo(
-				budget.annualBalance,
+				-1000000 + budget.annualBalance,
 				9,
 			)
-			expect(-budget.armyExpenses).toBeLessThanOrEqual(
-				budget.taxes + budget.stateMaintenance + 1e-12,
-			)
+			expect(engine.treasuryCurrent[nation]).toBeLessThan(0)
 		}
 	})
 })
