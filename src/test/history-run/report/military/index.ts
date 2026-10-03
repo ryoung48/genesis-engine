@@ -1014,6 +1014,9 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	report["sieges.phases.p50"] = median(
 		window.siegeEndings.map((siege) => siege.phases),
 	)
+	report["sieges.phases.p90"] = p90(
+		window.siegeEndings.map((siege) => siege.phases),
+	)
 	report["sieges.phases.p99"] = quantile({
 		values: window.siegeEndings.map((siege) => siege.phases),
 		q: 0.99,
@@ -1177,6 +1180,14 @@ const LOG_TOTALS = [
 	"wars.ending.exhaustion",
 	"rebelWars.successShare",
 	"battles.n",
+	"battles.kind.open",
+	"battles.kind.ambush",
+	"battles.kind.river crossing",
+	"sieges.n",
+	"sieges.completed.n",
+	"sieges.phases.p50",
+	"sieges.phases.p90",
+	"sieges.phases.p99",
 	"battles.attackerWinShare",
 	"battles.weakerWinShare",
 	"battles.routShare",

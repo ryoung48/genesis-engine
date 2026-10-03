@@ -16,9 +16,38 @@ Both runs: seed 14963991, lateMedieval, 204000 requested points (204001 generate
 | Exhaustion ending share | 20.86% | 21.12% |
 | Stalled ending share | 6.79% | 7.04% |
 
-There are 6971 open battles, 531 ambushes and 95 river crossings, plus 114 siege starts. Open is the plurality; ambushes are 6.99% of battles, inside the 3-9% band. Eligibility tests enforce river and town restrictions.
+### Encounter distribution
 
-113 sieges finish and one remains in an active war at the horizon. Outcomes: surrendered 54, starved out 38, betrayed 1, stormed 15, relieved 4, lifted 1. Completed siege phases: median 2, p99 7. These differ from isolated calibration because the world changes membership, deployments, occupation and peace between phases. Siege starts/ends are paired, no beat falls outside a siege, no siege outlives its war, and active state matches the journal. Annual military validation passes.
+| Encounter | Count | Share of all encounters |
+| --- | ---: | ---: |
+| Open battle | 6971 | 90.40% |
+| Ambush | 531 | 6.89% |
+| River crossing | 95 | 1.23% |
+| Siege start | 114 | 1.48% |
+| Total | 7711 | 100% |
+
+This denominator includes 7597 battles and 114 siege starts; monthly siege ticks are not additional encounters. Among battles alone, ambushes are 6.99%, inside the 3-9% band. Eligibility tests enforce river and town restrictions.
+
+### Siege length and outcomes
+
+114 sieges started, 113 finished, and one remained active at the horizon. Finished sieges have a **median of 2 phases, p90 of 6 phases, and p99 of 7 phases**. Each scheduled phase is 30 days: approximately 2, 6 and 7 months respectively. These are completed-phase statistics, not exact calendar durations; peace or invalidation can end a siege between scheduled ticks. The p90 was measured in the equivalent reporting-only rerun at `../2026-10-03T15-09-02-444Z-battle-types-summary/100.json`; existing simulation statistics are identical.
+
+| Finished siege outcome | Count | Share of finished sieges |
+| --- | ---: | ---: |
+| Surrendered | 54 | 47.79% |
+| Starved out | 38 | 33.63% |
+| Stormed | 15 | 13.27% |
+| Betrayed | 1 | 0.88% |
+| Relieved | 4 | 3.54% |
+| Lifted | 1 | 0.88% |
+
+The town fell in 108 of 113 completed sieges (**95.58%**); the remaining 5 (**4.42%**) ended without a fall. Percentages are rounded independently.
+
+World siege lengths differ from isolated calibration because the world changes membership, deployments, occupation and peace between phases. Siege starts/ends are paired, no beat falls outside a siege, no siege outlives its war, and active state matches the journal. Annual military validation passes.
+
+### Battle results
+
+Across the 7597 battles, attackers won **60.04%**. Results were **45.68% rout**, **30.70% normal**, **12.94% decisive**, and **10.69% inconclusive**. The weaker side won **12.94%**. Median troop loss shares were **5.28% for attackers** and **9.05% for defenders**. The report recorded **11.67 million battle casualties**, excluding siege attrition and siege clashes. There were **5.81 battles per completed war** (aggregate battles divided by completed wars, including battles in wars still active at the horizon).
 
 Sieges delay occupation until resolution and add monthly attrition. The additional random draws also change later wars, so a seed-equivalent run is not a paired experiment on otherwise identical wars. The slight decrease in median war duration is not the expected isolated siege effect, but the p90 increases slightly. Completed wars decrease 6.64%, battles decrease 5.72%, and attacker success increases 2.62 percentage points; these are model behavior changes retained for review, not calibrated away.
 
