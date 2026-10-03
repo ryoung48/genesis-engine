@@ -32,11 +32,7 @@ import {
 	diffYears,
 	yearMs,
 } from "@/model/history/sim/engine/state/time"
-import {
-	applyDerivedParents,
-	considerTitles,
-	settleProvinces,
-} from "@/model/history/sim/engine/state/titles"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
 	ClearRealmDiplomacyParams,
@@ -337,9 +333,9 @@ function repartitionNation({
 			data: { nation: p, leader: state.leaderRuntime.idx[p] - 1 },
 		})
 	}
-	applyDerivedParents({ state, nation, members })
+	STATE_TITLES.applyDerivedParents({ state, nation, members })
 	rebuildAssignment({ state })
-	settleProvinces({ state, provinces: members })
+	STATE_TITLES.settleProvinces({ state, provinces: members })
 	for (const subject of absorbed)
 		if (!isSovereign({ state, p: subject }))
 			clearRealmDiplomacy({ state, nation: subject })
@@ -1194,5 +1190,5 @@ export const STATE = {
 		MILITARY.mutate({ state: params.state, action: () => uniteCouple(params) }),
 	foundRuler: (params: FoundRulerParams) =>
 		MILITARY.mutate({ state: params.state, action: () => foundRuler(params) }),
-	considerTitles,
+	considerTitles: STATE_TITLES.considerTitles,
 }

@@ -421,49 +421,6 @@ export interface ClearRealmDiplomacyParams {
 	nation: number
 }
 
-export interface ApplyDerivedParentsParams {
-	state: HistoryState
-	nation: number
-	members: number[]
-}
-
-export interface ConsiderTitlesParams {
-	state: HistoryState
-	nation: number
-	rng: SharedRng
-	revenueOf: (nation: number) => number
-}
-
-export interface FoundTitleForParams extends ConsiderTitlesParams {
-	tier: number
-}
-
-export interface DissolveLapsedParams {
-	state: HistoryState
-	nation: number
-}
-
-export interface TitleRevenueBarParams {
-	state: HistoryState
-	tier: number
-	revenueOf: (nation: number) => number
-}
-
-export interface RelinkNationsParams {
-	state: HistoryState
-	nations: Iterable<number>
-}
-
-export interface SettleTitleSetParams {
-	state: HistoryState
-	touched: Set<number>
-}
-
-export interface SettleProvincesParams {
-	state: HistoryState
-	provinces: number[]
-}
-
 export interface ReleaseSubjectRelationsParams {
 	state: HistoryState
 	nation: number

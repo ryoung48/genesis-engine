@@ -13,7 +13,7 @@ import type {
 	SettleProvincesParams,
 	SettleTitleSetParams,
 	TitleRevenueBarParams,
-} from "@/model/history/sim/engine/state/types"
+} from "@/model/history/sim/engine/state/titles/types"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import { HOLDING } from "@/model/society/dejure/holding"
@@ -284,4 +284,8 @@ function considerTitles({
 		if (foundTitleFor({ state, nation, tier, rng, revenueOf })) break
 }
 
-export { applyDerivedParents, considerTitles, settleProvinces }
+export const STATE_TITLES = {
+	applyDerivedParents,
+	considerTitles,
+	settleProvinces,
+}
