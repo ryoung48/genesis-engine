@@ -35,6 +35,5 @@ scripts/planets/output/
 scripts/planets/tmp-*/
 verification/
 
-# Raw detailed history reports exceed GitHub's 100MB file limit; keep them local.
-stats/history/*/[0-9]*.json
-stats/history/*/profiled/
+# Benchmark runs, reports and comparison pages are large; keep them local.
+stats/
