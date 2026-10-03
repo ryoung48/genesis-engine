@@ -1,6 +1,7 @@
 import type {
 	DisplayMonthFields,
 	DisplayMonthParams,
+	EdgeGeometry,
 	SstFieldsFlowParams,
 	SstGradientFlowParams,
 	SurfaceFlowField,
@@ -10,6 +11,7 @@ import type {
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
 import type { FlowGrid } from "@/model/climate/weather/wind/types"
+import type { SphereMesh } from "@/model/mesh/types"
 
 const SMOOTHING_PASSES = 2
 
@@ -17,6 +19,24 @@ const wrapLonDeltaDeg = (delta: number): number => {
 	if (delta > 180) return delta - 360
 	if (delta < -180) return delta + 360
 	return delta
+}
+
+function edgeGeometry(mesh: SphereMesh): EdgeGeometry {
+	const { adjOffset, adjList } = mesh
+	const { latDeg, lonDeg } = RAIN.getClimateGeometry(mesh)
+	const dx = new Float64Array(adjList.length)
+	const dy = new Float64Array(adjList.length)
+	const distSq = new Float64Array(adjList.length)
+	for (let r = 0; r < mesh.numRegions; r++)
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			dx[j] =
+				wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r]) *
+				Math.cos((((latDeg[r] + latDeg[nb]) * 0.5) / 180) * Math.PI)
+			dy[j] = latDeg[nb] - latDeg[r]
+			distSq[j] = dx[j] * dx[j] + dy[j] * dy[j]
+		}
+	return { dx, dy, distSq }
 }
 
 // Geostrophic flow along SST isotherms, treating warm water as high sea
@@ -27,10 +47,10 @@ function fromSstGradient({
 	isLand,
 	sst,
 	fSign,
+	edges,
 }: SstGradientFlowParams): SurfaceFlowField {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const { latDeg, lonDeg } = RAIN.getClimateGeometry(mesh)
 	let srcX = new Float32Array(N)
 	let srcY = new Float32Array(N)
 	let dstX = new Float32Array(N)
@@ -43,11 +63,9 @@ function fromSstGradient({
 		let weightSum = 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			const dx =
-				wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r]) *
-				Math.cos((((latDeg[r] + latDeg[nb]) * 0.5) / 180) * Math.PI)
-			const dy = latDeg[nb] - latDeg[r]
-			const distSq = dx * dx + dy * dy
+			const dx = edges.dx[j]
+			const dy = edges.dy[j]
+			const distSq = edges.distSq[j]
 			if (distSq <= 1e-6) continue
 			const dw = (isLand[nb] ? 0 : sst[nb]) - sst[r]
 			gx += (dw * dx) / distSq
@@ -102,7 +120,8 @@ function fromSstFields({
 	sstMonthly,
 }: SstFieldsFlowParams): SurfaceFlowFields {
 	const N = mesh.numRegions
-	const annual = fromSstGradient({ mesh, isLand, sst, fSign })
+	const edges = edgeGeometry(mesh)
+	const annual = fromSstGradient({ mesh, isLand, sst, fSign, edges })
 	const flowUMonthly = new Float32Array(sstMonthly.length)
 	const flowVMonthly = new Float32Array(sstMonthly.length)
 	const months = sstMonthly.length / N
@@ -112,6 +131,7 @@ function fromSstFields({
 			isLand,
 			sst: sstMonthly.subarray(month * N, (month + 1) * N),
 			fSign,
+			edges,
 		})
 		flowUMonthly.set(flow.u, month * N)
 		flowVMonthly.set(flow.v, month * N)

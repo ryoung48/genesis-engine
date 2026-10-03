@@ -1,11 +1,19 @@
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { SphereMesh } from "@/model/mesh/types"
 
+// Per-edge offsets in degrees, aligned with the mesh adjacency list.
+export type EdgeGeometry = {
+	dx: Float64Array
+	dy: Float64Array
+	distSq: Float64Array
+}
+
 export type SstGradientFlowParams = {
 	mesh: SphereMesh
 	isLand: Uint8Array
 	sst: Float32Array
 	fSign: Int8Array
+	edges: EdgeGeometry
 }
 
 export type SurfaceFlowField = {

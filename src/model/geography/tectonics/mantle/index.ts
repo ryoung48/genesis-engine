@@ -97,12 +97,19 @@ function projectMantleFieldToRegions({
 	const { r_xyz } = mesh
 	const coarseRegionCount = coarseMesh.numRegions
 	const maxWalk = Math.ceil(Math.sqrt(coarseRegionCount))
+	const nearest = new Int32Array(mesh.numRegions)
 	let cur = 0
 
 	for (let r = 0; r < mesh.numRegions; r++) {
 		const px = r_xyz[3 * r]
 		const py = r_xyz[3 * r + 1]
 		const pz = r_xyz[3 * r + 2]
+		// Start from an already-resolved neighbour so the walk is short.
+		for (let i = mesh.adjOffset[r], iEnd = mesh.adjOffset[r + 1]; i < iEnd; i++)
+			if (mesh.adjList[i] < r) {
+				cur = nearest[mesh.adjList[i]]
+				break
+			}
 
 		let bestDot =
 			px * coarse_xyz[3 * cur] +
@@ -140,6 +147,7 @@ function projectMantleFieldToRegions({
 			}
 		}
 
+		nearest[r] = cur
 		projected[r] = coarseMantleField[cur] ?? 0
 	}
 	return projected

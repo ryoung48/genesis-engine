@@ -42,15 +42,24 @@ const eastMoistureWinBias = (absLat: number, hadley: number): number => {
 // thermal equator, dropping to near-zero by 0.4. `x` is the |cellLat - teq|
 // distance already normalized to hadley-cell units, so a cell moves in and out
 // of the band purely from the ITCZ's seasonal north/south swing.
+const ITCZ_CURVE = { domain: [0, 0.15, 0.4, 1], range: [1, 1, 0.15, 0] }
 const itczScale = (x: number) =>
-	MATH.piecewise({ domain: [0, 0.15, 0.4, 1], range: [1, 1, 0.15, 0], x })
+	MATH.piecewise({ domain: ITCZ_CURVE.domain, range: ITCZ_CURVE.range, x })
 
 // West-facing coasts, winter storm track: onsets at 25°/hadleyWidth off the
 // month's thermal equator and peaks at 40°, so a mid-latitude west coast is
 // wettest when the band has receded toward the opposite hemisphere (local
 // winter) — the Mediterranean/maritime winter-rain regime.
+const WESTERLIES_CURVE = {
+	domain: [25 / 30, 45 / 30, 80 / 30],
+	range: [0, 1, 0.8],
+}
 const westerliesScale = (x: number) =>
-	MATH.piecewise({ domain: [25 / 30, 45 / 30, 80 / 30], range: [0, 1, 0.8], x })
+	MATH.piecewise({
+		domain: WESTERLIES_CURVE.domain,
+		range: WESTERLIES_CURVE.range,
+		x,
+	})
 
 // East-facing coasts, trade-wind convergence: full strength while the month's
 // thermal equator is within ~0.25 hadley-widths of the cell (local wet season),
@@ -59,10 +68,14 @@ const westerliesScale = (x: number) =>
 // savanna dry season; the humid-subtropical floor below keeps higher-latitude
 // east coasts (Cfa) wet year-round. Replaces the old eastStormScale, which grew
 // with distance from the band and left east coasts near-flat.
+const EAST_PROXIMITY_CURVE = {
+	domain: [0, 0.25, 0.6, 1.4, 2.6],
+	range: [1, 1, 0.38, 0.14, 0.08],
+}
 const eastProximityScale = (x: number) =>
 	MATH.piecewise({
-		domain: [0, 0.25, 0.6, 1.4, 2.6],
-		range: [1, 1, 0.38, 0.14, 0.08],
+		domain: EAST_PROXIMITY_CURVE.domain,
+		range: EAST_PROXIMITY_CURVE.range,
 		x,
 	})
 
@@ -70,8 +83,13 @@ const eastProximityScale = (x: number) =>
 // tropics so a savanna east coast can swing to a real dry season, rising to
 // ~0.45 by the subtropics where east coasts are humid-subtropical (Cfa, no dry
 // season). West coasts are unaffected.
+const EAST_HUMID_FLOOR_CURVE = { domain: [16, 27, 40], range: [0, 0.32, 0.46] }
 const eastHumidFloor = (absLatDeg: number) =>
-	MATH.piecewise({ domain: [16, 27, 40], range: [0, 0.32, 0.46], x: absLatDeg })
+	MATH.piecewise({
+		domain: EAST_HUMID_FLOOR_CURVE.domain,
+		range: EAST_HUMID_FLOOR_CURVE.range,
+		x: absLatDeg,
+	})
 
 // Hadley-cell subsidence: no suppression until 10°/hadleyWidth off the
 // thermal equator, ramps to near-full suppression by 18°, holds through 34°,
@@ -79,10 +97,14 @@ const eastHumidFloor = (absLatDeg: number) =>
 // since dist is already normalized to hadley-cell units). Peak is 0.96, not
 // 1.0, so the driest subtropical west coasts keep only a bare trickle of rain
 // rather than going fully bone-dry.
+const SUBSIDENCE_CURVE = {
+	domain: [10 / 30, 18 / 30, 34 / 30, 44 / 30],
+	range: [0, 0.96, 0.96, 0],
+}
 const subsidenceScale = (x: number) =>
 	MATH.piecewise({
-		domain: [10 / 30, 18 / 30, 34 / 30, 44 / 30],
-		range: [0, 0.96, 0.96, 0],
+		domain: SUBSIDENCE_CURVE.domain,
+		range: SUBSIDENCE_CURVE.range,
 		x,
 	})
 
@@ -93,15 +115,45 @@ const subsidenceScale = (x: number) =>
 // climbing into the wind matters — flat/downslope hops get 1x (unaffected);
 // the existing per-hop depletion already handles leeward rain-shadow drying
 // once moisture has been pulled out here.
+const OROGRAPHIC_LIFT_CURVE = {
+	domain: [0, 0.2, 0.45, 1],
+	range: [1, 1, 1.6, 3],
+}
 const orographicLiftScale = (slope: number) =>
-	MATH.piecewise({ domain: [0, 0.2, 0.45, 1], range: [1, 1, 1.6, 3], x: slope })
+	MATH.piecewise({
+		domain: OROGRAPHIC_LIFT_CURVE.domain,
+		range: OROGRAPHIC_LIFT_CURVE.range,
+		x: slope,
+	})
 
+const HADLEY_WIDTH_CURVE = {
+	domain: [6, 12, 24, 48, 96, 192, 384, 2000],
+	range: [18, 25, 30, 40, 55, 65, 70, 88],
+}
 const hadleyWidth = (x: number) =>
 	MATH.piecewise({
-		domain: [6, 12, 24, 48, 96, 192, 384, 2000],
-		range: [18, 25, 30, 40, 55, 65, 70, 88],
+		domain: HADLEY_WIDTH_CURVE.domain,
+		range: HADLEY_WIDTH_CURVE.range,
 		x,
 	})
+
+const TRADE_ZONAL_CURVE = {
+	domain: [0, 10, 25, 35, 50],
+	range: [0.7, 1, 1, 0.4, 0],
+}
+const TRADE_MERIDIONAL_CURVE = {
+	domain: [0, 5, 15, 30, 40],
+	range: [0, 0.2, 0.55, 0.8, 0],
+}
+const SUBTROPICAL_JET_CURVE = {
+	domain: [20, 28, 32, 40],
+	range: [0, 0.75, 1.1, 0.3],
+}
+const POLAR_JET_CURVE = { domain: [45, 52, 60, 70], range: [0, 0.45, 0.9, 0] }
+const POLEWARD_CURVE = {
+	domain: [22, 30, 45, 60, 75],
+	range: [0, 0.2, 0.55, 0.35, 0],
+}
 const climateGeometryCache = new WeakMap<SphereMesh, ClimateGeometry>()
 
 function getClimateGeometry(mesh: SphereMesh): ClimateGeometry {
@@ -418,17 +470,15 @@ function computeAdvection({
 		// pass must never use it as a source nor overwrite it as a target.
 		const eastLiftAffected = new Uint8Array(N)
 		const westLiftAffected = new Uint8Array(N)
-		const isValidFlow = ({
+		// The prevailing flow at a cell is the same for every outgoing edge, so
+		// it is resolved once per cell and each edge only checks its alignment.
+		const flowAt = ({
 			attr,
 			r,
-			eastward,
-			northward,
 		}: {
 			attr: "east" | "west"
 			r: number
-			eastward: number
-			northward: number
-		}): boolean => {
+		}): { east: number; north: number; norm: number; minAlignment: number } => {
 			const lat = latDeg[r]
 			const absLat = absLatDeg[r]
 			const teq = teqByLon[regionBin[r]]
@@ -436,46 +486,50 @@ function computeAdvection({
 
 			if (attr === "east") {
 				const zonalStrength = MATH.piecewise({
-					domain: [0, 10, 25, 35, 50],
-					range: [0.7, 1, 1, 0.4, 0],
+					domain: TRADE_ZONAL_CURVE.domain,
+					range: TRADE_ZONAL_CURVE.range,
 					x: absLat,
 				})
 				const meridionalStrength = MATH.piecewise({
-					domain: [0, 5, 15, 30, 40],
-					range: [0, 0.2, 0.55, 0.8, 0],
+					domain: TRADE_MERIDIONAL_CURVE.domain,
+					range: TRADE_MERIDIONAL_CURVE.range,
 					x: distToTeq,
 				})
 				const teqDir = teq > lat ? 1 : teq < lat ? -1 : 0
 				const flowEast = -zonalStrength
 				const flowNorth = teqDir * meridionalStrength
-				const flowNorm = Math.hypot(flowEast, flowNorth)
-				if (flowNorm < 1e-6) return eastward <= -0.573576436351046
-				const alignment =
-					(eastward * flowEast + northward * flowNorth) / flowNorm
-				return alignment >= 0.35
+				return {
+					east: flowEast,
+					north: flowNorth,
+					norm: Math.hypot(flowEast, flowNorth),
+					minAlignment: 0.35,
+				}
 			}
 			const subtropicalJet = MATH.piecewise({
-				domain: [20, 28, 32, 40],
-				range: [0, 0.75, 1.1, 0.3],
+				domain: SUBTROPICAL_JET_CURVE.domain,
+				range: SUBTROPICAL_JET_CURVE.range,
 				x: absLat,
 			})
 			const polarJet = MATH.piecewise({
-				domain: [45, 52, 60, 70],
-				range: [0, 0.45, 0.9, 0],
+				domain: POLAR_JET_CURVE.domain,
+				range: POLAR_JET_CURVE.range,
 				x: absLat,
 			})
 			const zonalStrength = Math.max(0.7, subtropicalJet, polarJet)
 			const polewardStrength = MATH.piecewise({
-				domain: [22, 30, 45, 60, 75],
-				range: [0, 0.2, 0.55, 0.35, 0],
+				domain: POLEWARD_CURVE.domain,
+				range: POLEWARD_CURVE.range,
 				x: absLat,
 			})
 			const poleDir = lat >= teq ? 1 : -1
 			const flowEast = zonalStrength
 			const flowNorth = poleDir * polewardStrength
-			const flowNorm = Math.hypot(flowEast, flowNorth)
-			const alignment = (eastward * flowEast + northward * flowNorth) / flowNorm
-			return alignment >= 0.4
+			return {
+				east: flowEast,
+				north: flowNorth,
+				norm: Math.hypot(flowEast, flowNorth),
+				minAlignment: 0.4,
+			}
 		}
 
 		const assignRain = (attr: "east" | "west", blockedBy?: Float32Array) => {
@@ -521,17 +575,16 @@ function computeAdvection({
 				}
 
 				const rIsOceanWater = !land[r] && isOceanWater(r)
+				const flow = flowAt({ attr, r })
+				const calm = attr === "east" && flow.norm < 1e-6
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
-					if (
-						!isValidFlow({
-							attr,
-							r,
-							eastward: edgeEastward[j],
-							northward: edgeNorthward[j],
-						})
-					)
-						continue
+					const aligned = calm
+						? edgeEastward[j] <= -0.573576436351046
+						: (edgeEastward[j] * flow.east + edgeNorthward[j] * flow.north) /
+								flow.norm >=
+							flow.minAlignment
+					if (!aligned) continue
 					// Scale the per-hop moisture change by this edge's real
 					// distance relative to the mesh average — a hop between two
 					// coastline-dense cells covers far less ground than a hop

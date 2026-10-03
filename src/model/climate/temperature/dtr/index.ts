@@ -123,21 +123,23 @@ function computeDiurnalRange(args: {
 		else oceanRegions.push(r)
 	}
 
+	const oceanRain = 300
+	const oceanDaylightWet = 1 - Math.E ** (-oceanRain / 100)
+	const oceanDaylightAmp = 0.6 * (1 - 0.5 * oceanDaylightWet)
+	const oceanHourFactor = 3 * relHours ** 0.55
 	for (const r of oceanRegions) {
 		for (let m = 0; m < 12; m++) {
 			const idx = m * N + r
-			const rain = 300
 			const dayFrac = daylight_hours_monthly[idx] / params?.hoursPerDay
-			const daylightWet = 1 - Math.E ** (-rain / 100)
-			const daylightAmp = 0.6 * (1 - 0.5 * daylightWet)
-			const daylightFactor = 1 - daylightAmp * (2 * dayFrac - 1) ** 2
-			const oceanVariability = 3 * relHours ** 0.55 * daylightFactor
+			const daylightFactor = 1 - oceanDaylightAmp * (2 * dayFrac - 1) ** 2
+			const oceanVariability = oceanHourFactor * daylightFactor
 			dtr_monthly[idx] = 4 + oceanVariability
 		}
 	}
 
 	for (const r of landRegions) {
 		const distKm = oceanDist ? oceanDist[r] : 0
+		const landFactor = Math.min(1, 1 - Math.E ** (-distKm / 1200))
 
 		for (let m = 0; m < 12; m++) {
 			const idx = m * N + r
@@ -146,12 +148,12 @@ function computeDiurnalRange(args: {
 			const daylightWet = 1 - Math.E ** (-rain / 100)
 			const daylightAmp = 0.6 * (1 - 0.5 * daylightWet)
 			const daylightFactor = 1 - daylightAmp * (2 * dayFrac - 1) ** 2
-			const rainVariability = 8.5 * Math.E ** (-rain / 85)
+			const rainDecay = Math.E ** (-rain / 85)
+			const rainVariability = 8.5 * rainDecay
 			const dayAlpha = 0.2 + 0.23 * Math.E ** (-rain / 90)
 			const dayFactor = relHours ** dayAlpha
 
-			const landAlpha = 0.08 + 0.37 * Math.E ** (-rain / 85)
-			const landFactor = Math.min(1, 1 - Math.E ** (-distKm / 1200))
+			const landAlpha = 0.08 + 0.37 * rainDecay
 
 			dtr_monthly[idx] =
 				5 +

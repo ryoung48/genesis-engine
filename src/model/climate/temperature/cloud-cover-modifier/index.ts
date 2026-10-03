@@ -5,6 +5,7 @@ import { MATH } from "@/model/shared/math/core"
 const HOT_LOW_CLOUD_WARMING_C = 4
 const HOT_HIGH_CLOUD_COOLING_C = 2.5
 const INTENSITY_CAP_TEMP_C = 20
+const CLEARNESS_CURVE = { domain: [0.2, 0.8], range: [1, -1] }
 
 function applyCloudCoverTemperatureModifier({
 	climate,
@@ -48,8 +49,8 @@ function applyCloudCoverTemperatureModifier({
 			// +1 (max warming) at <=20% cloud cover (clear), -1 (max cooling) at
 			// >=80% cloud cover (overcast), linear ramp between.
 			const clearness = MATH.piecewise({
-				domain: [0.2, 0.8],
-				range: [1, -1],
+				domain: CLEARNESS_CURVE.domain,
+				range: CLEARNESS_CURVE.range,
 				x: cloudFraction,
 			})
 			const hotSideDelta =

@@ -5,10 +5,15 @@ import type {
 import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 
+const CEILING_CURVE = {
+	domain: [-14, -8, 2, 12, 18, 40, 60, 90],
+	range: [40, 62, 83, 125, 165, 300, 150, 0],
+}
+
 const ceilingScale = (x: number) =>
 	MATH.piecewise({
-		domain: [-14, -8, 2, 12, 18, 40, 60, 90],
-		range: [40, 62, 83, 125, 165, 300, 150, 0],
+		domain: CEILING_CURVE.domain,
+		range: CEILING_CURVE.range,
 		x,
 	})
 

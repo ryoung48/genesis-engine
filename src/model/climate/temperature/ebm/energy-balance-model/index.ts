@@ -47,8 +47,9 @@ export class EnergyBalanceModel {
 	olrB = 0
 	equilibriumGuess = 288
 	internalHeatFlux = 0
-	private sigma = 5.67e-8
 	private baseGreenhouseFactor = 0
+	private olrANumerator = 0
+	private olrBNumerator = 0
 
 	constructor(config: EBMConfig) {
 		this.config = config
@@ -106,10 +107,11 @@ export class EnergyBalanceModel {
 			((meanSolarFlux + this.internalHeatFlux) / stellar.SIGMA) ** 0.25
 
 		this.olrTRef = blackbodyTemp
+		this.olrANumerator = stellar.SIGMA * this.olrTRef ** 4
+		this.olrBNumerator = 4 * stellar.SIGMA * this.olrTRef ** 3
 		this.olrB = (4 * stellar.SIGMA * this.olrTRef ** 3) / (1 + greenhouseFactor)
 		this.olrA = (stellar.SIGMA * this.olrTRef ** 4) / (1 + greenhouseFactor)
 		this.equilibriumGuess = this.olrTRef * (1 + greenhouseFactor / 4)
-		this.sigma = stellar.SIGMA
 		this.baseGreenhouseFactor = greenhouseFactor
 	}
 
@@ -132,8 +134,8 @@ export class EnergyBalanceModel {
 			this.baseGreenhouseFactor *
 			GREENHOUSE_MOISTURE.moistureGreenhouseMultiplier(temperatureK)
 		return {
-			olrA: (this.sigma * this.olrTRef ** 4) / (1 + g),
-			olrB: (4 * this.sigma * this.olrTRef ** 3) / (1 + g),
+			olrA: this.olrANumerator / (1 + g),
+			olrB: this.olrBNumerator / (1 + g),
 		}
 	}
 

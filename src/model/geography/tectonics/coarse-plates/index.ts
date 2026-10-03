@@ -76,6 +76,7 @@ function projectCoarsePlates({
 
 	const NC = coarseMesh.numRegions
 	const MAX_WALK = Math.ceil(Math.sqrt(NC))
+	const nearest = new Int32Array(N)
 	let cur = 0
 
 	for (let r = 0; r < N; r++) {
@@ -107,6 +108,13 @@ function projectCoarsePlates({
 		px /= len
 		py /= len
 		pz /= len
+
+		// Start from an already-resolved neighbour so the walk is short.
+		for (let i = mesh.adjOffset[r], iEnd = mesh.adjOffset[r + 1]; i < iEnd; i++)
+			if (mesh.adjList[i] < r) {
+				cur = nearest[mesh.adjList[i]]
+				break
+			}
 
 		// Greedy walk: find nearest coarse region to the perturbed point
 		let bestDot =
@@ -147,6 +155,7 @@ function projectCoarsePlates({
 			}
 		}
 
+		nearest[r] = cur
 		r_plate[r] = coarse_r_plate[cur]
 	}
 
