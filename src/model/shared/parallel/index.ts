@@ -57,21 +57,29 @@ function shared<T extends SharedArray>(source: T): T {
 
 // Runs a kernel over every cell index, split across the pool. The kernel must
 // compute each cell from read-only inputs so the split cannot change results.
-function mapCells<Payload>({
+function mapCells<Payload>(params: MapCellsParams<Payload>): void {
+	if (params.count < MIN_PARALLEL_CELLS)
+		params.kernel({ ...params.payload, start: 0, end: params.count })
+	else mapItems(params)
+}
+
+// Same split for a handful of heavy independent items, such as months.
+function mapItems<Payload>({
 	task,
 	kernel,
 	count,
 	payload,
 }: MapCellsParams<Payload>): void {
 	pool ??= startPool()
-	if (pool.length === 0 || count < MIN_PARALLEL_CELLS) {
+	if (pool.length === 0 || count < 2) {
 		kernel({ ...payload, start: 0, end: count })
 		return
 	}
-	const chunks = pool.length + 1
+	const chunks = Math.min(count, pool.length + 1)
 	const size = Math.ceil(count / chunks)
 	const control = new Int32Array(new SharedArrayBuffer(8))
-	for (let i = 0; i < pool.length; i++)
+	const helpers = chunks - 1
+	for (let i = 0; i < helpers; i++)
 		pool[i].postMessage({
 			task,
 			payload,
@@ -81,7 +89,7 @@ function mapCells<Payload>({
 		})
 	kernel({ ...payload, start: 0, end: Math.min(count, size) })
 	let finished = Atomics.load(control, 0)
-	while (finished < pool.length) {
+	while (finished < helpers) {
 		Atomics.wait(control, 0, finished)
 		finished = Atomics.load(control, 0)
 	}
@@ -99,4 +107,9 @@ function local<T extends SharedArray>(source: T): T {
 	return copy
 }
 
-export const PARALLEL = { mapCells, shared, local }
+// Starts the workers ahead of first use so they load while earlier stages run.
+function warm(): void {
+	pool ??= startPool()
+}
+
+export const PARALLEL = { mapCells, mapItems, shared, local, warm }

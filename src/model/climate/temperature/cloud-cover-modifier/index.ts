@@ -1,6 +1,10 @@
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
-import type { CloudCoverTemperatureModifierParams } from "@/model/climate/temperature/cloud-cover-modifier/types"
+import type {
+	CloudCoverCellsParams,
+	CloudCoverTemperatureModifierParams,
+} from "@/model/climate/temperature/cloud-cover-modifier/types"
 import { MATH } from "@/model/shared/math/core"
+import { PARALLEL } from "@/model/shared/parallel"
 
 const HOT_LOW_CLOUD_WARMING_C = 4
 const HOT_HIGH_CLOUD_COOLING_C = 2.5
@@ -21,12 +25,57 @@ function applyCloudCoverTemperatureModifier({
 	// since this loop already visits every cell/month to estimate cloud
 	// fraction for the temperature effect below -- see GenesisClimate's
 	// cloud_cover_monthly doc.
-	const cloudCoverMonthly = new Float32Array(N * 12)
-	climate.cloud_cover_monthly = cloudCoverMonthly
+	const cloudCoverMonthly = PARALLEL.shared(new Float32Array(N * 12))
+	const temperatureMonthly = PARALLEL.shared(climate.temperature_monthly)
+	const temperatureAvg = PARALLEL.shared(climate.temperature_avg)
+	const temperatureMin = PARALLEL.shared(climate.temperature_min)
+	const temperatureMax = PARALLEL.shared(climate.temperature_max)
+	PARALLEL.mapCells({
+		task: "cloudCoverCells",
+		kernel: cloudCoverCells,
+		count: N,
+		payload: {
+			temperatureMonthly,
+			temperatureAvg,
+			temperatureMin,
+			temperatureMax,
+			cloudCoverMonthly,
+			petMonthly: PARALLEL.shared(climate.pet_monthly),
+			aetMonthly: PARALLEL.shared(hydrology.aet_monthly),
+			rainMonthly: PARALLEL.shared(rainfall.monthly),
+			dtrMonthly: PARALLEL.shared(dtrMonthly),
+			oceanDist: PARALLEL.shared(oceanDist),
+			isLand: PARALLEL.shared(isLand),
+			isTidallyLocked,
+		},
+	})
+	climate.cloud_cover_monthly = PARALLEL.local(cloudCoverMonthly)
+	climate.temperature_monthly.set(temperatureMonthly)
+	climate.temperature_avg.set(temperatureAvg)
+	climate.temperature_min.set(temperatureMin)
+	climate.temperature_max.set(temperatureMax)
+}
 
-	for (let r = 0; r < N; r++) {
+function cloudCoverCells({
+	start,
+	end,
+	temperatureMonthly,
+	temperatureAvg,
+	temperatureMin,
+	temperatureMax,
+	cloudCoverMonthly,
+	petMonthly,
+	aetMonthly,
+	rainMonthly,
+	dtrMonthly,
+	oceanDist,
+	isLand,
+	isTidallyLocked,
+}: CloudCoverCellsParams): void {
+	const N = oceanDist.length
+	for (let r = start; r < end; r++) {
 		const oceanDistanceKm = oceanDist[r]
-		const annualTempC = climate.temperature_avg[r]
+		const annualTempC = temperatureAvg[r]
 		const intensity = Math.min(1, Math.abs(annualTempC) / INTENSITY_CAP_TEMP_C)
 		let annualDelta = 0
 		let minDelta = 0
@@ -34,11 +83,11 @@ function applyCloudCoverTemperatureModifier({
 		for (let m = 0; m < 12; m++) {
 			const idx = m * N + r
 			const cloudFraction = CLOUD_COVER.estimate({
-				aetMm: hydrology.aet_monthly[idx],
-				petMm: climate.pet_monthly[idx],
-				rainfallMm: rainfall.monthly[idx],
+				aetMm: aetMonthly[idx],
+				petMm: petMonthly[idx],
+				rainfallMm: rainMonthly[idx],
 				dtrC: dtrMonthly[idx],
-				temperatureC: climate.temperature_monthly[idx],
+				temperatureC: temperatureMonthly[idx],
 				oceanDistanceKm,
 				isTidallyLocked,
 			})
@@ -61,19 +110,20 @@ function applyCloudCoverTemperatureModifier({
 
 			const scaledDelta = delta * intensity
 
-			climate.temperature_monthly[idx] += scaledDelta
+			temperatureMonthly[idx] += scaledDelta
 			annualDelta += scaledDelta
 			if (scaledDelta < minDelta) minDelta = scaledDelta
 			if (scaledDelta > maxDelta) maxDelta = scaledDelta
 		}
 		if (intensity === 0) continue
 		annualDelta /= 12
-		climate.temperature_avg[r] += annualDelta
-		climate.temperature_min[r] += minDelta
-		climate.temperature_max[r] += maxDelta
+		temperatureAvg[r] += annualDelta
+		temperatureMin[r] += minDelta
+		temperatureMax[r] += maxDelta
 	}
 }
 
 export const CLOUD_COVER_TEMPERATURE_MODIFIER = {
 	applyCloudCoverTemperatureModifier,
+	cloudCoverCells,
 }

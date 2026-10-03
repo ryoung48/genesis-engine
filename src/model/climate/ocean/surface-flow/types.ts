@@ -1,5 +1,6 @@
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { CellRange } from "@/model/shared/parallel/types"
 
 // Per-edge offsets in degrees, aligned with the mesh adjacency list.
 export type EdgeGeometry = {
@@ -9,11 +10,23 @@ export type EdgeGeometry = {
 }
 
 export type SstGradientFlowParams = {
-	mesh: SphereMesh
+	adjOffset: Int32Array
+	adjList: Int32Array
 	isLand: Uint8Array
 	sst: Float32Array
 	fSign: Int8Array
 	edges: EdgeGeometry
+}
+
+export type SstFlowMonthsParams = CellRange & {
+	adjOffset: Int32Array
+	adjList: Int32Array
+	isLand: Uint8Array
+	sstMonthly: Float32Array
+	fSign: Int8Array
+	edges: EdgeGeometry
+	flowUMonthly: Float32Array
+	flowVMonthly: Float32Array
 }
 
 export type SurfaceFlowField = {

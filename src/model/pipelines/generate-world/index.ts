@@ -31,6 +31,7 @@ import type {
 	StageTiming,
 } from "@/model/pipelines/types"
 import { STATS } from "@/model/shared/math/stats"
+import { PARALLEL } from "@/model/shared/parallel"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
 import { URBANIZATION } from "@/model/society/urbanization"
@@ -222,6 +223,7 @@ function generateGenesisWorld({
 	params,
 	onProgress,
 }: GenerateGenesisWorldParams): GenesisWorld {
+	PARALLEL.warm()
 	const rng = RNG.createRng({ seed: params.seed })
 	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []

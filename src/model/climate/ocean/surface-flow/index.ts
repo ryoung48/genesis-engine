@@ -3,6 +3,7 @@ import type {
 	DisplayMonthParams,
 	EdgeGeometry,
 	SstFieldsFlowParams,
+	SstFlowMonthsParams,
 	SstGradientFlowParams,
 	SurfaceFlowField,
 	SurfaceFlowFields,
@@ -12,6 +13,7 @@ import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
 import type { FlowGrid } from "@/model/climate/weather/wind/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import { PARALLEL } from "@/model/shared/parallel"
 
 const SMOOTHING_PASSES = 2
 
@@ -24,9 +26,9 @@ const wrapLonDeltaDeg = (delta: number): number => {
 function edgeGeometry(mesh: SphereMesh): EdgeGeometry {
 	const { adjOffset, adjList } = mesh
 	const { latDeg, lonDeg } = RAIN.getClimateGeometry(mesh)
-	const dx = new Float64Array(adjList.length)
-	const dy = new Float64Array(adjList.length)
-	const distSq = new Float64Array(adjList.length)
+	const dx = PARALLEL.shared(new Float64Array(adjList.length))
+	const dy = PARALLEL.shared(new Float64Array(adjList.length))
+	const distSq = PARALLEL.shared(new Float64Array(adjList.length))
 	for (let r = 0; r < mesh.numRegions; r++)
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
@@ -43,14 +45,14 @@ function edgeGeometry(mesh: SphereMesh): EdgeGeometry {
 // surface: (u, v) = fSign * k x grad(sst), which keeps warm water on the right
 // of the flow where f > 0.
 function fromSstGradient({
-	mesh,
+	adjOffset,
+	adjList,
 	isLand,
 	sst,
 	fSign,
 	edges,
 }: SstGradientFlowParams): SurfaceFlowField {
-	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
+	const N = isLand.length
 	let srcX = new Float32Array(N)
 	let srcY = new Float32Array(N)
 	let dstX = new Float32Array(N)
@@ -121,13 +123,57 @@ function fromSstFields({
 }: SstFieldsFlowParams): SurfaceFlowFields {
 	const N = mesh.numRegions
 	const edges = edgeGeometry(mesh)
-	const annual = fromSstGradient({ mesh, isLand, sst, fSign, edges })
-	const flowUMonthly = new Float32Array(sstMonthly.length)
-	const flowVMonthly = new Float32Array(sstMonthly.length)
-	const months = sstMonthly.length / N
-	for (let month = 0; month < months; month++) {
+	const { adjOffset, adjList } = mesh
+	const annual = fromSstGradient({
+		adjOffset,
+		adjList,
+		isLand,
+		sst,
+		fSign,
+		edges,
+	})
+	const flowUMonthly = PARALLEL.shared(new Float32Array(sstMonthly.length))
+	const flowVMonthly = PARALLEL.shared(new Float32Array(sstMonthly.length))
+	PARALLEL.mapItems({
+		task: "sstFlowMonths",
+		kernel: sstFlowMonths,
+		count: sstMonthly.length / N,
+		payload: {
+			adjOffset: PARALLEL.shared(adjOffset),
+			adjList: PARALLEL.shared(adjList),
+			isLand: PARALLEL.shared(isLand),
+			sstMonthly: PARALLEL.shared(sstMonthly),
+			fSign: PARALLEL.shared(fSign),
+			edges,
+			flowUMonthly,
+			flowVMonthly,
+		},
+	})
+	return {
+		flowU: annual.u,
+		flowV: annual.v,
+		flowUMonthly: PARALLEL.local(flowUMonthly),
+		flowVMonthly: PARALLEL.local(flowVMonthly),
+	}
+}
+
+function sstFlowMonths({
+	start,
+	end,
+	adjOffset,
+	adjList,
+	isLand,
+	sstMonthly,
+	fSign,
+	edges,
+	flowUMonthly,
+	flowVMonthly,
+}: SstFlowMonthsParams): void {
+	const N = isLand.length
+	for (let month = start; month < end; month++) {
 		const flow = fromSstGradient({
-			mesh,
+			adjOffset,
+			adjList,
 			isLand,
 			sst: sstMonthly.subarray(month * N, (month + 1) * N),
 			fSign,
@@ -136,7 +182,6 @@ function fromSstFields({
 		flowUMonthly.set(flow.u, month * N)
 		flowVMonthly.set(flow.v, month * N)
 	}
-	return { flowU: annual.u, flowV: annual.v, flowUMonthly, flowVMonthly }
 }
 
 // month 0 is the annual mean, 1..12 are calendar months.
@@ -184,6 +229,7 @@ function toGrid({
 
 export const SURFACE_FLOW = {
 	fromSstFields,
+	sstFlowMonths,
 	forDisplayMonth,
 	toGrid,
 }

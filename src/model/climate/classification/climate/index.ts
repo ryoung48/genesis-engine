@@ -7,6 +7,7 @@ import type {
 	ComputeTemperatureParams,
 	LatBandInterpolationParams,
 	MeshLatitudeGeometry,
+	ZonalTemperatureCellsParams,
 } from "@/model/climate/classification/climate/types"
 import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import type { EBMConfig } from "@/model/climate/temperature/ebm/config"
@@ -19,6 +20,7 @@ import { ELEVATION } from "@/model/geography/terrain/elevation"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import { MATH } from "@/model/shared/math/core"
+import { PARALLEL } from "@/model/shared/parallel"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
 
@@ -162,6 +164,79 @@ function applyDtrToClimateMinMax({
 	}
 }
 
+// Convert ocean distance from km to miles for continentality model
+const KM_TO_MI = 0.621371
+
+function zonalTemperatureCells({
+	start,
+	end,
+	xyz,
+	elevation,
+	elevationKm,
+	oceanDist,
+	isLand,
+	annualByBand,
+	monthlyByBand,
+	monthlyRangeByBand,
+	monthlyInsolationByBand,
+	gravityRatio,
+	monthly,
+	noLapse,
+	monthlyRange,
+	insolation,
+}: ZonalTemperatureCellsParams): void {
+	const N = isLand.length
+	for (let r = start; r < end; r++) {
+		const z = xyz[3 * r + 2]
+		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
+		const hKm = elevationKm
+			? elevationKm[r]
+			: ELEVATION.elevToHeightKm({ elev: elevation[r] })
+		const annualAvg = interpolateLatBand({
+			range: annualByBand,
+			latDeg,
+		})
+
+		// Continentality: scale seasonal deviation from annual mean
+		// Ocean (0 mi): factor ≈ 0.78 (damped), coast (~300 mi): factor ≈ 1.0, deep inland: → 1.75
+		// Taper toward poles: less solar energy = lower ceiling for continental amplification
+		const distMiles = oceanDist ? oceanDist[r] * KM_TO_MI : 0
+		const absLat = Math.abs(latDeg)
+		const polarTaper = absLat > 55 ? 1 - (absLat - 55) / 35 : 1 // linear fade 55°–90°
+		const maxAmplitude = 0.5 * Math.max(0, polarTaper)
+		const inertiaFactor = oceanDist
+			? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000)
+			: 1
+
+		for (let month = 0; month < 12; month++) {
+			const zonalMonthNoLapse = interpolateLatBand({
+				range: monthlyByBand[month],
+				latDeg,
+			})
+			const monthlyNoLapse =
+				annualAvg + (zonalMonthNoLapse - annualAvg) * inertiaFactor
+			// Temperature proxies moisture: cold columns approach the dry lapse rate.
+			const moistureFraction = MATH.smoothstep({
+				edge0: -20,
+				edge1: 20,
+				x: monthlyNoLapse,
+			})
+			const lapseRate = (9.8 - 4.8 * moistureFraction) * gravityRatio
+			const lapseCorrection = isLand[r] === 1 ? hKm * lapseRate : 0
+			monthly[month * N + r] = monthlyNoLapse - lapseCorrection
+			noLapse[month * N + r] = monthlyNoLapse
+			// Range scales with continentality; insolation is purely astronomical
+			monthlyRange[month * N + r] =
+				interpolateLatBand({ range: monthlyRangeByBand[month], latDeg }) *
+				inertiaFactor
+			insolation[month * N + r] = interpolateLatBand({
+				range: monthlyInsolationByBand[month],
+				latDeg,
+			})
+		}
+	}
+}
+
 const SOLVED_MODEL_LIMIT = 4
 
 const solvedModels = new Map<string, EnergyBalanceModel>()
@@ -272,66 +347,37 @@ function computeTemperature({
 	const temperature_avg = new Float32Array(N)
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
-	const temperature_monthly = new Float32Array(N * 12)
-	const temperature_monthly_nolapse = new Float32Array(N * 12)
-	const temperature_monthly_range = new Float32Array(N * 12)
-	const insolation_monthly = new Float32Array(N * 12)
+	const monthly = PARALLEL.shared(new Float32Array(N * 12))
+	const noLapse = PARALLEL.shared(new Float32Array(N * 12))
+	const monthlyRange = PARALLEL.shared(new Float32Array(N * 12))
+	const insolation = PARALLEL.shared(new Float32Array(N * 12))
 	const pet_monthly = new Float32Array(N * 12)
 
-	const gravityRatio = params.planetRadiusKm / 6371
-
-	// Convert ocean distance from km to miles for continentality model
-	const KM_TO_MI = 0.621371
-
-	for (let r = 0; r < N; r++) {
-		const z = mesh.r_xyz[3 * r + 2]
-		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
-		const hKm = elevation_km
-			? elevation_km[r]
-			: ELEVATION.elevToHeightKm({ elev: elevation[r] })
-		const annualAvg = interpolateLatBand({
-			range: temperatureAvgByBand,
-			latDeg,
-		})
-
-		// Continentality: scale seasonal deviation from annual mean
-		// Ocean (0 mi): factor ≈ 0.78 (damped), coast (~300 mi): factor ≈ 1.0, deep inland: → 1.75
-		// Taper toward poles: less solar energy = lower ceiling for continental amplification
-		const distMiles = oceanDist ? oceanDist[r] * KM_TO_MI : 0
-		const absLat = Math.abs(latDeg)
-		const polarTaper = absLat > 55 ? 1 - (absLat - 55) / 35 : 1 // linear fade 55°–90°
-		const maxAmplitude = 0.5 * Math.max(0, polarTaper)
-		const inertiaFactor = oceanDist
-			? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000)
-			: 1
-
-		for (let month = 0; month < 12; month++) {
-			const zonalMonthNoLapse = interpolateLatBand({
-				range: monthlyRanges[month],
-				latDeg,
-			})
-			const monthlyNoLapse =
-				annualAvg + (zonalMonthNoLapse - annualAvg) * inertiaFactor
-			// Temperature proxies moisture: cold columns approach the dry lapse rate.
-			const moistureFraction = MATH.smoothstep({
-				edge0: -20,
-				edge1: 20,
-				x: monthlyNoLapse,
-			})
-			const lapseRate = (9.8 - 4.8 * moistureFraction) * gravityRatio
-			const lapseCorrection = isLand[r] === 1 ? hKm * lapseRate : 0
-			temperature_monthly[month * N + r] = monthlyNoLapse - lapseCorrection
-			temperature_monthly_nolapse[month * N + r] = monthlyNoLapse
-			// Range scales with continentality; insolation is purely astronomical
-			temperature_monthly_range[month * N + r] =
-				interpolateLatBand({ range: monthlyRangeRanges[month], latDeg }) *
-				inertiaFactor
-			insolation_monthly[month * N + r] = interpolateLatBand({
-				range: monthlyInsolRanges[month],
-				latDeg,
-			})
-		}
-	}
+	PARALLEL.mapCells({
+		task: "zonalTemperatureCells",
+		kernel: zonalTemperatureCells,
+		count: N,
+		payload: {
+			xyz: PARALLEL.shared(mesh.r_xyz),
+			elevation: PARALLEL.shared(elevation),
+			elevationKm: elevation_km ? PARALLEL.shared(elevation_km) : null,
+			oceanDist: oceanDist ? PARALLEL.shared(oceanDist) : null,
+			isLand: PARALLEL.shared(isLand),
+			annualByBand: temperatureAvgByBand,
+			monthlyByBand: monthlyRanges,
+			monthlyRangeByBand: monthlyRangeRanges,
+			monthlyInsolationByBand: monthlyInsolRanges,
+			gravityRatio: params.planetRadiusKm / 6371,
+			monthly,
+			noLapse,
+			monthlyRange,
+			insolation,
+		},
+	})
+	const temperature_monthly = PARALLEL.local(monthly)
+	const temperature_monthly_nolapse = PARALLEL.local(noLapse)
+	const temperature_monthly_range = PARALLEL.local(monthlyRange)
+	const insolation_monthly = PARALLEL.local(insolation)
 
 	// ── Ocean SST noise: break up straight latitude bands ──────────────
 	// Applied only to ocean cells; amplitude tapers toward equator and poles.
@@ -378,4 +424,5 @@ export const CLIMATE = {
 	computeLandFraction,
 	applyDtrToClimateMinMax,
 	computeTemperature,
+	zonalTemperatureCells,
 }

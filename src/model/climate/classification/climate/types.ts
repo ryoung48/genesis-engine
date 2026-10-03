@@ -1,6 +1,7 @@
 import type { GenesisClimate } from "@/model/climate/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
+import type { CellRange } from "@/model/shared/parallel/types"
 
 export interface MeshLatitudeGeometry {
 	latDegByRegion: Float64Array
@@ -38,4 +39,21 @@ export type ComputeTemperatureParams = {
 	isLand: Uint8Array
 	// [JUSTIFICATION] Procedural terrain can derive height from normalized elevation.
 	elevation_km?: Float32Array
+}
+
+export interface ZonalTemperatureCellsParams extends CellRange {
+	xyz: Float32Array
+	elevation: Float32Array
+	elevationKm: Float32Array | null
+	oceanDist: Float32Array | null
+	isLand: Uint8Array
+	annualByBand: number[]
+	monthlyByBand: number[][]
+	monthlyRangeByBand: number[][]
+	monthlyInsolationByBand: number[][]
+	gravityRatio: number
+	monthly: Float32Array
+	noLapse: Float32Array
+	monthlyRange: Float32Array
+	insolation: Float32Array
 }
