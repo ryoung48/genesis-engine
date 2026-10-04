@@ -28,6 +28,8 @@ export interface AdvanceParams extends HealthPersonParams {
 }
 
 export interface ReplayParams extends HealthPersonParams {
+	record: boolean
+	death: number | null
 	// The person is known to be alive then: no death is drawn earlier.
 	survives: number
 }

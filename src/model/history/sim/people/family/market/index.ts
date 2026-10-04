@@ -46,6 +46,7 @@ function marry({ people, a, b, time }: MarryParams): void {
 }
 
 function outsider({
+	draws,
 	people,
 	partner,
 	time,
@@ -60,6 +61,9 @@ function outsider({
 			? Math.min(44, Math.max(16, partnerAge - rng.uniform(0, 8)))
 			: Math.min(69, Math.max(18, partnerAge + rng.uniform(0, 8)))
 	const spouse = PEOPLE.spawn({
+		recordHealth: draws?.recordHealth ?? true,
+		death: null,
+		nameSeed: draws?.nameSeed ?? null,
 		people,
 		sex,
 		birth: time - age,
@@ -68,7 +72,7 @@ function outsider({
 		mother: -1,
 		dynasty: -1,
 		origin,
-		rng,
+		rng: draws?.rng ?? rng,
 	})
 	return spouse
 }
@@ -239,7 +243,7 @@ function foreignMatch({
 	market,
 	ancestry,
 }: MatchParams): number {
-	const near = rng.shuffle([...neighborsOf(seeker.realm)])
+	const near = rng.shuffle([...neighborsOf(seeker.realm)].sort((a, b) => a - b))
 	const adjacent = new Set(near)
 	const far = new Set<number>()
 	for (const realm of near) for (const next of neighborsOf(realm)) far.add(next)
@@ -281,7 +285,9 @@ function minorSeekers({
 	const seen = new Set<number>()
 	const minors: number[] = []
 	for (const ruler of sovereigns)
-		for (const person of PEOPLE.family({ people, person: ruler })) {
+		for (const person of PEOPLE.family({ people, person: ruler }).sort(
+			(a, b) => a - b,
+		)) {
 			if (seen.has(person)) continue
 			seen.add(person)
 			const age = time - table.birth[person]
@@ -482,6 +488,7 @@ function seekMatches({
 			continue
 		}
 		partner = outsider({
+			draws: null,
 			people,
 			partner: person,
 			time,

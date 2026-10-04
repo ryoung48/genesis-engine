@@ -79,7 +79,12 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 	const tenureViews = (indices: number[]) =>
 		indices.flatMap((index): TenureView[] => {
 			const tenure = people.tenures[index]
-			if (tenure.startTimeMs > timeMs) return []
+			if (
+				tenure.startTimeMs === null
+					? tenure.endTimeMs > timeMs
+					: tenure.startTimeMs > timeMs
+			)
+				return []
 			return [
 				{
 					seat: tenure.seat,
@@ -115,6 +120,22 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 			),
 		].filter((sibling) => sibling !== id && bornBy(sibling)),
 		tenures: tenureViews(people.tenuresOf.get(id) ?? []),
+		predecessors: tenureViews(
+			(people.tenuresOf.get(id) ?? []).flatMap((index) => {
+				const tenure = people.tenures[index]
+				if (
+					tenure.kind === "regent" ||
+					tenure.startTimeMs === null ||
+					tenure.startTimeMs > timeMs
+				)
+					return []
+				return (people.tenuresOfSeat.get(tenure.seat) ?? []).filter(
+					(prior) =>
+						prior !== index &&
+						people.tenures[prior].endTimeMs === tenure.startTimeMs,
+				)
+			}),
+		),
 		regents: tenureViews(people.regentsOfWard.get(id) ?? []),
 	}
 }
@@ -171,13 +192,14 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 
 	for (const [index, tenure] of person.tenures.entries()) {
 		const regent = tenure.kind === "regent"
-		events.push({
-			timeMs: tenure.startTimeMs,
-			kind: regent ? "became regent" : "took seat",
-			other: tenure.seat,
-			tenure: index,
-			...(regent ? {} : { reason: tenure.startReason }),
-		})
+		if (tenure.startTimeMs !== null)
+			events.push({
+				timeMs: tenure.startTimeMs,
+				kind: regent ? "became regent" : "took seat",
+				other: tenure.seat,
+				tenure: index,
+				...(regent ? {} : { reason: tenure.startReason }),
+			})
 		if (tenure.endTimeMs !== null && tenure.endTimeMs !== person.deathTimeMs)
 			events.push({
 				timeMs: tenure.endTimeMs,
@@ -296,7 +318,7 @@ function holder({ people, seat, timeMs }: SeatAtParams): number {
 	const tenures = people.tenuresOfSeat.get(seat) ?? []
 	for (let i = tenures.length - 1; i >= 0; i--) {
 		const tenure = people.tenures[tenures[i]]
-		if (tenure.startTimeMs <= timeMs)
+		if (tenure.startTimeMs !== null && tenure.startTimeMs <= timeMs)
 			return tenure.endTimeMs > timeMs ? tenure.person : -1
 	}
 	return -1
@@ -400,6 +422,7 @@ function opinion({
 			const tenure = people.tenures[index]
 			if (
 				tenure.kind === "regent" ||
+				tenure.startTimeMs === null ||
 				tenure.startTimeMs > timeMs ||
 				tenure.endTimeMs <= timeMs ||
 				holder({ people, seat: tenure.seat, timeMs }) !== id

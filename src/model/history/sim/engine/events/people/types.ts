@@ -2,6 +2,11 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { PeopleMatches } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
+export interface InitPeopleParams {
+	state: HistoryState
+	seed: number
+}
+
 export interface PeopleEventParams {
 	state: HistoryState
 	rng: SharedRng

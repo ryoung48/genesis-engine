@@ -37,6 +37,9 @@ function couple(): { people: PeopleState; mother: number; father: number } {
 	const people = PEOPLE.create(4)
 	const spawn = (sex: 0 | 1) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex,
 			birth: 80,
@@ -191,6 +194,7 @@ it("decides every outcome at conception and stops projecting behind a fatal one"
 		expect(FERTILITY.finishDelivery({ people, id, time })).toBeNull()
 		expect(
 			FERTILITY.deliver({
+				birthDraws: null,
 				people,
 				pregnancy: taken,
 				time,

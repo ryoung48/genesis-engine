@@ -67,6 +67,9 @@ function byteLength(packet: PeoplePacket): number {
 
 function spawn(people: PeopleState): number {
 	return PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex: people.persons.sex.length % 2 === 0 ? 0 : 1,
 		birth: 800 + people.persons.sex.length,
@@ -314,6 +317,9 @@ it("records every person once and rebuilds the same record from transferred pack
 		if (year === 1) {
 			const parties = [0, 1].map((sex) =>
 				PEOPLE.spawn({
+					recordHealth: true,
+					death: null,
+					nameSeed: null,
 					people: engine.people,
 					sex: sex === 0 ? 0 : 1,
 					birth: engine.time / STATE.yearMs - 13,
@@ -434,15 +440,14 @@ it("records every person once and rebuilds the same record from transferred pack
 	expect(ids.some((id) => table.dynasty[id] < 0 && table.father[id] < 0)).toBe(
 		true,
 	)
-	// A rehomed bride joins her new parents' children after their own, so the
-	// list is no longer in id order.
+	// Final ancestry is allocated before births; child IDs remain ordered.
 	expect(
 		ids.some((id) =>
 			table.children[id].some(
 				(child, index) => index > 0 && child < table.children[id][index - 1],
 			),
 		),
-	).toBe(true)
+	).toBe(false)
 }, 600000)
 
 it("keeps the append buffer writable after a transfer and never emits a row twice", () => {

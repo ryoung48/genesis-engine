@@ -79,6 +79,9 @@ function create(): MarriageFixture {
 function add({ fixture, age, sex, realm }: AddMarriagePersonParams): number {
 	const { people, time } = fixture
 	const id = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex,
 		birth: time - age,

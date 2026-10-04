@@ -1,3 +1,4 @@
+import { BACKFILL } from "@/model/history/sim/engine/backfill"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
@@ -73,9 +74,9 @@ import { TERRAIN } from "@/model/history/sim/engine/terrain"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { FAMILY } from "@/model/history/sim/people/family"
+import { STARTING_RANDOM } from "@/model/history/sim/people/family/starting/random"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import type { RealmOrigin } from "@/model/history/sim/people/types"
-import type { SharedRng } from "@/model/shared/random/rng"
 import { DEJURE } from "@/model/society/dejure"
 
 export const rel = {
@@ -223,7 +224,7 @@ function releaseFaction({
 		foundRuler({
 			state,
 			p,
-			age: rulerAge(rng),
+			age: STARTING_RANDOM.rulerAge({ rng }),
 			claim: FOUNDER_CLAIM,
 			rng,
 			reason,
@@ -627,7 +628,7 @@ function createHistoryState({
 	heritages,
 	religions,
 	startYear,
-	rng,
+	seed,
 	waterAccess,
 	landmarks,
 	regionProvince,
@@ -834,16 +835,8 @@ function createHistoryState({
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
 		state.parentCurrent[p] = nations.parent[p]
-		FIELDS.prov.parent.set({
-			state,
-			p,
-			value: nations.parent[p],
-		})
-		FIELDS.prov.assignment.set({
-			state,
-			p,
-			value: nations.sovereign[p],
-		})
+		FIELDS.prov.parent.set({ state, p, value: nations.parent[p] })
+		FIELDS.prov.assignment.set({ state, p, value: nations.sovereign[p] })
 		FIELDS.prov.population.rural.set({
 			state,
 			p,
@@ -862,39 +855,13 @@ function createHistoryState({
 		FIELDS.prov.occupation.set({ state, p, value: -1 })
 	}
 
-	for (let p = 0; p < P; p++) {
-		if (provinces.desolate[p]) continue
-		if (state.stateless[p]) continue
-		if (nations.parent[p] >= 0) continue
-		foundRuler({
-			state,
-			p,
-			age: rulerAge(rng),
-			claim: FOUNDER_CLAIM,
-			rng,
-			reason: "unknown",
-		})
-	}
 	rebuildAssignment({ state })
+	BACKFILL.sovereigns({ state, seed })
 
 	return state
 }
 
 const FOUNDER_CLAIM = 3
-
-// Children are about as common among starting rulers as among reigning ones
-// once successions settle, 4-6%.
-function rulerAge(rng: SharedRng): number {
-	return (
-		rng.weightedChoice([
-			{ v: rng.uniform(1, 10), w: 0.4 },
-			{ v: rng.uniform(11, 15), w: 0.2 },
-			{ v: rng.uniform(16, 30), w: 5 },
-			{ v: rng.uniform(31, 50), w: 4 },
-			{ v: rng.uniform(51, 65), w: 1 },
-		]) ?? 30
-	)
-}
 
 function originOf({ state, realm }: OriginOfParams): RealmOrigin {
 	const culture = state.culture[realm]

@@ -25,6 +25,28 @@ import type {
 function create(provinceCount: number): PeopleState {
 	const ranks = new Uint8Array(provinceCount)
 	return {
+		startingFamilies: {
+			sovereignsMs: 0,
+			housesMs: 0,
+			betrothalsMs: 0,
+			weddingsAccepted: { parent: 0, founder: 0, descendant: 0, remarriage: 0 },
+			weddingsRejected: { parent: 0, founder: 0, descendant: 0, remarriage: 0 },
+			anchorCount: 0,
+			predecessors: {},
+			predecessorProposals: {},
+			fallbacks: {},
+			cousinCandidates: 0,
+			cousinProposals: 0,
+			cousinPairs: 0,
+			cousinRejections: {},
+			spouseCandidates: 0,
+			rejectedCandidates: [],
+			founderMarriages: 0,
+			remarriages: 0,
+			freshDistricts: 0,
+			relativeGrants: 0,
+			patricianHeads: 0,
+		},
 		household: {
 			heritageOfCulture: () => -1,
 			religionOfRealm: () => -1,
@@ -141,7 +163,7 @@ function add({
 	table.home.push(realm)
 	table.fertility.push(fertility)
 	table.peak.push(0)
-	table.nextBirth.push(0)
+	table.nextBirth.push(birth)
 	table.betrothed.push(-1)
 	table.betrothedAt.push(-1)
 	table.baseHealth.push(0)
@@ -163,6 +185,9 @@ function add({
 
 // No death date is fixed at birth: health decides it year by year.
 function spawn({
+	recordHealth,
+	death,
+	nameSeed: explicitNameSeed,
 	people,
 	sex,
 	birth,
@@ -182,11 +207,13 @@ function spawn({
 		mother,
 		dynasty,
 		culture: origin.culture,
-		nameSeed: nameSeed({ sex, genderSystem: origin.genderSystem, rng }),
+		nameSeed:
+			explicitNameSeed ??
+			nameSeed({ sex, genderSystem: origin.genderSystem, rng }),
 		realm: origin.realm,
 		fertility: 0.5 + 0.1 * rng.random(),
 	})
-	HEALTH.replay({ people, person, survives })
+	HEALTH.replay({ people, person, survives, death, record: recordHealth })
 	return person
 }
 
@@ -238,7 +265,7 @@ function aliveAt({ people, person, time }: PersonAtParams): boolean {
 function nameSeed({ sex, genderSystem, rng }: NameSeedParams): number {
 	const wanted = sex === 1 ? "female" : "male"
 	let seed = rng.randint(1, 0x7fffffff)
-	for (let attempt = 0; attempt < 200; attempt++) {
+	for (let attempt = 0; attempt < 4096; attempt++) {
 		if (
 			GENDER_SYSTEM.resolveLeaderGender({ system: genderSystem, seed }) ===
 			wanted
@@ -246,7 +273,7 @@ function nameSeed({ sex, genderSystem, rng }: NameSeedParams): number {
 			return seed
 		seed = rng.randint(1, 0x7fffffff)
 	}
-	return seed
+	throw new Error("No name seed resolves to the requested sex")
 }
 
 function preference({ genderSystem }: PreferenceParams): GenderPreference {

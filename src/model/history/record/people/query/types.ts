@@ -56,7 +56,7 @@ export interface TenureView {
 	kind: SeatKind
 	// The child a regent governs for; -1 for other kinds.
 	ward: number
-	startTimeMs: number
+	startTimeMs: number | null
 	// [JUSTIFICATION] A seat still held at the queried time has no end.
 	endTimeMs: number | null
 	person: number
@@ -72,6 +72,7 @@ export interface ConditionView {
 }
 
 export interface PersonView {
+	predecessors: TenureView[]
 	id: number
 	sex: number
 	birthTimeMs: number

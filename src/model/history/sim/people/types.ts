@@ -1,5 +1,6 @@
 import type { MarriageObservation } from "@/model/history/sim/people/family/diagnostics/types"
 import type { MarriageCandidateContext } from "@/model/history/sim/people/family/match-scoring/types"
+import type { StartingFamilies } from "@/model/history/sim/people/family/starting/types"
 import type { Deliveries } from "@/model/history/sim/people/fertility/types"
 import type {
 	HouseholdContext,
@@ -8,6 +9,19 @@ import type {
 import type { PeopleLog } from "@/model/history/sim/people/log/types"
 import type { OpinionContext } from "@/model/history/sim/people/opinion/types"
 import type { SharedRng } from "@/model/shared/random/rng"
+
+export type PeopleRandomSource = Pick<
+	SharedRng,
+	"random" | "uniform" | "randint" | "weightedChoice" | "shuffle"
+>
+
+export interface PersonDraws {
+	recordHealth: boolean
+	nameSeed: number
+	rng: PeopleRandomSource
+}
+
+export type BirthDraws = ((sex: Sex) => PersonDraws) | null
 
 export type Sex = 0 | 1
 
@@ -110,6 +124,7 @@ export type DeathCause = "natural" | "heart" | "battle" | "childbirth"
 export type PregnancyLoss = "miscarriage" | "stillbirth" | "childbirth death"
 
 export interface PeopleState {
+	startingFamilies: StartingFamilies
 	household: HouseholdContext
 	residenceHistory: Map<number, ResidenceHistory>
 	holdingsChanged: (person: number) => void
@@ -151,6 +166,9 @@ export interface AddPersonParams {
 }
 
 export interface SpawnParams {
+	recordHealth: boolean
+	death: number | null
+	nameSeed: number | null
 	people: PeopleState
 	sex: Sex
 	birth: number
@@ -160,7 +178,7 @@ export interface SpawnParams {
 	mother: number
 	dynasty: number
 	origin: RealmOrigin
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface PersonAtParams {
@@ -187,7 +205,7 @@ export interface FoundHouseParams {
 	age: number
 	// Tier of the seat the house is founded for; sets its family size.
 	rank: number
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface SetRulerParams {
@@ -251,7 +269,7 @@ export interface RunPeopleYearParams extends MarriageRealms {
 	time: number
 	rulers: number[]
 	sovereigns: number[]
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface ProjectYearParams {
@@ -259,7 +277,7 @@ export interface ProjectYearParams {
 	time: number
 	rulers: number[]
 	originOf: (realm: number) => RealmOrigin
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface PeopleMatches {
@@ -289,7 +307,7 @@ export interface MarriageTieParams {
 export interface NameSeedParams {
 	sex: Sex
 	genderSystem: number
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface PreferenceParams {

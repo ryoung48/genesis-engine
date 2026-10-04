@@ -65,6 +65,9 @@ it("counts living observations, crowns and boundary samples independently of reg
 	const record = PEOPLE_RECORD.create()
 	for (let id = 0; id < 3; id++) {
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: 0,
 			birth: 80,
@@ -150,6 +153,9 @@ it("joins unmoved households to parent-only territorial transitions and excludes
 	}
 	for (let id = 0; id < 4; id++) {
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: 0,
 			birth: id === 2 ? 115 : 80,

@@ -12,10 +12,112 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { TRANSLATOR } from "@/model/history/sim/record/translator"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { BACKFILL_FIXTURE } from "@/test/history-run/fixtures/backfill"
+
+it("folds initial known and unknown tenures before redundant installs and later replacements", () => {
+	const { people, house } = BACKFILL_FIXTURE.create({
+		seed: 1,
+		genderSystem: 0,
+		age: 40,
+		sovereign: true,
+	})
+	if (!house.predecessor) throw new Error("Missing predecessor")
+	const person = house.holder.person
+	people.log.initialTenures.push(
+		{
+			person: house.predecessor.person,
+			seat: 0,
+			kind: "ruler",
+			start: null,
+			end: house.accession,
+			startReason: "unknown",
+			endReason: "succession",
+		},
+		{
+			person,
+			seat: 0,
+			kind: "ruler",
+			start: house.accession,
+			end: Infinity,
+			startReason: "succession",
+			endReason: null,
+		},
+	)
+	PEOPLE.setRuler({ people, person, seat: 0, rank: 2, reason: "unknown" })
+	const record = PEOPLE_RECORD.create()
+	PEOPLE_RECORD.append({
+		record,
+		packet: structuredClone(PEOPLE_LOG.seal({ people, sovereign: () => true })),
+		timeMs: 100,
+		recordTime: (time) => time,
+	})
+	expect(record.tenures).toHaveLength(2)
+	expect(record.tenuresOf.get(person)).toHaveLength(1)
+	expect(record.tenuresOfSeat.get(0)).toHaveLength(2)
+	expect(record.tenures[1].startTimeMs).toBe(house.accession)
+	expect(record.tenures[1].startReason).toBe("succession")
+	expect(
+		PERSON_QUERY.holder({
+			people: record,
+			seat: 0,
+			timeMs: house.accession - 0.1,
+		}),
+	).toBe(-1)
+	expect(
+		PERSON_QUERY.holder({ people: record, seat: 0, timeMs: house.accession }),
+	).toBe(person)
+	const predecessor = PERSON_QUERY.view({
+		people: record,
+		id: house.predecessor.person,
+		timeMs: 100,
+	})
+	expect(predecessor?.tenures[0].startTimeMs).toBeNull()
+	expect(
+		PERSON_QUERY.timeline({
+			people: record,
+			id: house.predecessor.person,
+			timeMs: 100,
+		}).filter((event) => event.kind === "took seat"),
+	).toHaveLength(0)
+	people.household.time = () => 101
+	const successor = PEOPLE.spawn({
+		recordHealth: true,
+		people,
+		sex: 0,
+		birth: 70,
+		survives: 101,
+		father: -1,
+		mother: -1,
+		dynasty: -1,
+		death: null,
+		nameSeed: null,
+		origin: house.holder.origin,
+		rng: HISTORY_RNG.createHistoryRng(31),
+	})
+	PEOPLE.setRuler({
+		people,
+		person: successor,
+		seat: 0,
+		rank: 2,
+		reason: "succession",
+	})
+	PEOPLE_RECORD.append({
+		record,
+		packet: PEOPLE_LOG.seal({ people, sovereign: () => true }),
+		timeMs: 101,
+		recordTime: (time) => time,
+	})
+	expect(record.tenures).toHaveLength(3)
+	expect(record.tenures[1].endTimeMs).toBe(101)
+	expect(PERSON_QUERY.holder({ people: record, seat: 0, timeMs: 101 })).toBe(
+		successor,
+	)
+})
 
 // Checked after each yearly pass. Both columns agree, no betrothed person has a living spouse, every pair was
 // made between 12+ parties within the age gap with one under 16, is wed within
@@ -279,6 +381,9 @@ it("retains culture heritage after world transfer and release without detaching 
 	const time = engine.time / STATE.yearMs
 	const ids = [0, 1].map((culture) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people: engine.people,
 			sex: culture as 0 | 1,
 			birth: time - 30,

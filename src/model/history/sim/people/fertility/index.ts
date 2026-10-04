@@ -182,22 +182,34 @@ function kills(outcome: PregnancyOutcome): boolean {
 
 // Ends a pregnancy at its time: the children are created and a loss is
 // logged. True when it kills the mother.
-function deliver({ people, pregnancy, time, rng }: DeliverParams): boolean {
+function deliver({
+	people,
+	pregnancy,
+	time,
+	rng,
+	birthDraws,
+}: DeliverParams): boolean {
 	const { mother, father, origin } = pregnancy
 	if (bornAlive(pregnancy.outcome)) {
 		const dynasty = childDynasty({ people, mother, father, origin })
-		for (let i = 0; i < (pregnancy.twins ? 2 : 1); i++)
+		for (let i = 0; i < (pregnancy.twins ? 2 : 1); i++) {
+			const sex = rng.random() < GIRL_CHANCE ? 1 : 0
+			const draws = birthDraws?.(sex)
 			PEOPLE.spawn({
+				recordHealth: draws?.recordHealth ?? true,
+				death: null,
+				nameSeed: draws?.nameSeed ?? null,
 				people,
-				sex: rng.random() < GIRL_CHANCE ? 1 : 0,
+				sex,
 				birth: time,
 				survives: time,
 				father,
 				mother,
 				dynasty,
 				origin,
-				rng,
+				rng: draws?.rng ?? rng,
 			})
+		}
 	}
 	const fatal = kills(pregnancy.outcome)
 	if (pregnancy.outcome !== "birth")
@@ -365,7 +377,15 @@ function bear(params: BearParams): boolean {
 			if (kills(pregnancy.outcome)) return false
 			continue
 		}
-		if (deliver({ people, pregnancy, time: pregnancy.due, rng }))
+		if (
+			deliver({
+				people,
+				pregnancy,
+				time: pregnancy.due,
+				rng,
+				birthDraws: params.birthDraws,
+			})
+		)
 			return PEOPLE.shortenLife({
 				people,
 				person: mother,
@@ -395,6 +415,7 @@ function project({
 		return queued
 	for (;;) {
 		const pregnancy = conceive({
+			birthDraws: null,
 			people,
 			mother,
 			father,
@@ -463,30 +484,55 @@ function cancelForDeath({ people, person }: CancelParams): number {
 
 // Brothers and sisters of a child created on its own, kept clear of its
 // pregnancy. The mother lives at least to the child's birth.
-function siblings({ people, child, until, origin, rng }: SiblingsParams): void {
+function siblings({
+	survives,
+	people,
+	child,
+	until,
+	origin,
+	rng,
+	birthDraws,
+}: SiblingsParams): void {
 	const table = people.persons
 	const mother = table.mother[child]
 	const father = table.father[child]
-	const birth = table.birth[child]
-	const family = {
+	const anchors = table.children[mother]
+		.filter((id) => table.father[id] === father)
+		.map((id) => table.birth[id])
+		.sort((a, b) => a - b)
+	let from = table.marriedAt[mother]
+	for (const birth of anchors) {
+		bear({
+			people,
+			mother,
+			father,
+			from,
+			until: Math.min(until, birth - 2 * GESTATION - REST),
+			survives: survives ?? anchors[anchors.length - 1],
+			now: until,
+			origin,
+			rng,
+			birthDraws,
+		})
+		table.nextBirth[mother] = Math.max(table.nextBirth[mother], birth + REST)
+		from = birth + REST
+	}
+	bear({
 		people,
 		mother,
 		father,
-		survives: birth,
+		from,
+		until,
+		survives: survives ?? anchors[anchors.length - 1],
 		now: until,
 		origin,
 		rng,
-	}
-	bear({
-		...family,
-		from: table.birth[mother] + ADULT_AGE,
-		until: birth - 2 * GESTATION - REST,
+		birthDraws,
 	})
-	table.nextBirth[mother] = Math.max(table.nextBirth[mother], birth + REST)
-	bear({ ...family, from: birth, until })
 }
 
 export const FERTILITY = {
+	childDynasty,
 	bear,
 	siblings,
 	project,

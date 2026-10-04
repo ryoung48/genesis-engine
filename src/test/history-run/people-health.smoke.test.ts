@@ -34,6 +34,9 @@ function world(sex: Sex, birth: number) {
 	const clock = { time: birth }
 	people.household = { ...people.household, time: () => clock.time }
 	const person = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex,
 		birth,
@@ -56,7 +59,13 @@ function reseed(people: PeopleState, person: number, seed: number): void {
 	table.congenital[person] = 0
 	table.death[person] = Infinity
 	clearConditions(people, person)
-	HEALTH.replay({ people, person, survives: table.birth[person] + 1000 })
+	HEALTH.replay({
+		record: true,
+		death: null,
+		people,
+		person,
+		survives: table.birth[person] + 1000,
+	})
 	table.healthIntervalEnd[person] = table.birth[person]
 }
 
@@ -275,6 +284,8 @@ it("replays an offline life to the same health and death as living it year by ye
 		table.death[lived.person] = Infinity
 		lived.clock.time = 100.3
 		HEALTH.replay({
+			record: true,
+			death: null,
 			people: lived.people,
 			person: lived.person,
 			survives: 100.3,
@@ -289,6 +300,8 @@ it("replays an offline life to the same health and death as living it year by ye
 		offline.people.persons.death[offline.person] = Infinity
 		offline.clock.time = 160.5
 		HEALTH.replay({
+			record: true,
+			death: null,
 			people: offline.people,
 			person: offline.person,
 			survives: 100.3,
@@ -311,6 +324,8 @@ it("replays an offline life to the same health and death as living it year by ye
 		starter.people.persons.death[starter.person] = Infinity
 		starter.clock.time = 150
 		HEALTH.replay({
+			record: true,
+			death: null,
 			people: starter.people,
 			person: starter.person,
 			survives: 150,
@@ -794,7 +809,7 @@ it("reproduces the planned kernel: a minority become Incapable or Blind and no c
 			table.death[person] = Infinity
 			clearConditions(people, person)
 			clock.time = 16
-			HEALTH.replay({ people, person, survives: 16 })
+			HEALTH.replay({ record: true, death: null, people, person, survives: 16 })
 			people.log.count = 0
 			let incapableAt = -1
 			for (let year = 17; table.death[person] === Infinity; year++) {

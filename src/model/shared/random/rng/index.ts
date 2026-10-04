@@ -1,5 +1,6 @@
 import type {
 	CreateRngParams,
+	CreateSourceRngParams,
 	CreateStringRngParams,
 } from "@/model/shared/random/rng/types"
 
@@ -49,10 +50,16 @@ function makeRandInt(seed: number): (n: number) => number {
 }
 
 function createRng({ seed, options = {} }: CreateRngParams): SharedRng {
-	const random = makeRng(seed)
-	const nonPositiveWeightBehavior =
-		options.nonPositiveWeightBehavior ?? "undefined"
+	return fromSource({
+		random: makeRng(seed),
+		nonPositiveWeightBehavior: options.nonPositiveWeightBehavior ?? "undefined",
+	})
+}
 
+function fromSource({
+	random,
+	nonPositiveWeightBehavior,
+}: CreateSourceRngParams): SharedRng {
 	const next = () => random()
 
 	const randint = (a: number, b: number) =>
@@ -132,6 +139,7 @@ function createStringRng({ seed, options }: CreateStringRngParams): SharedRng {
 }
 
 export const RNG = {
+	fromSource,
 	seedStringToNumber,
 	makeRng,
 	makeRandInt,

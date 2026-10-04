@@ -1,10 +1,12 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { SeatChangeReason } from "@/model/history/sim/people/types"
-import type { SharedRng } from "@/model/shared/random/rng"
+import type {
+	PeopleRandomSource,
+	SeatChangeReason,
+} from "@/model/history/sim/people/types"
 
 export interface DistrictParams {
 	state: HistoryState
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface SeatParams {
@@ -12,11 +14,17 @@ export interface SeatParams {
 	seat: number
 }
 
+export interface GrantParams extends DistrictParams {
+	found: ((seat: number) => number) | null
+	randomOf: ((seat: number) => PeopleRandomSource) | null
+}
+
 export interface HolderParams {
+	found: ((seat: number) => number) | null
 	state: HistoryState
 	seat: number
 	relativeFirst: boolean
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface GrantCandidate {

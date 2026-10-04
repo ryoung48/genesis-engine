@@ -219,21 +219,35 @@ function advance({ people, person, year, record }: AdvanceParams): boolean {
 // reached. They may be dead already, or due to die later this year. The
 // living are recorded with their band and conditions as they stand, with no
 // history of how they came by them.
-function replay({ people, person, survives }: ReplayParams): void {
+function replay({
+	people,
+	person,
+	survives,
+	death,
+	record,
+}: ReplayParams): void {
 	const table = people.persons
 	initialize({ people, person })
 	table.healthIntervalEnd[person] = survives
 	const now = people.household.time()
 	for (
 		let year = Math.floor(survives);
-		year <= Math.floor(now) && table.death[person] === Infinity;
+		year <= Math.floor(Math.min(now, death ?? Infinity)) &&
+		table.death[person] === Infinity;
 		year++
 	)
 		advance({ people, person, year, record: false })
+	if (death !== null) table.death[person] = death
 	const last = Math.min(table.death[person], Math.max(now, survives))
 	table.healthFlags[person] =
 		(table.healthFlags[person] & ~BAND_MASK) |
 		BANDS.indexOf(band(effective({ people, person, time: last })))
+	if (record) snapshot({ people, person })
+}
+
+function snapshot({ people, person }: HealthPersonParams): void {
+	const table = people.persons
+	const now = people.household.time()
 	if (table.death[person] <= now || !AGEING.afflicted({ people, person }))
 		return
 	logChanges({
@@ -269,6 +283,7 @@ function led({ people, person }: HealthPersonParams): void {
 }
 
 export const HEALTH = {
+	snapshot,
 	channels: CHANNEL,
 	band,
 	effective,

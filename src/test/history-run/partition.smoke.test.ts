@@ -117,6 +117,9 @@ function person({
 }): number {
 	const people = state.people
 	const id = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex,
 		birth: now(state) - age,

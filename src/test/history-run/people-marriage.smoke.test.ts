@@ -4,7 +4,6 @@ import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
-import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
 import { SUCCESSION_PROJECTION } from "@/model/history/sim/engine/events/succession/projection"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
@@ -605,6 +604,9 @@ it("onboards outsiders with one health replay and ordinary creation-time mortali
 	const market = vi.spyOn(FAMILY, "runYear").mockImplementation((params) => {
 		for (const sex of [0, 1] as const) {
 			const id = PEOPLE.spawn({
+				recordHealth: true,
+				death: null,
+				nameSeed: null,
 				people: engine.people,
 				sex,
 				birth: time - 40,
@@ -715,49 +717,5 @@ it("onboards outsiders with one health replay and ordinary creation-time mortali
 		market.mockRestore()
 		replay.mockRestore()
 		projection.mockRestore()
-	}
-})
-
-it("skips a starting queen ancestry reassignment that would relate her to her spouse", () => {
-	const fixture = MARRIAGE_FIXTURE.create()
-	for (const [sex, age] of [
-		[0, 35],
-		[1, 30],
-		[0, 35],
-		[0, 65],
-		[1, 60],
-	])
-		MARRIAGE_FIXTURE.add({ fixture, age, sex: sex as 0 | 1, realm: 0 })
-	const table = fixture.people.persons
-	table.father[0] = 3
-	table.father[2] = 3
-	table.mother[2] = 4
-	table.dynasty[1] = -1
-	table.spouse[0] = 1
-	table.spouse[1] = 0
-	fixture.people.rulerOf[0] = 0
-	fixture.people.rulerOf[1] = 2
-	const state = {
-		people: fixture.people,
-		P: 2,
-		time: 100 * STATE.yearMs,
-		parentCurrent: new Int32Array([-1, -1]),
-		sovereignCurrent: new Int32Array([0, 1]),
-		hierarchyDirty: false,
-		governmentType: new Uint8Array(2).fill(
-			GOVERNMENT.getGovIdx().feudal_monarchy,
-		),
-	} as HistoryState
-	const neighbors = vi.spyOn(STATE, "getNationNeighbors").mockReturnValue([1])
-	fixture.rng.random = () => 0
-	try {
-		ROYAL_MARRIAGES.seed({ state, rng: fixture.rng })
-		expect(neighbors).toHaveBeenCalled()
-		expect(table.father[1]).toBe(-1)
-		expect(table.mother[1]).toBe(-1)
-		expect(table.dynasty[1]).toBe(-1)
-		expect(table.spouse[0]).toBe(1)
-	} finally {
-		neighbors.mockRestore()
 	}
 })

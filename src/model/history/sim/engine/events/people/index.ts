@@ -1,3 +1,4 @@
+import { BACKFILL } from "@/model/history/sim/engine/backfill"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
@@ -7,6 +8,7 @@ import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-
 import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import type {
 	FailHeartsParams,
+	InitPeopleParams,
 	PeopleEventParams,
 	SettleMatchesParams,
 	StateParams,
@@ -20,6 +22,7 @@ import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { FAMILY } from "@/model/history/sim/people/family"
 import { MARRIAGE_DIAGNOSTICS } from "@/model/history/sim/people/family/diagnostics"
+import { STARTING_RANDOM } from "@/model/history/sim/people/family/starting/random"
 import { HEALTH } from "@/model/history/sim/people/health"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
@@ -37,7 +40,7 @@ import type {
 // still holds about a third fewer standing betrothals than years 20-30.
 const START_BETROTHAL_SHARE = 1
 
-function nextYear({ state }: PeopleEventParams): void {
+function nextYear({ state }: StateParams): void {
 	state.heap.enqueue(
 		state.time + STATE.deltaYear(1),
 		EVENT_HEAP.evt.PEOPLE_YEAR,
@@ -216,20 +219,20 @@ function settleMatches({ state, matches }: SettleMatchesParams): boolean {
 	return united
 }
 
-function init({ state, rng }: PeopleEventParams): void {
-	DISTRICTS.grant({ state, rng })
-	ROYAL_MARRIAGES.seed({ state, rng })
+function init({ state, seed }: InitPeopleParams): void {
+	BACKFILL.houses({ state, seed })
+	const started = performance.now()
 	FAMILY.seekMatches({
 		people: state.people,
 		time: state.time / STATE.yearMs,
 		seekers: [],
 		sovereigns: sovereignRulers({ state }),
 		minorChance: START_BETROTHAL_SHARE,
-		rng,
+		rng: STARTING_RANDOM.source({ seed, path: [0], purpose: 8 }),
 		...marriageRealms({ state }),
 	})
-	PATRICIANS.settle({ state, rng })
-	nextYear({ state, rng })
+	state.people.startingFamilies.betrothalsMs = performance.now() - started
+	nextYear({ state })
 }
 
 // Every failed heart is dated before any succession runs, so no one who dies
@@ -269,9 +272,9 @@ function runYear({ state, rng }: PeopleEventParams): void {
 		for (const realm of [...state.people.persons.heldSeats[person]])
 			REGENCY.startIncapacity({ state, realm })
 	DISTRICTS.settle({ state, rng })
-	DISTRICTS.grant({ state, rng })
+	DISTRICTS.grant({ found: null, randomOf: null, state, rng })
 	ROYAL_MARRIAGES.review({ state })
-	PATRICIANS.settle({ state, rng })
+	PATRICIANS.settle({ found: null, state, rng })
 	const people = state.people
 	const rulers: number[] = []
 	for (let seat = 0; seat < state.P; seat++)
@@ -295,7 +298,7 @@ function runYear({ state, rng }: PeopleEventParams): void {
 		rng,
 	})
 	ROYAL_MARRIAGES.review({ state })
-	nextYear({ state, rng })
+	nextYear({ state })
 }
 
 export const PEOPLE_EVENTS = { init, runYear }

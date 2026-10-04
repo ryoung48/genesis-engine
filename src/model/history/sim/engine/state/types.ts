@@ -464,6 +464,7 @@ export interface ProvinceDistanceSqParams {
 }
 
 export interface CreateHistoryStateParams {
+	seed: number
 	nations: GenesisNationHierarchy
 	provinces: GenesisProvinces
 	population: ProvincePopulation
@@ -476,7 +477,6 @@ export interface CreateHistoryStateParams {
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
 	startYear: number
-	rng: SharedRng
 	waterAccess?: Uint8Array
 	landmarks?: GenesisLandmarks
 	regionProvince?: Int32Array

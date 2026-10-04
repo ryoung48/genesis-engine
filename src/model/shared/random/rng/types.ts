@@ -11,3 +11,7 @@ export interface CreateStringRngParams {
 	seed: string
 	options?: CreateRngOptions
 }
+export interface CreateSourceRngParams {
+	random: () => number
+	nonPositiveWeightBehavior: "undefined" | "first"
+}

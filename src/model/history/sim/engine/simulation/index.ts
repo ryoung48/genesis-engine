@@ -116,7 +116,7 @@ function initHistory(params: {
 				heritages: params.heritages,
 				religions: params.religions,
 				startYear,
-				rng,
+				seed: params.seed,
 				waterAccess: params.waterAccess,
 				landmarks: params.landmarks,
 				regionProvince: params.regionProvince,
@@ -167,7 +167,7 @@ function initHistory(params: {
 	timed({
 		label: "initHistory:initPeople",
 		timings: params.timings,
-		fn: () => PEOPLE_EVENTS.init({ state, rng }),
+		fn: () => PEOPLE_EVENTS.init({ state, seed: params.seed }),
 	})
 	timed({
 		label: "initHistory:initWar",

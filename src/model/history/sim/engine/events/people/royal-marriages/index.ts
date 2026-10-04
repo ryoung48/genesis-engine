@@ -1,11 +1,7 @@
 import type {
 	AllianceMatchParams,
-	BirthParents,
-	BirthParentsParams,
 	PairKeyParams,
-	RehomeParams,
 	ReviewParams,
-	SeedRoyalMarriagesParams,
 } from "@/model/history/sim/engine/events/people/royal-marriages/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { Relation } from "@/model/history/sim/engine/state/types"
@@ -13,11 +9,6 @@ import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import { KINSHIP } from "@/model/history/sim/people/kinship"
-
-// Share of starting kings in alliance-marrying realms whose queen comes from a
-// neighbouring ruling house.
-const START_ROYAL_MARRIAGE_SHARE = 0.4
 
 const UNALLIABLE = new Set<Relation>([
 	STATE.rel.WAR,
@@ -127,109 +118,4 @@ function review({ state }: ReviewParams): void {
 	reviewAlliances({ state })
 }
 
-// Parents the bride could plausibly have in another ruling house: as the
-// ruler's sister (same parents), else as the ruler's daughter.
-function birthParents({
-	people,
-	bride,
-	house,
-}: BirthParentsParams): BirthParents | null {
-	const table = people.persons
-	const born = table.birth[bride]
-	const fits = (mother: number, father: number) =>
-		mother >= 0 &&
-		born - table.birth[mother] >= 16 &&
-		born - table.birth[mother] < 45 &&
-		table.death[mother] > born &&
-		(father < 0 || table.death[father] > born - 0.75)
-	const sister = { father: table.father[house], mother: table.mother[house] }
-	if (fits(sister.mother, sister.father)) return sister
-	if (table.sex[house] !== 0) return null
-	const daughter = { father: house, mother: table.spouse[house] }
-	return fits(daughter.mother, daughter.father) ? daughter : null
-}
-
-function rehome({
-	people,
-	person,
-	parents,
-	dynasty,
-	origin,
-	rng,
-}: RehomeParams): void {
-	const table = people.persons
-	table.father[person] = parents.father
-	table.mother[person] = parents.mother
-	for (const parent of [parents.father, parents.mother])
-		if (parent >= 0) table.children[parent].push(person)
-	table.dynasty[person] = dynasty
-	table.culture[person] = origin.culture
-	table.home[person] = origin.realm
-	HOUSEHOLD.amendInitial({
-		people,
-		person,
-		province: origin.realm,
-	})
-	table.nameSeed[person] = PEOPLE.nameSeed({
-		sex: table.sex[person],
-		genderSystem: origin.genderSystem,
-		rng,
-	})
-	PEOPLE.redraw({ people, person })
-}
-
-// The founders' queens are generated as outsiders; some become daughters or
-// sisters of a neighbouring ruler so the world opens with marriage ties.
-function seed({ state, rng }: SeedRoyalMarriagesParams): void {
-	const people = state.people
-	const table = people.persons
-	const time = state.time / STATE.yearMs
-	const allies = (realm: number) =>
-		STATE.isSovereign({ state, p: realm }) &&
-		people.rulerOf[realm] >= 0 &&
-		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[realm])
-	for (let realm = 0; realm < state.P; realm++) {
-		if (!allies(realm)) continue
-		const king = people.rulerOf[realm]
-		const queen = table.spouse[king]
-		if (table.sex[king] !== 0 || queen < 0 || table.dynasty[queen] >= 0)
-			continue
-		if (!PEOPLE.aliveAt({ people, person: queen, time })) continue
-		if (rng.random() >= START_ROYAL_MARRIAGE_SHARE) continue
-		for (const other of rng.shuffle(
-			STATE.getNationNeighbors({ state, nation: realm }).filter(allies),
-		)) {
-			const house = people.rulerOf[other]
-			const parents = birthParents({ people, bride: queen, house })
-			if (!parents) continue
-			if (
-				[parents.father, parents.mother].some(
-					(parent) =>
-						parent >= 0 &&
-						KINSHIP.prohibitedMatch({
-							context: table,
-							a: king,
-							b: parent,
-							cache: null,
-						}),
-				)
-			)
-				continue
-			rehome({
-				people,
-				person: queen,
-				parents,
-				dynasty: table.dynasty[house],
-				origin: STATE.originOf({ state, realm: other }),
-				rng,
-			})
-			allianceFromMatch({
-				state,
-				match: { a: king, b: queen, realmA: realm, realmB: other },
-			})
-			break
-		}
-	}
-}
-
-export const ROYAL_MARRIAGES = { alliable, allianceFromMatch, seed, review }
+export const ROYAL_MARRIAGES = { alliable, allianceFromMatch, review }

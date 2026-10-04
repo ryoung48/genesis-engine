@@ -103,7 +103,7 @@ export interface RecordTenure {
 	kind: SeatKind
 	// The child a regent governs for; -1 for other kinds.
 	ward: number
-	startTimeMs: number
+	startTimeMs: number | null
 	endTimeMs: number
 	startReason: SeatChangeReason
 	endReason: SeatChangeReason | null

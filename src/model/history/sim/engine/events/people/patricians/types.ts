@@ -1,9 +1,15 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { SharedRng } from "@/model/shared/random/rng"
+import type { PeopleRandomSource } from "@/model/history/sim/people/types"
+
+export interface PatricianSlot {
+	realm: number
+	slot: number
+}
 
 export interface PatricianParams {
+	found: ((slot: PatricianSlot) => number) | null
 	state: HistoryState
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface RepublicParams {

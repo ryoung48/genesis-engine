@@ -16,6 +16,10 @@ Current realm is resolved on demand through the engine’s territorial sovereign
 
 Residence lookup selects the greatest effective time at or before selection, with last append winning equal-time ties across packets. Older-effective rows arriving later do not override newer moves. Initial residence applies from birth; before birth and before territorial coverage queries are unavailable. The wiki exposes selected-date residence and realm separately; religion is a realm proxy, not a stored individual faith.
 
+## Starting households
+
+Both [starting-family stages](families-and-lifecycle.md#starting-families) reconcile every affected survivor, including grandchildren, nephews/nieces and reused district recipients. Historical wedding relocation uses the actual wedding date. Complete held-seat arrays select a holder's primary residence; terminal kin keep their generated closure when granted a seat. Starting families are appended directly, so all residence, marriage and pregnancy references already use permanent live IDs.
+
 ## Residence report metrics
 
 `residenceRows` counts effective rows, including birth corrections, in each window. `sameResidenceRealmChanges` counts living people whose unmoved province changes territorial sovereign, coalescing same-time territorial changes and excluding birth, death and relocation boundaries. Pure occupation or diplomacy contributes zero. Reporting builds occupancy intervals once from the retained record, then joins sorted endpoints with per-province sovereign timelines. No all-person scan occurs per territorial transition. `diagnostics.householdsReportMs` isolates the final offline residence phase from simulation people time.

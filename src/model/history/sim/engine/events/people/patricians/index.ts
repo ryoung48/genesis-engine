@@ -22,7 +22,7 @@ function houseCount(realm: number): number {
 
 // Keeps 3-5 patrician house heads per electoral republic: a dead head passes
 // to their heir, an extinct house is replaced by a new one.
-function settle({ state, rng }: PatricianParams): void {
+function settle({ state, rng, found }: PatricianParams): void {
 	const people = state.people
 	const table = people.persons
 	const time = state.time / STATE.yearMs
@@ -53,14 +53,16 @@ function settle({ state, rng }: PatricianParams): void {
 		}
 		while (heads.length < houseCount(realm))
 			heads.push(
-				FAMILY.found({
-					people,
-					origin: STATE.originOf({ state, realm }),
-					time,
-					age: rng.uniform(25, 60),
-					rank: 0,
-					rng,
-				}),
+				found
+					? found({ realm, slot: heads.length })
+					: FAMILY.found({
+							people,
+							origin: STATE.originOf({ state, realm }),
+							time,
+							age: rng.uniform(25, 60),
+							rank: 0,
+							rng,
+						}),
 			)
 		people.patricians.set(realm, heads)
 	}

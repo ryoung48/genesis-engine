@@ -34,6 +34,9 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 	const born = engine.time / STATE.yearMs - 30
 	const rng = RNG.createRng({ seed: 771 })
 	const person = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people: engine.people,
 		sex: 0,
 		birth: born,
@@ -45,6 +48,9 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 		rng,
 	})
 	const resident = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people: engine.people,
 		sex: 1,
 		birth: born,

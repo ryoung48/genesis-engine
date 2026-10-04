@@ -39,7 +39,18 @@ export interface PeopleRows {
 
 // Rows the journal has not yet taken. The columns grow by doubling and are
 // never transferred.
+export interface InitialTenure {
+	person: number
+	seat: number
+	kind: "ruler" | "district"
+	start: number | null
+	end: number
+	startReason: SeatChangeReason
+	endReason: SeatChangeReason | null
+}
+
 export interface PeopleLog extends PeopleRows {
+	initialTenures: InitialTenure[]
 	// People already sealed into a packet; ids from here on are new.
 	emitted: number
 }
@@ -48,6 +59,7 @@ export interface PeopleLog extends PeopleRows {
 // snapshot of each person its creation rows introduce. A snapshot's death is
 // set only for a person already dead when created; the living carry Infinity.
 export interface PeoplePacket extends PeopleRows {
+	initialTenures: InitialTenure[]
 	sex: Uint8Array
 	createdAt: Float64Array
 	death: Float64Array

@@ -30,7 +30,7 @@ function run({ state, id, rng }: RunBirthParams): void {
 	const pregnancy = FERTILITY.finishDelivery({ people, id, time })
 	if (!pregnancy) return
 	state.lifecycle.births++
-	if (FERTILITY.deliver({ people, pregnancy, time, rng }))
+	if (FERTILITY.deliver({ birthDraws: null, people, pregnancy, time, rng }))
 		PERSON_DEATH.kill({
 			state,
 			person: pregnancy.mother,

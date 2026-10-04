@@ -37,6 +37,9 @@ function fixture() {
 	const table = people.persons
 	const spawn = (sex: Sex, birth: number, band: string) => {
 		const person = PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex,
 			birth,

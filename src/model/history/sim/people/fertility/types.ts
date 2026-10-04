@@ -1,5 +1,9 @@
-import type { PeopleState, RealmOrigin } from "@/model/history/sim/people/types"
-import type { SharedRng } from "@/model/shared/random/rng"
+import type {
+	BirthDraws,
+	PeopleRandomSource,
+	PeopleState,
+	RealmOrigin,
+} from "@/model/history/sim/people/types"
 
 export type PregnancyOutcome =
 	| "birth"
@@ -40,11 +44,12 @@ export interface FinishDeliveryParams {
 }
 
 export interface DeliverParams {
+	birthDraws: BirthDraws
 	people: PeopleState
 	pregnancy: Pregnancy
 	// When the pregnancy ends.
 	time: number
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface QueueParams {
@@ -64,7 +69,7 @@ export interface ProjectParams {
 	from: number
 	until: number
 	origin: RealmOrigin
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface TakeQueuedParams {
@@ -72,6 +77,7 @@ export interface TakeQueuedParams {
 }
 
 export interface BearParams {
+	birthDraws: BirthDraws
 	people: PeopleState
 	mother: number
 	father: number
@@ -83,15 +89,17 @@ export interface BearParams {
 	// The present: a pregnancy that ends later stays pending.
 	now: number
 	origin: RealmOrigin
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface SiblingsParams {
+	survives: number | null
+	birthDraws: BirthDraws
 	people: PeopleState
 	child: number
 	until: number
 	origin: RealmOrigin
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface CoupleParams {
@@ -110,7 +118,7 @@ export interface OutcomeParams {
 	time: number
 	// Children the mother has already borne.
 	earlier: number
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface SmoothWeightParams {
@@ -122,7 +130,7 @@ export interface SmoothWeightParams {
 
 export interface DurationParams {
 	outcome: PregnancyOutcome
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface ChildCount {

@@ -37,6 +37,10 @@ State-level maps in `PeopleState`:
 | `deposed` | Realm → `{ claimant, generation, tried }` for deposed rulers' lines. |
 | `log` | Rows appended since the last journal flush, as typed columns, and the cursor of people already sent. See [person records](../mechanics/person-records.md). |
 
+## Initialization
+
+[Starting families](families-and-lifecycle.md#starting-families) contain final parentage, synthetic predecessors, bounded previous marriages and immediate descendant families. Sovereigns are installed before population/economy/military/diplomacy; sequential district grants and patricians follow. Shared ancestors are real people, maternal roots remain visible, and all eligible tracked survivors enter the later marriage market. Historical people are materialized at startup, with permanent IDs; only legitimate later founders, outsiders and births add people afterwards.
+
 ## Yearly order
 
 The yearly `PEOPLE_YEAR` event runs, in order:

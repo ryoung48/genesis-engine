@@ -71,13 +71,33 @@ The `BIRTH` event runs at the pregnancy's end.
 ## Founding a house
 
 `FAMILY.found` creates a new ruler of a given age with a fresh dynasty:
-- a father who has already died and a mother who lived at least to the founder's birth, with siblings from the mother's 16th birthday onward, kept clear of the founder's own pregnancy;
+- a father who has already died and a mother who lived at least to the founder's birth, with siblings after the parents' wedding, kept clear of the founder's own pregnancy;
 - the father and the founder take the standing of the seat the house is founded for, which sets the family's size;
 - with 85% chance (if 18+), a spouse from outside and their children so far.
 
-Founders are used for starting rulers, new houses taking a throne, new district holders and new patrician houses. Each created person's health is aged from birth to the present, and death is drawn only from the date they are known to have reached ([health](health-and-mortality.md#people-created-with-a-past)).
+This runtime founder operation supplies later new throne, district and patrician houses. Starting holders instead use the dated construction below. Each created person's health is aged from birth to the present, and death is drawn only from the date they are known to have reached ([health](health-and-mortality.md#people-created-with-a-past)).
 
 Starting ruler ages: 1–10 (weight 0.4), 11–15 (0.2), 16–30 (5), 31–50 (4), 51–65 (1). About 6% start as children, close to the 4–6% share of child rulers once successions settle.
+
+## Starting families
+
+`engine/backfill` builds sovereign ancestry during state creation, after territorial assignment and before population, economy, military and diplomacy. District grants and patrician appointments follow those passes. Original world seed and canonical seat/role paths supply keyed hash sources; neither people stage nor the initial betrothal pass draws from the shared simulation stream. Names, base fertility and pregnancy opportunities have separate sources. Final live IDs are allocated parent-first; inherited traits see final ancestry, without reparenting or redraws.
+
+Holder ages keep the existing distributions. Parents are born 20–40 (father) and 17–32 (mother) years earlier. A sovereign's synthetic accession is initialization time minus a uniform draw from zero to the lesser of age and 30. The predecessor dies at accession; their tenure start is unknown. Proposed relations are child 70%, older full sibling 8%, uncle/aunt 5% and unrelated 17%, with sex following cultural preference. Sibling spacing is conditioned on both parents being 16+ at the older birth. Passed-over parents die after their last required child and by accession. District and patrician families have dead fathers by initialization and no invented predecessor tenure. These are initialization approximations, not simulated historical elections.
+
+Adjacent sovereign pairs have a 25% cousin proposal chance before diplomacy. Priority-ordered feasible disjoint pairs share actual grandparents; established paternal ancestry is preserved. Father births must differ by gestation plus rest through 12 years. Shared grandparents are born 28/25 years before the older father and survive both reserved births. Cousins need not share a dynasty in matriarchal cultures. There are no district cousin proposals or starting personal unions.
+
+Both unparented anchor lineages receive distinct dynasties, including non-transmitting maternal roots. All descendants use the ordinary gender-aware dynasty operation; outsider spouses remain dynasty-less. Singleton maternal dynasties are retained identities, separate from occupied ruling houses.
+
+An anchor-parent wedding is proposed one year before the earliest reserved birth. Failure of age, survival, kinship or reciprocal scoring retains known parentage without a wedding or extra children. Founder first-marriage participation is 85% at 18+; wedding ages are 18–25 for men and 16–25 for women, bounded by initialization. Opposite-sex outsider ages use the market's existing 0–8-year gap and clamp (women 16–44, men 18–69). Every historical wedding uses `BACKFILL_MARRIAGE.acceptable`; held and projected standing and alliance value are zero because materialization precedes installation. Initial betrothals retain ordinary live inheritance projection.
+
+After widowhood, annual opportunities begin one year after spouse death, with 35% participation. Adult children and siblings have the same annual opportunities from their eligible minimum ages. Each opportunity proposes one candidate; rejected candidates remain recorded people with no wedding or children. There are at most two historical marriages per person. Children may produce grandchildren and siblings nephews/nieces; those terminal descendants receive no historical spouses or offspring. A terminal relative later selected for a district keeps that existing family and enters normal runtime matching.
+
+Historical fertility reuses gestation, rest, maternal limits, caps, outcomes and twins. Reserved births block competing pregnancies; required survival/death anchors stay fixed. The couple cap still hashes final person IDs. Cross-start pregnancies remain pending with no unborn person. Health replay uses final traits and parents with survival conditioning; it reads present health for historical pregnancies. Only surviving people's final starting condition snapshots are emitted, without earlier health-transition histories.
+
+District grants retain the 30% preference for an eligible landless relative other than the apparent heir, and existing seat score order. Each recipient is installed before the next selection, so reused relatives have one identity and complete holdings. Fresh district families precede installation; the existing 3–5 patrician slots follow grants. Both stages reconcile surviving households and clear ended live spouse pointers. Historical weddings and moves retain their effective dates in the ordinary person log.
+
+The detailed report's `diagnostics.startingFamilies` separates predecessor proposals/results, cousin proposals/rejection reasons, initial living/dead people, holder kinds, dynasty roots/singletons/occupied houses, retained rejected candidates, prior marriages and kin observations across holders. Stage timings are milliseconds. Retained bytes measure collected copies of the actual starting people/record/skeleton structures; rejected-column bytes omit scheduling and indexes. Sampled initialization heap is the whole process heap, including the generated world and diagnostic copies, not an isolated family peak. Memory-measurement time is reported separately. The saved P5 report has no equivalent startup retention measurements.
 
 ## Death
 

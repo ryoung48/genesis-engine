@@ -27,6 +27,9 @@ function fixture() {
 		})
 	const spawn = (birth: number, survives: number) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: 0,
 			birth,

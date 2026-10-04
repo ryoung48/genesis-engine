@@ -30,6 +30,7 @@ import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
+import { PEOPLE_FAMILIES_REPORT } from "@/test/history-run/report/people-families"
 import { PEOPLE_HEALTH_REPORT } from "@/test/history-run/report/people-health"
 import type { StarterReport } from "@/test/history-run/report/people-health/types"
 import { PEOPLE_MARRIAGE_REPORT } from "@/test/history-run/report/people-marriage"
@@ -374,13 +375,19 @@ function runSeed({
 	seedDiagnostics,
 }: RunSeedParams): CenturyReport[] {
 	const started = performance.now()
-	const { engine, generated, generationMs, engineMs } =
-		HISTORY_RUN.createEngine({
-			seed,
-			era: options.era,
-			numPoints: options.numPoints,
-			startYear: options.startYear,
-		})
+	const familyCapture = PEOPLE_FAMILIES_REPORT.attach()
+	const { engine, generated, generationMs, engineMs } = (() => {
+		try {
+			return HISTORY_RUN.createEngine({
+				seed,
+				era: options.era,
+				numPoints: options.numPoints,
+				startYear: options.startYear,
+			})
+		} finally {
+			familyCapture.detach()
+		}
+	})()
 	const logs = {
 		rebelLogistics: HISTORY_COMPARISON.digester(),
 		rebellionEvents: HISTORY_COMPARISON.digester(),
@@ -499,6 +506,18 @@ function runSeed({
 		probe: MILITARY_REPORT.fiscalProbe,
 	})
 	const peopleRecord = PEOPLE_RECORD_REPORT.attach()
+	const initialPeople = structuredClone(peopleRecord.tracker)
+	PEOPLE_RECORD_REPORT.ingest({
+		tracker: initialPeople,
+		transactions: engine.journal,
+	})
+	const startingFamilies = PEOPLE_FAMILIES_REPORT.of({
+		engine,
+		peopleRecord: initialPeople.record,
+		capture: familyCapture,
+	})
+	familyCapture.skeleton = []
+	Object.assign(diagnostics, { startingFamilies })
 	const peopleHealth = PEOPLE_HEALTH_REPORT.tracker({ engine })
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	const start = Math.round(engine.time / STATE.yearMs)

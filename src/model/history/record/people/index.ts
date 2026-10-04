@@ -467,6 +467,23 @@ function append({
 				break
 		}
 	}
+	for (const tenure of packet.initialTenures) {
+		if (!has({ people: record, id: tenure.person }))
+			throw new Error("Unknown initial tenure holder")
+		const index = record.tenures.length
+		record.tenures.push({
+			person: tenure.person,
+			seat: tenure.seat,
+			kind: tenure.kind,
+			ward: -1,
+			startTimeMs: tenure.start === null ? null : recordTime(tenure.start),
+			endTimeMs: recordTime(tenure.end),
+			startReason: tenure.startReason,
+			endReason: tenure.endReason,
+		})
+		pushIndex({ index: record.tenuresOf, key: tenure.person, value: index })
+		pushIndex({ index: record.tenuresOfSeat, key: tenure.seat, value: index })
+	}
 	changeSeats({ record, rows: seats, timeMs })
 }
 

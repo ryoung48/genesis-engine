@@ -65,7 +65,6 @@ export function usePersonWikiData(
 		setSelectedWikiWarId,
 		setSelectedWikiPersonId,
 	} = input
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	return useMemo<PersonWikiData | null>(() => {
 		if (selectedWikiPersonId === null || !history.state) return null
 		const state = history.state
@@ -171,13 +170,23 @@ export function usePersonWikiData(
 			sceneRef.current?.focusOnProvince(provinceId, {
 				distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 			})
+
+		const tenureSpan = (tenure: TenureView) =>
+			`${tenure.startTimeMs === null ? "start unknown" : dateLabel(tenure.startTimeMs)} – ${tenure.endTimeMs === null ? "" : dateLabel(tenure.endTimeMs)}`
+
 		const seatChip = (tenure: TenureView): PersonWikiChip | null => {
 			const labelTime =
-				tenure.endTimeMs === null ? viewTimeMs : tenure.startTimeMs
-			const nation = nationAt(tenure.seat, labelTime)
-			const span = `${dateLabel(tenure.startTimeMs)} – ${
-				tenure.endTimeMs === null ? "" : dateLabel(tenure.endTimeMs)
-			}`
+				tenure.endTimeMs === null
+					? viewTimeMs
+					: (tenure.startTimeMs ?? viewTimeMs)
+
+			const nation = nationAt(
+				tenure.seat,
+				Math.max(state.record.minTimeMs, labelTime),
+			)
+
+			const span = tenureSpan(tenure)
+
 			if (tenure.kind === "regent") {
 				const ward = PERSON_NAMES.person({ people, person: tenure.ward })
 				return nation
@@ -633,15 +642,42 @@ export function usePersonWikiData(
 				},
 				{
 					label: "Regencies",
+
 					chips: view.tenures
+
 						.filter(
 							(tenure) => tenure.kind === "regent" && tenure.endTimeMs === null,
+						)
+
+						.flatMap((tenure) => {
+							const chip = seatChip(tenure)
+
+							return chip ? [chip] : []
+						}),
+				},
+
+				{
+					label: "Previous titles",
+					chips: view.tenures
+						.filter(
+							(tenure) => tenure.kind !== "regent" && tenure.endTimeMs !== null,
 						)
 						.flatMap((tenure) => {
 							const chip = seatChip(tenure)
 							return chip ? [chip] : []
 						}),
 				},
+
+				{
+					label: "Predecessors",
+					chips: view.predecessors.flatMap((tenure) =>
+						chips([tenure.person]).map((chip) => ({
+							...chip,
+							title: `${chip.title ?? chip.name} · ${tenureSpan(tenure)}`,
+						})),
+					),
+				},
+
 				{ label: "Parents", chips: chips([view.father, view.mother]) },
 				{ label: "Siblings", chips: chips(view.siblings) },
 				{
@@ -684,5 +720,6 @@ export function usePersonWikiData(
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		setSelectedWikiPersonId,
+		sceneRef.current?.focusOnProvince,
 	])
 }

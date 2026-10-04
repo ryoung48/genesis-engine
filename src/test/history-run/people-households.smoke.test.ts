@@ -32,6 +32,9 @@ function fixture(): HistoryState {
 		DEATH_SCHEDULE.ensure({ state, person, cause: "natural" })
 	for (let id = 0; id < 3; id++) {
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: 0,
 			birth: 80,
@@ -188,6 +191,9 @@ for (const order of [
 		}
 		const rng = RNG.createRng({ seed: 771 })
 		const dying = PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people: state.people,
 			sex: 0,
 			birth: state.time / STATE.yearMs - 50,
@@ -199,6 +205,9 @@ for (const order of [
 			rng,
 		})
 		const heir = PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people: state.people,
 			sex: 0,
 			birth: state.time / STATE.yearMs - 25,
@@ -312,6 +321,9 @@ for (const order of [
 				reason: "unknown",
 			})
 			const successor = PEOPLE.spawn({
+				recordHealth: true,
+				death: null,
+				nameSeed: null,
 				people: state.people,
 				sex: 0,
 				birth: state.time / STATE.yearMs - 25,
@@ -363,6 +375,9 @@ for (const order of [
 			}
 
 			const spouse = PEOPLE.spawn({
+				recordHealth: true,
+				death: null,
+				nameSeed: null,
 				people: state.people,
 				sex: 1,
 				birth: state.time / STATE.yearMs - 25,
@@ -416,6 +431,9 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 	people.persons.spouse[1] = mother
 	const spawn = (birth: number) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: 0,
 			birth,
@@ -492,6 +510,9 @@ it("succeeds a district-only holder at death before settlement and never repeats
 	const rng = RNG.createRng({ seed: 71 })
 	const time = state.time / STATE.yearMs
 	const holder = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people: state.people,
 		sex: 0,
 		birth: time - 50,
@@ -503,6 +524,9 @@ it("succeeds a district-only holder at death before settlement and never repeats
 		rng,
 	})
 	const heir = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people: state.people,
 		sex: 0,
 		birth: time - 25,
@@ -553,6 +577,9 @@ it("weights each local district, keeps repeated nomination slots and uses the st
 	const time = state.time / STATE.yearMs
 	const persons = [0, 1, 2].map((dynasty) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people: state.people,
 			sex: 0,
 			birth: time - 30,
@@ -697,6 +724,9 @@ it("rechecks a marriage alliance after relocation releases its sustaining betrot
 	}
 	const children = crowns.slice(0, 2).map((realm, sex) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people: state.people,
 			sex: sex === 0 ? 0 : 1,
 			birth: time - 13,
@@ -786,6 +816,9 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 	const time = state.time / STATE.yearMs
 	const rng = RNG.createRng({ seed: 81 })
 	const dying = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people: state.people,
 		sex: 0,
 		birth: time - 50,
@@ -799,6 +832,9 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 	state.people.persons.death[dying] = time + 0.25
 	const heirs = [0, 1, 2].map((index) =>
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people: state.people,
 			sex: 0,
 			birth: time - 30 + index,
@@ -854,3 +890,68 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 		choose.mockRestore()
 	}
 }, 60000)
+
+it("installs each initial relative grant before selecting the next without expanding terminal kin", () => {
+	const people = PEOPLE.create(25)
+	people.household.time = () => 100
+	const rng = RNG.createRng({ seed: 1 })
+	const peopleIds = Array.from({ length: 5 }, (...entry) => {
+		const id = entry[1]
+		return PEOPLE.spawn({
+			people,
+			sex: 0,
+			birth: 40 + id * 5,
+			survives: 100,
+			father: id === 0 ? -1 : id === 4 ? 2 : 0,
+			mother: -1,
+			dynasty: 0,
+			origin: { realm: 0, culture: 0, genderSystem: 0 },
+			nameSeed: null,
+			death: null,
+			recordHealth: false,
+			rng,
+		})
+	})
+	people.persons.death[peopleIds[2]] = 99
+	const state = {
+		people,
+		time: 100 * STATE.yearMs,
+		P: 25,
+		parentCurrent: new Int32Array(25).fill(0),
+		sovereignCurrent: new Int32Array(25),
+		seatRank: new Uint8Array(25),
+		desolate: new Uint8Array(25),
+		stateless: new Uint8Array(25),
+		culture: new Int32Array(25),
+		cultureGenderSystems: new Uint8Array([0]),
+		habitability: new Float32Array(25).fill(1),
+		popUrbanCurrent: new Float64Array(25),
+		waterAccess: new Uint8Array(25),
+		province_xyz: new Float32Array(75),
+	} as unknown as HistoryState
+	state.parentCurrent[0] = -1
+	state.seatRank.set([3, 1, 1])
+	PEOPLE.setRuler({
+		people,
+		person: peopleIds[0],
+		seat: 0,
+		rank: 3,
+		reason: "unknown",
+	})
+	const found = vi.fn(() => {
+		throw new Error("Unexpected fresh family")
+	})
+	const source = { ...rng, random: () => 0 }
+	const count = people.persons.sex.length
+	DISTRICTS.grant({ state, rng: source, found, randomOf: () => source })
+	expect(found).not.toHaveBeenCalled()
+	expect(new Set([people.rulerOf[1], people.rulerOf[2]])).toEqual(
+		new Set([peopleIds[3], peopleIds[4]]),
+	)
+	for (const person of [peopleIds[3], peopleIds[4]])
+		expect(people.persons.heldSeats[person]).toHaveLength(1)
+	expect(people.persons.sex.length).toBe(count)
+	expect(people.persons.children[peopleIds[4]]).toEqual([])
+	expect(people.persons.spouse[peopleIds[4]]).toBe(-1)
+	expect(people.startingFamilies.relativeGrants).toBe(2)
+})

@@ -47,6 +47,9 @@ it("draws only the name seed and fertility from the shared stream at spawn, and 
 	const seed = PEOPLE.nameSeed({ sex: 0, genderSystem: 1, rng: control })
 	const fertility = 0.5 + 0.1 * control.random()
 	const person = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex: 0,
 		birth: 0,
@@ -69,6 +72,9 @@ it("draws valid, reproducible character and expected founder personality distrib
 	const frequencies = new Map<string, number>()
 	for (let person = 0; person < 20000; person++) {
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: 0,
 			birth: 0,
@@ -166,6 +172,9 @@ it("redraws descendants from final parents in birth order, leaving births and sh
 	const rng = RNG.createRng({ seed: 221 })
 	for (let person = 0; person < 4; person++)
 		PEOPLE.spawn({
+			recordHealth: true,
+			death: null,
+			nameSeed: null,
 			people,
 			sex: person === 1 ? 1 : 0,
 			birth: person * 20,
@@ -198,6 +207,9 @@ it("gates personality by age and reads stress at the selected time", () => {
 	const people = PEOPLE.create(1)
 	const rng = RNG.createRng({ seed: 221 })
 	const id = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex: 0,
 		birth: 0,
@@ -619,7 +631,7 @@ it("validates final parent draws after init and years of births, with no soverei
 			era: "lateMedieval",
 			numPoints: 30000,
 		})
-		expect(redraws).toBeGreaterThan(0)
+		expect(redraws).toBe(0)
 		expect(PEOPLE_TRAITS_REPORT.validate({ engine })).toBe(
 			engine.people.persons.birth.length,
 		)
@@ -656,6 +668,9 @@ it("keeps base variance near founders and child bases correlated with parental m
 			const father = generation === 0 ? -1 : previous[rng.randint(0, size - 1)]
 			const mother = generation === 0 ? -1 : previous[rng.randint(0, size - 1)]
 			const person = PEOPLE.spawn({
+				recordHealth: true,
+				death: null,
+				nameSeed: null,
 				people,
 				sex: 0,
 				birth: 40 * generation,

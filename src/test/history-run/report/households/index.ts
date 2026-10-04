@@ -43,6 +43,7 @@ function build({
 				tenures
 					.filter(
 						(tenure) =>
+							tenure.startTimeMs !== null &&
 							tenure.startTimeMs <= sample.timeMs &&
 							tenure.endTimeMs > sample.timeMs,
 					)

@@ -39,6 +39,9 @@ function found({
 			? 1
 			: 0
 	const father = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex: 0,
 		birth: birth - rng.uniform(20, 40),
@@ -55,6 +58,9 @@ function found({
 	)
 	PEOPLE.raise({ people, person: father, rank })
 	const mother = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex: 1,
 		birth: birth - rng.uniform(17, 32),
@@ -67,6 +73,9 @@ function found({
 	})
 	MARRIAGE_MARKET.marry({ people, a: father, b: mother, time: birth - 1 })
 	const founder = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
 		people,
 		sex,
 		birth,
@@ -78,10 +87,19 @@ function found({
 		rng,
 	})
 	PEOPLE.raise({ people, person: founder, rank })
-	FERTILITY.siblings({ people, child: founder, until: time, origin, rng })
+	FERTILITY.siblings({
+		survives: null,
+		birthDraws: null,
+		people,
+		child: founder,
+		until: time,
+		origin,
+		rng,
+	})
 	if (age >= 18 && rng.random() < MARRIED_FOUNDER_CHANCE) {
 		const wedding = Math.min(time, birth + rng.uniform(16, 25))
 		const spouse = MARRIAGE_MARKET.outsider({
+			draws: null,
 			people,
 			partner: founder,
 			time: wedding,
@@ -100,6 +118,7 @@ function found({
 		MARRIAGE_MARKET.marry({ people, a: founder, b: spouse, time: wedding })
 		const [wife, husband] = sex === 1 ? [founder, spouse] : [spouse, founder]
 		FERTILITY.bear({
+			birthDraws: null,
 			people,
 			mother: wife,
 			father: husband,

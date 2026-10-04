@@ -96,6 +96,7 @@ function create(): PeopleLog {
 		c: new Int32Array(INITIAL_ROWS),
 		d: new Int32Array(INITIAL_ROWS),
 		emitted: 0,
+		initialTenures: [],
 	}
 }
 
@@ -232,7 +233,11 @@ function append({ log, row }: AppendRowParams): void {
 }
 
 function pending(people: PeopleState): boolean {
-	return people.log.count > 0 || people.log.emitted < people.persons.sex.length
+	return (
+		people.log.initialTenures.length > 0 ||
+		people.log.count > 0 ||
+		people.log.emitted < people.persons.sex.length
+	)
 }
 
 // People created since the last seal come first, so a person's row precedes
@@ -243,6 +248,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 	const creations = table.sex.length - first
 	const count = creations + log.count
 	const packet: PeoplePacket = {
+		initialTenures: log.initialTenures,
 		count,
 		time: new Float64Array(count),
 		kind: new Uint8Array(count),
@@ -309,6 +315,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		if (packet.kind[index] === SEAT)
 			packet.c[index] = sovereign(packet.a[index]) ? 0 : 1
 	log.count = 0
+	log.initialTenures = []
 	log.emitted = table.sex.length
 	return packet
 }

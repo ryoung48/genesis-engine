@@ -42,6 +42,10 @@ A realm's government decides how it passes on, whether its ruling house marries 
 - **Partitions** is `GOVERNMENT.partitionsOfIndex`: `tribal_monarchy` and `chiefdom` only. Partition is single-heir succession plus a division: the primary heir is chosen by the single-heir rule and the junior heirs then take districts. In code their system (`GOVERNMENT.successionOfIndex`) is still `single_heir`, so marriages, unions and regencies work as in any single-heir realm.
 - **Marries for alliance** is `GOVERNMENT.marriageAlliancesOfIndex`: single-heir realms and elections outside the republic family.
 
+## Starting holder evidence
+
+[Starting families](../people/families-and-lifecycle.md#starting-families) construct synthetic predecessor relations and accessions, then install all sovereigns before downstream initialization. Unknown predecessor tenure starts are [recorded evidence](../mechanics/person-records.md#initial-tenure-evidence), not reconstructed political history or inputs to historical marriage inheritance scoring. Adjacent cousin proposals precede diplomacy. District grants keep canonical score order and install each selected relative before the next grant; no starting personal unions are seeded. Ordinary later union formation and succession rules continue.
+
 ## Assignment
 
 Each nation draws its type once, at world generation (`GOVERNMENT.assignGovernmentType`).
@@ -235,7 +239,7 @@ Each electoral republic keeps 3–5 patrician house heads (the count is fixed pe
 
 ## Historical presentation and reports
 
-The selected-date wiki shows active held titles, primary first, separately from regencies. Lost titles remain in the timeline. Reports sample living people at initialization and integer-year boundaries, assigning each observation to one half-open window and including the final endpoint only in the last window. `heldSeatsHistogram` contains counts for zero, one and at least two seats. `seatsPerHolder` divides total held seats by observations with a seat and is null without holders. `unionHolders` counts observations with at least two sovereign crowns; districts and regencies do not count as crowns.
+The selected-date wiki shows active held titles, primary first, separately from regencies. Lost titles remain in the timeline and previous-title summaries; unknown-start predecessor titles have summaries without fabricated accession events. Reports sample living people at initialization and integer-year boundaries, assigning each observation to one half-open window and including the final endpoint only in the last window. `heldSeatsHistogram` contains counts for zero, one and at least two seats. `seatsPerHolder` divides total held seats by observations with a seat and is null without holders. `unionHolders` counts observations with at least two sovereign crowns; districts and regencies do not count as crowns.
 
 ## Read-only inheritance projection
 

@@ -2,10 +2,11 @@ import type { MatchScore } from "@/model/history/sim/people/family/match-scoring
 import type {
 	CrossMatch,
 	MarriageRealms,
+	PeopleRandomSource,
 	PeopleState,
+	PersonDraws,
 	RealmOrigin,
 } from "@/model/history/sim/people/types"
-import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface MarryParams {
 	people: PeopleState
@@ -15,11 +16,12 @@ export interface MarryParams {
 }
 
 export interface OutsiderParams {
+	draws: PersonDraws | null
 	people: PeopleState
 	partner: number
 	time: number
 	origin: RealmOrigin
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface Seeker {
@@ -37,7 +39,7 @@ export interface MatchParams {
 	neighborsOf: (realm: number) => readonly number[]
 	// The seeker would accept this partner.
 	fits: (partner: number) => boolean
-	rng: SharedRng
+	rng: PeopleRandomSource
 	time: number
 	market: MarriageRealms
 	ancestry: Map<number, Set<number>>
@@ -70,7 +72,7 @@ export interface SeekMatchesParams extends MarriageRealms {
 	sovereigns: number[]
 	// Chance that an eligible royal minor seeks this year.
 	minorChance: number
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface MinorSeekersParams {
@@ -79,7 +81,7 @@ export interface MinorSeekersParams {
 	sovereigns: number[]
 	royal: (realm: number) => boolean
 	chance: number
-	rng: SharedRng
+	rng: PeopleRandomSource
 }
 
 export interface EvaluatePairParams {

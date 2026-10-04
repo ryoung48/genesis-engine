@@ -2,6 +2,7 @@ import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/s
 import type {
 	DistrictParams,
 	GrantCandidate,
+	GrantParams,
 	HolderParams,
 	InstallDistrictParams,
 	RevalidateParams,
@@ -73,9 +74,19 @@ function landlessRelative({ state, seat }: SeatParams): number {
 	}).heir
 }
 
-function newHolder({ state, seat, relativeFirst, rng }: HolderParams): number {
+function newHolder({
+	state,
+	seat,
+	relativeFirst,
+	rng,
+	found,
+}: HolderParams): number {
 	const relative = relativeFirst ? landlessRelative({ state, seat }) : -1
-	if (relative >= 0) return relative
+	if (relative >= 0) {
+		if (found) state.people.startingFamilies.relativeGrants++
+		return relative
+	}
+	if (found) return found(seat)
 	const sovereign = state.sovereignCurrent[seat]
 	const origin = STATE.originOf({ state, realm: seat })
 	return FAMILY.found({
@@ -152,7 +163,9 @@ function succeed({ state, seat, rng }: SucceedDistrictParams): void {
 		state,
 		seat,
 		person:
-			heir >= 0 ? heir : newHolder({ state, seat, relativeFirst: true, rng }),
+			heir >= 0
+				? heir
+				: newHolder({ state, seat, relativeFirst: true, rng, found: null }),
 		reason: "succession",
 	})
 }
@@ -166,7 +179,7 @@ function settle({ state }: DistrictParams): void {
 	}
 }
 
-function grant({ state, rng }: DistrictParams): void {
+function grant({ state, rng, found, randomOf }: GrantParams): void {
 	const people = state.people
 	const size = new Map<number, number>()
 	const seats = new Map<number, number[]>()
@@ -180,7 +193,7 @@ function grant({ state, rng }: DistrictParams): void {
 		if (list) list.push(p)
 		else seats.set(sovereign, [p])
 	}
-	for (const [sovereign, list] of seats) {
+	for (const [sovereign, list] of [...seats].sort((a, b) => a[0] - b[0])) {
 		const roll = (Math.imul(sovereign + 1, 2246822519) >>> 0) / 2 ** 32
 		const wanted = Math.floor(
 			grantShare(size.get(sovereign) ?? 0) * list.length + roll,
@@ -214,18 +227,21 @@ function grant({ state, rng }: DistrictParams): void {
 					(maxDistance || 1),
 		}))
 		candidates.sort((a, b) => a.key - b.key || a.seat - b.seat)
-		for (const { seat } of candidates.slice(0, missing))
+		for (const { seat } of candidates.slice(0, missing)) {
+			const source = randomOf?.(seat) ?? rng
 			install({
 				state,
 				seat,
 				person: newHolder({
 					state,
 					seat,
-					relativeFirst: rng.random() < NEW_GRANT_RELATIVE_CHANCE,
-					rng,
+					relativeFirst: source.random() < NEW_GRANT_RELATIVE_CHANCE,
+					rng: source,
+					found,
 				}),
 				reason: "district grant",
 			})
+		}
 	}
 }
 
