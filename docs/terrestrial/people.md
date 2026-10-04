@@ -1,6 +1,6 @@
 # People (`:history`)
 
-See [character](character.md) for inherited attributes, traits, governors and stress, and [people records](people-records.md) for how people reach the history record.
+See [households](households.md) for residence, affiliation, holdings and succession, [character](character.md) for inherited attributes, traits, governors and stress, and [people records](people-records.md) for how people reach the history record.
 
 Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`, `log/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `partition/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
 
@@ -16,7 +16,7 @@ Every person the simulation creates is recorded, landed or not, living or dead: 
 
 ## What is tracked per person
 
-`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
+`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), residence (current household province), initialResidence (birth-effective province), heldSeats (sorted unique seat IDs), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
 The additional character columns are `bases`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](character.md).
 
@@ -27,7 +27,9 @@ State-level maps in `PeopleState`:
 | `rulerOf` | Holder of each seat (sovereign root or district), -1 if empty. `PEOPLE.setRuler` is its only writer. |
 | `stressed` | People with positive stress after the preceding annual pass; used to reset former sovereign rulers. |
 | `patricians` | 3–5 patrician house heads per electoral republic. |
-| `unionGenerations` | Shared rulers counted per union junior. |
+| `unionGenerations` | Shared successors counted once per actual senior–junior edge and dispatch. |
+| `residenceHistory` | Sparse retained effective-time moves and birth corrections, including dead people; independent of the pending log. |
+| `household` | Engine-provided territorial-sovereign, rank and time callbacks. |
 | `marriageAlliances` | Realm pairs allied by a royal marriage. |
 | `regencies` | Realm → `{ ward, regent (-1 = council), kind }`. |
 | `deposed` | Realm → `{ claimant, generation, tried }` for deposed rulers' lines. |
@@ -36,7 +38,7 @@ State-level maps in `PeopleState`:
 ## Life
 
 - **Death is fixed at birth** (`LIFESPAN.deathAt`). Yearly hazard: 10% under 1, 3% under 5, 0.5% under 16, then 1.2% under 40 for both sexes, then Gompertz ageing (1.2% × e^(0.09 × (age − 40))). Nobody lives past 100.
-- **Only childbirth moves a death date**, and only earlier (`PEOPLE.shortenLife`). The new date goes to the record as a `death` row. A sovereign ruler's succession, and a regent's replacement, are rescheduled to the new date; everything else reads the person table live.
+- **Only childbirth moves a death date**, and only earlier (`PEOPLE.shortenLife`). The new date goes to the record as a `death` row. Every holder's person-level succession, including district-only holders, and a regent's replacement are rescheduled to the new date. Holder revisions reject stale heap events; regent events remain separate.
 - **Health is read back from the death date** (`HEALTH.band`): Grave in the last half year, Poor in the last 2 years of a life ending at 40+, Fair in the last 6 years of a life ending at 50+, else Good. A mother whose pregnancy will kill her reads Poor or Grave during it, which gives a reigning queen a weak crown in her last months.
 - **Births** come from pregnancies (see Pregnancy). Only couples where one spouse is a ruler or a ruler's child keep having children.
 - **Dynasty** follows the father, or the mother in matriarchal cultures. It falls back to the other parent when the first has none. Dynasties spread only through births.
@@ -72,7 +74,7 @@ Once a year (`FAMILY.runYear`) for rulers, their children and their siblings:
 
 1. **Who seeks.** Unmarried or widowed women 16–39 and men 18–49 who are not betrothed; each seeks with 35% chance that year. Royal children aged 12–15 also seek (see Betrothal).
 2. **Foreign or home.** Families of realms that marry for alliance (single heir, or non-republic election) look abroad 80% of the time; others 30%.
-3. **Foreign search.** Neighbouring realms first, then neighbours' neighbours, among that year's other seekers of the opposite sex. *Royal blood* (a sovereign ruler or their child) looks for royal blood across both rings before settling for a lesser house. The spouse moves to the ruler's realm, or else to the husband's.
+3. **Foreign search.** Neighbouring realms first, then neighbours' neighbours, among that year's other seekers of the opposite sex. *Royal blood* (a sovereign ruler or their child) looks for royal blood across both rings before settling for a lesser house. The unlanded spouse joins the landed spouse’s household, or else the male spouse’s; separately landed spouses retain their seats and locations.
 4. **Waiting.** Royals of alliance-marrying realms who find no foreign match and are under 25 (minors included) stay single and try again next year.
 5. **Home match.** Otherwise they marry a made-up outsider of no house from their own culture: a wife up to 8 years younger (at least 15), a husband up to 8 years older.
 
@@ -103,9 +105,9 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 
 - **Grants.** A realm's titled direct subjects are its district seats. It grants a share of them by size: none up to 4 provinces, rising to 92% at 25+. Poor and distant seats are granted first.
 - **Who gets a new grant.** With 30% chance the ruler's closest adult, landless relative (never the heir apparent). Otherwise a new house aged 18–55.
-- **Inheritance.** A dead holder's district passes to their next *adult* heir who holds no seat, else by the grant rule. Minors never hold districts.
+- **Inheritance.** At the person-level death event a district passes to the next *adult* heir who holds no seat, else by the grant rule. Annual settlement does not inherit again. Minors never hold districts.
 - **Loss.** A district that stops being a direct titled subject is vacated.
-- **Revalidation.** `DISTRICTS.revalidate` is the per-seat check behind both rules: it vacates a seat that is no longer a district seat and moves a living holder of a valid seat to the realm that owns it now. The yearly pass runs it over every seat; a [partition](government.md#partition) runs it over the divided realm's seats in the same succession.
+- **Revalidation.** `DISTRICTS.revalidate` is the per-seat check behind both rules: it vacates a seat that is no longer a district seat and keeps a living holder of a valid seat; affiliation follows current ownership without rewriting residence. The yearly pass runs it over every seat; a [partition](government.md#partition) runs it over the divided realm's seats in the same succession.
 - **Partition.** A new ruler's former district is vacated when the realm is divided. Seats taken or lost in a partition carry the seat reason `partition`: the heir's new seat, the district an heir or the primary gave up, and the seats displaced admins lose and take.
 
 ## Heirs
@@ -127,7 +129,7 @@ How a realm passes on (the systems, elections, claim, disputes and the partition
 
 - **Formed** when one person comes to rule two single-heir realms by inheritance, or when two reigning single-heir rulers are married to each other (the heiress case).
 - **Senior** is the realm that must lead (it already has juniors or an overlord), else the one with more provinces.
-- **Blocked** when the realms are at war, either is already a union junior, or both must lead.
+- **Blocked** for a new external link when realms are at war, either is already a union junior, or both must lead. Existing group membership remains compatible; eligibility checks every held crown.
 - **Ended** when a partner's living ruler is someone other than that person or their spouse.
 - **Merged** into the senior when an adjacent junior has had 3 shared rulers.
 

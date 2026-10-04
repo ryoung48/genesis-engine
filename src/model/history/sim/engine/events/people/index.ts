@@ -10,6 +10,7 @@ import type {
 	StateParams,
 } from "@/model/history/sim/engine/events/people/types"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
@@ -36,15 +37,14 @@ function nextYear({ state }: PeopleEventParams): void {
 // at the new date.
 function endEarly({ state, person }: EndEarlyParams): void {
 	const people = state.people
-	for (let seat = 0; seat < state.P; seat++) {
-		if (people.rulerOf[seat] !== person) continue
+	for (const seat of people.persons.heldSeats[person]) {
 		if (!STATE.isSovereign({ state, p: seat })) continue
 		state.leaderRuntime.end[seat] = Math.max(
 			state.time,
 			people.persons.death[person] * STATE.yearMs,
 		)
-		STATE.scheduleSuccession({ state, p: seat })
 	}
+	SUCCESSION_SCHEDULE.ensure({ state, person })
 	for (const [realm, regency] of people.regencies)
 		if (regency.regent === person)
 			REGENCY.scheduleRegentDeath({ state, realm, regent: person })

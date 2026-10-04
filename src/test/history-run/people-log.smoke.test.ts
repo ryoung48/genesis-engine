@@ -8,6 +8,7 @@ import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
+import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
 	AppendedRow,
@@ -43,6 +44,7 @@ const SNAPSHOT_COLUMNS = [
 	"culture",
 	"nameSeed",
 	"home",
+	"initialResidence",
 	"bases",
 	"personality",
 	"grades",
@@ -146,12 +148,7 @@ it("rejects reserved kinds, unknown codes and values a row cannot hold", () => {
 	const { log } = people
 	const reject = (row: unknown) =>
 		expect(() => PEOPLE_LOG.append({ log, row: row as AppendedRow })).toThrow()
-	for (const kind of [
-		"health_band",
-		"condition",
-		"residence",
-		"opinion_memory",
-	])
+	for (const kind of ["health_band", "condition", "opinion_memory"])
 		reject({ kind, time: 1, person: 0 })
 	reject({ kind: "creation", time: 1, person: 0 })
 	reject({ kind: "coronation", time: 1, person: 0 })
@@ -172,7 +169,7 @@ it("rejects reserved kinds, unknown codes and values a row cannot hold", () => {
 	packet.b[0] = 1
 	expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 	packet.b[0] = 0
-	for (const code of [3, 4, 10, 11, 13]) {
+	for (const code of [3, 4, 11, 13]) {
 		packet.kind[0] = code
 		expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 	}
@@ -186,7 +183,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	table.father[first[2]] = first[0]
 	table.mother[first[2]] = first[1]
 	const packet = PEOPLE_LOG.seal({ people, sovereign: () => true })
-	expect(byteLength(packet)).toBe(25 * 3 + 65 * 3)
+	expect(byteLength(packet)).toBe(25 * 3 + 69 * 3)
 	expect(rowsOf(packet)).toEqual(
 		first.map((person) => ({
 			kind: "creation",
@@ -213,7 +210,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	expect(people.log.time.length).toBe(8192)
 	const grown = PEOPLE_LOG.seal({ people, sovereign: () => true })
 	expect(grown.count).toBe(rows + 1)
-	expect(byteLength(grown)).toBe(25 * (rows + 1) + 65)
+	expect(byteLength(grown)).toBe(25 * (rows + 1) + 69)
 	const decoded = rowsOf(grown)
 	expect(decoded[0]).toMatchObject({
 		kind: "creation",
@@ -268,6 +265,32 @@ it("records every person once and rebuilds the same record from transferred pack
 	const created: number[] = []
 	const kinds = new Set<string>()
 	for (let year = 0; year <= 25; year++) {
+		if (year === 1) {
+			const parties = [0, 1].map((sex) =>
+				PEOPLE.spawn({
+					people: engine.people,
+					sex: sex === 0 ? 0 : 1,
+					birth: engine.time / STATE.yearMs - 13,
+					father: -1,
+					mother: -1,
+					dynasty: -1,
+					origin: { realm: 0, culture: 0, genderSystem: 0 },
+					rng,
+				}),
+			)
+			BETROTHAL.betroth({
+				people: engine.people,
+				a: parties[0],
+				b: parties[1],
+				time: engine.time / STATE.yearMs,
+			})
+			BETROTHAL.release({
+				people: engine.people,
+				person: parties[0],
+				time: engine.time / STATE.yearMs,
+				cause: "alliance",
+			})
+		}
 		if (year > 0)
 			SIM_ENGINE.simulateUntil({
 				state: engine,
@@ -280,7 +303,7 @@ it("records every person once and rebuilds the same record from transferred pack
 		)
 		for (const packet of packets) {
 			expect(byteLength(packet)).toBe(
-				25 * packet.count + 65 * packet.sex.length,
+				25 * packet.count + 69 * packet.sex.length,
 			)
 			for (const row of rowsOf(packet)) {
 				kinds.add(row.kind)
@@ -314,6 +337,7 @@ it("records every person once and rebuilds the same record from transferred pack
 		"death",
 		"pregnancy",
 		"regent",
+		"residence",
 		"seat",
 		"stress",
 		"wedding",
@@ -438,7 +462,7 @@ it("keeps the append buffer writable after a transfer and never emits a row twic
 			reason: "partition",
 		},
 	])
-	expect(byteLength(packet)).toBe(25 * 3 + 65)
+	expect(byteLength(packet)).toBe(25 * 3 + 69)
 }, 600000)
 
 it("answers family, marriage, betrothal, tenure, pregnancy and stress views from the record alone", () => {

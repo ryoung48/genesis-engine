@@ -227,7 +227,7 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 		if (
 			person >= 0 &&
 			!STATE.isSovereign({ state: engine, p: seat }) &&
-			table.throne[person] === seat
+			table.heldSeats[person].includes(seat)
 		)
 			sampleAppliedEffect({
 				tracker,

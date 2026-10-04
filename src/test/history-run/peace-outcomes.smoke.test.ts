@@ -153,7 +153,7 @@ it("submits a claimant whose offensive ends without land", () => {
 	expect(terms.outcome).toBe("submission")
 	expect(state.people.rulerOf[crown]).not.toBe(claimant)
 	expect(STATE.isSovereign({ state, p: child })).toBe(false)
-	expect(state.people.persons.throne[claimant]).toBe(-1)
+	expect(state.people.persons.heldSeats[claimant]).toEqual([])
 })
 
 it("joins supporting districts and recalculates both armies independently", () => {
@@ -174,7 +174,7 @@ it("joins supporting districts and recalculates both armies independently", () =
 			return (
 				state.seatRank[seat] > 0 &&
 				holder >= 0 &&
-				state.people.persons.throne[holder] === seat &&
+				state.people.persons.heldSeats[holder].includes(seat) &&
 				PEOPLE.aliveAt({ people: state.people, person: holder, time })
 			)
 		})

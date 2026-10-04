@@ -81,6 +81,12 @@ function sha256(people: PeopleRecord): string {
 			person.culture,
 			person.nameSeed,
 			person.home,
+			person.initialResidence,
+			(people.residencesOf.get(id) ?? []).map((row) => [
+				row.timeMs,
+				row.province,
+				row.sequence,
+			]),
 			person.bases,
 			person.personality,
 			person.grades,

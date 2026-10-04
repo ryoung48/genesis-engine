@@ -11,10 +11,14 @@ import type {
 	DissolveLapsedParams,
 	FoundTitleForParams,
 	OwnedChildCountParams,
+	RefreshHouseholdsParams,
 	RelinkNationsParams,
 	SettleProvincesParams,
 	SettleTitleSetParams,
 } from "@/model/history/sim/engine/state/titles/types"
+import { PEOPLE } from "@/model/history/sim/people"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import { HOLDING } from "@/model/society/dejure/holding"
@@ -32,6 +36,41 @@ const TITLE_CREATION_COST_DUCATS: Readonly<Record<number, number>> = {
 	4: 625 / 9,
 }
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000
+
+function refreshHouseholds({
+	state,
+	previousRanks,
+}: RefreshHouseholdsParams): void {
+	const holders = new Set<number>()
+	for (let seat = 0; seat < state.P; seat++) {
+		if (
+			previousRanks[seat] === state.seatRank[seat] ||
+			state.people.rulerOf[seat] < 0
+		)
+			continue
+		holders.add(state.people.rulerOf[seat])
+		if (state.seatRank[seat] === 0 && state.parentCurrent[seat] >= 0)
+			PEOPLE.vacate({
+				people: state.people,
+				seat,
+				reason: "territorial change",
+			})
+	}
+
+	for (const person of holders) {
+		HOUSEHOLD.seatChanged({ people: state.people, person })
+		PEOPLE.raise({
+			people: state.people,
+			person,
+			rank:
+				HOLDINGS.standing({
+					people: state.people,
+					person,
+					ranks: state.seatRank,
+				}) - 1,
+		})
+	}
+}
 
 function applyDerivedParents({
 	state,
@@ -87,11 +126,13 @@ function settleTitleSet({ state, touched }: SettleTitleSetParams): void {
 		touched,
 	})
 	if (changes.length === 0) return
+	const previousRanks = state.seatRank
 	state.seatRank = DEJURE.seatRank({
 		titles: state.titles,
 		provinceCount: state.P,
 		heldOnly: true,
 	})
+	refreshHouseholds({ state, previousRanks })
 	const affected = new Set<number>()
 	for (const change of changes) {
 		if (change.kind === "passed") {
@@ -141,11 +182,13 @@ function refreshTitleIndex({ state }: DissolveLapsedParams): void {
 		titles: state.titles,
 		provinceCount: state.P,
 	})
+	const previousRanks = state.seatRank
 	state.seatRank = DEJURE.seatRank({
 		titles: state.titles,
 		provinceCount: state.P,
 		heldOnly: true,
 	})
+	refreshHouseholds({ state, previousRanks })
 }
 
 function foundTitleFor({

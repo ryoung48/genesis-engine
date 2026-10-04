@@ -13,6 +13,8 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import type { Sex } from "@/model/history/sim/people/types"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SharedRng } from "@/model/shared/random/rng"
@@ -198,10 +200,13 @@ function fixture({
 function succeed(fx: Fixture): void {
 	const { state, realm, rng, dying } = fx
 	kill({ state, who: dying })
+	STATE.scheduleSuccession({ state, p: realm })
 	SUCCESSION.runSuccession({
 		state,
-		province: realm,
-		leaderIdx: state.leaderRuntime.idx[realm],
+		person: state.people.rulerOf[realm],
+		revision:
+			state.successionSchedule.pending.get(state.people.rulerOf[realm])
+				?.revision ?? -1,
 		rng,
 	})
 	invariants(fx)
@@ -223,7 +228,6 @@ function skipReason(fx: Fixture): unknown {
 
 function invariants({ state, provinces }: Fixture): void {
 	const people = state.people
-	const table = people.persons
 	const held = new Map<number, number>()
 	for (const seat of provinces) {
 		const holder = people.rulerOf[seat]
@@ -231,7 +235,11 @@ function invariants({ state, provinces }: Fixture): void {
 		if (!PEOPLE.aliveAt({ people, person: holder, time: now(state) })) continue
 		held.set(holder, (held.get(holder) ?? 0) + 1)
 		if (STATE.isSovereign({ state, p: seat })) {
-			const throne = table.throne[holder]
+			const throne = HOLDINGS.primary({
+				people: state.people,
+				person: holder,
+				ranks: state.seatRank,
+			})
 			expect(
 				throne === seat ||
 					(people.rulerOf[throne] === holder &&
@@ -240,8 +248,16 @@ function invariants({ state, provinces }: Fixture): void {
 			).toBe(true)
 		} else {
 			expect(DISTRICTS.isDistrictSeat({ state, seat })).toBe(true)
-			expect(table.throne[holder]).toBe(seat)
-			expect(table.realm[holder]).toBe(state.sovereignCurrent[seat])
+			expect(
+				HOLDINGS.primary({
+					people: state.people,
+					person: holder,
+					ranks: state.seatRank,
+				}),
+			).toBe(seat)
+			expect(HOUSEHOLD.realmOf({ people, person: holder })).toBe(
+				state.sovereignCurrent[seat],
+			)
 		}
 	}
 	for (const count of held.values()) expect(count).toBe(1)
@@ -318,7 +334,13 @@ it("gives the best district to the younger son and keeps the rest", () => {
 		const move = note.adminPersons.indexOf(admin)
 		expect(move).toBeGreaterThanOrEqual(0)
 		const to = note.adminTo[move]
-		expect(state.people.persons.throne[admin]).toBe(to)
+		expect(
+			HOLDINGS.primary({
+				people: state.people,
+				person: admin,
+				ranks: state.seatRank,
+			}),
+		).toBe(to)
 		if (to >= 0) {
 			expect(state.people.rulerOf[to]).toBe(admin)
 			expect(state.sovereignCurrent[to]).toBe(seats[0])
@@ -370,7 +392,13 @@ it("seats juniors when the primary already rules another realm", () => {
 	succeed(fx)
 	expect(state.people.rulerOf[realm]).toBe(elder)
 	expect(state.people.rulerOf[other]).toBe(elder)
-	expect([realm, other]).toContain(state.people.persons.throne[elder])
+	expect([realm, other]).toContain(
+		HOLDINGS.primary({
+			people: state.people,
+			person: elder,
+			ranks: state.seatRank,
+		}),
+	)
 	expect(state.people.rulerOf[seats[0]]).toBe(younger)
 	expect(partitionNote(fx).heirs).toEqual([younger])
 }, 120000)
@@ -395,7 +423,13 @@ it("lets an eligible branch inherit past a son who rules elsewhere", () => {
 	succeed(fx)
 	expect(partitionNote(fx).heirs).toEqual([youngest])
 	expect(state.people.rulerOf[seats[0]]).toBe(youngest)
-	expect(state.people.persons.throne[abroad]).toBe(other)
+	expect(
+		HOLDINGS.primary({
+			people: state.people,
+			person: abroad,
+			ranks: state.seatRank,
+		}),
+	).toBe(other)
 }, 120000)
 
 it("keeps an heir in the district he holds and seats the others around him", () => {
@@ -475,7 +509,13 @@ it("clears the seats the heirs held before", () => {
 	state.occupationCurrent[seats[1]] = 0
 	succeed(fx)
 	expect(state.people.rulerOf[realm]).toBe(elder)
-	expect(state.people.persons.throne[elder]).toBe(realm)
+	expect(
+		HOLDINGS.primary({
+			people: state.people,
+			person: elder,
+			ranks: state.seatRank,
+		}),
+	).toBe(realm)
 	expect(state.people.rulerOf[seats[0]]).toBe(younger)
 	expect(STATE.isSovereign({ state, p: seats[0] })).toBe(true)
 	expect(state.people.rulerOf[abroad]).toBe(-1)
@@ -691,7 +731,6 @@ it("bumps a lower admin, and ends the chain at a dead one", () => {
 		return { fx, admin, holders, note: partitionNote(fx) }
 	}
 	const living = build(false)
-	const table = living.fx.state.people.persons
 	expect(living.note.adminPersons[0]).toBe(living.admin)
 	expect(living.note.adminBumped[0]).toBe(1)
 	// Each bumped holder takes a seat of lower rank than the one they lost, so
@@ -708,11 +747,23 @@ it("bumps a lower admin, and ends the chain at a dead one", () => {
 		if (move === last) {
 			expect(adminTo[move]).toBe(-1)
 			expect(adminBumped[move]).toBe(0)
-			expect(table.throne[moved]).toBe(-1)
+			expect(
+				HOLDINGS.primary({
+					people: living.fx.state.people,
+					person: moved,
+					ranks: living.fx.state.seatRank,
+				}),
+			).toBe(-1)
 			continue
 		}
 		expect(adminBumped[move]).toBe(1)
-		expect(table.throne[moved]).toBe(adminTo[move])
+		expect(
+			HOLDINGS.primary({
+				people: living.fx.state.people,
+				person: moved,
+				ranks: living.fx.state.seatRank,
+			}),
+		).toBe(adminTo[move])
 		expect(living.fx.state.people.rulerOf[adminTo[move]]).toBe(moved)
 	}
 
@@ -822,7 +873,13 @@ it("drops a share that an earlier release made invalid", () => {
 	expect(note.unseatedReasons[note.unseatedHeirs.indexOf(third)]).toBe(
 		"share dropped",
 	)
-	expect(state.people.persons.throne[third]).toBe(-1)
+	expect(
+		HOLDINGS.primary({
+			people: state.people,
+			person: third,
+			ranks: state.seatRank,
+		}),
+	).toBe(-1)
 	expect(state.sovereignCurrent[seats[1]]).toBe(realm)
 	expect(state.people.rulerOf[seats[1]]).toBe(-1)
 	expect(note.adminPersons).toContain(admin)

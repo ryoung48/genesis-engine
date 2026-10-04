@@ -1,4 +1,5 @@
 import { PEOPLE_RECORD } from "@/model/history/record/people"
+import { AFFILIATION } from "@/model/history/record/people/query/affiliation"
 import type {
 	AttributeView,
 	BetrothalView,
@@ -6,6 +7,7 @@ import type {
 	PersonAtParams,
 	PersonEvent,
 	PersonView,
+	RealmAtParams,
 	SeatAtParams,
 	SpouseView,
 	TenureView,
@@ -16,6 +18,7 @@ import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { HEALTH } from "@/model/history/sim/people/health"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
 import { TRAITS } from "@/model/history/sim/people/traits"
+import { EFFECTIVE_TIME } from "@/model/shared/time/effective"
 
 function until(time: number, timeMs: number): number | null {
 	return time <= timeMs ? time : null
@@ -70,6 +73,7 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 		})
 	return {
 		...person,
+		residence: residenceAt({ people, id, timeMs }),
 		father: PEOPLE_RECORD.has({ people, id: person.father })
 			? person.father
 			: -1,
@@ -127,6 +131,15 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 			other: child,
 			tenure: -1,
 		})
+	for (const residence of params.people.residencesOf.get(params.id) ?? [])
+		if (residence.timeMs <= params.timeMs)
+			events.push({
+				timeMs: residence.timeMs,
+				kind: "moved",
+				other: residence.province,
+				tenure: -1,
+			})
+
 	for (const [index, tenure] of person.tenures.entries()) {
 		const regent = tenure.kind === "regent"
 		events.push({
@@ -249,7 +262,26 @@ function stress({ people, id, timeMs }: PersonAtParams): number {
 		if (row.timeMs <= timeMs) level = row.level
 	return level
 }
+function residenceAt({ people, id, timeMs }: PersonAtParams): number {
+	const person = PEOPLE_RECORD.person({ people, id })
+	if (!person || timeMs < person.birthTimeMs) return -1
+	const rows = people.residencesOf.get(id) ?? []
+	const index = EFFECTIVE_TIME.latest({
+		times: rows.map((row) => row.timeMs),
+		length: rows.length,
+		time: timeMs,
+	})
+	return index < 0 ? person.initialResidence : rows[index].province
+}
+
+function realmAt({ people, id, timeMs, record }: RealmAtParams): number {
+	const province = residenceAt({ people, id, timeMs })
+	return province < 0 ? -1 : AFFILIATION.at({ record, province, timeMs })
+}
+
 export const PERSON_QUERY = {
+	residenceAt,
+	realmAt,
 	attributes,
 	traits,
 	stress,

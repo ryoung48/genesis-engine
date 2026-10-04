@@ -149,6 +149,8 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 			tenures: people.tenures.length,
 			retainedBytes: {
 				persons: retainedBytes(people.persons),
+				initialResidence: retainedBytes(people.persons.initialResidence),
+				residencesOf: retainedBytes(people.residencesOf),
 				childrenOf: retainedBytes(people.childrenOf),
 				marriages: retainedBytes([people.marriages, people.marriagesOf]),
 				betrothals: retainedBytes([people.betrothals, people.betrothalsOf]),
@@ -185,6 +187,38 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 			),
 			memory,
 			peopleRecord,
+			residenceHistory: {
+				people: engine.people.residenceHistory.size,
+				logicalBytes: [...engine.people.residenceHistory.values()].reduce(
+					(sum, history) => sum + 12 * history.length,
+					0,
+				),
+				allocatedBytes: [...engine.people.residenceHistory.values()].reduce(
+					(sum, history) =>
+						sum + history.times.byteLength + history.provinces.byteLength,
+					0,
+				),
+				retainedBytes: retainedBytes(engine.people.residenceHistory),
+				entryObjectsBytes: retainedBytes(
+					[...engine.people.residenceHistory.values()].map((history) => ({
+						length: history.length,
+						times: new Float64Array(0),
+						provinces: new Int32Array(0),
+					})),
+				),
+				pendingLogBytes: retainedBytes(engine.people.log),
+				initialResidenceBytes: retainedBytes(
+					engine.people.persons.initialResidence,
+				),
+			},
+			holdings: {
+				people: engine.people.persons.heldSeats.length,
+				seats: engine.people.persons.heldSeats.reduce(
+					(sum, seats) => sum + seats.length,
+					0,
+				),
+				retainedBytes: retainedBytes(engine.people.persons.heldSeats),
+			},
 			simulationMs,
 			ticksMs,
 			cloningMs,

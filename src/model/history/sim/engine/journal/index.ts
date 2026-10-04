@@ -241,6 +241,7 @@ function packetBuffers(packet: PeoplePacket): Transferable[] {
 		packet.culture.buffer,
 		packet.nameSeed.buffer,
 		packet.home.buffer,
+		packet.initialResidence.buffer,
 		packet.bases.buffer,
 		packet.personality.buffer,
 		packet.grades.buffer,

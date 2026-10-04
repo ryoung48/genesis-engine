@@ -299,10 +299,14 @@ it("charges founding through succession and overthrow", () => {
 	succession.state.people.persons.death[
 		succession.state.people.rulerOf[succession.nation]
 	] = succession.state.time / STATE.yearMs - 1
+	STATE.scheduleSuccession({ state: succession.state, p: succession.nation })
 	SUCCESSION.runSuccession({
 		state: succession.state,
-		province: succession.nation,
-		leaderIdx: succession.state.leaderRuntime.idx[succession.nation],
+		person: succession.state.people.rulerOf[succession.nation],
+		revision:
+			succession.state.successionSchedule.pending.get(
+				succession.state.people.rulerOf[succession.nation],
+			)?.revision ?? -1,
 		rng: succession.rng,
 	})
 	expect(

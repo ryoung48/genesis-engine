@@ -2,6 +2,7 @@ import { DERIVE } from "@/model/history/sim/engine/derive"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
+import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
@@ -72,6 +73,7 @@ import { TERRAIN } from "@/model/history/sim/engine/terrain"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { FAMILY } from "@/model/history/sim/people/family"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import type { RealmOrigin } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import { DEJURE } from "@/model/society/dejure"
@@ -209,7 +211,7 @@ function releaseFaction({
 	const vassal = state.people.rulerOf[p]
 	if (
 		vassal >= 0 &&
-		state.people.persons.throne[vassal] === p &&
+		state.people.persons.heldSeats[vassal].includes(p) &&
 		PEOPLE.aliveAt({
 			people: state.people,
 			person: vassal,
@@ -235,12 +237,7 @@ function releaseProvince(params: ReleaseProvinceParams): void {
 
 // Schedules the ruler's succession at their death.
 function scheduleSuccession({ state, p }: ScheduleSuccessionParams): void {
-	state.heap.enqueue(
-		state.leaderRuntime.end[p],
-		EVENT_HEAP.evt.SUCCESSION,
-		p,
-		state.leaderRuntime.idx[p],
-	)
+	SUCCESSION_SCHEDULE.ensure({ state, person: state.people.rulerOf[p] })
 }
 
 function isProvinceConnectedToParent({
@@ -647,6 +644,7 @@ function createHistoryState({
 	const startTime = startYear * yearMs
 	const waterAccessLevels = waterAccess ?? new Uint8Array(P)
 	const stateless = new Uint8Array(P)
+
 	for (let p = 0; p < P; p++) {
 		if (!provinces.desolate[p] && nations.sovereign[p] < 0) stateless[p] = 1
 	}
@@ -780,6 +778,7 @@ function createHistoryState({
 		events: [],
 		journal: [],
 		pendingJournal: JOURNAL.pending(),
+		successionSchedule: SUCCESSION_SCHEDULE.create(),
 		people: PEOPLE.create(P),
 		heap: new EventHeap(),
 		leaderRuntime: {
@@ -805,6 +804,14 @@ function createHistoryState({
 					count: 0,
 				},
 	}
+
+	state.people.household = {
+		realmOf: (province) => getSovereign({ state, p: province }),
+		ranks: () => state.seatRank,
+		time: () => state.time / yearMs,
+	}
+	state.people.holdingsChanged = (person) =>
+		SUCCESSION_SCHEDULE.ensure({ state, person })
 
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
@@ -996,6 +1003,8 @@ function unite({ state, a, b, ruler, shared }: UniteParams): UnionLink {
 	}
 	setRelation({ state, a: junior, b: senior, rel: rel.PU_JUNIOR })
 	people.unionGenerations.set(junior, 1)
+	if (state.successionSchedule.processing >= 0)
+		state.successionSchedule.accountedEdges.add(`${senior}:${junior}`)
 	state.events.push({
 		tag: "personal union formed",
 		time: state.time,
@@ -1006,24 +1015,71 @@ function unite({ state, a, b, ruler, shared }: UniteParams): UnionLink {
 
 // A ruler married to the ruler of another single-heir realm joins the two
 // crowns, as with Castile and Aragon.
+function unionSenior({ state, p }: UnionRealmParams): number {
+	const seen = new Set<number>()
+	let senior = p
+	while (!seen.has(senior)) {
+		seen.add(senior)
+		const next = unionPartners({ state, p: senior }).find(
+			(other) => getRelation({ state, a: senior, b: other }) === rel.PU_SENIOR,
+		)
+		if (next === undefined) return senior
+		senior = next
+	}
+	return senior
+}
+
 function uniteCouple({ state, p, person }: UnionRulerParams): void {
 	const people = state.people
-	const table = people.persons
-	const spouse = table.spouse[person]
-	if (spouse < 0) return
-	if (!PEOPLE.aliveAt({ people, person: spouse, time: state.time / yearMs }))
+	const spouse = people.persons.spouse[person]
+	if (
+		spouse < 0 ||
+		!PEOPLE.aliveAt({ people, person: spouse, time: state.time / yearMs })
+	)
 		return
-	const other = table.throne[spouse]
-	if (other < 0 || other === p || !isSovereign({ state, p: other })) return
-	if (people.rulerOf[other] !== spouse) return
-	for (const realm of [p, other])
-		if (
-			GOVERNMENT.successionOfIndex(state.governmentType[realm]) !==
-			"single_heir"
+	const own = HOLDINGS.ordered({
+		people,
+		person,
+		ranks: state.seatRank,
+	}).filter((seat) => isSovereign({ state, p: seat }))
+	const crowns = HOLDINGS.ordered({
+		people,
+		person: spouse,
+		ranks: state.seatRank,
+	}).filter((seat) => isSovereign({ state, p: seat }))
+	if (!own.includes(p)) return
+	if (
+		[...own, ...crowns].some(
+			(seat) =>
+				GOVERNMENT.successionOfIndex(state.governmentType[seat]) !==
+				"single_heir",
 		)
-			return
-	if (!canUnite({ state, a: p, b: other })) return
-	unite({ state, a: p, b: other, ruler: person, shared: false })
+	)
+		return
+	if (
+		!own.every((a) =>
+			crowns.every(
+				(b) =>
+					unionSenior({ state, p: a }) === unionSenior({ state, p: b }) ||
+					canUnite({ state, a, b }),
+			),
+		)
+	)
+		return
+	for (const a of own)
+		for (const b of crowns) {
+			if (
+				!people.persons.heldSeats[person].includes(a) ||
+				!people.persons.heldSeats[spouse].includes(b) ||
+				!isSovereign({ state, p: a }) ||
+				!isSovereign({ state, p: b })
+			)
+				continue
+			if (unionSenior({ state, p: a }) === unionSenior({ state, p: b }))
+				continue
+			if (canUnite({ state, a, b }))
+				unite({ state, a, b, ruler: person, shared: false })
+		}
 }
 
 function mergeUnion({ state, junior, senior }: UnionPairParams): void {
@@ -1052,33 +1108,62 @@ function installRuler({
 }: InstallRulerParams): void {
 	const people = state.people
 	const table = people.persons
-	const other = table.throne[person]
+	if (!PEOPLE.aliveAt({ people, person, time: state.time / yearMs })) return
+	const crowns = HOLDINGS.ordered({
+		people,
+		person,
+		ranks: state.seatRank,
+	}).filter((seat) => seat !== p && isSovereign({ state, p: seat }))
+	const accounted =
+		state.successionSchedule.processing >= 0
+			? state.successionSchedule.accountedEdges
+			: new Set<string>()
 	breakUnions({ state, p, person })
-	PEOPLE.vacate({ people, seat: p, reason })
-	let merge = -1
-	if (other >= 0 && other !== p && isSovereign({ state, p: other })) {
-		const link = unite({ state, a: p, b: other, ruler: person, shared: true })
-		PEOPLE.setRuler({
-			people,
-			seat: p,
-			person,
-			rank: state.seatRank[p],
-			reason,
-		})
-		table.throne[person] = link.senior
-		table.realm[person] = link.senior
-		if (link.merge) merge = link.junior
-	} else {
-		PEOPLE.enthrone({
-			people,
-			person,
-			seat: p,
-			realm: p,
-			rank: state.seatRank[p],
-			reason,
-		})
-		uniteCouple({ state, p, person })
+	PEOPLE.setRuler({
+		people,
+		person,
+		seat: p,
+		rank: state.seatRank[p],
+		reason,
+	})
+	for (const other of crowns) {
+		if (
+			!people.persons.heldSeats[person].includes(other) ||
+			!isSovereign({ state, p: other }) ||
+			!isSovereign({ state, p })
+		)
+			continue
+		if (unionSenior({ state, p }) === unionSenior({ state, p: other })) continue
+		if (canUnite({ state, a: p, b: other })) {
+			const link = unite({ state, a: p, b: other, ruler: person, shared: true })
+			accounted.add(`${link.senior}:${link.junior}`)
+		}
 	}
+	uniteCouple({ state, p, person })
+	for (const other of [...unionPartners({ state, p })]) {
+		if (
+			!isSovereign({ state, p }) ||
+			!isSovereign({ state, p: other }) ||
+			people.rulerOf[other] !== person
+		)
+			continue
+		const relation = getRelation({ state, a: p, b: other })
+		if (relation !== rel.PU_SENIOR && relation !== rel.PU_JUNIOR) continue
+		const senior = relation === rel.PU_SENIOR ? other : p
+		const junior = relation === rel.PU_SENIOR ? p : other
+		const edge = `${senior}:${junior}`
+		if (accounted.has(edge)) continue
+		accounted.add(edge)
+		const link = unite({
+			state,
+			a: senior,
+			b: junior,
+			ruler: person,
+			shared: true,
+		})
+		if (link.merge) mergeUnion({ state, junior, senior })
+	}
+
 	state.leaderRuntime.idx[p]++
 	state.leaderRuntime.birth[p] = table.birth[person] * yearMs
 	state.leaderRuntime.end[p] = Math.max(
@@ -1089,8 +1174,6 @@ function installRuler({
 	FIELDS.prov.leader.dynasty.set({ state, p, value: table.dynasty[person] })
 	FIELDS.prov.leader.claim.set({ state, p, value: claim })
 	FIELDS.prov.leader.birthYear.set({ state, p, value: table.birth[person] })
-	if (merge >= 0)
-		mergeUnion({ state, junior: merge, senior: table.throne[person] })
 }
 
 function foundRuler({
@@ -1188,6 +1271,7 @@ export const STATE = {
 		}),
 	scheduleSuccession,
 	canUnite,
+	unionSenior,
 	uniteCouple: (params: UnionRulerParams) =>
 		MILITARY.mutate({ state: params.state, action: () => uniteCouple(params) }),
 	foundRuler: (params: FoundRulerParams) =>

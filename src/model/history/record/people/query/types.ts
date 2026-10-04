@@ -1,3 +1,4 @@
+import type { AffiliationRecord } from "@/model/history/record/people/query/affiliation/types"
 import type {
 	PeopleRecord,
 	RecordBetrothalEnd,
@@ -72,6 +73,7 @@ export interface PersonView {
 	dynasty: number
 	nameSeed: number
 	home: number
+	residence: number
 	spouses: SpouseView[]
 	betrothals: BetrothalView[]
 	children: number[]
@@ -82,6 +84,7 @@ export interface PersonView {
 }
 
 export type PersonEventKind =
+	| "moved"
 	| "born"
 	| "married"
 	| "betrothed"
@@ -119,4 +122,8 @@ export interface TraitsView {
 	personality: PersonalityTrait[]
 	congenital: CongenitalTrait[]
 	grades: string[]
+}
+
+export interface RealmAtParams extends PersonAtParams {
+	record: AffiliationRecord
 }

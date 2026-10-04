@@ -44,7 +44,9 @@ Local measurements are in `stats/history/2026-10-03T20-58-05-000Z-scrub-memory-m
 
 ## People record
 
-The record holds every person the simulation creates. `PeopleRecord.persons` is dense typed columns indexed by person id, 81 bytes a person, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [People records](people-records.md) describes each.
+The table below is the archived P2 measurement, before residence. [Households](households.md) adds a 4-byte initial column, sparse record residence rows and a separate retained simulation history. New measurements are documented below; historical P2 figures remain unchanged.
+
+The record holds every person the simulation creates. `PeopleRecord.persons` is dense typed columns indexed by person id, 85 bytes a person with initial residence, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [People records](people-records.md) describes each.
 
 The live-history harness (20,000 points, 300 years) recorded 26,190 people, 9,194 marriages, 6,866 tenures and 470 betrothals. Each structure's size is what a retained `structuredClone` of it adds after a garbage collection, heap plus array buffers:
 
@@ -94,3 +96,21 @@ pnpm report:history
 The completed after-change report is `stats/history/2026-10-03T21-02-00-462Z-scrub-history-memory/933.json`, with `933-diff.html` beside it. The comparison found zero changed, added or removed simulation-statistic or diagnostic values. Wall time was 257.60 seconds versus 254.06 seconds before (+1.4%); peak RSS was 2,899.07 MiB versus 2,755.32 MiB (+5.2%). These are single runs on a shared machine.
 
 The detailed-report runner already releases journals and does not build the browser scrub record, so its timing and memory do not measure the live-path savings. It verifies simulation statistics independently of the live-memory experiment.
+
+## Household retention measurement
+
+P3’s released-journal harness (`stats/history/2026-10-04T13-39-53-052Z-people-3-dp91/people-record-memory.json`) uses seed 14963991, lateMedieval, 20,000 points and 300 years. It recorded 24,742 people; the different simulation means these figures are structure measurements, not a matched P2 memory delta.
+
+| Structure | Bytes | Interpretation |
+|---|---:|---|
+| Simulation retained residence history | 4,506,288 | 9,186 person entries, including dead people |
+| History logical payload | 178,584 | 14,882 rows × 12 bytes |
+| History allocated payload | 447,216 | Growable typed columns including slack |
+| Empty history entry/column objects | 3,968,544 | Separate clone measurement; not additive to complete history |
+| Simulation initial residence | 198,128 | Array retained size |
+| Simulation pending log | 104,120 | Separate from history |
+| Held-seat arrays | 999,480 | One array per person, 417 held IDs at final sample |
+| Record initial residence | 184,008 | Capacity 45,920, including buffer/object overhead |
+| Record residence rows/index | 2,090,696 | Sparse effective-time objects and map |
+
+Record person columns retain 3,853,088 bytes in total; their initial column is already included. GC heap was 141.04 MiB and array buffers 59.67 MiB; RSS 727.41 MiB is reported separately from structure retention. Journal transfer and release left zero worker/browser transactions and zero extra cached census buffers. Simulation/transfer/translation took 34.91 seconds and 48 scrub reconstructions took 536.34 ms. These single timings overlap other verification and do not establish a latency delta.

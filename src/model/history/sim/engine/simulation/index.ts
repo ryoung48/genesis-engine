@@ -236,8 +236,8 @@ function processEventsUntil({
 			case EVENT_HEAP.evt.SUCCESSION:
 				SUCCESSION.runSuccession({
 					state,
-					province: dataBuf[0],
-					leaderIdx: dataBuf[1],
+					person: dataBuf[0],
+					revision: dataBuf[1],
 					rng,
 				})
 				break

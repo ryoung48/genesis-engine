@@ -1,3 +1,7 @@
+import type {
+	HouseholdContext,
+	ResidenceHistory,
+} from "@/model/history/sim/people/household/types"
 import type { PeopleLog } from "@/model/history/sim/people/log/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
@@ -22,8 +26,9 @@ export interface PersonTable {
 	dynasty: number[]
 	culture: number[]
 	nameSeed: number[]
-	realm: number[]
-	throne: number[]
+	residence: number[]
+	initialResidence: number[]
+	heldSeats: number[][]
 	children: number[][]
 	scopeYear: number[]
 	marriedAt: number[]
@@ -74,6 +79,9 @@ export interface DeposedClaim {
 export type PregnancyLoss = "miscarriage" | "stillbirth" | "childbirth death"
 
 export interface PeopleState {
+	household: HouseholdContext
+	residenceHistory: Map<number, ResidenceHistory>
+	holdingsChanged: (person: number) => void
 	persons: PersonTable
 	alive: number[]
 	stressed: number[]
@@ -143,16 +151,6 @@ export interface FoundHouseParams {
 	// Tier of the seat the house is founded for; sets its family size.
 	rank: number
 	rng: SharedRng
-}
-
-export interface ThroneParams {
-	people: PeopleState
-	person: number
-	seat: number
-	realm: number
-	// The seat's title tier (`seatRank`).
-	rank: number
-	reason: SeatChangeReason
 }
 
 export interface SetRulerParams {

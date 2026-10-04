@@ -50,6 +50,7 @@ export interface PeoplePacket extends PeopleRows {
 	culture: Int32Array
 	nameSeed: Int32Array
 	home: Int32Array
+	initialResidence: Int32Array
 	bases: Float64Array
 	personality: Float64Array
 	grades: Float64Array
@@ -139,7 +140,15 @@ export interface StressRow {
 	level: number
 }
 
+export interface ResidenceRow {
+	kind: "residence"
+	time: number
+	person: number
+	province: number
+}
+
 export type AppendedRow =
+	| ResidenceRow
 	| DeathRow
 	| WeddingRow
 	| SeatChange
@@ -150,6 +159,7 @@ export type AppendedRow =
 	| StressRow
 
 export type PeopleRow =
+	| ResidenceRow
 	| CreationRow
 	| DeathRow
 	| WeddingRow

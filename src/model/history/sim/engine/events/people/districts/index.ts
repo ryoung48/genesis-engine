@@ -6,7 +6,9 @@ import type {
 	RevalidateParams,
 	SeatCheck,
 	SeatParams,
+	SucceedDistrictParams,
 } from "@/model/history/sim/engine/events/people/districts/types"
+import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -66,7 +68,7 @@ function landlessRelative({ state, seat }: SeatParams): number {
 		preference,
 		eligible: (person) =>
 			person !== apparent &&
-			people.persons.throne[person] < 0 &&
+			people.persons.heldSeats[person].length === 0 &&
 			time - people.persons.birth[person] >= ADULT_AGE,
 	}).heir
 }
@@ -87,12 +89,12 @@ function newHolder({ state, seat, relativeFirst, rng }: HolderParams): number {
 }
 
 function install({ state, seat, person, reason }: InstallDistrictParams): void {
-	PEOPLE.vacate({ people: state.people, seat, reason })
-	PEOPLE.enthrone({
+	if (!PEOPLE.aliveAt({ people: state.people, person, time: now(state) }))
+		return
+	PEOPLE.setRuler({
 		people: state.people,
 		person,
 		seat,
-		realm: state.sovereignCurrent[seat],
 		rank: state.seatRank[seat],
 		reason,
 	})
@@ -115,10 +117,9 @@ function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 			continue
 		}
 		if (
-			table.throne[holder] === seat &&
+			table.heldSeats[holder].includes(seat) &&
 			PEOPLE.aliveAt({ people, person: holder, time })
 		) {
-			table.realm[holder] = state.sovereignCurrent[seat]
 			checks.push({ seat, holder, standing: "kept" })
 			continue
 		}
@@ -127,29 +128,34 @@ function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 	return checks
 }
 
-function settle({ state, rng }: DistrictParams): void {
+function succeed({ state, seat, rng }: SucceedDistrictParams): void {
 	const people = state.people
 	const table = people.persons
 	const time = now(state)
+	const holder = people.rulerOf[seat]
+	if (holder < 0 || !isDistrictSeat({ state, seat })) return
+	const heir = HEIRS.of({
+		people,
+		dying: holder,
+		time,
+		preference: PEOPLE.preference(STATE.originOf({ state, realm: seat })),
+		eligible: (person) =>
+			table.heldSeats[person].length === 0 &&
+			time - table.birth[person] >= ADULT_AGE,
+	}).heir
+	install({
+		state,
+		seat,
+		person:
+			heir >= 0 ? heir : newHolder({ state, seat, relativeFirst: true, rng }),
+		reason: "succession",
+	})
+}
+
+function settle({ state }: DistrictParams): void {
 	for (let seat = 0; seat < state.P; seat++) {
 		const check = revalidate({ state, seats: [seat] })[0]
-		if (check?.standing !== "lapsed") continue
-		const holder = check.holder
-		const heir = HEIRS.of({
-			people,
-			dying: holder,
-			time,
-			preference: PEOPLE.preference(STATE.originOf({ state, realm: seat })),
-			eligible: (person) =>
-				table.throne[person] < 0 && time - table.birth[person] >= ADULT_AGE,
-		}).heir
-		install({
-			state,
-			seat,
-			person:
-				heir >= 0 ? heir : newHolder({ state, seat, relativeFirst: true, rng }),
-			reason: "district grant",
-		})
+		if (check) SUCCESSION_SCHEDULE.ensure({ state, person: check.holder })
 	}
 }
 
@@ -216,4 +222,11 @@ function grant({ state, rng }: DistrictParams): void {
 	}
 }
 
-export const DISTRICTS = { settle, grant, install, isDistrictSeat, revalidate }
+export const DISTRICTS = {
+	succeed,
+	settle,
+	grant,
+	install,
+	isDistrictSeat,
+	revalidate,
+}

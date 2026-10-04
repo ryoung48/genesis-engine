@@ -47,7 +47,7 @@ function settle({ state, rng }: PatricianParams): void {
 				dying: head,
 				time,
 				preference: PEOPLE.preference(STATE.originOf({ state, realm })),
-				eligible: (person) => table.throne[person] < 0,
+				eligible: (person) => table.heldSeats[person].length === 0,
 			}).heir
 			if (heir >= 0) heads.push(heir)
 		}

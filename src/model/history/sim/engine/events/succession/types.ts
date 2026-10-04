@@ -5,7 +5,7 @@ export interface InitSuccessionParams {
 	state: HistoryState
 }
 
-export interface RunSuccessionParams {
+export interface RunSeatSuccessionParams {
 	state: HistoryState
 	province: number
 	leaderIdx: number
@@ -22,6 +22,8 @@ export interface PretenderParams {
 	realm: number
 	seat: number
 	supportingSeats: number[]
+	supportingHolders: number[]
+	seatHolder: number
 	pretender: number
 	// A deposed ruler's line pressing its claim.
 	restoration: boolean
@@ -43,5 +45,12 @@ export interface WeakCrownParams {
 	state: HistoryState
 	realm: number
 	claim: number
+	rng: SharedRng
+}
+
+export interface RunSuccessionParams {
+	state: HistoryState
+	person: number
+	revision: number
 	rng: SharedRng
 }

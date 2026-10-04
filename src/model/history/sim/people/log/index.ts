@@ -40,7 +40,6 @@ const KINDS: readonly PeopleRowKind[] = [
 const RESERVED: ReadonlySet<PeopleRowKind> = new Set([
 	"health_band",
 	"condition",
-	"residence",
 	"opinion_memory",
 ])
 const CREATION = KINDS.indexOf("creation")
@@ -173,6 +172,12 @@ function append({ log, row }: AppendRowParams): void {
 			b = row.b
 			c = codeOf({ codes: BETROTHAL_END_CODE, name: row.cause })
 			break
+		case "residence":
+			time = row.time
+			a = row.person
+			b = row.province
+			if (b < 0) throw new Error("Invalid residence location")
+			break
 		case "stress":
 			time = row.time
 			a = row.person
@@ -221,6 +226,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		culture: new Int32Array(creations),
 		nameSeed: new Int32Array(creations),
 		home: new Int32Array(creations),
+		initialResidence: new Int32Array(creations),
 		bases: new Float64Array(creations),
 		personality: new Float64Array(creations),
 		grades: new Float64Array(creations),
@@ -244,6 +250,12 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		packet.culture[index] = slot(table.culture[person])
 		packet.nameSeed[index] = slot(table.nameSeed[person])
 		packet.home[index] = slot(table.home[person])
+		packet.initialResidence[index] = slot(table.initialResidence[person])
+		if (
+			packet.initialResidence[index] < 0 ||
+			packet.initialResidence[index] >= people.rulerOf.length
+		)
+			throw new Error("Invalid initial residence")
 		packet.bases[index] = finite(table.bases[person])
 		packet.personality[index] = finite(table.personality[person])
 		packet.grades[index] = finite(table.grades[person])
@@ -313,6 +325,10 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 				b,
 				cause: nameOf({ names: BETROTHAL_ENDS, code: c }),
 			}
+		case "residence":
+			if (b < 0 || c !== 0 || d !== 0 || !Number.isFinite(time))
+				throw new Error("Invalid residence row")
+			return { kind, time, person: a, province: b }
 		case "stress":
 			return { kind, time, person: a, level: b }
 		default:

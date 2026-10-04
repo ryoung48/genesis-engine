@@ -83,8 +83,8 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 | Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
 
 **Elections.**
-- *Electors.* In monarchies the district holders vote, weighted by district population. In republics the patrician heads vote, one vote each.
-- *Candidates.* The late ruler's house senior, plus the senior adults of the top 3 electors' houses (every elector's house in a republic).
+- *Electors.* In monarchies each valid direct local district casts a vote weighted by its population; one holder can cast multiple district votes. In republics the patrician heads vote, one vote each.
+- *Candidates.* The late ruler’s house senior, plus eligible house seniors from the top three district slots by population and seat ID. Repeated nominees are removed without refilling slots; republics consider every distinct head’s house.
 - *Votes.* Each elector backs their own house, then (outside republics) a house tied to theirs by marriage, else the strongest candidate: vote share, plus a bonus for age 25–60.
 
 **Claim**, by how the ruler took the throne, feeds title founding and weak-crown rebellions:
@@ -135,7 +135,7 @@ The primary's own former district is vacated before seats are assigned. A primar
 - a living holder bumped this way moves down by the same rule; a dead one ends the chain;
 - with no lower seat they are landless.
 
-No dead person is seated. An admin who keeps a valid seat belongs to the realm that owns it now, so the admin of a district that joined an heir realm follows it. Dead holders of valid seats are left for the yearly district inheritance.
+No dead person is seated. An admin who keeps a valid seat belongs to the realm that owns it now, so the admin of a district that joined an heir realm follows it. Dead holders of valid seats inherit at their person-level death event; yearly district settlement validates seats and ensures scheduling without repeating inheritance.
 
 **Regencies** start only when the seating is final: first for each new realm with a minor ruler, then for the primary realm, then one regency review so a regent of any other realm who has just become sovereign is replaced. A sibling who received a realm of their own is never a minor heir's regent.
 
@@ -150,3 +150,11 @@ The history report's `partition` section is built from these notes (`src/test/hi
 ## Character effects
 
 Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpation chance gains `clamp(1 + 0.125 × (intrigue - 5.7), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [character](character.md) for the full rules.
+
+## Household holdings and scheduling
+
+[Households](households.md) describes the independent seat index, frozen death walk and local election rules. One holder event succeeds all surviving crowns under their own laws and valid districts immediately, in current rank/ID order. A merger or prior transfer can remove a later frozen seat. District succession selects an adult landless relative or founds a new house; regent replacement remains separately scheduled. Availability considers every crown, and regency checks use the relevant local district rather than a foreign primary.
+
+Single-heir union eligibility checks every sovereign crown held by the heir, ignoring districts. Existing senior and sibling-junior membership is compatible without inventing sibling edges. Installation and separately crowned spouses preflight all crown pairs and recheck changed memberships after each external link. Actual senior–junior edges advance once per shared successor dispatch; new edges start at generation 1 and spouse-only links do not advance generations. Merger checks run immediately.
+
+Monarchic nominations take three ranked district slots, then deduplicate house seniors without refilling. The first nomination supplies candidate weight. Republic heads vote once per distinct person. Claimants and backers use their strongest actual local district (population then seat ID), and ownership is revalidated before releasing supporting seats.

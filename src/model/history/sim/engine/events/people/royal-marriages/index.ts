@@ -12,6 +12,7 @@ import type { Relation } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
 
 // Share of starting kings in alliance-marrying realms whose queen comes from a
 // neighbouring ruling house.
@@ -78,7 +79,7 @@ function allianceFromMatch({ state, match }: AllianceMatchParams): boolean {
 // itself stays and drifts like any other. A living betrothal with no marriage
 // alliance between its realms is broken; one with a dead party is left for
 // the death release.
-function review({ state }: ReviewParams): void {
+function reviewAlliances({ state }: ReviewParams): void {
 	const people = state.people
 	const time = state.time / STATE.yearMs
 	for (const [key, { first, second }] of people.marriageAlliances) {
@@ -99,6 +100,12 @@ function review({ state }: ReviewParams): void {
 			data: { first, second },
 		})
 	}
+}
+
+function review({ state }: ReviewParams): void {
+	const people = state.people
+	const time = state.time / STATE.yearMs
+	reviewAlliances({ state })
 	const table = people.persons
 	for (const person of people.alive) {
 		const partner = table.betrothed[person]
@@ -110,12 +117,13 @@ function review({ state }: ReviewParams): void {
 			continue
 		const key = pairKey({
 			state,
-			a: table.realm[person],
-			b: table.realm[partner],
+			a: HOUSEHOLD.realmOf({ people, person: person }),
+			b: HOUSEHOLD.realmOf({ people, person: partner }),
 		})
 		if (!people.marriageAlliances.has(key))
 			BETROTHAL.release({ people, person, time, cause: "alliance" })
 	}
+	reviewAlliances({ state })
 }
 
 // Parents the bride could plausibly have in another ruling house: as the
@@ -156,6 +164,11 @@ function rehome({
 	table.dynasty[person] = dynasty
 	table.culture[person] = origin.culture
 	table.home[person] = origin.realm
+	HOUSEHOLD.amendInitial({
+		people,
+		person,
+		province: origin.realm,
+	})
 	table.nameSeed[person] = PEOPLE.nameSeed({
 		sex: table.sex[person],
 		genderSystem: origin.genderSystem,

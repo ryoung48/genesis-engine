@@ -1,5 +1,7 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { TRAITS } from "@/model/history/sim/people/traits"
@@ -17,12 +19,19 @@ import type {
 	SetRulerParams,
 	ShortenLifeParams,
 	SpawnParams,
-	ThroneParams,
 	VacateParams,
 } from "@/model/history/sim/people/types"
 
 function create(provinceCount: number): PeopleState {
+	const ranks = new Uint8Array(provinceCount)
 	return {
+		household: {
+			realmOf: (province) => province,
+			ranks: () => ranks,
+			time: () => 0,
+		},
+		residenceHistory: new Map(),
+		holdingsChanged: () => undefined,
 		persons: {
 			bases: [],
 
@@ -40,8 +49,9 @@ function create(provinceCount: number): PeopleState {
 			dynasty: [],
 			culture: [],
 			nameSeed: [],
-			realm: [],
-			throne: [],
+			residence: [],
+			initialResidence: [],
+			heldSeats: [],
 			children: [],
 			scopeYear: [],
 			marriedAt: [],
@@ -96,8 +106,13 @@ function add({
 	table.dynasty.push(dynasty)
 	table.culture.push(culture)
 	table.nameSeed.push(nameSeed)
-	table.realm.push(realm)
-	table.throne.push(-1)
+	const residence =
+		mother >= 0
+			? HOUSEHOLD.residenceAt({ people, person: mother, time: birth })
+			: realm
+	table.residence.push(residence)
+	table.initialResidence.push(residence)
+	table.heldSeats.push([])
 	table.children.push([])
 	table.scopeYear.push(-1)
 	table.marriedAt.push(-1)
@@ -152,7 +167,17 @@ function setRuler({
 	rank,
 	reason,
 }: SetRulerParams): void {
-	people.rulerOf[seat] = person
+	if (people.rulerOf[seat] === person) return
+	const previous = people.rulerOf[seat]
+	if (person < 0) HOLDINGS.detach({ people, seat, person: previous })
+	else {
+		people.household.ranks()[seat] = rank
+		HOLDINGS.attach({ people, seat, person })
+	}
+	if (previous >= 0) people.holdingsChanged(previous)
+	if (person >= 0) people.holdingsChanged(person)
+	if (previous >= 0) HOUSEHOLD.seatChanged({ people, person: previous })
+	if (person >= 0) HOUSEHOLD.seatChanged({ people, person })
 	PEOPLE_LOG.append({
 		log: people.log,
 		row: { kind: "seat", seat, person, reason },
@@ -195,26 +220,9 @@ function preference({ genderSystem }: PreferenceParams): GenderPreference {
 		: "male"
 }
 
-function enthrone({
-	people,
-	person,
-	seat,
-	realm,
-	rank,
-	reason,
-}: ThroneParams): void {
-	const table = people.persons
-	table.throne[person] = seat
-	table.realm[person] = realm
-	const spouse = table.spouse[person]
-	if (spouse >= 0 && table.throne[spouse] < 0) table.realm[spouse] = realm
-	setRuler({ people, seat, person, rank, reason })
-}
-
 function vacate({ people, seat, reason }: VacateParams): void {
 	const person = people.rulerOf[seat]
 	if (person < 0) return
-	if (people.persons.throne[person] === seat) people.persons.throne[person] = -1
 	setRuler({ people, seat, person: -1, rank: 0, reason })
 }
 
@@ -288,7 +296,6 @@ export const PEOPLE = {
 	aliveAt,
 	nameSeed,
 	preference,
-	enthrone,
 	vacate,
 	raise,
 	shortenLife,

@@ -88,21 +88,8 @@ function incomeFactor(params: GovernorParams): number {
 function stressLevel(params: GovernorParams): number {
 	const person = of(params)
 	if (person < 0 || params.state.people.persons.stress[person] < 100) return 0
-	const throne = params.state.people.persons.throne[person]
-	if (
-		throne >= 0 &&
-		params.state.people.rulerOf[throne] === person &&
-		STATE.isSovereign({ state: params.state, p: throne })
-	)
-		return Math.min(
-			3,
-			Math.floor(params.state.people.persons.stress[person] / 100),
-		)
-	for (let seat = 0; seat < params.state.P; seat++)
-		if (
-			params.state.people.rulerOf[seat] === person &&
-			STATE.isSovereign({ state: params.state, p: seat })
-		)
+	for (const seat of params.state.people.persons.heldSeats[person])
+		if (STATE.isSovereign({ state: params.state, p: seat }))
 			return Math.min(
 				3,
 				Math.floor(params.state.people.persons.stress[person] / 100),

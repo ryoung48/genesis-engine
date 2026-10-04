@@ -22,6 +22,7 @@ export interface RecordPerson extends Character {
 	culture: number
 	nameSeed: number
 	home: number
+	initialResidence: number
 }
 
 // Every person, indexed by id. The columns grow by doubling, so their length
@@ -37,6 +38,7 @@ export interface PersonColumns {
 	culture: Int32Array
 	nameSeed: Int32Array
 	home: Int32Array
+	initialResidence: Int32Array
 	bases: Float64Array
 	personality: Float64Array
 	grades: Float64Array
@@ -87,7 +89,14 @@ export interface RecordTenure {
 	endReason: SeatChangeReason | null
 }
 
+export interface RecordResidence {
+	timeMs: number
+	province: number
+	sequence: number
+}
+
 export interface PeopleRecord {
+	residencesOf: Map<number, RecordResidence[]>
 	stressOf: Map<number, RecordStress[]>
 	persons: PersonColumns
 	childrenOf: Map<number, number[]>

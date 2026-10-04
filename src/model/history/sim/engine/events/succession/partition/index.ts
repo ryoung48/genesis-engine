@@ -27,6 +27,7 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HEIRS } from "@/model/history/sim/people/heirs"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { ERAS } from "@/model/society/eras"
 
 function now(state: HistoryState): number {
@@ -141,7 +142,8 @@ function assign({ run, heirs }: AssignParams): PartitionShare[] {
 	const seats = districtSeats({ state, realm })
 	const held = new Map<number, number>()
 	for (const heir of heirs) {
-		const seat = people.persons.throne[heir]
+		const seat =
+			seats.find((seat) => people.persons.heldSeats[heir].includes(seat)) ?? -1
 		if (seats.includes(seat) && people.rulerOf[seat] === heir)
 			held.set(heir, seat)
 	}
@@ -180,14 +182,18 @@ function release({ run, share }: ReleaseParams): void {
 		run.unseated.push({ heir, reason: "share dropped" })
 		return
 	}
-	const other = people.persons.throne[heir]
+	const other = HOLDINGS.primary({
+		people,
+		person: heir,
+		ranks: state.seatRank,
+	})
 	if (other >= 0 && other !== seat)
 		PEOPLE.vacate({ people, seat: other, reason: "partition" })
 	const holder = people.rulerOf[seat]
 	if (holder !== heir) {
 		if (
 			holder >= 0 &&
-			people.persons.throne[holder] === seat &&
+			people.persons.heldSeats[holder].includes(seat) &&
 			PEOPLE.aliveAt({ people, person: holder, time: now(state) })
 		)
 			run.displaced.push({
@@ -316,7 +322,7 @@ function demote({ run, displaced }: DemoteParams): void {
 		run.moves.push({ person, from: seat, to: target, bumped: bumped >= 0 })
 		if (
 			bumped < 0 ||
-			people.persons.throne[bumped] >= 0 ||
+			people.persons.heldSeats[bumped].length > 0 ||
 			!PEOPLE.aliveAt({ people, person: bumped, time: now(state) })
 		)
 			return
@@ -332,7 +338,7 @@ function reseat(run: PartitionRun): void {
 	for (const check of DISTRICTS.revalidate({ state, seats: before.seats }))
 		if (
 			check.standing === "vacated" &&
-			people.persons.throne[check.holder] < 0 &&
+			people.persons.heldSeats[check.holder].length === 0 &&
 			PEOPLE.aliveAt({ people, person: check.holder, time: now(state) })
 		)
 			run.displaced.push({

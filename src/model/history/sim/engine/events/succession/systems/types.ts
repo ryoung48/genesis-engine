@@ -12,12 +12,13 @@ export interface SuccessionChoice {
 	// -1 founds a new house.
 	heir: number
 	claim: number
-	// District seat of a losing claimant who rises as pretender, or -1.
+	pretender: number
 	pretenderSeat: number
 	supportingSeats: number[]
 }
 
 export interface Elector {
+	seat: number
 	person: number
 	weight: number
 }

@@ -70,7 +70,9 @@ function standingOf({ people, mother, father }: CoupleParams): number {
 
 function isRuler({ people, mother, father }: CoupleParams): boolean {
 	const table = people.persons
-	return table.throne[mother] >= 0 || table.throne[father] >= 0
+	return (
+		table.heldSeats[mother].length > 0 || table.heldSeats[father].length > 0
+	)
 }
 
 // About half of couples, fixed per pair, stop one child short.

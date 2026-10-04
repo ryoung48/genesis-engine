@@ -1,5 +1,9 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
+import type {
+	HouseholdsReport,
+	ResidenceReport,
+} from "@/test/history-run/report/households/types"
 import type { MilitaryReport } from "@/test/history-run/report/military/types"
 import type {
 	PartitionReport,
@@ -51,6 +55,7 @@ export interface CenturyReport {
 	revenuePerHead: number
 	regency: RegencyReport
 	character: CharacterReport
+	households: HouseholdsReport & ResidenceReport
 	people: PeopleReport
 	marriage: MarriageReport
 	military: MilitaryReport

@@ -417,10 +417,16 @@ it("reads current governors outside the revenue cache and resets stale stress af
 	expect(ECONOMY.revenue({ state, p: realm })).not.toBe(base)
 	expect(COMMAND.multiplier({ state, realm })).toBeGreaterThanOrEqual(0.87)
 	const ward = people.alive.find((person) => person !== ruler) as number
-	people.rulerOf[realm] = ward
+	PEOPLE.setRuler({
+		people,
+		seat: realm,
+		person: ward,
+		rank: state.seatRank[realm],
+		reason: "unknown",
+	})
 	people.regencies.set(realm, { ward, regent: ruler, kind: "relative" })
-	for (let seat = 0; seat < state.P; seat++)
-		if (people.rulerOf[seat] === ruler) people.rulerOf[seat] = -1
+	for (const seat of [...people.persons.heldSeats[ruler]])
+		PEOPLE.vacate({ people, seat, reason: "unknown" })
 	expect(GOVERNOR.stressLevel({ state, realm })).toBe(0)
 	expect(GOVERNOR.incomeFactor({ state, realm })).toBeCloseTo(1.05)
 	people.stressed = [ruler]
@@ -875,16 +881,18 @@ it("samples living populations on matched dates and measures capped governors in
 		table.congenital[person] = 0
 		table.carried[person] = 0
 		table.stress[person] = i === 2 ? 110 : 0
-		table.throne[person] = -1
+		table.heldSeats[person] = []
 	}
 	table.grades[ids[2]] = 49542 | (2 << 5)
 	table.congenital[ids[2]] = 2
 	table.carried[ids[2]] = 1
 	engine.people.rulerOf[seats[2]] = ids[3]
 	engine.parentCurrent[seats[2]] = seats[0]
-	table.throne[ids[3]] = seats[2]
+	table.heldSeats[ids[3]] = [seats[2]]
 	engine.people.rulerOf[seats[0]] = ids[0]
+	table.heldSeats[ids[0]] = [seats[0]]
 	engine.people.rulerOf[seats[1]] = ids[1]
+	table.heldSeats[ids[1]] = [seats[1]]
 	engine.people.regencies.set(seats[0], {
 		ward: ids[0],
 		regent: -1,

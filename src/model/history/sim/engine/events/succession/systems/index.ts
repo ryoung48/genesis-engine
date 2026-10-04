@@ -1,3 +1,4 @@
+import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import type {
 	Candidate,
 	CandidateParams,
@@ -40,6 +41,7 @@ const ADULT_AGE = 16
 const NEW_HOUSE: SuccessionChoice = {
 	heir: -1,
 	claim: HEIR_CLAIM.none,
+	pretender: -1,
 	pretenderSeat: -1,
 	supportingSeats: [],
 }
@@ -56,19 +58,26 @@ function age({ state, person }: PersonParams): number {
 function available({ state, person }: PersonParams): boolean {
 	if (!PEOPLE.aliveAt({ people: state.people, person, time: now(state) }))
 		return false
-	const seat = state.people.persons.throne[person]
-	return seat < 0 || !STATE.isSovereign({ state, p: seat })
+	return !state.people.persons.heldSeats[person].some((seat) =>
+		STATE.isSovereign({ state, p: seat }),
+	)
 }
 
 // Single-heir realms also pass to a relative who already rules elsewhere,
 // forming (or continuing) a personal union.
 function inheritable({ state, realm, person }: ElectableParams): boolean {
-	if (available({ state, person })) return true
 	if (!PEOPLE.aliveAt({ people: state.people, person, time: now(state) }))
 		return false
-	const seat = state.people.persons.throne[person]
-	if (seat === realm) return false
-	return STATE.canUnite({ state, a: realm, b: seat })
+	const seats = state.people.persons.heldSeats[person]
+	if (seats.includes(realm)) return false
+	return seats
+		.filter((seat) => STATE.isSovereign({ state, p: seat }))
+		.every(
+			(seat) =>
+				STATE.unionSenior({ state, p: realm }) ===
+					STATE.unionSenior({ state, p: seat }) ||
+				STATE.canUnite({ state, a: realm, b: seat }),
+		)
 }
 
 function adultAvailable({ state, person }: PersonParams): boolean {
@@ -90,16 +99,28 @@ function preferenceOf({ state, realm }: RealmParams): GenderPreference {
 function districtsOf({ state, realm }: RealmParams): Elector[] {
 	const people = state.people
 	const electors: Elector[] = []
-	for (const seat of STATE.getChildren({ state, p: realm })) {
+	for (const seat of [...new Set(STATE.getChildren({ state, p: realm }))].sort(
+		(a, b) => a - b,
+	)) {
+		if (!DISTRICTS.isDistrictSeat({ state, seat })) continue
 		const person = people.rulerOf[seat]
-		if (person < 0 || people.persons.throne[person] !== seat) continue
+		if (person < 0 || !people.persons.heldSeats[person].includes(seat)) continue
 		if (!PEOPLE.aliveAt({ people, person, time: now(state) })) continue
 		electors.push({
+			seat,
 			person,
 			weight: STATE.getNationPopulation({ state, root: seat }),
 		})
 	}
 	return electors
+}
+
+function localDistrict({ state, realm, person }: ElectableParams): number {
+	return (
+		districtsOf({ state, realm })
+			.filter((elector) => elector.person === person)
+			.sort((a, b) => b.weight - a.weight || a.seat - b.seat)[0]?.seat ?? -1
+	)
 }
 
 function candidate({
@@ -187,7 +208,7 @@ function contest({
 	if (!backed || rng.random() >= share)
 		return { backed, share, seat: -1, supportingSeats: [] }
 	const supportingSeats = electors.flatMap((elector, i) =>
-		choices[i] === 1 ? [state.people.persons.throne[elector.person]] : [],
+		choices[i] === 1 ? [elector.seat] : [],
 	)
 	if (rival.seat >= 0)
 		return { backed, share, seat: rival.seat, supportingSeats }
@@ -201,8 +222,7 @@ function contest({
 	return {
 		backed,
 		share,
-		seat:
-			backer < 0 ? -1 : state.people.persons.throne[electors[backer].person],
+		seat: backer < 0 ? -1 : electors[backer].seat,
 		supportingSeats,
 	}
 }
@@ -225,7 +245,7 @@ function disputed({ state, realm, person }: ElectableParams): boolean {
 function strongestDistrict({ state, realm }: RealmParams): number {
 	const strongest = districtsOf({ state, realm })
 		.filter((f) => adultAvailable({ state, person: f.person }))
-		.sort((a, b) => b.weight - a.weight || a.person - b.person)[0]
+		.sort((a, b) => b.weight - a.weight || a.seat - b.seat)[0]
 	return strongest?.person ?? -1
 }
 
@@ -256,7 +276,9 @@ function challenge({
 		rival: candidate({
 			state,
 			person: claimant,
-			seat: claimantDistrict ? state.people.persons.throne[claimant] : -1,
+			seat: claimantDistrict
+				? localDistrict({ state, realm, person: claimant })
+				: -1,
 			totalWeight,
 			weight: claimantDistrict?.weight ?? 0,
 		}),
@@ -283,6 +305,7 @@ function singleHeir({
 	const choice: SuccessionChoice = {
 		heir,
 		claim: HEIR_CLAIM[relation],
+		pretender: -1,
 		pretenderSeat: -1,
 		supportingSeats: [],
 	}
@@ -305,6 +328,7 @@ function singleHeir({
 	})
 	return {
 		...choice,
+		pretender: rival,
 		pretenderSeat: contest.seat,
 		supportingSeats: contest.supportingSeats,
 	}
@@ -328,14 +352,15 @@ function election(params: ChooseParams): SuccessionChoice {
 		GOVERNMENT.govFamilyOfIndex(state.governmentType[realm]) === "republic"
 	const late = houseSenior(params)
 	const electors: Elector[] = republic
-		? (state.people.patricians.get(realm) ?? [])
+		? [...new Set(state.people.patricians.get(realm) ?? [])]
 				.filter((person) => available({ state, person }))
-				.map((person) => ({ person, weight: 1 }))
+				.map((person) => ({ person, seat: -1, weight: 1 }))
 		: districtsOf({ state, realm })
 	if (electors.length === 0)
 		return {
 			heir: late,
 			claim: ELECTED_CLAIM,
+			pretender: -1,
 			pretenderSeat: -1,
 			supportingSeats: [],
 		}
@@ -346,19 +371,20 @@ function election(params: ChooseParams): SuccessionChoice {
 			candidate({ state, person: late, seat: -1, totalWeight, weight: 0 }),
 		)
 	const ranked = [...electors].sort(
-		(a, b) => b.weight - a.weight || a.person - b.person,
+		(a, b) => b.weight - a.weight || a.seat - b.seat,
 	)
 	for (const elector of republic
 		? ranked
 		: ranked.slice(0, MAX_FIEF_CANDIDATES)) {
 		const person = houseSenior({ ...params, dying: elector.person })
 		if (person < 0 || candidates.some((c) => c.person === person)) continue
-		const holdsDistrict = !republic && person === elector.person
+		const holdsDistrict =
+			!republic && localDistrict({ state, realm, person }) >= 0
 		candidates.push(
 			candidate({
 				state,
 				person,
-				seat: holdsDistrict ? state.people.persons.throne[person] : -1,
+				seat: holdsDistrict ? localDistrict({ state, realm, person }) : -1,
 				totalWeight,
 				weight: elector.weight,
 			}),
@@ -367,7 +393,10 @@ function election(params: ChooseParams): SuccessionChoice {
 	if (candidates.length === 0) return NEW_HOUSE
 	const voters =
 		late >= 0
-			? [...electors, { person: late, weight: totalWeight / electors.length }]
+			? [
+					...electors,
+					{ person: late, seat: -1, weight: totalWeight / electors.length },
+				]
 			: electors
 	const { votes, choices } = tally({
 		state,
@@ -394,11 +423,10 @@ function election(params: ChooseParams): SuccessionChoice {
 	return {
 		heir: candidates[winner].person,
 		claim: ELECTED_CLAIM,
+		pretender: pretenderIndex < 0 ? -1 : candidates[pretenderIndex].person,
 		pretenderSeat,
 		supportingSeats: electors.flatMap((elector, i) =>
-			choices[i] === pretenderIndex
-				? [state.people.persons.throne[elector.person]]
-				: [],
+			choices[i] === pretenderIndex ? [elector.seat] : [],
 		),
 	}
 }
@@ -416,6 +444,7 @@ function appointment({ state, realm, rng }: ChooseParams): SuccessionChoice {
 	return {
 		heir: rng.choice(pool),
 		claim: APPOINTED_CLAIM,
+		pretender: -1,
 		pretenderSeat: -1,
 		supportingSeats: [],
 	}
@@ -433,6 +462,8 @@ function choose(params: ChooseParams): SuccessionChoice {
 
 export const SUCCESSION_SYSTEMS = {
 	choose,
+	inheritable,
+	localDistrict,
 	challenge,
 	strongestDistrict,
 	adultAvailable,

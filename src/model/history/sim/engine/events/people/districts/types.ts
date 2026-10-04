@@ -45,3 +45,7 @@ export interface SeatCheck {
 	holder: number
 	standing: SeatStanding
 }
+
+export interface SucceedDistrictParams extends DistrictParams {
+	seat: number
+}

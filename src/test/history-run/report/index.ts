@@ -17,6 +17,11 @@ import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
+import { HOUSEHOLDS_REPORT } from "@/test/history-run/report/households"
+import type {
+	HouseholdsReport,
+	StructuralSample,
+} from "@/test/history-run/report/households/types"
 import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
@@ -455,7 +460,9 @@ function runSeed({
 		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
 		partitionTotal: null as PartitionReport | null,
+		householdsReportMs: 0,
 		peopleRecord: null as PeopleRecordReport | null,
+		households: null as HouseholdsReport | null,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
@@ -509,6 +516,17 @@ function runSeed({
 	}
 	const characterTracker = PEOPLE_TRAITS_REPORT.tracker()
 	const peopleRecord = PEOPLE_RECORD_REPORT.attach()
+	const householdTerritory = HOUSEHOLDS_REPORT.territory({
+		parents: engine.parentCurrent,
+		owners: engine.sovereignCurrent,
+		timeMs: start * STATE.yearMs,
+	})
+	const householdSamples: StructuralSample[] = [
+		{
+			timeMs: start * STATE.yearMs,
+			sovereigns: new Set(sovereigns({ engine })),
+		},
+	]
 	const partitions = PARTITION_REPORT.tracker()
 	partitions.cursor = engine.events.length
 	let divideMs = 0
@@ -530,6 +548,10 @@ function runSeed({
 			rng,
 			validate: false,
 		})
+		householdSamples.push({
+			timeMs: year * STATE.yearMs,
+			sovereigns: new Set(sovereigns({ engine })),
+		})
 		MILITARY.validate({ state: engine })
 		rebelLogistics.sample({ source: "annual" })
 		diagnostics.recruitment.push(
@@ -538,6 +560,10 @@ function runSeed({
 				lateKnowledgeBand: options.lateKnowledgeBand,
 			}),
 		)
+		HOUSEHOLDS_REPORT.ingestTerritory({
+			territory: householdTerritory,
+			transactions: engine.journal,
+		})
 		PEOPLE_RECORD_REPORT.ingest({
 			tracker: peopleRecord.tracker,
 			transactions: engine.journal,
@@ -609,6 +635,17 @@ function runSeed({
 				from,
 				to: year,
 			}),
+			households: {
+				residenceRows: 0,
+				sameResidenceRealmChanges: 0,
+				...HOUSEHOLDS_REPORT.build({
+					people: peopleRecord.tracker.record,
+					samples: householdSamples,
+					fromMs: from * STATE.yearMs,
+					toMs: year * STATE.yearMs,
+					final: year === start + options.years,
+				}),
+			},
 			people: peopleReport({
 				engine,
 				from,
@@ -637,7 +674,39 @@ function runSeed({
 			})
 		diagnostics.completed = year === start + options.years
 		if (diagnostics.completed) {
+			const householdsStarted = performance.now()
+			const residenceReports = HOUSEHOLDS_REPORT.residence({
+				people: peopleRecord.tracker.record,
+				territory: householdTerritory,
+				windows: reports.map((report, index) => ({
+					fromMs: report.from * STATE.yearMs,
+					toMs: report.to * STATE.yearMs,
+					final: index === reports.length - 1,
+				})),
+			})
+			for (let index = 0; index < reports.length; index++)
+				Object.assign(reports[index].households, residenceReports[index])
+
 			diagnostics.totalPeopleCreated = PEOPLE_TRAITS_REPORT.validate({ engine })
+			diagnostics.households = {
+				...HOUSEHOLDS_REPORT.build({
+					people: peopleRecord.tracker.record,
+					samples: householdSamples,
+					fromMs: start * STATE.yearMs,
+					toMs: year * STATE.yearMs,
+					final: true,
+				}),
+				...residenceReports.reduce(
+					(total, report) => ({
+						residenceRows: total.residenceRows + report.residenceRows,
+						sameResidenceRealmChanges:
+							total.sameResidenceRealmChanges +
+							report.sameResidenceRealmChanges,
+					}),
+					{ residenceRows: 0, sameResidenceRealmChanges: 0 },
+				),
+			}
+			diagnostics.householdsReportMs = performance.now() - householdsStarted
 			diagnostics.peopleRecord = PEOPLE_RECORD_REPORT.summarize(
 				peopleRecord.tracker,
 			)

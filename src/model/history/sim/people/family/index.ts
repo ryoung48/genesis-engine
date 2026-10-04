@@ -12,6 +12,7 @@ import type {
 	SeekMatchesParams,
 } from "@/model/history/sim/people/family/types"
 import { FERTILITY } from "@/model/history/sim/people/fertility"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
@@ -46,6 +47,7 @@ function marry({ people, a, b, time }: MarryParams): void {
 			time,
 		},
 	})
+	HOUSEHOLD.weddingResidence({ people, a, b, time })
 }
 
 function outsider({
@@ -77,7 +79,6 @@ function outsider({
 		from: time,
 		rng,
 	})
-	table.realm[spouse] = table.realm[partner]
 	marry({ people, a: partner, b: spouse, time })
 	return spouse
 }
@@ -233,21 +234,6 @@ function foreignMatch({
 	return -1
 }
 
-function wed({ people, a, b, time }: MarryParams): void {
-	const table = people.persons
-	const host =
-		table.throne[a] >= 0
-			? a
-			: table.throne[b] >= 0
-				? b
-				: table.sex[a] === 0
-					? a
-					: b
-	const guest = host === a ? b : a
-	if (table.throne[guest] < 0) table.realm[guest] = table.realm[host]
-	marry({ people, a, b, time })
-}
-
 // Royal children of alliance-marrying realms seek a betrothal from 12, as the
 // CK3 AI does.
 function minorSeekers({
@@ -269,7 +255,7 @@ function minorSeekers({
 			if (age < BETROTHAL.minAge || age >= BETROTHAL.adultAge) continue
 			if (!PEOPLE.aliveAt({ people, person, time })) continue
 			if (table.spouse[person] >= 0 || table.betrothed[person] >= 0) continue
-			if (!royal(table.realm[person])) continue
+			if (!royal(HOUSEHOLD.realmOf({ people, person: person }))) continue
 			if (rng.random() < chance) minors.push(person)
 		}
 	return minors
@@ -304,7 +290,7 @@ function seekMatches({
 		}),
 	].map((person) => ({
 		person,
-		realm: table.realm[person],
+		realm: HOUSEHOLD.realmOf({ people, person: person }),
 		royalBlood:
 			crowned.has(person) ||
 			crowned.has(table.father[person]) ||
@@ -332,7 +318,7 @@ function seekMatches({
 					a: seeker.person,
 					b: partner,
 					realmA: seeker.realm,
-					realmB: table.realm[partner],
+					realmB: HOUSEHOLD.realmOf({ people, person: partner }),
 				})
 			)
 		}
@@ -355,14 +341,14 @@ function seekMatches({
 				a: seeker.person,
 				b: partner,
 				realmA: seeker.realm,
-				realmB: table.realm[partner],
+				realmB: HOUSEHOLD.realmOf({ people, person: partner }),
 			}
 			if (Math.min(age, ageOf(partner)) < BETROTHAL.adultAge) {
 				BETROTHAL.betroth({ people, a: seeker.person, b: partner, time })
 				matches.betrothals.push(match)
 			} else {
 				matches.weddings.push(match)
-				wed({ people, a: seeker.person, b: partner, time })
+				marry({ people, a: seeker.person, b: partner, time })
 			}
 			continue
 		}
@@ -374,7 +360,7 @@ function seekMatches({
 			people,
 			partner: seeker.person,
 			time,
-			origin: originOf(seeker.realm),
+			origin: originOf(table.residence[seeker.person]),
 			rng,
 		})
 	}
@@ -410,8 +396,13 @@ function runYear({
 
 	const weddings: CrossMatch[] = []
 	for (const { a, b } of BETROTHAL.fulfil({ people, time })) {
-		weddings.push({ a, b, realmA: table.realm[a], realmB: table.realm[b] })
-		wed({ people, a, b, time })
+		weddings.push({
+			a,
+			b,
+			realmA: HOUSEHOLD.realmOf({ people, person: a }),
+			realmB: HOUSEHOLD.realmOf({ people, person: b }),
+		})
+		marry({ people, a, b, time })
 	}
 	const seekers: number[] = []
 	for (const person of people.alive) {
@@ -446,7 +437,7 @@ function runYear({
 				from: time,
 				until: time + 1,
 				survives: time,
-				origin: realms.originOf(table.realm[mother]),
+				origin: realms.originOf(table.residence[mother]),
 				rng,
 			})
 		)

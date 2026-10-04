@@ -10,6 +10,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -37,8 +38,8 @@ function expectBetrothals(engine: HistoryState): void {
 		expect(
 			Math.min(time - table.birth[person], time - table.birth[partner]),
 		).toBeLessThan(BETROTHAL.adultAge + 1)
-		const realmA = table.realm[person]
-		const realmB = table.realm[partner]
+		const realmA = HOUSEHOLD.realmOf({ people, person: person })
+		const realmB = HOUSEHOLD.realmOf({ people, person: partner })
 		expect(STATE.getRelation({ state: engine, a: realmA, b: realmB })).not.toBe(
 			STATE.rel.WAR,
 		)
@@ -167,7 +168,7 @@ it("records rulers, their families and seat tenures consistently", () => {
 	for (let seat = 0; seat < engine.P; seat++) {
 		const holder = engine.people.rulerOf[seat]
 		if (holder < 0 || STATE.isSovereign({ state: engine, p: seat })) continue
-		if (table.throne[holder] !== seat) continue
+		if (!table.heldSeats[holder].includes(seat)) continue
 		// An absorbed realm's ruler, possibly a child, keeps the seat as a district.
 		const granted = (people.tenuresOf.get(holder) ?? []).some(
 			(index) =>

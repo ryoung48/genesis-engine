@@ -1,6 +1,7 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { EventHeap } from "@/model/history/sim/engine/event-heap"
+import type { SuccessionSchedule } from "@/model/history/sim/engine/events/succession/schedule/types"
 import type {
 	JournalTransaction,
 	PendingJournal,
@@ -265,6 +266,7 @@ export interface HistoryState {
 	events: EngineNote[]
 	journal: JournalTransaction[]
 	pendingJournal: PendingJournal
+	successionSchedule: SuccessionSchedule
 	people: PeopleState
 	heap: EventHeap
 	leaderRuntime: LeaderRuntime

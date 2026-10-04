@@ -40,3 +40,8 @@ export interface SettleTitleSetParams {
 export interface OwnedChildCountParams extends DissolveLapsedParams {
 	title: number
 }
+
+export interface RefreshHouseholdsParams {
+	state: HistoryState
+	previousRanks: ArrayLike<number>
+}

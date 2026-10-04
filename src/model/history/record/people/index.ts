@@ -19,6 +19,7 @@ const INT_COLUMNS = [
 	"culture",
 	"nameSeed",
 	"home",
+	"initialResidence",
 ] as const
 const FLOAT_COLUMNS = [
 	"birthTimeMs",
@@ -35,6 +36,7 @@ const SNAPSHOT_COLUMNS = [
 	"culture",
 	"nameSeed",
 	"home",
+	"initialResidence",
 	"bases",
 	"personality",
 	"grades",
@@ -55,12 +57,14 @@ function create(): PeopleRecord {
 			culture: new Int32Array(0),
 			nameSeed: new Int32Array(0),
 			home: new Int32Array(0),
+			initialResidence: new Int32Array(0),
 			bases: new Float64Array(0),
 			personality: new Float64Array(0),
 			grades: new Float64Array(0),
 			congenital: new Float64Array(0),
 			carried: new Float64Array(0),
 		},
+		residencesOf: new Map(),
 		stressOf: new Map(),
 		childrenOf: new Map(),
 		marriages: [],
@@ -100,6 +104,7 @@ function person(params: RecordPersonParams): RecordPerson | null {
 		culture: persons.culture[id],
 		nameSeed: persons.nameSeed[id],
 		home: persons.home[id],
+		initialResidence: persons.initialResidence[id],
 		bases: persons.bases[id],
 		personality: persons.personality[id],
 		grades: persons.grades[id],
@@ -295,6 +300,21 @@ function append({
 					value: marriage,
 				})
 				pushIndex({ index: record.marriagesOf, key: row.wife, value: marriage })
+				break
+			}
+			case "residence": {
+				const birth = birthTimeMs({ people: record, id: row.person })
+				const time = recordTime(row.time)
+				if (!Number.isFinite(time) || time < birth || row.province < 0)
+					throw new Error("Invalid recorded residence")
+				const rows = record.residencesOf.get(row.person) ?? []
+				rows.push({
+					timeMs: time,
+					province: row.province,
+					sequence: rows.length,
+				})
+				rows.sort((a, b) => a.timeMs - b.timeMs || a.sequence - b.sequence)
+				record.residencesOf.set(row.person, rows)
 				break
 			}
 			case "stress":
