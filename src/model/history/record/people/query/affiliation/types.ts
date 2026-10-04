@@ -39,6 +39,7 @@ export interface RealmTransition {
 
 export interface TerritorialRootParams {
 	province: number
+	cache: Map<number, number> | null
 	origin: AffiliationRecord["origin"]
 	nodeOf: (province: number) => TerritoryNode | undefined
 	identityOf: (province: number) => number

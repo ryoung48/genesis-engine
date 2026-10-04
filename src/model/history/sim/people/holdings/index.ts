@@ -31,8 +31,11 @@ function ordered({ people, person, ranks }: RankedHoldingsParams): number[] {
 	return order({ seats: people.persons.heldSeats[person], ranks })
 }
 
-function primary(params: RankedHoldingsParams): number {
-	return ordered(params)[0] ?? -1
+function primary({ people, person, ranks }: RankedHoldingsParams): number {
+	let primary = -1
+	for (const seat of people.persons.heldSeats[person])
+		if (primary < 0 || ranks[seat] > ranks[primary]) primary = seat
+	return primary
 }
 
 function standing(params: RankedHoldingsParams): number {

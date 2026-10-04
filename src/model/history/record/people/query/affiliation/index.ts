@@ -10,25 +10,36 @@ import type {
 
 function rootOf({
 	province,
+	cache,
 	origin,
 	nodeOf,
 	identityOf,
 }: TerritorialRootParams): number {
 	const seen = new Set<number>()
 	let location = province
+	let realm = -1
 	while (location >= 0 && !seen.has(location)) {
+		const cached = cache?.get(location)
+		if (cached !== undefined) {
+			realm = cached
+			break
+		}
 		seen.add(location)
 		const node = nodeOf(location)
-		if (!node) return -1
+		if (!node) break
 		if (node.parent >= 0) location = node.parent
-		else
-			return node.owner < 0
-				? -1
-				: origin === "procedural"
-					? identityOf(location)
-					: node.owner
+		else {
+			realm =
+				node.owner < 0
+					? -1
+					: origin === "procedural"
+						? identityOf(location)
+						: node.owner
+			break
+		}
 	}
-	return -1
+	if (cache) for (const location of seen) cache.set(location, realm)
+	return realm
 }
 
 function resolve({
@@ -41,6 +52,7 @@ function resolve({
 		return -1
 	return rootOf({
 		province,
+		cache: null,
 		origin: record.origin,
 		identityOf: (location) =>
 			record.events.nationEvents.findIndex(
@@ -80,6 +92,7 @@ function transitions({
 	const children = new Map<number, Set<number>>()
 	const changes: TerritorialChange[] = []
 	const timelines = new Map<number, RealmTransition[]>()
+	const roots = new Map<number, number>()
 	const linkOf = (province: number) => {
 		const node = nodes.get(province)
 		return node?.parent ?? -1
@@ -87,6 +100,7 @@ function transitions({
 	const realmOf = (province: number) =>
 		rootOf({
 			province,
+			cache: roots,
 			origin: record.origin,
 			nodeOf: (location) => nodes.get(location),
 			identityOf: (location) => identities.get(location) ?? -1,
@@ -137,6 +151,7 @@ function transitions({
 				realmOf(province),
 			]),
 		)
+		roots.clear()
 		for (const change of group) {
 			const node = nodes.get(change.province)
 			if (!node) continue
@@ -158,6 +173,7 @@ function transitions({
 			rows.push({ timeMs, before: previous, after })
 			timelines.set(province, rows)
 		}
+		roots.clear()
 	}
 	return timelines
 }

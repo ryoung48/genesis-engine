@@ -51,11 +51,17 @@ function endEarly({ state, person }: EndEarlyParams): void {
 }
 
 function marriageRealms({ state }: StateParams): MarriageRealms {
+	const neighbors = new Map<number, number[]>()
 	return {
-		neighborsOf: (realm) =>
-			STATE.isSovereign({ state, p: realm })
+		neighborsOf: (realm) => {
+			const cached = neighbors.get(realm)
+			if (cached) return cached
+			const list = STATE.isSovereign({ state, p: realm })
 				? STATE.getNationNeighbors({ state, nation: realm })
-				: [],
+				: []
+			neighbors.set(realm, list)
+			return list
+		},
 		originOf: (realm) => STATE.originOf({ state, realm }),
 		royal: (realm) =>
 			STATE.isSovereign({ state, p: realm }) &&

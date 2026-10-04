@@ -8,6 +8,58 @@ import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { RNG } from "@/model/shared/random/rng"
 import { HOUSEHOLDS_REPORT } from "@/test/history-run/report/households"
 
+it("resolves shared ancestors afresh after each territorial batch, including cycles", () => {
+	const territory = HOUSEHOLDS_REPORT.territory({
+		parents: [-1, -1, 0, 2, 2],
+		owners: [0, 1, 2, 3, 4],
+		timeMs: 0,
+	})
+	territory.maxTimeMs = 70
+	for (const [province, timeMs, parentId] of [
+		[2, 10, 1],
+		[1, 20, 0],
+		[1, 30, -1],
+		[2, 40, 0],
+		[2, 50, 3],
+		[2, 60, 1],
+	])
+		territory.events.provinceEvents.get(province)?.events.push({
+			timeMs,
+			kind: "parent",
+			payload: { parentId },
+			comment: null,
+		})
+	for (const [timeMs, nationId] of [
+		[30, -1],
+		[70, 1],
+	])
+		territory.events.provinceEvents.get(1)?.events.push({
+			timeMs,
+			kind: "owner",
+			payload: { nationId },
+			comment: null,
+		})
+	const timelines = AFFILIATION.transitions({ record: territory })
+	for (const province of [2, 3, 4]) {
+		expect(timelines.get(province)).toEqual([
+			{ timeMs: 10, before: 0, after: 1 },
+			{ timeMs: 20, before: 1, after: 0 },
+			{ timeMs: 30, before: 0, after: -1 },
+			{ timeMs: 40, before: -1, after: 0 },
+			{ timeMs: 50, before: 0, after: -1 },
+			{ timeMs: 70, before: -1, after: 1 },
+		])
+		for (const row of timelines.get(province) ?? []) {
+			expect(
+				AFFILIATION.at({ record: territory, province, timeMs: row.timeMs - 1 }),
+			).toBe(row.before)
+			expect(
+				AFFILIATION.at({ record: territory, province, timeMs: row.timeMs }),
+			).toBe(row.after)
+		}
+	}
+})
+
 it("counts living observations, crowns and boundary samples independently of regencies", () => {
 	const people = PEOPLE.create(6)
 	const record = PEOPLE_RECORD.create()

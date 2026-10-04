@@ -154,6 +154,7 @@ function succeed({ state, seat, rng }: SucceedDistrictParams): void {
 
 function settle({ state }: DistrictParams): void {
 	for (let seat = 0; seat < state.P; seat++) {
+		if (state.people.rulerOf[seat] < 0) continue
 		const check = revalidate({ state, seats: [seat] })[0]
 		if (check) SUCCESSION_SCHEDULE.ensure({ state, person: check.holder })
 	}
