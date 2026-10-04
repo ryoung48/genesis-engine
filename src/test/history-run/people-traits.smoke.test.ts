@@ -233,7 +233,7 @@ it("gates personality by age and reads stress at the selected time", () => {
 		PERSON_QUERY.stress({ people: record, id, timeMs: 21 * STATE.yearMs }),
 	).toBe(0)
 })
-it("uses final neutral points, hook rates, tier bands and age-independent adult attributes", () => {
+it("uses final neutral points, effect rates, tier bands and age-independent adult attributes", () => {
 	const neutralPoints = {
 		diplomacy: 5.5,
 		martial: 5.4,
@@ -946,7 +946,7 @@ it("samples living populations on matched dates and measures capped governors in
 	expect(all.congenitalShares).toEqual({ dwarf: 0.25 })
 	expect(all.carriedShares).toEqual({ "intellect.bad.2": 0.25, giant: 0.25 })
 	expect(all.stressLevelShares).toEqual([0.75, 0.25, 0, 0])
-	for (const [hook, attribute, value] of [
+	for (const [effect, attribute, value] of [
 		["laxity", "diplomacy", 17],
 		["battle", "martial", 17],
 		["revenue", "stewardship", 15],
@@ -956,32 +956,32 @@ it("samples living populations on matched dates and measures capped governors in
 			GOVERNOR.factor({ attribute, value }),
 		)
 		const mean = (values[0] + values[1]) / 2
-		expect(report.hookEffects[hook].observations).toBe(2)
-		expect(report.hookEffects[hook].meanDelta).toBe(
+		expect(report.appliedEffects[effect].observations).toBe(2)
+		expect(report.appliedEffects[effect].meanDelta).toBe(
 			(5 + value) / 2 - ATTRIBUTES.neutral(attribute),
 		)
-		expect(report.hookEffects[hook].mean).toBe(mean)
-		expect(report.hookEffects[hook].deviation).toBeCloseTo(
+		expect(report.appliedEffects[effect].mean).toBe(mean)
+		expect(report.appliedEffects[effect].deviation).toBeCloseTo(
 			Math.abs(values[1] - values[0]) / 2,
 			10,
 		)
-		expect(report.hookEffects[hook].lowerCapShare).toBe(
-			hook === "laxity" ? 0.5 : 0,
+		expect(report.appliedEffects[effect].lowerCapShare).toBe(
+			effect === "laxity" ? 0.5 : 0,
 		)
-		expect(report.hookEffects[hook].upperCapShare).toBe(
-			hook === "laxity" ? 0 : 0.5,
+		expect(report.appliedEffects[effect].upperCapShare).toBe(
+			effect === "laxity" ? 0 : 0.5,
 		)
 	}
-	expect(report.hookEffects.usurpation.observations).toBe(1)
-	expect(report.hookEffects.usurpation.mean).toBe(
+	expect(report.appliedEffects.usurpation.observations).toBe(1)
+	expect(report.appliedEffects.usurpation.mean).toBe(
 		GOVERNOR.factor({ attribute: "intrigue", value: 11 }),
 	)
-	expect(report.hookEffects.usurpation.upperCapShare).toBe(0)
-	expect(report.hookEffects.candidateProxy.mean).toBe(
+	expect(report.appliedEffects.usurpation.upperCapShare).toBe(0)
+	expect(report.appliedEffects.candidateProxy.mean).toBe(
 		GOVERNOR.candidateStrength(8),
 	)
-	expect(report.hookEffects.candidateProxy.lowerCapShare).toBe(0)
-	expect(report.hookEffects.candidateProxy.upperCapShare).toBe(0)
+	expect(report.appliedEffects.candidateProxy.lowerCapShare).toBe(0)
+	expect(report.appliedEffects.candidateProxy.upperCapShare).toBe(0)
 	expect(report.enrichment.gradeDifferences).toEqual({ Genius: -1 })
 	expect(report.enrichment.congenitalDifferences).toEqual({ dwarf: -1 })
 	engine.time += STATE.yearMs

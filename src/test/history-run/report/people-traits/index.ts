@@ -10,6 +10,7 @@ import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AccumulateParams,
+	AppliedEffectSampleParams,
 	CharacterGroup,
 	CharacterGroupStatistics,
 	CharacterPopulation,
@@ -18,7 +19,6 @@ import type {
 	CharacterSampleParams,
 	CharacterTracker,
 	GroupAccumulator,
-	HookSampleParams,
 	PopulationAccumulator,
 	TercileParams,
 	ValidateCharacterParams,
@@ -63,7 +63,7 @@ function tracker(): CharacterTracker {
 		rulers: population(),
 		people: population(),
 		enrichment: { rulers: group(), others: group() },
-		hooks: {},
+		appliedEffects: {},
 	}
 }
 function accumulate({
@@ -168,7 +168,7 @@ function summarizePopulation(
 		minors: summarizeGroup(accumulator.minors),
 	}
 }
-function sampleHook({
+function sampleAppliedEffect({
 	tracker,
 	name,
 	attribute,
@@ -176,8 +176,8 @@ function sampleHook({
 	lower,
 	upper,
 	proxy,
-}: HookSampleParams): void {
-	const a = (tracker.hooks[name] ??= {
+}: AppliedEffectSampleParams): void {
+	const a = (tracker.appliedEffects[name] ??= {
 		observations: 0,
 		delta: 0,
 		sum: 0,
@@ -229,7 +229,7 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 			!STATE.isSovereign({ state: engine, p: seat }) &&
 			table.throne[person] === seat
 		)
-			sampleHook({
+			sampleAppliedEffect({
 				tracker,
 				name: "candidateProxy",
 				attribute: "diplomacy",
@@ -300,7 +300,7 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 			["revenue", "stewardship", 0.87, 1.21],
 			["knowledge", "learning", 0.93, 1.1],
 		] as const)
-			sampleHook({
+			sampleAppliedEffect({
 				tracker,
 				name,
 				attribute,
@@ -313,7 +313,7 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 			regent >= 0 &&
 			(regency?.kind === "relative" || regency?.kind === "protector")
 		)
-			sampleHook({
+			sampleAppliedEffect({
 				tracker,
 				name: "usurpation",
 				attribute: "intrigue",
@@ -542,8 +542,8 @@ function summarize({
 			gradeDifferences: differences("gradeShares"),
 			congenitalDifferences: differences("congenitalShares"),
 		},
-		hookEffects: Object.fromEntries(
-			Object.entries(tracker.hooks).map(([name, a]) => {
+		appliedEffects: Object.fromEntries(
+			Object.entries(tracker.appliedEffects).map(([name, a]) => {
 				const mean = a.sum / a.observations
 				return [
 					name,

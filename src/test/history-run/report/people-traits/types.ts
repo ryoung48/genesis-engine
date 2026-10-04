@@ -20,7 +20,7 @@ export interface CharacterTracker {
 	rulers: PopulationAccumulator
 	people: PopulationAccumulator
 	enrichment: { rulers: GroupAccumulator; others: GroupAccumulator }
-	hooks: Record<string, HookAccumulator>
+	appliedEffects: Record<string, AppliedEffectAccumulator>
 }
 export interface CharacterReportParams {
 	engine: HistoryState
@@ -62,7 +62,7 @@ export interface CharacterEnrichment {
 	gradeDifferences: Record<string, number>
 	congenitalDifferences: Record<string, number>
 }
-export interface HookEffect {
+export interface AppliedEffect {
 	observations: number
 	meanDelta: number
 	mean: number
@@ -78,7 +78,7 @@ export interface CharacterReport {
 			| (CharacterGroupStatistics & { stressedNonRulers: number })
 	}
 	enrichment: CharacterEnrichment
-	hookEffects: Record<string, HookEffect>
+	appliedEffects: Record<string, AppliedEffect>
 	weakCrownYears: Record<string, number>
 	effects: Record<string, number>
 }
@@ -110,7 +110,7 @@ export interface AccumulateParams {
 	person: number
 	sovereigns: Set<number>
 }
-export interface HookAccumulator {
+export interface AppliedEffectAccumulator {
 	observations: number
 	delta: number
 	sum: number
@@ -118,7 +118,7 @@ export interface HookAccumulator {
 	lower: number
 	upper: number
 }
-export interface HookSampleParams {
+export interface AppliedEffectSampleParams {
 	tracker: CharacterTracker
 	name: string
 	attribute: Attribute
