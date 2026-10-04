@@ -356,7 +356,7 @@ Siege (`SIEGE`, in `events/siege`):
 | Constant | Value | Basis |
 | --- | --- | --- |
 | `SIEGE_PHASE_DAYS` | 30 | anchor: EU5 sieges advance in 30-day phases [S8]; CK3 and EU4 are day-based and were scaled to it |
-| garrison size rate | the defender's `levyEligibility` (0.02; 0.05 tribal) | anchor: the sim's own levy eligibility (`docs/terrestrial/military.md`, `recruitment/index.ts`), read from the recruitment code rather than hardcoded. A modelling shortcut: the rate is a levy figure but sizes a mixed garrison, since regulars are sized by funding, not population. A 5,000-person town holds 100 men, a 100,000-person city 2,000; Kenilworth held about 1,200 in a castle for 172 days [S2] |
+| garrison size rate | the defender's `levyEligibility` (0.02; 0.05 tribal) | anchor: the sim's own levy eligibility (`docs/terrestrial/politics/armies-and-wars.md`, `recruitment/index.ts`), read from the recruitment code rather than hardcoded. A modelling shortcut: the rate is a levy figure but sizes a mixed garrison, since regulars are sized by funding, not population. A 5,000-person town holds 100 men, a 100,000-person city 2,000; Kenilworth held about 1,200 in a castle for 172 days [S2] |
 | `SIEGE_GARRISON_FIELD_CAP` | 0.5 of the defending coalition's deployed troops | calibrated: a siege cannot strip the whole field army into one town, so at least half stays outside and can relieve |
 | `SIEGE_ATTRITION_MONTHLY` | 0.01 | anchor: CK3 besiegers lose 1% of army strength per month [S7] |
 | `SIEGE_ABANDON_SHARE` | 0.75 | calibrated: besiegers at `R` below 0.75 can no longer invest the town; the start rule is `R` > 1, so this adds a margin before they give up |
@@ -400,7 +400,7 @@ All siege percentages apply to the current troop count unless a row says "starti
 - [S7] [CK3 Warfare](https://ck3.paradoxwikis.com/Warfare#Siege): 1% monthly besieger attrition; terrain advantage +10 to +30.
 - [S8] [EU5 Combat#Sieges](https://eu5.paradoxwikis.com/Combat#Sieges) and [EU4 Land warfare#Sieges](https://eu4.paradoxwikis.com/Land_warfare#Sieges): 30-day phases, dice results (disease, shortages, desertion, surrender), +2 per breach, assaults.
 - [S9] [Disease helped decide the Crusades](https://healthchecksonhistory.substack.com/p/disease-decided-the-crusades) and the [Siege of Acre (1189-1191)](https://en.wikipedia.org/wiki/Siege_of_Acre_(1189%E2%80%931191)): disease hollowed out the army; a share of a long crusade dies of disease.
-- [S10] `docs/terrestrial/population.md`: development table steps at 1,000 / 5,000 / 20,000 urban residents.
+- [S10] `docs/terrestrial/population/growth-cities-and-knowledge.md`: development table steps at 1,000 / 5,000 / 20,000 urban residents.
 
 Where a source was only read via a search summary, the note says so. Anything marked "calibrated" is a modelling choice, not a measured historical value.
 

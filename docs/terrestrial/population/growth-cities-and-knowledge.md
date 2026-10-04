@@ -1,4 +1,8 @@
-# Population, urbanization, knowledge, and development (`:history`)
+# Population growth, cities, knowledge and development
+
+Scope: `:history`.
+
+Population counts aggregate residents rather than [individually simulated people](../people/overview.md). Cities, knowledge and development share the census update and feedback loop; [economic output and taxation](output-and-taxation.md) consumes their values.
 
 This document describes the current historical simulation. Population is a headcount split into rural and urban residents. Knowledge is a continuous province value. Development is a local 0–1 style settlement and infrastructure value, not a population count or an EU4 development total. Urbanization is the assignment and gradual movement of residents into ranked towns and cities.
 
@@ -67,26 +71,9 @@ Knowledge supplies a further floor: 0.05 at knowledge 1, 0.10 at 2, 0.25 at 3, a
 
 Development is therefore an **intensity** associated with settlement, nearby cities, and knowledge. The current live value is not multiplied by province area. A larger province does not automatically have more development points than a smaller province with the same local value. Any future conversion into area-total units, such as EU4-style province development, is a separate calculation.
 
-## Economic output and treasury income
+## Economic output
 
-The current economy calculates each province's **annual gross output** from its total population, development, and local knowledge:
-
-`province output = (rural population + urban population) × output per person at current development × productivity at local knowledge`
-
-The development curve for output per person is interpolated between these points:
-
-| Development | Silver equivalent per person per year | Ducats per person per year |
-| ---: | ---: | ---: |
-| 0 | 150 g | 0.003 |
-| 0.25 | 250 g | 0.005 |
-| 0.65 | 450 g | 0.009 |
-| 0.95 | 700 g | 0.014 |
-
-The silver figures are calibration inputs; the calculation uses the current fixed conversion of **1 ducat = 50,000 g of silver**. Values outside the development table use its nearest endpoint. Local knowledge then multiplies output per person by 1 at knowledge 2, 1.3 at 3, and 3 at 4, with interpolation; knowledge below 2 uses 1. Population scales output directly: twice as many residents at the same development and knowledge produce twice the output. Rural and urban residents have the same direct output weight. Urbanization raises output when it raises development, rather than through a separate urban-income term. Province area does not enter this formula directly.
-
-The treasury does not collect all gross output. The model sums output across the provinces of a sovereign's internal realm, then applies the extraction rate for the **population-weighted realm knowledge**: 1.5% at knowledge 1, 3% at 2, 10% at 3, and 15% at 4. Every government collects the full extraction rate. The result is the realm's annual tax revenue. State maintenance sums 35% of each province’s revenue with a distance-from-capital multiplier. The remainder is civilian surplus before integrated levy and regular maintenance and other treasury changes.
-
-For example, 100,000 residents at development 0.25 and local knowledge 2 produce `100,000 × 0.005 × 1 = 500` ducats of gross annual output. With realm knowledge 2, it collects `500 × 3% = 15` ducats in taxes; at the capital, state maintenance is 5.25 ducats, leaving 9.75 before army costs. Local knowledge controls that province's productivity, while realm knowledge controls the extraction rate.
+See [output and taxation](output-and-taxation.md) for productivity, tax extraction, state maintenance and the worked treasury example.
 
 ## Main feedback loop
 

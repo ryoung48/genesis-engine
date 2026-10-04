@@ -1,4 +1,8 @@
-# Rebellion (`:history`)
+# Rebellions, independence and throne wars
+
+Scope: `:history`.
+
+District rebellions create independent realms or contest a throne. [Armies and wars](armies-and-wars.md) owns combat and occupation; [diplomacy](diplomacy-and-subjects.md) owns attitudes and formal subject obligations.
 
 Code: triggers and breakaway in `src/model/history/sim/engine/events/war` (`rebel`, `seedRebellions`) and `engine/events/succession` (`pretenderRevolt`, `weakCrownRevolt`, `restoration/`); rebellion threat in `engine/military` (`rebellionThreat`); release in `engine/state/index.ts` (`releaseProvince`, `releaseFaction`, `fixConnections`); war endings in `engine/events/peace`; record text in `src/model/history/sim/record/translator`.
 
@@ -10,7 +14,7 @@ A **district** is a seat whose parent is its sovereign (a direct report of the c
 
 ## Rebellion threat
 
-The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and logistics. The crown's territory excludes the departing district. It uses the cubed force share from [military](military.md#war-starts).
+The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and logistics. The crown's territory excludes the departing district. It uses the cubed force share from [military](armies-and-wars.md#war-starts).
 
 ```text
 crownTarget = recruitment targets for the remaining crown territory
@@ -34,12 +38,12 @@ Strength-tested candidates emit a `rebellion evaluated` diagnostic note before a
 | --- | --- | --- |
 | Seeded | At simulation start, for up to 1.25% of districts. The realm must not be at war. | Threat > 0.45. An independence war starts already under way. |
 | District's own war event | Every 8–16 years. The realm must not be at war. | Threat test, laxity 0.1 under a weak crown. An adult holder with enough backing may seek the throne; otherwise the district seeks independence. |
-| Weak crown | After every succession with no pretender, and after a lord protector usurps. Skipped at a succession that [partitions](government.md#partition) the realm. Districts are tried in random order, and at most one breaks away. | Threat test, laxity 0.05 per missing claim point below 3, plus 0.1 under a weak crown. An adult holder with enough backing may seek the throne. |
-| Pretender | A disputed succession, a lost election or a restoration attempt ([government](government.md#succession), [restoration](people.md#restoration)). Skipped at a succession that partitions the realm; a deposed claim is kept for later. | District backing (below). No threat test. The seat must still be a direct district of the realm. A throne war always starts. |
+| Weak crown | After every succession with no pretender, and after a lord protector usurps. Skipped at a succession that [partitions](government-and-succession.md#partition) the realm. Districts are tried in random order, and at most one breaks away. | Threat test, laxity 0.05 per missing claim point below 3, plus 0.1 under a weak crown. An adult holder with enough backing may seek the throne. |
+| Pretender | A disputed succession, a lost election or a restoration attempt ([government](government-and-succession.md#succession), [restoration](government-and-succession.md#restoration)). Skipped at a succession that partitions the realm; a deposed claim is kept for later. | District backing (below). No threat test. The seat must still be a direct district of the realm. A throne war always starts. |
 
 **Threat test.** The district breaks away when `threat > 0.45 − laxity`, and then only with chance equal to the threat.
 
-A **weak crown** is a realm under a regent, or whose ruler is in Poor or Grave health ([people](people.md#regencies)).
+A **weak crown** is a realm under a regent, or whose ruler is in Poor or Grave health ([simulated people](government-and-succession.md#regencies)).
 
 ## Support
 
@@ -59,12 +63,12 @@ District holders can favor a claimant, while foreign realms can fight beside the
 - **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
 - **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
 - **Cut-off land.** Crown provinces left without a connection to their parent are released as well. They are recorded as `province released` and shown as a "disconnected" revolt.
-- **Partition.** A [partition](government.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of higher title tier.
+- **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of higher title tier.
 
 ## The rebel war
 
 - **Whether it starts.** An independence war after a threat-based breakaway starts with chance `1 − threat`; otherwise the district goes free with a 10-year truce with its former crown. A throne war always starts, as does a seeded rebel war.
-- **Sides.** The crown attacks in an independence war. The rebels attack in a throne war and can occupy the crown's capital. Only the war's attacker occupies land (see [military](military.md#battle-resolution)).
+- **Sides.** The crown attacks in an independence war. The rebels attack in a throne war and can occupy the crown's capital. Only the war's attacker occupies land (see [military](armies-and-wars.md#battle-resolution)).
 - **Protection.** A realm will not declare a separate war on the rebel side while its rebel war is active.
 - **No buy-off.** Rebels cannot buy peace.
 
@@ -96,11 +100,9 @@ Every ending sets a 10-year truce and leaves the two leaders Suspicious.
 
 A crown's direct overlord normally joins its side through the formal vassal tie. If that overlord fought for the crown and loses a throne war, the new regime renounces the bond and the pair becomes Suspicious. If the overlord stayed out, the bond survives and the pair becomes Suspicious. If a disloyal overlord backed the claimant, the bond survives and repayment makes the pair Trusted. Each rule uses only the crown's direct overlord; an overlord further up a vassal chain does not join through that chain.
 
-## Diplomatic dispositions
+## Subject secession thresholds
 
-Every pair of realms has a shared attitude: Rival, Suspicious, Neutral, Friendly or Trusted. Formal alliances, vassalage, unions, colonies and wars are separate ties. Neighboring pairs start with one weighted attitude draw; an old Ally draw makes the pair Trusted and creates an alliance if allowed. Other pairs start Neutral.
-
-On each realm's diplomacy event, neighboring pairs and its direct formal-tie partners roll through the five-state transition matrix. An active war does not drift. A marriage-bound alliance cannot drift downward. Only a free neighboring pair already Trusted at the start of the event rolls a 3% chance to form a pact. A smaller realm can become a vassal when its revenue is under half the other's; otherwise an allowed pact is an alliance. An unbound alliance dissolves with chance 0% at Trusted, 10% at Friendly, 35% at Neutral, 70% at Suspicious and 100% at Rival.
+The [diplomatic attitude](diplomacy-and-subjects.md) of a vassal toward its overlord determines the threat needed to break free.
 
 | Vassal–overlord disposition | Vassal breaks free when threat exceeds |
 | --- | ---: |
@@ -109,8 +111,6 @@ On each realm's diplomacy event, neighboring pairs and its direct formal-tie par
 | Neutral | 0.7 |
 | Suspicious | 0.4 |
 | Rival | 0.05 |
-
-A Rival vassal refuses its overlord's war call and withholds tribute. A Suspicious vassal refuses an offensive call. An overlord that fights beside its vassal in the vassal's war raises the pair's disposition one step at peace; one that sits out lowers it one step. A Rival or Suspicious ally refuses a defensive call until its alliance dissolves.
 
 ## Record
 
@@ -126,6 +126,6 @@ A Rival vassal refuses its overlord's war call and withholds tribute. A Suspicio
 
   The war page shows its own text: "X restored control over Y" for a restoration, "Y won independence from X" (with "after ceding n provinces" when land changed hands) for independence, and "The war lapsed: X no longer rules a realm" for a lapsed war.
 
-## Character effects
+## Attribute and trait effects
 
-Governor diplomacy adds `clamp(-0.0125 × (diplomacy - 5.5), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and Poor/Grave health. See [character](character.md) for the full rules.
+Governor diplomacy adds `clamp(-0.0125 × (diplomacy - 5.5), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and Poor/Grave health. See [attributes, traits and stress](../people/attributes-traits-and-stress.md) for the full rules.

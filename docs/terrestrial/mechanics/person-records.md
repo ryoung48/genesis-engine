@@ -1,6 +1,10 @@
-# People records (`:history`)
+# Person event logging, transfer and historical queries
 
-How people travel from the simulation to the history record. See [households](households.md) for effective-time residence rules, [people](people.md) for the rules that create them and [history record memory](history-record-memory.md) for what the main thread retains.
+Scope: `:history`.
+
+This reference owns event encoding, snapshots, buffer transfer and historical ingestion for [simulated people](../people/overview.md). [Household residence](../people/residence-and-realm.md) owns the effective-time location rules.
+
+How people travel from the simulation to the history record. See [household residence](../people/residence-and-realm.md) for effective-time residence rules, [simulated people](../people/overview.md) for the rules that create them and [record ownership and memory](record-memory.md) for what the main thread retains.
 
 Code: the log and its codec in `src/model/history/sim/people/log` (`PEOPLE_LOG`); sealing and transfer in `src/model/history/sim/engine/journal` (`JOURNAL.flush`, `JOURNAL.transferList`); ingestion and accessors in `src/model/history/record/people` (`PEOPLE_RECORD`); views in `record/people/query` (`PERSON_QUERY`).
 
@@ -79,25 +83,23 @@ The report digest includes initial residence and every retained residence row. S
 
 ## Measurements
 
-The following measurements describe the P2 schema (65 snapshot bytes and 81 record bytes), before households. Detailed report, seed 14963991, lateMedieval, 204,000 points, 933 years from 867 (`stats/history/2026-10-04T04-48-15-693Z-people-2-dp72/933.json`, `diagnostics.peopleRecord`). Single runs on a shared machine.
+See [person packet measurements](pipeline-performance.md#person-packet-measurements-p2-schema) for the historical P2 workload and [record memory](record-memory.md#people-record) for retained structure sizes.
 
-| Measure | Value |
-|---|---:|
-| People created and recorded | 330,956 |
-| Rows | 637,416 (1.93 per person) |
-| `creation` | 330,956 |
-| `seat` | 152,712 |
-| `wedding` | 114,976 |
-| `pregnancy` | 18,350 |
-| `regent` | 9,453 |
-| `betrothal` | 4,761 |
-| `death` | 4,193 |
-| `stress` | 1,216 |
-| `betrothal_end` | 799 |
-| Packet bytes | 37,447,540 (35.7 MiB; about 40 KB a year) |
-| Journal flush, all flushes after the initial one | 6.80 s (6.00 s with object rows) |
-| Record ingestion | 0.81 s (0.84 s with object rows) |
+## Record and wiki
 
-The packet bytes are exactly 25 × 637,416 + 65 × 330,956. The flush figure times the whole of `JOURNAL.flush`, not only its people rows, and the two runs' wall times differed by 9% from machine load, so neither timing shows a change. The record built from packets has the same digest (`diagnostics.peopleRecord.sha256`) as the one built from object rows.
+- **Journal and record.** Each journal transaction carries its people rows as one typed-array packet, and `PEOPLE_RECORD` folds the packets into person columns and the derived marriages, betrothals, tenures, pregnancies and stress rows. [People records](person-records.md) has the row kinds, the packet and the record's structures. A reigning ruler's `rulerChange` entry on the nation timeline also gets a moved death date.
+- **Queries.** `PERSON_QUERY` gives the person view, the timeline, the seat holder at a time, and health. On a mother's timeline, "miscarriage" and "stillborn child" are added, and "died in childbirth" replaces "died". "betrothed" and, for an alliance break, "betrothal broken" are added. The person page shows them as Family rows, and a "Betrothed" chip group while a betrothal stands.
+- **Nation timelines.** Only realm-level person events reach them:
+  - successions;
+  - partitions: one Ruler row naming the late ruler, what the primary kept, the realm each junior heir received, and each district that passed to an heir realm;
+  - regency start, coming of age, regent change and usurpation;
+  - marriage alliances (one row per royal marriage and its alliance; the row says "was betrothed to" when the couple had not yet married);
+  - unions;
+  - pretender and restoration revolts.
 
-The record's memory per structure is measured by `src/test/history-run/retained-memory.smoke.test.ts`; see [history record memory](history-record-memory.md#people-record).
+  Everything else stays on the person page.
+- **Partition wording.** A realm created by a partition reads "Split from X in the partition of [late ruler]'s realm, under [heir]". On person pages a seat taken or lost in one reads "became ruler of Y in the partition of X", "took the seat of Z in the partition of X" or "lost Y in the partition of X". The nation stats show a Succession row: Single heir, Partition, Election or Appointment.
+
+## Attribute and stress queries
+
+Person rows preserve packed innate attributes and traits. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read those properties at the selected date, with personality ages 9/11/13.

@@ -1,4 +1,8 @@
-# Government (`:history`)
+# Government, title holders and succession
+
+Scope: `:history`.
+
+Government determines how rulers are chosen and titles pass between [simulated people](../people/overview.md). A held seat is a person’s title; the primary seat ranks highest and guides [residence](../people/residence-and-realm.md), which is stored separately. [Title hierarchy](title-hierarchy.md) defines the ranks and territorial title structure.
 
 Code: types, families and the era mix in `src/model/society/eras`; assignment, succession system and partition gate in `src/model/history/sim/nations/government`; succession in `src/model/history/sim/engine/events/succession` (`systems/`, `partition/`); heir lines in `src/model/history/sim/people/heirs`.
 
@@ -82,10 +86,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 | Election | elective monarchy, tribal federation, native council, steppe horde, republics | See below. |
 | Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
 
-**Elections.**
-- *Electors.* In monarchies each valid direct local district casts a vote weighted by its population; one holder can cast multiple district votes. In republics the patrician heads vote, one vote each.
-- *Candidates.* The late ruler’s house senior, plus eligible house seniors from the top three district slots by population and seat ID. Repeated nominees are removed without refilling slots; republics consider every distinct head’s house.
-- *Votes.* Each elector backs their own house, then (outside republics) a house tied to theirs by marriage, else the strongest candidate: vote share, plus a bonus for age 25–60.
+**Elections.** See [district elections](#district-elections) for electors, nominations and voting.
 
 **Claim**, by how the ruler took the throne, feeds title founding and weak-crown rebellions:
 - 3: child or founder, a restored claimant, and a junior heir who received a realm in a partition;
@@ -99,7 +100,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 - Otherwise the weak-crown rebellion check runs.
 - None of these revolts starts at a succession that divides the realm (see Partition).
 
-Disputed succession pretenders fight for the throne; a victory replaces the ruler. The war rules are in [rebellion](rebellion.md).
+Disputed succession pretenders fight for the throne; a victory replaces the ruler. The war rules are in [rebellion](rebellions-and-throne-wars.md).
 
 ## Partition
 
@@ -147,14 +148,88 @@ No dead person is seated. An admin who keeps a valid seat belongs to the realm t
 
 The history report's `partition` section is built from these notes (`src/test/history-run/report/partition`): how often realms divide and why not, how large the shares are, what happens to title holding, and what becomes of the heir realms.
 
-## Character effects
+## Attribute and trait effects
 
-Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpation chance gains `clamp(1 + 0.125 × (intrigue - 5.7), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [character](character.md) for the full rules.
+Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpation chance gains `clamp(1 + 0.125 × (intrigue - 5.7), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [attributes, traits and stress](../people/attributes-traits-and-stress.md) for the full rules.
 
-## Household holdings and scheduling
+## Held seats and primary title
 
-[Households](households.md) describes the independent seat index, frozen death walk and local election rules. One holder event succeeds all surviving crowns under their own laws and valid districts immediately, in current rank/ID order. A merger or prior transfer can remove a later frozen seat. District succession selects an adult landless relative or founds a new house; regent replacement remains separately scheduled. Availability considers every crown, and regency checks use the relevant local district rather than a foreign primary.
+Every person owns an independent sorted array of held seat IDs. `rulerOf` remains the authority for each seat; `PEOPLE.setRuler` and `PEOPLE.vacate` maintain both directions through `HOLDINGS`. Losing one seat preserves the others. The primary seat has the highest current title rank, with the lowest seat ID breaking ties. No primary seat is stored separately.
 
-Single-heir union eligibility checks every sovereign crown held by the heir, ignoring districts. Existing senior and sibling-junior membership is compatible without inventing sibling edges. Installation and separately crowned spouses preflight all crown pairs and recheck changed memberships after each external link. Actual senior–junior edges advance once per shared successor dispatch; new edges start at generation 1 and spouse-only links do not advance generations. Merger checks run immediately.
+## Holder death scheduling
 
-Monarchic nominations take three ranked district slots, then deduplicate house seniors without refilling. The first nomination supplies candidate weight. Republic heads vote once per distinct person. Claimants and backers use their strongest actual local district (population then seat ID), and ownership is revalidated before releasing supporting seats.
+The engine schedules one death event per holder, including district-only holders. A sparse pending entry stores person revision, due time and pending/processing state. Revisions survive last-seat loss, so reacquisition cannot revive an obsolete heap event. Additional seats reuse the holder's event; a shortened life replaces it. Regent deaths remain separate events.
+
+Dispatch consumes its token before effects and freezes held seats by descending current rank and ascending ID. Each step rechecks ownership and hierarchy: sovereign crowns use their own law, valid districts inherit immediately, and other seats are vacated. A prior merger or transfer can remove a later seat from the walk. Annual district settlement validates and grants seats, and ensures holder events; it does not inherit independently.
+
+Availability considers every crown, and regency checks use the relevant local district rather than a foreign primary.
+
+## Districts
+
+- **Grants.** A realm's titled direct subjects are its district seats. It grants a share of them by size: none up to 4 provinces, rising to 92% at 25+. Poor and distant seats are granted first.
+- **Who gets a new grant.** With 30% chance the ruler's closest adult, landless relative (never the heir apparent). Otherwise a new house aged 18–55.
+- **Inheritance.** At the person-level death event a district passes to the next *adult* heir who holds no seat, else by the grant rule. Annual settlement does not inherit again. Minors never hold districts.
+- **Loss.** A district that stops being a direct titled subject is vacated.
+- **Revalidation.** `DISTRICTS.revalidate` is the per-seat check behind both rules: it vacates a seat that is no longer a district seat and keeps a living holder of a valid seat; affiliation follows current ownership without rewriting residence. The yearly pass runs it over every seat; a [partition](government-and-succession.md#partition) runs it over the divided realm's seats in the same succession.
+- **Partition.** A new ruler's former district is vacated when the realm is divided. Seats taken or lost in a partition carry the seat reason `partition`: the heir's new seat, the district an heir or the primary gave up, and the seats displaced admins lose and take.
+
+## Heirs
+
+`HEIRS.of` is primogeniture with representation:
+- children first, in birth order; a dead child's line comes before the next sibling;
+- then the siblings' lines;
+- then the parents' siblings' lines.
+
+The culture's gender preference sorts each group: patriarchal prefers sons, matriarchal prefers daughters, equal ignores sex. Callers pass an eligibility filter.
+
+`HEIRS.line` returns every child of a ruler in the same order, each with the first eligible person of that child's line (or none). A partition uses it to find one heir per child line.
+
+## Personal unions
+
+- **Formed** when one person comes to rule two single-heir realms by inheritance, or when two reigning single-heir rulers are married to each other (the heiress case).
+- **Senior** is the realm that must lead (it already has juniors or an overlord), else the one with more provinces.
+- **Blocked** for a new external link when realms are at war, either is already a union junior, or both must lead. Existing group membership remains compatible; eligibility checks every held crown.
+- **Ended** when a partner's living ruler is someone other than that person or their spouse.
+- **Merged** into the senior when an adjacent junior has had 3 shared rulers.
+
+A living heir must be compatible with every held sovereign crown. Districts do not veto unions. Existing group membership follows junior-to-senior union edges only; diplomatic overlords and territorial parents are excluded. Sibling juniors can continue their existing group without a sibling link, even while their dead senior awaits its turn. An incompatible external crown still rejects the heir.
+
+Installation rechecks surviving crowns after each external link. Existing groups retain their senior and edges. Each actual senior–junior edge advances once when both endpoints share the living successor, using a dispatch-local accounted-edge set. New edges start at generation 1; spouse-only shared unions do not advance generations. Merger eligibility is checked immediately after continuation, and removed seats are skipped.
+
+Installation and separately crowned spouses preflight all crown pairs before adding external links.
+
+## District elections
+
+Each valid direct local district supplies a population-weighted elector, even when its holder has other districts or a foreign primary. Candidates include the late ruler’s house senior. District nomination takes the top three district slots by descending population and ascending seat ID, then deduplicates eligible house seniors without refilling slots. Candidate strength uses the first nomination's weight. Republic patricians vote once per distinct eligible person.
+
+Claimants use their strongest local qualifying district, with seat ID breaking population ties. Hereditary contests without a claimant district use the strongest backing district. Supporting seats are actual local elector seats, excluding the synthetic late-house vote. Ownership and district status are checked before release.
+
+Republics consider every distinct patrician head’s house. Each elector backs their own house, then (outside republics) a house tied to theirs by marriage, else the strongest candidate: vote share, plus a bonus for age 25–60.
+
+## Regencies
+
+- **When.** A sovereign ruler under 16 gets a regent until 16, their death or a usurpation.
+- **Who.** The first of these who is an adult, alive and holds no throne:
+  1. the surviving parent, of either sex;
+  2. the closest adult of the child's house in inheritance order;
+  3. the strongest district holder (lord protector);
+  4. otherwise a regency council with no person.
+- **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere is replaced at the yearly check.
+- **After a partition.** Regencies start once the partition's seating is final, for the new realms and then for the primary realm, and one review replaces any regent who became sovereign in it ([government](government-and-succession.md#partition)).
+- **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and its districts rebel more easily ([rebellion](rebellions-and-throne-wars.md)). It still defends; diplomatic disposition governs subject calls.
+- **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs.
+
+## Restoration
+
+- **The claim.** A deposed child or the ruler overthrown in a [throne war](rebellions-and-throne-wars.md#throne-wars) becomes the realm's claimant. On their death the claim passes to their eldest child (generation 1). After that it lapses.
+- **When they try.** Once on coming of age, and at every later succession, with chance 50% (generation 0) or 25% (generation 1). The chance doubles against a child ruler or a ruler with claim ≤ 1.
+- **Contest.** The same district contest as a disputed succession. If it succeeds, a district leads the revolt with the claimant ruling the rebel realm (a `rebellion` note marked `restoration`); its district backers join it in a throne war.
+- **End of the claim.** A revolt uses it up. It also ends if the claimant takes the throne, or lapses if the realm stops being sovereign.
+
+## Patricians
+
+Each electoral republic keeps 3–5 patrician house heads (the count is fixed per realm). A dead head passes to their heir who holds no seat; an extinct house is replaced by a new one aged 25–60.
+
+## Historical presentation and reports
+
+The selected-date wiki shows active held titles, primary first, separately from regencies. Lost titles remain in the timeline. Reports sample living people at initialization and integer-year boundaries, assigning each observation to one half-open window and including the final endpoint only in the last window. `heldSeatsHistogram` contains counts for zero, one and at least two seats. `seatsPerHolder` divides total held seats by observations with a seat and is null without holders. `unionHolders` counts observations with at least two sovereign crowns; districts and regencies do not count as crowns.

@@ -1,4 +1,8 @@
-# De jure titles (`:history`)
+# Title ranks and de jure hierarchy
+
+Scope: `:history`.
+
+De jure is the normative hierarchy of titles; actual territorial ownership can differ. This reference covers title ranks, generation, holding, creation and dissolution. [Government and succession](government-and-succession.md) describes the people who hold the seats.
 
 Code: `src/model/society/dejure` (`index.ts`, `holding/`, `founding/`), tier table in `src/model/society/titles`, runtime wiring in `src/model/history/sim/engine/state/titles/index.ts`, initial setup in `src/model/history/sim/nations/index.ts`.
 
@@ -116,4 +120,4 @@ Different:
 
 Nations consolidate more than before the title layer: about 1023 → 826 over 100 years. See the deviations section of `plans/dejure-title-layer.md`.
 
-[Partition](government.md#partition) works against that consolidation in tribal land: on the 204,000-point benchmark (seed 14963991, 867–1800) the sovereign count ends at 441 instead of 277 and is 36–167 higher at every century mark, and the held share of kingdom titles seated in partitioning realms falls from 0.91–0.99 to 0.74–0.85. Figures from the 933-year report `stats/history/2026-10-03T18-12-34-411Z-multi-heir-partitions-full/`.
+[Partition](government-and-succession.md#partition) works against that consolidation in tribal land: on the 204,000-point benchmark (seed 14963991, 867–1800) the sovereign count ends at 441 instead of 277 and is 36–167 higher at every century mark, and the held share of kingdom titles seated in partitioning realms falls from 0.91–0.99 to 0.74–0.85. Figures from the 933-year report `stats/history/2026-10-03T18-12-34-411Z-multi-heir-partitions-full/`.

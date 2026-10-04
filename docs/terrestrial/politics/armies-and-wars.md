@@ -1,4 +1,8 @@
-# Armies and battles (`:history`)
+# Armies, battles and war settlement
+
+Scope: `:history`.
+
+Armies are aggregate troop counts. This reference covers their budgets, deployment, combat and war outcomes. [Taxation](../population/output-and-taxation.md#economic-output-and-treasury-income) supplies civilian surplus; [rebellions](rebellions-and-throne-wars.md) defines civil-war triggers and endings.
 
 Code: army economy and combat in `src/model/history/sim/engine/military`; recruitment and deployment operations in `engine/military`, field logistics in `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`, kind selection in `battle/kind`, siege phases in `engine/events/siege`, and shared occupation and settlement checks in `battle/conquest`.
 
@@ -20,7 +24,7 @@ The existing knowledge-based logistics limit caps total enrolled levies plus reg
 
 ## State maintenance and treasury
 
-Every government collects provincial output times the realm's knowledge-based extraction rate. Administration costs 35% of each province's collected revenue multiplied by `1 + 0.15 × (travel days / 30)^0.7`. Travel days are great-circle distance from the capital divided by 30 km/day. Civilian surplus is revenue less state maintenance.
+Civilian surplus supplies the army readiness budget. See [economic output, taxation and state maintenance](../population/output-and-taxation.md#economic-output-and-treasury-income) for revenue and administrative costs.
 
 | Recruitment | Home / peace maintenance | Campaign maintenance |
 | --- | ---: | ---: |
@@ -31,7 +35,7 @@ Both prices scale by `(realm output per resident / 450)^0.5` and the shared silv
 
 Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, distinguishing projected annual upkeep from settled interval expense. Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
 
-[Title creation](dejure-titles.md#founding-and-dissolving-founding-considertitles) is an immediate one-off cash expense recorded as the negative "Title creation" budget row, beside bought peace and realm splits. It contributes once through `otherChangesTotal`; recurring tax/army settlement and `annualBalance` exclude it. Tax previews and settlement preserve this accumulator. Census snapshots record it, then reset it for the next interval.
+[Title creation](title-hierarchy.md#founding-and-dissolving-founding-considertitles) is an immediate one-off cash expense recorded as the negative "Title creation" budget row, beside bought peace and realm splits. It contributes once through `otherChangesTotal`; recurring tax/army settlement and `annualBalance` exclude it. Tax previews and settlement preserve this accumulator. Census snapshots record it, then reset it for the next interval.
 
 One-off rows describe the preceding census interval under the frame's year heading. A dated founding appears on the title timeline at event time; its fee appears in the covering census afterward, then disappears from the next census. Frames between censuses retain the last recorded budget and cash. A payer with no census yet has no recorded economy, and a payer annexed before the next census never has a snapshot showing its fee. Prices and calibration uncertainty are documented in the title reference above.
 
@@ -55,7 +59,7 @@ Coalition battle attendance is capped by the lead's knowledge-based logistics, s
 
 A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
 
-Rebellions have their own triggers, threat and endings; see [rebellion](rebellion.md).
+Rebellions have their own triggers, threat and endings; see [rebellion](rebellions-and-throne-wars.md).
 
 Interstate attacks exclude every formal tie, including alliances, subject bonds, unions, colonies and active wars. Threat is calculated by cubed force share, with no terrain or defender bonus:
 
@@ -207,7 +211,7 @@ Mobilization, field battles and siege events record physical deployments rather 
 
 ## Occupation and war settlement
 
-Code: occupation and war endings after field battles and siege endings share `engine/events/battle/conquest`; the terms are set in `engine/events/peace` (`PEACE.terms`, `PEACE.conclude`). This section covers conquest wars; rebel wars have their own endings (see [rebellion](rebellion.md#endings)).
+Code: occupation and war endings after field battles and siege endings share `engine/events/battle/conquest`; the terms are set in `engine/events/peace` (`PEACE.terms`, `PEACE.conclude`). This section covers conquest wars; rebel wars have their own endings (see [rebellion](rebellions-and-throne-wars.md#endings)).
 
 A war ends when the first of these holds, in this order:
 
@@ -257,6 +261,6 @@ These rules describe the procedural `:history` simulation. Imported historical w
 
 Rebellion previews calculate each prospective territory with the same economy and recruitment formulas used after release. Crown territory excludes the departing subject; both armies use their own knowledge-derived limits. Potential support and the existing-war discount remain preview estimates.
 
-## Character effects
+## Attribute and trait effects
 
-Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers. Sieges and raids do not use commander character. See [character](character.md) for the full rules.
+Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers. Sieges and raids do not use commander character. See [attributes, traits and stress](../people/attributes-traits-and-stress.md) for the full rules.

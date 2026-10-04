@@ -1,4 +1,8 @@
-# Character (`:history`)
+# Person attributes, traits and stress
+
+Scope: `:history`.
+
+Attributes, personality, inherited traits and stress describe the same [simulated people](overview.md). They influence family and political outcomes; `CHARACTER` is the code API for reading those properties.
 
 People have six base attributes, three personality traits, three congenital ladders and fifteen independently inherited congenital traits. The table stores five packed innate columns and a sixth column for stress. Pure helpers decode the columns; records preserve the innate data and stress level changes for queries at a selected date. "Hook" is reserved for the Crusader Kings III mechanic of that name (a claim one character holds over another) and is not used here; what archived plans and saved reports call a hook is an *effect* in this document, as listed in the glossary of `plans/archive/people-1b-rename-hooks.md`.
 
@@ -13,7 +17,6 @@ When royal marriage initialization changes a queen's parents and name seed, `PEO
 Packing: `bases` uses six four-bit values; `personality` uses three six-bit codes; `grades` uses seven bits per ladder (active grade plus three, carried good tier, carried bad tier); `congenital` and `carried` are fifteen-bit sets. `CHARACTER.of` reads a person's packed values for pure helpers.
 
 ## Attributes and personality
-
 
 **Base attributes** (six integer columns, 0–10).
 
@@ -82,7 +85,6 @@ The two triples are Compassionate / Callous / Sadistic and Stubborn / Fickle / E
 
  (one `congenital` bit-set column; inherited by DP1.4, else the 0.5% birth chance). Each trait is rolled on its own. Giant and Dwarf exclude each other; the first rolled wins. Health values are read from `plans/people-4-health-lifecycle.md` on, opinion values from `plans/people-7-opinion-politics.md` on.
 
-
 | Trait | Skills | Prowess | Health | Fertility | Opinion (scope in DP10) |
 |---|---|---|---|---|---|
 | Giant | | +6 | −0.25 | | |
@@ -104,7 +106,6 @@ The two triples are Compassionate / Callous / Sadistic and Stubborn / Fickle / E
 ## Carried traits
 
  (carried grades and a `carried` bit-set). A grade or trait is *active* (it shows and has its effects) or *carried* (no effect, but it can be passed on).
-
 
 Each parent is active (A), carrying (C) or neither (N) for the trait:
 
@@ -181,8 +182,7 @@ A `stress` column (0–400), stepped by `PEOPLE_EVENTS.runYear` as its first act
 
 Stress for anyone who is not a sovereign ruler is 0 from the first step after they stop ruling. `plans/people-4-health-lifecycle.md` later adds the ageing-condition stress factors and reads the stress level in Withering Mind progression.
 
-
-Trait consumers use `TRAITS.modifier` to sum only the requested attribute or scalar value, and `TRAITS.has` checks the packed personality slots directly. These reads preserve the personality age gates and grade contributions without constructing a full modifier object. Fertility reads these values once per eligible couple pass, after the age and living-child gates. Report samples reuse ruler attributes when the ruler is also the governor. No persistent modifier cache is added. Personality generation selects the lowest three group rolls with stable insertion, reads inherited membership from two bit masks, and reuses fixed weights and inheritance chances. Base attributes read each parent once. A zero-stress person with no current stressors or bereavement skips trait-factor evaluation. These allocation reductions preserve the remaining hash channels and personality tie order.
+Allocation and traversal implementation details are in [pipeline performance](../mechanics/pipeline-performance.md#trait-evaluation-and-birth-roll-allocation).
 
 ## Record, wiki and diagnostics
 

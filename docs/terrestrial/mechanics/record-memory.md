@@ -1,4 +1,8 @@
-# History record memory
+# History record ownership and memory usage
+
+Scope: `:history`.
+
+This reference covers buffer ownership, retained data and memory measurements. [Person records](person-records.md) owns packet schemas; [pipeline performance](pipeline-performance.md) owns optimization timing comparisons.
 
 The history record remains the complete source for scrubbing. Events, people, census dates and numeric values are retained at their existing precision. These changes reduce temporary and duplicate storage; they do not compress, thin or replay historical data.
 
@@ -7,7 +11,7 @@ The history record remains the complete source for scrubbing. Events, people, ce
 - The simulation worker posts the pending journal, then calls `JOURNAL.releaseSent` after `postMessage` succeeds. Sent transactions and engine notes can then be collected. Census buffer transfers still move ownership to the receiver.
 - The procedural timeline treats its journal ref as a pending queue. `SIM_RECORD.consumeJournal` translates the whole queue into the record, then empties it. Later batches append to that empty queue. The non-consuming `appendJournal` operation remains available for consumers comparing or inspecting batches.
 - Frame population and development arrays reference the selected census snapshot directly. Census snapshots and those frame arrays must be treated as immutable. The engine copies its current arrays when recording a census, so later simulation updates do not change earlier frames. Political arrays and other reconstructed frame state retain their existing ownership.
-- People rows arrive as one typed-array packet per journal transaction, and its buffers are transferred with the census buffers. `PEOPLE_RECORD.append` folds a packet into the record and keeps no reference to it, so packets are collected with their transactions. See [people records](people-records.md).
+- People rows arrive as one typed-array packet per journal transaction, and its buffers are transferred with the census buffers. `PEOPLE_RECORD.append` folds a packet into the record and keeps no reference to it, so packets are collected with their transactions. See [person records](person-records.md).
 - The existing frame cache still retains up to 48 dates. No decompression or additional history replay is introduced.
 
 ## Measurements
@@ -44,9 +48,9 @@ Local measurements are in `stats/history/2026-10-03T20-58-05-000Z-scrub-memory-m
 
 ## People record
 
-The table below is the archived P2 measurement, before residence. [Households](households.md) adds a 4-byte initial column, sparse record residence rows and a separate retained simulation history. New measurements are documented below; historical P2 figures remain unchanged.
+The table below is the archived P2 measurement, before residence. [Household residence](../people/residence-and-realm.md) adds a 4-byte initial column, sparse record residence rows and a separate retained simulation history. New measurements are documented below; historical P2 figures remain unchanged.
 
-The record holds every person the simulation creates. `PeopleRecord.persons` is dense typed columns indexed by person id, 85 bytes a person with initial residence, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [People records](people-records.md) describes each.
+The record holds every person the simulation creates. `PeopleRecord.persons` is dense typed columns indexed by person id, 85 bytes a person with initial residence, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [People records](person-records.md) describes each.
 
 The live-history harness (20,000 points, 300 years) recorded 26,190 people, 9,194 marriages, 6,866 tenures and 470 betrothals. Each structure's size is what a retained `structuredClone` of it adds after a garbage collection, heap plus array buffers:
 
