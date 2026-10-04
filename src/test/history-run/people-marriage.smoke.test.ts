@@ -81,16 +81,17 @@ it("projects actual ordered primary and partition allocations for each gender la
 		} as HistoryState
 		const before = JSON.stringify(people)
 		const random = vi.spyOn(fixture.rng, "random")
-		const projection = SUCCESSION_PROJECTION.of({ state })
+		const projection = SUCCESSION_PROJECTION.crowns({ state })
 		expect(projection.get(expected)).toBe(4)
 		const junior = expected === 1 ? 2 : 3
 		expect(projection.get(junior)).toBe(3)
 		expect(JSON.stringify(people)).toBe(before)
 		expect(random).not.toHaveBeenCalled()
-		state.governmentType[0] = GOVERNMENT.getGovIdx().elective_monarchy
-		expect(SUCCESSION_PROJECTION.of({ state }).size).toBe(0)
-		state.governmentType[0] = GOVERNMENT.getGovIdx().theocracy
-		expect(SUCCESSION_PROJECTION.of({ state }).size).toBe(0)
+		for (const government of ["elective_monarchy", "theocracy"] as const) {
+			state.governmentType[0] = GOVERNMENT.getGovIdx()[government]
+			expect(SUCCESSION_PROJECTION.crowns({ state }).size).toBe(0)
+			expect(SUCCESSION_PROJECTION.districts({ state }).size).toBe(0)
+		}
 	}
 })
 

@@ -43,7 +43,7 @@ The yearly `PEOPLE_YEAR` event runs, in order:
 1. the stress step for every sovereign ruler, then the deaths of any whose heart failed;
 2. the health pass: completed ages, band and condition changes, death projected for the coming year, and regents for the newly Incapable;
 3. district inheritance and new grants, the marriage-alliance review (which also breaks betrothals left without an alliance) and patrician upkeep;
-4. fulfilled betrothals, then reciprocal foreign/domestic matching and outsider proposals; each accepted pair settles alliances/unions immediately and refreshes opinion contexts and inheritance before the next search;
+4. fulfilled betrothals, then reciprocal foreign/domestic matching and outsider proposals; each accepted pair settles alliances/unions immediately and refreshes opinion contexts, and crown inheritance when a union was founded, before the next search;
 5. the coming year's conceptions, then the regency review, usurpation rolls and restoration.
 
 Deaths, births, coming of age and rebellions run on their own events at the exact time. [Families](families-and-lifecycle.md) has the order of same-time events.

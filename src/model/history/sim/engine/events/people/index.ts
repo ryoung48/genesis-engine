@@ -49,7 +49,9 @@ function nextYear({ state }: PeopleEventParams): void {
 function marriageRealms({ state }: StateParams): MarriageRealms {
 	const neighbors = new Map<number, number[]>()
 	const contexts = new Map<number, OpinionPerson>()
-	let projection = new Map<number, number>()
+	let districtHeirs = new Map<number, number>()
+	let crownHeirs = new Map<number, number>()
+	let stale: "all" | "crowns" | "none" = "all"
 	const people = state.people
 	const table = people.persons
 	const time = state.time / STATE.yearMs
@@ -110,7 +112,10 @@ function marriageRealms({ state }: StateParams): MarriageRealms {
 				person,
 				ranks: state.seatRank,
 			}),
-			projectedStanding: projection.get(person) ?? 0,
+			projectedStanding: Math.max(
+				districtHeirs.get(person) ?? 0,
+				crownHeirs.get(person) ?? 0,
+			),
 			sovereignTiers: (personOf(person)?.sovereignSeats ?? []).map(
 				(seat) => state.seatRank[seat],
 			),
@@ -125,19 +130,30 @@ function marriageRealms({ state }: StateParams): MarriageRealms {
 			DEATH_SCHEDULE.ensure({ state, person, cause: "natural" })
 			contexts.delete(person)
 		},
-		settle: ({ match, betrothal }) =>
-			settleMatches({
-				state,
-				matches: {
-					weddings: betrothal ? [] : [match],
-					betrothals: betrothal ? [match] : [],
-				},
-			}),
+		settle: ({ match, betrothal }) => {
+			if (
+				settleMatches({
+					state,
+					matches: {
+						weddings: betrothal ? [] : [match],
+						betrothals: betrothal ? [match] : [],
+					},
+				})
+			)
+				if (stale === "none") stale = "crowns"
+		},
+		// A match moves a household and may ally two realms, neither of which
+		// changes a holder or an heir. Only a union changes who may inherit a
+		// crown, and no match changes the line of a district.
 		refresh: () => {
-			neighbors.clear()
 			contexts.clear()
+			if (stale === "none") return
+			neighbors.clear()
 			const started = performance.now()
-			projection = SUCCESSION_PROJECTION.of({ state })
+			if (stale === "all")
+				districtHeirs = SUCCESSION_PROJECTION.districts({ state })
+			crownHeirs = SUCCESSION_PROJECTION.crowns({ state })
+			stale = "none"
 			const totals =
 				state.marriageMarket.get(time) ?? MARRIAGE_DIAGNOSTICS.create()
 			MARRIAGE_DIAGNOSTICS.observe({
@@ -177,9 +193,11 @@ function sovereignRulers({ state }: StateParams): number[] {
 }
 
 // Marriage alliances from the year's matches, and heiress unions from its
-// weddings. A betrothal whose alliance cannot hold is broken at once.
-function settleMatches({ state, matches }: SettleMatchesParams): void {
+// weddings. A betrothal whose alliance cannot hold is broken at once. Returns
+// whether a union was founded, which always records an event.
+function settleMatches({ state, matches }: SettleMatchesParams): boolean {
 	const people = state.people
+	let united = false
 	for (const match of matches.betrothals)
 		if (!ROYAL_MARRIAGES.allianceFromMatch({ state, match }))
 			BETROTHAL.release({
@@ -190,9 +208,12 @@ function settleMatches({ state, matches }: SettleMatchesParams): void {
 			})
 	for (const match of matches.weddings) {
 		ROYAL_MARRIAGES.allianceFromMatch({ state, match })
-		if (people.rulerOf[match.realmA] === match.a)
-			STATE.uniteCouple({ state, p: match.realmA, person: match.a })
+		if (people.rulerOf[match.realmA] !== match.a) continue
+		const events = state.events.length
+		STATE.uniteCouple({ state, p: match.realmA, person: match.a })
+		if (state.events.length !== events) united = true
 	}
+	return united
 }
 
 function init({ state, rng }: PeopleEventParams): void {

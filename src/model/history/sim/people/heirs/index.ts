@@ -61,7 +61,7 @@ function of({
 	preference,
 	eligible,
 }: HeirsOfParams): HeirResult {
-	const seen = new Set<number>([dying])
+	const seen = new Set<number>().add(dying)
 	const line = { people, time, preference, eligible, seen }
 	const table = people.persons
 	const child = firstAmong({ line, persons: table.children[dying] })
@@ -94,7 +94,7 @@ function line({
 		time,
 		preference,
 		eligible,
-		seen: new Set<number>([dying]),
+		seen: new Set<number>().add(dying),
 	}
 	return ordered({
 		people,

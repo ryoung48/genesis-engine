@@ -240,11 +240,12 @@ function foreignMatch({
 	ancestry,
 }: MatchParams): number {
 	const near = rng.shuffle([...neighborsOf(seeker.realm)])
+	const adjacent = new Set(near)
 	const far = new Set<number>()
 	for (const realm of near) for (const next of neighborsOf(realm)) far.add(next)
 	const rings = [
 		near.filter((realm) => realm !== seeker.realm),
-		[...far].filter((realm) => realm !== seeker.realm && !near.includes(realm)),
+		[...far].filter((realm) => realm !== seeker.realm && !adjacent.has(realm)),
 	]
 	const passes = seeker.royalBlood ? [true, false] : [false]
 	for (const royalOnly of passes)
@@ -337,6 +338,21 @@ function seekMatches({
 				),
 		),
 	})
+	// Only an accepted pair removes candidates or moves a household, so the
+	// realm groups stand until the next one, and nobody else stops being
+	// eligible or changes blood within the pass.
+	let candidates = ids.filter(eligible).map(seekerOf)
+	let groups: Map<number, Seeker[]> | null = null
+	const grouped = () => {
+		const pool = new Map<number, Seeker[]>()
+		for (const other of candidates) {
+			other.realm = HOUSEHOLD.realmOf({ people, person: other.person })
+			const list = pool.get(other.realm)
+			if (list) list.push(other)
+			else pool.set(other.realm, [other])
+		}
+		return pool
+	}
 	const accept = (selection: AcceptedPair) => {
 		const { match, outsider: fallback } = selection
 		const pair = evaluatePair({ people, time, match, market, ancestry })
@@ -381,22 +397,17 @@ function seekMatches({
 		}
 		market.settle({ match, betrothal })
 		market.refresh()
+		candidates = candidates.filter((other) => !matched.has(other.person))
+		groups = null
 	}
 	market.refresh()
 	for (const person of ids) {
 		if (matched.has(person) || !eligible(person)) continue
 		const seeker = seekerOf(person)
 		const age = ageOf(person)
-		const pool = new Map<number, Seeker[]>()
-		for (const id of ids) {
-			if (matched.has(id) || !eligible(id)) continue
-			const other = seekerOf(id)
-			const list = pool.get(other.realm) ?? []
-			list.push(other)
-			pool.set(other.realm, list)
-		}
+		groups ??= grouped()
+		const pool = groups
 		const fits = (partner: number) => {
-			if (!eligible(partner)) return false
 			const other = ageOf(partner)
 			if (Math.min(age, other) >= BETROTHAL.adultAge) return true
 			const realmB = HOUSEHOLD.realmOf({ people, person: partner })

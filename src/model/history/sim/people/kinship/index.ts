@@ -25,7 +25,10 @@ function prohibitedMatch({
 		return seen
 	}
 	const first = ancestors(a)
-	for (const ancestor of ancestors(b)) if (first.has(ancestor)) return true
+	const second = ancestors(b)
+	const [fewer, more] =
+		first.size < second.size ? [first, second] : [second, first]
+	for (const ancestor of fewer) if (more.has(ancestor)) return true
 	return false
 }
 
