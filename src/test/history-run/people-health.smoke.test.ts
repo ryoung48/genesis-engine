@@ -15,6 +15,7 @@ import { HEALTH } from "@/model/history/sim/people/health"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { TRAITS } from "@/model/history/sim/people/traits"
 import type { PeopleState, Sex } from "@/model/history/sim/people/types"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RNG } from "@/model/shared/random/rng"
@@ -216,6 +217,27 @@ it("lets physique and congenital health raise effective health and survival", ()
 	}
 	table.grades[person] = NEUTRAL_GRADES
 	expect(graded).toEqual([-1, -0.5, -0.25, 0.25, 0.5, 1])
+	// The flat health lookup agrees with the general trait modifier for any
+	// character and age.
+	let seed = 99
+	const next = () => {
+		seed = (seed * 1103515245 + 12345) % 2147483648
+		return seed
+	}
+	for (let sample = 0; sample < 20000; sample++) {
+		const grade = () => (next() % 7) + ((next() % 4) << 3) + ((next() % 4) << 5)
+		const character = {
+			bases: 0,
+			carried: 0,
+			personality: (next() % 40) | ((next() % 40) << 6) | ((next() % 40) << 12),
+			grades: grade() | (grade() << 7) | (grade() << 14),
+			congenital: next() % 2 ** 15,
+		}
+		const age = next() % 80
+		expect(TRAITS.health({ character, age })).toBe(
+			TRAITS.modifier({ character, age, modifier: "health" }),
+		)
+	}
 	for (const boost of [0.25, 0.5, 1])
 		for (const health of [0.5, 1.5, 2.5, 2.9])
 			expect(

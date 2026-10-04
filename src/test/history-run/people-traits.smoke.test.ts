@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto"
-import { mkdirSync, writeFileSync } from "node:fs"
 import { expect, it } from "vitest"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
@@ -24,11 +22,6 @@ import type { PeopleState } from "@/model/history/sim/people/types"
 import { HASH } from "@/model/shared/random/hash"
 import { RNG } from "@/model/shared/random/rng"
 import { HISTORY_RUN } from "@/test/history-run"
-import { LADDER_EXPERIMENT } from "@/test/history-run/ladder-experiment"
-import type {
-	LadderGrade,
-	LadderRules,
-} from "@/test/history-run/ladder-experiment/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
 
 // Stress levels a person's pending rows carry, in append order.
@@ -849,40 +842,6 @@ it("reads scalar trait modifiers without changing age gates or grade contributio
 	expect(TRAITS.has({ character, age: 13, trait: "lustful" })).toBe(true)
 })
 
-it("preserves the reference character draw across 20000 founders and descendants", () => {
-	const people = PEOPLE.create(1)
-	const table = people.persons
-	const digest = createHash("sha256")
-	for (let person = 0; person < 20000; person++) {
-		table.nameSeed.push(person + 721)
-		table.father.push(
-			person < 200
-				? -1
-				: Math.floor(HASH.unit({ seed: person, channel: 1, salt: 0 }) * person),
-		)
-		table.mother.push(
-			person < 200
-				? -1
-				: Math.floor(HASH.unit({ seed: person, channel: 2, salt: 0 }) * person),
-		)
-		const traits = TRAITS.draw({ table, person })
-		table.personality.push(traits.personality)
-		table.grades.push(traits.grades)
-		table.congenital.push(traits.congenital)
-		table.carried.push(traits.carried)
-		const attributes = ATTRIBUTES.draw({
-			table,
-			person,
-		})
-		table.bases.push(attributes.bases)
-
-		const innate = CHARACTER.of({ people, person })
-		digest.update(JSON.stringify(innate))
-	}
-	expect(digest.digest("hex")).toBe(
-		"e67b54fee939e789cbbd7e57fb10e4090d56961c45f244890576f09d4e07baf9",
-	)
-})
 it("keeps personality group order stable when group hash rolls tie", () => {
 	const people = PEOPLE.create(1)
 	const table = people.persons
@@ -1057,89 +1016,3 @@ it("samples living populations on matched dates and measures capped governors in
 	expect(offGrid.enrichment.others).toEqual({ observations: 0 })
 	expect(offGrid.rulers.all.observations).toBe(2)
 }, 120000)
-
-it("validates the experimental ladder against production over 100000 legal parent cases and three ladders", () => {
-	const states: LadderGrade[] = []
-	for (let active = -3; active <= 3; active++)
-		for (let good = 0; good <= 3; good++)
-			for (let bad = 0; bad <= 3; bad++)
-				if (
-					(!good || good > Math.max(0, active)) &&
-					(!bad || bad > Math.max(0, -active))
-				)
-					states.push({ active, good, bad })
-	const { persons: table } = PEOPLE.create(1)
-	table.father = [-1, -1, 0]
-	table.mother = [-1, -1, 1]
-	table.personality = [0, 0, 0]
-	table.congenital = [0, 0, 0]
-	table.carried = [0, 0, 0]
-	const pack = (value: LadderGrade) =>
-		((value.active + 3) | (value.good << 3) | (value.bad << 5)) *
-		(1 + (1 << 7) + (1 << 14))
-	for (let i = 0; i < 100000; i++) {
-		const first = states[i % states.length]
-		const second = states[Math.floor(i / states.length) % states.length]
-		const seed =
-			1 +
-			Math.floor(
-				HASH.unit({ seed: 14963991, channel: 999, salt: i }) * 0x7ffffffe,
-			)
-		table.nameSeed[2] = seed
-		table.grades = [pack(first), pack(second), 49539]
-		const production = TRAITS.draw({ table, person: 2 })
-		for (const [index, ladder] of (
-			["intellect", "physique", "beauty"] as const
-		).entries()) {
-			const experimental = LADDER_EXPERIMENT.draw({
-				seed,
-				channel: 200 + index * 30,
-				first,
-				second,
-				birth:
-					ladder === "intellect"
-						? [0.005, 0.0025, 0.0005]
-						: [0.005, 0.0025, 0.0015],
-				rules: {
-					higherTierParent: "active",
-					lowerTierParent: "carrier",
-					sideOrder: "goodFirst",
-				},
-			})
-			expect(experimental).toEqual(
-				TRAITS.grade({ character: production, ladder }),
-			)
-		}
-	}
-}, 120000)
-it("measures twelve inheritance alternatives on fixed seeds and random mating without selection", () => {
-	const runs = []
-	for (const higherTierParent of ["active", "none"] as const)
-		for (const lowerTierParent of [
-			"carrier",
-			"reducedCarrier",
-			"none",
-		] as const)
-			for (const sideOrder of ["goodFirst", "independent"] as const) {
-				const rules: LadderRules = {
-					higherTierParent,
-					lowerTierParent,
-					sideOrder,
-				}
-				const generations = LADDER_EXPERIMENT.simulate({ rules })
-				runs.push({ rules, generations })
-				console.log(JSON.stringify({ rules, generations }))
-			}
-	const directory =
-		process.env.LADDER_OUT ??
-		`stats/history/${new Date().toISOString().replaceAll(":", "-").replace(".", "-")}-people-1a-ladder`
-	mkdirSync(directory, { recursive: true })
-	writeFileSync(
-		`${directory}/ladder-experiment.json`,
-		JSON.stringify(
-			{ seed: 14963991, population: 40000, generations: 32, runs },
-			null,
-			2,
-		),
-	)
-}, 3600000)

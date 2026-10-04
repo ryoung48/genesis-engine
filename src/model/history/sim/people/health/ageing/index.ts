@@ -467,6 +467,8 @@ function blind({ people, person }: AgeingPersonParams): boolean {
 
 export const AGEING = {
 	conditions: CONDITIONS,
+	firstOnsetAge: FIRST_ONSET_AGE,
+	noChanges: NO_CHANGES,
 	channels: CHANNEL,
 	afflicted,
 	levels,

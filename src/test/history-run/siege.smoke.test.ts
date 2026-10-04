@@ -514,6 +514,9 @@ describe("battle kinds and shared resolver", () => {
 
 it("calibrates the production siege loop across ratios, relief and logistics caps", () => {
 	const rng = HISTORY_RNG.createHistoryRng(2025)
+	// 2,000 trials keep worst-case binomial standard error near 1.1%; output
+	// requests retain the full 20,000-trial calibration and its tail resolution.
+	const samples = process.env.SIEGE_CALIBRATION_OUT ? 20000 : 2000
 	const results: SiegeCalibrationScenario[] = []
 	for (const terrain of [0, 1])
 		for (const multiple of [1, 10])
@@ -521,7 +524,7 @@ it("calibrates the production siege loop across ratios, relief and logistics cap
 				for (const field of [0, 0.5]) {
 					const phases: number[] = []
 					const outcomes: Record<string, number> = {}
-					for (let run = 0; run < 20000; run++) {
+					for (let run = 0; run < samples; run++) {
 						fixture()
 						state.provinceTopography[1] = terrain
 						const army = 100 * ratio
@@ -556,12 +559,12 @@ it("calibrates the production siege loop across ratios, relief and logistics cap
 						vi.clearAllMocks()
 					}
 					phases.sort((a, b) => a - b)
-					const median = phases[10000]
-					const p99 = phases[19800]
+					const median = phases[Math.floor(samples / 2)]
+					const p99 = phases[Math.floor(samples * 0.99)]
 					const max = phases.at(-1)!
 					const failures =
-						((outcomes.lifted ?? 0) + (outcomes.relieved ?? 0)) / 20000
-					const storms = (outcomes.stormed ?? 0) / 20000
+						((outcomes.lifted ?? 0) + (outcomes.relieved ?? 0)) / samples
+					const storms = (outcomes.stormed ?? 0) / samples
 					results.push({
 						terrain,
 						multiple,
@@ -579,7 +582,7 @@ it("calibrates the production siege loop across ratios, relief and logistics cap
 					expect(p99).toBeLessThanOrEqual(17)
 					expect(max).toBeLessThanOrEqual(30)
 					expect(failures).toBeLessThanOrEqual(0.1)
-					expect((outcomes.betrayed ?? 0) / 20000).toBeLessThanOrEqual(0.09)
+					expect((outcomes.betrayed ?? 0) / samples).toBeLessThanOrEqual(0.09)
 					if (ratio >= 2) {
 						expect(storms).toBeGreaterThanOrEqual(0.1)
 						expect(storms).toBeLessThanOrEqual(0.25)

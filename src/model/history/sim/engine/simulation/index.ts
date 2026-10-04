@@ -280,8 +280,11 @@ function processEventsUntil({
 				})
 				break
 		}
-		DEATH_SCHEDULE.offerNew({ state })
-		BIRTH_EVENTS.queue({ state })
+		// Only an event that created people or pregnancies has anything to queue.
+		if (state.deathSchedule.offered !== state.people.persons.sex.length)
+			DEATH_SCHEDULE.offerNew({ state })
+		if (state.people.deliveries.queued !== state.people.deliveries.next)
+			BIRTH_EVENTS.queue({ state })
 		state.militaryDepth--
 		MILITARY.reconcile({ state })
 		JOURNAL.flush({

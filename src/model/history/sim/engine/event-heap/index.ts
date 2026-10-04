@@ -19,31 +19,43 @@ const INITIAL_CAPACITY = 1024
 const DATA_FIELDS = 4
 
 // Same-time order: deaths, births, everything else, then the yearly people
-// pass; the enqueue sequence settles what remains.
+// pass; the enqueue sequence settles what remains. Both are folded into one
+// number so that a tie on time needs a single further comparison.
+const PRIORITY_STEP = 2 ** 44
+
 function priorityOf(type: number): number {
 	if (type === evt.DEATH) return 0
 	if (type === evt.BIRTH) return 1
 	return type === evt.PEOPLE_YEAR ? 3 : 2
 }
 
-// Packed storage keeps the simulation event queue small while serving its next event in logarithmic time.
+// Packed storage keeps the simulation event queue small while serving its
+// next event in logarithmic time. The heap orders only each event's two sort
+// keys and the slot its payload lives in; a payload is written once and never
+// moves, so a sift shifts three numbers a level.
 export class EventHeap {
 	private _size = 0
 	private _capacity: number
-	private _time: Float64Array
+	private _keyTime: Float64Array
+	private _keyOrder: Float64Array
+	private _slot: Int32Array
 	private _type: Uint8Array
 	private _data: Int32Array
 	private _time2: Float64Array
-	private _sequence: Float64Array
+	private _free: Int32Array
+	private _freeCount = 0
+	private _slots = 0
 	private _next = 0
 
 	constructor(capacity = INITIAL_CAPACITY) {
 		this._capacity = capacity
-		this._time = new Float64Array(capacity)
+		this._keyTime = new Float64Array(capacity)
+		this._keyOrder = new Float64Array(capacity)
+		this._slot = new Int32Array(capacity)
 		this._type = new Uint8Array(capacity)
 		this._data = new Int32Array(capacity * DATA_FIELDS)
 		this._time2 = new Float64Array(capacity)
-		this._sequence = new Float64Array(capacity)
+		this._free = new Int32Array(capacity)
 	}
 
 	get size(): number {
@@ -55,15 +67,15 @@ export class EventHeap {
 	}
 
 	peekTime(): number {
-		return this._time[0]
+		return this._keyTime[0]
 	}
 
 	peekType(): EventType {
-		return this._type[0] as EventType
+		return this._type[this._slot[0]] as EventType
 	}
 
 	peekData(out: Int32Array): void {
-		const base = 0
+		const base = this._slot[0] * DATA_FIELDS
 		out[0] = this._data[base]
 		out[1] = this._data[base + 1]
 		out[2] = this._data[base + 2]
@@ -71,7 +83,7 @@ export class EventHeap {
 	}
 
 	peekTime2(): number {
-		return this._time2[0]
+		return this._time2[this._slot[0]]
 	}
 
 	enqueue(
@@ -84,103 +96,98 @@ export class EventHeap {
 		time2 = 0,
 	): void {
 		if (this._size >= this._capacity) this._grow()
-		const i = this._size++
-		this._time[i] = time
-		this._type[i] = type
-		const base = i * DATA_FIELDS
+		const slot =
+			this._freeCount > 0 ? this._free[--this._freeCount] : this._slots++
+		this._type[slot] = type
+		const base = slot * DATA_FIELDS
 		this._data[base] = d0
 		this._data[base + 1] = d1
 		this._data[base + 2] = d2
 		this._data[base + 3] = d3
-		this._time2[i] = time2
-		this._sequence[i] = this._next++
-		this._siftUp(i)
+		this._time2[slot] = time2
+		const order = priorityOf(type) * PRIORITY_STEP + this._next++
+		const keyTime = this._keyTime
+		const keyOrder = this._keyOrder
+		const slots = this._slot
+		let i = this._size++
+		while (i > 0) {
+			const parent = (i - 1) >> 1
+			const parentTime = keyTime[parent]
+			if (
+				time > parentTime ||
+				(time === parentTime && order > keyOrder[parent])
+			)
+				break
+			keyTime[i] = parentTime
+			keyOrder[i] = keyOrder[parent]
+			slots[i] = slots[parent]
+			i = parent
+		}
+		keyTime[i] = time
+		keyOrder[i] = order
+		slots[i] = slot
 	}
 
 	dequeue(): void {
 		if (this._size <= 0) return
-		this._size--
-		if (this._size > 0) {
-			this._swap(0, this._size)
-			this._siftDown(0)
+		const keyTime = this._keyTime
+		const keyOrder = this._keyOrder
+		const slots = this._slot
+		this._free[this._freeCount++] = slots[0]
+		const n = --this._size
+		if (n === 0) return
+		const time = keyTime[n]
+		const order = keyOrder[n]
+		const slot = slots[n]
+		let i = 0
+		while (true) {
+			let child = 2 * i + 1
+			if (child >= n) break
+			const right = child + 1
+			if (
+				right < n &&
+				(keyTime[right] < keyTime[child] ||
+					(keyTime[right] === keyTime[child] &&
+						keyOrder[right] < keyOrder[child]))
+			)
+				child = right
+			const childTime = keyTime[child]
+			if (time < childTime || (time === childTime && order < keyOrder[child]))
+				break
+			keyTime[i] = childTime
+			keyOrder[i] = keyOrder[child]
+			slots[i] = slots[child]
+			i = child
 		}
+		keyTime[i] = time
+		keyOrder[i] = order
+		slots[i] = slot
 	}
 
 	private _grow(): void {
-		const newCap = this._capacity * 2
-		const newTime = new Float64Array(newCap)
-		newTime.set(this._time)
-		const newType = new Uint8Array(newCap)
-		newType.set(this._type)
-		const newData = new Int32Array(newCap * DATA_FIELDS)
-		newData.set(this._data)
-		const newTime2 = new Float64Array(newCap)
-		newTime2.set(this._time2)
-		this._time = newTime
-		this._type = newType
-		this._data = newData
-		this._time2 = newTime2
-		const newSequence = new Float64Array(newCap)
-		newSequence.set(this._sequence)
-		this._sequence = newSequence
-		this._capacity = newCap
-	}
-
-	private _swap(a: number, b: number): void {
-		// time
-		const tA = this._time[a]
-		this._time[a] = this._time[b]
-		this._time[b] = tA
-		// type
-		const tyA = this._type[a]
-		this._type[a] = this._type[b]
-		this._type[b] = tyA
-		// data
-		const baseA = a * DATA_FIELDS
-		const baseB = b * DATA_FIELDS
-		for (let k = 0; k < DATA_FIELDS; k++) {
-			const tmp = this._data[baseA + k]
-			this._data[baseA + k] = this._data[baseB + k]
-			this._data[baseB + k] = tmp
-		}
-		// time2
-		const t2A = this._time2[a]
-		this._time2[a] = this._time2[b]
-		this._time2[b] = t2A
-		const sequenceA = this._sequence[a]
-		this._sequence[a] = this._sequence[b]
-		this._sequence[b] = sequenceA
-	}
-
-	private _before(a: number, b: number): boolean {
-		if (this._time[a] !== this._time[b]) return this._time[a] < this._time[b]
-		const priorityA = priorityOf(this._type[a])
-		const priorityB = priorityOf(this._type[b])
-		if (priorityA !== priorityB) return priorityA < priorityB
-		return this._sequence[a] < this._sequence[b]
-	}
-
-	private _siftUp(i: number): void {
-		while (i > 0) {
-			const parent = (i - 1) >> 1
-			if (!this._before(i, parent)) break
-			this._swap(i, parent)
-			i = parent
-		}
-	}
-
-	private _siftDown(i: number): void {
-		const n = this._size
-		while (true) {
-			let smallest = i
-			const left = 2 * i + 1
-			const right = 2 * i + 2
-			if (left < n && this._before(left, smallest)) smallest = left
-			if (right < n && this._before(right, smallest)) smallest = right
-			if (smallest === i) break
-			this._swap(i, smallest)
-			i = smallest
-		}
+		const capacity = this._capacity * 2
+		const keyTime = new Float64Array(capacity)
+		keyTime.set(this._keyTime)
+		this._keyTime = keyTime
+		const keyOrder = new Float64Array(capacity)
+		keyOrder.set(this._keyOrder)
+		this._keyOrder = keyOrder
+		const slots = new Int32Array(capacity)
+		slots.set(this._slot)
+		this._slot = slots
+		const type = new Uint8Array(capacity)
+		type.set(this._type)
+		this._type = type
+		const data = new Int32Array(capacity * DATA_FIELDS)
+		data.set(this._data)
+		this._data = data
+		const time2 = new Float64Array(capacity)
+		time2.set(this._time2)
+		this._time2 = time2
+		const free = new Int32Array(capacity)
+		free.set(this._free)
+		this._free = free
+		this._capacity = capacity
 	}
 }
 

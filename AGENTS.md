@@ -67,6 +67,8 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 
 # History benchmark baselines
 
+- For history smoke tests, run `pnpm test:history:related <changed files>` after each implementation step and `pnpm test:history` once at the end. Let Vitest select related tests from the import graph instead of maintaining per-plan smoke-test lists. These commands exclude the history generators, detailed benchmark, and retained-memory diagnostic; the benchmark requirements below remain separate.
+
 - The required history benchmark command is **`pnpm report:history`**, which runs `src/test/history-run/history-report.smoke.test.ts`. Use this script for every required history baseline and after-change comparison.
 - Every plan that impacts history must name the latest completed, applicable **detailed report produced by `pnpm report:history`** in `stats/history/` as its baseline. Pipeline reports from `pnpm gen:history` do not replace this required baseline or comparison report.
 - Reuse the saved baseline instead of running a fresh before-change benchmark. Record its exact path and configuration in the plan. Partial checkpoints and profiled runs are not substitutes for a completed equivalent baseline.

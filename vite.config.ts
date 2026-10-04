@@ -1,4 +1,6 @@
 /// <reference types="vitest/config" />
+
+import { availableParallelism } from "node:os"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
@@ -8,6 +10,9 @@ import { defineConfig } from "vite"
 export default defineConfig(({ mode }) => {
 	const isTest = mode === "test" || process.env.VITEST === "true"
 	const base = process.env.VITE_BASE_PATH ?? "/"
+	const historySmokeFiles = [
+		"src/test/history-run/!(history-run|history-report|retained-memory).smoke.test.ts",
+	]
 
 	return {
 		base,
@@ -55,8 +60,23 @@ export default defineConfig(({ mode }) => {
 				{
 					extends: true,
 					test: {
+						name: "history-smoke",
+						include: historySmokeFiles,
+						fileParallelism: true,
+						isolate: true,
+						maxWorkers: Math.min(8, availableParallelism()),
+						sequence: {
+							groupOrder: 0,
+						},
+						testTimeout: 300000,
+					},
+				},
+				{
+					extends: true,
+					test: {
 						name: "smoke",
 						include: ["src/test/**/*.smoke.test.ts"],
+						exclude: historySmokeFiles,
 						fileParallelism: false,
 						sequence: {
 							groupOrder: 1,

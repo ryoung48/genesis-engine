@@ -16,6 +16,8 @@ const BACKGROUND: readonly (readonly [number, number])[] = [
 	[16, 0.005],
 	[Infinity, 0.012],
 ]
+// Each band's chance as a yearly death rate.
+const BACKGROUND_RATE = BACKGROUND.map(([, chance]) => -Math.log(1 - chance))
 const MONTH = 1 / 12
 const CHANNEL = {
 	select: 1002,
@@ -32,29 +34,41 @@ function monthlyChance(health: number): number {
 }
 
 // The interval split at the 1st, 5th and 16th birthdays it crosses.
+function healthRate(health: number): number {
+	return health < DIE_HEALTH ? -12 * Math.log(1 - monthlyChance(health)) : 0
+}
+
 function segments({
 	birth,
 	health,
 	from,
 	to,
 }: IntervalParams): HazardSegment[] {
-	const healthRate = -12 * Math.log(1 - monthlyChance(health))
+	const rate = healthRate(health)
 	const parts: HazardSegment[] = []
 	let start = from
-	for (const [age, chance] of BACKGROUND) {
+	for (const [index, [age]] of BACKGROUND.entries()) {
 		if (start >= to) break
 		const end = Math.min(to, birth + age)
 		if (end <= start) continue
-		parts.push({ start, end, rate: healthRate - Math.log(1 - chance) })
+		parts.push({ start, end, rate: rate + BACKGROUND_RATE[index] })
 		start = end
 	}
 	return parts
 }
 
-function survival(params: IntervalParams): number {
+// The same sum the segments give, without building them: almost every
+// interval ends in survival and needs nothing else.
+function survival({ birth, health, from, to }: IntervalParams): number {
+	const rate = healthRate(health)
 	let hazard = 0
-	for (const part of segments(params))
-		hazard += part.rate * (part.end - part.start)
+	let start = from
+	for (let index = 0; index < BACKGROUND.length && start < to; index++) {
+		const end = Math.min(to, birth + BACKGROUND[index][0])
+		if (end <= start) continue
+		hazard += (rate + BACKGROUND_RATE[index]) * (end - start)
+		start = end
+	}
 	return Math.exp(-hazard)
 }
 
@@ -66,10 +80,7 @@ function survival(params: IntervalParams): number {
 // through the interval.
 function project(params: ProjectDeathParams): number {
 	const { seed, year, from } = params
-	const parts = segments(params)
-	let hazard = 0
-	for (const part of parts) hazard += part.rate * (part.end - part.start)
-	const survives = Math.exp(-hazard)
+	const survives = survival(params)
 	const newborn = from === params.birth
 	const roll = HASH.unit({
 		seed,
@@ -77,6 +88,7 @@ function project(params: ProjectDeathParams): number {
 		salt: year,
 	})
 	if (roll < survives) return Infinity
+	const parts = segments(params)
 	const date = HASH.unit({
 		seed,
 		channel: newborn ? CHANNEL.newbornDate : CHANNEL.month,

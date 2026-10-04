@@ -209,6 +209,10 @@ function replace({ state, realm, ward }: WardParams): void {
 
 // The next in the regent order takes over each regency the dead person held.
 function regentDied({ state, regent }: RegentDiedParams): void {
+	let governs = false
+	for (const held of state.people.regencies.values())
+		if (held.regent === regent) governs = true
+	if (!governs) return
 	for (const [realm, held] of [...state.people.regencies]) {
 		if (held.regent !== regent) continue
 		const regency = GOVERNOR.regency({ state, realm })

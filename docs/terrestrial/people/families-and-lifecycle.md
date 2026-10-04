@@ -93,7 +93,7 @@ A stale or replaced token does nothing. `PERSON_DEATH.kill` is the immediate pat
 
 ## Event order
 
-At equal times the heap runs deaths, then births, then every other event, then the yearly people pass; ties within a class run in the order they were queued. So a death at a delivery's time cancels it, births and deaths at a year boundary precede that year's pass, and weddings precede that pass's conceptions. Battle and childbirth deaths apply inside their own event.
+At equal times the heap runs deaths, then births, then every other event, then the yearly people pass; ties within a class run in the order they were queued. The heap sorts on the time and on one number that folds the class and the queue order together; an event's payload sits in a slot that never moves. So a death at a delivery's time cancels it, births and deaths at a year boundary precede that year's pass, and weddings precede that pass's conceptions. Battle and childbirth deaths apply inside their own event.
 
 ## Approximations
 

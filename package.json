@@ -8,6 +8,8 @@
 		"typecheck": "tsc -b",
 		"build": "tsc -b && vite build",
 		"lint": "biome check --write --unsafe",
+		"test:history": "vitest run --project history-smoke",
+		"test:history:related": "vitest related --run --project history-smoke",
 		"preview": "vite preview",
 		"gen:lang": "vitest run --project smoke src/model/actors/language/language.smoke.test.ts",
 		"gen:history": "vitest run --project smoke src/test/history-run/history-run.smoke.test.ts",

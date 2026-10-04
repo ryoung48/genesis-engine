@@ -161,8 +161,10 @@ function flush({
 		if (RULER_TAGS.has(note.tag)) rulerRoots.add(note.data.nation as number)
 	}
 	const deaths = new Map<number, EngineNote>()
-	for (const note of notes)
-		if (note.tag === "succession") deaths.set(note.data.nation as number, note)
+	if (rulerRoots.size > 0)
+		for (const note of notes)
+			if (note.tag === "succession")
+				deaths.set(note.data.nation as number, note)
 	const rulers = [...rulerRoots]
 		.filter(
 			(root) =>

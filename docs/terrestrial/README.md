@@ -37,6 +37,7 @@ Start here for the historical simulation’s rules and implementation references
 
 ## Mechanics
 
+- [History smoke tests and related-test commands](mechanics/smoke-tests.md)
 - [Person event logging, transfer and historical queries](mechanics/person-records.md)
 - [History pipeline performance and benchmark results](mechanics/pipeline-performance.md)
 - [History record ownership and memory usage](mechanics/record-memory.md)

@@ -145,6 +145,10 @@ const ATTRIBUTES = [
 	"prowess",
 ] as const
 const LADDERS = ["intellect", "physique", "beauty"] as const
+const PERSONALITY_HEALTH = PERSONALITY.map((row) => row.health)
+const CONGENITAL_HEALTH = CONGENITAL.map((row) => row.health)
+// By the stored physique grade: the active grade plus three.
+const PHYSIQUE_HEALTH = [-1, -0.5, -0.25, 0, 0.25, 0.5, 1, 0]
 const INHERITANCE_CHANCES = {
 	activeActive: [0.8, 1],
 	activeCarried: [0.5, 1],
@@ -414,6 +418,22 @@ function modifier({ character, age, modifier }: TraitModifierParams): number {
 	}
 	return value
 }
+// The health modifier alone, read from flat tables: the yearly health pass
+// asks for it for everyone alive. Equal to `modifier` for "health".
+function health({ character, age }: TraitAtParams): number {
+	let value = 0
+	for (let slot = 0; slot < 3; slot++)
+		if (age >= 9 + slot * 2)
+			value +=
+				PERSONALITY_HEALTH[(character.personality >>> (slot * 6)) & 63] ?? 0
+	let bits = character.congenital
+	while (bits !== 0) {
+		value += CONGENITAL_HEALTH[31 - Math.clz32(bits & -bits)]
+		bits &= bits - 1
+	}
+	return value + PHYSIQUE_HEALTH[(character.grades >>> 7) & 7]
+}
+
 function has({ character, age, trait }: TraitHasParams): boolean {
 	for (let slot = 0; slot < 3; slot++)
 		if (
@@ -532,6 +552,7 @@ export const TRAITS = {
 	active,
 	modifier,
 	has,
+	health,
 	stressFactors,
 	warChance,
 	incomeFactor,

@@ -48,10 +48,14 @@ const CHANNEL = { birth: 1000, ageing: 1001 }
 const NO_ATTRIBUTE_CONDITIONS: readonly AttributeModifier[] = []
 const NO_STRESS_CONDITIONS: readonly StressModifier[] = []
 
-function band(health: number): HealthBand {
+function bandCode(health: number): number {
 	let index = 0
 	while (index < THRESHOLDS.length && health > THRESHOLDS[index]) index++
-	return BANDS[index]
+	return index
+}
+
+function band(health: number): HealthBand {
+	return BANDS[bandCode(health)]
 }
 
 function initialize({ people, person }: HealthPersonParams): void {
@@ -75,10 +79,9 @@ function effective({ people, person, time }: HealthAtParams): number {
 	return Math.max(
 		0,
 		table.baseHealth[person] +
-			TRAITS.modifier({
+			TRAITS.health({
 				character: CHARACTER.of({ people, person }),
 				age: time - table.birth[person],
-				modifier: "health",
 			}) +
 			(AGEING.effectsOf({ people, person })?.health ?? 0),
 	)
@@ -129,6 +132,8 @@ function pulse({ people, person, age }: PulseParams): ConditionChange[] {
 		table.baseHealth[person] -= DECLINE_LOSS
 	const led = (table.healthFlags[person] & LED_FLAG) !== 0
 	table.healthFlags[person] &= ~LED_FLAG
+	// Nothing can progress or begin for the young and unafflicted.
+	if (age < AGEING.firstOnsetAge && !before) return AGEING.noChanges
 	return AGEING.step({
 		people,
 		person,
@@ -177,14 +182,15 @@ function advance({ people, person, year, record }: AdvanceParams): boolean {
 	const completed = Math.floor(year - birth)
 	for (let age = table.healthAgeYear[person] + 1; age <= completed; age++) {
 		const changes = pulse({ people, person, age })
-		if (record) logChanges({ people, person, time: year, changes })
+		if (record && changes.length > 0)
+			logChanges({ people, person, time: year, changes })
 	}
 	if (completed > table.healthAgeYear[person])
 		table.healthAgeYear[person] = completed
 	const from = table.healthIntervalEnd[person]
 	const to = year + 1
 	const health = effective({ people, person, time: Math.max(from, year) })
-	const code = BANDS.indexOf(band(health))
+	const code = bandCode(health)
 	if (code !== (table.healthFlags[person] & BAND_MASK)) {
 		table.healthFlags[person] = (table.healthFlags[person] & ~BAND_MASK) | code
 		if (record)

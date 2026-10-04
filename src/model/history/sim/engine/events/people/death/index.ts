@@ -61,12 +61,14 @@ function run({ state, person, revision, rng }: RunDeathParams): void {
 			state.lifecycle.deaths++
 			before({ state, person, cause })
 		}
-		SUCCESSION.succeedPerson({
-			state,
-			person,
-			context: { accountedEdges: new Set(), cause },
-			rng,
-		})
+		// Most of the dead hold nothing and govern for nobody.
+		if (state.people.persons.heldSeats[person].length > 0)
+			SUCCESSION.succeedPerson({
+				state,
+				person,
+				context: { accountedEdges: new Set(), cause },
+				rng,
+			})
 		if (!repeat) REGENCY.regentDied({ state, regent: person })
 	} finally {
 		DEATH_SCHEDULE.finish({ state, person })

@@ -125,6 +125,6 @@ Detailed report, seed 14963991, lateMedieval, 204000 points, 933 years from 867 
 | Incapacity regencies | 528 of 13325 successions |
 | Field-battle sides led in person / leaders killed | 44229 / 123 |
 | `health_band` / `condition` rows | 203527 / 453841 |
-| Yearly health pass | 16.7 ms a year, of a 40.5 ms people pass |
+| Yearly health pass | 9.0 ms a year, of a 29.2 ms people pass (`stats/history/2026-10-04T17-56-24-332Z-people-4-perf/933.json`, same statistics; 16.7 of 40.5 before the performance follow-up) |
 
 Retained structure measurements are in [record memory](record-memory.md#health-and-lifecycle-retention-p4).
