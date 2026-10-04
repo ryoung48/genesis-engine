@@ -36,6 +36,7 @@ function now(state: HistoryState): number {
 }
 
 // The late ruler's child who is the person or one of their ancestors, or -1.
+// Nobody born before the ruler descends from them, so the walk stops there.
 function branchOf({ people, dying, person }: BranchParams): number {
 	if (dying < 0) return -1
 	const table = people.persons
@@ -44,6 +45,7 @@ function branchOf({ people, dying, person }: BranchParams): number {
 	while (stack.length > 0) {
 		const current = stack.pop() as number
 		if (current < 0 || seen.has(current)) continue
+		if (table.birth[current] <= table.birth[dying]) continue
 		seen.add(current)
 		if (table.father[current] === dying || table.mother[current] === dying)
 			return current

@@ -3,6 +3,10 @@ import type {
 	ProhibitedMatchParams,
 } from "@/model/history/sim/people/kinship/types"
 
+// Generations of ancestry that bar a match: the fourth degree of the Fourth
+// Lateran Council (1215, canon 50), so third cousins and closer are kin.
+const KIN_DEPTH = 4
+
 function prohibitedMatch({
 	context,
 	a,
@@ -13,13 +17,20 @@ function prohibitedMatch({
 		const cached = cache?.get(person)
 		if (cached) return cached
 		const seen = new Set<number>()
-		const pending = [person]
-		while (pending.length > 0) {
-			const current = pending.pop() as number
-			if (current < 0 || current >= context.father.length || seen.has(current))
-				continue
-			seen.add(current)
-			pending.push(context.father[current], context.mother[current])
+		let generation = [person]
+		for (let depth = 0; depth <= KIN_DEPTH; depth++) {
+			const parents: number[] = []
+			for (const current of generation) {
+				if (
+					current < 0 ||
+					current >= context.father.length ||
+					seen.has(current)
+				)
+					continue
+				seen.add(current)
+				parents.push(context.father[current], context.mother[current])
+			}
+			generation = parents
 		}
 		cache?.set(person, seen)
 		return seen

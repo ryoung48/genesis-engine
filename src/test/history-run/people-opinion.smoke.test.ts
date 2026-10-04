@@ -111,7 +111,7 @@ it("adds close kin and completed marriage once, ends spouse affinity at either d
 	).toBeNull()
 })
 
-it("blocks all known ancestral intersections, unknown parents stay distinct, and cycles terminate", () => {
+it("blocks ancestry shared within four generations, unknown parents stay distinct, and cycles terminate", () => {
 	const father = [-1, -1, 0, 0, 2, 3, 4, 6, 7, 8, 9, 5]
 	const mother = father.map(() => -1)
 	const context = { father, mother }
@@ -121,10 +121,17 @@ it("blocks all known ancestral intersections, unknown parents stay distinct, and
 		[2, 3],
 		[3, 4],
 		[4, 5],
-		[10, 11],
+		[2, 8],
 	])
 		expect(KINSHIP.prohibitedMatch({ context, a, b, cache: new Map() })).toBe(
 			true,
+		)
+	for (const [a, b] of [
+		[2, 9],
+		[10, 11],
+	])
+		expect(KINSHIP.prohibitedMatch({ context, a, b, cache: new Map() })).toBe(
+			false,
 		)
 	expect(KINSHIP.prohibitedMatch({ context, a: 0, b: 1, cache: null })).toBe(
 		false,

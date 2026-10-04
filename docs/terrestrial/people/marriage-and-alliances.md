@@ -16,7 +16,7 @@ Once a year (`FAMILY.runYear`) all living tracked noble-family adults can partic
 4. **Outsider fallback.** After all allowed searches fail, an adult gets one outsider opportunity with probability `min(0.5, max(0, age−25)/20)`: zero through 25, 25% at 30, 50% from 35. This uses hash channel 140, salt completed age-year, and no shared RNG draw. The outsider is generated only on success, has unknown parents and an age clamped to the adult bounds. Existing generation draws remain.
 5. **Onboarding and rejection.** Every instantiated outsider receives the ordinary survivor health replay, creation snapshot and one mortality projection for `[Y,Y+1)` before either score. A rejected outsider remains unmarried and tracked; it is not offered elsewhere in this fixed cohort. Later health, death scheduling and yearly participation apply normally. There is no replacement roll or special royal waiting cutoff.
 
-Known blood relatives are prohibited: each person's entire known ancestor set includes themselves, and any intersection vetoes weddings and betrothals before scoring. Unknown parents never intersect. Traversal is cycle-safe and cached only for this pass. This conservatively blocks cousins and distant known kin without claiming unknown-parent outsiders are biologically unrelated. Completed marriages remain intact. Starting ancestry is finalized before traits and all proposed historical weddings pass this same veto.
+Close blood relatives are prohibited: each person's ancestor set holds themselves and their known ancestors up to four generations back, and any intersection vetoes weddings and betrothals before scoring. This is the fourth degree of the Fourth Lateran Council (1215, canon 50): third cousins and closer are kin, more distant relatives may marry. Unknown parents never intersect. Traversal is cycle-safe and cached only for this pass. The veto does not claim unknown-parent outsiders are biologically unrelated. Completed marriages remain intact. Starting ancestry is finalized before traits and all proposed historical weddings pass this same veto.
 
 Each directed score is:
 
@@ -47,7 +47,7 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 - **Result.** Either party under 16 makes a betrothal (`betrothed` and `betrothedAt` on both); two adults wed as before. The betrothal forms or binds the marriage alliance at once.
 - **Fulfilment.** Each yearly pass weds every living pair where both are 16+, by the usual host rule. Heiress unions apply. Betrothed men therefore marry at 16.
 - **Breaking.** Three causes:
-  - *kinship*: the full known-ancestor veto fails at fulfilment; released once without a wedding;
+  - *kinship*: the four-generation ancestor veto fails at fulfilment; released once without a wedding;
   - *death*: either party died (released at the death);
   - *alliance*: the review finds no marriage alliance between the pair's realms (war, lost sovereignty, a government that stops marrying for alliance, or a succession that moves the betrothed out of the ruler's family). A betrothal whose alliance cannot form is broken at once.
 - **Start.** After all starting families, district grants, patricians and household reconciliation, every eligible royal minor seeks once in canonical seat/person order, using a separate keyed source and the same veto/scorer/projection. Adult seekers are empty; this pass creates betrothals and settles alliances, without starting weddings or unions.
