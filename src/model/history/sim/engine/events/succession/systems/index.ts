@@ -14,10 +14,12 @@ import type {
 	TallyParams,
 	TallyResult,
 } from "@/model/history/sim/engine/events/succession/systems/types"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
+import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { HEIRS } from "@/model/history/sim/people/heirs"
 import type { HeirRelation } from "@/model/history/sim/people/heirs/types"
 import type { GenderPreference } from "@/model/history/sim/people/types"
@@ -114,7 +116,10 @@ function candidate({
 		seat,
 		strength:
 			(totalWeight > 0 ? weight / totalWeight : 0) +
-			(years >= 25 && years <= 60 ? 0.2 : 0),
+			(years >= 25 && years <= 60 ? 0.2 : 0) +
+			0.02 *
+				(GOVERNOR.personAttribute({ state, person, attribute: "diplomacy" }) -
+					ATTRIBUTES.neutral("diplomacy")),
 	}
 }
 

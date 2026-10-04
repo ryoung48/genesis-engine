@@ -14,9 +14,12 @@ import type {
 } from "@/model/history/sim/engine/events/succession/types"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
+import { CHARACTER } from "@/model/history/sim/people/character"
+import { TRAITS } from "@/model/history/sim/people/traits"
 
 const MAX_CLAIM = 3
 const WEAK_CLAIM_LAXITY = 0.05
@@ -220,12 +223,23 @@ function runSuccession({
 function usurpChance({ state, realm }: RealmParams): number {
 	const regency = REGENCY.active({ state, realm })
 	if (!regency) return 0
-	if (regency.kind === "protector") return USURP_CHANCE
+	const personality = GOVERNOR.has({ state, realm, trait: "ambitious" })
+		? 2
+		: GOVERNOR.has({ state, realm, trait: "content" })
+			? 0
+			: 1
+	const factor =
+		personality *
+		GOVERNOR.factor({
+			attribute: "intrigue",
+			value: GOVERNOR.attribute({ state, realm, attribute: "intrigue" }),
+		})
+	if (regency.kind === "protector") return USURP_CHANCE * factor
 	if (regency.kind !== "relative") return 0
 	const seat = state.people.persons.throne[regency.regent]
 	return seat >= 0 && state.parentCurrent[seat] === realm
-		? 2 * USURP_CHANCE
-		: USURP_CHANCE
+		? 2 * USURP_CHANCE * factor
+		: USURP_CHANCE * factor
 }
 
 // The regent takes the throne and the child lives on as the realm's deposed
@@ -241,7 +255,21 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 	state.events.push({
 		tag: "usurpation",
 		time: state.time,
-		data: { nation: realm, regent, ward, kind },
+		data: {
+			nation: realm,
+			regent,
+			ward,
+			kind,
+			regentIntrigue: GOVERNOR.attribute({
+				state,
+				realm,
+				attribute: "intrigue",
+			}),
+			regentTraits: TRAITS.active({
+				character: CHARACTER.of({ people, person: regent }),
+				age: state.time / STATE.yearMs - people.persons.birth[regent],
+			}),
+		},
 	})
 	if (kind === "protector" && district >= 0)
 		PEOPLE.vacate({ people, seat: district, reason: "usurpation" })

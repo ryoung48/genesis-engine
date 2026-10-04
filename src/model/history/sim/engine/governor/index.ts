@@ -1,0 +1,138 @@
+import type {
+	AttributeFactorParams,
+	GovernorAttributeParams,
+	GovernorParams,
+	GovernorTraitParams,
+	PersonAttributeParams,
+	PersonTraitParams,
+	WarStartParams,
+} from "@/model/history/sim/engine/governor/types"
+import { STATE } from "@/model/history/sim/engine/state"
+import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
+import type { AttributeModifier } from "@/model/history/sim/people/attributes/types"
+import { CHARACTER } from "@/model/history/sim/people/character"
+import { TRAITS } from "@/model/history/sim/people/traits"
+import type { Regency } from "@/model/history/sim/people/types"
+
+const NO_CONDITIONS: readonly AttributeModifier[] = []
+
+function regency({ state, realm }: GovernorParams): Regency | null {
+	const entry = state.people.regencies.get(realm)
+	return entry && entry.ward === state.people.rulerOf[realm] ? entry : null
+}
+function of(params: GovernorParams): number {
+	return regency(params)?.regent ?? params.state.people.rulerOf[params.realm]
+}
+function personAttribute({
+	state,
+	person,
+	attribute,
+}: PersonAttributeParams): number {
+	return ATTRIBUTES.effective({
+		conditions: NO_CONDITIONS,
+		character: CHARACTER.of({ people: state.people, person }),
+		age: state.time / STATE.yearMs - state.people.persons.birth[person],
+		attribute,
+	})
+}
+function attribute(params: GovernorAttributeParams): number {
+	const person = of(params)
+	return person >= 0
+		? personAttribute({
+				state: params.state,
+				person,
+				attribute: params.attribute,
+			})
+		: regency(params)
+			? 5
+			: ATTRIBUTES.neutral(params.attribute)
+}
+function personHas({ state, person, trait }: PersonTraitParams): boolean {
+	return (
+		person >= 0 &&
+		TRAITS.has({
+			trait,
+			character: CHARACTER.of({ people: state.people, person }),
+			age: state.time / STATE.yearMs - state.people.persons.birth[person],
+		})
+	)
+}
+function has(params: GovernorTraitParams): boolean {
+	return personHas({
+		state: params.state,
+		person: of(params),
+		trait: params.trait,
+	})
+}
+function warChance({ state, realm }: GovernorParams): number {
+	const person = state.people.rulerOf[realm]
+	return person < 0
+		? 1 / 1.11
+		: TRAITS.warChance({
+				character: CHARACTER.of({ people: state.people, person }),
+				age: state.time / STATE.yearMs - state.people.persons.birth[person],
+			})
+}
+function incomeFactor(params: GovernorParams): number {
+	const person = of(params)
+	return person < 0
+		? 1
+		: TRAITS.incomeFactor({
+				character: CHARACTER.of({ people: params.state.people, person }),
+				age:
+					params.state.time / STATE.yearMs -
+					params.state.people.persons.birth[person],
+				stressLevel: stressLevel(params),
+			})
+}
+function stressLevel(params: GovernorParams): number {
+	const person = of(params)
+	if (person < 0 || params.state.people.persons.stress[person] < 100) return 0
+	const throne = params.state.people.persons.throne[person]
+	if (
+		throne >= 0 &&
+		params.state.people.rulerOf[throne] === person &&
+		STATE.isSovereign({ state: params.state, p: throne })
+	)
+		return Math.min(
+			3,
+			Math.floor(params.state.people.persons.stress[person] / 100),
+		)
+	for (let seat = 0; seat < params.state.P; seat++)
+		if (
+			params.state.people.rulerOf[seat] === person &&
+			STATE.isSovereign({ state: params.state, p: seat })
+		)
+			return Math.min(
+				3,
+				Math.floor(params.state.people.persons.stress[person] / 100),
+			)
+	return 0
+}
+function factor({ attribute, value }: AttributeFactorParams): number {
+	const delta = value - ATTRIBUTES.neutral(attribute)
+	if (attribute === "diplomacy" && delta === 0) return 0
+	if (attribute === "diplomacy")
+		return Math.max(-0.1, Math.min(0.1, -0.01 * delta))
+	if (attribute === "intrigue")
+		return Math.max(0.5, Math.min(2, 1 + 0.1 * delta))
+	if (attribute === "learning")
+		return Math.max(0.93, Math.min(1.1, 1 + 0.01 * delta))
+	return Math.max(0.87, Math.min(1.21, 1 + 0.02 * delta))
+}
+function startsWar(params: WarStartParams): boolean {
+	return params.roll < Math.min(1, (1 - params.threat) * warChance(params))
+}
+export const GOVERNOR = {
+	startsWar,
+	personHas,
+	warChance,
+	incomeFactor,
+	of,
+	regency,
+	attribute,
+	has,
+	stressLevel,
+	personAttribute,
+	factor,
+}

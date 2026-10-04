@@ -1,3 +1,4 @@
+import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
 import { CONQUEST } from "@/model/history/sim/engine/events/battle/conquest"
 import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "@/model/history/sim/engine/events/battle/types"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
@@ -109,11 +111,17 @@ function runBattle({
 		return
 	}
 	const terrain = TERRAIN.battlefield({ state, p: target })
+	const modifiers = BATTLE_KIND.modifiers({ kind, ambusher, terrain })
 	const result = MILITARY.fight({
 		state,
 		war,
 		eventAttacker: attacker,
-		...BATTLE_KIND.modifiers({ kind, ambusher, terrain }),
+		attackerMultiplier:
+			modifiers.attackerMultiplier *
+			COMMAND.multiplier({ state, realm: attacker }),
+		defenderMultiplier:
+			modifiers.defenderMultiplier *
+			COMMAND.multiplier({ state, realm: defender }),
 		rng,
 	})
 	if (result.outcome === "empty") {
@@ -150,6 +158,17 @@ function runBattle({
 					vegetation: terrain.vegetation,
 					waterTarget: terrain.water,
 					terrainDefense: terrain.defense,
+					martialDifference:
+						GOVERNOR.attribute({
+							state,
+							realm: attacker,
+							attribute: "martial",
+						}) -
+						GOVERNOR.attribute({
+							state,
+							realm: defender,
+							attribute: "martial",
+						}),
 					loserShortfall: result.loserShortfall,
 					attackerArmy: Math.round(result.attackerArmy),
 					defenderArmy: Math.round(result.defenderArmy),

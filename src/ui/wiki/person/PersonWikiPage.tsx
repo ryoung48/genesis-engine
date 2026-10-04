@@ -16,7 +16,6 @@ export interface PersonWikiChip {
 	key: string
 	name: string
 	color: string
-	/** Dead, or no longer holding the seat, at the selected date. */
 	dimmed: boolean
 	title: string
 	onClick: () => void
@@ -30,12 +29,11 @@ export interface PersonWikiGroup {
 export interface PersonWikiData {
 	name: string
 	houseColor: string
-	/** House and life span, e.g. "House Aral · 822 – 870". */
 	metaLabel: string
 	planetTitle: string
 	stats: StatEntry[]
-	/** Seats held, parents, siblings, spouses and children; empty groups are
-	 * skipped. */
+	attributes: StatEntry[]
+	traits: string[]
 	groups: PersonWikiGroup[]
 	timelineEvents: WikiTimelineEvent[]
 	dateRangeStart: number
@@ -79,6 +77,24 @@ export function PersonWikiPage({ person }: { person: PersonWikiData }) {
 				</div>
 			</Surface>
 
+			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
+				<ChipGroup label="Attributes" count={person.attributes.length}>
+					<div className="grid grid-cols-2 gap-x-3 gap-y-1">
+						{renderStatGrid(person.attributes)}
+					</div>
+				</ChipGroup>
+				<ChipGroup label="Traits" count={person.traits.length}>
+					{person.traits.map((trait) => (
+						<EntityChip
+							key={trait}
+							name={trait}
+							color={person.houseColor}
+							dimmed={false}
+							title={trait}
+						/>
+					))}
+				</ChipGroup>
+			</Surface>
 			{groups.length > 0 ? (
 				<div className="rounded-xl border border-t border-slate-200 divide-y divide-slate-200 bg-white px-3 py-2.5">
 					{groups.map((group) => (

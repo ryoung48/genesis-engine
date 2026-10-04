@@ -7,6 +7,7 @@ export interface InitKnowledgeParams {
 export interface AdvanceKnowledgeParams {
 	state: HistoryState
 	yearFraction: number
+	ownFactor: (sovereign: number) => number
 }
 
 export interface KnowledgeLevelParams {
@@ -27,4 +28,10 @@ export interface RealmKnowledgeParams {
 export interface MaxCitySizeParams {
 	knowledge: number
 	realmPopulation: number
+}
+
+export interface OwnAdvanceParams {
+	knowledge: number
+	worldKnowledge: number
+	development: number
 }

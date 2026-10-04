@@ -1,4 +1,5 @@
 import type {
+	AttributeView,
 	BetrothalView,
 	CoupleAtParams,
 	PersonAtParams,
@@ -7,10 +8,13 @@ import type {
 	SeatAtParams,
 	SpouseView,
 	TenureView,
+	TraitsView,
 } from "@/model/history/record/people/query/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
+import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { HEALTH } from "@/model/history/sim/people/health"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
+import { TRAITS } from "@/model/history/sim/people/traits"
 
 function until(time: number, timeMs: number): number | null {
 	return time <= timeMs ? time : null
@@ -199,4 +203,57 @@ function holder({ people, seat, timeMs }: SeatAtParams): number {
 	return -1
 }
 
-export const PERSON_QUERY = { view, timeline, married, holder, health }
+function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
+	const person = people.persons.get(id)
+	if (!person || timeMs < person.birthTimeMs) return []
+	const age =
+		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
+	return (
+		[
+			"diplomacy",
+			"martial",
+			"stewardship",
+			"intrigue",
+			"learning",
+			"prowess",
+		] as const
+	).map((name) => {
+		const value = ATTRIBUTES.effective({
+			conditions: [],
+			character: person,
+			age,
+			attribute: name,
+		})
+		return { name, value, tier: ATTRIBUTES.tier(value) }
+	})
+}
+function traits({ people, id, timeMs }: PersonAtParams): TraitsView | null {
+	const person = people.persons.get(id)
+	if (!person || timeMs < person.birthTimeMs) return null
+	const age =
+		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
+	const education = ATTRIBUTES.education({ character: person })
+	return {
+		personality: TRAITS.active({ character: person, age }),
+		congenital: TRAITS.congenital({ character: person, age }),
+		grades: TRAITS.labels({ character: person, age }),
+		education:
+			age >= 16 ? `${education.focus} education ${education.level}` : null,
+	}
+}
+function stress({ people, id, timeMs }: PersonAtParams): number {
+	let level = 0
+	for (const row of people.stressOf.get(id) ?? [])
+		if (row.timeMs <= timeMs) level = row.level
+	return level
+}
+export const PERSON_QUERY = {
+	attributes,
+	traits,
+	stress,
+	view,
+	timeline,
+	married,
+	holder,
+	health,
+}

@@ -161,6 +161,7 @@ function rehome({
 		genderSystem: origin.genderSystem,
 		rng,
 	})
+	PEOPLE.redraw({ people, person })
 }
 
 // The founders' queens are generated as outsiders; some become daughters or

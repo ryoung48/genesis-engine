@@ -1,5 +1,7 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
+import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
+import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AddPersonParams,
 	GenderPreference,
@@ -21,6 +23,13 @@ import type {
 function create(provinceCount: number): PeopleState {
 	return {
 		persons: {
+			bases: [],
+			education: [],
+			personality: [],
+			grades: [],
+			congenital: [],
+			carried: [],
+			stress: [],
 			sex: [],
 			birth: [],
 			death: [],
@@ -44,6 +53,7 @@ function create(provinceCount: number): PeopleState {
 			betrothedAt: [],
 		},
 		alive: [],
+		stressed: [],
 		rulerOf: new Int32Array(provinceCount).fill(-1),
 		patricians: new Map(),
 		unionGenerations: new Map(),
@@ -51,6 +61,7 @@ function create(provinceCount: number): PeopleState {
 		regencies: new Map(),
 		deposed: new Map(),
 		log: {
+			stress: [],
 			persons: [],
 			marriages: [],
 			seats: [],
@@ -78,6 +89,13 @@ function add({
 }: AddPersonParams): number {
 	const table = people.persons
 	const id = table.sex.length
+	table.bases.push(0)
+	table.education.push(0)
+	table.personality.push(0)
+	table.grades.push(0)
+	table.congenital.push(0)
+	table.carried.push(0)
+	table.stress.push(0)
 	table.sex.push(sex)
 	table.birth.push(birth)
 	table.death.push(death)
@@ -101,6 +119,7 @@ function add({
 	table.betrothedAt.push(-1)
 	if (father >= 0) table.children[father].push(id)
 	if (mother >= 0) table.children[mother].push(id)
+	drawPerson({ people, person: id })
 	people.alive.push(id)
 	if (
 		(father >= 0 && table.throne[father] >= 0) ||
@@ -279,7 +298,33 @@ function tiedByMarriage({ people, a, b, time }: MarriageTieParams): boolean {
 	return false
 }
 
+function drawPerson({ people, person }: PersonRefParams): void {
+	const table = people.persons
+	const traits = TRAITS.draw({ table, person })
+	const attributes = ATTRIBUTES.draw({
+		table,
+		person,
+		character: { ...traits, bases: 0, education: 0 },
+	})
+	for (const key of ["bases", "education"] as const)
+		table[key][person] = attributes[key]
+	for (const key of ["personality", "grades", "congenital", "carried"] as const)
+		table[key][person] = traits[key]
+}
+function redraw({ people, person }: PersonRefParams): void {
+	const descendants = new Set([person])
+	const queue = [person]
+	for (let i = 0; i < queue.length; i++)
+		for (const child of people.persons.children[queue[i]])
+			if (!descendants.has(child)) {
+				descendants.add(child)
+				queue.push(child)
+			}
+	queue.sort((a, b) => people.persons.birth[a] - people.persons.birth[b])
+	for (const person of queue) drawPerson({ people, person })
+}
 export const PEOPLE = {
+	redraw,
 	record,
 	recordFamily,
 	setRuler,

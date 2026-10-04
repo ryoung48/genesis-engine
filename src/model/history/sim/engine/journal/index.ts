@@ -15,6 +15,7 @@ import type {
 } from "@/model/history/sim/engine/journal/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import { CHARACTER } from "@/model/history/sim/people/character"
 
 const RULER_TAGS = new Set([
 	"succession",
@@ -116,6 +117,11 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 function peopleRows(state: HistoryState): JournalPeople {
 	const { persons: table, log } = state.people
 	const rows: JournalPeople = {
+		stress: log.stress.map(({ person, time, level }) => ({
+			person,
+			timeMs: time * yearMs,
+			level,
+		})),
 		persons: log.persons.map((id) => ({
 			id,
 			sex: table.sex[id],
@@ -126,6 +132,7 @@ function peopleRows(state: HistoryState): JournalPeople {
 			dynasty: table.dynasty[id],
 			nameSeed: table.nameSeed[id],
 			home: table.home[id],
+			...CHARACTER.of({ people: state.people, person: id }),
 		})),
 		marriages: log.marriages.map((marriage) => ({
 			husband: marriage.husband,
@@ -166,6 +173,7 @@ function peopleRows(state: HistoryState): JournalPeople {
 			cause,
 		})),
 	}
+	log.stress.length = 0
 	log.persons.length = 0
 	log.marriages.length = 0
 	log.seats.length = 0
@@ -192,6 +200,7 @@ function flush({
 		pendingJournal.relations.size === 0 &&
 		pendingJournal.occupations.size === 0 &&
 		pendingJournal.coalitions.length === 0 &&
+		log.stress.length === 0 &&
 		log.persons.length === 0 &&
 		log.marriages.length === 0 &&
 		log.seats.length === 0 &&
@@ -265,6 +274,7 @@ function flush({
 		}
 	const people = peopleRows(state)
 	if (
+		people.stress.length > 0 ||
 		people.persons.length > 0 ||
 		people.marriages.length > 0 ||
 		people.seats.length > 0 ||

@@ -5,6 +5,7 @@ import type {
 	WarGoal,
 } from "@/model/history/sim/engine/state/types"
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
+import type { Character } from "@/model/history/sim/people/traits/types"
 import type {
 	PregnancyLoss,
 	RegentKind,
@@ -43,7 +44,7 @@ interface JournalRuler {
 	regency: RegentKind | null
 }
 
-export interface JournalPerson {
+export interface JournalPerson extends Character {
 	id: number
 	sex: number
 	birthTimeMs: number
@@ -98,7 +99,14 @@ export interface JournalDeath {
 	deathTimeMs: number
 }
 
+export interface JournalStress {
+	person: number
+	timeMs: number
+	level: number
+}
+
 export interface JournalPeople {
+	stress: JournalStress[]
 	persons: JournalPerson[]
 	marriages: JournalMarriage[]
 	seats: JournalSeat[]

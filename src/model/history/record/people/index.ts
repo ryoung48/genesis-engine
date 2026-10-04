@@ -8,6 +8,7 @@ import type {
 function create(): PeopleRecord {
 	return {
 		persons: new Map(),
+		stressOf: new Map(),
 		childrenOf: new Map(),
 		marriages: [],
 		marriagesOf: new Map(),
@@ -44,6 +45,12 @@ function append({
 	timeMs,
 	recordTime,
 }: AppendPeopleParams): void {
+	for (const row of rows.stress)
+		pushIndex({
+			index: record.stressOf,
+			key: row.person,
+			value: { ...row, timeMs: recordTime(row.timeMs) },
+		})
 	for (const row of rows.persons) {
 		if (row.dynasty >= 0 && !record.dynastyHome.has(row.dynasty))
 			record.dynastyHome.set(row.dynasty, row.home)

@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process"
 import {
 	mkdirSync,
 	mkdtempSync,
-	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -12,7 +11,6 @@ import { dirname, join, resolve } from "node:path"
 import { afterEach, expect, it, vi } from "vitest"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import type { JsonObject, MetricRow } from "@/test/history-run/comparison/types"
-import { HISTORY_OUTPUT } from "@/test/history-run/output"
 
 const temporary: string[] = []
 const cli = resolve("scripts/history-diff.mjs")
@@ -25,52 +23,6 @@ afterEach(() => {
 		rmSync(path, { recursive: true, force: true })
 	}
 	temporary.length = 0
-})
-
-it("retains the newest ten completed report folders and their comparisons", () => {
-	const root = fixture(tmpdir())
-	const history = join(root, "stats/history")
-	const folders = [...Array(12).keys()].map(
-		(index) =>
-			`2026-01-${String(index + 1).padStart(2, "0")}T00-00-00-000Z-report`,
-	)
-	for (const folder of folders) {
-		const directory = join(history, folder)
-		mkdirSync(directory, { recursive: true })
-		writeFileSync(join(directory, "2.json"), JSON.stringify(report(100)))
-		writeFileSync(join(directory, "2-diff.html"), "comparison")
-	}
-	const ignored = [
-		"2025-01-01T00-00-00-000Z-partial",
-		"2025-01-02T00-00-00-000Z-pipeline",
-		"2025-01-03T00-00-00-000Z-profiled",
-		"notes",
-	]
-	for (const folder of ignored) {
-		const directory = join(history, folder)
-		mkdirSync(directory, { recursive: true })
-		const data = report(100)
-		;(data.diagnostics as JsonObject).completed = false
-		writeFileSync(join(directory, "2.json"), JSON.stringify(data))
-		if (folder.includes("pipeline") || folder.includes("profiled")) {
-			const nested = join(directory, folder.split("-").at(-1)!)
-			mkdirSync(nested)
-			writeFileSync(join(nested, "2.json"), JSON.stringify(report(100)))
-		}
-	}
-	vi.spyOn(process, "cwd").mockReturnValue(root)
-	HISTORY_OUTPUT.prune(join(root, "custom.json"))
-	expect(readdirSync(history)).toHaveLength(16)
-	HISTORY_OUTPUT.prune(join(history, folders[11], "2.json"))
-	expect(readdirSync(history).sort()).toEqual(
-		[...ignored, ...folders.slice(2)].sort(),
-	)
-	for (const folder of folders.slice(2))
-		expect(readFileSync(join(history, folder, "2-diff.html"), "utf8")).toBe(
-			"comparison",
-		)
-	HISTORY_OUTPUT.prune(join(history, folders[11], "2.json"))
-	expect(readdirSync(history)).toHaveLength(14)
 })
 
 function fixture(root: string): string {

@@ -6,6 +6,13 @@ export type Sex = 0 | 1
 export type GenderPreference = "male" | "female" | "none"
 
 export interface PersonTable {
+	bases: number[]
+	education: number[]
+	personality: number[]
+	grades: number[]
+	congenital: number[]
+	carried: number[]
+	stress: number[]
 	sex: Sex[]
 	birth: number[]
 	death: number[]
@@ -108,7 +115,14 @@ export interface PeopleLogDeath {
 // betrothals between recorded people, seat holder changes, recorded people
 // whose death moved earlier, and recorded mothers' pregnancies that bore no
 // living child or killed the mother.
+export interface PeopleLogStress {
+	person: number
+	time: number
+	level: number
+}
+
 export interface PeopleLog {
+	stress: PeopleLogStress[]
 	persons: number[]
 	marriages: PeopleLogMarriage[]
 	seats: PeopleLogSeat[]
@@ -123,6 +137,7 @@ export interface PeopleLog {
 export interface PeopleState {
 	persons: PersonTable
 	alive: number[]
+	stressed: number[]
 	rulerOf: Int32Array
 	// Patrician house heads of each electoral republic, by realm.
 	patricians: Map<number, number[]>

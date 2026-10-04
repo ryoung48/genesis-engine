@@ -22,6 +22,8 @@ import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
+import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
+import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
 import type {
 	BetrothalOutcome,
 	CenturyReport,
@@ -56,7 +58,16 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
 	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
+	const characterStage = (env.HISTORY_CHARACTER_STAGE ??
+		"personality") as CharacterStage
+	if (
+		!["draw", "fertility", "attributes", "stress", "personality"].includes(
+			characterStage,
+		)
+	)
+		throw new Error("Invalid HISTORY_CHARACTER_STAGE")
 	return {
+		characterStage,
 		lateKnowledgeBand: Number(
 			env.HISTORY_LATE_KNOWLEDGE ?? DEFAULT_LATE_KNOWLEDGE_BAND,
 		),
@@ -390,6 +401,9 @@ function runSeed({
 		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
 		siegeLifecycle: BATTLEFIELD_REPORT.lifecycle({ engine }),
 		completed: false,
+		characterStage: options.characterStage,
+		innateValidatedAtInit: PEOPLE_TRAITS_REPORT.validate({ engine }),
+		totalPeopleCreated: engine.people.persons.birth.length,
 		sourceHash: createHash("sha256")
 			.update(
 				execFileSync(
@@ -488,6 +502,7 @@ function runSeed({
 		runPeopleYear(params)
 		peopleMs += performance.now() - t0
 	}
+	const characterTracker = PEOPLE_TRAITS_REPORT.tracker()
 	const partitions = PARTITION_REPORT.tracker()
 	partitions.cursor = engine.events.length
 	let divideMs = 0
@@ -529,6 +544,7 @@ function runSeed({
 		}
 		PARTITION_REPORT.observe({ engine, tracker: partitions })
 		trackMarriages({ engine, tracker })
+		PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker })
 		MILITARY_REPORT.sample({
 			engine,
 			tracker: military.tracker,
@@ -575,6 +591,12 @@ function runSeed({
 				Math.max(1, raids.length),
 			revenuePerHead: revenue / Math.max(1, pop),
 			regency: regencyReport({ engine, from, to: year, top: topSet }),
+			character: PEOPLE_TRAITS_REPORT.summarize({
+				engine,
+				tracker: characterTracker,
+				from,
+				to: year,
+			}),
 			people: peopleReport({
 				engine,
 				from,
@@ -602,6 +624,8 @@ function runSeed({
 				divideMs: divideTotalMs,
 			})
 		diagnostics.completed = year === start + options.years
+		if (diagnostics.completed)
+			diagnostics.totalPeopleCreated = PEOPLE_TRAITS_REPORT.validate({ engine })
 		diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
 		persist()
 		options.log(
@@ -678,7 +702,6 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		options.log(
 			`HTML comparison: ${HISTORY_COMPARISON.write({ current: options.outPath, baseline: options.baselinePath })}`,
 		)
-		HISTORY_OUTPUT.prune(options.outPath)
 	}
 	return results
 }

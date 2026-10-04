@@ -1,14 +1,16 @@
 import type {
 	JournalPeople,
+	JournalStress,
 	SeatKind,
 } from "@/model/history/sim/engine/journal/types"
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
+import type { Character } from "@/model/history/sim/people/traits/types"
 import type {
 	PregnancyLoss,
 	SeatChangeReason,
 } from "@/model/history/sim/people/types"
 
-export interface RecordPerson {
+export interface RecordPerson extends Character {
 	id: number
 	sex: number
 	birthTimeMs: number
@@ -58,6 +60,7 @@ export interface RecordTenure {
 }
 
 export interface PeopleRecord {
+	stressOf: Map<number, JournalStress[]>
 	persons: Map<number, RecordPerson>
 	childrenOf: Map<number, number[]>
 	marriages: RecordMarriage[]

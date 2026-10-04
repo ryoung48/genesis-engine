@@ -3,6 +3,7 @@ import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-bud
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { FIELDS } from "@/model/history/sim/engine/fields"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
@@ -521,6 +522,7 @@ function createActiveWar({
 		tag: "war started",
 		time: startTime,
 		data: {
+			rulerWarChance: GOVERNOR.warChance({ state, realm: attacker }),
 			attacker,
 			defender,
 			war: war.idx,

@@ -1,5 +1,6 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { PEOPLE } from "@/model/history/sim/people"
+import { CHARACTER } from "@/model/history/sim/people/character"
 import type {
 	BearParams,
 	ChildCount,
@@ -15,6 +16,8 @@ import type {
 	WomanParams,
 } from "@/model/history/sim/people/fertility/types"
 import { HEALTH } from "@/model/history/sim/people/health"
+import { STRESS } from "@/model/history/sim/people/stress"
+import { TRAITS } from "@/model/history/sim/people/traits"
 
 // Living children allowed per couple, by standing 0-5.
 const CHILD_LIMIT = [1, 2, 3, 5, 5, 8]
@@ -195,9 +198,6 @@ function countChildren({
 	return { earlier, living, together }
 }
 
-// Steps month by month through [from, until), rolling conceptions and their
-// outcomes. Children are created at conception with their due date as their
-// birth. Returns whether the mother died in childbirth.
 function bear({
 	people,
 	mother,
@@ -211,6 +211,8 @@ function bear({
 	const table = people.persons
 	const cap = capOf({ people, mother, father })
 	const ruler = isRuler({ people, mother, father })
+	let motherCharacterFertility: number | null = null
+	let fatherCharacterFertility: number | null = null
 	for (
 		let time = Math.max(from, table.nextBirth[mother]);
 		time < until;
@@ -228,10 +230,24 @@ function bear({
 			time,
 		})
 		if (living >= cap) continue
+		motherCharacterFertility ??=
+			TRAITS.fertility({
+				character: CHARACTER.of({ people, person: mother }),
+				age: 16,
+			}) * STRESS.fertilityFactor(table.stress[mother])
+		fatherCharacterFertility ??=
+			TRAITS.fertility({
+				character: CHARACTER.of({ people, person: father }),
+				age: 16,
+			}) * STRESS.fertilityFactor(table.stress[father])
 		const motherFertility =
 			Math.max(0, table.fertility[mother] - 0.05 * earlier) *
-			motherAgeFactor(motherAge)
-		const fatherFertility = table.fertility[father] * fatherAgeFactor(fatherAge)
+			motherAgeFactor(motherAge) *
+			motherCharacterFertility
+		const fatherFertility =
+			table.fertility[father] *
+			fatherAgeFactor(fatherAge) *
+			fatherCharacterFertility
 		const bonus = ruler && together === 0 ? FIRST_HEIR_BONUS : 0
 		const chance =
 			Math.max(

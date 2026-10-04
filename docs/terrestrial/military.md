@@ -256,3 +256,7 @@ Raids keep the squared force share and their own random loss shares (10% × forc
 These rules describe the procedural `:history` simulation. Imported historical wars are translated into history records and do not run through this live army and battle engine; their battles have no simulated kind, and their siege lists are empty.
 
 Rebellion previews calculate each prospective territory with the same economy and recruitment formulas used after release. Crown territory excludes the departing subject; both armies use their own knowledge-derived limits. Potential support and the existing-war discount remain preview estimates.
+
+## Character effects
+
+Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.02 × (martial - 6.2), 0.87, 1.21)`, alongside terrain and battle-kind modifiers. Sieges and raids do not use commander character. See [character](character.md) for the full rules.

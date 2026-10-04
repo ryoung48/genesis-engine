@@ -204,6 +204,36 @@ export function usePersonWikiData(
 				swatchColor: uiPalette.person.health[health],
 			})
 
+		if (
+			view.tenures.some(
+				(tenure) => tenure.kind === "ruler" && tenure.endTimeMs === null,
+			)
+		)
+			stats.push({
+				label: "Stress",
+				value: `Level ${PERSON_QUERY.stress({ people, id, timeMs: viewTimeMs })}`,
+			})
+		const characterTraits = PERSON_QUERY.traits({
+			people,
+			id,
+			timeMs: viewTimeMs,
+		})
+		const attributes: StatEntry[] = PERSON_QUERY.attributes({
+			people,
+			id,
+			timeMs: viewTimeMs,
+		}).map((entry) => ({
+			label: entry.name,
+			value: `${entry.value} · ${entry.tier}`,
+		}))
+		const traits = characterTraits
+			? [
+					...characterTraits.personality,
+					...characterTraits.grades,
+					...characterTraits.congenital,
+					...(characterTraits.education ? [characterTraits.education] : []),
+				]
+			: []
 		const timelineEvents: WikiTimelineEvent[] = []
 		const fullTimeMs = state.record.maxTimeMs
 		const fullView = PERSON_QUERY.view({ people, id, timeMs: fullTimeMs })
@@ -381,6 +411,8 @@ export function usePersonWikiData(
 			metaLabel: `${person.house ? `House ${person.house} · ` : ""}${dateLabel(person.birthTimeMs)}${lifeEnd}`,
 			planetTitle: planetName,
 			stats,
+			attributes,
+			traits,
 			groups: [
 				{
 					label: "Titles",

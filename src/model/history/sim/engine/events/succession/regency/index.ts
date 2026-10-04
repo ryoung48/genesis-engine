@@ -12,12 +12,12 @@ import type {
 	WardParams,
 } from "@/model/history/sim/engine/events/succession/regency/types"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HEALTH } from "@/model/history/sim/people/health"
 import { HEIRS } from "@/model/history/sim/people/heirs"
-import type { Regency } from "@/model/history/sim/people/types"
 
 const COUNCIL: RegentChoice = { regent: -1, kind: "council" }
 const WEAK_CROWN_LAXITY = 0.1
@@ -56,13 +56,6 @@ function choose({ state, realm, ward }: WardParams): RegentChoice {
 	return COUNCIL
 }
 
-function active({ state, realm }: RealmRegencyParams): Regency | null {
-	const regency = state.people.regencies.get(realm)
-	return regency && regency.ward === state.people.rulerOf[realm]
-		? regency
-		: null
-}
-
 function ailing({ state, realm }: RealmRegencyParams): boolean {
 	const ruler = state.people.rulerOf[realm]
 	if (ruler < 0) return false
@@ -72,19 +65,19 @@ function ailing({ state, realm }: RealmRegencyParams): boolean {
 		death: table.death[ruler],
 		time: now(state),
 	})
-	return band === "Poor" || band === "Grave"
+	return band === "Poor" || band === "Grave" || table.stress[ruler] >= 300
 }
 
 // A realm under a regent or an ailing ruler has a weak crown: its districts
 // rebel more easily and it starts no wars.
 function weak({ state, realm }: RealmRegencyParams): boolean {
-	return active({ state, realm }) !== null || ailing({ state, realm })
+	return GOVERNOR.regency({ state, realm }) !== null || ailing({ state, realm })
 }
 
 // A parent regent born into another ruling house holds the realm's alliance
 // with that house's realm as a living marriage would.
 function bindsTo({ state, realm, other }: BindsToParams): boolean {
-	const regency = active({ state, realm })
+	const regency = GOVERNOR.regency({ state, realm })
 	if (!regency || regency.kind !== "parent") return false
 	const table = state.people.persons
 	const house = table.dynasty[regency.regent]
@@ -190,7 +183,7 @@ function replace({ state, realm, ward }: WardParams): void {
 
 // The next in the regent order takes over as soon as the regent dies.
 function regentDied({ state, realm, regent }: RegentDiedParams): void {
-	const regency = active({ state, realm })
+	const regency = GOVERNOR.regency({ state, realm })
 	if (!regency || regency.regent !== regent) return
 	if (!STATE.isSovereign({ state, p: realm })) return
 	replace({ state, realm, ward: regency.ward })
@@ -200,7 +193,10 @@ function regentDied({ state, realm, regent }: RegentDiedParams): void {
 // regents who took a throne of their own.
 function review({ state }: ReviewParams): void {
 	for (const [realm, regency] of [...state.people.regencies]) {
-		if (!STATE.isSovereign({ state, p: realm }) || !active({ state, realm })) {
+		if (
+			!STATE.isSovereign({ state, p: realm }) ||
+			!GOVERNOR.regency({ state, realm })
+		) {
 			end({ state, realm, cause: "lost" })
 			continue
 		}
@@ -213,7 +209,7 @@ function review({ state }: ReviewParams): void {
 }
 
 export const REGENCY = {
-	active,
+	active: (params: RealmRegencyParams) => GOVERNOR.regency(params),
 	weak,
 	bindsTo,
 	laxity: WEAK_CROWN_LAXITY,

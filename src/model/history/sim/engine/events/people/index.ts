@@ -2,6 +2,7 @@ import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { PATRICIANS } from "@/model/history/sim/engine/events/people/patricians"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
+import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import type {
 	EndEarlyParams,
 	PeopleEventParams,
@@ -111,6 +112,7 @@ function init({ state, rng }: PeopleEventParams): void {
 }
 
 function runYear({ state, rng }: PeopleEventParams): void {
+	STRESS_EVENTS.runYear({ state })
 	DISTRICTS.settle({ state, rng })
 	DISTRICTS.grant({ state, rng })
 	ROYAL_MARRIAGES.review({ state })

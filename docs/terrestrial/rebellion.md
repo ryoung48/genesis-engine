@@ -125,3 +125,7 @@ A Rival vassal refuses its overlord's war call and withholds tribute. A Suspicio
   Throne outcomes add "Claimant took the throne", "Rebels submitted", or "Rebels held land (n provinces)". Coalition backers appear with the `backer` role. The record no longer tracks rivalries.
 
   The war page shows its own text: "X restored control over Y" for a restoration, "Y won independence from X" (with "after ceding n provinces" when land changed hands) for independence, and "The war lapsed: X no longer rules a realm" for a lapsed war.
+
+## Character effects
+
+Governor diplomacy adds `clamp(-0.01 × (diplomacy - 6.3), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and Poor/Grave health. See [character](character.md) for the full rules.

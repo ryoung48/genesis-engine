@@ -146,3 +146,7 @@ No dead person is seated. An admin who keeps a valid seat belongs to the realm t
 - `partition`, with the heirs and their seats, every resulting realm's kind (`primary`, `heir`, or `released` for cut-off land that went independent), population, province count and top tier, the admins who moved and where, the districts that joined an heir realm, the heirs who received nothing and why (`no seat`, `reserved seat unavailable`, `share dropped`), and the titles left without a holder.
 
 The history report's `partition` section is built from these notes (`src/test/history-run/report/partition`): how often realms divide and why not, how large the shares are, what happens to title holding, and what becomes of the heir realms.
+
+## Character effects
+
+Election candidate strength gains `0.02 × (diplomacy - 6.3)`. Regent usurpation chance gains `clamp(1 + 0.1 × (intrigue - 6.5), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [character](character.md) for the full rules.

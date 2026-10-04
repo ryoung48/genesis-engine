@@ -7,6 +7,7 @@ import type {
 	RestorationRevolt,
 } from "@/model/history/sim/engine/events/succession/restoration/types"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HEIRS } from "@/model/history/sim/people/heirs"
@@ -94,7 +95,13 @@ function attempt({
 		state.leaderClaimCurrent[realm] <= WEAK_CLAIM
 	const chance = Math.min(
 		1,
-		TRY_CHANCE[claim.generation] * (weak ? WEAK_RULER_FACTOR : 1),
+		TRY_CHANCE[claim.generation] *
+			(weak ? WEAK_RULER_FACTOR : 1) *
+			(GOVERNOR.personHas({ state, person: claimant, trait: "ambitious" })
+				? 1.5
+				: GOVERNOR.personHas({ state, person: claimant, trait: "content" })
+					? 0.5
+					: 1),
 	)
 	if (rng.random() >= chance) return null
 	const contest = SUCCESSION_SYSTEMS.challenge({

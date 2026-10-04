@@ -3,6 +3,14 @@ import type {
 	RecordBetrothalEnd,
 } from "@/model/history/record/people/types"
 import type { SeatKind } from "@/model/history/sim/engine/journal/types"
+import type {
+	Attribute,
+	AttributeTier,
+} from "@/model/history/sim/people/attributes/types"
+import type {
+	CongenitalTrait,
+	PersonalityTrait,
+} from "@/model/history/sim/people/traits/types"
 import type { SeatChangeReason } from "@/model/history/sim/people/types"
 
 export interface PersonAtParams {
@@ -100,4 +108,16 @@ export interface PersonEvent {
 	// [JUSTIFICATION] Only taking or leaving a seat has a reason, and a seat
 	// still held when its holder died has none for its end.
 	reason?: SeatChangeReason
+}
+
+export interface AttributeView {
+	name: Attribute
+	value: number
+	tier: AttributeTier
+}
+export interface TraitsView {
+	personality: PersonalityTrait[]
+	congenital: CongenitalTrait[]
+	grades: string[]
+	education: string | null
 }

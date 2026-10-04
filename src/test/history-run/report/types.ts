@@ -5,8 +5,11 @@ import type {
 	PartitionReport,
 	PartitionStateReport,
 } from "@/test/history-run/report/partition/types"
+import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
+import type { CharacterReport } from "@/test/history-run/report/people-traits/types"
 
 export interface HistoryReportOptions {
+	characterStage: CharacterStage
 	seeds: number[]
 	era: SocietyEra
 	numPoints: number
@@ -47,6 +50,7 @@ export interface CenturyReport {
 	raidSuccessShare: number
 	revenuePerHead: number
 	regency: RegencyReport
+	character: CharacterReport
 	people: PeopleReport
 	marriage: MarriageReport
 	military: MilitaryReport

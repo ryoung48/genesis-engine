@@ -3,6 +3,7 @@ import type {
 	InitKnowledgeParams,
 	KnowledgeLevelParams,
 	MaxCitySizeParams,
+	OwnAdvanceParams,
 	PopulationMeanParams,
 	RealmKnowledgeParams,
 } from "@/model/history/sim/engine/knowledge/types"
@@ -137,24 +138,35 @@ function maxLead({ knowledge }: KnowledgeLevelParams): number {
 	})
 }
 
+function ownAdvance({
+	knowledge,
+	worldKnowledge,
+	development,
+}: OwnAdvanceParams): number {
+	const drag = Math.max(
+		0,
+		1 - (knowledge - worldKnowledge) / maxLead({ knowledge: worldKnowledge }),
+	)
+	return selfAdvanceRate({ knowledge }) * development * Math.min(1, drag)
+}
 function advanceKnowledge({
 	state,
 	yearFraction,
+	ownFactor,
 }: AdvanceKnowledgeParams): void {
 	const worldKnowledge = realmKnowledge({
 		state,
 		provinces: allProvinces({ state }),
 	})
-	const leadLimit = maxLead({ knowledge: worldKnowledge })
 	const next = state.knowledgeCurrent.slice()
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		const knowledge = state.knowledgeCurrent[p]
-		const drag = Math.max(0, 1 - (knowledge - worldKnowledge) / leadLimit)
-		const own =
-			selfAdvanceRate({ knowledge }) *
-			state.developmentCurrent[p] *
-			Math.min(1, drag)
+		const own = ownAdvance({
+			knowledge,
+			worldKnowledge,
+			development: state.developmentCurrent[p],
+		})
 		const sovereign = STATE.getSovereign({ state, p })
 		let pull = 0
 		for (
@@ -172,7 +184,7 @@ function advanceKnowledge({
 					: FOREIGN_DIFFUSION
 			pull = Math.max(pull, gap * rate)
 		}
-		next[p] = knowledge + (own + pull) * yearFraction
+		next[p] = knowledge + (own * ownFactor(sovereign) + pull) * yearFraction
 	}
 	for (let p = 0; p < state.P; p++)
 		if (!state.desolate[p]) state.knowledgeCurrent[p] = next[p]
@@ -255,6 +267,7 @@ function yearBaseline(year: number): number {
 }
 
 export const KNOWLEDGE = {
+	ownAdvance,
 	initKnowledge,
 	advanceKnowledge,
 	growthRate,

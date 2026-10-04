@@ -22,6 +22,7 @@ import type {
 	WarTarget,
 } from "@/model/history/sim/engine/events/war/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import type {
@@ -420,6 +421,20 @@ function rebel({
 }: RebelParams): boolean {
 	const preview = MILITARY.rebellionPreview({ state, overlord, subject })
 	const threat = preview.threat
+	laxity += GOVERNOR.factor({
+		attribute: "diplomacy",
+		value: GOVERNOR.attribute({
+			state,
+			realm: overlord,
+			attribute: "diplomacy",
+		}),
+	})
+	const holder = state.people.rulerOf[subject]
+	laxity += GOVERNOR.personHas({ state, person: holder, trait: "ambitious" })
+		? 0.02
+		: GOVERNOR.personHas({ state, person: holder, trait: "content" })
+			? -0.02
+			: 0
 	const threshold = REBELLION_THRESHOLD - laxity
 	const roll = threat <= threshold ? -1 : rng.random()
 	const decision =
@@ -452,6 +467,11 @@ function rebel({
 			subject,
 			succession,
 			goal: throne ? "throne" : "independence",
+			governorDiplomacy: GOVERNOR.attribute({
+				state,
+				realm: overlord,
+				attribute: "diplomacy",
+			}),
 		},
 	})
 	if (throne)
@@ -496,7 +516,12 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
 			if (
-				rng.random() > closest.w &&
+				GOVERNOR.startsWar({
+					state,
+					realm: nation,
+					threat: closest.w,
+					roll: rng.random(),
+				}) &&
 				!SUBMISSION.offer({
 					state,
 					attacker: nation,

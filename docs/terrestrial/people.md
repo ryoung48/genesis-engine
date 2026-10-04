@@ -1,5 +1,7 @@
 # People (`:history`)
 
+See [character](character.md) for inherited attributes, traits, governors and stress.
+
 Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `partition/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
 
 People are the cause behind realm events, not a population. Only ruling houses are simulated: a few thousand people on the default map.
@@ -16,11 +18,14 @@ A person is **recorded** (sent to the history record and wiki) when they hold a 
 
 `PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, betrothed partner and betrothal time (-1 without one), whether they are recorded, base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
+The additional character columns are `bases`, `education`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](character.md).
+
 State-level maps in `PeopleState`:
 
 | Field | Meaning |
 |---|---|
 | `rulerOf` | Holder of each seat (sovereign root or district), -1 if empty. `PEOPLE.setRuler` is its only writer. |
+| `stressed` | People with positive stress after the preceding annual pass; used to reset former sovereign rulers. |
 | `patricians` | 3–5 patrician house heads per electoral republic. |
 | `unionGenerations` | Shared rulers counted per union junior. |
 | `marriageAlliances` | Realm pairs allied by a royal marriage. |
@@ -43,6 +48,7 @@ State-level maps in `PeopleState`:
 
 - **Who.** Both parents alive and 16+, the mother under 45 at the due date, not within 3 months of her last pregnancy's end, and the couple's living children below their cap.
 - **Monthly chance.** Mother: `max(0, fertility − 0.05 × her earlier children)` × her age factor (1 to 25, 0.9 to 30, 0.7 to 35, 0.5 to 40, 0.33 to 45, else 0.1). Father: `fertility` × his age factor (1 to 35, 0.9 to 40, 0.8 to 50, 0.7 to 60, 0.6 to 70, else 0.5). The chance is `clamp(((mother + father) / 2 + bonus) × 0.0475, 0.01, 0.25)`, × 0.85 unless one spouse holds a seat. The bonus is 0.3 for a seat holder's first child.
+- **Character fertility.** Each parent's fertility term is multiplied by `max(0, 1 + active trait fertility sum)` and by the stress fertility factor (1, 0.9, 0.7, 0.5). Carried traits contribute nothing.
 - **Outcome**, as weights out of `N + 17`: normal birth N = 215 (−10 if the mother's health is Poor, −25 if Grave; +5 with 2+ earlier children, +5 more with 4+); miscarriage 10 (80–120 days); stillbirth 3 (180–200 days); mother dies 2 (the child is born at 280 days and she dies at the birth); mother and child die 2 (180–200 days). About 1.5% of pregnancies kill the mother.
 - **Twins**, on a live birth: 4% if the mother is 25–35, else 2%; +5% if she has had twins, +3% if her mother has. Girls are 49%.
 - **Standing** of a seat is its title tier + 1 (1 for a county seat, up to 5 for a hegemony). A couple's standing is the highest `peak` among the spouses and their parents.
@@ -179,3 +185,7 @@ Successions, coming of age and rebellions run on their own events at the exact t
 
   Everything else stays on the person page.
 - **Partition wording.** A realm created by a partition reads "Split from X in the partition of [late ruler]'s realm, under [heir]". On person pages a seat taken or lost in one reads "became ruler of Y in the partition of X", "took the seat of Z in the partition of X" or "lost Y in the partition of X". The nation stats show a Succession row: Single heir, Partition, Election or Appointment.
+
+## Character records and wiki
+
+Recorded-person rows preserve packed innate character. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read character at the selected date, with personality ages 9/11/13 and education age 16.
