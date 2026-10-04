@@ -1,6 +1,6 @@
 import type { PeopleState } from "@/model/history/sim/people/types"
 
-export type BetrothalEndCause = "death" | "alliance"
+export type BetrothalEndCause = "death" | "alliance" | "kinship"
 
 export interface BetrothParams {
 	people: PeopleState
@@ -19,6 +19,7 @@ export interface ReleaseParams {
 export interface BetrothalPassParams {
 	people: PeopleState
 	time: number
+	onKinship: () => void
 }
 
 export interface BetrothedPair {

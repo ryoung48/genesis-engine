@@ -4,9 +4,36 @@ import type {
 	ResolveAffiliationParams,
 	TerritorialChange,
 	TerritorialRootParams,
+	TerritorialView,
 	TerritoryNode,
 	TransitionParams,
 } from "@/model/history/record/people/query/affiliation/types"
+
+function nodeAt({
+	record,
+	province,
+	timeMs,
+	inclusive,
+}: ResolveAffiliationParams): TerritorialView | null {
+	if (timeMs < record.minTimeMs || (!inclusive && timeMs === record.minTimeMs))
+		return null
+	const log = record.events.provinceEvents.get(province)
+	if (!log) return null
+	let owner = log.base.ownerId
+	let parent = log.base.parentId
+	let religion = log.base.religionId
+	for (const event of log.events) {
+		if (event.timeMs > timeMs || (!inclusive && event.timeMs === timeMs))
+			continue
+		if (event.kind === "owner")
+			owner = (event.payload.nationId as number | null) ?? -1
+		if (event.kind === "parent")
+			parent = (event.payload.parentId as number | null) ?? -1
+		if (event.kind === "religion")
+			religion = (event.payload.religionId as number | null) ?? -1
+	}
+	return { owner, parent, religion }
+}
 
 function rootOf({
 	province,
@@ -58,21 +85,8 @@ function resolve({
 			record.events.nationEvents.findIndex(
 				(nation) => nation?.base.capitalProvinceId === location,
 			),
-		nodeOf: (location) => {
-			const log = record.events.provinceEvents.get(location)
-			if (!log) return undefined
-			let owner = log.base.ownerId
-			let parent = log.base.parentId
-			for (const event of log.events) {
-				if (event.timeMs > timeMs || (!inclusive && event.timeMs === timeMs))
-					continue
-				if (event.kind === "owner")
-					owner = (event.payload.nationId as number | null) ?? -1
-				if (event.kind === "parent")
-					parent = (event.payload.parentId as number | null) ?? -1
-			}
-			return { owner, parent }
-		},
+		nodeOf: (location) =>
+			nodeAt({ record, province: location, timeMs, inclusive }) ?? undefined,
 	})
 }
 
@@ -178,4 +192,4 @@ function transitions({
 	return timelines
 }
 
-export const AFFILIATION = { at, transitions }
+export const AFFILIATION = { at, transitions, nodeAt }

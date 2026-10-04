@@ -1,6 +1,7 @@
 import type { Attribute } from "@/model/history/sim/people/attributes/types"
 import type {
 	Character,
+	CompatibilityParams,
 	CongenitalTrait,
 	DrawTraitsParams,
 	GeneResult,
@@ -11,6 +12,7 @@ import type {
 	InheritParams,
 	LadderDrawParams,
 	PersonalityTrait,
+	ReputationParams,
 	ScalarTraitModifier,
 	StressFactorsParams,
 	TraitAtParams,
@@ -94,21 +96,21 @@ const PERSONALITY_ROWS: TraitRow[] = [
 ]
 const PERSONALITY = PERSONALITY_ROWS.map(definition)
 const CONGENITAL_ROWS: TraitRow[] = [
-	["giant", 0, 0, 0, 0, 0, 6, -0.25, 0, 0, 0, 0, 0, 0, 0, 0],
-	["dwarf", 0, 0, 0, 0, 0, -4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["clubfooted", 0, 0, 0, 0, 0, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["hunchbacked", 0, 0, 0, 0, 0, -2, 0, 0, 0, 0, -10, 0, 0, 0, 0],
-	["spindly", 0, 0, 0, 0, 0, -1, -0.25, 0, 0, 0, 0, 0, 0, 0, 0],
+	["giant", 0, 0, 0, 0, 0, 6, -0.25, 0, -5, 0, 0, 0, 0, 0, 0],
+	["dwarf", 0, 0, 0, 0, 0, -4, 0, 0, -20, 0, 0, 0, 0, 0, 0],
+	["clubfooted", 0, 0, 0, 0, 0, -2, 0, 0, -10, 0, 0, 0, 0, 0, 0],
+	["hunchbacked", 0, 0, 0, 0, 0, -2, 0, 0, -30, 0, -10, 0, 0, 0, 0],
+	["spindly", 0, 0, 0, 0, 0, -1, -0.25, 0, -10, 0, 0, 0, 0, 0, 0],
 	["lisping", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 	["stuttering", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 	["bleeder", 0, 0, 0, 0, 0, 0, -1.5, 0, 0, 0, -10, 0, 0, 0, 0],
 	["wheezing", 0, 0, 0, 0, 0, 0, -0.15, 0, 0, 0, -10, 0, 0, 0, 0],
 	["infertile", 0, 0, 0, 0, 0, 0, 0, -0.5, 0, 0, 0, 0, 0, 0, 0],
-	["scaly", 0, 0, 0, 0, 0, 0, 0, -0.2, 0, 0, -10, 0, 0, 0, 0],
+	["scaly", 0, 0, 0, 0, 0, 0, 0, -0.2, -30, 0, -10, 0, 0, 0, 0],
 	["albino", 0, 0, 0, 0, 0, 0, 0, 0, 0, -10, 0, 0, 0, 0, 0],
 	["depressed", -1, -1, -1, -1, 0, 0, -0.5, -0.1, 0, 0, 0, 0, 0, 0, 0],
-	["lunatic", 0, 0, 0, 0, 0, 0, -0.25, 0, 0, 0, -10, 0, 0, 0, 0],
-	["possessed", 0, 0, 0, 0, 0, 0, -0.5, 0, 0, 0, 0, 0, 0, 0, 0],
+	["lunatic", 0, 0, 0, 0, 0, 0, -0.25, 0, -10, 0, -10, 0, 0, 0, 0],
+	["possessed", 0, 0, 0, 0, 0, 0, -0.5, 0, -10, 0, 0, 0, 0, 0, 0],
 ]
 const CONGENITAL = CONGENITAL_ROWS.map(definition)
 const GROUPS = [
@@ -545,7 +547,56 @@ function labels({ character }: TraitAtParams): string[] {
 		return value === 0 ? [] : [names[ladder][value + 3]]
 	})
 }
+function attraction(params: TraitAtParams): number {
+	const beauty = grade({ character: params.character, ladder: "beauty" }).active
+	const physique = grade({
+		character: params.character,
+		ladder: "physique",
+	}).active
+	return (
+		modifier({ ...params, modifier: "attraction" }) +
+		beauty * 10 +
+		(physique > 0
+			? physique * 5
+			: physique === -2
+				? -5
+				: physique === -3
+					? -10
+					: 0)
+	)
+}
+
+function compatibility({ first, second }: CompatibilityParams): number {
+	const a = active(first)
+	const b = active(second)
+	let value = 0
+	for (const trait of a)
+		for (const other of b) {
+			if (trait === other) value += 5
+			else if (
+				GROUPS.some(
+					(group) =>
+						group.some((code) => PERSONALITY[code].name === trait) &&
+						group.some((code) => PERSONALITY[code].name === other),
+				)
+			)
+				value -= 5
+		}
+	return value
+}
+
+function reputation({ character, age, vassal }: ReputationParams): number {
+	const params = { character, age }
+	return (
+		modifier({ ...params, modifier: "opinion" }) +
+		(vassal ? modifier({ ...params, modifier: "vassalOpinion" }) : 0)
+	)
+}
+
 export const TRAITS = {
+	attraction,
+	compatibility,
+	reputation,
 	congenital,
 	labels,
 	draw,

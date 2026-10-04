@@ -665,6 +665,12 @@ describe("military transitions and conservation", () => {
 			b: nations[0],
 			rel: STATE.rel.VASSAL,
 		})
+		STATE.setDisposition({
+			state,
+			a: supporter,
+			b: nations[0],
+			disposition: STATE.disp.NEUTRAL,
+		})
 		const active = war()
 		expect(active.participants[supporter]).toBe("attacker")
 		STATE.setDisposition({

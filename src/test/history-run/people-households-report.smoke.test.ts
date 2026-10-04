@@ -142,6 +142,8 @@ it("counts living observations, crowns and boundary samples independently of reg
 it("joins unmoved households to parent-only territorial transitions and excludes boundaries", () => {
 	const people = PEOPLE.create(6)
 	people.household = {
+		heritageOfCulture: () => -1,
+		religionOfRealm: () => -1,
 		realmOf: () => 0,
 		ranks: () => [0, 0, 0, 0, 0, 0],
 		time: () => 115,

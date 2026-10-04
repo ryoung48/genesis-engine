@@ -199,6 +199,9 @@ function buildProceduralRecord(
 		maxTimeMs: recordStartTimeMs,
 		nations: nationIdentities,
 		cultures: cultureRows,
+		heritageOfCulture:
+			world.heritages?.assignment.slice() ??
+			new Int32Array(cultureRows.length).fill(-1),
 		religions: religionRows,
 		events: {
 			provinceEvents,

@@ -109,8 +109,18 @@ export interface PrimarySeatParams {
 }
 
 export interface AssignParams {
-	run: PartitionRun
+	state: HistoryState
+	realm: number
+	excludedSeat: number
+	unseated: UnseatedHeir[]
 	heirs: number[]
+}
+
+export interface ProjectPartitionParams {
+	state: HistoryState
+	realm: number
+	dying: number
+	primary: number
 }
 
 export interface ReleaseParams {

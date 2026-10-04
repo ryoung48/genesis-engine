@@ -5,6 +5,7 @@ import type {
 	BetrothalView,
 	ConditionView,
 	CoupleAtParams,
+	OpinionQueryParams,
 	PersonAtParams,
 	PersonEvent,
 	PersonEventKind,
@@ -20,6 +21,12 @@ import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { OPINION } from "@/model/history/sim/people/opinion"
+import type {
+	OpinionBreakdown,
+	OpinionContext,
+	OpinionPerson,
+} from "@/model/history/sim/people/opinion/types"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type { DeathCause } from "@/model/history/sim/people/types"
 import { EFFECTIVE_TIME } from "@/model/shared/time/effective"
@@ -37,7 +44,12 @@ function until(time: number, timeMs: number): number | null {
 
 function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 	const person = PEOPLE_RECORD.person({ people, id })
-	if (!person || person.birthTimeMs > timeMs) return null
+	if (
+		!person ||
+		person.birthTimeMs > timeMs ||
+		people.persons.createdTimeMs[id] > timeMs
+	)
+		return null
 	const bornBy = (other: number) =>
 		PEOPLE_RECORD.birthTimeMs({ people, id: other }) <= timeMs
 	const spouses: SpouseView[] = []
@@ -127,10 +139,16 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 			other: betrothal.person,
 			tenure: -1,
 		})
-		if (betrothal.endTimeMs !== null && betrothal.cause === "alliance")
+		if (
+			betrothal.endTimeMs !== null &&
+			(betrothal.cause === "alliance" || betrothal.cause === "kinship")
+		)
 			events.push({
 				timeMs: betrothal.endTimeMs,
-				kind: "betrothal broken",
+				kind:
+					betrothal.cause === "kinship"
+						? "betrothal broken for kinship"
+						: "betrothal broken",
 				other: betrothal.person,
 				tenure: -1,
 			})
@@ -286,7 +304,12 @@ function holder({ people, seat, timeMs }: SeatAtParams): number {
 
 function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
 	const person = PEOPLE_RECORD.person({ people, id })
-	if (!person || timeMs < person.birthTimeMs) return []
+	if (
+		!person ||
+		timeMs < person.birthTimeMs ||
+		people.persons.createdTimeMs[id] > timeMs
+	)
+		return []
 	const age =
 		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
 	const effects = AGEING.effects(conditionLevels({ people, id, timeMs }))
@@ -311,7 +334,12 @@ function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
 }
 function traits({ people, id, timeMs }: PersonAtParams): TraitsView | null {
 	const person = PEOPLE_RECORD.person({ people, id })
-	if (!person || timeMs < person.birthTimeMs) return null
+	if (
+		!person ||
+		timeMs < person.birthTimeMs ||
+		people.persons.createdTimeMs[id] > timeMs
+	)
+		return null
 	const age =
 		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
 	return {
@@ -328,7 +356,12 @@ function stress({ people, id, timeMs }: PersonAtParams): number {
 }
 function residenceAt({ people, id, timeMs }: PersonAtParams): number {
 	const person = PEOPLE_RECORD.person({ people, id })
-	if (!person || timeMs < person.birthTimeMs) return -1
+	if (
+		!person ||
+		timeMs < person.birthTimeMs ||
+		people.persons.createdTimeMs[id] > timeMs
+	)
+		return -1
 	const rows = people.residencesOf.get(id) ?? []
 	const index = EFFECTIVE_TIME.latest({
 		times: rows.map((row) => row.timeMs),
@@ -343,7 +376,89 @@ function realmAt({ people, id, timeMs, record }: RealmAtParams): number {
 	return province < 0 ? -1 : AFFILIATION.at({ record, province, timeMs })
 }
 
+function opinion({
+	people,
+	a,
+	b,
+	timeMs,
+	record,
+}: OpinionQueryParams): OpinionBreakdown | null {
+	const personOf = (id: number): OpinionPerson | null => {
+		const person = PEOPLE_RECORD.person({ people, id })
+		if (
+			!person ||
+			person.birthTimeMs > timeMs ||
+			people.persons.createdTimeMs[id] > timeMs
+		)
+			return null
+		const realm = realmAt({ people, id, timeMs, record })
+		const capital =
+			record.events.nationEvents[realm]?.base.capitalProvinceId ?? -1
+		const sovereignSeats: number[] = []
+		const districtSovereigns: number[] = []
+		for (const index of people.tenuresOf.get(id) ?? []) {
+			const tenure = people.tenures[index]
+			if (
+				tenure.kind === "regent" ||
+				tenure.startTimeMs > timeMs ||
+				tenure.endTimeMs <= timeMs ||
+				holder({ people, seat: tenure.seat, timeMs }) !== id
+			)
+				continue
+			const node = AFFILIATION.nodeAt({
+				record,
+				province: tenure.seat,
+				timeMs,
+				inclusive: true,
+			})
+			if (!node || node.owner < 0) continue
+			if (node.parent < 0) sovereignSeats.push(tenure.seat)
+			else {
+				const parent = AFFILIATION.nodeAt({
+					record,
+					province: node.parent,
+					timeMs,
+					inclusive: true,
+				})
+				if (parent && parent.parent < 0 && parent.owner >= 0)
+					districtSovereigns.push(node.parent)
+			}
+		}
+		return {
+			id,
+			character: person,
+			age: (Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs,
+			culture: person.culture,
+			heritage:
+				person.culture >= 0
+					? (record.heritageOfCulture[person.culture] ?? -1)
+					: -1,
+			religion:
+				capital >= 0
+					? (AFFILIATION.nodeAt({
+							record,
+							province: capital,
+							timeMs,
+							inclusive: true,
+						})?.religion ?? -1)
+					: -1,
+			sovereignSeats,
+			districtSovereigns,
+		}
+	}
+	const context: OpinionContext = {
+		personOf,
+		kinship: people.persons,
+		married: ({ a, b }) =>
+			PEOPLE_RECORD.deathTimeMs({ people, id: a }) > timeMs &&
+			PEOPLE_RECORD.deathTimeMs({ people, id: b }) > timeMs &&
+			married({ people, a, b, timeMs }),
+	}
+	return OPINION.of({ observer: a, target: b, time: timeMs / yearMs, context })
+}
+
 export const PERSON_QUERY = {
+	opinion,
 	residenceAt,
 	realmAt,
 	attributes,

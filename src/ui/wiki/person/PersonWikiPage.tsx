@@ -1,3 +1,4 @@
+import type { OpinionBreakdown } from "@/model/history/sim/people/opinion/types"
 import { ChipGroup } from "@/ui/components/composites/ChipGroup"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { EntityChip } from "@/ui/components/composites/EntityChip"
@@ -34,6 +35,7 @@ export interface PersonWikiData {
 	stats: StatEntry[]
 	attributes: StatEntry[]
 	traits: string[]
+	opinions: PersonWikiOpinion[]
 	groups: PersonWikiGroup[]
 	timelineEvents: WikiTimelineEvent[]
 	dateRangeStart: number
@@ -47,6 +49,11 @@ export interface PersonWikiData {
 	onSelectDate: (date: number) => void
 	onSelectOrganization: (orgId: string) => void
 	onSelectWar: (warId: number) => void
+}
+
+export interface PersonWikiOpinion {
+	label: string
+	breakdown: OpinionBreakdown | null
 }
 
 const NO_COUNT_HISTORY: WikiCountHistoryPoint[] = []
@@ -93,6 +100,31 @@ export function PersonWikiPage({ person }: { person: PersonWikiData }) {
 							title={trait}
 						/>
 					))}
+				</ChipGroup>
+			</Surface>
+
+			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
+				<ChipGroup label="Opinions" count={person.opinions.length}>
+					<div className="space-y-2">
+						{person.opinions.map(({ label, breakdown }) => (
+							<div key={label}>
+								<div>
+									{label}: {breakdown?.total ?? "Unavailable"}
+								</div>
+								{breakdown && (
+									<div className="text-slate-500">
+										{Object.entries(breakdown)
+											.filter(([key]) => key !== "total")
+											.map(
+												([key, value]) =>
+													`${key}: ${value > 0 ? "+" : ""}${value}`,
+											)
+											.join(" · ")}
+									</div>
+								)}
+							</div>
+						))}
+					</div>
 				</ChipGroup>
 			</Surface>
 			{groups.length > 0 ? (

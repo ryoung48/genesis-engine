@@ -3,6 +3,7 @@ import type {
 	PeopleRecord,
 	RecordBetrothalEnd,
 } from "@/model/history/record/people/types"
+import type { HistoryRecord } from "@/model/history/record/types"
 import type {
 	Attribute,
 	AttributeTier,
@@ -97,6 +98,7 @@ export type PersonEventKind =
 	| "married"
 	| "betrothed"
 	| "betrothal broken"
+	| "betrothal broken for kinship"
 	| "child born"
 	| "took seat"
 	| "left seat"
@@ -142,4 +144,8 @@ export interface TraitsView {
 
 export interface RealmAtParams extends PersonAtParams {
 	record: AffiliationRecord
+}
+
+export interface OpinionQueryParams extends CoupleAtParams {
+	record: HistoryRecord
 }

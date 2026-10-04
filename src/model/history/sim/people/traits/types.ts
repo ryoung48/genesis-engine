@@ -154,3 +154,12 @@ export interface TraitModifierParams extends TraitAtParams {
 export interface TraitHasParams extends TraitAtParams {
 	trait: PersonalityTrait
 }
+
+export interface CompatibilityParams {
+	first: TraitAtParams
+	second: TraitAtParams
+}
+
+export interface ReputationParams extends TraitAtParams {
+	vassal: boolean
+}

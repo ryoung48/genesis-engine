@@ -24,6 +24,10 @@ export interface TerritoryNode {
 	parent: number
 }
 
+export interface TerritorialView extends TerritoryNode {
+	religion: number
+}
+
 export interface TerritorialChange {
 	province: number
 	timeMs: number

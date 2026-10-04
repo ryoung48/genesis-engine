@@ -35,11 +35,13 @@ export interface LineBase {
 	seen: Set<number>
 }
 
-export interface LineParams extends LineBase {
+export interface LineParams {
+	line: LineBase
 	person: number
 }
 
-export interface AmongParams extends LineBase {
+export interface AmongParams {
+	line: LineBase
 	persons: number[]
 }
 

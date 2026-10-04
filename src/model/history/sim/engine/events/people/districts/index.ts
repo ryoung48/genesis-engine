@@ -128,13 +128,13 @@ function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 	return checks
 }
 
-function succeed({ state, seat, rng }: SucceedDistrictParams): void {
+function heirOf({ state, seat }: SeatParams): number {
 	const people = state.people
 	const table = people.persons
 	const time = now(state)
 	const holder = people.rulerOf[seat]
-	if (holder < 0 || !isDistrictSeat({ state, seat })) return
-	const heir = HEIRS.of({
+	if (holder < 0 || !isDistrictSeat({ state, seat })) return -1
+	return HEIRS.of({
 		people,
 		dying: holder,
 		time,
@@ -143,6 +143,11 @@ function succeed({ state, seat, rng }: SucceedDistrictParams): void {
 			table.heldSeats[person].length === 0 &&
 			time - table.birth[person] >= ADULT_AGE,
 	}).heir
+}
+
+function succeed({ state, seat, rng }: SucceedDistrictParams): void {
+	if (state.people.rulerOf[seat] < 0 || !isDistrictSeat({ state, seat })) return
+	const heir = heirOf({ state, seat })
 	install({
 		state,
 		seat,
@@ -225,6 +230,7 @@ function grant({ state, rng }: DistrictParams): void {
 }
 
 export const DISTRICTS = {
+	heirOf,
 	succeed,
 	settle,
 	grant,

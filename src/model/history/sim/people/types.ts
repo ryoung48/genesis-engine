@@ -1,9 +1,12 @@
+import type { MarriageObservation } from "@/model/history/sim/people/family/diagnostics/types"
+import type { MarriageCandidateContext } from "@/model/history/sim/people/family/match-scoring/types"
 import type { Deliveries } from "@/model/history/sim/people/fertility/types"
 import type {
 	HouseholdContext,
 	ResidenceHistory,
 } from "@/model/history/sim/people/household/types"
 import type { PeopleLog } from "@/model/history/sim/people/log/types"
+import type { OpinionContext } from "@/model/history/sim/people/opinion/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export type Sex = 0 | 1
@@ -19,6 +22,7 @@ export interface PersonTable {
 	carried: number[]
 	stress: number[]
 	sex: Sex[]
+	createdAt: number[]
 	birth: number[]
 	death: number[]
 	father: number[]
@@ -222,12 +226,24 @@ export interface VacateParams {
 
 // The realm-level rules the marriage market reads from the engine.
 export interface MarriageRealms {
+	observe: (observation: MarriageObservation) => void
+	opinionContext: () => OpinionContext
+	candidateOf: (person: number) => MarriageCandidateContext
+	allied: (match: CrossMatch) => boolean
+	onboard: (person: number) => void
+	settle: (selection: MarriageSelection) => void
+	refresh: () => void
 	neighborsOf: (realm: number) => readonly number[]
 	originOf: (realm: number) => RealmOrigin
 	// Realms whose ruling houses marry abroad for alliance.
 	royal: (realm: number) => boolean
 	// The match would form or bind a marriage alliance.
 	alliable: (match: CrossMatch) => boolean
+}
+
+export interface MarriageSelection {
+	match: CrossMatch
+	betrothal: boolean
 }
 
 export interface RunPeopleYearParams extends MarriageRealms {

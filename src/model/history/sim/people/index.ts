@@ -26,6 +26,8 @@ function create(provinceCount: number): PeopleState {
 	const ranks = new Uint8Array(provinceCount)
 	return {
 		household: {
+			heritageOfCulture: () => -1,
+			religionOfRealm: () => -1,
 			realmOf: (province) => province,
 			ranks: () => ranks,
 			time: () => 0,
@@ -41,6 +43,7 @@ function create(provinceCount: number): PeopleState {
 			carried: [],
 			stress: [],
 			sex: [],
+			createdAt: [],
 			birth: [],
 			death: [],
 			father: [],
@@ -116,6 +119,7 @@ function add({
 	table.carried.push(0)
 	table.stress.push(0)
 	table.sex.push(sex)
+	table.createdAt.push(birth)
 	table.birth.push(birth)
 	table.death.push(death)
 	table.father.push(father)

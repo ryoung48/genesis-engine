@@ -192,7 +192,7 @@ it("rejects reserved kinds, unknown codes and values a row cannot hold", () => {
 	reject({ kind: "coronation", time: 1, person: 0 })
 	reject({ kind: "seat", seat: 0, person: 0, reason: "abdication" })
 	reject({ kind: "pregnancy", time: 1, mother: 0, father: 1, outcome: "birth" })
-	reject({ kind: "betrothal_end", time: 1, a: 0, b: 1, cause: "kinship" })
+	reject({ kind: "betrothal_end", time: 1, a: 0, b: 1, cause: "unknown" })
 	reject({ kind: "death", time: Number.NaN, person: 0, cause: "natural" })
 	reject({ kind: "death", time: Infinity, person: 0, cause: "natural" })
 	reject({ kind: "death", time: 1, person: 2 ** 31, cause: "natural" })
@@ -225,7 +225,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	table.father[first[2]] = first[0]
 	table.mother[first[2]] = first[1]
 	const packet = PEOPLE_LOG.seal({ people, sovereign: () => true })
-	expect(byteLength(packet)).toBe(25 * 3 + 70 * 3)
+	expect(byteLength(packet)).toBe(25 * 3 + 78 * 3)
 	expect(rowsOf(packet)).toEqual(
 		first.map((person) => ({
 			kind: "creation",
@@ -256,7 +256,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	expect(people.log.time.length).toBe(8192)
 	const grown = PEOPLE_LOG.seal({ people, sovereign: () => true })
 	expect(grown.count).toBe(rows + 1)
-	expect(byteLength(grown)).toBe(25 * (rows + 1) + 70)
+	expect(byteLength(grown)).toBe(25 * (rows + 1) + 78)
 	const decoded = rowsOf(grown)
 	expect(decoded[0]).toMatchObject({
 		kind: "creation",
@@ -350,7 +350,7 @@ it("records every person once and rebuilds the same record from transferred pack
 		)
 		for (const packet of packets) {
 			expect(byteLength(packet)).toBe(
-				25 * packet.count + 70 * packet.sex.length,
+				25 * packet.count + 78 * packet.sex.length,
 			)
 			for (const row of rowsOf(packet)) {
 				kinds.add(row.kind)
@@ -515,7 +515,7 @@ it("keeps the append buffer writable after a transfer and never emits a row twic
 			reason: "partition",
 		},
 	])
-	expect(byteLength(packet)).toBe(25 * 3 + 70)
+	expect(byteLength(packet)).toBe(25 * 3 + 78)
 }, 600000)
 
 it("answers family, marriage, betrothal, tenure, pregnancy and stress views from the record alone", () => {

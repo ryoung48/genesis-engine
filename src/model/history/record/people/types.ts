@@ -47,6 +47,7 @@ export interface PersonColumns {
 	// The health band when the person was created, and the record time it
 	// holds from: Infinity for someone already dead then.
 	healthBand: Uint8Array
+	createdTimeMs: Float64Array
 	healthTimeMs: Float64Array
 	// The person's latest health row; -1 without one.
 	lastHealth: Int32Array
@@ -155,6 +156,7 @@ export interface ReserveParams {
 }
 
 export interface AddPersonParams {
+	createdTimeMs: number
 	record: PeopleRecord
 	packet: PeoplePacket
 	id: number

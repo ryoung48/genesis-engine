@@ -66,6 +66,7 @@ const LOSSES = Object.keys(LOSS_CODE) as PregnancyLoss[]
 const BETROTHAL_END_CODE: Record<BetrothalEndCause, number> = {
 	alliance: 0,
 	death: 1,
+	kinship: 2,
 }
 const DEATH_CAUSE_CODE: Record<DeathCause, number> = {
 	natural: 0,
@@ -250,6 +251,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		c: new Int32Array(count),
 		d: new Int32Array(count),
 		sex: new Uint8Array(creations),
+		createdAt: new Float64Array(creations),
 		death: new Float64Array(creations),
 		healthBand: new Uint8Array(creations),
 		dynasty: new Int32Array(creations),
@@ -281,6 +283,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 			table.death[person] <= people.household.time()
 				? table.death[person]
 				: Infinity
+		packet.createdAt[index] = table.createdAt[person]
 		packet.healthBand[index] = table.healthFlags[person] & 7
 		packet.dynasty[index] = slot(table.dynasty[person])
 		packet.culture[index] = slot(table.culture[person])

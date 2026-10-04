@@ -32,6 +32,7 @@ import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
 import { PEOPLE_HEALTH_REPORT } from "@/test/history-run/report/people-health"
 import type { StarterReport } from "@/test/history-run/report/people-health/types"
+import { PEOPLE_MARRIAGE_REPORT } from "@/test/history-run/report/people-marriage"
 import { PEOPLE_RECORD_REPORT } from "@/test/history-run/report/people-record"
 import type { PeopleRecordReport } from "@/test/history-run/report/people-record/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
@@ -687,6 +688,11 @@ function runSeed({
 				to: year,
 			}),
 			marriage: marriageReport({ engine, from, to: year, tracker }),
+			marriageMarket: PEOPLE_MARRIAGE_REPORT.summarize({
+				windows: engine.marriageMarket,
+				from,
+				to: year,
+			}),
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 			partitionState: PARTITION_REPORT.state({ engine }),
 			partition: PARTITION_REPORT.summarize({

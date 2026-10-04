@@ -1,6 +1,8 @@
 import type { PeopleState } from "@/model/history/sim/people/types"
 
 export interface HouseholdContext {
+	heritageOfCulture: (culture: number) => number
+	religionOfRealm: (realm: number) => number
 	realmOf: (province: number) => number
 	ranks: () => { length: number; [index: number]: number }
 	time: () => number

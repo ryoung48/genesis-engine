@@ -375,6 +375,7 @@ export function usePersonWikiData(
 				event.kind === "married" ||
 				event.kind === "betrothed" ||
 				event.kind === "betrothal broken" ||
+				event.kind === "betrothal broken for kinship" ||
 				event.kind === "child born"
 			) {
 				const other = mention(event.other)
@@ -387,9 +388,11 @@ export function usePersonWikiData(
 							? `${person.name} married ${other.name}.`
 							: event.kind === "betrothed"
 								? `${person.name} was betrothed to ${other.name}.`
-								: event.kind === "betrothal broken"
-									? `${person.name}'s betrothal to ${other.name} was broken.`
-									: `${other.name} was born to ${person.name}.`,
+								: event.kind === "betrothal broken for kinship"
+									? `${person.name}’s betrothal to ${other.name} was broken because they share known ancestry.`
+									: event.kind === "betrothal broken"
+										? `${person.name}'s betrothal to ${other.name} was broken.`
+										: `${other.name} was born to ${person.name}.`,
 					people: [...selfMentions, other],
 				})
 			} else if (event.kind === "regent appointed") {
@@ -542,6 +545,42 @@ export function usePersonWikiData(
 			stats,
 			attributes,
 			traits,
+			opinions: [
+				...new Set([
+					view.father,
+					view.mother,
+					...view.children,
+					...view.siblings,
+					...view.spouses.map((spouse) => spouse.person),
+				]),
+			]
+				.filter((other) => other >= 0)
+				.flatMap((other) => {
+					const relative = PERSON_NAMES.person({ people, person: other })
+					if (!relative) return []
+					return [
+						{
+							label: `${person.name} → ${relative.name}`,
+							breakdown: PERSON_QUERY.opinion({
+								people,
+								a: id,
+								b: other,
+								timeMs: viewTimeMs,
+								record: state.record,
+							}),
+						},
+						{
+							label: `${relative.name} → ${person.name}`,
+							breakdown: PERSON_QUERY.opinion({
+								people,
+								a: other,
+								b: id,
+								timeMs: viewTimeMs,
+								record: state.record,
+							}),
+						},
+					]
+				}),
 			groups: [
 				{
 					label: "Residence",

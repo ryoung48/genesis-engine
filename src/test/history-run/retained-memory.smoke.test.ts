@@ -189,6 +189,19 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 			),
 			memory,
 			peopleRecord,
+			marriage: {
+				heritageEntries: state.record.heritageOfCulture.length,
+				engineHeritageBytes: engine.heritageOfCulture.byteLength,
+				recordHeritageBytes: state.record.heritageOfCulture.byteLength,
+				createdAtBytes: retainedBytes(engine.people.persons.createdAt),
+				marketBytes: retainedBytes(engine.marriageMarket),
+				landlessUnmarried: engine.people.alive.filter(
+					(person) =>
+						engine.people.persons.death[person] > engine.time / STATE.yearMs &&
+						engine.people.persons.heldSeats[person].length === 0 &&
+						engine.people.persons.spouse[person] < 0,
+				).length,
+			},
 			residenceHistory: {
 				people: engine.people.residenceHistory.size,
 				logicalBytes: [...engine.people.residenceHistory.values()].reduce(
