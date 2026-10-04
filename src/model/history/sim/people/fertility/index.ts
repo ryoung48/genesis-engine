@@ -16,6 +16,7 @@ import type {
 	WomanParams,
 } from "@/model/history/sim/people/fertility/types"
 import { HEALTH } from "@/model/history/sim/people/health"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
 
@@ -274,12 +275,16 @@ function bear({
 				rng,
 			})
 		table.nextBirth[mother] = due + REST
-		if (result !== "birth" && table.recorded[mother])
-			people.log.pregnancies.push({
-				mother,
-				father,
-				time: due,
-				outcome: fatal ? "childbirth death" : result,
+		if (result !== "birth")
+			PEOPLE_LOG.append({
+				log: people.log,
+				row: {
+					kind: "pregnancy",
+					mother,
+					father,
+					time: due,
+					outcome: fatal ? "childbirth death" : result,
+				},
 			})
 		if (fatal) return PEOPLE.shortenLife({ people, person: mother, time: due })
 		time = table.nextBirth[mother] - MONTH

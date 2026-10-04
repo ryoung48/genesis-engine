@@ -5,6 +5,7 @@ import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -44,11 +45,15 @@ it("keeps flushed journal snapshots intact when subsequent batches reuse buffers
 		attackers: [0],
 		defenders: [1],
 	})
-	engine.people.log.pregnancies.push({
-		mother: 0,
-		father: 1,
-		time: 1,
-		outcome: "childbirth death",
+	PEOPLE_LOG.append({
+		log: engine.people.log,
+		row: {
+			kind: "pregnancy",
+			mother: 0,
+			father: 1,
+			time: 1,
+			outcome: "childbirth death",
+		},
 	})
 	JOURNAL.flush({ state: engine, noteCursor: 0, census: false, initial: false })
 	const first = structuredClone(engine.journal[0])
@@ -61,11 +66,15 @@ it("keeps flushed journal snapshots intact when subsequent batches reuse buffers
 		attackers: [1],
 		defenders: [0],
 	})
-	engine.people.log.pregnancies.push({
-		mother: 1,
-		father: 0,
-		time: 2,
-		outcome: "stillbirth",
+	PEOPLE_LOG.append({
+		log: engine.people.log,
+		row: {
+			kind: "pregnancy",
+			mother: 1,
+			father: 0,
+			time: 2,
+			outcome: "stillbirth",
+		},
 	})
 	JOURNAL.flush({ state: engine, noteCursor: 0, census: false, initial: false })
 	expect(engine.journal).toHaveLength(2)
@@ -73,9 +82,16 @@ it("keeps flushed journal snapshots intact when subsequent batches reuse buffers
 	expect(engine.journal[1].occupations).toEqual([
 		{ province: 0, before: 3, after: 4 },
 	])
-	expect(engine.journal[1].people.pregnancies).toEqual([
-		{ mother: 1, father: 0, timeMs: STATE.yearMs * 2, outcome: "stillbirth" },
-	])
+	const packet = engine.journal[1].people
+	if (!packet) throw new Error("The second flush carried no people rows")
+	expect(packet.count).toBe(1)
+	expect(PEOPLE_LOG.read({ rows: packet, index: 0 })).toEqual({
+		kind: "pregnancy",
+		mother: 1,
+		father: 0,
+		time: 2,
+		outcome: "stillbirth",
+	})
 	JOURNAL.flush({ state: engine, noteCursor: 0, census: false, initial: false })
 	expect(engine.journal).toHaveLength(2)
 	JOURNAL.occupation({ state: engine, province: 0, before: 4, after: 5 })

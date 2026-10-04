@@ -1,13 +1,66 @@
 import type {
+	AddPersonParams,
 	AppendPeopleParams,
 	BetrothalPairParams,
 	PeopleRecord,
 	PushIndexParams,
+	RecordPerson,
+	RecordPersonParams,
+	ReserveParams,
+	SeatChangesParams,
 } from "@/model/history/record/people/types"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import type { RegentRow, SeatRow } from "@/model/history/sim/people/log/types"
+
+const INT_COLUMNS = [
+	"father",
+	"mother",
+	"dynasty",
+	"culture",
+	"nameSeed",
+	"home",
+] as const
+const FLOAT_COLUMNS = [
+	"birthTimeMs",
+	"deathTimeMs",
+	"bases",
+	"personality",
+	"grades",
+	"congenital",
+	"carried",
+] as const
+const SNAPSHOT_COLUMNS = [
+	"sex",
+	"dynasty",
+	"culture",
+	"nameSeed",
+	"home",
+	"bases",
+	"personality",
+	"grades",
+	"congenital",
+	"carried",
+] as const
 
 function create(): PeopleRecord {
 	return {
-		persons: new Map(),
+		persons: {
+			count: 0,
+			sex: new Uint8Array(0),
+			birthTimeMs: new Float64Array(0),
+			deathTimeMs: new Float64Array(0),
+			father: new Int32Array(0),
+			mother: new Int32Array(0),
+			dynasty: new Int32Array(0),
+			culture: new Int32Array(0),
+			nameSeed: new Int32Array(0),
+			home: new Int32Array(0),
+			bases: new Float64Array(0),
+			personality: new Float64Array(0),
+			grades: new Float64Array(0),
+			congenital: new Float64Array(0),
+			carried: new Float64Array(0),
+		},
 		stressOf: new Map(),
 		childrenOf: new Map(),
 		marriages: [],
@@ -21,6 +74,64 @@ function create(): PeopleRecord {
 		pregnanciesOf: new Map(),
 		betrothals: [],
 		betrothalsOf: new Map(),
+	}
+}
+
+function count(people: PeopleRecord): number {
+	return people.persons.count
+}
+
+function has({ people, id }: RecordPersonParams): boolean {
+	return id >= 0 && id < people.persons.count
+}
+
+function person(params: RecordPersonParams): RecordPerson | null {
+	if (!has(params)) return null
+	const { id } = params
+	const persons = params.people.persons
+	return {
+		id,
+		sex: persons.sex[id],
+		birthTimeMs: persons.birthTimeMs[id],
+		deathTimeMs: persons.deathTimeMs[id],
+		father: persons.father[id],
+		mother: persons.mother[id],
+		dynasty: persons.dynasty[id],
+		culture: persons.culture[id],
+		nameSeed: persons.nameSeed[id],
+		home: persons.home[id],
+		bases: persons.bases[id],
+		personality: persons.personality[id],
+		grades: persons.grades[id],
+		congenital: persons.congenital[id],
+		carried: persons.carried[id],
+	}
+}
+
+// Infinity for a person the record does not hold.
+function birthTimeMs(params: RecordPersonParams): number {
+	return has(params) ? params.people.persons.birthTimeMs[params.id] : Infinity
+}
+
+function deathTimeMs(params: RecordPersonParams): number {
+	return has(params) ? params.people.persons.deathTimeMs[params.id] : Infinity
+}
+
+function reserve({ persons, count: needed }: ReserveParams): void {
+	if (needed <= persons.sex.length) return
+	const capacity = Math.max(needed, persons.sex.length * 2)
+	const sex = new Uint8Array(capacity)
+	sex.set(persons.sex)
+	persons.sex = sex
+	for (const column of INT_COLUMNS) {
+		const grown = new Int32Array(capacity)
+		grown.set(persons[column])
+		persons[column] = grown
+	}
+	for (const column of FLOAT_COLUMNS) {
+		const grown = new Float64Array(capacity)
+		grown.set(persons[column])
+		persons[column] = grown
 	}
 }
 
@@ -39,104 +150,179 @@ function openBetrothal({ record, a, b }: BetrothalPairParams): number {
 	return -1
 }
 
-function append({
-	record,
-	rows,
-	timeMs,
-	recordTime,
-}: AppendPeopleParams): void {
-	for (const row of rows.stress)
-		pushIndex({
-			index: record.stressOf,
-			key: row.person,
-			value: { ...row, timeMs: recordTime(row.timeMs) },
-		})
-	for (const row of rows.persons) {
-		if (row.dynasty >= 0 && !record.dynastyHome.has(row.dynasty))
-			record.dynastyHome.set(row.dynasty, row.home)
-		record.persons.set(row.id, {
-			...row,
-			birthTimeMs: recordTime(row.birthTimeMs),
-			deathTimeMs: recordTime(row.deathTimeMs),
-		})
-		for (const parent of [row.father, row.mother])
-			if (parent >= 0)
-				pushIndex({ index: record.childrenOf, key: parent, value: row.id })
-	}
-	for (const { id, deathTimeMs } of rows.deaths) {
-		const person = record.persons.get(id)
-		if (person) person.deathTimeMs = recordTime(deathTimeMs)
-	}
-	for (const { mother, father, timeMs, outcome } of rows.pregnancies)
-		pushIndex({
-			index: record.pregnanciesOf,
-			key: mother,
-			value: { father, timeMs: recordTime(timeMs), outcome },
-		})
-	for (const { a, b, timeMs: startMs } of rows.betrothals) {
-		const index = record.betrothals.length
-		record.betrothals.push({
-			a,
-			b,
-			startTimeMs: recordTime(startMs),
-			endTimeMs: Infinity,
-			cause: null,
-		})
-		pushIndex({ index: record.betrothalsOf, key: a, value: index })
-		pushIndex({ index: record.betrothalsOf, key: b, value: index })
-	}
-	for (const { a, b, timeMs: endMs, cause } of rows.betrothalEnds) {
-		const index = openBetrothal({ record, a, b })
-		if (index < 0) continue
-		record.betrothals[index].endTimeMs = recordTime(endMs)
-		record.betrothals[index].cause = cause
-	}
-	for (const row of rows.marriages) {
-		const betrothal = openBetrothal({ record, a: row.husband, b: row.wife })
-		if (betrothal >= 0) {
-			record.betrothals[betrothal].endTimeMs = recordTime(row.startTimeMs)
-			record.betrothals[betrothal].cause = "married"
-		}
-		const index = record.marriages.length
-		record.marriages.push({ ...row, startTimeMs: recordTime(row.startTimeMs) })
-		pushIndex({ index: record.marriagesOf, key: row.husband, value: index })
-		pushIndex({ index: record.marriagesOf, key: row.wife, value: index })
-	}
-	// A seat that changes hands more than once in a transaction keeps only its
-	// last holder; the first change still closes the tenure that was open.
+function addPerson(params: AddPersonParams): void {
+	const { record, packet, id, snapshot } = params
+	const persons = record.persons
+	if (id !== persons.count)
+		throw new Error(
+			`Person ${id} arrived out of order: the record holds ${persons.count} people`,
+		)
+	for (const column of SNAPSHOT_COLUMNS)
+		persons[column][id] = packet[column][snapshot]
+	persons.father[id] = params.father
+	persons.mother[id] = params.mother
+	persons.birthTimeMs[id] = params.birthTimeMs
+	persons.deathTimeMs[id] = params.deathTimeMs
+	persons.count++
+	const dynasty = persons.dynasty[id]
+	if (dynasty >= 0 && !record.dynastyHome.has(dynasty))
+		record.dynastyHome.set(dynasty, persons.home[id])
+	for (const parent of [params.father, params.mother])
+		if (parent >= 0)
+			pushIndex({ index: record.childrenOf, key: parent, value: id })
+}
+
+// A seat that changes hands more than once in a transaction keeps only its
+// last holder; the first change still closes the tenure that was open.
+function changeSeats({ record, rows, timeMs }: SeatChangesParams): void {
 	const lastChange = new Map<string, number>()
-	for (const [index, row] of rows.seats.entries())
-		lastChange.set(`${row.kind === "regent"}:${row.seat}`, index)
-	for (const [
-		index,
-		{ seat, person, kind, ward, reason },
-	] of rows.seats.entries()) {
-		const ofSeat =
-			kind === "regent" ? record.regentsOfSeat : record.tenuresOfSeat
+	for (const [index, row] of rows.entries())
+		lastChange.set(`${row.kind}:${row.seat}`, index)
+	for (const [index, row] of rows.entries()) {
+		const { seat, person: holder, reason } = row
+		const regent = row.kind === "regent"
+		const ofSeat = regent ? record.regentsOfSeat : record.tenuresOfSeat
 		const open = ofSeat.get(seat)?.at(-1)
 		if (open !== undefined && record.tenures[open].endTimeMs === Infinity) {
-			if (record.tenures[open].person === person) continue
+			if (record.tenures[open].person === holder) continue
 			record.tenures[open].endTimeMs = timeMs
 			record.tenures[open].endReason = reason
 		}
-		if (person < 0 || lastChange.get(`${kind === "regent"}:${seat}`) !== index)
-			continue
+		if (holder < 0 || lastChange.get(`${row.kind}:${seat}`) !== index) continue
 		const tenureIndex = record.tenures.length
 		record.tenures.push({
-			person,
+			person: holder,
 			seat,
-			kind,
-			ward,
+			kind: regent ? "regent" : row.seatKind,
+			ward: regent ? row.ward : -1,
 			startTimeMs: timeMs,
 			endTimeMs: Infinity,
 			startReason: reason,
 			endReason: null,
 		})
-		pushIndex({ index: record.tenuresOf, key: person, value: tenureIndex })
+		pushIndex({ index: record.tenuresOf, key: holder, value: tenureIndex })
 		pushIndex({ index: ofSeat, key: seat, value: tenureIndex })
-		if (kind === "regent")
-			pushIndex({ index: record.regentsOfWard, key: ward, value: tenureIndex })
+		if (regent)
+			pushIndex({
+				index: record.regentsOfWard,
+				key: row.ward,
+				value: tenureIndex,
+			})
 	}
 }
 
-export const PEOPLE_RECORD = { create, append }
+// Rows fold in append order. Seat and regent changes only touch tenures, so
+// they are applied together once the rest of the packet is in.
+function append({
+	record,
+	packet,
+	timeMs,
+	recordTime,
+}: AppendPeopleParams): void {
+	const persons = record.persons
+	reserve({ persons, count: persons.count + packet.sex.length })
+	const seats: (SeatRow | RegentRow)[] = []
+	for (let index = 0; index < packet.count; index++) {
+		const row = PEOPLE_LOG.read({ rows: packet, index })
+		switch (row.kind) {
+			case "creation":
+				addPerson({
+					record,
+					packet,
+					id: row.person,
+					snapshot: row.snapshot,
+					father: row.father,
+					mother: row.mother,
+					birthTimeMs: recordTime(row.time),
+					deathTimeMs: recordTime(packet.death[row.snapshot]),
+				})
+				break
+			case "death":
+				if (has({ people: record, id: row.person }))
+					persons.deathTimeMs[row.person] = recordTime(row.time)
+				break
+			case "pregnancy":
+				pushIndex({
+					index: record.pregnanciesOf,
+					key: row.mother,
+					value: {
+						father: row.father,
+						timeMs: recordTime(row.time),
+						outcome: row.outcome,
+					},
+				})
+				break
+			case "betrothal": {
+				const betrothal = record.betrothals.length
+				record.betrothals.push({
+					a: row.a,
+					b: row.b,
+					startTimeMs: recordTime(row.time),
+					endTimeMs: Infinity,
+					cause: null,
+				})
+				pushIndex({ index: record.betrothalsOf, key: row.a, value: betrothal })
+				pushIndex({ index: record.betrothalsOf, key: row.b, value: betrothal })
+				break
+			}
+			case "betrothal_end": {
+				const betrothal = openBetrothal({ record, a: row.a, b: row.b })
+				if (betrothal < 0) break
+				record.betrothals[betrothal].endTimeMs = recordTime(row.time)
+				record.betrothals[betrothal].cause = row.cause
+				break
+			}
+			case "wedding": {
+				const startTimeMs = recordTime(row.time)
+				const betrothal = openBetrothal({
+					record,
+					a: row.husband,
+					b: row.wife,
+				})
+				if (betrothal >= 0) {
+					record.betrothals[betrothal].endTimeMs = startTimeMs
+					record.betrothals[betrothal].cause = "married"
+				}
+				const marriage = record.marriages.length
+				record.marriages.push({
+					husband: row.husband,
+					wife: row.wife,
+					startTimeMs,
+				})
+				pushIndex({
+					index: record.marriagesOf,
+					key: row.husband,
+					value: marriage,
+				})
+				pushIndex({ index: record.marriagesOf, key: row.wife, value: marriage })
+				break
+			}
+			case "stress":
+				pushIndex({
+					index: record.stressOf,
+					key: row.person,
+					value: {
+						person: row.person,
+						timeMs: recordTime(row.time),
+						level: row.level,
+					},
+				})
+				break
+			case "seat":
+			case "regent":
+				seats.push(row)
+				break
+		}
+	}
+	changeSeats({ record, rows: seats, timeMs })
+}
+
+export const PEOPLE_RECORD = {
+	create,
+	append,
+	count,
+	has,
+	person,
+	birthTimeMs,
+	deathTimeMs,
+}

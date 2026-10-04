@@ -8,6 +8,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { CHARACTER } from "@/model/history/sim/people/character"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { STRESS } from "@/model/history/sim/people/stress"
 
 function write({ state, person, value, time }: WriteStressParams): void {
@@ -15,7 +16,10 @@ function write({ state, person, value, time }: WriteStressParams): void {
 	const before = STRESS.level(table.stress[person])
 	table.stress[person] = value
 	if (before !== STRESS.level(value) && table.death[person] > time)
-		state.people.log.stress.push({ person, time, level: STRESS.level(value) })
+		PEOPLE_LOG.append({
+			log: state.people.log,
+			row: { kind: "stress", person, time, level: STRESS.level(value) },
+		})
 }
 function runYear({ state }: StressYearParams): void {
 	const people = state.people

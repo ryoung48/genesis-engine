@@ -44,6 +44,14 @@ The CPU profile attributes substantial simulation work to repeated military depl
 Census keyframes and complete records still grow with history length. Lossless compression could reduce their storage while retaining every recorded value; thinning would change historical query fidelity.
 
 The live worker and browser now release consumed journal batches, and scrub frames share their census arrays. See [History record memory](history-record-memory.md) for ownership rules, measurements and verification.
+## People packets
+
+People rows no longer cross the worker boundary as one object per row. Each journal transaction carries one typed-array packet whose buffers are transferred, and the record ingests it without keeping it; see [people records](people-records.md). Every person is now recorded, so the journal carries more rows than before.
+
+In the detailed report (seed 14963991, lateMedieval, 204,000 points, 933 years) the journal carried 637,416 people rows for 330,956 people in 35.7 MiB of packets. Summed over the run, `JOURNAL.flush` took 6.80 s with packets and 6.00 s with object rows carrying the same rows, and folding the rows into a people record took 0.81 s against 0.84 s. The two runs' wall times differed by 9% from machine load (302.5 s and 278.0 s, with world generation 10% slower too), so these single samples show no change in either direction. The flush figure covers the whole flush, not only its people rows, and excludes the initial flush. The detailed report does not structured-clone the journal, so it does not measure the saving on the worker boundary.
+
+In the live-history harness (20,000 points, 300 years, 32,336 transactions) cloning and transferring all batches took 1.16 s and translating them 0.71 s, in a single run alongside other work.
+
 ## Lazy person names
 
 The follow-up change defers person and house names until display code requests them through `PERSON_NAMES`. Raw people keep their name seeds, birth realms and dynasty IDs. Ruler events retain person/regent IDs and dates; revolt comments retain their structured cause and pretender ID. Wiki consumers resolve those into the same labels and text as before.

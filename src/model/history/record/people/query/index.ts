@@ -1,3 +1,4 @@
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
 	AttributeView,
 	BetrothalView,
@@ -21,16 +22,16 @@ function until(time: number, timeMs: number): number | null {
 }
 
 function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
-	const person = people.persons.get(id)
+	const person = PEOPLE_RECORD.person({ people, id })
 	if (!person || person.birthTimeMs > timeMs) return null
 	const bornBy = (other: number) =>
-		(people.persons.get(other)?.birthTimeMs ?? Infinity) <= timeMs
+		PEOPLE_RECORD.birthTimeMs({ people, id: other }) <= timeMs
 	const spouses: SpouseView[] = []
 	for (const index of people.marriagesOf.get(id) ?? []) {
 		const marriage = people.marriages[index]
 		if (marriage.startTimeMs > timeMs) continue
 		const partner = marriage.husband === id ? marriage.wife : marriage.husband
-		const partnerDeath = people.persons.get(partner)?.deathTimeMs ?? Infinity
+		const partnerDeath = PEOPLE_RECORD.deathTimeMs({ people, id: partner })
 		spouses.push({
 			person: partner,
 			startTimeMs: marriage.startTimeMs,
@@ -69,8 +70,12 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 		})
 	return {
 		...person,
-		father: people.persons.has(person.father) ? person.father : -1,
-		mother: people.persons.has(person.mother) ? person.mother : -1,
+		father: PEOPLE_RECORD.has({ people, id: person.father })
+			? person.father
+			: -1,
+		mother: PEOPLE_RECORD.has({ people, id: person.mother })
+			? person.mother
+			: -1,
 		deathTimeMs: until(person.deathTimeMs, timeMs),
 		spouses,
 		betrothals,
@@ -117,7 +122,7 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 	}
 	for (const child of person.children)
 		events.push({
-			timeMs: params.people.persons.get(child)?.birthTimeMs ?? 0,
+			timeMs: PEOPLE_RECORD.birthTimeMs({ people: params.people, id: child }),
 			kind: "child born",
 			other: child,
 			tenure: -1,
@@ -173,7 +178,7 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 }
 
 function health({ people, id, timeMs }: PersonAtParams): HealthBand | null {
-	const person = people.persons.get(id)
+	const person = PEOPLE_RECORD.person({ people, id })
 	if (!person || person.birthTimeMs > timeMs || person.deathTimeMs <= timeMs)
 		return null
 	return HEALTH.band({
@@ -204,7 +209,7 @@ function holder({ people, seat, timeMs }: SeatAtParams): number {
 }
 
 function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
-	const person = people.persons.get(id)
+	const person = PEOPLE_RECORD.person({ people, id })
 	if (!person || timeMs < person.birthTimeMs) return []
 	const age =
 		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
@@ -228,7 +233,7 @@ function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
 	})
 }
 function traits({ people, id, timeMs }: PersonAtParams): TraitsView | null {
-	const person = people.persons.get(id)
+	const person = PEOPLE_RECORD.person({ people, id })
 	if (!person || timeMs < person.birthTimeMs) return null
 	const age =
 		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs

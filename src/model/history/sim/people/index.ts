@@ -1,6 +1,7 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AddPersonParams,
@@ -45,7 +46,6 @@ function create(provinceCount: number): PeopleState {
 			scopeYear: [],
 			marriedAt: [],
 			home: [],
-			recorded: [],
 			fertility: [],
 			peak: [],
 			nextBirth: [],
@@ -60,16 +60,7 @@ function create(provinceCount: number): PeopleState {
 		marriageAlliances: new Map(),
 		regencies: new Map(),
 		deposed: new Map(),
-		log: {
-			stress: [],
-			persons: [],
-			marriages: [],
-			seats: [],
-			deaths: [],
-			pregnancies: [],
-			betrothals: [],
-			betrothalEnds: [],
-		},
+		log: PEOPLE_LOG.create(),
 		nextDynasty: 0,
 	}
 }
@@ -111,7 +102,6 @@ function add({
 	table.scopeYear.push(-1)
 	table.marriedAt.push(-1)
 	table.home.push(realm)
-	table.recorded.push(false)
 	table.fertility.push(fertility)
 	table.peak.push(0)
 	table.nextBirth.push(0)
@@ -121,11 +111,6 @@ function add({
 	if (mother >= 0) table.children[mother].push(id)
 	drawPerson({ people, person: id })
 	people.alive.push(id)
-	if (
-		(father >= 0 && table.throne[father] >= 0) ||
-		(mother >= 0 && table.throne[mother] >= 0)
-	)
-		record({ people, person: id })
 	return id
 }
 
@@ -154,37 +139,6 @@ function spawn({
 	})
 }
 
-// Only seat holders and their close family reach the history record.
-function record({ people, person }: PersonRefParams): void {
-	const table = people.persons
-	if (person < 0 || table.recorded[person]) return
-	table.recorded[person] = true
-	people.log.persons.push(person)
-	const spouse = table.spouse[person]
-	if (spouse >= 0 && table.recorded[spouse])
-		people.log.marriages.push({
-			husband: table.sex[person] === 0 ? person : spouse,
-			wife: table.sex[person] === 0 ? spouse : person,
-			start: table.marriedAt[person],
-		})
-}
-
-function recordFamily({ people, person }: PersonRefParams): void {
-	const table = people.persons
-	const siblings = [table.father[person], table.mother[person]].flatMap(
-		(parent) => (parent >= 0 ? table.children[parent] : []),
-	)
-	for (const member of [
-		person,
-		table.father[person],
-		table.mother[person],
-		table.spouse[person],
-		...table.children[person],
-		...siblings,
-	])
-		record({ people, person: member })
-}
-
 // A seat's standing is its title tier plus one: 1 for a county seat, up to 5
 // for a hegemony. Family size follows the highest standing ever held.
 function raise({ people, person, rank }: RaiseParams): void {
@@ -199,15 +153,18 @@ function setRuler({
 	reason,
 }: SetRulerParams): void {
 	people.rulerOf[seat] = person
-	people.log.seats.push({ seat, person, ward: -1, reason })
-	if (person < 0) return
-	raise({ people, person, rank })
-	recordFamily({ people, person })
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: { kind: "seat", seat, person, reason },
+	})
+	if (person >= 0) raise({ people, person, rank })
 }
 
 function setRegent({ people, seat, person, ward }: SetRegentParams): void {
-	people.log.seats.push({ seat, person, ward, reason: "unknown" })
-	record({ people, person })
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: { kind: "regent", seat, person, ward, reason: "unknown" },
+	})
 }
 
 function aliveAt({ people, person, time }: PersonAtParams): boolean {
@@ -277,8 +234,7 @@ function family({ people, person }: PersonRefParams): number[] {
 function shortenLife({ people, person, time }: ShortenLifeParams): boolean {
 	if (time >= people.persons.death[person]) return false
 	people.persons.death[person] = time
-	if (people.persons.recorded[person])
-		people.log.deaths.push({ person, death: time })
+	PEOPLE_LOG.append({ log: people.log, row: { kind: "death", person, time } })
 	return true
 }
 
@@ -323,8 +279,6 @@ function redraw({ people, person }: PersonRefParams): void {
 }
 export const PEOPLE = {
 	redraw,
-	record,
-	recordFamily,
 	setRuler,
 	setRegent,
 	family,

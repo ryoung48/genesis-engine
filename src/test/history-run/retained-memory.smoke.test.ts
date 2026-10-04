@@ -5,6 +5,7 @@ import { setFlagsFromString } from "node:v8"
 import { runInNewContext } from "node:vm"
 import { expect, it } from "vitest"
 import { HISTORY } from "@/model/history/record"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
@@ -123,6 +124,46 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				].filter((buffer) => !censusBuffers.has(buffer)),
 			),
 		)
+		// Each structure's size is what a retained copy of it adds after a
+		// collection: heap for objects, array buffers for typed columns.
+		const copies: unknown[] = []
+		const retainedBytes = (value: unknown) => {
+			collect()
+			const before = process.memoryUsage()
+			copies.push(structuredClone(value))
+			collect()
+			const after = process.memoryUsage()
+			return (
+				after.heapUsed -
+				before.heapUsed +
+				after.arrayBuffers -
+				before.arrayBuffers
+			)
+		}
+		const people = state.record.people
+		const peopleRecord = people && {
+			people: PEOPLE_RECORD.count(people),
+			personCapacity: people.persons.sex.length,
+			marriages: people.marriages.length,
+			betrothals: people.betrothals.length,
+			tenures: people.tenures.length,
+			retainedBytes: {
+				persons: retainedBytes(people.persons),
+				childrenOf: retainedBytes(people.childrenOf),
+				marriages: retainedBytes([people.marriages, people.marriagesOf]),
+				betrothals: retainedBytes([people.betrothals, people.betrothalsOf]),
+				tenures: retainedBytes([
+					people.tenures,
+					people.tenuresOf,
+					people.tenuresOfSeat,
+					people.regentsOfSeat,
+					people.regentsOfWard,
+				]),
+				pregnanciesOf: retainedBytes(people.pregnanciesOf),
+				stressOf: retainedBytes(people.stressOf),
+				dynastyHome: retainedBytes(people.dynastyHome),
+			},
+		}
 		const measurement = {
 			hashFormat: "value-json-v1",
 			gcAfterYield: true,
@@ -143,6 +184,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				0,
 			),
 			memory,
+			peopleRecord,
 			simulationMs,
 			ticksMs,
 			cloningMs,

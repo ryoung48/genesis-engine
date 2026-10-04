@@ -1,5 +1,6 @@
 import { expect, it } from "vitest"
 import { DATE } from "@/model/history/earth/date"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
@@ -115,7 +116,9 @@ it("records rulers, their families and seat tenures consistently", () => {
 	for (const log of state.record.events.nationEvents)
 		for (const event of log?.events ?? []) {
 			if (event.kind !== "rulerChange") continue
-			expect(people.persons.has(event.payload.person as number)).toBe(true)
+			expect(
+				PEOPLE_RECORD.has({ people, id: event.payload.person as number }),
+			).toBe(true)
 		}
 
 	for (const tenures of [
@@ -129,8 +132,8 @@ it("records rulers, their families and seat tenures consistently", () => {
 		}
 
 	for (const marriage of people.marriages) {
-		expect(people.persons.has(marriage.husband)).toBe(true)
-		expect(people.persons.has(marriage.wife)).toBe(true)
+		expect(PEOPLE_RECORD.has({ people, id: marriage.husband })).toBe(true)
+		expect(PEOPLE_RECORD.has({ people, id: marriage.wife })).toBe(true)
 	}
 
 	const rootOf = new Map<number, number>()
@@ -176,20 +179,25 @@ it("records rulers, their families and seat tenures consistently", () => {
 	}
 	for (const [realm, regency] of engine.people.regencies)
 		if (regency.regent >= 0) {
-			expect(people.persons.has(regency.regent)).toBe(true)
+			expect(PEOPLE_RECORD.has({ people, id: regency.regent })).toBe(true)
 			expect(years - table.birth[regency.regent]).toBeGreaterThanOrEqual(16)
 			if (engine.people.rulerOf[realm] === regency.ward)
 				expect(table.death[regency.regent]).toBeGreaterThan(years)
 		}
 	for (const claim of engine.people.deposed.values()) {
 		expect(claim.generation).toBeLessThan(2)
-		expect(people.persons.has(claim.claimant)).toBe(true)
+		expect(PEOPLE_RECORD.has({ people, id: claim.claimant })).toBe(true)
 	}
 
 	const offsetMs = DATE.earthHistoryStartYear * STATE.yearMs
-	for (const [id, person] of people.persons)
+	expect(PEOPLE_RECORD.count(people)).toBe(table.birth.length)
+	for (let id = 0; id < PEOPLE_RECORD.count(people); id++)
 		expect(
-			Math.abs(person.deathTimeMs + offsetMs - table.death[id] * STATE.yearMs),
+			Math.abs(
+				PEOPLE_RECORD.deathTimeMs({ people, id }) +
+					offsetMs -
+					table.death[id] * STATE.yearMs,
+			),
 		).toBeLessThan(1)
 
 	for (const note of engine.events)

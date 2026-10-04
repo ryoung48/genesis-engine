@@ -1,8 +1,8 @@
 # People (`:history`)
 
-See [character](character.md) for inherited attributes, traits, governors and stress.
+See [character](character.md) for inherited attributes, traits, governors and stress, and [people records](people-records.md) for how people reach the history record.
 
-Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `partition/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
+Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `betrothal/`, `fertility/`, `heirs/`, `lifespan/`, `health/`, `log/`); engine wiring in `src/model/history/sim/engine/events/people` (`districts/`, `royal-marriages/`, `patricians/`) and `engine/events/succession` (`systems/`, `partition/`, `regency/`, `restoration/`); unions in `engine/state/index.ts`; record in `src/model/history/record/people`.
 
 People are the cause behind realm events, not a population. Only ruling houses are simulated: a few thousand people on the default map.
 
@@ -12,11 +12,11 @@ People are the cause behind realm events, not a population. Only ruling houses a
 - **Their close family.** Spouses, children and siblings. They are generated with the holder and live on in the person table.
 - **Everyone else is never created.** Spouses from outside the ruling houses are made up on the spot at the wedding (see Marriage).
 
-A person is **recorded** (sent to the history record and wiki) when they hold a seat, are a seat holder's parent, spouse, child or sibling, are born to a seat holder, become a regent, or inherit a deposed claim. Unrecorded people still exist in the sim but never appear in the record.
+Every person the simulation creates is recorded, landed or not, living or dead: see [people records](people-records.md).
 
 ## What is tracked per person
 
-`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, betrothed partner and betrothal time (-1 without one), whether they are recorded, base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
+`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
 The additional character columns are `bases`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](character.md).
 
@@ -31,12 +31,12 @@ State-level maps in `PeopleState`:
 | `marriageAlliances` | Realm pairs allied by a royal marriage. |
 | `regencies` | Realm → `{ ward, regent (-1 = council), kind }`. |
 | `deposed` | Realm → `{ claimant, generation, tried }` for deposed rulers' lines. |
-| `log` | Rows since the last journal flush: new recorded persons, marriages, betrothals made and broken, seat changes (ruler, district or regent), recorded persons whose death moved earlier, and recorded mothers' lost pregnancies and childbirth deaths. |
+| `log` | Rows appended since the last journal flush, as typed columns, and the cursor of people already sent. See [people records](people-records.md). |
 
 ## Life
 
 - **Death is fixed at birth** (`LIFESPAN.deathAt`). Yearly hazard: 10% under 1, 3% under 5, 0.5% under 16, then 1.2% under 40 for both sexes, then Gompertz ageing (1.2% × e^(0.09 × (age − 40))). Nobody lives past 100.
-- **Only childbirth moves a death date**, and only earlier (`PEOPLE.shortenLife`). A recorded person's new date goes to the record as a `deaths` row. A sovereign ruler's succession, and a regent's replacement, are rescheduled to the new date; everything else reads the person table live.
+- **Only childbirth moves a death date**, and only earlier (`PEOPLE.shortenLife`). The new date goes to the record as a `death` row. A sovereign ruler's succession, and a regent's replacement, are rescheduled to the new date; everything else reads the person table live.
 - **Health is read back from the death date** (`HEALTH.band`): Grave in the last half year, Poor in the last 2 years of a life ending at 40+, Fair in the last 6 years of a life ending at 50+, else Good. A mother whose pregnancy will kill her reads Poor or Grave during it, which gives a reigning queen a weak crown in her last months.
 - **Births** come from pregnancies (see Pregnancy). Only couples where one spouse is a ruler or a ruler's child keep having children.
 - **Dynasty** follows the father, or the mother in matriarchal cultures. It falls back to the other parent when the first has none. Dynasties spread only through births.
@@ -53,7 +53,7 @@ State-level maps in `PeopleState`:
 - **Twins**, on a live birth: 4% if the mother is 25–35, else 2%; +5% if she has had twins, +3% if her mother has. Girls are 49%.
 - **Standing** of a seat is its title tier + 1 (1 for a county seat, up to 5 for a hegemony). A couple's standing is the highest `peak` among the spouses and their parents.
 - **Cap on living children** by standing 0–5: 1, 2, 3, 5, 5, 8; +2 if a spouse holds a seat; −1 for about half of couples (a fixed hash of the pair).
-- **Record.** Recorded mothers' miscarriages, stillbirths and childbirth deaths are `pregnancies` rows. They show only on the mother's page ("miscarriage", "stillborn child", "died in childbirth"); a reigning queen's death reaches her realm only as its succession.
+- **Record.** Miscarriages, stillbirths and childbirth deaths are `pregnancy` rows. They show only on the mother's page ("miscarriage", "stillborn child", "died in childbirth"); a reigning queen's death reaches her realm only as its succession.
 
 ## Founding a house
 
@@ -168,12 +168,7 @@ Successions, coming of age and rebellions run on their own events at the exact t
 
 ## Record and wiki
 
-- **Journal.** Each flush carries new recorded persons, marriages, seat rows, `deaths`, `pregnancies`, `betrothals` and `betrothalEnds` rows:
-  - a seat row's kind is `ruler`, `district` or `regent`, and a regent row also names the ward;
-  - a `deaths` row gives a recorded person's earlier death date;
-  - a `pregnancies` row is a recorded mother's miscarriage, stillbirth or childbirth death;
-  - `betrothals` and `betrothalEnds` (cause `death` or `alliance`) cover recorded pairs; a fulfilled betrothal ends in its marriage row.
-- **Record.** `PEOPLE_RECORD` builds persons, marriages and tenures, indexed by person, by seat and by ward. A tenure keeps the reason it started and the reason it ended. A seat that changes hands more than once in one transaction keeps only its last holder. Regent tenures are kept apart from holder tenures on the same seat. `deaths` rows update the person's death date, pregnancy outcomes are indexed by mother, and betrothals by person (`betrothalsOf`, with start, end and cause). A reigning ruler's `rulerChange` entry on the nation timeline also gets the new death date.
+- **Journal and record.** Each journal transaction carries its people rows as one typed-array packet, and `PEOPLE_RECORD` folds the packets into person columns and the derived marriages, betrothals, tenures, pregnancies and stress rows. [People records](people-records.md) has the row kinds, the packet and the record's structures. A reigning ruler's `rulerChange` entry on the nation timeline also gets a moved death date.
 - **Queries.** `PERSON_QUERY` gives the person view, the timeline, the seat holder at a time, and health. On a mother's timeline, "miscarriage" and "stillborn child" are added, and "died in childbirth" replaces "died". "betrothed" and, for an alliance break, "betrothal broken" are added. The person page shows them as Family rows, and a "Betrothed" chip group while a betrothal stands.
 - **Nation timelines.** Only realm-level person events reach them:
   - successions;
@@ -188,4 +183,4 @@ Successions, coming of age and rebellions run on their own events at the exact t
 
 ## Character records and wiki
 
-Recorded-person rows preserve packed innate character. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read character at the selected date, with personality ages 9/11/13.
+Person rows preserve packed innate character. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read character at the selected date, with personality ages 9/11/13.

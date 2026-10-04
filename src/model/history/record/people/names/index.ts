@@ -1,3 +1,4 @@
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import type {
 	InitializeNamesParams,
 	NameContext,
@@ -23,7 +24,7 @@ function context(people: PeopleRecord): NameContext {
 }
 
 function house({ people, person }: PersonNamesParams): string | null {
-	const row = people?.persons.get(person)
+	const row = people ? PEOPLE_RECORD.person({ people, id: person }) : null
 	if (!people || !row || row.dynasty < 0) return null
 	return context(people).generator.dynasty({
 		dynastyIdx: row.dynasty,
@@ -33,7 +34,7 @@ function house({ people, person }: PersonNamesParams): string | null {
 
 function names(params: PersonNamesParams): PersonNames | null {
 	const { people, person } = params
-	const row = people?.persons.get(person)
+	const row = people ? PEOPLE_RECORD.person({ people, id: person }) : null
 	if (!people || !row) return null
 	const resolved = context(people)
 	const cached = resolved.cache.get(person)
@@ -53,7 +54,9 @@ function names(params: PersonNamesParams): PersonNames | null {
 
 function person(params: PersonNamesParams): NamedPerson | null {
 	const named = names(params)
-	const row = params.people?.persons.get(params.person)
+	const row = params.people
+		? PEOPLE_RECORD.person({ people: params.people, id: params.person })
+		: null
 	return row && named ? { ...row, ...named } : null
 }
 

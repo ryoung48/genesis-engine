@@ -1,9 +1,10 @@
-import type {
-	JournalPeople,
-	JournalStress,
-	SeatKind,
-} from "@/model/history/sim/engine/journal/types"
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
+import type {
+	PeoplePacket,
+	RegentRow,
+	SeatKind,
+	SeatRow,
+} from "@/model/history/sim/people/log/types"
 import type { Character } from "@/model/history/sim/people/traits/types"
 import type {
 	PregnancyLoss,
@@ -18,8 +19,29 @@ export interface RecordPerson extends Character {
 	father: number
 	mother: number
 	dynasty: number
+	culture: number
 	nameSeed: number
 	home: number
+}
+
+// Every person, indexed by id. The columns grow by doubling, so their length
+// can exceed `count`.
+export interface PersonColumns {
+	count: number
+	sex: Uint8Array
+	birthTimeMs: Float64Array
+	deathTimeMs: Float64Array
+	father: Int32Array
+	mother: Int32Array
+	dynasty: Int32Array
+	culture: Int32Array
+	nameSeed: Int32Array
+	home: Int32Array
+	bases: Float64Array
+	personality: Float64Array
+	grades: Float64Array
+	congenital: Float64Array
+	carried: Float64Array
 }
 
 export interface RecordMarriage {
@@ -47,6 +69,12 @@ export interface RecordPregnancy {
 	outcome: PregnancyLoss
 }
 
+export interface RecordStress {
+	person: number
+	timeMs: number
+	level: number
+}
+
 export interface RecordTenure {
 	person: number
 	seat: number
@@ -60,8 +88,8 @@ export interface RecordTenure {
 }
 
 export interface PeopleRecord {
-	stressOf: Map<number, JournalStress[]>
-	persons: Map<number, RecordPerson>
+	stressOf: Map<number, RecordStress[]>
+	persons: PersonColumns
 	childrenOf: Map<number, number[]>
 	marriages: RecordMarriage[]
 	marriagesOf: Map<number, number[]>
@@ -71,7 +99,7 @@ export interface PeopleRecord {
 	tenuresOfSeat: Map<number, number[]>
 	regentsOfSeat: Map<number, number[]>
 	regentsOfWard: Map<number, number[]>
-	// Home realm of each house's first recorded member; house names use it.
+	// Home realm of each house's first member; house names use it.
 	dynastyHome: Map<number, number>
 	// Pregnancies that bore no living child or killed the mother, by mother.
 	pregnanciesOf: Map<number, RecordPregnancy[]>
@@ -81,9 +109,37 @@ export interface PeopleRecord {
 
 export interface AppendPeopleParams {
 	record: PeopleRecord
-	rows: JournalPeople
+	packet: PeoplePacket
+	// The transaction's record time; seat and regent rows take it.
 	timeMs: number
-	recordTime: (engineTimeMs: number) => number
+	recordTime: (years: number) => number
+}
+
+export interface RecordPersonParams {
+	people: PeopleRecord
+	id: number
+}
+
+export interface ReserveParams {
+	persons: PersonColumns
+	count: number
+}
+
+export interface AddPersonParams {
+	record: PeopleRecord
+	packet: PeoplePacket
+	id: number
+	snapshot: number
+	father: number
+	mother: number
+	birthTimeMs: number
+	deathTimeMs: number
+}
+
+export interface SeatChangesParams {
+	record: PeopleRecord
+	rows: (SeatRow | RegentRow)[]
+	timeMs: number
 }
 
 export interface PushIndexParams<T> {

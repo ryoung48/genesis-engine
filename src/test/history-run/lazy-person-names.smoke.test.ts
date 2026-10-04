@@ -3,6 +3,7 @@ import { createElement } from "react"
 import { renderToString } from "react-dom/server"
 import { expect, it, vi } from "vitest"
 import { HISTORY } from "@/model/history/record"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
@@ -69,7 +70,7 @@ it("generates names only for requested display data and caches them without chan
 		)
 		if (!event) throw new Error("Ruler has no event")
 		const id = event.payload.person as number
-		const row = people.persons.get(id)
+		const row = PEOPLE_RECORD.person({ people, id })
 		if (!row) throw new Error("Ruler has no person")
 		PERSON_QUERY.view({ people, id, timeMs: state.record.maxTimeMs })
 		PERSON_QUERY.timeline({ people, id, timeMs: state.record.maxTimeMs })
@@ -105,12 +106,14 @@ it("generates names only for requested display data and caches them without chan
 		expect(nation.ruler.name).toBe(expected.name)
 		expect(PERSON_NAMES.person({ people, person: id })).toEqual(first)
 		expect(rulerCalls).toBe(1)
-		row.deathTimeMs -= STATE.yearMs
+		people.persons.deathTimeMs[id] -= STATE.yearMs
 		expect(PERSON_NAMES.person({ people, person: id })?.deathTimeMs).toBe(
-			row.deathTimeMs,
+			row.deathTimeMs - STATE.yearMs,
 		)
-		row.deathTimeMs += STATE.yearMs
-		for (const person of Array.from(people.persons.values()).reverse()) {
+		people.persons.deathTimeMs[id] += STATE.yearMs
+		for (let other = PEOPLE_RECORD.count(people) - 1; other >= 0; other--) {
+			const person = PEOPLE_RECORD.person({ people, id: other })
+			if (!person) throw new Error("Record is missing a person")
 			const actual = PERSON_NAMES.person({ people, person: person.id })
 			const expected = reference.ruler({
 				province: person.home,
@@ -131,7 +134,7 @@ it("generates names only for requested display data and caches them without chan
 			expect(person).not.toHaveProperty("name")
 			expect(person).not.toHaveProperty("house")
 		}
-		expect(rulerCalls).toBe(people.persons.size)
+		expect(rulerCalls).toBe(PEOPLE_RECORD.count(people))
 		const display = PERSON_NAMES.payload({ people, payload: event.payload })
 		expect(display).toMatchObject({
 			name: expected.name,
@@ -154,7 +157,7 @@ it("generates names only for requested display data and caches them without chan
 				comment: { ...comment, person: -1, throne: false },
 			}),
 		).toBe("Revolted against Test kingdom (restoration)")
-		expect(rulerCalls).toBe(people.persons.size)
+		expect(rulerCalls).toBe(PEOPLE_RECORD.count(people))
 		expect(PERSON_NAMES.person({ people, person: -1 })).toBeNull()
 		expect(recordPersonMention({ people, person: id })?.name).toBe(
 			expected.name,
@@ -211,7 +214,7 @@ it("generates names only for requested display data and caches them without chan
 			return createElement(PersonWikiPage, { person: data })
 		}
 		expect(renderToString(createElement(PersonPage))).toContain(expected.name)
-		expect(rulerCalls).toBe(people.persons.size)
+		expect(rulerCalls).toBe(PEOPLE_RECORD.count(people))
 	} finally {
 		NAMES.createWorldNames = create
 	}

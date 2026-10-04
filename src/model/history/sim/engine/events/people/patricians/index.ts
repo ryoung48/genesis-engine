@@ -62,7 +62,6 @@ function settle({ state, rng }: PatricianParams): void {
 					rng,
 				}),
 			)
-		for (const head of heads) PEOPLE.recordFamily({ people, person: head })
 		people.patricians.set(realm, heads)
 	}
 }

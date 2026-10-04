@@ -63,7 +63,6 @@ function due({ state }: DueParams): number[] {
 			}
 			current = { claimant: heir, generation, tried: false }
 			people.deposed.set(realm, current)
-			PEOPLE.record({ people, person: heir })
 		}
 		if (
 			!current.tried &&

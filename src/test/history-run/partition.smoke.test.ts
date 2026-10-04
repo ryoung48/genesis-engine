@@ -694,13 +694,27 @@ it("bumps a lower admin, and ends the chain at a dead one", () => {
 	const table = living.fx.state.people.persons
 	expect(living.note.adminPersons[0]).toBe(living.admin)
 	expect(living.note.adminBumped[0]).toBe(1)
-	const bumped = living.note.adminPersons[1]
-	expect(living.holders).toContain(bumped)
-	expect(living.note.adminTo[1]).toBe(-1)
-	expect(table.throne[bumped]).toBe(-1)
-	expect(living.fx.state.people.rulerOf[living.note.adminTo[0]]).toBe(
-		living.admin,
-	)
+	// Each bumped holder takes a seat of lower rank than the one they lost, so
+	// the chain runs down the ranks until someone has nowhere to go.
+	const { adminPersons, adminFrom, adminTo, adminBumped } = living.note
+	const last = adminPersons.length - 1
+	expect(last).toBeGreaterThanOrEqual(1)
+	for (let move = 0; move <= last; move++) {
+		const moved = adminPersons[move]
+		if (move > 0) {
+			expect(living.holders).toContain(moved)
+			expect(adminFrom[move]).toBe(adminTo[move - 1])
+		}
+		if (move === last) {
+			expect(adminTo[move]).toBe(-1)
+			expect(adminBumped[move]).toBe(0)
+			expect(table.throne[moved]).toBe(-1)
+			continue
+		}
+		expect(adminBumped[move]).toBe(1)
+		expect(table.throne[moved]).toBe(adminTo[move])
+		expect(living.fx.state.people.rulerOf[adminTo[move]]).toBe(moved)
+	}
 
 	const dead = build(true)
 	expect(dead.note.adminPersons).toEqual([dead.admin])

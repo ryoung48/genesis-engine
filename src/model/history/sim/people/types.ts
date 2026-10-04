@@ -1,4 +1,4 @@
-import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
+import type { PeopleLog } from "@/model/history/sim/people/log/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export type Sex = 0 | 1
@@ -29,7 +29,6 @@ export interface PersonTable {
 	marriedAt: number[]
 	// Realm at birth; names are drawn from its culture.
 	home: number[]
-	recorded: boolean[]
 	// Base fertility, 0.5 to 0.6.
 	fertility: number[]
 	// Highest seat standing ever held; 0 for none.
@@ -40,20 +39,6 @@ export interface PersonTable {
 	betrothed: number[]
 	// When the betrothal was made; -1 without one.
 	betrothedAt: number[]
-}
-
-export interface PeopleLogMarriage {
-	husband: number
-	wife: number
-	start: number
-}
-
-export interface PeopleLogSeat {
-	seat: number
-	person: number
-	reason: SeatChangeReason
-	// The child a regent governs for; -1 for a seat holder's row.
-	ward: number
 }
 
 export type SeatChangeReason =
@@ -87,52 +72,6 @@ export interface DeposedClaim {
 }
 
 export type PregnancyLoss = "miscarriage" | "stillbirth" | "childbirth death"
-
-export interface PeopleLogPregnancy {
-	mother: number
-	father: number
-	// When the pregnancy ended.
-	time: number
-	outcome: PregnancyLoss
-}
-
-export interface PeopleLogBetrothal {
-	a: number
-	b: number
-	time: number
-}
-
-export interface PeopleLogBetrothalEnd extends PeopleLogBetrothal {
-	cause: BetrothalEndCause
-}
-
-export interface PeopleLogDeath {
-	person: number
-	death: number
-}
-
-// Rows the journal has not yet taken: newly recorded people, marriages and
-// betrothals between recorded people, seat holder changes, recorded people
-// whose death moved earlier, and recorded mothers' pregnancies that bore no
-// living child or killed the mother.
-export interface PeopleLogStress {
-	person: number
-	time: number
-	level: number
-}
-
-export interface PeopleLog {
-	stress: PeopleLogStress[]
-	persons: number[]
-	marriages: PeopleLogMarriage[]
-	seats: PeopleLogSeat[]
-	deaths: PeopleLogDeath[]
-	pregnancies: PeopleLogPregnancy[]
-	betrothals: PeopleLogBetrothal[]
-	// Betrothals released by death or a broken alliance; a fulfilled one ends
-	// in its marriage row instead.
-	betrothalEnds: PeopleLogBetrothalEnd[]
-}
 
 export interface PeopleState {
 	persons: PersonTable

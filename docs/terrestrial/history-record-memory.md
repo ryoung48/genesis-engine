@@ -7,6 +7,7 @@ The history record remains the complete source for scrubbing. Events, people, ce
 - The simulation worker posts the pending journal, then calls `JOURNAL.releaseSent` after `postMessage` succeeds. Sent transactions and engine notes can then be collected. Census buffer transfers still move ownership to the receiver.
 - The procedural timeline treats its journal ref as a pending queue. `SIM_RECORD.consumeJournal` translates the whole queue into the record, then empties it. Later batches append to that empty queue. The non-consuming `appendJournal` operation remains available for consumers comparing or inspecting batches.
 - Frame population and development arrays reference the selected census snapshot directly. Census snapshots and those frame arrays must be treated as immutable. The engine copies its current arrays when recording a census, so later simulation updates do not change earlier frames. Political arrays and other reconstructed frame state retain their existing ownership.
+- People rows arrive as one typed-array packet per journal transaction, and its buffers are transferred with the census buffers. `PEOPLE_RECORD.append` folds a packet into the record and keeps no reference to it, so packets are collected with their transactions. See [people records](people-records.md).
 - The existing frame cache still retains up to 48 dates. No decompression or additional history replay is introduced.
 
 ## Measurements
@@ -41,11 +42,32 @@ The scrub median is essentially unchanged (-0.6%). The simulation/transfer/trans
 
 Local measurements are in `stats/history/2026-10-03T20-58-05-000Z-scrub-memory-measurements/`. Reports and comparisons stay local and are not committed.
 
+## People record
+
+The record holds every person the simulation creates. `PeopleRecord.persons` is dense typed columns indexed by person id, 81 bytes a person, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [People records](people-records.md) describes each.
+
+The live-history harness (20,000 points, 300 years) recorded 26,190 people, 9,194 marriages, 6,866 tenures and 470 betrothals. Each structure's size is what a retained `structuredClone` of it adds after a garbage collection, heap plus array buffers:
+
+| Structure | Retained | Notes |
+| --- | ---: | --- |
+| `persons` columns | 3.50 MiB | Capacity 45,920 after doubling; the 26,190 people in use are 2.02 MiB. |
+| `tenures` and its four indices | 2.28 MiB | |
+| `marriages`, `marriagesOf` | 2.03 MiB | |
+| `childrenOf` | 1.34 MiB | |
+| `pregnanciesOf` | 0.25 MiB | |
+| `betrothals`, `betrothalsOf` | 0.16 MiB | |
+| `dynastyHome` | 0.05 MiB | |
+| `stressOf` | 0.02 MiB | |
+
+That is 9.6 MiB of people data on the main thread, of 127.3 MiB retained JavaScript heap and 66.6 MiB of array buffers in the same run. The derived objects are 64% of it; converting them to columns is not planned. The 204,000-point report's 330,956 people need 25.6 MiB of columns in use and up to twice that in capacity. Local measurements are in `stats/history/2026-10-04T04-48-15-693Z-people-2-dp72/people-record-memory.json`.
+
+The record hash of this run cannot be compared with the earlier measurements above: the record now holds every person, and its people are columns.
+
 ## Verification
 
 `src/test/history-run/pipeline-optimization.smoke.test.ts` transfers census buffers, releases worker batches, consumes browser queues and compares the complete streamed record with a retained-batch record across 20 years. It checks frames at census dates and between censuses in reverse order, and checks that all three frame arrays reference the correct census snapshot.
 
-The optional `src/test/history-run/retained-memory.smoke.test.ts` harness records memory, simulation/translation timing, scrub reconstruction timing and hashes. `HISTORY_MEMORY_RETAIN=1` reproduces the former retained-journal behavior and adds back the former census copies for timing comparisons; it is confined to the measurement harness. Scrub timing excludes hash serialization.
+The optional `src/test/history-run/retained-memory.smoke.test.ts` harness records memory, the people record's size per structure, simulation/translation timing, scrub reconstruction timing and hashes. `HISTORY_MEMORY_RETAIN=1` reproduces the former retained-journal behavior and adds back the former census copies for timing comparisons; it is confined to the measurement harness. Scrub timing excludes hash serialization.
 
 The harness hashes JSON values with explicit map entries and non-finite/negative-zero number representations, so sharing an empty array does not change the result hash. `hashFormat: "value-json-v1"` marks these hashes; they cannot be compared directly with the initial V8 serialization hashes. Memory is collected after yielding to the event loop, releasing temporary hash serialization strings before GC. The `gcAfterYield` flag distinguishes these samples from earlier exploratory measurements.
 

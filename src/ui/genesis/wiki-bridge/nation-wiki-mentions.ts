@@ -1,5 +1,6 @@
 import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
+import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { uiPalette } from "@/ui/components/tokens"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
@@ -109,8 +110,9 @@ export function regentRole({
 	ward,
 	kind,
 }: RegentRoleParams): string | null {
-	const regentRow = people?.persons.get(regent)
-	const wardRow = people?.persons.get(ward)
+	if (!people) return null
+	const regentRow = PEOPLE_RECORD.person({ people, id: regent })
+	const wardRow = PEOPLE_RECORD.person({ people, id: ward })
 	if (!regentRow || !wardRow) return null
 	const female = regentRow.sex === 1
 	const parents = [wardRow.father, wardRow.mother].filter((id) => id >= 0)
@@ -118,7 +120,7 @@ export function regentRole({
 	if ([regentRow.father, regentRow.mother].some((id) => parents.includes(id)))
 		return female ? "sister" : "brother"
 	const grandparents = parents.flatMap((id) => {
-		const parent = people?.persons.get(id)
+		const parent = PEOPLE_RECORD.person({ people, id })
 		return parent ? [parent.father, parent.mother] : []
 	})
 	if (

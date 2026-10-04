@@ -13,6 +13,7 @@ import type {
 } from "@/model/history/sim/people/family/types"
 import { FERTILITY } from "@/model/history/sim/people/fertility"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
 	CrossMatch,
 	FoundHouseParams,
@@ -36,14 +37,15 @@ function marry({ people, a, b, time }: MarryParams): void {
 	table.spouse[b] = a
 	table.marriedAt[a] = time
 	table.marriedAt[b] = time
-	if (table.recorded[a] && table.recorded[b])
-		people.log.marriages.push({
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: {
+			kind: "wedding",
 			husband: table.sex[a] === 0 ? a : b,
 			wife: table.sex[a] === 0 ? b : a,
-			start: time,
-		})
-	else if (table.throne[a] >= 0) PEOPLE.record({ people, person: b })
-	else if (table.throne[b] >= 0) PEOPLE.record({ people, person: a })
+			time,
+		},
+	})
 }
 
 function outsider({

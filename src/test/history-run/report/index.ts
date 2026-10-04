@@ -10,6 +10,8 @@ import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import type { PeoplePacket } from "@/model/history/sim/people/log/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -22,6 +24,8 @@ import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
+import { PEOPLE_RECORD_REPORT } from "@/test/history-run/report/people-record"
+import type { PeopleRecordReport } from "@/test/history-run/report/people-record/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
 import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
 import type {
@@ -451,6 +455,7 @@ function runSeed({
 		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
 		partitionTotal: null as PartitionReport | null,
+		peopleRecord: null as PeopleRecordReport | null,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
@@ -503,6 +508,7 @@ function runSeed({
 		peopleMs += performance.now() - t0
 	}
 	const characterTracker = PEOPLE_TRAITS_REPORT.tracker()
+	const peopleRecord = PEOPLE_RECORD_REPORT.attach()
 	const partitions = PARTITION_REPORT.tracker()
 	partitions.cursor = engine.events.length
 	let divideMs = 0
@@ -532,10 +538,16 @@ function runSeed({
 				lateKnowledgeBand: options.lateKnowledgeBand,
 			}),
 		)
-		for (const transaction of engine.journal)
-			for (const row of transaction.people.pregnancies)
-				if (row.outcome === "childbirth death")
-					childbirthDeathTimes.push(row.timeMs)
+		PEOPLE_RECORD_REPORT.ingest({
+			tracker: peopleRecord.tracker,
+			transactions: engine.journal,
+		})
+		for (const { people: packet } of engine.journal)
+			for (let index = 0; index < (packet?.count ?? 0); index++) {
+				const row = PEOPLE_LOG.read({ rows: packet as PeoplePacket, index })
+				if (row.kind === "pregnancy" && row.outcome === "childbirth death")
+					childbirthDeathTimes.push(row.time * STATE.yearMs)
+			}
 		engine.journal.length = 0
 		diagnostics.annualTicks.push(performance.now() - tickStart)
 		if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
@@ -624,8 +636,12 @@ function runSeed({
 				divideMs: divideTotalMs,
 			})
 		diagnostics.completed = year === start + options.years
-		if (diagnostics.completed)
+		if (diagnostics.completed) {
 			diagnostics.totalPeopleCreated = PEOPLE_TRAITS_REPORT.validate({ engine })
+			diagnostics.peopleRecord = PEOPLE_RECORD_REPORT.summarize(
+				peopleRecord.tracker,
+			)
+		}
 		diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
 		persist()
 		options.log(
@@ -643,6 +659,7 @@ function runSeed({
 	}
 	PEOPLE_EVENTS.runYear = runPeopleYear
 	PARTITION.divide = divide
+	peopleRecord.detach()
 	military.detach()
 	rebelLogistics.detach()
 	const settled = tracker.standing.slice(20, 31)

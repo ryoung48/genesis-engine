@@ -4,7 +4,6 @@ import type {
 } from "@/model/history/record/types"
 import type {
 	FlushJournalParams,
-	JournalPeople,
 	JournalRelationChange,
 	JournalTransaction,
 	PendingJournal,
@@ -13,9 +12,9 @@ import type {
 	RecordProvinceParams,
 	RecordRelationParams,
 } from "@/model/history/sim/engine/journal/types"
-import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import { CHARACTER } from "@/model/history/sim/people/character"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import type { PeoplePacket } from "@/model/history/sim/people/log/types"
 
 const RULER_TAGS = new Set([
 	"succession",
@@ -114,76 +113,6 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 	}
 }
 
-function peopleRows(state: HistoryState): JournalPeople {
-	const { persons: table, log } = state.people
-	const rows: JournalPeople = {
-		stress: log.stress.map(({ person, time, level }) => ({
-			person,
-			timeMs: time * yearMs,
-			level,
-		})),
-		persons: log.persons.map((id) => ({
-			id,
-			sex: table.sex[id],
-			birthTimeMs: table.birth[id] * yearMs,
-			deathTimeMs: table.death[id] * yearMs,
-			father: table.father[id],
-			mother: table.mother[id],
-			dynasty: table.dynasty[id],
-			nameSeed: table.nameSeed[id],
-			home: table.home[id],
-			...CHARACTER.of({ people: state.people, person: id }),
-		})),
-		marriages: log.marriages.map((marriage) => ({
-			husband: marriage.husband,
-			wife: marriage.wife,
-			startTimeMs: marriage.start * yearMs,
-		})),
-		seats: log.seats.map(({ seat, person, ward, reason }) => ({
-			seat,
-			person,
-			reason,
-			kind:
-				ward >= 0
-					? "regent"
-					: state.parentCurrent[seat] < 0
-						? "ruler"
-						: "district",
-			ward,
-		})),
-		deaths: log.deaths.map(({ person, death }) => ({
-			id: person,
-			deathTimeMs: death * yearMs,
-		})),
-		pregnancies: log.pregnancies.map(({ mother, father, time, outcome }) => ({
-			mother,
-			father,
-			timeMs: time * yearMs,
-			outcome,
-		})),
-		betrothals: log.betrothals.map(({ a, b, time }) => ({
-			a,
-			b,
-			timeMs: time * yearMs,
-		})),
-		betrothalEnds: log.betrothalEnds.map(({ a, b, time, cause }) => ({
-			a,
-			b,
-			timeMs: time * yearMs,
-			cause,
-		})),
-	}
-	log.stress.length = 0
-	log.persons.length = 0
-	log.marriages.length = 0
-	log.seats.length = 0
-	log.deaths.length = 0
-	log.pregnancies.length = 0
-	log.betrothals.length = 0
-	log.betrothalEnds.length = 0
-	return rows
-}
-
 function flush({
 	state,
 	noteCursor,
@@ -191,7 +120,6 @@ function flush({
 	initial,
 }: FlushJournalParams): void {
 	const pendingJournal = state.pendingJournal
-	const log = state.people.log
 	if (
 		!initial &&
 		!census &&
@@ -200,14 +128,7 @@ function flush({
 		pendingJournal.relations.size === 0 &&
 		pendingJournal.occupations.size === 0 &&
 		pendingJournal.coalitions.length === 0 &&
-		log.stress.length === 0 &&
-		log.persons.length === 0 &&
-		log.marriages.length === 0 &&
-		log.seats.length === 0 &&
-		log.deaths.length === 0 &&
-		log.pregnancies.length === 0 &&
-		log.betrothals.length === 0 &&
-		log.betrothalEnds.length === 0
+		!PEOPLE_LOG.pending(state.people)
 	)
 		return
 	const parents = [...pendingJournal.parents.values()].filter(
@@ -272,16 +193,14 @@ function flush({
 			budget.titleCreationExpenses = 0
 			budget.otherChangesTotal = 0
 		}
-	const people = peopleRows(state)
+	const people = PEOPLE_LOG.pending(state.people)
+		? PEOPLE_LOG.seal({
+				people: state.people,
+				sovereign: (seat) => state.parentCurrent[seat] < 0,
+			})
+		: null
 	if (
-		people.stress.length > 0 ||
-		people.persons.length > 0 ||
-		people.marriages.length > 0 ||
-		people.seats.length > 0 ||
-		people.deaths.length > 0 ||
-		people.pregnancies.length > 0 ||
-		people.betrothals.length > 0 ||
-		people.betrothalEnds.length > 0 ||
+		people ||
 		parents.length > 0 ||
 		relations.length > 0 ||
 		occupations.length > 0 ||
@@ -308,16 +227,39 @@ function flush({
 	pendingJournal.coalitions = []
 }
 
+function packetBuffers(packet: PeoplePacket): Transferable[] {
+	return [
+		packet.time.buffer,
+		packet.kind.buffer,
+		packet.a.buffer,
+		packet.b.buffer,
+		packet.c.buffer,
+		packet.d.buffer,
+		packet.sex.buffer,
+		packet.death.buffer,
+		packet.dynasty.buffer,
+		packet.culture.buffer,
+		packet.nameSeed.buffer,
+		packet.home.buffer,
+		packet.bases.buffer,
+		packet.personality.buffer,
+		packet.grades.buffer,
+		packet.congenital.buffer,
+		packet.carried.buffer,
+	]
+}
+
 function transferList(journal: JournalTransaction[]): Transferable[] {
-	return journal.flatMap((transaction) =>
-		transaction.census
+	return journal.flatMap((transaction) => [
+		...(transaction.census
 			? [
 					transaction.census.urban.buffer,
 					transaction.census.rural.buffer,
 					transaction.census.development.buffer,
 				]
-			: [],
-	)
+			: []),
+		...(transaction.people ? packetBuffers(transaction.people) : []),
+	])
 }
 
 function releaseSent(state: HistoryState): void {

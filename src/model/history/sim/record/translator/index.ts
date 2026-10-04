@@ -17,6 +17,7 @@ import type { SiegeBeatData } from "@/model/history/sim/engine/events/siege/type
 import { RELATION_CODE } from "@/model/history/sim/engine/fields"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import { COLORING } from "@/model/history/sim/nations/coloring"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
 	ActiveTie,
 	AppendJournalParams,
@@ -42,6 +43,11 @@ const YEAR_MS = 365 * 86_400_000
 
 function recordTime(engineTimeMs: number): number {
 	return engineTimeMs - DATE.earthHistoryStartYear * YEAR_MS
+}
+
+// People rows carry simulation years.
+function peopleTime(years: number): number {
+	return recordTime(years * YEAR_MS)
 }
 
 function descendants({ children, province }: DescendantsParams): number[] {
@@ -93,9 +99,9 @@ function nationLabel({
 // each revolt and each rebel-war outcome.
 // A reigning ruler whose death moved earlier: the reign's last ruler entry
 // carries the new death date.
-function moveRulerDeath({ translator, death }: RulerDeathParams): void {
+function moveRulerDeath({ translator, person, time }: RulerDeathParams): void {
 	const { record } = translator.state
-	for (const index of record.people?.tenuresOf.get(death.id) ?? []) {
+	for (const index of record.people?.tenuresOf.get(person) ?? []) {
 		const tenure = record.people?.tenures[index]
 		if (!tenure || tenure.kind !== "ruler" || tenure.endTimeMs !== Infinity)
 			continue
@@ -103,12 +109,9 @@ function moveRulerDeath({ translator, death }: RulerDeathParams): void {
 		if (nationId === undefined) continue
 		const entry = record.events.nationEvents[nationId]?.events.findLast(
 			(event) =>
-				event.kind === "rulerChange" && event.payload.person === death.id,
+				event.kind === "rulerChange" && event.payload.person === person,
 		)
-		if (entry)
-			entry.payload.deathDate = DATE.timeMsToEu4Date(
-				recordTime(death.deathTimeMs),
-			)
+		if (entry) entry.payload.deathDate = DATE.timeMsToEu4Date(peopleTime(time))
 	}
 }
 
@@ -981,15 +984,20 @@ function applyTransaction({
 	const { record } = translator.state
 	const timeMs = Math.max(record.minTimeMs, recordTime(transaction.timeMs))
 	record.maxTimeMs = Math.max(record.maxTimeMs, timeMs)
-	if (record.people)
+	const packet = transaction.people
+	if (record.people && packet) {
 		PEOPLE_RECORD.append({
 			record: record.people,
-			rows: transaction.people,
+			packet,
 			timeMs,
-			recordTime,
+			recordTime: peopleTime,
 		})
-	for (const death of transaction.people.deaths)
-		moveRulerDeath({ translator, death })
+		for (let index = 0; index < packet.count; index++) {
+			const row = PEOPLE_LOG.read({ rows: packet, index })
+			if (row.kind === "death")
+				moveRulerDeath({ translator, person: row.person, time: row.time })
+		}
+	}
 	const count = translator.parent.length
 	const affected = new Set<number>()
 	const pairs = new Set<number>()

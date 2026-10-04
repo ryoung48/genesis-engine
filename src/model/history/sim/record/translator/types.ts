@@ -1,8 +1,5 @@
 import type { HistoryState, RevoltComment } from "@/model/history/record/types"
-import type {
-	JournalDeath,
-	JournalTransaction,
-} from "@/model/history/sim/engine/journal/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { EngineNote } from "@/model/history/sim/engine/state/types"
 import type { LanguageNames } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
@@ -110,7 +107,9 @@ export interface RoyalMarriage {
 
 export interface RulerDeathParams {
 	translator: ProceduralTranslator
-	death: JournalDeath
+	person: number
+	// The new death date in simulation years.
+	time: number
 }
 
 export interface ContributionsParams {

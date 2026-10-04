@@ -16,8 +16,10 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
+import type { PeopleState } from "@/model/history/sim/people/types"
 import { HASH } from "@/model/shared/random/hash"
 import { RNG } from "@/model/shared/random/rng"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -27,6 +29,22 @@ import type {
 	LadderRules,
 } from "@/test/history-run/ladder-experiment/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
+
+// Stress levels a person's pending rows carry, in append order.
+function stressLevels({
+	people,
+	person,
+}: {
+	people: PeopleState
+	person: number
+}): number[] {
+	const levels: number[] = []
+	for (let index = 0; index < people.log.count; index++) {
+		const row = PEOPLE_LOG.read({ rows: people.log, index })
+		if (row.kind === "stress" && row.person === person) levels.push(row.level)
+	}
+	return levels
+}
 
 it("reproduces spawn's original shared random draws and redraw consumes none", () => {
 	const people = PEOPLE.create(1)
@@ -204,18 +222,14 @@ it("gates personality by age and reads stress at the selected time", () => {
 	])
 		expect(TRAITS.active({ character, age })).toHaveLength(count)
 	const record = PEOPLE_RECORD.create()
-	record.persons.set(id, {
-		...character,
-		id,
-		sex: 0,
-		birthTimeMs: 0,
-		deathTimeMs: 100 * STATE.yearMs,
-		father: -1,
-		mother: -1,
-		dynasty: 0,
-		nameSeed: 1,
-		home: 0,
+	people.persons.death[id] = 100
+	PEOPLE_RECORD.append({
+		record,
+		packet: PEOPLE_LOG.seal({ people, sovereign: () => true }),
+		timeMs: 0,
+		recordTime: (years) => years * STATE.yearMs,
 	})
+	expect(PEOPLE_RECORD.person({ people: record, id })).toMatchObject(character)
 	record.stressOf.set(id, [
 		{ person: id, timeMs: 20 * STATE.yearMs, level: 2 },
 		{ person: id, timeMs: 21 * STATE.yearMs, level: 0 },
@@ -412,9 +426,7 @@ it("reads current governors outside the revenue cache and resets stale stress af
 	people.stressed = [ruler]
 	STRESS_EVENTS.runYear({ state })
 	expect(people.persons.stress[ruler]).toBe(0)
-	expect(
-		people.log.stress.some((row) => row.person === ruler && row.level === 0),
-	).toBe(true)
+	expect(stressLevels({ people, person: ruler })).toContain(0)
 	people.regencies.set(realm, { ward, regent: -1, kind: "council" })
 	expect(GOVERNOR.attribute({ state, realm, attribute: "learning" })).toBe(5)
 })
@@ -712,19 +724,13 @@ it("steps personal unions once, resets subjects without a holder change, and cou
 		}
 		expect(STRESS.level(table.stress[ruler])).toBe(3)
 		expect(REGENCY.weak({ state, realm })).toBe(true)
-		expect(
-			people.log.stress
-				.filter((row) => row.person === ruler)
-				.map((row) => row.level),
-		).toEqual([1, 2, 3])
+		expect(stressLevels({ people, person: ruler })).toEqual([1, 2, 3])
 		// A sovereignty change can leave every seat's holder unchanged.
 		state.parentCurrent[realm] = realms[2]
 		state.parentCurrent[other] = realms[2]
 		STRESS_EVENTS.runYear({ state })
 		expect(table.stress[ruler]).toBe(0)
-		expect(
-			people.log.stress.filter((row) => row.person === ruler).at(-1)?.level,
-		).toBe(0)
+		expect(stressLevels({ people, person: ruler }).at(-1)).toBe(0)
 		state.parentCurrent[realm] = -1
 		state.parentCurrent[other] = -1
 		table.stress[ruler] = 200

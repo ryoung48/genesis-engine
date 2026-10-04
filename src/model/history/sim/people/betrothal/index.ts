@@ -4,6 +4,7 @@ import type {
 	BetrothParams,
 	ReleaseParams,
 } from "@/model/history/sim/people/betrothal/types"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 
 // CK3: the AI betroths no one under 12, and the betrothed marry as adults at
 // 16. Its age-gap penalty in the spouse finder starts past 5 years.
@@ -17,8 +18,7 @@ function betroth({ people, a, b, time }: BetrothParams): void {
 	table.betrothed[b] = a
 	table.betrothedAt[a] = time
 	table.betrothedAt[b] = time
-	if (table.recorded[a] && table.recorded[b])
-		people.log.betrothals.push({ a, b, time })
+	PEOPLE_LOG.append({ log: people.log, row: { kind: "betrothal", a, b, time } })
 }
 
 function release({ people, person, time, cause }: ReleaseParams): void {
@@ -29,8 +29,10 @@ function release({ people, person, time, cause }: ReleaseParams): void {
 	table.betrothed[partner] = -1
 	table.betrothedAt[person] = -1
 	table.betrothedAt[partner] = -1
-	if (table.recorded[person] && table.recorded[partner])
-		people.log.betrothalEnds.push({ a: person, b: partner, time, cause })
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: { kind: "betrothal_end", a: person, b: partner, time, cause },
+	})
 }
 
 // A betrothal lapses at the first yearly pass after either party's death.

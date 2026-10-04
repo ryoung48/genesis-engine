@@ -4,13 +4,8 @@ import type {
 	HistoryState,
 	WarGoal,
 } from "@/model/history/sim/engine/state/types"
-import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
-import type { Character } from "@/model/history/sim/people/traits/types"
-import type {
-	PregnancyLoss,
-	RegentKind,
-	SeatChangeReason,
-} from "@/model/history/sim/people/types"
+import type { PeoplePacket } from "@/model/history/sim/people/log/types"
+import type { RegentKind } from "@/model/history/sim/people/types"
 
 interface JournalProvinceChange {
 	province: number
@@ -44,78 +39,6 @@ interface JournalRuler {
 	regency: RegentKind | null
 }
 
-export interface JournalPerson extends Character {
-	id: number
-	sex: number
-	birthTimeMs: number
-	deathTimeMs: number
-	father: number
-	mother: number
-	dynasty: number
-	nameSeed: number
-	home: number
-}
-
-export interface JournalMarriage {
-	husband: number
-	wife: number
-	startTimeMs: number
-}
-
-export type SeatKind = "ruler" | "district" | "regent"
-
-// A seat (sovereign root or district) changing holder or regent; -1 leaves it
-// empty.
-export interface JournalSeat {
-	seat: number
-	person: number
-	// A throne is a sovereign root after the event.
-	kind: SeatKind
-	// The child a regent governs for; -1 for other kinds.
-	ward: number
-	reason: SeatChangeReason
-}
-
-export interface JournalPregnancy {
-	mother: number
-	father: number
-	timeMs: number
-	outcome: PregnancyLoss
-}
-
-export interface JournalBetrothal {
-	a: number
-	b: number
-	timeMs: number
-}
-
-export interface JournalBetrothalEnd extends JournalBetrothal {
-	cause: BetrothalEndCause
-}
-
-// A recorded person whose death moved earlier.
-export interface JournalDeath {
-	id: number
-	deathTimeMs: number
-}
-
-export interface JournalStress {
-	person: number
-	timeMs: number
-	level: number
-}
-
-export interface JournalPeople {
-	stress: JournalStress[]
-	persons: JournalPerson[]
-	marriages: JournalMarriage[]
-	seats: JournalSeat[]
-	deaths: JournalDeath[]
-	pregnancies: JournalPregnancy[]
-	betrothals: JournalBetrothal[]
-	betrothalEnds: JournalBetrothalEnd[]
-}
-
 export interface JournalTransaction {
 	timeMs: number
 	parents: JournalProvinceChange[]
@@ -123,7 +46,9 @@ export interface JournalTransaction {
 	occupations: JournalProvinceChange[]
 	coalitions: JournalCoalition[]
 	rulers: JournalRuler[]
-	people: JournalPeople
+	// [JUSTIFICATION] Most transactions carry no people rows, and an empty
+	// packet would still allocate and transfer seventeen buffers.
+	people: PeoplePacket | null
 	notes: EngineNote[]
 	census: CensusKeyframe | null
 }

@@ -2,11 +2,11 @@ import type {
 	PeopleRecord,
 	RecordBetrothalEnd,
 } from "@/model/history/record/people/types"
-import type { SeatKind } from "@/model/history/sim/engine/journal/types"
 import type {
 	Attribute,
 	AttributeTier,
 } from "@/model/history/sim/people/attributes/types"
+import type { SeatKind } from "@/model/history/sim/people/log/types"
 import type {
 	CongenitalTrait,
 	PersonalityTrait,
