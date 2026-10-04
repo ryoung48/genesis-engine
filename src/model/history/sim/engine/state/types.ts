@@ -16,6 +16,7 @@ import type {
 	MilitaryTotals,
 	Troops,
 } from "@/model/history/sim/engine/military/recruitment/types"
+import type { MarriageTotals } from "@/model/history/sim/people/family/diagnostics/types"
 import type {
 	PeopleState,
 	SeatChangeReason,
@@ -162,6 +163,7 @@ export interface LifecycleCounters {
 }
 
 export interface HistoryState {
+	marriageMarket: Map<number, MarriageTotals>
 	riverByProvince: Uint8Array
 	P: number
 	time: number
@@ -259,6 +261,7 @@ export interface HistoryState {
 	provinceVegetation: Uint8Array
 	habitability: Float32Array
 	culture: Int32Array
+	heritageOfCulture: Int32Array
 	cultureCount: number
 	cultureGenderSystems: Uint8Array
 	cultureColors: Float32Array
@@ -468,6 +471,8 @@ export interface CreateHistoryStateParams {
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
 	cultures: GenesisPartition
+	// [JUSTIFICATION] Some generated worlds have no heritage partition.
+	heritages?: GenesisPartition
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
 	startYear: number

@@ -10,6 +10,7 @@ import type {
 	PartitionStateReport,
 } from "@/test/history-run/report/partition/types"
 import type { PeopleHealthReport } from "@/test/history-run/report/people-health/types"
+import type { MarriageMarketReport } from "@/test/history-run/report/people-marriage/types"
 import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
 import type { CharacterReport } from "@/test/history-run/report/people-traits/types"
 
@@ -60,6 +61,7 @@ export interface CenturyReport {
 	people: PeopleReport
 	peopleHealth: PeopleHealthReport
 	marriage: MarriageReport
+	marriageMarket: MarriageMarketReport
 	military: MilitaryReport
 	partitionState: PartitionStateReport
 	partition: PartitionReport

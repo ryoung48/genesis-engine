@@ -203,3 +203,9 @@ History report output preserves completed report folders; the runner does not pr
 The trait names, modifiers and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt`, `common/script_values/00_stress_values.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Effect caps and the annual stress cadence are simulation design choices documented in the character plan.
 
 Attraction and role-scoped opinion values are data only in this stage, and marriage selection is unchanged. Health values and the ageing conditions are live: see [health](health-and-mortality.md). Childhood skill rolls, lifestyle perks, inbreeding and old-record compatibility are excluded.
+
+## Marriage attraction and scoped reputation
+
+[Marriage scoring](marriage-and-alliances.md) reads attraction from the same trait table as other modifiers: Beauty grades contribute −30/−20/−10/0/+10/+20/+30; positive Physique +5/+10/+15, negative Physique −2/−3 contribute −5/−10 (Delicate zero). Brave/Craven contribute +10/−10; Gregarious and Compassionate +5; Shy, Callous and Gluttonous −5. Hunchbacked/Scaly −30, Dwarf −20, Clubfooted/Spindly/Lunatic/Possessed −10 and Giant −5. Carried traits do nothing. Cumulative ageing and Blind attraction effects are added by the live adapter.
+
+The [opinion evaluator](opinion-and-relationships.md) uses general reputation for Sadistic and Albino (−10 each). Arbitrary (−5), Hunchbacked, Bleeder, Wheezing, Scaly and Lunatic (−10 each) apply only from a direct district holder toward their actual sovereign holder, once across all held seats. These are not general marriage penalties.

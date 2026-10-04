@@ -13,6 +13,7 @@ import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
+import { KINSHIP } from "@/model/history/sim/people/kinship"
 
 // Share of starting kings in alliance-marrying realms whose queen comes from a
 // neighbouring ruling house.
@@ -201,6 +202,19 @@ function seed({ state, rng }: SeedRoyalMarriagesParams): void {
 			const house = people.rulerOf[other]
 			const parents = birthParents({ people, bride: queen, house })
 			if (!parents) continue
+			if (
+				[parents.father, parents.mother].some(
+					(parent) =>
+						parent >= 0 &&
+						KINSHIP.prohibitedMatch({
+							context: table,
+							a: king,
+							b: parent,
+							cache: null,
+						}),
+				)
+			)
+				continue
 			rehome({
 				people,
 				person: queen,

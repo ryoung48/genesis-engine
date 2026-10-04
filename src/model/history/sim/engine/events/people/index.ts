@@ -11,13 +11,23 @@ import type {
 	SettleMatchesParams,
 	StateParams,
 } from "@/model/history/sim/engine/events/people/types"
+import { SUCCESSION_PROJECTION } from "@/model/history/sim/engine/events/succession/projection"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
+import { CHARACTER } from "@/model/history/sim/people/character"
 import { FAMILY } from "@/model/history/sim/people/family"
+import { MARRIAGE_DIAGNOSTICS } from "@/model/history/sim/people/family/diagnostics"
 import { HEALTH } from "@/model/history/sim/people/health"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { HOUSEHOLD } from "@/model/history/sim/people/household"
+import type {
+	OpinionPair,
+	OpinionPerson,
+} from "@/model/history/sim/people/opinion/types"
 import type {
 	CrossMatch,
 	MarriageRealms,
@@ -38,7 +48,108 @@ function nextYear({ state }: PeopleEventParams): void {
 
 function marriageRealms({ state }: StateParams): MarriageRealms {
 	const neighbors = new Map<number, number[]>()
+	const contexts = new Map<number, OpinionPerson>()
+	let projection = new Map<number, number>()
+	const people = state.people
+	const table = people.persons
+	const time = state.time / STATE.yearMs
+	const personOf = (person: number): OpinionPerson | null => {
+		if (
+			person < 0 ||
+			person >= table.sex.length ||
+			table.createdAt[person] > time ||
+			table.birth[person] > time
+		)
+			return null
+		const cached = contexts.get(person)
+		if (cached) return cached
+		const realm = HOUSEHOLD.realmOf({ people, person })
+		const culture = table.culture[person]
+		const seats = table.heldSeats[person].filter(
+			(seat) => people.rulerOf[seat] === person,
+		)
+		const value = {
+			id: person,
+			character: CHARACTER.of({ people, person }),
+			age: time - table.birth[person],
+			culture,
+			heritage: people.household.heritageOfCulture(culture),
+			religion: people.household.religionOfRealm(realm),
+			sovereignSeats: seats.filter((seat) =>
+				STATE.isSovereign({ state, p: seat }),
+			),
+			districtSovereigns: seats
+				.filter((seat) => DISTRICTS.isDistrictSeat({ state, seat }))
+				.map((seat) => state.parentCurrent[seat]),
+		}
+		contexts.set(person, value)
+		return value
+	}
+	const context = {
+		personOf,
+		kinship: table,
+		married: ({ a, b, time: at }: OpinionPair) =>
+			table.spouse[a] === b &&
+			table.marriedAt[a] <= at &&
+			table.death[a] > at &&
+			table.death[b] > at,
+	}
+
 	return {
+		observe: (observation) => {
+			const year = observation.time
+			const totals =
+				state.marriageMarket.get(year) ?? MARRIAGE_DIAGNOSTICS.create()
+			MARRIAGE_DIAGNOSTICS.observe({ totals, observation })
+			state.marriageMarket.set(year, totals)
+		},
+		opinionContext: () => context,
+		candidateOf: (person) => ({
+			currentStanding: HOLDINGS.standing({
+				people,
+				person,
+				ranks: state.seatRank,
+			}),
+			projectedStanding: projection.get(person) ?? 0,
+			sovereignTiers: (personOf(person)?.sovereignSeats ?? []).map(
+				(seat) => state.seatRank[seat],
+			),
+			attractionModifier: AGEING.effectsOf({ people, person })?.attraction ?? 0,
+		}),
+		allied: (match) =>
+			match.realmA !== match.realmB &&
+			STATE.getRelation({ state, a: match.realmA, b: match.realmB }) ===
+				STATE.rel.ALLY,
+		onboard: (person) => {
+			table.createdAt[person] = time
+			DEATH_SCHEDULE.ensure({ state, person, cause: "natural" })
+			contexts.delete(person)
+		},
+		settle: ({ match, betrothal }) =>
+			settleMatches({
+				state,
+				matches: {
+					weddings: betrothal ? [] : [match],
+					betrothals: betrothal ? [match] : [],
+				},
+			}),
+		refresh: () => {
+			neighbors.clear()
+			contexts.clear()
+			const started = performance.now()
+			projection = SUCCESSION_PROJECTION.of({ state })
+			const totals =
+				state.marriageMarket.get(time) ?? MARRIAGE_DIAGNOSTICS.create()
+			MARRIAGE_DIAGNOSTICS.observe({
+				totals,
+				observation: {
+					kind: "projection",
+					time,
+					ms: performance.now() - started,
+				},
+			})
+			state.marriageMarket.set(time, totals)
+		},
 		neighborsOf: (realm) => {
 			const cached = neighbors.get(realm)
 			if (cached) return cached
@@ -87,17 +198,14 @@ function settleMatches({ state, matches }: SettleMatchesParams): void {
 function init({ state, rng }: PeopleEventParams): void {
 	DISTRICTS.grant({ state, rng })
 	ROYAL_MARRIAGES.seed({ state, rng })
-	settleMatches({
-		state,
-		matches: FAMILY.seekMatches({
-			people: state.people,
-			time: state.time / STATE.yearMs,
-			seekers: [],
-			sovereigns: sovereignRulers({ state }),
-			minorChance: START_BETROTHAL_SHARE,
-			rng,
-			...marriageRealms({ state }),
-		}),
+	FAMILY.seekMatches({
+		people: state.people,
+		time: state.time / STATE.yearMs,
+		seekers: [],
+		sovereigns: sovereignRulers({ state }),
+		minorChance: START_BETROTHAL_SHARE,
+		rng,
+		...marriageRealms({ state }),
 	})
 	PATRICIANS.settle({ state, rng })
 	nextYear({ state, rng })
@@ -150,7 +258,7 @@ function runYear({ state, rng }: PeopleEventParams): void {
 	for (const heads of people.patricians.values()) rulers.push(...heads)
 	const time = state.time / STATE.yearMs
 	const realms = marriageRealms({ state })
-	const matches = FAMILY.runYear({
+	FAMILY.runYear({
 		people,
 		time,
 		rulers,
@@ -158,7 +266,6 @@ function runYear({ state, rng }: PeopleEventParams): void {
 		rng,
 		...realms,
 	})
-	settleMatches({ state, matches })
 	FAMILY.project({
 		people,
 		time,

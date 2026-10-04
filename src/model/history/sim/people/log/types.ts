@@ -49,6 +49,7 @@ export interface PeopleLog extends PeopleRows {
 // set only for a person already dead when created; the living carry Infinity.
 export interface PeoplePacket extends PeopleRows {
 	sex: Uint8Array
+	createdAt: Float64Array
 	death: Float64Array
 	// The health band when the person was created.
 	healthBand: Uint8Array

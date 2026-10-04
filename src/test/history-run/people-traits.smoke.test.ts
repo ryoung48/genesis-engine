@@ -822,7 +822,7 @@ it("reads scalar trait modifiers without changing age gates or grade contributio
 		prowess: -3,
 		health: -1,
 		fertility: 0.25,
-		attraction: 0,
+		attraction: -30,
 		opinion: 0,
 		vassalOpinion: -10,
 		stressGain: 0.25,

@@ -873,6 +873,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				riverVisible: generated.rivers.visible,
 				r_xyz: generated.mesh.r_xyz,
 				cultures: generated.cultures,
+				heritages: generated.heritages,
 				religions: generated.religions,
 				era: generated.params.era,
 				seed: generated.params.seed,

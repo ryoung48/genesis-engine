@@ -10,13 +10,13 @@ Code: person model in `src/model/history/sim/people` (`index.ts`, `family/`, `be
 
 - **Seat holders.** Sovereign rulers (`rulerOf[root]`), district holders (`rulerOf[seat]`) and the patrician house heads of electoral republics.
 - **Their close family.** Spouses, children and siblings. They are generated with the holder and live on in the person table.
-- **Everyone else is never created.** Spouses from outside the ruling houses are made up on the spot at the wedding (see [Marriage](marriage-and-alliances.md#marriage)).
+- **Everyone else is never created.** Spouses from outside the ruling houses are generated for a fallback proposal, including rejected unmarried outsiders (see [Marriage](marriage-and-alliances.md#marriage)).
 
 Every person the simulation creates is recorded, landed or not, living or dead: see [person records](../mechanics/person-records.md).
 
 ## What is tracked per person
 
-`PersonTable` (columns indexed by person id): sex, birth and death (years; death is `Infinity` until a date is chosen), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), residence (current household province), initialResidence (birth-effective province), heldSeats (sorted unique seat IDs), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
+`PersonTable` (columns indexed by person id): sex, creation availability, birth and death (years; death is `Infinity` until a date is chosen), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), residence (current household province), initialResidence (birth-effective province), heldSeats (sorted unique seat IDs), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
 The additional attribute, trait and stress columns are `bases`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](attributes-traits-and-stress.md). The ten health columns are listed in [health](health-and-mortality.md#simulation-columns).
 
@@ -43,7 +43,7 @@ The yearly `PEOPLE_YEAR` event runs, in order:
 1. the stress step for every sovereign ruler, then the deaths of any whose heart failed;
 2. the health pass: completed ages, band and condition changes, death projected for the coming year, and regents for the newly Incapable;
 3. district inheritance and new grants, the marriage-alliance review (which also breaks betrothals left without an alliance) and patrician upkeep;
-4. fulfilled betrothals, marriages and new betrothals, then marriage alliances and heiress unions from them;
+4. fulfilled betrothals, then reciprocal foreign/domestic matching and outsider proposals; each accepted pair settles alliances/unions immediately and refreshes opinion contexts and inheritance before the next search;
 5. the coming year's conceptions, then the regency review, usurpation rolls and restoration.
 
 Deaths, births, coming of age and rebellions run on their own events at the exact time. [Families](families-and-lifecycle.md) has the order of same-time events.
@@ -51,3 +51,5 @@ Deaths, births, coming of age and rebellions run on their own events at the exac
 ## Related rules and records
 
 See [families, births and lifespans](families-and-lifecycle.md) for life, pregnancy and house founding; [marriage and family alliances](marriage-and-alliances.md) for partner selection and betrothals; [government and succession](../politics/government-and-succession.md) for districts, heirs, unions and regencies; [household residence](residence-and-realm.md) for location and territorial realm; and [person records](../mechanics/person-records.md#record-and-wiki) for historical queries and wiki presentation.
+
+Directed structural opinions are computed on demand from [opinion and relationships](opinion-and-relationships.md), with no stored pair matrix.

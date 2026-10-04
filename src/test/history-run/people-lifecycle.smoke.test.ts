@@ -596,7 +596,10 @@ it("fails every stressed heart after the whole stress loop, dating all deaths be
 			})),
 	)
 	const hearts = rows.filter(
-		(row) => row.kind === "condition" && row.condition === "faltering_heart",
+		(row) =>
+			row.kind === "condition" &&
+			row.condition === "faltering_heart" &&
+			[first, second].includes(row.person),
 	)
 	expect(hearts).toHaveLength(2)
 	for (const row of hearts) expect(row).toMatchObject({ before: 3, after: 4 })

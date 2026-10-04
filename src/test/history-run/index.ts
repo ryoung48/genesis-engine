@@ -102,6 +102,7 @@ function createEngine({
 		r_xyz: generated.mesh.r_xyz,
 		cultures,
 		religions: generated.religions,
+		heritages: generated.heritages,
 		era: generated.params.era,
 		seed: generated.params.seed,
 		startYear,

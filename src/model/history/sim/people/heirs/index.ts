@@ -31,25 +31,24 @@ function siblings({ people, person, preference }: SiblingsParams): number[] {
 	return ordered({ people, persons: [...found], preference })
 }
 
-// Primogeniture with representation: a dead heir's line comes before the
-// next sibling.
-function firstInLine({ person, ...line }: LineParams): number {
-	const { people, time, eligible, seen } = line
-	if (seen.has(person)) return -1
-	seen.add(person)
-	if (PEOPLE.aliveAt({ people, person, time }))
-		return eligible(person) ? person : -1
-	if (people.persons.birth[person] > time) return -1
-	return firstAmong({ ...line, persons: people.persons.children[person] })
+function firstInLine({ person, line }: LineParams): number {
+	if (line.seen.has(person)) return -1
+	line.seen.add(person)
+	if (PEOPLE.aliveAt({ people: line.people, person, time: line.time }))
+		return line.eligible(person) ? person : -1
+	if (line.people.persons.birth[person] > line.time) return -1
+	return firstAmong({ line, persons: line.people.persons.children[person] })
 }
 
-function firstAmong({ persons, ...line }: AmongParams): number {
+function firstAmong({ persons, line }: AmongParams): number {
+	if (persons.length === 0) return -1
+	if (persons.length === 1) return firstInLine({ line, person: persons[0] })
 	for (const candidate of ordered({
 		people: line.people,
 		persons: [...persons],
 		preference: line.preference,
 	})) {
-		const heir = firstInLine({ ...line, person: candidate })
+		const heir = firstInLine({ line, person: candidate })
 		if (heir >= 0) return heir
 	}
 	return -1
@@ -65,17 +64,17 @@ function of({
 	const seen = new Set<number>([dying])
 	const line = { people, time, preference, eligible, seen }
 	const table = people.persons
-	const child = firstAmong({ ...line, persons: table.children[dying] })
+	const child = firstAmong({ line, persons: table.children[dying] })
 	if (child >= 0) return { heir: child, relation: "child" }
 	const sibling = firstAmong({
-		...line,
+		line,
 		persons: siblings({ people, person: dying, preference }),
 	})
 	if (sibling >= 0) return { heir: sibling, relation: "sibling" }
 	for (const parent of [table.father[dying], table.mother[dying]]) {
 		if (parent < 0) continue
 		const relative = firstAmong({
-			...line,
+			line,
 			persons: siblings({ people, person: parent, preference }),
 		})
 		if (relative >= 0) return { heir: relative, relation: "relative" }
@@ -83,7 +82,6 @@ function of({
 	return { heir: -1, relation: "none" }
 }
 
-// Every child's line in inheritance order, each with its own first heir.
 function line({
 	people,
 	dying,
@@ -91,7 +89,13 @@ function line({
 	preference,
 	eligible,
 }: HeirLineParams): HeirBranch[] {
-	const seen = new Set<number>([dying])
+	const line = {
+		people,
+		time,
+		preference,
+		eligible,
+		seen: new Set<number>([dying]),
+	}
 	return ordered({
 		people,
 		persons: [...people.persons.children[dying]],
@@ -99,11 +103,7 @@ function line({
 	}).map((branch) => ({
 		branch,
 		heir: firstInLine({
-			people,
-			time,
-			preference,
-			eligible,
-			seen,
+			line,
 			person: branch,
 		}),
 	}))

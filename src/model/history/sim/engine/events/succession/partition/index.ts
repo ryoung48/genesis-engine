@@ -14,6 +14,7 @@ import type {
 	PartitionSnapshot,
 	PieceParams,
 	PrimarySeatParams,
+	ProjectPartitionParams,
 	RealmParams,
 	ReleaseParams,
 	SeatParams,
@@ -136,10 +137,17 @@ function districtSeats({ state, realm }: RealmParams): number[] {
 
 // An heir who already holds a district of the realm keeps it; the others take
 // the best seats left, in inheritance order.
-function assign({ run, heirs }: AssignParams): PartitionShare[] {
-	const { state, realm } = run
+function assign({
+	state,
+	realm,
+	unseated,
+	heirs,
+	excludedSeat,
+}: AssignParams): PartitionShare[] {
 	const people = state.people
-	const seats = districtSeats({ state, realm })
+	const seats = districtSeats({ state, realm }).filter(
+		(seat) => seat !== excludedSeat,
+	)
 	const held = new Map<number, number>()
 	for (const heir of heirs) {
 		const seat =
@@ -156,12 +164,12 @@ function assign({ run, heirs }: AssignParams): PartitionShare[] {
 		const own = held.get(heir)
 		if (own !== undefined) {
 			if (occupied({ state, seat: own }))
-				run.unseated.push({ heir, reason: "reserved seat unavailable" })
+				unseated.push({ heir, reason: "reserved seat unavailable" })
 			else shares.push({ heir, seat: own })
 			continue
 		}
 		const seat = free.shift()
-		if (seat === undefined) run.unseated.push({ heir, reason: "no seat" })
+		if (seat === undefined) unseated.push({ heir, reason: "no seat" })
 		else shares.push({ heir, seat })
 	}
 	return shares.sort((a, b) => seats.indexOf(a.seat) - seats.indexOf(b.seat))
@@ -453,7 +461,14 @@ function divide({
 		joined: [],
 		moves: [],
 	}
-	for (const share of assign({ run, heirs })) release({ run, share })
+	for (const share of assign({
+		state,
+		realm,
+		unseated: run.unseated,
+		heirs,
+		excludedSeat: -1,
+	}))
+		release({ run, share })
 	if (run.released.length === 0)
 		return skip({ state, realm, dying, primary, reason: "no free seat" })
 	resolveCutOff(run)
@@ -463,4 +478,34 @@ function divide({
 	return run.released.length
 }
 
-export const PARTITION = { divide }
+function project({
+	state,
+	realm,
+	dying,
+	primary,
+}: ProjectPartitionParams): PartitionShare[] {
+	if (!GOVERNMENT.partitionsOfIndex(state.governmentType[realm])) return []
+	const branch = branchOf({ people: state.people, dying, person: primary })
+	if (branch < 0) return []
+	const held = HOLDINGS.primary({
+		people: state.people,
+		person: primary,
+		ranks: state.seatRank,
+	})
+	const excludedSeat =
+		held >= 0 &&
+		held !== realm &&
+		!STATE.isSovereign({ state, p: held }) &&
+		state.people.rulerOf[held] === primary
+			? held
+			: -1
+	return assign({
+		state,
+		realm,
+		unseated: [],
+		excludedSeat,
+		heirs: juniorHeirs({ state, realm, dying, branch }),
+	})
+}
+
+export const PARTITION = { divide, project }

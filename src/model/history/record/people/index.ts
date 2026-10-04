@@ -30,6 +30,7 @@ const INT_COLUMNS = [
 const FLOAT_COLUMNS = [
 	"birthTimeMs",
 	"deathTimeMs",
+	"createdTimeMs",
 	"healthTimeMs",
 	"bases",
 	"personality",
@@ -72,6 +73,7 @@ function create(): PeopleRecord {
 			congenital: new Float64Array(0),
 			carried: new Float64Array(0),
 			healthBand: new Uint8Array(0),
+			createdTimeMs: new Float64Array(0),
 			healthTimeMs: new Float64Array(0),
 			lastHealth: new Int32Array(0),
 			deathCause: new Uint8Array(0),
@@ -187,6 +189,7 @@ function addPerson(params: AddPersonParams): void {
 		persons[column][id] = packet[column][snapshot]
 	persons.father[id] = params.father
 	persons.mother[id] = params.mother
+	persons.createdTimeMs[id] = params.createdTimeMs
 	persons.birthTimeMs[id] = params.birthTimeMs
 	persons.deathTimeMs[id] = params.deathTimeMs
 	persons.healthTimeMs[id] =
@@ -335,6 +338,7 @@ function append({
 					father: row.father,
 					mother: row.mother,
 					birthTimeMs: recordTime(row.time),
+					createdTimeMs: recordTime(packet.createdAt[row.snapshot]),
 					deathTimeMs: recordTime(packet.death[row.snapshot]),
 					timeMs,
 				})

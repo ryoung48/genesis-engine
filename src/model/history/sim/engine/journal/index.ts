@@ -248,6 +248,7 @@ function packetBuffers(packet: PeoplePacket): Transferable[] {
 		packet.d.buffer,
 		packet.sex.buffer,
 		packet.death.buffer,
+		packet.createdAt.buffer,
 		packet.healthBand.buffer,
 		packet.dynasty.buffer,
 		packet.culture.buffer,

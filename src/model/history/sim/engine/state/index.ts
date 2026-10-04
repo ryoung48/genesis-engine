@@ -624,6 +624,7 @@ function createHistoryState({
 	riverVisible,
 	r_xyz,
 	cultures,
+	heritages,
 	religions,
 	startYear,
 	rng,
@@ -766,6 +767,9 @@ function createHistoryState({
 		habitability: population.habitability.slice(),
 		culture: cultures.assignment.slice(),
 		cultureCount: cultures.count,
+		marriageMarket: new Map(),
+		heritageOfCulture:
+			heritages?.assignment.slice() ?? new Int32Array(cultures.count).fill(-1),
 		cultureGenderSystems:
 			cultures.genderSystems?.slice() ?? new Uint8Array(cultures.count),
 		cultureColors: cultures.colors.slice(),
@@ -816,6 +820,10 @@ function createHistoryState({
 	}
 
 	state.people.household = {
+		heritageOfCulture: (culture) =>
+			culture >= 0 ? (state.heritageOfCulture[culture] ?? -1) : -1,
+		religionOfRealm: (realm) =>
+			realm >= 0 ? (state.religion[state.culture[realm]] ?? -1) : -1,
 		realmOf: (province) => getSovereign({ state, p: province }),
 		ranks: () => state.seatRank,
 		time: () => state.time / yearMs,

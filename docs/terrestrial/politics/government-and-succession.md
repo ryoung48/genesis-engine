@@ -236,3 +236,7 @@ Each electoral republic keeps 3–5 patrician house heads (the count is fixed pe
 ## Historical presentation and reports
 
 The selected-date wiki shows active held titles, primary first, separately from regencies. Lost titles remain in the timeline. Reports sample living people at initialization and integer-year boundaries, assigning each observation to one half-open window and including the final endpoint only in the last window. `heldSeatsHistogram` contains counts for zero, one and at least two seats. `seatsPerHolder` divides total held seats by observations with a seat and is null without holders. `unionHolders` counts observations with at least two sovereign crowns; districts and regencies do not count as crowns.
+
+## Read-only inheritance projection
+
+`SUCCESSION_PROJECTION.of` supplies expected standing to the [marriage market](../people/marriage-and-alliances.md). Single-heir crowns use current `HEIRS.of` ordering, cultural gender preference and `SUCCESSION_SYSTEMS.inheritable`; districts use the same `DISTRICTS.heirOf` as actual district succession. Partition uses the actual branch/junior-heir and seat-allocation functions, preserving owned seats, excluding occupied seats and excluding the primary heir's district that actual succession vacates. No speculative election/appointment result, future birth or death is added. Projection changes no people, grants, events or RNG state. It runs before matching and after each accepted pair settles its realm consequences; current and projected standing remain separately inspectable.

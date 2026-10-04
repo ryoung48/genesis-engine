@@ -267,6 +267,7 @@ export interface NationIdentity {
 }
 
 export interface HistoryRecordCommon {
+	heritageOfCulture: Int32Array
 	minTimeMs: number
 	maxTimeMs: number
 	nations: NationIdentity[]

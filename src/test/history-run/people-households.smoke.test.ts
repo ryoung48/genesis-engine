@@ -403,6 +403,8 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 	const state = fixture()
 	const people = state.people
 	people.household = {
+		heritageOfCulture: () => -1,
+		religionOfRealm: () => -1,
 		time: () => state.time / STATE.yearMs,
 		ranks: () => [0, 0, 2, 3, 1, 1],
 		realmOf: (province) => (province < 2 ? 0 : province),
@@ -742,6 +744,8 @@ it("rechecks a marriage alliance after relocation releases its sustaining betrot
 it("weddings and title loss preserve separate landed households", () => {
 	const { people } = fixture()
 	people.household = {
+		heritageOfCulture: () => -1,
+		religionOfRealm: () => -1,
 		time: () => 100,
 		ranks: () => [0, 0, 2, 3, 1, 1],
 		realmOf: (province) => province,

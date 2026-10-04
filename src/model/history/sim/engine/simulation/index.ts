@@ -78,6 +78,8 @@ function initHistory(params: {
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
 	cultures: GenesisPartition
+	// [JUSTIFICATION] Some generated worlds have no heritage partition.
+	heritages?: GenesisPartition
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
 	era?: SocietyEra
@@ -111,6 +113,7 @@ function initHistory(params: {
 				riverVisible: params.riverVisible,
 				r_xyz: params.r_xyz,
 				cultures: params.cultures,
+				heritages: params.heritages,
 				religions: params.religions,
 				startYear,
 				rng,

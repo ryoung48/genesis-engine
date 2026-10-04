@@ -278,6 +278,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 			tag: nation.tag,
 		})),
 		cultures,
+		heritageOfCulture: new Int32Array(cultures.length).fill(-1),
 		religions,
 		events,
 		titles: null,

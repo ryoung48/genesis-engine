@@ -5,6 +5,7 @@ import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
+import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
@@ -12,6 +13,7 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { SIM_RECORD } from "@/model/history/sim/record"
+import { TRANSLATOR } from "@/model/history/sim/record/translator"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 
@@ -246,3 +248,79 @@ it("records rulers, their families and seat tenures consistently", () => {
 		expect(PERSON_NAMES.person({ people, person: ruler })?.name).toBeTruthy()
 	}
 }, 600_000)
+
+it("retains culture heritage after world transfer and release without detaching the live engine mapping", () => {
+	const { generated, engine } = HISTORY_RUN.createEngine({
+		seed: 14963991,
+		era: "lateMedieval",
+		numPoints: 20000,
+	})
+	const world = generated as unknown as SerializedGenesisWorld
+	if (!world.heritages || !world.cultures) throw new Error("Missing partitions")
+	expect(engine.heritageOfCulture).toEqual(world.heritages.assignment)
+	expect(engine.heritageOfCulture.buffer).not.toBe(
+		world.heritages.assignment.buffer,
+	)
+	expect(world.cultures.count).toBeGreaterThanOrEqual(2)
+	world.heritages.assignment[1] = world.heritages.assignment[0]
+	engine.heritageOfCulture[1] = engine.heritageOfCulture[0]
+	const received = structuredClone(world, {
+		transfer: [world.heritages.assignment.buffer],
+	})
+	expect(world.heritages.assignment.byteLength).toBe(0)
+	expect(engine.heritageOfCulture.byteLength).toBeGreaterThan(0)
+	const state = SIM_RECORD.buildProceduralState({
+		world: received,
+		startTimeMs: engine.time,
+	})
+	const mapping = state.record.heritageOfCulture
+	expect(mapping).toEqual(engine.heritageOfCulture)
+	expect(mapping.buffer).not.toBe(received.heritages!.assignment.buffer)
+	const time = engine.time / STATE.yearMs
+	const ids = [0, 1].map((culture) =>
+		PEOPLE.spawn({
+			people: engine.people,
+			sex: culture as 0 | 1,
+			birth: time - 30,
+			survives: time,
+			father: -1,
+			mother: -1,
+			dynasty: -1,
+			origin: { realm: 0, culture, genderSystem: 0 },
+			rng: HISTORY_RNG.createHistoryRng(101 + culture),
+		}),
+	)
+	JOURNAL.flush({ state: engine, noteCursor: 0, census: false, initial: false })
+	const transferred = structuredClone(engine.journal, {
+		transfer: JOURNAL.transferList(engine.journal),
+	})
+	for (const transaction of transferred)
+		if (transaction.people)
+			PEOPLE_RECORD.append({
+				record: state.record.people!,
+				packet: transaction.people,
+				timeMs: TRANSLATOR.recordTime(transaction.timeMs),
+				recordTime: (year) => TRANSLATOR.recordTime(year * STATE.yearMs),
+			})
+	structuredClone(received.heritages!.assignment, {
+		transfer: [received.heritages!.assignment.buffer],
+	})
+	expect(mapping[0]).toBe(mapping[1])
+	const opinion = PERSON_QUERY.opinion({
+		people: state.record.people!,
+		record: state.record,
+		a: ids[0],
+		b: ids[1],
+		timeMs: state.record.maxTimeMs,
+	})
+	expect(opinion?.culture).toBe(5)
+	const absent: SerializedGenesisWorld = { ...received }
+	delete absent.heritages
+	const unknown = SIM_RECORD.buildProceduralState({
+		world: absent,
+		startTimeMs: engine.time,
+	})
+	expect([...unknown.record.heritageOfCulture]).toEqual(
+		Array(world.cultures.count).fill(-1),
+	)
+})
