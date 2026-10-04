@@ -70,6 +70,7 @@ function spawn(people: PeopleState): number {
 		people,
 		sex: people.persons.sex.length % 2 === 0 ? 0 : 1,
 		birth: 800 + people.persons.sex.length,
+		survives: 800 + people.persons.sex.length,
 		father: -1,
 		mother: -1,
 		dynasty: people.persons.sex.length - 1,
@@ -82,7 +83,7 @@ it("round-trips every implemented row kind, code and sentinel", () => {
 	const people = PEOPLE.create(8)
 	const { log } = people
 	const appended: AppendedRow[] = [
-		{ kind: "death", time: 901.25, person: 4 },
+		{ kind: "death", time: 901.25, person: 4, cause: "natural" },
 		{ kind: "wedding", time: 880.5, husband: 1, wife: 0x7fffffff },
 		...SEAT_REASONS.map(
 			(reason, seat): AppendedRow => ({
@@ -119,6 +120,27 @@ it("round-trips every implemented row kind, code and sentinel", () => {
 		{ kind: "betrothal_end", time: 871, a: 6, b: 7, cause: "alliance" },
 		{ kind: "betrothal_end", time: -12.5, a: 7, b: 6, cause: "death" },
 		{ kind: "stress", time: 899, person: 1, level: 3 },
+		{ kind: "death", time: 905, person: 5, cause: "heart" },
+		{ kind: "death", time: 906, person: 6, cause: "battle" },
+		{ kind: "death", time: 907, person: 7, cause: "childbirth" },
+		...PEOPLE_LOG.healthBands.map(
+			(band, index): AppendedRow => ({
+				kind: "health_band",
+				time: 890 + index,
+				person: 1,
+				band,
+			}),
+		),
+		...PEOPLE_LOG.conditions.map(
+			(condition, index): AppendedRow => ({
+				kind: "condition",
+				time: 895,
+				person: 2,
+				condition,
+				before: index - 1 > 4 ? -1 : index - 1,
+				after: index === 1 ? -1 : Math.min(4, index),
+			}),
+		),
 	]
 	for (const row of appended) PEOPLE_LOG.append({ log, row })
 	expect(PEOPLE_LOG.pending(people)).toBe(true)
@@ -148,28 +170,48 @@ it("rejects reserved kinds, unknown codes and values a row cannot hold", () => {
 	const { log } = people
 	const reject = (row: unknown) =>
 		expect(() => PEOPLE_LOG.append({ log, row: row as AppendedRow })).toThrow()
-	for (const kind of ["health_band", "condition", "opinion_memory"])
-		reject({ kind, time: 1, person: 0 })
+	reject({ kind: "opinion_memory", time: 1, person: 0 })
+	reject({ kind: "health_band", time: 1, person: 0, band: "Fair" })
+	reject({
+		kind: "condition",
+		time: 1,
+		person: 0,
+		condition: "gout",
+		before: -1,
+		after: 0,
+	})
+	reject({
+		kind: "condition",
+		time: 1,
+		person: 0,
+		condition: "infirm",
+		before: -2,
+		after: 0,
+	})
 	reject({ kind: "creation", time: 1, person: 0 })
 	reject({ kind: "coronation", time: 1, person: 0 })
 	reject({ kind: "seat", seat: 0, person: 0, reason: "abdication" })
 	reject({ kind: "pregnancy", time: 1, mother: 0, father: 1, outcome: "birth" })
 	reject({ kind: "betrothal_end", time: 1, a: 0, b: 1, cause: "kinship" })
-	reject({ kind: "death", time: Number.NaN, person: 0 })
-	reject({ kind: "death", time: Infinity, person: 0 })
-	reject({ kind: "death", time: 1, person: 2 ** 31 })
-	reject({ kind: "death", time: 1, person: -2 })
+	reject({ kind: "death", time: Number.NaN, person: 0, cause: "natural" })
+	reject({ kind: "death", time: Infinity, person: 0, cause: "natural" })
+	reject({ kind: "death", time: 1, person: 2 ** 31, cause: "natural" })
+	reject({ kind: "death", time: 1, person: 0, cause: "plague" })
+	reject({ kind: "death", time: 1, person: -2, cause: "natural" })
 	reject({ kind: "stress", time: 1, person: 0, level: 1.5 })
 	expect(log.count).toBe(0)
 	expect(PEOPLE_LOG.pending(people)).toBe(false)
 
-	PEOPLE_LOG.append({ log, row: { kind: "death", time: 1, person: 0 } })
+	PEOPLE_LOG.append({
+		log,
+		row: { kind: "death", time: 1, person: 0, cause: "natural" },
+	})
 	const packet = PEOPLE_LOG.seal({ people, sovereign: () => true })
 	expect(() => PEOPLE_LOG.read({ rows: packet, index: 1 })).toThrow()
-	packet.b[0] = 1
+	packet.b[0] = 4
 	expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 	packet.b[0] = 0
-	for (const code of [3, 4, 11, 13]) {
+	for (const code of [11, 13]) {
 		packet.kind[0] = code
 		expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 	}
@@ -183,7 +225,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	table.father[first[2]] = first[0]
 	table.mother[first[2]] = first[1]
 	const packet = PEOPLE_LOG.seal({ people, sovereign: () => true })
-	expect(byteLength(packet)).toBe(25 * 3 + 69 * 3)
+	expect(byteLength(packet)).toBe(25 * 3 + 70 * 3)
 	expect(rowsOf(packet)).toEqual(
 		first.map((person) => ({
 			kind: "creation",
@@ -196,7 +238,11 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	)
 	for (const person of first)
 		for (const column of SNAPSHOT_COLUMNS)
-			expect(packet[column][person]).toBe(table[column][person])
+			expect(packet[column][person]).toBe(
+				column === "death" && table.death[person] > people.household.time()
+					? Infinity
+					: table[column][person],
+			)
 	expect(packet.nameSeed[first[1]]).toBe(0x7fffffff)
 	expect(PEOPLE_LOG.pending(people)).toBe(false)
 
@@ -210,7 +256,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	expect(people.log.time.length).toBe(8192)
 	const grown = PEOPLE_LOG.seal({ people, sovereign: () => true })
 	expect(grown.count).toBe(rows + 1)
-	expect(byteLength(grown)).toBe(25 * (rows + 1) + 69)
+	expect(byteLength(grown)).toBe(25 * (rows + 1) + 70)
 	const decoded = rowsOf(grown)
 	expect(decoded[0]).toMatchObject({
 		kind: "creation",
@@ -226,7 +272,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 		})
 
 	const invalid: [keyof typeof table, number][] = [
-		["death", Infinity],
+		["death", Number.NaN],
 		["birth", Number.NaN],
 		["sex", 2],
 		["nameSeed", 2 ** 31],
@@ -271,6 +317,7 @@ it("records every person once and rebuilds the same record from transferred pack
 					people: engine.people,
 					sex: sex === 0 ? 0 : 1,
 					birth: engine.time / STATE.yearMs - 13,
+					survives: engine.time / STATE.yearMs - 13,
 					father: -1,
 					mother: -1,
 					dynasty: -1,
@@ -303,7 +350,7 @@ it("records every person once and rebuilds the same record from transferred pack
 		)
 		for (const packet of packets) {
 			expect(byteLength(packet)).toBe(
-				25 * packet.count + 69 * packet.sex.length,
+				25 * packet.count + 70 * packet.sex.length,
 			)
 			for (const row of rowsOf(packet)) {
 				kinds.add(row.kind)
@@ -330,16 +377,19 @@ it("records every person once and rebuilds the same record from transferred pack
 	const table = engine.people.persons
 	const count = table.birth.length
 	expect(created).toEqual(Array.from({ length: count }, (...entry) => entry[1]))
+	// Stress rows depend on which rulers the world's wars happen to strain.
+	kinds.delete("stress")
 	expect([...kinds].sort()).toEqual([
 		"betrothal",
 		"betrothal_end",
+		"condition",
 		"creation",
 		"death",
+		"health_band",
 		"pregnancy",
 		"regent",
 		"residence",
 		"seat",
-		"stress",
 		"wedding",
 	])
 
@@ -366,7 +416,10 @@ it("records every person once and rebuilds the same record from transferred pack
 			congenital: table.congenital[id],
 			carried: table.carried[id],
 			birthTimeMs: table.birth[id] * STATE.yearMs - offsetMs,
-			deathTimeMs: table.death[id] * STATE.yearMs - offsetMs,
+			deathTimeMs:
+				table.death[id] * STATE.yearMs <= engine.time
+					? table.death[id] * STATE.yearMs - offsetMs
+					: Infinity,
 		})
 	}
 	const start = startTimeMs / STATE.yearMs
@@ -462,7 +515,7 @@ it("keeps the append buffer writable after a transfer and never emits a row twic
 			reason: "partition",
 		},
 	])
-	expect(byteLength(packet)).toBe(25 * 3 + 69)
+	expect(byteLength(packet)).toBe(25 * 3 + 70)
 }, 600000)
 
 it("answers family, marriage, betrothal, tenure, pregnancy and stress views from the record alone", () => {
@@ -541,9 +594,15 @@ it("answers family, marriage, betrothal, tenure, pregnancy and stress views from
 		"died",
 	])
 		expect(events).toContain(kind)
+	const stressed = [...people.stressOf.values()]
+		.flat()
+		.findLast((row) => row.level > 0)
+	if (!stressed) throw new Error("Missing stress rows")
 	expect(
-		views.some(
-			(view) => PERSON_QUERY.stress({ people, id: view.id, timeMs }) > 0,
-		),
-	).toBe(true)
+		PERSON_QUERY.stress({
+			people,
+			id: stressed.person,
+			timeMs: stressed.timeMs,
+		}),
+	).toBe(stressed.level)
 }, 600000)

@@ -153,7 +153,9 @@ Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpatio
 
 ## Household holdings and scheduling
 
-[Households](households.md) describes the independent seat index, frozen death walk and local election rules. One holder event succeeds all surviving crowns under their own laws and valid districts immediately, in current rank/ID order. A merger or prior transfer can remove a later frozen seat. District succession selects an adult landless relative or founds a new house; regent replacement remains separately scheduled. Availability considers every crown, and regency checks use the relevant local district rather than a foreign primary.
+[Households](households.md) describes the independent seat index, frozen death walk and local election rules. One death event per person succeeds all surviving crowns under their own laws and valid districts immediately, in current rank/ID order, then reassigns the regencies that person held. A merger or prior transfer can remove a later frozen seat. District succession selects an adult landless relative or founds a new house. Availability considers every crown, and regency checks use the relevant local district rather than a foreign primary.
+
+A reign has no end date until its ruler dies or is deposed: no death is known in advance ([health](health.md)). An Incapable person cannot be elected, appointed or made regent, but can inherit; an incapable sovereign reigns under a regent ([people](people.md#regencies)).
 
 Single-heir union eligibility checks every sovereign crown held by the heir, ignoring districts. Existing senior and sibling-junior membership is compatible without inventing sibling edges. Installation and separately crowned spouses preflight all crown pairs and recheck changed memberships after each external link. Actual senior–junior edges advance once per shared successor dispatch; new edges start at generation 1 and spouse-only links do not advance generations. Merger checks run immediately.
 

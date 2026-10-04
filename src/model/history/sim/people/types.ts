@@ -1,3 +1,4 @@
+import type { Deliveries } from "@/model/history/sim/people/fertility/types"
 import type {
 	HouseholdContext,
 	ResidenceHistory,
@@ -44,6 +45,22 @@ export interface PersonTable {
 	betrothed: number[]
 	// When the betrothal was made; -1 without one.
 	betrothedAt: number[]
+	// Health at birth less the permanent losses of ageing.
+	baseHealth: number[]
+	// Progress of each ageing condition, 0-100; -1 when absent.
+	infirmXp: number[]
+	cloudedEyesXp: number[]
+	fragileBonesXp: number[]
+	witheringMindXp: number[]
+	falteringHeartXp: number[]
+	// The last recorded health band, with the Blind and Incapable bits.
+	healthFlags: number[]
+	// The last completed age whose yearly health pulse has run.
+	healthAgeYear: number[]
+	// Death has been projected up to this time.
+	healthIntervalEnd: number[]
+	// The calendar year the person last led an army; -1 for never.
+	ledYear: number[]
 }
 
 export type SeatChangeReason =
@@ -58,10 +75,18 @@ export type SeatChangeReason =
 	| "partition"
 	| "unknown"
 
-export type RegentKind = "parent" | "relative" | "protector" | "council"
+export type RegentKind =
+	| "parent"
+	| "spouse"
+	| "relative"
+	| "protector"
+	| "council"
+
+export type RegencyCause = "minority" | "incapacity"
 
 export interface Regency {
 	ward: number
+	cause: RegencyCause
 	// -1 for a regency council.
 	regent: number
 	kind: RegentKind
@@ -76,6 +101,8 @@ export interface DeposedClaim {
 	tried: boolean
 }
 
+export type DeathCause = "natural" | "heart" | "battle" | "childbirth"
+
 export type PregnancyLoss = "miscarriage" | "stillbirth" | "childbirth death"
 
 export interface PeopleState {
@@ -85,6 +112,9 @@ export interface PeopleState {
 	persons: PersonTable
 	alive: number[]
 	stressed: number[]
+	// Deaths of a spouse or child since the last yearly pass, by the bereaved.
+	bereavements: Map<number, number>
+	deliveries: Deliveries
 	rulerOf: Int32Array
 	// Patrician house heads of each electoral republic, by realm.
 	patricians: Map<number, number[]>
@@ -93,7 +123,8 @@ export interface PeopleState {
 	// Realm pairs allied by a marriage between their ruling families, keyed by
 	// the lower realm times the province count plus the higher.
 	marriageAlliances: Map<number, MarriageAlliance>
-	// Sovereign realms governed by a regent, by realm.
+	// Sovereign realms governed by a regent for a child or an incapable ruler,
+	// by realm.
 	regencies: Map<number, Regency>
 	// Claims of deposed rulers, by the realm they lost.
 	deposed: Map<number, DeposedClaim>
@@ -119,6 +150,8 @@ export interface SpawnParams {
 	people: PeopleState
 	sex: Sex
 	birth: number
+	// The person is known to be alive then; their birth for a newborn.
+	survives: number
 	father: number
 	mother: number
 	dynasty: number
@@ -205,9 +238,12 @@ export interface RunPeopleYearParams extends MarriageRealms {
 	rng: SharedRng
 }
 
-export interface PeopleYear extends PeopleMatches {
-	// People whose death date moved earlier this year.
-	shortened: number[]
+export interface ProjectYearParams {
+	people: PeopleState
+	time: number
+	rulers: number[]
+	originOf: (realm: number) => RealmOrigin
+	rng: SharedRng
 }
 
 export interface PeopleMatches {

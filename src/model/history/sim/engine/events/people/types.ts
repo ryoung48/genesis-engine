@@ -7,9 +7,11 @@ export interface PeopleEventParams {
 	rng: SharedRng
 }
 
-export interface EndEarlyParams {
+export interface FailHeartsParams {
 	state: HistoryState
-	person: number
+	// Rulers whose heart failed this year, in person order.
+	hearts: number[]
+	rng: SharedRng
 }
 
 export interface StateParams {

@@ -3,9 +3,11 @@ import { AFFILIATION } from "@/model/history/record/people/query/affiliation"
 import type {
 	AttributeView,
 	BetrothalView,
+	ConditionView,
 	CoupleAtParams,
 	PersonAtParams,
 	PersonEvent,
+	PersonEventKind,
 	PersonView,
 	RealmAtParams,
 	SeatAtParams,
@@ -15,10 +17,19 @@ import type {
 } from "@/model/history/record/people/query/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
-import { HEALTH } from "@/model/history/sim/people/health"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { TRAITS } from "@/model/history/sim/people/traits"
+import type { DeathCause } from "@/model/history/sim/people/types"
 import { EFFECTIVE_TIME } from "@/model/shared/time/effective"
+
+const DEATH_EVENTS: Record<DeathCause, PersonEventKind> = {
+	natural: "died",
+	heart: "died of heart failure",
+	battle: "killed in battle",
+	childbirth: "died in childbirth",
+}
 
 function until(time: number, timeMs: number): number | null {
 	return time <= timeMs ? time : null
@@ -165,13 +176,34 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 			other: regency.person,
 			tenure: index,
 		})
-	let childbirth = false
+	const blind = PEOPLE_LOG.conditions.indexOf("blind")
+	const incapable = PEOPLE_LOG.conditions.indexOf("incapable")
+	const levels = PEOPLE_LOG.conditions.map(() => -1)
+	for (const row of PEOPLE_RECORD.healthRows(params)) {
+		if (row.code === 0) continue
+		const condition = row.code - 1
+		const before = levels[condition]
+		levels[condition] = row.value
+		if (row.timeMs > params.timeMs) break
+		events.push({
+			timeMs: row.timeMs,
+			kind:
+				condition === blind
+					? "became blind"
+					: condition === incapable
+						? "became incapable"
+						: row.value < 0
+							? "condition lost"
+							: before < 0
+								? "condition gained"
+								: "condition worsened",
+			other: condition,
+			tenure: -1,
+		})
+	}
 	for (const pregnancy of params.people.pregnanciesOf.get(params.id) ?? []) {
 		if (pregnancy.timeMs > params.timeMs) continue
-		if (pregnancy.outcome === "childbirth death") {
-			childbirth = true
-			continue
-		}
+		if (pregnancy.outcome === "childbirth death") continue
 		events.push({
 			timeMs: pregnancy.timeMs,
 			kind:
@@ -183,22 +215,53 @@ function timeline(params: PersonAtParams): PersonEvent[] {
 	if (person.deathTimeMs !== null)
 		events.push({
 			timeMs: person.deathTimeMs,
-			kind: childbirth ? "died in childbirth" : "died",
+			kind: DEATH_EVENTS[PEOPLE_RECORD.deathCause(params)],
 			other: -1,
 			tenure: -1,
 		})
 	return events.sort((a, b) => a.timeMs - b.timeMs)
 }
 
+// The recorded band at that time: the latest change, else the band the
+// person was created with. Null before that creation, when no health is
+// known, and for the unborn and the dead.
 function health({ people, id, timeMs }: PersonAtParams): HealthBand | null {
 	const person = PEOPLE_RECORD.person({ people, id })
 	if (!person || person.birthTimeMs > timeMs || person.deathTimeMs <= timeMs)
 		return null
-	return HEALTH.band({
-		birth: person.birthTimeMs / yearMs,
-		death: person.deathTimeMs / yearMs,
-		time: timeMs / yearMs,
-	})
+	const changed = PEOPLE_RECORD.healthAt({ people, id, timeMs, code: 0 })
+	if (changed !== null) return PEOPLE_LOG.healthBands[changed]
+	return timeMs >= people.persons.healthTimeMs[id]
+		? PEOPLE_LOG.healthBands[people.persons.healthBand[id]]
+		: null
+}
+
+// Each condition's recorded level at that time, in code order; -1 when
+// absent. The living only: the dead and the unborn have none.
+function conditionLevels({ people, id, timeMs }: PersonAtParams): number[] {
+	const levels = PEOPLE_LOG.conditions.map(() => -1)
+	const person = PEOPLE_RECORD.person({ people, id })
+	if (!person || person.birthTimeMs > timeMs) return levels
+	const at = Math.min(timeMs, person.deathTimeMs)
+	for (const row of PEOPLE_RECORD.healthRows({ people, id })) {
+		if (row.timeMs > at) break
+		if (row.code > 0) levels[row.code - 1] = row.value
+	}
+	return levels
+}
+
+function conditions(params: PersonAtParams): ConditionView[] {
+	return conditionLevels(params).flatMap((level, index) =>
+		level < 0 ? [] : [{ condition: PEOPLE_LOG.conditions[index], level }],
+	)
+}
+
+// Null while the person lives.
+function deathCause({ people, id, timeMs }: PersonAtParams): DeathCause | null {
+	const person = PEOPLE_RECORD.person({ people, id })
+	return person && person.deathTimeMs <= timeMs
+		? PEOPLE_RECORD.deathCause({ people, id })
+		: null
 }
 
 function married({ people, a, b, timeMs }: CoupleAtParams): boolean {
@@ -226,6 +289,7 @@ function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
 	if (!person || timeMs < person.birthTimeMs) return []
 	const age =
 		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
+	const effects = AGEING.effects(conditionLevels({ people, id, timeMs }))
 	return (
 		[
 			"diplomacy",
@@ -237,7 +301,7 @@ function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
 		] as const
 	).map((name) => {
 		const value = ATTRIBUTES.effective({
-			conditions: [],
+			conditions: [effects.attributes],
 			character: person,
 			age,
 			attribute: name,
@@ -285,6 +349,8 @@ export const PERSON_QUERY = {
 	attributes,
 	traits,
 	stress,
+	conditions,
+	deathCause,
 	view,
 	timeline,
 	married,

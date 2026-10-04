@@ -1,5 +1,5 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { RegentKind } from "@/model/history/sim/people/types"
+import type { RegencyCause, RegentKind } from "@/model/history/sim/people/types"
 
 export type RegencyEndCause =
 	| "age"
@@ -25,23 +25,27 @@ export interface WardParams {
 	ward: number
 }
 
+export interface ChooseParams extends WardParams {
+	cause: RegencyCause
+}
+
 export interface AppointParams {
 	state: HistoryState
 	realm: number
 	ward: number
+	cause: RegencyCause
 	choice: RegentChoice
 }
 
 export interface RegentDiedParams {
 	state: HistoryState
-	realm: number
 	regent: number
 }
 
 export interface BeginParams {
 	state: HistoryState
 	realm: number
-	choice: RegentChoice
+	cause: RegencyCause
 }
 
 export interface EndParams {

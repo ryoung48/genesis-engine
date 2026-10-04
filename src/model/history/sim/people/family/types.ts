@@ -73,3 +73,9 @@ export interface MinorSeekersParams {
 	chance: number
 	rng: SharedRng
 }
+
+export interface ScopeParams {
+	people: PeopleState
+	time: number
+	rulers: number[]
+}

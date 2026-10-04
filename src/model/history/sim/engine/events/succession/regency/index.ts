@@ -3,6 +3,7 @@ import type {
 	AppointParams,
 	BeginParams,
 	BindsToParams,
+	ChooseParams,
 	EndParams,
 	LeaderParams,
 	RealmRegencyParams,
@@ -17,26 +18,40 @@ import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HEALTH } from "@/model/history/sim/people/health"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { HEIRS } from "@/model/history/sim/people/heirs"
 
 const COUNCIL: RegentChoice = { regent: -1, kind: "council" }
 const WEAK_CROWN_LAXITY = 0.1
+// Below the Poor band's upper bound of 3, so the weak-crown period stays near
+// the two years the old lifespan-derived band gave.
+const AILING_HEALTH = 2.5
 
 function now(state: HistoryState): number {
 	return state.time / STATE.yearMs
 }
 
-// The surviving parent, then the closest adult of the child's house in
-// inheritance order, then the strongest district holder, then a council.
-function choose({ state, realm, ward }: WardParams): RegentChoice {
+// A child's surviving parent or an incapable ruler's spouse, then the closest
+// adult of the ward's house in inheritance order, then the strongest district
+// holder, then a council.
+function choose({ state, realm, ward, cause }: ChooseParams): RegentChoice {
 	const people = state.people
 	const table = people.persons
-	for (const parent of [table.mother[ward], table.father[ward]])
+	if (cause === "minority") {
+		for (const parent of [table.mother[ward], table.father[ward]])
+			if (
+				parent >= 0 &&
+				SUCCESSION_SYSTEMS.adultAvailable({ state, person: parent })
+			)
+				return { regent: parent, kind: "parent" }
+	} else {
+		const spouse = table.spouse[ward]
 		if (
-			parent >= 0 &&
-			SUCCESSION_SYSTEMS.adultAvailable({ state, person: parent })
+			spouse >= 0 &&
+			SUCCESSION_SYSTEMS.adultAvailable({ state, person: spouse })
 		)
-			return { regent: parent, kind: "parent" }
+			return { regent: spouse, kind: "spouse" }
+	}
 	const house = table.dynasty[ward]
 	if (house >= 0) {
 		const relative = HEIRS.of({
@@ -59,13 +74,13 @@ function choose({ state, realm, ward }: WardParams): RegentChoice {
 function ailing({ state, realm }: RealmRegencyParams): boolean {
 	const ruler = state.people.rulerOf[realm]
 	if (ruler < 0) return false
-	const table = state.people.persons
-	const band = HEALTH.band({
-		birth: table.birth[ruler],
-		death: table.death[ruler],
-		time: now(state),
-	})
-	return band === "Poor" || band === "Grave" || table.stress[ruler] >= 300
+	return (
+		HEALTH.effective({
+			people: state.people,
+			person: ruler,
+			time: now(state),
+		}) < AILING_HEALTH || state.people.persons.stress[ruler] >= 300
+	)
 }
 
 // A realm under a regent or an ailing ruler has a weak crown: its districts
@@ -90,30 +105,17 @@ function bindsTo({ state, realm, other }: BindsToParams): boolean {
 	)
 }
 
-// Schedules the regent's replacement at their death.
-function scheduleRegentDeath({ state, realm, regent }: RegentDiedParams): void {
-	state.heap.enqueue(
-		// A millisecond past the death, so the regent reads as dead when the
-		// order is re-run and cannot be chosen again.
-		Math.ceil(state.people.persons.death[regent] * STATE.yearMs) + 1,
-		EVENT_HEAP.evt.REGENT_DEATH,
-		realm,
-		regent,
-	)
-}
-
-function appoint({ state, realm, ward, choice }: AppointParams): void {
+function appoint({ state, realm, ward, cause, choice }: AppointParams): void {
 	const people = state.people
-	people.regencies.set(realm, { ward, ...choice })
+	people.regencies.set(realm, { ward, cause, ...choice })
 	PEOPLE.setRegent({ people, seat: realm, person: choice.regent, ward })
-	if (choice.regent >= 0)
-		scheduleRegentDeath({ state, realm, regent: choice.regent })
 }
 
-function begin({ state, realm, choice }: BeginParams): void {
+function begin({ state, realm, cause }: BeginParams): void {
 	const people = state.people
 	const ward = people.rulerOf[realm]
-	appoint({ state, realm, ward, choice })
+	const choice = choose({ state, realm, ward, cause })
+	appoint({ state, realm, ward, cause, choice })
 	state.events.push({
 		tag: "regency started",
 		time: state.time,
@@ -123,27 +125,42 @@ function begin({ state, realm, choice }: BeginParams): void {
 			ward,
 			regent: choice.regent,
 			kind: choice.kind,
+			regencyCause: cause,
 			age: Math.round(now(state) - people.persons.birth[ward]),
 		},
 	})
 }
 
-// A child on a sovereign throne is governed by a regent until sixteen.
+// A child on a sovereign throne is governed by a regent until sixteen. The
+// end is queued for that birthday; a ward who has died or been deposed by
+// then leaves it stale.
 function startMinority({ state, realm }: RealmRegencyParams): void {
 	const ward = state.people.rulerOf[realm]
 	if (ward < 0 || !STATE.isSovereign({ state, p: realm })) return
 	const birth = state.people.persons.birth[ward]
 	if (now(state) - birth >= SUCCESSION_SYSTEMS.adultAge) return
-	begin({ state, realm, choice: choose({ state, realm, ward }) })
-	const comesOfAge =
-		birth * STATE.yearMs + STATE.deltaYear(SUCCESSION_SYSTEMS.adultAge)
-	if (comesOfAge < state.leaderRuntime.end[realm])
-		state.heap.enqueue(
-			comesOfAge,
-			EVENT_HEAP.evt.REGENCY,
-			realm,
-			state.leaderRuntime.idx[realm],
-		)
+	begin({ state, realm, cause: "minority" })
+	state.heap.enqueue(
+		birth * STATE.yearMs + STATE.deltaYear(SUCCESSION_SYSTEMS.adultAge),
+		EVENT_HEAP.evt.REGENCY,
+		realm,
+		state.leaderRuntime.idx[realm],
+	)
+}
+
+// An incapable sovereign is governed for until they die or are usurped.
+function startIncapacity({ state, realm }: RealmRegencyParams): void {
+	const ward = state.people.rulerOf[realm]
+	if (ward < 0 || !STATE.isSovereign({ state, p: realm })) return
+	if (!AGEING.incapable({ people: state.people, person: ward })) return
+	if (GOVERNOR.regency({ state, realm })) return
+	begin({ state, realm, cause: "incapacity" })
+}
+
+// The regency a newly seated ruler needs, if any.
+function start(params: RealmRegencyParams): void {
+	startMinority(params)
+	startIncapacity(params)
 }
 
 function end({ state, realm, cause }: EndParams): void {
@@ -161,6 +178,7 @@ function end({ state, realm, cause }: EndParams): void {
 			ward: regency.ward,
 			regent: regency.regent,
 			kind: regency.kind,
+			regencyCause: regency.cause,
 			cause,
 		},
 	})
@@ -168,29 +186,40 @@ function end({ state, realm, cause }: EndParams): void {
 
 function comeOfAge({ state, realm, leader }: LeaderParams): void {
 	if (state.leaderRuntime.idx[realm] !== leader) return
+	if (state.people.regencies.get(realm)?.cause !== "minority") return
 	end({ state, realm, cause: "age" })
 }
 
 function replace({ state, realm, ward }: WardParams): void {
-	const choice = choose({ state, realm, ward })
-	appoint({ state, realm, ward, choice })
+	const cause = state.people.regencies.get(realm)?.cause ?? "minority"
+	const choice = choose({ state, realm, ward, cause })
+	appoint({ state, realm, ward, cause, choice })
 	state.events.push({
 		tag: "regent changed",
 		time: state.time,
-		data: { nation: realm, ward, regent: choice.regent, kind: choice.kind },
+		data: {
+			nation: realm,
+			ward,
+			regent: choice.regent,
+			kind: choice.kind,
+			regencyCause: cause,
+		},
 	})
 }
 
-// The next in the regent order takes over as soon as the regent dies.
-function regentDied({ state, realm, regent }: RegentDiedParams): void {
-	const regency = GOVERNOR.regency({ state, realm })
-	if (!regency || regency.regent !== regent) return
-	if (!STATE.isSovereign({ state, p: realm })) return
-	replace({ state, realm, ward: regency.ward })
+// The next in the regent order takes over each regency the dead person held.
+function regentDied({ state, regent }: RegentDiedParams): void {
+	for (const [realm, held] of [...state.people.regencies]) {
+		if (held.regent !== regent) continue
+		const regency = GOVERNOR.regency({ state, realm })
+		if (!regency || regency.regent !== regent) continue
+		if (!STATE.isSovereign({ state, p: realm })) continue
+		replace({ state, realm, ward: regency.ward })
+	}
 }
 
-// Ends regencies whose child no longer holds a sovereign throne, and replaces
-// regents who took a throne of their own.
+// Ends regencies whose ward no longer holds a sovereign throne, and replaces
+// regents who took a throne of their own or can no longer govern.
 function review({ state }: ReviewParams): void {
 	for (const [realm, regency] of [...state.people.regencies]) {
 		if (
@@ -213,10 +242,10 @@ export const REGENCY = {
 	weak,
 	bindsTo,
 	laxity: WEAK_CROWN_LAXITY,
-	startMinority,
+	start,
+	startIncapacity,
 	end,
 	comeOfAge,
 	regentDied,
-	scheduleRegentDeath,
 	review,
 }

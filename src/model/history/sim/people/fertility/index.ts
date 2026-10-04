@@ -3,19 +3,28 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import type {
 	BearParams,
+	CancelParams,
 	ChildCount,
 	ChildDynastyParams,
 	CoupleAtParams,
 	CoupleParams,
 	DeliverParams,
+	Delivery,
 	DurationParams,
+	FinishDeliveryParams,
 	OutcomeParams,
+	Pregnancy,
 	PregnancyOutcome,
+	ProjectParams,
+	QueueParams,
 	SiblingsParams,
+	SmoothWeightParams,
+	TakeQueuedParams,
 	TwinChanceParams,
 	WomanParams,
 } from "@/model/history/sim/people/fertility/types"
 import { HEALTH } from "@/model/history/sim/people/health"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
@@ -33,6 +42,9 @@ const MONTHLY_SCALE = 0.0475
 const COMMONER_FACTOR = 0.85
 const FIRST_HEIR_BONUS = 0.3
 const GIRL_CHANCE = 0.49
+// CK3 pregnancy.0001: the weight of an untroubled birth, with the Sickly and
+// Ill Mother weights folded in.
+const SMOOTH_WEIGHT = 215
 
 function motherAgeFactor(age: number): number {
 	if (age <= 25) return 1
@@ -89,6 +101,15 @@ function capOf(params: CoupleParams): number {
 	)
 }
 
+function smoothWeight({ health, earlier }: SmoothWeightParams): number {
+	let weight = SMOOTH_WEIGHT
+	if (health <= 5) weight -= 10
+	if (health <= 3) weight -= 15
+	if (earlier >= 2) weight += 5
+	if (earlier >= 4) weight += 5
+	return weight
+}
+
 function outcome({
 	people,
 	mother,
@@ -96,17 +117,10 @@ function outcome({
 	earlier,
 	rng,
 }: OutcomeParams): PregnancyOutcome {
-	const table = people.persons
-	const band = HEALTH.band({
-		birth: table.birth[mother],
-		death: table.death[mother],
-		time,
+	const normal = smoothWeight({
+		health: HEALTH.effective({ people, person: mother, time }),
+		earlier,
 	})
-	let normal = 215
-	if (band === "Poor" || band === "Grave") normal -= 10
-	if (band === "Grave") normal -= 15
-	if (earlier >= 2) normal += 5
-	if (earlier >= 4) normal += 5
 	let roll = rng.random() * (normal + 17)
 	if ((roll -= normal) < 0) return "birth"
 	if ((roll -= 10) < 0) return "miscarriage"
@@ -158,29 +172,54 @@ function childDynasty({
 		: table.dynasty[second]
 }
 
-function deliver({
-	people,
-	mother,
-	father,
-	due,
-	twins,
-	origin,
-	rng,
-}: DeliverParams): void {
-	const dynasty = childDynasty({ people, mother, father, origin })
-	for (let i = 0; i < (twins ? 2 : 1); i++)
-		PEOPLE.spawn({
-			people,
-			sex: rng.random() < GIRL_CHANCE ? 1 : 0,
-			birth: due,
-			father,
-			mother,
-			dynasty,
-			origin,
-			rng,
-		})
+function bornAlive(outcome: PregnancyOutcome): boolean {
+	return outcome === "birth" || outcome === "mother dies"
 }
 
+function kills(outcome: PregnancyOutcome): boolean {
+	return outcome === "mother dies" || outcome === "mother and child die"
+}
+
+// Ends a pregnancy at its time: the children are created and a loss is
+// logged. True when it kills the mother.
+function deliver({ people, pregnancy, time, rng }: DeliverParams): boolean {
+	const { mother, father, origin } = pregnancy
+	if (bornAlive(pregnancy.outcome)) {
+		const dynasty = childDynasty({ people, mother, father, origin })
+		for (let i = 0; i < (pregnancy.twins ? 2 : 1); i++)
+			PEOPLE.spawn({
+				people,
+				sex: rng.random() < GIRL_CHANCE ? 1 : 0,
+				birth: time,
+				survives: time,
+				father,
+				mother,
+				dynasty,
+				origin,
+				rng,
+			})
+	}
+	const fatal = kills(pregnancy.outcome)
+	if (pregnancy.outcome !== "birth")
+		PEOPLE_LOG.append({
+			log: people.log,
+			row: {
+				kind: "pregnancy",
+				mother,
+				father,
+				time,
+				outcome:
+					pregnancy.outcome === "miscarriage" ||
+					pregnancy.outcome === "stillbirth"
+						? pregnancy.outcome
+						: "childbirth death",
+			},
+		})
+	return fatal
+}
+
+// Children already born, with those of pending deliveries from their due
+// dates on; a pending child counts as living.
 function countChildren({
 	people,
 	mother,
@@ -198,10 +237,22 @@ function countChildren({
 		together++
 		if (table.death[child] > time) living++
 	}
+	for (const id of people.deliveries.byMother.get(mother) ?? []) {
+		const delivery = people.deliveries.byId.get(id)
+		if (!delivery || delivery.due > time || !bornAlive(delivery.outcome))
+			continue
+		const children = delivery.twins ? 2 : 1
+		earlier += children
+		if (delivery.father !== father) continue
+		together += children
+		living += children
+	}
 	return { earlier, living, together }
 }
 
-function bear({
+// The couple's next pregnancy conceived in the interval, with its end already
+// decided; the mother rests until a season after it.
+function conceive({
 	people,
 	mother,
 	father,
@@ -210,7 +261,7 @@ function bear({
 	survives,
 	origin,
 	rng,
-}: BearParams): boolean {
+}: BearParams): Pregnancy | null {
 	const table = people.persons
 	const cap = capOf({ people, mother, father })
 	const ruler = isRuler({ people, mother, father })
@@ -221,11 +272,16 @@ function bear({
 		time < until;
 		time += MONTH
 	) {
-		if (table.death[mother] <= time || table.death[father] <= time) return false
+		if (table.death[mother] <= time || table.death[father] <= time) return null
 		const motherAge = time - table.birth[mother]
 		const fatherAge = time - table.birth[father]
-		if (motherAge + GESTATION >= LAST_BIRTH_AGE) return false
+		if (motherAge + GESTATION >= LAST_BIRTH_AGE) return null
 		if (motherAge < ADULT_AGE || fatherAge < ADULT_AGE) continue
+		if (
+			AGEING.incapable({ people, person: mother }) ||
+			AGEING.incapable({ people, person: father })
+		)
+			return null
 		const { earlier, living, together } = countChildren({
 			people,
 			mother,
@@ -237,12 +293,16 @@ function bear({
 			TRAITS.fertility({
 				character: CHARACTER.of({ people, person: mother }),
 				age: 16,
-			}) * STRESS.fertilityFactor(table.stress[mother])
+			}) *
+			STRESS.fertilityFactor(table.stress[mother]) *
+			HEALTH.fertility({ people, person: mother })
 		fatherCharacterFertility ??=
 			TRAITS.fertility({
 				character: CHARACTER.of({ people, person: father }),
 				age: 16,
-			}) * STRESS.fertilityFactor(table.stress[father])
+			}) *
+			STRESS.fertilityFactor(table.stress[father]) *
+			HEALTH.fertility({ people, person: father })
 		const motherFertility =
 			Math.max(0, table.fertility[mother] - 0.05 * earlier) *
 			motherAgeFactor(motherAge) *
@@ -263,35 +323,142 @@ function bear({
 		if (rng.random() >= chance) continue
 		const result = outcome({ people, mother, time, earlier, rng })
 		const due = time + duration({ outcome: result, rng }) / YEAR_DAYS
-		const fatal = result === "mother dies" || result === "mother and child die"
-		if (fatal && due < survives) continue
-		if (table.death[mother] <= due) return false
-		if (result === "birth" || result === "mother dies")
-			deliver({
-				people,
-				mother,
-				father,
-				due,
-				twins: rng.random() < twinChance({ people, mother, age: motherAge }),
-				origin,
-				rng,
-			})
+		if (kills(result) && due < survives) continue
+		if (table.death[mother] <= due) return null
+		const twins =
+			bornAlive(result) &&
+			rng.random() < twinChance({ people, mother, age: motherAge })
 		table.nextBirth[mother] = due + REST
-		if (result !== "birth")
-			PEOPLE_LOG.append({
-				log: people.log,
-				row: {
-					kind: "pregnancy",
-					mother,
-					father,
-					time: due,
-					outcome: fatal ? "childbirth death" : result,
-				},
-			})
-		if (fatal) return PEOPLE.shortenLife({ people, person: mother, time: due })
-		time = table.nextBirth[mother] - MONTH
+		return {
+			mother,
+			father,
+			conception: time,
+			due,
+			outcome: result,
+			twins,
+			origin,
+		}
 	}
-	return false
+	return null
+}
+
+function queue({ people, pregnancy }: QueueParams): number {
+	const deliveries = people.deliveries
+	const id = deliveries.next++
+	deliveries.byId.set(id, { ...pregnancy, id })
+	const list = deliveries.byMother.get(pregnancy.mother)
+	if (list) list.push(id)
+	else deliveries.byMother.set(pregnancy.mother, [id])
+	return id
+}
+
+// Pregnancies of a past interval, each delivered as it is conceived; one that
+// ends after the present is left pending. True when a delivery moved the
+// mother's death earlier.
+function bear(params: BearParams): boolean {
+	const { people, mother, now, rng } = params
+	for (;;) {
+		const pregnancy = conceive(params)
+		if (!pregnancy) return false
+		if (pregnancy.due > now) {
+			queue({ people, pregnancy })
+			if (kills(pregnancy.outcome)) return false
+			continue
+		}
+		if (deliver({ people, pregnancy, time: pregnancy.due, rng }))
+			return PEOPLE.shortenLife({
+				people,
+				person: mother,
+				time: pregnancy.due,
+			})
+	}
+}
+
+// Pregnancies conceived in the coming interval, queued for delivery. Each
+// mother is projected once per interval, and not again while a pregnancy that
+// will kill her is pending.
+function project({
+	people,
+	mother,
+	father,
+	from,
+	until,
+	origin,
+	rng,
+}: ProjectParams): number[] {
+	const deliveries = people.deliveries
+	const queued: number[] = []
+	if ((deliveries.projected.get(mother) ?? -Infinity) >= until) return queued
+	deliveries.projected.set(mother, until)
+	const pending = deliveries.byMother.get(mother) ?? []
+	if (pending.some((id) => kills(deliveries.byId.get(id)?.outcome ?? "birth")))
+		return queued
+	for (;;) {
+		const pregnancy = conceive({
+			people,
+			mother,
+			father,
+			from,
+			until,
+			survives: from,
+			now: from,
+			origin,
+			rng,
+		})
+		if (!pregnancy) return queued
+		queued.push(queue({ people, pregnancy }))
+		if (kills(pregnancy.outcome)) return queued
+	}
+}
+
+// Takes a pending delivery at its time. Null when it was cancelled, the
+// mother has died, or the father was dead at conception; the mother is then
+// free again from the conception or her last remaining delivery.
+function finishDelivery({
+	people,
+	id,
+	time,
+}: FinishDeliveryParams): Delivery | null {
+	const deliveries = people.deliveries
+	const delivery = deliveries.byId.get(id)
+	if (!delivery) return null
+	deliveries.byId.delete(id)
+	const table = people.persons
+	const { mother, father } = delivery
+	const remaining = (deliveries.byMother.get(mother) ?? []).filter(
+		(other) => other !== id,
+	)
+	if (remaining.length > 0) deliveries.byMother.set(mother, remaining)
+	else deliveries.byMother.delete(mother)
+	if (table.death[mother] >= time && table.death[father] > delivery.conception)
+		return delivery
+	let free = delivery.conception
+	for (const other of remaining)
+		free = Math.max(free, (deliveries.byId.get(other)?.due ?? free) + REST)
+	table.nextBirth[mother] = free
+	return null
+}
+
+// Pending deliveries not yet handed to the event queue.
+function takeQueued({ people }: TakeQueuedParams): Delivery[] {
+	const deliveries = people.deliveries
+	const fresh: Delivery[] = []
+	for (let id = deliveries.queued; id < deliveries.next; id++) {
+		const delivery = deliveries.byId.get(id)
+		if (delivery) fresh.push(delivery)
+	}
+	deliveries.queued = deliveries.next
+	return fresh
+}
+
+// A dead mother's pending deliveries never happen.
+function cancelForDeath({ people, person }: CancelParams): number {
+	const deliveries = people.deliveries
+	const pending = deliveries.byMother.get(person) ?? []
+	for (const id of pending) deliveries.byId.delete(id)
+	deliveries.byMother.delete(person)
+	deliveries.projected.delete(person)
+	return pending.length
 }
 
 // Brothers and sisters of a child created on its own, kept clear of its
@@ -301,7 +468,15 @@ function siblings({ people, child, until, origin, rng }: SiblingsParams): void {
 	const mother = table.mother[child]
 	const father = table.father[child]
 	const birth = table.birth[child]
-	const family = { people, mother, father, survives: birth, origin, rng }
+	const family = {
+		people,
+		mother,
+		father,
+		survives: birth,
+		now: until,
+		origin,
+		rng,
+	}
 	bear({
 		...family,
 		from: table.birth[mother] + ADULT_AGE,
@@ -311,4 +486,13 @@ function siblings({ people, child, until, origin, rng }: SiblingsParams): void {
 	bear({ ...family, from: birth, until })
 }
 
-export const FERTILITY = { bear, siblings }
+export const FERTILITY = {
+	bear,
+	siblings,
+	project,
+	smoothWeight,
+	deliver,
+	takeQueued,
+	finishDelivery,
+	cancelForDeath,
+}

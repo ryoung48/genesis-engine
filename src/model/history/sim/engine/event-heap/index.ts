@@ -2,14 +2,14 @@ const evt = {
 	SIEGE: 10,
 	WAR: 0,
 	BATTLE: 1,
-	SUCCESSION: 2,
+	DEATH: 2,
 	TAX: 3,
 	CENSUS: 4,
 	DIPLOMACY: 5,
 	REGENCY: 6,
 	RAID: 7,
 	PEOPLE_YEAR: 8,
-	REGENT_DEATH: 9,
+	BIRTH: 11,
 } as const
 
 type EventType = (typeof evt)[keyof typeof evt]
@@ -17,6 +17,14 @@ type EventType = (typeof evt)[keyof typeof evt]
 const INITIAL_CAPACITY = 1024
 
 const DATA_FIELDS = 4
+
+// Same-time order: deaths, births, everything else, then the yearly people
+// pass; the enqueue sequence settles what remains.
+function priorityOf(type: number): number {
+	if (type === evt.DEATH) return 0
+	if (type === evt.BIRTH) return 1
+	return type === evt.PEOPLE_YEAR ? 3 : 2
+}
 
 // Packed storage keeps the simulation event queue small while serving its next event in logarithmic time.
 export class EventHeap {
@@ -26,6 +34,8 @@ export class EventHeap {
 	private _type: Uint8Array
 	private _data: Int32Array
 	private _time2: Float64Array
+	private _sequence: Float64Array
+	private _next = 0
 
 	constructor(capacity = INITIAL_CAPACITY) {
 		this._capacity = capacity
@@ -33,6 +43,7 @@ export class EventHeap {
 		this._type = new Uint8Array(capacity)
 		this._data = new Int32Array(capacity * DATA_FIELDS)
 		this._time2 = new Float64Array(capacity)
+		this._sequence = new Float64Array(capacity)
 	}
 
 	get size(): number {
@@ -82,6 +93,7 @@ export class EventHeap {
 		this._data[base + 2] = d2
 		this._data[base + 3] = d3
 		this._time2[i] = time2
+		this._sequence[i] = this._next++
 		this._siftUp(i)
 	}
 
@@ -108,6 +120,9 @@ export class EventHeap {
 		this._type = newType
 		this._data = newData
 		this._time2 = newTime2
+		const newSequence = new Float64Array(newCap)
+		newSequence.set(this._sequence)
+		this._sequence = newSequence
 		this._capacity = newCap
 	}
 
@@ -132,12 +147,23 @@ export class EventHeap {
 		const t2A = this._time2[a]
 		this._time2[a] = this._time2[b]
 		this._time2[b] = t2A
+		const sequenceA = this._sequence[a]
+		this._sequence[a] = this._sequence[b]
+		this._sequence[b] = sequenceA
+	}
+
+	private _before(a: number, b: number): boolean {
+		if (this._time[a] !== this._time[b]) return this._time[a] < this._time[b]
+		const priorityA = priorityOf(this._type[a])
+		const priorityB = priorityOf(this._type[b])
+		if (priorityA !== priorityB) return priorityA < priorityB
+		return this._sequence[a] < this._sequence[b]
 	}
 
 	private _siftUp(i: number): void {
 		while (i > 0) {
 			const parent = (i - 1) >> 1
-			if (this._time[i] >= this._time[parent]) break
+			if (!this._before(i, parent)) break
 			this._swap(i, parent)
 			i = parent
 		}
@@ -149,9 +175,8 @@ export class EventHeap {
 			let smallest = i
 			const left = 2 * i + 1
 			const right = 2 * i + 2
-			if (left < n && this._time[left] < this._time[smallest]) smallest = left
-			if (right < n && this._time[right] < this._time[smallest])
-				smallest = right
+			if (left < n && this._before(left, smallest)) smallest = left
+			if (right < n && this._before(right, smallest)) smallest = right
 			if (smallest === i) break
 			this._swap(i, smallest)
 			i = smallest

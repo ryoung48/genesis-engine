@@ -1,4 +1,5 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type { DeathCause } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface InitSuccessionParams {
@@ -48,9 +49,15 @@ export interface WeakCrownParams {
 	rng: SharedRng
 }
 
-export interface RunSuccessionParams {
+// One death's seat walk. Each union edge advances at most once per walk.
+export interface SuccessionContext {
+	accountedEdges: Set<string>
+	cause: DeathCause
+}
+
+export interface SucceedPersonParams {
 	state: HistoryState
 	person: number
-	revision: number
+	context: SuccessionContext
 	rng: SharedRng
 }

@@ -68,6 +68,7 @@ it("counts living observations, crowns and boundary samples independently of reg
 			people,
 			sex: 0,
 			birth: 80,
+			survives: 80,
 			father: -1,
 			mother: -1,
 			dynasty: id,
@@ -87,6 +88,10 @@ it("counts living observations, crowns and boundary samples independently of reg
 		recordTime: (time) => time,
 	})
 	PEOPLE.vacate({ people, seat: 3, reason: "union" })
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: { kind: "death", person: 2, time: 102, cause: "natural" },
+	})
 	PEOPLE_RECORD.append({
 		record,
 		packet: PEOPLE_LOG.seal({ people, sovereign: () => true }),
@@ -146,6 +151,7 @@ it("joins unmoved households to parent-only territorial transitions and excludes
 			people,
 			sex: 0,
 			birth: id === 2 ? 115 : 80,
+			survives: id === 2 ? 115 : 80,
 			father: -1,
 			mother: -1,
 			dynasty: id,

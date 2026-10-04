@@ -35,17 +35,6 @@ function release({ people, person, time, cause }: ReleaseParams): void {
 	})
 }
 
-// A betrothal lapses at the first yearly pass after either party's death.
-function releaseDead({ people, time }: BetrothalPassParams): void {
-	const table = people.persons
-	for (const person of people.alive) {
-		const partner = table.betrothed[person]
-		if (partner < 0) continue
-		const death = Math.min(table.death[person], table.death[partner])
-		if (death <= time) release({ people, person, time: death, cause: "death" })
-	}
-}
-
 // Pairs whose younger party has come of age; their columns are cleared for
 // the wedding.
 function fulfil({ people, time }: BetrothalPassParams): BetrothedPair[] {
@@ -74,6 +63,5 @@ export const BETROTHAL = {
 	maxAgeGap: MAX_AGE_GAP,
 	betroth,
 	release,
-	releaseDead,
 	fulfil,
 }

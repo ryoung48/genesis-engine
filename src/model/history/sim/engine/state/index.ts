@@ -1,8 +1,8 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
+import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
-import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
@@ -237,7 +237,11 @@ function releaseProvince(params: ReleaseProvinceParams): void {
 
 // Schedules the ruler's succession at their death.
 function scheduleSuccession({ state, p }: ScheduleSuccessionParams): void {
-	SUCCESSION_SCHEDULE.ensure({ state, person: state.people.rulerOf[p] })
+	DEATH_SCHEDULE.ensure({
+		state,
+		person: state.people.rulerOf[p],
+		cause: "natural",
+	})
 }
 
 function isProvinceConnectedToParent({
@@ -323,7 +327,6 @@ function repartitionNation({
 	// Depose leaders of absorbed sovereigns before parents are rewritten
 	for (const p of subjects) {
 		if (p === nation || !isSovereign({ state, p })) continue
-		state.leaderRuntime.end[p] = state.time
 		state.leaderRuntime.idx[p]++
 		state.events.push({
 			tag: "ruler deposed",
@@ -778,13 +781,20 @@ function createHistoryState({
 		events: [],
 		journal: [],
 		pendingJournal: JOURNAL.pending(),
-		successionSchedule: SUCCESSION_SCHEDULE.create(),
+		deathSchedule: DEATH_SCHEDULE.create(),
+		successionContext: null,
+		lifecycle: {
+			births: 0,
+			deaths: 0,
+			staleDeaths: 0,
+			cancelledDeliveries: 0,
+			peakDeliveries: 0,
+		},
 		people: PEOPLE.create(P),
 		heap: new EventHeap(),
 		leaderRuntime: {
 			idx: new Int32Array(P),
 			birth: new Float64Array(P),
-			end: new Float64Array(P),
 			targetUrban: new Float32Array(P),
 			nameSeed: new Int32Array(P).fill(-1),
 		},
@@ -811,7 +821,7 @@ function createHistoryState({
 		time: () => state.time / yearMs,
 	}
 	state.people.holdingsChanged = (person) =>
-		SUCCESSION_SCHEDULE.ensure({ state, person })
+		DEATH_SCHEDULE.ensure({ state, person, cause: "natural" })
 
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
@@ -1003,8 +1013,7 @@ function unite({ state, a, b, ruler, shared }: UniteParams): UnionLink {
 	}
 	setRelation({ state, a: junior, b: senior, rel: rel.PU_JUNIOR })
 	people.unionGenerations.set(junior, 1)
-	if (state.successionSchedule.processing >= 0)
-		state.successionSchedule.accountedEdges.add(`${senior}:${junior}`)
+	state.successionContext?.accountedEdges.add(`${senior}:${junior}`)
 	state.events.push({
 		tag: "personal union formed",
 		time: state.time,
@@ -1114,10 +1123,7 @@ function installRuler({
 		person,
 		ranks: state.seatRank,
 	}).filter((seat) => seat !== p && isSovereign({ state, p: seat }))
-	const accounted =
-		state.successionSchedule.processing >= 0
-			? state.successionSchedule.accountedEdges
-			: new Set<string>()
+	const accounted = state.successionContext?.accountedEdges ?? new Set<string>()
 	breakUnions({ state, p, person })
 	PEOPLE.setRuler({
 		people,
@@ -1166,10 +1172,6 @@ function installRuler({
 
 	state.leaderRuntime.idx[p]++
 	state.leaderRuntime.birth[p] = table.birth[person] * yearMs
-	state.leaderRuntime.end[p] = Math.max(
-		state.time,
-		table.death[person] * yearMs,
-	)
 	FIELDS.prov.leader.nameSeed.set({ state, p, value: table.nameSeed[person] })
 	FIELDS.prov.leader.dynasty.set({ state, p, value: table.dynasty[person] })
 	FIELDS.prov.leader.claim.set({ state, p, value: claim })

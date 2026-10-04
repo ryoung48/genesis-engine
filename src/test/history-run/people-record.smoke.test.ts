@@ -193,13 +193,16 @@ it("records rulers, their families and seat tenures consistently", () => {
 	const offsetMs = DATE.earthHistoryStartYear * STATE.yearMs
 	expect(PEOPLE_RECORD.count(people)).toBe(table.birth.length)
 	for (let id = 0; id < PEOPLE_RECORD.count(people); id++)
-		expect(
-			Math.abs(
-				PEOPLE_RECORD.deathTimeMs({ people, id }) +
-					offsetMs -
-					table.death[id] * STATE.yearMs,
-			),
-		).toBeLessThan(1)
+		if (table.death[id] * STATE.yearMs > engine.time)
+			expect(PEOPLE_RECORD.deathTimeMs({ people, id })).toBe(Infinity)
+		else
+			expect(
+				Math.abs(
+					PEOPLE_RECORD.deathTimeMs({ people, id }) +
+						offsetMs -
+						table.death[id] * STATE.yearMs,
+				),
+			).toBeLessThan(1)
 
 	for (const note of engine.events)
 		if (note.tag === "succession")

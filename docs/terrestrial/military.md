@@ -2,7 +2,7 @@
 
 Code: army economy and combat in `src/model/history/sim/engine/military`; recruitment and deployment operations in `engine/military`, field logistics in `engine/knowledge`; war creation and settlement in `engine/state/index.ts`; war decisions in `engine/events/war` (peaceful annexation in `war/submission`); scheduled battles in `engine/events/battle`, kind selection in `battle/kind`, siege phases in `engine/events/siege`, and shared occupation and settlement checks in `battle/conquest`.
 
-Armies are aggregate troop counts. Combat strength is 0.75 per levy and 1 per regular; logistics, casualties, and recorded army sizes count soldiers. Affordability targets always use home upkeep prices; actual upkeep still follows peace/campaign deployment. The simulation tracks enrollment, field logistics, treasury support, war deployments, casualties, and occupied provinces; it does not track individual soldiers, units, or commanders.
+Armies are aggregate troop counts. Combat strength is 0.75 per levy and 1 per regular; logistics, casualties, and recorded army sizes count soldiers. Affordability targets always use home upkeep prices; actual upkeep still follows peace/campaign deployment. The simulation tracks enrollment, field logistics, treasury support, war deployments, casualties, and occupied provinces; it does not track individual soldiers or units, and the only commander is a ruler leading in person (see [Command](#command)).
 
 ## Enrollment and recruitment
 
@@ -259,4 +259,18 @@ Rebellion previews calculate each prospective territory with the same economy an
 
 ## Character effects
 
-Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers. Sieges and raids do not use commander character. See [character](character.md) for the full rules.
+Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers, in every field battle and whoever leads: a regent's martial counts for a regent-governed realm. Sieges and raids do not use commander character. See [character](character.md) for the full rules.
+
+## Command
+
+Code: `src/model/history/sim/engine/events/battle/command` (`COMMAND`).
+
+Before each field battle, each side's ruler may take the field in person (`COMMAND.lead`). Leading is separate from the governor's martial multiplier above and adds only a risk and one penalty.
+
+- **Who leads.** The realm's ruler, if 16 or older, ruling without a regent, with effective health above 3, and not Infirm, Blind or Incapable ([health](health.md)).
+- **Once a year.** A ruler leads at most one field battle a calendar year (`ledYear`, set when they are chosen, whether or not they survive). The simulation does not track where a ruler is, so one battle a year stands for one campaign with one army, and it bounds the yearly risk of a realm fighting on several fronts.
+- **Fragile Bones.** The leader's army is multiplied by `clamp(1 + 0.01 × advantage, 0.5, 1)`, where advantage is the condition's summed rows (−3 to −24). An army whose ruler does not lead takes no such penalty. Leading also makes the condition's next yearly progression more likely to be its largest gain; the note is used by one pulse.
+- **Risk.** One hash roll per led battle (channel 1040, salted by the battle's time). The leader is killed if it is below `(5 / 1040) × max(0.1, (30 − prowess) / 30) × temper × odds`: temper is 2 for Brave and 0.5 for Craven, and odds is `min(1, 1.4 × enemy / own)` for the side with the larger army, else 1. At prowess 6 with neither trait that is 0.385% per led battle. The 5 and 1040 are CK3's commander event weights; its wounds and maimings are not modelled, and its precondition that the commander is already wounded or weak is dropped with them.
+- **Death.** A killed leader dies once the battle is settled, with cause `battle`; their succession follows at once and any pending natural death goes stale ([families](families.md#death)).
+
+The `battle` note carries each side's leader and whether they fell.

@@ -77,7 +77,7 @@ function enthrone({
 		nation: realm,
 		rng,
 	})
-	REGENCY.startMinority({ state, realm })
+	REGENCY.start({ state, realm })
 	const overlord = STATE.diplomaticOverlord({ state, nation: realm })
 	if (
 		overlord >= 0 &&

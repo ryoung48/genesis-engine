@@ -39,7 +39,7 @@ Strength-tested candidates emit a `rebellion evaluated` diagnostic note before a
 
 **Threat test.** The district breaks away when `threat > 0.45 − laxity`, and then only with chance equal to the threat.
 
-A **weak crown** is a realm under a regent, or whose ruler is in Poor or Grave health ([people](people.md#regencies)).
+A **weak crown** is a realm under a regent (for a child or for an incapable ruler), or whose ruler has effective health below 2.5 or stress of 300 or more ([people](people.md#regencies), [health](health.md#other-uses-of-health)).
 
 ## Support
 
@@ -128,4 +128,4 @@ A Rival vassal refuses its overlord's war call and withholds tribute. A Suspicio
 
 ## Character effects
 
-Governor diplomacy adds `clamp(-0.0125 × (diplomacy - 5.5), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and Poor/Grave health. See [character](character.md) for the full rules.
+Governor diplomacy adds `clamp(-0.0125 × (diplomacy - 5.5), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and health below 2.5. See [character](character.md) for the full rules.

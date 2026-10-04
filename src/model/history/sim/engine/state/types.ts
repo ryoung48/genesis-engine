@@ -1,7 +1,8 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { EventHeap } from "@/model/history/sim/engine/event-heap"
-import type { SuccessionSchedule } from "@/model/history/sim/engine/events/succession/schedule/types"
+import type { DeathSchedule } from "@/model/history/sim/engine/events/people/death/schedule/types"
+import type { SuccessionContext } from "@/model/history/sim/engine/events/succession/types"
 import type {
 	JournalTransaction,
 	PendingJournal,
@@ -112,7 +113,6 @@ interface ActiveWarOptions {
 interface LeaderRuntime {
 	idx: Int32Array
 	birth: Float64Array
-	end: Float64Array
 	targetUrban: Float32Array
 	nameSeed: Int32Array
 }
@@ -150,6 +150,15 @@ export interface ProvinceEconomyCache {
 export interface CandidatesRefresh {
 	hierarchyVersion: number
 	wars: number
+}
+
+// Running totals of births and deaths applied at their own times.
+export interface LifecycleCounters {
+	births: number
+	deaths: number
+	staleDeaths: number
+	cancelledDeliveries: number
+	peakDeliveries: number
 }
 
 export interface HistoryState {
@@ -266,7 +275,10 @@ export interface HistoryState {
 	events: EngineNote[]
 	journal: JournalTransaction[]
 	pendingJournal: PendingJournal
-	successionSchedule: SuccessionSchedule
+	deathSchedule: DeathSchedule
+	lifecycle: LifecycleCounters
+	// The seat walk of the death being applied; null outside one.
+	successionContext: SuccessionContext | null
 	people: PeopleState
 	heap: EventHeap
 	leaderRuntime: LeaderRuntime

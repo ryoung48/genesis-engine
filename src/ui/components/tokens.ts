@@ -22,10 +22,12 @@ export const uiPalette = {
 	person: {
 		noHouse: "#94a3b8",
 		health: {
+			Excellent: "#15803d",
 			Good: "#22c55e",
-			Fair: "#84cc16",
+			Fine: "#84cc16",
 			Poor: "#f59e0b",
-			Grave: "#b91c1c",
+			"Near death": "#ea580c",
+			Dying: "#b91c1c",
 		},
 	},
 	swatch: {

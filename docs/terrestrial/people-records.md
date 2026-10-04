@@ -1,6 +1,6 @@
 # People records (`:history`)
 
-How people travel from the simulation to the history record. See [households](households.md) for effective-time residence rules, [people](people.md) for the rules that create them and [history record memory](history-record-memory.md) for what the main thread retains.
+How people travel from the simulation to the history record. See [households](households.md) for effective-time residence rules, [health](health.md) and [families](families.md) for the health and lifecycle rows, [people](people.md) for the rules that create them and [history record memory](history-record-memory.md) for what the main thread retains.
 
 Code: the log and its codec in `src/model/history/sim/people/log` (`PEOPLE_LOG`); sealing and transfer in `src/model/history/sim/engine/journal` (`JOURNAL.flush`, `JOURNAL.transferList`); ingestion and accessors in `src/model/history/record/people` (`PEOPLE_RECORD`); views in `record/people/query` (`PERSON_QUERY`).
 
@@ -10,7 +10,7 @@ Every person the simulation creates, landed or not, living or dead, exactly once
 
 A person's row is written at the **first journal flush after their creation**, from the person table as it stands at that flush. It is not captured when the person is created, because `ROYAL_MARRIAGES.seed` rewrites an outsider bride's parents, dynasty, culture, home and name seed and redraws her character afterwards. Person ids are dense table indices, so the log keeps one cursor (people already sent) and each flush sends the ids from the cursor to the table length in id order. No id can be sent twice, and a role change never creates a row.
 
-**A person's row fields are final at their first flush.** After it, death corrections arrive as `death` rows and location changes as `residence` rows. Birth-effective residence corrections preserve the emitted initial snapshot and append a row at birth. Rehoming runs only during initialization, before the initial flush, and the death dates `FAMILY.found` and `outsider` overwrite follow the spawn in the same call. A rule that needs to change a recorded field later must add a row kind for it.
+**A person's row fields are final at their first flush.** After it, a death arrives as a `death` row, health as `health_band` and `condition` rows, and location changes as `residence` rows. Rehoming runs only during initialization, before the initial flush. A rule that needs to change a recorded field later must add a row kind for it.
 
 ## Rows
 
@@ -19,10 +19,10 @@ A person's row is written at the **first journal flush after their creation**, f
 | Kind / code | time | a | b | c | d |
 |---|---|---|---|---|---|
 | `creation` / 0 | birth | person | father | mother | snapshot index in this packet |
-| `death` / 1 | the new death date | person | 0 | 0 | 0 |
+| `death` / 1 | the death | person | cause code | 0 | 0 |
 | `wedding` / 2 | marriage start | husband | wife | 0 | 0 |
-| `health_band` / 3 | reserved | person | old band | new band | 0 |
-| `condition` / 4 | reserved | person | condition | old level | new level |
+| `health_band` / 3 | the yearly pass | person | new band code | 0 | 0 |
+| `condition` / 4 | the yearly pass, or creation for a starter | person | condition code | old level | new level |
 | `seat` / 5 | 0 | seat | holder (−1 if vacated) | seat-kind code | seat-reason code |
 | `pregnancy` / 6 | when the pregnancy ends | mother | father | loss-outcome code | 0 |
 | `betrothal` / 7 | when made | a | b | 0 | 0 |
@@ -32,11 +32,12 @@ A person's row is written at the **first journal flush after their creation**, f
 | `opinion_memory` / 11 | reserved | observer | target | reason code | signed initial value |
 | `regent` / 12 | 0 | seat | regent (−1 for a council or the regency's end) | ward | seat-reason code |
 
-- **Time** is simulation years, the unit the person table uses. It is each row's *effective* time, not when it was appended, and it is not an ordering key: a pregnancy and the death it causes carry the future due date, and siblings and house founders are created with past births.
+- **Time** is simulation years, the unit the person table uses. It is each row's *effective* time. Deaths, pregnancies, weddings and health rows are written when they happen, so their time is never after their transaction's; siblings and house founders are created with past births, so time is still not an ordering key.
 - **Seat and regent rows carry no time.** Their time is the enclosing transaction's. Writing it into the column as years would round-trip through a division and could move a tenure boundary.
 - **Seat kind** is 0 for a sovereign root (`ruler`) and 1 for a `district`. `sim/people` does not read engine state, so `JOURNAL.flush` passes `PEOPLE_LOG.seal` a `sovereign(seat)` callback and the code is written at the flush, as the object rows derived it before.
-- **Codes.** Seat reasons, loss outcomes and betrothal-end causes map to codes in alphabetical order from 0, declared once in `PEOPLE_LOG`. A `death` row means a date moved earlier by childbirth; its `b` is kept at 0 for a later cause code.
-- **Reserved kinds** (`health_band`, `condition`, `opinion_memory`) and a non-zero death `b` are rejected. Their payload layouts are fixed in the table so that implementing one adds a codec entry and nothing else.
+- **Codes.** Seat reasons, loss outcomes and betrothal-end causes map to codes in alphabetical order from 0, declared once in `PEOPLE_LOG`. Death causes are natural 0, heart 1, battle 2, childbirth 3. Health bands run from Dying 0 to Excellent 5. Conditions are infirm 0, clouded_eyes 1, fragile_bones 2, withering_mind 3, faltering_heart 4, blind 5, incapable 6, with levels 0–4 and −1 for absent; Blind and Incapable are present at 0.
+- **One death row per person**, written by the death event when it applies the death. A person created already dead has no death row: their snapshot carries the date.
+- **Reserved kind** (`opinion_memory`) is rejected. Its payload layout is fixed in the table so that implementing it adds a codec entry and nothing else.
 - **Validation.** `PEOPLE_LOG.append` takes every kind except `creation` and rejects an unknown or reserved kind, an unknown code, a non-finite time and a payload outside −1 … 2³¹−1. `PEOPLE_LOG.seal` writes the creation rows and snapshots and rejects a non-finite birth, death or character word, a sex other than 0 or 1, and an out-of-range id or seed. Nothing is truncated silently.
 
 `PEOPLE_LOG.read({ rows, index })` is the one decoder. It returns a kind-tagged row with its codes turned back into the string unions, from either the pending buffer or a sealed packet.
@@ -52,11 +53,12 @@ Rows are in **append order within their transaction**, with the transaction's ne
 | Snapshot column | Type |
 |---|---|
 | sex | `Uint8Array` |
-| death | `Float64Array` |
+| death | `Float64Array`: the date for a person already dead when created, else `Infinity` |
+| health band | `Uint8Array`: the band when created |
 | dynasty, culture, name seed, home, initial residence | `Int32Array` each |
 | `bases`, `personality`, `grades`, `congenital`, `carried` | `Float64Array` each |
 
-That is 69 bytes a person; birth, father and mother are on the creation row. A packet is exactly 25 × rows + 69 × creations bytes. Initial residence is the birth-effective column, independently of the current location at sealing. Every snapshot buffer, including this column, is transferred.
+That is 70 bytes a person; birth, father and mother are on the creation row. A packet is exactly 25 × rows + 70 × creations bytes. Initial residence is the birth-effective column, independently of the current location at sealing. Every snapshot buffer, including this column, is transferred.
 
 `JOURNAL.transferList` lists every packet's buffers beside the census buffers, so the worker's `postMessage` moves them to the main thread without copying, and `JOURNAL.releaseSent` drops the packets with their transactions. The append buffer is never transferred, so nothing is detached under the simulation. An empty flush asks `PEOPLE_LOG.pending` and allocates nothing.
 
@@ -66,10 +68,15 @@ Packets are copied to exact size rather than transferred as fixed chunks: a year
 
 `PEOPLE_RECORD.append` folds a packet's rows in append order and keeps no reference to it.
 
-- **Columns.** `PeopleRecord.persons` is dense columns indexed by person id: the snapshot fields plus birth, father and mother, with times converted to record milliseconds, 85 bytes a person, grown by doubling. Ingestion checks that each creation row's id is the number of people already stored. Read people through `PEOPLE_RECORD.count`, `.has`, `.person` (a transient `RecordPerson`), `.birthTimeMs` and `.deathTimeMs`, not through the columns.
+- **Columns.** `PeopleRecord.persons` is dense columns indexed by person id: the snapshot fields plus birth, father and mother, with times converted to record milliseconds, grown by doubling. Health adds four: the snapshot band, the record time it holds from (`Infinity` for someone created dead), the death cause, and the index of the person's latest health row. Ingestion checks that each creation row's id is the number of people already stored. Read people through `PEOPLE_RECORD.count`, `.has`, `.person` (a transient `RecordPerson`), `.birthTimeMs` and `.deathTimeMs`, not through the columns.
 - **Derived objects.** `childrenOf`, `marriages`, `marriagesOf`, `tenures` with `tenuresOf`, `tenuresOfSeat`, `regentsOfSeat` and `regentsOfWard`, `dynastyHome`, `pregnanciesOf`, `betrothals`, `betrothalsOf`, `stressOf` and sparse `residencesOf`. Tenures and betrothals have an open end that a later row closes, so they are state folded from rows, not rows.
-- **Fold.** A `death` row moves the person's death date. A `wedding` closes the pair's standing betrothal as `married`; a `betrothal_end` closes it with its cause. A tenure keeps the reason it started and the reason it ended. A seat that changes hands more than once in one transaction keeps only its last holder, though the first change still closes the tenure that was open; `regent` rows are tracked apart from `seat` rows on the same seat.
-- **Ruler death dates.** The translator reads the packet's `death` rows after the append and moves the death date on a reigning ruler's `rulerChange` entry. This is the only use of people rows outside the people record.
+- **Health rows.** `PeopleRecord.health` is one set of typed columns for every `health_band` and `condition` row in arrival order: time, code (0 for a band, else the condition's code plus one), value (the band, or the level after the change) and the index of the same person's previous row, 17 bytes a row. A person's rows are read by walking that chain back from their latest.
+- **Fold.** A `death` row sets the person's death date and cause. A `wedding` closes the pair's standing betrothal as `married`; a `betrothal_end` closes it with its cause. A tenure keeps the reason it started and the reason it ended. A seat that changes hands more than once in one transaction keeps only its last holder, though the first change still closes the tenure that was open; `regent` rows are tracked apart from `seat` rows on the same seat.
+- **Ruler death dates.** The translator reads the packet's `death` rows after the append and writes the death date and cause on that person's latest `rulerChange` entry, whichever nation identity holds it. This is the only use of people rows outside the people record. A successor's entry names the predecessor and the cause from the journal's ruler delta, not from people rows.
+
+## Health queries
+
+`PERSON_QUERY.health` returns the latest recorded band at or before the selected time, else the creation snapshot from the time it holds. It returns nothing before a starter's snapshot (no health is known before the simulation began), for the unborn, for the dead and for someone created already dead. `PERSON_QUERY.conditions` folds the condition rows up to the selected time; `.attributes` applies those levels' effects; `.deathCause` is null while the person lives. None of them reads simulation health, XP or any future date.
 
 ## Residence queries
 

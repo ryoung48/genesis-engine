@@ -8,18 +8,18 @@ import type {
 	MatchParams,
 	MinorSeekersParams,
 	OutsiderParams,
+	ScopeParams,
 	Seeker,
 	SeekMatchesParams,
 } from "@/model/history/sim/people/family/types"
 import { FERTILITY } from "@/model/history/sim/people/fertility"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
 	CrossMatch,
 	FoundHouseParams,
 	PeopleMatches,
-	PeopleYear,
+	ProjectYearParams,
 	RunPeopleYearParams,
 	Sex,
 } from "@/model/history/sim/people/types"
@@ -68,15 +68,11 @@ function outsider({
 		people,
 		sex,
 		birth: time - age,
+		survives: time,
 		father: -1,
 		mother: -1,
 		dynasty: -1,
 		origin,
-		rng,
-	})
-	table.death[spouse] = LIFESPAN.deathAt({
-		birth: time - age,
-		from: time,
 		rng,
 	})
 	marry({ people, a: partner, b: spouse, time })
@@ -105,6 +101,7 @@ function found({
 		people,
 		sex: 0,
 		birth: birth - rng.uniform(20, 40),
+		survives: birth,
 		father: -1,
 		mother: -1,
 		dynasty,
@@ -120,15 +117,11 @@ function found({
 		people,
 		sex: 1,
 		birth: birth - rng.uniform(17, 32),
+		survives: birth,
 		father: -1,
 		mother: -1,
 		dynasty: -1,
 		origin,
-		rng,
-	})
-	table.death[mother] = LIFESPAN.deathAt({
-		birth: table.birth[mother],
-		from: birth,
 		rng,
 	})
 	marry({ people, a: father, b: mother, time: birth - 1 })
@@ -136,13 +129,13 @@ function found({
 		people,
 		sex,
 		birth,
+		survives: time,
 		father,
 		mother,
 		dynasty,
 		origin,
 		rng,
 	})
-	table.death[founder] = LIFESPAN.deathAt({ birth, from: time, rng })
 	PEOPLE.raise({ people, person: founder, rank })
 	FERTILITY.siblings({ people, child: founder, until: time, origin, rng })
 	if (age >= 18 && rng.random() < MARRIED_FOUNDER_CHANCE) {
@@ -162,6 +155,7 @@ function found({
 			from: wedding,
 			until: time,
 			survives: wife === founder ? time : wedding,
+			now: time,
 			origin,
 			rng,
 		})
@@ -367,17 +361,10 @@ function seekMatches({
 	return matches
 }
 
-function runYear({
-	people,
-	time,
-	rulers,
-	sovereigns,
-	rng,
-	...realms
-}: RunPeopleYearParams): PeopleYear {
+// The ruling line: each ruler with their children and siblings stay in scope
+// for marriage, and the rulers and their children for births.
+function scope({ people, time, rulers }: ScopeParams): Set<number> {
 	const table = people.persons
-	BETROTHAL.releaseDead({ people, time })
-	people.alive = people.alive.filter((person) => table.death[person] > time)
 	const stamp = Math.floor(time)
 	const line = new Set<number>()
 	for (const ruler of rulers) {
@@ -393,6 +380,23 @@ function runYear({
 				table.scopeYear[sibling] = stamp
 		}
 	}
+	return line
+}
+
+// The year's betrothal fulfilments and matches; every wedding is complete,
+// with its household moved, when this returns.
+function runYear({
+	people,
+	time,
+	rulers,
+	sovereigns,
+	rng,
+	...realms
+}: RunPeopleYearParams): PeopleMatches {
+	const table = people.persons
+	people.alive = people.alive.filter((person) => table.death[person] > time)
+	const stamp = Math.floor(time)
+	scope({ people, time, rulers })
 
 	const weddings: CrossMatch[] = []
 	for (const { a, b } of BETROTHAL.fulfil({ people, time })) {
@@ -421,29 +425,36 @@ function runYear({
 		...realms,
 	})
 	weddings.push(...matches.weddings)
+	return { weddings, betrothals: matches.betrothals }
+}
 
-	const shortened: number[] = []
-	for (const mother of [...people.alive]) {
+// Conceptions of the coming year for each married couple of the ruling line,
+// in person order.
+function project({
+	people,
+	time,
+	rulers,
+	originOf,
+	rng,
+}: ProjectYearParams): void {
+	const table = people.persons
+	const line = scope({ people, time, rulers })
+	for (const mother of people.alive) {
 		if (table.sex[mother] !== 1) continue
 		const father = table.spouse[mother]
 		if (father < 0) continue
 		if (!line.has(mother) && !line.has(father)) continue
 		if (!PEOPLE.aliveAt({ people, person: mother, time })) continue
-		if (
-			FERTILITY.bear({
-				people,
-				mother,
-				father,
-				from: time,
-				until: time + 1,
-				survives: time,
-				origin: realms.originOf(table.residence[mother]),
-				rng,
-			})
-		)
-			shortened.push(mother)
+		FERTILITY.project({
+			people,
+			mother,
+			father,
+			from: time,
+			until: time + 1,
+			origin: originOf(table.residence[mother]),
+			rng,
+		})
 	}
-	return { weddings, betrothals: matches.betrothals, shortened }
 }
 
-export const FAMILY = { found, seekMatches, runYear }
+export const FAMILY = { found, seekMatches, runYear, project }

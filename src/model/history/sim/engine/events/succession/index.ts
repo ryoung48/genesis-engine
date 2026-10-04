@@ -3,7 +3,6 @@ import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthro
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
-import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import type {
 	InitSuccessionParams,
@@ -11,8 +10,8 @@ import type {
 	RealmParams,
 	RealmRngParams,
 	RunSeatSuccessionParams,
-	RunSuccessionParams,
 	RunYearParams,
+	SucceedPersonParams,
 	WeakCrownParams,
 } from "@/model/history/sim/engine/events/succession/types"
 import { WAR } from "@/model/history/sim/engine/events/war"
@@ -40,7 +39,7 @@ function initSuccession({ state }: InitSuccessionParams): void {
 		if (state.desolate[p]) continue
 		if (!STATE.isSovereign({ state, p })) continue
 		STATE.scheduleSuccession({ state, p })
-		REGENCY.startMinority({ state, realm: p })
+		REGENCY.start({ state, realm: p })
 	}
 }
 
@@ -214,6 +213,7 @@ function runSeatSuccession({
 			leader: leaderIdx,
 			successor: state.leaderRuntime.idx[province],
 			dying,
+			cause: state.successionContext?.cause ?? "natural",
 			claim: choice.claim,
 		},
 	})
@@ -230,7 +230,7 @@ function runSeatSuccession({
 			primarySeat,
 			rng,
 		}) > 0
-	REGENCY.startMinority({ state, realm: province })
+	REGENCY.start({ state, realm: province })
 
 	if (divided) REGENCY.review({ state })
 	else {
@@ -257,18 +257,20 @@ function runSeatSuccession({
 	})
 }
 
-function runSuccession({
+// The dead person's seats, frozen once and walked in order; a seat that has
+// since changed hands is skipped.
+function succeedPerson({
 	state,
 	person,
-	revision,
+	context,
 	rng,
-}: RunSuccessionParams): void {
-	if (!SUCCESSION_SCHEDULE.consume({ state, person, revision })) return
+}: SucceedPersonParams): void {
 	const seats = HOLDINGS.ordered({
 		people: state.people,
 		person,
 		ranks: state.seatRank,
 	})
+	state.successionContext = context
 	try {
 		for (const seat of seats) {
 			if (state.people.rulerOf[seat] !== person) continue
@@ -284,7 +286,7 @@ function runSuccession({
 			else PEOPLE.vacate({ people: state.people, seat, reason: "succession" })
 		}
 	} finally {
-		SUCCESSION_SCHEDULE.finish({ state, person })
+		state.successionContext = null
 	}
 }
 
@@ -336,6 +338,7 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 			regent,
 			ward,
 			kind,
+			regencyCause: regency.cause,
 			regentIntrigue: GOVERNOR.attribute({
 				state,
 				realm,
@@ -377,11 +380,7 @@ function runYear({ state, rng }: RunYearParams): void {
 
 export const SUCCESSION = {
 	initSuccession,
-	runSuccession: (params: RunSuccessionParams) =>
-		MILITARY.mutate({
-			state: params.state,
-			action: () => runSuccession(params),
-		}),
+	succeedPerson,
 	runYear: (params: RunYearParams) =>
 		MILITARY.mutate({ state: params.state, action: () => runYear(params) }),
 }

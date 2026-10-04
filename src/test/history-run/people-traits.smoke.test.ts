@@ -5,6 +5,8 @@ import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
+import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
+import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
@@ -15,7 +17,6 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { CHARACTER } from "@/model/history/sim/people/character"
-import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
@@ -46,24 +47,24 @@ function stressLevels({
 	return levels
 }
 
-it("reproduces spawn's original shared random draws and redraw consumes none", () => {
+it("draws only the name seed and fertility from the shared stream at spawn, and redraw consumes none", () => {
 	const people = PEOPLE.create(1)
 	const rng = RNG.createRng({ seed: 318 })
 	const control = RNG.createRng({ seed: 318 })
-	const death = LIFESPAN.deathAt({ birth: 0, from: 0, rng: control })
 	const seed = PEOPLE.nameSeed({ sex: 0, genderSystem: 1, rng: control })
 	const fertility = 0.5 + 0.1 * control.random()
 	const person = PEOPLE.spawn({
 		people,
 		sex: 0,
 		birth: 0,
+		survives: 0,
 		father: -1,
 		mother: -1,
 		dynasty: 0,
 		origin: { realm: 0, culture: 0, genderSystem: 1 },
 		rng,
 	})
-	expect(people.persons.death[person]).toBe(death)
+	expect(people.persons.death[person]).toBe(Infinity)
 	expect(people.persons.nameSeed[person]).toBe(seed)
 	expect(people.persons.fertility[person]).toBe(fertility)
 	PEOPLE.redraw({ people, person })
@@ -78,6 +79,7 @@ it("draws valid, reproducible character and expected founder personality distrib
 			people,
 			sex: 0,
 			birth: 0,
+			survives: 0,
 			father: -1,
 			mother: -1,
 			dynasty: 0,
@@ -174,6 +176,7 @@ it("redraws descendants from final parents in birth order, leaving births and sh
 			people,
 			sex: person === 1 ? 1 : 0,
 			birth: person * 20,
+			survives: person * 20,
 			father: person === 2 ? 0 : person === 3 ? 2 : -1,
 			mother: person === 2 ? 1 : -1,
 			dynasty: 0,
@@ -205,6 +208,7 @@ it("gates personality by age and reads stress at the selected time", () => {
 		people,
 		sex: 0,
 		birth: 0,
+		survives: 0,
 		father: -1,
 		mother: -1,
 		dynasty: 0,
@@ -424,7 +428,12 @@ it("reads current governors outside the revenue cache and resets stale stress af
 		rank: state.seatRank[realm],
 		reason: "unknown",
 	})
-	people.regencies.set(realm, { ward, regent: ruler, kind: "relative" })
+	people.regencies.set(realm, {
+		cause: "minority",
+		ward,
+		regent: ruler,
+		kind: "relative",
+	})
 	for (const seat of [...people.persons.heldSeats[ruler]])
 		PEOPLE.vacate({ people, seat, reason: "unknown" })
 	expect(GOVERNOR.stressLevel({ state, realm })).toBe(0)
@@ -433,7 +442,12 @@ it("reads current governors outside the revenue cache and resets stale stress af
 	STRESS_EVENTS.runYear({ state })
 	expect(people.persons.stress[ruler]).toBe(0)
 	expect(stressLevels({ people, person: ruler })).toContain(0)
-	people.regencies.set(realm, { ward, regent: -1, kind: "council" })
+	people.regencies.set(realm, {
+		cause: "minority",
+		ward,
+		regent: -1,
+		kind: "council",
+	})
 	expect(GOVERNOR.attribute({ state, realm, attribute: "learning" })).toBe(5)
 })
 it("hash channels and event salts separate deterministic rolls", () => {
@@ -579,7 +593,7 @@ it("a Genius parent transmits Genius in a quarter of draws and an active good si
 	expect(Math.abs(geniuses / 10000 - 0.25)).toBeLessThan(0.02)
 })
 
-it("validates final parent draws after init and years of births, with no governing person redrawn at init", () => {
+it("validates final parent draws after init and years of births, with no sovereign or regent redrawn at init", () => {
 	const original = PEOPLE.redraw
 	let redraws = 0
 	PEOPLE.redraw = (params) => {
@@ -593,7 +607,11 @@ it("validates final parent draws after init and years of births, with no governi
 					queue.push(child)
 				}
 		for (const person of descendants) {
-			expect(params.people.rulerOf.includes(person)).toBe(false)
+			expect(
+				params.people.persons.heldSeats[person].some(
+					(seat) => params.people.household.realmOf(seat) === seat,
+				),
+			).toBe(false)
 			expect(
 				Array.from(params.people.regencies.values()).some(
 					(regency) => regency.regent === person,
@@ -648,6 +666,7 @@ it("keeps base variance near founders and child bases correlated with parental m
 				people,
 				sex: 0,
 				birth: 40 * generation,
+				survives: 40 * generation,
 				father,
 				mother,
 				dynasty: 0,
@@ -743,17 +762,41 @@ it("steps personal unions once, resets subjects without a holder change, and cou
 		people.stressed = [ruler]
 		table.personality[ruler] = 18 | (20 << 6) | (24 << 12)
 		const relatives = people.alive
-			.filter((person) => person !== ruler)
+			.filter(
+				(person) =>
+					person !== ruler &&
+					table.heldSeats[person].length === 0 &&
+					PEOPLE.aliveAt({
+						people,
+						person,
+						time: state.time / STATE.yearMs,
+					}),
+			)
 			.slice(0, 3)
-		const pass = state.time / STATE.yearMs
 		table.spouse[ruler] = relatives[0]
+		table.spouse[relatives[0]] = ruler
+		for (const relative of relatives) {
+			table.father[relative] = -1
+			table.mother[relative] = -1
+		}
+		table.spouse[relatives[1]] = -1
+		table.father[relatives[1]] = ruler
 		table.children[ruler] = [relatives[1]]
-		table.death[relatives[0]] = pass - 0.5
-		table.death[relatives[1]] = pass - 0.5
+		for (const relative of relatives.slice(0, 2)) {
+			PERSON_DEATH.mark({ state, person: relative, cause: "natural" })
+			PERSON_DEATH.run({
+				state,
+				person: relative,
+				revision: DEATH_SCHEDULE.revisionOf({ state, person: relative }),
+				rng: RNG.createRng({ seed: 1 }),
+			})
+		}
+		expect(table.spouse[ruler]).toBe(-1)
+		expect(people.bereavements.get(ruler)).toBe(2)
 		STRESS_EVENTS.runYear({ state })
 		expect(table.stress[ruler]).toBe(210)
+		expect(people.bereavements.size).toBe(0)
 		table.spouse[ruler] = relatives[2]
-		table.death[relatives[2]] = pass + 100
 		state.time += STATE.yearMs
 		STRESS_EVENTS.runYear({ state })
 		expect(table.stress[ruler]).toBe(180)
@@ -894,11 +937,13 @@ it("samples living populations on matched dates and measures capped governors in
 	engine.people.rulerOf[seats[1]] = ids[1]
 	table.heldSeats[ids[1]] = [seats[1]]
 	engine.people.regencies.set(seats[0], {
+		cause: "minority",
 		ward: ids[0],
 		regent: -1,
 		kind: "council",
 	})
 	engine.people.regencies.set(seats[1], {
+		cause: "minority",
 		ward: ids[1],
 		regent: ids[2],
 		kind: "relative",

@@ -8,20 +8,45 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { CHARACTER } from "@/model/history/sim/people/character"
+import { HEALTH } from "@/model/history/sim/people/health"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { STRESS } from "@/model/history/sim/people/stress"
 
-function write({ state, person, value, time }: WriteStressParams): void {
-	const table = state.people.persons
+// Records a changed stress level; a rise is a mental break, which advances a
+// Faltering Heart. True when that heart has failed. Nothing else changes
+// here: the death is applied once the whole year's stress is written.
+function write({ state, person, value, time }: WriteStressParams): boolean {
+	const people = state.people
+	const table = people.persons
 	const before = STRESS.level(table.stress[person])
+	const after = STRESS.level(value)
 	table.stress[person] = value
-	if (before !== STRESS.level(value) && table.death[person] > time)
+	if (before === after || table.death[person] <= time) return false
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: { kind: "stress", person, time, level: after },
+	})
+	if (after < before) return false
+	const rise = AGEING.heartRise({ people, person })
+	if (rise.change)
 		PEOPLE_LOG.append({
-			log: state.people.log,
-			row: { kind: "stress", person, time, level: STRESS.level(value) },
+			log: people.log,
+			row: {
+				kind: "condition",
+				person,
+				time,
+				condition: AGEING.conditions[rise.change.condition],
+				before: rise.change.before,
+				after: rise.change.after,
+			},
 		})
+	return rise.terminal
 }
-function runYear({ state }: StressYearParams): void {
+
+// Steps every sovereign ruler's stress once, from a list fixed at the start.
+// Returns the rulers whose heart failed, in person order.
+function runYear({ state }: StressYearParams): number[] {
 	const people = state.people
 	const table = people.persons
 	const time = state.time / STATE.yearMs
@@ -64,26 +89,21 @@ function runYear({ state }: StressYearParams): void {
 	for (const person of people.stressed)
 		if (!rulers.has(person)) write({ state, person, value: 0, time })
 	people.stressed = []
+	const failed: number[] = []
 	for (const [person, flags] of rulers) {
-		const relatives = new Set([table.spouse[person], ...table.children[person]])
-		let bereavements = 0
-		for (const relative of relatives)
-			if (
-				relative >= 0 &&
-				table.death[relative] > time - 1 &&
-				table.death[relative] <= time
-			)
-				bereavements++
+		const bereavements = people.bereavements.get(person) ?? 0
 		const value = STRESS.step({
-			conditions: [],
+			conditions: HEALTH.stressConditions({ people, person }),
 			character: CHARACTER.of({ people, person }),
 			age: time - table.birth[person],
 			value: table.stress[person],
 			bereavements,
 			...flags,
 		})
-		write({ state, person, value, time })
+		if (write({ state, person, value, time })) failed.push(person)
 		if (value > 0) people.stressed.push(person)
 	}
+	people.bereavements.clear()
+	return failed.sort((a, b) => a - b)
 }
 export const STRESS_EVENTS = { runYear }

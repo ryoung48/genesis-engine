@@ -4,15 +4,15 @@ Every person owns an independent sorted array of held seat IDs. `rulerOf` remain
 
 ## Succession
 
-The engine schedules one death event per holder, including district-only holders. A sparse pending entry stores person revision, due time and pending/processing state. Revisions survive last-seat loss, so reacquisition cannot revive an obsolete heap event. Additional seats reuse the holder's event; a shortened life replaces it. Regent deaths remain separate events.
+The engine schedules one death event per person with a finite death date, seat holder or not ([families](families.md#death)). A sparse pending entry stores revision, due time, cause and pending/processing state. A living person whose death date is still unknown (`Infinity`) has no entry and nothing is queued for them. Losing a last seat does not cancel a death; additional seats reuse the person's event; a date that moves replaces it. A regent's death is the same event: the person's regencies are reassigned after their seats.
 
-Dispatch consumes its token before effects and freezes held seats by descending current rank and ascending ID. Each step rechecks ownership and hierarchy: sovereign crowns use their own law, valid districts inherit immediately, and other seats are vacated. A prior merger or transfer can remove a later seat from the walk. Annual district settlement validates and grants seats, and ensures holder events; it does not inherit independently.
+`PERSON_DEATH.run` consumes the token, applies the death's effects, then runs the seat walk (`SUCCESSION.succeedPerson`) with a fresh context for that death. The walk freezes held seats by descending current rank and ascending ID. Each step rechecks ownership and hierarchy: sovereign crowns use their own law, valid districts inherit immediately, and other seats are vacated. A prior merger or transfer can remove a later seat from the walk. Annual district settlement validates and grants seats, and ensures holder events; it does not inherit independently.
 
 ## Personal unions
 
 A living heir must be compatible with every held sovereign crown. Districts do not veto unions. Existing group membership follows junior-to-senior union edges only; diplomatic overlords and territorial parents are excluded. Sibling juniors can continue their existing group without a sibling link, even while their dead senior awaits its turn. An incompatible external crown still rejects the heir.
 
-Installation rechecks surviving crowns after each external link. Existing groups retain their senior and edges. Each actual senior–junior edge advances once when both endpoints share the living successor, using a dispatch-local accounted-edge set. New edges start at generation 1; spouse-only shared unions do not advance generations. Merger eligibility is checked immediately after continuation, and removed seats are skipped.
+Installation rechecks surviving crowns after each external link. Existing groups retain their senior and edges. Each actual senior–junior edge advances once when both endpoints share the living successor, using the accounted-edge set of the walk's context (`state.successionContext`, set for the duration of one death's walk and null otherwise). New edges start at generation 1; spouse-only shared unions do not advance generations. Merger eligibility is checked immediately after continuation, and removed seats are skipped.
 
 ## District elections
 
@@ -28,7 +28,7 @@ The selected-date wiki shows active held titles, primary first, separately from 
 
 Residence is a province, independent of home culture and names. The primary held seat sets a holder’s location; rank changes can change that primary. Losing the last seat leaves residence unchanged. A wedding joins the unlanded spouse to the landed spouse, otherwise to the male spouse. Separately landed spouses stay at their own seats. Relocation carries an unlanded living spouse and living unlanded children under 16 sharing the old location; adults and separately landed relatives stay.
 
-Newborns use the mother’s retained location at birth, including backdated births and dead mothers. A maternal move corrects already-created unborn children. Before their first seal this amends initial residence; afterwards it appends a birth-effective correction without rewriting the emitted snapshot. Initial residence and sparse growable history survive every journal flush and death. The pending log is separate and transferable packet buffers never detach retained history.
+Newborns use the mother’s location at birth. A child delivered in the simulation is created at the delivery, so that is where she lives then; no child exists before its birth and nothing needs correcting. Backdated births of founders' families look the mother's location up in her retained history, including for dead mothers. Initial residence and sparse growable history survive every journal flush and death. The pending log is separate and transferable packet buffers never detach retained history.
 
 Current realm is resolved on demand through the engine’s territorial sovereign callback. Historical realm follows province parent history and maps the sovereign root into its record nation ID. Territorial conquest, annexation and union merger can change realm without a residence row or a resident sweep. District owners, occupation/controllers, diplomatic overlords and personal-union seniority do not replace the territorial sovereign. Unowned land has no realm even when occupied.
 

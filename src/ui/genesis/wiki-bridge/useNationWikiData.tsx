@@ -76,6 +76,14 @@ import {
 } from "@/ui/wiki/stats/nation/nation-distributions"
 import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
 
+// How a ruler's death reads when their successor is named.
+const RULER_FATES: Record<string, string> = {
+	natural: "died",
+	heart: "died of heart failure",
+	battle: "was killed in battle",
+	childbirth: "died in childbirth",
+}
+
 export function useNationWikiData(
 	input: NationWikiDataInput,
 ): NationWikiData | null {
@@ -659,7 +667,10 @@ export function useNationWikiData(
 							})
 						const ward = mention("ward")
 						const regent = mention("regent")
-						const wardName = ward?.name ?? "the child ruler"
+						const incapacity = event.payload.regencyCause === "incapacity"
+						const wardName =
+							ward?.name ??
+							(incapacity ? "the incapable ruler" : "the child ruler")
 						const role = regentRole({
 							people: record.people,
 							regent: regent?.id ?? -1,
@@ -679,7 +690,7 @@ export function useNationWikiData(
 									? `${regentName} usurped the throne of ${title} from ${wardName}.`
 									: kind === "ended"
 										? `${wardName} came of age and the regency of ${title} ended.`
-										: `${regentName} ${kind === "changed" ? "took over as" : "became"} regent of ${title} for ${wardName}.`,
+										: `${regentName} ${kind === "changed" ? "took over as" : "became"} regent of ${title} for ${wardName}${incapacity ? ", who could no longer rule" : ""}.`,
 							comment: eventComment(event.comment),
 							nations,
 							people: [ward, regent].flatMap((person) =>
@@ -754,17 +765,28 @@ export function useNationWikiData(
 						const isInterregnum = /^interregnum$/i.test(
 							String(event.payload.name ?? "").trim(),
 						)
+						const late = recordPersonMention({
+							people: record.people,
+							person: Number(event.payload.predecessor ?? -1),
+						})
+						const fate =
+							RULER_FATES[String(event.payload.predecessorDeathCause)]
+						const after = late && fate ? ` after ${late.name} ${fate}` : ""
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
 							type: "Ruler",
 							description: isInterregnum
 								? `${title} entered an interregnum.`
-								: `${title} gained ruler ${person.description}.`,
+								: `${title} gained ruler ${person.description}${after}.`,
 							comment: eventComment(event.comment),
 							nations,
 							dynasties: isInterregnum ? [] : person.dynasties,
-							people: isInterregnum ? [] : person.people,
+							people: isInterregnum
+								? []
+								: late && fate
+									? [...person.people, late]
+									: person.people,
 						})
 						break
 					}

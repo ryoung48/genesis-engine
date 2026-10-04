@@ -275,16 +275,20 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 		const attributes = Object.fromEntries(
 			NAMES.map((attribute) => [
 				attribute,
-				ATTRIBUTES.effective({ conditions: [], character, age, attribute }),
+				ATTRIBUTES.effective({
+					conditions: HEALTH.attributeConditions({
+						people: engine.people,
+						person,
+					}),
+					character,
+					age,
+					attribute,
+				}),
 			]),
 		) as Record<Attribute, number>
 		const regency = GOVERNOR.regency({ state: engine, realm })
 		const regent = regency?.regent ?? -1
-		const band = HEALTH.band({
-			birth: table.birth[person],
-			death: table.death[person],
-			time,
-		})
+		const health = HEALTH.effective({ people: engine.people, person, time })
 		const governorAttributes =
 			GOVERNOR.of({ state: engine, realm }) === person
 				? attributes
@@ -330,7 +334,7 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 			congenital: TRAITS.congenital({ character, age }),
 			stress: STRESS.level(table.stress[person]),
 			regency: regency !== null,
-			ailing: band === "Poor" || band === "Grave",
+			ailing: health < 2.5,
 			revenue:
 				ECONOMY.revenue({ state: engine, p: realm }) /
 				Math.max(1, ECONOMY.realmPopulation({ state: engine, p: realm })),

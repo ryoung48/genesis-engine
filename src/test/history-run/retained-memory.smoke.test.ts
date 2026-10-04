@@ -147,6 +147,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 			marriages: people.marriages.length,
 			betrothals: people.betrothals.length,
 			tenures: people.tenures.length,
+			healthRows: people.health.count,
 			retainedBytes: {
 				persons: retainedBytes(people.persons),
 				initialResidence: retainedBytes(people.persons.initialResidence),
@@ -163,6 +164,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				]),
 				pregnanciesOf: retainedBytes(people.pregnanciesOf),
 				stressOf: retainedBytes(people.stressOf),
+				health: retainedBytes(people.health),
 				dynastyHome: retainedBytes(people.dynastyHome),
 			},
 		}
@@ -210,6 +212,26 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				initialResidenceBytes: retainedBytes(
 					engine.people.persons.initialResidence,
 				),
+			},
+			health: {
+				columnsBytes: retainedBytes([
+					engine.people.persons.baseHealth,
+					engine.people.persons.infirmXp,
+					engine.people.persons.cloudedEyesXp,
+					engine.people.persons.fragileBonesXp,
+					engine.people.persons.witheringMindXp,
+					engine.people.persons.falteringHeartXp,
+					engine.people.persons.healthFlags,
+					engine.people.persons.healthAgeYear,
+					engine.people.persons.healthIntervalEnd,
+					engine.people.persons.ledYear,
+				]),
+				pendingDeaths: engine.deathSchedule.pending.size,
+				deathScheduleBytes: retainedBytes(engine.deathSchedule),
+				pendingDeliveries: engine.people.deliveries.byId.size,
+				deliveriesBytes: retainedBytes(engine.people.deliveries),
+				heapEvents: engine.heap.size,
+				heapBytes: retainedBytes(engine.heap),
 			},
 			holdings: {
 				people: engine.people.persons.heldSeats.length,
