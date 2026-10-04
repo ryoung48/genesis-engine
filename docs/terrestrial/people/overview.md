@@ -16,9 +16,9 @@ Every person the simulation creates is recorded, landed or not, living or dead: 
 
 ## What is tracked per person
 
-`PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), residence (current household province), initialResidence (birth-effective province), heldSeats (sorted unique seat IDs), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
+`PersonTable` (columns indexed by person id): sex, birth and death (years; death is `Infinity` until a date is chosen), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), residence (current household province), initialResidence (birth-effective province), heldSeats (sorted unique seat IDs), children, marriage time, betrothed partner and betrothal time (-1 without one), base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
-The additional attribute, trait and stress columns are `bases`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](attributes-traits-and-stress.md).
+The additional attribute, trait and stress columns are `bases`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](attributes-traits-and-stress.md). The ten health columns are listed in [health](health-and-mortality.md#simulation-columns).
 
 State-level maps in `PeopleState`:
 
@@ -31,20 +31,22 @@ State-level maps in `PeopleState`:
 | `residenceHistory` | Sparse retained effective-time moves and birth corrections, including dead people; independent of the pending log. |
 | `household` | Engine-provided territorial-sovereign, rank and time callbacks. |
 | `marriageAlliances` | Realm pairs allied by a royal marriage. |
-| `regencies` | Realm → `{ ward, regent (-1 = council), kind }`. |
+| `regencies` | Realm → `{ ward, cause (minority or incapacity), regent (-1 = council), kind }`. |
+| `bereavements` | Deaths of a spouse or child since the last yearly pass, by the bereaved; read and cleared by the stress step. |
+| `deliveries` | Pending pregnancies by id and by mother ([families](families-and-lifecycle.md#pregnancy)). |
 | `deposed` | Realm → `{ claimant, generation, tried }` for deposed rulers' lines. |
 | `log` | Rows appended since the last journal flush, as typed columns, and the cursor of people already sent. See [person records](../mechanics/person-records.md). |
 
 ## Yearly order
 
 The yearly `PEOPLE_YEAR` event runs, in order:
-1. district inheritance and new grants;
-2. the marriage-alliance review, which also breaks betrothals left without an alliance;
-3. patrician upkeep;
-4. betrothals broken by death, fulfilled betrothals, marriages and betrothals, the coming year's pregnancies, then rescheduled successions and regent replacements for those who will die in childbirth, then marriage alliances from that year's betrothals and weddings, and heiress unions;
-5. the regency review, usurpation rolls and restoration.
+1. the stress step for every sovereign ruler, then the deaths of any whose heart failed;
+2. the health pass: completed ages, band and condition changes, death projected for the coming year, and regents for the newly Incapable;
+3. district inheritance and new grants, the marriage-alliance review (which also breaks betrothals left without an alliance) and patrician upkeep;
+4. fulfilled betrothals, marriages and new betrothals, then marriage alliances and heiress unions from them;
+5. the coming year's conceptions, then the regency review, usurpation rolls and restoration.
 
-Successions, coming of age and rebellions run on their own events at the exact time.
+Deaths, births, coming of age and rebellions run on their own events at the exact time. [Families](families-and-lifecycle.md) has the order of same-time events.
 
 ## Related rules and records
 

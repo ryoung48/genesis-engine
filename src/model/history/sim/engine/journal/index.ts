@@ -12,9 +12,13 @@ import type {
 	RecordProvinceParams,
 	RecordRelationParams,
 } from "@/model/history/sim/engine/journal/types"
-import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type {
+	EngineNote,
+	HistoryState,
+} from "@/model/history/sim/engine/state/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { PeoplePacket } from "@/model/history/sim/people/log/types"
+import type { DeathCause } from "@/model/history/sim/people/types"
 
 const RULER_TAGS = new Set([
 	"succession",
@@ -156,6 +160,9 @@ function flush({
 	for (const note of notes) {
 		if (RULER_TAGS.has(note.tag)) rulerRoots.add(note.data.nation as number)
 	}
+	const deaths = new Map<number, EngineNote>()
+	for (const note of notes)
+		if (note.tag === "succession") deaths.set(note.data.nation as number, note)
 	const rulers = [...rulerRoots]
 		.filter(
 			(root) =>
@@ -170,9 +177,11 @@ function flush({
 			nameSeed: state.leaderNameSeedCurrent[root],
 			dynasty: state.leaderDynCurrent[root],
 			birthTimeMs: state.leaderRuntime.birth[root],
-			deathTimeMs: state.leaderRuntime.end[root],
 			regent: state.people.regencies.get(root)?.regent ?? -1,
 			regency: state.people.regencies.get(root)?.kind ?? null,
+			deceased: (deaths.get(root)?.data.dying as number | undefined) ?? -1,
+			deathCause:
+				(deaths.get(root)?.data.cause as DeathCause | undefined) ?? null,
 		}))
 	const keyframe = census
 		? {
@@ -237,6 +246,7 @@ function packetBuffers(packet: PeoplePacket): Transferable[] {
 		packet.d.buffer,
 		packet.sex.buffer,
 		packet.death.buffer,
+		packet.healthBand.buffer,
 		packet.dynasty.buffer,
 		packet.culture.buffer,
 		packet.nameSeed.buffer,

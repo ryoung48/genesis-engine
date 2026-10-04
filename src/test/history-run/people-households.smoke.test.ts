@@ -3,10 +3,10 @@ import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { EventHeap } from "@/model/history/sim/engine/event-heap"
+import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
+import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
-import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
-import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -26,15 +26,16 @@ function fixture(): HistoryState {
 		people,
 		time: 100 * STATE.yearMs,
 		heap: new EventHeap(),
-		successionSchedule: SUCCESSION_SCHEDULE.create(),
+		deathSchedule: DEATH_SCHEDULE.create(),
 	} as HistoryState
 	people.holdingsChanged = (person) =>
-		SUCCESSION_SCHEDULE.ensure({ state, person })
+		DEATH_SCHEDULE.ensure({ state, person, cause: "natural" })
 	for (let id = 0; id < 3; id++) {
 		PEOPLE.spawn({
 			people,
 			sex: 0,
 			birth: 80,
+			survives: 80,
 			father: -1,
 			mother: -1,
 			dynasty: id,
@@ -74,44 +75,49 @@ it("deduplicates schedules, replaces shortened death and consumes once", () => {
 			rank: 2,
 			reason: "unknown",
 		})
-	const first = state.successionSchedule.pending.get(0)
+	const first = state.deathSchedule.pending.get(0)
 	expect(state.heap.size).toBe(1)
-	SUCCESSION_SCHEDULE.ensure({ state, person: 0 })
+	DEATH_SCHEDULE.ensure({ state, person: 0, cause: "natural" })
 	expect(state.heap.size).toBe(1)
 	PEOPLE.vacate({ people: state.people, seat: 2, reason: "union" })
-	expect(state.successionSchedule.pending.get(0)).toBe(first)
+	expect(state.deathSchedule.pending.get(0)).toBe(first)
 	PEOPLE.shortenLife({ people: state.people, person: 0, time: 120 })
-	SUCCESSION_SCHEDULE.ensure({ state, person: 0 })
-	const replacement = state.successionSchedule.pending.get(0)
+	DEATH_SCHEDULE.ensure({ state, person: 0, cause: "natural" })
+	const replacement = state.deathSchedule.pending.get(0)
 	expect(replacement?.revision).toBeGreaterThan(first?.revision ?? 0)
 	state.time = 120 * STATE.yearMs
 	expect(
-		SUCCESSION_SCHEDULE.consume({
+		DEATH_SCHEDULE.consume({
 			state,
 			person: 0,
 			revision: first?.revision ?? -1,
 		}),
-	).toBe(false)
+	).toBeNull()
 	expect(
-		SUCCESSION_SCHEDULE.consume({
+		DEATH_SCHEDULE.consume({
 			state,
 			person: 0,
 			revision: replacement?.revision ?? -1,
 		}),
-	).toBe(true)
-	SUCCESSION_SCHEDULE.ensure({ state, person: 0 })
+	).toBe("natural")
+	DEATH_SCHEDULE.ensure({ state, person: 0, cause: "natural" })
 	expect(state.heap.size).toBe(2)
 	expect(
-		SUCCESSION_SCHEDULE.consume({
+		DEATH_SCHEDULE.consume({
 			state,
 			person: 0,
 			revision: replacement?.revision ?? -1,
 		}),
-	).toBe(false)
-	SUCCESSION_SCHEDULE.finish({ state, person: 0 })
+	).toBeNull()
+	DEATH_SCHEDULE.finish({ state, person: 0 })
+	expect(DEATH_SCHEDULE.applied({ state, person: 0 })).toBe(true)
+	PEOPLE.vacate({ people: state.people, seat: 3, reason: "union" })
+	DEATH_SCHEDULE.ensure({ state, person: 0, cause: "natural" })
+	expect(state.deathSchedule.pending.has(0)).toBe(false)
+	expect(state.heap.size).toBe(2)
 })
 
-it("last-seat loss and reacquisition never reuse an obsolete token", () => {
+it("keeps one finite death token through last-seat loss and reacquisition", () => {
 	const state = fixture()
 	PEOPLE.setRuler({
 		people: state.people,
@@ -120,9 +126,9 @@ it("last-seat loss and reacquisition never reuse an obsolete token", () => {
 		rank: 2,
 		reason: "unknown",
 	})
-	const old = state.successionSchedule.pending.get(0)
+	const old = state.deathSchedule.pending.get(0)
 	PEOPLE.vacate({ people: state.people, seat: 2, reason: "union" })
-	expect(state.successionSchedule.pending.has(0)).toBe(false)
+	expect(state.deathSchedule.pending.get(0)).toBe(old)
 	PEOPLE.setRuler({
 		people: state.people,
 		person: 0,
@@ -130,9 +136,19 @@ it("last-seat loss and reacquisition never reuse an obsolete token", () => {
 		rank: 2,
 		reason: "unknown",
 	})
-	expect(state.successionSchedule.pending.get(0)?.revision).toBeGreaterThan(
-		old?.revision ?? 0,
-	)
+	expect(state.deathSchedule.pending.get(0)).toBe(old)
+	expect(state.heap.size).toBe(1)
+	state.people.persons.death[1] = Infinity
+	DEATH_SCHEDULE.ensure({ state, person: 1, cause: "natural" })
+	expect(state.deathSchedule.pending.has(1)).toBe(false)
+	expect(state.heap.size).toBe(1)
+	state.people.persons.death[1] = 150
+	DEATH_SCHEDULE.ensure({ state, person: 1, cause: "natural" })
+	DEATH_SCHEDULE.ensure({ state, person: 1, cause: "natural" })
+	expect(state.heap.size).toBe(2)
+	state.people.persons.death[1] = Infinity
+	DEATH_SCHEDULE.ensure({ state, person: 1, cause: "natural" })
+	expect(state.deathSchedule.pending.has(1)).toBe(false)
 })
 
 for (const order of [
@@ -175,6 +191,7 @@ for (const order of [
 			people: state.people,
 			sex: 0,
 			birth: state.time / STATE.yearMs - 50,
+			survives: state.time / STATE.yearMs - 50,
 			father: -1,
 			mother: -1,
 			dynasty: -1,
@@ -185,6 +202,7 @@ for (const order of [
 			people: state.people,
 			sex: 0,
 			birth: state.time / STATE.yearMs - 25,
+			survives: state.time / STATE.yearMs - 25,
 			father: dying,
 			mother: -1,
 			dynasty: -1,
@@ -233,9 +251,8 @@ for (const order of [
 				}
 			})
 		try {
-			const revision =
-				state.successionSchedule.pending.get(dying)?.revision ?? -1
-			SUCCESSION.runSuccession({ state, person: dying, revision, rng })
+			const revision = state.deathSchedule.pending.get(dying)?.revision ?? -1
+			PERSON_DEATH.run({ state, person: dying, revision, rng })
 			expect(state.people.persons.heldSeats[dying]).toEqual([])
 			expect(state.people.persons.heldSeats[heir]).toEqual(
 				crowns.slice(0, 3).sort((a, b) => a - b),
@@ -248,7 +265,7 @@ for (const order of [
 			expect(
 				state.events.filter((event) => event.tag === "personal union ended"),
 			).toHaveLength(0)
-			SUCCESSION.runSuccession({ state, person: dying, revision, rng })
+			PERSON_DEATH.run({ state, person: dying, revision, rng })
 			expect(choices).toHaveBeenCalledTimes(3)
 			PEOPLE.setRuler({
 				people: state.people,
@@ -298,6 +315,7 @@ for (const order of [
 				people: state.people,
 				sex: 0,
 				birth: state.time / STATE.yearMs - 25,
+				survives: state.time / STATE.yearMs - 25,
 				father: heir,
 				mother: -1,
 				dynasty: -1,
@@ -306,7 +324,7 @@ for (const order of [
 			})
 			state.people.persons.death[successor] = state.time / STATE.yearMs + 50
 			state.people.persons.death[heir] = state.time / STATE.yearMs + 1
-			SUCCESSION_SCHEDULE.ensure({ state, person: heir })
+			DEATH_SCHEDULE.ensure({ state, person: heir, cause: "natural" })
 			choices.mockImplementation(() => ({
 				heir: successor,
 				claim: 3,
@@ -327,10 +345,10 @@ for (const order of [
 				.mockReturnValue({ offset, list: Int32Array.from(list) })
 			state.time += STATE.yearMs
 			try {
-				SUCCESSION.runSuccession({
+				PERSON_DEATH.run({
 					state,
 					person: heir,
-					revision: state.successionSchedule.pending.get(heir)?.revision ?? -1,
+					revision: state.deathSchedule.pending.get(heir)?.revision ?? -1,
 					rng,
 				})
 				expect(state.people.unionGenerations.has(crowns[1])).toBe(false)
@@ -348,6 +366,7 @@ for (const order of [
 				people: state.people,
 				sex: 1,
 				birth: state.time / STATE.yearMs - 25,
+				survives: state.time / STATE.yearMs - 25,
 				father: -1,
 				mother: -1,
 				dynasty: -1,
@@ -398,6 +417,7 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 			people,
 			sex: 0,
 			birth,
+			survives: birth,
 			father: 1,
 			mother,
 			dynasty: 0,
@@ -405,12 +425,9 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 			rng: RNG.createRng({ seed: 71 }),
 		})
 	const child = spawn(95)
-	const unborn = spawn(105)
 	people.persons.death[child] = 150
-	people.persons.death[unborn] = 150
 	HOUSEHOLD.relocate({ people, person: mother, province: 2, time: 100 })
 	expect(people.persons.residence[child]).toBe(2)
-	expect(people.persons.initialResidence[unborn]).toBe(2)
 	expect(people.persons.residence[1]).toBe(4)
 	expect(people.persons.residence[2]).toBe(0)
 	const record = PEOPLE_RECORD.create()
@@ -436,10 +453,8 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 	HOUSEHOLD.relocate({ people, person: mother, province: 4, time: 101 })
 	HOUSEHOLD.relocate({ people, person: mother, province: 5, time: 99 })
 	expect(people.persons.residence[mother]).toBe(4)
-	expect(people.persons.residence[unborn]).toBe(4)
-	expect(people.persons.initialResidence[unborn]).toBe(2)
 	expect(() =>
-		HOUSEHOLD.relocate({ people, person: unborn, province: 3, time: 104 }),
+		HOUSEHOLD.relocate({ people, person: child, province: 3, time: 94 }),
 	).toThrow()
 	people.persons.death[mother] = 103
 	const early = spawn(98)
@@ -454,7 +469,7 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 		timeMs: 101,
 		recordTime: (time) => time,
 	})
-	for (const person of [mother, child, unborn, early, middle, late])
+	for (const person of [mother, child, early, middle, late])
 		for (const time of [79, 98, 99, 100, 100.5, 101, 102, 105])
 			expect(
 				PERSON_QUERY.residenceAt({ people: record, id: person, timeMs: time }),
@@ -478,6 +493,7 @@ it("succeeds a district-only holder at death before settlement and never repeats
 		people: state.people,
 		sex: 0,
 		birth: time - 50,
+		survives: time - 50,
 		father: -1,
 		mother: -1,
 		dynasty: -1,
@@ -488,6 +504,7 @@ it("succeeds a district-only holder at death before settlement and never repeats
 		people: state.people,
 		sex: 0,
 		birth: time - 25,
+		survives: time - 25,
 		father: holder,
 		mother: -1,
 		dynasty: -1,
@@ -497,14 +514,14 @@ it("succeeds a district-only holder at death before settlement and never repeats
 	state.people.persons.death[holder] = time + 0.25
 	state.people.persons.death[heir] = time + 40
 	DISTRICTS.install({ state, seat, person: holder, reason: "unknown" })
-	const revision = state.successionSchedule.pending.get(holder)?.revision ?? -1
+	const revision = state.deathSchedule.pending.get(holder)?.revision ?? -1
 	state.time += STATE.yearMs / 4
-	SUCCESSION.runSuccession({ state, person: holder, revision, rng })
+	PERSON_DEATH.run({ state, person: holder, revision, rng })
 	expect(state.people.rulerOf[seat]).toBe(heir)
 	expect(state.people.persons.heldSeats[holder]).toEqual([])
 	const rows = state.people.log.count
 	DISTRICTS.settle({ state, rng })
-	SUCCESSION.runSuccession({ state, person: holder, revision, rng })
+	PERSON_DEATH.run({ state, person: holder, revision, rng })
 	expect(state.people.rulerOf[seat]).toBe(heir)
 	expect(state.people.log.count).toBe(rows)
 }, 60000)
@@ -537,6 +554,7 @@ it("weights each local district, keeps repeated nomination slots and uses the st
 			people: state.people,
 			sex: 0,
 			birth: time - 30,
+			survives: time - 30,
 			father: -1,
 			mother: -1,
 			dynasty: 10000 + dynasty,
@@ -585,6 +603,8 @@ it("weights each local district, keeps repeated nomination slots and uses the st
 
 	state.people.persons.death[state.people.rulerOf[realm]] = time
 	state.people.persons.children[state.people.rulerOf[realm]] = []
+	state.people.persons.father[state.people.rulerOf[realm]] = -1
+	state.people.persons.mother[state.people.rulerOf[realm]] = -1
 	state.governmentType[realm] = GOVERNMENT.getGovIdx().elective_monarchy
 	try {
 		expect(
@@ -661,6 +681,13 @@ it("rechecks a marriage alliance after relocation releases its sustaining betrot
 		.slice(0, 3)
 	const time = state.time / STATE.yearMs
 	const rng = RNG.createRng({ seed: 91 })
+	for (const member of PEOPLE.family({
+		people: state.people,
+		person: state.people.rulerOf[crowns[0]],
+	})) {
+		state.people.persons.spouse[member] = -1
+		state.people.persons.betrothed[member] = -1
+	}
 	for (const crown of crowns) {
 		state.governmentType[crown] = GOVERNMENT.getGovIdx().feudal_monarchy
 		for (const other of [...state.relationColumns[crown]])
@@ -671,6 +698,7 @@ it("rechecks a marriage alliance after relocation releases its sustaining betrot
 			people: state.people,
 			sex: sex === 0 ? 0 : 1,
 			birth: time - 13,
+			survives: time - 13,
 			father: state.people.rulerOf[realm],
 			mother: -1,
 			dynasty: -1,
@@ -757,6 +785,7 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 		people: state.people,
 		sex: 0,
 		birth: time - 50,
+		survives: time - 50,
 		father: -1,
 		mother: -1,
 		dynasty: -1,
@@ -769,6 +798,7 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 			people: state.people,
 			sex: 0,
 			birth: time - 30 + index,
+			survives: time - 30 + index,
 			father: dying,
 			mother: -1,
 			dynasty: -1,
@@ -796,7 +826,7 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 			reason: "unknown",
 		})
 	}
-	const revision = state.successionSchedule.pending.get(dying)?.revision ?? -1
+	const revision = state.deathSchedule.pending.get(dying)?.revision ?? -1
 	const choose = vi
 		.spyOn(SUCCESSION_SYSTEMS, "choose")
 		.mockImplementation(({ realm }) => ({
@@ -808,13 +838,13 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 		}))
 	state.time += STATE.yearMs / 4
 	try {
-		SUCCESSION.runSuccession({ state, person: dying, revision, rng })
+		PERSON_DEATH.run({ state, person: dying, revision, rng })
 		expect(choose.mock.calls.map(([params]) => params.realm)).toEqual(crowns)
 		expect(state.people.rulerOf[crowns[0]]).toBe(heirs[0])
 		expect(state.people.rulerOf[crowns[1]]).toBe(heirs[1])
 		expect(state.people.rulerOf[district]).toBe(heirs[2])
 		expect(state.people.persons.heldSeats[dying]).toEqual([])
-		SUCCESSION.runSuccession({ state, person: dying, revision, rng })
+		PERSON_DEATH.run({ state, person: dying, revision, rng })
 		expect(choose).toHaveBeenCalledTimes(2)
 	} finally {
 		choose.mockRestore()

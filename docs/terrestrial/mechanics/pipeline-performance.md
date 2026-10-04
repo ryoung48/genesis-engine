@@ -92,9 +92,9 @@ The following measurements describe the P2 schema (65 snapshot bytes and 81 reco
 
 The packet bytes are exactly 25 × 637,416 + 65 × 330,956. The flush figure times the whole of `JOURNAL.flush`, not only its people rows, and the two runs' wall times differed by 9% from machine load, so neither timing shows a change. The record built from packets has the same digest (`diagnostics.peopleRecord.sha256`) as the one built from object rows.
 
-Wall times were 302.5 seconds with packets and 278.0 seconds with object rows; world generation was 10% slower too. This supports the machine-load caveat rather than attributing the end-to-end difference to the packet change. The detailed report excludes structured cloning across the worker boundary, so it does not measure that saving.
-
 The record's memory per structure is measured by `src/test/history-run/retained-memory.smoke.test.ts`; see [record ownership and memory](record-memory.md#people-record).
+
+Wall times in the P2 packet comparison were 302.5 seconds with packets and 278.0 seconds with object rows; world generation was 10% slower too. This supports the machine-load caveat rather than attributing the end-to-end difference to the packet change. The detailed report excludes structured cloning across the worker boundary, so it does not measure that saving.
 
 ## Trait evaluation and birth-roll allocation
 
@@ -111,3 +111,20 @@ People created changed 326784→291832; crown successions 13350→13960; multipl
 Mean of ten window people times changed 24.677→35.356 ms/year; wall 399.859→513.462 seconds; peak RSS 2814.758→3091.883 MiB. Offline residence reporting took 24.797 seconds separately. These single runs on a shared machine show a substantial overhead and cannot precisely separate algorithm cost, different workload and contention. The expected directions were increased retention and execution time, with no supported magnitude. See [memory measurements](record-memory.md#household-retention-measurement) for structure costs.
 
 The performance follow-up, `stats/history/2026-10-04T14-06-53-796Z-people-3-quick-wins/933.json`, compares explicitly against final DP9.1 with the same configuration through `pnpm report:history`. The allocation and traversal changes above reduced mean people time 35.356→19.828 ms/year (-43.9%), wall time 513.462→314.261 seconds (-38.8%) and offline residence reporting 24.797→14.580 seconds (-41.2%). Peak RSS was effectively unchanged, 3091.883→3102.508 MiB (+0.3%). All ten windows' behavioral fields, household totals and the people-record digest match exactly. The adjacent README and `quick-wins-comparison.json` record verification and comparison scope. This is a single shared-machine comparison; it does not isolate individual optimizations or establish a repeatable speedup guarantee.
+
+## Health and lifecycle benchmark (P4)
+
+Detailed report, seed 14963991, lateMedieval, 204000 points, 933 years from 867 (`stats/history/2026-10-04T16-53-40-598Z-people-4-dp4/933.json`); single runs on a shared machine.
+
+| Measure | Value |
+|---|---:|
+| Deaths: natural / childbirth / battle / heart | 258215 / 3801 / 123 / 0 |
+| Adult age at death, median, men / women | 60 / 63 |
+| Children delivered who reach 16 | 0.745-0.760 per century |
+| Ever Incapable / ever Blind, of those dying after 50 | 6.0% / 1.1% |
+| Incapacity regencies | 528 of 13325 successions |
+| Field-battle sides led in person / leaders killed | 44229 / 123 |
+| `health_band` / `condition` rows | 203527 / 453841 |
+| Yearly health pass | 16.7 ms a year, of a 40.5 ms people pass |
+
+Retained structure measurements are in [record memory](record-memory.md#health-and-lifecycle-retention-p4).

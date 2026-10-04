@@ -50,7 +50,7 @@ Local measurements are in `stats/history/2026-10-03T20-58-05-000Z-scrub-memory-m
 
 The table below is the archived P2 measurement, before residence. [Household residence](../people/residence-and-realm.md) adds a 4-byte initial column, sparse record residence rows and a separate retained simulation history. New measurements are documented below; historical P2 figures remain unchanged.
 
-The record holds every person the simulation creates. `PeopleRecord.persons` is dense typed columns indexed by person id, 85 bytes a person with initial residence, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [People records](person-records.md) describes each.
+The record holds every person the simulation creates. At the P3 residence stage, `PeopleRecord.persons` used dense typed columns indexed by person id, 85 bytes a person with initial residence, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [Person records](person-records.md) describes the current schema, including the health columns added by P4.
 
 The live-history harness (20,000 points, 300 years) recorded 26,190 people, 9,194 marriages, 6,866 tenures and 470 betrothals. Each structure's size is what a retained `structuredClone` of it adds after a garbage collection, heap plus array buffers:
 
@@ -118,3 +118,7 @@ P3’s released-journal harness (`stats/history/2026-10-04T13-39-53-052Z-people-
 | Record residence rows/index | 2,090,696 | Sparse effective-time objects and map |
 
 Record person columns retain 3,853,088 bytes in total; their initial column is already included. GC heap was 141.04 MiB and array buffers 59.67 MiB; RSS 727.41 MiB is reported separately from structure retention. Journal transfer and release left zero worker/browser transactions and zero extra cached census buffers. Simulation/transfer/translation took 34.91 seconds and 48 scrub reconstructions took 536.34 ms. These single timings overlap other verification and do not establish a latency delta.
+
+## Health and lifecycle retention (P4)
+
+Retained memory at 20000 points over 300 years (`stats/history/people-4-completed-memory.json`, 22937 people): the ten simulation health columns 2.20 MB, the record's 47456 health rows 0.92 MB, the death schedule 42 KB with 52 pending deaths, pending deliveries 65 KB, and the event heap 0.67 MB.

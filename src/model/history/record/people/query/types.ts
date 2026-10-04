@@ -7,6 +7,7 @@ import type {
 	Attribute,
 	AttributeTier,
 } from "@/model/history/sim/people/attributes/types"
+import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
 import type { SeatKind } from "@/model/history/sim/people/log/types"
 import type {
 	CongenitalTrait,
@@ -62,6 +63,13 @@ export interface TenureView {
 	endReason: SeatChangeReason | null
 }
 
+// A health condition a person has at the queried time.
+export interface ConditionView {
+	condition: HealthCondition
+	// 0-4 on an ageing condition's track; 0 for Blind and Incapable.
+	level: number
+}
+
 export interface PersonView {
 	id: number
 	sex: number
@@ -97,14 +105,22 @@ export type PersonEventKind =
 	| "regent appointed"
 	| "miscarriage"
 	| "stillborn child"
+	| "condition gained"
+	| "condition worsened"
+	| "condition lost"
+	| "became blind"
+	| "became incapable"
 	| "died"
 	| "died in childbirth"
+	| "died of heart failure"
+	| "killed in battle"
 
 export interface PersonEvent {
 	timeMs: number
 	kind: PersonEventKind
-	// Spouse, betrothed, child, seat or regent the event concerns, or the
-	// father of a lost pregnancy; -1 for birth and death.
+	// Spouse, betrothed, child, seat or regent the event concerns, the father
+	// of a lost pregnancy, or the code of a health condition; -1 for birth and
+	// death.
 	other: number
 	// The tenure a seat or regency event belongs to; -1 for other kinds.
 	tenure: number

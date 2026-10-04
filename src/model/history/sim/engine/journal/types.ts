@@ -5,7 +5,7 @@ import type {
 	WarGoal,
 } from "@/model/history/sim/engine/state/types"
 import type { PeoplePacket } from "@/model/history/sim/people/log/types"
-import type { RegentKind } from "@/model/history/sim/people/types"
+import type { DeathCause, RegentKind } from "@/model/history/sim/people/types"
 
 interface JournalProvinceChange {
 	province: number
@@ -33,10 +33,13 @@ interface JournalRuler {
 	nameSeed: number
 	dynasty: number
 	birthTimeMs: number
-	deathTimeMs: number
 	// -1 when no regent, or a regency council, governs.
 	regent: number
 	regency: RegentKind | null
+	// The ruler whose death in this transaction opened the seat; -1 for none.
+	deceased: number
+	// [JUSTIFICATION] A ruler seated without a death has no cause to carry.
+	deathCause: DeathCause | null
 }
 
 export interface JournalTransaction {

@@ -67,7 +67,6 @@ function write({ people, person, province, time }: RelocateParams): boolean {
 		person,
 		time: Math.max(people.household.time(), table.birth[person]),
 	})
-	correctUnborn({ people, person })
 	return true
 }
 
@@ -84,23 +83,6 @@ function amendInitial({
 			time: Math.max(people.household.time(), people.persons.birth[person]),
 		})
 	} else write({ people, person, province, time: people.persons.birth[person] })
-}
-
-function correctUnborn({ people, person }: HouseholdPersonParams): void {
-	for (const child of people.persons.children[person])
-		if (
-			people.persons.mother[child] === person &&
-			people.persons.birth[child] > people.household.time()
-		)
-			amendInitial({
-				people,
-				person: child,
-				province: residenceAt({
-					people,
-					person,
-					time: people.persons.birth[child],
-				}),
-			})
 }
 
 function relocate(params: RelocateParams): void {

@@ -1,8 +1,8 @@
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
+import { HEALTH } from "@/model/history/sim/people/health"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
@@ -61,9 +61,27 @@ function create(provinceCount: number): PeopleState {
 			nextBirth: [],
 			betrothed: [],
 			betrothedAt: [],
+			baseHealth: [],
+			infirmXp: [],
+			cloudedEyesXp: [],
+			fragileBonesXp: [],
+			witheringMindXp: [],
+			falteringHeartXp: [],
+			healthFlags: [],
+			healthAgeYear: [],
+			healthIntervalEnd: [],
+			ledYear: [],
 		},
 		alive: [],
 		stressed: [],
+		bereavements: new Map(),
+		deliveries: {
+			next: 0,
+			byId: new Map(),
+			byMother: new Map(),
+			projected: new Map(),
+			queued: 0,
+		},
 		rulerOf: new Int32Array(provinceCount).fill(-1),
 		patricians: new Map(),
 		unionGenerations: new Map(),
@@ -122,6 +140,16 @@ function add({
 	table.nextBirth.push(0)
 	table.betrothed.push(-1)
 	table.betrothedAt.push(-1)
+	table.baseHealth.push(0)
+	table.infirmXp.push(-1)
+	table.cloudedEyesXp.push(-1)
+	table.fragileBonesXp.push(-1)
+	table.witheringMindXp.push(-1)
+	table.falteringHeartXp.push(-1)
+	table.healthFlags.push(0)
+	table.healthAgeYear.push(0)
+	table.healthIntervalEnd.push(birth)
+	table.ledYear.push(-1)
 	if (father >= 0) table.children[father].push(id)
 	if (mother >= 0) table.children[mother].push(id)
 	drawPerson({ people, person: id })
@@ -129,21 +157,23 @@ function add({
 	return id
 }
 
+// No death date is fixed at birth: health decides it year by year.
 function spawn({
 	people,
 	sex,
 	birth,
+	survives,
 	father,
 	mother,
 	dynasty,
 	origin,
 	rng,
 }: SpawnParams): number {
-	return add({
+	const person = add({
 		people,
 		sex,
 		birth,
-		death: LIFESPAN.deathAt({ birth, from: birth, rng }),
+		death: Infinity,
 		father,
 		mother,
 		dynasty,
@@ -152,6 +182,8 @@ function spawn({
 		realm: origin.realm,
 		fertility: 0.5 + 0.1 * rng.random(),
 	})
+	HEALTH.replay({ people, person, survives })
+	return person
 }
 
 // A seat's standing is its title tier plus one: 1 for a county seat, up to 5
@@ -238,11 +270,10 @@ function family({ people, person }: PersonRefParams): number[] {
 	return members
 }
 
-// Only childbirth moves a death date, and only earlier.
+// A death date only ever moves earlier.
 function shortenLife({ people, person, time }: ShortenLifeParams): boolean {
 	if (time >= people.persons.death[person]) return false
 	people.persons.death[person] = time
-	PEOPLE_LOG.append({ log: people.log, row: { kind: "death", person, time } })
 	return true
 }
 

@@ -2,8 +2,11 @@ import type {
 	AddPersonParams,
 	AppendPeopleParams,
 	BetrothalPairParams,
+	HealthAtParams,
+	HealthRowParams,
 	PeopleRecord,
 	PushIndexParams,
+	RecordHealthRow,
 	RecordPerson,
 	RecordPersonParams,
 	ReserveParams,
@@ -11,8 +14,11 @@ import type {
 } from "@/model/history/record/people/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { RegentRow, SeatRow } from "@/model/history/sim/people/log/types"
+import type { DeathCause } from "@/model/history/sim/people/types"
 
+const BYTE_COLUMNS = ["sex", "healthBand", "deathCause"] as const
 const INT_COLUMNS = [
+	"lastHealth",
 	"father",
 	"mother",
 	"dynasty",
@@ -24,6 +30,7 @@ const INT_COLUMNS = [
 const FLOAT_COLUMNS = [
 	"birthTimeMs",
 	"deathTimeMs",
+	"healthTimeMs",
 	"bases",
 	"personality",
 	"grades",
@@ -32,6 +39,7 @@ const FLOAT_COLUMNS = [
 ] as const
 const SNAPSHOT_COLUMNS = [
 	"sex",
+	"healthBand",
 	"dynasty",
 	"culture",
 	"nameSeed",
@@ -63,6 +71,17 @@ function create(): PeopleRecord {
 			grades: new Float64Array(0),
 			congenital: new Float64Array(0),
 			carried: new Float64Array(0),
+			healthBand: new Uint8Array(0),
+			healthTimeMs: new Float64Array(0),
+			lastHealth: new Int32Array(0),
+			deathCause: new Uint8Array(0),
+		},
+		health: {
+			count: 0,
+			timeMs: new Float64Array(0),
+			code: new Uint8Array(0),
+			value: new Int8Array(0),
+			prev: new Int32Array(0),
 		},
 		residencesOf: new Map(),
 		stressOf: new Map(),
@@ -125,9 +144,11 @@ function deathTimeMs(params: RecordPersonParams): number {
 function reserve({ persons, count: needed }: ReserveParams): void {
 	if (needed <= persons.sex.length) return
 	const capacity = Math.max(needed, persons.sex.length * 2)
-	const sex = new Uint8Array(capacity)
-	sex.set(persons.sex)
-	persons.sex = sex
+	for (const column of BYTE_COLUMNS) {
+		const grown = new Uint8Array(capacity)
+		grown.set(persons[column])
+		persons[column] = grown
+	}
 	for (const column of INT_COLUMNS) {
 		const grown = new Int32Array(capacity)
 		grown.set(persons[column])
@@ -168,6 +189,11 @@ function addPerson(params: AddPersonParams): void {
 	persons.mother[id] = params.mother
 	persons.birthTimeMs[id] = params.birthTimeMs
 	persons.deathTimeMs[id] = params.deathTimeMs
+	persons.healthTimeMs[id] =
+		params.deathTimeMs === Infinity
+			? Math.max(params.birthTimeMs, params.timeMs)
+			: Infinity
+	persons.lastHealth[id] = -1
 	persons.count++
 	const dynasty = persons.dynasty[id]
 	if (dynasty >= 0 && !record.dynastyHome.has(dynasty))
@@ -175,6 +201,76 @@ function addPerson(params: AddPersonParams): void {
 	for (const parent of [params.father, params.mother])
 		if (parent >= 0)
 			pushIndex({ index: record.childrenOf, key: parent, value: id })
+}
+
+function pushHealth({
+	record,
+	person,
+	timeMs,
+	code,
+	value,
+}: HealthRowParams): void {
+	const rows = record.health
+	if (rows.count === rows.timeMs.length) {
+		const capacity = Math.max(1024, rows.count * 2)
+		const timeColumn = new Float64Array(capacity)
+		timeColumn.set(rows.timeMs)
+		rows.timeMs = timeColumn
+		const codeColumn = new Uint8Array(capacity)
+		codeColumn.set(rows.code)
+		rows.code = codeColumn
+		const valueColumn = new Int8Array(capacity)
+		valueColumn.set(rows.value)
+		rows.value = valueColumn
+		const prevColumn = new Int32Array(capacity)
+		prevColumn.set(rows.prev)
+		rows.prev = prevColumn
+	}
+	const index = rows.count++
+	rows.timeMs[index] = timeMs
+	rows.code[index] = code
+	rows.value[index] = value
+	rows.prev[index] = record.persons.lastHealth[person]
+	record.persons.lastHealth[person] = index
+}
+
+// The latest recorded value of one health code at a time; null with no row
+// by then.
+function healthAt({ people, id, timeMs, code }: HealthAtParams): number | null {
+	if (!has({ people, id })) return null
+	const rows = people.health
+	for (
+		let index = people.persons.lastHealth[id];
+		index >= 0;
+		index = rows.prev[index]
+	)
+		if (rows.code[index] === code && rows.timeMs[index] <= timeMs)
+			return rows.value[index]
+	return null
+}
+
+// A person's health rows, oldest first.
+function healthRows({ people, id }: RecordPersonParams): RecordHealthRow[] {
+	if (!has({ people, id })) return []
+	const rows = people.health
+	const found: RecordHealthRow[] = []
+	for (
+		let index = people.persons.lastHealth[id];
+		index >= 0;
+		index = rows.prev[index]
+	)
+		found.push({
+			timeMs: rows.timeMs[index],
+			code: rows.code[index],
+			value: rows.value[index],
+		})
+	return found.reverse()
+}
+
+function deathCause(params: RecordPersonParams): DeathCause {
+	return PEOPLE_LOG.deathCauses[
+		has(params) ? params.people.persons.deathCause[params.id] : 0
+	]
 }
 
 // A seat that changes hands more than once in a transaction keeps only its
@@ -240,13 +336,46 @@ function append({
 					mother: row.mother,
 					birthTimeMs: recordTime(row.time),
 					deathTimeMs: recordTime(packet.death[row.snapshot]),
+					timeMs,
 				})
 				break
 			case "death":
-				if (has({ people: record, id: row.person }))
+				if (has({ people: record, id: row.person })) {
 					persons.deathTimeMs[row.person] = recordTime(row.time)
+					persons.deathCause[row.person] = PEOPLE_LOG.deathCauses.indexOf(
+						row.cause,
+					)
+				}
+				break
+			case "health_band":
+				if (has({ people: record, id: row.person }))
+					pushHealth({
+						record,
+						person: row.person,
+						timeMs: recordTime(row.time),
+						code: 0,
+						value: PEOPLE_LOG.healthBands.indexOf(row.band),
+					})
+				break
+			case "condition":
+				if (has({ people: record, id: row.person }))
+					pushHealth({
+						record,
+						person: row.person,
+						timeMs: recordTime(row.time),
+						code: 1 + PEOPLE_LOG.conditions.indexOf(row.condition),
+						value: row.after,
+					})
 				break
 			case "pregnancy":
+				// A backfilled childbirth death has no death row: the mother was
+				// created already dead, and this row carries her cause.
+				if (
+					row.outcome === "childbirth death" &&
+					has({ people: record, id: row.mother })
+				)
+					persons.deathCause[row.mother] =
+						PEOPLE_LOG.deathCauses.indexOf("childbirth")
 				pushIndex({
 					index: record.pregnanciesOf,
 					key: row.mother,
@@ -345,4 +474,7 @@ export const PEOPLE_RECORD = {
 	person,
 	birthTimeMs,
 	deathTimeMs,
+	deathCause,
+	healthAt,
+	healthRows,
 }

@@ -8,7 +8,10 @@ import { PERSON_QUERY } from "@/model/history/record/people/query"
 import type { TenureView } from "@/model/history/record/people/query/types"
 import type { RecordPerson } from "@/model/history/record/people/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
+import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import type { DeathCause } from "@/model/history/sim/people/types"
 import { FRAME } from "@/model/history/world-frame"
 import { TITLES } from "@/model/society/titles"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
@@ -28,6 +31,26 @@ import type {
 import type { WikiTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
 const DAY_MS = 86_400_000
+const CONDITION_LABELS: Record<HealthCondition, string> = {
+	infirm: "Infirm",
+	clouded_eyes: "Clouded Eyes",
+	fragile_bones: "Fragile Bones",
+	withering_mind: "Withering Mind",
+	faltering_heart: "Faltering Heart",
+	blind: "Blind",
+	incapable: "Incapable",
+}
+const DEATH_LABELS: Record<DeathCause, string> = {
+	natural: "Natural causes",
+	heart: "Heart failure",
+	battle: "Killed in battle",
+	childbirth: "Childbirth",
+}
+const DEATH_VERBS = {
+	died: "died",
+	"died of heart failure": "died of heart failure",
+	"killed in battle": "was killed in battle",
+}
 
 export function usePersonWikiData(
 	input: PersonWikiDataInput,
@@ -206,6 +229,27 @@ export function usePersonWikiData(
 				value: health,
 				swatchColor: uiPalette.person.health[health],
 			})
+		const conditions = alive
+			? PERSON_QUERY.conditions({ people, id, timeMs: selectedTimeMs })
+			: []
+		if (conditions.length > 0)
+			stats.push({
+				label: "Conditions",
+				value: conditions
+					.map(({ condition, level }) =>
+						condition === "blind" || condition === "incapable"
+							? CONDITION_LABELS[condition]
+							: `${CONDITION_LABELS[condition]} ${level + 1}`,
+					)
+					.join(", "),
+			})
+		const deathCause = PERSON_QUERY.deathCause({
+			people,
+			id,
+			timeMs: selectedTimeMs,
+		})
+		if (deathCause)
+			stats.push({ label: "Cause of death", value: DEATH_LABELS[deathCause] })
 
 		if (
 			view.tenures.some(
@@ -277,11 +321,38 @@ export function usePersonWikiData(
 							: `${person.name} was born.`,
 					people: [...selfMentions, ...parents],
 				})
-			} else if (event.kind === "died") {
+			} else if (
+				event.kind === "died" ||
+				event.kind === "died of heart failure" ||
+				event.kind === "killed in battle"
+			) {
 				pushTimelineEvent(timelineEvents, {
 					...base,
 					type: "Life",
-					description: `${person.name} died aged ${ageAt(person, event.timeMs)}.`,
+					description: `${person.name} ${DEATH_VERBS[event.kind]} aged ${ageAt(person, event.timeMs)}.`,
+					people: selfMentions,
+				})
+			} else if (
+				event.kind === "condition gained" ||
+				event.kind === "condition worsened" ||
+				event.kind === "condition lost" ||
+				event.kind === "became blind" ||
+				event.kind === "became incapable"
+			) {
+				const label = CONDITION_LABELS[PEOPLE_LOG.conditions[event.other]]
+				pushTimelineEvent(timelineEvents, {
+					...base,
+					type: "Life",
+					description:
+						event.kind === "became blind"
+							? `${person.name} went blind.`
+							: event.kind === "became incapable"
+								? `${person.name} became incapable.`
+								: event.kind === "condition gained"
+									? `${person.name} developed ${label}.`
+									: event.kind === "condition worsened"
+										? `${person.name}'s ${label} worsened.`
+										: `${person.name} no longer had ${label}.`,
 					people: selfMentions,
 				})
 			} else if (

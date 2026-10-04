@@ -2,14 +2,16 @@ import { expect, it, vi } from "vitest"
 import { HISTORY } from "@/model/history/record"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
-import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
+import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { TAX } from "@/model/history/sim/engine/events/tax"
+import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { DEJURE } from "@/model/society/dejure"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
@@ -296,19 +298,19 @@ it("records the fee only in the covering census and retains frames between censu
 it("charges founding through succession and overthrow", () => {
 	const succession = fixture(2)
 	succession.state.time += STATE.yearMs
-	succession.state.people.persons.death[
-		succession.state.people.rulerOf[succession.nation]
-	] = succession.state.time / STATE.yearMs - 1
-	STATE.scheduleSuccession({ state: succession.state, p: succession.nation })
-	SUCCESSION.runSuccession({
+	// Whether the realm is partitioned or a district revolts at this succession
+	// depends on who inherits in the generated world; the founding charge does
+	// not.
+	succession.state.governmentType[succession.nation] =
+		GOVERNMENT.getGovIdx().feudal_monarchy
+	const rebel = vi.spyOn(WAR, "rebel").mockReturnValue(false)
+	PERSON_DEATH.kill({
 		state: succession.state,
 		person: succession.state.people.rulerOf[succession.nation],
-		revision:
-			succession.state.successionSchedule.pending.get(
-				succession.state.people.rulerOf[succession.nation],
-			)?.revision ?? -1,
+		cause: "natural",
 		rng: succession.rng,
 	})
+	rebel.mockRestore()
 	expect(
 		succession.state.events.filter((note) => note.tag === "title created"),
 	).toHaveLength(1)

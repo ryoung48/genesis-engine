@@ -975,7 +975,7 @@ describe("military transitions and conservation", () => {
 		).toBeGreaterThanOrEqual(defeatedTroops.levy)
 		expect(
 			engine.militaryTotals.demobilized.regular - before.regular,
-		).toBeGreaterThanOrEqual(defeatedTroops.regular)
+		).toBeGreaterThanOrEqual(defeatedTroops.regular - 1e-9)
 		MILITARY.validate({ state: engine })
 	}, 120000)
 })

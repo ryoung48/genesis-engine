@@ -1,3 +1,4 @@
+import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import type {
 	DistrictParams,
 	GrantCandidate,
@@ -8,7 +9,6 @@ import type {
 	SeatParams,
 	SucceedDistrictParams,
 } from "@/model/history/sim/engine/events/people/districts/types"
-import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -156,7 +156,8 @@ function settle({ state }: DistrictParams): void {
 	for (let seat = 0; seat < state.P; seat++) {
 		if (state.people.rulerOf[seat] < 0) continue
 		const check = revalidate({ state, seats: [seat] })[0]
-		if (check) SUCCESSION_SCHEDULE.ensure({ state, person: check.holder })
+		if (check)
+			DEATH_SCHEDULE.ensure({ state, person: check.holder, cause: "natural" })
 	}
 }
 

@@ -29,7 +29,7 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 - **Result.** Either party under 16 makes a betrothal (`betrothed` and `betrothedAt` on both); two adults wed as before. The betrothal forms or binds the marriage alliance at once.
 - **Fulfilment.** Each yearly pass weds every living pair where both are 16+, by the usual host rule. Heiress unions apply. Betrothed men therefore marry at 16.
 - **Breaking.** Only two causes:
-  - *death*: either party died (checked at the start of the yearly marriages);
+  - *death*: either party died (released at the death);
   - *alliance*: the review finds no marriage alliance between the pair's realms (war, lost sovereignty, a government that stops marrying for alliance, or a succession that moves the betrothed out of the ruler's family). A betrothal whose alliance cannot form is broken at once.
 - **Start.** After `ROYAL_MARRIAGES.seed`, every royal minor seeks once, under the same rules. The world opens with about a third fewer standing betrothals than it holds at years 20–30.
 

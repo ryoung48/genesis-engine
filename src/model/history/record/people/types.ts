@@ -44,6 +44,25 @@ export interface PersonColumns {
 	grades: Float64Array
 	congenital: Float64Array
 	carried: Float64Array
+	// The health band when the person was created, and the record time it
+	// holds from: Infinity for someone already dead then.
+	healthBand: Uint8Array
+	healthTimeMs: Float64Array
+	// The person's latest health row; -1 without one.
+	lastHealth: Int32Array
+	deathCause: Uint8Array
+}
+
+// Discrete health changes of every person in arrival order, each linked to
+// the same person's previous row.
+export interface HealthRows {
+	count: number
+	timeMs: Float64Array
+	// 0 for a health band; otherwise a condition's code plus one.
+	code: Uint8Array
+	// The band's code, or the condition's level after the change.
+	value: Int8Array
+	prev: Int32Array
 }
 
 export interface RecordMarriage {
@@ -96,6 +115,7 @@ export interface RecordResidence {
 }
 
 export interface PeopleRecord {
+	health: HealthRows
 	residencesOf: Map<number, RecordResidence[]>
 	stressOf: Map<number, RecordStress[]>
 	persons: PersonColumns
@@ -143,6 +163,28 @@ export interface AddPersonParams {
 	mother: number
 	birthTimeMs: number
 	deathTimeMs: number
+	// The record time of the transaction that created the person.
+	timeMs: number
+}
+
+export interface HealthRowParams {
+	record: PeopleRecord
+	person: number
+	timeMs: number
+	code: number
+	value: number
+}
+
+export interface HealthAtParams extends RecordPersonParams {
+	timeMs: number
+	code: number
+}
+
+export interface RecordHealthRow {
+	timeMs: number
+	// 0 for a health band; otherwise a condition's code plus one.
+	code: number
+	value: number
 }
 
 export interface SeatChangesParams {

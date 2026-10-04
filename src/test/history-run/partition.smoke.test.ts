@@ -1,8 +1,8 @@
 import { expect, it, vi } from "vitest"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
-import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import type { PartitionNoteData } from "@/model/history/sim/engine/events/succession/partition/types"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { FIELDS } from "@/model/history/sim/engine/fields"
@@ -120,6 +120,7 @@ function person({
 		people,
 		sex,
 		birth: now(state) - age,
+		survives: now(state) - age,
 		father,
 		mother: -1,
 		dynasty:
@@ -201,12 +202,12 @@ function succeed(fx: Fixture): void {
 	const { state, realm, rng, dying } = fx
 	kill({ state, who: dying })
 	STATE.scheduleSuccession({ state, p: realm })
-	SUCCESSION.runSuccession({
+	PERSON_DEATH.run({
 		state,
 		person: state.people.rulerOf[realm],
 		revision:
-			state.successionSchedule.pending.get(state.people.rulerOf[realm])
-				?.revision ?? -1,
+			state.deathSchedule.pending.get(state.people.rulerOf[realm])?.revision ??
+			-1,
 		rng,
 	})
 	invariants(fx)
@@ -598,6 +599,7 @@ it("chooses regents once every heir is seated", () => {
 	)
 	if (ward === undefined) throw new Error("no realm for a regency")
 	state.people.regencies.set(ward, {
+		cause: "minority",
 		ward: state.people.rulerOf[ward],
 		regent: adult,
 		kind: "relative",

@@ -20,6 +20,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { HEIRS } from "@/model/history/sim/people/heirs"
 import type { HeirRelation } from "@/model/history/sim/people/heirs/types"
 import type { GenderPreference } from "@/model/history/sim/people/types"
@@ -54,10 +55,12 @@ function age({ state, person }: PersonParams): number {
 	return now(state) - state.people.persons.birth[person]
 }
 
-// Alive and not already sovereign somewhere; district holders may be raised.
+// Alive, capable and not already sovereign somewhere; district holders may
+// be raised.
 function available({ state, person }: PersonParams): boolean {
 	if (!PEOPLE.aliveAt({ people: state.people, person, time: now(state) }))
 		return false
+	if (AGEING.incapable({ people: state.people, person })) return false
 	return !state.people.persons.heldSeats[person].some((seat) =>
 		STATE.isSovereign({ state, p: seat }),
 	)

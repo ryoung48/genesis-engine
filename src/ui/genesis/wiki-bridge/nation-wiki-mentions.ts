@@ -115,6 +115,7 @@ export function regentRole({
 	const wardRow = PEOPLE_RECORD.person({ people, id: ward })
 	if (!regentRow || !wardRow) return null
 	const female = regentRow.sex === 1
+	if (kind === "spouse") return female ? "wife" : "husband"
 	const parents = [wardRow.father, wardRow.mother].filter((id) => id >= 0)
 	if (parents.includes(regent)) return female ? "mother" : "father"
 	if ([regentRow.father, regentRow.mother].some((id) => parents.includes(id)))

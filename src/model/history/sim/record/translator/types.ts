@@ -1,6 +1,11 @@
-import type { HistoryState, RevoltComment } from "@/model/history/record/types"
+import type {
+	HistoryEvent,
+	HistoryState,
+	RevoltComment,
+} from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { EngineNote } from "@/model/history/sim/engine/state/types"
+import type { DeathCause } from "@/model/history/sim/people/types"
 import type { LanguageNames } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
@@ -43,6 +48,8 @@ export interface ProceduralTranslator {
 	rebelWars: Map<number, RebelWar>
 	children: Set<number>[]
 	identityByRoot: Map<number, number>
+	// Each ruler's latest ruler entry, under whichever nation identity holds it.
+	rulerEntries: Map<number, HistoryEvent>
 	rawColors: Array<[number, number, number]>
 	relationCells: Map<number, number>
 	relationColumns: Map<number, Set<number>>
@@ -108,8 +115,9 @@ export interface RoyalMarriage {
 export interface RulerDeathParams {
 	translator: ProceduralTranslator
 	person: number
-	// The new death date in simulation years.
+	// The death date in simulation years.
 	time: number
+	cause: DeathCause
 }
 
 export interface ContributionsParams {

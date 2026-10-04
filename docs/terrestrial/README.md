@@ -20,6 +20,7 @@ Start here for the historical simulation’s rules and implementation references
 - [Marriage, betrothal and family alliances](people/marriage-and-alliances.md)
 - [Person attributes, traits and stress](people/attributes-traits-and-stress.md)
 - [Household residence and territorial realm](people/residence-and-realm.md)
+- [Health, ageing and mortality](people/health-and-mortality.md)
 
 ## Politics
 

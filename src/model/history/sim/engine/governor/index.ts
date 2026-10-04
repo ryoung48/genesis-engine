@@ -9,12 +9,10 @@ import type {
 } from "@/model/history/sim/engine/governor/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
-import type { AttributeModifier } from "@/model/history/sim/people/attributes/types"
 import { CHARACTER } from "@/model/history/sim/people/character"
+import { HEALTH } from "@/model/history/sim/people/health"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type { Regency } from "@/model/history/sim/people/types"
-
-const NO_CONDITIONS: readonly AttributeModifier[] = []
 
 function regency({ state, realm }: GovernorParams): Regency | null {
 	const entry = state.people.regencies.get(realm)
@@ -29,7 +27,7 @@ function personAttribute({
 	attribute,
 }: PersonAttributeParams): number {
 	return ATTRIBUTES.effective({
-		conditions: NO_CONDITIONS,
+		conditions: HEALTH.attributeConditions({ people: state.people, person }),
 		character: CHARACTER.of({ people: state.people, person }),
 		age: state.time / STATE.yearMs - state.people.persons.birth[person],
 		attribute,

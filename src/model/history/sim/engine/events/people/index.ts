@@ -1,20 +1,23 @@
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
+import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { PATRICIANS } from "@/model/history/sim/engine/events/people/patricians"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
 import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import type {
-	EndEarlyParams,
+	FailHeartsParams,
 	PeopleEventParams,
 	SettleMatchesParams,
 	StateParams,
 } from "@/model/history/sim/engine/events/people/types"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
-import { SUCCESSION_SCHEDULE } from "@/model/history/sim/engine/events/succession/schedule"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
+import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { FAMILY } from "@/model/history/sim/people/family"
+import { HEALTH } from "@/model/history/sim/people/health"
 import type {
 	CrossMatch,
 	MarriageRealms,
@@ -31,23 +34,6 @@ function nextYear({ state }: PeopleEventParams): void {
 		0,
 		0,
 	)
-}
-
-// A death moved earlier: the person's reigns end and their regencies pass on
-// at the new date.
-function endEarly({ state, person }: EndEarlyParams): void {
-	const people = state.people
-	for (const seat of people.persons.heldSeats[person]) {
-		if (!STATE.isSovereign({ state, p: seat })) continue
-		state.leaderRuntime.end[seat] = Math.max(
-			state.time,
-			people.persons.death[person] * STATE.yearMs,
-		)
-	}
-	SUCCESSION_SCHEDULE.ensure({ state, person })
-	for (const [realm, regency] of people.regencies)
-		if (regency.regent === person)
-			REGENCY.scheduleRegentDeath({ state, realm, regent: person })
 }
 
 function marriageRealms({ state }: StateParams): MarriageRealms {
@@ -117,8 +103,42 @@ function init({ state, rng }: PeopleEventParams): void {
 	nextYear({ state, rng })
 }
 
+// Every failed heart is dated before any succession runs, so no one who dies
+// this instant is chosen as an heir or regent; the deaths then apply in
+// person order.
+function failHearts({ state, hearts, rng }: FailHeartsParams): void {
+	if (hearts.length === 0) return
+	for (const person of hearts)
+		PERSON_DEATH.mark({ state, person, cause: "heart" })
+	for (const person of hearts)
+		PERSON_DEATH.run({
+			state,
+			person,
+			revision: DEATH_SCHEDULE.revisionOf({ state, person }),
+			rng,
+		})
+	const people = state.people
+	const time = state.time / STATE.yearMs
+	people.stressed = people.stressed.filter(
+		(person) =>
+			PEOPLE.aliveAt({ people, person, time }) &&
+			people.persons.heldSeats[person].some((seat) =>
+				STATE.isSovereign({ state, p: seat }),
+			),
+	)
+}
+
 function runYear({ state, rng }: PeopleEventParams): void {
-	STRESS_EVENTS.runYear({ state })
+	failHearts({ state, hearts: STRESS_EVENTS.runYear({ state }), rng })
+	const health = HEALTH.runYear({
+		people: state.people,
+		time: state.time / STATE.yearMs,
+	})
+	for (const person of health.dying)
+		DEATH_SCHEDULE.ensure({ state, person, cause: "natural" })
+	for (const person of health.incapacitated)
+		for (const realm of [...state.people.persons.heldSeats[person]])
+			REGENCY.startIncapacity({ state, realm })
 	DISTRICTS.settle({ state, rng })
 	DISTRICTS.grant({ state, rng })
 	ROYAL_MARRIAGES.review({ state })
@@ -128,16 +148,24 @@ function runYear({ state, rng }: PeopleEventParams): void {
 	for (let seat = 0; seat < state.P; seat++)
 		if (people.rulerOf[seat] >= 0) rulers.push(people.rulerOf[seat])
 	for (const heads of people.patricians.values()) rulers.push(...heads)
-	const { shortened, ...matches } = FAMILY.runYear({
+	const time = state.time / STATE.yearMs
+	const realms = marriageRealms({ state })
+	const matches = FAMILY.runYear({
 		people,
-		time: state.time / STATE.yearMs,
+		time,
 		rulers,
 		sovereigns: sovereignRulers({ state }),
 		rng,
-		...marriageRealms({ state }),
+		...realms,
 	})
-	for (const person of shortened) endEarly({ state, person })
 	settleMatches({ state, matches })
+	FAMILY.project({
+		people,
+		time,
+		rulers,
+		originOf: realms.originOf,
+		rng,
+	})
 	ROYAL_MARRIAGES.review({ state })
 	nextYear({ state, rng })
 }

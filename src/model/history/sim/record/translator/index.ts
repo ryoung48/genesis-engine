@@ -97,22 +97,18 @@ function nationLabel({
 // Registers and retires rebel wars from this transaction's notes before any
 // ownership is derived, and collects the reason text the record attaches to
 // each revolt and each rebel-war outcome.
-// A reigning ruler whose death moved earlier: the reign's last ruler entry
-// carries the new death date.
-function moveRulerDeath({ translator, person, time }: RulerDeathParams): void {
-	const { record } = translator.state
-	for (const index of record.people?.tenuresOf.get(person) ?? []) {
-		const tenure = record.people?.tenures[index]
-		if (!tenure || tenure.kind !== "ruler" || tenure.endTimeMs !== Infinity)
-			continue
-		const nationId = translator.identityByRoot.get(tenure.seat)
-		if (nationId === undefined) continue
-		const entry = record.events.nationEvents[nationId]?.events.findLast(
-			(event) =>
-				event.kind === "rulerChange" && event.payload.person === person,
-		)
-		if (entry) entry.payload.deathDate = DATE.timeMsToEu4Date(peopleTime(time))
-	}
+// A ruler's latest entry carries their death date and cause once they die,
+// whether or not they still held the throne.
+function moveRulerDeath({
+	translator,
+	person,
+	time,
+	cause,
+}: RulerDeathParams): void {
+	const entry = translator.rulerEntries.get(person)
+	if (!entry) return
+	entry.payload.deathDate = DATE.timeMsToEu4Date(peopleTime(time))
+	entry.payload.deathCause = cause
 }
 
 function scanOwnerNotes({
@@ -832,6 +828,7 @@ function appendNote({
 				ward: data.ward as number,
 				regent: data.regent as number,
 				regentKind: data.kind as string,
+				regencyCause: data.regencyCause as string,
 			},
 			comment: null,
 		})
@@ -953,6 +950,7 @@ function createTranslator({
 		relationColumns: new Map(),
 		activeTies: new Map(),
 		royalMarriages: new Map(),
+		rulerEntries: new Map(),
 		warCoalitions: new Map(),
 		ownedCount,
 		stateless,
@@ -995,7 +993,12 @@ function applyTransaction({
 		for (let index = 0; index < packet.count; index++) {
 			const row = PEOPLE_LOG.read({ rows: packet, index })
 			if (row.kind === "death")
-				moveRulerDeath({ translator, person: row.person, time: row.time })
+				moveRulerDeath({
+					translator,
+					person: row.person,
+					time: row.time,
+					cause: row.cause,
+				})
 		}
 	}
 	const count = translator.parent.length
@@ -1158,19 +1161,23 @@ function applyTransaction({
 		const previous = log.events.findLast(
 			(event) => event.kind === "rulerChange",
 		)
-		log.events.push({
+		const entry: HistoryEvent = {
 			timeMs,
 			kind: "rulerChange",
 			payload: {
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
-				deathDate: DATE.timeMsToEu4Date(recordTime(ruler.deathTimeMs)),
+				deathDate: null,
 				person: ruler.person,
 				newRuler: previous?.payload.person !== ruler.person,
 				regency: ruler.regency,
 				regent: ruler.regent,
+				predecessor: ruler.deceased,
+				predecessorDeathCause: ruler.deathCause,
 			},
 			comment: null,
-		})
+		}
+		log.events.push(entry)
+		translator.rulerEntries.set(ruler.person, entry)
 	}
 	if (transaction.census)
 		record.events.censuses.push({

@@ -458,8 +458,7 @@ function divide({
 		return skip({ state, realm, dying, primary, reason: "no free seat" })
 	resolveCutOff(run)
 	reseat(run)
-	for (const { seat } of run.released)
-		REGENCY.startMinority({ state, realm: seat })
+	for (const { seat } of run.released) REGENCY.start({ state, realm: seat })
 	note({ run, dying, primary })
 	return run.released.length
 }

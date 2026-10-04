@@ -158,11 +158,13 @@ Every person owns an independent sorted array of held seat IDs. `rulerOf` remain
 
 ## Holder death scheduling
 
-The engine schedules one death event per holder, including district-only holders. A sparse pending entry stores person revision, due time and pending/processing state. Revisions survive last-seat loss, so reacquisition cannot revive an obsolete heap event. Additional seats reuse the holder's event; a shortened life replaces it. Regent deaths remain separate events.
+The engine schedules one death event per person with a finite death date, seat holder or not ([families](../people/families-and-lifecycle.md#death)). A sparse pending entry stores revision, due time, cause and pending/processing state. A living person whose death date is still unknown (`Infinity`) has no entry and nothing is queued for them. Losing a last seat does not cancel a death; additional seats reuse the person's event; a date that moves replaces it. A regent's death is the same event: the person's regencies are reassigned after their seats.
 
-Dispatch consumes its token before effects and freezes held seats by descending current rank and ascending ID. Each step rechecks ownership and hierarchy: sovereign crowns use their own law, valid districts inherit immediately, and other seats are vacated. A prior merger or transfer can remove a later seat from the walk. Annual district settlement validates and grants seats, and ensures holder events; it does not inherit independently.
+`PERSON_DEATH.run` consumes the token, applies the death's effects, then runs the seat walk (`SUCCESSION.succeedPerson`) with a fresh context for that death. The walk freezes held seats by descending current rank and ascending ID. Each step rechecks ownership and hierarchy: sovereign crowns use their own law, valid districts inherit immediately, and other seats are vacated. A prior merger or transfer can remove a later seat from the walk. Annual district settlement validates and grants seats, and ensures holder events; it does not inherit independently.
 
 Availability considers every crown, and regency checks use the relevant local district rather than a foreign primary.
+
+A reign has no end date until its ruler dies or is deposed: no death is known in advance ([health](../people/health-and-mortality.md)). An Incapable person cannot be elected, appointed or made regent, but can inherit; an incapable sovereign reigns under a regent ([simulated people](government-and-succession.md#regencies)).
 
 ## Districts
 
@@ -194,7 +196,7 @@ The culture's gender preference sorts each group: patriarchal prefers sons, matr
 
 A living heir must be compatible with every held sovereign crown. Districts do not veto unions. Existing group membership follows junior-to-senior union edges only; diplomatic overlords and territorial parents are excluded. Sibling juniors can continue their existing group without a sibling link, even while their dead senior awaits its turn. An incompatible external crown still rejects the heir.
 
-Installation rechecks surviving crowns after each external link. Existing groups retain their senior and edges. Each actual senior–junior edge advances once when both endpoints share the living successor, using a dispatch-local accounted-edge set. New edges start at generation 1; spouse-only shared unions do not advance generations. Merger eligibility is checked immediately after continuation, and removed seats are skipped.
+Installation rechecks surviving crowns after each external link. Existing groups retain their senior and edges. Each actual senior–junior edge advances once when both endpoints share the living successor, using the accounted-edge set of the walk's context (`state.successionContext`, set for the duration of one death's walk and null otherwise). New edges start at generation 1; spouse-only shared unions do not advance generations. Merger eligibility is checked immediately after continuation, and removed seats are skipped.
 
 Installation and separately crowned spouses preflight all crown pairs before adding external links.
 
@@ -208,16 +210,17 @@ Republics consider every distinct patrician head’s house. Each elector backs t
 
 ## Regencies
 
-- **When.** A sovereign ruler under 16 gets a regent until 16, their death or a usurpation.
-- **Who.** The first of these who is an adult, alive and holds no throne:
-  1. the surviving parent, of either sex;
-  2. the closest adult of the child's house in inheritance order;
+- **When.** A sovereign ruler under 16 gets a regent until 16, their death or a usurpation (cause `minority`). A sovereign who becomes Incapable, or is already Incapable when seated, gets one until their death or a usurpation (cause `incapacity`).
+- **Who.** The first of these who is an adult, alive, capable and holds no throne:
+  1. for a child, the surviving parent of either sex; for an incapable ruler, the spouse;
+  2. the closest adult of the ward's house in inheritance order;
   3. the strongest district holder (lord protector);
   4. otherwise a regency council with no person.
-- **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere is replaced at the yearly check.
+- **Coming of age.** The end of a minority is queued for the ward's 16th birthday when the regency starts. A ward who has died or been deposed leaves it stale, and it never ends an incapacity regency.
+- **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere or becomes Incapable is replaced at the yearly check.
 - **After a partition.** Regencies start once the partition's seating is final, for the new realms and then for the primary realm, and one review replaces any regent who became sovereign in it ([government](government-and-succession.md#partition)).
-- **Weak crown.** A realm under a regent, or whose ruler is in Poor or Grave health, starts no wars and its districts rebel more easily ([rebellion](rebellions-and-throne-wars.md)). It still defends; diplomatic disposition governs subject calls.
-- **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs.
+- **Weak crown.** A realm under a regent, or whose ruler has health below 2.5 or stress of 300 or more, starts no wars and its districts rebel more easily ([rebellion](rebellions-and-throne-wars.md)). It still defends; diplomatic disposition governs subject calls.
+- **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs. A spouse or a council never usurps. The deposed ruler, child or incapable, becomes the realm's claimant.
 
 ## Restoration
 

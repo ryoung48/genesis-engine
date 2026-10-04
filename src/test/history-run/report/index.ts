@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
@@ -10,6 +10,7 @@ import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
+import { HEALTH } from "@/model/history/sim/people/health"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { PeoplePacket } from "@/model/history/sim/people/log/types"
 import { ERAS } from "@/model/society/eras"
@@ -29,6 +30,8 @@ import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
+import { PEOPLE_HEALTH_REPORT } from "@/test/history-run/report/people-health"
+import type { StarterReport } from "@/test/history-run/report/people-health/types"
 import { PEOPLE_RECORD_REPORT } from "@/test/history-run/report/people-record"
 import type { PeopleRecordReport } from "@/test/history-run/report/people-record/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
@@ -430,6 +433,7 @@ function runSeed({
 					.trim()
 					.split("\n")
 					.sort()
+					.filter((path) => existsSync(path.trim()))
 					.map((path) => path + "\n" + readFileSync(path.trim(), "utf8"))
 					.join("\n"),
 			)
@@ -463,6 +467,8 @@ function runSeed({
 		householdsReportMs: 0,
 		peopleRecord: null as PeopleRecordReport | null,
 		households: null as HouseholdsReport | null,
+		lifecycle: { ...engine.lifecycle },
+		starters: null as StarterReport | null,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
@@ -471,6 +477,7 @@ function runSeed({
 		mkdirSync(dirname(options.outPath), { recursive: true })
 		diagnostics.wallMs = performance.now() - started
 		diagnostics.peakMemoryKb = process.resourceUsage().maxRSS
+		diagnostics.lifecycle = { ...engine.lifecycle }
 		digestEvents()
 		diagnostics.rebelLogistics = logs.rebelLogistics.value()
 		diagnostics.rebellionEvents = logs.rebellionEvents.value()
@@ -490,6 +497,8 @@ function runSeed({
 		engine,
 		probe: MILITARY_REPORT.fiscalProbe,
 	})
+	const peopleRecord = PEOPLE_RECORD_REPORT.attach()
+	const peopleHealth = PEOPLE_HEALTH_REPORT.tracker({ engine })
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	const start = Math.round(engine.time / STATE.yearMs)
 	const reports: CenturyReport[] = []
@@ -508,6 +517,13 @@ function runSeed({
 		betrothals: [],
 		standing: [startBetrothals.size],
 	}
+	const runHealthYear = HEALTH.runYear
+	HEALTH.runYear = (params) => {
+		const t0 = performance.now()
+		const dying = runHealthYear(params)
+		peopleHealth.healthMs += performance.now() - t0
+		return dying
+	}
 	const runPeopleYear = PEOPLE_EVENTS.runYear
 	PEOPLE_EVENTS.runYear = (params) => {
 		const t0 = performance.now()
@@ -515,7 +531,6 @@ function runSeed({
 		peopleMs += performance.now() - t0
 	}
 	const characterTracker = PEOPLE_TRAITS_REPORT.tracker()
-	const peopleRecord = PEOPLE_RECORD_REPORT.attach()
 	const householdTerritory = HOUSEHOLDS_REPORT.territory({
 		parents: engine.parentCurrent,
 		owners: engine.sovereignCurrent,
@@ -568,6 +583,10 @@ function runSeed({
 			tracker: peopleRecord.tracker,
 			transactions: engine.journal,
 		})
+		PEOPLE_HEALTH_REPORT.ingest({
+			tracker: peopleHealth,
+			transactions: engine.journal,
+		})
 		for (const { people: packet } of engine.journal)
 			for (let index = 0; index < (packet?.count ?? 0); index++) {
 				const row = PEOPLE_LOG.read({ rows: packet as PeoplePacket, index })
@@ -582,6 +601,12 @@ function runSeed({
 		}
 		PARTITION_REPORT.observe({ engine, tracker: partitions })
 		trackMarriages({ engine, tracker })
+		PEOPLE_HEALTH_REPORT.sample({ engine, tracker: peopleHealth })
+		if (year === start + 10)
+			diagnostics.starters = PEOPLE_HEALTH_REPORT.starters({
+				record: peopleRecord.tracker.record,
+				start,
+			})
 		PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker, start })
 		MILITARY_REPORT.sample({
 			engine,
@@ -652,6 +677,14 @@ function runSeed({
 				to: year,
 				peopleMs,
 				childbirthDeathTimes,
+			}),
+			peopleHealth: PEOPLE_HEALTH_REPORT.summarize({
+				engine,
+				tracker: peopleHealth,
+				record: peopleRecord.tracker.record,
+				start,
+				from,
+				to: year,
 			}),
 			marriage: marriageReport({ engine, from, to: year, tracker }),
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
@@ -727,6 +760,7 @@ function runSeed({
 		divideMs = 0
 	}
 	PEOPLE_EVENTS.runYear = runPeopleYear
+	HEALTH.runYear = runHealthYear
 	PARTITION.divide = divide
 	peopleRecord.detach()
 	military.detach()

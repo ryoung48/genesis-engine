@@ -1,4 +1,6 @@
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
+import type { HealthBand } from "@/model/history/sim/people/health/types"
 import type {
 	AppendRowParams,
 	CodeParams,
@@ -12,6 +14,7 @@ import type {
 	SeatKind,
 } from "@/model/history/sim/people/log/types"
 import type {
+	DeathCause,
 	PeopleState,
 	PregnancyLoss,
 	SeatChangeReason,
@@ -37,11 +40,7 @@ const KINDS: readonly PeopleRowKind[] = [
 	"regent",
 ]
 // Kinds whose data does not exist yet.
-const RESERVED: ReadonlySet<PeopleRowKind> = new Set([
-	"health_band",
-	"condition",
-	"opinion_memory",
-])
+const RESERVED: ReadonlySet<PeopleRowKind> = new Set(["opinion_memory"])
 const CREATION = KINDS.indexOf("creation")
 const SEAT = KINDS.indexOf("seat")
 
@@ -68,6 +67,21 @@ const BETROTHAL_END_CODE: Record<BetrothalEndCause, number> = {
 	alliance: 0,
 	death: 1,
 }
+const DEATH_CAUSE_CODE: Record<DeathCause, number> = {
+	natural: 0,
+	heart: 1,
+	battle: 2,
+	childbirth: 3,
+}
+const DEATH_CAUSES = Object.keys(DEATH_CAUSE_CODE) as DeathCause[]
+const HEALTH_BANDS: readonly HealthBand[] = [
+	"Dying",
+	"Near death",
+	"Poor",
+	"Fine",
+	"Good",
+	"Excellent",
+]
 const BETROTHAL_ENDS = Object.keys(BETROTHAL_END_CODE) as BetrothalEndCause[]
 const SEAT_KINDS: readonly Exclude<SeatKind, "regent">[] = ["ruler", "district"]
 
@@ -138,6 +152,7 @@ function append({ log, row }: AppendRowParams): void {
 		case "death":
 			time = row.time
 			a = row.person
+			b = codeOf({ codes: DEATH_CAUSE_CODE, name: row.cause })
 			break
 		case "wedding":
 			time = row.time
@@ -183,6 +198,20 @@ function append({ log, row }: AppendRowParams): void {
 			a = row.person
 			b = row.level
 			break
+		case "health_band":
+			time = row.time
+			a = row.person
+			b = HEALTH_BANDS.indexOf(row.band)
+			if (b < 0) throw new Error(`Unknown health band "${row.band}"`)
+			break
+		case "condition":
+			time = row.time
+			a = row.person
+			b = AGEING.conditions.indexOf(row.condition)
+			if (b < 0) throw new Error(`Unknown condition "${row.condition}"`)
+			c = row.before
+			d = row.after
+			break
 		default:
 			throw new Error(`People row kind "${KINDS[kind]}" is written at seal`)
 	}
@@ -222,6 +251,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		d: new Int32Array(count),
 		sex: new Uint8Array(creations),
 		death: new Float64Array(creations),
+		healthBand: new Uint8Array(creations),
 		dynasty: new Int32Array(creations),
 		culture: new Int32Array(creations),
 		nameSeed: new Int32Array(creations),
@@ -245,7 +275,13 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		packet.c[index] = slot(table.mother[person])
 		packet.d[index] = index
 		packet.sex[index] = sex
-		packet.death[index] = finite(table.death[person])
+		if (Number.isNaN(table.death[person]))
+			throw new Error(`Person ${person} has no death date`)
+		packet.death[index] =
+			table.death[person] <= people.household.time()
+				? table.death[person]
+				: Infinity
+		packet.healthBand[index] = table.healthFlags[person] & 7
 		packet.dynasty[index] = slot(table.dynasty[person])
 		packet.culture[index] = slot(table.culture[person])
 		packet.nameSeed[index] = slot(table.nameSeed[person])
@@ -287,8 +323,12 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 		case "creation":
 			return { kind, time, person: a, father: b, mother: c, snapshot: d }
 		case "death":
-			if (b !== 0) throw new Error("People death causes are reserved")
-			return { kind, time, person: a }
+			return {
+				kind,
+				time,
+				person: a,
+				cause: nameOf({ names: DEATH_CAUSES, code: b }),
+			}
 		case "wedding":
 			return { kind, time, husband: a, wife: b }
 		case "seat":
@@ -331,6 +371,22 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 			return { kind, time, person: a, province: b }
 		case "stress":
 			return { kind, time, person: a, level: b }
+		case "health_band":
+			return {
+				kind,
+				time,
+				person: a,
+				band: nameOf({ names: HEALTH_BANDS, code: b }),
+			}
+		case "condition":
+			return {
+				kind,
+				time,
+				person: a,
+				condition: nameOf({ names: AGEING.conditions, code: b }),
+				before: c,
+				after: d,
+			}
 		default:
 			throw new Error(
 				`People row kind ${rows.kind[index]} is ${kind === undefined ? "unknown" : "reserved"}`,
@@ -338,4 +394,13 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 	}
 }
 
-export const PEOPLE_LOG = { create, append, pending, seal, read }
+export const PEOPLE_LOG = {
+	deathCauses: DEATH_CAUSES,
+	healthBands: HEALTH_BANDS,
+	conditions: AGEING.conditions,
+	create,
+	append,
+	pending,
+	seal,
+	read,
+}

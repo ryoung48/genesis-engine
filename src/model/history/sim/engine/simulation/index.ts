@@ -4,6 +4,9 @@ import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { DIPLOMACY } from "@/model/history/sim/engine/events/diplomacy"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
+import { BIRTH_EVENTS } from "@/model/history/sim/engine/events/people/birth"
+import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
+import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
@@ -187,6 +190,8 @@ function initHistory(params: {
 	seedColonyRelations({ state, nations: params.nations })
 
 	ROYAL_MARRIAGES.review({ state })
+	DEATH_SCHEDULE.offerNew({ state })
+	BIRTH_EVENTS.queue({ state })
 	MILITARY.reconcile({ state })
 	MILITARY.recordArmies({ state })
 	JOURNAL.flush({ state, noteCursor: 0, census: true, initial: true })
@@ -215,7 +220,8 @@ function processEventsUntil({
 			type === EVENT_HEAP.evt.PEOPLE_YEAR
 		)
 			MILITARY.touchAll({ state })
-		else MILITARY.touch({ state, nation: dataBuf[0] })
+		else if (type !== EVENT_HEAP.evt.DEATH && type !== EVENT_HEAP.evt.BIRTH)
+			MILITARY.touch({ state, nation: dataBuf[0] })
 		MILITARY.reconcile({ state })
 		state.militaryDepth++
 		switch (type) {
@@ -233,13 +239,16 @@ function processEventsUntil({
 					rng,
 				})
 				break
-			case EVENT_HEAP.evt.SUCCESSION:
-				SUCCESSION.runSuccession({
+			case EVENT_HEAP.evt.DEATH:
+				PERSON_DEATH.run({
 					state,
 					person: dataBuf[0],
 					revision: dataBuf[1],
 					rng,
 				})
+				break
+			case EVENT_HEAP.evt.BIRTH:
+				BIRTH_EVENTS.run({ state, id: dataBuf[0], rng })
 				break
 			case EVENT_HEAP.evt.TAX:
 				TAX.runTax({
@@ -263,13 +272,6 @@ function processEventsUntil({
 			case EVENT_HEAP.evt.DIPLOMACY:
 				DIPLOMACY.runDiplomacy({ state, nation: dataBuf[0], rng })
 				break
-			case EVENT_HEAP.evt.REGENT_DEATH:
-				REGENCY.regentDied({
-					state,
-					realm: dataBuf[0],
-					regent: dataBuf[1],
-				})
-				break
 			case EVENT_HEAP.evt.REGENCY:
 				REGENCY.comeOfAge({
 					state,
@@ -278,6 +280,8 @@ function processEventsUntil({
 				})
 				break
 		}
+		DEATH_SCHEDULE.offerNew({ state })
+		BIRTH_EVENTS.queue({ state })
 		state.militaryDepth--
 		MILITARY.reconcile({ state })
 		JOURNAL.flush({

@@ -83,7 +83,7 @@ The two triples are Compassionate / Callous / Sadistic and Stubborn / Fickle / E
 
 ## Congenital traits
 
- (one `congenital` bit-set column; inherited by DP1.4, else the 0.5% birth chance). Each trait is rolled on its own. Giant and Dwarf exclude each other; the first rolled wins. Health values are read from `plans/people-4-health-lifecycle.md` on, opinion values from `plans/people-7-opinion-politics.md` on.
+ (one `congenital` bit-set column; inherited by DP1.4, else the 0.5% birth chance). Each trait is rolled on its own. Giant and Dwarf exclude each other; the first rolled wins. Health values feed effective health ([health](health-and-mortality.md)); opinion values are read from `plans/people-7-opinion-politics.md` on.
 
 | Trait | Skills | Prowess | Health | Fertility | Opinion (scope in DP10) |
 |---|---|---|---|---|---|
@@ -129,7 +129,7 @@ Each parent is active (A), carrying (C) or neither (N) for the trait:
 
 **Fertility effect (FR1.2, FR1.3).** The person's fertility term in `FERTILITY.bear` is multiplied by `max(0, 1 + sum)` of the active beauty grade, congenital, Lustful and Chaste fertility values in the tables above. Carried traits do nothing. This is the first DP1 step that changes outcomes, so it gets its own report.
 
-**Effective attribute** (`ATTRIBUTES.effective`, pure; not stored): form the additive sum of base, active personality, grades, congenital and cumulative condition modifiers; multiply it by `max(0, 1 + sum of applicable condition percentage modifiers)`, then floor the result at 0. Incapacity overrides all six values to 0. This supports percentage prowess/skill losses without applying them twice. Tiers: 0–4 Terrible, 5–8 Poor, 9–10 Average, 11–13 Good, 14+ Excellent.
+**Effective attribute** (`ATTRIBUTES.effective`, pure; not stored): form the additive sum of base, active personality, grades, congenital and cumulative condition modifiers; multiply it by `max(0, 1 + sum of applicable condition percentage modifiers)`, then floor the result at 0. Incapacity overrides all six values to 0. This supports percentage prowess/skill losses without applying them twice. The condition modifiers are the summed level rows of the person's ageing conditions, Blind and Incapable ([health](health-and-mortality.md#effects)); the simulation takes them from `HEALTH.attributeConditions` and the record from the recorded levels. Tiers: 0–4 Terrible, 5–8 Poor, 9–10 Average, 11–13 Good, 14+ Excellent.
 
 **Neutral points** (`ATTRIBUTES.neutral`): diplomacy 5.5, martial 5.4, stewardship 5.4, intrigue 5.7, learning 6.0; prowess stays 5.
 
@@ -180,7 +180,9 @@ A `stress` column (0–400), stepped by `PEOPLE_EVENTS.runYear` as its first act
 - **Reset.** `PeopleState.stressed` lists the people whose stress was above 0 after the previous step. At each step, anyone on it who rules no sovereign seat is set to 0 and dropped; if their level was above 0 and they are alive, a `stress` row with level 0 is written at `T`. The reset is done here and not in `PEOPLE.vacate` because a seat can stop being sovereign with no change of holder (its realm is subjugated or absorbed). A ruler who loses every sovereign seat and holds one again by the next step keeps their stress: the gap was shorter than the step.
 - **Stale values.** Between losing the last seat and the next step the column still holds the old value, and no effect may read it. `REGENCY.weak` reads only a realm's own ruler, and `FERTILITY.bear` runs after the step in the same pass. The Greedy revenue factor reads the governor, who can be a regent, and a landless former ruler can be appointed regent inside that interval. So the factor takes its stress level from `GOVERNOR.stressLevel({ state, realm })`, which returns the governor's level only if that person rules a sovereign seat at the time of the read, and 0 otherwise. A regent who is a sovereign ruler elsewhere keeps their real level.
 
-Stress for anyone who is not a sovereign ruler is 0 from the first step after they stop ruling. `plans/people-4-health-lifecycle.md` later adds the ageing-condition stress factors and reads the stress level in Withering Mind progression.
+Stress for anyone who is not a sovereign ruler is 0 from the first step after they stop ruling.
+
+**Conditions and the heart.** Withering Mind and Faltering Heart add 20% to stress gain per row reached, and Faltering Heart takes 20% from stress loss per row ([health](health-and-mortality.md#effects)); the stress level also raises the weights of Withering Mind's faster gains. When a write raises a ruler's stress level, that is a mental break: after the `stress` row is written, a Faltering Heart they already have gains 25 XP, once however many levels the rise spans. A fall, a held level, a reset and a rise before the condition began give nothing. A heart that reaches 100 has failed. The step changes no holdings and no death dates itself: it finishes for every ruler on its starting list and returns the failed hearts, and the people pass then dates all of those deaths to the pass time before running any of their successions, in person order. No newly seated heir is stepped in that pass. Bereavement is counted from the deaths applied since the last step (`PeopleState.bereavements`), not from death dates.
 
 Allocation and traversal implementation details are in [pipeline performance](../mechanics/pipeline-performance.md#trait-evaluation-and-birth-roll-allocation).
 
@@ -200,4 +202,4 @@ History report output preserves completed report folders; the runner does not pr
 
 The trait names, modifiers and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt`, `common/script_values/00_stress_values.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Effect caps and the annual stress cadence are simulation design choices documented in the character plan.
 
-Health, attraction and role-scoped opinion values are data only in this stage. Health/lifespan and marriage selection remain unchanged. Ageing conditions can supply cumulative additive and percentage attribute modifiers, incapacity, and stress gain/loss modifiers through the existing pure helper parameters. No condition is applied yet. Mental breaks, stress deaths, childhood skill rolls, lifestyle perks, inbreeding and old-record compatibility are excluded.
+Attraction and role-scoped opinion values are data only in this stage, and marriage selection is unchanged. Health values and the ageing conditions are live: see [health](health-and-mortality.md). Childhood skill rolls, lifestyle perks, inbreeding and old-record compatibility are excluded.

@@ -1,5 +1,8 @@
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
+import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
+import type { HealthBand } from "@/model/history/sim/people/health/types"
 import type {
+	DeathCause,
 	PeopleState,
 	PregnancyLoss,
 	SeatChangeReason,
@@ -42,10 +45,13 @@ export interface PeopleLog extends PeopleRows {
 }
 
 // One journal transaction's rows in append order, sized exactly, with the
-// snapshot of each person its creation rows introduce.
+// snapshot of each person its creation rows introduce. A snapshot's death is
+// set only for a person already dead when created; the living carry Infinity.
 export interface PeoplePacket extends PeopleRows {
 	sex: Uint8Array
 	death: Float64Array
+	// The health band when the person was created.
+	healthBand: Uint8Array
 	dynasty: Int32Array
 	culture: Int32Array
 	nameSeed: Int32Array
@@ -69,11 +75,12 @@ export interface CreationRow {
 	snapshot: number
 }
 
-// A death date moved earlier.
+// A death as it happens.
 export interface DeathRow {
 	kind: "death"
 	time: number
 	person: number
+	cause: DeathCause
 }
 
 export interface WeddingRow {
@@ -133,6 +140,24 @@ export interface BetrothalEndRow {
 	cause: BetrothalEndCause
 }
 
+// A person's health entering another band.
+export interface HealthBandRow {
+	kind: "health_band"
+	time: number
+	person: number
+	band: HealthBand
+}
+
+// A condition gained, changing level or lost; an absent level is -1.
+export interface ConditionRow {
+	kind: "condition"
+	time: number
+	person: number
+	condition: HealthCondition
+	before: number
+	after: number
+}
+
 export interface StressRow {
 	kind: "stress"
 	time: number
@@ -148,6 +173,8 @@ export interface ResidenceRow {
 }
 
 export type AppendedRow =
+	| ConditionRow
+	| HealthBandRow
 	| ResidenceRow
 	| DeathRow
 	| WeddingRow
@@ -159,6 +186,8 @@ export type AppendedRow =
 	| StressRow
 
 export type PeopleRow =
+	| ConditionRow
+	| HealthBandRow
 	| ResidenceRow
 	| CreationRow
 	| DeathRow
