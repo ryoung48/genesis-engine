@@ -24,7 +24,7 @@ function create(provinceCount: number): PeopleState {
 	return {
 		persons: {
 			bases: [],
-			education: [],
+
 			personality: [],
 			grades: [],
 			congenital: [],
@@ -90,7 +90,7 @@ function add({
 	const table = people.persons
 	const id = table.sex.length
 	table.bases.push(0)
-	table.education.push(0)
+
 	table.personality.push(0)
 	table.grades.push(0)
 	table.congenital.push(0)
@@ -304,10 +304,8 @@ function drawPerson({ people, person }: PersonRefParams): void {
 	const attributes = ATTRIBUTES.draw({
 		table,
 		person,
-		character: { ...traits, bases: 0, education: 0 },
 	})
-	for (const key of ["bases", "education"] as const)
-		table[key][person] = attributes[key]
+	table.bases[person] = attributes.bases
 	for (const key of ["personality", "grades", "congenital", "carried"] as const)
 		table[key][person] = traits[key]
 }

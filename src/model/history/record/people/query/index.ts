@@ -232,13 +232,10 @@ function traits({ people, id, timeMs }: PersonAtParams): TraitsView | null {
 	if (!person || timeMs < person.birthTimeMs) return null
 	const age =
 		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
-	const education = ATTRIBUTES.education({ character: person })
 	return {
 		personality: TRAITS.active({ character: person, age }),
 		congenital: TRAITS.congenital({ character: person, age }),
 		grades: TRAITS.labels({ character: person, age }),
-		education:
-			age >= 16 ? `${education.focus} education ${education.level}` : null,
 	}
 }
 function stress({ people, id, timeMs }: PersonAtParams): number {

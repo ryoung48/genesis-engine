@@ -18,7 +18,7 @@ A person is **recorded** (sent to the history record and wiki) when they hold a 
 
 `PersonTable` (columns indexed by person id): sex, birth and death (years), father, mother, spouse, dynasty (-1 for none), culture, name seed, home (realm at birth; names come from its culture), realm (where they live), throne (the seat they hold, or -1), children, marriage time, betrothed partner and betrothal time (-1 without one), whether they are recorded, base fertility (0.5–0.6, drawn at creation), peak (highest seat standing ever held) and next birth (earliest next conception).
 
-The additional character columns are `bases`, `education`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](character.md).
+The additional character columns are `bases`, `personality`, `grades`, `congenital`, `carried` and `stress`. See [packing and inheritance](character.md).
 
 State-level maps in `PeopleState`:
 
@@ -188,4 +188,4 @@ Successions, coming of age and rebellions run on their own events at the exact t
 
 ## Character records and wiki
 
-Recorded-person rows preserve packed innate character. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read character at the selected date, with personality ages 9/11/13 and education age 16.
+Recorded-person rows preserve packed innate character. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read character at the selected date, with personality ages 9/11/13.

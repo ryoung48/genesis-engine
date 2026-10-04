@@ -9,13 +9,17 @@ import { HEALTH } from "@/model/history/sim/people/health"
 import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
-	CharacterDistribution,
+	AccumulateParams,
+	CharacterGroup,
+	CharacterGroupStatistics,
+	CharacterPopulation,
 	CharacterReport,
 	CharacterReportParams,
 	CharacterSampleParams,
 	CharacterTracker,
-	DistributionParams,
-	ShareParams,
+	GroupAccumulator,
+	HookSampleParams,
+	PopulationAccumulator,
 	TercileParams,
 	ValidateCharacterParams,
 } from "@/test/history-run/report/people-traits/types"
@@ -28,12 +32,217 @@ const NAMES = [
 	"learning",
 	"prowess",
 ] as const
-function tracker(): CharacterTracker {
-	return { samples: [] }
+function group(): GroupAccumulator {
+	return {
+		observations: 0,
+		attributes: Object.fromEntries(
+			NAMES.map((name) => [
+				name,
+				{
+					sum: 0,
+					squares: 0,
+					tiers: { Terrible: 0, Poor: 0, Average: 0, Good: 0, Excellent: 0 },
+					histogram: Array(38).fill(0),
+				},
+			]),
+		) as unknown as GroupAccumulator["attributes"],
+		personality: {},
+		grades: {},
+		congenital: {},
+		carried: {},
+		stress: [0, 0, 0, 0],
+		stressedNonRulers: 0,
+	}
 }
-function sample({ engine, tracker }: CharacterSampleParams): void {
+function population(): PopulationAccumulator {
+	return { all: group(), adults: group(), minors: group() }
+}
+function tracker(): CharacterTracker {
+	return {
+		samples: [],
+		rulers: population(),
+		people: population(),
+		enrichment: { rulers: group(), others: group() },
+		hooks: {},
+	}
+}
+function accumulate({
+	population,
+	group,
+	engine,
+	person,
+	sovereigns,
+}: AccumulateParams): void {
+	const character = CHARACTER.of({ people: engine.people, person })
+	const age = engine.time / STATE.yearMs - engine.people.persons.birth[person]
+	const targets = [
+		population.all,
+		age >= 16 ? population.adults : population.minors,
+		...(group ? [group] : []),
+	]
+	for (const name of NAMES) {
+		const value = ATTRIBUTES.effective({
+			conditions: [],
+			character,
+			age,
+			attribute: name,
+		})
+		for (const target of targets) {
+			const attribute = target.attributes[name]
+			attribute.sum += value
+			attribute.squares += value * value
+			attribute.tiers[ATTRIBUTES.tier(value)]++
+			attribute.histogram[value]++
+		}
+	}
+	const carried: string[] = []
+	for (const ladder of ["intellect", "physique", "beauty"] as const) {
+		const values = TRAITS.grade({ character, ladder })
+		if (values.good) carried.push(`${ladder}.good.${values.good}`)
+		if (values.bad) carried.push(`${ladder}.bad.${values.bad}`)
+	}
+	carried.push(
+		...TRAITS.congenital({
+			character: { ...character, congenital: character.carried },
+			age,
+		}),
+	)
+	const lists = {
+		personality: TRAITS.active({ character, age }),
+		grades: TRAITS.labels({ character, age }),
+		congenital: TRAITS.congenital({ character, age }),
+		carried,
+	}
+	for (const target of targets) {
+		target.observations++
+		target.stress[STRESS.level(engine.people.persons.stress[person])]++
+		if (engine.people.persons.stress[person] > 0 && !sovereigns.has(person))
+			target.stressedNonRulers++
+		for (const key of [
+			"personality",
+			"grades",
+			"congenital",
+			"carried",
+		] as const)
+			for (const name of lists[key])
+				target[key][name] = (target[key][name] ?? 0) + 1
+	}
+}
+function summarizeGroup(accumulator: GroupAccumulator): CharacterGroup {
+	const n = accumulator.observations
+	if (!n) return { observations: 0 }
+	const shares = (counts: Record<string, number>) =>
+		Object.fromEntries(
+			Object.entries(counts).map(([name, count]) => [name, count / n]),
+		)
+	return {
+		observations: n,
+		attributes: Object.fromEntries(
+			NAMES.map((name) => {
+				const a = accumulator.attributes[name]
+				const mean = a.sum / n
+				return [
+					name,
+					{
+						mean,
+						deviation: Math.sqrt(Math.max(0, a.squares / n - mean * mean)),
+						tierShares: shares(a.tiers),
+						histogram: a.histogram,
+					},
+				]
+			}),
+		) as CharacterGroupStatistics["attributes"],
+		personalityShares: shares(accumulator.personality),
+		gradeShares: shares(accumulator.grades),
+		congenitalShares: shares(accumulator.congenital),
+		carriedShares: shares(accumulator.carried),
+		stressLevelShares: accumulator.stress.map((count) => count / n),
+	}
+}
+function summarizePopulation(
+	accumulator: PopulationAccumulator,
+): CharacterPopulation {
+	return {
+		all: summarizeGroup(accumulator.all),
+		adults: summarizeGroup(accumulator.adults),
+		minors: summarizeGroup(accumulator.minors),
+	}
+}
+function sampleHook({
+	tracker,
+	name,
+	attribute,
+	value,
+	lower,
+	upper,
+	proxy,
+}: HookSampleParams): void {
+	const a = (tracker.hooks[name] ??= {
+		observations: 0,
+		delta: 0,
+		sum: 0,
+		squares: 0,
+		lower: 0,
+		upper: 0,
+	})
+	const delta = value - ATTRIBUTES.neutral(attribute)
+	const applied = proxy
+		? GOVERNOR.candidateStrength(value)
+		: GOVERNOR.factor({ attribute, value })
+	a.observations++
+	a.delta += delta
+	a.sum += applied
+	a.squares += applied * applied
+	if (!proxy) {
+		a.lower += Number(applied === lower)
+		a.upper += Number(applied === upper)
+	}
+}
+function sample({ engine, tracker, start }: CharacterSampleParams): void {
 	const table = engine.people.persons
 	const time = engine.time / STATE.yearMs
+	const sovereigns = new Set<number>()
+	for (let realm = 0; realm < engine.P; realm++) {
+		const person = engine.people.rulerOf[realm]
+		if (person >= 0 && STATE.isSovereign({ state: engine, p: realm }))
+			sovereigns.add(person)
+	}
+	if ((Math.round(time) - start) % 10 === 0)
+		for (const person of engine.people.alive) {
+			const adult = time - table.birth[person] >= 16
+			accumulate({
+				population: tracker.people,
+				group: adult
+					? sovereigns.has(person)
+						? tracker.enrichment.rulers
+						: tracker.enrichment.others
+					: null,
+				engine,
+				person,
+				sovereigns,
+			})
+		}
+	for (let seat = 0; seat < engine.P; seat++) {
+		const person = engine.people.rulerOf[seat]
+		if (
+			person >= 0 &&
+			!STATE.isSovereign({ state: engine, p: seat }) &&
+			table.throne[person] === seat
+		)
+			sampleHook({
+				tracker,
+				name: "candidateProxy",
+				attribute: "diplomacy",
+				value: GOVERNOR.personAttribute({
+					state: engine,
+					person,
+					attribute: "diplomacy",
+				}),
+				lower: 0,
+				upper: 0,
+				proxy: true,
+			})
+	}
 	const growth = new Float64Array(engine.P)
 	const counts = new Uint32Array(engine.P)
 	const worldKnowledge = KNOWLEDGE.realmKnowledge({
@@ -54,6 +263,13 @@ function sample({ engine, tracker }: CharacterSampleParams): void {
 	for (let realm = 0; realm < engine.P; realm++) {
 		const person = engine.people.rulerOf[realm]
 		if (person < 0 || !STATE.isSovereign({ state: engine, p: realm })) continue
+		accumulate({
+			population: tracker.rulers,
+			group: null,
+			engine,
+			person,
+			sovereigns,
+		})
 		const character = CHARACTER.of({ people: engine.people, person })
 		const age = time - table.birth[person]
 		const attributes = Object.fromEntries(
@@ -78,6 +294,34 @@ function sample({ engine, tracker }: CharacterSampleParams): void {
 							GOVERNOR.attribute({ state: engine, realm, attribute }),
 						]),
 					) as Record<Attribute, number>)
+		for (const [name, attribute, lower, upper] of [
+			["laxity", "diplomacy", -0.1, 0.1],
+			["battle", "martial", 0.87, 1.21],
+			["revenue", "stewardship", 0.87, 1.21],
+			["knowledge", "learning", 0.93, 1.1],
+		] as const)
+			sampleHook({
+				tracker,
+				name,
+				attribute,
+				value: governorAttributes[attribute],
+				lower,
+				upper,
+				proxy: false,
+			})
+		if (
+			regent >= 0 &&
+			(regency?.kind === "relative" || regency?.kind === "protector")
+		)
+			sampleHook({
+				tracker,
+				name: "usurpation",
+				attribute: "intrigue",
+				value: governorAttributes.intrigue,
+				lower: 0.5,
+				upper: 2,
+				proxy: false,
+			})
 		tracker.samples.push({
 			attributes,
 			governorAttributes,
@@ -111,33 +355,6 @@ function sample({ engine, tracker }: CharacterSampleParams): void {
 		})
 	}
 }
-function distribution({ values }: DistributionParams): CharacterDistribution {
-	const mean = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length)
-	const tierShares: Record<string, number> = {
-		Terrible: 0,
-		Poor: 0,
-		Average: 0,
-		Good: 0,
-		Excellent: 0,
-	}
-	for (const value of values)
-		tierShares[ATTRIBUTES.tier(value)] += 1 / Math.max(1, values.length)
-	return {
-		mean,
-		deviation: Math.sqrt(
-			values.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
-				Math.max(1, values.length),
-		),
-		tierShares,
-	}
-}
-function shares({ values, denominator }: ShareParams): Record<string, number> {
-	const result: Record<string, number> = {}
-	for (const rows of values)
-		for (const name of rows)
-			result[name] = (result[name] ?? 0) + 1 / Math.max(1, denominator)
-	return result
-}
 function tercile({ values, value }: TercileParams): number {
 	return value <= values[Math.floor(values.length / 3)]
 		? 0
@@ -152,13 +369,6 @@ function summarize({
 	to,
 }: CharacterReportParams): CharacterReport {
 	const rows = tracker.samples
-	const n = rows.length
-	const attributes = Object.fromEntries(
-		NAMES.map((name) => [
-			name,
-			distribution({ values: rows.map((row) => row.attributes[name]) }),
-		]),
-	) as Record<Attribute, CharacterDistribution>
 	const effects: Record<string, number> = {}
 	const cutoffs = Object.fromEntries(
 		NAMES.map((name) => [
@@ -284,51 +494,71 @@ function summarize({
 		effects[`battleWins.${label}.winShare`] =
 			effects[`battleWins.${label}.wins`] /
 			Math.max(1, effects[`battleWins.${label}.battles`])
-	const table = engine.people.persons
-	const carried: string[][] = []
-	let births = 0
-	for (let person = 0; person < table.birth.length; person++)
-		if (
-			table.recorded[person] &&
-			table.birth[person] >= from &&
-			table.birth[person] < to
-		) {
-			births++
-			const character = CHARACTER.of({ people: engine.people, person })
-			const unseen: string[] = []
-			for (const ladder of ["intellect", "physique", "beauty"] as const) {
-				const values = TRAITS.grade({ character, ladder })
-				if (values.good) unseen.push(`${ladder}.good.${values.good}`)
-				if (values.bad) unseen.push(`${ladder}.bad.${values.bad}`)
-			}
-			unseen.push(
-				...TRAITS.congenital({
-					character: { ...character, congenital: character.carried },
-					age: 16,
-				}),
-			)
-			carried.push(unseen)
-		}
+	const rulers = summarizePopulation(tracker.rulers)
+	const people = summarizePopulation(tracker.people)
+	const enriched = summarizeGroup(tracker.enrichment.rulers)
+	const others = summarizeGroup(tracker.enrichment.others)
+	const differences = (
+		key: "personalityShares" | "gradeShares" | "congenitalShares",
+	) => {
+		if (!("attributes" in enriched) || !("attributes" in others)) return {}
+		return Object.fromEntries(
+			[
+				...new Set([
+					...Object.keys(enriched[key]),
+					...Object.keys(others[key]),
+				]),
+			].map((name) => [
+				name,
+				(enriched[key][name] ?? 0) - (others[key][name] ?? 0),
+			]),
+		)
+	}
 	const result: CharacterReport = {
-		rulerYears: n,
-		attributes,
-		personalityShares: shares({
-			values: rows.map((row) => row.personality),
-			denominator: n,
-		}),
-		gradeShares: shares({
-			values: rows.map((row) => row.grades),
-			denominator: n,
-		}),
-		congenitalShares: shares({
-			values: rows.map((row) => row.congenital),
-			denominator: n,
-		}),
-		carriedShares: shares({ values: carried, denominator: births }),
-		recordedBirths: births,
-		stressLevelShares: [0, 1, 2, 3].map(
-			(level) =>
-				rows.filter((row) => row.stress === level).length / Math.max(1, n),
+		rulers,
+		people: {
+			...people,
+			all:
+				"attributes" in people.all
+					? {
+							...people.all,
+							stressedNonRulers: tracker.people.all.stressedNonRulers,
+						}
+					: people.all,
+		},
+		enrichment: {
+			rulers: enriched,
+			others,
+			attributeDifferences:
+				"attributes" in enriched && "attributes" in others
+					? Object.fromEntries(
+							NAMES.map((name) => [
+								name,
+								enriched.attributes[name].mean - others.attributes[name].mean,
+							]),
+						)
+					: {},
+			personalityDifferences: differences("personalityShares"),
+			gradeDifferences: differences("gradeShares"),
+			congenitalDifferences: differences("congenitalShares"),
+		},
+		hookEffects: Object.fromEntries(
+			Object.entries(tracker.hooks).map(([name, a]) => {
+				const mean = a.sum / a.observations
+				return [
+					name,
+					{
+						observations: a.observations,
+						meanDelta: a.delta / a.observations,
+						mean,
+						deviation: Math.sqrt(
+							Math.max(0, a.squares / a.observations - mean * mean),
+						),
+						lowerCapShare: a.lower / a.observations,
+						upperCapShare: a.upper / a.observations,
+					},
+				]
+			}),
 		),
 		weakCrownYears: {
 			regency: rows.filter((row) => row.regency).length,
@@ -337,7 +567,7 @@ function summarize({
 		},
 		effects,
 	}
-	tracker.samples = []
+	Object.assign(tracker, PEOPLE_TRAITS_REPORT.tracker())
 	return result
 }
 function validate({ engine }: ValidateCharacterParams): number {
@@ -345,8 +575,8 @@ function validate({ engine }: ValidateCharacterParams): number {
 	for (let person = 0; person < table.birth.length; person++) {
 		const character = CHARACTER.of({ people: engine.people, person })
 		const traits = TRAITS.draw({ table, person })
-		const attributes = ATTRIBUTES.draw({ table, person, character })
-		for (const name of ["bases", "education"] as const)
+		const attributes = ATTRIBUTES.draw({ table, person })
+		for (const name of ["bases"] as const)
 			if (character[name] !== attributes[name])
 				throw new Error(
 					`Person ${person}: ${name} does not match final parents`,

@@ -128,4 +128,4 @@ A Rival vassal refuses its overlord's war call and withholds tribute. A Suspicio
 
 ## Character effects
 
-Governor diplomacy adds `clamp(-0.01 × (diplomacy - 6.3), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and Poor/Grave health. See [character](character.md) for the full rules.
+Governor diplomacy adds `clamp(-0.0125 × (diplomacy - 5.5), -0.1, 0.1)` to laxity on every strength-tested rebellion. An Ambitious district holder adds 0.02; Content subtracts 0.02. Stress level 3 makes the crown weak, alongside regency and Poor/Grave health. See [character](character.md) for the full rules.

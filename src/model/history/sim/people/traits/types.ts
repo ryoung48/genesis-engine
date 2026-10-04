@@ -58,7 +58,7 @@ export type GeneState = "active" | "carried" | "none"
 export type Ladder = "intellect" | "physique" | "beauty"
 export interface Character {
 	bases: number
-	education: number
+
 	personality: number
 	grades: number
 	congenital: number

@@ -119,5 +119,4 @@ export interface TraitsView {
 	personality: PersonalityTrait[]
 	congenital: CongenitalTrait[]
 	grades: string[]
-	education: string | null
 }

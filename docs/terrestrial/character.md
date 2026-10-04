@@ -1,6 +1,6 @@
 # Character (`:history`)
 
-People have six base attributes, education, three personality traits, three congenital ladders and fifteen independently inherited congenital traits. The table stores six packed innate columns and a seventh column for stress. Pure helpers decode the columns; records preserve the innate data and stress level changes for queries at a selected date.
+People have six base attributes, three personality traits, three congenital ladders and fifteen independently inherited congenital traits. The table stores five packed innate columns and a sixth column for stress. Pure helpers decode the columns; records preserve the innate data and stress level changes for queries at a selected date.
 
 Code: `sim/people/attributes`, `traits`, `character`, `stress`; `sim/engine/governor`, `events/people/stress`, and `events/battle/command`; `record/people/query`; `test/history-run/report/people-traits`, all under `src/model/history` except the report.
 
@@ -10,17 +10,15 @@ Code: `sim/people/attributes`, `traits`, `character`, `stress`; `sim/engine/gove
 
 When royal marriage initialization changes a queen's parents and name seed, `PEOPLE.redraw` redraws her and every descendant in birth order. Existing births and dates stand; only character is recalculated. Her starting children were conceived with provisional fertility, an accepted limitation until starting-family backfill is implemented. No governor is rehomed during initialization.
 
-Packing: `bases` uses six four-bit values; `education` uses three focus bits and level above them; `personality` uses three six-bit codes; `grades` uses seven bits per ladder (active grade plus three, carried good tier, carried bad tier); `congenital` and `carried` are fifteen-bit sets. `CHARACTER.of` reads a person's packed values for pure helpers.
+Packing: `bases` uses six four-bit values; `personality` uses three six-bit codes; `grades` uses seven bits per ladder (active grade plus three, carried good tier, carried bad tier); `congenital` and `carried` are fifteen-bit sets. `CHARACTER.of` reads a person's packed values for pure helpers.
 
-## Attributes, education and personality
+## Attributes and personality
 
 
 **Base attributes** (six integer columns, 0–10).
 
 - No known parent: `floor(11u)`.
 - Otherwise `clamp(round(5 + 0.5 × (mid − 5) + (2u − 1) × 5.1), 0, 10)`, where `mid` is the parents' mean base and an unknown parent counts as 5.
-
-**Education** (`educationFocus`, `educationLevel`). The focus is the skill with the highest base, ties broken by hash. The level is 1–4 and follows CK3's childhood education-point rolls, drawn after the intellect grade is known: ten separate birth hash rolls, one for each birthday from 6 to 15, each succeeding with chance `S / (S + F)`. `S = 60`, plus 10 / 15 / 20 for an active intellect grade of +1 / +2 / +3. `F = 60`, plus 10 / 15 / 20 for an active intellect grade of −1 / −2 / −3. A carried grade contributes nothing. Each success is worth 2 points: level 1 up to 7 points, level 2 up to 12, level 3 up to 17, level 4 above that, so 0–3, 4–6, 7–8 and 9–10 successes. An ungraded person gets levels 1–4 with chance 17.2%, 65.6%, 16.1% and 1.1%. From age 16 it adds `2 × level` to the focus skill, and a martial education also adds `level` to prowess.
 
 **Personality** (three columns). All 36 CK3 personality traits, in 17 groups of opposites: 15 pairs and 2 triples. Three distinct groups are chosen by hash. Every trait has weight 1 except Eccentric, which has 0.05. Within a group each member has share `s = weight / group weight` (1/2 in a pair, 1/3 in the Compassionate triple; 48.8%, 48.8% and 2.4% for Stubborn, Fickle and Eccentric), except that when exactly one member appears among the parents that member has chance `s + 0.4 × (1 − s)` (0.7 in a pair) and the rest share the remainder in proportion to their weights. The traits become active at ages 9, 11 and 13.
 
@@ -130,9 +128,9 @@ Each parent is active (A), carrying (C) or neither (N) for the trait:
 
 **Fertility hook (FR1.2, FR1.3).** The person's fertility term in `FERTILITY.bear` is multiplied by `max(0, 1 + sum)` of the active beauty grade, congenital, Lustful and Chaste fertility values in the tables above. Carried traits do nothing. This is the first DP1 step that changes outcomes, so it gets its own report.
 
-**Effective attribute** (`ATTRIBUTES.effective`, pure; not stored): form the additive sum of base, education, active personality, grades, congenital and cumulative condition modifiers; multiply it by `max(0, 1 + sum of applicable condition percentage modifiers)`, then floor the result at 0. Incapacity overrides all six values to 0. This supports percentage prowess/skill losses without applying them twice. Tiers: 0–4 Terrible, 5–8 Poor, 9–12 Average, 13–16 Good, 17+ Excellent.
+**Effective attribute** (`ATTRIBUTES.effective`, pure; not stored): form the additive sum of base, active personality, grades, congenital and cumulative condition modifiers; multiply it by `max(0, 1 + sum of applicable condition percentage modifiers)`, then floor the result at 0. Incapacity overrides all six values to 0. This supports percentage prowess/skill losses without applying them twice. Tiers: 0–4 Terrible, 5–8 Poor, 9–10 Average, 11–13 Good, 14+ Excellent.
 
-**Neutral points** (`ATTRIBUTES.neutral`): diplomacy 6.3, martial 6.2, stewardship 6.2, intrigue 6.5, learning 6.8.
+**Neutral points** (`ATTRIBUTES.neutral`): diplomacy 5.5, martial 5.4, stewardship 5.4, intrigue 5.7, learning 6.0; prowess stays 5.
 
 ## Governors and attribute effects
 
@@ -140,12 +138,14 @@ Each parent is active (A), carrying (C) or neither (N) for the trait:
 
 | | Hook | Formula |
 |---|---|---|
-| DP3.1 | `rebel` laxity (`war/index.ts`), both call sites and `weakCrownRevolt` | laxity `+= clamp(−0.01 × d(diplomacy), −0.1, 0.1)` for the overlord |
-| DP3.1 | `candidate` strength (`succession/systems`) | `+= 0.02 × d(diplomacy)` of the candidate |
-| DP3.2 | `attackerMultiplier` / `defenderMultiplier` passed to `MILITARY.fight` | `× clamp(1 + 0.02 × d(martial), 0.87, 1.21)` for each side's war leader |
-| DP3.3 | `ECONOMY.revenue` at read (the realm cache is keyed on hierarchy and census versions, not on the ruler); `surplus` reads through it | `× clamp(1 + 0.02 × d(stewardship), 0.87, 1.21)` |
-| DP3.4 | `usurpChance` (`succession/index.ts`) | `× clamp(1 + 0.1 × d(intrigue), 0.5, 2)` for the regent |
-| DP3.5 | `own` term in `KNOWLEDGE.advanceKnowledge`, passed in by the caller per sovereign | `× clamp(1 + 0.01 × d(learning), 0.93, 1.10)` |
+| DP3.1 | `rebel` laxity (`war/index.ts`), both call sites and `weakCrownRevolt` | laxity `+= clamp(−0.0125 × d(diplomacy), −0.1, 0.1)` for the overlord |
+| DP3.1 | `candidate` strength (`succession/systems`) | `+= 0.025 × d(diplomacy)` of the candidate |
+| DP3.2 | `attackerMultiplier` / `defenderMultiplier` passed to `MILITARY.fight` | `× clamp(1 + 0.025 × d(martial), 0.87, 1.21)` for each side's war leader |
+| DP3.3 | `ECONOMY.revenue` at read (the realm cache is keyed on hierarchy and census versions, not on the ruler); `surplus` reads through it | `× clamp(1 + 0.025 × d(stewardship), 0.87, 1.21)` |
+| DP3.4 | `usurpChance` (`succession/index.ts`) | `× clamp(1 + 0.125 × d(intrigue), 0.5, 2)` for the regent |
+| DP3.5 | `own` term in `KNOWLEDGE.advanceKnowledge`, passed in by the caller per sovereign | `× clamp(1 + 0.0125 × d(learning), 0.93, 1.10)` |
+
+The attribute rates are 1.25 times the previous CK3 per-point values. Removing the former focus bonus narrows the skill distribution; this factor preserves the observed spread of applied outcomes while caps remain unchanged. Neutral points shift down by 0.8, and tier bands narrow to retain useful ruler shares.
 
 ## Personality decisions
 
@@ -182,18 +182,22 @@ A `stress` column (0–400), stepped by `PEOPLE_EVENTS.runYear` as its first act
 Stress for anyone who is not a sovereign ruler is 0 from the first step after they stop ruling. `plans/people-4-health-lifecycle.md` later adds the ageing-condition stress factors and reads the stress level in Withering Mind progression.
 
 
-Trait consumers use `TRAITS.modifier` to sum only the requested attribute or scalar value, and `TRAITS.has` checks the packed personality slots directly. These reads preserve the personality age gates and grade contributions without constructing a full modifier object. Fertility reads these values once per eligible couple pass, after the age and living-child gates. Report samples reuse ruler attributes when the ruler is also the governor. No persistent modifier cache is added. Personality generation selects the lowest three group rolls with stable insertion, reads inherited membership from two bit masks, and reuses fixed weights and inheritance chances. Base attributes read each parent once and collect education ties in the same pass. A zero-stress person with no current stressors or bereavement skips trait-factor evaluation. These allocation reductions preserve every hash draw and tie order.
+Trait consumers use `TRAITS.modifier` to sum only the requested attribute or scalar value, and `TRAITS.has` checks the packed personality slots directly. These reads preserve the personality age gates and grade contributions without constructing a full modifier object. Fertility reads these values once per eligible couple pass, after the age and living-child gates. Report samples reuse ruler attributes when the ruler is also the governor. No persistent modifier cache is added. Personality generation selects the lowest three group rolls with stable insertion, reads inherited membership from two bit masks, and reuses fixed weights and inheritance chances. Base attributes read each parent once. A zero-stress person with no current stressors or bereavement skips trait-factor evaluation. These allocation reductions preserve the remaining hash channels and personality tie order.
 
 ## Record, wiki and diagnostics
 
-The person query returns attributes and tiers, age-gated personality and education, visible congenital traits and grades, and the last stress level change at or before the selected date. The page renders an Attributes group, trait chips and a stress row for a current ruler. Carried traits have no visible effect.
+The person query returns attributes and tiers, age-gated personality, visible congenital traits and grades, and the last stress level change at or before the selected date. The page renders an Attributes group, trait chips and a stress row for a current ruler. Carried traits have no visible effect.
 
-Annual report samples measure sovereign ruler attribute means, deviations and tiers; personality, grade and congenital shares; stress-level shares and weak crowns by cause. Recorded births in each window supply carrier shares. Effect diagnostics compare diplomacy, stewardship, intrigue and learning terciles, martial difference signs and war-chance bands. Regent-year exposures accompany usurpation counts. Knowledge diagnostics sample the annual own-advance term, excluding diffusion. Counts describe the run; wealth, force, realm size and tenure confound raw population comparisons.
+The character report has separate `rulers` and `people` populations, each split into `all`, `adults` (16+) and `minors`. Each nonempty group reports attribute means, deviations, tiers and 0–37 histograms; active personality, grade, congenital and carried shares; and stress-level shares. Empty groups contain only `observations: 0`. Rulers are sampled per sovereign seat yearly, so their observations count ruler-years. Everyone alive, including rulers, is sampled every tenth year relative to the run start; these observations count person-samples. `people.all.stressedNonRulers` counts sampled people with raw stress above zero and no sovereign seat, including stale values before the next stress step.
+
+`enrichment` compares distinct adult sovereign rulers with other adults on those same ten-year dates. It gives both populations' observations and distributions plus differences in attribute means and personality, grade and congenital shares. This is descriptive enrichment: dynasty, fertility and survival also differ, so it cannot isolate selection.
+
+`hookEffects` measures applied values after caps, their mean and deviation, mean attribute-minus-neutral delta, and cap shares. Laxity, battle, revenue and knowledge use each sovereign realm's governor yearly (including regents and councils). Usurpation uses relative/protector regent-years. The uncapped `candidateProxy` samples district holders yearly; it does not measure actual election candidates and carries no spread acceptance criterion. All distributions accumulate counters rather than retaining person-sample rows. Existing effect diagnostics retain realm observations for tercile comparisons; weak-crown causes remain unchanged. Knowledge diagnostics exclude diffusion.
 
 History report output preserves completed report folders; the runner does not prune earlier baselines.
 
 ## Sources and deferred consumers
 
-The trait names, modifiers, education rules and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt`, `common/scripted_effects/00_education_effects.txt`, `common/script_values/00_stress_values.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Hook caps and the annual stress cadence are simulation design choices documented in the character plan.
+The trait names, modifiers and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt`, `common/script_values/00_stress_values.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Hook caps and the annual stress cadence are simulation design choices documented in the character plan.
 
 Health, attraction and role-scoped opinion values are data only in this stage. Health/lifespan and marriage selection remain unchanged. Ageing conditions can supply cumulative additive and percentage attribute modifiers, incapacity, and stress gain/loss modifiers through the existing pure helper parameters. No condition is applied yet. Mental breaks, stress deaths, childhood skill rolls, lifestyle perks, inbreeding and old-record compatibility are excluded.

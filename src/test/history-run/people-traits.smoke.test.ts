@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { expect, it } from "vitest"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
@@ -20,6 +21,11 @@ import { TRAITS } from "@/model/history/sim/people/traits"
 import { HASH } from "@/model/shared/random/hash"
 import { RNG } from "@/model/shared/random/rng"
 import { HISTORY_RUN } from "@/test/history-run"
+import { LADDER_EXPERIMENT } from "@/test/history-run/ladder-experiment"
+import type {
+	LadderGrade,
+	LadderRules,
+} from "@/test/history-run/ladder-experiment/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
 
 it("reproduces spawn's original shared random draws and redraw consumes none", () => {
@@ -45,12 +51,10 @@ it("reproduces spawn's original shared random draws and redraw consumes none", (
 	PEOPLE.redraw({ people, person })
 	expect(rng.random()).toBe(control.random())
 })
-it("draws valid, reproducible character and expected founder personality and education distributions", () => {
+it("draws valid, reproducible character and expected founder personality distributions", () => {
 	const people = PEOPLE.create(1)
 	const rng = RNG.createRng({ seed: 721 })
 	const frequencies = new Map<string, number>()
-	const education = [0, 0, 0, 0]
-	let ungraded = 0
 	for (let person = 0; person < 20000; person++) {
 		PEOPLE.spawn({
 			people,
@@ -69,9 +73,9 @@ it("draws valid, reproducible character and expected founder personality and edu
 			congenital: character.congenital,
 			carried: character.carried,
 		})
-		expect(
-			ATTRIBUTES.draw({ table: people.persons, person, character }),
-		).toEqual({ bases: character.bases, education: character.education })
+		expect(ATTRIBUTES.draw({ table: people.persons, person })).toEqual({
+			bases: character.bases,
+		})
 		for (let i = 0; i < 6; i++)
 			expect((character.bases >>> (i * 4)) & 15).toBeLessThanOrEqual(10)
 		const traits = TRAITS.active({ character, age: 16 })
@@ -100,10 +104,6 @@ it("draws valid, reproducible character and expected founder personality and edu
 				true,
 			)
 		}
-		if (TRAITS.grade({ character, ladder: "intellect" }).active === 0) {
-			ungraded++
-			education[ATTRIBUTES.education({ character }).level - 1]++
-		}
 	}
 	expect(frequencies.size).toBe(36)
 	for (const [trait, count] of frequencies) {
@@ -111,8 +111,6 @@ it("draws valid, reproducible character and expected founder personality and edu
 		expect(share).toBeGreaterThan(trait === "eccentric" ? 0.002 : 0.04)
 		expect(share).toBeLessThan(trait === "eccentric" ? 0.01 : 0.11)
 	}
-	for (const [index, target] of [0.172, 0.656, 0.161, 0.011].entries())
-		expect(Math.abs(education[index] / ungraded - target)).toBeLessThan(0.02)
 })
 it("inherits active and carried single traits with conditional carrier probabilities", () => {
 	const people = PEOPLE.create(1)
@@ -177,12 +175,12 @@ it("redraws descendants from final parents in birth order, leaving births and sh
 			congenital: character.congenital,
 			carried: character.carried,
 		})
-		expect(
-			ATTRIBUTES.draw({ table: people.persons, person, character }),
-		).toEqual({ bases: character.bases, education: character.education })
+		expect(ATTRIBUTES.draw({ table: people.persons, person })).toEqual({
+			bases: character.bases,
+		})
 	}
 })
-it("gates personality and education by age and reads stress at the selected time", () => {
+it("gates personality by age and reads stress at the selected time", () => {
 	const people = PEOPLE.create(1)
 	const rng = RNG.createRng({ seed: 221 })
 	const id = PEOPLE.spawn({
@@ -223,14 +221,6 @@ it("gates personality and education by age and reads stress at the selected time
 		{ person: id, timeMs: 21 * STATE.yearMs, level: 0 },
 	])
 	expect(
-		PERSON_QUERY.traits({ people: record, id, timeMs: 15 * STATE.yearMs })
-			?.education,
-	).toBeNull()
-	expect(
-		PERSON_QUERY.traits({ people: record, id, timeMs: 16 * STATE.yearMs })
-			?.education,
-	).not.toBeNull()
-	expect(
 		PERSON_QUERY.attributes({ people: record, id, timeMs: 16 * STATE.yearMs }),
 	).toHaveLength(6)
 	expect(
@@ -243,10 +233,85 @@ it("gates personality and education by age and reads stress at the selected time
 		PERSON_QUERY.stress({ people: record, id, timeMs: 21 * STATE.yearMs }),
 	).toBe(0)
 })
+it("uses final neutral points, hook rates, tier bands and age-independent adult attributes", () => {
+	const neutralPoints = {
+		diplomacy: 5.5,
+		martial: 5.4,
+		stewardship: 5.4,
+		intrigue: 5.7,
+		learning: 6,
+		prowess: 5,
+	}
+	const rates = {
+		diplomacy: -0.0125,
+		martial: 0.025,
+		stewardship: 0.025,
+		intrigue: 0.125,
+		learning: 0.0125,
+	}
+	expect(GOVERNOR.candidateStrength(5.5)).toBe(0)
+	expect(GOVERNOR.candidateStrength(6.5)).toBe(0.025)
+	for (const attribute of Object.keys(
+		neutralPoints,
+	) as (keyof typeof neutralPoints)[])
+		expect(ATTRIBUTES.neutral(attribute)).toBe(neutralPoints[attribute])
+	for (const attribute of Object.keys(rates) as (keyof typeof rates)[]) {
+		const centre = attribute === "diplomacy" ? 0 : 1
+		expect(
+			GOVERNOR.factor({ attribute, value: neutralPoints[attribute] }),
+		).toBe(centre)
+		expect(
+			GOVERNOR.factor({ attribute, value: neutralPoints[attribute] + 1 }),
+		).toBeCloseTo(centre + rates[attribute], 14)
+		for (let value = 0; value < 40; value++) {
+			const first = GOVERNOR.factor({ attribute, value })
+			const second = GOVERNOR.factor({ attribute, value: value + 1 })
+			expect(
+				attribute === "diplomacy" ? second <= first : second >= first,
+			).toBe(true)
+		}
+	}
+	for (const [value, tier] of [
+		[4, "Terrible"],
+		[5, "Poor"],
+		[7, "Poor"],
+		[8, "Poor"],
+		[9, "Average"],
+		[10, "Average"],
+		[11, "Good"],
+		[13, "Good"],
+		[14, "Excellent"],
+	] as const)
+		expect(ATTRIBUTES.tier(value)).toBe(tier)
+	const character = {
+		bases: 0x555555,
+		personality: 0 | (18 << 6) | (20 << 12),
+		grades: 49539,
+		congenital: 0,
+		carried: 0,
+	}
+	for (const attribute of Object.keys(
+		neutralPoints,
+	) as (keyof typeof neutralPoints)[]) {
+		const value = ATTRIBUTES.effective({
+			character,
+			attribute,
+			age: 16,
+			conditions: [],
+		})
+		expect(value).toBe(
+			ATTRIBUTES.base({ character, attribute }) +
+				TRAITS.modifier({ character, age: 16, modifier: attribute }),
+		)
+		expect(value).toBe(
+			ATTRIBUTES.effective({ character, attribute, age: 15, conditions: [] }),
+		)
+	}
+})
 it("scales stress, caps levels and decays in peace", () => {
 	const character = {
 		bases: 0,
-		education: 8,
+
 		personality: 1 | (3 << 6) | (18 << 12),
 		grades: 49539,
 		congenital: 0,
@@ -365,7 +430,7 @@ it("hash channels and event salts separate deterministic rolls", () => {
 it("adds cumulative conditions before applying percentage losses once and overrides incapacity", () => {
 	const character = {
 		bases: 10,
-		education: 8,
+
 		personality: 0,
 		grades: 49539,
 		congenital: 0,
@@ -437,7 +502,6 @@ it("stores both carried grade sides and handles promotion above or up to the car
 		let character = {
 			...TRAITS.draw({ table, person: 2 }),
 			bases: 0,
-			education: 8,
 		}
 		expect(TRAITS.grade({ character, ladder: "intellect" })).toEqual({
 			active: 0,
@@ -451,7 +515,7 @@ it("stores both carried grade sides and handles promotion above or up to the car
 				: [200, 203].includes(params.channel)
 					? 0.99
 					: original(params)
-		character = { ...TRAITS.draw({ table, person: 2 }), bases: 0, education: 8 }
+		character = { ...TRAITS.draw({ table, person: 2 }), bases: 0 }
 		expect(TRAITS.grade({ character, ladder: "intellect" })).toEqual({
 			active: 2,
 			good: 3,
@@ -463,7 +527,7 @@ it("stores both carried grade sides and handles promotion above or up to the car
 				: [200, 201, 203].includes(params.channel)
 					? 0.99
 					: original(params)
-		character = { ...TRAITS.draw({ table, person: 2 }), bases: 0, education: 8 }
+		character = { ...TRAITS.draw({ table, person: 2 }), bases: 0 }
 		expect(TRAITS.grade({ character, ladder: "intellect" })).toEqual({
 			active: 2,
 			good: 0,
@@ -489,7 +553,6 @@ it("a Genius parent transmits Genius in a quarter of draws and an active good si
 		const character = {
 			...TRAITS.draw({ table, person: 2 }),
 			bases: 0,
-			education: 8,
 		}
 		const grade = TRAITS.grade({ character, ladder: "intellect" })
 		if (grade.active === 3) geniuses++
@@ -696,7 +759,7 @@ it("steps personal unions once, resets subjects without a holder change, and cou
 it("reads scalar trait modifiers without changing age gates or grade contributions", () => {
 	const character = {
 		bases: 0,
-		education: 0,
+
 		personality: 2 | (11 << 6) | (12 << 12),
 		grades: 6 | (1 << 7) | (6 << 14),
 		congenital: (1 << 10) | (1 << 12),
@@ -755,14 +818,14 @@ it("preserves the reference character draw across 20000 founders and descendants
 		const attributes = ATTRIBUTES.draw({
 			table,
 			person,
-			character: CHARACTER.of({ people, person }),
 		})
 		table.bases.push(attributes.bases)
-		table.education.push(attributes.education)
-		digest.update(JSON.stringify(CHARACTER.of({ people, person })))
+
+		const innate = CHARACTER.of({ people, person })
+		digest.update(JSON.stringify(innate))
 	}
 	expect(digest.digest("hex")).toBe(
-		"0ec4e50acf0a30f3c86bf61836bf7ad076119dc1c1dbf22222cc934b8e761900",
+		"e67b54fee939e789cbbd7e57fb10e4090d56961c45f244890576f09d4e07baf9",
 	)
 })
 it("keeps personality group order stable when group hash rolls tie", () => {
@@ -781,3 +844,243 @@ it("keeps personality group order stable when group hash rolls tie", () => {
 		HASH.unit = unit
 	}
 })
+
+it("samples living populations on matched dates and measures capped governors including regents and councils", () => {
+	const { engine } = HISTORY_RUN.createEngine({
+		seed: 14963991,
+		era: "lateMedieval",
+		numPoints: 30000,
+	})
+	const start = engine.time / STATE.yearMs
+	const ids = engine.people.alive.slice(0, 4)
+	const table = engine.people.persons
+	const seats = Array.from(engine.people.rulerOf.keys()).filter((p) =>
+		STATE.isSovereign({ state: engine, p }),
+	)
+	engine.people.rulerOf.fill(-1)
+	engine.people.alive = ids
+	engine.people.regencies.clear()
+	for (const [i, person] of ids.entries()) {
+		table.birth[person] = start - [30, 10, 40, 8][i]
+		table.bases[person] = [2, 4, 10, 8][i] * 0x111111
+		table.personality[person] = 0 | (18 << 6) | (20 << 12)
+		table.grades[person] = 49539
+
+		table.congenital[person] = 0
+		table.carried[person] = 0
+		table.stress[person] = i === 2 ? 110 : 0
+		table.throne[person] = -1
+	}
+	table.grades[ids[2]] = 49542 | (2 << 5)
+	table.congenital[ids[2]] = 2
+	table.carried[ids[2]] = 1
+	engine.people.rulerOf[seats[2]] = ids[3]
+	engine.parentCurrent[seats[2]] = seats[0]
+	table.throne[ids[3]] = seats[2]
+	engine.people.rulerOf[seats[0]] = ids[0]
+	engine.people.rulerOf[seats[1]] = ids[1]
+	engine.people.regencies.set(seats[0], {
+		ward: ids[0],
+		regent: -1,
+		kind: "council",
+	})
+	engine.people.regencies.set(seats[1], {
+		ward: ids[1],
+		regent: ids[2],
+		kind: "relative",
+	})
+	const tracker = PEOPLE_TRAITS_REPORT.tracker()
+	PEOPLE_TRAITS_REPORT.sample({ engine, tracker, start })
+	const report = PEOPLE_TRAITS_REPORT.summarize({
+		engine,
+		tracker,
+		from: start,
+		to: start + 1,
+	})
+	expect(report.rulers.all.observations).toBe(2)
+	expect(report.rulers.adults.observations).toBe(1)
+	expect(report.rulers.minors.observations).toBe(1)
+	expect(report.people.all.observations).toBe(4)
+	expect(report.people.adults.observations).toBe(2)
+	expect(report.people.minors.observations).toBe(2)
+	expect(report.enrichment.rulers.observations).toBe(1)
+	expect(report.enrichment.others.observations).toBe(1)
+	const all = report.people.all
+	if (!("attributes" in all)) throw new Error("Missing population")
+	expect(all.stressedNonRulers).toBe(1)
+	const expected = {
+		diplomacy: [4, 4, 17, 8],
+		martial: [4, 6, 17, 8],
+		stewardship: [2, 4, 15, 8],
+		intrigue: [0, 4, 11, 8],
+		learning: [2, 4, 15, 8],
+		prowess: [5, 7, 9, 8],
+	}
+	for (const name of Object.keys(expected) as (keyof typeof expected)[]) {
+		const values = expected[name]
+		const mean = values.reduce((sum, value) => sum + value, 0) / 4
+		expect(all.attributes[name].mean).toBe(mean)
+		expect(all.attributes[name].deviation).toBeCloseTo(
+			Math.sqrt(
+				values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / 4,
+			),
+			12,
+		)
+		expect(all.attributes[name].histogram).toEqual(
+			Array.from(
+				Array(38).keys(),
+				(bin) => values.filter((value) => value === bin).length,
+			),
+		)
+		for (const tier of ["Terrible", "Poor", "Average", "Good", "Excellent"])
+			expect(all.attributes[name].tierShares[tier]).toBe(
+				values.filter((value) => ATTRIBUTES.tier(value) === tier).length / 4,
+			)
+	}
+	expect(all.personalityShares).toEqual({
+		brave: 0.75,
+		humble: 0.5,
+		honest: 0.5,
+	})
+	expect(all.gradeShares).toEqual({ Genius: 0.25 })
+	expect(all.congenitalShares).toEqual({ dwarf: 0.25 })
+	expect(all.carriedShares).toEqual({ "intellect.bad.2": 0.25, giant: 0.25 })
+	expect(all.stressLevelShares).toEqual([0.75, 0.25, 0, 0])
+	for (const [hook, attribute, value] of [
+		["laxity", "diplomacy", 17],
+		["battle", "martial", 17],
+		["revenue", "stewardship", 15],
+		["knowledge", "learning", 15],
+	] as const) {
+		const values = [5, value].map((value) =>
+			GOVERNOR.factor({ attribute, value }),
+		)
+		const mean = (values[0] + values[1]) / 2
+		expect(report.hookEffects[hook].observations).toBe(2)
+		expect(report.hookEffects[hook].meanDelta).toBe(
+			(5 + value) / 2 - ATTRIBUTES.neutral(attribute),
+		)
+		expect(report.hookEffects[hook].mean).toBe(mean)
+		expect(report.hookEffects[hook].deviation).toBeCloseTo(
+			Math.abs(values[1] - values[0]) / 2,
+			10,
+		)
+		expect(report.hookEffects[hook].lowerCapShare).toBe(
+			hook === "laxity" ? 0.5 : 0,
+		)
+		expect(report.hookEffects[hook].upperCapShare).toBe(
+			hook === "laxity" ? 0 : 0.5,
+		)
+	}
+	expect(report.hookEffects.usurpation.observations).toBe(1)
+	expect(report.hookEffects.usurpation.mean).toBe(
+		GOVERNOR.factor({ attribute: "intrigue", value: 11 }),
+	)
+	expect(report.hookEffects.usurpation.upperCapShare).toBe(0)
+	expect(report.hookEffects.candidateProxy.mean).toBe(
+		GOVERNOR.candidateStrength(8),
+	)
+	expect(report.hookEffects.candidateProxy.lowerCapShare).toBe(0)
+	expect(report.hookEffects.candidateProxy.upperCapShare).toBe(0)
+	expect(report.enrichment.gradeDifferences).toEqual({ Genius: -1 })
+	expect(report.enrichment.congenitalDifferences).toEqual({ dwarf: -1 })
+	engine.time += STATE.yearMs
+	PEOPLE_TRAITS_REPORT.sample({ engine, tracker, start })
+	const offGrid = PEOPLE_TRAITS_REPORT.summarize({
+		engine,
+		tracker,
+		from: start + 1,
+		to: start + 2,
+	})
+	expect(offGrid.people.adults).toEqual({ observations: 0 })
+	expect(offGrid.people.minors).toEqual({ observations: 0 })
+	expect(offGrid.enrichment.rulers).toEqual({ observations: 0 })
+	expect(offGrid.enrichment.others).toEqual({ observations: 0 })
+	expect(offGrid.rulers.all.observations).toBe(2)
+}, 120000)
+
+it("validates the experimental ladder against production over 100000 legal parent cases and three ladders", () => {
+	const states: LadderGrade[] = []
+	for (let active = -3; active <= 3; active++)
+		for (let good = 0; good <= 3; good++)
+			for (let bad = 0; bad <= 3; bad++)
+				if (
+					(!good || good > Math.max(0, active)) &&
+					(!bad || bad > Math.max(0, -active))
+				)
+					states.push({ active, good, bad })
+	const { persons: table } = PEOPLE.create(1)
+	table.father = [-1, -1, 0]
+	table.mother = [-1, -1, 1]
+	table.personality = [0, 0, 0]
+	table.congenital = [0, 0, 0]
+	table.carried = [0, 0, 0]
+	const pack = (value: LadderGrade) =>
+		((value.active + 3) | (value.good << 3) | (value.bad << 5)) *
+		(1 + (1 << 7) + (1 << 14))
+	for (let i = 0; i < 100000; i++) {
+		const first = states[i % states.length]
+		const second = states[Math.floor(i / states.length) % states.length]
+		const seed =
+			1 +
+			Math.floor(
+				HASH.unit({ seed: 14963991, channel: 999, salt: i }) * 0x7ffffffe,
+			)
+		table.nameSeed[2] = seed
+		table.grades = [pack(first), pack(second), 49539]
+		const production = TRAITS.draw({ table, person: 2 })
+		for (const [index, ladder] of (
+			["intellect", "physique", "beauty"] as const
+		).entries()) {
+			const experimental = LADDER_EXPERIMENT.draw({
+				seed,
+				channel: 200 + index * 30,
+				first,
+				second,
+				birth:
+					ladder === "intellect"
+						? [0.005, 0.0025, 0.0005]
+						: [0.005, 0.0025, 0.0015],
+				rules: {
+					higherTierParent: "active",
+					lowerTierParent: "carrier",
+					sideOrder: "goodFirst",
+				},
+			})
+			expect(experimental).toEqual(
+				TRAITS.grade({ character: production, ladder }),
+			)
+		}
+	}
+}, 120000)
+it("measures twelve inheritance alternatives on fixed seeds and random mating without selection", () => {
+	const runs = []
+	for (const higherTierParent of ["active", "none"] as const)
+		for (const lowerTierParent of [
+			"carrier",
+			"reducedCarrier",
+			"none",
+		] as const)
+			for (const sideOrder of ["goodFirst", "independent"] as const) {
+				const rules: LadderRules = {
+					higherTierParent,
+					lowerTierParent,
+					sideOrder,
+				}
+				const generations = LADDER_EXPERIMENT.simulate({ rules })
+				runs.push({ rules, generations })
+				console.log(JSON.stringify({ rules, generations }))
+			}
+	const directory =
+		process.env.LADDER_OUT ??
+		`stats/history/${new Date().toISOString().replaceAll(":", "-").replace(".", "-")}-people-1a-ladder`
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(
+		`${directory}/ladder-experiment.json`,
+		JSON.stringify(
+			{ seed: 14963991, population: 40000, generations: 32, runs },
+			null,
+			2,
+		),
+	)
+}, 3600000)

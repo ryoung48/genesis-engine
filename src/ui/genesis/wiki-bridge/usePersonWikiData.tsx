@@ -231,7 +231,6 @@ export function usePersonWikiData(
 					...characterTraits.personality,
 					...characterTraits.grades,
 					...characterTraits.congenital,
-					...(characterTraits.education ? [characterTraits.education] : []),
 				]
 			: []
 		const timelineEvents: WikiTimelineEvent[] = []

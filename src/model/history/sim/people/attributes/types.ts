@@ -16,7 +16,6 @@ export type AttributeTier =
 	| "Average"
 	| "Good"
 	| "Excellent"
-export type EducationLevel = 1 | 2 | 3 | 4
 export interface AttributeModifier {
 	additions: Record<Attribute, number>
 	percentages: Record<Attribute, number>
@@ -26,16 +25,7 @@ export interface EffectiveParams extends TraitAtParams {
 	conditions: readonly AttributeModifier[]
 	attribute: Attribute
 }
-export interface EducationParams {
-	character: Character
-}
-export interface Education {
-	focus: Exclude<Attribute, "prowess">
-	level: EducationLevel
-}
-export interface AttributeDrawParams extends DrawTraitsParams {
-	character: Character
-}
+export type AttributeDrawParams = DrawTraitsParams
 
 export interface BaseParams {
 	character: Pick<Character, "bases">

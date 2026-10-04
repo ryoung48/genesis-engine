@@ -3,8 +3,6 @@ import type {
 	AttributeDrawParams,
 	AttributeTier,
 	BaseParams,
-	Education,
-	EducationParams,
 	EffectiveParams,
 } from "@/model/history/sim/people/attributes/types"
 import { TRAITS } from "@/model/history/sim/people/traits"
@@ -19,21 +17,19 @@ const NAMES = [
 	"prowess",
 ] as const
 const NEUTRAL = {
-	diplomacy: 6.3,
-	martial: 6.2,
-	stewardship: 6.2,
-	intrigue: 6.5,
-	learning: 6.8,
+	diplomacy: 5.5,
+	martial: 5.4,
+	stewardship: 5.4,
+	intrigue: 5.7,
+	learning: 6.0,
 	prowess: 5,
 }
-function draw({ table, person, character }: AttributeDrawParams) {
+function draw({ table, person }: AttributeDrawParams) {
 	const seed = table.nameSeed[person]
 	let bases = 0
 	const father = table.father[person]
 	const mother = table.mother[person]
 	const founders = father < 0 && mother < 0
-	let best = -1
-	const focuses: number[] = []
 	for (let index = 0; index < NAMES.length; index++) {
 		const u = HASH.unit({ seed, channel: 1 + index, salt: 0 })
 		const mid =
@@ -47,36 +43,8 @@ function draw({ table, person, character }: AttributeDrawParams) {
 					Math.min(10, Math.round(5 + 0.5 * (mid - 5) + (2 * u - 1) * 5.1)),
 				)
 		bases |= value << (index * 4)
-		if (index >= 5) continue
-		if (value > best) {
-			best = value
-			focuses.length = 0
-		}
-		if (value === best) focuses.push(index)
 	}
-	const focus =
-		focuses[
-			Math.floor(HASH.unit({ seed, channel: 10, salt: 0 }) * focuses.length)
-		]
-	const intellect = TRAITS.grade({ character, ladder: "intellect" }).active
-	const bonus = [0, 10, 15, 20][Math.abs(intellect)]
-	const success = 60 + (intellect > 0 ? bonus : 0)
-	const failure = 60 + (intellect < 0 ? bonus : 0)
-	let successes = 0
-	for (let i = 0; i < 10; i++)
-		if (
-			HASH.unit({ seed, channel: 20 + i, salt: 0 }) <
-			success / (success + failure)
-		)
-			successes++
-	const level = successes <= 3 ? 1 : successes <= 6 ? 2 : successes <= 8 ? 3 : 4
-	return { bases, education: focus | (level << 3) }
-}
-function education({ character }: EducationParams): Education {
-	return {
-		focus: NAMES[character.education & 7] as Education["focus"],
-		level: (character.education >>> 3) as Education["level"],
-	}
+	return { bases }
 }
 function base({ character, attribute }: BaseParams): number {
 	return (character.bases >>> (NAMES.indexOf(attribute) * 4)) & 15
@@ -88,12 +56,6 @@ function effective({
 	conditions,
 }: EffectiveParams): number {
 	let value = base({ character, attribute })
-	const focus = NAMES[character.education & 7]
-	const level = character.education >>> 3
-	if (age >= 16) {
-		if (focus === attribute) value += 2 * level
-		if (attribute === "prowess" && focus === "martial") value += level
-	}
 	if (conditions.some((condition) => condition.incapable)) return 0
 	value += TRAITS.modifier({ character, age, modifier: attribute })
 	let percentage = 0
@@ -108,9 +70,9 @@ function tier(value: number): AttributeTier {
 		? "Terrible"
 		: value <= 8
 			? "Poor"
-			: value <= 12
+			: value <= 10
 				? "Average"
-				: value <= 16
+				: value <= 13
 					? "Good"
 					: "Excellent"
 }
@@ -123,5 +85,4 @@ export const ATTRIBUTES = {
 	effective,
 	tier,
 	neutral,
-	education,
 }

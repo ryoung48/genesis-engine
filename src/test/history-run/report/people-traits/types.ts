@@ -17,6 +17,10 @@ export interface CharacterSample {
 }
 export interface CharacterTracker {
 	samples: CharacterSample[]
+	rulers: PopulationAccumulator
+	people: PopulationAccumulator
+	enrichment: { rulers: GroupAccumulator; others: GroupAccumulator }
+	hooks: Record<string, HookAccumulator>
 }
 export interface CharacterReportParams {
 	engine: HistoryState
@@ -27,30 +31,101 @@ export interface CharacterReportParams {
 export interface CharacterSampleParams {
 	engine: HistoryState
 	tracker: CharacterTracker
-}
-export interface DistributionParams {
-	values: number[]
+	start: number
 }
 export interface CharacterDistribution {
 	mean: number
 	deviation: number
 	tierShares: Record<string, number>
+	histogram: number[]
 }
-export interface CharacterReport {
-	rulerYears: number
+export type CharacterGroup = { observations: 0 } | CharacterGroupStatistics
+export interface CharacterGroupStatistics {
+	observations: number
 	attributes: Record<Attribute, CharacterDistribution>
 	personalityShares: Record<string, number>
 	gradeShares: Record<string, number>
 	congenitalShares: Record<string, number>
 	carriedShares: Record<string, number>
-	recordedBirths: number
 	stressLevelShares: number[]
+}
+export interface CharacterPopulation {
+	all: CharacterGroup
+	adults: CharacterGroup
+	minors: CharacterGroup
+}
+export interface CharacterEnrichment {
+	rulers: CharacterGroup
+	others: CharacterGroup
+	attributeDifferences: Record<string, number>
+	personalityDifferences: Record<string, number>
+	gradeDifferences: Record<string, number>
+	congenitalDifferences: Record<string, number>
+}
+export interface HookEffect {
+	observations: number
+	meanDelta: number
+	mean: number
+	deviation: number
+	lowerCapShare: number
+	upperCapShare: number
+}
+export interface CharacterReport {
+	rulers: CharacterPopulation
+	people: Omit<CharacterPopulation, "all"> & {
+		all:
+			| { observations: 0 }
+			| (CharacterGroupStatistics & { stressedNonRulers: number })
+	}
+	enrichment: CharacterEnrichment
+	hookEffects: Record<string, HookEffect>
 	weakCrownYears: Record<string, number>
 	effects: Record<string, number>
 }
-export interface ShareParams {
-	values: string[][]
-	denominator: number
+export interface AttributeAccumulator {
+	sum: number
+	squares: number
+	tiers: Record<string, number>
+	histogram: number[]
+}
+export interface GroupAccumulator {
+	observations: number
+	attributes: Record<Attribute, AttributeAccumulator>
+	personality: Record<string, number>
+	grades: Record<string, number>
+	congenital: Record<string, number>
+	carried: Record<string, number>
+	stress: number[]
+	stressedNonRulers: number
+}
+export interface PopulationAccumulator {
+	all: GroupAccumulator
+	adults: GroupAccumulator
+	minors: GroupAccumulator
+}
+export interface AccumulateParams {
+	population: PopulationAccumulator
+	group: GroupAccumulator | null
+	engine: HistoryState
+	person: number
+	sovereigns: Set<number>
+}
+export interface HookAccumulator {
+	observations: number
+	delta: number
+	sum: number
+	squares: number
+	lower: number
+	upper: number
+}
+export interface HookSampleParams {
+	tracker: CharacterTracker
+	name: string
+	attribute: Attribute
+	value: number
+	lower: number
+	upper: number
+	proxy: boolean
 }
 export interface TercileParams {
 	values: number[]

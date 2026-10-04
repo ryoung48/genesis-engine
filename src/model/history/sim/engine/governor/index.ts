@@ -113,17 +113,21 @@ function factor({ attribute, value }: AttributeFactorParams): number {
 	const delta = value - ATTRIBUTES.neutral(attribute)
 	if (attribute === "diplomacy" && delta === 0) return 0
 	if (attribute === "diplomacy")
-		return Math.max(-0.1, Math.min(0.1, -0.01 * delta))
+		return Math.max(-0.1, Math.min(0.1, -0.0125 * delta))
 	if (attribute === "intrigue")
-		return Math.max(0.5, Math.min(2, 1 + 0.1 * delta))
+		return Math.max(0.5, Math.min(2, 1 + 0.125 * delta))
 	if (attribute === "learning")
-		return Math.max(0.93, Math.min(1.1, 1 + 0.01 * delta))
-	return Math.max(0.87, Math.min(1.21, 1 + 0.02 * delta))
+		return Math.max(0.93, Math.min(1.1, 1 + 0.0125 * delta))
+	return Math.max(0.87, Math.min(1.21, 1 + 0.025 * delta))
+}
+function candidateStrength(value: number): number {
+	return 0.025 * (value - ATTRIBUTES.neutral("diplomacy"))
 }
 function startsWar(params: WarStartParams): boolean {
 	return params.roll < Math.min(1, (1 - params.threat) * warChance(params))
 }
 export const GOVERNOR = {
+	candidateStrength,
 	startsWar,
 	personHas,
 	warChance,

@@ -544,7 +544,7 @@ function runSeed({
 		}
 		PARTITION_REPORT.observe({ engine, tracker: partitions })
 		trackMarriages({ engine, tracker })
-		PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker })
+		PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker, start })
 		MILITARY_REPORT.sample({
 			engine,
 			tracker: military.tracker,

@@ -7,7 +7,7 @@ export type GenderPreference = "male" | "female" | "none"
 
 export interface PersonTable {
 	bases: number[]
-	education: number[]
+
 	personality: number[]
 	grades: number[]
 	congenital: number[]

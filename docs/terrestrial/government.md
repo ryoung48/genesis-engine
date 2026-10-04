@@ -149,4 +149,4 @@ The history report's `partition` section is built from these notes (`src/test/hi
 
 ## Character effects
 
-Election candidate strength gains `0.02 × (diplomacy - 6.3)`. Regent usurpation chance gains `clamp(1 + 0.1 × (intrigue - 6.5), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [character](character.md) for the full rules.
+Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpation chance gains `clamp(1 + 0.125 × (intrigue - 5.7), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [character](character.md) for the full rules.

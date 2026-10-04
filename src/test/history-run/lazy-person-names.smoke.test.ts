@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs"
 import { createElement } from "react"
 import { renderToString } from "react-dom/server"
 import { expect, it, vi } from "vitest"
@@ -17,6 +18,7 @@ import {
 	recordPersonMention,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
+import { PersonWikiPage } from "@/ui/wiki/person/PersonWikiPage"
 
 it("generates names only for requested display data and caches them without changing raw people", () => {
 	const seed = 14963991
@@ -183,7 +185,30 @@ it("generates names only for requested display data and caches them without chan
 				house ?? "None",
 			)
 			expect(data?.timelineEvents.length).toBeGreaterThan(0)
-			return createElement("span", null, data?.name)
+			if (!data) throw new Error("Missing person page")
+			const traits = PERSON_QUERY.traits({
+				people,
+				id,
+				timeMs: state.record.maxTimeMs,
+			})
+			expect(data.traits).toEqual([
+				...(traits?.personality ?? []),
+				...(traits?.grades ?? []),
+				...(traits?.congenital ?? []),
+			])
+			expect(data.attributes).toEqual(
+				PERSON_QUERY.attributes({
+					people,
+					id,
+					timeMs: state.record.maxTimeMs,
+				}).map((entry) => ({
+					label: entry.name,
+					value: `${entry.value} · ${entry.tier}`,
+				})),
+			)
+			if (process.env.PERSON_PAGE_OUT)
+				writeFileSync(process.env.PERSON_PAGE_OUT, JSON.stringify(data))
+			return createElement(PersonWikiPage, { person: data })
 		}
 		expect(renderToString(createElement(PersonPage))).toContain(expected.name)
 		expect(rulerCalls).toBe(people.persons.size)

@@ -259,4 +259,4 @@ Rebellion previews calculate each prospective territory with the same economy an
 
 ## Character effects
 
-Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.02 × (martial - 6.2), 0.87, 1.21)`, alongside terrain and battle-kind modifiers. Sieges and raids do not use commander character. See [character](character.md) for the full rules.
+Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers. Sieges and raids do not use commander character. See [character](character.md) for the full rules.
