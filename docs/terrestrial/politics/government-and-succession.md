@@ -173,7 +173,12 @@ A reign has no end date until its ruler dies or is deposed: no death is known in
 ## Districts
 
 - **Grants.** A realm's titled direct subjects are its district seats. It grants a share of them by size: none up to 4 provinces, rising to 92% at 25+. Poor and distant seats are granted first.
-- **Who gets a new grant.** With 30% chance the ruler's closest adult, landless relative (never the heir apparent). Otherwise a new house aged 18–55.
+- **Who gets a new grant.** In order:
+  1. with 30% chance, the ruler's closest adult, landless relative (never the heir apparent);
+  2. a cadet of an established house: the closest adult, landless relative of another district holder in the realm (never that holder's heir apparent), trying the nearest district first;
+  3. a new house aged 18–55.
+
+  The cadet rule applies at world start as well. It leaves the number of district holders unchanged and founds fewer houses: on the 204,000-point benchmark (seed 14963991, 867–1800) 263,889 people are created instead of 306,287, and the sovereign count is 40–90 lower in the first three centuries and 30–50 higher in the last three. Figures from `stats/history/2026-10-05T04-09-26-764Z-district-cadets/`; one seed.
 - **Inheritance.** At the person-level death event a district passes to the next *adult* heir who holds no seat, else by the grant rule. Annual settlement does not inherit again. Minors never hold districts.
 - **Loss.** A district that stops being a direct titled subject is vacated.
 - **Revalidation.** `DISTRICTS.revalidate` is the per-seat check behind both rules: it vacates a seat that is no longer a district seat and keeps a living holder of a valid seat; affiliation follows current ownership without rewriting residence. The yearly pass runs it over every seat; a [partition](government-and-succession.md#partition) runs it over the divided realm's seats in the same succession.

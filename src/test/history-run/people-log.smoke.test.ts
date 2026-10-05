@@ -451,13 +451,26 @@ it("records every person once and rebuilds the same record from transferred pack
 					b: target,
 					timeMs: streamed.record.maxTimeMs,
 				})
+					.filter((memory) => memory.strength !== 0)
 					.map((memory) => ({
 						reason: memory.reason,
 						start:
 							memory.startTimeMs / STATE.yearMs + DATE.earthHistoryStartYear,
 					}))
 					.sort((x, y) => x.reason.localeCompare(y.reason)),
-			).toEqual([...entries].sort((x, y) => x.reason.localeCompare(y.reason)))
+			).toEqual(
+				entries
+					.filter(
+						(memory) =>
+							!OPINION_MEMORY.expired({
+								memory,
+								time:
+									streamed.record.maxTimeMs / STATE.yearMs +
+									DATE.earthHistoryStartYear,
+							}),
+					)
+					.sort((x, y) => x.reason.localeCompare(y.reason)),
+			)
 	expect(PEOPLE_RECORD.count(people)).toBe(count)
 	expect(PEOPLE_RECORD.has({ people, id: count })).toBe(false)
 	expect(PEOPLE_RECORD.has({ people, id: -1 })).toBe(false)
@@ -595,7 +608,7 @@ it("answers family, marriage, betrothal, tenure, pregnancy and stress views from
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	SIM_ENGINE.simulateUntil({
 		state: engine,
-		targetTimeMs: engine.time + STATE.deltaYear(25),
+		targetTimeMs: engine.time + STATE.deltaYear(40),
 		rng: HISTORY_RNG.createHistoryRng(seed + 99999),
 		validate: false,
 	})

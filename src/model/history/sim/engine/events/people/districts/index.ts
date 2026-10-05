@@ -36,28 +36,25 @@ function now(state: HistoryState): number {
 	return state.time / STATE.yearMs
 }
 
-// The sovereign's closest adult relative who holds nothing, passing over the
-// heir apparent so the crown is not split from its heir; with no adult
-// children this is usually a sibling.
-function landlessRelative({ state, seat }: SeatParams): number {
+// A holder's closest adult relative who holds nothing, passing over the heir
+// apparent so the seat is not split from its heir; with no adult children
+// this is usually a sibling.
+function landlessKin({ state, seat }: SeatParams): number {
 	const people = state.people
-	const sovereign = state.sovereignCurrent[seat]
-	const ruler = people.rulerOf[sovereign]
-	if (ruler < 0) return -1
+	const holder = people.rulerOf[seat]
+	if (holder < 0) return -1
 	const time = now(state)
-	const preference = PEOPLE.preference(
-		STATE.originOf({ state, realm: sovereign }),
-	)
+	const preference = PEOPLE.preference(STATE.originOf({ state, realm: seat }))
 	const apparent = HEIRS.of({
 		people,
-		dying: ruler,
+		dying: holder,
 		time,
 		preference,
 		eligible: () => true,
 	}).heir
 	return HEIRS.of({
 		people,
-		dying: ruler,
+		dying: holder,
 		time,
 		preference,
 		eligible: (person) =>
@@ -67,6 +64,33 @@ function landlessRelative({ state, seat }: SeatParams): number {
 	}).heir
 }
 
+// A landless adult of another district holder's house in the realm, nearest
+// district first, so a vacant district goes to a known family before a new one.
+function cadet({ state, seat }: SeatParams): number {
+	const people = state.people
+	const time = now(state)
+	const districts = STATE.getNationProvinces({
+		state,
+		root: state.sovereignCurrent[seat],
+	}).filter(
+		(other) =>
+			other !== seat &&
+			STATE_TITLES.isDistrictSeat({ state, seat: other }) &&
+			people.rulerOf[other] >= 0 &&
+			PEOPLE.aliveAt({ people, person: people.rulerOf[other], time }),
+	)
+	districts.sort(
+		(a, b) =>
+			STATE.provinceDistanceSq({ state, a: seat, b: a }) -
+				STATE.provinceDistanceSq({ state, a: seat, b }) || a - b,
+	)
+	for (const other of districts) {
+		const kin = landlessKin({ state, seat: other })
+		if (kin >= 0) return kin
+	}
+	return -1
+}
+
 function newHolder({
 	state,
 	seat,
@@ -74,11 +98,15 @@ function newHolder({
 	rng,
 	found,
 }: HolderParams): number {
-	const relative = relativeFirst ? landlessRelative({ state, seat }) : -1
+	const relative = relativeFirst
+		? landlessKin({ state, seat: state.sovereignCurrent[seat] })
+		: -1
 	if (relative >= 0) {
 		if (found) state.people.startingFamilies.relativeGrants++
 		return relative
 	}
+	const kin = cadet({ state, seat })
+	if (kin >= 0) return kin
 	if (found) return found(seat)
 	const sovereign = state.sovereignCurrent[seat]
 	const origin = STATE.originOf({ state, realm: seat })
