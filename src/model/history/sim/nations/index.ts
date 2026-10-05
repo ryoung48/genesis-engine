@@ -455,6 +455,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		rank = DEJURE.seatRank({ titles, provinceCount, heldOnly: true })
 	}
 	const parent = new Int32Array(provinceCount).fill(-1)
+	const district = new Uint8Array(provinceCount)
 	for (let nation = 0; nation < nationCount; nation++)
 		DEJURE.deriveParents({
 			titles,
@@ -464,6 +465,9 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 			members: nationMembers[nation],
 			root: seeds[nation],
 			parent,
+			district,
+			adjOffset: provinces.adjOffset,
+			adjList: provinces.adjList,
 		})
 	const depth = DEJURE.depthOfParents({ parent })
 

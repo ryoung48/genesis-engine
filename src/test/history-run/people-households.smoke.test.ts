@@ -925,6 +925,9 @@ it("installs each initial relative grant before selecting the next without expan
 		parentCurrent: new Int32Array(25).fill(0),
 		sovereignCurrent: new Int32Array(25),
 		seatRank: new Uint8Array(25),
+		districtSeat: new Uint8Array(25),
+		districtRank: new Uint8Array(25),
+		topTier: new Uint8Array(25),
 		desolate: new Uint8Array(25),
 		stateless: new Uint8Array(25),
 		culture: new Int32Array(25),
@@ -935,7 +938,8 @@ it("installs each initial relative grant before selecting the next without expan
 		province_xyz: new Float32Array(75),
 	} as unknown as HistoryState
 	state.parentCurrent[0] = -1
-	state.seatRank.set([3, 1, 1])
+	state.seatRank.set([2, 1, 1])
+	state.districtSeat.set([0, 1, 1])
 	PEOPLE.setRuler({
 		people,
 		person: peopleIds[0],

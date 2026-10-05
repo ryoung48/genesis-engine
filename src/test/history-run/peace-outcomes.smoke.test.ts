@@ -14,6 +14,7 @@ import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HISTORY_RUN } from "@/test/history-run"
 
@@ -172,7 +173,7 @@ it("joins supporting districts and recalculates both armies independently", () =
 		const eligible = STATE.getChildren({ state, p }).filter((seat) => {
 			const holder = state.people.rulerOf[seat]
 			return (
-				state.seatRank[seat] > 0 &&
+				STATE_TITLES.isDistrictSeat({ state, seat }) &&
 				holder >= 0 &&
 				state.people.persons.heldSeats[holder].includes(seat) &&
 				PEOPLE.aliveAt({ people: state.people, person: holder, time })

@@ -159,9 +159,7 @@ export function usePersonWikiData(
 			const report = FRAME.directReports({ frame }).find(
 				(entry) => entry.seat === seat,
 			)
-			return report
-				? TITLE_TIER_LABELS[TITLES.tierOrder[frame.titles.tier[report.title]]]
-				: null
+			return report ? TITLE_TIER_LABELS[TITLES.tierOrder[report.tier]] : null
 		}
 		const seatLabel = (seat: number, timeMs: number, sovereign: boolean) => {
 			const rank = rankAt(seat, timeMs, sovereign)
@@ -478,11 +476,15 @@ export function usePersonWikiData(
 									? "after a restoration"
 									: event.reason === "union"
 										? "when the realms united"
-										: event.reason === "territorial change"
-											? "after a territorial change"
-											: event.reason === "district grant"
-												? "when the seat was granted"
-												: ""
+										: event.reason === "promotion"
+											? "after promotion"
+											: event.reason === "demotion"
+												? "after demotion"
+												: event.reason === "territorial change"
+													? "after a territorial change"
+													: event.reason === "district grant"
+														? "when the seat was granted"
+														: ""
 				pushTimelineEvent(timelineEvents, {
 					...base,
 					type: "Ruler",

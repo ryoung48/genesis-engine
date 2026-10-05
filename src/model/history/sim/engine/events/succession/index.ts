@@ -133,7 +133,9 @@ function weakCrownRevolt({ state, realm, claim, rng }: WeakCrownParams): void {
 	const districts = rng
 		.shuffle(STATE.getChildren({ state, p: realm }))
 		.filter(
-			(seat) => state.seatRank[seat] > 0 && state.people.rulerOf[seat] >= 0,
+			(seat) =>
+				STATE_TITLES.isDistrictSeat({ state, seat: seat }) &&
+				state.people.rulerOf[seat] >= 0,
 		)
 	for (const subject of districts)
 		if (

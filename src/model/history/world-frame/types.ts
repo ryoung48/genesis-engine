@@ -129,7 +129,7 @@ export interface NationFrameParams {
 
 export interface DirectReport {
 	seat: number
-	title: number
+	tier: number
 	nation: number
 }
 

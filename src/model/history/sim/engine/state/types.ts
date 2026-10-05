@@ -185,6 +185,9 @@ export interface HistoryState {
 	titles: DejureTitles
 	titleMembers: TitleMembers
 	seatRank: Uint8Array
+	districtSeat: Uint8Array
+	districtRank: Uint8Array
+	topTier: Uint8Array
 	titleFounded: Uint8Array
 	titleLapseSince: Float64Array
 	_nationAdjCache?: { offset: Int32Array; list: Int32Array }

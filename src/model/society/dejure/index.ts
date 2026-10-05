@@ -6,7 +6,7 @@ import type {
 	DejureTitles,
 	DepthOfParentsParams,
 	DeriveParentsParams,
-	LiegeOfParams,
+	DistrictSeatsParams,
 	MembersOfParams,
 	SeatRankParams,
 	SeatScoreParams,
@@ -295,28 +295,36 @@ function seatRank({
 	return rank
 }
 
-function liegeOf({
+function districtSeats({
 	titles,
 	provinceCount,
 	rank,
 	ownerOf,
-	province,
+	members,
 	root,
-}: LiegeOfParams): number {
-	if (province === root) return -1
-	const owner = ownerOf[province]
-	for (let tier = 1; tier <= TIER_SLOTS; tier++) {
-		const title = titleAt({ titles, provinceCount, tier, province })
-		if (title < 0 || titles.holder[title] < 0) continue
-		const seat = titles.seat[title]
-		if (
-			seat !== province &&
-			ownerOf[seat] === owner &&
-			rank[seat] > rank[province]
-		)
-			return seat
+}: DistrictSeatsParams): number[] {
+	let top = 0
+	for (let i = 0; i < members.length; i++) top = Math.max(top, rank[members[i]])
+	if (top === 0) return []
+	if (top === 1)
+		return Array.from(members).filter((p) => p !== root && rank[p] === 0)
+	const region = tierRegion({ titles, provinceCount, tier: top - 1 })
+	const crown = new Set<number>()
+	for (let i = 0; i < members.length; i++) {
+		const p = members[i]
+		if (p === root || rank[p] === top) crown.add(region[p])
 	}
-	return root
+	return Array.from(members).filter((p) => {
+		const title = region[p]
+		return (
+			p !== root &&
+			rank[p] === top - 1 &&
+			title >= 0 &&
+			titles.holder[title] === ownerOf[root] &&
+			titles.seat[title] === p &&
+			!crown.has(title)
+		)
+	})
 }
 
 function deriveParents({
@@ -327,18 +335,81 @@ function deriveParents({
 	members,
 	root,
 	parent,
-}: DeriveParentsParams): void {
+	district,
+	adjOffset,
+	adjList,
+}: DeriveParentsParams): number {
+	let top = 0
+	const owned = new Set<number>()
 	for (let i = 0; i < members.length; i++) {
-		const province = members[i]
-		parent[province] = liegeOf({
-			titles,
-			provinceCount,
-			rank,
-			ownerOf,
-			province,
-			root,
-		})
+		const p = members[i]
+		top = Math.max(top, rank[p])
+		owned.add(p)
+		parent[p] = -2
+		district[p] = 0
 	}
+	const seats = districtSeats({
+		titles,
+		provinceCount,
+		rank,
+		ownerOf,
+		members,
+		root,
+	})
+	for (const seat of seats) district[seat] = 1
+	const region =
+		top >= 2 ? tierRegion({ titles, provinceCount, tier: top - 1 }) : null
+	const crown = new Set<number>()
+	for (const p of owned) {
+		if (p === root || rank[p] === top) {
+			parent[p] = root
+			if (region) crown.add(region[p])
+		} else if (top <= 1) parent[p] = root
+	}
+	if (region) {
+		for (const p of owned)
+			if (
+				region[p] >= 0 &&
+				titles.holder[region[p]] === ownerOf[root] &&
+				crown.has(region[p])
+			)
+				parent[p] = root
+		for (const seat of seats) {
+			parent[seat] = root
+			const title = region[seat]
+			const queue = [seat]
+			for (let head = 0; head < queue.length; head++) {
+				const p = queue[head]
+				for (let j = adjOffset[p]; j < adjOffset[p + 1]; j++) {
+					const neighbor = adjList[j]
+					if (
+						!owned.has(neighbor) ||
+						region[neighbor] !== title ||
+						parent[neighbor] !== -2
+					)
+						continue
+					parent[neighbor] = seat
+					queue.push(neighbor)
+				}
+			}
+		}
+	}
+	const queue = Array.from(owned)
+		.filter((p) => parent[p] !== -2)
+		.sort((a, b) => a - b)
+	for (let head = 0; head < queue.length; head++) {
+		const p = queue[head]
+		const anchor = district[p] ? p : parent[p]
+		for (let j = adjOffset[p]; j < adjOffset[p + 1]; j++) {
+			const neighbor = adjList[j]
+			if (!owned.has(neighbor) || parent[neighbor] !== -2) continue
+			parent[neighbor] = anchor
+			queue.push(neighbor)
+		}
+	}
+	for (const p of owned) if (parent[p] === -2) parent[p] = root
+	parent[root] = -1
+	return top
 }
 
 function depthOfParents({ parent }: DepthOfParentsParams): Int32Array {
@@ -381,6 +452,7 @@ export const DEJURE = {
 	membersOf,
 	seatRank,
 	deriveParents,
+	districtSeats,
 	depthOfParents,
 	withCapacity,
 }

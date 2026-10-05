@@ -249,6 +249,19 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			after.people = { ...object(after.people) }
 			delete object(before.people).msPerYear
 			delete object(after.people).msPerYear
+			const beforeDeriveMs = object(before.districts).deriveMs
+			const afterDeriveMs = object(after.districts).deriveMs
+			if (before.districts) before.districts = { ...object(before.districts) }
+			if (after.districts) after.districts = { ...object(after.districts) }
+			delete object(before.districts).deriveMs
+			delete object(after.districts).deriveMs
+			rows.push({
+				before: beforeDeriveMs,
+				after: afterDeriveMs,
+				section: "Performance",
+				period: `${seed} / ${period}`,
+				metric: "districts.deriveMs",
+			})
 			const beforeDivideMs = object(before.partition).divideMs
 			const afterDivideMs = object(after.partition).divideMs
 			if (before.partition) before.partition = { ...object(before.partition) }
@@ -297,6 +310,24 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			after: tickSummary(db.annualTicks),
 			section: "Performance",
 			period: seed,
+			rows,
+		})
+		const districtsBefore = { ...object(da.districtsTotal) }
+		const districtsAfter = { ...object(db.districtsTotal) }
+		rows.push({
+			before: districtsBefore.deriveMs,
+			after: districtsAfter.deriveMs,
+			section: "Performance",
+			period: seed,
+			metric: "districtsTotal.deriveMs",
+		})
+		delete districtsBefore.deriveMs
+		delete districtsAfter.deriveMs
+		addRows({
+			before: { districts: districtsBefore },
+			after: { districts: districtsAfter },
+			section: "Century statistics",
+			period: `${seed} / whole run`,
 			rows,
 		})
 		const totalBefore = { ...object(da.partitionTotal) }

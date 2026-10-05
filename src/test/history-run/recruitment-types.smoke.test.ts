@@ -631,6 +631,12 @@ describe("military transitions and conservation", () => {
 		reset()
 		const ally = nations[2]
 		STATE.setRelation({ state, a: nations[1], b: ally, rel: STATE.rel.ALLY })
+		STATE.setDisposition({
+			state,
+			a: nations[1],
+			b: ally,
+			disposition: STATE.disp.TRUSTED,
+		})
 		const active = war()
 		expect(active.participants[ally]).toBe("defender")
 		const before = state.levyCurrent[ally]
@@ -723,6 +729,12 @@ describe("military transitions and conservation", () => {
 		reset()
 		const ally = nations[2]
 		STATE.setRelation({ state, a: nations[1], b: ally, rel: STATE.rel.ALLY })
+		STATE.setDisposition({
+			state,
+			a: nations[1],
+			b: ally,
+			disposition: STATE.disp.TRUSTED,
+		})
 		const active = war()
 		const surplus = ECONOMY.surplus({ state, p: ally })
 		FIELDS.prov.treasury.set({ state, p: ally, value: -0.1 * surplus })

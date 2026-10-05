@@ -50,8 +50,43 @@ export interface SeatCheck {
 	seat: number
 	holder: number
 	standing: SeatStanding
+	rank: number
 }
 
 export interface SucceedDistrictParams extends DistrictParams {
 	seat: number
+}
+
+export interface DisplacedHolder {
+	person: number
+	seat: number
+	rank: number
+}
+
+export interface AdminMove {
+	person: number
+	from: number
+	// -1 for landless.
+	to: number
+	bumped: boolean
+	rank: number
+	reason: "promotion" | "demotion" | "landless"
+}
+
+export interface ReseatParams {
+	state: HistoryState
+	displaced: DisplacedHolder[]
+	reason: "partition" | "territorial change"
+}
+
+export interface DemoteParams {
+	state: HistoryState
+	displaced: DisplacedHolder
+	reason: "partition" | "territorial change"
+	moves: AdminMove[]
+}
+
+export interface HomeRegionParams {
+	state: HistoryState
+	displaced: DisplacedHolder
 }

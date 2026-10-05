@@ -4,6 +4,7 @@ import type {
 	UnseatedReason,
 } from "@/model/history/sim/engine/events/succession/partition/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import { Distribution } from "@/test/history-run/report/distribution/types"
 
 export interface PartitionStateParams {
 	engine: HistoryState
@@ -23,11 +24,6 @@ export interface PartitionStateReport {
 	heldTitleSharePartitioning: Record<string, number>
 	tribalMonarchies: TribalRealms
 	chiefdoms: TribalRealms
-}
-
-export interface Distribution {
-	p50: number
-	p90: number
 }
 
 export type PartitionTagKind = "primary" | "heir"
@@ -126,6 +122,8 @@ export interface HeirRealmFates {
 }
 
 export interface PartitionReport {
+	titleShares: number
+	districtShares: number
 	partitions: number
 	skipped: Record<PartitionSkipReason, number>
 	// Partitions over partitions plus skips.

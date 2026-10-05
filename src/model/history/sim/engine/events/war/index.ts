@@ -26,6 +26,7 @@ import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	Disposition,
 	StartWarParams,
@@ -332,7 +333,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 		if (
 			parent < 0 ||
 			parent !== STATE.getSovereign({ state, p: nation }) ||
-			state.seatRank[nation] === 0 ||
+			!STATE_TITLES.isDistrictSeat({ state, seat: nation }) ||
 			state.people.rulerOf[nation] < 0
 		)
 			continue
@@ -561,7 +562,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 		}
 	} else if (
 		parent === sovereignNation &&
-		state.seatRank[nation] > 0 &&
+		STATE_TITLES.isDistrictSeat({ state, seat: nation }) &&
 		state.people.rulerOf[nation] >= 0
 	) {
 		// A great vassal's district — consider rebellion

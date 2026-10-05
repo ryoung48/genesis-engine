@@ -50,3 +50,8 @@ export interface RefreshHouseholdsParams {
 	state: HistoryState
 	previousRanks: ArrayLike<number>
 }
+
+export interface TopTierParams {
+	state: HistoryState
+	realm: number
+}

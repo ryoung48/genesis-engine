@@ -37,6 +37,8 @@ const SEAT_REASONS: SeatChangeReason[] = [
 	"union",
 	"unknown",
 	"usurpation",
+	"promotion",
+	"demotion",
 ]
 const SNAPSHOT_COLUMNS = [
 	"sex",

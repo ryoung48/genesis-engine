@@ -12,6 +12,8 @@ import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
+import { PEOPLE } from "@/model/history/sim/people"
+import { FAMILY } from "@/model/history/sim/people/family"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { DEJURE } from "@/model/society/dejure"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
@@ -303,6 +305,41 @@ it("charges founding through succession and overthrow", () => {
 	// not.
 	succession.state.governmentType[succession.nation] =
 		GOVERNMENT.getGovIdx().feudal_monarchy
+	const origin = STATE.originOf({
+		state: succession.state,
+		realm: succession.nation,
+	})
+	const time = succession.state.time / STATE.yearMs
+	const dying = FAMILY.found({
+		people: succession.state.people,
+		origin,
+		time,
+		age: 60,
+		rank: 1,
+		rng: succession.rng,
+	})
+	const heir = PEOPLE.spawn({
+		recordHealth: true,
+		death: null,
+		nameSeed: null,
+		people: succession.state.people,
+		sex: 0,
+		birth: time - 30,
+		survives: time,
+		father: dying,
+		mother: -1,
+		dynasty: succession.state.people.persons.dynasty[dying],
+		origin,
+		rng: succession.rng,
+	})
+	succession.state.people.persons.death[heir] = time + 60
+	STATE.installRuler({
+		state: succession.state,
+		p: succession.nation,
+		person: dying,
+		claim: 3,
+		reason: "succession",
+	})
 	const rebel = vi.spyOn(WAR, "rebel").mockReturnValue(false)
 	PERSON_DEATH.kill({
 		state: succession.state,

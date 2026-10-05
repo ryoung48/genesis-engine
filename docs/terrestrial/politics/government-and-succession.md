@@ -86,7 +86,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 | System | Governments | Rule |
 |---|---|---|
 | Single heir | feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a personal union. With no heir, the strongest adult district holder takes it as a new house. |
-| Single heir, then partition | chiefdom, tribal monarchy | The same rule picks the primary heir, who keeps the realm root; the other child lines then each take a district as a new realm (see Partition). |
+| Single heir, then partition | chiefdom, tribal monarchy | The same rule picks the primary heir, who keeps the realm root; the other child lines take surplus titles, then titled districts, as new realms (see Partition). |
 | Election | elective monarchy, tribal federation, native council, steppe horde, republics | See below. |
 | Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
 
@@ -115,32 +115,13 @@ Chiefdoms and tribal monarchies treat the realm as the dynasty's patrimony, as i
 - Every other child line gives at most one junior heir (`HEIRS.line`): the child if alive, else the first living person of a dead child's line. A junior heir must not already be sovereign somewhere. A living child who is not eligible is not replaced by their own children, and never blocks another line.
 - When any junior heir is of the culture's preferred sex, only those remain. Minors are included.
 
-**Shares.**
-- Each junior heir takes one district seat of the realm, with the land under it.
-- An heir who already holds a district of the realm takes that seat and no other. Nobody is given a seat another heir holds.
-- The other heirs, in inheritance order, take the best seats left: higher title tier first, then larger population.
-- A district with an enemy-occupied province is not handed out; an heir whose own district is occupied stays its admin. Heirs beyond the available seats get nothing.
-- The primary keeps the root, the crown demesne and every district nobody took. Realms of 4 provinces or fewer have no districts and never divide.
+**Shares.** Junior heirs first take surplus top-tier titles, ordered by owned population in the title region and then seat id. The primary keeps the title containing the capital, or the first title if none contains it. A title share carries its crown land and every district seated inside its region, each district whole. Attached land outside that region leaves with an inside district; inside land attached to an outside district stays with that district. Crown land inside the title always leaves.
 
-**Release.** Shares leave one at a time, best seat first. Each is checked again just before it leaves, because an earlier release can move titles and change the hierarchy: the seat must still be a district of the realm, hold no occupied province, and its heir must still be eligible. A share that fails is dropped. The heir gives up any other district they hold, takes the seat, and the district becomes a sovereign realm through the same release as a rebellion (`STATE.releaseFaction`):
-- it holds the seat's land as of the release and a population-proportional share of the treasury;
-- it takes the divided realm's government;
-- it is at peace with neutral relations, apart from a personal union formed at once when the heir is married to the reigning ruler of another single-heir realm;
-- its ruler has claim 3.
+Remaining junior heirs take one titled district each, best rank and population first, excluding districts already allocated with title shares. An heir's own district is reserved only if it is still on offer. County districts never form shares. The root and every supporting seat move before title settlement, so temporary ownership cannot move a title onto an admin’s seat. Allocation is shared by projection and actual division; every share is rechecked for ownership, eligibility and occupation before release. Realms with no surplus title and no titled district have nothing to divide.
 
-The primary's own former district is vacated before seats are assigned. A primary who already ruled another realm keeps it, in the personal union the inheritance forms.
+**Cut-off land.** Before freeing anything cut off, partition joins each piece to a bordering heir realm whose top tier is equal to or above the piece's own rank. Highest top tier, then population and seat id decide ties. Occupied pieces do not join. Remaining cut-off land is released by the existing connection repair.
 
-**Cut-off land.** After the releases, every district or crown province the primary still owns must connect to the root by land or sea adjacency through the primary's territory.
-- A cut-off piece joins a bordering realm created by this partition whose top title tier is higher than the piece's: highest tier first, then larger population. Every possible join is made before anything is freed, so a piece that only borders another cut-off piece can follow it.
-- A piece with an occupied province joins nobody.
-- What is still cut off is released as independent, as after a rebellion (`province released`).
-
-**Displaced admins.** A living admin who lost a seat to an heir, or whose seat stopped being a district seat, moves down in the realm that now owns the seat they lost:
-- they take a seat of strictly lower title tier: a vacant one if any, else a held one (higher tier first, then larger population);
-- a living holder bumped this way moves down by the same rule; a dead one ends the chain;
-- with no lower seat they are landless.
-
-No dead person is seated. An admin who keeps a valid seat belongs to the realm that owns it now, so the admin of a district that joined an heir realm follows it. Dead holders of valid seats inherit at their person-level death event; yearly district settlement validates seats and ensures scheduling without repeating inheritance.
+**Displaced admins.** The shared [promotion and demotion rule](#districts) re-seats living admins before new grants. Partition uses the retained district rank and the same home-region and ordering rules as the yearly pass, with seat reason `partition`. District admins inside a title share keep their eligible seats.
 
 **Regencies** start only when the seating is final: first for each new realm with a minor ruler, then for the primary realm, then one regency review so a regent of any other realm who has just become sovereign is replaced. A sibling who received a realm of their own is never a minor heir's regent.
 
@@ -172,7 +153,7 @@ A reign has no end date until its ruler dies or is deposed: no death is known in
 
 ## Districts
 
-- **Grants.** A realm's titled direct subjects are its district seats. It grants a share of them by size: none up to 4 provinces, rising to 92% at 25+. Poor and distant seats are granted first.
+- **Grants.** A realm's district seats are exactly one tier below its highest held title, outside crown land: kingdoms under an emperor, duchies under a king, counties under a duke, none under a count. The crown keeps all top-tier seats and the one-tier-below titles around those seats and the capital. It grants a share of them by size: none up to 4 provinces, rising to 92% at 25+. Poor and distant seats are granted first.
 - **Who gets a new grant.** In order:
   1. with 30% chance, the ruler's closest adult, landless relative (never the heir apparent);
   2. a cadet of an established house: the closest adult, landless relative of another district holder in the realm (never that holder's heir apparent), trying the nearest district first;
@@ -180,7 +161,8 @@ A reign has no end date until its ruler dies or is deposed: no death is known in
 
   The cadet rule applies at world start as well. It leaves the number of district holders unchanged and founds fewer houses: on the 204,000-point benchmark (seed 14963991, 867–1800) 263,889 people are created instead of 306,287, and the sovereign count is 40–90 lower in the first three centuries and 30–50 higher in the last three. Figures from `stats/history/2026-10-05T04-09-26-764Z-district-cadets/`; one seed.
 - **Inheritance.** At the person-level death event a district passes to the next *adult* heir who holds no seat, else by the grant rule. Annual settlement does not inherit again. Minors never hold districts.
-- **Loss.** A district that stops being a direct titled subject is vacated.
+- **Loss.** A seat that stops being a district is vacated at revalidation; rank zero alone does not invalidate a county district.
+- **Promotion and demotion.** Before grants, living landless displaced admins are ordered by lost district rank descending, owned population in their current home region descending, then lost seat id. The lost rank is retained from the seat's last district status. The home region is the current de jure title of that rank containing the lost seat, or the seat alone when absent or county-tier. An empty higher-rank district containing the lost seat promotes its strongest displaced admin. Otherwise a strictly lower district in the realm now owning the lost seat is chosen: inside the home region, vacant, higher rank, larger population, then lower id. A living bumped holder moves down by the same rule; with no candidate the admin stays landless. Yearly moves use `promotion` or `demotion`, write no opinion memory, and count toward the grant quota.
 - **Revalidation.** `DISTRICTS.revalidate` is the per-seat check behind both rules: it vacates a seat that is no longer a district seat and keeps a living holder of a valid seat; affiliation follows current ownership without rewriting residence. The yearly pass runs it over every seat; a [partition](government-and-succession.md#partition) runs it over the divided realm's seats in the same succession.
 - **Partition.** A new ruler's former district is vacated when the realm is divided. Seats taken or lost in a partition carry the seat reason `partition`: the heir's new seat, the district an heir or the primary gave up, and the seats displaced admins lose and take.
 
@@ -211,7 +193,7 @@ Installation and separately crowned spouses preflight all crown pairs before add
 
 ## District elections
 
-Each valid direct local district supplies a population-weighted elector, even when its holder has other districts or a foreign primary. Candidates include the late ruler’s house senior. District nomination takes the top three district slots by descending population and ascending seat ID, then deduplicates eligible house seniors without refilling slots. Candidate strength uses the first nomination's weight. Republic patricians vote once per distinct eligible person.
+County admins vote with their province’s population weight. Each valid direct local district supplies a population-weighted elector, even when its holder has other districts or a foreign primary. Candidates include the late ruler’s house senior. District nomination takes the top three district slots by descending population and ascending seat ID, then deduplicates eligible house seniors without refilling slots. Candidate strength uses the first nomination's weight. Republic patricians vote once per distinct eligible person.
 
 Claimants use their strongest local qualifying district, with seat ID breaking population ties. Hereditary contests without a claimant district use the strongest backing district. Supporting seats are actual local elector seats, excluding the synthetic late-house vote. Ownership and district status are checked before release.
 
@@ -223,7 +205,7 @@ Republics consider every distinct patrician head’s house. Each elector backs t
 - **Who.** The first of these who is an adult, alive, capable and holds no throne:
   1. for a child, the surviving parent of either sex; for an incapable ruler, the spouse;
   2. the closest adult of the ward's house in inheritance order;
-  3. the strongest district holder (lord protector);
+  3. the strongest district holder (lord protector), including a county admin;
   4. otherwise a regency council with no person.
 - **Coming of age.** The end of a minority is queued for the ward's 16th birthday when the regency starts. A ward who has died or been deposed leaves it stale, and it never ends an incapacity regency.
 - **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere or becomes Incapable is replaced at the yearly check.

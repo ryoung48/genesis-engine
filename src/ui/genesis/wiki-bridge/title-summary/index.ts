@@ -40,11 +40,11 @@ function describe({
 		.filter((report) => report.nation === nationId)
 		.sort(
 			(a, b) =>
-				titles.tier[b.title] - titles.tier[a.title] ||
+				b.tier - a.tier ||
 				provinceName(a.seat).localeCompare(provinceName(b.seat)),
 		)
-		.map(({ seat, title }) => {
-			const tierName = TITLES.tierOrder[titles.tier[title]]
+		.map(({ seat, tier }) => {
+			const tierName = TITLES.tierOrder[tier]
 			return {
 				province: seat,
 				provinceName: provinceName(seat),

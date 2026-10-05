@@ -3,6 +3,7 @@ import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
+import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import type { PartitionNoteData } from "@/model/history/sim/engine/events/succession/partition/types"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { FIELDS } from "@/model/history/sim/engine/fields"
@@ -22,6 +23,7 @@ import type { SharedRng } from "@/model/shared/random/rng"
 import type { GovernmentType } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { DISTRICT_FIXTURE } from "@/test/history-run/fixtures/district-tiers"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 
 interface Fixture {
@@ -47,7 +49,11 @@ function districtSeats({
 	realm: number
 }): number[] {
 	return STATE.getChildren({ state, p: realm })
-		.filter((seat) => STATE_TITLES.isDistrictSeat({ state, seat }))
+		.filter(
+			(seat) =>
+				STATE_TITLES.isDistrictSeat({ state, seat }) &&
+				state.seatRank[seat] > 0,
+		)
 		.sort(
 			(a, b) =>
 				state.seatRank[b] - state.seatRank[a] ||
@@ -171,6 +177,13 @@ function fixture({
 	let realm = -1
 	for (let p = 0; p < state.P && realm < 0; p++) {
 		if (!quiet({ state, realm: p })) continue
+		const top = STATE_TITLES.topTier({ state, realm: p })
+		if (
+			Array.from(state.titles.holder).filter(
+				(holder, title) => holder === p && state.titles.tier[title] === top,
+			).length > 1
+		)
+			continue
 		const seats = districtSeats({ state, realm: p })
 		const fits = accept
 			? accept({ state, realm: p })
@@ -214,6 +227,7 @@ function succeed(fx: Fixture): void {
 			-1,
 		rng,
 	})
+	DISTRICTS.settle({ state: fx.state, rng: fx.rng })
 	invariants(fx)
 }
 
@@ -662,7 +676,7 @@ function rankedChildren({
 	seat: number
 }): number[] {
 	return STATE.getChildren({ state, p: seat }).filter(
-		(child) => state.seatRank[child] > 0 && !state.desolate[child],
+		(child) => !state.desolate[child],
 	)
 }
 
@@ -701,150 +715,127 @@ it("moves a displaced admin to the new realm's best vacant lower seat", () => {
 	expect(state.people.rulerOf[to]).toBe(admin)
 	expect(state.parentCurrent[to]).toBe(seats[0])
 	expect(state.seatRank[to]).toBeLessThan(rank)
-	expect(districtSeats({ state, realm: seats[0] })[0]).toBe(to)
+	expect(STATE_TITLES.isDistrictSeat({ state, seat: to })).toBe(true)
 }, 120000)
 
-it("bumps a lower admin, and ends the chain at a dead one", () => {
-	const build = (dead: boolean) => {
-		const fx = fixture({
-			districts: 2,
-			government: "tribal_monarchy",
-			accept: nested,
-		})
-		const { state, realm, seats } = fx
-		const lower = rankedChildren({ state, seat: seats[0] })
-		const holders = lower.map((seat, index) => {
-			const holder = person({
-				state,
-				realm,
-				age: 30 + index,
-				father: -1,
-				sex: 0,
-			})
-			DISTRICTS.install({
-				state,
-				seat,
-				person: holder,
-				reason: "district grant",
-			})
-			return holder
-		})
-		if (dead) for (const holder of holders) kill({ state, who: holder })
-		const admin = state.people.rulerOf[seats[0]]
-		son({ fx, age: 30 })
-		son({ fx, age: 25 })
-		succeed(fx)
-		return { fx, admin, holders, note: partitionNote(fx) }
-	}
-	const living = build(false)
-	expect(living.note.adminPersons[0]).toBe(living.admin)
-	expect(living.note.adminBumped[0]).toBe(1)
-	// Each bumped holder takes a seat of lower rank than the one they lost, so
-	// the chain runs down the ranks until someone has nowhere to go.
-	const { adminPersons, adminFrom, adminTo, adminBumped } = living.note
-	const last = adminPersons.length - 1
-	expect(last).toBeGreaterThanOrEqual(1)
-	for (let move = 0; move <= last; move++) {
-		const moved = adminPersons[move]
-		if (move > 0) {
-			expect(living.holders).toContain(moved)
-			expect(adminFrom[move]).toBe(adminTo[move - 1])
-		}
-		if (move === last) {
-			expect(adminTo[move]).toBe(-1)
-			expect(adminBumped[move]).toBe(0)
-			expect(
-				HOLDINGS.primary({
-					people: living.fx.state.people,
-					person: moved,
-					ranks: living.fx.state.seatRank,
-				}),
-			).toBe(-1)
-			continue
-		}
-		expect(adminBumped[move]).toBe(1)
-		expect(
-			HOLDINGS.primary({
-				people: living.fx.state.people,
-				person: moved,
-				ranks: living.fx.state.seatRank,
-			}),
-		).toBe(adminTo[move])
-		expect(living.fx.state.people.rulerOf[adminTo[move]]).toBe(moved)
-	}
-
-	const dead = build(true)
-	expect(dead.note.adminPersons).toEqual([dead.admin])
-	expect(dead.note.adminBumped).toEqual([1])
-	expect(dead.fx.state.people.rulerOf[dead.note.adminTo[0]]).toBe(dead.admin)
-	for (const holder of dead.holders)
-		expect(dead.note.adminPersons).not.toContain(holder)
-}, 240000)
-
-// A district whose release cuts off both a piece of lower tier that borders
-// it and a piece of its own tier or higher.
-function mixedCut({ state, realm }: { state: HistoryState; realm: number }) {
-	return districtSeats({ state, realm }).find((seat) => {
-		const pieces = cutOff({ state, realm, removed: [seat] })
-		const subtree = new Set(STATE.getNationProvinces({ state, root: seat }))
-		const borders = (piece: number) =>
-			STATE.getNationProvinces({ state, root: piece }).some((p) =>
-				STATE.getProvinceNeighbors({ state, p }).some((neighbor) =>
-					subtree.has(neighbor),
-				),
-			)
-		return (
-			pieces.some(
-				(piece) =>
-					state.seatRank[piece] < state.seatRank[seat] && borders(piece),
-			) && pieces.some((piece) => state.seatRank[piece] >= state.seatRank[seat])
-		)
+it.each([
+	false,
+	true,
+])("bumps a county admin after a duchy share and stops at a dead holder (%s)", (dead) => {
+	const fx = DISTRICT_FIXTURE.create({
+		count: 6,
+		root: 0,
+		edges: [
+			[0, 1],
+			[1, 2],
+			[2, 3],
+			[3, 4],
+			[4, 5],
+		],
+		titles: [
+			{ tier: 2, seat: 0, provinces: [0, 1, 2, 3, 4, 5] },
+			{ tier: 1, seat: 0, provinces: [0, 1] },
+			{ tier: 1, seat: 2, provinces: [2, 3, 4, 5] },
+		],
 	})
-}
-
-it("joins cut-off land to a higher heir realm and frees the rest", () => {
-	const fx = fixture({
-		districts: 2,
-		government: "tribal_monarchy",
-		accept: (candidate) => mixedCut(candidate) !== undefined,
+	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
+	const primary = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
 	})
-	const { state, realm } = fx
-	const share = mixedCut({ state, realm }) as number
-	son({ fx, age: 30 })
-	const younger = son({ fx, age: 25 })
-	DISTRICTS.install({
-		state,
-		seat: share,
-		person: younger,
-		reason: "district grant",
+	DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
 	})
-	succeed(fx)
-	const note = partitionNote(fx)
-	expect(note.seats).toEqual([share])
-	expect(note.joinedDistricts.length).toBeGreaterThan(0)
-	for (const district of note.joinedDistricts)
-		expect(state.sovereignCurrent[district]).toBe(share)
-	expect(note.joinedRealms.every((joined) => joined === share)).toBe(true)
-	expect(note.realmKind).toContain("released")
-	for (const child of STATE.getChildren({ state, p: realm }))
-		expect(STATE.isConnectedToParent({ state, province: child })).toBe(true)
-	const released = note.realmKind.flatMap((kind, index) =>
-		kind === "released" ? [note.realms[index]] : [],
+	const admin = DISTRICT_FIXTURE.person({ fixture: fx, seat: 2, father: -1 })
+	const holders = [3, 4, 5].map((seat) =>
+		DISTRICT_FIXTURE.person({ fixture: fx, seat, father: -1 }),
 	)
-	for (const root of released)
-		expect(STATE.isSovereign({ state, p: root })).toBe(true)
-	expect(
-		PARTITION_REPORT.shares(note).reduce((sum, part) => sum + part, 0),
-	).toBeCloseTo(1)
-	expect(note.realms.length).toBeGreaterThanOrEqual(3)
-	expect(PARTITION_REPORT.effectiveRealms(note)).toBeCloseTo(
-		1 /
-			note.realmPopulation.reduce(
-				(sum, population) => sum + (population / note.populationBefore) ** 2,
-				0,
-			),
-	)
-}, 120000)
+	if (dead) for (const holder of holders) kill({ state: fx.state, who: holder })
+	STATE.installRuler({
+		state: fx.state,
+		p: 0,
+		person: primary,
+		claim: 3,
+		reason: "succession",
+	})
+	PARTITION.divide({
+		state: fx.state,
+		realm: 0,
+		dying,
+		primary,
+		primarySeat: -1,
+		rng: fx.rng,
+	})
+	const note = fx.state.events.findLast((note) => note.tag === "partition")
+		?.data as PartitionNoteData
+	expect(note.adminPersons[0]).toBe(admin)
+	expect(note.adminTo[0]).toBe(5)
+	expect(note.adminBumped[0]).toBe(1)
+	if (dead) expect(note.adminPersons).toEqual([admin])
+	else {
+		expect(note.adminPersons).toEqual([admin, holders[2]])
+		expect(note.adminTo).toEqual([5, -1])
+	}
+})
+
+it("joins equal-tier cut-off land to an heir whose root is not its highest seat", () => {
+	const fx = DISTRICT_FIXTURE.create({
+		count: 8,
+		root: 0,
+		edges: [
+			[0, 1],
+			[1, 2],
+			[2, 3],
+			[3, 4],
+			[4, 5],
+			[5, 6],
+			[6, 7],
+		],
+		titles: [
+			{ tier: 2, seat: 0, provinces: [0, 1, 2, 3, 4, 5, 6, 7] },
+			{ tier: 1, seat: 0, provinces: [0, 1] },
+			{ tier: 1, seat: 2, provinces: [2, 3] },
+			{ tier: 1, seat: 4, provinces: [4, 5] },
+			{ tier: 1, seat: 6, provinces: [6, 7] },
+		],
+	})
+	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
+	const primary = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
+	})
+	DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: 2,
+		father: dying,
+	})
+	STATE.installRuler({
+		state: fx.state,
+		p: 0,
+		person: primary,
+		claim: 3,
+		reason: "succession",
+	})
+	PARTITION.divide({
+		state: fx.state,
+		realm: 0,
+		dying,
+		primary,
+		primarySeat: -1,
+		rng: fx.rng,
+	})
+	const note = fx.state.events.findLast((note) => note.tag === "partition")
+		?.data as PartitionNoteData
+	expect(note.seats).toEqual([2])
+	expect(note.joinedDistricts).toContain(4)
+	expect(note.joinedRealms.every((realm) => realm === 2)).toBe(true)
+	expect(note.primaryRankBefore).toBe(2)
+	expect(note.realmRank[note.realms.indexOf(2)]).toBe(1)
+})
 
 it("drops a share that an earlier release made invalid", () => {
 	const fx = fixture({
@@ -954,3 +945,194 @@ it("records a partition as a split, a timeline row and seat reasons", () => {
 		events(admin).findLast((event) => event.kind === "left seat"),
 	).toMatchObject({ other: seats[0], reason: "partition" })
 }, 120000)
+
+it.each([
+	false,
+	true,
+])("allocates surplus titles before districts without splitting attached land (crown attachment: %s)", (crown) => {
+	const fx = DISTRICT_FIXTURE.create({
+		count: 20,
+		root: 0,
+		edges: [
+			[0, 1],
+			[1, 2],
+			[2, 3],
+			[3, 4],
+			[4, 5],
+			[5, 6],
+			[6, 7],
+			[7, 8],
+			[crown ? 0 : 3, 9],
+			...Array.from({ length: 5 }, (_, i) => [1, i + 10] as [number, number]),
+			...Array.from({ length: 5 }, (_, i) => [5, i + 15] as [number, number]),
+		],
+		titles: [
+			{ tier: 2, seat: 1, provinces: [0, 1, 2, 3, 8, 10, 11, 12, 13, 14] },
+			{ tier: 2, seat: 5, provinces: [4, 5, 6, 7, 9, 15, 16, 17, 18, 19] },
+			{ tier: 1, seat: 1, provinces: [0, 1, 10, 11, 12, 13, 14] },
+			{ tier: 1, seat: 3, provinces: [2, 3] },
+			{ tier: 1, seat: 5, provinces: [4, 5, 15, 16, 17, 18, 19] },
+			{ tier: 1, seat: 7, provinces: [6, 7] },
+		],
+	})
+	const { state } = fx
+	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
+	const primary = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
+	})
+	const junior = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
+	})
+	const admin = DISTRICT_FIXTURE.person({ fixture: fx, seat: 7, father: -1 })
+	const projection = PARTITION.project({ state, realm: 0, dying, primary })
+	expect(
+		projection.map((share) => [share.heir, share.seat, share.kind]),
+	).toEqual([[junior, 5, "title"]])
+	expect(state.parentCurrent[8]).toBe(7)
+	expect(state.parentCurrent[9]).toBe(crown ? 0 : 3)
+	STATE.installRuler({
+		state,
+		p: 0,
+		person: primary,
+		claim: 3,
+		reason: "succession",
+	})
+	expect(
+		PARTITION.divide({
+			state,
+			realm: 0,
+			dying,
+			primary,
+			primarySeat: -1,
+			rng: fx.rng,
+		}),
+	).toBe(1)
+	const note = state.events.findLast((note) => note.tag === "partition")
+		?.data as PartitionNoteData
+	expect(note.seats).toEqual(projection.map((share) => share.seat))
+	expect(note.shareKind).toEqual(["title"])
+	expect(state.sovereignCurrent[8]).toBe(5)
+	expect(state.sovereignCurrent[9]).toBe(crown ? 5 : 0)
+	expect(state.people.rulerOf[7]).toBe(admin)
+	expect(STATE_TITLES.isDistrictSeat({ state, seat: 7 })).toBe(true)
+	expect(note.primaryRankBefore).toBe(2)
+})
+
+it("does not offer districts carried by a title share to a later heir", () => {
+	const fx = DISTRICT_FIXTURE.create({
+		count: 8,
+		root: 0,
+		edges: [
+			[0, 1],
+			[1, 2],
+			[2, 3],
+			[3, 4],
+			[4, 5],
+			[5, 6],
+			[6, 7],
+		],
+		titles: [
+			{ tier: 2, seat: 0, provinces: [0, 1, 2, 3] },
+			{ tier: 2, seat: 4, provinces: [4, 5, 6, 7] },
+			{ tier: 1, seat: 0, provinces: [0, 1] },
+			{ tier: 1, seat: 2, provinces: [2, 3] },
+			{ tier: 1, seat: 4, provinces: [4, 5] },
+			{ tier: 1, seat: 6, provinces: [6, 7] },
+		],
+	})
+	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
+	const primary = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
+	})
+	const junior = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
+	})
+	const third = DISTRICT_FIXTURE.person({ fixture: fx, seat: 6, father: dying })
+	fx.state.popRuralCurrent[6] = 10000
+	const shares = PARTITION.project({
+		state: fx.state,
+		realm: 0,
+		dying,
+		primary,
+	})
+	expect(shares.map((share) => [share.heir, share.seat, share.kind])).toEqual([
+		[junior, 4, "title"],
+		[third, 2, "district"],
+	])
+	const provinces = shares.flatMap((share) =>
+		[share.seat, ...share.supporters].flatMap((seat) =>
+			STATE.getNationProvinces({ state: fx.state, root: seat }),
+		),
+	)
+	expect(new Set(provinces).size).toBe(provinces.length)
+	STATE.installRuler({
+		state: fx.state,
+		p: 0,
+		person: primary,
+		claim: 3,
+		reason: "succession",
+	})
+	expect(
+		PARTITION.divide({
+			state: fx.state,
+			realm: 0,
+			dying,
+			primary,
+			primarySeat: -1,
+			rng: fx.rng,
+		}),
+	).toBe(2)
+	expect(fx.state.people.rulerOf[2]).toBe(third)
+})
+
+it("does not divide a single duchy into county shares", () => {
+	const fx = DISTRICT_FIXTURE.create({
+		count: 4,
+		root: 0,
+		edges: [
+			[0, 1],
+			[1, 2],
+			[2, 3],
+		],
+		titles: [{ tier: 1, seat: 1, provinces: [0, 1, 2, 3] }],
+	})
+	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
+	const primary = DISTRICT_FIXTURE.person({
+		fixture: fx,
+		seat: -1,
+		father: dying,
+	})
+	DISTRICT_FIXTURE.person({ fixture: fx, seat: -1, father: dying })
+	expect(
+		PARTITION.project({ state: fx.state, realm: 0, dying, primary }),
+	).toEqual([])
+	STATE.installRuler({
+		state: fx.state,
+		p: 0,
+		person: primary,
+		claim: 3,
+		reason: "succession",
+	})
+	expect(
+		PARTITION.divide({
+			state: fx.state,
+			realm: 0,
+			dying,
+			primary,
+			primarySeat: -1,
+			rng: fx.rng,
+		}),
+	).toBe(0)
+	expect(
+		fx.state.events.findLast((note) => note.tag === "partition skipped")?.data
+			.reason,
+	).toBe("no free seat")
+})

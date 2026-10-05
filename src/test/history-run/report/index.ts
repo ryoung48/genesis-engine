@@ -18,6 +18,8 @@ import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
+import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
+import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import { HOUSEHOLDS_REPORT } from "@/test/history-run/report/households"
 import type {
 	HouseholdsReport,
@@ -473,6 +475,7 @@ function runSeed({
 		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
 		partitionTotal: null as PartitionReport | null,
+		districtsTotal: null as DistrictReport | null,
 		householdsReportMs: 0,
 		peopleRecord: null as PeopleRecordReport | null,
 		households: null as HouseholdsReport | null,
@@ -564,6 +567,7 @@ function runSeed({
 			sovereigns: new Set(sovereigns({ engine })),
 		},
 	]
+	const districts = DISTRICTS_REPORT.capture({ engine })
 	const partitions = PARTITION_REPORT.tracker()
 	partitions.cursor = engine.events.length
 	let divideMs = 0
@@ -577,231 +581,254 @@ function runSeed({
 		divideTotalMs += elapsed
 		return created
 	}
-	for (let year = start + 1; year <= start + options.years; year++) {
-		const tickStart = performance.now()
-		SIM_ENGINE.simulateUntil({
-			state: engine,
-			targetTimeMs: year * STATE.yearMs,
-			rng,
-			validate: false,
-		})
-		householdSamples.push({
-			timeMs: year * STATE.yearMs,
-			sovereigns: new Set(sovereigns({ engine })),
-		})
-		MILITARY.validate({ state: engine })
-		rebelLogistics.sample({ source: "annual" })
-		diagnostics.recruitment.push(
-			RECRUITMENT_REPORT.snapshot({
-				engine,
-				lateKnowledgeBand: options.lateKnowledgeBand,
-			}),
-		)
-		HOUSEHOLDS_REPORT.ingestTerritory({
-			territory: householdTerritory,
-			transactions: engine.journal,
-		})
-		PEOPLE_RECORD_REPORT.ingest({
-			tracker: peopleRecord.tracker,
-			transactions: engine.journal,
-		})
-		PEOPLE_HEALTH_REPORT.ingest({
-			tracker: peopleHealth,
-			transactions: engine.journal,
-		})
-		for (const { people: packet } of engine.journal)
-			for (let index = 0; index < (packet?.count ?? 0); index++) {
-				const row = PEOPLE_LOG.read({ rows: packet as PeoplePacket, index })
-				if (row.kind === "pregnancy" && row.outcome === "childbirth death")
-					childbirthDeathTimes.push(row.time * STATE.yearMs)
-			}
-		engine.journal.length = 0
-		diagnostics.annualTicks.push(performance.now() - tickStart)
-		if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
-			diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
-			persist()
-		}
-		PARTITION_REPORT.observe({ engine, tracker: partitions })
-		trackMarriages({ engine, tracker })
-		PEOPLE_HEALTH_REPORT.sample({ engine, tracker: peopleHealth })
-		if (year === start + 10)
-			diagnostics.starters = PEOPLE_HEALTH_REPORT.starters({
-				record: peopleRecord.tracker.record,
-				start,
+	try {
+		for (let year = start + 1; year <= start + options.years; year++) {
+			const tickStart = performance.now()
+			SIM_ENGINE.simulateUntil({
+				state: engine,
+				targetTimeMs: year * STATE.yearMs,
+				rng,
+				validate: false,
 			})
-		PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker, start })
-		PEOPLE_OPINION_REPORT.sample({ engine, tracker: opinionTracker })
-		MILITARY_REPORT.sample({
-			engine,
-			tracker: military.tracker,
-			sampleRelations: (year - start) % 10 === 0,
-		})
-		for (const p of largest({ engine })) {
-			sampledYears++
-			if (MILITARY.atWar({ state: engine, nation: p })) atWarYears++
-		}
-		if ((year - start) % 100 !== 0 && year !== start + options.years) continue
-		const top = largest({ engine })
-		const topSet = new Set(top)
-		const opinion = PEOPLE_OPINION_REPORT.of({
-			engine,
-			tracker: opinionTracker,
-			record: peopleRecord.tracker.record,
-			from,
-			to: year,
-		})
-		const events = eventsIn({ engine, from, to: year })
-		const rebellions = events.filter((event) => event.tag === "rebellion")
-		const raids = events.filter((event) => event.tag === "raid")
-		const endSovereigns = sovereigns({ engine })
-		let pop = 0
-		let revenue = 0
-		for (const p of endSovereigns) {
-			pop += STATE.getNationPopulation({ state: engine, root: p })
-			revenue += ECONOMY.revenue({ state: engine, p })
-		}
-		const wars = engine.wars.filter(
-			(war) =>
-				war.startTime >= from * STATE.yearMs &&
-				war.startTime < year * STATE.yearMs,
-		).length
-		reports.push({
-			from,
-			to: year,
-			sovereigns: endSovereigns.length,
-			warsPerSovereign: wars / ((startSovereigns + endSovereigns.length) / 2),
-			rebellions: rebellions.length,
-			largestAtWarShare: atWarYears / Math.max(1, sampledYears),
-			rebellionsPerLargest:
-				rebellions.filter((event) => topSet.has(event.data.overlord as number))
-					.length / LARGEST,
-			unionJuniorsPerLargest:
-				top.reduce((sum, nation) => sum + unionJuniors({ engine, nation }), 0) /
-				LARGEST,
-			raids: raids.length,
-			raidSuccessShare:
-				raids.filter((event) => event.data.success).length /
-				Math.max(1, raids.length),
-			revenuePerHead: revenue / Math.max(1, pop),
-			regency: regencyReport({ engine, from, to: year, top: topSet }),
-			character: PEOPLE_TRAITS_REPORT.summarize({
-				engine,
-				tracker: characterTracker,
-				from,
-				to: year,
-			}),
-			households: {
-				residenceRows: 0,
-				sameResidenceRealmChanges: 0,
-				...HOUSEHOLDS_REPORT.build({
-					people: peopleRecord.tracker.record,
-					samples: householdSamples,
-					fromMs: from * STATE.yearMs,
-					toMs: year * STATE.yearMs,
-					final: year === start + options.years,
+			householdSamples.push({
+				timeMs: year * STATE.yearMs,
+				sovereigns: new Set(sovereigns({ engine })),
+			})
+			MILITARY.validate({ state: engine })
+			rebelLogistics.sample({ source: "annual" })
+			diagnostics.recruitment.push(
+				RECRUITMENT_REPORT.snapshot({
+					engine,
+					lateKnowledgeBand: options.lateKnowledgeBand,
 				}),
-			},
-			people: peopleReport({
-				engine,
-				from,
-				to: year,
-				peopleMs,
-				childbirthDeathTimes,
-			}),
-			peopleHealth: PEOPLE_HEALTH_REPORT.summarize({
-				engine,
-				tracker: peopleHealth,
-				record: peopleRecord.tracker.record,
-				start,
-				from,
-				to: year,
-			}),
-			marriage: marriageReport({ engine, from, to: year, tracker }),
-			marriageMarket: PEOPLE_MARRIAGE_REPORT.summarize({
-				windows: engine.marriageMarket,
-				from,
-				to: year,
-			}),
-			peopleOpinion: opinion.statistics,
-			peopleOpinionCost: opinion.cost,
-			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
-			partitionState: PARTITION_REPORT.state({ engine }),
-			partition: PARTITION_REPORT.summarize({
-				engine,
-				tracker: partitions,
-				from,
-				to: year,
-				divideMs,
-			}),
-		})
-		if (year === start + options.years)
-			diagnostics.partitionTotal = PARTITION_REPORT.summarize({
-				engine,
-				tracker: partitions,
-				from: start,
-				to: year + 1,
-				divideMs: divideTotalMs,
-			})
-		diagnostics.completed = year === start + options.years
-		if (diagnostics.completed) {
-			const householdsStarted = performance.now()
-			const residenceReports = HOUSEHOLDS_REPORT.residence({
-				people: peopleRecord.tracker.record,
-				territory: householdTerritory,
-				windows: reports.map((report, index) => ({
-					fromMs: report.from * STATE.yearMs,
-					toMs: report.to * STATE.yearMs,
-					final: index === reports.length - 1,
-				})),
-			})
-			for (let index = 0; index < reports.length; index++)
-				Object.assign(reports[index].households, residenceReports[index])
-
-			diagnostics.totalPeopleCreated = PEOPLE_TRAITS_REPORT.validate({ engine })
-			diagnostics.households = {
-				...HOUSEHOLDS_REPORT.build({
-					people: peopleRecord.tracker.record,
-					samples: householdSamples,
-					fromMs: start * STATE.yearMs,
-					toMs: year * STATE.yearMs,
-					final: true,
-				}),
-				...residenceReports.reduce(
-					(total, report) => ({
-						residenceRows: total.residenceRows + report.residenceRows,
-						sameResidenceRealmChanges:
-							total.sameResidenceRealmChanges +
-							report.sameResidenceRealmChanges,
-					}),
-					{ residenceRows: 0, sameResidenceRealmChanges: 0 },
-				),
-			}
-			diagnostics.householdsReportMs = performance.now() - householdsStarted
-			diagnostics.peopleRecord = PEOPLE_RECORD_REPORT.summarize(
-				peopleRecord.tracker,
 			)
+			HOUSEHOLDS_REPORT.ingestTerritory({
+				territory: householdTerritory,
+				transactions: engine.journal,
+			})
+			PEOPLE_RECORD_REPORT.ingest({
+				tracker: peopleRecord.tracker,
+				transactions: engine.journal,
+			})
+			PEOPLE_HEALTH_REPORT.ingest({
+				tracker: peopleHealth,
+				transactions: engine.journal,
+			})
+			for (const { people: packet } of engine.journal)
+				for (let index = 0; index < (packet?.count ?? 0); index++) {
+					const row = PEOPLE_LOG.read({ rows: packet as PeoplePacket, index })
+					if (row.kind === "pregnancy" && row.outcome === "childbirth death")
+						childbirthDeathTimes.push(row.time * STATE.yearMs)
+				}
+			engine.journal.length = 0
+			diagnostics.annualTicks.push(performance.now() - tickStart)
+			if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
+				diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
+				persist()
+			}
+			DISTRICTS_REPORT.sample({ engine, tracker: districts.tracker })
+			PARTITION_REPORT.observe({ engine, tracker: partitions })
+			trackMarriages({ engine, tracker })
+			PEOPLE_HEALTH_REPORT.sample({ engine, tracker: peopleHealth })
+			if (year === start + 10)
+				diagnostics.starters = PEOPLE_HEALTH_REPORT.starters({
+					record: peopleRecord.tracker.record,
+					start,
+				})
+			PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker, start })
+			PEOPLE_OPINION_REPORT.sample({ engine, tracker: opinionTracker })
+			MILITARY_REPORT.sample({
+				engine,
+				tracker: military.tracker,
+				sampleRelations: (year - start) % 10 === 0,
+			})
+			for (const p of largest({ engine })) {
+				sampledYears++
+				if (MILITARY.atWar({ state: engine, nation: p })) atWarYears++
+			}
+			if ((year - start) % 100 !== 0 && year !== start + options.years) continue
+			const top = largest({ engine })
+			const topSet = new Set(top)
+			const opinion = PEOPLE_OPINION_REPORT.of({
+				engine,
+				tracker: opinionTracker,
+				record: peopleRecord.tracker.record,
+				from,
+				to: year,
+			})
+			const events = eventsIn({ engine, from, to: year })
+			const rebellions = events.filter((event) => event.tag === "rebellion")
+			const raids = events.filter((event) => event.tag === "raid")
+			const endSovereigns = sovereigns({ engine })
+			let pop = 0
+			let revenue = 0
+			for (const p of endSovereigns) {
+				pop += STATE.getNationPopulation({ state: engine, root: p })
+				revenue += ECONOMY.revenue({ state: engine, p })
+			}
+			const wars = engine.wars.filter(
+				(war) =>
+					war.startTime >= from * STATE.yearMs &&
+					war.startTime < year * STATE.yearMs,
+			).length
+			reports.push({
+				from,
+				to: year,
+				sovereigns: endSovereigns.length,
+				warsPerSovereign: wars / ((startSovereigns + endSovereigns.length) / 2),
+				rebellions: rebellions.length,
+				largestAtWarShare: atWarYears / Math.max(1, sampledYears),
+				rebellionsPerLargest:
+					rebellions.filter((event) =>
+						topSet.has(event.data.overlord as number),
+					).length / LARGEST,
+				unionJuniorsPerLargest:
+					top.reduce(
+						(sum, nation) => sum + unionJuniors({ engine, nation }),
+						0,
+					) / LARGEST,
+				raids: raids.length,
+				raidSuccessShare:
+					raids.filter((event) => event.data.success).length /
+					Math.max(1, raids.length),
+				revenuePerHead: revenue / Math.max(1, pop),
+				regency: regencyReport({ engine, from, to: year, top: topSet }),
+				character: PEOPLE_TRAITS_REPORT.summarize({
+					engine,
+					tracker: characterTracker,
+					from,
+					to: year,
+				}),
+				households: {
+					residenceRows: 0,
+					sameResidenceRealmChanges: 0,
+					...HOUSEHOLDS_REPORT.build({
+						people: peopleRecord.tracker.record,
+						samples: householdSamples,
+						fromMs: from * STATE.yearMs,
+						toMs: year * STATE.yearMs,
+						final: year === start + options.years,
+					}),
+				},
+				people: peopleReport({
+					engine,
+					from,
+					to: year,
+					peopleMs,
+					childbirthDeathTimes,
+				}),
+				peopleHealth: PEOPLE_HEALTH_REPORT.summarize({
+					engine,
+					tracker: peopleHealth,
+					record: peopleRecord.tracker.record,
+					start,
+					from,
+					to: year,
+				}),
+				marriage: marriageReport({ engine, from, to: year, tracker }),
+				marriageMarket: PEOPLE_MARRIAGE_REPORT.summarize({
+					windows: engine.marriageMarket,
+					from,
+					to: year,
+				}),
+				peopleOpinion: opinion.statistics,
+				peopleOpinionCost: opinion.cost,
+				military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
+				districts: DISTRICTS_REPORT.summarize({
+					engine,
+					tracker: districts.tracker,
+					from,
+					to: year,
+				}),
+				partitionState: PARTITION_REPORT.state({ engine }),
+				partition: PARTITION_REPORT.summarize({
+					engine,
+					tracker: partitions,
+					from,
+					to: year,
+					divideMs,
+				}),
+			})
+			if (year === start + options.years)
+				diagnostics.partitionTotal = PARTITION_REPORT.summarize({
+					engine,
+					tracker: partitions,
+					from: start,
+					to: year + 1,
+					divideMs: divideTotalMs,
+				})
+			if (year === start + options.years)
+				diagnostics.districtsTotal = DISTRICTS_REPORT.summarize({
+					engine,
+					tracker: districts.tracker,
+					from: start,
+					to: year,
+				})
+			diagnostics.completed = year === start + options.years
+			if (diagnostics.completed) {
+				const householdsStarted = performance.now()
+				const residenceReports = HOUSEHOLDS_REPORT.residence({
+					people: peopleRecord.tracker.record,
+					territory: householdTerritory,
+					windows: reports.map((report, index) => ({
+						fromMs: report.from * STATE.yearMs,
+						toMs: report.to * STATE.yearMs,
+						final: index === reports.length - 1,
+					})),
+				})
+				for (let index = 0; index < reports.length; index++)
+					Object.assign(reports[index].households, residenceReports[index])
+
+				diagnostics.totalPeopleCreated = PEOPLE_TRAITS_REPORT.validate({
+					engine,
+				})
+				diagnostics.households = {
+					...HOUSEHOLDS_REPORT.build({
+						people: peopleRecord.tracker.record,
+						samples: householdSamples,
+						fromMs: start * STATE.yearMs,
+						toMs: year * STATE.yearMs,
+						final: true,
+					}),
+					...residenceReports.reduce(
+						(total, report) => ({
+							residenceRows: total.residenceRows + report.residenceRows,
+							sameResidenceRealmChanges:
+								total.sameResidenceRealmChanges +
+								report.sameResidenceRealmChanges,
+						}),
+						{ residenceRows: 0, sameResidenceRealmChanges: 0 },
+					),
+				}
+				diagnostics.householdsReportMs = performance.now() - householdsStarted
+				diagnostics.peopleRecord = PEOPLE_RECORD_REPORT.summarize(
+					peopleRecord.tracker,
+				)
+			}
+			diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
+			persist()
+			options.log(
+				`seed ${seed} saved through ${year}; ${(diagnostics.wallMs / 1000).toFixed(1)}s`,
+			)
+			childbirthDeathTimes = childbirthDeathTimes.filter(
+				(time) => time >= year * STATE.yearMs,
+			)
+			from = year
+			startSovereigns = endSovereigns.length
+			atWarYears = 0
+			sampledYears = 0
+			peopleMs = 0
+			divideMs = 0
 		}
-		diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
-		persist()
-		options.log(
-			`seed ${seed} saved through ${year}; ${(diagnostics.wallMs / 1000).toFixed(1)}s`,
-		)
-		childbirthDeathTimes = childbirthDeathTimes.filter(
-			(time) => time >= year * STATE.yearMs,
-		)
-		from = year
-		startSovereigns = endSovereigns.length
-		atWarYears = 0
-		sampledYears = 0
-		peopleMs = 0
-		divideMs = 0
+	} finally {
+		PEOPLE_EVENTS.runYear = runPeopleYear
+		HEALTH.runYear = runHealthYear
+		PARTITION.divide = divide
+		districts.detach()
+		peopleRecord.detach()
+		military.detach()
+		rebelLogistics.detach()
 	}
-	PEOPLE_EVENTS.runYear = runPeopleYear
-	HEALTH.runYear = runHealthYear
-	PARTITION.divide = divide
-	peopleRecord.detach()
-	military.detach()
-	rebelLogistics.detach()
 	const settled = tracker.standing.slice(20, 31)
 	options.log(
 		`seed ${seed} betrothals standing: ${tracker.standing[0]} at start, ${(settled.reduce((sum, count) => sum + count, 0) / Math.max(1, settled.length)).toFixed(1)} mean over years 20-30`,

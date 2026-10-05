@@ -67,7 +67,17 @@ it("projects actual ordered primary and partition allocations for each gender la
 			hierarchyDirty: false,
 			culture: new Int32Array([0, 0, 0]),
 			cultureGenderSystems: new Uint8Array([gender]),
-			seatRank: new Uint8Array([3, 2, 1]),
+			seatRank: new Uint8Array([3, 2, 2]),
+			districtSeat: new Uint8Array([0, 1, 1]),
+			districtRank: new Uint8Array([0, 2, 2]),
+			topTier: new Uint8Array([3, 0, 0]),
+			titles: {
+				count: 0,
+				holder: new Int32Array(0),
+				tier: new Uint8Array(0),
+				seat: new Int32Array(0),
+				regionOf: new Int32Array(12).fill(-1),
+			},
 			governmentType: new Uint8Array([
 				GOVERNMENT.getGovIdx().tribal_monarchy,
 				GOVERNMENT.getGovIdx().feudal_monarchy,

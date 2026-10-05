@@ -1,10 +1,14 @@
 import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import type {
+	AdminMove,
+	DemoteParams,
 	DistrictParams,
 	GrantCandidate,
 	GrantParams,
 	HolderParams,
+	HomeRegionParams,
 	InstallDistrictParams,
+	ReseatParams,
 	RevalidateParams,
 	SeatCheck,
 	SucceedDistrictParams,
@@ -23,7 +27,6 @@ import { DEJURE } from "@/model/society/dejure"
 const NEW_GRANT_RELATIVE_CHANCE = 0.3
 const ADULT_AGE = 16
 
-// Share of a realm's titled seats held as districts rather than crown demesne.
 function grantShare(size: number): number {
 	if (size <= 4) return 0
 	if (size >= 25) return 0.92
@@ -36,9 +39,6 @@ function now(state: HistoryState): number {
 	return state.time / STATE.yearMs
 }
 
-// A holder's closest adult relative who holds nothing, passing over the heir
-// apparent so the seat is not split from its heir; with no adult children
-// this is usually a sibling.
 function landlessKin({ state, seat }: SeatParams): number {
 	const people = state.people
 	const holder = people.rulerOf[seat]
@@ -64,8 +64,6 @@ function landlessKin({ state, seat }: SeatParams): number {
 	}).heir
 }
 
-// A landless adult of another district holder's house in the realm, nearest
-// district first, so a vacant district goes to a known family before a new one.
 function cadet({ state, seat }: SeatParams): number {
 	const people = state.people
 	const time = now(state)
@@ -120,7 +118,6 @@ function newHolder({
 	})
 }
 
-// Returns whether the person took the seat; the dead cannot.
 function install({
 	state,
 	seat,
@@ -139,9 +136,6 @@ function install({
 	return true
 }
 
-// Checks each held, non-sovereign seat against the current hierarchy: a seat
-// that stopped being a district seat loses its holder, and a living holder of
-// a valid seat follows it to the realm that owns it now.
 function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 	const people = state.people
 	const table = people.persons
@@ -152,17 +146,32 @@ function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 		if (holder < 0 || STATE.isSovereign({ state, p: seat })) continue
 		if (!STATE_TITLES.isDistrictSeat({ state, seat })) {
 			PEOPLE.vacate({ people, seat, reason: "territorial change" })
-			checks.push({ seat, holder, standing: "vacated" })
+			checks.push({
+				seat,
+				holder,
+				rank: state.districtRank[seat],
+				standing: "vacated",
+			})
 			continue
 		}
 		if (
 			table.heldSeats[holder].includes(seat) &&
 			PEOPLE.aliveAt({ people, person: holder, time })
 		) {
-			checks.push({ seat, holder, standing: "kept" })
+			checks.push({
+				seat,
+				holder,
+				rank: state.districtRank[seat],
+				standing: "kept",
+			})
 			continue
 		}
-		checks.push({ seat, holder, standing: "lapsed" })
+		checks.push({
+			seat,
+			holder,
+			rank: state.districtRank[seat],
+			standing: "lapsed",
+		})
 	}
 	return checks
 }
@@ -202,13 +211,158 @@ function succeed({ state, seat, rng }: SucceedDistrictParams): void {
 	})
 }
 
-function settle({ state }: DistrictParams): void {
-	for (let seat = 0; seat < state.P; seat++) {
-		if (state.people.rulerOf[seat] < 0) continue
-		const check = revalidate({ state, seats: [seat] })[0]
-		if (check)
-			DEATH_SCHEDULE.ensure({ state, person: check.holder, cause: "natural" })
+function homeRegion({ state, displaced }: HomeRegionParams): Set<number> {
+	const { seat, rank } = displaced
+	const title =
+		rank > 0
+			? DEJURE.titleAt({
+					titles: state.titles,
+					provinceCount: state.P,
+					tier: rank,
+					province: seat,
+				})
+			: -1
+	if (title < 0) return new Set([seat])
+	return new Set(
+		state.titleMembers.list.subarray(
+			state.titleMembers.offset[title],
+			state.titleMembers.offset[title + 1],
+		),
+	)
+}
+
+function demote({ state, displaced, reason, moves }: DemoteParams): void {
+	const people = state.people
+	let { person, seat, rank } = displaced
+	for (;;) {
+		const realm = state.sovereignCurrent[seat]
+		const home = homeRegion({ state, displaced: { person, seat, rank } })
+		const candidates =
+			realm < 0
+				? []
+				: STATE.getChildren({ state, p: realm }).filter(
+						(candidate) =>
+							STATE_TITLES.isDistrictSeat({ state, seat: candidate }) &&
+							state.seatRank[candidate] < rank,
+					)
+		const population = new Map(
+			candidates.map((candidate) => [
+				candidate,
+				STATE.getNationPopulation({ state, root: candidate }),
+			]),
+		)
+		const target = candidates.sort(
+			(a, b) =>
+				Number(home.has(b)) - Number(home.has(a)) ||
+				Number(people.rulerOf[a] >= 0) - Number(people.rulerOf[b] >= 0) ||
+				state.seatRank[b] - state.seatRank[a] ||
+				(population.get(b) as number) - (population.get(a) as number) ||
+				a - b,
+		)[0]
+		if (target === undefined) {
+			moves.push({
+				person,
+				from: seat,
+				to: -1,
+				bumped: false,
+				rank,
+				reason: "landless",
+			})
+			return
+		}
+		const bumped = people.rulerOf[target]
+		const targetRank = state.districtRank[target]
+		install({
+			state,
+			seat: target,
+			person,
+			reason: reason === "partition" ? reason : "demotion",
+		})
+		moves.push({
+			person,
+			from: seat,
+			to: target,
+			bumped: bumped >= 0,
+			rank,
+			reason: "demotion",
+		})
+		if (
+			bumped < 0 ||
+			people.persons.heldSeats[bumped].length > 0 ||
+			!PEOPLE.aliveAt({ people, person: bumped, time: now(state) })
+		)
+			return
+		person = bumped
+		seat = target
+		rank = targetRank
 	}
+}
+
+function reseat({ state, displaced, reason }: ReseatParams): AdminMove[] {
+	const people = state.people
+	const moves: AdminMove[] = []
+	const population = new Map(
+		displaced.map((holder) => {
+			let total = 0
+			const realm = state.sovereignCurrent[holder.seat]
+			for (const p of homeRegion({ state, displaced: holder }))
+				if (state.sovereignCurrent[p] === realm && !state.desolate[p])
+					total += state.popRuralCurrent[p] + state.popUrbanCurrent[p]
+			return [holder.seat, total]
+		}),
+	)
+	for (const holder of displaced.toSorted(
+		(a, b) =>
+			b.rank - a.rank ||
+			(population.get(b.seat) as number) - (population.get(a.seat) as number) ||
+			a.seat - b.seat,
+	)) {
+		if (
+			people.persons.heldSeats[holder.person].length > 0 ||
+			!PEOPLE.aliveAt({ people, person: holder.person, time: now(state) })
+		)
+			continue
+		const target = state.parentCurrent[holder.seat]
+		if (
+			target >= 0 &&
+			STATE_TITLES.isDistrictSeat({ state, seat: target }) &&
+			people.rulerOf[target] < 0 &&
+			state.seatRank[target] > holder.rank
+		) {
+			install({
+				state,
+				seat: target,
+				person: holder.person,
+				reason: reason === "partition" ? reason : "promotion",
+			})
+			moves.push({
+				person: holder.person,
+				from: holder.seat,
+				to: target,
+				bumped: false,
+				rank: holder.rank,
+				reason: "promotion",
+			})
+		} else demote({ state, displaced: holder, reason, moves })
+	}
+	return moves
+}
+
+function settle({ state }: DistrictParams): void {
+	const seats: number[] = []
+	for (let seat = 0; seat < state.P; seat++)
+		if (state.people.rulerOf[seat] >= 0) seats.push(seat)
+	const displaced = []
+	for (const check of revalidate({ state, seats })) {
+		DEATH_SCHEDULE.ensure({ state, person: check.holder, cause: "natural" })
+		if (check.standing === "vacated")
+			displaced.push({
+				person: check.holder,
+				seat: check.seat,
+				rank: check.rank,
+			})
+	}
+	DISTRICTS.reseat({ state, displaced, reason: "territorial change" })
 }
 
 function grant({
@@ -297,4 +451,5 @@ export const DISTRICTS = {
 	grant,
 	install,
 	revalidate,
+	reseat,
 }

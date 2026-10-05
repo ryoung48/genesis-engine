@@ -74,23 +74,20 @@ export interface SeatRankParams {
 	heldOnly: boolean
 }
 
-export interface LiegeOfParams {
-	titles: DejureTitles
-	provinceCount: number
-	rank: Uint8Array
-	ownerOf: Int32Array
-	province: number
-	root: number
-}
-
-export interface DeriveParentsParams {
+export interface DistrictSeatsParams {
 	titles: DejureTitles
 	provinceCount: number
 	rank: Uint8Array
 	ownerOf: Int32Array
 	members: ArrayLike<number>
 	root: number
+}
+
+export interface DeriveParentsParams extends DistrictSeatsParams {
+	adjOffset: Int32Array
+	adjList: Int32Array
 	parent: Int32Array
+	district: Uint8Array
 }
 
 export interface DepthOfParentsParams {

@@ -169,13 +169,14 @@ function releaseFaction({
 	supporters,
 }: ReleaseFactionParams): void {
 	const formerSovereign = getSovereign({ state, p })
-	const supportingProvinces = [...new Set(supporters)]
-		.filter(
-			(seat) =>
-				seat !== p &&
-				FIELDS.prov.parent.get({ state, p: seat }) === formerSovereign,
-		)
-		.flatMap((seat) => getNationProvinces({ state, root: seat }))
+	const supportingSeats = [...new Set(supporters)].filter(
+		(seat) =>
+			seat !== p &&
+			FIELDS.prov.parent.get({ state, p: seat }) === formerSovereign,
+	)
+	const supportingProvinces = supportingSeats.flatMap((seat) =>
+		getNationProvinces({ state, root: seat }),
+	)
 	const formerPopulation = getNationPopulation({ state, root: formerSovereign })
 	const share =
 		formerPopulation > 0
@@ -205,6 +206,8 @@ function releaseFaction({
 	formerBudget.succession -= treasury
 	formerBudget.otherChangesTotal -= treasury
 	FIELDS.prov.parent.set({ state, p, value: -1 })
+	for (const seat of supportingSeats)
+		FIELDS.prov.parent.set({ state, p: seat, value: p })
 	rebuildAssignment({ state })
 	repartitionNation({ state, nation: formerSovereign, subjects: [] })
 	repartitionNation({ state, nation: p, subjects: supportingProvinces })
@@ -709,6 +712,9 @@ function createHistoryState({
 			provinceCount: P,
 			heldOnly: true,
 		}),
+		districtSeat: new Uint8Array(P),
+		districtRank: new Uint8Array(P),
+		topTier: new Uint8Array(P),
 		titleFounded: new Uint8Array(nations.titles.count + TITLE_CAPACITY),
 		titleLapseSince: new Float64Array(
 			nations.titles.count + TITLE_CAPACITY,
@@ -872,6 +878,17 @@ function createHistoryState({
 		FIELDS.prov.occupation.set({ state, p, value: -1 })
 	}
 
+	rebuildAssignment({ state })
+	for (const nation of new Set(state.sovereignCurrent)) {
+		if (nation < 0 || state.sovereignCurrent[nation] !== nation) continue
+		STATE_TITLES.applyDerivedParents({
+			state,
+			nation,
+			members: getNationProvinces({ state, root: nation }).filter(
+				(p) => !state.desolate[p],
+			),
+		})
+	}
 	rebuildAssignment({ state })
 	BACKFILL.sovereigns({ state, seed })
 

@@ -95,6 +95,8 @@ export type SeatChangeReason =
 	| "territorial change"
 	| "district grant"
 	| "partition"
+	| "promotion"
+	| "demotion"
 	| "unknown"
 
 export type RegentKind =

@@ -1,3 +1,7 @@
+import type {
+	AdminMove,
+	DisplacedHolder,
+} from "@/model/history/sim/engine/events/people/districts/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { PeopleState } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
@@ -25,29 +29,15 @@ export type UnseatedReason =
 export type PartitionRealmKind = "primary" | "heir" | "released"
 
 export interface PartitionShare {
+	kind: "title" | "district"
+	supporters: number[]
 	heir: number
 	seat: number
-}
-
-// A living admin who lost a seat, with the rank the seat had before the
-// division.
-export interface DisplacedHolder {
-	person: number
-	seat: number
-	rank: number
 }
 
 export interface UnseatedHeir {
 	heir: number
 	reason: UnseatedReason
-}
-
-export interface AdminMove {
-	person: number
-	from: number
-	// -1 for landless.
-	to: number
-	bumped: boolean
 }
 
 export interface JoinedDistrict {
@@ -59,7 +49,7 @@ export interface JoinedDistrict {
 export interface PartitionSnapshot {
 	provinces: number[]
 	population: number
-	seatRank: Uint8Array
+	topTier: number
 	// Held seats other than the realm root.
 	seats: number[]
 	titleHolder: Int32Array
@@ -80,11 +70,6 @@ export interface PartitionRun {
 export interface RealmParams {
 	state: HistoryState
 	realm: number
-}
-
-export interface SeatParams {
-	state: HistoryState
-	seat: number
 }
 
 export interface BranchParams {
@@ -108,7 +93,7 @@ export interface PrimarySeatParams {
 	primarySeat: number
 }
 
-export interface AssignParams {
+export interface AllocateParams {
 	state: HistoryState
 	realm: number
 	excludedSeat: number
@@ -131,11 +116,6 @@ export interface ReleaseParams {
 export interface PieceParams {
 	run: PartitionRun
 	piece: number
-}
-
-export interface DemoteParams {
-	run: PartitionRun
-	displaced: DisplacedHolder
 }
 
 export interface NoteParams {
@@ -174,6 +154,7 @@ export type PartitionNoteData = {
 	provincesBefore: number
 	heirs: number[]
 	seats: number[]
+	shareKind: ("title" | "district")[]
 	realms: number[]
 	realmKind: PartitionRealmKind[]
 	realmPopulation: number[]

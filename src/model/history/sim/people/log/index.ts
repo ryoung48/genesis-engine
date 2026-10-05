@@ -54,6 +54,8 @@ const SEAT_REASON_CODE: Record<SeatChangeReason, number> = {
 	union: 7,
 	unknown: 8,
 	usurpation: 9,
+	promotion: 10,
+	demotion: 11,
 }
 const SEAT_REASONS = Object.keys(SEAT_REASON_CODE) as SeatChangeReason[]
 const LOSS_CODE: Record<PregnancyLoss, number> = {

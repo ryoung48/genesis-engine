@@ -16,6 +16,7 @@ import type {
 	SeatParams,
 	SettleProvincesParams,
 	SettleTitleSetParams,
+	TopTierParams,
 } from "@/model/history/sim/engine/state/titles/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
@@ -38,13 +39,12 @@ const TITLE_CREATION_COST_DUCATS: Readonly<Record<number, number>> = {
 }
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000
 
-// A titled seat held directly of its sovereign.
 function isDistrictSeat({ state, seat }: SeatParams): boolean {
 	const parent = state.parentCurrent[seat]
 	return (
 		parent >= 0 &&
 		parent === state.sovereignCurrent[seat] &&
-		state.seatRank[seat] > 0 &&
+		state.districtSeat[seat] === 1 &&
 		!state.desolate[seat]
 	)
 }
@@ -61,12 +61,6 @@ function refreshHouseholds({
 		)
 			continue
 		holders.add(state.people.rulerOf[seat])
-		if (state.seatRank[seat] === 0 && state.parentCurrent[seat] >= 0)
-			PEOPLE.vacate({
-				people: state.people,
-				seat,
-				reason: "territorial change",
-			})
 	}
 
 	for (const person of holders) {
@@ -93,7 +87,7 @@ function applyDerivedParents({
 	const ownerOf = state.sovereignCurrent.slice()
 	for (const member of members) ownerOf[member] = nation
 	const next = new Int32Array(state.P).fill(-1)
-	DEJURE.deriveParents({
+	const top = DEJURE.deriveParents({
 		titles: state.titles,
 		provinceCount: state.P,
 		rank: state.seatRank,
@@ -101,7 +95,13 @@ function applyDerivedParents({
 		members,
 		root: nation,
 		parent: next,
+		district: state.districtSeat,
+		adjOffset: state.provinceAdjOffset,
+		adjList: state.provinceAdjList,
 	})
+	state.topTier[nation] = top
+	for (const member of members)
+		if (state.districtSeat[member]) state.districtRank[member] = top - 1
 	FIELDS.prov.parent.set({ state, p: nation, value: -1 })
 	const ordered = members
 		.filter((member) => member !== nation)
@@ -330,7 +330,12 @@ function considerTitles({ state, nation, rng }: ConsiderTitlesParams): void {
 		if (foundTitleFor({ state, nation, tier, rng })) break
 }
 
+function topTier({ state, realm }: TopTierParams): number {
+	return state.topTier[realm]
+}
+
 export const STATE_TITLES = {
+	topTier,
 	applyDerivedParents,
 	considerTitles,
 	isDistrictSeat,

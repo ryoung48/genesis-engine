@@ -77,26 +77,22 @@ A founded title lapses when the nation holds fewer than 2 fully held children fo
 
 ## Nation vs its subordinates
 
-- A nation is a sovereign realm. Its id is its root province id, so relations, leaders and wars are indexed by it. Only sovereigns hold titles, and they hold every title at every tier where they have the majority.
-- Provinces below the root hold no titles. They get only a `parent` link, derived from held titles.
+- A nation is a sovereign realm. Its id is its root province id, so relations, leaders and wars are indexed by it. Title holders are sovereigns chosen by majority ownership.
+- The crown implicitly holds every top-tier title. District admins hold seats exactly one tier below the realm's top tier, outside crown land. Lower titles have no individual holder.
 
 ## Derived liege tree (`DEJURE.deriveParents`)
 
-`parent` is recomputed from ownership and seats. It is never written ad hoc.
+`parent` is recomputed from ownership, title seats and province adjacency. It is never stored ad hoc. The realm's top tier `T` is the highest `seatRank` among its settled provinces, which can exceed the root's rank. Crown seats are the root and every seat of rank `T`. A held tier `T-1` title containing a crown seat is a crown title.
 
-For a province `p` in nation `N` with root `R`:
+1. The root has no parent.
+2. In a county-tier realm, and at every crown seat, land answers to the root.
+3. In a duke-tier realm, every non-crown province is a county district seat answering to the root.
+4. At higher tiers, land in a held crown title answers to the root. Any other held tier `T-1` title has a district seat answering to the root; land connected to that seat through owned provinces inside the title answers to that district.
+5. Remaining provinces attach by a multi-source breadth-first walk through the realm's own territory. The seeds are all provinces placed by rules 1–4, queued by ascending province id; neighbors follow adjacency-list order. Each province follows the crown or district anchor first reached at the fewest steps. An unreachable province answers to the root and uses the existing connection repair.
 
-1. If `p` is the root, it has no parent.
-2. Walk tiers 1 to 4 and look at the title whose region contains `p`. Skip vacant titles.
-3. The liege is that title's seat if the seat is not `p`, is owned by `N`, and has a higher `seatRank` than `p`.
-4. If no tier gives a liege, the parent is the root `R`.
+A held title's fragment separated from its seat uses rule 5, just like loose land. Lower titles can be divided between districts. All district land is connected to its seat through land answering to that district. Crown land can be separated from the capital.
 
-`seatRank` of a province is the highest tier of any held title seated there. It's how a duchy seat becomes the liege of its member provinces, a kingdom seat the liege of its duchy seats, and so on up to the root.
-
-Rules to keep the hierarchy valid:
-
-- Go through `settleProvinces` / `applyDerivedParents`. Parent writes must go rank-descending, or the `FIELDS.prov.parent.set` cycle check throws.
-- `applyDerivedParents` covers the members of a nation, excluding desolate provinces.
+The resulting tree has two levels below the root: district seats and their land. Parent writes go through `settleProvinces` / `applyDerivedParents`, rank-descending for the cycle check. Runtime state caches district flags, the rank at which each seat was last a district, and each root's top tier.
 
 ## Comparison with CK3
 
@@ -110,7 +106,7 @@ Similar:
 Different:
 
 - Holders are sovereigns chosen by majority ownership, not characters granted titles. No vassal contracts, grants or usurpation.
-- The liege tree is derived, not chosen.
+- The liege tree is derived, not chosen, and has only two levels below the crown; lower titles have no individual holders.
 - No de jure drift. The tree changes only when titles are founded or dissolved.
 - Founding is a cash-gated random attempt with a fixed establishment fee instead of a player decision; CK3 prestige/piety requirements are not modeled.
 - Titles can be vacant.

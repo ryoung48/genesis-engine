@@ -10,11 +10,11 @@ A rebellion is a district leaving its realm. The district and everything under i
 
 ## Who can rebel
 
-A **district** is a seat whose parent is its sovereign (a direct report of the crown), with a titled seat (`seatRank > 0`) and a living holder. Crown demesne, sub-vassals and vacant seats never rebel.
+A **district** is a flagged seat exactly one tier below its realm’s top tier, outside crown land, answering directly to its sovereign. A living county admin can rebel. Crown land and vacant seats never rebel.
 
 ## Rebellion threat
 
-The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and logistics. The crown's territory excludes the departing district. It uses the cubed force share from [military](armies-and-wars.md#war-starts).
+The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and logistics. The crown's territory excludes the departing district, whose territory includes all land attached by adjacency. It uses the cubed force share from [military](armies-and-wars.md#war-starts).
 
 ```text
 crownTarget = recruitment targets for the remaining crown territory
@@ -63,7 +63,7 @@ District holders can favor a claimant, while foreign realms can fight beside the
 - **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
 - **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
 - **Cut-off land.** Crown provinces left without a connection to their parent are released as well. They are recorded as `province released` and shown as a "disconnected" revolt.
-- **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of higher title tier.
+- **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of equal or higher top tier.
 
 ## The rebel war
 

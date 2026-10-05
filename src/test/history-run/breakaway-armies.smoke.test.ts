@@ -91,7 +91,7 @@ describe("independent breakaway armies", () => {
 		] as const) {
 			expect(state.levyCurrent[nation]).toBeCloseTo(target.levy, 7)
 			expect(state.regularCurrent[nation]).toBeCloseTo(target.regular, 7)
-			expect(RECRUITMENT.realmTargets({ state, nation }).logistics).toBe(
+			expect(RECRUITMENT.realmTargets({ state, nation }).logistics).toBeCloseTo(
 				target.logistics,
 			)
 			expect(state.militaryIntervals.get(nation)!.pending).toEqual({

@@ -8,8 +8,8 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { ERAS } from "@/model/society/eras"
 import { TITLES } from "@/model/society/titles"
+import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution/index"
 import type {
-	Distribution,
 	EndTagParams,
 	HeirRealmFate,
 	ObserveParams,
@@ -25,9 +25,7 @@ import type {
 } from "@/test/history-run/report/partition/types"
 
 function median(values: number[]): number {
-	if (values.length === 0) return 0
-	const sorted = values.toSorted((a, b) => a - b)
-	return sorted[Math.floor((sorted.length - 1) / 2)]
+	return REPORT_DISTRIBUTION.summarize(values).p50
 }
 
 function state({ engine }: PartitionStateParams): PartitionStateReport {
@@ -107,15 +105,6 @@ function shares(note: PartitionNoteData): number[] {
 // equal parts.
 function effectiveRealms(note: PartitionNoteData): number {
 	return 1 / shares(note).reduce((sum, share) => sum + share * share, 0)
-}
-
-function distribution(values: number[]): Distribution {
-	if (values.length === 0) return { p50: 0, p90: 0 }
-	const sorted = values.toSorted((a, b) => a - b)
-	return {
-		p50: sorted[Math.floor((sorted.length - 1) * 0.5)],
-		p90: sorted[Math.floor((sorted.length - 1) * 0.9)],
-	}
 }
 
 function tracker(): PartitionTracker {
@@ -356,19 +345,33 @@ function summarize({
 	}
 	return {
 		partitions: partitions.length,
+		titleShares: notes.reduce(
+			(sum, note) =>
+				sum + note.shareKind.filter((kind) => kind === "title").length,
+			0,
+		),
+		districtShares: notes.reduce(
+			(sum, note) =>
+				sum + note.shareKind.filter((kind) => kind === "district").length,
+			0,
+		),
 		skipped,
 		rate: partitions.length / Math.max(1, partitions.length + skips),
 		heirsSeated: notes.reduce((sum, note) => sum + note.heirs.length, 0),
 		heirsUnseated,
-		newRealms: distribution(notes.map((note) => note.heirs.length)),
-		primaryPopulationShare: distribution(notes.map((note) => shares(note)[0])),
-		primaryProvinceShare: distribution(
+		newRealms: REPORT_DISTRIBUTION.summarize(
+			notes.map((note) => note.heirs.length),
+		),
+		primaryPopulationShare: REPORT_DISTRIBUTION.summarize(
+			notes.map((note) => shares(note)[0]),
+		),
+		primaryProvinceShare: REPORT_DISTRIBUTION.summarize(
 			notes.map(
 				(note) => note.realmProvinces[0] / Math.max(1, note.provincesBefore),
 			),
 		),
-		largestJuniorShare: distribution(largestJunior),
-		effectiveRealms: distribution(notes.map(effectiveRealms)),
+		largestJuniorShare: REPORT_DISTRIBUTION.summarize(largestJunior),
+		effectiveRealms: REPORT_DISTRIBUTION.summarize(notes.map(effectiveRealms)),
 		sameTierShare: sameTier / Math.max(1, heirRealms),
 		titlesLost,
 		primaryRankDrops,
@@ -391,7 +394,9 @@ function summarize({
 		},
 		siblingWars: tracked.siblingWarYears.filter(within).length,
 		siblingUnions: tracked.siblingUnionYears.filter(within).length,
-		generation: distribution(partitions.map((entry) => entry.generation)),
+		generation: REPORT_DISTRIBUTION.summarize(
+			partitions.map((entry) => entry.generation),
+		),
 		maxGeneration: Math.max(0, ...partitions.map((entry) => entry.generation)),
 		regencies: partitions.reduce((sum, entry) => sum + entry.regencies, 0),
 		adminsSeatedVacant,
@@ -399,7 +404,7 @@ function summarize({
 		adminsLandless,
 		joinedDistricts,
 		releasedRealms,
-		releasedPopulationShare: distribution(releasedShares),
+		releasedPopulationShare: REPORT_DISTRIBUTION.summarize(releasedShares),
 		divideMs,
 	}
 }

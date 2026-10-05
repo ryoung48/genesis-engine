@@ -10,6 +10,7 @@ import type {
 	OrgMemberProvincesParams,
 	ToRenderInputsParams,
 } from "@/model/history/world-frame/types"
+import { DEJURE } from "@/model/society/dejure"
 
 function emptyRelations(): NationRelations {
 	return {
@@ -101,25 +102,32 @@ function heldTitles({ frame, nationId }: NationFrameParams): number[] {
 function directReports({ frame }: DirectReportsParams): DirectReport[] {
 	const { titles } = frame
 	if (!titles) return []
-	const bestAtSeat = new Map<number, number>()
-	for (let title = 0; title < titles.count; title++) {
-		const seat = titles.seat[title]
-		if (
-			seat < 0 ||
-			titles.holder[title] < 0 ||
-			titles.holder[title] !== frame.provinceNation[seat]
-		)
-			continue
-		const best = bestAtSeat.get(seat)
-		if (best === undefined || titles.tier[title] > titles.tier[best])
-			bestAtSeat.set(seat, title)
+	const rank = DEJURE.seatRank({
+		titles,
+		provinceCount: frame.provinceCount,
+		heldOnly: true,
+	})
+	const members = new Map<number, number[]>()
+	for (let p = 0; p < frame.provinceCount; p++) {
+		const nation = frame.provinceNation[p]
+		if (nation < 0) continue
+		const list = members.get(nation)
+		if (list) list.push(p)
+		else members.set(nation, [p])
 	}
 	const reports: DirectReport[] = []
-	for (const [seat, title] of bestAtSeat) {
-		const nation = titles.holder[title]
-		const capital = frame.nations.get(nation)?.capitalProvince ?? -1
-		if (capital >= 0 && frame.provinceParent[seat] === capital)
-			reports.push({ seat, title, nation })
+	for (const [nation, provinces] of members) {
+		const root = frame.nations.get(nation)?.capitalProvince ?? -1
+		if (root < 0) continue
+		for (const seat of DEJURE.districtSeats({
+			titles,
+			provinceCount: frame.provinceCount,
+			rank,
+			ownerOf: frame.provinceNation,
+			members: provinces,
+			root,
+		}))
+			reports.push({ seat, tier: rank[seat], nation })
 	}
 	return reports
 }

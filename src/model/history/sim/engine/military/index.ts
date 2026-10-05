@@ -41,6 +41,7 @@ import type {
 	ThreatParams,
 } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { MATH } from "@/model/shared/math/core"
 
 const DEFENDER_BONUS = 1.2
@@ -212,7 +213,7 @@ function rebellionPreview({
 	for (const vassal of STATE.getChildren({ state, p: overlord }))
 		if (
 			vassal !== subject &&
-			state.seatRank[vassal] > 0 &&
+			STATE_TITLES.isDistrictSeat({ state, seat: vassal }) &&
 			state.people.rulerOf[vassal] >= 0
 		) {
 			const potential = RECRUITMENT.realmTargets({ state, nation: vassal })

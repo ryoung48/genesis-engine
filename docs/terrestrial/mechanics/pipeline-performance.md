@@ -182,3 +182,11 @@ Live-history harness (20,000 points, 300 years), unmodified P7 against the four 
 | Retained JavaScript heap (MiB) | 149 | 143 |
 
 The report, its comparison page and both harness files are in `stats/history/2026-10-05T03-39-58-023Z-p7-exact-optimisations/`.
+
+## District derivation timer
+
+The detailed history report wraps `DEJURE.deriveParents` for the run and restores it afterward. `districts.deriveMs` and `districts.deriveCalls` measure title lookups and the two adjacency walks per reporting window; `districtsTotal` records the run totals. The HTML comparison places derivation milliseconds under Performance, separately from district counts and simulation statistics. The timer does not require profiling.
+
+For seed 14963991, lateMedieval, 204,000 points, 867–1800, the completed district-tiers report measured 2,666.75 ms in 52,585 derivations (2.86 ms per simulated year, 0.74% of annual tick time). The people pass measured 82.8–124.4 ms/year by window, with a duration-weighted mean of 103.10 ms/year, compared with 58.69 ms/year in the district-cadet baseline. Average tick time rose from 298.43 to 384.23 ms (+28.8%), wall time from 347.52 to 437.47 s (+25.9%), and peak RSS from 2,219.99 to 2,842.07 MiB (+28.0%).
+
+The final report, comparison and discussion are in `stats/history/2026-10-05T23-41-24-810Z-district-tiers/`; the exact baseline is `stats/history/2026-10-05T04-09-26-764Z-district-cadets/933.json`. Both are standard detailed reports without profiling, with late-knowledge threshold 2.366478320318625. The final 10-year preflight had 843 held districts, below the plan’s 1,332 decision point. The full run creates 2.2% more people, which does not by itself explain the 75.7% people-pass increase or the RSS difference. Additional district work and title-share allocation during inheritance projection are included in that pass; no profile apportions their costs. The small derivation share rules out the adjacency walks as the sole cause of the slowdown. These are single samples on a shared machine; the final run had no concurrent smoke-test run from this task.
