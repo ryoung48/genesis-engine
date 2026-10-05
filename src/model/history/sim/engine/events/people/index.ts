@@ -100,16 +100,15 @@ function marriageRealms({ state }: StateParams): MarriageRealms {
 			contexts.delete(person)
 		},
 		settle: ({ match, betrothal }) => {
-			if (
-				settleMatches({
-					state,
-					matches: {
-						weddings: betrothal ? [] : [match],
-						betrothals: betrothal ? [match] : [],
-					},
-				})
-			)
-				if (stale === "none") stale = "crowns"
+			const united = settleMatches({
+				state,
+				matches: {
+					weddings: betrothal ? [] : [match],
+					betrothals: betrothal ? [match] : [],
+				},
+			})
+			if (united && stale === "none") stale = "crowns"
+			return united
 		},
 		// A match moves a household and may ally two realms, neither of which
 		// changes a holder or an heir. Only a union changes who may inherit a

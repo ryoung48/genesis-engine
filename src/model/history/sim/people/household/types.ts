@@ -8,10 +8,14 @@ export interface HouseholdContext {
 	time: () => number
 }
 
+// Every move in one set of columns; each row points at the same person's
+// previous move, and `head` holds each person's latest row.
 export interface ResidenceHistory {
+	head: Map<number, number>
 	length: number
 	times: Float64Array
 	provinces: Int32Array
+	previous: Int32Array
 }
 
 export interface HouseholdPersonParams {

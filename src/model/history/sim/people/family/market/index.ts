@@ -348,6 +348,8 @@ function seekMatches({
 	// realm groups stand until the next one, and nobody else stops being
 	// eligible or changes blood within the pass.
 	let candidates = ids.filter(eligible).map(seekerOf)
+	const waiting = new Map(candidates.map((other) => [other.person, other]))
+	const order = new Map(candidates.map((other, index) => [other.person, index]))
 	let groups: Map<number, Seeker[]> | null = null
 	const grouped = () => {
 		const pool = new Map<number, Seeker[]>()
@@ -358,6 +360,46 @@ function seekMatches({
 			else pool.set(other.realm, [other])
 		}
 		return pool
+	}
+	const leave = (other: Seeker) => {
+		const list = groups?.get(other.realm)
+		const index = list ? list.indexOf(other) : -1
+		if (list && index >= 0) list.splice(index, 1)
+	}
+	// A wedding moves the unlanded spouse and their young children; everyone
+	// else stays in the group they were in, unless the match redrew realms.
+	const regroup = (pair: number[], redrawn: boolean) => {
+		if (redrawn) {
+			for (const person of pair) waiting.delete(person)
+			candidates = candidates.filter((other) => waiting.has(other.person))
+			groups = null
+		}
+		if (!groups) return
+		for (const person of pair) {
+			const other = waiting.get(person)
+			if (!other) continue
+			leave(other)
+			waiting.delete(person)
+		}
+		for (const person of pair)
+			for (const child of table.children[person]) {
+				const other = waiting.get(child)
+				if (!other) continue
+				const realm = HOUSEHOLD.realmOf({ people, person: child })
+				if (realm === other.realm) continue
+				leave(other)
+				other.realm = realm
+				const list = groups.get(realm)
+				const rank = order.get(child) as number
+				const at = list
+					? list.findIndex(
+							(entry) => (order.get(entry.person) as number) > rank,
+						)
+					: -1
+				if (!list) groups.set(realm, [other])
+				else if (at < 0) list.push(other)
+				else list.splice(at, 0, other)
+			}
 	}
 	const accept = (selection: AcceptedPair) => {
 		const { match, outsider: fallback } = selection
@@ -401,10 +443,9 @@ function seekMatches({
 			marry({ people, a: match.a, b: match.b, time })
 			matches.weddings.push(match)
 		}
-		market.settle({ match, betrothal })
+		const redrawn = market.settle({ match, betrothal })
 		market.refresh()
-		candidates = candidates.filter((other) => !matched.has(other.person))
-		groups = null
+		regroup([match.a, match.b], redrawn)
 	}
 	market.refresh()
 	for (const person of ids) {

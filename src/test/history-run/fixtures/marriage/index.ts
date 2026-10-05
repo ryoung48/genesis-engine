@@ -63,7 +63,7 @@ function create(): MarriageFixture {
 		onboard: (id) => {
 			people.persons.createdAt[id] = time
 		},
-		settle: () => undefined,
+		settle: () => false,
 		refresh: () => undefined,
 		observe: (row) => observations.push(row),
 	}

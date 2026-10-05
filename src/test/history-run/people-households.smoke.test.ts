@@ -454,15 +454,19 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 	const record = PEOPLE_RECORD.create()
 	const packet = PEOPLE_LOG.seal({ people, sovereign: () => true })
 	expect(packet.initialResidence[mother]).toBe(0)
-	const retained = people.residenceHistory.get(mother)
-	const before = retained?.times.slice()
+	const retained = people.residenceHistory
+	const before = retained.times.slice()
 	const received = structuredClone(packet, {
-		transfer: Object.values(packet)
-			.filter((column) => ArrayBuffer.isView(column))
-			.map((column) => (column as Float64Array).buffer),
+		transfer: [
+			...new Set(
+				Object.values(packet)
+					.filter((column) => ArrayBuffer.isView(column))
+					.map((column) => (column as Float64Array).buffer),
+			),
+		],
 	})
-	expect(retained?.times).toEqual(before)
-	expect(retained?.times.byteLength).toBeGreaterThan(0)
+	expect(retained.times).toEqual(before)
+	expect(retained.head.get(mother)).toBeGreaterThanOrEqual(0)
 	PEOPLE_RECORD.append({
 		record,
 		packet: received,
@@ -495,7 +499,7 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 			expect(
 				PERSON_QUERY.residenceAt({ people: record, id: person, timeMs: time }),
 			).toBe(HOUSEHOLD.residenceAt({ people, person, time }))
-	expect(people.residenceHistory.get(mother)).toBe(retained)
+	expect(people.residenceHistory).toBe(retained)
 })
 
 it("succeeds a district-only holder at death before settlement and never repeats it", () => {

@@ -130,7 +130,7 @@ export type PregnancyLoss = "miscarriage" | "stillbirth" | "childbirth death"
 export interface PeopleState {
 	startingFamilies: StartingFamilies
 	household: HouseholdContext
-	residenceHistory: Map<number, ResidenceHistory>
+	residenceHistory: ResidenceHistory
 	holdingsChanged: (person: number) => void
 	persons: PersonTable
 	alive: number[]
@@ -256,7 +256,8 @@ export interface MarriageRealms {
 	candidateOf: (person: number) => MarriageCandidateContext
 	allied: (match: CrossMatch) => boolean
 	onboard: (person: number) => void
-	settle: (selection: MarriageSelection) => void
+	// Returns whether the match may have changed which realm anyone lives in.
+	settle: (selection: MarriageSelection) => boolean
 	refresh: () => void
 	neighborsOf: (realm: number) => readonly number[]
 	originOf: (realm: number) => RealmOrigin

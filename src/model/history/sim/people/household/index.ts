@@ -7,7 +7,6 @@ import type {
 	WeddingResidenceParams,
 } from "@/model/history/sim/people/household/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import { EFFECTIVE_TIME } from "@/model/shared/time/effective"
 
 function realmOf({ people, person }: HouseholdPersonParams): number {
 	return people.household.realmOf(people.persons.residence[person])
@@ -15,16 +14,22 @@ function realmOf({ people, person }: HouseholdPersonParams): number {
 
 function residenceAt({ people, person, time }: ResidenceAtParams): number {
 	if (time < people.persons.birth[person]) return -1
-	const history = people.residenceHistory.get(person)
-	const index = history
-		? EFFECTIVE_TIME.latest({
-				times: history.times,
-				length: history.length,
-				time,
-			})
-		: -1
-	return history && index >= 0
-		? history.provinces[index]
+	const history = people.residenceHistory
+	let best = -1
+	// Latest rows come first, so a strict comparison keeps the last append
+	// among equal times.
+	for (
+		let row = history.head.get(person) ?? -1;
+		row >= 0;
+		row = history.previous[row]
+	)
+		if (
+			history.times[row] <= time &&
+			(best < 0 || history.times[row] > history.times[best])
+		)
+			best = row
+	return best >= 0
+		? history.provinces[best]
 		: people.persons.initialResidence[person]
 }
 
@@ -39,25 +44,22 @@ function write({ people, person, province, time }: RelocateParams): boolean {
 	)
 		throw new Error("Invalid residence change")
 	if (residenceAt({ people, person, time }) === province) return false
-	let history = people.residenceHistory.get(person)
-	if (!history) {
-		history = {
-			length: 0,
-			times: new Float64Array(4),
-			provinces: new Int32Array(4),
-		}
-		people.residenceHistory.set(person, history)
-	}
+	const history = people.residenceHistory
 	if (history.length === history.times.length) {
 		const times = new Float64Array(history.length * 2)
 		const provinces = new Int32Array(history.length * 2)
+		const previous = new Int32Array(history.length * 2)
 		times.set(history.times)
 		provinces.set(history.provinces)
+		previous.set(history.previous)
 		history.times = times
 		history.provinces = provinces
+		history.previous = previous
 	}
 	history.times[history.length] = time
-	history.provinces[history.length++] = province
+	history.provinces[history.length] = province
+	history.previous[history.length] = history.head.get(person) ?? -1
+	history.head.set(person, history.length++)
 	PEOPLE_LOG.append({
 		log: people.log,
 		row: { kind: "residence", person, province, time },

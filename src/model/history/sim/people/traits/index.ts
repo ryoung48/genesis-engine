@@ -132,6 +132,11 @@ const GROUPS = [
 	[30, 31, 32],
 	[33, 34, 35],
 ]
+const GROUP_OF = new Map<string, number>(
+	GROUPS.flatMap((group, index) =>
+		group.map((code): [string, number] => [PERSONALITY[code].name, index]),
+	),
+)
 const PERSONALITY_WEIGHTS = PERSONALITY.map((row) =>
 	row.name === "eccentric" ? 0.05 : 1,
 )
@@ -573,14 +578,7 @@ function compatibility({ first, second }: CompatibilityParams): number {
 	for (const trait of a)
 		for (const other of b) {
 			if (trait === other) value += 5
-			else if (
-				GROUPS.some(
-					(group) =>
-						group.some((code) => PERSONALITY[code].name === trait) &&
-						group.some((code) => PERSONALITY[code].name === other),
-				)
-			)
-				value -= 5
+			else if (GROUP_OF.get(trait) === GROUP_OF.get(other)) value -= 5
 		}
 	return value
 }

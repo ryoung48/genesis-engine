@@ -11,7 +11,7 @@ The history record remains the complete source for scrubbing. Events, people, ce
 - The simulation worker posts the pending journal, then calls `JOURNAL.releaseSent` after `postMessage` succeeds. Sent transactions and engine notes can then be collected. Census buffer transfers still move ownership to the receiver.
 - The procedural timeline treats its journal ref as a pending queue. `SIM_RECORD.consumeJournal` translates the whole queue into the record, then empties it. Later batches append to that empty queue. The non-consuming `appendJournal` operation remains available for consumers comparing or inspecting batches.
 - Frame population and development arrays reference the selected census snapshot directly. Census snapshots and those frame arrays must be treated as immutable. The engine copies its current arrays when recording a census, so later simulation updates do not change earlier frames. Political arrays and other reconstructed frame state retain their existing ownership.
-- People rows arrive as one typed-array packet per journal transaction, and its buffers are transferred with the census buffers. `PEOPLE_RECORD.append` folds a packet into the record and keeps no reference to it, so packets are collected with their transactions. See [person records](person-records.md).
+- People rows arrive as one typed-array packet per journal transaction. All of a packet's columns are views on a single buffer, which is transferred with the census buffers. `PEOPLE_RECORD.append` folds a packet into the record and keeps no reference to it, so packets are collected with their transactions. See [person records](person-records.md).
 - The existing frame cache still retains up to 48 dates. No decompression or additional history replay is introduced.
 
 ## Measurements
@@ -118,6 +118,12 @@ P3’s released-journal harness (`stats/history/2026-10-04T13-39-53-052Z-people-
 | Record residence rows/index | 2,090,696 | Sparse effective-time objects and map |
 
 Record person columns retain 3,853,088 bytes in total; their initial column is already included. GC heap was 141.04 MiB and array buffers 59.67 MiB; RSS 727.41 MiB is reported separately from structure retention. Journal transfer and release left zero worker/browser transactions and zero extra cached census buffers. Simulation/transfer/translation took 34.91 seconds and 48 scrub reconstructions took 536.34 ms. These single timings overlap other verification and do not establish a latency delta.
+
+### Pooled residence history
+
+The table above measured one history object with two typed arrays per person who had moved; most of its retained size was those objects, not the moves. The simulation now keeps every move in one shared set of columns (`times`, `provinces`, and `previous`, which links a row to the same person's earlier move) with a map from person to their latest row. Lookups walk a person's chain and select the greatest effective time at or before the query, the last append winning ties, as before.
+
+On the same harness workload (seed 14963991, lateMedieval, 20,000 points, 300 years, 23,041 people) retained residence history fell from 4.9 MB to 1.0 MB. Before and after files are in `stats/history/2026-10-05T03-39-58-023Z-p7-exact-optimisations/`.
 
 ## Health and lifecycle retention (P4)
 

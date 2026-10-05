@@ -252,29 +252,70 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 	const first = log.emitted
 	const creations = table.sex.length - first
 	const count = creations + log.count
+	// One buffer for the whole packet, widest columns first so every view is
+	// aligned; a packet then crosses the worker boundary as a single transfer.
+	const buffer = new ArrayBuffer(
+		8 * (count + 7 * creations) +
+			4 * (4 * count + 5 * creations) +
+			count +
+			2 * creations,
+	)
+	let offset = 0
+	const doubles = (length: number) => {
+		const view = new Float64Array(buffer, offset, length)
+		offset += 8 * length
+		return view
+	}
+	const integers = (length: number) => {
+		const view = new Int32Array(buffer, offset, length)
+		offset += 4 * length
+		return view
+	}
+	const bytes = (length: number) => {
+		const view = new Uint8Array(buffer, offset, length)
+		offset += length
+		return view
+	}
+	const time = doubles(count)
+	const createdAt = doubles(creations)
+	const death = doubles(creations)
+	const bases = doubles(creations)
+	const personality = doubles(creations)
+	const grades = doubles(creations)
+	const congenital = doubles(creations)
+	const carried = doubles(creations)
+	const a = integers(count)
+	const b = integers(count)
+	const c = integers(count)
+	const d = integers(count)
+	const dynasty = integers(creations)
+	const culture = integers(creations)
+	const nameSeed = integers(creations)
+	const home = integers(creations)
+	const initialResidence = integers(creations)
 	const packet: PeoplePacket = {
 		initialTenures: log.initialTenures,
 		count,
-		time: new Float64Array(count),
-		kind: new Uint8Array(count),
-		a: new Int32Array(count),
-		b: new Int32Array(count),
-		c: new Int32Array(count),
-		d: new Int32Array(count),
-		sex: new Uint8Array(creations),
-		createdAt: new Float64Array(creations),
-		death: new Float64Array(creations),
-		healthBand: new Uint8Array(creations),
-		dynasty: new Int32Array(creations),
-		culture: new Int32Array(creations),
-		nameSeed: new Int32Array(creations),
-		home: new Int32Array(creations),
-		initialResidence: new Int32Array(creations),
-		bases: new Float64Array(creations),
-		personality: new Float64Array(creations),
-		grades: new Float64Array(creations),
-		congenital: new Float64Array(creations),
-		carried: new Float64Array(creations),
+		time,
+		kind: bytes(count),
+		a,
+		b,
+		c,
+		d,
+		sex: bytes(creations),
+		createdAt,
+		death,
+		healthBand: bytes(creations),
+		dynasty,
+		culture,
+		nameSeed,
+		home,
+		initialResidence,
+		bases,
+		personality,
+		grades,
+		congenital,
+		carried,
 	}
 	for (let index = 0; index < creations; index++) {
 		const person = first + index

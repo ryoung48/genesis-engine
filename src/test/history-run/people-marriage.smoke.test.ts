@@ -273,7 +273,7 @@ it("settles and refreshes after the first pair before regrouping the fixed cohor
 	fixture.people.household.realmOf = (province) => realms[province]
 	let version = 0
 	fixture.market.settle = ({ match }) => {
-		if (match.a !== 0) return
+		if (match.a !== 0) return false
 		realms[1] = 0
 		realms[2] = 0
 		fixture.candidates.set(3, {
@@ -282,6 +282,7 @@ it("settles and refreshes after the first pair before regrouping the fixed cohor
 			sovereignTiers: [1],
 			attractionModifier: 0,
 		})
+		return true
 	}
 	fixture.market.refresh = () => {
 		version++
@@ -498,9 +499,13 @@ it("releases a related betrothal once, preserves kinship cause through transferr
 		sovereign: () => true,
 	})
 	const transferred = structuredClone(packet, {
-		transfer: Object.values(packet).flatMap((value) =>
-			ArrayBuffer.isView(value) ? [value.buffer] : [],
-		),
+		transfer: [
+			...new Set(
+				Object.values(packet).flatMap((value) =>
+					ArrayBuffer.isView(value) ? [value.buffer] : [],
+				),
+			),
+		],
 	})
 	const people = PEOPLE_RECORD.create()
 	PEOPLE_RECORD.append({
@@ -538,7 +543,7 @@ it("settles and refreshes each wedding before regrouping later fixed-cohort seek
 		realm === 0 ? [1] : realm === 2 ? [3] : []
 	fixture.market.alliable = (match) => match.realmA !== match.realmB
 	fixture.market.settle = ({ match }) => {
-		if (match.a !== 0) return
+		if (match.a !== 0) return false
 		fixture.people.persons.residence[3] = 2
 		const a = fixture.context.personOf(2)!
 		const b = fixture.context.personOf(3)!
@@ -554,6 +559,7 @@ it("settles and refreshes each wedding before regrouping later fixed-cohort seek
 			sovereignTiers: [2],
 			attractionModifier: 0,
 		})
+		return true
 	}
 	const refresh = vi.spyOn(fixture.market, "refresh")
 	const matches = FAMILY.seekMatches({

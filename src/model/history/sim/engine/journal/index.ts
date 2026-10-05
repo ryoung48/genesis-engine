@@ -17,7 +17,7 @@ import type {
 	HistoryState,
 } from "@/model/history/sim/engine/state/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import type { PeoplePacket } from "@/model/history/sim/people/log/types"
+
 import type { DeathCause } from "@/model/history/sim/people/types"
 
 const RULER_TAGS = new Set([
@@ -238,31 +238,6 @@ function flush({
 	pendingJournal.coalitions = []
 }
 
-function packetBuffers(packet: PeoplePacket): Transferable[] {
-	return [
-		packet.time.buffer,
-		packet.kind.buffer,
-		packet.a.buffer,
-		packet.b.buffer,
-		packet.c.buffer,
-		packet.d.buffer,
-		packet.sex.buffer,
-		packet.death.buffer,
-		packet.createdAt.buffer,
-		packet.healthBand.buffer,
-		packet.dynasty.buffer,
-		packet.culture.buffer,
-		packet.nameSeed.buffer,
-		packet.home.buffer,
-		packet.initialResidence.buffer,
-		packet.bases.buffer,
-		packet.personality.buffer,
-		packet.grades.buffer,
-		packet.congenital.buffer,
-		packet.carried.buffer,
-	]
-}
-
 function transferList(journal: JournalTransaction[]): Transferable[] {
 	return journal.flatMap((transaction) => [
 		...(transaction.census
@@ -272,7 +247,7 @@ function transferList(journal: JournalTransaction[]): Transferable[] {
 					transaction.census.development.buffer,
 				]
 			: []),
-		...(transaction.people ? packetBuffers(transaction.people) : []),
+		...(transaction.people ? [transaction.people.time.buffer] : []),
 	])
 }
 

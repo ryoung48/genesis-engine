@@ -203,24 +203,14 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				).length,
 			},
 			residenceHistory: {
-				people: engine.people.residenceHistory.size,
-				logicalBytes: [...engine.people.residenceHistory.values()].reduce(
-					(sum, history) => sum + 12 * history.length,
-					0,
-				),
-				allocatedBytes: [...engine.people.residenceHistory.values()].reduce(
-					(sum, history) =>
-						sum + history.times.byteLength + history.provinces.byteLength,
-					0,
-				),
+				people: engine.people.residenceHistory.head.size,
+				logicalBytes: 16 * engine.people.residenceHistory.length,
+				allocatedBytes:
+					engine.people.residenceHistory.times.byteLength +
+					engine.people.residenceHistory.provinces.byteLength +
+					engine.people.residenceHistory.previous.byteLength,
 				retainedBytes: retainedBytes(engine.people.residenceHistory),
-				entryObjectsBytes: retainedBytes(
-					[...engine.people.residenceHistory.values()].map((history) => ({
-						length: history.length,
-						times: new Float64Array(0),
-						provinces: new Int32Array(0),
-					})),
-				),
+				entryObjectsBytes: retainedBytes(engine.people.residenceHistory.head),
 				pendingLogBytes: retainedBytes(engine.people.log),
 				initialResidenceBytes: retainedBytes(
 					engine.people.persons.initialResidence,

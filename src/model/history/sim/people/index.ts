@@ -55,7 +55,13 @@ function create(provinceCount: number): PeopleState {
 			ranks: () => ranks,
 			time: () => 0,
 		},
-		residenceHistory: new Map(),
+		residenceHistory: {
+			head: new Map(),
+			length: 0,
+			times: new Float64Array(1024),
+			provinces: new Int32Array(1024),
+			previous: new Int32Array(1024),
+		},
 		holdingsChanged: () => undefined,
 		persons: {
 			bases: [],

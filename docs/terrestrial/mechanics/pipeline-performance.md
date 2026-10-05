@@ -51,7 +51,7 @@ The live worker and browser now release consumed journal batches, and scrub fram
 
 ## People packets
 
-People rows no longer cross the worker boundary as one object per row. Each journal transaction carries one typed-array packet whose buffers are transferred, and the record ingests it without keeping it; see [person records](person-records.md). Every person is now recorded, so the journal carries more rows than before.
+People rows no longer cross the worker boundary as one object per row. Each journal transaction carries one typed-array packet whose single buffer is transferred, and the record ingests it without keeping it; see [person records](person-records.md). Every person is now recorded, so the journal carries more rows than before.
 
 The detailed P2 row counts, packet sizes and flush/ingestion timings are in [person packet measurements](#person-packet-measurements-p2-schema). The detailed report does not structured-clone the journal, so it does not measure the saving on the worker boundary.
 
@@ -150,3 +150,35 @@ That is 4–7 ms of an annual tick averaging 358 ms. A drift call costs about 20
 | People created | 312,018 | 312,018 | 316,070 | 306,287 |
 
 Whole-run time does not isolate the cost. The memories step simulates exactly the P6 history and still ran 10% slower, alongside lint and typecheck, with unchanged world generation 15% slower in the same run; the diplomacy step ran alone on a smaller population and matched P6. The component timers above are the supported figures. Retained sizes are in [record memory](record-memory.md#opinion-memory-retention-p7).
+
+## Outcome-neutral people and transport optimisations
+
+Four changes that leave every simulation statistic and the people-record digest unchanged:
+
+- **Trait compatibility.** `TRAITS.compatibility` looks each trait's opposing group up in a table built once, instead of searching the groups for every pair of traits.
+- **Marriage-market groups.** After an accepted pair, only the couple and their children who moved are regrouped; everyone is regrouped only when the match founded a union. See [marriage and alliances](../people/marriage-and-alliances.md).
+- **One buffer per people packet.** A packet's twenty columns are views on one buffer, so a transaction transfers one buffer for its people rows instead of twenty.
+- **Pooled residence history.** See [record memory](record-memory.md#pooled-residence-history).
+
+Detailed report, seed 14963991, lateMedieval, 204000 points, 933 years from 867, late-knowledge threshold 2.366478320318625, against `stats/history/2026-10-05T00-28-51-114Z-people-7-diplomacy/933.json`. Single runs on a shared machine.
+
+| Measure | Before | After |
+|---|---:|---:|
+| Wall time (s) | 416.5 | 375.8 |
+| People pass, ms per simulated year, range over the ten windows | 77–96 | 61–74 |
+| Foreign marriage scoring, first window (s) | 1.62 | 1.00 |
+| People created | 306,287 | 306,287 |
+| People-record digest | `15de9cd8…` | `15de9cd8…` |
+
+Every per-window statistic matches. The fields that differ are timers and serialized-size measurements; the saved baseline was produced from a working tree just before the P7 commit, and unmodified P7 code already differs from it on the opinion-memory size fields.
+
+Live-history harness (20,000 points, 300 years), unmodified P7 against the four changes:
+
+| Measure | Before | After |
+|---|---:|---:|
+| Simulation, transfer and translation (s) | 27.2 | 19.7 |
+| Simulation ticks (s) | 22.0 | 17.4 |
+| Cloning across the worker boundary (s) | 4.3 | 1.6 |
+| Retained JavaScript heap (MiB) | 149 | 143 |
+
+The report, its comparison page and both harness files are in `stats/history/2026-10-05T03-39-58-023Z-p7-exact-optimisations/`.
