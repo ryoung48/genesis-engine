@@ -2,10 +2,13 @@ import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
+import { PERSON_QUERY } from "@/model/history/record/people/query"
+import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { uiPalette } from "@/ui/components/tokens"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { HistoryTimeline } from "@/ui/genesis/view/types"
 import type {
+	NoblePopularityParams,
 	PersonDisplayParams,
 	RecordPersonMentionParams,
 	RegentRoleParams,
@@ -100,6 +103,18 @@ export function recordPersonMention({
 					: uiPalette.person.noHouse,
 			}
 		: null
+}
+
+// The ruler's standing among the holders of the realm's districts.
+export function noblePopularityStat(params: NoblePopularityParams): StatEntry {
+	const popularity = PERSON_QUERY.popularity(params)
+	return {
+		label: "Noble popularity (religion excluded)",
+		value:
+			popularity.count > 0
+				? `${popularity.value > 0 ? "+" : ""}${popularity.value.toFixed(1)} · ${popularity.count} ${popularity.count === 1 ? "holder" : "holders"}`
+				: "No district opinions",
+	}
 }
 
 // How a regent stands to the child they govern for, read from the recorded

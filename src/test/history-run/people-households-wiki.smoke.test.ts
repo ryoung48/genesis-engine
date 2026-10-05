@@ -3,10 +3,10 @@ import { createElement } from "react"
 import { renderToString } from "react-dom/server"
 import { expect, it, vi } from "vitest"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { SIM_RECORD } from "@/model/history/sim/record"
@@ -27,7 +27,7 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 		(p) => !engine.desolate[p] && STATE.isSovereign({ state: engine, p }),
 	)
 	const district = Array.from(engine.people.rulerOf.keys()).find((seat) =>
-		DISTRICTS.isDistrictSeat({ state: engine, seat }),
+		STATE_TITLES.isDistrictSeat({ state: engine, seat }),
 	)
 	if (district === undefined || crowns.length < 4)
 		throw new Error("Missing seats")

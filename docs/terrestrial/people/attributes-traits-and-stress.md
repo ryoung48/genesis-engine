@@ -83,7 +83,7 @@ The two triples are Compassionate / Callous / Sadistic and Stubborn / Fickle / E
 
 ## Congenital traits
 
- (one `congenital` bit-set column; inherited by DP1.4, else the 0.5% birth chance). Each trait is rolled on its own. Giant and Dwarf exclude each other; the first rolled wins. Health values feed effective health ([health](health-and-mortality.md)); opinion values are read from `plans/people-7-opinion-politics.md` on.
+ (one `congenital` bit-set column; inherited by DP1.4, else the 0.5% birth chance). Each trait is rolled on its own. Giant and Dwarf exclude each other; the first rolled wins. Health values feed effective health ([health](health-and-mortality.md)); opinion values feed the reputation term of [directed opinion](opinion-and-relationships.md), which marriage, district loyalty, noble popularity and diplomatic drift read.
 
 | Trait | Skills | Prowess | Health | Fertility | Opinion (scope in DP10) |
 |---|---|---|---|---|---|

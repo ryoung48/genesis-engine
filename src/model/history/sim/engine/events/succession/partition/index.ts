@@ -24,6 +24,7 @@ import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -125,7 +126,7 @@ function occupied({ state, seat }: SeatParams): boolean {
 function districtSeats({ state, realm }: RealmParams): number[] {
 	const population = new Map<number, number>()
 	const seats = STATE.getChildren({ state, p: realm }).filter((seat) =>
-		DISTRICTS.isDistrictSeat({ state, seat }),
+		STATE_TITLES.isDistrictSeat({ state, seat }),
 	)
 	for (const seat of seats)
 		population.set(seat, STATE.getNationPopulation({ state, root: seat }))
@@ -184,7 +185,7 @@ function release({ run, share }: ReleaseParams): void {
 	const { heir, seat } = share
 	const people = state.people
 	if (
-		!DISTRICTS.isDistrictSeat({ state, seat }) ||
+		!STATE_TITLES.isDistrictSeat({ state, seat }) ||
 		state.sovereignCurrent[seat] !== realm ||
 		occupied({ state, seat }) ||
 		!SUCCESSION_SYSTEMS.available({ state, person: heir })
@@ -307,7 +308,7 @@ function demote({ run, displaced }: DemoteParams): void {
 				? []
 				: STATE.getChildren({ state, p: realm }).filter(
 						(candidate) =>
-							DISTRICTS.isDistrictSeat({ state, seat: candidate }) &&
+							STATE_TITLES.isDistrictSeat({ state, seat: candidate }) &&
 							state.seatRank[candidate] < rank,
 					)
 		for (const candidate of candidates)

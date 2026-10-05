@@ -5,6 +5,7 @@ import type {
 	SeatKind,
 	SeatRow,
 } from "@/model/history/sim/people/log/types"
+import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import type { Character } from "@/model/history/sim/people/traits/types"
 import type {
 	PregnancyLoss,
@@ -115,7 +116,15 @@ export interface RecordResidence {
 	sequence: number
 }
 
+// One refresh of what an observer remembers of a target.
+export interface RecordMemory {
+	reason: OpinionMemoryReason
+	startTimeMs: number
+}
+
 export interface PeopleRecord {
+	// Every memory refresh in arrival order, by observer and then target.
+	memoriesOf: Map<number, Map<number, RecordMemory[]>>
 	health: HealthRows
 	residencesOf: Map<number, RecordResidence[]>
 	stressOf: Map<number, RecordStress[]>

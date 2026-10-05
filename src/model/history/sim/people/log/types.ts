@@ -1,6 +1,7 @@
 import type { BetrothalEndCause } from "@/model/history/sim/people/betrothal/types"
 import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
+import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import type {
 	DeathCause,
 	PeopleState,
@@ -185,7 +186,18 @@ export interface ResidenceRow {
 	province: number
 }
 
+// An interaction the observer remembers of the target from this time; its
+// strength follows from the reason.
+export interface OpinionMemoryRow {
+	kind: "opinion_memory"
+	time: number
+	observer: number
+	target: number
+	reason: OpinionMemoryReason
+}
+
 export type AppendedRow =
+	| OpinionMemoryRow
 	| ConditionRow
 	| HealthBandRow
 	| ResidenceRow
@@ -199,6 +211,7 @@ export type AppendedRow =
 	| StressRow
 
 export type PeopleRow =
+	| OpinionMemoryRow
 	| ConditionRow
 	| HealthBandRow
 	| ResidenceRow

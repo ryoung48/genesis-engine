@@ -9,12 +9,10 @@ export interface DistrictParams {
 	rng: PeopleRandomSource
 }
 
-export interface SeatParams {
-	state: HistoryState
-	seat: number
-}
-
 export interface GrantParams extends DistrictParams {
+	// Whether each recipient remembers the grant; false while the world is
+	// being set up.
+	recordOpinionMemory: boolean
 	found: ((seat: number) => number) | null
 	randomOf: ((seat: number) => PeopleRandomSource) | null
 }

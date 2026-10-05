@@ -15,6 +15,7 @@ import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import { HISTORY_RUN } from "@/test/history-run"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
 import type { RebelLogisticsObservation } from "@/test/history-run/report/military/rebel-logistics/types"
@@ -169,6 +170,7 @@ describe("observational rebellion evaluation notes", () => {
 			ATTRIBUTES.neutral("diplomacy"),
 		)
 		vi.spyOn(GOVERNOR, "personHas").mockReturnValue(false)
+		vi.spyOn(OPINION, "of").mockReturnValue(null)
 	})
 	afterEach(() => vi.restoreAllMocks())
 

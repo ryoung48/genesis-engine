@@ -10,6 +10,7 @@ import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -504,7 +505,7 @@ it("succeeds a district-only holder at death before settlement and never repeats
 		numPoints: 10000,
 	})
 	const seat = Array.from(state.people.rulerOf.keys()).find((seat) =>
-		DISTRICTS.isDistrictSeat({ state, seat }),
+		STATE_TITLES.isDistrictSeat({ state, seat }),
 	)
 	if (seat === undefined) throw new Error("Missing district")
 	const rng = RNG.createRng({ seed: 71 })
@@ -562,16 +563,16 @@ it("weights each local district, keeps repeated nomination slots and uses the st
 		(root) =>
 			STATE.isSovereign({ state, p: root }) &&
 			STATE.getChildren({ state, p: root }).filter((seat) =>
-				DISTRICTS.isDistrictSeat({ state, seat }),
+				STATE_TITLES.isDistrictSeat({ state, seat }),
 			).length >= 4,
 	)
 	if (realm === undefined) throw new Error("Missing electoral districts")
 	const seats = STATE.getChildren({ state, p: realm })
-		.filter((seat) => DISTRICTS.isDistrictSeat({ state, seat }))
+		.filter((seat) => STATE_TITLES.isDistrictSeat({ state, seat }))
 		.sort((a, b) => a - b)
 		.slice(0, 4)
 	for (const seat of STATE.getChildren({ state, p: realm }))
-		if (!seats.includes(seat) && DISTRICTS.isDistrictSeat({ state, seat }))
+		if (!seats.includes(seat) && STATE_TITLES.isDistrictSeat({ state, seat }))
 			PEOPLE.vacate({ people: state.people, seat, reason: "unknown" })
 	const rng = RNG.createRng({ seed: 991 })
 	const time = state.time / STATE.yearMs
@@ -610,7 +611,7 @@ it("weights each local district, keeps repeated nomination slots and uses the st
 	const foreign = Array.from(state.people.rulerOf.keys()).find(
 		(seat) =>
 			state.parentCurrent[seat] !== realm &&
-			DISTRICTS.isDistrictSeat({ state, seat }),
+			STATE_TITLES.isDistrictSeat({ state, seat }),
 	)
 	if (foreign === undefined) throw new Error("Missing foreign district")
 	for (const seat of seats) state.seatRank[seat] = 1
@@ -810,7 +811,7 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 		)
 		.slice(0, 2)
 	const district = Array.from(state.people.rulerOf.keys()).find((seat) =>
-		DISTRICTS.isDistrictSeat({ state, seat }),
+		STATE_TITLES.isDistrictSeat({ state, seat }),
 	)
 	if (district === undefined) throw new Error("Missing district")
 	const time = state.time / STATE.yearMs
@@ -943,7 +944,13 @@ it("installs each initial relative grant before selecting the next without expan
 	})
 	const source = { ...rng, random: () => 0 }
 	const count = people.persons.sex.length
-	DISTRICTS.grant({ state, rng: source, found, randomOf: () => source })
+	DISTRICTS.grant({
+		state,
+		rng: source,
+		found,
+		randomOf: () => source,
+		recordOpinionMemory: false,
+	})
 	expect(found).not.toHaveBeenCalled()
 	expect(new Set([people.rulerOf[1], people.rulerOf[2]])).toEqual(
 		new Set([peopleIds[3], peopleIds[4]]),

@@ -13,6 +13,7 @@ import type {
 	SealParams,
 	SeatKind,
 } from "@/model/history/sim/people/log/types"
+import { OPINION_MEMORY } from "@/model/history/sim/people/opinion/memory"
 import type {
 	DeathCause,
 	PeopleState,
@@ -39,8 +40,6 @@ const KINDS: readonly PeopleRowKind[] = [
 	"opinion_memory",
 	"regent",
 ]
-// Kinds whose data does not exist yet.
-const RESERVED: ReadonlySet<PeopleRowKind> = new Set(["opinion_memory"])
 const CREATION = KINDS.indexOf("creation")
 const SEAT = KINDS.indexOf("seat")
 
@@ -143,8 +142,6 @@ function grow(log: PeopleLog): void {
 function append({ log, row }: AppendRowParams): void {
 	const kind = KINDS.indexOf(row.kind)
 	if (kind < 0) throw new Error(`Unknown people row kind "${row.kind}"`)
-	if (RESERVED.has(row.kind))
-		throw new Error(`People row kind "${row.kind}" is reserved`)
 	let time = 0
 	let a = 0
 	let b = 0
@@ -213,6 +210,14 @@ function append({ log, row }: AppendRowParams): void {
 			if (b < 0) throw new Error(`Unknown condition "${row.condition}"`)
 			c = row.before
 			d = row.after
+			break
+		case "opinion_memory":
+			time = row.time
+			a = row.observer
+			b = row.target
+			c = OPINION_MEMORY.codeOf(row.reason)
+			if (a < 0 || b < 0 || a === b)
+				throw new Error("Invalid opinion memory endpoints")
 			break
 		default:
 			throw new Error(`People row kind "${KINDS[kind]}" is written at seal`)
@@ -397,10 +402,18 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 				before: c,
 				after: d,
 			}
+		case "opinion_memory":
+			if (a < 0 || b < 0 || a === b || d !== 0 || !Number.isFinite(time))
+				throw new Error("Invalid opinion memory row")
+			return {
+				kind,
+				time,
+				observer: a,
+				target: b,
+				reason: OPINION_MEMORY.reasonOf(c),
+			}
 		default:
-			throw new Error(
-				`People row kind ${rows.kind[index]} is ${kind === undefined ? "unknown" : "reserved"}`,
-			)
+			throw new Error(`People row kind ${rows.kind[index]} is unknown`)
 	}
 }
 

@@ -33,6 +33,7 @@ function acceptable({ people, a, b, time }: BackfillPairParams): boolean {
 		},
 		kinship: table,
 		married: () => false,
+		memoriesOf: () => [],
 	}
 	const candidateOf = (person: number): MarriageCandidateContext => ({
 		currentStanding: HOLDINGS.standing({

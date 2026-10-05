@@ -22,6 +22,13 @@ export interface SeedParams {
 
 export interface RollParams extends SeedParams {
 	current: Disposition
+	// The two governors' mean opinion of each other, -1 to 1.
+	bias: number
+}
+
+export interface WeightsParams {
+	current: Disposition
+	bias: number
 }
 
 export interface StepParams {

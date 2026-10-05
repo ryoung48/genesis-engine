@@ -1,4 +1,3 @@
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import type {
 	Candidate,
 	CandidateParams,
@@ -17,6 +16,7 @@ import type {
 } from "@/model/history/sim/engine/events/succession/systems/types"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -105,7 +105,7 @@ function districtsOf({ state, realm }: RealmParams): Elector[] {
 	for (const seat of [...new Set(STATE.getChildren({ state, p: realm }))].sort(
 		(a, b) => a - b,
 	)) {
-		if (!DISTRICTS.isDistrictSeat({ state, seat })) continue
+		if (!STATE_TITLES.isDistrictSeat({ state, seat })) continue
 		const person = people.rulerOf[seat]
 		if (person < 0 || !people.persons.heldSeats[person].includes(seat)) continue
 		if (!PEOPLE.aliveAt({ people, person, time: now(state) })) continue

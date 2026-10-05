@@ -16,6 +16,7 @@ import type {
 	PeopleRow,
 	PeopleRows,
 } from "@/model/history/sim/people/log/types"
+import { OPINION_MEMORY } from "@/model/history/sim/people/opinion/memory"
 import type {
 	PeopleState,
 	SeatChangeReason,
@@ -144,6 +145,15 @@ it("round-trips every implemented row kind, code and sentinel", () => {
 				after: index === 1 ? -1 : Math.min(4, index),
 			}),
 		),
+		...OPINION_MEMORY.reasons.map(
+			(reason, index): AppendedRow => ({
+				kind: "opinion_memory",
+				time: 896 + index / 4,
+				observer: index,
+				target: index + 1,
+				reason,
+			}),
+		),
 	]
 	for (const row of appended) PEOPLE_LOG.append({ log, row })
 	expect(PEOPLE_LOG.pending(people)).toBe(true)
@@ -168,12 +178,24 @@ it("round-trips every implemented row kind, code and sentinel", () => {
 	expect(PEOPLE_LOG.pending(people)).toBe(false)
 })
 
-it("rejects reserved kinds, unknown codes and values a row cannot hold", () => {
+it("rejects unknown kinds and codes and values a row cannot hold", () => {
 	const people = PEOPLE.create(8)
 	const { log } = people
 	const reject = (row: unknown) =>
 		expect(() => PEOPLE_LOG.append({ log, row: row as AppendedRow })).toThrow()
-	reject({ kind: "opinion_memory", time: 1, person: 0 })
+	const memory = {
+		kind: "opinion_memory",
+		time: 1,
+		observer: 0,
+		target: 1,
+		reason: "attack",
+	}
+	reject({ ...memory, reason: "insult" })
+	reject({ ...memory, target: 0 })
+	reject({ ...memory, observer: -1 })
+	reject({ ...memory, target: -1 })
+	reject({ ...memory, time: Number.NaN })
+	reject({ ...memory, time: Infinity })
 	reject({ kind: "health_band", time: 1, person: 0, band: "Fair" })
 	reject({
 		kind: "condition",
@@ -214,10 +236,26 @@ it("rejects reserved kinds, unknown codes and values a row cannot hold", () => {
 	packet.b[0] = 4
 	expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 	packet.b[0] = 0
-	for (const code of [11, 13]) {
-		packet.kind[0] = code
-		expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
+	packet.kind[0] = 13
+	expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
+
+	PEOPLE_LOG.append({ log, row: memory as AppendedRow })
+	const memories = PEOPLE_LOG.seal({ people, sovereign: () => true })
+	expect(PEOPLE_LOG.read({ rows: memories, index: 0 })).toEqual(memory)
+	for (const [column, value] of [
+		["d", 1],
+		["c", OPINION_MEMORY.reasons.length],
+		["c", -1],
+		["b", 0],
+		["b", -1],
+		["time", Number.NaN],
+	] as const) {
+		const held = memories[column][0]
+		memories[column][0] = value
+		expect(() => PEOPLE_LOG.read({ rows: memories, index: 0 })).toThrow()
+		memories[column][0] = held
 	}
+	expect(PEOPLE_LOG.read({ rows: memories, index: 0 })).toEqual(memory)
 })
 
 it("seals each person once with an exact snapshot and grows without losing rows", () => {
@@ -363,6 +401,7 @@ it("records every person once and rebuilds the same record from transferred pack
 				if (row.kind === "creation") created.push(row.person)
 			}
 		}
+		if (year === 0) expect(kinds.has("opinion_memory")).toBe(false)
 		SIM_RECORD.appendJournal({
 			translator: directTranslator,
 			transactions: engine.journal,
@@ -392,6 +431,7 @@ it("records every person once and rebuilds the same record from transferred pack
 		"creation",
 		"death",
 		"health_band",
+		"opinion_memory",
 		"pregnancy",
 		"regent",
 		"residence",
@@ -401,6 +441,23 @@ it("records every person once and rebuilds the same record from transferred pack
 
 	const people = streamed.record.people as PeopleRecord
 	expect(people).toEqual(direct.record.people)
+	expect(engine.people.memories.size).toBeGreaterThan(0)
+	for (const [observer, targets] of engine.people.memories)
+		for (const [target, entries] of targets)
+			expect(
+				PERSON_QUERY.memories({
+					people,
+					a: observer,
+					b: target,
+					timeMs: streamed.record.maxTimeMs,
+				})
+					.map((memory) => ({
+						reason: memory.reason,
+						start:
+							memory.startTimeMs / STATE.yearMs + DATE.earthHistoryStartYear,
+					}))
+					.sort((x, y) => x.reason.localeCompare(y.reason)),
+			).toEqual([...entries].sort((x, y) => x.reason.localeCompare(y.reason)))
 	expect(PEOPLE_RECORD.count(people)).toBe(count)
 	expect(PEOPLE_RECORD.has({ people, id: count })).toBe(false)
 	expect(PEOPLE_RECORD.has({ people, id: -1 })).toBe(false)

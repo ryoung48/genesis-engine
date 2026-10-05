@@ -9,6 +9,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
@@ -46,7 +47,7 @@ function districtSeats({
 	realm: number
 }): number[] {
 	return STATE.getChildren({ state, p: realm })
-		.filter((seat) => DISTRICTS.isDistrictSeat({ state, seat }))
+		.filter((seat) => STATE_TITLES.isDistrictSeat({ state, seat }))
 		.sort(
 			(a, b) =>
 				state.seatRank[b] - state.seatRank[a] ||
@@ -251,7 +252,7 @@ function invariants({ state, provinces }: Fixture): void {
 							STATE.rel.PU_JUNIOR),
 			).toBe(true)
 		} else {
-			expect(DISTRICTS.isDistrictSeat({ state, seat })).toBe(true)
+			expect(STATE_TITLES.isDistrictSeat({ state, seat })).toBe(true)
 			expect(
 				HOLDINGS.primary({
 					people: state.people,

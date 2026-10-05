@@ -13,6 +13,7 @@ import type {
 	OwnedChildCountParams,
 	RefreshHouseholdsParams,
 	RelinkNationsParams,
+	SeatParams,
 	SettleProvincesParams,
 	SettleTitleSetParams,
 } from "@/model/history/sim/engine/state/titles/types"
@@ -36,6 +37,17 @@ const TITLE_CREATION_COST_DUCATS: Readonly<Record<number, number>> = {
 	4: 625 / 9,
 }
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000
+
+// A titled seat held directly of its sovereign.
+function isDistrictSeat({ state, seat }: SeatParams): boolean {
+	const parent = state.parentCurrent[seat]
+	return (
+		parent >= 0 &&
+		parent === state.sovereignCurrent[seat] &&
+		state.seatRank[seat] > 0 &&
+		!state.desolate[seat]
+	)
+}
 
 function refreshHouseholds({
 	state,
@@ -321,5 +333,6 @@ function considerTitles({ state, nation, rng }: ConsiderTitlesParams): void {
 export const STATE_TITLES = {
 	applyDerivedParents,
 	considerTitles,
+	isDistrictSeat,
 	settleProvinces,
 }

@@ -128,3 +128,25 @@ Detailed report, seed 14963991, lateMedieval, 204000 points, 933 years from 867 
 | Yearly health pass | 9.0 ms a year, of a 29.2 ms people pass (`stats/history/2026-10-04T17-56-24-332Z-people-4-perf/933.json`, same statistics; 16.7 of 40.5 before the performance follow-up) |
 
 Retained structure measurements are in [record memory](record-memory.md#health-and-lifecycle-retention-p4).
+
+## Opinion in politics benchmark (P7)
+
+Detailed reports, seed 14963991, lateMedieval, 204000 points, 933 years from 867; single runs on a shared machine. P6 is `stats/history/2026-10-04T23-37-23-729Z-kinship-depth-4/933.json`; the three P7 steps are `2026-10-05T00-04-02-114Z-people-7-memory`, `2026-10-05T00-17-52-635Z-people-7-loyalty` and `2026-10-05T00-28-51-114Z-people-7-diplomacy`. Each folder's README compares statistics apart from timing.
+
+The three opinion consumers time themselves inside the code they measure (`peopleOpinionCost` in each report window). For the final step:
+
+| Component | Calls per simulated year | ms per simulated year |
+|---|---:|---:|
+| Diplomatic drift bias: two directed opinions per call | 148–230 | 2.4–4.8 |
+| Rebellion loyalty: one directed opinion per strength test | 68–99 | 1.0–1.6 |
+| Memory pruning: one scan of the live entries | 1 scan of 100–240 entries | 0.11–0.24 |
+
+That is 4–7 ms of an annual tick averaging 358 ms. A drift call costs about 20 µs and a loyalty test about 15 µs: each opinion builds both people's contexts from live state, scores trait compatibility and checks close kinship. Drift and rebellion build a fresh context at each event and cache nothing, so a regency or succession earlier in the same instant is always seen; only the marriage market keeps a per-pass person cache, cleared on its existing refresh. Person contexts built rise from 88,000–136,000 per century with the marriage market alone to 168,000–244,000 with both political consumers.
+
+| Whole run | P6 | Memories | Loyalty | Diplomacy |
+|---|---:|---:|---:|---:|
+| Wall time (s) | 417.5 | 466.5 | 465.3 | 416.5 |
+| Summed annual ticks (s) | 338.3 | 371.2 | 371.8 | 334.2 |
+| People created | 312,018 | 312,018 | 316,070 | 306,287 |
+
+Whole-run time does not isolate the cost. The memories step simulates exactly the P6 history and still ran 10% slower, alongside lint and typecheck, with unchanged world generation 15% slower in the same run; the diplomacy step ran alone on a smaller population and matched P6. The component timers above are the supported figures. Retained sizes are in [record memory](record-memory.md#opinion-memory-retention-p7).

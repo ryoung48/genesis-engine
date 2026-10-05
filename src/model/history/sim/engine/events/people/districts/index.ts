@@ -7,14 +7,17 @@ import type {
 	InstallDistrictParams,
 	RevalidateParams,
 	SeatCheck,
-	SeatParams,
 	SucceedDistrictParams,
 } from "@/model/history/sim/engine/events/people/districts/types"
+import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
+import type { SeatParams } from "@/model/history/sim/engine/state/titles/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { FAMILY } from "@/model/history/sim/people/family"
 import { HEIRS } from "@/model/history/sim/people/heirs"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import { DEJURE } from "@/model/society/dejure"
 
 const NEW_GRANT_RELATIVE_CHANCE = 0.3
@@ -27,16 +30,6 @@ function grantShare(size: number): number {
 	if (size <= 7) return ((size - 4) / 3) * 0.13
 	if (size <= 10) return 0.13 + ((size - 7) / 3) * 0.57
 	return 0.7 + ((size - 10) / 14) * 0.2
-}
-
-function isDistrictSeat({ state, seat }: SeatParams): boolean {
-	const parent = state.parentCurrent[seat]
-	return (
-		parent >= 0 &&
-		parent === state.sovereignCurrent[seat] &&
-		state.seatRank[seat] > 0 &&
-		!state.desolate[seat]
-	)
 }
 
 function now(state: HistoryState): number {
@@ -99,9 +92,15 @@ function newHolder({
 	})
 }
 
-function install({ state, seat, person, reason }: InstallDistrictParams): void {
+// Returns whether the person took the seat; the dead cannot.
+function install({
+	state,
+	seat,
+	person,
+	reason,
+}: InstallDistrictParams): boolean {
 	if (!PEOPLE.aliveAt({ people: state.people, person, time: now(state) }))
-		return
+		return false
 	PEOPLE.setRuler({
 		people: state.people,
 		person,
@@ -109,6 +108,7 @@ function install({ state, seat, person, reason }: InstallDistrictParams): void {
 		rank: state.seatRank[seat],
 		reason,
 	})
+	return true
 }
 
 // Checks each held, non-sovereign seat against the current hierarchy: a seat
@@ -122,7 +122,7 @@ function revalidate({ state, seats }: RevalidateParams): SeatCheck[] {
 	for (const seat of seats) {
 		const holder = people.rulerOf[seat]
 		if (holder < 0 || STATE.isSovereign({ state, p: seat })) continue
-		if (!isDistrictSeat({ state, seat })) {
+		if (!STATE_TITLES.isDistrictSeat({ state, seat })) {
 			PEOPLE.vacate({ people, seat, reason: "territorial change" })
 			checks.push({ seat, holder, standing: "vacated" })
 			continue
@@ -144,7 +144,7 @@ function heirOf({ state, seat }: SeatParams): number {
 	const table = people.persons
 	const time = now(state)
 	const holder = people.rulerOf[seat]
-	if (holder < 0 || !isDistrictSeat({ state, seat })) return -1
+	if (holder < 0 || !STATE_TITLES.isDistrictSeat({ state, seat })) return -1
 	return HEIRS.of({
 		people,
 		dying: holder,
@@ -157,7 +157,11 @@ function heirOf({ state, seat }: SeatParams): number {
 }
 
 function succeed({ state, seat, rng }: SucceedDistrictParams): void {
-	if (state.people.rulerOf[seat] < 0 || !isDistrictSeat({ state, seat })) return
+	if (
+		state.people.rulerOf[seat] < 0 ||
+		!STATE_TITLES.isDistrictSeat({ state, seat })
+	)
+		return
 	const heir = heirOf({ state, seat })
 	install({
 		state,
@@ -179,7 +183,13 @@ function settle({ state }: DistrictParams): void {
 	}
 }
 
-function grant({ state, rng, found, randomOf }: GrantParams): void {
+function grant({
+	state,
+	rng,
+	found,
+	randomOf,
+	recordOpinionMemory,
+}: GrantParams): void {
 	const people = state.people
 	const size = new Map<number, number>()
 	const seats = new Map<number, number[]>()
@@ -188,7 +198,7 @@ function grant({ state, rng, found, randomOf }: GrantParams): void {
 		const sovereign = state.sovereignCurrent[p]
 		if (sovereign < 0) continue
 		size.set(sovereign, (size.get(sovereign) ?? 0) + 1)
-		if (!isDistrictSeat({ state, seat: p })) continue
+		if (!STATE_TITLES.isDistrictSeat({ state, seat: p })) continue
 		const list = seats.get(sovereign)
 		if (list) list.push(p)
 		else seats.set(sovereign, [p])
@@ -229,18 +239,25 @@ function grant({ state, rng, found, randomOf }: GrantParams): void {
 		candidates.sort((a, b) => a.key - b.key || a.seat - b.seat)
 		for (const { seat } of candidates.slice(0, missing)) {
 			const source = randomOf?.(seat) ?? rng
-			install({
+			const grantor = GOVERNOR.of({ state, realm: sovereign })
+			const person = newHolder({
 				state,
 				seat,
-				person: newHolder({
-					state,
-					seat,
-					relativeFirst: source.random() < NEW_GRANT_RELATIVE_CHANCE,
-					rng: source,
-					found,
-				}),
-				reason: "district grant",
+				relativeFirst: source.random() < NEW_GRANT_RELATIVE_CHANCE,
+				rng: source,
+				found,
 			})
+			if (
+				install({ state, seat, person, reason: "district grant" }) &&
+				recordOpinionMemory
+			)
+				OPINION.remember({
+					people,
+					observer: person,
+					target: grantor,
+					reason: "grant",
+					time: now(state),
+				})
 		}
 	}
 }
@@ -251,6 +268,5 @@ export const DISTRICTS = {
 	settle,
 	grant,
 	install,
-	isDistrictSeat,
 	revalidate,
 }

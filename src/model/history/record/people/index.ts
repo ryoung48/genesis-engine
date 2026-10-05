@@ -85,6 +85,7 @@ function create(): PeopleRecord {
 			value: new Int8Array(0),
 			prev: new Int32Array(0),
 		},
+		memoriesOf: new Map(),
 		residencesOf: new Map(),
 		stressOf: new Map(),
 		childrenOf: new Map(),
@@ -461,6 +462,24 @@ function append({
 					},
 				})
 				break
+			case "opinion_memory": {
+				if (
+					!has({ people: record, id: row.observer }) ||
+					!has({ people: record, id: row.target })
+				)
+					throw new Error("Unknown opinion memory person")
+				let targets = record.memoriesOf.get(row.observer)
+				if (!targets) {
+					targets = new Map()
+					record.memoriesOf.set(row.observer, targets)
+				}
+				pushIndex({
+					index: targets,
+					key: row.target,
+					value: { reason: row.reason, startTimeMs: recordTime(row.time) },
+				})
+				break
+			}
 			case "seat":
 			case "regent":
 				seats.push(row)

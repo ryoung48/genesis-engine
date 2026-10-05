@@ -9,6 +9,9 @@ export interface RecordParams {
 	seeded: boolean
 	succession: boolean
 	laxity: number
+	// The holder's religion-excluded opinion of the ruler; null when either
+	// is missing.
+	holderOpinion: number | null
 	threshold: number
 	roll: number
 	decision: RebellionDecision

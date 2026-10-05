@@ -54,6 +54,19 @@ export interface PersonWikiData {
 export interface PersonWikiOpinion {
 	label: string
 	breakdown: OpinionBreakdown | null
+	memories: PersonWikiMemory[]
+}
+
+// A remembered interaction and what it still adds to the opinion.
+export interface PersonWikiMemory {
+	label: string
+	dateLabel: string
+	strength: number
+}
+
+function signed(value: number): string {
+	const rounded = Math.round(value * 10) / 10
+	return `${rounded > 0 ? "+" : ""}${rounded}`
 }
 
 const NO_COUNT_HISTORY: WikiCountHistoryPoint[] = []
@@ -106,22 +119,27 @@ export function PersonWikiPage({ person }: { person: PersonWikiData }) {
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
 				<ChipGroup label="Opinions" count={person.opinions.length}>
 					<div className="space-y-2">
-						{person.opinions.map(({ label, breakdown }) => (
+						{person.opinions.map(({ label, breakdown, memories }) => (
 							<div key={label}>
 								<div>
-									{label}: {breakdown?.total ?? "Unavailable"}
+									{label}: {breakdown ? signed(breakdown.total) : "Unavailable"}
 								</div>
 								{breakdown && (
 									<div className="text-slate-500">
 										{Object.entries(breakdown)
 											.filter(([key]) => key !== "total")
-											.map(
-												([key, value]) =>
-													`${key}: ${value > 0 ? "+" : ""}${value}`,
-											)
+											.map(([key, value]) => `${key}: ${signed(value)}`)
 											.join(" · ")}
 									</div>
 								)}
+								{memories.map((memory) => (
+									<div
+										key={`${memory.label}:${memory.dateLabel}`}
+										className="text-slate-500"
+									>
+										{`${memory.label} (${memory.dateLabel}): ${signed(memory.strength)}`}
+									</div>
+								))}
 							</div>
 						))}
 					</div>

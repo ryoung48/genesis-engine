@@ -16,6 +16,7 @@ import type {
 	MilitaryTotals,
 	Troops,
 } from "@/model/history/sim/engine/military/recruitment/types"
+import type { OpinionPoliticsTotals } from "@/model/history/sim/engine/opinion-context/types"
 import type { MarriageTotals } from "@/model/history/sim/people/family/diagnostics/types"
 import type {
 	PeopleState,
@@ -164,6 +165,7 @@ export interface LifecycleCounters {
 
 export interface HistoryState {
 	marriageMarket: Map<number, MarriageTotals>
+	opinionPolitics: OpinionPoliticsTotals
 	riverByProvince: Uint8Array
 	P: number
 	time: number

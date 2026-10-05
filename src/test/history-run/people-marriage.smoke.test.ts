@@ -719,3 +719,70 @@ it("onboards outsiders with one health replay and ordinary creation-time mortali
 		projection.mockRestore()
 	}
 })
+
+it("feeds a memory into the match score once and leaves the other terms and the kinship veto alone", () => {
+	const fixture = MARRIAGE_FIXTURE.create()
+	for (const sex of [0, 1] as const)
+		MARRIAGE_FIXTURE.add({ fixture, age: 30, sex, realm: 0 })
+	const score = (observer: number, target: number) =>
+		MATCH_SCORING.score({
+			observer,
+			target,
+			time: 100,
+			context: fixture.context,
+			candidateOf: fixture.market.candidateOf,
+			alliance: false,
+			allied: false,
+		})!
+	const before = score(0, 1)
+	const reverse = score(1, 0)
+	OPINION.remember({
+		people: fixture.people,
+		observer: 0,
+		target: 1,
+		reason: "attack",
+		time: 100,
+	})
+	expect(score(0, 1)).toEqual({
+		...before,
+		opinion: before.opinion - 25,
+		total: before.total - 25,
+		breakdown: {
+			...before.breakdown,
+			memories: -25,
+			unclamped: before.breakdown.unclamped - 25,
+			total: before.breakdown.total - 25,
+		},
+	})
+	expect(score(1, 0)).toEqual(reverse)
+
+	for (const kin of [false, true]) {
+		const pair = MARRIAGE_FIXTURE.create()
+		for (const sex of [0, 1] as const)
+			MARRIAGE_FIXTURE.add({ fixture: pair, age: 25, sex, realm: 0 })
+		pair.rng.random = () => 1
+		if (kin) pair.people.persons.father[1] = 0
+		for (const [observer, target] of [
+			[0, 1],
+			[1, 0],
+		])
+			for (const reason of ["aid", "grant"] as const)
+				OPINION.remember({
+					people: pair.people,
+					observer,
+					target,
+					reason,
+					time: 100,
+				})
+		FAMILY.seekMatches({
+			people: pair.people,
+			time: 100,
+			seekers: [0, 1],
+			sovereigns: [],
+			minorChance: 0,
+			rng: pair.rng,
+			...pair.market,
+		})
+		expect(pair.people.persons.spouse[0]).toBe(kin ? -1 : 1)
+	}
+})

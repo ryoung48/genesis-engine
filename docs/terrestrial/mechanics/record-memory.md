@@ -122,3 +122,19 @@ Record person columns retain 3,853,088 bytes in total; their initial column is a
 ## Health and lifecycle retention (P4)
 
 Retained memory at 20000 points over 300 years (`stats/history/people-4-completed-memory.json`, 22937 people): the ten simulation health columns 2.20 MB, the record's 47456 health rows 0.92 MB, the death schedule 42 KB with 52 pending deaths, pending deliveries 65 KB, and the event heap 0.67 MB.
+
+## Opinion memory retention (P7)
+
+[Interaction memories](../people/opinion-and-relationships.md#interaction-memories) are held three ways, and only one of them grows with the length of the history.
+
+| Structure | Holds | Size in the 933-year report |
+|---|---|---:|
+| `PeopleState.memories` (simulation) | The live entries only: observer → target → at most five reason/start pairs | 100–240 entries; at most 14 KB serialized |
+| `opinion_memory` log rows (transport) | One 25-byte row per refresh, sent once and released with its packet | 22,084 rows, 552 KB over the run |
+| `PeopleRecord.memoriesOf` (record) | Every refresh, by observer and target, in arrival order | 22,084 refreshes; 1.22 MB serialized |
+
+- **Live map.** The yearly people pass removes an entry once it has faded (ten years) or once its observer or target has actually died, so the map stays at a few hundred entries however long the simulation runs. In the report a little over half of all entries leave by expiry and the rest because a party died first. Pruning writes no row.
+- **Record index.** The record never removes or overwrites a refresh: a query at an earlier date must still find the refresh that was current then. It grows by about 24 refreshes per simulated year at 204,000 points, 97% of them attacks and grants.
+- **What the figures are.** Sizes are `v8.serialize` byte lengths taken by the report at each window end (`peopleOpinionCost.liveMemoryBytes`, `.recordMemoryBytes`). They measure payload and keys, not `Map` and object overhead or array capacity, and are not directly comparable with the structured-clone retention figures above. Row payload is exact: 8-byte time, 1-byte kind and four 4-byte slots.
+
+Source: `stats/history/2026-10-05T00-28-51-114Z-people-7-diplomacy/933.json`, seed 14963991, lateMedieval, 204000 points, 933 years from 867, with the two earlier P7 step reports beside it in `stats/history`. Peak RSS in the three P7 reports (2,478–2,533 MiB) is below the P6 report's 3,010 MiB; the first of them is statistically identical to P6, so that difference is allocation and GC timing and not a saving.

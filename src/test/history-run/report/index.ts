@@ -34,6 +34,7 @@ import { PEOPLE_FAMILIES_REPORT } from "@/test/history-run/report/people-familie
 import { PEOPLE_HEALTH_REPORT } from "@/test/history-run/report/people-health"
 import type { StarterReport } from "@/test/history-run/report/people-health/types"
 import { PEOPLE_MARRIAGE_REPORT } from "@/test/history-run/report/people-marriage"
+import { PEOPLE_OPINION_REPORT } from "@/test/history-run/report/people-opinion"
 import { PEOPLE_RECORD_REPORT } from "@/test/history-run/report/people-record"
 import type { PeopleRecordReport } from "@/test/history-run/report/people-record/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
@@ -551,6 +552,7 @@ function runSeed({
 		peopleMs += performance.now() - t0
 	}
 	const characterTracker = PEOPLE_TRAITS_REPORT.tracker()
+	const opinionTracker = PEOPLE_OPINION_REPORT.tracker()
 	const householdTerritory = HOUSEHOLDS_REPORT.territory({
 		parents: engine.parentCurrent,
 		owners: engine.sovereignCurrent,
@@ -628,6 +630,7 @@ function runSeed({
 				start,
 			})
 		PEOPLE_TRAITS_REPORT.sample({ engine, tracker: characterTracker, start })
+		PEOPLE_OPINION_REPORT.sample({ engine, tracker: opinionTracker })
 		MILITARY_REPORT.sample({
 			engine,
 			tracker: military.tracker,
@@ -640,6 +643,13 @@ function runSeed({
 		if ((year - start) % 100 !== 0 && year !== start + options.years) continue
 		const top = largest({ engine })
 		const topSet = new Set(top)
+		const opinion = PEOPLE_OPINION_REPORT.of({
+			engine,
+			tracker: opinionTracker,
+			record: peopleRecord.tracker.record,
+			from,
+			to: year,
+		})
 		const events = eventsIn({ engine, from, to: year })
 		const rebellions = events.filter((event) => event.tag === "rebellion")
 		const raids = events.filter((event) => event.tag === "raid")
@@ -712,6 +722,8 @@ function runSeed({
 				from,
 				to: year,
 			}),
+			peopleOpinion: opinion.statistics,
+			peopleOpinionCost: opinion.cost,
 			military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
 			partitionState: PARTITION_REPORT.state({ engine }),
 			partition: PARTITION_REPORT.summarize({

@@ -15,22 +15,19 @@ import type {
 } from "@/model/history/sim/engine/events/people/types"
 import { SUCCESSION_PROJECTION } from "@/model/history/sim/engine/events/succession/projection"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
-import { CHARACTER } from "@/model/history/sim/people/character"
 import { FAMILY } from "@/model/history/sim/people/family"
 import { MARRIAGE_DIAGNOSTICS } from "@/model/history/sim/people/family/diagnostics"
 import { STARTING_RANDOM } from "@/model/history/sim/people/family/starting/random"
 import { HEALTH } from "@/model/history/sim/people/health"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
-import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import type {
-	OpinionPair,
-	OpinionPerson,
-} from "@/model/history/sim/people/opinion/types"
+import { OPINION } from "@/model/history/sim/people/opinion"
+import type { OpinionPerson } from "@/model/history/sim/people/opinion/types"
 import type {
 	CrossMatch,
 	MarriageRealms,
@@ -58,47 +55,16 @@ function marriageRealms({ state }: StateParams): MarriageRealms {
 	const people = state.people
 	const table = people.persons
 	const time = state.time / STATE.yearMs
+	const live = LIVE_OPINION_CONTEXT.of({ state, time })
 	const personOf = (person: number): OpinionPerson | null => {
-		if (
-			person < 0 ||
-			person >= table.sex.length ||
-			table.createdAt[person] > time ||
-			table.birth[person] > time
-		)
-			return null
 		const cached = contexts.get(person)
 		if (cached) return cached
-		const realm = HOUSEHOLD.realmOf({ people, person })
-		const culture = table.culture[person]
-		const seats = table.heldSeats[person].filter(
-			(seat) => people.rulerOf[seat] === person,
-		)
-		const value = {
-			id: person,
-			character: CHARACTER.of({ people, person }),
-			age: time - table.birth[person],
-			culture,
-			heritage: people.household.heritageOfCulture(culture),
-			religion: people.household.religionOfRealm(realm),
-			sovereignSeats: seats.filter((seat) =>
-				STATE.isSovereign({ state, p: seat }),
-			),
-			districtSovereigns: seats
-				.filter((seat) => DISTRICTS.isDistrictSeat({ state, seat }))
-				.map((seat) => state.parentCurrent[seat]),
-		}
-		contexts.set(person, value)
+		state.opinionPolitics.marriageCacheMisses++
+		const value = live.personOf(person)
+		if (value) contexts.set(person, value)
 		return value
 	}
-	const context = {
-		personOf,
-		kinship: table,
-		married: ({ a, b, time: at }: OpinionPair) =>
-			table.spouse[a] === b &&
-			table.marriedAt[a] <= at &&
-			table.death[a] > at &&
-			table.death[b] > at,
-	}
+	const context = { ...live, personOf }
 
 	return {
 		observe: (observation) => {
@@ -272,7 +238,13 @@ function runYear({ state, rng }: PeopleEventParams): void {
 		for (const realm of [...state.people.persons.heldSeats[person]])
 			REGENCY.startIncapacity({ state, realm })
 	DISTRICTS.settle({ state, rng })
-	DISTRICTS.grant({ found: null, randomOf: null, state, rng })
+	DISTRICTS.grant({
+		found: null,
+		randomOf: null,
+		recordOpinionMemory: true,
+		state,
+		rng,
+	})
 	ROYAL_MARRIAGES.review({ state })
 	PATRICIANS.settle({ found: null, state, rng })
 	const people = state.people
@@ -298,6 +270,7 @@ function runYear({ state, rng }: PeopleEventParams): void {
 		rng,
 	})
 	ROYAL_MARRIAGES.review({ state })
+	OPINION.prune({ people, time })
 	nextYear({ state })
 }
 

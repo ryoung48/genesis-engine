@@ -10,6 +10,7 @@ import type {
 } from "@/model/history/sim/people/attributes/types"
 import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
 import type { SeatKind } from "@/model/history/sim/people/log/types"
+import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import type {
 	CongenitalTrait,
 	PersonalityTrait,
@@ -148,5 +149,23 @@ export interface RealmAtParams extends PersonAtParams {
 }
 
 export interface OpinionQueryParams extends CoupleAtParams {
+	record: HistoryRecord
+}
+
+export interface OpinionContextParams {
+	people: PeopleRecord
+	record: HistoryRecord
+	timeMs: number
+}
+
+// What one person remembers of another at the queried time. A faded memory
+// stays listed with no strength.
+export interface MemoryView {
+	reason: OpinionMemoryReason
+	startTimeMs: number
+	strength: number
+}
+
+export interface PopularityQueryParams extends SeatAtParams {
 	record: HistoryRecord
 }

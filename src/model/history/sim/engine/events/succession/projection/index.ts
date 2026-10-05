@@ -6,6 +6,7 @@ import type {
 } from "@/model/history/sim/engine/events/succession/projection/types"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { HEIRS } from "@/model/history/sim/people/heirs"
 
@@ -22,7 +23,7 @@ function districts({ state }: ProjectionParams): Map<number, number> {
 	for (let seat = 0; seat < state.P; seat++)
 		if (
 			state.people.rulerOf[seat] >= 0 &&
-			DISTRICTS.isDistrictSeat({ state, seat })
+			STATE_TITLES.isDistrictSeat({ state, seat })
 		)
 			award({
 				state,
@@ -38,7 +39,7 @@ function crowns({ state }: ProjectionParams): Map<number, number> {
 		const dying = state.people.rulerOf[realm]
 		if (
 			dying < 0 ||
-			DISTRICTS.isDistrictSeat({ state, seat: realm }) ||
+			STATE_TITLES.isDistrictSeat({ state, seat: realm }) ||
 			!STATE.isSovereign({ state, p: realm }) ||
 			GOVERNMENT.successionOfIndex(state.governmentType[realm]) !==
 				"single_heir"

@@ -1,6 +1,11 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
+export interface SeatParams {
+	state: HistoryState
+	seat: number
+}
+
 export interface ApplyDerivedParentsParams {
 	state: HistoryState
 	nation: number

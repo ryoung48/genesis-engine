@@ -5,27 +5,34 @@ import type {
 	BetrothalView,
 	ConditionView,
 	CoupleAtParams,
+	MemoryView,
+	OpinionContextParams,
 	OpinionQueryParams,
 	PersonAtParams,
 	PersonEvent,
 	PersonEventKind,
 	PersonView,
+	PopularityQueryParams,
 	RealmAtParams,
 	SeatAtParams,
 	SpouseView,
 	TenureView,
 	TraitsView,
 } from "@/model/history/record/people/query/types"
+import type { RecordMemory } from "@/model/history/record/people/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { OPINION } from "@/model/history/sim/people/opinion"
+import { OPINION_MEMORY } from "@/model/history/sim/people/opinion/memory"
+import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import type {
 	OpinionBreakdown,
 	OpinionContext,
 	OpinionPerson,
+	Popularity,
 } from "@/model/history/sim/people/opinion/types"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type { DeathCause } from "@/model/history/sim/people/types"
@@ -398,13 +405,50 @@ function realmAt({ people, id, timeMs, record }: RealmAtParams): number {
 	return province < 0 ? -1 : AFFILIATION.at({ record, province, timeMs })
 }
 
-function opinion({
+// The latest refresh of each reason at or before the time; a later arrival
+// wins a tie.
+function memoriesAt({ people, a, b, timeMs }: CoupleAtParams): RecordMemory[] {
+	const latest = new Map<OpinionMemoryReason, RecordMemory>()
+	for (const row of people.memoriesOf.get(a)?.get(b) ?? []) {
+		if (row.startTimeMs > timeMs) continue
+		const held = latest.get(row.reason)
+		if (!held || row.startTimeMs >= held.startTimeMs)
+			latest.set(row.reason, row)
+	}
+	return [...latest.values()]
+}
+
+// Everyone the person remembers or is remembered by, from refreshes made by
+// the time.
+function memoryPartners({ people, id, timeMs }: PersonAtParams): number[] {
+	const partners = new Set<number>()
+	const begun = (rows: RecordMemory[]) =>
+		rows.some((row) => row.startTimeMs <= timeMs)
+	for (const [target, rows] of people.memoriesOf.get(id) ?? [])
+		if (begun(rows)) partners.add(target)
+	for (const [observer, targets] of people.memoriesOf) {
+		const rows = targets.get(id)
+		if (rows && begun(rows)) partners.add(observer)
+	}
+	return [...partners]
+}
+
+function memories(params: CoupleAtParams): MemoryView[] {
+	return memoriesAt(params).map((row) => ({
+		reason: row.reason,
+		startTimeMs: row.startTimeMs,
+		strength: OPINION_MEMORY.contribution({
+			memory: { reason: row.reason, start: row.startTimeMs / yearMs },
+			time: params.timeMs / yearMs,
+		}),
+	}))
+}
+
+function opinionContext({
 	people,
-	a,
-	b,
-	timeMs,
 	record,
-}: OpinionQueryParams): OpinionBreakdown | null {
+	timeMs,
+}: OpinionContextParams): OpinionContext {
 	const personOf = (id: number): OpinionPerson | null => {
 		const person = PEOPLE_RECORD.person({ people, id })
 		if (
@@ -469,19 +513,71 @@ function opinion({
 			districtSovereigns,
 		}
 	}
-	const context: OpinionContext = {
+	return {
 		personOf,
 		kinship: people.persons,
 		married: ({ a, b }) =>
 			PEOPLE_RECORD.deathTimeMs({ people, id: a }) > timeMs &&
 			PEOPLE_RECORD.deathTimeMs({ people, id: b }) > timeMs &&
 			married({ people, a, b, timeMs }),
+		memoriesOf: ({ observer, target }) =>
+			memoriesAt({ people, a: observer, b: target, timeMs }).map((row) => ({
+				reason: row.reason,
+				start: row.startTimeMs / yearMs,
+			})),
 	}
-	return OPINION.of({ observer: a, target: b, time: timeMs / yearMs, context })
+}
+
+function opinion({
+	people,
+	a,
+	b,
+	timeMs,
+	record,
+}: OpinionQueryParams): OpinionBreakdown | null {
+	return OPINION.of({
+		observer: a,
+		target: b,
+		time: timeMs / yearMs,
+		context: opinionContext({ people, record, timeMs }),
+	})
+}
+
+// Noble popularity of the realm seated at `seat`: its ruler as seen by the
+// holders of the districts directly under it then.
+function popularity({
+	people,
+	record,
+	seat,
+	timeMs,
+}: PopularityQueryParams): Popularity {
+	const holders: number[] = []
+	for (const district of people.tenuresOfSeat.keys()) {
+		const person = holder({ people, seat: district, timeMs })
+		if (
+			person >= 0 &&
+			AFFILIATION.nodeAt({
+				record,
+				province: district,
+				timeMs,
+				inclusive: true,
+			})?.parent === seat
+		)
+			holders.push(person)
+	}
+	return OPINION.popularity({
+		ruler: holder({ people, seat, timeMs }),
+		holders,
+		time: timeMs / yearMs,
+		context: opinionContext({ people, record, timeMs }),
+	})
 }
 
 export const PERSON_QUERY = {
 	opinion,
+	memories,
+	memoryPartners,
+	popularity,
 	residenceAt,
 	realmAt,
 	attributes,

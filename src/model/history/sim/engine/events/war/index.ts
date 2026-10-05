@@ -24,11 +24,13 @@ import type {
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
 import type {
 	Disposition,
 	StartWarParams,
 } from "@/model/history/sim/engine/state/types"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
@@ -36,6 +38,10 @@ const INTERSTATE_WAR_SEED_FRACTION = 0.025
 const REBELLION_SEED_FRACTION = 0.0125
 
 const REBELLION_THRESHOLD = 0.45
+
+// Laxity per point of the holder's opinion of the ruler: 50 points weigh as
+// much as one weak crown.
+const HOLDER_OPINION_LAXITY = -0.002
 
 const FRONT_PROVINCES = 15
 
@@ -355,6 +361,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			seeded: true,
 			succession: false,
 			laxity: 0,
+			holderOpinion: null,
 			threshold: REBELLION_THRESHOLD,
 			roll: -1,
 			decision: threat <= REBELLION_THRESHOLD ? "threshold" : "accepted",
@@ -435,6 +442,18 @@ function rebel({
 		: GOVERNOR.personHas({ state, person: holder, trait: "content" })
 			? -0.02
 			: 0
+	const started = performance.now()
+	const time = state.time / STATE.yearMs
+	const breakdown = OPINION.of({
+		observer: holder,
+		target: state.people.rulerOf[overlord],
+		time,
+		context: LIVE_OPINION_CONTEXT.of({ state, time }),
+	})
+	const holderOpinion = OPINION.loyaltyOf({ breakdown })
+	laxity += HOLDER_OPINION_LAXITY * holderOpinion
+	state.opinionPolitics.loyaltyEvaluations++
+	state.opinionPolitics.loyaltyMs += performance.now() - started
 	const threshold = REBELLION_THRESHOLD - laxity
 	const roll = threat <= threshold ? -1 : rng.random()
 	const decision =
@@ -446,6 +465,7 @@ function rebel({
 		seeded: false,
 		succession,
 		laxity,
+		holderOpinion: breakdown ? holderOpinion : null,
 		threshold,
 		roll,
 		decision,

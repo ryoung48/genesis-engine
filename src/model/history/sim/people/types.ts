@@ -7,7 +7,11 @@ import type {
 	ResidenceHistory,
 } from "@/model/history/sim/people/household/types"
 import type { PeopleLog } from "@/model/history/sim/people/log/types"
-import type { OpinionContext } from "@/model/history/sim/people/opinion/types"
+import type { OpinionMemory } from "@/model/history/sim/people/opinion/memory/types"
+import type {
+	MemoryCounts,
+	OpinionContext,
+} from "@/model/history/sim/people/opinion/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export type PeopleRandomSource = Pick<
@@ -147,6 +151,9 @@ export interface PeopleState {
 	regencies: Map<number, Regency>
 	// Claims of deposed rulers, by the realm they lost.
 	deposed: Map<number, DeposedClaim>
+	// Remembered interactions by observer, then target; one entry per reason.
+	memories: Map<number, Map<number, OpinionMemory[]>>
+	memoryCounts: MemoryCounts
 	log: PeopleLog
 	nextDynasty: number
 }

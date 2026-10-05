@@ -19,9 +19,11 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { PEOPLE } from "@/model/history/sim/people"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import { TRAITS } from "@/model/history/sim/people/traits"
 
 const MAX_CLAIM = 3
@@ -59,7 +61,7 @@ function pretenderRevolt({
 }: PretenderParams): void {
 	if (
 		seat < 0 ||
-		!DISTRICTS.isDistrictSeat({ state, seat }) ||
+		!STATE_TITLES.isDistrictSeat({ state, seat }) ||
 		FIELDS.prov.parent.get({ state, p: seat }) !== realm ||
 		state.people.rulerOf[seat] < 0 ||
 		state.people.rulerOf[seat] !== seatHolder
@@ -82,7 +84,7 @@ function pretenderRevolt({
 		p: seat,
 		supporters: supportingSeats.filter(
 			(seat, index) =>
-				DISTRICTS.isDistrictSeat({ state, seat }) &&
+				STATE_TITLES.isDistrictSeat({ state, seat }) &&
 				state.parentCurrent[seat] === realm &&
 				state.people.rulerOf[seat] >= 0 &&
 				state.people.rulerOf[seat] === supportingHolders[index],
@@ -281,7 +283,7 @@ function succeedPerson({
 					leaderIdx: state.leaderRuntime.idx[seat],
 					rng,
 				})
-			else if (DISTRICTS.isDistrictSeat({ state, seat }))
+			else if (STATE_TITLES.isDistrictSeat({ state, seat }))
 				DISTRICTS.succeed({ state, seat, rng })
 			else PEOPLE.vacate({ people: state.people, seat, reason: "succession" })
 		}
@@ -360,6 +362,13 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 		claim,
 		deposed: ward,
 		reason: "usurpation",
+	})
+	OPINION.remember({
+		people,
+		observer: ward,
+		target: regent,
+		reason: "usurpation",
+		time: state.time / STATE.yearMs,
 	})
 	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })
 	STATE.considerTitles({

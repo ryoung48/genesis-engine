@@ -255,6 +255,15 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			if (after.partition) after.partition = { ...object(after.partition) }
 			delete object(before.partition).divideMs
 			delete object(after.partition).divideMs
+			addRows({
+				before: { peopleOpinionCost: before.peopleOpinionCost ?? {} },
+				after: { peopleOpinionCost: after.peopleOpinionCost ?? {} },
+				section: "Performance",
+				period: `${seed} / ${period}`,
+				rows,
+			})
+			delete before.peopleOpinionCost
+			delete after.peopleOpinionCost
 			delete before.from
 			delete before.to
 			delete after.from

@@ -2,6 +2,7 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import type {
+	OpinionMemoryQueryParams,
 	OpinionPair,
 	OpinionPerson,
 } from "@/model/history/sim/people/opinion/types"
@@ -42,6 +43,8 @@ function create(): MarriageFixture {
 			people.persons.marriedAt[a] <= at &&
 			people.persons.death[a] > at &&
 			people.persons.death[b] > at,
+		memoriesOf: ({ observer, target }: OpinionMemoryQueryParams) =>
+			people.memories.get(observer)?.get(target) ?? [],
 	}
 	const market: MarriageFixture["market"] = {
 		opinionContext: () => context,

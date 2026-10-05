@@ -3,6 +3,7 @@ import { DATE } from "@/model/history/earth/date"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
+import type { HistoryRecord } from "@/model/history/record/types"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
@@ -13,11 +14,13 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { TRANSLATOR } from "@/model/history/sim/record/translator"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { BACKFILL_FIXTURE } from "@/test/history-run/fixtures/backfill"
+import { MARRIAGE_FIXTURE } from "@/test/history-run/fixtures/marriage"
 
 it("folds initial known and unknown tenures before redundant installs and later replacements", () => {
 	const { people, house } = BACKFILL_FIXTURE.create({
@@ -428,4 +431,105 @@ it("retains culture heritage after world transfer and release without detaching 
 	expect([...unknown.record.heritageOfCulture]).toEqual(
 		Array(world.cultures.count).fill(-1),
 	)
+})
+
+it("folds memory refreshes by observer, target and reason and answers each time from the refreshes made by then", () => {
+	const fixture = MARRIAGE_FIXTURE.create()
+	for (const sex of [0, 1, 0] as const)
+		MARRIAGE_FIXTURE.add({ fixture, age: 30, sex, realm: 0 })
+	const { people } = fixture
+	const record = PEOPLE_RECORD.create()
+	const history = {
+		people: record,
+		heritageOfCulture: new Int32Array([7]),
+		minTimeMs: 100 * STATE.yearMs,
+		maxTimeMs: 120 * STATE.yearMs,
+		origin: "procedural",
+		events: { provinceEvents: new Map(), nationEvents: [] },
+	} as unknown as HistoryRecord
+	const flush = (time: number) =>
+		PEOPLE_RECORD.append({
+			record,
+			packet: structuredClone(
+				PEOPLE_LOG.seal({ people, sovereign: () => true }),
+			),
+			timeMs: time * STATE.yearMs,
+			recordTime: (year) => year * STATE.yearMs,
+		})
+	const remember = (reason: "attack" | "grant", time: number, target: number) =>
+		OPINION.remember({ people, observer: 0, target, reason, time })
+	remember("attack", 100, 1)
+	flush(100)
+	remember("attack", 103, 1)
+	remember("grant", 103, 1)
+	remember("grant", 103, 1)
+	remember("attack", 103, 2)
+	flush(103)
+	expect(record.memoriesOf.get(0)?.get(1)).toHaveLength(4)
+	expect(record.memoriesOf.get(0)?.get(2)).toHaveLength(1)
+	expect(record.memoriesOf.has(1)).toBe(false)
+	const at = (years: number, target: number) =>
+		PERSON_QUERY.memories({
+			people: record,
+			a: 0,
+			b: target,
+			timeMs: years * STATE.yearMs,
+		})
+	expect(at(99.5, 1)).toEqual([])
+	expect(at(102, 1)).toEqual([
+		{ reason: "attack", startTimeMs: 100 * STATE.yearMs, strength: -20 },
+	])
+	expect(at(103, 1)).toEqual([
+		{ reason: "attack", startTimeMs: 103 * STATE.yearMs, strength: -25 },
+		{ reason: "grant", startTimeMs: 103 * STATE.yearMs, strength: 15 },
+	])
+	expect(
+		PERSON_QUERY.memories({
+			people: record,
+			a: 0,
+			b: 1,
+			timeMs: 103 * STATE.yearMs - 1,
+		}).map((memory) => memory.startTimeMs),
+	).toEqual([100 * STATE.yearMs])
+	expect(at(113, 1).map((memory) => Math.abs(memory.strength))).toEqual([0, 0])
+	expect(at(108, 2)).toEqual([
+		{ reason: "attack", startTimeMs: 103 * STATE.yearMs, strength: -12.5 },
+	])
+	expect(
+		PERSON_QUERY.memories({
+			people: record,
+			a: 1,
+			b: 0,
+			timeMs: 103 * STATE.yearMs,
+		}),
+	).toEqual([])
+	const opinion = (years: number) =>
+		PERSON_QUERY.opinion({
+			people: record,
+			record: history,
+			a: 0,
+			b: 1,
+			timeMs: years * STATE.yearMs,
+		})!
+	expect(opinion(102).memories).toBe(-20)
+	expect(opinion(103).memories).toBe(-10)
+	expect(opinion(108)).toMatchObject({
+		memories: -5,
+		unclamped: opinion(113).unclamped - 5,
+	})
+	OPINION.prune({ people, time: 120 })
+	expect(people.memories.size).toBe(0)
+	expect(opinion(103).memories).toBe(-10)
+
+	PEOPLE_LOG.append({
+		log: people.log,
+		row: {
+			kind: "opinion_memory",
+			time: 104,
+			observer: 0,
+			target: 40,
+			reason: "aid",
+		},
+	})
+	expect(() => flush(104)).toThrow()
 })

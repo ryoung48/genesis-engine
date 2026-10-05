@@ -4,6 +4,7 @@ import { HEALTH } from "@/model/history/sim/people/health"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AddPersonParams,
@@ -113,6 +114,8 @@ function create(provinceCount: number): PeopleState {
 		marriageAlliances: new Map(),
 		regencies: new Map(),
 		deposed: new Map(),
+		memories: new Map(),
+		memoryCounts: OPINION.counts(),
 		log: PEOPLE_LOG.create(),
 		nextDynasty: 0,
 	}

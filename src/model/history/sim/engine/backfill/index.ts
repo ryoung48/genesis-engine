@@ -214,6 +214,7 @@ function houses({ state, seed }: BackfillParams): void {
 	DISTRICTS.grant({
 		state,
 		rng,
+		recordOpinionMemory: false,
 		found: (seat) => {
 			metrics.freshDistricts++
 			return fresh({ state, seed, kind: 1, seat, slot: 0 })

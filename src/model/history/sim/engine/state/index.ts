@@ -9,6 +9,7 @@ import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
+import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import {
 	getChildren,
 	getNationNeighbors,
@@ -76,6 +77,7 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { FAMILY } from "@/model/history/sim/people/family"
 import { STARTING_RANDOM } from "@/model/history/sim/people/family/starting/random"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { OPINION } from "@/model/history/sim/people/opinion"
 import type { RealmOrigin } from "@/model/history/sim/people/types"
 import { DEJURE } from "@/model/society/dejure"
 
@@ -445,7 +447,21 @@ function startWar({
 		})
 	)
 		return null
-	return createActiveWar({ state, attacker, defender, rng, options: { goal } })
+	const war = createActiveWar({
+		state,
+		attacker,
+		defender,
+		rng,
+		options: { goal },
+	})
+	OPINION.remember({
+		people: state.people,
+		observer: GOVERNOR.of({ state, realm: defender }),
+		target: GOVERNOR.of({ state, realm: attacker }),
+		reason: "attack",
+		time: state.time / yearMs,
+	})
+	return war
 }
 
 function warSides({ war }: WarSidesParams): WarSides {
@@ -769,6 +785,7 @@ function createHistoryState({
 		culture: cultures.assignment.slice(),
 		cultureCount: cultures.count,
 		marriageMarket: new Map(),
+		opinionPolitics: LIVE_OPINION_CONTEXT.totals(),
 		heritageOfCulture:
 			heritages?.assignment.slice() ?? new Int32Array(cultures.count).fill(-1),
 		cultureGenderSystems:

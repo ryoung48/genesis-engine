@@ -11,6 +11,7 @@ import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import type { DeathCause } from "@/model/history/sim/people/types"
 import { FRAME } from "@/model/history/world-frame"
 import { TITLES } from "@/model/society/titles"
@@ -45,6 +46,13 @@ const DEATH_LABELS: Record<DeathCause, string> = {
 	heart: "Heart failure",
 	battle: "Killed in battle",
 	childbirth: "Childbirth",
+}
+const MEMORY_LABELS: Record<OpinionMemoryReason, string> = {
+	aid: "Aided in war",
+	abandonment: "Abandoned in war",
+	attack: "Attacked",
+	usurpation: "Usurped the throne",
+	grant: "Granted a district",
 }
 const DEATH_VERBS = {
 	died: "died",
@@ -561,34 +569,39 @@ export function usePersonWikiData(
 					...view.children,
 					...view.siblings,
 					...view.spouses.map((spouse) => spouse.person),
+					...PERSON_QUERY.memoryPartners({ people, id, timeMs: viewTimeMs }),
 				]),
 			]
 				.filter((other) => other >= 0)
 				.flatMap((other) => {
 					const relative = PERSON_NAMES.person({ people, person: other })
 					if (!relative) return []
-					return [
-						{
-							label: `${person.name} → ${relative.name}`,
+					const directed = (forward: boolean) => {
+						const [a, b] = forward ? [id, other] : [other, id]
+						return {
+							label: forward
+								? `${person.name} → ${relative.name}`
+								: `${relative.name} → ${person.name}`,
 							breakdown: PERSON_QUERY.opinion({
 								people,
-								a: id,
-								b: other,
+								a,
+								b,
 								timeMs: viewTimeMs,
 								record: state.record,
 							}),
-						},
-						{
-							label: `${relative.name} → ${person.name}`,
-							breakdown: PERSON_QUERY.opinion({
+							memories: PERSON_QUERY.memories({
 								people,
-								a: other,
-								b: id,
+								a,
+								b,
 								timeMs: viewTimeMs,
-								record: state.record,
-							}),
-						},
-					]
+							}).map((memory) => ({
+								label: MEMORY_LABELS[memory.reason],
+								dateLabel: dateLabel(memory.startTimeMs),
+								strength: memory.strength,
+							})),
+						}
+					}
+					return [directed(true), directed(false)]
 				}),
 			groups: [
 				{
