@@ -137,7 +137,9 @@ it("reconciles memory, loyalty, drift and diplomacy counts with the run and repo
 	expect(diplomacy.alliancesFormed).toBe(
 		engine.events.filter(
 			(note) =>
-				note.tag === "alliance formed" && note.time >= start * STATE.yearMs,
+				note.tag === "alliance formed" &&
+				note.time >= start * STATE.yearMs &&
+				note.time < (start + years) * STATE.yearMs,
 		).length,
 	)
 	expect(statistics.contextBuilds).toBe(politics.contextBuilds)
@@ -160,9 +162,9 @@ it("reconciles memory, loyalty, drift and diplomacy counts with the run and repo
 	})
 	expect(next.statistics.memory).toEqual({
 		live: statistics.memory.live,
-		refreshes: [0, 0, 0, 0, 0],
-		expired: [0, 0, 0, 0, 0],
-		died: [0, 0, 0, 0, 0],
+		refreshes: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+		expired: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+		died: [0, 0, 0, 0, 0, 0, 0, 0, 0],
 	})
 	expect(next.statistics.drift).toMatchObject({
 		calls: 0,

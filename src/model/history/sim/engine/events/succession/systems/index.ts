@@ -465,6 +465,7 @@ function choose(params: ChooseParams): SuccessionChoice {
 
 export const SUCCESSION_SYSTEMS = {
 	choose,
+	districts: districtsOf,
 	inheritable,
 	localDistrict,
 	challenge,

@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
@@ -337,7 +338,8 @@ it("gives the best district to the younger son and keeps the rest", () => {
 	)
 	expect(
 		FIELDS.prov.treasury.get({ state, p: realm }) +
-			FIELDS.prov.treasury.get({ state, p: seats[0] }),
+			FIELDS.prov.treasury.get({ state, p: seats[0] }) -
+			TREASURY_BUDGET.get({ state, p: realm }).coronationExpenses,
 	).toBeCloseTo(1000)
 	expect(STATE.getRelation({ state, a: realm, b: seats[0] })).toBe(
 		STATE.rel.NONE,

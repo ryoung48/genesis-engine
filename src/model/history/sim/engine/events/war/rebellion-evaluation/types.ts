@@ -12,6 +12,8 @@ export interface RecordParams {
 	// The holder's religion-excluded opinion of the ruler; null when either
 	// is missing.
 	holderOpinion: number | null
+	// Whether the overlord carried the composite-realm penalty.
+	composite: boolean
 	threshold: number
 	roll: number
 	decision: RebellionDecision

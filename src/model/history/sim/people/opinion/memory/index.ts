@@ -1,6 +1,7 @@
 import type {
 	MemoryAtParams,
 	OpinionMemoryReason,
+	OpinionMemorySlot,
 } from "@/model/history/sim/people/opinion/memory/types"
 
 const DURATION_YEARS = 10
@@ -12,6 +13,10 @@ const REASONS: readonly OpinionMemoryReason[] = [
 	"attack",
 	"usurpation",
 	"grant",
+	"coronation_uncrowned",
+	"coronation_humble",
+	"coronation_lavish",
+	"coronation_magnificent",
 ]
 const VALUES: Record<OpinionMemoryReason, number> = {
 	aid: 15,
@@ -19,6 +24,21 @@ const VALUES: Record<OpinionMemoryReason, number> = {
 	attack: -25,
 	usurpation: -40,
 	grant: 15,
+	coronation_uncrowned: -20,
+	coronation_humble: -10,
+	coronation_lavish: 10,
+	coronation_magnificent: 20,
+}
+const SLOTS: Record<OpinionMemoryReason, OpinionMemorySlot> = {
+	aid: "aid",
+	abandonment: "abandonment",
+	attack: "attack",
+	usurpation: "usurpation",
+	grant: "grant",
+	coronation_uncrowned: "coronation",
+	coronation_humble: "coronation",
+	coronation_lavish: "coronation",
+	coronation_magnificent: "coronation",
 }
 
 function codeOf(reason: OpinionMemoryReason): number {
@@ -32,6 +52,10 @@ function reasonOf(code: number): OpinionMemoryReason {
 	if (reason === undefined)
 		throw new Error(`Unknown opinion memory reason code ${code}`)
 	return reason
+}
+
+function slotOf(reason: OpinionMemoryReason): OpinionMemorySlot {
+	return SLOTS[reason]
 }
 
 function expired({ memory, time }: MemoryAtParams): boolean {
@@ -51,6 +75,7 @@ export const OPINION_MEMORY = {
 	reasons: REASONS,
 	codeOf,
 	reasonOf,
+	slotOf,
 	expired,
 	contribution,
 }

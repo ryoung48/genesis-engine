@@ -209,8 +209,8 @@ export function buildNationWikiStats(
 										description: "Realm split",
 									},
 									{
-										value: economy.budget.titleCreationExpenses,
-										description: "Title creation",
+										value: economy.budget.coronationExpenses,
+										description: "Coronation",
 									},
 								].filter((entry) => entry.value !== 0)}
 								formatValue={formatSignedDucats}

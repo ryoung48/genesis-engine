@@ -381,6 +381,10 @@ const MEMORY_VALUES = {
 	attack: -25,
 	usurpation: -40,
 	grant: 15,
+	coronation_uncrowned: -20,
+	coronation_humble: -10,
+	coronation_lavish: 10,
+	coronation_magnificent: 20,
 } as const
 
 function pair() {
@@ -423,7 +427,7 @@ it("remembers each reason one way at full, half and no strength, replacing a rep
 	remember("grant", 104)
 	expect(toward(0, 1, 104).memories).toBe(-10)
 	expect(toward(0, 1, 109).memories).toBe(-5)
-	expect(people.memoryCounts.refreshes).toEqual([0, 0, 2, 0, 1])
+	expect(people.memoryCounts.refreshes).toEqual([0, 0, 2, 0, 1, 0, 0, 0, 0])
 	expect(people.log.count).toBe(3)
 })
 
@@ -474,16 +478,16 @@ it("prunes faded memories and those of the actually dead without touching the lo
 	expect(people.memories.get(0)?.get(1)).toHaveLength(1)
 	expect(people.memories.get(1)?.get(0)).toHaveLength(1)
 	expect(people.memoryCounts).toMatchObject({
-		expired: [0, 0, 0, 0, 0],
-		died: [0, 0, 0, 0, 0],
+		expired: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+		died: [0, 0, 0, 0, 0, 0, 0, 0, 0],
 		visited: 2,
 	})
 	people.persons.death[1] = 99
 	OPINION.prune({ people, time: 100 })
 	expect(people.memories.size).toBe(0)
 	expect(people.memoryCounts).toMatchObject({
-		expired: [0, 0, 1, 0, 0],
-		died: [0, 0, 1, 0, 0],
+		expired: [0, 0, 1, 0, 0, 0, 0, 0, 0],
+		died: [0, 0, 1, 0, 0, 0, 0, 0, 0],
 		visited: 4,
 	})
 	expect(people.memoryCounts.pruneMs).toBeGreaterThanOrEqual(0)
@@ -507,7 +511,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 			(memory) => memory.reason,
 		)
 	expect(people.memories.size).toBe(0)
-	expect(refreshes()).toEqual([0, 0, 0, 0, 0])
+	expect(refreshes()).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0])
 	expect(state.wars.length).toBeGreaterThan(0)
 	expect(
 		state.people.rulerOf.some(
@@ -563,11 +567,11 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 	).not.toBeNull()
 	expect(held(ruler(b), ruler(a))).toEqual(["attack"])
 	expect(held(ruler(a), ruler(b))).toEqual([])
-	expect(refreshes()).toEqual([0, 0, 1, 0, 0])
+	expect(refreshes()).toEqual([0, 0, 1, 0, 0, 0, 0, 0, 0])
 	expect(
 		STATE.startWar({ state, attacker: b, defender: c, rng, goal: "conquest" }),
 	).toBeNull()
-	expect(refreshes()).toEqual([0, 0, 1, 0, 0])
+	expect(refreshes()).toEqual([0, 0, 1, 0, 0, 0, 0, 0, 0])
 
 	const regent = outsider()
 	people.regencies.set(c, {
@@ -586,7 +590,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 	expect(held(ruler(d), regent)).toEqual(["attack"])
 	expect(held(ruler(d), ruler(c))).toEqual([])
 	expect(held(regent, ruler(d))).toEqual([])
-	expect(refreshes()).toEqual([0, 0, 2, 0, 0])
+	expect(refreshes()).toEqual([0, 0, 2, 0, 0, 0, 0, 0, 0])
 
 	people.regencies.set(e, {
 		ward: ruler(e),
@@ -606,7 +610,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 	expect(
 		STATE.startWar({ state, attacker: g, defender: h, rng, goal: "conquest" }),
 	).not.toBeNull()
-	expect(refreshes()).toEqual([0, 0, 2, 0, 0])
+	expect(refreshes()).toEqual([0, 0, 2, 0, 0, 0, 0, 0, 0])
 
 	expect(VASSALAGE.bind({ state, vassal, overlord, cause: "seed" })).toBe(true)
 	expect(STATE.diplomaticOverlord({ state, nation: vassal })).toBe(overlord)
@@ -619,7 +623,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 	const events = state.heap.size
 	const war = { attacker: vassal, defender: other, allies: new Set([overlord]) }
 	DISPOSITION.afterWar({ state, war: war as War, outcome: "regime change" })
-	expect(refreshes()).toEqual([0, 0, 2, 0, 0])
+	expect(refreshes()).toEqual([0, 0, 2, 0, 0, 0, 0, 0, 0])
 	DISPOSITION.afterWar({ state, war: war as War, outcome: "peace" })
 	expect(held(ruler(vassal), ruler(overlord))).toEqual(["aid"])
 	expect(held(ruler(overlord), ruler(vassal))).toEqual([])
@@ -632,7 +636,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 	expect(STATE.getDisposition({ state, a: vassal, b: overlord })).toBe(
 		"FRIENDLY",
 	)
-	expect(refreshes()).toEqual([1, 1, 2, 0, 0])
+	expect(refreshes()).toEqual([1, 1, 2, 0, 0, 0, 0, 0, 0])
 	OPINION.prune({ people, time })
 	expect(state.heap.size).toBe(events)
 
@@ -670,7 +674,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 		}),
 	).toBe(false)
 	expect(grant(false, null).length).toBeGreaterThanOrEqual(1)
-	expect(refreshes()).toEqual([1, 1, 2, 0, 0])
+	expect(refreshes()).toEqual([1, 1, 2, 0, 0, 0, 0, 0, 0])
 	PEOPLE.vacate({ people, seat: seats[1], reason: "unknown" })
 	const granted = grant(true, null).filter((seat) => {
 		const grantor = GOVERNOR.of({ state, realm: state.sovereignCurrent[seat] })
@@ -684,7 +688,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 				GOVERNOR.of({ state, realm: state.sovereignCurrent[seat] }),
 			),
 		).toEqual(["grant"])
-	expect(refreshes()).toEqual([1, 1, 2, 0, granted.length])
+	expect(refreshes()).toEqual([1, 1, 2, 0, granted.length, 0, 0, 0, 0])
 	DISTRICTS.succeed({ state, seat: seats[2], rng })
 	const partitioned = outsider()
 	PEOPLE.vacate({ people, seat: seats[2], reason: "unknown" })
@@ -696,7 +700,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 			reason: "partition",
 		}),
 	).toBe(true)
-	expect(refreshes()).toEqual([1, 1, 2, 0, granted.length])
+	expect(refreshes()).toEqual([1, 1, 2, 0, granted.length, 0, 0, 0, 0])
 
 	const usurper = outsider()
 	const ward = ruler(usurped)

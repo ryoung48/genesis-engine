@@ -47,33 +47,47 @@ Seat rule: the seat must be inside the region and owned by the holder. If not, i
 
 There is no hysteresis. The previous keep/challenge thresholds (holder keeps at 50%, challenger needs 25% and more than the holder) were removed, so control can flip as soon as another owner has a strict majority.
 
-## Founding and dissolving (`FOUNDING`, `considerTitles`)
+## Founding and dissolving (`FOUNDING`, `CORONATION.elevate`)
 
-Only kingdom, empire and hegemony can be founded. A nation tries tiers lowest first and founds at most one title per call. Attempts occur during succession and overthrow, not annually or through a player decision.
+Only kingdom, empire and hegemony can be founded, and only as part of a [coronation](government-and-succession.md#coronation): a title above the realm's own rank at a mid-reign elevation coronation, a title at or below it at a new ruler's accession coronation. There is no separate founding charge: the coronation is the one payment, and each coronation founds at most one title.
 
-A nation can found a title at tier `T` when:
+A realm **qualifies** at tier `T` when:
 
-- It holds at least 2 tier `T-1` titles that it fully owns and that aren't already inside a fully held tier `T` region (`orphansOnly`).
-- Its posted treasury cash covers the fixed establishment fee. Exact equality is sufficient; debt is ineligible. Pending army costs follow existing settlement rules.
-- A roll passes: 2% + 2% × leader claim.
+- it holds at least 2 tier `T-1` titles that it fully owns and that aren't already inside a fully held tier `T` region (`orphansOnly`), and
+- those titles together contain at least the tier's minimum size in provinces (kingdom 8, empire 40, hegemony 180). Two two-province duchies are two orphan children but cannot make a kingdom.
 
-Founding merges those children's provinces into a new region, writes the new title into `regionOf` at tier `T` and all higher tiers, and picks the seat: the holder's root province if it's inside the region, otherwise the holder-owned province with the best rank and `seatScore`. It emits `title created`, re-settles the titles it replaced, and relinks the nation.
+`FOUNDING.qualifies` is the one definition; `FOUNDING.found` applies it too. A realm that does not qualify is never screened for money, never rolls and is never flagged composite.
 
-Successful founding immediately debits cash once and records a negative `titleCreationExpenses` budget line. Failed rolls, invalid children and null founding results cost nothing. The fee replaces the former peer-revenue gate; cash-rich realms can found regardless of annual revenue.
+**Raising the realm's rank: the yearly attempt.** Once a year, after the district settle and grant, `CORONATION.elevate` considers every realm in one pass:
 
-| Title | Establishment fee (ducats) | Silver equivalent |
-| --- | ---: | ---: |
-| Kingdom | 625 / 36 (about 17.361111) | 868.055556 kg |
-| Empire | 625 / 18 (about 34.722222) | 1,736.111111 kg |
-| Hegemony | 625 / 9 (about 69.444444) | 3,472.222222 kg |
+1. One sweep of the title registry (`FOUNDING.qualifying`) lists every realm's qualifying children per tier. It reads each title's provinces once to find its sole owner and answers the orphan rule from that cache.
+2. Qualifying realms are taken in ascending realm id, one at a time, each to completion before the next. A realm with no ruler or under a regent is skipped.
+3. For the realm, only tiers above its own top tier are tried, lowest first. The coronation priced at tier `T` must be at least customary; a tier that fails this takes no roll. Then a roll must pass: 2% + 2% × leader claim, per year. The first tier to pass is elected and the rest are not tried.
+4. The elected realm is crowned at once: the title is founded, and the coronation is priced, paid and its gifts given.
 
-These are accepted gameplay calibration prices, not measured medieval coronation tariffs. The [mirrored CK3 title defines](https://github.com/jesec/ck3-mod-base/blob/master/base/game/common/defines/00_defines.txt#L913-L937) give base prices of 500, 1,000 and 2,000 gold. The [army defines](https://github.com/jesec/ck3-mod-base/blob/master/base/game/common/defines/00_defines.txt#L617-L629) give 0.003 gold per soldier; [military localization](https://github.com/jesec/ck3-mod-base/blob/master/base/game/localization/english/gui/militaryview_l_english.yml) identifies levy upkeep as monthly. Matching 0.036 gold per levy-year to this model's 62.5 g silver campaign levy-year at 450 g output per resident-year gives 15,625 / 9 g silver per CK3 gold. With `ECONOMY.ducatsPerGram = 1 / 50,000`, the fixed conversion is 5 / 144 ducats per gold. Preserve precision until display; future military upkeep changes do not change these fees.
+The chance is the formula that used to apply once per accession. Applied per year it gives a mean wait from qualifying to elevation of 12.5 years for a child heir (claim 3), 17 for a sibling, 25 for another relative and 50 for a new house, which sits inside the historical spread between holding the lower rank and the elevation coronation (Roger II of Sicily 3 years, Frederick I of Prussia 13, Stefan Dušan 15, Otto I 26, Charlemagne 32, Bolesław I 33). Those cases are illustrative and include time spent acquiring the lands.
 
-Equivalence of soldiers, service duration, equipment and provisioning between the two upkeep models is unverified. There is no demonstrated physical coin weight for a CK3 gold unit, so no additional bullion conversion applies. [John's 1199 chancery ordinance](https://sourcebooks.web.fordham.edu/source/1199Johnfees.asp), [Charles the Bold's ducal accounts](https://www.jstage.jst.go.jp/article/jsmes/8/0/8_26/_article/-char/en), and [Van Gelder's study of coronations and inaugurations](https://cris.vub.be/ws/portalfiles/portal/121350664/Van_Gelder_introduction.pdf) support expenditure on legal instruments, regalia, ceremony and political recognition in particular settings. They do not establish universal rank tariffs, doubling by rank, or expenses exclusive to founding. Keeping succession free is a gameplay scope choice.
+**One realm at a time.** A founding rewrites `regionOf` for the provinces it takes and re-settles the titles it took them from, which can pass those titles to another realm. Example: an old kingdom is divided between realms A and B, each holding two of its duchies whole, so both qualify. A founds first; its duchies leave the old kingdom, whose remaining provinces are all B's. B's two duchies now sit inside a kingdom B wholly owns, so they are no longer orphans: B takes the old kingdom by ordinary settlement and founds nothing. So once any title has been founded in a pass, each later realm is requalified against the registry as it then stands, immediately before its money check, and one that no longer qualifies is dropped without a roll. A realm that newly qualifies because of another's founding waits for next year's pass.
 
-Generation, inheritance, conquest, automatic holder changes and acquisition of an existing or vacant title are free. Payment attaches to new creation, not its holder. Dissolution gives no refund; later refounding pays the full fee again, with no permanent paid flag. There is no ongoing upkeep, duchy founding, usurpation fee or discount.
+Founding merges the children's provinces into a new region, writes the new title into `regionOf` at tier `T` and all higher tiers, and picks the seat: the holder's root province if it's inside the region, otherwise the holder-owned province with the best rank and `seatScore`. It emits `title created`, re-settles the titles it replaced, and relinks the nation. Admins displaced by the redrawn districts are reseated in the following year's settle.
 
-A founded title lapses when the nation holds fewer than 2 fully held children for 25 years (`LAPSE_YEARS`). It then emits `title destroyed` and the region is cleared. Generated titles never dissolve.
+Every elevation raises the realm's rank. If the title registry is full the founding creates nothing, and then nothing is paid, given or recorded.
+
+**Titles at or below the realm's rank: at accession.** A realm that qualifies at or below its own rank (an empire holding orphan duchies that could make a kingdom) founds that title only when a new ruler is crowned. The accession coronation tries those tiers lowest first and founds at most one: the coronation, priced at the realm's own rank as always, must be at least customary, and the same roll of 2% + 2% × leader claim must pass, once per accession. The title changes neither the realm's rank nor the price, so it costs nothing beyond the coronation the new ruler holds anyway. Anything else the realm qualifies for waits for the next ruler. No such title is founded under a regent; a child who acceded gets the attempt at the coronation held at sixteen.
+
+An accession coronation never founds a title above the realm's rank.
+
+**Composite realms.** A realm that, at the end of the yearly pass, qualifies at a tier above its own top tier is a composite realm: it holds the lands of a higher rank without the rank. It is exactly the realm the yearly pass can elevate. Money, a regency and a failed roll do not clear it; they decide whether the realm can act on its position, not whether it is in it. Until it is elevated or loses the lands a composite realm:
+
+- is [easier to break away from](rebellions-and-throne-wars.md#attribute-and-trait-effects), by one weak-claim step;
+- keeps its lower top tier, so its districts are one tier smaller and more numerous, and its [partition](government-and-succession.md#partition) hands out titles of the lower tier;
+- stands at the lower rank among its peers.
+
+A personal union is not a composite realm: titles are held per realm, so union partners never qualify jointly.
+
+Generation, inheritance, conquest, automatic holder changes and acquisition of an existing or vacant title cost nothing. Dissolution gives no refund, and a later refounding is a new coronation at that day's price. There is no ongoing upkeep and no duchy founding.
+
+A founded title lapses when the nation holds fewer than 2 fully held children for 25 years (`LAPSE_YEARS`). Lapse is checked at each accession coronation, so a title founded mid-reign is first tested when the next ruler is crowned. It then emits `title destroyed` and the region is cleared. Generated titles never dissolve.
 
 ## Nation vs its subordinates
 
@@ -108,7 +122,7 @@ Different:
 - Holders are sovereigns chosen by majority ownership, not characters granted titles. No vassal contracts, grants or usurpation.
 - The liege tree is derived, not chosen, and has only two levels below the crown; lower titles have no individual holders.
 - No de jure drift. The tree changes only when titles are founded or dissolved.
-- Founding is a cash-gated random attempt with a fixed establishment fee instead of a player decision; CK3 prestige/piety requirements are not modeled.
+- Founding is a yearly random attempt gated by the coronation the realm can afford, instead of a player decision with a fixed price; CK3 prestige/piety requirements are not modeled.
 - Titles can be vacant.
 - No barony tier below county.
 

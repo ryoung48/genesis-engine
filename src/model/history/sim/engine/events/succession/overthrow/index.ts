@@ -1,5 +1,6 @@
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
 import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
+import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
 import type {
 	EnthroneParams,
 	SeeksParams,
@@ -72,12 +73,8 @@ function enthrone({
 		deposed,
 		reason: "regime change",
 	})
-	STATE.considerTitles({
-		state,
-		nation: realm,
-		rng,
-	})
 	REGENCY.start({ state, realm })
+	CORONATION.hold({ state, realm, rng })
 	const overlord = STATE.diplomaticOverlord({ state, nation: realm })
 	if (
 		overlord >= 0 &&

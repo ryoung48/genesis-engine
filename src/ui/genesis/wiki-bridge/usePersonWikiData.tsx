@@ -53,6 +53,10 @@ const MEMORY_LABELS: Record<OpinionMemoryReason, string> = {
 	attack: "Attacked",
 	usurpation: "Usurped the throne",
 	grant: "Granted a district",
+	coronation_uncrowned: "No coronation gifts",
+	coronation_humble: "Humble coronation",
+	coronation_lavish: "Lavish coronation",
+	coronation_magnificent: "Magnificent coronation",
 }
 const DEATH_VERBS = {
 	died: "died",

@@ -21,7 +21,7 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 			indemnityReceived: 0,
 			boughtPeace: 0,
 			succession: 0,
-			titleCreationExpenses: 0,
+			coronationExpenses: 0,
 			otherChangesTotal: 0,
 			treasurySafe: 0,
 			settled: false,

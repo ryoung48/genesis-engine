@@ -4,6 +4,7 @@ import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-bud
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
+import { CORONATION_COUNTERS } from "@/model/history/sim/engine/events/succession/coronation/counters"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
@@ -713,6 +714,8 @@ function createHistoryState({
 			heldOnly: true,
 		}),
 		districtSeat: new Uint8Array(P),
+		coronationOwed: new Int32Array(P).fill(-1),
+		compositeRealm: new Uint8Array(P),
 		districtRank: new Uint8Array(P),
 		topTier: new Uint8Array(P),
 		titleFounded: new Uint8Array(nations.titles.count + TITLE_CAPACITY),
@@ -792,6 +795,7 @@ function createHistoryState({
 		cultureCount: cultures.count,
 		marriageMarket: new Map(),
 		opinionPolitics: LIVE_OPINION_CONTEXT.totals(),
+		coronations: CORONATION_COUNTERS.create(),
 		heritageOfCulture:
 			heritages?.assignment.slice() ?? new Int32Array(cultures.count).fill(-1),
 		cultureGenderSystems:
@@ -1287,5 +1291,4 @@ export const STATE = {
 		MILITARY.mutate({ state: params.state, action: () => uniteCouple(params) }),
 	foundRuler: (params: FoundRulerParams) =>
 		MILITARY.mutate({ state: params.state, action: () => foundRuler(params) }),
-	considerTitles: STATE_TITLES.considerTitles,
 }

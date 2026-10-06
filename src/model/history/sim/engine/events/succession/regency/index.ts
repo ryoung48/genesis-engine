@@ -1,11 +1,12 @@
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
+import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
 import type {
 	AppointParams,
 	BeginParams,
 	BindsToParams,
 	ChooseParams,
+	ComeOfAgeParams,
 	EndParams,
-	LeaderParams,
 	RealmRegencyParams,
 	RegentChoice,
 	RegentDiedParams,
@@ -184,10 +185,14 @@ function end({ state, realm, cause }: EndParams): void {
 	})
 }
 
-function comeOfAge({ state, realm, leader }: LeaderParams): void {
+// A ward who is incapable at sixteen passes straight into an incapacity
+// regency; one who acceded to the throne is otherwise crowned.
+function comeOfAge({ state, realm, leader, rng }: ComeOfAgeParams): void {
 	if (state.leaderRuntime.idx[realm] !== leader) return
 	if (state.people.regencies.get(realm)?.cause !== "minority") return
 	end({ state, realm, cause: "age" })
+	startIncapacity({ state, realm })
+	CORONATION.holdDeferred({ state, realm, leader, rng })
 }
 
 function replace({ state, realm, ward }: WardParams): void {

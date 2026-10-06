@@ -44,6 +44,10 @@ const REBELLION_THRESHOLD = 0.45
 // much as one weak crown.
 const HOLDER_OPINION_LAXITY = -0.002
 
+// A realm holding the lands of a higher rank without the title is one weak
+// claim step easier to break away from.
+const COMPOSITE_REALM_LAXITY = 0.05
+
 const FRONT_PROVINCES = 15
 
 const MAX_FRONT_FACTOR = 4
@@ -363,6 +367,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			succession: false,
 			laxity: 0,
 			holderOpinion: null,
+			composite: false,
 			threshold: REBELLION_THRESHOLD,
 			roll: -1,
 			decision: threat <= REBELLION_THRESHOLD ? "threshold" : "accepted",
@@ -453,6 +458,8 @@ function rebel({
 	})
 	const holderOpinion = OPINION.loyaltyOf({ breakdown })
 	laxity += HOLDER_OPINION_LAXITY * holderOpinion
+	const composite = state.compositeRealm[overlord] === 1
+	if (composite) laxity += COMPOSITE_REALM_LAXITY
 	state.opinionPolitics.loyaltyEvaluations++
 	state.opinionPolitics.loyaltyMs += performance.now() - started
 	const threshold = REBELLION_THRESHOLD - laxity
@@ -467,12 +474,15 @@ function rebel({
 		succession,
 		laxity,
 		holderOpinion: breakdown ? holderOpinion : null,
+		composite,
 		threshold,
 		roll,
 		decision,
 		preview,
 	})
+	if (composite) state.coronations.compositeEvaluations++
 	if (decision !== "accepted") return false
+	if (composite) state.coronations.compositeRebellions++
 	const supporters = OVERTHROW.seeks({
 		state,
 		realm: overlord,

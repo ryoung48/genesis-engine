@@ -1,4 +1,5 @@
 import { serialize } from "node:v8"
+import { CORONATION_COUNTERS } from "@/model/history/sim/engine/events/succession/coronation/counters"
 import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
@@ -6,6 +7,9 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { OPINION } from "@/model/history/sim/people/opinion"
 import { OPINION_MEMORY } from "@/model/history/sim/people/opinion/memory"
 import type {
+	CoronationGridParams,
+	CoronationGrids,
+	CoronationReport,
 	HolderOpinions,
 	OpinionReportParams,
 	OpinionSampleParams,
@@ -21,6 +25,7 @@ function tracker(): OpinionTracker {
 	return {
 		memory: OPINION.counts(),
 		politics: LIVE_OPINION_CONTEXT.totals(),
+		coronations: CORONATION_COUNTERS.create(),
 		districtYears: [0, 0, 0, 0],
 		unavailableDistrictYears: 0,
 		sampleMs: 0,
@@ -159,6 +164,52 @@ function dispositions(engine: HistoryState): number[] {
 	return counts
 }
 
+function coronationGrids({
+	engine,
+	tracker,
+	kind,
+}: CoronationGridParams): CoronationGrids {
+	const grid = (key: keyof CoronationGrids) =>
+		Array.from({ length: CORONATION_COUNTERS.ranks }, (_, rank) =>
+			CORONATION_COUNTERS.qualities.map((quality) => {
+				const cell = CORONATION_COUNTERS.cell({ kind, rank, quality })
+				return engine.coronations[key][cell] - tracker.coronations[key][cell]
+			}),
+		)
+	return {
+		held: grid("held"),
+		ducats: grid("ducats"),
+		memories: grid("memories"),
+		founded: grid("founded"),
+		raised: grid("raised"),
+	}
+}
+
+function coronations({
+	engine,
+	tracker,
+}: OpinionSampleParams): CoronationReport {
+	const since = (
+		key:
+			| "deferred"
+			| "majority"
+			| "incapable"
+			| "compositeRealmYears"
+			| "compositeEvaluations"
+			| "compositeRebellions",
+	) => engine.coronations[key] - tracker.coronations[key]
+	return {
+		accession: coronationGrids({ engine, tracker, kind: "accession" }),
+		elevation: coronationGrids({ engine, tracker, kind: "elevation" }),
+		deferred: since("deferred"),
+		majority: since("majority"),
+		incapable: since("incapable"),
+		compositeRealmYears: since("compositeRealmYears"),
+		compositeEvaluations: since("compositeEvaluations"),
+		compositeRebellions: since("compositeRebellions"),
+	}
+}
+
 function of({
 	engine,
 	tracker,
@@ -210,6 +261,7 @@ function of({
 		for (const rows of targets.values()) recordRefreshRows += rows.length
 	const report: OpinionWindowReport = {
 		statistics: {
+			coronations: coronations({ engine, tracker }),
 			holderOpinion,
 			popularity: popular,
 			rebellion: {
@@ -260,6 +312,8 @@ function of({
 				(politics.loyaltyMs - tracker.politics.loyaltyMs) / years,
 			driftMsPerYear: (politics.driftMs - tracker.politics.driftMs) / years,
 			pruneMsPerYear: (memory.pruneMs - tracker.memory.pruneMs) / years,
+			elevateMsPerYear:
+				(engine.coronations.elevateMs - tracker.coronations.elevateMs) / years,
 			reportSampleMsPerYear: tracker.sampleMs / years,
 			logPayloadBytes:
 				ROW_BYTES * refreshes.reduce((sum, count) => sum + count, 0),
@@ -270,6 +324,7 @@ function of({
 	}
 	tracker.memory = structuredClone(memory)
 	tracker.politics = structuredClone(politics)
+	tracker.coronations = structuredClone(engine.coronations)
 	tracker.districtYears = [0, 0, 0, 0]
 	tracker.unavailableDistrictYears = 0
 	tracker.sampleMs = 0

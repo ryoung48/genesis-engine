@@ -2,6 +2,7 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { EventHeap } from "@/model/history/sim/engine/event-heap"
 import type { DeathSchedule } from "@/model/history/sim/engine/events/people/death/schedule/types"
+import type { CoronationCounters } from "@/model/history/sim/engine/events/succession/coronation/counters/types"
 import type { SuccessionContext } from "@/model/history/sim/engine/events/succession/types"
 import type {
 	JournalTransaction,
@@ -166,6 +167,7 @@ export interface LifecycleCounters {
 export interface HistoryState {
 	marriageMarket: Map<number, MarriageTotals>
 	opinionPolitics: OpinionPoliticsTotals
+	coronations: CoronationCounters
 	riverByProvince: Uint8Array
 	P: number
 	time: number
@@ -186,6 +188,12 @@ export interface HistoryState {
 	titleMembers: TitleMembers
 	seatRank: Uint8Array
 	districtSeat: Uint8Array
+	// Per realm root: the leader index of the accession owed a coronation when
+	// its minority regency ends, or -1.
+	coronationOwed: Int32Array
+	// Per realm root: 1 while the realm holds the lands of a rank above its
+	// own without the title; rewritten by the yearly elevation pass.
+	compositeRealm: Uint8Array
 	districtRank: Uint8Array
 	topTier: Uint8Array
 	titleFounded: Uint8Array

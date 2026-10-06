@@ -1,4 +1,5 @@
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
+import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
@@ -254,11 +255,7 @@ function runSeatSuccession({
 		restore({ state, realm: province, rng })
 	}
 
-	STATE.considerTitles({
-		state,
-		nation: province,
-		rng,
-	})
+	CORONATION.hold({ state, realm: province, rng })
 }
 
 // The dead person's seats, frozen once and walked in order; a seat that has
@@ -373,11 +370,7 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 		time: state.time / STATE.yearMs,
 	})
 	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })
-	STATE.considerTitles({
-		state,
-		nation: realm,
-		rng,
-	})
+	CORONATION.hold({ state, realm, rng })
 }
 
 function runYear({ state, rng }: RunYearParams): void {
@@ -387,6 +380,7 @@ function runYear({ state, rng }: RunYearParams): void {
 		if (chance > 0 && rng.random() < chance) usurp({ state, realm, rng })
 	}
 	for (const realm of RESTORATION.due({ state })) restore({ state, realm, rng })
+	CORONATION.elevate({ state, rng })
 }
 
 export const SUCCESSION = {

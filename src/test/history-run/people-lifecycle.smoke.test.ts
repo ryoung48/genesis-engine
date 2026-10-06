@@ -743,7 +743,12 @@ it("governs for an incapable sovereign through a regent until death, spouse firs
 	).toBe(0)
 	expect(SUCCESSION_SYSTEMS.available({ state, person: ruler })).toBe(false)
 	// The end-of-minority callback leaves an incapacity regency alone.
-	REGENCY.comeOfAge({ state, realm, leader: state.leaderRuntime.idx[realm] })
+	REGENCY.comeOfAge({
+		state,
+		realm,
+		leader: state.leaderRuntime.idx[realm],
+		rng,
+	})
 	expect(people.regencies.has(realm)).toBe(true)
 	// The regent dies: the next in order takes over, the cause unchanged.
 	PERSON_DEATH.kill({ state, person: spouse, cause: "natural", rng })

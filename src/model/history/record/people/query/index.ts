@@ -27,7 +27,7 @@ import type { HealthBand } from "@/model/history/sim/people/health/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { OPINION } from "@/model/history/sim/people/opinion"
 import { OPINION_MEMORY } from "@/model/history/sim/people/opinion/memory"
-import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
+import type { OpinionMemorySlot } from "@/model/history/sim/people/opinion/memory/types"
 import type {
 	OpinionBreakdown,
 	OpinionContext,
@@ -405,15 +405,15 @@ function realmAt({ people, id, timeMs, record }: RealmAtParams): number {
 	return province < 0 ? -1 : AFFILIATION.at({ record, province, timeMs })
 }
 
-// The latest refresh of each reason at or before the time; a later arrival
+// The latest refresh of each slot at or before the time; a later arrival
 // wins a tie.
 function memoriesAt({ people, a, b, timeMs }: CoupleAtParams): RecordMemory[] {
-	const latest = new Map<OpinionMemoryReason, RecordMemory>()
+	const latest = new Map<OpinionMemorySlot, RecordMemory>()
 	for (const row of people.memoriesOf.get(a)?.get(b) ?? []) {
 		if (row.startTimeMs > timeMs) continue
-		const held = latest.get(row.reason)
-		if (!held || row.startTimeMs >= held.startTimeMs)
-			latest.set(row.reason, row)
+		const slot = OPINION_MEMORY.slotOf(row.reason)
+		const held = latest.get(slot)
+		if (!held || row.startTimeMs >= held.startTimeMs) latest.set(slot, row)
 	}
 	return [...latest.values()]
 }

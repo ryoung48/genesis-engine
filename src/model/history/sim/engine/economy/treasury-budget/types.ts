@@ -20,7 +20,7 @@ export interface TreasuryBudget {
 	indemnityReceived: number
 	boughtPeace: number
 	succession: number
-	titleCreationExpenses: number
+	coronationExpenses: number
 	otherChangesTotal: number
 	treasurySafe: number
 	settled: boolean

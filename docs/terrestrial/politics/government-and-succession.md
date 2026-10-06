@@ -207,11 +207,66 @@ Republics consider every distinct patrician head’s house. Each elector backs t
   2. the closest adult of the ward's house in inheritance order;
   3. the strongest district holder (lord protector), including a county admin;
   4. otherwise a regency council with no person.
-- **Coming of age.** The end of a minority is queued for the ward's 16th birthday when the regency starts. A ward who has died or been deposed leaves it stale, and it never ends an incapacity regency.
+- **Coming of age.** The end of a minority is queued for the ward's 16th birthday when the regency starts. A ward who has died or been deposed leaves it stale, and it never ends an incapacity regency. A ward who is Incapable on that birthday passes straight into an incapacity regency, with a new regent chosen by the incapacity order; otherwise a ward who [acceded to the throne](#coronation) is crowned.
 - **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere or becomes Incapable is replaced at the yearly check.
 - **After a partition.** Regencies start once the partition's seating is final, for the new realms and then for the primary realm, and one review replaces any regent who became sovereign in it ([government](government-and-succession.md#partition)).
 - **Weak crown.** A realm under a regent, or whose ruler has health below 2.5 or stress of 300 or more, starts no wars and its districts rebel more easily ([rebellion](rebellions-and-throne-wars.md)). It still defends; diplomatic disposition governs subject calls.
 - **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs. A spouse or a council never usurps. The deposed ruler, child or incapable, becomes the realm's claimant.
+
+## Coronation
+
+Code: `src/model/history/sim/engine/events/succession/coronation` (`CORONATION.hold`, `.holdDeferred`, `.elevate`).
+
+A coronation is the ceremony, regalia and recognition of a ruler, with the gifts handed to the realm's district admins. The realm's own treasury pays. There are two kinds.
+
+**Accession coronation.** Held when a person becomes ruler of a realm that already exists and is still sovereign afterwards: by succession, usurpation or regime change, under every government type. It is held once the throne is settled, after any partition, regency choice, succession revolt and restoration attempt, so its gifts do not affect the accession's own revolt test; they affect the yearly rebellion tests of the following ten years. Lapsed founded titles dissolve at this point, and the realm may found one title [at or below its own rank](title-hierarchy.md#founding-and-dissolving-founding-coronationelevate); a title above it waits for an elevation.
+
+Not crowned: rulers of realms created at that moment (partition heirs, breakaway and pretender realms, released provinces), initial and backfilled rulers, district holders, and a union junior that merges into its senior while taking the ruler.
+
+**Under a regency.** A regent is never crowned, and no coronation is held while a regent governs.
+
+- A child who took the throne by one of the accessions above is owed a coronation and is crowned on coming of age at sixteen, at that day's treasury, rank and district admins. One who dies or is deposed first is never crowned.
+- Coming of age crowns nobody else. An initial ruler or a partition heir who starts under a minority regency was never owed a coronation and gets none at sixteen.
+- A ruler who accedes Incapable, or a ward who is Incapable at sixteen, is never crowned. A sitting ruler who later becomes Incapable keeps the coronation they had.
+- A regent who usurps the throne becomes the ruler and is crowned then.
+
+Deferral to majority is the simpler of the historical practices (Louis XIV acceded at four in 1643 and was crowned at fifteen; Henry VI of England acceded as an infant in 1422 and was crowned at seven; Henry III was crowned at nine within weeks of acceding in 1216).
+
+**Elevation coronation.** Held when a sitting ruler [founds a title](title-hierarchy.md#founding-and-dissolving-founding-coronationelevate) above the realm's rank in the yearly pass. It needs no change of ruler, so the ruler who assembled the lands is the one raised. It must be at least customary at the rank it is priced at, and it is held only if the title is actually created.
+
+**Reference fee.** Every rank has one reference price: `625 / 288` ducats per province times the rank's minimum size.
+
+| Rank | Minimum provinces | Reference fee (ducats) |
+| --- | ---: | ---: |
+| County | 1 | 625 / 288 (about 2.170139) |
+| Duchy | 2 | 625 / 144 (about 4.340278) |
+| Kingdom | 8 | 625 / 36 (about 17.361111) |
+| Empire | 40 | 3125 / 36 (about 86.805556) |
+| Hegemony | 180 | 3125 / 8 (390.625) |
+
+The price rank is the realm's top tier. For an elevation it is the founded tier, which is the realm's new rank: a ruler who founds a kingdom pays a king's coronation.
+
+The rate is the kingdom price divided by the kingdom's minimum size. Prices that double per rank, as CK3's do, grow more slowly than minimum realm size (×2, ×4, ×5, ×4.5), so the fee would become relatively cheaper with rank; scaling by minimum size keeps it roughly proportional to the smallest realm that can hold the rank. The fee is flat within a rank: an empire of 179 provinces pays what one of 40 pays.
+
+These are accepted gameplay calibration prices, not measured medieval coronation tariffs. The kingdom anchor comes from the [mirrored CK3 title defines](https://github.com/jesec/ck3-mod-base/blob/master/base/game/common/defines/00_defines.txt#L913-L937), which give a base price of 500 gold for a kingdom. The [army defines](https://github.com/jesec/ck3-mod-base/blob/master/base/game/common/defines/00_defines.txt#L617-L629) give 0.003 gold per soldier; [military localization](https://github.com/jesec/ck3-mod-base/blob/master/base/game/localization/english/gui/militaryview_l_english.yml) identifies levy upkeep as monthly. Matching 0.036 gold per levy-year to this model's 62.5 g silver campaign levy-year at 450 g output per resident-year gives 15,625 / 9 g silver per CK3 gold. With `ECONOMY.ducatsPerGram = 1 / 50,000`, the fixed conversion is 5 / 144 ducats per gold, and 500 gold is 625 / 36 ducats. The empire and hegemony fees no longer correspond to CK3's 1,000 and 2,000 gold; they follow this model's tier sizes. Future military upkeep changes do not change these fees.
+
+Equivalence of soldiers, service duration, equipment and provisioning between the two upkeep models is unverified. There is no demonstrated physical coin weight for a CK3 gold unit, so no additional bullion conversion applies. [John's 1199 chancery ordinance](https://sourcebooks.web.fordham.edu/source/1199Johnfees.asp), [Charles the Bold's ducal accounts](https://www.jstage.jst.go.jp/article/jsmes/8/0/8_26/_article/-char/en), and [Van Gelder's study of coronations and inaugurations](https://cris.vub.be/ws/portalfiles/portal/121350664/Van_Gelder_introduction.pdf) support expenditure on legal instruments, regalia, ceremony and political recognition at accession in particular settings. They do not establish universal rank tariffs or scaling by rank.
+
+**Quality.** A coronation resolves to exactly one of five qualities, from the reference fee `B`, the posted treasury `T` and the [safe reserve](armies-and-wars.md#state-maintenance-and-treasury) `S` (two years of surplus). Equality is sufficient.
+
+| Quality | Price | Held when |
+| --- | ---: | --- |
+| Magnificent | 4 × B | `4B ≤ T − S` |
+| Lavish | 2 × B | else `2B ≤ T − S` |
+| Customary | B | else `B ≤ T` |
+| Humble | B / 2 | else `B / 2 ≤ T` |
+| Uncrowned | 0 | otherwise |
+
+The customary ceremony is an obligation paid from whatever cash exists; extravagance is paid only from cash above the safe reserve, which the treasury already treats as excess. Nothing is bought on credit, so a realm in debt is uncrowned. The ×2 steps keep each quality a clearly different outlay, and magnificent stays below the next rank's customary fee from kingdom upward.
+
+**Payment.** The price leaves the treasury once and is recorded as the negative `coronationExpenses` [one-off budget line](armies-and-wars.md#state-maintenance-and-treasury). An uncrowned ruler pays nothing.
+
+**Gifts.** Each living district admin of the realm, as they stood before any founding redrew the districts, remembers the coronation: resentment below customary, nothing at it, goodwill above it. The values and how the memories replace each other are in [interaction memories](../people/opinion-and-relationships.md#interaction-memories).
 
 ## Restoration
 

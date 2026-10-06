@@ -280,6 +280,7 @@ function processEventsUntil({
 					state,
 					realm: dataBuf[0],
 					leader: dataBuf[1],
+					rng,
 				})
 				break
 		}

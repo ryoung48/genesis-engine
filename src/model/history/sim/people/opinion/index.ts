@@ -90,8 +90,8 @@ function alive({ people, person, time }: PersonAtParams): boolean {
 	)
 }
 
-// A repeated reason restarts from full strength instead of stacking. Returns
-// whether the observer and target are two living people.
+// A repeated slot restarts from full strength with the new reason instead of
+// stacking. Returns whether the observer and target are two living people.
 function remember({
 	people,
 	observer,
@@ -111,9 +111,14 @@ function remember({
 		people.memories.set(observer, targets)
 	}
 	const entries = targets.get(target) ?? []
-	const existing = entries.find((entry) => entry.reason === reason)
-	if (existing) existing.start = time
-	else entries.push({ reason, start: time })
+	const slot = OPINION_MEMORY.slotOf(reason)
+	const existing = entries.find(
+		(entry) => OPINION_MEMORY.slotOf(entry.reason) === slot,
+	)
+	if (existing) {
+		existing.reason = reason
+		existing.start = time
+	} else entries.push({ reason, start: time })
 	targets.set(target, entries)
 	people.memoryCounts.refreshes[OPINION_MEMORY.codeOf(reason)]++
 	PEOPLE_LOG.append({

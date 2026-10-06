@@ -17,6 +17,30 @@ export interface WholeHeldParams {
 	title: number
 }
 
+export interface OrphanParams {
+	childHeld: boolean
+	parentHeld: boolean
+}
+
+export interface QualifyingParams {
+	titles: DejureTitles
+	members: TitleMembers
+	provinceCount: number
+	ownerOf: Int32Array
+}
+
+export interface QualifiedFounding {
+	holder: number
+	tier: number
+	children: number[]
+}
+
+export interface QualifiesParams {
+	members: TitleMembers
+	children: number[]
+	tier: number
+}
+
 export interface FoundTitleParams {
 	titles: DejureTitles
 	members: TitleMembers

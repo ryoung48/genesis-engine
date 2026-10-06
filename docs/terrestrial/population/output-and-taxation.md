@@ -31,4 +31,4 @@ For example, 100,000 residents at development 0.25 and local knowledge 2 produce
 
 Every government collects provincial output times the realm's knowledge-based extraction rate. Administration costs 35% of each province's collected revenue multiplied by `1 + 0.15 × (travel days / 30)^0.7`. Travel days are great-circle distance from the capital divided by 30 km/day. Civilian surplus is revenue less state maintenance.
 
-Army upkeep, fiscal exhaustion, one-off expenses and cash leakage are described in [army budgets](../politics/armies-and-wars.md#state-maintenance-and-treasury). Title creation prices belong to [title hierarchy](../politics/title-hierarchy.md#founding-and-dissolving-founding-considertitles).
+Army upkeep, fiscal exhaustion, one-off expenses and cash leakage are described in [army budgets](../politics/armies-and-wars.md#state-maintenance-and-treasury). Coronation prices belong to [government and succession](../politics/government-and-succession.md#coronation).

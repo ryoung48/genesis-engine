@@ -12,19 +12,33 @@ export interface ApplyDerivedParentsParams {
 	members: number[]
 }
 
-export interface ConsiderTitlesParams {
+export interface Founding {
+	tier: number
+	children: number[]
+}
+
+export interface ElectFoundingParams {
 	state: HistoryState
 	nation: number
 	rng: SharedRng
+	permits: (tier: number) => boolean
+	// The tiers the realm qualifies at, lowest first.
+	qualified: Founding[]
+}
+
+export interface QualifyingParams {
+	state: HistoryState
+}
+
+export interface FoundParams {
+	state: HistoryState
+	nation: number
+	founding: Founding
 }
 
 export interface DissolveLapsedParams {
 	state: HistoryState
 	nation: number
-}
-
-export interface FoundTitleForParams extends ConsiderTitlesParams {
-	tier: number
 }
 
 export interface RelinkNationsParams {

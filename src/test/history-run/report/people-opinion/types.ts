@@ -1,4 +1,8 @@
 import type { PeopleRecord } from "@/model/history/record/people/types"
+import type {
+	CoronationCounters,
+	CoronationKind,
+} from "@/model/history/sim/engine/events/succession/coronation/counters/types"
 import type { OpinionPoliticsTotals } from "@/model/history/sim/engine/opinion-context/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { MemoryCounts } from "@/model/history/sim/people/opinion/types"
@@ -7,6 +11,7 @@ export interface OpinionTracker {
 	// Running totals as of the last window's end.
 	memory: MemoryCounts
 	politics: OpinionPoliticsTotals
+	coronations: CoronationCounters
 	// Yearly samples of held districts by their holder's religion-excluded
 	// opinion band; `unavailable` has no ruler to hold an opinion of.
 	districtYears: number[]
@@ -79,7 +84,36 @@ export interface DiplomacyOutcomes {
 	alliancesEnded: number
 }
 
+// Each grid is rank (county to hegemony) × quality (uncrowned to magnificent).
+// `held`, `ducats` and `memories` use the rank the fee was priced at; `founded`
+// and `raised` the tier of the title created.
+export interface CoronationGrids {
+	held: number[][]
+	ducats: number[][]
+	memories: number[][]
+	founded: number[][]
+	raised: number[][]
+}
+
+export interface CoronationGridParams extends OpinionSampleParams {
+	kind: CoronationKind
+}
+
+export interface CoronationReport {
+	accession: CoronationGrids
+	elevation: CoronationGrids
+	deferred: number
+	majority: number
+	incapable: number
+	// Realms flagged composite at the end of each yearly pass, and the
+	// rebellion checks made under that flag.
+	compositeRealmYears: number
+	compositeEvaluations: number
+	compositeRebellions: number
+}
+
 export interface OpinionReport {
+	coronations: CoronationReport
 	holderOpinion: HolderOpinions
 	popularity: PopularitySummary
 	rebellion: RebellionBands
@@ -97,6 +131,7 @@ export interface OpinionCostReport {
 	loyaltyMsPerYear: number
 	driftMsPerYear: number
 	pruneMsPerYear: number
+	elevateMsPerYear: number
 	reportSampleMsPerYear: number
 	// 25 bytes per refresh row sent in the window.
 	logPayloadBytes: number

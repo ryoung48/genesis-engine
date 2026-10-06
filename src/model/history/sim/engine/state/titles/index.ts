@@ -1,5 +1,4 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
-import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import {
 	getNationProvinces,
@@ -7,10 +6,12 @@ import {
 } from "@/model/history/sim/engine/state/hierarchy"
 import type {
 	ApplyDerivedParentsParams,
-	ConsiderTitlesParams,
 	DissolveLapsedParams,
-	FoundTitleForParams,
+	ElectFoundingParams,
+	Founding,
+	FoundParams,
 	OwnedChildCountParams,
+	QualifyingParams,
 	RefreshHouseholdsParams,
 	RelinkNationsParams,
 	SeatParams,
@@ -23,20 +24,15 @@ import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
+import type { QualifiedFounding } from "@/model/society/dejure/founding/types"
 import { HOLDING } from "@/model/society/dejure/holding"
 import { TITLES } from "@/model/society/titles"
 
 const TIER_SLOTS = TITLES.tierOrder.length - 1
 const FIRST_FOUNDED_TIER = 2
-const MIN_FOUNDING_CHILDREN = 2
 const LAPSE_YEARS = 25
 const BASE_FOUNDING_CHANCE = 0.02
 const CLAIM_FOUNDING_CHANCE = 0.02
-const TITLE_CREATION_COST_DUCATS: Readonly<Record<number, number>> = {
-	2: 625 / 36,
-	3: 625 / 18,
-	4: 625 / 9,
-}
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000
 
 function isDistrictSeat({ state, seat }: SeatParams): boolean {
@@ -203,28 +199,7 @@ function refreshTitleIndex({ state }: DissolveLapsedParams): void {
 	refreshHouseholds({ state, previousRanks })
 }
 
-function foundTitleFor({
-	state,
-	nation,
-	tier,
-	rng,
-}: FoundTitleForParams): boolean {
-	const children = FOUNDING.fullyHeldChildren({
-		titles: state.titles,
-		members: state.titleMembers,
-		provinceCount: state.P,
-		ownerOf: state.sovereignCurrent,
-		holder: nation,
-		tier,
-		orphansOnly: true,
-	})
-	if (children.length < MIN_FOUNDING_CHILDREN) return false
-	const cost = TITLE_CREATION_COST_DUCATS[tier]
-	const treasury = FIELDS.prov.treasury.get({ state, p: nation })
-	if (treasury < cost) return false
-	const claim = state.leaderClaimCurrent[nation]
-	if (rng.random() >= BASE_FOUNDING_CHANCE + CLAIM_FOUNDING_CHANCE * claim)
-		return false
+function found({ state, nation, founding }: FoundParams): boolean {
 	const founded = FOUNDING.found({
 		titles: state.titles,
 		members: state.titleMembers,
@@ -235,14 +210,10 @@ function foundTitleFor({
 		urbanPop: state.popUrbanCurrent,
 		waterAccess: state.waterAccess,
 		holder: nation,
-		tier,
-		children,
+		tier: founding.tier,
+		children: founding.children,
 	})
 	if (!founded) return false
-	FIELDS.prov.treasury.set({ state, p: nation, value: treasury - cost })
-	const budget = TREASURY_BUDGET.get({ state, p: nation })
-	budget.titleCreationExpenses -= cost
-	budget.otherChangesTotal -= cost
 	state.titleFounded[founded.title] = 1
 	state.titleLapseSince[founded.title] = -1
 	refreshTitleIndex({ state, nation })
@@ -292,7 +263,7 @@ function dissolveLapsed({ state, nation }: DissolveLapsedParams): void {
 	for (let title = 0; title < state.titles.count; title++) {
 		if (!state.titleFounded[title] || state.titles.holder[title] !== nation)
 			continue
-		if (ownedChildCount({ state, nation, title }) >= MIN_FOUNDING_CHILDREN) {
+		if (ownedChildCount({ state, nation, title }) >= FOUNDING.minChildren) {
 			state.titleLapseSince[title] = -1
 			continue
 		}
@@ -324,10 +295,52 @@ function dissolveLapsed({ state, nation }: DissolveLapsedParams): void {
 	}
 }
 
-function considerTitles({ state, nation, rng }: ConsiderTitlesParams): void {
-	dissolveLapsed({ state, nation })
-	for (let tier = FIRST_FOUNDED_TIER; tier <= TIER_SLOTS; tier++)
-		if (foundTitleFor({ state, nation, tier, rng })) break
+// The tiers the realm qualifies to found at, lowest first, from a scan of its
+// own titles.
+function qualified({ state, nation }: DissolveLapsedParams): Founding[] {
+	const result: Founding[] = []
+	for (let tier = FIRST_FOUNDED_TIER; tier <= TIER_SLOTS; tier++) {
+		const children = FOUNDING.fullyHeldChildren({
+			titles: state.titles,
+			members: state.titleMembers,
+			provinceCount: state.P,
+			ownerOf: state.sovereignCurrent,
+			holder: nation,
+			tier,
+			orphansOnly: true,
+		})
+		if (FOUNDING.qualifies({ members: state.titleMembers, children, tier }))
+			result.push({ tier, children })
+	}
+	return result
+}
+
+// Every realm's qualifying tiers from one sweep of the registry.
+function qualifying({ state }: QualifyingParams): QualifiedFounding[] {
+	DERIVE.ensureHierarchyClean(state)
+	return FOUNDING.qualifying({
+		titles: state.titles,
+		members: state.titleMembers,
+		provinceCount: state.P,
+		ownerOf: state.sovereignCurrent,
+	})
+}
+
+// The lowest qualifying tier the realm can pay for and rolls well on; a tier
+// it cannot pay for takes no roll.
+function electFounding({
+	state,
+	nation,
+	rng,
+	permits,
+	qualified,
+}: ElectFoundingParams): Founding | null {
+	const chance =
+		BASE_FOUNDING_CHANCE +
+		CLAIM_FOUNDING_CHANCE * state.leaderClaimCurrent[nation]
+	for (const founding of qualified)
+		if (permits(founding.tier) && rng.random() < chance) return founding
+	return null
 }
 
 function topTier({ state, realm }: TopTierParams): number {
@@ -337,7 +350,11 @@ function topTier({ state, realm }: TopTierParams): number {
 export const STATE_TITLES = {
 	topTier,
 	applyDerivedParents,
-	considerTitles,
+	lapse: dissolveLapsed,
+	qualified,
+	qualifying,
+	electFounding,
+	found,
 	isDistrictSeat,
 	settleProvinces,
 }
