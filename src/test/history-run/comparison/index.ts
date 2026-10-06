@@ -249,6 +249,21 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			after.people = { ...object(after.people) }
 			delete object(before.people).msPerYear
 			delete object(after.people).msPerYear
+			const beforeProjectionMs = object(before.marriageMarket).projectionMs
+			const afterProjectionMs = object(after.marriageMarket).projectionMs
+			if (before.marriageMarket)
+				before.marriageMarket = { ...object(before.marriageMarket) }
+			if (after.marriageMarket)
+				after.marriageMarket = { ...object(after.marriageMarket) }
+			delete object(before.marriageMarket).projectionMs
+			delete object(after.marriageMarket).projectionMs
+			rows.push({
+				before: beforeProjectionMs,
+				after: afterProjectionMs,
+				section: "Performance",
+				period: `${seed} / ${period}`,
+				metric: "marriageMarket.projectionMs",
+			})
 			const beforeDeriveMs = object(before.districts).deriveMs
 			const afterDeriveMs = object(after.districts).deriveMs
 			if (before.districts) before.districts = { ...object(before.districts) }

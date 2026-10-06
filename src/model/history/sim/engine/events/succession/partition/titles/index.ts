@@ -15,14 +15,23 @@ export const PARTITION_TITLES = {
 		heirs,
 	}: AllocateTitleSharesParams): TitleAllocation {
 		const top = STATE_TITLES.topTier({ state, realm })
-		const titles = Array.from(
-			{ length: state.titles.count },
-			(_, title) => title,
-		).filter(
-			(title) =>
-				state.titles.holder[title] === realm &&
-				state.titles.tier[title] === top,
-		)
+		const shares: PartitionShare[] = []
+		const allocated = new Set<number>()
+		const remaining = [...heirs]
+		if (top === 0) return { shares, allocated, remaining }
+		const children = STATE.getChildren({ state, p: realm })
+		const titles: number[] = []
+		for (const seat of [realm, ...children]) {
+			if (state.seatRank[seat] !== top) continue
+			const title = DEJURE.titleAt({
+				titles: state.titles,
+				provinceCount: state.P,
+				tier: top,
+				province: seat,
+			})
+			if (title >= 0 && state.titles.holder[title] === realm) titles.push(title)
+		}
+		if (titles.length <= 1) return { shares, allocated, remaining }
 		const population = new Map(
 			titles.map((title) => {
 				let total = 0
@@ -53,13 +62,10 @@ export const PARTITION_TITLES = {
 						province: realm,
 					}) === title,
 			) ?? titles[0]
-		const shares: PartitionShare[] = []
-		const allocated = new Set<number>()
-		const remaining = [...heirs]
 		for (const title of titles) {
 			if (title === primaryTitle || remaining.length === 0) continue
 			const seat = state.titles.seat[title]
-			const supporters = STATE.getChildren({ state, p: realm }).filter(
+			const supporters = children.filter(
 				(p) =>
 					p !== seat &&
 					DEJURE.titleAt({

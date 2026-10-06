@@ -135,12 +135,14 @@ function allocate({
 	heirs,
 	excludedSeat,
 }: AllocateParams): PartitionShare[] {
+	if (heirs.length === 0) return []
 	const people = state.people
 	const { shares, allocated, remaining } = PARTITION_TITLES.allocate({
 		state,
 		realm,
 		heirs,
 	})
+	if (remaining.length === 0) return shares
 	const seats = districtSeats({ state, realm }).filter(
 		(seat) => seat !== excludedSeat && !allocated.has(seat),
 	)

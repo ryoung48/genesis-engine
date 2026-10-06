@@ -39,6 +39,7 @@ function report(population: number): JsonObject {
 				to: 869,
 				sovereigns: population,
 				people: { alive: population, msPerYear: 10 },
+				marriageMarket: { projectionMs: 20, projectionRefreshes: 2 },
 				districts: { held: population, deriveMs: 5, deriveCalls: 2 },
 			},
 		],
@@ -79,6 +80,16 @@ it("separates simulation and performance changes, preserves missing fields and e
 	writeFileSync(current, JSON.stringify(b))
 	const path = HISTORY_COMPARISON.write({ current, baseline: before })
 	const result = rows(path)
+	expect(
+		result.find((row) => row.metric === "marriageMarket.projectionMs"),
+	).toMatchObject({ section: "Performance", before: 20, after: 20 })
+	expect(
+		result.some(
+			(row) =>
+				row.metric === "marriageMarket.projectionMs" &&
+				row.section === "Century statistics",
+		),
+	).toBe(false)
 	expect(
 		result.find((row) => row.metric === "districts.deriveMs"),
 	).toMatchObject({ section: "Performance", before: 5, after: 5 })
