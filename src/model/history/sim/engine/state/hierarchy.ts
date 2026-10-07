@@ -5,6 +5,7 @@ import type {
 	GetNationNeighborsParams,
 	GetNationProvincesParams,
 	GetProvinceNeighborsParams,
+	OccupiedLandParams,
 	RebuildAssignmentParams,
 	ValidateLiveHierarchyParams,
 	ValidateParentArrayParams,
@@ -31,6 +32,36 @@ export function getNationProvinces({
 			const child = state.childList[i]
 			result.push(child)
 			stack.push(child)
+		}
+	}
+	return result
+}
+
+// A marked province counts for the war its mark names; an unmarked one follows
+// its parent, except under the defender's root, which covers only itself.
+export function occupiedLand({ state, war }: OccupiedLandParams): number[] {
+	if (!war.occupied.some((p) => state.occupationCurrent[p] === war.idx))
+		return []
+	DERIVE.ensureHierarchyClean(state)
+	const root = war.defender
+	const result: number[] = []
+	if (state.occupationCurrent[root] === war.idx) result.push(root)
+	const stack = [root]
+	const covered = [false]
+	while (stack.length > 0) {
+		const current = stack.pop()!
+		const parentCovered = covered.pop()!
+		for (
+			let i = state.childOffset[current];
+			i < state.childOffset[current + 1];
+			i++
+		) {
+			const child = state.childList[i]
+			const mark = state.occupationCurrent[child]
+			const held = mark >= 0 ? mark === war.idx : parentCovered
+			if (held) result.push(child)
+			stack.push(child)
+			covered.push(held)
 		}
 	}
 	return result

@@ -890,7 +890,20 @@ describe("military transitions and conservation", () => {
 	it("charges an undiscounted positive peace buyoff under every government", () => {
 		reset()
 		const active = war()
-		active.occupied = [nations[1]]
+		for (const p of STATE.getChildren({ state, p: nations[1] })) {
+			FIELDS.prov.occupation.set({ state, p, value: active.idx })
+			active.occupied.push(p)
+		}
+		const provinces = STATE.getNationProvinces({ state, root: nations[1] })
+		const output = provinces.reduce(
+			(sum, p) => sum + ECONOMY.provinceOutput({ state, p }),
+			0,
+		)
+		const held = provinces.reduce(
+			(sum, p) =>
+				sum + (p === nations[1] ? 0 : ECONOMY.provinceOutput({ state, p })),
+			0,
+		)
 		const threat = vi.spyOn(MILITARY, "threat").mockReturnValue(0.001)
 		try {
 			const asks: number[] = []
@@ -908,7 +921,10 @@ describe("military transitions and conservation", () => {
 			expect(asks[0]).toBeGreaterThan(0)
 			expect(new Set(asks).size).toBe(1)
 			expect(asks[0]).toBeCloseTo(
-				0.999 * 20 * ECONOMY.revenue({ state, p: nations[1] }),
+				0.999 *
+					20 *
+					(held / output) *
+					ECONOMY.revenue({ state, p: nations[1] }),
 				8,
 			)
 		} finally {

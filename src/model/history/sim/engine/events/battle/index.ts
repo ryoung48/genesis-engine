@@ -25,14 +25,16 @@ function findInvasionTarget({
 		state,
 		root: war.attacker,
 	})
-	const attackerTerritory = new Set([...attackerProvinces, ...war.occupied])
+	const occupied = STATE.occupiedLand({ state, war })
+	const covered = new Set(occupied)
+	const attackerTerritory = new Set([...attackerProvinces, ...occupied])
 	const defenderProvinces = STATE.getNationProvinces({
 		state,
 		root: war.defender,
 	})
 
 	const candidates = defenderProvinces.filter((p) => {
-		if (state.occupationCurrent[p] === war.idx) return false
+		if (covered.has(p)) return false
 		const neighbors = STATE.getProvinceNeighbors({ state, p })
 		return neighbors.some((nb) => attackerTerritory.has(nb))
 	})
@@ -41,10 +43,21 @@ function findInvasionTarget({
 	return rng.shuffle(candidates)[0]
 }
 
+// The defender goes for the seat: a child retaken under a held seat would stay
+// covered through it.
 function findReconquestTarget({
+	state,
 	war,
 }: FindReconquestTargetParams): number | null {
-	return war.occupied.length > 0 ? war.occupied[war.occupied.length - 1] : null
+	const covered = new Set(STATE.occupiedLand({ state, war }))
+	return (
+		war.occupied.findLast((p) => {
+			if (state.occupationCurrent[p] !== war.idx || !covered.has(p))
+				return false
+			const parent = state.parentCurrent[p]
+			return parent === war.defender || !covered.has(parent)
+		}) ?? null
+	)
 }
 
 function targetFor({
@@ -55,7 +68,7 @@ function targetFor({
 }: ResolveTargetParams): number | null {
 	return attacker === war.attacker
 		? findInvasionTarget({ state, war, rng })
-		: findReconquestTarget({ war })
+		: findReconquestTarget({ state, war })
 }
 
 // Occupation and sovereignty can change between queueing and fighting, so the
@@ -91,6 +104,8 @@ function runBattle({
 		PEACE.conclude({ state, war, rng, reason: "not sovereign" })
 		return
 	}
+
+	if (CONQUEST.settle({ state, war, rng })) return
 
 	const battle = resolveTarget({ state, war, attacker: eventAttacker, rng })
 	if (battle === null) {
@@ -157,6 +172,9 @@ function runBattle({
 		province: target,
 		attackerWon: result.attackerWon,
 		outcome: result.outcome,
+		loserLossShare: result.attackerWon
+			? result.defenderLossShare
+			: result.attackerLossShare,
 		sack: false,
 		rng,
 		record: (loot) => {

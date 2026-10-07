@@ -47,6 +47,8 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		candidatesHierarchyVersion: -1,
 		allocation: {},
 		occupied: [],
+		battleScore: 0,
+		dealConsidered: false,
 		allies: new Set(),
 	}
 	engine.wars.push(smallerWar)

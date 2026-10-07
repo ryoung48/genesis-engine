@@ -2,8 +2,8 @@ import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export type PeaceReason =
-	| "capital taken"
-	| "occupation restored"
+	| "enforced"
+	| "defended"
 	| "offensive spent"
 	| "offensive repelled"
 	| "both exhausted"
@@ -11,6 +11,7 @@ export type PeaceReason =
 	| "no troops"
 	| "not sovereign"
 	| "peace bought"
+	| "negotiated"
 
 export type PeaceOutcome =
 	| "annexation"
@@ -50,4 +51,8 @@ export interface BuyoffParams {
 
 export interface AcceptBuyoffParams extends BuyoffParams {
 	rng: SharedRng
+}
+
+export interface NegotiateParams extends AcceptBuyoffParams {
+	stalled: boolean
 }

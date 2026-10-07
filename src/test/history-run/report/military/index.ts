@@ -122,6 +122,9 @@ function emptyWindow(): MilitaryWindow {
 		vassalageEndedByCause: {},
 		counterWars: 0,
 		peacefulAnnexations: 0,
+		provincesReleased: 0,
+		cutOffJoined: 0,
+		cutOffJoinedWars: 0,
 		vassalSamples: 0,
 		vassalPairs: 0,
 		alliances: 0,
@@ -297,7 +300,7 @@ function observeBattle({ engine, tracker, note }: ObserveNoteParams): void {
 function warEnding({ engine, note }: WarEndingParams): WarEnding {
 	const data = note.data
 	const war = engine.wars[data.war as number]
-	if (data.reason === "capital taken") return "capital"
+	if (data.reason === "enforced") return "capital"
 	if (data.reason === "both exhausted") return "exhaustion"
 	if (
 		["no target", "no troops", "not sovereign"].includes(data.reason as string)
@@ -390,6 +393,8 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 		if (data.cause === "abandoned") window.dispositionAbandoned++
 	} else if (note.tag === "peaceful annexation") {
 		window.peacefulAnnexations++
+	} else if (note.tag === "province released") {
+		window.provincesReleased++
 	} else if (note.tag === "vassalage ended") {
 		window.vassalageEnded++
 		const cause = typeof data.cause === "string" ? data.cause : "structural"
@@ -444,6 +449,8 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 		}
 		const government = tracker.warGovernment.get(warIdx)
 		if (government === undefined) return
+		window.cutOffJoined += data.joined as number
+		if ((data.joined as number) > 0) window.cutOffJoinedWars++
 		window.completed.push({
 			years: (note.time - war.startTime) / STATE.yearMs,
 			government,
@@ -456,6 +463,14 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 			inVassal: tracker.warInVassal.get(warIdx) ?? false,
 			rebelIndependent:
 				war.goal === "independence" && data.winner === war.defender,
+			score: data.score as number,
+			capitalHeld: (data.capital as number) > 0,
+			enforced: data.reason === "enforced",
+			reason: data.reason as string,
+			defenderIndemnity:
+				data.outcome === "cession" && data.payer === war.defender,
+			attackerIndemnity:
+				data.outcome === "cession" && data.payer === war.attacker,
 		})
 		tracker.warGovernment.delete(warIdx)
 		tracker.warInVassal.delete(warIdx)
@@ -850,6 +865,9 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		Math.max(1e-9, window.vassalPairs / Math.max(1, window.vassalSamples))
 	report["counterWars.n"] = window.counterWars
 	report["peacefulAnnexations.n"] = window.peacefulAnnexations
+	report["provincesReleased.n"] = window.provincesReleased
+	report["wars.cutOffJoined.n"] = window.cutOffJoined
+	report["wars.cutOffJoined.wars"] = window.cutOffJoinedWars
 	const relationTotal = Object.values(window.relationPairs).reduce(
 		(sum, count) => sum + count,
 		0,
@@ -882,7 +900,20 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		report[`wars.monarchy.ending.${ending}`] = share(
 			monarchyLed.map((war) => war.ending === ending),
 		)
+		const years = completed
+			.filter((war) => war.ending === ending)
+			.map((war) => war.years)
+		report[`wars.years.ending.${ending}.p50`] = median(years)
+		report[`wars.years.ending.${ending}.p90`] = p90(years)
 	}
+	report["wars.years.p25"] = quantile({
+		values: completed.map((war) => war.years),
+		q: 0.25,
+	})
+	report["wars.years.p75"] = quantile({
+		values: completed.map((war) => war.years),
+		q: 0.75,
+	})
 	for (const outcome of [
 		"annexation",
 		"restoration",
@@ -896,6 +927,57 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		report[`wars.outcome.${outcome}`] = share(
 			completed.map((war) => war.outcome === outcome),
 		)
+	for (const goal of ["conquest", "independence", "throne"]) {
+		const scores = completed
+			.filter((war) => war.goal === goal)
+			.map((war) => war.score)
+		for (const [name, q] of [
+			["p10", 0.1],
+			["p50", 0.5],
+			["p90", 0.9],
+		] as const)
+			report[`wars.score.${goal}.${name}`] = quantile({ values: scores, q })
+	}
+	for (const reason of [
+		"enforced",
+		"defended",
+		"both exhausted",
+		"offensive spent",
+		"offensive repelled",
+		"peace bought",
+		"negotiated",
+		"no target",
+		"no troops",
+		"not sovereign",
+	])
+		report[`wars.reason.${reason}`] = share(
+			completed.map((war) => war.reason === reason),
+		)
+	for (const [name, q] of [
+		["p10", 0.1],
+		["p50", 0.5],
+		["p90", 0.9],
+	] as const)
+		report[`wars.score.negotiated.${name}`] = quantile({
+			values: completed
+				.filter((war) => war.reason === "negotiated")
+				.map((war) => war.score),
+			q,
+		})
+	report["wars.outcome.cession.defenderIndemnity"] = share(
+		completed.map((war) => war.defenderIndemnity),
+	)
+	report["wars.outcome.cession.attackerIndemnity"] = share(
+		completed.map((war) => war.attackerIndemnity),
+	)
+	const capitalHeld = completed.filter((war) => war.capitalHeld)
+	report["wars.capitalHeldShare"] = ratio({
+		count: capitalHeld.length,
+		total: completed.length,
+	})
+	report["wars.capitalHeld.enforcedShare"] = share(
+		capitalHeld.map((war) => war.enforced),
+	)
 	for (const government of FAMILIES) {
 		const wars = completed.filter((war) => war.government === government)
 		report[`wars.outcome.bought peace.${government}`] = share(

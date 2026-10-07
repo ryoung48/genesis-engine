@@ -44,6 +44,7 @@ function warOf(sieges: SiegeRecord[]): WarRecord {
 		events: [],
 		battles: [],
 		mobilization: initial,
+		warScore: null,
 		sieges,
 	}
 }

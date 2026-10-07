@@ -140,7 +140,7 @@ it("closes a siege exactly once at peace and consumes its queued tick without ef
 
 it("enthrones a victorious claimant and preserves a restoration claim", () => {
 	const { state, rng, war, crown, child, claimant, deposed } = setupThrone()
-	const terms = PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	const terms = PEACE.conclude({ state, war, rng, reason: "enforced" })
 	expect(terms.outcome).toBe("regime change")
 	expect(terms.receiver).toBe(crown)
 	expect(state.people.rulerOf[crown]).toBe(claimant)
@@ -300,7 +300,7 @@ it("remembers the original crown ruler when the throne is vacant", () => {
 	const { state, rng, war, crown, deposed } = setupThrone()
 	PEOPLE.vacate({ people: state.people, seat: crown, reason: "succession" })
 	state.people.persons.death[deposed] = state.time / STATE.yearMs - 1
-	PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	PEACE.conclude({ state, war, rng, reason: "enforced" })
 	expect(state.people.deposed.get(crown)?.claimant).toBe(deposed)
 })
 
@@ -315,7 +315,7 @@ it("makes a mid-war usurper the deposed claimant", () => {
 		reason: "usurpation",
 	})
 	const usurper = state.people.rulerOf[crown]
-	PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	PEACE.conclude({ state, war, rng, reason: "enforced" })
 	expect(state.people.deposed.get(crown)?.claimant).toBe(usurper)
 })
 
@@ -363,7 +363,7 @@ it("lets a disloyal overlord back a throne claimant and keeps the bond after vic
 		(member) => member.nation === overlord,
 	)
 	expect(battle.roles[battleIndex]).toBe("backer")
-	PEACE.conclude({ state, war: throneWar, rng, reason: "capital taken" })
+	PEACE.conclude({ state, war: throneWar, rng, reason: "enforced" })
 	expect(STATE.getRelation({ state, a: crown, b: overlord })).toBe(
 		STATE.rel.OVERLORD,
 	)
@@ -392,7 +392,7 @@ it("renounces vassalage when the overlord loses with the crown", () => {
 	if (!throneWar) throw new Error("no throne war")
 	expect(throneWar.allies.has(overlord)).toBe(true)
 	expect(throneWar.backers).not.toContain(overlord)
-	PEACE.conclude({ state, war: throneWar, rng, reason: "capital taken" })
+	PEACE.conclude({ state, war: throneWar, rng, reason: "enforced" })
 	expect(STATE.getRelation({ state, a: crown, b: overlord })).toBe(
 		STATE.rel.NONE,
 	)
@@ -435,7 +435,7 @@ it("repays a Rival vassal backer without ending its bond", () => {
 	)
 	expect(coalition?.attackers).toContain(vassal)
 	expect(coalition?.defenders).not.toContain(vassal)
-	PEACE.conclude({ state, war: throneWar, rng, reason: "capital taken" })
+	PEACE.conclude({ state, war: throneWar, rng, reason: "enforced" })
 	expect(STATE.getRelation({ state, a: vassal, b: crown })).toBe(
 		STATE.rel.OVERLORD,
 	)
@@ -446,7 +446,7 @@ it("repays a Rival vassal backer without ending its bond", () => {
 
 it("annexes after a capital falls and signs a truce", () => {
 	const { state, rng, war } = setup()
-	const terms = PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	const terms = PEACE.conclude({ state, war, rng, reason: "enforced" })
 	expect(terms.outcome).toBe("annexation")
 	expect(STATE.isSovereign({ state, p: war.defender })).toBe(false)
 	expect(TRUCE.active({ state, a: war.attacker, b: war.defender })).toBe(true)
@@ -487,7 +487,7 @@ it("keeps formal ties and shared dispositions independent", () => {
 it("calls a full rebel reconquest restoration", () => {
 	const { state, rng, war, child } = setup()
 	war.goal = "independence"
-	const terms = PEACE.conclude({ state, war, rng, reason: "capital taken" })
+	const terms = PEACE.conclude({ state, war, rng, reason: "enforced" })
 	expect(terms.outcome).toBe("restoration")
 	expect(terms.transferred).toContain(war.defender)
 	expect(terms.transferred).toContain(child)
@@ -645,7 +645,7 @@ it("gives rebels independence when they hold out and blocks ordinary renewed war
 		state,
 		war,
 		rng,
-		reason: "occupation restored",
+		reason: "defended",
 	})
 	expect(terms.outcome).toBe("independence")
 	expect(terms.winner).toBe(war.defender)

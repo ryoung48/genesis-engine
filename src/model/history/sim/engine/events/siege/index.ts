@@ -1,6 +1,7 @@
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { CONQUEST } from "@/model/history/sim/engine/events/battle/conquest"
 import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { SIEGE_TROOPS } from "@/model/history/sim/engine/events/siege/troops"
 import type {
 	EndParams,
@@ -113,6 +114,7 @@ function finish(params: FinishParams): void {
 		province: siege.province,
 		attackerWon: fall,
 		outcome: fall ? "normal" : "inconclusive",
+		loserLossShare: 0,
 		sack: outcome === "stormed",
 		record: () => undefined,
 		rng,
@@ -150,11 +152,17 @@ function tick({ state, warIdx, rng }: TickParams): void {
 	const restoration = siege.besiegerSide === "defender"
 	if (
 		!STATE.isSovereign({ state, p: war.attacker }) ||
-		!STATE.isSovereign({ state, p: war.defender }) ||
-		(restoration
+		!STATE.isSovereign({ state, p: war.defender })
+	) {
+		PEACE.conclude({ state, war, rng, reason: "not sovereign" })
+		return
+	}
+	if (CONQUEST.settle({ state, war, rng })) return
+	if (
+		restoration
 			? state.occupationCurrent[siege.province] !== war.idx
 			: state.occupationCurrent[siege.province] === war.idx ||
-				STATE.getSovereign({ state, p: siege.province }) !== defender)
+				STATE.getSovereign({ state, p: siege.province }) !== defender
 	) {
 		finish({ ...params, outcome: "lifted", reason: "invalid", rng })
 		return

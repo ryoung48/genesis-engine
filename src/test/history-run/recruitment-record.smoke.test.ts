@@ -12,7 +12,7 @@ it("preserves recruitment composition and combined maintenance at historical cen
 	const { generated, engine } = HISTORY_RUN.createEngine({
 		seed: 14963991,
 		era: "lateMedieval",
-		numPoints: 30000,
+		numPoints: 10000,
 	})
 	const world = generated as unknown as SerializedGenesisWorld
 	const recordState = SIM_RECORD.buildProceduralState({

@@ -120,6 +120,11 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				label: "Casus Belli",
 				value: cleanEu4Identifier(war.casusBelli),
 			})
+		if (war.warScore !== null)
+			stats.push({
+				label: "War score",
+				value: `${war.warScore > 0 ? "+" : ""}${Math.round(war.warScore)}`,
+			})
 
 		// A nation stays listed under whichever side it last held (sideByTag
 		// above), but whether it's actually *in* the war right now depends on

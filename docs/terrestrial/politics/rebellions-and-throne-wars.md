@@ -62,7 +62,7 @@ District holders can favor a claimant, while foreign realms can fight beside the
 
 - **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
 - **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
-- **Cut-off land.** Crown provinces left without a connection to their parent are released as well. They are recorded as `province released` and shown as a "disconnected" revolt.
+- **Cut-off land.** When a district leaves for independence, any of its own land left without a connection to its seat is released as well, recorded as `province released` and shown as a "disconnected" revolt. A throne rebellion releases nothing at the declaration: crown districts the faction has severed stay with the crown through the war, and are settled at the peace if both realms are still standing.
 - **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of equal or higher top tier.
 
 ## The rebel war
@@ -74,14 +74,14 @@ District holders can favor a claimant, while foreign realms can fight beside the
 
 ## Endings
 
-Every ending sets a 10-year truce and leaves the two leaders Suspicious.
+Every ending sets a 10-year truce and leaves the two leaders Suspicious. Rebel wars use the same [war score](armies-and-wars.md#war-score) and the same ending order as conquest wars: a total result needs the score at +100 or the capital held when the war ends, and occupied land is kept only on a positive score. A [negotiated peace](armies-and-wars.md#endings) can end either rebel war with the attacker keeping what it holds and no payment.
 
 ### Independence wars
 
 | How it ends | Outcome |
 | --- | --- |
-| The crown takes the rebel capital | **Restoration**: the rebel realm returns in full. |
-| The war stalls or runs out while the crown holds rebel land | **Independence**: the crown keeps what it occupies (a partial reconquest), and the rest of the rebels stay independent. |
+| The score reaches +100, or the war ends for any reason while the crown holds the rebel capital | **Restoration**: the rebel realm returns in full. |
+| The war ends otherwise while the crown holds rebel land on a positive score | **Independence**: the crown keeps what it occupies (a partial reconquest), along with any rebel district that this cuts off and that borders the crown, and the rest of the rebels stay independent. |
 | Anything else (crown driven back, both exhausted, no troops, no target) | **Independence**: a rebel war never ends in white peace. |
 | The crown stops being sovereign while the rebels remain | **Independence**. |
 | Otherwise, a leader stops being sovereign | **Lapsed**. |
@@ -90,9 +90,9 @@ Every ending sets a 10-year truce and leaves the two leaders Suspicious.
 
 | How it ends | Outcome |
 | --- | --- |
-| Rebels take the crown's capital | **Regime change**: the claimant takes the throne, the rebel realm rejoins the crown, and the overthrown ruler becomes the deposed claimant. If the crown is vacant, its ruler at the war's start receives that claim. |
-| The war stalls while rebels occupy crown land | **Cession**: rebels keep the occupied land and remain sovereign. |
-| Rebels hold no occupied land when the war ends | **Submission**: the rebel realm rejoins the crown and the claimant loses the rebel seat. |
+| The score reaches +100, or the war ends for any reason while the rebels hold the crown's capital | **Regime change**: the claimant takes the throne, the rebel realm rejoins the crown, and the overthrown ruler becomes the deposed claimant. If the crown is vacant, its ruler at the war's start receives that claim. |
+| The war ends otherwise while the rebels hold crown land on a positive score | **Cession**: rebels keep the occupied land, along with any crown district that this cuts off and that borders them, and remain sovereign. |
+| The rebels hold no land, or hold it on a score of zero or less, when the war ends | **Submission**: the rebel realm rejoins the crown and the claimant loses the rebel seat. |
 | The crown ceases to be sovereign while rebels remain | **Independence**. |
 | Otherwise, a leader ceases to be sovereign | **Lapsed**. |
 

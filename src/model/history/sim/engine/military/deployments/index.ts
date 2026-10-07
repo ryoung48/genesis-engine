@@ -55,7 +55,7 @@ function exhausted({ state, nation }: NationParams): boolean {
 	return (
 		strength <= 0 ||
 		target.levy + target.regular <= 0 ||
-		strength < 0.25 * (target.levy + target.regular) ||
+		strength < 0.15 * (target.levy + target.regular) ||
 		treasury < -0.5 * Math.max(0, ECONOMY.surplus({ state, p: nation }))
 	)
 }

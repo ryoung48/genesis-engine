@@ -149,6 +149,8 @@ export interface WarRecord {
 	sieges: SiegeRecord[]
 	// Each realm's troops when the war was declared; empty for Earth wars.
 	mobilization: BattleContribution[]
+	// Final war score, positive for the attacker; null for Earth wars.
+	warScore: number | null
 }
 
 export interface OrgMembershipEventRecord {

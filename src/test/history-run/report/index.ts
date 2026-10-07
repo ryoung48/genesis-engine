@@ -59,6 +59,7 @@ import type {
 	UnionJuniorsParams,
 	WindowParams,
 } from "@/test/history-run/report/types"
+import { HISTORY_VALIDATION } from "@/test/history-run/report/validation"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
 const LARGEST = 20
@@ -381,7 +382,7 @@ function runSeed({
 	const familyCapture = PEOPLE_FAMILIES_REPORT.attach()
 	const { engine, generated, generationMs, engineMs } = (() => {
 		try {
-			return HISTORY_RUN.createEngine({
+			return HISTORY_RUN.createFreshEngine({
 				seed,
 				era: options.era,
 				numPoints: options.numPoints,
@@ -420,7 +421,9 @@ function runSeed({
 	})
 	digestEvents()
 	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
+	const validation = HISTORY_VALIDATION.tracker()
 	const diagnostics = {
+		validation,
 		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
 		siegeLifecycle: BATTLEFIELD_REPORT.lifecycle({ engine }),
 		completed: false,
@@ -553,6 +556,7 @@ function runSeed({
 		const t0 = performance.now()
 		runPeopleYear(params)
 		peopleMs += performance.now() - t0
+		HISTORY_VALIDATION.betrothals({ engine: params.state, tracker: validation })
 	}
 	const characterTracker = PEOPLE_TRAITS_REPORT.tracker()
 	const opinionTracker = PEOPLE_OPINION_REPORT.tracker()
@@ -622,6 +626,10 @@ function runSeed({
 				}
 			engine.journal.length = 0
 			diagnostics.annualTicks.push(performance.now() - tickStart)
+			HISTORY_VALIDATION.alliances({ engine, tracker: validation })
+			HISTORY_VALIDATION.rulers({ engine, tracker: validation })
+			if ((year - start) % 10 === 0)
+				HISTORY_VALIDATION.districts({ engine, tracker: validation })
 			if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
 				diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
 				persist()
@@ -782,6 +790,11 @@ function runSeed({
 				diagnostics.totalPeopleCreated = PEOPLE_TRAITS_REPORT.validate({
 					engine,
 				})
+				HISTORY_VALIDATION.record({
+					engine,
+					tracker: validation,
+					people: peopleRecord.tracker.record,
+				})
 				diagnostics.households = {
 					...HOUSEHOLDS_REPORT.build({
 						people: peopleRecord.tracker.record,
@@ -833,6 +846,7 @@ function runSeed({
 	options.log(
 		`seed ${seed} betrothals standing: ${tracker.standing[0]} at start, ${(settled.reduce((sum, count) => sum + count, 0) / Math.max(1, settled.length)).toFixed(1)} mean over years 20-30`,
 	)
+	HISTORY_VALIDATION.assert(validation)
 	return reports
 }
 

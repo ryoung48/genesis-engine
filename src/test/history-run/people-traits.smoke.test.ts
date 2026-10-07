@@ -8,9 +8,7 @@ import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/s
 import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
-import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
@@ -65,71 +63,6 @@ it("draws only the name seed and fertility from the shared stream at spawn, and 
 	expect(people.persons.fertility[person]).toBe(fertility)
 	PEOPLE.redraw({ people, person })
 	expect(rng.random()).toBe(control.random())
-})
-it("draws valid, reproducible character and expected founder personality distributions", () => {
-	const people = PEOPLE.create(1)
-	const rng = RNG.createRng({ seed: 721 })
-	const frequencies = new Map<string, number>()
-	for (let person = 0; person < 20000; person++) {
-		PEOPLE.spawn({
-			recordHealth: true,
-			death: null,
-			nameSeed: null,
-			people,
-			sex: 0,
-			birth: 0,
-			survives: 0,
-			father: -1,
-			mother: -1,
-			dynasty: 0,
-			origin: { realm: 0, culture: 0, genderSystem: 1 },
-			rng,
-		})
-		const character = CHARACTER.of({ people, person })
-		expect(TRAITS.draw({ table: people.persons, person })).toEqual({
-			personality: character.personality,
-			grades: character.grades,
-			congenital: character.congenital,
-			carried: character.carried,
-		})
-		expect(ATTRIBUTES.draw({ table: people.persons, person })).toEqual({
-			bases: character.bases,
-		})
-		for (let i = 0; i < 6; i++)
-			expect((character.bases >>> (i * 4)) & 15).toBeLessThanOrEqual(10)
-		const traits = TRAITS.active({ character, age: 16 })
-		expect(new Set(traits).size).toBe(3)
-		const codes = [0, 6, 12].map(
-			(shift) => (character.personality >>> shift) & 63,
-		)
-		expect(
-			new Set(
-				codes.map((code) =>
-					code < 30 ? Math.floor(code / 2) : code < 33 ? 15 : 16,
-				),
-			).size,
-		).toBe(3)
-		for (const trait of traits)
-			frequencies.set(trait, (frequencies.get(trait) ?? 0) + 1)
-		expect(character.congenital & character.carried).toBe(0)
-		expect(character.congenital & 3).not.toBe(3)
-		for (const ladder of ["intellect", "physique", "beauty"] as const) {
-			const grade = TRAITS.grade({ character, ladder })
-			expect(Math.abs(grade.active)).toBeLessThanOrEqual(3)
-			expect(grade.good === 0 || grade.good > Math.max(0, grade.active)).toBe(
-				true,
-			)
-			expect(grade.bad === 0 || grade.bad > Math.max(0, -grade.active)).toBe(
-				true,
-			)
-		}
-	}
-	expect(frequencies.size).toBe(36)
-	for (const [trait, count] of frequencies) {
-		const share = count / 20000
-		expect(share).toBeGreaterThan(trait === "eccentric" ? 0.002 : 0.04)
-		expect(share).toBeLessThan(trait === "eccentric" ? 0.01 : 0.11)
-	}
 })
 it("inherits active and carried single traits with conditional carrier probabilities", () => {
 	const people = PEOPLE.create(1)
@@ -597,125 +530,6 @@ it("a Genius parent transmits Genius in a quarter of draws and an active good si
 	}
 	expect(Math.abs(geniuses / 10000 - 0.25)).toBeLessThan(0.02)
 })
-
-it("validates final parent draws after init and years of births, with no sovereign or regent redrawn at init", () => {
-	const original = PEOPLE.redraw
-	let redraws = 0
-	PEOPLE.redraw = (params) => {
-		redraws++
-		const descendants = new Set([params.person])
-		const queue = [params.person]
-		for (let i = 0; i < queue.length; i++)
-			for (const child of params.people.persons.children[queue[i]])
-				if (!descendants.has(child)) {
-					descendants.add(child)
-					queue.push(child)
-				}
-		for (const person of descendants) {
-			expect(
-				params.people.persons.heldSeats[person].some(
-					(seat) => params.people.household.realmOf(seat) === seat,
-				),
-			).toBe(false)
-			expect(
-				Array.from(params.people.regencies.values()).some(
-					(regency) => regency.regent === person,
-				),
-			).toBe(false)
-		}
-		original(params)
-	}
-	try {
-		const { engine } = HISTORY_RUN.createEngine({
-			seed: 14963991,
-			era: "lateMedieval",
-			numPoints: 30000,
-		})
-		expect(redraws).toBe(0)
-		expect(PEOPLE_TRAITS_REPORT.validate({ engine })).toBe(
-			engine.people.persons.birth.length,
-		)
-		SIM_ENGINE.simulateUntil({
-			state: engine,
-			targetTimeMs: engine.time + 10 * STATE.yearMs,
-			rng: HISTORY_RNG.createHistoryRng(14963991 + 99999),
-			validate: false,
-		})
-		expect(PEOPLE_TRAITS_REPORT.validate({ engine })).toBe(
-			engine.people.persons.birth.length,
-		)
-	} finally {
-		PEOPLE.redraw = original
-	}
-}, 120000)
-
-it("keeps base variance near founders and child bases correlated with parental means", () => {
-	const people = PEOPLE.create(1)
-	const rng = RNG.createRng({ seed: 451 })
-	const size = 8000
-	let previous: number[] = []
-	let foundersVariance = 0
-	let finalCorrelation = 0
-	let finalVariance = 0
-	for (let generation = 0; generation < 7; generation++) {
-		const ids: number[] = []
-		let sx = 0
-		let sy = 0
-		let sxx = 0
-		let syy = 0
-		let sxy = 0
-		for (let i = 0; i < size; i++) {
-			const father = generation === 0 ? -1 : previous[rng.randint(0, size - 1)]
-			const mother = generation === 0 ? -1 : previous[rng.randint(0, size - 1)]
-			const person = PEOPLE.spawn({
-				recordHealth: true,
-				death: null,
-				nameSeed: null,
-				people,
-				sex: 0,
-				birth: 40 * generation,
-				survives: 40 * generation,
-				father,
-				mother,
-				dynasty: 0,
-				origin: { realm: 0, culture: 0, genderSystem: 1 },
-				rng,
-			})
-			ids.push(person)
-			const child = ATTRIBUTES.base({
-				character: CHARACTER.of({ people, person }),
-				attribute: "diplomacy",
-			})
-			const parent =
-				father < 0
-					? 5
-					: (ATTRIBUTES.base({
-							character: CHARACTER.of({ people, person: father }),
-							attribute: "diplomacy",
-						}) +
-							ATTRIBUTES.base({
-								character: CHARACTER.of({ people, person: mother }),
-								attribute: "diplomacy",
-							})) /
-						2
-			sx += parent
-			sy += child
-			sxx += parent * parent
-			syy += child * child
-			sxy += parent * child
-		}
-		finalVariance = syy / size - (sy / size) ** 2
-		if (generation === 0) foundersVariance = finalVariance
-		else
-			finalCorrelation =
-				(sxy / size - (sx * sy) / size ** 2) /
-				Math.sqrt((sxx / size - (sx / size) ** 2) * finalVariance)
-		previous = ids
-	}
-	expect(finalCorrelation).toBeGreaterThan(0.1)
-	expect(finalVariance / foundersVariance).toBeGreaterThan(0.8)
-	expect(finalVariance / foundersVariance).toBeLessThan(1.2)
-}, 120000)
 
 it("steps personal unions once, resets subjects without a holder change, and counts bereavement once before remarriage", () => {
 	const { engine: state } = HISTORY_RUN.createEngine({

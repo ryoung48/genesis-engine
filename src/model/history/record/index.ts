@@ -184,6 +184,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 				})
 				.sort((a, b) => a.timeMs - b.timeMs),
 			mobilization: [] as BattleContribution[],
+			warScore: null as number | null,
 			sieges: [] as WarRecord["sieges"],
 			battles: war.battles.map(
 				(battle): Battle => ({

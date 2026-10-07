@@ -13,6 +13,7 @@ import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import type {
+	BuildEngineParams,
 	CreatedEngine,
 	CreateEngineParams,
 	EnvParams,
@@ -20,6 +21,7 @@ import type {
 	HistoryRunSummary,
 	YearReport,
 } from "@/test/history-run/types"
+import { WORLD_CACHE } from "@/test/history-run/world-cache"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
 const DEFAULT_SEED = 14963991
@@ -61,14 +63,15 @@ function countEngine({ engine }: { engine: EngineState }): {
 	}
 }
 
-function createEngine({
+function build({
 	seed,
 	era,
 	numPoints,
 	startYear,
-}: CreateEngineParams): CreatedEngine {
+	generate,
+}: BuildEngineParams): CreatedEngine {
 	const generationStart = performance.now()
-	const generated = GENERATE_WORLD.generateGenesisWorld({
+	const generated = generate({
 		params: {
 			...DEFAULT_WORLD_PARAMS,
 			seed,
@@ -126,9 +129,19 @@ function createEngine({
 	}
 }
 
+// Tests reuse a generated world from disk.
+function createEngine(params: CreateEngineParams): CreatedEngine {
+	return build({ ...params, generate: WORLD_CACHE.generate })
+}
+
+// Benchmarks generate the world every time so its cost stays in their timings.
+function createFreshEngine(params: CreateEngineParams): CreatedEngine {
+	return build({ ...params, generate: GENERATE_WORLD.generateGenesisWorld })
+}
+
 function run(options: HistoryRunOptions): HistoryRunSummary {
 	const { seed, era, numPoints, years, log } = options
-	const { generated, engine, generationMs, engineMs } = createEngine({
+	const { generated, engine, generationMs, engineMs } = createFreshEngine({
 		seed,
 		era,
 		numPoints,
@@ -230,4 +243,9 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 	return summary
 }
 
-export const HISTORY_RUN = { optionsFromEnv, run, createEngine }
+export const HISTORY_RUN = {
+	optionsFromEnv,
+	run,
+	createEngine,
+	createFreshEngine,
+}

@@ -37,6 +37,12 @@ export interface CompletedWar {
 	backers: number
 	inVassal: boolean
 	rebelIndependent: boolean
+	score: number
+	capitalHeld: boolean
+	enforced: boolean
+	reason: string
+	defenderIndemnity: boolean
+	attackerIndemnity: boolean
 }
 
 export interface BattleSample {
@@ -133,6 +139,9 @@ export interface MilitaryWindow {
 	vassalageEndedByCause: Record<string, number>
 	counterWars: number
 	peacefulAnnexations: number
+	provincesReleased: number
+	cutOffJoined: number
+	cutOffJoinedWars: number
 	vassalSamples: number
 	vassalPairs: number
 	alliances: number

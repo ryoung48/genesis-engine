@@ -1,6 +1,10 @@
-import type { ApplyConquestParams } from "@/model/history/sim/engine/events/battle/conquest/types"
+import type {
+	ApplyConquestParams,
+	SettleParams,
+} from "@/model/history/sim/engine/events/battle/conquest/types"
 import type { NextBattleTimeParams } from "@/model/history/sim/engine/events/battle/types"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
+import { WAR_SCORE } from "@/model/history/sim/engine/events/war/score"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
@@ -27,6 +31,19 @@ function nextBattleTime({ state, outcome, rng }: NextBattleTimeParams): number {
 	return state.time + STATE.deltaMonth(rng.uniform(lo, hi))
 }
 
+function settle({ state, war, rng }: SettleParams): boolean {
+	const { score } = WAR_SCORE.current({ state, war })
+	if (score >= WAR_SCORE.limit) {
+		PEACE.conclude({ state, war, rng, reason: "enforced" })
+		return true
+	}
+	if (score <= -WAR_SCORE.limit) {
+		PEACE.conclude({ state, war, rng, reason: "defended" })
+		return true
+	}
+	return false
+}
+
 function apply({
 	state,
 	war,
@@ -35,6 +52,7 @@ function apply({
 	province: target,
 	attackerWon,
 	outcome,
+	loserLossShare,
 	sack,
 	record,
 	rng,
@@ -69,12 +87,16 @@ function apply({
 				p: target,
 				value: war.idx,
 			})
-			if (!war.occupied.includes(target)) war.occupied.push(target)
+			const i = war.occupied.indexOf(target)
+			if (i >= 0) war.occupied.splice(i, 1)
+			war.occupied.push(target)
 		}
 	}
 
 	const winner = result.attackerWon ? attacker : defender
 	const loser = result.attackerWon ? defender : attacker
+	if (result.outcome !== "inconclusive")
+		WAR_SCORE.battle({ war, winner, loserLossShare })
 
 	record(loot)
 
@@ -83,16 +105,15 @@ function apply({
 	const defensiveSettlementChance =
 		DEFENSIVE_SETTLEMENT_CHANCE[result.outcome] ?? 0
 
-	const occupiedCount = war.occupied.length
 	const time = nextBattleTime({ state, outcome: result.outcome, rng })
 
-	if (progress && restoration && occupiedCount === 0) {
-		PEACE.conclude({ state, war, rng, reason: "occupation restored" })
-	} else if (progress && target === war.defender) {
-		PEACE.conclude({ state, war, rng, reason: "capital taken" })
-	} else if (atkExhausted && defExhausted) {
+	if (settle({ state, war, rng })) return
+	if (atkExhausted && defExhausted) {
 		PEACE.conclude({ state, war, rng, reason: "both exhausted" })
-	} else if (attacker === war.attacker && occupiedCount === 0) {
+	} else if (
+		attacker === war.attacker &&
+		STATE.occupiedLand({ state, war }).length === 0
+	) {
 		if (atkExhausted) {
 			PEACE.conclude({ state, war, rng, reason: "offensive spent" })
 		} else if (
@@ -114,6 +135,14 @@ function apply({
 	} else if (PEACE.acceptBuyoff({ state, war, rng })) {
 		PEACE.conclude({ state, war, rng, reason: "peace bought" })
 	} else {
+		const stalled = winner === war.defender
+		if (
+			(stalled || result.outcome !== "inconclusive") &&
+			PEACE.negotiate({ state, war, rng, stalled })
+		) {
+			PEACE.conclude({ state, war, rng, reason: "negotiated" })
+			return
+		}
 		const next =
 			result.outcome === "uncontested" || rng.random() < WINNER_INITIATIVE
 				? winner
@@ -126,4 +155,4 @@ function apply({
 		})
 	}
 }
-export const CONQUEST = { apply }
+export const CONQUEST = { apply, settle }

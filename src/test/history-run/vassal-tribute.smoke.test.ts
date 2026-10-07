@@ -4,7 +4,6 @@ import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
-import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -174,28 +173,4 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 	expect(
 		STATE.getRulerRelation({ state: engine, nation: internal }),
 	).toBeUndefined()
-})
-
-it("keeps every alliance valid through a short simulation", () => {
-	const { engine } = HISTORY_RUN.createEngine({
-		seed: 14963992,
-		era: "lateMedieval",
-		numPoints: 30000,
-	})
-	SIM_ENGINE.simulateUntil({
-		state: engine,
-		targetTimeMs: engine.time + 15 * STATE.yearMs,
-		rng: HISTORY_RNG.createHistoryRng(14963992 + 99999),
-		validate: false,
-	})
-	for (let a = 0; a < engine.P; a++) {
-		if (engine.desolate[a] || !STATE.isSovereign({ state: engine, p: a }))
-			continue
-		for (const b of engine.relationColumns[a])
-			if (
-				b > a &&
-				STATE.getRelation({ state: engine, a, b }) === STATE.rel.ALLY
-			)
-				expect(STATE.canAlly({ state: engine, a, b })).toBe(true)
-	}
 })

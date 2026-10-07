@@ -185,6 +185,8 @@ it("ages each completed year once from 25 and never restores lost health", () =>
 	people.alive = [person]
 	const losses = new Array<number>(81).fill(0)
 	const seeds = 4000
+	// Counted and asserted once: an assertion per year is most of this test's time.
+	const broken = { restored: 0, wrongStep: 0, agedTwice: 0 }
 	for (let seed = 1; seed <= seeds; seed++) {
 		reseed(people, person, seed)
 		table.healthIntervalEnd[person] = Infinity
@@ -193,16 +195,17 @@ it("ages each completed year once from 25 and never restores lost health", () =>
 			clock.time = year
 			HEALTH.runYear({ people, time: year })
 			const after = table.baseHealth[person]
-			expect(after).toBeLessThanOrEqual(before)
+			if (after > before) broken.restored++
 			if (after < before) {
-				expect(before - after).toBeCloseTo(0.125, 12)
+				if (Math.abs(before - after - 0.125) >= 5e-13) broken.wrongStep++
 				losses[year]++
 			}
 			HEALTH.runYear({ people, time: year })
-			expect(table.baseHealth[person]).toBe(after)
+			if (table.baseHealth[person] !== after) broken.agedTwice++
 			before = after
 		}
 	}
+	expect(broken).toEqual({ restored: 0, wrongStep: 0, agedTwice: 0 })
 	for (let age = 1; age < 25; age++) expect(losses[age]).toBe(0)
 	const chance = (age: number) => Math.min(1, 0.075 + 0.022 * (age - 25))
 	for (const age of [25, 30, 44])
@@ -785,64 +788,3 @@ it("sums every attained level row, replaces Clouded Eyes with Blind and ends in 
 	])
 	expect(AGEING.heartRise({ people, person }).terminal).toBe(false)
 })
-
-it("reproduces the planned kernel: a minority become Incapable or Blind and no calm heart fails", () => {
-	const lives = 200000
-	const reached = {
-		count: 0,
-		incapable: 0,
-		blind: 0,
-		heart: 0,
-		incapableYears: 0,
-	}
-	const ages: [number[], number[]] = [[], []]
-	for (const sex of [0, 1] as const) {
-		const { people, person, clock } = world(sex, 0)
-		const table = people.persons
-		people.alive = [person]
-		for (let life = 0; life < lives / 2; life++) {
-			table.nameSeed[person] = 1 + life * 2 + sex
-			table.personality[person] = NO_PERSONALITY
-			table.grades[person] = NEUTRAL_GRADES
-			table.congenital[person] = 0
-			table.bases[person] = 0x655555
-			table.death[person] = Infinity
-			clearConditions(people, person)
-			clock.time = 16
-			HEALTH.replay({ record: true, death: null, people, person, survives: 16 })
-			people.log.count = 0
-			let incapableAt = -1
-			for (let year = 17; table.death[person] === Infinity; year++) {
-				clock.time = year
-				const result = HEALTH.runYear({ people, time: year })
-				if (result.incapacitated.length > 0) incapableAt = year
-				people.log.count = 0
-			}
-			const death = table.death[person]
-			ages[sex].push(death)
-			if (death <= 50) continue
-			reached.count++
-			if (AGEING.blind({ people, person })) reached.blind++
-			if (table.falteringHeartXp[person] >= 100) reached.heart++
-			if (incapableAt >= 0) {
-				reached.incapable++
-				reached.incapableYears += death - incapableAt
-			}
-		}
-	}
-	const incapableShare = reached.incapable / reached.count
-	const blindShare = reached.blind / reached.count
-	const incapableYears = reached.incapableYears / Math.max(1, reached.incapable)
-	const median = (values: number[]) =>
-		[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]
-	process.stdout.write(
-		`kernel: reached 50 ${reached.count}, incapable ${(100 * incapableShare).toFixed(2)}%, blind ${(100 * blindShare).toFixed(2)}%, incapable years ${incapableYears.toFixed(2)}, median death men ${median(ages[0]).toFixed(1)} women ${median(ages[1]).toFixed(1)}\n`,
-	)
-	expect(reached.heart).toBe(0)
-	expect(incapableShare).toBeGreaterThanOrEqual(0.04)
-	expect(incapableShare).toBeLessThanOrEqual(0.07)
-	expect(blindShare).toBeGreaterThanOrEqual(0.005)
-	expect(blindShare).toBeLessThanOrEqual(0.015)
-	expect(incapableYears).toBeGreaterThanOrEqual(0.5)
-	expect(incapableYears).toBeLessThanOrEqual(0.9)
-}, 900000)

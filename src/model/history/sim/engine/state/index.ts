@@ -17,6 +17,7 @@ import {
 	getNationPopulation,
 	getNationProvinces,
 	getProvinceNeighbors,
+	occupiedLand,
 	rebuildAssignment,
 	validateLiveHierarchy,
 } from "@/model/history/sim/engine/state/hierarchy"
@@ -62,6 +63,7 @@ import type {
 	ScheduleSuccessionParams,
 	SetDispositionParams,
 	SetRelationParams,
+	SettleCutOffParams,
 	StartWarParams,
 	UnionLink,
 	UnionPairParams,
@@ -437,6 +439,44 @@ function fixConnections({ state, nation, rng }: FixConnectionsParams): void {
 	}
 }
 
+// A realm that takes land in a peace also takes the districts that land cut
+// off from the loser's capital, when they border it; other cut-off districts
+// are released as usual.
+function settleCutOff({
+	state,
+	nation,
+	other,
+	rng,
+}: SettleCutOffParams): number[] {
+	const joined: number[] = []
+	let moved = true
+	while (moved) {
+		moved = false
+		for (const subject of getChildren({ state, p: nation })) {
+			if (isProvinceConnectedToParent({ state, province: subject })) continue
+			const provinces = getNationProvinces({ state, root: subject })
+			if (
+				!provinces.some((p) =>
+					getProvinceNeighbors({ state, p }).some(
+						(nb) => state.sovereignCurrent[nb] === other,
+					),
+				)
+			)
+				continue
+			for (const p of provinces)
+				if (state.occupationCurrent[p] >= 0)
+					FIELDS.prov.occupation.set({ state, p, value: -1 })
+			repartitionNation({ state, nation: other, subjects: provinces })
+			repartitionNation({ state, nation, subjects: [] })
+			joined.push(...provinces)
+			moved = true
+			break
+		}
+	}
+	fixConnections({ state, nation, rng })
+	return joined
+}
+
 function startWar({
 	state,
 	attacker,
@@ -511,6 +551,8 @@ function createActiveWar({
 		candidatesHierarchyVersion: -1,
 		allocation: {},
 		occupied: [],
+		battleScore: 0,
+		dealConsidered: false,
 		allies: new Set(),
 	}
 	state.wars.push(war)
@@ -553,7 +595,6 @@ function createActiveWar({
 		new Set(
 			(options.occupied ?? []).filter(
 				(province) =>
-					province !== defender &&
 					getSovereign({ state, p: province }) === defender &&
 					state.occupationCurrent[province] < 0,
 			),
@@ -1236,6 +1277,7 @@ export const STATE = {
 	isSovereign,
 	getChildren,
 	getNationProvinces,
+	occupiedLand,
 	getNationPopulation,
 	getNationNeighbors,
 	getProvinceNeighbors,
@@ -1254,6 +1296,11 @@ export const STATE = {
 		MILITARY.mutate({
 			state: params.state,
 			action: () => fixConnections(params),
+		}),
+	settleCutOff: (params: SettleCutOffParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => settleCutOff(params),
 		}),
 	startWar: (params: StartWarParams) =>
 		MILITARY.mutate({ state: params.state, action: () => startWar(params) }),

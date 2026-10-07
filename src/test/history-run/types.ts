@@ -1,6 +1,7 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import type { GenesisWorld } from "@/model/pipelines/types"
 import type { SocietyEra } from "@/model/society/types"
+import type { CachedWorldParams } from "@/test/history-run/world-cache/types"
 
 export interface HistoryRunOptions {
 	seed: number
@@ -51,8 +52,12 @@ export interface CreateEngineParams {
 	startYear?: number
 }
 
+export interface BuildEngineParams extends CreateEngineParams {
+	generate: (params: CachedWorldParams) => GenesisWorld
+}
+
 export interface CreatedEngine {
-	generated: ReturnType<typeof GENERATE_WORLD.generateGenesisWorld>
+	generated: GenesisWorld
 	engine: HistoryState
 	generationMs: number
 	engineMs: number

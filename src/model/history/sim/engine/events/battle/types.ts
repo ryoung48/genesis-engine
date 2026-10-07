@@ -35,5 +35,6 @@ export interface FindInvasionTargetParams {
 }
 
 export interface FindReconquestTargetParams {
+	state: HistoryState
 	war: War
 }

@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
 	const isTest = mode === "test" || process.env.VITEST === "true"
 	const base = process.env.VITE_BASE_PATH ?? "/"
 	const historySmokeFiles = [
-		"src/test/history-run/!(history-run|history-report|retained-memory).smoke.test.ts",
+		"src/test/history-run/!(history-run|history-report|retained-memory|siege-calibration).smoke.test.ts",
 	]
 
 	return {
@@ -69,6 +69,7 @@ export default defineConfig(({ mode }) => {
 							groupOrder: 0,
 						},
 						testTimeout: 300000,
+						hookTimeout: 120000,
 					},
 				},
 				{

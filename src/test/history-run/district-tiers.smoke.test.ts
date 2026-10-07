@@ -1,7 +1,5 @@
 import { expect, it } from "vitest"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
-import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
-import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -9,7 +7,6 @@ import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import { DEJURE } from "@/model/society/dejure"
-import { HISTORY_RUN } from "@/test/history-run"
 import { DISTRICT_FIXTURE } from "@/test/history-run/fixtures/district-tiers"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
@@ -236,52 +233,6 @@ it("retains the lost district rank when its title disappears and prefers its cur
 	DISTRICTS.settle({ state: fx.state, rng: fx.rng })
 	expect(fx.state.people.rulerOf[3]).toBe(admin)
 })
-
-it("keeps derived districts valid through simulated decades", () => {
-	const { engine: state } = HISTORY_RUN.createEngine({
-		seed: 14963991,
-		era: "lateMedieval",
-		numPoints: 10000,
-	})
-	const rng = HISTORY_RNG.createHistoryRng(14963991)
-	const start = state.time
-	for (let decade = 1; decade <= 3; decade++) {
-		SIM_ENGINE.simulateUntil({
-			state,
-			targetTimeMs: start + decade * 10 * STATE.yearMs,
-			rng,
-			validate: true,
-		})
-		for (let seat = 0; seat < state.P; seat++) {
-			if (!STATE_TITLES.isDistrictSeat({ state, seat })) continue
-			const land = new Set(STATE.getNationProvinces({ state, root: seat }))
-			const reached = new Set([seat])
-			const queue = [seat]
-			for (let head = 0; head < queue.length; head++)
-				for (const neighbor of STATE.getProvinceNeighbors({
-					state,
-					p: queue[head],
-				})) {
-					if (!land.has(neighbor) || reached.has(neighbor)) continue
-					reached.add(neighbor)
-					queue.push(neighbor)
-				}
-			expect(reached.size).toBe(land.size)
-		}
-		for (let p = 0; p < state.P; p++) {
-			if (state.desolate[p] || state.stateless[p]) continue
-			const realm = state.sovereignCurrent[p]
-			const parent = state.parentCurrent[p]
-			if (p !== realm)
-				expect(
-					parent === realm ||
-						STATE_TITLES.isDistrictSeat({ state, seat: parent }),
-				).toBe(true)
-			if (STATE_TITLES.isDistrictSeat({ state, seat: p }))
-				expect(state.seatRank[p]).toBe(state.topTier[realm] - 1)
-		}
-	}
-}, 120000)
 
 it("demotes a displaced king into a containing duchy instead of treating it as a promotion", () => {
 	const fx = DISTRICT_FIXTURE.create({

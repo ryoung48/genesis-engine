@@ -89,6 +89,9 @@ export interface War {
 	candidatesHierarchyVersion: number
 	allocation: Record<number, number>
 	occupied: number[]
+	battleScore: number
+	// Whether the one negotiated peace this war gets has been tried.
+	dealConsidered: boolean
 	// Allies in the war's last logged coalition; they stay until exhausted,
 	// while newcomers must also be out of debt to join.
 	allies: Set<number>
@@ -317,6 +320,11 @@ export interface ResolveWarParams {
 	receiver: number
 }
 
+export interface OccupiedLandParams {
+	state: HistoryState
+	war: War
+}
+
 export interface WarSidesParams {
 	war: War
 }
@@ -459,6 +467,13 @@ export interface ReleaseSubjectRelationsParams {
 export interface FixConnectionsParams {
 	state: HistoryState
 	nation: number
+	rng: SharedRng
+}
+
+export interface SettleCutOffParams {
+	state: HistoryState
+	nation: number
+	other: number
 	rng: SharedRng
 }
 

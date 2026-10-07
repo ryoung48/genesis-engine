@@ -525,8 +525,9 @@ function rebel({
 			goal: "independence",
 		})
 	else TRUCE.sign({ state, a: overlord, b: subject })
-	if (throne) STATE.fixConnections({ state, nation: overlord, rng })
-	else STATE.fixConnections({ state, nation: subject, rng })
+	// A throne war ends with the realm reunited or with a peace that checks the
+	// crown's land, so the crown's severed districts are not released here.
+	if (!throne) STATE.fixConnections({ state, nation: subject, rng })
 	return true
 }
 

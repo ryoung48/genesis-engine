@@ -573,6 +573,7 @@ function appendNote({
 			battles: [],
 			sieges: [],
 			mobilization: [],
+			warScore: null,
 		}
 		record.events.wars[warId] = war
 		if (coalition) coalitionChange({ translator, coalition, timeMs })
@@ -711,6 +712,7 @@ function appendNote({
 			record.nations[
 				translator.identityByRoot.get(data.defender as number) ?? -1
 			]?.name ?? "Unknown"
+		war.warScore = data.score as number
 		const transferred = (data.transferred as number[]).length
 		const comment =
 			data.outcome === "white peace"

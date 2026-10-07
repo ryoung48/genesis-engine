@@ -1,69 +1,21 @@
-import { writeFileSync } from "node:fs"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { ECONOMY } from "@/model/history/sim/engine/economy"
-import { EventHeap } from "@/model/history/sim/engine/event-heap"
 import { CONQUEST } from "@/model/history/sim/engine/events/battle/conquest"
 import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
+import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import type { Siege } from "@/model/history/sim/engine/events/siege/types"
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
-import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import type { ClashResult } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
-import type { SiegeCalibrationScenario } from "@/test/history-run/types"
+import { SIEGE_FIXTURE } from "@/test/history-run/fixtures/siege"
 
 let state: HistoryState
 let war: War
 let caps: number[]
-// Initial eligible target ratios from the saved 204k-world battle-types report.
-const CALIBRATION_RATIOS = [
-	1.2, 2, 4, 8, 20, 8.433626876656279, 118.8284912341113, 320.4382529310275,
-]
 function fixture(): void {
-	caps = [100000, 100000]
-	war = {
-		idx: 0,
-		attacker: 0,
-		defender: 1,
-		startTime: 0,
-		goal: "conquest",
-		backers: [],
-		refusedCalls: new Set(),
-		originalCrownRuler: -1,
-		deployed: { 0: { levy: 200, regular: 0 }, 1: { levy: 200, regular: 0 } },
-		participants: { 0: "attacker", 1: "defender" },
-		candidates: { attacker: [], defender: [] },
-		callable: { attacker: [], defender: [] },
-		candidatesHierarchyVersion: 0,
-		allocation: { 0: 1, 1: 1 },
-		occupied: [],
-		allies: new Set(),
-		siege: null,
-	}
-	state = {
-		time: 0,
-		militaryReady: false,
-		wars: [war],
-		heap: new EventHeap(),
-		events: [],
-		levyCurrent: new Float64Array([200, 200]),
-		regularCurrent: new Float64Array(2),
-		popUrbanCurrent: new Float32Array([5000, 5000]),
-		popRuralCurrent: new Float32Array([1000000, 1000000]),
-		provinceTopography: new Uint8Array(2),
-		provinceVegetation: new Uint8Array([3, 3]),
-		riverByProvince: new Uint8Array(2),
-		occupationCurrent: new Int32Array([-1, -1]),
-		militaryIntervals: new Map(),
-		militaryTotals: { casualties: { levy: 0, regular: 0 } },
-		militaryDirty: new Set(),
-		militaryAllocationDirty: new Set(),
-		militaryStrengthDirty: new Set(),
-	} as unknown as HistoryState
+	;({ state, war, caps } = SIEGE_FIXTURE.create())
 }
 function start(): Siege {
 	const siege = SIEGE.prepare({ state, war, attacker: 0, province: 1 })
@@ -83,7 +35,7 @@ function phase(values: number[]): void {
 	SIEGE.tick({ state, warIdx: 0, rng: scripted(values) })
 }
 function result() {
-	return state.events.findLast((note) => note.tag === "siege ended")?.data
+	return SIEGE_FIXTURE.result({ state })
 }
 function clashResult(): ClashResult {
 	return {
@@ -99,34 +51,7 @@ function clashResult(): ClashResult {
 }
 beforeEach(() => {
 	fixture()
-	vi.spyOn(STATE, "isSovereign").mockReturnValue(true)
-	vi.spyOn(STATE, "getSovereign").mockImplementation(({ p }) => p)
-	vi.spyOn(STATE, "getNationProvinces").mockImplementation(({ root }) => [root])
-	vi.spyOn(ECONOMY, "realmKnowledge").mockImplementation(({ p }) => caps[p])
-	vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockImplementation(
-		({ knowledge }) => knowledge,
-	)
-	vi.spyOn(RECRUITMENT, "advance").mockReturnValue(undefined)
-	vi.spyOn(RECRUITMENT, "realmTargets").mockReturnValue(
-		RECRUITMENT.targets({
-			population: 100000,
-			tribal: false,
-			knowledge: 1,
-			surplus: 100,
-			outputPerHead: 450,
-		}),
-	)
-	vi.spyOn(FIELDS.prov.population.rural, "set").mockImplementation(
-		({ state, p, value }) => {
-			state.popRuralCurrent[p] = value
-		},
-	)
-	vi.spyOn(FIELDS.prov.population.urban, "set").mockImplementation(
-		({ state, p, value }) => {
-			state.popUrbanCurrent[p] = value
-		},
-	)
-	vi.spyOn(CONQUEST, "apply").mockReturnValue(undefined)
+	SIEGE_FIXTURE.mock({ caps: () => caps })
 })
 afterEach(() => vi.restoreAllMocks())
 
@@ -331,11 +256,47 @@ describe("siege phases", () => {
 			expect.objectContaining({ attacker: 1, defender: 0, attackerWon: true }),
 		)
 	})
-	it("invalidates changed sovereignty and ignores a stale tick without randomness or effects", () => {
+	it("lifts a siege whose target this war already holds", () => {
 		start()
-		vi.mocked(STATE.isSovereign).mockReturnValue(false)
+		state.occupationCurrent[1] = 0
 		phase([])
 		expect(result()?.reason).toBe("invalid")
+		expect(CONQUEST.apply).toHaveBeenCalledWith(
+			expect.objectContaining({ attackerWon: false, loserLossShare: 0 }),
+		)
+	})
+	it("ends the war before the siege phase when the score is settled", () => {
+		start()
+		vi.mocked(CONQUEST.settle).mockReturnValue(true)
+		const rng = scripted([])
+		const random = vi.spyOn(rng, "random")
+		state.time += 30 * 86400000
+		SIEGE.tick({ state, warIdx: 0, rng })
+		expect(random).not.toHaveBeenCalled()
+		expect(CONQUEST.apply).not.toHaveBeenCalled()
+	})
+	it("lapses the war on changed sovereignty and ignores a stale tick without randomness or effects", () => {
+		start()
+		vi.mocked(STATE.isSovereign).mockReturnValue(false)
+		const conclude = vi.spyOn(PEACE, "conclude").mockImplementation(() => {
+			SIEGE.end({ state, war, outcome: "lifted", reason: "war ended" })
+			war.endTime = state.time
+			return {
+				outcome: "lapsed",
+				winner: -1,
+				transferred: [],
+				receiver: 0,
+				payment: 0,
+				payer: -1,
+			}
+		})
+		phase([])
+		expect(conclude).toHaveBeenCalledWith(
+			expect.objectContaining({ reason: "not sovereign" }),
+		)
+		expect(CONQUEST.settle).not.toHaveBeenCalled()
+		expect(CONQUEST.apply).not.toHaveBeenCalled()
+		expect(result()?.reason).toBe("war ended")
 		const notes = state.events.length
 		const size = state.heap.size
 		const rng = scripted([])
@@ -511,86 +472,3 @@ describe("battle kinds and shared resolver", () => {
 		expect(war.deployed[0].levy).toBeCloseTo(200 - pure.attackerLosses)
 	})
 })
-
-it("calibrates the production siege loop across ratios, relief and logistics caps", () => {
-	const rng = HISTORY_RNG.createHistoryRng(2025)
-	// 2,000 trials keep worst-case binomial standard error near 1.1%; output
-	// requests retain the full 20,000-trial calibration and its tail resolution.
-	const samples = process.env.SIEGE_CALIBRATION_OUT ? 20000 : 2000
-	const results: SiegeCalibrationScenario[] = []
-	for (const terrain of [0, 1])
-		for (const multiple of [1, 10])
-			for (const ratio of CALIBRATION_RATIOS)
-				for (const field of [0, 0.5]) {
-					const phases: number[] = []
-					const outcomes: Record<string, number> = {}
-					for (let run = 0; run < samples; run++) {
-						fixture()
-						state.provinceTopography[1] = terrain
-						const army = 100 * ratio
-						const outside = army * field
-						caps = [army, outside]
-						war.deployed[0].levy = army * multiple
-						war.deployed[1].levy = 100 + outside * multiple
-						state.levyCurrent[0] = war.deployed[0].levy
-						state.levyCurrent[1] = war.deployed[1].levy
-						war.siege = {
-							province: 1,
-							startTime: 0,
-							phase: 0,
-							besieger: 0,
-							besiegerSide: "attacker",
-							startBesiegerStrength: army * 0.75,
-							garrison: { 1: { levy: 100, regular: 0 } },
-							startGarrison: 100,
-							shortages: [],
-							breaches: 0,
-						}
-						while (war.siege !== null) {
-							state.time += 30 * 86400000
-							state.heap = new EventHeap()
-							state.events.length = 0
-							SIEGE.tick({ state, warIdx: 0, rng })
-						}
-						const end = result()!
-						phases.push(end.phases as number)
-						const outcome = end.outcome as string
-						outcomes[outcome] = (outcomes[outcome] ?? 0) + 1
-						vi.clearAllMocks()
-					}
-					phases.sort((a, b) => a - b)
-					const median = phases[Math.floor(samples / 2)]
-					const p99 = phases[Math.floor(samples * 0.99)]
-					const max = phases.at(-1)!
-					const failures =
-						((outcomes.lifted ?? 0) + (outcomes.relieved ?? 0)) / samples
-					const storms = (outcomes.stormed ?? 0) / samples
-					results.push({
-						terrain,
-						multiple,
-						ratio,
-						field,
-						median,
-						p99,
-						max,
-						failures,
-						storms,
-						outcomes,
-					})
-					expect(median).toBeGreaterThanOrEqual(3)
-					expect(median).toBeLessThanOrEqual(7)
-					expect(p99).toBeLessThanOrEqual(17)
-					expect(max).toBeLessThanOrEqual(30)
-					expect(failures).toBeLessThanOrEqual(0.1)
-					expect((outcomes.betrayed ?? 0) / samples).toBeLessThanOrEqual(0.09)
-					if (ratio >= 2) {
-						expect(storms).toBeGreaterThanOrEqual(0.1)
-						expect(storms).toBeLessThanOrEqual(0.25)
-					}
-				}
-	if (process.env.SIEGE_CALIBRATION_OUT)
-		writeFileSync(
-			process.env.SIEGE_CALIBRATION_OUT,
-			JSON.stringify(results, null, "\t"),
-		)
-}, 600000)

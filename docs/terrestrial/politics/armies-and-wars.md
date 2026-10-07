@@ -55,7 +55,7 @@ Coalition battle attendance is capped by the lead's knowledge-based logistics, s
 | --- | --- |
 | Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and depleted troops. |
 | Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor (by distance from its capital to the neighbor's closest province) if threat is below its relation threshold. |
-| Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed as if its capital had fallen, with no war. |
+| Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed whole, with no war. |
 
 A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
 
@@ -87,8 +87,9 @@ Formal ties are excluded before the disposition threshold is checked.
 | After a decisive victory, rout, or uncontested battle | 1–4 months. |
 | Next attacker | The winner with 70% probability, the loser with 30%; an uncontested winner always keeps initiative. |
 | War attacker holding nothing | Keeps attacking; after a loss it regroups for 3–8 months. |
-| Invasion target | Unoccupied defender province adjacent to attacker territory or that war's occupation. |
-| Restoration target | Most recently occupied province. |
+| Invasion target | A defender province this war does not already hold, adjacent to the attacker's own provinces or to the war's occupied land. A province under a seat the war holds is already held and is not a target, but it gives access to what lies beyond it. A province another war took is a target again, and gives this war no access. |
+| Restoration target | The most recently taken province the war still holds whose parent it does not hold: the defender goes for the seat, because a child retaken under a held seat would stay held through it. |
+| Score check | Before a target is chosen, a war whose score is already at ±100 ends (see [war score](#war-score)). |
 | Target check | When the battle runs; if the queued attacker has no target but the other side does, they swap roles. |
 | No legal target for either side | War ends in stalemate. |
 
@@ -203,7 +204,7 @@ Ratios and forces are refreshed between these actions after losses. Destroying t
 
 `relieved` and `lifted` make no territorial progress. Lift reasons are `repelled`, `besiegers spent`, `invalid` or `war ended`. Peace clears an active siege as `lifted (war ended)`; its queued tick then does nothing.
 
-Sieges ending in their own tick share occupation and settlement checks with field battles: a fall is handled as a normal attacker victory, while relief or lifting is handled as an inconclusive attacker loss. If the war continues, the next battle follows the corresponding delay and initiative rules above. During the siege, these post-combat checks wait until its end.
+Sieges ending in their own tick share occupation and settlement checks with field battles: a fall is handled as a normal attacker victory, while relief or lifting is handled as an inconclusive attacker loss. A fall changes the land or capital part of the [war score](#war-score) and adds nothing to the battle part. A siege tick first ends the war as `not sovereign` if either leader has stopped being sovereign, then ends it if the score is already at ±100, and only then checks its target and runs the phase. If the war continues, the next battle follows the corresponding delay and initiative rules above. During the siege, these post-combat checks wait until its end.
 
 Sieges are stored separately in `war.sieges`, with start and end times, completed phase count, outcome, lift reason, forces, deployment snapshots and ordered beats. Sorties, assaults and relief are siege beats rather than additional field battle records. War and nation timelines show the start, each logged beat, and the end with elapsed calendar duration in 30-day months (or days for shorter sieges). Running sieges have no end entry.
 
@@ -213,19 +214,71 @@ Mobilization, field battles and siege events record physical deployments rather 
 
 Code: occupation and war endings after field battles and siege endings share `engine/events/battle/conquest`; the terms are set in `engine/events/peace` (`PEACE.terms`, `PEACE.conclude`). This section covers conquest wars; rebel wars have their own endings (see [rebellion](rebellions-and-throne-wars.md#endings)).
 
+### War score
+
+Code: `engine/events/war/score` (`WAR_SCORE`); the land a war holds is `STATE.occupiedLand`.
+
+Every war has a score from −100 to +100, positive for the attacker. It is computed whenever it is read and has no clock.
+
+```text
+score   = +100 if the defender is fully occupied, else
+          clamp(battles + land + capital, −100, +100)
+battles = war.battleScore                                          −100 … +50
+land    = 50 × occupied share of the defender's non-capital output    0 … +50
+capital = 50 while this war holds the defender's capital              0 or +50
+```
+
+- **Battles.** After a field battle with a winner the battle part moves toward the winner by `50 × the loser's loss share`, and is kept between −100 and +50. Inconclusive battles and sieges add nothing to it. The defender occupies nothing, so its whole score comes from battles; that is why the battle part reaches −100 but only +50.
+- **Land.** Province output summed over the occupied land, without the capital, over the same sum for everything the defender owns, without the capital.
+- **Capital.** A realm's capital is its root province. It is worth as much as all the defender's other land together, and it is not counted as land, so holding it alone gives exactly 50.
+- **Full occupation.** When the war holds every province the defender owns, the score is +100 whatever the battle part says.
+
+Which war a province counts for is decided by the occupation marks, never by a war's own list of what it took:
+
+- A province with an occupation mark counts for the war the mark names.
+- An unmarked province counts for the war that holds its parent, so a held seat brings its whole district.
+- The capital covers only itself: an unmarked province directly under it counts for no war.
+
+Every province therefore counts for at most one war. When another war takes a child of a held seat, the child and everything under it pass to that war. When the defender retakes the child while the seat is still held, it is back under the seat's war. When the defender retakes the seat, everything unmarked under it is free.
+
+| Constant | Value | Source |
+| --- | ---: | --- |
+| Score range | −100…100 | CK3 war score scale. |
+| Battle scale | 50 × loser's loss share | CK3 `WAR_ATTACKER_COMBAT_SCORE_SCALE = WAR_DEFENDER_COMBAT_SCORE_SCALE = 50`. |
+| Attacker battle cap | +50 | CK3 `MAX_ATTACKER_BATTLES_WAR_SCORE = 50`. |
+| Defender battle cap | −100 | CK3 `MAX_DEFENDER_BATTLES_WAR_SCORE = 100`. |
+| Land weight | 50 | The half of the scale battles cannot give the attacker. A design choice. |
+| Capital bonus | 50 | Equal to the land weight. CK3 gives 10; a design choice. |
+
+Worked example, a conquest war against a realm of three provinces: capital C, and A and B with 58.3% and 41.7% of the non-capital output.
+
+| Step | What happens | Battles | Land | Capital | Score |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Start | Nothing occupied. | 0 | 0 | 0 | 0 |
+| 1 | The attacker wins at C; the defender loses 10% of its army. | +5 | 0 | +50 | +55 |
+| 2 | The defender fails to retake C and loses 30%. | +20 | 0 | +50 | +70 |
+| 3 | The attacker wins at A; the defender loses 20%. | +30 | +29.2 | +50 | +100 (clamped from 109.2) |
+
+The war ends at step 3 as `enforced`. Had it ended for any other reason after step 1, the attacker would still take the whole realm, because it holds the capital.
+
+### Endings
+
 A war ends when the first of these holds, in this order:
 
 | Reason | When |
 | --- | --- |
-| `not sovereign` | Before a battle, either war leader is no longer sovereign. |
+| `not sovereign` | Before a battle or siege phase, either war leader is no longer sovereign. |
+| `enforced` | The score is +100. Checked before a battle or siege phase and after every battle and finished siege. |
+| `defended` | The score is −100, checked at the same moments. |
 | `no target` | Neither side has a legal target. |
 | `no troops` | Neither side has troops in the field. |
-| `occupation restored` | The defender wins back the last occupied province. |
-| `capital taken` | The attacker wins at the defender's capital. |
 | `both exhausted` | Both war leaders are exhausted. |
 | `offensive spent` | The attacker holds nothing and is exhausted after its own attack. |
 | `offensive repelled` | The attacker holds nothing and has just lost its own attack. The defender then ends the war with 40% chance after a decisive win, 75% after a rout and 90% after an uncontested win; otherwise the attacker regroups for 3–8 months and tries again. |
-| `peace bought` | Any other battle, if the defender can afford a buy-off and accepts it (50% chance). |
+| `peace bought` | Any other battle, if the defender can afford a buy-off and accepts it (25% chance). |
+| `negotiated` | Any other battle, if a deal is offered and accepted (see below). |
+
+A leader is exhausted when its army is below 15% of its target strength, or its treasury is below minus half a year's surplus. Taking the capital does not end a war by itself, and neither does the defender winning back its last occupied province: the attacker then holds nothing and attacks again, or gives up through `offensive spent` or `offensive repelled`.
 
 The reason then sets the terms:
 
@@ -233,15 +286,26 @@ The reason then sets the terms:
 | --- | --- | --- |
 | **Lapsed** | `not sovereign` | Nothing changes hands; the leader still sovereign counts as the winner. |
 | **Bought peace** | `peace bought` | The defender pays the attacker; no land moves. |
-| **Annexation** | `capital taken` | The defender's whole realm goes to the attacker, and the defender's subject relations are released. |
-| **Cession** | Any other ending while the attacker occupies land | The attacker keeps the occupied provinces. |
-| **Indemnity** or **white peace** | `occupation restored`, `offensive spent` or `offensive repelled`, with nothing occupied | The defender wins. It gets an indemnity with a chance that rises with its strength (see below); otherwise white peace. |
-| **White peace** | Any other ending with nothing occupied (`both exhausted`, `no target`, `no troops`) | Nothing changes hands. |
+| **Annexation** | `enforced`, or any other ending while the attacker holds the capital | The defender's whole realm goes to the attacker, and the defender's subject relations are released. |
+| **Cession** | Any other ending while the attacker holds land on a positive score | The attacker keeps the occupied land. After a `negotiated` peace one side may also pay an indemnity (see below). |
+| **Indemnity** or **white peace** | `defended`, `offensive spent` or `offensive repelled`, with nothing ceded | The defender wins. It gets an indemnity with a chance that rises with its strength (see below); otherwise white peace. |
+| **White peace** | Any other ending with nothing ceded, including land held on a score of zero or less | Nothing changes hands. |
 
-- **Buy-off.** Offered only in a conquest war where the attacker occupies land and the defender's battle share (`MILITARY.threat`) is below 0.01. The price is `(1 − threat) × 20 × occupied share of the defender's output × defender revenue` for every government. The defender must hold that much in its treasury.
+- **Buy-off.** Offered only in a conquest war where the attacker holds land but not the capital, and the defender's battle share (`MILITARY.threat`) is below 0.01. The price is `(1 − threat) × 20 × occupied share of the defender's output × defender revenue` for every government. The defender must hold that much in its treasury. It is rolled at 25% after each battle that qualifies.
+- **Negotiated peace.** At most one offer per war. After a battle or finished siege, when the attacker holds land but not the capital, an offer is made with 10% chance if either the attacker's side came off worse (it lost, a province was retaken, its own siege failed, or an inconclusive battle went against it) or its side won and the score is +50 or more. The offer is accepted half the time. The attacker keeps the land it holds, and in a conquest war the score sets who pays the indemnity of 10% of revenue for 5 years:
+
+  | Score at the offer | Terms |
+  | --- | --- |
+  | +50 or more | The attacker keeps the land and the defender pays. |
+  | +10 to +50 | The attacker keeps the land; nobody pays. |
+  | Above 0, below +10 | The attacker keeps the land and pays the defender. |
+  | 0 or below (conquest wars only) | White peace: the land goes back and nobody pays. |
+
+  Rebel wars get the plain terms at any positive score, with no payment.
 - **Indemnity chance.** `0.1 + 0.8 × max(0, 2 × threat − 1)`, where `threat` is the defender's battle share when the war ends: 10% for an even or weaker defender, rising to 90% for an overwhelming one. An indemnity makes the attacker pay the defender 10% of its revenue each year for 5 years, as long as the defender stays sovereign.
-- **After every ending,** the two leaders become Suspicious and sign a 10-year truce. Occupations from the war are cleared, transferred provinces are repartitioned under their new realm, and the defender's remaining land is reconnected unless it was annexed.
-- **Record.** The `war ended` note logs the winner, reason, outcome, transferred provinces, and any payment and payer. The war page shows the outcome as text: "Annexed", "Ceded n provinces", "White peace", "X owes Y 10% of its revenue for 5 years", "Y paid X n ducats for peace", or, for a lapsed war, "The war lapsed: X no longer rules a realm".
+- **Cut-off land.** When a peace gives the attacker land, each of the defender's districts that this leaves without a connection to its capital and that borders the attacker's land goes to the attacker as well. Cut-off districts that do not border the attacker are released as new realms, as after any other peace that leaves the defender standing.
+- **After every ending,** the two leaders become Suspicious and sign a 10-year truce. Occupations from the war are cleared, and transferred provinces are repartitioned under their new realm.
+- **Record.** The `war ended` note logs the winner, reason, outcome, transferred provinces (including cut-off land that went with them), any payment and payer, and the final score with its battle, land and capital parts. The war page shows the final score and the outcome as text: "Annexed", "Ceded n provinces", "White peace", "X owes Y 10% of its revenue for 5 years", "Y paid X n ducats for peace", or, for a lapsed war, "The war lapsed: X no longer rules a realm".
 
 ## Plunder and raids
 
