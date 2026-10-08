@@ -41,7 +41,7 @@ export interface RebuildAssignmentParams {
 	state: HistoryState
 }
 
-export type WarGoal = "conquest" | "independence" | "throne"
+export type WarGoal = "conquest" | "independence" | "throne" | "claim"
 export type Relation =
 	| "NONE"
 	| "OVERLORD"
@@ -64,6 +64,8 @@ export interface StartWarParams {
 	defender: number
 	rng: SharedRng
 	goal: WarGoal
+	// [JUSTIFICATION] Only a claim war has a claimant.
+	claimant?: number
 }
 
 import type { Siege } from "@/model/history/sim/engine/events/siege/types"
@@ -80,6 +82,7 @@ export interface War {
 	backers: number[]
 	refusedCalls: Set<number>
 	originalCrownRuler: number
+	claimant: number
 	deployed: Record<number, Troops>
 	participants: Record<number, WarSide>
 	candidates: Record<WarSide, number[]>
@@ -106,6 +109,8 @@ export interface Indemnity {
 interface ActiveWarOptions {
 	// [JUSTIFICATION] Fixtures and seeded wars default to conquest.
 	goal?: WarGoal
+	// [JUSTIFICATION] Only a claim war has a claimant; every other war uses -1.
+	claimant?: number
 	startTime?: number
 	nextBattleTime?: number
 	occupied?: number[]
@@ -547,6 +552,15 @@ export interface FoundRulerParams {
 export interface UnionRealmParams {
 	state: HistoryState
 	p: number
+}
+
+export interface IsRebelGoalParams {
+	goal: WarGoal
+}
+
+export interface ContinueUnionParams {
+	state: HistoryState
+	generations: Map<number, number>
 }
 
 export interface UnionPairParams {

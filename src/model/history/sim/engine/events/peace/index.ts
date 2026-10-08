@@ -87,6 +87,7 @@ function buyoff({ state, war }: BuyoffParams): number {
 // land.
 function negotiate({ state, war, rng, stalled }: NegotiateParams): boolean {
 	if (
+		war.goal === "claim" ||
 		war.dealConsidered ||
 		capitalHeld({ state, war }) ||
 		STATE.occupiedLand({ state, war }).length === 0
@@ -135,7 +136,7 @@ function terms({ state, war, reason }: PeaceParams): PeaceTerms {
 		const defender = STATE.isSovereign({ state, p: war.defender })
 		const { rebels, crown } = STATE.warSides({ war })
 		if (
-			war.goal !== "conquest" &&
+			STATE.isRebelGoal({ goal: war.goal }) &&
 			!STATE.isSovereign({ state, p: crown }) &&
 			STATE.isSovereign({ state, p: rebels })
 		)
@@ -148,6 +149,24 @@ function terms({ state, war, reason }: PeaceParams): PeaceTerms {
 	}
 	const total = reason === "enforced" || capitalHeld({ state, war })
 	const { score } = WAR_SCORE.current({ state, war })
+	if (war.goal === "claim") {
+		if (reason === "claim lapsed")
+			return { ...base, outcome: "lapsed", winner: war.defender }
+		if (total && OVERTHROW.stands({ state, war }))
+			return { ...base, outcome: "union", winner: war.attacker }
+		if (
+			reason === "defended" ||
+			reason === "offensive spent" ||
+			reason === "offensive repelled"
+		)
+			return {
+				...base,
+				outcome: "indemnity",
+				winner: war.defender,
+				payer: war.attacker,
+			}
+		return { ...base, outcome: "white peace", winner: war.defender }
+	}
 	const land = !total && score > 0 ? STATE.occupiedLand({ state, war }) : []
 	if (war.goal === "throne") {
 		if (total)
@@ -272,8 +291,30 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 		transferred: result.transferred,
 		receiver: result.receiver,
 	})
-	if (result.outcome === "regime change" && claimant >= 0)
+	if (result.outcome === "regime change" && claimant >= 0) {
+		PEOPLE.vacate({
+			people: state.people,
+			seat: war.attacker,
+			reason: "regime change",
+		})
 		OVERTHROW.enthrone({ state, war, claimant, claim, deposed, rng })
+	}
+	if (result.outcome === "union") {
+		STATE.setRelation({
+			state,
+			a: war.attacker,
+			b: war.defender,
+			rel: STATE.rel.NONE,
+		})
+		OVERTHROW.enthrone({
+			state,
+			war,
+			claimant: war.claimant,
+			claim,
+			deposed,
+			rng,
+		})
+	}
 	if (result.outcome === "submission")
 		PEOPLE.vacate({
 			people: state.people,
@@ -303,19 +344,21 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 		: []
 	if (parted && !tookLand)
 		STATE.fixConnections({ state, nation: war.defender, rng })
-	STATE.setRelation({
-		state,
-		a: war.attacker,
-		b: war.defender,
-		rel: STATE.rel.NONE,
-	})
-	STATE.setDisposition({
-		state,
-		a: war.attacker,
-		b: war.defender,
-		disposition: STATE.disp.SUSPICIOUS,
-	})
-	TRUCE.sign({ state, a: war.attacker, b: war.defender })
+	if (result.outcome !== "union") {
+		STATE.setRelation({
+			state,
+			a: war.attacker,
+			b: war.defender,
+			rel: STATE.rel.NONE,
+		})
+		STATE.setDisposition({
+			state,
+			a: war.attacker,
+			b: war.defender,
+			disposition: STATE.disp.SUSPICIOUS,
+		})
+		TRUCE.sign({ state, a: war.attacker, b: war.defender })
+	}
 	state.events.push({
 		tag: "war ended",
 		time: state.time,

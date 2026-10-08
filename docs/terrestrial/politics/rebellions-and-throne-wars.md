@@ -61,7 +61,7 @@ District holders can favor a claimant, while foreign realms can fight beside the
 ## Breakaway
 
 - **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
-- **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
+- **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, or when the holder rules the realm being left or another crown that cannot unite with the new realm, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
 - **Cut-off land.** When a district leaves for independence, any of its own land left without a connection to its seat is released as well, recorded as `province released` and shown as a "disconnected" revolt. A throne rebellion releases nothing at the declaration: crown districts the faction has severed stay with the crown through the war, and are settled at the peace if both realms are still standing.
 - **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of equal or higher top tier.
 
@@ -87,6 +87,8 @@ Every ending sets a 10-year truce and leaves the two leaders Suspicious. Rebel w
 | Otherwise, a leader stops being sovereign | **Lapsed**. |
 
 ### Throne wars
+
+A winning rebel claimant holds no other crown: while a throne war runs, neither side's realm passes by inheritance to someone who rules another sovereign realm.
 
 | How it ends | Outcome |
 | --- | --- |
@@ -116,7 +118,7 @@ The [diplomatic attitude](diplomacy-and-subjects.md) of a vassal toward its over
 
 - **Revolt text.** Each revolt adds "Revolted against X (cause, for pretender)" to the rebel nation; a throne revolt adds "to seize the throne". The cause is `threat`, `succession`, `restoration` or `disconnected`.
 - **Split text.** A realm created by a partition reads "Split from X in the partition of [late ruler]'s realm, under [heir]" instead.
-- **War name.** An independence war is "Suppression of the X Revolt", or "X Civil War" when the rebel territory exceeds half the crown's area. A throne war is "X War of Succession", with casus belli `claim` and war goal `throne`.
+- **War name.** An independence war is "Suppression of the X Revolt", or "X Civil War" when the rebel territory exceeds half the crown's area. A throne war is "X War of Succession", with casus belli `claim` and war goal `throne`. A [foreign claim](personal-unions.md#foreign-claims) war shares the name, casus belli and goal but is not a rebel war.
 - **Outcome text.** When a rebel war ends, the rebel realm's territory changes carry a comment:
   - "Rebels defeated" when the crown takes the rebel capital (restoration);
   - "Rebels held out" when the rebels survive, or "Partial reconquest (n provinces)" when the crown keeps land it occupied;

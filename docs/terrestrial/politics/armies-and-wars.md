@@ -55,6 +55,7 @@ Coalition battle attendance is capped by the lead's knowledge-based logistics, s
 | --- | --- |
 | Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and depleted troops. |
 | Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor (by distance from its capital to the neighbor's closest province) if threat is below its relation threshold. |
+| Foreign claim | A foreign ruler next in a disputed single-heir succession declares a claim war on the realm if it would attack that neighbour for land (see [foreign claims](personal-unions.md#foreign-claims)). |
 | Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed whole, with no war. |
 
 A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
@@ -275,6 +276,7 @@ A war ends when the first of these holds, in this order:
 | `both exhausted` | Both war leaders are exhausted. |
 | `offensive spent` | The attacker holds nothing and is exhausted after its own attack. |
 | `offensive repelled` | The attacker holds nothing and has just lost its own attack. The defender then ends the war with 40% chance after a decisive win, 75% after a rout and 90% after an uncontested win; otherwise the attacker regroups for 3–8 months and tries again. |
+| `claim lapsed` | A claim war whose claim no longer stands, checked before a battle or siege phase and after each. Takes precedence over every other ending. |
 | `peace bought` | Any other battle, if the defender can afford a buy-off and accepts it (25% chance). |
 | `negotiated` | Any other battle, if a deal is offered and accepted (see below). |
 
@@ -286,6 +288,7 @@ The reason then sets the terms:
 | --- | --- | --- |
 | **Lapsed** | `not sovereign` | Nothing changes hands; the leader still sovereign counts as the winner. |
 | **Bought peace** | `peace bought` | The defender pays the attacker; no land moves. |
+| **Union** | A claim war ending `enforced`, or any other ending while the attacker holds the capital, with the claim standing | The claimant takes the defender's throne and the realms form a personal union. No land moves. |
 | **Annexation** | `enforced`, or any other ending while the attacker holds the capital | The defender's whole realm goes to the attacker, and the defender's subject relations are released. |
 | **Cession** | Any other ending while the attacker holds land on a positive score | The attacker keeps the occupied land. After a `negotiated` peace one side may also pay an indemnity (see below). |
 | **Indemnity** or **white peace** | `defended`, `offensive spent` or `offensive repelled`, with nothing ceded | The defender wins. It gets an indemnity with a chance that rises with its strength (see below); otherwise white peace. |
@@ -304,8 +307,9 @@ The reason then sets the terms:
   Rebel wars get the plain terms at any positive score, with no payment.
 - **Indemnity chance.** `0.1 + 0.8 × max(0, 2 × threat − 1)`, where `threat` is the defender's battle share when the war ends: 10% for an even or weaker defender, rising to 90% for an overwhelming one. An indemnity makes the attacker pay the defender 10% of its revenue each year for 5 years, as long as the defender stays sovereign.
 - **Cut-off land.** When a peace gives the attacker land, each of the defender's districts that this leaves without a connection to its capital and that borders the attacker's land goes to the attacker as well. Cut-off districts that do not border the attacker are released as new realms, as after any other peace that leaves the defender standing.
-- **After every ending,** the two leaders become Suspicious and sign a 10-year truce. Occupations from the war are cleared, and transferred provinces are repartitioned under their new realm.
-- **Record.** The `war ended` note logs the winner, reason, outcome, transferred provinces (including cut-off land that went with them), any payment and payer, and the final score with its battle, land and capital parts. The war page shows the final score and the outcome as text: "Annexed", "Ceded n provinces", "White peace", "X owes Y 10% of its revenue for 5 years", "Y paid X n ducats for peace", or, for a lapsed war, "The war lapsed: X no longer rules a realm".
+- **Claim wars.** A claim war never moves land: occupied land goes back at every ending whatever the score, and it takes neither buy-off nor negotiated peace. A `claim lapsed` ending is a lapsed outcome with the defender as winner.
+- **After every ending but a union,** the two leaders become Suspicious and sign a 10-year truce. Occupations from the war are cleared, and transferred provinces are repartitioned under their new realm.
+- **Record.** The `war ended` note logs the winner, reason, outcome, transferred provinces (including cut-off land that went with them), any payment and payer, and the final score with its battle, land and capital parts. The war page shows the final score and the outcome as text: "Annexed", "Ceded n provinces", "White peace", "X owes Y 10% of its revenue for 5 years", "Y paid X n ducats for peace", for a union, "Personal union under X"; for a lapsed claim, "The claim lapsed"; or, for a lapsed war, "The war lapsed: X no longer rules a realm".
 
 ## Plunder and raids
 

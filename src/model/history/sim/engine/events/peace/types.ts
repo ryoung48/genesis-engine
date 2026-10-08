@@ -12,6 +12,7 @@ export type PeaceReason =
 	| "not sovereign"
 	| "peace bought"
 	| "negotiated"
+	| "claim lapsed"
 
 export type PeaceOutcome =
 	| "annexation"
@@ -24,6 +25,7 @@ export type PeaceOutcome =
 	| "lapsed"
 	| "regime change"
 	| "submission"
+	| "union"
 
 export interface PeaceTerms {
 	outcome: PeaceOutcome

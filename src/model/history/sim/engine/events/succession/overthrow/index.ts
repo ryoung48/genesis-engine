@@ -5,12 +5,14 @@ import type {
 	EnthroneParams,
 	SeeksParams,
 	SeizeParams,
+	StandsParams,
 } from "@/model/history/sim/engine/events/succession/overthrow/types"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 
 const THRONE_BACKING = 0.95
 const THRONE_BID_CHANCE = 0.05
@@ -50,6 +52,30 @@ function seeks({ state, realm, holder, rng }: SeeksParams): number[] {
 		: []
 }
 
+function stands({ state, war }: StandsParams): boolean {
+	const people = state.people
+	const claimant = war.claimant
+	if (
+		claimant < 0 ||
+		!PEOPLE.aliveAt({
+			people,
+			person: claimant,
+			time: state.time / STATE.yearMs,
+		}) ||
+		AGEING.incapable({ people, person: claimant }) ||
+		people.rulerOf[war.defender] !== war.originalCrownRuler
+	)
+		return false
+	const crowns = people.persons.heldSeats[claimant].filter((seat) =>
+		STATE.isSovereign({ state, p: seat }),
+	)
+	return (
+		crowns.length === 1 &&
+		crowns[0] === war.attacker &&
+		STATE.canUniteAfterWar({ state, a: war.defender, b: war.attacker })
+	)
+}
+
 function enthrone({
 	state,
 	war,
@@ -60,11 +86,6 @@ function enthrone({
 }: EnthroneParams): void {
 	const realm = war.defender
 	REGENCY.end({ state, realm, cause: "overthrown" })
-	PEOPLE.vacate({
-		people: state.people,
-		seat: war.attacker,
-		reason: "regime change",
-	})
 	seize({
 		state,
 		realm,
@@ -102,4 +123,4 @@ function enthrone({
 	})
 }
 
-export const OVERTHROW = { seize, seeks, enthrone }
+export const OVERTHROW = { seize, seeks, stands, enthrone }

@@ -127,6 +127,10 @@ export interface MilitaryWindow {
 	dispositionAbandoned: number
 	throneVassalFreed: number
 	vassalsChained: number
+	mixedGovernmentUnions: number
+	unionsContinued: number
+	claimCandidates: number
+	claimsPressed: number
 	tiePairs: Record<string, number>
 	firstTiePairs: Record<string, number>
 	lastTiePairs: Record<string, number>

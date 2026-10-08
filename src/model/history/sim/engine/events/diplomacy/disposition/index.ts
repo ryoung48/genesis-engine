@@ -126,7 +126,7 @@ function drift({ state, a, b, rng, bound }: DriftParams): void {
 }
 
 function afterWar({ state, war, outcome }: AfterWarParams): void {
-	if (outcome === "regime change") return
+	if (outcome === "regime change" || outcome === "union") return
 	for (const leader of [war.attacker, war.defender]) {
 		const overlord = STATE.diplomaticOverlord({ state, nation: leader })
 		if (overlord < 0) continue

@@ -6,6 +6,13 @@ export interface InitSuccessionParams {
 	state: HistoryState
 }
 
+export interface PressForeignClaimParams {
+	state: HistoryState
+	realm: number
+	claimant: number
+	rng: SharedRng
+}
+
 export interface RunSeatSuccessionParams {
 	state: HistoryState
 	province: number

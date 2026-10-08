@@ -72,3 +72,16 @@ export interface SeedWarStageParams {
 	goal: "conquest" | "independence"
 	forceOccupied: boolean
 }
+
+export interface ViableTargetsParams {
+	state: HistoryState
+	nation: number
+}
+
+export interface PressClaimParams {
+	state: HistoryState
+	attacker: number
+	defender: number
+	claimant: number
+	rng: SharedRng
+}

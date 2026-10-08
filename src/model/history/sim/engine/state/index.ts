@@ -42,6 +42,7 @@ import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
 	ClearRealmDiplomacyParams,
+	ContinueUnionParams,
 	CreateActiveWarParams,
 	CreateHistoryStateParams,
 	FixConnectionsParams,
@@ -50,6 +51,7 @@ import type {
 	HistoryState,
 	InstallRulerParams,
 	IsProvinceConnectedToParentParams,
+	IsRebelGoalParams,
 	OriginOfParams,
 	ProvinceDistanceSqParams,
 	QueueBattleEventParams,
@@ -225,7 +227,13 @@ function releaseFaction({
 			people: state.people,
 			person: vassal,
 			time: state.time / yearMs,
-		})
+		}) &&
+		state.people.persons.heldSeats[vassal].every(
+			(seat) =>
+				seat === p ||
+				!isSovereign({ state, p: seat }) ||
+				(seat !== formerSovereign && canUnite({ state, a: p, b: seat })),
+		)
 	)
 		installRuler({ state, p, person: vassal, claim: FOUNDER_CLAIM, reason })
 	else
@@ -367,6 +375,7 @@ function releaseSubjectRelations({
 	state,
 	nation,
 }: ReleaseSubjectRelationsParams): void {
+	const orphans = new Map<number, number>()
 	for (let other = 0; other < state.P; other++) {
 		if (other === nation || state.desolate[other]) continue
 		const relation = getRelation({ state, a: nation, b: other })
@@ -397,8 +406,9 @@ function releaseSubjectRelations({
 			state.events.push({
 				tag: "personal union ended",
 				time: state.time,
-				data: { junior: nation, senior: other },
+				data: { junior: other, senior: nation },
 			})
+			orphans.set(other, state.people.unionGenerations.get(other) ?? 1)
 			continue
 		}
 
@@ -407,9 +417,53 @@ function releaseSubjectRelations({
 			state.events.push({
 				tag: "personal union ended",
 				time: state.time,
-				data: { junior: other, senior: nation },
+				data: { junior: nation, senior: other },
 			})
 		}
+	}
+	continueUnion({ state, generations: orphans })
+}
+
+// Juniors that just lost their senior and are still ruled by one living person
+// stay together under the largest of them, keeping their generation counts.
+function continueUnion({ state, generations }: ContinueUnionParams): void {
+	const people = state.people
+	const time = state.time / yearMs
+	const byRuler = new Map<number, number[]>()
+	for (const realm of generations.keys()) {
+		const ruler = people.rulerOf[realm]
+		if (
+			ruler < 0 ||
+			!isSovereign({ state, p: realm }) ||
+			!PEOPLE.aliveAt({ people, person: ruler, time })
+		)
+			continue
+		const group = byRuler.get(ruler)
+		if (group) group.push(realm)
+		else byRuler.set(ruler, [realm])
+	}
+	for (const [ruler, group] of byRuler) {
+		if (group.length < 2) continue
+		const sizes = new Map(
+			group.map((p) => [p, getNationProvinces({ state, root: p }).length]),
+		)
+		const senior = [...group].sort(
+			(x, y) =>
+				Number(mustLead({ state, p: y })) - Number(mustLead({ state, p: x })) ||
+				sizes.get(y)! - sizes.get(x)! ||
+				x - y,
+		)[0]
+		people.unionGenerations.delete(senior)
+		const juniors = group.filter((p) => p !== senior)
+		for (const junior of juniors) {
+			setRelation({ state, a: junior, b: senior, rel: rel.PU_JUNIOR })
+			people.unionGenerations.set(junior, generations.get(junior) ?? 1)
+		}
+		state.events.push({
+			tag: "personal union continued",
+			time: state.time,
+			data: { senior, juniors, ruler },
+		})
 	}
 }
 
@@ -483,6 +537,7 @@ function startWar({
 	defender,
 	rng,
 	goal,
+	claimant,
 }: StartWarParams): War | null {
 	if (
 		DERIVE.provinceWars({ state, p: attacker }).some((idx) => {
@@ -496,7 +551,7 @@ function startWar({
 		attacker,
 		defender,
 		rng,
-		options: { goal },
+		options: { goal, claimant },
 	})
 	OPINION.remember({
 		people: state.people,
@@ -506,6 +561,21 @@ function startWar({
 		time: state.time / yearMs,
 	})
 	return war
+}
+
+function isRebelGoal({ goal }: IsRebelGoalParams): boolean {
+	return goal === "independence" || goal === "throne"
+}
+
+function isPressing({ state, p }: UnionRealmParams): boolean {
+	return DERIVE.provinceWars({ state, p }).some((idx) => {
+		const war = state.wars[idx]
+		return (
+			war.endTime === undefined &&
+			war.attacker === p &&
+			(war.goal === "throne" || war.goal === "claim")
+		)
+	})
 }
 
 function warSides({ war }: WarSidesParams): WarSides {
@@ -542,7 +612,10 @@ function createActiveWar({
 		backers: [],
 		refusedCalls: new Set(),
 		originalCrownRuler:
-			options.goal === "throne" ? state.people.rulerOf[defender] : -1,
+			options.goal === "throne" || options.goal === "claim"
+				? state.people.rulerOf[defender]
+				: -1,
+		claimant: options.claimant ?? -1,
 		siege: null,
 		deployed: {},
 		participants: {},
@@ -994,17 +1067,32 @@ function isUnionJunior({ state, p }: UnionRealmParams): boolean {
 	return getRulerRelation({ state, nation: p })?.relation === rel.PU_SENIOR
 }
 
-// Two realms may enter a union when they are not at war, neither is already a
-// union junior, and at most one of them must lead.
-function canUnite({ state, a, b }: RealmPairParams): boolean {
-	const relation = getRelation({ state, a, b })
-	if (relation === rel.PU_SENIOR || relation === rel.PU_JUNIOR) return true
+function unionAllowed({ state, a, b }: RealmPairParams): boolean {
 	return (
-		relation !== rel.WAR &&
+		GOVERNMENT.successionOfIndex(state.governmentType[a]) === "single_heir" &&
+		GOVERNMENT.successionOfIndex(state.governmentType[b]) === "single_heir" &&
 		!isUnionJunior({ state, p: a }) &&
 		!isUnionJunior({ state, p: b }) &&
 		!(mustLead({ state, p: a }) && mustLead({ state, p: b }))
 	)
+}
+
+function isLinked({ state, a, b }: RealmPairParams): boolean {
+	const relation = getRelation({ state, a, b })
+	return relation === rel.PU_SENIOR || relation === rel.PU_JUNIOR
+}
+
+// Two single-heir realms may enter a union when they are not at war, neither is
+// already a union junior, and at most one of them must lead.
+function canUnite({ state, a, b }: RealmPairParams): boolean {
+	if (isLinked({ state, a, b })) return true
+	return (
+		getRelation({ state, a, b }) !== rel.WAR && unionAllowed({ state, a, b })
+	)
+}
+
+function canUniteAfterWar({ state, a, b }: RealmPairParams): boolean {
+	return isLinked({ state, a, b }) || unionAllowed({ state, a, b })
 }
 
 // A partner stays while its living ruler is the same person or that person's
@@ -1012,6 +1100,7 @@ function canUnite({ state, a, b }: RealmPairParams): boolean {
 function breakUnions({ state, p, person }: UnionRulerParams): void {
 	const people = state.people
 	const time = state.time / yearMs
+	const orphans = new Map<number, number>()
 	for (const other of unionPartners({ state, p })) {
 		const ruler = people.rulerOf[other]
 		if (ruler === person) continue
@@ -1023,12 +1112,14 @@ function breakUnions({ state, p, person }: UnionRulerParams): void {
 		)
 			continue
 		const pJunior = getRelation({ state, a: p, b: other }) === rel.PU_SENIOR
+		if (!pJunior) orphans.set(other, people.unionGenerations.get(other) ?? 1)
 		endUnion({
 			state,
 			junior: pJunior ? p : other,
 			senior: pJunior ? other : p,
 		})
 	}
+	continueUnion({ state, generations: orphans })
 }
 
 // Links two realms in a personal union, or counts another shared ruler of an
@@ -1111,14 +1202,6 @@ function uniteCouple({ state, p, person }: UnionRulerParams): void {
 		ranks: state.seatRank,
 	}).filter((seat) => isSovereign({ state, p: seat }))
 	if (!own.includes(p)) return
-	if (
-		[...own, ...crowns].some(
-			(seat) =>
-				GOVERNMENT.successionOfIndex(state.governmentType[seat]) !==
-				"single_heir",
-		)
-	)
-		return
 	if (
 		!own.every((a) =>
 			crowns.every(
@@ -1333,6 +1416,9 @@ export const STATE = {
 		}),
 	scheduleSuccession,
 	canUnite,
+	canUniteAfterWar,
+	isRebelGoal,
+	isPressing,
 	unionSenior,
 	uniteCouple: (params: UnionRulerParams) =>
 		MILITARY.mutate({ state: params.state, action: () => uniteCouple(params) }),

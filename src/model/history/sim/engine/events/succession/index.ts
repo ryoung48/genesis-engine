@@ -7,6 +7,7 @@ import { RESTORATION } from "@/model/history/sim/engine/events/succession/restor
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import type {
 	InitSuccessionParams,
+	PressForeignClaimParams,
 	PretenderParams,
 	RealmParams,
 	RealmRngParams,
@@ -153,6 +154,31 @@ function weakCrownRevolt({ state, realm, claim, rng }: WeakCrownParams): void {
 	STATE.fixConnections({ state, nation: realm, rng })
 }
 
+function pressForeignClaim({
+	state,
+	realm,
+	claimant,
+	rng,
+}: PressForeignClaimParams): void {
+	if (
+		claimant < 0 ||
+		state.people.rulerOf[realm] === claimant ||
+		!SUCCESSION_SYSTEMS.inheritable({ state, realm, person: claimant })
+	)
+		return
+	const crowns = state.people.persons.heldSeats[claimant].filter((seat) =>
+		STATE.isSovereign({ state, p: seat }),
+	)
+	if (crowns.length !== 1) return
+	WAR.pressClaim({
+		state,
+		attacker: crowns[0],
+		defender: realm,
+		claimant,
+		rng,
+	})
+}
+
 function runSeatSuccession({
 	state,
 	province,
@@ -220,6 +246,7 @@ function runSeatSuccession({
 			dying,
 			cause: state.successionContext?.cause ?? "natural",
 			claim: choice.claim,
+			foreignClaimant: choice.foreignClaimant,
 		},
 	})
 
@@ -253,6 +280,12 @@ function runSeatSuccession({
 			})
 		else weakCrownRevolt({ state, realm: province, claim: choice.claim, rng })
 		restore({ state, realm: province, rng })
+		pressForeignClaim({
+			state,
+			realm: province,
+			claimant: choice.foreignClaimant,
+			rng,
+		})
 	}
 
 	CORONATION.hold({ state, realm: province, rng })

@@ -68,7 +68,7 @@ function observation({
 function attach({ engine, record }: AttachParams): AttachedDiagnostics {
 	const observe = (params: ObserveParams) => {
 		if (
-			params.war.goal === "conquest" ||
+			!STATE.isRebelGoal({ goal: params.war.goal }) ||
 			params.war.endTime !== undefined ||
 			!params.war.participants[params.nation] ||
 			!STATE.isSovereign({ state: engine, p: params.nation })
@@ -79,7 +79,7 @@ function attach({ engine, record }: AttachParams): AttachedDiagnostics {
 	const sample: AttachedDiagnostics["sample"] = ({ source }) => {
 		for (const idx of engine.activeWarIds) {
 			const war = engine.wars[idx]
-			if (war.goal === "conquest") continue
+			if (!STATE.isRebelGoal({ goal: war.goal })) continue
 			for (const nation of Object.keys(war.participants).map(Number))
 				observe({ engine, war, nation, source })
 		}

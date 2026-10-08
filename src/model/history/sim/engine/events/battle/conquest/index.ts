@@ -4,6 +4,7 @@ import type {
 } from "@/model/history/sim/engine/events/battle/conquest/types"
 import type { NextBattleTimeParams } from "@/model/history/sim/engine/events/battle/types"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
+import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { WAR_SCORE } from "@/model/history/sim/engine/events/war/score"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
@@ -32,6 +33,10 @@ function nextBattleTime({ state, outcome, rng }: NextBattleTimeParams): number {
 }
 
 function settle({ state, war, rng }: SettleParams): boolean {
+	if (war.goal === "claim" && !OVERTHROW.stands({ state, war })) {
+		PEACE.conclude({ state, war, rng, reason: "claim lapsed" })
+		return true
+	}
 	const { score } = WAR_SCORE.current({ state, war })
 	if (score >= WAR_SCORE.limit) {
 		PEACE.conclude({ state, war, rng, reason: "enforced" })

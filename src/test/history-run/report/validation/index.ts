@@ -56,6 +56,24 @@ function rulers({ engine, tracker }: ValidateEngineParams): void {
 	}
 }
 
+// Every living person's sovereign realms belong to one union group.
+function unions({ engine, tracker }: ValidateEngineParams): void {
+	const year = engine.time / STATE.yearMs
+	for (const person of engine.people.alive) {
+		const crowns = engine.people.persons.heldSeats[person].filter((seat) =>
+			STATE.isSovereign({ state: engine, p: seat }),
+		)
+		if (crowns.length < 2) continue
+		const senior = STATE.unionSenior({ state: engine, p: crowns[0] })
+		if (crowns.some((p) => STATE.unionSenior({ state: engine, p }) !== senior))
+			violation({
+				tracker,
+				rule: "ruler of realms outside one union group",
+				detail: `person ${person}, realms ${crowns.join(",")} in ${year.toFixed(0)}`,
+			})
+	}
+}
+
 // Read straight after a yearly people pass. Both columns agree, no betrothed
 // person has a living spouse, every pair was made between 12+ parties within
 // the age gap with one under 16, is wed within a yearly pass of coming of age,
@@ -266,6 +284,7 @@ export const HISTORY_VALIDATION = {
 	tracker: createTracker,
 	alliances,
 	rulers,
+	unions,
 	betrothals,
 	districts,
 	record,

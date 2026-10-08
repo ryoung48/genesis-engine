@@ -85,7 +85,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 
 | System | Governments | Rule |
 |---|---|---|
-| Single heir | feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a personal union. With no heir, the strongest adult district holder takes it as a new house. |
+| Single heir | feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a [personal union](personal-unions.md). With no heir, the strongest adult district holder takes it as a new house. |
 | Single heir, then partition | chiefdom, tribal monarchy | The same rule picks the primary heir, who keeps the realm root; the other child lines take surplus titles, then titled districts, as new realms (see Partition). |
 | Election | elective monarchy, tribal federation, native council, steppe horde, republics | See below. |
 | Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
@@ -103,6 +103,8 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 - A losing election candidate who holds a district and won 40% also revolts.
 - Otherwise the weak-crown rebellion check runs.
 - None of these revolts starts at a succession that divides the realm (see Partition).
+
+A foreign ruler who stands next in a disputed line may also press the claim by war; see [foreign claims](personal-unions.md#foreign-claims).
 
 Disputed succession pretenders fight for the throne; a victory replaces the ruler. The war rules are in [rebellion](rebellions-and-throne-wars.md).
 
@@ -179,17 +181,7 @@ The culture's gender preference sorts each group: patriarchal prefers sons, matr
 
 ## Personal unions
 
-- **Formed** when one person comes to rule two single-heir realms by inheritance, or when two reigning single-heir rulers are married to each other (the heiress case).
-- **Senior** is the realm that must lead (it already has juniors or an overlord), else the one with more provinces.
-- **Blocked** for a new external link when realms are at war, either is already a union junior, or both must lead. Existing group membership remains compatible; eligibility checks every held crown.
-- **Ended** when a partner's living ruler is someone other than that person or their spouse.
-- **Merged** into the senior when an adjacent junior has had 3 shared rulers.
-
-A living heir must be compatible with every held sovereign crown. Districts do not veto unions. Existing group membership follows junior-to-senior union edges only; diplomatic overlords and territorial parents are excluded. Sibling juniors can continue their existing group without a sibling link, even while their dead senior awaits its turn. An incompatible external crown still rejects the heir.
-
-Installation rechecks surviving crowns after each external link. Existing groups retain their senior and edges. Each actual senior–junior edge advances once when both endpoints share the living successor, using the accounted-edge set of the walk's context (`state.successionContext`, set for the duration of one death's walk and null otherwise). New edges start at generation 1; spouse-only shared unions do not advance generations. Merger eligibility is checked immediately after continuation, and removed seats are skipped.
-
-Installation and separately crowned spouses preflight all crown pairs before adding external links.
+One person ruling several single-heir realms ties them in a union. Formation, blocks, ending, merging and the invariants are in [personal unions](personal-unions.md).
 
 ## District elections
 

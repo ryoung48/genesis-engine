@@ -410,7 +410,9 @@ function runSeed({
 				logs.armyReconstitutions.add(note)
 			else if (
 				note.tag === "war ended" &&
-				engine.wars[note.data.war as number].goal !== "conquest"
+				STATE.isRebelGoal({
+					goal: engine.wars[note.data.war as number].goal,
+				})
 			)
 				logs.rebelWarOutcomes.add(note)
 		}
@@ -628,6 +630,7 @@ function runSeed({
 			diagnostics.annualTicks.push(performance.now() - tickStart)
 			HISTORY_VALIDATION.alliances({ engine, tracker: validation })
 			HISTORY_VALIDATION.rulers({ engine, tracker: validation })
+			HISTORY_VALIDATION.unions({ engine, tracker: validation })
 			if ((year - start) % 10 === 0)
 				HISTORY_VALIDATION.districts({ engine, tracker: validation })
 			if ([1367, 1500, 1800].includes(year) || year === start + options.years) {

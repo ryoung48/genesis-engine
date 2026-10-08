@@ -16,6 +16,7 @@ import type {
 import type { SiegeBeatData } from "@/model/history/sim/engine/events/siege/types"
 import { RELATION_CODE } from "@/model/history/sim/engine/fields"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
+import { STATE } from "@/model/history/sim/engine/state"
 import { COLORING } from "@/model/history/sim/nations/coloring"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
@@ -156,7 +157,7 @@ function scanOwnerNotes({
 			const coalition = transaction.coalitions.find(
 				(entry) => entry.warId === warId,
 			)
-			if (!coalition || coalition.goal === "conquest") continue
+			if (!coalition || !STATE.isRebelGoal({ goal: coalition.goal })) continue
 			translator.rebelWars.set(warId, {
 				rebelRoot:
 					coalition.goal === "throne"
@@ -521,7 +522,7 @@ function appendNote({
 			}
 		}
 		let civilWar = false
-		if (coalition && coalition.goal !== "conquest") {
+		if (coalition && STATE.isRebelGoal({ goal: coalition.goal })) {
 			const crown = coalition.goal === "throne" ? defender : attacker
 			const rebelRoot =
 				coalition.goal === "throne"
@@ -547,7 +548,7 @@ function appendNote({
 		const war: WarRecord = {
 			id: warId,
 			name:
-				coalition?.goal === "throne"
+				coalition?.goal === "throne" || coalition?.goal === "claim"
 					? `${record.nations[defender]?.name ?? "Unknown"} War of Succession`
 					: civilWar
 						? `${record.nations[attacker]?.name ?? "Unknown"} Civil War`
@@ -555,20 +556,24 @@ function appendNote({
 							? `Suppression of the ${record.nations[defender]?.name ?? "Unknown"} Revolt`
 							: `${record.nations[attacker]?.name ?? "Unknown"}–${record.nations[defender]?.name ?? "Unknown"} War`,
 			casusBelli:
-				coalition?.goal === "throne"
+				coalition?.goal === "throne" || coalition?.goal === "claim"
 					? "claim"
 					: coalition?.goal === "independence"
 						? "rebellion"
 						: "conquest",
 			warGoalType:
-				coalition?.goal === "throne"
+				coalition?.goal === "throne" || coalition?.goal === "claim"
 					? "throne"
 					: coalition?.goal === "independence"
 						? "rebellion"
 						: "province",
-			warGoalId: coalition?.goal === "throne" ? attacker : defender,
+			warGoalId:
+				coalition?.goal === "throne" || coalition?.goal === "claim"
+					? attacker
+					: defender,
 			warGoalProvinceId: data.defender as number,
-			rebel: coalition !== undefined && coalition.goal !== "conquest",
+			rebel:
+				coalition !== undefined && STATE.isRebelGoal({ goal: coalition.goal }),
 			events: [],
 			battles: [],
 			sieges: [],
@@ -719,25 +724,29 @@ function appendNote({
 				? "White peace"
 				: data.outcome === "regime change"
 					? "Claimant took the throne"
-					: data.outcome === "submission"
-						? "Rebels submitted"
-						: data.outcome === "annexation"
-							? "Annexed"
-							: data.outcome === "restoration"
-								? `${attacker} restored control over ${defender}`
-								: data.outcome === "cession"
-									? war.warGoalType === "throne"
-										? `Rebels held land (${transferred} provinces)`
-										: `Ceded ${transferred} provinces`
-									: data.outcome === "indemnity"
-										? `${attacker} owes ${defender} 10% of its revenue for 5 years`
-										: data.outcome === "bought peace"
-											? `${defender} paid ${attacker} ${Math.round(data.payment as number)} ducats for peace`
-											: data.outcome === "independence"
-												? war.warGoalType === "throne"
-													? "Rebels held out"
-													: `${defender} won independence from ${attacker}${transferred > 0 ? ` after ceding ${transferred} provinces` : ""}`
-												: `The war lapsed: ${data.winner === data.attacker ? defender : attacker} no longer rules a realm`
+					: data.outcome === "union"
+						? `Personal union under ${attacker}`
+						: data.outcome === "lapsed" && data.reason === "claim lapsed"
+							? "The claim lapsed"
+							: data.outcome === "submission"
+								? "Rebels submitted"
+								: data.outcome === "annexation"
+									? "Annexed"
+									: data.outcome === "restoration"
+										? `${attacker} restored control over ${defender}`
+										: data.outcome === "cession"
+											? war.warGoalType === "throne"
+												? `Rebels held land (${transferred} provinces)`
+												: `Ceded ${transferred} provinces`
+											: data.outcome === "indemnity"
+												? `${attacker} owes ${defender} 10% of its revenue for 5 years`
+												: data.outcome === "bought peace"
+													? `${defender} paid ${attacker} ${Math.round(data.payment as number)} ducats for peace`
+													: data.outcome === "independence"
+														? war.warGoalType === "throne"
+															? "Rebels held out"
+															: `${defender} won independence from ${attacker}${transferred > 0 ? ` after ceding ${transferred} provinces` : ""}`
+														: `The war lapsed: ${data.winner === data.attacker ? defender : attacker} no longer rules a realm`
 		const active = translator.warCoalitions.get(warId)
 		if (active) {
 			for (const id of active.attackers)

@@ -110,6 +110,10 @@ function emptyWindow(): MilitaryWindow {
 		dispositionAbandoned: 0,
 		throneVassalFreed: 0,
 		vassalsChained: 0,
+		mixedGovernmentUnions: 0,
+		unionsContinued: 0,
+		claimCandidates: 0,
+		claimsPressed: 0,
 		tiePairs: {},
 		firstTiePairs: {},
 		lastTiePairs: {},
@@ -324,6 +328,7 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 		const government = family({ state: engine, p: attacker })
 		tracker.warGovernment.set(data.war as number, government)
 		const startedWar = engine.wars[data.war as number]
+		if (startedWar.goal === "claim") window.claimsPressed++
 		const crown = STATE.warSides({ war: startedWar }).crown
 		tracker.warInVassal.set(
 			data.war as number,
@@ -378,6 +383,10 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 			}) === data.crown
 		)
 			window.backersDisloyalVassal++
+	} else if (note.tag === "personal union continued") {
+		window.unionsContinued++
+	} else if (note.tag === "succession") {
+		if ((data.foreignClaimant as number) >= 0) window.claimCandidates++
 	} else if (note.tag === "tribute withheld") {
 		window.tributeWithheld++
 	} else if (note.tag === "alliance formed") {
@@ -681,6 +690,15 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 			const tie = STATE.getRelation({ state: engine, a: nation, b: other })
 			const kind = tieKind({ tie })
 			if (kind) window.tiePairs[kind] = (window.tiePairs[kind] ?? 0) + 1
+			if (
+				kind === "union" &&
+				[nation, other].some(
+					(p) =>
+						GOVERNMENT.successionOfIndex(engine.governmentType[p]) !==
+						"single_heir",
+				)
+			)
+				window.mixedGovernmentUnions++
 			if (tie !== STATE.rel.ALLY) continue
 			window.alliances++
 			if (!STATE.canAlly({ state: engine, a: nation, b: other }))
@@ -923,11 +941,12 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		"white peace",
 		"independence",
 		"lapsed",
+		"union",
 	])
 		report[`wars.outcome.${outcome}`] = share(
 			completed.map((war) => war.outcome === outcome),
 		)
-	for (const goal of ["conquest", "independence", "throne"]) {
+	for (const goal of ["conquest", "independence", "throne", "claim"]) {
 		const scores = completed
 			.filter((war) => war.goal === goal)
 			.map((war) => war.score)
@@ -949,6 +968,7 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		"no target",
 		"no troops",
 		"not sovereign",
+		"claim lapsed",
 	])
 		report[`wars.reason.${reason}`] = share(
 			completed.map((war) => war.reason === reason),
@@ -993,7 +1013,9 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		0,
 	)
 	const rebelWars = completed.filter((war) => war.goal === "independence")
-	const allRebelWars = completed.filter((war) => war.goal !== "conquest")
+	const allRebelWars = completed.filter((war) =>
+		STATE.isRebelGoal({ goal: war.goal }),
+	)
 	const throneWars = completed.filter((war) => war.goal === "throne")
 	report["rebelWars.completed.n"] = rebelWars.length
 	report["rebelWars.independent.n"] = rebelWars.filter(
@@ -1036,6 +1058,26 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	report["backers.overlord.n"] = window.backersOverlord
 	report["backers.disloyalVassal.n"] = window.backersDisloyalVassal
 	report["throneWars.vassalFreed.n"] = window.throneVassalFreed
+	report["unions.mixedGovernment.n"] =
+		window.mixedGovernmentUnions / Math.max(1, window.vassalSamples)
+	report["unions.continued.n"] = window.unionsContinued
+	report["claims.candidates.n"] = window.claimCandidates
+	report["claims.pressed.n"] = window.claimsPressed
+	const claimWars = completed.filter((war) => war.goal === "claim")
+	report["claimWars.completed.n"] = claimWars.length
+	report["claimWars.union.n"] = claimWars.filter(
+		(war) => war.outcome === "union",
+	).length
+	report["claimWars.lapsed.n"] = claimWars.filter(
+		(war) => war.outcome === "lapsed",
+	).length
+	report["claimWars.years.mean"] =
+		claimWars.reduce((sum, war) => sum + war.years, 0) /
+		Math.max(1, claimWars.length)
+	report["claimWars.years.max"] = Math.max(
+		0,
+		...claimWars.map((war) => war.years),
+	)
 	for (const [pact, count] of Object.entries(window.backingRepaid))
 		report[`backing.repaid.${pact}.n`] = count
 	report["tribute.withheld.n"] = window.tributeWithheld

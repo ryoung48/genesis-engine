@@ -25,6 +25,7 @@ Start here for the historical simulation’s rules and implementation references
 ## Politics
 
 - [Government, title holders and succession](politics/government-and-succession.md)
+- [Personal unions and foreign claims](politics/personal-unions.md)
 - [Title ranks and de jure hierarchy](politics/title-hierarchy.md)
 - [Armies, battles and war settlement](politics/armies-and-wars.md)
 - [Diplomatic attitudes, alliances and vassalage](politics/diplomacy-and-subjects.md)

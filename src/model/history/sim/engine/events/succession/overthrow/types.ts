@@ -18,6 +18,11 @@ export interface SeeksParams {
 	rng: SharedRng
 }
 
+export interface StandsParams {
+	state: HistoryState
+	war: War
+}
+
 export interface EnthroneParams {
 	state: HistoryState
 	war: War

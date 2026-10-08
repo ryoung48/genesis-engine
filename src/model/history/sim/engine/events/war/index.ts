@@ -13,11 +13,13 @@ import type {
 	ListWarTargetsParams,
 	MeasureWarTargetParams,
 	NextEventParams,
+	PressClaimParams,
 	RebelParams,
 	RunWarParams,
 	SeedInterstateWarsParams,
 	SeedRebellionsParams,
 	SeedWarStageParams,
+	ViableTargetsParams,
 	WarCandidate,
 	WarTarget,
 } from "@/model/history/sim/engine/events/war/types"
@@ -86,7 +88,7 @@ function listWarCandidates({
 				!DERIVE.provinceWars({ state, p: nb }).some((idx) => {
 					const war = state.wars[idx]
 					return (
-						war.goal !== "conquest" &&
+						STATE.isRebelGoal({ goal: war.goal }) &&
 						war.endTime === undefined &&
 						STATE.warSides({ war }).rebels === nb &&
 						war.attacker !== nation &&
@@ -170,7 +172,7 @@ function seedWarStage({
 	goal,
 	forceOccupied,
 }: SeedWarStageParams): void {
-	const rebel = goal !== "conquest"
+	const rebel = STATE.isRebelGoal({ goal })
 	const occupationCandidates = getDefenderOccupationCandidates({
 		state,
 		attacker,
@@ -225,7 +227,8 @@ function seedWarStage({
 				: undefined,
 		},
 	})
-	if (war.goal !== "conquest") BACKING.recruit({ state, war, rng })
+	if (STATE.isRebelGoal({ goal: war.goal }))
+		BACKING.recruit({ state, war, rng })
 	MILITARY.reconcile({ state })
 	for (const nation of [attacker, defender]) {
 		const fraction = rng.uniform(0.5, 0.9) * (lateStage ? 0.7 : 1)
@@ -396,7 +399,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 // Armies take the field when a war is declared.
 function start(params: StartWarParams): void {
 	if (
-		params.goal === "conquest" &&
+		!STATE.isRebelGoal({ goal: params.goal }) &&
 		TRUCE.active({
 			state: params.state,
 			a: params.attacker,
@@ -406,7 +409,7 @@ function start(params: StartWarParams): void {
 		return
 	const war = STATE.startWar(params)
 	if (war) {
-		if (war.goal !== "conquest")
+		if (STATE.isRebelGoal({ goal: war.goal }))
 			BACKING.recruit({ state: params.state, war, rng: params.rng })
 		MILITARY.reconcile({ state: params.state })
 		MILITARY.mobilize({ state: params.state, war })
@@ -531,17 +534,52 @@ function rebel({
 	return true
 }
 
+function canDeclare({ state, nation }: ViableTargetsParams): boolean {
+	return (
+		FIELDS.prov.parent.get({ state, p: nation }) < 0 &&
+		!STATE.getRulerRelation({ state, nation }) &&
+		!REGENCY.weak({ state, realm: nation })
+	)
+}
+
+function viableTargets({ state, nation }: ViableTargetsParams): WarTarget[] {
+	return listWarCandidates({ state, nation })
+		.filter((t) => t.threshold > 0 && !t.hasWar)
+		.map((candidate) => measureWarTarget({ state, nation, candidate }))
+		.filter((t) => t.w < t.threshold)
+}
+
+function pressClaim({
+	state,
+	attacker,
+	defender,
+	claimant,
+	rng,
+}: PressClaimParams): void {
+	if (!canDeclare({ state, nation: attacker })) return
+	const target = viableTargets({ state, nation: attacker }).find(
+		(t) => t.n === defender,
+	)
+	if (
+		!target ||
+		!GOVERNOR.startsWar({
+			state,
+			realm: attacker,
+			threat: target.w,
+			roll: rng.random(),
+		})
+	)
+		return
+	start({ state, attacker, defender, rng, goal: "claim", claimant })
+}
+
 function runWar({ state, nation, rng }: RunWarParams): void {
 	const parent = FIELDS.prov.parent.get({ state, p: nation })
 	const sovereignNation = STATE.getSovereign({ state, p: nation })
-	const rulerRelation = STATE.getRulerRelation({ state, nation })
 
 	// Only independent nations with a strong crown start wars
-	if (parent < 0 && !rulerRelation && !REGENCY.weak({ state, realm: nation })) {
-		const viable = listWarCandidates({ state, nation })
-			.filter((t) => t.threshold > 0 && !t.hasWar)
-			.map((candidate) => measureWarTarget({ state, nation, candidate }))
-			.filter((t) => t.w < t.threshold)
+	if (canDeclare({ state, nation })) {
+		const viable = viableTargets({ state, nation })
 
 		if (viable.length > 0) {
 			// Favor closer viable opponents, matching the old history model.
@@ -617,6 +655,8 @@ export const WAR = {
 		MILITARY.mutate({ state: params.state, action: () => initWar(params) }),
 	runWar: (params: RunWarParams) =>
 		MILITARY.mutate({ state: params.state, action: () => runWar(params) }),
+	pressClaim: (params: PressClaimParams) =>
+		MILITARY.mutate({ state: params.state, action: () => pressClaim(params) }),
 	rebel: (params: RebelParams) =>
 		MILITARY.mutate({ state: params.state, action: () => rebel(params) }),
 }

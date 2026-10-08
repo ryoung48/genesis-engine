@@ -99,9 +99,21 @@ function applyDerivedParents({
 	for (const member of members)
 		if (state.districtSeat[member]) state.districtRank[member] = top - 1
 	FIELDS.prov.parent.set({ state, p: nation, value: -1 })
+	const depthOf = (member: number): number => {
+		let depth = 0
+		for (let at = next[member]; at >= 0 && depth <= state.P; at = next[at])
+			depth++
+		return depth
+	}
+	const depths = new Map(members.map((member) => [member, depthOf(member)]))
 	const ordered = members
 		.filter((member) => member !== nation)
-		.sort((a, b) => state.seatRank[b] - state.seatRank[a] || a - b)
+		.sort(
+			(a, b) =>
+				(depths.get(a) ?? 0) - (depths.get(b) ?? 0) ||
+				state.seatRank[b] - state.seatRank[a] ||
+				a - b,
+		)
 	for (const member of ordered)
 		FIELDS.prov.parent.set({ state, p: member, value: next[member] })
 }

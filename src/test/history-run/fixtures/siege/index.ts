@@ -28,6 +28,7 @@ function create(): SiegeFixture {
 		backers: [],
 		refusedCalls: new Set(),
 		originalCrownRuler: -1,
+		claimant: -1,
 		deployed: { 0: { levy: 200, regular: 0 }, 1: { levy: 200, regular: 0 } },
 		participants: { 0: "attacker", 1: "defender" },
 		candidates: { attacker: [], defender: [] },

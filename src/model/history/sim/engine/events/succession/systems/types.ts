@@ -15,6 +15,8 @@ export interface SuccessionChoice {
 	pretender: number
 	pretenderSeat: number
 	supportingSeats: number[]
+	// -1 when no foreign ruler stands in a disputed line.
+	foreignClaimant: number
 }
 
 export interface Elector {

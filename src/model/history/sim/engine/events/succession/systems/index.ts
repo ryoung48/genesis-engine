@@ -45,6 +45,7 @@ const NEW_HOUSE: SuccessionChoice = {
 	pretender: -1,
 	pretenderSeat: -1,
 	supportingSeats: [],
+	foreignClaimant: -1,
 }
 
 function now(state: HistoryState): number {
@@ -73,14 +74,15 @@ function inheritable({ state, realm, person }: ElectableParams): boolean {
 		return false
 	const seats = state.people.persons.heldSeats[person]
 	if (seats.includes(realm)) return false
-	return seats
-		.filter((seat) => STATE.isSovereign({ state, p: seat }))
-		.every(
-			(seat) =>
-				STATE.unionSenior({ state, p: realm }) ===
-					STATE.unionSenior({ state, p: seat }) ||
-				STATE.canUnite({ state, a: realm, b: seat }),
-		)
+	const crowns = seats.filter((seat) => STATE.isSovereign({ state, p: seat }))
+	if (crowns.some((seat) => STATE.isPressing({ state, p: seat }))) return false
+	if (crowns.length > 0 && STATE.isPressing({ state, p: realm })) return false
+	return crowns.every(
+		(seat) =>
+			STATE.unionSenior({ state, p: realm }) ===
+				STATE.unionSenior({ state, p: seat }) ||
+			STATE.canUnite({ state, a: realm, b: seat }),
+	)
 }
 
 function adultAvailable({ state, person }: PersonParams): boolean {
@@ -89,10 +91,29 @@ function adultAvailable({ state, person }: PersonParams): boolean {
 
 // Elected and appointed rulers are adults of the culture's preferred sex.
 function electable({ state, realm, person }: ElectableParams): boolean {
-	if (!adultAvailable({ state, person })) return false
+	return (
+		adultAvailable({ state, person }) && preferredSex({ state, realm, person })
+	)
+}
+
+function preferredSex({ state, realm, person }: ElectableParams): boolean {
 	const preference = preferenceOf({ state, realm })
 	if (preference === "none") return true
 	return state.people.persons.sex[person] === (preference === "male" ? 0 : 1)
+}
+
+function foreignClaimable({ state, realm, person }: ElectableParams): boolean {
+	const people = state.people
+	return (
+		PEOPLE.aliveAt({ people, person, time: now(state) }) &&
+		!AGEING.incapable({ people, person }) &&
+		age({ state, person }) >= ADULT_AGE &&
+		preferredSex({ state, realm, person }) &&
+		people.persons.heldSeats[person].filter((seat) =>
+			STATE.isSovereign({ state, p: seat }),
+		).length === 1 &&
+		inheritable({ state, realm, person })
+	)
 }
 
 function preferenceOf({ state, realm }: RealmParams): GenderPreference {
@@ -311,8 +332,17 @@ function singleHeir({
 		pretender: -1,
 		pretenderSeat: -1,
 		supportingSeats: [],
+		foreignClaimant: -1,
 	}
 	if (!disputed({ state, realm, person: heir })) return choice
+	choice.foreignClaimant = HEIRS.of({
+		people,
+		dying,
+		time: now(state),
+		preference,
+		eligible: (person) =>
+			person !== heir && foreignClaimable({ state, realm, person }),
+	}).heir
 	const rival = HEIRS.of({
 		people,
 		dying,
@@ -366,6 +396,7 @@ function election(params: ChooseParams): SuccessionChoice {
 			pretender: -1,
 			pretenderSeat: -1,
 			supportingSeats: [],
+			foreignClaimant: -1,
 		}
 	const totalWeight = electors.reduce((sum, e) => sum + e.weight, 0)
 	const candidates: Candidate[] = []
@@ -431,6 +462,7 @@ function election(params: ChooseParams): SuccessionChoice {
 		supportingSeats: electors.flatMap((elector, i) =>
 			choices[i] === pretenderIndex ? [elector.seat] : [],
 		),
+		foreignClaimant: -1,
 	}
 }
 
@@ -450,6 +482,7 @@ function appointment({ state, realm, rng }: ChooseParams): SuccessionChoice {
 		pretender: -1,
 		pretenderSeat: -1,
 		supportingSeats: [],
+		foreignClaimant: -1,
 	}
 }
 
