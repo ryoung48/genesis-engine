@@ -4,8 +4,8 @@ import type {
 	BetrothParams,
 	ReleaseParams,
 } from "@/model/history/sim/people/betrothal/types"
-import { KINSHIP } from "@/model/history/sim/people/kinship"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 
 // CK3: the AI betroths no one under 12, and the betrothed marry as adults at
 // 16. Its age-gap penalty in the spouse finder starts past 5 years.
@@ -49,8 +49,8 @@ function fulfil({
 		const partner = table.betrothed[person]
 		if (partner < person) continue
 		if (
-			KINSHIP.prohibitedMatch({
-				context: table,
+			!MARRIAGE_LAW.permits({
+				people,
 				a: person,
 				b: partner,
 				cache: null,

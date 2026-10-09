@@ -97,6 +97,8 @@ export function buildStringIdDistributionForProvinces(params: {
 	colorById?: Map<string, [number, number, number]>
 	rgbToCss: (rgb: [number, number, number]) => string
 	fallbackColor: string
+ // [JUSTIFICATION] Only entity charts provide selection handlers.
+ selectionForId?: (id: string) => (() => void) | undefined
 }): DistributionChartBucket[] {
 	const {
 		idByProvince,
@@ -114,6 +116,7 @@ export function buildStringIdDistributionForProvinces(params: {
 	}
 	return Array.from(counts.entries())
 		.map(([id, count]) => ({
+			onSelect: params.selectionForId?.(id),
 			label: nameById?.get(id) ?? id,
 			count,
 			color: colorById?.get(id) ? rgbToCss(colorById.get(id)!) : fallbackColor,

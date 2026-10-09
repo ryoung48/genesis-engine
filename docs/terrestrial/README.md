@@ -13,8 +13,11 @@ Start here for the historical simulation’s rules and implementation references
 - **Held seats** are titles belonging to a person. The highest-ranked seat is primary (lowest seat ID breaks ties); title ownership and residence are separate.
 - **De jure hierarchy** is the normative title structure, which may differ from actual territorial ownership.
 
+- **Religion** belongs to a family; both partitions and their descriptive doctrines are fixed at world generation.
+
 ## People
 
+- [Religions and doctrines](people/religions-and-doctrines.md)
 - [Simulated people and ruling families](people/overview.md)
 - [Families, births and lifespans](people/families-and-lifecycle.md)
 - [Marriage, betrothal and family alliances](people/marriage-and-alliances.md)
@@ -44,3 +47,5 @@ Start here for the historical simulation’s rules and implementation references
 - [History record ownership and memory usage](mechanics/record-memory.md)
 
 The topic references describe the implemented rules. Mechanics covers logging, transfer, queries, pipeline performance and memory; each historical measurement retains its own workload and limits. Proposed features remain in `plans/`, not in these references.
+
+Religion sets marriage customs and constrains culture gender systems; sexual orientation is recorded without mechanical effects. See [marriage](people/marriage-and-alliances.md) and [attributes](people/attributes-traits-and-stress.md).

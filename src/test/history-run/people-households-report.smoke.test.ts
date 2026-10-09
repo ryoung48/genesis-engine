@@ -5,6 +5,7 @@ import { AFFILIATION } from "@/model/history/record/people/query/affiliation"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 import { RNG } from "@/model/shared/random/rng"
 import { HOUSEHOLDS_REPORT } from "@/test/history-run/report/households"
 
@@ -145,6 +146,7 @@ it("counts living observations, crowns and boundary samples independently of reg
 it("joins unmoved households to parent-only territorial transitions and excludes boundaries", () => {
 	const people = PEOPLE.create(6)
 	people.household = {
+		lawOfRealm: () => MARRIAGE_LAW.defaultLaw,
 		heritageOfCulture: () => -1,
 		religionOfRealm: () => -1,
 		realmOf: () => 0,

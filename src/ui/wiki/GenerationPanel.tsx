@@ -44,6 +44,8 @@ import {
 	type PersonWikiData,
 	PersonWikiPage,
 } from "@/ui/wiki/person/PersonWikiPage"
+import { ReligionWikiPage } from "@/ui/wiki/religion/ReligionWikiPage"
+import type { ReligionWikiData } from "@/ui/wiki/religion/types"
 import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
 import { GenerationTimingChart } from "@/ui/wiki/timing/GenerationTimingChart"
 import {
@@ -145,6 +147,7 @@ interface GenerationPanelProps {
 	 * timeline mention), this wiki page replaces the navigator the same way --
 	 * mutually exclusive with the pages above. */
 	personWiki: PersonWikiData | null
+	religionWiki: ReligionWikiData | null
 }
 
 export const GenerationPanel: React.FC<GenerationPanelProps> = ({
@@ -204,6 +207,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	organizationWiki,
 	warWiki,
 	personWiki,
+	religionWiki,
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
@@ -476,6 +480,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						<OrganizationWikiPage organization={organizationWiki} />
 					) : warWiki ? (
 						<WarWikiPage war={warWiki} />
+					) : religionWiki ? (
+						<ReligionWikiPage religion={religionWiki} />
 					) : personWiki ? (
 						<PersonWikiPage person={personWiki} />
 					) : (

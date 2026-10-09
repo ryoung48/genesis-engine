@@ -10,13 +10,12 @@ Code: `src/model/history/sim/people/family`, `betrothal` and `sim/engine/events/
 
 Once a year (`FAMILY.runYear`) all living tracked noble-family adults can participate, including grandchildren, nieces/nephews and retained outsiders. This does not create population-level people.
 
-1. **Who seeks.** Unmarried or widowed women aged 16–44 and men 18–69, unbetrothed; each participates with 35% chance. Royal minors keep the narrower ruling-family rules below. The participating IDs and seeker order stay fixed for the pass.
+1. **Who seeks.** Unmarried or widowed women aged 16–44 and men 18–69, unbetrothed and without a patron; each participates with 35% chance. Royal minors keep the narrower ruling-family rules below. The participating IDs and seeker order stay fixed for the pass.
 2. **Foreign search.** The existing roll is 80% in sovereign alliance-marrying realms and 30% otherwise. When it succeeds, search neighbouring realms, then their neighbours. Royal blood (a sovereign or their child) searches royal candidates in both rings before other candidates. Rank across the whole current ring, with lowest person ID breaking ties.
 3. **Domestic search.** If the foreign roll fails or finds no mutually acceptable pair, search participating adults in the seeker's live realm, royal candidates first for royal blood. Minors cannot form domestic betrothals.
 4. **Outsider fallback.** After all allowed searches fail, an adult gets one outsider opportunity with probability `min(0.5, max(0, age−25)/20)`: zero through 25, 25% at 30, 50% from 35. This uses hash channel 140, salt completed age-year, and no shared RNG draw. The outsider is generated only on success, has unknown parents and an age clamped to the adult bounds. Existing generation draws remain.
 5. **Onboarding and rejection.** Every instantiated outsider receives the ordinary survivor health replay, creation snapshot and one mortality projection for `[Y,Y+1)` before either score. A rejected outsider remains unmarried and tracked; it is not offered elsewhere in this fixed cohort. Later health, death scheduling and yearly participation apply normally. There is no replacement roll or special royal waiting cutoff.
 
-Close blood relatives are prohibited: each person's ancestor set holds themselves and their known ancestors up to four generations back, and any intersection vetoes weddings and betrothals before scoring. This is the fourth degree of the Fourth Lateran Council (1215, canon 50): third cousins and closer are kin, more distant relatives may marry. Unknown parents never intersect. Traversal is cycle-safe and cached only for this pass. The veto does not claim unknown-parent outsiders are biologically unrelated. Completed marriages remain intact. Starting ancestry is finalized before traits and all proposed historical weddings pass this same veto.
 
 Each directed score is:
 
@@ -47,7 +46,7 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 - **Result.** Either party under 16 makes a betrothal (`betrothed` and `betrothedAt` on both); two adults wed as before. The betrothal forms or binds the marriage alliance at once.
 - **Fulfilment.** Each yearly pass weds every living pair where both are 16+, by the usual host rule. Heiress unions apply. Betrothed men therefore marry at 16.
 - **Breaking.** Three causes:
-  - *kinship*: the four-generation ancestor veto fails at fulfilment; released once without a wedding;
+  - *kinship*: either faith bars the relationship at fulfilment; released once without a wedding;
   - *death*: either party died (released at the death);
   - *alliance*: the review finds no marriage alliance between the pair's realms (war, lost sovereignty, a government that stops marrying for alliance, or a succession that moves the betrothed out of the ruler's family). A betrothal whose alliance cannot form is broken at once.
 - **Start.** After all starting families, district grants, patricians and household reconciliation, every eligible royal minor seeks once in canonical seat/person order, using a separate keyed source and the same veto/scorer/projection. Adult seekers are empty; this pass creates betrothals and settles alliances, without starting weddings or unions.
@@ -57,3 +56,22 @@ Royal houses promise their children before they come of age, as in CK3 (`BETROTH
 - A wedding or betrothal between the ruling families (ruler, children, siblings) of two sovereign, alliance-marrying realms makes them allies, unless they are at war or in a subject or union bond. The note is `marriage alliance`.
 - While a living marriage or betrothal joins the two ruling families, the alliance does not re-roll in diplomacy. When none is left, the marriage alliance ends, its betrothals are broken, and the alliance drifts like any other.
 - A regent parent born into another ruling house holds the alliance with that house's realm the same way while she governs.
+
+## Religion, kinship and consorts
+
+Every marriage, betrothal fulfilment and consort search uses `MARRIAGE_LAW.permits`: opposite sex, then the kinship bars of both partners' realm religions. Ancestral couples remain monogamous and pass this gate. Orientation does not affect marriage or fertility; the default CK3 same-sex-marriage rule is disabled.
+
+`KINSHIP.relation` records ancestors and their depths through four generations, including self at zero. Close kin are direct ancestors, siblings and half-siblings; uncle/niece includes aunt/nephew; cousins are first cousins; other shared ancestry is distant. Relatedness sums `0.5^(da+db)` over nearest common ancestors. Full siblings and parent/child have 0.5, half-siblings and uncle/niece 0.25, first cousins 0.125, second cousins 0.03125. Collapsed pedigree paths are counted once per ancestor.
+
+| Consanguinity | Close | Uncle/niece | Cousins | Distant |
+|---|---|---|---|---|
+| restricted | barred | barred | barred | allowed |
+| cousins | barred | barred | allowed | allowed |
+| aunt_nephew_and_uncle_niece | barred | allowed | allowed | allowed |
+| unrestricted | allowed | allowed | allowed | allowed |
+
+Either partner's bar may refuse the pair. A barred betrothal is released once with cause `kinship`. Doctrine-less worlds use restricted monogamy.
+
+After primary marriages, polygamous and concubine religions permit up to three additional partners for men aged 18–69. Desired counts by standing (untitled, county, duchy, kingdom, empire, hegemony) are `[0,0,1,2,3,3]`. Each eligible man seeks with the existing 0.35 chance using hash channel 141 and calendar year. Same-realm unmarried adult women without a betrothal or patron are scored with the ordinary reciprocal marriage score, without an alliance; highest acceptable total wins, lowest ID breaks ties. One tie is added per man per year.
+
+Additional wives and concubines are stored as consorts with a patron, use wedding residence, and form no marriage alliance. Death clears the tie. A widower retains consorts without promoting one; women with a patron do not seek a spouse. Their children name the patron as father and enter ordinary family and succession rules. Historical person pages show the recorded ties and their kind.

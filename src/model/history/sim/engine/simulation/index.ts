@@ -28,6 +28,7 @@ import type {
 } from "@/model/history/sim/engine/simulation/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { StageTiming } from "@/model/pipelines/types"
 import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
@@ -82,6 +83,8 @@ function initHistory(params: {
 	heritages?: GenesisPartition
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
+	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
+	religionDoctrine?: ReligionDoctrine
 	era?: SocietyEra
 	seed: number
 	startYear?: number
@@ -115,6 +118,7 @@ function initHistory(params: {
 				cultures: params.cultures,
 				heritages: params.heritages,
 				religions: params.religions,
+				religionDoctrine: params.religionDoctrine,
 				startYear,
 				seed: params.seed,
 				waterAccess: params.waterAccess,

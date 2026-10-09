@@ -4,7 +4,7 @@ Scope: `:history`.
 
 Attributes, personality, inherited traits and stress describe the same [simulated people](overview.md). They influence family and political outcomes; `CHARACTER` is the code API for reading those properties.
 
-People have six base attributes, three personality traits, three congenital ladders and fifteen independently inherited congenital traits. The table stores five packed innate columns and a sixth column for stress. Pure helpers decode the columns; records preserve the innate data and stress level changes for queries at a selected date. "Hook" is reserved for the Crusader Kings III mechanic of that name (a claim one character holds over another) and is not used here; what archived plans and saved reports call a hook is an *effect* in this document, as listed in the glossary of `plans/archive/people-1b-rename-hooks.md`.
+People have six base attributes, three personality traits, three congenital ladders and seventeen congenital traits. Fifteen traits use carried-gene inheritance; Inbred and Pure-blooded use parental relatedness and active inheritance. The table stores five packed innate columns and a sixth column for stress. Pure helpers decode the columns; records preserve the innate data and stress level changes for queries at a selected date. "Hook" is reserved for the Crusader Kings III mechanic of that name (a claim one character holds over another) and is not used here; what archived plans and saved reports call a hook is an *effect* in this document, as listed in the glossary of `plans/archive/people-1b-rename-hooks.md`.
 
 Code: `sim/people/attributes`, `traits`, `character`, `stress`; `sim/engine/governor`, `events/people/stress`, and `events/battle/command`; `record/people/query`; `test/history-run/report/people-traits`, all under `src/model/history` except the report.
 
@@ -14,7 +14,7 @@ Code: `sim/people/attributes`, `traits`, `character`, `stress`; `sim/engine/gove
 
 When royal marriage initialization changes a queen's parents and name seed, `PEOPLE.redraw` redraws her and every descendant in birth order. Existing births and dates stand; only character is recalculated. Her starting children were conceived with provisional fertility, an accepted limitation until starting-family backfill is implemented. No governor is rehomed during initialization.
 
-Packing: `bases` uses six four-bit values; `personality` uses three six-bit codes; `grades` uses seven bits per ladder (active grade plus three, carried good tier, carried bad tier); `congenital` and `carried` are fifteen-bit sets. `CHARACTER.of` reads a person's packed values for pure helpers.
+Packing: `bases` uses six four-bit values; `personality` uses three six-bit codes; `grades` uses seven bits per ladder (active grade plus three, carried good tier, carried bad tier); `congenital` and `carried` are seventeen-bit active and fifteen-bit carried sets. `CHARACTER.of` reads a person's packed values for pure helpers.
 
 ## Attributes and personality
 
@@ -202,10 +202,18 @@ History report output preserves completed report folders; the runner does not pr
 
 The trait names, modifiers and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt`, `common/script_values/00_stress_values.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Effect caps and the annual stress cadence are simulation design choices documented in the character plan.
 
-Attraction and role-scoped opinion values are data only in this stage, and marriage selection is unchanged. Health values and the ageing conditions are live: see [health](health-and-mortality.md). Childhood skill rolls, lifestyle perks, inbreeding and old-record compatibility are excluded.
+Attraction and role-scoped opinion affect marriage scoring. Health values and the ageing conditions are live: see [health](health-and-mortality.md). Childhood skill rolls, lifestyle perks and old-record compatibility are excluded.
 
 ## Marriage attraction and scoped reputation
 
 [Marriage scoring](marriage-and-alliances.md) reads attraction from the same trait table as other modifiers: Beauty grades contribute −30/−20/−10/0/+10/+20/+30; positive Physique +5/+10/+15, negative Physique −2/−3 contribute −5/−10 (Delicate zero). Brave/Craven contribute +10/−10; Gregarious and Compassionate +5; Shy, Callous and Gluttonous −5. Hunchbacked/Scaly −30, Dwarf −20, Clubfooted/Spindly/Lunatic/Possessed −10 and Giant −5. Carried traits do nothing. Cumulative ageing and Blind attraction effects are added by the live adapter.
 
 The [opinion evaluator](opinion-and-relationships.md) uses general reputation for Sadistic and Albino (−10 each). Arbitrary (−5), Hunchbacked, Bleeder, Wheezing, Scaly and Lunatic (−10 each) apply only from a direct district holder toward their actual sovereign holder, once across all held seats. These are not general marriage penalties.
+
+## Orientation and related-parent births
+
+Every person has a lifelong orientation from the name seed, hash channel 420: heterosexual 89%, homosexual 5%, bisexual 5%, asexual 1%. It is visible from age ten and changes neither marriage eligibility nor fertility. Redrawing traits leaves it fixed.
+
+The congenital table has seventeen traits. Bits 15 and 16 are Inbred and Pure-blooded, with no carried state. With parental relatedness `r`, Inbred has independent chances `0.3*r*max(0,1-0.5*pureBloodedParents)` and 0.15 from each Inbred parent. Only if not Inbred, Pure-blooded has chance `0.03*r`, plus independent inheritance of 0.15 from one parent or 0.75 from two. Unknown parents give zero relatedness. Hash channels 400–405 isolate these choices from shared streams.
+
+Inbred gives diplomacy/martial/stewardship/intrigue/learning −5, prowess −2, health −1.5, fertility −0.5, attraction −30 and vassal opinion −10. Pure-blooded gives health +0.25 and fertility +0.1. CK3 1.19.0.6 supplies the multipliers and effects; interpreting its native relatedness calculation and applying the pure-blooded reduction to parents are explicit modelling choices. The nine `enables_inbred` traits retain their existing carried-gene inheritance; no undocumented native extra effect is assumed.

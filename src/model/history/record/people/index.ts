@@ -16,7 +16,7 @@ import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { RegentRow, SeatRow } from "@/model/history/sim/people/log/types"
 import type { DeathCause } from "@/model/history/sim/people/types"
 
-const BYTE_COLUMNS = ["sex", "healthBand", "deathCause"] as const
+const BYTE_COLUMNS = ["sex", "orientation", "healthBand", "deathCause"] as const
 const INT_COLUMNS = [
 	"lastHealth",
 	"father",
@@ -40,6 +40,7 @@ const FLOAT_COLUMNS = [
 ] as const
 const SNAPSHOT_COLUMNS = [
 	"sex",
+	"orientation",
 	"healthBand",
 	"dynasty",
 	"culture",
@@ -58,6 +59,7 @@ function create(): PeopleRecord {
 		persons: {
 			count: 0,
 			sex: new Uint8Array(0),
+			orientation: new Uint8Array(0),
 			birthTimeMs: new Float64Array(0),
 			deathTimeMs: new Float64Array(0),
 			father: new Int32Array(0),
@@ -89,6 +91,8 @@ function create(): PeopleRecord {
 		residencesOf: new Map(),
 		stressOf: new Map(),
 		childrenOf: new Map(),
+		consorts: [],
+		consortsOf: new Map(),
 		marriages: [],
 		marriagesOf: new Map(),
 		tenures: [],
@@ -118,6 +122,7 @@ function person(params: RecordPersonParams): RecordPerson | null {
 	return {
 		id,
 		sex: persons.sex[id],
+		orientation: persons.orientation[id],
 		birthTimeMs: persons.birthTimeMs[id],
 		deathTimeMs: persons.deathTimeMs[id],
 		father: persons.father[id],
@@ -409,6 +414,18 @@ function append({
 				if (betrothal < 0) break
 				record.betrothals[betrothal].endTimeMs = recordTime(row.time)
 				record.betrothals[betrothal].cause = row.cause
+				break
+			}
+			case "consort": {
+				const index = record.consorts.length
+				record.consorts.push({
+					patron: row.patron,
+					partner: row.partner,
+					consortKind: row.consortKind,
+					startTimeMs: recordTime(row.time),
+				})
+				pushIndex({ index: record.consortsOf, key: row.patron, value: index })
+				pushIndex({ index: record.consortsOf, key: row.partner, value: index })
 				break
 			}
 			case "wedding": {

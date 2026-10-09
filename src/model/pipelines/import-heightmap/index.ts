@@ -545,6 +545,7 @@ function importGenesisWorld({
 
 	t0 = performance.now()
 	const provinceSociety = DERIVE_PROVINCE_SOCIETY.deriveProvinceSociety({
+		isEarthImport: true,
 		mesh,
 		params: genesisParams,
 		post,
@@ -625,6 +626,7 @@ function importGenesisWorld({
 		religions: provinceSociety.religions,
 		religionFamilies: provinceSociety.religionFamilies,
 		religionTypes: provinceSociety.religionTypes,
+		religionDoctrine: provinceSociety.religionDoctrine,
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		tradeGoods: post.tradeGoods,

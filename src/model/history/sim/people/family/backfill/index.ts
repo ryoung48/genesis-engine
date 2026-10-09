@@ -4,7 +4,7 @@ import { MATCH_SCORING } from "@/model/history/sim/people/family/match-scoring"
 import type { MarriageCandidateContext } from "@/model/history/sim/people/family/match-scoring/types"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import { KINSHIP } from "@/model/history/sim/people/kinship"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 import type {
 	OpinionContext,
 	OpinionPerson,
@@ -12,8 +12,7 @@ import type {
 
 function acceptable({ people, a, b, time }: BackfillPairParams): boolean {
 	const table = people.persons
-	if (KINSHIP.prohibitedMatch({ context: table, a, b, cache: null }))
-		return false
+	if (!MARRIAGE_LAW.permits({ people, a, b, cache: null })) return false
 	const context: OpinionContext = {
 		personOf: (id): OpinionPerson | null => {
 			if (id < 0 || id >= table.sex.length || table.birth[id] > time)

@@ -3,10 +3,12 @@ import type {
 	DerivedSociety,
 	DeriveSocietyParams,
 } from "@/model/history/sim/derive/types"
+import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import { HERITAGE } from "@/model/history/sim/heritage"
 import { NATIONS } from "@/model/history/sim/nations"
 import { RELIGION } from "@/model/history/sim/religion"
+import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
 import { ERAS } from "@/model/society/eras"
 
 // The political layer of a procedurally generated history's initial conditions:
@@ -27,6 +29,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 	let heritages: DerivedSociety["heritages"]
 	let religions: DerivedSociety["religions"]
 	let religionFamilies: DerivedSociety["religionFamilies"]
+	let religionDoctrine: DerivedSociety["religionDoctrine"]
 	let religionTypes: DerivedSociety["religionTypes"]
 	let nations: DerivedSociety["nations"]
 
@@ -124,9 +127,21 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 				cultureCount: cultures!.count,
 				provinceCount,
 				cultureAssignment: cultures!.assignment,
-				governmentType: nations?.governmentType,
 				migrationWave: params.population?.migrationWave,
-				sizeWeight: eraConfig.governmentSizeWeight ?? 0.55,
+				era: eraConfig.id,
+				seed: params.seed,
+			})
+			if (!params.isEarthImport)
+				religionDoctrine = RELIGION_DOCTRINE.assign({
+					religionTypes,
+					religionFamilies,
+					familyCount: families.count,
+					seed: params.seed,
+				})
+			cultures!.genderSystems = GENDER_SYSTEM.restrict({
+				systems: cultures!.genderSystems!,
+				cultureToReligion: religions!.assignment,
+				doctrine: religionDoctrine,
 				seed: params.seed,
 			})
 			religions!.colors = GRAPH_PARTITION.deriveChildColors({
@@ -161,6 +176,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 		religions,
 		religionFamilies,
 		religionTypes,
+		religionDoctrine,
 	}
 }
 

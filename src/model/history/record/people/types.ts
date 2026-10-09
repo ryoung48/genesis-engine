@@ -15,6 +15,7 @@ import type {
 export interface RecordPerson extends Character {
 	id: number
 	sex: number
+	orientation: number
 	birthTimeMs: number
 	deathTimeMs: number
 	father: number
@@ -31,6 +32,7 @@ export interface RecordPerson extends Character {
 export interface PersonColumns {
 	count: number
 	sex: Uint8Array
+	orientation: Uint8Array
 	birthTimeMs: Float64Array
 	deathTimeMs: Float64Array
 	father: Int32Array
@@ -65,6 +67,13 @@ export interface HealthRows {
 	// The band's code, or the condition's level after the change.
 	value: Int8Array
 	prev: Int32Array
+}
+
+export interface RecordConsort {
+	patron: number
+	partner: number
+	consortKind: "wife" | "concubine"
+	startTimeMs: number
 }
 
 export interface RecordMarriage {
@@ -130,6 +139,8 @@ export interface PeopleRecord {
 	stressOf: Map<number, RecordStress[]>
 	persons: PersonColumns
 	childrenOf: Map<number, number[]>
+	consorts: RecordConsort[]
+	consortsOf: Map<number, number[]>
 	marriages: RecordMarriage[]
 	marriagesOf: Map<number, number[]>
 	tenures: RecordTenure[]

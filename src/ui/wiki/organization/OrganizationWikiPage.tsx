@@ -85,6 +85,8 @@ export interface OrganizationWikiData {
 	 * don't currently mention wars, but WikiTimelineSection's refs are shared
 	 * with NationWikiPage, so this needs a real (if unused) handler. */
 	onSelectWar: (warId: number) => void
+	onSelectReligion: (key: string) => void
+	resolveReligion: (key: string) => number | null
 	onSelectPerson: (personId: number) => void
 }
 
@@ -300,6 +302,8 @@ export function OrganizationWikiPage({
 					onSelectOrganization: () => undefined,
 					onSelectWar: organization.onSelectWar,
 					onSelectPerson: organization.onSelectPerson,
+					onSelectReligion: organization.onSelectReligion,
+					resolveReligion: organization.resolveReligion,
 					onSelectDate: organization.onSelectDate,
 				}}
 			/>

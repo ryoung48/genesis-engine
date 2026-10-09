@@ -1,4 +1,5 @@
 import type { Attribute } from "@/model/history/sim/people/attributes/types"
+import { KINSHIP } from "@/model/history/sim/people/kinship"
 import type {
 	Character,
 	CompatibilityParams,
@@ -11,6 +12,7 @@ import type {
 	IncomeParams,
 	InheritParams,
 	LadderDrawParams,
+	OppositesParams,
 	PersonalityTrait,
 	ReputationParams,
 	ScalarTraitModifier,
@@ -111,7 +113,11 @@ const CONGENITAL_ROWS: TraitRow[] = [
 	["depressed", -1, -1, -1, -1, 0, 0, -0.5, -0.1, 0, 0, 0, 0, 0, 0, 0],
 	["lunatic", 0, 0, 0, 0, 0, 0, -0.25, 0, -10, 0, -10, 0, 0, 0, 0],
 	["possessed", 0, 0, 0, 0, 0, 0, -0.5, 0, -10, 0, 0, 0, 0, 0, 0],
+	["inbred", -5, -5, -5, -5, -5, -2, -1.5, -0.5, -30, 0, -10, 0, 0, 0, 0],
+	["pure_blooded", 0, 0, 0, 0, 0, 0, 0.25, 0.1, 0, 0, 0, 0, 0, 0, 0],
 ]
+const INBRED_RELATEDNESS_MULT = 0.3
+const PUREBLOODED_INBRED_RELATEDNESS_MULT = 0.03
 const CONGENITAL = CONGENITAL_ROWS.map(definition)
 const GROUPS = [
 	[0, 1],
@@ -364,7 +370,7 @@ function draw({
 	}
 	let congenital = 0
 	let carried = 0
-	for (let index = 0; index < CONGENITAL.length; index++) {
+	for (let index = 0; index < 15; index++) {
 		const bit = 1 << index
 		const p = parents.map((parent) =>
 			parent < 0
@@ -386,6 +392,34 @@ function draw({
 		if (result.active && !(index === 1 && congenital & 1)) congenital |= bit
 		else if (result.carried) carried |= bit
 	}
+	const r = KINSHIP.relation({
+		context: table,
+		a: parents[0],
+		b: parents[1],
+		cache: null,
+	}).relatedness
+	const inbred = parents.map(
+		(parent) => parent >= 0 && Boolean(table.congenital[parent] & (1 << 15)),
+	)
+	const pure = parents.map(
+		(parent) => parent >= 0 && Boolean(table.congenital[parent] & (1 << 16)),
+	)
+	const pureCount = pure.filter(Boolean).length
+	const draw = (channel: number) => HASH.unit({ seed, channel, salt: 0 })
+	if (
+		draw(400) <
+			INBRED_RELATEDNESS_MULT * r * Math.max(0, 1 - 0.5 * pureCount) ||
+		(inbred[0] && draw(401) < 0.15) ||
+		(inbred[1] && draw(402) < 0.15)
+	)
+		congenital |= 1 << 15
+	else if (
+		draw(403) < PUREBLOODED_INBRED_RELATEDNESS_MULT * r ||
+		(pureCount === 2
+			? draw(404) < 0.75
+			: (pure[0] && draw(404) < 0.15) || (pure[1] && draw(405) < 0.15))
+	)
+		congenital |= 1 << 16
 	return { personality: packed, grades, congenital, carried }
 }
 function modifier({ character, age, modifier }: TraitModifierParams): number {
@@ -591,7 +625,17 @@ function reputation({ character, age, vassal }: ReputationParams): number {
 	)
 }
 
+function opposites({ trait }: OppositesParams): PersonalityTrait[] {
+	const group = GROUP_OF.get(trait)
+	return group === undefined
+		? []
+		: GROUPS[group]
+				.map((code) => PERSONALITY[code].name as PersonalityTrait)
+				.filter((name) => name !== trait)
+}
+
 export const TRAITS = {
+	opposites,
 	attraction,
 	compatibility,
 	reputation,

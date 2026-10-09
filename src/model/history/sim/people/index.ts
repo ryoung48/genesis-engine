@@ -4,7 +4,9 @@ import { HEALTH } from "@/model/history/sim/people/health"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 import { OPINION } from "@/model/history/sim/people/opinion"
+import { ORIENTATION } from "@/model/history/sim/people/orientation"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AddPersonParams,
@@ -51,6 +53,7 @@ function create(provinceCount: number): PeopleState {
 		household: {
 			heritageOfCulture: () => -1,
 			religionOfRealm: () => -1,
+			lawOfRealm: () => MARRIAGE_LAW.defaultLaw,
 			realmOf: (province) => province,
 			ranks: () => ranks,
 			time: () => 0,
@@ -64,6 +67,9 @@ function create(provinceCount: number): PeopleState {
 		},
 		holdingsChanged: () => undefined,
 		persons: {
+			orientation: [],
+			consorts: [],
+			patron: [],
 			bases: [],
 
 			personality: [],
@@ -150,6 +156,9 @@ function add({
 	table.carried.push(0)
 	table.stress.push(0)
 	table.sex.push(sex)
+	table.orientation.push(ORIENTATION.of({ seed: nameSeed }))
+	table.consorts.push([])
+	table.patron.push(-1)
 	table.createdAt.push(birth)
 	table.birth.push(birth)
 	table.death.push(death)

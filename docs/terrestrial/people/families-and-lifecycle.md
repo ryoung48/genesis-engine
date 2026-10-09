@@ -121,3 +121,7 @@ At equal times the heap runs deaths, then births, then every other event, then t
 - A newborn's first partial year of mortality is drawn at delivery, not at conception.
 - A later death that was not foreseen cancels deliveries; it does not reopen the year's rolls.
 - Backfilled pregnancies read the mother's present health, not her health then.
+
+## Consort families
+
+Conception uses a woman's primary spouse or, when she has none, her patron. Consorts' children use the ordinary birth, genealogy and succession paths. Starting-family and backfill couples remain opposite-sex and monogamous; their children still draw orientation. See [marriage and kinship](marriage-and-alliances.md#religion-kinship-and-consorts).

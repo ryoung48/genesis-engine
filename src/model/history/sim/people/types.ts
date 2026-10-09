@@ -31,7 +31,12 @@ export type Sex = 0 | 1
 
 export type GenderPreference = "male" | "female" | "none"
 
+import type { Orientation } from "@/model/history/sim/people/orientation/types"
+
 export interface PersonTable {
+	orientation: Orientation[]
+	consorts: number[][]
+	patron: number[]
 	bases: number[]
 
 	personality: number[]

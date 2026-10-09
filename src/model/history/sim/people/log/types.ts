@@ -15,6 +15,7 @@ export type PeopleRowKind =
 	| "creation"
 	| "death"
 	| "wedding"
+	| "consort"
 	| "health_band"
 	| "condition"
 	| "seat"
@@ -62,6 +63,7 @@ export interface PeopleLog extends PeopleRows {
 export interface PeoplePacket extends PeopleRows {
 	initialTenures: InitialTenure[]
 	sex: Uint8Array
+	orientation: Uint8Array
 	createdAt: Float64Array
 	death: Float64Array
 	// The health band when the person was created.
@@ -95,6 +97,14 @@ export interface DeathRow {
 	time: number
 	person: number
 	cause: DeathCause
+}
+
+export interface ConsortRow {
+	kind: "consort"
+	time: number
+	patron: number
+	partner: number
+	consortKind: "wife" | "concubine"
 }
 
 export interface WeddingRow {
@@ -203,6 +213,7 @@ export type AppendedRow =
 	| ResidenceRow
 	| DeathRow
 	| WeddingRow
+	| ConsortRow
 	| SeatChange
 	| RegentRow
 	| PregnancyRow
@@ -218,6 +229,7 @@ export type PeopleRow =
 	| CreationRow
 	| DeathRow
 	| WeddingRow
+	| ConsortRow
 	| SeatRow
 	| RegentRow
 	| PregnancyRow

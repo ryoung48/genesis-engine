@@ -53,6 +53,8 @@ export type CongenitalTrait =
 	| "depressed"
 	| "lunatic"
 	| "possessed"
+	| "inbred"
+	| "pure_blooded"
 export type Grade = -3 | -2 | -1 | 0 | 1 | 2 | 3
 export type GeneState = "active" | "carried" | "none"
 export type Ladder = "intellect" | "physique" | "beauty"
@@ -162,4 +164,8 @@ export interface CompatibilityParams {
 
 export interface ReputationParams extends TraitAtParams {
 	vassal: boolean
+}
+
+export interface OppositesParams {
+	trait: PersonalityTrait
 }

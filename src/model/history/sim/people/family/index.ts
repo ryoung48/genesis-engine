@@ -200,6 +200,12 @@ function runYear({
 		rng,
 		...realms,
 	})
+	MARRIAGE_MARKET.takeConsorts({
+		people,
+		time,
+		chance: MARRIAGE_CHANCE,
+		market: realms,
+	})
 	weddings.push(...matches.weddings)
 	return { weddings, betrothals: matches.betrothals }
 }
@@ -217,7 +223,8 @@ function project({
 	const line = scope({ people, time, rulers })
 	for (const mother of people.alive) {
 		if (table.sex[mother] !== 1) continue
-		const father = table.spouse[mother]
+		const father =
+			table.spouse[mother] >= 0 ? table.spouse[mother] : table.patron[mother]
 		if (father < 0) continue
 		if (!line.has(mother) && !line.has(father)) continue
 		if (!PEOPLE.aliveAt({ people, person: mother, time })) continue

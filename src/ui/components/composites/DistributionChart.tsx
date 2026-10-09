@@ -7,14 +7,16 @@ export interface DistributionChartBucket {
 	label: string
 	count: number
 	color: string
+	// [JUSTIFICATION] Only navigable entity buckets supply a selection handler.
+	onSelect?: () => void
 }
 
 interface DistributionChartProps {
 	title: string
 	buckets: readonly DistributionChartBucket[]
-	/** "compact" collapses the whole chart to a single unboxed row (label,
-	 * bar, total) -- identity moves to per-segment hover tooltips. */
+	// [JUSTIFICATION] Compact charts share the component but omit the boxed legend.
 	variant?: "default" | "compact"
+	// [JUSTIFICATION] Compact sidebars may omit the total to leave room for their bar.
 	showTotal?: boolean
 }
 
@@ -60,7 +62,20 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 						{visibleBuckets.map((bucket, index) => (
 							<div
 								key={bucket.label}
-								className="h-full min-w-0"
+								className={`h-full min-w-0 ${bucket.onSelect ? "cursor-pointer" : ""}`}
+								onClick={bucket.onSelect}
+								role={bucket.onSelect ? "button" : undefined}
+								tabIndex={bucket.onSelect ? 0 : undefined}
+								aria-label={bucket.onSelect ? bucket.label : undefined}
+								onKeyDown={(event) => {
+									if (
+										bucket.onSelect &&
+										(event.key === "Enter" || event.key === " ")
+									) {
+										event.preventDefault()
+										bucket.onSelect()
+									}
+								}}
 								style={{
 									flexBasis: `${(bucket.count / totalCount) * 100}%`,
 									backgroundColor: bucket.color,
@@ -112,7 +127,20 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 				{visibleBuckets.map((bucket) => (
 					<div
 						key={bucket.label}
-						className="inline-block h-full align-top transition-all"
+						className={`inline-block h-full align-top transition-all ${bucket.onSelect ? "cursor-pointer" : ""}`}
+						onClick={bucket.onSelect}
+						role={bucket.onSelect ? "button" : undefined}
+						tabIndex={bucket.onSelect ? 0 : undefined}
+						aria-label={bucket.onSelect ? bucket.label : undefined}
+						onKeyDown={(event) => {
+							if (
+								bucket.onSelect &&
+								(event.key === "Enter" || event.key === " ")
+							) {
+								event.preventDefault()
+								bucket.onSelect()
+							}
+						}}
 						style={{
 							width: `${(bucket.count / totalCount) * 100}%`,
 							backgroundColor: bucket.color,

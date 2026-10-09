@@ -72,7 +72,16 @@ export interface ConditionView {
 	level: number
 }
 
+export interface ConsortView extends SpouseView {
+	consortKind: "wife" | "concubine"
+}
+
 export interface PersonView {
+	// [JUSTIFICATION] Orientation is hidden before age ten.
+	orientation: number | null
+	consorts: ConsortView[]
+	// [JUSTIFICATION] A person may have no patron.
+	patron: ConsortView | null
 	predecessors: TenureView[]
 	id: number
 	sex: number

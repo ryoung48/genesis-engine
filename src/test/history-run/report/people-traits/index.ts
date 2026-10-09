@@ -6,11 +6,13 @@ import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import type { Attribute } from "@/model/history/sim/people/attributes/types"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { HEALTH } from "@/model/history/sim/people/health"
+import { KINSHIP } from "@/model/history/sim/people/kinship"
 import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AccumulateParams,
 	AppliedEffectSampleParams,
+	BirthRelatednessBand,
 	CharacterGroup,
 	CharacterGroupStatistics,
 	CharacterPopulation,
@@ -18,7 +20,9 @@ import type {
 	CharacterReportParams,
 	CharacterSampleParams,
 	CharacterTracker,
+	GeneticBirthGroup,
 	GroupAccumulator,
+	InbreedingReportParams,
 	PopulationAccumulator,
 	TercileParams,
 	ValidateCharacterParams,
@@ -611,7 +615,81 @@ function validate({ engine }: ValidateCharacterParams): number {
 	}
 	return table.birth.length
 }
+function inbreeding({ engine, from, to }: InbreedingReportParams) {
+	const table = engine.people.persons
+	const bands: Record<string, BirthRelatednessBand> = Object.fromEntries(
+		["0", "<=0.031", "<=0.125", ">0.125"].map(
+			(name): [string, BirthRelatednessBand] => [
+				name,
+				{
+					births: 0,
+					inbred: 0,
+					pureBlooded: 0,
+					inbredShare: null,
+					pureBloodedShare: null,
+				},
+			],
+		),
+	)
+	const enables = [
+		"giant",
+		"dwarf",
+		"clubfooted",
+		"hunchbacked",
+		"spindly",
+		"scaly",
+		"wheezing",
+		"bleeder",
+		"infertile",
+	]
+	const groups: Record<string, GeneticBirthGroup> = {
+		related: { births: 0, traits: {}, shares: {} },
+		unrelated: { births: 0, traits: {}, shares: {} },
+	}
+	const cache = new Map<number, Map<number, number>>()
+	for (let person = 0; person < table.sex.length; person++) {
+		if (table.birth[person] < from || table.birth[person] >= to) continue
+		const r = KINSHIP.relation({
+			context: table,
+			a: table.father[person],
+			b: table.mother[person],
+			cache,
+		}).relatedness
+		const band =
+			bands[
+				r === 0
+					? "0"
+					: r <= 0.03125
+						? "<=0.031"
+						: r <= 0.125
+							? "<=0.125"
+							: ">0.125"
+			]
+		band.births++
+		if (table.congenital[person] & (1 << 15)) band.inbred++
+		if (table.congenital[person] & (1 << 16)) band.pureBlooded++
+		const group = groups[r > 0 ? "related" : "unrelated"]
+		group.births++
+		for (const trait of TRAITS.congenital({
+			character: CHARACTER.of({ people: engine.people, person }),
+			age: 0,
+		}))
+			if (enables.includes(trait))
+				group.traits[trait] = (group.traits[trait] ?? 0) + 1
+	}
+	for (const band of Object.values(bands)) {
+		band.inbredShare = band.births ? band.inbred / band.births : null
+		band.pureBloodedShare = band.births ? band.pureBlooded / band.births : null
+	}
+	for (const group of Object.values(groups))
+		for (const trait of enables)
+			group.shares[trait] = group.births
+				? (group.traits[trait] ?? 0) / group.births
+				: 0
+	return { bands, enablesInbred: groups }
+}
 export const PEOPLE_TRAITS_REPORT = {
+	inbreeding,
 	validate,
 	tracker,
 	sample,

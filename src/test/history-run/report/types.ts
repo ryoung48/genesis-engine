@@ -48,7 +48,12 @@ export interface WindowParams {
 	to: number
 }
 
+import type { PEOPLE_MARRIAGE_REPORT } from "@/test/history-run/report/people-marriage"
+import type { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
+
 export interface CenturyReport {
+	marriageDemography: ReturnType<typeof PEOPLE_MARRIAGE_REPORT.demography>
+	inbreeding: ReturnType<typeof PEOPLE_TRAITS_REPORT.inbreeding>
 	from: number
 	to: number
 	sovereigns: number

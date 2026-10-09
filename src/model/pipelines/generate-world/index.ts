@@ -618,6 +618,7 @@ function generateGenesisWorld({
 	})
 
 	const provinceSociety = DERIVE_PROVINCE_SOCIETY.deriveProvinceSociety({
+		isEarthImport: false,
 		mesh,
 		params,
 		post,
@@ -708,6 +709,7 @@ function generateGenesisWorld({
 		religions: provinceSociety.religions,
 		religionFamilies: provinceSociety.religionFamilies,
 		religionTypes: provinceSociety.religionTypes,
+		religionDoctrine: provinceSociety.religionDoctrine,
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		tradeGoods: post.tradeGoods,

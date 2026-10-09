@@ -4,6 +4,7 @@ import type {
 	AttributeView,
 	BetrothalView,
 	ConditionView,
+	ConsortView,
 	CoupleAtParams,
 	MemoryView,
 	OpinionContextParams,
@@ -71,6 +72,27 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 			endTimeMs: until(Math.min(person.deathTimeMs, partnerDeath), timeMs),
 		})
 	}
+	const consorts: ConsortView[] = []
+	let patron: ConsortView | null = null
+	for (const index of people.consortsOf.get(id) ?? []) {
+		const tie = people.consorts[index]
+		if (tie.startTimeMs > timeMs) continue
+		const partner = tie.patron === id ? tie.partner : tie.patron
+		const entry = {
+			person: partner,
+			startTimeMs: tie.startTimeMs,
+			consortKind: tie.consortKind,
+			endTimeMs: until(
+				Math.min(
+					person.deathTimeMs,
+					PEOPLE_RECORD.deathTimeMs({ people, id: partner }),
+				),
+				timeMs,
+			),
+		}
+		if (tie.patron === id) consorts.push(entry)
+		else if (entry.endTimeMs === null) patron = entry
+	}
 	const betrothals: BetrothalView[] = []
 	for (const index of people.betrothalsOf.get(id) ?? []) {
 		const betrothal = people.betrothals[index]
@@ -108,6 +130,12 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 		})
 	return {
 		...person,
+		orientation:
+			Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs >= 10 * yearMs
+				? person.orientation
+				: null,
+		consorts,
+		patron,
 		residence: residenceAt({ people, id, timeMs }),
 		father: PEOPLE_RECORD.has({ people, id: person.father })
 			? person.father

@@ -45,6 +45,10 @@ export interface WikiTimelineEvent {
 }
 
 interface WikiTimelineRefs {
+	// [JUSTIFICATION] Religion links exist only on pages with doctrine data.
+	onSelectReligion?: (key: string) => void
+	// [JUSTIFICATION] Existing wiki entities do not all expose religion navigation.
+	resolveReligion?: (key: string) => number | null
 	onSelectNation: (tag: string) => void
 	onSelectProvince: (provinceId: number) => void
 	onSelectOrganization: (orgId: string) => void
@@ -132,6 +136,7 @@ function renderLinkedTimelineText(
 				color: string
 				id: number
 		  }
+		| { kind: "religion"; key: string; name: string; color: string; id: string }
 		| { kind: "label"; key: string; name: string; color: string }
 	> = [
 		...event.nations.map((entry) => ({
@@ -178,7 +183,8 @@ function renderLinkedTimelineText(
 			color: entry.color,
 		})),
 		...event.religions.map((entry) => ({
-			kind: "label" as const,
+			id: entry.id,
+			kind: "religion" as const,
 			key: `religion:${entry.id}`,
 			name: entry.name,
 			color: entry.color,
@@ -262,6 +268,9 @@ function renderLinkedTimelineText(
 		const mention = match.mention
 		if (
 			mention.kind === "label" ||
+			(mention.kind === "religion" &&
+				(!refs.onSelectReligion ||
+					refs.resolveReligion?.(mention.id) == null)) ||
 			(mention.kind === "nation" && !mention.link)
 		) {
 			nodes.push(
@@ -285,6 +294,8 @@ function renderLinkedTimelineText(
 							refs.onSelectProvince(mention.id)
 						else if (mention.kind === "war") refs.onSelectWar(mention.id)
 						else if (mention.kind === "person") refs.onSelectPerson(mention.id)
+						else if (mention.kind === "religion")
+							refs.onSelectReligion?.(mention.id)
 						else refs.onSelectOrganization(mention.id)
 					}}
 				/>,

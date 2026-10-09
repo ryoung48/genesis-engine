@@ -12,6 +12,7 @@ import type { HealthCondition } from "@/model/history/sim/people/health/ageing/t
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
+import { ORIENTATION } from "@/model/history/sim/people/orientation"
 import type { DeathCause } from "@/model/history/sim/people/types"
 import { FRAME } from "@/model/history/world-frame"
 import { TITLES } from "@/model/society/titles"
@@ -242,6 +243,11 @@ export function usePersonWikiData(
 			},
 			{ label: "House", value: person.house ?? "None" },
 		]
+		if (view.orientation !== null)
+			stats.push({
+				label: "Orientation",
+				value: ORIENTATION.names[view.orientation],
+			})
 		if (health)
 			stats.push({
 				label: "Health",
@@ -296,7 +302,9 @@ export function usePersonWikiData(
 			? [
 					...characterTraits.personality,
 					...characterTraits.grades,
-					...characterTraits.congenital,
+					...characterTraits.congenital.map((trait) =>
+						trait === "pure_blooded" ? "Pure-blooded" : trait,
+					),
 				]
 			: []
 		const timelineEvents: WikiTimelineEvent[] = []
@@ -575,6 +583,8 @@ export function usePersonWikiData(
 					...view.children,
 					...view.siblings,
 					...view.spouses.map((spouse) => spouse.person),
+					...view.consorts.map((consort) => consort.person),
+					...(view.patron ? [view.patron.person] : []),
 					...PERSON_QUERY.memoryPartners({ people, id, timeMs: viewTimeMs }),
 				]),
 			]
@@ -710,6 +720,17 @@ export function usePersonWikiData(
 							.filter((betrothal) => betrothal.endTimeMs === null)
 							.map((betrothal) => betrothal.person),
 					),
+				},
+				{
+					label: "Consorts",
+					chips: chips(view.consorts.map((tie) => tie.person)),
+				},
+				{
+					label:
+						view.patron?.consortKind === "wife"
+							? "Additional wife of"
+							: "Concubine of",
+					chips: chips(view.patron ? [view.patron.person] : []),
 				},
 				{ label: "Children", chips: chips(view.children) },
 			],

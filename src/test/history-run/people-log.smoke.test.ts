@@ -42,6 +42,7 @@ const SEAT_REASONS: SeatChangeReason[] = [
 ]
 const SNAPSHOT_COLUMNS = [
 	"sex",
+	"orientation",
 	"death",
 	"dynasty",
 	"culture",
@@ -238,7 +239,7 @@ it("rejects unknown kinds and codes and values a row cannot hold", () => {
 	packet.b[0] = 4
 	expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 	packet.b[0] = 0
-	packet.kind[0] = 13
+	packet.kind[0] = 14
 	expect(() => PEOPLE_LOG.read({ rows: packet, index: 0 })).toThrow()
 
 	PEOPLE_LOG.append({ log, row: memory as AppendedRow })
@@ -268,7 +269,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	table.father[first[2]] = first[0]
 	table.mother[first[2]] = first[1]
 	const packet = PEOPLE_LOG.seal({ people, sovereign: () => true })
-	expect(byteLength(packet)).toBe(25 * 3 + 78 * 3)
+	expect(byteLength(packet)).toBe(25 * 3 + 79 * 3)
 	expect(rowsOf(packet)).toEqual(
 		first.map((person) => ({
 			kind: "creation",
@@ -299,7 +300,7 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	expect(people.log.time.length).toBe(8192)
 	const grown = PEOPLE_LOG.seal({ people, sovereign: () => true })
 	expect(grown.count).toBe(rows + 1)
-	expect(byteLength(grown)).toBe(25 * (rows + 1) + 78)
+	expect(byteLength(grown)).toBe(25 * (rows + 1) + 79)
 	const decoded = rowsOf(grown)
 	expect(decoded[0]).toMatchObject({
 		kind: "creation",
@@ -396,7 +397,7 @@ it("records every person once and rebuilds the same record from transferred pack
 		)
 		for (const packet of packets) {
 			expect(byteLength(packet)).toBe(
-				25 * packet.count + 78 * packet.sex.length,
+				25 * packet.count + 79 * packet.sex.length,
 			)
 			for (const row of rowsOf(packet)) {
 				kinds.add(row.kind)
@@ -426,6 +427,7 @@ it("records every person once and rebuilds the same record from transferred pack
 	expect(created).toEqual(Array.from({ length: count }, (...entry) => entry[1]))
 	// Stress rows depend on which rulers the world's wars happen to strain.
 	kinds.delete("stress")
+	kinds.delete("consort")
 	expect([...kinds].sort()).toEqual([
 		"betrothal",
 		"betrothal_end",
@@ -592,7 +594,7 @@ it("keeps the append buffer writable after a transfer and never emits a row twic
 			reason: "partition",
 		},
 	])
-	expect(byteLength(packet)).toBe(25 * 3 + 78)
+	expect(byteLength(packet)).toBe(25 * 3 + 79)
 }, 600000)
 
 it("answers family, marriage, betrothal, tenure, pregnancy and stress views from the record alone", () => {

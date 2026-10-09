@@ -18,6 +18,7 @@ import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 import { RNG } from "@/model/shared/random/rng"
 import { HISTORY_RUN } from "@/test/history-run"
 
@@ -421,6 +422,7 @@ it("retains birth-effective residence through moves, sealing, corrections and a 
 	const state = fixture()
 	const people = state.people
 	people.household = {
+		lawOfRealm: () => MARRIAGE_LAW.defaultLaw,
 		heritageOfCulture: () => -1,
 		religionOfRealm: () => -1,
 		time: () => state.time / STATE.yearMs,
@@ -781,6 +783,7 @@ it("rechecks a marriage alliance after relocation releases its sustaining betrot
 it("weddings and title loss preserve separate landed households", () => {
 	const { people } = fixture()
 	people.household = {
+		lawOfRealm: () => MARRIAGE_LAW.defaultLaw,
 		heritageOfCulture: () => -1,
 		religionOfRealm: () => -1,
 		time: () => 100,

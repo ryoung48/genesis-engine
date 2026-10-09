@@ -25,6 +25,7 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
+import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
@@ -198,6 +199,8 @@ export interface GenesisWorld {
 	/** [JUSTIFICATION] Religion families are only generated after province society is derived. */
 	religionFamilies?: Int32Array
 	religionTypes?: Uint8Array
+	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
+	religionDoctrine?: ReligionDoctrine
 	landmarks?: GenesisLandmarks
 	population?: ProvincePopulation
 	tradeGoods?: LocationTradeGoods

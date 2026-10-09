@@ -41,6 +41,7 @@ export function useOrganizationWikiData(
 ): OrganizationWikiData | null {
 	const {
 		selectedWikiOrganizationId,
+		religionSelection,
 		world,
 		worldForDisplay,
 		history,
@@ -417,6 +418,7 @@ export function useOrganizationWikiData(
 			fallbackColor: "rgb(148, 163, 184)",
 		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
+			selectionForId: religionSelection.forKey,
 			idByProvince: Array.from(frame.provinceReligion, (id) =>
 				id < 0 ? null : (frame.religions[id]?.key ?? null),
 			),
@@ -466,6 +468,8 @@ export function useOrganizationWikiData(
 			members,
 			cultureDistribution,
 			religionDistribution,
+			onSelectReligion: religionSelection.selectKey,
+			resolveReligion: religionSelection.resolve,
 			climateDistribution,
 			vegetationDistribution,
 			topographyDistribution,
@@ -497,6 +501,7 @@ export function useOrganizationWikiData(
 			},
 		}
 	}, [
+		religionSelection,
 		selectedWikiOrganizationId,
 		world,
 		history.query,

@@ -48,3 +48,8 @@ export interface PersonDisplayParams {
 	people: PeopleRecord | null
 	payload: Record<string, unknown>
 }
+
+export interface ReligionOptionLabelInput {
+	group: string
+	option: string
+}

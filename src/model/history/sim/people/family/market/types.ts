@@ -42,7 +42,14 @@ export interface MatchParams {
 	rng: PeopleRandomSource
 	time: number
 	market: MarriageRealms
-	ancestry: Map<number, Set<number>>
+	ancestry: Map<number, Map<number, number>>
+}
+
+export interface TakeConsortsParams {
+	people: PeopleState
+	time: number
+	chance: number
+	market: MarriageRealms
 }
 
 export interface AdultParams {
@@ -61,7 +68,7 @@ export interface MatchInParams {
 	fits: (partner: number) => boolean
 	time: number
 	market: MarriageRealms
-	ancestry: Map<number, Set<number>>
+	ancestry: Map<number, Map<number, number>>
 }
 
 export interface SeekMatchesParams extends MarriageRealms {
@@ -89,7 +96,7 @@ export interface EvaluatePairParams {
 	time: number
 	match: CrossMatch
 	market: MarriageRealms
-	ancestry: Map<number, Set<number>>
+	ancestry: Map<number, Map<number, number>>
 }
 
 export interface PairEvaluation {

@@ -1,4 +1,4 @@
-import type { GenesisPartition } from "@/model/society/types"
+import type { GenesisPartition, SocietyEra } from "@/model/society/types"
 
 export interface ComputeReligionsParams {
 	cultures: GenesisPartition
@@ -18,11 +18,8 @@ export interface AssignReligionTypesParams {
 	cultureCount: number
 	provinceCount: number
 	cultureAssignment: Int32Array
-	/** [JUSTIFICATION] Nation government data is unavailable for worlds without state formation. */
-	governmentType?: Uint8Array
-	/** [JUSTIFICATION] Population migration is not computed for every world-generation path. */
+	// [JUSTIFICATION] Population migration is not computed for every world-generation path.
 	migrationWave?: Float32Array
-	/** 1.0 = ancient era, 0.0 = information era */
-	sizeWeight: number
+	era: SocietyEra
 	seed: number
 }

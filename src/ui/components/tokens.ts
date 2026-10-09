@@ -58,6 +58,12 @@ export const uiChartPalette = {
 } as const
 
 export const uiTokens = {
+	wiki: {
+		page: "space-y-2 overflow-x-hidden",
+		stats: "mt-3 grid grid-cols-2 gap-x-3 gap-y-1",
+		rows: "space-y-1",
+		row: "flex items-baseline justify-between gap-2",
+	},
 	surface: {
 		canvas: "bg-slate-100",
 		panel: "bg-white/95",

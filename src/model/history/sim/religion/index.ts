@@ -12,7 +12,6 @@ const religionTypeNames = [
 	"Dualistic",
 	"Monotheistic",
 	"Non-theistic",
-	"Non-religious",
 ] as const
 
 const religionTypeColors: readonly (readonly [number, number, number])[] = [
@@ -21,28 +20,21 @@ const religionTypeColors: readonly (readonly [number, number, number])[] = [
 	[0.336, 0.732, 0.864], // 2: dualistic
 	[0.478, 0.61, 0.782], // 3: monotheistic
 	[0.908, 0.848, 0.652], // 4: non-theistic
-	[1.0, 0.44, 0.44], // 5: non-religious
 ]
 
-const GOV_PRIORS: readonly (readonly number[])[] = [
-	//  anim  poly  dual  mono   nth  ath
-	[50, 8, 1, 8, 2, 1], // tribal
-	[4, 6, 2, 42, 16, 1], // monarchy
-	[5, 3, 1, 40, 20, 8], // republic
-	[5, 1, 2, 65, 6, 1], // theocracy
-]
+const ERA_TYPE_WEIGHTS = {
+	paleolithic: [84.0, 9.7, 0.7, 5.4, 0.3],
+	neolithic: [79.8, 10.1, 0.9, 8.7, 0.5],
+	bronze: [59.6, 10.3, 1.5, 24.5, 4.1],
+	iron: [50.0, 10.0, 1.8, 30.9, 7.3],
+	lateMedieval: [34.7, 9.3, 2.2, 40.5, 13.2],
+	earlyModern: [34.4, 8.9, 2.1, 40.6, 14.0],
+	industrial: [9.6, 6.3, 2.0, 50.0, 32.1],
+	information: [2.5, 3.5, 1.2, 43.1, 49.7],
+}
 
-const INDUSTRIAL_SIZE_WEIGHT_MAX = 0.3
 const CULTURES_PER_RELIGION = 6
 const RELIGIONS_PER_FAMILY = 3
-
-function govTypeToCategory(gov: number): number {
-	if (gov <= 3) return 0 // tribal
-	if (gov <= 7) return 1 // monarchy
-	if (gov <= 12 || gov === 17 || gov === 18) return 2 // republic
-	if (gov <= 16) return 3 // theocracy
-	return 2 // colonial → republic-ish
-}
 
 function computeReligions({
 	cultures,
@@ -102,13 +94,11 @@ function assignReligionTypes(params: AssignReligionTypesParams): Uint8Array {
 		cultureCount,
 		provinceCount,
 		cultureAssignment,
-		governmentType,
+		era,
 		migrationWave,
-		sizeWeight,
 		seed,
 	} = params
 
-	const familyGovSum = new Float32Array(religionFamilyCount)
 	const familyMigSum = new Float32Array(religionFamilyCount)
 	const familyProvCount = new Int32Array(religionFamilyCount)
 
@@ -119,13 +109,9 @@ function assignReligionTypes(params: AssignReligionTypesParams): Uint8Array {
 		if (religion < 0 || religion >= religionCount) continue
 		const family = religionFamilies[religion]
 		if (family < 0 || family >= religionFamilyCount) continue
-		familyGovSum[family] += govTypeToCategory(governmentType?.[p] ?? 0)
 		familyMigSum[family] += migrationWave?.[p] ?? 0.5
 		familyProvCount[family]++
 	}
-
-	const eraAncient = Math.max(0, Math.min(1, (sizeWeight - 0.55) / 0.45))
-	const eraModern = Math.max(0, Math.min(1, (0.4 - sizeWeight) / 0.4))
 
 	const result = new Uint8Array(religionCount)
 	const familyTypes = new Uint8Array(religionFamilyCount)
@@ -133,17 +119,9 @@ function assignReligionTypes(params: AssignReligionTypesParams): Uint8Array {
 
 	for (let family = 0; family < religionFamilyCount; family++) {
 		const count = familyProvCount[family]
-		const avgGov = count > 0 ? familyGovSum[family] / count : 1.0
 		const avgMig = count > 0 ? familyMigSum[family] / count : 0.5
 
-		const gFloor = Math.min(3, Math.floor(avgGov))
-		const gCeil = Math.min(3, gFloor + 1)
-		const gFrac = avgGov - gFloor
-		const rowA = GOV_PRIORS[gFloor]
-		const rowB = GOV_PRIORS[gCeil]
-		for (let type = 0; type < religionTypeNames.length; type++) {
-			prior[type] = rowA[type] * (1 - gFrac) + rowB[type] * gFrac
-		}
+		prior.set(ERA_TYPE_WEIGHTS[era])
 		if (avgMig > 0.55) {
 			const s = (avgMig - 0.55) / 0.45
 			prior[0] *= 1 + s * 2.0
@@ -153,21 +131,6 @@ function assignReligionTypes(params: AssignReligionTypesParams): Uint8Array {
 			prior[3] *= 1 + s * 0.8
 			prior[1] *= 1 + s * 0.5
 			prior[0] *= Math.max(0.4, 1 - s * 0.5)
-		}
-
-		if (eraAncient > 0) {
-			prior[0] *= 1 + eraAncient * 1.5
-			prior[1] *= 1 + eraAncient * 0.8
-			prior[4] *= Math.max(0.2, 1 - eraAncient)
-			prior[5] *= Math.max(0.1, 1 - eraAncient)
-		}
-		if (eraModern > 0) {
-			prior[4] *= 1 + eraModern * 2.5
-			prior[5] *= 1 + eraModern * 3.0
-			prior[0] *= Math.max(0.1, 1 - eraModern * 0.8)
-		}
-		if (sizeWeight > INDUSTRIAL_SIZE_WEIGHT_MAX) {
-			prior[5] = 0
 		}
 
 		let total = 0

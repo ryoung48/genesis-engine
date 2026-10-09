@@ -82,8 +82,10 @@ import { PEOPLE } from "@/model/history/sim/people"
 import { FAMILY } from "@/model/history/sim/people/family"
 import { STARTING_RANDOM } from "@/model/history/sim/people/family/starting/random"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 import { OPINION } from "@/model/history/sim/people/opinion"
 import type { RealmOrigin } from "@/model/history/sim/people/types"
+import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
 import { DEJURE } from "@/model/society/dejure"
 
 export const rel = {
@@ -761,6 +763,7 @@ function createHistoryState({
 	cultures,
 	heritages,
 	religions,
+	religionDoctrine,
 	startYear,
 	seed,
 	waterAccess,
@@ -917,6 +920,9 @@ function createHistoryState({
 		cultureColors: cultures.colors.slice(),
 		religion: religions?.assignment.slice() ?? new Int32Array(P).fill(-1),
 		religionCount: religions?.count ?? 0,
+		marriageLaws: [...Array(religions?.count ?? 0).keys()].map((religion) =>
+			RELIGION_DOCTRINE.marriageLaw({ doctrine: religionDoctrine, religion }),
+		),
 		religionColors: religions?.colors.slice() ?? new Float32Array(0),
 		nationColors: nations.colors.slice(),
 		governmentType: nations.governmentType?.slice() ?? new Uint8Array(P),
@@ -966,6 +972,9 @@ function createHistoryState({
 			culture >= 0 ? (state.heritageOfCulture[culture] ?? -1) : -1,
 		religionOfRealm: (realm) =>
 			realm >= 0 ? (state.religion[state.culture[realm]] ?? -1) : -1,
+		lawOfRealm: (realm) =>
+			state.marriageLaws[state.people.household.religionOfRealm(realm)] ??
+			MARRIAGE_LAW.defaultLaw,
 		realmOf: (province) => getSovereign({ state, p: province }),
 		ranks: () => state.seatRank,
 		time: () => state.time / yearMs,

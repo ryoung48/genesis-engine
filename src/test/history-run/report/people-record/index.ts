@@ -73,6 +73,7 @@ function sha256(people: PeopleRecord): string {
 		add([
 			person.id,
 			person.sex,
+			person.orientation,
 			person.birthTimeMs,
 			person.deathTimeMs,
 			person.father,
@@ -103,6 +104,8 @@ function sha256(people: PeopleRecord): string {
 	}
 	for (const row of people.marriages)
 		add([row.husband, row.wife, row.startTimeMs])
+	for (const row of people.consorts)
+		add([row.patron, row.partner, row.consortKind, row.startTimeMs])
 	for (const row of people.betrothals)
 		add([row.a, row.b, row.startTimeMs, row.endTimeMs, row.cause])
 	for (const row of people.tenures)

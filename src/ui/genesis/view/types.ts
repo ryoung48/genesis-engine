@@ -71,6 +71,7 @@ export type WikiSelectionSetters = {
 }
 
 export type NationWikiDataInput = WikiSelectionSetters & {
+	religionSelection: ReligionSelection
 	selectedWikiNationId: number | null
 	world: SerializedGenesisWorld | null
 	worldForDisplay: SerializedGenesisWorld | null
@@ -93,6 +94,23 @@ export type WarWikiDataInput = WikiSelectionSetters & {
 	planetName: string
 	getProvinceColor: (provinceId: number) => string | null
 	sceneRef: SceneRef
+}
+
+export interface ReligionSelection {
+	forKey: (key: string) => (() => void) | undefined
+	selectKey: (key: string) => void
+	resolve: (key: string) => number | null
+	select: (id: number) => void
+}
+export interface ReligionWikiDataInput {
+	selectedWikiReligionId: number | null
+	world: Pick<
+		SerializedGenesisWorld,
+		"religionDoctrine" | "religionFamilies" | "religionTypes"
+	> | null
+	frame: WorldFrame | null
+	setSelectedWikiReligionId: (id: number | null) => void
+	setSelectedWikiNationId: (id: number | null) => void
 }
 
 export type PersonWikiDataInput = WikiSelectionSetters & {

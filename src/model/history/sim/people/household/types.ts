@@ -1,6 +1,8 @@
+import type { MarriageLaw } from "@/model/history/sim/people/marriage-law/types"
 import type { PeopleState } from "@/model/history/sim/people/types"
 
 export interface HouseholdContext {
+	lawOfRealm: (realm: number) => MarriageLaw
 	heritageOfCulture: (culture: number) => number
 	religionOfRealm: (realm: number) => number
 	realmOf: (province: number) => number

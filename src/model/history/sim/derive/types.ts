@@ -1,5 +1,6 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { NATIONS } from "@/model/history/sim/nations"
+import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { StageTiming } from "@/model/pipelines/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "@/model/society/types"
 
 export interface DeriveSocietyParams {
+	isEarthImport: boolean
 	provinces: GenesisProvinces | undefined
 	population: ProvincePopulation | undefined
 	landmarks: GenesisLandmarks
@@ -39,4 +41,6 @@ export interface DerivedSociety {
 	religionFamilies: Int32Array | undefined
 	// [JUSTIFICATION] follows religions.
 	religionTypes: Uint8Array | undefined
+	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
+	religionDoctrine: ReligionDoctrine | undefined
 }

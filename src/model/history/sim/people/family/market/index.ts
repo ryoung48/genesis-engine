@@ -13,11 +13,13 @@ import type {
 	PairEvaluation,
 	Seeker,
 	SeekMatchesParams,
+	TakeConsortsParams,
 } from "@/model/history/sim/people/family/market/types"
 import { MATCH_SCORING } from "@/model/history/sim/people/family/match-scoring"
+import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import { KINSHIP } from "@/model/history/sim/people/kinship"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
+import { MARRIAGE_LAW } from "@/model/history/sim/people/marriage-law"
 import type { PeopleMatches, Sex } from "@/model/history/sim/people/types"
 import { HASH } from "@/model/shared/random/hash"
 
@@ -82,7 +84,8 @@ function seeksSpouse({ people, person, time }: AdultParams): boolean {
 	const age = time - table.birth[person]
 	const adult =
 		table.sex[person] === 1 ? age >= 16 && age < 45 : age >= 18 && age < 70
-	if (!adult || table.betrothed[person] >= 0) return false
+	if (!adult || table.betrothed[person] >= 0 || table.patron[person] >= 0)
+		return false
 	const spouse = table.spouse[person]
 	return spouse < 0 || table.death[spouse] <= time
 }
@@ -95,8 +98,8 @@ function evaluatePair({
 	ancestry,
 }: EvaluatePairParams): PairEvaluation | null {
 	if (
-		KINSHIP.prohibitedMatch({
-			context: people.persons,
+		!MARRIAGE_LAW.permits({
+			people,
 			a: match.a,
 			b: match.b,
 			cache: ancestry,
@@ -176,8 +179,8 @@ function matchIn({
 			if (!fits(other.person)) continue
 			observation.hardEligible++
 			if (
-				KINSHIP.prohibitedMatch({
-					context: table,
+				!MARRIAGE_LAW.permits({
+					people,
 					a: seeker.person,
 					b: other.person,
 					cache: ancestry,
@@ -324,7 +327,7 @@ function seekMatches({
 		}),
 	]
 	const matched = new Set<number>()
-	const ancestry = new Map<number, Set<number>>()
+	const ancestry = new Map<number, Map<number, number>>()
 	const matches: PeopleMatches = { weddings: [], betrothals: [] }
 	const ageOf = (person: number) => time - table.birth[person]
 	const eligible = (person: number) =>
@@ -562,7 +565,94 @@ function seekMatches({
 	return matches
 }
 
+const DESIRED_CONSORTS = [0, 0, 1, 2, 3, 3]
+function takeConsorts({
+	people,
+	time,
+	chance,
+	market,
+}: TakeConsortsParams): void {
+	const table = people.persons
+	const pool = new Map<number, number[]>()
+	for (const person of people.alive) {
+		if (
+			table.sex[person] !== 1 ||
+			!seeksSpouse({ people, person, time }) ||
+			!PEOPLE.aliveAt({ people, person, time })
+		)
+			continue
+		const realm = HOUSEHOLD.realmOf({ people, person })
+		const list = pool.get(realm)
+		if (list) list.push(person)
+		else pool.set(realm, [person])
+	}
+	const ancestry = new Map<number, Map<number, number>>()
+	for (const person of people.alive) {
+		const age = time - table.birth[person]
+		if (
+			table.sex[person] !== 0 ||
+			age < 18 ||
+			age >= 70 ||
+			!PEOPLE.aliveAt({ people, person, time })
+		)
+			continue
+		const realm = HOUSEHOLD.realmOf({ people, person })
+		const law = people.household.lawOfRealm(realm)
+		if (law.consort === "none") continue
+		const standing = HOLDINGS.standing({
+			people,
+			person,
+			ranks: people.household.ranks(),
+		})
+		const count = table.consorts[person].filter((partner) =>
+			PEOPLE.aliveAt({ people, person: partner, time }),
+		).length
+		if (
+			count >= Math.min(law.consortMax, DESIRED_CONSORTS[standing]) ||
+			HASH.unit({
+				seed: table.nameSeed[person],
+				channel: 141,
+				salt: Math.floor(time),
+			}) >= chance
+		)
+			continue
+		let best = -1,
+			score = -Infinity
+		for (const partner of pool.get(realm) ?? []) {
+			if (table.patron[partner] >= 0) continue
+			const pair = evaluatePair({
+				people,
+				time,
+				match: { a: person, b: partner, realmA: realm, realmB: realm },
+				market,
+				ancestry,
+			})
+			if (
+				pair?.acceptable &&
+				(pair.total > score || (pair.total === score && partner < best))
+			) {
+				best = partner
+				score = pair.total
+			}
+		}
+		if (best < 0) continue
+		table.consorts[person].push(best)
+		table.patron[best] = person
+		PEOPLE_LOG.append({
+			log: people.log,
+			row: {
+				kind: "consort",
+				patron: person,
+				partner: best,
+				consortKind: law.consort,
+				time,
+			},
+		})
+		HOUSEHOLD.weddingResidence({ people, a: person, b: best, time })
+	}
+}
 export const MARRIAGE_MARKET = {
+	takeConsorts,
 	marry,
 	outsider,
 	seeksSpouse,

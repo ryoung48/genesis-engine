@@ -190,13 +190,13 @@ it("links cousin anchors before inheritance and never overwrites established anc
 		people.persons.father[b.holder.father.person],
 	)
 	expect(
-		KINSHIP.prohibitedMatch({
+		KINSHIP.relation({
 			context: people.persons,
 			a: a.holder.person,
 			b: b.holder.person,
 			cache: null,
-		}),
-	).toBe(true)
+		}).kind,
+	).toBe("cousin")
 	expect(
 		STARTING_ANCHORS.bridge({
 			path: [0, 0, 9],

@@ -35,6 +35,15 @@ function before({ state, person, cause }: DeathEffectParams): void {
 				relative,
 				(people.bereavements.get(relative) ?? 0) + 1,
 			)
+	for (const partner of table.consorts[person]) table.patron[partner] = -1
+	table.consorts[person] = []
+	const patron = table.patron[person]
+	if (patron >= 0) {
+		table.consorts[patron] = table.consorts[patron].filter(
+			(partner) => partner !== person,
+		)
+		table.patron[person] = -1
+	}
 	const spouse = table.spouse[person]
 	if (spouse >= 0) {
 		if (table.spouse[spouse] === person) table.spouse[spouse] = -1

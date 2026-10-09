@@ -1,9 +1,17 @@
+import type { PeopleRecord } from "@/model/history/record/people/types"
+
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type {
 	MarriageTotals,
 	SearchTotals,
 	SelectionTotals,
 } from "@/model/history/sim/people/family/diagnostics/types"
-
+export interface MarriageDemographyParams {
+	engine: HistoryState
+	record: PeopleRecord
+	from: number
+	to: number
+}
 export interface MarriageWindowParams {
 	windows: Map<number, MarriageTotals>
 	from: number

@@ -1,50 +1,18 @@
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
-import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import { SIM_DERIVE } from "@/model/history/sim/derive"
-import type { SphereMesh } from "@/model/mesh/types"
-import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
-import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type {
+	DerivedProvinceSociety,
+	DeriveProvinceSocietyInput,
+} from "@/model/pipelines/derive-province-society/types"
+import type { StageTiming } from "@/model/pipelines/types"
 import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/society/infrastructure/settlements"
-
-interface DeriveProvinceSocietyInput {
-	mesh: SphereMesh
-	params: Pick<GenesisParams, "seed" | "planetRadiusKm" | "era">
-	post: Pick<
-		ReturnType<typeof POST_ELEVATION.runPostElevationPipeline>,
-		| "coastal"
-		| "eraSettledMask"
-		| "eraStatehoodMask"
-		| "landmarks"
-		| "population"
-		| "provinces"
-		| "rivers"
-		| "topography"
-		| "waterAccess"
-	>
-	isLand: Uint8Array
-}
-
-type DerivedSociety = ReturnType<typeof SIM_DERIVE.deriveSociety>
-
-interface DerivedProvinceSociety {
-	nations: DerivedSociety["nations"]
-	cultures: DerivedSociety["cultures"]
-	heritages: DerivedSociety["heritages"]
-	religions: DerivedSociety["religions"]
-	religionFamilies: DerivedSociety["religionFamilies"]
-	religionTypes: DerivedSociety["religionTypes"]
-	landmarks: GenesisLandmarks
-	settlementRegions: Int32Array
-	settlementWaterLandmarks: Int32Array
-	settlementPortRegions: Int32Array
-	timings: StageTiming[]
-}
 
 function deriveProvinceSociety({
 	mesh,
 	params,
 	post,
 	isLand,
+	isEarthImport,
 }: DeriveProvinceSocietyInput): DerivedProvinceSociety {
 	const timings: StageTiming[] = []
 	const record = <T>(stage: string, fn: () => T): T => {
@@ -55,6 +23,7 @@ function deriveProvinceSociety({
 	}
 
 	const society = SIM_DERIVE.deriveSociety({
+		isEarthImport,
 		provinces: post.provinces,
 		population: post.population,
 		landmarks: post.landmarks,
@@ -102,6 +71,7 @@ function deriveProvinceSociety({
 		religions: society.religions,
 		religionFamilies: society.religionFamilies,
 		religionTypes: society.religionTypes,
+		religionDoctrine: society.religionDoctrine,
 		landmarks,
 		settlementRegions: settlementAnchors.settlementRegions,
 		settlementWaterLandmarks: settlementAnchors.settlementWaterLandmarks,

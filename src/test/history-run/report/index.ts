@@ -41,6 +41,7 @@ import { PEOPLE_RECORD_REPORT } from "@/test/history-run/report/people-record"
 import type { PeopleRecordReport } from "@/test/history-run/report/people-record/types"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
 import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
+import { RELIGION_REPORT } from "@/test/history-run/report/religion"
 import type {
 	BetrothalOutcome,
 	CenturyReport,
@@ -425,6 +426,17 @@ function runSeed({
 	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
 	const validation = HISTORY_VALIDATION.tracker()
 	const diagnostics = {
+		religionGenderSystems: RELIGION_REPORT.genderSystems({
+			systems: engine.cultureGenderSystems,
+			cultureToReligion: engine.religion,
+			doctrine: generated.religionDoctrine,
+			era: options.era,
+		}),
+		religion: RELIGION_REPORT.summarize({
+			religionTypes: generated.religionTypes,
+			religionFamilies: generated.religionFamilies,
+			religionDoctrine: generated.religionDoctrine,
+		}),
 		validation,
 		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
 		siegeLifecycle: BATTLEFIELD_REPORT.lifecycle({ engine }),
@@ -736,6 +748,13 @@ function runSeed({
 					from,
 					to: year,
 				}),
+				marriageDemography: PEOPLE_MARRIAGE_REPORT.demography({
+					engine,
+					record: peopleRecord.tracker.record,
+					from,
+					to: year,
+				}),
+				inbreeding: PEOPLE_TRAITS_REPORT.inbreeding({ engine, from, to: year }),
 				marriage: marriageReport({ engine, from, to: year, tracker }),
 				marriageMarket: PEOPLE_MARRIAGE_REPORT.summarize({
 					windows: engine.marriageMarket,

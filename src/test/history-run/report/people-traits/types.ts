@@ -70,6 +70,23 @@ export interface AppliedEffect {
 	lowerCapShare: number
 	upperCapShare: number
 }
+export interface InbreedingReportParams {
+	engine: HistoryState
+	from: number
+	to: number
+}
+export interface BirthRelatednessBand {
+	births: number
+	inbred: number
+	pureBlooded: number
+	inbredShare: number | null
+	pureBloodedShare: number | null
+}
+export interface GeneticBirthGroup {
+	births: number
+	traits: Record<string, number>
+	shares: Record<string, number>
+}
 export interface CharacterReport {
 	rulers: CharacterPopulation
 	people: Omit<CharacterPopulation, "all"> & {

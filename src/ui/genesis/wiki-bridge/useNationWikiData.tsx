@@ -90,6 +90,7 @@ export function useNationWikiData(
 ): NationWikiData | null {
 	const {
 		selectedWikiNationId,
+		religionSelection,
 		world,
 		worldForDisplay,
 		history,
@@ -115,7 +116,10 @@ export function useNationWikiData(
 		const record = history.state.record
 		const eventComment = (comment: HistoryComment) =>
 			formatEventComment(
-				PERSON_NAMES.comment({ people: record.people, comment }),
+				PERSON_NAMES.comment({
+					people: record.people,
+					comment: comment ?? null,
+				}),
 			)
 		const nationList = record.nations
 		const daysFromMs = (timeMs: number) => timeMs / 86_400_000
@@ -1672,6 +1676,7 @@ export function useNationWikiData(
 			fallbackColor: "rgb(148, 163, 184)",
 		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
+			selectionForId: religionSelection.forKey,
 			idByProvince: Array.from(frame.provinceReligion, (id) =>
 				id >= 0 ? (frame.religions[id]?.key ?? null) : null,
 			),
@@ -1724,6 +1729,8 @@ export function useNationWikiData(
 			organizations,
 			cultureDistribution,
 			religionDistribution,
+			onSelectReligion: religionSelection.selectKey,
+			resolveReligion: religionSelection.resolve,
 			climateDistribution,
 			vegetationDistribution,
 			topographyDistribution,
@@ -1760,6 +1767,7 @@ export function useNationWikiData(
 			},
 		}
 	}, [
+		religionSelection,
 		selectedWikiNationId,
 		world,
 		history.query,

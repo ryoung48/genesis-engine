@@ -15,6 +15,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { War } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
+import { HEIRS } from "@/model/history/sim/people/heirs"
 import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { KINSHIP } from "@/model/history/sim/people/kinship"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
@@ -125,36 +126,33 @@ it("adds close kin and completed marriage once, ends spouse affinity at either d
 	).toBeNull()
 })
 
-it("blocks ancestry shared within four generations, unknown parents stay distinct, and cycles terminate", () => {
-	const father = [-1, -1, 0, 0, 2, 3, 4, 6, 7, 8, 9, 5]
-	const mother = father.map(() => -1)
-	const context = { father, mother }
-	for (const [a, b] of [
-		[0, 0],
-		[0, 2],
-		[2, 3],
-		[3, 4],
-		[4, 5],
-		[2, 8],
-	])
-		expect(KINSHIP.prohibitedMatch({ context, a, b, cache: new Map() })).toBe(
-			true,
-		)
-	for (const [a, b] of [
-		[2, 9],
-		[10, 11],
-	])
-		expect(KINSHIP.prohibitedMatch({ context, a, b, cache: new Map() })).toBe(
-			false,
-		)
-	expect(KINSHIP.prohibitedMatch({ context, a: 0, b: 1, cache: null })).toBe(
-		false,
-	)
+it("classifies shared ancestry and keeps unknown parents distinct", () => {
+	const context = {
+		father: [-1, -1, 0, 0, 2, 3, 4, 5],
+		mother: Array(8).fill(-1),
+	}
+	expect(KINSHIP.relation({ context, a: 2, b: 3, cache: new Map() })).toEqual({
+		kind: "close",
+		relatedness: 0.25,
+	})
+	expect(KINSHIP.relation({ context, a: 4, b: 5, cache: new Map() })).toEqual({
+		kind: "cousin",
+		relatedness: 0.0625,
+	})
+	expect(KINSHIP.relation({ context, a: 6, b: 7, cache: null })).toEqual({
+		kind: "distant",
+		relatedness: 0.015625,
+	})
+	expect(KINSHIP.relation({ context, a: 0, b: 1, cache: null })).toEqual({
+		kind: "none",
+		relatedness: 0,
+	})
 	expect(KINSHIP.closeKin({ context, a: 2, b: 3 })).toBe(true)
-	expect(KINSHIP.closeKin({ context, a: 0, b: 1 })).toBe(false)
-	father[0] = 10
+	context.father[0] = 6
 	expect(
-		KINSHIP.prohibitedMatch({ context, a: 10, b: 11, cache: new Map() }),
+		Number.isFinite(
+			KINSHIP.relation({ context, a: 6, b: 7, cache: null }).relatedness,
+		),
 	).toBe(true)
 })
 
@@ -664,7 +662,14 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 	const corpse = outsider()
 	table.death[corpse] = time - 1
 	PEOPLE.vacate({ people, seat: seats[0], reason: "unknown" })
-	expect(grant(true, corpse)).toEqual([])
+	const inherited = vi
+		.spyOn(HEIRS, "of")
+		.mockReturnValue({ heir: -1, relation: "none" })
+	try {
+		expect(grant(true, corpse)).toEqual([])
+	} finally {
+		inherited.mockRestore()
+	}
 	expect(
 		DISTRICTS.install({
 			state,

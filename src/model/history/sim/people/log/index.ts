@@ -39,6 +39,7 @@ const KINDS: readonly PeopleRowKind[] = [
 	"residence",
 	"opinion_memory",
 	"regent",
+	"consort",
 ]
 const CREATION = KINDS.indexOf("creation")
 const SEAT = KINDS.indexOf("seat")
@@ -155,6 +156,12 @@ function append({ log, row }: AppendRowParams): void {
 			a = row.person
 			b = codeOf({ codes: DEATH_CAUSE_CODE, name: row.cause })
 			break
+		case "consort":
+			time = row.time
+			a = row.patron
+			b = row.partner
+			c = row.consortKind === "wife" ? 0 : 1
+			break
 		case "wedding":
 			time = row.time
 			a = row.husband
@@ -260,7 +267,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		8 * (count + 7 * creations) +
 			4 * (4 * count + 5 * creations) +
 			count +
-			2 * creations,
+			3 * creations,
 	)
 	let offset = 0
 	const doubles = (length: number) => {
@@ -305,6 +312,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		c,
 		d,
 		sex: bytes(creations),
+		orientation: bytes(creations),
 		createdAt,
 		death,
 		healthBand: bytes(creations),
@@ -331,6 +339,7 @@ function seal({ people, sovereign }: SealParams): PeoplePacket {
 		packet.c[index] = slot(table.mother[person])
 		packet.d[index] = index
 		packet.sex[index] = sex
+		packet.orientation[index] = table.orientation[person]
 		if (Number.isNaN(table.death[person]))
 			throw new Error(`Person ${person} has no death date`)
 		packet.death[index] =
@@ -386,6 +395,14 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 				time,
 				person: a,
 				cause: nameOf({ names: DEATH_CAUSES, code: b }),
+			}
+		case "consort":
+			return {
+				kind,
+				time,
+				patron: a,
+				partner: b,
+				consortKind: c === 0 ? "wife" : "concubine",
 			}
 		case "wedding":
 			return { kind, time, husband: a, wife: b }

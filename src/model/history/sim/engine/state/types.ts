@@ -19,10 +19,12 @@ import type {
 } from "@/model/history/sim/engine/military/recruitment/types"
 import type { OpinionPoliticsTotals } from "@/model/history/sim/engine/opinion-context/types"
 import type { MarriageTotals } from "@/model/history/sim/people/family/diagnostics/types"
+import type { MarriageLaw } from "@/model/history/sim/people/marriage-law/types"
 import type {
 	PeopleState,
 	SeatChangeReason,
 } from "@/model/history/sim/people/types"
+import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
 import type {
@@ -288,6 +290,7 @@ export interface HistoryState {
 	cultureColors: Float32Array
 	religion: Int32Array
 	religionCount: number
+	marriageLaws: MarriageLaw[]
 	religionColors: Float32Array
 	nationColors: Float32Array
 	governmentType: Uint8Array
@@ -509,6 +512,8 @@ export interface CreateHistoryStateParams {
 	heritages?: GenesisPartition
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
+	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
+	religionDoctrine?: ReligionDoctrine
 	startYear: number
 	waterAccess?: Uint8Array
 	landmarks?: GenesisLandmarks
