@@ -10,7 +10,27 @@ function titleCase(value: string): string {
 		.join(" ")
 }
 
+const ROMAN_NUMERALS: readonly (readonly [number, string])[] = [
+	[10, "X"],
+	[9, "IX"],
+	[5, "V"],
+	[4, "IV"],
+	[1, "I"],
+]
+
+function roman(value: number): string {
+	let rest = value
+	let result = ""
+	for (const [size, numeral] of ROMAN_NUMERALS)
+		while (rest >= size) {
+			result += numeral
+			rest -= size
+		}
+	return result
+}
+
 export const TEXT = {
 	capitalize,
 	titleCase,
+	roman,
 }

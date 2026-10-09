@@ -101,12 +101,6 @@ export interface RecordPregnancy {
 	outcome: PregnancyLoss
 }
 
-export interface RecordStress {
-	person: number
-	timeMs: number
-	level: number
-}
-
 export interface RecordTenure {
 	person: number
 	seat: number
@@ -136,7 +130,6 @@ export interface PeopleRecord {
 	memoriesOf: Map<number, Map<number, RecordMemory[]>>
 	health: HealthRows
 	residencesOf: Map<number, RecordResidence[]>
-	stressOf: Map<number, RecordStress[]>
 	persons: PersonColumns
 	childrenOf: Map<number, number[]>
 	consorts: RecordConsort[]

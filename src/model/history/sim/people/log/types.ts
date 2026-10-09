@@ -22,7 +22,6 @@ export type PeopleRowKind =
 	| "pregnancy"
 	| "betrothal"
 	| "betrothal_end"
-	| "stress"
 	| "residence"
 	| "opinion_memory"
 	| "regent"
@@ -182,13 +181,6 @@ export interface ConditionRow {
 	after: number
 }
 
-export interface StressRow {
-	kind: "stress"
-	time: number
-	person: number
-	level: number
-}
-
 export interface ResidenceRow {
 	kind: "residence"
 	time: number
@@ -219,7 +211,6 @@ export type AppendedRow =
 	| PregnancyRow
 	| BetrothalRow
 	| BetrothalEndRow
-	| StressRow
 
 export type PeopleRow =
 	| OpinionMemoryRow
@@ -235,7 +226,6 @@ export type PeopleRow =
 	| PregnancyRow
 	| BetrothalRow
 	| BetrothalEndRow
-	| StressRow
 
 export interface AppendRowParams {
 	log: PeopleLog

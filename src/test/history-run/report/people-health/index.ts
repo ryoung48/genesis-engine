@@ -1,5 +1,4 @@
 import { PEOPLE_RECORD } from "@/model/history/record/people"
-import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
 import { HEALTH } from "@/model/history/sim/people/health"
@@ -38,7 +37,7 @@ const INCAPABLE = PEOPLE_LOG.conditions.indexOf("incapable")
 const AILING_HEALTH = 2.5
 
 function noWeakCrown(): CauseReport["weakCrownYears"] {
-	return { minority: 0, incapacity: 0, ailing: 0, stress: 0 }
+	return { minority: 0, incapacity: 0, ailing: 0 }
 }
 
 function createTracker({ engine }: TrackerParams): PeopleHealthTracker {
@@ -52,7 +51,6 @@ function createTracker({ engine }: TrackerParams): PeopleHealthTracker {
 		levelYears: Array.from({ length: AGEING_CONDITIONS }, () => [
 			0, 0, 0, 0, 0,
 		]),
-		heartRises: 0,
 		weakCrownYears: noWeakCrown(),
 		deadSeatHolderYears: 0,
 	}
@@ -64,12 +62,6 @@ function ingest({ tracker, transactions }: IngestHealthParams): void {
 		for (let index = 0; index < packet.count; index++) {
 			const row = PEOPLE_LOG.read({ rows: packet, index })
 			if (row.kind === "wedding") tracker.weddings++
-			else if (
-				row.kind === "condition" &&
-				row.condition === "faltering_heart" &&
-				row.before >= 0
-			)
-				tracker.heartRises++
 		}
 	}
 }
@@ -107,8 +99,6 @@ function sample({ engine, tracker }: SampleHealthParams): void {
 		if (regency) tracker.weakCrownYears[regency.cause]++
 		else if (HEALTH.effective({ people, person: ruler, time }) < AILING_HEALTH)
 			tracker.weakCrownYears.ailing++
-		else if (REGENCY.weak({ state: engine, realm }))
-			tracker.weakCrownYears.stress++
 	}
 }
 
@@ -299,7 +289,6 @@ function summarize({
 					levels,
 				]),
 			),
-			heartRises: tracker.heartRises,
 		},
 		causes: causes({ engine, tracker, from, to }),
 		command: command({ engine, tracker, from, to }),

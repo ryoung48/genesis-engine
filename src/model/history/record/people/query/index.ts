@@ -402,15 +402,10 @@ function traits({ people, id, timeMs }: PersonAtParams): TraitsView | null {
 	return {
 		personality: TRAITS.active({ character: person, age }),
 		congenital: TRAITS.congenital({ character: person, age }),
-		grades: TRAITS.labels({ character: person, age }),
+		grades: TRAITS.gradeTraits({ character: person, age }),
 	}
 }
-function stress({ people, id, timeMs }: PersonAtParams): number {
-	let level = 0
-	for (const row of people.stressOf.get(id) ?? [])
-		if (row.timeMs <= timeMs) level = row.level
-	return level
-}
+
 function residenceAt({ people, id, timeMs }: PersonAtParams): number {
 	const person = PEOPLE_RECORD.person({ people, id })
 	if (
@@ -446,17 +441,18 @@ function memoriesAt({ people, a, b, timeMs }: CoupleAtParams): RecordMemory[] {
 	return [...latest.values()]
 }
 
-// Everyone the person remembers or is remembered by, from refreshes made by
-// the time.
+// Partners with a memory that still contributes at the queried time.
 function memoryPartners({ people, id, timeMs }: PersonAtParams): number[] {
 	const partners = new Set<number>()
-	const begun = (rows: RecordMemory[]) =>
-		rows.some((row) => row.startTimeMs <= timeMs)
-	for (const [target, rows] of people.memoriesOf.get(id) ?? [])
-		if (begun(rows)) partners.add(target)
+	for (const target of people.memoriesOf.get(id)?.keys() ?? [])
+		if (activeMemories({ people, a: id, b: target, timeMs }).length > 0)
+			partners.add(target)
 	for (const [observer, targets] of people.memoriesOf) {
-		const rows = targets.get(id)
-		if (rows && begun(rows)) partners.add(observer)
+		if (
+			targets.has(id) &&
+			activeMemories({ people, a: observer, b: id, timeMs }).length > 0
+		)
+			partners.add(observer)
 	}
 	return [...partners]
 }
@@ -470,6 +466,10 @@ function memories(params: CoupleAtParams): MemoryView[] {
 			time: params.timeMs / yearMs,
 		}),
 	}))
+}
+
+function activeMemories(params: CoupleAtParams): MemoryView[] {
+	return memories(params).filter((memory) => memory.strength !== 0)
 }
 
 function opinionContext({
@@ -604,13 +604,13 @@ function popularity({
 export const PERSON_QUERY = {
 	opinion,
 	memories,
+	activeMemories,
 	memoryPartners,
 	popularity,
 	residenceAt,
 	realmAt,
 	attributes,
 	traits,
-	stress,
 	conditions,
 	deathCause,
 	view,

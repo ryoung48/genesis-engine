@@ -80,20 +80,9 @@ function incomeFactor(params: GovernorParams): number {
 				age:
 					params.state.time / STATE.yearMs -
 					params.state.people.persons.birth[person],
-				stressLevel: stressLevel(params),
 			})
 }
-function stressLevel(params: GovernorParams): number {
-	const person = of(params)
-	if (person < 0 || params.state.people.persons.stress[person] < 100) return 0
-	for (const seat of params.state.people.persons.heldSeats[person])
-		if (STATE.isSovereign({ state: params.state, p: seat }))
-			return Math.min(
-				3,
-				Math.floor(params.state.people.persons.stress[person] / 100),
-			)
-	return 0
-}
+
 function factor({ attribute, value }: AttributeFactorParams): number {
 	const delta = value - ATTRIBUTES.neutral(attribute)
 	if (attribute === "diplomacy" && delta === 0) return 0
@@ -121,7 +110,6 @@ export const GOVERNOR = {
 	regency,
 	attribute,
 	has,
-	stressLevel,
 	personAttribute,
 	factor,
 }

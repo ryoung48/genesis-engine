@@ -6,7 +6,6 @@ export interface CharacterSample {
 	personality: string[]
 	grades: string[]
 	congenital: string[]
-	stress: number
 	regency: boolean
 	ailing: boolean
 	revenue: number
@@ -47,7 +46,6 @@ export interface CharacterGroupStatistics {
 	gradeShares: Record<string, number>
 	congenitalShares: Record<string, number>
 	carriedShares: Record<string, number>
-	stressLevelShares: number[]
 }
 export interface CharacterPopulation {
 	all: CharacterGroup
@@ -89,11 +87,7 @@ export interface GeneticBirthGroup {
 }
 export interface CharacterReport {
 	rulers: CharacterPopulation
-	people: Omit<CharacterPopulation, "all"> & {
-		all:
-			| { observations: 0 }
-			| (CharacterGroupStatistics & { stressedNonRulers: number })
-	}
+	people: CharacterPopulation
 	enrichment: CharacterEnrichment
 	appliedEffects: Record<string, AppliedEffect>
 	weakCrownYears: Record<string, number>
@@ -112,8 +106,6 @@ export interface GroupAccumulator {
 	grades: Record<string, number>
 	congenital: Record<string, number>
 	carried: Record<string, number>
-	stress: number[]
-	stressedNonRulers: number
 }
 export interface PopulationAccumulator {
 	all: GroupAccumulator
@@ -125,7 +117,6 @@ export interface AccumulateParams {
 	group: GroupAccumulator | null
 	engine: HistoryState
 	person: number
-	sovereigns: Set<number>
 }
 export interface AppliedEffectAccumulator {
 	observations: number

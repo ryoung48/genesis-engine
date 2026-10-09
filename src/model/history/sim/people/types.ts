@@ -43,7 +43,6 @@ export interface PersonTable {
 	grades: number[]
 	congenital: number[]
 	carried: number[]
-	stress: number[]
 	sex: Sex[]
 	createdAt: number[]
 	birth: number[]
@@ -141,9 +140,6 @@ export interface PeopleState {
 	holdingsChanged: (person: number) => void
 	persons: PersonTable
 	alive: number[]
-	stressed: number[]
-	// Deaths of a spouse or child since the last yearly pass, by the bereaved.
-	bereavements: Map<number, number>
 	deliveries: Deliveries
 	rulerOf: Int32Array
 	// Patrician house heads of each electoral republic, by realm.

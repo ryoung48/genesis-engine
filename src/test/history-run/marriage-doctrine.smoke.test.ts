@@ -25,6 +25,7 @@ import { HASH } from "@/model/shared/random/hash"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { MARRIAGE_FIXTURE } from "@/test/history-run/fixtures/marriage"
+import { NO_RELIGION_SELECTION } from "@/test/history-run/no-religion-selection"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { PersonWikiPage } from "@/ui/wiki/person/PersonWikiPage"
@@ -523,8 +524,8 @@ it("renders orientation, consorts, patron and the new congenital traits", () => 
 	record.consortsOf.set(father, [0])
 	record.consortsOf.set(mother, [0])
 	const input: PersonWikiDataInput = {
+		religionSelection: NO_RELIGION_SELECTION,
 		selectedWikiPersonId: child,
-		planetName: "Fixture world",
 		sceneRef: { current: null },
 		setSelectedWikiNationId: () => undefined,
 		setSelectedWikiOrganizationId: () => undefined,
@@ -540,7 +541,7 @@ it("renders orientation, consorts, patron and the new congenital traits", () => 
 	}
 	const html = renderToStaticMarkup(createElement(PersonPreview, input))
 	expect(html).toContain("Orientation")
-	expect(html).toContain("inbred")
+	expect(html).toContain("Inbred")
 	expect(
 		renderToStaticMarkup(
 			createElement(PersonPreview, { ...input, selectedWikiPersonId: father }),

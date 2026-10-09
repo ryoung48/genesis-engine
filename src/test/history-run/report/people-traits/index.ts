@@ -7,7 +7,6 @@ import type { Attribute } from "@/model/history/sim/people/attributes/types"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { HEALTH } from "@/model/history/sim/people/health"
 import { KINSHIP } from "@/model/history/sim/people/kinship"
-import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
 import type {
 	AccumulateParams,
@@ -54,8 +53,6 @@ function group(): GroupAccumulator {
 		grades: {},
 		congenital: {},
 		carried: {},
-		stress: [0, 0, 0, 0],
-		stressedNonRulers: 0,
 	}
 }
 function population(): PopulationAccumulator {
@@ -75,7 +72,6 @@ function accumulate({
 	group,
 	engine,
 	person,
-	sovereigns,
 }: AccumulateParams): void {
 	const character = CHARACTER.of({ people: engine.people, person })
 	const age = engine.time / STATE.yearMs - engine.people.persons.birth[person]
@@ -119,9 +115,6 @@ function accumulate({
 	}
 	for (const target of targets) {
 		target.observations++
-		target.stress[STRESS.level(engine.people.persons.stress[person])]++
-		if (engine.people.persons.stress[person] > 0 && !sovereigns.has(person))
-			target.stressedNonRulers++
 		for (const key of [
 			"personality",
 			"grades",
@@ -160,7 +153,6 @@ function summarizeGroup(accumulator: GroupAccumulator): CharacterGroup {
 		gradeShares: shares(accumulator.grades),
 		congenitalShares: shares(accumulator.congenital),
 		carriedShares: shares(accumulator.carried),
-		stressLevelShares: accumulator.stress.map((count) => count / n),
 	}
 }
 function summarizePopulation(
@@ -223,7 +215,6 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 					: null,
 				engine,
 				person,
-				sovereigns,
 			})
 		}
 	for (let seat = 0; seat < engine.P; seat++) {
@@ -272,7 +263,6 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 			group: null,
 			engine,
 			person,
-			sovereigns,
 		})
 		const character = CHARACTER.of({ people: engine.people, person })
 		const age = time - table.birth[person]
@@ -336,7 +326,6 @@ function sample({ engine, tracker, start }: CharacterSampleParams): void {
 			personality: TRAITS.active({ character, age }),
 			grades: TRAITS.labels({ character, age }),
 			congenital: TRAITS.congenital({ character, age }),
-			stress: STRESS.level(table.stress[person]),
 			regency: regency !== null,
 			ailing: health < 2.5,
 			revenue:
@@ -524,16 +513,7 @@ function summarize({
 	}
 	const result: CharacterReport = {
 		rulers,
-		people: {
-			...people,
-			all:
-				"attributes" in people.all
-					? {
-							...people.all,
-							stressedNonRulers: tracker.people.all.stressedNonRulers,
-						}
-					: people.all,
-		},
+		people,
 		enrichment: {
 			rulers: enriched,
 			others,
@@ -571,7 +551,6 @@ function summarize({
 		weakCrownYears: {
 			regency: rows.filter((row) => row.regency).length,
 			ailing: rows.filter((row) => row.ailing).length,
-			stress: rows.filter((row) => row.stress === 3).length,
 		},
 		effects,
 	}

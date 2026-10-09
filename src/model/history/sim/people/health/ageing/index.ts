@@ -7,7 +7,6 @@ import type {
 	ConditionLevels,
 	ConditionRow,
 	HealthCondition,
-	HeartRise,
 	LevelChangeParams,
 	OnsetChanceParams,
 	ProgressOption,
@@ -43,7 +42,6 @@ const BLIND_FLAG = 8
 const INCAPABLE_FLAG = 16
 const LEVEL_XP = 25
 const MAX_XP = 100
-const HEART_RISE_XP = 25
 const SKILLS: readonly Attribute[] = [
 	"diplomacy",
 	"martial",
@@ -73,8 +71,6 @@ function row(values: Partial<ConditionRow>): ConditionRow {
 		health: 0,
 		fertility: 0,
 		attraction: 0,
-		stressGain: 0,
-		stressLoss: 0,
 		advantage: 0,
 		life: 0,
 		...values,
@@ -117,15 +113,12 @@ const FRAGILE_FOURTH = row({
 	advantage: -10,
 	life: 10,
 })
-const WITHERING_BASE = row({ additions: { learning: -2 }, stressGain: 0.2 })
+const WITHERING_BASE = row({ additions: { learning: -2 } })
 const WITHERING_LEVEL = row({
 	percentages: Object.fromEntries(SKILLS.map((skill) => [skill, -0.25])),
-	stressGain: 0.2,
 })
 const HEART = row({
 	additions: { prowess: -1 },
-	stressGain: 0.2,
-	stressLoss: -0.2,
 	health: -0.1,
 })
 // CK3 00_traits.txt: each condition's base row, then one row per level
@@ -233,7 +226,6 @@ function sumRows(levels: ConditionLevels): ConditionEffects {
 			percentages: zero(),
 			incapable: levels[INCAPABLE] >= 0,
 		},
-		stress: { gain: 0, loss: 0 },
 		health: 0,
 		fertility: 0,
 		attraction: 0,
@@ -248,8 +240,6 @@ function sumRows(levels: ConditionLevels): ConditionEffects {
 				total.attributes.additions[name] += entry.additions[name] ?? 0
 				total.attributes.percentages[name] += entry.percentages[name] ?? 0
 			}
-			total.stress.gain += entry.stressGain
-			total.stress.loss += entry.stressLoss
 			total.health += entry.health
 			total.fertility += entry.fertility
 			total.attraction += entry.attraction
@@ -290,13 +280,12 @@ function onsetChance({ condition, age, health }: OnsetChanceParams): number {
 
 // CK3 yearly_health_pulse effect block: the yearly XP gains and their
 // weights, with the sim's stand-ins for friends, lovers and the Athletic
-// trait folded into the constants. Faltering Heart has no yearly gain.
+// trait folded into the constants.
 function progressOptions({
 	condition,
 	age,
 	health,
 	prowess,
-	stressLevel,
 	led,
 }: ProgressParams): ProgressOption[] {
 	if (condition === INFIRM) {
@@ -309,10 +298,10 @@ function progressOptions({
 	}
 	if (condition === WITHERING_MIND)
 		return [
-			{ xp: 50, weight: 9 + 2 * stressLevel },
-			{ xp: 8, weight: 48 + 4 * stressLevel },
+			{ xp: 50, weight: 9 },
+			{ xp: 8, weight: 48 },
 			{ xp: 4, weight: 75 },
-			{ xp: 1, weight: stressLevel === 0 ? 10 : 0 },
+			{ xp: 1, weight: 10 },
 		]
 	if (condition === FRAGILE_BONES)
 		return [
@@ -325,6 +314,12 @@ function progressOptions({
 			{ xp: 15, weight: 5 },
 			{ xp: 9, weight: 20 },
 			{ xp: 3, weight: 75 },
+		]
+	if (condition === FALTERING_HEART)
+		return [
+			{ xp: 2, weight: 75 },
+			{ xp: 4, weight: 25 },
+			{ xp: 8, weight: (age >= 65 ? 25 : 0) + (health < 3 ? 25 : 0) },
 		]
 	return []
 }
@@ -347,7 +342,6 @@ function step({
 	age,
 	health,
 	prowess,
-	stressLevel,
 	led,
 }: AgeingStepParams): ConditionChange[] {
 	const table = people.persons
@@ -365,7 +359,6 @@ function step({
 				age,
 				health,
 				prowess,
-				stressLevel,
 				led,
 			})
 			let total = 0
@@ -436,33 +429,21 @@ function step({
 	return changes
 }
 
-// CK3 stress_threshold.0001: a mental break adds a quarter of the Faltering
-// Heart track, and the full track kills.
-function heartRise({ people, person }: AgeingPersonParams): HeartRise {
-	const column = people.persons.falteringHeartXp
-	const xp = column[person]
-	if (xp < 0 || xp >= MAX_XP) return { terminal: false, change: null }
-	const next = Math.min(MAX_XP, xp + HEART_RISE_XP)
-	column[person] = next
-	return {
-		terminal: next >= MAX_XP,
-		change:
-			levelOf(xp) === levelOf(next)
-				? null
-				: {
-						condition: FALTERING_HEART,
-						before: levelOf(xp),
-						after: levelOf(next),
-					},
-	}
-}
-
 function incapable({ people, person }: AgeingPersonParams): boolean {
 	return (people.persons.healthFlags[person] & INCAPABLE_FLAG) !== 0
 }
 
 function blind({ people, person }: AgeingPersonParams): boolean {
 	return (people.persons.healthFlags[person] & BLIND_FLAG) !== 0
+}
+
+function heartFailed({ people, person }: AgeingPersonParams): boolean {
+	return people.persons.falteringHeartXp[person] >= MAX_XP
+}
+
+function spareHeart({ people, person }: AgeingPersonParams): void {
+	const column = people.persons.falteringHeartXp
+	column[person] = Math.min(column[person], MAX_XP - 1)
 }
 
 export const AGEING = {
@@ -477,7 +458,8 @@ export const AGEING = {
 	onsetChance,
 	progressOptions,
 	step,
-	heartRise,
 	incapable,
 	blind,
+	heartFailed,
+	spareHeart,
 }

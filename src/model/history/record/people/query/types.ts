@@ -13,6 +13,7 @@ import type { SeatKind } from "@/model/history/sim/people/log/types"
 import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import type {
 	CongenitalTrait,
+	GradeTrait,
 	PersonalityTrait,
 } from "@/model/history/sim/people/traits/types"
 import type { SeatChangeReason } from "@/model/history/sim/people/types"
@@ -150,7 +151,7 @@ export interface AttributeView {
 export interface TraitsView {
 	personality: PersonalityTrait[]
 	congenital: CongenitalTrait[]
-	grades: string[]
+	grades: GradeTrait[]
 }
 
 export interface RealmAtParams extends PersonAtParams {

@@ -8,15 +8,14 @@ import type {
 	GeneResult,
 	Grade,
 	GradeParams,
+	GradeTrait,
 	GradeValues,
-	IncomeParams,
 	InheritParams,
 	LadderDrawParams,
 	OppositesParams,
 	PersonalityTrait,
 	ReputationParams,
 	ScalarTraitModifier,
-	StressFactorsParams,
 	TraitAtParams,
 	TraitDefinition,
 	TraitHasParams,
@@ -39,8 +38,6 @@ function definition(row: TraitRow): TraitDefinition {
 		attraction,
 		opinion,
 		vassalOpinion,
-		stressGain,
-		stressLoss,
 		warChance,
 		income,
 	] = row
@@ -52,69 +49,67 @@ function definition(row: TraitRow): TraitDefinition {
 		attraction,
 		opinion,
 		vassalOpinion,
-		stressGain,
-		stressLoss,
 		warChance,
 		income,
 	}
 }
 const PERSONALITY_ROWS: TraitRow[] = [
-	["brave", 0, 2, 0, 0, 0, 3, 0, 0, 10, 0, 0, 0, 0, 0, 0],
-	["craven", 0, -2, 0, 2, 0, -3, 0, 0, -10, 0, 0, 0, 0, 0, 0],
-	["ambitious", 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0.25, 0, 1, 0],
-	["content", 0, 0, 0, -1, 2, 0, 0, 0, 0, 0, 0, 0, 0.1, -0.25, 0],
-	["wrathful", -1, 3, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0],
-	["calm", 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0.1, -0.25, 0],
-	["just", 0, 0, 2, -3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["arbitrary", 0, 0, -2, 3, -1, 0, 0, 0, 0, 0, -5, -0.5, 0, 0, 0],
-	["diligent", 2, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, -0.5, 0, 0],
-	["lazy", -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0],
-	["generous", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1],
-	["greedy", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.05],
-	["lustful", 0, 0, 0, 2, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0],
-	["chaste", 0, 0, 0, 0, 2, 0, 0, -0.25, 0, 0, 0, 0, 0, 0, 0],
-	["temperate", 0, 0, 2, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0],
-	["gluttonous", 0, 0, -2, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0.1, 0, 0],
-	["patient", 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["impatient", 0, 0, 0, 0, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["humble", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["arrogant", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["honest", 2, 0, 0, -4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["deceitful", -2, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["gregarious", 2, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0],
-	["shy", -2, 0, 0, 0, 1, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0],
-	["zealous", 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["cynical", 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["trusting", 2, 0, 0, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["paranoid", -1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-	["forgiving", 2, 0, 0, -2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["vengeful", -2, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["compassionate", 2, 0, 0, -2, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0],
-	["callous", -2, 0, 0, 2, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0],
-	["sadistic", 0, 0, 0, 2, 0, 4, 0, 0, 0, -10, 0, 0, 0, 0, 0],
-	["stubborn", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["fickle", 2, 0, -2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["eccentric", -2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0, 0],
+	["brave", 0, 2, 0, 0, 0, 3, 0, 0, 10, 0, 0, 0, 0],
+	["craven", 0, -2, 0, 2, 0, -3, 0, 0, -10, 0, 0, 0, 0],
+	["ambitious", 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0],
+	["content", 0, 0, 0, -1, 2, 0, 0, 0, 0, 0, 0, -0.25, 0],
+	["wrathful", -1, 3, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0.25, 0],
+	["calm", 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, -0.25, 0],
+	["just", 0, 0, 2, -3, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+	["arbitrary", 0, 0, -2, 3, -1, 0, 0, 0, 0, 0, -5, 0, 0],
+	["diligent", 2, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+	["lazy", -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0],
+	["generous", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1],
+	["greedy", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.05],
+	["lustful", 0, 0, 0, 2, 0, 0, 0, 0.25, 0, 0, 0, 0, 0],
+	["chaste", 0, 0, 0, 0, 2, 0, 0, -0.25, 0, 0, 0, 0, 0],
+	["temperate", 0, 0, 2, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0],
+	["gluttonous", 0, 0, -2, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0],
+	["patient", 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+	["impatient", 0, 0, 0, 0, -2, 0, 0, 0, 0, 0, 0, 0, 0],
+	["humble", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["arrogant", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["honest", 2, 0, 0, -4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["deceitful", -2, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["gregarious", 2, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0],
+	["shy", -2, 0, 0, 0, 1, 0, 0, 0, -5, 0, 0, 0, 0],
+	["zealous", 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["cynical", 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+	["trusting", 2, 0, 0, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["paranoid", -1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["forgiving", 2, 0, 0, -2, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+	["vengeful", -2, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0],
+	["compassionate", 2, 0, 0, -2, 0, 0, 0, 0, 5, 0, 0, 0, 0],
+	["callous", -2, 0, 0, 2, 0, 0, 0, 0, -5, 0, 0, 0, 0],
+	["sadistic", 0, 0, 0, 2, 0, 4, 0, 0, 0, -10, 0, 0, 0],
+	["stubborn", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["fickle", 2, 0, -2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["eccentric", -2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0],
 ]
 const PERSONALITY = PERSONALITY_ROWS.map(definition)
 const CONGENITAL_ROWS: TraitRow[] = [
-	["giant", 0, 0, 0, 0, 0, 6, -0.25, 0, -5, 0, 0, 0, 0, 0, 0],
-	["dwarf", 0, 0, 0, 0, 0, -4, 0, 0, -20, 0, 0, 0, 0, 0, 0],
-	["clubfooted", 0, 0, 0, 0, 0, -2, 0, 0, -10, 0, 0, 0, 0, 0, 0],
-	["hunchbacked", 0, 0, 0, 0, 0, -2, 0, 0, -30, 0, -10, 0, 0, 0, 0],
-	["spindly", 0, 0, 0, 0, 0, -1, -0.25, 0, -10, 0, 0, 0, 0, 0, 0],
-	["lisping", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["stuttering", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-	["bleeder", 0, 0, 0, 0, 0, 0, -1.5, 0, 0, 0, -10, 0, 0, 0, 0],
-	["wheezing", 0, 0, 0, 0, 0, 0, -0.15, 0, 0, 0, -10, 0, 0, 0, 0],
-	["infertile", 0, 0, 0, 0, 0, 0, 0, -0.5, 0, 0, 0, 0, 0, 0, 0],
-	["scaly", 0, 0, 0, 0, 0, 0, 0, -0.2, -30, 0, -10, 0, 0, 0, 0],
-	["albino", 0, 0, 0, 0, 0, 0, 0, 0, 0, -10, 0, 0, 0, 0, 0],
-	["depressed", -1, -1, -1, -1, 0, 0, -0.5, -0.1, 0, 0, 0, 0, 0, 0, 0],
-	["lunatic", 0, 0, 0, 0, 0, 0, -0.25, 0, -10, 0, -10, 0, 0, 0, 0],
-	["possessed", 0, 0, 0, 0, 0, 0, -0.5, 0, -10, 0, 0, 0, 0, 0, 0],
-	["inbred", -5, -5, -5, -5, -5, -2, -1.5, -0.5, -30, 0, -10, 0, 0, 0, 0],
-	["pure_blooded", 0, 0, 0, 0, 0, 0, 0.25, 0.1, 0, 0, 0, 0, 0, 0, 0],
+	["giant", 0, 0, 0, 0, 0, 6, -0.25, 0, -5, 0, 0, 0, 0],
+	["dwarf", 0, 0, 0, 0, 0, -4, 0, 0, -20, 0, 0, 0, 0],
+	["clubfooted", 0, 0, 0, 0, 0, -2, 0, 0, -10, 0, 0, 0, 0],
+	["hunchbacked", 0, 0, 0, 0, 0, -2, 0, 0, -30, 0, -10, 0, 0],
+	["spindly", 0, 0, 0, 0, 0, -1, -0.25, 0, -10, 0, 0, 0, 0],
+	["lisping", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["stuttering", -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	["bleeder", 0, 0, 0, 0, 0, 0, -1.5, 0, 0, 0, -10, 0, 0],
+	["wheezing", 0, 0, 0, 0, 0, 0, -0.15, 0, 0, 0, -10, 0, 0],
+	["infertile", 0, 0, 0, 0, 0, 0, 0, -0.5, 0, 0, 0, 0, 0],
+	["scaly", 0, 0, 0, 0, 0, 0, 0, -0.2, -30, 0, -10, 0, 0],
+	["albino", 0, 0, 0, 0, 0, 0, 0, 0, 0, -10, 0, 0, 0],
+	["depressed", -1, -1, -1, -1, 0, 0, -0.5, -0.1, 0, 0, 0, 0, 0],
+	["lunatic", 0, 0, 0, 0, 0, 0, -0.25, 0, -10, 0, -10, 0, 0],
+	["possessed", 0, 0, 0, 0, 0, 0, -0.5, 0, -10, 0, 0, 0, 0],
+	["inbred", -5, -5, -5, -5, -5, -2, -1.5, -0.5, -30, 0, -10, 0, 0],
+	["pure_blooded", 0, 0, 0, 0, 0, 0, 0.25, 0.1, 0, 0, 0, 0, 0],
 ]
 const INBRED_RELATEDNESS_MULT = 0.3
 const PUREBLOODED_INBRED_RELATEDNESS_MULT = 0.03
@@ -484,30 +479,7 @@ function has({ character, age, trait }: TraitHasParams): boolean {
 			return true
 	return false
 }
-function stressFactors(params: StressFactorsParams) {
-	return {
-		gain: Math.max(
-			0,
-			1 +
-				modifier({
-					character: params.character,
-					age: params.age,
-					modifier: "stressGain",
-				}) +
-				params.conditions.reduce((sum, condition) => sum + condition.gain, 0),
-		),
-		loss: Math.max(
-			0,
-			1 +
-				modifier({
-					character: params.character,
-					age: params.age,
-					modifier: "stressLoss",
-				}) +
-				params.conditions.reduce((sum, condition) => sum + condition.loss, 0),
-		),
-	}
-}
+
 function warChance(params: TraitAtParams): number {
 	return (
 		(1 +
@@ -519,17 +491,14 @@ function warChance(params: TraitAtParams): number {
 		1.11
 	)
 }
-function incomeFactor(params: IncomeParams): number {
+function incomeFactor(params: TraitAtParams): number {
 	return (
 		1 +
 		modifier({
 			character: params.character,
 			age: params.age,
 			modifier: "income",
-		}) +
-		(has({ character: params.character, age: params.age, trait: "greedy" })
-			? 0.1 * params.stressLevel
-			: 0)
+		})
 	)
 }
 function fertility(params: TraitAtParams): number {
@@ -551,7 +520,7 @@ function visibleCongenital(character: Character): TraitDefinition[] {
 function congenital({ character }: TraitAtParams) {
 	return visibleCongenital(character).map((row) => row.name as CongenitalTrait)
 }
-function labels({ character }: TraitAtParams): string[] {
+function gradeTraits({ character }: TraitAtParams): GradeTrait[] {
 	const names = {
 		intellect: [
 			"Imbecile",
@@ -583,8 +552,13 @@ function labels({ character }: TraitAtParams): string[] {
 	}
 	return LADDERS.flatMap((ladder) => {
 		const value = grade({ character, ladder }).active
-		return value === 0 ? [] : [names[ladder][value + 3]]
+		return value === 0
+			? []
+			: [{ label: names[ladder][value + 3], grade: value }]
 	})
+}
+function labels(params: TraitAtParams): string[] {
+	return gradeTraits(params).map((trait) => trait.label)
 }
 function attraction(params: TraitAtParams): number {
 	const beauty = grade({ character: params.character, ladder: "beauty" }).active
@@ -641,12 +615,12 @@ export const TRAITS = {
 	reputation,
 	congenital,
 	labels,
+	gradeTraits,
 	draw,
 	active,
 	modifier,
 	has,
 	health,
-	stressFactors,
 	warChance,
 	incomeFactor,
 	fertility,

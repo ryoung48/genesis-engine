@@ -26,15 +26,6 @@ function before({ state, person, cause }: DeathEffectParams): void {
 		row: { kind: "death", person, time: table.death[person], cause },
 	})
 	BETROTHAL.release({ people, person, time, cause: "death" })
-	const bereaved = [table.spouse[person], table.father[person]]
-	if (table.mother[person] !== table.father[person])
-		bereaved.push(table.mother[person])
-	for (const relative of bereaved)
-		if (relative >= 0 && PEOPLE.aliveAt({ people, person: relative, time }))
-			people.bereavements.set(
-				relative,
-				(people.bereavements.get(relative) ?? 0) + 1,
-			)
 	for (const partner of table.consorts[person]) table.patron[partner] = -1
 	table.consorts[person] = []
 	const patron = table.patron[person]

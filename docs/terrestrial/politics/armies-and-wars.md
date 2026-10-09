@@ -33,7 +33,7 @@ Civilian surplus supplies the army readiness budget. See [economic output, taxat
 
 Both prices scale by `(realm output per resident / 450)^0.5` and the shared silver-to-ducat conversion. Upkeep integrates actual soldier-years, including gradual replacements, over each peace/campaign interval. Only mobilized commitments pay campaign prices. Battle logistics caps do not reduce mobilized upkeep.
 
-Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, distinguishing projected annual upkeep from settled interval expense. Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
+Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, labelled "settled interval" once the interval has settled. Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
 
 A [coronation](government-and-succession.md#coronation) is an immediate one-off cash expense recorded as the negative "Coronation" budget row (`coronationExpenses`), beside bought peace and realm splits. It contributes once through `otherChangesTotal`; recurring tax/army settlement and `annualBalance` exclude it. Tax previews and settlement preserve this accumulator. Census snapshots record it, then reset it for the next interval.
 
@@ -331,7 +331,7 @@ Rebellion previews calculate each prospective territory with the same economy an
 
 ## Attribute and trait effects
 
-Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers, in every field battle and whoever leads: a regent's martial counts for a regent-governed realm. Sieges and raids do not use commander character. See [attributes, traits and stress](../people/attributes-traits-and-stress.md) for the full rules.
+Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers, in every field battle and whoever leads: a regent's martial counts for a regent-governed realm. Sieges and raids do not use commander character. See [attributes and traits](../people/attributes-and-traits.md) for the full rules.
 
 ## Command
 

@@ -301,7 +301,6 @@ it("folds deaths, conditions, causes and command into each window by hand count"
 		blind: { onsets: 1, meanAge: 62 },
 		incapable: { onsets: 1, meanAge: 59 },
 	})
-	expect(report.conditions.heartRises).toBe(1)
 	expect(report.conditions.from50To59.personYears).toBe(0)
 	// The window is [100, 110): the note at 110 belongs to the next one.
 	expect(report.causes.regenciesStarted).toEqual({ minority: 1, incapacity: 2 })

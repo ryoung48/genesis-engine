@@ -31,10 +31,10 @@ A person's row is written at the **first journal flush after their creation**, f
 | `pregnancy` / 6 | when the pregnancy ends | mother | father | loss-outcome code | 0 |
 | `betrothal` / 7 | when made | a | b | 0 | 0 |
 | `betrothal_end` / 8 | when released | a | b | end-cause code | 0 |
-| `stress` / 9 | when the level changed | person | new level | 0 | 0 |
-| `residence` / 10 | effective move or corrected birth | person | province ID | 0 | 0 |
-| `opinion_memory` / 11 | refresh (start) | observer | target | reason code | 0 |
-| `regent` / 12 | 0 | seat | regent (−1 for a council or the regency's end) | ward | seat-reason code |
+| `residence` / 9 | effective move or corrected birth | person | province ID | 0 | 0 |
+| `opinion_memory` / 10 | refresh (start) | observer | target | reason code | 0 |
+| `regent` / 11 | 0 | seat | regent (−1 for a council or the regency's end) | ward | seat-reason code |
+| `consort` / 12 | relationship start | patron | partner | wife 0, concubine 1 | 0 |
 
 - **Time** is simulation years, the unit the person table uses. It is each row's *effective* time. Deaths, pregnancies, weddings and health rows are written when they happen, so their time is never after their transaction's; siblings and house founders are created with past births, so time is still not an ordering key.
 - **Seat and regent rows carry no time.** Their time is the enclosing transaction's. Writing it into the column as years would round-trip through a division and could move a tenure boundary.
@@ -73,7 +73,7 @@ Packets are copied to exact size rather than transferred as fixed chunks: a year
 `PEOPLE_RECORD.append` folds a packet's rows in append order and keeps no reference to it.
 
 - **Columns.** `PeopleRecord.persons` is dense columns indexed by person id: the snapshot fields plus birth, father and mother, with times converted to record milliseconds, grown by doubling. Health adds four: the snapshot band, the record time it holds from (`Infinity` for someone created dead), the death cause, and the index of the person's latest health row. Ingestion checks that each creation row's id is the number of people already stored. Read people through `PEOPLE_RECORD.count`, `.has`, `.person` (a transient `RecordPerson`), `.birthTimeMs` and `.deathTimeMs`, not through the columns.
-- **Derived objects.** `childrenOf`, `marriages`, `marriagesOf`, `tenures` with `tenuresOf`, `tenuresOfSeat`, `regentsOfSeat` and `regentsOfWard`, `dynastyHome`, `pregnanciesOf`, `betrothals`, `betrothalsOf`, `stressOf` and sparse `residencesOf`. Tenures and betrothals have an open end that a later row closes, so they are state folded from rows, not rows.
+- **Derived objects.** `childrenOf`, `marriages`, `marriagesOf`, `tenures` with `tenuresOf`, `tenuresOfSeat`, `regentsOfSeat` and `regentsOfWard`, `dynastyHome`, `pregnanciesOf`, `betrothals`, `betrothalsOf`, sparse `residencesOf`. Tenures and betrothals have an open end that a later row closes, so they are state folded from rows, not rows.
 - **Health rows.** `PeopleRecord.health` is one set of typed columns for every `health_band` and `condition` row in arrival order: time, code (0 for a band, else the condition's code plus one), value (the band, or the level after the change) and the index of the same person's previous row, 17 bytes a row. A person's rows are read by walking that chain back from their latest.
 - **Memory refreshes.** `memoriesOf` maps observer to target to that pair's refreshes in arrival order, each a reason and a start in record milliseconds. Nothing is ever removed or overwritten: the record holds refreshes only, and decay is computed at the query. An `opinion_memory` row naming a person the record does not hold is an error, and creation rows precede it in the same packet.
 - **Fold.** A `death` row sets the person's death date and cause. A `wedding` closes the pair's standing betrothal as `married`; a `betrothal_end` closes it with its cause. A tenure keeps the reason it started and the reason it ended. A seat that changes hands more than once in one transaction keeps only its last holder, though the first change still closes the tenure that was open; `regent` rows are tracked apart from `seat` rows on the same seat.
@@ -101,7 +101,7 @@ See [person packet measurements](pipeline-performance.md#person-packet-measureme
 
 ## Record and wiki
 
-- **Journal and record.** Each journal transaction carries its people rows as one typed-array packet, and `PEOPLE_RECORD` folds the packets into person columns and the derived marriages, betrothals, tenures, pregnancies and stress rows. [People records](person-records.md) has the row kinds, the packet and the record's structures. A ruler's `rulerChange` entry on the nation timeline gets their death date and cause when they die.
+- **Journal and record.** Each journal transaction carries its people rows as one typed-array packet, and `PEOPLE_RECORD` folds the packets into person columns and the derived marriages, betrothals, tenures, pregnancies. [People records](person-records.md) has the row kinds, the packet and the record's structures. A ruler's `rulerChange` entry on the nation timeline gets their death date and cause when they die.
 - **Queries.** `PERSON_QUERY` gives the person view, the timeline, the seat holder at a time, the health band, the conditions and the cause of death, all at the selected time and from recorded rows only. On a mother's timeline, "miscarriage" and "stillborn child" are added. The death row reads "died", "died in childbirth", "died of heart failure" or "was killed in battle" by its cause. Conditions add "developed", "worsened", "no longer had", "went blind" and "became incapable" rows. The person page shows Health, Conditions (with levels) and, for the dead, Cause of death. "betrothed", "betrothal broken" for alliance breaks, and "betrothal broken for kinship" for known ancestral intersections are added. The person page shows them as Family rows, and a "Betrothed" chip group while a betrothal stands.
 - **Nation timelines.** Only realm-level person events reach them:
   - successions, naming a predecessor who was killed in battle, died of heart failure or died in childbirth;
@@ -114,9 +114,9 @@ See [person packet measurements](pipeline-performance.md#person-packet-measureme
   Everything else stays on the person page.
 - **Partition wording.** A realm created by a partition reads "Split from X in the partition of [late ruler]'s realm, under [heir]". On person pages a seat taken or lost in one reads "became ruler of Y in the partition of X", "took the seat of Z in the partition of X" or "lost Y in the partition of X". The nation stats show a Succession row: Single heir, Partition, Election or Appointment.
 
-## Attribute and stress queries
+## Attribute and trait queries
 
-Person rows preserve packed innate attributes and traits. Stress rows record level changes and resets; `PERSON_QUERY.attributes`, `.traits` and `.stress` read those properties at the selected date, with personality ages 9/11/13.
+Person rows preserve packed innate attributes and traits. `PERSON_QUERY.attributes`, `.traits` read those properties at the selected date, with personality ages 9/11/13.
 
 ## Opinion inputs and creation availability
 

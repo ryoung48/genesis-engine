@@ -26,7 +26,6 @@ import type {
 import { HEALTH } from "@/model/history/sim/people/health"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
 
 // Living children allowed per couple, by standing 0-5.
@@ -305,16 +304,12 @@ function conceive({
 			TRAITS.fertility({
 				character: CHARACTER.of({ people, person: mother }),
 				age: 16,
-			}) *
-			STRESS.fertilityFactor(table.stress[mother]) *
-			HEALTH.fertility({ people, person: mother })
+			}) * HEALTH.fertility({ people, person: mother })
 		fatherCharacterFertility ??=
 			TRAITS.fertility({
 				character: CHARACTER.of({ people, person: father }),
 				age: 16,
-			}) *
-			STRESS.fertilityFactor(table.stress[father]) *
-			HEALTH.fertility({ people, person: father })
+			}) * HEALTH.fertility({ people, person: father })
 		const motherFertility =
 			Math.max(0, table.fertility[mother] - 0.05 * earlier) *
 			motherAgeFactor(motherAge) *

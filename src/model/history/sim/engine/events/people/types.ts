@@ -12,13 +12,6 @@ export interface PeopleEventParams {
 	rng: SharedRng
 }
 
-export interface FailHeartsParams {
-	state: HistoryState
-	// Rulers whose heart failed this year, in person order.
-	hearts: number[]
-	rng: SharedRng
-}
-
 export interface StateParams {
 	state: HistoryState
 }

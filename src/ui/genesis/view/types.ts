@@ -114,9 +114,9 @@ export interface ReligionWikiDataInput {
 }
 
 export type PersonWikiDataInput = WikiSelectionSetters & {
+	religionSelection: ReligionSelection
 	selectedWikiPersonId: number | null
 	history: HistoryTimeline
-	planetName: string
 	sceneRef: SceneRef
 }
 

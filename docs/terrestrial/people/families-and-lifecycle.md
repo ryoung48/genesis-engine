@@ -16,11 +16,10 @@ A birth or a death takes effect at the time it happens, as its own event. A wedd
 
 `PEOPLE_YEAR` at year Y. Births and deaths due at Y have already run.
 
-1. **Stress.** Every sovereign ruler is stepped once, from a list fixed at the start. Hearts that failed are then dated to Y, all of them before any succession, and die in person order.
-2. **Health.** Completed ages are processed and death is projected over `[Y, Y+1)`; a chosen date gets a death event. A sovereign who became Incapable gets a regent.
-3. **Seats and alliances.** District settlement and grants, the marriage-alliance review, patrician upkeep.
-4. **Weddings.** Betrothals whose parties are both 16 are fulfilled, seekers are matched, and every wedding is complete at Y: the household has moved and the alliance or heiress union is settled.
-5. **Conceptions.** Each married couple in scope is projected once over `[Y, Y+1)`, in person order; the marriage-alliance review runs again; the next pass is queued.
+1. **Health.** Completed ages are processed and death is projected over `[Y, Y+1)`; a chosen date gets a death event. A sovereign who became Incapable gets a regent.
+2. **Seats and alliances.** District settlement and grants, the marriage-alliance review, patrician upkeep.
+3. **Weddings.** Betrothals whose parties are both 16 are fulfilled, seekers are matched, and every wedding is complete at Y: the household has moved and the alliance or heiress union is settled.
+4. **Conceptions.** Each married couple in scope is projected once over `[Y, Y+1)`, in person order; the marriage-alliance review runs again; the next pass is queued.
 
 ## Life
 
@@ -37,7 +36,7 @@ A birth or a death takes effect at the time it happens, as its own event. A wedd
 
 - **Who.** Both parents alive, capable and 16+, the mother under 45 at the due date, not within 3 months of her last pregnancy's end, and the couple's living children below their cap.
 - **Monthly chance.** Mother: `max(0, fertility − 0.05 × her earlier children)` × her age factor (1 to 25, 0.9 to 30, 0.7 to 35, 0.5 to 40, 0.33 to 45, else 0.1). Father: `fertility` × his age factor (1 to 35, 0.9 to 40, 0.8 to 50, 0.7 to 60, 0.6 to 70, else 0.5). The chance is `clamp(((mother + father) / 2 + bonus) × 0.0475, 0.01, 0.25)`, × 0.85 unless one spouse holds a seat. The bonus is 0.3 for a seat holder's first child.
-- **Trait and stress fertility effects.** Each parent's fertility term is multiplied by `max(0, 1 + active trait fertility sum)`, by the stress fertility factor (1, 0.9, 0.7, 0.5) and by the Infirm fertility factor (−10% per row reached). Carried traits contribute nothing.
+- **Trait fertility effects.** Each parent's fertility term is multiplied by `max(0, 1 + active trait fertility sum)` and by the Infirm fertility factor (−10% per row reached). Carried traits contribute nothing.
 - **Outcome**, as weights out of `N + 17`: normal birth N = 215 (−10 if the mother's health is 5 or below, −25 if 3 or below; +5 with 2+ earlier children, +5 more with 4+); miscarriage 10 (80–120 days); stillbirth 3 (180–200 days); mother dies 2 (the child is born at 280 days and she dies at the birth); mother and child die 2 (180–200 days). About 1.5% of pregnancies kill the mother.
 - **Twins**, on a live birth: 4% if the mother is 25–35, else 2%; +5% if she has had twins, +3% if her mother has. Girls are 49%.
 - **Standing** of a seat is its title tier + 1 (1 for a county seat, up to 5 for a hegemony). A couple's standing is the highest `peak` among the spouses and their parents.
@@ -105,7 +104,7 @@ The detailed report's `diagnostics.startingFamilies` separates predecessor propo
 
 `PERSON_DEATH.run` applies an accepted token once, in this order:
 
-1. The death row is written with its cause; the betrothal is released; both spouse pointers are cleared; the spouse and parents are noted as bereaved for the next stress step; a mother's pending deliveries are cancelled.
+1. The death row is written with its cause; the betrothal is released; both spouse pointers are cleared; a mother's pending deliveries are cancelled.
 2. The frozen seat walk passes on every seat the person held ([household residence](../politics/government-and-succession.md#holder-death-scheduling)).
 3. Each regency the person held as regent is given to the next in order.
 

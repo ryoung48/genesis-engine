@@ -76,7 +76,6 @@ function create(provinceCount: number): PeopleState {
 			grades: [],
 			congenital: [],
 			carried: [],
-			stress: [],
 			sex: [],
 			createdAt: [],
 			birth: [],
@@ -111,8 +110,6 @@ function create(provinceCount: number): PeopleState {
 			ledYear: [],
 		},
 		alive: [],
-		stressed: [],
-		bereavements: new Map(),
 		deliveries: {
 			next: 0,
 			byId: new Map(),
@@ -154,7 +151,6 @@ function add({
 	table.grades.push(0)
 	table.congenital.push(0)
 	table.carried.push(0)
-	table.stress.push(0)
 	table.sex.push(sex)
 	table.orientation.push(ORIENTATION.of({ seed: nameSeed }))
 	table.consorts.push([])

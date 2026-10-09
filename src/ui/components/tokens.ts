@@ -21,6 +21,7 @@ export const uiPalette = {
 	activeDark: "#0f172a",
 	person: {
 		noHouse: "#94a3b8",
+		deceased: "#000000",
 		health: {
 			Excellent: "#15803d",
 			Good: "#22c55e",
@@ -28,6 +29,20 @@ export const uiPalette = {
 			Poor: "#f59e0b",
 			"Near death": "#ea580c",
 			Dying: "#b91c1c",
+		},
+		trait: {
+			virtue: "#0d9488",
+			vice: "#e11d48",
+			neutral: "#7c3aed",
+			gift: "#0284c7",
+			defect: "#ea580c",
+			lineage: "#ca8a04",
+		},
+		condition: ["#eab308", "#f59e0b", "#f97316", "#ea580c", "#b91c1c"],
+		opinion: {
+			positive: "#0d9488",
+			negative: "#e11d48",
+			neutral: "#94a3b8",
 		},
 	},
 	swatch: {

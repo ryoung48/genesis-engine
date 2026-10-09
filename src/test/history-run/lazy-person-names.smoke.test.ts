@@ -13,6 +13,8 @@ import { SIM_RECORD } from "@/model/history/sim/record"
 import { NAMES } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { NO_RELIGION_SELECTION } from "@/test/history-run/no-religion-selection"
+import { PERSON_TRAITS } from "@/ui/genesis/shared/person-traits"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
 import {
 	personDisplay,
@@ -166,6 +168,10 @@ it("generates names only for requested display data and caches them without chan
 			house ? `${expected.name} ${house}` : expected.name,
 		)
 		const input = {
+			religionSelection: {
+				...NO_RELIGION_SELECTION,
+				forKey: () => () => NO_RELIGION_SELECTION.select(0),
+			},
 			selectedWikiPersonId: id,
 			history: {
 				state,
@@ -174,7 +180,6 @@ it("generates names only for requested display data and caches them without chan
 				maxTimeMs: state.record.maxTimeMs,
 				setSelectedTimeMs: vi.fn(),
 			},
-			planetName: "Test world",
 			sceneRef: { current: null },
 			setSelectedWikiNationId: vi.fn(),
 			setSelectedWikiOrganizationId: vi.fn(),
@@ -184,8 +189,11 @@ it("generates names only for requested display data and caches them without chan
 		function PersonPage() {
 			const data = usePersonWikiData(input)
 			expect(data?.name).toBe(expected.name)
+			const religion = data?.stats.find((stat) => stat.label === "Religion")
+			expect(religion?.value).toBe("")
+			expect(religion?.valueAction).toBeDefined()
 			expect(data?.stats.find((stat) => stat.label === "House")?.value).toBe(
-				house ?? "None",
+				house ?? undefined,
 			)
 			expect(data?.timelineEvents.length).toBeGreaterThan(0)
 			if (!data) throw new Error("Missing person page")
@@ -194,10 +202,12 @@ it("generates names only for requested display data and caches them without chan
 				id,
 				timeMs: state.record.maxTimeMs,
 			})
-			expect(data.traits).toEqual([
-				...(traits?.personality ?? []),
-				...(traits?.grades ?? []),
-				...(traits?.congenital ?? []),
+			expect(data.personality).toEqual(
+				(traits?.personality ?? []).map(PERSON_TRAITS.personality),
+			)
+			expect(data.physical).toEqual([
+				...(traits?.grades ?? []).map(PERSON_TRAITS.grade),
+				...(traits?.congenital ?? []).map(PERSON_TRAITS.congenital),
 			])
 			expect(data.attributes).toEqual(
 				PERSON_QUERY.attributes({

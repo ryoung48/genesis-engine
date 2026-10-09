@@ -387,6 +387,13 @@ it("starts every ruler alive with a health snapshot, then records bands and caus
 				table.birth[person] - 280 / 365,
 			)
 	}
+	const failingHeart = engine.people.alive.find(
+		(person) => table.sex[person] === 0 && table.death[person] === Infinity,
+	)
+	if (failingHeart === undefined)
+		throw new Error("Missing heart-failure subject")
+	table.falteringHeartXp[failingHeart] = 98
+	table.baseHealth[failingHeart] = 10
 	SIM_ENGINE.simulateUntil({
 		state: engine,
 		targetTimeMs: start + STATE.deltaYear(15),
@@ -402,12 +409,14 @@ it("starts every ruler alive with a health snapshot, then records bands and caus
 				expect(deaths.has(row.person)).toBe(false)
 				deaths.set(row.person, row.time)
 				causes.add(row.cause)
+				if (row.person === failingHeart) expect(row.cause).toBe("heart")
 			}
 			if (row.kind === "health_band")
 				expect(row.time).toBeLessThanOrEqual(deaths.get(row.person) ?? Infinity)
 		}
 	expect(causes.has("natural")).toBe(true)
 	expect(causes.has("childbirth")).toBe(true)
+	expect(deaths.has(failingHeart)).toBe(true)
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
 	const people = state.record.people as PeopleRecord
 	const offsetMs = DATE.earthHistoryStartYear * STATE.yearMs
@@ -457,7 +466,6 @@ function clearConditions(people: PeopleState, person: number): void {
 	const table = people.persons
 	for (const column of XP_COLUMNS) table[column][person] = -1
 	table.healthFlags[person] = 0
-	table.stress[person] = 0
 }
 
 it("opens each condition at its age with CK3's age and health factors", () => {
@@ -513,7 +521,6 @@ it("opens each condition at its age with CK3's age and health factors", () => {
 				age,
 				health: 2,
 				prowess: 6,
-				stressLevel: 0,
 				led: false,
 			})
 		for (let age = 16; age < 45; age++) expect(step(age)).toEqual([])
@@ -530,14 +537,13 @@ it("opens each condition at its age with CK3's age and health factors", () => {
 		expect(Math.abs(ever[condition] / seeds - 0.8)).toBeLessThan(0.03)
 })
 
-it("progresses a condition from the year after it began, by CK3's weighted gains", () => {
+it("progresses a condition from the year after it began, by weighted gains", () => {
 	const options = (
 		condition: number,
 		inputs: Partial<{
 			age: number
 			health: number
 			prowess: number
-			stressLevel: number
 			led: boolean
 		}>,
 	) =>
@@ -546,7 +552,6 @@ it("progresses a condition from the year after it began, by CK3's weighted gains
 			age: 50,
 			health: 2,
 			prowess: 6,
-			stressLevel: 0,
 			led: false,
 			...inputs,
 		}).map((option) => [option.xp, option.weight])
@@ -576,12 +581,6 @@ it("progresses a condition from the year after it began, by CK3's weighted gains
 		[4, 75],
 		[1, 10],
 	])
-	expect(options(3, { stressLevel: 2 })).toEqual([
-		[50, 13],
-		[8, 56],
-		[4, 75],
-		[1, 0],
-	])
 	expect(options(2, {})).toEqual([
 		[3, 25],
 		[6, 75],
@@ -597,7 +596,26 @@ it("progresses a condition from the year after it began, by CK3's weighted gains
 		[9, 20],
 		[3, 75],
 	])
-	expect(options(4, {})).toEqual([])
+	expect(options(4, { health: 3 })).toEqual([
+		[2, 75],
+		[4, 25],
+		[8, 0],
+	])
+	expect(options(4, { age: 65 })).toEqual([
+		[2, 75],
+		[4, 25],
+		[8, 50],
+	])
+	expect(options(4, {})).toEqual([
+		[2, 75],
+		[4, 25],
+		[8, 25],
+	])
+	expect(options(4, { age: 65, health: 3 })).toEqual([
+		[2, 75],
+		[4, 25],
+		[8, 25],
+	])
 
 	const { people, person } = world(0, 0)
 	const table = people.persons
@@ -616,13 +634,11 @@ it("progresses a condition from the year after it began, by CK3's weighted gains
 				age: 30 + index,
 				health: 2,
 				prowess: 6,
-				stressLevel: 0,
 				led,
 			})
 			const gain = table.fragileBonesXp[person]
 			gains[index].set(gain, (gains[index].get(gain) ?? 0) + 1)
 		}
-		expect(table.falteringHeartXp[person]).toBe(0)
 		expect([3, 9, 15, 6, 12, 18, 24, 30]).toContain(table.cloudedEyesXp[person])
 	}
 	expect([...gains[0].keys()].sort((a, b) => a - b)).toEqual([3, 6])
@@ -641,7 +657,6 @@ it("progresses a condition from the year after it began, by CK3's weighted gains
 				age,
 				health: 2,
 				prowess: 6,
-				stressLevel: 0,
 				led: false,
 			})
 			for (const change of changes)
@@ -651,6 +666,49 @@ it("progresses a condition from the year after it began, by CK3's weighted gains
 				}
 		}
 	}
+})
+
+it("makes the final heart level fatal at the yearly pass and processes it once", () => {
+	const { people, person, clock } = world(0, 0)
+	const table = people.persons
+	clearConditions(people, person)
+	table.baseHealth[person] = 10
+	table.death[person] = Infinity
+	table.falteringHeartXp[person] = 98
+	table.healthAgeYear[person] = 69
+	table.healthIntervalEnd[person] = 70
+	clock.time = 70
+	const result = HEALTH.runYear({ people, time: 70 })
+	expect(result.dying).toEqual([person])
+	expect(table.falteringHeartXp[person]).toBe(100)
+	expect(table.death[person]).toBe(70)
+	expect(AGEING.heartFailed({ people, person })).toBe(true)
+	expect(HEALTH.runYear({ people, time: 70 }).dying).toEqual([])
+	const rows = PEOPLE_LOG.seal({ people, sovereign: () => true })
+	const conditions = []
+	for (let index = 0; index < rows.count; index++) {
+		const row = PEOPLE_LOG.read({ rows, index })
+		if (row.kind === "condition" && row.condition === "faltering_heart")
+			conditions.push(row)
+	}
+	expect(conditions).toEqual([
+		expect.objectContaining({ time: 70, before: 3, after: 4 }),
+	])
+})
+
+it("conditions historical heart progression on the person's known survival", () => {
+	const { people, person, clock } = world(0, 0)
+	const table = people.persons
+	table.falteringHeartXp[person] = 98
+	table.death[person] = Infinity
+	clock.time = 70
+	HEALTH.replay({ people, person, survives: 70, death: null, record: true })
+	expect(table.falteringHeartXp[person]).toBe(99)
+	expect(table.death[person]).toBeGreaterThan(70)
+	table.death[person] = Infinity
+	clock.time = 71
+	expect(HEALTH.runYear({ people, time: 71 }).dying).toEqual([person])
+	expect(table.death[person]).toBe(71)
 })
 
 it("sums every attained level row, replaces Clouded Eyes with Blind and ends in Incapable or death", () => {
@@ -663,7 +721,6 @@ it("sums every attained level row, replaces Clouded Eyes with Blind and ends in 
 	expect(clear.health).toBe(0)
 	expect(clear.fertility).toBe(1)
 	expect(clear.attributes.incapable).toBe(false)
-	expect(clear.stress).toEqual({ gain: 0, loss: 0 })
 
 	const infirm = of(0, 2)
 	expect(infirm.attributes.additions).toMatchObject({
@@ -701,13 +758,10 @@ it("sums every attained level row, replaces Clouded Eyes with Blind and ends in 
 	expect(mind.attributes.additions.learning).toBe(-2)
 	expect(mind.attributes.percentages.diplomacy).toBeCloseTo(-0.5, 12)
 	expect(mind.attributes.percentages.prowess).toBe(0)
-	expect(mind.stress.gain).toBeCloseTo(0.6, 12)
 
 	const heart = of(4, 3)
 	expect(heart.attributes.additions.prowess).toBe(-4)
 	expect(heart.health).toBeCloseTo(-0.4, 12)
-	expect(heart.stress.gain).toBeCloseTo(0.8, 12)
-	expect(heart.stress.loss).toBeCloseTo(-0.8, 12)
 
 	const blind = of(5, 0)
 	expect(blind.attributes.additions).toMatchObject({
@@ -738,7 +792,6 @@ it("sums every attained level row, replaces Clouded Eyes with Blind and ends in 
 		age: 70,
 		health: 2,
 		prowess: 6,
-		stressLevel: 0,
 		led: false,
 	})
 	expect(table.cloudedEyesXp[person]).toBe(-1)
@@ -760,7 +813,6 @@ it("sums every attained level row, replaces Clouded Eyes with Blind and ends in 
 			age,
 			health: 2,
 			prowess: 6,
-			stressLevel: 0,
 			led: false,
 		}))
 			expect([1, 3, 5, 6]).not.toContain(change.condition)
@@ -773,18 +825,4 @@ it("sums every attained level row, replaces Clouded Eyes with Blind and ends in 
 		}),
 	).toBe(0)
 	expect(HEALTH.fertility({ people, person })).toBeLessThanOrEqual(1)
-
-	clearConditions(people, person)
-	expect(AGEING.heartRise({ people, person })).toEqual({
-		terminal: false,
-		change: null,
-	})
-	table.falteringHeartXp[person] = 0
-	expect([1, 2, 3, 4].map(() => AGEING.heartRise({ people, person }))).toEqual([
-		{ terminal: false, change: { condition: 4, before: 0, after: 1 } },
-		{ terminal: false, change: { condition: 4, before: 1, after: 2 } },
-		{ terminal: false, change: { condition: 4, before: 2, after: 3 } },
-		{ terminal: true, change: { condition: 4, before: 3, after: 4 } },
-	])
-	expect(AGEING.heartRise({ people, person }).terminal).toBe(false)
 })

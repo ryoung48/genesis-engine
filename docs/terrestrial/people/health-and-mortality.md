@@ -2,13 +2,13 @@
 
 Scope: `:history`.
 
-Health determines survival and ageing conditions for [simulated people](overview.md). [Families](families-and-lifecycle.md) owns birth and death event effects; [attributes, traits and stress](attributes-traits-and-stress.md) describes personal modifiers.
+Health determines survival and ageing conditions for [simulated people](overview.md). [Families](families-and-lifecycle.md) owns birth and death event effects; [attributes and traits](attributes-and-traits.md) describes personal modifiers.
 
-How a person's health changes, which conditions old age brings, and how death is decided. See [simulated people](overview.md) for who is simulated, [families](families-and-lifecycle.md) for births, deaths and their events, [attributes, traits and stress](attributes-traits-and-stress.md) for attributes and stress, and [person records](../mechanics/person-records.md) for what reaches the record.
+How a person's health changes, which conditions old age brings, and how death is decided. See [simulated people](overview.md) for who is simulated, [families](families-and-lifecycle.md) for births, deaths and their events, [attributes and traits](attributes-and-traits.md) for attributes and traits, and [person records](../mechanics/person-records.md) for what reaches the record.
 
 Code: `src/model/history/sim/people/health` (`HEALTH`), `health/ageing` (`AGEING`), `lifespan` (`LIFESPAN`); the yearly pass is called from `src/model/history/sim/engine/events/people`.
 
-Values marked CK3 are read from the game files (`common/defines/00_defines.txt`, `common/traits/00_traits.txt`, `common/on_action/health_on_actions.txt`, `events/health_events.txt`, `events/stress_events/stress_threshold_events.txt`). Everything else is this simulation's design.
+Values marked CK3 are read from the game files (`common/defines/00_defines.txt`, `common/traits/00_traits.txt`, `common/on_action/health_on_actions.txt`, `events/health_events.txt`). Everything else is this simulation's design.
 
 ## Health
 
@@ -34,7 +34,7 @@ Every health roll is `HASH.unit` on the person's `nameSeed`, a channel and a sal
 | 1002, 1003, 1004 | death in an interval: whether, which month, when in the month | world year |
 | 1005, 1006 | a newborn's first partial year: whether, when | world year |
 | 1011–1014 | susceptibility to Clouded Eyes, Fragile Bones, Withering Mind, Faltering Heart | 0 |
-| 1020–1023 | yearly progression of Infirm, Clouded Eyes, Fragile Bones, Withering Mind | completed age |
+| 1020–1024 | yearly progression of the five ageing conditions | completed age |
 | 1030–1034 | yearly onset of the five conditions | completed age |
 | 1040 | death while leading a battle | battle time |
 
@@ -42,7 +42,7 @@ Channels 1–6 are attributes, 100–132 personality and 200 upwards congenital 
 
 ## The yearly pass
 
-`HEALTH.runYear` runs in the people pass after the stress step, over everyone alive with no death date. For the pass at year Y:
+`HEALTH.runYear` runs in the people pass over everyone alive with no death date. For the pass at year Y:
 
 1. **Age pulses.** Each completed age not yet processed, up to `floor(Y − birth)`, runs once: the ageing loss, then each existing condition's progression, then each onset. A person therefore gets their pulse at the first pass after their birthday. A condition gained in a pulse first progresses in the next.
 2. **Band.** If the band changed, it is logged.
@@ -63,7 +63,7 @@ Survival over `dt` years is `(1 − background)^dt × (1 − p)^(12 dt)`. An int
 
 Founders, outsider spouses and backfilled relatives are created as adults or as children born years ago. `HEALTH.replay` ages them from birth to the present with the same age-keyed rolls a living person gets, and projects death only from the date they are known to have been alive (`survives`): a founder's coronation, a spouse's wedding, a mother's delivery. A relative with no such constraint can come out already dead, with a real past death date, or alive.
 
-This conditions survival on nothing else. A starter aged 60 keeps whatever health and conditions the replay gave them, so the first years of a run see a cluster of deaths among the old. A replay never advances a Faltering Heart, because that takes stress, which is not replayed.
+This conditions survival on nothing else. A starter aged 60 keeps whatever health and conditions the replay gave them, so the first years of a run see a cluster of deaths among the old. During replay, heart progression is capped at 99 XP through the known survival date, so a historical heart failure cannot contradict that survival. Subsequent pulses can reach the fatal threshold.
 
 The record gets the band and conditions a living starter has when created, not the history of how they came by them.
 
@@ -92,12 +92,14 @@ One roll a year picks an XP gain. A weight below 0 counts as 0.
 | Condition | Yearly gain (weight) |
 |---|---|
 | Infirm | +8 (50, +25 from age 50, −25 at health 3+); +4 (60 + prowess); +12 (+50 from age 65, −25 at health 3+) |
-| Withering Mind | +50 (9 + 2 × stress level); +8 (48 + 4 × stress level); +4 (75); +1 (10 at stress level 0) |
+| Withering Mind | +50 (9); +8 (48); +4 (75); +1 (10) |
 | Fragile Bones | +3 (25); +6 (75); +12 (100 if the person led an army since the last pulse) |
 | Clouded Eyes | +15 (5); +9 (20); +3 (75) |
-| Faltering Heart | none; +25 at each rise in stress level |
+| Faltering Heart | +2 (75); +4 (25); +8 (+25 from age 65, +25 below health 3) |
 
-The Withering Mind constants fold in CK3's terms for having no friends, lovers or wards, and Infirm's first weight folds in "not athletic"; the simulation has none of those. Faltering Heart follows CK3's mental breaks: it gains only when a sovereign ruler's stress level rises (see [attributes, traits and stress](attributes-traits-and-stress.md#stress)), by 25 whatever the size of the jump. Stress has three levels, so the fourth gain needs a fall and a second rise.
+The Withering Mind constants fold in CK3's terms for having no friends, lovers or wards, and Infirm's first weight folds in "not athletic"; the simulation has none of those.
+
+Faltering Heart uses a simulation-specific rule independent of stress: a baseline mean of 2.5 XP/year, rising to 3.6 with either age 65+ or health below 3, and about 4.33 with both. The gains reuse the yearly pulse and 25-XP levels to make baseline decline slow (roughly 40 years from onset), while advanced age and poor health shorten it (roughly 23 years with both). These are design values, not CK3 progression or medical estimates. At 100 XP, death is scheduled at that yearly pass with cause `heart`, ahead of natural mortality projection.
 
 ### Effects
 
@@ -108,8 +110,8 @@ Levels are cumulative: a person has the base row and the row of every level reac
 | Infirm | diplomacy −1, martial −1, prowess −20%, fertility −10%, health −0.25 | diplomacy −1, martial −1, stewardship −1, prowess −20%, fertility −10%, health −0.25, attraction −5 | diplomacy −2, martial −2, stewardship −2, prowess −20%, fertility −10%, health −0.25, attraction −5 | as level 2 | as level 2 |
 | Clouded Eyes | martial −1, prowess −2 | as base | as base | martial −1, stewardship −1, intrigue −1, prowess −2, attraction −5 | Blind |
 | Fragile Bones | prowess −10%, advantage −3, life −3 years | as base | as base | prowess −10%, advantage −5, life −5 years | prowess −10%, advantage −10, life −10 years |
-| Withering Mind | learning −2, stress gain +20% | the five skills −25%, stress gain +20% | as level 1 | as level 1 | as level 1; Incapable |
-| Faltering Heart | prowess −1, stress gain +20%, stress loss −20%, health −0.1 | as base | as base | as base | death |
+| Withering Mind | learning −2 | the five skills −25% | as level 1 | as level 1 | as level 1; Incapable |
+| Faltering Heart | prowess −1, health −0.1 | as base | as base | as base | death |
 
 Percentages are summed before the total factor is clamped at 0. The summed effects depend only on the levels, so each combination is computed once and shared.
 
@@ -119,7 +121,7 @@ Percentages are summed before the total factor is clamped at 0. The summed effec
 - **Incapable** (Withering Mind at 100): all six attributes 0, health −2. Permanent. An incapable person cannot be a regent, be elected or appointed, lead an army or conceive; they can still inherit. A sovereign gets a regent ([simulated people](../politics/government-and-succession.md#regencies)).
 - **Heart failure** (Faltering Heart at 100): death at that yearly pass.
 
-Conditions never heal. In the standalone kernel (200000 lives from 16, no traits, prowess 6, no stress), 5.3% of those who reach 50 become Incapable, for half a year on average, and 1.0% Blind; the median adult death is at 59 for men and 62 for women.
+Conditions never heal. In the standalone kernel (200000 lives from 16, no traits, prowess 6), 5.3% of those who reach 50 become Incapable, for half a year on average, and 1.0% Blind; the median adult death is at 59 for men and 62 for women.
 
 ## Other uses of health
 

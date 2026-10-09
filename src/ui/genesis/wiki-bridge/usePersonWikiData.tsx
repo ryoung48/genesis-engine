@@ -5,7 +5,10 @@ import { HISTORY } from "@/model/history/record"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import type { NamedPerson } from "@/model/history/record/people/names/types"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
-import type { TenureView } from "@/model/history/record/people/query/types"
+import type {
+	PersonView,
+	TenureView,
+} from "@/model/history/record/people/query/types"
 import type { RecordPerson } from "@/model/history/record/people/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
@@ -15,13 +18,21 @@ import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/mem
 import { ORIENTATION } from "@/model/history/sim/people/orientation"
 import type { DeathCause } from "@/model/history/sim/people/types"
 import { FRAME } from "@/model/history/world-frame"
+import { TEXT } from "@/model/shared/text"
 import { TITLES } from "@/model/society/titles"
+import type { TitleTier } from "@/model/society/titles/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { EntityChip } from "@/ui/components/composites/EntityChip"
+import { GraveStoneIcon } from "@/ui/components/primitives/icons/GraveStoneIcon"
+import { HeartIcon } from "@/ui/components/primitives/icons/HeartIcon"
 import { uiPalette } from "@/ui/components/tokens"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
+import { PERSON_TRAITS } from "@/ui/genesis/shared/person-traits"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
+import { PERSON_TITLE } from "@/ui/genesis/wiki-bridge/person-title"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
+import type { PartitionStatParams } from "@/ui/genesis/wiki-bridge/types"
 import {
 	paletteColorForDynasty,
 	pushTimelineEvent,
@@ -29,10 +40,23 @@ import {
 import type {
 	PersonWikiChip,
 	PersonWikiData,
+	PersonWikiOpinion,
 } from "@/ui/wiki/person/PersonWikiPage"
 import type { WikiTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
 const DAY_MS = 86_400_000
+
+function signed(value: number): string {
+	const rounded = Math.round(value * 10) / 10
+	return `${rounded > 0 ? "+" : ""}${rounded}`
+}
+
+function opinionColor(total: number): string {
+	if (Math.round(total) === 0) return uiPalette.person.opinion.neutral
+	return total > 0
+		? uiPalette.person.opinion.positive
+		: uiPalette.person.opinion.negative
+}
 const CONDITION_LABELS: Record<HealthCondition, string> = {
 	infirm: "Infirm",
 	clouded_eyes: "Clouded Eyes",
@@ -69,9 +93,9 @@ export function usePersonWikiData(
 	input: PersonWikiDataInput,
 ): PersonWikiData | null {
 	const {
+		religionSelection,
 		selectedWikiPersonId,
 		history,
-		planetName,
 		sceneRef,
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
@@ -107,10 +131,39 @@ export function usePersonWikiData(
 			const row = PERSON_NAMES.person({ people, person: personId })
 			return row ? { id: personId, name: row.name, color: colorOf(row) } : null
 		}
+		const opinionOf = (other: number): PersonWikiOpinion | undefined => {
+			const breakdown = PERSON_QUERY.opinion({
+				people,
+				a: id,
+				b: other,
+				timeMs: viewTimeMs,
+				record: state.record,
+			})
+			if (!breakdown) return undefined
+			const factors = Object.entries(breakdown)
+				.filter(([key]) => key !== "total")
+				.map(([key, value]) => `${key}: ${signed(value)}`)
+				.join(" · ")
+			const memories = PERSON_QUERY.activeMemories({
+				people,
+				a: id,
+				b: other,
+				timeMs: viewTimeMs,
+			}).map(
+				(memory) =>
+					`${MEMORY_LABELS[memory.reason]} (${dateLabel(memory.startTimeMs)}): ${signed(memory.strength)}`,
+			)
+			return {
+				label: signed(breakdown.total),
+				color: opinionColor(breakdown.total),
+				detail: [`Sees them: ${factors}`, ...memories].join("\n"),
+			}
+		}
 		const personChip = (personId: number): PersonWikiChip | null => {
 			const row = PERSON_NAMES.person({ people, person: personId })
 			if (!row || row.birthTimeMs > viewTimeMs) return null
 			return {
+				opinion: personId === id ? undefined : opinionOf(personId),
 				key: `person:${personId}`,
 				name: row.name,
 				color: colorOf(row),
@@ -236,23 +289,42 @@ export function usePersonWikiData(
 		const health = PERSON_QUERY.health({ people, id, timeMs: selectedTimeMs })
 		const alive = person.deathTimeMs > selectedTimeMs
 		const stats: StatEntry[] = [
+			...(person.house
+				? [
+						{
+							label: "House",
+							value: person.house,
+							swatchColor: colorOf(person),
+						},
+					]
+				: []),
 			{ label: "Sex", value: person.sex === 1 ? "Female" : "Male" },
 			{
 				label: alive ? "Age" : "Died aged",
 				value: String(ageAt(person, alive ? viewTimeMs : person.deathTimeMs)),
+				valueAction: alive ? (
+					health ? (
+						<span title={`Health: ${health}`}>
+							<HeartIcon
+								className="h-2.5 w-2.5"
+								style={{ color: uiPalette.person.health[health] }}
+							/>
+						</span>
+					) : undefined
+				) : (
+					<span title="Deceased">
+						<GraveStoneIcon
+							className="h-2.5 w-2.5"
+							style={{ color: uiPalette.person.deceased }}
+						/>
+					</span>
+				),
 			},
-			{ label: "House", value: person.house ?? "None" },
 		]
 		if (view.orientation !== null)
 			stats.push({
 				label: "Orientation",
 				value: ORIENTATION.names[view.orientation],
-			})
-		if (health)
-			stats.push({
-				label: "Health",
-				value: health,
-				swatchColor: uiPalette.person.health[health],
 			})
 		const conditions = alive
 			? PERSON_QUERY.conditions({ people, id, timeMs: selectedTimeMs })
@@ -264,9 +336,13 @@ export function usePersonWikiData(
 					.map(({ condition, level }) =>
 						condition === "blind" || condition === "incapable"
 							? CONDITION_LABELS[condition]
-							: `${CONDITION_LABELS[condition]} ${level + 1}`,
+							: `${CONDITION_LABELS[condition]} ${TEXT.roman(level + 1)}`,
 					)
 					.join(", "),
+				swatchColor:
+					uiPalette.person.condition[
+						Math.max(...conditions.map(({ level }) => level), 0)
+					],
 			})
 		const deathCause = PERSON_QUERY.deathCause({
 			people,
@@ -276,15 +352,6 @@ export function usePersonWikiData(
 		if (deathCause)
 			stats.push({ label: "Cause of death", value: DEATH_LABELS[deathCause] })
 
-		if (
-			view.tenures.some(
-				(tenure) => tenure.kind === "ruler" && tenure.endTimeMs === null,
-			)
-		)
-			stats.push({
-				label: "Stress",
-				value: `Level ${PERSON_QUERY.stress({ people, id, timeMs: viewTimeMs })}`,
-			})
 		const characterTraits = PERSON_QUERY.traits({
 			people,
 			id,
@@ -298,15 +365,13 @@ export function usePersonWikiData(
 			label: entry.name,
 			value: `${entry.value} · ${entry.tier}`,
 		}))
-		const traits = characterTraits
-			? [
-					...characterTraits.personality,
-					...characterTraits.grades,
-					...characterTraits.congenital.map((trait) =>
-						trait === "pure_blooded" ? "Pure-blooded" : trait,
-					),
-				]
-			: []
+		const personality = (characterTraits?.personality ?? []).map(
+			PERSON_TRAITS.personality,
+		)
+		const physical = [
+			...(characterTraits?.grades ?? []).map(PERSON_TRAITS.grade),
+			...(characterTraits?.congenital ?? []).map(PERSON_TRAITS.congenital),
+		]
 		const timelineEvents: WikiTimelineEvent[] = []
 		const fullTimeMs = state.record.maxTimeMs
 		const fullView = PERSON_QUERY.view({ people, id, timeMs: fullTimeMs })
@@ -522,6 +587,55 @@ export function usePersonWikiData(
 			}
 		}
 
+		const tierOfView = (personView: PersonView | null): TitleTier | null => {
+			if (!personView) return null
+			let highest = -1
+			for (const tenure of personView.tenures) {
+				if (tenure.kind === "regent" || tenure.endTimeMs !== null) continue
+				highest = Math.max(
+					highest,
+					0,
+					TITLES.tierOrder.findIndex(
+						(tier) =>
+							TITLE_TIER_LABELS[tier] ===
+							rankAt(tenure.seat, viewTimeMs, tenure.kind === "ruler"),
+					),
+				)
+			}
+			return highest < 0 ? null : TITLES.tierOrder[highest]
+		}
+		const royalParent = [view.father, view.mother].flatMap((parent) => {
+			if (parent < 0) return []
+			const parentView = PERSON_QUERY.view({
+				people,
+				id: parent,
+				timeMs: viewTimeMs,
+			})
+			const tier = tierOfView(parentView)
+			return parentView && PERSON_TITLE.royal(tier)
+				? [{ tier, view: parentView }]
+				: []
+		})[0]
+		const crown =
+			royalParent !== undefined &&
+			PERSON_TITLE.isCrown({
+				person: id,
+				children: royalParent.view.children.flatMap((child) => {
+					const row = PERSON_NAMES.person({ people, person: child })
+					return row &&
+						row.birthTimeMs <= viewTimeMs &&
+						row.deathTimeMs > viewTimeMs
+						? [
+								{
+									id: child,
+									female: row.sex === 1,
+									birthTimeMs: row.birthTimeMs,
+								},
+							]
+						: []
+				}),
+			})
+
 		const activeTenures = view.tenures.filter(
 			(tenure) => tenure.kind !== "regent" && tenure.endTimeMs === null,
 		)
@@ -551,124 +665,135 @@ export function usePersonWikiData(
 			timeMs: viewTimeMs,
 			record: state.record,
 		})
-		const religionProvince =
+		const capitalProvince =
 			realm < 0
 				? -1
 				: (state.record.events.nationEvents[realm]?.base.capitalProvinceId ??
 					-1)
-		const religion =
+		const capitalFrame = HISTORY.frameAt({ state, timeMs: viewTimeMs })
+		const realmChip: PersonWikiChip | null =
 			realm < 0
 				? null
-				: state.record.religions.find(
-						(row) =>
-							row.id ===
-							HISTORY.frameAt({ state, timeMs: viewTimeMs }).provinceReligion[
-								religionProvince
-							],
-					)
-		stats.push({ label: "Religion", value: religion?.name ?? "Unknown" })
-		const lifeEnd = alive ? "" : ` – ${dateLabel(person.deathTimeMs)}`
+				: {
+						key: `realm:${realm}`,
+						dimmed: false,
+						name: state.record.nations[realm]?.name ?? "Unknown realm",
+						color:
+							nationAt(realm, Math.max(state.record.minTimeMs, viewTimeMs))
+								?.color ?? uiPalette.person.noHouse,
+						title: "Territorial sovereign of residence",
+						onClick: () => setSelectedWikiNationId(realm),
+					}
+		const residenceChip: PersonWikiChip | null =
+			residence < 0
+				? null
+				: {
+						key: `residence:${residence}`,
+						dimmed: false,
+						name: provinceMention(residence).name,
+						color:
+							nationAt(residence, Math.max(state.record.minTimeMs, viewTimeMs))
+								?.color ?? uiPalette.person.noHouse,
+						title: "Current household location",
+						onClick: () => focusProvince(residence),
+					}
+		const partitionStat = ({
+			label,
+			rows,
+			assigned,
+			select,
+		}: PartitionStatParams) => {
+			const row =
+				realm < 0 ? undefined : rows.find((entry) => entry.id === assigned)
+			const color = row
+				? COLOR.rgb01ToCss([
+						row.color[0] / 255,
+						row.color[1] / 255,
+						row.color[2] / 255,
+					])
+				: null
+			const onClick = row && select ? select(row) : undefined
+			if (row && color && onClick) {
+				stats.push({
+					label,
+					value: "",
+					valueAction: (
+						<EntityChip name={row.name} color={color} onClick={onClick} />
+					),
+				})
+				return
+			}
+			stats.push({
+				label,
+				value: row?.name ?? "Unknown",
+				swatchColor: color,
+			})
+		}
+		partitionStat({
+			label: "Culture",
+			rows: state.record.cultures,
+			assigned: capitalFrame.provinceCulture[capitalProvince],
+			select: null,
+		})
+		partitionStat({
+			label: "Religion",
+			rows: state.record.religions,
+			assigned: capitalFrame.provinceReligion[capitalProvince],
+			select: (row) => religionSelection.forKey(row.key),
+		})
+		if (realmChip || residenceChip)
+			stats.push({
+				label: "Residence",
+				value: "",
+				valueAction: (
+					<span className="inline-flex items-center gap-1">
+						{realmChip ? (
+							<EntityChip
+								name={realmChip.name}
+								color={realmChip.color}
+								title={realmChip.title}
+								onClick={realmChip.onClick}
+							/>
+						) : null}
+						{realmChip && residenceChip ? <span>·</span> : null}
+						{residenceChip ? (
+							<EntityChip
+								name={residenceChip.name}
+								color={residenceChip.color}
+								title={residenceChip.title}
+								onClick={residenceChip.onClick}
+							/>
+						) : null}
+					</span>
+				),
+			})
 		return {
 			name: person.name,
-			houseColor: colorOf(person),
-			metaLabel: `${person.house ? `House ${person.house} · ` : ""}${dateLabel(person.birthTimeMs)}${lifeEnd}`,
-			planetTitle: planetName,
+			title: PERSON_TITLE.of({
+				female: person.sex === 1,
+				hasHouse: Boolean(person.house),
+				tier: tierOfView(view),
+				royalParent: royalParent?.tier ?? null,
+				crown: crown && alive,
+			}),
+			life: `${dateLabel(person.birthTimeMs)} – ${alive ? "present" : dateLabel(person.deathTimeMs)}`,
 			stats,
 			attributes,
-			traits,
-			opinions: [
-				...new Set([
-					view.father,
-					view.mother,
-					...view.children,
-					...view.siblings,
-					...view.spouses.map((spouse) => spouse.person),
-					...view.consorts.map((consort) => consort.person),
-					...(view.patron ? [view.patron.person] : []),
-					...PERSON_QUERY.memoryPartners({ people, id, timeMs: viewTimeMs }),
-				]),
-			]
-				.filter((other) => other >= 0)
-				.flatMap((other) => {
-					const relative = PERSON_NAMES.person({ people, person: other })
-					if (!relative) return []
-					const directed = (forward: boolean) => {
-						const [a, b] = forward ? [id, other] : [other, id]
-						return {
-							label: forward
-								? `${person.name} → ${relative.name}`
-								: `${relative.name} → ${person.name}`,
-							breakdown: PERSON_QUERY.opinion({
-								people,
-								a,
-								b,
-								timeMs: viewTimeMs,
-								record: state.record,
-							}),
-							memories: PERSON_QUERY.memories({
-								people,
-								a,
-								b,
-								timeMs: viewTimeMs,
-							}).map((memory) => ({
-								label: MEMORY_LABELS[memory.reason],
-								dateLabel: dateLabel(memory.startTimeMs),
-								strength: memory.strength,
-							})),
-						}
-					}
-					return [directed(true), directed(false)]
-				}),
+			personality,
+			physical,
+			titles: held.flatMap((tenure, index): PersonWikiChip[] => {
+				const chip = seatChip(tenure)
+				return chip
+					? [
+							{
+								...chip,
+								title:
+									index === 0 ? `Primary title · ${chip.title}` : chip.title,
+							},
+						]
+					: []
+			}),
 			groups: [
-				{
-					label: "Residence",
-					chips:
-						residence < 0
-							? []
-							: [
-									{
-										key: `residence:${residence}`,
-										dimmed: false,
-										name: provinceMention(residence).name,
-										color: uiPalette.person.noHouse,
-										title: "Current household location",
-										onClick: () => focusProvince(residence),
-									},
-								],
-				},
-				{
-					label: "Realm",
-					chips:
-						realm < 0
-							? []
-							: [
-									{
-										key: `realm:${realm}`,
-										dimmed: false,
-										name: state.record.nations[realm]?.name ?? "Unknown realm",
-										color: uiPalette.person.noHouse,
-										title: "Territorial sovereign of residence",
-										onClick: () => setSelectedWikiNationId(realm),
-									},
-								],
-				},
-				{
-					label: "Titles",
-					chips: held.flatMap((tenure, index): PersonWikiChip[] => {
-						const chip = seatChip(tenure)
-						return chip
-							? [
-									{
-										...chip,
-										title:
-											index === 0
-												? `Primary title · ${chip.title}`
-												: chip.title,
-									},
-								]
-							: []
-					}),
-				},
 				{
 					label: "Regencies",
 
@@ -695,16 +820,6 @@ export function usePersonWikiData(
 							const chip = seatChip(tenure)
 							return chip ? [chip] : []
 						}),
-				},
-
-				{
-					label: "Predecessors",
-					chips: view.predecessors.flatMap((tenure) =>
-						chips([tenure.person]).map((chip) => ({
-							...chip,
-							title: `${chip.title ?? chip.name} · ${tenureSpan(tenure)}`,
-						})),
-					),
 				},
 
 				{ label: "Parents", chips: chips([view.father, view.mother]) },
@@ -739,7 +854,6 @@ export function usePersonWikiData(
 			dateRangeEnd: history.maxTimeMs / DAY_MS,
 			currentDate: selectedTimeMs / DAY_MS,
 			currentDateLabel: DATE.formatHistoryTimeMs(selectedTimeMs),
-			onBack: () => setSelectedWikiPersonId(null),
 			onSelectNation: selectNation,
 			onSelectProvince: focusProvince,
 			onSelectPerson: (personId: number) => setSelectedWikiPersonId(personId),
@@ -749,13 +863,13 @@ export function usePersonWikiData(
 			onSelectWar: (warId: number) => setSelectedWikiWarId(warId),
 		}
 	}, [
+		religionSelection,
 		selectedWikiPersonId,
 		history.state,
 		history.selectedTimeMs,
 		history.setSelectedTimeMs,
 		history.minTimeMs,
 		history.maxTimeMs,
-		planetName,
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,

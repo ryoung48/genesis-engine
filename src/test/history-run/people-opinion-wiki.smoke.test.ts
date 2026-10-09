@@ -14,8 +14,8 @@ import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { MARRIAGE_FIXTURE } from "@/test/history-run/fixtures/marriage"
+import { NO_RELIGION_SELECTION } from "@/test/history-run/no-religion-selection"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
-import { noblePopularityStat } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { PersonWikiPage } from "@/ui/wiki/person/PersonWikiPage"
 
@@ -118,43 +118,13 @@ it("summarizes noble popularity from the holders of a realm's districts at the s
 	expect(popularity(0, 101.9).value).toBe(before)
 	expect(popularity(0, 102).value).toBe(before + 15)
 	expect(popularity(0, 107).value).toBe(before + 7.5)
-	expect(
-		noblePopularityStat({
-			people,
-			record,
-			seat: 0,
-			timeMs: 102 * STATE.yearMs,
-		}),
-	).toEqual({
-		label: "Noble popularity (religion excluded)",
-		value: `+${(before + 15).toFixed(1)} · 1 holder`,
-	})
-	expect(
-		noblePopularityStat({
-			people,
-			record,
-			seat: 0,
-			timeMs: 100 * STATE.yearMs,
-		}).value,
-	).toMatch(/ · 2 holders$/)
 	PEOPLE.vacate({ people: live, seat: 3, reason: "unknown" })
 	flush(104)
 	expect(popularity(0, 104 - 1 / 365).count).toBe(1)
 	expect(popularity(0, 104)).toEqual(empty)
-	expect(
-		noblePopularityStat({
-			people,
-			record,
-			seat: 0,
-			timeMs: 104 * STATE.yearMs,
-		}),
-	).toEqual({
-		label: "Noble popularity (religion excluded)",
-		value: "No district opinions",
-	})
 })
 
-it("shows a person's memories with their dates and current strength, hiding future ones and fading old ones to nothing", () => {
+it("shows active memories at the selected date and removes expired partners while retaining family", () => {
 	const { engine, generated } = HISTORY_RUN.createEngine({
 		seed: 14963991,
 		era: "lateMedieval",
@@ -205,6 +175,7 @@ it("shows a person's memories with their dates and current strength, hiding futu
 	const translator = SIM_RECORD.createTranslator({ state, world })
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
 	const input = {
+		religionSelection: NO_RELIGION_SELECTION,
 		selectedWikiPersonId: observer,
 		history: {
 			state,
@@ -213,7 +184,6 @@ it("shows a person's memories with their dates and current strength, hiding futu
 			maxTimeMs: state.record.maxTimeMs,
 			setSelectedTimeMs: vi.fn(),
 		},
-		planetName: "Opinion",
 		sceneRef: { current: null },
 		setSelectedWikiNationId: vi.fn(),
 		setSelectedWikiOrganizationId: vi.fn(),
@@ -222,41 +192,27 @@ it("shows a person's memories with their dates and current strength, hiding futu
 	} as unknown as PersonWikiDataInput
 	const nameOf = (person: number) =>
 		PERSON_NAMES.person({ people: state.record.people, person })?.name
-	const toward = `${nameOf(observer)} → ${nameOf(target)}`
-	const back = `${nameOf(target)} → ${nameOf(observer)}`
-	let memories = new Map<string, { label: string; strength: number }[]>()
+	state.record.people!.persons.father[observer] = target
 	function Page() {
 		const data = usePersonWikiData(input)
 		if (!data) throw new Error("Missing person page")
-		memories = new Map(
-			data.opinions.map((opinion) => [
-				opinion.label,
-				opinion.memories.map(({ label, strength }) => ({ label, strength })),
-			]),
-		)
 		return createElement(PersonWikiPage, { person: data })
 	}
-	expect(renderToString(createElement(Page))).not.toContain("Attacked")
-	expect(memories.has(toward)).toBe(false)
-	input.history.selectedTimeMs = state.record.minTimeMs + 0.5 * STATE.yearMs
-	const fresh = renderToString(createElement(Page))
-	expect(memories.get(toward)).toEqual([{ label: "Attacked", strength: -25 }])
-	expect(memories.get(back)).toEqual([])
+	const at = (years: number) => {
+		input.history.selectedTimeMs = state.record.minTimeMs + years * STATE.yearMs
+		return renderToString(createElement(Page))
+	}
+	expect(nameOf(target)).toBeTruthy()
+	expect(at(0)).not.toContain("Attacked")
+	const fresh = at(0.5)
 	expect(fresh).toContain("Attacked (")
 	expect(fresh).toContain("): -25")
 	expect(fresh).toContain("memories: -25")
+	expect(at(5.5)).toContain("): -12.5")
+	expect(at(10.5)).not.toContain("Attacked (")
 	input.selectedWikiPersonId = target
-	renderToString(createElement(Page))
-	expect(memories.get(toward)).toEqual([{ label: "Attacked", strength: -25 }])
-	expect(memories.get(back)).toEqual([])
-	input.selectedWikiPersonId = observer
-	input.history.selectedTimeMs = state.record.minTimeMs + 5.5 * STATE.yearMs
-	renderToString(createElement(Page))
-	expect(memories.get(toward)).toEqual([{ label: "Attacked", strength: -12.5 }])
-	input.history.selectedTimeMs = state.record.minTimeMs + 11 * STATE.yearMs
-	const faded = renderToString(createElement(Page))
+	expect(at(0.5)).not.toContain("Attacked (")
 	expect(
-		memories.get(toward)?.map((memory) => Math.abs(memory.strength)),
-	).toEqual([0])
-	expect(faded).toContain("Attacked (")
+		state.record.people!.memoriesOf.get(observer)?.get(target),
+	).toHaveLength(1)
 }, 120_000)

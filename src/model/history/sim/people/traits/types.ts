@@ -74,12 +74,14 @@ export interface TraitAtParams {
 	character: Character
 	age: number
 }
-export interface IncomeParams extends TraitAtParams {
-	stressLevel: number
-}
+
 export interface GradeParams {
 	character: Pick<Character, "grades">
 	ladder: Ladder
+}
+export interface GradeTrait {
+	label: string
+	grade: Grade
 }
 export interface GradeValues {
 	active: Grade
@@ -113,24 +115,12 @@ export interface TraitDefinition {
 	attraction: number
 	opinion: number
 	vassalOpinion: number
-	stressGain: number
-	stressLoss: number
 	warChance: number
 	income: number
 }
 
-export interface StressModifier {
-	gain: number
-	loss: number
-}
-export interface StressFactorsParams extends TraitAtParams {
-	conditions: readonly StressModifier[]
-}
-
 export type TraitRow = readonly [
 	PersonalityTrait | CongenitalTrait,
-	number,
-	number,
 	number,
 	number,
 	number,

@@ -59,7 +59,7 @@ function ingest({ tracker, transactions }: IngestParams): void {
 	}
 }
 
-// People in id order with their pregnancies and stress rows, then marriages,
+// People in id order with their pregnancies, then marriages,
 // betrothals and tenures in the order the record holds them.
 function sha256(people: PeopleRecord): string {
 	const hash = createHash("sha256")
@@ -99,7 +99,6 @@ function sha256(people: PeopleRecord): string {
 				row.timeMs,
 				row.outcome,
 			]),
-			(people.stressOf.get(id) ?? []).map((row) => [row.timeMs, row.level]),
 		])
 	}
 	for (const row of people.marriages)

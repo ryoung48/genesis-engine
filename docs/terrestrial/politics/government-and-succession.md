@@ -137,7 +137,7 @@ The history report's `partition` section is built from these notes (`src/test/hi
 
 ## Attribute and trait effects
 
-Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpation chance gains `clamp(1 + 0.125 × (intrigue - 5.7), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [attributes, traits and stress](../people/attributes-traits-and-stress.md) for the full rules.
+Election candidate strength gains `0.025 × (diplomacy - 5.5)`. Regent usurpation chance gains `clamp(1 + 0.125 × (intrigue - 5.7), 0.5, 2)` and a personality factor (Ambitious ×2, Content ×0). Restoration chance is multiplied by 1.5 for an Ambitious claimant and 0.5 for Content before the probability cap. See [attributes and traits](../people/attributes-and-traits.md) for the full rules.
 
 ## Held seats and primary title
 
@@ -202,7 +202,7 @@ Republics consider every distinct patrician head’s house. Each elector backs t
 - **Coming of age.** The end of a minority is queued for the ward's 16th birthday when the regency starts. A ward who has died or been deposed leaves it stale, and it never ends an incapacity regency. A ward who is Incapable on that birthday passes straight into an incapacity regency, with a new regent chosen by the incapacity order; otherwise a ward who [acceded to the throne](#coronation) is crowned.
 - **Replacement.** A regent who dies is replaced at the moment of death, by the same order. One who takes a throne elsewhere or becomes Incapable is replaced at the yearly check.
 - **After a partition.** Regencies start once the partition's seating is final, for the new realms and then for the primary realm, and one review replaces any regent who became sovereign in it ([government](government-and-succession.md#partition)).
-- **Weak crown.** A realm under a regent, or whose ruler has health below 2.5 or stress of 300 or more, starts no wars and its districts rebel more easily ([rebellion](rebellions-and-throne-wars.md)). It still defends; diplomatic disposition governs subject calls.
+- **Weak crown.** A realm under a regent, or whose ruler has health below 2.5, starts no wars and its districts rebel more easily ([rebellion](rebellions-and-throne-wars.md)). It still defends; diplomatic disposition governs subject calls.
 - **Usurpation.** Yearly chance 3% for a kinsman regent, doubled if they hold a district of the realm, and 3% for a lord protector. A kinsman takes claim 1 and his house keeps the throne. A lord protector takes claim 0, their house takes the throne, their district returns to the crown, and the weak-crown rebellion check runs. A spouse or a council never usurps. The deposed ruler, child or incapable, becomes the realm's claimant.
 
 ## Coronation

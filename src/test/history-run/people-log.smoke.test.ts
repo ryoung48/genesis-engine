@@ -126,7 +126,6 @@ it("round-trips every implemented row kind, code and sentinel", () => {
 		{ kind: "betrothal", time: 870, a: 6, b: 7 },
 		{ kind: "betrothal_end", time: 871, a: 6, b: 7, cause: "alliance" },
 		{ kind: "betrothal_end", time: -12.5, a: 7, b: 6, cause: "death" },
-		{ kind: "stress", time: 899, person: 1, level: 3 },
 		{ kind: "death", time: 905, person: 5, cause: "heart" },
 		{ kind: "death", time: 906, person: 6, cause: "battle" },
 		{ kind: "death", time: 907, person: 7, cause: "childbirth" },
@@ -226,7 +225,6 @@ it("rejects unknown kinds and codes and values a row cannot hold", () => {
 	reject({ kind: "death", time: 1, person: 2 ** 31, cause: "natural" })
 	reject({ kind: "death", time: 1, person: 0, cause: "plague" })
 	reject({ kind: "death", time: 1, person: -2, cause: "natural" })
-	reject({ kind: "stress", time: 1, person: 0, level: 1.5 })
 	expect(log.count).toBe(0)
 	expect(PEOPLE_LOG.pending(people)).toBe(false)
 
@@ -295,7 +293,12 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	for (let level = 0; level < rows; level++)
 		PEOPLE_LOG.append({
 			log: people.log,
-			row: { kind: "stress", time: level / 8, person: late, level },
+			row: {
+				kind: "residence",
+				time: level / 8,
+				person: late,
+				province: level,
+			},
 		})
 	expect(people.log.time.length).toBe(8192)
 	const grown = PEOPLE_LOG.seal({ people, sovereign: () => true })
@@ -309,10 +312,10 @@ it("seals each person once with an exact snapshot and grows without losing rows"
 	})
 	for (const level of [0, 4095, 4096, rows - 1])
 		expect(decoded[level + 1]).toEqual({
-			kind: "stress",
+			kind: "residence",
 			time: level / 8,
 			person: late,
-			level,
+			province: level,
 		})
 
 	const invalid: [keyof typeof table, number][] = [
@@ -425,8 +428,6 @@ it("records every person once and rebuilds the same record from transferred pack
 	const table = engine.people.persons
 	const count = table.birth.length
 	expect(created).toEqual(Array.from({ length: count }, (...entry) => entry[1]))
-	// Stress rows depend on which rulers the world's wars happen to strain.
-	kinds.delete("stress")
 	kinds.delete("consort")
 	expect([...kinds].sort()).toEqual([
 		"betrothal",
@@ -597,7 +598,7 @@ it("keeps the append buffer writable after a transfer and never emits a row twic
 	expect(byteLength(packet)).toBe(25 * 3 + 79)
 }, 600000)
 
-it("answers family, marriage, betrothal, tenure, pregnancy and stress views from the record alone", () => {
+it("answers family, marriage, betrothal, tenure, pregnancy views from the record alone", () => {
 	const seed = 14963991
 	const { generated, engine } = HISTORY_RUN.createEngine({
 		seed,
@@ -673,15 +674,4 @@ it("answers family, marriage, betrothal, tenure, pregnancy and stress views from
 		"died",
 	])
 		expect(events).toContain(kind)
-	const stressed = [...people.stressOf.values()]
-		.flat()
-		.findLast((row) => row.level > 0)
-	if (!stressed) throw new Error("Missing stress rows")
-	expect(
-		PERSON_QUERY.stress({
-			people,
-			id: stressed.person,
-			timeMs: stressed.timeMs,
-		}),
-	).toBe(stressed.level)
 }, 600000)

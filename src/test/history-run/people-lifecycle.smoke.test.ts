@@ -4,7 +4,6 @@ import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
 import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
 import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
-import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
@@ -21,7 +20,6 @@ import { HEALTH } from "@/model/history/sim/people/health"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { PeopleRow } from "@/model/history/sim/people/log/types"
-import { STRESS } from "@/model/history/sim/people/stress"
 import type { PeopleState } from "@/model/history/sim/people/types"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RNG } from "@/model/shared/random/rng"
@@ -501,10 +499,6 @@ it("schedules landless deaths, never an unknown one, and writes no future rows",
 	}
 }, 300000)
 
-// Brave, wrathful and lustful: no stress modifier and none of the stressor
-// traits.
-const CALM_TRAITS = 0 | (4 << 6) | (12 << 12)
-
 function sovereignAdults(state: HistoryState): number[] {
 	const table = state.people.persons
 	const time = state.time / STATE.yearMs
@@ -521,154 +515,6 @@ function sovereignAdults(state: HistoryState): number[] {
 	}
 	return realms
 }
-
-it("fails every stressed heart after the whole stress loop, dating all deaths before any succession", () => {
-	const seed = 14963991
-	const { engine: state } = HISTORY_RUN.createEngine({
-		seed,
-		era: "lateMedieval",
-		numPoints: 10000,
-	})
-	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
-	const people = state.people
-	const table = people.persons
-	const realms = sovereignAdults(state).slice(0, 3)
-	const [first, second, calm] = realms.map((realm) => people.rulerOf[realm])
-	for (const ruler of [first, second, calm]) {
-		table.personality[ruler] = CALM_TRAITS
-		table.stress[ruler] = 90
-		people.bereavements.set(ruler, 2)
-	}
-	// Three mental breaks behind them; the calm ruler has no heart condition.
-	table.falteringHeartXp[first] = 75
-	table.falteringHeartXp[second] = 75
-	people.stressed = [first, second, calm]
-	JOURNAL.releaseSent(state)
-	state.time += STATE.yearMs
-	const snapshot = new Set<number>()
-	for (let realm = 0; realm < state.P; realm++)
-		if (people.rulerOf[realm] >= 0 && STATE.isSovereign({ state, p: realm }))
-			snapshot.add(people.rulerOf[realm])
-	const walks: number[] = []
-	const marked: boolean[] = []
-	const succeed = SUCCESSION.succeedPerson
-	const walk = vi
-		.spyOn(SUCCESSION, "succeedPerson")
-		.mockImplementation((params) => {
-			walks.push(params.person)
-			marked.push(
-				[first, second].every(
-					(ruler) => table.death[ruler] === state.time / STATE.yearMs,
-				),
-			)
-			succeed(params)
-		})
-	const stress = vi.spyOn(STRESS, "step")
-	PEOPLE_EVENTS.runYear({ state, rng })
-	walk.mockRestore()
-	const stepped = stress.mock.calls.length
-	stress.mockRestore()
-	expect(walks.slice(0, 2)).toEqual([first, second].sort((a, b) => a - b))
-	expect(marked.slice(0, 2)).toEqual([true, true])
-	expect(table.falteringHeartXp[first]).toBe(100)
-	expect(table.falteringHeartXp[calm]).toBe(-1)
-	expect(STRESS.level(table.stress[calm])).toBe(1)
-	expect(table.death[calm]).toBeGreaterThan(state.time / STATE.yearMs)
-	for (const [index, ruler] of [first, second].entries()) {
-		expect(DEATH_SCHEDULE.applied({ state, person: ruler })).toBe(true)
-		const heir = people.rulerOf[realms[index]]
-		expect(heir).toBeGreaterThanOrEqual(0)
-		expect([first, second]).not.toContain(heir)
-		expect(people.stressed).not.toContain(ruler)
-	}
-	// Each ruler of the snapshot was stepped once; no new heir was.
-	expect(stepped).toBe(snapshot.size)
-	JOURNAL.flush({ state, noteCursor: 0, census: false, initial: false })
-	const rows = rowsOf(state)
-	expect(
-		rows.filter(
-			(row) => row.kind === "death" && [first, second].includes(row.person),
-		),
-	).toEqual(
-		[first, second]
-			.sort((a, b) => a - b)
-			.map((person) => ({
-				kind: "death",
-				time: state.time / STATE.yearMs,
-				person,
-				cause: "heart",
-			})),
-	)
-	const hearts = rows.filter(
-		(row) =>
-			row.kind === "condition" &&
-			row.condition === "faltering_heart" &&
-			[first, second].includes(row.person),
-	)
-	expect(hearts).toHaveLength(2)
-	for (const row of hearts) expect(row).toMatchObject({ before: 3, after: 4 })
-	// The stress row precedes the heart row it caused.
-	for (const ruler of [first, second]) {
-		const stressAt = rows.findIndex(
-			(row) => row.kind === "stress" && row.person === ruler,
-		)
-		const heartAt = rows.findIndex(
-			(row) => row.kind === "condition" && row.person === ruler,
-		)
-		expect(stressAt).toBeGreaterThanOrEqual(0)
-		expect(heartAt).toBeGreaterThan(stressAt)
-	}
-}, 120000)
-
-it("advances a heart only on a rise after onset, by one step however far the level jumps", () => {
-	const { engine: state } = HISTORY_RUN.createEngine({
-		seed: 14963991,
-		era: "lateMedieval",
-		numPoints: 10000,
-	})
-	const people = state.people
-	const table = people.persons
-	const [realm] = sovereignAdults(state)
-	const ruler = people.rulerOf[realm]
-	table.personality[ruler] = CALM_TRAITS
-	const pass = (stress: number, bereavements: number) => {
-		table.stress[ruler] = stress
-		people.stressed = [ruler]
-		if (bereavements > 0) people.bereavements.set(ruler, bereavements)
-		state.time += STATE.yearMs
-		return STRESS_EVENTS.runYear({ state })
-	}
-	// No condition: a rise changes nothing.
-	expect(pass(90, 2)).toEqual([])
-	expect(table.falteringHeartXp[ruler]).toBe(-1)
-	table.falteringHeartXp[ruler] = 0
-	// Level 1 held, then a fall: no XP.
-	pass(150, 2)
-	expect(table.falteringHeartXp[ruler]).toBe(0)
-	pass(110, 0)
-	expect(STRESS.level(table.stress[ruler])).toBe(0)
-	expect(table.falteringHeartXp[ruler]).toBe(0)
-	// A jump from level 0 to level 3 is one mental break.
-	pass(0, 20)
-	expect(STRESS.level(table.stress[ruler])).toBe(3)
-	expect(table.falteringHeartXp[ruler]).toBe(25)
-	// Held at level 3: nothing.
-	pass(400, 20)
-	expect(table.falteringHeartXp[ruler]).toBe(25)
-	// A fall to 2 and a rise back to 3 is another break.
-	pass(290, 0)
-	expect(STRESS.level(table.stress[ruler])).toBe(2)
-	expect(pass(290, 2)).toEqual([])
-	expect(STRESS.level(table.stress[ruler])).toBe(3)
-	expect(table.falteringHeartXp[ruler]).toBe(50)
-	// A ruler who is no longer sovereign is reset without a break.
-	state.people.rulerOf[realm] = -1
-	table.stress[ruler] = 250
-	people.stressed = [ruler]
-	expect(STRESS_EVENTS.runYear({ state })).toEqual([])
-	expect(table.stress[ruler]).toBe(0)
-	expect(table.falteringHeartXp[ruler]).toBe(50)
-}, 120000)
 
 it("governs for an incapable sovereign through a regent until death, spouse first", () => {
 	const seed = 14963991

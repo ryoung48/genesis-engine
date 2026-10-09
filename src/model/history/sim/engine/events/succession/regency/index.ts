@@ -80,7 +80,7 @@ function ailing({ state, realm }: RealmRegencyParams): boolean {
 			people: state.people,
 			person: ruler,
 			time: now(state),
-		}) < AILING_HEALTH || state.people.persons.stress[ruler] >= 300
+		}) < AILING_HEALTH
 	)
 }
 

@@ -354,6 +354,50 @@ it("folds memory refreshes by observer, target and reason and answers each time 
 		}).map((memory) => memory.startTimeMs),
 	).toEqual([100 * STATE.yearMs])
 	expect(at(113, 1).map((memory) => Math.abs(memory.strength))).toEqual([0, 0])
+	expect(
+		PERSON_QUERY.activeMemories({
+			people: record,
+			a: 0,
+			b: 1,
+			timeMs: 113 * STATE.yearMs,
+		}),
+	).toEqual([])
+	expect(
+		PERSON_QUERY.memoryPartners({
+			people: record,
+			id: 0,
+			timeMs: 103 * STATE.yearMs,
+		}),
+	).toEqual([1, 2])
+	expect(
+		PERSON_QUERY.memoryPartners({
+			people: record,
+			id: 1,
+			timeMs: 103 * STATE.yearMs,
+		}),
+	).toEqual([0])
+	expect(
+		PERSON_QUERY.memoryPartners({
+			people: record,
+			id: 0,
+			timeMs: 113 * STATE.yearMs,
+		}),
+	).toEqual([])
+	expect(
+		PERSON_QUERY.memoryPartners({
+			people: record,
+			id: 1,
+			timeMs: 113 * STATE.yearMs,
+		}),
+	).toEqual([])
+	expect(
+		PERSON_QUERY.activeMemories({
+			people: record,
+			a: 0,
+			b: 1,
+			timeMs: 102 * STATE.yearMs,
+		}),
+	).toEqual(at(102, 1))
 	expect(at(108, 2)).toEqual([
 		{ reason: "attack", startTimeMs: 103 * STATE.yearMs, strength: -12.5 },
 	])

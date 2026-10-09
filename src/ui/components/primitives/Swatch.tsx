@@ -11,8 +11,8 @@ const shapeClassName: Record<SwatchShape, string> = {
 }
 
 const sizeClassName: Record<SwatchSize, string> = {
-	sm: "h-2 w-2",
-	md: "h-2.5 w-2.5",
+	sm: "h-1.5 w-1.5",
+	md: "h-2 w-2",
 }
 
 interface SwatchProps extends React.HTMLAttributes<HTMLSpanElement> {

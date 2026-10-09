@@ -16,9 +16,7 @@ import type {
 } from "@/model/history/sim/people/health/types"
 import { LIFESPAN } from "@/model/history/sim/people/lifespan"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
-import type { StressModifier } from "@/model/history/sim/people/traits/types"
 import { HASH } from "@/model/shared/random/hash"
 
 // CK3 NChildbirth: a newborn's health.
@@ -46,7 +44,6 @@ const BAND_MASK = 7
 const LED_FLAG = 32
 const CHANNEL = { birth: 1000, ageing: 1001 }
 const NO_ATTRIBUTE_CONDITIONS: readonly AttributeModifier[] = []
-const NO_STRESS_CONDITIONS: readonly StressModifier[] = []
 
 function bandCode(health: number): number {
 	let index = 0
@@ -92,13 +89,6 @@ function attributeConditions(
 ): readonly AttributeModifier[] {
 	const total = AGEING.effectsOf(params)
 	return total ? [total.attributes] : NO_ATTRIBUTE_CONDITIONS
-}
-
-function stressConditions(
-	params: HealthPersonParams,
-): readonly StressModifier[] {
-	const total = AGEING.effectsOf(params)
-	return total ? [total.stress] : NO_STRESS_CONDITIONS
 }
 
 function fertility(params: HealthPersonParams): number {
@@ -152,7 +142,6 @@ function pulse({ people, person, age }: PulseParams): ConditionChange[] {
 						age,
 						attribute: "prowess",
 					}),
-		stressLevel: STRESS.level(table.stress[person]),
 		led,
 	})
 }
@@ -182,8 +171,11 @@ function advance({ people, person, year, record }: AdvanceParams): boolean {
 	const completed = Math.floor(year - birth)
 	for (let age = table.healthAgeYear[person] + 1; age <= completed; age++) {
 		const changes = pulse({ people, person, age })
+		const knownAlive = !record && birth + age <= table.healthIntervalEnd[person]
+		if (knownAlive) AGEING.spareHeart({ people, person })
 		if (record && changes.length > 0)
 			logChanges({ people, person, time: year, changes })
+		if (AGEING.heartFailed({ people, person })) break
 	}
 	if (completed > table.healthAgeYear[person])
 		table.healthAgeYear[person] = completed
@@ -198,6 +190,10 @@ function advance({ people, person, year, record }: AdvanceParams): boolean {
 				log: people.log,
 				row: { kind: "health_band", person, time: year, band: BANDS[code] },
 			})
+	}
+	if (AGEING.heartFailed({ people, person })) {
+		table.death[person] = Math.max(year, from)
+		return true
 	}
 	if (from >= to) return false
 	table.healthIntervalEnd[person] = to
@@ -288,7 +284,6 @@ export const HEALTH = {
 	band,
 	effective,
 	attributeConditions,
-	stressConditions,
 	fertility,
 	recorded,
 	replay,

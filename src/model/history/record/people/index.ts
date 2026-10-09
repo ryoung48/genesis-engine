@@ -89,7 +89,6 @@ function create(): PeopleRecord {
 		},
 		memoriesOf: new Map(),
 		residencesOf: new Map(),
-		stressOf: new Map(),
 		childrenOf: new Map(),
 		consorts: [],
 		consortsOf: new Map(),
@@ -468,17 +467,6 @@ function append({
 				record.residencesOf.set(row.person, rows)
 				break
 			}
-			case "stress":
-				pushIndex({
-					index: record.stressOf,
-					key: row.person,
-					value: {
-						person: row.person,
-						timeMs: recordTime(row.time),
-						level: row.level,
-					},
-				})
-				break
 			case "opinion_memory": {
 				if (
 					!has({ people: record, id: row.observer }) ||

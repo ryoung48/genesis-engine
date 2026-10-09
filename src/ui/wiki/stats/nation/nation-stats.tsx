@@ -177,7 +177,7 @@ export function buildNationWikiStats(
 										value: economy.budget.armyExpenses,
 										description: economy.budget.settled
 											? "Army maintenance (settled interval)"
-											: "Army maintenance (projected annual)",
+											: "Army maintenance",
 									},
 									{
 										value: economy.budget.treasuryLeakage,

@@ -5,11 +5,12 @@ import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { NO_RELIGION_SELECTION } from "@/test/history-run/no-religion-selection"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { PersonWikiPage } from "@/ui/wiki/person/PersonWikiPage"
 
-it("renders recorded predecessors with unknown starts, prior titles and maternal dynasties", () => {
+it("renders prior titles with unknown starts and maternal dynasties", () => {
 	const { engine, generated } = HISTORY_RUN.createEngine({
 		seed: 14963991,
 		era: "lateMedieval",
@@ -27,6 +28,7 @@ it("renders recorded predecessors with unknown starts, prior titles and maternal
 	const tenure = people.tenures.find((tenure) => tenure.startTimeMs === null)
 	if (!tenure) throw new Error("Missing predecessor tenure")
 	const input = {
+		religionSelection: NO_RELIGION_SELECTION,
 		selectedWikiPersonId: tenure.person,
 		history: {
 			state,
@@ -35,7 +37,6 @@ it("renders recorded predecessors with unknown starts, prior titles and maternal
 			maxTimeMs: state.record.maxTimeMs,
 			setSelectedTimeMs: vi.fn(),
 		},
-		planetName: "Backfill",
 		sceneRef: { current: null },
 		setSelectedWikiNationId: vi.fn(),
 		setSelectedWikiOrganizationId: vi.fn(),
@@ -52,12 +53,6 @@ it("renders recorded predecessors with unknown starts, prior titles and maternal
 			expect(
 				previous?.chips.some((chip) => chip.title?.includes("start unknown")),
 			).toBe(true)
-		else
-			expect(
-				data.groups
-					.find((group) => group.label === "Predecessors")
-					?.chips.some((chip) => chip.title?.includes("start unknown")),
-			).toBe(true)
 		return createElement(PersonWikiPage, { person: data })
 	}
 	expect(renderToString(createElement(Page))).toContain("Previous titles")
@@ -67,7 +62,7 @@ it("renders recorded predecessors with unknown starts, prior titles and maternal
 		timeMs: state.record.minTimeMs,
 	})
 	input.selectedWikiPersonId = holder
-	expect(renderToString(createElement(Page))).toContain("Predecessors")
+	renderToString(createElement(Page))
 	const mother = people.persons.mother[holder]
 	expect(mother).toBeGreaterThanOrEqual(0)
 	expect(people.persons.dynasty[mother]).toBeGreaterThanOrEqual(0)

@@ -517,9 +517,13 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 				holder >= 0 && STATE_TITLES.isDistrictSeat({ state, seat }),
 		),
 	).toBe(true)
-	for (const { people: packet } of state.journal)
-		for (let index = 0; index < (packet?.count ?? 0); index++)
-			expect(packet?.kind[index]).not.toBe(11)
+	for (const { people: packet } of state.journal) {
+		if (!packet) continue
+		for (let index = 0; index < packet.count; index++)
+			expect(PEOPLE_LOG.read({ rows: packet, index }).kind).not.toBe(
+				"opinion_memory",
+			)
+	}
 
 	const rulers = new Set<number>()
 	const free: number[] = []

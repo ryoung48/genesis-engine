@@ -7,6 +7,7 @@ import type {
 	ScheduleStateParams,
 } from "@/model/history/sim/engine/events/people/death/schedule/types"
 import { STATE } from "@/model/history/sim/engine/state"
+import { AGEING } from "@/model/history/sim/people/health/ageing"
 import type { DeathCause } from "@/model/history/sim/people/types"
 
 // A death dated to the present is stored in years, and converting it back to
@@ -32,8 +33,13 @@ function applied({ state, person }: ScheduleParams): boolean {
 // an unknown date leaves none. A death before now with no token was already
 // complete when the person was created. Someone handed a seat after their
 // death was applied gets a token for that seat alone.
-function ensure({ state, person, cause }: EnsureParams): void {
+function ensure({ state, person, cause: requested }: EnsureParams): void {
 	if (person < 0) return
+	const cause: DeathCause =
+		requested === "natural" &&
+		AGEING.heartFailed({ people: state.people, person })
+			? "heart"
+			: requested
 	const repeat = applied({ state, person })
 	if (repeat && state.people.persons.heldSeats[person].length === 0) return
 	const schedule = state.deathSchedule

@@ -35,7 +35,6 @@ const KINDS: readonly PeopleRowKind[] = [
 	"pregnancy",
 	"betrothal",
 	"betrothal_end",
-	"stress",
 	"residence",
 	"opinion_memory",
 	"regent",
@@ -200,11 +199,6 @@ function append({ log, row }: AppendRowParams): void {
 			a = row.person
 			b = row.province
 			if (b < 0) throw new Error("Invalid residence location")
-			break
-		case "stress":
-			time = row.time
-			a = row.person
-			b = row.level
 			break
 		case "health_band":
 			time = row.time
@@ -444,8 +438,6 @@ function read({ rows, index }: ReadRowParams): PeopleRow {
 			if (b < 0 || c !== 0 || d !== 0 || !Number.isFinite(time))
 				throw new Error("Invalid residence row")
 			return { kind, time, person: a, province: b }
-		case "stress":
-			return { kind, time, person: a, level: b }
 		case "health_band":
 			return {
 				kind,

@@ -30,7 +30,6 @@ import {
 } from "@/ui/genesis/wiki-bridge/nation-focus"
 import {
 	cultureMention,
-	noblePopularityStat,
 	organizationMention,
 	personDisplay,
 	recordPersonMention,
@@ -487,19 +486,6 @@ export function useNationWikiData(
 								),
 							}
 						: { label: "Regent", value: "Regency Council" },
-				)
-			const capital =
-				record.events.nationEvents[nationId]?.base.capitalProvinceId ?? -1
-			if (record.people && rulerPerson >= 0 && capital >= 0)
-				stats.splice(
-					stats.indexOf(rulerStat) + 1,
-					0,
-					noblePopularityStat({
-						people: record.people,
-						record,
-						seat: capital,
-						timeMs: history.selectedTimeMs,
-					}),
 				)
 			if (dynastyName || rulerPerson >= 0) {
 				rulerStat.value = ""

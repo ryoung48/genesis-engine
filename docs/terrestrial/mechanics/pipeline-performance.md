@@ -84,7 +84,6 @@ The following measurements describe the P2 schema (65 snapshot bytes and 81 reco
 | `regent` | 9,453 |
 | `betrothal` | 4,761 |
 | `death` | 4,193 |
-| `stress` | 1,216 |
 | `betrothal_end` | 799 |
 | Packet bytes | 37,447,540 (35.7 MiB; about 40 KB a year) |
 | Journal flush, all flushes after the initial one | 6.80 s (6.00 s with object rows) |
@@ -98,7 +97,7 @@ Wall times in the P2 packet comparison were 302.5 seconds with packets and 278.0
 
 ## Trait evaluation and birth-roll allocation
 
-Trait consumers use `TRAITS.modifier` to sum only the requested attribute or scalar value, and `TRAITS.has` checks the packed personality slots directly. These reads preserve the personality age gates and grade contributions without constructing a full modifier object. Fertility reads these values once per eligible couple pass, after the age and living-child gates. Report samples reuse ruler attributes when the ruler is also the governor. No persistent modifier cache is added. Personality generation selects the lowest three group rolls with stable insertion, reads inherited membership from two bit masks, and reuses fixed weights and inheritance chances. Base attributes read each parent once. A zero-stress person with no current stressors or bereavement skips trait-factor evaluation. These allocation reductions preserve the remaining hash channels and personality tie order.
+Trait consumers use `TRAITS.modifier` to sum only the requested attribute or scalar value, and `TRAITS.has` checks the packed personality slots directly. These reads preserve the personality age gates and grade contributions without constructing a full modifier object. Fertility reads these values once per eligible couple pass, after the age and living-child gates. Report samples reuse ruler attributes when the ruler is also the governor. No persistent modifier cache is added. Personality generation selects the lowest three group rolls with stable insertion, reads inherited membership from two bit masks, and reuses fixed weights and inheritance chances. Base attributes read each parent once. These allocation reductions preserve the remaining hash channels and personality tie order.
 
 ## Household benchmark and allocation improvements
 

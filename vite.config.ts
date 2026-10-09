@@ -10,6 +10,10 @@ import { defineConfig } from "vite"
 export default defineConfig(({ mode }) => {
 	const isTest = mode === "test" || process.env.VITEST === "true"
 	const base = process.env.VITE_BASE_PATH ?? "/"
+	const isolationHeaders = {
+		"Cross-Origin-Opener-Policy": "same-origin",
+		"Cross-Origin-Embedder-Policy": "credentialless",
+	}
 	const historySmokeFiles = [
 		"src/test/history-run/!(history-run|history-report|retained-memory|siege-calibration).smoke.test.ts",
 	]
@@ -17,6 +21,7 @@ export default defineConfig(({ mode }) => {
 	return {
 		base,
 		server: {
+			headers: isolationHeaders,
 			watch: {
 				ignored: [
 					"**/*.md",
@@ -26,6 +31,7 @@ export default defineConfig(({ mode }) => {
 				],
 			},
 		},
+		preview: { headers: isolationHeaders },
 		optimizeDeps: isTest
 			? undefined
 			: {

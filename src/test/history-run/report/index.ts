@@ -80,9 +80,7 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	const characterStage = (env.HISTORY_CHARACTER_STAGE ??
 		"personality") as CharacterStage
 	if (
-		!["draw", "fertility", "attributes", "stress", "personality"].includes(
-			characterStage,
-		)
+		!["draw", "fertility", "attributes", "personality"].includes(characterStage)
 	)
 		throw new Error("Invalid HISTORY_CHARACTER_STAGE")
 	return {

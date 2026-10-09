@@ -1,12 +1,12 @@
-# Person attributes, traits and stress
+# Person attributes and traits
 
 Scope: `:history`.
 
-Attributes, personality, inherited traits and stress describe the same [simulated people](overview.md). They influence family and political outcomes; `CHARACTER` is the code API for reading those properties.
+Attributes, personality and inherited traits describe the same [simulated people](overview.md). They influence family and political outcomes; `CHARACTER` is the code API for reading those properties.
 
-People have six base attributes, three personality traits, three congenital ladders and seventeen congenital traits. Fifteen traits use carried-gene inheritance; Inbred and Pure-blooded use parental relatedness and active inheritance. The table stores five packed innate columns and a sixth column for stress. Pure helpers decode the columns; records preserve the innate data and stress level changes for queries at a selected date. "Hook" is reserved for the Crusader Kings III mechanic of that name (a claim one character holds over another) and is not used here; what archived plans and saved reports call a hook is an *effect* in this document, as listed in the glossary of `plans/archive/people-1b-rename-hooks.md`.
+People have six base attributes, three personality traits, three congenital ladders and seventeen congenital traits. Fifteen traits use carried-gene inheritance; Inbred and Pure-blooded use parental relatedness and active inheritance. The table stores five packed innate columns. Pure helpers decode the columns; records preserve the innate data for queries at a selected date. "Hook" is reserved for the Crusader Kings III mechanic of that name (a claim one character holds over another) and is not used here; what archived plans and saved reports call a hook is an *effect* in this document, as listed in the glossary of `plans/archive/people-1b-rename-hooks.md`.
 
-Code: `sim/people/attributes`, `traits`, `character`, `stress`; `sim/engine/governor`, `events/people/stress`, and `events/battle/command`; `record/people/query`; `test/history-run/report/people-traits`, all under `src/model/history` except the report.
+Code: `sim/people/attributes`, `traits`, `character`; `sim/engine/governor`, and `events/battle/command`; `record/people/query`; `test/history-run/report/people-traits`, all under `src/model/history` except the report.
 
 ## Deterministic birth rolls and re-parenting
 
@@ -25,26 +25,26 @@ Packing: `bases` uses six four-bit values; `personality` uses three six-bit code
 
 **Personality** (three columns). All 36 CK3 personality traits, in 17 groups of opposites: 15 pairs and 2 triples. Three distinct groups are chosen by hash. Every trait has weight 1 except Eccentric, which has 0.05. Within a group each member has share `s = weight / group weight` (1/2 in a pair, 1/3 in the Compassionate triple; 48.8%, 48.8% and 2.4% for Stubborn, Fickle and Eccentric), except that when exactly one member appears among the parents that member has chance `s + 0.4 × (1 − s)` (0.7 in a pair) and the rest share the remainder in proportion to their weights. The traits become active at ages 9, 11 and 13.
 
-Each row below is one group. "Other" lists the non-skill values that have an effect here: stress factors, income, war chance, fertility, health, role-scoped opinion (DP10) and attraction. Opinion entries distinguish general reputation from vassal-only effects; carried/inactive traits contribute nothing.
+Each row below is one group. "Other" lists the non-skill values that have an effect here: income, war chance, fertility, health, role-scoped opinion (DP10) and attraction. Opinion entries distinguish general reputation from vassal-only effects; carried/inactive traits contribute nothing.
 
 | Trait | Dip | Mar | Stw | Int | Lrn | Prw | Other |
 |---|---|---|---|---|---|---|---|
 | Brave | | +2 | | | | +3 | attraction +10 |
 | Craven | | −2 | | +2 | | −3 | attraction −10 |
-| Ambitious | +1 | +1 | +1 | +1 | +1 | +1 | stress gain +25%; war chance +1 |
-| Content | | | | −1 | +2 | | stress loss +10%; war chance −0.25 |
+| Ambitious | +1 | +1 | +1 | +1 | +1 | +1 | war chance +1 |
+| Content | | | | −1 | +2 | | war chance −0.25 |
 | Wrathful | −1 | +3 | | −1 | | | war chance +0.25 |
-| Calm | +1 | | | +1 | | | stress loss +10%; war chance −0.25 |
+| Calm | +1 | | | +1 | | | war chance −0.25 |
 | Just | | | +2 | −3 | +1 | | |
-| Arbitrary | | | −2 | +3 | −1 | | stress gain −50%; opinion −5 |
-| Diligent | +2 | | +3 | | +3 | | stress loss −50% |
-| Lazy | −1 | −1 | −1 | −1 | −1 | | stress loss +50% |
+| Arbitrary | | | −2 | +3 | −1 | | opinion −5 |
+| Diligent | +2 | | +3 | | +3 | | |
+| Lazy | −1 | −1 | −1 | −1 | −1 | | |
 | Generous | +3 | | | | | | income −10% |
-| Greedy | −2 | | | | | | income +5%, and +10% more per stress level; war chance +0.5 |
+| Greedy | −2 | | | | | | income +5%; war chance +0.5 |
 | Lustful | | | | +2 | | | fertility +25% |
 | Chaste | | | | | +2 | | fertility −25% |
 | Temperate | | | +2 | | | | health +0.25 |
-| Gluttonous | | | −2 | | | | stress loss +10%; attraction −5 |
+| Gluttonous | | | −2 | | | | attraction −5 |
 | Patient | | | | | +2 | | |
 | Impatient | | | | | −2 | | |
 | Humble | | | | | | | |
@@ -56,7 +56,7 @@ Each row below is one group. "Other" lists the non-skill values that have an eff
 | Zealous | | +2 | | | | | |
 | Cynical | | | | +2 | +2 | | |
 | Trusting | +2 | | | −2 | | | |
-| Paranoid | −1 | | | +3 | | | stress gain +100% |
+| Paranoid | −1 | | | +3 | | | |
 | Forgiving | +2 | | | −2 | +1 | | |
 | Vengeful | −2 | | | +2 | | +2 | |
 | Compassionate | +2 | | | −2 | | | attraction +5 |
@@ -64,7 +64,7 @@ Each row below is one group. "Other" lists the non-skill values that have an eff
 | Sadistic | | | | +2 | | +4 | opinion −10 |
 | Stubborn | | | +3 | | | | |
 | Fickle | +2 | | −2 | +1 | | | |
-| Eccentric | −2 | | | | +2 | | stress gain +50%; stress loss +50% |
+| Eccentric | −2 | | | | +2 | | |
 
 The two triples are Compassionate / Callous / Sadistic and Stubborn / Fickle / Eccentric. Humble and Arrogant have no value with an effect and are shown only.
 
@@ -156,41 +156,15 @@ The attribute rates are 1.25 times the previous CK3 per-point values. Removing t
 | `usurpChance` | Ambitious regent ×2, Content regent ×0 |
 | Restoration `TRY_CHANCE` | Ambitious claimant ×1.5, Content ×0.5, before the cap at 1 |
 | `rebel` laxity, district holder | Ambitious +0.02, Content −0.02 |
-| `ECONOMY.revenue` | Generous ×0.9; Greedy × `1.05 + 0.1 × GOVERNOR.stressLevel` (DP6: 0 for a governor who rules no sovereign seat) |
+| `ECONOMY.revenue` | Generous ×0.9; Greedy ×1.05 |
 
 Arbitrary and Sadistic rulers' role-scoped opinion values enter DP10 once, then affect district loyalty through DP10.3/DP3.1. Arbitrary affects actual subjects only; Sadistic affects every observer.
 
-## Stress
-
-A `stress` column (0–400), stepped by `PEOPLE_EVENTS.runYear` as its first action, before `DISTRICTS.settle` and `FAMILY.runYear`. `T` is the pass time in years; passes are exactly one year apart.
-
-- **Who is stepped.** One scan of the seats collects, for each person, the sovereign seats they rule (`rulerOf[seat]` with `STATE.isSovereign`). Each person in that map is stepped exactly once, however many realms they rule (a personal union gives one person several).
-- **Several realms.** A stressor holds if it is true in any of the person's sovereign realms, and counts once: a Craven ruler of two realms at war gains +40, not +80.
-- **Stressors**, +40 a year each, times the summed active personality and cumulative ageing-condition gain factor, floored at 0:
-  - Craven: the realm is at war.
-  - Content: the realm is the attacker in a war.
-  - Just: a district of the realm is in revolt against it.
-  - Compassionate: the realm is the attacker in a war.
-  - Generous: the treasury is negative.
-  - Greedy: the realm pays tribute or an indemnity.
-- **Bereavement:** +20 for each person in the ruler's `spouse` and `children` columns whose `death` satisfies `T − 1 < death ≤ T`, read from the person table at the step. Consecutive intervals tile the timeline, so each death counts once. The spouse pointer still names the one who died: `seeksSpouse` allows remarriage only in a pass at or after the death, and that pass's step has already run before `FAMILY.runYear` overwrites the pointer. A childbirth death set during pass `T` falls after `T` and is counted at `T + 1`.
-- **Loss:** −30 a year, times the summed active personality and cumulative Faltering Heart loss factor, floored at 0.
-- **Levels:** 0 below 100, 1 from 100, 2 from 200, 3 from 300.
-- **Effects:** the person's fertility term in `FERTILITY.bear` × 0.9, 0.7, 0.5 at levels 1–3. At level 3 the ruler counts as ailing in `REGENCY.weak`.
-- **Reset.** `PeopleState.stressed` lists the people whose stress was above 0 after the previous step. At each step, anyone on it who rules no sovereign seat is set to 0 and dropped; if their level was above 0 and they are alive, a `stress` row with level 0 is written at `T`. The reset is done here and not in `PEOPLE.vacate` because a seat can stop being sovereign with no change of holder (its realm is subjugated or absorbed). A ruler who loses every sovereign seat and holds one again by the next step keeps their stress: the gap was shorter than the step.
-- **Stale values.** Between losing the last seat and the next step the column still holds the old value, and no effect may read it. `REGENCY.weak` reads only a realm's own ruler, and `FERTILITY.bear` runs after the step in the same pass. The Greedy revenue factor reads the governor, who can be a regent, and a landless former ruler can be appointed regent inside that interval. So the factor takes its stress level from `GOVERNOR.stressLevel({ state, realm })`, which returns the governor's level only if that person rules a sovereign seat at the time of the read, and 0 otherwise. A regent who is a sovereign ruler elsewhere keeps their real level.
-
-Stress for anyone who is not a sovereign ruler is 0 from the first step after they stop ruling.
-
-**Conditions and the heart.** Withering Mind and Faltering Heart add 20% to stress gain per row reached, and Faltering Heart takes 20% from stress loss per row ([health](health-and-mortality.md#effects)); the stress level also raises the weights of Withering Mind's faster gains. When a write raises a ruler's stress level, that is a mental break: after the `stress` row is written, a Faltering Heart they already have gains 25 XP, once however many levels the rise spans. A fall, a held level, a reset and a rise before the condition began give nothing. A heart that reaches 100 has failed. The step changes no holdings and no death dates itself: it finishes for every ruler on its starting list and returns the failed hearts, and the people pass then dates all of those deaths to the pass time before running any of their successions, in person order. No newly seated heir is stepped in that pass. Bereavement is counted from the deaths applied since the last step (`PeopleState.bereavements`), not from death dates.
-
-Allocation and traversal implementation details are in [pipeline performance](../mechanics/pipeline-performance.md#trait-evaluation-and-birth-roll-allocation).
-
 ## Record, wiki and diagnostics
 
-The person query returns attributes and tiers, age-gated personality, visible congenital traits and grades, and the last stress level change at or before the selected date. The page renders an Attributes group, trait chips and a stress row for a current ruler. Carried traits have no visible effect.
+The person query returns attributes and tiers, age-gated personality, visible congenital traits and grades. The page shows personality chips in the main stat block, coloured virtue, vice or temperament, and an Attributes group with a Physical chip row for grades and congenital traits, coloured gift, defect or lineage. Carried traits have no visible effect.
 
-The character report has separate `rulers` and `people` populations, each split into `all`, `adults` (16+) and `minors`. Each nonempty group reports attribute means, deviations, tiers and 0–37 histograms; active personality, grade, congenital and carried shares; and stress-level shares. Empty groups contain only `observations: 0`. Rulers are sampled per sovereign seat yearly, so their observations count ruler-years. Everyone alive, including rulers, is sampled every tenth year relative to the run start; these observations count person-samples. `people.all.stressedNonRulers` counts sampled people with raw stress above zero and no sovereign seat, including stale values before the next stress step.
+The character report has separate `rulers` and `people` populations, each split into `all`, `adults` (16+) and `minors`. Each nonempty group reports attribute means, deviations, tiers and 0–37 histograms; active personality, grade, congenital and carried shares. Empty groups contain only `observations: 0`. Rulers are sampled per sovereign seat yearly, so their observations count ruler-years. Everyone alive, including rulers, is sampled every tenth year relative to the run start; these observations count person-samples.
 
 `enrichment` compares distinct adult sovereign rulers with other adults on those same ten-year dates. It gives both populations' observations and distributions plus differences in attribute means and personality, grade and congenital shares. This is descriptive enrichment: dynasty, fertility and survival also differ, so it cannot isolate selection.
 
@@ -200,7 +174,7 @@ History report output preserves completed report folders; the runner does not pr
 
 ## Sources and deferred consumers
 
-The trait names, modifiers and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt`, `common/script_values/00_stress_values.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Effect caps and the annual stress cadence are simulation design choices documented in the character plan.
+The trait names, modifiers and inheritance chances come from the local Crusader Kings III 1.19.0.6 install: `common/traits/00_traits.txt`, `common/defines/00_defines.txt`, `common/modifiers/00_basic_modifiers.txt` and `events/death_events/death_management_events.txt`. Hash constants follow Austin Appleby's public-domain MurmurHash3. Base parent weight 0.5 follows Plomin & Deary (2015); personality parent bias 0.4 follows Vukasovic & Bratko (2015). Effect caps are simulation design choices documented in the character plan.
 
 Attraction and role-scoped opinion affect marriage scoring. Health values and the ageing conditions are live: see [health](health-and-mortality.md). Childhood skill rolls, lifestyle perks and old-record compatibility are excluded.
 

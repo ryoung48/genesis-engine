@@ -1744,9 +1744,9 @@ export const GenesisView: React.FC<{
 	})
 
 	const personWikiData = usePersonWikiData({
+		religionSelection: religionWiki.selection,
 		selectedWikiPersonId,
 		history,
-		planetName,
 		sceneRef,
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,

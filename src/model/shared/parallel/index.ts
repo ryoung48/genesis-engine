@@ -99,7 +99,11 @@ function mapItems<Payload>({
 
 // Returns results to ordinary memory so later stages can transfer or clone them.
 function local<T extends SharedArray>(source: T): T {
-	if (!(source.buffer instanceof SharedArrayBuffer)) return source
+	if (
+		typeof SharedArrayBuffer === "undefined" ||
+		!(source.buffer instanceof SharedArrayBuffer)
+	)
+		return source
 	const copy = new (source.constructor as new (length: number) => T)(
 		source.length,
 	)

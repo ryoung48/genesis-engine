@@ -2,7 +2,6 @@ import type {
 	Attribute,
 	AttributeModifier,
 } from "@/model/history/sim/people/attributes/types"
-import type { StressModifier } from "@/model/history/sim/people/traits/types"
 import type { PeopleState } from "@/model/history/sim/people/types"
 
 export type AgeCondition =
@@ -27,8 +26,6 @@ export interface ConditionRow {
 	health: number
 	fertility: number
 	attraction: number
-	stressGain: number
-	stressLoss: number
 	advantage: number
 	// Years of life expectancy lost, applied as added physiological age.
 	life: number
@@ -37,7 +34,6 @@ export interface ConditionRow {
 // The summed rows of every condition a person has.
 export interface ConditionEffects {
 	attributes: AttributeModifier
-	stress: StressModifier
 	health: number
 	// Multiplies fertility; never below 0.
 	fertility: number
@@ -64,7 +60,6 @@ export interface AgeingStepParams extends AgeingPersonParams {
 	// Effective health after the year's ageing loss.
 	health: number
 	prowess: number
-	stressLevel: number
 	// The person led an army since their last pulse.
 	led: boolean
 }
@@ -86,7 +81,6 @@ export interface ProgressParams {
 	age: number
 	health: number
 	prowess: number
-	stressLevel: number
 	led: boolean
 }
 
@@ -95,12 +89,4 @@ export interface LevelChangeParams {
 	before: number
 	after: number
 	changes: ConditionChange[]
-}
-
-export interface HeartRise {
-	// The heart has failed: the person dies.
-	terminal: boolean
-	// [JUSTIFICATION] A rise that stays within the same level changes nothing
-	// on record, and someone without the condition gains nothing.
-	change: ConditionChange | null
 }

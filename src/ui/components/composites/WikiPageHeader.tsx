@@ -28,7 +28,7 @@ export const WikiPageHeader: React.FC<WikiPageHeaderProps> = ({
 			) : null}
 		</div>
 		<div className="mt-0.5 flex items-center justify-between gap-3">
-			<div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
+			<div className="flex flex-wrap items-center gap-2 text-[9px] text-slate-500">
 				{meta}
 			</div>
 			{metaAction ? (

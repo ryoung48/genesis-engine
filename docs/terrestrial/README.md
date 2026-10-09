@@ -7,7 +7,7 @@ Start here for the historical simulation’s rules and implementation references
 ## Concepts
 
 - **People** are individually simulated rulers, seat holders and their families. Every created person is recorded, whether landed or not.
-- **Attributes, traits and stress** are properties of those same people. “Character” names the code API `CHARACTER`; it does not identify another kind of person.
+- **Attributes and traits** are properties of those same people. “Character” names the code API `CHARACTER`; it does not identify another kind of person.
 - **Population** is the aggregate rural and urban headcount, not the individually simulated people table.
 - **Residence** is a person’s province. Their territorial realm is derived from that province’s ownership.
 - **Held seats** are titles belonging to a person. The highest-ranked seat is primary (lowest seat ID breaks ties); title ownership and residence are separate.
@@ -21,7 +21,7 @@ Start here for the historical simulation’s rules and implementation references
 - [Simulated people and ruling families](people/overview.md)
 - [Families, births and lifespans](people/families-and-lifecycle.md)
 - [Marriage, betrothal and family alliances](people/marriage-and-alliances.md)
-- [Person attributes, traits and stress](people/attributes-traits-and-stress.md)
+- [Person attributes and traits](people/attributes-and-traits.md)
 - [Household residence and territorial realm](people/residence-and-realm.md)
 - [Health, ageing and mortality](people/health-and-mortality.md)
 
@@ -48,4 +48,4 @@ Start here for the historical simulation’s rules and implementation references
 
 The topic references describe the implemented rules. Mechanics covers logging, transfer, queries, pipeline performance and memory; each historical measurement retains its own workload and limits. Proposed features remain in `plans/`, not in these references.
 
-Religion sets marriage customs and constrains culture gender systems; sexual orientation is recorded without mechanical effects. See [marriage](people/marriage-and-alliances.md) and [attributes](people/attributes-traits-and-stress.md).
+Religion sets marriage customs and constrains culture gender systems; sexual orientation is recorded without mechanical effects. See [marriage](people/marriage-and-alliances.md) and [attributes](people/attributes-and-traits.md).

@@ -1,42 +1,18 @@
 import { expect, it } from "vitest"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
-import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
-import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
-import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
-import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
-import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { PEOPLE } from "@/model/history/sim/people"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import { STRESS } from "@/model/history/sim/people/stress"
 import { TRAITS } from "@/model/history/sim/people/traits"
-import type { PeopleState } from "@/model/history/sim/people/types"
 import { HASH } from "@/model/shared/random/hash"
 import { RNG } from "@/model/shared/random/rng"
 import { HISTORY_RUN } from "@/test/history-run"
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
-
-// Stress levels a person's pending rows carry, in append order.
-function stressLevels({
-	people,
-	person,
-}: {
-	people: PeopleState
-	person: number
-}): number[] {
-	const levels: number[] = []
-	for (let index = 0; index < people.log.count; index++) {
-		const row = PEOPLE_LOG.read({ rows: people.log, index })
-		if (row.kind === "stress" && row.person === person) levels.push(row.level)
-	}
-	return levels
-}
 
 it("draws only the name seed and fertility from the shared stream at spawn, and redraw consumes none", () => {
 	const people = PEOPLE.create(1)
@@ -136,7 +112,7 @@ it("redraws descendants from final parents in birth order, leaving births and sh
 		})
 	}
 })
-it("gates personality by age and reads stress at the selected time", () => {
+it("gates personality by age", () => {
 	const people = PEOPLE.create(1)
 	const rng = RNG.createRng({ seed: 221 })
 	const id = PEOPLE.spawn({
@@ -172,22 +148,6 @@ it("gates personality by age and reads stress at the selected time", () => {
 		recordTime: (years) => years * STATE.yearMs,
 	})
 	expect(PEOPLE_RECORD.person({ people: record, id })).toMatchObject(character)
-	record.stressOf.set(id, [
-		{ person: id, timeMs: 20 * STATE.yearMs, level: 2 },
-		{ person: id, timeMs: 21 * STATE.yearMs, level: 0 },
-	])
-	expect(
-		PERSON_QUERY.attributes({ people: record, id, timeMs: 16 * STATE.yearMs }),
-	).toHaveLength(6)
-	expect(
-		PERSON_QUERY.stress({ people: record, id, timeMs: 19 * STATE.yearMs }),
-	).toBe(0)
-	expect(
-		PERSON_QUERY.stress({ people: record, id, timeMs: 20 * STATE.yearMs }),
-	).toBe(2)
-	expect(
-		PERSON_QUERY.stress({ people: record, id, timeMs: 21 * STATE.yearMs }),
-	).toBe(0)
 })
 it("uses final neutral points, effect rates, tier bands and age-independent adult attributes", () => {
 	const neutralPoints = {
@@ -264,60 +224,7 @@ it("uses final neutral points, effect rates, tier bands and age-independent adul
 		)
 	}
 })
-it("scales stress, caps levels and decays in peace", () => {
-	const character = {
-		bases: 0,
 
-		personality: 1 | (3 << 6) | (18 << 12),
-		grades: 49539,
-		congenital: 0,
-		carried: 0,
-	}
-	let value = 0
-	for (let year = 0; year < 8; year++)
-		value = STRESS.step({
-			conditions: [],
-			character,
-			age: 30,
-			value,
-			war: true,
-			attacking: true,
-			revolt: false,
-			debt: false,
-			paying: false,
-			bereavements: 0,
-		})
-	expect(STRESS.level(value)).toBe(3)
-	expect(
-		STRESS.step({
-			conditions: [],
-			character,
-			age: 30,
-			value,
-			war: false,
-			attacking: false,
-			revolt: false,
-			debt: false,
-			paying: false,
-			bereavements: 0,
-		}),
-	).toBeLessThan(value)
-	expect([0, 100, 200, 300].map(STRESS.fertilityFactor)).toEqual([
-		1, 0.9, 0.7, 0.5,
-	])
-	expect(STRESS.level(400)).toBe(3)
-	const greedy = { ...character, personality: 11 | (18 << 6) | (20 << 12) }
-	for (let stressLevel = 0; stressLevel <= 3; stressLevel++)
-		expect(
-			TRAITS.incomeFactor({ character: greedy, age: 30, stressLevel }),
-		).toBeCloseTo(1.05 + 0.1 * stressLevel)
-	expect(
-		TRAITS.warChance({
-			character: { ...character, personality: 0 | (18 << 6) | (20 << 12) },
-			age: 30,
-		}),
-	).toBeCloseTo(1 / 1.11)
-})
 it("centres and bounds governor factors", () => {
 	for (const attribute of [
 		"diplomacy",
@@ -337,7 +244,7 @@ it("centres and bounds governor factors", () => {
 	expect(GOVERNOR.factor({ attribute: "martial", value: 100 })).toBe(1.21)
 	expect(GOVERNOR.factor({ attribute: "learning", value: -100 })).toBe(0.93)
 })
-it("reads current governors outside the revenue cache and resets stale stress after sovereignty ends", () => {
+it("reads current governors outside the revenue cache", () => {
 	const { engine: state } = HISTORY_RUN.createEngine({
 		seed: 14963991,
 		era: "lateMedieval",
@@ -352,8 +259,6 @@ it("reads current governors outside the revenue cache and resets stale stress af
 	people.regencies.delete(realm)
 	people.persons.birth[ruler] = time - 30
 	people.persons.personality[ruler] = 11 | (18 << 6) | (20 << 12)
-	people.persons.stress[ruler] = 200
-	expect(GOVERNOR.stressLevel({ state, realm })).toBe(2)
 	const base = ECONOMY.revenue({ state, p: realm })
 	people.persons.bases[ruler] ^= 10 << 8
 	expect(ECONOMY.revenue({ state, p: realm })).not.toBe(base)
@@ -374,12 +279,7 @@ it("reads current governors outside the revenue cache and resets stale stress af
 	})
 	for (const seat of [...people.persons.heldSeats[ruler]])
 		PEOPLE.vacate({ people, seat, reason: "unknown" })
-	expect(GOVERNOR.stressLevel({ state, realm })).toBe(0)
 	expect(GOVERNOR.incomeFactor({ state, realm })).toBeCloseTo(1.05)
-	people.stressed = [ruler]
-	STRESS_EVENTS.runYear({ state })
-	expect(people.persons.stress[ruler]).toBe(0)
-	expect(stressLevels({ people, person: ruler })).toContain(0)
 	people.regencies.set(realm, {
 		cause: "minority",
 		ward,
@@ -531,108 +431,6 @@ it("a Genius parent transmits Genius in a quarter of draws and an active good si
 	expect(Math.abs(geniuses / 10000 - 0.25)).toBeLessThan(0.02)
 })
 
-it("steps personal unions once, resets subjects without a holder change, and counts bereavement once before remarriage", () => {
-	const { engine: state } = HISTORY_RUN.createEngine({
-		seed: 14963991,
-		era: "lateMedieval",
-		numPoints: 30000,
-	})
-	const realms = Array.from(state.people.rulerOf.keys()).filter(
-		(p) => STATE.isSovereign({ state, p }) && state.people.rulerOf[p] >= 0,
-	)
-	const realm = realms[0]
-	const other = realms[1]
-	const ruler = state.people.rulerOf[realm]
-	const table = state.people.persons
-	const people = state.people
-	const time = state.time / STATE.yearMs
-	table.birth[ruler] = time - 30
-	table.death[ruler] = time + 100
-	table.personality[ruler] = 1 | (3 << 6) | (18 << 12)
-	table.children[ruler] = []
-	table.spouse[ruler] = -1
-	table.stress[ruler] = 0
-	people.rulerOf[other] = ruler
-	people.regencies.clear()
-	const original = MILITARY.atWar
-	MILITARY.atWar = () => true
-	try {
-		const war = state.wars[0]
-		war.attacker = realm
-		war.defender = other
-		war.endTime = undefined
-		war.goal = "conquest"
-		state.activeWarIds = new Set([war.idx])
-		STRESS_EVENTS.runYear({ state })
-		expect(table.stress[ruler]).toBe(47)
-		for (let year = 1; year < 8; year++) {
-			state.time += STATE.yearMs
-			STRESS_EVENTS.runYear({ state })
-		}
-		expect(STRESS.level(table.stress[ruler])).toBe(3)
-		expect(REGENCY.weak({ state, realm })).toBe(true)
-		expect(stressLevels({ people, person: ruler })).toEqual([1, 2, 3])
-		// A sovereignty change can leave every seat's holder unchanged.
-		state.parentCurrent[realm] = realms[2]
-		state.parentCurrent[other] = realms[2]
-		STRESS_EVENTS.runYear({ state })
-		expect(table.stress[ruler]).toBe(0)
-		expect(stressLevels({ people, person: ruler }).at(-1)).toBe(0)
-		state.parentCurrent[realm] = -1
-		state.parentCurrent[other] = -1
-		table.stress[ruler] = 200
-		people.stressed = [ruler]
-		table.personality[ruler] = 18 | (20 << 6) | (24 << 12)
-		const relatives = people.alive
-			.filter(
-				(person) =>
-					person !== ruler &&
-					table.heldSeats[person].length === 0 &&
-					PEOPLE.aliveAt({
-						people,
-						person,
-						time: state.time / STATE.yearMs,
-					}),
-			)
-			.slice(0, 3)
-		table.spouse[ruler] = relatives[0]
-		table.spouse[relatives[0]] = ruler
-		for (const relative of relatives) {
-			table.father[relative] = -1
-			table.mother[relative] = -1
-		}
-		table.spouse[relatives[1]] = -1
-		table.father[relatives[1]] = ruler
-		table.children[ruler] = [relatives[1]]
-		for (const relative of relatives.slice(0, 2)) {
-			PERSON_DEATH.mark({ state, person: relative, cause: "natural" })
-			PERSON_DEATH.run({
-				state,
-				person: relative,
-				revision: DEATH_SCHEDULE.revisionOf({ state, person: relative }),
-				rng: RNG.createRng({ seed: 1 }),
-			})
-		}
-		expect(table.spouse[ruler]).toBe(-1)
-		expect(people.bereavements.get(ruler)).toBe(2)
-		STRESS_EVENTS.runYear({ state })
-		expect(table.stress[ruler]).toBe(210)
-		expect(people.bereavements.size).toBe(0)
-		table.spouse[ruler] = relatives[2]
-		state.time += STATE.yearMs
-		STRESS_EVENTS.runYear({ state })
-		expect(table.stress[ruler]).toBe(180)
-		// Brief deposition and restoration between passes does not erase accumulated stress.
-		people.rulerOf[realm] = -1
-		people.rulerOf[other] = -1
-		people.rulerOf[realm] = ruler
-		STRESS_EVENTS.runYear({ state })
-		expect(table.stress[ruler]).toBe(150)
-	} finally {
-		MILITARY.atWar = original
-	}
-}, 120000)
-
 it("reads scalar trait modifiers without changing age gates or grade contributions", () => {
 	const character = {
 		bases: 0,
@@ -654,8 +452,6 @@ it("reads scalar trait modifiers without changing age gates or grade contributio
 		attraction: -30,
 		opinion: 0,
 		vassalOpinion: -10,
-		stressGain: 0.25,
-		stressLoss: 0,
 		warChance: 1.5,
 		income: 0.05,
 	} as const
@@ -711,7 +507,6 @@ it("samples living populations on matched dates and measures capped governors in
 
 		table.congenital[person] = 0
 		table.carried[person] = 0
-		table.stress[person] = i === 2 ? 110 : 0
 		table.heldSeats[person] = []
 	}
 	table.grades[ids[2]] = 49542 | (2 << 5)
@@ -754,7 +549,6 @@ it("samples living populations on matched dates and measures capped governors in
 	expect(report.enrichment.others.observations).toBe(1)
 	const all = report.people.all
 	if (!("attributes" in all)) throw new Error("Missing population")
-	expect(all.stressedNonRulers).toBe(1)
 	const expected = {
 		diplomacy: [4, 4, 17, 8],
 		martial: [4, 6, 17, 8],
@@ -792,7 +586,6 @@ it("samples living populations on matched dates and measures capped governors in
 	expect(all.gradeShares).toEqual({ Genius: 0.25 })
 	expect(all.congenitalShares).toEqual({ dwarf: 0.25 })
 	expect(all.carriedShares).toEqual({ "intellect.bad.2": 0.25, giant: 0.25 })
-	expect(all.stressLevelShares).toEqual([0.75, 0.25, 0, 0])
 	for (const [effect, attribute, value] of [
 		["laxity", "diplomacy", 17],
 		["battle", "martial", 17],

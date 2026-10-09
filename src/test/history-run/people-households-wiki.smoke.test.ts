@@ -13,6 +13,7 @@ import { SIM_RECORD } from "@/model/history/sim/record"
 import { RNG } from "@/model/shared/random/rng"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
+import { NO_RELIGION_SELECTION } from "@/test/history-run/no-religion-selection"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { PersonWikiPage } from "@/ui/wiki/person/PersonWikiPage"
@@ -105,6 +106,7 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 	engine.journal.length = 0
 	const start = state.record.minTimeMs
 	const input = {
+		religionSelection: NO_RELIGION_SELECTION,
 		selectedWikiPersonId: person,
 		history: {
 			state,
@@ -113,7 +115,6 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 			maxTimeMs: start,
 			setSelectedTimeMs: vi.fn(),
 		},
-		planetName: "Household fixture",
 		sceneRef: { current: null },
 		setSelectedWikiNationId: vi.fn(),
 		setSelectedWikiOrganizationId: vi.fn(),
@@ -125,8 +126,7 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 		const data = usePersonWikiData(input)
 		if (!data) throw new Error("Missing page")
 		if (input.selectedWikiPersonId === person) {
-			const titles =
-				data.groups.find((group) => group.label === "Titles")?.chips ?? []
+			const titles = data.titles
 			expect(titles).toHaveLength(titleCount)
 			expect(new Set(titles.map((chip) => chip.key)).size).toBe(titleCount)
 			expect(titles[0].title).toContain("Primary title")
@@ -136,7 +136,9 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 		}
 		return createElement(PersonWikiPage, { person: data })
 	}
-	expect(renderToString(createElement(Page))).toContain("Residence")
+	expect(renderToString(createElement(Page))).toContain(
+		"Current household location",
+	)
 	engine.time += STATE.yearMs
 	PEOPLE.vacate({ people: engine.people, seat: crowns[1], reason: "union" })
 	FIELDS.prov.parent.set({ state: engine, p: crowns[2], value: crowns[3] })

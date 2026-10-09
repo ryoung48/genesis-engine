@@ -46,7 +46,7 @@ The three assignment streams have salts 7411, 7412 and 7413, with family/religio
 
 Procedural worlds carry doctrines. Earth imports explicitly omit them, including imports without a province raster. Both paths still assign the five types to generated religion partitions.
 
-On supported worlds, religion segments in nation and organization charts and religion mentions in nation timelines open the religion wiki. It shows the name, type, family, sibling religions, all fifteen doctrines with differences from the family marked, virtues and sins, and province and nation holdings at the viewed date. A family's label uses its lowest-index religion's name followed by “family”. Sibling and nation chips open their respective pages. Unsupported or unresolved religion keys remain unlinked.
+On supported worlds, religion segments in nation and organization charts, religion mentions in nation and organization timelines, and the Religion row of a person page open the religion wiki. It shows the name, type, family, sibling religions, all fifteen doctrines with differences from the family marked, virtues and sins, and province and nation holdings at the viewed date. A family's label uses its lowest-index religion's name followed by “family”. Sibling and nation chips open their respective pages. Unsupported or unresolved religion keys remain unlinked.
 
 Marriage type, consanguinity and gender have the simulation effects below. The other doctrines, virtues and sins do not enter [opinion](opinion-and-relationships.md) or faith hostility. Heads of faith here are doctrine options rather than simulated people.
 

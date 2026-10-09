@@ -1,13 +1,10 @@
 import { BACKFILL } from "@/model/history/sim/engine/backfill"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { PATRICIANS } from "@/model/history/sim/engine/events/people/patricians"
 import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
-import { STRESS_EVENTS } from "@/model/history/sim/engine/events/people/stress"
 import type {
-	FailHeartsParams,
 	InitPeopleParams,
 	PeopleEventParams,
 	SettleMatchesParams,
@@ -18,7 +15,6 @@ import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
 import { BETROTHAL } from "@/model/history/sim/people/betrothal"
 import { FAMILY } from "@/model/history/sim/people/family"
 import { MARRIAGE_DIAGNOSTICS } from "@/model/history/sim/people/family/diagnostics"
@@ -200,33 +196,7 @@ function init({ state, seed }: InitPeopleParams): void {
 	nextYear({ state })
 }
 
-// Every failed heart is dated before any succession runs, so no one who dies
-// this instant is chosen as an heir or regent; the deaths then apply in
-// person order.
-function failHearts({ state, hearts, rng }: FailHeartsParams): void {
-	if (hearts.length === 0) return
-	for (const person of hearts)
-		PERSON_DEATH.mark({ state, person, cause: "heart" })
-	for (const person of hearts)
-		PERSON_DEATH.run({
-			state,
-			person,
-			revision: DEATH_SCHEDULE.revisionOf({ state, person }),
-			rng,
-		})
-	const people = state.people
-	const time = state.time / STATE.yearMs
-	people.stressed = people.stressed.filter(
-		(person) =>
-			PEOPLE.aliveAt({ people, person, time }) &&
-			people.persons.heldSeats[person].some((seat) =>
-				STATE.isSovereign({ state, p: seat }),
-			),
-	)
-}
-
 function runYear({ state, rng }: PeopleEventParams): void {
-	failHearts({ state, hearts: STRESS_EVENTS.runYear({ state }), rng })
 	const health = HEALTH.runYear({
 		people: state.people,
 		time: state.time / STATE.yearMs,

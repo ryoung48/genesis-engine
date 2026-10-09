@@ -163,7 +163,6 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 					people.regentsOfWard,
 				]),
 				pregnanciesOf: retainedBytes(people.pregnanciesOf),
-				stressOf: retainedBytes(people.stressOf),
 				health: retainedBytes(people.health),
 				dynastyHome: retainedBytes(people.dynastyHome),
 			},

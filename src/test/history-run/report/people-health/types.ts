@@ -67,20 +67,17 @@ export interface ConditionReport {
 	from70: ConditionAgeGroup
 	// Sampled person-years at each level 0-4 of the five ageing conditions.
 	levelYears: Record<string, number[]>
-	// Level changes of Faltering Heart: the mental breaks that advanced it.
-	heartRises: number
 }
 
 export interface CauseReport {
 	regenciesStarted: Record<RegencyCause, number>
 	usurpations: Record<RegencyCause, number>
 	// Yearly samples of sovereign realms with a weak crown, by its cause; a
-	// regency takes precedence, then ailing health, then stress.
+	// regency takes precedence, then ailing health.
 	weakCrownYears: {
 		minority: number
 		incapacity: number
 		ailing: number
-		stress: number
 	}
 }
 
@@ -131,7 +128,6 @@ export interface PeopleHealthTracker {
 	groupYears: number[]
 	groupConditions: number[][]
 	levelYears: number[][]
-	heartRises: number
 	weakCrownYears: CauseReport["weakCrownYears"]
 	deadSeatHolderYears: number
 }

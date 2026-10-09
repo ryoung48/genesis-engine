@@ -1,10 +1,9 @@
 import type { PeopleRecord } from "@/model/history/record/people/types"
+import type { Battle, WarRecord } from "@/model/history/record/types"
 import type {
-	Battle,
-	HistoryRecord,
-	WarRecord,
-} from "@/model/history/record/types"
-import type { WorldFrame } from "@/model/history/world-frame/types"
+	PartitionRow,
+	WorldFrame,
+} from "@/model/history/world-frame/types"
 import type { SceneRef } from "@/ui/genesis/view/types"
 
 export interface BattleDetailParams {
@@ -16,14 +15,6 @@ export interface BattleDetailParams {
 export interface RecordPersonMentionParams {
 	people: PeopleRecord | null
 	person: number
-}
-
-export interface NoblePopularityParams {
-	people: PeopleRecord
-	record: HistoryRecord
-	// The realm's capital province.
-	seat: number
-	timeMs: number
 }
 
 export interface RegentRoleParams {
@@ -52,4 +43,11 @@ export interface PersonDisplayParams {
 export interface ReligionOptionLabelInput {
 	group: string
 	option: string
+}
+
+export interface PartitionStatParams {
+	label: string
+	rows: PartitionRow[]
+	assigned: number
+	select: ((row: PartitionRow) => (() => void) | undefined) | null
 }
