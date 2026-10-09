@@ -75,10 +75,8 @@ export function buildReligionWikiData(input: ReligionWikiDataInput) {
 		.filter((row) => world.religionFamilies![row.id] === family)
 		.sort((a, b) => a.id - b.id)
 	const holdings = new Map<number, number>()
-	let provinces = 0
 	for (let province = 0; province < frame.provinceReligion.length; province++)
 		if (frame.provinceReligion[province] === id) {
-			provinces++
 			const nation = frame.provinceNation[province]
 			if (nation >= 0) holdings.set(nation, (holdings.get(nation) ?? 0) + 1)
 		}
@@ -97,19 +95,22 @@ export function buildReligionWikiData(input: ReligionWikiDataInput) {
 				title: sibling.name,
 				onClick: () => selection.select(sibling.id),
 			})),
-		doctrines: RELIGION_DOCTRINE.groups.map((group, index) => ({
-			group: religionGroupLabel(group.name),
-			option: religionOptionLabel({
+		stats: RELIGION_DOCTRINE.groups.map((group, index) => {
+			const option = religionOptionLabel({
 				group: group.name,
 				option: group.options[doctrine.options[id * width + index]],
-			}),
-			differs:
+			})
+			const differs =
 				doctrine.options[id * width + index] !==
-				doctrine.familyOptions[family * width + index],
-		})),
+				doctrine.familyOptions[family * width + index]
+			return {
+				label: religionGroupLabel(group.name),
+				value: differs ? `${option} · differs` : option,
+				...(differs ? { valueHelp: "Differs from the family's doctrine" } : {}),
+			}
+		}),
 		virtues: doctrine.virtues[id].map((trait) => TEXT.titleCase(trait)),
 		sins: doctrine.sins[id].map((trait) => TEXT.titleCase(trait)),
-		stats: [{ label: "Provinces", value: provinces.toLocaleString() }],
 		nations: [...holdings]
 			.sort((a, b) => b[1] - a[1])
 			.flatMap(([nationId, count]) => {

@@ -7,7 +7,6 @@ import { Swatch } from "@/ui/components/primitives/Swatch"
 import { uiTokens } from "@/ui/components/tokens"
 import type { ReligionWikiPageProps } from "@/ui/wiki/religion/types"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
-import { WikiSection } from "@/ui/wiki/shared/WikiTimeline"
 export function ReligionWikiPage({ religion }: ReligionWikiPageProps) {
 	return (
 		<div className={uiTokens.wiki.page}>
@@ -36,28 +35,6 @@ export function ReligionWikiPage({ religion }: ReligionWikiPageProps) {
 					)}
 				</ChipGroup>
 			</Surface>
-			<WikiSection title="Doctrines">
-				<div className={uiTokens.wiki.rows}>
-					{religion.doctrines.map((row) => (
-						<div
-							key={row.group}
-							data-doctrine={row.group}
-							className={`${uiTokens.wiki.row} ${uiTokens.type.valueSm} ${uiTokens.text.primary}`}
-						>
-							<span>{row.group}</span>
-							<span>
-								{row.option}
-								{row.differs && (
-									<span title="Differs from the family's doctrine">
-										{" "}
-										· differs
-									</span>
-								)}
-							</span>
-						</div>
-					))}
-				</div>
-			</WikiSection>
 			<Surface tone="panelMuted" radius="xl" padding="md">
 				{[
 					{ label: "Virtues", traits: religion.virtues },

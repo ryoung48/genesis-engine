@@ -57,7 +57,9 @@ describe("religion wiki", () => {
 				createElement(ReligionWikiPage, { religion: data }),
 			)
 			if (
-				(html.match(/data-doctrine=/g) ?? []).length !== 15 ||
+				data.stats.length !== width ||
+				html.includes(">Provinces<") ||
+				html.includes(">Doctrines<") ||
 				data.virtues.length !== 3 ||
 				data.sins.length !== 3
 			)
@@ -70,23 +72,20 @@ describe("religion wiki", () => {
 					doctrine.options[row.id * width + group] !==
 					doctrine.familyOptions[family * width + group]
 				if (differs) differences++
+				const option = religionOptionLabel({
+					group: definition.name,
+					option: definition.options[doctrine.options[row.id * width + group]],
+				})
 				if (
-					data.doctrines[group].group !== religionGroupLabel(definition.name) ||
-					data.doctrines[group].option !==
-						religionOptionLabel({
-							group: definition.name,
-							option:
-								definition.options[doctrine.options[row.id * width + group]],
-						}) ||
-					data.doctrines[group].differs !== differs
+					data.stats[group].label !== religionGroupLabel(definition.name) ||
+					data.stats[group].value !==
+						(differs ? `${option} · differs` : option) ||
+					Boolean(data.stats[group].valueHelp) !== differs ||
+					!html.includes(`>${data.stats[group].label}<`)
 				)
 					violations++
 			}
 			if ((html.match(/ · differs/g) ?? []).length !== differences) violations++
-			const provinceCount = Array.from(frame.provinceReligion).filter(
-				(id) => id === row.id,
-			).length
-			if (data.stats[0].value !== provinceCount.toLocaleString()) violations++
 			for (const sibling of data.siblings) {
 				const siblingId = result.selection.resolve(sibling.key)
 				if (

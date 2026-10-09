@@ -6,7 +6,6 @@ export interface ReligionWikiData {
 	typeName: string
 	familyName: string
 	siblings: PersonWikiChip[]
-	doctrines: { group: string; option: string; differs: boolean }[]
 	virtues: string[]
 	sins: string[]
 	stats: StatEntry[]
