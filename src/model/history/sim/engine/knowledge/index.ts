@@ -2,6 +2,7 @@ import type {
 	AdvanceKnowledgeParams,
 	InitKnowledgeParams,
 	KnowledgeLevelParams,
+	LogisticsScaleParams,
 	MaxCitySizeParams,
 	OwnAdvanceParams,
 	PopulationMeanParams,
@@ -79,9 +80,15 @@ const EXTRACTION_CURVE = {
 	range: [0.015, 0.03, 0.1, 0.15],
 }
 
+// Foraging area grows with army size, so the distance a foraging army can
+// sustain grows with the square root of its numbers (van Creveld, Supplying
+// War, 1977, ch. 1): beyond the knee, extra troops add force as their square
+// root. A design value, not a measured one.
+const FIELD_ARMY_RETURNS = 0.5
+
 const FIELD_ARMY_CURVE = {
 	domain: [0, 1, 2, 3, 4],
-	range: [25_000, 40_000, 120_000, 400_000, 1_500_000],
+	range: [25_000, 40_000, 120_000, 250_000, 600_000],
 }
 
 function populationMean({
@@ -246,12 +253,17 @@ function extractionRate({ knowledge }: KnowledgeLevelParams): number {
 	})
 }
 
-function maxFieldArmy({ knowledge }: KnowledgeLevelParams): number {
+function fieldArmyKnee({ knowledge }: KnowledgeLevelParams): number {
 	return MATH.piecewise({
 		domain: FIELD_ARMY_CURVE.domain,
 		range: FIELD_ARMY_CURVE.range,
 		x: knowledge,
 	})
+}
+
+function logisticsScale({ knee, troops }: LogisticsScaleParams): number {
+	if (troops <= knee) return 1
+	return (knee / troops) ** (1 - FIELD_ARMY_RETURNS)
 }
 
 function eraBaseline(era: SocietyEra): number {
@@ -276,7 +288,8 @@ export const KNOWLEDGE = {
 	maxCitySize,
 	productivity,
 	extractionRate,
-	maxFieldArmy,
+	fieldArmyKnee,
+	logisticsScale,
 	realmKnowledge,
 	eraBaseline,
 	yearBaseline,

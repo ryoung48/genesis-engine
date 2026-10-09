@@ -7,7 +7,14 @@ export interface PersonTitleParams {
 	tier: TitleTier | null
 	// [JUSTIFICATION] Only a king's or emperor's child has a royal parent.
 	royalParent: TitleTier | null
+	// [JUSTIFICATION] Only a person governing for a child ruler has a regency.
+	regency: RegencyView | null
 	crown: boolean
+}
+
+export interface RegencyView {
+	tier: TitleTier
+	mother: boolean
 }
 
 export interface CrownParams {

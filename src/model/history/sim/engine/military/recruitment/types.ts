@@ -15,7 +15,7 @@ export interface RecruitmentLimits {
 
 export interface RecruitmentTargets extends Troops {
 	safety: number
-	logistics: number
+	knee: number
 	limits: RecruitmentLimits
 	uncapped: Troops
 	levyEligibility: number

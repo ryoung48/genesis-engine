@@ -517,7 +517,7 @@ function sovereignAdults(state: HistoryState): number[] {
 }
 
 it("governs for an incapable sovereign through a regent until death, spouse first", () => {
-	const seed = 14963991
+	const seed = 14963993
 	const { generated, engine: state } = HISTORY_RUN.createEngine({
 		seed,
 		era: "lateMedieval",

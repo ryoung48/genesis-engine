@@ -5,14 +5,10 @@ import { HISTORY } from "@/model/history/record"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import type { NamedPerson } from "@/model/history/record/people/names/types"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
-import type {
-	PersonView,
-	TenureView,
-} from "@/model/history/record/people/query/types"
+import type { PersonView } from "@/model/history/record/people/query/types"
 import type { RecordPerson } from "@/model/history/record/people/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
 import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
-import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import { ORIENTATION } from "@/model/history/sim/people/orientation"
@@ -31,6 +27,7 @@ import { PERSON_TRAITS } from "@/ui/genesis/shared/person-traits"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
 import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
 import { PERSON_TITLE } from "@/ui/genesis/wiki-bridge/person-title"
+import type { RegencyView } from "@/ui/genesis/wiki-bridge/person-title/types"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
 import type { PartitionStatParams } from "@/ui/genesis/wiki-bridge/types"
 import {
@@ -234,57 +231,6 @@ export function usePersonWikiData(
 			sceneRef.current?.focusOnProvince(provinceId, {
 				distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 			})
-
-		const tenureSpan = (tenure: TenureView) =>
-			`${tenure.startTimeMs === null ? "start unknown" : dateLabel(tenure.startTimeMs)} – ${tenure.endTimeMs === null ? "" : dateLabel(tenure.endTimeMs)}`
-
-		const seatChip = (tenure: TenureView): PersonWikiChip | null => {
-			const labelTime =
-				tenure.endTimeMs === null
-					? viewTimeMs
-					: (tenure.startTimeMs ?? viewTimeMs)
-
-			const nation = nationAt(
-				tenure.seat,
-				Math.max(state.record.minTimeMs, labelTime),
-			)
-
-			const span = tenureSpan(tenure)
-
-			if (tenure.kind === "regent") {
-				const ward = PERSON_NAMES.person({ people, person: tenure.ward })
-				return nation
-					? {
-							key: `regent:${tenure.seat}:${tenure.startTimeMs}`,
-							name: `Regent of ${seatLabel(tenure.seat, labelTime, true)}`,
-							color: nation.color,
-							dimmed: tenure.endTimeMs !== null,
-							title: `Regent${ward ? ` for ${ward.name}` : ""}, ${span}`,
-							onClick: () => selectNation(nation.tag),
-						}
-					: null
-			}
-			if (tenure.kind === "ruler")
-				return nation
-					? {
-							key: `seat:${tenure.seat}:${tenure.startTimeMs}`,
-							name: seatLabel(tenure.seat, labelTime, true),
-							color: nation.color,
-							dimmed: tenure.endTimeMs !== null,
-							title: `Ruler, ${span}`,
-							onClick: () => selectNation(nation.tag),
-						}
-					: null
-			const province = provinceMention(tenure.seat)
-			return {
-				key: `seat:${tenure.seat}:${tenure.startTimeMs}`,
-				name: seatLabel(tenure.seat, labelTime, false),
-				color: nation?.color ?? province.color,
-				dimmed: tenure.endTimeMs !== null,
-				title: `District${nation ? ` of ${nation.name}` : ""}, ${span}`,
-				onClick: () => focusProvince(tenure.seat),
-			}
-		}
 
 		const health = PERSON_QUERY.health({ people, id, timeMs: selectedTimeMs })
 		const alive = person.deathTimeMs > selectedTimeMs
@@ -616,6 +562,20 @@ export function usePersonWikiData(
 				? [{ tier, view: parentView }]
 				: []
 		})[0]
+		const regency = view.tenures.reduce<RegencyView | null>((best, tenure) => {
+			if (tenure.kind !== "regent" || tenure.endTimeMs !== null) return best
+			const label = rankAt(tenure.seat, viewTimeMs, true)
+			const index = Math.max(
+				0,
+				TITLES.tierOrder.findIndex((tier) => TITLE_TIER_LABELS[tier] === label),
+			)
+			if (best && TITLES.tierOrder.indexOf(best.tier) >= index) return best
+			return {
+				tier: TITLES.tierOrder[index],
+				mother:
+					PERSON_NAMES.person({ people, person: tenure.ward })?.mother === id,
+			}
+		}, null)
 		const crown =
 			royalParent !== undefined &&
 			PERSON_TITLE.isCrown({
@@ -635,24 +595,6 @@ export function usePersonWikiData(
 						: []
 				}),
 			})
-
-		const activeTenures = view.tenures.filter(
-			(tenure) => tenure.kind !== "regent" && tenure.endTimeMs === null,
-		)
-		const ranks = new Uint8Array(state.provinceMap.compactToRealId.length)
-		for (const tenure of activeTenures)
-			ranks[tenure.seat] = Math.max(
-				0,
-				TITLES.tierOrder.findIndex(
-					(tier) =>
-						TITLE_TIER_LABELS[tier] ===
-						rankAt(tenure.seat, viewTimeMs, tenure.kind === "ruler"),
-				),
-			)
-		const held = HOLDINGS.order({
-			seats: activeTenures.map((tenure) => tenure.seat),
-			ranks,
-		}).flatMap((seat) => activeTenures.filter((tenure) => tenure.seat === seat))
 
 		const residence = PERSON_QUERY.residenceAt({
 			people,
@@ -774,6 +716,7 @@ export function usePersonWikiData(
 				hasHouse: Boolean(person.house),
 				tier: tierOfView(view),
 				royalParent: royalParent?.tier ?? null,
+				regency,
 				crown: crown && alive,
 			}),
 			life: `${dateLabel(person.birthTimeMs)} – ${alive ? "present" : dateLabel(person.deathTimeMs)}`,
@@ -781,47 +724,7 @@ export function usePersonWikiData(
 			attributes,
 			personality,
 			physical,
-			titles: held.flatMap((tenure, index): PersonWikiChip[] => {
-				const chip = seatChip(tenure)
-				return chip
-					? [
-							{
-								...chip,
-								title:
-									index === 0 ? `Primary title · ${chip.title}` : chip.title,
-							},
-						]
-					: []
-			}),
 			groups: [
-				{
-					label: "Regencies",
-
-					chips: view.tenures
-
-						.filter(
-							(tenure) => tenure.kind === "regent" && tenure.endTimeMs === null,
-						)
-
-						.flatMap((tenure) => {
-							const chip = seatChip(tenure)
-
-							return chip ? [chip] : []
-						}),
-				},
-
-				{
-					label: "Previous titles",
-					chips: view.tenures
-						.filter(
-							(tenure) => tenure.kind !== "regent" && tenure.endTimeMs !== null,
-						)
-						.flatMap((tenure) => {
-							const chip = seatChip(tenure)
-							return chip ? [chip] : []
-						}),
-				},
-
 				{ label: "Parents", chips: chips([view.father, view.mother]) },
 				{ label: "Siblings", chips: chips(view.siblings) },
 				{

@@ -554,8 +554,8 @@ it("succeeds a district-only holder at death before settlement and never repeats
 	PERSON_DEATH.run({ state, person: holder, revision, rng })
 	expect(state.people.rulerOf[seat]).toBe(heir)
 	expect(state.people.persons.heldSeats[holder]).toEqual([])
-	const rows = state.people.log.count
 	DISTRICTS.settle({ state, rng })
+	const rows = state.people.log.count
 	PERSON_DEATH.run({ state, person: holder, revision, rng })
 	expect(state.people.rulerOf[seat]).toBe(heir)
 	expect(state.people.log.count).toBe(rows)

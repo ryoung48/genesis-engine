@@ -116,7 +116,7 @@ it("conditions all predecessor relations on fixed births, parent survival and fi
 	])
 })
 
-it("retains rejected candidates without weddings or children and scores every optional wedding", () => {
+it("retains rejected candidates without weddings or children, scores every optional wedding and records only parents' weddings", () => {
 	const acceptance = vi
 		.spyOn(BACKFILL_MARRIAGE, "acceptable")
 		.mockReturnValue(false)
@@ -144,8 +144,15 @@ it("retains rejected candidates without weddings or children and scores every op
 		}
 		const packet = PEOPLE_LOG.seal({ people, sovereign: () => false })
 		expect(packet.sex.length).toBe(people.persons.sex.length)
-		for (let index = 0; index < packet.count; index++)
-			expect(PEOPLE_LOG.read({ rows: packet, index }).kind).not.toBe("wedding")
+		for (let index = 0; index < packet.count; index++) {
+			const row = PEOPLE_LOG.read({ rows: packet, index })
+			if (row.kind !== "wedding") continue
+			expect(
+				people.persons.children[row.wife].some(
+					(child) => people.persons.father[child] === row.husband,
+				),
+			).toBe(true)
+		}
 	} finally {
 		acceptance.mockRestore()
 		participation.mockRestore()

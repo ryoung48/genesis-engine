@@ -221,3 +221,7 @@ export interface ClashResult {
 	defenderLosses: number
 	loserShortfall: number
 }
+
+export interface AttendParams extends NationParams {
+	members: CoalitionMember[]
+}

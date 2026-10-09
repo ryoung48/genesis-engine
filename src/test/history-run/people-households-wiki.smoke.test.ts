@@ -18,7 +18,7 @@ import type { PersonWikiDataInput } from "@/ui/genesis/view/types"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { PersonWikiPage } from "@/ui/wiki/person/PersonWikiPage"
 
-it("renders concurrent titles, separate regencies and historical unmoved affiliation", () => {
+it("renders a ruler's title and historical unmoved affiliation", () => {
 	const { generated, engine } = HISTORY_RUN.createEngine({
 		seed: 14963991,
 		era: "lateMedieval",
@@ -121,18 +121,11 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 		setSelectedWikiWarId: vi.fn(),
 		setSelectedWikiPersonId: vi.fn(),
 	} as unknown as PersonWikiDataInput
-	let titleCount = 3
 	function Page() {
 		const data = usePersonWikiData(input)
 		if (!data) throw new Error("Missing page")
 		if (input.selectedWikiPersonId === person) {
-			const titles = data.titles
-			expect(titles).toHaveLength(titleCount)
-			expect(new Set(titles.map((chip) => chip.key)).size).toBe(titleCount)
-			expect(titles[0].title).toContain("Primary title")
-			expect(
-				data.groups.find((group) => group.label === "Regencies")?.chips,
-			).toHaveLength(1)
+			expect(data.title).toMatch(/King|Queen|Emperor|Empress/)
 		}
 		return createElement(PersonWikiPage, { person: data })
 	}
@@ -156,9 +149,7 @@ it("renders concurrent titles, separate regencies and historical unmoved affilia
 	})
 	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
 	input.history.selectedTimeMs = state.record.maxTimeMs
-	titleCount = 2
 	const html = renderToString(createElement(Page))
-	expect(html).toContain("Titles")
 	if (process.env.HOUSEHOLD_PAGE_OUT)
 		writeFileSync(process.env.HOUSEHOLD_PAGE_OUT, html)
 	const people = state.record.people

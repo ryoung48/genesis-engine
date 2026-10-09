@@ -219,7 +219,7 @@ describe("siege phases", () => {
 		expect(war.deployed[1].levy).toBe(195)
 		expect(result()?.outcome).toBe(won ? "relieved" : undefined)
 	})
-	it("caps field forces after excluding the physical garrison", () => {
+	it("keeps the lead's own field force after excluding the physical garrison", () => {
 		war.deployed[1].levy = 10000
 		state.levyCurrent[1] = 10000
 		caps[1] = 1000
@@ -232,7 +232,7 @@ describe("siege phases", () => {
 				side: "defender",
 				excluded: siege.garrison,
 			}).members[0].levy,
-		).toBe(1000)
+		).toBe(9900)
 		const physical = MILITARY.deploymentData({
 			state,
 			war,

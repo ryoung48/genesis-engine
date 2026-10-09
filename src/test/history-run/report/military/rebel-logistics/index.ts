@@ -32,7 +32,7 @@ function observation({
 			(war.deployed[participant]?.regular ?? 0),
 		0,
 	)
-	const fieldLimit = KNOWLEDGE.maxFieldArmy({
+	const fieldKnee = KNOWLEDGE.fieldArmyKnee({
 		knowledge: ECONOMY.realmKnowledge({ state: engine, p: leader }),
 	})
 	const enrolled = {
@@ -53,15 +53,12 @@ function observation({
 		targets: { levy: target.levy, regular: target.regular },
 		enrolled,
 		deployed: { ...(war.deployed[nation] ?? { levy: 0, regular: 0 }) },
-		logistics: target.logistics,
+		knee: target.knee,
 		targetLimited: target.limits.logistics,
 		limits: target.limits,
-		enrollmentAtCap:
-			enrolled.levy + enrolled.regular >= target.logistics * (1 - 1e-9),
-		fieldLimit,
+		fieldKnee,
 		coalitionDeployed,
-		fieldLimited:
-			coalitionDeployed > fieldLimit + Math.max(1, fieldLimit) * 1e-9,
+		beyondKnee: coalitionDeployed > fieldKnee + Math.max(1, fieldKnee) * 1e-9,
 	}
 }
 

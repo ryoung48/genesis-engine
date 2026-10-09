@@ -42,14 +42,6 @@ it("preserves recruitment composition and combined maintenance at historical cen
 			expect(
 				Math.abs(economy.army - economy.levy - economy.regular),
 			).toBeLessThan(Math.max(1, economy.army) * 1e-6)
-			const deployed = source.deployments[index].reduce(
-				(sum, troops) => sum + troops.levy + troops.regular,
-				0,
-			)
-			expect(economy.deployed).toBeCloseTo(deployed, 8)
-			expect(
-				economy.deployedLevyPercent + economy.deployedRegularPercent,
-			).toBeCloseTo(deployed > 0 ? 100 : 0, 8)
 			if (economy.budget)
 				expect(economy.budget.armyExpenses).toBeCloseTo(
 					economy.budget.levyExpenses + economy.budget.regularExpenses,

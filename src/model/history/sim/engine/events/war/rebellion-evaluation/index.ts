@@ -39,7 +39,7 @@ function record({
 		const target = preview[side]
 		data[side + "Budget"] = target.budget
 		data[side + "Safety"] = target.safety
-		data[side + "Logistics"] = target.logistics
+		data[side + "Knee"] = target.knee
 		data[side + "Funding"] = target.funding
 		data[side + "RemainingBudget"] = target.remainingBudget
 		data[side + "BudgetLimited"] = target.limits.budget

@@ -43,7 +43,6 @@ export interface PersonWikiData {
 	name: string
 	title: string
 	life: string
-	titles: PersonWikiChip[]
 	stats: StatEntry[]
 	attributes: StatEntry[]
 	personality: PersonTraitView[]
@@ -183,16 +182,6 @@ export function PersonWikiPage({ person }: { person: PersonWikiData }) {
 							<span className="text-[9px] text-slate-400">Physical</span>
 							<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px] text-slate-700">
 								<TraitChips traits={person.physical} />
-							</div>
-						</>
-					) : null}
-					{person.titles.length > 0 ? (
-						<>
-							<span className="text-[9px] text-slate-400">Titles</span>
-							<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px] text-slate-700">
-								{person.titles.map((chip) => (
-									<PersonChip key={chip.key} chip={chip} />
-								))}
 							</div>
 						</>
 					) : null}

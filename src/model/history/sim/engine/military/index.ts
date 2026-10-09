@@ -9,6 +9,7 @@ import { ARMY_STRENGTH } from "@/model/history/sim/engine/military/strength"
 import type {
 	ApplyLossesParams,
 	ApplyTroopLossesParams,
+	AttendParams,
 	BattleDeployments,
 	BattleOutcome,
 	BattleResult,
@@ -97,9 +98,27 @@ function realmKnowledge({ state, nation }: NationParams): number {
 }
 
 function logistics({ state, nation }: NationParams): number {
-	return KNOWLEDGE.maxFieldArmy({
+	return KNOWLEDGE.fieldArmyKnee({
 		knowledge: realmKnowledge({ state, nation }),
 	})
+}
+
+function attend({ state, nation, members }: AttendParams): CoalitionMember[] {
+	const lead = members.find((member) => member.nation === nation)
+	const scale = KNOWLEDGE.logisticsScale({
+		knee: Math.max(
+			logistics({ state, nation }),
+			lead ? lead.levy + lead.regular : 0,
+		),
+		troops: totalTroops(members),
+	})
+	if (scale >= 1) return members
+	return members.map((member) => ({
+		...member,
+		force: member.force * scale,
+		levy: member.levy * scale,
+		regular: member.regular * scale,
+	}))
 }
 
 function armySize({ state, nation }: NationParams): number {
@@ -145,15 +164,7 @@ function sideMembers({
 			target,
 		}).map((ally) => previewMember({ state, nation: ally })),
 	]
-	const total = totalTroops(members)
-	const cap = logistics({ state, nation })
-	if (total <= cap) return members
-	return members.map((member) => ({
-		...member,
-		force: (member.force * cap) / total,
-		levy: (member.levy * cap) / total,
-		regular: (member.regular * cap) / total,
-	}))
+	return attend({ state, nation, members })
 }
 
 function forceShare({ a, b, k }: ForceShareParams): number {
@@ -234,7 +245,10 @@ function rebellionPreview({
 	const rebelStrength = Math.max(
 		MIN_FORCE,
 		ARMY_STRENGTH.of(rebelEstimate) *
-			(rebelCount > 0 ? Math.min(1, rebel.logistics / rebelCount) : 1),
+			KNOWLEDGE.logisticsScale({
+				knee: Math.max(rebel.knee, rebel.levy + rebel.regular),
+				troops: rebelCount,
+			}),
 	)
 	return {
 		crown,
@@ -286,17 +300,7 @@ function coalition({ state, war, side, excluded }: CoalitionParams): Coalition {
 		intended > 0
 			? MATH.clamp({ value: 1 - deployed / intended, lo: 0, hi: 1 })
 			: 0
-	const cap = logistics({ state, nation })
-	if (deployed <= cap) return { members, shortfall }
-	return {
-		members: members.map((member) => ({
-			...member,
-			force: (member.force * cap) / deployed,
-			levy: (member.levy * cap) / deployed,
-			regular: (member.regular * cap) / deployed,
-		})),
-		shortfall,
-	}
+	return { members: attend({ state, nation, members }), shortfall }
 }
 
 function lossShare({ ratio, multiplier, rng }: LossShareParams): number {
@@ -906,11 +910,6 @@ function validate({ state }: RecordArmiesParams): void {
 				targets.safety + Math.max(1, targets.safety) * 1e-9
 			)
 				throw new Error("Population safety ceiling exceeded in realm " + nation)
-			if (
-				holdings.levy + holdings.regular >
-				targets.logistics + Math.max(1, targets.logistics) * 1e-9
-			)
-				throw new Error("Army logistics ceiling exceeded in realm " + nation)
 		}
 	}
 }

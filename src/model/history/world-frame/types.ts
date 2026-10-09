@@ -1,7 +1,4 @@
-import type {
-	CensusDeployment,
-	CensusEconomy,
-} from "@/model/history/record/types"
+import type { CensusEconomy } from "@/model/history/record/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 
 export interface Ruler {
@@ -75,13 +72,7 @@ export interface NationEconomy {
 	revenue: number
 	levy: number
 	regular: number
-	deployed: number
-	deployedLevy: number
-	deployedRegular: number
-	deployedLevyPercent: number
-	deployedRegularPercent: number
 	army: number
-	deployments: CensusDeployment[]
 	budget: TreasuryBudget | null
 	treasurySafe: number
 	treasuryChange: number

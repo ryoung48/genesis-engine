@@ -38,7 +38,7 @@ A realm's government decides how it passes on, whether its ruling house marries 
 | Colonial | trading company | A chartered company's territory. | Appointment | No | No |
 | | settler colony | A colony of settlers. | Appointment | No | No |
 
-- **Succession** is what the nation page shows (`GOVERNMENT.successionLabelOfIndex`): Single heir, Partition, Election or Appointment.
+- **Succession** is Single heir, Partition, Election or Appointment by government.
 - **Partitions** is `GOVERNMENT.partitionsOfIndex`: `tribal_monarchy` and `chiefdom` only. Partition is single-heir succession plus a division: the primary heir is chosen by the single-heir rule and the junior heirs then take districts. In code their system (`GOVERNMENT.successionOfIndex`) is still `single_heir`, so marriages, unions and regencies work as in any single-heir realm.
 - **Marries for alliance** is `GOVERNMENT.marriageAlliancesOfIndex`: single-heir realms and elections outside the republic family.
 

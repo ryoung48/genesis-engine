@@ -29,13 +29,7 @@ function anchorMarriage({
 		!PEOPLE.aliveAt({ people, person: mother, time: wedding }) ||
 		!PEOPLE.aliveAt({ people, person: father, time: wedding }) ||
 		!MARRIAGE_MARKET.seeksSpouse({ people, person: mother, time: wedding }) ||
-		!MARRIAGE_MARKET.seeksSpouse({ people, person: father, time: wedding }) ||
-		!BACKFILL_MARRIAGE.acceptable({
-			people,
-			a: father,
-			b: mother,
-			time: wedding,
-		})
+		!MARRIAGE_MARKET.seeksSpouse({ people, person: father, time: wedding })
 	) {
 		people.startingFamilies.weddingsRejected.parent++
 		return

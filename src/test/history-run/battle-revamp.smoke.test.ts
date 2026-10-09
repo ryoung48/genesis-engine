@@ -133,11 +133,15 @@ describe("battle odds", () => {
 		)
 	})
 
-	it("caps battle attendance in soldiers before applying troop strength", () => {
+	it("never reduces the lead's own troops and gives allies diminishing returns beyond them", () => {
 		reset({ attack: 1000, defend: 1000 })
-		const limit = vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockReturnValue(500)
-		try {
-			const result = MILITARY.fight({
+		const ally = [...engine.militaryIntervals.keys()].find(
+			(nation) => nation !== war.attacker && nation !== war.defender,
+		)
+		if (ally === undefined) throw new Error("missing ally fixture")
+		const limit = vi.spyOn(KNOWLEDGE, "fieldArmyKnee").mockReturnValue(500)
+		const fight = () =>
+			MILITARY.fight({
 				state: engine,
 				war,
 				eventAttacker: war.attacker,
@@ -145,11 +149,23 @@ describe("battle odds", () => {
 				defenderMultiplier: 1,
 				rng: HISTORY_RNG.createHistoryRng(102),
 			})
-			expect(result.attackerArmy).toBe(500)
-			expect(result.defenderArmy).toBe(500)
-			expect(result.preBattleWinProbability).toBeCloseTo(0.5, 12)
+		try {
+			const alone = fight()
+			expect(alone.attackerArmy).toBe(1000)
+			reset({ attack: 1000, defend: 1000 })
+			engine.levyCurrent[ally] = 1000
+			engine.regularCurrent[ally] = 0
+			war.deployed[ally] = { levy: 1000, regular: 0 }
+			war.allocation[ally] = 1
+			war.participants[ally] = "attacker"
+			const allied = fight()
+			expect(allied.attackerArmy).toBeCloseTo(1000 * Math.sqrt(2), 9)
+			expect(allied.defenderArmy).toBe(1000)
 		} finally {
 			limit.mockRestore()
+			delete war.participants[ally]
+			delete war.deployed[ally]
+			delete war.allocation[ally]
 		}
 	})
 

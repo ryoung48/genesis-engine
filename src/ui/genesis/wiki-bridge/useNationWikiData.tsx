@@ -9,9 +9,7 @@ import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import type { HistoryComment } from "@/model/history/record/types"
 import { yearMs } from "@/model/history/sim/engine/state/time"
-import { GOVERNMENT as SIM_GOVERNMENT } from "@/model/history/sim/nations/government"
 import { FRAME } from "@/model/history/world-frame"
-import type { GovernmentType } from "@/model/society/types"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
@@ -211,13 +209,6 @@ export function useNationWikiData(
 			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
 		})
-		const governmentIndex = record.people
-			? SIM_GOVERNMENT.getGovIdx()[nationState?.government as GovernmentType]
-			: undefined
-		const successionLabel =
-			governmentIndex === undefined
-				? null
-				: SIM_GOVERNMENT.successionLabelOfIndex(governmentIndex)
 		const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
 			governmentType: nationState?.government ?? null,
 			governmentReform: nationState?.governmentReform,
@@ -414,9 +405,7 @@ export function useNationWikiData(
 			governmentColor: governmentColor
 				? COLOR.rgb01ToCss(governmentColor)
 				: null,
-			successionLabel,
 			economy,
-			warName: (warId) => record.events.wars[warId]?.name ?? `War ${warId}`,
 			yearLabel: DATE.formatEu4Year(
 				economy?.budget?.year ??
 					DATE.historyTimeMsToYear(history.selectedTimeMs),

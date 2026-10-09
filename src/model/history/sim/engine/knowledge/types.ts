@@ -14,6 +14,11 @@ export interface KnowledgeLevelParams {
 	knowledge: number
 }
 
+export interface LogisticsScaleParams {
+	knee: number
+	troops: number
+}
+
 export interface PopulationMeanParams {
 	state: HistoryState
 	provinces: Iterable<number>

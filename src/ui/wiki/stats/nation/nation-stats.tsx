@@ -16,42 +16,28 @@ function treasuryHealthColor(economy: NationEconomy): string {
 	return uiPalette.treasury.critical
 }
 
-function armyStat({ economy, warName, yearLabel }: ArmyStatParams): StatEntry {
-	const deployed = economy.deployed
+function armyStat({ economy, yearLabel }: ArmyStatParams): StatEntry {
+	const share = (troops: number) =>
+		economy.army > 0 ? (100 * troops) / economy.army : 0
 	return {
 		label: "Field army",
-		valuePrefix: `${formatCount(economy.army)} enrolled ·`,
-		value: `${formatCount(deployed)} deployed`,
-		valueHelp:
-			economy.deployments.length > 0 ? (
-				<TraceTooltipContent
-					title={`${yearLabel} deployments`}
-					trace={economy.deployments.map((deployment) => ({
-						value: deployment.troops,
-						description: warName(deployment.warId),
-					}))}
-					formatValue={formatCount}
-					finalLabel="Total deployed"
-					finalValue={deployed}
-				/>
-			) : undefined,
-		valueHelpTarget: "suffix",
-		trailingHelp: (
+		value: formatCount(economy.army),
+		valueHelp: (
 			<TraceTooltipContent
 				title={`${yearLabel} field army composition`}
 				trace={[
 					{
-						value: economy.deployedLevy,
-						description: `Levies (${economy.deployedLevyPercent.toFixed(1)}%)`,
+						value: economy.levy,
+						description: `Levies (${share(economy.levy).toFixed(1)}%)`,
 					},
 					{
-						value: economy.deployedRegular,
-						description: `Regulars (${economy.deployedRegularPercent.toFixed(1)}%)`,
+						value: economy.regular,
+						description: `Regulars (${share(economy.regular).toFixed(1)}%)`,
 					},
 				]}
 				formatValue={formatCount}
-				finalLabel="Deployed troops"
-				finalValue={deployed}
+				finalLabel="Enrolled troops"
+				finalValue={economy.army}
 			/>
 		),
 	}
@@ -125,9 +111,7 @@ export function buildNationWikiStats(
 		rulerLabel,
 		governmentSubtype,
 		governmentColor,
-		successionLabel,
 		economy,
-		warName,
 		yearLabel,
 	} = params
 	const density = totalAreaKm2 > 0 ? totalPopulation / totalAreaKm2 : 0
@@ -152,9 +136,6 @@ export function buildNationWikiStats(
 			value: governmentSubtype ?? "Unknown",
 			swatchColor: governmentColor,
 		},
-		...(successionLabel !== null
-			? [{ label: "Succession", value: successionLabel }]
-			: []),
 		...(economy
 			? [
 					{
@@ -222,7 +203,7 @@ export function buildNationWikiStats(
 						),
 						swatchColor: treasuryHealthColor(economy),
 					},
-					armyStat({ economy, warName, yearLabel }),
+					armyStat({ economy, yearLabel }),
 				]
 			: []),
 	]

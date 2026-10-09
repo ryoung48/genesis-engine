@@ -170,7 +170,7 @@ function fixture({
 	accept?: (candidate: { state: HistoryState; realm: number }) => boolean
 }): Fixture {
 	const { engine: state, generated } = HISTORY_RUN.createEngine({
-		seed: 14963991,
+		seed: 14963993,
 		era: "lateMedieval",
 		numPoints: 30000,
 	})

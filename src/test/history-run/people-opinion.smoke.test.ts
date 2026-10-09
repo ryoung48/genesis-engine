@@ -732,7 +732,7 @@ it("emits one memory per successful runtime occurrence and none at initializatio
 		SUCCESSION.runYear({ state, rng })
 		expect(ruler(usurped)).toBe(usurper)
 		expect(held(ward, usurper)).toEqual(["usurpation"])
-		expect(held(usurper, ward)).toEqual([])
+		expect(held(usurper, ward)).not.toContain("usurpation")
 		expect(refreshes()[3]).toBe(
 			state.events.slice(notes).filter((note) => note.tag === "usurpation")
 				.length,

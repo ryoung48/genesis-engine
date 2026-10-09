@@ -16,7 +16,6 @@ export interface RecruitmentCohort {
 	fundingCommitment: number
 	remainingReadinessBudget: number
 	ceilingBindings: number
-	logisticsBindings: number
 	logisticsLimitedRealms: number
 	treasuryDebt: number
 }
@@ -31,14 +30,13 @@ export interface RecruitmentRealm {
 	deployed: Troops
 	targets: Troops
 	uncappedTargets: Troops
-	logisticsLimit: number
+	knee: number
 	levyEligibility: number
 	funding: number
 	remainingBudget: number
 	treasury: number
 	pending: Troops
 	safetyBinding: boolean
-	logisticsBinding: boolean
 	logisticsLimited: boolean
 }
 

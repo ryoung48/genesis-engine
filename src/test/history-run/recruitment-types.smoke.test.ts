@@ -108,7 +108,7 @@ function war() {
 }
 
 describe("recruitment and integrated military expense", () => {
-	it("limits total enrollment without changing the uncapped target composition", () => {
+	it("gives diminishing returns beyond the knee without changing the uncapped target composition", () => {
 		for (const tribal of [false, true])
 			for (const knowledge of [0.42, 1.44, 2.38]) {
 				const target = RECRUITMENT.targets({
@@ -119,8 +119,14 @@ describe("recruitment and integrated military expense", () => {
 					outputPerHead: 450,
 				})
 				const raw = target.uncapped.levy + target.uncapped.regular
-				expect(raw).toBeGreaterThan(target.logistics)
-				expect(target.levy + target.regular).toBeCloseTo(target.logistics, 7)
+				const total = target.levy + target.regular
+				expect(raw).toBeGreaterThan(target.knee)
+				expect(total).toBeGreaterThan(target.knee)
+				expect(total).toBeLessThan(raw)
+				expect(total).toBeCloseTo(
+					raw * KNOWLEDGE.logisticsScale({ knee: target.knee, troops: raw }),
+					7,
+				)
 				expect(target.levy / target.uncapped.levy).toBeCloseTo(
 					target.regular / target.uncapped.regular,
 					12,
@@ -218,7 +224,7 @@ describe("recruitment and integrated military expense", () => {
 			surplus: 1e6,
 			outputPerHead: 450,
 		})
-		expect(target.levy + target.regular).toBeCloseTo(100, 9)
+		expect(target.levy + target.regular).toBeCloseTo(60, 9)
 		expect(target.levy / target.uncapped.levy).toBeCloseTo(
 			target.regular / target.uncapped.regular,
 			12,
@@ -355,8 +361,8 @@ describe("recruitment and integrated military expense", () => {
 		}
 		const settled = RECRUITMENT.targets({ ...common, tribal: false })
 		const tribal = RECRUITMENT.targets({ ...common, tribal: true })
-		expect(tribal.levy).toBe(50000)
-		expect(settled.levy).toBe(20000)
+		expect(tribal.uncapped.levy).toBe(50000)
+		expect(settled.uncapped.levy).toBe(20000)
 		expect(tribal.home).toEqual(settled.home)
 		expect(tribal.campaign).toEqual(settled.campaign)
 		expect(tribal.home.regular).toBeGreaterThan(tribal.home.levy)
@@ -375,8 +381,10 @@ describe("military transitions and conservation", () => {
 		advance(0.5)
 		const before = counts()
 		const reference = { ...state.militaryIntervals.get(nation)!.reference }
-		const cap = (before[0] + before[1]) * 0.25
-		const limit = vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockReturnValue(cap)
+		const uncapped = RECRUITMENT.realmTargets({ state, nation }).uncapped
+		const cap =
+			(0.25 * (before[0] + before[1]) ** 2) / (uncapped.levy + uncapped.regular)
+		const limit = vi.spyOn(KNOWLEDGE, "fieldArmyKnee").mockReturnValue(cap)
 		try {
 			FIELDS.prov.knowledge.set({
 				state,
@@ -386,7 +394,10 @@ describe("military transitions and conservation", () => {
 			const target = RECRUITMENT.realmTargets({ state, nation })
 			expect(counts()[0]).toBeCloseTo(target.levy, 8)
 			expect(counts()[1]).toBeCloseTo(target.regular, 8)
-			expect(counts()[0] + counts()[1]).toBeCloseTo(cap, 8)
+			expect(counts()[0] + counts()[1]).toBeCloseTo(
+				0.5 * (before[0] + before[1]),
+				6,
+			)
 			expect(counts().slice(2)).toEqual(before.slice(2))
 			expect(state.militaryIntervals.get(nation)!.reference).toEqual(reference)
 			expect(active.deployed[nation].levy).toBeLessThanOrEqual(counts()[0])
@@ -397,26 +408,22 @@ describe("military transitions and conservation", () => {
 		MILITARY.validate({ state })
 	})
 
-	it("uses the same field limit for crown and rebel threat", () => {
+	it("applies diminishing returns to both sides of a rebellion preview", () => {
 		reset()
 		const overlord = nations.find(
 			(nation) => STATE.getChildren({ state, p: nation }).length > 0,
 		)
 		if (overlord === undefined) throw new Error("missing crown fixture")
 		const subject = STATE.getChildren({ state, p: overlord })[0]
-		const holdings = {
-			levy: state.levyCurrent[overlord],
-			regular: state.regularCurrent[overlord],
-		}
-		const limit = vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockReturnValue(1)
+		const real = MILITARY.rebellionPreview({ state, overlord, subject })
+		const limit = vi.spyOn(KNOWLEDGE, "fieldArmyKnee").mockReturnValue(1)
 		try {
-			state.levyCurrent[overlord] = 1e8
-			state.regularCurrent[overlord] = 1e8
-			expect(MILITARY.rebellionThreat({ state, overlord, subject })).toBe(0.5)
+			const tight = MILITARY.rebellionPreview({ state, overlord, subject })
+			expect(tight.crownStrength).toBeLessThan(real.crownStrength)
+			expect(tight.rebelStrength).toBeLessThanOrEqual(real.rebelStrength)
+			expect(tight.crown.levy + tight.crown.regular).toBeGreaterThan(1)
 		} finally {
 			limit.mockRestore()
-			state.levyCurrent[overlord] = holdings.levy
-			state.regularCurrent[overlord] = holdings.regular
 		}
 	})
 

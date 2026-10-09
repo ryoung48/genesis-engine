@@ -14,7 +14,7 @@ A **district** is a flagged seat exactly one tier below its realm’s top tier, 
 
 ## Rebellion threat
 
-The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and logistics. The crown's territory excludes the departing district, whose territory includes all land attached by adjacency. It uses the cubed force share from [military](armies-and-wars.md#war-starts).
+The threat compares independently calculated rebel and remaining-crown recruitment targets. Each prospective territory uses its own population, knowledge, tax extraction, state maintenance, affordability, and field logistics (diminishing returns beyond the knee). The crown's territory excludes the departing district, whose territory includes all land attached by adjacency. It uses the cubed force share from [military](armies-and-wars.md#war-starts).
 
 ```text
 crownTarget = recruitment targets for the remaining crown territory
@@ -23,7 +23,7 @@ league      = sum of independent recruitment targets for other eligible district
 
 crown  = (0.75 * crownTarget.levy + crownTarget.regular) / (1 + existing crown wars)
 estimate = 0.9 * (rebelTarget + 0.25 * league), computed per troop type
-scale = min(1, rebel logistics cap / total estimated soldiers)
+scale = (max(rebel knee, rebelTarget total) / total estimated soldiers)^0.5, at most 1
 rebels = scale * (0.75 * estimate.levy + estimate.regular)
 threat = rebels^3 / (crown^3 + rebels^3)
 ```

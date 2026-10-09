@@ -7,6 +7,7 @@ const base: PersonTitleParams = {
 	hasHouse: true,
 	tier: null,
 	royalParent: null,
+	regency: null,
 	crown: false,
 }
 
@@ -44,6 +45,36 @@ it("titles a person by their highest tier, then royal birth, then house", () => 
 		}),
 	).toBe("Crown Princess")
 	expect(PERSON_TITLE.of({ ...base, royalParent: "duchy" })).toBe("Noble")
+})
+
+it("titles a regent as a protector, or a dowager when governing for their own child", () => {
+	const regent = { tier: "kingdom", mother: false } as const
+	expect(PERSON_TITLE.of({ ...base, regency: regent })).toBe("Lord Protector")
+	expect(PERSON_TITLE.of({ ...base, female: true, regency: regent })).toBe(
+		"Lady Protector",
+	)
+	for (const [tier, title] of [
+		["county", "Dowager Countess"],
+		["duchy", "Dowager Duchess"],
+		["kingdom", "Queen Dowager"],
+		["empire", "Empress Dowager"],
+		["hegemony", "Empress Dowager"],
+	] as const)
+		expect(
+			PERSON_TITLE.of({
+				...base,
+				female: true,
+				regency: { tier, mother: true },
+			}),
+		).toBe(title)
+	expect(
+		PERSON_TITLE.of({
+			...base,
+			tier: "kingdom",
+			female: true,
+			regency: { tier: "empire", mother: true },
+		}),
+	).toBe("Queen")
 })
 
 it("names the eldest living son the crown, else the eldest daughter", () => {

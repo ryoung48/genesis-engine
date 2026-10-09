@@ -26,13 +26,12 @@ export interface RebelLogisticsObservation {
 	targets: Troops
 	enrolled: Troops
 	deployed: Troops
-	logistics: number
+	knee: number
 	targetLimited: boolean
 	limits: RecruitmentLimits
-	enrollmentAtCap: boolean
-	fieldLimit: number
+	fieldKnee: number
 	coalitionDeployed: number
-	fieldLimited: boolean
+	beyondKnee: boolean
 }
 
 export interface AttachParams {

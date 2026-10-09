@@ -37,9 +37,9 @@ function targets({
 	const budget = Number.isFinite(surplus) ? 0.75 * Math.max(0, surplus) : 0
 	const living = Number.isFinite(population) ? Math.max(0, population) : 0
 	const levyEligibility = tribal ? 0.05 : 0.02
-	const safety = living * 0.1
+	const safety = living * 0.06
 	const level = Number.isFinite(knowledge) ? knowledge : 0
-	const logistics = KNOWLEDGE.maxFieldArmy({ knowledge: level })
+	const knee = KNOWLEDGE.fieldArmyKnee({ knowledge: level })
 	const funding = MATH.piecewise({
 		...FUNDING,
 		x: level,
@@ -50,7 +50,7 @@ function targets({
 	const expense = levy * home.levy + regular * home.regular
 	const budgetScale = expense > 0 ? Math.min(1, budget / expense) : 1
 	const populationScale = total > 0 ? Math.min(1, safety / total) : 1
-	const logisticsScale = total > 0 ? Math.min(1, logistics / total) : 1
+	const logisticsScale = KNOWLEDGE.logisticsScale({ knee, troops: total })
 	const scale = Math.min(budgetScale, populationScale, logisticsScale)
 	const remainingBudget = Math.max(0, budget - expense * scale)
 
@@ -58,7 +58,7 @@ function targets({
 		levy: levy * scale,
 		regular: regular * scale,
 		safety,
-		logistics,
+		knee,
 		uncapped: { levy, regular },
 		limits: {
 			budget: budgetScale < 1 && budgetScale === scale,
@@ -152,10 +152,7 @@ function reconcile({ holdings, targets }: ReconcileParams): Troops {
 		Number.isFinite(holdings.regular) ? Math.max(0, holdings.regular) : 0,
 	)
 	const total = levy + regular
-	const scale =
-		total > 0
-			? Math.min(1, targets.safety / total, targets.logistics / total)
-			: 1
+	const scale = total > 0 ? Math.min(1, targets.safety / total) : 1
 	return { levy: levy * scale, regular: regular * scale }
 }
 

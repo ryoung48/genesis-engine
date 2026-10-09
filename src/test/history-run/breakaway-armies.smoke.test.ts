@@ -91,8 +91,8 @@ describe("independent breakaway armies", () => {
 		] as const) {
 			expect(state.levyCurrent[nation]).toBeCloseTo(target.levy, 7)
 			expect(state.regularCurrent[nation]).toBeCloseTo(target.regular, 7)
-			expect(RECRUITMENT.realmTargets({ state, nation }).logistics).toBeCloseTo(
-				target.logistics,
+			expect(RECRUITMENT.realmTargets({ state, nation }).knee).toBeCloseTo(
+				target.knee,
 			)
 			expect(state.militaryIntervals.get(nation)!.pending).toEqual({
 				levy: 0,
@@ -141,12 +141,12 @@ describe("independent breakaway armies", () => {
 			for (const row of rows) {
 				const raw = row.uncappedTargets.levy + row.uncappedTargets.regular
 				expect(row.targets.levy + row.targets.regular).toBeLessThanOrEqual(
-					Math.min(raw, row.logistics) * (1 + 1e-9),
+					raw * (1 + 1e-9),
 				)
 				expect(row.targetLimited).toBe(row.limits.logistics)
-				expect(row.fieldLimited).toBe(
+				expect(row.beyondKnee).toBe(
 					row.coalitionDeployed >
-						row.fieldLimit + Math.max(1, row.fieldLimit) * 1e-9,
+						row.fieldKnee + Math.max(1, row.fieldKnee) * 1e-9,
 				)
 			}
 			const levy = state.levyCurrent[rebel] * 0.5

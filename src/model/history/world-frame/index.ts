@@ -46,40 +46,16 @@ function nationEconomy({
 	nationId,
 }: NationFrameParams): NationEconomy | null {
 	if (!frame.economy) return null
-	const {
-		nations,
-		treasury,
-		revenue,
-		levy,
-		regular,
-		army,
-		deployments,
-		budgets,
-	} = frame.economy
+	const { nations, treasury, revenue, levy, regular, army, budgets } =
+		frame.economy
 	for (let index = 0; index < nations.length; index++) {
 		if (nations[index] === nationId) {
-			const deployedLevy = deployments[index].reduce(
-				(sum, deployment) => sum + deployment.levy,
-				0,
-			)
-			const deployedRegular = deployments[index].reduce(
-				(sum, deployment) => sum + deployment.regular,
-				0,
-			)
-			const deployed = deployedLevy + deployedRegular
 			return {
 				treasury: treasury[index],
 				revenue: revenue[index],
 				levy: levy[index],
 				regular: regular[index],
-				deployed,
-				deployedLevy,
-				deployedRegular,
-				deployedLevyPercent: deployed > 0 ? (100 * deployedLevy) / deployed : 0,
-				deployedRegularPercent:
-					deployed > 0 ? (100 * deployedRegular) / deployed : 0,
 				army: army[index],
-				deployments: deployments[index],
 				budget: budgets[index],
 				treasurySafe: budgets[index]?.treasurySafe ?? 0,
 				treasuryChange: budgets[index]

@@ -69,7 +69,7 @@ function mock({ caps }: SiegeMockParams): void {
 	vi.spyOn(STATE, "getSovereign").mockImplementation(({ p }) => p)
 	vi.spyOn(STATE, "getNationProvinces").mockImplementation(({ root }) => [root])
 	vi.spyOn(ECONOMY, "realmKnowledge").mockImplementation(({ p }) => caps()[p])
-	vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockImplementation(
+	vi.spyOn(KNOWLEDGE, "fieldArmyKnee").mockImplementation(
 		({ knowledge }) => knowledge,
 	)
 	vi.spyOn(RECRUITMENT, "advance").mockReturnValue(undefined)

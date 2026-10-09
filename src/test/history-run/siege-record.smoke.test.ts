@@ -52,7 +52,7 @@ it("translates every siege snapshot and synchronizes coalition changes at siege 
 			outputPerHead: 450,
 		}),
 	)
-	vi.spyOn(KNOWLEDGE, "maxFieldArmy").mockReturnValue(1000)
+	vi.spyOn(KNOWLEDGE, "fieldArmyKnee").mockReturnValue(1000)
 	vi.spyOn(MILITARY, "clash").mockReturnValue({
 		attackerWon: true,
 		outcome: "inconclusive",

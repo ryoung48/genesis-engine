@@ -23,7 +23,6 @@ function cohort({ realms }: CohortParams): RecruitmentCohort {
 		fundingCommitment: 0,
 		remainingReadinessBudget: 0,
 		ceilingBindings: 0,
-		logisticsBindings: 0,
 		logisticsLimitedRealms: 0,
 		treasuryDebt: 0,
 	}
@@ -38,7 +37,6 @@ function cohort({ realms }: CohortParams): RecruitmentCohort {
 		result.fundingCommitment += realm.funding * realm.population
 		result.remainingReadinessBudget += realm.remainingBudget
 		result.ceilingBindings += Number(realm.safetyBinding)
-		result.logisticsBindings += Number(realm.logisticsBinding)
 		result.logisticsLimitedRealms += Number(realm.logisticsLimited)
 		result.treasuryDebt += Math.max(0, -realm.treasury)
 		const total = realm.enrolled.levy + realm.enrolled.regular
@@ -98,7 +96,7 @@ function snapshot({
 			deployed,
 			targets: { levy: targets.levy, regular: targets.regular },
 			uncappedTargets: targets.uncapped,
-			logisticsLimit: targets.logistics,
+			knee: targets.knee,
 			levyEligibility: targets.levyEligibility,
 			funding: targets.funding,
 			remainingBudget: targets.remainingBudget,
@@ -112,8 +110,6 @@ function snapshot({
 			safetyBinding:
 				enrolled.levy + enrolled.regular >= targets.safety * (1 - 1e-9) &&
 				targets.safety > 0,
-			logisticsBinding:
-				enrolled.levy + enrolled.regular >= targets.logistics * (1 - 1e-9),
 			logisticsLimited: targets.limits.logistics,
 		})
 	}

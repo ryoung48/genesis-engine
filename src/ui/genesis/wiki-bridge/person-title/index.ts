@@ -13,6 +13,14 @@ const TIER_TITLES: Record<TitleTier, readonly [string, string]> = {
 	hegemony: ["Emperor", "Empress"],
 }
 
+const DOWAGER_TITLES: Record<TitleTier, string> = {
+	county: "Dowager Countess",
+	duchy: "Dowager Duchess",
+	kingdom: "Queen Dowager",
+	empire: "Empress Dowager",
+	hegemony: "Empress Dowager",
+}
+
 const ROYAL_TIERS: readonly TitleTier[] = ["kingdom", "empire", "hegemony"]
 
 function royal(tier: TitleTier | null): tier is TitleTier {
@@ -35,9 +43,14 @@ function of({
 	hasHouse,
 	tier,
 	royalParent,
+	regency,
 	crown,
 }: PersonTitleParams): string {
 	if (royal(tier)) return TIER_TITLES[tier][female ? 1 : 0]
+	if (regency) {
+		if (!female) return "Lord Protector"
+		return regency.mother ? DOWAGER_TITLES[regency.tier] : "Lady Protector"
+	}
 	if (royal(royalParent)) {
 		const prince = female ? "Princess" : "Prince"
 		return crown ? `Crown ${prince}` : prince

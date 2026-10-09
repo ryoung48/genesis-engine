@@ -362,19 +362,6 @@ function partitionsOfIndex(index: number): boolean {
 	return type !== undefined && PARTITIONS.has(type)
 }
 
-const SUCCESSION_LABEL: Record<SuccessionSystem, string> = {
-	single_heir: "Single heir",
-	election: "Election",
-	appointment: "Appointment",
-}
-
-// How the realm passes on, as shown in the nation's stats.
-function successionLabelOfIndex(index: number): string {
-	return partitionsOfIndex(index)
-		? "Partition"
-		: SUCCESSION_LABEL[successionOfIndex(index)]
-}
-
 // Royal marriages bind realms only where a house holds the throne: single-heir
 // realms and non-republican elections. Republic and appointed rulers marry
 // privately.
@@ -392,6 +379,5 @@ export const GOVERNMENT = {
 	govFamilyOfIndex,
 	successionOfIndex,
 	partitionsOfIndex,
-	successionLabelOfIndex,
 	assignGovernmentType,
 }
