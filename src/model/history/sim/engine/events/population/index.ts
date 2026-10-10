@@ -134,9 +134,10 @@ function development({ state, init }: DevelopmentParams): void {
 		cityMin,
 		desolate: state.desolate,
 		waterAccess: state.waterAccess,
+		adjOffset: state.provinceAdjOffset,
+		adjList: state.provinceAdjList,
 		urbanAt: (p) => FIELDS.prov.population.urban.get({ state, p }),
 		sovereignAt: (p) => STATE.getSovereign({ state, p }),
-		neighborsAt: (p) => STATE.getProvinceNeighbors({ state, p }),
 	})
 
 	const DEV_RISE = 0.1

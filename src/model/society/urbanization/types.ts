@@ -36,15 +36,8 @@ export interface SpreadDevelopmentParams {
 	waterAccess: Uint8Array
 	urbanAt: (province: number) => number
 	sovereignAt: (province: number) => number
-	neighborsAt: (province: number) => Iterable<number>
-}
-
-export interface SpreadEntry {
-	province: number
-	dev: number
-	sourceNation: number
-	hops: number
-	stamp: number
+	adjOffset: Int32Array
+	adjList: Int32Array
 }
 
 export interface NationProfile {

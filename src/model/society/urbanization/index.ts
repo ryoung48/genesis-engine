@@ -10,7 +10,6 @@ import type {
 	RankSizesForNationParams,
 	SortByRankParams,
 	SpreadDevelopmentParams,
-	SpreadEntry,
 	UrbanizationInputs,
 	UrbanizationResult,
 } from "@/model/society/urbanization/types"
@@ -118,85 +117,145 @@ function sortByRank({
 	})
 }
 
-// Higher development first; among equal development a later insertion comes
-// first, and the seed cities keep their index order behind every insertion.
-function spreadEntryBefore(a: SpreadEntry, b: SpreadEntry): boolean {
-	if (a.dev !== b.dev) return a.dev > b.dev
-	return a.stamp > b.stamp
-}
-
-function pushSpreadEntry(heap: SpreadEntry[], entry: SpreadEntry): void {
-	heap.push(entry)
-	let i = heap.length - 1
-	while (i > 0) {
-		const parent = (i - 1) >> 1
-		if (!spreadEntryBefore(heap[i], heap[parent])) break
-		;[heap[i], heap[parent]] = [heap[parent], heap[i]]
-		i = parent
-	}
-}
-
-function popSpreadEntry(heap: SpreadEntry[]): SpreadEntry {
-	const top = heap[0]
-	const last = heap.pop() as SpreadEntry
-	if (heap.length > 0) {
-		heap[0] = last
-		let i = 0
-		for (;;) {
-			let best = i
-			const l = 2 * i + 1
-			const r = l + 1
-			if (l < heap.length && spreadEntryBefore(heap[l], heap[best])) best = l
-			if (r < heap.length && spreadEntryBefore(heap[r], heap[best])) best = r
-			if (best === i) break
-			;[heap[i], heap[best]] = [heap[best], heap[i]]
-			i = best
-		}
-	}
-	return top
-}
-
 // Development radiating from every city, strongest source first, decaying per
 // hop (faster across a border, slower into water-accessible provinces).
+// Higher development pops first; among equal development a later insertion
+// comes first, and the seed cities keep their index order behind every insertion.
+// The queue is struct-of-arrays so a spread allocates no per-entry objects.
 function spreadDevelopment({
 	count,
 	cityMin,
 	desolate,
 	waterAccess,
+	adjOffset,
+	adjList,
 	urbanAt,
 	sovereignAt,
-	neighborsAt,
 }: SpreadDevelopmentParams): Float32Array {
 	const BASE_DECAY = 0.75
 	const FOREIGN_DECAY = 0.65
 	const WATER_ACCESS_BONUS = 1.1
 
+	let capacity = 256
+	let size = 0
+	let provinceQ = new Int32Array(capacity)
+	let devQ = new Float64Array(capacity)
+	let sourceQ = new Int32Array(capacity)
+	let hopsQ = new Int32Array(capacity)
+	let stampQ = new Int32Array(capacity)
+
+	const grow = () => {
+		capacity *= 2
+		const province = new Int32Array(capacity)
+		const dev = new Float64Array(capacity)
+		const source = new Int32Array(capacity)
+		const hops = new Int32Array(capacity)
+		const stamp = new Int32Array(capacity)
+		province.set(provinceQ)
+		dev.set(devQ)
+		source.set(sourceQ)
+		hops.set(hopsQ)
+		stamp.set(stampQ)
+		provinceQ = province
+		devQ = dev
+		sourceQ = source
+		hopsQ = hops
+		stampQ = stamp
+	}
+
+	// The new entry is already written at index `size`; this sifts it up.
+	const siftUp = (start: number) => {
+		const province = provinceQ[start]
+		const dev = devQ[start]
+		const source = sourceQ[start]
+		const hops = hopsQ[start]
+		const stamp = stampQ[start]
+		let i = start
+		while (i > 0) {
+			const parent = (i - 1) >> 1
+			const parentDev = devQ[parent]
+			if (dev < parentDev || (dev === parentDev && stamp < stampQ[parent]))
+				break
+			provinceQ[i] = provinceQ[parent]
+			devQ[i] = parentDev
+			sourceQ[i] = sourceQ[parent]
+			hopsQ[i] = hopsQ[parent]
+			stampQ[i] = stampQ[parent]
+			i = parent
+		}
+		provinceQ[i] = province
+		devQ[i] = dev
+		sourceQ[i] = source
+		hopsQ[i] = hops
+		stampQ[i] = stamp
+	}
+
+	// The root is already read by the caller; this refills it from the last entry.
+	const siftDown = () => {
+		size--
+		if (size === 0) return
+		const province = provinceQ[size]
+		const dev = devQ[size]
+		const source = sourceQ[size]
+		const hops = hopsQ[size]
+		const stamp = stampQ[size]
+		let i = 0
+		for (;;) {
+			const left = 2 * i + 1
+			if (left >= size) break
+			let best = left
+			const right = left + 1
+			if (
+				right < size &&
+				(devQ[right] > devQ[left] ||
+					(devQ[right] === devQ[left] && stampQ[right] > stampQ[left]))
+			)
+				best = right
+			if (dev > devQ[best] || (dev === devQ[best] && stamp > stampQ[best]))
+				break
+			provinceQ[i] = provinceQ[best]
+			devQ[i] = devQ[best]
+			sourceQ[i] = sourceQ[best]
+			hopsQ[i] = hopsQ[best]
+			stampQ[i] = stampQ[best]
+			i = best
+		}
+		provinceQ[i] = province
+		devQ[i] = dev
+		sourceQ[i] = source
+		hopsQ[i] = hops
+		stampQ[i] = stamp
+	}
+
 	const devFromCities = new Float32Array(count)
-	const seeds: SpreadEntry[] = []
+	let seeds = 0
 	for (let p = 0; p < count; p++) {
 		if (desolate[p]) continue
 		const urban = urbanAt(p)
 		if (urban < cityMin) continue
 		const dev = urbanPopToDev(urban)
 		devFromCities[p] = dev
-		seeds.push({
-			province: p,
-			dev,
-			sourceNation: sovereignAt(p),
-			hops: 0,
-			stamp: -seeds.length,
-		})
+		if (size === capacity) grow()
+		provinceQ[size] = p
+		devQ[size] = dev
+		sourceQ[size] = sovereignAt(p)
+		hopsQ[size] = 0
+		stampQ[size] = -seeds
+		seeds++
+		siftUp(size++)
 	}
 
-	const heap: SpreadEntry[] = []
-	for (const seed of seeds) pushSpreadEntry(heap, seed)
 	let stamp = 0
-
-	while (heap.length > 0) {
-		const { province, dev, sourceNation, hops } = popSpreadEntry(heap)
+	while (size > 0) {
+		const province = provinceQ[0]
+		const dev = devQ[0]
+		const sourceNation = sourceQ[0]
+		const hops = hopsQ[0]
+		siftDown()
 		if (dev < 0.01 || hops >= MAX_SPREAD_HOPS) continue
 
-		for (const nb of neighborsAt(province)) {
+		for (let i = adjOffset[province]; i < adjOffset[province + 1]; i++) {
+			const nb = adjList[i]
 			if (desolate[nb]) continue
 			const isForeign = sovereignAt(nb) !== sourceNation
 
@@ -208,13 +267,13 @@ function spreadDevelopment({
 			if (devFromCities[nb] >= spreadDev) continue
 
 			devFromCities[nb] = spreadDev
-			pushSpreadEntry(heap, {
-				province: nb,
-				dev: spreadDev,
-				sourceNation,
-				hops: hops + 1,
-				stamp: ++stamp,
-			})
+			if (size === capacity) grow()
+			provinceQ[size] = nb
+			devQ[size] = spreadDev
+			sourceQ[size] = sourceNation
+			hopsQ[size] = hops + 1
+			stampQ[size] = ++stamp
+			siftUp(size++)
 		}
 	}
 	return devFromCities
@@ -291,9 +350,10 @@ function computeDevelopment({
 		cityMin,
 		desolate,
 		waterAccess,
+		adjOffset,
+		adjList,
 		urbanAt: (p) => urbanPopulation[p],
 		sovereignAt: (p) => sovereign[p],
-		neighborsAt: (p) => adjList.subarray(adjOffset[p], adjOffset[p + 1]),
 	})
 	for (let p = 0; p < P; p++) {
 		if (desolate[p]) {
