@@ -60,3 +60,23 @@ The final suite used about 87% less wall time than the serial baseline. These ar
 After removing the assertion-free measurement, the experimental ladder comparison and the fixed character-draw checksum, and making governor inputs explicit in the three failing tests, the full suite passed all 236 tests across 26 files in 86 seconds, with no failures or skips. The focused related-test run passed all 30 tests; lint and typecheck passed. The completed local result is `stats/history-smoke-reviewed.json`. Production simulation and `report:history` were unchanged by this test review.
 
 Engine creation includes the knowledge spin-up: about 10 ms on a 30,000-point world and about 70 ms on a 204,000-point world for an 867 start. Starts in 1500 or 1800 need roughly 130 or 160 ten-year steps.
+
+## Distribution producer
+
+Small deterministic fixtures live in `src/test/history-run/distribution-{time,targets,territory,attacks,record}.smoke.test.ts` and `history-routing.smoke.test.ts`. They check numerical projection, ownership/connectivity revisions, war/identity lifecycles, shared folding, apply-once streaming, empty completion, actual active-batch pause, cancellation and alternate batch sizes. They do not sample rates or target fidelity; those belong to detailed reports.
+
+```powershell
+pnpm test:history:related src/model/history/distribution/engine/index.ts src/model/history/distribution/territory/index.ts
+pnpm test:history
+pnpm lint
+pnpm typecheck
+$env:HISTORY_PIPELINE = 'distribution'
+$env:HISTORY_START = '2'
+$env:HISTORY_YEARS = '2023'
+$env:HISTORY_POINTS = '204000'
+$env:HISTORY_SEEDS = '14963991,42,12345'
+$env:HISTORY_TITLE = 'distribution-history-pre-default'
+pnpm report:history
+```
+
+Keep HISTORY_OUT unset for the standard local report folder. `gen:history` also accepts the explicit producer; distribution defaults to the complete 2–2025 span. Detailed simulation remains the default for report/baseline reproduction. Calibration now uses only 204,000-point worlds at the user’s request; preserve the equivalent Pipe 2 benchmark. Automatic comparison matching includes producer metadata; explicit cross-pipeline comparisons label the different mechanisms and omit inapplicable people/military metrics. Clear task-specific environment settings after running commands. See [history pipelines](history-pipelines.md) and the [fixed distribution acceptance gate](../politics/distribution-history.md).

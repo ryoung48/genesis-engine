@@ -18,8 +18,14 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
-	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
+	const pipeline = env.HISTORY_PIPELINE ?? "simulation"
+	if (pipeline !== "simulation" && pipeline !== "distribution")
+		throw new Error("Invalid HISTORY_PIPELINE")
+	const years = Number(
+		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 2023 : DEFAULT_YEARS),
+	)
 	return {
+		pipeline,
 		lateKnowledgeBand: Number(
 			env.HISTORY_LATE_KNOWLEDGE ?? DEFAULT_LATE_KNOWLEDGE_BAND,
 		),

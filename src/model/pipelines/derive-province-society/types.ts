@@ -8,7 +8,10 @@ import type { StageTiming } from "@/model/shared/timing/types"
 export interface DeriveProvinceSocietyInput {
 	isEarthImport: boolean
 	mesh: SphereMesh
-	params: Pick<GenesisParams, "seed" | "planetRadiusKm" | "era">
+	params: Pick<
+		GenesisParams,
+		"seed" | "planetRadiusKm" | "era" | "historyPipeline"
+	>
 	post: Pick<
 		ReturnType<typeof POST_ELEVATION.runPostElevationPipeline>,
 		| "coastal"

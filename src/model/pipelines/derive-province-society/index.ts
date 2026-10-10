@@ -18,6 +18,7 @@ function deriveProvinceSociety({
 	const timings: StageTiming[] = []
 	const society = SIM_DERIVE.deriveSociety({
 		isEarthImport,
+		historyPipeline: params.historyPipeline,
 		provinces: post.provinces,
 		population: post.population,
 		landmarks: post.landmarks,

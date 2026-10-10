@@ -17,6 +17,7 @@ import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { CORONATION_REPORT } from "@/test/history-run/report/coronation"
 import { DIPLOMATIC_TIES_REPORT } from "@/test/history-run/report/diplomatic-ties"
+import { DISTRIBUTION_REPORT } from "@/test/history-run/report/distribution"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import { GOVERNMENT_REPORT } from "@/test/history-run/report/government"
@@ -569,8 +570,15 @@ function runSeed({
 }
 
 function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
+	if (options.pipeline === "distribution") {
+		DISTRIBUTION_REPORT.run(options)
+		return new Map()
+	}
 	const results = new Map<number, CenturyReport[]>()
-	const saved: Record<string, unknown> = { expectedSeeds: options.seeds }
+	const saved: Record<string, unknown> = {
+		pipeline: "simulation",
+		expectedSeeds: options.seeds,
+	}
 	const seedDiagnostics: Record<string, unknown> = {}
 	for (const seed of options.seeds) {
 		const reports = runSeed({ seed, options, saved, seedDiagnostics })

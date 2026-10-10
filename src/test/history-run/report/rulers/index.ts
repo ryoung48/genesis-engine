@@ -1,6 +1,6 @@
 import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { STATE } from "@/model/history/sim/engine/state"
-import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import type {
 	HeirDistribution,
 	HeirPlansReport,
@@ -15,9 +15,9 @@ function distribution(values: number[]): HeirDistribution {
 	return {
 		count,
 		mean: count ? values.reduce((sum, value) => sum + value, 0) / count : null,
-		p10: count ? REPORT_DISTRIBUTION.percentile({ values, q: 0.1 }) : null,
-		p50: count ? REPORT_DISTRIBUTION.percentile({ values, q: 0.5 }) : null,
-		p90: count ? REPORT_DISTRIBUTION.percentile({ values, q: 0.9 }) : null,
+		p10: count ? REPORT_STATISTICS.percentile({ values, fraction: 0.1 }) : null,
+		p50: count ? REPORT_STATISTICS.percentile({ values, fraction: 0.5 }) : null,
+		p90: count ? REPORT_STATISTICS.percentile({ values, fraction: 0.9 }) : null,
 	}
 }
 

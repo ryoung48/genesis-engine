@@ -72,3 +72,42 @@ The final report, comparison and discussion are in `stats/history/2026-10-05T23-
 ## Ruler-only people
 
 For seed 14963991, lateMedieval, 204,000 points, 867–1800, the completed ruler-only report is `stats/history/2026-10-11T21-43-35-790Z-ruler-only-people/933.json`, compared with `stats/history/2026-10-11T17-27-55-417Z-government-isolated-changed/933.json`. Annual ticks fell from 283.1 to 165.6 s, wall time from 362.3 to 193.4 s and peak RSS from 2,466.8 to 2,360.6 MiB (−4.3%). The sovereign count also falls over the run (315 in the first window, 84 in the last, as claim wars form unions), so part of the time saving is a smaller map. Baseline wall time varied by 14.8% between near-identical runs. The local `comparison.md` holds the full table.
+
+## Distribution history calibration (2026-10-10)
+
+The original [Pipe 3](history-pipelines.md) calibration ran while this political producer was opt-in. The completed original-mechanism report is `stats/history/2026-10-09T23-54-37-668Z-distribution-history-pre-default/2023.json`, lateMedieval, 204,000 requested points, seeds 14963991/42/12345, AD 2–2025 (2,023 transitions), knowledge metadata 2.366478320318625, standard diagnostics and no profiling. The eligible graph sizes differ by seed. Placement is shared generation work; the engine separately repeats pure target projection while indexing the placed countries. PMF/projection planning is additional work, rather than detailed-engine initialization.
+
+| Seed | Eligible provinces | Generation | Engine initialization | Annual advancement total | Annual frame folding total | Record JSON |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 14963991 | 10,944 | 12.62 s | 2.21 s | 105.03 s | 114.16 s | 47.22 MiB |
+| 42 | 11,183 | 16.84 s | 3.15 s | 163.95 s | 133.89 s | 46.61 MiB |
+| 12345 | 12,370 | 13.75 s | 2.37 s | 154.82 s | 125.55 s | 51.90 MiB |
+
+These are single samples on a shared machine, overlapping other calibration and verification. Frame timing reconstructs a date every year and grows with cumulative political events; it is not constant-time scrubbing. JSON size is serialized record cost, not an isolated retained-heap measurement. The additional engine initialization takes about 2–3 seconds here and is materially larger than the hoped-for small indexing overhead. Annual projection, articulation work, writing and ingestion are exposed separately in subsequent diagnostics.
+
+The equivalent Pipe 2 preservation report is `stats/history/2026-10-09T23-57-16-382Z-distribution-history-preserve-pipe2/933.json`, compared to `stats/history/2026-10-09T04-56-54-635Z-parent-weddings-always-recorded/933.json`. Existing behavioral statistics and event digests match. Pipeline metadata and source provenance changed intentionally; timing/memory differences are separated. Old reports lacking pipeline metadata are explicitly inferred as simulation.
+
+The overlapping Pipe 3 workload is `stats/history/2026-10-10T00-09-25-029Z-distribution-history-overlap/933.json`: the same seed/points/era, AD 867–1800, with AD 2–867 warm-up separately measured at 51.80 seconds. Measured-window advancement totaled 58.94 seconds and annual frame folding 63.08 seconds. The saved Pipe 2 baseline's annual ticks totaled 304.85 seconds. These are different mechanisms and diagnostics; concurrent verification and their different retained records prevent treating that ratio as a controlled speedup. Shared generation remains of similar order, while the political advancement is directionally cheaper. No equivalent pre-change Pipe 3 baseline exists.
+
+The original calibration conserved all annual ownership, connectivity and capital invariants, but failed trajectory acceptance: AD 1914 relative count error was 0.899/1.023/1.077; modern country-share TV was 0.198/0.237/0.251. A doubled 4% capture-budget trial and ordinal-order initialization were tested and rejected; original 2% capture and largest-first placement remain. At that stage the application default remained detailed history. See [distribution rules](../politics/distribution-history.md) for the fixed target gate; estimates are not acceptance criteria.
+
+
+Final original-mechanism validation also completed at `stats/history/2026-10-10T00-24-22-568Z-distribution-history-final-original-mechanism/2023.json`. Every recorded annual political field and serialized record byte count matches the original large calibration; all added identity/war lifecycle counters are zero. These final reports fold frames at 20-year transport boundaries plus the six checkpoints and endpoint, rather than at every year. They record the observation years and cadence explicitly, and comparison flags this diagnostic workload difference. The lower frame-work total must not be interpreted as a faster frame reader. That original-mechanism run did not pass the fixed trajectory gate.
+
+## Passing large-world steering repair
+
+The completed final report is `stats/history/2026-10-10T01-20-34-437Z-distribution-history-final/2023.json`: distribution, 204,000 requested points, seeds 14963991/42/12345, lateMedieval, AD 2–2025, knowledge threshold 2.366478320318625, standard diagnostics and no profiling. All six checkpoints on every seed pass the unchanged country TV ≤0.10, province-mass TV ≤0.15 and relative count error ≤0.25 gate; all annual ownership/connectivity/capital/lifecycle violations are zero. Fast history is now the application default.
+
+| Seed | Generation | Engine initialization | Annual advancement | Median year | Report wall | Record JSON |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 14963991 | 19.44 s | 5.21 s | 86.97 s | 36.63 ms | 135.33 s | 65.89 MiB |
+| 42 | 14.04 s | 2.57 s | 71.12 s | 33.64 ms | 104.66 s | 66.26 MiB |
+| 12345 | 14.55 s | 2.51 s | 79.10 s | 37.75 ms | 115.01 s | 72.99 MiB |
+
+These are single shared-machine samples; the first seed overlapped smoke tests. Report wall includes independent validation and frame reconstruction, and excludes the subsequent HTML comparison. Advancement includes yearly target planning, ownership mutations and record writing/ingestion. Remaining projection cost is 17.28/27.71/27.37 seconds, respectively. The passing mechanism has more political turnover and larger records than the failed original mechanism, so its timing change is not an isolated algorithm speedup.
+
+The CPU diagnostic at `stats/profiles/2026-10-10T01-08-01-109Z-distribution-steering-worker/worker.cpuprofile` sampled the actual worker on the same 204,000-point seed for 200 years. Attack declarations account for 6.15 of 9.47 seconds sampled inside annual advancement; frontier checks account for 3.93 seconds inclusive. These overlap and must not be added. The report comparison scan also consumes sampled CPU, but is outside simulation advancement and browser playback. Profiled slices remain diagnostic.
+
+Performance work removes repeated world-histogram construction per country, stops feasibility queries at the first legal frontier, scores identical successor histograms once, and materializes only the accepted connected cut. Against `stats/history/2026-10-10T01-14-07-882Z-distribution-history-reachable-steering/2023.json`, final annual political report fields and record byte counts match exactly; only connectivity timing is excluded from that field equality. The final scoring cache alone gives little measurable improvement in these noisy samples. See the report's `calibration-gate.md` and generated `2023-diff.html`; all reports remain local and previous reports are preserved.
+
+The separate headless Chromium check at 204,000 points, seed 42, measured **41.62 seconds** from Generate to the ready world, including display setup, and **112.03 seconds** from timeline start through 2025, including a brief pause/resume check. All six historical checkpoints scrubbed correctly and no page errors occurred. This UI sample ran after the benchmark and smoke suite completed. It includes worker scheduling, transport, main-thread record ingestion, frame reconstruction and rendering, so it is distinct from the Node advancement timer. Results are saved in `stats/distribution-ui-big-check.json`.

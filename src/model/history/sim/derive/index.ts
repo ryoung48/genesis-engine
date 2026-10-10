@@ -1,3 +1,4 @@
+import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 import { CULTURE } from "@/model/history/sim/culture"
 import type {
 	DerivedSociety,
@@ -103,7 +104,22 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 			// layer from the earth-history engine (src/model/history/record/),
 			// not the procedural flood-fill nation/government generator.
 			const isEarthImportRaster = !!params.provinces.realIds
-			if (eraConfig.hasNations && !isEarthImportRaster) {
+			if (params.historyPipeline === "distribution" && !isEarthImportRaster) {
+				nations = TIMING.measure({
+					stage: "distribution placement",
+					timings,
+					fn: () =>
+						DISTRIBUTION_TERRITORY.place({
+							provinces: params.provinces!,
+							habitability: params.population!.habitability,
+							waterAccess: params.waterAccess,
+							provinceContinent,
+							migrationWave: params.population!.migrationWave,
+							r_xyz: params.r_xyz,
+							seed: params.seed,
+						}).nations,
+				})
+			} else if (eraConfig.hasNations && !isEarthImportRaster) {
 				const provinces = params.provinces
 				const population = params.population
 				const sizePlan = startSizePlan(params)

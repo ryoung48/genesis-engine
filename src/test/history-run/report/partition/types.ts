@@ -4,7 +4,7 @@ import type {
 	UnseatedReason,
 } from "@/model/history/sim/engine/events/succession/partition/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import { Distribution } from "@/test/history-run/report/distribution/types"
+import { Distribution } from "@/test/history-run/report/statistics/types"
 
 export interface PartitionStateParams {
 	engine: HistoryState

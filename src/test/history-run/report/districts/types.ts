@@ -1,5 +1,5 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { Distribution } from "@/test/history-run/report/distribution/types"
+import type { Distribution } from "@/test/history-run/report/statistics/types"
 
 export interface DistrictReport {
 	realmsByTopTier: Record<string, number>

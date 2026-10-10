@@ -1,6 +1,6 @@
 import type { AssignColonialRelationsParams } from "@/model/history/sim/nations/colonial/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PLACEMENT } from "@/model/history/sim/nations/placement"
+import { PLACEMENT_FRONTIER } from "@/model/history/sim/nations/placement/frontier"
 
 function assignColonialRelations(params: AssignColonialRelationsParams): void {
 	const {
@@ -80,7 +80,7 @@ function assignColonialRelations(params: AssignColonialRelationsParams): void {
 		let bestDist = Infinity
 		for (const col of colonizers) {
 			if (nationColonizer[col.nation] >= 0) continue
-			const d = PLACEMENT.provinceSeedDistance({
+			const d = PLACEMENT_FRONTIER.provinceSeedDistance({
 				aProvince: seeds[col.nation],
 				bProvince: target.capital,
 				provinceSeeds,

@@ -1,7 +1,7 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import type { InterregnumNoteData } from "@/model/history/sim/engine/events/succession/interregnum/types"
 import { STATE } from "@/model/history/sim/engine/state"
-import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution/index"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import type {
 	InterregnumReport,
 	InterregnumTracker,
@@ -50,7 +50,7 @@ function summarize({
 		}
 	return {
 		events: notes.length,
-		freedPerEvent: REPORT_DISTRIBUTION.summarize(
+		freedPerEvent: REPORT_STATISTICS.summarize(
 			notes.map((note) => note.freed.length),
 		),
 		skippedSeats: notes.reduce((sum, note) => sum + note.skipped.length, 0),

@@ -1,6 +1,8 @@
+import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SocietyEra } from "@/model/society/types"
 
 export interface HistoryReportOptions {
+	pipeline: HistoryPipeline
 	seeds: number[]
 	era: SocietyEra
 	numPoints: number

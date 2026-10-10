@@ -86,3 +86,13 @@ The detailed-report runner already releases journals and does not build the brow
 The retained-memory harness runs 300 years on the 204,000-point world and collects garbage before each reading. Against the commit before the ruler-only change, both runs started at the same size (about 1.1 GiB of heap plus array buffers, almost all of it the generated world). After 300 years the retained heap was 217 MiB instead of 365 MiB (a 148 MiB saving, 41% of the heap, 13% of everything retained) while array buffers were unchanged at about 700 MiB, because the census columns are the same. Heap growth since the start fell from 280 to 141 MiB.
 
 The 933-year report's peak RSS fell by only 4.3% (2,467 to 2,361 MiB) because most of the peak is the world, which the change does not touch, plus transient allocations. RSS after a collection varied by hundreds of MiB between identical runs and is not a usable comparison; heap used plus array buffers is.
+
+## Distribution records
+
+[Fast history](history-pipelines.md) publishes sparse annual political events without people, title tables, census copies or economy state. Its generated-world graph is copied before worker world buffers are transferred. Historical identities, owner/controller changes and paired directed-war participant events remain in the record; population/development arrays in folded frames are zero-filled with economy null because these capabilities are absent.
+
+Record batches own copied patches, combine at most 20 completed years and include throughTimeMs even without events. Consumers enforce sequence ranges, append once, invalidate changed/future frame caches and empty their pending queue. The worker releases pending batches after publishing. Historical event storage still grows with turnover; this is not constant memory.
+
+The completed 204,000-point, AD 2–2025 original-mechanism report recorded serialized political records of 47.22/46.61/51.90 MiB for seeds 14963991/42/12345. These are JSON byte counts including Map contents, not isolated retained JavaScript heap measurements; process heap/RSS also include generated worlds and report diagnostics. Null people/censuses are a narrower Pipe 3 contract, not a reduction of Pipe 2's complete people-retention guarantee. Workload paths and timing caveats are in [pipeline performance](pipeline-performance.md).
+
+The passing steering-repair report (`stats/history/2026-10-10T01-20-34-437Z-distribution-history-final/2023.json`) records 65.89/66.26/72.99 MiB on the same three large-world seeds. The increased political turnover needed to follow the target trajectory grows the record; faster candidate evaluation does not reduce retained history. These figures remain serialized JSON sizes, not retained-heap estimates.

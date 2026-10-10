@@ -1,7 +1,11 @@
 import type { RefObject } from "react"
+import type { RecordBatch } from "@/model/history/distribution/record/types"
+import type { HistoryState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerResponse,
+	ProceduralHistoryInitial,
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
 import type { GenerationRequest } from "@/ui/genesis/generation/progress/types"
@@ -12,6 +16,8 @@ export interface HistoryTimelineInput {
 	religionMode: ReligionMapMode
 	journalTransactionsRef: RefObject<JournalTransaction[]>
 	journalVersion: number
+	distributionStateRef: RefObject<HistoryState | null>
+	distributionBatchesRef: RefObject<RecordBatch[]>
 }
 
 export interface EarthTimelineInput {
@@ -26,7 +32,9 @@ export interface GenerationCallbacks {
 	setSeed: (v: number) => void
 	setWorld: (v: SerializedGenesisWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
-	onHistoryStart: (journal: JournalTransaction[]) => void
+	onHistoryStart: (initial: ProceduralHistoryInitial | null) => void
+	onDistributionBatch: (batch: RecordBatch) => void
+	onHistoryStopped: (complete: boolean) => void
 	onHistoryJournal: (journal: JournalTransaction[]) => void
 	onGenerationComplete?: () => void
 	onPathfindResult?: (result: {
@@ -37,6 +45,19 @@ export interface GenerationCallbacks {
 		travelDays: number
 		reachable: boolean
 	}) => void
+}
+
+export type GenerationParams = GenesisParams
+
+export interface GenerateWorldParams {
+	overrideSeed: number
+	overrides: Partial<GenerationParams> | undefined
+	currentParams: GenerationParams
+	callbacks: GenerationCallbacks
+}
+export interface GenerateOverrideParams {
+	seed: number
+	overrides: Partial<GenerationParams> | undefined
 }
 
 export interface CreateWorkerParams {

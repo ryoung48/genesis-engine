@@ -3,7 +3,6 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
-import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution"
 import type {
 	DistrictCapture,
 	DistrictEngineParams,
@@ -12,6 +11,7 @@ import type {
 	DistrictSummaryParams,
 	DistrictTracker,
 } from "@/test/history-run/report/districts/types"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 function counts(): Record<string, number> {
 	return Object.fromEntries(TITLES.tierOrder.map((tier) => [tier, 0]))
@@ -165,7 +165,7 @@ function summarize({
 	}
 	for (const [tier, values] of crownShares)
 		report.crownLandShare[TITLES.tierOrder[tier]] =
-			REPORT_DISTRIBUTION.summarize(values)
+			REPORT_STATISTICS.summarize(values)
 	const changes = new Map<number, number>()
 	for (const change of tracker.changes) {
 		if (change.year <= from || change.year > to) continue

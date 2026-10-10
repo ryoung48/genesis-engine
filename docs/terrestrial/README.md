@@ -4,6 +4,8 @@ Scope: `:history`.
 
 Start here for the historical simulation’s rules and implementation references. Climate and celestial simulation are separate documentation scopes.
 
+The three history producers are [stored Earth, detailed simulation and default fast history](mechanics/history-pipelines.md). The people, title, military, population and economy rules below describe Pipe 2. [Distribution history](politics/distribution-history.md) describes Pipe 3 and its validated large-world calibration.
+
 ## Concepts
 
 - **Rulers** are the only individuals the simulation tracks: each sovereign realm has exactly one, a row of columns with a name, sex, dynasty, birth and death date and claim. See [rulers and dynasties](politics/rulers-and-dynasties.md). Their families are generated on demand for the wiki, outside the simulation; see [people](people/overview.md).

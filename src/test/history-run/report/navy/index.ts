@@ -2,7 +2,7 @@ import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { NAVY } from "@/model/history/sim/engine/military/navy"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
-import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import type {
 	BlockadeBeats,
 	NavalOutcomeMix,
@@ -169,19 +169,19 @@ function summarize({
 			mean:
 				shares.reduce((sum, share) => sum + share, 0) /
 				Math.max(1, shares.length),
-			p10: REPORT_DISTRIBUTION.percentile({ values: shares, q: 0.1 }),
-			p50: REPORT_DISTRIBUTION.percentile({ values: shares, q: 0.5 }),
-			p90: REPORT_DISTRIBUTION.percentile({ values: shares, q: 0.9 }),
+			p10: REPORT_STATISTICS.percentile({ values: shares, fraction: 0.1 }),
+			p50: REPORT_STATISTICS.percentile({ values: shares, fraction: 0.5 }),
+			p90: REPORT_STATISTICS.percentile({ values: shares, fraction: 0.9 }),
 		},
 		realmsWithShips:
 			samples.reduce((sum, entry) => sum + entry.withShips, 0) /
 			Math.max(1, realms),
 		ships: {
-			...REPORT_DISTRIBUTION.summarize(ships),
-			p10: REPORT_DISTRIBUTION.percentile({ values: ships, q: 0.1 }),
-			p25: REPORT_DISTRIBUTION.percentile({ values: ships, q: 0.25 }),
-			p75: REPORT_DISTRIBUTION.percentile({ values: ships, q: 0.75 }),
-			max: REPORT_DISTRIBUTION.percentile({ values: ships, q: 1 }),
+			...REPORT_STATISTICS.summarize(ships),
+			p10: REPORT_STATISTICS.percentile({ values: ships, fraction: 0.1 }),
+			p25: REPORT_STATISTICS.percentile({ values: ships, fraction: 0.25 }),
+			p75: REPORT_STATISTICS.percentile({ values: ships, fraction: 0.75 }),
+			max: REPORT_STATISTICS.percentile({ values: ships, fraction: 1 }),
 			total:
 				ships.reduce((sum, count) => sum + count, 0) /
 				Math.max(1, samples.length),

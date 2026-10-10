@@ -7,10 +7,9 @@ import type {
 import { GENERATION_PROGRESS } from "@/ui/genesis/generation/progress"
 import type {
 	CreateWorkerParams,
+	GenerateWorldParams,
 	GenerationCallbacks,
 } from "@/ui/genesis/generation/types"
-
-export type GenerationParams = GenesisParams
 
 interface ImportHeightmapParams {
 	seed: number
@@ -126,6 +125,15 @@ function createWorker({
 	worker.onmessage = (event: MessageEvent<GenesisWorkerResponse>) => {
 		if (callbacks.workerRef.current !== worker) return
 		const message = event.data
+		if (callbacks.workerRef.current !== worker) return
+		if (message.type === "distribution-progress") {
+			callbacks.onDistributionBatch(message.batch)
+			return
+		}
+		if (message.type === "history-stopped") {
+			callbacks.onHistoryStopped(message.complete)
+			return
+		}
 		if (message.type === "progress") {
 			callbacks.setGenerationLabel(message.label)
 			progress.update({ stage: message.stage, percent: message.pct })
@@ -139,6 +147,7 @@ function createWorker({
 		if (message.type === "error") {
 			progress.stop()
 			console.error("Genesis worker failed", message.message, message.stack)
+			callbacks.onHistoryStopped(false)
 			callbacks.setGenerationLabel(failLabel)
 			callbacks.setGenerating(false)
 			return
@@ -171,6 +180,7 @@ function createWorker({
 				.join(":") ||
 			"Unknown worker error"
 		console.error("Genesis worker crashed", detail, event.error)
+		callbacks.onHistoryStopped(false)
 		callbacks.setGenerationLabel(failLabel)
 		callbacks.setGenerating(false)
 		worker.terminate()
@@ -181,12 +191,12 @@ function createWorker({
 	return worker
 }
 
-export function generateWorld(
-	overrideSeed: number,
-	overrides: Partial<GenerationParams> | undefined,
-	currentParams: GenerationParams,
-	callbacks: GenerationCallbacks,
-): void {
+export function generateWorld({
+	overrideSeed,
+	overrides,
+	currentParams,
+	callbacks,
+}: GenerateWorldParams): void {
 	callbacks.setGenerating(true)
 	callbacks.setGenerationProgress(0)
 	callbacks.setGenerationLabel("Starting generation...")
@@ -239,6 +249,8 @@ export function generateWorld(
 		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
 		era: overrides?.era ?? currentParams.era,
+		historyPipeline:
+			overrides?.historyPipeline ?? currentParams.historyPipeline,
 	} as GenesisParams
 
 	const request: GenesisWorkerRequest = { type: "generate", params }
@@ -247,7 +259,7 @@ export function generateWorld(
 			callbacks,
 			onDone: (message) => {
 				callbacks.setWorld(message.world)
-				callbacks.onHistoryStart(message.journal)
+				callbacks.onHistoryStart(message.history)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
@@ -415,7 +427,7 @@ export function importHeightmap(
 			callbacks,
 			onDone: (message) => {
 				callbacks.setWorld(message.world)
-				callbacks.onHistoryStart(message.journal)
+				callbacks.onHistoryStart(message.history)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
