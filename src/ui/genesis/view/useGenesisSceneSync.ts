@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { DATE } from "@/model/history/earth/date"
+import { RECORD_ROUTES } from "@/model/history/record/routes"
 import {
 	buildGhslSettlementPopulationSlice,
 	topSettlementIndices,
@@ -9,13 +10,6 @@ import {
 	buildRealmBorderLayers,
 } from "@/ui/genesis/view/realm-border-layers"
 import type { GenesisSceneSyncInput } from "@/ui/genesis/view/types"
-/**
- * Pushes UI state into the live GenesisScene: hovered region, border and
- * grid visibility, projection/view mode, the settlement and infrastructure
- * marker sets (procedural dots vs. real EU4 settlements -- both share the
- * Infrastructure toggle but only one set is ever shown), and the label
- * overlays. Every effect here is one-way UI -> renderer.
- */
 export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	const {
 		sceneRef,
@@ -133,11 +127,23 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 			!isEarthImportDisplay &&
 			worldForDisplay?.urbanPopulation
 		) {
-			scene.setSettlements(worldForDisplay.urbanPopulation)
+			scene.setSettlements({
+				urbanPop: worldForDisplay.urbanPopulation,
+				capitalProvinces: new Set(
+					history.query?.renderInputs.seeds ??
+						worldForDisplay.nations?.seeds ??
+						[],
+				),
+				routeEndpoints: RECORD_ROUTES.packedEndpoints(worldForDisplay.routes),
+			})
 		} else {
-			scene.setSettlements(null)
+			scene.setSettlements({
+				urbanPop: null,
+				routeEndpoints: new Set(),
+				capitalProvinces: new Set(),
+			})
 		}
-	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay])
+	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay, history.query])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setInfrastructureVisible(

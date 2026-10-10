@@ -221,7 +221,7 @@ export function buildGlobeSettlementLabels(
 			: (world.urbanPopulation?.[p] ?? 0)
 		const scale = settlementFontScale(pop)
 		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_GLOBE * scale
-		const markerScale = globeScaleForPop(pop, world.params?.era)
+		const markerScale = globeScaleForPop()
 		const globePlacement = settlementLabelPositionGlobe(
 			r_xyz,
 			elevation,
@@ -298,7 +298,7 @@ export function buildMapSettlementLabels(
 			: (world.urbanPopulation?.[p] ?? 0)
 		const scale = settlementFontScale(pop)
 		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_MAP * scale
-		const markerRadius = mapRadiusForPop(pop, world.params?.era)
+		const markerRadius = mapRadiusForPop()
 		const [px, py, pz] = hasRealCoord
 			? settlementLabelPositionMapOverride(
 					projection,

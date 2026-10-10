@@ -9,6 +9,7 @@ import type { Eu4ProvinceMap } from "@/model/history/earth/import/eu4-province-m
 import type { Nation } from "@/model/history/earth/reference/nations/types"
 import type { LonLat } from "@/model/history/earth/types"
 import type { PeopleRecord } from "@/model/history/record/people/types"
+import type { RouteLog } from "@/model/history/record/routes/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import type {
@@ -176,6 +177,7 @@ export interface CensusKeyframe {
 	urban: Float32Array
 	rural: Float32Array
 	development: Float32Array
+	knowledge: Float32Array
 	economy: CensusEconomy
 }
 
@@ -248,6 +250,7 @@ export interface RaidRecord {
 }
 
 export interface HistoryEvents {
+	roads: RouteLog
 	provinceEvents: Map<number, ProvinceEventLog>
 	nationEvents: (NationEventLog | undefined)[]
 	wars: WarRecord[]

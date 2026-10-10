@@ -22,6 +22,7 @@ import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { CHARACTER } from "@/model/history/sim/people/character"
 import { HOLDINGS } from "@/model/history/sim/people/holdings"
@@ -247,6 +248,7 @@ function runSeatSuccession({
 			cause: state.successionContext?.cause ?? "natural",
 			claim: choice.claim,
 			foreignClaimant: choice.foreignClaimant,
+			system: GOVERNMENT.successionOfIndex(state.governmentType[province]),
 		},
 	})
 

@@ -236,7 +236,7 @@ export interface GenesisScene {
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
 	focusOnProvince(provinceId: number, opts?: FocusOnProvinceOptions): void
-	setSettlements(urbanPop: Float32Array | null): void
+	setSettlements(params: SetSettlementsParams): void
 	setSettlementsVisible(visible: boolean): void
 	setEu4Settlements(
 		lats: Float32Array | null,
@@ -481,7 +481,28 @@ export interface BuildSelectedProvinceBorderMapParams {
 	}
 }
 
+export interface BuildGlobeSettlementsParams {
+	capitalProvinces: ReadonlySet<number>
+	world: SerializedGenesisWorld
+	locations: Int32Array
+	urbanPop: Float32Array
+	elevationVisible: boolean
+	routeEndpoints: ReadonlySet<number>
+}
+export interface SettlementExistsParams {
+	pop: number
+	era: SerializedGenesisWorld["params"]["era"] | undefined
+	province: number
+	routeEndpoints: ReadonlySet<number>
+}
+export interface SetSettlementsParams {
+	capitalProvinces: ReadonlySet<number>
+	urbanPop: Float32Array | null
+	routeEndpoints: ReadonlySet<number>
+}
 export interface BuildMapSettlementsParams {
+	capitalProvinces: ReadonlySet<number>
+	routeEndpoints: ReadonlySet<number>
 	world: SerializedGenesisWorld
 	locations: Int32Array
 	urbanPop: Float32Array

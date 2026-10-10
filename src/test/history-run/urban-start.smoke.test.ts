@@ -1,4 +1,5 @@
 import { expect, it } from "vitest"
+import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { HISTORY_RUN } from "@/test/history-run"
 
 it("starts history from the generated urban population and development", () => {
@@ -17,4 +18,6 @@ it("starts history from the generated urban population and development", () => {
 			mismatches++
 	}
 	expect(mismatches).toBe(0)
+	expect(engine.roads).not.toBeNull()
+	expect(ROUTES.stored(engine.roads!)).toEqual(generated.routes?.routes)
 }, 300_000)

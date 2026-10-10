@@ -36,6 +36,7 @@ import {
 	hotspotColor,
 	humidityColor,
 	humidityDifferenceColor,
+	knowledgeColor,
 	migrationColor,
 	OCEAN_LIGHT_BLUE,
 	populationColor,
@@ -970,11 +971,18 @@ export function computeRegionColors(
 				}
 			}
 		}
-		let maxDevelopment = 0
-		if (populationMode === "development" && world.development) {
+		const developmentValues =
+			populationMode === "knowledge" ? world.knowledge : world.development
+		let minDevelopment = populationMode === "knowledge" ? Infinity : 0
+		let maxDevelopment = populationMode === "knowledge" ? -Infinity : 0
+		if (
+			(populationMode === "development" || populationMode === "knowledge") &&
+			developmentValues
+		) {
 			for (let i = 0; i < world.provinces.count; i++) {
-				if (!desolate[i] && world.development[i] > maxDevelopment)
-					maxDevelopment = world.development[i]
+				if (desolate[i]) continue
+				minDevelopment = Math.min(minDevelopment, developmentValues[i])
+				maxDevelopment = Math.max(maxDevelopment, developmentValues[i])
 			}
 		}
 		let maxUrbanPopulation = 0
@@ -987,7 +995,8 @@ export function computeRegionColors(
 		}
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
 		const invAbsDiffMax = maxAbsDensityDiff > 0 ? 1 / maxAbsDensityDiff : 0
-		const invDevelopmentMax = maxDevelopment > 0 ? 1 / maxDevelopment : 0
+		const developmentRange = maxDevelopment - minDevelopment
+		const invDevelopmentRange = developmentRange > 0 ? 1 / developmentRange : 0
 		const invUrbanMax = maxUrbanPopulation > 0 ? 1 / maxUrbanPopulation : 0
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
@@ -1038,10 +1047,18 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
-				} else if (populationMode === "development" && world.development) {
-					const [cr, cg, cb] = developmentColor(
-						world.development[p] * invDevelopmentMax,
-					)
+				} else if (
+					(populationMode === "development" ||
+						populationMode === "knowledge") &&
+					developmentValues
+				) {
+					const color =
+						populationMode === "knowledge" ? knowledgeColor : developmentColor
+					const normalized =
+						populationMode === "knowledge" && developmentRange === 0
+							? 0.5
+							: (developmentValues[p] - minDevelopment) * invDevelopmentRange
+					const [cr, cg, cb] = color(normalized)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb

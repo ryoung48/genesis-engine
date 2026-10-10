@@ -31,6 +31,7 @@ const RULER_TAGS = new Set([
 
 function pending(): PendingJournal {
 	return {
+		roads: null,
 		parents: new Map(),
 		relations: new Map(),
 		occupations: new Map(),
@@ -132,7 +133,8 @@ function flush({
 		pendingJournal.relations.size === 0 &&
 		pendingJournal.occupations.size === 0 &&
 		pendingJournal.coalitions.length === 0 &&
-		!PEOPLE_LOG.pending(state.people)
+		!PEOPLE_LOG.pending(state.people) &&
+		!pendingJournal.roads
 	)
 		return
 	const parents = [...pendingJournal.parents.values()].filter(
@@ -191,6 +193,7 @@ function flush({
 				urban: state.popUrbanCurrent.slice(),
 				rural: state.popRuralCurrent.slice(),
 				development: state.developmentCurrent.slice(),
+				knowledge: state.knowledgeCurrent.slice(),
 				economy: censusEconomy(state),
 			}
 		: null
@@ -218,7 +221,8 @@ function flush({
 		pendingJournal.coalitions.length > 0 ||
 		rulers.length > 0 ||
 		notes.length > 0 ||
-		keyframe
+		keyframe ||
+		pendingJournal.roads
 	) {
 		state.journal.push({
 			timeMs: state.time,
@@ -230,8 +234,10 @@ function flush({
 			people,
 			notes,
 			census: keyframe,
+			roads: pendingJournal.roads,
 		})
 	}
+	pendingJournal.roads = null
 	pendingJournal.parents.clear()
 	pendingJournal.relations.clear()
 	pendingJournal.occupations.clear()
@@ -245,6 +251,17 @@ function transferList(journal: JournalTransaction[]): Transferable[] {
 					transaction.census.urban.buffer,
 					transaction.census.rural.buffer,
 					transaction.census.development.buffer,
+					transaction.census.knowledge.buffer,
+				]
+			: []),
+		...(transaction.roads
+			? [
+					...Object.values(transaction.roads.added).map(
+						(array) => array.buffer,
+					),
+					...Object.values(transaction.roads.released).map(
+						(array) => array.buffer,
+					),
 				]
 			: []),
 		...(transaction.people ? [transaction.people.time.buffer] : []),

@@ -8,6 +8,7 @@ describe("route adjacency-slot usage", () => {
 	it("counts both directions and shared edges across land routes", () => {
 		const counts = new Uint32Array(adjList.length)
 		EDGE_USAGE.recordPath({
+			delta: 1,
 			adjOffset,
 			adjList,
 			counts,
@@ -16,6 +17,7 @@ describe("route adjacency-slot usage", () => {
 			endEdge: 3,
 		})
 		EDGE_USAGE.recordPath({
+			delta: 1,
 			adjOffset,
 			adjList,
 			counts,
@@ -29,6 +31,7 @@ describe("route adjacency-slot usage", () => {
 	it("counts sea water edges while excluding both anchor connections", () => {
 		const counts = new Uint32Array(adjList.length)
 		EDGE_USAGE.recordPath({
+			delta: 1,
 			adjOffset,
 			adjList,
 			counts,

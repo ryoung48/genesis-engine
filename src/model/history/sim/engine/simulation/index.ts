@@ -1,4 +1,3 @@
-import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
@@ -20,24 +19,17 @@ import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { ROADS } from "@/model/history/sim/engine/roads"
 import type {
 	ProcessEventsUntilParams,
 	SeedColonyRelationsParams,
 	SimulateUntilParams,
 	TimedParams,
 } from "@/model/history/sim/engine/simulation/types"
+import { InitHistoryParams } from "@/model/history/sim/engine/simulation/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
-import type { StageTiming } from "@/model/pipelines/types"
 import { UNITS } from "@/model/shared/units"
-import type { ProvincePopulation } from "@/model/society/population/types"
-import type {
-	GenesisNationHierarchy,
-	GenesisPartition,
-	GenesisProvinces,
-	SocietyEra,
-} from "@/model/society/types"
 import { URBANIZATION } from "@/model/society/urbanization"
 
 function timed<T>({ label, timings, fn }: TimedParams<T>): T {
@@ -70,38 +62,7 @@ function seedColonyRelations({
 	}
 }
 
-function initHistory(params: {
-	nations: GenesisNationHierarchy
-	provinces: GenesisProvinces
-	population: ProvincePopulation
-	coastal: Uint8Array
-	waterAccess?: Uint8Array
-	riverVisible: Uint8Array
-	r_xyz: Float32Array
-	cultures: GenesisPartition
-	// [JUSTIFICATION] Some generated worlds have no heritage partition.
-	heritages?: GenesisPartition
-	// [JUSTIFICATION] Some generated eras do not create religious partitions.
-	religions?: GenesisPartition
-	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
-	religionDoctrine?: ReligionDoctrine
-	era?: SocietyEra
-	seed: number
-	startYear?: number
-	landmarks?: GenesisLandmarks
-	regionProvince?: Int32Array
-	regionAdjOffset?: Int32Array
-	regionAdjList?: Int32Array
-	regionIsLand?: Uint8Array
-	// [JUSTIFICATION] Worlds without a custom planet size use Earth's radius.
-	planetRadiusKm?: number
-	topography: Uint8Array | null
-	vegetation: Uint8Array | null
-	settlementRegions?: Int32Array
-	settlementWaterLandmarks?: Int32Array
-	settlementPortRegions?: Int32Array
-	timings?: StageTiming[]
-}): HistoryState {
+function initHistory(params: InitHistoryParams): HistoryState {
 	const startYear = params.startYear ?? STATE.defaultStartYear
 	const rng = HISTORY_RNG.createHistoryRng(params.seed + 99999)
 	const state = timed({
@@ -163,6 +124,46 @@ function initHistory(params: {
 				}),
 			}),
 	})
+	if (
+		params.settlementRegions &&
+		params.landmarks &&
+		params.regionAdjOffset &&
+		params.regionAdjList &&
+		params.regionProvince &&
+		params.regionIsLand
+	)
+		timed({
+			label: "initHistory:initRoads",
+			timings: params.timings,
+			fn: () =>
+				ROADS.init({
+					state,
+					world: {
+						mesh: {
+							r_xyz: state.r_xyz,
+							adjOffset: state.regionAdjOffset,
+							adjList: state.regionAdjList,
+						},
+						params: { era: state.era, planetRadiusKm: state.planetRadiusKm },
+						provinces: {
+							count: state.P,
+							desolate: state.desolate,
+							regionProvince: state.regionProvince,
+							adjOffset: state.provinceAdjOffset,
+							adjList: state.provinceAdjList,
+						},
+						nations: params.nations,
+						landmarks: state.landmarks,
+						isLand: state.regionIsLand,
+					},
+					inputs: {
+						urbanPopulation: state.popUrbanCurrent,
+						settlementRegions: params.settlementRegions?.slice(),
+						settlementWaterLandmarks: params.settlementWaterLandmarks?.slice(),
+						settlementPortRegions: params.settlementPortRegions?.slice(),
+					},
+				}),
+		})
 	timed({
 		label: "initHistory:initEconomy",
 		timings: params.timings,
@@ -277,6 +278,7 @@ function processEventsUntil({
 				break
 			case EVENT_HEAP.evt.CENSUS:
 				POPULATION.runPopulation({ state, previousTime: time2 })
+				ROADS.advance({ state })
 				TAX.previewBudget({ state })
 				MILITARY.recordArmies({ state })
 				break

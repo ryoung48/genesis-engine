@@ -113,6 +113,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				census.rural.buffer,
 				census.urban.buffer,
 				census.development.buffer,
+				census.knowledge.buffer,
 			]),
 		)
 		const extraFrameBuffers = new Set(
@@ -121,6 +122,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 					frame.provincePopulation.buffer,
 					frame.provincePopulationUrban.buffer,
 					frame.provinceDevelopment.buffer,
+					frame.provinceKnowledge.buffer,
 				].filter((buffer) => !censusBuffers.has(buffer)),
 			),
 		)

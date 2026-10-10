@@ -6,6 +6,7 @@ export type SocietyMapMode =
 	| "density"
 	| "urban"
 	| "development"
+	| "knowledge"
 	| "culture"
 	| "heritage"
 	| "religion"

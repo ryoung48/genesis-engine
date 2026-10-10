@@ -6,7 +6,12 @@ import {
 	ROUTE_TUNING,
 	routePopulationThresholds,
 } from "@/model/society/infrastructure/trade/routing/route-tuning"
-import type { AppendSeaRoutesParams } from "@/model/society/infrastructure/trade/routing/sea/types"
+import type {
+	AppendSeaRoutesParams,
+	SeaCandidatesParams,
+	SeaNeighborPairsParams,
+	SeaRouteLimitParams,
+} from "@/model/society/infrastructure/trade/routing/sea/types"
 import { ROUTE_SEARCH } from "@/model/society/infrastructure/trade/routing/search"
 import type {
 	RouteWorld,
@@ -15,19 +20,14 @@ import type {
 } from "@/model/society/infrastructure/trade/routing/types"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
 
-export function collectSeaCandidates({
+function collectSeaCandidates({
 	state,
 	settlementRegions,
 	settlementWaterLandmarks,
 	settlementPortRegions,
 	urbanPopulation,
-}: {
-	state: RouteWorld
-	settlementRegions: Int32Array
-	settlementWaterLandmarks: Int32Array
-	settlementPortRegions: Int32Array
-	urbanPopulation: Float32Array
-}): SeaCandidateGroup[] {
+	membership,
+}: SeaCandidatesParams): SeaCandidateGroup[] {
 	const thresholds = routePopulationThresholds(state.era)
 	const groups = new Map<number, SeaCandidateGroup>()
 	const minWaterBodySize =
@@ -43,7 +43,9 @@ export function collectSeaCandidates({
 			portRegion < 0 ||
 			(state.landmarks.size[waterLandmark] ?? 0) < minWaterBodySize ||
 			state.desolate[province] ||
-			population < thresholds.portSettlementMin
+			(membership
+				? !membership[province]
+				: population < thresholds.portSettlementMin)
 		) {
 			continue
 		}
@@ -61,7 +63,7 @@ export function collectSeaCandidates({
 	return [...groups.values()]
 }
 
-export function computeWaterDepthPenalty(state: RouteWorld): Float32Array {
+function computeWaterDepthPenalty(state: RouteWorld): Float32Array {
 	const waterDepth = new Int32Array(state.regionProvince.length).fill(-1)
 	const penalty = new Float32Array(state.regionProvince.length)
 	const queue = new Int32Array(state.regionProvince.length)
@@ -121,11 +123,7 @@ function computeSeaRouteMaxLengthKm({
 	state,
 	sourcePopulation,
 	targetPopulation,
-}: {
-	state: RouteWorld
-	sourcePopulation: number
-	targetPopulation: number
-}): number {
+}: SeaRouteLimitParams): number {
 	const thresholds = routePopulationThresholds(state.era)
 	return sourcePopulation < thresholds.shortRouteMaxPop &&
 		targetPopulation < thresholds.shortRouteMaxPop
@@ -139,13 +137,7 @@ function collectSeaNeighborPairs({
 	candidates,
 	waterDepthPenalty,
 	workspace,
-}: {
-	state: RouteWorld
-	waterLandmark: number
-	candidates: SeaCandidateGroup["candidates"]
-	waterDepthPenalty: Float32Array
-	workspace: SeaNeighborWorkspace
-}): Array<[number, number]> {
+}: SeaNeighborPairsParams): Array<[number, number]> {
 	workspace.stamp++
 	if (workspace.stamp === 0x7fffffff) {
 		workspace.queued.fill(0)
@@ -233,7 +225,7 @@ function collectSeaNeighborPairs({
 		)
 }
 
-export function appendSeaRoutes({
+function appendSeaRoutes({
 	state,
 	candidateGroups,
 	waterDepthPenalty,
@@ -243,14 +235,18 @@ export function appendSeaRoutes({
 	urbanPopulation,
 	planetRadiusKm,
 	routes,
+	work,
 }: AppendSeaRoutesParams): void {
 	for (const { waterLandmark, candidates } of candidateGroups) {
+		const desired = new Set<number>()
+		work.desired.set(waterLandmark, desired)
 		if (candidates.length < 2) continue
 		const candidatePopulation = new Float32Array(candidates.length)
 		for (let i = 0; i < candidates.length; i++) {
 			candidatePopulation[i] =
 				urbanPopulation[candidates[i]?.province ?? -1] ?? 0
 		}
+		const neighborStart = performance.now()
 		const candidatePairs = collectSeaNeighborPairs({
 			state,
 			waterLandmark,
@@ -258,6 +254,7 @@ export function appendSeaRoutes({
 			waterDepthPenalty,
 			workspace: neighborWorkspace,
 		})
+		work.neighborMs += performance.now() - neighborStart
 		const targetIndexScratch = new Int32Array(candidatePairs.length)
 		const targetPortScratch = new Int32Array(candidatePairs.length)
 		const maxLengthScratch = new Float32Array(candidatePairs.length)
@@ -284,6 +281,17 @@ export function appendSeaRoutes({
 					sourcePopulation: sourcePop,
 					targetPopulation: targetPop,
 				})
+				const key = PATHFIND.pairKey({
+					a: source.province,
+					b: target.province,
+					span: state.P,
+				})
+				desired.add(key)
+				if (work.stored.has(key) || (work.rejected.get(key) ?? -1) >= maxLen)
+					continue
+				if (work.rejected.has(key)) work.retried++
+				work.attempted++
+				work.rejected.set(key, maxLen)
 				if (
 					Math.max(
 						UNITS.regionDistanceKm({
@@ -312,6 +320,7 @@ export function appendSeaRoutes({
 				const targetIndex = targetIndexScratch[i] ?? -1
 				const target = candidates[targetIndex]
 				const maxLen = maxLengthScratch[i] ?? 0
+				work.searched++
 				const waterPath = ROUTE_SEARCH.findPath({
 					state,
 					workspace,
@@ -335,6 +344,13 @@ export function appendSeaRoutes({
 					planetRadiusKm,
 				})
 				if (lengthKm > maxLen) continue
+				work.rejected.delete(
+					PATHFIND.pairKey({
+						a: source.province,
+						b: target.province,
+						span: state.P,
+					}),
+				)
 				routes.push({
 					fromProvince: source.province,
 					toProvince: target.province,
@@ -348,13 +364,14 @@ export function appendSeaRoutes({
 					pathRegions,
 					firstEdge: 2,
 					endEdge: pathRegions.length - 1,
+					delta: 1,
 				})
 			}
 		}
 	}
 }
 
-export function createSeaNeighborWorkspace(size: number): SeaNeighborWorkspace {
+function createSeaNeighborWorkspace(size: number): SeaNeighborWorkspace {
 	const distance = new Float32Array(size)
 	return {
 		distance,
@@ -367,4 +384,11 @@ export function createSeaNeighborWorkspace(size: number): SeaNeighborWorkspace {
 		}),
 		stamp: 0,
 	}
+}
+
+export const SEA_ROUTES = {
+	appendSeaRoutes,
+	collectSeaCandidates,
+	computeWaterDepthPenalty,
+	createSeaNeighborWorkspace,
 }

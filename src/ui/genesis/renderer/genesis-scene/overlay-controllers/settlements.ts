@@ -6,19 +6,18 @@ import {
 	buildMapRealSettlements,
 	buildMapSettlements,
 } from "@/ui/genesis/renderer/settlement-overlay"
+import type { SetSettlementsParams } from "@/ui/genesis/renderer/types"
 
 export interface SettlementsControllerDeps {
 	updateOverlayVisibility: () => void
 }
 
-/** Owns the two settlement-dot overlays: the generated-world settlement
- * overlay (settlementLocations/settlementUrbanPop, keyed by region) and the
- * real-EU4-import one (eu4Settlement*, keyed by lat/lon). See
- * plans/genesis-scene-controller-split.md. */
 export function createSettlementsController(
 	ctx: GenesisContext,
 	deps: SettlementsControllerDeps,
 ) {
+	let routeEndpoints: ReadonlySet<number> = new Set()
+	let capitalProvinces: ReadonlySet<number> = new Set()
 	function rebuildSettlementOverlay() {
 		disposeGroup(ctx.globeGroup, ctx.globeSettlements)
 		disposeGroup(ctx.scene, ctx.mapSettlements)
@@ -32,16 +31,20 @@ export function createSettlementsController(
 		) {
 			return
 		}
-		ctx.globeSettlements = buildGlobeSettlements(
-			ctx.currentWorld,
-			ctx.settlementLocations,
-			ctx.settlementUrbanPop,
-			ctx.elevationVisible,
-		)
+		ctx.globeSettlements = buildGlobeSettlements({
+			world: ctx.currentWorld,
+			locations: ctx.settlementLocations,
+			urbanPop: ctx.settlementUrbanPop,
+			elevationVisible: ctx.elevationVisible,
+			routeEndpoints,
+			capitalProvinces,
+		})
 		ctx.mapSettlements = buildMapSettlements({
 			world: ctx.currentWorld,
 			locations: ctx.settlementLocations,
 			urbanPop: ctx.settlementUrbanPop,
+			routeEndpoints,
+			capitalProvinces,
 			centerLongitudeDeg: ctx.currentMapCenterLongitudeDeg,
 			projectionLatitudeDeg: ctx.currentMapProjectionLatitudeDeg,
 		})
@@ -94,7 +97,10 @@ export function createSettlementsController(
 		deps.updateOverlayVisibility()
 	}
 
-	function setSettlements(urbanPop: Float32Array | null) {
+	function setSettlements(params: SetSettlementsParams) {
+		const { urbanPop } = params
+		routeEndpoints = params.routeEndpoints
+		capitalProvinces = params.capitalProvinces
 		if (
 			!urbanPop ||
 			!ctx.currentWorld?.provinces ||

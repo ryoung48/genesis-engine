@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { WIND } from "@/model/climate/weather/wind"
+import { RECORD_ROUTES } from "@/model/history/record/routes"
 import {
 	getHoverBiome,
 	getHoverClimateDisplay,
@@ -236,7 +237,11 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		return buildNationDynastyLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
 	const settlementLabelsArray = useMemo(() => {
-		return buildSettlementLabelNames(worldForDisplay, worldNames)
+		return buildSettlementLabelNames({
+			world: worldForDisplay,
+			resolvers: worldNames,
+			routeEndpoints: RECORD_ROUTES.packedEndpoints(worldForDisplay?.routes),
+		})
 	}, [worldForDisplay, worldNames])
 	const cultureLabelsArray = useMemo(() => {
 		return buildCultureLabelNames(worldForDisplay, worldNames)

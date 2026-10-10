@@ -5,4 +5,5 @@ export interface RecordPathParams {
 	pathRegions: ArrayLike<number>
 	firstEdge: number
 	endEdge: number
+	delta: number
 }

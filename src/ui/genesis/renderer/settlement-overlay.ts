@@ -1,32 +1,18 @@
 ﻿import * as THREE from "three"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import type {
 	BuildGlobeRealSettlementsParams,
+	BuildGlobeSettlementsParams,
 	BuildMapRealSettlementsParams,
 	BuildMapSettlementsParams,
+	SettlementExistsParams,
 } from "@/ui/genesis/renderer/types"
 
-/** Stable id for a procedural settlement, shared between its marker (here)
- * and its label (settlement-labels.ts) so marker-driven culling (see
- * settlement-marker-collision.ts) can find its matching label. Keyed by
- * compact province index `p`, since procedural settlements are built one
- * per province in that same loop on both the marker and label side. Not
- * the province id itself: today there's exactly one settlement per
- * province, but if that ever changes, only this function's implementation
- * needs to change, not every marker/label builder that calls it. */
 export function settlementId(p: number): string {
 	return `p${p}`
 }
 
-/** Stable id for a real-Earth-import (GHSL) settlement -- same purpose as
- * settlementId() above, but keyed by the raw GHSL settlement array index
- * (see BuildGlobeRealSettlementsParams.indices) instead of a compact
- * province index, since that's the index space
- * buildGlobeRealSettlements/buildMapRealSettlements actually iterate over.
- * Distinct prefix from settlementId() so the two index spaces (both
- * small integers starting at 0) can't collide in a shared visibility map. */
 export function ghslSettlementId(i: number): string {
 	return `g${i}`
 }
@@ -97,7 +83,7 @@ function drawFilledCircle(
 
 // Two fixed patterns: a plain white circle for ordinary settlements, and a
 // black dot inside a black-outlined circle for capitals -- see
-// GenesisView.tsx's/nation seeds' capitalProvinceIds for how "capital" is
+// The selected history frame supplies capital provinces; this is how "capital" is
 // determined. Built once and reused by every marker (globe, map, procedural,
 // and EU4-import alike).
 let _normalTexture: THREE.CanvasTexture | undefined
@@ -132,42 +118,23 @@ function textureFor(isCapital: boolean): THREE.CanvasTexture {
 	return isCapital ? capitalTexture() : normalTexture()
 }
 
-function collectCapitalProvinces(
-	world: SerializedGenesisWorld,
-	locationsLength: number,
-): Set<number> {
-	const capitals = new Set<number>()
-	const seeds = world.nations?.seeds
-	if (!seeds) return capitals
-	for (let i = 0; i < seeds.length; i++) {
-		const province = seeds[i]
-		if (province >= 0 && province < locationsLength) capitals.add(province)
-	}
-	return capitals
+function settlementExists({
+	pop,
+	era,
+	province,
+	routeEndpoints,
+}: SettlementExistsParams): boolean {
+	return (
+		routeEndpoints.has(province) ||
+		pop >= SETTLEMENT_TUNING.getSettlementRenderThresholds(era)[0]
+	)
 }
 
-/** Minimum population for a settlement to be rendered at all -- the lowest
- * of SETTLEMENT_TUNING's era-scaled render thresholds. Existence only:
- * doesn't affect marker size, which is fixed (GLOBE_MARKER_SCALE/
- * MAP_MARKER_RADIUS). */
-function settlementExists(
-	pop: number,
-	era: SerializedGenesisWorld["params"]["era"] | undefined,
-): boolean {
-	return pop >= SETTLEMENT_TUNING.getSettlementRenderThresholds(era)[0]
-}
-
-export function globeScaleForPop(
-	_pop: number,
-	_era?: SerializedGenesisWorld["params"]["era"],
-): number {
+export function globeScaleForPop(): number {
 	return GLOBE_MARKER_SCALE
 }
 
-export function mapRadiusForPop(
-	_pop: number,
-	_era?: SerializedGenesisWorld["params"]["era"],
-): number {
+export function mapRadiusForPop(): number {
 	return MAP_MARKER_RADIUS
 }
 
@@ -197,24 +164,33 @@ function settlementPositionGlobe(
 	return [nx * radius, ny * radius, nz * radius]
 }
 
-export function buildGlobeSettlements(
-	world: SerializedGenesisWorld,
-	locations: Int32Array,
-	urbanPop: Float32Array,
-	elevationVisible: boolean,
-): THREE.Group {
+export function buildGlobeSettlements({
+	world,
+	locations,
+	urbanPop,
+	elevationVisible,
+	routeEndpoints,
+	capitalProvinces,
+}: BuildGlobeSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces) return group
 
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
-	const capitalProvinces = collectCapitalProvinces(world, locations.length)
 
 	for (let p = 0; p < locations.length; p++) {
 		const r = locations[p]
 		if (r < 0) continue
 		const pop = urbanPop[p] ?? 0
-		if (!settlementExists(pop, world.params?.era)) continue
+		if (
+			!settlementExists({
+				pop,
+				era: world.params?.era,
+				province: p,
+				routeEndpoints,
+			})
+		)
+			continue
 
 		const [px, py, pz] = settlementPositionGlobe(
 			r_xyz,
@@ -277,6 +253,8 @@ export function buildMapSettlements({
 	urbanPop,
 	centerLongitudeDeg,
 	projectionLatitudeDeg,
+	routeEndpoints,
+	capitalProvinces,
 }: BuildMapSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces) return group
@@ -287,7 +265,6 @@ export function buildMapSettlements({
 	)
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
-	const capitalProvinces = collectCapitalProvinces(world, locations.length)
 	// Wrap-around copies are built as flat siblings here (matching
 	// buildMapSettlementLabels' wrapOffsets), NOT via addMapSlideClones --
 	// that helper deep-clones the whole group as a single child subtree,
@@ -300,7 +277,15 @@ export function buildMapSettlements({
 		const r = locations[p]
 		if (r < 0) continue
 		const pop = urbanPop[p] ?? 0
-		if (!settlementExists(pop, world.params?.era)) continue
+		if (
+			!settlementExists({
+				pop,
+				era: world.params?.era,
+				province: p,
+				routeEndpoints,
+			})
+		)
+			continue
 
 		const [px, py, pz] = settlementPositionMap(projection, r_xyz, elevation, r)
 		const isCapital = capitalProvinces.has(p)
@@ -336,8 +321,7 @@ export function buildMapSettlements({
 // ── Real (EU4-import) settlements: positioned by raw lon/lat, not the
 // procedural mesh's province regions -- see eu4-nation-border-overlay.ts for
 // the same lon/lat-direct convention used for border vectors. Capital
-// styling reuses world.nations.seeds the same way the procedural overlay's
-// collectCapitalProvinces does -- see GenesisView.tsx's capitalProvinceIds
+// styling uses capitalProvinceIds supplied for the selected history frame
 // (raw EU4 ids, not compact indices, since these settlements are matched to
 // provinces by raw id). Reuses the same fixed-pattern textures as the
 // procedural overlay for a consistent look. ────────────────────────────────

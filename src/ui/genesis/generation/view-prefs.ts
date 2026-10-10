@@ -137,6 +137,7 @@ const SOCIETY_MAP_MODES = new Set<SocietyMapMode>([
 	"density",
 	"urban",
 	"development",
+	"knowledge",
 	"culture",
 	"heritage",
 	"religion",

@@ -51,6 +51,8 @@ The model distributes the target urban population among ranked cities. Rank one 
 
 The same city-target function (`URBANIZATION.cityTargets`, including the knowledge-based size cap and redistribution) is used at world generation and at every census. At initialization, provinces jump directly to their city targets. At later censuses, urban population moves by at most 10% of the gap to the target and at most 3% of the greater of its current urban population or 1,000 per year. The realm's rural population is scaled in the opposite direction to account for those migrants. Thus urbanization can rise or fall without treating every urban resident as a new person.
 
+Urban population sets [road-network membership](../mechanics/road-network.md) on ten-year batches, with a 70% release threshold and two-batch dwell; route endpoints keep settlement markers and labels even below `townMin`.
+
 ## Knowledge growth and diffusion
 
 Knowledge grows through a province's own development and contact with more knowledgeable neighbors:
@@ -70,6 +72,10 @@ Cities spread some development into neighboring provinces. A same-realm hop reta
 Knowledge supplies a further floor: 0.05 at knowledge 1, 0.10 at 2, 0.25 at 3, and 0.45 at 4, with interpolation. The development target is the highest of local urban development, city-spread development, and this floor. At each census, current development closes 10% of a positive gap to the target or 5% of a negative gap. The initial development, calculated at generation, is set directly from cities, before the knowledge floor is applied.
 
 Development is therefore an **intensity** associated with settlement, nearby cities, and knowledge. The current live value is not multiplied by province area. A larger province does not automatically have more development points than a smaller province with the same local value. Any future conversion into area-total units, such as EU4-style province development, is a separate calculation.
+
+## Knowledge map
+
+In Society → Development, select Knowledge in the map controls. The map uses a relative yellow-to-purple scale for each selected frame: the lowest knowledge among non-desolate provinces is yellow and the highest is purple. Desolate provinces are excluded from the range. When all values are equal, they use the palette's midpoint. Colors show relative standing within a year rather than absolute progress between years. Hovering a province shows its actual knowledge to two decimal places. Annual census snapshots retain knowledge alongside population and development, so scrubbing the timeline displays knowledge for the selected year. This mode is available for procedural histories; Earth imports have no simulated knowledge.
 
 ## Economic output
 

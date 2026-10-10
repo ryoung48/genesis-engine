@@ -18,6 +18,8 @@ import type {
 } from "@/test/history-run/report/people-opinion/types"
 import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
 import type { CharacterReport } from "@/test/history-run/report/people-traits/types"
+import type { RoadsReport } from "@/test/history-run/report/roads/types"
+import type { SettlementChangeReport } from "@/test/history-run/report/settlement-change/types"
 
 export interface HistoryReportOptions {
 	characterStage: CharacterStage
@@ -52,6 +54,8 @@ import type { PEOPLE_MARRIAGE_REPORT } from "@/test/history-run/report/people-ma
 import type { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
 
 export interface CenturyReport {
+	roads: RoadsReport
+	settlementChange: SettlementChangeReport
 	marriageDemography: ReturnType<typeof PEOPLE_MARRIAGE_REPORT.demography>
 	inbreeding: ReturnType<typeof PEOPLE_TRAITS_REPORT.inbreeding>
 	from: number
@@ -133,6 +137,8 @@ export interface PeopleReport {
 	// Share of those rulers with no child alive at their death.
 	childlessShare: number
 	newHouseShare: number
+	hereditarySuccessions: number
+	hereditaryNewHouseShare: number
 	minorShare: number
 	childbirthDeaths: number
 	twinBirths: number

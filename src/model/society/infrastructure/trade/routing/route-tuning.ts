@@ -2,6 +2,8 @@ import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SocietyEra } from "@/model/society/types"
 
 export const ROUTE_TUNING = {
+	batchIntervalYears: 10,
+	membership: { releaseShare: 0.7, minDwellBatches: 2 },
 	search: {
 		costScale: 4,
 		landBucketCount: 5,

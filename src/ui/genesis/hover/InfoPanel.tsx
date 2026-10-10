@@ -355,6 +355,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		"density",
 		"urban",
 		"development",
+		"knowledge",
 		"culture",
 		"religion",
 	]

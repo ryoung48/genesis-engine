@@ -1,6 +1,7 @@
 import type { LonLat } from "@/model/history/earth/types"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
+import { RECORD_ROUTES } from "@/model/history/record/routes"
 import type {
 	HistoryRecord,
 	HistoryState,
@@ -210,6 +211,7 @@ function buildProceduralRecord(
 			diplomacy: [],
 			organizationEvents,
 			censuses: [],
+			roads: RECORD_ROUTES.create(),
 			titleEvents: [],
 			raids: [],
 		},

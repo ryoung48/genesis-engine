@@ -27,10 +27,7 @@ import type {
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
-import type {
-	Route,
-	RouteEdge,
-} from "@/model/society/infrastructure/transport/types"
+import type { RouteState } from "@/model/society/infrastructure/trade/routing/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
@@ -309,8 +306,8 @@ export interface HistoryState {
 	people: PeopleState
 	heap: EventHeap
 	leaderRuntime: LeaderRuntime
-	routes: Route[]
-	network: RouteEdge[]
+	roads: RouteState | null
+	roadsLastBatchTime: number
 	landmarks: GenesisLandmarks
 }
 

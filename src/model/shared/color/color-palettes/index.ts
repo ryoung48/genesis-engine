@@ -75,6 +75,8 @@ const plasmaStops = palette(
 	"#f0f921",
 )
 
+const knowledgeStops = plasmaStops.slice(1).toReversed()
+
 const spectralStops = palette(
 	"#5e4fa2",
 	"#3288bd",
@@ -95,5 +97,6 @@ export const COLOR_PALETTES = {
 	purplesStops,
 	ylOrRdStops,
 	plasmaStops,
+	knowledgeStops,
 	spectralStops,
 }

@@ -446,6 +446,15 @@ export function migrationColor(
 	return [last.r, last.g, last.b]
 }
 
+export function knowledgeColor(t: number): [number, number, number] {
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleColorStops({
+			stops: COLOR_PALETTES.knowledgeStops,
+			t: Math.max(0, Math.min(1, t)),
+		}),
+	)
+}
+
 export function developmentColor(t: number): [number, number, number] {
 	return COLOR_INTERPOLATION.quantizeRgb(
 		COLOR_INTERPOLATION.sampleColorStops({

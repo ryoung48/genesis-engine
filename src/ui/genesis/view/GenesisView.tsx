@@ -88,6 +88,7 @@ import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import { SolarSystemControls } from "@/ui/genesis/solar-system/SolarSystemControls"
 import { useSolarSystemBodies } from "@/ui/genesis/solar-system/useSolarSystemBodies"
 import { useSolarSystemView } from "@/ui/genesis/solar-system/useSolarSystemView"
+import { ROAD_DISPLAY } from "@/ui/genesis/view/road-display"
 import type { WorldWindStatsCache } from "@/ui/genesis/view/types"
 import { useGenesisSceneSync } from "@/ui/genesis/view/useGenesisSceneSync"
 import { useMapColoring } from "@/ui/genesis/view/useMapColoring"
@@ -718,8 +719,14 @@ export const GenesisView: React.FC<{
 					population,
 					totalPopulation: frame.totalPopulation,
 				},
+				...ROAD_DISPLAY.of({
+					world: displayWorld,
+					frame,
+					visible: showInfrastructure,
+				}),
 				urbanPopulation: frame.provincePopulationUrban,
 				development: frame.provinceDevelopment,
+				knowledge: frame.provinceKnowledge,
 			}
 		}
 		const displayProvinces = attachEarthProvinceAreas({
@@ -833,6 +840,7 @@ export const GenesisView: React.FC<{
 		eu4ProvinceSettlements,
 		history.selectedTimeMs,
 		history.query,
+		showInfrastructure,
 	])
 	useEffect(() => {
 		let cancelled = false
@@ -2222,6 +2230,7 @@ export const GenesisView: React.FC<{
 								nationMode={nationMode}
 								setNationMode={setNationMode}
 								populationMode={populationMode}
+								setPopulationMode={setSocietyMode}
 								religionMode={religionMode}
 								setReligionMode={setReligionMode}
 								labelMode={labelMode}

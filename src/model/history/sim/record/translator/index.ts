@@ -1,5 +1,6 @@
 import { DATE } from "@/model/history/earth/date"
 import { PEOPLE_RECORD } from "@/model/history/record/people"
+import { RECORD_ROUTES } from "@/model/history/record/routes"
 import type {
 	BattleContribution,
 	HistoryEvent,
@@ -1190,12 +1191,19 @@ function applyTransaction({
 		log.events.push(entry)
 		translator.rulerEntries.set(ruler.person, entry)
 	}
+	if (transaction.roads)
+		RECORD_ROUTES.apply({
+			log: record.events.roads,
+			roads: transaction.roads,
+			timeMs,
+		})
 	if (transaction.census)
 		record.events.censuses.push({
 			timeMs,
 			urban: transaction.census.urban,
 			rural: transaction.census.rural,
 			development: transaction.census.development,
+			knowledge: transaction.census.knowledge,
 			economy: {
 				...transaction.census.economy,
 				nations: Int32Array.from(transaction.census.economy.nations, (root) =>

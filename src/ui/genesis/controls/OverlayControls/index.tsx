@@ -19,6 +19,7 @@ import { ClimateModeSection } from "./ClimateModeSection"
 import { ClimateToggleSection } from "./ClimateToggleSection"
 import { ClockSection } from "./ClockSection"
 import { DangerSection } from "./DangerSection"
+import { DevelopmentModeSection } from "./DevelopmentModeSection"
 import { ElevationModeSection } from "./ElevationModeSection"
 import { GeographySection } from "./GeographySection"
 import { GridSection } from "./GridSection"
@@ -85,6 +86,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	nationMode,
 	setNationMode,
 	populationMode,
+	setPopulationMode,
 	religionMode,
 	setReligionMode,
 	labelMode,
@@ -384,6 +386,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setNationMode={setNationMode}
 									nationsExpanded={nationsExpanded}
 									setNationsExpanded={setNationsExpanded}
+								/>
+								<DevelopmentModeSection
+									colorMode={colorMode}
+									societyMode={populationMode}
+									setSocietyMode={setPopulationMode}
+									isEarthImport={isEarthImport}
 								/>
 								<ReligionModeSection
 									colorMode={colorMode}

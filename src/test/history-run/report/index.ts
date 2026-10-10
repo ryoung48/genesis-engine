@@ -14,6 +14,7 @@ import { HEALTH } from "@/model/history/sim/people/health"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { PeoplePacket } from "@/model/history/sim/people/log/types"
 import { ERAS } from "@/model/society/eras"
+import { ROUTE_TUNING } from "@/model/society/infrastructure/trade/routing/route-tuning"
 import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
@@ -42,6 +43,8 @@ import type { PeopleRecordReport } from "@/test/history-run/report/people-record
 import { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
 import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
 import { RELIGION_REPORT } from "@/test/history-run/report/religion"
+import { ROADS_REPORT } from "@/test/history-run/report/roads"
+import { SETTLEMENT_CHANGE_REPORT } from "@/test/history-run/report/settlement-change"
 import type {
 	BetrothalOutcome,
 	CenturyReport,
@@ -231,6 +234,8 @@ function peopleReport({
 	let births = 0
 	let childless = 0
 	let newHouse = 0
+	let hereditary = 0
+	let hereditaryNewHouse = 0
 	let minor = 0
 	for (const note of successions) {
 		const dying = note.data.dying as number
@@ -243,6 +248,10 @@ function peopleReport({
 		)
 			childless++
 		if (note.data.claim === 0) newHouse++
+		if (note.data.system === "single_heir") {
+			hereditary++
+			if (note.data.claim === 0) hereditaryNewHouse++
+		}
 		if (minors.has(`${note.data.nation}:${note.data.successor}`)) minor++
 	}
 	const childbirthDeaths = childbirthDeathTimes.filter(
@@ -266,6 +275,8 @@ function peopleReport({
 		birthsPerRuler: births / count,
 		childlessShare: childless / count,
 		newHouseShare: newHouse / count,
+		hereditarySuccessions: hereditary,
+		hereditaryNewHouseShare: hereditaryNewHouse / Math.max(1, hereditary),
 		minorShare: minor / count,
 		childbirthDeaths,
 		twinBirths,
@@ -541,6 +552,8 @@ function runSeed({
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	const start = Math.round(engine.time / STATE.yearMs)
 	const reports: CenturyReport[] = []
+	const settlementChanges = SETTLEMENT_CHANGE_REPORT.create(engine)
+	let roadCursor = 0
 	let from = start
 	let startSovereigns = sovereigns({ engine }).length
 	let atWarYears = 0
@@ -606,6 +619,12 @@ function runSeed({
 				rng,
 				validate: false,
 			})
+			if ((year - start) % ROUTE_TUNING.batchIntervalYears === 0)
+				SETTLEMENT_CHANGE_REPORT.sample({
+					tracker: settlementChanges,
+					engine,
+					year,
+				})
 			householdSamples.push({
 				timeMs: year * STATE.yearMs,
 				sovereigns: new Set(sovereigns({ engine })),
@@ -693,6 +712,12 @@ function runSeed({
 					war.startTime < year * STATE.yearMs,
 			).length
 			reports.push({
+				roads: ROADS_REPORT.of({ engine, fromBatch: roadCursor }),
+				settlementChange: SETTLEMENT_CHANGE_REPORT.of({
+					tracker: settlementChanges,
+					from,
+					to: year,
+				}),
 				from,
 				to: year,
 				sovereigns: endSovereigns.length,
@@ -777,6 +802,7 @@ function runSeed({
 					divideMs,
 				}),
 			})
+			roadCursor = engine.roads?.batch ?? 0
 			if (year === start + options.years)
 				diagnostics.partitionTotal = PARTITION_REPORT.summarize({
 					engine,

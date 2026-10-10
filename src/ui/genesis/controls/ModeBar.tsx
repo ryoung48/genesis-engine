@@ -129,7 +129,9 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				options={societyOptions}
 				value={
 					getBaseMapMode(colorMode) === "population"
-						? societyMode
+						? societyMode === "knowledge"
+							? "development"
+							: societyMode
 						: colorMode === "timezone"
 							? "timezone"
 							: isTitlesNationMode(nationMode)
@@ -145,6 +147,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						mode === "density" ||
 						mode === "urban" ||
 						mode === "development" ||
+						mode === "knowledge" ||
 						mode === "culture" ||
 						mode === "heritage" ||
 						mode === "religion" ||

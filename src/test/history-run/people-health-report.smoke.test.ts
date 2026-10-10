@@ -232,6 +232,7 @@ it("folds deaths, conditions, causes and command into each window by hand count"
 				people: packet,
 				notes: [],
 				census: null,
+				roads: null,
 			}),
 		),
 	})

@@ -2,6 +2,7 @@ import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
 import { PERSON_NAMES } from "@/model/history/record/people/names"
+import { RECORD_ROUTES } from "@/model/history/record/routes"
 import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
 	Battle,
@@ -256,6 +257,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 			}, [])
 			.sort((a, b) => a.timeMs - b.timeMs),
 		censuses: [],
+		roads: RECORD_ROUTES.create(),
 		titleEvents: [],
 		raids: [],
 	}
@@ -715,6 +717,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 	const provincePopulation = census?.rural ?? new Float32Array(count)
 	const provincePopulationUrban = census?.urban ?? new Float32Array(count)
 	const provinceDevelopment = census?.development ?? new Float32Array(count)
+	const provinceKnowledge = census?.knowledge ?? new Float32Array(count)
 	let totalPopulation = 0
 	for (let province = 0; province < count; province++)
 		totalPopulation +=
@@ -722,6 +725,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 	return {
 		timeMs,
 		provinceCount: count,
+		routes: RECORD_ROUTES.at({ log: record.events.roads, timeMs }),
 		provinceNation,
 		provinceParent,
 		provinceController,
@@ -732,6 +736,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provincePopulation,
 		provincePopulationUrban,
 		provinceDevelopment,
+		provinceKnowledge,
 		economy: census?.economy ?? null,
 		titles: record.titles
 			? TITLE_RECORD.fold({

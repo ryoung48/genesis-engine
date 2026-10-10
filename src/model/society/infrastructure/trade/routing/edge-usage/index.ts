@@ -7,6 +7,7 @@ function recordPath({
 	pathRegions,
 	firstEdge,
 	endEdge,
+	delta,
 }: RecordPathParams): void {
 	for (let edge = firstEdge; edge < endEdge; edge++) {
 		const a = pathRegions[edge - 1]
@@ -16,7 +17,7 @@ function recordPath({
 			const to = direction === 0 ? b : a
 			for (let slot = adjOffset[from]; slot < adjOffset[from + 1]; slot++) {
 				if (adjList[slot] !== to) continue
-				counts[slot]++
+				counts[slot] += delta
 				break
 			}
 		}

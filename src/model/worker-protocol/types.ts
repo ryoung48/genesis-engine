@@ -223,6 +223,8 @@ export interface SerializedGenesisWorld {
 		realNames?: (string | null)[]
 		count: number
 	}
+	// [JUSTIFICATION] Knowledge is supplied by procedural history frames, not generation or Earth imports.
+	knowledge?: Float32Array
 	development?: Float32Array
 	urbanPopulation?: Float32Array
 	population?: {

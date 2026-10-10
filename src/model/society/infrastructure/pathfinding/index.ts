@@ -7,7 +7,9 @@ import type {
 	PathfindGraph,
 	PathfindParams,
 	PathfindResult,
+	ProjectionRegions,
 	SearchWorkspace,
+	TangentProjectionParams,
 } from "@/model/society/infrastructure/pathfinding/types"
 
 const LAND_SPEED_KM_PER_DAY = 30
@@ -371,15 +373,13 @@ export const PATHFIND = {
 	pathfind,
 	pairKey,
 	tangentProjectFlat,
+	centroid,
 }
 
-function tangentProjectFlat({
+function centroid({
 	regions,
 	r_xyz,
-}: {
-	regions: Int32Array | number[]
-	r_xyz: Float32Array
-}): Float64Array {
+}: ProjectionRegions): [number, number, number] {
 	let cx = 0
 	let cy = 0
 	let cz = 0
@@ -392,6 +392,15 @@ function tangentProjectFlat({
 	cx /= clen
 	cy /= clen
 	cz /= clen
+
+	return [cx, cy, cz]
+}
+function tangentProjectFlat({
+	regions,
+	r_xyz,
+	center,
+}: TangentProjectionParams): Float64Array {
+	const [cx, cy, cz] = center
 
 	let ax = 0
 	let ay = 0

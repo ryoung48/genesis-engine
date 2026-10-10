@@ -118,6 +118,9 @@ it("builds the same complete record while releasing translated journal batches",
 	const all = queue.slice()
 	JOURNAL.releaseSent(engine)
 	SIM_RECORD.consumeJournal({ translator, transactions: queue })
+	expect(streamed.record.events.censuses[0].knowledge).toEqual(
+		engine.knowledgeCurrent,
+	)
 	expect(queue).toHaveLength(0)
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 	for (let year = 1; year <= 20; year++) {
@@ -151,6 +154,7 @@ it("builds the same complete record while releasing translated journal batches",
 			expect(frame.provincePopulation).toBe(census.rural)
 			expect(frame.provincePopulationUrban).toBe(census.urban)
 			expect(frame.provinceDevelopment).toBe(census.development)
+			expect(frame.provinceKnowledge).toBe(census.knowledge)
 		}
 	}
 })

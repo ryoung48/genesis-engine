@@ -1,5 +1,6 @@
 import type { CensusEconomy } from "@/model/history/record/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
+import type { Route } from "@/model/society/infrastructure/transport/types"
 
 export interface Ruler {
 	name: string
@@ -79,6 +80,7 @@ export interface NationEconomy {
 }
 
 export interface WorldFrame {
+	routes: Route[]
 	timeMs: number
 	provinceCount: number
 	provinceNation: Int32Array
@@ -91,6 +93,7 @@ export interface WorldFrame {
 	provincePopulation: Float32Array
 	provincePopulationUrban: Float32Array
 	provinceDevelopment: Float32Array
+	provinceKnowledge: Float32Array
 	// [JUSTIFICATION] Earth records carry no census, so they have no economy.
 	economy: CensusEconomy | null
 	// [JUSTIFICATION] Earth frames have no de jure title layer.

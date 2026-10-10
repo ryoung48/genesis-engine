@@ -247,6 +247,7 @@ function run(options: HistoryRunOptions): HistoryRunSummary {
 }
 
 export const HISTORY_RUN = {
+	build,
 	optionsFromEnv,
 	run,
 	createEngine,

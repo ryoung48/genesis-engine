@@ -2,7 +2,12 @@ import { UNITS } from "@/model/shared/units"
 import { URQUHART } from "@/model/shared/urquhart"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
 import { EDGE_USAGE } from "@/model/society/infrastructure/trade/routing/edge-usage"
-import type { AppendLandRoutesParams } from "@/model/society/infrastructure/trade/routing/land/types"
+import type {
+	AppendLandRoutesParams,
+	LandCandidatesParams,
+	ProvinceLandClustersParams,
+	PushLandCandidateParams,
+} from "@/model/society/infrastructure/trade/routing/land/types"
 import {
 	ROUTE_TUNING,
 	routePopulationThresholds,
@@ -16,7 +21,7 @@ import type {
 } from "@/model/society/infrastructure/trade/routing/types"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
 
-export function computeLandPassableMask(state: RouteWorld): Uint8Array {
+function computeLandPassableMask(state: RouteWorld): Uint8Array {
 	const mask = new Uint8Array(state.regionProvince.length)
 	for (let region = 0; region < state.regionProvince.length; region++) {
 		const province = state.regionProvince[region]
@@ -32,13 +37,10 @@ export function computeLandPassableMask(state: RouteWorld): Uint8Array {
 	return mask
 }
 
-export function computeProvinceLandClusters({
+function computeProvinceLandClusters({
 	state,
 	landPassable,
-}: {
-	state: RouteWorld
-	landPassable: Uint8Array
-}): Int32Array {
+}: ProvinceLandClustersParams): Int32Array {
 	const regionCluster = new Int32Array(state.regionProvince.length).fill(-1)
 	const provinceCluster = new Int32Array(state.P).fill(-1)
 	const queue = new Int32Array(state.regionProvince.length)
@@ -77,17 +79,13 @@ export function computeProvinceLandClusters({
 	return provinceCluster
 }
 
-export function collectLandCandidatesByKind({
+function collectLandCandidatesByKind({
 	state,
 	settlementRegions,
 	provinceClusters,
 	urbanPopulation,
-}: {
-	state: RouteWorld
-	settlementRegions: Int32Array
-	provinceClusters: Int32Array
-	urbanPopulation: Float32Array
-}): LandCandidateGroupsByKind {
+	membership,
+}: LandCandidatesParams): LandCandidateGroupsByKind {
 	const thresholds = routePopulationThresholds(state.era)
 	const majorGroups = new Map<number, LandCandidateGroup>()
 	const minorGroups = new Map<number, LandCandidateGroup>()
@@ -104,7 +102,9 @@ export function collectLandCandidatesByKind({
 			landmark < 0 ||
 			(state.landmarks.size[landmark] ?? 0) < minLandBodySize ||
 			state.desolate[province] ||
-			population <= thresholds.minorSettlementMin
+			(membership
+				? !membership[0][province] && !membership[1][province]
+				: population < thresholds.minorSettlementMin)
 		) {
 			continue
 		}
@@ -113,14 +113,19 @@ export function collectLandCandidatesByKind({
 			province,
 			region,
 		}
-		pushLandCandidate({
-			groups: minorGroups,
-			groupKey,
-			cluster,
-			landmark,
-			candidate,
-		})
-		if (population > thresholds.majorSettlementMin) {
+		if (!membership || membership[1][province])
+			pushLandCandidate({
+				groups: minorGroups,
+				groupKey,
+				cluster,
+				landmark,
+				candidate,
+			})
+		if (
+			membership
+				? membership[0][province]
+				: population > thresholds.majorSettlementMin
+		) {
 			pushLandCandidate({
 				groups: majorGroups,
 				groupKey,
@@ -142,13 +147,7 @@ function pushLandCandidate({
 	cluster,
 	landmark,
 	candidate,
-}: {
-	groups: Map<number, LandCandidateGroup>
-	groupKey: number
-	cluster: number
-	landmark: number
-	candidate: RouteCandidate
-}): void {
+}: PushLandCandidateParams): void {
 	const group = groups.get(groupKey)
 	if (group) {
 		group.candidates.push(candidate)
@@ -161,7 +160,7 @@ function pushLandCandidate({
 	})
 }
 
-export function appendLandRoutes({
+function appendLandRoutes({
 	state,
 	kind,
 	candidateGroups,
@@ -172,12 +171,17 @@ export function appendLandRoutes({
 	provincePairSpan,
 	blockedPairs,
 	routes,
+	work,
+	centers,
 }: AppendLandRoutesParams): void {
 	const maxLengthKm =
 		kind === TRANSPORT.ROUTE_LAND_MAJOR
 			? ROUTE_TUNING.land.majorMaxLengthKm
 			: ROUTE_TUNING.land.minorMaxLengthKm
 	for (const { cluster, landmark, candidates } of candidateGroups) {
+		const groupKey = landmark * Math.max(1, state.P) + cluster
+		const desired = new Set<number>()
+		work.desired.set(groupKey, desired)
 		if (candidates.length < 2) continue
 		const groupId = landmark * state.regionProvince.length + cluster
 		const candidateRegions = new Int32Array(candidates.length)
@@ -187,6 +191,7 @@ export function appendLandRoutes({
 		const points = PATHFIND.tangentProjectFlat({
 			regions: candidateRegions,
 			r_xyz: state.r_xyz,
+			center: centers.get(groupKey) as readonly [number, number, number],
 		})
 		const candidatePairs = URQUHART.buildUrquhartEdgesFromFlat(points).sort(
 			([sourceA, targetA], [sourceB, targetB]) =>
@@ -201,6 +206,15 @@ export function appendLandRoutes({
 				span: provincePairSpan,
 			})
 			if (blockedPairs.has(provincePairKey)) continue
+			desired.add(provincePairKey)
+			if (
+				work.stored.has(provincePairKey) ||
+				(work.rejected.get(provincePairKey) ?? -1) >= maxLengthKm
+			)
+				continue
+			if (work.rejected.has(provincePairKey)) work.retried++
+			work.attempted++
+			work.rejected.set(provincePairKey, maxLengthKm)
 			if (
 				UNITS.regionDistanceKm({
 					r_xyz: state.r_xyz,
@@ -211,6 +225,7 @@ export function appendLandRoutes({
 			) {
 				continue
 			}
+			work.searched++
 			const pathRegions = ROUTE_SEARCH.findPath({
 				state,
 				workspace,
@@ -232,6 +247,7 @@ export function appendLandRoutes({
 			) {
 				continue
 			}
+			work.rejected.delete(provincePairKey)
 			routes.push({
 				fromProvince: source.province,
 				toProvince: target.province,
@@ -245,7 +261,15 @@ export function appendLandRoutes({
 				pathRegions,
 				firstEdge: 1,
 				endEdge: pathRegions.length,
+				delta: 1,
 			})
 		}
 	}
+}
+
+export const LAND_ROUTES = {
+	appendLandRoutes,
+	collectLandCandidatesByKind,
+	computeLandPassableMask,
+	computeProvinceLandClusters,
 }

@@ -104,10 +104,10 @@ try {
                 result.routes = computation.routes.length
                 result.edges = computation.network.length
                 result.byKind = Object.fromEntries([0, 1, 2].map(kind => [kind, computation.routes.filter(route => route.kind === kind).length]))
-                if (variant === variants[0]) reference = computation
+                if (variant === variants[0]) reference = process.env.ROUTE_PREVIOUS_ROUTES ? JSON.parse(readFileSync(process.env.ROUTE_PREVIOUS_ROUTES, "utf8")) : computation
                 const original = new Map(reference.routes.map(route => [`${route.kind}:${route.fromProvince}:${route.toProvince}`, route.pathRegions]))
                 const currentPairs = new Set(computation.routes.map(route => `${route.kind}:${route.fromProvince}:${route.toProvince}`))
-                result.changedPaths = computation.routes.filter(route => JSON.stringify(route.pathRegions) !== JSON.stringify(original.get(`${route.kind}:${route.fromProvince}:${route.toProvince}`))).length
+                result.changedPaths = computation.routes.filter(route => original.has(`${route.kind}:${route.fromProvince}:${route.toProvince}`) && JSON.stringify(route.pathRegions) !== JSON.stringify(original.get(`${route.kind}:${route.fromProvince}:${route.toProvince}`))).length
                 result.removedRoutes = [...original.keys()].filter(key => !currentPairs.has(key)).length
                 result.addedRoutes = [...currentPairs].filter(key => !original.has(key)).length
             }
@@ -115,19 +115,22 @@ try {
             console.info(`${variant} ${repetition + 1}/${repetitions}: ${sample.ms.toFixed(1)}ms`)
         }
     }
+    const production = modules.production.computeRoutes({ world, inputs })
+    writeFileSync(`${output}/routes.json`, JSON.stringify(production))
+    if (!process.env.ROUTE_WORLD && world.routes) assert.equal(fingerprint(production), fingerprint(world.routes), "Generated routes equal the direct build")
     if (process.env.ROUTE_EXPECTED_REPORT) {
         const expected = JSON.parse(readFileSync(process.env.ROUTE_EXPECTED_REPORT))
         assert.equal(expected.seed, seed)
         assert.equal(expected.points, world.params.numPoints)
-        assert.equal(results.production.hash, expected.results.bidirectional.hash, "Production must match the tested unrestricted bidirectional output")
+        assert.equal(results.production.hash, expected.results.production.hash, "Production must match the tested unrestricted bidirectional output")
     }
-    const { computeLandPassableMask, computeProvinceLandClusters } = await server.ssrLoadModule(`/${root}/land/index.ts`)
+    const { LAND_ROUTES } = await server.ssrLoadModule(`/${root}/land/index.ts`)
     const state = { P: world.provinces.count, era: world.params.era, desolate: world.provinces.desolate,
         stateless: Uint8Array.from(world.nations.sovereign, (owner, province) => !world.provinces.desolate[province] && owner < 0 ? 1 : 0),
         regionProvince: world.provinces.regionProvince, regionAdjOffset: world.mesh.adjOffset,
         regionAdjList: world.mesh.adjList, regionIsLand: world.isLand, r_xyz: world.mesh.r_xyz, landmarks: world.landmarks }
-    const landPassable = computeLandPassableMask(state)
-    globalThis.routeOriginalEligibility = { landPassable, provinceClusters: computeProvinceLandClusters({ state, landPassable }) }
+    const landPassable = LAND_ROUTES.computeLandPassableMask(state)
+    globalThis.routeOriginalEligibility = { landPassable, provinceClusters: LAND_ROUTES.computeProvinceLandClusters({ state, landPassable }) }
     for (const variant of variants) {
         const oracle = createOracle({ PriorityHeap, regionCount: world.mesh.numRegions })
         globalThis.routeVerify = oracle.verify
@@ -146,17 +149,41 @@ try {
         const result = results[variant]
         result.medianMs = median(result.runs.map(run => run.ms))
         result.medianLandMs = median(result.runs.map(run => run.timings.filter(timing => timing.Stage.includes("appendLandRoutes")).reduce((sum, timing) => sum + Number(timing.ms), 0)))
-        result.medianSeaMs = median(result.runs.map(run => Number(run.timings.find(timing => timing.Stage.includes("appendSeaRoutes")).ms)))
+        result.medianSeaMs = median(result.runs.map(run => Number(run.timings.find(timing => timing.Stage.includes("appendSeaRoutes"))?.ms ?? 0)))
         result.rangeMs = [Math.min(...result.runs.map(run => run.ms)), Math.max(...result.runs.map(run => run.ms))]
         result.pairedSpeedups = result.runs.map((run, index) => results[variants[0]].runs[index].ms / run.ms)
         result.medianPairedSpeedup = median(result.pairedSpeedups)
 
     }
-    const sources = ["land/index.ts", "land/eligibility/index.ts", "sea/index.ts", "network/index.ts", "search/index.ts", "search/types.ts", "route-tuning.ts", "edge-usage/index.ts", "edge-usage/types.ts"]
+    const { PATHFIND } = await server.ssrLoadModule("/src/model/society/infrastructure/pathfinding/index.ts")
+    const { URQUHART } = await server.ssrLoadModule("/src/model/shared/urquhart/index.ts")
+    const persistent = modules.production.createState({ world, inputs })
+    modules.production.advance({ state: persistent, urbanPopulation: inputs.urbanPopulation })
+    const groups = LAND_ROUTES.collectLandCandidatesByKind({ state: persistent.world, settlementRegions: persistent.settlementRegions, provinceClusters: persistent.provinceClusters, urbanPopulation: inputs.urbanPopulation, membership: persistent.membership }).minor
+    const projectionFlips = {}
+    for (const group of groups) {
+        if (group.candidates.length < 3) continue
+        const regions = group.candidates.map(candidate => candidate.region)
+        const fixed = persistent.centers.get(group.landmark * Math.max(1, persistent.world.P) + group.cluster)
+        const edges = (subset, center) => new Set(URQUHART.buildUrquhartEdgesFromFlat(PATHFIND.tangentProjectFlat({ regions: subset, r_xyz: persistent.world.r_xyz, center })).map(([a, b]) => `${Math.min(subset[a], subset[b])}:${Math.max(subset[a], subset[b])}`))
+        const full = { centroid: edges(regions, PATHFIND.centroid({ regions, r_xyz: persistent.world.r_xyz })), fixed: edges(regions, fixed) }
+        const row = projectionFlips[regions.length] ??= { additions: 0, centroid: 0, fixed: 0 }
+        for (const added of regions) {
+            const subset = regions.filter(region => region !== added)
+            const before = { centroid: edges(subset, PATHFIND.centroid({ regions: subset, r_xyz: persistent.world.r_xyz })), fixed: edges(subset, fixed) }
+            for (const mode of ["centroid", "fixed"]) {
+                const after = new Set([...full[mode]].filter(pair => !pair.split(":").map(Number).includes(added)))
+                row[mode] += [...before[mode]].filter(pair => !after.has(pair)).length + [...after].filter(pair => !before[mode].has(pair)).length
+            }
+            row.additions++
+        }
+    }
+    const sources = ["land/index.ts", "land/eligibility/index.ts", "sea/index.ts", "network/index.ts", "search/index.ts", "search/types.ts", "route-tuning.ts", "edge-usage/index.ts", "edge-usage/types.ts", "types.ts", "land/types.ts", "sea/types.ts", "membership/index.ts", "membership/types.ts", "network/types.ts", "network/edges/index.ts", "network/edges/types.ts"]
     const report = {
         started, baseline, referenceVariant: variants[0], seed, points: world.params.numPoints, regions: world.mesh.numRegions,
         provinces: world.provinces.count, era: world.params.era, repetitions,
         sourceHashes: Object.fromEntries(sources.map(file => [file, createHash("sha256").update(readFileSync(`${root}/${file}`)).digest("hex")])),
+        projectionFlips, previousRoutes: process.env.ROUTE_PREVIOUS_ROUTES ?? null,
         worldSource: process.env.ROUTE_WORLD ?? "fresh", preparationMs, node: process.version, results,
     }
     writeFileSync(`${output}/report.json`, JSON.stringify(report, null, 2))

@@ -311,13 +311,7 @@ export function buildGlobeNationScripts(
 			anchorRegion,
 			elevationVisible,
 		)
-		const markerScale =
-			capitalProvince >= 0
-				? globeScaleForPop(
-						world.urbanPopulation?.[capitalProvince] ?? 0,
-						world.params?.era,
-					)
-				: 0
+		const markerScale = capitalProvince >= 0 ? globeScaleForPop() : 0
 
 		const mesh = pool.items[activeCount]
 		mesh.frustumCulled = cullingEnabled
@@ -414,13 +408,7 @@ export function buildMapNationScripts(
 		const settlementRegion = world.settlementRegions?.[capitalProvince] ?? -1
 		const anchorRegion =
 			settlementRegion >= 0 ? settlementRegion : capitalRegion
-		const markerRadius =
-			capitalProvince >= 0
-				? mapRadiusForPop(
-						world.urbanPopulation?.[capitalProvince] ?? 0,
-						world.params?.era,
-					)
-				: 0
+		const markerRadius = capitalProvince >= 0 ? mapRadiusForPop() : 0
 		const [px, py, pz] = labelPositionMap(
 			projection,
 			r_xyz,

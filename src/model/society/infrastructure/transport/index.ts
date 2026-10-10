@@ -44,6 +44,20 @@ function packRoutes(
 	}
 }
 
+function unpackRoutes(routes: SerializedRoutes | null | undefined): Route[] {
+	const result: Route[] = []
+	forEachRoute({
+		routes,
+		callback: (route) =>
+			result.push({
+				fromProvince: route.fromProvince,
+				toProvince: route.toProvince,
+				kind: route.kind,
+				pathRegions: Array.from(route.pathRegions),
+			}),
+	})
+	return result
+}
 function packNetwork(
 	edges: readonly RouteEdge[] | null | undefined,
 ): SerializedNetwork {
@@ -106,6 +120,7 @@ function forEachEdge({ network, callback }: ForEachEdgeParams): void {
 
 export const TRANSPORT = {
 	packRoutes,
+	unpackRoutes,
 	packNetwork,
 	networkCount,
 	forEachRoute,

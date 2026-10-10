@@ -6,6 +6,7 @@ import type {
 } from "@/model/history/sim/engine/state/types"
 import type { PeoplePacket } from "@/model/history/sim/people/log/types"
 import type { DeathCause, RegentKind } from "@/model/history/sim/people/types"
+import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 
 interface JournalProvinceChange {
 	province: number
@@ -42,7 +43,13 @@ interface JournalRuler {
 	deathCause: DeathCause | null
 }
 
+export interface RoadJournal {
+	added: SerializedRoutes
+	released: SerializedRoutes
+}
+
 export interface JournalTransaction {
+	roads: RoadJournal | null
 	timeMs: number
 	parents: JournalProvinceChange[]
 	relations: JournalRelationChange[]
@@ -57,6 +64,7 @@ export interface JournalTransaction {
 }
 
 export interface PendingJournal {
+	roads: RoadJournal | null
 	parents: Map<number, JournalProvinceChange>
 	relations: Map<number, JournalRelationChange>
 	occupations: Map<number, JournalProvinceChange>

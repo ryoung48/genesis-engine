@@ -950,8 +950,8 @@ function createHistoryState({
 			targetUrban: new Float32Array(P),
 			nameSeed: new Int32Array(P).fill(-1),
 		},
-		routes: [],
-		network: [],
+		roads: null,
+		roadsLastBatchTime: 0,
 		landmarks: landmarks
 			? {
 					...landmarks,

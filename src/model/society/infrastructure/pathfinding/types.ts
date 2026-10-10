@@ -64,3 +64,11 @@ export interface PathfindParams {
 	graph: PathfindGraph
 	request: PathfindRequest
 }
+
+export interface ProjectionRegions {
+	regions: Int32Array | number[]
+	r_xyz: Float32Array
+}
+export interface TangentProjectionParams extends ProjectionRegions {
+	center: readonly [number, number, number]
+}

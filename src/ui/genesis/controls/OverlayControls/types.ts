@@ -82,6 +82,7 @@ export interface OverlayControlsProps {
 	nationMode: NationMapMode
 	setNationMode: (v: NationMapMode) => void
 	populationMode: SocietyMapMode
+	setPopulationMode: (v: SocietyMapMode) => void
 	religionMode: ReligionMapMode
 	setReligionMode: (v: ReligionMapMode) => void
 	labelMode: LabelMode
@@ -152,4 +153,11 @@ export interface OverlayControlsProps {
 	setShowDaylight?: (v: boolean) => void
 	onEnterSolarSystem?: () => void
 	isEarthImport?: boolean
+}
+
+export interface DevelopmentModeSectionProps {
+	colorMode: ColorMode
+	societyMode: SocietyMapMode
+	setSocietyMode: (value: SocietyMapMode) => void
+	isEarthImport: boolean
 }

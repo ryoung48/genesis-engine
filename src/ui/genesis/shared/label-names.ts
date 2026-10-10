@@ -1,15 +1,9 @@
-import type { DynastyNameParams } from "@/model/society/language/names/types"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-
-interface LabelNameResolvers {
-	nation: (capitalProvince: number) => string
-	dynasty: (params: DynastyNameParams) => string
-	province: (provinceIdx: number) => string
-	culture: (cultureId: number) => string
-	heritage: (heritageId: number) => string
-	religion: (religionId: number) => string
-}
+import type {
+	LabelNameResolvers,
+	SettlementLabelNamesParams,
+} from "@/ui/genesis/shared/label-names/types"
 
 export function buildNationLabelNames(
 	world: SerializedGenesisWorld | null,
@@ -25,10 +19,11 @@ export function buildNationLabelNames(
 	return names
 }
 
-export function buildSettlementLabelNames(
-	world: SerializedGenesisWorld | null,
-	resolvers: LabelNameResolvers | null,
-): string[] | null {
+export function buildSettlementLabelNames({
+	world,
+	resolvers,
+	routeEndpoints,
+}: SettlementLabelNamesParams): string[] | null {
 	// Earth-import worlds skip the procedural urbanization pipeline entirely
 	// (see derive-province-society.ts), so world.urbanPopulation is undefined
 	// there -- real names/population instead come from the real GHSL
@@ -59,7 +54,9 @@ export function buildSettlementLabelNames(
 		const settlementRegion = world.settlementRegions[p] ?? -1
 		const pop = world.urbanPopulation?.[p] ?? 0
 		names[p] =
-			settlementRegion >= 0 && pop >= townMin ? resolvers.province(p) : ""
+			settlementRegion >= 0 && (pop >= townMin || routeEndpoints.has(p))
+				? resolvers.province(p)
+				: ""
 	}
 	return names
 }

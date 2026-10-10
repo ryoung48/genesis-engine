@@ -364,11 +364,13 @@ export function buildDemographicDisplayData(params: {
 		}
 	}
 
-	if (populationMode === "development") {
-		if (isDesolate || !world.development) return null
+	if (populationMode === "development" || populationMode === "knowledge") {
+		const values =
+			populationMode === "knowledge" ? world.knowledge : world.development
+		if (isDesolate || !values) return null
 		return {
-			label: "Development",
-			value: world.development[province].toFixed(2),
+			label: populationMode === "knowledge" ? "Knowledge" : "Development",
+			value: values[province].toFixed(2),
 			color: null,
 		}
 	}
