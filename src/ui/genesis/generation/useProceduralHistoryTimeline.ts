@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { DISTRIBUTION_RECORD } from "@/model/history/distribution/record"
 import { HISTORY } from "@/model/history/record"
 import { STATE } from "@/model/history/sim/engine/state"
 import { SIM_RECORD } from "@/model/history/sim/record"
@@ -33,6 +34,8 @@ export function useProceduralHistoryTimeline({
 	religionMode,
 	journalTransactionsRef,
 	journalVersion,
+	distributionStateRef,
+	distributionBatchesRef,
 }: HistoryTimelineInput) {
 	const isProcedural =
 		!!world && !world.isEarthImport && !!world.provinces && !!world.nations
@@ -40,16 +43,22 @@ export function useProceduralHistoryTimeline({
 	const [recordVersion, setRecordVersion] = useState(0)
 	const session = useMemo(() => {
 		if (!isProcedural || !world) return null
-		const next = SIM_RECORD.buildProceduralState({
-			world,
-			startTimeMs: PROCEDURAL_ENGINE_START_TIME_MS,
-		})
+		const distribution = world.params.historyPipeline === "distribution"
+		const next = distribution
+			? distributionStateRef.current
+			: SIM_RECORD.buildProceduralState({
+					world,
+					startTimeMs: PROCEDURAL_ENGINE_START_TIME_MS,
+				})
+		if (!next) return null
 		return {
 			state: next,
-			translator: SIM_RECORD.createTranslator({ state: next, world }),
+			translator: distribution
+				? null
+				: SIM_RECORD.createTranslator({ state: next, world }),
 			progress: { journalVersion: -1 },
 		}
-	}, [isProcedural, world])
+	}, [isProcedural, world, distributionStateRef])
 	const state = session?.state ?? null
 	useEffect(() => {
 		if (!session) return
@@ -57,16 +66,28 @@ export function useProceduralHistoryTimeline({
 		if (progress.journalVersion === journalVersion) return
 		progress.journalVersion = journalVersion
 		const transactions = journalTransactionsRef.current
-		if (transactions.length === 0) return
+		if (
+			transactions.length === 0 &&
+			distributionBatchesRef.current.length === 0
+		)
+			return
 		const previousMax = sessionState.record.maxTimeMs
-		SIM_RECORD.consumeJournal({ translator, transactions })
+		if (translator) SIM_RECORD.consumeJournal({ translator, transactions })
+		else {
+			for (const batch of distributionBatchesRef.current)
+				DISTRIBUTION_RECORD.consumeBatch({ state: sessionState, batch })
+			distributionBatchesRef.current = []
+		}
 		setSelectedTimeMs((time) =>
 			time >= previousMax ? sessionState.record.maxTimeMs : time,
 		)
 		setRecordVersion((version) => version + 1)
-	}, [session, journalTransactionsRef, journalVersion])
+	}, [session, journalTransactionsRef, journalVersion, distributionBatchesRef])
 
 	const [selectedTimeMs, setSelectedTimeMs] = useState(PROCEDURAL_START_TIME_MS)
+	useEffect(() => {
+		if (state) setSelectedTimeMs(state.record.minTimeMs)
+	}, [state])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: recordVersion signals in-place record appends that frameAt cannot observe.
 	const query = useMemo(() => {

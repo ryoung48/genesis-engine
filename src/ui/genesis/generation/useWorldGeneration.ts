@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
+import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
@@ -21,14 +22,17 @@ import {
 	MonthlyRasterAsset,
 } from "@/ui/genesis/generation/earth-assets"
 import {
-	type GenerationCallbacks,
-	type GenerationParams,
 	generateWorld,
 	importHeightmap,
 	loadImageAsGrayscale,
 	requestInfrastructure,
 } from "@/ui/genesis/generation/generation"
 import { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
+import type { GenerateOverrideParams } from "@/ui/genesis/generation/types"
+import {
+	type GenerationCallbacks,
+	type GenerationParams,
+} from "@/ui/genesis/generation/types"
 import type { WorldGenerationInput } from "@/ui/genesis/view/types"
 
 // Fits Earth's own SeismologyProfile.totalHeating to volcanism 1 (the prior
@@ -57,6 +61,10 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		setProceduralHistoryPlaying,
 		startProceduralJournal,
 		recordProceduralJournal,
+		recordDistributionBatch,
+		stopProceduralHistory,
+		historyPipeline,
+		setHistoryPipeline,
 		seed,
 		setSeed,
 		setDataVariant,
@@ -105,7 +113,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		(w: SerializedGenesisWorld | null) => {
 			if (w === null) {
 				setProceduralHistoryPlaying(false)
-				startProceduralJournal([])
+				startProceduralJournal(null)
 				infrastructureRequestedRef.current = false
 				setInfrastructure(null)
 			}
@@ -125,6 +133,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			workerRef,
 			onHistoryStart: startProceduralJournal,
 			onHistoryJournal: recordProceduralJournal,
+			onDistributionBatch: recordDistributionBatch,
+			onHistoryStopped: stopProceduralHistory,
 			onPathfindResult: (result) => {
 				if (result.reachable) {
 					const pathArray = Array.from(result.pathRegions)
@@ -162,6 +172,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const currentParams = useMemo<GenerationParams>(
 		() => ({
+			historyPipeline,
 			seed,
 			numPoints,
 			numPlates,
@@ -210,6 +221,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 		}),
 		[
+			historyPipeline,
 			seed,
 			numPoints,
 			numPlates,
@@ -245,10 +257,15 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	)
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleGenerateWorld = useCallback(
-		(overrideSeed: number, overrides?: Partial<GenerationParams>) => {
+		({ seed: overrideSeed, overrides }: GenerateOverrideParams) => {
 			setSelectedTimeMs(simStartTimeMs)
 			setShowCoastlines(false)
-			generateWorld(overrideSeed, overrides, currentParams, generationCallbacks)
+			generateWorld({
+				overrideSeed,
+				overrides,
+				currentParams,
+				callbacks: generationCallbacks,
+			})
 		},
 		[currentParams, generationCallbacks, simStartTimeMs],
 	)
@@ -563,7 +580,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		}
 		setDataVariant("generated")
 		handleReturnToPlanetView()
-		handleGenerateWorld(seed)
+		handleGenerateWorld({ seed, overrides: undefined })
 	}, [
 		handleEarthImport,
 		handleGenerateWorld,
@@ -572,6 +589,13 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		setDataVariant,
 	])
 
+	const handleChangeHistoryPipeline = useCallback(
+		(pipeline: HistoryPipeline) => {
+			setHistoryPipeline(pipeline)
+			handleGenerateWorld({ seed, overrides: { historyPipeline: pipeline } })
+		},
+		[seed, setHistoryPipeline, handleGenerateWorld],
+	)
 	const handleResetDefaults = useCallback(
 		() => resetWorldDefaults(setters),
 		[setters],
@@ -591,6 +615,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		generationLabel,
 		handleEarthImport,
 		handleGenerate,
+		handleGenerateWorld,
+		handleChangeHistoryPipeline,
 		handleResetDefaults,
 		handleReturnToPlanetView,
 		handleRequestInfrastructure,

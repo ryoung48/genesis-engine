@@ -302,7 +302,7 @@ export function useNationWikiData(
 								// A procedural royal marriage is itself an alliance; list it once,
 								// under Royal Marriages.
 								!(
-									record.origin === "procedural" &&
+									record.people !== null &&
 									nationState.relations.royalMarriages.includes(otherId)
 								),
 						)
@@ -395,6 +395,9 @@ export function useNationWikiData(
 		})
 		const economy = FRAME.nationEconomy({ frame, nationId })
 		const stats = buildNationWikiStats({
+			showPopulation:
+				record.events.censuses.length > 0 || !!worldForDisplay.realPopulation,
+			showGovernment: !!nationState?.government,
 			territoryBasis,
 			totalAreaKm2,
 			totalPopulation,

@@ -262,6 +262,7 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 	const resolvedMinMs = minTimeMs === Infinity ? 0 : minTimeMs
 	return {
 		origin: "earth",
+		pipeline: "earth",
 		people: null,
 		minTimeMs: resolvedMinMs,
 		maxTimeMs: maxTimeMs === -Infinity ? 0 : maxTimeMs,

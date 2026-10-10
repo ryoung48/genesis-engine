@@ -3,7 +3,6 @@ import { COLONIAL } from "@/model/history/sim/nations/colonial"
 import { COLORING } from "@/model/history/sim/nations/coloring"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
-import { TITLE_CLAIM } from "@/model/history/sim/nations/title-claim"
 import type {
 	BuildNationPlanParams,
 	ComputeNationsParams,
@@ -13,7 +12,6 @@ import type {
 import { IMPERIAL_PATCHWORK } from "@/model/history/sim/organizations/imperial-patchwork"
 import { TRADE_LEAGUE } from "@/model/history/sim/organizations/trade-league"
 import { MATH } from "@/model/shared/math/core"
-import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { IDENTITY_SEEDS } from "@/model/shared/random/identity-seeds"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
@@ -37,15 +35,6 @@ const NATION_PERCENTAGES = MATH.normalize([
 	0.0, 0.11, 0.144, 0.194, 0.165, 0.251, 0.137,
 ])
 
-/**
- * Government mix for Imperial Patchwork members, overriding the era's own
- * governmentMix (see the buildImperialPatchwork branch below). The era mix is
- * tuned for the whole settled world including its frontier (lateMedieval
- * skews tribal at 0.44), which doesn't fit a shattered "civilized empire"
- * patchwork -- this skews heavily monarchy (many Imperial Princes), with
- * enough republic share that Free Cities/Peasant Republics actually show up,
- * a modest theocracy share for Prelates/Electors, and no tribal at all.
- */
 const IMPERIAL_PATCHWORK_GOVERNMENT_MIX: GovernmentMix = {
 	tribal: 0,
 	monarchy: 0.68,
@@ -53,8 +42,6 @@ const IMPERIAL_PATCHWORK_GOVERNMENT_MIX: GovernmentMix = {
 	theocracy: 0.1,
 }
 
-/** Number of Trade Leagues to place per world, each from its own largest
- * eligible remaining coastal, non-tribal nation. */
 const TRADE_LEAGUE_COUNT = 3
 
 function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
@@ -100,200 +87,24 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		provinceCount,
 	})
 	const titleMembers = DEJURE.membersOf({ titles, provinceCount })
-	const noise = new SimplexNoise(params.seed ^ 0xdeadbeef)
 	const plan = buildNationPlan({
 		total: activeCount,
 		nationPercentages: params.nationPercentages,
 		nationBuckets: params.nationBuckets,
 	})
-	const assignment = new Int32Array(provinceCount).fill(-1)
-	const blocked = new Uint8Array(provinceCount)
-	const seeds: number[] = []
-	const sizes: number[] = []
-	let assigned = 0
-
-	for (let targetIdx = 0; targetIdx < plan.targets.length; targetIdx++) {
-		const target = plan.targets[targetIdx]
-		const components = PLACEMENT.buildOpenComponents({
-			active,
-			assignment,
-			adjOffset: provinces.adjOffset,
-			adjList: provinces.adjList,
-		})
-		const seedProvince = PLACEMENT.selectSeed({
-			target,
-			active,
-			assignment,
-			blocked,
-			habitability,
-			waterAccess,
-			migrationWave: params.migrationWave,
-			provinceContinent,
-			componentId: components.componentId,
-			componentSizes: components.sizes,
-			adjOffset: provinces.adjOffset,
-			adjList: provinces.adjList,
-		})
-		if (seedProvince < 0) continue
-
-		const nation = seeds.length
-		const seedUnit = TITLE_CLAIM.unitFor({
-			titles,
-			members: titleMembers,
-			provinceCount,
-			assignment,
-			province: seedProvince,
-			remaining: target,
-		})
-		const root =
-			seedUnit.title >= 0 ? titles.seat[seedUnit.title] : seedProvince
-		seeds.push(root)
-		sizes.push(0)
-
-		const frontier = new Set<number>()
-		const claimUnit = (unit: number[]) => {
-			for (const province of unit) {
-				PLACEMENT.claimProvinceDynamic({
-					nation,
-					province,
-					active,
-					assignment,
-					sizes,
-					frontier,
-					adjOffset: provinces.adjOffset,
-					adjList: provinces.adjList,
-				})
-				assigned++
-			}
-		}
-		claimUnit(seedUnit.provinces)
-
-		while (sizes[nation] < target) {
-			const claim = PLACEMENT.bestClaim({
-				nation,
-				seedProvince: root,
-				frontier,
-				active,
-				assignment,
-				habitability,
-				waterAccess,
-				r_xyz,
-				provinceSeeds: provinces.seeds,
-				adjOffset: provinces.adjOffset,
-				adjList: provinces.adjList,
-				noise,
-				maxSpreadRad,
-			})
-			if (claim < 0) break
-			claimUnit(
-				TITLE_CLAIM.unitFor({
-					titles,
-					members: titleMembers,
-					provinceCount,
-					assignment,
-					province: claim,
-					remaining: target - sizes[nation],
-				}).provinces,
-			)
-		}
-
-		const blockHops = Math.max(1, Math.round(Math.sqrt(target) * 0.5))
-		PLACEMENT.markBlocked({
-			start: root,
-			hops: blockHops,
-			active,
-			blocked,
-			adjOffset: provinces.adjOffset,
-			adjList: provinces.adjList,
-		})
-	}
-
-	if (assigned < activeCount) {
-		const components = PLACEMENT.buildOpenComponents({
-			active,
-			assignment,
-			adjOffset: provinces.adjOffset,
-			adjList: provinces.adjList,
-		})
-		const componentMembers: number[][] = new Array(components.sizes.length)
-		for (let i = 0; i < componentMembers.length; i++) componentMembers[i] = []
-		for (let p = 0; p < provinceCount; p++) {
-			const cid = components.componentId[p]
-			if (cid >= 0) componentMembers[cid].push(p)
-		}
-
-		for (let cid = 0; cid < componentMembers.length; cid++) {
-			const members = componentMembers[cid]
-			if (members.length === 0) continue
-
-			let bestNation = -1
-			let bestScore = -Infinity
-			for (let i = 0; i < members.length; i++) {
-				const province = members[i]
-				for (
-					let j = provinces.adjOffset[province],
-						jEnd = provinces.adjOffset[province + 1];
-					j < jEnd;
-					j++
-				) {
-					const nation = assignment[provinces.adjList[j]]
-					if (nation < 0) continue
-					const score =
-						PLACEMENT.nationPlacementScore({
-							province,
-							habitability,
-							waterAccess,
-							provinceContinent,
-							target: members.length,
-						}) -
-						sizes[nation] * 0.02
-					if (score > bestScore) {
-						bestScore = score
-						bestNation = nation
-					}
-				}
-			}
-
-			if (bestNation >= 0) {
-				for (let i = 0; i < members.length; i++) {
-					assignment[members[i]] = bestNation
-				}
-				sizes[bestNation] += members.length
-				assigned += members.length
-				continue
-			}
-
-			const nation = seeds.length
-			let seedProvince = members[0]
-			let seedScore = PLACEMENT.nationPlacementScore({
-				province: seedProvince,
-				habitability,
-				waterAccess,
-				provinceContinent,
-				target: members.length,
-			})
-			for (let i = 1; i < members.length; i++) {
-				const province = members[i]
-				const score = PLACEMENT.nationPlacementScore({
-					province,
-					habitability,
-					waterAccess,
-					provinceContinent,
-					target: members.length,
-				})
-				if (score > seedScore) {
-					seedProvince = province
-					seedScore = score
-				}
-			}
-			seeds.push(seedProvince)
-			sizes.push(members.length)
-			for (let i = 0; i < members.length; i++) {
-				assignment[members[i]] = nation
-			}
-			assigned += members.length
-		}
-	}
+	const { assignment, seeds, sizes } = PLACEMENT.placeCountries({
+		provinces,
+		active,
+		habitability,
+		waterAccess,
+		provinceContinent,
+		migrationWave: params.migrationWave,
+		r_xyz,
+		seed: params.seed,
+		maxSpreadRad,
+		targets: plan.targets,
+		policy: { kind: "simulation", titles, titleMembers },
+	})
 
 	let organizationPlan: ReturnType<
 		typeof IMPERIAL_PATCHWORK.buildImperialPatchwork
@@ -723,12 +534,6 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 	}
 }
 
-/**
- * Removes any zero-size nation slots (left behind by IMPERIAL_PATCHWORK
- * shattering a nation into replacements) and remaps assignment to the
- * compacted indices. Returns the old-index -> new-index map (identity where
- * nothing changed) so callers holding onto now-stale indices can translate.
- */
 function compactZeroSizeNations(params: {
 	seeds: number[]
 	sizes: number[]
@@ -757,16 +562,6 @@ function compactZeroSizeNations(params: {
 	return remap
 }
 
-/**
- * Ranks an Imperial Patchwork's members into HRE-style titles: the shatter
- * target is Emperor; up to 7 of the largest non-Emperor monarchy/theocracy
- * members are Electors (mirroring the historical Prince-/Archbishop-Electors);
- * the monarchy/theocracy remainder are Imperial Princes/Prelates. Republics
- * split three ways by size/subtype: a peasant_republic-governed member of
- * size 1, 1-in-6 of the time, is a Peasant Republic (lord-less free-peasant
- * commune, e.g. Dithmarschen); every other size-1 republic is a Free City;
- * everything larger is a plain Republic.
- */
 function resolveOrganizationTitles(params: {
 	leadNationIndex: number
 	memberNationIndices: number[]
@@ -824,9 +619,6 @@ function resolveOrganizationTitles(params: {
 	})
 }
 
-/** Console table confirming an Imperial Patchwork actually fired, and what
- * it produced -- there's otherwise no visible signal that organization
- * generation ran at all. */
 function printOrganizationSummary(params: {
 	leadNationIndex: number
 	members: GenesisOrganizationMember[]

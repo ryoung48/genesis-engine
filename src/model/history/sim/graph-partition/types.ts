@@ -23,3 +23,14 @@ export type GraphPartitionParams = {
 	targetCount: number
 	seed: number
 }
+
+export interface PartitionAdjacencyParams {
+	count: number
+	assignment: Int32Array
+	adjOffset: Int32Array
+	adjList: Int32Array
+}
+export interface PartitionAdjacency {
+	adjOffset: Int32Array
+	adjList: Int32Array
+}

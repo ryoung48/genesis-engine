@@ -3,6 +3,8 @@ import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/t
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import type { RecordBatch } from "@/model/history/distribution/record/types"
+import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
@@ -454,7 +456,19 @@ export type GenesisWorkerRequest =
 			type: "compute-infrastructure"
 	  }
 
+export type ProceduralHistoryInitial =
+	| { pipeline: "simulation"; journal: JournalTransaction[] }
+	| { pipeline: "distribution"; state: RecordState }
+	| { pipeline: "earth" }
+
 export type GenesisWorkerResponse =
+	| { type: "distribution-progress"; session: number; batch: RecordBatch }
+	| {
+			type: "history-stopped"
+			session: number
+			timeMs: number
+			complete: boolean
+	  }
 	| {
 			type: "progress"
 			label: string
@@ -463,7 +477,7 @@ export type GenesisWorkerResponse =
 	| {
 			type: "done"
 			world: SerializedGenesisWorld
-			journal: JournalTransaction[]
+			history: ProceduralHistoryInitial
 	  }
 	| {
 			type: "error"

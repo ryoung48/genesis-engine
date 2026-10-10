@@ -25,6 +25,7 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
+import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
@@ -37,6 +38,8 @@ import type {
 } from "@/model/society/types"
 
 export interface GenesisParams {
+	// [JUSTIFICATION] Terrain-only callers need not select history; application and history runners select it explicitly.
+	historyPipeline?: HistoryPipeline
 	seed: number
 	numPoints: number
 	numPlates: number

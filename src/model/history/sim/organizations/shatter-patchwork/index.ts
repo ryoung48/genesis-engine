@@ -1,4 +1,4 @@
-import { PLACEMENT } from "@/model/history/sim/nations/placement"
+import { PLACEMENT_FRONTIER } from "@/model/history/sim/nations/placement/frontier"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import type { GenesisProvinces } from "@/model/society/types"
 
@@ -192,13 +192,13 @@ function shatterPatchwork(
 
 	const newIndices: number[] = []
 	for (const target of targets) {
-		const components = PLACEMENT.buildOpenComponents({
+		const components = PLACEMENT_FRONTIER.buildOpenComponents({
 			active,
 			assignment,
 			adjOffset: provinces.adjOffset,
 			adjList: provinces.adjList,
 		})
-		const seedProvince = PLACEMENT.selectSeed({
+		const seedProvince = PLACEMENT_FRONTIER.selectSeed({
 			target,
 			active,
 			assignment,
@@ -232,7 +232,7 @@ function shatterPatchwork(
 		}
 
 		while (sizes[nationIndex] < target) {
-			const claim = PLACEMENT.bestClaim({
+			const claim = PLACEMENT_FRONTIER.bestClaim({
 				nation: nationIndex,
 				seedProvince,
 				frontier,
@@ -246,9 +246,10 @@ function shatterPatchwork(
 				adjList: provinces.adjList,
 				noise,
 				maxSpreadRad,
+				sharedBorderWeight: PLACEMENT_FRONTIER.sharedBorderWeight,
 			})
 			if (claim < 0) break
-			PLACEMENT.claimProvinceDynamic({
+			PLACEMENT_FRONTIER.claimProvinceDynamic({
 				nation: nationIndex,
 				province: claim,
 				active,
@@ -261,7 +262,7 @@ function shatterPatchwork(
 		}
 
 		const blockHops = Math.max(1, Math.round(Math.sqrt(target) * 0.5))
-		PLACEMENT.markBlocked({
+		PLACEMENT_FRONTIER.markBlocked({
 			start: seedProvince,
 			hops: blockHops,
 			active,

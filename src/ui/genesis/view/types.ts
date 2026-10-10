@@ -7,16 +7,19 @@ import type {
 	SystemBody,
 } from "@/model/celestial/system/types"
 import type { WIND } from "@/model/climate/weather/wind"
+import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type {
 	Eu4ProvinceFillGeometry,
 	RawOrganizationReference,
 } from "@/model/history/earth/data-source/types"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { SocietyEra } from "@/model/society/types"
 import type {
 	InfrastructureResult,
+	ProceduralHistoryInitial,
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
 import type {
@@ -282,7 +285,11 @@ export type WorldGenerationInput = {
 	setSolarSystemViewActive: (active: boolean) => void
 	setPathfindingResult: (result: PathfindingResult | null) => void
 	setProceduralHistoryPlaying: (playing: boolean) => void
-	startProceduralJournal: (transactions: JournalTransaction[]) => void
+	startProceduralJournal: (initial: ProceduralHistoryInitial | null) => void
+	recordDistributionBatch: (batch: RecordBatch) => void
+	stopProceduralHistory: (complete: boolean) => void
+	historyPipeline: HistoryPipeline
+	setHistoryPipeline: (pipeline: HistoryPipeline) => void
 	recordProceduralJournal: (transactions: JournalTransaction[]) => void
 	seed: number
 	setSeed: (seed: number) => void

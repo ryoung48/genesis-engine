@@ -1,3 +1,4 @@
+import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
@@ -20,6 +21,7 @@ import type { CharacterStage } from "@/test/history-run/report/people-traits/sta
 import type { CharacterReport } from "@/test/history-run/report/people-traits/types"
 
 export interface HistoryReportOptions {
+	pipeline: HistoryPipeline
 	characterStage: CharacterStage
 	seeds: number[]
 	era: SocietyEra

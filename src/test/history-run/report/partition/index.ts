@@ -8,7 +8,6 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { ERAS } from "@/model/society/eras"
 import { TITLES } from "@/model/society/titles"
-import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution/index"
 import type {
 	EndTagParams,
 	HeirRealmFate,
@@ -23,9 +22,10 @@ import type {
 	SummarizeParams,
 	TribalRealms,
 } from "@/test/history-run/report/partition/types"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics/index"
 
 function median(values: number[]): number {
-	return REPORT_DISTRIBUTION.summarize(values).p50
+	return REPORT_STATISTICS.summarize(values).p50
 }
 
 function state({ engine }: PartitionStateParams): PartitionStateReport {
@@ -359,19 +359,19 @@ function summarize({
 		rate: partitions.length / Math.max(1, partitions.length + skips),
 		heirsSeated: notes.reduce((sum, note) => sum + note.heirs.length, 0),
 		heirsUnseated,
-		newRealms: REPORT_DISTRIBUTION.summarize(
+		newRealms: REPORT_STATISTICS.summarize(
 			notes.map((note) => note.heirs.length),
 		),
-		primaryPopulationShare: REPORT_DISTRIBUTION.summarize(
+		primaryPopulationShare: REPORT_STATISTICS.summarize(
 			notes.map((note) => shares(note)[0]),
 		),
-		primaryProvinceShare: REPORT_DISTRIBUTION.summarize(
+		primaryProvinceShare: REPORT_STATISTICS.summarize(
 			notes.map(
 				(note) => note.realmProvinces[0] / Math.max(1, note.provincesBefore),
 			),
 		),
-		largestJuniorShare: REPORT_DISTRIBUTION.summarize(largestJunior),
-		effectiveRealms: REPORT_DISTRIBUTION.summarize(notes.map(effectiveRealms)),
+		largestJuniorShare: REPORT_STATISTICS.summarize(largestJunior),
+		effectiveRealms: REPORT_STATISTICS.summarize(notes.map(effectiveRealms)),
 		sameTierShare: sameTier / Math.max(1, heirRealms),
 		titlesLost,
 		primaryRankDrops,
@@ -394,7 +394,7 @@ function summarize({
 		},
 		siblingWars: tracked.siblingWarYears.filter(within).length,
 		siblingUnions: tracked.siblingUnionYears.filter(within).length,
-		generation: REPORT_DISTRIBUTION.summarize(
+		generation: REPORT_STATISTICS.summarize(
 			partitions.map((entry) => entry.generation),
 		),
 		maxGeneration: Math.max(0, ...partitions.map((entry) => entry.generation)),
@@ -404,7 +404,7 @@ function summarize({
 		adminsLandless,
 		joinedDistricts,
 		releasedRealms,
-		releasedPopulationShare: REPORT_DISTRIBUTION.summarize(releasedShares),
+		releasedPopulationShare: REPORT_STATISTICS.summarize(releasedShares),
 		divideMs,
 	}
 }

@@ -4,6 +4,7 @@ import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipCont
 import { uiPalette } from "@/ui/components/tokens"
 import type {
 	ArmyStatParams,
+	UrbanizationParams,
 	BuildNationWikiStatsParams,
 } from "@/ui/wiki/stats/nation/types"
 
@@ -80,10 +81,7 @@ export function formatDensity(perKm2: number): string {
 	return `${perKm2.toFixed(perKm2 >= 100 ? 0 : 1)} /km²`
 }
 
-function formatUrbanization(
-	totalUrbanPopulation: number,
-	totalPopulation: number,
-) {
+function formatUrbanization({totalUrbanPopulation,totalPopulation}:UrbanizationParams) {
 	if (
 		!Number.isFinite(totalUrbanPopulation) ||
 		!Number.isFinite(totalPopulation) ||
@@ -120,22 +118,22 @@ export function buildNationWikiStats(
 			label: territoryBasis === "controlled" ? "Controlled Area" : "Total Area",
 			value: `${formatAreaKm2(totalAreaKm2)} · ${provinceCount.toLocaleString()} Province${provinceCount === 1 ? "" : "s"}`,
 		},
-		{
+		...(params.showPopulation?[{
 			label:
 				territoryBasis === "controlled"
 					? "Controlled Population"
 					: "Population",
 			valuePrefix: formatCount(totalPopulation),
-			value: ` · ${formatDensity(density)} · ${formatUrbanization(totalUrbanPopulation, totalPopulation)} urbanized`,
-		},
+			value: ` · ${formatDensity(density)} · ${formatUrbanization({totalUrbanPopulation,totalPopulation})} urbanized`,
+		}]:[]),
 		...(rulerLabel !== null && rulerLabel !== undefined
 			? [{ label: "Ruler", value: rulerLabel }]
 			: []),
-		{
+		...(params.showGovernment?[{
 			label: "Government",
 			value: governmentSubtype ?? "Unknown",
 			swatchColor: governmentColor,
-		},
+		}]:[]),
 		...(economy
 			? [
 					{

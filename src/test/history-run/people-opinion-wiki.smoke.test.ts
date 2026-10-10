@@ -49,6 +49,7 @@ it("summarizes noble popularity from the holders of a realm's districts at the s
 		minTimeMs: 100 * STATE.yearMs,
 		maxTimeMs: 110 * STATE.yearMs,
 		origin: "procedural",
+		pipeline: "simulation",
 		events: {
 			provinceEvents: new Map([
 				[0, province(0, -1, 0)],

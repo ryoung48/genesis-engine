@@ -56,3 +56,8 @@ export interface LogDigester {
 	add: (entry: unknown) => void
 	value: () => LogDigest
 }
+
+export interface CountryCountsParams {
+	report: SavedReport
+	seed: string
+}
