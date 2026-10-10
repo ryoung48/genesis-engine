@@ -47,3 +47,8 @@ export interface EventTimeParams {
 	channel: number
 	salt: number
 }
+
+export interface SettlementRecordParams {
+	engine: DistributionEngine
+	previousTimeMs: number
+}

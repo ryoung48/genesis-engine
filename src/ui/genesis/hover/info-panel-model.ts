@@ -2,6 +2,7 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { DATE } from "@/model/history/earth/date"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/genesis/hover/hover"
@@ -387,6 +388,22 @@ export function buildDemographicDisplayData(params: {
 	}
 
 	if (populationMode === "migration") {
+		if (world.historyMigration.pipeline === "distribution" && !isDesolate) {
+			const m = world.historyMigration.data,
+				year = m.arrivalYear[province]
+			return {
+				label: "Migration arrival",
+				value:
+					province === m.origin
+						? `Origin · ${DATE.formatEu4Year(year)}`
+						: !Number.isFinite(m.continuousArrival[province])
+							? "Unreachable"
+							: year === 2147483647
+								? "After 2025"
+								: DATE.formatEu4Year(year),
+				color: null,
+			}
+		}
 		const wave = world.population?.migrationWave?.[province] ?? -1
 		if (isDesolate || wave < 0) return null
 		const pct = Math.round(wave * 100)

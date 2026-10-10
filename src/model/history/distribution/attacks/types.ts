@@ -1,7 +1,7 @@
 import type {
 	DistributionProjection,
 	Histogram,
-} from "@/model/history/distribution/targets/types"
+} from "@/model/history/distribution/targets/projection/types"
 import type { Territory } from "@/model/history/distribution/territory/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 

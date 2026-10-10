@@ -856,6 +856,7 @@ function generateGenesisWorld({
 		religionGender: provinceSociety.religionGender,
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
+		historyMigration: post.historyMigration,
 		tradeGoods: post.tradeGoods,
 		settlementRegions: provinceSociety.settlementRegions,
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,

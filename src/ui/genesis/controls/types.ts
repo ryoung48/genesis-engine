@@ -1,3 +1,4 @@
+import type { HistoryScale } from "@/ui/genesis/controls/history-scale/types"
 import type {
 	ClimateSubMode,
 	TopographySubMode,
@@ -40,6 +41,7 @@ export interface ModeBarProps {
 
 import type React from "react"
 export interface SimulationControlsProps {
+	scale: HistoryScale
 	selectedTimeMs: number
 	minTimeMs: number
 	maxTimeMs: number

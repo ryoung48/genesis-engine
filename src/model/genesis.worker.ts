@@ -1,3 +1,4 @@
+import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
 /// <reference lib="webworker" />
 
 import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
@@ -265,6 +266,7 @@ function serializeWorld(
 		development: world.development,
 		urbanPopulation: world.urbanPopulation,
 		population: world.population,
+		historyMigration: world.historyMigration,
 		monthlyTEQ: world.monthlyTEQ,
 		dtr_annual: world.dtr_annual,
 		dtr_monthly: world.dtr_monthly,
@@ -622,6 +624,19 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	}
 	if (world.development) add(world.development.buffer)
 	if (world.urbanPopulation) add(world.urbanPopulation.buffer)
+	if (world.historyMigration.pipeline === "distribution") {
+		const m = world.historyMigration.data
+		add(
+			m.arrivalYear.buffer,
+			m.continuousArrival.buffer,
+			m.predecessor.buffer,
+			m.edgeKind.buffer,
+			m.arrivalTier.buffer,
+			m.order.buffer,
+			m.contextMask.buffer,
+			m.componentId.buffer,
+		)
+	}
 	if (world.population) {
 		add(
 			world.population.habitability.buffer,
@@ -690,7 +705,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 						complete: false,
 					} satisfies GenesisWorkerResponse),
 				batchYears: 20,
-				yieldYear: () => new Promise((resolve) => setTimeout(resolve, 0)),
+				yieldYear: () =>
+ new Promise((resolve) => setTimeout(resolve, engine.year <= DISTRIBUTION_TARGETS.firstStateYear ? 100 : 0)),
 			})
 				.then(() => {
 					if (session !== historySession) return

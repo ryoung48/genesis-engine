@@ -74,3 +74,5 @@ export const TOPOGRAPHY_COLORS: Record<number, [number, number, number]> = {
 	5: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // ocean
 	6: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // lake
 }
+
+export const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]

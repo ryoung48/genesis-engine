@@ -1,24 +1,14 @@
+import { DISTRIBUTION_PROJECTION } from "@/model/history/distribution/targets/projection"
 import type {
-	ActionParams,
 	ComponentProjection,
 	DistributionProjection,
-	EndpointParams,
-	GainParams,
+	TargetProfile,
+} from "@/model/history/distribution/targets/projection/types"
+import type {
 	HeldCapacitiesParams,
-	Histogram,
-	HistogramParams,
 	LandStatus,
-	LossParams,
-	ObjectiveParams,
-	PmfDiagnostic,
-	PmfParams,
-	PowerParams,
-	ProjectComponentParams,
 	ProjectionParams,
 	SegmentParams,
-	SizeParams,
-	SizePmf,
-	TargetProfile,
 	YearParams,
 } from "@/model/history/distribution/targets/types"
 
@@ -52,34 +42,24 @@ const statusYears = [
 	-9999, -8000, -6000, -4000, -3300, -3000, -2000, -1000, -500, 2, 476, 1066,
 	1500, 1701, 1914, 2025,
 ]
-const uninhabitedPercent = [
-	12, 10, 8, 6, 5, 5, 4, 3, 3, 2, 1.5, 0.8, 0, 0, 0, 0,
-]
 const stateHeldPercent = [
 	0, 0, 0, 0, 0, 2, 8, 20, 33, 45, 50, 60, 71, 79, 95, 100,
 ]
-const START_YEAR = -9999
+const START_YEAR = -79999
 const FIRST_STATE_YEAR = -3300
-const PRE_STATE_STEP_YEARS = 50
-const lower = [1, 2, 5, 10, 25, 50, 101]
-const upper = [1, 4, 9, 24, 49, 100, Infinity]
-const countryWeight = 1 / 0.1
-const territoryWeight = 1 / 0.15
-const countWeight = 1 / Math.log1p(0.25)
-
-function bucket({ size }: SizeParams): number {
-	for (let b = 0; b < upper.length; b++) if (size <= upper[b]) return b
-	throw new Error("Invalid country size")
-}
 
 function stepYears({ year }: YearParams): number {
-	return year < FIRST_STATE_YEAR ? PRE_STATE_STEP_YEARS : 1
+	return year < -9999 ? 500 : year < FIRST_STATE_YEAR ? 100 : 1
 }
 
 function nextYear({ year }: YearParams): number {
 	return Math.min(
 		year + stepYears({ year }),
-		year < FIRST_STATE_YEAR ? FIRST_STATE_YEAR : year + 1,
+		year < -9999
+			? -9999
+			: year < FIRST_STATE_YEAR
+				? FIRST_STATE_YEAR
+				: year + 1,
 	)
 }
 
@@ -94,26 +74,43 @@ function segment({ axis, year }: SegmentParams): { i: number; f: number } {
 
 function status({ year }: YearParams): LandStatus {
 	if (!Number.isInteger(year) || year < START_YEAR || year > 2025)
-		throw new Error("Distribution year outside 9999 BCE–2025")
+		throw new Error("Distribution year outside 80000 BCE–2025")
 	const { i, f } = segment({ axis: statusYears, year })
 	const mix = (values: number[]) =>
 		((1 - f) * values[i] + f * values[i + 1]) / 100
-	const uninhabited = mix(uninhabitedPercent),
-		stateHeld = mix(stateHeldPercent)
-	return { uninhabited, stateless: 1 - uninhabited - stateHeld, stateHeld }
+	return { stateHeld: mix(stateHeldPercent) }
 }
 
-function heldCapacities({ capacities, year }: HeldCapacitiesParams): number[] {
-	const { stateHeld } = status({ year })
-	if (stateHeld <= 0) return []
-	return capacities.map((capacity) =>
-		Math.max(1, Math.round(capacity * stateHeld)),
+function heldCapacities({
+	capacities,
+	habitableCount,
+	year,
+}: HeldCapacitiesParams): number[] {
+	const requested = Math.round(status({ year }).stateHeld * habitableCount)
+	const total = capacities.reduce((sum, value) => sum + value, 0),
+		feasible = Math.min(requested, total)
+	if (!total) return capacities.map(() => 0)
+	const allocations = capacities.map((capacity) =>
+		Math.floor((feasible * capacity) / total),
 	)
+	const rank = capacities
+		.map((capacity, id) => ({
+			id,
+			remainder: (feasible * capacity) / total - allocations[id],
+		}))
+		.sort((a, b) => b.remainder - a.remainder || a.id - b.id)
+	let remaining = feasible - allocations.reduce((sum, value) => sum + value, 0)
+	for (const { id } of rank)
+		if (remaining > 0 && allocations[id] < capacities[id]) {
+			allocations[id]++
+			remaining--
+		}
+	return allocations
 }
 
 function profile({ year }: YearParams): TargetProfile {
 	if (!Number.isInteger(year) || year < START_YEAR || year > 2025)
-		throw new Error("Distribution year outside 9999 BCE–2025")
+		throw new Error("Distribution year outside 80000 BCE–2025")
 	const { i, f } = segment({ axis: years, year })
 	const totalA = counts[i].reduce((a, b) => a + b, 0)
 	const totalB = counts[i + 1].reduce((a, b) => a + b, 0)
@@ -136,292 +133,33 @@ function profile({ year }: YearParams): TargetProfile {
 	}
 }
 
-function power({ lo, hi, alpha }: PowerParams): SizePmf {
-	const favored = alpha >= 0 ? lo : hi
-	const weights = Array.from({ length: hi - lo + 1 }, (_, i) =>
-		Math.exp(-alpha * Math.log((lo + i) / favored)),
-	)
-	const total = weights.reduce((a, b) => a + b, 0)
-	const probabilities = weights.map((w) => w / total)
-	return {
-		probabilities,
-		mean: probabilities.reduce((a, p, i) => a + p * (lo + i), 0),
-		clamped: false,
-		mixture: false,
-		expansions: 0,
-		numericalFallback: false,
-	}
-}
-
-function fitPmf({ lo, hi, mean, iterations }: PmfParams): SizePmf {
-	if (
-		!Number.isInteger(lo) ||
-		!Number.isInteger(hi) ||
-		lo < 1 ||
-		hi < lo ||
-		!Number.isFinite(mean)
-	)
-		throw new Error("Invalid PMF support")
-	const target = Math.max(lo, Math.min(hi, mean))
-	const point = ({ endpoint }: EndpointParams): SizePmf => ({
-		probabilities: Array.from({ length: hi - lo + 1 }, (_, i) =>
-			lo + i === endpoint ? 1 : 0,
-		),
-		mean: endpoint,
-		clamped: target !== mean,
-		mixture: false,
-		expansions: 0,
-		numericalFallback: false,
-	})
-	if (target === lo || target === hi) return point({ endpoint: target })
-	let a = -64,
-		b = 64,
-		expansions = 0,
-		numericalFallback = false
-	let high = power({ lo, hi, alpha: a }),
-		low = power({ lo, hi, alpha: b })
-	while (high.mean < target) {
-		expansions++
-		if (!Number.isFinite(a * 2)) {
-			high = point({ endpoint: hi })
-			numericalFallback = true
-			break
-		}
-		a *= 2
-		high = power({ lo, hi, alpha: a })
-	}
-	while (low.mean > target) {
-		expansions++
-		if (!Number.isFinite(b * 2)) {
-			low = point({ endpoint: lo })
-			numericalFallback = true
-			break
-		}
-		b *= 2
-		low = power({ lo, hi, alpha: b })
-	}
-	for (let i = 0; i < Math.min(64, iterations); i++) {
-		const mid = a / 2 + b / 2
-		if (mid === a || mid === b) break
-		const law = power({ lo, hi, alpha: mid })
-		if (Math.abs(law.mean - target) <= 0.0001)
-			return { ...law, clamped: target !== mean, expansions, numericalFallback }
-		if (law.mean > target) {
-			a = mid
-			high = law
-		} else {
-			b = mid
-			low = law
-		}
-	}
-	if (high.mean === low.mean) {
-		if (Math.abs(high.mean - target) > 0.0001)
-			throw new Error("PMF bracket collapsed away from requested mean")
-		return { ...high, clamped: target !== mean, expansions, numericalFallback }
-	}
-	const weight = (target - low.mean) / (high.mean - low.mean)
-	return {
-		probabilities: high.probabilities.map(
-			(p, i) => weight * p + (1 - weight) * low.probabilities[i],
-		),
-		mean: target,
-		clamped: target !== mean,
-		mixture: true,
-		expansions,
-		numericalFallback,
-	}
-}
-
-function objective({
-	counts,
-	countries,
-	masses,
-	count,
-	capacity,
-	shares,
-	territoryShares,
-	pmf,
-}: ObjectiveParams): number {
-	let value = 0
-	for (let b = 0; b < 7; b++) {
-		value += (countries[b] - count * shares[b]) ** 2 / (count * shares[b] + 1)
-		value +=
-			(masses[b] - capacity * territoryShares[b]) ** 2 /
-			(capacity * territoryShares[b] + 1)
-	}
-	for (let s = 1; s < counts.length; s++)
-		value += (counts[s] - count * pmf[s]) ** 2 / (count * pmf[s] + 1)
-	return value
-}
-
-function projectComponent({
-	capacity,
-	profile: law,
-}: ProjectComponentParams): ComponentProjection {
-	if (!Number.isInteger(capacity) || capacity <= 0)
-		throw new Error("Projection needs positive integer capacity")
-	const ceiling = Math.min(capacity, law.ceiling)
-	const shares = law.shares.map((q, b) => (lower[b] <= ceiling ? q : 0))
-	const sum = shares.reduce((a, b) => a + b, 0)
-	if (sum <= 0) throw new Error("No supported target weight")
-	for (let b = 0; b < 7; b++) shares[b] /= sum
-	const pmf = new Array<number>(ceiling + 1).fill(0)
-	const conditional = new Array<number>(7).fill(0)
-	const fitDiagnostics: PmfDiagnostic[] = []
-	for (let b = 0; b < 7; b++) {
-		if (lower[b] > ceiling) continue
-		const fit = fitPmf({
-			lo: lower[b],
-			hi: Math.min(upper[b], ceiling),
-			mean: law.means[b],
-			iterations: 64,
-		})
-		conditional[b] = fit.mean
-		fitDiagnostics.push({
-			lo: lower[b],
-			hi: Math.min(upper[b], ceiling),
-			requestedMean: law.means[b],
-			mean: fit.mean,
-			clamped: fit.clamped,
-			mixture: fit.mixture,
-			expansions: fit.expansions,
-			numericalFallback: fit.numericalFallback,
-		})
-		for (let i = 0; i < fit.probabilities.length; i++)
-			pmf[lower[b] + i] = shares[b] * fit.probabilities[i]
-	}
-	const continuousMean = shares.reduce((a, q, b) => a + q * conditional[b], 0)
-	const territoryShares = shares.map(
-		(q, b) => (q * conditional[b]) / continuousMean,
-	)
-	const reference = capacity / continuousMean
-	const count = Math.max(
-		Math.ceil(capacity / ceiling),
-		Math.min(capacity, Math.ceil(reference - 0.5)),
-	)
-	const sizes: number[] = [],
-		frequencies = new Array<number>(ceiling + 1).fill(0),
-		countries = new Array<number>(7).fill(0),
-		masses = new Array<number>(7).fill(0)
-	let s = 1,
-		cdf = pmf[1],
-		mass = 0
-	for (let i = 0; i < count; i++) {
-		const quantile = (i + 0.5) / count
-		while (s < ceiling && cdf < quantile) cdf += pmf[++s]
-		sizes.push(s)
-		frequencies[s]++
-		countries[bucket({ size: s })]++
-		masses[bucket({ size: s })] += s
-		mass += s
-	}
-	const args = {
-		counts: frequencies,
-		countries,
-		masses,
-		count,
-		capacity,
-		shares,
-		territoryShares,
-		pmf,
-	}
-	while (mass !== capacity) {
-		const direction = mass < capacity ? 1 : -1
-		let best = -1,
-			bestValue = Infinity
-		for (let old = 1; old <= ceiling; old++) {
-			const next = old + direction
-			if (!frequencies[old] || next < 1 || next > ceiling) continue
-			const ob = bucket({ size: old }),
-				nb = bucket({ size: next })
-			let value = 0
-			for (const bucketId of new Set([ob, nb])) {
-				const dc = (bucketId === nb ? 1 : 0) - (bucketId === ob ? 1 : 0)
-				const dm = (bucketId === nb ? next : 0) - (bucketId === ob ? old : 0)
-				const ec = count * shares[bucketId],
-					em = capacity * territoryShares[bucketId]
-				value +=
-					((countries[bucketId] + dc - ec) ** 2 -
-						(countries[bucketId] - ec) ** 2) /
-					(ec + 1)
-				value +=
-					((masses[bucketId] + dm - em) ** 2 - (masses[bucketId] - em) ** 2) /
-					(em + 1)
-			}
-			value +=
-				((frequencies[old] - 1 - count * pmf[old]) ** 2 -
-					(frequencies[old] - count * pmf[old]) ** 2) /
-				(count * pmf[old] + 1)
-			value +=
-				((frequencies[next] + 1 - count * pmf[next]) ** 2 -
-					(frequencies[next] - count * pmf[next]) ** 2) /
-				(count * pmf[next] + 1)
-			if (value < bestValue) {
-				bestValue = value
-				best = old
-			}
-		}
-		if (best < 0) throw new Error("Projection mass cannot be balanced")
-		const ordinal = sizes.indexOf(best),
-			next = best + direction,
-			ob = bucket({ size: best }),
-			nb = bucket({ size: next })
-		sizes[ordinal] = next
-		frequencies[best]--
-		frequencies[next]++
-		countries[ob]--
-		countries[nb]++
-		masses[ob] -= best
-		masses[nb] += next
-		mass += direction
-	}
-	return {
-		capacity,
-		ceiling,
-		sizes,
-		shares,
-		territoryShares,
-		pmf,
-		continuousMean,
-		objective: objective(args),
-		fitDiagnostics,
-	}
-}
-
-function histogram({ sizes }: HistogramParams): Histogram {
-	const countries = new Array<number>(7).fill(0),
-		territory = new Array<number>(7).fill(0)
-	let mass = 0,
-		count = 0
-	for (const size of sizes) {
-		if (!Number.isInteger(size) || size <= 0)
-			throw new Error("Invalid live country size")
-		const b = bucket({ size: size })
-		countries[b]++
-		territory[b] += size
-		mass += size
-		count++
-	}
-	return { count, mass, countries, territory }
-}
-
 function project({
 	capacities,
 	year,
 }: ProjectionParams): DistributionProjection {
 	const raw = profile({ year }),
 		cache = new Map<number, ComponentProjection>()
-	const components = capacities.map((capacity) => {
+	const componentIds = capacities.flatMap((capacity, id) =>
+		capacity > 0 ? [id] : [],
+	)
+	const components = componentIds.map((id) => {
+		const capacity = capacities[id]
 		let result = cache.get(capacity)
 		if (!result) {
-			result = projectComponent({ capacity, profile: raw })
+			result = DISTRIBUTION_PROJECTION.projectComponent({
+				capacity,
+				profile: raw,
+			})
 			cache.set(capacity, result)
 		}
 		return result
 	})
-	const h = histogram({ sizes: components.flatMap((c) => c.sizes) })
+	const h = DISTRIBUTION_PROJECTION.histogram({
+		sizes: components.flatMap((c) => c.sizes),
+	})
 	return {
 		components,
+		componentIds,
 		targetN: h.count,
 		targetMean: h.count ? h.mass / h.count : 0,
 		countryShares: h.countries.map((n) => (h.count ? n / h.count : 0)),
@@ -431,88 +169,13 @@ function project({
 	}
 }
 
-function loss({ observed: h, target: t }: LossParams): number {
-	if (h.mass === 0 && t.targetN === 0) return 0
-	if (h.count <= 0 || t.targetN <= 0 || h.mass <= 0)
-		throw new Error("Positive territory requires countries")
-	let value = countWeight * Math.abs(Math.log(h.count / t.targetN))
-	for (let b = 0; b < 7; b++)
-		value +=
-			0.5 *
-			(countryWeight * Math.abs(h.countries[b] / h.count - t.countryShares[b]) +
-				territoryWeight *
-					Math.abs(h.territory[b] / h.mass - t.territoryShares[b]))
-	return value
-}
-
-function gain({ before, after, target }: GainParams): number {
-	if (before.mass === 0 && after.mass === 0) return 0
-	if (before.count <= 0 || after.count <= 0)
-		throw new Error("Invalid action counts")
-	let distance =
-		countWeight *
-		Math.abs(Math.log1p((after.count - before.count) / before.count))
-	for (let b = 0; b < 7; b++)
-		distance +=
-			0.5 *
-			(countryWeight *
-				Math.abs(
-					before.countries[b] / before.count - after.countries[b] / after.count,
-				) +
-				territoryWeight *
-					Math.abs(
-						before.territory[b] / before.mass - after.territory[b] / after.mass,
-					))
-	return distance > 0
-		? Math.max(
-				-1,
-				Math.min(
-					1,
-					(loss({ observed: before, target }) -
-						loss({ observed: after, target })) /
-						distance,
-				),
-			)
-		: 0
-}
-
-function action({ observed, remove, add }: ActionParams): Histogram {
-	const result = {
-		count: observed.count,
-		mass: observed.mass,
-		countries: [...observed.countries],
-		territory: [...observed.territory],
-	}
-	for (const size of remove) {
-		const b = bucket({ size: size })
-		result.count--
-		result.mass -= size
-		result.countries[b]--
-		result.territory[b] -= size
-	}
-	for (const size of add) {
-		const b = bucket({ size: size })
-		result.count++
-		result.mass += size
-		result.countries[b]++
-		result.territory[b] += size
-	}
-	return result
-}
 export const DISTRIBUTION_TARGETS = {
 	startYear: START_YEAR,
 	firstStateYear: FIRST_STATE_YEAR,
 	stepYears,
 	nextYear,
-	bucket,
-	action,
 	status,
 	heldCapacities,
 	profile,
-	fitPmf,
-	projectComponent,
 	project,
-	histogram,
-	loss,
-	gain,
 }

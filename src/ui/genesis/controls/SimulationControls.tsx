@@ -1,22 +1,12 @@
 import React from "react"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { IconButton } from "@/ui/components/primitives/IconButton"
-import type {
-	ClampTimelineTimeParams,
-	SimulationControlsProps,
-} from "@/ui/genesis/controls/types"
+import { HISTORY_SCALE } from "@/ui/genesis/controls/history-scale"
+import type { SimulationControlsProps } from "@/ui/genesis/controls/types"
 import { historyTimeParts } from "@/ui/genesis/generation/history-time"
 import { monthLabels } from "@/ui/genesis/shared/constants"
 
 const TIMELINE_STEP_MS = 30 * 24 * 60 * 60 * 1000
-
-function clampTimelineTime({
-	timeMs,
-	minTimeMs,
-	maxTimeMs,
-}: ClampTimelineTimeParams) {
-	return Math.min(maxTimeMs, Math.max(minTimeMs, timeMs))
-}
 
 function formatTimelineYear(year: number): string {
 	if (year <= 0) return `${1 - year} BC`
@@ -24,6 +14,7 @@ function formatTimelineYear(year: number): string {
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
+	scale,
 	selectedTimeMs,
 	minTimeMs,
 	maxTimeMs,
@@ -54,17 +45,22 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 
 	const handleStepBackward = () =>
 		onTimeChange(
-			clampTimelineTime({
-				timeMs: selectedTimeMs - step,
+			HISTORY_SCALE.step({
+				scale,
+				timeMs: selectedTimeMs,
+				direction: -1,
+				stepMs: step,
 				minTimeMs,
 				maxTimeMs,
 			}),
 		)
-
 	const handleStepForward = () =>
 		onTimeChange(
-			clampTimelineTime({
-				timeMs: selectedTimeMs + step,
+			HISTORY_SCALE.step({
+				scale,
+				timeMs: selectedTimeMs,
+				direction: 1,
+				stepMs: step,
 				minTimeMs,
 				maxTimeMs,
 			}),
@@ -104,11 +100,31 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 					</div>
 					<input
 						type="range"
-						min={minTimeMs}
-						max={maxTimeMs}
-						step={step}
-						value={selectedTimeMs}
-						onChange={(e) => onTimeChange(Number(e.target.value))}
+						min={HISTORY_SCALE.encode({ scale, timeMs: minTimeMs })}
+						max={HISTORY_SCALE.encode({ scale, timeMs: maxTimeMs })}
+						step={scale.kind === "phased" ? "any" : step}
+						value={HISTORY_SCALE.encode({ scale, timeMs: selectedTimeMs })}
+						onChange={(e) =>
+							onTimeChange(
+								HISTORY_SCALE.decode({
+									scale,
+									value: Number(e.target.value),
+									minTimeMs,
+									maxTimeMs,
+								}),
+							)
+						}
+						disabled={maxTimeMs <= minTimeMs}
+						aria-valuetext={timelineLabel}
+						onKeyDown={(e) => {
+							if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+								e.preventDefault()
+								handleStepBackward()
+							} else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+								e.preventDefault()
+								handleStepForward()
+							}
+						}}
 						className="min-w-0 flex-1 accent-slate-100"
 						aria-label={stepLabels?.slider ?? "Simulation month"}
 					/>

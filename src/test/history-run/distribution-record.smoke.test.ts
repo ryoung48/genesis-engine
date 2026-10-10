@@ -257,3 +257,60 @@ it("does not label founding on stateless land as a civil war", () => {
 	expect(batch.wars).toHaveLength(0)
 	expect(batch.nations[0].identity.isRebel).toBe(false)
 })
+
+it("records exact settlement inside coarse steps and invalidates cached future frames", () => {
+	const world = DISTRIBUTION_FIXTURE.world({
+		neighbors: [[1], [0]],
+		desolate: [],
+		seed: 42,
+	})
+	if (world.historyMigration.pipeline !== "distribution")
+		throw new Error("Fixture")
+	const m = world.historyMigration.data,
+		other = 1 - m.origin
+	m.arrivalYear[other] = -79749
+	m.continuousArrival[other] = -79749
+	m.order = Int32Array.of(m.origin, other)
+	const engine = E.create({ world })
+	const arrival = DATE.eu4DateToTimeMs("-79749.1.1")
+	HISTORY.frameAt({ state: engine.history, timeMs: arrival })
+	E.advance({ engine })
+	expect(
+		HISTORY.frameAt({ state: engine.history, timeMs: arrival - 86400000 })
+			.provinceNation[other],
+	).toBe(-1)
+	expect(
+		HISTORY.frameAt({ state: engine.history, timeMs: arrival }).provinceNation[
+			other
+		],
+	).toBe(-2)
+	expect(
+		engine.history.record.events.provinceEvents.get(other)?.events[0].timeMs,
+	).toBe(arrival)
+})
+it("retains settlement then absorption on a political endpoint", () => {
+	const world = DISTRIBUTION_FIXTURE.world({
+		neighbors: [[1], [0]],
+		desolate: [],
+		seed: 42,
+	})
+	const engine = DISTRIBUTION_FIXTURE.engine({
+		world,
+		groups: [[0]],
+		year: 2024,
+	})
+	engine.migration.arrivalYear[1] = 2025
+	engine.migration.continuousArrival[1] = 2025
+	engine.settlement.order = Int32Array.of(0, 1)
+	engine.settlement.cursor = 1
+	engine.settlement.capacities = [1]
+	engine.territory.owner[1] = -1
+	const log = engine.history.record.events.provinceEvents.get(1)!
+	log.base.ownerId = -1
+	log.base.controllerId = -1
+	E.advance({ engine })
+	const events = log.events.filter((event) => event.kind === "owner")
+	expect(events.map((event) => event.payload.nationId)).toEqual([-2, 0])
+	expect(events[0].timeMs).toBe(DATE.eu4DateToTimeMs("2025.1.1"))
+	expect(events[1].timeMs).toBeGreaterThanOrEqual(events[0].timeMs)
+})

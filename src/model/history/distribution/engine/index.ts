@@ -1,4 +1,5 @@
 import { DISTRIBUTION_ATTACKS } from "@/model/history/distribution/attacks"
+import { DISTRIBUTION_CRADLES } from "@/model/history/distribution/cradles"
 import type {
 	AdvanceParams,
 	CreateEngineParams,
@@ -6,6 +7,7 @@ import type {
 	EngineParams,
 	EngineSplitParams,
 	PlaybackParams,
+	StepEngineParams,
 } from "@/model/history/distribution/engine/types"
 import { DISTRIBUTION_RECORD } from "@/model/history/distribution/record"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
@@ -13,6 +15,7 @@ import { DISTRIBUTION_SECESSION } from "@/model/history/distribution/secession"
 import { DISTRIBUTION_SETTLEMENT } from "@/model/history/distribution/settlement"
 import { DISTRIBUTION_STATEHOOD } from "@/model/history/distribution/statehood"
 import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
+import { DISTRIBUTION_PROJECTION } from "@/model/history/distribution/targets/projection"
 import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 import { DATE } from "@/model/history/earth/date"
 import { PROCEDURAL_RECORD } from "@/model/history/record/procedural"
@@ -20,7 +23,11 @@ import { PLACEMENT } from "@/model/history/sim/nations/placement"
 import { RNG } from "@/model/shared/random/rng"
 
 function create({ world }: CreateEngineParams): DistributionEngine {
-	if (world.params.historyPipeline !== "distribution" || !world.provinces)
+	if (
+		world.params.historyPipeline !== "distribution" ||
+		!world.provinces ||
+		world.historyMigration.pipeline !== "distribution"
+	)
 		throw new Error("Distribution requires generated provinces")
 	const provinces = structuredClone(world.provinces)
 	const territory = DISTRIBUTION_TERRITORY.initialize({
@@ -29,11 +36,14 @@ function create({ world }: CreateEngineParams): DistributionEngine {
 	})
 	const habitability =
 		world.population?.habitability ?? new Float32Array(provinces.count).fill(1)
+	const migration = structuredClone(world.historyMigration.data)
+	const habitableCount = territory.capacities.reduce(
+		(sum, value) => sum + value,
+		0,
+	)
 	const settlement = DISTRIBUTION_SETTLEMENT.seed({
-		provinces,
-		migrationWave:
-			world.population?.migrationWave ??
-			new Float32Array(provinces.count).fill(-1),
+		migration,
+		componentCount: territory.capacities.length,
 	})
 	DISTRIBUTION_SETTLEMENT.step({
 		settlement,
@@ -55,21 +65,9 @@ function create({ world }: CreateEngineParams): DistributionEngine {
 	const validation = DISTRIBUTION_TERRITORY.validate({ territory })
 	if (validation.ownership || validation.connectivity || validation.capitals)
 		throw new Error("Invalid distribution initial ownership")
-	return {
-		territory,
-		attacks: DISTRIBUTION_ATTACKS.create(),
-		rng: RNG.createRng({ seed: world.params.seed }),
-		year: DISTRIBUTION_TARGETS.startYear,
-		target: DISTRIBUTION_TARGETS.project({
-			capacities: DISTRIBUTION_TARGETS.heldCapacities({
-				capacities: territory.capacities,
-				year: DISTRIBUTION_TARGETS.startYear,
-			}),
-			year: DISTRIBUTION_TARGETS.startYear,
-		}),
-		history,
-		settlement,
-		siteScore: Float32Array.from({ length: provinces.count }, (_, province) =>
+	const siteScore = Float32Array.from(
+		{ length: provinces.count },
+		(_, province) =>
 			PLACEMENT.nationPlacementScore({
 				province,
 				habitability,
@@ -77,7 +75,44 @@ function create({ world }: CreateEngineParams): DistributionEngine {
 				provinceContinent: undefined,
 				target: 1,
 			}),
-		),
+	)
+	const provincePositions = Float32Array.from(territory.positions)
+	const cradles = DISTRIBUTION_CRADLES.create({
+		provinces,
+		migration,
+		siteScore,
+		r_xyz: provincePositions,
+		planetRadiusKm: world.params.planetRadiusKm,
+	})
+	return {
+		territory,
+		migration,
+		cradles,
+		provincePositions,
+		planetRadiusKm: world.params.planetRadiusKm,
+		habitableCount,
+		executionStepCount: 0,
+		endpointClampExtraSteps: 0,
+		preStatePoliticalSteps: 0,
+		preStateAdvanceMs: 0,
+		politicalAdvanceMs: 0,
+		settlementEvents: 0,
+		unmetDemand: 0,
+		foundingViolations: 0,
+		attacks: DISTRIBUTION_ATTACKS.create(),
+		rng: RNG.createRng({ seed: world.params.seed }),
+		year: DISTRIBUTION_TARGETS.startYear,
+		target: DISTRIBUTION_TARGETS.project({
+			capacities: DISTRIBUTION_TARGETS.heldCapacities({
+				capacities: settlement.capacities,
+				habitableCount,
+				year: DISTRIBUTION_TARGETS.startYear,
+			}),
+			year: DISTRIBUTION_TARGETS.startYear,
+		}),
+		history,
+		settlement,
+		siteScore,
 		foundings: { projected: 0, firstInComponent: 0, inStatedComponent: 0 },
 		sequence: 0,
 		pending: [],
@@ -111,9 +146,9 @@ function splitCountry({
 		total,
 		limit: mandatory ? limit : total - 1,
 	})) {
-		const gain = DISTRIBUTION_TARGETS.gain({
+		const gain = DISTRIBUTION_PROJECTION.gain({
 			before,
-			after: DISTRIBUTION_TARGETS.action({
+			after: DISTRIBUTION_PROJECTION.action({
 				observed: before,
 				remove: [total],
 				add: [total - size, size],
@@ -143,7 +178,7 @@ function splitCountry({
 		size: bestSize,
 		limit: mandatory ? limit : total - 1,
 	})
-	const after = DISTRIBUTION_TARGETS.action({
+	const after = DISTRIBUTION_PROJECTION.action({
 		observed: before,
 		remove: [total],
 		add: [total - detached.length, detached.length],
@@ -175,17 +210,42 @@ function splitCountry({
 	return true
 }
 
-function advance({ engine: e }: EngineParams): void {
+function step({ engine: e, endpoint }: StepEngineParams): void {
 	if (e.year >= 2025) return
 	const started = performance.now(),
-		previousTimeMs = DATE.eu4DateToTimeMs(`${e.year}.1.1`),
-		oldOwner = e.territory.owner.slice(),
+		previousTimeMs = DATE.eu4DateToTimeMs(`${e.year}.1.1`)
+	const scheduled = DISTRIBUTION_TARGETS.nextYear({ year: e.year })
+	if (endpoint < scheduled) e.endpointClampExtraSteps++
+	e.year = Math.min(scheduled, endpoint)
+	e.executionStepCount++
+	DISTRIBUTION_SETTLEMENT.step({
+		settlement: e.settlement,
+		territory: e.territory,
+		year: e.year,
+	})
+	DISTRIBUTION_CRADLES.activate({
+		cradles: e.cradles,
+		provinces: e.territory.provinces,
+		r_xyz: e.provincePositions,
+		planetRadiusKm: e.planetRadiusKm,
+		year: e.year,
+	})
+	if (e.year <= DISTRIBUTION_TARGETS.firstStateYear) {
+		e.pending.push(
+			DISTRIBUTION_RECORD.writeSettlement({ engine: e, previousTimeMs }),
+		)
+		const elapsed = performance.now() - started
+		e.advanceMs += elapsed
+		e.preStateAdvanceMs += elapsed
+		return
+	}
+	const oldOwner = e.territory.owner.slice(),
 		oldIds = new Set(e.territory.countries.keys())
-	e.year = DISTRIBUTION_TARGETS.nextYear({ year: e.year })
 	const planning = performance.now()
 	e.target = DISTRIBUTION_TARGETS.project({
 		capacities: DISTRIBUTION_TARGETS.heldCapacities({
-			capacities: e.territory.capacities,
+			capacities: e.settlement.capacities,
+			habitableCount: e.habitableCount,
 			year: e.year,
 		}),
 		year: e.year,
@@ -212,16 +272,11 @@ function advance({ engine: e }: EngineParams): void {
 		ceiling: 0,
 		fragmentation: 0,
 	}
-	DISTRIBUTION_SETTLEMENT.step({
-		settlement: e.settlement,
-		territory: e.territory,
-		year: e.year,
-	})
 	if (e.year > DISTRIBUTION_TARGETS.firstStateYear) {
 		DISTRIBUTION_STATEHOOD.found({ engine: e })
 		DISTRIBUTION_STATEHOOD.absorb({ engine: e })
 	}
-	let observed = DISTRIBUTION_TARGETS.histogram({
+	let observed = DISTRIBUTION_PROJECTION.histogram({
 		sizes: [...e.territory.countries.values()].map((c) => c.members.size),
 	})
 	for (const c of [...e.territory.countries.values()])
@@ -245,7 +300,7 @@ function advance({ engine: e }: EngineParams): void {
 		rng: e.rng,
 	}
 	DISTRIBUTION_ATTACKS.resolve(params)
-	observed = DISTRIBUTION_TARGETS.histogram({
+	observed = DISTRIBUTION_PROJECTION.histogram({
 		sizes: [...e.territory.countries.values()].map((c) => c.members.size),
 	})
 	const fighting = new Set(
@@ -264,13 +319,18 @@ function advance({ engine: e }: EngineParams): void {
 		oldIds,
 	})
 	e.pending.push(batch)
-	e.advanceMs += performance.now() - started
+	const elapsed = performance.now() - started
+	e.advanceMs += elapsed
+	e.politicalAdvanceMs += elapsed
+}
+function advance({ engine }: EngineParams): void {
+	step({ engine, endpoint: 2025 })
 }
 
 function advanceUntil({ engine, year }: AdvanceParams): void {
 	if (!Number.isInteger(year) || year < engine.year || year > 2025)
 		throw new Error("Invalid distribution endpoint")
-	while (engine.year < year) advance({ engine })
+	while (engine.year < year) step({ engine, endpoint: year })
 }
 
 async function play({
@@ -299,7 +359,9 @@ async function play({
 			engine.pending = []
 			return
 		}
-		if (queued.length >= batchYears || !isRunning() || engine.year === 2025)
+		if (
+ queued.length >= (engine.year <= DISTRIBUTION_TARGETS.firstStateYear ? 1 : batchYears) || !isRunning() || engine.year === 2025
+ )
 			flush()
 	}
 	flush()

@@ -1,16 +1,37 @@
 import { expect, it } from "vitest"
 import { DISTRIBUTION_TARGETS as T } from "@/model/history/distribution/targets"
+import { DISTRIBUTION_PROJECTION } from "@/model/history/distribution/targets/projection"
 
 it("gives equivalent successor histograms to symmetric and same-bucket cuts", () => {
-	const observed = T.histogram({ sizes: [800, 1, 20] })
-	const split = T.action({ observed, remove: [800], add: [200, 600] })
-	expect(T.action({ observed, remove: [800], add: [600, 200] })).toEqual(split)
-	expect(T.action({ observed, remove: [800], add: [300, 500] })).toEqual(split)
-	expect(T.bucket({ size: 200 })).toBe(T.bucket({ size: 600 }))
+	const observed = DISTRIBUTION_PROJECTION.histogram({ sizes: [800, 1, 20] })
+	const split = DISTRIBUTION_PROJECTION.action({
+		observed,
+		remove: [800],
+		add: [200, 600],
+	})
+	expect(
+		DISTRIBUTION_PROJECTION.action({
+			observed,
+			remove: [800],
+			add: [600, 200],
+		}),
+	).toEqual(split)
+	expect(
+		DISTRIBUTION_PROJECTION.action({
+			observed,
+			remove: [800],
+			add: [300, 500],
+		}),
+	).toEqual(split)
+	expect(DISTRIBUTION_PROJECTION.bucket({ size: 200 })).toBe(
+		DISTRIBUTION_PROJECTION.bucket({ size: 600 }),
+	)
 })
 
 it("permits an improving size correction at the target country count", () => {
-	const before = T.histogram({ sizes: [...new Array<number>(20).fill(1), 400] })
+	const before = DISTRIBUTION_PROJECTION.histogram({
+		sizes: [...new Array<number>(20).fill(1), 400],
+	})
 	const target = {
 		...T.project({ capacities: [], year: 2025 }),
 		targetN: 21,
@@ -19,13 +40,20 @@ it("permits an improving size correction at the target country count", () => {
 		territoryShares: [20 / 420, 0, 0, 0, 0, 0, 400 / 420],
 		distributionApplicable: true,
 	}
-	const after = T.action({ observed: before, remove: [400], add: [200, 200] })
+	const after = DISTRIBUTION_PROJECTION.action({
+		observed: before,
+		remove: [400],
+		add: [200, 200],
+	})
 	const reduction =
-		T.loss({ observed: before, target }) - T.loss({ observed: after, target })
+		DISTRIBUTION_PROJECTION.loss({ observed: before, target }) -
+		DISTRIBUTION_PROJECTION.loss({ observed: after, target })
 	expect(reduction).toBeCloseTo(
 		10 * (2 / 22 - 1 / 21) - Math.log(22 / 21) / Math.log(1.25),
 	)
-	expect(T.gain({ before, after, target })).toBeGreaterThan(0)
+	expect(
+		DISTRIBUTION_PROJECTION.gain({ before, after, target }),
+	).toBeGreaterThan(0)
 })
 
 it("uses measured checkpoint shares and separate whole-period caps", () => {
@@ -50,17 +78,32 @@ it("uses measured checkpoint shares and separate whole-period caps", () => {
 })
 it("fits endpoints, adaptive brackets and a normalized mixture fallback", () => {
 	for (const mean of [101, 120]) {
-		const fit = T.fitPmf({ lo: 101, hi: 120, mean, iterations: 64 })
+		const fit = DISTRIBUTION_PROJECTION.fitPmf({
+			lo: 101,
+			hi: 120,
+			mean,
+			iterations: 64,
+		})
 		expect(fit.probabilities[mean - 101]).toBe(1)
 	}
-	const fit = T.fitPmf({ lo: 101, hi: 120, mean: 119.9, iterations: 64 })
+	const fit = DISTRIBUTION_PROJECTION.fitPmf({
+		lo: 101,
+		hi: 120,
+		mean: 119.9,
+		iterations: 64,
+	})
 	expect(fit.expansions).toBeGreaterThan(0)
 	expect(
 		Math.abs(
 			fit.probabilities.reduce((a, p, i) => a + p * (i + 101), 0) - 119.9,
 		),
 	).toBeLessThanOrEqual(0.0001)
-	const mixture = T.fitPmf({ lo: 2, hi: 4, mean: 2.6, iterations: 0 })
+	const mixture = DISTRIBUTION_PROJECTION.fitPmf({
+		lo: 2,
+		hi: 4,
+		mean: 2.6,
+		iterations: 0,
+	})
 	expect(mixture.mixture).toBe(true)
 	expect(
 		mixture.probabilities.reduce((a, p, i) => a + p * (i + 2), 0),
@@ -76,9 +119,12 @@ it("conserves component mass independently of ownership and handles empty target
 	const empty = T.project({ capacities: [], year: 2 })
 	expect(empty.targetN).toBe(0)
 	expect(empty.distributionApplicable).toBe(false)
-	expect(T.loss({ observed: T.histogram({ sizes: [] }), target: empty })).toBe(
-		0,
-	)
+	expect(
+		DISTRIBUTION_PROJECTION.loss({
+			observed: DISTRIBUTION_PROJECTION.histogram({ sizes: [] }),
+			target: empty,
+		}),
+	).toBe(0)
 })
 
 it("projects count ties and integer mass using fixed component targets", () => {
@@ -88,12 +134,31 @@ it("projects count ties and integer mass using fixed component targets", () => {
 		shares: [0, 1, 0, 0, 0, 0, 0],
 		means: [1, 2, 5, 10, 25, 50, 101],
 	}
-	const tie = T.projectComponent({ capacity: 3, profile })
+	const tie = DISTRIBUTION_PROJECTION.projectComponent({ capacity: 3, profile })
 	expect(tie.sizes).toEqual([3])
-	const balanced = T.projectComponent({
+	const balanced = DISTRIBUTION_PROJECTION.projectComponent({
 		capacity: 5,
 		profile: { ...profile, means: [1, 3, 5, 10, 25, 50, 101] },
 	})
 	expect(balanced.sizes).toEqual([2, 3])
 	expect(balanced.sizes.reduce((a, b) => a + b, 0)).toBe(5)
+})
+
+it("allocates feasible held capacity with explicit component IDs and deterministic remainders", () => {
+	const capacities = T.heldCapacities({
+		capacities: [0, 1, 4, 5],
+		habitableCount: 20,
+		year: 2,
+	})
+	expect(capacities).toEqual([0, 1, 4, 4])
+	const projection = T.project({ capacities, year: 2 })
+	expect(projection.componentIds).toEqual([1, 2, 3])
+	expect(projection.components.reduce((sum, c) => sum + c.capacity, 0)).toBe(9)
+	expect(
+		T.heldCapacities({
+			capacities: [0, 1, 0],
+			habitableCount: 100,
+			year: 2025,
+		}),
+	).toEqual([0, 1, 0])
 })

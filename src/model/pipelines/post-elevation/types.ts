@@ -16,6 +16,7 @@ import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import type { SphereMesh } from "@/model/mesh/types"
 
 export type ApplyOceanCurrentsToClimateParams = {
@@ -141,6 +142,7 @@ export interface PostPipelineInput {
 }
 
 export interface PostPipelineOutput {
+	historyMigration: HistoryMigration
 	climate: GenesisClimate
 	wind: WindVectors
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */

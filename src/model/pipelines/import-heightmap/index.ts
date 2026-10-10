@@ -705,6 +705,7 @@ function importGenesisWorld({
 		religionGender: provinceSociety.religionGender,
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
+		historyMigration: { pipeline: "earth" },
 		tradeGoods: post.tradeGoods,
 		settlementRegions: provinceSociety.settlementRegions,
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,

@@ -1,5 +1,6 @@
 import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
 import type { DistributionEngine } from "@/model/history/distribution/engine/types"
+import { DISTRIBUTION_MIGRATION } from "@/model/history/distribution/migration"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 import type { Territory } from "@/model/history/distribution/territory/types"
@@ -34,6 +35,7 @@ function world({
 		adjOffset,
 		adjList,
 		size: new Int32Array(count).fill(1),
+		areaKm2: new Float32Array(count).fill(1),
 		colors: new Float32Array(count * 3),
 		waterAccess: new Uint8Array(count),
 		riverAccess: new Uint8Array(count),
@@ -48,11 +50,30 @@ function world({
 		(_, i) => i / Math.max(1, count),
 	)
 	const nations = DISTRIBUTION_TERRITORY.emptyNations({ provinces })
+	const mesh = {
+		r_xyz,
+		numRegions: count,
+		adjOffset,
+		adjList,
+		regionArea: new Float32Array(count).fill(1),
+	}
+	const historyMigration = {
+		pipeline: "distribution",
+		data: DISTRIBUTION_MIGRATION.compute({
+			provinces,
+			habitability: new Float32Array(count).fill(1),
+			mesh,
+			ocean: new Uint8Array(count),
+			planetRadiusKm: 6371,
+			seed,
+		}),
+	}
 	return {
-		params: { seed, historyPipeline: "distribution" },
+		params: { seed, planetRadiusKm: 6371, historyPipeline: "distribution" },
 		provinces,
 		nations,
-		mesh: { r_xyz },
+		mesh,
+		historyMigration,
 		population: { migrationWave },
 	} as unknown as SerializedGenesisWorld
 }
@@ -84,6 +105,8 @@ function engine({
 	const e = DISTRIBUTION_ENGINE.create({ world: w })
 	e.territory = territory({ world: w, groups })
 	e.settlement.cursor = e.settlement.order.length
+	e.settlement.capacities = [...e.territory.capacities]
+	e.settlement.newlySettled = new Int32Array(0)
 	e.year = year
 	const { record } = e.history
 	for (const [p, log] of record.events.provinceEvents) {

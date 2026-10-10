@@ -1,6 +1,7 @@
 import { expect, it } from "vitest"
 import { DISTRIBUTION_ATTACKS as A } from "@/model/history/distribution/attacks"
 import { DISTRIBUTION_TARGETS as T } from "@/model/history/distribution/targets"
+import { DISTRIBUTION_PROJECTION } from "@/model/history/distribution/targets/projection"
 import { RNG } from "@/model/shared/random/rng"
 import { DISTRIBUTION_FIXTURE } from "@/test/history-run/fixtures/distribution"
 
@@ -139,7 +140,9 @@ it("permits multiple incoming attacks with one outgoing target and no reciprocal
 })
 it("normalizes the same improving merger at both world scales", () => {
 	for (const mass of [8, 8000]) {
-		const before = T.histogram({ sizes: new Array<number>(mass).fill(1) })
+		const before = DISTRIBUTION_PROJECTION.histogram({
+			sizes: new Array<number>(mass).fill(1),
+		})
 		const target = {
 			...T.project({ capacities: [], year: 2 }),
 			targetN: mass / 2,
@@ -148,8 +151,12 @@ it("normalizes the same improving merger at both world scales", () => {
 			territoryShares: [0, 1, 0, 0, 0, 0, 0],
 			distributionApplicable: true,
 		}
-		const after = T.action({ observed: before, remove: [1, 1], add: [2] })
-		const gain = T.gain({ before, after, target })
+		const after = DISTRIBUTION_PROJECTION.action({
+			observed: before,
+			remove: [1, 1],
+			add: [2],
+		})
+		const gain = DISTRIBUTION_PROJECTION.gain({ before, after, target })
 		expect(gain).toBeCloseTo(1, 9)
 		expect(A.bias({ gain })).toBe(4)
 	}

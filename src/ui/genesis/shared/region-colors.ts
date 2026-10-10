@@ -1,4 +1,4 @@
-﻿import { KOPPEN } from "@/model/climate/classification/koppen"
+import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
@@ -78,6 +78,7 @@ import {
 	basinColor,
 	TERRAIN_FEATURE_COLORS,
 	TOPOGRAPHY_COLORS,
+	UNOWNED_GRAY,
 } from "@/ui/genesis/shared/region-colors/palette"
 
 const CULTURE_ELEVATION_BUMP_SCALE = 1.6
@@ -1075,9 +1076,13 @@ export function computeRegionColors(
 				) {
 					const t = world.population.migrationWave[p]
 					if (t < 0) {
-						rgb[3 * r] = 0.35
-						rgb[3 * r + 1] = 0.33
-						rgb[3 * r + 2] = 0.32
+						const neutral =
+							world.historyMigration.pipeline === "distribution"
+								? UNOWNED_GRAY
+								: [0.35, 0.33, 0.32]
+						rgb[3 * r] = neutral[0]
+						rgb[3 * r + 1] = neutral[1]
+						rgb[3 * r + 2] = neutral[2]
 					} else {
 						const [cr, cg, cb] = migrationColor(t)
 						rgb[3 * r] = cr

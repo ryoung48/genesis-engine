@@ -17,6 +17,7 @@ import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { HISTORY_SCALE } from "@/ui/genesis/controls/history-scale"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
 import {
 	type MeasureMode,
@@ -1624,16 +1625,19 @@ export const GenesisView: React.FC<{
 	useEffect(() => {
 		if (!proceduralReplayPlaying || world?.isEarthImport) return
 		const timer = window.setInterval(() => {
-			const stepYears =
-				history.state?.record.pipeline === "distribution"
-					? DISTRIBUTION_TARGETS.stepYears({
-							year: DATE.historyTimeMsToYear(history.selectedTimeMs),
-						})
-					: 1
-			const next = Math.min(
-				history.selectedTimeMs + stepYears * STATE_CLOCK.yearMs,
-				history.maxTimeMs,
-			)
+			const next = HISTORY_SCALE.step({
+				scale: {
+					kind:
+						history.state?.record.pipeline === "distribution"
+							? "phased"
+							: "linear",
+				},
+				timeMs: history.selectedTimeMs,
+				direction: 1,
+				stepMs: STATE_CLOCK.yearMs,
+				minTimeMs: history.minTimeMs,
+				maxTimeMs: history.maxTimeMs,
+			})
 			history.setSelectedTimeMs(next)
 			if (next >= history.maxTimeMs) {
 				setProceduralReplayPlaying(false)
@@ -1650,6 +1654,7 @@ export const GenesisView: React.FC<{
 		history.state?.record.pipeline,
 		proceduralHistoryPlaying,
 		handleToggleProceduralHistoryPlayback,
+		history.minTimeMs,
 	])
 	const handleToggleHistoryPlayback = useCallback(() => {
 		if (world?.isEarthImport) {
@@ -2400,6 +2405,12 @@ export const GenesisView: React.FC<{
 							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
 								<div className="pointer-events-auto">
 									<SimulationControls
+										scale={{
+											kind:
+												history.state.record.pipeline === "distribution"
+													? "phased"
+													: "linear",
+										}}
 										selectedTimeMs={history.selectedTimeMs}
 										minTimeMs={history.minTimeMs}
 										maxTimeMs={history.maxTimeMs}
@@ -2418,7 +2429,10 @@ export const GenesisView: React.FC<{
 										stepLabels={{
 											previous: "Previous year",
 											next: "Next year",
-											slider: "History year",
+											slider:
+												history.state.record.pipeline === "distribution"
+													? "History year (compressed prehistory scale)"
+													: "History year",
 										}}
 										playPauseLabels={{
 											play: "Start timeline",

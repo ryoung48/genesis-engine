@@ -5,39 +5,37 @@ import type {
 	StepSettlementParams,
 } from "@/model/history/distribution/settlement/types"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
-import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
 
 function seed({
-	provinces,
-	migrationWave,
+	migration,
+	componentCount,
 }: SeedSettlementParams): SettlementState {
-	const arrival = (p: number) =>
-		migrationWave[p] < 0 ? Infinity : migrationWave[p]
-	const habitable: number[] = []
-	for (let p = 0; p < provinces.count; p++)
-		if (!provinces.desolate[p]) habitable.push(p)
-	habitable.sort((a, b) => arrival(a) - arrival(b) || a - b)
-	return { order: Int32Array.from(habitable), cursor: 0 }
+	return {
+		order: migration.order,
+		arrivalYear: migration.arrivalYear,
+		cursor: 0,
+		capacities: new Array<number>(componentCount).fill(0),
+		newlySettled: new Int32Array(0),
+	}
 }
-
 function settledCount({ settlement, year }: SettledCountParams): number {
-	const { uninhabited } = DISTRIBUTION_TARGETS.status({ year })
-	return Math.max(
-		settlement.cursor,
-		Math.min(
-			settlement.order.length,
-			Math.ceil((1 - uninhabited) * settlement.order.length - 1e-9),
-		),
+	let count = settlement.cursor
+	while (
+		count < settlement.order.length &&
+		settlement.arrivalYear[settlement.order[count]] <= year
 	)
+		count++
+	return count
 }
-
 function step({ settlement, territory, year }: StepSettlementParams): number {
 	const count = settledCount({ settlement, year })
-	const settled = count - settlement.cursor
-	for (let i = settlement.cursor; i < count; i++)
-		territory.owner[settlement.order[i]] = DISTRIBUTION_STATUS.stateless
+	settlement.newlySettled = settlement.order.slice(settlement.cursor, count)
+	for (const p of settlement.newlySettled) {
+		territory.owner[p] = DISTRIBUTION_STATUS.stateless
+		settlement.capacities[territory.componentId[p]]++
+	}
+	const added = count - settlement.cursor
 	settlement.cursor = count
-	return settled
+	return added
 }
-
 export const DISTRIBUTION_SETTLEMENT = { seed, settledCount, step }

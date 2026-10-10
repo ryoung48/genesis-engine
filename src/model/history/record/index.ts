@@ -1,3 +1,4 @@
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
@@ -493,9 +494,21 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provinceNation[province] = nation
 		provinceParent[province] = parent
 		provinceController[province] = controller
-		provinceCulture[province] = culture
-		provinceCultureBlendSecondary[province] = log.base.cultureBlendSecondaryId
-		provinceReligion[province] = religion
+		provinceCulture[province] =
+			state.record.pipeline === "distribution" &&
+			DISTRIBUTION_STATUS.isUninhabited({ owner: nation })
+				? -1
+				: culture
+		provinceCultureBlendSecondary[province] =
+			state.record.pipeline === "distribution" &&
+			DISTRIBUTION_STATUS.isUninhabited({ owner: nation })
+				? -1
+				: log.base.cultureBlendSecondaryId
+		provinceReligion[province] =
+			state.record.pipeline === "distribution" &&
+			DISTRIBUTION_STATUS.isUninhabited({ owner: nation })
+				? -1
+				: religion
 		provinceHre[province] = hre ? 1 : 0
 	}
 

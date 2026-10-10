@@ -1,6 +1,8 @@
 import { expect, it } from "vitest"
 import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
 import { DISTRIBUTION_SECESSION as SECESSION } from "@/model/history/distribution/secession"
+import { DISTRIBUTION_STATEHOOD as S } from "@/model/history/distribution/statehood"
+import { DISTRIBUTION_TARGETS as TARGETS } from "@/model/history/distribution/targets"
 import { DISTRIBUTION_TERRITORY as T } from "@/model/history/distribution/territory"
 import { DISTRIBUTION_FIXTURE } from "@/test/history-run/fixtures/distribution"
 
@@ -132,4 +134,69 @@ it("partitions isolated residuals and keeps capitals through carved splits", () 
 		connectivity: 0,
 		capitals: 0,
 	})
+})
+
+it("shares the 200-year eligibility boundary between normal and fallback founding", () => {
+	for (const mode of ["found", "absorb"] as const) {
+		const w = DISTRIBUTION_FIXTURE.world({
+			neighbors: [[]],
+			desolate: [],
+			seed: 42,
+		})
+		const engine = DISTRIBUTION_FIXTURE.engine({
+			world: w,
+			groups: [],
+			year: 2025,
+		})
+		engine.migration.arrivalYear[0] = 1826
+		engine.target = TARGETS.project({ capacities: [1], year: 2025 })
+		S[mode]({ engine })
+		expect(engine.territory.countries.size).toBe(0)
+		engine.migration.arrivalYear[0] = 1825
+		S[mode]({ engine })
+		expect(engine.territory.countries.size).toBe(1)
+	}
+})
+it("prioritizes an active cradle and never absorbs uninhabited land", () => {
+	const w = DISTRIBUTION_FIXTURE.world({
+		neighbors: [[], []],
+		desolate: [],
+		seed: 42,
+	})
+	const engine = DISTRIBUTION_FIXTURE.engine({
+		world: w,
+		groups: [],
+		year: 2025,
+	})
+	engine.migration.arrivalYear.fill(-79999)
+	engine.target = TARGETS.project({ capacities: [1, 1], year: 2025 })
+	engine.siteScore = Float32Array.of(100, 1)
+	engine.cradles.schedule = [
+		{
+			province: 1,
+			selectionYear: -3300,
+			arrivalYear: -79999,
+			residenceYears: 76699,
+			componentId: 1,
+			nearestDistanceKm: Infinity,
+		},
+	]
+	engine.cradles.cursor = 1
+	S.found({ engine })
+	expect(engine.territory.countries.get(0)?.capital).toBe(1)
+	engine.territory.owner[0] = -1
+	S.absorb({ engine })
+	expect(engine.territory.owner[0]).toBe(-1)
+})
+it("keeps all countries absent through the first-state boundary", () => {
+	const engine = DISTRIBUTION_ENGINE.create({
+		world: DISTRIBUTION_FIXTURE.world({
+			neighbors: [[1], [0]],
+			desolate: [],
+			seed: 42,
+		}),
+	})
+	DISTRIBUTION_ENGINE.advanceUntil({ engine, year: -3300 })
+	expect(engine.territory.countries.size).toBe(0)
+	expect(engine.preStatePoliticalSteps).toBe(0)
 })

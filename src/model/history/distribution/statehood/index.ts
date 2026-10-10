@@ -1,9 +1,7 @@
 import { DISTRIBUTION_ATTACKS } from "@/model/history/distribution/attacks"
 import type {
 	Candidate,
-	FallbackParams,
 	NeighborParams,
-	SiteParams,
 	StatehoodParams,
 } from "@/model/history/distribution/statehood/types"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
@@ -24,70 +22,52 @@ function hasStateNeighbor({ territory: t, province }: NeighborParams): boolean {
 	return false
 }
 
-function bestSite({ territory: t, score, spaced }: SiteParams): number {
-	let best = -1
-	for (let p = 0; p < t.owner.length; p++) {
-		if (!DISTRIBUTION_STATUS.isStateless({ owner: t.owner[p] })) continue
-		if (best >= 0 && score[p] <= score[best]) continue
-		if (spaced && hasStateNeighbor({ territory: t, province: p })) continue
-		best = p
+function bestSite({ engine: e }: StatehoodParams): number {
+	const t = e.territory
+	const eligible = (p: number) =>
+		DISTRIBUTION_STATUS.isStateless({ owner: t.owner[p] }) &&
+		e.year - e.migration.arrivalYear[p] >= 200
+	for (const choice of e.cradles.schedule.slice(0, e.cradles.cursor))
+		if (
+			eligible(choice.province) &&
+			!hasStateNeighbor({ territory: t, province: choice.province })
+		)
+			return choice.province
+	const stated = new Set(
+		[...t.countries.values()].map((c) => t.componentId[c.capital]),
+	)
+	const candidates: number[] = []
+	for (let p = 0; p < t.owner.length; p++) if (eligible(p)) candidates.push(p)
+	const unstated = candidates.filter((p) => !stated.has(t.componentId[p]))
+	const pool = unstated.length ? unstated : candidates
+	const spaced = pool.filter(
+		(p) => !hasStateNeighbor({ territory: t, province: p }),
+	)
+	const sites = spaced.length ? spaced : pool
+	let best = -1,
+		score = -Infinity
+	for (const p of sites) {
+		const value =
+			e.siteScore[p] *
+			(1 + Math.exp(-e.cradles.nearestDistanceKm[p] / e.cradles.spacingKm))
+		if (value > score || (value === score && p < best)) {
+			best = p
+			score = value
+		}
 	}
 	return best
 }
-
 function found({ engine: e }: StatehoodParams): void {
 	const limit = Math.max(1, Math.ceil(FOUNDING_MAX_SHARE * e.target.targetN))
 	let created = 0
 	while (e.territory.countries.size < e.target.targetN && created < limit) {
-		let site = bestSite({
-			territory: e.territory,
-			score: e.siteScore,
-			spaced: true,
-		})
-		if (site < 0)
-			site = bestSite({
-				territory: e.territory,
-				score: e.siteScore,
-				spaced: false,
-			})
+		const site = bestSite({ engine: e })
 		if (site < 0) break
+		if (e.year - e.migration.arrivalYear[site] < 200) e.foundingViolations++
 		DISTRIBUTION_TERRITORY.found({ territory: e.territory, province: site })
 		created++
 	}
 	e.foundings.projected += created
-}
-
-function fallbackSite({ engine: e }: FallbackParams): number {
-	const t = e.territory
-	const stated = new Set<number>()
-	for (const c of t.countries.values()) stated.add(t.componentId[c.capital])
-	const stateless = new Map<number, number[]>()
-	for (let i = 0; i < e.settlement.cursor; i++) {
-		const p = e.settlement.order[i]
-		if (!DISTRIBUTION_STATUS.isStateless({ owner: t.owner[p] })) continue
-		const list = stateless.get(t.componentId[p])
-		if (list) list.push(p)
-		else stateless.set(t.componentId[p], [p])
-	}
-	let pool: number[] = []
-	for (const [component, list] of stateless)
-		if (!stated.has(component) && list.length > pool.length) pool = list
-	if (!pool.length) {
-		const all = [...stateless.values()].flat()
-		const spaced = all.filter(
-			(p) => !hasStateNeighbor({ territory: t, province: p }),
-		)
-		pool = spaced.length ? spaced : all
-	}
-	let best = -1
-	for (const p of pool)
-		if (
-			best < 0 ||
-			e.siteScore[p] > e.siteScore[best] ||
-			(e.siteScore[p] === e.siteScore[best] && p < best)
-		)
-			best = p
-	return best
 }
 
 function absorb({ engine: e }: StatehoodParams): void {
@@ -95,10 +75,10 @@ function absorb({ engine: e }: StatehoodParams): void {
 	let held = 0
 	for (const c of t.countries.values()) held += c.members.size
 	const wanted = Math.round(
-		DISTRIBUTION_TARGETS.status({ year: e.year }).stateHeld *
-			e.settlement.order.length,
+		DISTRIBUTION_TARGETS.status({ year: e.year }).stateHeld * e.habitableCount,
 	)
 	let deficit = Math.min(wanted, e.settlement.cursor) - held
+	e.unmetDemand = Math.max(0, deficit)
 	if (deficit <= 0) return
 	const limits = new Map<number, number>()
 	const limitOf = (countryId: number) => {
@@ -207,16 +187,18 @@ function absorb({ engine: e }: StatehoodParams): void {
 		deficit--
 	}
 	while (deficit > 0) {
-		const site = fallbackSite({ engine: e })
+		const site = bestSite({ engine: e })
 		if (site < 0) break
 		const stated = [...t.countries.values()].some(
 			(c) => t.componentId[c.capital] === t.componentId[site],
 		)
+		if (e.year - e.migration.arrivalYear[site] < 200) e.foundingViolations++
 		DISTRIBUTION_TERRITORY.found({ territory: t, province: site })
 		if (stated) e.foundings.inStatedComponent++
 		else e.foundings.firstInComponent++
 		deficit--
 	}
+	e.unmetDemand = Math.max(0, deficit)
 }
 
 export const DISTRIBUTION_STATEHOOD = { found, absorb }

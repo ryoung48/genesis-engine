@@ -3,6 +3,7 @@ import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/t
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
@@ -70,6 +71,7 @@ type SerializedNationHierarchy = GenesisNationHierarchy
 export interface SerializedGenesisWorld {
 	routes: SerializedRoutes | null
 	network: SerializedNetwork | null
+	historyMigration: HistoryMigration
 	mesh: SerializedSphereMesh
 	plateAssignment: Int32Array
 	elevation: Float32Array

@@ -432,8 +432,12 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			current.data.pipeline === "distribution" ||
 			previous?.data.pipeline === "distribution"
 		) {
-			const before = byYear(da.annual),
-				after = byYear(db.annual)
+			const before = byYear(
+					Array.isArray(da.checkpoints) ? da.checkpoints : da.annual,
+				),
+				after = byYear(
+					Array.isArray(db.checkpoints) ? db.checkpoints : db.annual,
+				)
 			for (const year of new Set([...before.keys(), ...after.keys()])) {
 				const a = { ...before.get(year) },
 					b = { ...after.get(year) }
@@ -468,6 +472,32 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 					rows,
 				})
 			}
+			const migrationBefore = { ...object(da.migration) },
+				migrationAfter = { ...object(db.migration) }
+			for (const metric of [
+				"initializationMs",
+				"preStateAdvanceMs",
+				"politicalAdvanceMs",
+				"settlementRecordBytes",
+				"retainedArrayBytes",
+			]) {
+				rows.push({
+					before: migrationBefore[metric],
+					after: migrationAfter[metric],
+					section: "Performance",
+					period: seed,
+					metric: `migration.${metric}`,
+				})
+				delete migrationBefore[metric]
+				delete migrationAfter[metric]
+			}
+			addRows({
+				before: migrationBefore,
+				after: migrationAfter,
+				section: "Migration diagnostics",
+				period: seed,
+				rows,
+			})
 			for (const key of [
 				"warmupMs",
 				"projectionMs",
@@ -623,6 +653,7 @@ function html({ current, previous }: ReportPair): string {
 <style>:root{font-family:system-ui;color:#17212b;background:#f5f7fa}body{max-width:1400px;margin:32px auto;padding:0 24px}h1{margin-bottom:8px}p{line-height:1.5;overflow-wrap:anywhere}.warning{background:#fff0cc;padding:16px;border-radius:8px}.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:24px 0}input,select,button{font:inherit;padding:8px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:10px;text-align:left;border-bottom:1px solid #dce1e7;overflow-wrap:anywhere}th{background:#e8edf3}td:nth-child(n+4){font-variant-numeric:tabular-nums}tr.changed{background:#fff8e8}.scroll{overflow:auto}button:disabled{opacity:.5}</style>
 <h1>History benchmark comparison</h1><p>Current: ${link(current)}<br>Previous: ${previous ? link(previous) : "No earlier completed matching report found."}</p>
 ${!previous || !configMatches ? '<p class="warning">' + (!previous ? "First comparable run: values are shown without a baseline." : "Configuration differs or is missing from an older report. Review Configuration before interpreting changes as regressions.") + "</p>" : ""}
+${current.data.pipeline === "distribution" ? '<p class="warning">Fast migration fields missing in older reports are labelled Missing. Prehistory warm-up and execution cadence can differ; trajectory rows compare exact checkpoint years.</p>' : ""}
 ${previous && (current.data.pipeline ?? "simulation") !== (previous.data.pipeline ?? "simulation") ? '<p class="warning">Different mechanisms: this explicit cross-pipeline comparison shows shared political counts and timings. People, military and economy statistics are inapplicable to distribution history.</p>' : ""}
 ${current.data.pipeline === undefined || (previous && previous.data.pipeline === undefined) ? '<p class="warning">An older saved report has no pipeline field and is interpreted as simulation.</p>' : ""}
 <p>Simulation and diagnostics: ${simulationChanges.filter((row) => row.before !== undefined && row.after !== undefined).length.toLocaleString("en-US")} changed existing values, ${simulationChanges.filter((row) => row.before === undefined).length.toLocaleString("en-US")} added, ${simulationChanges.filter((row) => row.after === undefined).length.toLocaleString("en-US")} removed. Timing and memory: ${changed.filter((row) => row.section === "Performance").length.toLocaleString("en-US")} differences. Numerical changes show current minus previous. No increase or decrease is automatically judged better.</p>

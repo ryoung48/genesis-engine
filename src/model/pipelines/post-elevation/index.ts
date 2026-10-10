@@ -33,6 +33,8 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import { PROVINCES } from "@/model/geography/terrain/provinces"
 import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import { DISTRIBUTION_MIGRATION } from "@/model/history/distribution/migration"
+import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
@@ -975,31 +977,56 @@ function runPostElevationPipeline(
 		seed: params.seed,
 	})
 	const planetRadiusKm = params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
-	const migration = MIGRATION.compute({
-		provinces,
-		habitability: rawHabitability,
-		mesh,
-		isLand,
-		elevationKm: elevation_km,
-		planetRadiusKm,
-		seed: params.seed,
-		horizonYear: MIGRATION_HORIZON_YEAR,
-	})
-	const cradles = MIGRATION.cradles({
-		provinces,
-		arrivalYear: migration.arrivalYear,
-		siteScore: Float32Array.from({ length: provinces.count }, (_, province) =>
-			PLACEMENT.nationPlacementScore({
-				province,
-				habitability: rawHabitability,
-				waterAccess: provinces.waterAccess,
-				provinceContinent: undefined,
-				target: 1,
-			}),
-		),
-		r_xyz: mesh.r_xyz,
-		planetRadiusKm,
-	})
+	const historyMigration: HistoryMigration =
+		params.historyPipeline === "distribution"
+			? {
+					pipeline: "distribution",
+					data: DISTRIBUTION_MIGRATION.compute({
+						provinces,
+						habitability: rawHabitability,
+						mesh,
+						ocean: LANDMARKS.regionTypeMask({ landmarks, type: "ocean" }),
+						planetRadiusKm,
+						seed: params.seed,
+					}),
+				}
+			: { pipeline: "simulation" }
+	const simulationMigration =
+		historyMigration.pipeline === "distribution"
+			? null
+			: MIGRATION.compute({
+					provinces,
+					habitability: rawHabitability,
+					mesh,
+					isLand,
+					elevationKm: elevation_km,
+					planetRadiusKm,
+					seed: params.seed,
+					horizonYear: MIGRATION_HORIZON_YEAR,
+				})
+	const cradles = simulationMigration
+		? MIGRATION.cradles({
+				provinces,
+				arrivalYear: simulationMigration.arrivalYear,
+				siteScore: Float32Array.from(
+					{ length: provinces.count },
+					(_, province) =>
+						PLACEMENT.nationPlacementScore({
+							province,
+							habitability: rawHabitability,
+							waterAccess: provinces.waterAccess,
+							provinceContinent: undefined,
+							target: 1,
+						}),
+				),
+				r_xyz: mesh.r_xyz,
+				planetRadiusKm,
+			})
+		: null
+	const migrationWave =
+		historyMigration.pipeline === "distribution"
+			? historyMigration.data.migrationWave
+			: (simulationMigration?.migrationWave ?? new Float32Array(0))
 	TIMING.record({ stage: "Post: migration", startedAt: t0, timings })
 	onProgress?.("Post: migration", 74)
 
@@ -1009,72 +1036,83 @@ function runPostElevationPipeline(
 	const startYear = STATE_CLOCK.defaultStartYear
 	const arrivalSteered = eraConfig.id === "lateMedieval"
 
-	// Settled land has people (cultures, population); state-held land is the
-	// part of it that gets nations. The late medieval start reads both from the
-	// arrival field and the target profile; other eras keep their wave
-	// percentiles.
-	const actualSettlementWave = arrivalSteered
-		? Math.fround(
-				MIGRATION.waveOf({
-					year: startYear,
-					horizonYear: MIGRATION_HORIZON_YEAR,
-				}),
-			)
-		: ERAS.wavePercentileThreshold({
-				migrationWave: migration.migrationWave,
-				desolate: provinces.desolate,
-				fraction: eraConfig.settlementFraction,
-			})
-	const actualStatehoodWave = ERAS.wavePercentileThreshold({
-		migrationWave: migration.migrationWave,
-		desolate: provinces.desolate,
-		fraction: eraConfig.settlementFraction * eraConfig.statehoodFraction,
-	})
-	// Cultures and religions cover every habitable province, so land settled
-	// after the start (or never) already has them and a name.
-	const eraSettledMask = new Uint8Array(provinces.count)
-	const settledAtStart = new Uint8Array(provinces.count)
-	let habitableCount = 0
-	for (let p = 0; p < provinces.count; p++) {
-		if (provinces.desolate[p]) continue
-		habitableCount++
-		if (arrivalSteered) {
-			eraSettledMask[p] = 1
-			settledAtStart[p] = migration.arrivalYear[p] <= startYear ? 1 : 0
-		} else if (
-			migration.migrationWave[p] >= 0 &&
-			migration.migrationWave[p] <= actualSettlementWave
-		) {
-			eraSettledMask[p] = 1
-			settledAtStart[p] = 1
-		}
-	}
+	let actualSettlementWave = 1
+	let eraSettledMask: Uint8Array = new Uint8Array(provinces.count)
 	let eraStatehoodMask: Uint8Array | undefined
-	if (eraConfig.hasNations && provinces.count > 0) {
-		if (arrivalSteered) {
-			const profile = TARGET_PROFILE.at({
-				year: startYear,
-				habitableProvinces: habitableCount,
-			})
-			const sources = MIGRATION.activeCradles({ cradles, year: startYear })
-			eraStatehoodMask = MIGRATION.heldCore({
-				provinces,
-				suitability: migration.suitability,
-				settled: settledAtStart,
-				sources: sources.length ? sources : [migration.origin],
-				count: Math.round(profile.stateHeld * habitableCount),
-				r_xyz: mesh.r_xyz,
-				planetRadiusKm,
-			})
-		} else {
-			eraStatehoodMask = Uint8Array.from(settledAtStart)
-			if (eraConfig.settlementFraction * eraConfig.statehoodFraction < 1.0)
-				for (let p = 0; p < provinces.count; p++)
-					if (migration.migrationWave[p] > actualStatehoodWave)
-						eraStatehoodMask[p] = 0
+	if (historyMigration.pipeline === "distribution") {
+		eraSettledMask = historyMigration.data.contextMask
+		eraStatehoodMask = new Uint8Array(provinces.count)
+	} else if (simulationMigration && cradles) {
+		// Settled land has people (cultures, population); state-held land is the
+		// part of it that gets nations. The late medieval start reads both from the
+		// arrival field and the target profile; other eras keep their wave
+		// percentiles.
+		actualSettlementWave = arrivalSteered
+			? Math.fround(
+					MIGRATION.waveOf({
+						year: startYear,
+						horizonYear: MIGRATION_HORIZON_YEAR,
+					}),
+				)
+			: ERAS.wavePercentileThreshold({
+					migrationWave,
+					desolate: provinces.desolate,
+					fraction: eraConfig.settlementFraction,
+				})
+		const actualStatehoodWave = ERAS.wavePercentileThreshold({
+			migrationWave,
+			desolate: provinces.desolate,
+			fraction: eraConfig.settlementFraction * eraConfig.statehoodFraction,
+		})
+		// Cultures and religions cover every habitable province, so land settled
+		// after the start (or never) already has them and a name.
+		const settledAtStart = new Uint8Array(provinces.count)
+		let habitableCount = 0
+		for (let p = 0; p < provinces.count; p++) {
+			if (provinces.desolate[p]) continue
+			habitableCount++
+			if (arrivalSteered) {
+				eraSettledMask[p] = 1
+				settledAtStart[p] = simulationMigration.arrivalYear[p] <= startYear ? 1 : 0
+			} else if (
+				migrationWave[p] >= 0 &&
+				migrationWave[p] <= actualSettlementWave
+			) {
+				eraSettledMask[p] = 1
+				settledAtStart[p] = 1
+			}
+		}
+		if (eraConfig.hasNations && provinces.count > 0) {
+			if (arrivalSteered) {
+				const profile = TARGET_PROFILE.at({
+					year: startYear,
+					habitableProvinces: habitableCount,
+				})
+				const sources = MIGRATION.activeCradles({ cradles, year: startYear })
+				eraStatehoodMask = MIGRATION.heldCore({
+					provinces,
+					suitability: simulationMigration.suitability,
+					settled: settledAtStart,
+					sources: sources.length ? sources : [simulationMigration.origin],
+					count: Math.round(profile.stateHeld * habitableCount),
+					r_xyz: mesh.r_xyz,
+					planetRadiusKm,
+				})
+			} else {
+				eraStatehoodMask = Uint8Array.from(settledAtStart)
+				if (eraConfig.settlementFraction * eraConfig.statehoodFraction < 1.0)
+					for (let p = 0; p < provinces.count; p++)
+						if (migrationWave[p] > actualStatehoodWave) eraStatehoodMask[p] = 0
+			}
 		}
 	}
 
+	const populationWave =
+		historyMigration.pipeline === "distribution"
+			? Float32Array.from(migrationWave, (w, p) =>
+					historyMigration.data.contextMask[p] ? w : -1,
+				)
+			: migrationWave
 	const population: ProvincePopulation = POPULATION.computePopulation({
 		provinces,
 		landmarks,
@@ -1088,16 +1126,18 @@ function runPostElevationPipeline(
 		mesh,
 		planetRadiusKm: params.planetRadiusKm,
 		eraTargetPopulation: eraConfig.targetPopulation,
-		migrationWave: migration.migrationWave,
+		migrationWave: populationWave,
 		settlementWave: actualSettlementWave,
 		migrationFalloff: eraConfig.migrationFalloff,
 	})
-	population.migrationWave = migration.migrationWave
-	population.arrivalYear = migration.arrivalYear
-	population.predecessor = migration.predecessor
-	population.settlementOrder = migration.order
-	population.cradles = cradles
-	population.migrationDiagnostics = migration.diagnostics
+	population.migrationWave = migrationWave
+	if (simulationMigration) {
+		population.arrivalYear = simulationMigration.arrivalYear
+		population.predecessor = simulationMigration.predecessor
+		population.settlementOrder = simulationMigration.order
+		population.cradles = cradles ?? undefined
+		population.migrationDiagnostics = simulationMigration.diagnostics
+	}
 	TIMING.record({ stage: "Post: population", startedAt: t0, timings })
 	onProgress?.("Post: population", 74)
 
@@ -1153,6 +1193,7 @@ function runPostElevationPipeline(
 		provinces,
 		locations,
 		population,
+		historyMigration,
 		tradeGoods,
 		hazards,
 		cycloneRisk,

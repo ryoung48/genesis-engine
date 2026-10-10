@@ -43,6 +43,7 @@ export default defineConfig(({ command, mode }) => {
 		"Cross-Origin-Embedder-Policy": "credentialless",
 	}
 	const historySmokeFiles = [
+		"src/ui/genesis/controls/history-scale/history-scale.smoke.test.ts",
 		"src/test/history-run/!(history-run|history-report|retained-memory|siege-calibration).smoke.test.ts",
 	]
 

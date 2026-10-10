@@ -1,4 +1,4 @@
-﻿import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { COLOR } from "@/model/history/earth/color"
 import { GOVERNMENT } from "@/model/history/earth/government"
@@ -20,12 +20,12 @@ import {
 	type NationMapMode,
 	type SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
+import { UNOWNED_GRAY } from "@/ui/genesis/shared/region-colors/palette"
 import {
 	TITLE_TIER_COLORS,
 	tintNationColor,
 } from "@/ui/genesis/shared/title-colors"
 
-const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 const STATELESS_WHITE: [number, number, number] = [1, 1, 1]
 
 type Rgb = [number, number, number]

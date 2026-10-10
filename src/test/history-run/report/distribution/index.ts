@@ -1,14 +1,19 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
+import { DISTRIBUTION_ATTACKS } from "@/model/history/distribution/attacks"
 import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
+import type { DistributionEngine } from "@/model/history/distribution/engine/types"
 import { DISTRIBUTION_RECORD } from "@/model/history/distribution/record"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
+import { DISTRIBUTION_PROJECTION } from "@/model/history/distribution/targets/projection"
 import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
+import { DATE } from "@/model/history/earth/date"
 import { HISTORY } from "@/model/history/record"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
+import { DISTRIBUTION_MIGRATION_REPORT } from "@/test/history-run/report/distribution/migration"
 import type {
 	AverageParams,
 	DistanceParams,
@@ -16,6 +21,7 @@ import type {
 	DistributionSnapshot,
 	GateParams,
 	LandmassParams,
+	SnapshotAtParams,
 	SnapshotParams,
 } from "@/test/history-run/report/distribution/types"
 import { REPORT_LIFETIME } from "@/test/history-run/report/lifetime"
@@ -23,10 +29,9 @@ import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
 const CHECKPOINT_YEARS = [
-	-9999, -8000, -6000, -4000, -3300, -3000, -2000, -1000, -500, 2, 476, 1066,
-	1500, 1701, 1914, 2025,
+	-79999, -59999, -39999, -19999, -9999, -8000, -6000, -4000, -3300, -3000,
+	-2000, -1000, -500, 2, 476, 1066, 1500, 1701, 1914, 2025,
 ]
-const UNINHABITED_BAND = 0.005
 const STATUS_BAND = 0.02
 const FALLBACK_SHARE_CAP = 0.05
 const ELONGATION_MIN_SIZE = 4
@@ -46,9 +51,9 @@ function statusShares({ engine: e }: LandmassParams) {
 		else held++
 	}
 	return {
-		uninhabited: uninhabited / habitable,
-		stateless: stateless / habitable,
-		stateHeld: held / habitable,
+		uninhabited: habitable ? uninhabited / habitable : 0,
+		stateless: habitable ? stateless / habitable : 0,
+		stateHeld: habitable ? held / habitable : 0,
 	}
 }
 
@@ -65,11 +70,7 @@ function gate({ rows, violations, expectedRows }: GateParams): boolean {
 		rows.length === expectedRows &&
 		rows.every(
 			(r) =>
-				Math.abs(r.status.uninhabited - r.targetStatus.uninhabited) <=
-					UNINHABITED_BAND &&
 				Math.abs(r.status.stateHeld - r.targetStatus.stateHeld) <=
-					STATUS_BAND &&
-				Math.abs(r.status.stateless - r.targetStatus.stateless) <=
 					STATUS_BAND &&
 				(r.year > DISTRIBUTION_TARGETS.firstStateYear || r.count === 0),
 		) &&
@@ -85,7 +86,7 @@ function gate({ rows, violations, expectedRows }: GateParams): boolean {
 
 function snapshot({ engine: e }: SnapshotParams): DistributionSnapshot {
 	const sizes = [...e.territory.countries.values()].map((c) => c.members.size),
-		h = DISTRIBUTION_TARGETS.histogram({ sizes }),
+		h = DISTRIBUTION_PROJECTION.histogram({ sizes }),
 		t = e.target
 	const countryShares = h.countries.map((n) => (h.count ? n / h.count : 0)),
 		territoryShares = h.territory.map((n) => (h.mass ? n / h.mass : 0))
@@ -173,8 +174,27 @@ function snapshot({ engine: e }: SnapshotParams): DistributionSnapshot {
 		)
 			lifecycle++
 	}
+	let habitableArea = 0,
+		inhabitedArea = 0
+	for (let p = 0; p < e.territory.owner.length; p++)
+		if (!e.territory.provinces.desolate[p]) {
+			const area = e.territory.provinces.areaKm2?.[p] ?? 0
+			habitableArea += area
+			if (e.territory.owner[p] !== DISTRIBUTION_STATUS.uninhabited)
+				inhabitedArea += area
+		}
+	const requestedHeld = Math.round(
+		DISTRIBUTION_TARGETS.status({ year: e.year }).stateHeld * e.habitableCount,
+	)
+	const feasibleHeld = t.components.reduce((sum, c) => sum + c.capacity, 0)
 	return {
 		year: e.year,
+		cradles: e.cradles.schedule.filter((c) => c.selectionYear <= e.year),
+		inhabitedAreaShare: habitableArea ? inhabitedArea / habitableArea : 0,
+		requestedHeld,
+		feasibleHeld,
+		unmetHeld: Math.max(0, feasibleHeld - h.mass),
+		unmetCountries: Math.max(0, t.targetN - h.count),
 		status: statusShares({ engine: e }),
 		targetStatus: DISTRIBUTION_TARGETS.status({ year: e.year }),
 		foundings: { ...e.foundings },
@@ -190,7 +210,7 @@ function snapshot({ engine: e }: SnapshotParams): DistributionSnapshot {
 			? tv({ before: territoryShares, after: t.territoryShares })
 			: 0,
 		countError: t.targetN ? Math.abs(h.count - t.targetN) / t.targetN : 0,
-		steeringLoss: DISTRIBUTION_TARGETS.loss({ observed: h, target: t }),
+		steeringLoss: DISTRIBUTION_PROJECTION.loss({ observed: h, target: t }),
 		rawCountryTV: h.mass
 			? tv({ before: countryShares, after: t.raw.shares })
 			: 0,
@@ -247,6 +267,46 @@ function snapshot({ engine: e }: SnapshotParams): DistributionSnapshot {
 	}
 }
 
+function snapshotAt({ engine, year }: SnapshotAtParams): DistributionSnapshot {
+	const timeMs = DATE.eu4DateToTimeMs(`${year}.1.1`)
+	if (
+		timeMs > engine.history.record.maxTimeMs ||
+		timeMs < engine.history.record.minTimeMs
+	)
+		throw new Error("Checkpoint unavailable")
+	const frame = HISTORY.frameAt({ state: engine.history, timeMs })
+	if (year === engine.year) return snapshot({ engine })
+	if (year > -3300)
+		throw new Error("Political checkpoints require the completed annual step")
+	const historical: DistributionEngine = {
+		...engine,
+		year,
+		attacks: DISTRIBUTION_ATTACKS.create(),
+		pending: [],
+		splits: 0,
+		absorptions: 0,
+		history: {
+			...engine.history,
+			record: {
+				...engine.history.record,
+				nations: [],
+				events: { ...engine.history.record.events, nationEvents: [], wars: [] },
+			},
+		},
+		territory: {
+			...engine.territory,
+			owner: frame.provinceNation,
+			mutations: 0,
+			connectivityScans: 0,
+			connectivityMs: 0,
+			countries: new Map(),
+		},
+		target: DISTRIBUTION_TARGETS.project({ capacities: [], year }),
+		foundings: { projected: 0, firstInComponent: 0, inStatedComponent: 0 },
+	}
+	return snapshot({ engine: historical })
+}
+
 function run(options: DistributionReportOptions): void {
 	const baselinePipeline = options.baselinePath
 		? (HISTORY_COMPARISON.read(options.baselinePath).data.pipeline ??
@@ -256,7 +316,7 @@ function run(options: DistributionReportOptions): void {
 		to = from + options.years
 	if (from < DISTRIBUTION_TARGETS.startYear || to > 2025 || options.years < 1)
 		throw new Error(
-			"Distribution measurement window must be inside 9999 BCE–2025",
+			"Distribution measurement window must be inside 80000 BCE–2025",
 		)
 	const saved: Record<string, unknown> = {
 		pipeline: "distribution",
@@ -283,10 +343,8 @@ function run(options: DistributionReportOptions): void {
 		})
 		const engineMs = performance.now() - init
 		const warmupStarted = performance.now()
-		while (engine.year < from) {
-			DISTRIBUTION_ENGINE.advance({ engine })
-			engine.pending = []
-		}
+		DISTRIBUTION_ENGINE.advanceUntil({ engine, year: from })
+		engine.pending = []
 		const warmupMs = performance.now() - warmupStarted
 		const initial = snapshot({ engine }),
 			annual: DistributionSnapshot[] = [],
@@ -297,13 +355,19 @@ function run(options: DistributionReportOptions): void {
 		const selected: DistributionSnapshot[] = []
 		let cursor = 0
 		while (cursor < checkpoints.length && initial.year >= checkpoints[cursor]) {
-			selected.push(initial)
+			selected.push(snapshotAt({ engine, year: checkpoints[cursor] }))
 			cursor++
 		}
 		let steps = 0
 		while (engine.year < to) {
 			const tick = performance.now()
-			DISTRIBUTION_ENGINE.advance({ engine })
+			DISTRIBUTION_ENGINE.advanceUntil({
+				engine,
+				year: Math.min(
+					to,
+					DISTRIBUTION_TARGETS.nextYear({ year: engine.year }),
+				),
+			})
 			annualTicks.push(performance.now() - tick)
 			steps++
 			const atCheckpoint =
@@ -320,11 +384,12 @@ function run(options: DistributionReportOptions): void {
 					cursor < checkpoints.length &&
 					engine.year >= checkpoints[cursor]
 				) {
-					selected.push(row)
+					selected.push(snapshotAt({ engine, year: checkpoints[cursor] }))
 					cursor++
 				}
+				const checkpoint = selected.at(-1)!
 				options.log(
-					`seed ${seed} year ${row.year}: uninhabited ${row.status.uninhabited.toFixed(4)}/${row.targetStatus.uninhabited.toFixed(4)}, stateless ${row.status.stateless.toFixed(4)}/${row.targetStatus.stateless.toFixed(4)}, held ${row.status.stateHeld.toFixed(4)}/${row.targetStatus.stateHeld.toFixed(4)}, countries ${row.count}/${row.targetCount}, country TV ${row.countryTV.toFixed(3)}, territory TV ${row.territoryTV.toFixed(3)}, count error ${row.countError.toFixed(3)}, tendrils ${row.tendrilShare.toFixed(4)}, elongation p50/p90 ${row.elongation.p50.toFixed(2)}/${row.elongation.p90.toFixed(2)}, elongated ${row.elongatedShare.toFixed(3)}`,
+					`seed ${seed} year ${checkpoint.year}: uninhabited ${checkpoint.status.uninhabited.toFixed(4)}, stateless ${checkpoint.status.stateless.toFixed(4)}, held ${checkpoint.status.stateHeld.toFixed(4)}/${checkpoint.targetStatus.stateHeld.toFixed(4)}, countries ${checkpoint.count}/${checkpoint.targetCount}, country TV ${checkpoint.countryTV.toFixed(3)}, territory TV ${checkpoint.territoryTV.toFixed(3)}, count error ${checkpoint.countError.toFixed(3)}, tendrils ${checkpoint.tendrilShare.toFixed(4)}, elongation p50/p90 ${checkpoint.elongation.p50.toFixed(2)}/${checkpoint.elongation.p90.toFixed(2)}, elongated ${checkpoint.elongatedShare.toFixed(3)}`,
 				)
 			}
 			if (steps % 20 === 0 || atCheckpoint || engine.year === to) {
@@ -357,7 +422,9 @@ function run(options: DistributionReportOptions): void {
 				args[1] instanceof Map ? [...args[1]] : args[1],
 			),
 		)
+		const migration = DISTRIBUTION_MIGRATION_REPORT.summarize({ engine })
 		bySeed[seed] = {
+			migration,
 			pipeline: "distribution",
 			completed: true,
 			era: options.era,
@@ -423,8 +490,8 @@ function run(options: DistributionReportOptions): void {
 	})
 	writeFileSync(
 		join(dirname(options.outPath), "comparison.md"),
-		`Pipe 3 (${options.seeds.join(", ")}, ${options.numPoints} points, ${from}–${to}). Warm-up from AD 2 is reported separately. ${options.baselinePath ? `Explicit reference: ${options.baselinePath}; ${baselinePipeline === "distribution" ? "same producer" : "different mechanisms"}.` : "No equivalent pre-change Pipe 3 baseline exists."} See ${comparison}. Calibration uses the selected seed at 204000 points.\n`,
+		`Pipe 3 (${options.seeds.join(", ")}, ${options.numPoints} points, ${from}–${to}). Warm-up from 80000 BCE is reported separately; the equivalent -9999 window now uses 100-year pre-state cadence rather than 50-year cadence. Exact checkpoints are compared by year. ${options.baselinePath ? `Explicit reference: ${options.baselinePath}; ${baselinePipeline === "distribution" ? "same producer" : "different mechanisms"}.` : "No equivalent pre-change Pipe 3 baseline exists."} See ${comparison}. Calibration uses the selected seed at 204000 points.\n`,
 	)
 }
 
-export const DISTRIBUTION_REPORT = { run, snapshot }
+export const DISTRIBUTION_REPORT = { run, snapshot, snapshotAt }

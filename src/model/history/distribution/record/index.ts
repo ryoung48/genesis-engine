@@ -4,9 +4,11 @@ import type {
 	EventTimeParams,
 	MergeBatchesParams,
 	RecordBatch,
+	SettlementRecordParams,
 	WriteYearParams,
 } from "@/model/history/distribution/record/types"
 import { DISTRIBUTION_RECORD_WAR } from "@/model/history/distribution/record/war"
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { DATE } from "@/model/history/earth/date"
 import { PROCEDURAL_RECORD } from "@/model/history/record/procedural"
 import type { HistoryState } from "@/model/history/record/types"
@@ -52,12 +54,49 @@ function mergeBatches({ batches }: MergeBatchesParams): RecordBatch {
 	return {
 		sequence: first.sequence,
 		lastSequence: last.lastSequence,
-		firstTimeMs: first.firstTimeMs,
+		firstTimeMs: Math.min(...batches.map((b) => b.firstTimeMs)),
 		throughTimeMs: last.throughTimeMs,
 		provinces: batches.flatMap((b) => b.provinces),
 		nations: batches.flatMap((b) => b.nations),
 		wars: batches.flatMap((b) => b.wars),
 	}
+}
+function settlementPatches({ engine: e }: SettlementRecordParams) {
+	return [...e.settlement.newlySettled].map((province) => ({
+		province,
+		events: ["owner", "controller"].map((kind) => ({
+			timeMs: DATE.eu4DateToTimeMs(`${e.migration.arrivalYear[province]}.1.1`),
+			kind,
+			payload: { nationId: DISTRIBUTION_STATUS.stateless },
+			comment: null as null,
+		})),
+	}))
+}
+function writeSettlement({
+	engine: e,
+	previousTimeMs,
+}: SettlementRecordParams): RecordBatch {
+	const started = performance.now(),
+		provinces = settlementPatches({ engine: e, previousTimeMs })
+	const throughTimeMs = DATE.eu4DateToTimeMs(`${e.year}.1.1`)
+	const batch: RecordBatch = {
+		sequence: ++e.sequence,
+		lastSequence: e.sequence,
+		firstTimeMs: Math.min(
+			throughTimeMs,
+			...provinces.map((p) => p.events[0].timeMs),
+		),
+		throughTimeMs,
+		provinces,
+		nations: [],
+		wars: [],
+	}
+	e.settlementEvents += provinces.length
+	e.recordWritingMs += performance.now() - started
+	const ingestion = performance.now()
+	consumeBatch({ state: e.history, batch })
+	e.recordIngestionMs += performance.now() - ingestion
+	return batch
 }
 function writeYear({
 	engine: e,
@@ -79,7 +118,10 @@ function writeYear({
 	for (let p = 0; p < oldOwner.length; p++) {
 		const owner = e.territory.owner[p]
 		if (oldOwner[p] === owner) continue
-		const timeMs = eventTime({ channel: oldOwner[p], salt: owner })
+		const timeMs = Math.max(
+			eventTime({ channel: oldOwner[p], salt: owner }),
+			DATE.eu4DateToTimeMs(`${e.migration.arrivalYear[p]}.1.1`),
+		)
 		ownershipTimes.set(p, timeMs)
 		firstGain.set(owner, Math.min(firstGain.get(owner) ?? timeMs, timeMs))
 		for (const id of [oldOwner[p], owner])
@@ -104,10 +146,15 @@ function writeYear({
 		lastSequence: e.sequence,
 		throughTimeMs,
 		firstTimeMs: previousTimeMs + dayMs,
-		provinces: [],
+		provinces: settlementPatches({ engine: e, previousTimeMs }),
 		nations: [],
 		wars: [],
 	}
+	e.settlementEvents += batch.provinces.length
+	batch.firstTimeMs = Math.min(
+		batch.firstTimeMs,
+		...batch.provinces.map((p) => p.events[0].timeMs),
+	)
 	for (const [province, timeMs] of ownershipTimes)
 		batch.provinces.push({
 			province,
@@ -269,4 +316,5 @@ export const DISTRIBUTION_RECORD = {
 	consumeBatch,
 	mergeBatches,
 	writeYear,
+	writeSettlement,
 }

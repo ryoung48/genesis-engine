@@ -13,7 +13,7 @@ import type {
 	OpportunityParams,
 	WeightParams,
 } from "@/model/history/distribution/attacks/types"
-import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
+import { DISTRIBUTION_PROJECTION } from "@/model/history/distribution/targets/projection"
 import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 
 const maxAttackYears = 40
@@ -140,12 +140,12 @@ function mergerGain({
 	const a = territory.countries.get(attacker),
 		d = territory.countries.get(defender)
 	if (!a || !d) return 0
-	const after = DISTRIBUTION_TARGETS.action({
+	const after = DISTRIBUTION_PROJECTION.action({
 		observed,
 		remove: [a.members.size, d.members.size],
 		add: [a.members.size + d.members.size],
 	})
-	return DISTRIBUTION_TARGETS.gain({ before: observed, after, target })
+	return DISTRIBUTION_PROJECTION.gain({ before: observed, after, target })
 }
 function end({
 	attacks,
@@ -316,7 +316,7 @@ function declare({
 	year,
 	rng,
 }: AnnualAttackParams): void {
-	const observed = DISTRIBUTION_TARGETS.histogram({
+	const observed = DISTRIBUTION_PROJECTION.histogram({
 		sizes: [...t.countries.values()].map((c) => c.members.size),
 	})
 	const fronts = new Map<number, number>()
