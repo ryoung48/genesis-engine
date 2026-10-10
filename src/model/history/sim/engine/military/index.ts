@@ -809,7 +809,7 @@ function reconcile({ state }: RecordArmiesParams): void {
 	for (const nation of state.militaryAllocationDirty) touched.add(nation)
 	for (const nation of state.militaryStrengthDirty) touched.add(nation)
 	const wars = DEPLOYMENTS.touchedWars({ state, nations: touched })
-	touched.clear()
+	if (touched.size > 0) touched.clear()
 	if (
 		wars.size === 0 &&
 		state.militaryDirty.size === 0 &&
@@ -844,9 +844,10 @@ function reconcile({ state }: RecordArmiesParams): void {
 	for (const nation of new Set([...dirty, ...rebalance]))
 		if (STATE.isSovereign({ state, p: nation }))
 			RECRUITMENT.refresh({ state, nation })
-	state.militaryAllocationDirty.clear()
-	state.militaryStrengthDirty.clear()
-	state.militaryDirty.clear()
+	if (state.militaryAllocationDirty.size > 0)
+		state.militaryAllocationDirty.clear()
+	if (state.militaryStrengthDirty.size > 0) state.militaryStrengthDirty.clear()
+	if (state.militaryDirty.size > 0) state.militaryDirty.clear()
 	state.militaryDiplomacyDirty = false
 }
 

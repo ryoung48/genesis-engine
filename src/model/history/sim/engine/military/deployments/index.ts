@@ -372,14 +372,17 @@ function reconcileParticipation({ state, wars }: WarsParams): Set<number> {
 		state.militaryAssignments.clear()
 		for (const idx of state.activeWarIds) {
 			const war = state.wars[idx]
-			for (const [key, side] of Object.entries(war.participants)) {
-				const nation = Number(key)
-				const assigned = state.militaryAssignments.get(nation) ?? []
-				assigned.push({
+			for (const nation of participantNations(war.participants)) {
+				const assignment = {
 					war,
-					opponent: side === "attacker" ? war.defender : war.attacker,
-				})
-				state.militaryAssignments.set(nation, assigned)
+					opponent:
+						war.participants[nation] === "attacker"
+							? war.defender
+							: war.attacker,
+				}
+				const assigned = state.militaryAssignments.get(nation)
+				if (assigned) assigned.push(assignment)
+				else state.militaryAssignments.set(nation, [assignment])
 			}
 		}
 	}
