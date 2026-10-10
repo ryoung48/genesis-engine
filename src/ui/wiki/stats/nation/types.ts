@@ -6,8 +6,6 @@ export interface ArmyStatParams {
 }
 
 export interface BuildNationWikiStatsParams {
-	showPopulation:boolean
-	showGovernment:boolean
 	territoryBasis: "owned" | "controlled"
 	totalAreaKm2: number
 	totalPopulation: number
@@ -20,5 +18,3 @@ export interface BuildNationWikiStatsParams {
 	economy: NationEconomy | null
 	yearLabel: string
 }
-
-export interface UrbanizationParams {totalUrbanPopulation:number;totalPopulation:number}

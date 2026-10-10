@@ -1,26 +1,46 @@
 import React from "react"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { IconButton } from "@/ui/components/primitives/IconButton"
-import type {
-	ClampTimelineTimeParams,
-	SimulationControlsProps,
-} from "@/ui/genesis/controls/types"
 import { historyTimeParts } from "@/ui/genesis/generation/history-time"
 import { monthLabels } from "@/ui/genesis/shared/constants"
 
+/** One 30-day month on the history time axis. */
 const TIMELINE_STEP_MS = 30 * 24 * 60 * 60 * 1000
 
-function clampTimelineTime({
-	timeMs,
-	minTimeMs,
-	maxTimeMs,
-}: ClampTimelineTimeParams) {
+function clampTimelineTime(
+	timeMs: number,
+	minTimeMs: number,
+	maxTimeMs: number,
+) {
 	return Math.min(maxTimeMs, Math.max(minTimeMs, timeMs))
 }
 
 function formatTimelineYear(year: number): string {
 	if (year <= 0) return `${1 - year} BC`
 	return `Y${year}`
+}
+
+interface SimulationControlsProps {
+	selectedTimeMs: number
+	minTimeMs: number
+	maxTimeMs: number
+	onTimeChange: (timeMs: number) => void
+	floating?: boolean
+	onPlayPause?: () => void
+	simPlaying?: boolean
+	/** Overrides the default YEAR_MS-based month label and step (used for
+	 * Earth-imported history, whose timeline runs in the earth-history
+	 * engine's own day units rather than genesis.worker.ts's YEAR_MS ticks).
+	 * See docs/earth-history-plan.md "Reuse the existing scrubber". */
+	formatLabel?: (timeValue: number) => string
+	stepValue?: number
+	/** Extra content rendered after the play/pause button, e.g. the
+	 * Earth-history bookmark popup trigger. */
+	extraControls?: React.ReactNode
+	playPauseLabels?: {
+		play: string
+		pause: string
+	}
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
@@ -35,7 +55,6 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	stepValue,
 	extraControls,
 	playPauseLabels,
-	stepLabels,
 }) => {
 	const wrapperClassName = floating
 		? "absolute bottom-3 left-1/2 z-20 -translate-x-1/2 pointer-events-none"
@@ -53,22 +72,10 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	}
 
 	const handleStepBackward = () =>
-		onTimeChange(
-			clampTimelineTime({
-				timeMs: selectedTimeMs - step,
-				minTimeMs,
-				maxTimeMs,
-			}),
-		)
+		onTimeChange(clampTimelineTime(selectedTimeMs - step, minTimeMs, maxTimeMs))
 
 	const handleStepForward = () =>
-		onTimeChange(
-			clampTimelineTime({
-				timeMs: selectedTimeMs + step,
-				minTimeMs,
-				maxTimeMs,
-			}),
-		)
+		onTimeChange(clampTimelineTime(selectedTimeMs + step, minTimeMs, maxTimeMs))
 
 	return (
 		<div className={wrapperClassName}>
@@ -83,8 +90,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						size="sm"
 						shape="rounded"
 						className="h-7 w-7 shrink-0 border-white/0 bg-white/5 text-slate-100 shadow-none hover:bg-white/10"
-						title={stepLabels?.previous ?? "Previous month"}
-						aria-label={stepLabels?.previous ?? "Previous month"}
+						title="Previous month"
+						aria-label="Previous month"
 					>
 						<svg
 							width="12"
@@ -110,7 +117,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						value={selectedTimeMs}
 						onChange={(e) => onTimeChange(Number(e.target.value))}
 						className="min-w-0 flex-1 accent-slate-100"
-						aria-label={stepLabels?.slider ?? "Simulation month"}
+						aria-label="Simulation month"
 					/>
 					<IconButton
 						onClick={handleStepForward}
@@ -118,8 +125,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						size="sm"
 						shape="rounded"
 						className="h-7 w-7 shrink-0 border-white/0 bg-white/5 text-slate-100 shadow-none hover:bg-white/10"
-						title={stepLabels?.next ?? "Next month"}
-						aria-label={stepLabels?.next ?? "Next month"}
+						title="Next month"
+						aria-label="Next month"
 					>
 						<svg
 							width="12"

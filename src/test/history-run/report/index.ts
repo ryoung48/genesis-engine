@@ -18,7 +18,6 @@ import type { SocietyEra } from "@/model/society/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
-import { DISTRIBUTION_REPORT } from "@/test/history-run/report/distribution"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import { HOUSEHOLDS_REPORT } from "@/test/history-run/report/households"
@@ -77,12 +76,7 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
-	const pipeline = env.HISTORY_PIPELINE ?? "simulation"
-	if (pipeline !== "simulation" && pipeline !== "distribution")
-		throw new Error("Invalid HISTORY_PIPELINE")
-	const years = Number(
-		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 2023 : DEFAULT_YEARS),
-	)
+	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
 	const characterStage = (env.HISTORY_CHARACTER_STAGE ??
 		"personality") as CharacterStage
 	if (
@@ -90,7 +84,6 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	)
 		throw new Error("Invalid HISTORY_CHARACTER_STAGE")
 	return {
-		pipeline,
 		characterStage,
 		lateKnowledgeBand: Number(
 			env.HISTORY_LATE_KNOWLEDGE ?? DEFAULT_LATE_KNOWLEDGE_BAND,
@@ -878,15 +871,8 @@ function runSeed({
 }
 
 function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
-	if (options.pipeline === "distribution") {
-		DISTRIBUTION_REPORT.run(options)
-		return new Map()
-	}
 	const results = new Map<number, CenturyReport[]>()
-	const saved: Record<string, unknown> = {
-		pipeline: "simulation",
-		expectedSeeds: options.seeds,
-	}
+	const saved: Record<string, unknown> = { expectedSeeds: options.seeds }
 	const seedDiagnostics: Record<string, unknown> = {}
 	for (const seed of options.seeds) {
 		const reports = runSeed({ seed, options, saved, seedDiagnostics })

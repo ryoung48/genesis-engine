@@ -1,5 +1,4 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
-import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { NATIONS } from "@/model/history/sim/nations"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { StageTiming } from "@/model/pipelines/types"
@@ -11,8 +10,6 @@ import type {
 } from "@/model/society/types"
 
 export interface DeriveSocietyParams {
-	// [JUSTIFICATION] Non-history direct callers use the existing society generation.
-	historyPipeline?: HistoryPipeline
 	isEarthImport: boolean
 	provinces: GenesisProvinces | undefined
 	population: ProvincePopulation | undefined

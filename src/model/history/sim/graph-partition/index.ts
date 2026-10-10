@@ -2,8 +2,6 @@ import type {
 	GeneratePartitionColorsParams,
 	GraphPartitionParams,
 	HslToRgbParams,
-	PartitionAdjacency,
-	PartitionAdjacencyParams,
 	RgbToHslParams,
 } from "@/model/history/sim/graph-partition/types"
 import { IDENTITY_SEEDS } from "@/model/shared/random/identity-seeds"
@@ -131,8 +129,28 @@ function computeGraphPartition({
 		if (group >= 0) size[group]++
 	}
 
-	const { adjOffset: groupAdjOffset, adjList: groupAdjList } =
-		partitionAdjacency({ count, assignment, adjOffset, adjList })
+	const neighbors: Set<number>[] = new Array(count)
+	for (let i = 0; i < count; i++) neighbors[i] = new Set()
+	for (let i = 0; i < nodeCount; i++) {
+		const a = assignment[i]
+		if (a < 0) continue
+		for (let j = adjOffset[i], jEnd = adjOffset[i + 1]; j < jEnd; j++) {
+			const b = assignment[adjList[j]]
+			if (b >= 0 && b !== a) neighbors[a].add(b)
+		}
+	}
+
+	const groupAdjOffset = new Int32Array(count + 1)
+	let totalAdj = 0
+	for (let i = 0; i < count; i++) {
+		totalAdj += neighbors[i].size
+		groupAdjOffset[i + 1] = totalAdj
+	}
+	const groupAdjList = new Int32Array(totalAdj)
+	for (let i = 0; i < count; i++) {
+		let idx = groupAdjOffset[i]
+		for (const nb of neighbors[i]) groupAdjList[idx++] = nb
+	}
 
 	return {
 		assignment,
@@ -300,40 +318,7 @@ function emptyPartition(nodeCount: number): GenesisPartition {
 	}
 }
 
-function partitionAdjacency({
-	count,
-	assignment,
-	adjOffset,
-	adjList,
-}: PartitionAdjacencyParams): PartitionAdjacency {
-	const neighbors: Set<number>[] = new Array(count)
-	for (let i = 0; i < count; i++) neighbors[i] = new Set()
-	for (let i = 0; i < assignment.length; i++) {
-		const a = assignment[i]
-		if (a < 0) continue
-		for (let j = adjOffset[i], jEnd = adjOffset[i + 1]; j < jEnd; j++) {
-			const b = assignment[adjList[j]]
-			if (b >= 0 && b !== a) neighbors[a].add(b)
-		}
-	}
-
-	const groupAdjOffset = new Int32Array(count + 1)
-	let totalAdj = 0
-	for (let i = 0; i < count; i++) {
-		totalAdj += neighbors[i].size
-		groupAdjOffset[i + 1] = totalAdj
-	}
-	const groupAdjList = new Int32Array(totalAdj)
-	for (let i = 0; i < count; i++) {
-		let idx = groupAdjOffset[i]
-		for (const nb of neighbors[i]) groupAdjList[idx++] = nb
-	}
-
-	return { adjOffset: groupAdjOffset, adjList: groupAdjList }
-}
-
 export const GRAPH_PARTITION = {
-	partitionAdjacency,
 	computeGraphPartition,
 	deriveChildColors,
 	generatePartitionColors,

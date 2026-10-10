@@ -38,7 +38,6 @@ export interface BestClaimParams {
 	adjList: Int32Array
 	noise: SimplexNoise
 	maxSpreadRad: number
-	sharedBorderWeight: number
 }
 
 export interface ClaimProvinceDynamicParams {

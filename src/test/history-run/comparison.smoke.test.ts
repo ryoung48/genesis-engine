@@ -68,28 +68,6 @@ function rows(path: string): MetricRow[] {
 	)
 }
 
-it("labels different producers and compares shared country counts without people metrics", () => {
-	const root = fixture(tmpdir()),
-		previous = join(root, "previous.json"),
-		current = join(root, "current.json")
-	const before = report(100),
-		after = report(80)
-	after.pipeline = "distribution"
-	;(after.diagnostics as JsonObject).annual = [
-		{ year: 868, count: 90 },
-		{ year: 869, count: 80 },
-	]
-	writeFileSync(previous, JSON.stringify(before))
-	writeFileSync(current, JSON.stringify(after))
-	const output = HISTORY_COMPARISON.write({ current, baseline: previous }),
-		metrics = rows(output)
-	expect(readFileSync(output, "utf8")).toContain("Different mechanisms")
-	expect(
-		metrics.find((row) => row.metric === "independentCountries"),
-	).toMatchObject({ before: 100, after: 80 })
-	expect(metrics.some((row) => row.metric === "people.alive")).toBe(false)
-})
-
 it("separates simulation and performance changes, preserves missing fields and escapes HTML", () => {
 	const root = fixture(tmpdir())
 	const before = join(root, "previous.json")

@@ -178,7 +178,6 @@ it("preserves runtime creation availability through packets and historical opini
 		minTimeMs: 1100,
 		maxTimeMs: 1200,
 		origin: "procedural",
-		pipeline: "simulation",
 		events: { provinceEvents: new Map(), nationEvents: [] },
 	} as unknown as HistoryRecord
 	expect(PERSON_QUERY.view({ people, id: 1, timeMs: 1099 })).toBeNull()
@@ -225,7 +224,6 @@ it("resolves historical direct roles, residence religion, holder changes, weddin
 		minTimeMs: 100 * STATE.yearMs,
 		maxTimeMs: 110 * STATE.yearMs,
 		origin: "procedural",
-		pipeline: "simulation",
 		events: {
 			provinceEvents: new Map([
 				[

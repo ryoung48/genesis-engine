@@ -5,6 +5,7 @@ import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { PEOPLE } from "@/model/history/sim/people"
 import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
+import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution"
 import type {
 	DistrictCapture,
 	DistrictEngineParams,
@@ -13,7 +14,6 @@ import type {
 	DistrictSummaryParams,
 	DistrictTracker,
 } from "@/test/history-run/report/districts/types"
-import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 function counts(): Record<string, number> {
 	return Object.fromEntries(TITLES.tierOrder.map((tier) => [tier, 0]))
@@ -199,7 +199,7 @@ function summarize({
 	}
 	for (const [tier, values] of crownShares)
 		report.crownLandShare[TITLES.tierOrder[tier]] =
-			REPORT_STATISTICS.summarize(values)
+			REPORT_DISTRIBUTION.summarize(values)
 	for (const entry of tracker.reseatings) {
 		if (entry.year < from || entry.year >= to) continue
 		for (const holder of entry.displaced)

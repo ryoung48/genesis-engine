@@ -307,7 +307,6 @@ it("folds memory refreshes by observer, target and reason and answers each time 
 		minTimeMs: 100 * STATE.yearMs,
 		maxTimeMs: 120 * STATE.yearMs,
 		origin: "procedural",
-		pipeline: "simulation",
 		events: { provinceEvents: new Map(), nationEvents: [] },
 	} as unknown as HistoryRecord
 	const flush = (time: number) =>

@@ -12,12 +12,10 @@ import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
-import { DISTRIBUTION_REPORT } from "@/test/history-run/report/distribution"
 import type {
 	BuildEngineParams,
 	CreatedEngine,
 	CreateEngineParams,
-	DistributionRunSummary,
 	EnvParams,
 	HistoryRunOptions,
 	HistoryRunSummary,
@@ -33,14 +31,8 @@ function optionsFromEnv({ env, log }: EnvParams): HistoryRunOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
-	const pipeline = env.HISTORY_PIPELINE ?? "simulation"
-	if (pipeline !== "simulation" && pipeline !== "distribution")
-		throw new Error("Invalid HISTORY_PIPELINE")
-	const years = Number(
-		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 2023 : DEFAULT_YEARS),
-	)
+	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
 	return {
-		pipeline,
 		seed: Number(env.HISTORY_SEED ?? DEFAULT_SEED),
 		era,
 		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
@@ -150,31 +142,7 @@ function createFreshEngine(params: CreateEngineParams): CreatedEngine {
 	return build({ ...params, generate: GENERATE_WORLD.generateGenesisWorld })
 }
 
-function run(
-	options: HistoryRunOptions,
-): HistoryRunSummary | DistributionRunSummary {
-	if (options.pipeline === "distribution") {
-		DISTRIBUTION_REPORT.run({
-			pipeline: "distribution",
-			characterStage: "personality",
-			lateKnowledgeBand: 2.366478320318625,
-			seeds: [options.seed],
-			era: options.era,
-			numPoints: options.numPoints,
-			years: options.years,
-			startYear: 2,
-			outPath: options.summaryPath,
-			baselinePath: null,
-			log: options.log,
-		})
-		return {
-			pipeline: "distribution",
-			seed: options.seed,
-			years: options.years,
-			reportPath: options.summaryPath,
-		}
-	}
-
+function run(options: HistoryRunOptions): HistoryRunSummary {
 	const { seed, era, numPoints, years, log } = options
 	const { generated, engine, generationMs, engineMs } = createFreshEngine({
 		seed,

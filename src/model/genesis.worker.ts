@@ -1,7 +1,5 @@
 /// <reference lib="webworker" />
 
-import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
-import type { DistributionEngine } from "@/model/history/distribution/engine/types"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
@@ -33,10 +31,6 @@ let historyState: HistoryState | null = null
 let historyRng: ReturnType<typeof HISTORY_RNG.createHistoryRng> | null = null
 let historyTime = STATE.defaultStartYear * STATE.yearMs
 let simulationRunning = false
-let distributionEngine: DistributionEngine | null = null
-let historySession = 0
-let distributionPlaying = false
-let simulationRun = 0
 
 function getProgressLabel(label: string): string {
 	switch (label) {
@@ -104,16 +98,10 @@ function getProgressLabel(label: string): string {
 }
 
 async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
-	if (!historyState || !historyRng || simulationRunning) return
-	const session = historySession,
-		run = ++simulationRun
+	if (!historyState || !historyRng) return
 	simulationRunning = true
 
-	while (
-		simulationRunning &&
-		session === historySession &&
-		run === simulationRun
-	) {
+	while (simulationRunning) {
 		try {
 			historyTime += tickMs
 			SIM_ENGINE.simulateUntil({
@@ -695,64 +683,11 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 	const message = event.data
 
 	if (message.type === "pause") {
-		simulationRun++
 		simulationRunning = false
 		return
 	}
 
 	if (message.type === "simulate") {
-		if (distributionEngine) {
-			if (distributionPlaying || distributionEngine.year >= 2025) return
-			const engine = distributionEngine,
-				session = historySession
-			simulationRunning = true
-			distributionPlaying = true
-			void DISTRIBUTION_ENGINE.play({
-				engine,
-				isCurrent: () => session === historySession,
-				isRunning: () => simulationRunning,
-				onBatch: (batch) =>
-					self.postMessage({
-						type: "distribution-progress",
-						session,
-						batch,
-					} satisfies GenesisWorkerResponse),
-				onPaused: (timeMs) =>
-					self.postMessage({
-						type: "history-stopped",
-						session,
-						timeMs,
-						complete: false,
-					} satisfies GenesisWorkerResponse),
-				batchYears: 20,
-				yieldYear: () => new Promise((resolve) => setTimeout(resolve, 0)),
-			})
-				.then(() => {
-					if (session !== historySession) return
-					distributionPlaying = false
-					if (engine.year === 2025) {
-						simulationRunning = false
-						self.postMessage({
-							type: "history-stopped",
-							session,
-							timeMs: engine.history.record.maxTimeMs,
-							complete: true,
-						} satisfies GenesisWorkerResponse)
-					}
-				})
-				.catch((error) => {
-					if (session === historySession) {
-						distributionPlaying = false
-						simulationRunning = false
-						self.postMessage({
-							type: "error",
-							message: String(error),
-						} satisfies GenesisWorkerResponse)
-					}
-				})
-			return
-		}
-
 		if (!historyState || !historyRng) {
 			self.postMessage({
 				type: "error",
@@ -884,10 +819,6 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		return
 	}
 
-	historySession++
-	simulationRunning = false
-	distributionPlaying = false
-	distributionEngine = null
 	const progressTimings: StageTiming[] = []
 	let previousProgress: { label: string; startedAt: number } | null = null
 	const progressCb = (label: string, pct?: number) => {
@@ -928,8 +859,6 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		historyTime = STATE.defaultStartYear * STATE.yearMs
 		simulationRunning = false
 		if (
-			generated.params.historyPipeline !== "distribution" &&
-			!generated.isEarthImport &&
 			generated.nations &&
 			generated.provinces &&
 			generated.population &&
@@ -973,23 +902,10 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 
 		generated.timings = progressTimings
 		const world = attachPrecomputedGeometry(serializeWorld(generated))
-		if (
-			!generated.isEarthImport &&
-			generated.params.historyPipeline === "distribution"
-		)
-			distributionEngine = DISTRIBUTION_ENGINE.create({ world })
 		progressCb("Done", 100)
 		const journal = historyState?.journal ?? []
 		self.postMessage(
-			{
-				type: "done",
-				world,
-				history: generated.isEarthImport
-					? { pipeline: "earth" }
-					: distributionEngine
-						? { pipeline: "distribution", state: distributionEngine.history }
-						: { pipeline: "simulation", journal },
-			} satisfies GenesisWorkerResponse,
+			{ type: "done", world, journal } satisfies GenesisWorkerResponse,
 			[...buildTransferList(world), ...JOURNAL.transferList(journal)],
 		)
 		if (historyState) JOURNAL.releaseSent(historyState)

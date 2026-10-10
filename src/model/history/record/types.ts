@@ -279,7 +279,6 @@ export interface HistoryRecordCommon {
 
 export type HistoryRecord = HistoryRecordCommon & {
 	origin: "earth" | "procedural"
-	pipeline: "earth" | "simulation" | "distribution"
 	events: HistoryEvents
 	// [JUSTIFICATION] Earth records have no de jure title layer.
 	titles: TitleBase | null

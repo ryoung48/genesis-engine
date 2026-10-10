@@ -2,13 +2,17 @@ import React from "react"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { ModeButtonGroup } from "@/ui/genesis/controls/mode-controls"
 import type {
-	ModeBarProps,
-	ResolveSubModeParams,
-} from "@/ui/genesis/controls/types"
+	ClimateSubMode,
+	TopographySubMode,
+	VegetationSubMode,
+} from "@/ui/genesis/controls/OverlayControls"
+import type { ResolveSubModeParams } from "@/ui/genesis/controls/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
 	MapModePrimary,
+	NationMapMode,
+	SocietyMapMode,
 	SocietyMapOption,
 } from "@/ui/genesis/shared/map-modes"
 import {
@@ -19,6 +23,23 @@ import {
 	isTitlesNationMode,
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "@/ui/genesis/shared/map-modes"
+
+interface ModeBarProps {
+	colorMode: ColorMode
+	setColorMode: (v: ColorMode) => void
+	geographyMode: ColorMode
+	setGeographyMode: (v: ColorMode) => void
+	nationMode: NationMapMode
+	setNationMode: (v: NationMapMode) => void
+	societyMode: SocietyMapMode
+	setSocietyMode: (v: SocietyMapMode) => void
+	debugMapModes: boolean
+	vegetationSubMode: VegetationSubMode
+	climateSubMode: ClimateSubMode
+	elevationSubMode: "colored" | "grayscale"
+	topographySubMode: TopographySubMode
+	isEarthImport?: boolean
+}
 
 function resolveSubMode({
 	baseMode,
@@ -65,7 +86,6 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	elevationSubMode,
 	topographySubMode,
 	isEarthImport = false,
-	politicalOnly = false,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes).filter(
@@ -83,17 +103,6 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	const societyOptions = getVisibleSocietyModeOptions(
 		debugMapModes,
 		isEarthImport,
-	).filter(
-		([mode]) =>
-			!politicalOnly ||
-			[
-				"borders",
-				"provinces",
-				"culture",
-				"heritage",
-				"religion",
-				"timezone",
-			].includes(mode),
 	)
 
 	const submodeControl =

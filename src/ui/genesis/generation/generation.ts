@@ -1,14 +1,14 @@
-import type { TideLock } from "@/model/celestial/orbit-body/types"
+﻿import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
+	InfrastructureResult,
+	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
-import type {
-	CreateWorkerParams,
-	GenerateWorldParams,
-	GenerationCallbacks,
-} from "@/ui/genesis/generation/types"
+
+export type GenerationParams = GenesisParams
 
 interface ImportHeightmapParams {
 	seed: number
@@ -103,11 +103,37 @@ export function loadImageAsGrayscale(
 	})
 }
 
-function createWorker({
-	callbacks,
-	onDone,
-	failLabel,
-}: CreateWorkerParams): Worker {
+export interface GenerationCallbacks {
+	setGenerating: (v: boolean) => void
+	setGenerationProgress: (v: number | ((current: number) => number)) => void
+	setGenerationLabel: (v: string) => void
+	setSeed: (v: number) => void
+	setWorld: (v: SerializedGenesisWorld | null) => void
+	workerRef: React.MutableRefObject<Worker | null>
+	onHistoryStart: (journal: JournalTransaction[]) => void
+	onHistoryJournal: (journal: JournalTransaction[]) => void
+	onGenerationComplete?: () => void
+	onPathfindResult?: (result: {
+		pathRegions: Int32Array
+		distanceKm: number
+		landKm: number
+		seaKm: number
+		travelDays: number
+		reachable: boolean
+	}) => void
+	/** Fired when a "compute-infrastructure" request completes -- see
+	 * requestInfrastructure below. */
+	onInfrastructureResult?: (result: InfrastructureResult) => void
+}
+
+function createWorker(
+	callbacks: GenerationCallbacks,
+	onDone: (
+		message: GenesisWorkerResponse & { type: "done" },
+		worker: Worker,
+	) => void,
+	failLabel: string,
+): Worker {
 	callbacks.workerRef.current?.terminate()
 	const worker = new Worker(
 		new URL("../../../model/genesis.worker.ts", import.meta.url),
@@ -117,15 +143,6 @@ function createWorker({
 
 	worker.onmessage = (event: MessageEvent<GenesisWorkerResponse>) => {
 		const message = event.data
-		if (callbacks.workerRef.current !== worker) return
-		if (message.type === "distribution-progress") {
-			callbacks.onDistributionBatch(message.batch)
-			return
-		}
-		if (message.type === "history-stopped") {
-			callbacks.onHistoryStopped(message.complete)
-			return
-		}
 		if (message.type === "progress") {
 			callbacks.setGenerationLabel(message.label)
 			callbacks.setGenerationProgress((current: number) =>
@@ -136,12 +153,11 @@ function createWorker({
 			return
 		}
 		if (message.type === "done") {
-			onDone(message)
+			onDone(message, worker)
 			return
 		}
 		if (message.type === "error") {
 			console.error("Genesis worker failed", message.message, message.stack)
-			callbacks.onHistoryStopped(false)
 			callbacks.setGenerationLabel(failLabel)
 			callbacks.setGenerating(false)
 			return
@@ -179,7 +195,6 @@ function createWorker({
 				.join(":") ||
 			"Unknown worker error"
 		console.error("Genesis worker crashed", detail, event.error)
-		callbacks.onHistoryStopped(false)
 		callbacks.setGenerationLabel(failLabel)
 		callbacks.setGenerating(false)
 		worker.terminate()
@@ -190,12 +205,12 @@ function createWorker({
 	return worker
 }
 
-export function generateWorld({
-	overrideSeed,
-	overrides,
-	currentParams,
-	callbacks,
-}: GenerateWorldParams): void {
+export function generateWorld(
+	overrideSeed: number,
+	overrides: Partial<GenerationParams> | undefined,
+	currentParams: GenerationParams,
+	callbacks: GenerationCallbacks,
+): void {
 	callbacks.setGenerating(true)
 	callbacks.setGenerationProgress(0)
 	callbacks.setGenerationLabel("Starting generation...")
@@ -248,25 +263,23 @@ export function generateWorld({
 		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
 		era: overrides?.era ?? currentParams.era,
-		historyPipeline:
-			overrides?.historyPipeline ?? currentParams.historyPipeline,
 	} as GenesisParams
 
 	const request: GenesisWorkerRequest = { type: "generate", params }
 	requestAnimationFrame(() => {
-		const worker = createWorker({
+		const worker = createWorker(
 			callbacks,
-			onDone: (message) => {
+			(message, _w) => {
 				callbacks.setWorld(message.world)
-				callbacks.onHistoryStart(message.history)
+				callbacks.onHistoryStart(message.journal)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
 				callbacks.onGenerationComplete?.()
 				// Keep the worker alive to serve pathfind requests.
 			},
-			failLabel: "Generation failed",
-		})
+			"Generation failed",
+		)
 		worker.postMessage(request)
 	})
 }
@@ -431,19 +444,19 @@ export function importHeightmap(
 		},
 	}
 	requestAnimationFrame(() => {
-		const worker = createWorker({
+		const worker = createWorker(
 			callbacks,
-			onDone: (message) => {
+			(message, _w) => {
 				callbacks.setWorld(message.world)
-				callbacks.onHistoryStart(message.history)
+				callbacks.onHistoryStart(message.journal)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
 				callbacks.onGenerationComplete?.()
 				// Keep worker alive for simulation
 			},
-			failLabel: "Import failed",
-		})
+			"Import failed",
+		)
 		const transfer = [grayscale.buffer]
 		if (coastlineMask) transfer.push(coastlineMask.mask.buffer)
 		if (lakeMask) transfer.push(lakeMask.mask.buffer)

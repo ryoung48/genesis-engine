@@ -9,7 +9,6 @@ import { WIND } from "@/model/climate/weather/wind"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
-import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { StageTiming } from "@/model/pipelines/types"
 import type {
@@ -17,7 +16,6 @@ import type {
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
 import {
 	type MeasureMode,
@@ -378,21 +376,12 @@ export const GenesisView: React.FC<{
 		proceduralHistoryPlaying,
 		startProceduralJournal,
 		recordProceduralJournal,
-		distributionStateRef,
-		distributionBatchesRef,
-		recordDistributionBatch,
-		stopProceduralHistory,
 		journalTransactionsRef,
 		journalVersion,
 		setProceduralHistoryPlaying,
 	} = useProceduralHistory({ workerRef })
 	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
-	const [historyPipeline, setHistoryPipeline] =
-		useState<HistoryPipeline>("distribution")
-	const simStartTimeMs =
-		historyPipeline === "distribution"
-			? 0
-			: historyYearToTime(STATE.defaultStartYear)
+	const simStartTimeMs = historyYearToTime(STATE.defaultStartYear)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	// Earth-imported worlds scrub real Gregorian dates via history's own
 	// slider. selectedTimeMs tracks it so Social's population/culture/heritage/
@@ -404,8 +393,6 @@ export const GenesisView: React.FC<{
 		religionMode,
 		journalTransactionsRef,
 		journalVersion,
-		distributionStateRef,
-		distributionBatchesRef,
 	})
 	useEffect(() => {
 		if (!world?.isEarthImport) return
@@ -1527,7 +1514,6 @@ export const GenesisView: React.FC<{
 		generationProgress,
 		generationLabel,
 		handleGenerate,
-		handleChangeHistoryPipeline,
 		handleResetDefaults,
 		handleReturnToPlanetView,
 		handleRequestInfrastructure,
@@ -1545,10 +1531,6 @@ export const GenesisView: React.FC<{
 		setProceduralHistoryPlaying,
 		startProceduralJournal,
 		recordProceduralJournal,
-		recordDistributionBatch,
-		stopProceduralHistory,
-		historyPipeline,
-		setHistoryPipeline,
 		seed,
 		setSeed,
 		setDataVariant: handleSetDataVariant,
@@ -2397,11 +2379,6 @@ export const GenesisView: React.FC<{
 										}
 										formatLabel={historyFormatLabel}
 										stepValue={365 * 86_400_000}
-										stepLabels={{
-											previous: "Previous year",
-											next: "Next year",
-											slider: "History year",
-										}}
 										playPauseLabels={{
 											play: "Start timeline",
 											pause: "Pause timeline",
@@ -2413,17 +2390,7 @@ export const GenesisView: React.FC<{
 													selectedDate={history.selectedTimeMs}
 													placement="below"
 												/>
-											) : (
-												<SegmentedControl<HistoryPipeline>
-													tone="overlay"
-													value={historyPipeline}
-													options={[
-														{ value: "distribution", label: "Fast history" },
-														{ value: "simulation", label: "Detailed history" },
-													]}
-													onChange={handleChangeHistoryPipeline}
-												/>
-											)
+											) : undefined
 										}
 									/>
 								</div>
@@ -2433,9 +2400,6 @@ export const GenesisView: React.FC<{
 							<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
 								<div className="pointer-events-auto">
 									<ModeBar
-										politicalOnly={
-											history.state?.record.pipeline === "distribution"
-										}
 										colorMode={colorMode}
 										setColorMode={setGeographyColorMode}
 										geographyMode={geographyMode}

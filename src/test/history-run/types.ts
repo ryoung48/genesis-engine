@@ -1,11 +1,9 @@
-import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { GenesisWorld } from "@/model/pipelines/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { CachedWorldParams } from "@/test/history-run/world-cache/types"
 
 export interface HistoryRunOptions {
-	pipeline: HistoryPipeline
 	seed: number
 	era: SocietyEra
 	numPoints: number
@@ -76,11 +74,4 @@ export interface SiegeCalibrationScenario {
 	failures: number
 	storms: number
 	outcomes: Record<string, number>
-}
-
-export interface DistributionRunSummary {
-	pipeline: "distribution"
-	seed: number
-	years: number
-	reportPath: string
 }
