@@ -1,22 +1,20 @@
 import { UNITS } from "@/model/shared/units"
 import { URQUHART } from "@/model/shared/urquhart"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
+import { EDGE_USAGE } from "@/model/society/infrastructure/trade/routing/edge-usage"
+import type { AppendLandRoutesParams } from "@/model/society/infrastructure/trade/routing/land/types"
 import {
 	ROUTE_TUNING,
 	routePopulationThresholds,
 } from "@/model/society/infrastructure/trade/routing/route-tuning"
+import { ROUTE_SEARCH } from "@/model/society/infrastructure/trade/routing/search"
 import type {
 	LandCandidateGroup,
 	LandCandidateGroupsByKind,
 	RouteCandidate,
 	RouteWorld,
-	SearchWorkspace,
 } from "@/model/society/infrastructure/trade/routing/types"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
-import type {
-	Route,
-	SerializedRouteKind,
-} from "@/model/society/infrastructure/transport/types"
 
 export function computeLandPassableMask(state: RouteWorld): Uint8Array {
 	const mask = new Uint8Array(state.regionProvince.length)
@@ -163,134 +161,25 @@ function pushLandCandidate({
 	})
 }
 
-function findLandPath({
-	state,
-	workspace,
-	startRegion,
-	endRegion,
-	cluster,
-	landmark,
-	landPassable,
-	provinceClusters,
-	landEdgeUsed,
-	regionPairSpan,
-}: {
-	state: RouteWorld
-	workspace: SearchWorkspace
-	startRegion: number
-	endRegion: number
-	cluster: number
-	landmark: number
-	landPassable: Uint8Array
-	provinceClusters: Int32Array
-	landEdgeUsed: Set<number>
-	regionPairSpan: number
-}): number[] {
-	if (startRegion < 0 || endRegion < 0) return []
-	workspace.stamp++
-	if (workspace.stamp === 0x7fffffff) {
-		workspace.queued.fill(0)
-		workspace.settled.fill(0)
-		workspace.targetStamp.fill(0)
-		workspace.targetCount.fill(0)
-		workspace.stamp = 1
-	}
-	const stamp = workspace.stamp
-	const heap = workspace.heap
-	heap.clear()
-	const { regionAdjOffset, regionAdjList, regionProvince, landmarks } = state
-	const regionLandmark = landmarks.regionLandmark
-
-	workspace.distance[startRegion] = 0
-	workspace.prev[startRegion] = startRegion
-	workspace.queued[startRegion] = stamp
-	heap.push(startRegion)
-
-	while (heap.size > 0) {
-		const current = heap.pop()
-		if (workspace.settled[current] === stamp) continue
-		workspace.settled[current] = stamp
-		if (current === endRegion) break
-		for (
-			let i = regionAdjOffset[current], end = regionAdjOffset[current + 1];
-			i < end;
-			i++
-		) {
-			const neighbor = regionAdjList[i]
-			if (
-				workspace.settled[neighbor] === stamp ||
-				landPassable[neighbor] !== 1
-			) {
-				continue
-			}
-			const province = regionProvince[neighbor]
-			if (
-				province < 0 ||
-				provinceClusters[province] !== cluster ||
-				regionLandmark[neighbor] !== landmark
-			) {
-				continue
-			}
-			const nextDistance =
-				workspace.distance[current] +
-				(landEdgeUsed.has(
-					PATHFIND.pairKey({ a: current, b: neighbor, span: regionPairSpan }),
-				)
-					? ROUTE_TUNING.land.existingEdgeCost
-					: ROUTE_TUNING.land.newEdgeCost)
-			if (
-				workspace.queued[neighbor] !== stamp ||
-				nextDistance < workspace.distance[neighbor]
-			) {
-				workspace.distance[neighbor] = nextDistance
-				workspace.prev[neighbor] = current
-				workspace.queued[neighbor] = stamp
-				heap.push(neighbor)
-			}
-		}
-	}
-
-	return PATHFIND.reconstructPathFromTree({
-		workspace,
-		startRegion,
-		endRegion,
-		stamp,
-	})
-}
-
 export function appendLandRoutes({
 	state,
 	kind,
 	candidateGroups,
-	provinceClusters,
-	landPassable,
+	groupIds,
 	workspace,
 	landUsage,
-	regionPairSpan,
 	planetRadiusKm,
 	provincePairSpan,
 	blockedPairs,
 	routes,
-}: {
-	state: RouteWorld
-	kind: SerializedRouteKind
-	candidateGroups: LandCandidateGroup[]
-	provinceClusters: Int32Array
-	landPassable: Uint8Array
-	workspace: SearchWorkspace
-	landUsage: Set<number>
-	regionPairSpan: number
-	planetRadiusKm: number | undefined
-	provincePairSpan: number
-	blockedPairs: Set<number>
-	routes: Route[]
-}): void {
+}: AppendLandRoutesParams): void {
 	const maxLengthKm =
 		kind === TRANSPORT.ROUTE_LAND_MAJOR
 			? ROUTE_TUNING.land.majorMaxLengthKm
 			: ROUTE_TUNING.land.minorMaxLengthKm
 	for (const { cluster, landmark, candidates } of candidateGroups) {
 		if (candidates.length < 2) continue
+		const groupId = landmark * state.regionProvince.length + cluster
 		const candidateRegions = new Int32Array(candidates.length)
 		for (let i = 0; i < candidates.length; i++) {
 			candidateRegions[i] = candidates[i]?.region ?? -1
@@ -322,17 +211,16 @@ export function appendLandRoutes({
 			) {
 				continue
 			}
-			const pathRegions = findLandPath({
+			const pathRegions = ROUTE_SEARCH.findPath({
 				state,
 				workspace,
 				startRegion: source.region,
 				endRegion: target.region,
-				cluster,
-				landmark,
-				landPassable,
-				provinceClusters,
-				landEdgeUsed: landUsage,
-				regionPairSpan,
+				groupId,
+				groupIds,
+				edgeUsed: landUsage,
+				waterDepthPenalty: null,
+				kind: "land",
 			})
 			if (pathRegions.length < 2) continue
 			if (
@@ -350,15 +238,14 @@ export function appendLandRoutes({
 				kind,
 				pathRegions,
 			})
-			for (let i = 1; i < pathRegions.length; i++) {
-				landUsage.add(
-					PATHFIND.pairKey({
-						a: pathRegions[i - 1],
-						b: pathRegions[i],
-						span: regionPairSpan,
-					}),
-				)
-			}
+			EDGE_USAGE.recordPath({
+				adjOffset: state.regionAdjOffset,
+				adjList: state.regionAdjList,
+				counts: landUsage,
+				pathRegions,
+				firstEdge: 1,
+				endEdge: pathRegions.length,
+			})
 		}
 	}
 }

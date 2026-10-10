@@ -1,11 +1,13 @@
-import { MinHeap } from "@/model/shared/min-heap"
+import { BUCKET_QUEUE } from "@/model/shared/bucket-queue"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
+import { LAND_ELIGIBILITY } from "@/model/society/infrastructure/trade/routing/land/eligibility"
 import {
 	appendLandRoutes,
 	collectLandCandidatesByKind,
 	computeLandPassableMask,
 	computeProvinceLandClusters,
 } from "@/model/society/infrastructure/trade/routing/land/index"
+import { ROUTE_TUNING } from "@/model/society/infrastructure/trade/routing/route-tuning"
 import {
 	appendSeaRoutes,
 	collectSeaCandidates,
@@ -106,9 +108,14 @@ function createSearchWorkspace(size: number): SearchWorkspace {
 		prev: new Int32Array(size).fill(-1),
 		queued: new Int32Array(size),
 		settled: new Int32Array(size),
-		targetStamp: new Int32Array(size),
-		targetCount: new Int32Array(size),
-		heap: new MinHeap(distance),
+		landQueue: BUCKET_QUEUE.create({
+			distance,
+			bucketCount: ROUTE_TUNING.search.landBucketCount,
+		}),
+		seaQueue: BUCKET_QUEUE.create({
+			distance,
+			bucketCount: ROUTE_TUNING.search.seaBucketCount,
+		}),
 		stamp: 0,
 	}
 }
@@ -194,11 +201,20 @@ function computeRoutes({
 		timings: inputs.timings,
 		fn: () => computeProvinceLandClusters({ state, landPassable }),
 	})
+	const groupIds = timed({
+		label: "computeRoutes:computeLandGroupIds",
+		timings: inputs.timings,
+		fn: () =>
+			LAND_ELIGIBILITY.computeGroupIds({
+				state,
+				landPassable,
+				provinceClusters,
+			}),
+	})
 	const workspace = createSearchWorkspace(state.regionProvince.length)
 	const neighborWorkspace = createSeaNeighborWorkspace(
 		state.regionProvince.length,
 	)
-	const regionPairSpan = state.regionProvince.length
 	const provincePairSpan = state.P
 	const landCandidates = collectLandCandidatesByKind({
 		state,
@@ -206,8 +222,8 @@ function computeRoutes({
 		provinceClusters,
 		urbanPopulation,
 	})
-	const landUsage = new Set<number>()
-	const seaUsage = new Set<number>()
+	const landUsage = new Uint32Array(state.regionAdjList.length)
+	const seaUsage = new Uint32Array(state.regionAdjList.length)
 	const routes: Route[] = []
 	const majorPairs = new Set<number>()
 
@@ -219,11 +235,9 @@ function computeRoutes({
 				state,
 				kind: TRANSPORT.ROUTE_LAND_MAJOR,
 				candidateGroups: landCandidates.major,
-				provinceClusters,
-				landPassable,
+				groupIds,
 				workspace,
 				landUsage,
-				regionPairSpan,
 				planetRadiusKm: world.params.planetRadiusKm,
 				provincePairSpan,
 				blockedPairs: new Set<number>(),
@@ -248,11 +262,9 @@ function computeRoutes({
 				state,
 				kind: TRANSPORT.ROUTE_LAND_MINOR,
 				candidateGroups: landCandidates.minor,
-				provinceClusters,
-				landPassable,
+				groupIds,
 				workspace,
 				landUsage,
-				regionPairSpan,
 				planetRadiusKm: world.params.planetRadiusKm,
 				provincePairSpan,
 				blockedPairs: majorPairs,
@@ -276,7 +288,6 @@ function computeRoutes({
 				workspace,
 				neighborWorkspace,
 				seaUsage,
-				regionPairSpan,
 				urbanPopulation,
 				planetRadiusKm: world.params.planetRadiusKm,
 				routes,

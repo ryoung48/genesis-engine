@@ -2,6 +2,11 @@ import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SocietyEra } from "@/model/society/types"
 
 export const ROUTE_TUNING = {
+	search: {
+		costScale: 4,
+		landBucketCount: 5,
+		seaBucketCount: 45,
+	},
 	land: {
 		minBodyShare: 0.001,
 		majorMaxLengthKm: 3_000,

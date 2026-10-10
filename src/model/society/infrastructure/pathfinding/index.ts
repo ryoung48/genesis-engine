@@ -371,7 +371,6 @@ export const PATHFIND = {
 	pathfind,
 	pairKey,
 	tangentProjectFlat,
-	reconstructPathFromTree,
 }
 
 function tangentProjectFlat({
@@ -425,29 +424,4 @@ function tangentProjectFlat({
 		projected[i * 2 + 1] = x * vx + y * vy + z * vz
 	}
 	return projected
-}
-
-function reconstructPathFromTree({
-	workspace,
-	startRegion,
-	endRegion,
-	stamp,
-}: {
-	workspace: SearchWorkspace
-	startRegion: number
-	endRegion: number
-	stamp: number
-}): number[] {
-	if (workspace.settled[endRegion] !== stamp) return []
-	const path: number[] = []
-	for (
-		let region = endRegion;
-		region !== startRegion;
-		region = workspace.prev[region]
-	) {
-		path.push(region)
-	}
-	path.push(startRegion)
-	path.reverse()
-	return path
 }

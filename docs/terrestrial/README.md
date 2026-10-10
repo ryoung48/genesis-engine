@@ -44,6 +44,7 @@ Start here for the historical simulation’s rules and implementation references
 - [History smoke tests and related-test commands](mechanics/smoke-tests.md)
 - [Person event logging, transfer and historical queries](mechanics/person-records.md)
 - [History pipeline performance and benchmark results](mechanics/pipeline-performance.md)
+- [Procedural planet route search performance](mechanics/route-search-performance.md)
 - [History record ownership and memory usage](mechanics/record-memory.md)
 
 The topic references describe the implemented rules. Mechanics covers logging, transfer, queries, pipeline performance and memory; each historical measurement retains its own workload and limits. Proposed features remain in `plans/`, not in these references.

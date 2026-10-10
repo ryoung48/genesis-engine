@@ -1,7 +1,7 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
-import type { MinHeap } from "@/model/shared/min-heap"
+import type { BucketQueue } from "@/model/shared/bucket-queue/types"
 import type {
 	Route,
 	RouteEdge,
@@ -87,9 +87,8 @@ export interface SearchWorkspace {
 	prev: Int32Array
 	queued: Int32Array
 	settled: Int32Array
-	targetStamp: Int32Array
-	targetCount: Int32Array
-	heap: MinHeap
+	landQueue: BucketQueue
+	seaQueue: BucketQueue
 	stamp: number
 }
 
@@ -98,6 +97,6 @@ export interface SeaNeighborWorkspace {
 	owner: Int32Array
 	queued: Int32Array
 	settled: Int32Array
-	heap: MinHeap
+	queue: BucketQueue
 	stamp: number
 }
