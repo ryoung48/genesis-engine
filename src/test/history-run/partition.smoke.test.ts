@@ -21,6 +21,8 @@ import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import type { Sex } from "@/model/history/sim/people/types"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SharedRng } from "@/model/shared/random/rng"
+import { DEJURE } from "@/model/society/dejure"
+import { HOLDING } from "@/model/society/dejure/holding"
 import type { GovernmentType } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
@@ -186,6 +188,35 @@ function fixture({
 		)
 			continue
 		const seats = districtSeats({ state, realm: p })
+		if (!accept && districts > 0 && top > 0) {
+			const title = DEJURE.titleAt({
+				titles: state.titles,
+				provinceCount: state.P,
+				tier: top,
+				province: p,
+			})
+			if (title < 0) continue
+			const removed = new Set(
+				seats
+					.slice(0, districts)
+					.flatMap((seat) => STATE.getNationProvinces({ state, root: seat })),
+			)
+			const members = state.titleMembers.list.subarray(
+				state.titleMembers.offset[title],
+				state.titleMembers.offset[title + 1],
+			)
+			const retained = members.filter(
+				(province) =>
+					state.sovereignCurrent[province] === p && !removed.has(province),
+			).length
+			if (
+				HOLDING.nextHolder({
+					counts: { total: members.length, byOwner: new Map([[p, retained]]) },
+					tier: top,
+				}) !== p
+			)
+				continue
+		}
 		const fits = accept
 			? accept({ state, realm: p })
 			: seats.length >= districts &&

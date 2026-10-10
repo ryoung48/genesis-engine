@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
+import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
@@ -318,6 +319,10 @@ describe("battle odds", () => {
 
 describe("battle progress", () => {
 	it("rolls to end an offensive after a defensive rout", () => {
+		const kind = vi.spyOn(BATTLE_KIND, "choose").mockReturnValue({
+			kind: "open",
+			ambusher: "none",
+		})
 		const fight = vi.spyOn(MILITARY, "fight").mockReturnValue({
 			outcome: "rout",
 			initialOutcome: "decisive",
@@ -360,15 +365,19 @@ describe("battle progress", () => {
 				).toBeDefined()
 		}
 		fight.mockRestore()
+		kind.mockRestore()
 		exhausted.mockRestore()
 	}, 120_000)
 
 	function battleWith(values: number[]) {
 		setup()
 		reset({ attack: 1000, defend: 1000 })
-		engine.levyCurrent.set(levies)
 		engine.provinceTopography.fill(0)
 		engine.provinceVegetation.fill(3)
+		const kind = vi.spyOn(BATTLE_KIND, "choose").mockReturnValue({
+			kind: "open",
+			ambusher: "none",
+		})
 		const note = engine.events.length
 		// Battle progress is tested without the rulers' character: neither
 		// governor tilts the fight and nobody leads in person.
@@ -378,8 +387,9 @@ describe("battle progress", () => {
 			state: engine,
 			warIdx: war.idx,
 			eventAttacker: war.attacker,
-			rng: sequenceRng([0, ...values]),
+			rng: sequenceRng(values),
 		})
+		kind.mockRestore()
 		multiplier.mockRestore()
 		lead.mockRestore()
 		const notes = engine.events.slice(note)

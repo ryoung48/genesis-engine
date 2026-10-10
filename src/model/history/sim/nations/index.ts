@@ -170,6 +170,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 
 		while (sizes[nation] < target) {
 			const claim = PLACEMENT.bestClaim({
+				target,
 				nation,
 				seedProvince: root,
 				frontier,

@@ -10,6 +10,7 @@ import type {
 	ProvinceSeedDistanceParams,
 	SelectSeedParams,
 	TargetSizeBiasParams,
+	WaterPlacementBonusParams,
 } from "@/model/history/sim/nations/placement/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
@@ -46,6 +47,16 @@ function migrationWavePlacementMultiplier({
 	return 1 - wave * largeNationSizeBias({ target }) * LARGE_NATION_WAVE_BIAS
 }
 
+function waterPlacementBonus({
+	province,
+	waterAccess,
+	target,
+}: WaterPlacementBonusParams): number {
+	return target < LARGE_NATION_CONTINENT_MIN_TARGET
+		? waterAccess[province] * WATER_ACCESS.waterAccessBonus
+		: 0
+}
+
 function nationPlacementScore({
 	province,
 	habitability,
@@ -55,7 +66,7 @@ function nationPlacementScore({
 }: NationPlacementScoreParams): number {
 	return (
 		habitability[province] +
-		waterAccess[province] * WATER_ACCESS.waterAccessBonus +
+		waterPlacementBonus({ province, waterAccess, target }) +
 		continentPlacementBonus({ province, provinceContinent, target })
 	)
 }
@@ -72,6 +83,7 @@ function continentPlacementBonus({
 
 function bestClaim({
 	nation,
+	target,
 	seedProvince,
 	frontier,
 	active,
@@ -116,8 +128,7 @@ function bestClaim({
 		const score =
 			(1 / (d + 0.1)) * (1 + NOISE_STRENGTH * noiseVal) +
 			habitability[candidate] * HABITABILITY_CLAIM_WEIGHT +
-			waterAccess[candidate] *
-				WATER_ACCESS.waterAccessBonus *
+			waterPlacementBonus({ province: candidate, waterAccess, target }) *
 				WATER_CLAIM_WEIGHT +
 			sharedBorder * 0.05 +
 			seedPenalty

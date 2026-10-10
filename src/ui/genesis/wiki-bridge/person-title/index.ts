@@ -40,13 +40,12 @@ function isCrown({ person, children }: CrownParams): boolean {
 
 function of({
 	female,
-	hasHouse,
 	tier,
 	royalParent,
 	regency,
 	crown,
 }: PersonTitleParams): string {
-	if (royal(tier)) return TIER_TITLES[tier][female ? 1 : 0]
+	if (tier) return TIER_TITLES[tier][female ? 1 : 0]
 	if (regency) {
 		if (!female) return "Lord Protector"
 		return regency.mother ? DOWAGER_TITLES[regency.tier] : "Lady Protector"
@@ -55,8 +54,7 @@ function of({
 		const prince = female ? "Princess" : "Prince"
 		return crown ? `Crown ${prince}` : prince
 	}
-	if (tier) return TIER_TITLES[tier][female ? 1 : 0]
-	return hasHouse ? "Noble" : "Low born"
+	return "Noble"
 }
 
 export const PERSON_TITLE = { of, isCrown, royal }

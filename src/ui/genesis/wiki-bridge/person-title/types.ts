@@ -2,8 +2,7 @@ import type { TitleTier } from "@/model/society/titles/types"
 
 export interface PersonTitleParams {
 	female: boolean
-	hasHouse: boolean
-	// [JUSTIFICATION] A person who holds no seat has no title tier.
+	// [JUSTIFICATION] Only sovereign holdings supply a title tier.
 	tier: TitleTier | null
 	// [JUSTIFICATION] Only a king's or emperor's child has a royal parent.
 	royalParent: TitleTier | null

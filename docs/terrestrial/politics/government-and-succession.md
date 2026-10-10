@@ -48,6 +48,8 @@ A realm's government decides how it passes on, whether its ruling house marries 
 
 ## Assignment
 
+Procedural nations are placed largest first and grow contiguously. Targets below 10 provinces receive the existing water-access preference for capital selection and frontier claims. Targets of 10 or more receive no water-access bonus in either step; they can still claim coastal land through habitability, available space and proximity. The cutoff reuses the placement algorithm's existing lower boundary for large-nation continent preference and the 10–24 province size bucket. Government assignment still uses water access for every eligible size.
+
 Each nation draws its type once, at world generation (`GOVERNMENT.assignGovernmentType`).
 
 1. **Family weights.** The era's government mix is blended with a prior by nation size. The era's `governmentSizeWeight` sets the blend: 1.0 in the earliest era (size alone), 0.55 in the late medieval era, 0.15 in the information age (the era mix alone).

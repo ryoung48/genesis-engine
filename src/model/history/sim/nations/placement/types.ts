@@ -8,6 +8,12 @@ export interface NationPlacementScoreParams {
 	target: number
 }
 
+export interface WaterPlacementBonusParams {
+	province: number
+	waterAccess: Uint8Array<ArrayBufferLike>
+	target: number
+}
+
 export interface ContinentPlacementBonusParams {
 	province: number
 	provinceContinent: Uint8Array<ArrayBufferLike> | undefined
@@ -26,6 +32,7 @@ export interface TargetSizeBiasParams {
 
 export interface BestClaimParams {
 	nation: number
+	target: number
 	seedProvince: number
 	frontier: Set<number>
 	active: Uint8Array

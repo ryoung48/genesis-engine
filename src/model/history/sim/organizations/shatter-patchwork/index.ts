@@ -233,6 +233,7 @@ function shatterPatchwork(
 
 		while (sizes[nationIndex] < target) {
 			const claim = PLACEMENT.bestClaim({
+				target,
 				nation: nationIndex,
 				seedProvince,
 				frontier,

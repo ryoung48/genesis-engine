@@ -537,14 +537,13 @@ export function usePersonWikiData(
 			if (!personView) return null
 			let highest = -1
 			for (const tenure of personView.tenures) {
-				if (tenure.kind === "regent" || tenure.endTimeMs !== null) continue
+				if (tenure.kind !== "ruler" || tenure.endTimeMs !== null) continue
 				highest = Math.max(
 					highest,
 					0,
 					TITLES.tierOrder.findIndex(
 						(tier) =>
-							TITLE_TIER_LABELS[tier] ===
-							rankAt(tenure.seat, viewTimeMs, tenure.kind === "ruler"),
+							TITLE_TIER_LABELS[tier] === rankAt(tenure.seat, viewTimeMs, true),
 					),
 				)
 			}
@@ -576,6 +575,7 @@ export function usePersonWikiData(
 					PERSON_NAMES.person({ people, person: tenure.ward })?.mother === id,
 			}
 		}, null)
+
 		const crown =
 			royalParent !== undefined &&
 			PERSON_TITLE.isCrown({
@@ -713,7 +713,6 @@ export function usePersonWikiData(
 			name: person.name,
 			title: PERSON_TITLE.of({
 				female: person.sex === 1,
-				hasHouse: Boolean(person.house),
 				tier: tierOfView(view),
 				royalParent: royalParent?.tier ?? null,
 				regency,

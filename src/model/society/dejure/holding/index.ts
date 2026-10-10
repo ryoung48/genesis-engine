@@ -106,4 +106,4 @@ function settleTitles({
 	return ordered.flatMap((title) => settleTitle({ ...params, title }))
 }
 
-export const HOLDING = { settleTitles }
+export const HOLDING = { nextHolder, settleTitles }
