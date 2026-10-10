@@ -802,7 +802,7 @@ function reconcile({ state }: RecordArmiesParams): void {
 		state.militaryStrengthDirty.size === 0 &&
 		DEPLOYMENTS.quiet({ state, nations: touched })
 	) {
-		touched.clear()
+		if (touched.size > 0) touched.clear()
 		return
 	}
 	for (const nation of state.militaryDirty) touched.add(nation)
