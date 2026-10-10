@@ -1,18 +1,19 @@
-import { MinHeap } from "@/model/shared/min-heap"
+import { BUCKET_QUEUE } from "@/model/shared/bucket-queue"
 import { UNITS } from "@/model/shared/units"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
+import { EDGE_USAGE } from "@/model/society/infrastructure/trade/routing/edge-usage"
 import {
 	ROUTE_TUNING,
 	routePopulationThresholds,
 } from "@/model/society/infrastructure/trade/routing/route-tuning"
+import type { AppendSeaRoutesParams } from "@/model/society/infrastructure/trade/routing/sea/types"
+import { ROUTE_SEARCH } from "@/model/society/infrastructure/trade/routing/search"
 import type {
 	RouteWorld,
 	SeaCandidateGroup,
 	SeaNeighborWorkspace,
-	SearchWorkspace,
 } from "@/model/society/infrastructure/trade/routing/types"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
-import type { Route } from "@/model/society/infrastructure/transport/types"
 
 export function collectSeaCandidates({
 	state,
@@ -95,10 +96,7 @@ export function computeWaterDepthPenalty(state: RouteWorld): Float32Array {
 			i++
 		) {
 			const neighbor = state.regionAdjList[i]
-			if (
-				(state.regionIsLand.length > 0 && state.regionIsLand[neighbor]) ||
-				waterDepth[neighbor] >= 0
-			) {
+			if (waterDepth[neighbor] >= 0) {
 				continue
 			}
 			waterDepth[neighbor] = nextDepth
@@ -156,8 +154,8 @@ function collectSeaNeighborPairs({
 		workspace.stamp = 1
 	}
 	const stamp = workspace.stamp
-	const heap = workspace.heap
-	heap.clear()
+	const queue = workspace.queue
+	queue.clear()
 	const pairKeys = new Set<number>()
 	const candidateSpan = candidates.length
 
@@ -168,12 +166,13 @@ function collectSeaNeighborPairs({
 			workspace.distance[region] = 0
 			workspace.owner[region] = sourceIndex
 			workspace.queued[region] = stamp
-			heap.push(region)
+			queue.push(region)
 		}
 	}
 
-	while (heap.size > 0) {
-		const current = heap.pop()
+	while (queue.size > 0) {
+		const current = queue.pop()
+		if (current < 0) break
 		if (workspace.settled[current] === stamp) continue
 		workspace.settled[current] = stamp
 		for (
@@ -183,10 +182,7 @@ function collectSeaNeighborPairs({
 			i++
 		) {
 			const neighbor = state.regionAdjList[i]
-			if (
-				(state.regionIsLand.length > 0 && state.regionIsLand[neighbor]) ||
-				state.landmarks.regionLandmark[neighbor] !== waterLandmark
-			) {
+			if (state.landmarks.regionLandmark[neighbor] !== waterLandmark) {
 				continue
 			}
 			if (workspace.queued[neighbor] === stamp) {
@@ -208,8 +204,9 @@ function collectSeaNeighborPairs({
 			}
 			const nextDistance =
 				workspace.distance[current] +
-				ROUTE_TUNING.sea.newEdgeCost +
-				(waterDepthPenalty[current] + waterDepthPenalty[neighbor]) / 2
+				ROUTE_TUNING.sea.newEdgeCost * ROUTE_TUNING.search.costScale +
+				(waterDepthPenalty[current] + waterDepthPenalty[neighbor]) *
+					(ROUTE_TUNING.search.costScale / 2)
 			if (
 				workspace.queued[neighbor] !== stamp ||
 				nextDistance < workspace.distance[neighbor]
@@ -217,7 +214,7 @@ function collectSeaNeighborPairs({
 				workspace.distance[neighbor] = nextDistance
 				workspace.owner[neighbor] = workspace.owner[current]
 				workspace.queued[neighbor] = stamp
-				heap.push(neighbor)
+				queue.push(neighbor)
 			}
 		}
 	}
@@ -236,98 +233,6 @@ function collectSeaNeighborPairs({
 		)
 }
 
-function findSeaPathsToTargets({
-	state,
-	workspace,
-	startRegion,
-	targetRegions,
-	waterLandmark,
-	waterEdgeUsed,
-	waterDepthPenalty,
-	regionPairSpan,
-}: {
-	state: RouteWorld
-	workspace: SearchWorkspace
-	startRegion: number
-	targetRegions: ArrayLike<number>
-	waterLandmark: number
-	waterEdgeUsed: Set<number>
-	waterDepthPenalty: Float32Array
-	regionPairSpan: number
-}): number {
-	workspace.stamp++
-	if (workspace.stamp === 0x7fffffff) {
-		workspace.queued.fill(0)
-		workspace.settled.fill(0)
-		workspace.targetStamp.fill(0)
-		workspace.targetCount.fill(0)
-		workspace.stamp = 1
-	}
-	const stamp = workspace.stamp
-	const heap = workspace.heap
-	heap.clear()
-	let remainingTargets = 0
-	for (let i = 0; i < targetRegions.length; i++) {
-		const region = targetRegions[i] ?? -1
-		if (region < 0) continue
-		if (workspace.targetStamp[region] !== stamp) {
-			workspace.targetStamp[region] = stamp
-			workspace.targetCount[region] = 1
-			remainingTargets++
-			continue
-		}
-		workspace.targetCount[region]++
-	}
-	workspace.distance[startRegion] = 0
-	workspace.prev[startRegion] = startRegion
-	workspace.queued[startRegion] = stamp
-	heap.push(startRegion)
-
-	while (heap.size > 0 && remainingTargets > 0) {
-		const current = heap.pop()
-		if (workspace.settled[current] === stamp) continue
-		workspace.settled[current] = stamp
-		if (workspace.targetStamp[current] === stamp) {
-			remainingTargets -= workspace.targetCount[current]
-			workspace.targetCount[current] = 0
-		}
-		for (
-			let i = state.regionAdjOffset[current],
-				end = state.regionAdjOffset[current + 1];
-			i < end;
-			i++
-		) {
-			const neighbor = state.regionAdjList[i]
-			if (
-				workspace.settled[neighbor] === stamp ||
-				(state.regionIsLand.length > 0 && state.regionIsLand[neighbor]) ||
-				state.landmarks.regionLandmark[neighbor] !== waterLandmark
-			) {
-				continue
-			}
-			const nextDistance =
-				workspace.distance[current] +
-				(waterEdgeUsed.has(
-					PATHFIND.pairKey({ a: current, b: neighbor, span: regionPairSpan }),
-				)
-					? ROUTE_TUNING.sea.existingEdgeCost
-					: ROUTE_TUNING.sea.newEdgeCost) +
-				(waterDepthPenalty[current] + waterDepthPenalty[neighbor]) / 2
-			if (
-				workspace.queued[neighbor] !== stamp ||
-				nextDistance < workspace.distance[neighbor]
-			) {
-				workspace.distance[neighbor] = nextDistance
-				workspace.prev[neighbor] = current
-				workspace.queued[neighbor] = stamp
-				heap.push(neighbor)
-			}
-		}
-	}
-
-	return stamp
-}
-
 export function appendSeaRoutes({
 	state,
 	candidateGroups,
@@ -335,22 +240,10 @@ export function appendSeaRoutes({
 	workspace,
 	neighborWorkspace,
 	seaUsage,
-	regionPairSpan,
 	urbanPopulation,
 	planetRadiusKm,
 	routes,
-}: {
-	state: RouteWorld
-	candidateGroups: SeaCandidateGroup[]
-	waterDepthPenalty: Float32Array
-	workspace: SearchWorkspace
-	neighborWorkspace: SeaNeighborWorkspace
-	seaUsage: Set<number>
-	regionPairSpan: number
-	urbanPopulation: Float32Array
-	planetRadiusKm: number | undefined
-	routes: Route[]
-}): void {
+}: AppendSeaRoutesParams): void {
 	for (const { waterLandmark, candidates } of candidateGroups) {
 		if (candidates.length < 2) continue
 		const candidatePopulation = new Float32Array(candidates.length)
@@ -368,7 +261,6 @@ export function appendSeaRoutes({
 		const targetIndexScratch = new Int32Array(candidatePairs.length)
 		const targetPortScratch = new Int32Array(candidatePairs.length)
 		const maxLengthScratch = new Float32Array(candidatePairs.length)
-		const singleTargetRegion = new Int32Array(1)
 		for (let pairIndex = 0; pairIndex < candidatePairs.length; ) {
 			const sourceIndex = candidatePairs[pairIndex]?.[0] ?? -1
 			if (sourceIndex < 0) {
@@ -420,22 +312,16 @@ export function appendSeaRoutes({
 				const targetIndex = targetIndexScratch[i] ?? -1
 				const target = candidates[targetIndex]
 				const maxLen = maxLengthScratch[i] ?? 0
-				singleTargetRegion[0] = targetPortScratch[i] ?? -1
-				const searchStamp = findSeaPathsToTargets({
+				const waterPath = ROUTE_SEARCH.findPath({
 					state,
 					workspace,
 					startRegion: source.portRegion,
-					targetRegions: singleTargetRegion,
-					waterLandmark,
-					waterEdgeUsed: seaUsage,
+					endRegion: targetPortScratch[i] ?? -1,
+					groupId: waterLandmark,
+					groupIds: null,
+					edgeUsed: seaUsage,
 					waterDepthPenalty,
-					regionPairSpan,
-				})
-				const waterPath = PATHFIND.reconstructPathFromTree({
-					workspace,
-					startRegion: source.portRegion,
-					endRegion: target.portRegion,
-					stamp: searchStamp,
+					kind: "sea",
 				})
 				if (waterPath.length < 2) continue
 				const pathRegions = [
@@ -455,15 +341,14 @@ export function appendSeaRoutes({
 					kind: TRANSPORT.ROUTE_SEA,
 					pathRegions,
 				})
-				for (let i = 2; i < pathRegions.length - 1; i++) {
-					seaUsage.add(
-						PATHFIND.pairKey({
-							a: pathRegions[i - 1],
-							b: pathRegions[i],
-							span: regionPairSpan,
-						}),
-					)
-				}
+				EDGE_USAGE.recordPath({
+					adjOffset: state.regionAdjOffset,
+					adjList: state.regionAdjList,
+					counts: seaUsage,
+					pathRegions,
+					firstEdge: 2,
+					endEdge: pathRegions.length - 1,
+				})
 			}
 		}
 	}
@@ -476,7 +361,10 @@ export function createSeaNeighborWorkspace(size: number): SeaNeighborWorkspace {
 		owner: new Int32Array(size).fill(-1),
 		queued: new Int32Array(size),
 		settled: new Int32Array(size),
-		heap: new MinHeap(distance),
+		queue: BUCKET_QUEUE.create({
+			distance,
+			bucketCount: ROUTE_TUNING.search.seaBucketCount,
+		}),
 		stamp: 0,
 	}
 }
