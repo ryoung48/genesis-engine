@@ -92,3 +92,10 @@ export interface FrontierParams {
 	limit: number
 	firstOnly: boolean
 }
+
+export interface CaptureWeightsParams {
+	territory: Territory
+	attacker: number
+	defender: number
+	candidates: number[]
+}

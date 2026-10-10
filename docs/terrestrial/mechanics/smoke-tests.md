@@ -74,9 +74,9 @@ $env:HISTORY_PIPELINE = 'distribution'
 $env:HISTORY_START = '2'
 $env:HISTORY_YEARS = '2023'
 $env:HISTORY_POINTS = '204000'
-$env:HISTORY_SEEDS = '14963991,42,12345'
+$env:HISTORY_SEEDS = '14963991'
 $env:HISTORY_TITLE = 'distribution-history-pre-default'
 pnpm report:history
 ```
 
-Keep HISTORY_OUT unset for the standard local report folder. `gen:history` also accepts the explicit producer; distribution defaults to the complete 2–2025 span. Detailed simulation remains the default for report/baseline reproduction. Calibration now uses only 204,000-point worlds at the user’s request; preserve the equivalent Pipe 2 benchmark. Automatic comparison matching includes producer metadata; explicit cross-pipeline comparisons label the different mechanisms and omit inapplicable people/military metrics. Clear task-specific environment settings after running commands. See [history pipelines](history-pipelines.md) and the [fixed distribution acceptance gate](../politics/distribution-history.md).
+Keep HISTORY_OUT unset for the standard local report folder. `gen:history` also accepts the explicit producer; distribution defaults to the complete 2–2025 span. Detailed simulation remains the default for report/baseline reproduction. Calibration uses one 204,000-point world with seed 14963991; preserve the equivalent Pipe 2 benchmark. Automatic comparison matching includes producer metadata; explicit cross-pipeline comparisons label the different mechanisms and omit inapplicable people/military metrics. Clear task-specific environment settings after running commands. See [history pipelines](history-pipelines.md) and the [fixed distribution acceptance gate](../politics/distribution-history.md).

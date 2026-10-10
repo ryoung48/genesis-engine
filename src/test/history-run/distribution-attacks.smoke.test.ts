@@ -1,7 +1,6 @@
 import { expect, it } from "vitest"
 import { DISTRIBUTION_ATTACKS as A } from "@/model/history/distribution/attacks"
 import { DISTRIBUTION_TARGETS as T } from "@/model/history/distribution/targets"
-import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 import { RNG } from "@/model/shared/random/rng"
 import { DISTRIBUTION_FIXTURE } from "@/test/history-run/fixtures/distribution"
 
@@ -53,15 +52,13 @@ it("retains the size penalty when an attacker has only one eligible neighbor", (
 		desolate: [],
 		seed: 42,
 	})
-	if (!world.provinces || !world.nations) throw new Error("Missing fixture")
-	world.nations.assignment = Int32Array.from({ length: 126 }, (_, i) =>
-		i < 25 ? 0 : i < 125 ? 1 : 2,
-	)
-	world.nations.seeds = Int32Array.from([0, 124, 125])
-	world.nations.count = 3
-	const territory = DISTRIBUTION_TERRITORY.initialize({
-		provinces: world.provinces,
-		nations: world.nations,
+	const territory = DISTRIBUTION_FIXTURE.territory({
+		world,
+		groups: [
+			Array.from({ length: 25 }, (_, i) => i),
+			[124, ...Array.from({ length: 99 }, (_, i) => 25 + i)],
+			[125],
+		],
 	})
 	const attacks = A.create()
 	attacks.active.set(0, { id: 0, attacker: 1, defender: 2, start: 2 })
@@ -81,17 +78,13 @@ it("retains the size penalty when an attacker has only one eligible neighbor", (
 
 it("removes blocked attacks before dividing a defender's opening strength", () => {
 	const world = DISTRIBUTION_FIXTURE.world({
-		neighbors: [[1], [0, 2, 3], [1, 4], [1], [2]],
+		neighbors: [[1], [0, 2, 4], [1, 3], [2, 5], [1], [3]],
 		desolate: [],
 		seed: 42,
 	})
-	if (!world.provinces || !world.nations) throw new Error("Missing fixture")
-	world.nations.assignment = Int32Array.from([0, 0, 0, 1, 2])
-	world.nations.seeds = Int32Array.from([0, 3, 4])
-	world.nations.count = 3
-	const territory = DISTRIBUTION_TERRITORY.initialize({
-			provinces: world.provinces,
-			nations: world.nations,
+	const territory = DISTRIBUTION_FIXTURE.territory({
+			world,
+			groups: [[0, 1, 2, 3], [4], [5]],
 		}),
 		attacks = A.create()
 	attacks.active.set(0, { id: 0, attacker: 1, defender: 0, start: 2 })
@@ -99,15 +92,15 @@ it("removes blocked attacks before dividing a defender's opening strength", () =
 	A.resolve({
 		attacks,
 		territory,
-		target: T.project({ capacities: [5], year: 3 }),
+		target: T.project({ capacities: [6], year: 3 }),
 		year: 3,
 		rng: RNG.fromSource({
-			random: () => 0.2,
+			random: () => 0.1,
 			nonPositiveWeightBehavior: "undefined",
 		}),
 	})
 	expect(attacks.endReasons.blocked).toBe(1)
-	expect(territory.owner[2]).toBe(0)
+	expect(territory.owner[3]).toBe(0)
 	expect(attacks.active.has(1)).toBe(true)
 })
 
@@ -117,13 +110,9 @@ it("permits multiple incoming attacks with one outgoing target and no reciprocal
 		desolate: [],
 		seed: 42,
 	})
-	if (!world.provinces || !world.nations) throw new Error("Missing fixture")
-	world.nations.assignment = Int32Array.from([0, 1, 2, 3])
-	world.nations.seeds = Int32Array.from([0, 1, 2, 3])
-	world.nations.count = 4
-	const territory = DISTRIBUTION_TERRITORY.initialize({
-		provinces: world.provinces,
-		nations: world.nations,
+	const territory = DISTRIBUTION_FIXTURE.territory({
+		world,
+		groups: [[0], [1], [2], [3]],
 	})
 	const attacks = A.create()
 	attacks.active.set(0, { id: 0, attacker: 0, defender: 1, start: 2 })

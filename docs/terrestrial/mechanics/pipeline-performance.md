@@ -75,7 +75,9 @@ For seed 14963991, lateMedieval, 204,000 points, 867–1800, the completed ruler
 
 ## Distribution history calibration (2026-10-10)
 
-The original [Pipe 3](history-pipelines.md) calibration ran while this political producer was opt-in. The completed original-mechanism report is `stats/history/2026-10-09T23-54-37-668Z-distribution-history-pre-default/2023.json`, lateMedieval, 204,000 requested points, seeds 14963991/42/12345, AD 2–2025 (2,023 transitions), knowledge metadata 2.366478320318625, standard diagnostics and no profiling. The eligible graph sizes differ by seed. Placement is shared generation work; the engine separately repeats pure target projection while indexing the placed countries. PMF/projection planning is additional work, rather than detailed-engine initialization.
+Required calibration runs use one seed, 14963991. The tables below retain archived measurements.
+
+The original [Pipe 3](history-pipelines.md) calibration ran while this political producer was opt-in. The completed original-mechanism report is `stats/history/2026-10-09T23-54-37-668Z-distribution-history-pre-default/2023.json`, lateMedieval, 204,000 requested points, seed 14963991 entry, AD 2–2025 (2,023 transitions), knowledge metadata 2.366478320318625, standard diagnostics and no profiling. The eligible graph sizes differ by seed. Placement is shared generation work; the engine separately repeats pure target projection while indexing the placed countries. PMF/projection planning is additional work, rather than detailed-engine initialization.
 
 | Seed | Eligible provinces | Generation | Engine initialization | Annual advancement total | Annual frame folding total | Record JSON |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -96,7 +98,7 @@ Final original-mechanism validation also completed at `stats/history/2026-10-10T
 
 ## Passing large-world steering repair
 
-The completed final report is `stats/history/2026-10-10T01-20-34-437Z-distribution-history-final/2023.json`: distribution, 204,000 requested points, seeds 14963991/42/12345, lateMedieval, AD 2–2025, knowledge threshold 2.366478320318625, standard diagnostics and no profiling. All six checkpoints on every seed pass the unchanged country TV ≤0.10, province-mass TV ≤0.15 and relative count error ≤0.25 gate; all annual ownership/connectivity/capital/lifecycle violations are zero. Fast history is now the application default.
+The completed final report is `stats/history/2026-10-10T01-20-34-437Z-distribution-history-final/2023.json`: distribution, 204,000 requested points, seed 14963991 entry, lateMedieval, AD 2–2025, knowledge threshold 2.366478320318625, standard diagnostics and no profiling. All six checkpoints for seed 14963991 pass the unchanged country TV ≤0.10, province-mass TV ≤0.15 and relative count error ≤0.25 gate; all annual ownership/connectivity/capital/lifecycle violations are zero. Fast history is now the application default.
 
 | Seed | Generation | Engine initialization | Annual advancement | Median year | Report wall | Record JSON |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |

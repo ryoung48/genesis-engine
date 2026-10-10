@@ -1,5 +1,7 @@
 import type { AttackState } from "@/model/history/distribution/attacks/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
+import type { SettlementState } from "@/model/history/distribution/settlement/types"
+import type { Foundings } from "@/model/history/distribution/statehood/types"
 import type {
 	DistributionProjection,
 	Histogram,
@@ -16,12 +18,16 @@ export interface DistributionEngine {
 	year: number
 	target: DistributionProjection
 	history: HistoryState
+	settlement: SettlementState
+	siteScore: Float32Array
+	foundings: Foundings
 	sequence: number
 	pending: RecordBatch[]
 	advanceMs: number
 	projectionMs: number
 	recordWritingMs: number
 	recordIngestionMs: number
+	rebellions: SplitRebellion[]
 	splits: number
 	absorptions: number
 }
@@ -49,4 +55,11 @@ export interface PlaybackParams {
 	onPaused: (timeMs: number) => void
 	yieldYear: () => Promise<void>
 	batchYears: number
+}
+
+export interface SplitRebellion {
+	id: number
+	parent: number
+	successor: number
+	province: number
 }

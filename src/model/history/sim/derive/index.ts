@@ -105,19 +105,8 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 			// not the procedural flood-fill nation/government generator.
 			const isEarthImportRaster = !!params.provinces.realIds
 			if (params.historyPipeline === "distribution" && !isEarthImportRaster) {
-				nations = TIMING.measure({
-					stage: "distribution placement",
-					timings,
-					fn: () =>
-						DISTRIBUTION_TERRITORY.place({
-							provinces: params.provinces!,
-							habitability: params.population!.habitability,
-							waterAccess: params.waterAccess,
-							provinceContinent,
-							migrationWave: params.population!.migrationWave,
-							r_xyz: params.r_xyz,
-							seed: params.seed,
-						}).nations,
+				nations = DISTRIBUTION_TERRITORY.emptyNations({
+					provinces: params.provinces,
 				})
 			} else if (eraConfig.hasNations && !isEarthImportRaster) {
 				const provinces = params.provinces

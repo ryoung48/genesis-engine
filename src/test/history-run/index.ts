@@ -37,7 +37,7 @@ function optionsFromEnv({ env, log }: EnvParams): HistoryRunOptions {
 	if (pipeline !== "simulation" && pipeline !== "distribution")
 		throw new Error("Invalid HISTORY_PIPELINE")
 	const years = Number(
-		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 2023 : DEFAULT_YEARS),
+		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 12024 : DEFAULT_YEARS),
 	)
 	return {
 		pipeline,
@@ -165,7 +165,7 @@ function run(
 			era: options.era,
 			numPoints: options.numPoints,
 			years: options.years,
-			startYear: 2,
+			startYear: undefined,
 			outPath: options.summaryPath,
 			baselinePath: null,
 			log: options.log,

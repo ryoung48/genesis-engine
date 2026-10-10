@@ -6,6 +6,7 @@ import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/t
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import { WIND } from "@/model/climate/weather/wind"
+import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
@@ -391,7 +392,7 @@ export const GenesisView: React.FC<{
 		useState<HistoryPipeline>("distribution")
 	const simStartTimeMs =
 		historyPipeline === "distribution"
-			? 0
+			? DATE.eu4DateToTimeMs(`${DISTRIBUTION_TARGETS.startYear}.1.1`)
 			: historyYearToTime(STATE_CLOCK.defaultStartYear)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	// Earth-imported worlds scrub real Gregorian dates via history's own
@@ -1623,8 +1624,14 @@ export const GenesisView: React.FC<{
 	useEffect(() => {
 		if (!proceduralReplayPlaying || world?.isEarthImport) return
 		const timer = window.setInterval(() => {
+			const stepYears =
+				history.state?.record.pipeline === "distribution"
+					? DISTRIBUTION_TARGETS.stepYears({
+							year: DATE.historyTimeMsToYear(history.selectedTimeMs),
+						})
+					: 1
 			const next = Math.min(
-				history.selectedTimeMs + STATE_CLOCK.yearMs,
+				history.selectedTimeMs + stepYears * STATE_CLOCK.yearMs,
 				history.maxTimeMs,
 			)
 			history.setSelectedTimeMs(next)
@@ -1640,6 +1647,7 @@ export const GenesisView: React.FC<{
 		history.selectedTimeMs,
 		history.maxTimeMs,
 		history.setSelectedTimeMs,
+		history.state?.record.pipeline,
 		proceduralHistoryPlaying,
 		handleToggleProceduralHistoryPlayback,
 	])

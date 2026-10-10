@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { COLOR } from "@/model/history/earth/color"
 import type { RawOrganizationReference } from "@/model/history/earth/data-source/types"
 import { GOVERNMENT } from "@/model/history/earth/government"
@@ -357,6 +358,7 @@ export function useMapColoring(input: MapColoringInput) {
 				cultureColorById: historyCultureColorById ?? undefined,
 				locations: worldForDisplay.locations ?? null,
 				organizationKindById,
+				uninhabitedGray: history.state?.record.pipeline === "distribution",
 			})
 			if (historyColors) return withOrgHighlight(historyColors)
 		}
@@ -408,6 +410,7 @@ export function useMapColoring(input: MapColoringInput) {
 		withOrgHighlight,
 		religionMode,
 		organizationKindById,
+		history.state?.record.pipeline,
 	])
 
 	const regionColors = useMemo(() => {
@@ -460,12 +463,20 @@ export function useMapColoring(input: MapColoringInput) {
 		const provinceNation = frame.provinceNation[hoverProvince] ?? -1
 		const owner = isWasteland || provinceNation < 0 ? null : provinceNation
 		const nation = owner === null ? null : (frame.nations.get(owner) ?? null)
+		const statusLabel =
+			isWasteland || history.state.record.pipeline !== "distribution"
+				? null
+				: DISTRIBUTION_STATUS.isStateless({ owner: provinceNation })
+					? "Stateless"
+					: DISTRIBUTION_STATUS.isUninhabited({ owner: provinceNation })
+						? "Uninhabited"
+						: null
 		const nationName =
 			owner !== null
 				? (nation?.name ??
 					history.state.record.nations[owner]?.name ??
 					`nation ${owner}`)
-				: null
+				: statusLabel
 		const nationColor = nation
 			? COLOR.rgb01ToCss([
 					nation.color[0] / 255,

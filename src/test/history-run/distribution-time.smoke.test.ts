@@ -14,26 +14,48 @@ it("gives both split successors the planned ten-year cooldown", () => {
 		desolate: [],
 		seed: 42,
 	})
-	if (!world.nations) throw new Error("Missing fixture")
-	world.nations.assignment = new Int32Array(40)
-	world.nations.seeds = Int32Array.from([0])
-	world.nations.count = 1
-	const engine = E.create({ world })
+	const engine = DISTRIBUTION_FIXTURE.engine({
+		world,
+		groups: [Array.from({ length: 40 }, (_, i) => i)],
+		year: 2,
+	})
 	engine.rng = RNG.fromSource({
 		random: () => 0,
 		nonPositiveWeightBehavior: "undefined",
 	})
-	E.advanceYear({ engine })
+	E.advance({ engine })
 	expect(engine.territory.countries.size).toBe(2)
 	expect(
 		[...engine.territory.countries.values()].map((c) => c.cooldown),
 	).toEqual([13, 13])
 	expect(engine.attacks.declared).toHaveLength(0)
-	E.advanceYear({ engine })
+	const rebellion = engine.history.record.events.wars[0]
+	expect(rebellion).toMatchObject({
+		id: 0,
+		rebel: true,
+		casusBelli: "rebellion",
+		warGoalType: "rebellion",
+		warGoalId: 0,
+	})
+	expect(rebellion.name).toContain("Civil War")
+	expect(
+		rebellion.events
+			.filter((event) => event.kind === "warStart")
+			.map((event) => [event.nationId, event.side]),
+	).toEqual([
+		[1, "attacker"],
+		[0, "defender"],
+	])
+	expect(
+		rebellion.events.filter((event) => event.kind === "warEnd"),
+	).toHaveLength(2)
+	expect(engine.history.record.nations[1].isRebel).toBe(false)
+	E.advance({ engine })
 	expect(engine.territory.countries.size).toBe(2)
+	expect(engine.history.record.events.wars).toHaveLength(1)
 })
 
-it("advances exactly 2023 empty annual transitions and stops at 2025", () => {
+it("advances 134 fifty-year steps then annual transitions and stops at 2025", () => {
 	for (const desolate of [[], [0]]) {
 		const world = DISTRIBUTION_FIXTURE.world({
 			neighbors: desolate.length ? [[]] : [],
@@ -41,10 +63,12 @@ it("advances exactly 2023 empty annual transitions and stops at 2025", () => {
 			seed: 42,
 		})
 		const engine = E.create({ world })
-		expect(engine.history.record.minTimeMs).toBe(0)
+		expect(engine.history.record.minTimeMs).toBe(
+			DATE.eu4DateToTimeMs("-9999.1.1"),
+		)
 		E.advanceUntil({ engine, year: 2025 })
-		E.advanceYear({ engine })
-		expect(engine.sequence).toBe(2023)
+		E.advance({ engine })
+		expect(engine.sequence).toBe(134 + 5325)
 		expect(engine.history.record.maxTimeMs).toBe(
 			DATE.eu4DateToTimeMs("2025.1.1"),
 		)
@@ -89,8 +113,8 @@ it("processes a pause message during an active batch and resumes identically", a
 				setTimeout(resolve, 10)
 			}),
 	})
-	expect(engine.year).toBe(3)
-	expect(paused).toBe(DATE.eu4DateToTimeMs("3.1.1"))
+	expect(engine.year).toBe(-9949)
+	expect(paused).toBe(DATE.eu4DateToTimeMs("-9949.1.1"))
 	channel.port1.close()
 	channel.port2.close()
 	E.advanceUntil({ engine, year: 40 })
@@ -138,7 +162,7 @@ it("preserves replay across transport sizes and discards a cancelled active batc
 				}, 0),
 			),
 	})
-	expect(cancelled.year).toBe(3)
+	expect(cancelled.year).toBe(-9949)
 	expect(published).toBe(0)
 	expect(cancelled.pending).toHaveLength(0)
 })

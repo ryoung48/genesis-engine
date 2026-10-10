@@ -35,9 +35,15 @@ export interface MergeBatchesParams {
 
 export interface WriteYearParams {
 	engine: DistributionEngine
+	previousTimeMs: number
 	oldOwner: Int32Array
 	oldIds: Set<number>
 }
 export interface CapitalOfParams {
 	log: NationEventLog
+}
+
+export interface EventTimeParams {
+	channel: number
+	salt: number
 }

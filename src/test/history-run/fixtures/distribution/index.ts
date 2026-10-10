@@ -1,7 +1,16 @@
+import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
+import type { DistributionEngine } from "@/model/history/distribution/engine/types"
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
+import type { Territory } from "@/model/history/distribution/territory/types"
+import { PROCEDURAL_RECORD } from "@/model/history/record/procedural"
 import type { GenesisProvinces } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import type { FixtureParams } from "@/test/history-run/fixtures/distribution/types"
+import type {
+	EngineFixtureParams,
+	FixtureParams,
+	GroupsParams,
+} from "@/test/history-run/fixtures/distribution/types"
 
 function world({
 	neighbors,
@@ -30,23 +39,77 @@ function world({
 		riverAccess: new Uint8Array(count),
 		lakeAccess: new Uint8Array(count),
 	}
-	const r_xyz = Float32Array.from({ length: count * 3 }, (_, i) =>
-		i % 3 === 0 ? 1 : 0,
-	)
-	const { nations } = DISTRIBUTION_TERRITORY.place({
-		provinces,
-		habitability: new Float32Array(count).fill(1),
-		waterAccess: provinces.waterAccess,
-		provinceContinent: undefined,
-		migrationWave: undefined,
-		r_xyz,
-		seed,
+	const r_xyz = Float32Array.from({ length: count * 3 }, (_, i) => {
+		const angle = Math.floor(i / 3) * 0.02
+		return i % 3 === 0 ? Math.cos(angle) : i % 3 === 1 ? Math.sin(angle) : 0
 	})
+	const migrationWave = Float32Array.from(
+		{ length: count },
+		(_, i) => i / Math.max(1, count),
+	)
+	const nations = DISTRIBUTION_TERRITORY.emptyNations({ provinces })
 	return {
 		params: { seed, historyPipeline: "distribution" },
 		provinces,
 		nations,
 		mesh: { r_xyz },
+		population: { migrationWave },
 	} as unknown as SerializedGenesisWorld
 }
-export const DISTRIBUTION_FIXTURE = { world }
+
+function territory({ world: w, groups }: GroupsParams): Territory {
+	if (!w.provinces) throw new Error("Missing fixture")
+	const t = DISTRIBUTION_TERRITORY.initialize({
+		provinces: w.provinces,
+		r_xyz: w.mesh.r_xyz,
+	})
+	for (let p = 0; p < t.owner.length; p++)
+		if (!w.provinces.desolate[p]) t.owner[p] = DISTRIBUTION_STATUS.stateless
+	for (const group of groups) {
+		const country = DISTRIBUTION_TERRITORY.found({
+			territory: t,
+			province: group[0],
+		})
+		for (const province of group.slice(1))
+			DISTRIBUTION_TERRITORY.claim({ territory: t, country, province })
+	}
+	return t
+}
+
+function engine({
+	world: w,
+	groups,
+	year,
+}: EngineFixtureParams): DistributionEngine {
+	const e = DISTRIBUTION_ENGINE.create({ world: w })
+	e.territory = territory({ world: w, groups })
+	e.settlement.cursor = e.settlement.order.length
+	e.year = year
+	const { record } = e.history
+	for (const [p, log] of record.events.provinceEvents) {
+		log.base.ownerId = e.territory.owner[p]
+		log.base.controllerId = e.territory.owner[p]
+	}
+	for (const c of e.territory.countries.values()) {
+		record.nations[c.id] = {
+			id: c.id,
+			name: `Country ${c.id}`,
+			color: PROCEDURAL_RECORD.successorNationColor({ id: c.id }),
+			birthTimeMs: record.minTimeMs,
+			deathTimeMs: -1,
+			isRebel: false,
+			tag: null,
+		}
+		record.events.nationEvents[c.id] = {
+			base: {
+				capitalProvinceId: c.capital,
+				initialGovernment: "",
+				reforms: [],
+			},
+			events: [],
+		}
+	}
+	return e
+}
+
+export const DISTRIBUTION_FIXTURE = { world, territory, engine }

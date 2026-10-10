@@ -107,3 +107,17 @@ export interface SizeParams {
 export interface EndpointParams {
 	endpoint: number
 }
+
+export interface SegmentParams {
+	axis: number[]
+	year: number
+}
+export interface LandStatus {
+	uninhabited: number
+	stateless: number
+	stateHeld: number
+}
+export interface HeldCapacitiesParams {
+	capacities: number[]
+	year: number
+}

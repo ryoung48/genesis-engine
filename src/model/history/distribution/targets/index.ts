@@ -4,8 +4,10 @@ import type {
 	DistributionProjection,
 	EndpointParams,
 	GainParams,
+	HeldCapacitiesParams,
 	Histogram,
 	HistogramParams,
+	LandStatus,
 	LossParams,
 	ObjectiveParams,
 	PmfDiagnostic,
@@ -13,14 +15,19 @@ import type {
 	PowerParams,
 	ProjectComponentParams,
 	ProjectionParams,
+	SegmentParams,
 	SizeParams,
 	SizePmf,
 	TargetProfile,
 	YearParams,
 } from "@/model/history/distribution/targets/types"
 
-const years = [2, 476, 1066, 1701, 1914, 2025]
+const years = [-3000, -2000, -1000, -500, 2, 476, 1066, 1701, 1914, 2025]
 const counts = [
+	[55, 35, 10, 0, 0, 0, 0],
+	[45, 38, 13, 4, 0, 0, 0],
+	[35, 40, 15.8, 7, 2, 0.2, 0],
+	[28, 42, 18, 8, 3, 0.9, 0.1],
 	[58, 166, 94, 45, 13, 5, 4],
 	[70, 161, 85, 39, 20, 9, 7],
 	[141, 180, 106, 84, 23, 9, 8],
@@ -28,7 +35,12 @@ const counts = [
 	[22, 35, 14, 25, 8, 10, 25],
 	[27, 30, 24, 33, 25, 26, 27],
 ]
+const adTwoMeans = [1, 2.741, 6.2234, 14.0222, 35.1538, 58, 317.25]
 const means = [
+	adTwoMeans,
+	adTwoMeans,
+	adTwoMeans,
+	adTwoMeans,
 	[1, 2.741, 6.2234, 14.0222, 35.1538, 58, 317.25],
 	[1, 2.795, 6.3176, 14.6923, 32.2, 63.5556, 190.5714],
 	[1, 2.8111, 6.4906, 15.8214, 35.2609, 65.1111, 162.5],
@@ -36,6 +48,19 @@ const means = [
 	[1, 2.6, 6.2857, 15.44, 37.125, 68.3, 444.4],
 	[1, 2.6, 6.4583, 15.6364, 36.08, 71.6923, 349.8148],
 ]
+const statusYears = [
+	-9999, -8000, -6000, -4000, -3300, -3000, -2000, -1000, -500, 2, 476, 1066,
+	1500, 1701, 1914, 2025,
+]
+const uninhabitedPercent = [
+	12, 10, 8, 6, 5, 5, 4, 3, 3, 2, 1.5, 0.8, 0, 0, 0, 0,
+]
+const stateHeldPercent = [
+	0, 0, 0, 0, 0, 2, 8, 20, 33, 45, 50, 60, 71, 79, 95, 100,
+]
+const START_YEAR = -9999
+const FIRST_STATE_YEAR = -3300
+const PRE_STATE_STEP_YEARS = 50
 const lower = [1, 2, 5, 10, 25, 50, 101]
 const upper = [1, 4, 9, 24, 49, 100, Infinity]
 const countryWeight = 1 / 0.1
@@ -47,12 +72,49 @@ function bucket({ size }: SizeParams): number {
 	throw new Error("Invalid country size")
 }
 
-function profile({ year }: YearParams): TargetProfile {
-	if (!Number.isInteger(year) || year < 2 || year > 2025)
-		throw new Error("Distribution year outside 2–2025")
+function stepYears({ year }: YearParams): number {
+	return year < FIRST_STATE_YEAR ? PRE_STATE_STEP_YEARS : 1
+}
+
+function nextYear({ year }: YearParams): number {
+	return Math.min(
+		year + stepYears({ year }),
+		year < FIRST_STATE_YEAR ? FIRST_STATE_YEAR : year + 1,
+	)
+}
+
+function segment({ axis, year }: SegmentParams): { i: number; f: number } {
 	let i = 0
-	while (i < years.length - 2 && year > years[i + 1]) i++
-	const f = (year - years[i]) / (years[i + 1] - years[i])
+	while (i < axis.length - 2 && year > axis[i + 1]) i++
+	return {
+		i,
+		f: Math.max(0, (year - axis[i]) / (axis[i + 1] - axis[i])),
+	}
+}
+
+function status({ year }: YearParams): LandStatus {
+	if (!Number.isInteger(year) || year < START_YEAR || year > 2025)
+		throw new Error("Distribution year outside 9999 BCE–2025")
+	const { i, f } = segment({ axis: statusYears, year })
+	const mix = (values: number[]) =>
+		((1 - f) * values[i] + f * values[i + 1]) / 100
+	const uninhabited = mix(uninhabitedPercent),
+		stateHeld = mix(stateHeldPercent)
+	return { uninhabited, stateless: 1 - uninhabited - stateHeld, stateHeld }
+}
+
+function heldCapacities({ capacities, year }: HeldCapacitiesParams): number[] {
+	const { stateHeld } = status({ year })
+	if (stateHeld <= 0) return []
+	return capacities.map((capacity) =>
+		Math.max(1, Math.round(capacity * stateHeld)),
+	)
+}
+
+function profile({ year }: YearParams): TargetProfile {
+	if (!Number.isInteger(year) || year < START_YEAR || year > 2025)
+		throw new Error("Distribution year outside 9999 BCE–2025")
+	const { i, f } = segment({ axis: years, year })
 	const totalA = counts[i].reduce((a, b) => a + b, 0)
 	const totalB = counts[i + 1].reduce((a, b) => a + b, 0)
 	return {
@@ -438,8 +500,14 @@ function action({ observed, remove, add }: ActionParams): Histogram {
 	return result
 }
 export const DISTRIBUTION_TARGETS = {
+	startYear: START_YEAR,
+	firstStateYear: FIRST_STATE_YEAR,
+	stepYears,
+	nextYear,
 	bucket,
 	action,
+	status,
+	heldCapacities,
 	profile,
 	fitPmf,
 	projectComponent,

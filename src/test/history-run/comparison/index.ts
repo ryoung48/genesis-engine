@@ -74,7 +74,11 @@ function read(path: string): SavedReport {
 		if (
 			typeof start !== "number" ||
 			typeof end !== "number" ||
-			end - start !== diag.annualTicks.length ||
+			(data.pipeline === "distribution"
+				? Array.isArray(diag.annual) && object(diag.annual.at(-1)).year === end
+					? diag.annual.length
+					: -1
+				: end - start) !== diag.annualTicks.length ||
 			diag.completed === false
 		)
 			throw new Error(`Partial report: ${path}, seed ${seed}`)
@@ -264,7 +268,7 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 		period: "Run",
 		rows,
 	})
-	for (const seed of new Set([...current.seeds, ...(previous?.seeds ?? [])])) {
+	for (const seed of current.seeds) {
 		const windows = (report: SavedReport | null) =>
 			new Map(
 				(Array.isArray(report?.data[seed])
@@ -442,6 +446,20 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 				})
 				delete a.connectivityMs
 				delete b.connectivityMs
+				if (
+					a.projectionSummary !== undefined &&
+					isDeepStrictEqual(a.projectionSummary, b.projectionSummary)
+				) {
+					rows.push({
+						section: "Distribution trajectory",
+						period: `${seed} / year ${year}`,
+						metric: "projectionSummary identical",
+						before: true,
+						after: true,
+					})
+					delete a.projectionSummary
+					delete b.projectionSummary
+				}
 				addRows({
 					before: a,
 					after: b,
@@ -476,10 +494,15 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			})
 		const ta = Array.isArray(da.annualTicks) ? (da.annualTicks as number[]) : []
 		const tb = Array.isArray(db.annualTicks) ? (db.annualTicks as number[]) : []
+		const steps = Array.isArray(db.annual)
+			? db.annual
+			: Array.isArray(da.annual)
+				? da.annual
+				: []
 		for (let i = 0; i < Math.max(ta.length, tb.length); i++)
 			rows.push({
 				section: "Performance",
-				period: `${seed} / year ${Number(object(b.values().next().value ?? a.values().next().value).from) + i + 1}`,
+				period: `${seed} / year ${object(steps[i]).year ?? Number(object(b.values().next().value ?? a.values().next().value).from) + i + 1}`,
 				metric: "annualTickMs",
 				before: ta[i],
 				after: tb[i],

@@ -2,7 +2,7 @@ import { it } from "vitest"
 import { HISTORY_REPORT } from "@/test/history-run/report"
 import { HISTORY_REPORT_OPTIONS } from "@/test/history-run/report/options"
 
-it("reports multi-seed war, rebellion, union and raid rates per century", () => {
+it("reports war, rebellion, union and raid rates per century for one seed", () => {
 	const options = HISTORY_REPORT_OPTIONS.fromEnv({
 		env: process.env,
 		log: (line) => process.stdout.write(`${line}\n`),

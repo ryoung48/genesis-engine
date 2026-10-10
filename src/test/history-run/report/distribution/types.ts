@@ -1,12 +1,22 @@
 import type { HistoryReportOptions } from "@/test/history-run/report/options/types"
 import type { AttackEndReason } from "@/model/history/distribution/attacks/types"
 import type { DistributionEngine } from "@/model/history/distribution/engine/types"
-import type { PmfDiagnostic } from "@/model/history/distribution/targets/types"
+import type { Foundings } from "@/model/history/distribution/statehood/types"
+import type {
+	LandStatus,
+	PmfDiagnostic,
+} from "@/model/history/distribution/targets/types"
 export interface SnapshotParams {
+	engine: DistributionEngine
+}
+export interface LandmassParams {
 	engine: DistributionEngine
 }
 export interface DistributionSnapshot {
 	year: number
+	status: LandStatus
+	targetStatus: LandStatus
+	foundings: Foundings
 	count: number
 	mass: number
 	mean: number
@@ -56,6 +66,8 @@ export interface DistributionSnapshot {
 	connectivityScans: number
 	connectivityMs: number
 	tendrilShare: number
+	elongation: { p50: number; p90: number }
+	elongatedShare: number
 	invariants: {
 		ownership: number
 		connectivity: number
@@ -73,12 +85,13 @@ export interface AverageParams {
 	values: number[]
 }
 
-export interface PercentileParams {
-	values: number[]
-	q: number
-}
-
 export type DistributionReportOptions = Omit<
 	HistoryReportOptions,
 	"reachKm" | "cohesionStep"
 >
+
+export interface GateParams {
+	rows: DistributionSnapshot[]
+	violations: number
+	expectedRows: number
+}

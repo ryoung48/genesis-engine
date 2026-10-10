@@ -4,6 +4,7 @@ import type {
 	AttackState,
 	BiasParams,
 	CaptureParams,
+	CaptureWeightsParams,
 	CeilingParams,
 	CompletionParams,
 	EndAttackParams,
@@ -17,6 +18,7 @@ import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 
 const maxAttackYears = 40
 const captureFraction = 0.02
+const FRONT_REACH = 2
 
 function completionRate({
 	attackerSize,
@@ -65,6 +67,33 @@ function frontier({
 	return valid
 }
 
+function captureWeights({
+	territory,
+	attacker,
+	defender,
+	candidates,
+}: CaptureWeightsParams): { v: number; w: number }[] {
+	const a = territory.countries.get(attacker),
+		d = territory.countries.get(defender)
+	if (!a || !d) return []
+	const lead = candidates.map(
+		(province) =>
+			DISTRIBUTION_TERRITORY.distance({
+				territory,
+				a: a.capital,
+				b: province,
+			}) -
+			DISTRIBUTION_TERRITORY.distance({ territory, a: d.capital, b: province }),
+	)
+	const lowest = Math.min(...lead),
+		reach = FRONT_REACH * DISTRIBUTION_TERRITORY.spacing({ territory })
+	return candidates.map((province, i) => ({
+		v: province,
+		w:
+			DISTRIBUTION_TERRITORY.enclosure({ territory, attacker, province }) ** 2 *
+			Math.exp(-(lead[i] - lowest) / reach),
+	}))
+}
 function bias({ gain }: BiasParams): number {
 	return Math.max(
 		0.25,
@@ -247,15 +276,12 @@ function resolve({
 		const count = Math.max(1, Math.floor(captureFraction * attackStrength))
 		for (let i = 0; i < count && valid.length; i++) {
 			const province = rng.weightedChoice(
-				valid.map((candidate) => ({
-					v: candidate,
-					w:
-						DISTRIBUTION_TERRITORY.enclosure({
-							territory: t,
-							attacker: a.id,
-							province: candidate,
-						}) ** 2,
-				})),
+				captureWeights({
+					territory: t,
+					attacker: a.id,
+					defender: d.id,
+					candidates: valid,
+				}),
 			)
 			if (province === undefined) break
 			DISTRIBUTION_TERRITORY.transfer({

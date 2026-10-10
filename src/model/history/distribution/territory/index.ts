@@ -1,109 +1,67 @@
-import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import type {
+	ClaimParams,
 	ConnectedParams,
 	Country,
 	CountryParams,
-	CutMembersParams,
+	DistanceParams,
+	EmptyNationsParams,
 	EnclosureParams,
+	FoundParams,
 	InitializeTerritoryParams,
-	PlacementParams,
-	PlacementResult,
+	PocketParams,
+	ProvinceParams,
 	SplitParams,
+	StretchParams,
 	Territory,
-	TerritoryCuts,
 	TerritoryParams,
 	TransferParams,
 	ValidationResult,
 } from "@/model/history/distribution/territory/types"
 import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
-import { RNG } from "@/model/shared/random/rng"
 import { HIERARCHY } from "@/model/society/hierarchy"
+import type { GenesisNationHierarchy } from "@/model/society/types"
 
-function place(params: PlacementParams): PlacementResult {
-	const { provinces } = params
-	const active = Uint8Array.from(provinces.desolate, (value) => (value ? 0 : 1))
-	const empty = new Int32Array(provinces.count).fill(-1)
-	const components = PLACEMENT.buildOpenComponents({
-		active,
-		assignment: empty,
-		adjOffset: provinces.adjOffset,
-		adjList: provinces.adjList,
-	})
-	const projection = DISTRIBUTION_TARGETS.project({
-		capacities: components.sizes,
-		year: 2,
-	})
-	const targets: number[] = [],
-		targetComponents: number[] = []
-	projection.components.forEach((component, cid) => {
-		for (const size of [...component.sizes].sort((a, b) => b - a)) {
-			targets.push(size)
-			targetComponents.push(cid)
-		}
-	})
-	const placed = PLACEMENT.placeCountries({
-		...params,
-		active,
-		maxSpreadRad: Math.PI,
-		targets,
-		policy: {
-			kind: "distribution",
-			ceiling: projection.raw.ceiling,
-			componentId: components.componentId,
-			targetComponents,
-			residualSizes: ({ capacity }) =>
-				DISTRIBUTION_TARGETS.projectComponent({
-					capacity,
-					profile: projection.raw,
-				}).sizes,
-		},
-	})
+const MAX_POCKET_SHARE = 0.25
+
+function emptyNations({
+	provinces,
+}: EmptyNationsParams): GenesisNationHierarchy {
 	const parent = new Int32Array(provinces.count).fill(-1)
 	const children = HIERARCHY.buildChildrenCSR({
 		parent,
 		provinceCount: provinces.count,
 	})
-	const sovereign = Int32Array.from(placed.assignment, (id) =>
-		id < 0 ? -1 : placed.seeds[id],
-	)
 	return {
-		projection,
-		nations: {
-			assignment: placed.assignment,
-			seeds: Int32Array.from(placed.seeds),
-			languageSeeds: Int32Array.from(placed.seeds),
-			nameSeeds: Int32Array.from(placed.seeds),
-			count: placed.seeds.length,
-			size: Int32Array.from(placed.sizes),
-			colors: placed.seeds.length
-				? GRAPH_PARTITION.generatePartitionColors({
-						count: placed.seeds.length,
-						rng: RNG.createRng({ seed: params.seed }),
-					})
-				: new Float32Array(0),
-			...GRAPH_PARTITION.partitionAdjacency({
-				count: placed.seeds.length,
-				assignment: placed.assignment,
-				adjOffset: provinces.adjOffset,
-				adjList: provinces.adjList,
-			}),
-			parent,
-			depth: new Int32Array(provinces.count),
-			...children,
-			sovereign,
-			gravity: new Float32Array(provinces.count),
-			titles: {
-				count: 0,
-				tier: new Uint8Array(0),
-				seat: new Int32Array(0),
-				holder: new Int32Array(0),
-				regionOf: new Int32Array(0),
-			},
-			governmentType: new Uint8Array(provinces.count),
-			organizations: [],
-			nationColonizer: new Int32Array(placed.seeds.length).fill(-1),
+		assignment: new Int32Array(provinces.count).fill(-1),
+		seeds: new Int32Array(0),
+		languageSeeds: new Int32Array(0),
+		nameSeeds: new Int32Array(0),
+		count: 0,
+		size: new Int32Array(0),
+		colors: new Float32Array(0),
+		...GRAPH_PARTITION.partitionAdjacency({
+			count: 0,
+			assignment: new Int32Array(provinces.count).fill(-1),
+			adjOffset: provinces.adjOffset,
+			adjList: provinces.adjList,
+		}),
+		parent,
+		depth: new Int32Array(provinces.count),
+		...children,
+		sovereign: new Int32Array(provinces.count).fill(-1),
+		gravity: new Float32Array(provinces.count),
+		titles: {
+			count: 0,
+			tier: new Uint8Array(0),
+			seat: new Int32Array(0),
+			holder: new Int32Array(0),
+			regionOf: new Int32Array(0),
 		},
+		governmentType: new Uint8Array(provinces.count),
+		organizations: [],
+		nationColonizer: new Int32Array(0),
 	}
 }
 
@@ -124,10 +82,30 @@ function refresh({ territory: t, country: c }: CountryParams): void {
 		}
 }
 
+function distance({ territory: t, a, b }: DistanceParams): number {
+	return Math.hypot(
+		t.positions[3 * a] - t.positions[3 * b],
+		t.positions[3 * a + 1] - t.positions[3 * b + 1],
+		t.positions[3 * a + 2] - t.positions[3 * b + 2],
+	)
+}
+
 function initialize({
 	provinces,
-	nations,
+	r_xyz,
 }: InitializeTerritoryParams): Territory {
+	const positions = new Float64Array(provinces.count * 3)
+	for (let p = 0; p < provinces.count; p++) {
+		const region = provinces.seeds[p]
+		const length =
+			Math.hypot(
+				r_xyz[3 * region],
+				r_xyz[3 * region + 1],
+				r_xyz[3 * region + 2],
+			) || 1
+		for (let k = 0; k < 3; k++)
+			positions[3 * p + k] = r_xyz[3 * region + k] / length
+	}
 	const active = Uint8Array.from(provinces.desolate, (d) => (d ? 0 : 1))
 	const components = PLACEMENT.buildOpenComponents({
 		active,
@@ -137,50 +115,82 @@ function initialize({
 	})
 	const t: Territory = {
 		provinces,
-		owner: nations.assignment.slice(),
+		positions,
+		owner: new Int32Array(provinces.count).fill(
+			DISTRIBUTION_STATUS.uninhabited,
+		),
 		countries: new Map(),
-		nextId: nations.count,
+		nextId: 0,
 		capacities: components.sizes,
 		componentId: components.componentId,
 		connectivityScans: 0,
 		connectivityMs: 0,
 		mutations: 0,
 	}
-	for (let id = 0; id < nations.count; id++)
-		t.countries.set(id, {
+	return t
+}
+
+function found({ territory: t, province }: FoundParams): Country {
+	const id = t.nextId++,
+		country: Country = {
 			id,
-			capital: nations.seeds[id],
-			members: new Set(),
+			capital: province,
+			members: new Set([province]),
 			boundary: new Set(),
 			contacts: new Map(),
-			revision: 0,
+			revision: 1,
 			cacheRevision: -1,
-			articulations: new Set(),
+			articulations: new Map(),
 			cooldown: 0,
-		})
-	for (let p = 0; p < provinces.count; p++)
-		if (t.owner[p] >= 0) t.countries.get(t.owner[p])?.members.add(p)
-	for (const country of t.countries.values()) refresh({ territory: t, country })
-	return t
+		}
+	t.owner[province] = id
+	t.countries.set(id, country)
+	t.mutations++
+	refreshAround({ territory: t, province })
+	return country
+}
+
+function claim({ territory: t, country: c, province }: ClaimParams): void {
+	t.owner[province] = c.id
+	c.members.add(province)
+	c.revision++
+	t.mutations++
+	refreshAround({ territory: t, province })
+}
+
+function refreshAround({ territory: t, province }: ProvinceParams): void {
+	const touched = new Set([t.owner[province]])
+	for (
+		let j = t.provinces.adjOffset[province];
+		j < t.provinces.adjOffset[province + 1];
+		j++
+	)
+		touched.add(t.owner[t.provinces.adjList[j]])
+	for (const id of touched) {
+		const country = t.countries.get(id)
+		if (country) refresh({ territory: t, country })
+	}
 }
 
 function articulations({
 	territory: t,
 	country: c,
-}: CountryParams): Set<number> {
+}: CountryParams): Map<number, number> {
 	if (c.cacheRevision === c.revision) return c.articulations
 	const started = performance.now()
 	const discovery = new Map<number, number>(),
 		low = new Map<number, number>(),
 		parent = new Map<number, number>(),
-		children = new Map<number, number>()
-	const points = new Set<number>(),
+		children = new Map<number, number>(),
+		subtree = new Map<number, number>()
+	const points = new Map<number, number>(),
 		stack = [c.capital],
 		cursor = new Map<number, number>()
 	let clock = 0
 	discovery.set(c.capital, ++clock)
 	low.set(c.capital, clock)
 	parent.set(c.capital, -1)
+	subtree.set(c.capital, 1)
 	while (stack.length) {
 		const p = stack[stack.length - 1]
 		let j = cursor.get(p) ?? t.provinces.adjOffset[p]
@@ -193,6 +203,7 @@ function articulations({
 				children.set(p, (children.get(p) ?? 0) + 1)
 				discovery.set(q, ++clock)
 				low.set(q, clock)
+				subtree.set(q, 1)
 				stack.push(q)
 			} else if (q !== parent.get(p))
 				low.set(p, Math.min(low.get(p) ?? 0, discovery.get(q) ?? 0))
@@ -201,12 +212,13 @@ function articulations({
 			const par = parent.get(p) ?? -1
 			if (par >= 0) {
 				low.set(par, Math.min(low.get(par) ?? 0, low.get(p) ?? 0))
+				subtree.set(par, (subtree.get(par) ?? 0) + (subtree.get(p) ?? 0))
 				if (
 					parent.get(par) !== -1 &&
 					(low.get(p) ?? 0) >= (discovery.get(par) ?? 0)
 				)
-					points.add(par)
-			} else if ((children.get(p) ?? 0) > 1) points.add(p)
+					points.set(par, (points.get(par) ?? 0) + (subtree.get(p) ?? 0))
+			} else if ((children.get(p) ?? 0) > 1) points.set(p, 0)
 		}
 	}
 	c.articulations = points
@@ -231,6 +243,41 @@ function enclosure({
 	return owned
 }
 
+function pocketSize({
+	territory: t,
+	country: d,
+	province,
+}: PocketParams): number {
+	if (d.members.size === 1) return 0
+	if (province === d.capital) return -1
+	const pocket = articulations({ territory: t, country: d }).get(province) ?? 0
+	return pocket > Math.max(1, Math.floor(MAX_POCKET_SHARE * d.members.size))
+		? -1
+		: pocket
+}
+
+function pocketMembers({
+	territory: t,
+	country: d,
+	province,
+}: PocketParams): number[] {
+	const reached = new Set([d.capital, province]),
+		queue = [d.capital]
+	for (let i = 0; i < queue.length; i++)
+		for (
+			let j = t.provinces.adjOffset[queue[i]];
+			j < t.provinces.adjOffset[queue[i] + 1];
+			j++
+		) {
+			const q = t.provinces.adjList[j]
+			if (t.owner[q] === d.id && !reached.has(q)) {
+				reached.add(q)
+				queue.push(q)
+			}
+		}
+	return [...d.members].filter((q) => !reached.has(q))
+}
+
 function canTransfer({
 	territory: t,
 	attacker,
@@ -240,14 +287,7 @@ function canTransfer({
 }: TransferParams): boolean {
 	const a = t.countries.get(attacker),
 		d = t.countries.get(defender)
-	if (
-		!a ||
-		!d ||
-		a === d ||
-		t.owner[province] !== defender ||
-		a.members.size >= ceiling
-	)
-		return false
+	if (!a || !d || a === d || t.owner[province] !== defender) return false
 	let adjacent = false
 	for (
 		let j = t.provinces.adjOffset[province];
@@ -255,12 +295,9 @@ function canTransfer({
 		j++
 	)
 		if (t.owner[t.provinces.adjList[j]] === attacker) adjacent = true
-	return (
-		adjacent &&
-		(d.members.size === 1 ||
-			(province !== d.capital &&
-				!articulations({ territory: t, country: d }).has(province)))
-	)
+	if (!adjacent) return false
+	const pocket = pocketSize({ territory: t, country: d, province })
+	return pocket >= 0 && a.members.size + 1 + pocket <= ceiling
 }
 
 function transfer(params: TransferParams): boolean {
@@ -269,19 +306,25 @@ function transfer(params: TransferParams): boolean {
 	const a = t.countries.get(attacker),
 		d = t.countries.get(defender)
 	if (!a || !d) return false
+	const moved =
+		pocketSize({ territory: t, country: d, province }) > 0
+			? [province, ...pocketMembers({ territory: t, country: d, province })]
+			: [province]
 	const touched = new Set([attacker, defender])
-	for (
-		let j = t.provinces.adjOffset[province];
-		j < t.provinces.adjOffset[province + 1];
-		j++
-	)
-		touched.add(t.owner[t.provinces.adjList[j]])
-	d.members.delete(province)
-	a.members.add(province)
-	t.owner[province] = attacker
+	for (const p of moved) {
+		for (
+			let j = t.provinces.adjOffset[p];
+			j < t.provinces.adjOffset[p + 1];
+			j++
+		)
+			touched.add(t.owner[t.provinces.adjList[j]])
+		d.members.delete(p)
+		a.members.add(p)
+		t.owner[p] = attacker
+	}
 	a.revision++
 	d.revision++
-	t.mutations++
+	t.mutations += moved.length
 	if (d.members.size === 0) t.countries.delete(defender)
 	for (const id of touched) {
 		const country = t.countries.get(id)
@@ -290,43 +333,19 @@ function transfer(params: TransferParams): boolean {
 	return true
 }
 
-function cuts({ territory: t, country: c }: CountryParams): TerritoryCuts {
-	const tree = new Map<number, number[]>(),
-		queue = [c.capital],
-		seen = new Set(queue)
-	for (let i = 0; i < queue.length; i++) {
-		const province = queue[i]
-		for (
-			let j = t.provinces.adjOffset[province];
-			j < t.provinces.adjOffset[province + 1];
-			j++
-		) {
-			const q = t.provinces.adjList[j]
-			if (t.owner[q] !== c.id || seen.has(q)) continue
-			seen.add(q)
-			queue.push(q)
-			const list = tree.get(province) ?? []
-			list.push(q)
-			tree.set(province, list)
-		}
-	}
-	const sizes = new Map<number, number>()
-	for (let i = queue.length - 1; i >= 0; i--)
-		sizes.set(
-			queue[i],
-			1 +
-				(tree.get(queue[i]) ?? []).reduce(
-					(total, child) => total + (sizes.get(child) ?? 0),
-					0,
-				),
-		)
-	return { roots: queue.slice(1), children: tree, sizes }
+function spacing({ territory: t }: TerritoryParams): number {
+	return Math.sqrt((4 * Math.PI) / t.provinces.count)
 }
-function cutMembers({ cuts, root }: CutMembersParams): number[] {
-	const members = [root]
-	for (let i = 0; i < members.length; i++)
-		members.push(...(cuts.children.get(members[i]) ?? []))
-	return members
+
+function stretch({
+	territory: t,
+	country: c,
+	province,
+}: StretchParams): number {
+	return (
+		distance({ territory: t, a: c.capital, b: province }) /
+		(spacing({ territory: t }) * Math.sqrt((c.members.size + 1) / Math.PI))
+	)
 }
 
 function connected({ territory: t, members, root }: ConnectedParams): boolean {
@@ -373,7 +392,7 @@ function split({ territory: t, country: c, provinces }: SplitParams): Country {
 			contacts: new Map(),
 			revision: 1,
 			cacheRevision: -1,
-			articulations: new Set(),
+			articulations: new Map(),
 			cooldown: 0,
 		}
 	const touched = new Set<number>([c.id, id])
@@ -402,8 +421,11 @@ function validate({ territory: t }: TerritoryParams): ValidationResult {
 	for (let p = 0; p < t.owner.length; p++)
 		if (
 			t.provinces.desolate[p]
-				? t.owner[p] !== -1
-				: !t.countries.get(t.owner[p])?.members.has(p)
+				? t.owner[p] !== DISTRIBUTION_STATUS.uninhabited
+				: DISTRIBUTION_STATUS.isOwned({ owner: t.owner[p] })
+					? !t.countries.get(t.owner[p])?.members.has(p)
+					: !DISTRIBUTION_STATUS.isUninhabited({ owner: t.owner[p] }) &&
+						!DISTRIBUTION_STATUS.isStateless({ owner: t.owner[p] })
 		)
 			result.ownership++
 	for (const c of t.countries.values()) {
@@ -416,13 +438,17 @@ function validate({ territory: t }: TerritoryParams): ValidationResult {
 }
 
 export const DISTRIBUTION_TERRITORY = {
-	place,
+	emptyNations,
 	initialize,
+	found,
+	claim,
 	canTransfer,
 	enclosure,
+	distance,
 	transfer,
-	cuts,
-	cutMembers,
+	spacing,
+	stretch,
+	articulations,
 	split,
 	validate,
 }

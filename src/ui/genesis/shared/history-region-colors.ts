@@ -1,4 +1,5 @@
 ﻿import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { COLOR } from "@/model/history/earth/color"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
@@ -25,6 +26,7 @@ import {
 } from "@/ui/genesis/shared/title-colors"
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
+const STATELESS_WHITE: [number, number, number] = [1, 1, 1]
 
 type Rgb = [number, number, number]
 type OrganizationKind = GenesisOrganization["kind"]
@@ -93,6 +95,7 @@ export function computeHistoryRegionColors(params: {
 	suppressFill?: boolean
 	locations: Pick<GenesisLocations, "regionLocation"> | null
 	organizationKindById: ReadonlyMap<string, OrganizationKind>
+	uninhabitedGray: boolean
 }): Float32Array | null {
 	const {
 		colorMode,
@@ -108,6 +111,7 @@ export function computeHistoryRegionColors(params: {
 		suppressFill,
 		locations,
 		organizationKindById,
+		uninhabitedGray,
 	} = params
 
 	const isPolitical =
@@ -221,6 +225,13 @@ export function computeHistoryRegionColors(params: {
 				write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
 				continue
 			}
+			if (DISTRIBUTION_STATUS.isStateless({ owner })) {
+				write(
+					r,
+					darkenPoliticalAtElevation(STATELESS_WHITE, elevationKm[r] ?? 0),
+				)
+				continue
+			}
 			if (owner < 0) {
 				const status = LAND_STATUS.statusAt({
 					provinceStatus: frame.provinceStatus,
@@ -329,7 +340,10 @@ export function computeHistoryRegionColors(params: {
 		}
 
 		// isDemographic
-		if (suppressFill) {
+		if (
+			suppressFill ||
+			(uninhabitedGray && DISTRIBUTION_STATUS.isUninhabited({ owner }))
+		) {
 			write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
 			continue
 		}

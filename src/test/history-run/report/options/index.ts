@@ -7,7 +7,7 @@ import type {
 } from "@/test/history-run/report/options/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
-const DEFAULT_SEEDS = [14963991]
+const DEFAULT_SEED = 14963991
 
 const DEFAULT_YEARS = 300
 
@@ -18,20 +18,21 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
 	if (!ERAS.eraOrder.includes(era))
 		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
+	const seed = Number(env.HISTORY_SEEDS ?? DEFAULT_SEED)
+	if (!Number.isInteger(seed) || env.HISTORY_SEEDS?.trim() === "")
+		throw new Error("HISTORY_SEEDS must contain exactly one integer seed")
 	const pipeline = env.HISTORY_PIPELINE ?? "simulation"
 	if (pipeline !== "simulation" && pipeline !== "distribution")
 		throw new Error("Invalid HISTORY_PIPELINE")
 	const years = Number(
-		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 2023 : DEFAULT_YEARS),
+		env.HISTORY_YEARS ?? (pipeline === "distribution" ? 12024 : DEFAULT_YEARS),
 	)
 	return {
 		pipeline,
 		lateKnowledgeBand: Number(
 			env.HISTORY_LATE_KNOWLEDGE ?? DEFAULT_LATE_KNOWLEDGE_BAND,
 		),
-		seeds: env.HISTORY_SEEDS
-			? env.HISTORY_SEEDS.split(",").map(Number)
-			: DEFAULT_SEEDS,
+		seeds: [seed],
 		era,
 		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
 		years,

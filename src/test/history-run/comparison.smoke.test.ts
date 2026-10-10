@@ -208,3 +208,37 @@ it("rejects checkpoints and unfinished multi-seed reports", () => {
 		HISTORY_COMPARISON.write({ current, baseline: current }),
 	).toThrow("Partial multi-seed")
 })
+
+it("accepts completed distribution reports with multi-year steps and labels their actual years", () => {
+	const root = fixture(tmpdir())
+	const path = join(root, "101.json")
+	const data = report(80)
+	data.pipeline = "distribution"
+	data["42"] = [{ from: -3400, to: -3299, sovereigns: 80 }]
+	const diagnostics = data.diagnostics as JsonObject
+	diagnostics.annualTicks = [10, 20, 30]
+	diagnostics.annual = [
+		{ year: -3350, projectionSummary: [{ capacity: 10, fits: [{ mean: 2 }] }] },
+		{ year: -3300 },
+		{ year: -3299 },
+	]
+	writeFileSync(path, JSON.stringify(data))
+	expect(HISTORY_COMPARISON.read(path).seeds).toEqual(["42"])
+	const previous = join(root, "previous.json")
+	writeFileSync(previous, JSON.stringify(data))
+	const output = HISTORY_COMPARISON.write({ current: path, baseline: previous })
+	expect(
+		rows(output)
+			.filter((row) => row.metric === "annualTickMs")
+			.map((row) => row.period),
+	).toEqual(["42 / year -3350", "42 / year -3300", "42 / year -3299"])
+	expect(
+		rows(output).find((row) => row.metric === "projectionSummary identical"),
+	).toMatchObject({ before: true, after: true })
+	expect(
+		rows(output).some((row) => row.metric.startsWith("projectionSummary[")),
+	).toBe(false)
+	diagnostics.annualTicks = [10, 20]
+	writeFileSync(path, JSON.stringify(data))
+	expect(() => HISTORY_COMPARISON.read(path)).toThrow("Partial report")
+})

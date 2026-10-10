@@ -1,8 +1,4 @@
-import type { DistributionProjection } from "@/model/history/distribution/targets/types"
-import type {
-	GenesisNationHierarchy,
-	GenesisProvinces,
-} from "@/model/society/types"
+import type { GenesisProvinces } from "@/model/society/types"
 
 export interface Country {
 	id: number
@@ -12,12 +8,13 @@ export interface Country {
 	contacts: Map<number, number>
 	revision: number
 	cacheRevision: number
-	articulations: Set<number>
+	articulations: Map<number, number>
 	cooldown: number
 }
 export interface Territory {
 	provinces: GenesisProvinces
 	owner: Int32Array
+	positions: Float64Array
 	countries: Map<number, Country>
 	nextId: number
 	capacities: number[]
@@ -28,7 +25,12 @@ export interface Territory {
 }
 export interface InitializeTerritoryParams {
 	provinces: GenesisProvinces
-	nations: GenesisNationHierarchy
+	r_xyz: Float32Array
+}
+export interface DistanceParams {
+	territory: Territory
+	a: number
+	b: number
 }
 export interface TerritoryParams {
 	territory: Territory
@@ -37,14 +39,15 @@ export interface CountryParams {
 	territory: Territory
 	country: Country
 }
-export interface TerritoryCuts {
-	roots: number[]
-	children: Map<number, number[]>
-	sizes: Map<number, number>
+export interface StretchParams {
+	territory: Territory
+	country: Country
+	province: number
 }
-export interface CutMembersParams {
-	cuts: TerritoryCuts
-	root: number
+export interface PocketParams {
+	territory: Territory
+	country: Country
+	province: number
 }
 export interface TransferParams {
 	territory: Territory
@@ -63,18 +66,21 @@ export interface SplitParams {
 	country: Country
 	provinces: number[]
 }
-export interface PlacementParams {
+export interface EmptyNationsParams {
 	provinces: GenesisProvinces
-	habitability: Float32Array
-	waterAccess: Uint8Array
-	provinceContinent: Uint8Array | undefined
-	migrationWave: Float32Array | undefined
-	r_xyz: Float32Array
-	seed: number
 }
-export interface PlacementResult {
-	nations: GenesisNationHierarchy
-	projection: DistributionProjection
+export interface ProvinceParams {
+	territory: Territory
+	province: number
+}
+export interface FoundParams {
+	territory: Territory
+	province: number
+}
+export interface ClaimParams {
+	territory: Territory
+	country: Country
+	province: number
 }
 export interface ValidationResult {
 	ownership: number
