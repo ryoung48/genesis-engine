@@ -7,10 +7,14 @@ import type {
 	OwnAdvanceParams,
 	PopulationMeanParams,
 	RealmKnowledgeParams,
+	StartBaselineParams,
+	UrbanKnowledgeParams,
 } from "@/model/history/sim/engine/knowledge/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { MATH } from "@/model/shared/math/core"
+import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
+import type { UrbanKnowledge } from "@/model/society/urbanization/types"
 
 const ERA_BASELINE: Record<SocietyEra, number> = {
 	paleolithic: -3,
@@ -270,6 +274,25 @@ function eraBaseline(era: SocietyEra): number {
 	return ERA_BASELINE[era]
 }
 
+function startBaseline({ era, startYear }: StartBaselineParams): number {
+	return startYear === undefined && era !== ERAS.defaultEra
+		? eraBaseline(era)
+		: yearBaseline(startYear ?? STATE.defaultStartYear)
+}
+
+function urbanKnowledge({
+	era,
+	baseline,
+}: UrbanKnowledgeParams): UrbanKnowledge {
+	return {
+		urbanFactor:
+			urbanFactor({ knowledge: baseline }) /
+			urbanFactor({ knowledge: eraBaseline(era) }),
+		maxCitySize: (realmPopulation) =>
+			maxCitySize({ knowledge: baseline, realmPopulation }),
+	}
+}
+
 function yearBaseline(year: number): number {
 	return MATH.piecewise({
 		domain: YEAR_BASELINE.domain,
@@ -293,4 +316,6 @@ export const KNOWLEDGE = {
 	realmKnowledge,
 	eraBaseline,
 	yearBaseline,
+	startBaseline,
+	urbanKnowledge,
 }

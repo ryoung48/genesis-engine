@@ -31,7 +31,6 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { StageTiming } from "@/model/pipelines/types"
 import { UNITS } from "@/model/shared/units"
-import { ERAS } from "@/model/society/eras"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
@@ -39,6 +38,7 @@ import type {
 	GenesisProvinces,
 	SocietyEra,
 } from "@/model/society/types"
+import { URBANIZATION } from "@/model/society/urbanization"
 
 function timed<T>({ label, timings, fn }: TimedParams<T>): T {
 	const t0 = performance.now()
@@ -134,12 +134,10 @@ function initHistory(params: {
 			}),
 	})
 
-	// The year curve is calibrated on late-medieval worlds; worlds generated for
-	// other eras keep their era's level unless given an explicit start year.
-	state.knowledgeBaseline =
-		params.startYear === undefined && state.era !== ERAS.defaultEra
-			? KNOWLEDGE.eraBaseline(state.era)
-			: KNOWLEDGE.yearBaseline(startYear)
+	state.knowledgeBaseline = KNOWLEDGE.startBaseline({
+		era: state.era,
+		startYear: params.startYear,
+	})
 
 	// Seed colony dependencies before init passes so subordinate colonies are
 	// excluded from independent diplomacy and subject formation.
@@ -150,7 +148,20 @@ function initHistory(params: {
 	timed({
 		label: "initHistory:initPopulation",
 		timings: params.timings,
-		fn: () => POPULATION.initPopulation({ state }),
+		fn: () =>
+			POPULATION.initPopulation({
+				state,
+				urbanization: URBANIZATION.computeUrbanization({
+					params: { era: state.era },
+					provinces: params.provinces,
+					nations: params.nations,
+					population: params.population,
+					knowledge: KNOWLEDGE.urbanKnowledge({
+						era: state.era,
+						baseline: state.knowledgeBaseline,
+					}),
+				}),
+			}),
 	})
 	timed({
 		label: "initHistory:initEconomy",

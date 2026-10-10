@@ -446,7 +446,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 												)
 													setTimingDrillDown("post")
 												else if (
-													label === "computeRoutes" &&
+													label === "routes" &&
 													computeRoutesTimingSummary
 												)
 													setTimingDrillDown("computeRoutes")

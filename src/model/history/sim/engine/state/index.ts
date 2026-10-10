@@ -987,16 +987,6 @@ function createHistoryState({
 		state.parentCurrent[p] = nations.parent[p]
 		FIELDS.prov.parent.set({ state, p, value: nations.parent[p] })
 		FIELDS.prov.assignment.set({ state, p, value: nations.sovereign[p] })
-		FIELDS.prov.population.rural.set({
-			state,
-			p,
-			value: population.population[p] * 0.95,
-		})
-		FIELDS.prov.population.urban.set({
-			state,
-			p,
-			value: population.population[p] * 0.05,
-		})
 		FIELDS.prov.development.set({ state, p, value: 0 })
 		FIELDS.prov.leader.dynasty.set({ state, p, value: -1 })
 		FIELDS.prov.leader.nameSeed.set({ state, p, value: -1 })

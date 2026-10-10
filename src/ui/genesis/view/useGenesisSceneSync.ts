@@ -36,7 +36,6 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		showGrid,
 		gridSpacing,
 		showInfrastructure,
-		infrastructure,
 		showElevation,
 		eu4GhslSettlements,
 		labelMode,
@@ -149,12 +148,16 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showInfrastructure && !isEarthImportDisplay && infrastructure) {
-			scene.setInfrastructure(infrastructure.network)
+		if (
+			showInfrastructure &&
+			!isEarthImportDisplay &&
+			worldForDisplay?.network
+		) {
+			scene.setInfrastructure(worldForDisplay.network)
 		} else {
 			scene.setInfrastructure(null)
 		}
-	}, [showInfrastructure, isEarthImportDisplay, infrastructure])
+	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setEu4SettlementsVisible(

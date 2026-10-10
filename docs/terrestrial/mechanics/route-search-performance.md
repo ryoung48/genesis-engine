@@ -1,6 +1,6 @@
 # Route search performance
 
-This work covers the lazy procedural-planet infrastructure overlay: land routes, sea routes and sea neighbor discovery. The worktree is `chaos-machine-route-search`, branch `optimize/route-search`, based on main commit `b24992d3`.
+This work covers the procedural-planet route build, now the final world-generation stage (`routes`, after urbanisation), so its time is part of generation and the infrastructure overlay reads the result from the generated world. It covers land routes, sea routes and sea neighbor discovery. The worktree is `chaos-machine-route-search`, branch `optimize/route-search`, based on main commit `b24992d3`.
 
 ## Production implementation
 
@@ -81,4 +81,6 @@ Both promoted-production comparisons use five warmed samples on the saved full p
 
 These compare all retained optimizations with original main, unlike the earlier bidirectional-isolation table. They are not additive estimates. The maintained diagnostics read actual production search code; no separate bidirectional implementation or corridor generator remains in the benchmark scripts. The unused forward target arrays and output-tree rewrite from the prototype are omitted because route assembly now consumes the reconstructed path directly.
 
-Detailed historical simulation reports are not applicable because routing is requested lazily for the infrastructure overlay and does not change world generation or historical simulation rules. No tests or benchmarks remain running after completion.
+Detailed historical simulation reports are not applicable because the simulation does not read routes. Moving the build into generation leaves every other world field unchanged (checked against the pre-change pipeline on seed 14963991 at 12,000 points) and adds a `routes` row with the `computeRoutes:*` breakdown to the generation timings. Imported Earth worlds carry no routes and no `routes` row.
+
+Generated routes match saved production fingerprints computed from the same inputs for seeds 14963991 and 42. At 204,000 points the `routes` stage took 728.8 ms on seed 14963991 and 1,276 ms on seed 42 (the latter run shared the machine with other work). The packed routes and network are about 0.37 MiB; the cached world file grows by about 1.1 MiB. No tests or benchmarks remain running after completion.

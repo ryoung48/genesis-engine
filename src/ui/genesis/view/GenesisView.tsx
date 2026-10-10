@@ -11,10 +11,7 @@ import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/
 import { DATE } from "@/model/history/earth/date"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { StageTiming } from "@/model/pipelines/types"
-import type {
-	InfrastructureResult,
-	SerializedGenesisWorld,
-} from "@/model/worker-protocol/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
 import {
@@ -144,8 +141,7 @@ export const GenesisView: React.FC<{
 
 	// Core state
 	const [world, setWorld] = useState<SerializedGenesisWorld | null>(null)
-	const [infrastructure, setInfrastructure] =
-		useState<InfrastructureResult | null>(null)
+
 	const [generationTimings, setGenerationTimings] = useState<
 		StageTiming[] | null
 	>(null)
@@ -1279,7 +1275,7 @@ export const GenesisView: React.FC<{
 							endRegion: info.region,
 							allowLand: pathfindingLand,
 							allowSea: pathfindingSea,
-							network: infrastructure?.network ?? null,
+							network: worldForDisplay?.network ?? null,
 						})
 					}
 				}
@@ -1360,7 +1356,6 @@ export const GenesisView: React.FC<{
 		pathfindingLand,
 		pathfindingSea,
 		worldForDisplay,
-		infrastructure,
 		setMeasureMode,
 		history.state,
 		history.query,
@@ -1496,7 +1491,6 @@ export const GenesisView: React.FC<{
 		showGrid,
 		gridSpacing,
 		showInfrastructure,
-		infrastructure,
 		showElevation,
 		eu4GhslSettlements,
 		labelMode,
@@ -1516,13 +1510,11 @@ export const GenesisView: React.FC<{
 		handleGenerate,
 		handleResetDefaults,
 		handleReturnToPlanetView,
-		handleRequestInfrastructure,
 	} = useWorldGeneration({
 		sceneRef,
 		workerRef,
 		lastWorldRef,
 		setWorld,
-		setInfrastructure,
 		setSelectedTimeMs,
 		simStartTimeMs,
 		setShowCoastlines,
@@ -1565,14 +1557,6 @@ export const GenesisView: React.FC<{
 		pressure,
 		mainWorldSystemBody,
 	})
-
-	// The road/sea route network is expensive, so it's computed lazily in the
-	// worker rather than on every world generation -- request it the first
-	// time the user turns the Infrastructure overlay on (handleRequestInfrastructure
-	// no-ops once it's already been requested/received for this world).
-	useEffect(() => {
-		if (showInfrastructure && worldForDisplay) handleRequestInfrastructure()
-	}, [showInfrastructure, worldForDisplay, handleRequestInfrastructure])
 
 	const {
 		exportWidthPreset,
@@ -2143,7 +2127,7 @@ export const GenesisView: React.FC<{
 								clockMonth={clockMonth}
 								unitSystem={unitSystem}
 								world={worldForDisplay}
-								routes={infrastructure?.routes ?? null}
+								routes={worldForDisplay?.routes ?? null}
 								hoverCardRef={hoverCardRef}
 								getProvinceName={getProvinceName}
 								getLeaderName={getLeaderName}

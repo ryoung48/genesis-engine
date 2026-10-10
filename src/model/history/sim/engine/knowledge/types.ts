@@ -1,4 +1,5 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type { SocietyEra } from "@/model/society/types"
 
 export interface InitKnowledgeParams {
 	state: HistoryState
@@ -39,4 +40,14 @@ export interface OwnAdvanceParams {
 	knowledge: number
 	worldKnowledge: number
 	development: number
+}
+
+export interface StartBaselineParams {
+	era: SocietyEra
+	startYear: number | undefined
+}
+
+export interface UrbanKnowledgeParams {
+	era: SocietyEra
+	baseline: number
 }

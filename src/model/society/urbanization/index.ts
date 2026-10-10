@@ -4,6 +4,7 @@ import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { GovernmentType } from "@/model/society/types"
 import type {
+	CityTargetsParams,
 	ComputeDevelopmentParams,
 	NationProfile,
 	RankSizeCitiesParams,
@@ -89,6 +90,39 @@ function urbanPopToDev(pop: number): number {
 const MAX_SPREAD_HOPS = 20
 
 const MAX_URBAN_SHARE = 0.85
+
+const TOWN_LIMIT = 25_000
+
+const RANK_CAP_EXPONENT = 1.3
+
+function cityTargets({
+	sizes,
+	count,
+	maxCitySizeAt,
+	ruralAt,
+}: CityTargetsParams): number[] {
+	const targets = Array.from({ length: count }, (_, idx) =>
+		Math.min(
+			sizes[idx] ?? 0,
+			maxCitySizeAt(idx) / (idx + 1) ** RANK_CAP_EXPONENT,
+		),
+	)
+	let excess = 0
+	for (let idx = 0; idx < sizes.length; idx++)
+		excess += sizes[idx] - targets[idx]
+	let ruralMass = 0
+	for (let idx = 0; idx < count; idx++)
+		if (targets[idx] < TOWN_LIMIT) ruralMass += ruralAt(idx)
+	if (excess <= 0 || ruralMass <= 0) return targets
+	for (let idx = 0; idx < count; idx++) {
+		if (targets[idx] >= TOWN_LIMIT) continue
+		targets[idx] = Math.min(
+			TOWN_LIMIT,
+			targets[idx] + (excess * ruralAt(idx)) / ruralMass,
+		)
+	}
+	return targets
+}
 
 function rankSizesForNation({
 	governmentTypeIndex,
@@ -260,11 +294,18 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 			governmentTypeIndex: governmentType?.[nation] ?? 1,
 			totalPopulation: totalPop,
 			provinceCount: sorted.length,
-			urbanFactor: 1,
+			urbanFactor: inputs.knowledge.urbanFactor,
+		})
+		const maxCitySize = inputs.knowledge.maxCitySize(totalPop)
+		const targets = cityTargets({
+			sizes,
+			count: sorted.length,
+			maxCitySizeAt: () => maxCitySize,
+			ruralAt: (idx) => population[sorted[idx]],
 		})
 
 		for (let idx = 0; idx < sorted.length; idx++) {
-			urbanPopulation[sorted[idx]] = sizes[idx] ?? 0
+			urbanPopulation[sorted[idx]] = targets[idx]
 		}
 	}
 
@@ -320,6 +361,7 @@ function computeUrbanization(inputs: UrbanizationInputs): UrbanizationResult {
 }
 
 export const URBANIZATION = {
+	cityTargets,
 	computeUrbanization,
 	rankSizesForNation,
 	sortByRank,

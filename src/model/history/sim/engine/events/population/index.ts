@@ -1,6 +1,5 @@
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
-	CityTargetsParams,
 	DevelopmentParams,
 	InitPopulationParams,
 	RunPopulationParams,
@@ -20,48 +19,7 @@ const URBAN_GROWTH = 0.1
 
 const TOWN_SEED = 1_000
 
-const TOWN_LIMIT = 25_000
-
-const RANK_CAP_EXPONENT = 1.3
-
-function cityTargets({
-	state,
-	sorted,
-	sizes,
-	init,
-	realmPopulation,
-}: CityTargetsParams): number[] {
-	const targets = sorted.map((prov, idx) =>
-		Math.min(
-			sizes[idx] ?? 0,
-			KNOWLEDGE.maxCitySize({
-				knowledge: init
-					? state.knowledgeBaseline
-					: FIELDS.prov.knowledge.get({ state, p: prov }),
-				realmPopulation,
-			}) /
-				(idx + 1) ** RANK_CAP_EXPONENT,
-		),
-	)
-	let excess = 0
-	for (let idx = 0; idx < sizes.length; idx++)
-		excess += sizes[idx] - targets[idx]
-	let ruralMass = 0
-	for (let idx = 0; idx < sorted.length; idx++)
-		if (targets[idx] < TOWN_LIMIT)
-			ruralMass += FIELDS.prov.population.rural.get({ state, p: sorted[idx] })
-	if (excess <= 0 || ruralMass <= 0) return targets
-	for (let idx = 0; idx < sorted.length; idx++) {
-		if (targets[idx] >= TOWN_LIMIT) continue
-		const share =
-			(excess * FIELDS.prov.population.rural.get({ state, p: sorted[idx] })) /
-			ruralMass
-		targets[idx] = Math.min(TOWN_LIMIT, targets[idx] + share)
-	}
-	return targets
-}
-
-function urbanization({ state, init, yearFraction }: UrbanizationParams): void {
+function urbanization({ state, yearFraction }: UrbanizationParams): void {
 	const eraFactor = KNOWLEDGE.urbanFactor({
 		knowledge: KNOWLEDGE.eraBaseline(state.era),
 	})
@@ -90,26 +48,26 @@ function urbanization({ state, init, yearFraction }: UrbanizationParams): void {
 			provinceCount: sorted.length,
 			urbanFactor:
 				KNOWLEDGE.urbanFactor({
-					knowledge: init ? state.knowledgeBaseline : knowledge,
+					knowledge,
 				}) / eraFactor,
 		})
 
-		const targets = cityTargets({
-			state,
-			sorted,
+		const targets = URBANIZATION.cityTargets({
 			sizes,
-			init,
-			realmPopulation: totalPop,
+			count: sorted.length,
+			maxCitySizeAt: (idx) =>
+				KNOWLEDGE.maxCitySize({
+					knowledge: FIELDS.prov.knowledge.get({ state, p: sorted[idx] }),
+					realmPopulation: totalPop,
+				}),
+			ruralAt: (idx) =>
+				FIELDS.prov.population.rural.get({ state, p: sorted[idx] }),
 		})
 		let migrants = 0
 		for (let idx = 0; idx < sorted.length; idx++) {
 			const prov = sorted[idx]
 			const target = targets[idx]
 			state.leaderRuntime.targetUrban[prov] = target
-			if (init) {
-				state.popUrbanCurrent[prov] = target
-				continue
-			}
 			const urban = FIELDS.prov.population.urban.get({ state, p: prov })
 			const maxAdjustment =
 				Math.max(urban, TOWN_SEED) * MAX_ADJUSTMENT_RATE * yearFraction
@@ -119,7 +77,7 @@ function urbanization({ state, init, yearFraction }: UrbanizationParams): void {
 			state.popUrbanCurrent[prov] = urban + adjustment
 			migrants += adjustment
 		}
-		if (init || totalRural <= 0) continue
+		if (totalRural <= 0) continue
 
 		const ruralScale = Math.max(0, 1 - migrants / totalRural)
 		for (const prov of provinces)
@@ -127,7 +85,7 @@ function urbanization({ state, init, yearFraction }: UrbanizationParams): void {
 	}
 }
 
-function development({ state, init }: DevelopmentParams): void {
+function development({ state }: DevelopmentParams): void {
 	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(state.era)
 	const devFromCities = URBANIZATION.spreadDevelopment({
 		count: state.P,
@@ -146,27 +104,29 @@ function development({ state, init }: DevelopmentParams): void {
 		const localDev = URBANIZATION.urbanPopToDev(
 			FIELDS.prov.population.urban.get({ state, p }),
 		)
-		const floor = init
-			? 0
-			: KNOWLEDGE.developmentFloor({
-					knowledge: FIELDS.prov.knowledge.get({ state, p }),
-				})
+		const floor = KNOWLEDGE.developmentFloor({
+			knowledge: FIELDS.prov.knowledge.get({ state, p }),
+		})
 		const targetDev = Math.max(devFromCities[p], localDev, floor)
 
-		if (init) {
-			state.developmentCurrent[p] = targetDev
-		} else {
-			const currentDev = state.developmentCurrent[p]
-			const gap = targetDev - currentDev
-			const rate = gap > 0 ? DEV_RISE : DEV_FALL
-			state.developmentCurrent[p] = currentDev + gap * rate
-		}
+		const currentDev = state.developmentCurrent[p]
+		const gap = targetDev - currentDev
+		const rate = gap > 0 ? DEV_RISE : DEV_FALL
+		state.developmentCurrent[p] = currentDev + gap * rate
 	}
 }
 
-function initPopulation({ state }: InitPopulationParams): void {
-	urbanization({ state, init: true, yearFraction: 0 })
-	development({ state, init: true })
+function initPopulation({
+	state,
+	urbanization: start,
+}: InitPopulationParams): void {
+	for (let p = 0; p < state.P; p++) {
+		if (state.desolate[p]) continue
+		state.popUrbanCurrent[p] = start.urbanPopulation[p]
+		state.popRuralCurrent[p] = start.ruralPopulation[p]
+		state.leaderRuntime.targetUrban[p] = start.urbanPopulation[p]
+		state.developmentCurrent[p] = start.development[p]
+	}
 	KNOWLEDGE.initKnowledge({ state })
 	state.heap.enqueue(
 		state.time + STATE.yearMs,
@@ -213,8 +173,8 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 		state.popUrbanCurrent[p] = state.popUrbanCurrent[p] * growth
 	}
 
-	urbanization({ state, init: false, yearFraction })
-	development({ state, init: false })
+	urbanization({ state, yearFraction })
+	development({ state })
 
 	// Schedule next census
 	state.heap.enqueue(

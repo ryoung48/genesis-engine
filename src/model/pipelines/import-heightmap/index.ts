@@ -568,6 +568,7 @@ function importGenesisWorld({
 	return {
 		mesh,
 		isEarthImport: true,
+		routes: null,
 		plates,
 		plateAssignment,
 		boundary,

@@ -14,6 +14,7 @@ import { ELEVATION } from "@/model/geography/terrain/elevation"
 import { EROSION } from "@/model/geography/terrain/erosion"
 import { HOTSPOTS } from "@/model/geography/terrain/hotspots"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
+import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
@@ -34,6 +35,7 @@ import { STATS } from "@/model/shared/math/stats"
 import { PARALLEL } from "@/model/shared/parallel"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
+import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { URBANIZATION } from "@/model/society/urbanization"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
@@ -631,20 +633,53 @@ function generateGenesisWorld({
 	// by the procedural history sim's init passes. They are one-shot functions
 	// of geography, hierarchy and settlement size, so they run here instead.
 	const infrastructureTiming: StageTiming[] = []
+	const { provinces, population } = post
+	const { nations, landmarks } = provinceSociety
 	const urbanization = withTiming("urbanization", infrastructureTiming, () =>
-		URBANIZATION.computeUrbanization({
-			params,
-			provinces: post.provinces,
-			nations: provinceSociety.nations,
-			population: post.population,
-		}),
+		provinces && nations && population
+			? URBANIZATION.computeUrbanization({
+					params,
+					provinces,
+					nations,
+					population,
+					knowledge: KNOWLEDGE.urbanKnowledge({
+						era: params.era,
+						baseline: KNOWLEDGE.startBaseline({
+							era: params.era,
+							startYear: undefined,
+						}),
+					}),
+				})
+			: {
+					urbanPopulation: new Float32Array(provinces?.count ?? 0),
+					development: new Float32Array(provinces?.count ?? 0),
+				},
 	)
 	onProgress?.("urbanization", 80)
 
-	// The route/road network is expensive and only needed for the
-	// Infrastructure overlay's display, so it's no longer computed here --
-	// GenesisView requests it lazily from the worker (see "compute-infrastructure"
-	// in genesis.worker.ts) the first time the user toggles that overlay on.
+	const routes =
+		provinces && nations && landmarks
+			? withTiming("routes", infrastructureTiming, () =>
+					ROUTES.computeRoutes({
+						world: {
+							mesh,
+							params,
+							provinces,
+							nations,
+							landmarks,
+							isLand,
+						},
+						inputs: {
+							urbanPopulation: urbanization.urbanPopulation,
+							settlementRegions: provinceSociety.settlementRegions,
+							settlementWaterLandmarks:
+								provinceSociety.settlementWaterLandmarks,
+							settlementPortRegions: provinceSociety.settlementPortRegions,
+							timings: infrastructureTiming,
+						},
+					}),
+				)
+			: null
 	pipelineTiming.push(...infrastructureTiming)
 	onProgress?.("routes", 85)
 
@@ -716,6 +751,7 @@ function generateGenesisWorld({
 		settlementRegions: provinceSociety.settlementRegions,
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
 		settlementPortRegions: provinceSociety.settlementPortRegions,
+		routes,
 		urbanPopulation: urbanization.urbanPopulation,
 		development: urbanization.development,
 		oceanCurrents: post.oceanCurrents,

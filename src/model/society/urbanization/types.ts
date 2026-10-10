@@ -5,6 +5,18 @@ import type {
 	GenesisProvinces,
 } from "@/model/society/types"
 
+export interface UrbanKnowledge {
+	urbanFactor: number
+	maxCitySize: (realmPopulation: number) => number
+}
+
+export interface CityTargetsParams {
+	sizes: number[]
+	count: number
+	maxCitySizeAt: (index: number) => number
+	ruralAt: (index: number) => number
+}
+
 export interface RankSizeCitiesParams {
 	urbanPop: number
 	q: number
@@ -63,6 +75,7 @@ export interface UrbanizationInputs {
 		"parent" | "sovereign" | "governmentType" | "titles"
 	>
 	population: Pick<ProvincePopulation, "population" | "habitability">
+	knowledge: UrbanKnowledge
 }
 
 export interface UrbanizationResult {

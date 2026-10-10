@@ -8,9 +8,13 @@ import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balan
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
 import { ERAS } from "@/model/society/eras"
+import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
+import { TRANSPORT } from "@/model/society/infrastructure/transport"
+import { loadEarthGrayscale } from "@/test/earth/assets"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/genesis/generation/generation-preview"
 
@@ -217,6 +221,39 @@ describe("full world smoke generation", () => {
 		const world = GENERATE_WORLD.generateGenesisWorld({ params })
 		const summary = summarizeWorld(world)
 		const fingerprint = computeWorldFingerprint(world)
+		expect(world.routes).not.toBeNull()
+		expect(
+			world.routes!.routes.some(
+				(route) =>
+					route.kind === TRANSPORT.ROUTE_LAND_MAJOR ||
+					route.kind === TRANSPORT.ROUTE_LAND_MINOR,
+			),
+		).toBe(true)
+		expect(
+			world.routes!.routes.some((route) => route.kind === TRANSPORT.ROUTE_SEA),
+		).toBe(true)
+		const routeInputs = {
+			world: {
+				mesh: world.mesh,
+				params: world.params,
+				provinces: world.provinces!,
+				nations: world.nations!,
+				landmarks: world.landmarks!,
+				isLand: world.isLand,
+			},
+			inputs: {
+				urbanPopulation: world.urbanPopulation,
+				settlementRegions: world.settlementRegions,
+				settlementWaterLandmarks: world.settlementWaterLandmarks,
+				settlementPortRegions: world.settlementPortRegions,
+			},
+		}
+		expect(ROUTES.computeRoutes(routeInputs)).toEqual(world.routes)
+		expect(computeWorldFingerprint(world)).toBe(fingerprint)
+		expect(world.timings.some((timing) => timing.Stage === "routes")).toBe(true)
+		expect(
+			world.timings.some((timing) => timing.Stage.startsWith("computeRoutes:")),
+		).toBe(true)
 
 		console.info("Smoke params", {
 			seed: params.seed,
@@ -385,6 +422,28 @@ describe("full world smoke generation", () => {
 		expect(world.volcanism.hotspotExposure).toBeDefined()
 	}, 300_000)
 
+	it("leaves imported worlds without routes or route timings", () => {
+		const earth = loadEarthGrayscale("earth.png")
+		const world = IMPORT_HEIGHTMAP.importGenesisWorld({
+			params: {
+				...DEFAULT_WORLD_PARAMS,
+				seed: SMOKE_PLANET_SEED,
+				numPoints: 12000,
+				grayscale: earth.grayscale,
+				imageWidth: earth.width,
+				imageHeight: earth.height,
+			},
+		})
+		expect(world.routes).toBeNull()
+		expect(
+			world.timings.some(
+				(timing) =>
+					timing.Stage === "routes" ||
+					timing.Stage.startsWith("computeRoutes:"),
+			),
+		).toBe(false)
+	}, 300_000)
+
 	it("logs pasta distributions for frozen, refuge, and hothouse volcanic scenarios", () => {
 		const base = buildSmokeParams()
 		const scenarioParams: Array<{
@@ -530,6 +589,7 @@ describe("full world smoke generation", () => {
 				!world.population ||
 				!world.cultures
 			) {
+				expect(world.routes).toBeNull()
 				console.info(`Era ${era}: no society data`)
 				continue
 			}

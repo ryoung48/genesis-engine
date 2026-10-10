@@ -91,15 +91,12 @@ function getTimingSummary({
 export function getGenerationTimingSummary(
 	timings?: StageTiming[] | null,
 ): TimingSummary | null {
-	const computeRoutesSummary = getComputeRoutesTimingSummary(timings)
 	return getTimingSummary({
 		timings,
 		filter: (stage) =>
 			!stage.startsWith(POST_TIMING_PREFIX) &&
 			!stage.startsWith(COMPUTE_ROUTES_PREFIX),
-		pinnedEntries: computeRoutesSummary
-			? [{ label: "computeRoutes", ms: computeRoutesSummary.totalMs }]
-			: [],
+		pinnedEntries: [],
 	})
 }
 

@@ -4,7 +4,6 @@ import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
-	InfrastructureResult,
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
 
@@ -121,9 +120,6 @@ export interface GenerationCallbacks {
 		travelDays: number
 		reachable: boolean
 	}) => void
-	/** Fired when a "compute-infrastructure" request completes -- see
-	 * requestInfrastructure below. */
-	onInfrastructureResult?: (result: InfrastructureResult) => void
 }
 
 function createWorker(
@@ -173,13 +169,7 @@ function createWorker(
 			})
 			return
 		}
-		if (message.type === "infrastructure-result") {
-			callbacks.onInfrastructureResult?.({
-				routes: message.routes,
-				network: message.network,
-			})
-			return
-		}
+
 		if (message.type === "sim-progress") {
 			callbacks.onHistoryJournal(message.journal)
 			return
@@ -282,16 +272,6 @@ export function generateWorld(
 		)
 		worker.postMessage(request)
 	})
-}
-
-/** Asks the worker to lazily compute the road/sea route network for the most
- * recently generated world. Call once when the Infrastructure overlay is
- * first toggled on; the result arrives via onInfrastructureResult. */
-export function requestInfrastructure(
-	workerRef: React.MutableRefObject<Worker | null>,
-): void {
-	const request: GenesisWorkerRequest = { type: "compute-infrastructure" }
-	workerRef.current?.postMessage(request)
 }
 
 export function importHeightmap(

@@ -35,6 +35,10 @@ $env:HISTORY_OUT = 'history-summary.json'
 pnpm gen:history
 ```
 
+## Routes stage
+
+Route computation (land and sea routes plus the network) is the final world-generation stage, timed as `routes` with `computeRoutes:*` sub-rows. Measured at 204,000 points: 728.8 ms on seed 14963991, about 2.8% of the 25.8 s generation baseline (`stats/history/2026-10-10T19-42-27-900Z-large-states-water-neutral/933.json`); 1,276 ms on seed 42 under machine load. See `route-search-performance.md`.
+
 ## Verification
 
 All four 300-year runs produced identical yearly non-timing fields. Century and partial-century reports matched for seeds 14963991 and 42, 10,000 points and 201 years, excluding the people timing metric. A 20-year regression test compares complete records and final frames built from streamed versus retained journal batches. Other regression checks cover hierarchy order, floating-point summation order, immutable journal snapshots, empty flushes and cancelled changes.

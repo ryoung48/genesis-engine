@@ -27,6 +27,7 @@ import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { RouteComputation } from "@/model/society/infrastructure/trade/routing/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
@@ -97,6 +98,7 @@ export interface StageTiming {
 }
 
 export interface GenesisWorld {
+	routes: RouteComputation | null
 	mesh: SphereMesh
 	plates: TectonicPlate[]
 	plateAssignment: Int32Array

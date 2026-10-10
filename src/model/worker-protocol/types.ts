@@ -62,6 +62,8 @@ type SerializedLocations = GenesisLocations
 type SerializedNationHierarchy = GenesisNationHierarchy
 
 export interface SerializedGenesisWorld {
+	routes: SerializedRoutes | null
+	network: SerializedNetwork | null
 	mesh: SerializedSphereMesh
 	plateAssignment: Int32Array
 	elevation: Float32Array
@@ -301,11 +303,6 @@ export interface SerializedNetwork {
 	weight: Float32Array
 }
 
-export interface InfrastructureResult {
-	routes: SerializedRoutes
-	network: SerializedNetwork
-}
-
 export type GenesisWorkerRequest =
 	| {
 			type: "generate"
@@ -450,9 +447,6 @@ export type GenesisWorkerRequest =
 	| {
 			type: "pause"
 	  }
-	| {
-			type: "compute-infrastructure"
-	  }
 
 export type GenesisWorkerResponse =
 	| {
@@ -479,7 +473,6 @@ export type GenesisWorkerResponse =
 			travelDays: number
 			reachable: boolean
 	  }
-	| ({ type: "infrastructure-result" } & InfrastructureResult)
 	| {
 			type: "sim-progress"
 			timeMs: number
