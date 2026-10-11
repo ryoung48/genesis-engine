@@ -1,5 +1,6 @@
 import type {
 	AssignGovernmentTypeParams,
+	MonarchySubtypeParams,
 	RefineGovernmentSubtypeParams,
 	SuccessionSystem,
 } from "@/model/history/sim/nations/government/types"
@@ -163,6 +164,54 @@ function assignGovernmentType({
 	})
 }
 
+function monarchySubtype({
+	size,
+	sizeWeight,
+	r,
+}: MonarchySubtypeParams): number {
+	// monarchy → feudal, elective, absolute, constitutional, warlord state
+	// Information era (sizeWeight ~0.15): constitutional dominant, a few
+	// absolute holdouts (Gulf-style states).
+	if (sizeWeight < 0.22) {
+		if (size >= 12 && r < 0.3) return getGovIdx().absolute_monarchy // absolute holdout
+		return getGovIdx().constitutional_monarchy
+	}
+	// Industrial era (~0.30): constitutional rises, absolute for medium+,
+	// no surviving feudalism. Warlord states can emerge from post-imperial
+	// collapse (Warlord-Era China is squarely this era).
+	if (sizeWeight < 0.4) {
+		if (size >= 6 && r < 0.15) return getGovIdx().warlord_state
+		if (r < 0.55) return getGovIdx().constitutional_monarchy
+		if (size >= 6) return getGovIdx().absolute_monarchy
+		return getGovIdx().constitutional_monarchy
+	}
+	// Early modern (~0.45): age of absolutism; elective and feudal persist;
+	// constitutional begins to emerge.
+	if (sizeWeight < 0.55) {
+		if (size >= 8 && r < 0.45) return getGovIdx().absolute_monarchy // medium+
+		if (size >= 8 && r < 0.65) return getGovIdx().elective_monarchy // medium+ (Poland, HRE)
+		if (r < 0.88) return getGovIdx().feudal_monarchy // still widespread
+		return getGovIdx().constitutional_monarchy // early constitutional
+	}
+	// Late medieval (~0.55): feudal fragmentation is the default even for
+	// large realms -- centralized absolute rule is a rare, well-organized
+	// exception here, unlike antiquity's large-empire tier below.
+	if (sizeWeight < 0.65) {
+		if (size >= 20) {
+			if (r < 0.2) return getGovIdx().absolute_monarchy
+			if (r < 0.35) return getGovIdx().elective_monarchy
+			return getGovIdx().feudal_monarchy
+		}
+		if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
+		return getGovIdx().feudal_monarchy // default
+	}
+	// Ancient (>=0.65): feudal default; elective for medium+ kingdoms;
+	// absolute for large empires.
+	if (size >= 20 && r < 0.65) return getGovIdx().absolute_monarchy
+	if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
+	return getGovIdx().feudal_monarchy // default
+}
+
 function refineGovernmentSubtype({
 	mainType,
 	size,
@@ -174,9 +223,7 @@ function refineGovernmentSubtype({
 }: RefineGovernmentSubtypeParams): number {
 	switch (mainType) {
 		case 0: {
-			// tribal → chiefdom, tribal monarchy, tribal federation, native council, steppe horde
-			// Steppe hordes: large, arid/frontier nomadic confederations (Mongols, Huns, Xiongnu).
-			if (size >= 15 && hab < 0.4 && r < 0.4) return getGovIdx().steppe_horde
+			// tribal → chiefdom, tribal monarchy, tribal federation, native council
 			if (size >= 10)
 				return r < 0.55
 					? getGovIdx().tribal_federation
@@ -188,49 +235,8 @@ function refineGovernmentSubtype({
 				: getGovIdx().native_council
 		}
 
-		case 1: {
-			// monarchy → feudal, elective, absolute, constitutional, warlord state
-			// Information era (sizeWeight ~0.15): constitutional dominant, a few
-			// absolute holdouts (Gulf-style states).
-			if (sizeWeight < 0.22) {
-				if (size >= 12 && r < 0.3) return getGovIdx().absolute_monarchy // absolute holdout
-				return getGovIdx().constitutional_monarchy
-			}
-			// Industrial era (~0.30): constitutional rises, absolute for medium+,
-			// no surviving feudalism. Warlord states can emerge from post-imperial
-			// collapse (Warlord-Era China is squarely this era).
-			if (sizeWeight < 0.4) {
-				if (size >= 6 && r < 0.15) return getGovIdx().warlord_state
-				if (r < 0.55) return getGovIdx().constitutional_monarchy
-				if (size >= 6) return getGovIdx().absolute_monarchy
-				return getGovIdx().constitutional_monarchy
-			}
-			// Early modern (~0.45): age of absolutism; elective and feudal persist;
-			// constitutional begins to emerge.
-			if (sizeWeight < 0.55) {
-				if (size >= 8 && r < 0.45) return getGovIdx().absolute_monarchy // medium+
-				if (size >= 8 && r < 0.65) return getGovIdx().elective_monarchy // medium+ (Poland, HRE)
-				if (r < 0.88) return getGovIdx().feudal_monarchy // still widespread
-				return getGovIdx().constitutional_monarchy // early constitutional
-			}
-			// Late medieval (~0.55): feudal fragmentation is the default even for
-			// large realms -- centralized absolute rule is a rare, well-organized
-			// exception here, unlike antiquity's large-empire tier below.
-			if (sizeWeight < 0.65) {
-				if (size >= 20) {
-					if (r < 0.2) return getGovIdx().absolute_monarchy
-					if (r < 0.35) return getGovIdx().elective_monarchy
-					return getGovIdx().feudal_monarchy
-				}
-				if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
-				return getGovIdx().feudal_monarchy // default
-			}
-			// Ancient (>=0.65): feudal default; elective for medium+ kingdoms;
-			// absolute for large empires.
-			if (size >= 20 && r < 0.65) return getGovIdx().absolute_monarchy
-			if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
-			return getGovIdx().feudal_monarchy // default
-		}
+		case 1:
+			return monarchySubtype({ size, sizeWeight, r })
 
 		case 2: {
 			// republic → oligarchic, dynastic signoria, free city, presidential,
@@ -332,7 +338,6 @@ const SUCCESSION_SYSTEM: Record<GovernmentType, SuccessionSystem> = {
 	elective_monarchy: "election",
 	tribal_federation: "election",
 	native_council: "election",
-	steppe_horde: "election",
 	oligarchic_republic: "election",
 	pirate_republic: "election",
 	peasant_republic: "election",
@@ -380,4 +385,5 @@ export const GOVERNMENT = {
 	successionOfIndex,
 	partitionsOfIndex,
 	assignGovernmentType,
+	monarchySubtype,
 }

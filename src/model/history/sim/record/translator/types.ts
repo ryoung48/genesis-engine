@@ -127,6 +127,7 @@ export interface ContributionsParams {
 }
 
 export interface InheritGovernmentParams {
+	cause: string
 	record: HistoryRecord
 	ids: number[]
 	government: string

@@ -6,7 +6,6 @@ import type {
 	BindsToParams,
 	ChooseParams,
 	ComeOfAgeParams,
-	EndParams,
 	RealmRegencyParams,
 	RegentChoice,
 	RegentDiedParams,
@@ -16,6 +15,7 @@ import type {
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_REGENCY } from "@/model/history/sim/engine/state/regency"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { PEOPLE } from "@/model/history/sim/people"
 import { HEALTH } from "@/model/history/sim/people/health"
@@ -164,33 +164,12 @@ function start(params: RealmRegencyParams): void {
 	startIncapacity(params)
 }
 
-function end({ state, realm, cause }: EndParams): void {
-	const people = state.people
-	const regency = people.regencies.get(realm)
-	if (!regency) return
-	people.regencies.delete(realm)
-	if (regency.regent >= 0)
-		PEOPLE.setRegent({ people, seat: realm, person: -1, ward: regency.ward })
-	state.events.push({
-		tag: "regency ended",
-		time: state.time,
-		data: {
-			nation: realm,
-			ward: regency.ward,
-			regent: regency.regent,
-			kind: regency.kind,
-			regencyCause: regency.cause,
-			cause,
-		},
-	})
-}
-
 // A ward who is incapable at sixteen passes straight into an incapacity
 // regency; one who acceded to the throne is otherwise crowned.
 function comeOfAge({ state, realm, leader, rng }: ComeOfAgeParams): void {
 	if (state.leaderRuntime.idx[realm] !== leader) return
 	if (state.people.regencies.get(realm)?.cause !== "minority") return
-	end({ state, realm, cause: "age" })
+	STATE_REGENCY.end({ state, realm, cause: "age" })
 	startIncapacity({ state, realm })
 	CORONATION.holdDeferred({ state, realm, leader, rng })
 }
@@ -235,7 +214,7 @@ function review({ state }: ReviewParams): void {
 			!STATE.isSovereign({ state, p: realm }) ||
 			!GOVERNOR.regency({ state, realm })
 		) {
-			end({ state, realm, cause: "lost" })
+			STATE_REGENCY.end({ state, realm, cause: "lost" })
 			continue
 		}
 		if (
@@ -253,7 +232,7 @@ export const REGENCY = {
 	laxity: WEAK_CROWN_LAXITY,
 	start,
 	startIncapacity,
-	end,
+	end: STATE_REGENCY.end,
 	comeOfAge,
 	regentDied,
 	review,

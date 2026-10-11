@@ -80,17 +80,14 @@ function reviewAlliances({ state }: ReviewParams): void {
 		const holds =
 			STATE.isSovereign({ state, p: first }) &&
 			STATE.isSovereign({ state, p: second }) &&
+			GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[first]) &&
+			GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[second]) &&
 			rulerA >= 0 &&
 			rulerB >= 0 &&
 			STATE.getRelation({ state, a: first, b: second }) === STATE.rel.ALLY &&
 			PEOPLE.tiedByMarriage({ people, a: rulerA, b: rulerB, time })
 		if (holds) continue
-		people.marriageAlliances.delete(key)
-		state.events.push({
-			tag: "marriage alliance ended",
-			time: state.time,
-			data: { first, second },
-		})
+		STATE.endMarriageAlliance({ state, key })
 	}
 }
 

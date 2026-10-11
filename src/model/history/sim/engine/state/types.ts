@@ -19,6 +19,10 @@ import type {
 	Troops,
 } from "@/model/history/sim/engine/military/recruitment/types"
 import type { OpinionPoliticsTotals } from "@/model/history/sim/engine/opinion-context/types"
+import type {
+	ElectionStreak,
+	GovernmentTransition,
+} from "@/model/history/sim/engine/state/government/types"
 import type { MarriageTotals } from "@/model/history/sim/people/family/diagnostics/types"
 import type { MarriageLaw } from "@/model/history/sim/people/marriage-law/types"
 import type {
@@ -173,6 +177,7 @@ export interface LifecycleCounters {
 }
 
 export interface HistoryState {
+	electionStreaks: Map<number, ElectionStreak>
 	marriageMarket: Map<number, MarriageTotals>
 	opinionPolitics: OpinionPoliticsTotals
 	coronations: CoronationCounters
@@ -598,4 +603,16 @@ export interface ReleaseFactionsParams {
 	seats: { p: number; supporters: number[] }[]
 	rng: SharedRng
 	reason: SeatChangeReason
+}
+
+export interface ReconcileGovernmentParams {
+	state: HistoryState
+	realm: number
+	transition: GovernmentTransition | null
+	rng: SharedRng
+}
+
+export interface EndMarriageAllianceParams {
+	state: HistoryState
+	key: number
 }

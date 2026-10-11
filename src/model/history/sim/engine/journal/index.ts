@@ -27,6 +27,7 @@ const RULER_TAGS = new Set([
 	"regent changed",
 	"usurpation",
 	"regime change",
+	"government change",
 ])
 
 function pending(): PendingJournal {

@@ -478,6 +478,7 @@ function contributions({
 // A new realm takes the parent realm's government, whatever its seat province
 // carried before.
 function inheritGovernment({
+	cause,
 	record,
 	ids,
 	government,
@@ -496,7 +497,7 @@ function inheritGovernment({
 				timeMs,
 				kind: "governmentChange",
 				payload: { governmentType: government },
-				comment: null,
+				comment: cause,
 			})
 	}
 }
@@ -884,17 +885,30 @@ function appendNote({
 			},
 			comment: null,
 		})
+	} else if (note.tag === "government change") {
+		const id = translator.identityByRoot.get(data.nation as number)
+		if (id === undefined) return
+		const government = data.to as string
+		const cause = data.cause as string
+		if (cause === "inherited")
+			inheritGovernment({ record, ids: [id], government, timeMs, cause })
+		else {
+			const log = record.events.nationEvents[id]
+			if (!log) return
+			if (log.events.length === 0)
+				log.base.initialGovernment = data.from as string
+			log.events.push({
+				timeMs,
+				kind: "governmentChange",
+				payload: { governmentType: government },
+				comment: cause,
+			})
+		}
 	} else if (note.tag === "partition") {
 		const nationId = translator.identityByRoot.get(data.nation as number)
 		if (nationId === undefined) return
 		const realmId = (root: number) => translator.identityByRoot.get(root) ?? -1
 		const realms = (data.seats as number[]).map(realmId)
-		inheritGovernment({
-			record,
-			ids: realms,
-			government: data.government as string,
-			timeMs,
-		})
 		record.events.nationEvents[nationId]?.events.push({
 			timeMs,
 			kind: "partition",
@@ -913,12 +927,6 @@ function appendNote({
 		if (nationId === undefined) return
 		const realmId = (root: number) => translator.identityByRoot.get(root) ?? -1
 		const realms = (data.freed as number[]).map(realmId)
-		inheritGovernment({
-			record,
-			ids: realms,
-			government: data.government as string,
-			timeMs,
-		})
 		const payload = {
 			late: data.dying,
 			ruler: data.ruler,

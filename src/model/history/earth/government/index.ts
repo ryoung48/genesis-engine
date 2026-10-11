@@ -42,7 +42,6 @@ const FAMILY_TYPES: Record<
 		"tribal_monarchy",
 		"tribal_federation",
 		"native_council",
-		"steppe_horde",
 	],
 	monarchy: [
 		"feudal_monarchy",

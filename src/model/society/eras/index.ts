@@ -15,7 +15,6 @@ const governmentTypes: GovernmentType[] = [
 	"tribal_monarchy",
 	"tribal_federation",
 	"native_council",
-	"steppe_horde",
 	// monarchy
 	"feudal_monarchy",
 	"elective_monarchy",
@@ -48,7 +47,6 @@ const governmentTypeLabels: Record<GovernmentType, string> = {
 	tribal_monarchy: "Tribal Monarchy",
 	tribal_federation: "Tribal Federation",
 	native_council: "Native Council",
-	steppe_horde: "Steppe Horde",
 	feudal_monarchy: "Feudal Monarchy",
 	elective_monarchy: "Elective Monarchy",
 	absolute_monarchy: "Absolute Monarchy",
@@ -76,7 +74,6 @@ const governmentTypeFamily: Record<GovernmentType, GovernmentFamily> = {
 	tribal_monarchy: "tribal",
 	tribal_federation: "tribal",
 	native_council: "tribal",
-	steppe_horde: "tribal",
 	feudal_monarchy: "monarchy",
 	elective_monarchy: "monarchy",
 	absolute_monarchy: "monarchy",

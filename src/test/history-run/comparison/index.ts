@@ -345,6 +345,13 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			period: `${seed} / whole run`,
 			rows,
 		})
+		addRows({
+			before: { governmentTotal: da.governmentTotal },
+			after: { governmentTotal: db.governmentTotal },
+			section: "Government",
+			period: `${seed} / whole run`,
+			rows,
+		})
 		const totalBefore = { ...object(da.partitionTotal) }
 		const totalAfter = { ...object(db.partitionTotal) }
 		rows.push({
@@ -469,6 +476,7 @@ function html({ current, previous }: ReportPair): string {
 	const simulationChanges = changed.filter((row) =>
 		[
 			"Century statistics",
+			"Government",
 			"Annual armies and economy",
 			"Knowledge",
 			"Raw diagnostics",

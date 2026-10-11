@@ -60,10 +60,12 @@ District holders can favor a claimant, while foreign realms can fight beside the
 
 ## Breakaway
 
+A released realm inherits its former sovereign’s government, then receives one [founding review](government-change.md) after its land is assembled.
+
 - **Resources.** The rebel realm takes the crown's enrolled troops and positive treasury in proportion to its population, including every supporting district in a throne war.
 - **Ruler.** The district's holder rules the rebel realm with claim 3 (founder). With no living holder, or when the holder rules the realm being left or another crown that cannot unite with the new realm, a new house is founded. In a pretender revolt, the pretender takes the rebel throne with claim 3, even when the district belonged to a backer.
 - **Cut-off land.** When a district leaves for independence, any of its own land left without a connection to its seat is released as well, recorded as `province released` and shown as a "disconnected" revolt. A throne rebellion releases nothing at the declaration: crown districts the faction has severed stay with the crown through the war, and are settled at the peace if both realms are still standing.
-- **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with three differences: no war starts and relations are neutral, the new realm takes the divided realm's government instead of the one its seat province carried, and cut-off land first joins a bordering heir realm of equal or higher top tier.
+- **Partition.** A [partition](government-and-succession.md#partition) releases a district through the same path, with no war and neutral relations; cut-off land first joins a bordering heir realm of equal or higher top tier.
 
 ## The rebel war
 

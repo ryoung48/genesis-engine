@@ -12,6 +12,7 @@ import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
+import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
 import {
 	getChildren,
 	getNationNeighbors,
@@ -22,6 +23,8 @@ import {
 	rebuildAssignment,
 	validateLiveHierarchy,
 } from "@/model/history/sim/engine/state/hierarchy"
+import { STATE_PATRICIANS } from "@/model/history/sim/engine/state/patricians"
+import { STATE_REGENCY } from "@/model/history/sim/engine/state/regency"
 import {
 	canAlly,
 	diplomaticOverlord,
@@ -40,6 +43,7 @@ import type {
 	ContinueUnionParams,
 	CreateActiveWarParams,
 	CreateHistoryStateParams,
+	EndMarriageAllianceParams,
 	FixConnectionsParams,
 	FoundRulerParams,
 	GetWarAlliesParams,
@@ -50,6 +54,7 @@ import type {
 	ProvinceDistanceSqParams,
 	QueueBattleEventParams,
 	RealmPairParams,
+	ReconcileGovernmentParams,
 	ReleaseDisconnectedProvinceParams,
 	ReleaseFactionParams,
 	ReleaseFactionsParams,
@@ -83,6 +88,7 @@ import { OPINION } from "@/model/history/sim/people/opinion"
 import type { RealmOrigin } from "@/model/history/sim/people/types"
 import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
 import { DEJURE } from "@/model/society/dejure"
+import { ERAS } from "@/model/society/eras"
 
 const {
 	defaultStartYear: DEFAULT_START_YEAR,
@@ -203,7 +209,14 @@ function releaseFactions({
 						)) /
 					formerPopulation
 				: 0
-		return { p, formerSovereign, supportingSeats, supportingProvinces, share }
+		return {
+			p,
+			formerSovereign,
+			supportingSeats,
+			supportingProvinces,
+			share,
+			government: state.governmentType[formerSovereign],
+		}
 	})
 	const formerRealms = new Set(
 		releases.map((release) => release.formerSovereign),
@@ -242,7 +255,26 @@ function releaseFactions({
 	for (const { p, supportingProvinces } of releases)
 		repartitionNation({ state, nation: p, subjects: supportingProvinces })
 	for (const nation of formerRealms) RECRUITMENT.reconstitute({ state, nation })
-	for (const { p, formerSovereign } of releases) {
+	for (const { p, formerSovereign, government } of releases) {
+		const from = ERAS.governmentTypes[state.governmentType[p]]
+		FIELDS.prov.government.set({ state, p, value: government })
+		if (from !== ERAS.governmentTypes[government])
+			state.events.push({
+				tag: "government change",
+				time: state.time,
+				data: {
+					nation: p,
+					from,
+					to: ERAS.governmentTypes[government],
+					cause: "inherited",
+				},
+			})
+		const transition = STATE_GOVERNMENT.found({
+			state,
+			realm: p,
+			provinces: getNationProvinces({ state, root: p }),
+			rng,
+		})
 		RECRUITMENT.reconstitute({ state, nation: p })
 		clearRealmDiplomacy({ state, nation: p })
 		const vassal = state.people.rulerOf[p]
@@ -271,6 +303,7 @@ function releaseFactions({
 				rng,
 				reason,
 			})
+		reconcileGovernment({ state, realm: p, transition, rng })
 		scheduleSuccession({ state, p })
 	}
 }
@@ -880,6 +913,7 @@ function createHistoryState({
 		knowledgeSpinUp: { origin: 0, years: 0 },
 		censusVersion: 0,
 		realmCache: new Map(),
+		electionStreaks: new Map(),
 		provinceEconomyCache: {
 			capital: new Int32Array(P).fill(-1),
 			distanceMultiplier: new Float64Array(P),
@@ -1066,6 +1100,72 @@ function unionPartners({ state, p }: UnionRealmParams): number[] {
 			partners.push(other)
 	}
 	return partners
+}
+
+function endMarriageAlliance({ state, key }: EndMarriageAllianceParams): void {
+	const binding = state.people.marriageAlliances.get(key)
+	if (!binding) return
+	state.people.marriageAlliances.delete(key)
+	state.events.push({
+		tag: "marriage alliance ended",
+		time: state.time,
+		data: { first: binding.first, second: binding.second },
+	})
+}
+
+function reconcileGovernment({
+	state,
+	realm,
+	rng,
+}: ReconcileGovernmentParams): void {
+	const government = state.governmentType[realm]
+	if (GOVERNMENT.successionOfIndex(government) !== "single_heir") {
+		const orphans = new Map<number, number>()
+		for (const other of [...state.relationColumns[realm]]) {
+			const relation = getRelation({ state, a: realm, b: other })
+			if (relation === rel.PU_SENIOR)
+				endUnion({ state, junior: realm, senior: other })
+			else if (relation === rel.PU_JUNIOR) {
+				orphans.set(other, state.people.unionGenerations.get(other) ?? 1)
+				endUnion({ state, junior: other, senior: realm })
+			}
+		}
+		continueUnion({ state, generations: orphans })
+		const ruler = state.people.rulerOf[realm]
+		if (
+			ruler >= 0 &&
+			state.people.persons.heldSeats[ruler].some(
+				(seat) => seat !== realm && isSovereign({ state, p: seat }),
+			)
+		) {
+			STATE_REGENCY.end({ state, realm, cause: "government" })
+			state.coronationOwed[realm] = -1
+			foundRuler({
+				state,
+				p: realm,
+				age: rng.uniform(20, 50),
+				claim: FOUNDER_CLAIM,
+				rng,
+				reason: "territorial change",
+			})
+			scheduleSuccession({ state, p: realm })
+		}
+	}
+	STATE_PATRICIANS.settleRealm({
+		state,
+		realm,
+		sovereign: isSovereign({ state, p: realm }),
+		origin: originOf({ state, realm }),
+		time: state.time / yearMs,
+		rng,
+		found: null,
+	})
+	if (!GOVERNMENT.marriageAlliancesOfIndex(government)) {
+		for (const [key, binding] of state.people.marriageAlliances) {
+			if (binding.first === realm || binding.second === realm)
+				endMarriageAlliance({ state, key })
+		}
+	}
 }
 
 function endUnion({ state, junior, senior }: UnionPairParams): void {
@@ -1367,6 +1467,8 @@ function foundRuler({
 }
 
 export const STATE = {
+	reconcileGovernment,
+	endMarriageAlliance,
 	rel,
 	disp,
 	getWarAllies,

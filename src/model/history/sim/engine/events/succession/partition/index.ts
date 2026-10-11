@@ -22,7 +22,6 @@ import type {
 } from "@/model/history/sim/engine/events/succession/partition/types"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
@@ -214,11 +213,6 @@ function release({ run, share }: ReleaseParams): void {
 			})
 		DISTRICTS.install({ state, seat, person: heir, reason: "partition" })
 	}
-	FIELDS.prov.government.set({
-		state,
-		p: seat,
-		value: state.governmentType[realm],
-	})
 	STATE.releaseFaction({
 		state,
 		p: seat,

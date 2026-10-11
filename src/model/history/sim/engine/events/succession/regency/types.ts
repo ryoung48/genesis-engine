@@ -2,13 +2,6 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { RegencyCause, RegentKind } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
-export type RegencyEndCause =
-	| "age"
-	| "death"
-	| "usurpation"
-	| "lost"
-	| "overthrown"
-
 export interface RegentChoice {
 	// -1 for a regency council.
 	regent: number
@@ -47,12 +40,6 @@ export interface BeginParams {
 	state: HistoryState
 	realm: number
 	cause: RegencyCause
-}
-
-export interface EndParams {
-	state: HistoryState
-	realm: number
-	cause: RegencyEndCause
 }
 
 export interface ComeOfAgeParams {

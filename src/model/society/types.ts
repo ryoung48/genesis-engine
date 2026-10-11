@@ -165,36 +165,35 @@ export type SocietyEra =
 	| "information"
 
 export type GovernmentType =
-	// tribal (0–4)
-	| "chiefdom" // 0: small hereditary chief — default tribal
-	| "tribal_monarchy" // 1: medium organised tribal kingdom
-	| "tribal_federation" // 2: medium+ multi-tribe council
-	| "native_council" // 3: small frontier indigenous council
-	| "steppe_horde" // 4: large nomadic confederation — Mongols, Huns, Xiongnu
-	// monarchy (5–12)
-	| "feudal_monarchy" // 5: decentralised lords-and-vassals — ancient/medieval
-	| "elective_monarchy" // 6: elected king — medium+
-	| "absolute_monarchy" // 7: centralised crown, patrimonial administration — large, earlyModern+
-	| "constitutional_monarchy" // 8: limited monarchy — earlyModern+
-	| "dynastic_signoria" // 9: republic fallen under one dynastic lord — small, earlyModern (Medici, Visconti)
-	| "warlord_state" // 10: fragmented post-imperial military rule — no legitimate succession
-	// republic (13–19)
-	| "oligarchic_republic" // 14: aristocratic senate — medium ancient core
-	| "peasant_republic" // 16: lord-less free-peasant commune — small coastal/marsh (Dithmarschen, Frisia)
-	| "presidential_republic" // 17: elected executive — industrial+
-	| "parliamentary_republic" // 18: legislature-led — industrial+
-	| "pirate_republic" // 19: small outlaw haven — coastal, earlyModern
-	// theocracy (20–22)
-	| "theocracy" // 20: religious government — medium+, default
-	| "monastic_state" // 21: military-religious order — small coastal
-	| "imperial_cult" // 22: state religion as imperial authority — large
-	// republic extensions (23–26)
-	| "socialist_state" // 23: one-party socialist republic — industrial+
-	| "military_junta" // 24: authoritarian military regime — industrial+
-	| "fascist_state" // 25: totalitarian nationalist mass-party regime — industrial (WWII-era)
-	| "dictatorial_rule" // 26: personalist authoritarian rule, no military/party institution — industrial+
-	// colonial (27–28) — assigned by post-pass, not the normal gov mix
-	| "trading_company" // 27: chartered company rule — earlyModern+, coastal
+	// tribal
+	| "chiefdom" // small hereditary chief — default tribal
+	| "tribal_monarchy" // medium organised tribal kingdom
+	| "tribal_federation" // medium+ multi-tribe council
+	| "native_council" // small frontier indigenous council
+	// monarchy
+	| "feudal_monarchy" // decentralised lords-and-vassals — ancient/medieval
+	| "elective_monarchy" // elected king — medium+
+	| "absolute_monarchy" // centralised crown, patrimonial administration — large, earlyModern+
+	| "constitutional_monarchy" // limited monarchy — earlyModern+
+	| "dynastic_signoria" // republic fallen under one dynastic lord — small, earlyModern (Medici, Visconti)
+	| "warlord_state" // fragmented post-imperial military rule — no legitimate succession
+	// republic
+	| "oligarchic_republic" // aristocratic senate — medium ancient core
+	| "peasant_republic" // lord-less free-peasant commune — small coastal/marsh (Dithmarschen, Frisia)
+	| "presidential_republic" // elected executive — industrial+
+	| "parliamentary_republic" // legislature-led — industrial+
+	| "pirate_republic" // small outlaw haven — coastal, earlyModern
+	// theocracy
+	| "theocracy" // religious government — medium+, default
+	| "monastic_state" // military-religious order — small coastal
+	| "imperial_cult" // state religion as imperial authority — large
+	// republic extensions
+	| "socialist_state" // one-party socialist republic — industrial+
+	| "military_junta" // authoritarian military regime — industrial+
+	| "fascist_state" // totalitarian nationalist mass-party regime — industrial (WWII-era)
+	| "dictatorial_rule" // personalist authoritarian rule, no military/party institution — industrial+
+	// colonial  — assigned by post-pass, not the normal gov mix
+	| "trading_company" // chartered company rule — earlyModern+, coastal
 	| "settler_colony"
 
 export type GovernmentFamily =

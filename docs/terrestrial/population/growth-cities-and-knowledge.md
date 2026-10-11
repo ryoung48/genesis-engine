@@ -45,6 +45,8 @@ Values outside the table use the nearest endpoint rate. For a one-year census, e
 
 ## Urbanization and city sizes
 
+A realm’s urban target follows its current government, including [runtime changes](../politics/government-change.md).
+
 Each sovereign realm has a government profile with an urban share `U` and a city-rank exponent `q`. For example, `U` is 1.5% for a chiefdom, 5% for a feudal monarchy, 12% for an absolute monarchy, and 20% for an oligarchic republic. The realm's target urban share is `min(85%, U Ã— urbanFactor(realm knowledge) / urbanFactor(era baseline))`. The urban factor is 0.7 at knowledge 0, 1 at 1, 1.1 at 2, 1.6 at 3, and 4 at 4. Realm knowledge is the population-weighted mean of its provinces' knowledge.
 
 The model distributes the target urban population among ranked cities. Rank one is the sovereign seat; other titled seats follow, then provinces are ordered by habitability. `q` controls how strongly the population concentrates in the highest ranks. Candidate cities below 5,000 people are dropped, and the list cannot exceed the realm's province count. Each city's size is limited by knowledge, total realm population, and rank. The city-size base rises from 350,000 at knowledge 1 to 5 million at knowledge 4; small realms receive a lower cap. Population that exceeds these caps may be redistributed into towns below 25,000 people.

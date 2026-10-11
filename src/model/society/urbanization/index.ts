@@ -22,7 +22,6 @@ const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 	tribal_monarchy: { U: 0.025, q: 1.0 }, // one organised royal seat
 	tribal_federation: { U: 0.03, q: 0.75 }, // multi-tribe council, several similar centers
 	native_council: { U: 0.015, q: 0.8 }, // small frontier council, flat and sparse
-	steppe_horde: { U: 0.01, q: 0.6 }, // nomadic, no fixed urban seat, very flat
 
 	// monarchy — decentralised feudal through centralised absolutist to modern constitutional
 	feudal_monarchy: { U: 0.05, q: 0.85 }, // many small towns, few large cities

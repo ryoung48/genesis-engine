@@ -1,3 +1,4 @@
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
 import { INTERREGNUM } from "@/model/history/sim/engine/events/succession/interregnum"
@@ -22,6 +23,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -199,6 +201,9 @@ function runSeatSuccession({
 	}
 
 	const dying = state.people.rulerOf[province]
+	const previousHouse = dying >= 0 ? state.people.persons.dynasty[dying] : -1
+	const elected =
+		GOVERNMENT.successionOfIndex(state.governmentType[province]) === "election"
 	const choice = SUCCESSION_SYSTEMS.choose({
 		state,
 		realm: province,
@@ -301,6 +306,17 @@ function runSeatSuccession({
 		})
 	}
 
+	const transition = STATE_GOVERNMENT.accede({
+		state,
+		realm: province,
+		provinces: STATE.getNationProvinces({ state, root: province }),
+		rng,
+		knowledge: ECONOMY.realmKnowledge({ state, p: province }),
+		elected,
+		previousHouse,
+	})
+	if (transition)
+		STATE.reconcileGovernment({ state, realm: province, transition, rng })
 	CORONATION.hold({ state, realm: province, rng })
 }
 
@@ -416,6 +432,16 @@ function usurp({ state, realm, rng }: RealmRngParams): void {
 		time: state.time / STATE.yearMs,
 	})
 	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })
+	const transition = STATE_GOVERNMENT.accede({
+		state,
+		realm,
+		provinces: STATE.getNationProvinces({ state, root: realm }),
+		rng,
+		knowledge: ECONOMY.realmKnowledge({ state, p: realm }),
+		elected: false,
+		previousHouse: people.persons.dynasty[ward],
+	})
+	if (transition) STATE.reconcileGovernment({ state, realm, transition, rng })
 	CORONATION.hold({ state, realm, rng })
 }
 
@@ -426,6 +452,31 @@ function runYear({ state, rng }: RunYearParams): void {
 		if (chance > 0 && rng.random() < chance) usurp({ state, realm, rng })
 	}
 	for (const realm of RESTORATION.due({ state })) restore({ state, realm, rng })
+	for (const realm of state.electionStreaks.keys()) {
+		if (!STATE.isSovereign({ state, p: realm }))
+			state.electionStreaks.delete(realm)
+	}
+	for (let realm = 0; realm < state.P; realm++) {
+		if (
+			state.desolate[realm] ||
+			state.stateless[realm] ||
+			!STATE.isSovereign({ state, p: realm })
+		)
+			continue
+		const government = state.governmentType[realm]
+		if (
+			government !== GOVERNMENT.getGovIdx().feudal_monarchy &&
+			government !== GOVERNMENT.getGovIdx().elective_monarchy
+		)
+			continue
+		const transition = STATE_GOVERNMENT.yearly({
+			state,
+			realm,
+			provinces: STATE.getNationProvinces({ state, root: realm }),
+			rng,
+		})
+		if (transition) STATE.reconcileGovernment({ state, realm, transition, rng })
+	}
 	CORONATION.elevate({ state, rng })
 }
 

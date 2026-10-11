@@ -21,6 +21,8 @@ import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
+import { GOVERNMENT_REPORT } from "@/test/history-run/report/government"
+import type { GovernmentReport } from "@/test/history-run/report/government/types"
 import { HOUSEHOLDS_REPORT } from "@/test/history-run/report/households"
 import type {
 	HouseholdsReport,
@@ -502,6 +504,7 @@ function runSeed({
 		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
 		partitionTotal: null as PartitionReport | null,
+		governmentTotal: null as GovernmentReport | null,
 		districtsTotal: null as DistrictReport | null,
 		householdsReportMs: 0,
 		peopleRecord: null as PeopleRecordReport | null,
@@ -800,6 +803,7 @@ function runSeed({
 					from,
 					to: year,
 				}),
+				government: GOVERNMENT_REPORT.summarize({ engine, from, to: year }),
 				partitionState: PARTITION_REPORT.state({ engine }),
 				partition: PARTITION_REPORT.summarize({
 					engine,
@@ -815,6 +819,12 @@ function runSeed({
 					to: year,
 				}),
 			})
+			if (year === start + options.years)
+				diagnostics.governmentTotal = GOVERNMENT_REPORT.summarize({
+					engine,
+					from: start,
+					to: year + 1,
+				})
 			roadCursor = engine.roads?.batch ?? 0
 			if (year === start + options.years)
 				diagnostics.partitionTotal = PARTITION_REPORT.summarize({

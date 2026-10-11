@@ -10,7 +10,6 @@ export const GOVERNMENT_COLORS_BY_TYPE: Record<
 	tribal_monarchy: [0.55, 0.35, 0.14],
 	tribal_federation: [0.93, 0.76, 0.5],
 	native_council: [0.44, 0.24, 0.11],
-	steppe_horde: [0.68, 0.42, 0.16],
 	// monarchy — blue family
 	feudal_monarchy: [0.42, 0.54, 0.72],
 	elective_monarchy: [0.55, 0.78, 0.95],

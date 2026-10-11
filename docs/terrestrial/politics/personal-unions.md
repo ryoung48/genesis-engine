@@ -7,8 +7,8 @@ A personal union ties the realms of one person who rules several single-heir rea
 - **Formed** when one person comes to rule two single-heir realms by inheritance, when two reigning single-heir rulers are married to each other (the heiress case), or when a foreign claim is won (see below).
 - **Single-heir only.** `STATE.canUnite` is the one test every new link passes, through inheritance, installation of a ruler and marriage. It requires both realms to be single-heir. An elected or appointed ruler who is next in line to a single-heir realm is passed over like any heir whose crown is incompatible.
 - **Senior** is the realm that must lead (it already has juniors or an overlord), else the one with more provinces.
-- **Blocked** for a new external link when realms are at war, either is not single-heir, either is already a union junior, or both must lead. Existing group membership stays compatible whatever the members' government has since become; eligibility checks every held crown.
-- **Ended** when a partner's living ruler is someone other than that person or their spouse.
+- **Blocked** for a new external link when realms are at war, either is not single-heir, either is already a union junior, or both must lead. Eligibility checks every held crown; a [government change](government-change.md) away from single-heir succession ends the realm's union links.
+- **Ended** when a partner's living ruler is someone other than that person or their spouse, or when a realm leaves single-heir succession. Government reconciliation removes senior and junior links immediately, including junior generation entries. Remaining juniors under one ruler continue together. A departing crown sharing that ruler receives an independent founder, so the old ruler does not retain untied sovereign crowns.
 - **Continued.** Juniors whose senior is lost (a new ruler at the senior, or the senior absorbed) and that are still ruled by one living person stay together: the largest becomes their senior, generation counts are kept, and a `personal union continued` note is logged.
 - **Merged** into the senior when an adjacent junior has had 3 shared rulers.
 

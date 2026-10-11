@@ -10,13 +10,14 @@ A realm's government decides how it passes on, whether its ruling house marries 
 
 ## Government types
 
+[Government changes](government-change.md) describes runtime review moments and transitions.
+
 | Family | Type | What it is | Succession | Partitions | Marries for alliance |
 |---|---|---|---|---|---|
 | Tribal | chiefdom | A small realm under one chief. | Partition | Yes | Yes |
 | | tribal monarchy | A tribal kingdom held by one house. | Partition | Yes | Yes |
 | | tribal federation | A league of tribes that chooses its leader. | Election | No | Yes |
 | | native council | A small council-led people. | Election | No | Yes |
-| | steppe horde | A large nomadic confederation of arid land. | Election | No | Yes |
 | Monarchy | feudal monarchy | A crown over hereditary lords. | Single heir | No | Yes |
 | | elective monarchy | A crown the great lords elect. | Election | No | Yes |
 | | absolute monarchy | A centralized crown. | Single heir | No | Yes |
@@ -74,14 +75,12 @@ Each nation draws its type once, at world generation (`GOVERNMENT.assignGovernme
 3. **Size caps.** A nation above the era's `maxRepublicSize` or `maxTheocracySize` (40 provinces each in the late medieval era) cannot draw that family.
 4. **Draw.** The weights are clamped at zero and normalized, and the family is drawn from a hash of the seed and the nation index. Trade-league cities never draw tribal.
 5. **Subtype**, from a second hash:
-   - *Tribal.* 15+ provinces on poor land: steppe horde 40% of the time. 10+: tribal federation 55%, tribal monarchy 45%. 5–9: tribal monarchy. Smaller: chiefdom or native council, with the council more likely on harsh or frontier land.
+   - *Tribal.* 10+: tribal federation 55%, tribal monarchy 45%. 5–9: tribal monarchy. Smaller: chiefdom or native council, with the council more likely on harsh or frontier land.
    - *Monarchy,* by era. Ancient: feudal by default, elective for 5+ provinces 75% of the time, absolute for most realms of 20+. Late medieval: feudal by default, elective for mid-size realms, absolute only for a fifth of realms of 20+. Early modern: absolute and elective for 8+, feudal still common, a few constitutional. Industrial: constitutional and absolute, some warlord states. Information age: constitutional, with a few absolute holdouts.
    - *Republic.* Before the industrial era: oligarchic by default, dynastic signoria for a quarter of long-settled cores, peasant republics among realms of 4 or fewer, a few pirate republics on small coasts. Later eras draw parliamentary, presidential, juntas, and (by era) fascist, socialist and dictatorial regimes.
    - *Theocracy.* 20+ provinces before the industrial era: imperial cult 45% of the time. Small coastal realms: monastic state 55%. Otherwise theocracy.
 
-**Stored per province.** Every province carries the government of the nation that owned it at world generation; land that began stateless carries chiefdom. Conquest does not update it. A realm released by rebellion or cut off from its crown therefore takes whatever its new root province carries, which can differ from the realm it left.
-
-**The one runtime change.** A realm created by a partition takes the divided realm's government: its seat province is rewritten before it is released. Without this a district on once-conquered land would emerge under the government stamped at world generation and might never partition again.
+Government belongs to the realm and is read at its root province. New realms inherit their former sovereign's government, then undergo a [founding review](government-change.md).
 
 ## Succession
 
@@ -91,7 +90,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 |---|---|---|
 | Single heir | feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a [personal union](personal-unions.md). With no heir and at least one living district admin, an [interregnum](#interregnum) follows; with no district admin a random noble takes it as a new house. |
 | Single heir, then partition | chiefdom, tribal monarchy | The same rule picks the primary heir, who keeps the realm root; the other child lines take surplus titles, then titled districts, as new realms (see Partition). |
-| Election | elective monarchy, tribal federation, native council, steppe horde, republics | See below. |
+| Election | elective monarchy, tribal federation, native council, republics | See below. |
 | Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
 
 **Elections.** See [district elections](#district-elections) for electors, nominations and voting.

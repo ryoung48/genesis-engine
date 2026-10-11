@@ -11,7 +11,6 @@ import type {
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { WAR } from "@/model/history/sim/engine/events/war"
-import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
@@ -63,12 +62,6 @@ function begin({ state, realm, dying, rng }: BeginParams): InterregnumRun {
 			run.skipped.push({ seat: entry.seat, reason: "holder changed" })
 		else run.freed.push(entry)
 	}
-	for (const { seat } of run.freed)
-		FIELDS.prov.government.set({
-			state,
-			p: seat,
-			value: state.governmentType[realm],
-		})
 	STATE.releaseFactions({
 		state,
 		seats: run.freed.map(({ seat }) => ({

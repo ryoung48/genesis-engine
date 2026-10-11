@@ -1,6 +1,7 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
+import type { GovernmentReport } from "@/test/history-run/report/government/types"
 import type {
 	HouseholdsReport,
 	ResidenceReport,
@@ -81,6 +82,7 @@ export interface CenturyReport {
 	peopleOpinionCost: OpinionCostReport
 	military: MilitaryReport
 	districts: DistrictReport
+	government: GovernmentReport
 	partitionState: PartitionStateReport
 	partition: PartitionReport
 	interregnum: InterregnumReport

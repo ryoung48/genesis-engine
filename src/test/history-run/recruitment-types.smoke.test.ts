@@ -368,7 +368,7 @@ describe("recruitment and integrated military expense", () => {
 		expect(tribal.home.regular).toBeGreaterThan(tribal.home.levy)
 		expect(tribal.campaign.regular).toBeGreaterThan(tribal.campaign.levy)
 		expect(
-			GOVERNMENT.govFamilyOfIndex(GOVERNMENT.getGovIdx().steppe_horde),
+			GOVERNMENT.govFamilyOfIndex(GOVERNMENT.getGovIdx().tribal_federation),
 		).toBe("tribal")
 	})
 })
@@ -868,7 +868,7 @@ describe("military transitions and conservation", () => {
 		for (const government of [
 			GOVERNMENT.getGovIdx().feudal_monarchy,
 			GOVERNMENT.getGovIdx().chiefdom,
-			GOVERNMENT.getGovIdx().steppe_horde,
+			GOVERNMENT.getGovIdx().tribal_federation,
 			GOVERNMENT.getGovIdx().oligarchic_republic,
 			GOVERNMENT.getGovIdx().theocracy,
 		]) {
@@ -917,7 +917,7 @@ describe("military transitions and conservation", () => {
 			for (const government of [
 				GOVERNMENT.getGovIdx().feudal_monarchy,
 				GOVERNMENT.getGovIdx().chiefdom,
-				GOVERNMENT.getGovIdx().steppe_horde,
+				GOVERNMENT.getGovIdx().tribal_federation,
 				GOVERNMENT.getGovIdx().oligarchic_republic,
 				GOVERNMENT.getGovIdx().theocracy,
 			]) {
@@ -943,7 +943,7 @@ describe("military transitions and conservation", () => {
 		for (const government of [
 			GOVERNMENT.getGovIdx().feudal_monarchy,
 			GOVERNMENT.getGovIdx().chiefdom,
-			GOVERNMENT.getGovIdx().steppe_horde,
+			GOVERNMENT.getGovIdx().tribal_federation,
 			GOVERNMENT.getGovIdx().oligarchic_republic,
 			GOVERNMENT.getGovIdx().theocracy,
 		]) {

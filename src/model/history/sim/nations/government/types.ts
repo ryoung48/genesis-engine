@@ -11,9 +11,9 @@ export interface AssignGovernmentTypeParams {
 	migrationWave: Float32Array | undefined
 	statehoodFraction: number
 	seed: number
-	/** [JUSTIFICATION] only eras that cap republic size supply this; others leave it unset */
+	// [JUSTIFICATION] Only eras that cap republic size supply this.
 	maxRepublicSize?: number
-	/** [JUSTIFICATION] only eras that cap theocracy size supply this; others leave it unset */
+	// [JUSTIFICATION] Only eras that cap theocracy size supply this.
 	maxTheocracySize?: number
 }
 
@@ -28,3 +28,9 @@ export interface RefineGovernmentSubtypeParams {
 }
 
 export type SuccessionSystem = "single_heir" | "election" | "appointment"
+
+export interface MonarchySubtypeParams {
+	size: number
+	sizeWeight: number
+	r: number
+}

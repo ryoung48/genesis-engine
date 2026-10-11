@@ -12,7 +12,7 @@ Armies are aggregate troop counts. Combat strength is 0.75 per levy and 1 per re
 
 Sovereign realms hold actual enrolled levies and regulars. Soldiers remain inhabitants: recruitment does not remove population, demobilization does not grow it, and casualties reduce rural population once.
 
-Levy eligibility is 2% of population for nontribal governments and 5% for all tribal-family governments, including steppe hordes. A separate 6% combined population safety ceiling covers both types. Neither type receives priority when the shared budget or safety ceiling binds. Government family changes only levy eligibility and permission to initiate raids in this military/fiscal model.
+Levy eligibility is 2% of population for nontribal governments and 5% for all tribal-family governments. A separate 6% combined population safety ceiling covers both types. Neither type receives priority when the shared budget or safety ceiling binds. Government family changes only levy eligibility and permission to initiate raids in this military/fiscal model.
 
 Let `B = 0.75 × max(0, civilian surplus)`. Requested levies equal population eligibility. Requested regulars equal `funding × B / regular home price`, using the full readiness budget without deducting levy costs first. Funding interpolates from 10% at knowledge 0.42 through 25% at 1.00 and 55% at 1.44 to 90% at 2.38. This defines requests rather than imposing a final composition.
 

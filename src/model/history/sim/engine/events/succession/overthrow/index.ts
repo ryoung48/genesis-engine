@@ -1,3 +1,4 @@
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
 import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
 import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
@@ -11,6 +12,7 @@ import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
 import { PEOPLE } from "@/model/history/sim/people"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 
@@ -95,6 +97,16 @@ function enthrone({
 		reason: "regime change",
 	})
 	REGENCY.start({ state, realm })
+	const transition = STATE_GOVERNMENT.accede({
+		state,
+		realm,
+		provinces: STATE.getNationProvinces({ state, root: realm }),
+		rng,
+		knowledge: ECONOMY.realmKnowledge({ state, p: realm }),
+		elected: false,
+		previousHouse: deposed >= 0 ? state.people.persons.dynasty[deposed] : -1,
+	})
+	if (transition) STATE.reconcileGovernment({ state, realm, transition, rng })
 	CORONATION.hold({ state, realm, rng })
 	const overlord = STATE.diplomaticOverlord({ state, nation: realm })
 	if (
