@@ -1,11 +1,14 @@
-﻿import type { TideLock } from "@/model/celestial/orbit-body/types"
-import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
-	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
+import { GENERATION_PROGRESS } from "@/ui/genesis/generation/progress"
+import type {
+	CreateWorkerParams,
+	GenerationCallbacks,
+} from "@/ui/genesis/generation/types"
 
 export type GenerationParams = GenesisParams
 
@@ -102,57 +105,39 @@ export function loadImageAsGrayscale(
 	})
 }
 
-export interface GenerationCallbacks {
-	setGenerating: (v: boolean) => void
-	setGenerationProgress: (v: number | ((current: number) => number)) => void
-	setGenerationLabel: (v: string) => void
-	setSeed: (v: number) => void
-	setWorld: (v: SerializedGenesisWorld | null) => void
-	workerRef: React.MutableRefObject<Worker | null>
-	onHistoryStart: (journal: JournalTransaction[]) => void
-	onHistoryJournal: (journal: JournalTransaction[]) => void
-	onGenerationComplete?: () => void
-	onPathfindResult?: (result: {
-		pathRegions: Int32Array
-		distanceKm: number
-		landKm: number
-		seaKm: number
-		travelDays: number
-		reachable: boolean
-	}) => void
-}
-
-function createWorker(
-	callbacks: GenerationCallbacks,
-	onDone: (
-		message: GenesisWorkerResponse & { type: "done" },
-		worker: Worker,
-	) => void,
-	failLabel: string,
-): Worker {
+function createWorker({
+	callbacks,
+	onDone,
+	failLabel,
+	request,
+}: CreateWorkerParams): Worker {
 	callbacks.workerRef.current?.terminate()
 	const worker = new Worker(
 		new URL("../../../model/genesis.worker.ts", import.meta.url),
 		{ type: "module" },
 	)
 	callbacks.workerRef.current = worker
+	const progress = GENERATION_PROGRESS.create({
+		request,
+		setProgress: callbacks.setGenerationProgress,
+		isCurrent: () => callbacks.workerRef.current === worker,
+	})
 
 	worker.onmessage = (event: MessageEvent<GenesisWorkerResponse>) => {
+		if (callbacks.workerRef.current !== worker) return
 		const message = event.data
 		if (message.type === "progress") {
 			callbacks.setGenerationLabel(message.label)
-			callbacks.setGenerationProgress((current: number) =>
-				message.pct == null
-					? current
-					: Math.max(current, Math.min(100, message.pct)),
-			)
+			progress.update({ stage: message.stage, percent: message.pct })
 			return
 		}
 		if (message.type === "done") {
-			onDone(message, worker)
+			progress.complete(message.world.timings ?? [])
+			onDone(message)
 			return
 		}
 		if (message.type === "error") {
+			progress.stop()
 			console.error("Genesis worker failed", message.message, message.stack)
 			callbacks.setGenerationLabel(failLabel)
 			callbacks.setGenerating(false)
@@ -177,6 +162,7 @@ function createWorker(
 	}
 
 	worker.onerror = (event: ErrorEvent) => {
+		progress.stop()
 		const detail =
 			event.message ||
 			(event.error instanceof Error ? event.error.message : undefined) ||
@@ -257,9 +243,9 @@ export function generateWorld(
 
 	const request: GenesisWorkerRequest = { type: "generate", params }
 	requestAnimationFrame(() => {
-		const worker = createWorker(
+		const worker = createWorker({
 			callbacks,
-			(message, _w) => {
+			onDone: (message) => {
 				callbacks.setWorld(message.world)
 				callbacks.onHistoryStart(message.journal)
 				callbacks.setGenerationLabel("Done")
@@ -268,8 +254,9 @@ export function generateWorld(
 				callbacks.onGenerationComplete?.()
 				// Keep the worker alive to serve pathfind requests.
 			},
-			"Generation failed",
-		)
+			failLabel: "Generation failed",
+			request,
+		})
 		worker.postMessage(request)
 	})
 }
@@ -424,9 +411,9 @@ export function importHeightmap(
 		},
 	}
 	requestAnimationFrame(() => {
-		const worker = createWorker(
+		const worker = createWorker({
 			callbacks,
-			(message, _w) => {
+			onDone: (message) => {
 				callbacks.setWorld(message.world)
 				callbacks.onHistoryStart(message.journal)
 				callbacks.setGenerationLabel("Done")
@@ -435,8 +422,9 @@ export function importHeightmap(
 				callbacks.onGenerationComplete?.()
 				// Keep worker alive for simulation
 			},
-			"Import failed",
-		)
+			failLabel: "Import failed",
+			request,
+		})
 		const transfer = [grayscale.buffer]
 		if (coastlineMask) transfer.push(coastlineMask.mask.buffer)
 		if (lakeMask) transfer.push(lakeMask.mask.buffer)

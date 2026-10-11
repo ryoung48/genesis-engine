@@ -27,6 +27,7 @@ import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import { StageTiming } from "@/model/shared/timing/types"
 import type { RouteComputation } from "@/model/society/infrastructure/trade/routing/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
@@ -90,11 +91,6 @@ export interface GenesisParams {
 	seismologyTotalHeatingK?: number
 	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */
 	era?: SocietyEra
-}
-
-export interface StageTiming {
-	Stage: string
-	ms: string
 }
 
 export interface GenesisWorld {

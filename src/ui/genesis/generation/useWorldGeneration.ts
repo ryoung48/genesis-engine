@@ -21,13 +21,13 @@ import {
 	MonthlyRasterAsset,
 } from "@/ui/genesis/generation/earth-assets"
 import {
-	type GenerationCallbacks,
 	type GenerationParams,
 	generateWorld,
 	importHeightmap,
 	loadImageAsGrayscale,
 } from "@/ui/genesis/generation/generation"
 import { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
+import { type GenerationCallbacks } from "@/ui/genesis/generation/types"
 import type { WorldGenerationInput } from "@/ui/genesis/view/types"
 
 // Fits Earth's own SeismologyProfile.totalHeating to volcanism 1 (the prior

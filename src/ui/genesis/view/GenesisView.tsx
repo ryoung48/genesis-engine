@@ -9,8 +9,8 @@ import { WIND } from "@/model/climate/weather/wind"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
-import { STATE } from "@/model/history/sim/engine/state"
-import type { StageTiming } from "@/model/pipelines/types"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
+import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
@@ -19,7 +19,6 @@ import {
 	OverlayControls,
 } from "@/ui/genesis/controls/OverlayControls"
 import { SimulationControls } from "@/ui/genesis/controls/SimulationControls"
-import { PortedGalaxyView } from "@/ui/genesis/galaxy/view/PortedGalaxyView"
 import {
 	DEFAULT_WORLD_PARAMS,
 	VIEW_PREFS_STORAGE_KEY,
@@ -105,15 +104,16 @@ import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
 const NO_TITLE_BORDER_TIERS: readonly TitleBorderTier[] = []
 
+const PortedGalaxyView = React.lazy(() =>
+	import("@/ui/genesis/galaxy/view/PortedGalaxyView").then((module) => ({
+		default: module.PortedGalaxyView,
+	})),
+)
+
 export const GenesisView: React.FC<{
-	/** Scopes this instance's localStorage session/view-prefs entries so an
-	 * independently-mounted instance (e.g. a `/galaxy` route reusing this same
-	 * component for its system drill-in view) doesn't collide with the
-	 * default "/" instance. Omit for the original unnamespaced behavior. */
+	// [JUSTIFICATION] The default route uses the shared session without a namespace.
 	sessionNamespace?: string
-	/** Mounts straight into galaxy mode instead of the default globe/map view
-	 * -- used by the `/galaxy` route so its instance opens directly on the
-	 * galaxy-scale view rather than a Sol/Earth default. */
+	// [JUSTIFICATION] Only the galaxy route needs to override the default planet view.
 	initialGalaxyModeActive?: boolean
 }> = ({ sessionNamespace, initialGalaxyModeActive = false }) => {
 	// Refs
@@ -379,7 +379,7 @@ export const GenesisView: React.FC<{
 		setProceduralHistoryPlaying,
 	} = useProceduralHistory({ workerRef })
 	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
-	const simStartTimeMs = historyYearToTime(STATE.defaultStartYear)
+	const simStartTimeMs = historyYearToTime(STATE_CLOCK.defaultStartYear)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	// Earth-imported worlds scrub real Gregorian dates via history's own
 	// slider. selectedTimeMs tracks it so Social's population/culture/heritage/
@@ -1602,7 +1602,7 @@ export const GenesisView: React.FC<{
 		if (!proceduralReplayPlaying || world?.isEarthImport) return
 		const timer = window.setInterval(() => {
 			const next = Math.min(
-				history.selectedTimeMs + STATE.yearMs,
+				history.selectedTimeMs + STATE_CLOCK.yearMs,
 				history.maxTimeMs,
 			)
 			history.setSelectedTimeMs(next)
@@ -2421,7 +2421,9 @@ export const GenesisView: React.FC<{
 						galaxyModeActive ? "" : "invisible pointer-events-none"
 					}`}
 				>
-					<PortedGalaxyView onOpenSystem={handleOpenGalaxySystem} />
+					<React.Suspense fallback={<div role="status">Loading galaxy…</div>}>
+						<PortedGalaxyView onOpenSystem={handleOpenGalaxySystem} />
+					</React.Suspense>
 				</div>
 			)}
 		</div>

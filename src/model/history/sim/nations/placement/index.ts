@@ -8,10 +8,12 @@ import type {
 	MigrationWavePlacementMultiplierParams,
 	NationPlacementScoreParams,
 	ProvinceSeedDistanceParams,
+	SeedPlacementCandidate,
 	SelectSeedParams,
 	TargetSizeBiasParams,
 	WaterPlacementBonusParams,
 } from "@/model/history/sim/nations/placement/types"
+import { RNG } from "@/model/shared/random/rng"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
 const NOISE_FREQ = 4.0
@@ -28,12 +30,20 @@ const LARGE_NATION_CONTINENT_MIN_TARGET = 10
 
 const LARGE_NATION_CONTINENT_FULL_TARGET = 50
 
-const LARGE_NATION_WAVE_BIAS = 0.35
+const LARGE_NATION_WAVE_BIAS = 0.175
+
+const LARGE_NATION_HABITABILITY_REDUCTION = 0.5
 
 function largeNationSizeBias({ target }: TargetSizeBiasParams): number {
 	return GRAPH_PARTITION.clamp01(
 		(target - LARGE_NATION_CONTINENT_MIN_TARGET) /
 			(LARGE_NATION_CONTINENT_FULL_TARGET - LARGE_NATION_CONTINENT_MIN_TARGET),
+	)
+}
+
+function habitabilityPlacementWeight({ target }: TargetSizeBiasParams): number {
+	return (
+		1 - largeNationSizeBias({ target }) * LARGE_NATION_HABITABILITY_REDUCTION
 	)
 }
 
@@ -65,7 +75,7 @@ function nationPlacementScore({
 	target,
 }: NationPlacementScoreParams): number {
 	return (
-		habitability[province] +
+		habitability[province] * habitabilityPlacementWeight({ target }) +
 		waterPlacementBonus({ province, waterAccess, target }) +
 		continentPlacementBonus({ province, provinceContinent, target })
 	)
@@ -127,7 +137,9 @@ function bestClaim({
 		const noiseVal = noise.noise3D(nx, ny, nz)
 		const score =
 			(1 / (d + 0.1)) * (1 + NOISE_STRENGTH * noiseVal) +
-			habitability[candidate] * HABITABILITY_CLAIM_WEIGHT +
+			habitability[candidate] *
+				HABITABILITY_CLAIM_WEIGHT *
+				habitabilityPlacementWeight({ target }) +
 			waterPlacementBonus({ province: candidate, waterAccess, target }) *
 				WATER_CLAIM_WEIGHT +
 			sharedBorder * 0.05 +
@@ -164,6 +176,7 @@ function claimProvinceDynamic({
 }
 
 function selectSeed({
+	seed,
 	target,
 	active,
 	assignment,
@@ -177,10 +190,8 @@ function selectSeed({
 	adjOffset,
 	adjList,
 }: SelectSeedParams): number {
-	let best = -1
-	let bestScore = -Infinity
-	let fallback = -1
-	let fallbackScore = -Infinity
+	const candidates: SeedPlacementCandidate[] = []
+	const fallback: SeedPlacementCandidate[] = []
 	for (let p = 0; p < assignment.length; p++) {
 		if (!active[p] || assignment[p] >= 0) continue
 		const cid = componentId[p]
@@ -211,16 +222,15 @@ function selectSeed({
 				blockedPenalty +
 			expansion +
 			sizeFactor
-		if (componentSize >= target && score > bestScore) {
-			bestScore = score
-			best = p
-		}
-		if (score > fallbackScore) {
-			fallbackScore = score
-			fallback = p
-		}
+		const candidate = { v: p, w: score }
+		if (componentSize >= target) candidates.push(candidate)
+		else fallback.push(candidate)
 	}
-	return best >= 0 ? best : fallback
+	return (
+		RNG.createRng({ seed }).weightedChoice(
+			candidates.length > 0 ? candidates : fallback,
+		) ?? -1
+	)
 }
 
 function provinceSeedDistance({

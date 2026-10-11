@@ -15,11 +15,6 @@ export interface CoastlineControllerDeps {
 	updateOverlayVisibility: () => void
 }
 
-/** Owns the coastline overlay -- exact Natural Earth vector data for a real
- * "Load Earth" world, or a coastline derived from the mesh's own land/ocean
- * boundary for a procedurally generated one (see deriveCoastlineFromWorld).
- * Computed lazily (only when toggled on) and cached per world instance. See
- * plans/genesis-scene-controller-split.md. */
 export function createCoastlineController(
 	ctx: GenesisContext,
 	deps: CoastlineControllerDeps,

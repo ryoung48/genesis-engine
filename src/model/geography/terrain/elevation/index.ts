@@ -46,6 +46,7 @@ import type {
 import { VOLCANISM } from "@/model/geography/terrain/volcanism"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { RNG } from "@/model/shared/random/rng"
+import { TIMING } from "@/model/shared/timing"
 
 function assignDistanceField({
 	mesh,
@@ -1177,9 +1178,10 @@ function _computeTectonicBfsFields({
 		r_isOcean,
 		scaleFactor,
 	})
-	timing?.push({
-		Stage: "Coast boundary + rift BFS",
-		ms: (performance.now() - coastAndRiftStart).toFixed(1),
+	TIMING.record({
+		stage: "Coast boundary + rift BFS",
+		timings: timing,
+		startedAt: coastAndRiftStart,
 	})
 
 	// Mid-ocean ridge / fracture zone / back-arc / coast boundary BFS
@@ -1219,9 +1221,10 @@ function _computeTectonicBfsFields({
 			maxStress,
 			scaleFactor,
 		})
-	timing?.push({
-		Stage: "Ridge/fracture/back-arc BFS",
-		ms: (performance.now() - ridgeAndBackArcStart).toFixed(1),
+	TIMING.record({
+		stage: "Ridge/fracture/back-arc BFS",
+		timings: timing,
+		startedAt: ridgeAndBackArcStart,
 	})
 
 	return {
@@ -1331,9 +1334,10 @@ function _runMainElevationLoop({
 			})
 		}
 	}
-	timing?.push({
-		Stage: "Main elevation loop (land+ocean)",
-		ms: (performance.now() - mainElevationLoopStart).toFixed(1),
+	TIMING.record({
+		stage: "Main elevation loop (land+ocean)",
+		timings: timing,
+		startedAt: mainElevationLoopStart,
 	})
 }
 
@@ -1373,9 +1377,10 @@ function _applyPostProcessingArcs({
 			markFeature,
 		})
 	}
-	timing?.push({
-		Stage: "Island arcs",
-		ms: (performance.now() - islandArcsStart).toFixed(1),
+	TIMING.record({
+		stage: "Island arcs",
+		timings: timing,
+		startedAt: islandArcsStart,
 	})
 
 	const volcanicArcsStart = performance.now()
@@ -1388,9 +1393,10 @@ function _applyPostProcessingArcs({
 		volcanism,
 		markFeature,
 	})
-	timing?.push({
-		Stage: "Volcanic arcs",
-		ms: (performance.now() - volcanicArcsStart).toFixed(1),
+	TIMING.record({
+		stage: "Volcanic arcs",
+		timings: timing,
+		startedAt: volcanicArcsStart,
 	})
 }
 
@@ -1581,9 +1587,10 @@ function blendElevation({
 		coastal,
 		markFeature,
 	})
-	timing?.push({
-		Stage: "Coastal roughening",
-		ms: (performance.now() - coastalRougheningStart).toFixed(1),
+	TIMING.record({
+		stage: "Coastal roughening",
+		timings: timing,
+		startedAt: coastalRougheningStart,
 	})
 
 	_applyPostProcessingArcs({

@@ -1,8 +1,8 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
-import type { StageTiming } from "@/model/pipelines/types"
 import type { SharedRng } from "@/model/shared/random/rng"
+import type { StageTiming } from "@/model/shared/timing/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
@@ -21,12 +21,6 @@ export interface ProcessEventsUntilParams {
 	targetTime: number
 	rng: SharedRng
 	validate: boolean
-}
-
-export interface TimedParams<T> {
-	label: string
-	timings: StageTiming[] | undefined
-	fn: () => T
 }
 
 export interface SimulateUntilParams {

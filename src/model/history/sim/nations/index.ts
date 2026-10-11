@@ -25,7 +25,6 @@ import type {
 	GenesisNationHierarchy,
 	GenesisOrganization,
 	GenesisOrganizationMember,
-	GenesisProvinces,
 	GovernmentMix,
 	OrganizationTitle,
 } from "@/model/society/types"
@@ -121,6 +120,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 			adjList: provinces.adjList,
 		})
 		const seedProvince = PLACEMENT.selectSeed({
+			seed: params.seed + targetIdx,
 			target,
 			active,
 			assignment,
@@ -421,14 +421,6 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		let wi = adjOffset[i]
 		for (const nb of adjSets[i]) adjList[wi++] = nb
 	}
-
-	printNationDistribution({
-		actualSizes: size,
-		targetProvinceMass: plan.targetProvinceMass,
-		targetNationCount: plan.targetNationCount,
-		buckets: params.nationBuckets,
-	})
-
 	const nationMembers = COLORING.groupByNation({
 		assignment,
 		nationCount,
@@ -635,18 +627,6 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				leadNationIndex: organizationPlan.leadNationIndex,
 				members,
 			})
-			printOrganizationSummary({
-				leadNationIndex: organizationPlan.leadNationIndex,
-				members,
-				sizes,
-				seeds,
-				provinces,
-				r_xyz,
-			})
-		} else if (params.buildImperialPatchwork) {
-			console.log(
-				"[NATIONS] Imperial Patchwork: skipped (no nation was large/settled enough to shatter)",
-			)
 		}
 		if (tradeLeaguePlans.length > 0) {
 			for (let i = 0; i < tradeLeaguePlans.length; i++) {
@@ -672,24 +652,8 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 					leadNationIndex: tradeLeaguePlan.leadNationIndex,
 					members,
 				})
-				console.log(
-					`[NATIONS] Trade League ${i + 1}/${tradeLeaguePlans.length}: ${members.length} members, lead nation #${tradeLeaguePlan.leadNationIndex} (${sizes[tradeLeaguePlan.leadNationIndex]} provinces)`,
-				)
 			}
-			if (tradeLeaguePlans.length < TRADE_LEAGUE_COUNT) {
-				console.log(
-					`[NATIONS] Trade League: only placed ${tradeLeaguePlans.length}/${TRADE_LEAGUE_COUNT} (no further coastal, non-tribal nation was large enough to shatter)`,
-				)
-			}
-		} else if (params.buildTradeLeague) {
-			console.log(
-				"[NATIONS] Trade League: skipped (no coastal, non-tribal nation was large enough to shatter)",
-			)
 		}
-	} else if (params.buildImperialPatchwork || params.buildTradeLeague) {
-		console.log(
-			"[NATIONS] Imperial Patchwork / Trade League: skipped (governmentMix not supplied)",
-		)
 	}
 
 	return {
@@ -823,72 +787,6 @@ function resolveOrganizationTitles(params: {
 		}
 		return { nationIndex: nation, title }
 	})
-}
-
-/** Console table confirming an Imperial Patchwork actually fired, and what
- * it produced -- there's otherwise no visible signal that organization
- * generation ran at all. */
-function printOrganizationSummary(params: {
-	leadNationIndex: number
-	members: GenesisOrganizationMember[]
-	sizes: number[]
-	seeds: number[]
-	provinces: GenesisProvinces
-	r_xyz: Float32Array
-}) {
-	const { leadNationIndex, members, sizes, seeds, provinces, r_xyz } = params
-	const titleCounts = new Map<OrganizationTitle, number>()
-	for (const member of members) {
-		titleCounts.set(member.title, (titleCounts.get(member.title) ?? 0) + 1)
-	}
-	const capitalProvince = seeds[leadNationIndex]
-	const region = provinces.seeds[capitalProvince]
-	const x = r_xyz[3 * region]
-	const y = r_xyz[3 * region + 1]
-	const z = r_xyz[3 * region + 2]
-	const latDeg = (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
-	const lonDeg = (Math.atan2(y, x) * 180) / Math.PI
-	console.log(
-		`[NATIONS] Imperial Patchwork: ${members.length} members, emperor nation #${leadNationIndex} (${sizes[leadNationIndex]} provinces), capital province #${capitalProvince} at lat ${latDeg.toFixed(1)}, lon ${lonDeg.toFixed(1)}`,
-	)
-	console.table(
-		Array.from(titleCounts.entries()).map(([title, count]) => ({
-			title,
-			count,
-		})),
-	)
-}
-
-function printNationDistribution(params: {
-	actualSizes: Int32Array
-	targetProvinceMass: number[]
-	targetNationCount: number[]
-	buckets?: [number, number][]
-}) {
-	const { actualSizes, targetProvinceMass, targetNationCount } = params
-	const buckets = params.buckets ?? ERAS.nationBuckets
-	const totalProvinceMass = actualSizes.reduce((sum, value) => sum + value, 0)
-	const rows = buckets.map(([min, max], idx) => {
-		let nationCount = 0
-		let provinceMass = 0
-		for (let i = 0; i < actualSizes.length; i++) {
-			const size = actualSizes[i]
-			if (size >= min && size <= max) {
-				nationCount++
-				provinceMass += size
-			}
-		}
-		return {
-			bucket: `${min}-${max}`,
-			targetProvinceMass: targetProvinceMass[idx] ?? 0,
-			actualProvinceMass: provinceMass,
-			actualProvincePct: `${((provinceMass / Math.max(1, totalProvinceMass)) * 100).toFixed(1)}%`,
-			targetNationCount: targetNationCount[idx] ?? 0,
-			actualNationCount: nationCount,
-		}
-	})
-
-	console.table(rows)
 }
 
 function integerMass({ total, weights }: IntegerMassParams): number[] {

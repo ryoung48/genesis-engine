@@ -46,7 +46,10 @@ export function setCameraFarForMaxDistance(
 export function buildGenesisSceneSetup(
 	canvas: HTMLCanvasElement,
 ): GenesisContext {
-	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+	const renderer = new THREE.WebGLRenderer({
+		canvas,
+		antialias: true,
+	})
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 	renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
 	// Body textures are sampled at extremely grazing angles near a sphere's

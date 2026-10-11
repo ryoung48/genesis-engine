@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { PASTA } from "@/model/climate/classification/pasta"
@@ -10,6 +10,7 @@ import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
+import { TIMING } from "@/model/shared/timing"
 import { ERAS } from "@/model/society/eras"
 import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
@@ -250,9 +251,13 @@ describe("full world smoke generation", () => {
 		}
 		expect(ROUTES.computeRoutes(routeInputs)).toEqual(world.routes)
 		expect(computeWorldFingerprint(world)).toBe(fingerprint)
-		expect(world.timings.some((timing) => timing.Stage === "routes")).toBe(true)
 		expect(
-			world.timings.some((timing) => timing.Stage.startsWith("computeRoutes:")),
+			TIMING.flatten(world.timings).some((timing) => timing.Stage === "routes"),
+		).toBe(true)
+		expect(
+			TIMING.flatten(world.timings).some((timing) =>
+				timing.Stage.startsWith("computeRoutes:"),
+			),
 		).toBe(true)
 
 		console.info("Smoke params", {
@@ -436,7 +441,7 @@ describe("full world smoke generation", () => {
 		})
 		expect(world.routes).toBeNull()
 		expect(
-			world.timings.some(
+			TIMING.flatten(world.timings).some(
 				(timing) =>
 					timing.Stage === "routes" ||
 					timing.Stage.startsWith("computeRoutes:"),

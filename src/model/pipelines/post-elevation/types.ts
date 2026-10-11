@@ -26,11 +26,8 @@ export type ApplyOceanCurrentsToClimateParams = {
 	isLocked: boolean
 }
 
-import type {
-	GenesisParams,
-	GenesisWorld,
-	StageTiming,
-} from "@/model/pipelines/types"
+import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
+import type { StageTiming } from "@/model/shared/timing/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type { GenesisProvinces } from "@/model/society/types"

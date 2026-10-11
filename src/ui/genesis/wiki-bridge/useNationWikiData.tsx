@@ -8,7 +8,7 @@ import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-cate
 import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import type { HistoryComment } from "@/model/history/record/types"
-import { yearMs } from "@/model/history/sim/engine/state/time"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
@@ -447,7 +447,8 @@ export function useNationWikiData(
 						regentRelation ? `(${regentRelation})` : null,
 						String(
 							Math.floor(
-								(history.selectedTimeMs - regentRow.birthTimeMs) / yearMs,
+								(history.selectedTimeMs - regentRow.birthTimeMs) /
+									STATE_CLOCK.yearMs,
 							),
 						),
 						regentRow.sex === 1 ? "♀" : "♂",

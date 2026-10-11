@@ -24,22 +24,13 @@ import type {
 	ProcessEventsUntilParams,
 	SeedColonyRelationsParams,
 	SimulateUntilParams,
-	TimedParams,
 } from "@/model/history/sim/engine/simulation/types"
 import { InitHistoryParams } from "@/model/history/sim/engine/simulation/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import { TIMING } from "@/model/shared/timing"
 import { UNITS } from "@/model/shared/units"
 import { URBANIZATION } from "@/model/society/urbanization"
-
-function timed<T>({ label, timings, fn }: TimedParams<T>): T {
-	const t0 = performance.now()
-	const result = fn()
-	if (timings) {
-		timings.push({ Stage: label, ms: (performance.now() - t0).toFixed(1) })
-	}
-	return result
-}
 
 function seedColonyRelations({
 	state,
@@ -65,8 +56,8 @@ function seedColonyRelations({
 function initHistory(params: InitHistoryParams): HistoryState {
 	const startYear = params.startYear ?? STATE.defaultStartYear
 	const rng = HISTORY_RNG.createHistoryRng(params.seed + 99999)
-	const state = timed({
-		label: "initHistory:createHistoryState",
+	const state = TIMING.measure({
+		stage: "initHistory:createHistoryState",
 		timings: params.timings,
 		fn: () =>
 			STATE.createHistoryState({
@@ -106,8 +97,8 @@ function initHistory(params: InitHistoryParams): HistoryState {
 
 	// Population runs first: diplomacy and war seeding compare revenue and
 	// armies, which read development, knowledge and the seeded economy.
-	timed({
-		label: "initHistory:initPopulation",
+	TIMING.measure({
+		stage: "initHistory:initPopulation",
 		timings: params.timings,
 		fn: () =>
 			POPULATION.initPopulation({
@@ -132,8 +123,8 @@ function initHistory(params: InitHistoryParams): HistoryState {
 		params.regionProvince &&
 		params.regionIsLand
 	)
-		timed({
-			label: "initHistory:initRoads",
+		TIMING.measure({
+			stage: "initHistory:initRoads",
 			timings: params.timings,
 			fn: () =>
 				ROADS.init({
@@ -164,44 +155,44 @@ function initHistory(params: InitHistoryParams): HistoryState {
 					},
 				}),
 		})
-	timed({
-		label: "initHistory:initEconomy",
+	TIMING.measure({
+		stage: "initHistory:initEconomy",
 		timings: params.timings,
 		fn: () => ECONOMY.initEconomy({ state }),
 	})
-	timed({
-		label: "initHistory:initMilitary",
+	TIMING.measure({
+		stage: "initHistory:initMilitary",
 		timings: params.timings,
 		fn: () => MILITARY.initialize({ state }),
 	})
-	timed({
-		label: "initHistory:initDiplomacy",
+	TIMING.measure({
+		stage: "initHistory:initDiplomacy",
 		timings: params.timings,
 		fn: () => DIPLOMACY.initDiplomacy({ state, rng }),
 	})
 	// Districts are granted before war seeding: only districts can rebel.
-	timed({
-		label: "initHistory:initPeople",
+	TIMING.measure({
+		stage: "initHistory:initPeople",
 		timings: params.timings,
 		fn: () => PEOPLE_EVENTS.init({ state, seed: params.seed }),
 	})
-	timed({
-		label: "initHistory:initWar",
+	TIMING.measure({
+		stage: "initHistory:initWar",
 		timings: params.timings,
 		fn: () => WAR.initWar({ state, rng }),
 	})
-	timed({
-		label: "initHistory:initSuccession",
+	TIMING.measure({
+		stage: "initHistory:initSuccession",
 		timings: params.timings,
 		fn: () => SUCCESSION.initSuccession({ state }),
 	})
-	timed({
-		label: "initHistory:initTax",
+	TIMING.measure({
+		stage: "initHistory:initTax",
 		timings: params.timings,
 		fn: () => TAX.initTax({ state }),
 	})
-	timed({
-		label: "initHistory:initRaid",
+	TIMING.measure({
+		stage: "initHistory:initRaid",
 		timings: params.timings,
 		fn: () => RAID.initRaid({ state, rng }),
 	})

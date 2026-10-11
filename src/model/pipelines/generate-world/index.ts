@@ -7,7 +7,6 @@ import type {
 	BoundaryInfo,
 	DistanceFields,
 	GenesisTerrainFeatures,
-	TectonicPlate,
 } from "@/model/geography/tectonics/types"
 import { CRATERS } from "@/model/geography/terrain/craters"
 import { ELEVATION } from "@/model/geography/terrain/elevation"
@@ -16,36 +15,24 @@ import { HOTSPOTS } from "@/model/geography/terrain/hotspots"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MESH } from "@/model/mesh"
-import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
 import type {
 	ApplyPeakCompressionParams,
 	GenerateGenesisWorldParams,
-	ProgressFn,
+	RunActivePathParams,
 	SummarizeHotspotExposureParams,
 	TectonicPathResult,
 } from "@/model/pipelines/generate-world/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
-import type {
-	GenesisParams,
-	GenesisWorld,
-	StageTiming,
-} from "@/model/pipelines/types"
+import type { GenesisWorld } from "@/model/pipelines/types"
 import { STATS } from "@/model/shared/math/stats"
 import { PARALLEL } from "@/model/shared/parallel"
 import { RNG } from "@/model/shared/random/rng"
+import { TIMING } from "@/model/shared/timing"
+import type { StageTiming } from "@/model/shared/timing/types"
 import { UNITS } from "@/model/shared/units"
 import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { URBANIZATION } from "@/model/society/urbanization"
-
-function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
-	console.time(label)
-	const t0 = performance.now()
-	const result = fn()
-	timings.push({ Stage: label, ms: (performance.now() - t0).toFixed(1) })
-	console.timeEnd(label)
-	return result
-}
 
 function applyPeakCompression({ elev, N }: ApplyPeakCompressionParams): void {
 	for (let r = 0; r < N; r++) {
@@ -85,19 +72,19 @@ function summarizeHotspotExposure({
 	}
 }
 
-function runActivePath(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plates: TectonicPlate[],
-	plateIds: number[],
-	coarse: ReturnType<typeof COARSE_PLATES.generateCoarsePlates>,
-	params: GenesisParams,
-	volcanism: number,
-	plateAssignment: Int32Array,
-	pipelineTiming: StageTiming[],
-	elevationTiming: StageTiming[],
-	onProgress?: ProgressFn,
-): TectonicPathResult {
+function runActivePath({
+	mesh,
+	r_plate,
+	plates,
+	plateIds,
+	coarse,
+	params,
+	volcanism,
+	plateAssignment,
+	pipelineTiming,
+	elevationTiming,
+	onProgress,
+}: RunActivePathParams): TectonicPathResult {
 	// 5. Plate density (ocean: 3.0–3.5, land: 2.4–2.9)
 	const plateDensity = new Map<number, number>()
 	const densityRng = RNG.createRng({ seed: params.seed + 777 })
@@ -127,87 +114,118 @@ function runActivePath(
 	// 6. Build super plates (skip if < 8 plates)
 	let superPlateData = null
 	if (params.numPlates >= 8) {
-		superPlateData = withTiming("super-plates", pipelineTiming, () =>
-			SUPER_PLATES.buildSuperPlates({
+		superPlateData = TIMING.measure({
+			stage: "super-plates",
+			timings: pipelineTiming,
+			fn: () =>
+				SUPER_PLATES.buildSuperPlates({
+					mesh,
+					r_plate,
+					plateSeeds: plateIds,
+					plateVec: coarse.coarsePlateVec,
+					plateIsOcean: coarse.coarsePlateIsOcean,
+					plateDensity,
+				}),
+		})
+		onProgress?.("super-plates", 12)
+	}
+
+	// 7. Collision + stress (dual-layer with super plates)
+	const collisionTiming: StageTiming[] = []
+	const boundary = TIMING.measure({
+		stage: "collision",
+		timings: pipelineTiming,
+		fn: () =>
+			COLLISION.classifyBoundaries({
 				mesh,
 				r_plate,
 				plateSeeds: plateIds,
 				plateVec: coarse.coarsePlateVec,
 				plateIsOcean: coarse.coarsePlateIsOcean,
 				plateDensity,
+				superPlateData,
+				seed: params.seed,
+				spread: 5,
+				timing: collisionTiming,
 			}),
-		)
-		onProgress?.("super-plates", 12)
-	}
-
-	// 7. Collision + stress (dual-layer with super plates)
-	const boundary = withTiming("collision", pipelineTiming, () =>
-		COLLISION.classifyBoundaries({
-			mesh,
-			r_plate,
-			plateSeeds: plateIds,
-			plateVec: coarse.coarsePlateVec,
-			plateIsOcean: coarse.coarsePlateIsOcean,
-			plateDensity,
-			superPlateData,
-			seed: params.seed,
-			spread: 5,
-			timing: elevationTiming,
-		}),
-	)
+	})
 	onProgress?.("collision", 14)
 
+	TIMING.attach({
+		timings: pipelineTiming,
+		stage: "collision",
+		children: collisionTiming,
+	})
+
 	// 8. Distance fields
-	const distFields = withTiming("distance-fields", pipelineTiming, () =>
-		ELEVATION.computeDistanceFields({
-			mesh,
-			r_plate,
-			plateIsOcean: coarse.coarsePlateIsOcean,
-			boundary,
-			seed: params.seed,
-		}),
-	)
+	const distFields = TIMING.measure({
+		stage: "distance-fields",
+		timings: pipelineTiming,
+		fn: () =>
+			ELEVATION.computeDistanceFields({
+				mesh,
+				r_plate,
+				plateIsOcean: coarse.coarsePlateIsOcean,
+				boundary,
+				seed: params.seed,
+			}),
+	})
 	onProgress?.("distance-fields", 16)
 
 	// 9. Elevation assignment
-	const blendResult = withTiming("elevation", pipelineTiming, () =>
-		ELEVATION.blendElevation({
-			mesh,
-			r_plate,
-			plateVec: coarse.coarsePlateVec,
-			plateIsOcean: coarse.coarsePlateIsOcean,
-			distFields,
-			boundary,
-			roughness: params.roughness,
-			volcanism,
-			seed: params.seed,
-			timing: elevationTiming,
-		}),
-	)
+	const blendResult = TIMING.measure({
+		stage: "elevation",
+		timings: pipelineTiming,
+		fn: () =>
+			ELEVATION.blendElevation({
+				mesh,
+				r_plate,
+				plateVec: coarse.coarsePlateVec,
+				plateIsOcean: coarse.coarsePlateIsOcean,
+				distFields,
+				boundary,
+				roughness: params.roughness,
+				volcanism,
+				seed: params.seed,
+				timing: elevationTiming,
+			}),
+	})
+	TIMING.attach({
+		timings: pipelineTiming,
+		stage: "elevation",
+		children: elevationTiming,
+	})
 	const { elevation, terrainFeatures } = blendResult
 	onProgress?.("elevation", 26)
 
 	// 10. Hotspot volcanism
-	const r_hotspot = withTiming("hotspots", pipelineTiming, () =>
-		volcanism <= 0
-			? new Float32Array(mesh.numRegions)
-			: HOTSPOTS.applyHotspots({
-					mesh,
-					plates,
-					plateAssignment,
-					elevation,
-					mantleUpwelling: r_mantleUpwelling,
-					terrainFeatures,
-					seed: params.seed,
-					volcanism,
-				}),
-	)
+	const r_hotspot = TIMING.measure({
+		stage: "hotspots",
+		timings: pipelineTiming,
+		fn: () =>
+			volcanism <= 0
+				? new Float32Array(mesh.numRegions)
+				: HOTSPOTS.applyHotspots({
+						mesh,
+						plates,
+						plateAssignment,
+						elevation,
+						mantleUpwelling: r_mantleUpwelling,
+						terrainFeatures,
+						seed: params.seed,
+						volcanism,
+					}),
+	})
 	clampHotspots(r_hotspot)
 	onProgress?.("hotspots", 29)
 
 	// 11. Peak compression (Math.pow(elev, 0.92) for positive elevations)
-	withTiming("peak-compression", pipelineTiming, () => {
-		applyPeakCompression({ elev: elevation, N: mesh.numRegions })
+	TIMING.measure({
+		stage: "peak-compression",
+		timings: pipelineTiming,
+		fn: () => {
+			applyPeakCompression({ elev: elevation, N: mesh.numRegions })
+		},
 	})
 	onProgress?.("peak-compression", 29)
 
@@ -225,19 +243,22 @@ function generateGenesisWorld({
 	params,
 	onProgress,
 }: GenerateGenesisWorldParams): GenesisWorld {
+	const startedAt = performance.now()
 	PARALLEL.warm()
 	const rng = RNG.createRng({ seed: params.seed })
 	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []
 	const elevationTiming: StageTiming[] = []
 	const postTiming: StageTiming[] = []
-	console.time("total")
 	onProgress?.("Building sphere mesh...", 5)
 
 	// 1. Build hi-res sphere mesh
-	const mesh = withTiming("mesh", pipelineTiming, () =>
-		MESH.buildSphereMesh({ n: params.numPoints, jitter: params.jitter, rng }),
-	)
+	const mesh = TIMING.measure({
+		stage: "mesh",
+		timings: pipelineTiming,
+		fn: () =>
+			MESH.buildSphereMesh({ n: params.numPoints, jitter: params.jitter, rng }),
+	})
 	onProgress?.("mesh", 3)
 
 	// Mutable state for the active plate tectonics pipeline
@@ -251,38 +272,48 @@ function generateGenesisWorld({
 
 	// 2. Generate coarse plates on fixed 20K mesh
 	onProgress?.("coarse-plates", 5)
-	const coarse = withTiming("coarse-plates", pipelineTiming, () =>
-		COARSE_PLATES.generateCoarsePlates({
-			seed: params.seed,
-			numPlates: params.numPlates,
-			landDistribution: params.landDistribution,
-			continentSizeVariety: params.continentSizeVariety,
-			landCoverage: params.landCoverage,
-		}),
-	)
+	const coarse = TIMING.measure({
+		stage: "coarse-plates",
+		timings: pipelineTiming,
+		fn: () =>
+			COARSE_PLATES.generateCoarsePlates({
+				seed: params.seed,
+				numPlates: params.numPlates,
+				landDistribution: params.landDistribution,
+				continentSizeVariety: params.continentSizeVariety,
+				landCoverage: params.landCoverage,
+			}),
+	})
 
 	// 3. Project coarse plates → hi-res mesh with FBM noise perturbation
 	onProgress?.("project", 11)
-	const r_plate = withTiming("project", pipelineTiming, () =>
-		COARSE_PLATES.projectCoarsePlates({
-			mesh,
-			coarseMesh: coarse.coarseMesh,
-			coarse_r_plate: coarse.coarse_r_plate,
-			seed: params.seed,
-			numPlates: params.numPlates,
-		}),
-	)
+	const r_plate = TIMING.measure({
+		stage: "project",
+		timings: pipelineTiming,
+		fn: () =>
+			COARSE_PLATES.projectCoarsePlates({
+				mesh,
+				coarseMesh: coarse.coarseMesh,
+				coarse_r_plate: coarse.coarse_r_plate,
+				seed: params.seed,
+				numPlates: params.numPlates,
+			}),
+	})
 
 	// 4. Smooth projected boundaries + reconnect fragments
 	const plateIds = Array.from(coarse.coarsePlateSeeds)
 	onProgress?.("smooth-plates", 12)
-	withTiming("smooth-plates", pipelineTiming, () => {
-		PLATES.smoothAndReconnectPlates({
-			mesh,
-			r_plate,
-			plateSeeds: plateIds,
-			numPasses: 3,
-		})
+	TIMING.measure({
+		stage: "smooth-plates",
+		timings: pipelineTiming,
+		fn: () => {
+			PLATES.smoothAndReconnectPlates({
+				mesh,
+				r_plate,
+				plateSeeds: plateIds,
+				numPasses: 3,
+			})
+		},
 	})
 
 	// Build TectonicPlate[] and plateAssignment
@@ -318,7 +349,7 @@ function generateGenesisWorld({
 		distFields,
 		r_hotspot,
 		r_mantleUpwelling,
-	} = runActivePath(
+	} = runActivePath({
 		mesh,
 		r_plate,
 		plates,
@@ -330,125 +361,134 @@ function generateGenesisWorld({
 		pipelineTiming,
 		elevationTiming,
 		onProgress,
-	))
+	}))
 
 	// 12. Terrain post-processing (genesis order)
-	withTiming("post", pipelineTiming, () => {
-		// Terrain warp — first, before ocean detection or smoothing
-		if (params.terrainWarp > 0) {
-			const postStageStart = performance.now()
-			EROSION.warpTerrain({
-				mesh,
-				elev: elevation,
-				seed: params.seed,
-				strength: params.terrainWarp,
-				r_hotspot,
-			})
-			postTiming.push({
-				Stage: `Terrain warp (strength=${params.terrainWarp.toFixed(2)})`,
-				ms: (performance.now() - postStageStart).toFixed(1),
-			})
-		}
-
-		// Build ocean mask from current elevation (after warp)
-		const ocean = new Uint8Array(mesh.numRegions)
-		for (let r = 0; r < mesh.numRegions; r++) {
-			if (elevation[r] <= 0) ocean[r] = 1
-		}
-
-		// Bilateral smoothing
-		if (params.smoothing > 0) {
-			const smoothIters = Math.round(1 + params.smoothing * 4)
-			const smoothStr = 0.2 + params.smoothing * 0.5
-			const postStageStart = performance.now()
-			EROSION.smoothElevation({
-				mesh,
-				elev: elevation,
-				r_isOcean: ocean,
-				iterations: smoothIters,
-				strength: smoothStr,
-			})
-			postTiming.push({
-				Stage: `Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`,
-				ms: (performance.now() - postStageStart).toFixed(1),
-			})
-		}
-
-		// Composite erosion (hydraulic + thermal + glacial interleaved)
-		const gIters = Math.round(params.glacialErosion * 10)
-		if (
-			params.hydraulicErosion > 0 ||
-			params.thermalErosion > 0 ||
-			gIters > 0
-		) {
-			const hIters = Math.round(params.hydraulicErosion * 20)
-			const hK = params.hydraulicErosion * 0.0006
-			const tIters = Math.round(params.thermalErosion * 10)
-			const talusSlope = 1.2 - params.thermalErosion * 0.4
-			const kThermal = params.thermalErosion * 0.15
-			const postStageStart = performance.now()
-			EROSION.erodeComposite({
-				mesh,
-				elev: elevation,
-				r_isOcean: ocean,
-				hIters,
-				K: hK,
-				m: 0.5,
-				dt: 1.0,
-				tIters,
-				talusSlope,
-				kThermal,
-				gIters,
-				glacialStrength: params.glacialErosion,
-			})
-			postTiming.push({
-				Stage: `Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`,
-				ms: (performance.now() - postStageStart).toFixed(1),
-			})
-		}
-
-		// Ridge sharpening
-		if (params.ridgeSharpening > 0) {
-			const rsIters = Math.round(1 + params.ridgeSharpening * 3)
-			const rsStr = params.ridgeSharpening * 0.08
-			const postStageStart = performance.now()
-			EROSION.sharpenRidges({
-				mesh,
-				elev: elevation,
-				r_isOcean: ocean,
-				iterations: rsIters,
-				strength: rsStr,
-			})
-			postTiming.push({
-				Stage: `Ridge sharpening (${rsIters} iters)`,
-				ms: (performance.now() - postStageStart).toFixed(1),
-			})
-		}
-
-		// Always-on soil creep
-		const postStageStart = performance.now()
-		EROSION.applySoilCreep({
-			mesh,
-			elev: elevation,
-			r_isOcean: ocean,
-			iterations: 3,
-			strength: 0.1125,
-		})
-		postTiming.push({
-			Stage: "Soil creep (3 iters)",
-			ms: (performance.now() - postStageStart).toFixed(1),
-		})
-
-		// Honor exact coverage extremes after all terrain shaping.
-		if (params.landCoverage <= 0 && volcanism <= 0) {
-			for (let r = 0; r < mesh.numRegions; r++) {
-				elevation[r] = Math.min(elevation[r], -0.02)
+	TIMING.measure({
+		stage: "post",
+		timings: pipelineTiming,
+		fn: () => {
+			// Terrain warp — first, before ocean detection or smoothing
+			if (params.terrainWarp > 0) {
+				const postStageStart = performance.now()
+				EROSION.warpTerrain({
+					mesh,
+					elev: elevation,
+					seed: params.seed,
+					strength: params.terrainWarp,
+					r_hotspot,
+				})
+				TIMING.record({
+					stage: `Terrain warp (strength=${params.terrainWarp.toFixed(2)})`,
+					timings: postTiming,
+					startedAt: postStageStart,
+				})
 			}
-		} else if (params.landCoverage >= 1) {
+
+			// Build ocean mask from current elevation (after warp)
+			const ocean = new Uint8Array(mesh.numRegions)
 			for (let r = 0; r < mesh.numRegions; r++) {
-				elevation[r] = Math.max(elevation[r], 0.02)
+				if (elevation[r] <= 0) ocean[r] = 1
 			}
-		}
+
+			// Bilateral smoothing
+			if (params.smoothing > 0) {
+				const smoothIters = Math.round(1 + params.smoothing * 4)
+				const smoothStr = 0.2 + params.smoothing * 0.5
+				const postStageStart = performance.now()
+				EROSION.smoothElevation({
+					mesh,
+					elev: elevation,
+					r_isOcean: ocean,
+					iterations: smoothIters,
+					strength: smoothStr,
+				})
+				TIMING.record({
+					stage: `Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`,
+					timings: postTiming,
+					startedAt: postStageStart,
+				})
+			}
+
+			// Composite erosion (hydraulic + thermal + glacial interleaved)
+			const gIters = Math.round(params.glacialErosion * 10)
+			if (
+				params.hydraulicErosion > 0 ||
+				params.thermalErosion > 0 ||
+				gIters > 0
+			) {
+				const hIters = Math.round(params.hydraulicErosion * 20)
+				const hK = params.hydraulicErosion * 0.0006
+				const tIters = Math.round(params.thermalErosion * 10)
+				const talusSlope = 1.2 - params.thermalErosion * 0.4
+				const kThermal = params.thermalErosion * 0.15
+				const postStageStart = performance.now()
+				EROSION.erodeComposite({
+					mesh,
+					elev: elevation,
+					r_isOcean: ocean,
+					hIters,
+					K: hK,
+					m: 0.5,
+					dt: 1.0,
+					tIters,
+					talusSlope,
+					kThermal,
+					gIters,
+					glacialStrength: params.glacialErosion,
+				})
+				TIMING.record({
+					stage: `Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`,
+					timings: postTiming,
+					startedAt: postStageStart,
+				})
+			}
+
+			// Ridge sharpening
+			if (params.ridgeSharpening > 0) {
+				const rsIters = Math.round(1 + params.ridgeSharpening * 3)
+				const rsStr = params.ridgeSharpening * 0.08
+				const postStageStart = performance.now()
+				EROSION.sharpenRidges({
+					mesh,
+					elev: elevation,
+					r_isOcean: ocean,
+					iterations: rsIters,
+					strength: rsStr,
+				})
+				TIMING.record({
+					stage: `Ridge sharpening (${rsIters} iters)`,
+					timings: postTiming,
+					startedAt: postStageStart,
+				})
+			}
+
+			// Always-on soil creep
+			const postStageStart = performance.now()
+			EROSION.applySoilCreep({
+				mesh,
+				elev: elevation,
+				r_isOcean: ocean,
+				iterations: 3,
+				strength: 0.1125,
+			})
+			TIMING.record({
+				stage: "Soil creep (3 iters)",
+				timings: postTiming,
+				startedAt: postStageStart,
+			})
+
+			// Honor exact coverage extremes after all terrain shaping.
+			if (params.landCoverage <= 0 && volcanism <= 0) {
+				for (let r = 0; r < mesh.numRegions; r++) {
+					elevation[r] = Math.min(elevation[r], -0.02)
+				}
+			} else if (params.landCoverage >= 1) {
+				for (let r = 0; r < mesh.numRegions; r++) {
+					elevation[r] = Math.max(elevation[r], 0.02)
+				}
+			}
+		},
 	})
 
 	// Pre-crater land mask — captures tectonic land/ocean boundary before impacts
@@ -459,14 +499,18 @@ function generateGenesisWorld({
 
 	// Impact craters (applied after all erosion so they stay crisp)
 	if (params.craters && params.craters > 0) {
-		withTiming("craters", pipelineTiming, () => {
-			CRATERS.applyCraters({
-				mesh,
-				elevation,
-				seed: params.seed,
-				intensity: params.craters,
-				planetRadiusKm: params.planetRadiusKm,
-			})
+		TIMING.measure({
+			stage: "craters",
+			timings: pipelineTiming,
+			fn: () => {
+				CRATERS.applyCraters({
+					mesh,
+					elevation,
+					seed: params.seed,
+					intensity: params.craters,
+					planetRadiusKm: params.planetRadiusKm,
+				})
+			},
 		})
 		onProgress?.("craters", 39)
 	}
@@ -521,25 +565,31 @@ function generateGenesisWorld({
 			if (!flooded[r]) isLand[r] = 1
 		}
 	}
-	const finalCoastDist = withTiming("coastDist", pipelineTiming, () =>
-		STATS.computeCoastDistances({
-			mesh,
-			isLand,
-			planetRadiusKm: params.planetRadiusKm,
-		}),
-	)
+	const finalCoastDist = TIMING.measure({
+		stage: "coastDist",
+		timings: pipelineTiming,
+		fn: () =>
+			STATS.computeCoastDistances({
+				mesh,
+				isLand,
+				planetRadiusKm: params.planetRadiusKm,
+			}),
+	})
 	distFields.distCoast = finalCoastDist.distCoast
 	distFields.distCoastLand = finalCoastDist.distCoastLand
 	onProgress?.("coastDist", 39)
 
 	// 13. Ocean distance (BFS hop count → km)
-	const oceanDist = withTiming("oceanDist", pipelineTiming, () =>
-		STATS.computeOceanDistanceBFS({
-			mesh,
-			isLand,
-			planetRadiusKm: params.planetRadiusKm,
-		}),
-	)
+	const oceanDist = TIMING.measure({
+		stage: "oceanDist",
+		timings: pipelineTiming,
+		fn: () =>
+			STATS.computeOceanDistanceBFS({
+				mesh,
+				isLand,
+				planetRadiusKm: params.planetRadiusKm,
+			}),
+	})
 	onProgress?.("oceanDist", 39)
 	// 17. Small ocean detection — patches < 0.1% of land become lakes so rivers drain through them
 	const smallOcean = new Uint8Array(mesh.numRegions)
@@ -589,26 +639,41 @@ function generateGenesisWorld({
 	}
 
 	// 14–22. Shared post-elevation pipeline (climate → population)
-	const post = withTiming("post-pipeline", pipelineTiming, () =>
-		POST_ELEVATION.runPostElevationPipeline({
-			mesh,
-			elevation,
-			elevation_km,
-			isLand,
-			riverLand,
-			distCoast: distFields.distCoast,
-			oceanDist,
-			params,
-			emergedLand,
-			tectonicMode: "active" as const,
-			boundary,
-			distFields,
-			r_hotspot,
-			r_mantleUpwelling,
-			terrainFeatures,
-			onProgress,
-		}),
-	)
+	TIMING.attach({
+		timings: pipelineTiming,
+		stage: "post",
+		children: postTiming,
+	})
+	const terrainMs = performance.now() - startedAt
+	const terrainTiming = pipelineTiming.splice(0)
+	const post = TIMING.measure({
+		stage: "post-pipeline",
+		timings: pipelineTiming,
+		fn: () =>
+			POST_ELEVATION.runPostElevationPipeline({
+				mesh,
+				elevation,
+				elevation_km,
+				isLand,
+				riverLand,
+				distCoast: distFields.distCoast,
+				oceanDist,
+				params,
+				emergedLand,
+				tectonicMode: "active" as const,
+				boundary,
+				distFields,
+				r_hotspot,
+				r_mantleUpwelling,
+				terrainFeatures,
+				onProgress,
+			}),
+	})
+	TIMING.attach({
+		timings: pipelineTiming,
+		stage: "post-pipeline",
+		children: post.timings,
+	})
 	onProgress?.("post-pipeline", 70)
 
 	// Summarise hotspot exposure using the final isLand (after post-elevation
@@ -619,6 +684,7 @@ function generateGenesisWorld({
 		finalLand: isLand,
 	})
 
+	const societyStart = performance.now()
 	const provinceSociety = DERIVE_PROVINCE_SOCIETY.deriveProvinceSociety({
 		isEarthImport: false,
 		mesh,
@@ -626,69 +692,112 @@ function generateGenesisWorld({
 		post,
 		isLand,
 	})
-	pipelineTiming.push(...provinceSociety.timings)
+	const societyMs = performance.now() - societyStart
 	onProgress?.("cultures", 77)
 
 	// Urbanization, development and the route/road network used to be produced
 	// by the procedural history sim's init passes. They are one-shot functions
 	// of geography, hierarchy and settlement size, so they run here instead.
+	const infrastructureStart = performance.now()
 	const infrastructureTiming: StageTiming[] = []
 	const { provinces, population } = post
 	const { nations, landmarks } = provinceSociety
-	const urbanization = withTiming("urbanization", infrastructureTiming, () =>
-		provinces && nations && population
-			? URBANIZATION.computeUrbanization({
-					params,
-					provinces,
-					nations,
-					population,
-					knowledge: KNOWLEDGE.urbanKnowledge({
-						era: params.era,
-						baseline: KNOWLEDGE.startBaseline({
+	const urbanization = TIMING.measure({
+		stage: "urbanization",
+		timings: infrastructureTiming,
+		fn: () =>
+			provinces && nations && population
+				? URBANIZATION.computeUrbanization({
+						params,
+						provinces,
+						nations,
+						population,
+						knowledge: KNOWLEDGE.urbanKnowledge({
 							era: params.era,
-							startYear: undefined,
+							baseline: KNOWLEDGE.startBaseline({
+								era: params.era,
+								startYear: undefined,
+							}),
 						}),
-					}),
-				})
-			: {
-					urbanPopulation: new Float32Array(provinces?.count ?? 0),
-					development: new Float32Array(provinces?.count ?? 0),
-				},
-	)
+					})
+				: {
+						urbanPopulation: new Float32Array(provinces?.count ?? 0),
+						development: new Float32Array(provinces?.count ?? 0),
+					},
+	})
 	onProgress?.("urbanization", 80)
 
 	const routes =
 		provinces && nations && landmarks
-			? withTiming("routes", infrastructureTiming, () =>
-					ROUTES.computeRoutes({
-						world: {
-							mesh,
-							params,
-							provinces,
-							nations,
-							landmarks,
-							isLand,
-						},
-						inputs: {
-							urbanPopulation: urbanization.urbanPopulation,
-							settlementRegions: provinceSociety.settlementRegions,
-							settlementWaterLandmarks:
-								provinceSociety.settlementWaterLandmarks,
-							settlementPortRegions: provinceSociety.settlementPortRegions,
-							timings: infrastructureTiming,
-						},
-					}),
-				)
+			? TIMING.measure({
+					stage: "routes",
+					timings: infrastructureTiming,
+					fn: () =>
+						ROUTES.computeRoutes({
+							world: {
+								mesh,
+								params,
+								provinces,
+								nations,
+								landmarks,
+								isLand,
+							},
+							inputs: {
+								urbanPopulation: urbanization.urbanPopulation,
+								settlementRegions: provinceSociety.settlementRegions,
+								settlementWaterLandmarks:
+									provinceSociety.settlementWaterLandmarks,
+								settlementPortRegions: provinceSociety.settlementPortRegions,
+								timings: infrastructureTiming,
+							},
+						}),
+				})
 			: null
-	pipelineTiming.push(...infrastructureTiming)
+	const routeDetails = infrastructureTiming.filter((entry) =>
+		entry.Stage.startsWith("computeRoutes:"),
+	)
+	const infrastructureStages = infrastructureTiming.filter(
+		(entry) => !entry.Stage.startsWith("computeRoutes:"),
+	)
+	TIMING.attach({
+		timings: infrastructureStages,
+		stage: "routes",
+		children: routeDetails,
+	})
 	onProgress?.("routes", 85)
 
-	const timings = [...pipelineTiming, ...post.timings]
-	console.timeEnd("total")
-	console.table(pipelineTiming)
-	if (elevationTiming.length > 0) console.table(elevationTiming)
-	if (postTiming.length > 0) console.table(postTiming)
-	if (post.timings.length > 0) console.table(post.timings)
+	const timings: StageTiming[] = []
+	const parts: StageTiming[] = []
+	TIMING.append({
+		stage: "Terrain",
+		timings: parts,
+		ms: terrainMs,
+		children: terrainTiming,
+	})
+	TIMING.append({
+		stage: "Environment",
+		timings: parts,
+		ms: pipelineTiming[0].ms,
+		children: post.timings,
+	})
+	TIMING.append({
+		stage: "Society",
+		timings: parts,
+		ms: societyMs,
+		children: provinceSociety.timings,
+	})
+	TIMING.append({
+		stage: "Infrastructure",
+		timings: parts,
+		ms: performance.now() - infrastructureStart,
+		children: infrastructureStages,
+	})
+	TIMING.append({
+		stage: "Generation",
+		timings,
+		ms: performance.now() - startedAt,
+		children: parts,
+	})
 
 	return {
 		mesh,

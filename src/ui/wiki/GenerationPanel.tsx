@@ -9,7 +9,7 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/ocean/tides/tidal-schedule/types"
-import type { StageTiming } from "@/model/pipelines/types"
+import type { StageTiming } from "@/model/shared/timing/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { Button } from "@/ui/components/primitives/Button"
@@ -50,9 +50,7 @@ import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
 import { GenerationTimingChart } from "@/ui/wiki/timing/GenerationTimingChart"
 import {
 	formatTimingSeconds,
-	getComputeRoutesTimingSummary,
 	getGenerationTimingSummary,
-	getPostTimingSummary,
 } from "@/ui/wiki/timing/timing-summary"
 import { type WarWikiData, WarWikiPage } from "@/ui/wiki/war/WarWikiPage"
 
@@ -226,26 +224,18 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	void setWorldTab
 	void resetWorldDefaults
 	void onClose
-	type DrillDownState =
-		| null
-		| "post"
-		| "computeRoutes"
-		| {
-				kind: "other"
-				parent: "pipeline" | "post" | "computeRoutes"
-		  }
-	const [timingDrillDown, setTimingDrillDown] = useState<DrillDownState>(null)
+	const [timingPath, setTimingPath] = useState<string[]>([])
 	const generationTimingSummary = useMemo(
-		() => getGenerationTimingSummary(generationTimings),
+		() => getGenerationTimingSummary({ timings: generationTimings, path: [] }),
 		[generationTimings],
 	)
-	const postTimingSummary = useMemo(
-		() => getPostTimingSummary(generationTimings),
-		[generationTimings],
-	)
-	const computeRoutesTimingSummary = useMemo(
-		() => getComputeRoutesTimingSummary(generationTimings),
-		[generationTimings],
+	const visibleTimingSummary = useMemo(
+		() =>
+			getGenerationTimingSummary({
+				timings: generationTimings,
+				path: timingPath,
+			}) ?? generationTimingSummary,
+		[generationTimings, timingPath, generationTimingSummary],
 	)
 	const dayLengthSlider = planetSliders.find(
 		(slider) => slider.label === "Day Length",
@@ -344,124 +334,35 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							}
 							onClick={() => {
 								setShowGenerationTimings((current) => !current)
-								if (showGenerationTimings) setTimingDrillDown(null)
+								if (showGenerationTimings) setTimingPath([])
 							}}
 						/>
-						{showGenerationTimings && (
+						{showGenerationTimings && visibleTimingSummary && (
 							<div className="mt-3 space-y-3">
-								{timingDrillDown === "post" && postTimingSummary ? (
-									<div className="space-y-2">
-										<DrillDownBreadcrumbHeader
-											title="Post breakdown"
-											trailingValue={formatTimingSeconds(
-												postTimingSummary.totalMs,
-											)}
-											onBack={() => setTimingDrillDown(null)}
-										/>
-										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-											<GenerationTimingChart
-												entries={postTimingSummary.entries}
-												onBarClick={(label) => {
-													if (label === "Other")
-														setTimingDrillDown({
-															kind: "other",
-															parent: "post",
-														})
-												}}
-											/>
-										</div>
-									</div>
-								) : timingDrillDown === "computeRoutes" &&
-									computeRoutesTimingSummary ? (
-									<div className="space-y-2">
-										<DrillDownBreadcrumbHeader
-											title="Compute routes breakdown"
-											trailingValue={formatTimingSeconds(
-												computeRoutesTimingSummary.totalMs,
-											)}
-											onBack={() => setTimingDrillDown(null)}
-										/>
-										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-											<GenerationTimingChart
-												entries={computeRoutesTimingSummary.entries}
-												onBarClick={(label) => {
-													if (label === "Other")
-														setTimingDrillDown({
-															kind: "other",
-															parent: "computeRoutes",
-														})
-												}}
-											/>
-										</div>
-									</div>
-								) : typeof timingDrillDown === "object" &&
-									timingDrillDown?.kind === "other" ? (
-									<div className="space-y-2">
-										<DrillDownBreadcrumbHeader
-											title="Other items"
-											trailingValue={formatTimingSeconds(
-												timingDrillDown.parent === "pipeline"
-													? (generationTimingSummary?.totalMs ?? 0)
-													: timingDrillDown.parent === "post"
-														? (postTimingSummary?.totalMs ?? 0)
-														: (computeRoutesTimingSummary?.totalMs ?? 0),
-											)}
-											onBack={() => {
-												const parent = timingDrillDown.parent
-												if (parent === "pipeline") setTimingDrillDown(null)
-												else setTimingDrillDown(parent)
-											}}
-										/>
-										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-											<GenerationTimingChart
-												entries={
-													timingDrillDown.parent === "pipeline"
-														? (generationTimingSummary?.otherEntries ?? [])
-														: timingDrillDown.parent === "post"
-															? (postTimingSummary?.otherEntries ?? [])
-															: (computeRoutesTimingSummary?.otherEntries ?? [])
-												}
-											/>
-										</div>
-									</div>
-								) : (
-									<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-										<div className="mb-2 flex items-center justify-between px-1">
-											<div
-												className={`${uiTokens.type.controlWide} text-slate-500`}
-											>
-												Pipeline
-											</div>
-											<span className="font-mono text-[10px] text-slate-400">
-												{formatTimingSeconds(generationTimingSummary.totalMs)}
-											</span>
-										</div>
-										<GenerationTimingChart
-											entries={generationTimingSummary.entries}
-											onBarClick={(label) => {
-												if (
-													(label === "post-pipeline" ||
-														label === "Post-elevation pipeline") &&
-													postTimingSummary
-												)
-													setTimingDrillDown("post")
-												else if (
-													label === "routes" &&
-													computeRoutesTimingSummary
-												)
-													setTimingDrillDown("computeRoutes")
-												else if (
-													label === "Other" &&
-													generationTimingSummary.otherEntries.length > 0
-												)
-													setTimingDrillDown({
-														kind: "other",
-														parent: "pipeline",
-													})
-											}}
-										/>
-									</div>
+								{timingPath.length > 0 && (
+									<DrillDownBreadcrumbHeader
+										title={timingPath.join(" / ")}
+										trailingValue={formatTimingSeconds(
+											visibleTimingSummary.totalMs,
+										)}
+										onBack={() =>
+											setTimingPath((current) => current.slice(0, -1))
+										}
+									/>
 								)}
+								<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+									<GenerationTimingChart
+										entries={visibleTimingSummary.entries}
+										onBarClick={(label) => {
+											if (
+												visibleTimingSummary.entries.some(
+													(entry) => entry.label === label && entry.expandable,
+												)
+											)
+												setTimingPath((current) => [...current, label])
+										}}
+									/>
+								</div>
 							</div>
 						)}
 					</div>

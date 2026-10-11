@@ -21,7 +21,7 @@ import type {
 	TraitsView,
 } from "@/model/history/record/people/query/types"
 import type { RecordMemory } from "@/model/history/record/people/types"
-import { yearMs } from "@/model/history/sim/engine/state/time"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { AGEING } from "@/model/history/sim/people/health/ageing"
 import type { HealthBand } from "@/model/history/sim/people/health/types"
@@ -131,7 +131,8 @@ function view({ people, id, timeMs }: PersonAtParams): PersonView | null {
 	return {
 		...person,
 		orientation:
-			Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs >= 10 * yearMs
+			Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs >=
+			10 * STATE_CLOCK.yearMs
 				? person.orientation
 				: null,
 		consorts,
@@ -368,7 +369,8 @@ function attributes({ people, id, timeMs }: PersonAtParams): AttributeView[] {
 	)
 		return []
 	const age =
-		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
+		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) /
+		STATE_CLOCK.yearMs
 	const effects = AGEING.effects(conditionLevels({ people, id, timeMs }))
 	return (
 		[
@@ -398,7 +400,8 @@ function traits({ people, id, timeMs }: PersonAtParams): TraitsView | null {
 	)
 		return null
 	const age =
-		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs
+		(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) /
+		STATE_CLOCK.yearMs
 	return {
 		personality: TRAITS.active({ character: person, age }),
 		congenital: TRAITS.congenital({ character: person, age }),
@@ -462,8 +465,11 @@ function memories(params: CoupleAtParams): MemoryView[] {
 		reason: row.reason,
 		startTimeMs: row.startTimeMs,
 		strength: OPINION_MEMORY.contribution({
-			memory: { reason: row.reason, start: row.startTimeMs / yearMs },
-			time: params.timeMs / yearMs,
+			memory: {
+				reason: row.reason,
+				start: row.startTimeMs / STATE_CLOCK.yearMs,
+			},
+			time: params.timeMs / STATE_CLOCK.yearMs,
 		}),
 	}))
 }
@@ -522,7 +528,9 @@ function opinionContext({
 		return {
 			id,
 			character: person,
-			age: (Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) / yearMs,
+			age:
+				(Math.min(timeMs, person.deathTimeMs) - person.birthTimeMs) /
+				STATE_CLOCK.yearMs,
 			culture: person.culture,
 			heritage:
 				person.culture >= 0
@@ -551,7 +559,7 @@ function opinionContext({
 		memoriesOf: ({ observer, target }) =>
 			memoriesAt({ people, a: observer, b: target, timeMs }).map((row) => ({
 				reason: row.reason,
-				start: row.startTimeMs / yearMs,
+				start: row.startTimeMs / STATE_CLOCK.yearMs,
 			})),
 	}
 }
@@ -566,7 +574,7 @@ function opinion({
 	return OPINION.of({
 		observer: a,
 		target: b,
-		time: timeMs / yearMs,
+		time: timeMs / STATE_CLOCK.yearMs,
 		context: opinionContext({ people, record, timeMs }),
 	})
 }
@@ -596,7 +604,7 @@ function popularity({
 	return OPINION.popularity({
 		ruler: holder({ people, seat, timeMs }),
 		holders,
-		time: timeMs / yearMs,
+		time: timeMs / STATE_CLOCK.yearMs,
 		context: opinionContext({ people, record, timeMs }),
 	})
 }

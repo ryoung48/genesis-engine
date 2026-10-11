@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react"
 import { HISTORY } from "@/model/history/record"
-import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { PartitionRow } from "@/model/history/world-frame/types"
 import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 
-const PROCEDURAL_START_TIME_MS = (STATE.defaultStartYear - 2) * 365 * 86_400_000
+const PROCEDURAL_START_TIME_MS =
+	(STATE_CLOCK.defaultStartYear - 2) * 365 * 86_400_000
 const PROCEDURAL_ENGINE_START_TIME_MS =
-	STATE.defaultStartYear * 365 * 86_400_000
+	STATE_CLOCK.defaultStartYear * 365 * 86_400_000
 
 function nameMap(rows: PartitionRow[]): Map<string, string> {
 	return new Map(rows.map((row) => [row.key, row.name]))

@@ -343,11 +343,6 @@ export interface WarSides {
 	crown: number
 }
 
-export interface DiffYearsParams {
-	a: number
-	b: number
-}
-
 export interface BuildProvinceXyzParams {
 	provinceSeeds: Int32Array
 	r_xyz: Float32Array
@@ -558,10 +553,6 @@ export interface FoundRulerParams {
 export interface UnionRealmParams {
 	state: HistoryState
 	p: number
-}
-
-export interface IsRebelGoalParams {
-	goal: WarGoal
 }
 
 export interface ContinueUnionParams {

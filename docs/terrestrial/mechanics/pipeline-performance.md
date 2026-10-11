@@ -37,7 +37,7 @@ pnpm gen:history
 
 ## Routes stage
 
-Route computation (land and sea routes plus the network) is the final world-generation stage, timed as `routes` with `computeRoutes:*` sub-rows. Measured at 204,000 points: 728.8 ms on seed 14963991, about 2.8% of the 25.8 s generation baseline (`stats/history/2026-10-10T19-42-27-900Z-large-states-water-neutral/933.json`); 1,276 ms on seed 42 under machine load. See `route-search-performance.md`.
+Route computation (land and sea routes plus the network) is the final world-generation stage, timed under Generation / Infrastructure / `routes`, with detailed child measurements. See [generation timing and estimated progress](../../development/generation-timing.md) for the profile hierarchy and browser cache. Measured at 204,000 points: 728.8 ms on seed 14963991, about 2.8% of the 25.8 s generation baseline (`stats/history/2026-10-10T19-42-27-900Z-large-states-water-neutral/933.json`); 1,276 ms on seed 42 under machine load. See `route-search-performance.md`.
 
 History repeats the route build at initialization, then advances it every ten years after the census population pass. The 204,000-point, seed 14963991, 30-year slice measured a 522 ms initial routing batch and 379 ms across three subsequent batches (maximum 164 ms), with static preprocessing additionally included in engine initialization. Sea-neighbour discovery dominates batch cost. See [road network](road-network.md) for the workload, retained state, final full-horizon comparison and timing caveats.
 

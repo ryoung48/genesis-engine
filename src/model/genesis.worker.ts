@@ -7,7 +7,8 @@ import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
-import type { StageTiming } from "@/model/pipelines/types"
+import { TIMING } from "@/model/shared/timing"
+import type { StageTiming } from "@/model/shared/timing/types"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
 import type { SocietyEra } from "@/model/society/types"
@@ -721,21 +722,12 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		return
 	}
 
-	const progressTimings: StageTiming[] = []
-	let previousProgress: { label: string; startedAt: number } | null = null
 	const progressCb = (label: string, pct?: number) => {
 		const progressLabel = getProgressLabel(label)
-		const now = performance.now()
-		if (previousProgress) {
-			progressTimings.push({
-				Stage: previousProgress.label,
-				ms: (now - previousProgress.startedAt).toFixed(1),
-			})
-		}
-		previousProgress = { label: progressLabel, startedAt: now }
 		self.postMessage({
 			type: "progress",
 			label: progressLabel,
+			stage: label,
 			pct,
 		} satisfies GenesisWorkerResponse)
 	}
@@ -771,7 +763,10 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 		) {
 			progressCb("Initializing history", 95)
 			historyRng = HISTORY_RNG.createHistoryRng(generated.params.seed + 99999)
+			const historyStartedAt = performance.now()
+			const historyTimings: StageTiming[] = []
 			historyState = SIM_ENGINE.initHistory({
+				timings: historyTimings,
 				nations: generated.nations,
 				provinces: generated.provinces,
 				population: generated.population,
@@ -797,16 +792,40 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				settlementWaterLandmarks: generated.settlementWaterLandmarks,
 				settlementPortRegions: generated.settlementPortRegions,
 			})
+			TIMING.append({
+				stage: "History initialization",
+				timings: generated.timings,
+				ms: performance.now() - historyStartedAt,
+				children: historyTimings,
+			})
 			historyTime = historyState.time
 		}
 
-		lastGeneratedWorld = clonePathfindSeedWorld(generated)
-
-		generated.timings.push(
-			...progressTimings.filter((timing) => timing.Stage === "History"),
-		)
-		const world = attachPrecomputedGeometry(serializeWorld(generated))
-		progressCb("Done", 100)
+		progressCb("Preparing world", 98)
+		const preparationStartedAt = performance.now()
+		const preparationTimings: StageTiming[] = []
+		lastGeneratedWorld = TIMING.measure({
+			stage: "Pathfinding snapshot",
+			timings: preparationTimings,
+			fn: () => clonePathfindSeedWorld(generated),
+		})
+		const serialized = TIMING.measure({
+			stage: "Serialization",
+			timings: preparationTimings,
+			fn: () => serializeWorld(generated),
+		})
+		const world = TIMING.measure({
+			stage: "Geometry",
+			timings: preparationTimings,
+			fn: () => attachPrecomputedGeometry(serialized),
+		})
+		TIMING.append({
+			stage: "Worker preparation",
+			timings: generated.timings,
+			ms: performance.now() - preparationStartedAt,
+			children: preparationTimings,
+		})
+		world.timings = generated.timings
 		const journal = historyState?.journal ?? []
 		self.postMessage(
 			{ type: "done", world, journal } satisfies GenesisWorkerResponse,

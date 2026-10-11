@@ -10,6 +10,7 @@ import type {
 } from "@/model/geography/tectonics/types"
 import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
+import { TIMING } from "@/model/shared/timing"
 
 const COLLISION_THRESHOLD = 0.75
 
@@ -252,9 +253,10 @@ function classifyBoundaries({
 			noise,
 		})
 	}
-	timing?.push({
-		Stage: "Collisions (dual)",
-		ms: (performance.now() - collisionsStart).toFixed(1),
+	TIMING.record({
+		stage: "Collisions (dual)",
+		timings: timing,
+		startedAt: collisionsStart,
 	})
 
 	let mountain_r: Set<number>
@@ -410,9 +412,10 @@ function classifyBoundaries({
 			}
 		}
 	}
-	timing?.push({
-		Stage: "Stress propagation (dual)",
-		ms: (performance.now() - stressStart).toFixed(1),
+	TIMING.record({
+		stage: "Stress propagation (dual)",
+		timings: timing,
+		startedAt: stressStart,
 	})
 
 	// Plate interiors: find a representative hi-res region per plate

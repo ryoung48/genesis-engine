@@ -11,10 +11,8 @@ import {
 import React, { useMemo, useRef } from "react"
 import { Bar } from "react-chartjs-2"
 import { uiChartPalette } from "@/ui/components/tokens"
-import {
-	formatTimingSeconds,
-	type TimingEntry,
-} from "@/ui/wiki/timing/timing-summary"
+import { formatTimingSeconds } from "@/ui/wiki/timing/timing-summary"
+import type { TimingEntry } from "@/ui/wiki/timing/types"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 
@@ -82,8 +80,8 @@ export const GenerationTimingChart: React.FC<{
 					},
 				},
 			},
-			onClick: (_event, elements) => {
-				if (elements.length > 0 && onBarClick) {
+			onClick: (event, elements) => {
+				if (event && elements.length > 0 && onBarClick) {
 					const idx = elements[0].index
 					onBarClick(entries[idx]?.label ?? "")
 				}
@@ -93,7 +91,7 @@ export const GenerationTimingChart: React.FC<{
 		return {
 			data,
 			options,
-			height: Math.max(180, Math.min(420, entries.length * 24 + 56)),
+			height: Math.max(180, entries.length * 24 + 56),
 		}
 	}, [entries, onBarClick])
 

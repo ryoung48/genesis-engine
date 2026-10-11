@@ -2,6 +2,7 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import type { BucketQueue } from "@/model/shared/bucket-queue/types"
+import type { StageTiming } from "@/model/shared/timing/types"
 import type {
 	Route,
 	RouteEdge,
@@ -46,7 +47,7 @@ export interface RouteInputs {
 	// [JUSTIFICATION] Worlds without ports have no port anchors.
 	settlementPortRegions?: Int32Array
 	// [JUSTIFICATION] Timing collection is enabled only by diagnostic callers.
-	timings?: Array<{ Stage: string; ms: string }>
+	timings?: StageTiming[]
 }
 
 export interface RouteComputation {

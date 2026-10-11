@@ -38,9 +38,11 @@ import type {
 	PostPipelineInput,
 	PostPipelineOutput,
 } from "@/model/pipelines/post-elevation/types"
-import type { GenesisWorld, StageTiming } from "@/model/pipelines/types"
+import type { GenesisWorld } from "@/model/pipelines/types"
 import { STATS } from "@/model/shared/math/stats"
 import { RNG } from "@/model/shared/random/rng"
+import { TIMING } from "@/model/shared/timing"
+import type { StageTiming } from "@/model/shared/timing/types"
 import { ERAS } from "@/model/society/eras"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { POPULATION } from "@/model/society/population"
@@ -188,13 +190,6 @@ function runPostElevationPipeline(
 		realSstAnomalyNoData,
 	} = input
 	const timings: StageTiming[] = []
-	function record(stage: string, startMs: number) {
-		timings.push({
-			Stage: stage,
-			ms: (performance.now() - startMs).toFixed(1),
-		})
-	}
-
 	// ── Climate ────────────────────────────────────────────────────────
 	let t0 = performance.now()
 	const landFraction = CLIMATE.computeLandFraction({ mesh, isLand })
@@ -207,22 +202,22 @@ function runPostElevationPipeline(
 		isLand,
 		elevation_km,
 	})
-	record("Post: climate", t0)
+	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
 	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
 	const wind = WIND.computeWindVectors({ mesh, climate, elevation_km, params })
-	record("Post: wind", t0)
+	TIMING.record({ stage: "Post: wind", startedAt: t0, timings })
 	onProgress?.("Post: wind", 43)
 
 	t0 = performance.now()
 	const currentLandmarks = LANDMARKS.computeLandmarks({ mesh, isLand })
-	record("Post: current landmarks", t0)
+	TIMING.record({ stage: "Post: current landmarks", startedAt: t0, timings })
 
 	const N = mesh.numRegions
 	t0 = performance.now()
 	let monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
-	record("Post: thermal equator", t0)
+	TIMING.record({ stage: "Post: thermal equator", startedAt: t0, timings })
 	onProgress?.("Post: thermal equator", 44)
 
 	// ── Moisture advection ─────────────────────────────────────────────
@@ -246,7 +241,7 @@ function runPostElevationPipeline(
 		landmarks: currentLandmarks,
 		slopeScore,
 	})
-	record("Post: moisture advection", t0)
+	TIMING.record({ stage: "Post: moisture advection", startedAt: t0, timings })
 	onProgress?.("Post: moisture advection", 50)
 
 	// ── Ocean SST ────────────────────────────────────────────────────────
@@ -303,7 +298,7 @@ function runPostElevationPipeline(
 	})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
-	record("Post: ocean SST", t0)
+	TIMING.record({ stage: "Post: ocean SST", startedAt: t0, timings })
 
 	// ── Rainfall ───────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -318,7 +313,7 @@ function runPostElevationPipeline(
 		distCoast,
 		landmarks: currentLandmarks,
 	})
-	record("Post: rainfall", t0)
+	TIMING.record({ stage: "Post: rainfall", startedAt: t0, timings })
 	onProgress?.("Post: rainfall", 54)
 	const rainfall: GenesisRainfall = {
 		monthly: rain.monthly,
@@ -355,7 +350,11 @@ function runPostElevationPipeline(
 		})
 		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
-		record("Post: drain arid closed water", t0)
+		TIMING.record({
+			stage: "Post: drain arid closed water",
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	// ── Diurnal temperature range + PET ───────────────────────────────
@@ -377,7 +376,7 @@ function runPostElevationPipeline(
 		dpm: params.daysPerYear / 12,
 	})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
-	record("Post: dtr + pet", t0)
+	TIMING.record({ stage: "Post: dtr + pet", startedAt: t0, timings })
 	onProgress?.("Post: dtr + pet", 56)
 
 	t0 = performance.now()
@@ -386,7 +385,7 @@ function runPostElevationPipeline(
 		rainfall,
 		isLand: riverLand,
 	})
-	record("Post: hydrology", t0)
+	TIMING.record({ stage: "Post: hydrology", startedAt: t0, timings })
 	onProgress?.("Post: hydrology", 57)
 
 	t0 = performance.now()
@@ -399,7 +398,7 @@ function runPostElevationPipeline(
 		isLand,
 		isTidallyLocked: params.tideLock?.type === "solar",
 	})
-	record("Post: clouds", t0)
+	TIMING.record({ stage: "Post: clouds", startedAt: t0, timings })
 
 	// ── Rivers ─────────────────────────────────────────────────────────
 	// Real river/lake data (Earth import) replaces the whole procedural
@@ -432,7 +431,7 @@ function runPostElevationPipeline(
 				if (realLakeRegions[r]) rivers.waterLevel[r] = elevation_km[r]
 			}
 		}
-		record("Post: rivers (real)", t0)
+		TIMING.record({ stage: "Post: rivers (real)", startedAt: t0, timings })
 	} else {
 		rivers = RIVERS.computeRivers({
 			mesh,
@@ -443,7 +442,7 @@ function runPostElevationPipeline(
 			isLand: riverLand,
 			params,
 		})
-		record("Post: rivers", t0)
+		TIMING.record({ stage: "Post: rivers", startedAt: t0, timings })
 
 		t0 = performance.now()
 		LAKES.computeLakes({
@@ -456,7 +455,7 @@ function runPostElevationPipeline(
 			emergedLand,
 			elevationKm: elevation_km,
 		})
-		record("Post: lakes", t0)
+		TIMING.record({ stage: "Post: lakes", startedAt: t0, timings })
 	}
 	onProgress?.("Post: rivers", 62)
 
@@ -521,7 +520,11 @@ function runPostElevationPipeline(
 		rainfall,
 		isLand: riverLand,
 	})
-	record("Post: landmarks + distances + temperature (post-lake)", t0)
+	TIMING.record({
+		stage: "Post: landmarks + distances + temperature (post-lake)",
+		startedAt: t0,
+		timings,
+	})
 	onProgress?.("Post: landmarks", 62)
 
 	t0 = performance.now()
@@ -534,7 +537,7 @@ function runPostElevationPipeline(
 		isLand,
 		isTidallyLocked: params.tideLock?.type === "solar",
 	})
-	record("Post: clouds (post-lake)", t0)
+	TIMING.record({ stage: "Post: clouds (post-lake)", startedAt: t0, timings })
 
 	// ── Observed Earth climate (must run before pasta/vegetation so Earth
 	// imports classify vegetation from observed rather than procedural
@@ -661,7 +664,11 @@ function runPostElevationPipeline(
 		})
 		observedCurrent = currentHolder.observedCurrent
 	}
-	record("Post: observed Earth climate", t0)
+	TIMING.record({
+		stage: "Post: observed Earth climate",
+		startedAt: t0,
+		timings,
+	})
 	onProgress?.("Post: observed Earth climate", 57)
 
 	// ── Ice (needed for pasta climate) ─────────────────────────────────
@@ -676,7 +683,7 @@ function runPostElevationPipeline(
 			cycles: 15,
 			planetRadiusKm: params.planetRadiusKm,
 		})
-	record("Post: ice", t0)
+	TIMING.record({ stage: "Post: ice", startedAt: t0, timings })
 	onProgress?.("Post: ice", 58)
 
 	// ── Pasta climate (needed before vegetation) ───────────────────────
@@ -713,7 +720,7 @@ function runPostElevationPipeline(
 			: undefined
 	const realPastaClimate: Uint8Array | undefined = earthPastaResult?.zones
 	const realPastaDebug: PastaDebug | undefined = earthPastaResult?.debug
-	record("Post: pasta climate", t0)
+	TIMING.record({ stage: "Post: pasta climate", startedAt: t0, timings })
 	onProgress?.("Post: pasta climate", 59)
 
 	// ── Vegetation ─────────────────────────────────────────────────────
@@ -740,7 +747,7 @@ function runPostElevationPipeline(
 				gar: earthPastaResult.debug.gar,
 			})
 		: undefined
-	record("Post: vegetation", t0)
+	TIMING.record({ stage: "Post: vegetation", startedAt: t0, timings })
 	onProgress?.("Post: vegetation", 60)
 
 	// ── Tidal range ────────────────────────────────────────────────────
@@ -784,7 +791,7 @@ function runPostElevationPipeline(
 		params,
 		landmarks,
 	})
-	record("Post: tidal range", t0)
+	TIMING.record({ stage: "Post: tidal range", startedAt: t0, timings })
 
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -801,7 +808,7 @@ function runPostElevationPipeline(
 			tidalRange,
 			slopeScore,
 		})
-	record("Post: topography", t0)
+	TIMING.record({ stage: "Post: topography", startedAt: t0, timings })
 	onProgress?.("Post: topography", 65)
 
 	// Demote sea-adjacent regions from ocean to lake coastal tier.
@@ -841,7 +848,7 @@ function runPostElevationPipeline(
 		isLand,
 		climate,
 	})
-	record("Post: climate zones", t0)
+	TIMING.record({ stage: "Post: climate zones", startedAt: t0, timings })
 	onProgress?.("Post: climate zones", 64)
 
 	// ── Koppen climate ─────────────────────────────────────────────────
@@ -852,7 +859,7 @@ function runPostElevationPipeline(
 		temperatureMonthly: climate.temperature_monthly,
 		rainfallMonthly: rainfall.monthly,
 	})
-	record("Post: koppen climate", t0)
+	TIMING.record({ stage: "Post: koppen climate", startedAt: t0, timings })
 	onProgress?.("Post: koppen climate", 69)
 
 	// ── Hazards ────────────────────────────────────────────────────────
@@ -865,7 +872,7 @@ function runPostElevationPipeline(
 		isLand,
 		hotspot: r_hotspot,
 	})
-	record("Post: hazards", t0)
+	TIMING.record({ stage: "Post: hazards", startedAt: t0, timings })
 	onProgress?.("Post: hazards", 70)
 
 	t0 = performance.now()
@@ -876,7 +883,7 @@ function runPostElevationPipeline(
 		topography,
 		params,
 	})
-	record("Post: cyclones", t0)
+	TIMING.record({ stage: "Post: cyclones", startedAt: t0, timings })
 
 	t0 = performance.now()
 	const tornadoRisk = TORNADOES.computeTornadoRisk({
@@ -890,7 +897,7 @@ function runPostElevationPipeline(
 		oceanDist,
 		params,
 	})
-	record("Post: tornadoes", t0)
+	TIMING.record({ stage: "Post: tornadoes", startedAt: t0, timings })
 
 	// ── Provinces ──────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -929,7 +936,7 @@ function runPostElevationPipeline(
 					seed: params.seed,
 					options: provinceOptions,
 				})
-	record("Post: provinces", t0)
+	TIMING.record({ stage: "Post: provinces", startedAt: t0, timings })
 	onProgress?.("Post: provinces", 72)
 
 	const { waterAccess, riverAccess, lakeAccess } = provinces
@@ -941,7 +948,7 @@ function runPostElevationPipeline(
 		seed: params.seed,
 		options: { planetRadiusKm: params.planetRadiusKm },
 	})
-	record("Post: locations", t0)
+	TIMING.record({ stage: "Post: locations", startedAt: t0, timings })
 	onProgress?.("Post: locations", 73)
 
 	// ── Migration diffusion ─────────────────────────────────────────────
@@ -972,7 +979,7 @@ function runPostElevationPipeline(
 	for (let p = 0; p < provinces.count; p++) {
 		if (migration.migrationWave[p] < 0) provinces.desolate[p] = 1
 	}
-	record("Post: migration", t0)
+	TIMING.record({ stage: "Post: migration", startedAt: t0, timings })
 	onProgress?.("Post: migration", 74)
 
 	// ── Population ─────────────────────────────────────────────────────
@@ -1041,7 +1048,7 @@ function runPostElevationPipeline(
 	})
 	population.migrationWave = migration.migrationWave
 	population.cradleProvinces = migration.cradleProvinces
-	record("Post: population", t0)
+	TIMING.record({ stage: "Post: population", startedAt: t0, timings })
 	onProgress?.("Post: population", 74)
 
 	// ── Trade goods ─────────────────────────────────────────────────────
@@ -1059,7 +1066,7 @@ function runPostElevationPipeline(
 				pastaClimate,
 			})
 		: undefined
-	record("Post: trade goods", t0)
+	TIMING.record({ stage: "Post: trade goods", startedAt: t0, timings })
 	onProgress?.("Post: trade goods", 75)
 
 	return {

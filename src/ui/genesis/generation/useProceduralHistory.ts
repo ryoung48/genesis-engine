@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
-import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import type { GenesisWorkerRequest } from "@/model/worker-protocol/types"
 import type { ProceduralHistoryInput } from "@/ui/genesis/view/types"
 
@@ -37,7 +37,7 @@ export function useProceduralHistory(input: ProceduralHistoryInput) {
 		} else {
 			workerRef.current.postMessage({
 				type: "simulate",
-				tickMs: STATE.yearMs,
+				tickMs: STATE_CLOCK.yearMs,
 			} satisfies GenesisWorkerRequest)
 			setProceduralHistoryPlaying(true)
 		}

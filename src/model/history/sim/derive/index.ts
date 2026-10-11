@@ -9,6 +9,7 @@ import { HERITAGE } from "@/model/history/sim/heritage"
 import { NATIONS } from "@/model/history/sim/nations"
 import { RELIGION } from "@/model/history/sim/religion"
 import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
+import { TIMING } from "@/model/shared/timing"
 import { ERAS } from "@/model/society/eras"
 
 // The political layer of a procedurally generated history's initial conditions:
@@ -18,13 +19,6 @@ import { ERAS } from "@/model/society/eras"
 // in a procedural HistoryRecord / HistoryState (see sim/record).
 function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 	const { timings } = params
-	const record = <T>(stage: string, fn: () => T): T => {
-		const t0 = performance.now()
-		const result = fn()
-		timings.push({ Stage: stage, ms: (performance.now() - t0).toFixed(1) })
-		return result
-	}
-
 	let cultures: DerivedSociety["cultures"]
 	let heritages: DerivedSociety["heritages"]
 	let religions: DerivedSociety["religions"]
@@ -64,108 +58,116 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 			if (eraConfig.hasNations && !isEarthImportRaster) {
 				const provinces = params.provinces
 				const population = params.population
-				nations = record("nations", () =>
-					NATIONS.computeNations({
-						provinces,
-						coastal: params.coastal,
-						riverVisible: params.riverVisible,
-						waterAccess: params.waterAccess,
-						provinceContinent,
-						habitability: population.habitability,
-						r_xyz: params.r_xyz,
-						seed: params.seed,
-						planetRadiusKm: params.planetRadiusKm,
-						eraActiveMask: eraStatehoodMask,
-						nationPercentages: eraConfig.nationPercentages,
-						nationBuckets: eraConfig.nationBuckets,
-						governmentMix: eraConfig.governmentMix,
-						governmentSizeWeight: eraConfig.governmentSizeWeight,
-						maxRepublicSize: eraConfig.maxRepublicSize,
-						maxTheocracySize: eraConfig.maxTheocracySize,
-						migrationWave: population.migrationWave,
-						statehoodFraction: eraConfig.statehoodFraction,
-						buildImperialPatchwork: eraConfig.organizations?.imperialPatchwork,
-						buildTradeLeague: eraConfig.organizations?.tradeLeague,
-					}),
-				)
+				nations = TIMING.measure({
+					stage: "nations",
+					timings,
+					fn: () =>
+						NATIONS.computeNations({
+							provinces,
+							coastal: params.coastal,
+							riverVisible: params.riverVisible,
+							waterAccess: params.waterAccess,
+							provinceContinent,
+							habitability: population.habitability,
+							r_xyz: params.r_xyz,
+							seed: params.seed,
+							planetRadiusKm: params.planetRadiusKm,
+							eraActiveMask: eraStatehoodMask,
+							nationPercentages: eraConfig.nationPercentages,
+							nationBuckets: eraConfig.nationBuckets,
+							governmentMix: eraConfig.governmentMix,
+							governmentSizeWeight: eraConfig.governmentSizeWeight,
+							maxRepublicSize: eraConfig.maxRepublicSize,
+							maxTheocracySize: eraConfig.maxTheocracySize,
+							migrationWave: population.migrationWave,
+							statehoodFraction: eraConfig.statehoodFraction,
+							buildImperialPatchwork:
+								eraConfig.organizations?.imperialPatchwork,
+							buildTradeLeague: eraConfig.organizations?.tradeLeague,
+						}),
+				})
 			}
 		}
 
-		record("cultures", () => {
-			const settledMask =
-				eraSettledMask ??
-				(() => {
-					const m = new Uint8Array(provinceCount)
-					for (let p = 0; p < provinceCount; p++) {
-						if (!desolate[p]) m[p] = 1
-					}
-					return m
-				})()
-			cultures = CULTURE.computeCultures({
-				provinces: params.provinces!,
-				seed: params.seed,
-				settledMask,
-			})
-			heritages = HERITAGE.computeHeritages({
-				cultures: cultures!,
-				seed: params.seed,
-			})
-			religions = RELIGION.computeReligions({
-				cultures: cultures!,
-				seed: params.seed,
-			})
-			const families = RELIGION.computeReligionFamilies({
-				religions: religions!,
-				seed: params.seed,
-			})
-			religionFamilies = families.assignment
-			religionTypes = RELIGION.assignReligionTypes({
-				religionCount: religions!.count,
-				religionFamilies,
-				religionFamilyCount: families.count,
-				cultureToReligion: religions!.assignment,
-				cultureCount: cultures!.count,
-				provinceCount,
-				cultureAssignment: cultures!.assignment,
-				migrationWave: params.population?.migrationWave,
-				era: eraConfig.id,
-				seed: params.seed,
-			})
-			if (!params.isEarthImport)
-				religionDoctrine = RELIGION_DOCTRINE.assign({
-					religionTypes,
-					religionFamilies,
-					familyCount: families.count,
+		TIMING.measure({
+			stage: "cultures",
+			timings,
+			fn: () => {
+				const settledMask =
+					eraSettledMask ??
+					(() => {
+						const m = new Uint8Array(provinceCount)
+						for (let p = 0; p < provinceCount; p++) {
+							if (!desolate[p]) m[p] = 1
+						}
+						return m
+					})()
+				cultures = CULTURE.computeCultures({
+					provinces: params.provinces!,
+					seed: params.seed,
+					settledMask,
+				})
+				heritages = HERITAGE.computeHeritages({
+					cultures: cultures!,
 					seed: params.seed,
 				})
-			cultures!.genderSystems = GENDER_SYSTEM.restrict({
-				systems: cultures!.genderSystems!,
-				cultureToReligion: religions!.assignment,
-				doctrine: religionDoctrine,
-				seed: params.seed,
-			})
-			religions!.colors = GRAPH_PARTITION.deriveChildColors({
-				childCount: religions!.count,
-				childToParent: religionFamilies,
-				parentColors: families.colors,
-				seed: params.seed + 6281,
-			})
-			cultures!.colors = GRAPH_PARTITION.deriveChildColors({
-				childCount: cultures!.count,
-				childToParent: heritages!.assignment,
-				parentColors: heritages!.colors,
-				seed: params.seed + 5101,
-			})
-			// Organization naming needs the emperor's culture, which isn't known
-			// until cultures are computed -- patch it in now rather than
-			// reordering the pipeline.
-			if (nations?.organizations?.length) {
-				for (const org of nations.organizations) {
-					const capital = nations.seeds[org.leadNationIndex]
-					org.cultureIdx =
-						capital !== undefined ? cultures!.assignment[capital] : -1
+				religions = RELIGION.computeReligions({
+					cultures: cultures!,
+					seed: params.seed,
+				})
+				const families = RELIGION.computeReligionFamilies({
+					religions: religions!,
+					seed: params.seed,
+				})
+				religionFamilies = families.assignment
+				religionTypes = RELIGION.assignReligionTypes({
+					religionCount: religions!.count,
+					religionFamilies,
+					religionFamilyCount: families.count,
+					cultureToReligion: religions!.assignment,
+					cultureCount: cultures!.count,
+					provinceCount,
+					cultureAssignment: cultures!.assignment,
+					migrationWave: params.population?.migrationWave,
+					era: eraConfig.id,
+					seed: params.seed,
+				})
+				if (!params.isEarthImport)
+					religionDoctrine = RELIGION_DOCTRINE.assign({
+						religionTypes,
+						religionFamilies,
+						familyCount: families.count,
+						seed: params.seed,
+					})
+				cultures!.genderSystems = GENDER_SYSTEM.restrict({
+					systems: cultures!.genderSystems!,
+					cultureToReligion: religions!.assignment,
+					doctrine: religionDoctrine,
+					seed: params.seed,
+				})
+				religions!.colors = GRAPH_PARTITION.deriveChildColors({
+					childCount: religions!.count,
+					childToParent: religionFamilies,
+					parentColors: families.colors,
+					seed: params.seed + 6281,
+				})
+				cultures!.colors = GRAPH_PARTITION.deriveChildColors({
+					childCount: cultures!.count,
+					childToParent: heritages!.assignment,
+					parentColors: heritages!.colors,
+					seed: params.seed + 5101,
+				})
+				// Organization naming needs the emperor's culture, which isn't known
+				// until cultures are computed -- patch it in now rather than
+				// reordering the pipeline.
+				if (nations?.organizations?.length) {
+					for (const org of nations.organizations) {
+						const capital = nations.seeds[org.leadNationIndex]
+						org.cultureIdx =
+							capital !== undefined ? cultures!.assignment[capital] : -1
+					}
 				}
-			}
+			},
 		})
 	}
 

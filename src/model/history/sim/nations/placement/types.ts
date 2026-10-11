@@ -59,6 +59,7 @@ export interface ClaimProvinceDynamicParams {
 }
 
 export interface SelectSeedParams {
+	seed: number
 	target: number
 	active: Uint8Array
 	assignment: Int32Array
@@ -71,6 +72,11 @@ export interface SelectSeedParams {
 	componentSizes: number[]
 	adjOffset: Int32Array
 	adjList: Int32Array
+}
+
+export interface SeedPlacementCandidate {
+	v: number
+	w: number
 }
 
 export interface ProvinceSeedDistanceParams {

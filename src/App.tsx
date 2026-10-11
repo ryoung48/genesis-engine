@@ -1,7 +1,13 @@
+import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 import { APP_PATHS } from "@/app-routes"
-import { PlanetRendererExperiment } from "@/ui/genesis/planet-renderer-experiment/PlanetRendererExperiment"
 import { GenesisView } from "@/ui/genesis/view/GenesisView"
+
+const PlanetRendererExperiment = lazy(() =>
+	import(
+		"@/ui/genesis/planet-renderer-experiment/PlanetRendererExperiment"
+	).then((module) => ({ default: module.PlanetRendererExperiment })),
+)
 
 function App() {
 	return (
@@ -10,7 +16,13 @@ function App() {
 				<Route path={APP_PATHS.tectonicLab} element={<GenesisView />} />
 				<Route
 					path={APP_PATHS.planetRendererExperiment}
-					element={<PlanetRendererExperiment />}
+					element={
+						<Suspense
+							fallback={<div role="status">Loading planet preview…</div>}
+						>
+							<PlanetRendererExperiment />
+						</Suspense>
+					}
 				/>
 				<Route
 					path={APP_PATHS.galaxy}

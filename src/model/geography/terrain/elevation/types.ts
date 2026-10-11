@@ -6,7 +6,7 @@ import type {
 import type { SphereMesh } from "@/model/mesh/types"
 import type { SimplexNoise } from "@/model/shared/math/simplex-noise"
 
-type StageTiming = { Stage: string; ms: string }
+import type { StageTiming } from "@/model/shared/timing/types"
 
 type FbmFn = (x: number, y: number, z: number, octaves?: number) => number
 type MarkFeatureFn = (r: number, feature: number, delta: number) => void

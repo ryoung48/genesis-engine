@@ -1,3 +1,4 @@
+import { RELATION_CODE } from "@/model/history/sim/engine/fields/relation-code"
 import type {
 	DispSetParams,
 	ProvGetParams,
@@ -176,17 +177,6 @@ const prov = {
 		},
 	},
 } as const
-
-export const RELATION_CODE: Record<Relation, number> = {
-	NONE: 0,
-	OVERLORD: 1,
-	VASSAL: 2,
-	PU_SENIOR: 3,
-	PU_JUNIOR: 4,
-	ALLY: 5,
-	WAR: 10,
-	COLONY: 11,
-}
 export const DISPOSITION_CODE: Record<Disposition, number> = {
 	RIVAL: 0,
 	SUSPICIOUS: 1,

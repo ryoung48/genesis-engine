@@ -5,7 +5,8 @@ import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
-import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type { GenesisParams } from "@/model/pipelines/types"
+import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
 	GenesisNationHierarchy,
@@ -453,6 +454,7 @@ export type GenesisWorkerRequest =
 export type GenesisWorkerResponse =
 	| {
 			type: "progress"
+			stage: string
 			label: string
 			pct?: number
 	  }

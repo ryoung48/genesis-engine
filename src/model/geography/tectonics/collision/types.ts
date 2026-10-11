@@ -5,7 +5,7 @@ import type {
 import type { SphereMesh } from "@/model/mesh/types"
 import type { SimplexNoise } from "@/model/shared/math/simplex-noise"
 
-type StageTiming = { Stage: string; ms: string }
+import type { StageTiming } from "@/model/shared/timing/types"
 
 export interface PlateVelocityAtParams {
 	plateVec: Map<number, PlateVec>

@@ -140,3 +140,17 @@ export type UiBorderTone = keyof typeof uiTokens.border
 export type UiRadius = keyof typeof uiTokens.radius
 export type UiShadow = keyof typeof uiTokens.shadow
 export type UiBlur = keyof typeof uiTokens.blur
+
+export const uiCoastalWaves = {
+	color: "#d5eef5",
+	tiers: [
+		{ width: 0.03, opacity: 0.05 },
+		{ width: 0.02, opacity: 0.15 },
+		{ width: 0.01, opacity: 0.3 },
+	],
+	renderOrder: 997,
+	maskRenderOrder: 996,
+	bandWidth: 0.003,
+	waterStencilRef: 1,
+	mapWidthScale: 2 / Math.PI,
+} as const

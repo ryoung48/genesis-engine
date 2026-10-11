@@ -2,7 +2,8 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { SIM_DERIVE } from "@/model/history/sim/derive"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { POST_ELEVATION } from "@/model/pipelines/post-elevation"
-import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type { GenesisParams } from "@/model/pipelines/types"
+import type { StageTiming } from "@/model/shared/timing/types"
 
 export interface DeriveProvinceSocietyInput {
 	isEarthImport: boolean

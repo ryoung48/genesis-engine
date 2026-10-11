@@ -1,4 +1,5 @@
 import { BUCKET_QUEUE } from "@/model/shared/bucket-queue"
+import { TIMING } from "@/model/shared/timing"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
 import { EDGE_USAGE } from "@/model/society/infrastructure/trade/routing/edge-usage"
 import { LAND_ELIGIBILITY } from "@/model/society/infrastructure/trade/routing/land/eligibility"
@@ -350,13 +351,17 @@ function computeRoutes(params: CreateRouteStateParams): RouteComputation {
 		state,
 		urbanPopulation: params.inputs.urbanPopulation,
 	})
-	params.inputs.timings?.push({
-		Stage: "computeRoutes:appendLandRoutes",
-		ms: batch.landMs.toFixed(1),
+	TIMING.append({
+		stage: "computeRoutes:appendLandRoutes",
+		timings: params.inputs.timings,
+		ms: batch.landMs,
+		children: [],
 	})
-	params.inputs.timings?.push({
-		Stage: "computeRoutes:appendSeaRoutes",
-		ms: batch.seaMs.toFixed(1),
+	TIMING.append({
+		stage: "computeRoutes:appendSeaRoutes",
+		timings: params.inputs.timings,
+		ms: batch.seaMs,
+		children: [],
 	})
 	const routes = stored(state)
 	return {

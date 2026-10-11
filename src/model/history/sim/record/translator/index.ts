@@ -15,9 +15,9 @@ import type {
 	BattleKind,
 } from "@/model/history/sim/engine/events/battle/kind/types"
 import type { SiegeBeatData } from "@/model/history/sim/engine/events/siege/types"
-import { RELATION_CODE } from "@/model/history/sim/engine/fields"
+import { RELATION_CODE } from "@/model/history/sim/engine/fields/relation-code"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
-import { STATE } from "@/model/history/sim/engine/state"
+import { WAR_GOAL } from "@/model/history/sim/engine/state/war-goal"
 import { COLORING } from "@/model/history/sim/nations/coloring"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
@@ -172,7 +172,7 @@ function scanOwnerNotes({
 			const coalition = transaction.coalitions.find(
 				(entry) => entry.warId === warId,
 			)
-			if (!coalition || !STATE.isRebelGoal({ goal: coalition.goal })) continue
+			if (!coalition || !WAR_GOAL.isRebel({ goal: coalition.goal })) continue
 			translator.rebelWars.set(warId, {
 				rebelRoot:
 					coalition.goal === "throne"
@@ -563,7 +563,7 @@ function appendNote({
 			}
 		}
 		let civilWar = false
-		if (coalition && STATE.isRebelGoal({ goal: coalition.goal })) {
+		if (coalition && WAR_GOAL.isRebel({ goal: coalition.goal })) {
 			const crown = coalition.goal === "throne" ? defender : attacker
 			const rebelRoot =
 				coalition.goal === "throne"
@@ -614,7 +614,7 @@ function appendNote({
 					: defender,
 			warGoalProvinceId: data.defender as number,
 			rebel:
-				coalition !== undefined && STATE.isRebelGoal({ goal: coalition.goal }),
+				coalition !== undefined && WAR_GOAL.isRebel({ goal: coalition.goal }),
 			events: [],
 			battles: [],
 			sieges: [],

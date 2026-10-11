@@ -1,7 +1,7 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { NATIONS } from "@/model/history/sim/nations"
 import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
-import type { StageTiming } from "@/model/pipelines/types"
+import type { StageTiming } from "@/model/shared/timing/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisPartition,

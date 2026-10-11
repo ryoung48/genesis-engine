@@ -11,33 +11,19 @@ import { REAL_EARTH_DATA } from "@/model/pipelines/import-heightmap/real-earth-d
 import { SAMPLING } from "@/model/pipelines/import-heightmap/sampling"
 import type { ImportGenesisWorldParams } from "@/model/pipelines/import-heightmap/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
-import type {
-	GenesisParams,
-	GenesisWorld,
-	StageTiming,
-} from "@/model/pipelines/types"
+import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
 import { STATS } from "@/model/shared/math/stats"
 import { RNG } from "@/model/shared/random/rng"
+import { TIMING } from "@/model/shared/timing"
+import type { StageTiming } from "@/model/shared/timing/types"
 import { UNITS } from "@/model/shared/units"
-
-function createTimingRecorder() {
-	const timings: StageTiming[] = []
-	return {
-		timings,
-		record(stage: string, startMs: number) {
-			timings.push({
-				Stage: stage,
-				ms: (performance.now() - startMs).toFixed(1),
-			})
-		},
-	}
-}
 
 function importGenesisWorld({
 	params,
 	onProgress,
 }: ImportGenesisWorldParams): GenesisWorld {
-	const { timings, record } = createTimingRecorder()
+	const timings: StageTiming[] = []
+	const startedAt = performance.now()
 	const rng = RNG.createRng({ seed: params.seed })
 
 	onProgress?.("import:mesh", 3)
@@ -91,7 +77,11 @@ function importGenesisWorld({
 		rng,
 		densityWeight,
 	})
-	record("Sphere mesh (Fibonacci + Delaunay + pole)", t0)
+	TIMING.record({
+		stage: "Sphere mesh (Fibonacci + Delaunay + pole)",
+		startedAt: t0,
+		timings,
+	})
 
 	onProgress?.("import:heightmap", 10)
 	t0 = performance.now()
@@ -101,7 +91,7 @@ function importGenesisWorld({
 		imgW: params.imageWidth,
 		imgH: params.imageHeight,
 	})
-	record("Heightmap sampling", t0)
+	TIMING.record({ stage: "Heightmap sampling", startedAt: t0, timings })
 
 	// Authoritative land/ocean mask from vector coastline data, if provided.
 	// Reconciled against elevation now (before warp/erosion) and again after,
@@ -121,7 +111,11 @@ function importGenesisWorld({
 			maskIsLand,
 			epsilon: 0.02,
 		})
-		record("Coastline mask reconciliation", t0)
+		TIMING.record({
+			stage: "Coastline mask reconciliation",
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	// Post-processing
@@ -134,7 +128,11 @@ function importGenesisWorld({
 			strength: params.terrainWarp,
 			r_hotspot: new Float32Array(mesh.numRegions),
 		})
-		record(`Terrain warp (strength=${params.terrainWarp.toFixed(2)})`, t0)
+		TIMING.record({
+			stage: `Terrain warp (strength=${params.terrainWarp.toFixed(2)})`,
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	// Warp can shift elevation sign near the coast; re-clamp to the mask
@@ -168,7 +166,11 @@ function importGenesisWorld({
 			iterations: smoothIters,
 			strength: smoothStr,
 		})
-		record(`Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`, t0)
+		TIMING.record({
+			stage: `Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`,
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	const gIters = Math.round(params.glacialErosion * 10)
@@ -193,7 +195,11 @@ function importGenesisWorld({
 			gIters,
 			glacialStrength: params.glacialErosion,
 		})
-		record(`Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`, t0)
+		TIMING.record({
+			stage: `Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`,
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	if (params.ridgeSharpening > 0) {
@@ -207,7 +213,11 @@ function importGenesisWorld({
 			iterations: rsIters,
 			strength: rsStr,
 		})
-		record(`Ridge sharpening (${rsIters} iters)`, t0)
+		TIMING.record({
+			stage: `Ridge sharpening (${rsIters} iters)`,
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	t0 = performance.now()
@@ -218,7 +228,7 @@ function importGenesisWorld({
 		iterations: 3,
 		strength: 0.1125,
 	})
-	record("Soil creep (3 iters)", t0)
+	TIMING.record({ stage: "Soil creep (3 iters)", startedAt: t0, timings })
 	onProgress?.("import:post", 20)
 
 	// Final clamp: erosion/soil-creep can nudge elevation across zero near
@@ -246,7 +256,11 @@ function importGenesisWorld({
 		elevation,
 		planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
 	})
-	record("Synthetic plates + boundary", t0)
+	TIMING.record({
+		stage: "Synthetic plates + boundary",
+		startedAt: t0,
+		timings,
+	})
 	onProgress?.("import:plates", 25)
 
 	// Ocean distance
@@ -278,7 +292,7 @@ function importGenesisWorld({
 		isLand,
 		planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
 	})
-	record("Ocean distance (BFS)", t0)
+	TIMING.record({ stage: "Ocean distance (BFS)", startedAt: t0, timings })
 	onProgress?.("import:oceanDist", 28)
 
 	// Build GenesisParams from ImportParams
@@ -408,7 +422,7 @@ function importGenesisWorld({
 			elevation_km,
 			genesisParams.planetRadiusKm,
 		)
-		record("Real river snapping", t0)
+		TIMING.record({ stage: "Real river snapping", startedAt: t0, timings })
 	}
 
 	let realProvinceSeeds:
@@ -421,7 +435,11 @@ function importGenesisWorld({
 			isLand,
 			params.realProvinces,
 		)
-		record("Real province seed resolution", t0)
+		TIMING.record({
+			stage: "Real province seed resolution",
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	let eu4ProvinceIds: Int16Array | undefined
@@ -439,7 +457,11 @@ function importGenesisWorld({
 			rasterH: params.eu4ProvincesHeight,
 			nodata: params.eu4ProvincesNoData,
 		})
-		record("EU4 province raster sampling", t0)
+		TIMING.record({
+			stage: "EU4 province raster sampling",
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	// Shared post-elevation pipeline (climate → population). Real climate
@@ -449,6 +471,9 @@ function importGenesisWorld({
 	// climate, not the procedural EBM output. See runPostElevationPipeline's
 	// "Observed Earth climate" step.
 	t0 = performance.now()
+	const terrainMs = performance.now() - startedAt
+	const terrainTiming = timings.splice(0)
+	const environmentStart = performance.now()
 	const post = POST_ELEVATION.runPostElevationPipeline({
 		mesh,
 		elevation,
@@ -515,7 +540,12 @@ function importGenesisWorld({
 		realSstAnomalyNoData: params.realSstAnomalyNoData,
 		onProgress,
 	})
-	record("Post-elevation pipeline", t0)
+	TIMING.record({ stage: "Post-elevation pipeline", startedAt: t0, timings })
+	TIMING.attach({
+		timings,
+		stage: "Post-elevation pipeline",
+		children: post.timings,
+	})
 	onProgress?.("import:post-pipeline", 70)
 
 	if (post.climate.real_temperature_monthly) {
@@ -525,11 +555,19 @@ function importGenesisWorld({
 			isLand,
 			world: post,
 		})
-		record("Observed Earth humidity sampling", t0)
+		TIMING.record({
+			stage: "Observed Earth humidity sampling",
+			startedAt: t0,
+			timings,
+		})
 
 		t0 = performance.now()
 		REAL_EARTH_DATA.attachCachedCloudCoverEstimate({ mesh, world: post })
-		record("Observed Earth cloud cover cache", t0)
+		TIMING.record({
+			stage: "Observed Earth cloud cover cache",
+			startedAt: t0,
+			timings,
+		})
 	}
 
 	if (post.climate.real_temperature_monthly && post.rainfall.real_monthly) {
@@ -540,10 +578,17 @@ function importGenesisWorld({
 			temperatureMonthly: post.climate.real_temperature_monthly,
 			rainfallMonthly: post.rainfall.real_monthly,
 		})
-		record("Observed Earth koppen classification", t0)
+		TIMING.record({
+			stage: "Observed Earth koppen classification",
+			startedAt: t0,
+			timings,
+		})
 	}
 
+	const environmentMs = performance.now() - environmentStart
+	const environmentTiming = timings.splice(0)
 	t0 = performance.now()
+	const societyStart = t0
 	const provinceSociety = DERIVE_PROVINCE_SOCIETY.deriveProvinceSociety({
 		isEarthImport: true,
 		mesh,
@@ -551,7 +596,12 @@ function importGenesisWorld({
 		post,
 		isLand,
 	})
-	record("Imported province society", t0)
+	TIMING.record({ stage: "Imported province society", startedAt: t0, timings })
+	TIMING.attach({
+		timings,
+		stage: "Imported province society",
+		children: provinceSociety.timings,
+	})
 	onProgress?.("import:society", 77)
 
 	if (params.lakeNames?.length) {
@@ -562,9 +612,34 @@ function importGenesisWorld({
 			lakeLandmarkType: LANDMARKS.landmarkTypeLake,
 			lakePolygons: params.lakeNames,
 		})
-		record("Real lake name matching", t0)
+		TIMING.record({ stage: "Real lake name matching", startedAt: t0, timings })
 	}
 
+	const parts: StageTiming[] = []
+	TIMING.append({
+		stage: "Terrain",
+		timings: parts,
+		ms: terrainMs,
+		children: terrainTiming,
+	})
+	TIMING.append({
+		stage: "Environment",
+		timings: parts,
+		ms: environmentMs,
+		children: environmentTiming,
+	})
+	TIMING.append({
+		stage: "Society",
+		timings: parts,
+		ms: performance.now() - societyStart,
+		children: timings.splice(0),
+	})
+	TIMING.append({
+		stage: "Generation",
+		timings,
+		ms: performance.now() - startedAt,
+		children: parts,
+	})
 	return {
 		mesh,
 		isEarthImport: true,
@@ -636,7 +711,7 @@ function importGenesisWorld({
 		settlementPortRegions: provinceSociety.settlementPortRegions,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: STATS.countContinents({ mesh, isLand }),
-		timings: [...timings, ...post.timings, ...provinceSociety.timings],
+		timings,
 	}
 }
 

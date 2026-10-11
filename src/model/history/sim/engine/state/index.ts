@@ -11,6 +11,7 @@ import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import {
 	getChildren,
 	getNationNeighbors,
@@ -32,12 +33,6 @@ import {
 	setDisposition,
 	setRelation,
 } from "@/model/history/sim/engine/state/relations"
-import {
-	deltaMonth,
-	deltaYear,
-	diffYears,
-	yearMs,
-} from "@/model/history/sim/engine/state/time"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
@@ -51,7 +46,6 @@ import type {
 	HistoryState,
 	InstallRulerParams,
 	IsProvinceConnectedToParentParams,
-	IsRebelGoalParams,
 	OriginOfParams,
 	ProvinceDistanceSqParams,
 	QueueBattleEventParams,
@@ -77,6 +71,7 @@ import type {
 	WarSides,
 	WarSidesParams,
 } from "@/model/history/sim/engine/state/types"
+import { WAR_GOAL } from "@/model/history/sim/engine/state/war-goal"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { PEOPLE } from "@/model/history/sim/people"
@@ -88,6 +83,15 @@ import { OPINION } from "@/model/history/sim/people/opinion"
 import type { RealmOrigin } from "@/model/history/sim/people/types"
 import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
 import { DEJURE } from "@/model/society/dejure"
+
+const {
+	defaultStartYear: DEFAULT_START_YEAR,
+	deltaMonth,
+	deltaYear,
+	diffYears,
+	yearMs,
+} = STATE_CLOCK
+const { isRebel: isRebelGoal } = WAR_GOAL
 
 export const rel = {
 	NONE: "NONE",
@@ -108,8 +112,6 @@ export const disp = {
 	TRUSTED: "TRUSTED",
 } as const
 const TITLE_CAPACITY = 4096
-
-const DEFAULT_START_YEAR = 867
 
 function buildProvinceXyz({
 	provinceSeeds,
@@ -596,10 +598,6 @@ function startWar({
 		time: state.time / yearMs,
 	})
 	return war
-}
-
-function isRebelGoal({ goal }: IsRebelGoalParams): boolean {
-	return goal === "independence" || goal === "throne"
 }
 
 function isPressing({ state, p }: UnionRealmParams): boolean {

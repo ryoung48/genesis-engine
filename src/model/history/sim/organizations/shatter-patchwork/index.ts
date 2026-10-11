@@ -199,6 +199,7 @@ function shatterPatchwork(
 			adjList: provinces.adjList,
 		})
 		const seedProvince = PLACEMENT.selectSeed({
+			seed: (seed ^ seedSalt) + seeds.length,
 			target,
 			active,
 			assignment,

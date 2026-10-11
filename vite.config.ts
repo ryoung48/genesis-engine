@@ -7,7 +7,7 @@ import path from "path"
 import { defineConfig } from "vite"
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
 	const isTest = mode === "test" || process.env.VITEST === "true"
 	const base = process.env.VITE_BASE_PATH ?? "/"
 	const isolationHeaders = {
@@ -24,9 +24,14 @@ export default defineConfig(({ mode }) => {
 			headers: isolationHeaders,
 			watch: {
 				ignored: [
+					"**/.claude/**",
+					"**/.opencode/**",
 					"**/*.md",
 					"**/*.smoke.test.ts",
+					"**/coverage/**",
+					"**/logs/**",
 					"**/scripts/**",
+					"**/stats/**",
 					"**/tsconfig.json",
 				],
 			},
@@ -35,8 +40,8 @@ export default defineConfig(({ mode }) => {
 		optimizeDeps: isTest
 			? undefined
 			: {
+					entries: ["index.html"],
 					include: [
-						"@datastructures-js/priority-queue",
 						"chart.js",
 						"delaunator",
 						"react-chartjs-2",
@@ -46,13 +51,13 @@ export default defineConfig(({ mode }) => {
 				},
 		plugins: [
 			react(
-				isTest
-					? {}
-					: {
+				command === "build" && !isTest
+					? {
 							babel: {
 								plugins: [["babel-plugin-react-compiler"]],
 							},
-						},
+						}
+					: {},
 			),
 			...(isTest ? [] : [tailwindcss()]),
 		],

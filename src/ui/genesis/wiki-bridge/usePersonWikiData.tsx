@@ -7,7 +7,7 @@ import type { NamedPerson } from "@/model/history/record/people/names/types"
 import { PERSON_QUERY } from "@/model/history/record/people/query"
 import type { PersonView } from "@/model/history/record/people/query/types"
 import type { RecordPerson } from "@/model/history/record/people/types"
-import { yearMs } from "@/model/history/sim/engine/state/time"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import type { HealthCondition } from "@/model/history/sim/people/health/ageing/types"
 import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
@@ -117,7 +117,7 @@ export function usePersonWikiData(
 		const dateLabel = (timeMs: number) =>
 			DATE.formatHistoryDays(timeMs / DAY_MS)
 		const ageAt = (row: RecordPerson, timeMs: number) =>
-			Math.floor((timeMs - row.birthTimeMs) / yearMs)
+			Math.floor((timeMs - row.birthTimeMs) / STATE_CLOCK.yearMs)
 		const colorOf = (row: NamedPerson) =>
 			row.house ? paletteColorForDynasty(row.house) : uiPalette.person.noHouse
 		const lifeLabel = (row: RecordPerson) =>
