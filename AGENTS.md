@@ -15,6 +15,10 @@ Always check for duplicated logic before adding new code. Reuse or extract share
 
 Avoid barrel files. Import from the concrete module you need instead of adding or expanding `index.ts` re-export layers. This applies to a single stray `export {...} from "./x"` / `export type {...} from "./y"` statement mixed into an otherwise-real file too, not just a whole pass-through file.
 
+## Skills
+
+- **plan-review** — `.claude/skills/plan-review/SKILL.md`. Read and follow this skill when asked to review, vet, harden, or run a review cycle for a plan. It runs a reviewer subagent loop, addressing each finding until the plan is ready or the round limit is reached. This repository-local skill applies even when it is absent from the session's available-skills list.
+
 ## Refactoring
 - Use `scripts/refactor/rename-symbol.mjs <file> <oldName> <newName>` to rename a top-level exported symbol — updates every project-wide reference, including property-access usages like `OLD_NAME.someMethod`.
 - Use `scripts/refactor/move-module.mjs <from> <to>` to move/rename files or folders — rewrites every importer (relative and `@/...` alias) project-wide.
