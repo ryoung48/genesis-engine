@@ -879,6 +879,7 @@ function createHistoryState({
 		developmentCurrent: new Float32Array(P),
 		knowledgeCurrent: new Float32Array(P),
 		knowledgeBaseline: 0,
+		knowledgeSpinUp: { origin: 0, years: 0 },
 		censusVersion: 0,
 		realmCache: new Map(),
 		provinceEconomyCache: {

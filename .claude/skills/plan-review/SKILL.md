@@ -1,6 +1,6 @@
 ---
 name: plan-review
-description: Have an external reviewer (Codex or Claude CLI) review a plan file in plans/, then address or reject each finding and send it back, looping until the reviewer declares the plan ready to implement. Use when the user asks to review, vet, or harden a plan.
+description: Have an external reviewer (Codex or Claude CLI) review a plan file in plans/, then address or reject each finding and send it back, looping until the reviewer declares the plan ready to implement. Use when the user says "start a review loop for plan X" (X is the plan file), or asks to review, vet, or harden a plan.
 ---
 
 # Plan review loop
@@ -9,7 +9,7 @@ Drives an adversarial review of a plan in `plans/` by a separate model process. 
 
 ## 1. Setup
 
-1. Identify the plan file. If the user didn't name one, ask. Never create a plan file.
+1. Identify the plan file from the trigger ("start a review loop for plan X" → `plans/X.md`, or the exact path given). If the user didn't name one, ask. Never create a plan file.
 2. **Always ask which reviewer to use** (AskUserQuestion: `codex` or `claude`), even if you think the answer is obvious. Ask every invocation; do not reuse an earlier answer.
 3. Make a working dir in the scratchpad: `<scratchpad>/plan-review-<plan-name>/`. Round files go there, not in the repo.
 4. Read the plan and the "Plan Review" and "Plans" sections of `AGENTS.md` yourself so you can triage knowledgeably.
@@ -30,16 +30,18 @@ Write `round-N-prompt.md` in the working dir. Contents:
 
 Run from the repo root, foreground, with a long timeout (up to 600000 ms); if it may exceed that, use `run_in_background` and wait for the completion notification. Pipe the prompt via stdin so Windows quoting can't mangle it. Output goes to `round-N-review.md`.
 
+Models are fixed: Codex uses `sol-6.1`, Claude uses `claude-sonnet-5-5`. Do not substitute others.
+
 Codex (read-only sandbox):
 
 ```bash
-codex exec -s read-only --skip-git-repo-check -C . -o "<dir>/round-N-review.md" - < "<dir>/round-N-prompt.md"
+codex exec -m sol-6.1 -s read-only --skip-git-repo-check -C . -o "<dir>/round-N-review.md" - < "<dir>/round-N-prompt.md"
 ```
 
 Claude (read-only tools, headless):
 
 ```bash
-claude -p --tools "Read,Grep,Glob" --permission-mode dontAsk < "<dir>/round-N-prompt.md" > "<dir>/round-N-review.md"
+claude -p --model claude-sonnet-5-5 --tools "Read,Grep,Glob" --permission-mode dontAsk < "<dir>/round-N-prompt.md" > "<dir>/round-N-review.md"
 ```
 
 If the command fails or the output has no `VERDICT:` line, report the error to the user rather than guessing; retry once at most.

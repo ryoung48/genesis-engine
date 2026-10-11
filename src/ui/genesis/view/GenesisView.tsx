@@ -72,6 +72,7 @@ import {
 	DEFAULT_GEOGRAPHY_MODE,
 	isDebugGeographyMode,
 	isDebugNationMode,
+	isElevationColorMode,
 	isTitlesNationMode,
 	normalizeGeographyColorMode,
 	normalizeNationMapMode,
@@ -361,7 +362,7 @@ export const GenesisView: React.FC<{
 		(next: boolean) => {
 			setShowElevation(next)
 			sceneRef.current?.setElevationVisible(next)
-			if (!next && (colorMode === "terrain" || colorMode === "landHeightmap")) {
+			if (!next && isElevationColorMode(colorMode)) {
 				setColorMode(geographyMode)
 			}
 		},

@@ -1,5 +1,6 @@
 import type {
 	AdvanceKnowledgeParams,
+	FillLiveParams,
 	InitKnowledgeParams,
 	KnowledgeLevelParams,
 	LogisticsScaleParams,
@@ -7,7 +8,9 @@ import type {
 	OwnAdvanceParams,
 	PopulationMeanParams,
 	RealmKnowledgeParams,
+	SovereignsParams,
 	StartBaselineParams,
+	StepParams,
 	UrbanKnowledgeParams,
 } from "@/model/history/sim/engine/knowledge/types"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -38,7 +41,7 @@ const REALM_EXPONENT = 0.3
 
 const MAX_REALM_FACTOR = 2.5
 
-const INITIAL_LEAD = 0.5
+const SPIN_UP_STEP_YEARS = 10
 
 const DOMESTIC_DIFFUSION = 0.04
 
@@ -119,18 +122,68 @@ function realmKnowledge({ state, provinces }: RealmKnowledgeParams): number {
 	return populationMean({ state, provinces, values: state.knowledgeCurrent })
 }
 
+function sovereigns({ state }: SovereignsParams): Int32Array {
+	const sovereign = new Int32Array(state.P)
+	for (let p = 0; p < state.P; p++)
+		if (!state.desolate[p]) sovereign[p] = STATE.getSovereign({ state, p })
+	return sovereign
+}
+
+function fillLive({ state, value }: FillLiveParams): void {
+	for (let p = 0; p < state.P; p++)
+		if (!state.desolate[p]) state.knowledgeCurrent[p] = value
+}
+
 function initKnowledge({ state }: InitKnowledgeParams): void {
-	const meanDev = populationMean({
-		state,
-		provinces: allProvinces({ state }),
-		values: state.developmentCurrent,
-	})
 	const baseline = state.knowledgeBaseline
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-		state.knowledgeCurrent[p] =
-			baseline + INITIAL_LEAD * (state.developmentCurrent[p] - meanDev)
+	const origin = ERA_BASELINE[state.era] - 1
+	const provinces = allProvinces({ state })
+	state.knowledgeSpinUp = { origin, years: 0 }
+	fillLive({ state, value: origin })
+	let mean = populationMean({
+		state,
+		provinces,
+		values: state.knowledgeCurrent,
+	})
+	if (baseline <= origin || mean >= baseline) {
+		fillLive({ state, value: baseline })
+		return
 	}
+	const sovereign = sovereigns({ state })
+	let current: Float32Array = state.knowledgeCurrent
+	let next: Float32Array = state.knowledgeCurrent.slice()
+	let years = 0
+	for (;;) {
+		step({
+			state,
+			current,
+			next,
+			sovereign,
+			yearFraction: SPIN_UP_STEP_YEARS,
+			worldKnowledge: mean,
+			ownFactor: () => 1,
+		})
+		const after = populationMean({ state, provinces, values: next })
+		if (after <= mean) {
+			fillLive({ state, value: baseline })
+			state.knowledgeSpinUp = { origin, years: 0 }
+			return
+		}
+		if (after >= baseline) {
+			const fraction = (baseline - mean) / (after - mean)
+			for (let p = 0; p < state.P; p++)
+				if (!state.desolate[p]) current[p] += (next[p] - current[p]) * fraction
+			years += SPIN_UP_STEP_YEARS * fraction
+			break
+		}
+		years += SPIN_UP_STEP_YEARS
+		mean = after
+		const done = current
+		current = next
+		next = done
+	}
+	if (current !== state.knowledgeCurrent) state.knowledgeCurrent.set(current)
+	state.knowledgeSpinUp = { origin, years }
 }
 
 function selfAdvanceRate({ knowledge }: KnowledgeLevelParams): number {
@@ -160,25 +213,23 @@ function ownAdvance({
 	)
 	return selfAdvanceRate({ knowledge }) * development * Math.min(1, drag)
 }
-function advanceKnowledge({
+function step({
 	state,
+	current,
+	next,
+	sovereign,
 	yearFraction,
+	worldKnowledge,
 	ownFactor,
-}: AdvanceKnowledgeParams): void {
-	const worldKnowledge = realmKnowledge({
-		state,
-		provinces: allProvinces({ state }),
-	})
-	const next = state.knowledgeCurrent.slice()
+}: StepParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		const knowledge = state.knowledgeCurrent[p]
+		const knowledge = current[p]
 		const own = ownAdvance({
 			knowledge,
 			worldKnowledge,
 			development: state.developmentCurrent[p],
 		})
-		const sovereign = STATE.getSovereign({ state, p })
 		let pull = 0
 		for (
 			let i = state.provinceAdjOffset[p];
@@ -187,18 +238,35 @@ function advanceKnowledge({
 		) {
 			const nb = state.provinceAdjList[i]
 			if (state.desolate[nb]) continue
-			const gap = state.knowledgeCurrent[nb] - knowledge
+			const gap = current[nb] - knowledge
 			if (gap <= 0) continue
 			const rate =
-				STATE.getSovereign({ state, p: nb }) === sovereign
-					? DOMESTIC_DIFFUSION
-					: FOREIGN_DIFFUSION
+				sovereign[nb] === sovereign[p] ? DOMESTIC_DIFFUSION : FOREIGN_DIFFUSION
 			pull = Math.max(pull, gap * rate)
 		}
-		next[p] = knowledge + (own * ownFactor(sovereign) + pull) * yearFraction
+		next[p] = knowledge + (own * ownFactor(sovereign[p]) + pull) * yearFraction
 	}
-	for (let p = 0; p < state.P; p++)
-		if (!state.desolate[p]) state.knowledgeCurrent[p] = next[p]
+}
+
+function advanceKnowledge({
+	state,
+	yearFraction,
+	ownFactor,
+}: AdvanceKnowledgeParams): void {
+	const next = state.knowledgeCurrent.slice()
+	step({
+		state,
+		current: state.knowledgeCurrent,
+		next,
+		sovereign: sovereigns({ state }),
+		yearFraction,
+		worldKnowledge: realmKnowledge({
+			state,
+			provinces: allProvinces({ state }),
+		}),
+		ownFactor,
+	})
+	state.knowledgeCurrent.set(next)
 }
 
 function growthRate({ knowledge }: KnowledgeLevelParams): number {

@@ -10,6 +10,7 @@ import type { GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
 	DEFAULT_GEOGRAPHY_MODE,
+	type ElevationSubMode,
 	type NationMapMode,
 	type ReligionMapMode,
 	type SocietyMapMode,
@@ -67,13 +68,14 @@ export interface StoredViewPrefs {
 	clockMonth: number
 	vegetationSubMode: VegetationSubMode
 	climateSubMode: ClimateSubMode
-	elevationSubMode: "colored" | "grayscale"
+	elevationSubMode: ElevationSubMode
 	topographySubMode: TopographySubMode
 	dangerSubMode: DangerSubMode
 }
 
 const COLOR_MODES = new Set<ColorMode>([
 	"terrain",
+	"terrainAlt",
 	"landHeightmap",
 	"slope",
 	"topography",
@@ -440,7 +442,8 @@ export function parseStoredViewPrefs(
 					: DEFAULT_VIEW_PREFS.climateSubMode,
 			elevationSubMode:
 				parsed.elevationSubMode === "colored" ||
-				parsed.elevationSubMode === "grayscale"
+				parsed.elevationSubMode === "grayscale" ||
+				parsed.elevationSubMode === "alt"
 					? parsed.elevationSubMode
 					: DEFAULT_VIEW_PREFS.elevationSubMode,
 			topographySubMode:

@@ -18,7 +18,10 @@ import type {
 	GenesisViewMode,
 } from "@/ui/genesis/renderer/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
-import { VEGETATION_WATER_BLUE } from "@/ui/genesis/shared/colors"
+import {
+	isColoredTerrainMode,
+	VEGETATION_WATER_BLUE,
+} from "@/ui/genesis/shared/colors"
 
 /** Cross-controller calls `terrain-controller.ts` needs but doesn't own --
  * supplied by create-genesis-scene.ts at construction time. Most of these
@@ -154,7 +157,7 @@ export function createTerrainController(
 	}
 
 	function applyWaterMaterialForMode(mode: ColorMode) {
-		const useTerrainWaterMaterial = mode === "terrain"
+		const useTerrainWaterMaterial = isColoredTerrainMode(mode)
 		const useVegetationWaterMaterial =
 			mode === "vegetation" ||
 			mode === "vegetationMaps" ||

@@ -10,6 +10,7 @@ import type { ResolveSubModeParams } from "@/ui/genesis/controls/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
+	ElevationSubMode,
 	MapModePrimary,
 	NationMapMode,
 	SocietyMapMode,
@@ -17,6 +18,7 @@ import type {
 } from "@/ui/genesis/shared/map-modes"
 import {
 	DEFAULT_TITLES_MODE,
+	ELEVATION_SUB_MODE_COLOR_MODE,
 	getMapModePrimary,
 	getVisibleGeographyModeOptions,
 	getVisibleSocietyModeOptions,
@@ -36,7 +38,7 @@ interface ModeBarProps {
 	debugMapModes: boolean
 	vegetationSubMode: VegetationSubMode
 	climateSubMode: ClimateSubMode
-	elevationSubMode: "colored" | "grayscale"
+	elevationSubMode: ElevationSubMode
 	topographySubMode: TopographySubMode
 	isEarthImport?: boolean
 }
@@ -59,7 +61,7 @@ function resolveSubMode({
 		return "climate"
 	}
 	if (baseMode === "terrain") {
-		return elevationSubMode === "grayscale" ? "landHeightmap" : "terrain"
+		return ELEVATION_SUB_MODE_COLOR_MODE[elevationSubMode]
 	}
 	if (baseMode === "topography") {
 		if (topographySubMode === "slope") return "slope"

@@ -8,6 +8,7 @@ import type {
 	JournalTransaction,
 	PendingJournal,
 } from "@/model/history/sim/engine/journal/types"
+import type { KnowledgeSpinUp } from "@/model/history/sim/engine/knowledge/types"
 import type {
 	Assignment,
 	WarSide,
@@ -219,6 +220,7 @@ export interface HistoryState {
 	// 0 = iron age, 1 = late medieval, 2 = early modern, 3 = industrial, 4 = information.
 	knowledgeCurrent: Float32Array
 	knowledgeBaseline: number
+	knowledgeSpinUp: KnowledgeSpinUp
 	// Bumped at each census; with hierarchyVersion it keys realmCache.
 	censusVersion: number
 	realmCache: Map<number, RealmCacheEntry>

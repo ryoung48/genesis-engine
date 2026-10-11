@@ -5,6 +5,7 @@ export interface KnowledgeRealm {
 	population: number
 	knowledge: number
 	government: string
+	type: string
 	surplus: number
 }
 
@@ -17,6 +18,15 @@ export interface KnowledgeSnapshot {
 	cohorts: Record<
 		string,
 		{ population: number; realms: number; weightedKnowledge: number }
+	>
+	types: Record<
+		string,
+		{
+			population: number
+			realms: number
+			weightedKnowledge: number
+			quantiles: number[]
+		}
 	>
 }
 

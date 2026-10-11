@@ -17,6 +17,7 @@ import {
 	getDataVariant,
 } from "@/ui/genesis/shared/data-variant"
 import type {
+	ElevationSubMode,
 	NationMapMode,
 	ReligionMapMode,
 	SocietyMapMode,
@@ -186,9 +187,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [climateSubMode, setClimateSubMode] = useState<ClimateSubMode>(
 		initialViewPrefs.climateSubMode,
 	)
-	const [elevationSubMode, setElevationSubMode] = useState<
-		"colored" | "grayscale"
-	>(initialViewPrefs.elevationSubMode)
+	const [elevationSubMode, setElevationSubMode] = useState<ElevationSubMode>(
+		initialViewPrefs.elevationSubMode,
+	)
 	const [topographySubMode, setTopographySubMode] = useState<TopographySubMode>(
 		initialViewPrefs.topographySubMode,
 	)

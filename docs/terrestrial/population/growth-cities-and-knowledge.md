@@ -14,7 +14,7 @@ World generation first gives each province a habitability score from climate, ve
 
 The generated world calculates its initial urban population and development map once, with `URBANIZATION.computeUrbanization`, from its government types, settlements, province adjacency and the starting-knowledge city caps. A procedural history starts from that same result rather than calculating its own: each non-desolate province begins with the generated urban population, the remainder of its generated population as rural, and the generated development. Routes, settlement markers and the history engine therefore agree on which provinces are urban at the start. Rural population is then reduced by military initialisation, so the history state's starting total need not equal the generated population total. A history started in a non-default year recalculates this start with that year's knowledge baseline.
 
-Starting knowledge follows a year baseline for the default late medieval history: 0.42 in 867, 1 in 1300, 1.44 in 1500, and 2.38 in 1800, with interpolation between those years. Other generated eras use their era baseline when no explicit start year is given. Each province starts at that baseline plus `0.5 × (its initial development − the population-weighted world mean development)`. The first knowledge-driven development floor applies at the following census, after knowledge has been initialized.
+Starting knowledge follows a year baseline for the default late medieval history: 0.42 in 867, 1 in 1300, 1.44 in 1500, and 2.38 in 1800, with interpolation between those years. Other generated eras use their era baseline when no explicit start year is given. The start is a spin-up, not a formula: every non-desolate province begins at the preceding era's baseline (`era baseline − 1`, 0 for late medieval), then the yearly knowledge rule below runs in ten-year steps with development, population and borders held at their starting values and no governor learning factor. The step that would pass the start baseline is applied as a fraction, so the population-weighted world mean lands exactly on the baseline. The 867 start takes about 630 years of spin-up, spreading realms from about 0.05 to 0.62 (tribal realms average about 0.34, monarchies about 0.46). The start consumes no random numbers; a world with no population gets a uniform baseline. `initial.spinUp` in the history report records the origin and years. The first knowledge-driven development floor applies at the following census, after knowledge has been initialized.
 
 ## Annual update order
 
@@ -60,6 +60,8 @@ Knowledge grows through a province's own development and contact with more knowl
 `new knowledge = old knowledge + (own advance + strongest neighbor pull) × years elapsed`
 
 Own advance is a knowledge-dependent rate multiplied by current development. It slows or stops if the province is too far ahead of the population-weighted world knowledge level. Neighbor pull uses only neighbors with higher knowledge: 4% of the gap for a neighbor in the same sovereign realm, or 1.5% across a sovereign border. Only the strongest neighbor pull is used, and all provinces read the previous knowledge values before the new values are committed.
+
+An isolated low-development realm with no more knowledgeable neighbour advances very slowly and can fall behind the world without limit.
 
 Knowledge also affects population growth, the urban share and city-size cap, and the minimum development target. It can therefore raise development indirectly even where no large city appears.
 

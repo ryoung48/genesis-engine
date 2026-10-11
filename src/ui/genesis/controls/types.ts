@@ -4,11 +4,12 @@ import type {
 	VegetationSubMode,
 } from "@/ui/genesis/controls/OverlayControls"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
+import type { ElevationSubMode } from "@/ui/genesis/shared/map-modes"
 
 export interface ResolveSubModeParams {
 	baseMode: ColorMode
 	vegetationSubMode: VegetationSubMode
 	climateSubMode: ClimateSubMode
-	elevationSubMode: "colored" | "grayscale"
+	elevationSubMode: ElevationSubMode
 	topographySubMode: TopographySubMode
 }

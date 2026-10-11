@@ -2,6 +2,7 @@ import type { GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
 import type {
+	ElevationSubMode,
 	NationMapMode,
 	ReligionMapMode,
 	SocietyMapMode,
@@ -126,8 +127,8 @@ export interface OverlayControlsProps {
 	setVegetationSubMode: (v: VegetationSubMode) => void
 	climateSubMode: ClimateSubMode
 	setClimateSubMode: (v: ClimateSubMode) => void
-	elevationSubMode: "colored" | "grayscale"
-	setElevationSubMode: (v: "colored" | "grayscale") => void
+	elevationSubMode: ElevationSubMode
+	setElevationSubMode: (v: ElevationSubMode) => void
 	topographySubMode: TopographySubMode
 	setTopographySubMode: (v: TopographySubMode) => void
 	dangerSubMode: DangerSubMode

@@ -6,6 +6,7 @@ import {
 	DEFAULT_WATER_SPECULAR,
 } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
 import { loadGlobeCloudTexture } from "@/ui/genesis/renderer/textures"
+import { isColoredTerrainMode } from "@/ui/genesis/shared/colors"
 
 export interface LightingControllerDeps {
 	requestRender: () => void
@@ -150,7 +151,9 @@ export function createLightingController(
 			ctx.sun.intensity = DEFAULT_SUN_INTENSITY
 			if (ctx.currentViewMode === "globe") ctx.atmosMesh.visible = true
 			ctx.waterMat.specular.set(
-				ctx.currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000,
+				isColoredTerrainMode(ctx.currentColorMode)
+					? DEFAULT_WATER_SPECULAR
+					: 0x000000,
 			)
 		}
 		syncMapLighting()

@@ -22,14 +22,17 @@ function snapshot({ engine }: SnapshotParams): KnowledgeSnapshot {
 			population: STATE.getNationPopulation({ state: engine, root: nation }),
 			knowledge: ECONOMY.realmKnowledge({ state: engine, p: nation }),
 			government: ERAS.governmentTypeFamily[type],
+			type,
 			surplus: ECONOMY.surplus({ state: engine, p: nation }),
 		})
 	}
 	const cohorts: KnowledgeSnapshot["cohorts"] = {}
+	const typed: Record<string, KnowledgeRealm[]> = {}
 	let population = 0
 	let weighted = 0
 	for (const realm of realms) {
 		population += realm.population
+		;(typed[realm.type] ??= []).push(realm)
 		weighted += realm.population * realm.knowledge
 		const cohort = (cohorts[realm.government] ??= {
 			population: 0,
@@ -42,16 +45,32 @@ function snapshot({ engine }: SnapshotParams): KnowledgeSnapshot {
 	}
 	for (const cohort of Object.values(cohorts))
 		cohort.weightedKnowledge /= Math.max(1, cohort.population)
-	const levels = realms.map((realm) => realm.knowledge).sort((a, b) => a - b)
+	const quantiles = (members: KnowledgeRealm[]) => {
+		const levels = members.map((realm) => realm.knowledge).sort((a, b) => a - b)
+		return [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1].map(
+			(q) => levels[Math.floor(q * Math.max(0, levels.length - 1))] ?? 0,
+		)
+	}
+	const types: KnowledgeSnapshot["types"] = {}
+	for (const [type, members] of Object.entries(typed)) {
+		const typePopulation = members.reduce((sum, r) => sum + r.population, 0)
+		types[type] = {
+			realms: members.length,
+			population: typePopulation,
+			weightedKnowledge:
+				members.reduce((sum, r) => sum + r.population * r.knowledge, 0) /
+				Math.max(1, typePopulation),
+			quantiles: quantiles(members),
+		}
+	}
 	return {
 		year: engine.time / STATE.yearMs,
 		population,
 		weightedKnowledge: weighted / Math.max(1, population),
-		quantiles: [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1].map(
-			(q) => levels[Math.floor(q * Math.max(0, levels.length - 1))] ?? 0,
-		),
+		quantiles: quantiles(realms),
 		top: realms.sort((a, b) => b.population - a.population).slice(0, 20),
 		cohorts,
+		types,
 	}
 }
 

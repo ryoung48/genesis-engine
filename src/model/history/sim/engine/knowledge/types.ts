@@ -51,3 +51,27 @@ export interface UrbanKnowledgeParams {
 	era: SocietyEra
 	baseline: number
 }
+
+export interface KnowledgeSpinUp {
+	origin: number
+	years: number
+}
+
+export interface SovereignsParams {
+	state: HistoryState
+}
+
+export interface FillLiveParams {
+	state: HistoryState
+	value: number
+}
+
+export interface StepParams {
+	state: HistoryState
+	current: Float32Array
+	next: Float32Array
+	sovereign: Int32Array
+	yearFraction: number
+	worldKnowledge: number
+	ownFactor: (sovereign: number) => number
+}

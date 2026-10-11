@@ -2,6 +2,7 @@ import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import type { RgbColor } from "@/model/shared/color/color-interpolation/types"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
 import {
+	altElevationToColor,
 	elevationToColor,
 	grayscaleColor,
 	hex,
@@ -15,6 +16,7 @@ export { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors/misc"
 
 export type ColorMode =
 	| "terrain"
+	| "terrainAlt"
 	| "landHeightmap"
 	| "slope"
 	| "topography"
@@ -636,6 +638,10 @@ export function windSpeedColor(speedMs: number): [number, number, number] {
 	return COLOR_INTERPOLATION.sampleColorStops({ stops: windSpeedStops, t })
 }
 
+export function isColoredTerrainMode(mode: ColorMode): boolean {
+	return mode === "terrain" || mode === "terrainAlt"
+}
+
 export function getColor(
 	km: number,
 	mode: ColorMode,
@@ -646,6 +652,8 @@ export function getColor(
 			return grayscaleColor(km, maxElevKm)
 		case "slope":
 			return slopeColor(Math.max(0, Math.min(1, km)))
+		case "terrainAlt":
+			return altElevationToColor(km)
 		default:
 			return elevationToColor(km, maxElevKm)
 	}

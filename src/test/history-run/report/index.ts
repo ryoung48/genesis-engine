@@ -486,7 +486,7 @@ function runSeed({
 		}).trim(),
 		generationMs,
 		engineMs,
-		initial,
+		initial: { ...initial, spinUp: engine.knowledgeSpinUp },
 		lateKnowledgeBand: options.lateKnowledgeBand,
 		recruitment: [
 			RECRUITMENT_REPORT.snapshot({
@@ -665,7 +665,10 @@ function runSeed({
 			HISTORY_VALIDATION.unions({ engine, tracker: validation })
 			if ((year - start) % 10 === 0)
 				HISTORY_VALIDATION.districts({ engine, tracker: validation })
-			if ([1367, 1500, 1800].includes(year) || year === start + options.years) {
+			if (
+				[1000, 1100, 1200, 1367, 1500, 1800].includes(year) ||
+				year === start + options.years
+			) {
 				diagnostics.snapshots.push(KNOWLEDGE_REPORT.snapshot({ engine }))
 				persist()
 			}

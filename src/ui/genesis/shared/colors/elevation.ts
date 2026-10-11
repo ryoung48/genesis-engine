@@ -27,6 +27,15 @@ export function elevationToColor(
 	return COLOR_INTERPOLATION.sampleColorStops({ stops: landColorStops, t })
 }
 
+export function altElevationToColor(km: number): [number, number, number] {
+	if (km <= 0) return elevationToColor(km)
+	const meters = km * 1000
+	const band =
+		altLandBands.find(({ maxMeters }) => meters < maxMeters) ??
+		altLandBands[altLandBands.length - 1]
+	return hex(band.color)
+}
+
 /**
  * Grayscale terrain: ocean = black, land on 0 -> maxElev km scale.
  * Accepts elevation in km.
@@ -39,6 +48,17 @@ export function grayscaleColor(
 	const t = Math.max(0, Math.min(1, km / maxElevKm))
 	return [t, t, t]
 }
+
+const altLandBands: { maxMeters: number; color: number }[] = [
+	{ maxMeters: 100, color: 0x017476 },
+	{ maxMeters: 200, color: 0x3a8e86 },
+	{ maxMeters: 500, color: 0x74a996 },
+	{ maxMeters: 1000, color: 0xadc3a5 },
+	{ maxMeters: 1500, color: 0xe6ddb5 },
+	{ maxMeters: 2000, color: 0xc3977e },
+	{ maxMeters: 3000, color: 0x9f5449 },
+	{ maxMeters: Number.POSITIVE_INFINITY, color: 0xffffff },
+]
 
 const oceanColorStops: RgbColor[] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],
