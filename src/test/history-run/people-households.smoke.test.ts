@@ -260,6 +260,7 @@ for (const order of [
 					pretenderSeat: -1,
 					supportingSeats: [],
 					foreignClaimant: -1,
+					interregnum: false,
 				}
 			})
 		try {
@@ -347,6 +348,7 @@ for (const order of [
 				pretenderSeat: -1,
 				supportingSeats: [],
 				foreignClaimant: -1,
+				interregnum: false,
 			}))
 			const offset = new Int32Array(state.P + 1)
 			const list: number[] = []
@@ -886,6 +888,7 @@ it("freezes a mixed crown/district walk and dispatches each crown with its own l
 			pretenderSeat: -1,
 			supportingSeats: [],
 			foreignClaimant: -1,
+			interregnum: false,
 		}))
 	state.time += STATE.yearMs / 4
 	try {

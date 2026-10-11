@@ -17,6 +17,8 @@ export interface SuccessionChoice {
 	supportingSeats: number[]
 	// -1 when no foreign ruler stands in a disputed line.
 	foreignClaimant: number
+	// The dynasty ends with no heir and the districts break away.
+	interregnum: boolean
 }
 
 export interface Elector {

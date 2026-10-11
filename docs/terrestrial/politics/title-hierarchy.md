@@ -13,7 +13,7 @@ Titles are fixed regions of provinces. Who holds a title is separate state, comp
 | Tier | Name | Min size (provinces) | Generated | Founded |
 | --- | --- | --- | --- | --- |
 | 0 | county | 1 | implicit, one per province | no |
-| 1 | duchy | 2 | yes, target 4 | no |
+| 1 | duchy | 2 | yes, target 4 | only to recover a destroyed duchy |
 | 2 | kingdom | 8 | yes, target 16 | yes |
 | 3 | empire | 40 | yes, target 90 | yes |
 | 4 | hegemony | 180 | no | yes |
@@ -49,7 +49,7 @@ There is no hysteresis. The previous keep/challenge thresholds (holder keeps at 
 
 ## Founding and dissolving (`FOUNDING`, `CORONATION.elevate`)
 
-Only kingdom, empire and hegemony can be founded, and only as part of a [coronation](government-and-succession.md#coronation): a title above the realm's own rank at a mid-reign elevation coronation, a title at or below it at a new ruler's accession coronation. There is no separate founding charge: the coronation is the one payment, and each coronation founds at most one title.
+Kingdom, empire and hegemony can be founded, and a duchy can be refounded over provinces whose duchy was destroyed (below), only as part of a [coronation](government-and-succession.md#coronation): a title above the realm's own rank at a mid-reign elevation coronation, a title at or below it at a new ruler's accession coronation. There is no separate founding charge: the coronation is the one payment, and each coronation founds at most one title.
 
 A realm **qualifies** at tier `T` when:
 
@@ -85,9 +85,11 @@ An accession coronation never founds a title above the realm's rank.
 
 A personal union is not a composite realm: titles are held per realm, so union partners never qualify jointly.
 
-Generation, inheritance, conquest, automatic holder changes and acquisition of an existing or vacant title cost nothing. Dissolution gives no refund, and a later refounding is a new coronation at that day's price. There is no ongoing upkeep and no duchy founding.
+Generation, inheritance, conquest, automatic holder changes and acquisition of an existing or vacant title cost nothing. Dissolution gives no refund, and a later refounding is a new coronation at that day's price. There is no ongoing upkeep. Counties are never founded or destroyed.
 
-A founded title lapses when the nation holds fewer than 2 fully held children for 25 years (`LAPSE_YEARS`). Lapse is checked at each accession coronation, so a title founded mid-reign is first tested when the next ruler is crowned. It then emits `title destroyed` and the region is cleared. Generated titles never dissolve.
+A founded title lapses when the nation holds fewer than 2 fully held children for 25 years (`LAPSE_YEARS`). Lapse is checked at each accession coronation, so a title founded mid-reign is first tested when the next ruler is crowned. It then emits `title destroyed` and the region is cleared. Generated titles never dissolve by lapse. An [interregnum](government-and-succession.md#interregnum) destroys the realm's top-tier titles of duchy or above at once, generated or founded, and keeps the one-tier-below titles around the capital and the destroyed titles' seats as the crown land.
+
+**Recovered duchies.** `HistoryState.duchyGap` marks the provinces whose duchy was destroyed (by lapse or interregnum); it starts empty, so a province left outside any duchy by generation can never found one. A holder's candidates are its marked, duchy-less provinces, joined where adjacent and equal at every higher tier. The largest component (ties to the lowest province id) qualifies with at least 2 provinces and is trimmed to 4 by growth from the best `seatScore`. The existing coronation flow founds it with the usual 2% + 2% × claim roll, priced at the realm's rank after the founding (a duchy-rank realm pays 625 / 144 ducats, about 4.34). A recovered duchy lapses when fewer than 2 of its provinces are held for 25 years, marking them again. It never makes a realm composite.
 
 ## Nation vs its subordinates
 

@@ -17,6 +17,7 @@ import type {
 	PersonAtParams,
 	PersonRefParams,
 	PreferenceParams,
+	PromoteParams,
 	RaiseParams,
 	SetRegentParams,
 	SetRulerParams,
@@ -262,6 +263,18 @@ function setRuler({
 	if (person >= 0) raise({ people, person, rank })
 }
 
+// The seat's holder keeps it but a district tenure ends and a ruler tenure
+// begins, which the record folds from a vacating and a taking row.
+function promote({ people, seat }: PromoteParams): void {
+	const person = people.rulerOf[seat]
+	if (person < 0) return
+	for (const holder of [-1, person])
+		PEOPLE_LOG.append({
+			log: people.log,
+			row: { kind: "seat", seat, person: holder, reason: "interregnum" },
+		})
+}
+
 function setRegent({ people, seat, person, ward }: SetRegentParams): void {
 	PEOPLE_LOG.append({
 		log: people.log,
@@ -364,6 +377,7 @@ function redraw({ people, person }: PersonRefParams): void {
 export const PEOPLE = {
 	redraw,
 	setRuler,
+	promote,
 	setRegent,
 	family,
 	tiedByMarriage,

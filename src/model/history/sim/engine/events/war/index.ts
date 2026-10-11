@@ -649,6 +649,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 }
 
 export const WAR = {
+	candidates: listWarCandidates,
 	start: (params: StartWarParams) =>
 		MILITARY.mutate({ state: params.state, action: () => start(params) }),
 	initWar: (params: InitWarParams) =>

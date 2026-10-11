@@ -69,3 +69,8 @@ export interface TopTierParams {
 	state: HistoryState
 	realm: number
 }
+
+export interface DissolveTitleParams {
+	state: HistoryState
+	title: number
+}

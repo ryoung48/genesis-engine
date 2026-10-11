@@ -1,5 +1,6 @@
 import type {
 	HistoryEvent,
+	HistoryRecord,
 	HistoryState,
 	RevoltComment,
 } from "@/model/history/record/types"
@@ -123,4 +124,11 @@ export interface RulerDeathParams {
 export interface ContributionsParams {
 	translator: ProceduralTranslator
 	data: EngineNote["data"]
+}
+
+export interface InheritGovernmentParams {
+	record: HistoryRecord
+	ids: number[]
+	government: string
+	timeMs: number
 }

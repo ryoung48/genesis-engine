@@ -22,6 +22,19 @@ export interface OrphanParams {
 	parentHeld: boolean
 }
 
+export interface DuchyGroupsParams {
+	titles: DejureTitles
+	provinceCount: number
+	ownerOf: Int32Array
+	// Provinces whose duchy was destroyed.
+	gap: Uint8Array
+	adjOffset: Int32Array
+	adjList: Int32Array
+	habitability: Float32Array
+	urbanPop: Float32Array
+	waterAccess: Uint8Array
+}
+
 export interface QualifyingParams {
 	titles: DejureTitles
 	members: TitleMembers
@@ -33,6 +46,18 @@ export interface QualifiedFounding {
 	holder: number
 	tier: number
 	children: number[]
+}
+
+export interface SameAboveParams {
+	titles: DejureTitles
+	provinceCount: number
+	a: number
+	b: number
+}
+
+export interface TrimDuchyParams {
+	group: number[]
+	params: DuchyGroupsParams
 }
 
 export interface QualifiesParams {

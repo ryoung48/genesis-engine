@@ -51,8 +51,11 @@ function applyEvent({
 	}
 	for (let province = 0; province < provinceCount; province++) {
 		const inside = created
-			? slot > 0 &&
-				children.has(frame.regionOf[(slot - 1) * provinceCount + province])
+			? children.has(
+					slot === 0
+						? province
+						: frame.regionOf[(slot - 1) * provinceCount + province],
+				)
 			: frame.regionOf[slot * provinceCount + province] === event.title
 		if (!inside) continue
 		frame.regionOf[slot * provinceCount + province] = created ? event.title : -1

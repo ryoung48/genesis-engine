@@ -58,6 +58,7 @@ import type {
 	RealmPairParams,
 	ReleaseDisconnectedProvinceParams,
 	ReleaseFactionParams,
+	ReleaseFactionsParams,
 	ReleaseProvinceParams,
 	ReleaseSubjectRelationsParams,
 	RepartitionNationParams,
@@ -168,86 +169,118 @@ function getWarAllies({
 	return allies
 }
 
+function releaseFactions({
+	state,
+	seats,
+	rng,
+	reason,
+}: ReleaseFactionsParams): void {
+	const releases = seats.map(({ p, supporters }) => {
+		const formerSovereign = getSovereign({ state, p })
+		const supportingSeats = [...new Set(supporters)].filter(
+			(seat) =>
+				seat !== p &&
+				FIELDS.prov.parent.get({ state, p: seat }) === formerSovereign,
+		)
+		const supportingProvinces = supportingSeats.flatMap((seat) =>
+			getNationProvinces({ state, root: seat }),
+		)
+		const formerPopulation = getNationPopulation({
+			state,
+			root: formerSovereign,
+		})
+		const share =
+			formerPopulation > 0
+				? (getNationPopulation({ state, root: p }) +
+						supportingProvinces.reduce(
+							(sum, province) =>
+								sum +
+								state.popRuralCurrent[province] +
+								state.popUrbanCurrent[province],
+							0,
+						)) /
+					formerPopulation
+				: 0
+		return { p, formerSovereign, supportingSeats, supportingProvinces, share }
+	})
+	const formerRealms = new Set(
+		releases.map((release) => release.formerSovereign),
+	)
+	for (const nation of formerRealms)
+		RECRUITMENT.settleOwnership({ state, nation })
+	const treasuries = releases.map(
+		({ formerSovereign, share }) =>
+			Math.max(0, FIELDS.prov.treasury.get({ state, p: formerSovereign })) *
+			share,
+	)
+	for (const [
+		index,
+		{ p, formerSovereign, supportingSeats },
+	] of releases.entries()) {
+		const treasury = treasuries[index]
+		FIELDS.prov.treasury.set({ state, p, value: treasury })
+		const releasedBudget = TREASURY_BUDGET.get({ state, p })
+		releasedBudget.succession += treasury
+		releasedBudget.otherChangesTotal += treasury
+		FIELDS.prov.treasury.set({
+			state,
+			p: formerSovereign,
+			value: FIELDS.prov.treasury.get({ state, p: formerSovereign }) - treasury,
+		})
+		const formerBudget = TREASURY_BUDGET.get({ state, p: formerSovereign })
+		formerBudget.succession -= treasury
+		formerBudget.otherChangesTotal -= treasury
+		FIELDS.prov.parent.set({ state, p, value: -1 })
+		for (const seat of supportingSeats)
+			FIELDS.prov.parent.set({ state, p: seat, value: p })
+	}
+	rebuildAssignment({ state })
+	for (const nation of formerRealms)
+		repartitionNation({ state, nation, subjects: [] })
+	for (const { p, supportingProvinces } of releases)
+		repartitionNation({ state, nation: p, subjects: supportingProvinces })
+	for (const nation of formerRealms) RECRUITMENT.reconstitute({ state, nation })
+	for (const { p, formerSovereign } of releases) {
+		RECRUITMENT.reconstitute({ state, nation: p })
+		clearRealmDiplomacy({ state, nation: p })
+		const vassal = state.people.rulerOf[p]
+		if (
+			vassal >= 0 &&
+			state.people.persons.heldSeats[vassal].includes(p) &&
+			PEOPLE.aliveAt({
+				people: state.people,
+				person: vassal,
+				time: state.time / yearMs,
+			}) &&
+			state.people.persons.heldSeats[vassal].every(
+				(seat) =>
+					seat === p ||
+					!isSovereign({ state, p: seat }) ||
+					(seat !== formerSovereign && canUnite({ state, a: p, b: seat })),
+			)
+		)
+			installRuler({ state, p, person: vassal, claim: FOUNDER_CLAIM, reason })
+		else
+			foundRuler({
+				state,
+				p,
+				age: STARTING_RANDOM.rulerAge({ rng }),
+				claim: FOUNDER_CLAIM,
+				rng,
+				reason,
+			})
+		scheduleSuccession({ state, p })
+	}
+}
+
 function releaseFaction({
 	state,
 	p,
+	supporters,
 	rng,
 	reason,
-	supporters,
 }: ReleaseFactionParams): void {
-	const formerSovereign = getSovereign({ state, p })
-	const supportingSeats = [...new Set(supporters)].filter(
-		(seat) =>
-			seat !== p &&
-			FIELDS.prov.parent.get({ state, p: seat }) === formerSovereign,
-	)
-	const supportingProvinces = supportingSeats.flatMap((seat) =>
-		getNationProvinces({ state, root: seat }),
-	)
-	const formerPopulation = getNationPopulation({ state, root: formerSovereign })
-	const share =
-		formerPopulation > 0
-			? (getNationPopulation({ state, root: p }) +
-					supportingProvinces.reduce(
-						(sum, province) =>
-							sum +
-							state.popRuralCurrent[province] +
-							state.popUrbanCurrent[province],
-						0,
-					)) /
-				formerPopulation
-			: 0
-	RECRUITMENT.settleOwnership({ state, nation: formerSovereign })
-	const treasury =
-		Math.max(0, FIELDS.prov.treasury.get({ state, p: formerSovereign })) * share
-	FIELDS.prov.treasury.set({ state, p, value: treasury })
-	const releasedBudget = TREASURY_BUDGET.get({ state, p })
-	releasedBudget.succession += treasury
-	releasedBudget.otherChangesTotal += treasury
-	FIELDS.prov.treasury.set({
-		state,
-		p: formerSovereign,
-		value: FIELDS.prov.treasury.get({ state, p: formerSovereign }) - treasury,
-	})
-	const formerBudget = TREASURY_BUDGET.get({ state, p: formerSovereign })
-	formerBudget.succession -= treasury
-	formerBudget.otherChangesTotal -= treasury
-	FIELDS.prov.parent.set({ state, p, value: -1 })
-	for (const seat of supportingSeats)
-		FIELDS.prov.parent.set({ state, p: seat, value: p })
-	rebuildAssignment({ state })
-	repartitionNation({ state, nation: formerSovereign, subjects: [] })
-	repartitionNation({ state, nation: p, subjects: supportingProvinces })
-	RECRUITMENT.reconstitute({ state, nation: formerSovereign })
-	RECRUITMENT.reconstitute({ state, nation: p })
-	clearRealmDiplomacy({ state, nation: p })
-	const vassal = state.people.rulerOf[p]
-	if (
-		vassal >= 0 &&
-		state.people.persons.heldSeats[vassal].includes(p) &&
-		PEOPLE.aliveAt({
-			people: state.people,
-			person: vassal,
-			time: state.time / yearMs,
-		}) &&
-		state.people.persons.heldSeats[vassal].every(
-			(seat) =>
-				seat === p ||
-				!isSovereign({ state, p: seat }) ||
-				(seat !== formerSovereign && canUnite({ state, a: p, b: seat })),
-		)
-	)
-		installRuler({ state, p, person: vassal, claim: FOUNDER_CLAIM, reason })
-	else
-		foundRuler({
-			state,
-			p,
-			age: STARTING_RANDOM.rulerAge({ rng }),
-			claim: FOUNDER_CLAIM,
-			rng,
-			reason,
-		})
-	scheduleSuccession({ state, p })
+	releaseFactions({ state, seats: [{ p, supporters }], rng, reason })
 }
 
 function releaseProvince(params: ReleaseProvinceParams): void {
@@ -835,6 +868,7 @@ function createHistoryState({
 		compositeRealm: new Uint8Array(P),
 		districtRank: new Uint8Array(P),
 		topTier: new Uint8Array(P),
+		duchyGap: new Uint8Array(P),
 		titleFounded: new Uint8Array(nations.titles.count + TITLE_CAPACITY),
 		titleLapseSince: new Float64Array(
 			nations.titles.count + TITLE_CAPACITY,
@@ -1367,6 +1401,11 @@ export const STATE = {
 		MILITARY.mutate({
 			state: params.state,
 			action: () => releaseProvince(params),
+		}),
+	releaseFactions: (params: ReleaseFactionsParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => releaseFactions(params),
 		}),
 	releaseFaction: (params: ReleaseFactionParams) =>
 		MILITARY.mutate({

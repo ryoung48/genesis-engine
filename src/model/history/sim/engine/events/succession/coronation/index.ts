@@ -193,6 +193,7 @@ function flagComposite({ state, qualifying }: FlagCompositeParams): number {
 	for (const { holder, tier } of qualifying) {
 		if (
 			state.compositeRealm[holder] ||
+			tier === 1 ||
 			tier <= STATE_TITLES.topTier({ state, realm: holder })
 		)
 			continue

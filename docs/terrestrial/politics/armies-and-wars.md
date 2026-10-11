@@ -56,6 +56,7 @@ Coalition battle attendance gives allies diminishing returns beyond the lead's o
 | Initial interstate wars | Seeded among neighboring sovereigns; some start with occupied provinces and depleted troops. |
 | Later interstate war | Periodic decision, usually every 5–10 years; independent, strong-crown realm picks its nearest viable neighbor (by distance from its capital to the neighbor's closest province) if threat is below its relation threshold. |
 | Foreign claim | A foreign ruler next in a disputed single-heir succession declares a claim war on the realm if it would attack that neighbour for land (see [foreign claims](personal-unions.md#foreign-claims)). |
+| Interregnum | When a heirless hereditary realm breaks into freed districts, each freed realm declares a conquest war on its weakest bordering freed realm (see [interregnum](government-and-succession.md#interregnum)). |
 | Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed whole, with no war. |
 
 A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.

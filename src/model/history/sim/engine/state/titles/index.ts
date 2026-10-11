@@ -7,6 +7,7 @@ import {
 import type {
 	ApplyDerivedParentsParams,
 	DissolveLapsedParams,
+	DissolveTitleParams,
 	ElectFoundingParams,
 	Founding,
 	FoundParams,
@@ -29,7 +30,7 @@ import { HOLDING } from "@/model/society/dejure/holding"
 import { TITLES } from "@/model/society/titles"
 
 const TIER_SLOTS = TITLES.tierOrder.length - 1
-const FIRST_FOUNDED_TIER = 2
+const FIRST_FOUNDED_TIER = 1
 const LAPSE_YEARS = 25
 const BASE_FOUNDING_CHANCE = 0.02
 const CLAIM_FOUNDING_CHANCE = 0.02
@@ -197,7 +198,7 @@ function settleProvinces({ state, provinces }: SettleProvincesParams): void {
 	settleTitleSet({ state, touched })
 }
 
-function refreshTitleIndex({ state }: DissolveLapsedParams): void {
+function refreshTitleIndex({ state }: QualifyingParams): void {
 	state.titleMembers = DEJURE.membersOf({
 		titles: state.titles,
 		provinceCount: state.P,
@@ -226,9 +227,11 @@ function found({ state, nation, founding }: FoundParams): boolean {
 		children: founding.children,
 	})
 	if (!founded) return false
+	if (founded.tier === 1)
+		for (const province of founded.children) state.duchyGap[province] = 0
 	state.titleFounded[founded.title] = 1
 	state.titleLapseSince[founded.title] = -1
-	refreshTitleIndex({ state, nation })
+	refreshTitleIndex({ state })
 	state.events.push({
 		tag: "title created",
 		time: state.time,
@@ -252,6 +255,16 @@ function ownedChildCount({
 	title,
 }: OwnedChildCountParams): number {
 	const tier = state.titles.tier[title]
+	if (tier === 1) {
+		let owned = 0
+		for (
+			let i = state.titleMembers.offset[title];
+			i < state.titleMembers.offset[title + 1];
+			i++
+		)
+			if (state.sovereignCurrent[state.titleMembers.list[i]] === nation) owned++
+		return owned
+	}
 	return FOUNDING.fullyHeldChildren({
 		titles: state.titles,
 		members: state.titleMembers,
@@ -271,6 +284,39 @@ function ownedChildCount({
 	).length
 }
 
+// Destroys one title and returns the sovereigns that held it or owned its land.
+function dissolve({ state, title }: DissolveTitleParams): number[] {
+	const affected = new Set([state.titles.holder[title]])
+	for (
+		let i = state.titleMembers.offset[title];
+		i < state.titleMembers.offset[title + 1];
+		i++
+	) {
+		const province = state.titleMembers.list[i]
+		affected.add(state.sovereignCurrent[province])
+		if (state.titles.tier[title] === 1) state.duchyGap[province] = 1
+	}
+	const dissolved = FOUNDING.dissolve({
+		titles: state.titles,
+		members: state.titleMembers,
+		provinceCount: state.P,
+		title,
+	})
+	state.titleFounded[title] = 0
+	refreshTitleIndex({ state })
+	state.events.push({
+		tag: "title destroyed",
+		time: state.time,
+		data: {
+			title,
+			tier: dissolved.tier,
+			children: dissolved.children,
+			ancestors: dissolved.ancestors,
+		},
+	})
+	return [...affected].filter((nation) => nation >= 0)
+}
+
 function dissolveLapsed({ state, nation }: DissolveLapsedParams): void {
 	for (let title = 0; title < state.titles.count; title++) {
 		if (!state.titleFounded[title] || state.titles.holder[title] !== nation)
@@ -285,42 +331,43 @@ function dissolveLapsed({ state, nation }: DissolveLapsedParams): void {
 		}
 		if (state.time - state.titleLapseSince[title] < LAPSE_YEARS * YEAR_MS)
 			continue
-		const dissolved = FOUNDING.dissolve({
-			titles: state.titles,
-			members: state.titleMembers,
-			provinceCount: state.P,
-			title,
-		})
-		state.titleFounded[title] = 0
-		refreshTitleIndex({ state, nation })
-		state.events.push({
-			tag: "title destroyed",
-			time: state.time,
-			data: {
-				title,
-				tier: dissolved.tier,
-				children: dissolved.children,
-				ancestors: dissolved.ancestors,
-			},
-		})
+		dissolve({ state, title })
 		relinkNations({ state, nations: [nation] })
 	}
+}
+
+function duchyGroups({ state }: QualifyingParams): Map<number, number[]> {
+	return FOUNDING.duchyGroups({
+		titles: state.titles,
+		provinceCount: state.P,
+		ownerOf: state.sovereignCurrent,
+		gap: state.duchyGap,
+		adjOffset: state.provinceAdjOffset,
+		adjList: state.provinceAdjList,
+		habitability: state.habitability,
+		urbanPop: state.popUrbanCurrent,
+		waterAccess: state.waterAccess,
+	})
 }
 
 // The tiers the realm qualifies to found at, lowest first, from a scan of its
 // own titles.
 function qualified({ state, nation }: DissolveLapsedParams): Founding[] {
 	const result: Founding[] = []
+	const duchy = duchyGroups({ state }).get(nation)
 	for (let tier = FIRST_FOUNDED_TIER; tier <= TIER_SLOTS; tier++) {
-		const children = FOUNDING.fullyHeldChildren({
-			titles: state.titles,
-			members: state.titleMembers,
-			provinceCount: state.P,
-			ownerOf: state.sovereignCurrent,
-			holder: nation,
-			tier,
-			orphansOnly: true,
-		})
+		const children =
+			tier === 1
+				? (duchy ?? [])
+				: FOUNDING.fullyHeldChildren({
+						titles: state.titles,
+						members: state.titleMembers,
+						provinceCount: state.P,
+						ownerOf: state.sovereignCurrent,
+						holder: nation,
+						tier,
+						orphansOnly: true,
+					})
 		if (FOUNDING.qualifies({ members: state.titleMembers, children, tier }))
 			result.push({ tier, children })
 	}
@@ -330,12 +377,15 @@ function qualified({ state, nation }: DissolveLapsedParams): Founding[] {
 // Every realm's qualifying tiers from one sweep of the registry.
 function qualifying({ state }: QualifyingParams): QualifiedFounding[] {
 	DERIVE.ensureHierarchyClean(state)
-	return FOUNDING.qualifying({
+	const founding = FOUNDING.qualifying({
 		titles: state.titles,
 		members: state.titleMembers,
 		provinceCount: state.P,
 		ownerOf: state.sovereignCurrent,
 	})
+	for (const [holder, children] of duchyGroups({ state }))
+		founding.push({ holder, tier: 1, children })
+	return founding.sort((a, b) => a.holder - b.holder || a.tier - b.tier)
 }
 
 // The lowest qualifying tier the realm can pay for and rolls well on; a tier
@@ -366,6 +416,8 @@ export const STATE_TITLES = {
 	qualified,
 	qualifying,
 	electFounding,
+	dissolve,
+	relink: relinkNations,
 	found,
 	isDistrictSeat,
 	settleProvinces,

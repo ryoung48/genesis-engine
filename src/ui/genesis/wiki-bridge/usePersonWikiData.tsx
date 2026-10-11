@@ -489,25 +489,27 @@ export function usePersonWikiData(
 							? ` in the partition of ${divided.name}`
 							: " in a partition"
 				const reason =
-					event.reason === "succession"
-						? "after a succession"
-						: event.reason === "usurpation"
-							? "in a usurpation"
-							: event.reason === "rebellion"
-								? "after a rebellion"
-								: event.reason === "restoration"
-									? "after a restoration"
-									: event.reason === "union"
-										? "when the realms united"
-										: event.reason === "promotion"
-											? "after promotion"
-											: event.reason === "demotion"
-												? "after demotion"
-												: event.reason === "territorial change"
-													? "after a territorial change"
-													: event.reason === "district grant"
-														? "when the seat was granted"
-														: ""
+					event.reason === "interregnum"
+						? "in the interregnum"
+						: event.reason === "succession"
+							? "after a succession"
+							: event.reason === "usurpation"
+								? "in a usurpation"
+								: event.reason === "rebellion"
+									? "after a rebellion"
+									: event.reason === "restoration"
+										? "after a restoration"
+										: event.reason === "union"
+											? "when the realms united"
+											: event.reason === "promotion"
+												? "after promotion"
+												: event.reason === "demotion"
+													? "after demotion"
+													: event.reason === "territorial change"
+														? "after a territorial change"
+														: event.reason === "district grant"
+															? "when the seat was granted"
+															: ""
 				pushTimelineEvent(timelineEvents, {
 					...base,
 					type: "Ruler",
@@ -520,7 +522,9 @@ export function usePersonWikiData(
 									: `${person.name} was granted ${district}${nation ? ` in ${nation.name}` : ""}.`
 							: sovereign
 								? `${person.name} lost the throne of ${place}${reason ? ` ${reason}` : ""}.`
-								: `${person.name} lost ${district}${partition}.`,
+								: event.reason === "interregnum"
+									? `${person.name} made ${district} an independent realm in the interregnum.`
+									: `${person.name} lost ${district}${partition}.`,
 					people: selfMentions,
 					nations: [nation, divided].flatMap((entry, index, all) =>
 						entry &&

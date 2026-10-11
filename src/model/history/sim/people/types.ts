@@ -99,6 +99,7 @@ export type SeatChangeReason =
 	| "territorial change"
 	| "district grant"
 	| "partition"
+	| "interregnum"
 	| "promotion"
 	| "demotion"
 	| "unknown"
@@ -323,4 +324,9 @@ export interface NameSeedParams {
 
 export interface PreferenceParams {
 	genderSystem: number
+}
+
+export interface PromoteParams {
+	people: PeopleState
+	seat: number
 }

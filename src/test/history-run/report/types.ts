@@ -5,6 +5,7 @@ import type {
 	HouseholdsReport,
 	ResidenceReport,
 } from "@/test/history-run/report/households/types"
+import type { InterregnumReport } from "@/test/history-run/report/interregnum/types"
 import type { MilitaryReport } from "@/test/history-run/report/military/types"
 import type {
 	PartitionReport,
@@ -82,6 +83,7 @@ export interface CenturyReport {
 	districts: DistrictReport
 	partitionState: PartitionStateReport
 	partition: PartitionReport
+	interregnum: InterregnumReport
 }
 
 export interface MarriageReport {

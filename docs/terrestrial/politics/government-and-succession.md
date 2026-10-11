@@ -87,7 +87,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 
 | System | Governments | Rule |
 |---|---|---|
-| Single heir | feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a [personal union](personal-unions.md). With no heir, the strongest adult district holder takes it as a new house. |
+| Single heir | feudal / absolute / constitutional monarchy, dynastic signoria, imperial cult | `HEIRS.of`. The heir may already rule elsewhere, which forms a [personal union](personal-unions.md). With no heir and at least one living district admin, an [interregnum](#interregnum) follows; with no district admin a random noble takes it as a new house. |
 | Single heir, then partition | chiefdom, tribal monarchy | The same rule picks the primary heir, who keeps the realm root; the other child lines take surplus titles, then titled districts, as new realms (see Partition). |
 | Election | elective monarchy, tribal federation, native council, steppe horde, republics | See below. |
 | Appointment | theocracy, monastic state, warlord state, trading company, settler colony, modern regimes | Half the time an adult of a district-holding house of the preferred sex, else a new house. |
@@ -98,7 +98,7 @@ The government type picks the system (`GOVERNMENT.successionOfIndex`). Chiefdoms
 - 3: child or founder, a restored claimant, and a junior heir who received a realm in a partition;
 - 2: sibling or elected;
 - 1: other relative, appointed, or a usurping kinsman;
-- 0: new house or lord protector.
+- 0: new house, lord protector, or the crown-land ruler after an interregnum.
 
 **Disputes.** A single-heir succession is disputed when the heir rules elsewhere, is under 16, or is of the sex the culture passes over, and an adult of the preferred sex stands next in line.
 - The district holders split between the heir and the rival. With at least 40% backing, and then with a chance equal to that share, the rival's district (or their strongest backer's) leads a revolt with the rival as pretender. Every district that backed the rival joins it.
@@ -136,6 +136,22 @@ Remaining junior heirs take one titled district each, best rank and population f
 - `partition`, with the heirs and their seats, every resulting realm's kind (`primary`, `heir`, or `released` for cut-off land that went independent), population, province count and top tier, the admins who moved and where, the districts that joined an heir realm, the heirs who received nothing and why (`no seat`, `reserved seat unavailable`, `share dropped`), and the titles left without a holder.
 
 The history report's `partition` section is built from these notes (`src/test/history-run/report/partition`): how often realms divide and why not, how large the shares are, what happens to title holding, and what becomes of the heir realms.
+
+## Interregnum
+
+Code: `src/model/history/sim/engine/events/succession/interregnum` (`INTERREGNUM`, called from `runSeatSuccession`).
+
+**Gate.** A single-heir realm (including the partitioning governments) whose ruler dies with no eligible heir, and that has at least one living district admin other than the dying ruler, ends its dynasty's authority. Elections, appointment, a vacant throne and a heirless realm with no district admin are unchanged: the last gets a random noble as a new house.
+
+**Sequence.**
+1. A snapshot records every district seat with a living admin (ascending seat id) and every top-tier title of tier duchy or above the realm holds.
+2. `STATE.releaseFactions` frees all snapshot seats in one batch, so each freed realm owns exactly the provinces its seat owned at the moment of death. Each takes the realm's government, is ruled by its admin (claim 3; a new house when the admin holds another sovereign seat that cannot unite with it), and a minor or incapable admin gets the usual regency. The admin's district tenure ends and a ruler tenure begins at the same instant (seat reason `interregnum`).
+3. The snapshot titles are destroyed at once, founded or generated, with no 25-year wait. Counties are never destroyed. Every sovereign that owned land of a destroyed title, held it, or was freed is relinked, so ranks and districts are current.
+4. Crown land the releases cut off from the root goes independent through the connection repair.
+5. The original nation keeps the one-tier-below titles around its capital and the destroyed titles' seats, the loose land attached to them and vacant district seats. A random noble (age 20–50, claim 0) rules it.
+6. Each freed realm, in ascending id, declares a conquest war on the bordering freed realm with the lowest threat (ties to the lower id), skipping truces and ties; a realm already attacked declares nothing. The crown-land realm fights none of them by this rule.
+
+The succession starts no pretender, weak-crown or restoration revolt, as with a partition. The `interregnum` note records the freed seats and their admins, skipped seats, cut-off provinces, wars and titles lost; the history report's `interregnum` section is built from it. Destroyed kingdoms and empires return through the [coronation](#coronation); destroyed duchies return as [recovered duchies](title-hierarchy.md#founding-and-dissolving-founding-coronationelevate).
 
 ## Attribute and trait effects
 
@@ -213,7 +229,7 @@ Code: `src/model/history/sim/engine/events/succession/coronation` (`CORONATION.h
 
 A coronation is the ceremony, regalia and recognition of a ruler, with the gifts handed to the realm's district admins. The realm's own treasury pays. There are two kinds.
 
-**Accession coronation.** Held when a person becomes ruler of a realm that already exists and is still sovereign afterwards: by succession, usurpation or regime change, under every government type. It is held once the throne is settled, after any partition, regency choice, succession revolt and restoration attempt, so its gifts do not affect the accession's own revolt test; they affect the yearly rebellion tests of the following ten years. Lapsed founded titles dissolve at this point, and the realm may found one title [at or below its own rank](title-hierarchy.md#founding-and-dissolving-founding-coronationelevate); a title above it waits for an elevation.
+**Accession coronation.** Held when a person becomes ruler of a realm that already exists and is still sovereign afterwards: by succession, usurpation or regime change, under every government type. It is held once the throne is settled, after any partition, regency choice, succession revolt and restoration attempt, so its gifts do not affect the accession's own revolt test; they affect the yearly rebellion tests of the following ten years. Lapsed founded titles dissolve at this point, and the realm may found one title (including a recovered duchy) [at or below its own rank](title-hierarchy.md#founding-and-dissolving-founding-coronationelevate); a title above it waits for an elevation.
 
 Not crowned: rulers of realms created at that moment (partition heirs, breakaway and pretender realms, released provinces), initial and backfilled rulers, district holders, and a union junior that merges into its senior while taking the ruler.
 

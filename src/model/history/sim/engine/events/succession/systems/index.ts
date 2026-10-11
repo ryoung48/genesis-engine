@@ -46,6 +46,7 @@ const NEW_HOUSE: SuccessionChoice = {
 	pretenderSeat: -1,
 	supportingSeats: [],
 	foreignClaimant: -1,
+	interregnum: false,
 }
 
 function now(state: HistoryState): number {
@@ -325,7 +326,14 @@ function singleHeir({
 		eligible: (person) => inheritable({ state, realm, person }),
 	})
 	if (heir < 0)
-		return { ...NEW_HOUSE, heir: strongestDistrict({ state, realm }) }
+		return {
+			...NEW_HOUSE,
+			interregnum:
+				dying >= 0 &&
+				districtsOf({ state, realm }).some(
+					(district) => district.person !== dying,
+				),
+		}
 	const choice: SuccessionChoice = {
 		heir,
 		claim: HEIR_CLAIM[relation],
@@ -333,6 +341,7 @@ function singleHeir({
 		pretenderSeat: -1,
 		supportingSeats: [],
 		foreignClaimant: -1,
+		interregnum: false,
 	}
 	if (!disputed({ state, realm, person: heir })) return choice
 	choice.foreignClaimant = HEIRS.of({
@@ -397,6 +406,7 @@ function election(params: ChooseParams): SuccessionChoice {
 			pretenderSeat: -1,
 			supportingSeats: [],
 			foreignClaimant: -1,
+			interregnum: false,
 		}
 	const totalWeight = electors.reduce((sum, e) => sum + e.weight, 0)
 	const candidates: Candidate[] = []
@@ -463,6 +473,7 @@ function election(params: ChooseParams): SuccessionChoice {
 			choices[i] === pretenderIndex ? [elector.seat] : [],
 		),
 		foreignClaimant: -1,
+		interregnum: false,
 	}
 }
 
@@ -483,6 +494,7 @@ function appointment({ state, realm, rng }: ChooseParams): SuccessionChoice {
 		pretenderSeat: -1,
 		supportingSeats: [],
 		foreignClaimant: -1,
+		interregnum: false,
 	}
 }
 

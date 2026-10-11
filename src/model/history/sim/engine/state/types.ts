@@ -204,6 +204,8 @@ export interface HistoryState {
 	districtRank: Uint8Array
 	topTier: Uint8Array
 	titleFounded: Uint8Array
+	// Provinces whose duchy was destroyed; only they can found a duchy again.
+	duchyGap: Uint8Array
 	titleLapseSince: Float64Array
 	_nationAdjCache?: { offset: Int32Array; list: Int32Array }
 	_nationAdjCacheVersion?: number
@@ -596,4 +598,11 @@ export interface UnionLink {
 	senior: number
 	junior: number
 	merge: boolean
+}
+
+export interface ReleaseFactionsParams {
+	state: HistoryState
+	seats: { p: number; supporters: number[] }[]
+	rng: SharedRng
+	reason: SeatChangeReason
 }

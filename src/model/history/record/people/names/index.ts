@@ -112,6 +112,11 @@ function comment({ people, comment }: PersonCommentParams): string | null {
 		const heir = names({ people, person: comment.person })?.name
 		return `Split from ${comment.nation} in the partition of ${late ? `${late}'s` : "the late ruler's"} realm${heir ? `, under ${heir}` : ""}`
 	}
+	if (comment.cause === "interregnum") {
+		const late = names({ people, person: comment.late })?.name
+		const admin = names({ people, person: comment.person })?.name
+		return `Broke away from ${comment.nation} in the interregnum after ${late ? `${late}'s` : "the late ruler's"} death${admin ? `, under ${admin}` : ""}`
+	}
 	const pretender = names({ people, person: comment.person })?.name
 	return `Revolted against ${comment.nation} (${comment.cause}${pretender ? `, for ${pretender}` : ""})${comment.throne ? " to seize the throne" : ""}`
 }

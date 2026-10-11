@@ -26,6 +26,7 @@ import type {
 	HouseholdsReport,
 	StructuralSample,
 } from "@/test/history-run/report/households/types"
+import { INTERREGNUM_REPORT } from "@/test/history-run/report/interregnum"
 import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
@@ -599,6 +600,8 @@ function runSeed({
 	const districts = DISTRICTS_REPORT.capture({ engine })
 	const partitions = PARTITION_REPORT.tracker()
 	partitions.cursor = engine.events.length
+	const interregnums = INTERREGNUM_REPORT.tracker()
+	interregnums.cursor = engine.events.length
 	let divideMs = 0
 	let divideTotalMs = 0
 	const divide = PARTITION.divide
@@ -668,6 +671,7 @@ function runSeed({
 			}
 			DISTRICTS_REPORT.sample({ engine, tracker: districts.tracker })
 			PARTITION_REPORT.observe({ engine, tracker: partitions })
+			INTERREGNUM_REPORT.observe({ engine, tracker: interregnums })
 			trackMarriages({ engine, tracker })
 			PEOPLE_HEALTH_REPORT.sample({ engine, tracker: peopleHealth })
 			if (year === start + 10)
@@ -800,6 +804,12 @@ function runSeed({
 					from,
 					to: year,
 					divideMs,
+				}),
+				interregnum: INTERREGNUM_REPORT.summarize({
+					engine,
+					tracker: interregnums,
+					from,
+					to: year,
 				}),
 			})
 			roadCursor = engine.roads?.batch ?? 0
@@ -938,6 +948,13 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		for (const { from, to, partition: d } of reports)
 			options.log(
 				`${`${from}-${to}`.padEnd(11)} ${String(d.partitions).padStart(10)} ${`${(100 * d.rate).toFixed(0)}%`.padStart(5)} ${`${d.skipped["not child line"]}/${d.skipped["no junior heir"]}/${d.skipped["no free seat"]}`.padStart(23)} ${`${d.newRealms.p50}/${d.newRealms.p90}`.padStart(19)} ${d.primaryPopulationShare.p50.toFixed(2).padStart(18)} ${d.effectiveRealms.p50.toFixed(2).padStart(15)} ${`${(100 * d.sameTierShare).toFixed(0)}%`.padStart(10)} ${`${d.siblingWars}/${d.siblingUnions}`.padStart(20)} ${`${d.fates.mergedByUnion}/${d.fates.absorbedBySibling}/${d.fates.absorbedByOther}/${d.fates.partitionedAgain}`.padStart(33)} ${`${d.fates.standingInUnion}/${d.fates.standingAlone}`.padStart(21)} ${d.divideMs.toFixed(0).padStart(10)}`,
+			)
+		options.log(
+			"period      interregnums  freed p50/p90  skipped  wars  cut off  titles lost  freed still sovereign  heirless without districts",
+		)
+		for (const { from, to, interregnum: d } of reports)
+			options.log(
+				`${`${from}-${to}`.padEnd(11)} ${String(d.events).padStart(12)} ${`${d.freedPerEvent.p50}/${d.freedPerEvent.p90}`.padStart(14)} ${String(d.skippedSeats).padStart(8)} ${String(d.warsDeclared).padStart(5)} ${String(d.cutOffProvinces).padStart(8)} ${String(d.titlesLost).padStart(12)} ${`${d.freedStillSovereign}/${d.freedRealms}`.padStart(22)} ${String(d.withoutDistricts).padStart(26)}`,
 			)
 		MILITARY_REPORT.log({ reports, log: options.log })
 	}

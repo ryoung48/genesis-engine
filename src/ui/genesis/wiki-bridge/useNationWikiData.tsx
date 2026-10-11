@@ -732,6 +732,40 @@ export function useNationWikiData(
 						})
 						break
 					}
+					case "interregnum": {
+						const mention = (person: unknown) =>
+							recordPersonMention({
+								people: record.people,
+								person: Number(person ?? -1),
+							})
+						const late = mention(event.payload.late)
+						const ruler = mention(event.payload.ruler)
+						const crown = Number(event.payload.crown)
+						const realms = event.payload.realms as number[]
+						const attackers = event.payload.warAttackers as number[]
+						const defenders = event.payload.warDefenders as number[]
+						for (const realm of [crown, ...realms])
+							addNationMention(nations, realm)
+						const wars = attackers.map(
+							(attacker, war) =>
+								` ${eventNation(attacker).name} attacked ${eventNation(defenders[war]).name}.`,
+						)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Ruler",
+							description:
+								nationId === crown
+									? `${late?.name ?? "Its ruler"} died with no heir and the realm broke apart: ${realms.map((realm) => eventNation(realm).name).join(", ")} became independent. ${ruler?.name ?? "A new ruler"} kept the crown lands.${wars.join("")}`
+									: `${late?.name ?? "The ruler"} of ${eventNation(crown).name} died with no heir and this district became independent.${wars.join("")}`,
+							comment: eventComment(event.comment),
+							nations,
+							people: [late, ruler].flatMap((person) =>
+								person ? [person] : [],
+							),
+						})
+						break
+					}
 					case "peacefulAnnexation": {
 						const annexerId = Number(event.payload.annexerId)
 						const annexedId = Number(event.payload.annexedId)

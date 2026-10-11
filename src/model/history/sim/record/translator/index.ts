@@ -29,6 +29,7 @@ import type {
 	CreateTranslatorParams,
 	DescendantsParams,
 	IdentityForRootParams,
+	InheritGovernmentParams,
 	OwnerNoteReasons,
 	ProceduralTranslator,
 	ProjectTieParams,
@@ -150,6 +151,19 @@ function scanOwnerNotes({
 					}),
 					cause: "partition",
 					person: heirs[index],
+					throne: false,
+					late: note.data.dying as number,
+				})
+		} else if (note.tag === "interregnum") {
+			const holders = note.data.holders as number[]
+			for (const [index, seat] of (note.data.freed as number[]).entries())
+				reasons.revolts.set(seat, {
+					nation: nationLabel({
+						translator,
+						root: note.data.nation as number,
+					}),
+					cause: "interregnum",
+					person: holders[index],
 					throne: false,
 					late: note.data.dying as number,
 				})
@@ -459,6 +473,32 @@ function contributions({
 			ROLE_BY_RELATION[(data.deployedRelations as number[])[index]] ??
 			null,
 	}))
+}
+
+// A new realm takes the parent realm's government, whatever its seat province
+// carried before.
+function inheritGovernment({
+	record,
+	ids,
+	government,
+	timeMs,
+}: InheritGovernmentParams): void {
+	for (const id of ids) {
+		const log = record.events.nationEvents[id]
+		if (!log) continue
+		const current =
+			log.events.findLast((event) => event.kind === "governmentChange")?.payload
+				.governmentType ?? log.base.initialGovernment
+		if (current === government) continue
+		if (log.events.length === 0) log.base.initialGovernment = government
+		else
+			log.events.push({
+				timeMs,
+				kind: "governmentChange",
+				payload: { governmentType: government },
+				comment: null,
+			})
+	}
 }
 
 function appendNote({
@@ -849,25 +889,12 @@ function appendNote({
 		if (nationId === undefined) return
 		const realmId = (root: number) => translator.identityByRoot.get(root) ?? -1
 		const realms = (data.seats as number[]).map(realmId)
-		// A new realm takes the divided realm's government, whatever its seat
-		// province carried before.
-		for (const id of realms) {
-			const log = record.events.nationEvents[id]
-			if (!log) continue
-			const current =
-				log.events.findLast((event) => event.kind === "governmentChange")
-					?.payload.governmentType ?? log.base.initialGovernment
-			if (current === data.government) continue
-			if (log.events.length === 0)
-				log.base.initialGovernment = data.government as string
-			else
-				log.events.push({
-					timeMs,
-					kind: "governmentChange",
-					payload: { governmentType: data.government },
-					comment: null,
-				})
-		}
+		inheritGovernment({
+			record,
+			ids: realms,
+			government: data.government as string,
+			timeMs,
+		})
 		record.events.nationEvents[nationId]?.events.push({
 			timeMs,
 			kind: "partition",
@@ -881,6 +908,32 @@ function appendNote({
 			},
 			comment: null,
 		})
+	} else if (note.tag === "interregnum") {
+		const nationId = translator.identityByRoot.get(data.nation as number)
+		if (nationId === undefined) return
+		const realmId = (root: number) => translator.identityByRoot.get(root) ?? -1
+		const realms = (data.freed as number[]).map(realmId)
+		inheritGovernment({
+			record,
+			ids: realms,
+			government: data.government as string,
+			timeMs,
+		})
+		const payload = {
+			late: data.dying,
+			ruler: data.ruler,
+			crown: nationId,
+			realms,
+			warAttackers: (data.warAttackers as number[]).map(realmId),
+			warDefenders: (data.warDefenders as number[]).map(realmId),
+		}
+		for (const id of [nationId, ...realms])
+			record.events.nationEvents[id]?.events.push({
+				timeMs,
+				kind: "interregnum",
+				payload,
+				comment: null,
+			})
 	} else if (note.tag === "peaceful annexation") {
 		const annexerId = translator.identityByRoot.get(data.attacker as number)
 		const annexedId = translator.identityByRoot.get(data.defender as number)

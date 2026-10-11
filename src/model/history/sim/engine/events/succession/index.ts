@@ -1,5 +1,6 @@
 import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
+import { INTERREGNUM } from "@/model/history/sim/engine/events/succession/interregnum"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
@@ -204,6 +205,9 @@ function runSeatSuccession({
 		dying,
 		rng,
 	})
+	const interregnum = choice.interregnum
+		? INTERREGNUM.begin({ state, realm: province, dying, rng })
+		: null
 	const supportingHolders = choice.supportingSeats.map(
 		(seat) => state.people.rulerOf[seat],
 	)
@@ -249,12 +253,19 @@ function runSeatSuccession({
 			claim: choice.claim,
 			foreignClaimant: choice.foreignClaimant,
 			system: GOVERNMENT.successionOfIndex(state.governmentType[province]),
+			interregnum: choice.interregnum,
 		},
 	})
 
 	STATE.scheduleSuccession({ state, p: province })
+	if (interregnum)
+		INTERREGNUM.finish({
+			run: interregnum,
+			ruler: state.people.rulerOf[province],
+		})
 	// Regents are chosen once a partition's seating is final, and a realm that
-	// was divided among its heirs sees no succession revolt.
+	// was divided among its heirs or broken up by an interregnum sees no
+	// succession revolt.
 	const divided =
 		PARTITION.divide({
 			state,
@@ -263,7 +274,7 @@ function runSeatSuccession({
 			primary: state.people.rulerOf[province],
 			primarySeat,
 			rng,
-		}) > 0
+		}) > 0 || interregnum !== null
 	REGENCY.start({ state, realm: province })
 
 	if (divided) REGENCY.review({ state })

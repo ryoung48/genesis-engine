@@ -2,6 +2,7 @@ import { DEJURE } from "@/model/society/dejure"
 import type {
 	DissolvedTitle,
 	DissolveTitleParams,
+	DuchyGroupsParams,
 	FoundedTitle,
 	FoundTitleParams,
 	FullyHeldChildrenParams,
@@ -9,12 +10,17 @@ import type {
 	QualifiedFounding,
 	QualifiesParams,
 	QualifyingParams,
+	SameAboveParams,
+	TrimDuchyParams,
 	WholeHeldParams,
 } from "@/model/society/dejure/founding/types"
 import { TITLES } from "@/model/society/titles"
 
 const TIER_SLOTS = 4
 const MIN_CHILDREN = 2
+const DUCHY_MIN_SIZE = TITLES.minSizeForTier({ tier: "duchy" })
+// The duchy size at generation (title-hierarchy doc, Tiers).
+const DUCHY_TARGET = 4
 
 function wholeHeld({
 	members,
@@ -69,11 +75,81 @@ function fullyHeldChildren({
 }
 
 function qualifies({ members, children, tier }: QualifiesParams): boolean {
+	if (tier === 1) return children.length >= DUCHY_MIN_SIZE
 	if (children.length < MIN_CHILDREN) return false
 	let provinces = 0
 	for (const child of children)
 		provinces += members.offset[child + 1] - members.offset[child]
 	return provinces >= TITLES.minSizeForTier({ tier: TITLES.tierOrder[tier] })
+}
+
+function sameAbove({ titles, provinceCount, a, b }: SameAboveParams): boolean {
+	for (let slot = 1; slot < TIER_SLOTS; slot++)
+		if (
+			titles.regionOf[slot * provinceCount + a] !==
+			titles.regionOf[slot * provinceCount + b]
+		)
+			return false
+	return true
+}
+
+// A holder's duchy group: the largest connected set of its provinces whose
+// duchy was destroyed, joined only where every higher region agrees, cut to
+// the duchy target size from the best seat outward. Ties go to the lowest id.
+function duchyGroups(params: DuchyGroupsParams): Map<number, number[]> {
+	const { titles, provinceCount, ownerOf, gap, adjOffset, adjList } = params
+	const open = new Set<number>()
+	for (let p = 0; p < provinceCount; p++)
+		if (gap[p] && ownerOf[p] >= 0 && titles.regionOf[p] < 0) open.add(p)
+	const largest = new Map<number, number[]>()
+	for (const start of [...open]) {
+		if (!open.has(start)) continue
+		open.delete(start)
+		const group = [start]
+		for (let i = 0; i < group.length; i++) {
+			const p = group[i]
+			for (let edge = adjOffset[p]; edge < adjOffset[p + 1]; edge++) {
+				const neighbor = adjList[edge]
+				if (
+					!open.has(neighbor) ||
+					ownerOf[neighbor] !== ownerOf[p] ||
+					!sameAbove({ titles, provinceCount, a: p, b: neighbor })
+				)
+					continue
+				open.delete(neighbor)
+				group.push(neighbor)
+			}
+		}
+		const current = largest.get(ownerOf[start])
+		if (!current || group.length > current.length)
+			largest.set(ownerOf[start], group)
+	}
+	const groups = new Map<number, number[]>()
+	for (const [holder, group] of largest)
+		if (group.length >= DUCHY_MIN_SIZE)
+			groups.set(holder, trimDuchy({ group, params }))
+	return groups
+}
+
+function trimDuchy({ group, params }: TrimDuchyParams): number[] {
+	if (group.length <= DUCHY_TARGET) return group.toSorted((a, b) => a - b)
+	const { adjOffset, adjList, habitability, urbanPop, waterAccess } = params
+	const score = (province: number) =>
+		DEJURE.seatScore({ province, habitability, urbanPop, waterAccess })
+	const better = (a: number, b: number) => score(b) - score(a) || a - b
+	const remaining = new Set(group)
+	const selected = [group.toSorted(better)[0]]
+	remaining.delete(selected[0])
+	while (selected.length < DUCHY_TARGET) {
+		const frontier = new Set<number>()
+		for (const p of selected)
+			for (let edge = adjOffset[p]; edge < adjOffset[p + 1]; edge++)
+				if (remaining.has(adjList[edge])) frontier.add(adjList[edge])
+		const next = [...frontier].sort(better)[0]
+		selected.push(next)
+		remaining.delete(next)
+	}
+	return selected.sort((a, b) => a - b)
 }
 
 // Every realm's qualifying children at every tier from one pass over the
@@ -140,9 +216,11 @@ function found({
 	if (title >= titles.tier.length) return null
 	if (!qualifies({ members, children, tier })) return null
 	const provinces: number[] = []
-	for (const child of children)
-		for (let i = members.offset[child]; i < members.offset[child + 1]; i++)
-			provinces.push(members.list[i])
+	if (tier === 1) provinces.push(...children)
+	else
+		for (const child of children)
+			for (let i = members.offset[child]; i < members.offset[child + 1]; i++)
+				provinces.push(members.list[i])
 	let seat = provinces.includes(holder) ? holder : -1
 	if (seat < 0) {
 		let bestKey = Number.NEGATIVE_INFINITY
@@ -212,6 +290,7 @@ function dissolve({
 export const FOUNDING = {
 	minChildren: MIN_CHILDREN,
 	fullyHeldChildren,
+	duchyGroups,
 	qualifies,
 	qualifying,
 	found,
