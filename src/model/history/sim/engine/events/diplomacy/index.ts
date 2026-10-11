@@ -1,10 +1,10 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
+import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import type {
 	CanBeRivalsParams,
 	InitDiplomacyParams,
-	MarriageBoundParams,
 	NextEventParams,
 	ProcessVassalDiplomacyParams,
 	RunDiplomacyParams,
@@ -13,12 +13,9 @@ import type {
 	SyncVassalRelationsParams,
 } from "@/model/history/sim/engine/events/diplomacy/types"
 import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
-import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
-import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
 
 const PACT_CHANCE = 0.03
 const DISSOLVE_CHANCE = {
@@ -102,29 +99,6 @@ function processVassalDiplomacy({
 			goal: "conquest",
 		})
 	}
-}
-
-// An alliance holds while the two ruling families stay joined by a living
-// marriage, or while one realm's regent parent was born into the other's
-// ruling house.
-function marriageBound({ state, a, b }: MarriageBoundParams): boolean {
-	const people = state.people
-	const rulerA = people.rulerOf[a]
-	const rulerB = people.rulerOf[b]
-	return (
-		rulerA >= 0 &&
-		rulerB >= 0 &&
-		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[a]) &&
-		GOVERNMENT.marriageAlliancesOfIndex(state.governmentType[b]) &&
-		(PEOPLE.tiedByMarriage({
-			people,
-			a: rulerA,
-			b: rulerB,
-			time: state.time / STATE.yearMs,
-		}) ||
-			REGENCY.bindsTo({ state, realm: a, other: b }) ||
-			REGENCY.bindsTo({ state, realm: b, other: a }))
-	)
 }
 
 function nextEvent({ state, province, rng, years }: NextEventParams): void {
@@ -269,7 +243,8 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 		if (tie === STATE.rel.NONE && !neighborSet.has(other)) continue
 		const current = STATE.getDisposition({ state, a: nation, b: other })
 		const bound =
-			tie === STATE.rel.ALLY && marriageBound({ state, a: nation, b: other })
+			tie === STATE.rel.ALLY &&
+			ROYAL_MARRIAGE.bound({ state, a: nation, b: other })
 		let formedVassal = false
 		if (
 			tie === STATE.rel.NONE &&

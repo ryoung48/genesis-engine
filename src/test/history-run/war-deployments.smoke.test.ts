@@ -40,7 +40,7 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		backers: [],
 		refusedCalls: new Set(),
 		originalCrownRuler: -1,
-		claimant: -1,
+		claimantRuler: -1,
 		deployed: {},
 		participants: {},
 		candidates: { attacker: [], defender: [] },

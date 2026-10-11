@@ -990,10 +990,8 @@ describe("military transitions and conservation", () => {
 		STATE.foundRuler({
 			state: engine,
 			p: victor,
-			age: 30,
-			claim: 3,
+			ruler: { dynasty: -1, age: "fresh", claim: 3 },
 			rng: HISTORY_RNG.createHistoryRng(12),
-			reason: "succession",
 		})
 		expect(engine.levyCurrent[victor]).toBe(enrolled.levy)
 		expect(engine.regularCurrent[victor]).toBe(enrolled.regular)

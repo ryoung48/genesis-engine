@@ -1,24 +1,20 @@
 import { expect, it, vi } from "vitest"
-import { PERSON_NAMES } from "@/model/history/record/people/names"
-import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { RULER_NAMES } from "@/model/history/record/rulers"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
+import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import type { PartitionNoteData } from "@/model/history/sim/engine/events/succession/partition/types"
-import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
+import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
+import type { SuccessionChoice } from "@/model/history/sim/engine/events/succession/systems/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
-import { HOLDINGS } from "@/model/history/sim/people/holdings"
-import { HOUSEHOLD } from "@/model/history/sim/people/household"
-import type { Sex } from "@/model/history/sim/people/types"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import type { SharedRng } from "@/model/shared/random/rng"
 import { DEJURE } from "@/model/society/dejure"
@@ -37,11 +33,6 @@ interface Fixture {
 	// District seats, best first: higher tier, then larger population.
 	seats: number[]
 	provinces: number[]
-	dying: number
-}
-
-function now(state: HistoryState): number {
-	return state.time / STATE.yearMs
 }
 
 function districtSeats({
@@ -112,55 +103,12 @@ function quiet({ state, realm }: { state: HistoryState; realm: number }) {
 	)
 }
 
-function person({
-	state,
-	realm,
-	age,
-	father,
-	sex,
-}: {
-	state: HistoryState
-	realm: number
-	age: number
-	father: number
-	sex: Sex
-}): number {
-	const people = state.people
-	const id = PEOPLE.spawn({
-		recordHealth: true,
-		death: null,
-		nameSeed: null,
-		people,
-		sex,
-		birth: now(state) - age,
-		survives: now(state) - age,
-		father,
-		mother: -1,
-		dynasty:
-			father >= 0 ? people.persons.dynasty[father] : people.nextDynasty++,
-		origin: STATE.originOf({ state, realm }),
-		rng: HISTORY_RNG.createHistoryRng(age + 7),
-	})
-	people.persons.death[id] = now(state) + 40
-	return id
+function refOf({ state, p }: { state: HistoryState; p: number }) {
+	return STATE_RULERS.ref({ state, ruler: STATE_RULERS.read({ state, p }) })
 }
 
-function son({ fx, age }: { fx: Fixture; age: number }): number {
-	return person({
-		state: fx.state,
-		realm: fx.realm,
-		age,
-		father: fx.dying,
-		sex: 0,
-	})
-}
-
-function kill({ state, who }: { state: HistoryState; who: number }): void {
-	state.people.persons.death[who] = now(state) - 0.01
-}
-
-// A quiet realm with the wanted number of district seats, given a new ruler
-// with no family, a patrilineal culture and the given government.
+// A quiet realm with the wanted number of district seats, a patrilineal
+// culture and the given government.
 function fixture({
 	districts,
 	government,
@@ -228,13 +176,11 @@ function fixture({
 	state.governmentType[realm] = GOVERNMENT.getGovIdx()[government]
 	state.cultureGenderSystems[state.culture[realm]] =
 		GENDER_SYSTEM.cultureGenderSystem.PATRIARCHAL
-	const dying = person({ state, realm, age: 60, father: -1, sex: 0 })
-	STATE.installRuler({
+	STATE.foundRuler({
 		state,
 		p: realm,
-		person: dying,
-		claim: 3,
-		reason: "succession",
+		ruler: { dynasty: -1, age: "fresh", claim: 3 },
+		rng,
 	})
 	return {
 		state,
@@ -243,23 +189,39 @@ function fixture({
 		realm,
 		seats: districtSeats({ state, realm }),
 		provinces: STATE.getNationProvinces({ state, root: realm }),
-		dying,
 	}
 }
 
-function succeed(fx: Fixture): void {
-	const { state, realm, rng, dying } = fx
-	kill({ state, who: dying })
-	STATE.scheduleSuccession({ state, p: realm })
-	PERSON_DEATH.run({
-		state,
-		person: state.people.rulerOf[realm],
-		revision:
-			state.deathSchedule.pending.get(state.people.rulerOf[realm])?.revision ??
-			-1,
-		rng,
-	})
-	DISTRICTS.settle({ state: fx.state, rng: fx.rng })
+// The late ruler dies and the succession system rolls the given choice.
+function succeed({
+	fx,
+	choice,
+}: {
+	fx: Fixture
+	choice: Partial<SuccessionChoice>
+}): void {
+	const { state, realm, rng } = fx
+	const forced: SuccessionChoice = {
+		system: "single_heir",
+		house: "same",
+		claim: 3,
+		age: "inherited",
+		juniors: 0,
+		interregnum: false,
+		daughterLine: false,
+		...choice,
+	}
+	const spy = vi.spyOn(SUCCESSION_SYSTEMS, "choose").mockReturnValue(forced)
+	try {
+		SUCCESSION.runSuccession({
+			state,
+			realm,
+			leaderIdx: state.leaderRuntime.idx[realm],
+			rng,
+		})
+	} finally {
+		spy.mockRestore()
+	}
 	invariants(fx)
 }
 
@@ -278,40 +240,13 @@ function skipReason(fx: Fixture): unknown {
 }
 
 function invariants({ state, provinces }: Fixture): void {
-	const people = state.people
-	const held = new Map<number, number>()
-	for (const seat of provinces) {
-		const holder = people.rulerOf[seat]
-		if (holder < 0) continue
-		if (!PEOPLE.aliveAt({ people, person: holder, time: now(state) })) continue
-		held.set(holder, (held.get(holder) ?? 0) + 1)
-		if (STATE.isSovereign({ state, p: seat })) {
-			const throne = HOLDINGS.primary({
-				people: state.people,
-				person: holder,
-				ranks: state.seatRank,
-			})
-			expect(
-				throne === seat ||
-					(people.rulerOf[throne] === holder &&
-						STATE.getRelation({ state, a: seat, b: throne }) ===
-							STATE.rel.PU_JUNIOR),
-			).toBe(true)
-		} else {
-			expect(STATE_TITLES.isDistrictSeat({ state, seat })).toBe(true)
-			expect(
-				HOLDINGS.primary({
-					people: state.people,
-					person: holder,
-					ranks: state.seatRank,
-				}),
-			).toBe(seat)
-			expect(HOUSEHOLD.realmOf({ people, person: holder })).toBe(
-				state.sovereignCurrent[seat],
-			)
-		}
+	for (const p of provinces) {
+		if (!STATE.isSovereign({ state, p })) continue
+		expect(state.leaderRuntime.rulerId[p]).toBeGreaterThanOrEqual(0)
+		expect(state.leaderRuntime.death[p]).toBeGreaterThan(
+			state.leaderRuntime.birth[p],
+		)
 	}
-	for (const count of held.values()) expect(count).toBe(1)
 	STATE.validateLiveHierarchy({ state, context: "partition test" })
 	const note = state.events.findLast((entry) => entry.tag === "partition")
 	if (!note) return
@@ -326,10 +261,7 @@ function invariants({ state, provinces }: Fixture): void {
 
 it("leaves a monarchy whole", () => {
 	const fx = fixture({ districts: 2, government: "feudal_monarchy" })
-	const elder = son({ fx, age: 30 })
-	son({ fx, age: 25 })
-	succeed(fx)
-	expect(fx.state.people.rulerOf[fx.realm]).toBe(elder)
+	succeed({ fx: fx, choice: { juniors: 2 } })
 	expect(
 		fx.state.events.some(
 			(note) => note.tag === "partition" || note.tag === "partition skipped",
@@ -337,18 +269,10 @@ it("leaves a monarchy whole", () => {
 	).toBe(false)
 }, 120000)
 
-it("does not divide a realm inherited by a brother", () => {
+it("skips a partitioning realm whose heir has no brothers", () => {
 	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, dying } = fx
-	const parent = person({ state, realm, age: 90, father: -1, sex: 0 })
-	state.people.persons.father[dying] = parent
-	state.people.persons.children[parent].push(dying)
-	const brother = person({ state, realm, age: 50, father: parent, sex: 0 })
-	person({ state, realm, age: 45, father: parent, sex: 0 })
-	kill({ state, who: parent })
-	succeed(fx)
-	expect(state.people.rulerOf[realm]).toBe(brother)
-	expect(skipReason(fx)).toBe("not child line")
+	succeed({ fx: fx, choice: { juniors: 0 } })
+	expect(skipReason(fx)).toBe("no junior heir")
 }, 120000)
 
 it("gives the best district to the younger son and keeps the rest", () => {
@@ -356,13 +280,14 @@ it("gives the best district to the younger son and keeps the rest", () => {
 	const { state, realm, seats } = fx
 	FIELDS.prov.treasury.set({ state, p: realm, value: 1000 })
 	state.governmentType[seats[0]] = GOVERNMENT.getGovIdx().feudal_monarchy
-	const admin = state.people.rulerOf[seats[0]]
-	const elder = son({ fx, age: 30 })
-	const younger = son({ fx, age: 25 })
-	succeed(fx)
-	expect(state.people.rulerOf[realm]).toBe(elder)
+	const house = state.leaderDynCurrent[realm]
+	succeed({ fx: fx, choice: { juniors: 1 } })
 	expect(STATE.isSovereign({ state, p: seats[0] })).toBe(true)
-	expect(state.people.rulerOf[seats[0]]).toBe(younger)
+	expect(state.leaderDynCurrent[seats[0]]).toBe(house)
+	expect(state.leaderClaimCurrent[seats[0]]).toBe(3)
+	expect(state.leaderRuntime.rulerId[seats[0]]).not.toBe(
+		state.leaderRuntime.rulerId[realm],
+	)
 	expect(state.sovereignCurrent[seats[1]]).toBe(realm)
 	expect(state.governmentType[seats[0]]).toBe(
 		GOVERNMENT.getGovIdx().tribal_monarchy,
@@ -379,130 +304,21 @@ it("gives the best district to the younger son and keeps the rest", () => {
 		STATE.disp.NEUTRAL,
 	)
 	const note = partitionNote(fx)
-	expect(note.heirs).toEqual([younger])
 	expect(note.seats).toEqual([seats[0]])
 	expect(note.realmKind.slice(0, 2)).toEqual(["primary", "heir"])
-	if (admin >= 0) {
-		const move = note.adminPersons.indexOf(admin)
-		expect(move).toBeGreaterThanOrEqual(0)
-		const to = note.adminTo[move]
-		expect(
-			HOLDINGS.primary({
-				people: state.people,
-				person: admin,
-				ranks: state.seatRank,
-			}),
-		).toBe(to)
-		if (to >= 0) {
-			expect(state.people.rulerOf[to]).toBe(admin)
-			expect(state.sovereignCurrent[to]).toBe(seats[0])
-		}
-	}
 	const shares = PARTITION_REPORT.shares(note)
 	expect(shares.reduce((sum, share) => sum + share, 0)).toBeCloseTo(1)
 	expect(PARTITION_REPORT.effectiveRealms(note)).toBeGreaterThan(1)
 }, 120000)
 
-it("passes a dead son's share to his child and skips a lone heir", () => {
+it("seats a junior who is still a child under a regency", () => {
 	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, seats } = fx
-	const elder = son({ fx, age: 35 })
-	const dead = son({ fx, age: 30 })
-	const grandson = person({ state, realm, age: 8, father: dead, sex: 0 })
-	kill({ state, who: dead })
-	succeed(fx)
-	expect(state.people.rulerOf[realm]).toBe(elder)
-	expect(state.people.rulerOf[seats[0]]).toBe(grandson)
+	const { state, seats } = fx
+	succeed({ fx: fx, choice: { juniors: 1 } })
 	expect(STATE.isSovereign({ state, p: seats[0] })).toBe(true)
-	expect(state.people.regencies.get(seats[0])?.ward).toBe(grandson)
-
-	const lone = fixture({ districts: 2, government: "tribal_monarchy" })
-	son({ fx: lone, age: 30 })
-	succeed(lone)
-	expect(skipReason(lone)).toBe("no junior heir")
-}, 240000)
-
-it("seats juniors when the primary already rules another realm", () => {
-	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, seats } = fx
-	const elder = son({ fx, age: 35 })
-	const younger = son({ fx, age: 30 })
-	const other = Array.from({ length: state.P }, (_, p) => p).find(
-		(p) =>
-			p !== realm &&
-			quiet({ state, realm: p }) &&
-			STATE.canUnite({ state, a: realm, b: p }),
+	expect(state.regency[seats[0]] === 1).toBe(
+		STATE_RULERS.ageYears({ state, p: seats[0] }) < STATE_RULERS.adultAge,
 	)
-	if (other === undefined) throw new Error("no realm to rule")
-	STATE.installRuler({
-		state,
-		p: other,
-		person: elder,
-		claim: 3,
-		reason: "succession",
-	})
-	succeed(fx)
-	expect(state.people.rulerOf[realm]).toBe(elder)
-	expect(state.people.rulerOf[other]).toBe(elder)
-	expect([realm, other]).toContain(
-		HOLDINGS.primary({
-			people: state.people,
-			person: elder,
-			ranks: state.seatRank,
-		}),
-	)
-	expect(state.people.rulerOf[seats[0]]).toBe(younger)
-	expect(partitionNote(fx).heirs).toEqual([younger])
-}, 120000)
-
-it("lets an eligible branch inherit past a son who rules elsewhere", () => {
-	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, seats } = fx
-	son({ fx, age: 35 })
-	const abroad = son({ fx, age: 30 })
-	const youngest = son({ fx, age: 25 })
-	const other = Array.from({ length: state.P }, (_, p) => p).find(
-		(p) => p !== realm && quiet({ state, realm: p }),
-	)
-	if (other === undefined) throw new Error("no realm to rule")
-	STATE.installRuler({
-		state,
-		p: other,
-		person: abroad,
-		claim: 3,
-		reason: "succession",
-	})
-	succeed(fx)
-	expect(partitionNote(fx).heirs).toEqual([youngest])
-	expect(state.people.rulerOf[seats[0]]).toBe(youngest)
-	expect(
-		HOLDINGS.primary({
-			people: state.people,
-			person: abroad,
-			ranks: state.seatRank,
-		}),
-	).toBe(other)
-}, 120000)
-
-it("keeps an heir in the district he holds and seats the others around him", () => {
-	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, seats } = fx
-	const elder = son({ fx, age: 35 })
-	const middle = son({ fx, age: 30 })
-	const youngest = son({ fx, age: 25 })
-	DISTRICTS.install({
-		state,
-		seat: seats[0],
-		person: youngest,
-		reason: "district grant",
-	})
-	succeed(fx)
-	expect(state.people.rulerOf[realm]).toBe(elder)
-	expect(state.people.rulerOf[seats[0]]).toBe(youngest)
-	expect(state.people.rulerOf[seats[1]]).toBe(middle)
-	expect(STATE.isSovereign({ state, p: seats[0] })).toBe(true)
-	expect(STATE.isSovereign({ state, p: seats[1] })).toBe(true)
-	expect(partitionNote(fx).adminPersons).not.toContain(youngest)
 }, 120000)
 
 it("has nothing to hand out without a free district", () => {
@@ -513,98 +329,59 @@ it("has nothing to hand out without a free district", () => {
 			districtSeats({ state, realm }).length === 0 &&
 			STATE.getNationProvinces({ state, root: realm }).length <= 4,
 	})
-	son({ fx: small, age: 30 })
-	son({ fx: small, age: 25 })
-	succeed(small)
+	succeed({ fx: small, choice: { juniors: 2 } })
 	expect(skipReason(small)).toBe("no free seat")
 
 	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
 	const { state, seats } = fx
 	state.occupationCurrent[seats[0]] = 0
-	son({ fx, age: 30 })
-	const younger = son({ fx, age: 25 })
-	succeed(fx)
+	succeed({ fx: fx, choice: { juniors: 1 } })
 	expect(state.sovereignCurrent[seats[0]]).toBe(fx.realm)
-	expect(state.people.rulerOf[seats[1]]).toBe(younger)
 	expect(STATE.isSovereign({ state, p: seats[1] })).toBe(true)
 }, 240000)
 
-it("clears the seats the heirs held before", () => {
-	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
+it("starts no succession revolt in a divided realm", () => {
+	const divided = fixture({ districts: 2, government: "tribal_monarchy" })
+	const wars = divided.state.wars.length
+	const rebellions = () =>
+		divided.state.events.filter((note) => note.tag === "rebellion").length
+	const before = rebellions()
+	succeed({ fx: divided, choice: { juniors: 1, daughterLine: true } })
+	expect(partitionNote(divided).seats).toHaveLength(1)
+	expect(rebellions()).toBe(before)
+	expect(divided.state.wars).toHaveLength(wars)
+}, 240000)
+
+it("drops a share that an earlier release made invalid", () => {
+	const fx = fixture({
+		districts: 3,
+		government: "tribal_monarchy",
+		accept: ({ state, realm }) => {
+			const seats = districtSeats({ state, realm })
+			return (
+				seats.length >= 3 &&
+				cutOff({ state, realm, removed: seats.slice(0, 2) }).length === 0
+			)
+		},
+	})
 	const { state, realm, seats } = fx
-	const elder = son({ fx, age: 35 })
-	const younger = son({ fx, age: 30 })
-	const occupiedHolder = son({ fx, age: 25 })
-	DISTRICTS.install({
-		state,
-		seat: seats[0],
-		person: elder,
-		reason: "district grant",
+	const release = STATE.releaseFaction
+	const spy = vi.spyOn(STATE, "releaseFaction").mockImplementation((params) => {
+		release(params)
+		FIELDS.prov.parent.set({ state, p: seats[1], value: seats[2] })
 	})
-	let abroad = -1
-	for (let p = 0; p < state.P && abroad < 0; p++)
-		if (p !== realm && quiet({ state, realm: p }))
-			abroad = districtSeats({ state, realm: p })[0] ?? -1
-	if (abroad < 0) throw new Error("no district abroad")
-	DISTRICTS.install({
-		state,
-		seat: abroad,
-		person: younger,
-		reason: "district grant",
-	})
-	DISTRICTS.install({
-		state,
-		seat: seats[1],
-		person: occupiedHolder,
-		reason: "district grant",
-	})
-	state.occupationCurrent[seats[1]] = 0
-	succeed(fx)
-	expect(state.people.rulerOf[realm]).toBe(elder)
-	expect(
-		HOLDINGS.primary({
-			people: state.people,
-			person: elder,
-			ranks: state.seatRank,
-		}),
-	).toBe(realm)
-	expect(state.people.rulerOf[seats[0]]).toBe(younger)
-	expect(STATE.isSovereign({ state, p: seats[0] })).toBe(true)
-	expect(state.people.rulerOf[abroad]).toBe(-1)
-	expect(state.people.rulerOf[seats[1]]).toBe(occupiedHolder)
-	expect(state.sovereignCurrent[seats[1]]).toBe(realm)
+	try {
+		succeed({ fx: fx, choice: { juniors: 2 } })
+	} finally {
+		spy.mockRestore()
+	}
 	const note = partitionNote(fx)
-	expect(note.unseatedReasons[note.unseatedHeirs.indexOf(occupiedHolder)]).toBe(
-		"reserved seat unavailable",
-	)
+	expect(note.seats).toEqual([seats[0]])
+	expect(note.unseatedReasons).toContain("share dropped")
+	expect(state.sovereignCurrent[seats[1]]).toBe(realm)
 }, 120000)
 
-it("joins an heir's realm to the realm of the spouse who rules abroad", () => {
-	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, seats } = fx
-	son({ fx, age: 35 })
-	const younger = son({ fx, age: 30 })
-	const other = Array.from({ length: state.P }, (_, p) => p).find(
-		(p) =>
-			p !== realm &&
-			quiet({ state, realm: p }) &&
-			GOVERNMENT.successionOfIndex(state.governmentType[p]) === "single_heir",
-	)
-	if (other === undefined) throw new Error("no realm to marry into")
-	const spouse = state.people.rulerOf[other]
-	const table = state.people.persons
-	if (table.spouse[spouse] >= 0) table.spouse[table.spouse[spouse]] = -1
-	table.spouse[spouse] = younger
-	table.spouse[younger] = spouse
-	succeed(fx)
-	expect(state.people.rulerOf[seats[0]]).toBe(younger)
-	expect(state.people.rulerOf[other]).toBe(spouse)
-	expect([STATE.rel.PU_JUNIOR, STATE.rel.PU_SENIOR]).toContain(
-		STATE.getRelation({ state, a: seats[0], b: other }),
-	)
-}, 120000)
-
-it("never reseats an admin who died before the succession", () => {
+it("records a partition as a split and a timeline row naming its rulers", () => {
 	const fx = fixture({
 		districts: 2,
 		government: "tribal_monarchy",
@@ -612,207 +389,87 @@ it("never reseats an admin who died before the succession", () => {
 			const seats = districtSeats({ state, realm })
 			return (
 				seats.length >= 2 &&
-				state.people.rulerOf[seats[0]] >= 0 &&
 				cutOff({ state, realm, removed: [seats[0]] }).length === 0
 			)
 		},
 	})
-	const { state, seats } = fx
-	const admin = state.people.rulerOf[seats[0]]
-	kill({ state, who: admin })
-	son({ fx, age: 30 })
-	const younger = son({ fx, age: 25 })
-	succeed(fx)
-	expect(state.people.rulerOf[seats[0]]).toBe(younger)
-	expect(partitionNote(fx).adminPersons).not.toContain(admin)
-	for (const seat of fx.provinces)
-		expect(state.people.rulerOf[seat]).not.toBe(admin)
-}, 120000)
-
-it("chooses regents once every heir is seated", () => {
-	const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-	const { state, realm, seats } = fx
-	const elder = son({ fx, age: 35 })
-	const adult = son({ fx, age: 30 })
-	const minor = son({ fx, age: 10 })
-	DISTRICTS.install({
-		state,
-		seat: seats[1],
-		person: adult,
-		reason: "district grant",
+	const { state, world, realm, seats } = fx
+	const record = SIM_RECORD.buildProceduralState({
+		world,
+		startTimeMs: state.time,
 	})
-	const ward = Array.from({ length: state.P }, (_, p) => p).find(
-		(p) =>
-			p !== realm &&
-			STATE.isSovereign({ state, p }) &&
-			state.people.rulerOf[p] >= 0 &&
-			!state.people.regencies.has(p),
+	const translator = SIM_RECORD.createTranslator({ state: record, world })
+	const late = refOf({ state, p: realm })
+	const noteCursor = state.events.length
+	state.time += STATE.yearMs
+	succeed({ fx: fx, choice: { juniors: 1 } })
+	JOURNAL.flush({ state, noteCursor, census: false, initial: false })
+	SIM_RECORD.appendJournal({ translator, transactions: state.journal })
+
+	const parentId = translator.identityByRoot.get(realm) as number
+	const heirId = translator.identityByRoot.get(seats[0]) as number
+	const row = record.record.events.nationEvents[parentId].events.findLast(
+		(event) => event.kind === "partition",
 	)
-	if (ward === undefined) throw new Error("no realm for a regency")
-	state.people.regencies.set(ward, {
-		cause: "minority",
-		ward: state.people.rulerOf[ward],
-		regent: adult,
-		kind: "relative",
+	const heir = refOf({ state, p: seats[0] })
+	expect(row?.payload).toMatchObject({
+		late,
+		primary: refOf({ state, p: realm }),
+		heirs: [heir],
+		realms: [heirId],
 	})
-	succeed(fx)
-	expect(state.people.rulerOf[seats[0]]).toBe(minor)
-	expect(state.people.rulerOf[seats[1]]).toBe(adult)
-	const regency = state.people.regencies.get(seats[0])
-	expect(regency?.ward).toBe(minor)
-	expect([adult, elder]).not.toContain(regency?.regent)
-	expect(state.people.regencies.get(ward)?.regent).not.toBe(adult)
+	expect(record.record.nations[heirId].name.length).toBeGreaterThan(0)
+	const owner = record.record.events.provinceEvents
+		.get(seats[0])
+		?.events.findLast((event) => event.kind === "owner")
+	expect(owner?.payload.nationId).toBe(heirId)
+	expect(
+		RULER_NAMES.comment({
+			record: record.record,
+			comment: owner?.comment ?? null,
+		}),
+	).toBe(
+		`Split from ${record.record.nations[parentId].name} in the partition of ${RULER_NAMES.names({ record: record.record, ref: late }).name}'s realm, under ${RULER_NAMES.names({ record: record.record, ref: heir }).name}`,
+	)
+	expect(RULER_NAMES.names({ record: record.record, ref: heir })).toMatchObject(
+		{
+			name: expect.any(String),
+			house: RULER_NAMES.names({ record: record.record, ref: late }).house,
+		},
+	)
 }, 120000)
 
-it("starts no succession revolt in a divided realm", () => {
-	const build = (juniors: boolean) => {
-		const fx = fixture({ districts: 2, government: "tribal_monarchy" })
-		const { state, realm } = fx
-		const elder = son({ fx, age: 40 })
-		person({ state, realm, age: 8, father: elder, sex: 0 })
-		kill({ state, who: elder })
-		if (juniors) son({ fx, age: 30 })
-		const claimant = person({ state, realm, age: 30, father: -1, sex: 0 })
-		state.people.deposed.set(realm, { claimant, generation: 0, tried: false })
-		return { fx, claimant }
-	}
-	const attempt = vi.spyOn(RESTORATION, "attempt")
-	try {
-		const divided = build(true)
-		const wars = divided.fx.state.wars.length
-		const rebellions = () =>
-			divided.fx.state.events.filter((note) => note.tag === "rebellion").length
-		const before = rebellions()
-		succeed(divided.fx)
-		expect(partitionNote(divided.fx).heirs).toHaveLength(1)
-		expect(attempt).not.toHaveBeenCalled()
-		expect(rebellions()).toBe(before)
-		expect(divided.fx.state.wars).toHaveLength(wars)
-		expect(
-			divided.fx.state.people.deposed.get(divided.fx.realm)?.claimant,
-		).toBe(divided.claimant)
-
-		const whole = build(false)
-		succeed(whole.fx)
-		expect(skipReason(whole.fx)).toBe("no junior heir")
-		expect(attempt).toHaveBeenCalledTimes(1)
-	} finally {
-		attempt.mockRestore()
-	}
-}, 240000)
-
-function rankedChildren({
-	state,
-	seat,
+function divide({
+	fx,
+	juniors,
 }: {
-	state: HistoryState
-	seat: number
-}): number[] {
-	return STATE.getChildren({ state, p: seat }).filter(
-		(child) => !state.desolate[child],
-	)
-}
-
-// A realm whose best district has a living admin and lower seats of its own.
-function nested({ state, realm }: { state: HistoryState; realm: number }) {
-	const seats = districtSeats({ state, realm })
-	const best = seats[0]
-	if (seats.length < 2 || state.people.rulerOf[best] < 0) return false
-	return (
-		rankedChildren({ state, seat: best }).length >= 2 &&
-		rankedChildren({ state, seat: best }).every(
-			(child) => state.seatRank[child] < state.seatRank[best],
-		) &&
-		cutOff({ state, realm, removed: [best] }).length === 0
-	)
-}
-
-it("moves a displaced admin to the new realm's best vacant lower seat", () => {
-	const fx = fixture({
-		districts: 2,
-		government: "tribal_monarchy",
-		accept: nested,
-	})
-	const { state, seats } = fx
-	const admin = state.people.rulerOf[seats[0]]
-	const rank = state.seatRank[seats[0]]
-	son({ fx, age: 30 })
-	const younger = son({ fx, age: 25 })
-	succeed(fx)
-	expect(state.people.rulerOf[seats[0]]).toBe(younger)
-	const note = partitionNote(fx)
-	const move = note.adminPersons.indexOf(admin)
-	const to = note.adminTo[move]
-	expect(note.adminFrom[move]).toBe(seats[0])
-	expect(note.adminBumped[move]).toBe(0)
-	expect(state.people.rulerOf[to]).toBe(admin)
-	expect(state.parentCurrent[to]).toBe(seats[0])
-	expect(state.seatRank[to]).toBeLessThan(rank)
-	expect(STATE_TITLES.isDistrictSeat({ state, seat: to })).toBe(true)
-}, 120000)
-
-it.each([
-	false,
-	true,
-])("bumps a county admin after a duchy share and stops at a dead holder (%s)", (dead) => {
-	const fx = DISTRICT_FIXTURE.create({
-		count: 6,
-		root: 0,
-		edges: [
-			[0, 1],
-			[1, 2],
-			[2, 3],
-			[3, 4],
-			[4, 5],
-		],
-		titles: [
-			{ tier: 2, seat: 0, provinces: [0, 1, 2, 3, 4, 5] },
-			{ tier: 1, seat: 0, provinces: [0, 1] },
-			{ tier: 1, seat: 2, provinces: [2, 3, 4, 5] },
-		],
-	})
-	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
-	const primary = DISTRICT_FIXTURE.person({
+	fx: ReturnType<typeof DISTRICT_FIXTURE.create>
+	juniors: number
+}): number {
+	const { state } = fx
+	DISTRICT_FIXTURE.ruler({
 		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	const admin = DISTRICT_FIXTURE.person({ fixture: fx, seat: 2, father: -1 })
-	const holders = [3, 4, 5].map((seat) =>
-		DISTRICT_FIXTURE.person({ fixture: fx, seat, father: -1 }),
-	)
-	if (dead) for (const holder of holders) kill({ state: fx.state, who: holder })
-	STATE.installRuler({
-		state: fx.state,
 		p: 0,
-		person: primary,
+		dynasty: -1,
+		age: "fresh",
 		claim: 3,
-		reason: "succession",
 	})
-	PARTITION.divide({
-		state: fx.state,
-		realm: 0,
-		dying,
-		primary,
-		primarySeat: -1,
+	const late = refOf({ state, p: 0 })
+	STATE.foundRuler({
+		state,
+		p: 0,
+		ruler: { dynasty: late.dynasty, age: "inherited", claim: 3 },
 		rng: fx.rng,
 	})
-	const note = fx.state.events.findLast((note) => note.tag === "partition")
-		?.data as PartitionNoteData
-	expect(note.adminPersons[0]).toBe(admin)
-	expect(note.adminTo[0]).toBe(5)
-	expect(note.adminBumped[0]).toBe(1)
-	if (dead) expect(note.adminPersons).toEqual([admin])
-	else {
-		expect(note.adminPersons).toEqual([admin, holders[2]])
-		expect(note.adminTo).toEqual([5, -1])
-	}
-})
+	return PARTITION.divide({
+		state,
+		realm: 0,
+		juniors,
+		late,
+		primary: refOf({ state, p: 0 }),
+		rng: fx.rng,
+	})
+}
 
 it("joins equal-tier cut-off land to an heir whose root is not its highest seat", () => {
 	const fx = DISTRICT_FIXTURE.create({
@@ -835,32 +492,8 @@ it("joins equal-tier cut-off land to an heir whose root is not its highest seat"
 			{ tier: 1, seat: 6, provinces: [6, 7] },
 		],
 	})
-	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
-	const primary = DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: 2,
-		father: dying,
-	})
-	STATE.installRuler({
-		state: fx.state,
-		p: 0,
-		person: primary,
-		claim: 3,
-		reason: "succession",
-	})
-	PARTITION.divide({
-		state: fx.state,
-		realm: 0,
-		dying,
-		primary,
-		primarySeat: -1,
-		rng: fx.rng,
-	})
+	fx.state.popRuralCurrent[2] = 10000
+	divide({ fx, juniors: 1 })
 	const note = fx.state.events.findLast((note) => note.tag === "partition")
 		?.data as PartitionNoteData
 	expect(note.seats).toEqual([2])
@@ -869,115 +502,6 @@ it("joins equal-tier cut-off land to an heir whose root is not its highest seat"
 	expect(note.primaryRankBefore).toBe(2)
 	expect(note.realmRank[note.realms.indexOf(2)]).toBe(1)
 })
-
-it("drops a share that an earlier release made invalid", () => {
-	const fx = fixture({
-		districts: 3,
-		government: "tribal_monarchy",
-		accept: ({ state, realm }) => {
-			const seats = districtSeats({ state, realm })
-			return (
-				seats.length >= 3 &&
-				state.people.rulerOf[seats[1]] >= 0 &&
-				cutOff({ state, realm, removed: seats.slice(0, 2) }).length === 0
-			)
-		},
-	})
-	const { state, realm, seats } = fx
-	const admin = state.people.rulerOf[seats[1]]
-	son({ fx, age: 35 })
-	const second = son({ fx, age: 30 })
-	const third = son({ fx, age: 25 })
-	const release = STATE.releaseFaction
-	const spy = vi.spyOn(STATE, "releaseFaction").mockImplementation((params) => {
-		release(params)
-		FIELDS.prov.parent.set({ state, p: seats[1], value: seats[2] })
-	})
-	try {
-		succeed(fx)
-	} finally {
-		spy.mockRestore()
-	}
-	const note = partitionNote(fx)
-	expect(note.heirs).toEqual([second])
-	expect(note.unseatedReasons[note.unseatedHeirs.indexOf(third)]).toBe(
-		"share dropped",
-	)
-	expect(
-		HOLDINGS.primary({
-			people: state.people,
-			person: third,
-			ranks: state.seatRank,
-		}),
-	).toBe(-1)
-	expect(state.sovereignCurrent[seats[1]]).toBe(realm)
-	expect(state.people.rulerOf[seats[1]]).toBe(-1)
-	expect(note.adminPersons).toContain(admin)
-}, 120000)
-
-it("records a partition as a split, a timeline row and seat reasons", () => {
-	const fx = fixture({
-		districts: 2,
-		government: "tribal_monarchy",
-		accept: ({ state, realm }) => {
-			const seats = districtSeats({ state, realm })
-			return (
-				seats.length >= 2 &&
-				state.people.rulerOf[seats[0]] >= 0 &&
-				cutOff({ state, realm, removed: [seats[0]] }).length === 0
-			)
-		},
-	})
-	const { state, world, realm, seats, dying } = fx
-	const record = SIM_RECORD.buildProceduralState({
-		world,
-		startTimeMs: state.time,
-	})
-	const translator = SIM_RECORD.createTranslator({ state: record, world })
-	const admin = state.people.rulerOf[seats[0]]
-	const elder = son({ fx, age: 30 })
-	const younger = son({ fx, age: 25 })
-	const noteCursor = state.events.length
-	state.time += STATE.yearMs
-	succeed(fx)
-	JOURNAL.flush({ state, noteCursor, census: false, initial: false })
-	SIM_RECORD.appendJournal({ translator, transactions: state.journal })
-
-	const people = record.record.people
-	if (!people) throw new Error("no people record")
-	const parentId = translator.identityByRoot.get(realm) as number
-	const heirId = translator.identityByRoot.get(seats[0]) as number
-	const row = record.record.events.nationEvents[parentId].events.findLast(
-		(event) => event.kind === "partition",
-	)
-	expect(row?.payload).toMatchObject({
-		late: dying,
-		primary: elder,
-		heirs: [younger],
-		realms: [heirId],
-	})
-	expect(record.record.nations[heirId].name.length).toBeGreaterThan(0)
-	const owner = record.record.events.provinceEvents
-		.get(seats[0])
-		?.events.findLast((event) => event.kind === "owner")
-	expect(owner?.payload.nationId).toBe(heirId)
-	expect(
-		PERSON_NAMES.comment({ people, comment: owner?.comment ?? null }),
-	).toBe(
-		`Split from ${record.record.nations[parentId].name} in the partition of ${PERSON_NAMES.person({ people, person: dying })?.name}'s realm, under ${PERSON_NAMES.person({ people, person: younger })?.name}`,
-	)
-	const events = (id: number) =>
-		PERSON_QUERY.timeline({ people, id, timeMs: record.record.maxTimeMs })
-	const took = events(younger).filter((event) => event.kind === "took seat")
-	expect(took).toHaveLength(1)
-	expect(took[0]).toMatchObject({ other: seats[0], reason: "partition" })
-	expect(events(younger).some((event) => event.kind === "left seat")).toBe(
-		false,
-	)
-	expect(
-		events(admin).findLast((event) => event.kind === "left seat"),
-	).toMatchObject({ other: seats[0], reason: "partition" })
-}, 120000)
 
 it.each([
 	false,
@@ -1009,49 +533,15 @@ it.each([
 		],
 	})
 	const { state } = fx
-	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
-	const primary = DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	const junior = DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	const admin = DISTRICT_FIXTURE.person({ fixture: fx, seat: 7, father: -1 })
-	const projection = PARTITION.project({ state, realm: 0, dying, primary })
-	expect(
-		projection.map((share) => [share.heir, share.seat, share.kind]),
-	).toEqual([[junior, 5, "title"]])
 	expect(state.parentCurrent[8]).toBe(7)
 	expect(state.parentCurrent[9]).toBe(crown ? 0 : 3)
-	STATE.installRuler({
-		state,
-		p: 0,
-		person: primary,
-		claim: 3,
-		reason: "succession",
-	})
-	expect(
-		PARTITION.divide({
-			state,
-			realm: 0,
-			dying,
-			primary,
-			primarySeat: -1,
-			rng: fx.rng,
-		}),
-	).toBe(1)
+	expect(divide({ fx, juniors: 1 })).toBe(1)
 	const note = state.events.findLast((note) => note.tag === "partition")
 		?.data as PartitionNoteData
-	expect(note.seats).toEqual(projection.map((share) => share.seat))
+	expect(note.seats).toEqual([5])
 	expect(note.shareKind).toEqual(["title"])
 	expect(state.sovereignCurrent[8]).toBe(5)
 	expect(state.sovereignCurrent[9]).toBe(crown ? 5 : 0)
-	expect(state.people.rulerOf[7]).toBe(admin)
-	expect(STATE_TITLES.isDistrictSeat({ state, seat: 7 })).toBe(true)
 	expect(note.primaryRankBefore).toBe(2)
 })
 
@@ -1077,53 +567,19 @@ it("does not offer districts carried by a title share to a later heir", () => {
 			{ tier: 1, seat: 6, provinces: [6, 7] },
 		],
 	})
-	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
-	const primary = DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	const junior = DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	const third = DISTRICT_FIXTURE.person({ fixture: fx, seat: 6, father: dying })
 	fx.state.popRuralCurrent[6] = 10000
-	const shares = PARTITION.project({
-		state: fx.state,
-		realm: 0,
-		dying,
-		primary,
-	})
-	expect(shares.map((share) => [share.heir, share.seat, share.kind])).toEqual([
-		[junior, 4, "title"],
-		[third, 2, "district"],
-	])
-	const provinces = shares.flatMap((share) =>
-		[share.seat, ...share.supporters].flatMap((seat) =>
-			STATE.getNationProvinces({ state: fx.state, root: seat }),
-		),
+	expect(divide({ fx, juniors: 2 })).toBe(2)
+	const note = fx.state.events.findLast((note) => note.tag === "partition")
+		?.data as PartitionNoteData
+	expect(note.shareKind).toEqual(["title", "district"])
+	const provinces = note.seats.flatMap((seat) =>
+		STATE.getNationProvinces({ state: fx.state, root: seat }),
 	)
 	expect(new Set(provinces).size).toBe(provinces.length)
-	STATE.installRuler({
-		state: fx.state,
-		p: 0,
-		person: primary,
-		claim: 3,
-		reason: "succession",
-	})
-	expect(
-		PARTITION.divide({
-			state: fx.state,
-			realm: 0,
-			dying,
-			primary,
-			primarySeat: -1,
-			rng: fx.rng,
-		}),
-	).toBe(2)
-	expect(fx.state.people.rulerOf[2]).toBe(third)
+	for (const seat of note.seats) {
+		expect(STATE.isSovereign({ state: fx.state, p: seat })).toBe(true)
+		expect(fx.state.leaderClaimCurrent[seat]).toBe(3)
+	}
 })
 
 it("does not divide a single duchy into county shares", () => {
@@ -1137,33 +593,7 @@ it("does not divide a single duchy into county shares", () => {
 		],
 		titles: [{ tier: 1, seat: 1, provinces: [0, 1, 2, 3] }],
 	})
-	const dying = DISTRICT_FIXTURE.person({ fixture: fx, seat: 0, father: -1 })
-	const primary = DISTRICT_FIXTURE.person({
-		fixture: fx,
-		seat: -1,
-		father: dying,
-	})
-	DISTRICT_FIXTURE.person({ fixture: fx, seat: -1, father: dying })
-	expect(
-		PARTITION.project({ state: fx.state, realm: 0, dying, primary }),
-	).toEqual([])
-	STATE.installRuler({
-		state: fx.state,
-		p: 0,
-		person: primary,
-		claim: 3,
-		reason: "succession",
-	})
-	expect(
-		PARTITION.divide({
-			state: fx.state,
-			realm: 0,
-			dying,
-			primary,
-			primarySeat: -1,
-			rng: fx.rng,
-		}),
-	).toBe(0)
+	expect(divide({ fx, juniors: 1 })).toBe(0)
 	expect(
 		fx.state.events.findLast((note) => note.tag === "partition skipped")?.data
 			.reason,

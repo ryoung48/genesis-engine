@@ -1,5 +1,8 @@
-import type { PeopleRecord } from "@/model/history/record/people/types"
-import type { Battle, WarRecord } from "@/model/history/record/types"
+import type {
+	Battle,
+	HistoryRecord,
+	WarRecord,
+} from "@/model/history/record/types"
 import type {
 	PartitionRow,
 	WorldFrame,
@@ -12,19 +15,6 @@ export interface BattleDetailParams {
 	defenderName: string
 }
 
-export interface RecordPersonMentionParams {
-	people: PeopleRecord | null
-	person: number
-}
-
-export interface RegentRoleParams {
-	people: PeopleRecord | null
-	regent: number
-	ward: number
-	// Regent kind from the engine: parent, relative or protector.
-	kind: string
-}
-
 export interface RebelControlledNationIdsParams {
 	frame: WorldFrame
 	wars: WarRecord[]
@@ -35,14 +25,9 @@ export interface FocusWikiNationParams extends RebelControlledNationIdsParams {
 	sceneRef: SceneRef
 }
 
-export interface PersonDisplayParams {
-	people: PeopleRecord | null
+export interface RulerDisplayParams {
+	record: HistoryRecord
 	payload: Record<string, unknown>
-}
-
-export interface ReligionOptionLabelInput {
-	group: string
-	option: string
 }
 
 export interface PartitionStatParams {

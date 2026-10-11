@@ -1,6 +1,6 @@
 import { expect, it } from "vitest"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
-import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
+import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
@@ -19,7 +19,7 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 			!engine.desolate[p] &&
 			STATE.isSovereign({ state: engine, p }) &&
 			GOVERNMENT.marriageAlliancesOfIndex(engine.governmentType[p]) &&
-			engine.people.rulerOf[p] >= 0,
+			engine.leaderRuntime.rulerId[p] >= 0,
 	)
 	const [r, s, x, y, sibling] = sovereigns.slice(0, 5)
 	if (sibling === undefined) throw new Error("too few sovereigns")
@@ -49,28 +49,8 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(STATE.rel.ALLY)
 	expect(STATE.getRelation({ state: engine, a: s, b: y })).toBe(STATE.rel.NONE)
 	expect(STATE.diplomaticOverlord({ state: engine, nation: s })).toBe(r)
-	expect(
-		ROYAL_MARRIAGES.alliable({
-			state: engine,
-			match: {
-				a: engine.people.rulerOf[s],
-				b: engine.people.rulerOf[x],
-				realmA: s,
-				realmB: x,
-			},
-		}),
-	).toBe(true)
-	expect(
-		ROYAL_MARRIAGES.alliable({
-			state: engine,
-			match: {
-				a: engine.people.rulerOf[s],
-				b: engine.people.rulerOf[y],
-				realmA: s,
-				realmB: y,
-			},
-		}),
-	).toBe(false)
+	expect(ROYAL_MARRIAGE.eligible({ state: engine, a: s, b: x })).toBe(true)
+	expect(ROYAL_MARRIAGE.eligible({ state: engine, a: s, b: y })).toBe(false)
 
 	const before = FIELDS.prov.treasury.get({ state: engine, p: r })
 	TAX.previewBudget({ state: engine })
@@ -123,12 +103,12 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 	STATE.setRelation({ state: engine, a: y, b: s, rel: STATE.rel.VASSAL })
 	STATE.setRelation({ state: engine, a: y, b: x, rel: STATE.rel.ALLY })
 	const marriageKey = Math.min(s, x) * engine.P + Math.max(s, x)
-	engine.people.marriageAlliances.set(marriageKey, { first: s, second: x })
+	engine.marriageTies.set(marriageKey, { first: s, second: x })
 	STATE.setRelation({ state: engine, a: r, b: x, rel: STATE.rel.NONE })
 	expect(STATE.getRelation({ state: engine, a: s, b: x })).toBe(STATE.rel.NONE)
 	expect(STATE.getRelation({ state: engine, a: y, b: x })).toBe(STATE.rel.NONE)
-	ROYAL_MARRIAGES.review({ state: engine })
-	expect(engine.people.marriageAlliances.has(marriageKey)).toBe(false)
+	ROYAL_MARRIAGE.review({ state: engine })
+	expect(engine.marriageTies.has(marriageKey)).toBe(false)
 	STATE.setRelation({ state: engine, a: r, b: x, rel: STATE.rel.ALLY })
 	STATE.setRelation({ state: engine, a: s, b: x, rel: STATE.rel.ALLY })
 	STATE.createActiveWar({
@@ -168,7 +148,6 @@ it("transfers vassal tribute and keeps subject alliances inside the ruler's bloc
 		state: engine,
 		p: internal,
 		rng: HISTORY_RNG.createHistoryRng(3141),
-		reason: "territorial change",
 	})
 	expect(
 		STATE.getRulerRelation({ state: engine, nation: internal }),

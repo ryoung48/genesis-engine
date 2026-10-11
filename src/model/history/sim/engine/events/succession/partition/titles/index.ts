@@ -12,12 +12,12 @@ export const PARTITION_TITLES = {
 	allocate({
 		state,
 		realm,
-		heirs,
+		count,
 	}: AllocateTitleSharesParams): TitleAllocation {
 		const top = STATE_TITLES.topTier({ state, realm })
 		const shares: PartitionShare[] = []
 		const allocated = new Set<number>()
-		const remaining = [...heirs]
+		let remaining = count
 		if (top === 0) return { shares, allocated, remaining }
 		const children = STATE.getChildren({ state, p: realm })
 		const titles: number[] = []
@@ -63,7 +63,7 @@ export const PARTITION_TITLES = {
 					}) === title,
 			) ?? titles[0]
 		for (const title of titles) {
-			if (title === primaryTitle || remaining.length === 0) continue
+			if (title === primaryTitle || remaining === 0) continue
 			const seat = state.titles.seat[title]
 			const supporters = children.filter(
 				(p) =>
@@ -81,12 +81,8 @@ export const PARTITION_TITLES = {
 				)
 			)
 				continue
-			shares.push({
-				heir: remaining.shift() as number,
-				seat,
-				kind: "title",
-				supporters,
-			})
+			remaining--
+			shares.push({ seat, kind: "title", supporters })
 			for (const p of supporters) allocated.add(p)
 		}
 		return { shares, allocated, remaining }

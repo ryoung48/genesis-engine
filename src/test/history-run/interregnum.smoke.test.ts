@@ -1,21 +1,20 @@
-import { expect, it } from "vitest"
-import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { expect, it, vi } from "vitest"
+import { RULER_NAMES } from "@/model/history/record/rulers"
 import { TITLE_RECORD } from "@/model/history/record/titles"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
+import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import type { InterregnumNoteData } from "@/model/history/sim/engine/events/succession/interregnum/types"
-import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
+import type { SuccessionChoice } from "@/model/history/sim/engine/events/succession/systems/types"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
 import { SIM_RECORD } from "@/model/history/sim/record"
-import type { SharedRng } from "@/model/shared/random/rng"
+import { RNG, type SharedRng } from "@/model/shared/random/rng"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import type { DuchyGroupsParams } from "@/model/society/dejure/founding/types"
 import type { DejureTitles } from "@/model/society/dejure/types"
@@ -29,23 +28,6 @@ interface Fixture {
 	rng: SharedRng
 	realm: number
 	seats: number[]
-	dying: number
-}
-
-function now(state: HistoryState): number {
-	return state.time / STATE.yearMs
-}
-
-function districtSeats({
-	state,
-	realm,
-}: {
-	state: HistoryState
-	realm: number
-}): number[] {
-	return SUCCESSION_SYSTEMS.districts({ state, realm }).map(
-		(district) => district.seat,
-	)
 }
 
 function quiet({ state, realm }: { state: HistoryState; realm: number }) {
@@ -60,43 +42,8 @@ function quiet({ state, realm }: { state: HistoryState; realm: number }) {
 	)
 }
 
-function person({
-	state,
-	realm,
-	age,
-	father,
-}: {
-	state: HistoryState
-	realm: number
-	age: number
-	father: number
-}): number {
-	const people = state.people
-	const id = PEOPLE.spawn({
-		recordHealth: true,
-		death: null,
-		nameSeed: null,
-		people,
-		sex: 0,
-		birth: now(state) - age,
-		survives: now(state) - age,
-		father,
-		mother: -1,
-		dynasty:
-			father >= 0 ? people.persons.dynasty[father] : people.nextDynasty++,
-		origin: STATE.originOf({ state, realm }),
-		rng: HISTORY_RNG.createHistoryRng(age + 7),
-	})
-	people.persons.death[id] = now(state) + 40
-	return id
-}
-
-function kill({ state, who }: { state: HistoryState; who: number }): void {
-	state.people.persons.death[who] = now(state) - 0.01
-}
-
-// A quiet realm with at least the wanted number of district seats, all held
-// by living admins, ruled by a childless man of the given government.
+// A quiet realm with at least the wanted number of district seats, ruled by a
+// man of the given government.
 function fixture({
 	districts,
 	government,
@@ -113,52 +60,57 @@ function fixture({
 	let realm = -1
 	for (let p = 0; p < state.P && realm < 0; p++) {
 		if (!quiet({ state, realm: p })) continue
-		const seats = districtSeats({ state, realm: p })
-		if (seats.length >= districts) realm = p
+		if (SUCCESSION_SYSTEMS.districts({ state, realm: p }).length >= districts)
+			realm = p
 	}
 	if (realm < 0) throw new Error("no realm fits the case")
 	state.governmentType[realm] = GOVERNMENT.getGovIdx()[government]
 	state.cultureGenderSystems[state.culture[realm]] =
 		GENDER_SYSTEM.cultureGenderSystem.PATRIARCHAL
-	const dying = person({ state, realm, age: 60, father: -1 })
-	STATE.installRuler({
+	STATE.foundRuler({
 		state,
 		p: realm,
-		person: dying,
-		claim: 3,
-		reason: "succession",
+		ruler: { dynasty: -1, age: "fresh", claim: 3 },
+		rng,
 	})
 	return {
 		state,
 		world: generated as unknown as SerializedGenesisWorld,
 		rng,
 		realm,
-		seats: districtSeats({ state, realm }),
-		dying,
+		seats: SUCCESSION_SYSTEMS.districts({ state, realm }),
 	}
 }
 
-function choose(fx: Fixture) {
-	return SUCCESSION_SYSTEMS.choose({
-		state: fx.state,
-		realm: fx.realm,
-		dying: fx.dying,
-		rng: fx.rng,
+function sequence(values: number[]): SharedRng {
+	return RNG.fromSource({
+		random: () => values.shift() ?? 0.5,
+		nonPositiveWeightBehavior: "undefined",
 	})
 }
 
 function die(fx: Fixture): void {
-	const { state, realm, rng, dying } = fx
-	kill({ state, who: dying })
-	STATE.scheduleSuccession({ state, p: realm })
-	PERSON_DEATH.run({
-		state,
-		person: state.people.rulerOf[realm],
-		revision:
-			state.deathSchedule.pending.get(state.people.rulerOf[realm])?.revision ??
-			-1,
-		rng,
-	})
+	const { state, realm, rng } = fx
+	const forced: SuccessionChoice = {
+		system: "single_heir",
+		house: "new",
+		claim: 0,
+		age: "fresh",
+		juniors: 0,
+		interregnum: true,
+		daughterLine: false,
+	}
+	const spy = vi.spyOn(SUCCESSION_SYSTEMS, "choose").mockReturnValue(forced)
+	try {
+		SUCCESSION.runSuccession({
+			state,
+			realm,
+			leaderIdx: state.leaderRuntime.idx[realm],
+			rng,
+		})
+	} finally {
+		spy.mockRestore()
+	}
 }
 
 function interregnumNote(fx: Fixture): InterregnumNoteData | null {
@@ -187,54 +139,45 @@ function topTierTitles({
 	return titles
 }
 
-it("fires only for a heirless hereditary realm with a district admin", () => {
+it("fires only for a heirless hereditary realm with a district", () => {
 	const fx = fixture({ districts: 2, government: "feudal_monarchy" })
-	const { state, realm, dying } = fx
-	expect(fx.seats.length).toBeGreaterThanOrEqual(2)
-	expect(choose(fx)).toMatchObject({ heir: -1, claim: 0, interregnum: true })
-
-	const vacant = SUCCESSION_SYSTEMS.choose({
-		state,
-		realm,
-		dying: -1,
-		rng: fx.rng,
+	const { state, realm } = fx
+	const roll = (values: number[]) =>
+		SUCCESSION_SYSTEMS.choose({ state, realm, rng: sequence(values) })
+	expect(roll([0.995, 0.1])).toMatchObject({
+		house: "new",
+		claim: 0,
+		interregnum: true,
 	})
-	expect(vacant.interregnum).toBe(false)
-
+	expect(roll([0.995, 0.9]).interregnum).toBe(false)
+	expect(roll([0.5, 0.1])).toMatchObject({
+		house: "same",
+		claim: 3,
+		interregnum: false,
+	})
 	for (const government of ["elective_monarchy", "theocracy"] as const) {
 		const original = state.governmentType[realm]
 		state.governmentType[realm] = GOVERNMENT.getGovIdx()[government]
-		expect(choose(fx).interregnum).toBe(false)
+		expect(roll([0.995, 0.1, 0.1]).interregnum).toBe(false)
 		state.governmentType[realm] = original
 	}
-
-	const heir = person({ state, realm, age: 30, father: dying })
-	const heirs = choose(fx)
-	expect(heirs).toMatchObject({ heir, claim: 3, interregnum: false })
-	state.people.persons.death[heir] = now(state) - 1
-
-	const [own, ...others] = fx.seats
-	for (const seat of others)
-		PEOPLE.vacate({ people: state.people, seat, reason: "unknown" })
-	expect(choose(fx).interregnum).toBe(true)
-	PEOPLE.vacate({ people: state.people, seat: own, reason: "unknown" })
-	expect(choose(fx)).toMatchObject({ heir: -1, interregnum: false })
-	DISTRICTS.install({
-		state,
-		seat: own,
-		person: dying,
-		reason: "district grant",
+	const children = STATE.getChildren({ state, p: realm })
+	const flags = children.map((seat) => state.districtSeat[seat])
+	for (const seat of children) state.districtSeat[seat] = 0
+	expect(roll([0.995, 0.1]).interregnum).toBe(false)
+	children.forEach((seat, index) => {
+		state.districtSeat[seat] = flags[index]
 	})
-	expect(choose(fx).interregnum).toBe(false)
 }, 120000)
 
 it("frees every district at the moment of death and keeps the crown land", () => {
 	const fx = fixture({ districts: 3, government: "feudal_monarchy" })
-	const { state, realm, dying } = fx
+	const { state, realm } = fx
+	const dying = state.leaderRuntime.rulerId[realm]
+	const house = state.leaderDynCurrent[realm]
 	const snapshot = SUCCESSION_SYSTEMS.districts({ state, realm }).map(
-		({ seat, person: holder }) => ({
+		(seat) => ({
 			seat,
-			holder,
 			provinces: new Set(STATE.getNationProvinces({ state, root: seat })),
 		}),
 	)
@@ -247,20 +190,23 @@ it("frees every district at the moment of death and keeps the crown land", () =>
 	expect(note).not.toBeNull()
 	expect(note?.freed).toEqual(snapshot.map((entry) => entry.seat))
 	expect(note?.skipped).toEqual([])
+	const dynasties = new Set([house])
 	for (const entry of snapshot) {
 		expect(STATE.isSovereign({ state, p: entry.seat })).toBe(true)
 		expect(
 			new Set(STATE.getNationProvinces({ state, root: entry.seat })),
 		).toEqual(entry.provinces)
 		expect(state.governmentType[entry.seat]).toBe(state.governmentType[realm])
+		expect(state.leaderClaimCurrent[entry.seat]).toBe(3)
+		expect(dynasties.has(state.leaderDynCurrent[entry.seat])).toBe(false)
+		dynasties.add(state.leaderDynCurrent[entry.seat])
 	}
-	expect(state.people.rulerOf[snapshot[0].seat]).toBe(snapshot[0].holder)
 
 	expect(STATE.isSovereign({ state, p: realm })).toBe(true)
-	expect(state.people.rulerOf[realm]).not.toBe(dying)
+	expect(state.leaderRuntime.rulerId[realm]).not.toBe(dying)
+	expect(state.leaderDynCurrent[realm]).not.toBe(house)
 	expect(state.leaderClaimCurrent[realm]).toBe(0)
-	const years =
-		now(state) - state.people.persons.birth[state.people.rulerOf[realm]]
+	const years = STATE_RULERS.ageYears({ state, p: realm })
 	expect(years).toBeGreaterThanOrEqual(19.9)
 	expect(years).toBeLessThanOrEqual(50.1)
 
@@ -283,20 +229,7 @@ it("frees every district at the moment of death and keeps the crown land", () =>
 	STATE.validateLiveHierarchy({ state, context: "interregnum test" })
 }, 120000)
 
-it("gives a minor admin the usual regency", () => {
-	const fx = fixture({ districts: 2, government: "feudal_monarchy" })
-	const { state, realm } = fx
-	const seat = fx.seats[0]
-	const admin = state.people.rulerOf[seat]
-	state.people.persons.birth[admin] = now(state) - 10
-	state.time += STATE.yearMs
-	die(fx)
-	expect(interregnumNote(fx)?.freed).toContain(seat)
-	expect(REGENCY.active({ state, realm: seat })).not.toBeNull()
-	expect(REGENCY.active({ state, realm })).toBeNull()
-}, 120000)
-
-it("records the break-up and turns the admin's district tenure into a ruler tenure", () => {
+it("records the break-up with the rulers of the crown and the freed realms", () => {
 	const fx = fixture({ districts: 2, government: "feudal_monarchy" })
 	const { state, world, realm } = fx
 	const record = SIM_RECORD.buildProceduralState({
@@ -305,7 +238,10 @@ it("records the break-up and turns the admin's district tenure into a ruler tenu
 	})
 	const translator = SIM_RECORD.createTranslator({ state: record, world })
 	const seat = fx.seats[0]
-	const admin = state.people.rulerOf[seat]
+	const late = STATE_RULERS.ref({
+		state,
+		ruler: STATE_RULERS.read({ state, p: realm }),
+	})
 	const noteCursor = state.events.length
 	state.time += STATE.yearMs
 	die(fx)
@@ -313,8 +249,6 @@ it("records the break-up and turns the admin's district tenure into a ruler tenu
 	JOURNAL.flush({ state, noteCursor, census: false, initial: false })
 	SIM_RECORD.appendJournal({ translator, transactions: state.journal })
 
-	const people = record.record.people
-	if (!people) throw new Error("no people record")
 	const crownId = translator.identityByRoot.get(realm) as number
 	const freedId = translator.identityByRoot.get(seat) as number
 	for (const id of [crownId, freedId])
@@ -322,33 +256,22 @@ it("records the break-up and turns the admin's district tenure into a ruler tenu
 			record.record.events.nationEvents[id].events.findLast(
 				(event) => event.kind === "interregnum",
 			)?.payload,
-		).toMatchObject({ crown: crownId })
-
-	const tenures = people.tenures.filter(
-		(tenure) => tenure.seat === seat && tenure.person === admin,
+		).toMatchObject({ crown: crownId, late })
+	const freedRuler = STATE_RULERS.ref({
+		state,
+		ruler: STATE_RULERS.read({ state, p: seat }),
+	})
+	const owner = record.record.events.provinceEvents
+		.get(seat)
+		?.events.findLast((event) => event.kind === "owner")
+	expect(
+		RULER_NAMES.comment({
+			record: record.record,
+			comment: owner?.comment ?? null,
+		}),
+	).toBe(
+		`Broke away from ${record.record.nations[crownId].name} in the interregnum after ${RULER_NAMES.names({ record: record.record, ref: late }).name}'s death, under ${RULER_NAMES.names({ record: record.record, ref: freedRuler }).name}`,
 	)
-	expect(tenures.at(-2)).toMatchObject({
-		kind: "district",
-		endReason: "interregnum",
-	})
-	expect(tenures.at(-1)).toMatchObject({
-		kind: "ruler",
-		startReason: "interregnum",
-	})
-	expect(tenures.at(-2)?.endTimeMs).toBe(tenures.at(-1)?.startTimeMs)
-	const events = PERSON_QUERY.timeline({
-		people,
-		id: admin,
-		timeMs: record.record.maxTimeMs,
-	})
-	expect(events.findLast((event) => event.kind === "left seat")).toMatchObject({
-		other: seat,
-		reason: "interregnum",
-	})
-	expect(events.findLast((event) => event.kind === "took seat")).toMatchObject({
-		other: seat,
-		reason: "interregnum",
-	})
 }, 120000)
 
 function line(count: number): Pick<DuchyGroupsParams, "adjOffset" | "adjList"> {

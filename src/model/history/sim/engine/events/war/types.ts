@@ -82,6 +82,5 @@ export interface PressClaimParams {
 	state: HistoryState
 	attacker: number
 	defender: number
-	claimant: number
 	rng: SharedRng
 }

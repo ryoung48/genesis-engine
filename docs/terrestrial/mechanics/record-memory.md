@@ -2,16 +2,16 @@
 
 Scope: `:history`.
 
-This reference covers buffer ownership, retained data and memory measurements. [Person records](person-records.md) owns packet schemas; [pipeline performance](pipeline-performance.md) owns optimization timing comparisons.
+This reference covers buffer ownership, retained data and memory measurements. [Pipeline performance](pipeline-performance.md) owns optimization timing comparisons.
 
-The history record remains the complete source for scrubbing. Events, people, census dates and numeric values are retained at their existing precision. These changes reduce temporary and duplicate storage; they do not compress, thin or replay historical data.
+The history record remains the complete source for scrubbing. Events, census dates and numeric values are retained at their existing precision. These changes reduce temporary and duplicate storage; they do not compress, thin or replay historical data.
 
 ## Ownership
 
 - The simulation worker posts the pending journal, then calls `JOURNAL.releaseSent` after `postMessage` succeeds. Sent transactions and engine notes can then be collected. Census buffer transfers still move ownership to the receiver.
 - The procedural timeline treats its journal ref as a pending queue. `SIM_RECORD.consumeJournal` translates the whole queue into the record, then empties it. Later batches append to that empty queue. The non-consuming `appendJournal` operation remains available for consumers comparing or inspecting batches.
 - Frame population and development arrays reference the selected census snapshot directly. Census snapshots and those frame arrays must be treated as immutable. The engine copies its current arrays when recording a census, so later simulation updates do not change earlier frames. Political arrays and other reconstructed frame state retain their existing ownership.
-- People rows arrive as one typed-array packet per journal transaction. All of a packet's columns are views on a single buffer, which is transferred with the census buffers. `PEOPLE_RECORD.append` folds a packet into the record and keeps no reference to it, so packets are collected with their transactions. See [person records](person-records.md).
+- Rulers arrive inside the journal transaction as plain numbers: each ruler change carries the ruler's naming inputs (id, name seed, name origin, sex, dynasty, dynasty origin), and notes that name replaced rulers carry the same snapshots. The record keeps them in the nation event payloads; names resolve lazily and are never stored. See [rulers and dynasties](../politics/rulers-and-dynasties.md#records-and-names).
 - The roads adapter shares the engine's owned geography buffers and retains copies of the three settlement-anchor arrays; it never retains the generation buffers that transfer to the UI.
 - Roads arrive as packed added/released paths in changed journal batches. Translation retains each added path once in a lifetime log, plus an active-entry map; release packets are discarded with their transactions. Frames reference retained paths. Engine batch summaries keep counts and timings without retaining released paths. Report fields `roads.routeLogEntries` and `roads.pathRegions` measure lifetime entries and path elements (four bytes per element in transport; JavaScript arrays in the record have additional overhead). See [road network](road-network.md).
 - The existing frame cache still retains up to 48 dates. No decompression or additional history replay is introduced.
@@ -48,34 +48,11 @@ The scrub median is essentially unchanged (-0.6%). The simulation/transfer/trans
 
 Local measurements are in `stats/history/2026-10-03T20-58-05-000Z-scrub-memory-measurements/`. Reports and comparisons stay local and are not committed.
 
-## People record
-
-The table below is the archived P2 measurement, before residence. [Household residence](../people/residence-and-realm.md) adds a 4-byte initial column, sparse record residence rows and a separate retained simulation history. New measurements are documented below; historical P2 figures remain unchanged.
-
-The record holds every person the simulation creates. At the P3 residence stage, `PeopleRecord.persons` used dense typed columns indexed by person id, 85 bytes a person with initial residence, grown by doubling; the marriages, betrothals, tenures and their indices, `childrenOf`, `pregnanciesOf`, `stressOf` and `dynastyHome` remain objects and maps. [Person records](person-records.md) describes the current schema, including the health columns added by P4.
-
-The live-history harness (20,000 points, 300 years) recorded 26,190 people, 9,194 marriages, 6,866 tenures and 470 betrothals. Each structure's size is what a retained `structuredClone` of it adds after a garbage collection, heap plus array buffers:
-
-| Structure | Retained | Notes |
-| --- | ---: | --- |
-| `persons` columns | 3.50 MiB | Capacity 45,920 after doubling; the 26,190 people in use are 2.02 MiB. |
-| `tenures` and its four indices | 2.28 MiB | |
-| `marriages`, `marriagesOf` | 2.03 MiB | |
-| `childrenOf` | 1.34 MiB | |
-| `pregnanciesOf` | 0.25 MiB | |
-| `betrothals`, `betrothalsOf` | 0.16 MiB | |
-| `dynastyHome` | 0.05 MiB | |
-| `stressOf` | 0.02 MiB | |
-
-That is 9.6 MiB of people data on the main thread, of 127.3 MiB retained JavaScript heap and 66.6 MiB of array buffers in the same run. The derived objects are 64% of it; converting them to columns is not planned. The 204,000-point report's 330,956 people need 25.6 MiB of columns in use and up to twice that in capacity. Local measurements are in `stats/history/2026-10-04T04-48-15-693Z-people-2-dp72/people-record-memory.json`.
-
-The record hash of this run cannot be compared with the earlier measurements above: the record now holds every person, and its people are columns.
-
 ## Verification
 
 `src/test/history-run/pipeline-optimization.smoke.test.ts` transfers census buffers, releases worker batches, consumes browser queues and compares the complete streamed record with a retained-batch record across 20 years. It checks frames at census dates and between censuses in reverse order, and checks that all three frame arrays reference the correct census snapshot.
 
-The optional `src/test/history-run/retained-memory.smoke.test.ts` harness records memory, the people record's size per structure, simulation/translation timing, scrub reconstruction timing and hashes. `HISTORY_MEMORY_RETAIN=1` reproduces the former retained-journal behavior and adds back the former census copies for timing comparisons; it is confined to the measurement harness. Scrub timing excludes hash serialization.
+The optional `src/test/history-run/retained-memory.smoke.test.ts` harness records memory, the ruler state's size, simulation/translation timing, scrub reconstruction timing and hashes. `HISTORY_MEMORY_RETAIN=1` reproduces the former retained-journal behavior and adds back the former census copies for timing comparisons; it is confined to the measurement harness. Scrub timing excludes hash serialization.
 
 The harness hashes JSON values with explicit map entries and non-finite/negative-zero number representations, so sharing an empty array does not change the result hash. `hashFormat: "value-json-v1"` marks these hashes; they cannot be compared directly with the initial V8 serialization hashes. Memory is collected after yielding to the event loop, releasing temporary hash serialization strings before GC. The `gcAfterYield` flag distinguishes these samples from earlier exploratory measurements.
 
@@ -103,46 +80,6 @@ The completed after-change report is `stats/history/2026-10-03T21-02-00-462Z-scr
 
 The detailed-report runner already releases journals and does not build the browser scrub record, so its timing and memory do not measure the live-path savings. It verifies simulation statistics independently of the live-memory experiment.
 
-## Household retention measurement
+## Ruler-only measurement
 
-P3’s released-journal harness (`stats/history/2026-10-04T13-39-53-052Z-people-3-dp91/people-record-memory.json`) uses seed 14963991, lateMedieval, 20,000 points and 300 years. It recorded 24,742 people; the different simulation means these figures are structure measurements, not a matched P2 memory delta.
-
-| Structure | Bytes | Interpretation |
-|---|---:|---|
-| Simulation retained residence history | 4,506,288 | 9,186 person entries, including dead people |
-| History logical payload | 178,584 | 14,882 rows × 12 bytes |
-| History allocated payload | 447,216 | Growable typed columns including slack |
-| Empty history entry/column objects | 3,968,544 | Separate clone measurement; not additive to complete history |
-| Simulation initial residence | 198,128 | Array retained size |
-| Simulation pending log | 104,120 | Separate from history |
-| Held-seat arrays | 999,480 | One array per person, 417 held IDs at final sample |
-| Record initial residence | 184,008 | Capacity 45,920, including buffer/object overhead |
-| Record residence rows/index | 2,090,696 | Sparse effective-time objects and map |
-
-Record person columns retain 3,853,088 bytes in total; their initial column is already included. GC heap was 141.04 MiB and array buffers 59.67 MiB; RSS 727.41 MiB is reported separately from structure retention. Journal transfer and release left zero worker/browser transactions and zero extra cached census buffers. Simulation/transfer/translation took 34.91 seconds and 48 scrub reconstructions took 536.34 ms. These single timings overlap other verification and do not establish a latency delta.
-
-### Pooled residence history
-
-The table above measured one history object with two typed arrays per person who had moved; most of its retained size was those objects, not the moves. The simulation now keeps every move in one shared set of columns (`times`, `provinces`, and `previous`, which links a row to the same person's earlier move) with a map from person to their latest row. Lookups walk a person's chain and select the greatest effective time at or before the query, the last append winning ties, as before.
-
-On the same harness workload (seed 14963991, lateMedieval, 20,000 points, 300 years, 23,041 people) retained residence history fell from 4.9 MB to 1.0 MB. Before and after files are in `stats/history/2026-10-05T03-39-58-023Z-p7-exact-optimisations/`.
-
-## Health and lifecycle retention (P4)
-
-Retained memory at 20000 points over 300 years (`stats/history/people-4-completed-memory.json`, 22937 people): the ten simulation health columns 2.20 MB, the record's 47456 health rows 0.92 MB, the death schedule 42 KB with 52 pending deaths, pending deliveries 65 KB, and the event heap 0.67 MB.
-
-## Opinion memory retention (P7)
-
-[Interaction memories](../people/opinion-and-relationships.md#interaction-memories) are held three ways, and only one of them grows with the length of the history.
-
-| Structure | Holds | Size in the 933-year report |
-|---|---|---:|
-| `PeopleState.memories` (simulation) | The live entries only: observer → target → at most five reason/start pairs | 100–240 entries; at most 14 KB serialized |
-| `opinion_memory` log rows (transport) | One 25-byte row per refresh, sent once and released with its packet | 22,084 rows, 552 KB over the run |
-| `PeopleRecord.memoriesOf` (record) | Every refresh, by observer and target, in arrival order | 22,084 refreshes; 1.22 MB serialized |
-
-- **Live map.** The yearly people pass removes an entry once it has faded (ten years) or once its observer or target has actually died, so the map stays at a few hundred entries however long the simulation runs. In the report a little over half of all entries leave by expiry and the rest because a party died first. Pruning writes no row.
-- **Record index.** The record never removes or overwrites a refresh: a query at an earlier date must still find the refresh that was current then. It grows by about 24 refreshes per simulated year at 204,000 points, 97% of them attacks and grants.
-- **What the figures are.** Sizes are `v8.serialize` byte lengths taken by the report at each window end (`peopleOpinionCost.liveMemoryBytes`, `.recordMemoryBytes`). They measure payload and keys, not `Map` and object overhead or array capacity, and are not directly comparable with the structured-clone retention figures above. Row payload is exact: 8-byte time, 1-byte kind and four 4-byte slots.
-
-Source: `stats/history/2026-10-05T00-28-51-114Z-people-7-diplomacy/933.json`, seed 14963991, lateMedieval, 204000 points, 933 years from 867, with the two earlier P7 step reports beside it in `stats/history`. Peak RSS in the three P7 reports (2,478–2,533 MiB) is below the P6 report's 3,010 MiB; the first of them is statistically identical to P6, so that difference is allocation and GC timing and not a saving.
+With no people record, the 933-year report `stats/history/2026-10-11T21-43-35-790Z-ruler-only-people/933.json` peaked at 2,360.6 MiB against 2,466.8 MiB before (−4.3%, one shared-machine sample each). The census, province and military buffers, not the people record, dominate the peak.

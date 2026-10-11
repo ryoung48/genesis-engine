@@ -1,9 +1,7 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { EventHeap } from "@/model/history/sim/engine/event-heap"
-import type { DeathSchedule } from "@/model/history/sim/engine/events/people/death/schedule/types"
 import type { CoronationCounters } from "@/model/history/sim/engine/events/succession/coronation/counters/types"
-import type { SuccessionContext } from "@/model/history/sim/engine/events/succession/types"
 import type {
 	JournalTransaction,
 	PendingJournal,
@@ -18,18 +16,15 @@ import type {
 	MilitaryTotals,
 	Troops,
 } from "@/model/history/sim/engine/military/recruitment/types"
-import type { OpinionPoliticsTotals } from "@/model/history/sim/engine/opinion-context/types"
 import type {
 	ElectionStreak,
 	GovernmentTransition,
 } from "@/model/history/sim/engine/state/government/types"
-import type { MarriageTotals } from "@/model/history/sim/people/family/diagnostics/types"
-import type { MarriageLaw } from "@/model/history/sim/people/marriage-law/types"
 import type {
-	PeopleState,
-	SeatChangeReason,
-} from "@/model/history/sim/people/types"
-import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
+	AgeTable,
+	MarriageTie,
+	Ruler,
+} from "@/model/history/sim/engine/state/rulers/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { DejureTitles, TitleMembers } from "@/model/society/dejure/types"
 import type { RouteState } from "@/model/society/infrastructure/trade/routing/types"
@@ -68,8 +63,6 @@ export interface StartWarParams {
 	defender: number
 	rng: SharedRng
 	goal: WarGoal
-	// [JUSTIFICATION] Only a claim war has a claimant.
-	claimant?: number
 }
 
 import type { Siege } from "@/model/history/sim/engine/events/siege/types"
@@ -85,8 +78,10 @@ export interface War {
 	goal: WarGoal
 	backers: number[]
 	refusedCalls: Set<number>
+	// Ruler ids of the throne held and of the claimant when the war began; -1
+	// when the war has no such ruler.
 	originalCrownRuler: number
-	claimant: number
+	claimantRuler: number
 	deployed: Record<number, Troops>
 	participants: Record<number, WarSide>
 	candidates: Record<WarSide, number[]>
@@ -113,8 +108,6 @@ export interface Indemnity {
 interface ActiveWarOptions {
 	// [JUSTIFICATION] Fixtures and seeded wars default to conquest.
 	goal?: WarGoal
-	// [JUSTIFICATION] Only a claim war has a claimant; every other war uses -1.
-	claimant?: number
 	startTime?: number
 	nextBattleTime?: number
 	occupied?: number[]
@@ -125,11 +118,20 @@ interface ActiveWarOptions {
 	}
 }
 
-interface LeaderRuntime {
+export interface LeaderRuntime {
 	idx: Int32Array
 	birth: Float64Array
 	targetUrban: Float32Array
 	nameSeed: Int32Array
+	rulerId: Int32Array
+	nameOrigin: Int32Array
+	sex: Uint8Array
+	death: Float64Array
+}
+
+export interface RulerSequence {
+	nextRuler: number
+	nextDynasty: number
 }
 
 export interface EngineNote {
@@ -167,19 +169,13 @@ export interface CandidatesRefresh {
 	wars: number
 }
 
-// Running totals of births and deaths applied at their own times.
-export interface LifecycleCounters {
-	births: number
-	deaths: number
-	staleDeaths: number
-	cancelledDeliveries: number
-	peakDeliveries: number
-}
-
 export interface HistoryState {
 	electionStreaks: Map<number, ElectionStreak>
-	marriageMarket: Map<number, MarriageTotals>
-	opinionPolitics: OpinionPoliticsTotals
+	marriageTies: Map<number, MarriageTie>
+	unionGenerations: Map<number, number>
+	dynastyOrigin: Map<number, number>
+	rulerSequence: RulerSequence
+	regency: Uint8Array
 	coronations: CoronationCounters
 	riverByProvince: Uint8Array
 	P: number
@@ -296,7 +292,7 @@ export interface HistoryState {
 	cultureColors: Float32Array
 	religion: Int32Array
 	religionCount: number
-	marriageLaws: MarriageLaw[]
+	religionGender: Uint8Array
 	religionColors: Float32Array
 	nationColors: Float32Array
 	governmentType: Uint8Array
@@ -308,11 +304,6 @@ export interface HistoryState {
 	events: EngineNote[]
 	journal: JournalTransaction[]
 	pendingJournal: PendingJournal
-	deathSchedule: DeathSchedule
-	lifecycle: LifecycleCounters
-	// The seat walk of the death being applied; null outside one.
-	successionContext: SuccessionContext | null
-	people: PeopleState
 	heap: EventHeap
 	leaderRuntime: LeaderRuntime
 	roads: RouteState | null
@@ -434,15 +425,27 @@ export interface GetWarAlliesParams {
 	target: number
 }
 
+export interface NewRuler {
+	// -1 founds a new dynasty at the seat.
+	dynasty: number
+	age: AgeTable
+	claim: number
+}
+
 export interface ReleaseProvinceParams {
 	state: HistoryState
 	p: number
 	rng: SharedRng
-	reason: SeatChangeReason
+	// [JUSTIFICATION] Most releases found a new house, which is the default.
+	ruler?: NewRuler
 }
 
-export interface ReleaseFactionParams extends ReleaseProvinceParams {
+export interface ReleaseFactionParams {
+	state: HistoryState
+	p: number
+	rng: SharedRng
 	supporters: number[]
+	ruler: NewRuler
 }
 
 export interface IsProvinceConnectedToParentParams {
@@ -513,8 +516,8 @@ export interface CreateHistoryStateParams {
 	heritages?: GenesisPartition
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
-	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
-	religionDoctrine?: ReligionDoctrine
+	// [JUSTIFICATION] Earth imports and worlds without religions have no gender preference.
+	religionGender?: Uint8Array
 	startYear: number
 	waterAccess?: Uint8Array
 	landmarks?: GenesisLandmarks
@@ -533,26 +536,45 @@ export interface OriginOfParams {
 	realm: number
 }
 
-export interface ScheduleSuccessionParams {
+export interface SeatRulerParams {
 	state: HistoryState
 	p: number
-}
-
-export interface InstallRulerParams {
-	state: HistoryState
-	p: number
-	person: number
+	ruler: Ruler
 	claim: number
-	reason: SeatChangeReason
+	// Whether a reign counts toward merging the realm's union juniors.
+	natural: boolean
+	rng: SharedRng
 }
 
 export interface FoundRulerParams {
 	state: HistoryState
 	p: number
-	age: number
-	claim: number
+	ruler: NewRuler
 	rng: SharedRng
-	reason: SeatChangeReason
+}
+
+export interface ShareRulerParams {
+	state: HistoryState
+	senior: number
+	ruler: Ruler
+	claim: number
+}
+
+export interface DetachJuniorParams {
+	state: HistoryState
+	junior: number
+	senior: number
+	rng: SharedRng
+}
+
+export interface RegroupParams {
+	state: HistoryState
+	generations: Map<number, number>
+}
+
+export interface SeedRulersParams {
+	state: HistoryState
+	rng: SharedRng
 }
 
 export interface UnionRealmParams {
@@ -560,21 +582,10 @@ export interface UnionRealmParams {
 	p: number
 }
 
-export interface ContinueUnionParams {
-	state: HistoryState
-	generations: Map<number, number>
-}
-
 export interface UnionPairParams {
 	state: HistoryState
 	junior: number
 	senior: number
-}
-
-export interface UnionRulerParams {
-	state: HistoryState
-	p: number
-	person: number
 }
 
 export interface RealmPairParams {
@@ -587,22 +598,21 @@ export interface UniteParams {
 	state: HistoryState
 	a: number
 	b: number
-	ruler: number
-	// The same person now rules both realms, counting toward a merge.
-	shared: boolean
+	// The living ruler the whole resulting group shares.
+	ruler: Ruler
+	claim: number
+	rng: SharedRng
 }
 
 export interface UnionLink {
 	senior: number
 	junior: number
-	merge: boolean
 }
 
 export interface ReleaseFactionsParams {
 	state: HistoryState
-	seats: { p: number; supporters: number[] }[]
+	seats: { p: number; supporters: number[]; ruler: NewRuler }[]
 	rng: SharedRng
-	reason: SeatChangeReason
 }
 
 export interface ReconcileGovernmentParams {
@@ -615,4 +625,9 @@ export interface ReconcileGovernmentParams {
 export interface EndMarriageAllianceParams {
 	state: HistoryState
 	key: number
+}
+
+export interface EndMarriageTiesParams {
+	state: HistoryState
+	realm: number
 }

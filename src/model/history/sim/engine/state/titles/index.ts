@@ -13,16 +13,12 @@ import type {
 	FoundParams,
 	OwnedChildCountParams,
 	QualifyingParams,
-	RefreshHouseholdsParams,
 	RelinkNationsParams,
 	SeatParams,
 	SettleProvincesParams,
 	SettleTitleSetParams,
 	TopTierParams,
 } from "@/model/history/sim/engine/state/titles/types"
-import { PEOPLE } from "@/model/history/sim/people"
-import { HOLDINGS } from "@/model/history/sim/people/holdings"
-import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import type { QualifiedFounding } from "@/model/society/dejure/founding/types"
@@ -44,35 +40,6 @@ function isDistrictSeat({ state, seat }: SeatParams): boolean {
 		state.districtSeat[seat] === 1 &&
 		!state.desolate[seat]
 	)
-}
-
-function refreshHouseholds({
-	state,
-	previousRanks,
-}: RefreshHouseholdsParams): void {
-	const holders = new Set<number>()
-	for (let seat = 0; seat < state.P; seat++) {
-		if (
-			previousRanks[seat] === state.seatRank[seat] ||
-			state.people.rulerOf[seat] < 0
-		)
-			continue
-		holders.add(state.people.rulerOf[seat])
-	}
-
-	for (const person of holders) {
-		HOUSEHOLD.seatChanged({ people: state.people, person })
-		PEOPLE.raise({
-			people: state.people,
-			person,
-			rank:
-				HOLDINGS.standing({
-					people: state.people,
-					person,
-					ranks: state.seatRank,
-				}) - 1,
-		})
-	}
 }
 
 function applyDerivedParents({
@@ -147,13 +114,11 @@ function settleTitleSet({ state, touched }: SettleTitleSetParams): void {
 		touched,
 	})
 	if (changes.length === 0) return
-	const previousRanks = state.seatRank
 	state.seatRank = DEJURE.seatRank({
 		titles: state.titles,
 		provinceCount: state.P,
 		heldOnly: true,
 	})
-	refreshHouseholds({ state, previousRanks })
 	const affected = new Set<number>()
 	for (const change of changes) {
 		if (change.kind === "passed") {
@@ -203,13 +168,11 @@ function refreshTitleIndex({ state }: QualifyingParams): void {
 		titles: state.titles,
 		provinceCount: state.P,
 	})
-	const previousRanks = state.seatRank
 	state.seatRank = DEJURE.seatRank({
 		titles: state.titles,
 		provinceCount: state.P,
 		heldOnly: true,
 	})
-	refreshHouseholds({ state, previousRanks })
 }
 
 function found({ state, nation, founding }: FoundParams): boolean {

@@ -236,7 +236,7 @@ function serializeWorld(
 		religions: world.religions,
 		religionFamilies: world.religionFamilies,
 		religionTypes: world.religionTypes,
-		religionDoctrine: world.religionDoctrine,
+		religionGender: world.religionGender,
 		landmarks: world.landmarks
 			? {
 					regionLandmark: world.landmarks.regionLandmark,
@@ -594,10 +594,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.religions) add(...partitionBuffers(world.religions))
 	if (world.religionFamilies) add(world.religionFamilies.buffer)
 	if (world.religionTypes) add(world.religionTypes.buffer)
-	if (world.religionDoctrine) {
-		add(world.religionDoctrine.options.buffer)
-		add(world.religionDoctrine.familyOptions.buffer)
-	}
+	if (world.religionGender) add(world.religionGender.buffer)
 	if (world.landmarks) {
 		add(
 			world.landmarks.regionLandmark.buffer,
@@ -779,7 +776,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				cultures: generated.cultures,
 				heritages: generated.heritages,
 				religions: generated.religions,
-				religionDoctrine: generated.religionDoctrine,
+				religionGender: generated.religionGender,
 				era: generated.params.era,
 				seed: generated.params.seed,
 				landmarks: generated.landmarks,

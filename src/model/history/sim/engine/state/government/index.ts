@@ -120,8 +120,7 @@ function accede(
 	const earlier = found(params)
 	if (earlier) return earlier
 	const type = ERAS.governmentTypes[state.governmentType[realm]]
-	const ruler = state.people.rulerOf[realm]
-	const house = ruler >= 0 ? state.people.persons.dynasty[ruler] : -1
+	const house = state.leaderDynCurrent[realm]
 	if (
 		GOVERNMENT.govFamilyOfIndex(state.governmentType[realm]) === "republic" &&
 		GOVERNMENT.successionOfIndex(state.governmentType[realm]) === "election" &&

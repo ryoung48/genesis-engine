@@ -5,7 +5,6 @@ import { setFlagsFromString } from "node:v8"
 import { runInNewContext } from "node:vm"
 import { expect, it } from "vitest"
 import { HISTORY } from "@/model/history/record"
-import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
@@ -142,33 +141,6 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				before.arrayBuffers
 			)
 		}
-		const people = state.record.people
-		const peopleRecord = people && {
-			people: PEOPLE_RECORD.count(people),
-			personCapacity: people.persons.sex.length,
-			marriages: people.marriages.length,
-			betrothals: people.betrothals.length,
-			tenures: people.tenures.length,
-			healthRows: people.health.count,
-			retainedBytes: {
-				persons: retainedBytes(people.persons),
-				initialResidence: retainedBytes(people.persons.initialResidence),
-				residencesOf: retainedBytes(people.residencesOf),
-				childrenOf: retainedBytes(people.childrenOf),
-				marriages: retainedBytes([people.marriages, people.marriagesOf]),
-				betrothals: retainedBytes([people.betrothals, people.betrothalsOf]),
-				tenures: retainedBytes([
-					people.tenures,
-					people.tenuresOf,
-					people.tenuresOfSeat,
-					people.regentsOfSeat,
-					people.regentsOfWard,
-				]),
-				pregnanciesOf: retainedBytes(people.pregnanciesOf),
-				health: retainedBytes(people.health),
-				dynastyHome: retainedBytes(people.dynastyHome),
-			},
-		}
 		const measurement = {
 			hashFormat: "value-json-v1",
 			gcAfterYield: true,
@@ -189,61 +161,14 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				0,
 			),
 			memory,
-			peopleRecord,
-			marriage: {
-				heritageEntries: state.record.heritageOfCulture.length,
-				engineHeritageBytes: engine.heritageOfCulture.byteLength,
-				recordHeritageBytes: state.record.heritageOfCulture.byteLength,
-				createdAtBytes: retainedBytes(engine.people.persons.createdAt),
-				marketBytes: retainedBytes(engine.marriageMarket),
-				landlessUnmarried: engine.people.alive.filter(
-					(person) =>
-						engine.people.persons.death[person] > engine.time / STATE.yearMs &&
-						engine.people.persons.heldSeats[person].length === 0 &&
-						engine.people.persons.spouse[person] < 0,
-				).length,
-			},
-			residenceHistory: {
-				people: engine.people.residenceHistory.head.size,
-				logicalBytes: 16 * engine.people.residenceHistory.length,
-				allocatedBytes:
-					engine.people.residenceHistory.times.byteLength +
-					engine.people.residenceHistory.provinces.byteLength +
-					engine.people.residenceHistory.previous.byteLength,
-				retainedBytes: retainedBytes(engine.people.residenceHistory),
-				entryObjectsBytes: retainedBytes(engine.people.residenceHistory.head),
-				pendingLogBytes: retainedBytes(engine.people.log),
-				initialResidenceBytes: retainedBytes(
-					engine.people.persons.initialResidence,
-				),
-			},
-			health: {
-				columnsBytes: retainedBytes([
-					engine.people.persons.baseHealth,
-					engine.people.persons.infirmXp,
-					engine.people.persons.cloudedEyesXp,
-					engine.people.persons.fragileBonesXp,
-					engine.people.persons.witheringMindXp,
-					engine.people.persons.falteringHeartXp,
-					engine.people.persons.healthFlags,
-					engine.people.persons.healthAgeYear,
-					engine.people.persons.healthIntervalEnd,
-					engine.people.persons.ledYear,
-				]),
-				pendingDeaths: engine.deathSchedule.pending.size,
-				deathScheduleBytes: retainedBytes(engine.deathSchedule),
-				pendingDeliveries: engine.people.deliveries.byId.size,
-				deliveriesBytes: retainedBytes(engine.people.deliveries),
+			rulers: {
+				sovereigns: engine.leaderRuntime.rulerId.filter((id) => id >= 0).length,
+				dynasties: engine.rulerSequence.nextDynasty,
+				marriageTies: engine.marriageTies.size,
+				unionJuniors: engine.unionGenerations.size,
 				heapEvents: engine.heap.size,
 				heapBytes: retainedBytes(engine.heap),
-			},
-			holdings: {
-				people: engine.people.persons.heldSeats.length,
-				seats: engine.people.persons.heldSeats.reduce(
-					(sum, seats) => sum + seats.length,
-					0,
-				),
-				retainedBytes: retainedBytes(engine.people.persons.heldSeats),
+				ruledBytes: retainedBytes(engine.leaderRuntime),
 			},
 			simulationMs,
 			ticksMs,

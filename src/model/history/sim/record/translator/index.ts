@@ -1,5 +1,4 @@
 import { DATE } from "@/model/history/earth/date"
-import { PEOPLE_RECORD } from "@/model/history/record/people"
 import { RECORD_ROUTES } from "@/model/history/record/routes"
 import type {
 	BattleContribution,
@@ -17,9 +16,9 @@ import type {
 import type { SiegeBeatData } from "@/model/history/sim/engine/events/siege/types"
 import { RELATION_CODE } from "@/model/history/sim/engine/fields/relation-code"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { WAR_GOAL } from "@/model/history/sim/engine/state/war-goal"
 import { COLORING } from "@/model/history/sim/nations/coloring"
-import { PEOPLE_LOG } from "@/model/history/sim/people/log"
 import type {
 	ActiveTie,
 	AppendJournalParams,
@@ -35,7 +34,6 @@ import type {
 	ProjectTieParams,
 	RebelWar,
 	RebelWarOfParams,
-	RulerDeathParams,
 	ScanOwnerNotesParams,
 	UpdateTiesParams,
 } from "@/model/history/sim/record/translator/types"
@@ -46,11 +44,6 @@ const YEAR_MS = 365 * 86_400_000
 
 function recordTime(engineTimeMs: number): number {
 	return engineTimeMs - DATE.earthHistoryStartYear * YEAR_MS
-}
-
-// People rows carry simulation years.
-function peopleTime(years: number): number {
-	return recordTime(years * YEAR_MS)
 }
 
 function descendants({ children, province }: DescendantsParams): number[] {
@@ -100,20 +93,6 @@ function nationLabel({
 // Registers and retires rebel wars from this transaction's notes before any
 // ownership is derived, and collects the reason text the record attaches to
 // each revolt and each rebel-war outcome.
-// A ruler's latest entry carries their death date and cause once they die,
-// whether or not they still held the throne.
-function moveRulerDeath({
-	translator,
-	person,
-	time,
-	cause,
-}: RulerDeathParams): void {
-	const entry = translator.rulerEntries.get(person)
-	if (!entry) return
-	entry.payload.deathDate = DATE.timeMsToEu4Date(peopleTime(time))
-	entry.payload.deathCause = cause
-}
-
 function scanOwnerNotes({
 	translator,
 	transaction,
@@ -129,20 +108,24 @@ function scanOwnerNotes({
 			const cause =
 				note.tag === "province released"
 					? "disconnected"
-					: note.data.restoration
-						? "restoration"
-						: note.data.succession
-							? "succession"
-							: "threat"
+					: note.data.succession
+						? "succession"
+						: "threat"
 			reasons.revolts.set(note.data.subject as number, {
 				nation: nationLabel({ translator, root: note.data.overlord as number }),
 				cause,
-				person: (note.data.pretender as number | undefined) ?? -1,
+				ruler: note.data.pretender
+					? STATE_RULERS.readNote({ data: note.data, prefix: "pretender" })
+					: null,
 				throne: note.data.goal === "throne",
-				late: -1,
+				late: null,
 			})
 		} else if (note.tag === "partition") {
-			const heirs = note.data.heirs as number[]
+			const heirs = STATE_RULERS.readNoteColumns({
+				data: note.data,
+				prefix: "heir",
+			})
+			const late = STATE_RULERS.readNote({ data: note.data, prefix: "late" })
 			for (const [index, seat] of (note.data.seats as number[]).entries())
 				reasons.revolts.set(seat, {
 					nation: nationLabel({
@@ -150,12 +133,16 @@ function scanOwnerNotes({
 						root: note.data.nation as number,
 					}),
 					cause: "partition",
-					person: heirs[index],
+					ruler: heirs[index],
 					throne: false,
-					late: note.data.dying as number,
+					late,
 				})
 		} else if (note.tag === "interregnum") {
-			const holders = note.data.holders as number[]
+			const holders = STATE_RULERS.readNoteColumns({
+				data: note.data,
+				prefix: "freed",
+			})
+			const late = STATE_RULERS.readNote({ data: note.data, prefix: "late" })
 			for (const [index, seat] of (note.data.freed as number[]).entries())
 				reasons.revolts.set(seat, {
 					nation: nationLabel({
@@ -163,9 +150,9 @@ function scanOwnerNotes({
 						root: note.data.nation as number,
 					}),
 					cause: "interregnum",
-					person: holders[index],
+					ruler: holders[index],
 					throne: false,
-					late: note.data.dying as number,
+					late,
 				})
 		} else if (note.tag === "war started") {
 			const warId = note.data.war as number
@@ -852,7 +839,6 @@ function appendNote({
 			firstId,
 			secondId,
 			subjectType: null,
-			spouses: data.spouses as [number, number],
 		})
 	} else if (note.tag === "marriage alliance ended") {
 		const count = translator.parent.length
@@ -878,10 +864,13 @@ function appendNote({
 			kind: "regency",
 			payload: {
 				event: REGENCY_EVENTS[note.tag],
-				ward: data.ward as number,
-				regent: data.regent as number,
-				regentKind: data.kind as string,
-				regencyCause: data.regencyCause as string,
+				...(note.tag === "usurpation"
+					? {
+							kinsman: data.kinsman,
+							ward: STATE_RULERS.readNote({ data, prefix: "ward" }),
+							usurper: STATE_RULERS.readNote({ data, prefix: "usurper" }),
+						}
+					: {}),
 			},
 			comment: null,
 		})
@@ -913,9 +902,9 @@ function appendNote({
 			timeMs,
 			kind: "partition",
 			payload: {
-				late: data.dying,
-				primary: data.primary,
-				heirs: data.heirs,
+				late: STATE_RULERS.readNote({ data, prefix: "late" }),
+				primary: STATE_RULERS.readNote({ data, prefix: "primary" }),
+				heirs: STATE_RULERS.readNoteColumns({ data, prefix: "heir" }),
 				realms,
 				joinedDistricts: data.joinedDistricts,
 				joinedRealms: (data.joinedRealms as number[]).map(realmId),
@@ -928,8 +917,8 @@ function appendNote({
 		const realmId = (root: number) => translator.identityByRoot.get(root) ?? -1
 		const realms = (data.freed as number[]).map(realmId)
 		const payload = {
-			late: data.dying,
-			ruler: data.ruler,
+			late: STATE_RULERS.readNote({ data, prefix: "late" }),
+			ruler: STATE_RULERS.readNote({ data, prefix: "ruler" }),
 			crown: nationId,
 			realms,
 			warAttackers: (data.warAttackers as number[]).map(realmId),
@@ -971,7 +960,6 @@ function appendNote({
 const REGENCY_EVENTS: Record<string, string> = {
 	"regency started": "started",
 	"regency ended": "ended",
-	"regent changed": "changed",
 	usurpation: "usurpation",
 }
 
@@ -1023,7 +1011,6 @@ function createTranslator({
 		relationColumns: new Map(),
 		activeTies: new Map(),
 		royalMarriages: new Map(),
-		rulerEntries: new Map(),
 		warCoalitions: new Map(),
 		ownedCount,
 		stateless,
@@ -1055,25 +1042,6 @@ function applyTransaction({
 	const { record } = translator.state
 	const timeMs = Math.max(record.minTimeMs, recordTime(transaction.timeMs))
 	record.maxTimeMs = Math.max(record.maxTimeMs, timeMs)
-	const packet = transaction.people
-	if (record.people && packet) {
-		PEOPLE_RECORD.append({
-			record: record.people,
-			packet,
-			timeMs,
-			recordTime: peopleTime,
-		})
-		for (let index = 0; index < packet.count; index++) {
-			const row = PEOPLE_LOG.read({ rows: packet, index })
-			if (row.kind === "death")
-				moveRulerDeath({
-					translator,
-					person: row.person,
-					time: row.time,
-					cause: row.cause,
-				})
-		}
-	}
 	const count = translator.parent.length
 	const affected = new Set<number>()
 	const pairs = new Set<number>()
@@ -1234,23 +1202,28 @@ function applyTransaction({
 		const previous = log.events.findLast(
 			(event) => event.kind === "rulerChange",
 		)
-		const entry: HistoryEvent = {
+		const newRuler = previous?.payload.rulerId !== ruler.rulerId
+		if (previous && newRuler && ruler.deathCause) {
+			previous.payload.deathDate = DATE.timeMsToEu4Date(timeMs)
+			previous.payload.deathCause = ruler.deathCause
+		}
+		log.events.push({
 			timeMs,
 			kind: "rulerChange",
 			payload: {
 				birthDate: DATE.timeMsToEu4Date(recordTime(ruler.birthTimeMs)),
 				deathDate: null,
-				person: ruler.person,
-				newRuler: previous?.payload.person !== ruler.person,
+				rulerId: ruler.rulerId,
+				nameSeed: ruler.nameSeed,
+				nameOrigin: ruler.nameOrigin,
+				sex: ruler.sex,
+				dynasty: ruler.dynasty,
+				dynastyOrigin: ruler.dynastyOrigin,
+				newRuler,
 				regency: ruler.regency,
-				regent: ruler.regent,
-				predecessor: ruler.deceased,
-				predecessorDeathCause: ruler.deathCause,
 			},
 			comment: null,
-		}
-		log.events.push(entry)
-		translator.rulerEntries.set(ruler.person, entry)
+		})
 	}
 	if (transaction.roads)
 		RECORD_ROUTES.apply({

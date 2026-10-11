@@ -11,14 +11,11 @@ import type {
 	QualityParams,
 	ResolveParams,
 } from "@/model/history/sim/engine/events/succession/coronation/types"
-import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { FIELDS } from "@/model/history/sim/engine/fields"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { Founding } from "@/model/history/sim/engine/state/titles/types"
-import { OPINION } from "@/model/history/sim/people/opinion"
-import type { OpinionMemoryReason } from "@/model/history/sim/people/opinion/memory/types"
 import { TITLES } from "@/model/society/titles"
 
 // The former kingdom founding fee of 625/36 ducats over the kingdom's minimum
@@ -30,13 +27,6 @@ const MULTIPLIER: Record<CoronationQuality, number> = {
 	customary: 1,
 	lavish: 2,
 	magnificent: 4,
-}
-const REASON: Record<CoronationQuality, OpinionMemoryReason | null> = {
-	uncrowned: "coronation_uncrowned",
-	humble: "coronation_humble",
-	customary: null,
-	lavish: "coronation_lavish",
-	magnificent: "coronation_magnificent",
 }
 const CUSTOMARY = CORONATION_COUNTERS.qualities.indexOf("customary")
 
@@ -85,13 +75,7 @@ function affords({ state, realm, rank }: ResolveParams): boolean {
 // none is no coronation at all; an accession is held either way.
 // Returns whether a title was created.
 function crown({ state, realm, kind, founding }: CrownParams): boolean {
-	const people = state.people
 	const before = STATE_TITLES.topTier({ state, realm })
-	const holders = new Set(
-		SUCCESSION_SYSTEMS.districts({ state, realm }).map(
-			(district) => district.person,
-		),
-	)
 	const created =
 		founding !== null && STATE_TITLES.found({ state, nation: realm, founding })
 	if (kind === "elevation" && !created) return false
@@ -108,25 +92,10 @@ function crown({ state, realm, kind, founding }: CrownParams): boolean {
 		budget.coronationExpenses -= price
 		budget.otherChangesTotal -= price
 	}
-	const reason = REASON[grade]
-	let memories = 0
-	if (reason)
-		for (const holder of holders)
-			if (
-				OPINION.remember({
-					people,
-					observer: holder,
-					target: people.rulerOf[realm],
-					reason,
-					time: state.time / STATE.yearMs,
-				})
-			)
-				memories++
 	const counters = state.coronations
 	const cell = CORONATION_COUNTERS.cell({ kind, rank, quality: grade })
 	counters.held[cell]++
 	counters.ducats[cell] += price
-	counters.memories[cell] += memories
 	if (founding === null || !created) return false
 	const founded = CORONATION_COUNTERS.cell({
 		kind,
@@ -161,26 +130,19 @@ function accede({ state, realm, rng }: HoldCoronationParams): void {
 // has one.
 function hold({ state, realm, rng }: HoldCoronationParams): void {
 	state.coronationOwed[realm] = -1
-	if (state.people.rulerOf[realm] < 0) return
-	const regency = GOVERNOR.regency({ state, realm })
-	if (!regency) {
+	if (!STATE_RULERS.has({ state, p: realm })) return
+	if (!state.regency[realm]) {
 		accede({ state, realm, rng })
 		return
 	}
-	if (regency.cause === "minority") {
-		state.coronationOwed[realm] = state.leaderRuntime.idx[realm]
-		state.coronations.deferred++
-	} else state.coronations.incapable++
+	state.coronationOwed[realm] = state.leaderRuntime.idx[realm]
+	state.coronations.deferred++
 }
 
 function holdDeferred({ state, realm, leader, rng }: HoldDeferredParams): void {
 	const owed = state.coronationOwed[realm]
 	state.coronationOwed[realm] = -1
 	if (owed !== leader || !STATE.isSovereign({ state, p: realm })) return
-	if (GOVERNOR.regency({ state, realm })) {
-		state.coronations.incapable++
-		return
-	}
 	state.coronations.majority++
 	accede({ state, realm, rng })
 }
@@ -219,8 +181,7 @@ function elevate({ state, rng }: ElevateParams): void {
 	}
 	let founded = false
 	for (const [realm, tiers] of fresh) {
-		if (state.people.rulerOf[realm] < 0 || GOVERNOR.regency({ state, realm }))
-			continue
+		if (!STATE_RULERS.has({ state, p: realm }) || state.regency[realm]) continue
 		const top = STATE_TITLES.topTier({ state, realm })
 		const founding = STATE_TITLES.electFounding({
 			state,

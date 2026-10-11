@@ -1,3 +1,4 @@
+import type { AgeTable } from "@/model/history/sim/engine/state/rulers/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
@@ -26,8 +27,11 @@ export interface FixtureTitlesParams {
 	titles: DistrictTitle[]
 }
 
-export interface FixturePersonParams {
+export interface FixtureRulerParams {
 	fixture: DistrictFixture
-	seat: number
-	father: number
+	p: number
+	// -1 founds a new dynasty.
+	dynasty: number
+	age: AgeTable
+	claim: number
 }

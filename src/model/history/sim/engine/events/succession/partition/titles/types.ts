@@ -4,11 +4,11 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 export interface AllocateTitleSharesParams {
 	state: HistoryState
 	realm: number
-	heirs: number[]
+	count: number
 }
 
 export interface TitleAllocation {
 	shares: PartitionShare[]
 	allocated: Set<number>
-	remaining: number[]
+	remaining: number
 }

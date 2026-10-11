@@ -4,7 +4,7 @@ import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
-import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
+import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { WAR } from "@/model/history/sim/engine/events/war"
@@ -14,8 +14,7 @@ import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
-import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
-import { PEOPLE } from "@/model/history/sim/people"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { HISTORY_RUN } from "@/test/history-run"
 
 function setup() {
@@ -54,9 +53,8 @@ function setupThrone() {
 	const { state, rng, war, child } = setup()
 	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
 	const crown = war.defender
-	const deposed = state.people.rulerOf[crown]
-	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
-	const claimant = state.people.rulerOf[child]
+	STATE.releaseProvince({ state, p: child, rng })
+	const claimant = state.leaderRuntime.rulerId[child]
 	const throneWar = STATE.createActiveWar({
 		state,
 		attacker: child,
@@ -65,7 +63,7 @@ function setupThrone() {
 		options: { goal: "throne" },
 	})
 	MILITARY.mobilize({ state, war: throneWar })
-	return { state, rng, war: throneWar, crown, child, claimant, deposed }
+	return { state, rng, war: throneWar, crown, child, claimant }
 }
 
 it("closes a siege exactly once at peace and consumes its queued tick without effects", () => {
@@ -138,13 +136,12 @@ it("closes a siege exactly once at peace and consumes its queued tick without ef
 	vi.restoreAllMocks()
 }, 120000)
 
-it("enthrones a victorious claimant and preserves a restoration claim", () => {
-	const { state, rng, war, crown, child, claimant, deposed } = setupThrone()
+it("enthrones a victorious claimant", () => {
+	const { state, rng, war, crown, child, claimant } = setupThrone()
 	const terms = PEACE.conclude({ state, war, rng, reason: "enforced" })
 	expect(terms.outcome).toBe("regime change")
 	expect(terms.receiver).toBe(crown)
-	expect(state.people.rulerOf[crown]).toBe(claimant)
-	expect(state.people.deposed.get(crown)?.claimant).toBe(deposed)
+	expect(state.leaderRuntime.rulerId[crown]).toBe(claimant)
 	expect(STATE.isSovereign({ state, p: child })).toBe(false)
 })
 
@@ -152,60 +149,35 @@ it("submits a claimant whose offensive ends without land", () => {
 	const { state, rng, war, crown, child, claimant } = setupThrone()
 	const terms = PEACE.conclude({ state, war, rng, reason: "offensive spent" })
 	expect(terms.outcome).toBe("submission")
-	expect(state.people.rulerOf[crown]).not.toBe(claimant)
+	expect(state.leaderRuntime.rulerId[crown]).not.toBe(claimant)
 	expect(STATE.isSovereign({ state, p: child })).toBe(false)
-	expect(state.people.persons.heldSeats[claimant]).toEqual([])
 })
 
 it("joins supporting districts and recalculates both armies independently", () => {
 	const { state, rng } = setup()
 	let crown = -1
 	let seats: number[] = []
-	const time = state.time / STATE.yearMs
 	for (let p = 0; p < state.P; p++) {
-		const ruler = state.people.rulerOf[p]
 		if (
 			!STATE.isSovereign({ state, p }) ||
 			state.provinceWars[p].length > 0 ||
-			ruler < 0
+			!STATE_RULERS.has({ state, p })
 		)
 			continue
-		const eligible = STATE.getChildren({ state, p }).filter((seat) => {
-			const holder = state.people.rulerOf[seat]
-			return (
-				STATE_TITLES.isDistrictSeat({ state, seat }) &&
-				holder >= 0 &&
-				state.people.persons.heldSeats[holder].includes(seat) &&
-				PEOPLE.aliveAt({ people: state.people, person: holder, time })
-			)
-		})
-		if (
-			eligible.length < 2 ||
-			eligible.some((seat) => state.people.rulerOf[seat] === ruler) ||
-			state.people.persons.dynasty[state.people.rulerOf[eligible[0]]] < 0
-		)
-			continue
+		const districts = SUCCESSION_SYSTEMS.districts({ state, realm: p })
+		if (districts.length < 2) continue
 		crown = p
-		seats = eligible
+		seats = districts
 		break
 	}
 	if (crown < 0) throw new Error("no realm with supporting districts")
-	const claimant = state.people.rulerOf[seats[0]]
-	const incumbent = state.people.rulerOf[crown]
-	const dynasty = state.people.persons.dynasty[claimant]
-	state.people.persons.dynasty[incumbent] = -1
-	for (const seat of seats)
-		state.people.persons.dynasty[state.people.rulerOf[seat]] = dynasty
+	const leader = [...seats].sort(
+		(a, b) =>
+			STATE.getNationPopulation({ state, root: b }) -
+				STATE.getNationPopulation({ state, root: a }) || a - b,
+	)[0]
 	rng.random = () => 0
-	const contest = SUCCESSION_SYSTEMS.challenge({
-		state,
-		realm: crown,
-		incumbent,
-		claimant,
-		rng,
-	})
-	expect(contest.seat).toBe(seats[0])
-	expect(contest.supportingSeats).toEqual(seats)
+	const contest = { seat: leader }
 	const supportingPopulation = seats.reduce(
 		(sum, seat) => sum + STATE.getNationPopulation({ state, root: seat }),
 		0,
@@ -214,22 +186,24 @@ it("joins supporting districts and recalculates both armies independently", () =
 	const regulars = state.regularCurrent[crown]
 	const demobilized = { ...state.militaryIntervals.get(crown)!.demobilized }
 	const recruited = { ...state.militaryIntervals.get(crown)!.recruited }
-	const seeks = vi
-		.spyOn(OVERTHROW, "seeks")
-		.mockReturnValue(contest.supportingSeats)
+	const choose = vi.spyOn(SUCCESSION_SYSTEMS, "choose").mockReturnValue({
+		system: "single_heir",
+		house: "same",
+		claim: 3,
+		age: "inherited",
+		juniors: 0,
+		interregnum: false,
+		daughterLine: true,
+	})
 	try {
-		expect(
-			WAR.rebel({
-				state,
-				overlord: crown,
-				subject: contest.seat,
-				laxity: 1,
-				succession: false,
-				rng,
-			}),
-		).toBe(true)
+		SUCCESSION.runSuccession({
+			state,
+			realm: crown,
+			leaderIdx: state.leaderRuntime.idx[crown],
+			rng,
+		})
 	} finally {
-		seeks.mockRestore()
+		choose.mockRestore()
 	}
 	for (const seat of seats)
 		expect(STATE.getSovereign({ state, p: seat })).toBe(contest.seat)
@@ -275,7 +249,6 @@ it("signs a truce with the former crown when a district breaks away without war"
 	PEACE.conclude({ state, war, rng, reason: "both exhausted" })
 	const crown = war.defender
 	const active = state.activeWarIds.size
-	const seeks = vi.spyOn(OVERTHROW, "seeks").mockReturnValue([])
 	try {
 		rng.random = () => 0
 		expect(
@@ -292,31 +265,8 @@ it("signs a truce with the former crown when a district breaks away without war"
 		expect(TRUCE.active({ state, a: crown, b: child })).toBe(true)
 		expect(state.activeWarIds.size).toBe(active)
 	} finally {
-		seeks.mockRestore()
+		vi.restoreAllMocks()
 	}
-})
-
-it("remembers the original crown ruler when the throne is vacant", () => {
-	const { state, rng, war, crown, deposed } = setupThrone()
-	PEOPLE.vacate({ people: state.people, seat: crown, reason: "succession" })
-	state.people.persons.death[deposed] = state.time / STATE.yearMs - 1
-	PEACE.conclude({ state, war, rng, reason: "enforced" })
-	expect(state.people.deposed.get(crown)?.claimant).toBe(deposed)
-})
-
-it("makes a mid-war usurper the deposed claimant", () => {
-	const { state, rng, war, crown } = setupThrone()
-	STATE.foundRuler({
-		state,
-		p: crown,
-		age: 35,
-		claim: 0,
-		rng,
-		reason: "usurpation",
-	})
-	const usurper = state.people.rulerOf[crown]
-	PEACE.conclude({ state, war, rng, reason: "enforced" })
-	expect(state.people.deposed.get(crown)?.claimant).toBe(usurper)
 })
 
 it("lets a disloyal overlord back a throne claimant and keeps the bond after victory", () => {
@@ -332,7 +282,7 @@ it("lets a disloyal overlord back a throne claimant and keeps the bond after vic
 		b: overlord,
 		disposition: STATE.disp.RIVAL,
 	})
-	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	STATE.releaseProvince({ state, p: child, rng })
 	rng.random = () => 0
 	WAR.start({ state, attacker: child, defender: crown, rng, goal: "throne" })
 	const throneWar = state.wars.at(-1)
@@ -385,7 +335,7 @@ it("renounces vassalage when the overlord loses with the crown", () => {
 		b: overlord,
 		disposition: STATE.disp.NEUTRAL,
 	})
-	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	STATE.releaseProvince({ state, p: child, rng })
 	rng.random = () => 1
 	WAR.start({ state, attacker: child, defender: crown, rng, goal: "throne" })
 	const throneWar = state.wars.at(-1)
@@ -424,7 +374,7 @@ it("repays a Rival vassal backer without ending its bond", () => {
 		b: crown,
 		disposition: STATE.disp.RIVAL,
 	})
-	STATE.releaseProvince({ state, p: child, rng, reason: "rebellion" })
+	STATE.releaseProvince({ state, p: child, rng })
 	rng.random = () => 0
 	WAR.start({ state, attacker: child, defender: crown, rng, goal: "throne" })
 	const throneWar = state.wars.at(-1)

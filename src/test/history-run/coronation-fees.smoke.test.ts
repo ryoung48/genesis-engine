@@ -1,11 +1,9 @@
 import { expect, it, vi } from "vitest"
 import { HISTORY } from "@/model/history/record"
-import { PEOPLE_RECORD } from "@/model/history/record/people"
-import { PERSON_QUERY } from "@/model/history/record/people/query"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
+import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
 import { CORONATION_COUNTERS } from "@/model/history/sim/engine/events/succession/coronation/counters"
 import type {
@@ -15,32 +13,27 @@ import type {
 } from "@/model/history/sim/engine/events/succession/coronation/counters/types"
 import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
+import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { TAX } from "@/model/history/sim/engine/events/tax"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { FIELDS } from "@/model/history/sim/engine/fields"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
-import { FAMILY } from "@/model/history/sim/people/family"
-import { AGEING } from "@/model/history/sim/people/health/ageing"
-import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-import { OPINION } from "@/model/history/sim/people/opinion"
 import { SIM_RECORD } from "@/model/history/sim/record"
+import type { SharedRng } from "@/model/shared/random/rng"
 import { DEJURE } from "@/model/society/dejure"
 import { FOUNDING } from "@/model/society/dejure/founding"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { DISTRICT_FIXTURE } from "@/test/history-run/fixtures/district-tiers"
 import type { DistrictTitle } from "@/test/history-run/fixtures/district-tiers/types"
-import { MARRIAGE_FIXTURE } from "@/test/history-run/fixtures/marriage"
-import { PEOPLE_OPINION_REPORT } from "@/test/history-run/report/people-opinion"
+import { CORONATION_REPORT } from "@/test/history-run/report/coronation"
 import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
 
 const FEES = [625 / 288, 625 / 144, 625 / 36, 3125 / 36, 3125 / 8]
@@ -130,15 +123,14 @@ function world({ realms, shared }: WorldSpec) {
 			(p) => (rootOf.get(p) ?? realms[0].root) === spec.root,
 		)
 		STATE_TITLES.applyDerivedParents({ state, nation: spec.root, members })
-		const ruler = DISTRICT_FIXTURE.person({ fixture, seat: -1, father: -1 })
-		STATE.installRuler({
-			state,
+		DISTRICT_FIXTURE.ruler({
+			fixture,
 			p: spec.root,
-			person: ruler,
+			dynasty: -1,
+			age: "fresh",
 			claim: 3,
-			reason: "succession",
 		})
-		return ruler
+		return state.leaderRuntime.rulerId[spec.root]
 	})
 	state.realmCache.clear()
 	state.treasuryBudgetCurrent.clear()
@@ -167,7 +159,7 @@ function cellOf(
 	counters: CoronationCounters,
 	kind: CoronationKind,
 ): (
-	key: "held" | "ducats" | "memories" | "founded" | "raised",
+	key: "held" | "ducats" | "founded" | "raised",
 	rank: number,
 	quality: CoronationQuality,
 ) => number {
@@ -183,8 +175,18 @@ function created(state: HistoryState): number {
 	return state.events.filter((note) => note.tag === "title created").length
 }
 
-function child(state: HistoryState, person: number): void {
-	state.people.persons.birth[person] = state.time / STATE.yearMs - 10
+// Seats a ten-year-old ruler, who governs under a regency council.
+function child(state: HistoryState, rng: SharedRng): void {
+	const ruler = STATE_RULERS.draw({
+		state,
+		p: 0,
+		dynasty: -1,
+		age: "fresh",
+		rng,
+	})
+	ruler.birthMs = state.time - 10 * STATE.yearMs
+	ruler.deathMs = state.time + 60 * STATE.yearMs
+	STATE.seatRuler({ state, p: 0, ruler, claim: 3, natural: false, rng })
 }
 
 function expectIdentities(counters: CoronationCounters): void {
@@ -198,7 +200,6 @@ function expectIdentities(counters: CoronationCounters): void {
 					counters.held[cell] * MULTIPLIERS[quality] * FEES[rank],
 					9,
 				)
-				if (quality === "customary") expect(counters.memories[cell]).toBe(0)
 				expect(counters.raised[cell]).toBeLessThanOrEqual(
 					counters.founded[cell],
 				)
@@ -251,17 +252,14 @@ it.each<[number, number, CoronationQuality]>([
 })
 
 it("elevates a sitting ruler at a coronation that is at least customary at the founded rank and charges once", () => {
-	const { fixture, state, ruler, pay, elevate, roll } = realm(TWO_DUCHIES)
-	const holders = [2, 6].map((seat) =>
-		DISTRICT_FIXTURE.person({ fixture, seat, father: -1 }),
-	)
+	const { state, ruler, pay, elevate, roll } = realm(TWO_DUCHIES)
 	const leader = state.leaderRuntime.idx[0]
 	roll.mockClear()
 	pay(FEES[2])
 	elevate()
 	expect(created(state)).toBe(1)
 	expect(state.titles.tier[2]).toBe(2)
-	expect(state.people.rulerOf[0]).toBe(ruler)
+	expect(state.leaderRuntime.rulerId[0]).toBe(ruler)
 	expect(state.leaderRuntime.idx[0]).toBe(leader)
 	expect(state.treasuryCurrent[0]).toBe(0)
 	expect(TREASURY_BUDGET.get({ state, p: 0 })).toMatchObject({
@@ -274,8 +272,6 @@ it("elevates a sitting ruler at a coronation that is at least customary at the f
 	expect(cell("raised", 2, "customary")).toBe(1)
 	expect(total(state.coronations.held)).toBe(1)
 	expect(roll).toHaveBeenCalledTimes(1)
-	for (const holder of holders)
-		expect(state.people.memories.has(holder)).toBe(false)
 	expect(state.compositeRealm[0]).toBe(0)
 	STATE.validateLiveHierarchy({ state, context: "elevation coronation" })
 	expectIdentities(state.coronations)
@@ -303,7 +299,7 @@ it("never founds above the realm's rank at an accession coronation", () => {
 
 it("founds one title at or below the realm's rank at an accession coronation, at no extra charge", () => {
 	for (const top of [2, 3]) {
-		const { fixture, state, ruler, pay, afford, hold, elevate, roll } = realm([
+		const { state, pay, afford, hold, elevate, roll } = realm([
 			{ tier: top, seat: 0, provinces: [0] },
 			{ tier: 1, seat: 1, provinces: [1, 2, 3, 4] },
 			{ tier: 1, seat: 5, provinces: [5, 6, 7, 8] },
@@ -311,7 +307,6 @@ it("founds one title at or below the realm's rank at an accession coronation, at
 		])
 		expect(STATE_TITLES.topTier({ state, realm: 0 })).toBe(top)
 		expect(STATE_TITLES.isDistrictSeat({ state, seat: 9 })).toBe(true)
-		const holder = DISTRICT_FIXTURE.person({ fixture, seat: 9, father: -1 })
 		roll.mockClear()
 		pay(FEES[top] - 1e-9)
 		hold()
@@ -334,9 +329,6 @@ it("founds one title at or below the realm's rank at an accession coronation, at
 		expect(total(state.coronations.founded)).toBe(1)
 		expect(total(state.coronations.raised)).toBe(0)
 		expect(total(state.coronations.held)).toBe(2)
-		expect(state.people.memories.get(holder)?.get(ruler)).toEqual([
-			{ reason: "coronation_lavish", start: state.time / STATE.yearMs },
-		])
 		expect(state.compositeRealm[0]).toBe(0)
 		STATE.validateLiveHierarchy({ state, context: "accession founding" })
 		expectIdentities(state.coronations)
@@ -344,8 +336,7 @@ it("founds one title at or below the realm's rank at an accession coronation, at
 })
 
 it("leaves no trace of an elevation that fails its roll, loses its children or finds the registry full", () => {
-	const { fixture, state, pay, elevate, roll } = realm(TWO_DUCHIES)
-	DISTRICT_FIXTURE.person({ fixture, seat: 2, father: -1 })
+	const { state, pay, elevate, roll } = realm(TWO_DUCHIES)
 	roll.mockClear()
 	pay(1000)
 	roll.mockReturnValue(1)
@@ -367,7 +358,6 @@ it("leaves no trace of an elevation that fails its roll, loses its children or f
 	expect(state.events).toHaveLength(notes)
 	expect(state.treasuryCurrent[0]).toBe(1000)
 	expect(state.treasuryBudgetCurrent.get(0)?.otherChangesTotal ?? 0).toBe(0)
-	expect(state.people.memories.size).toBe(0)
 	expect(total(state.coronations.held)).toBe(0)
 	expect(total(state.coronations.founded)).toBe(0)
 	expect(state.coronations.compositeRealmYears).toBe(2)
@@ -443,9 +433,6 @@ it("requires the children to reach the new rank's minimum size before any roll o
 
 it("prices an elevation with ample cash above customary and never founds at or below the realm's rank mid-reign", () => {
 	const rich = realm(TWO_DUCHIES)
-	const holders = [2, 6].map((seat) =>
-		DISTRICT_FIXTURE.person({ fixture: rich.fixture, seat, father: -1 }),
-	)
 	rich.afford(2, "magnificent")
 	rich.elevate()
 	expect(created(rich.state)).toBe(1)
@@ -458,11 +445,6 @@ it("prices an elevation with ample cash above customary and never founds at or b
 	).toBe(1)
 	for (const seat of [2, 6])
 		expect(STATE_TITLES.isDistrictSeat({ state: rich.state, seat })).toBe(false)
-	for (const holder of holders)
-		expect(
-			rich.state.people.memories.get(holder)?.get(rich.ruler),
-		).toHaveLength(1)
-	expect(total(rich.state.coronations.memories)).toBe(2)
 	expectIdentities(rich.state.coronations)
 
 	for (const tier of [2, 3]) {
@@ -512,11 +494,9 @@ it("charges once on the one-off line, never on credit and never again through ta
 })
 
 it("defers a child's coronation to sixteen and never crowns under a regent", () => {
-	const { state, rng, ruler, pay, hold } = realm(KINGDOM)
-	const people = state.people
-	child(state, ruler)
-	REGENCY.start({ state, realm: 0 })
-	expect(GOVERNOR.regency({ state, realm: 0 })?.cause).toBe("minority")
+	const { state, rng, pay, hold } = realm(KINGDOM)
+	child(state, rng)
+	expect(state.regency[0]).toBe(1)
 	pay(FEES[2])
 	hold()
 	const leader = state.leaderRuntime.idx[0]
@@ -524,12 +504,11 @@ it("defers a child's coronation to sixteen and never crowns under a regent", () 
 	expect(state.coronationOwed[0]).toBe(leader)
 	expect(state.coronations).toMatchObject({ deferred: 1, majority: 0 })
 	expect(total(state.coronations.held)).toBe(0)
-	expect(people.memories.size).toBe(0)
 
 	state.time += 6 * STATE.yearMs
 	pay(2 * FEES[2])
 	REGENCY.comeOfAge({ state, realm: 0, leader, rng })
-	expect(GOVERNOR.regency({ state, realm: 0 })).toBeNull()
+	expect(state.regency[0]).toBe(0)
 	expect(state.coronationOwed[0]).toBe(-1)
 	expect(state.coronations).toMatchObject({ deferred: 1, majority: 1 })
 	expect(total(state.coronations.held)).toBe(1)
@@ -542,20 +521,25 @@ it("defers a child's coronation to sixteen and never crowns under a regent", () 
 })
 
 it("cancels a deferred coronation when the ward is replaced and holds nothing for a stale coming of age", () => {
-	const { fixture, state, rng, ruler, pay, hold } = realm(KINGDOM)
-	child(state, ruler)
-	REGENCY.start({ state, realm: 0 })
+	const { state, rng, pay, hold } = realm(KINGDOM)
+	child(state, rng)
 	hold()
 	const leader = state.leaderRuntime.idx[0]
 	expect(state.coronationOwed[0]).toBe(leader)
-	REGENCY.end({ state, realm: 0, cause: "death" })
-	const adult = DISTRICT_FIXTURE.person({ fixture, seat: -1, father: -1 })
-	STATE.installRuler({
+	STATE_RULERS.endRegency({ state, realm: 0, cause: "death" })
+	STATE.seatRuler({
 		state,
 		p: 0,
-		person: adult,
+		ruler: STATE_RULERS.draw({
+			state,
+			p: 0,
+			dynasty: -1,
+			age: "fresh",
+			rng,
+		}),
 		claim: 3,
-		reason: "succession",
+		natural: false,
+		rng,
 	})
 	pay(FEES[2])
 	hold()
@@ -569,81 +553,9 @@ it("cancels a deferred coronation when the ward is replaced and holds nothing fo
 	expect(total(state.coronations.held)).toBe(1)
 })
 
-it("never crowns a ruler who accedes incapable and passes an incapable ward into an incapacity regency at sixteen", () => {
-	const accession = realm(KINGDOM)
-	const incapable = vi
-		.spyOn(AGEING, "incapable")
-		.mockImplementation(({ person }) => person === accession.ruler)
-	try {
-		REGENCY.start({ state: accession.state, realm: 0 })
-		expect(GOVERNOR.regency({ state: accession.state, realm: 0 })?.cause).toBe(
-			"incapacity",
-		)
-		accession.pay(1000)
-		accession.hold()
-		expect(accession.state.treasuryCurrent[0]).toBe(1000)
-		expect(accession.state.coronationOwed[0]).toBe(-1)
-		expect(accession.state.coronations).toMatchObject({
-			deferred: 0,
-			majority: 0,
-			incapable: 1,
-		})
-		expect(total(accession.state.coronations.held)).toBe(0)
-	} finally {
-		incapable.mockRestore()
-	}
-
-	for (const acceded of [true, false]) {
-		const { state, rng, ruler, pay, hold, elevate, roll } = realm(TWO_DUCHIES)
-		child(state, ruler)
-		REGENCY.start({ state, realm: 0 })
-		pay(1000)
-		if (acceded) hold()
-		const leader = state.leaderRuntime.idx[0]
-		expect(state.coronationOwed[0]).toBe(acceded ? leader : -1)
-		state.time += 6 * STATE.yearMs
-		const ward = vi
-			.spyOn(AGEING, "incapable")
-			.mockImplementation(({ person }) => person === ruler)
-		try {
-			const before = state.events.length
-			REGENCY.comeOfAge({ state, realm: 0, leader, rng })
-			const notes = state.events
-				.slice(before)
-				.filter((note) => note.tag.startsWith("regency"))
-			expect(notes.map((note) => note.tag)).toEqual([
-				"regency ended",
-				"regency started",
-			])
-			expect(notes[0].data.cause).toBe("age")
-			expect(notes[1].data.regencyCause).toBe("incapacity")
-			expect(notes[1].time).toBe(notes[0].time)
-			for (let year = 0; year < 2; year++) {
-				REGENCY.review({ state })
-				elevate()
-				expect(GOVERNOR.regency({ state, realm: 0 })?.cause).toBe("incapacity")
-				expect(state.compositeRealm[0]).toBe(1)
-			}
-			expect(roll).not.toHaveBeenCalled()
-		} finally {
-			ward.mockRestore()
-		}
-		expect(state.treasuryCurrent[0]).toBe(1000)
-		expect(state.coronationOwed[0]).toBe(-1)
-		expect(state.coronations).toMatchObject({
-			deferred: acceded ? 1 : 0,
-			majority: 0,
-			incapable: acceded ? 1 : 0,
-		})
-		expect(total(state.coronations.held)).toBe(0)
-		expect(created(state)).toBe(0)
-	}
-})
-
 it("ends an excluded minor's regency at sixteen with no coronation and no second regency for a capable ward", () => {
-	const { state, rng, ruler, pay } = realm(KINGDOM)
-	child(state, ruler)
-	REGENCY.start({ state, realm: 0 })
+	const { state, rng, pay } = realm(KINGDOM)
+	child(state, rng)
 	pay(1000)
 	expect(state.coronationOwed[0]).toBe(-1)
 	state.time += 6 * STATE.yearMs
@@ -660,184 +572,12 @@ it("ends an excluded minor's regency at sixteen with no coronation and no second
 			.filter((note) => note.tag.startsWith("regency"))
 			.map((note) => note.tag),
 	).toEqual(["regency ended"])
-	expect(GOVERNOR.regency({ state, realm: 0 })).toBeNull()
+	expect(state.regency[0]).toBe(0)
 	expect(state.treasuryCurrent[0]).toBe(1000)
 	expect(state.coronationOwed[0]).toBe(-1)
-	expect(state.people.memories.size).toBe(0)
 	expect(structuredClone(state.coronations)).toEqual(
 		CORONATION_COUNTERS.create(),
 	)
-})
-
-it("leaves each district holder one coronation memory that follows the quality and fades in ten years", () => {
-	const values: [CoronationQuality, number][] = [
-		["uncrowned", -20],
-		["humble", -10],
-		["customary", 0],
-		["lavish", 10],
-		["magnificent", 20],
-	]
-	for (const [quality, value] of values) {
-		const { fixture, state, ruler, pay, afford, hold } = realm([
-			{ tier: 1, seat: 0, provinces: [0, 1, 2, 3] },
-		])
-		const people = state.people
-		const holders = [1, 2].map((seat) =>
-			DISTRICT_FIXTURE.person({ fixture, seat, father: -1 }),
-		)
-		PEOPLE.setRuler({
-			people,
-			person: ruler,
-			seat: 3,
-			rank: 0,
-			reason: "district grant",
-		})
-		const time = state.time / STATE.yearMs
-		const opinion = (holder: number, at: number) =>
-			OPINION.of({
-				observer: holder,
-				target: ruler,
-				time: at,
-				context: LIVE_OPINION_CONTEXT.of({ state, time: at }),
-			})
-		const loyalty = holders.map((holder) =>
-			OPINION.loyaltyOf({ breakdown: opinion(holder, time) }),
-		)
-		if (quality === "uncrowned") pay(-1)
-		else afford(1, quality)
-		hold()
-		const cell = cellOf(state.coronations, "accession")
-		expect(cell("held", 1, quality)).toBe(1)
-		expect(cell("memories", 1, quality)).toBe(value === 0 ? 0 : 2)
-		expect(people.memories.has(ruler)).toBe(false)
-		for (const [index, holder] of holders.entries()) {
-			expect(people.memories.get(holder)?.get(ruler) ?? []).toEqual(
-				value === 0 ? [] : [{ reason: `coronation_${quality}`, start: time }],
-			)
-			expect(
-				OPINION.loyaltyOf({ breakdown: opinion(holder, time) }) -
-					loyalty[index],
-			).toBe(value)
-			expect(opinion(holder, time + 5)?.memories).toBe(value / 2)
-			expect(opinion(holder, time + 10)?.memories).toBe(0)
-		}
-		expectIdentities(state.coronations)
-	}
-})
-
-it("replaces an earlier coronation memory in the live state and the record, and sums it with other reasons", () => {
-	const { fixture, state, ruler, pay, afford, hold } = realm([
-		{ tier: 1, seat: 0, provinces: [0, 1, 2, 3] },
-	])
-	const people = state.people
-	const holder = DISTRICT_FIXTURE.person({ fixture, seat: 1, father: -1 })
-	const start = state.time / STATE.yearMs
-	afford(1, "magnificent")
-	hold()
-	OPINION.remember({
-		people,
-		observer: holder,
-		target: ruler,
-		reason: "grant",
-		time: start,
-	})
-	state.time += STATE.yearMs
-	afford(1, "customary")
-	hold()
-	expect(people.memories.get(holder)?.get(ruler)).toEqual([
-		{ reason: "coronation_magnificent", start },
-		{ reason: "grant", start },
-	])
-	pay(-1)
-	hold()
-	expect(people.memories.get(holder)?.get(ruler)).toEqual([
-		{ reason: "coronation_uncrowned", start: start + 1 },
-		{ reason: "grant", start },
-	])
-	expect(
-		OPINION.of({
-			observer: holder,
-			target: ruler,
-			time: start + 1,
-			context: LIVE_OPINION_CONTEXT.of({ state, time: start + 1 }),
-		})?.memories,
-	).toBe(-20 + 13.5)
-
-	const marriage = MARRIAGE_FIXTURE.create()
-	for (const sex of [0, 1] as const)
-		MARRIAGE_FIXTURE.add({ fixture: marriage, age: 30, sex, realm: 0 })
-	const record = PEOPLE_RECORD.create()
-	const remember = (
-		reason: "coronation_magnificent" | "coronation_uncrowned" | "grant",
-		time: number,
-	) =>
-		OPINION.remember({
-			people: marriage.people,
-			observer: 0,
-			target: 1,
-			reason,
-			time,
-		})
-	const flush = (time: number) =>
-		PEOPLE_RECORD.append({
-			record,
-			packet: structuredClone(
-				PEOPLE_LOG.seal({ people: marriage.people, sovereign: () => true }),
-			),
-			timeMs: time * STATE.yearMs,
-			recordTime: (year) => year * STATE.yearMs,
-		})
-	const recorded = (time: number) =>
-		PERSON_QUERY.memories({
-			people: record,
-			a: 0,
-			b: 1,
-			timeMs: time * STATE.yearMs,
-		})
-	remember("coronation_magnificent", 100)
-	remember("grant", 100)
-	flush(100)
-	remember("coronation_uncrowned", 101)
-	flush(101)
-	expect(recorded(100.5)).toEqual([
-		{
-			reason: "coronation_magnificent",
-			startTimeMs: 100 * STATE.yearMs,
-			strength: 19,
-		},
-		{ reason: "grant", startTimeMs: 100 * STATE.yearMs, strength: 14.25 },
-	])
-	expect(recorded(101)).toEqual([
-		{
-			reason: "coronation_uncrowned",
-			startTimeMs: 101 * STATE.yearMs,
-			strength: -20,
-		},
-		{ reason: "grant", startTimeMs: 100 * STATE.yearMs, strength: 13.5 },
-	])
-})
-
-it("lets an elevation's gifts replace the accession's and a customary elevation leave them alone", () => {
-	for (const later of ["magnificent", "customary"] as const) {
-		const { fixture, state, ruler, afford, hold, elevate } = realm(TWO_DUCHIES)
-		const holder = DISTRICT_FIXTURE.person({ fixture, seat: 2, father: -1 })
-		const start = state.time / STATE.yearMs
-		afford(1, "lavish")
-		hold()
-		expect(state.people.memories.get(holder)?.get(ruler)).toEqual([
-			{ reason: "coronation_lavish", start },
-		])
-		state.time += 3 * STATE.yearMs
-		afford(2, later)
-		elevate()
-		expect(created(state)).toBe(1)
-		expect(state.people.memories.get(holder)?.get(ruler)).toEqual([
-			later === "customary"
-				? { reason: "coronation_lavish", start }
-				: { reason: "coronation_magnificent", start: start + 3 },
-		])
-		expectIdentities(state.coronations)
-	}
 })
 
 it("elevates unrelated realms in ascending id and requalifies realms that shared a divided title", () => {
@@ -904,18 +644,13 @@ it("elevates unrelated realms in ascending id and requalifies realms that shared
 it("skips realms without a ruler or under a regent and flags them all the same", () => {
 	const vacant = realm(TWO_DUCHIES)
 	vacant.pay(1000)
-	PEOPLE.vacate({
-		people: vacant.state.people,
-		seat: 0,
-		reason: "succession",
-	})
+	STATE_RULERS.clear({ state: vacant.state, p: 0 })
 	vacant.elevate()
 	expect(vacant.roll).not.toHaveBeenCalled()
 	expect(created(vacant.state)).toBe(0)
 
-	const { state, ruler, pay, elevate, roll } = realm(TWO_DUCHIES)
-	child(state, ruler)
-	REGENCY.start({ state, realm: 0 })
+	const { state, rng, pay, elevate, roll } = realm(TWO_DUCHIES)
+	child(state, rng)
 	pay(1000)
 	elevate()
 	expect(roll).not.toHaveBeenCalled()
@@ -966,14 +701,12 @@ it("flags a realm that qualifies above its rank until it is raised or loses the 
 })
 
 it("makes a composite realm's districts one weak-claim step easier to lose", () => {
-	const { fixture, state, rng, roll } = realm(TWO_DUCHIES)
-	DISTRICT_FIXTURE.person({ fixture, seat: 2, father: -1 })
+	const { state, rng, roll } = realm(TWO_DUCHIES)
 	const real = MILITARY.rebellionPreview({ state, overlord: 0, subject: 2 })
 	const preview = vi.spyOn(MILITARY, "rebellionPreview")
 	const release = vi.spyOn(STATE, "releaseProvince").mockReturnValue(undefined)
 	const fix = vi.spyOn(STATE, "fixConnections").mockReturnValue(undefined)
 	const truce = vi.spyOn(TRUCE, "sign").mockReturnValue(undefined)
-	const seeks = vi.spyOn(OVERTHROW, "seeks").mockReturnValue([])
 	const check = (threat: number) => {
 		preview.mockReturnValue({ ...real, threat })
 		const rebelled = WAR.rebel({
@@ -1011,21 +744,8 @@ it("makes a composite realm's districts one weak-claim step easier to lose", () 
 			compositeEvaluations: 2,
 			compositeRebellions: 1,
 		})
-		state.people.regencies.set(0, {
-			ward: state.people.rulerOf[0],
-			cause: "minority",
-			regent: -1,
-			kind: "council",
-		})
-		const regency = check(0)
-		expect(regency.data.composite).toBe(true)
-		expect(regency.data.threshold as number).not.toBeCloseTo(
-			threshold - 0.05,
-			6,
-		)
 	} finally {
-		for (const spy of [preview, release, fix, truce, seeks, roll])
-			spy.mockRestore()
+		for (const spy of [preview, release, fix, truce, roll]) spy.mockRestore()
 	}
 })
 
@@ -1092,22 +812,19 @@ it("finds the same qualifying children as the per-realm scan and reads each titl
 })
 
 it("reports coronations per window, carrying a deferred coronation into the window it is held in", () => {
-	const { state, rng, ruler, pay, hold, elevate, roll } = realm(TWO_DUCHIES)
-	const tracker = PEOPLE_OPINION_REPORT.tracker()
-	const record = PEOPLE_RECORD.create()
+	const { state, rng, pay, hold, elevate, roll } = realm(TWO_DUCHIES)
+	const tracker = CORONATION_REPORT.tracker()
 	const start = Math.round(state.time / STATE.yearMs)
 	const window = (from: number, to: number) =>
-		PEOPLE_OPINION_REPORT.of({ engine: state, tracker, record, from, to })
-	child(state, ruler)
-	REGENCY.start({ state, realm: 0 })
+		CORONATION_REPORT.of({ engine: state, tracker, from, to })
+	child(state, rng)
 	hold()
 	roll.mockReturnValue(1)
 	elevate()
-	const first = window(start, start + 1).statistics.coronations
+	const first = window(start, start + 1).coronations
 	expect(first).toMatchObject({
 		deferred: 1,
 		majority: 0,
-		incapable: 0,
 		compositeRealmYears: 1,
 		compositeEvaluations: 0,
 		compositeRebellions: 0,
@@ -1125,11 +842,10 @@ it("reports coronations per window, carrying a deferred coronation into the wind
 	roll.mockReturnValue(0)
 	elevate()
 	const report = window(start + 1, start + 7)
-	const second = report.statistics.coronations
+	const second = report.coronations
 	expect(second).toMatchObject({
 		deferred: 0,
 		majority: 1,
-		incapable: 0,
 		compositeRealmYears: 0,
 	})
 	expect(second.accession.held[1]).toEqual([0, 0, 1, 0, 0])
@@ -1142,9 +858,9 @@ it("reports coronations per window, carrying a deferred coronation into the wind
 			.flat()
 			.reduce((sum, value) => sum + value, 0),
 	).toBe(-TREASURY_BUDGET.get({ state, p: 0 }).coronationExpenses)
-	expect(report.cost.elevateMsPerYear).toBeGreaterThanOrEqual(0)
+	expect(report.elevateMsPerYear).toBeGreaterThanOrEqual(0)
 	expect(state.coronations).toMatchObject({ deferred: 1, majority: 1 })
-	const third = window(start + 7, start + 8).statistics.coronations
+	const third = window(start + 7, start + 8).coronations
 	expect(third).toMatchObject({ deferred: 0, majority: 0 })
 	expect(third.accession.held.flat().every((count) => count === 0)).toBe(true)
 	expect(third.elevation.held.flat().every((count) => count === 0)).toBe(true)
@@ -1202,24 +918,12 @@ function generated(tier: number) {
 	world.nations.parent = state.parentCurrent.slice()
 	world.nations.sovereign = state.sovereignCurrent.slice()
 	const rng = HISTORY_RNG.createHistoryRng(1729)
-	const time = state.time / STATE.yearMs
-	const ruler = FAMILY.found({
-		people: state.people,
-		origin: STATE.originOf({ state, realm: nation }),
-		time,
-		age: 40,
-		rank: 1,
-		rng,
-	})
-	state.people.persons.death[ruler] = time + 60
-	STATE.installRuler({
+	STATE.foundRuler({
 		state,
 		p: nation,
-		person: ruler,
-		claim: 3,
-		reason: "succession",
+		ruler: { dynasty: -1, age: "fresh", claim: 3 },
+		rng,
 	})
-	PEOPLE_LOG.seal({ people: state.people, sovereign: () => true })
 	state.events.length = 0
 	state.journal.length = 0
 	vi.spyOn(rng, "random").mockReturnValue(0)
@@ -1334,43 +1038,32 @@ it("crowns at succession and at enthronement without founding", () => {
 	const succession = generated(2)
 	succession.state.time += STATE.yearMs
 	// Whether the realm is partitioned or a district revolts at this succession
-	// depends on who inherits in the generated world; the coronation does not.
+	// depends on the roll; the coronation does not.
 	succession.state.governmentType[succession.nation] =
 		GOVERNMENT.getGovIdx().feudal_monarchy
-	const people = succession.state.people
-	const dying = people.rulerOf[succession.nation]
-	const time = succession.state.time / STATE.yearMs
-	const heir = PEOPLE.spawn({
-		recordHealth: true,
-		death: null,
-		nameSeed: null,
-		people,
-		sex: 0,
-		birth: time - 30,
-		survives: time,
-		father: dying,
-		mother: -1,
-		dynasty: people.persons.dynasty[dying],
-		origin: STATE.originOf({
-			state: succession.state,
-			realm: succession.nation,
-		}),
-		rng: succession.rng,
-	})
-	people.persons.death[heir] = time + 60
 	FIELDS.prov.treasury.set({
 		state: succession.state,
 		p: succession.nation,
 		value: 1000,
 	})
 	const rebel = vi.spyOn(WAR, "rebel").mockReturnValue(false)
-	PERSON_DEATH.kill({
+	const choose = vi.spyOn(SUCCESSION_SYSTEMS, "choose").mockReturnValue({
+		system: "single_heir",
+		house: "same",
+		claim: 3,
+		age: "fresh",
+		juniors: 0,
+		interregnum: false,
+		daughterLine: false,
+	})
+	SUCCESSION.runSuccession({
 		state: succession.state,
-		person: dying,
-		cause: "natural",
+		realm: succession.nation,
+		leaderIdx: succession.state.leaderRuntime.idx[succession.nation],
 		rng: succession.rng,
 	})
 	rebel.mockRestore()
+	choose.mockRestore()
 	expect(created(succession.state)).toBe(0)
 	expect(
 		TREASURY_BUDGET.get({ state: succession.state, p: succession.nation })
@@ -1381,14 +1074,20 @@ it("crowns at succession and at enthronement without founding", () => {
 
 	const { state, nation, rng, provinces } = generated(2)
 	const attacker = provinces.find(
-		(p) => p !== nation && state.people.rulerOf[p] >= 0,
+		(p) => p !== nation && STATE_RULERS.has({ state, p }),
 	)
 	if (attacker === undefined) throw new Error("no claimant")
-	const claimant = state.people.rulerOf[attacker]
-	const deposed = state.people.rulerOf[nation]
+	const claimant = STATE_RULERS.read({ state, p: attacker })
 	const war = STATE.createActiveWar({ state, attacker, defender: nation, rng })
-	OVERTHROW.enthrone({ state, war, claimant, claim: 3, deposed, rng })
-	const crowned = GOVERNOR.regency({ state, realm: nation }) === null
+	OVERTHROW.enthrone({
+		state,
+		war,
+		ruler: claimant,
+		claim: 3,
+		union: false,
+		rng,
+	})
+	const crowned = state.regency[nation] === 0
 	expect(created(state)).toBe(0)
 	expect(total(state.coronations.held)).toBe(crowned ? 1 : 0)
 	expect(

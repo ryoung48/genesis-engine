@@ -225,8 +225,7 @@ function rebellionPreview({
 	for (const vassal of STATE.getChildren({ state, p: overlord }))
 		if (
 			vassal !== subject &&
-			STATE_TITLES.isDistrictSeat({ state, seat: vassal }) &&
-			state.people.rulerOf[vassal] >= 0
+			STATE_TITLES.isDistrictSeat({ state, seat: vassal })
 		) {
 			const potential = RECRUITMENT.realmTargets({ state, nation: vassal })
 			league.levy += potential.levy

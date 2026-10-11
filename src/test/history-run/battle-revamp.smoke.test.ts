@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
-import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
 import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
@@ -379,10 +378,6 @@ describe("battle progress", () => {
 			ambusher: "none",
 		})
 		const note = engine.events.length
-		// Battle progress is tested without the rulers' character: neither
-		// governor tilts the fight and nobody leads in person.
-		const multiplier = vi.spyOn(COMMAND, "multiplier").mockReturnValue(1)
-		const lead = vi.spyOn(COMMAND, "lead").mockReturnValue(null)
 		BATTLE.runBattle({
 			state: engine,
 			warIdx: war.idx,
@@ -390,8 +385,6 @@ describe("battle progress", () => {
 			rng: sequenceRng(values),
 		})
 		kind.mockRestore()
-		multiplier.mockRestore()
-		lead.mockRestore()
 		const notes = engine.events.slice(note)
 		return {
 			battle: notes.find((n) => n.tag === "battle"),

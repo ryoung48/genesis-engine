@@ -1,17 +1,13 @@
+import type { RulerRef } from "@/model/history/record/rulers/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
-export interface InterregnumSeat {
-	seat: number
-	holder: number
-}
-
 export interface InterregnumSnapshot {
-	seats: InterregnumSeat[]
+	seats: number[]
 	titles: number[]
 }
 
-export type InterregnumSkipReason = "left the realm" | "holder changed"
+export type InterregnumSkipReason = "left the realm"
 
 export interface InterregnumSkip {
 	seat: number
@@ -23,12 +19,17 @@ export interface InterregnumWar {
 	defender: number
 }
 
+export interface FreedSeat {
+	seat: number
+	ruler: RulerRef
+}
+
 export interface InterregnumRun {
 	state: HistoryState
 	realm: number
-	dying: number
+	late: RulerRef
 	rng: SharedRng
-	freed: InterregnumSeat[]
+	freed: FreedSeat[]
 	skipped: InterregnumSkip[]
 	cutOff: number[]
 	titles: number[]
@@ -37,14 +38,13 @@ export interface InterregnumRun {
 export interface BeginParams {
 	state: HistoryState
 	realm: number
-	dying: number
+	late: RulerRef
 	rng: SharedRng
 }
 
 export interface SnapshotParams {
 	state: HistoryState
 	realm: number
-	dying: number
 }
 
 export interface DeclareWarsParams {
@@ -53,16 +53,13 @@ export interface DeclareWarsParams {
 
 export interface FinishParams {
 	run: InterregnumRun
-	ruler: number
+	ruler: RulerRef
 }
 
 export type InterregnumNoteData = {
 	nation: number
-	dying: number
-	ruler: number
 	government: string
 	freed: number[]
-	holders: number[]
 	skipped: number[]
 	skippedReasons: InterregnumSkipReason[]
 	cutOff: number[]

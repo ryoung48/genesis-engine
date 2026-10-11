@@ -11,24 +11,11 @@ import type {
 	RecordProvinceChangeParams,
 	RecordProvinceParams,
 	RecordRelationParams,
+	RecordRulerParams,
+	RulerDeparture,
 } from "@/model/history/sim/engine/journal/types"
-import type {
-	EngineNote,
-	HistoryState,
-} from "@/model/history/sim/engine/state/types"
-import { PEOPLE_LOG } from "@/model/history/sim/people/log"
-
-import type { DeathCause } from "@/model/history/sim/people/types"
-
-const RULER_TAGS = new Set([
-	"succession",
-	"regency started",
-	"regency ended",
-	"regent changed",
-	"usurpation",
-	"regime change",
-	"government change",
-])
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
+import type { HistoryState } from "@/model/history/sim/engine/state/types"
 
 function pending(): PendingJournal {
 	return {
@@ -37,6 +24,7 @@ function pending(): PendingJournal {
 		relations: new Map(),
 		occupations: new Map(),
 		coalitions: [],
+		rulers: new Set(),
 	}
 }
 
@@ -63,6 +51,10 @@ function occupation(params: RecordProvinceParams): void {
 		changes: params.state.pendingJournal.occupations,
 		change: params,
 	})
+}
+
+function ruler({ state, p }: RecordRulerParams): void {
+	state.pendingJournal.rulers.add(p)
 }
 
 function relation({ state, x, y, before, after }: RecordRelationParams): void {
@@ -134,7 +126,7 @@ function flush({
 		pendingJournal.relations.size === 0 &&
 		pendingJournal.occupations.size === 0 &&
 		pendingJournal.coalitions.length === 0 &&
-		!PEOPLE_LOG.pending(state.people) &&
+		pendingJournal.rulers.size === 0 &&
 		!pendingJournal.roads
 	)
 		return
@@ -148,7 +140,7 @@ function flush({
 		(change) => change.before !== change.after,
 	)
 	const notes = state.events.slice(noteCursor)
-	const rulerRoots = new Set<number>()
+	const rulerRoots = new Set<number>(pendingJournal.rulers)
 	if (initial) {
 		for (let root = 0; root < state.P; root++)
 			if (
@@ -158,35 +150,31 @@ function flush({
 			)
 				rulerRoots.add(root)
 	}
-	for (const change of parents)
-		if (change.after < 0) rulerRoots.add(change.province)
-	for (const note of notes) {
-		if (RULER_TAGS.has(note.tag)) rulerRoots.add(note.data.nation as number)
-	}
-	const deaths = new Map<number, EngineNote>()
+	const departures = new Map<number, RulerDeparture>()
 	if (rulerRoots.size > 0)
-		for (const note of notes)
+		for (const note of notes) {
 			if (note.tag === "succession")
-				deaths.set(note.data.nation as number, note)
+				departures.set(note.data.nation as number, "natural")
+			else if (note.tag === "usurpation" || note.tag === "regime change")
+				departures.set(note.data.nation as number, "deposed")
+		}
 	const rulers = [...rulerRoots]
 		.filter(
 			(root) =>
 				root >= 0 &&
 				root < state.P &&
 				state.parentCurrent[root] < 0 &&
-				state.people.rulerOf[root] >= 0,
+				STATE_RULERS.has({ state, p: root }),
 		)
 		.map((root) => ({
 			root,
-			person: state.people.rulerOf[root],
-			nameSeed: state.leaderNameSeedCurrent[root],
-			dynasty: state.leaderDynCurrent[root],
+			...STATE_RULERS.ref({
+				state,
+				ruler: STATE_RULERS.read({ state, p: root }),
+			}),
 			birthTimeMs: state.leaderRuntime.birth[root],
-			regent: state.people.regencies.get(root)?.regent ?? -1,
-			regency: state.people.regencies.get(root)?.kind ?? null,
-			deceased: (deaths.get(root)?.data.dying as number | undefined) ?? -1,
-			deathCause:
-				(deaths.get(root)?.data.cause as DeathCause | undefined) ?? null,
+			regency: state.regency[root] === 1,
+			deathCause: departures.get(root) ?? null,
 		}))
 	const keyframe = census
 		? {
@@ -208,14 +196,7 @@ function flush({
 			budget.coronationExpenses = 0
 			budget.otherChangesTotal = 0
 		}
-	const people = PEOPLE_LOG.pending(state.people)
-		? PEOPLE_LOG.seal({
-				people: state.people,
-				sovereign: (seat) => state.parentCurrent[seat] < 0,
-			})
-		: null
 	if (
-		people ||
 		parents.length > 0 ||
 		relations.length > 0 ||
 		occupations.length > 0 ||
@@ -232,7 +213,6 @@ function flush({
 			occupations,
 			coalitions: pendingJournal.coalitions,
 			rulers,
-			people,
 			notes,
 			census: keyframe,
 			roads: pendingJournal.roads,
@@ -243,6 +223,7 @@ function flush({
 	pendingJournal.relations.clear()
 	pendingJournal.occupations.clear()
 	pendingJournal.coalitions = []
+	pendingJournal.rulers.clear()
 }
 
 function transferList(journal: JournalTransaction[]): Transferable[] {
@@ -265,7 +246,6 @@ function transferList(journal: JournalTransaction[]): Transferable[] {
 					),
 				]
 			: []),
-		...(transaction.people ? [transaction.people.time.buffer] : []),
 	])
 }
 
@@ -278,6 +258,7 @@ export const JOURNAL = {
 	pending,
 	parent,
 	occupation,
+	ruler,
 	relation,
 	coalition,
 	flush,

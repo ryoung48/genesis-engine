@@ -1,23 +1,13 @@
-import {
-	afterEach,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	vi,
-} from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { TAX } from "@/model/history/sim/engine/events/tax"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
 import { UNITS } from "@/model/shared/units"
 import { HISTORY_RUN } from "@/test/history-run"
 
@@ -69,12 +59,6 @@ function withOutputPerHead(grams: number): number {
 }
 
 describe("state maintenance", () => {
-	beforeEach(() => {
-		vi.spyOn(GOVERNOR, "attribute").mockImplementation(({ attribute }) =>
-			ATTRIBUTES.neutral(attribute),
-		)
-		vi.spyOn(GOVERNOR, "incomeFactor").mockReturnValue(1)
-	})
 	afterEach(() => vi.restoreAllMocks())
 
 	it("resolves the planet radius and measures great-circle distance", () => {

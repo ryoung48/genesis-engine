@@ -67,7 +67,6 @@ it("reports an injected settlement collapse in a thirty-year history window", ()
 		})
 	try {
 		const reports = HISTORY_REPORT.run({
-			characterStage: "personality",
 			seeds: [42],
 			era: "lateMedieval",
 			numPoints: 12000,

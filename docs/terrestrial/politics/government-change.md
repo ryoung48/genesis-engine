@@ -2,7 +2,7 @@
 
 Government belongs to a sovereign realm and is read from its root province. A new realm inherits its former sovereign's government after its provinces and supporting districts have been assembled. Conquest does not restamp every province.
 
-Code: `src/model/history/sim/engine/state/government`, `state/patricians`, the shared release path in `state`, and the succession events. The [government catalog and succession systems](government-and-succession.md) describe the consequences of each type.
+Code: `src/model/history/sim/engine/state/government`, the shared release path in `state`, and the succession events. The [government catalog and succession systems](government-and-succession.md) describe the consequences of each type.
 
 ## Review moments and order
 
@@ -32,11 +32,11 @@ No rule leaves the tribal family or enters or leaves theocracy. There is no poli
 
 ## Dependent state
 
-Government writes clear economy caches and invoke military mutation hooks. Army targets, levy eligibility, raids, succession, partition, inheritance projection and city targets read the current government at their next use.
+Government writes clear economy caches and invoke military mutation hooks. Army targets, levy eligibility, raids, succession, partition and city targets read the current government at their next use.
 
-After installing a released ruler, reconciliation runs even if inherited government did not change. Other reviews reconcile when they transition. Electoral republics receive their 3–5 patrician house heads immediately, and leaving electoral government retires the roster and election streak immediately. The yearly people pass repairs rosters through the same settlement operation.
+After installing a released ruler, reconciliation runs even if inherited government did not change. Other reviews reconcile when they transition.
 
-Leaving single-heir succession ends every personal union edge with its correct senior and junior and deletes the junior's generation entry. Remaining juniors sharing a ruler continue together through the existing union-continuation rule. If the departing crown shares its ruler with another sovereign realm, it receives an independent founder through the existing family path, aged 20–50 with founder claim 3; its old regency and deferred coronation end and succession is rescheduled. This repairs crown ownership without a second government review. Leaving marriage-alliance eligibility immediately removes affected marriage bindings and records their end. Ordinary alliances and living marriages persist; the annual review handles betrothal cleanup. Regents and coronations retain their ordinary rules.
+Leaving single-heir succession ends every personal union edge with its correct senior and junior and deletes the junior's generation entry. Each former junior of the realm, or the realm itself if it was a junior, receives a fresh ruler of the shared dynasty with claim 2, an `INHERITED_AGE` draw and a minority regency if needed; see [rulers and dynasties](rulers-and-dynasties.md#shared-rulers-and-unions). Leaving marriage-alliance eligibility immediately removes the realm's [marriage ties](royal-marriages.md#ending) and records their end. Ordinary alliances persist. Regents and coronations retain their ordinary rules.
 
 ## Records and measurement
 

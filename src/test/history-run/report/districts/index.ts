@@ -1,8 +1,6 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
-import { PEOPLE } from "@/model/history/sim/people"
 import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
 import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution"
@@ -36,11 +34,9 @@ function capture({ engine }: DistrictEngineParams): DistrictCapture {
 	const tracker: DistrictTracker = {
 		tiers: tiers({ engine }),
 		changes: [],
-		reseatings: [],
 		derivations: [],
 	}
 	const derive = DEJURE.deriveParents
-	const reseat = DISTRICTS.reseat
 	DEJURE.deriveParents = (params) => {
 		const started = performance.now()
 		try {
@@ -52,30 +48,10 @@ function capture({ engine }: DistrictEngineParams): DistrictCapture {
 			})
 		}
 	}
-	DISTRICTS.reseat = (params) => {
-		const displaced = params.displaced.filter(
-			(holder) =>
-				params.state.people.persons.heldSeats[holder.person].length === 0 &&
-				PEOPLE.aliveAt({
-					people: params.state.people,
-					person: holder.person,
-					time: params.state.time / STATE.yearMs,
-				}),
-		)
-		const moves = reseat(params)
-		if (params.reason !== "partition")
-			tracker.reseatings.push({
-				year: engine.time / STATE.yearMs,
-				displaced,
-				moves,
-			})
-		return moves
-	}
 	return {
 		tracker,
 		detach: () => {
 			DEJURE.deriveParents = derive
-			DISTRICTS.reseat = reseat
 		},
 	}
 }
@@ -104,15 +80,9 @@ function summarize({
 	const report: DistrictReport = {
 		realmsByTopTier: counts(),
 		seatsByTier: counts(),
-		heldByTier: counts(),
 		seats: 0,
-		held: 0,
 		attached: { crown: 0, district: 0, separated: 0 },
 		crownLandShare: {},
-		displaced: counts(),
-		promoted: counts(),
-		demoted: counts(),
-		landless: counts(),
 		rises: counts(),
 		falls: counts(),
 		repeatedTierChanges: 0,
@@ -159,10 +129,6 @@ function summarize({
 			if (!STATE_TITLES.isDistrictSeat({ state: engine, seat: p })) continue
 			report.seats++
 			report.seatsByTier[TITLES.tierOrder[engine.seatRank[p]]]++
-			if (engine.people.rulerOf[p] >= 0) {
-				report.held++
-				report.heldByTier[TITLES.tierOrder[engine.seatRank[p]]]++
-			}
 			placed.add(p)
 			if (!region) continue
 			const queue = [p]
@@ -200,22 +166,6 @@ function summarize({
 	for (const [tier, values] of crownShares)
 		report.crownLandShare[TITLES.tierOrder[tier]] =
 			REPORT_DISTRIBUTION.summarize(values)
-	for (const entry of tracker.reseatings) {
-		if (entry.year < from || entry.year >= to) continue
-		for (const holder of entry.displaced)
-			report.displaced[TITLES.tierOrder[holder.rank]]++
-		for (const move of entry.moves) {
-			if (!entry.displaced.some((holder) => holder.person === move.person))
-				report.displaced[TITLES.tierOrder[move.rank]]++
-			report[
-				move.reason === "promotion"
-					? "promoted"
-					: move.reason === "demotion"
-						? "demoted"
-						: "landless"
-			][TITLES.tierOrder[move.rank]]++
-		}
-	}
 	const changes = new Map<number, number>()
 	for (const change of tracker.changes) {
 		if (change.year <= from || change.year > to) continue

@@ -1,79 +1,19 @@
-import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
 import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
-import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
+import { ACCESSION } from "@/model/history/sim/engine/events/succession/accession"
 import type {
 	EnthroneParams,
-	SeeksParams,
-	SeizeParams,
 	StandsParams,
 } from "@/model/history/sim/engine/events/succession/overthrow/types"
-import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
-import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
-import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { STATE } from "@/model/history/sim/engine/state"
-import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
-import { PEOPLE } from "@/model/history/sim/people"
-import { AGEING } from "@/model/history/sim/people/health/ageing"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 
-const THRONE_BACKING = 0.95
-const THRONE_BID_CHANCE = 0.05
-
-function seize({
-	state,
-	realm,
-	person,
-	claim,
-	deposed,
-	reason,
-}: SeizeParams): void {
-	STATE.installRuler({ state, p: realm, person, claim, reason })
-	if (deposed >= 0) RESTORATION.depose({ state, realm, claimant: deposed })
-	STATE.scheduleSuccession({ state, p: realm })
-}
-
-function seeks({ state, realm, holder, rng }: SeeksParams): number[] {
-	const incumbent = state.people.rulerOf[realm]
-	if (
-		holder < 0 ||
-		incumbent < 0 ||
-		!SUCCESSION_SYSTEMS.adultAvailable({ state, person: holder })
-	)
-		return []
-	const challenge = SUCCESSION_SYSTEMS.challenge({
-		state,
-		realm,
-		incumbent,
-		claimant: holder,
-		rng,
-	})
-	return challenge.backed &&
-		challenge.share >= THRONE_BACKING &&
-		rng.random() < THRONE_BID_CHANCE
-		? challenge.supportingSeats
-		: []
-}
-
+// A claim stands while both rulers are those it was pressed between.
 function stands({ state, war }: StandsParams): boolean {
-	const people = state.people
-	const claimant = war.claimant
-	if (
-		claimant < 0 ||
-		!PEOPLE.aliveAt({
-			people,
-			person: claimant,
-			time: state.time / STATE.yearMs,
-		}) ||
-		AGEING.incapable({ people, person: claimant }) ||
-		people.rulerOf[war.defender] !== war.originalCrownRuler
-	)
-		return false
-	const crowns = people.persons.heldSeats[claimant].filter((seat) =>
-		STATE.isSovereign({ state, p: seat }),
-	)
 	return (
-		crowns.length === 1 &&
-		crowns[0] === war.attacker &&
+		state.leaderRuntime.rulerId[war.defender] === war.originalCrownRuler &&
+		state.leaderRuntime.rulerId[war.attacker] === war.claimantRuler &&
+		STATE.isSovereign({ state, p: war.attacker }) &&
 		STATE.canUniteAfterWar({ state, a: war.defender, b: war.attacker })
 	)
 }
@@ -81,33 +21,26 @@ function stands({ state, war }: StandsParams): boolean {
 function enthrone({
 	state,
 	war,
-	claimant,
+	ruler,
 	claim,
-	deposed,
+	union,
 	rng,
 }: EnthroneParams): void {
 	const realm = war.defender
-	REGENCY.end({ state, realm, cause: "overthrown" })
-	seize({
+	const deposed = STATE_RULERS.has({ state, p: realm })
+		? STATE_RULERS.ref({ state, ruler: STATE_RULERS.read({ state, p: realm }) })
+		: null
+	STATE_RULERS.endRegency({ state, realm, cause: "overthrown" })
+	if (union)
+		STATE.unite({ state, a: realm, b: war.attacker, ruler, claim, rng })
+	else STATE.seatRuler({ state, p: realm, ruler, claim, natural: false, rng })
+	ACCESSION.settle({
 		state,
 		realm,
-		person: claimant,
-		claim,
-		deposed,
-		reason: "regime change",
-	})
-	REGENCY.start({ state, realm })
-	const transition = STATE_GOVERNMENT.accede({
-		state,
-		realm,
-		provinces: STATE.getNationProvinces({ state, root: realm }),
 		rng,
-		knowledge: ECONOMY.realmKnowledge({ state, p: realm }),
 		elected: false,
-		previousHouse: deposed >= 0 ? state.people.persons.dynasty[deposed] : -1,
+		previousHouse: deposed?.dynasty ?? -1,
 	})
-	if (transition) STATE.reconcileGovernment({ state, realm, transition, rng })
-	CORONATION.hold({ state, realm, rng })
 	const overlord = STATE.diplomaticOverlord({ state, nation: realm })
 	if (
 		overlord >= 0 &&
@@ -131,8 +64,18 @@ function enthrone({
 	state.events.push({
 		tag: "regime change",
 		time: state.time,
-		data: { nation: realm, claimant, deposed, war: war.idx },
+		data: {
+			nation: realm,
+			war: war.idx,
+			...STATE_RULERS.noteFields({
+				prefix: "claimant",
+				ref: STATE_RULERS.ref({ state, ruler }),
+			}),
+			...(deposed
+				? STATE_RULERS.noteFields({ prefix: "deposed", ref: deposed })
+				: {}),
+		},
 	})
 }
 
-export const OVERTHROW = { seize, seeks, stands, enthrone }
+export const OVERTHROW = { stands, enthrone }

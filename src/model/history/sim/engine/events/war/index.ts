@@ -2,7 +2,6 @@ import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
-import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { BACKING } from "@/model/history/sim/engine/events/war/backing"
 import { REBELLION_EVALUATION } from "@/model/history/sim/engine/events/war/rebellion-evaluation"
@@ -24,16 +23,13 @@ import type {
 	WarTarget,
 } from "@/model/history/sim/engine/events/war/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
-import { LIVE_OPINION_CONTEXT } from "@/model/history/sim/engine/opinion-context"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	Disposition,
 	StartWarParams,
 } from "@/model/history/sim/engine/state/types"
-import { OPINION } from "@/model/history/sim/people/opinion"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
@@ -42,9 +38,9 @@ const REBELLION_SEED_FRACTION = 0.0125
 
 const REBELLION_THRESHOLD = 0.45
 
-// Laxity per point of the holder's opinion of the ruler: 50 points weigh as
-// much as one weak crown.
-const HOLDER_OPINION_LAXITY = -0.002
+// Share of a threatened target that a ruler declares war on: the war-chance
+// factor of a ruler with no temperament.
+const WAR_CHANCE = 1 / 1.11
 
 // A realm holding the lands of a higher rank without the title is one weak
 // claim step easier to break away from.
@@ -340,8 +336,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 		if (
 			parent < 0 ||
 			parent !== STATE.getSovereign({ state, p: nation }) ||
-			!STATE_TITLES.isDistrictSeat({ state, seat: nation }) ||
-			state.people.rulerOf[nation] < 0
+			!STATE_TITLES.isDistrictSeat({ state, seat: nation })
 		)
 			continue
 		directSubjects.push(nation)
@@ -369,7 +364,6 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			seeded: true,
 			succession: false,
 			laxity: 0,
-			holderOpinion: null,
 			composite: false,
 			threshold: REBELLION_THRESHOLD,
 			roll: -1,
@@ -381,7 +375,6 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 			state,
 			p: nation,
 			rng,
-			reason: "territorial change",
 		})
 		STATE.fixConnections({ state, nation, rng })
 		seedWarStage({
@@ -437,34 +430,8 @@ function rebel({
 }: RebelParams): boolean {
 	const preview = MILITARY.rebellionPreview({ state, overlord, subject })
 	const threat = preview.threat
-	laxity += GOVERNOR.factor({
-		attribute: "diplomacy",
-		value: GOVERNOR.attribute({
-			state,
-			realm: overlord,
-			attribute: "diplomacy",
-		}),
-	})
-	const holder = state.people.rulerOf[subject]
-	laxity += GOVERNOR.personHas({ state, person: holder, trait: "ambitious" })
-		? 0.02
-		: GOVERNOR.personHas({ state, person: holder, trait: "content" })
-			? -0.02
-			: 0
-	const started = performance.now()
-	const time = state.time / STATE.yearMs
-	const breakdown = OPINION.of({
-		observer: holder,
-		target: state.people.rulerOf[overlord],
-		time,
-		context: LIVE_OPINION_CONTEXT.of({ state, time }),
-	})
-	const holderOpinion = OPINION.loyaltyOf({ breakdown })
-	laxity += HOLDER_OPINION_LAXITY * holderOpinion
 	const composite = state.compositeRealm[overlord] === 1
 	if (composite) laxity += COMPOSITE_REALM_LAXITY
-	state.opinionPolitics.loyaltyEvaluations++
-	state.opinionPolitics.loyaltyMs += performance.now() - started
 	const threshold = REBELLION_THRESHOLD - laxity
 	const roll = threat <= threshold ? -1 : rng.random()
 	const decision =
@@ -476,7 +443,6 @@ function rebel({
 		seeded: false,
 		succession,
 		laxity,
-		holderOpinion: breakdown ? holderOpinion : null,
 		composite,
 		threshold,
 		roll,
@@ -486,13 +452,6 @@ function rebel({
 	if (composite) state.coronations.compositeEvaluations++
 	if (decision !== "accepted") return false
 	if (composite) state.coronations.compositeRebellions++
-	const supporters = OVERTHROW.seeks({
-		state,
-		realm: overlord,
-		holder: state.people.rulerOf[subject],
-		rng,
-	})
-	const throne = supporters.length > 0
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
@@ -500,26 +459,11 @@ function rebel({
 			overlord,
 			subject,
 			succession,
-			goal: throne ? "throne" : "independence",
-			governorDiplomacy: GOVERNOR.attribute({
-				state,
-				realm: overlord,
-				attribute: "diplomacy",
-			}),
+			goal: "independence",
 		},
 	})
-	if (throne)
-		STATE.releaseFaction({
-			state,
-			p: subject,
-			supporters,
-			rng,
-			reason: "rebellion",
-		})
-	else STATE.releaseProvince({ state, p: subject, rng, reason: "rebellion" })
-	if (throne)
-		start({ state, attacker: subject, defender: overlord, rng, goal: "throne" })
-	else if (rng.random() > threat)
+	STATE.releaseProvince({ state, p: subject, rng })
+	if (rng.random() > threat)
 		start({
 			state,
 			attacker: overlord,
@@ -528,10 +472,12 @@ function rebel({
 			goal: "independence",
 		})
 	else TRUCE.sign({ state, a: overlord, b: subject })
-	// A throne war ends with the realm reunited or with a peace that checks the
-	// crown's land, so the crown's severed districts are not released here.
-	if (!throne) STATE.fixConnections({ state, nation: subject, rng })
+	STATE.fixConnections({ state, nation: subject, rng })
 	return true
+}
+
+function startsWarChance(threat: number): number {
+	return Math.min(1, (1 - threat) * WAR_CHANCE)
 }
 
 function canDeclare({ state, nation }: ViableTargetsParams): boolean {
@@ -553,24 +499,20 @@ function pressClaim({
 	state,
 	attacker,
 	defender,
-	claimant,
 	rng,
 }: PressClaimParams): void {
 	if (!canDeclare({ state, nation: attacker })) return
-	const target = viableTargets({ state, nation: attacker }).find(
-		(t) => t.n === defender,
+	const candidate = listWarCandidates({ state, nation: attacker }).find(
+		(c) => c.n === defender && !c.hasWar,
 	)
+	if (!candidate) return
+	const target = measureWarTarget({ state, nation: attacker, candidate })
 	if (
-		!target ||
-		!GOVERNOR.startsWar({
-			state,
-			realm: attacker,
-			threat: target.w,
-			roll: rng.random(),
-		})
+		target.w >= ATTACK_THRESHOLD[STATE.disp.FRIENDLY] ||
+		rng.random() >= startsWarChance(target.w)
 	)
 		return
-	start({ state, attacker, defender, rng, goal: "claim", claimant })
+	start({ state, attacker, defender, rng, goal: "claim" })
 }
 
 function runWar({ state, nation, rng }: RunWarParams): void {
@@ -586,12 +528,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
 			if (
-				GOVERNOR.startsWar({
-					state,
-					realm: nation,
-					threat: closest.w,
-					roll: rng.random(),
-				}) &&
+				rng.random() < startsWarChance(closest.w) &&
 				!SUBMISSION.offer({
 					state,
 					attacker: nation,
@@ -611,8 +548,7 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 		}
 	} else if (
 		parent === sovereignNation &&
-		STATE_TITLES.isDistrictSeat({ state, seat: nation }) &&
-		state.people.rulerOf[nation] >= 0
+		STATE_TITLES.isDistrictSeat({ state, seat: nation })
 	) {
 		// A great vassal's district — consider rebellion
 		if (DERIVE.provinceWars({ state, p: sovereignNation }).length === 0)

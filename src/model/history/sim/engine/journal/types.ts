@@ -1,11 +1,10 @@
+import type { RulerRef } from "@/model/history/record/rulers/types"
 import type { CensusKeyframe } from "@/model/history/record/types"
 import type {
 	EngineNote,
 	HistoryState,
 	WarGoal,
 } from "@/model/history/sim/engine/state/types"
-import type { PeoplePacket } from "@/model/history/sim/people/log/types"
-import type { DeathCause, RegentKind } from "@/model/history/sim/people/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 
 interface JournalProvinceChange {
@@ -28,19 +27,16 @@ interface JournalCoalition {
 	defenders: number[]
 }
 
-interface JournalRuler {
+export type RulerDeparture = "natural" | "deposed"
+
+interface JournalRuler extends RulerRef {
 	root: number
-	person: number
-	nameSeed: number
-	dynasty: number
 	birthTimeMs: number
-	// -1 when no regent, or a regency council, governs.
-	regent: number
-	regency: RegentKind | null
-	// The ruler whose death in this transaction opened the seat; -1 for none.
-	deceased: number
-	// [JUSTIFICATION] A ruler seated without a death has no cause to carry.
-	deathCause: DeathCause | null
+	// Whether a regency council governs for a child ruler.
+	regency: boolean
+	// How the ruler this one replaced left the throne in this transaction;
+	// null when nobody left it.
+	deathCause: RulerDeparture | null
 }
 
 export interface RoadJournal {
@@ -56,9 +52,6 @@ export interface JournalTransaction {
 	occupations: JournalProvinceChange[]
 	coalitions: JournalCoalition[]
 	rulers: JournalRuler[]
-	// [JUSTIFICATION] Most transactions carry no people rows, and an empty
-	// packet would still allocate and transfer seventeen buffers.
-	people: PeoplePacket | null
 	notes: EngineNote[]
 	census: CensusKeyframe | null
 }
@@ -69,6 +62,13 @@ export interface PendingJournal {
 	relations: Map<number, JournalRelationChange>
 	occupations: Map<number, JournalProvinceChange>
 	coalitions: JournalCoalition[]
+	// Realms whose ruler columns were written since the last flush.
+	rulers: Set<number>
+}
+
+export interface RecordRulerParams {
+	state: HistoryState
+	p: number
 }
 
 export interface RecordProvinceParams {

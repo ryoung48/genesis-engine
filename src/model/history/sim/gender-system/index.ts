@@ -3,7 +3,6 @@ import type {
 	ResolveLeaderGenderParams,
 	RestrictGenderSystemsParams,
 } from "@/model/history/sim/gender-system/types"
-import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
 import { RNG } from "@/model/shared/random/rng"
 import type { CultureGenderSystem, LeaderGender } from "@/model/society/types"
 
@@ -68,20 +67,14 @@ function resolveLeaderGender({
 function restrict({
 	systems,
 	cultureToReligion,
-	doctrine,
+	religionGender,
 	seed,
 }: RestrictGenderSystemsParams): Uint8Array {
-	if (!doctrine) return systems
-	const group = RELIGION_DOCTRINE.groups.findIndex(
-		(group) => group.name === "gender",
-	)
+	if (!religionGender) return systems
 	return systems.map((system, culture) => {
 		const religion = cultureToReligion[culture]
 		if (religion < 0) return system
-		if (
-			doctrine.options[religion * RELIGION_DOCTRINE.groups.length + group] === 0
-		)
-			return cultureGenderSystem.PATRIARCHAL
+		if (religionGender[religion] === 0) return cultureGenderSystem.PATRIARCHAL
 		const roll = RNG.createRng({ seed: seed + 7414 + culture * 8191 }).random()
 		return roll < 0.14 ? 0 : roll < 0.43 ? 1 : 2
 	})

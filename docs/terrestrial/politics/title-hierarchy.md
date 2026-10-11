@@ -61,7 +61,7 @@ A realm **qualifies** at tier `T` when:
 **Raising the realm's rank: the yearly attempt.** Once a year, after the district settle and grant, `CORONATION.elevate` considers every realm in one pass:
 
 1. One sweep of the title registry (`FOUNDING.qualifying`) lists every realm's qualifying children per tier. It reads each title's provinces once to find its sole owner and answers the orphan rule from that cache.
-2. Qualifying realms are taken in ascending realm id, one at a time, each to completion before the next. A realm with no ruler or under a regent is skipped.
+2. Qualifying realms are taken in ascending realm id, one at a time, each to completion before the next. A realm under a regency is skipped.
 3. For the realm, only tiers above its own top tier are tried, lowest first. The coronation priced at tier `T` must be at least customary; a tier that fails this takes no roll. Then a roll must pass: 2% + 2% × leader claim, per year. The first tier to pass is elected and the rest are not tried.
 4. The elected realm is crowned at once: the title is founded, and the coronation is priced, paid and its gifts given.
 
@@ -73,13 +73,13 @@ Founding merges the children's provinces into a new region, writes the new title
 
 Every elevation raises the realm's rank. If the title registry is full the founding creates nothing, and then nothing is paid, given or recorded.
 
-**Titles at or below the realm's rank: at accession.** A realm that qualifies at or below its own rank (an empire holding orphan duchies that could make a kingdom) founds that title only when a new ruler is crowned. The accession coronation tries those tiers lowest first and founds at most one: the coronation, priced at the realm's own rank as always, must be at least customary, and the same roll of 2% + 2% × leader claim must pass, once per accession. The title changes neither the realm's rank nor the price, so it costs nothing beyond the coronation the new ruler holds anyway. Anything else the realm qualifies for waits for the next ruler. No such title is founded under a regent; a child who acceded gets the attempt at the coronation held at sixteen.
+**Titles at or below the realm's rank: at accession.** A realm that qualifies at or below its own rank (an empire holding orphan duchies that could make a kingdom) founds that title only when a new ruler is crowned. The accession coronation tries those tiers lowest first and founds at most one: the coronation, priced at the realm's own rank as always, must be at least customary, and the same roll of 2% + 2% × leader claim must pass, once per accession. The title changes neither the realm's rank nor the price, so it costs nothing beyond the coronation the new ruler holds anyway. Anything else the realm qualifies for waits for the next ruler. No such title is founded under a regency; a child who acceded gets the attempt at the coronation held at sixteen.
 
 An accession coronation never founds a title above the realm's rank.
 
 **Composite realms.** A realm that, at the end of the yearly pass, qualifies at a tier above its own top tier is a composite realm: it holds the lands of a higher rank without the rank. It is exactly the realm the yearly pass can elevate. Money, a regency and a failed roll do not clear it; they decide whether the realm can act on its position, not whether it is in it. Until it is elevated or loses the lands a composite realm:
 
-- is [easier to break away from](rebellions-and-throne-wars.md#attribute-and-trait-effects), by one weak-claim step;
+- is [easier to break away from](rebellions-and-throne-wars.md#laxity), by one weak-claim step;
 - keeps its lower top tier, so its districts are one tier smaller and more numerous, and its [partition](government-and-succession.md#partition) hands out titles of the lower tier;
 - stands at the lower rank among its peers.
 
@@ -94,7 +94,7 @@ A founded title lapses when the nation holds fewer than 2 fully held children fo
 ## Nation vs its subordinates
 
 - A nation is a sovereign realm. Its id is its root province id, so relations, leaders and wars are indexed by it. Title holders are sovereigns chosen by majority ownership.
-- The crown implicitly holds every top-tier title. District admins hold seats exactly one tier below the realm's top tier, outside crown land. Lower titles have no individual holder.
+- The crown implicitly holds every top-tier title. District seats are exactly one tier below the realm's top tier, outside crown land. Lower titles have no individual holder.
 
 ## Derived liege tree (`DEJURE.deriveParents`)
 

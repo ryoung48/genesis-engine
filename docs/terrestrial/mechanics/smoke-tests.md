@@ -5,7 +5,7 @@ Scope: `:history`.
 Run related tests after each implementation step:
 
 ```powershell
-pnpm test:history:related src/model/history/sim/people/health/index.ts
+pnpm test:history:related src/model/history/sim/engine/state/rulers/index.ts
 ```
 
 Pass every changed source file to `test:history:related`; Vitest selects test files through their imports. A change to a shared dependency can select most of the suite. For changes to test configuration, run the full suite directly.
@@ -28,9 +28,7 @@ pnpm test:history src/test/history-run/siege.smoke.test.ts
 Remove-Item Env:SIEGE_CALIBRATION_OUT
 ```
 
-The assertion-free twelve-variant inheritance measurement and its experimental implementation have been removed. Production inheritance tests still check valid grade states, carried sides, promotion, transmission frequencies, parent correlations and reproducible draws. They do not require every seeded character draw to match a fixed historical checksum.
-
-Rebellion evaluation tests use neutral governor diplomacy and no Ambitious/Content effect, so their threshold and random-draw assertions depend on explicit inputs rather than traits of a generated ruler. Provincial revenue aggregation likewise uses neutral governor modifiers; real governor income and cache behavior remain covered by the traits tests. Aggregation compares a relative revenue difference rather than requiring twelve decimal places of absolute agreement across a generated realm.
+Succession, partition, interregnum, regency, royal-marriage and union tests drive the engine through forced rolls: they replace `SUCCESSION_SYSTEMS.choose` or the RNG with fixed values, so their assertions depend on explicit inputs rather than on a generated ruler. Statistics such as outcome rates, reign lengths and tie counts are read from the `pnpm report:history` fields (`succession`, `marriageTies`, `dynasty`, `unions`), not asserted by tests. `src/test/history-run/fixtures/realms` builds free neighbouring realms and `fixtures/heap` reads the queued successions.
 
 To compare serial and parallel execution with the same tests:
 

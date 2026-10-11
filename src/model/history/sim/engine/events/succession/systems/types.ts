@@ -1,102 +1,54 @@
+import type { AgeTable } from "@/model/history/sim/engine/state/rulers/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type { SuccessionSystem } from "@/model/history/sim/nations/government/types"
 import type { SharedRng } from "@/model/shared/random/rng"
-
-export interface ChooseParams {
-	state: HistoryState
-	realm: number
-	dying: number
-	rng: SharedRng
-}
-
-export interface SuccessionChoice {
-	// -1 founds a new house.
-	heir: number
-	claim: number
-	pretender: number
-	pretenderSeat: number
-	supportingSeats: number[]
-	// -1 when no foreign ruler stands in a disputed line.
-	foreignClaimant: number
-	// The dynasty ends with no heir and the districts break away.
-	interregnum: boolean
-}
-
-export interface Elector {
-	seat: number
-	person: number
-	weight: number
-}
-
-export interface Candidate {
-	person: number
-	seat: number
-	strength: number
-}
-
-export interface TallyParams {
-	state: HistoryState
-	electors: Elector[]
-	candidates: Candidate[]
-	republic: boolean
-}
-
-export interface PersonParams {
-	state: HistoryState
-	person: number
-}
-
-export interface ElectableParams {
-	state: HistoryState
-	realm: number
-	person: number
-}
-
-export interface MarriageTieParams {
-	state: HistoryState
-	a: number
-	b: number
-}
 
 export interface RealmParams {
 	state: HistoryState
 	realm: number
 }
 
-export interface CandidateParams {
-	state: HistoryState
-	person: number
-	seat: number
-	totalWeight: number
-	weight: number
-}
-
-export interface ContestParams {
+export interface ChooseParams {
 	state: HistoryState
 	realm: number
-	heir: Candidate
-	rival: Candidate
 	rng: SharedRng
 }
 
-export interface ChallengeParams {
+export type SuccessionHouse = "same" | "other" | "new"
+
+export interface SuccessionChoice {
+	system: SuccessionSystem
+	// "same" keeps the late ruler's dynasty, "other" passes the crown through a
+	// marriage, "new" founds a dynasty.
+	house: SuccessionHouse
+	claim: number
+	age: AgeTable
+	// Junior heirs a partitioning realm divides among; 0 for none.
+	juniors: number
+	// The dynasty ends with no heir and the districts break away.
+	interregnum: boolean
+	// The crown passes to a daughter's line.
+	daughterLine: boolean
+}
+
+export interface HeirOutcome {
+	chance: number
+	house: SuccessionHouse
+	claim: number
+	daughterLine: boolean
+	son: boolean
+}
+
+export interface PretenderParams {
 	state: HistoryState
 	realm: number
-	incumbent: number
-	claimant: number
-	rng: SharedRng
+	system: SuccessionSystem
+	disputed: boolean
 }
 
-export interface ContestResult {
-	// The claimant won the pretender share of the districts.
-	backed: boolean
-	share: number
-	// District seat that rises for the claimant, or -1.
-	seat: number
-	supportingSeats: number[]
-}
-
-export interface TallyResult {
-	votes: number[]
-	// Index of the candidate each elector backed, in elector order.
-	choices: number[]
+export interface PretenderOdds {
+	// Chance that a district rises for a pretender; 0 when none can.
+	chance: number
+	// Chance that each other district joins it.
+	supporters: number
 }

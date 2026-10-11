@@ -33,7 +33,7 @@ export interface DerivedProvinceSociety {
 	religions: DerivedSociety["religions"]
 	religionFamilies: DerivedSociety["religionFamilies"]
 	religionTypes: DerivedSociety["religionTypes"]
-	religionDoctrine: DerivedSociety["religionDoctrine"]
+	religionGender: DerivedSociety["religionGender"]
 	landmarks: GenesisLandmarks
 	settlementRegions: Int32Array
 	settlementWaterLandmarks: Int32Array

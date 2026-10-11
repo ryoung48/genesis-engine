@@ -23,8 +23,7 @@ function observe({ engine, tracker: tracked }: ObserveInterregnumParams): void {
 		else if (
 			note.tag === "succession" &&
 			note.data.system === "single_heir" &&
-			note.data.claim === 0 &&
-			(note.data.dying as number) >= 0 &&
+			note.data.house === "new" &&
 			!note.data.interregnum
 		)
 			tracked.withoutDistricts.push(year)

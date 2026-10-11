@@ -8,7 +8,7 @@ import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import { HERITAGE } from "@/model/history/sim/heritage"
 import { NATIONS } from "@/model/history/sim/nations"
 import { RELIGION } from "@/model/history/sim/religion"
-import { RELIGION_DOCTRINE } from "@/model/history/sim/religion/doctrine"
+import { RELIGION_GENDER } from "@/model/history/sim/religion/gender"
 import { TIMING } from "@/model/shared/timing"
 import { ERAS } from "@/model/society/eras"
 
@@ -23,7 +23,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 	let heritages: DerivedSociety["heritages"]
 	let religions: DerivedSociety["religions"]
 	let religionFamilies: DerivedSociety["religionFamilies"]
-	let religionDoctrine: DerivedSociety["religionDoctrine"]
+	let religionGender: DerivedSociety["religionGender"]
 	let religionTypes: DerivedSociety["religionTypes"]
 	let nations: DerivedSociety["nations"]
 
@@ -133,7 +133,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 					seed: params.seed,
 				})
 				if (!params.isEarthImport)
-					religionDoctrine = RELIGION_DOCTRINE.assign({
+					religionGender = RELIGION_GENDER.assign({
 						religionTypes,
 						religionFamilies,
 						familyCount: families.count,
@@ -142,7 +142,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 				cultures!.genderSystems = GENDER_SYSTEM.restrict({
 					systems: cultures!.genderSystems!,
 					cultureToReligion: religions!.assignment,
-					doctrine: religionDoctrine,
+					religionGender,
 					seed: params.seed,
 				})
 				religions!.colors = GRAPH_PARTITION.deriveChildColors({
@@ -178,7 +178,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 		religions,
 		religionFamilies,
 		religionTypes,
-		religionDoctrine,
+		religionGender,
 	}
 }
 

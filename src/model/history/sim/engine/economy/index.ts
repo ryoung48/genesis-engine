@@ -6,7 +6,6 @@ import type {
 	TravelDaysParams,
 } from "@/model/history/sim/engine/economy/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { RealmCacheEntry } from "@/model/history/sim/engine/state/types"
@@ -168,14 +167,7 @@ function realmPopulation({ state, p }: EconomyLookupParams): number {
 }
 
 function revenue({ state, p }: EconomyLookupParams): number {
-	return (
-		realm({ state, p }).revenue *
-		GOVERNOR.factor({
-			attribute: "stewardship",
-			value: GOVERNOR.attribute({ state, realm: p, attribute: "stewardship" }),
-		}) *
-		GOVERNOR.incomeFactor({ state, realm: p })
-	)
+	return realm({ state, p }).revenue
 }
 
 function realmKnowledge({ state, p }: EconomyLookupParams): number {

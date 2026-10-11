@@ -1,22 +1,6 @@
+import type { Ruler } from "@/model/history/sim/engine/state/rulers/types"
 import type { HistoryState, War } from "@/model/history/sim/engine/state/types"
-import type { SeatChangeReason } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
-
-export interface SeizeParams {
-	state: HistoryState
-	realm: number
-	person: number
-	claim: number
-	deposed: number
-	reason: SeatChangeReason
-}
-
-export interface SeeksParams {
-	state: HistoryState
-	realm: number
-	holder: number
-	rng: SharedRng
-}
 
 export interface StandsParams {
 	state: HistoryState
@@ -26,8 +10,11 @@ export interface StandsParams {
 export interface EnthroneParams {
 	state: HistoryState
 	war: War
-	claimant: number
+	// The victorious rebel or claimant realm's ruler, read before the peace
+	// moved any land.
+	ruler: Ruler
 	claim: number
-	deposed: number
+	// Whether the ruler's own realm joins the defender in a union.
+	union: boolean
 	rng: SharedRng
 }

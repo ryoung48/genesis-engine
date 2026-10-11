@@ -702,7 +702,7 @@ function importGenesisWorld({
 		religions: provinceSociety.religions,
 		religionFamilies: provinceSociety.religionFamilies,
 		religionTypes: provinceSociety.religionTypes,
-		religionDoctrine: provinceSociety.religionDoctrine,
+		religionGender: provinceSociety.religionGender,
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		tradeGoods: post.tradeGoods,

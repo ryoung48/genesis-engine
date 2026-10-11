@@ -5,8 +5,8 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { ERAS } from "@/model/society/eras"
 import { URBANIZATION } from "@/model/society/urbanization"
@@ -30,56 +30,50 @@ function fixture(size: number) {
 	state.journal.length = 0
 	state.militaryReady = false
 	state.governmentType[0] = GOVERNMENT.getGovIdx().feudal_monarchy
-	const ruler = DISTRICT_FIXTURE.person({ fixture, seat: -1, father: -1 })
-	STATE.installRuler({
-		state,
+	DISTRICT_FIXTURE.ruler({
+		fixture,
 		p: 0,
-		person: ruler,
+		dynasty: -1,
+		age: "fresh",
 		claim: 3,
-		reason: "succession",
 	})
 	state.events.length = 0
 	return {
 		...fixture,
-		ruler,
 		review: { state, realm: 0, provinces: fixture.members, rng },
 	}
 }
 
-it("separates the converted crown and continues its former juniors under their shared ruler", () => {
-	const { state, rng, ruler } = fixture(3)
+it("gives each former junior a ruler of the shared house when the converted crown ends its union", () => {
+	const { state, rng } = fixture(3)
+	const house = state.leaderDynCurrent[0]
+	const ruler = state.leaderRuntime.rulerId[0]
 	for (const seat of [1, 2]) {
 		FIELDS.prov.parent.set({ state, p: seat, value: -1 })
-		PEOPLE.setRuler({
-			people: state.people,
-			seat,
-			person: ruler,
-			rank: 1,
-			reason: "unknown",
+		STATE.unite({
+			state,
+			a: 0,
+			b: seat,
+			ruler: STATE_RULERS.read({ state, p: 0 }),
+			claim: 3,
+			rng,
 		})
-		STATE.setRelation({ state, a: seat, b: 0, rel: "PU_JUNIOR" })
-		state.people.unionGenerations.set(seat, 2)
+		state.unionGenerations.set(seat, 2)
 	}
+	expect(state.leaderRuntime.rulerId[1]).toBe(ruler)
 	state.governmentType[0] = GOVERNMENT.getGovIdx().oligarchic_republic
-	state.people.regencies.set(0, {
-		ward: ruler,
-		cause: "minority",
-		regent: -1,
-		kind: "council",
-	})
-	state.coronationOwed[0] = ruler
+	state.coronationOwed[0] = state.leaderRuntime.idx[0]
 	STATE.reconcileGovernment({ state, realm: 0, transition: null, rng })
-	expect(state.people.rulerOf[0]).not.toBe(ruler)
-	expect(state.people.persons.heldSeats[ruler]).not.toContain(0)
-	expect(STATE.unionSenior({ state, p: 1 })).toBe(
-		STATE.unionSenior({ state, p: 2 }),
-	)
-	expect(STATE.unionSenior({ state, p: 0 })).not.toBe(
-		STATE.unionSenior({ state, p: 1 }),
-	)
-	expect(state.people.patricians.get(0)?.length).toBeGreaterThanOrEqual(3)
-	expect(state.people.regencies.has(0)).toBe(false)
-	expect(state.coronationOwed[0]).toBe(-1)
+	expect(state.leaderRuntime.rulerId[0]).toBe(ruler)
+	const rulers = new Set([ruler])
+	for (const seat of [1, 2]) {
+		expect(STATE.getRelation({ state, a: seat, b: 0 })).toBe("NONE")
+		expect(state.unionGenerations.has(seat)).toBe(false)
+		expect(state.leaderDynCurrent[seat]).toBe(house)
+		expect(state.leaderClaimCurrent[seat]).toBe(2)
+		expect(rulers.has(state.leaderRuntime.rulerId[seat])).toBe(false)
+		rulers.add(state.leaderRuntime.rulerId[seat])
+	}
 })
 
 it("resolves every surviving catalog index", () => {
@@ -234,11 +228,10 @@ it.each([
 })
 
 it("updates election streaks, resets on another house, and retires electors at conversion", () => {
-	const { state, review, rng, ruler } = fixture(3)
+	const { state, review, rng } = fixture(3)
 	state.governmentType[0] = GOVERNMENT.getGovIdx().oligarchic_republic
 	STATE.reconcileGovernment({ state, realm: 0, transition: null, rng })
-	expect(state.people.patricians.get(0)?.length).toBeGreaterThanOrEqual(3)
-	const house = state.people.persons.dynasty[ruler]
+	const house = state.leaderDynCurrent[0]
 	const accession = {
 		...review,
 		knowledge: 0,
@@ -247,14 +240,13 @@ it("updates election streaks, resets on another house, and retires electors at c
 	}
 	expect(STATE_GOVERNMENT.accede(accession)).toBeNull()
 	expect(STATE_GOVERNMENT.accede(accession)).toBeNull()
-	state.people.persons.dynasty[ruler] = house + 100
+	state.leaderDynCurrent[0] = house + 100
 	expect(STATE_GOVERNMENT.accede(accession)).toBeNull()
 	expect(state.electionStreaks.get(0)?.wins).toBe(1)
 	expect(STATE_GOVERNMENT.accede(accession)).toBeNull()
 	const transition = STATE_GOVERNMENT.accede(accession)
 	expect(transition?.to).toBe("dynastic_signoria")
 	STATE.reconcileGovernment({ state, realm: 0, transition, rng })
-	expect(state.people.patricians.has(0)).toBe(false)
 	expect(state.electionStreaks.has(0)).toBe(false)
 	const restoration = STATE_GOVERNMENT.accede({
 		...accession,
@@ -263,16 +255,12 @@ it("updates election streaks, resets on another house, and retires electors at c
 	})
 	expect(restoration?.cause).toBe("house lost")
 	STATE.reconcileGovernment({ state, realm: 0, transition: restoration, rng })
-	expect(state.people.patricians.get(0)?.length).toBeGreaterThanOrEqual(3)
-	expect(
-		SUCCESSION_SYSTEMS.choose({ state, realm: 0, dying: ruler, rng }).heir,
-	).toBeGreaterThanOrEqual(0)
 })
 
 it("a release inherits the parent rather than its province stamp", () => {
 	const { state, rng } = fixture(3)
 	state.governmentType[1] = GOVERNMENT.getGovIdx().chiefdom
-	STATE.releaseProvince({ state, p: 1, rng, reason: "rebellion" })
+	STATE.releaseProvince({ state, p: 1, rng })
 	expect(state.governmentType[1]).toBe(GOVERNMENT.getGovIdx().feudal_monarchy)
 	expect(
 		state.events.find((note) => note.tag === "government change")?.data.cause,
@@ -286,8 +274,8 @@ it("reviews the final released hierarchy including supporters", () => {
 		state,
 		p: 1,
 		supporters: [2, 3, 4, 5],
+		ruler: STATE.newHouse,
 		rng,
-		reason: "rebellion",
 	})
 	expect(STATE.getNationProvinces({ state, root: 1 })).toHaveLength(5)
 	expect(state.governmentType[1]).toBe(GOVERNMENT.getGovIdx().tribal_monarchy)
@@ -309,22 +297,6 @@ it("a disconnected release runs founding once before the city review", () => {
 	).toHaveLength(1)
 })
 
-it("an unchanged inherited republic immediately receives electors", () => {
-	const { state, rng } = fixture(2)
-	state.governmentType[0] = GOVERNMENT.getGovIdx().oligarchic_republic
-	state.governmentType[1] = GOVERNMENT.getGovIdx().oligarchic_republic
-	STATE.releaseProvince({ state, p: 1, rng, reason: "rebellion" })
-	expect(state.people.patricians.get(1)?.length).toBeGreaterThanOrEqual(3)
-	expect(
-		SUCCESSION_SYSTEMS.choose({
-			state,
-			realm: 1,
-			dying: state.people.rulerOf[1],
-			rng,
-		}).heir,
-	).toBeGreaterThanOrEqual(0)
-})
-
 it.each([
 	"PU_SENIOR",
 	"PU_JUNIOR",
@@ -333,30 +305,29 @@ it.each([
 	FIELDS.prov.parent.set({ state, p: 1, value: -1 })
 	STATE.setRelation({ state, a: 0, b: 1, rel: relation })
 	const junior = relation === "PU_JUNIOR" ? 0 : 1
-	state.people.unionGenerations.set(junior, 2)
+	state.unionGenerations.set(junior, 2)
 	state.governmentType[0] = GOVERNMENT.getGovIdx().oligarchic_republic
 	STATE.reconcileGovernment({ state, realm: 0, transition: null, rng })
 	expect(STATE.getRelation({ state, a: 0, b: 1 })).toBe("NONE")
-	expect(state.people.unionGenerations.has(junior)).toBe(false)
+	expect(state.unionGenerations.has(junior)).toBe(false)
 })
 
 it("yearly conversion reconciles marriage bindings and preserves the alliance", () => {
 	const { state, rng } = fixture(2)
 	FIELDS.prov.parent.set({ state, p: 1, value: -1 })
 	STATE.setRelation({ state, a: 0, b: 1, rel: "ALLY" })
-	state.people.marriageAlliances.set(7, { first: 0, second: 1 })
+	state.marriageTies.set(7, { first: 0, second: 1 })
 	state.popUrbanCurrent[0] = 30_000
 	state.popRuralCurrent[0] = 70_000
 	SUCCESSION.runYear({ state, rng })
 	expect(state.governmentType[0]).toBe(
 		GOVERNMENT.getGovIdx().oligarchic_republic,
 	)
-	expect(state.people.marriageAlliances.size).toBe(0)
+	expect(state.marriageTies.size).toBe(0)
 	expect(STATE.getRelation({ state, a: 0, b: 1 })).toBe("ALLY")
 	expect(
 		state.events.some((note) => note.tag === "marriage alliance ended"),
 	).toBe(true)
-	expect(state.people.patricians.get(0)?.length).toBeGreaterThanOrEqual(3)
 	const report = GOVERNMENT_REPORT.summarize({
 		engine: state,
 		from: 867,
@@ -367,43 +338,34 @@ it("yearly conversion reconciles marriage bindings and preserves the alliance", 
 })
 
 it("settles the elective succession before the absolute accession", () => {
-	const { state, rng, ruler } = fixture(20)
+	const { state, rng } = fixture(20)
 	state.governmentType[0] = GOVERNMENT.getGovIdx().elective_monarchy
 	state.knowledgeCurrent.fill(2)
 	state.realmCache.clear()
-	const chosen = DISTRICT_FIXTURE.person({
-		fixture: {
-			state,
-			rng,
-			root: 0,
-			members: Array.from({ length: 20 }, (_, p) => p),
-		},
-		seat: -1,
-		father: -1,
-	})
+	const dying = state.leaderRuntime.rulerId[0]
 	const choose = vi.spyOn(SUCCESSION_SYSTEMS, "choose")
 	choose.mockImplementationOnce(() => {
 		expect(state.governmentType[0]).toBe(
 			GOVERNMENT.getGovIdx().elective_monarchy,
 		)
 		return {
-			heir: chosen,
-			claim: 3,
+			system: "election",
+			house: "new",
+			claim: 2,
+			age: "elected",
+			juniors: 0,
 			interregnum: false,
-			supportingSeats: [],
-			pretenderSeat: -1,
-			pretender: -1,
-			foreignClaimant: -1,
+			daughterLine: false,
 		}
 	})
-	SUCCESSION.succeedPerson({
+	SUCCESSION.runSuccession({
 		state,
-		person: ruler,
-		context: { accountedEdges: new Set(), cause: "natural" },
+		realm: 0,
+		leaderIdx: state.leaderRuntime.idx[0],
 		rng,
 	})
 	choose.mockRestore()
-	expect(state.people.rulerOf[0]).toBe(chosen)
+	expect(state.leaderRuntime.rulerId[0]).not.toBe(dying)
 	expect(state.governmentType[0]).toBe(GOVERNMENT.getGovIdx().absolute_monarchy)
 })
 

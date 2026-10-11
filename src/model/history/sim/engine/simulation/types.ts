@@ -1,6 +1,5 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
@@ -44,8 +43,8 @@ export interface InitHistoryParams {
 	heritages?: GenesisPartition
 	// [JUSTIFICATION] Some generated eras do not create religious partitions.
 	religions?: GenesisPartition
-	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
-	religionDoctrine?: ReligionDoctrine
+	// [JUSTIFICATION] Earth imports and worlds without religions have no gender preference.
+	religionGender?: Uint8Array
 	// [JUSTIFICATION] The default era is used when none is supplied.
 	era?: SocietyEra
 	seed: number

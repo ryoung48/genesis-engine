@@ -2,11 +2,7 @@ import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { BATTLE } from "@/model/history/sim/engine/events/battle"
 import { DIPLOMACY } from "@/model/history/sim/engine/events/diplomacy"
-import { PEOPLE_EVENTS } from "@/model/history/sim/engine/events/people"
-import { BIRTH_EVENTS } from "@/model/history/sim/engine/events/people/birth"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
-import { DEATH_SCHEDULE } from "@/model/history/sim/engine/events/people/death/schedule"
-import { ROYAL_MARRIAGES } from "@/model/history/sim/engine/events/people/royal-marriages"
+import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
@@ -70,7 +66,7 @@ function initHistory(params: InitHistoryParams): HistoryState {
 				cultures: params.cultures,
 				heritages: params.heritages,
 				religions: params.religions,
-				religionDoctrine: params.religionDoctrine,
+				religionGender: params.religionGender,
 				startYear,
 				seed: params.seed,
 				waterAccess: params.waterAccess,
@@ -170,21 +166,11 @@ function initHistory(params: InitHistoryParams): HistoryState {
 		timings: params.timings,
 		fn: () => DIPLOMACY.initDiplomacy({ state, rng }),
 	})
-	// Districts are granted before war seeding: only districts can rebel.
-	TIMING.measure({
-		stage: "initHistory:initPeople",
-		timings: params.timings,
-		fn: () => PEOPLE_EVENTS.init({ state, seed: params.seed }),
-	})
+	state.heap.enqueue(state.time + STATE.deltaYear(1), EVENT_HEAP.evt.YEAR, 0, 0)
 	TIMING.measure({
 		stage: "initHistory:initWar",
 		timings: params.timings,
 		fn: () => WAR.initWar({ state, rng }),
-	})
-	TIMING.measure({
-		stage: "initHistory:initSuccession",
-		timings: params.timings,
-		fn: () => SUCCESSION.initSuccession({ state }),
 	})
 	TIMING.measure({
 		stage: "initHistory:initTax",
@@ -199,9 +185,7 @@ function initHistory(params: InitHistoryParams): HistoryState {
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
 
-	ROYAL_MARRIAGES.review({ state })
-	DEATH_SCHEDULE.offerNew({ state })
-	BIRTH_EVENTS.queue({ state })
+	ROYAL_MARRIAGE.review({ state })
 	MILITARY.reconcile({ state })
 	MILITARY.recordArmies({ state })
 	JOURNAL.flush({ state, noteCursor: 0, census: true, initial: true })
@@ -225,13 +209,9 @@ function processEventsUntil({
 
 		if (type === EVENT_HEAP.evt.BATTLE || type === EVENT_HEAP.evt.SIEGE)
 			MILITARY.touch({ state, nation: state.wars[dataBuf[0]].attacker })
-		else if (
-			type === EVENT_HEAP.evt.CENSUS ||
-			type === EVENT_HEAP.evt.PEOPLE_YEAR
-		)
+		else if (type === EVENT_HEAP.evt.CENSUS || type === EVENT_HEAP.evt.YEAR)
 			MILITARY.touchAll({ state })
-		else if (type !== EVENT_HEAP.evt.DEATH && type !== EVENT_HEAP.evt.BIRTH)
-			MILITARY.touch({ state, nation: dataBuf[0] })
+		else MILITARY.touch({ state, nation: dataBuf[0] })
 		MILITARY.reconcile({ state })
 		state.militaryDepth++
 		switch (type) {
@@ -249,16 +229,13 @@ function processEventsUntil({
 					rng,
 				})
 				break
-			case EVENT_HEAP.evt.DEATH:
-				PERSON_DEATH.run({
+			case EVENT_HEAP.evt.SUCCESSION:
+				SUCCESSION.runSuccession({
 					state,
-					person: dataBuf[0],
-					revision: dataBuf[1],
+					realm: dataBuf[0],
+					leaderIdx: dataBuf[1],
 					rng,
 				})
-				break
-			case EVENT_HEAP.evt.BIRTH:
-				BIRTH_EVENTS.run({ state, id: dataBuf[0], rng })
 				break
 			case EVENT_HEAP.evt.TAX:
 				TAX.runTax({
@@ -276,8 +253,14 @@ function processEventsUntil({
 			case EVENT_HEAP.evt.RAID:
 				RAID.runRaid({ state, nation: dataBuf[0], rng })
 				break
-			case EVENT_HEAP.evt.PEOPLE_YEAR:
-				PEOPLE_EVENTS.runYear({ state, rng })
+			case EVENT_HEAP.evt.YEAR:
+				state.heap.enqueue(
+					state.time + STATE.deltaYear(1),
+					EVENT_HEAP.evt.YEAR,
+					0,
+					0,
+				)
+				ROYAL_MARRIAGE.runYear({ state, rng })
 				SUCCESSION.runYear({ state, rng })
 				break
 			case EVENT_HEAP.evt.DIPLOMACY:
@@ -292,11 +275,6 @@ function processEventsUntil({
 				})
 				break
 		}
-		// Only an event that created people or pregnancies has anything to queue.
-		if (state.deathSchedule.offered !== state.people.persons.sex.length)
-			DEATH_SCHEDULE.offerNew({ state })
-		if (state.people.deliveries.queued !== state.people.deliveries.next)
-			BIRTH_EVENTS.queue({ state })
 		state.militaryDepth--
 		MILITARY.reconcile({ state })
 		JOURNAL.flush({

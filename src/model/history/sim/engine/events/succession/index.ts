@@ -1,133 +1,88 @@
-import { ECONOMY } from "@/model/history/sim/engine/economy"
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
+import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
+import { ACCESSION } from "@/model/history/sim/engine/events/succession/accession"
 import { CORONATION } from "@/model/history/sim/engine/events/succession/coronation"
 import { INTERREGNUM } from "@/model/history/sim/engine/events/succession/interregnum"
-import { OVERTHROW } from "@/model/history/sim/engine/events/succession/overthrow"
 import { PARTITION } from "@/model/history/sim/engine/events/succession/partition"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
-import { RESTORATION } from "@/model/history/sim/engine/events/succession/restoration"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import type {
-	InitSuccessionParams,
-	PressForeignClaimParams,
-	PretenderParams,
-	RealmParams,
+	ForeignClaimParams,
+	PretenderRevoltParams,
 	RealmRngParams,
-	RunSeatSuccessionParams,
+	RunSuccessionParams,
 	RunYearParams,
-	SucceedPersonParams,
+	Successor,
+	SuccessorParams,
 	WeakCrownParams,
 } from "@/model/history/sim/engine/events/succession/types"
 import { WAR } from "@/model/history/sim/engine/events/war"
-import { FIELDS } from "@/model/history/sim/engine/fields"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
-import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
-import { CHARACTER } from "@/model/history/sim/people/character"
-import { HOLDINGS } from "@/model/history/sim/people/holdings"
-import { OPINION } from "@/model/history/sim/people/opinion"
-import { TRAITS } from "@/model/history/sim/people/traits"
 
 const MAX_CLAIM = 3
 const WEAK_CLAIM_LAXITY = 0.05
-// Yearly chance that an ambitious regent seizes the throne, doubled for a
-// kinsman who holds a district of the realm.
-const USURP_CHANCE = 0.03
+// Yearly chance that a regency council's protector seizes the throne: 57
+// usurpations over 8,798 regency-years on the person model.
+const USURP_CHANCE = 0.0065
+// 53 of those 57 usurpers were kinsmen of the ward.
+const USURPER_KINSMAN_SHARE = 0.93
 // A usurping kinsman keeps the house's claim; a lord protector has none.
 const KINSMAN_USURPER_CLAIM = 1
-const RESTORED_CLAIM = 3
+const PRETENDER_CLAIM = 3
+// A daughter's line takes the throne of a marriage partner's ruler in 20 of
+// every 100 such successions: 78 unions standing at 6.1 union juniors on
+// average over 933 years, less 8 from claim wars, over about 350 daughter-line
+// successions with a tie.
+const UNION_INHERIT_CHANCE = 0.2
 
-function initSuccession({ state }: InitSuccessionParams): void {
-	for (let p = 0; p < state.P; p++) {
-		if (state.people.rulerOf[p] >= 0) STATE.scheduleSuccession({ state, p })
-		if (state.desolate[p]) continue
-		if (!STATE.isSovereign({ state, p })) continue
-		STATE.scheduleSuccession({ state, p })
-		REGENCY.start({ state, realm: p })
-	}
-}
-
-// A passed-over claimant, or a deposed ruler's line, takes a district out of
-// the realm and fights for the throne. The claimant rules the rebel realm even
-// when the district was a backer's.
+// A pretender takes the most populous district out of the realm, with the
+// districts that back it, and fights for the throne.
 function pretenderRevolt({
 	state,
 	realm,
-	seat,
-	supportingSeats,
-	supportingHolders,
-	seatHolder,
-	pretender,
-	restoration,
+	dynasty,
+	supporters,
 	rng,
-}: PretenderParams): void {
-	if (
-		seat < 0 ||
-		!STATE_TITLES.isDistrictSeat({ state, seat }) ||
-		FIELDS.prov.parent.get({ state, p: seat }) !== realm ||
-		state.people.rulerOf[seat] < 0 ||
-		state.people.rulerOf[seat] !== seatHolder
-	)
-		return
+}: PretenderRevoltParams): void {
+	const seats = SUCCESSION_SYSTEMS.districts({ state, realm })
+		.map((seat) => ({
+			seat,
+			population: STATE.getNationPopulation({ state, root: seat }),
+		}))
+		.sort((a, b) => b.population - a.population || a.seat - b.seat)
+		.map(({ seat }) => seat)
+	const [leader, ...others] = seats
+	if (leader === undefined) return
+	STATE.releaseFaction({
+		state,
+		p: leader,
+		supporters: others.filter(() => rng.random() < supporters),
+		ruler: { dynasty, age: "fresh", claim: PRETENDER_CLAIM },
+		rng,
+	})
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
 		data: {
 			overlord: realm,
-			subject: seat,
+			subject: leader,
 			goal: "throne",
 			succession: true,
-			pretender,
-			restoration,
+			pretender: true,
+			...STATE_RULERS.noteFields({
+				prefix: "pretender",
+				ref: STATE_RULERS.ref({
+					state,
+					ruler: STATE_RULERS.read({ state, p: leader }),
+				}),
+			}),
 		},
 	})
-	STATE.releaseFaction({
-		state,
-		p: seat,
-		supporters: supportingSeats.filter(
-			(seat, index) =>
-				STATE_TITLES.isDistrictSeat({ state, seat }) &&
-				state.parentCurrent[seat] === realm &&
-				state.people.rulerOf[seat] >= 0 &&
-				state.people.rulerOf[seat] === supportingHolders[index],
-		),
-		rng,
-		reason: restoration ? "restoration" : "rebellion",
-	})
-	if (state.people.rulerOf[seat] !== pretender) {
-		STATE.installRuler({
-			state,
-			p: seat,
-			person: pretender,
-			claim: RESTORED_CLAIM,
-			reason: restoration ? "restoration" : "rebellion",
-		})
-		STATE.scheduleSuccession({ state, p: seat })
-	}
-	WAR.start({ state, attacker: seat, defender: realm, rng, goal: "throne" })
+	WAR.start({ state, attacker: leader, defender: realm, rng, goal: "throne" })
 	STATE.fixConnections({ state, nation: realm, rng })
-}
-
-function restore({ state, realm, rng }: RealmRngParams): void {
-	const revolt = RESTORATION.attempt({ state, realm, rng })
-	if (revolt)
-		pretenderRevolt({
-			state,
-			realm,
-			seat: revolt.seat,
-			supportingSeats: revolt.supportingSeats,
-			supportingHolders: revolt.supportingSeats.map(
-				(seat) => state.people.rulerOf[seat],
-			),
-			seatHolder: state.people.rulerOf[revolt.seat],
-			pretender: revolt.claimant,
-			restoration: true,
-			rng,
-		})
 }
 
 // Each district re-tests its rebellion threat when the crown changes hands; the
@@ -136,14 +91,9 @@ function weakCrownRevolt({ state, realm, claim, rng }: WeakCrownParams): void {
 	const laxity =
 		WEAK_CLAIM_LAXITY * (MAX_CLAIM - claim) +
 		(REGENCY.weak({ state, realm }) ? REGENCY.laxity : 0)
-	const districts = rng
-		.shuffle(STATE.getChildren({ state, p: realm }))
-		.filter(
-			(seat) =>
-				STATE_TITLES.isDistrictSeat({ state, seat: seat }) &&
-				state.people.rulerOf[seat] >= 0,
-		)
-	for (const subject of districts)
+	for (const subject of rng.shuffle(
+		SUCCESSION_SYSTEMS.districts({ state, realm }),
+	))
 		if (
 			WAR.rebel({
 				state,
@@ -158,300 +108,220 @@ function weakCrownRevolt({ state, realm, claim, rng }: WeakCrownParams): void {
 	STATE.fixConnections({ state, nation: realm, rng })
 }
 
+// The marriage partner whose ruler's realm still stands as it was presses the
+// claim of a minor's crown.
 function pressForeignClaim({
 	state,
 	realm,
 	claimant,
 	rng,
-}: PressForeignClaimParams): void {
+}: ForeignClaimParams): void {
 	if (
-		claimant < 0 ||
-		state.people.rulerOf[realm] === claimant ||
-		!SUCCESSION_SYSTEMS.inheritable({ state, realm, person: claimant })
+		!STATE.isSovereign({ state, p: claimant.realm }) ||
+		state.leaderRuntime.rulerId[claimant.realm] !== claimant.ruler.rulerId ||
+		STATE.isPressing({ state, p: claimant.realm }) ||
+		STATE.isPressing({ state, p: realm }) ||
+		!STATE.canUnite({ state, a: realm, b: claimant.realm })
 	)
 		return
-	const crowns = state.people.persons.heldSeats[claimant].filter((seat) =>
-		STATE.isSovereign({ state, p: seat }),
-	)
-	if (crowns.length !== 1) return
-	WAR.pressClaim({
-		state,
-		attacker: crowns[0],
-		defender: realm,
-		claimant,
-		rng,
-	})
+	WAR.pressClaim({ state, attacker: claimant.realm, defender: realm, rng })
 }
 
-function runSeatSuccession({
+// Who takes the throne. A daughter's line brings the crown through a marriage:
+// the partner's own ruler, forming a union, or a ruler of the partner's house.
+function successorOf({
 	state,
-	province,
+	realm,
+	late,
+	partners,
+	choice,
+	rng,
+}: SuccessorParams): Successor {
+	if (choice.house === "other" && partners.length > 0) {
+		const partner = rng.choice(partners)
+		if (
+			rng.random() < UNION_INHERIT_CHANCE &&
+			!STATE.isPressing({ state, p: partner.realm }) &&
+			!STATE.isPressing({ state, p: realm }) &&
+			STATE.canUnite({ state, a: realm, b: partner.realm })
+		)
+			return { ruler: partner.ruler, union: partner }
+		return {
+			ruler: STATE_RULERS.draw({
+				state,
+				p: realm,
+				dynasty: partner.ruler.dynasty,
+				age: choice.age,
+				rng,
+			}),
+			union: null,
+		}
+	}
+	return {
+		ruler: STATE_RULERS.draw({
+			state,
+			p: realm,
+			dynasty: choice.house === "same" ? late.dynasty : -1,
+			age: choice.age,
+			rng,
+		}),
+		union: null,
+	}
+}
+
+function runSuccession({
+	state,
+	realm,
 	leaderIdx,
 	rng,
-}: RunSeatSuccessionParams): void {
-	if (state.leaderRuntime.idx[province] !== leaderIdx) return
-	REGENCY.end({ state, realm: province, cause: "death" })
-	if (!STATE.isSovereign({ state, p: province })) {
-		PEOPLE.vacate({
-			people: state.people,
-			seat: province,
-			reason: "succession",
-		})
+}: RunSuccessionParams): void {
+	if (
+		state.leaderRuntime.idx[realm] !== leaderIdx ||
+		!STATE.isSovereign({ state, p: realm }) ||
+		STATE.isUnionJunior({ state, p: realm }) ||
+		!STATE_RULERS.has({ state, p: realm })
+	)
 		return
-	}
-
-	const dying = state.people.rulerOf[province]
-	const previousHouse = dying >= 0 ? state.people.persons.dynasty[dying] : -1
-	const elected =
-		GOVERNMENT.successionOfIndex(state.governmentType[province]) === "election"
-	const choice = SUCCESSION_SYSTEMS.choose({
+	STATE_RULERS.endRegency({ state, realm, cause: "death" })
+	const late = STATE_RULERS.read({ state, p: realm })
+	const lateRef = STATE_RULERS.ref({ state, ruler: late })
+	const partners = ROYAL_MARRIAGE.partnersOf({ state, realm })
+	const choice = SUCCESSION_SYSTEMS.choose({ state, realm, rng })
+	const successor = successorOf({ state, realm, late, partners, choice, rng })
+	const interregnum = choice.interregnum
+		? INTERREGNUM.begin({ state, realm, late: lateRef, rng })
+		: null
+	STATE.seatRuler({
 		state,
-		realm: province,
-		dying,
+		p: realm,
+		ruler: successor.ruler,
+		claim: choice.claim,
+		natural: true,
 		rng,
 	})
-	const interregnum = choice.interregnum
-		? INTERREGNUM.begin({ state, realm: province, dying, rng })
-		: null
-	const supportingHolders = choice.supportingSeats.map(
-		(seat) => state.people.rulerOf[seat],
-	)
-	const seatHolder = state.people.rulerOf[choice.pretenderSeat]
-
-	const primarySeat =
-		choice.heir >= 0
-			? HOLDINGS.primary({
-					people: state.people,
-					person: choice.heir,
-					ranks: state.seatRank,
-				})
-			: -1
-	if (choice.heir >= 0)
-		STATE.installRuler({
+	if (successor.union)
+		STATE.unite({
 			state,
-			p: province,
-			person: choice.heir,
+			a: realm,
+			b: successor.union.realm,
+			ruler: successor.ruler,
 			claim: choice.claim,
-			reason: "succession",
-		})
-	else
-		STATE.foundRuler({
-			state,
-			p: province,
-			age: rng.uniform(20, 50),
-			claim: choice.claim,
-			reason: "succession",
 			rng,
 		})
-	// A union junior can merge into its senior while taking the new ruler.
-	if (!STATE.isSovereign({ state, p: province })) return
-
+	const successorRef = STATE_RULERS.ref({ state, ruler: successor.ruler })
 	state.events.push({
 		tag: "succession",
 		time: state.time,
 		data: {
-			nation: province,
+			nation: realm,
 			leader: leaderIdx,
-			successor: state.leaderRuntime.idx[province],
-			dying,
-			cause: state.successionContext?.cause ?? "natural",
+			successor: state.leaderRuntime.idx[realm],
 			claim: choice.claim,
-			foreignClaimant: choice.foreignClaimant,
-			system: GOVERNMENT.successionOfIndex(state.governmentType[province]),
+			system: choice.system,
+			house: choice.house,
 			interregnum: choice.interregnum,
+			minor: state.regency[realm] === 1,
+			cause: "natural",
+			...STATE_RULERS.noteFields({ prefix: "dying", ref: lateRef }),
+			...STATE_RULERS.noteFields({ prefix: "heir", ref: successorRef }),
 		},
 	})
-
-	STATE.scheduleSuccession({ state, p: province })
-	if (interregnum)
-		INTERREGNUM.finish({
-			run: interregnum,
-			ruler: state.people.rulerOf[province],
-		})
-	// Regents are chosen once a partition's seating is final, and a realm that
-	// was divided among its heirs or broken up by an interregnum sees no
-	// succession revolt.
+	if (interregnum) INTERREGNUM.finish({ run: interregnum, ruler: successorRef })
 	const divided =
 		PARTITION.divide({
 			state,
-			realm: province,
-			dying,
-			primary: state.people.rulerOf[province],
-			primarySeat,
+			realm,
+			juniors: choice.juniors,
+			late: lateRef,
+			primary: successorRef,
 			rng,
 		}) > 0 || interregnum !== null
-	REGENCY.start({ state, realm: province })
-
-	if (divided) REGENCY.review({ state })
-	else {
-		if (choice.pretenderSeat >= 0)
+	if (!divided) {
+		const minor = state.regency[realm] === 1
+		const pretender = SUCCESSION_SYSTEMS.pretender({
+			state,
+			realm,
+			system: choice.system,
+			disputed: minor || choice.daughterLine,
+		})
+		if (
+			SUCCESSION_SYSTEMS.districts({ state, realm }).length > 0 &&
+			rng.random() < pretender.chance
+		)
 			pretenderRevolt({
 				state,
-				realm: province,
-				seat: choice.pretenderSeat,
-				supportingSeats: choice.supportingSeats,
-				supportingHolders,
-				seatHolder,
-				pretender: choice.pretender,
-				restoration: false,
+				realm,
+				dynasty: choice.system === "election" ? -1 : late.dynasty,
+				supporters: pretender.supporters,
 				rng,
 			})
-		else weakCrownRevolt({ state, realm: province, claim: choice.claim, rng })
-		restore({ state, realm: province, rng })
-		pressForeignClaim({
-			state,
-			realm: province,
-			claimant: choice.foreignClaimant,
-			rng,
-		})
+		else weakCrownRevolt({ state, realm, claim: choice.claim, rng })
+		if (minor && partners.length > 0)
+			pressForeignClaim({ state, realm, claimant: rng.choice(partners), rng })
 	}
-
-	const transition = STATE_GOVERNMENT.accede({
+	ACCESSION.settle({
 		state,
-		realm: province,
-		provinces: STATE.getNationProvinces({ state, root: province }),
+		realm,
 		rng,
-		knowledge: ECONOMY.realmKnowledge({ state, p: province }),
-		elected,
-		previousHouse,
+		elected: choice.system === "election",
+		previousHouse: late.dynasty,
 	})
-	if (transition)
-		STATE.reconcileGovernment({ state, realm: province, transition, rng })
-	CORONATION.hold({ state, realm: province, rng })
 }
 
-// The dead person's seats, frozen once and walked in order; a seat that has
-// since changed hands is skipped.
-function succeedPerson({
-	state,
-	person,
-	context,
-	rng,
-}: SucceedPersonParams): void {
-	const seats = HOLDINGS.ordered({
-		people: state.people,
-		person,
-		ranks: state.seatRank,
-	})
-	state.successionContext = context
-	try {
-		for (const seat of seats) {
-			if (state.people.rulerOf[seat] !== person) continue
-			if (STATE.isSovereign({ state, p: seat }))
-				runSeatSuccession({
-					state,
-					province: seat,
-					leaderIdx: state.leaderRuntime.idx[seat],
-					rng,
-				})
-			else if (STATE_TITLES.isDistrictSeat({ state, seat }))
-				DISTRICTS.succeed({ state, seat, rng })
-			else PEOPLE.vacate({ people: state.people, seat, reason: "succession" })
-		}
-	} finally {
-		state.successionContext = null
-	}
-}
-
-function usurpChance({ state, realm }: RealmParams): number {
-	const regency = REGENCY.active({ state, realm })
-	if (!regency) return 0
-	const personality = GOVERNOR.has({ state, realm, trait: "ambitious" })
-		? 2
-		: GOVERNOR.has({ state, realm, trait: "content" })
-			? 0
-			: 1
-	const factor =
-		personality *
-		GOVERNOR.factor({
-			attribute: "intrigue",
-			value: GOVERNOR.attribute({ state, realm, attribute: "intrigue" }),
-		})
-	if (regency.kind === "protector") return USURP_CHANCE * factor
-	if (regency.kind !== "relative") return 0
-	const seat = SUCCESSION_SYSTEMS.localDistrict({
-		state,
-		realm,
-		person: regency.regent,
-	})
-	return seat >= 0 && state.parentCurrent[seat] === realm
-		? 2 * USURP_CHANCE * factor
-		: USURP_CHANCE * factor
-}
-
-// The regent takes the throne and the child lives on as the realm's deposed
-// claimant. A lord protector's own house takes the crown, and their district
-// passes to it.
+// The regency council's protector takes the throne. A kinsman of the ward keeps
+// the house's claim; any other protector founds a house with none.
 function usurp({ state, realm, rng }: RealmRngParams): void {
-	const regency = REGENCY.active({ state, realm })
-	if (!regency) return
-	const { regent, ward, kind } = regency
-	const people = state.people
-	const district = SUCCESSION_SYSTEMS.localDistrict({
+	const ward = STATE_RULERS.read({ state, p: realm })
+	const wardRef = STATE_RULERS.ref({ state, ruler: ward })
+	const kinsman = rng.random() < USURPER_KINSMAN_SHARE
+	STATE_RULERS.endRegency({ state, realm, cause: "usurpation" })
+	const usurper = STATE_RULERS.draw({
 		state,
-		realm,
-		person: regent,
+		p: realm,
+		dynasty: kinsman ? ward.dynasty : -1,
+		age: "fresh",
+		rng,
 	})
-	REGENCY.end({ state, realm, cause: "usurpation" })
+	const claim = kinsman ? KINSMAN_USURPER_CLAIM : 0
 	state.events.push({
 		tag: "usurpation",
 		time: state.time,
 		data: {
 			nation: realm,
-			regent,
-			ward,
-			kind,
-			regencyCause: regency.cause,
-			regentIntrigue: GOVERNOR.attribute({
-				state,
-				realm,
-				attribute: "intrigue",
-			}),
-			regentTraits: TRAITS.active({
-				character: CHARACTER.of({ people, person: regent }),
-				age: state.time / STATE.yearMs - people.persons.birth[regent],
+			kinsman,
+			...STATE_RULERS.noteFields({ prefix: "ward", ref: wardRef }),
+			...STATE_RULERS.noteFields({
+				prefix: "usurper",
+				ref: STATE_RULERS.ref({ state, ruler: usurper }),
 			}),
 		},
 	})
-	if (kind === "protector" && district >= 0)
-		PEOPLE.vacate({ people, seat: district, reason: "usurpation" })
-	const claim = kind === "relative" ? KINSMAN_USURPER_CLAIM : 0
-	OVERTHROW.seize({
+	STATE.seatRuler({
 		state,
-		realm,
-		person: regent,
+		p: realm,
+		ruler: usurper,
 		claim,
-		deposed: ward,
-		reason: "usurpation",
+		natural: false,
+		rng,
 	})
-	OPINION.remember({
-		people,
-		observer: ward,
-		target: regent,
-		reason: "usurpation",
-		time: state.time / STATE.yearMs,
-	})
-	if (kind === "protector") weakCrownRevolt({ state, realm, claim, rng })
-	const transition = STATE_GOVERNMENT.accede({
+	if (!kinsman) weakCrownRevolt({ state, realm, claim, rng })
+	ACCESSION.settle({
 		state,
 		realm,
-		provinces: STATE.getNationProvinces({ state, root: realm }),
 		rng,
-		knowledge: ECONOMY.realmKnowledge({ state, p: realm }),
 		elected: false,
-		previousHouse: people.persons.dynasty[ward],
+		previousHouse: ward.dynasty,
 	})
-	if (transition) STATE.reconcileGovernment({ state, realm, transition, rng })
-	CORONATION.hold({ state, realm, rng })
 }
 
 function runYear({ state, rng }: RunYearParams): void {
-	REGENCY.review({ state })
-	for (const realm of [...state.people.regencies.keys()]) {
-		const chance = usurpChance({ state, realm })
-		if (chance > 0 && rng.random() < chance) usurp({ state, realm, rng })
-	}
-	for (const realm of RESTORATION.due({ state })) restore({ state, realm, rng })
+	for (let realm = 0; realm < state.P; realm++)
+		if (
+			state.regency[realm] &&
+			STATE.isSovereign({ state, p: realm }) &&
+			rng.random() < USURP_CHANCE
+		)
+			usurp({ state, realm, rng })
 	for (const realm of state.electionStreaks.keys()) {
 		if (!STATE.isSovereign({ state, p: realm }))
 			state.electionStreaks.delete(realm)
@@ -481,8 +351,11 @@ function runYear({ state, rng }: RunYearParams): void {
 }
 
 export const SUCCESSION = {
-	initSuccession,
-	succeedPerson,
+	runSuccession: (params: RunSuccessionParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => runSuccession(params),
+		}),
 	runYear: (params: RunYearParams) =>
 		MILITARY.mutate({ state: params.state, action: () => runYear(params) }),
 }

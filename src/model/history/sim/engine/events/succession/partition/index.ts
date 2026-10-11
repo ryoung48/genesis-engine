@@ -1,101 +1,28 @@
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
 import { PARTITION_SHARES } from "@/model/history/sim/engine/events/succession/partition/shares"
 import { PARTITION_TITLES } from "@/model/history/sim/engine/events/succession/partition/titles"
 import type {
 	AllocateParams,
-	BranchParams,
 	DivideParams,
-	JuniorHeirsParams,
 	NoteParams,
 	PartitionNoteData,
 	PartitionRealmKind,
 	PartitionRun,
 	PartitionShare,
-	PartitionSkippedNoteData,
-	PartitionSnapshot,
 	PieceParams,
-	PrimarySeatParams,
-	ProjectPartitionParams,
 	RealmParams,
 	ReleaseParams,
 	SkipParams,
 } from "@/model/history/sim/engine/events/succession/partition/types"
-import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { SUCCESSION_SYSTEMS } from "@/model/history/sim/engine/events/succession/systems"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
-import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { PEOPLE } from "@/model/history/sim/people"
-import { HEIRS } from "@/model/history/sim/people/heirs"
-import { HOLDINGS } from "@/model/history/sim/people/holdings"
 import { ERAS } from "@/model/society/eras"
 
-function now(state: HistoryState): number {
-	return state.time / STATE.yearMs
-}
+const HEIR_CLAIM = 3
 
-function branchOf({ people, dying, person }: BranchParams): number {
-	if (dying < 0) return -1
-	const table = people.persons
-	const seen = new Set<number>()
-	const stack = [person]
-	while (stack.length > 0) {
-		const current = stack.pop() as number
-		if (current < 0 || seen.has(current)) continue
-		if (table.birth[current] <= table.birth[dying]) continue
-		seen.add(current)
-		if (table.father[current] === dying || table.mother[current] === dying)
-			return current
-		stack.push(table.father[current], table.mother[current])
-	}
-	return -1
-}
-
-function juniorHeirs({
-	state,
-	realm,
-	dying,
-	branch,
-}: JuniorHeirsParams): number[] {
-	const people = state.people
-	const preference = SUCCESSION_SYSTEMS.preferenceOf({ state, realm })
-	const heirs = HEIRS.line({
-		people,
-		dying,
-		time: now(state),
-		preference,
-		eligible: (person) => SUCCESSION_SYSTEMS.available({ state, person }),
-	})
-		.filter((entry) => entry.branch !== branch && entry.heir >= 0)
-		.map((entry) => entry.heir)
-	if (preference === "none") return heirs
-	const wanted = preference === "male" ? 0 : 1
-	const preferred = heirs.filter((heir) => people.persons.sex[heir] === wanted)
-	return preferred.length > 0 ? preferred : heirs
-}
-
-function vacatePrimarySeat({
-	state,
-	realm,
-	primary,
-	primarySeat,
-}: PrimarySeatParams): void {
-	if (
-		primarySeat < 0 ||
-		primarySeat === realm ||
-		STATE.isSovereign({ state, p: primarySeat }) ||
-		state.people.rulerOf[primarySeat] !== primary
-	)
-		return
-	PEOPLE.vacate({
-		people: state.people,
-		seat: primarySeat,
-		reason: "partition",
-	})
-}
-
-function snapshot({ state, realm }: RealmParams): PartitionSnapshot {
+function snapshot({ state, realm }: RealmParams) {
 	const provinces = STATE.getNationProvinces({ state, root: realm }).filter(
 		(p) => !state.desolate[p],
 	)
@@ -106,16 +33,14 @@ function snapshot({ state, realm }: RealmParams): PartitionSnapshot {
 		provinces,
 		population,
 		topTier: STATE_TITLES.topTier({ state, realm }),
-		seats: provinces.filter((p) => p !== realm && state.people.rulerOf[p] >= 0),
 		titleHolder: state.titles.holder.slice(0, state.titles.count),
 	}
 }
 
 function districtSeats({ state, realm }: RealmParams): number[] {
 	const population = new Map<number, number>()
-	const seats = STATE.getChildren({ state, p: realm }).filter(
-		(seat) =>
-			STATE_TITLES.isDistrictSeat({ state, seat }) && state.seatRank[seat] > 0,
+	const seats = SUCCESSION_SYSTEMS.districts({ state, realm }).filter(
+		(seat) => state.seatRank[seat] > 0,
 	)
 	for (const seat of seats)
 		population.set(seat, STATE.getNationPopulation({ state, root: seat }))
@@ -131,51 +56,30 @@ function allocate({
 	state,
 	realm,
 	unseated,
-	heirs,
-	excludedSeat,
+	count,
 }: AllocateParams): PartitionShare[] {
-	if (heirs.length === 0) return []
-	const people = state.people
+	if (count === 0) return []
 	const { shares, allocated, remaining } = PARTITION_TITLES.allocate({
 		state,
 		realm,
-		heirs,
+		count,
 	})
-	if (remaining.length === 0) return shares
-	const seats = districtSeats({ state, realm }).filter(
-		(seat) => seat !== excludedSeat && !allocated.has(seat),
-	)
-	const held = new Map<number, number>()
-	for (const heir of remaining) {
-		const seat =
-			seats.find((seat) => people.persons.heldSeats[heir].includes(seat)) ?? -1
-		if (seats.includes(seat) && people.rulerOf[seat] === heir)
-			held.set(heir, seat)
-	}
-	const reserved = new Set(held.values())
-	const free = seats.filter(
+	if (remaining === 0) return shares
+	const free = districtSeats({ state, realm }).filter(
 		(seat) =>
-			!reserved.has(seat) && !PARTITION_SHARES.occupied({ state, seat }),
+			!allocated.has(seat) && !PARTITION_SHARES.occupied({ state, seat }),
 	)
-	for (const heir of remaining) {
-		const own = held.get(heir)
-		if (own !== undefined) {
-			if (PARTITION_SHARES.occupied({ state, seat: own }))
-				unseated.push({ heir, reason: "reserved seat unavailable" })
-			else shares.push({ heir, seat: own, kind: "district", supporters: [] })
-			continue
-		}
+	for (let slot = 0; slot < remaining; slot++) {
 		const seat = free.shift()
-		if (seat === undefined) unseated.push({ heir, reason: "no seat" })
-		else shares.push({ heir, seat, kind: "district", supporters: [] })
+		if (seat === undefined) unseated.push({ reason: "no seat" })
+		else shares.push({ seat, kind: "district", supporters: [] })
 	}
 	return shares
 }
 
 function release({ run, share }: ReleaseParams): void {
 	const { state, realm, rng } = run
-	const { heir, seat } = share
-	const people = state.people
+	const { seat } = share
 	if (
 		(share.kind === "district"
 			? !STATE_TITLES.isDistrictSeat({ state, seat }) ||
@@ -186,41 +90,25 @@ function release({ run, share }: ReleaseParams): void {
 			(p) =>
 				state.sovereignCurrent[p] !== realm ||
 				PARTITION_SHARES.occupied({ state, seat: p }),
-		) ||
-		!SUCCESSION_SYSTEMS.available({ state, person: heir })
-	) {
-		run.unseated.push({ heir, reason: "share dropped" })
-		return
-	}
-	const other = HOLDINGS.primary({
-		people,
-		person: heir,
-		ranks: state.seatRank,
-	})
-	if (other >= 0 && other !== seat)
-		PEOPLE.vacate({ people, seat: other, reason: "partition" })
-	const holder = people.rulerOf[seat]
-	if (holder !== heir) {
-		if (
-			holder >= 0 &&
-			people.persons.heldSeats[holder].includes(seat) &&
-			PEOPLE.aliveAt({ people, person: holder, time: now(state) })
 		)
-			run.displaced.push({
-				person: holder,
-				seat,
-				rank: state.districtRank[seat],
-			})
-		DISTRICTS.install({ state, seat, person: heir, reason: "partition" })
+	) {
+		run.unseated.push({ reason: "share dropped" })
+		return
 	}
 	STATE.releaseFaction({
 		state,
 		p: seat,
 		supporters: share.supporters,
+		ruler: { dynasty: run.late.dynasty, age: "inherited", claim: HEIR_CLAIM },
 		rng,
-		reason: "partition",
 	})
-	run.released.push(share)
+	run.released.push({
+		...share,
+		ruler: STATE_RULERS.ref({
+			state,
+			ruler: STATE_RULERS.read({ state, p: seat }),
+		}),
+	})
 }
 
 function cutOffPieces({ state, realm }: RealmParams): number[] {
@@ -285,42 +173,22 @@ function resolveCutOff(run: PartitionRun): void {
 	STATE.fixConnections({ state, nation: realm, rng })
 }
 
-function reseat(run: PartitionRun): void {
-	const { state, snapshot: before } = run
-	const people = state.people
-	for (const check of DISTRICTS.revalidate({ state, seats: before.seats }))
-		if (
-			check.standing === "vacated" &&
-			people.persons.heldSeats[check.holder].length === 0 &&
-			PEOPLE.aliveAt({ people, person: check.holder, time: now(state) })
-		)
-			run.displaced.push({
-				person: check.holder,
-				seat: check.seat,
-				rank: check.rank,
-			})
-	run.moves.push(
-		...DISTRICTS.reseat({
-			state,
-			displaced: run.displaced,
-			reason: "partition",
-		}),
-	)
-}
-
-function skip({ state, realm, dying, primary, reason }: SkipParams): number {
-	const data: PartitionSkippedNoteData = {
-		nation: realm,
-		dying,
-		primary,
-		government: ERAS.governmentTypes[state.governmentType[realm]],
-		reason,
-	}
-	state.events.push({ tag: "partition skipped", time: state.time, data })
+function skip({ state, realm, late, primary, reason }: SkipParams): number {
+	state.events.push({
+		tag: "partition skipped",
+		time: state.time,
+		data: {
+			nation: realm,
+			government: ERAS.governmentTypes[state.governmentType[realm]],
+			reason,
+			...STATE_RULERS.noteFields({ prefix: "late", ref: late }),
+			...STATE_RULERS.noteFields({ prefix: "primary", ref: primary }),
+		},
+	})
 	return 0
 }
 
-function note({ run, dying, primary }: NoteParams): void {
+function note({ run, primary }: NoteParams): void {
 	const { state, realm, snapshot: before } = run
 	const population = new Map<number, number>()
 	const provinces = new Map<number, number>()
@@ -348,13 +216,10 @@ function note({ run, dying, primary }: NoteParams): void {
 			titlesLost.push(title)
 	const data: PartitionNoteData = {
 		nation: realm,
-		dying,
-		primary,
 		government: ERAS.governmentTypes[state.governmentType[realm]],
 		primaryRankBefore: before.topTier,
 		populationBefore: before.population,
 		provincesBefore: before.provinces.length,
-		heirs: run.released.map((share) => share.heir),
 		seats: heirSeats,
 		shareKind: run.released.map((share) => share.kind),
 		realms,
@@ -364,16 +229,17 @@ function note({ run, dying, primary }: NoteParams): void {
 		realmRank: realms.map((root) =>
 			STATE_TITLES.topTier({ state, realm: root }),
 		),
-		adminPersons: run.moves.map((move) => move.person),
-		adminFrom: run.moves.map((move) => move.from),
-		adminTo: run.moves.map((move) => move.to),
-		adminBumped: run.moves.map((move) => Number(move.bumped)),
 		joinedDistricts: run.joined.map((join) => join.district),
 		joinedRealms: run.joined.map((join) => join.realm),
-		unseatedHeirs: run.unseated.map((entry) => entry.heir),
 		unseatedReasons: run.unseated.map((entry) => entry.reason),
 		titlesLost,
 		titlesLostTier: titlesLost.map((title) => state.titles.tier[title]),
+		...STATE_RULERS.noteFields({ prefix: "late", ref: run.late }),
+		...STATE_RULERS.noteFields({ prefix: "primary", ref: primary }),
+		...STATE_RULERS.noteColumns({
+			prefix: "heir",
+			refs: run.released.map((share) => share.ruler),
+		}),
 	}
 	state.events.push({ tag: "partition", time: state.time, data })
 }
@@ -381,9 +247,9 @@ function note({ run, dying, primary }: NoteParams): void {
 function divide({
 	state,
 	realm,
-	dying,
+	juniors,
+	late,
 	primary,
-	primarySeat,
 	rng,
 }: DivideParams): number {
 	if (
@@ -391,69 +257,30 @@ function divide({
 		!STATE.isSovereign({ state, p: realm })
 	)
 		return 0
-	const branch = branchOf({ people: state.people, dying, person: primary })
-	if (branch < 0)
-		return skip({ state, realm, dying, primary, reason: "not child line" })
-	const heirs = juniorHeirs({ state, realm, dying, branch })
-	if (heirs.length === 0)
-		return skip({ state, realm, dying, primary, reason: "no junior heir" })
-	vacatePrimarySeat({ state, realm, primary, primarySeat })
+	if (juniors === 0)
+		return skip({ state, realm, late, primary, reason: "no junior heir" })
 	const run: PartitionRun = {
 		state,
 		realm,
 		rng,
 		snapshot: snapshot({ state, realm }),
+		late,
 		released: [],
-		displaced: [],
 		unseated: [],
 		joined: [],
-		moves: [],
 	}
 	for (const share of allocate({
 		state,
 		realm,
 		unseated: run.unseated,
-		heirs,
-		excludedSeat: -1,
+		count: juniors,
 	}))
 		release({ run, share })
 	if (run.released.length === 0)
-		return skip({ state, realm, dying, primary, reason: "no free seat" })
+		return skip({ state, realm, late, primary, reason: "no free seat" })
 	resolveCutOff(run)
-	reseat(run)
-	for (const { seat } of run.released) REGENCY.start({ state, realm: seat })
-	note({ run, dying, primary })
+	note({ run, primary })
 	return run.released.length
 }
 
-function project({
-	state,
-	realm,
-	dying,
-	primary,
-}: ProjectPartitionParams): PartitionShare[] {
-	if (!GOVERNMENT.partitionsOfIndex(state.governmentType[realm])) return []
-	const branch = branchOf({ people: state.people, dying, person: primary })
-	if (branch < 0) return []
-	const held = HOLDINGS.primary({
-		people: state.people,
-		person: primary,
-		ranks: state.seatRank,
-	})
-	const excludedSeat =
-		held >= 0 &&
-		held !== realm &&
-		!STATE.isSovereign({ state, p: held }) &&
-		state.people.rulerOf[held] === primary
-			? held
-			: -1
-	return allocate({
-		state,
-		realm,
-		unseated: [],
-		excludedSeat,
-		heirs: juniorHeirs({ state, realm, dying, branch }),
-	})
-}
-
-export const PARTITION = { divide, project }
+export const PARTITION = { divide }

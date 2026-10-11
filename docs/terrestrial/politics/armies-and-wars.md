@@ -59,7 +59,7 @@ Coalition battle attendance gives allies diminishing returns beyond the lead's o
 | Interregnum | When a heirless hereditary realm breaks into freed districts, each freed realm declares a conquest war on its weakest bordering freed realm (see [interregnum](government-and-succession.md#interregnum)). |
 | Peaceful annexation | Before a declared war starts, a target whose threat is below 0.05 submits with 25% chance: it is annexed whole, with no war. |
 
-A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is deposed. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
+A peaceful annexation is not a war: it has no war record, battles or truce, and does not count in war statistics. The annexed realm's subject relations are released, its provinces are repartitioned under the annexer, and its ruler is gone. In the record, each annexed province's ownership change carries the comment "X was peacefully annexed by Y", and both realms' timelines get an Annexation row with the same sentence.
 
 Rebellions have their own triggers, threat and endings; see [rebellion](rebellions-and-throne-wars.md).
 
@@ -329,21 +329,3 @@ Raids keep the squared force share and their own random loss shares (10% × forc
 These rules describe the procedural `:history` simulation. Imported historical wars are translated into history records and do not run through this live army and battle engine; their battles have no simulated kind, and their siege lists are empty.
 
 Rebellion previews calculate each prospective territory with the same economy and recruitment formulas used after release. Crown territory excludes the departing subject; both armies use their own knowledge-derived limits. Potential support and the existing-war discount remain preview estimates.
-
-## Attribute and trait effects
-
-Each side's war leader supplies the field commander. Its governor's martial attribute multiplies field strength by `clamp(1 + 0.025 × (martial - 5.4), 0.87, 1.21)`, alongside terrain and battle-kind modifiers, in every field battle and whoever leads: a regent's martial counts for a regent-governed realm. Sieges and raids do not use commander character. See [attributes and traits](../people/attributes-and-traits.md) for the full rules.
-
-## Command
-
-Code: `src/model/history/sim/engine/events/battle/command` (`COMMAND`).
-
-Before each field battle, each side's ruler may take the field in person (`COMMAND.lead`). Leading is separate from the governor's martial multiplier above and adds only a risk and one penalty.
-
-- **Who leads.** The realm's ruler, if 16 or older, ruling without a regent, with effective health above 3, and not Infirm, Blind or Incapable ([health](../people/health-and-mortality.md)).
-- **Once a year.** A ruler leads at most one field battle a calendar year (`ledYear`, set when they are chosen, whether or not they survive). The simulation does not track where a ruler is, so one battle a year stands for one campaign with one army, and it bounds the yearly risk of a realm fighting on several fronts.
-- **Fragile Bones.** The leader's army is multiplied by `clamp(1 + 0.01 × advantage, 0.5, 1)`, where advantage is the condition's summed rows (−3 to −24). An army whose ruler does not lead takes no such penalty. Leading also makes the condition's next yearly progression more likely to be its largest gain; the note is used by one pulse.
-- **Risk.** One hash roll per led battle (channel 1040, salted by the battle's time). The leader is killed if it is below `(5 / 1040) × max(0.1, (30 − prowess) / 30) × temper × odds`: temper is 2 for Brave and 0.5 for Craven, and odds is `min(1, 1.4 × enemy / own)` for the side with the larger army, else 1. At prowess 6 with neither trait that is 0.385% per led battle. The 5 and 1040 are CK3's commander event weights; its wounds and maimings are not modelled, and its precondition that the commander is already wounded or weak is dropped with them.
-- **Death.** A killed leader dies once the battle is settled, with cause `battle`; their succession follows at once and any pending natural death goes stale ([families](../people/families-and-lifecycle.md#death)).
-
-The `battle` note carries each side's leader and whether they fell.

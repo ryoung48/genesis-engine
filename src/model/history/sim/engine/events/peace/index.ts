@@ -17,7 +17,7 @@ import { WAR_SCORE } from "@/model/history/sim/engine/events/war/score"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
-import { PEOPLE } from "@/model/history/sim/people"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 
 const INDEMNITY_SHARE = 0.1
 const INDEMNITY_YEARS = 5
@@ -243,12 +243,10 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 	SIEGE.end({ state, war, outcome: "lifted", reason: "war ended" })
 	const score = WAR_SCORE.current({ state, war })
 	let result = terms({ state, war, reason })
-	const claimant = state.people.rulerOf[war.attacker]
+	const claimant = STATE_RULERS.has({ state, p: war.attacker })
+		? STATE_RULERS.read({ state, p: war.attacker })
+		: null
 	const claim = state.leaderClaimCurrent[war.attacker]
-	const deposed =
-		state.people.rulerOf[war.defender] >= 0
-			? state.people.rulerOf[war.defender]
-			: war.originalCrownRuler
 	if (
 		result.outcome === "indemnity" &&
 		rng.random() >= indemnityChance({ state, war })
@@ -291,15 +289,16 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 		transferred: result.transferred,
 		receiver: result.receiver,
 	})
-	if (result.outcome === "regime change" && claimant >= 0) {
-		PEOPLE.vacate({
-			people: state.people,
-			seat: war.attacker,
-			reason: "regime change",
+	if (result.outcome === "regime change" && claimant)
+		OVERTHROW.enthrone({
+			state,
+			war,
+			ruler: claimant,
+			claim,
+			union: false,
+			rng,
 		})
-		OVERTHROW.enthrone({ state, war, claimant, claim, deposed, rng })
-	}
-	if (result.outcome === "union") {
+	if (result.outcome === "union" && claimant) {
 		STATE.setRelation({
 			state,
 			a: war.attacker,
@@ -309,18 +308,12 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 		OVERTHROW.enthrone({
 			state,
 			war,
-			claimant: war.claimant,
+			ruler: claimant,
 			claim,
-			deposed,
+			union: true,
 			rng,
 		})
 	}
-	if (result.outcome === "submission")
-		PEOPLE.vacate({
-			people: state.people,
-			seat: war.attacker,
-			reason: "rebellion",
-		})
 	BACKING.repay({ state, war, outcome: result.outcome })
 	DISPOSITION.afterWar({ state, war, outcome: result.outcome })
 	const parted =

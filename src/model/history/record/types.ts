@@ -8,8 +8,8 @@ import type {
 import type { Eu4ProvinceMap } from "@/model/history/earth/import/eu4-province-map/types"
 import type { Nation } from "@/model/history/earth/reference/nations/types"
 import type { LonLat } from "@/model/history/earth/types"
-import type { PeopleRecord } from "@/model/history/record/people/types"
 import type { RouteLog } from "@/model/history/record/routes/types"
+import type { RulerRef } from "@/model/history/record/rulers/types"
 import type { TreasuryBudget } from "@/model/history/sim/engine/economy/treasury-budget/types"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import type {
@@ -21,10 +21,11 @@ import type { GenesisProvinces } from "@/model/society/types"
 export interface RevoltComment {
 	nation: string
 	cause: string
-	person: number
+	// The pretender or heir the revolt rose for; null for a plain revolt.
+	ruler: RulerRef | null
 	throne: boolean
-	// The ruler whose realm was divided; -1 outside a partition.
-	late: number
+	// The ruler whose realm was divided; null outside a partition.
+	late: RulerRef | null
 }
 
 export type HistoryComment = string | RevoltComment | null
@@ -64,9 +65,6 @@ export interface DiplomacyEventRecord {
 	firstId: number
 	secondId: number
 	subjectType: string | null
-	// [JUSTIFICATION] Only a procedural royal marriage names the married
-	// couple; every other event has no people.
-	spouses?: [number, number]
 }
 
 export interface WarParticipantEventRecord {
@@ -285,8 +283,6 @@ export type HistoryRecord = HistoryRecordCommon & {
 	events: HistoryEvents
 	// [JUSTIFICATION] Earth records have no de jure title layer.
 	titles: TitleBase | null
-	// [JUSTIFICATION] Earth records have no simulated people.
-	people: PeopleRecord | null
 }
 
 export interface ProvinceMeta {

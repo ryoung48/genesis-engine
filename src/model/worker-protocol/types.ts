@@ -4,7 +4,6 @@ import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
-import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
@@ -213,8 +212,8 @@ export interface SerializedGenesisWorld {
 	/** [JUSTIFICATION] Religion families are absent from worlds without procedural society generation. */
 	religionFamilies?: Int32Array
 	religionTypes?: Uint8Array
-	// [JUSTIFICATION] Earth imports and worlds without religions have no doctrines.
-	religionDoctrine?: ReligionDoctrine
+	// [JUSTIFICATION] Earth imports and worlds without religions have no gender preference.
+	religionGender?: Uint8Array
 	landmarks?: {
 		regionLandmark: Int32Array
 		type: Uint8Array

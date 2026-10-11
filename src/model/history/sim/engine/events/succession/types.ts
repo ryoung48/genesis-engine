@@ -1,21 +1,12 @@
+import type { MarriagePartner } from "@/model/history/sim/engine/events/diplomacy/marriage/types"
+import type { SuccessionChoice } from "@/model/history/sim/engine/events/succession/systems/types"
+import type { Ruler } from "@/model/history/sim/engine/state/rulers/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import type { DeathCause } from "@/model/history/sim/people/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
-export interface InitSuccessionParams {
-	state: HistoryState
-}
-
-export interface PressForeignClaimParams {
+export interface RunSuccessionParams {
 	state: HistoryState
 	realm: number
-	claimant: number
-	rng: SharedRng
-}
-
-export interface RunSeatSuccessionParams {
-	state: HistoryState
-	province: number
 	leaderIdx: number
 	rng: SharedRng
 }
@@ -25,27 +16,19 @@ export interface RunYearParams {
 	rng: SharedRng
 }
 
-export interface PretenderParams {
-	state: HistoryState
-	realm: number
-	seat: number
-	supportingSeats: number[]
-	supportingHolders: number[]
-	seatHolder: number
-	pretender: number
-	// A deposed ruler's line pressing its claim.
-	restoration: boolean
-	rng: SharedRng
-}
-
-export interface RealmParams {
-	state: HistoryState
-	realm: number
-}
-
 export interface RealmRngParams {
 	state: HistoryState
 	realm: number
+	rng: SharedRng
+}
+
+export interface PretenderRevoltParams {
+	state: HistoryState
+	realm: number
+	// Dynasty the rebel ruler is founded under; -1 for a new one.
+	dynasty: number
+	// Chance that each other district joins the revolt.
+	supporters: number
 	rng: SharedRng
 }
 
@@ -56,15 +39,24 @@ export interface WeakCrownParams {
 	rng: SharedRng
 }
 
-// One death's seat walk. Each union edge advances at most once per walk.
-export interface SuccessionContext {
-	accountedEdges: Set<string>
-	cause: DeathCause
+export interface ForeignClaimParams {
+	state: HistoryState
+	realm: number
+	claimant: MarriagePartner
+	rng: SharedRng
 }
 
-export interface SucceedPersonParams {
+export interface SuccessorParams {
 	state: HistoryState
-	person: number
-	context: SuccessionContext
+	realm: number
+	late: Ruler
+	partners: MarriagePartner[]
+	choice: SuccessionChoice
 	rng: SharedRng
+}
+
+export interface Successor {
+	ruler: Ruler
+	// The marriage partner whose living ruler takes the throne, forming a union.
+	union: MarriagePartner | null
 }

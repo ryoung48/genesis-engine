@@ -8,7 +8,6 @@ export interface InitKnowledgeParams {
 export interface AdvanceKnowledgeParams {
 	state: HistoryState
 	yearFraction: number
-	ownFactor: (sovereign: number) => number
 }
 
 export interface KnowledgeLevelParams {
@@ -73,5 +72,4 @@ export interface StepParams {
 	sovereign: Int32Array
 	yearFraction: number
 	worldKnowledge: number
-	ownFactor: (sovereign: number) => number
 }

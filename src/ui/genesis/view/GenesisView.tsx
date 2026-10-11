@@ -97,8 +97,6 @@ import { useOverlayState } from "@/ui/genesis/view/useOverlayState"
 import { useWorldDisplayData } from "@/ui/genesis/view/useWorldDisplayData"
 import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
-import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
-import { useReligionWikiData } from "@/ui/genesis/wiki-bridge/useReligionWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
@@ -308,48 +306,20 @@ export const GenesisView: React.FC<{
 	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<number | null>(
 		null,
 	)
-	// Person wiki page selection (simulated person id) -- also mutually
-	// exclusive with the pages above.
-	const [selectedWikiPersonId, setSelectedWikiPersonIdRaw] = useState<
-		number | null
-	>(null)
-	const [selectedWikiReligionId, setSelectedWikiReligionIdRaw] = useState<
-		number | null
-	>(null)
-	const setSelectedWikiReligionId = useCallback((id: number | null) => {
-		setSelectedWikiNationIdRaw(null)
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonIdRaw(null)
-		setSelectedWikiReligionIdRaw(id)
-	}, [])
 	const setSelectedWikiNationId = useCallback((id: number | null) => {
-		setSelectedWikiReligionIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonIdRaw(null)
 		setSelectedWikiNationIdRaw(id)
 	}, [])
 	const setSelectedWikiOrganizationId = useCallback((orgId: string | null) => {
-		setSelectedWikiReligionIdRaw(null)
 		setSelectedWikiNationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(orgId)
 	}, [])
 	const setSelectedWikiWarId = useCallback((warId: number | null) => {
-		setSelectedWikiReligionIdRaw(null)
 		setSelectedWikiNationIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiPersonIdRaw(null)
 		setSelectedWikiWarIdRaw(warId)
-	}, [])
-	const setSelectedWikiPersonId = useCallback((personId: number | null) => {
-		setSelectedWikiReligionIdRaw(null)
-		setSelectedWikiNationIdRaw(null)
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonIdRaw(personId)
 	}, [])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
@@ -1698,15 +1668,7 @@ export const GenesisView: React.FC<{
 	// for the same body.
 	const planetName = mainWorldSystemBody?.name || "Main World"
 
-	const religionWiki = useReligionWikiData({
-		selectedWikiReligionId,
-		world,
-		frame: history.query?.frame ?? null,
-		setSelectedWikiReligionId,
-		setSelectedWikiNationId,
-	})
 	const nationWikiData = useNationWikiData({
-		religionSelection: religionWiki.selection,
 		selectedWikiNationId,
 		world,
 		worldForDisplay,
@@ -1717,12 +1679,10 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
-		setSelectedWikiPersonId,
 		sceneRef,
 	})
 
 	const organizationWikiData = useOrganizationWikiData({
-		religionSelection: religionWiki.selection,
 		selectedWikiOrganizationId,
 		world,
 		worldForDisplay,
@@ -1734,20 +1694,8 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
-		setSelectedWikiPersonId,
 		buildOrgCategorizer,
 		sceneRef,
-	})
-
-	const personWikiData = usePersonWikiData({
-		religionSelection: religionWiki.selection,
-		selectedWikiPersonId,
-		history,
-		sceneRef,
-		setSelectedWikiNationId,
-		setSelectedWikiOrganizationId,
-		setSelectedWikiWarId,
-		setSelectedWikiPersonId,
 	})
 
 	const warWikiData = useWarWikiData({
@@ -1759,7 +1707,6 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
-		setSelectedWikiPersonId,
 		sceneRef,
 	})
 
@@ -2051,8 +1998,6 @@ export const GenesisView: React.FC<{
 						nationWiki={nationWikiData}
 						organizationWiki={organizationWikiData}
 						warWiki={warWikiData}
-						personWiki={personWikiData}
-						religionWiki={religionWiki.data}
 					/>
 				)}
 

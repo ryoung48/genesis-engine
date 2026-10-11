@@ -264,7 +264,6 @@ function summarize({
 	const partitions = tracked.partitions.filter((entry) => within(entry.year))
 	const notes = partitions.map((entry) => entry.data)
 	const skipped: Record<PartitionSkipReason, number> = {
-		"not child line": 0,
 		"no junior heir": 0,
 		"no free seat": 0,
 	}
@@ -273,7 +272,6 @@ function summarize({
 	const skips = Object.values(skipped).reduce((sum, count) => sum + count, 0)
 	const heirsUnseated: Record<UnseatedReason, number> = {
 		"no seat": 0,
-		"reserved seat unavailable": 0,
 		"share dropped": 0,
 	}
 	const titlesLost: Record<string, number> = Object.fromEntries(
@@ -282,9 +280,6 @@ function summarize({
 	let heirRealms = 0
 	let sameTier = 0
 	let primaryRankDrops = 0
-	let adminsSeatedVacant = 0
-	let adminsBumped = 0
-	let adminsLandless = 0
 	let joinedDistricts = 0
 	let releasedRealms = 0
 	const releasedShares: number[] = []
@@ -307,11 +302,6 @@ function summarize({
 			}
 		}
 		largestJunior.push(largest)
-		for (const [index, seat] of note.adminTo.entries()) {
-			if (seat < 0) adminsLandless++
-			else if (note.adminBumped[index]) adminsBumped++
-			else adminsSeatedVacant++
-		}
 		joinedDistricts += note.joinedDistricts.length
 	}
 	const fates = tracked.fates.filter((entry) => within(entry.year))
@@ -357,10 +347,10 @@ function summarize({
 		),
 		skipped,
 		rate: partitions.length / Math.max(1, partitions.length + skips),
-		heirsSeated: notes.reduce((sum, note) => sum + note.heirs.length, 0),
+		heirsSeated: notes.reduce((sum, note) => sum + note.seats.length, 0),
 		heirsUnseated,
 		newRealms: REPORT_DISTRIBUTION.summarize(
-			notes.map((note) => note.heirs.length),
+			notes.map((note) => note.seats.length),
 		),
 		primaryPopulationShare: REPORT_DISTRIBUTION.summarize(
 			notes.map((note) => shares(note)[0]),
@@ -399,9 +389,6 @@ function summarize({
 		),
 		maxGeneration: Math.max(0, ...partitions.map((entry) => entry.generation)),
 		regencies: partitions.reduce((sum, entry) => sum + entry.regencies, 0),
-		adminsSeatedVacant,
-		adminsBumped,
-		adminsLandless,
 		joinedDistricts,
 		releasedRealms,
 		releasedPopulationShare: REPORT_DISTRIBUTION.summarize(releasedShares),

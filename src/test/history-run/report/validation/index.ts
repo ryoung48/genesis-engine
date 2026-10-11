@@ -1,13 +1,9 @@
-import { PEOPLE_RECORD } from "@/model/history/record/people"
-import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
-import { PEOPLE } from "@/model/history/sim/people"
-import { BETROTHAL } from "@/model/history/sim/people/betrothal"
-import { HOUSEHOLD } from "@/model/history/sim/people/household"
 import type {
 	ValidateEngineParams,
-	ValidateRecordParams,
 	ValidationTracker,
 	ViolationParams,
 } from "@/test/history-run/report/validation/types"
@@ -41,113 +37,84 @@ function alliances({ engine, tracker }: ValidateEngineParams): void {
 	}
 }
 
-// Every sovereign seat with a ruler has a living one.
+// Every sovereign realm has a ruler who is alive, born before dying, a child
+// only under a regency, and whose succession is queued once.
 function rulers({ engine, tracker }: ValidateEngineParams): void {
 	const year = engine.time / STATE.yearMs
-	for (let seat = 0; seat < engine.P; seat++) {
-		const ruler = engine.people.rulerOf[seat]
-		if (ruler < 0 || !STATE.isSovereign({ state: engine, p: seat })) continue
-		if (!PEOPLE.aliveAt({ people: engine.people, person: ruler, time: year }))
-			violation({
-				tracker,
-				rule: "sovereign ruler is dead",
-				detail: `seat ${seat}, person ${ruler} in ${year.toFixed(0)}`,
-			})
+	for (let p = 0; p < engine.P; p++) {
+		if (
+			engine.desolate[p] ||
+			engine.stateless[p] ||
+			!STATE.isSovereign({ state: engine, p })
+		)
+			continue
+		const detail = `realm ${p} in ${year.toFixed(0)}`
+		if (!STATE_RULERS.has({ state: engine, p }))
+			violation({ tracker, rule: "sovereign without a ruler", detail })
+		else {
+			const { birth, death } = engine.leaderRuntime
+			if (death[p] <= birth[p])
+				violation({ tracker, rule: "ruler dies before birth", detail })
+			if (death[p] < engine.time - 1)
+				violation({ tracker, rule: "sovereign ruler is dead", detail })
+			if (
+				STATE_RULERS.ageYears({ state: engine, p }) < STATE_RULERS.adultAge !==
+				(engine.regency[p] === 1)
+			)
+				violation({ tracker, rule: "regency disagrees with age", detail })
+		}
 	}
 }
 
-// Every living person's sovereign realms belong to one union group.
+// Realms sharing a ruler belong to one union group.
 function unions({ engine, tracker }: ValidateEngineParams): void {
 	const year = engine.time / STATE.yearMs
-	for (const person of engine.people.alive) {
-		const crowns = engine.people.persons.heldSeats[person].filter((seat) =>
-			STATE.isSovereign({ state: engine, p: seat }),
+	const groups = new Map<number, Set<number>>()
+	for (let p = 0; p < engine.P; p++) {
+		if (
+			engine.desolate[p] ||
+			engine.stateless[p] ||
+			!STATE.isSovereign({ state: engine, p })
 		)
-		if (crowns.length < 2) continue
-		const senior = STATE.unionSenior({ state: engine, p: crowns[0] })
-		if (crowns.some((p) => STATE.unionSenior({ state: engine, p }) !== senior))
+			continue
+		const ruler = engine.leaderRuntime.rulerId[p]
+		if (ruler < 0) continue
+		const senior = STATE.seniorOf({ state: engine, p })
+		const group = groups.get(ruler) ?? new Set<number>()
+		group.add(senior >= 0 ? senior : p)
+		groups.set(ruler, group)
+	}
+	for (const [ruler, group] of groups)
+		if (group.size > 1)
 			violation({
 				tracker,
 				rule: "ruler of realms outside one union group",
-				detail: `person ${person}, realms ${crowns.join(",")} in ${year.toFixed(0)}`,
+				detail: `ruler ${ruler}, groups ${[...group].join(",")} in ${year.toFixed(0)}`,
 			})
-	}
-}
-
-// Read straight after a yearly people pass. Both columns agree, no betrothed
-// person has a living spouse, every pair was made between 12+ parties within
-// the age gap with one under 16, is wed within a yearly pass of coming of age,
-// and stands on a marriage alliance whose rulers are tied by marriage.
-function betrothals({ engine, tracker }: ValidateEngineParams): void {
-	const people = engine.people
-	const table = people.persons
-	const time = engine.time / STATE.yearMs
-	const check = (ok: boolean, rule: string, person: number) => {
-		if (!ok)
+	for (const junior of engine.unionGenerations.keys())
+		if (STATE.seniorOf({ state: engine, p: junior }) < 0)
 			violation({
 				tracker,
-				rule,
-				detail: `person ${person} in ${time.toFixed(0)}`,
+				rule: "union generation without a senior",
+				detail: `realm ${junior} in ${year.toFixed(0)}`,
 			})
-	}
-	for (const person of people.alive) {
-		const partner = table.betrothed[person]
-		if (partner < 0) continue
-		check(
-			table.betrothed[partner] === person &&
-				table.betrothedAt[partner] === table.betrothedAt[person],
-			"betrothal columns disagree",
-			person,
+}
+
+// Every marriage tie joins two allied sovereign realms that marry for alliance.
+function marriageTies({ engine, tracker }: ValidateEngineParams): void {
+	const year = engine.time / STATE.yearMs
+	for (const { first, second } of engine.marriageTies.values())
+		if (
+			!ROYAL_MARRIAGE.marries({ state: engine, realm: first }) ||
+			!ROYAL_MARRIAGE.marries({ state: engine, realm: second }) ||
+			STATE.getRelation({ state: engine, a: first, b: second }) !==
+				STATE.rel.ALLY
 		)
-		if (table.death[person] <= time || table.death[partner] <= time) continue
-		const spouse = table.spouse[person]
-		check(
-			spouse < 0 || table.death[spouse] <= time,
-			"betrothed with a living spouse",
-			person,
-		)
-		const made = table.betrothedAt[person]
-		const ages = [made - table.birth[person], made - table.birth[partner]]
-		check(
-			Math.min(...ages) >= BETROTHAL.minAge &&
-				Math.min(...ages) < BETROTHAL.adultAge &&
-				Math.abs(ages[0] - ages[1]) <= BETROTHAL.maxAgeGap,
-			"betrothal made outside its age rules",
-			person,
-		)
-		check(
-			Math.min(time - table.birth[person], time - table.birth[partner]) <
-				BETROTHAL.adultAge + 1,
-			"betrothed pair not wed on coming of age",
-			person,
-		)
-		const realmA = HOUSEHOLD.realmOf({ people, person })
-		const realmB = HOUSEHOLD.realmOf({ people, person: partner })
-		check(
-			STATE.getRelation({ state: engine, a: realmA, b: realmB }) !==
-				STATE.rel.WAR,
-			"betrothal between realms at war",
-			person,
-		)
-		check(
-			people.marriageAlliances.has(
-				Math.min(realmA, realmB) * engine.P + Math.max(realmA, realmB),
-			),
-			"betrothal without a marriage alliance",
-			person,
-		)
-	}
-	for (const { first, second } of people.marriageAlliances.values()) {
-		const rulerA = people.rulerOf[first]
-		const rulerB = people.rulerOf[second]
-		check(
-			rulerA >= 0 &&
-				rulerB >= 0 &&
-				PEOPLE.tiedByMarriage({ people, a: rulerA, b: rulerB, time }),
-			"marriage alliance without a marriage tie",
-			rulerA,
-		)
-	}
+			violation({
+				tracker,
+				rule: "marriage tie without an alliance",
+				detail: `realms ${first} and ${second} in ${year.toFixed(0)}`,
+			})
 }
 
 // Every district is one connected piece, hangs off its realm or another
@@ -196,75 +163,6 @@ function districts({ engine, tracker }: ValidateEngineParams): void {
 	}
 }
 
-// The people record agrees with the engine it was built from.
-function record({ engine, tracker, people }: ValidateRecordParams): void {
-	const years = engine.time / STATE.yearMs
-	const table = engine.people.persons
-	const fail = (rule: string, detail: string) =>
-		violation({ tracker, rule, detail })
-	if (PEOPLE_RECORD.count(people) !== table.birth.length)
-		fail(
-			"record and engine count different people",
-			`${PEOPLE_RECORD.count(people)} recorded, ${table.birth.length} born`,
-		)
-	for (const tenures of [
-		...people.tenuresOfSeat.values(),
-		...people.regentsOfSeat.values(),
-	])
-		for (let i = 1; i < tenures.length; i++)
-			if (
-				people.tenures[tenures[i - 1]].endTimeMs >
-				people.tenures[tenures[i]].startTimeMs
-			)
-				fail("tenures of a seat overlap", `tenure ${tenures[i]}`)
-	for (const marriage of people.marriages)
-		if (
-			!PEOPLE_RECORD.has({ people, id: marriage.husband }) ||
-			!PEOPLE_RECORD.has({ people, id: marriage.wife })
-		)
-			fail(
-				"marriage names an unrecorded person",
-				`${marriage.husband} and ${marriage.wife}`,
-			)
-	for (const [realm, regency] of engine.people.regencies) {
-		if (regency.regent < 0) continue
-		if (
-			!PEOPLE_RECORD.has({ people, id: regency.regent }) ||
-			years - table.birth[regency.regent] < 16 ||
-			(engine.people.rulerOf[realm] === regency.ward &&
-				table.death[regency.regent] <= years)
-		)
-			fail("regent unrecorded, underage or dead", `realm ${realm}`)
-	}
-	for (const claim of engine.people.deposed.values())
-		if (
-			claim.generation >= 2 ||
-			!PEOPLE_RECORD.has({ people, id: claim.claimant })
-		)
-			fail("deposed claim stale or unrecorded", `claimant ${claim.claimant}`)
-	const count = Math.min(PEOPLE_RECORD.count(people), table.birth.length)
-	for (let id = 0; id < count; id++) {
-		const recorded = PEOPLE_RECORD.deathTimeMs({ people, id })
-		const died = table.death[id] * STATE.yearMs
-		if (
-			died > engine.time
-				? recorded !== Infinity
-				: Math.abs(recorded - died) >= 1
-		)
-			fail("recorded death differs from the engine", `person ${id}`)
-	}
-	for (let seat = 0; seat < engine.P; seat++) {
-		const ruler = engine.people.rulerOf[seat]
-		if (ruler < 0 || !STATE.isSovereign({ state: engine, p: seat })) continue
-		const view = PERSON_QUERY.view({ people, id: ruler, timeMs: engine.time })
-		if (
-			!view?.tenures.some((tenure) => tenure.endTimeMs === null) ||
-			PERSON_QUERY.health({ people, id: ruler, timeMs: engine.time }) === null
-		)
-			fail("ruler without an open tenure or health", `seat ${seat}`)
-	}
-}
-
 // Thrown once the report is saved, so a violation late in a long run still
 // leaves its statistics on disk.
 function assert(tracker: ValidationTracker): void {
@@ -285,8 +183,7 @@ export const HISTORY_VALIDATION = {
 	alliances,
 	rulers,
 	unions,
-	betrothals,
+	marriageTies,
 	districts,
-	record,
 	assert,
 }

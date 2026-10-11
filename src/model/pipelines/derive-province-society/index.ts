@@ -71,7 +71,7 @@ function deriveProvinceSociety({
 		religions: society.religions,
 		religionFamilies: society.religionFamilies,
 		religionTypes: society.religionTypes,
-		religionDoctrine: society.religionDoctrine,
+		religionGender: society.religionGender,
 		landmarks,
 		settlementRegions: settlementAnchors.settlementRegions,
 		settlementWaterLandmarks: settlementAnchors.settlementWaterLandmarks,

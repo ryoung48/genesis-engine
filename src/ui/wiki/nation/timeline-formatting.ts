@@ -221,7 +221,6 @@ export function pushTimelineEvent(
 		dynasties?: WikiTimelineEvent["dynasties"]
 		organizations?: WikiTimelineEvent["organizations"]
 		wars?: WikiTimelineEvent["wars"]
-		people?: WikiTimelineEvent["people"]
 	},
 ) {
 	events.push({
@@ -240,7 +239,6 @@ export function pushTimelineEvent(
 		dynasties: params.dynasties ?? [],
 		organizations: params.organizations ?? [],
 		wars: params.wars ?? [],
-		people: params.people ?? [],
 	})
 }
 

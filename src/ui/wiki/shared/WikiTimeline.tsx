@@ -39,21 +39,13 @@ export interface WikiTimelineEvent {
 	/** Wars (wars.json) mentioned in this event's description -- clicking
 	 * navigates to that war's wiki page via refs.onSelectWar. */
 	wars: Array<{ id: number; name: string; color: string }>
-	/** Simulated people mentioned in the description -- clicking opens that
-	 * person's wiki page via refs.onSelectPerson. */
-	people: Array<{ id: number; name: string; color: string }>
 }
 
 interface WikiTimelineRefs {
-	// [JUSTIFICATION] Religion links exist only on pages with doctrine data.
-	onSelectReligion?: (key: string) => void
-	// [JUSTIFICATION] Existing wiki entities do not all expose religion navigation.
-	resolveReligion?: (key: string) => number | null
 	onSelectNation: (tag: string) => void
 	onSelectProvince: (provinceId: number) => void
 	onSelectOrganization: (orgId: string) => void
 	onSelectWar: (warId: number) => void
-	onSelectPerson: (personId: number) => void
 	onSelectDate: (date: number) => void
 }
 
@@ -129,14 +121,6 @@ function renderLinkedTimelineText(
 				color: string
 				id: number
 		  }
-		| {
-				kind: "person"
-				key: string
-				name: string
-				color: string
-				id: number
-		  }
-		| { kind: "religion"; key: string; name: string; color: string; id: string }
 		| { kind: "label"; key: string; name: string; color: string }
 	> = [
 		...event.nations.map((entry) => ({
@@ -169,13 +153,6 @@ function renderLinkedTimelineText(
 			color: entry.color,
 			id: entry.id,
 		})),
-		...event.people.map((entry) => ({
-			kind: "person" as const,
-			key: `person:${entry.id}`,
-			name: entry.name,
-			color: entry.color,
-			id: entry.id,
-		})),
 		...event.cultures.map((entry) => ({
 			kind: "label" as const,
 			key: `culture:${entry.id}`,
@@ -183,8 +160,7 @@ function renderLinkedTimelineText(
 			color: entry.color,
 		})),
 		...event.religions.map((entry) => ({
-			id: entry.id,
-			kind: "religion" as const,
+			kind: "label" as const,
 			key: `religion:${entry.id}`,
 			name: entry.name,
 			color: entry.color,
@@ -268,9 +244,6 @@ function renderLinkedTimelineText(
 		const mention = match.mention
 		if (
 			mention.kind === "label" ||
-			(mention.kind === "religion" &&
-				(!refs.onSelectReligion ||
-					refs.resolveReligion?.(mention.id) == null)) ||
 			(mention.kind === "nation" && !mention.link)
 		) {
 			nodes.push(
@@ -293,9 +266,6 @@ function renderLinkedTimelineText(
 						else if (mention.kind === "province")
 							refs.onSelectProvince(mention.id)
 						else if (mention.kind === "war") refs.onSelectWar(mention.id)
-						else if (mention.kind === "person") refs.onSelectPerson(mention.id)
-						else if (mention.kind === "religion")
-							refs.onSelectReligion?.(mention.id)
 						else refs.onSelectOrganization(mention.id)
 					}}
 				/>,

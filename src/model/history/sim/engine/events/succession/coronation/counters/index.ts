@@ -20,12 +20,10 @@ function create(): CoronationCounters {
 	return {
 		held: grid(),
 		ducats: grid(),
-		memories: grid(),
 		founded: grid(),
 		raised: grid(),
 		deferred: 0,
 		majority: 0,
-		incapable: 0,
 		compositeRealmYears: 0,
 		compositeEvaluations: 0,
 		compositeRebellions: 0,

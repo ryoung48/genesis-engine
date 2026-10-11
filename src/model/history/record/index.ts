@@ -1,8 +1,8 @@
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import { EU4_PROVINCE_MAP } from "@/model/history/earth/import/eu4-province-map"
 import { NATIONS } from "@/model/history/earth/reference/nations"
-import { PERSON_NAMES } from "@/model/history/record/people/names"
 import { RECORD_ROUTES } from "@/model/history/record/routes"
+import { RULER_NAMES } from "@/model/history/record/rulers"
 import { TITLE_RECORD } from "@/model/history/record/titles"
 import type {
 	Battle,
@@ -264,7 +264,6 @@ function buildEarthRecord(params: BuildEarthRecordParams): HistoryRecord {
 	const resolvedMinMs = minTimeMs === Infinity ? 0 : minTimeMs
 	return {
 		origin: "earth",
-		people: null,
 		minTimeMs: resolvedMinMs,
 		maxTimeMs: maxTimeMs === -Infinity ? 0 : maxTimeMs,
 		nations: params.nations.map((nation) => ({
@@ -561,7 +560,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			government,
 			governmentReform,
 			ruler: rulerPayload
-				? PERSON_NAMES.ruler({ people: record.people, payload: rulerPayload })
+				? RULER_NAMES.ruler({ record, payload: rulerPayload })
 				: null,
 			birthTimeMs: identity.birthTimeMs,
 			deathTimeMs: identity.deathTimeMs,

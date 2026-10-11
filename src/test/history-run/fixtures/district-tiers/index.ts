@@ -1,16 +1,16 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
-import { DISTRICTS } from "@/model/history/sim/engine/events/people/districts"
+import { EventHeap } from "@/model/history/sim/engine/event-heap"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { STATE } from "@/model/history/sim/engine/state"
+import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
-import { FAMILY } from "@/model/history/sim/people/family"
 import { DEJURE } from "@/model/society/dejure"
 import { HISTORY_RUN } from "@/test/history-run"
 import type {
 	DistrictFixture,
 	DistrictFixtureParams,
-	FixturePersonParams,
+	FixtureRulerParams,
 	FixtureTitlesParams,
 } from "@/test/history-run/fixtures/district-tiers/types"
 
@@ -56,8 +56,10 @@ function create({
 	})
 	const rng = HISTORY_RNG.createHistoryRng(1729)
 	state.parentCurrent.fill(-1)
-	state.people.rulerOf.fill(-1)
-	for (const seats of state.people.persons.heldSeats) seats.length = 0
+	for (let p = 0; p < state.P; p++) STATE_RULERS.clear({ state, p })
+	state.heap = new EventHeap()
+	state.marriageTies.clear()
+	state.unionGenerations.clear()
 	state.desolate.fill(1)
 	state.stateless.fill(1)
 	const members = Array.from({ length: count }, (_, p) => p)
@@ -90,25 +92,9 @@ function create({
 	return fixture
 }
 
-function person({ fixture, seat, father }: FixturePersonParams): number {
-	const { state, rng, root } = fixture
-	const person = FAMILY.found({
-		people: state.people,
-		origin: STATE.originOf({ state, realm: root }),
-		time: state.time / STATE.yearMs,
-		age: father < 0 ? 50 : 25,
-		rank: seat < 0 ? 0 : state.seatRank[seat],
-		rng,
-	})
-	state.people.persons.sex[person] = 0
-	state.people.persons.death[person] = state.time / STATE.yearMs + 100
-	if (father >= 0) {
-		state.people.persons.father[person] = father
-		state.people.persons.children[father].push(person)
-	}
-	if (seat >= 0)
-		DISTRICTS.install({ state, seat, person, reason: "district grant" })
-	return person
+function ruler({ fixture, p, dynasty, age, claim }: FixtureRulerParams): void {
+	const { state, rng } = fixture
+	STATE.foundRuler({ state, p, ruler: { dynasty, age, claim }, rng })
 }
 
-export const DISTRICT_FIXTURE = { create, titles, person }
+export const DISTRICT_FIXTURE = { create, titles, ruler }

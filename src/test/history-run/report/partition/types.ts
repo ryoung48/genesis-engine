@@ -145,9 +145,6 @@ export interface PartitionReport {
 	generation: Distribution
 	maxGeneration: number
 	regencies: number
-	adminsSeatedVacant: number
-	adminsBumped: number
-	adminsLandless: number
 	joinedDistricts: number
 	releasedRealms: number
 	releasedPopulationShare: Distribution

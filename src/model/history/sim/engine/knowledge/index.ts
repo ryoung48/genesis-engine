@@ -161,7 +161,6 @@ function initKnowledge({ state }: InitKnowledgeParams): void {
 			sovereign,
 			yearFraction: SPIN_UP_STEP_YEARS,
 			worldKnowledge: mean,
-			ownFactor: () => 1,
 		})
 		const after = populationMean({ state, provinces, values: next })
 		if (after <= mean) {
@@ -220,7 +219,6 @@ function step({
 	sovereign,
 	yearFraction,
 	worldKnowledge,
-	ownFactor,
 }: StepParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
@@ -244,14 +242,13 @@ function step({
 				sovereign[nb] === sovereign[p] ? DOMESTIC_DIFFUSION : FOREIGN_DIFFUSION
 			pull = Math.max(pull, gap * rate)
 		}
-		next[p] = knowledge + (own * ownFactor(sovereign[p]) + pull) * yearFraction
+		next[p] = knowledge + (own + pull) * yearFraction
 	}
 }
 
 function advanceKnowledge({
 	state,
 	yearFraction,
-	ownFactor,
 }: AdvanceKnowledgeParams): void {
 	const next = state.knowledgeCurrent.slice()
 	step({
@@ -264,7 +261,6 @@ function advanceKnowledge({
 			state,
 			provinces: allProvinces({ state }),
 		}),
-		ownFactor,
 	})
 	state.knowledgeCurrent.set(next)
 }

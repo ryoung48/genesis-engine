@@ -55,9 +55,3 @@ export interface RunDiplomacyParams {
 	nation: number
 	rng: SharedRng
 }
-
-export interface MarriageBoundParams {
-	state: HistoryState
-	a: number
-	b: number
-}

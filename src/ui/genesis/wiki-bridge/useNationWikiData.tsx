@@ -5,10 +5,9 @@ import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
-import { PERSON_NAMES } from "@/model/history/record/people/names"
-import { PERSON_QUERY } from "@/model/history/record/people/query"
+import { RULER_NAMES } from "@/model/history/record/rulers"
+import type { RulerRef } from "@/model/history/record/rulers/types"
 import type { HistoryComment } from "@/model/history/record/types"
-import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { FRAME } from "@/model/history/world-frame"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
@@ -29,10 +28,8 @@ import {
 import {
 	cultureMention,
 	organizationMention,
-	personDisplay,
-	recordPersonMention,
-	regentRole,
 	religionMention,
+	rulerDisplay,
 	warMention,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
 import {
@@ -74,20 +71,11 @@ import {
 } from "@/ui/wiki/stats/nation/nation-distributions"
 import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
 
-// How a ruler's death reads when their successor is named.
-const RULER_FATES: Record<string, string> = {
-	natural: "died",
-	heart: "died of heart failure",
-	battle: "was killed in battle",
-	childbirth: "died in childbirth",
-}
-
 export function useNationWikiData(
 	input: NationWikiDataInput,
 ): NationWikiData | null {
 	const {
 		selectedWikiNationId,
-		religionSelection,
 		world,
 		worldForDisplay,
 		history,
@@ -97,7 +85,6 @@ export function useNationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
-		setSelectedWikiPersonId,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -113,10 +100,7 @@ export function useNationWikiData(
 		const record = history.state.record
 		const eventComment = (comment: HistoryComment) =>
 			formatEventComment(
-				PERSON_NAMES.comment({
-					people: record.people,
-					comment: comment ?? null,
-				}),
+				RULER_NAMES.comment({ record, comment: comment ?? null }),
 			)
 		const nationList = record.nations
 		const daysFromMs = (timeMs: number) => timeMs / 86_400_000
@@ -222,10 +206,7 @@ export function useNationWikiData(
 				)
 				.at(-1)?.payload ?? null
 		const currentRulerPayload = rawRulerPayload
-			? PERSON_NAMES.payload({
-					people: record.people,
-					payload: rawRulerPayload,
-				})
+			? RULER_NAMES.payload({ record, payload: rawRulerPayload })
 			: null
 		const rulerLabel = nationState?.ruler
 			? formatRulerStatLabel(
@@ -414,78 +395,18 @@ export function useNationWikiData(
 		const rulerStat = stats.find((stat) => stat.label === "Ruler")
 		if (rulerStat && nationState?.ruler) {
 			const rulerSuffix = rulerLabel ? `· ${rulerLabel}` : ""
-			const rulerPerson =
-				typeof currentRulerPayload?.person === "number"
-					? currentRulerPayload.person
-					: -1
-			const rulerName =
-				rulerPerson >= 0 ? (
-					<InlineTextButton
-						onClick={() => setSelectedWikiPersonId(rulerPerson)}
-					>
-						{nationState.ruler.name}
-					</InlineTextButton>
-				) : (
-					<span>{nationState.ruler.name}</span>
-				)
-			const regentPerson =
-				typeof currentRulerPayload?.regent === "number"
-					? currentRulerPayload.regent
-					: -1
-			const regentRow = PERSON_NAMES.person({
-				people: record.people,
-				person: regentPerson,
-			})
-			const regentRelation = regentRole({
-				people: record.people,
-				regent: regentPerson,
-				ward: rulerPerson,
-				kind: String(currentRulerPayload?.regency ?? ""),
-			})
-			const regentLabel = regentRow
-				? [
-						regentRelation ? `(${regentRelation})` : null,
-						String(
-							Math.floor(
-								(history.selectedTimeMs - regentRow.birthTimeMs) /
-									STATE_CLOCK.yearMs,
-							),
-						),
-						regentRow.sex === 1 ? "♀" : "♂",
-					]
-						.filter((part) => part !== null)
-						.join(" · ")
-				: ""
 			if (currentRulerPayload?.regency)
-				stats.splice(
-					stats.indexOf(rulerStat) + 1,
-					0,
-					regentRow
-						? {
-								label: "Regent",
-								value: "",
-								valueAction: (
-									<span className="inline-flex items-center gap-1">
-										<InlineTextButton
-											onClick={() => setSelectedWikiPersonId(regentPerson)}
-										>
-											{regentRow.name}
-										</InlineTextButton>
-										<span>{regentLabel}</span>
-									</span>
-								),
-							}
-						: { label: "Regent", value: "Regency Council" },
-				)
-			if (dynastyName || rulerPerson >= 0) {
+				stats.splice(stats.indexOf(rulerStat) + 1, 0, {
+					label: "Regent",
+					value: "Regency Council",
+				})
+			if (dynastyName) {
 				rulerStat.value = ""
 				rulerStat.valueAction = (
 					<span className="inline-flex items-center gap-1">
-						{dynastyName ? (
-							<Swatch color={paletteColorForDynasty(dynastyName)} />
-						) : null}
-						{rulerName}
-						{dynastyName ? <span>{dynastyName}</span> : null}
+						<Swatch color={paletteColorForDynasty(dynastyName)} />
+						<span>{nationState.ruler.name}</span>
+						<span>{dynastyName}</span>
 						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
 					</span>
 				)
@@ -654,26 +575,10 @@ export function useNationWikiData(
 						break
 					}
 					case "regency": {
-						const mention = (key: string) =>
-							recordPersonMention({
-								people: record.people,
-								person: Number(event.payload[key] ?? -1),
-							})
-						const ward = mention("ward")
-						const regent = mention("regent")
-						const incapacity = event.payload.regencyCause === "incapacity"
-						const wardName =
-							ward?.name ??
-							(incapacity ? "the incapable ruler" : "the child ruler")
-						const role = regentRole({
-							people: record.people,
-							regent: regent?.id ?? -1,
-							ward: ward?.id ?? -1,
-							kind: String(event.payload.regentKind ?? ""),
-						})
-						const regentName = regent
-							? `${regent.name}${role ? ` (${role})` : ""}`
-							: "A regency council"
+						const named = (ref: unknown) =>
+							ref
+								? RULER_NAMES.names({ record, ref: ref as RulerRef }).name
+								: null
 						const kind = String(event.payload.event ?? "")
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
@@ -681,35 +586,31 @@ export function useNationWikiData(
 							type: "Ruler",
 							description:
 								kind === "usurpation"
-									? `${regentName} usurped the throne of ${title} from ${wardName}.`
+									? `${named(event.payload.usurper) ?? "A regency council"} usurped the throne of ${title} from ${named(event.payload.ward) ?? "the child ruler"}.`
 									: kind === "ended"
-										? `${wardName} came of age and the regency of ${title} ended.`
-										: `${regentName} ${kind === "changed" ? "took over as" : "became"} regent of ${title} for ${wardName}${incapacity ? ", who could no longer rule" : ""}.`,
+										? `The child ruler came of age and the regency of ${title} ended.`
+										: `A regency council began governing ${title} for the child ruler.`,
 							comment: eventComment(event.comment),
 							nations,
-							people: [ward, regent].flatMap((person) =>
-								person ? [person] : [],
-							),
 						})
 						break
 					}
 					case "partition": {
-						const mention = (person: unknown) =>
-							recordPersonMention({
-								people: record.people,
-								person: Number(person ?? -1),
-							})
-						const late = mention(event.payload.late)
-						const primary = mention(event.payload.primary)
-						const heirs = (event.payload.heirs as number[]).map(mention)
+						const named = (ref: unknown) =>
+							ref
+								? RULER_NAMES.names({ record, ref: ref as RulerRef }).name
+								: null
+						const late = named(event.payload.late)
+						const primary = named(event.payload.primary)
+						const heirs = (event.payload.heirs as RulerRef[]).map(named)
 						const realms = event.payload.realms as number[]
 						const joinedRealms = event.payload.joinedRealms as number[]
 						for (const realm of realms) addNationMention(nations, realm)
 						const shares = [
-							`${primary?.name ?? "the heir"} kept ${title}`,
+							`${primary ?? "the heir"} kept ${title}`,
 							...heirs.map(
 								(heir, share) =>
-									`${heir?.name ?? "an heir"} received ${eventNation(realms[share]).name}`,
+									`${heir ?? "an heir"} received ${eventNation(realms[share]).name}`,
 							),
 						]
 						const joined = (event.payload.joinedDistricts as number[]).map(
@@ -723,24 +624,20 @@ export function useNationWikiData(
 							id: dateId,
 							date: event.date,
 							type: "Ruler",
-							description: `On the death of ${late?.name ?? "its ruler"} the realm was divided: ${shares.join("; ")}.${joined.join("")}`,
+							description: `On the death of ${late ?? "its ruler"} the realm was divided: ${shares.join("; ")}.${joined.join("")}`,
 							comment: eventComment(event.comment),
 							nations,
 							provinces,
-							people: [late, primary, ...heirs].flatMap((person) =>
-								person ? [person] : [],
-							),
 						})
 						break
 					}
 					case "interregnum": {
-						const mention = (person: unknown) =>
-							recordPersonMention({
-								people: record.people,
-								person: Number(person ?? -1),
-							})
-						const late = mention(event.payload.late)
-						const ruler = mention(event.payload.ruler)
+						const named = (ref: unknown) =>
+							ref
+								? RULER_NAMES.names({ record, ref: ref as RulerRef }).name
+								: null
+						const late = named(event.payload.late)
+						const ruler = named(event.payload.ruler)
 						const crown = Number(event.payload.crown)
 						const realms = event.payload.realms as number[]
 						const attackers = event.payload.warAttackers as number[]
@@ -757,13 +654,10 @@ export function useNationWikiData(
 							type: "Ruler",
 							description:
 								nationId === crown
-									? `${late?.name ?? "Its ruler"} died with no heir and the realm broke apart: ${realms.map((realm) => eventNation(realm).name).join(", ")} became independent. ${ruler?.name ?? "A new ruler"} kept the crown lands.${wars.join("")}`
-									: `${late?.name ?? "The ruler"} of ${eventNation(crown).name} died with no heir and this district became independent.${wars.join("")}`,
+									? `${late ?? "Its ruler"} died with no heir and the realm broke apart: ${realms.map((realm) => eventNation(realm).name).join(", ")} became independent. ${ruler ?? "A new ruler"} kept the crown lands.${wars.join("")}`
+									: `${late ?? "The ruler"} of ${eventNation(crown).name} died with no heir and this district became independent.${wars.join("")}`,
 							comment: eventComment(event.comment),
 							nations,
-							people: [late, ruler].flatMap((person) =>
-								person ? [person] : [],
-							),
 						})
 						break
 					}
@@ -786,43 +680,25 @@ export function useNationWikiData(
 					}
 					case "rulerChange": {
 						if (event.payload.newRuler === false) break
-						const person = personDisplay({
-							people: record.people,
-							payload: event.payload,
-						})
+						const ruler = rulerDisplay({ record, payload: event.payload })
 						const isInterregnum = /^interregnum$/i.test(
 							String(event.payload.name ?? "").trim(),
 						)
-						const late = recordPersonMention({
-							people: record.people,
-							person: Number(event.payload.predecessor ?? -1),
-						})
-						const fate =
-							RULER_FATES[String(event.payload.predecessorDeathCause)]
-						const after = late && fate ? ` after ${late.name} ${fate}` : ""
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
 							type: "Ruler",
 							description: isInterregnum
 								? `${title} entered an interregnum.`
-								: `${title} gained ruler ${person.description}${after}.`,
+								: `${title} gained ruler ${ruler.description}.`,
 							comment: eventComment(event.comment),
 							nations,
-							dynasties: isInterregnum ? [] : person.dynasties,
-							people: isInterregnum
-								? []
-								: late && fate
-									? [...person.people, late]
-									: person.people,
+							dynasties: isInterregnum ? [] : ruler.dynasties,
 						})
 						break
 					}
 					case "heirChange": {
-						const person = personDisplay({
-							people: record.people,
-							payload: event.payload,
-						})
+						const person = rulerDisplay({ record, payload: event.payload })
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -835,10 +711,7 @@ export function useNationWikiData(
 						break
 					}
 					case "queenChange": {
-						const person = personDisplay({
-							people: record.people,
-							payload: event.payload,
-						})
+						const person = rulerDisplay({ record, payload: event.payload })
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -851,10 +724,7 @@ export function useNationWikiData(
 						break
 					}
 					case "leaderAdd": {
-						const person = personDisplay({
-							people: record.people,
-							payload: event.payload,
-						})
+						const person = rulerDisplay({ record, payload: event.payload })
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -1299,28 +1169,12 @@ export function useNationWikiData(
 			} else {
 				description = `${title} ${starts ? "formed" : "ended"} a ${relation} with ${otherName}.`
 			}
-			// A procedural royal marriage names the couple whose wedding or
-			// betrothal made it.
-			const couple = (event.spouses ?? []).flatMap((person) => {
-				const mention = recordPersonMention({ people: record.people, person })
-				return mention ? [mention] : []
-			})
-			if (couple.length === 2 && record.people) {
-				const married = PERSON_QUERY.married({
-					people: record.people,
-					a: couple[0].id,
-					b: couple[1].id,
-					timeMs: event.timeMs,
-				})
-				description = `${description.slice(0, -1)}: ${couple[0].name} ${married ? "married" : "was betrothed to"} ${couple[1].name}.`
-			}
 			pushTimelineEvent(timelineEvents, {
 				id: `diplomacy:${event.date}:${index}`,
 				date: event.date,
 				type: starts ? "Diplomacy (+)" : "Diplomacy (-)",
 				description,
 				nations,
-				people: couple,
 			})
 		}
 
@@ -1596,7 +1450,6 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
-				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		for (const [date, group] of cultureGroups) {
@@ -1619,7 +1472,6 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
-				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		for (const [date, group] of religionGroups) {
@@ -1642,7 +1494,6 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
-				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		for (const [date, group] of diplomacyGroups) {
@@ -1666,7 +1517,6 @@ export function useNationWikiData(
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
-				people: mergeById(group.flatMap((event) => event.people)),
 			})
 		}
 		timelineEvents = mergedTimelineEvents
@@ -1686,7 +1536,6 @@ export function useNationWikiData(
 			fallbackColor: "rgb(148, 163, 184)",
 		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
-			selectionForId: religionSelection.forKey,
 			idByProvince: Array.from(frame.provinceReligion, (id) =>
 				id >= 0 ? (frame.religions[id]?.key ?? null) : null,
 			),
@@ -1739,8 +1588,6 @@ export function useNationWikiData(
 			organizations,
 			cultureDistribution,
 			religionDistribution,
-			onSelectReligion: religionSelection.selectKey,
-			resolveReligion: religionSelection.resolve,
 			climateDistribution,
 			vegetationDistribution,
 			topographyDistribution,
@@ -1772,12 +1619,8 @@ export function useNationWikiData(
 			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
-			onSelectPerson: (personId: number) => {
-				setSelectedWikiPersonId(personId)
-			},
 		}
 	}, [
-		religionSelection,
 		selectedWikiNationId,
 		world,
 		history.query,
@@ -1799,6 +1642,5 @@ export function useNationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
-		setSelectedWikiPersonId,
 	])
 }

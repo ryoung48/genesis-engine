@@ -107,7 +107,7 @@ function build({
 		r_xyz: generated.mesh.r_xyz,
 		cultures,
 		religions: generated.religions,
-		religionDoctrine: generated.religionDoctrine,
+		religionGender: generated.religionGender,
 		heritages: generated.heritages,
 		era: generated.params.era,
 		seed: generated.params.seed,

@@ -1,30 +1,24 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
+import type { CoronationReport } from "@/test/history-run/report/coronation/types"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import type { GovernmentReport } from "@/test/history-run/report/government/types"
-import type {
-	HouseholdsReport,
-	ResidenceReport,
-} from "@/test/history-run/report/households/types"
 import type { InterregnumReport } from "@/test/history-run/report/interregnum/types"
 import type { MilitaryReport } from "@/test/history-run/report/military/types"
 import type {
 	PartitionReport,
 	PartitionStateReport,
 } from "@/test/history-run/report/partition/types"
-import type { PeopleHealthReport } from "@/test/history-run/report/people-health/types"
-import type { MarriageMarketReport } from "@/test/history-run/report/people-marriage/types"
-import type {
-	OpinionCostReport,
-	OpinionReport,
-} from "@/test/history-run/report/people-opinion/types"
-import type { CharacterStage } from "@/test/history-run/report/people-traits/stages/types"
-import type { CharacterReport } from "@/test/history-run/report/people-traits/types"
 import type { RoadsReport } from "@/test/history-run/report/roads/types"
+import type {
+	DynastyReport,
+	MarriageTieReport,
+	SuccessionReport,
+	UnionReport,
+} from "@/test/history-run/report/rulers/types"
 import type { SettlementChangeReport } from "@/test/history-run/report/settlement-change/types"
 
 export interface HistoryReportOptions {
-	characterStage: CharacterStage
 	seeds: number[]
 	era: SocietyEra
 	numPoints: number
@@ -52,14 +46,9 @@ export interface WindowParams {
 	to: number
 }
 
-import type { PEOPLE_MARRIAGE_REPORT } from "@/test/history-run/report/people-marriage"
-import type { PEOPLE_TRAITS_REPORT } from "@/test/history-run/report/people-traits"
-
 export interface CenturyReport {
 	roads: RoadsReport
 	settlementChange: SettlementChangeReport
-	marriageDemography: ReturnType<typeof PEOPLE_MARRIAGE_REPORT.demography>
-	inbreeding: ReturnType<typeof PEOPLE_TRAITS_REPORT.inbreeding>
 	from: number
 	to: number
 	sovereigns: number
@@ -72,14 +61,12 @@ export interface CenturyReport {
 	raidSuccessShare: number
 	revenuePerHead: number
 	regency: RegencyReport
-	character: CharacterReport
-	households: HouseholdsReport & ResidenceReport
-	people: PeopleReport
-	peopleHealth: PeopleHealthReport
-	marriage: MarriageReport
-	marriageMarket: MarriageMarketReport
-	peopleOpinion: OpinionReport
-	peopleOpinionCost: OpinionCostReport
+	succession: SuccessionReport
+	marriageTies: MarriageTieReport
+	dynasty: DynastyReport
+	unions: UnionReport
+	coronations: CoronationReport
+	elevateMsPerYear: number
 	military: MilitaryReport
 	districts: DistrictReport
 	government: GovernmentReport
@@ -88,77 +75,9 @@ export interface CenturyReport {
 	interregnum: InterregnumReport
 }
 
-export interface MarriageReport {
-	alliancesFormed: number
-	alliancesStanding: number
-	// Mean age at first marriage of sovereign rulers' children, by sex.
-	firstMarriageAge: [number, number]
-	marriedAbroadShare: number
-	heiressUnions: number
-	betrothalsMade: number
-	betrothalsFulfilled: number
-	betrothalsBrokenByDeath: number
-	betrothalsBrokenByAlliance: number
-}
-
-export type BetrothalOutcome = "made" | "married" | "death" | "alliance"
-
-export interface BetrothalChange {
-	time: number
-	outcome: BetrothalOutcome
-}
-
-export interface FirstMarriage {
-	time: number
-	sex: number
-	age: number
-	abroad: boolean
-}
-
-export interface MarriageTracker {
-	crowned: Set<number>
-	seen: Set<number>
-	marriages: FirstMarriage[]
-	// Standing betrothals by their lower party, as of the last sample.
-	betrothed: Map<number, number>
-	betrothals: BetrothalChange[]
-	// Standing betrothals after init, then at each yearly sample.
-	standing: number[]
-}
-
-export interface TrackMarriagesParams extends EngineParams {
-	tracker: MarriageTracker
-}
-
-export interface MarriageReportParams extends WindowParams {
-	tracker: MarriageTracker
-}
-
-export interface PeopleReport {
-	successions: number
-	// Children ever born to sovereign rulers who died in the window.
-	birthsPerRuler: number
-	// Share of those rulers with no child alive at their death.
-	childlessShare: number
-	newHouseShare: number
-	hereditarySuccessions: number
-	hereditaryNewHouseShare: number
-	minorShare: number
-	childbirthDeaths: number
-	twinBirths: number
-	alive: number
-	msPerYear: number
-}
-
-export interface PeopleReportParams extends WindowParams {
-	childbirthDeathTimes: number[]
-	peopleMs: number
-}
-
 export interface RegencyReport {
 	regencies: number
-	councilShare: number
-	usurpationsByUncle: number
+	usurpationsByKinsman: number
 	usurpationsByProtector: number
 	// Share of rebellions against the largest realms that broke out while
 	// the overlord was under a regency.
@@ -166,10 +85,6 @@ export interface RegencyReport {
 	// Share of all rebellions that broke out within two years before the
 	// overlord's next succession.
 	preSuccessionRebellionShare: number
-	restorationAttempts: number
-	restorationBacked: number
-	restorationRevolts: number
-	claimsLapsed: number
 }
 
 export interface RegencyReportParams extends WindowParams {

@@ -16,7 +16,6 @@ import { HISTORY_VALIDATION } from "@/test/history-run/report/validation"
 let state: HistoryState
 let attacker: number
 let defender: number
-let claimant: number
 
 function endWars(): void {
 	for (const idx of [...state.activeWarIds])
@@ -34,7 +33,7 @@ function declare(): War {
 		attacker,
 		defender,
 		rng: HISTORY_RNG.createHistoryRng(5),
-		options: { goal: "claim", claimant },
+		options: { goal: "claim" },
 	})
 }
 
@@ -53,7 +52,7 @@ beforeAll(() => {
 	const free = (p: number) =>
 		!state.desolate[p] &&
 		STATE.isSovereign({ state, p }) &&
-		state.people.rulerOf[p] >= 0 &&
+		state.leaderRuntime.rulerId[p] >= 0 &&
 		!STATE.getRulerRelation({ state, nation: p })
 	const pair = Array.from({ length: state.P }, (_, p) => p)
 		.filter(free)
@@ -71,7 +70,6 @@ beforeAll(() => {
 	;[attacker, defender] = pair
 	for (const p of pair)
 		state.governmentType[p] = GOVERNMENT.getGovIdx().feudal_monarchy
-	claimant = state.people.rulerOf[attacker]
 }, 120000)
 
 afterEach(() => {
@@ -83,12 +81,12 @@ afterEach(() => {
 })
 
 describe("claim wars", () => {
-	it("are interstate wars that record the person they press", () => {
+	it("are interstate wars that record the rulers they press between", () => {
 		const war = declare()
 		expect(STATE.isRebelGoal({ goal: war.goal })).toBe(false)
 		expect(STATE.warSides({ war })).toEqual({ rebels: -1, crown: -1 })
-		expect(war.claimant).toBe(claimant)
-		expect(war.originalCrownRuler).toBe(state.people.rulerOf[defender])
+		expect(war.claimantRuler).toBe(state.leaderRuntime.rulerId[attacker])
+		expect(war.originalCrownRuler).toBe(state.leaderRuntime.rulerId[defender])
 		expect(OVERTHROW.stands({ state, war })).toBe(true)
 		expect(PEACE.buyoff({ state, war })).toBe(0)
 		occupyCapital(war)
@@ -124,7 +122,6 @@ describe("pressing a claim", () => {
 			state,
 			attacker,
 			defender: far,
-			claimant,
 			rng: HISTORY_RNG.createHistoryRng(2),
 		})
 		expect(state.wars.length).toBe(before)
@@ -135,11 +132,30 @@ describe("pressing a claim", () => {
 		const rng = HISTORY_RNG.createHistoryRng(2)
 		rng.random = () => 0
 		const before = state.wars.length
-		WAR.pressClaim({ state, attacker, defender, claimant, rng })
+		WAR.pressClaim({ state, attacker, defender, rng })
 		expect(state.wars.length).toBe(before + 1)
 		const war = state.wars[before]
 		expect(war.goal).toBe("claim")
-		expect(war.claimant).toBe(claimant)
+		expect(war.claimantRuler).toBe(state.leaderRuntime.rulerId[attacker])
+	})
+})
+
+describe("pressing a claim between allies", () => {
+	it("declares a claim war on a marriage partner despite the alliance", () => {
+		vi.spyOn(MILITARY, "threat").mockReturnValue(0)
+		STATE.setRelation({ state, a: attacker, b: defender, rel: STATE.rel.ALLY })
+		STATE.setDisposition({
+			state,
+			a: attacker,
+			b: defender,
+			disposition: STATE.disp.TRUSTED,
+		})
+		const rng = HISTORY_RNG.createHistoryRng(2)
+		rng.random = () => 0
+		const before = state.wars.length
+		WAR.pressClaim({ state, attacker, defender, rng })
+		expect(state.wars.length).toBe(before + 1)
+		expect(state.wars[before].goal).toBe("claim")
 	})
 })
 
@@ -156,10 +172,10 @@ describe("the end of a claim war", () => {
 		})
 		expect(result.outcome).toBe("union")
 		expect(Array.from(state.sovereignCurrent)).toEqual(owners)
-		expect(state.people.rulerOf[defender]).toBe(claimant)
-		expect(state.people.rulerOf[attacker]).toBe(claimant)
-		expect(STATE.unionSenior({ state, p: attacker })).toBe(
-			STATE.unionSenior({ state, p: defender }),
+		expect(state.leaderRuntime.rulerId[defender]).toBe(war.claimantRuler)
+		expect(state.leaderRuntime.rulerId[attacker]).toBe(war.claimantRuler)
+		expect(STATE.isUnionJunior({ state, p: attacker })).not.toBe(
+			STATE.isUnionJunior({ state, p: defender }),
 		)
 		expect(TRUCE.active({ state, a: attacker, b: defender })).toBe(false)
 		const tracker = HISTORY_VALIDATION.tracker()
@@ -172,8 +188,8 @@ describe("the end of a claim war", () => {
 		occupyCapital(war)
 		state.governmentType[defender] = GOVERNMENT.getGovIdx().elective_monarchy
 		const rulers = [
-			state.people.rulerOf[attacker],
-			state.people.rulerOf[defender],
+			state.leaderRuntime.rulerId[attacker],
+			state.leaderRuntime.rulerId[defender],
 		]
 		expect(
 			CONQUEST.settle({ state, war, rng: HISTORY_RNG.createHistoryRng(4) }),
@@ -183,8 +199,8 @@ describe("the end of a claim war", () => {
 		expect(ended?.data.reason).toBe("claim lapsed")
 		expect(ended?.data.winner).toBe(defender)
 		expect([
-			state.people.rulerOf[attacker],
-			state.people.rulerOf[defender],
+			state.leaderRuntime.rulerId[attacker],
+			state.leaderRuntime.rulerId[defender],
 		]).toEqual(rulers)
 		expect(TRUCE.active({ state, a: attacker, b: defender })).toBe(true)
 	})

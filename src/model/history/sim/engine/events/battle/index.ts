@@ -1,4 +1,3 @@
-import { COMMAND } from "@/model/history/sim/engine/events/battle/command"
 import { CONQUEST } from "@/model/history/sim/engine/events/battle/conquest"
 import { BATTLE_KIND } from "@/model/history/sim/engine/events/battle/kind"
 import type {
@@ -9,9 +8,7 @@ import type {
 	RunBattleParams,
 } from "@/model/history/sim/engine/events/battle/types"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
-import { PERSON_DEATH } from "@/model/history/sim/engine/events/people/death"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
@@ -128,42 +125,18 @@ function runBattle({
 	}
 	const terrain = TERRAIN.battlefield({ state, p: target })
 	const modifiers = BATTLE_KIND.modifiers({ kind, ambusher, terrain })
-	const attackerLeader = COMMAND.lead({ state, realm: attacker })
-	const defenderLeader = COMMAND.lead({ state, realm: defender })
 	const result = MILITARY.fight({
 		state,
 		war,
 		eventAttacker: attacker,
-		attackerMultiplier:
-			modifiers.attackerMultiplier *
-			COMMAND.multiplier({ state, realm: attacker }) *
-			(attackerLeader?.penalty ?? 1),
-		defenderMultiplier:
-			modifiers.defenderMultiplier *
-			COMMAND.multiplier({ state, realm: defender }) *
-			(defenderLeader?.penalty ?? 1),
+		attackerMultiplier: modifiers.attackerMultiplier,
+		defenderMultiplier: modifiers.defenderMultiplier,
 		rng,
 	})
 	if (result.outcome === "empty") {
 		PEACE.conclude({ state, war, rng, reason: "no troops" })
 		return
 	}
-	const attackerFell =
-		attackerLeader !== null &&
-		COMMAND.fatal({
-			state,
-			leader: attackerLeader,
-			own: result.attackerArmy,
-			enemy: result.defenderArmy,
-		})
-	const defenderFell =
-		defenderLeader !== null &&
-		COMMAND.fatal({
-			state,
-			leader: defenderLeader,
-			own: result.defenderArmy,
-			enemy: result.attackerArmy,
-		})
 	CONQUEST.apply({
 		state,
 		war,
@@ -188,10 +161,6 @@ function runBattle({
 					province: target,
 					attacker,
 					defender,
-					attackerLeader: attackerLeader?.person ?? -1,
-					defenderLeader: defenderLeader?.person ?? -1,
-					attackerLeaderKilled: attackerFell,
-					defenderLeaderKilled: defenderFell,
 					winner: result.attackerWon ? attacker : defender,
 					result: result.outcome,
 					initialResult: result.initialOutcome,
@@ -201,17 +170,6 @@ function runBattle({
 					vegetation: terrain.vegetation,
 					waterTarget: terrain.water,
 					terrainDefense: terrain.defense,
-					martialDifference:
-						GOVERNOR.attribute({
-							state,
-							realm: attacker,
-							attribute: "martial",
-						}) -
-						GOVERNOR.attribute({
-							state,
-							realm: defender,
-							attribute: "martial",
-						}),
 					loserShortfall: result.loserShortfall,
 					attackerArmy: Math.round(result.attackerArmy),
 					defenderArmy: Math.round(result.defenderArmy),
@@ -229,14 +187,6 @@ function runBattle({
 			})
 		},
 	})
-	// A leader killed in the battle dies once it is settled; their succession
-	// follows at once.
-	for (const [leader, fell] of [
-		[attackerLeader, attackerFell],
-		[defenderLeader, defenderFell],
-	] as const)
-		if (leader && fell)
-			PERSON_DEATH.kill({ state, person: leader.person, cause: "battle", rng })
 }
 
 export const BATTLE = {

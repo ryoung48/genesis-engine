@@ -2,14 +2,13 @@ const evt = {
 	SIEGE: 10,
 	WAR: 0,
 	BATTLE: 1,
-	DEATH: 2,
+	SUCCESSION: 2,
 	TAX: 3,
 	CENSUS: 4,
 	DIPLOMACY: 5,
 	REGENCY: 6,
 	RAID: 7,
-	PEOPLE_YEAR: 8,
-	BIRTH: 11,
+	YEAR: 8,
 } as const
 
 type EventType = (typeof evt)[keyof typeof evt]
@@ -18,15 +17,14 @@ const INITIAL_CAPACITY = 1024
 
 const DATA_FIELDS = 4
 
-// Same-time order: deaths, births, everything else, then the yearly people
-// pass; the enqueue sequence settles what remains. Both are folded into one
+// Same-time order: successions, everything else, then the yearly pass; the
+// enqueue sequence settles what remains. Both are folded into one
 // number so that a tie on time needs a single further comparison.
 const PRIORITY_STEP = 2 ** 44
 
 function priorityOf(type: number): number {
-	if (type === evt.DEATH) return 0
-	if (type === evt.BIRTH) return 1
-	return type === evt.PEOPLE_YEAR ? 3 : 2
+	if (type === evt.SUCCESSION) return 0
+	return type === evt.YEAR ? 2 : 1
 }
 
 // Packed storage keeps the simulation event queue small while serving its

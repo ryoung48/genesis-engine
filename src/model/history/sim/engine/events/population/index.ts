@@ -6,7 +6,6 @@ import type {
 	UrbanizationParams,
 } from "@/model/history/sim/engine/events/population/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -144,22 +143,7 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 	MILITARY.beforeCensus({ state })
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 
-	const factors = new Map<number, number>()
-	KNOWLEDGE.advanceKnowledge({
-		state,
-		yearFraction,
-		ownFactor: (realm) => {
-			let factor = factors.get(realm)
-			if (factor === undefined) {
-				factor = GOVERNOR.factor({
-					attribute: "learning",
-					value: GOVERNOR.attribute({ state, realm, attribute: "learning" }),
-				})
-				factors.set(realm, factor)
-			}
-			return factor
-		},
-	})
+	KNOWLEDGE.advanceKnowledge({ state, yearFraction })
 
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue

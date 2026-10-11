@@ -1,21 +1,10 @@
-import {
-	afterEach,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	vi,
-} from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { WAR } from "@/model/history/sim/engine/events/war"
-import { GOVERNOR } from "@/model/history/sim/engine/governor"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
-import { ATTRIBUTES } from "@/model/history/sim/people/attributes"
-import { OPINION } from "@/model/history/sim/people/opinion"
 import { HISTORY_RUN } from "@/test/history-run"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
 import type { RebelLogisticsObservation } from "@/test/history-run/report/military/rebel-logistics/types"
@@ -82,8 +71,8 @@ describe("independent breakaway armies", () => {
 			state,
 			p: rebel,
 			supporters: [supporter],
+			ruler: STATE.newHouse,
 			rng: HISTORY_RNG.createHistoryRng(41),
-			reason: "rebellion",
 		})
 		for (const [nation, target] of [
 			[crown, expectedCrown],
@@ -165,13 +154,6 @@ describe("independent breakaway armies", () => {
 })
 
 describe("observational rebellion evaluation notes", () => {
-	beforeEach(() => {
-		vi.spyOn(GOVERNOR, "attribute").mockReturnValue(
-			ATTRIBUTES.neutral("diplomacy"),
-		)
-		vi.spyOn(GOVERNOR, "personHas").mockReturnValue(false)
-		vi.spyOn(OPINION, "of").mockReturnValue(null)
-	})
 	afterEach(() => vi.restoreAllMocks())
 
 	it("rejects the threshold boundary without consuming randomness or changing armies", () => {

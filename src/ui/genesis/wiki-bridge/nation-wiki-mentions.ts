@@ -1,15 +1,9 @@
 import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
-import { PEOPLE_RECORD } from "@/model/history/record/people"
-import { PERSON_NAMES } from "@/model/history/record/people/names"
-import { uiPalette } from "@/ui/components/tokens"
+import { RULER_NAMES } from "@/model/history/record/rulers"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { HistoryTimeline } from "@/ui/genesis/view/types"
-import type {
-	PersonDisplayParams,
-	RecordPersonMentionParams,
-	RegentRoleParams,
-} from "@/ui/genesis/wiki-bridge/types"
+import type { RulerDisplayParams } from "@/ui/genesis/wiki-bridge/types"
 import { paletteColorForDynasty } from "@/ui/wiki/nation/timeline-formatting"
 import type { WikiTimelineEvent as NationTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
@@ -86,85 +80,24 @@ export function dynastyMention(
 	}
 }
 
-export function recordPersonMention({
-	people,
-	person,
-}: RecordPersonMentionParams): NationTimelineEvent["people"][number] | null {
-	const row = PERSON_NAMES.person({ people, person })
-	return row
-		? {
-				id: person,
-				name: row.name,
-				color: row.house
-					? paletteColorForDynasty(row.house)
-					: uiPalette.person.noHouse,
-			}
-		: null
-}
-
-// How a regent stands to the child they govern for, read from the recorded
-// family: parent, sibling, parent's sibling, else a kinsman or a protector.
-export function regentRole({
-	people,
-	regent,
-	ward,
-	kind,
-}: RegentRoleParams): string | null {
-	if (!people) return null
-	const regentRow = PEOPLE_RECORD.person({ people, id: regent })
-	const wardRow = PEOPLE_RECORD.person({ people, id: ward })
-	if (!regentRow || !wardRow) return null
-	const female = regentRow.sex === 1
-	if (kind === "spouse") return female ? "wife" : "husband"
-	const parents = [wardRow.father, wardRow.mother].filter((id) => id >= 0)
-	if (parents.includes(regent)) return female ? "mother" : "father"
-	if ([regentRow.father, regentRow.mother].some((id) => parents.includes(id)))
-		return female ? "sister" : "brother"
-	const grandparents = parents.flatMap((id) => {
-		const parent = PEOPLE_RECORD.person({ people, id })
-		return parent ? [parent.father, parent.mother] : []
-	})
-	if (
-		[regentRow.father, regentRow.mother].some(
-			(id) => id >= 0 && grandparents.includes(id),
-		)
-	)
-		return female ? "aunt" : "uncle"
-	if (kind === "relative") return female ? "kinswoman" : "kinsman"
-	if (kind === "protector") return female ? "lady protector" : "lord protector"
-	return null
-}
-
-export function personDisplay({
-	people,
-	payload: rawPayload,
-}: PersonDisplayParams): {
+// A ruler's name and house as plain text, from a simulated ruler's recorded
+// naming inputs or an Earth ruler's recorded strings.
+export function rulerDisplay({ record, payload }: RulerDisplayParams): {
 	description: string
 	dynasties: NationTimelineEvent["dynasties"]
-	people: NationTimelineEvent["people"]
 } {
-	const payload = PERSON_NAMES.payload({ people, payload: rawPayload })
-	const name = String(payload.name ?? payload.monarchName ?? "unknown")
-	const dynasty =
-		typeof payload.dynasty === "string" && payload.dynasty.trim()
+	const ref = RULER_NAMES.refOf(payload)
+	const named = ref ? RULER_NAMES.names({ record, ref }) : null
+	const name = named
+		? named.name
+		: String(payload.name ?? payload.monarchName ?? "unknown")
+	const dynasty = named
+		? named.house
+		: typeof payload.dynasty === "string" && payload.dynasty.trim()
 			? payload.dynasty
 			: null
-	// Simulated rulers carry their person id and link to their wiki page.
-	const person = typeof payload.person === "number" ? payload.person : -1
 	return {
 		description: dynasty ? `${name} ${dynasty}` : name,
 		dynasties: dynasty ? [dynastyMention(dynasty)] : [],
-		people:
-			person >= 0
-				? [
-						{
-							id: person,
-							name,
-							color: dynasty
-								? paletteColorForDynasty(dynasty)
-								: uiPalette.person.noHouse,
-						},
-					]
-				: [],
 	}
 }

@@ -1,8 +1,7 @@
-import type { ReligionDoctrine } from "@/model/history/sim/religion/doctrine/types"
 export interface RestrictGenderSystemsParams {
 	systems: Uint8Array
 	cultureToReligion: Int32Array
-	doctrine: ReligionDoctrine | undefined
+	religionGender: Uint8Array | undefined
 	seed: number
 }
 export interface AssignCultureGenderSystemsParams {
