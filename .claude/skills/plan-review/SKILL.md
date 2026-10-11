@@ -30,12 +30,12 @@ Write `round-N-prompt.md` in the working dir. Contents:
 
 Run from the repo root, foreground, with a long timeout (up to 600000 ms); if it may exceed that, use `run_in_background` and wait for the completion notification. Pipe the prompt via stdin so Windows quoting can't mangle it. Output goes to `round-N-review.md`.
 
-Models are fixed: Codex uses `sol-6.1`, Claude uses `claude-sonnet-5-5`. Do not substitute others.
+Models are fixed: Codex uses `gpt-6.1-sol`, Claude uses `claude-sonnet-5-5`. Do not substitute others.
 
 Codex (read-only sandbox):
 
 ```bash
-codex exec -m sol-6.1 -s read-only --skip-git-repo-check -C . -o "<dir>/round-N-review.md" - < "<dir>/round-N-prompt.md"
+codex exec -m gpt-6.1-sol -s read-only --skip-git-repo-check -C . -o "<dir>/round-N-review.md" - < "<dir>/round-N-prompt.md"
 ```
 
 Claude (read-only tools, headless):
