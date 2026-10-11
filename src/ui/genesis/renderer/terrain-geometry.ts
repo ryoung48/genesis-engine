@@ -7,6 +7,7 @@
 // those themselves, since geometry/material objects aren't worker-safe to
 // hand back as-is (only their underlying typed arrays are transferable).
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import { CONTOUR_SURFACE } from "@/ui/genesis/renderer/contours/surface"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import { getColor } from "@/ui/genesis/shared/colors"
 
@@ -21,6 +22,7 @@ function usesSmoothedHeightmapColors(
 export interface TerrainGeometryArrays {
 	positions: Float32Array
 	normals: Float32Array
+	contourControls: Float32Array
 	colors: Float32Array
 	faceToRegion: Int32Array
 }
@@ -46,15 +48,14 @@ export function computeTerrainGeometryArrays(
 	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 
 	const tElevation = new Float32Array(numTriangles)
-	const tElevationKm = new Float32Array(numTriangles)
+	const contourSurface = CONTOUR_SURFACE.create(world)
+	const tElevationKm = contourSurface.triangleElevationKm
 	for (let triangle = 0; triangle < numTriangles; triangle++) {
 		const sideOffset = 3 * triangle
 		const a = s_begin_r[sideOffset]
 		const b = s_begin_r[sideOffset + 1]
 		const c = s_begin_r[sideOffset + 2]
 		tElevation[triangle] = (elevation[a] + elevation[b] + elevation[c]) / 3
-		tElevationKm[triangle] =
-			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
 	}
 
 	let validSideCount = 0
@@ -62,6 +63,7 @@ export function computeTerrainGeometryArrays(
 		if (s_outer_t[side] >= 0) validSideCount++
 	}
 
+	const contourControls = new Float32Array(validSideCount * 30)
 	const faceToRegion = new Int32Array(validSideCount)
 	const positions = new Float32Array(validSideCount * 9)
 	const colors = new Float32Array(validSideCount * 9)
@@ -74,6 +76,16 @@ export function computeTerrainGeometryArrays(
 		if (tOuter < 0) continue
 
 		const region = s_begin_r[side]
+		CONTOUR_SURFACE.writeControls({
+			world,
+			surface: contourSurface,
+			innerTriangle: tInner,
+			outerTriangle: tOuter,
+			region,
+			mapOrder: false,
+			controls: contourControls,
+			face: faceIndex,
+		})
 		faceToRegion[faceIndex++] = region
 		const vertices = [
 			{
@@ -234,11 +246,12 @@ export function computeTerrainGeometryArrays(
 		}
 	}
 
-	return { positions, normals, colors, faceToRegion }
+	return { positions, normals, colors, contourControls, faceToRegion }
 }
 
 export interface MapGeometryArrays {
 	positions: Float32Array
+	contourControls: Float32Array
 	colors: Float32Array
 	lonLat: Float32Array
 	faceToRegion: Int32Array
@@ -261,16 +274,10 @@ export function computeMapGeometryArrays(
 		regionColors && regionColors.length >= mesh.numRegions * 3
 	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 
-	const triangleElevationKm = new Float32Array(mesh.numTriangles)
-	for (let triangle = 0; triangle < mesh.numTriangles; triangle++) {
-		const sideOffset = 3 * triangle
-		const a = s_begin_r[sideOffset]
-		const b = s_begin_r[sideOffset + 1]
-		const c = s_begin_r[sideOffset + 2]
-		triangleElevationKm[triangle] =
-			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
-	}
+	const contourSurface = CONTOUR_SURFACE.create(world)
+	const triangleElevationKm = contourSurface.triangleElevationKm
 
+	const contourControls = new Float32Array(numSides * 60)
 	const positions = new Float32Array(numSides * 18)
 	const colors = new Float32Array(numSides * 18)
 	const lonLat = new Float32Array(numSides * 12)
@@ -333,6 +340,16 @@ export function computeMapGeometryArrays(
 			cLon: number,
 			cLat: number,
 		) => {
+			CONTOUR_SURFACE.writeControls({
+				world,
+				surface: contourSurface,
+				innerTriangle: tInner,
+				outerTriangle: tOuter,
+				region,
+				mapOrder: true,
+				controls: contourControls,
+				face: triangleCount,
+			})
 			const offset = triangleCount * 9
 			faceToRegion[triangleCount] = region
 			const a = projection.projectRadians(aLon, aLat, 0)
@@ -384,6 +401,7 @@ export function computeMapGeometryArrays(
 	// over-allocated for the worst case (every side wraps into 2 triangles),
 	// and a view would keep that whole oversized buffer alive/transferred.
 	return {
+		contourControls: contourControls.slice(0, triangleCount * 30),
 		positions: positions.slice(0, triangleCount * 9),
 		colors: colors.slice(0, triangleCount * 9),
 		lonLat: lonLat.slice(0, triangleCount * 6),

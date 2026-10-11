@@ -11,11 +11,12 @@ import {
 	setNebulaBackgroundSeed as applyNebulaBackgroundSeed,
 	frameNebulaBackground,
 } from "@/ui/genesis/renderer/nebula-background"
-import {
-	buildSolarSystemOverlay,
-	type OrbitAddress,
-	type SolarSystemOverlayParams,
-} from "@/ui/genesis/solar-system/overlay"
+import { buildSolarSystemOverlay } from "@/ui/genesis/solar-system/overlay/overlay"
+import type {
+	OrbitAddress,
+	SolarSystemOverlayParams,
+	SolarSystemOverlayState,
+} from "@/ui/genesis/solar-system/overlay/types"
 
 export interface SolarSystemControllerDeps {
 	requestRender: () => void
@@ -26,25 +27,48 @@ export interface SolarSystemControllerDeps {
 const SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER = 6
 const SOLAR_SYSTEM_MIN_FOCUS_DISTANCE = 0.3
 
-/** Owns the solar-system view: entering/leaving it (setSolarSystemActive),
- * the star-system overlay itself (setSolarSystemOverlay/
- * updateSolarSystemOverlay), the clock knobs (updateSolarSystemDay/
- * setSolarSystemSpinHours), focusing the camera on a body or moon
- * (focusOnSystemBody + its tween step), and the separate moon-orbit
- * overlay used in the planet view. See
- * plans/genesis-scene-controller-split.md. */
 export function createSolarSystemController(
 	ctx: GenesisContext,
 	deps: SolarSystemControllerDeps,
 ) {
-	// The black-hole material composites additively with normal depth testing
-	// (see buildSolarSystemOverlay) instead of needing a captured copy of the
-	// previous frame to distort, and the star's glow comes from its own corona
-	// shells rather than a post-process -- so this is just a normal
-	// single-pass render, same as any other scene.
+	let compilationNeeded = false
+	let compilation: Promise<void> | null = null
+	let disposed = false
+	const retiredOverlays = new Set<SolarSystemOverlayState>()
+
+	function disposeRetiredOverlays() {
+		for (const overlay of retiredOverlays) overlay.dispose()
+		retiredOverlays.clear()
+	}
+
 	function renderSolarSystemView() {
+		if (disposed || compilation) return
+		if (compilationNeeded) {
+			compilationNeeded = false
+			// Acquire the new materials' programs before releasing the previous
+			// overlay, so shared shader variants stay in the renderer's cache.
+			compilation = ctx.renderer
+				.compileAsync(ctx.solarSystemGroup, ctx.camera)
+				.then(() => {
+					if (!compilationNeeded) disposeRetiredOverlays()
+				})
+				.catch((error: unknown) => {
+					console.error("Solar system shader compilation failed", error)
+				})
+				.finally(() => {
+					compilation = null
+					if (!disposed) deps.requestRender()
+				})
+			return
+		}
 		frameNebulaBackground({ mesh: ctx.nebulaBackground, camera: ctx.camera })
 		ctx.renderer.render(ctx.scene, ctx.camera)
+	}
+
+	async function finishCompilation() {
+		disposed = true
+		await compilation
+		disposeRetiredOverlays()
 	}
 
 	function stepSolarSystemFocusTween() {
@@ -159,6 +183,7 @@ export function createSolarSystemController(
 	}
 
 	function setSolarSystemActive(active: boolean) {
+		if (disposed) return
 		if (ctx.solarSystemActive === active) return
 		ctx.solarSystemActive = active
 		ctx.solarSystemGroup.visible = active
@@ -182,6 +207,7 @@ export function createSolarSystemController(
 		// toggle invisible — suppress them while this view is active.
 		ctx.ambient.visible = !active
 		ctx.sun.visible = !active
+		if (active && ctx.solarSystemOverlayState) compilationNeeded = true
 		if (active) {
 			ctx.savedCameraPosition = ctx.camera.position.clone()
 			ctx.savedControlsTarget = ctx.controls.target.clone()
@@ -207,11 +233,13 @@ export function createSolarSystemController(
 	}
 
 	function setSolarSystemOverlay(params: SolarSystemOverlayParams | null) {
+		if (disposed) return
 		if (ctx.solarSystemOverlayState) {
 			ctx.solarSystemGroup.remove(ctx.solarSystemOverlayState.group)
-			ctx.solarSystemOverlayState.dispose()
+			retiredOverlays.add(ctx.solarSystemOverlayState)
 			ctx.solarSystemOverlayState = null
 		}
+		compilationNeeded = params !== null
 		if (params) {
 			ctx.solarSystemOverlayState = buildSolarSystemOverlay(params)
 			ctx.solarSystemGroup.add(ctx.solarSystemOverlayState.group)
@@ -235,6 +263,7 @@ export function createSolarSystemController(
 			return
 		}
 		if (
+			compilation ||
 			!ctx.solarSystemOverlayState ||
 			!ctx.solarSystemOverlayState.updateBodies(
 				params.bodies,
@@ -246,6 +275,7 @@ export function createSolarSystemController(
 				initialDay: ctx.currentSolarSystemDay,
 			})
 		}
+		compilationNeeded = true
 		ctx.solarSystemOverlayState?.setSpinHours(ctx.currentSolarSystemSpinHours)
 		reapplyTrackedSolarSystemFocus()
 		deps.requestRender()
@@ -287,15 +317,13 @@ export function createSolarSystemController(
 		ctx.solarSystemFocusChangeHandler = handler
 	}
 
-	/** Tints the nebula backdrop toward the given system's own seed-derived
-	 * hue -- call alongside setSolarSystemOverlay, which doesn't itself
-	 * carry the seed. */
 	function setNebulaBackgroundSeed(seed: number) {
 		applyNebulaBackgroundSeed({ mesh: ctx.nebulaBackground, seed })
 		deps.requestRender()
 	}
 
 	return {
+		finishCompilation,
 		renderSolarSystemView,
 		stepSolarSystemFocusTween,
 		focusOnSystemBody,

@@ -1,5 +1,6 @@
 ﻿import * as THREE from "three"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import { CONTOURS } from "@/ui/genesis/renderer/contours"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
 	createPlaceholderSatelliteTexture,
@@ -43,7 +44,13 @@ export function buildTerrainMesh(
 	// Earth". Anything else (a non-default color mode already selected,
 	// region colors already set) falls back to computing it here.
 	const precomputed = world.precomputedTerrainGeometry
-	const { positions, normals, colors, faceToRegion }: TerrainGeometryArrays =
+	const {
+		positions,
+		normals,
+		colors,
+		contourControls,
+		faceToRegion,
+	}: TerrainGeometryArrays =
 		precomputed && colorMode === "terrain" && !regionColors && elevationVisible
 			? precomputed
 			: computeTerrainGeometryArrays(
@@ -57,6 +64,7 @@ export function buildTerrainMesh(
 	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 	geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3))
 	geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+	CONTOURS.addAttributes({ geometry, controls: contourControls })
 	geometry.setAttribute(
 		"occColor",
 		new THREE.BufferAttribute(new Float32Array(faceToRegion.length * 9), 3),
@@ -126,6 +134,12 @@ export function buildTerrainMesh(
 		)
 	}
 
+	CONTOURS.attach({
+		material,
+		visible: false,
+		fragmentTarget: "#include <opaque_fragment>",
+		colorExpression: "outgoingLight",
+	})
 	return { mesh: new THREE.Mesh(geometry, material), faceToRegion }
 }
 
@@ -193,7 +207,13 @@ export function buildMapMesh(
 	// the default color mode/map center before the world reaches the main
 	// thread. Anything else falls back to computing it here.
 	const precomputed = world.precomputedMapGeometry
-	const { positions, colors, lonLat, faceToRegion }: MapGeometryArrays =
+	const {
+		positions,
+		colors,
+		lonLat,
+		contourControls,
+		faceToRegion,
+	}: MapGeometryArrays =
 		precomputed &&
 		colorMode === "terrain" &&
 		!regionColors &&
@@ -215,6 +235,7 @@ export function buildMapMesh(
 	const geometry = new THREE.BufferGeometry()
 	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 	geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+	CONTOURS.addAttributes({ geometry, controls: contourControls })
 	geometry.setAttribute("lonLat", new THREE.BufferAttribute(lonLat, 2))
 
 	const vertexCount = faceToRegion.length * 3
@@ -297,6 +318,12 @@ export function buildMapMesh(
 		`,
 	})
 
+	CONTOURS.attach({
+		material,
+		visible: false,
+		fragmentTarget: "gl_FragColor = linearToOutputTexel",
+		colorExpression: "finalColor",
+	})
 	const meshObject = new THREE.Mesh(geometry, material)
 	const cloneL = new THREE.Mesh(geometry, material)
 	const cloneR = new THREE.Mesh(geometry, material)

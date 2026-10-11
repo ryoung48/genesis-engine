@@ -341,6 +341,7 @@ export type GenesisSceneSyncInput = {
 	titleBorderTiers: readonly TitleBorderTier[]
 	sceneFrame: WorldFrame | null
 	showWireframe: boolean
+	showContours: boolean
 	showCoastlines: boolean
 	showGrid: boolean
 	gridSpacing: number

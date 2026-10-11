@@ -233,6 +233,7 @@ export interface GenesisScene {
 	setAtmospherePressure(pressureBar: number): void
 	setGlobeCloudTexturePath(texturePath: string | null): void
 	setCloudsVisible(visible: boolean): void
+	setContoursVisible(visible: boolean): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
 	focusOnProvince(provinceId: number, opts?: FocusOnProvinceOptions): void

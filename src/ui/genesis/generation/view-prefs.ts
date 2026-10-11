@@ -42,6 +42,7 @@ export interface StoredViewPrefs {
 	showElevation: boolean
 	showThermalEquator: boolean
 	showClouds: boolean
+	showContours: boolean
 	showCoastlines: boolean
 	showWindArrows: boolean
 	showGdd: boolean
@@ -180,6 +181,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showElevation: true,
 	showThermalEquator: false,
 	showClouds: false,
+	showContours: false,
 	showCoastlines: false,
 	showWindArrows: false,
 	showGdd: false,
@@ -355,6 +357,10 @@ export function parseStoredViewPrefs(
 				DEFAULT_VIEW_PREFS.showThermalEquator,
 			),
 			showClouds: readBoolean(parsed.showClouds, DEFAULT_VIEW_PREFS.showClouds),
+			showContours: readBoolean(
+				parsed.showContours,
+				DEFAULT_VIEW_PREFS.showContours,
+			),
 			showCoastlines: readBoolean(
 				parsed.showCoastlines,
 				DEFAULT_VIEW_PREFS.showCoastlines,

@@ -237,6 +237,16 @@ export function createTerrainController(
 		ctx.mapCloudMesh = null
 	}
 
+	function setContoursVisible(visible: boolean) {
+		ctx.contoursVisible = visible
+		for (const mesh of [ctx.terrainMesh, ctx.mapMesh]) {
+			if (!mesh) continue
+			const material = mesh.material as THREE.Material
+			material.userData.contourVisibility.value = visible ? 1 : 0
+		}
+		deps.requestRender()
+	}
+
 	function rebuildTerrain() {
 		if (!ctx.currentWorld) return
 		disposeObject3D(ctx.globeGroup, ctx.terrainMesh)
@@ -263,6 +273,7 @@ export function createTerrainController(
 		)
 		ctx.mapMesh = mapBuild.mesh
 		ctx.mapFaceToRegion = mapBuild.faceToRegion
+		setContoursVisible(ctx.contoursVisible)
 		ctx.globeGroup.add(ctx.terrainMesh)
 		ctx.scene.add(ctx.mapMesh)
 		ctx.mapCloudMesh = buildMapCloudMesh(ctx.mapMesh.geometry, ctx.mapCloudMat)
@@ -374,5 +385,6 @@ export function createTerrainController(
 		setRegionColors,
 		setDisplayColors,
 		setOccupationOverlay,
+		setContoursVisible,
 	}
 }

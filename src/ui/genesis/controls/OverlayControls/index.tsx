@@ -61,7 +61,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowThermalEquator,
 	showClouds,
 	setShowClouds,
+	showContours,
 	showCoastlines,
+	setShowContours,
 	setShowCoastlines,
 	showWindArrows,
 	setShowWindArrows,
@@ -347,6 +349,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setShowThermalEquator={setShowThermalEquator}
 									showClouds={showClouds}
 									setShowClouds={setShowClouds}
+									showContours={showContours}
+									setShowContours={setShowContours}
 									showCoastlines={showCoastlines}
 									setShowCoastlines={setShowCoastlines}
 									availableVariants={availableVariants}

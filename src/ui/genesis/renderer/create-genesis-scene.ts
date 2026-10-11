@@ -67,6 +67,7 @@ export function createGenesisScene(
 		setRegionColors,
 		setDisplayColors,
 		setOccupationOverlay,
+		setContoursVisible,
 	} = createTerrainController(context, {
 		rebuildOverlays: () => rebuildOverlays(),
 		updateOverlayVisibility: () => updateOverlayVisibility(),
@@ -423,7 +424,10 @@ export function createGenesisScene(
 	} = lightingController
 
 	return {
-		dispose,
+		dispose: () => {
+			animationLoopController.dispose()
+			void solarSystemController.finishCompilation().then(dispose)
+		},
 		resize,
 		updateWorld,
 		exportMapPng,
@@ -433,6 +437,7 @@ export function createGenesisScene(
 		setNationFillColorForRawId,
 		setNationOccupationStripeColorForRawId,
 		setOccupationOverlay,
+		setContoursVisible,
 		setHoveredRegion,
 		setNationBordersVisible,
 		setEarthHistoryNationOverride,

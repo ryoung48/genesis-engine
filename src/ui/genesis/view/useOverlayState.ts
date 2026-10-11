@@ -26,17 +26,6 @@ import { syncLabelModeToMapMode } from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import type { OverlayStateInput } from "@/ui/genesis/view/types"
 
-/**
- * Owns every persisted map/overlay view preference: the active map mode and
- * its sub-modes, the overlay toggles, the day/month clock, the measure and
- * pathfinding modes, and the projection/unit settings -- plus the single
- * effect that serializes the whole blob back to localStorage whenever any of
- * them changes.
- *
- * Scene side effects are deliberately NOT here: toggles that also have to
- * push state into the renderer (wireframe, elevation, measure-mode reset)
- * stay with the scene wiring so the coupling is visible at the call site.
- */
 export function useOverlayState(input: OverlayStateInput) {
 	const { initialViewPrefs, initialGenerationSession, sessionNamespace } = input
 	const viewPrefsStorageKey = sessionNamespace
@@ -123,6 +112,9 @@ export function useOverlayState(input: OverlayStateInput) {
 		initialViewPrefs.showThermalEquator,
 	)
 	const [showClouds, setShowClouds] = useState(initialViewPrefs.showClouds)
+	const [showContours, setShowContours] = useState(
+		initialViewPrefs.showContours,
+	)
 	const [showCoastlines, setShowCoastlines] = useState(
 		initialViewPrefs.showCoastlines,
 	)
@@ -239,6 +231,7 @@ export function useOverlayState(input: OverlayStateInput) {
 				showElevation,
 				showThermalEquator,
 				showClouds,
+				showContours,
 				showCoastlines,
 				showWindArrows,
 				showGdd,
@@ -309,6 +302,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showRivers,
 		showThermalEquator,
 		showClouds,
+		showContours,
 		showCoastlines,
 		showWindArrows,
 		showGdd,
@@ -380,6 +374,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setReligionMode,
 		setShowAet,
 		setShowClouds,
+		setShowContours,
 		setShowCoastlines,
 		setShowDaylight,
 		setShowElevation,
@@ -410,6 +405,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setViewMode,
 		showAet,
 		showClouds,
+		showContours,
 		showCoastlines,
 		showDaylight,
 		showElevation,

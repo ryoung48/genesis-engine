@@ -58,6 +58,8 @@ export interface OverlayControlsProps {
 	setShowThermalEquator: (v: boolean) => void
 	showClouds: boolean
 	setShowClouds: (v: boolean) => void
+	showContours: boolean
+	setShowContours: (v: boolean) => void
 	showCoastlines: boolean
 	setShowCoastlines: (v: boolean) => void
 	showWindArrows: boolean

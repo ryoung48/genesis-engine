@@ -200,6 +200,7 @@ export const GenesisView: React.FC<{
 		setSocietyMode,
 		setReligionMode,
 		setShowAet,
+		setShowContours,
 		setShowCoastlines,
 		setShowDaylight,
 		setShowElevation,
@@ -229,6 +230,7 @@ export const GenesisView: React.FC<{
 		setVegetationSubMode,
 		setViewMode,
 		showAet,
+		showContours,
 		showCoastlines,
 		showDaylight,
 		showElevation,
@@ -1496,6 +1498,7 @@ export const GenesisView: React.FC<{
 		titleBorderTiers: activeTitleBorderTiers,
 		sceneFrame,
 		showWireframe,
+		showContours,
 		showCoastlines,
 		showGrid,
 		gridSpacing,
@@ -2206,6 +2209,8 @@ export const GenesisView: React.FC<{
 								setShowThermalEquator={setShowThermalEquator}
 								showClouds={showClouds}
 								setShowClouds={setShowClouds}
+								showContours={showContours}
+								setShowContours={setShowContours}
 								showCoastlines={showCoastlines}
 								setShowCoastlines={setShowCoastlines}
 								showWindArrows={showWindArrows}

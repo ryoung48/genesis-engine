@@ -92,6 +92,7 @@ export interface GenesisContext {
 	currentViewMode: GenesisViewMode
 	currentMapCenterLongitudeDeg: number
 	currentMapProjectionLatitudeDeg: number
+	contoursVisible: boolean
 	elevationVisible: boolean
 	/** River line materials, recolored by terrain-controller's
 	 * applyWaterMaterialForMode whenever the color mode changes; rebuilt by

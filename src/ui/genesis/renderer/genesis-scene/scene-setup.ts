@@ -241,6 +241,7 @@ export function buildGenesisSceneSetup(
 		currentViewMode: "globe",
 		currentMapCenterLongitudeDeg: 0,
 		currentMapProjectionLatitudeDeg: 0,
+		contoursVisible: false,
 		elevationVisible: true,
 		riverMaterials: [],
 		globeCoastlineOverlay: null,

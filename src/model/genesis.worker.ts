@@ -626,6 +626,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.tradeGoods) add(world.tradeGoods.buffer)
 	if (world.precomputedTerrainGeometry) {
 		add(
+			world.precomputedTerrainGeometry.contourControls.buffer,
 			world.precomputedTerrainGeometry.positions.buffer,
 			world.precomputedTerrainGeometry.normals.buffer,
 			world.precomputedTerrainGeometry.colors.buffer,
@@ -634,6 +635,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	}
 	if (world.precomputedMapGeometry) {
 		add(
+			world.precomputedMapGeometry.contourControls.buffer,
 			world.precomputedMapGeometry.positions.buffer,
 			world.precomputedMapGeometry.colors.buffer,
 			world.precomputedMapGeometry.lonLat.buffer,

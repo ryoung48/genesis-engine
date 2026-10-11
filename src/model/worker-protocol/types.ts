@@ -285,12 +285,14 @@ export interface SerializedGenesisWorld {
 	 * state (a non-default color mode, region colors, a panned map) is
 	 * computed on the main thread as before. */
 	precomputedTerrainGeometry?: {
+		contourControls: Float32Array
 		positions: Float32Array
 		normals: Float32Array
 		colors: Float32Array
 		faceToRegion: Int32Array
 	}
 	precomputedMapGeometry?: {
+		contourControls: Float32Array
 		positions: Float32Array
 		colors: Float32Array
 		lonLat: Float32Array

@@ -14,7 +14,7 @@ import { getSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
 import type {
 	CompanionOverlayParams,
 	OrbitAddress,
-} from "@/ui/genesis/solar-system/overlay"
+} from "@/ui/genesis/solar-system/overlay/types"
 import type { SolarSystemViewInput } from "@/ui/genesis/view/types"
 
 const DEFAULT_COMPANION_DAYS_PER_YEAR = 365
@@ -187,6 +187,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	// whole overlay (and re-fetching every body's texture) on every tick.
 	const solarSystemElapsedHoursRef = useRef(solarSystemElapsedHours)
 	solarSystemElapsedHoursRef.current = solarSystemElapsedHours
+	const overlayBodiesRef = useRef<SystemBody[] | null>(null)
 	// The main world's real simulated terrain/vegetation, rendered as its
 	// solar-system-view surface texture -- for every main world except a real
 	// Earth import, which keeps the curated Earth photo (its "real" surface
@@ -264,6 +265,9 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		if (solarSystemViewActive && systemBodiesRef.current.length > 0) {
 			sceneRef.current?.setNebulaBackgroundSeed(seed)
 		}
+		overlayBodiesRef.current = solarSystemViewActive
+			? systemBodiesRef.current
+			: null
 	}, [
 		solarSystemViewActive,
 		effectiveDaysPerYear,
@@ -282,7 +286,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
-		if (!solarSystemViewActive) return
+		if (!solarSystemViewActive || overlayBodiesRef.current === systemBodies)
+			return
 		const initialDay = solarSystemElapsedHoursRef.current / 24
 		sceneRef.current?.updateSolarSystemOverlay(
 			solarSystemViewActive
@@ -320,6 +325,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 					}
 				: null,
 		)
+		overlayBodiesRef.current = systemBodies
 	}, [
 		systemBodies,
 		solarSystemViewActive,
