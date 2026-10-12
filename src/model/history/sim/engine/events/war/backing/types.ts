@@ -14,6 +14,7 @@ export interface BackerEnemiesParams {
 }
 
 export interface RepayParams {
+	rng: SharedRng
 	state: HistoryState
 	war: War
 	outcome: PeaceOutcome

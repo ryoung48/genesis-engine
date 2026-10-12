@@ -26,7 +26,6 @@ import type {
 	RatioParams,
 	SampleParams,
 	SummarizeParams,
-	TieKindParams,
 	TreasuryRole,
 	WarEnding,
 	WarEndingParams,
@@ -57,16 +56,6 @@ const RELATION_NAMES = Object.fromEntries(
 ) as Record<string, string>
 
 const LONG_PEACE_YEARS = 20
-
-function tieKind({
-	tie,
-}: TieKindParams): "alliance" | "vassal" | "union" | "war" | null {
-	if (tie === STATE.rel.ALLY) return "alliance"
-	if (tie === STATE.rel.VASSAL || tie === STATE.rel.OVERLORD) return "vassal"
-	if (tie === STATE.rel.PU_JUNIOR || tie === STATE.rel.PU_SENIOR) return "union"
-	if (tie === STATE.rel.WAR) return "war"
-	return null
-}
 
 const FISCAL_PROBE: FiscalProbe = {
 	surplus: ECONOMY.surplus,
@@ -114,7 +103,6 @@ function emptyWindow(): MilitaryWindow {
 		unionsContinued: 0,
 		claimCandidates: 0,
 		claimsPressed: 0,
-		tiePairs: {},
 		firstTiePairs: {},
 		lastTiePairs: {},
 		dispositionPairs: {},
@@ -131,7 +119,6 @@ function emptyWindow(): MilitaryWindow {
 		cutOffJoinedWars: 0,
 		vassalSamples: 0,
 		vassalPairs: 0,
-		alliances: 0,
 		alliancesFormed: 0,
 		alliancesEnded: 0,
 		vassalsFormed: 0,
@@ -488,7 +475,7 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 	}
 }
 
-function attach({ engine, probe }: AttachParams): AttachedTracker {
+function attach({ engine, probe, initialTies }: AttachParams): AttachedTracker {
 	const tracker = {
 		probe,
 		warGovernment: new Map(),
@@ -501,26 +488,8 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 		peaceYears: new Map(),
 		window: emptyWindow(),
 	}
-	const initial = tracker.window.firstTiePairs
-	for (let nation = 0; nation < engine.P; nation++) {
-		if (
-			engine.desolate[nation] ||
-			!STATE.isSovereign({ state: engine, p: nation })
-		)
-			continue
-		for (const other of engine.relationColumns[nation]) {
-			if (
-				other <= nation ||
-				engine.desolate[other] ||
-				!STATE.isSovereign({ state: engine, p: other })
-			)
-				continue
-			const kind = tieKind({
-				tie: STATE.getRelation({ state: engine, a: nation, b: other }),
-			})
-			if (kind) initial[kind] = (initial[kind] ?? 0) + 1
-		}
-	}
+	for (const kind of ["alliance", "vassal", "union", "war"] as const)
+		tracker.window.firstTiePairs[kind] = initialTies.snapshot.ties[kind].pairs
 	const events = engine.events
 	const push = events.push.bind(events)
 	events.push = (...notes) => {
@@ -572,7 +541,7 @@ function attach({ engine, probe }: AttachParams): AttachedTracker {
 	}
 }
 
-function sample({ engine, tracker, sampleRelations }: SampleParams): void {
+function sample({ engine, tracker, relations }: SampleParams): void {
 	const window = tracker.window
 	for (let nation = 0; nation < engine.P; nation++) {
 		if (
@@ -653,9 +622,14 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 			tracker.recovering.delete(nation)
 		}
 	}
-	if (!sampleRelations) return
+	if (!relations) return
 	window.vassalSamples++
-	const beforeTies = { ...window.tiePairs }
+	for (const kind of ["alliance", "vassal", "union", "war"] as const) {
+		const pairs = relations.snapshot.ties[kind].pairs
+		window.lastTiePairs[kind] = pairs
+	}
+	window.invalidAlliances += relations.invalidAlliances
+	window.mixedGovernmentUnions += relations.mixedGovernmentUnions
 	const beforeDispositions = { ...window.dispositionPairs }
 	const beforeVassalDispositions = { ...window.vassalDispositionPairs }
 	for (let nation = 0; nation < engine.P; nation++) {
@@ -680,30 +654,6 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 				if (STATE.diplomaticOverlord({ state: engine, nation: other }) >= 0)
 					window.vassalsChained++
 			}
-		for (const other of engine.relationColumns[nation]) {
-			if (
-				other <= nation ||
-				engine.desolate[other] ||
-				!STATE.isSovereign({ state: engine, p: other })
-			)
-				continue
-			const tie = STATE.getRelation({ state: engine, a: nation, b: other })
-			const kind = tieKind({ tie })
-			if (kind) window.tiePairs[kind] = (window.tiePairs[kind] ?? 0) + 1
-			if (
-				kind === "union" &&
-				[nation, other].some(
-					(p) =>
-						GOVERNMENT.successionOfIndex(engine.governmentType[p]) !==
-						"single_heir",
-				)
-			)
-				window.mixedGovernmentUnions++
-			if (tie !== STATE.rel.ALLY) continue
-			window.alliances++
-			if (!STATE.canAlly({ state: engine, a: nation, b: other }))
-				window.invalidAlliances++
-		}
 		for (const other of STATE.getNationNeighbors({ state: engine, nation })) {
 			if (other < nation) continue
 			const disposition = STATE.getDisposition({
@@ -720,13 +670,6 @@ function sample({ engine, tracker, sampleRelations }: SampleParams): void {
 			window.relationPairs[name] = (window.relationPairs[name] ?? 0) + 1
 		}
 	}
-	const censusTies = Object.fromEntries(
-		Object.entries(window.tiePairs).map(([kind, count]) => [
-			kind,
-			count - (beforeTies[kind] ?? 0),
-		]),
-	)
-	window.lastTiePairs = censusTies
 	window.lastDispositionPairs = Object.fromEntries(
 		Object.entries(window.dispositionPairs).map(([level, count]) => [
 			level,
@@ -854,10 +797,6 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	report["vassalageEnded.n"] = window.vassalageEnded
 	for (const [cause, count] of Object.entries(window.vassalageEndedByCause))
 		report[`vassalage.ended.cause.${cause}`] = count
-	report["vassals.mean"] =
-		window.vassalPairs / Math.max(1, window.vassalSamples)
-	report["alliances.mean"] =
-		window.alliances / Math.max(1, window.vassalSamples)
 	report["alliances.invalid"] = window.invalidAlliances
 	const sovereignYears = Math.max(1, totalSovereigns * 100)
 	report["ties.alliance.formed.perSovereignYear"] =
@@ -1091,14 +1030,6 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	))
 		report[`vassalage.ended.perVassalYear.${level.toLowerCase()}`] =
 			count / Math.max(1, window.vassalDispositionPairs[level] ?? 0)
-	for (const [kind, count] of Object.entries(window.tiePairs))
-		report[`ties.${kind}.n`] = count / Math.max(1, window.vassalSamples)
-	for (const kind of ["alliance", "vassal", "union", "war"])
-		for (const [time, counts] of [
-			["initial", window.firstTiePairs],
-			["horizon", window.lastTiePairs],
-		] as const)
-			report[`ties.${kind}.${time}.n`] = counts[kind] ?? 0
 	const dispositionTotal = Object.values(window.dispositionPairs).reduce(
 		(sum, n) => sum + n,
 		0,

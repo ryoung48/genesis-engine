@@ -22,6 +22,10 @@ export interface RunYearParams {
 	rng: SharedRng
 }
 
+export interface FormYearParams extends RunYearParams {
+	formationScale: number
+}
+
 export interface TieChanceParams {
 	state: HistoryState
 	realm: number

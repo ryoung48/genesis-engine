@@ -52,7 +52,7 @@ Local measurements are in `stats/history/2026-10-03T20-58-05-000Z-scrub-memory-m
 
 `src/test/history-run/pipeline-optimization.smoke.test.ts` transfers census buffers, releases worker batches, consumes browser queues and compares the complete streamed record with a retained-batch record across 20 years. It checks frames at census dates and between censuses in reverse order, and checks that all three frame arrays reference the correct census snapshot.
 
-The optional `src/test/history-run/retained-memory.smoke.test.ts` harness records memory, the ruler state's size, simulation/translation timing, scrub reconstruction timing and hashes. `HISTORY_MEMORY_RETAIN=1` reproduces the former retained-journal behavior and adds back the former census copies for timing comparisons; it is confined to the measurement harness. Scrub timing excludes hash serialization.
+The optional `src/test/history-run/retained-memory.smoke.test.ts` harness (204,000 points, 300 years) records memory at the start and end of the run, the ruler state's size, simulation/translation timing, scrub reconstruction timing and hashes. `HISTORY_MEMORY_RETAIN=1` reproduces the former retained-journal behavior and adds back the former census copies for timing comparisons; it is confined to the measurement harness. Scrub timing excludes hash serialization.
 
 The harness hashes JSON values with explicit map entries and non-finite/negative-zero number representations, so sharing an empty array does not change the result hash. `hashFormat: "value-json-v1"` marks these hashes; they cannot be compared directly with the initial V8 serialization hashes. Memory is collected after yielding to the event loop, releasing temporary hash serialization strings before GC. The `gcAfterYield` flag distinguishes these samples from earlier exploratory measurements.
 
@@ -82,4 +82,6 @@ The detailed-report runner already releases journals and does not build the brow
 
 ## Ruler-only measurement
 
-With no people record, the 933-year report `stats/history/2026-10-11T21-43-35-790Z-ruler-only-people/933.json` peaked at 2,360.6 MiB against 2,466.8 MiB before (−4.3%, one shared-machine sample each). The census, province and military buffers, not the people record, dominate the peak.
+The retained-memory harness runs 300 years on the 204,000-point world and collects garbage before each reading. Against the commit before the ruler-only change, both runs started at the same size (about 1.1 GiB of heap plus array buffers, almost all of it the generated world). After 300 years the retained heap was 217 MiB instead of 365 MiB (a 148 MiB saving, 41% of the heap, 13% of everything retained) while array buffers were unchanged at about 700 MiB, because the census columns are the same. Heap growth since the start fell from 280 to 141 MiB.
+
+The 933-year report's peak RSS fell by only 4.3% (2,467 to 2,361 MiB) because most of the peak is the world, which the change does not touch, plus transient allocations. RSS after a collection varied by hundreds of MiB between identical runs and is not a usable comparison; heap used plus array buffers is.

@@ -51,6 +51,8 @@ export interface WarFrame {
 	rebel: boolean
 	attackers: number[]
 	defenders: number[]
+	// Nations fighting against the crown; empty unless the war is a rebellion or a throne war.
+	rebels: number[]
 	occupiedProvinces: number[]
 }
 

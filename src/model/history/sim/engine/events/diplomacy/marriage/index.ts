@@ -1,4 +1,6 @@
+import { DIPLOMATIC_FORMATION } from "@/model/history/sim/engine/events/diplomacy/formation"
 import type {
+	FormYearParams,
 	MarriagePartner,
 	PairParams,
 	RealmParams,
@@ -13,16 +15,16 @@ import type {
 } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
-// Yearly chance that a realm holding no tie takes one, from 88.6 ties standing
-// on average among 237.6 marrying realms, 59% of which hold none, with an
-// assumed tie lasting 11.4 years: 88.6 / (237.6 * 0.59 * 11.4). The duration
-// is a calibration guess from the age tables; the report's marriageTies fields
-// check the resulting mix.
-const MARRIAGE_CHANCE = 0.055
+const MARRIAGE_CHANCE = DIPLOMATIC_FORMATION.chance({ base: 0.055 })
 // Each tie a realm already holds halves its chance of another, and a partner's
 // chance of accepting one. An assumption: monogamous rulers rarely take further
 // royal marriages, but kings did marry again across generations.
 const TIE_RETURN = 0.5
+// Keep the three-pass warm-up; the formation scale also applies here.
+const SEED_YEARS = 3
+// The half-formation report still seeded 107 tied realms against a target
+// near 90; this init-only factor compensates for newly eligible free realms.
+const SEED_FORMATION_SCALE = 0.8
 
 const UNALLIABLE = new Set<Relation>([
 	STATE.rel.WAR,
@@ -126,8 +128,7 @@ function review({ state }: StateParams): void {
 			STATE.endMarriageAlliance({ state, key })
 }
 
-function runYear({ state, rng }: RunYearParams): void {
-	review({ state })
+function formYear({ state, rng, formationScale }: FormYearParams): void {
 	for (let realm = 0; realm < state.P; realm++) {
 		if (state.desolate[realm] || !marries({ state, realm })) continue
 		const partners = [
@@ -140,7 +141,7 @@ function runYear({ state, rng }: RunYearParams): void {
 			)
 			.sort((x, y) => x - y)
 		if (partners.length === 0) continue
-		if (rng.random() >= chance({ state, realm })) continue
+		if (rng.random() >= chance({ state, realm }) * formationScale) continue
 		let best = partners[0]
 		for (const other of partners)
 			if (
@@ -153,8 +154,19 @@ function runYear({ state, rng }: RunYearParams): void {
 	}
 }
 
+function runYear({ state, rng }: RunYearParams): void {
+	review({ state })
+	formYear({ state, rng, formationScale: 1 })
+}
+
+function seed({ state, rng }: RunYearParams): void {
+	for (let year = 0; year < SEED_YEARS; year++)
+		formYear({ state, rng, formationScale: SEED_FORMATION_SCALE })
+}
+
 export const ROYAL_MARRIAGE = {
 	runYear,
+	seed,
 	review,
 	partnersOf,
 	bound,

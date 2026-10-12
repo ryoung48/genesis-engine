@@ -185,6 +185,8 @@ function initHistory(params: InitHistoryParams): HistoryState {
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
 
+	STATE.seedUnions({ state, rng })
+	ROYAL_MARRIAGE.seed({ state, rng })
 	ROYAL_MARRIAGE.review({ state })
 	MILITARY.reconcile({ state })
 	MILITARY.recordArmies({ state })

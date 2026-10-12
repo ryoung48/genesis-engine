@@ -705,6 +705,9 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 				rebel: war.rebel,
 				attackers: [...attackers],
 				defenders: [...defenders],
+				rebels: war.rebel
+					? [...(war.warGoalType === "throne" ? attackers : defenders)]
+					: [],
 				occupiedProvinces,
 			},
 		]

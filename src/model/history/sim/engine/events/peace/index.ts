@@ -314,7 +314,7 @@ function conclude({ state, war, reason, rng }: ConcludeParams): PeaceTerms {
 			rng,
 		})
 	}
-	BACKING.repay({ state, war, outcome: result.outcome })
+	BACKING.repay({ state, war, outcome: result.outcome, rng })
 	DISPOSITION.afterWar({ state, war, outcome: result.outcome })
 	const parted =
 		result.outcome !== "annexation" &&

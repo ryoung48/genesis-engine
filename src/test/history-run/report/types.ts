@@ -1,6 +1,7 @@
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { CoronationReport } from "@/test/history-run/report/coronation/types"
+import type { DiplomaticTiesReport } from "@/test/history-run/report/diplomatic-ties/types"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import type { GovernmentReport } from "@/test/history-run/report/government/types"
 import type { InterregnumReport } from "@/test/history-run/report/interregnum/types"
@@ -47,6 +48,7 @@ export interface WindowParams {
 }
 
 export interface CenturyReport {
+	diplomaticTies: DiplomaticTiesReport
 	roads: RoadsReport
 	settlementChange: SettlementChangeReport
 	from: number

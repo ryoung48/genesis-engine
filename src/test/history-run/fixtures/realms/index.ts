@@ -63,6 +63,7 @@ function neighbours({ neighbours: count }: RealmsFixtureParams): RealmsFixture {
 			rng: HISTORY_RNG.createHistoryRng(p + 1),
 		})
 	}
+	state.marriageTies.clear()
 	return { state, hub, realms, rng: HISTORY_RNG.createHistoryRng(77) }
 }
 

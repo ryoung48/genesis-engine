@@ -70,7 +70,7 @@ it("halves the chance of another tie for each tie a realm holds, as initiator an
 	isolate({ state, realms })
 	const others = realms.filter((p) => p !== hub)
 	const base = ROYAL_MARRIAGE.chance({ state, realm: hub })
-	expect(base).toBeCloseTo(0.055, 12)
+	expect(base).toBeCloseTo(0.0275, 12)
 	expect(ROYAL_MARRIAGE.acceptance({ state, realm: hub })).toBe(1)
 	tie({ state, a: hub, b: others[0] })
 	expect(ROYAL_MARRIAGE.chance({ state, realm: hub })).toBeCloseTo(base / 2, 12)
@@ -91,6 +91,9 @@ it("ends a realm's ties when its ruler is replaced and keeps the alliance", () =
 	const [a, b, c] = realms
 	tie({ state, a: a, b: b })
 	tie({ state, a: a, b: c })
+	const endedBefore = state.events.filter(
+		(note) => note.tag === "marriage alliance ended",
+	).length
 	STATE.foundRuler({
 		state,
 		p: a,
@@ -101,7 +104,7 @@ it("ends a realm's ties when its ruler is replaced and keeps the alliance", () =
 	expect(STATE.getRelation({ state, a, b })).toBe(STATE.rel.ALLY)
 	expect(
 		state.events.filter((note) => note.tag === "marriage alliance ended"),
-	).toHaveLength(2)
+	).toHaveLength(endedBefore + 2)
 }, 120000)
 
 it("ends a tie when its pair stops being eligible", () => {

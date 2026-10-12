@@ -10,6 +10,12 @@ A personal union ties the realms of one ruler who governs several single-heir re
 - **Blocked** for a new external link when realms are at war, either is not single-heir, either is already a union junior, or both must lead. A [government change](government-change.md) away from single-heir succession ends the realm's union links.
 - **Union by inheritance rate.** `UNION_INHERIT_CHANCE = 0.20`: 6.1 union juniors stood on average on the person model (5,740 junior-years); about 350 daughter-line successions with a tie occur per run (4,097 inheritances × 0.19 × 0.45, the share of realms holding a tie at a succession); a union ends at the third same-house succession (merge) or the first other outcome, so with 0.80 for the same house it lasts 1 + 0.8 + 0.64 = 2.44 senior successions, about 73 years at a 30-year reign; `6.1 × 933 / 73 ≈ 78` unions, less 8 from claim wars, over 350 gives 0.20. An estimate, checked by the report's `unions` fields.
 
+## At the start
+
+`STATE.seedUnions` runs after initial diplomacy and colony dependencies, before royal marriage seeding. It targets 2.5% of starting landowning realms, rounded down to whole pairs (`UNION_SEED_SHARE = 0.025`). The value comes from the user's rough parse of EU4's relations in force on 1444.11.11: about 2.5% of 670 landowning tags were in a union. It is a starting calibration, not a claim about historical global prevalence.
+
+Candidates are bordering, independent single-heir realms with no existing union links and either no relation or an alliance with each other. Overlords may qualify, but subjects and colony dependencies do not. The larger realm keeps its living ruler and becomes senior; equal sizes keep the first selected realm senior. Both crowns share that ruler through the existing union mechanism, start at one shared reign, and subsequently follow normal succession and merging rules. If too few eligible pairs exist, seeding stops below the target. On the 204,000-point late-medieval world (seed 14963991, start year 867), 12 unions cover 24 of 1,011 realms (2.37%, the whole-pair target). `diplomaticTies.initial` records pairs, distinct union members and their share of all starting realms; vassals are excluded from the union count.
+
 ## Continuing and ending
 
 - **Continued.** At a senior's succession to an heir of the same house every junior takes the new ruler and counts one more shared reign.

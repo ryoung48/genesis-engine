@@ -35,7 +35,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 		const retain = process.env.HISTORY_MEMORY_RETAIN === "1"
 		const seed = 14963991
 		const era = "lateMedieval"
-		const numPoints = 20000
+		const numPoints = 204000
 		const years = 300
 		const { generated, engine } = HISTORY_RUN.createEngine({
 			seed,
@@ -46,6 +46,9 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 		const startTimeMs = engine.time
 		const state = SIM_RECORD.buildProceduralState({ world, startTimeMs })
 		const translator = SIM_RECORD.createTranslator({ state, world })
+		await new Promise<void>((resolve) => setImmediate(resolve))
+		collect()
+		const memoryAtStart = process.memoryUsage()
 		const transactions: JournalTransaction[] = []
 		const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
 		let cursor = 0
@@ -160,6 +163,7 @@ it.skipIf(!process.env.HISTORY_MEMORY_OUT)(
 				(sum, buffer) => sum + buffer.byteLength,
 				0,
 			),
+			memoryAtStart,
 			memory,
 			rulers: {
 				sovereigns: engine.leaderRuntime.rulerId.filter((id) => id >= 0).length,

@@ -155,6 +155,7 @@ describe("inheritance through a marriage tie", () => {
 	}, 120000)
 
 	it("keeps the union through two reigns of the house and merges an adjacent junior at the third", () => {
+		vi.spyOn(SUCCESSION_SYSTEMS, "districts").mockReturnValue([])
 		const { state, realms, rng } = scenario()
 		const [senior, junior] = realms
 		STATE.unite({

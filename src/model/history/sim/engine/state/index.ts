@@ -1014,6 +1014,10 @@ const UNION_MERGE_GENERATIONS = 3
 // 226 of 1,002 sovereigns shared a dynasty with a neighbour on the person
 // model, and an adopter and its donor both count, so s = f / (2 - f).
 const DYNASTY_SEED_CHANCE = 0.13
+// Share of starting realms that sit in a personal union: 2.5% of the 670
+// landowning tags of EU4's 1444 start (17 realms in `union` diplomacy entries
+// in force on 1444.11.11, from the game's history/diplomacy files).
+const UNION_SEED_SHARE = 0.025
 const NEW_HOUSE: NewRuler = { dynasty: -1, age: "fresh", claim: FOUNDER_CLAIM }
 
 function unionPartners({ state, p }: UnionRealmParams): number[] {
@@ -1233,9 +1237,7 @@ function foundRuler({ state, p, ruler, rng }: FoundRulerParams): void {
 	})
 }
 
-// Links two realms in a personal union under the one that must lead, else the
-// larger, and gives the whole group the living ruler.
-function unite({ state, a, b, ruler, claim, rng }: UniteParams): UnionLink {
+function unionLink({ state, a, b }: RealmPairParams): UnionLink {
 	const leadsA = mustLead({ state, p: a })
 	const leadsB = mustLead({ state, p: b })
 	let senior = a
@@ -1249,6 +1251,11 @@ function unite({ state, a, b, ruler, claim, rng }: UniteParams): UnionLink {
 		senior = b
 		junior = a
 	}
+	return { senior, junior }
+}
+
+function unite({ state, a, b, ruler, claim, rng }: UniteParams): UnionLink {
+	const { senior, junior } = unionLink({ state, a, b })
 	const sharedClaim = senior === a ? claim : state.leaderClaimCurrent[senior]
 	if (state.leaderRuntime.rulerId[senior] !== ruler.rulerId)
 		seatRuler({
@@ -1295,7 +1302,43 @@ function seedRulers({ state, rng }: SeedRulersParams): void {
 	}
 }
 
+function seedUnions({ state, rng }: SeedRulersParams): void {
+	const realms: number[] = []
+	for (let p = 0; p < state.P; p++)
+		if (isSovereign({ state, p }) && !state.stateless[p] && !state.desolate[p])
+			realms.push(p)
+	let pairs = Math.floor((UNION_SEED_SHARE * realms.length) / 2)
+	const free = (p: number) =>
+		isSovereign({ state, p }) && !mustLead({ state, p })
+	for (const a of rng.shuffle(realms)) {
+		if (pairs === 0) break
+		if (!free(a)) continue
+		const partners = [...new Set(getNationNeighbors({ state, nation: a }))]
+			.filter(
+				(b) =>
+					free(b) &&
+					canUnite({ state, a, b }) &&
+					(getRelation({ state, a, b }) === rel.NONE ||
+						getRelation({ state, a, b }) === rel.ALLY),
+			)
+			.sort((x, y) => x - y)
+		if (partners.length === 0) continue
+		const b = rng.choice(partners)
+		const { senior } = unionLink({ state, a, b })
+		unite({
+			state,
+			a,
+			b,
+			ruler: STATE_RULERS.read({ state, p: senior }),
+			claim: state.leaderClaimCurrent[senior],
+			rng,
+		})
+		pairs--
+	}
+}
+
 export const STATE = {
+	seedUnions,
 	reconcileGovernment,
 	endMarriageAlliance,
 	endMarriageTies,

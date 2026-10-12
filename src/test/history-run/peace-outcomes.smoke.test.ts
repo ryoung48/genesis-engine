@@ -1,4 +1,5 @@
-import { expect, it, vi } from "vitest"
+import { afterEach, expect, it, vi } from "vitest"
+import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
@@ -16,6 +17,8 @@ import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { HISTORY_RUN } from "@/test/history-run"
+
+afterEach(() => vi.restoreAllMocks())
 
 function setup() {
 	const state = HISTORY_RUN.createEngine({
@@ -655,25 +658,34 @@ it("lapses a war when the attacking realm is absorbed", () => {
 
 it("lets a losing defender buy back occupied provinces", () => {
 	const { state, rng } = setup()
+	const canSell = (p: number) =>
+		!state.desolate[p] &&
+		STATE.isSovereign({ state, p }) &&
+		ECONOMY.revenue({ state, p }) > 0 &&
+		STATE.getChildren({ state, p }).some(
+			(child) => ECONOMY.provinceOutput({ state, p: child }) > 0,
+		)
 	const buyer = Array.from({ length: state.P }, (_, p) => p).find(
 		(p) =>
 			STATE.isSovereign({ state, p }) &&
 			STATE.getNationNeighbors({ state, nation: p }).some(
 				(nb) =>
-					STATE.isSovereign({ state, p: nb }) &&
-					STATE.getChildren({ state, p: nb }).length > 0 &&
+					canSell(nb) &&
 					MILITARY.threat({ state, attacker: p, defender: nb }) < 0.01,
 			),
 	)
 	if (buyer === undefined) throw new Error("no stronger neighbor")
 	const seller = STATE.getNationNeighbors({ state, nation: buyer }).find(
 		(nb) =>
-			STATE.isSovereign({ state, p: nb }) &&
-			STATE.getChildren({ state, p: nb }).length > 0 &&
+			canSell(nb) &&
 			MILITARY.threat({ state, attacker: buyer, defender: nb }) < 0.01,
 	)
 	if (seller === undefined) throw new Error("no seller")
-	const occupied = STATE.getChildren({ state, p: seller })[0]
+	const occupied = STATE.getChildren({ state, p: seller }).find(
+		(p) => ECONOMY.provinceOutput({ state, p }) > 0,
+	)
+	if (occupied === undefined)
+		throw new Error("no productive province to buy back")
 	const buyWar = STATE.createActiveWar({
 		state,
 		attacker: buyer,
@@ -683,6 +695,7 @@ it("lets a losing defender buy back occupied provinces", () => {
 	buyWar.occupied.push(occupied)
 	FIELDS.prov.occupation.set({ state, p: occupied, value: buyWar.idx })
 	FIELDS.prov.treasury.set({ state, p: seller, value: 1e12 })
+	vi.spyOn(MILITARY, "threat").mockReturnValue(0.005)
 	const price = PEACE.buyoff({ state, war: buyWar })
 	expect(price).toBeGreaterThan(0)
 	const random = rng.random

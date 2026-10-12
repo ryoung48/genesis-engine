@@ -3,10 +3,10 @@ import type { PeaceOutcome } from "@/model/history/sim/engine/events/peace/types
 import type {
 	EngineNote,
 	HistoryState,
-	Relation,
 	WarGoal,
 } from "@/model/history/sim/engine/state/types"
 import type { GovernmentFamily } from "@/model/society/types"
+import type { DiplomaticTieCapture } from "@/test/history-run/report/diplomatic-ties/types"
 
 export type DistanceBand = "near" | "mid" | "far"
 export type TreasuryRole = "vassal" | "overlord" | "free"
@@ -14,10 +14,6 @@ export type TreasuryRole = "vassal" | "overlord" | "free"
 export type WarEnding = "capital" | "settlement" | "stalled" | "exhaustion"
 
 export type MilitaryReport = Record<string, number>
-
-export interface TieKindParams {
-	tie: Relation
-}
 
 export interface FiscalProbe {
 	surplus: (params: EconomyLookupParams) => number
@@ -131,7 +127,6 @@ export interface MilitaryWindow {
 	unionsContinued: number
 	claimCandidates: number
 	claimsPressed: number
-	tiePairs: Record<string, number>
 	firstTiePairs: Record<string, number>
 	lastTiePairs: Record<string, number>
 	dispositionPairs: Record<string, number>
@@ -148,7 +143,6 @@ export interface MilitaryWindow {
 	cutOffJoinedWars: number
 	vassalSamples: number
 	vassalPairs: number
-	alliances: number
 	alliancesFormed: number
 	alliancesEnded: number
 	vassalsFormed: number
@@ -187,6 +181,7 @@ export interface MilitaryTracker {
 
 export interface AttachParams {
 	engine: HistoryState
+	initialTies: DiplomaticTieCapture
 	probe: FiscalProbe
 }
 
@@ -204,7 +199,7 @@ export interface ObserveNoteParams {
 export interface SampleParams {
 	engine: HistoryState
 	tracker: MilitaryTracker
-	sampleRelations: boolean
+	relations: DiplomaticTieCapture | null
 }
 
 export interface SummarizeParams {

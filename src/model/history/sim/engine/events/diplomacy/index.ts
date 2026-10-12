@@ -1,6 +1,7 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import { DISPOSITION } from "@/model/history/sim/engine/events/diplomacy/disposition"
+import { DIPLOMATIC_FORMATION } from "@/model/history/sim/engine/events/diplomacy/formation"
 import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import type {
 	CanBeRivalsParams,
@@ -17,7 +18,14 @@ import { WAR } from "@/model/history/sim/engine/events/war"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 
-const PACT_CHANCE = 0.03
+// More independent partners offset the shared half scale. The first final
+// report averaged 154.7 alliances against 230.2 before; halve ordinary pact
+// formation again to bring standing alliances nearer half as well.
+const PACT_CHANCE = DIPLOMATIC_FORMATION.chance({ base: 0.03 }) * 0.5
+// Calibrated against the 100-year half-formation report: more free realms
+// offset a simple half chance, so init needs a lower alliance roll.
+const INITIAL_ALLIANCE_CHANCE = 0.18
+const INITIAL_OVERLORD_CHANCE = 0.4
 const DISSOLVE_CHANCE = {
 	TRUSTED: 0,
 	FRIENDLY: 0.1,
@@ -147,7 +155,8 @@ function seedNeighborRelations({
 			})
 			if (
 				disposition === STATE.disp.TRUSTED &&
-				STATE.canAlly({ state, a: nation, b: neighbor })
+				STATE.canAlly({ state, a: nation, b: neighbor }) &&
+				rng.random() < INITIAL_ALLIANCE_CHANCE
 			)
 				STATE.setRelation({
 					state,
@@ -164,6 +173,7 @@ const VASSAL_SEED_CHANCE = 0.4
 const VASSAL_SEED_RATIO = 0.3
 
 function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
+	const allowedOverlords = new Map<number, boolean>()
 	for (let nation = 0; nation < state.P; nation++) {
 		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
 			continue
@@ -189,6 +199,9 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 			const bR = ECONOMY.revenue({ state, p: neighbor })
 			const ratio = aR / Math.max(1, bR)
 			if (ratio >= VASSAL_SEED_RATIO) continue
+			if (!allowedOverlords.has(neighbor))
+				allowedOverlords.set(neighbor, rng.random() < INITIAL_OVERLORD_CHANCE)
+			if (!allowedOverlords.get(neighbor)) continue
 			if (rng.random() >= VASSAL_SEED_CHANCE) continue
 			VASSALAGE.bind({
 				state,

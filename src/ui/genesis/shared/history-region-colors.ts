@@ -375,14 +375,8 @@ export function computeHistoryOccupationOverlay(params: {
 			: COLOR.hashColorForKey(`nation:${id}`)
 	}
 
-	const landholders = new Set<number>()
-	for (const owner of frame.provinceNation)
-		if (owner >= 0) landholders.add(owner)
 	const rebelHeld = new Set<number>()
-	for (const war of frame.wars)
-		if (war.rebel)
-			for (const id of war.defenders)
-				if (!landholders.has(id)) rebelHeld.add(id)
+	for (const war of frame.wars) for (const id of war.rebels) rebelHeld.add(id)
 
 	const N = regionProvince.length
 	const overlay = new Float32Array(N * 4)

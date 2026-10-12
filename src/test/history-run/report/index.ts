@@ -16,6 +16,7 @@ import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import { CORONATION_REPORT } from "@/test/history-run/report/coronation"
+import { DIPLOMATIC_TIES_REPORT } from "@/test/history-run/report/diplomatic-ties"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import { GOVERNMENT_REPORT } from "@/test/history-run/report/government"
@@ -221,6 +222,10 @@ function runSeed({
 	})
 	digestEvents()
 	const initial = KNOWLEDGE_REPORT.snapshot({ engine })
+	const initialTies = DIPLOMATIC_TIES_REPORT.capture({ engine })
+	const diplomaticTies = DIPLOMATIC_TIES_REPORT.create({
+		initial: initialTies.snapshot,
+	})
 	const validation = HISTORY_VALIDATION.tracker()
 	const diagnostics = {
 		religionGenderSystems: RELIGION_REPORT.genderSystems({
@@ -312,6 +317,7 @@ function runSeed({
 	}
 	const military = MILITARY_REPORT.attach({
 		engine,
+		initialTies,
 		probe: MILITARY_REPORT.fiscalProbe,
 	})
 	const rng = HISTORY_RNG.createHistoryRng(seed + 99999)
@@ -384,10 +390,19 @@ function runSeed({
 			PARTITION_REPORT.observe({ engine, tracker: partitions })
 			INTERREGNUM_REPORT.observe({ engine, tracker: interregnums })
 			RULERS_REPORT.sample({ engine, tracker: rulers })
+			const relations =
+				(year - start) % 10 === 0
+					? DIPLOMATIC_TIES_REPORT.capture({ engine })
+					: null
+			if (relations)
+				DIPLOMATIC_TIES_REPORT.sample({
+					tracker: diplomaticTies,
+					snapshot: relations.snapshot,
+				})
 			MILITARY_REPORT.sample({
 				engine,
 				tracker: military.tracker,
-				sampleRelations: (year - start) % 10 === 0,
+				relations,
 			})
 			for (const p of largest({ engine })) {
 				sampledYears++
@@ -418,6 +433,11 @@ function runSeed({
 					war.startTime < year * STATE.yearMs,
 			).length
 			reports.push({
+				diplomaticTies: DIPLOMATIC_TIES_REPORT.window({
+					tracker: diplomaticTies,
+					end: (relations ?? DIPLOMATIC_TIES_REPORT.capture({ engine }))
+						.snapshot,
+				}),
 				roads: ROADS_REPORT.of({ engine, fromBatch: roadCursor }),
 				settlementChange: SETTLEMENT_CHANGE_REPORT.of({
 					tracker: settlementChanges,
@@ -528,6 +548,7 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 		const reports = runSeed({ seed, options, saved, seedDiagnostics })
 		results.set(seed, reports)
 		options.log(`seed ${seed}`)
+		DIPLOMATIC_TIES_REPORT.log({ reports, log: options.log })
 		options.log(
 			"period      sovereigns  wars/sov  rebellions  top20 at war  rebels/top20  unions/top20  raids  raid win  ducats/head",
 		)

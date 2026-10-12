@@ -1,4 +1,5 @@
 import { ECONOMY } from "@/model/history/sim/engine/economy"
+import { DIPLOMATIC_FORMATION } from "@/model/history/sim/engine/events/diplomacy/formation"
 import { VASSALAGE } from "@/model/history/sim/engine/events/diplomacy/vassalage"
 import { TRUCE } from "@/model/history/sim/engine/events/peace/truce"
 import type {
@@ -133,7 +134,7 @@ function recruit({ state, war, rng }: RecruitParams): void {
 	}
 }
 
-function repay({ state, war, outcome }: RepayParams): void {
+function repay({ state, war, outcome, rng }: RepayParams): void {
 	const { rebels, crown } = STATE.warSides({ war })
 	const nation =
 		outcome === "regime change"
@@ -167,8 +168,10 @@ function repay({ state, war, outcome }: RepayParams): void {
 			continue
 		}
 		let pact: "vassal" | "alliance" | "trusted" = "trusted"
+		const formPact = rng.random() < DIPLOMATIC_FORMATION.chance({ base: 1 })
 		const pair = VASSALAGE.pair({ state, a: nation, b: backer })
 		if (
+			formPact &&
 			pair?.vassal === nation &&
 			VASSALAGE.bind({ state, ...pair, cause: "backing" })
 		) {
@@ -179,7 +182,7 @@ function repay({ state, war, outcome }: RepayParams): void {
 				b: backer,
 				disposition: STATE.disp.TRUSTED,
 			})
-		} else if (STATE.canAlly({ state, a: nation, b: backer })) {
+		} else if (formPact && STATE.canAlly({ state, a: nation, b: backer })) {
 			STATE.setRelation({ state, a: nation, b: backer, rel: STATE.rel.ALLY })
 			STATE.setDisposition({
 				state,
