@@ -23,6 +23,9 @@ import { GOVERNMENT_REPORT } from "@/test/history-run/report/government"
 import type { GovernmentReport } from "@/test/history-run/report/government/types"
 import { INTERREGNUM_REPORT } from "@/test/history-run/report/interregnum"
 import { KNOWLEDGE_REPORT } from "@/test/history-run/report/knowledge"
+import { LAND_REPORT } from "@/test/history-run/report/land"
+import type { LandReport } from "@/test/history-run/report/land/types"
+import { MIGRATION_REPORT } from "@/test/history-run/report/migration"
 import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
@@ -72,6 +75,8 @@ function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
 		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
 		years,
 		startYear: env.HISTORY_START ? Number(env.HISTORY_START) : undefined,
+		reachKm: Number(env.HISTORY_REACH_KM ?? 400),
+		cohesionStep: Number(env.HISTORY_COHESION_STEP ?? 0.1),
 		outPath: HISTORY_OUTPUT.path({ env, years, kind: "report" }),
 		baselinePath: env.HISTORY_BASELINE ?? null,
 		log,
@@ -190,6 +195,8 @@ function runSeed({
 			era: options.era,
 			numPoints: options.numPoints,
 			startYear: options.startYear,
+			reachKm: options.reachKm,
+			cohesionStep: options.cohesionStep,
 		})
 	const logs = {
 		rebelLogistics: HISTORY_COMPARISON.digester(),
@@ -239,6 +246,13 @@ function runSeed({
 			religionGender: generated.religionGender,
 		}),
 		validation,
+		migration: MIGRATION_REPORT.summarize({
+			generated,
+			startYear: Math.round(engine.time / STATE.yearMs),
+		}),
+		reachKm: options.reachKm,
+		cohesionStep: options.cohesionStep,
+		landCheckpoints: [] as LandReport[],
 		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
 		siegeLifecycle: BATTLEFIELD_REPORT.lifecycle({ engine }),
 		completed: false,
@@ -324,6 +338,7 @@ function runSeed({
 	const start = Math.round(engine.time / STATE.yearMs)
 	const reports: CenturyReport[] = []
 	const settlementChanges = SETTLEMENT_CHANGE_REPORT.create(engine)
+	const landTracker = LAND_REPORT.tracker()
 	let roadCursor = 0
 	let from = start
 	let startSovereigns = sovereigns({ engine }).length
@@ -377,6 +392,14 @@ function runSeed({
 			HISTORY_VALIDATION.rulers({ engine, tracker: validation })
 			HISTORY_VALIDATION.unions({ engine, tracker: validation })
 			HISTORY_VALIDATION.marriageTies({ engine, tracker: validation })
+			HISTORY_VALIDATION.landStatus({ engine, tracker: validation })
+			if ([1066, 1701].includes(year))
+				diagnostics.landCheckpoints.push(
+					LAND_REPORT.snapshot({
+						engine,
+						tracker: LAND_REPORT.tracker(),
+					}),
+				)
 			if ((year - start) % 10 === 0)
 				HISTORY_VALIDATION.districts({ engine, tracker: validation })
 			if (
@@ -495,6 +518,7 @@ function runSeed({
 					from,
 					to: year,
 				}),
+				land: LAND_REPORT.snapshot({ engine, tracker: landTracker }),
 			})
 			if (year === start + options.years)
 				diagnostics.governmentTotal = GOVERNMENT_REPORT.summarize({

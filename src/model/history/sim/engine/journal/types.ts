@@ -50,6 +50,7 @@ export interface JournalTransaction {
 	parents: JournalProvinceChange[]
 	relations: JournalRelationChange[]
 	occupations: JournalProvinceChange[]
+	statuses: JournalProvinceChange[]
 	coalitions: JournalCoalition[]
 	rulers: JournalRuler[]
 	notes: EngineNote[]
@@ -61,6 +62,7 @@ export interface PendingJournal {
 	parents: Map<number, JournalProvinceChange>
 	relations: Map<number, JournalRelationChange>
 	occupations: Map<number, JournalProvinceChange>
+	statuses: Map<number, JournalProvinceChange>
 	coalitions: JournalCoalition[]
 	// Realms whose ruler columns were written since the last flush.
 	rulers: Set<number>

@@ -70,6 +70,10 @@ export interface InitHistoryParams {
 	settlementWaterLandmarks?: Int32Array
 	// [JUSTIFICATION] Worlds without ports omit port anchors.
 	settlementPortRegions?: Int32Array
+	// [JUSTIFICATION] Omitted, wars use the tuned reach of 400 km.
+	reachKm?: number
+	// [JUSTIFICATION] Omitted, rebellions use the tuned cohesion step of 0.1.
+	cohesionStep?: number
 	// [JUSTIFICATION] Diagnostic callers may request initialization timings.
 	timings?: StageTiming[]
 }

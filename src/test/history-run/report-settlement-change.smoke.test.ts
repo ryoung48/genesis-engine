@@ -74,6 +74,8 @@ it("reports an injected settlement collapse in a thirty-year history window", ()
 			lateKnowledgeBand: 2.366478320318625,
 			outPath: "",
 			baselinePath: null,
+			reachKm: 800,
+			cohesionStep: 0.05,
 			log: vi.fn(),
 		})
 		const report = reports.get(42)![0].settlementChange

@@ -50,6 +50,10 @@ export interface CreateEngineParams {
 	numPoints: number
 	// [JUSTIFICATION] Omitted, the engine starts at its default year and era level.
 	startYear?: number
+	// [JUSTIFICATION] Omitted, wars use the tuned reach of 400 km.
+	reachKm?: number
+	// [JUSTIFICATION] Omitted, rebellions use the tuned cohesion step of 0.1.
+	cohesionStep?: number
 }
 
 export interface BuildEngineParams extends CreateEngineParams {

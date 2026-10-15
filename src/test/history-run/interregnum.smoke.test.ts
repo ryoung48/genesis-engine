@@ -58,10 +58,17 @@ function fixture({
 	})
 	const rng = HISTORY_RNG.createHistoryRng(1729)
 	let realm = -1
-	for (let p = 0; p < state.P && realm < 0; p++) {
+	let largest = 0
+	for (let p = 0; p < state.P; p++) {
 		if (!quiet({ state, realm: p })) continue
-		if (SUCCESSION_SYSTEMS.districts({ state, realm: p }).length >= districts)
+		const size = STATE.getNationProvinces({ state, root: p }).length
+		if (
+			SUCCESSION_SYSTEMS.districts({ state, realm: p }).length >= districts &&
+			size > largest
+		) {
 			realm = p
+			largest = size
+		}
 	}
 	if (realm < 0) throw new Error("no realm fits the case")
 	state.governmentType[realm] = GOVERNMENT.getGovIdx()[government]

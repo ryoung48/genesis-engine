@@ -8,7 +8,10 @@ import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
-import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-size-distribution"
+import {
+	buildLandStatusDistribution,
+	buildNationSizeDistribution,
+} from "@/ui/genesis/political/nation-size-distribution"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
@@ -58,7 +61,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 
 	// Habitable provinces owned by nobody. On Earth import that is land EU4 has
 	// not colonised at the scrubbed date; procedurally it is the era's stateless
-	// land (see the neolithic/lateMedieval statehoodFraction). Desolate
+	// land (see TARGET_PROFILE for the late medieval start). Desolate
 	// provinces are excluded -- they are uninhabitable, not merely unclaimed.
 	const unclaimedProvinceCount = useMemo(() => {
 		if (!history.query) return 0
@@ -74,11 +77,15 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		return unclaimed
 	}, [world?.isEarthImport, history.query, worldForDisplay])
 
-	const nationSizeDistribution = useMemo(
-		() =>
-			buildNationSizeDistribution(nationProvinceCounts, unclaimedProvinceCount),
-		[nationProvinceCounts, unclaimedProvinceCount],
-	)
+	const nationSizeDistribution = useMemo(() => {
+		const provinceStatus = history.query?.frame.provinceStatus
+		return history.query && provinceStatus
+			? buildLandStatusDistribution(history.query.frame, provinceStatus)
+			: buildNationSizeDistribution(
+					nationProvinceCounts,
+					unclaimedProvinceCount,
+				)
+	}, [history.query, nationProvinceCounts, unclaimedProvinceCount])
 
 	const governmentDistribution = useMemo(() => {
 		if (earthGovernmentDistribution) return earthGovernmentDistribution

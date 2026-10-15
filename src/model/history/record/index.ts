@@ -460,10 +460,13 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 	const provinceReligion = new Int32Array(count).fill(-1)
 	const provinceCultureBlendSecondary = new Int32Array(count).fill(-1)
 	const provinceHre = new Uint8Array(count)
+	const provinceStatus =
+		record.origin === "procedural" ? new Uint8Array(count) : null
 	for (let province = 0; province < count; province++) {
 		const rawId = provinceMap.compactToRealId[province]
 		const log = record.events.provinceEvents.get(rawId)
 		if (!log) continue
+		let status = log.base.status ?? 0
 		let nation = log.base.ownerId
 		let parent = log.base.parentId
 		let controller = log.base.controllerId
@@ -483,7 +486,9 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 			else if (event.kind === "religion")
 				religion = event.payload.religionId as number
 			else if (event.kind === "hre") hre = event.payload.member as boolean
+			else if (event.kind === "status") status = event.payload.status as number
 		}
+		if (provinceStatus) provinceStatus[province] = status
 		provinceNation[province] = nation
 		provinceParent[province] = parent
 		provinceController[province] = controller
@@ -735,6 +740,7 @@ function buildFrame({ state, timeMs }: FrameAtParams): WorldFrame {
 		provinceReligion,
 		provinceCultureBlendSecondary,
 		provinceHre,
+		provinceStatus,
 		provincePopulation,
 		provincePopulationUrban,
 		provinceDevelopment,

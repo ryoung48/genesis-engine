@@ -70,6 +70,8 @@ function build({
 	era,
 	numPoints,
 	startYear,
+	reachKm,
+	cohesionStep,
 	generate,
 }: BuildEngineParams): CreatedEngine {
 	const generationStart = performance.now()
@@ -112,6 +114,8 @@ function build({
 		era: generated.params.era,
 		seed: generated.params.seed,
 		startYear,
+		reachKm,
+		cohesionStep,
 		landmarks: generated.landmarks,
 		regionProvince: provinces.regionProvince,
 		regionAdjOffset: generated.mesh.adjOffset,

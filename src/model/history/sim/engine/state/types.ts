@@ -169,6 +169,36 @@ export interface CandidatesRefresh {
 	wars: number
 }
 
+export interface LandCounters {
+	absorptions: number
+	absorptionViolations: number
+	settlements: number
+	unmetDemand: number
+}
+
+export interface LandRuntime {
+	// Whether the arrival field and the target profile drive this run.
+	governed: boolean
+	// Distance past which the chance of declaring a war falls by 1/e per further step.
+	reachKm: number
+	// Laxity added per doubling of realm size past a kingdom and of distinct cultures.
+	cohesionStep: number
+	predecessor: Int32Array
+	order: Int32Array
+	cursor: number
+	habitable: number
+	// Mean distance between adjacent habitable provinces.
+	spacingKm: number
+	// Target share of habitable provinces that is state-held at the last census.
+	stateHeldTarget: number
+	// Per size bucket, the actual and target share of state-held provinces.
+	shares: Float64Array
+	targets: Float64Array
+	// Provinces each live realm held at the last census, by root.
+	realmSize: Int32Array
+	counters: LandCounters
+}
+
 export interface HistoryState {
 	electionStreaks: Map<number, ElectionStreak>
 	marriageTies: Map<number, MarriageTie>
@@ -272,7 +302,13 @@ export interface HistoryState {
 	provinceAdjList: Int32Array
 	provinceSize: Int32Array
 	desolate: Uint8Array
+	// Land without a sovereign, settled or not; cleared when a state takes it.
 	stateless: Uint8Array
+	// The part of stateless land nobody has reached yet; the census clears it.
+	uninhabited: Uint8Array
+	// Calendar year each province is first settled; the sentinel when never.
+	settledYear: Int32Array
+	land: LandRuntime
 	waterAccess: Uint8Array
 	regionProvince: Int32Array
 	regionAdjOffset: Int32Array
@@ -529,6 +565,14 @@ export interface CreateHistoryStateParams {
 	planetRadiusKm: number
 	topography: Uint8Array | null
 	vegetation: Uint8Array | null
+	reachKm: number
+	cohesionStep: number
+}
+
+export interface ClaimStatelessParams {
+	state: HistoryState
+	nation: number
+	province: number
 }
 
 export interface OriginOfParams {

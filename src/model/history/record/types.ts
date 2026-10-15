@@ -46,6 +46,8 @@ export interface ProvinceEventLog {
 		cultureBlendSecondaryId: number
 		religionId: number
 		inHolyRomanEmpire: boolean
+		// [JUSTIFICATION] Earth records carry no land status.
+		status?: number
 	}
 	events: HistoryEvent[]
 }

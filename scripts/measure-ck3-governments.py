@@ -92,11 +92,15 @@ class Ck3World:
         ]
         self.realm_counties = collections.defaultdict(list)
         self.sub_counties = collections.Counter()
+        self.held_titles = collections.defaultdict(list)
+        for title, entry in self.state.items():
+            if entry["holder"] and title[0] in TITLE_TIER:
+                self.held_titles[entry["holder"]].append(title)
         for county in self.counties:
-            liege_chain = self.chain(county)
-            self.realm_counties[liege_chain[-1]].append(county)
-            for title in liege_chain[:-1]:
+            for title in self.chain(county)[:-1]:
                 self.sub_counties[title] += 1
+            ruler = self.sovereign_ruler(self.state[county]["holder"])
+            self.realm_counties[self.crown_title(ruler)].append(county)
         self.byzantine_counties = (
             set(self.realm_counties.get("e_byzantium", []))
             if byzantium == "bureaucratic"
@@ -210,6 +214,36 @@ class Ck3World:
                         elif key == "government":
                             entry["gov"] = value
                 self.state[title] = entry
+
+    def liege_holder(self, holder):
+        # A ruler answers to the holder of the lieges of their highest-tier title that has one.
+        titles = [
+            title
+            for title in self.held_titles.get(holder, [])
+            if self.state[title]["liege"]
+        ]
+        if not titles:
+            return None
+        best = max(titles, key=lambda title: TITLE_TIER[title[0]])
+        liege = self.state.get(self.state[best]["liege"])
+        return liege["holder"] if liege else None
+
+    def sovereign_ruler(self, holder):
+        seen = set()
+        while holder and holder not in seen:
+            seen.add(holder)
+            liege = self.liege_holder(holder)
+            if not liege:
+                return holder
+            holder = liege
+        return holder
+
+    def crown_title(self, ruler):
+        # The title that names a ruler's realm: their highest-tier title, then the largest.
+        return max(
+            self.held_titles[ruler],
+            key=lambda title: (TITLE_TIER[title[0]], self.sub_counties.get(title, 1)),
+        )
 
     def chain(self, title):
         result = []
@@ -365,12 +399,8 @@ def report(world):
         for title in top_titles
         if world.state.get(title, {}).get("holder")
     }
-    holder_titles = collections.defaultdict(list)
-    for title, entry in world.state.items():
-        if entry["holder"] and title[0] in TITLE_TIER:
-            holder_titles[entry["holder"]].append(title)
     vassals = []
-    for holder, titles in holder_titles.items():
+    for holder, titles in world.held_titles.items():
         if holder in top_holders or all(title in top_titles for title in titles):
             continue
         best = max(

@@ -3,12 +3,14 @@ import type {
 	DerivedSociety,
 	DeriveSocietyParams,
 } from "@/model/history/sim/derive/types"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
 import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import { HERITAGE } from "@/model/history/sim/heritage"
 import { NATIONS } from "@/model/history/sim/nations"
 import { RELIGION } from "@/model/history/sim/religion"
 import { RELIGION_GENDER } from "@/model/history/sim/religion/gender"
+import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import { TIMING } from "@/model/shared/timing"
 import { ERAS } from "@/model/society/eras"
 
@@ -17,6 +19,52 @@ import { ERAS } from "@/model/society/eras"
 // Runs inside the genesis build pipeline (see derive-province-society) so the
 // assignments ship with the generated world; the genesis worker then wraps them
 // in a procedural HistoryRecord / HistoryState (see sim/record).
+const TARGET_BUCKETS: [number, number][] = [
+	[101, 250],
+	[50, 100],
+	[25, 49],
+	[10, 24],
+	[5, 9],
+	[2, 4],
+	[1, 1],
+]
+
+function startSizePlan(params: DeriveSocietyParams): {
+	percentages: number[]
+	buckets: [number, number][]
+} {
+	const config = ERAS.getEraConfig(params.era)
+	if (config.id !== "lateMedieval" || !params.eraStatehoodMask)
+		return {
+			percentages: config.nationPercentages,
+			buckets: config.nationBuckets,
+		}
+	const shares = TARGET_PROFILE.at({
+		year: STATE_CLOCK.defaultStartYear,
+		habitableProvinces: 1,
+	}).sizeShares
+	return {
+		percentages: [...shares].reverse(),
+		buckets: TARGET_BUCKETS,
+	}
+}
+
+function statehoodShare(params: DeriveSocietyParams): number {
+	const fallback = ERAS.getEraConfig(params.era).statehoodFraction
+	const { eraStatehoodMask: held, population, provinces } = params
+	if (!held || !population?.migrationWave || !provinces) return fallback
+	const settlementWave = population.settlementWave ?? 1
+	let heldCount = 0
+	let settledCount = 0
+	for (let p = 0; p < provinces.count; p++) {
+		if (provinces.desolate[p]) continue
+		const wave = population.migrationWave[p]
+		if (wave >= 0 && wave <= settlementWave) settledCount++
+		if (held[p]) heldCount++
+	}
+	return settledCount > 0 ? heldCount / settledCount : fallback
+}
+
 function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 	const { timings } = params
 	let cultures: DerivedSociety["cultures"]
@@ -58,6 +106,7 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 			if (eraConfig.hasNations && !isEarthImportRaster) {
 				const provinces = params.provinces
 				const population = params.population
+				const sizePlan = startSizePlan(params)
 				nations = TIMING.measure({
 					stage: "nations",
 					timings,
@@ -73,14 +122,14 @@ function deriveSociety(params: DeriveSocietyParams): DerivedSociety {
 							seed: params.seed,
 							planetRadiusKm: params.planetRadiusKm,
 							eraActiveMask: eraStatehoodMask,
-							nationPercentages: eraConfig.nationPercentages,
-							nationBuckets: eraConfig.nationBuckets,
+							nationPercentages: sizePlan.percentages,
+							nationBuckets: sizePlan.buckets,
 							governmentMix: eraConfig.governmentMix,
 							governmentSizeWeight: eraConfig.governmentSizeWeight,
 							maxRepublicSize: eraConfig.maxRepublicSize,
 							maxTheocracySize: eraConfig.maxTheocracySize,
 							migrationWave: population.migrationWave,
-							statehoodFraction: eraConfig.statehoodFraction,
+							statehoodFraction: statehoodShare(params),
 							buildImperialPatchwork:
 								eraConfig.organizations?.imperialPatchwork,
 							buildTradeLeague: eraConfig.organizations?.tradeLeague,

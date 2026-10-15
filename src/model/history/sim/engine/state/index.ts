@@ -1,3 +1,4 @@
+import { PROVINCE_STATUS } from "@/model/history/record/status"
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { EVENT_HEAP, EventHeap } from "@/model/history/sim/engine/event-heap"
@@ -35,6 +36,7 @@ import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
+	ClaimStatelessParams,
 	ClearRealmDiplomacyParams,
 	CreateActiveWarParams,
 	CreateHistoryStateParams,
@@ -77,8 +79,11 @@ import type {
 import { WAR_GOAL } from "@/model/history/sim/engine/state/war-goal"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
+import { TARGET_PROFILE } from "@/model/history/sim/targets"
+import { UNITS } from "@/model/shared/units"
 import { DEJURE } from "@/model/society/dejure"
 import { ERAS } from "@/model/society/eras"
+import { MIGRATION } from "@/model/society/migration"
 
 const {
 	defaultStartYear: DEFAULT_START_YEAR,
@@ -787,6 +792,8 @@ function createHistoryState({
 	planetRadiusKm,
 	topography,
 	vegetation,
+	reachKm,
+	cohesionStep,
 }: CreateHistoryStateParams): HistoryState {
 	const P = provinces.count
 	const terrain = TERRAIN.provinceTerrain({
@@ -797,10 +804,52 @@ function createHistoryState({
 	const startTime = startYear * yearMs
 	const waterAccessLevels = waterAccess ?? new Uint8Array(P)
 	const stateless = new Uint8Array(P)
-
+	const uninhabited = new Uint8Array(P)
+	const initial = PROVINCE_STATUS.initial({
+		desolate: provinces.desolate,
+		sovereign: nations.sovereign,
+		migrationWave: population.migrationWave,
+		settlementWave: population.settlementWave,
+	})
+	let habitable = 0
 	for (let p = 0; p < P; p++) {
-		if (!provinces.desolate[p] && nations.sovereign[p] < 0) stateless[p] = 1
+		if (initial[p] === PROVINCE_STATUS.code.desolate) continue
+		habitable++
+		uninhabited[p] = initial[p] === PROVINCE_STATUS.code.uninhabited ? 1 : 0
+		stateless[p] =
+			initial[p] === PROVINCE_STATUS.code.stateless ||
+			initial[p] === PROVINCE_STATUS.code.uninhabited
+				? 1
+				: 0
 	}
+	let spacingSum = 0
+	let spacingEdges = 0
+	for (let p = 0; p < P; p++) {
+		if (provinces.desolate[p]) continue
+		for (let j = provinces.adjOffset[p]; j < provinces.adjOffset[p + 1]; j++) {
+			const q = provinces.adjList[j]
+			if (q < p || provinces.desolate[q]) continue
+			spacingSum += UNITS.regionDistanceKm({
+				r_xyz,
+				fromRegion: provinces.seeds[p],
+				toRegion: provinces.seeds[q],
+				planetRadiusKm,
+			})
+			spacingEdges++
+		}
+	}
+	const spacingKm = spacingEdges > 0 ? spacingSum / spacingEdges : 1
+	const settledYear =
+		population.arrivalYear?.slice() ??
+		new Int32Array(P).fill(MIGRATION.sentinel)
+	const settlementOrder =
+		population.settlementOrder?.slice() ?? new Int32Array(0)
+	let settlementCursor = 0
+	while (
+		settlementCursor < settlementOrder.length &&
+		settledYear[settlementOrder[settlementCursor]] <= startYear
+	)
+		settlementCursor++
 	if (!waterAccess) {
 		for (let region = 0; region < provinces.regionProvince.length; region++) {
 			const province = provinces.regionProvince[region]
@@ -911,6 +960,29 @@ function createHistoryState({
 		provinceSize: provinces.size.slice(),
 		desolate: provinces.desolate.slice(),
 		stateless,
+		uninhabited,
+		settledYear,
+		land: {
+			governed: era === "lateMedieval" && population.arrivalYear !== undefined,
+			reachKm,
+			cohesionStep,
+			predecessor:
+				population.predecessor?.slice() ?? new Int32Array(P).fill(-1),
+			order: settlementOrder,
+			cursor: settlementCursor,
+			habitable,
+			spacingKm,
+			stateHeldTarget: 0,
+			shares: new Float64Array(TARGET_PROFILE.bucketCount),
+			targets: new Float64Array(TARGET_PROFILE.bucketCount),
+			realmSize: new Int32Array(P),
+			counters: {
+				absorptions: 0,
+				absorptionViolations: 0,
+				settlements: 0,
+				unmetDemand: 0,
+			},
+		},
 		waterAccess: waterAccessLevels.slice(),
 		regionProvince: regionProvince?.slice() ?? new Int32Array(0),
 		regionAdjOffset: regionAdjOffset?.slice() ?? new Int32Array(0),
@@ -1237,6 +1309,19 @@ function foundRuler({ state, p, ruler, rng }: FoundRulerParams): void {
 	})
 }
 
+function claimStateless({
+	state,
+	nation,
+	province,
+}: ClaimStatelessParams): void {
+	FIELDS.prov.status.set({
+		state,
+		p: province,
+		value: PROVINCE_STATUS.code.state,
+	})
+	repartitionNation({ state, nation, subjects: [province] })
+}
+
 function unionLink({ state, a, b }: RealmPairParams): UnionLink {
 	const leadsA = mustLead({ state, p: a })
 	const leadsB = mustLead({ state, p: b })
@@ -1424,6 +1509,11 @@ export const STATE = {
 		MILITARY.mutate({ state: params.state, action: () => seatRuler(params) }),
 	foundRuler: (params: FoundRulerParams) =>
 		MILITARY.mutate({ state: params.state, action: () => foundRuler(params) }),
+	claimStateless: (params: ClaimStatelessParams) =>
+		MILITARY.mutate({
+			state: params.state,
+			action: () => claimStateless(params),
+		}),
 	newHouse: NEW_HOUSE,
 	founderClaim: FOUNDER_CLAIM,
 	canUnite,

@@ -9,6 +9,8 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/ocean/tides/tidal-schedule/types"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
+import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
@@ -493,14 +495,24 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								</div>
 								{(() => {
 									const cfg = ERAS.eraConfigs[era]
+									const arrivalSteered = era === "lateMedieval"
+									const startStateHeld = Math.round(
+										100 *
+											TARGET_PROFILE.at({
+												year: STATE_CLOCK.defaultStartYear,
+												habitableProvinces: 1,
+											}).stateHeld,
+									)
 									return (
 										<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 space-y-1">
 											<div className="flex justify-between text-[10px]">
 												<span className="text-slate-500">Settled land</span>
 												<span className="font-mono text-slate-700">
-													{cfg.settlementFraction >= 1.0
-														? "100%"
-														: `${Math.round(cfg.settlementFraction * 100)}%`}
+													{arrivalSteered
+														? `reached by ${STATE_CLOCK.defaultStartYear}`
+														: cfg.settlementFraction >= 1.0
+															? "100%"
+															: `${Math.round(cfg.settlementFraction * 100)}%`}
 												</span>
 											</div>
 											<div className="flex justify-between text-[10px]">
@@ -508,9 +520,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 												<span className="font-mono text-slate-700">
 													{!cfg.hasNations
 														? "none"
-														: cfg.statehoodFraction >= 1.0
-															? "all settled"
-															: `${Math.round(cfg.statehoodFraction * 100)}% of settled`}
+														: arrivalSteered
+															? `${startStateHeld}% of habitable`
+															: cfg.statehoodFraction >= 1.0
+																? "all settled"
+																: `${Math.round(cfg.statehoodFraction * 100)}% of settled`}
 												</span>
 											</div>
 										</div>

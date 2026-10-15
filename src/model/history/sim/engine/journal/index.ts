@@ -23,6 +23,7 @@ function pending(): PendingJournal {
 		parents: new Map(),
 		relations: new Map(),
 		occupations: new Map(),
+		statuses: new Map(),
 		coalitions: [],
 		rulers: new Set(),
 	}
@@ -49,6 +50,13 @@ function parent(params: RecordProvinceParams): void {
 function occupation(params: RecordProvinceParams): void {
 	recordProvince({
 		changes: params.state.pendingJournal.occupations,
+		change: params,
+	})
+}
+
+function status(params: RecordProvinceParams): void {
+	recordProvince({
+		changes: params.state.pendingJournal.statuses,
 		change: params,
 	})
 }
@@ -125,6 +133,7 @@ function flush({
 		pendingJournal.parents.size === 0 &&
 		pendingJournal.relations.size === 0 &&
 		pendingJournal.occupations.size === 0 &&
+		pendingJournal.statuses.size === 0 &&
 		pendingJournal.coalitions.length === 0 &&
 		pendingJournal.rulers.size === 0 &&
 		!pendingJournal.roads
@@ -137,6 +146,9 @@ function flush({
 		(change) => change.before !== change.after,
 	)
 	const occupations = [...pendingJournal.occupations.values()].filter(
+		(change) => change.before !== change.after,
+	)
+	const statuses = [...pendingJournal.statuses.values()].filter(
 		(change) => change.before !== change.after,
 	)
 	const notes = state.events.slice(noteCursor)
@@ -200,6 +212,7 @@ function flush({
 		parents.length > 0 ||
 		relations.length > 0 ||
 		occupations.length > 0 ||
+		statuses.length > 0 ||
 		pendingJournal.coalitions.length > 0 ||
 		rulers.length > 0 ||
 		notes.length > 0 ||
@@ -211,6 +224,7 @@ function flush({
 			parents,
 			relations,
 			occupations,
+			statuses,
 			coalitions: pendingJournal.coalitions,
 			rulers,
 			notes,
@@ -222,6 +236,7 @@ function flush({
 	pendingJournal.parents.clear()
 	pendingJournal.relations.clear()
 	pendingJournal.occupations.clear()
+	pendingJournal.statuses.clear()
 	pendingJournal.coalitions = []
 	pendingJournal.rulers.clear()
 }
@@ -258,6 +273,7 @@ export const JOURNAL = {
 	pending,
 	parent,
 	occupation,
+	status,
 	ruler,
 	relation,
 	coalition,

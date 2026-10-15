@@ -5,6 +5,7 @@ import type { DiplomaticTiesReport } from "@/test/history-run/report/diplomatic-
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
 import type { GovernmentReport } from "@/test/history-run/report/government/types"
 import type { InterregnumReport } from "@/test/history-run/report/interregnum/types"
+import type { LandReport } from "@/test/history-run/report/land/types"
 import type { MilitaryReport } from "@/test/history-run/report/military/types"
 import type {
 	PartitionReport,
@@ -27,6 +28,8 @@ export interface HistoryReportOptions {
 	lateKnowledgeBand: number
 	// [JUSTIFICATION] Omitted, runs start at the engine's default year.
 	startYear?: number
+	reachKm: number
+	cohesionStep: number
 	outPath: string
 	baselinePath: string | null
 	log: (line: string) => void
@@ -75,6 +78,7 @@ export interface CenturyReport {
 	partitionState: PartitionStateReport
 	partition: PartitionReport
 	interregnum: InterregnumReport
+	land: LandReport
 }
 
 export interface RegencyReport {

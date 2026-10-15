@@ -13,17 +13,20 @@ import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
 import type { TitleTier } from "@/model/society/titles/types"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
+import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
 	miseryColor,
 	OCEAN_LIGHT_BLUE,
 	windSpeedColor,
 } from "@/ui/genesis/shared/colors"
+import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import {
 	computeHistoryOccupationOverlay,
 	computeHistoryRegionColors,
 	computeOrgStripeOverlay,
 	computeTitleStripeOverlay,
 } from "@/ui/genesis/shared/history-region-colors"
+import { LAND_STATUS } from "@/ui/genesis/shared/land-status"
 import type { NationMapMode } from "@/ui/genesis/shared/map-modes"
 import { computeRegionColors } from "@/ui/genesis/shared/region-colors"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
@@ -355,23 +358,34 @@ export function useMapColoring(input: MapColoringInput) {
 			})
 			if (historyColors) return withOrgHighlight(historyColors)
 		}
+		const baseColors = computeRegionColors(
+			worldForDisplay,
+			colorMode,
+			nationMode,
+			populationMode,
+			temperatureMonth,
+			rainfallMonth,
+			dtrMonth,
+			currentMonth,
+			viewMode,
+			showElevation,
+			undefined,
+			undefined,
+			dangerSubMode,
+			religionMode,
+		)
 		return withOrgHighlight(
-			computeRegionColors(
-				worldForDisplay,
-				colorMode,
-				nationMode,
-				populationMode,
-				temperatureMonth,
-				rainfallMonth,
-				dtrMonth,
-				currentMonth,
-				viewMode,
-				showElevation,
-				undefined,
-				undefined,
-				dangerSubMode,
-				religionMode,
-			),
+			historyFrame?.provinceStatus &&
+				worldForDisplay.provinces &&
+				worldForDisplay.elevation_km &&
+				getBaseMapMode(colorMode as ColorMode) === "population"
+				? LAND_STATUS.paintUninhabited({
+						rgb: baseColors,
+						provinceStatus: historyFrame.provinceStatus,
+						regionProvince: worldForDisplay.provinces.regionProvince,
+						elevationKm: worldForDisplay.elevation_km,
+					})
+				: baseColors,
 		)
 	}, [
 		colorMode,
@@ -475,6 +489,21 @@ export function useMapColoring(input: MapColoringInput) {
 				)
 			: null
 
+		const status = LAND_STATUS.statusAt({
+			provinceStatus: frame.provinceStatus,
+			province: hoverProvince,
+		})
+		const landStatus =
+			status === null || status === "state" || status === "desolate"
+				? null
+				: {
+						uninhabited: status === "uninhabited",
+						label: LAND_STATUS.label({
+							status,
+							settledYear:
+								worldForDisplay?.population?.arrivalYear?.[hoverProvince] ?? 0,
+						}),
+					}
 		const provinceName = meta?.name ?? null
 		const area = meta?.area ?? null
 		const region = meta?.region ?? null
@@ -553,12 +582,14 @@ export function useMapColoring(input: MapColoringInput) {
 			titleLabel: worldForDisplay?.isEarthImport ? null : titleLabel,
 			liegeLabel: worldForDisplay?.isEarthImport ? null : liegeLabel,
 			realmLabel: worldForDisplay?.isEarthImport ? null : realmLabel,
+			landStatus,
 		}
 	}, [
 		history.state,
 		history.query,
 		hoverProvince,
 		worldForDisplay?.isEarthImport,
+		worldForDisplay?.population,
 		nationMode,
 	])
 

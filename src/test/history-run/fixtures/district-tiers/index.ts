@@ -62,6 +62,7 @@ function create({
 	state.unionGenerations.clear()
 	state.desolate.fill(1)
 	state.stateless.fill(1)
+	state.uninhabited.fill(0)
 	const members = Array.from({ length: count }, (_, p) => p)
 	for (const p of members) {
 		state.parentCurrent[p] = p === root ? -1 : root

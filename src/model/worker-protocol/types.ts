@@ -8,6 +8,10 @@ import type { GenesisParams } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
+	CradleChoice,
+	MigrationDiagnostics,
+} from "@/model/society/migration/types"
+import type {
 	GenesisNationHierarchy,
 	GenesisPartition,
 	GenesisProvinces,
@@ -233,7 +237,16 @@ export interface SerializedGenesisWorld {
 		habitabilityScore: number
 		totalPopulation: number
 		migrationWave?: Float32Array
-		cradleProvinces?: Int32Array
+		// [JUSTIFICATION] Earth imports and eras without migration carry no settlement field.
+		arrivalYear?: Int32Array
+		// [JUSTIFICATION] Present exactly when arrivalYear is.
+		predecessor?: Int32Array
+		// [JUSTIFICATION] Present exactly when arrivalYear is.
+		settlementOrder?: Int32Array
+		// [JUSTIFICATION] Present exactly when arrivalYear is.
+		cradles?: CradleChoice[]
+		// [JUSTIFICATION] Present exactly when arrivalYear is.
+		migrationDiagnostics?: MigrationDiagnostics
 		settlementWave?: number
 	}
 	realPopulation?: {

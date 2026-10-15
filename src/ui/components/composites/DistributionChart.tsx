@@ -7,6 +7,8 @@ export interface DistributionChartBucket {
 	label: string
 	count: number
 	color: string
+	// [JUSTIFICATION] Only buckets steered toward a target profile carry one, as a percent of the total.
+	target?: number
 	// [JUSTIFICATION] Only navigable entity buckets supply a selection handler.
 	onSelect?: () => void
 }
@@ -145,7 +147,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 							width: `${(bucket.count / totalCount) * 100}%`,
 							backgroundColor: bucket.color,
 						}}
-						title={`${bucket.label}: ${bucket.count.toLocaleString()}`}
+						title={`${bucket.label}: ${bucket.count.toLocaleString()}${bucket.target === undefined ? "" : ` (target ${bucket.target.toFixed(1)}%)`}`}
 					/>
 				))}
 			</div>
@@ -161,7 +163,11 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 							/>
 							<span className="font-mono text-[8px] text-slate-500">
 								{bucket.label} ({bucket.count.toLocaleString()},{" "}
-								{share.toFixed(1)}%)
+								{share.toFixed(1)}%
+								{bucket.target === undefined
+									? ""
+									: `, target ${bucket.target.toFixed(1)}%`}
+								)
 							</span>
 						</div>
 					)

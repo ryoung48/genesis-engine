@@ -27,7 +27,7 @@ function ensureHierarchyClean(state: HistoryState): void {
 	const sov = state.sovereignCurrent
 	for (let p = 0; p < P; p++) sov[p] = -1
 	for (let p = 0; p < P; p++) {
-		if (state.stateless[p]) continue
+		if (state.stateless[p] || state.uninhabited[p]) continue
 		if (sov[p] !== -1) continue
 		let cur = p
 		let steps = 0

@@ -1,6 +1,7 @@
 import type { LonLat } from "@/model/history/earth/types"
 import { RECORD_ROUTES } from "@/model/history/record/routes"
 import { RULER_NAMES } from "@/model/history/record/rulers"
+import { PROVINCE_STATUS } from "@/model/history/record/status"
 import type {
 	HistoryRecord,
 	HistoryState,
@@ -143,10 +144,19 @@ function buildProceduralRecord(
 		}
 	}
 
+	const initialStatus = world.provinces
+		? PROVINCE_STATUS.initial({
+				desolate: world.provinces.desolate,
+				sovereign: nations?.sovereign ?? new Int32Array(provinceCount).fill(-1),
+				migrationWave: world.population?.migrationWave,
+				settlementWave: world.population?.settlementWave,
+			})
+		: new Uint8Array(0)
 	const provinceEvents = new Map<number, ProvinceEventLog>()
 	for (let province = 0; province < provinceCount; province++) {
 		provinceEvents.set(province, {
 			base: {
+				status: initialStatus[province],
 				ownerId: provinceNation[province],
 				controllerId: provinceNation[province],
 				parentId: nations?.parent[province] ?? -1,

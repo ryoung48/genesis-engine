@@ -6,6 +6,7 @@ import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marr
 import { POPULATION } from "@/model/history/sim/engine/events/population"
 import { RAID } from "@/model/history/sim/engine/events/raid"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
+import { STATEHOOD } from "@/model/history/sim/engine/events/statehood"
 import { SUCCESSION } from "@/model/history/sim/engine/events/succession"
 import { REGENCY } from "@/model/history/sim/engine/events/succession/regency"
 import { TAX } from "@/model/history/sim/engine/events/tax"
@@ -14,6 +15,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
+import { LAND_SHARES } from "@/model/history/sim/engine/land-shares"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { ROADS } from "@/model/history/sim/engine/roads"
 import type {
@@ -79,9 +81,12 @@ function initHistory(params: InitHistoryParams): HistoryState {
 				planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
 				topography: params.topography,
 				vegetation: params.vegetation,
+				reachKm: params.reachKm ?? 400,
+				cohesionStep: params.cohesionStep ?? 0.1,
 			}),
 	})
 
+	LAND_SHARES.refresh({ state })
 	state.knowledgeBaseline = KNOWLEDGE.startBaseline({
 		era: state.era,
 		startYear: params.startYear,
@@ -248,6 +253,7 @@ function processEventsUntil({
 				break
 			case EVENT_HEAP.evt.CENSUS:
 				POPULATION.runPopulation({ state, previousTime: time2 })
+				STATEHOOD.run({ state, rng })
 				ROADS.advance({ state })
 				TAX.previewBudget({ state })
 				MILITARY.recordArmies({ state })

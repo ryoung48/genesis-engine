@@ -1,3 +1,4 @@
+import { DERIVE } from "@/model/history/sim/engine/derive"
 import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
@@ -163,6 +164,40 @@ function districts({ engine, tracker }: ValidateEngineParams): void {
 	}
 }
 
+// Every province is exactly one of desolate, uninhabited, stateless or
+// state-held; nobody lives on unreached land, the founding and absorption
+// rules hold, and the land counters agree with the arrays.
+function landStatus({ engine, tracker }: ValidateEngineParams): void {
+	const year = engine.time / STATE.yearMs
+	DERIVE.ensureHierarchyClean(engine)
+	for (let p = 0; p < engine.P; p++) {
+		const detail = `province ${p} in ${year.toFixed(0)}`
+		if (engine.desolate[p]) {
+			if (engine.uninhabited[p])
+				violation({ tracker, rule: "desolate and uninhabited", detail })
+			continue
+		}
+		if (engine.uninhabited[p]) {
+			if (!engine.stateless[p])
+				violation({ tracker, rule: "uninhabited yet held", detail })
+			if (engine.popRuralCurrent[p] + engine.popUrbanCurrent[p] > 0)
+				violation({ tracker, rule: "populated uninhabited land", detail })
+		}
+		const sovereign = engine.sovereignCurrent[p]
+		if (engine.stateless[p] && sovereign >= 0)
+			violation({ tracker, rule: "stateless land with a sovereign", detail })
+		if (!engine.stateless[p] && sovereign < 0)
+			violation({ tracker, rule: "state land without a sovereign", detail })
+	}
+	const { counters } = engine.land
+	if (counters.absorptionViolations > 0)
+		violation({
+			tracker,
+			rule: "absorbed land that was not open",
+			detail: `${counters.absorptionViolations} in ${year.toFixed(0)}`,
+		})
+}
+
 // Thrown once the report is saved, so a violation late in a long run still
 // leaves its statistics on disk.
 function assert(tracker: ValidationTracker): void {
@@ -185,5 +220,6 @@ export const HISTORY_VALIDATION = {
 	unions,
 	marriageTies,
 	districts,
+	landStatus,
 	assert,
 }

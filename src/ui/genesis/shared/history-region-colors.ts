@@ -13,6 +13,7 @@ import {
 } from "@/ui/genesis/shared/color-helpers"
 import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
+import { LAND_STATUS } from "@/ui/genesis/shared/land-status"
 import {
 	isTitlesNationMode,
 	type NationMapMode,
@@ -221,7 +222,17 @@ export function computeHistoryRegionColors(params: {
 				continue
 			}
 			if (owner < 0) {
-				write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
+				const status = LAND_STATUS.statusAt({
+					provinceStatus: frame.provinceStatus,
+					province: p,
+				})
+				write(
+					r,
+					darkenPoliticalAtElevation(
+						status ? LAND_STATUS.color({ status }) : UNOWNED_GRAY,
+						elevationKm[r] ?? 0,
+					),
+				)
 				continue
 			}
 			if (nationMode === "government") {
@@ -320,6 +331,21 @@ export function computeHistoryRegionColors(params: {
 		// isDemographic
 		if (suppressFill) {
 			write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
+			continue
+		}
+		if (
+			LAND_STATUS.statusAt({
+				provinceStatus: frame.provinceStatus,
+				province: p,
+			}) === "uninhabited"
+		) {
+			write(
+				r,
+				darkenPoliticalAtElevation(
+					LAND_STATUS.color({ status: "uninhabited" }),
+					elevationKm[r] ?? 0,
+				),
+			)
 			continue
 		}
 		if (populationMode === "culture") {

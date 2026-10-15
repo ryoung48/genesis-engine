@@ -27,18 +27,22 @@ function setup() {
 		numPoints: 30000,
 	}).engine
 	const rng = HISTORY_RNG.createHistoryRng(1729)
-	const attacker = Array.from({ length: state.P }, (_, p) => p).find(
-		(p) =>
-			!state.desolate[p] &&
-			STATE.isSovereign({ state, p }) &&
-			state.provinceWars[p].length === 0 &&
-			STATE.getNationNeighbors({ state, nation: p }).some(
-				(nb) =>
-					STATE.isSovereign({ state, p: nb }) &&
-					state.provinceWars[nb].length === 0 &&
-					STATE.getChildren({ state, p: nb }).length > 0,
-			),
-	)
+	const size = (p: number) =>
+		STATE.getNationProvinces({ state, root: p }).length
+	const attacker = Array.from({ length: state.P }, (_, p) => p)
+		.filter(
+			(p) =>
+				!state.desolate[p] &&
+				STATE.isSovereign({ state, p }) &&
+				state.provinceWars[p].length === 0 &&
+				STATE.getNationNeighbors({ state, nation: p }).some(
+					(nb) =>
+						STATE.isSovereign({ state, p: nb }) &&
+						state.provinceWars[nb].length === 0 &&
+						STATE.getChildren({ state, p: nb }).length > 0,
+				),
+		)
+		.sort((a, b) => size(b) - size(a) || a - b)[0]
 	if (attacker === undefined) throw new Error("no neighboring realms")
 	const defender = STATE.getNationNeighbors({ state, nation: attacker }).find(
 		(nb) =>

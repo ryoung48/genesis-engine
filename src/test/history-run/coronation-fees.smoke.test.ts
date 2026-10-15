@@ -379,6 +379,7 @@ it("requires the children to reach the new rank's minimum size before any roll o
 		state.parentCurrent[p] = p === 0 ? -1 : 0
 		state.desolate[p] = 0
 		state.stateless[p] = 0
+		state.uninhabited[p] = 0
 	}
 	state.hierarchyDirty = true
 	DISTRICT_FIXTURE.titles({ fixture, titles: TWO_DUCHIES })

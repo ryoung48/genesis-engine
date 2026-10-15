@@ -7,17 +7,20 @@ import { BACKING } from "@/model/history/sim/engine/events/war/backing"
 import { REBELLION_EVALUATION } from "@/model/history/sim/engine/events/war/rebellion-evaluation"
 import { SUBMISSION } from "@/model/history/sim/engine/events/war/submission"
 import type {
+	CohesionLaxityParams,
 	GetDefenderOccupationCandidatesParams,
 	InitWarParams,
 	ListWarTargetsParams,
 	MeasureWarTargetParams,
 	NextEventParams,
 	PressClaimParams,
+	ReachFactorParams,
 	RebelParams,
 	RunWarParams,
 	SeedInterstateWarsParams,
 	SeedRebellionsParams,
 	SeedWarStageParams,
+	StartsWarChanceParams,
 	ViableTargetsParams,
 	WarCandidate,
 	WarTarget,
@@ -45,6 +48,11 @@ const WAR_CHANCE = 1 / 1.11
 // A realm holding the lands of a higher rank without the title is one weak
 // claim step easier to break away from.
 const COMPOSITE_REALM_LAXITY = 0.05
+
+// Cohesion falls as a realm grows (Turchin's asabiya): each doubling past a
+// kingdom-sized realm and each doubling of distinct cultures adds one
+// weak-claim step of laxity.
+const COHESION_REF_SIZE = 25
 
 const FRONT_PROVINCES = 15
 
@@ -432,6 +440,7 @@ function rebel({
 	const threat = preview.threat
 	const composite = state.compositeRealm[overlord] === 1
 	if (composite) laxity += COMPOSITE_REALM_LAXITY
+	laxity += cohesionLaxity({ state, realm: overlord })
 	const threshold = REBELLION_THRESHOLD - laxity
 	const roll = threat <= threshold ? -1 : rng.random()
 	const decision =
@@ -476,8 +485,32 @@ function rebel({
 	return true
 }
 
-function startsWarChance(threat: number): number {
-	return Math.min(1, (1 - threat) * WAR_CHANCE)
+// reachKm defaults to a month's march at 15 to 20 miles a day (Hall, medieval travel speed).
+function reachFactor({ state, distanceSq }: ReachFactorParams): number {
+	const km =
+		2 * state.planetRadiusKm * Math.asin(Math.min(1, Math.sqrt(distanceSq) / 2))
+	return Math.exp(-Math.max(0, km - state.land.reachKm) / state.land.reachKm)
+}
+
+function cohesionLaxity({ state, realm }: CohesionLaxityParams): number {
+	const provinces = STATE.getNationProvinces({ state, root: realm })
+	const cultures = new Set(provinces.map((p) => state.culture[p]))
+	return (
+		state.land.cohesionStep *
+			Math.max(0, Math.log2(provinces.length / COHESION_REF_SIZE)) +
+		state.land.cohesionStep * Math.log2(Math.max(1, cultures.size))
+	)
+}
+
+function startsWarChance({
+	state,
+	threat,
+	distanceSq,
+}: StartsWarChanceParams): number {
+	return Math.min(
+		1,
+		(1 - threat) * WAR_CHANCE * reachFactor({ state, distanceSq }),
+	)
 }
 
 function canDeclare({ state, nation }: ViableTargetsParams): boolean {
@@ -509,7 +542,12 @@ function pressClaim({
 	const target = measureWarTarget({ state, nation: attacker, candidate })
 	if (
 		target.w >= ATTACK_THRESHOLD[STATE.disp.FRIENDLY] ||
-		rng.random() >= startsWarChance(target.w)
+		rng.random() >=
+			startsWarChance({
+				state,
+				threat: target.w,
+				distanceSq: target.d,
+			})
 	)
 		return
 	start({ state, attacker, defender, rng, goal: "claim" })
@@ -528,7 +566,12 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
 			if (
-				rng.random() < startsWarChance(closest.w) &&
+				rng.random() <
+					startsWarChance({
+						state,
+						threat: closest.w,
+						distanceSq: closest.d,
+					}) &&
 				!SUBMISSION.offer({
 					state,
 					attacker: nation,

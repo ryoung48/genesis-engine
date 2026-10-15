@@ -1,3 +1,4 @@
+import { PROVINCE_STATUS } from "@/model/history/record/status"
 import { RELATION_CODE } from "@/model/history/sim/engine/fields/relation-code"
 import type {
 	DispSetParams,
@@ -53,6 +54,24 @@ const prov = {
 				state.hierarchyDirty = true
 				MILITARY.afterMutation({ state })
 			}
+		},
+	},
+	status: {
+		get: ({ state, p }: ProvGetParams) =>
+			state.uninhabited[p]
+				? PROVINCE_STATUS.code.uninhabited
+				: state.stateless[p]
+					? PROVINCE_STATUS.code.stateless
+					: PROVINCE_STATUS.code.state,
+		set: ({ state, p, value }: ProvSetParams) => {
+			const before = prov.status.get({ state, p })
+			if (before === value) return
+			MILITARY.beforeProvinceMutation({ state, p })
+			JOURNAL.status({ state, province: p, before, after: value })
+			state.uninhabited[p] = value === PROVINCE_STATUS.code.uninhabited ? 1 : 0
+			state.stateless[p] = value === PROVINCE_STATUS.code.state ? 0 : 1
+			state.hierarchyDirty = true
+			MILITARY.afterMutation({ state })
 		},
 	},
 	assignment: {

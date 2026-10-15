@@ -1,8 +1,11 @@
+import { PROVINCE_STATUS } from "@/model/history/record/status"
 import { EVENT_HEAP } from "@/model/history/sim/engine/event-heap"
 import type {
 	DevelopmentParams,
 	InitPopulationParams,
 	RunPopulationParams,
+	SettleParams,
+	SettleProvinceParams,
 	UrbanizationParams,
 } from "@/model/history/sim/engine/events/population/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
@@ -84,6 +87,47 @@ function urbanization({ state, yearFraction }: UrbanizationParams): void {
 	}
 }
 
+function settleProvince({ state, p, year }: SettleProvinceParams): void {
+	const predecessor = state.land.predecessor[p]
+	if (
+		predecessor >= 0 &&
+		state.uninhabited[predecessor] &&
+		state.settledYear[predecessor] <= year
+	)
+		settleProvince({ state, p: predecessor, year })
+	FIELDS.prov.status.set({ state, p, value: PROVINCE_STATUS.code.stateless })
+	state.land.counters.settlements++
+	if (predecessor < 0) return
+	const own = state.habitability[p]
+	const source = state.habitability[predecessor]
+	const rural = state.popRuralCurrent[predecessor]
+	const moved = own + source > 0 ? (rural * own) / (own + source) : 0
+	FIELDS.prov.population.rural.set({
+		state,
+		p: predecessor,
+		value: rural - moved,
+	})
+	FIELDS.prov.population.rural.set({ state, p, value: moved })
+	FIELDS.prov.knowledge.set({
+		state,
+		p,
+		value: FIELDS.prov.knowledge.get({ state, p: predecessor }),
+	})
+}
+
+function settle({ state }: SettleParams): void {
+	const land = state.land
+	if (!land.governed) return
+	const year = Math.floor(state.time / STATE.yearMs)
+	while (
+		land.cursor < land.order.length &&
+		state.settledYear[land.order[land.cursor]] <= year
+	) {
+		const p = land.order[land.cursor++]
+		if (state.uninhabited[p]) settleProvince({ state, p, year })
+	}
+}
+
 function development({ state }: DevelopmentParams): void {
 	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(state.era)
 	const devFromCities = URBANIZATION.spreadDevelopment({
@@ -99,7 +143,7 @@ function development({ state }: DevelopmentParams): void {
 	const DEV_RISE = 0.1
 	const DEV_FALL = 0.05
 	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
+		if (state.desolate[p] || state.uninhabited[p]) continue
 		const localDev = URBANIZATION.urbanPopToDev(
 			FIELDS.prov.population.urban.get({ state, p }),
 		)
@@ -143,10 +187,11 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 	MILITARY.beforeCensus({ state })
 	const yearFraction = (state.time - previousTime) / STATE.yearMs
 
+	settle({ state })
 	KNOWLEDGE.advanceKnowledge({ state, yearFraction })
 
 	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
+		if (state.desolate[p] || state.uninhabited[p]) continue
 		const growth =
 			1 +
 			KNOWLEDGE.growthRate({

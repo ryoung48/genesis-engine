@@ -1,4 +1,12 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import {
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest"
 import { WAR } from "@/model/history/sim/engine/events/war"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
@@ -155,6 +163,9 @@ describe("independent breakaway armies", () => {
 
 describe("observational rebellion evaluation notes", () => {
 	afterEach(() => vi.restoreAllMocks())
+	beforeEach(() => {
+		state.land.cohesionStep = 0
+	})
 
 	it("rejects the threshold boundary without consuming randomness or changing armies", () => {
 		const overlord = [...state.militaryIntervals.keys()].find(

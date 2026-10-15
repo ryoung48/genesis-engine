@@ -19,3 +19,13 @@ export interface RunPopulationParams {
 	state: HistoryState
 	previousTime: number
 }
+
+export interface SettleParams {
+	state: HistoryState
+}
+
+export interface SettleProvinceParams {
+	state: HistoryState
+	p: number
+	year: number
+}

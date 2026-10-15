@@ -204,36 +204,20 @@ Observed CK3 tier placement inside the current display ladder:
 
 ## Start-date county share by realm-size bucket
 
-Counties were grouped by their top liege realm from title history at the canonical start bookmarks.
+Counties are grouped by **sovereign ruler**: each held county belongs to its holder, each holder answers to the holder of the liege of their highest-tier title that has a liege, and counties are summed under the ruler at the top. A ruler's separate demesne counties and vassals whose liege is recorded on a higher title therefore stay in their sovereign's realm. The earlier grouping followed only the `liege =` line on each county title, which counted those counties and vassals as realms of their own (1,283 realms at 867 against 820 sovereigns) and put 28.7% of counties in single-county realms against 10.4% by sovereign. `scripts/measure-ck3-governments.py` now groups by sovereign (824 realms on 3,835 held counties at 867, 751 on 3,917 at 1066).
 
-### Held counties only
+Measured from the local install, in % (820 sovereigns on 3,835 held counties at 867; 752 on 3,917 at 1066):
 
-| Bucket | 867.1.1 | 1066.9.15 |
-| --- | ---: | ---: |
-| 1 | 28.74% | 23.49% |
-| 2-4 | 8.12% | 8.49% |
-| 5-9 | 7.41% | 8.06% |
-| 10-24 | 9.48% | 11.02% |
-| 25-49 | 5.94% | 7.04% |
-| 50+ | 40.32% | 41.89% |
+| Bookmark | Measure | 1 | 2-4 | 5-9 | 10-24 | 25-49 | 50-100 | 101+ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 867.1.1 | sovereigns | 48.54 | 39.88 | 5.73 | 3.17 | 0.98 | 1.10 | 0.61 |
+| 867.1.1 | counties | 10.38 | 21.56 | 7.80 | 10.14 | 6.78 | 15.96 | 27.38 |
+| 1066.9.15 | sovereigns | 49.47 | 35.90 | 8.11 | 3.86 | 1.06 | 0.66 | 0.93 |
+| 1066.9.15 | counties | 9.50 | 16.93 | 10.11 | 11.56 | 6.59 | 8.37 | 36.94 |
 
-Held county totals:
+Takeaway: at game start the two largest buckets (**50+**) hold about **43%** of held counties, in under 2% of the realms. Single-county realms are about half of the sovereigns but a tenth of the land.
 
-- **867:** 3,807
-- **1066:** 3,920
-
-### All county titles
-
-| Bucket | 867.1.1 | 1066.9.15 |
-| --- | ---: | ---: |
-| 1 | 28.71% | 21.74% |
-| 2-4 | 8.11% | 7.86% |
-| 5-9 | 7.40% | 7.46% |
-| 10-24 | 9.47% | 10.20% |
-| 25-49 | 5.93% | 7.20% |
-| 50+ | 40.38% | 45.54% |
-
-Takeaway: at game start, the **50+** bucket contains the largest share of counties, roughly **40-42%** of held counties.
+The history target profile uses these shares; see `docs/terrestrial/politics/land-status-and-targets.md`.
 
 ## Recommended bound for the `50+` bucket
 

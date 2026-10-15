@@ -193,6 +193,8 @@ interface InfoPanelProps {
 		titleLabel: string | null
 		liegeLabel: string | null
 		realmLabel: string | null
+		/** Set for land with no state: its label, and whether nobody lives there. */
+		landStatus: { label: string; uninhabited: boolean } | null
 	}
 }
 
@@ -456,6 +458,18 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		} else {
 			demographicEntryMap.delete("Religion")
 		}
+		if (historyHoverOverride.landStatus?.uninhabited)
+			for (const label of [
+				"Culture",
+				"Religion",
+				"Development",
+				"Knowledge",
+				"Population",
+				"Population (Real)",
+				"Population Δ",
+				"Urban Pop",
+			])
+				demographicEntryMap.delete(label)
 	}
 	const orderedSocietyEntries = [
 		demographicEntryMap.get("Culture"),
@@ -786,6 +800,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={`#${hoverProvinceDisplayId} ${historyHoverOverride?.provinceName ?? provinceName ?? ""}`}
 								color={null}
 							/>
+						)}
+						{historyHoverOverride?.landStatus && (
+							<Row label="Land" value={historyHoverOverride.landStatus.label} />
 						)}
 						{historyHoverOverride?.nationName && (
 							<SwatchRow

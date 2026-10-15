@@ -1,36 +1,16 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type {
+	CradleChoice,
+	MigrationDiagnostics,
+} from "@/model/society/migration/types"
 import type { GenesisProvinces } from "@/model/society/types"
-
-export interface BfsUpdateMinHopsParams {
-	start: number
-	adjOffset: Int32Array
-	adjList: Int32Array
-	minHops: Int32Array
-}
-
-export interface ComputeMigrationParams {
-	provinces: GenesisProvinces
-	habitability: Float32Array
-	mesh: SphereMesh
-	planetRadiusKm?: number
-	numRegions?: number
-}
 
 export interface ProvinceAreasKm2Params {
 	mesh: SphereMesh
 	regionProvince: Int32Array
 	provinceCount: number
 	planetRadiusKm: number
-}
-
-export interface PlaceCradlesParams {
-	continentProvinces: number[]
-	normHab: Float32Array
-	adjOffset: Int32Array
-	adjList: Int32Array
-	totalProvinces: number
-	k: number
 }
 
 export interface ComputeProvinceHabitabilityParams {
@@ -77,8 +57,21 @@ export interface ProvincePopulation {
 	 * 1 = latest frontier reached). -1 for desolate/unreachable provinces.
 	 */
 	migrationWave?: Float32Array
-	/** Province indices where prehistoric cradles were seeded */
-	cradleProvinces?: Int32Array
+	// [JUSTIFICATION] Earth imports and eras without migration carry no settlement field.
+	/** Calendar year each province is first settled; the sentinel when never */
+	arrivalYear?: Int32Array
+	// [JUSTIFICATION] Present exactly when arrivalYear is.
+	/** Province each province was settled from, -1 for the origin and unreached land */
+	predecessor?: Int32Array
+	// [JUSTIFICATION] Present exactly when arrivalYear is.
+	/** Provinces in arrival order, unreached land excluded */
+	settlementOrder?: Int32Array
+	// [JUSTIFICATION] Present exactly when arrivalYear is.
+	/** Agricultural cradles in selection order */
+	cradles?: CradleChoice[]
+	// [JUSTIFICATION] Present exactly when arrivalYear is.
+	/** Counts and distance quantiles of the arrival field's links */
+	migrationDiagnostics?: MigrationDiagnostics
 	/**
 	 * Era settlementWave threshold used during generation. Provinces with
 	 * migrationWave > settlementWave are unsettled (pop=0). Stored here so

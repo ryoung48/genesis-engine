@@ -1,5 +1,6 @@
 import { DATE } from "@/model/history/earth/date"
 import { RECORD_ROUTES } from "@/model/history/record/routes"
+import { PROVINCE_STATUS } from "@/model/history/record/status"
 import type {
 	BattleContribution,
 	HistoryEvent,
@@ -974,6 +975,14 @@ function createTranslator({
 	const occupation = new Int32Array(count).fill(-1)
 	const children = Array.from({ length: count }, () => new Set<number>())
 	const ownedCount = new Array<number>(state.record.nations.length).fill(0)
+	const initial = world.provinces
+		? PROVINCE_STATUS.initial({
+				desolate: world.provinces.desolate,
+				sovereign: world.nations?.sovereign ?? new Int32Array(count).fill(-1),
+				migrationWave: world.population?.migrationWave,
+				settlementWave: world.population?.settlementWave,
+			})
+		: new Uint8Array(0)
 	const stateless = new Uint8Array(count)
 	for (let province = 0; province < count; province++) {
 		const base = state.record.events.provinceEvents.get(province)?.base
@@ -982,11 +991,11 @@ function createTranslator({
 		controller[province] = base?.controllerId ?? -1
 		if (parent[province] >= 0) children[parent[province]].add(province)
 		if (owner[province] >= 0) ownedCount[owner[province]]++
-		if (
-			!world.provinces?.desolate[province] &&
-			(world.nations?.sovereign[province] ?? -1) < 0
-		)
-			stateless[province] = 1
+		stateless[province] =
+			initial[province] === PROVINCE_STATUS.code.stateless ||
+			initial[province] === PROVINCE_STATUS.code.uninhabited
+				? 1
+				: 0
 	}
 	const identityByRoot = new Map<number, number>()
 	const rawColors: Array<[number, number, number]> = []
@@ -1046,6 +1055,17 @@ function applyTransaction({
 	const affected = new Set<number>()
 	const pairs = new Set<number>()
 	const reasons = scanOwnerNotes({ translator, transaction })
+	for (const change of transaction.statuses) {
+		translator.stateless[change.province] =
+			change.after === PROVINCE_STATUS.code.state ? 0 : 1
+		record.events.provinceEvents.get(change.province)?.events.push({
+			timeMs,
+			kind: "status",
+			payload: { status: change.after },
+			comment: null,
+		})
+		affected.add(change.province)
+	}
 	for (const change of transaction.parents) {
 		for (const province of descendants({
 			children: translator.children,

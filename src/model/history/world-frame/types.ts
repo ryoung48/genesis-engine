@@ -92,6 +92,8 @@ export interface WorldFrame {
 	provinceReligion: Int32Array
 	provinceCultureBlendSecondary: Int32Array
 	provinceHre: Uint8Array
+	// [JUSTIFICATION] Earth frames carry no land status.
+	provinceStatus: Uint8Array | null
 	provincePopulation: Float32Array
 	provincePopulationUrban: Float32Array
 	provinceDevelopment: Float32Array

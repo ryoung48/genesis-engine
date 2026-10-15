@@ -22,9 +22,11 @@ Start here for the historical simulation’s rules and implementation references
 - [Armies, battles and war settlement](politics/armies-and-wars.md)
 - [Diplomatic attitudes, alliances and vassalage](politics/diplomacy-and-subjects.md)
 - [Rebellions, independence and throne wars](politics/rebellions-and-throne-wars.md)
+- [Land status and realm-size targets](politics/land-status-and-targets.md)
 
 ## Population and economy
 
+- [Migration and settlement](population/migration-and-settlement.md)
 - [Population growth, cities, knowledge and development](population/growth-cities-and-knowledge.md)
 - [Economic output, taxation and state maintenance](population/output-and-taxation.md)
 - [Religions](population/religions.md)

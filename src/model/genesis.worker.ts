@@ -617,8 +617,10 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		)
 		if (world.population.migrationWave)
 			add(world.population.migrationWave.buffer)
-		if (world.population.cradleProvinces)
-			add(world.population.cradleProvinces.buffer)
+		if (world.population.arrivalYear) add(world.population.arrivalYear.buffer)
+		if (world.population.predecessor) add(world.population.predecessor.buffer)
+		if (world.population.settlementOrder)
+			add(world.population.settlementOrder.buffer)
 	}
 	if (world.tradeGoods) add(world.tradeGoods.buffer)
 	if (world.precomputedTerrainGeometry) {

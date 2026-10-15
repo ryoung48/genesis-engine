@@ -84,3 +84,19 @@ export interface PressClaimParams {
 	defender: number
 	rng: SharedRng
 }
+
+export interface StartsWarChanceParams {
+	state: HistoryState
+	threat: number
+	distanceSq: number
+}
+
+export interface ReachFactorParams {
+	state: HistoryState
+	distanceSq: number
+}
+
+export interface CohesionLaxityParams {
+	state: HistoryState
+	realm: number
+}

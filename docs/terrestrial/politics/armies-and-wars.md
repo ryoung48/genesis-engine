@@ -79,6 +79,8 @@ threat = defender force³ / (attacker force³ + defender force³)
 
 Formal ties are excluded before the disposition threshold is checked.
 
+The chance that a viable declaration happens falls with reach: it is multiplied by `exp(−max(0, d − R) / R)` for a target at distance `d` from the attacker's capital, with `R` = 400 km (see [land status and targets](land-status-and-targets.md#natural-brakes-on-consolidation)).
+
 ## Battle resolution
 
 | Timing or target | Rule |
