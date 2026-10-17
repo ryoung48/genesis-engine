@@ -50,6 +50,7 @@ it("calibrates the production siege loop across ratios, relief and logistics cap
 							startBesiegerStrength: army * 0.75,
 							garrison: { 1: { levy: 100, regular: 0 } },
 							startGarrison: 100,
+							seaSupplied: false,
 							shortages: [],
 							breaches: 0,
 						}

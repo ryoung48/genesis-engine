@@ -14,7 +14,7 @@ Sovereign realms hold actual enrolled levies and regulars. Soldiers remain inhab
 
 Levy eligibility is 2% of population for nontribal governments and 5% for all tribal-family governments. A separate 6% combined population safety ceiling covers both types. Neither type receives priority when the shared budget or safety ceiling binds. Government family changes only levy eligibility and permission to initiate raids in this military/fiscal model.
 
-Let `B = 0.75 × max(0, civilian surplus)`. Requested levies equal population eligibility. Requested regulars equal `funding × B / regular home price`, using the full readiness budget without deducting levy costs first. Funding interpolates from 10% at knowledge 0.42 through 25% at 1.00 and 55% at 1.44 to 90% at 2.38. This defines requests rather than imposing a final composition.
+Let `B = 0.75 × max(0, civilian surplus)`. Requested levies equal population eligibility. Requested regulars equal `funding × B / regular home price`, using the full readiness budget without deducting levy costs first. Funding interpolates from 10% at knowledge 0.42 through 25% at 1.00 and 55% at 1.44 to 90% at 2.38. The navy takes a share of `funding × B` first and the army uses `B` minus the whole-ship upkeep that buys (see [navies](navies.md#naval-share-and-whole-ship-targets)). This defines requests rather than imposing a final composition.
 
 Calculate the requested combined headcount `N` and home upkeep `C`. Multiply both types by the same factor `min(1, B / C, safety ceiling / N, logistics scale)`, treating empty requests as zero targets. Thus budget, population, and logistics limits preserve the independently requested contribution of each type. Remaining readiness budget is `B` minus the combined capped home upkeep; savings do not generate additional requests.
 
@@ -33,7 +33,7 @@ Civilian surplus supplies the army readiness budget. See [economic output, taxat
 
 Both prices scale by `(realm output per resident / 450)^0.5` and the shared silver-to-ducat conversion. Upkeep integrates actual soldier-years, including gradual replacements, over each peace/campaign interval. Only mobilized commitments pay campaign prices. Battle logistics scaling does not reduce mobilized upkeep.
 
-Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, labelled "settled interval" once the interval has settled. Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
+Tax settlement charges accumulated levy and regular expenses once, in full. Peace preserves pending campaign costs. The treasury UI shows one combined Army maintenance expense, labelled "settled interval" once the interval has settled, and a separate Navy maintenance row for [ship upkeep](navies.md#ships-crews-and-upkeep). Every government may enter debt and shares a fiscal exhaustion threshold of half a year of positive civilian surplus. Strength exhaustion compares actual troops with 25% of affordable targets. An unarmed realm cannot join as a contributor.
 
 A [coronation](government-and-succession.md#coronation) is an immediate one-off cash expense recorded as the negative "Coronation" budget row (`coronationExpenses`), beside bought peace and realm splits. It contributes once through `otherChangesTotal`; recurring tax/army settlement and `annualBalance` exclude it. Tax previews and settlement preserve this accumulator. Census snapshots record it, then reset it for the next interval.
 
@@ -68,6 +68,8 @@ Interstate attacks exclude every formal tie, including alliances, subject bonds,
 ```text
 threat = defender force³ / (attacker force³ + defender force³)
 ```
+
+Force is attended troop force plus each member's fleet strength (whole ships × crew, split over its current wars like troops); see [navies](navies.md#threat).
 
 | Disposition | Attack threshold |
 | --- | ---: |
@@ -107,8 +109,9 @@ Once the target and encounter roles are resolved, the encounter becomes an `open
 | Ambush | Always eligible; field weight 0.05. | Ambusher gets ×1.3 combat strength; defender ambushes with 60% chance, attacker with 40%. |
 | River crossing | Eligible only when the target has a river; field weight 0.12. | Defender gets ×1.2 in addition to terrain. |
 | Siege | Target has at least 2,000 urban residents, a garrison of at least one troop, and besiegers stronger than the garrison. | Resolves through monthly phases, with wall defenses during assaults. |
+| Naval | Target is a port and both sides have committed ships that reach its water body; field weight `0.90 ×` the mean port share of the two war leads. | Fleets fight for the sea; no land changes hands. See [naval engagement](navies.md#naval-engagement). |
 
-When siege is eligible, it has a 95% selection probability. The remaining 5% is split among eligible field kinds by their relative weights. Without an eligible siege, those weights normalize over field kinds alone: without a river, about 93.3% open and 6.7% ambush; with a river, about 80.5% open, 5.7% ambush and 13.8% river crossing. River presence comes from the province's stored generated river data; town eligibility uses current urban population.
+When siege is eligible, it has a 95% selection probability. The remaining 5% is split among eligible field kinds by their relative weights. Without an eligible siege, those weights normalize over field kinds alone (the naval weight joins them when eligible; the figures below assume none): without a river, about 93.3% open and 6.7% ambush; with a river, about 80.5% open, 5.7% ambush and 13.8% river crossing. River presence comes from the province's stored generated river data; town eligibility uses current urban population.
 
 Open, ambush and river crossing resolve in one event. A siege starts without a field battle roll and suspends ordinary battles for that war until it ends. Each war can have one active siege.
 
@@ -190,7 +193,7 @@ If the siege continues, roll a d20 plus these modifiers:
 | 18–19 | Desertion | Garrison loses 10%. |
 | ≥20 | Surrender | Garrison capitulates. |
 
-Each shortage can occur once; repeats act as stalemates. Capitulation, including an emptied garrison, ends as `starved out` if any shortage has occurred and `surrendered` otherwise. Food and supply stocks are not tracked separately.
+Each shortage can occur once; repeats act as stalemates. A besieged port that the sea keeps supplied also turns rolls 10–13 into stalemates; see [sea supply and blockade](navies.md#sea-supply-and-blockade). Capitulation, including an emptied garrison, ends as `starved out` if any shortage has occurred and `surrendered` otherwise. Food and supply stocks are not tracked separately.
 
 If still standing, the phase checks a sortie, then an assault, then relief. The first terminal result ends the phase; a phase can otherwise record several beats.
 
@@ -199,6 +202,7 @@ If still standing, the phase checks a sortie, then an assault, then relief. The 
 | Sortie | `R < 3`; chance `min(0.4, 0.1 + 0.1 × breaches)`. | 20% of the garrison attacks 20% of the camp, with ×1.3 ambush strength against terrain defense. A non-inconclusive garrison win repairs one breach, or burns the works for another 3% besieger loss if no breach exists. Losses can empty the garrison and cause capitulation. |
 | Assault | `R ≥ 1.5`; chance `min(0.9, 0.3 × breaches + desperation)`, where desperation is 0.5 if besieger strength is below 85% of its starting value, otherwise 0. | All besiegers attack the garrison; defense is `T × max(1, 1.5 − 0.15 × breaches)`. An emptied garrison or non-inconclusive besieger win ends as `stormed`. Otherwise a besieger loss lifts the siege as `repelled`; an inconclusive besieger win continues it. |
 | Relief | Relief combat strength is at least 25% of besieger strength; 6% chance per phase. | Relief attacks the besiegers, who receive terrain defense. A non-inconclusive relief win ends as `relieved`; otherwise the siege continues. |
+| Blockade imposed / broken | Port target; 10% chance per phase after relief. | Naval engagements that flip sea supply; see [navies](navies.md#sea-supply-and-blockade). |
 
 Ratios and forces are refreshed between these actions after losses. Destroying the garrison in an assault takes priority over the clash result, so even a lost or inconclusive assault can take the town.
 
@@ -232,7 +236,7 @@ land    = 50 × occupied share of the defender's non-capital output    0 … +50
 capital = 50 while this war holds the defender's capital              0 or +50
 ```
 
-- **Battles.** After a field battle with a winner the battle part moves toward the winner by `50 × the loser's loss share`, and is kept between −100 and +50. Inconclusive battles and sieges add nothing to it. The defender occupies nothing, so its whole score comes from battles; that is why the battle part reaches −100 but only +50.
+- **Battles.** After a field battle with a winner the battle part moves toward the winner by `50 × the loser's loss share`, and is kept between −100 and +50. Inconclusive battles and sieges add nothing to it. A naval battle counts at half weight: `0.5 × 50 × the loser's loss share`. The defender occupies nothing, so its whole score comes from battles; that is why the battle part reaches −100 but only +50.
 - **Land.** Province output summed over the occupied land, without the capital, over the same sum for everything the defender owns, without the capital.
 - **Capital.** A realm's capital is its root province. It is worth as much as all the defender's other land together, and it is not counted as land, so holding it alone gives exactly 50.
 - **Full occupation.** When the war holds every province the defender owns, the score is +100 whatever the battle part says.

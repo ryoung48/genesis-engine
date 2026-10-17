@@ -30,6 +30,7 @@ import { MILITARY_REPORT } from "@/test/history-run/report/military"
 import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefields"
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
+import { NAVY_REPORT } from "@/test/history-run/report/navy"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
 import { RELIGION_REPORT } from "@/test/history-run/report/religion"
@@ -329,6 +330,7 @@ function runSeed({
 		if (diagnostics.recruitment.at(-1)?.year === start + 500)
 			writeFileSync(options.outPath.replace(/\.json$/, "-500.json"), content)
 	}
+	const navy = NAVY_REPORT.tracker()
 	const military = MILITARY_REPORT.attach({
 		engine,
 		initialTies,
@@ -427,6 +429,7 @@ function runSeed({
 				tracker: military.tracker,
 				relations,
 			})
+			NAVY_REPORT.sample({ engine, tracker: navy })
 			for (const p of largest({ engine })) {
 				sampledYears++
 				if (MILITARY.atWar({ state: engine, nation: p })) atWarYears++
@@ -497,6 +500,7 @@ function runSeed({
 				coronations: coronation.coronations,
 				elevateMsPerYear: coronation.elevateMsPerYear,
 				military: MILITARY_REPORT.summarize({ tracker: military.tracker }),
+				navy: NAVY_REPORT.summarize({ engine, tracker: navy, from, to: year }),
 				districts: DISTRICTS_REPORT.summarize({
 					engine,
 					tracker: districts.tracker,
@@ -616,6 +620,7 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 				`${`${from}-${to}`.padEnd(11)} ${String(d.events).padStart(12)} ${`${d.freedPerEvent.p50}/${d.freedPerEvent.p90}`.padStart(14)} ${String(d.skippedSeats).padStart(8)} ${String(d.warsDeclared).padStart(5)} ${String(d.cutOffProvinces).padStart(8)} ${String(d.titlesLost).padStart(12)} ${`${d.freedStillSovereign}/${d.freedRealms}`.padStart(22)} ${String(d.withoutDistricts).padStart(26)}`,
 			)
 		MILITARY_REPORT.log({ reports, log: options.log })
+		NAVY_REPORT.log({ reports, log: options.log })
 	}
 
 	if (options.outPath) {

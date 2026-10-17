@@ -23,6 +23,7 @@ function record(): SiegeRecord {
 		defender: 1,
 		besiegers: 100,
 		garrisonTroops: 100,
+		seaSupplied: false,
 		contributions: initial,
 		beats: [],
 		outcome: null,

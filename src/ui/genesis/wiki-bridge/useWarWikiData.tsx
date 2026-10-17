@@ -10,6 +10,7 @@ import type { WarWikiDataInput } from "@/ui/genesis/view/types"
 import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
 import {
 	battleDetail,
+	battleSite,
 	battleVerb,
 	formatBattleForce,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
@@ -332,7 +333,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				winnerForce && loserForce
 					? ` (${winnerName}: ${winnerForce}; ${loserName}: ${loserForce})`
 					: ""
-			const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name}${forces}.${battleDetail({ battle, attackerName: resolveNationName(battle.attacker.countryId), defenderName: resolveNationName(battle.defender.countryId) })}`
+			const description = `${winnerName} ${battleVerb(battle)} ${loserName} ${battleSite(battle)}${forces}.${battleDetail({ battle, attackerName: resolveNationName(battle.attacker.countryId), defenderName: resolveNationName(battle.defender.countryId) })}`
 			pushTimelineEvent(timelineEvents, {
 				id: `warBattle:${battle.timeMs}:${index}`,
 				date: daysFromMs(battle.timeMs),

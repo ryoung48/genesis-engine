@@ -20,6 +20,7 @@ Start here for the historical simulation’s rules and implementation references
 - [Personal unions and foreign claims](politics/personal-unions.md)
 - [Title ranks and de jure hierarchy](politics/title-hierarchy.md)
 - [Armies, battles and war settlement](politics/armies-and-wars.md)
+- [Navies and naval warfare](politics/navies.md)
 - [Diplomatic attitudes, alliances and vassalage](politics/diplomacy-and-subjects.md)
 - [Rebellions, independence and throne wars](politics/rebellions-and-throne-wars.md)
 - [Land status and realm-size targets](politics/land-status-and-targets.md)

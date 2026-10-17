@@ -16,6 +16,7 @@ import type {
 	WarSide,
 	WarsParams,
 } from "@/model/history/sim/engine/military/deployments/types"
+import { NAVY } from "@/model/history/sim/engine/military/navy"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { ARMY_STRENGTH } from "@/model/history/sim/engine/military/strength"
 import { STATE } from "@/model/history/sim/engine/state"
@@ -51,7 +52,8 @@ function exhausted({ state, nation }: NationParams): boolean {
 	const pending = state.militaryIntervals.get(nation)?.pending
 	const treasury =
 		state.treasuryCurrent[nation] -
-		(pending ? pending.levy + pending.regular : 0)
+		(pending ? pending.levy + pending.regular : 0) -
+		NAVY.pending({ state, nation })
 	return (
 		strength <= 0 ||
 		target.levy + target.regular <= 0 ||
@@ -131,7 +133,8 @@ function ready({ state, nation, war, exhaustion }: ReadyParams): boolean {
 	const pending = state.militaryIntervals.get(nation)?.pending
 	const treasury =
 		state.treasuryCurrent[nation] -
-		(pending ? pending.levy + pending.regular : 0)
+		(pending ? pending.levy + pending.regular : 0) -
+		NAVY.pending({ state, nation })
 	return !!war?.participants[nation] || treasury >= 0
 }
 
@@ -333,12 +336,14 @@ function reconcileParticipation({ state, wars }: WarsParams): Set<number> {
 				if (war.participants[nation] === membership[nation]) continue
 				changed.add(nation)
 				delete war.deployed[nation]
+				delete war.ships[nation]
 				delete war.allocation[nation]
 			}
 			for (const nation of participantNations(membership)) {
 				if (war.participants[nation]) continue
 				changed.add(nation)
 				delete war.deployed[nation]
+				delete war.ships[nation]
 				delete war.allocation[nation]
 			}
 			war.participants = membership

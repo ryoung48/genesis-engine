@@ -34,6 +34,7 @@ import {
 } from "@/ui/genesis/wiki-bridge/nation-wiki-mentions"
 import {
 	battleDetail,
+	battleSite,
 	battleVerb,
 	buildMergedDiplomacyDescription,
 	buildMergedProvinceAttributeDescription,
@@ -1293,7 +1294,7 @@ export function useNationWikiData(
 				)
 				const winnerName = won ? title : opponentName
 				const loserName = won ? opponentName : title
-				const description = `${winnerName} ${battleVerb(battle)} ${loserName} at the Battle of ${battle.name} (${war.name})${force ? `; ${title}: ${force}` : ""}.${battleDetail({ battle, attackerName: resolveNationName(battle.attacker.countryId), defenderName: resolveNationName(battle.defender.countryId) })}`
+				const description = `${winnerName} ${battleVerb(battle)} ${loserName} ${battleSite(battle)} (${war.name})${force ? `; ${title}: ${force}` : ""}.${battleDetail({ battle, attackerName: resolveNationName(battle.attacker.countryId), defenderName: resolveNationName(battle.defender.countryId) })}`
 				pushTimelineEvent(timelineEvents, {
 					id: `warBattle:${war.id}:${battle.date}:${index}`,
 					date: battle.date,

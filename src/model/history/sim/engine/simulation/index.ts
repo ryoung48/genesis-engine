@@ -72,6 +72,7 @@ function initHistory(params: InitHistoryParams): HistoryState {
 				startYear,
 				seed: params.seed,
 				waterAccess: params.waterAccess,
+				provinceWaterBody: params.settlementWaterLandmarks,
 				landmarks: params.landmarks,
 				regionProvince: params.regionProvince,
 				regionAdjOffset: params.regionAdjOffset,

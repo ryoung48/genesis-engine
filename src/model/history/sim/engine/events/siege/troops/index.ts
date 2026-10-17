@@ -95,6 +95,7 @@ function prepare({
 		startGarrison: size,
 		shortages: [],
 		breaches: 0,
+		seaSupplied: false,
 	}
 	return MILITARY.totalForce(besiegers) > MILITARY.totalForce(garrisonOf(siege))
 		? siege

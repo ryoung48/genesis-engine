@@ -40,6 +40,16 @@ function beatText({ beat }: BeatTextParams): string {
 			return beat.effect === "repelled"
 				? "The besiegers' assault is thrown back"
 				: "The besiegers storm the walls but cannot break in"
+		case "blockade imposed":
+			if (beat.effect === "blockaded")
+				return beat.outcome === "uncontested"
+					? "A fleet closes the harbour and cuts off supply by sea"
+					: "A fleet wins the sea and closes the harbour"
+			return "A fleet contests the sea off the harbour but cannot close it"
+		case "blockade broken":
+			return beat.effect === "supplied"
+				? "A fleet breaks the blockade and supply by sea resumes"
+				: "A fleet attacks the blockade but cannot break it"
 		case "relief":
 			if (beat.effect === "relieved")
 				return "A relief army breaks the siege lines"
@@ -78,7 +88,7 @@ function build({
 			id: `${id}:start`,
 			date: siege.timeMs / DAY_MS,
 			type: "Siege",
-			description: `${b} laid siege to ${place}, held by ${d}.${context}`,
+			description: `${b} laid siege to ${place}, held by ${d}${siege.seaSupplied ? ", which the sea kept supplied" : ""}.${context}`,
 		})
 		siege.beats.forEach((beat, beatIndex) =>
 			entries.push({

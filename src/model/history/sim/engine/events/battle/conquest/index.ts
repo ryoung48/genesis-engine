@@ -12,6 +12,7 @@ import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
 
 const WINNER_INITIATIVE = 0.7
+const NAVAL_SCORE_WEIGHT = 0.5
 const DEFENSIVE_SETTLEMENT_CHANCE: Partial<Record<BattleOutcome, number>> = {
 	decisive: 0.4,
 	rout: 0.75,
@@ -58,13 +59,15 @@ function apply({
 	attackerWon,
 	outcome,
 	loserLossShare,
+	occupies,
 	sack,
 	record,
 	rng,
 }: ApplyConquestParams): void {
 	const restoration = war.attacker === defender
 	const result = { attackerWon, outcome }
-	const progress = result.attackerWon && result.outcome !== "inconclusive"
+	const progress =
+		occupies && result.attackerWon && result.outcome !== "inconclusive"
 
 	const loot =
 		progress && !restoration
@@ -101,7 +104,13 @@ function apply({
 	const winner = result.attackerWon ? attacker : defender
 	const loser = result.attackerWon ? defender : attacker
 	if (result.outcome !== "inconclusive")
-		WAR_SCORE.battle({ war, winner, loserLossShare })
+		WAR_SCORE.battle({
+			war,
+			winner,
+			loserLossShare: occupies
+				? loserLossShare
+				: NAVAL_SCORE_WEIGHT * loserLossShare,
+		})
 
 	record(loot)
 

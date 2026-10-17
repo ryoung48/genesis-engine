@@ -266,6 +266,7 @@ const rel = {
 						after: RELATION_CODE[rel],
 					})
 				state.militaryDiplomacyDirty = true
+				state.relationVersion++
 				state.militaryDiplomacyNations.add(a).add(b)
 				state.relationsCurrent[forwardKey] = RELATION_CODE[flipped]
 				state.relationsCurrent[backwardKey] = RELATION_CODE[rel]

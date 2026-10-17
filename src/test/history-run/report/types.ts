@@ -7,6 +7,7 @@ import type { GovernmentReport } from "@/test/history-run/report/government/type
 import type { InterregnumReport } from "@/test/history-run/report/interregnum/types"
 import type { LandReport } from "@/test/history-run/report/land/types"
 import type { MilitaryReport } from "@/test/history-run/report/military/types"
+import type { NavyReport } from "@/test/history-run/report/navy/types"
 import type {
 	PartitionReport,
 	PartitionStateReport,
@@ -73,6 +74,7 @@ export interface CenturyReport {
 	coronations: CoronationReport
 	elevateMsPerYear: number
 	military: MilitaryReport
+	navy: NavyReport
 	districts: DistrictReport
 	government: GovernmentReport
 	partitionState: PartitionStateReport

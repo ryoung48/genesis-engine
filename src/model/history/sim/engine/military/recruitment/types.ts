@@ -24,6 +24,12 @@ export interface RecruitmentTargets extends Troops {
 	remainingBudget: number
 	home: Troops
 	campaign: Troops
+	ships: number
+	crew: number
+	shipHome: number
+	shipCampaign: number
+	fleetCost: number
+	militaryBudget: number
 }
 
 export interface RealmTargetCacheEntry {
@@ -51,25 +57,17 @@ export interface NationParams {
 	nation: number
 }
 
+export interface InitializeTroopsParams extends NationParams {
+	target: RecruitmentTargets
+}
+
 export interface TargetParams {
 	population: number
 	tribal: boolean
 	knowledge: number
 	surplus: number
 	outputPerHead: number
-}
-
-export interface RecoveryParams {
-	holdings: number
-	target: number
-	rate: number
-	years: number
-}
-
-export interface RecoveryResult {
-	holdings: number
-	replacements: number
-	soldierYears: number
+	navalShare: number
 }
 
 export interface ReconcileParams {

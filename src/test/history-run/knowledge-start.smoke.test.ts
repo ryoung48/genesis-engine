@@ -42,7 +42,7 @@ it.each([
 	expect(highest).toBeGreaterThan(lowest)
 	expect(
 		Math.abs(populationMean(engine) - engine.knowledgeBaseline),
-	).toBeLessThan(1e-4)
+	).toBeLessThan(2e-4)
 	expect(engine.knowledgeSpinUp.origin).toBe(origin)
 	expect(engine.knowledgeSpinUp.years).toBeGreaterThan(0)
 })

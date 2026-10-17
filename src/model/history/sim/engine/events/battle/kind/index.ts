@@ -12,7 +12,9 @@ const WEIGHTS: Record<BattleKind, number> = {
 	ambush: 0.05,
 	"river crossing": 0.12,
 	siege: 0,
+	naval: 0,
 }
+const NAVAL_WEIGHT = 0.9
 const SIEGE_CHANCE = 0.95
 const AMBUSH_DEFENDER_SHARE = 0.6
 const AMBUSH_BONUS = 1.3
@@ -25,12 +27,16 @@ function choose({
 	state,
 	province,
 	siegeEligible,
+	navalEligible,
+	portShare,
 	rng,
 }: ChooseParams): ChosenBattle {
 	const eligible: BattleKind[] = ["open", "ambush"]
 	if (TERRAIN.hasRiver({ state, p: province })) eligible.push("river crossing")
+	if (navalEligible) eligible.push("naval")
 	if (siegeEligible && isTown({ state, province })) eligible.push("siege")
 	const weights = { ...WEIGHTS }
+	weights.naval = NAVAL_WEIGHT * portShare
 	if (eligible.includes("siege")) {
 		const fieldWeight = eligible.reduce((sum, kind) => sum + weights[kind], 0)
 		weights.siege = (fieldWeight * SIEGE_CHANCE) / (1 - SIEGE_CHANCE)

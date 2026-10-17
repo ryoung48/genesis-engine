@@ -462,6 +462,12 @@ export function battleVerb(battle: Battle): string {
 	}
 }
 
+export function battleSite(battle: Battle): string {
+	return battle.simulated?.naval
+		? `in a naval battle off the coast of ${battle.name}`
+		: `at the Battle of ${battle.name}`
+}
+
 export function battleDetail({
 	battle,
 	attackerName,
@@ -470,6 +476,15 @@ export function battleDetail({
 	const simulated = battle.simulated
 	if (!simulated) return ""
 	const odds = Math.round(100 * simulated.preBattleWinProbability)
+	if (simulated.naval) {
+		const {
+			attackerShips,
+			defenderShips,
+			attackerShipsLost,
+			defenderShipsLost,
+		} = simulated.naval
+		return ` The attacker's ${attackerShips} ships lost ${attackerShipsLost} and the defender's ${defenderShips} lost ${defenderShipsLost}; the attacker's odds were ${odds}% beforehand.`
+	}
 	const kind =
 		simulated.kind === "ambush"
 			? ` ${simulated.ambusher === "attacker" ? attackerName : defenderName} ambushed the other side.`

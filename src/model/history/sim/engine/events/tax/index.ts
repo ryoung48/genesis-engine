@@ -14,6 +14,7 @@ import type {
 } from "@/model/history/sim/engine/events/tax/types"
 import { FIELDS } from "@/model/history/sim/engine/fields"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { NAVY } from "@/model/history/sim/engine/military/navy"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 
@@ -67,12 +68,15 @@ function settle({
 		expense.levy *= yearFraction
 		expense.regular *= yearFraction
 	}
+	const navalPaid = settled
+		? NAVY.settle({ state, nation })
+		: NAVY.upkeep({ state, nation }) * yearFraction
 	const upkeep = expense.levy + expense.regular
 	const opening = FIELDS.prov.treasury.get({ state, p: nation })
 	const cash = opening + revenue - tribute - indemnity
 	const maintenancePaid = maintenance
 	const armyPaid = upkeep
-	const beforeLeakage = cash - maintenancePaid - armyPaid
+	const beforeLeakage = cash - maintenancePaid - armyPaid - navalPaid
 	const safe = ECONOMY.treasurySafe({ state, p: nation })
 	const annualLeakage =
 		safe > 0
@@ -90,11 +94,18 @@ function settle({
 	budget.indemnity = indemnity > 0 ? -indemnity : 0
 	budget.stateMaintenance = -maintenancePaid
 	budget.armyExpenses = armyPaid > 0 ? -armyPaid : 0
+	budget.navalExpenses = navalPaid > 0 ? -navalPaid : 0
 	budget.levyExpenses = expense.levy > 0 ? -expense.levy : 0
 	budget.regularExpenses = expense.regular > 0 ? -expense.regular : 0
 	budget.treasuryLeakage = -leakage
 	budget.annualBalance =
-		revenue - tribute - indemnity - maintenancePaid - armyPaid - leakage
+		revenue -
+		tribute -
+		indemnity -
+		maintenancePaid -
+		armyPaid -
+		navalPaid -
+		leakage
 	budget.treasurySafe = safe
 	budget.settled = settled
 	budget.year = DATE.historyTimeMsToYear(state.time)

@@ -13,6 +13,7 @@ export interface TreasuryBudget {
 	armyExpenses: number
 	levyExpenses: number
 	regularExpenses: number
+	navalExpenses: number
 	treasuryLeakage: number
 	annualBalance: number
 	plunder: number

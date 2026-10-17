@@ -16,6 +16,7 @@ export interface ApplyConquestParams {
 	attackerWon: boolean
 	outcome: BattleOutcome
 	loserLossShare: number
+	occupies: boolean
 	sack: boolean
 	record: (loot: number) => void
 	rng: SharedRng

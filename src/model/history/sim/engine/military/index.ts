@@ -5,6 +5,8 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { RELATION_CODE } from "@/model/history/sim/engine/fields/relation-code"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { DEPLOYMENTS } from "@/model/history/sim/engine/military/deployments"
+import { NAVY } from "@/model/history/sim/engine/military/navy"
+import type { NavalCoalition } from "@/model/history/sim/engine/military/navy/types"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { ARMY_STRENGTH } from "@/model/history/sim/engine/military/strength"
 import type {
@@ -31,6 +33,8 @@ import type {
 	MobilizeParams,
 	MutationParams,
 	NationParams,
+	NavalBattleResult,
+	NavalFightParams,
 	PlunderParams,
 	ProvinceMutationParams,
 	RaidParams,
@@ -39,8 +43,12 @@ import type {
 	RebellionPreview,
 	RebellionThreatParams,
 	RecordArmiesParams,
+	RuralDeathsParams,
+	SideFleetParams,
 	SideMembersParams,
+	ThreatForceParams,
 	ThreatParams,
+	WholeShipsParams,
 } from "@/model/history/sim/engine/military/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
@@ -74,9 +82,17 @@ const ROUT_MIDPOINT = 0.4
 
 const ROUT_STEEPNESS = 20
 
-const PURSUIT_MIN = 0.05
+const LAND_ENGAGEMENT = {
+	lossScale: BATTLE_LOSS_SCALE,
+	pursuit: { min: 0.05, max: 0.2 },
+}
 
-const PURSUIT_MAX = 0.2
+const NAVAL_ENGAGEMENT = {
+	lossScale: 0.1,
+	pursuit: { min: 0.3, max: 0.7 },
+}
+
+const CREW_DEATH_SHARE = 0.4
 
 const MIN_FORCE = 1
 
@@ -126,13 +142,21 @@ function armySize({ state, nation }: NationParams): number {
 	return DEPLOYMENTS.available({ state, nation })
 }
 
+function warDivisor({ state, nation }: NationParams): number {
+	return 1 + DERIVE.provinceWars({ state, p: nation }).length
+}
+
 function previewMember({ state, nation }: NationParams): CoalitionMember {
-	const divisor = 1 + DERIVE.provinceWars({ state, p: nation }).length
+	const divisor = warDivisor({ state, nation })
 	const troops = {
 		levy: state.levyCurrent[nation] / divisor,
 		regular: state.regularCurrent[nation] / divisor,
 	}
-	return { nation, ...troops, force: ARMY_STRENGTH.of(troops) }
+	return {
+		nation,
+		...troops,
+		force: ARMY_STRENGTH.of(troops),
+	}
 }
 
 // Allies and vassals fighting beside a war's lead are at war too.
@@ -176,28 +200,40 @@ function threat({ state, attacker, defender }: ThreatParams): number {
 	return forceShare({
 		a: Math.max(
 			MIN_FORCE,
-			totalForce(
-				sideMembers({
+			threatForce({
+				state,
+				members: sideMembers({
 					state,
 					nation: attacker,
 					type: "offensive",
 					target: defender,
 				}),
-			),
+			}),
 		),
 		b: Math.max(
 			MIN_FORCE,
-			totalForce(
-				sideMembers({
+			threatForce({
+				state,
+				members: sideMembers({
 					state,
 					nation: defender,
 					type: "defensive",
 					target: attacker,
 				}),
-			),
+			}),
 		),
 		k: BATTLE_EXPONENT,
 	})
+}
+
+function threatForce({ state, members }: ThreatForceParams): number {
+	return members.reduce(
+		(sum, { nation, force }) =>
+			sum +
+			force +
+			NAVY.strength({ state, nation }) / warDivisor({ state, nation }),
+		0,
+	)
 }
 
 function rebellionPreview({
@@ -232,9 +268,16 @@ function rebellionPreview({
 			league.regular += potential.regular
 		}
 	const existingWars = DERIVE.provinceWars({ state, p: overlord }).length
+	const [crownShips, rebelShips] = NAVY.split({
+		ships: NAVY.ships({ state, nation: overlord }),
+		ports: [
+			NAVY.portCount({ state, provinces: crownProvinces }),
+			NAVY.portCount({ state, provinces: rebelProvinces }),
+		],
+	})
 	const crownStrength = Math.max(
 		MIN_FORCE,
-		ARMY_STRENGTH.of(crown) / (1 + existingWars),
+		(ARMY_STRENGTH.of(crown) + crownShips * crown.crew) / (1 + existingWars),
 	)
 	const rebelEstimate = {
 		levy: (rebel.levy + LEAGUE_SHARE * league.levy) * SUBJECT_LEVY_SHARE,
@@ -248,13 +291,16 @@ function rebellionPreview({
 			KNOWLEDGE.logisticsScale({
 				knee: Math.max(rebel.knee, rebel.levy + rebel.regular),
 				troops: rebelCount,
-			}),
+			}) +
+			rebelShips * rebel.crew,
 	)
 	return {
 		crown,
 		rebel,
 		league,
 		existingWars,
+		crownShips,
+		rebelShips,
 		crownStrength,
 		rebelStrength,
 		threat: forceShare({
@@ -374,18 +420,19 @@ function applyTroopLosses({
 		state.militaryDirty.add(nation)
 		state.militaryAllocationDirty.add(nation)
 		state.militaryStrengthDirty.add(nation)
-		const provinces = STATE.getNationProvinces({ state, root: nation })
-		const rural = provinces.reduce(
-			(sum, p) => sum + state.popRuralCurrent[p],
-			0,
-		)
-		if (rural <= 0) continue
-		const scale = Math.max(0, 1 - (actual.levy + actual.regular) / rural)
-		beforeRealmMutation({ state, provinces })
-		for (const p of provinces) state.popRuralCurrent[p] *= scale
-		afterMutation({ state })
+		killRural({ state, nation, deaths: actual.levy + actual.regular })
 	}
 	return applied
+}
+
+function killRural({ state, nation, deaths }: RuralDeathsParams): void {
+	const provinces = STATE.getNationProvinces({ state, root: nation })
+	const rural = provinces.reduce((sum, p) => sum + state.popRuralCurrent[p], 0)
+	if (rural <= 0) return
+	const scale = Math.max(0, 1 - deaths / rural)
+	beforeRealmMutation({ state, provinces })
+	for (const p of provinces) state.popRuralCurrent[p] *= scale
+	afterMutation({ state })
 }
 
 function battleOutcome(margin: number): BattleOutcome {
@@ -508,6 +555,8 @@ function clash({
 	defenderShortfall,
 	attackerMultiplier,
 	defenderMultiplier,
+	lossScale,
+	pursuit: pursuitRange,
 	rng,
 }: ClashParams): ClashResult {
 	const attackerArmy = totalTroops(attackers)
@@ -541,9 +590,9 @@ function clash({
 	const balance = 1 / (1 + Math.exp(-roll))
 	const margin = Math.abs(roll)
 	const attackerCasualties =
-		attackerArmy * BATTLE_LOSS_SCALE * (1 - balance) ** BATTLE_LOSS_EXPONENT
+		attackerArmy * lossScale * (1 - balance) ** BATTLE_LOSS_EXPONENT
 	const defenderCasualties =
-		defenderArmy * BATTLE_LOSS_SCALE * balance ** BATTLE_LOSS_EXPONENT
+		defenderArmy * lossScale * balance ** BATTLE_LOSS_EXPONENT
 	const loserArmy = attackerWon ? defenderArmy : attackerArmy
 	const loserCasualties = attackerWon ? defenderCasualties : attackerCasualties
 	const loserShortfall = attackerWon ? defenderShortfall : attackerShortfall
@@ -555,7 +604,8 @@ function clash({
 		rng.random() <
 		1 / (1 + Math.exp(-ROUT_STEEPNESS * (routScore - ROUT_MIDPOINT)))
 	const pursuit = routed
-		? rng.uniform(PURSUIT_MIN, PURSUIT_MAX) * (loserArmy - loserCasualties)
+		? rng.uniform(pursuitRange.min, pursuitRange.max) *
+			(loserArmy - loserCasualties)
 		: 0
 	const attackerLosses = attackerCasualties + (attackerWon ? 0 : pursuit)
 	const defenderLosses = defenderCasualties + (attackerWon ? pursuit : 0)
@@ -598,6 +648,7 @@ function fight({
 		defenderShortfall: defenders.shortfall,
 		attackerMultiplier,
 		defenderMultiplier,
+		...LAND_ENGAGEMENT,
 		rng,
 	})
 	applyLosses({
@@ -621,6 +672,134 @@ function fight({
 		defenderLossShare:
 			defenderArmy > 0 ? result.defenderLosses / defenderArmy : 0,
 		...deploymentsOf({ state, war, attackers, defenders }),
+	}
+}
+
+function wholeShips({ loss, rng }: WholeShipsParams): number {
+	const whole = Math.floor(loss)
+	return whole + (rng.random() < loss - whole ? 1 : 0)
+}
+
+function sideFleet({
+	state,
+	war,
+	side,
+	waterBody,
+}: SideFleetParams): NavalCoalition {
+	return NAVY.coalition({
+		state,
+		war,
+		nations: DEPLOYMENTS.sideMembers({ state, war, side }),
+		waterBody,
+	})
+}
+
+function reachingShips(params: SideFleetParams): number {
+	return sideFleet(params).ships
+}
+
+function fightNaval({
+	state,
+	war,
+	eventAttacker,
+	waterBody,
+	rng,
+}: NavalFightParams): NavalBattleResult | null {
+	const attackerSide = eventAttacker === war.attacker ? "attacker" : "defender"
+	const defenderSide = attackerSide === "attacker" ? "defender" : "attacker"
+	const attackers = sideFleet({ state, war, side: attackerSide, waterBody })
+	const defenders = sideFleet({ state, war, side: defenderSide, waterBody })
+	if (attackers.ships <= 0 || defenders.ships <= 0) {
+		state.navalTotals.reachViolations++
+		return null
+	}
+	const result = clash({
+		attackers: attackers.members,
+		defenders: defenders.members,
+		attackerShortfall: 0,
+		defenderShortfall: 0,
+		attackerMultiplier: 1,
+		defenderMultiplier: 1,
+		...NAVAL_ENGAGEMENT,
+		rng,
+	})
+	const members = [...attackers.members, ...defenders.members]
+	const deployedShips = members.map((member) => war.ships[member.nation])
+	const leads = {
+		attacker: eventAttacker,
+		defender: eventAttacker === war.attacker ? war.defender : war.attacker,
+	}
+	const deployedRelations = [
+		...attackers.members.map((member) => ({ member, lead: leads.attacker })),
+		...defenders.members.map((member) => ({ member, lead: leads.defender })),
+	].map(({ member, lead }) =>
+		member.nation === lead
+			? -1
+			: RELATION_CODE[STATE.getRelation({ state, a: lead, b: member.nation })],
+	)
+	const lost = { attacker: 0, defender: 0 }
+	let crewDeaths = 0
+	for (const [side, coalition, losses] of [
+		["attacker", attackers, result.attackerLosses],
+		["defender", defenders, result.defenderLosses],
+	] as const) {
+		const strength = totalTroops(coalition.members)
+		const requested = Math.min(
+			coalition.ships,
+			wholeShips({ loss: (losses / strength) * coalition.ships, rng }),
+		)
+		const shares = MATH.apportion({
+			shares: coalition.members.map((member) => war.ships[member.nation]),
+			total: requested,
+		})
+		for (const [i, member] of coalition.members.entries()) {
+			const ships = NAVY.lose({
+				state,
+				war,
+				nation: member.nation,
+				ships: shares[i],
+			})
+			if (ships <= 0) continue
+			lost[side] += ships
+			const deaths =
+				ships *
+				CREW_DEATH_SHARE *
+				NAVY.crew({
+					knowledge: ECONOMY.realmKnowledge({ state, p: member.nation }),
+				})
+			crewDeaths += deaths
+			state.navalTotals.crewDeaths += deaths
+			state.militaryDirty.add(member.nation)
+			state.militaryStrengthDirty.add(member.nation)
+			killRural({ state, nation: member.nation, deaths })
+		}
+	}
+	return {
+		attackerWon: result.attackerWon,
+		outcome: result.outcome,
+		initialOutcome: result.initialOutcome,
+		powerShare: result.powerShare,
+		preBattleWinProbability: result.preBattleWinProbability,
+		waterBody,
+		attackerShips: attackers.ships,
+		defenderShips: defenders.ships,
+		attackerShipsLost: lost.attacker,
+		defenderShipsLost: lost.defender,
+		attackerCrew: totalTroops(attackers.members),
+		defenderCrew: totalTroops(defenders.members),
+		attackerLossShare: lost.attacker / attackers.ships,
+		defenderLossShare: lost.defender / defenders.ships,
+		crewDeaths,
+		deployedNations: members.map((member) => member.nation),
+		deployedShips,
+		deployedRelations,
+		deployedRoles: memberRoles({
+			war,
+			coalitions: [
+				{ members: attackers.members, shortfall: 0 },
+				{ members: defenders.members, shortfall: 0 },
+			],
+		}),
 	}
 }
 
@@ -919,6 +1098,7 @@ export const MILITARY = {
 	totalForce,
 	coalition,
 	clash,
+	landEngagement: LAND_ENGAGEMENT,
 	casualties,
 	applyTroopLosses,
 	deploymentData,
@@ -948,6 +1128,9 @@ export const MILITARY = {
 	recordArmies,
 	fight: (params: FightParams) =>
 		mutate({ state: params.state, action: () => fight(params) }),
+	reachingShips,
+	fightNaval: (params: NavalFightParams) =>
+		mutate({ state: params.state, action: () => fightNaval(params) }),
 	exhausted,
 	applyLosses: (params: ApplyLossesParams) =>
 		mutate({ state: params.state, action: () => applyLosses(params) }),

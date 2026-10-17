@@ -42,6 +42,7 @@ it("weights shared deployments and carries losses into the next battle", () => {
 		originalCrownRuler: -1,
 		claimantRuler: -1,
 		deployed: {},
+		ships: {},
 		participants: {},
 		candidates: { attacker: [], defender: [] },
 		callable: { attacker: [], defender: [] },

@@ -17,7 +17,6 @@ it("leaves all non-road simulation state identical with settlement inputs absent
 		generate: () => ({
 			...withRoads.generated,
 			settlementRegions: undefined,
-			settlementWaterLandmarks: undefined,
 			settlementPortRegions: undefined,
 		}),
 	})

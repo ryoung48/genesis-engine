@@ -8,6 +8,7 @@ import { FIELDS } from "@/model/history/sim/engine/fields"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { NAVY } from "@/model/history/sim/engine/military/navy"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
@@ -245,6 +246,15 @@ function releaseFactions({ state, seats, rng }: ReleaseFactionsParams): void {
 		repartitionNation({ state, nation, subjects: [] })
 	for (const { p, supportingProvinces } of releases)
 		repartitionNation({ state, nation: p, subjects: supportingProvinces })
+	if (state.militaryReady)
+		for (const nation of formerRealms)
+			NAVY.release({
+				state,
+				from: nation,
+				to: releases
+					.filter((release) => release.formerSovereign === nation)
+					.map((release) => release.p),
+			})
 	for (const nation of formerRealms) RECRUITMENT.reconstitute({ state, nation })
 	for (const { p, government, ruler } of releases) {
 		const from = ERAS.governmentTypes[state.governmentType[p]]
@@ -637,6 +647,7 @@ function createActiveWar({
 			options.goal === "claim" ? state.leaderRuntime.rulerId[attacker] : -1,
 		siege: null,
 		deployed: {},
+		ships: {},
 		participants: {},
 		candidates: { attacker: [], defender: [] },
 		callable: { attacker: [], defender: [] },
@@ -731,6 +742,7 @@ function resolveWar({
 	state.militaryDiplomacyDirty = true
 	war.participants = {}
 	war.deployed = {}
+	war.ships = {}
 	war.allocation = {}
 
 	for (const p of war.occupied) {
@@ -783,6 +795,7 @@ function createHistoryState({
 	startYear,
 	seed,
 	waterAccess,
+	provinceWaterBody,
 	landmarks,
 	regionProvince,
 	regionAdjOffset,
@@ -923,6 +936,19 @@ function createHistoryState({
 		levyCurrent: new Float64Array(P),
 		regularCurrent: new Float64Array(P),
 		militaryIntervals: new Map(),
+		shipsCurrent: new Float64Array(P),
+		navalIntervals: new Map(),
+		navalTotals: {
+			decommissions: 0,
+			shipsLost: 0,
+			crewDeaths: 0,
+			reachViolations: 0,
+		},
+		provinceWaterBody:
+			provinceWaterBody?.length === P
+				? provinceWaterBody.slice()
+				: new Int32Array(P).fill(-1),
+		relationVersion: 0,
 		militaryAssignments: new Map(),
 		militaryTotals: {
 			recruited: { levy: 0, regular: 0 },

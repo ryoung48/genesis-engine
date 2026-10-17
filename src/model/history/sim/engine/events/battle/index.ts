@@ -6,10 +6,12 @@ import type {
 	FindReconquestTargetParams,
 	ResolveTargetParams,
 	RunBattleParams,
+	RunNavalParams,
 } from "@/model/history/sim/engine/events/battle/types"
 import { PEACE } from "@/model/history/sim/engine/events/peace"
 import { SIEGE } from "@/model/history/sim/engine/events/siege"
 import { MILITARY } from "@/model/history/sim/engine/military"
+import { NAVY } from "@/model/history/sim/engine/military/navy"
 import { STATE } from "@/model/history/sim/engine/state"
 import { TERRAIN } from "@/model/history/sim/engine/terrain"
 
@@ -85,6 +87,83 @@ function resolveTarget({
 	return { attacker: defender, defender: attacker, province: swapped }
 }
 
+function runNaval({
+	state,
+	war,
+	attacker,
+	defender,
+	province,
+	rng,
+}: RunNavalParams): void {
+	const waterBody = state.provinceWaterBody[province]
+	const result = MILITARY.fightNaval({
+		state,
+		war,
+		eventAttacker: attacker,
+		waterBody,
+		rng,
+	})
+	if (result === null) {
+		STATE.queueBattleEvent({
+			state,
+			warIdx: war.idx,
+			attacker,
+			time: state.time + STATE.deltaMonth(1),
+		})
+		return
+	}
+	CONQUEST.apply({
+		state,
+		war,
+		attacker,
+		defender,
+		province,
+		attackerWon: result.attackerWon,
+		outcome: result.outcome,
+		loserLossShare: result.attackerWon
+			? result.defenderLossShare
+			: result.attackerLossShare,
+		occupies: false,
+		sack: false,
+		rng,
+		record: () => {
+			state.events.push({
+				tag: "battle",
+				time: state.time,
+				data: {
+					war: war.idx,
+					kind: "naval",
+					ambusher: "none",
+					province,
+					waterBody,
+					attacker,
+					defender,
+					winner: result.attackerWon ? attacker : defender,
+					result: result.outcome,
+					initialResult: result.initialOutcome,
+					preBattleWinProbability: result.preBattleWinProbability,
+					powerShare: result.powerShare,
+					attackerShips: result.attackerShips,
+					defenderShips: result.defenderShips,
+					attackerShipsLost: result.attackerShipsLost,
+					defenderShipsLost: result.defenderShipsLost,
+					attackerCrew: Math.round(result.attackerCrew),
+					defenderCrew: Math.round(result.defenderCrew),
+					crewDeaths: Math.round(result.crewDeaths),
+					deployedNations: result.deployedNations,
+					deployedTroops: result.deployedShips,
+					deployedLevies: result.deployedShips.map(() => 0),
+					deployedRegulars: result.deployedShips,
+					deployedRelations: result.deployedRelations,
+					deployedRoles: result.deployedRoles,
+					attackerLosses: 100 * result.attackerLossShare,
+					defenderLosses: 100 * result.defenderLossShare,
+				},
+			})
+		},
+	})
+}
+
 function runBattle({
 	state,
 	warIdx,
@@ -113,14 +192,28 @@ function runBattle({
 	MILITARY.logCoalition({ state })
 
 	const siege = SIEGE.prepare({ state, war, attacker, province: target })
+	const waterBody = state.provinceWaterBody[target]
+	const navalEligible =
+		waterBody >= 0 &&
+		MILITARY.reachingShips({ state, war, side: "attacker", waterBody }) > 0 &&
+		MILITARY.reachingShips({ state, war, side: "defender", waterBody }) > 0
 	const { kind, ambusher } = BATTLE_KIND.choose({
 		state,
 		province: target,
 		siegeEligible: siege !== null,
+		navalEligible,
+		portShare:
+			(NAVY.exposure({ state, nation: war.attacker }).ports +
+				NAVY.exposure({ state, nation: war.defender }).ports) /
+			2,
 		rng,
 	})
 	if (kind === "siege" && siege !== null) {
 		SIEGE.begin({ state, war, siege })
+		return
+	}
+	if (kind === "naval") {
+		runNaval({ state, war, attacker, defender, province: target, rng })
 		return
 	}
 	const terrain = TERRAIN.battlefield({ state, p: target })
@@ -148,6 +241,7 @@ function runBattle({
 		loserLossShare: result.attackerWon
 			? result.defenderLossShare
 			: result.attackerLossShare,
+		occupies: true,
 		sack: false,
 		rng,
 		record: (loot) => {

@@ -100,6 +100,7 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 			roots,
 			(p) => state.levyCurrent[p] + state.regularCurrent[p],
 		),
+		ships: Float32Array.from(roots, (p) => Math.round(state.shipsCurrent[p])),
 		deployments: roots.map((p) => {
 			const rows: CensusDeployment[] = []
 			for (const warId of state.activeWarIds) {

@@ -2,12 +2,14 @@ import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { TREASURY_BUDGET } from "@/model/history/sim/engine/economy/treasury-budget"
 import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
 import { DEPLOYMENTS } from "@/model/history/sim/engine/military/deployments"
+import { NAVY } from "@/model/history/sim/engine/military/navy"
+import type { FleetTarget } from "@/model/history/sim/engine/military/navy/types"
+import { RECOVERY } from "@/model/history/sim/engine/military/recovery"
 import type {
+	InitializeTroopsParams,
 	NationParams,
 	RealmTargetCacheEntry,
 	ReconcileParams,
-	RecoveryParams,
-	RecoveryResult,
 	RecruitmentTargets,
 	StateParams,
 	TargetParams,
@@ -27,6 +29,7 @@ function targets({
 	knowledge,
 	surplus,
 	outputPerHead,
+	navalShare,
 }: TargetParams): RecruitmentTargets {
 	const price =
 		Number.isFinite(outputPerHead) && outputPerHead > 0
@@ -34,7 +37,7 @@ function targets({
 			: 0
 	const home = { levy: 20 * price, regular: 200 * price }
 	const campaign = { levy: 62.5 * price, regular: 625 * price }
-	const budget = Number.isFinite(surplus) ? 0.75 * Math.max(0, surplus) : 0
+	const readiness = Number.isFinite(surplus) ? 0.75 * Math.max(0, surplus) : 0
 	const living = Number.isFinite(population) ? Math.max(0, population) : 0
 	const levyEligibility = tribal ? 0.05 : 0.02
 	const safety = living * 0.06
@@ -45,6 +48,12 @@ function targets({
 		x: level,
 	})
 	const levy = home.levy > 0 ? living * levyEligibility : 0
+	const crew = NAVY.crew({ knowledge: level })
+	const shipHome = crew * 200 * price
+	const ships =
+		shipHome > 0 ? Math.floor((navalShare * funding * readiness) / shipHome) : 0
+	const fleetCost = ships * shipHome
+	const budget = funding > 0 ? readiness - fleetCost / funding : readiness
 	const regular = home.regular > 0 ? (funding * budget) / home.regular : 0
 	const total = levy + regular
 	const expense = levy * home.levy + regular * home.regular
@@ -71,6 +80,12 @@ function targets({
 		remainingBudget,
 		home,
 		campaign,
+		ships,
+		crew,
+		shipHome,
+		shipCampaign: crew * 625 * price,
+		fleetCost,
+		militaryBudget: funding * readiness,
 	}
 }
 
@@ -85,6 +100,7 @@ function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
 		knowledge: realm.knowledge,
 		surplus: realm.revenue - realm.stateMaintenance,
 		outputPerHead: realm.outputPerHead,
+		navalShare: NAVY.share({ exposure: NAVY.exposure({ state, nation }) }),
 	}
 	const cached = realmTargetCache.get(realm)
 	if (
@@ -93,7 +109,8 @@ function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
 		cached.inputs.tribal === inputs.tribal &&
 		cached.inputs.knowledge === inputs.knowledge &&
 		cached.inputs.surplus === inputs.surplus &&
-		cached.inputs.outputPerHead === inputs.outputPerHead
+		cached.inputs.outputPerHead === inputs.outputPerHead &&
+		cached.inputs.navalShare === inputs.navalShare
 	)
 		return cached.targets
 	const computed = targets(inputs)
@@ -114,32 +131,10 @@ function territoryTargets({
 		knowledge: economy.knowledge,
 		surplus: economy.revenue - economy.stateMaintenance,
 		outputPerHead: economy.outputPerHead,
+		navalShare: NAVY.share({
+			exposure: NAVY.exposureOf({ state, nation, provinces }),
+		}),
 	})
-}
-
-function recover({
-	holdings,
-	target,
-	rate,
-	years,
-}: RecoveryParams): RecoveryResult {
-	if (years <= 0) return { holdings, replacements: 0, soldierYears: 0 }
-	const shortfall = Math.max(0, target - holdings)
-	if (rate <= 0 || shortfall <= 0)
-		return { holdings, replacements: 0, soldierYears: holdings * years }
-	const k = -Math.log1p(-rate)
-	const closed = -Math.expm1(-k * years)
-	const replacements = shortfall * closed
-	const x = k * years
-	const growthIntegral =
-		Math.abs(x) < 1e-4
-			? years * (x / 2 - (x * x) / 6 + (x * x * x) / 24)
-			: years - closed / k
-	return {
-		holdings: holdings + replacements,
-		replacements,
-		soldierYears: holdings * years + shortfall * growthIntegral,
-	}
 }
 
 function reconcile({ holdings, targets }: ReconcileParams): Troops {
@@ -156,8 +151,19 @@ function reconcile({ holdings, targets }: ReconcileParams): Troops {
 	return { levy: levy * scale, regular: regular * scale }
 }
 
-function initializeRealm({ state, nation }: NationParams): void {
-	const target = realmTargets({ state, nation })
+function fleetOf(target: RecruitmentTargets): FleetTarget {
+	return {
+		ships: target.ships,
+		home: target.shipHome,
+		campaign: target.shipCampaign,
+	}
+}
+
+function initializeTroops({
+	state,
+	nation,
+	target,
+}: InitializeTroopsParams): void {
 	state.levyCurrent[nation] = target.levy
 	state.regularCurrent[nation] = target.regular
 	state.militaryIntervals.set(nation, {
@@ -176,6 +182,12 @@ function initializeRealm({ state, nation }: NationParams): void {
 	})
 }
 
+function initializeRealm({ state, nation }: NationParams): void {
+	const target = realmTargets({ state, nation })
+	initializeTroops({ state, nation, target })
+	NAVY.initialize({ state, nation, target: fleetOf(target) })
+}
+
 function initialize({ state }: StateParams): void {
 	for (let nation = 0; nation < state.P; nation++) {
 		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
@@ -185,6 +197,7 @@ function initialize({ state }: StateParams): void {
 }
 
 function advance({ state, nation }: NationParams): void {
+	NAVY.advance({ state, nation })
 	const interval = state.militaryIntervals.get(nation)
 	if (!interval || state.time <= interval.time) return
 	const years = (state.time - interval.time) / STATE.yearMs
@@ -192,7 +205,7 @@ function advance({ state, nation }: NationParams): void {
 	for (const type of ["levy", "regular"] as const) {
 		const column = type === "levy" ? state.levyCurrent : state.regularCurrent
 		const before = column[nation]
-		const result = recover({
+		const result = RECOVERY.recover({
 			holdings: before,
 			target: interval.targets[type],
 			rate: interval.rates[type],
@@ -271,6 +284,12 @@ function refresh({ state, nation }: NationParams): void {
 	interval.home = target.home
 	interval.campaign = target.campaign
 	interval.time = state.time
+	NAVY.refresh({
+		state,
+		nation,
+		target: fleetOf(target),
+		wars: assigned.map(({ war }) => war),
+	})
 }
 
 function upkeep({ state, nation }: NationParams): Troops {
@@ -303,12 +322,14 @@ function settle({ state, nation }: NationParams): Troops {
 function settleOwnership({ state, nation }: NationParams): void {
 	const expense = settle({ state, nation })
 	const total = expense.levy + expense.regular
-	state.treasuryCurrent[nation] -= total
+	const naval = NAVY.settle({ state, nation })
+	state.treasuryCurrent[nation] -= total + naval
 	const budget = TREASURY_BUDGET.get({ state, p: nation })
 	budget.armyExpenses -= total
 	budget.levyExpenses -= expense.levy
 	budget.regularExpenses -= expense.regular
-	budget.annualBalance -= total
+	budget.navalExpenses -= naval
+	budget.annualBalance -= total + naval
 	budget.settled = true
 }
 
@@ -318,7 +339,9 @@ function reconstitute({ state, nation }: NationParams): void {
 		levy: state.levyCurrent[nation],
 		regular: state.regularCurrent[nation],
 	}
-	initializeRealm({ state, nation })
+	const target = realmTargets({ state, nation })
+	initializeTroops({ state, nation, target })
+	NAVY.reconstitute({ state, nation, target: fleetOf(target) })
 	const interval = state.militaryIntervals.get(nation)!
 	if (previous) {
 		interval.pending = previous.pending
@@ -355,6 +378,7 @@ function reconstitute({ state, nation }: NationParams): void {
 
 function disband({ state, nation }: NationParams): void {
 	settleOwnership({ state, nation })
+	NAVY.clear({ state, nation })
 	const interval = state.militaryIntervals.get(nation)
 	if (interval) {
 		for (const type of ["levy", "regular"] as const) {
@@ -392,7 +416,6 @@ export const RECRUITMENT = {
 	targets,
 	realmTargets,
 	territoryTargets,
-	recover,
 	reconcile,
 	initialize,
 	advance,

@@ -76,6 +76,7 @@ export interface NationEconomy {
 	levy: number
 	regular: number
 	army: number
+	ships: number
 	budget: TreasuryBudget | null
 	treasurySafe: number
 	treasuryChange: number

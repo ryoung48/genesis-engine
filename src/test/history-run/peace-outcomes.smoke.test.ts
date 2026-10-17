@@ -96,6 +96,7 @@ it("closes a siege exactly once at peace and consumes its queued tick without ef
 			startBesiegerStrength: 1000,
 			garrison,
 			startGarrison: 100,
+			seaSupplied: false,
 			shortages: [],
 			breaches: 0,
 		},

@@ -8,6 +8,7 @@ import type {
 	FinishParams,
 	LogBeatParams,
 	Shortage,
+	SiegeFleets,
 	SiegeParams,
 	TickParams,
 } from "@/model/history/sim/engine/events/siege/types"
@@ -40,6 +41,8 @@ const ASSAULT_WALL_BONUS = 1.5
 const RELIEF_CHANCE = 0.06
 const RELIEF_MIN_RATIO = 0.25
 const STORM_URBAN_LOSS = 0.1
+const BLOCKADE_CHANCE = 0.1
+const BLOCKADE_BREAK_RATIO = 0.5
 
 function snapshot(params: SiegeParams) {
 	const { state, war, siege } = params
@@ -55,6 +58,22 @@ function snapshot(params: SiegeParams) {
 		}),
 	}
 }
+function fleets({ state, war, siege }: SiegeParams): SiegeFleets {
+	const waterBody = state.provinceWaterBody[siege.province]
+	const besieging = siege.besiegerSide
+	const defending = besieging === "attacker" ? "defender" : "attacker"
+	return {
+		waterBody,
+		besiegers:
+			waterBody >= 0
+				? MILITARY.reachingShips({ state, war, side: besieging, waterBody })
+				: 0,
+		defenders:
+			waterBody >= 0
+				? MILITARY.reachingShips({ state, war, side: defending, waterBody })
+				: 0,
+	}
+}
 function queue({ state, war }: SiegeParams): void {
 	state.heap.enqueue(
 		state.time + SIEGE_PHASE_DAYS * DAY_MS,
@@ -65,12 +84,19 @@ function queue({ state, war }: SiegeParams): void {
 function begin(params: SiegeParams): void {
 	const { state, war, siege } = params
 	war.siege = siege
+	const fleet = fleets(params)
+	siege.seaSupplied =
+		fleet.waterBody >= 0 && !(fleet.besiegers > 0 && fleet.defenders === 0)
 	MILITARY.logCoalition({ state })
 	state.events.push({
 		tag: "siege started",
 		time: state.time,
 		data: {
 			...snapshot(params),
+			seaSupplied: siege.seaSupplied,
+			waterBody: fleet.waterBody,
+			reachingBesiegers: fleet.besiegers,
+			reachingDefenders: fleet.defenders,
 			besieger: siege.besieger,
 			defender: SIEGE_TROOPS.defenderOf(params),
 		},
@@ -115,6 +141,7 @@ function finish(params: FinishParams): void {
 		attackerWon: fall,
 		outcome: fall ? "normal" : "inconclusive",
 		loserLossShare: 0,
+		occupies: true,
 		sack: outcome === "stormed",
 		record: () => undefined,
 		rng,
@@ -191,6 +218,9 @@ function tick({ state, warIdx, rng }: TickParams): void {
 		return
 	}
 	siege.phase++
+	const opening = fleets(params)
+	if (!siege.seaSupplied && opening.waterBody >= 0 && opening.besiegers === 0)
+		siege.seaSupplied = true
 	let troopsMoved = false
 	let besiegers = SIEGE_TROOPS.besiegersOf(params)
 	SIEGE_TROOPS.lose({
@@ -264,7 +294,10 @@ function tick({ state, warIdx, rng }: TickParams): void {
 	} else if (roll >= 10 && roll <= 15) {
 		const shortage: Shortage =
 			roll <= 11 ? "supplies" : roll <= 13 ? "food" : "water"
-		if (!siege.shortages.includes(shortage)) {
+		if (
+			!siege.shortages.includes(shortage) &&
+			!(siege.seaSupplied && shortage !== "water")
+		) {
 			siege.shortages.push(shortage)
 			const loss = SIEGE_TROOPS.lose({
 				...params,
@@ -343,6 +376,7 @@ function tick({ state, warIdx, rng }: TickParams): void {
 				ambusher: "attacker",
 				terrain,
 			}),
+			...MILITARY.landEngagement,
 			rng,
 		})
 		const garrisonLosses = SIEGE_TROOPS.lose({
@@ -415,6 +449,7 @@ function tick({ state, warIdx, rng }: TickParams): void {
 			defenderMultiplier:
 				terrain.defense *
 				Math.max(1, ASSAULT_WALL_BONUS - 0.15 * siege.breaches),
+			...MILITARY.landEngagement,
 			rng,
 		})
 		const besiegerLosses = SIEGE_TROOPS.lose({
@@ -477,6 +512,7 @@ function tick({ state, warIdx, rng }: TickParams): void {
 			defenderShortfall: 0,
 			attackerMultiplier: 1,
 			defenderMultiplier: terrain.defense,
+			...MILITARY.landEngagement,
 			rng,
 		})
 		const garrisonLosses = SIEGE_TROOPS.lose({
@@ -510,6 +546,52 @@ function tick({ state, warIdx, rng }: TickParams): void {
 		if (effect === "relieved") {
 			finish({ ...params, outcome: "relieved", reason: null, rng })
 			return
+		}
+	}
+	const fleet = fleets(params)
+	if (fleet.waterBody >= 0) {
+		const imposing = siege.seaSupplied
+		const eligible = imposing
+			? fleet.besiegers > 0
+			: fleet.defenders > 0 &&
+				fleet.defenders >= BLOCKADE_BREAK_RATIO * fleet.besiegers
+		if (eligible && rng.random() < BLOCKADE_CHANCE) {
+			const contested = imposing ? fleet.defenders > 0 : true
+			const fight = contested
+				? MILITARY.fightNaval({
+						state,
+						war,
+						eventAttacker: imposing ? siege.besieger : defender,
+						waterBody: fleet.waterBody,
+						rng,
+					})
+				: null
+			const attackerShips = fight?.attackerShips ?? fleet.besiegers
+			const defenderShips = fight?.defenderShips ?? 0
+			const attackerLost = fight?.attackerShipsLost ?? 0
+			const defenderLost = fight?.defenderShipsLost ?? 0
+			const won = fight ? fight.attackerWon : true
+			const decisive = fight
+				? fight.attackerWon && fight.outcome !== "inconclusive"
+				: true
+			if (decisive) siege.seaSupplied = !imposing
+			if (fight || !contested)
+				logBeat({
+					...params,
+					beat: {
+						beat: imposing ? "blockade imposed" : "blockade broken",
+						won,
+						outcome: fight?.outcome ?? "uncontested",
+						powerShare: fight?.powerShare ?? 1,
+						effect: decisive ? (imposing ? "blockaded" : "supplied") : "none",
+						besiegerShips: imposing ? attackerShips : defenderShips,
+						defenderShips: imposing ? defenderShips : attackerShips,
+						besiegerShipsLost: imposing ? attackerLost : defenderLost,
+						defenderShipsLost: imposing ? defenderLost : attackerLost,
+					},
+					besiegerLosses: 0,
+					garrisonLosses: 0,
+				})
 		}
 	}
 	queue(params)

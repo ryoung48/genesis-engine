@@ -30,6 +30,7 @@ function create(): SiegeFixture {
 		originalCrownRuler: -1,
 		claimantRuler: -1,
 		deployed: { 0: { levy: 200, regular: 0 }, 1: { levy: 200, regular: 0 } },
+		ships: {},
 		participants: { 0: "attacker", 1: "defender" },
 		candidates: { attacker: [], defender: [] },
 		callable: { attacker: [], defender: [] },
@@ -49,6 +50,7 @@ function create(): SiegeFixture {
 		events: [],
 		levyCurrent: new Float64Array([200, 200]),
 		regularCurrent: new Float64Array(2),
+		provinceWaterBody: new Int32Array([-1, -1]),
 		popUrbanCurrent: new Float32Array([5000, 5000]),
 		popRuralCurrent: new Float32Array([1000000, 1000000]),
 		provinceTopography: new Uint8Array(2),
@@ -80,6 +82,7 @@ function mock({ caps }: SiegeMockParams): void {
 			knowledge: 1,
 			surplus: 100,
 			outputPerHead: 450,
+			navalShare: 0,
 		}),
 	)
 	vi.spyOn(FIELDS.prov.population.rural, "set").mockImplementation(

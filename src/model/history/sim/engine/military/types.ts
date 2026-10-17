@@ -22,6 +22,11 @@ export interface ForceShareParams {
 	k: number
 }
 
+export interface ThreatForceParams {
+	state: HistoryState
+	members: CoalitionMember[]
+}
+
 export interface ThreatParams {
 	state: HistoryState
 	attacker: number
@@ -39,6 +44,8 @@ export interface RebellionPreview {
 	rebel: RecruitmentTargets
 	league: Troops
 	existingWars: number
+	crownShips: number
+	rebelShips: number
 	crownStrength: number
 	rebelStrength: number
 	threat: number
@@ -209,6 +216,8 @@ export interface ClashParams {
 	defenderShortfall: number
 	attackerMultiplier: number
 	defenderMultiplier: number
+	lossScale: number
+	pursuit: { min: number; max: number }
 	rng: SharedRng
 }
 export interface ClashResult {
@@ -224,4 +233,52 @@ export interface ClashResult {
 
 export interface AttendParams extends NationParams {
 	members: CoalitionMember[]
+}
+
+export interface NavalFightParams {
+	state: HistoryState
+	war: War
+	eventAttacker: number
+	waterBody: number
+	rng: SharedRng
+}
+
+export interface NavalBattleResult {
+	attackerWon: boolean
+	outcome: BattleOutcome
+	initialOutcome: BattleOutcome
+	powerShare: number
+	preBattleWinProbability: number
+	waterBody: number
+	attackerShips: number
+	defenderShips: number
+	attackerShipsLost: number
+	defenderShipsLost: number
+	attackerCrew: number
+	defenderCrew: number
+	attackerLossShare: number
+	defenderLossShare: number
+	crewDeaths: number
+	deployedNations: number[]
+	deployedShips: number[]
+	deployedRelations: number[]
+	deployedRoles: ("backer" | null)[]
+}
+
+export interface SideFleetParams {
+	state: HistoryState
+	war: War
+	side: WarSide
+	waterBody: number
+}
+
+export interface RuralDeathsParams {
+	state: HistoryState
+	nation: number
+	deaths: number
+}
+
+export interface WholeShipsParams {
+	loss: number
+	rng: SharedRng
 }

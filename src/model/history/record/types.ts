@@ -121,6 +121,16 @@ export interface SimulatedBattle {
 	powerShare: number
 	topography: string
 	vegetation: string
+	naval: SimulatedNaval | null
+}
+
+export interface SimulatedNaval {
+	waterBody: number
+	attackerShips: number
+	defenderShips: number
+	attackerShipsLost: number
+	defenderShipsLost: number
+	crewDeaths: number
 }
 
 export interface Battle {
@@ -195,6 +205,7 @@ export interface CensusEconomy {
 	levy: Float32Array
 	regular: Float32Array
 	army: Float32Array
+	ships: Float32Array
 	// Each realm's deployed troops per active war.
 	deployments: CensusDeployment[][]
 	budgets: Array<TreasuryBudget | null>
@@ -353,6 +364,7 @@ export interface SiegeRecord {
 	defender: number
 	besiegers: number
 	garrisonTroops: number
+	seaSupplied: boolean
 	contributions: BattleContribution[]
 	beats: SiegeBeat[]
 	outcome: SiegeOutcome | null

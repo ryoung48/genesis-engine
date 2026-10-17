@@ -327,13 +327,25 @@ describe("battle kinds and shared resolver", () => {
 		state.popUrbanCurrent[1] = 2000
 		for (const river of [false, true]) {
 			state.riverByProvince[1] = Number(river)
-			const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
+			const counts = {
+				open: 0,
+				ambush: 0,
+				"river crossing": 0,
+				siege: 0,
+				naval: 0,
+			}
 			const rng = HISTORY_RNG.createHistoryRng(2025)
 			for (let i = 0; i < 10000; i++) {
 				rng.random = () => (i + 0.5) / 10000
 				counts[
-					BATTLE_KIND.choose({ state, province: 1, siegeEligible: true, rng })
-						.kind
+					BATTLE_KIND.choose({
+						state,
+						province: 1,
+						siegeEligible: true,
+						navalEligible: false,
+						portShare: 0,
+						rng,
+					}).kind
 				]++
 			}
 			const fieldTotal = river ? 0.87 : 0.75
@@ -351,7 +363,13 @@ describe("battle kinds and shared resolver", () => {
 			for (const urban of [1999, 2000]) {
 				state.riverByProvince[1] = Number(river)
 				state.popUrbanCurrent[1] = urban
-				const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
+				const counts = {
+					open: 0,
+					ambush: 0,
+					"river crossing": 0,
+					siege: 0,
+					naval: 0,
+				}
 				const rng = HISTORY_RNG.createHistoryRng(2025)
 				for (let i = 0; i < 10000; i++) {
 					rng.random = () => (i + 0.5) / 10000
@@ -360,6 +378,8 @@ describe("battle kinds and shared resolver", () => {
 							state,
 							province: 1,
 							siegeEligible: urban < 2000,
+							navalEligible: false,
+							portShare: 0,
 							rng,
 						}).kind
 					]++
@@ -392,6 +412,7 @@ describe("battle kinds and shared resolver", () => {
 					attackerShortfall: 0,
 					defenderShortfall: 0,
 					...BATTLE_KIND.modifiers({ kind: "ambush", ambusher, terrain }),
+					...MILITARY.landEngagement,
 					rng,
 				})
 				if (result.attackerWon === (ambusher === "attacker")) wins++
@@ -403,11 +424,23 @@ describe("battle kinds and shared resolver", () => {
 	it("drops ineligible kinds and stacks every defender bonus with terrain", () => {
 		state.popUrbanCurrent[1] = 0
 		const rng = HISTORY_RNG.createHistoryRng(2025)
-		const counts = { open: 0, ambush: 0, "river crossing": 0, siege: 0 }
+		const counts = {
+			open: 0,
+			ambush: 0,
+			"river crossing": 0,
+			siege: 0,
+			naval: 0,
+		}
 		for (let i = 0; i < 20000; i++)
 			counts[
-				BATTLE_KIND.choose({ state, province: 1, siegeEligible: false, rng })
-					.kind
+				BATTLE_KIND.choose({
+					state,
+					province: 1,
+					siegeEligible: false,
+					navalEligible: false,
+					portShare: 0,
+					rng,
+				}).kind
 			]++
 		expect(counts.ambush / 20000).toBeGreaterThan(0.03)
 		expect(counts.ambush / 20000).toBeLessThan(0.09)
@@ -455,6 +488,7 @@ describe("battle kinds and shared resolver", () => {
 			defenderShortfall: defenders.shortfall,
 			attackerMultiplier: 1,
 			defenderMultiplier: 1.35,
+			...MILITARY.landEngagement,
 			rng: HISTORY_RNG.createHistoryRng(2025),
 		})
 		expect(war.deployed).toEqual(before)

@@ -28,6 +28,7 @@ export interface Siege {
 	startGarrison: number
 	shortages: Shortage[]
 	breaches: number
+	seaSupplied: boolean
 }
 export type SiegeBeatData =
 	| {
@@ -54,6 +55,17 @@ export type SiegeBeatData =
 			outcome: BattleOutcome
 			powerShare: number
 			effect: "stormed" | "repelled" | "none"
+	  }
+	| {
+			beat: "blockade imposed" | "blockade broken"
+			won: boolean
+			outcome: BattleOutcome
+			powerShare: number
+			effect: "blockaded" | "supplied" | "none"
+			besiegerShips: number
+			defenderShips: number
+			besiegerShipsLost: number
+			defenderShipsLost: number
 	  }
 	| {
 			beat: "relief"
@@ -89,4 +101,10 @@ export interface LogBeatParams extends SiegeParams {
 	beat: SiegeBeatData
 	besiegerLosses: number
 	garrisonLosses: number
+}
+
+export interface SiegeFleets {
+	waterBody: number
+	besiegers: number
+	defenders: number
 }

@@ -38,3 +38,9 @@ export interface FindReconquestTargetParams {
 	state: HistoryState
 	war: War
 }
+
+export interface RunNavalParams extends BattleTarget {
+	state: HistoryState
+	war: War
+	rng: SharedRng
+}

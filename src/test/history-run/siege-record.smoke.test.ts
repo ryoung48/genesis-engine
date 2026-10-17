@@ -50,6 +50,7 @@ it("translates every siege snapshot and synchronizes coalition changes at siege 
 			knowledge: 1,
 			surplus: 100,
 			outputPerHead: 450,
+			navalShare: 0,
 		}),
 	)
 	vi.spyOn(KNOWLEDGE, "fieldArmyKnee").mockReturnValue(1000)

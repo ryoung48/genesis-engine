@@ -14,6 +14,7 @@ function get({ state, p }: TreasuryBudgetLookupParams): TreasuryBudget {
 			armyExpenses: 0,
 			levyExpenses: 0,
 			regularExpenses: 0,
+			navalExpenses: 0,
 			treasuryLeakage: 0,
 			annualBalance: 0,
 			plunder: 0,

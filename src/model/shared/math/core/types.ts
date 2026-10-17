@@ -29,3 +29,8 @@ export interface PiecewiseParams {
 	range: number[]
 	x: number
 }
+
+export interface ApportionParams {
+	shares: number[]
+	total: number
+}

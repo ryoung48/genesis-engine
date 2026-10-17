@@ -632,7 +632,7 @@ function appendNote({
 			attacker: {
 				countryId: attackerId,
 				commander: null,
-				infantry: data.attackerArmy as number,
+				infantry: (data.attackerArmy ?? data.attackerCrew) as number,
 				cavalry: null,
 				artillery: null,
 				losses: data.attackerLosses as number,
@@ -640,13 +640,13 @@ function appendNote({
 			defender: {
 				countryId: defenderId,
 				commander: null,
-				infantry: data.defenderArmy as number,
+				infantry: (data.defenderArmy ?? data.defenderCrew) as number,
 				cavalry: null,
 				artillery: null,
 				losses: data.defenderLosses as number,
 			},
-			attackerDeployed: data.attackerDeployed as number,
-			defenderDeployed: data.defenderDeployed as number,
+			attackerDeployed: (data.attackerDeployed ?? data.attackerShips) as number,
+			defenderDeployed: (data.defenderDeployed ?? data.defenderShips) as number,
 			attackerWon: data.winner === data.attacker,
 			comment: null,
 			simulated: {
@@ -656,8 +656,19 @@ function appendNote({
 				outcome: data.result as BattleOutcome,
 				preBattleWinProbability: data.preBattleWinProbability as number,
 				powerShare: data.powerShare as number,
-				topography: data.topography as string,
-				vegetation: data.vegetation as string,
+				topography: (data.topography as string | undefined) ?? "",
+				vegetation: (data.vegetation as string | undefined) ?? "",
+				naval:
+					data.kind === "naval"
+						? {
+								waterBody: data.waterBody as number,
+								attackerShips: data.attackerShips as number,
+								defenderShips: data.defenderShips as number,
+								attackerShipsLost: data.attackerShipsLost as number,
+								defenderShipsLost: data.defenderShipsLost as number,
+								crewDeaths: data.crewDeaths as number,
+							}
+						: null,
 			},
 		})
 	} else if (
@@ -677,6 +688,7 @@ function appendNote({
 				defender: translator.identityByRoot.get(data.defender as number) ?? -1,
 				besiegers: data.besiegers as number,
 				garrisonTroops: data.garrisonTroops as number,
+				seaSupplied: data.seaSupplied as boolean,
 				contributions: troops,
 				beats: [],
 				outcome: null,
@@ -710,7 +722,19 @@ function appendNote({
 									powerShare: data.powerShare,
 									effect: data.effect,
 								}
-							: {}),
+							: data.beat === "blockade imposed" ||
+									data.beat === "blockade broken"
+								? {
+										won: data.won,
+										outcome: data.outcome,
+										powerShare: data.powerShare,
+										effect: data.effect,
+										besiegerShips: data.besiegerShips,
+										defenderShips: data.defenderShips,
+										besiegerShipsLost: data.besiegerShipsLost,
+										defenderShipsLost: data.defenderShipsLost,
+									}
+								: {}),
 				} as SiegeBeatData
 				siege.beats.push({
 					...beat,

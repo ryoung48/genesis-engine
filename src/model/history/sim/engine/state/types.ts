@@ -12,6 +12,10 @@ import type {
 	WarSide,
 } from "@/model/history/sim/engine/military/deployments/types"
 import type {
+	NavalInterval,
+	NavalTotals,
+} from "@/model/history/sim/engine/military/navy/types"
+import type {
 	MilitaryInterval,
 	MilitaryTotals,
 	Troops,
@@ -83,6 +87,7 @@ export interface War {
 	originalCrownRuler: number
 	claimantRuler: number
 	deployed: Record<number, Troops>
+	ships: Record<number, number>
 	participants: Record<number, WarSide>
 	candidates: Record<WarSide, number[]>
 	// Whether each candidate passes the diplomatic part of a call to arms;
@@ -262,6 +267,14 @@ export interface HistoryState {
 	levyCurrent: Float64Array
 	regularCurrent: Float64Array
 	militaryIntervals: Map<number, MilitaryInterval>
+	// Fractional build progress; the fleet that exists is its rounded value.
+	shipsCurrent: Float64Array
+	navalIntervals: Map<number, NavalInterval>
+	navalTotals: NavalTotals
+	// Port province: the water body its coast touches, or -1.
+	provinceWaterBody: Int32Array
+	// Bumped whenever a relation changes; keys the naval exposure cache.
+	relationVersion: number
 	militaryAssignments: Map<number, Assignment[]>
 	militaryTotals: MilitaryTotals
 	militaryDirty: Set<number>
@@ -556,6 +569,8 @@ export interface CreateHistoryStateParams {
 	religionGender?: Uint8Array
 	startYear: number
 	waterAccess?: Uint8Array
+	// [JUSTIFICATION] Earth imports have no water-body data and so no ports.
+	provinceWaterBody?: Int32Array
 	landmarks?: GenesisLandmarks
 	regionProvince?: Int32Array
 	regionAdjOffset?: Int32Array

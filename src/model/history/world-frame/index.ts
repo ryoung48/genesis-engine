@@ -46,7 +46,7 @@ function nationEconomy({
 	nationId,
 }: NationFrameParams): NationEconomy | null {
 	if (!frame.economy) return null
-	const { nations, treasury, revenue, levy, regular, army, budgets } =
+	const { nations, treasury, revenue, levy, regular, army, ships, budgets } =
 		frame.economy
 	for (let index = 0; index < nations.length; index++) {
 		if (nations[index] === nationId) {
@@ -56,6 +56,7 @@ function nationEconomy({
 				levy: levy[index],
 				regular: regular[index],
 				army: army[index],
+				ships: ships[index],
 				budget: budgets[index],
 				treasurySafe: budgets[index]?.treasurySafe ?? 0,
 				treasuryChange: budgets[index]

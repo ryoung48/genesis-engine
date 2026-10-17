@@ -161,6 +161,12 @@ export function buildNationWikiStats(
 											: "Army maintenance",
 									},
 									{
+										value: economy.budget.navalExpenses,
+										description: economy.budget.settled
+											? "Navy maintenance (settled interval)"
+											: "Navy maintenance",
+									},
+									{
 										value: economy.budget.treasuryLeakage,
 										description: "Treasury leakage",
 									},
@@ -204,6 +210,7 @@ export function buildNationWikiStats(
 						swatchColor: treasuryHealthColor(economy),
 					},
 					armyStat({ economy, yearLabel }),
+					{ label: "Ships", value: formatCount(economy.ships) },
 				]
 			: []),
 	]

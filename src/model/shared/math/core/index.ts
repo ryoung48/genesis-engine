@@ -1,5 +1,6 @@
 import type { SphereMesh } from "@/model/mesh/types"
 import type {
+	ApportionParams,
 	ClampParams,
 	EulerVelocityAtParams,
 	LerpParams,
@@ -74,7 +75,26 @@ function piecewise({ domain, range, x }: PiecewiseParams): number {
 	return range[range.length - 1]
 }
 
+function apportion({ shares, total }: ApportionParams): number[] {
+	const weight = shares.reduce((sum, share) => sum + share, 0)
+	const counts = shares.map(() => 0)
+	if (weight <= 0 || total <= 0) return counts
+	const exact = shares.map((share) => (total * share) / weight)
+	for (let i = 0; i < exact.length; i++) counts[i] = Math.floor(exact[i])
+	const order = exact
+		.map((value, i) => ({ i, rest: value - counts[i] }))
+		.sort((a, b) => b.rest - a.rest || a.i - b.i)
+	let left = total - counts.reduce((sum, count) => sum + count, 0)
+	for (const { i } of order) {
+		if (left <= 0) break
+		counts[i]++
+		left--
+	}
+	return counts
+}
+
 export const MATH = {
+	apportion,
 	clamp,
 	clamp01,
 	lerp,

@@ -117,6 +117,7 @@ describe("recruitment and integrated military expense", () => {
 					knowledge,
 					surplus: 1e6,
 					outputPerHead: 450,
+					navalShare: 0,
 				})
 				const raw = target.uncapped.levy + target.uncapped.regular
 				const total = target.levy + target.regular
@@ -147,6 +148,7 @@ describe("recruitment and integrated military expense", () => {
 			knowledge: 0.42,
 			surplus: (1e6 / 0.75) * ECONOMY.ducatsPerGram,
 			outputPerHead: 450,
+			navalShare: 0,
 		})
 		const late = RECRUITMENT.targets({
 			population: 1e6,
@@ -154,6 +156,7 @@ describe("recruitment and integrated military expense", () => {
 			knowledge: 2.38,
 			surplus: (5e6 / 0.75) * ECONOMY.ducatsPerGram,
 			outputPerHead: 450,
+			navalShare: 0,
 		})
 		expect(early.uncapped.regular).toBeCloseTo(500)
 		expect(early.levy).toBeCloseTo(20000)
@@ -168,6 +171,7 @@ describe("recruitment and integrated military expense", () => {
 				knowledge: 4,
 				surplus: 0,
 				outputPerHead: 450,
+				navalShare: 0,
 			}).regular,
 		).toBe(0)
 		expect(
@@ -177,6 +181,7 @@ describe("recruitment and integrated military expense", () => {
 				knowledge: 4,
 				surplus: 1e6,
 				outputPerHead: 0,
+				navalShare: 0,
 			}).regular,
 		).toBe(0)
 	})
@@ -188,6 +193,7 @@ describe("recruitment and integrated military expense", () => {
 			knowledge: 1,
 			surplus: 1 / 0.75,
 			outputPerHead: 450,
+			navalShare: 0,
 		})
 		expect(target.uncapped.levy).toBe(20000)
 		expect(target.uncapped.regular).toBeCloseTo(62.5, 9)
@@ -211,6 +217,7 @@ describe("recruitment and integrated military expense", () => {
 			knowledge: 1,
 			surplus: 0,
 			outputPerHead: 450,
+			navalShare: 0,
 		})
 		expect(empty.levy).toBe(0)
 		expect(empty.regular).toBe(0)
@@ -223,6 +230,7 @@ describe("recruitment and integrated military expense", () => {
 			knowledge: 1,
 			surplus: 1e6,
 			outputPerHead: 450,
+			navalShare: 0,
 		})
 		expect(target.levy + target.regular).toBeCloseTo(60, 9)
 		expect(target.levy / target.uncapped.levy).toBeCloseTo(
@@ -358,6 +366,7 @@ describe("recruitment and integrated military expense", () => {
 			knowledge: 1.44,
 			surplus: 100 / 0.75,
 			outputPerHead: 450,
+			navalShare: 0,
 		}
 		const settled = RECRUITMENT.targets({ ...common, tribal: false })
 		const tribal = RECRUITMENT.targets({ ...common, tribal: true })
@@ -1011,7 +1020,7 @@ describe("military transitions and conservation", () => {
 		expect(engine.regularCurrent[victor]).toBeLessThanOrEqual(enrolled.regular)
 		expect(
 			engine.militaryTotals.demobilized.levy - before.levy,
-		).toBeGreaterThanOrEqual(defeatedTroops.levy)
+		).toBeGreaterThanOrEqual(defeatedTroops.levy - 1e-9)
 		expect(
 			engine.militaryTotals.demobilized.regular - before.regular,
 		).toBeGreaterThanOrEqual(defeatedTroops.regular - 1e-9)
