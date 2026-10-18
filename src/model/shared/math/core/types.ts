@@ -34,3 +34,8 @@ export interface ApportionParams {
 	shares: number[]
 	total: number
 }
+
+export interface MaskedRanksParams {
+	values: Float32Array
+	mask: Uint8Array
+}

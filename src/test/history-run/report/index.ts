@@ -9,9 +9,13 @@ import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
+import { SIM_RECORD } from "@/model/history/sim/record"
+import { RELIGION_DOCTRINE } from "@/model/people/doctrine"
+import { NOBILITY } from "@/model/people/nobility"
 import { ERAS } from "@/model/society/eras"
 import { ROUTE_TUNING } from "@/model/society/infrastructure/trade/routing/route-tuning"
 import type { SocietyEra } from "@/model/society/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
@@ -33,6 +37,8 @@ import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitme
 import { NAVY_REPORT } from "@/test/history-run/report/navy"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
+import { PEOPLE_REPORT } from "@/test/history-run/report/people"
+import type { PeopleReport } from "@/test/history-run/report/people/types"
 import { RELIGION_REPORT } from "@/test/history-run/report/religion"
 import { ROADS_REPORT } from "@/test/history-run/report/roads"
 import { RULERS_REPORT } from "@/test/history-run/report/rulers"
@@ -307,9 +313,19 @@ function runSeed({
 		partitionTotal: null as PartitionReport | null,
 		governmentTotal: null as GovernmentReport | null,
 		districtsTotal: null as DistrictReport | null,
+		people: null as PeopleReport | null,
+		recordMs: 0,
+		peopleMs: 0,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
+	const world = generated as unknown as SerializedGenesisWorld
+	const recordState = SIM_RECORD.buildProceduralState({
+		world,
+		startTimeMs: engine.time,
+	})
+	const translator = SIM_RECORD.createTranslator({ state: recordState, world })
+	SIM_RECORD.consumeJournal({ translator, transactions: engine.journal })
 	const persist = () => {
 		if (!options.outPath) return
 		mkdirSync(dirname(options.outPath), { recursive: true })
@@ -388,8 +404,14 @@ function runSeed({
 					lateKnowledgeBand: options.lateKnowledgeBand,
 				}),
 			)
+			const recordStart = performance.now()
+			SIM_RECORD.consumeJournal({ translator, transactions: engine.journal })
 			engine.journal.length = 0
-			diagnostics.annualTicks.push(performance.now() - tickStart)
+			const recordElapsed = performance.now() - recordStart
+			diagnostics.recordMs += recordElapsed
+			diagnostics.annualTicks.push(
+				performance.now() - tickStart - recordElapsed,
+			)
 			HISTORY_VALIDATION.alliances({ engine, tracker: validation })
 			HISTORY_VALIDATION.rulers({ engine, tracker: validation })
 			HISTORY_VALIDATION.unions({ engine, tracker: validation })
@@ -546,6 +568,30 @@ function runSeed({
 					from: start,
 					to: year,
 				})
+			if (year === start + options.years) {
+				const peopleStart = performance.now()
+				diagnostics.people = PEOPLE_REPORT.of({
+					state: recordState,
+					geography:
+						generated.provinces && generated.locations
+							? NOBILITY.geographyOf({
+									provinceAdjOffset: generated.provinces.adjOffset,
+									provinceAdjList: generated.provinces.adjList,
+									locationProvince: generated.locations.locationProvince,
+									locationCount: generated.locations.count,
+								})
+							: null,
+					doctrine:
+						generated.religionTypes && generated.religionFamilies
+							? RELIGION_DOCTRINE.of({
+									religionTypes: generated.religionTypes,
+									religionFamilies: generated.religionFamilies,
+									seed,
+								})
+							: null,
+				})
+				diagnostics.peopleMs = performance.now() - peopleStart
+			}
 			diagnostics.completed = year === start + options.years
 			diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
 			persist()

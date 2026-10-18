@@ -1,6 +1,10 @@
 import { COLOR } from "@/model/history/earth/color"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import { RULER_NAMES } from "@/model/history/record/rulers"
+import type { RulerRef } from "@/model/history/record/rulers/types"
+import type { HistoryRecord } from "@/model/history/record/types"
+import { PERSON_QUERY } from "@/model/people/query"
+import { uiPalette } from "@/ui/components/tokens"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { HistoryTimeline } from "@/ui/genesis/view/types"
 import type { RulerDisplayParams } from "@/ui/genesis/wiki-bridge/types"
@@ -80,11 +84,29 @@ export function dynastyMention(
 	}
 }
 
+export function personMention({
+	record,
+	ref,
+}: {
+	record: HistoryRecord
+	ref: RulerRef
+}): NationTimelineEvent["people"][number] {
+	const named = RULER_NAMES.names({ record, ref })
+	return {
+		id: PERSON_QUERY.rulerKey(ref.rulerId),
+		name: named.name,
+		color: named.house
+			? paletteColorForDynasty(named.house)
+			: uiPalette.person.noHouse,
+	}
+}
+
 // A ruler's name and house as plain text, from a simulated ruler's recorded
 // naming inputs or an Earth ruler's recorded strings.
 export function rulerDisplay({ record, payload }: RulerDisplayParams): {
 	description: string
 	dynasties: NationTimelineEvent["dynasties"]
+	people: NationTimelineEvent["people"]
 } {
 	const ref = RULER_NAMES.refOf(payload)
 	const named = ref ? RULER_NAMES.names({ record, ref }) : null
@@ -99,5 +121,6 @@ export function rulerDisplay({ record, payload }: RulerDisplayParams): {
 	return {
 		description: dynasty ? `${name} ${dynasty}` : name,
 		dynasties: dynasty ? [dynastyMention(dynasty)] : [],
+		people: ref ? [personMention({ record, ref })] : [],
 	}
 }

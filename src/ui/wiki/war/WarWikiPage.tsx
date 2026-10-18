@@ -186,6 +186,8 @@ export function WarWikiPage({ war }: { war: WarWikiData }) {
 					onSelectProvince: war.onSelectProvince,
 					onSelectOrganization: war.onSelectOrganization,
 					onSelectWar: () => undefined,
+					onSelectPerson: () => undefined,
+					onSelectReligion: () => undefined,
 					onSelectDate: war.onSelectDate,
 				}}
 			/>

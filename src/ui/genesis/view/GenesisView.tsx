@@ -10,6 +10,7 @@ import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
+import type { PersonKey } from "@/model/people/keys/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
@@ -97,6 +98,8 @@ import { useOverlayState } from "@/ui/genesis/view/useOverlayState"
 import { useWorldDisplayData } from "@/ui/genesis/view/useWorldDisplayData"
 import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
+import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
+import { useReligionWikiData } from "@/ui/genesis/wiki-bridge/useReligionWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
@@ -200,6 +203,7 @@ export const GenesisView: React.FC<{
 		setShowAet,
 		setShowContours,
 		setShowCoastlines,
+		setShowWaves,
 		setShowDaylight,
 		setShowElevation,
 		setShowGdd,
@@ -230,6 +234,7 @@ export const GenesisView: React.FC<{
 		showAet,
 		showContours,
 		showCoastlines,
+		showWaves,
 		showDaylight,
 		showElevation,
 		showGdd,
@@ -306,20 +311,45 @@ export const GenesisView: React.FC<{
 	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<number | null>(
 		null,
 	)
+	const [selectedWikiPerson, setSelectedWikiPersonRaw] =
+		useState<PersonKey | null>(null)
+	const [selectedWikiReligionId, setSelectedWikiReligionIdRaw] = useState<
+		number | null
+	>(null)
 	const setSelectedWikiNationId = useCallback((id: number | null) => {
 		setSelectedWikiOrganizationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiPersonRaw(null)
+		setSelectedWikiReligionIdRaw(null)
 		setSelectedWikiNationIdRaw(id)
 	}, [])
 	const setSelectedWikiOrganizationId = useCallback((orgId: string | null) => {
 		setSelectedWikiNationIdRaw(null)
 		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiPersonRaw(null)
+		setSelectedWikiReligionIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(orgId)
 	}, [])
 	const setSelectedWikiWarId = useCallback((warId: number | null) => {
 		setSelectedWikiNationIdRaw(null)
 		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiPersonRaw(null)
+		setSelectedWikiReligionIdRaw(null)
 		setSelectedWikiWarIdRaw(warId)
+	}, [])
+	const setSelectedWikiPerson = useCallback((key: PersonKey | null) => {
+		setSelectedWikiNationIdRaw(null)
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiReligionIdRaw(null)
+		setSelectedWikiPersonRaw(key)
+	}, [])
+	const setSelectedWikiReligionId = useCallback((id: number | null) => {
+		setSelectedWikiNationIdRaw(null)
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiPersonRaw(null)
+		setSelectedWikiReligionIdRaw(id)
 	}, [])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
@@ -1021,6 +1051,7 @@ export const GenesisView: React.FC<{
 		religionMode,
 		viewMode,
 		showElevation,
+		showWaves,
 		dangerSubMode,
 		selectedWikiOrganizationId,
 		windVectors,
@@ -1679,6 +1710,8 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
 		sceneRef,
 	})
 
@@ -1694,6 +1727,8 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
 		buildOrgCategorizer,
 		sceneRef,
 	})
@@ -1707,6 +1742,33 @@ export const GenesisView: React.FC<{
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
+		sceneRef,
+	})
+
+	const religionWikiData = useReligionWikiData({
+		selectedWikiReligionId,
+		world,
+		history,
+		planetName,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
+	})
+
+	const personWikiData = usePersonWikiData({
+		selectedWikiPerson,
+		world,
+		history,
+		planetName,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
 		sceneRef,
 	})
 
@@ -1998,6 +2060,8 @@ export const GenesisView: React.FC<{
 						nationWiki={nationWikiData}
 						organizationWiki={organizationWikiData}
 						warWiki={warWikiData}
+						personWiki={personWikiData}
+						religionWiki={religionWikiData}
 					/>
 				)}
 
@@ -2158,6 +2222,8 @@ export const GenesisView: React.FC<{
 								setShowContours={setShowContours}
 								showCoastlines={showCoastlines}
 								setShowCoastlines={setShowCoastlines}
+								showWaves={showWaves}
+								setShowWaves={setShowWaves}
 								showWindArrows={showWindArrows}
 								setShowWindArrows={setShowWindArrows}
 								showGdd={showGdd}

@@ -9,6 +9,8 @@ import { RULER_NAMES } from "@/model/history/record/rulers"
 import type { RulerRef } from "@/model/history/record/rulers/types"
 import type { HistoryComment } from "@/model/history/record/types"
 import { FRAME } from "@/model/history/world-frame"
+import { PERSON_QUERY } from "@/model/people/query"
+import { EntityChip } from "@/ui/components/composites/EntityChip"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
@@ -28,6 +30,7 @@ import {
 import {
 	cultureMention,
 	organizationMention,
+	personMention,
 	religionMention,
 	rulerDisplay,
 	warMention,
@@ -49,6 +52,7 @@ import {
 	payloadValue,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
 import { RAID_TIMELINE } from "@/ui/genesis/wiki-bridge/raid-timeline"
+import { religionSelection } from "@/ui/genesis/wiki-bridge/religion-selection"
 import { SIEGE_TIMELINE } from "@/ui/genesis/wiki-bridge/siege-timeline"
 import { TITLE_SUMMARY } from "@/ui/genesis/wiki-bridge/title-summary"
 import { TITLE_TIMELINE } from "@/ui/genesis/wiki-bridge/title-timeline"
@@ -86,6 +90,8 @@ export function useNationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -401,19 +407,43 @@ export function useNationWikiData(
 					label: "Regent",
 					value: "Regency Council",
 				})
-			if (dynastyName) {
+			const rulerId =
+				typeof currentRulerPayload?.rulerId === "number"
+					? currentRulerPayload.rulerId
+					: null
+			const fullName = dynastyName
+				? `${nationState.ruler.name} ${dynastyName}`
+				: nationState.ruler.name
+			if (rulerId === null && dynastyName) {
 				rulerStat.value = ""
 				rulerStat.valueAction = (
 					<span className="inline-flex items-center gap-1">
 						<Swatch color={paletteColorForDynasty(dynastyName)} />
-						<span>{nationState.ruler.name}</span>
-						<span>{dynastyName}</span>
+						<span>{fullName}</span>
 						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
 					</span>
 				)
-			} else {
+			} else if (rulerId === null) {
 				rulerStat.valuePrefix = nationState.ruler.name
 				rulerStat.value = rulerSuffix
+			} else {
+				rulerStat.value = ""
+				rulerStat.valueAction = (
+					<span className="inline-flex items-center gap-1">
+						<EntityChip
+							name={fullName}
+							color={
+								dynastyName
+									? paletteColorForDynasty(dynastyName)
+									: uiPalette.person.noHouse
+							}
+							onClick={() =>
+								setSelectedWikiPerson(PERSON_QUERY.rulerKey(rulerId))
+							}
+						/>
+						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
+					</span>
+				)
 			}
 		}
 		if (activeConflicts.length > 0) {
@@ -455,6 +485,10 @@ export function useNationWikiData(
 			})
 		}
 
+		const refMentions = (refs: unknown[]) =>
+			refs
+				.filter((ref) => ref)
+				.map((ref) => personMention({ record, ref: ref as RulerRef }))
 		const eventNation = (otherId: number, rebelType?: unknown) => {
 			const striped = rebelControllerIds.has(otherId)
 			return {
@@ -593,6 +627,10 @@ export function useNationWikiData(
 										: `A regency council began governing ${title} for the child ruler.`,
 							comment: eventComment(event.comment),
 							nations,
+							people:
+								kind === "usurpation"
+									? refMentions([event.payload.usurper, event.payload.ward])
+									: [],
 						})
 						break
 					}
@@ -629,6 +667,11 @@ export function useNationWikiData(
 							comment: eventComment(event.comment),
 							nations,
 							provinces,
+							people: refMentions([
+								event.payload.late,
+								event.payload.primary,
+								...(event.payload.heirs as unknown[]),
+							]),
 						})
 						break
 					}
@@ -659,6 +702,7 @@ export function useNationWikiData(
 									: `${late ?? "The ruler"} of ${eventNation(crown).name} died with no heir and this district became independent.${wars.join("")}`,
 							comment: eventComment(event.comment),
 							nations,
+							people: refMentions([event.payload.late, event.payload.ruler]),
 						})
 						break
 					}
@@ -695,6 +739,7 @@ export function useNationWikiData(
 							comment: eventComment(event.comment),
 							nations,
 							dynasties: isInterregnum ? [] : ruler.dynasties,
+							people: isInterregnum ? [] : ruler.people,
 						})
 						break
 					}
@@ -1449,6 +1494,7 @@ export function useNationWikiData(
 				cultures: mergeById(group.flatMap((event) => event.cultures)),
 				religions: mergeById(group.flatMap((event) => event.religions)),
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				people: mergeById(group.flatMap((event) => event.people)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
 			})
@@ -1471,6 +1517,7 @@ export function useNationWikiData(
 				cultures: mergeById(group.flatMap((event) => event.cultures)),
 				religions: mergeById(group.flatMap((event) => event.religions)),
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				people: mergeById(group.flatMap((event) => event.people)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
 			})
@@ -1493,6 +1540,7 @@ export function useNationWikiData(
 				cultures: mergeById(group.flatMap((event) => event.cultures)),
 				religions: mergeById(group.flatMap((event) => event.religions)),
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				people: mergeById(group.flatMap((event) => event.people)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
 			})
@@ -1516,6 +1564,7 @@ export function useNationWikiData(
 				cultures: mergeById(group.flatMap((event) => event.cultures)),
 				religions: mergeById(group.flatMap((event) => event.religions)),
 				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				people: mergeById(group.flatMap((event) => event.people)),
 				organizations: mergeById(group.flatMap((event) => event.organizations)),
 				wars: mergeById(group.flatMap((event) => event.wars)),
 			})
@@ -1536,7 +1585,13 @@ export function useNationWikiData(
 			rgbToCss,
 			fallbackColor: "rgb(148, 163, 184)",
 		})
+		const religionSel = religionSelection({
+			frame,
+			supported: Boolean(world.religionTypes),
+			select: setSelectedWikiReligionId,
+		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
+			selectionForId: religionSel.forKey,
 			idByProvince: Array.from(frame.provinceReligion, (id) =>
 				id >= 0 ? (frame.religions[id]?.key ?? null) : null,
 			),
@@ -1617,6 +1672,10 @@ export function useNationWikiData(
 			onSelectOrganization: (orgId: string) => {
 				setSelectedWikiOrganizationId(orgId)
 			},
+			onSelectPerson: (key: string) => {
+				setSelectedWikiPerson(key)
+			},
+			onSelectReligion: religionSel.selectKey,
 			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},
@@ -1643,5 +1702,7 @@ export function useNationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
 	])
 }

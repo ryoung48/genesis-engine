@@ -105,6 +105,9 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		nationPercentages: params.nationPercentages,
 		nationBuckets: params.nationBuckets,
 	})
+	const governmentWave =
+		params.migrationWave &&
+		MATH.maskedRanks({ values: params.migrationWave, mask: active })
 	const assignment = new Int32Array(provinceCount).fill(-1)
 	const blocked = new Uint8Array(provinceCount)
 	const seeds: number[] = []
@@ -356,7 +359,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				habitability,
 				waterAccess,
 				r_xyz,
-				migrationWave: params.migrationWave,
+				migrationWave: governmentWave,
 				provinceContinent,
 				maxSpreadRad,
 				seed: params.seed + i,
@@ -516,7 +519,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				sizeWeight,
 				habitability,
 				waterAccess,
-				migrationWave: params.migrationWave,
+				migrationWave: governmentWave,
 				statehoodFraction,
 				seed: params.seed,
 				maxRepublicSize: params.maxRepublicSize,

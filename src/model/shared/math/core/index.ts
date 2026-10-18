@@ -4,6 +4,7 @@ import type {
 	ClampParams,
 	EulerVelocityAtParams,
 	LerpParams,
+	MaskedRanksParams,
 	PiecewiseParams,
 	SmoothstepParams,
 } from "@/model/shared/math/core/types"
@@ -93,7 +94,19 @@ function apportion({ shares, total }: ApportionParams): number[] {
 	return counts
 }
 
+function maskedRanks({ values, mask }: MaskedRanksParams): Float32Array {
+	const order: number[] = []
+	for (let i = 0; i < values.length; i++)
+		if (mask[i] && values[i] >= 0) order.push(i)
+	order.sort((a, b) => values[a] - values[b])
+	const ranks = new Float32Array(values.length).fill(-1)
+	const last = Math.max(1, order.length - 1)
+	for (let r = 0; r < order.length; r++) ranks[order[r]] = r / last
+	return ranks
+}
+
 export const MATH = {
+	maskedRanks,
 	apportion,
 	clamp,
 	clamp01,

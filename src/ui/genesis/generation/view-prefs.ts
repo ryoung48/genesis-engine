@@ -44,6 +44,7 @@ export interface StoredViewPrefs {
 	showClouds: boolean
 	showContours: boolean
 	showCoastlines: boolean
+	showWaves: boolean
 	showWindArrows: boolean
 	showGdd: boolean
 	showGint: boolean
@@ -183,6 +184,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showClouds: false,
 	showContours: false,
 	showCoastlines: false,
+	showWaves: false,
 	showWindArrows: false,
 	showGdd: false,
 	showGint: false,
@@ -365,6 +367,7 @@ export function parseStoredViewPrefs(
 				parsed.showCoastlines,
 				DEFAULT_VIEW_PREFS.showCoastlines,
 			),
+			showWaves: readBoolean(parsed.showWaves, DEFAULT_VIEW_PREFS.showWaves),
 			showWindArrows: readBoolean(
 				parsed.showWindArrows,
 				DEFAULT_VIEW_PREFS.showWindArrows,

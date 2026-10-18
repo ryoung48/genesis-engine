@@ -15,6 +15,13 @@ export interface RulerRef {
 	dynastyOrigin: number
 }
 
+export type RulerRelation = "son" | "daughterLine" | "nearKin" | "kinsman"
+
+export interface RulerKin {
+	relation: RulerRelation
+	late: RulerRef
+}
+
 export interface RulerNames {
 	name: string
 	house: string | null
@@ -22,12 +29,14 @@ export interface RulerNames {
 }
 
 export interface NameContext {
+	seed: number
 	generator: LanguageNames
 	cache: Map<number, RulerNames>
 }
 
 export interface InitializeNamesParams {
 	record: HistoryRecord
+	seed: number
 	generator: LanguageNames
 }
 

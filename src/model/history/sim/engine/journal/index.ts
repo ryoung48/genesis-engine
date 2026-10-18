@@ -1,3 +1,4 @@
+import type { RulerKin, RulerRef } from "@/model/history/record/rulers/types"
 import type {
 	CensusDeployment,
 	CensusEconomy,
@@ -6,6 +7,7 @@ import type {
 	FlushJournalParams,
 	JournalRelationChange,
 	JournalTransaction,
+	KinsParams,
 	PendingJournal,
 	RecordCoalitionParams,
 	RecordProvinceChangeParams,
@@ -15,7 +17,10 @@ import type {
 	RulerDeparture,
 } from "@/model/history/sim/engine/journal/types"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
-import type { HistoryState } from "@/model/history/sim/engine/state/types"
+import type {
+	EngineNote,
+	HistoryState,
+} from "@/model/history/sim/engine/state/types"
 
 function pending(): PendingJournal {
 	return {
@@ -120,6 +125,63 @@ function censusEconomy(state: HistoryState): CensusEconomy {
 	}
 }
 
+function setKin(kins: Map<number, RulerKin>, heir: RulerRef, kin: RulerKin) {
+	if (!kins.has(heir.rulerId)) kins.set(heir.rulerId, kin)
+}
+
+function successionKin({ data }: EngineNote): RulerKin | null {
+	const late = STATE_RULERS.readNote({ data, prefix: "dying" })
+	const heir = STATE_RULERS.readNote({ data, prefix: "heir" })
+	const claim = data.claim as number
+	if (data.system === "election")
+		return data.house === "same" ? { relation: "kinsman", late } : null
+	if (data.system !== "single_heir") return null
+	if (data.house === "other")
+		return heir.dynasty >= 0 && heir.dynasty !== late.dynasty
+			? { relation: "daughterLine", late }
+			: null
+	if (data.house !== "same") return null
+	if (claim === 3) return { relation: "son", late }
+	if (claim === 2) return { relation: "nearKin", late }
+	return { relation: "kinsman", late }
+}
+
+function kinsOf({ notes }: KinsParams): Map<number, RulerKin> {
+	const kins = new Map<number, RulerKin>()
+	for (const note of notes) {
+		const data = note.data
+		if (note.tag === "succession") {
+			const kin = successionKin(note)
+			if (kin)
+				setKin(kins, STATE_RULERS.readNote({ data, prefix: "heir" }), kin)
+		} else if (note.tag === "usurpation") {
+			if (data.kinsman)
+				setKin(kins, STATE_RULERS.readNote({ data, prefix: "usurper" }), {
+					relation: "kinsman",
+					late: STATE_RULERS.readNote({ data, prefix: "ward" }),
+				})
+		} else if (note.tag === "partition") {
+			const late = STATE_RULERS.readNote({ data, prefix: "late" })
+			for (const heir of STATE_RULERS.readNoteColumns({ data, prefix: "heir" }))
+				setKin(kins, heir, { relation: "son", late })
+		} else if (note.tag === "rebellion" && data.pretender) {
+			const succession = notes.findLast(
+				(other) =>
+					other.tag === "succession" && other.data.nation === data.overlord,
+			)
+			if (!succession) continue
+			const late = STATE_RULERS.readNote({
+				data: succession.data,
+				prefix: "dying",
+			})
+			const pretender = STATE_RULERS.readNote({ data, prefix: "pretender" })
+			if (late.dynasty >= 0 && pretender.dynasty === late.dynasty)
+				setKin(kins, pretender, { relation: "kinsman", late })
+		}
+	}
+	return kins
+}
+
 function flush({
 	state,
 	noteCursor,
@@ -171,6 +233,7 @@ function flush({
 			else if (note.tag === "usurpation" || note.tag === "regime change")
 				departures.set(note.data.nation as number, "deposed")
 		}
+	const kins = rulerRoots.size > 0 ? kinsOf({ notes }) : null
 	const rulers = [...rulerRoots]
 		.filter(
 			(root) =>
@@ -179,16 +242,20 @@ function flush({
 				state.parentCurrent[root] < 0 &&
 				STATE_RULERS.has({ state, p: root }),
 		)
-		.map((root) => ({
-			root,
-			...STATE_RULERS.ref({
+		.map((root) => {
+			const ref = STATE_RULERS.ref({
 				state,
 				ruler: STATE_RULERS.read({ state, p: root }),
-			}),
-			birthTimeMs: state.leaderRuntime.birth[root],
-			regency: state.regency[root] === 1,
-			deathCause: departures.get(root) ?? null,
-		}))
+			})
+			return {
+				root,
+				...ref,
+				birthTimeMs: state.leaderRuntime.birth[root],
+				regency: state.regency[root] === 1,
+				deathCause: departures.get(root) ?? null,
+				kin: kins?.get(ref.rulerId) ?? null,
+			}
+		})
 	const keyframe = census
 		? {
 				timeMs: state.time,

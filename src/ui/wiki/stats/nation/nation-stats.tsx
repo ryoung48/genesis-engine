@@ -16,12 +16,14 @@ function treasuryHealthColor(economy: NationEconomy): string {
 	return uiPalette.treasury.critical
 }
 
-function armyStat({ economy, yearLabel }: ArmyStatParams): StatEntry {
+function militaryStat({ economy, yearLabel }: ArmyStatParams): StatEntry {
 	const share = (troops: number) =>
 		economy.army > 0 ? (100 * troops) / economy.army : 0
 	return {
-		label: "Field army",
-		value: formatCount(economy.army),
+		label: "Military",
+		valuePrefix: `${formatCount(economy.army)} soldiers`,
+		value: ` · ${formatCount(economy.ships)} ships`,
+		valueHelpTarget: "prefix",
 		valueHelp: (
 			<TraceTooltipContent
 				title={`${yearLabel} field army composition`}
@@ -209,8 +211,7 @@ export function buildNationWikiStats(
 						),
 						swatchColor: treasuryHealthColor(economy),
 					},
-					armyStat({ economy, yearLabel }),
-					{ label: "Ships", value: formatCount(economy.ships) },
+					militaryStat({ economy, yearLabel }),
 				]
 			: []),
 	]

@@ -1265,6 +1265,7 @@ function applyTransaction({
 				dynastyOrigin: ruler.dynastyOrigin,
 				newRuler,
 				regency: ruler.regency,
+				kin: ruler.kin,
 			},
 			comment: null,
 		})

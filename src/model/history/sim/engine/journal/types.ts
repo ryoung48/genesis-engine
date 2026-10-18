@@ -1,4 +1,4 @@
-import type { RulerRef } from "@/model/history/record/rulers/types"
+import type { RulerKin, RulerRef } from "@/model/history/record/rulers/types"
 import type { CensusKeyframe } from "@/model/history/record/types"
 import type {
 	EngineNote,
@@ -37,6 +37,8 @@ interface JournalRuler extends RulerRef {
 	// How the ruler this one replaced left the throne in this transaction;
 	// null when nobody left it.
 	deathCause: RulerDeparture | null
+	// [JUSTIFICATION] Founders, appointees and usurpers have no kin to the late ruler.
+	kin: RulerKin | null
 }
 
 export interface RoadJournal {
@@ -66,6 +68,10 @@ export interface PendingJournal {
 	coalitions: JournalCoalition[]
 	// Realms whose ruler columns were written since the last flush.
 	rulers: Set<number>
+}
+
+export interface KinsParams {
+	notes: EngineNote[]
 }
 
 export interface RecordRulerParams {

@@ -118,6 +118,7 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showCoastlines, setShowCoastlines] = useState(
 		initialViewPrefs.showCoastlines,
 	)
+	const [showWaves, setShowWaves] = useState(initialViewPrefs.showWaves)
 	const [showWindArrows, setShowWindArrows] = useState(
 		initialViewPrefs.showWindArrows,
 	)
@@ -233,6 +234,7 @@ export function useOverlayState(input: OverlayStateInput) {
 				showClouds,
 				showContours,
 				showCoastlines,
+				showWaves,
 				showWindArrows,
 				showGdd,
 				showGint,
@@ -304,6 +306,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showClouds,
 		showContours,
 		showCoastlines,
+		showWaves,
 		showWindArrows,
 		showGdd,
 		showGint,
@@ -376,6 +379,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowClouds,
 		setShowContours,
 		setShowCoastlines,
+		setShowWaves,
 		setShowDaylight,
 		setShowElevation,
 		setShowGdd,
@@ -407,6 +411,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showClouds,
 		showContours,
 		showCoastlines,
+		showWaves,
 		showDaylight,
 		showElevation,
 		showGdd,

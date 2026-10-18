@@ -276,6 +276,13 @@ export function computeRegionColors(
 								temperatureMonth * N,
 							)
 		for (let r = 0; r < N; r++) {
+			if (isOceanRegion(r)) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+				continue
+			}
 			const [cr, cg, cb] =
 				colorMode === "temperatureDelta"
 					? temperatureDeltaColor(
@@ -503,14 +510,14 @@ export function computeRegionColors(
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else {
-				const biomeColor =
+				const isMaps =
 					colorMode === "vegetationMaps" || colorMode === "realVegetationMaps"
-						? vegetationMapColor(vegetation[r], world.climateZones?.[r])
-						: vegetationColor(vegetation[r])
-				const [cr, cg, cb] =
-					colorMode === "vegetationMaps" || colorMode === "realVegetationMaps"
-						? biomeColor
-						: darkenVegetationAtElevation(biomeColor, world.elevation_km[r])
+				const biomeColor = isMaps
+					? vegetationMapColor(vegetation[r], world.climateZones?.[r])
+					: vegetationColor(vegetation[r])
+				const [cr, cg, cb] = isMaps
+					? biomeColor
+					: darkenVegetationAtElevation(biomeColor, world.elevation_km[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb

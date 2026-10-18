@@ -219,6 +219,7 @@ export function pushTimelineEvent(
 		cultures?: WikiTimelineEvent["cultures"]
 		religions?: WikiTimelineEvent["religions"]
 		dynasties?: WikiTimelineEvent["dynasties"]
+		people?: WikiTimelineEvent["people"]
 		organizations?: WikiTimelineEvent["organizations"]
 		wars?: WikiTimelineEvent["wars"]
 	},
@@ -237,6 +238,7 @@ export function pushTimelineEvent(
 		cultures: params.cultures ?? [],
 		religions: params.religions ?? [],
 		dynasties: params.dynasties ?? [],
+		people: params.people ?? [],
 		organizations: params.organizations ?? [],
 		wars: params.wars ?? [],
 	})

@@ -15,6 +15,7 @@ import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
 import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
+import { religionSelection } from "@/ui/genesis/wiki-bridge/religion-selection"
 import {
 	compareTimelineDayThenType,
 	pushTimelineEvent,
@@ -50,6 +51,7 @@ export function useOrganizationWikiData(
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiReligionId,
 		buildOrgCategorizer,
 		sceneRef,
 	} = input
@@ -415,7 +417,13 @@ export function useOrganizationWikiData(
 			rgbToCss,
 			fallbackColor: "rgb(148, 163, 184)",
 		})
+		const religionSel = religionSelection({
+			frame,
+			supported: Boolean(world.religionTypes),
+			select: setSelectedWikiReligionId,
+		})
 		const religionDistribution = buildStringIdDistributionForProvinces({
+			selectionForId: religionSel.forKey,
 			idByProvince: Array.from(frame.provinceReligion, (id) =>
 				id < 0 ? null : (frame.religions[id]?.key ?? null),
 			),
@@ -488,6 +496,7 @@ export function useOrganizationWikiData(
 			},
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
+			onSelectReligion: religionSel.selectKey,
 			onSelectWar: (warId: number) => {
 				setSelectedWikiWarId(warId)
 			},

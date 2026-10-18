@@ -67,7 +67,7 @@ Each nation draws its type once, at world generation (`GOVERNMENT.assignGovernme
 2. **Modifiers**, each scaled by the size weight except the migration wave:
    - *Water access* at the capital raises republic, at the cost of tribal and monarchy.
    - *Habitability* below 0.35 raises tribal.
-   - *Migration wave.* Realms near the settlement frontier lean tribal; realms of long-settled cores lean monarchy, republic and theocracy.
+   - *Migration wave.* The wave is each held province's rank by arrival year among held provinces (0 earliest, 1 latest), so it spans 0 to 1 whatever the world's absolute settlement dates. Realms near the settlement frontier lean tribal (boost 0.8 × wave² at full frontier scale); realms of long-settled cores lean monarchy, republic and theocracy.
 3. **Size caps.** A nation above the era's `maxRepublicSize` or `maxTheocracySize` (40 provinces each in the late medieval era) cannot draw that family.
 4. **Draw.** The weights are clamped at zero and normalized, and the family is drawn from a hash of the seed and the nation index. Trade-league cities never draw tribal.
 5. **Subtype**, from a second hash:

@@ -24,6 +24,8 @@ export interface GeographySectionProps {
 	setShowContours: (v: boolean) => void
 	showCoastlines: boolean
 	setShowCoastlines: (v: boolean) => void
+	showWaves: boolean
+	setShowWaves: (v: boolean) => void
 	availableVariants: DataVariant[]
 	dataVariant: DataVariant
 	setDataVariant: (v: DataVariant) => void
@@ -49,6 +51,8 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 	showCoastlines,
 	setShowContours,
 	setShowCoastlines,
+	showWaves,
+	setShowWaves,
 	availableVariants,
 	dataVariant,
 	setDataVariant,
@@ -107,6 +111,11 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 						label="Coastlines"
 						checked={showCoastlines}
 						onChange={setShowCoastlines}
+					/>
+					<ToggleRow
+						label="Waves"
+						checked={showWaves}
+						onChange={setShowWaves}
 					/>
 					{showDataVariantRadio && (
 						<div className="pt-1">

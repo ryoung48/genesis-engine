@@ -19,6 +19,7 @@ import {
 	OCEAN_LIGHT_BLUE,
 	windSpeedColor,
 } from "@/ui/genesis/shared/colors"
+import { applyWaves } from "@/ui/genesis/shared/colors/waves"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import {
 	computeHistoryOccupationOverlay,
@@ -73,6 +74,7 @@ export function useMapColoring(input: MapColoringInput) {
 		religionMode,
 		viewMode,
 		showElevation,
+		showWaves,
 		dangerSubMode,
 		selectedWikiOrganizationId,
 		windVectors,
@@ -232,7 +234,7 @@ export function useMapColoring(input: MapColoringInput) {
 	)
 
 	// --- Region colors ---
-	const regionColors = useMemo(() => {
+	const baseRegionColors = useMemo(() => {
 		if (!worldForDisplay) return null
 		if (colorMode === "wind" && windVectors) {
 			const N = worldForDisplay.mesh.numRegions
@@ -407,6 +409,17 @@ export function useMapColoring(input: MapColoringInput) {
 		religionMode,
 		organizationKindById,
 	])
+
+	const regionColors = useMemo(() => {
+		if (!showWaves || !baseRegionColors || !worldForDisplay?.distCoast) {
+			return baseRegionColors
+		}
+		return applyWaves({
+			rgb: baseRegionColors,
+			isLand: worldForDisplay.isLand,
+			distCoast: worldForDisplay.distCoast,
+		})
+	}, [showWaves, baseRegionColors, worldForDisplay])
 
 	// Earth-import political/demographic fills are temporarily rendered only
 	// via the base region mesh, not the real-EU4-province overlay, to avoid

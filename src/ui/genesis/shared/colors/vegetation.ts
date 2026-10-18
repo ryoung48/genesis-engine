@@ -15,6 +15,12 @@ export function vegetationMapColor(
 	) {
 		return COLD_OPEN_LAND_COLOR
 	}
+	if (biomeCode === 1) {
+		return climateZoneCode === ARCTIC_CLIMATE_ZONE ||
+			climateZoneCode === SUBARCTIC_CLIMATE_ZONE
+			? SNOW_COLOR
+			: biomeMapColors[1]
+	}
 	return biomeMapColors[biomeCode] ?? biomeMapColors[0]
 }
 
@@ -79,6 +85,14 @@ function landSatelliteColor(
 	return [r / 255, g / 255, b / 255]
 }
 
+function hex(rgb: number): [number, number, number] {
+	return [
+		((rgb >> 16) & 255) / 255,
+		((rgb >> 8) & 255) / 255,
+		(rgb & 255) / 255,
+	]
+}
+
 function clamp01(x: number): number {
 	return Math.min(1, Math.max(0, x))
 }
@@ -114,18 +128,16 @@ const ARCTIC_CLIMATE_ZONE = 1
 
 const SUBARCTIC_CLIMATE_ZONE = 2
 
-const COLD_OPEN_LAND_COLOR: [number, number, number] = [
-	0xca / 255,
-	0xcd / 255,
-	0xca / 255,
-]
+const COLD_OPEN_LAND_COLOR = hex(0xcacdca)
+
+const SNOW_COLOR = hex(0xffffff)
 
 const biomeMapColors: [number, number, number][] = [
 	VEGETATION_WATER_BLUE,
-	[1, 1, 1],
-	[0xee / 255, 0xe3 / 255, 0xd2 / 255],
-	[0xf0 / 255, 0xed / 255, 0xe2 / 255],
-	[0xc0 / 255, 0xe8 / 255, 0xd4 / 255],
-	[0x94 / 255, 0xda / 255, 0xc4 / 255],
-	[0x94 / 255, 0xda / 255, 0xc4 / 255],
+	hex(0xf0e0b4),
+	hex(0xe0e6a8),
+	hex(0xbfe38f),
+	hex(0x8fd082),
+	hex(0x5cb86e),
+	hex(0x2f955c),
 ]

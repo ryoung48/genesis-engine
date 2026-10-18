@@ -14,6 +14,7 @@ import type {
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import type { PersonKey } from "@/model/people/keys/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
@@ -64,6 +65,8 @@ export type WikiSelectionSetters = {
 	setSelectedWikiNationId: (id: number | null) => void
 	setSelectedWikiOrganizationId: (orgId: string | null) => void
 	setSelectedWikiWarId: (warId: number | null) => void
+	setSelectedWikiPerson: (key: PersonKey | null) => void
+	setSelectedWikiReligionId: (id: number | null) => void
 }
 
 export type NationWikiDataInput = WikiSelectionSetters & {
@@ -80,6 +83,21 @@ export type NationWikiDataInput = WikiSelectionSetters & {
 export type OrganizationWikiDataInput = NationWikiDataInput & {
 	selectedWikiOrganizationId: string | null
 	buildOrgCategorizer: OrgCategorizerBuilder
+}
+
+export type ReligionWikiDataInput = WikiSelectionSetters & {
+	selectedWikiReligionId: number | null
+	world: SerializedGenesisWorld | null
+	history: HistoryTimeline
+	planetName: string
+}
+
+export type PersonWikiDataInput = WikiSelectionSetters & {
+	selectedWikiPerson: PersonKey | null
+	world: SerializedGenesisWorld | null
+	history: HistoryTimeline
+	planetName: string
+	sceneRef: SceneRef
 }
 
 export type WarWikiDataInput = WikiSelectionSetters & {
@@ -224,6 +242,7 @@ export type MapColoringInput = {
 	religionMode: ReligionMapMode
 	viewMode: GenesisViewMode
 	showElevation: boolean
+	showWaves: boolean
 	dangerSubMode: DangerSubMode
 	selectedWikiOrganizationId: string | null
 	windVectors: ReturnType<typeof WIND.computeWindVectors> | null

@@ -101,7 +101,7 @@ function assignGovernmentType({
 	// settled province belongs to a state; modern eras largely suppress it.
 	const wave = migrationWave?.[capitalProvince] ?? -1
 	if (wave >= 0) {
-		const frontierBoost = wave * wave * 2.0 * frontierTribalScale
+		const frontierBoost = wave * wave * 0.8 * frontierTribalScale
 		tribal += frontierBoost
 		monarchy -= frontierBoost * 0.5
 		republic -= frontierBoost * 0.35

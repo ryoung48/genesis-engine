@@ -6,7 +6,7 @@ Start here for the historical simulation’s rules and implementation references
 
 ## Concepts
 
-- **Rulers** are the only individuals the simulation tracks: each sovereign realm has exactly one, a row of columns with a name, sex, dynasty, birth and death date and claim. See [rulers and dynasties](politics/rulers-and-dynasties.md).
+- **Rulers** are the only individuals the simulation tracks: each sovereign realm has exactly one, a row of columns with a name, sex, dynasty, birth and death date and claim. See [rulers and dynasties](politics/rulers-and-dynasties.md). Their families are generated on demand for the wiki, outside the simulation; see [people](people/overview.md).
 - **Population** is the aggregate rural and urban headcount.
 - **De jure hierarchy** is the normative title structure, which may differ from actual territorial ownership.
 - **Religion** belongs to a family; both partitions and the one gender preference each religion carries are fixed at world generation.
@@ -24,6 +24,16 @@ Start here for the historical simulation’s rules and implementation references
 - [Diplomatic attitudes, alliances and vassalage](politics/diplomacy-and-subjects.md)
 - [Rebellions, independence and throne wars](politics/rebellions-and-throne-wars.md)
 - [Land status and realm-size targets](politics/land-status-and-targets.md)
+
+## People (generated on demand)
+
+- [Overview](people/overview.md)
+- [Record anchors](people/anchors.md)
+- [Nobility and the spouse pool](people/nobility.md)
+- [Health and ageing](people/health-and-ageing.md)
+- [Religion and doctrines](people/religion-and-doctrines.md)
+- [Marriages, fertility and children](people/families.md)
+- [Character and opinion](people/character-and-opinion.md)
 
 ## Population and economy
 

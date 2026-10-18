@@ -34,3 +34,5 @@ A tie ends when either realm's ruler is replaced, whatever the cause, or when th
 ## In succession
 
 At a succession the dying realm's ties are read first and saved with each partner's ruler, before the ties end with the replacement. On a daughter's-line inheritance a random partner is drawn; with chance `UNION_INHERIT_CHANCE = 0.20` and when the pair can unite, the partner's own ruler takes the throne and the two realms form a union; otherwise a new ruler of the partner's dynasty does. On a minor's crown a random saved partner is the claimant of a `claim` war if its ruler is unchanged, neither realm is pressing a war for a throne, the pair can still unite and the war gate allows it. Between marriage partners that gate ignores the alliance and requires the claimant's threat ratio to be under the `FRIENDLY` attack threshold (0.1). See [personal unions](personal-unions.md#foreign-claims).
+
+Ties appear as weddings on the person pages of their participants; see [record anchors](../people/anchors.md#royal-marriage-ties).

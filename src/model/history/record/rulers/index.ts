@@ -9,17 +9,26 @@ import type {
 } from "@/model/history/record/rulers/types"
 import type { HistoryRecord } from "@/model/history/record/types"
 import type { Ruler } from "@/model/history/world-frame/types"
+import type { LanguageNames } from "@/model/society/language/names"
 
 const contexts = new WeakMap<HistoryRecord, NameContext>()
 
-function initialize({ record, generator }: InitializeNamesParams): void {
-	contexts.set(record, { generator, cache: new Map() })
+function initialize({ record, seed, generator }: InitializeNamesParams): void {
+	contexts.set(record, { seed, generator, cache: new Map() })
 }
 
 function context(record: HistoryRecord): NameContext {
 	const result = contexts.get(record)
 	if (!result) throw new Error("Ruler names have no world context")
 	return result
+}
+
+function seed(record: HistoryRecord): number {
+	return context(record).seed
+}
+
+function generator(record: HistoryRecord): LanguageNames {
+	return context(record).generator
 }
 
 // Names resolve from the ruler's own origin provinces, never from the realm
@@ -112,6 +121,8 @@ function comment({ record, comment }: RulerCommentParams): string | null {
 
 export const RULER_NAMES = {
 	initialize,
+	seed,
+	generator,
 	names,
 	refOf,
 	ruler,

@@ -32,6 +32,7 @@ export interface WikiTimelineEvent {
 	cultures: Array<{ id: string; name: string; color: string }>
 	religions: Array<{ id: string; name: string; color: string }>
 	dynasties: Array<{ id: string; name: string; color: string }>
+	people: Array<{ id: string; name: string; color: string }>
 	/** International organizations (HRE, Hanseatic League, ...) mentioned in
 	 * this event's description -- clicking navigates to that org's wiki
 	 * page via refs.onSelectOrganization. */
@@ -46,6 +47,8 @@ interface WikiTimelineRefs {
 	onSelectProvince: (provinceId: number) => void
 	onSelectOrganization: (orgId: string) => void
 	onSelectWar: (warId: number) => void
+	onSelectPerson: (key: string) => void
+	onSelectReligion: (key: string) => void
 	onSelectDate: (date: number) => void
 }
 
@@ -121,6 +124,20 @@ function renderLinkedTimelineText(
 				color: string
 				id: number
 		  }
+		| {
+				kind: "person"
+				key: string
+				name: string
+				color: string
+				id: string
+		  }
+		| {
+				kind: "religion"
+				key: string
+				name: string
+				color: string
+				id: string
+		  }
 		| { kind: "label"; key: string; name: string; color: string }
 	> = [
 		...event.nations.map((entry) => ({
@@ -153,6 +170,13 @@ function renderLinkedTimelineText(
 			color: entry.color,
 			id: entry.id,
 		})),
+		...event.people.map((entry) => ({
+			kind: "person" as const,
+			key: `person:${entry.id}`,
+			name: entry.name,
+			color: entry.color,
+			id: entry.id,
+		})),
 		...event.cultures.map((entry) => ({
 			kind: "label" as const,
 			key: `culture:${entry.id}`,
@@ -160,10 +184,11 @@ function renderLinkedTimelineText(
 			color: entry.color,
 		})),
 		...event.religions.map((entry) => ({
-			kind: "label" as const,
+			kind: "religion" as const,
 			key: `religion:${entry.id}`,
 			name: entry.name,
 			color: entry.color,
+			id: entry.id,
 		})),
 		...event.dynasties.map((entry) => ({
 			kind: "label" as const,
@@ -266,6 +291,9 @@ function renderLinkedTimelineText(
 						else if (mention.kind === "province")
 							refs.onSelectProvince(mention.id)
 						else if (mention.kind === "war") refs.onSelectWar(mention.id)
+						else if (mention.kind === "person") refs.onSelectPerson(mention.id)
+						else if (mention.kind === "religion")
+							refs.onSelectReligion(mention.id)
 						else refs.onSelectOrganization(mention.id)
 					}}
 				/>,

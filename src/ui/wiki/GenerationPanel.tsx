@@ -42,6 +42,12 @@ import {
 	type OrganizationWikiData,
 	OrganizationWikiPage,
 } from "@/ui/wiki/organization/OrganizationWikiPage"
+import {
+	type PersonWikiData,
+	PersonWikiPage,
+} from "@/ui/wiki/person/PersonWikiPage"
+import { ReligionWikiPage } from "@/ui/wiki/religion/ReligionWikiPage"
+import type { ReligionWikiData } from "@/ui/wiki/religion/types"
 import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
 import { GenerationTimingChart } from "@/ui/wiki/timing/GenerationTimingChart"
 import {
@@ -137,6 +143,8 @@ interface GenerationPanelProps {
 	 * nationWiki/organizationWiki above -- mutually exclusive with both (see
 	 * GenesisView's selection state). */
 	warWiki: WarWikiData | null
+	personWiki: PersonWikiData | null
+	religionWiki: ReligionWikiData | null
 }
 
 export const GenerationPanel: React.FC<GenerationPanelProps> = ({
@@ -195,6 +203,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	nationWiki,
 	organizationWiki,
 	warWiki,
+	personWiki,
+	religionWiki,
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
@@ -370,6 +380,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						<OrganizationWikiPage organization={organizationWiki} />
 					) : warWiki ? (
 						<WarWikiPage war={warWiki} />
+					) : personWiki ? (
+						<PersonWikiPage person={personWiki} />
+					) : religionWiki ? (
+						<ReligionWikiPage religion={religionWiki} />
 					) : (
 						<>
 							<GenerationPlanetNavigator

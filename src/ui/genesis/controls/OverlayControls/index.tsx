@@ -65,6 +65,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	showCoastlines,
 	setShowContours,
 	setShowCoastlines,
+	showWaves,
+	setShowWaves,
 	showWindArrows,
 	setShowWindArrows,
 	showGdd,
@@ -353,6 +355,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setShowContours={setShowContours}
 									showCoastlines={showCoastlines}
 									setShowCoastlines={setShowCoastlines}
+									showWaves={showWaves}
+									setShowWaves={setShowWaves}
 									availableVariants={availableVariants}
 									dataVariant={dataVariant}
 									setDataVariant={setDataVariant}

@@ -225,7 +225,11 @@ function buildProceduralRecord(
 		},
 		titles: baseTitles,
 	}
-	RULER_NAMES.initialize({ record, generator: names })
+	RULER_NAMES.initialize({
+		record,
+		seed: world.params.seed,
+		generator: names,
+	})
 	return record
 }
 
