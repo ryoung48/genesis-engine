@@ -1,6 +1,5 @@
 import type {
 	ChooseParams,
-	HeirOutcome,
 	PretenderOdds,
 	PretenderParams,
 	RealmParams,
@@ -10,30 +9,6 @@ import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
-// Who inherits a single-heir throne, which fixes the house and the legitimacy
-// of the new ruler (it feeds title founding). The chances assume a sovereign's
-// sons and daughters are independent Poisson counts with mean ln 4, so that a
-// quarter of reigns leave no surviving son, the failure fraction McFarlane
-// finds for peerage families per generation; the collateral lines repeat that
-// proxy. Rounded to sum to 1. They are an assumption, not a measurement.
-const HEIR: readonly HeirOutcome[] = [
-	{ chance: 0.75, house: "same", claim: 3, daughterLine: false, son: true },
-	{ chance: 0.19, house: "other", claim: 3, daughterLine: true, son: false },
-	{ chance: 0.035, house: "same", claim: 2, daughterLine: false, son: false },
-	{ chance: 0.015, house: "same", claim: 1, daughterLine: false, son: false },
-	{ chance: 0.01, house: "new", claim: 0, daughterLine: false, son: false },
-]
-// A second surviving son given a first, from the same Poisson counts.
-const JUNIOR_HEIR_CHANCE = 0.54
-// Poisson(ln 4) probabilities of 2, 3, 4, 5 and 6+ sons, each over P(2+ sons)
-// and scaled to 1,000.
-const JUNIOR_COUNT: readonly { v: number; w: number }[] = [
-	{ v: 1, w: 594 },
-	{ v: 2, w: 275 },
-	{ v: 3, w: 96 },
-	{ v: 4, w: 27 },
-	{ v: 5, w: 8 },
-]
 const ELECTED_CLAIM = 2
 // Elected rulers keep the late ruler's house in 1,546 of 2,724 elections.
 const ELECTED_SAME_HOUSE_CHANCE = 0.568
@@ -56,29 +31,23 @@ function districts({ state, realm }: RealmParams): number[] {
 		.sort((a, b) => a - b)
 }
 
-function heirOutcome({ rng }: Pick<ChooseParams, "rng">): HeirOutcome {
-	let roll = rng.random()
-	for (const outcome of HEIR) {
-		roll -= outcome.chance
-		if (roll < 0) return outcome
-	}
-	return HEIR[HEIR.length - 1]
-}
-
-function singleHeir({ state, realm, rng }: ChooseParams): SuccessionChoice {
-	const outcome = heirOutcome({ rng })
-	const juniors =
-		outcome.son &&
-		GOVERNMENT.partitionsOfIndex(state.governmentType[realm]) &&
-		rng.random() < JUNIOR_HEIR_CHANCE
-			? (rng.weightedChoice(JUNIOR_COUNT) ?? 1)
-			: 0
+function singleHeir({
+	state,
+	realm,
+	plan,
+	rng,
+}: ChooseParams): SuccessionChoice {
+	if (!plan) throw new Error(`Realm ${realm} has no heir plan for its ruler`)
+	const { outcome } = plan
 	return {
 		system: "single_heir",
 		house: outcome.house,
 		claim: outcome.claim,
 		age: outcome.house === "new" ? "fresh" : "inherited",
-		juniors,
+		primary: outcome.son ? plan.primary : null,
+		juniors: GOVERNMENT.partitionsOfIndex(state.governmentType[realm])
+			? plan.juniors
+			: [],
 		interregnum:
 			outcome.house === "new" &&
 			districts({ state, realm }).length > 0 &&
@@ -93,7 +62,8 @@ function election({ rng }: ChooseParams): SuccessionChoice {
 		house: rng.random() < ELECTED_SAME_HOUSE_CHANCE ? "same" : "new",
 		claim: ELECTED_CLAIM,
 		age: "elected",
-		juniors: 0,
+		primary: null,
+		juniors: [],
 		interregnum: false,
 		daughterLine: false,
 	}
@@ -108,7 +78,8 @@ function appointment({ state, realm, rng }: ChooseParams): SuccessionChoice {
 		house: "new",
 		claim: notable ? APPOINTED_CLAIM : 0,
 		age: "fresh",
-		juniors: 0,
+		primary: null,
+		juniors: [],
 		interregnum: false,
 		daughterLine: false,
 	}
@@ -154,5 +125,4 @@ export const SUCCESSION_SYSTEMS = {
 	choose,
 	districts,
 	pretender,
-	heir: HEIR,
 }

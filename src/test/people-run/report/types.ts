@@ -1,4 +1,5 @@
 import type { HistoryState as RecordState } from "@/model/history/record/types"
+import type { RulerFact } from "@/model/people/anchors/types"
 import type { ReligionDoctrine } from "@/model/people/doctrine/types"
 import type { PeopleGeography } from "@/model/people/store/types"
 
@@ -44,13 +45,15 @@ export interface NobilityReport {
 }
 
 export interface PeopleReportParams {
+	sampleSize: number
 	state: RecordState
 	doctrine: ReligionDoctrine | null
 	geography: PeopleGeography | null
 }
 
 export interface SampleParams {
-	keys: string[]
+	facts: RulerFact[]
+	timeMs: number
 	size: number
 	seed: number
 }
@@ -58,4 +61,9 @@ export interface SampleParams {
 export interface MsQuantiles {
 	p50: number
 	p95: number
+}
+
+export interface QuantileParams {
+	values: number[]
+	share: number
 }

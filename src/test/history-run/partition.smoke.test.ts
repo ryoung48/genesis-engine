@@ -11,6 +11,7 @@ import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
+import type { Ruler } from "@/model/history/sim/engine/state/rulers/types"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
@@ -192,24 +193,48 @@ function fixture({
 	}
 }
 
+function drawJuniors({
+	state,
+	realm,
+	count,
+	rng,
+}: {
+	state: HistoryState
+	realm: number
+	count: number
+	rng: SharedRng
+}): Ruler[] {
+	return Array.from({ length: count }, () =>
+		STATE_RULERS.draw({
+			state,
+			p: realm,
+			dynasty: state.leaderDynCurrent[realm],
+			age: "inherited",
+			rng,
+		}),
+	)
+}
+
 // The late ruler dies and the succession system rolls the given choice.
 function succeed({
 	fx,
 	choice,
 }: {
 	fx: Fixture
-	choice: Partial<SuccessionChoice>
+	choice: Partial<Omit<SuccessionChoice, "juniors">> & { juniors?: number }
 }): void {
 	const { state, realm, rng } = fx
+	const { juniors = 0, ...rest } = choice
 	const forced: SuccessionChoice = {
 		system: "single_heir",
 		house: "same",
 		claim: 3,
 		age: "inherited",
-		juniors: 0,
+		primary: null,
+		juniors: drawJuniors({ state, realm, count: juniors, rng }),
 		interregnum: false,
 		daughterLine: false,
-		...choice,
+		...rest,
 	}
 	const spy = vi.spyOn(SUCCESSION_SYSTEMS, "choose").mockReturnValue(forced)
 	try {
@@ -464,7 +489,7 @@ function divide({
 	return PARTITION.divide({
 		state,
 		realm: 0,
-		juniors,
+		juniors: drawJuniors({ state, realm: 0, count: juniors, rng: fx.rng }),
 		late,
 		primary: refOf({ state, p: 0 }),
 		rng: fx.rng,

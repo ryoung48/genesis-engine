@@ -2,7 +2,7 @@
 
 Scope: `:history`.
 
-Government determines how rulers are chosen and titles pass between [rulers](rulers-and-dynasties.md): each sovereign realm has one ruler and nothing else is simulated about the ruling house. [Title hierarchy](title-hierarchy.md) defines the ranks and territorial title structure.
+Government determines how rulers are chosen and titles pass between [rulers](rulers-and-dynasties.md). Each sovereign realm has one ruler; early plans reserve surviving direct children. [Title hierarchy](title-hierarchy.md) defines the ranks and territorial title structure.
 
 Code: types, families and the era mix in `src/model/society/eras`; assignment, succession system and partition gate in `src/model/history/sim/nations/government`; succession in `src/model/history/sim/engine/events/succession` (`systems/`, `partition/`, `interregnum/`, `regency/`, `coronation/`); rulers in `src/model/history/sim/engine/state/rulers`.
 
@@ -80,21 +80,21 @@ Government belongs to the realm and is read at its root province. New realms inh
 
 ## Succession
 
-The government type picks the system (`GOVERNMENT.successionOfIndex`). A succession is one roll per system (`SUCCESSION_SYSTEMS.choose`) that fixes the new ruler's house, claim and age table together; the ruler is then sampled from that outcome. All rolls use the history RNG. See [rulers and dynasties](rulers-and-dynasties.md) for the ruler record, age tables and unions.
+The government at death picks the system (`GOVERNMENT.successionOfIndex`). `SUCCESSION_SYSTEMS.choose` uses the late person's early plan for single-heir succession; elections and appointments roll at death. All rolls use the history RNG. See [rulers and dynasties](rulers-and-dynasties.md) for the ruler record, age tables, early plans and unions.
 
-**Single heir** (feudal, absolute and constitutional monarchy, dynastic signoria, imperial cult, and the partitioning chiefdom and tribal monarchy). One roll picks who inherits:
+**Single heir** (feudal, absolute and constitutional monarchy, dynastic signoria, imperial cult, and the partitioning chiefdom and tribal monarchy). One early roll picks the promised outcome:
 
 | Outcome | Chance | House | Claim |
 |---|---:|---|---:|
-| Son | 0.75 | same | 3 |
+| Direct child (`son`) | 0.75 | same | 3 |
 | Daughter's line | 0.19 | other | 3 |
 | Brother's line | 0.035 | same | 2 |
 | Distant kin | 0.015 | same | 1 |
 | No heir | 0.01 | new | 0 |
 
-The chances assume a sovereign's sons and daughters are independent Poisson counts with mean ln 4, so that a quarter of reigns leave no surviving son, the failure fraction McFarlane (*The Nobility of Later Medieval England*, 1973) finds for peerage families per 25 years; the collateral lines repeat that proxy. The figures are rounded to sum to 1. They are an assumption transferred from peerages to sovereigns, not a measurement, and the report's `succession` fields are the check. On the person model a child inherited in 85% of successions (94% here), the house was kept in 77% of inheritances (80% here) and no heir occurred in 6.9% (1% here); that model generated houses only a few generations deep, so distant kin rarely existed.
+The chances assume a sovereign's sons and daughters are independent Poisson counts with mean ln 4, so that a quarter of reigns leave no surviving son, the failure fraction McFarlane (*The Nobility of Later Medieval England*, 1973) finds for peerage families per 25 years; the collateral lines repeat that proxy. The figures are rounded to sum to 1. They are an assumption transferred from peerages to sovereigns, not a measurement, and the report's `succession` fields are the check. On the person model a child inherited in 85% of successions, the house was kept in 77% of inheritances and no heir occurred in 6.9%; that model generated houses only a few generations deep, so distant kin rarely existed. The unconditioned table gives 94% to direct children plus the daughter's line, 80% to the same house and 1% to no heir. Fertility rejection and government selection at death change the realized shares.
 
-Every heir draws an `INHERITED_AGE`; a new house, from no heir, draws a uniform 20–50. House `other` means the crown passes through a [royal marriage](royal-marriages.md#in-succession): a random tied partner's own ruler takes the throne and the realms unite (chance 0.20, when they can), or a new ruler of the partner's dynasty does; without a tie, a new dynasty.
+The legacy `son` label means a direct child of either sex, keeping the existing culture-based gender distribution. The probabilities retain their historical male-line calibration as an approximation. Early planning clips `INHERITED_AGE` by the parent's fertile window and draws surviving children. An empty primary window redraws over the other unchanged rows, renormalized over 0.25. Other kin still draw `INHERITED_AGE` at succession; a new house, from no heir, draws a uniform 20–50. House `other` means the crown passes through a [royal marriage](royal-marriages.md#in-succession): a random tied partner's own ruler takes the throne and the realms unite (chance 0.20, when they can), or a new ruler of the partner's dynasty does; without a tie, a new dynasty.
 
 A succession is **disputed** when the heir is under 16 or the crown passes to a daughter's line.
 
@@ -108,7 +108,7 @@ A succession is **disputed** when the heir is under 16 or the crown passes to a 
 - 1: distant kin, an appointed notable, a usurping kinsman;
 - 0: a new house, a lord protector, or the crown-land ruler after an interregnum.
 
-**Order within one succession.** The deceased ruler's columns, the dynasty and the eligible tied partners are snapshotted. The outcome is chosen and any new ruler sampled from the snapshot; an interregnum, if rolled, frees its districts; the successor is installed with union and tie consequences; then partition runs, then the revolts if the realm was not divided, then the government review and the coronation. Heap events scheduled by the new rulers belong to the final arrangement of any union.
+**Order within one succession.** Seating previously ensured plans for the ruler and their primary child. At death, the deceased ruler, their plan, dynasty and eligible tied partners are snapshotted. Government selects the system; single-heir succession consumes the plan and preserves a direct child's identity, while other successors are selected at this point. An interregnum, if rolled, frees its districts; the successor is installed with union and tie consequences and their two levels of plans are ensured; then partition runs, then revolts if the realm was not divided, then government review and coronation. Transaction reconciliation prunes unused plans before the journal flush. Heap events scheduled by the new rulers belong to the final arrangement of any union.
 
 **Pretender revolts.** Rolled for a disputed inheritance or any election, in a realm with at least one district seat, never in a republic and never when the succession divided the realm or broke it up. An adult heir of the house faces none.
 
@@ -125,13 +125,13 @@ A tied partner may also press the claim of a minor's crown by war; see [foreign 
 
 ## Partition
 
-Chiefdoms and tribal monarchies treat the realm as the dynasty's patrimony, as in the Frankish divisions of 511 and 843, Kievan Rus' after 1054 and Poland's testament of 1138. When a son inherits, junior heirs exist with chance 0.54 (a second surviving son given a first, from the same Poisson counts as the heir table); their number is 1 to 5 with weights 594, 275, 96, 27 and 8 (Poisson(ln 4) probabilities of 2, 3, 4, 5 and 6 or more sons over the chance of two or more). The mean is 1.6 junior heirs. On the person model 82.7% of child successions had junior heirs, 2.5 on average and up to 11. `PARTITION.divide` receives the count, called from the succession event once the primary heir holds the throne.
+Chiefdoms and tribal monarchies treat the realm as the dynasty's patrimony, as in the Frankish divisions of 511 and 843, Kievan Rus' after 1054 and Poland's testament of 1138. Early planning rolls junior existence with chance 0.54 and a count of 1–5 with weights 594, 275, 96, 27 and 8, under every government. These retain the Poisson(ln 4) male-line calibration (2, 3, 4, 5 and 6+ sons conditional on two or more), now applied to direct children of either sex. Fertility and strict younger-sibling conditioning can reject draws, so the unconditioned mean of 1.6 juniors is not a forecast. At death, only a partitioning government and direct-child succession use the planned juniors. `PARTITION.divide` receives their identities, oldest first, after the primary holds the throne.
 
 **Shares.** Junior heirs first take surplus top-tier titles, ordered by owned population in the title region and then seat id. The primary keeps the title containing the capital, or the first title if none contains it. A title share carries its crown land and every district seated inside its region, each district whole. Attached land outside that region leaves with an inside district; inside land attached to an outside district stays with that district. Crown land inside the title always leaves.
 
 Remaining junior heirs take one titled district each, best rank and population first, excluding districts already allocated with title shares. County districts never form shares. The root and every supporting seat move before title settlement, so temporary ownership cannot move a title onto a seat. Every share is rechecked for ownership and occupation before release. Realms with no surplus title and no titled district have nothing to divide.
 
-Each seated junior founds a realm of the late ruler's dynasty with claim 3 and an `INHERITED_AGE` draw; a child gets a regency.
+Each seated junior founds a realm of the late ruler's dynasty with claim 3, preserving their planned identity, sex, name inputs and birth; a child gets a regency. No replacement ruler is drawn. The oldest junior gets the first allocated share. A dropped share does not reassign that child or shift later assignments; unmatched children receive no realm. The [heir record contract](rulers-and-dynasties.md#heir-plan-record-contract) describes the promises independently of territorial outcomes.
 
 **Cut-off land.** Before freeing anything cut off, partition joins each piece to a bordering heir realm whose top tier is equal to or above the piece's own rank. Highest top tier, then population and seat id decide ties. Occupied pieces do not join. Remaining cut-off land is released by the existing connection repair.
 

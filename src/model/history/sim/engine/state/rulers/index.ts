@@ -7,7 +7,10 @@ import { isSovereign } from "@/model/history/sim/engine/state/relations"
 import type {
 	AccessionAgeParams,
 	AgeBins,
+	CountRealmParams,
 	DrawBinParams,
+	DrawDeathAgeParams,
+	DrawHeirParams,
 	DrawRulerParams,
 	EndRegencyParams,
 	NoteColumnsParams,
@@ -15,6 +18,7 @@ import type {
 	ReadNoteParams,
 	RealmRulerParams,
 	Ruler,
+	RulerIdentityParams,
 	RulerRefParams,
 	WriteRulerParams,
 } from "@/model/history/sim/engine/state/rulers/types"
@@ -26,6 +30,10 @@ const ADULT_AGE = 16
 const BIN_YEARS = 5
 const NEW_HOUSE_AGE = { min: 20, max: 50 }
 const MAX_NAME_SEED = 0x7fffffff
+// Mirrors ADULT, GESTATION (280 days) and the exclusive LAST_BIRTH in
+// `src/model/people/fertility`; history never imports the people model.
+const GESTATION_YEARS = 280 / 365
+const LAST_BIRTH_AGE = 45
 
 // Accession ages of heirs and of elected rulers, measured on the person model
 // over 933 years: 4,097 heirs and 2,724 elected rulers.
@@ -48,26 +56,34 @@ const DEATH_AGE: AgeBins = {
 	],
 }
 
-function drawBin({ bins, floor, rng }: DrawBinParams): number {
+function drawBin({ bins, floor, ceiling, rng }: DrawBinParams): number | null {
 	const entries = bins.weights.map((weight, index) => {
 		const lo = Math.max(bins.start + index * BIN_YEARS, floor)
-		const hi = bins.start + (index + 1) * BIN_YEARS
+		const binHi = bins.start + (index + 1) * BIN_YEARS
+		const hi = ceiling === null ? binHi : Math.min(binHi, ceiling)
 		return { v: { lo, hi }, w: hi > lo ? (weight * (hi - lo)) / BIN_YEARS : 0 }
 	})
-	const bin = rng.weightedChoice(entries)
-	return bin ? rng.uniform(bin.lo, bin.hi) : floor
+	const bin = rng.weightedChoice(entries.filter((entry) => entry.w > 0))
+	return bin ? rng.uniform(bin.lo, bin.hi) : null
 }
 
 function accessionAge({ age, rng }: AccessionAgeParams): number {
 	if (age === "inherited")
-		return drawBin({ bins: INHERITED_AGE, floor: 0, rng })
+		return drawBin({ bins: INHERITED_AGE, floor: 0, ceiling: null, rng }) ?? 0
 	if (age === "elected")
-		return drawBin({ bins: ELECTED_AGE, floor: ADULT_AGE, rng })
+		return (
+			drawBin({ bins: ELECTED_AGE, floor: ADULT_AGE, ceiling: null, rng }) ??
+			ADULT_AGE
+		)
 	return rng.uniform(NEW_HOUSE_AGE.min, NEW_HOUSE_AGE.max)
 }
 
-function draw({ state, p, dynasty, age, rng }: DrawRulerParams): Ruler {
-	const years = accessionAge({ age, rng })
+function identity({
+	state,
+	p,
+	dynasty,
+	rng,
+}: RulerIdentityParams): Omit<Ruler, "birthMs" | "deathMs"> {
 	const culture = state.culture[p]
 	const system = culture >= 0 ? state.cultureGenderSystems[culture] : 0
 	const nameSeed = rng.randint(1, MAX_NAME_SEED)
@@ -77,11 +93,6 @@ function draw({ state, p, dynasty, age, rng }: DrawRulerParams): Ruler {
 		house = sequence.nextDynasty++
 		state.dynastyOrigin.set(house, p)
 	}
-	const birthMs = state.time - years * yearMs
-	const deathAge = Math.max(
-		drawBin({ bins: DEATH_AGE, floor: years, rng }),
-		years + 1e-6,
-	)
 	return {
 		rulerId: sequence.nextRuler++,
 		nameSeed,
@@ -91,9 +102,50 @@ function draw({ state, p, dynasty, age, rng }: DrawRulerParams): Ruler {
 				? 1
 				: 0,
 		dynasty: house,
-		birthMs,
-		deathMs: birthMs + deathAge * yearMs,
 	}
+}
+
+function drawDeathAge({ years, rng }: DrawDeathAgeParams): number {
+	return Math.max(
+		drawBin({ bins: DEATH_AGE, floor: years, ceiling: null, rng }) ?? years,
+		years + 1e-6,
+	)
+}
+
+function draw({ state, p, dynasty, age, rng }: DrawRulerParams): Ruler {
+	const years = accessionAge({ age, rng })
+	const born = identity({ state, p, dynasty, rng })
+	const birthMs = state.time - years * yearMs
+	const deathAge = drawDeathAge({ years, rng })
+	return { ...born, birthMs, deathMs: birthMs + deathAge * yearMs }
+}
+
+function drawHeir({
+	state,
+	parent,
+	p,
+	olderBirthMs,
+	rng,
+}: DrawHeirParams): Ruler | null {
+	const lifespan = (parent.deathMs - parent.birthMs) / yearMs
+	let ceiling = lifespan - ADULT_AGE - GESTATION_YEARS
+	if (olderBirthMs !== null)
+		ceiling = Math.min(ceiling, (parent.deathMs - olderBirthMs) / yearMs)
+	const floor = parent.sex === 1 ? Math.max(0, lifespan - LAST_BIRTH_AGE) : 0
+	if (ceiling <= floor) return null
+	const years = drawBin({ bins: INHERITED_AGE, floor, ceiling, rng })
+	if (
+		years === null ||
+		(parent.sex === 1 &&
+			parent.deathMs - years * yearMs >=
+				parent.birthMs + LAST_BIRTH_AGE * yearMs) ||
+		(olderBirthMs !== null && years >= ceiling)
+	)
+		return null
+	const born = identity({ state, p, dynasty: parent.dynasty, rng })
+	const birthMs = parent.deathMs - years * yearMs
+	const deathAge = drawDeathAge({ years, rng })
+	return { ...born, birthMs, deathMs: birthMs + deathAge * yearMs }
 }
 
 function read({ state, p }: RealmRulerParams): Ruler {
@@ -113,8 +165,21 @@ function has({ state, p }: RealmRulerParams): boolean {
 	return state.leaderRuntime.rulerId[p] >= 0
 }
 
+function countRealm({ state, rulerId, delta }: CountRealmParams): void {
+	if (rulerId < 0) return
+	const counts = state.rulerRealmCounts
+	const next = (counts.get(rulerId) ?? 0) + delta
+	if (next > 0) counts.set(rulerId, next)
+	else counts.delete(rulerId)
+	state.changedRulers.add(rulerId)
+}
+
 function write({ state, p, ruler, claim }: WriteRulerParams): void {
 	const runtime = state.leaderRuntime
+	if (runtime.rulerId[p] !== ruler.rulerId) {
+		countRealm({ state, rulerId: runtime.rulerId[p], delta: -1 })
+		countRealm({ state, rulerId: ruler.rulerId, delta: 1 })
+	}
 	runtime.idx[p]++
 	runtime.rulerId[p] = ruler.rulerId
 	runtime.nameOrigin[p] = ruler.nameOrigin
@@ -131,6 +196,7 @@ function write({ state, p, ruler, claim }: WriteRulerParams): void {
 
 function clear({ state, p }: RealmRulerParams): void {
 	const runtime = state.leaderRuntime
+	countRealm({ state, rulerId: runtime.rulerId[p], delta: -1 })
 	runtime.idx[p]++
 	runtime.rulerId[p] = -1
 	runtime.nameOrigin[p] = -1
@@ -272,6 +338,7 @@ function readNoteColumns({ data, prefix }: ReadNoteParams): RulerRef[] {
 export const STATE_RULERS = {
 	adultAge: ADULT_AGE,
 	draw,
+	drawHeir,
 	read,
 	has,
 	write,

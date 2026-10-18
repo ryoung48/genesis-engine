@@ -34,6 +34,7 @@ import {
 	setRelation,
 } from "@/model/history/sim/engine/state/relations"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
+import { HEIR_PLAN } from "@/model/history/sim/engine/state/rulers/heirs"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type {
 	BuildProvinceXyzParams,
@@ -49,7 +50,6 @@ import type {
 	GetWarAlliesParams,
 	HistoryState,
 	IsProvinceConnectedToParentParams,
-	NewRuler,
 	ProvinceDistanceSqParams,
 	QueueBattleEventParams,
 	RealmPairParams,
@@ -59,6 +59,7 @@ import type {
 	ReleaseFactionParams,
 	ReleaseFactionsParams,
 	ReleaseProvinceParams,
+	ReleaseRuler,
 	ReleaseSubjectRelationsParams,
 	RepartitionNationParams,
 	ResolveWarParams,
@@ -278,7 +279,16 @@ function releaseFactions({ state, seats, rng }: ReleaseFactionsParams): void {
 		})
 		RECRUITMENT.reconstitute({ state, nation: p })
 		clearRealmDiplomacy({ state, nation: p })
-		foundRuler({ state, p, ruler, rng })
+		if (ruler.kind === "draw") foundRuler({ state, p, ruler, rng })
+		else
+			seatRuler({
+				state,
+				p,
+				ruler: ruler.ruler,
+				claim: ruler.claim,
+				natural: false,
+				rng,
+			})
 		reconcileGovernment({ state, realm: p, transition, rng })
 	}
 }
@@ -1026,6 +1036,12 @@ function createHistoryState({
 		unionGenerations: new Map(),
 		dynastyOrigin: new Map(),
 		rulerSequence: { nextRuler: 0, nextDynasty: 0 },
+		heirPlans: new Map(),
+		heirPrimaryOwner: new Map(),
+		heirPlanStats: HEIR_PLAN.stats(),
+		rulerRealmCounts: new Map(),
+		changedRulers: new Set(),
+		journalSequence: 0,
 		regency: new Uint8Array(P),
 		coronations: CORONATION_COUNTERS.create(),
 		heritageOfCulture:
@@ -1116,7 +1132,12 @@ const DYNASTY_SEED_CHANCE = 0.13
 // landowning tags of EU4's 1444 start (17 realms in `union` diplomacy entries
 // in force on 1444.11.11, from the game's history/diplomacy files).
 const UNION_SEED_SHARE = 0.025
-const NEW_HOUSE: NewRuler = { dynasty: -1, age: "fresh", claim: FOUNDER_CLAIM }
+const NEW_HOUSE: ReleaseRuler = {
+	kind: "draw",
+	dynasty: -1,
+	age: "fresh",
+	claim: FOUNDER_CLAIM,
+}
 
 function unionPartners({ state, p }: UnionRealmParams): number[] {
 	const partners: number[] = []
@@ -1232,7 +1253,14 @@ function canUniteAfterWar({ state, a, b }: RealmPairParams): boolean {
 // Gives the ruler to the senior and every junior that does not already have
 // them. Only the senior holds the succession event, and a minority regency
 // follows each realm's own copy of the birth date.
-function shareRuler({ state, senior, ruler, claim }: ShareRulerParams): void {
+function shareRuler({
+	state,
+	senior,
+	ruler,
+	claim,
+	rng,
+}: ShareRulerParams): void {
+	HEIR_PLAN.ensure({ state, ruler, p: senior, rng })
 	for (const p of [senior, ...juniorsOf({ state, p: senior })]) {
 		if (state.leaderRuntime.rulerId[p] === ruler.rulerId) continue
 		endMarriageTies({ state, realm: p })
@@ -1262,6 +1290,7 @@ function detachJunior({
 			rng,
 		}),
 		claim: UNION_ENDED_CLAIM,
+		rng,
 	})
 }
 
@@ -1314,7 +1343,7 @@ function seatRuler({
 	if (!keep)
 		for (const junior of juniors)
 			detachJunior({ state, junior, senior: p, rng })
-	shareRuler({ state, senior: p, ruler, claim })
+	shareRuler({ state, senior: p, ruler, claim, rng })
 	if (keep && natural) advanceUnion({ state, p })
 }
 
@@ -1384,7 +1413,7 @@ function unite({ state, a, b, ruler, claim, rng }: UniteParams): UnionLink {
 		time: state.time,
 		data: { junior, senior, ruler: ruler.rulerId },
 	})
-	shareRuler({ state, senior, ruler, claim: sharedClaim })
+	shareRuler({ state, senior, ruler, claim: sharedClaim, rng })
 	return { senior, junior }
 }
 
@@ -1409,7 +1438,7 @@ function seedRulers({ state, rng }: SeedRulersParams): void {
 			rng,
 		})
 		seated.set(p, ruler.dynasty)
-		shareRuler({ state, senior: p, ruler, claim: FOUNDER_CLAIM })
+		shareRuler({ state, senior: p, ruler, claim: FOUNDER_CLAIM, rng })
 	}
 }
 

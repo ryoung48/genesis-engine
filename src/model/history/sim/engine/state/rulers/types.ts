@@ -27,6 +27,29 @@ export interface AgeBins {
 export interface DrawBinParams {
 	bins: AgeBins
 	floor: number
+	// Null leaves the draw unclipped above.
+	ceiling: number | null
+	rng: SharedRng
+}
+
+export interface DrawDeathAgeParams {
+	years: number
+	rng: SharedRng
+}
+
+export interface DrawHeirParams {
+	state: HistoryState
+	parent: Ruler
+	p: number
+	// Birth of the next older sibling; null for the primary child.
+	olderBirthMs: number | null
+	rng: SharedRng
+}
+
+export interface RulerIdentityParams {
+	state: HistoryState
+	p: number
+	dynasty: number
 	rng: SharedRng
 }
 
@@ -80,4 +103,10 @@ export interface NoteColumnsParams {
 export interface ReadNoteParams {
 	data: Record<string, unknown>
 	prefix: string
+}
+
+export interface CountRealmParams {
+	state: HistoryState
+	rulerId: number
+	delta: number
 }

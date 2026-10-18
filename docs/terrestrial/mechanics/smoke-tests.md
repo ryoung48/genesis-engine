@@ -18,7 +18,7 @@ pnpm test:history
 
 The `history-smoke` project runs files in isolated workers, with at most eight workers and no more than the machine's available CPU parallelism. The cap bounds concurrent world generation and engine initialization. Tests within each file remain sequential, so existing module patches and mutable fixtures retain their ordering.
 
-History generation (`gen:history`), detailed reporting (`report:history`) and the retained-memory diagnostic remain in the serial `smoke` project. They run after the parallel project when both projects are selected. Climate and celestial tests also retain their existing serial configuration. The ordinary history suite does not run the generators or benchmark.
+History generation (`gen:history`), detailed reporting (`report:history`), the independent people benchmark (`report:people`) and the retained-memory diagnostic remain in the serial `smoke` project. They run after the parallel project when both projects are selected. Climate and celestial tests also retain their existing serial configuration. The ordinary history suite does not run the generators or bulk benchmarks. The history report never runs the people benchmark; see [people reporting](../people/overview.md#reporting) for its separate command and workload controls.
 
 Siege calibration keeps all 64 combinations of terrain, troop multiples, force ratios and relief forces, with 2,000 trials per scenario instead of 20,000. Its acceptance bounds are unchanged. At 2,000 trials the worst-case binomial standard error is about 1.1 percentage points (`sqrt(0.5 * 0.5 / 2000)`); the p99 estimate has less tail resolution. Set `SIEGE_CALIBRATION_OUT` to retain the full 20,000-trial measurement and write its results:
 

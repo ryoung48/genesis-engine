@@ -22,6 +22,7 @@ export interface RulerSampleParams {
 export interface RulerWindowParams extends RulerSampleParams {
 	from: number
 	to: number
+	serializedPlanBytes: number
 }
 
 export interface SuccessionReport {
@@ -68,8 +69,35 @@ export interface UnionReport {
 }
 
 export interface RulersReport {
+	heirPlans: HeirPlansReport
 	succession: SuccessionReport
 	marriageTies: MarriageTieReport
 	dynasty: DynastyReport
 	unions: UnionReport
+}
+
+export interface HeirDistribution {
+	count: number
+	mean: number | null
+	p10: number | null
+	p50: number | null
+	p90: number | null
+}
+
+export interface HeirLeadReport {
+	primary: HeirDistribution
+	allChildren: HeirDistribution
+	primaryBornBeforePlanShare: number | null
+	heirBornBeforePlanShare: number | null
+}
+
+export interface HeirPlansReport {
+	// Cumulative through the end of this reporting window.
+	plansRolled: number
+	fertilityRejectedSonShare: number | null
+	plansCancelled: { unused: number; unreachable: number }
+	retainedPlansPeak: number
+	serializedPlanBytes: number
+	heirAccessionAge: HeirDistribution
+	planLeadYears: Record<"primary" | "seated" | "unseated", HeirLeadReport>
 }

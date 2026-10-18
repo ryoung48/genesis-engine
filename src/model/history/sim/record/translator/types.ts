@@ -121,3 +121,9 @@ export interface InheritGovernmentParams {
 	government: string
 	timeMs: number
 }
+
+export interface AppendHeirPlansParams {
+	translator: ProceduralTranslator
+	transaction: JournalTransaction
+	timeMs: number
+}

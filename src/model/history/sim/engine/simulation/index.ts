@@ -25,6 +25,7 @@ import type {
 } from "@/model/history/sim/engine/simulation/types"
 import { InitHistoryParams } from "@/model/history/sim/engine/simulation/types"
 import { STATE } from "@/model/history/sim/engine/state"
+import { HEIR_PLAN } from "@/model/history/sim/engine/state/rulers/heirs"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { TIMING } from "@/model/shared/timing"
 import { UNITS } from "@/model/shared/units"
@@ -196,6 +197,7 @@ function initHistory(params: InitHistoryParams): HistoryState {
 	ROYAL_MARRIAGE.review({ state })
 	MILITARY.reconcile({ state })
 	MILITARY.recordArmies({ state })
+	HEIR_PLAN.reconcile(state)
 	JOURNAL.flush({ state, noteCursor: 0, census: true, initial: true })
 	return state
 }
@@ -286,6 +288,7 @@ function processEventsUntil({
 		}
 		state.militaryDepth--
 		MILITARY.reconcile({ state })
+		HEIR_PLAN.reconcile(state)
 		JOURNAL.flush({
 			state,
 			noteCursor,

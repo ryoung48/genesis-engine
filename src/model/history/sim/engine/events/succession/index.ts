@@ -20,6 +20,7 @@ import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_GOVERNMENT } from "@/model/history/sim/engine/state/government"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
+import { HEIR_PLAN } from "@/model/history/sim/engine/state/rulers/heirs"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
 const MAX_CLAIM = 3
@@ -60,7 +61,7 @@ function pretenderRevolt({
 		state,
 		p: leader,
 		supporters: others.filter(() => rng.random() < supporters),
-		ruler: { dynasty, age: "fresh", claim: PRETENDER_CLAIM },
+		ruler: { kind: "draw", dynasty, age: "fresh", claim: PRETENDER_CLAIM },
 		rng,
 	})
 	state.events.push({
@@ -137,6 +138,7 @@ function successorOf({
 	choice,
 	rng,
 }: SuccessorParams): Successor {
+	if (choice.primary) return { ruler: choice.primary, union: null }
 	if (choice.house === "other" && partners.length > 0) {
 		const partner = rng.choice(partners)
 		if (
@@ -186,8 +188,17 @@ function runSuccession({
 	const late = STATE_RULERS.read({ state, p: realm })
 	const lateRef = STATE_RULERS.ref({ state, ruler: late })
 	const partners = ROYAL_MARRIAGE.partnersOf({ state, realm })
-	const choice = SUCCESSION_SYSTEMS.choose({ state, realm, rng })
+	const plan = HEIR_PLAN.read({ state, rulerId: late.rulerId })
+	const choice = SUCCESSION_SYSTEMS.choose({ state, realm, plan, rng })
 	const successor = successorOf({ state, realm, late, partners, choice, rng })
+	if (plan && choice.system === "single_heir")
+		HEIR_PLAN.fulfill({
+			state,
+			plan,
+			house: choice.house,
+			claim: choice.claim,
+			successor: successor.ruler,
+		})
 	const interregnum = choice.interregnum
 		? INTERREGNUM.begin({ state, realm, late: lateRef, rng })
 		: null

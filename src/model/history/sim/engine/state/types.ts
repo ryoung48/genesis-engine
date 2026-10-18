@@ -25,6 +25,10 @@ import type {
 	GovernmentTransition,
 } from "@/model/history/sim/engine/state/government/types"
 import type {
+	HeirPlan,
+	HeirPlanStats,
+} from "@/model/history/sim/engine/state/rulers/heirs/types"
+import type {
 	AgeTable,
 	MarriageTie,
 	Ruler,
@@ -210,6 +214,16 @@ export interface HistoryState {
 	unionGenerations: Map<number, number>
 	dynastyOrigin: Map<number, number>
 	rulerSequence: RulerSequence
+	// Succession promises keyed by the person who owns them, never by realm.
+	heirPlans: Map<number, HeirPlan>
+	// Planned primary child to the owner whose plan names them.
+	heirPrimaryOwner: Map<number, number>
+	heirPlanStats: HeirPlanStats
+	// Realms currently holding each ruler, unions included.
+	rulerRealmCounts: Map<number, number>
+	// Rulers whose realm count or plan changed since the last reconcile.
+	changedRulers: Set<number>
+	journalSequence: number
 	regency: Uint8Array
 	coronations: CoronationCounters
 	riverByProvince: Uint8Array
@@ -474,6 +488,10 @@ export interface GetWarAlliesParams {
 	target: number
 }
 
+export type ReleaseRuler =
+	| ({ kind: "draw" } & NewRuler)
+	| { kind: "existing"; ruler: Ruler; claim: number }
+
 export interface NewRuler {
 	// -1 founds a new dynasty at the seat.
 	dynasty: number
@@ -486,7 +504,7 @@ export interface ReleaseProvinceParams {
 	p: number
 	rng: SharedRng
 	// [JUSTIFICATION] Most releases found a new house, which is the default.
-	ruler?: NewRuler
+	ruler?: ReleaseRuler
 }
 
 export interface ReleaseFactionParams {
@@ -494,7 +512,7 @@ export interface ReleaseFactionParams {
 	p: number
 	rng: SharedRng
 	supporters: number[]
-	ruler: NewRuler
+	ruler: ReleaseRuler
 }
 
 export interface IsProvinceConnectedToParentParams {
@@ -617,6 +635,7 @@ export interface ShareRulerParams {
 	senior: number
 	ruler: Ruler
 	claim: number
+	rng: SharedRng
 }
 
 export interface DetachJuniorParams {
@@ -670,7 +689,7 @@ export interface UnionLink {
 
 export interface ReleaseFactionsParams {
 	state: HistoryState
-	seats: { p: number; supporters: number[]; ruler: NewRuler }[]
+	seats: { p: number; supporters: number[]; ruler: ReleaseRuler }[]
 	rng: SharedRng
 }
 

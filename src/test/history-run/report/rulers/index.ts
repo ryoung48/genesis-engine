@@ -1,11 +1,69 @@
 import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { STATE } from "@/model/history/sim/engine/state"
+import { REPORT_DISTRIBUTION } from "@/test/history-run/report/distribution"
 import type {
+	HeirDistribution,
+	HeirPlansReport,
 	RulerSampleParams,
 	RulersReport,
 	RulerTracker,
 	RulerWindowParams,
 } from "@/test/history-run/report/rulers/types"
+
+function distribution(values: number[]): HeirDistribution {
+	const count = values.length
+	return {
+		count,
+		mean: count ? values.reduce((sum, value) => sum + value, 0) / count : null,
+		p10: count ? REPORT_DISTRIBUTION.percentile({ values, q: 0.1 }) : null,
+		p50: count ? REPORT_DISTRIBUTION.percentile({ values, q: 0.5 }) : null,
+		p90: count ? REPORT_DISTRIBUTION.percentile({ values, q: 0.9 }) : null,
+	}
+}
+
+function heirs({
+	engine,
+	serializedPlanBytes,
+}: RulerWindowParams): HeirPlansReport {
+	const stats = engine.heirPlanStats
+	const cohort = (name: "primary" | "seated" | "unseated") => {
+		const leads = stats.leads.filter(
+			(lead) => (stats.seatedCohorts.get(lead.ownerId) ?? "unseated") === name,
+		)
+		const primary = leads
+			.filter((lead) => lead.primary)
+			.map((lead) => lead.years)
+		const all = leads.map((lead) => lead.years)
+		return {
+			primary: distribution(primary),
+			allChildren: distribution(all),
+			primaryBornBeforePlanShare: primary.length
+				? primary.filter((value) => value < 0).length / primary.length
+				: null,
+			heirBornBeforePlanShare: all.length
+				? all.filter((value) => value < 0).length / all.length
+				: null,
+		}
+	}
+	return {
+		plansRolled: stats.rolled,
+		fertilityRejectedSonShare: stats.sonRolls
+			? stats.fertilityRejections / stats.sonRolls
+			: null,
+		plansCancelled: {
+			unused: stats.cancelledUnused,
+			unreachable: stats.cancelledUnreachable,
+		},
+		retainedPlansPeak: stats.retainedPeak,
+		serializedPlanBytes,
+		heirAccessionAge: distribution(stats.accessionAges),
+		planLeadYears: {
+			primary: cohort("primary"),
+			seated: cohort("seated"),
+			unseated: cohort("unseated"),
+		},
+	}
+}
 
 function tracker(): RulerTracker {
 	return {
@@ -58,6 +116,7 @@ function of({
 	tracker: tracked,
 	from,
 	to,
+	serializedPlanBytes,
 }: RulerWindowParams): RulersReport {
 	const lo = from * STATE.yearMs
 	const hi = to * STATE.yearMs
@@ -95,6 +154,13 @@ function of({
 		}
 	const years = Math.max(1, to - from)
 	return {
+		heirPlans: heirs({
+			engine,
+			tracker: tracked,
+			from,
+			to,
+			serializedPlanBytes,
+		}),
 		succession,
 		marriageTies: {
 			formed: count("marriage alliance"),

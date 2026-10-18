@@ -4,23 +4,21 @@ import { HEALTH } from "@/model/people/health"
 import { NOBILITY } from "@/model/people/nobility"
 import { PERSON_QUERY } from "@/model/people/query"
 import { PEOPLE_STORE } from "@/model/people/store"
-import type { PeopleStore } from "@/model/people/store/types"
 import { HASH } from "@/model/shared/random/hash"
 import { TIME } from "@/model/shared/time"
 import type {
 	MsQuantiles,
 	PeopleReport,
 	PeopleReportParams,
+	QuantileParams,
 	Quantiles,
 	SampleParams,
-} from "@/test/history-run/report/people/types"
+} from "@/test/people-run/report/types"
 
 const YEAR = TIME.constants.yearMS
-const SAMPLE_SIZE = 200
-const GENERATION_CAP = 3000
 const CHANNEL = 7700
 
-function quantile(values: number[], share: number): number {
+function quantile({ values, share }: QuantileParams): number {
 	if (values.length === 0) return 0
 	const sorted = values.toSorted((a, b) => a - b)
 	return sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))]
@@ -35,37 +33,50 @@ function mean(values: number[]): number {
 function spread(values: number[]): Quantiles {
 	return {
 		mean: mean(values),
-		p10: quantile(values, 0.1),
-		p50: quantile(values, 0.5),
-		p90: quantile(values, 0.9),
+		p10: quantile({ values, share: 0.1 }),
+		p50: quantile({ values, share: 0.5 }),
+		p90: quantile({ values, share: 0.9 }),
 	}
 }
 
 function ms(values: number[]): MsQuantiles {
-	return { p50: quantile(values, 0.5), p95: quantile(values, 0.95) }
+	return {
+		p50: quantile({ values, share: 0.5 }),
+		p95: quantile({ values, share: 0.95 }),
+	}
 }
 
-function sample({ keys, size, seed }: SampleParams): string[] {
-	return keys
-		.map((key, at) => ({
-			key,
+function sample({ facts, size, seed, timeMs }: SampleParams): string[] {
+	const groups = new Map<string, string[]>()
+	const ordered = facts
+		.map((fact, at) => ({
+			fact,
 			roll: HASH.unit({ seed, channel: CHANNEL, salt: at }),
 		}))
 		.sort((a, b) => a.roll - b.roll)
-		.slice(0, size)
-		.map((entry) => entry.key)
+	for (const { fact } of ordered) {
+		const cohort = `${fact.ref.sex}:${timeMs - fact.birthMs < 16 * YEAR ? "minor" : "adult"}`
+		const group = groups.get(cohort) ?? []
+		group.push(fact.key)
+		groups.set(cohort, group)
+	}
+	const picked: string[] = []
+	while (picked.length < Math.min(size, facts.length)) {
+		for (const group of groups.values()) {
+			const key = group.shift()
+			if (key) picked.push(key)
+			if (picked.length === size) break
+		}
+	}
+	return picked
 }
 
-function freshStore(
-	state: PeopleReportParams["state"],
-	shared: PeopleStore,
-): PeopleStore {
-	const store = PEOPLE_STORE.reset({ record: state.record })
-	store.index = shared.index
-	return store
-}
-
-function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
+function of({
+	state,
+	doctrine,
+	geography,
+	sampleSize,
+}: PeopleReportParams): PeopleReport {
 	const record = state.record
 	const frameAt = (timeMs: number): WorldFrame =>
 		HISTORY.frameAt({ state, timeMs })
@@ -73,11 +84,16 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 	const indexStart = performance.now()
 	const index = PEOPLE_STORE.index(shared)
 	const indexMs = performance.now() - indexStart
-	const keys = [...index.facts.values()]
-		.filter((fact) => fact.reigns.length > 0)
-		.map((fact) => fact.key)
-	const picked = sample({ keys, size: SAMPLE_SIZE, seed: shared.worldSeed })
+	const facts = [...index.facts.values()].filter(
+		(fact) => fact.reigns.length > 0,
+	)
 	const time = record.maxTimeMs
+	const picked = sample({
+		facts,
+		size: sampleSize,
+		seed: shared.worldSeed,
+		timeMs: time,
+	})
 	const pageMs: number[] = []
 	const frameMs: number[] = []
 	const warmMs: number[] = []
@@ -91,8 +107,9 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 	let incapableAt70 = 0
 	let wives = 0
 	let childbirthWives = 0
+	const store = shared
+	const generationStart = performance.now()
 	for (const key of picked) {
-		const store = freshStore(state, shared)
 		let frameSpent = 0
 		const timed = (at: number): WorldFrame => {
 			const started = performance.now()
@@ -115,100 +132,86 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 		PERSON_QUERY.page({
 			store,
 			key,
-			timeMs: record.minTimeMs + (time - record.minTimeMs) * 0.9,
+			timeMs: time,
 			frameAt: timed,
 			doctrine,
 			geography,
 		})
 		warmMs.push(performance.now() - warm)
-		builds.l1 += store.builds.l1.size
-		builds.l2 += store.builds.l2.size
-		builds.l3 += store.builds.l3.size
-		for (const stub of store.stubs.values()) {
-			if (!stub.life) continue
-			const life = stub.life
-			if (stub.kind !== "ruler" && life.deathMs <= time) {
-				const age = (life.deathMs - stub.birthMs) / YEAR
-				if (age >= 16) adultDeaths.push(age)
-			}
-			const reached = (years: number) =>
-				life.deathMs >= stub.birthMs + years * YEAR &&
-				stub.birthMs + years * YEAR <= time
-			if (reached(60)) {
-				aliveAt60++
-				if (
-					HEALTH.at({ life, timeMs: stub.birthMs + 60 * YEAR }).levels.some(
-						(level) => level >= 0,
-					)
+	}
+	const generationMs = performance.now() - generationStart
+	builds.l1 = store.builds.l1.size
+	builds.l2 = store.builds.l2.size
+	builds.l3 = store.builds.l3.size
+	for (const stub of store.stubs.values()) {
+		if (!stub.life) continue
+		const life = stub.life
+		if (stub.kind !== "ruler" && life.deathMs <= time) {
+			const age = (life.deathMs - stub.birthMs) / YEAR
+			if (age >= 16) adultDeaths.push(age)
+		}
+		const reached = (years: number) =>
+			life.deathMs >= stub.birthMs + years * YEAR &&
+			stub.birthMs + years * YEAR <= time
+		if (reached(60)) {
+			aliveAt60++
+			if (
+				HEALTH.at({ life, timeMs: stub.birthMs + 60 * YEAR }).levels.some(
+					(level) => level >= 0,
 				)
-					conditionsAt60++
-			}
-			if (reached(70)) {
-				aliveAt70++
-				if (HEALTH.incapable({ life, timeMs: stub.birthMs + 70 * YEAR }))
-					incapableAt70++
+			)
+				conditionsAt60++
+		}
+		if (reached(70)) {
+			aliveAt70++
+			if (HEALTH.incapable({ life, timeMs: stub.birthMs + 70 * YEAR }))
+				incapableAt70++
+		}
+	}
+	for (const chain of store.chains.values()) {
+		const first = chain.marriages[0]
+		if (first) {
+			const husband = store.stubs.get(first.husband)
+			const wife = store.stubs.get(first.wife)
+			if (husband && wife) {
+				firstMarriage.male.push((first.startMs - husband.birthMs) / YEAR)
+				firstMarriage.female.push((first.startMs - wife.birthMs) / YEAR)
 			}
 		}
-		for (const chain of store.chains.values()) {
-			const first = chain.marriages[0]
-			if (first) {
-				const husband = store.stubs.get(first.husband)
-				const wife = store.stubs.get(first.wife)
-				if (husband && wife) {
-					firstMarriage.male.push((first.startMs - husband.birthMs) / YEAR)
-					firstMarriage.female.push((first.startMs - wife.birthMs) / YEAR)
-				}
-			}
-			for (const marriage of chain.marriages) {
-				const wife = store.stubs.get(marriage.wife)
-				if (!wife) continue
-				const wifeLife = wife.life
+		for (const marriage of chain.marriages) {
+			const wife = store.stubs.get(marriage.wife)
+			if (!wife) continue
+			const wifeLife = wife.life
+			if (
+				marriage.startMs <= wife.birthMs + 30 * YEAR &&
+				marriage.endMs >= wife.birthMs + 45 * YEAR
+			)
+				completed.push(marriage.children.length)
+			if (marriage.startMs <= wife.birthMs + 30 * YEAR) {
+				wives++
 				if (
-					marriage.startMs <= wife.birthMs + 30 * YEAR &&
-					marriage.endMs >= wife.birthMs + 45 * YEAR
-				)
-					completed.push(marriage.children.length)
-				if (marriage.startMs <= wife.birthMs + 30 * YEAR) {
-					wives++
-					if (
-						wifeLife &&
-						marriage.pregnancies.some(
-							(pregnancy) => pregnancy.outcome === "childbirth death",
-						)
+					wifeLife &&
+					marriage.pregnancies.some(
+						(pregnancy) => pregnancy.outcome === "childbirth death",
 					)
-						childbirthWives++
-				}
+				)
+					childbirthWives++
 			}
 		}
 	}
 	const pages = Math.max(1, picked.length)
-	const generationStore = freshStore(state, shared)
-	const generationStart = performance.now()
-	let generated = 0
-	for (const key of keys.slice(0, GENERATION_CAP)) {
-		PERSON_QUERY.page({
-			store: generationStore,
-			key,
-			timeMs: time,
-			frameAt,
-			doctrine,
-			geography,
-		})
-		generated++
-	}
-	const generationMs = performance.now() - generationStart
 	const tiers: Record<string, number> = {}
 	let free = 0
 	let kin = 0
-	for (const marriage of new Set(generationStore.marriages.values())) {
+	for (const marriage of new Set(store.marriages.values())) {
 		if (marriage.kind !== "free") continue
 		free++
 		if (marriage.kinship) kin++
 		for (const spouseKey of [marriage.husband, marriage.wife]) {
-			const stub = generationStore.stubs.get(spouseKey)
+			const stub = store.stubs.get(spouseKey)
 			if (stub?.kind !== "spouse") continue
 			const tier = NOBILITY.tierOf({
-				store: generationStore,
+				store,
 				stub,
 				timeMs: marriage.startMs,
 			})
@@ -216,7 +219,7 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 		}
 	}
 	let claimed = 0
-	for (const list of generationStore.claims.values()) claimed += list.length
+	for (const list of store.claims.values()) claimed += list.length
 	const spouses = Object.values(tiers).reduce((sum, count) => sum + count, 0)
 	const placed: Record<string, number> = {}
 	const first: Record<string, number> = {}
@@ -226,8 +229,8 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 			first[placement.requested] = (first[placement.requested] ?? 0) + 1
 	}
 	return {
-		rulers: keys.length,
-		persons: generationStore.stubs.size,
+		rulers: facts.length,
+		persons: store.stubs.size,
 		relabelShare: Object.fromEntries(
 			Object.entries(placed).map(([relation, count]) => [
 				relation,
@@ -259,7 +262,7 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 		warmMs: ms(warmMs),
 		pageMs: ms(pageMs),
 		generationMs,
-		generatedPages: generated,
+		generatedPages: picked.length,
 		nobility: {
 			freeMarriages: free,
 			claimedShare: claimed / Math.max(1, free),
@@ -270,8 +273,8 @@ function of({ state, doctrine, geography }: PeopleReportParams): PeopleReport {
 					count / Math.max(1, spouses),
 				]),
 			),
-			seededRealms: generationStore.seeded.size,
-			holdersCreated: generationStore.holders.size,
+			seededRealms: store.seeded.size,
+			holdersCreated: store.holders.size,
 			kinMarriageShare: kin / Math.max(1, free),
 		},
 	}

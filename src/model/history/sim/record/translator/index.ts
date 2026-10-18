@@ -1,5 +1,9 @@
 import { DATE } from "@/model/history/earth/date"
 import { RECORD_ROUTES } from "@/model/history/record/routes"
+import type {
+	HeirPlanChange,
+	PlannedChild,
+} from "@/model/history/record/rulers/types"
 import { PROVINCE_STATUS } from "@/model/history/record/status"
 import type {
 	BattleContribution,
@@ -16,12 +20,14 @@ import type {
 } from "@/model/history/sim/engine/events/battle/kind/types"
 import type { SiegeBeatData } from "@/model/history/sim/engine/events/siege/types"
 import { RELATION_CODE } from "@/model/history/sim/engine/fields/relation-code"
+import type { JournalPlannedChild } from "@/model/history/sim/engine/journal/types"
 import type { BattleOutcome } from "@/model/history/sim/engine/military/types"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { WAR_GOAL } from "@/model/history/sim/engine/state/war-goal"
 import { COLORING } from "@/model/history/sim/nations/coloring"
 import type {
 	ActiveTie,
+	AppendHeirPlansParams,
 	AppendJournalParams,
 	AppendNoteParams,
 	ApplyTransactionParams,
@@ -1068,6 +1074,63 @@ function createTranslator({
 	return translator
 }
 
+function appendHeirPlans({
+	translator,
+	transaction,
+	timeMs,
+}: AppendHeirPlansParams): void {
+	const roots = new Set<number>()
+	for (const change of transaction.heirCreations) roots.add(change.root)
+	for (const change of transaction.heirFulfillments) roots.add(change.root)
+	for (const change of transaction.heirCancellations) roots.add(change.root)
+	const date = (birthTimeMs: number) =>
+		DATE.timeMsToEu4Date(recordTime(birthTimeMs))
+	const child = (planned: JournalPlannedChild): PlannedChild => ({
+		ref: planned.ref,
+		birthDate: date(planned.birthTimeMs),
+	})
+	for (const root of roots) {
+		const log =
+			translator.state.record.events.nationEvents[
+				identityForRoot({ translator, root, timeMs })
+			]
+		const payload: HeirPlanChange = {
+			transactionId: transaction.transactionId,
+			created: transaction.heirCreations
+				.filter((change) => change.root === root)
+				.map((change) => ({
+					owner: change.owner,
+					birthDate: date(change.birthTimeMs),
+					relation: change.relation,
+					heir: change.heir ? child(change.heir) : null,
+					juniors: change.juniors.map(child),
+				})),
+			fulfilled: transaction.heirFulfillments
+				.filter((change) => change.root === root)
+				.map((change) => ({
+					rulerId: change.rulerId,
+					relation: change.relation,
+					house: change.house,
+					claim: change.claim,
+					successor: change.successor,
+					birthDate: date(change.birthTimeMs),
+				})),
+			cancelled: transaction.heirCancellations
+				.filter((change) => change.root === root)
+				.map((change) => ({
+					rulerId: change.rulerId,
+					reason: change.reason,
+				})),
+		}
+		log.events.push({
+			timeMs,
+			kind: "heirPlanChange",
+			payload: { ...payload },
+			comment: null,
+		})
+	}
+}
+
 function applyTransaction({
 	translator,
 	transaction,
@@ -1270,6 +1333,7 @@ function applyTransaction({
 			comment: null,
 		})
 	}
+	appendHeirPlans({ translator, transaction, timeMs })
 	if (transaction.roads)
 		RECORD_ROUTES.apply({
 			log: record.events.roads,

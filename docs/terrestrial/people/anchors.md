@@ -17,6 +17,8 @@ Each `rulerChange` payload carries `kin`: the relation of the new ruler to the r
 
 A union copy keeps its `rulerId` and its earliest event's `kin`. The pretender takes the late ruler from the succession note of the same transaction. The daughter's line is read from house `other`.
 
+The legacy relation `son` means a direct child of either sex; the culture's gender system still determines sex. Procedural history now reserves direct-child identities and births through [early heir plans](../politics/rulers-and-dynasties.md#heir-plan-record-contract). That contract provides creations, completed fulfillments and cancellations across all nation logs, ordered atomically by transaction id. Cancellation ends a succession promise, without deleting a child or asserting a death. Planned records expose no future deaths. This change provides record facts; adapting people consumers to reserve these children is separate work.
+
 ## Ruler facts
 
 `ANCHORS.build` makes one pass over the record. Per ruler it keeps birth, sex, name, dynasty, reigns and:
@@ -30,7 +32,7 @@ A union copy keeps its `rulerId` and its earliest event's `kin`. The pretender t
 
 The ruler-only model draws ages independently, so some recorded relations are impossible. A parent is possible when the mother is 16–45 and alive at the birth and the father is 16 or older and alive at conception (birth minus 280 days). Each relation is placed at the first possible step:
 
-- `son`: son of the late ruler → younger brother → nephew → unknown parents;
+- `son`: direct child of the late ruler → younger sibling → nephew or niece → unknown parents;
 - `daughterLine`: grandson through a daughter of the late ruler → nephew through a sister → unknown parents;
 - `nearKin`: brother if the birth gap is at most 20 years, else nephew; an older successor is an uncle;
 - `kinsman`: cousin → uncle → unknown parents.

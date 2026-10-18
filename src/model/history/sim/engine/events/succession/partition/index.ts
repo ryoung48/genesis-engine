@@ -77,7 +77,7 @@ function allocate({
 	return shares
 }
 
-function release({ run, share }: ReleaseParams): void {
+function release({ run, share, junior }: ReleaseParams): void {
 	const { state, realm, rng } = run
 	const { seat } = share
 	if (
@@ -99,7 +99,7 @@ function release({ run, share }: ReleaseParams): void {
 		state,
 		p: seat,
 		supporters: share.supporters,
-		ruler: { dynasty: run.late.dynasty, age: "inherited", claim: HEIR_CLAIM },
+		ruler: { kind: "existing", ruler: junior, claim: HEIR_CLAIM },
 		rng,
 	})
 	run.released.push({
@@ -257,7 +257,7 @@ function divide({
 		!STATE.isSovereign({ state, p: realm })
 	)
 		return 0
-	if (juniors === 0)
+	if (juniors.length === 0)
 		return skip({ state, realm, late, primary, reason: "no junior heir" })
 	const run: PartitionRun = {
 		state,
@@ -269,13 +269,13 @@ function divide({
 		unseated: [],
 		joined: [],
 	}
-	for (const share of allocate({
+	for (const [index, share] of allocate({
 		state,
 		realm,
 		unseated: run.unseated,
-		count: juniors,
-	}))
-		release({ run, share })
+		count: juniors.length,
+	}).entries())
+		release({ run, share, junior: juniors[index] })
 	if (run.released.length === 0)
 		return skip({ state, realm, late, primary, reason: "no free seat" })
 	resolveCutOff(run)

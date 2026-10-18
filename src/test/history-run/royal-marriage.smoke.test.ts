@@ -130,7 +130,8 @@ it("reads the saved partners after the tie map is cleared to press a minor's for
 		house: "same",
 		claim: 3,
 		age: "inherited",
-		juniors: 0,
+		primary: null,
+		juniors: [],
 		interregnum: false,
 		daughterLine: false,
 	})

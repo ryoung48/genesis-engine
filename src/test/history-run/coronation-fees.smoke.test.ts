@@ -652,6 +652,7 @@ it("skips realms without a ruler or under a regent and flags them all the same",
 
 	const { state, rng, pay, elevate, roll } = realm(TWO_DUCHIES)
 	child(state, rng)
+	roll.mockClear()
 	pay(1000)
 	elevate()
 	expect(roll).not.toHaveBeenCalled()
@@ -1053,7 +1054,8 @@ it("crowns at succession and at enthronement without founding", () => {
 		house: "same",
 		claim: 3,
 		age: "fresh",
-		juniors: 0,
+		primary: null,
+		juniors: [],
 		interregnum: false,
 		daughterLine: false,
 	})

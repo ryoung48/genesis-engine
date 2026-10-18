@@ -1,12 +1,13 @@
 import type { RulerRef } from "@/model/history/record/rulers/types"
+import type { Ruler } from "@/model/history/sim/engine/state/rulers/types"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface DivideParams {
 	state: HistoryState
 	realm: number
-	// Junior heirs the realm divides among; 0 for none.
-	juniors: number
+	// Planned junior heirs the realm divides among, oldest first.
+	juniors: Ruler[]
 	late: RulerRef
 	primary: RulerRef
 	rng: SharedRng
@@ -71,6 +72,7 @@ export interface AllocateParams {
 export interface ReleaseParams {
 	run: PartitionRun
 	share: PartitionShare
+	junior: Ruler
 }
 
 export interface PieceParams {

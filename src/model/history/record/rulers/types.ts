@@ -17,6 +17,46 @@ export interface RulerRef {
 
 export type RulerRelation = "son" | "daughterLine" | "nearKin" | "kinsman"
 
+export type PlanRelation = RulerRelation | "none"
+
+export type RulerHouse = "same" | "other" | "new"
+
+export interface PlannedChild {
+	ref: RulerRef
+	birthDate: string
+}
+
+export interface HeirPlanRecord {
+	owner: RulerRef
+	birthDate: string
+	relation: PlanRelation
+	heir: PlannedChild | null
+	juniors: PlannedChild[]
+}
+
+export interface HeirPlanFulfillment {
+	rulerId: number
+	relation: PlanRelation
+	house: RulerHouse
+	claim: number
+	successor: RulerRef
+	birthDate: string
+}
+
+export type HeirPlanCancelReason = "unused" | "unreachable"
+
+export interface HeirPlanCancellation {
+	rulerId: number
+	reason: HeirPlanCancelReason
+}
+
+export interface HeirPlanChange {
+	transactionId: number
+	created: HeirPlanRecord[]
+	fulfilled: HeirPlanFulfillment[]
+	cancelled: HeirPlanCancellation[]
+}
+
 export interface RulerKin {
 	relation: RulerRelation
 	late: RulerRef

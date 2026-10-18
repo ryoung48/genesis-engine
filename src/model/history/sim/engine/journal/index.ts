@@ -1,15 +1,25 @@
-import type { RulerKin, RulerRef } from "@/model/history/record/rulers/types"
+import { RULER_RELATIONS } from "@/model/history/record/rulers/relations"
+import type {
+	RulerHouse,
+	RulerKin,
+	RulerRef,
+} from "@/model/history/record/rulers/types"
 import type {
 	CensusDeployment,
 	CensusEconomy,
 } from "@/model/history/record/types"
 import type {
 	FlushJournalParams,
+	JournalPlannedChild,
 	JournalRelationChange,
 	JournalTransaction,
 	KinsParams,
 	PendingJournal,
+	PlannedChildParams,
 	RecordCoalitionParams,
+	RecordHeirCancelledParams,
+	RecordHeirFulfilledParams,
+	RecordHeirPlanParams,
 	RecordProvinceChangeParams,
 	RecordProvinceParams,
 	RecordRelationParams,
@@ -31,6 +41,9 @@ function pending(): PendingJournal {
 		statuses: new Map(),
 		coalitions: [],
 		rulers: new Set(),
+		heirCreations: [],
+		heirFulfillments: [],
+		heirCancellations: [],
 	}
 }
 
@@ -68,6 +81,63 @@ function status(params: RecordProvinceParams): void {
 
 function ruler({ state, p }: RecordRulerParams): void {
 	state.pendingJournal.rulers.add(p)
+}
+
+function plannedChild({
+	state,
+	child,
+}: PlannedChildParams): JournalPlannedChild {
+	return {
+		ref: STATE_RULERS.ref({ state, ruler: child }),
+		birthTimeMs: child.birthMs,
+	}
+}
+
+function heirPlan({
+	state,
+	root,
+	owner,
+	relation,
+	primary,
+	juniors,
+}: RecordHeirPlanParams): void {
+	state.pendingJournal.heirCreations.push({
+		root,
+		owner: STATE_RULERS.ref({ state, ruler: owner }),
+		birthTimeMs: owner.birthMs,
+		relation,
+		heir: primary ? plannedChild({ state, child: primary }) : null,
+		juniors: juniors.map((child) => plannedChild({ state, child })),
+	})
+}
+
+function heirFulfilled({
+	state,
+	root,
+	rulerId,
+	relation,
+	house,
+	claim,
+	successor,
+}: RecordHeirFulfilledParams): void {
+	state.pendingJournal.heirFulfillments.push({
+		root,
+		rulerId,
+		relation,
+		house,
+		claim,
+		successor: STATE_RULERS.ref({ state, ruler: successor }),
+		birthTimeMs: successor.birthMs,
+	})
+}
+
+function heirCancelled({
+	state,
+	root,
+	rulerId,
+	reason,
+}: RecordHeirCancelledParams): void {
+	state.pendingJournal.heirCancellations.push({ root, rulerId, reason })
 }
 
 function relation({ state, x, y, before, after }: RecordRelationParams): void {
@@ -132,18 +202,19 @@ function setKin(kins: Map<number, RulerKin>, heir: RulerRef, kin: RulerKin) {
 function successionKin({ data }: EngineNote): RulerKin | null {
 	const late = STATE_RULERS.readNote({ data, prefix: "dying" })
 	const heir = STATE_RULERS.readNote({ data, prefix: "heir" })
-	const claim = data.claim as number
 	if (data.system === "election")
 		return data.house === "same" ? { relation: "kinsman", late } : null
 	if (data.system !== "single_heir") return null
-	if (data.house === "other")
+	const relation = RULER_RELATIONS.ofOutcome({
+		house: data.house as RulerHouse,
+		claim: data.claim as number,
+	})
+	if (relation === "none") return null
+	if (relation === "daughterLine")
 		return heir.dynasty >= 0 && heir.dynasty !== late.dynasty
-			? { relation: "daughterLine", late }
+			? { relation, late }
 			: null
-	if (data.house !== "same") return null
-	if (claim === 3) return { relation: "son", late }
-	if (claim === 2) return { relation: "nearKin", late }
-	return { relation: "kinsman", late }
+	return { relation, late }
 }
 
 function kinsOf({ notes }: KinsParams): Map<number, RulerKin> {
@@ -199,6 +270,9 @@ function flush({
 		pendingJournal.statuses.size === 0 &&
 		pendingJournal.coalitions.length === 0 &&
 		pendingJournal.rulers.size === 0 &&
+		pendingJournal.heirCreations.length === 0 &&
+		pendingJournal.heirFulfillments.length === 0 &&
+		pendingJournal.heirCancellations.length === 0 &&
 		!pendingJournal.roads
 	)
 		return
@@ -282,12 +356,16 @@ function flush({
 		occupations.length > 0 ||
 		statuses.length > 0 ||
 		pendingJournal.coalitions.length > 0 ||
+		pendingJournal.heirCreations.length > 0 ||
+		pendingJournal.heirFulfillments.length > 0 ||
+		pendingJournal.heirCancellations.length > 0 ||
 		rulers.length > 0 ||
 		notes.length > 0 ||
 		keyframe ||
 		pendingJournal.roads
 	) {
 		state.journal.push({
+			transactionId: state.journalSequence++,
 			timeMs: state.time,
 			parents,
 			relations,
@@ -295,6 +373,9 @@ function flush({
 			statuses,
 			coalitions: pendingJournal.coalitions,
 			rulers,
+			heirCreations: pendingJournal.heirCreations,
+			heirFulfillments: pendingJournal.heirFulfillments,
+			heirCancellations: pendingJournal.heirCancellations,
 			notes,
 			census: keyframe,
 			roads: pendingJournal.roads,
@@ -307,6 +388,9 @@ function flush({
 	pendingJournal.statuses.clear()
 	pendingJournal.coalitions = []
 	pendingJournal.rulers.clear()
+	pendingJournal.heirCreations = []
+	pendingJournal.heirFulfillments = []
+	pendingJournal.heirCancellations = []
 }
 
 function transferList(journal: JournalTransaction[]): Transferable[] {
@@ -343,6 +427,9 @@ export const JOURNAL = {
 	occupation,
 	status,
 	ruler,
+	heirPlan,
+	heirFulfilled,
+	heirCancelled,
 	relation,
 	coalition,
 	flush,

@@ -1,5 +1,12 @@
-import type { RulerKin, RulerRef } from "@/model/history/record/rulers/types"
+import type {
+	HeirPlanCancelReason,
+	PlanRelation,
+	RulerHouse,
+	RulerKin,
+	RulerRef,
+} from "@/model/history/record/rulers/types"
 import type { CensusKeyframe } from "@/model/history/record/types"
+import type { Ruler } from "@/model/history/sim/engine/state/rulers/types"
 import type {
 	EngineNote,
 	HistoryState,
@@ -41,6 +48,36 @@ interface JournalRuler extends RulerRef {
 	kin: RulerKin | null
 }
 
+export interface JournalPlannedChild {
+	ref: RulerRef
+	birthTimeMs: number
+}
+
+export interface JournalHeirCreation {
+	root: number
+	owner: RulerRef
+	birthTimeMs: number
+	relation: PlanRelation
+	heir: JournalPlannedChild | null
+	juniors: JournalPlannedChild[]
+}
+
+export interface JournalHeirFulfillment {
+	root: number
+	rulerId: number
+	relation: PlanRelation
+	house: RulerHouse
+	claim: number
+	successor: RulerRef
+	birthTimeMs: number
+}
+
+export interface JournalHeirCancellation {
+	root: number
+	rulerId: number
+	reason: HeirPlanCancelReason
+}
+
 export interface RoadJournal {
 	added: SerializedRoutes
 	released: SerializedRoutes
@@ -48,6 +85,8 @@ export interface RoadJournal {
 
 export interface JournalTransaction {
 	roads: RoadJournal | null
+	// Orders transactions that share a timestamp, across every carrier realm.
+	transactionId: number
 	timeMs: number
 	parents: JournalProvinceChange[]
 	relations: JournalRelationChange[]
@@ -55,6 +94,9 @@ export interface JournalTransaction {
 	statuses: JournalProvinceChange[]
 	coalitions: JournalCoalition[]
 	rulers: JournalRuler[]
+	heirCreations: JournalHeirCreation[]
+	heirFulfillments: JournalHeirFulfillment[]
+	heirCancellations: JournalHeirCancellation[]
 	notes: EngineNote[]
 	census: CensusKeyframe | null
 }
@@ -68,6 +110,9 @@ export interface PendingJournal {
 	coalitions: JournalCoalition[]
 	// Realms whose ruler columns were written since the last flush.
 	rulers: Set<number>
+	heirCreations: JournalHeirCreation[]
+	heirFulfillments: JournalHeirFulfillment[]
+	heirCancellations: JournalHeirCancellation[]
 }
 
 export interface KinsParams {
@@ -112,4 +157,35 @@ export interface FlushJournalParams {
 	noteCursor: number
 	census: boolean
 	initial: boolean
+}
+
+export interface RecordHeirPlanParams {
+	state: HistoryState
+	root: number
+	owner: Ruler
+	relation: PlanRelation
+	primary: Ruler | null
+	juniors: Ruler[]
+}
+
+export interface RecordHeirFulfilledParams {
+	state: HistoryState
+	root: number
+	rulerId: number
+	relation: PlanRelation
+	house: RulerHouse
+	claim: number
+	successor: Ruler
+}
+
+export interface RecordHeirCancelledParams {
+	state: HistoryState
+	root: number
+	rulerId: number
+	reason: HeirPlanCancelReason
+}
+
+export interface PlannedChildParams {
+	state: HistoryState
+	child: Ruler
 }

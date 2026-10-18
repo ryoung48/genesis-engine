@@ -9,6 +9,7 @@ import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
+import type { HeirOutcome } from "@/model/history/sim/engine/state/rulers/heirs/types"
 import { STATE_TITLES } from "@/model/history/sim/engine/state/titles"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { GENDER_SYSTEM } from "@/model/history/sim/gender-system"
@@ -103,7 +104,8 @@ function die(fx: Fixture): void {
 		house: "new",
 		claim: 0,
 		age: "fresh",
-		juniors: 0,
+		primary: null,
+		juniors: [],
 		interregnum: true,
 		daughterLine: false,
 	}
@@ -149,15 +151,41 @@ function topTierTitles({
 it("fires only for a heirless hereditary realm with a district", () => {
 	const fx = fixture({ districts: 2, government: "feudal_monarchy" })
 	const { state, realm } = fx
-	const roll = (values: number[]) =>
-		SUCCESSION_SYSTEMS.choose({ state, realm, rng: sequence(values) })
-	expect(roll([0.995, 0.1])).toMatchObject({
+	const heirless = {
+		chance: 0.01,
+		house: "new",
+		claim: 0,
+		daughterLine: false,
+		son: false,
+	} as const
+	const direct = {
+		chance: 0.75,
+		house: "same",
+		claim: 3,
+		daughterLine: false,
+		son: false,
+	} as const
+	const roll = (outcome: HeirOutcome, values: number[]) =>
+		SUCCESSION_SYSTEMS.choose({
+			state,
+			realm,
+			plan: {
+				root: realm,
+				owner: STATE_RULERS.read({ state, p: realm }),
+				outcome,
+				primary: null,
+				juniors: [],
+				fulfilled: false,
+			},
+			rng: sequence(values),
+		})
+	expect(roll(heirless, [0.1])).toMatchObject({
 		house: "new",
 		claim: 0,
 		interregnum: true,
 	})
-	expect(roll([0.995, 0.9]).interregnum).toBe(false)
-	expect(roll([0.5, 0.1])).toMatchObject({
+	expect(roll(heirless, [0.9]).interregnum).toBe(false)
+	expect(roll(direct, [0.1])).toMatchObject({
 		house: "same",
 		claim: 3,
 		interregnum: false,
@@ -165,13 +193,13 @@ it("fires only for a heirless hereditary realm with a district", () => {
 	for (const government of ["elective_monarchy", "theocracy"] as const) {
 		const original = state.governmentType[realm]
 		state.governmentType[realm] = GOVERNMENT.getGovIdx()[government]
-		expect(roll([0.995, 0.1, 0.1]).interregnum).toBe(false)
+		expect(roll(heirless, [0.1, 0.1]).interregnum).toBe(false)
 		state.governmentType[realm] = original
 	}
 	const children = STATE.getChildren({ state, p: realm })
 	const flags = children.map((seat) => state.districtSeat[seat])
 	for (const seat of children) state.districtSeat[seat] = 0
-	expect(roll([0.995, 0.1]).interregnum).toBe(false)
+	expect(roll(heirless, [0.1]).interregnum).toBe(false)
 	children.forEach((seat, index) => {
 		state.districtSeat[seat] = flags[index]
 	})

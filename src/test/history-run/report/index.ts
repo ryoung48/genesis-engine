@@ -10,15 +10,10 @@ import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { SIM_RECORD } from "@/model/history/sim/record"
-import { RELIGION_DOCTRINE } from "@/model/people/doctrine"
-import { NOBILITY } from "@/model/people/nobility"
-import { ERAS } from "@/model/society/eras"
 import { ROUTE_TUNING } from "@/model/society/infrastructure/trade/routing/route-tuning"
-import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
-import { HISTORY_OUTPUT } from "@/test/history-run/output"
 import { CORONATION_REPORT } from "@/test/history-run/report/coronation"
 import { DIPLOMATIC_TIES_REPORT } from "@/test/history-run/report/diplomatic-ties"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
@@ -35,10 +30,9 @@ import { BATTLEFIELD_REPORT } from "@/test/history-run/report/military/battlefie
 import { REBEL_LOGISTICS_REPORT } from "@/test/history-run/report/military/rebel-logistics"
 import { RECRUITMENT_REPORT } from "@/test/history-run/report/military/recruitment"
 import { NAVY_REPORT } from "@/test/history-run/report/navy"
+import type { HistoryReportOptions } from "@/test/history-run/report/options/types"
 import { PARTITION_REPORT } from "@/test/history-run/report/partition"
 import type { PartitionReport } from "@/test/history-run/report/partition/types"
-import { PEOPLE_REPORT } from "@/test/history-run/report/people"
-import type { PeopleReport } from "@/test/history-run/report/people/types"
 import { RELIGION_REPORT } from "@/test/history-run/report/religion"
 import { ROADS_REPORT } from "@/test/history-run/report/roads"
 import { RULERS_REPORT } from "@/test/history-run/report/rulers"
@@ -46,49 +40,15 @@ import { SETTLEMENT_CHANGE_REPORT } from "@/test/history-run/report/settlement-c
 import type {
 	CenturyReport,
 	EngineParams,
-	HistoryReportOptions,
 	RegencyReport,
 	RegencyReportParams,
-	ReportEnvParams,
 	RunSeedParams,
 	UnionJuniorsParams,
 	WindowParams,
 } from "@/test/history-run/report/types"
 import { HISTORY_VALIDATION } from "@/test/history-run/report/validation"
-import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
 const LARGEST = 20
-
-const DEFAULT_SEEDS = [14963991]
-
-const DEFAULT_YEARS = 300
-
-// Year 1800 quantile from the original 933-year history baseline.
-const DEFAULT_LATE_KNOWLEDGE_BAND = 2.366478320318625
-
-function optionsFromEnv({ env, log }: ReportEnvParams): HistoryReportOptions {
-	const era = (env.HISTORY_ERA ?? "lateMedieval") as SocietyEra
-	if (!ERAS.eraOrder.includes(era))
-		throw new Error(`HISTORY_ERA must be one of ${ERAS.eraOrder.join(", ")}`)
-	const years = Number(env.HISTORY_YEARS ?? DEFAULT_YEARS)
-	return {
-		lateKnowledgeBand: Number(
-			env.HISTORY_LATE_KNOWLEDGE ?? DEFAULT_LATE_KNOWLEDGE_BAND,
-		),
-		seeds: env.HISTORY_SEEDS
-			? env.HISTORY_SEEDS.split(",").map(Number)
-			: DEFAULT_SEEDS,
-		era,
-		numPoints: Number(env.HISTORY_POINTS ?? DEFAULT_WORLD_PARAMS.numPoints),
-		years,
-		startYear: env.HISTORY_START ? Number(env.HISTORY_START) : undefined,
-		reachKm: Number(env.HISTORY_REACH_KM ?? 400),
-		cohesionStep: Number(env.HISTORY_COHESION_STEP ?? 0.1),
-		outPath: HISTORY_OUTPUT.path({ env, years, kind: "report" }),
-		baselinePath: env.HISTORY_BASELINE ?? null,
-		log,
-	}
-}
 
 function sovereigns({ engine }: EngineParams): number[] {
 	const list: number[] = []
@@ -313,9 +273,7 @@ function runSeed({
 		partitionTotal: null as PartitionReport | null,
 		governmentTotal: null as GovernmentReport | null,
 		districtsTotal: null as DistrictReport | null,
-		people: null as PeopleReport | null,
 		recordMs: 0,
-		peopleMs: 0,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
@@ -325,7 +283,13 @@ function runSeed({
 		startTimeMs: engine.time,
 	})
 	const translator = SIM_RECORD.createTranslator({ state: recordState, world })
-	SIM_RECORD.consumeJournal({ translator, transactions: engine.journal })
+	SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
+	HISTORY_VALIDATION.heirs({
+		engine,
+		tracker: validation,
+		record: recordState.record,
+	})
+	engine.journal.length = 0
 	const persist = () => {
 		if (!options.outPath) return
 		mkdirSync(dirname(options.outPath), { recursive: true })
@@ -405,7 +369,12 @@ function runSeed({
 				}),
 			)
 			const recordStart = performance.now()
-			SIM_RECORD.consumeJournal({ translator, transactions: engine.journal })
+			SIM_RECORD.appendJournal({ translator, transactions: engine.journal })
+			HISTORY_VALIDATION.heirs({
+				engine,
+				tracker: validation,
+				record: recordState.record,
+			})
 			engine.journal.length = 0
 			const recordElapsed = performance.now() - recordStart
 			diagnostics.recordMs += recordElapsed
@@ -516,6 +485,7 @@ function runSeed({
 				...RULERS_REPORT.window({
 					engine,
 					tracker: rulers,
+					serializedPlanBytes: validation.serializedPlanBytes,
 					from,
 					to: year,
 				}),
@@ -568,30 +538,7 @@ function runSeed({
 					from: start,
 					to: year,
 				})
-			if (year === start + options.years) {
-				const peopleStart = performance.now()
-				diagnostics.people = PEOPLE_REPORT.of({
-					state: recordState,
-					geography:
-						generated.provinces && generated.locations
-							? NOBILITY.geographyOf({
-									provinceAdjOffset: generated.provinces.adjOffset,
-									provinceAdjList: generated.provinces.adjList,
-									locationProvince: generated.locations.locationProvince,
-									locationCount: generated.locations.count,
-								})
-							: null,
-					doctrine:
-						generated.religionTypes && generated.religionFamilies
-							? RELIGION_DOCTRINE.of({
-									religionTypes: generated.religionTypes,
-									religionFamilies: generated.religionFamilies,
-									seed,
-								})
-							: null,
-				})
-				diagnostics.peopleMs = performance.now() - peopleStart
-			}
+
 			diagnostics.completed = year === start + options.years
 			diagnostics.siegeLifecycle = BATTLEFIELD_REPORT.lifecycle({ engine })
 			persist()
@@ -677,4 +624,4 @@ function run(options: HistoryReportOptions): Map<number, CenturyReport[]> {
 	return results
 }
 
-export const HISTORY_REPORT = { optionsFromEnv, run }
+export const HISTORY_REPORT = { run }

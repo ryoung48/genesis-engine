@@ -46,3 +46,13 @@ An outsider spouse's parents (`P(S,f|m)`) are created when the spouse is clicked
 Procedural records only: Earth-import rulers have no `rulerId`. Excluded: diseases and wounds (health changes come only from old age and the five ageing conditions), the six base attributes, Inbred and Pure-blooded, households, residence, interaction memories, district holders, patricians and lovers. Marriages between relatives follow the consanguinity doctrine but only among siblings, half-siblings, uncles/aunts with nieces/nephews, and first cousins. Standing for the child cap is fixed (ruler 3, other house member 3, commoner 1) rather than read from title tiers. A pregnancy's earlier-children count covers the marriage, not the mother's whole life. Culture at birth is read from the frame at the birth year rounded down to 25 years. Regency start and end have no timeline row.
 
 Details: [nobility and the spouse pool](nobility.md), [religion and doctrines](religion-and-doctrines.md), [anchors](anchors.md), [health and ageing](health-and-ageing.md), [families](families.md), [character and opinion](character-and-opinion.md).
+
+## Reporting
+
+`pnpm report:people` generates a procedural world with its initial conditions and rulers, then measures people queries at that starting date. It does not advance the simulation. `HISTORY_YEARS` is ignored. World generation uses `HISTORY_SEEDS`, `HISTORY_ERA`, `HISTORY_POINTS`, `HISTORY_START`, `HISTORY_REACH_KM` and `HISTORY_COHESION_STEP`.
+
+The report opens 12 distinct rulers selected deterministically across sex and minor/adult cohorts in the initialized world, and revisits each page to measure cached access. This small navigation workload replaces the former 200-page timing sample and 3,000-page bulk sweep. `PEOPLE_PAGES` can reduce the sample to between 1 and 12 pages. Generated relatives share one store, and its counts and family/health observations are descriptive of this sample, not population estimates. World preparation and people query time are recorded separately.
+
+`PEOPLE_OUT` chooses an exact output file; otherwise reports go to `stats/people/<UTC timestamp>-<PEOPLE_TITLE or people-report>/0.json`. `HISTORY_OUT` does not redirect people output.
+
+`pnpm report:history` performs no people generation and has no `diagnostics.people` or `peopleMs` fields. A people-report failure cannot prevent a separate history report from completing. The standalone people benchmark is excluded from `pnpm test:history`.

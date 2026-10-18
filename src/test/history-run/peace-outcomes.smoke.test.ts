@@ -199,7 +199,8 @@ it("joins supporting districts and recalculates both armies independently", () =
 		house: "same",
 		claim: 3,
 		age: "inherited",
-		juniors: 0,
+		primary: null,
+		juniors: [],
 		interregnum: false,
 		daughterLine: true,
 	})

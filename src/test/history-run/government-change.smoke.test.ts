@@ -353,7 +353,8 @@ it("settles the elective succession before the absolute accession", () => {
 			house: "new",
 			claim: 2,
 			age: "elected",
-			juniors: 0,
+			primary: null,
+			juniors: [],
 			interregnum: false,
 			daughterLine: false,
 		}
