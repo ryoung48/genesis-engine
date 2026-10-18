@@ -1,122 +1,130 @@
-import type { AnchoredCouple } from "@/model/people/anchors/types"
-import type { PersonKey } from "@/model/people/keys/types"
-import type { PeopleStore } from "@/model/people/store/types"
+import type {
+	Cast,
+	Kinship,
+	Marriage,
+	MarriageKind,
+	Person,
+	PersonId,
+	Reservation,
+} from "@/model/people/cast/types"
 
-export type PregnancyOutcome =
-	| "birth"
-	| "miscarriage"
-	| "stillbirth"
-	| "childbirth death"
-
-export interface Pregnancy {
-	conceptionMs: number
-	dueMs: number
-	outcome: PregnancyOutcome
-	twins: boolean
-	anchored: boolean
-	children: PersonKey[]
+export interface ExtendParams {
+	cast: Cast
+	id: PersonId
+	untilMs: number
 }
 
-export interface MarriageChild {
-	key: PersonKey
-	birthMs: number
-	anchored: boolean
-}
-
-export type Kinship = "sibling" | "half-sibling" | "uncle-niece" | "cousin"
-
-export type MarriageKind = "anchored" | "free" | "tie" | "plural" | "concubine"
-
-export interface Marriage {
-	key: string
-	husband: PersonKey
-	wife: PersonKey
+export interface OpenParams {
+	cast: Cast
+	husband: PersonId
+	wife: PersonId
 	startMs: number
-	endMs: number
 	kind: MarriageKind
-	// [JUSTIFICATION] Only a marriage promised in childhood has a betrothal date.
 	betrothedMs: number | null
-	// [JUSTIFICATION] Only a marriage between relatives has a kinship.
 	kinship: Kinship | null
-	pregnancies: Pregnancy[]
-	children: MarriageChild[]
+	revealedLater: boolean
 }
 
-export interface Chain {
-	owner: PersonKey
-	marriages: Marriage[]
-}
-
-export interface ChainParams {
-	store: PeopleStore
-	key: PersonKey
-}
-
-export interface AnchoredMarriageParams {
-	store: PeopleStore
-	couple: AnchoredCouple
-}
-
-export interface ByKeyParams {
-	store: PeopleStore
-	key: string
-}
-
-export interface FreeSearchParams {
-	store: PeopleStore
-	owner: PersonKey
-	anchored: Marriage[]
+export interface SearchParams {
+	cast: Cast
+	person: Person
+	untilMs: number
 }
 
 export interface AttemptParams {
-	store: PeopleStore
-	owner: PersonKey
-	anchored: Marriage[]
-	cursor: number
+	cast: Cast
+	owner: Person
+	cursorMs: number
 	salt: number
-	ordinal: number
+	forced: Reservation | null
+	kind: MarriageKind
 }
 
-export interface FinishParams {
-	store: PeopleStore
-	husband: PersonKey
-	wife: PersonKey
+export interface CoverParams {
+	cast: Cast
+	person: Person
+	fromMs: number
+	toMs: number
+}
+
+export interface SettleParams {
+	cast: Cast
+	owner: Person
 	startMs: number
-	endMs: number
-	kinship: Kinship | null
-	kind: MarriageKind
+	spouseBirthMs: number
 	betrothedMs: number | null
+	kind: MarriageKind
+	exclusive: boolean
+	forced: boolean
 }
 
 export interface WedParams {
-	store: PeopleStore
-	owner: PersonKey
-	anchored: Marriage[]
-	ordinal: number
-	spouseBirthMs: number
+	cast: Cast
+	owner: Person
+	spouse: Person
 	startMs: number
 	betrothedMs: number | null
 	kind: MarriageKind
 	exclusive: boolean
-	spouse: ConjuredSpouse
 }
 
-export type SettleSpouseParams = Omit<WedParams, "spouse">
-
-export interface ConjuredSpouse {
-	tier: number
-	seat: number
-	dynasty: number
-	dynastyOrigin: number
+export interface KinshipParams {
+	cast: Cast
+	first: Person
+	second: Person
 }
 
-export interface ClaimParams {
-	store: PeopleStore
-	owner: PersonKey
-	anchored: Marriage[]
-	candidate: PersonKey
+export type KinshipResult = Kinship | "ancestor" | null
+
+export interface BarParams {
+	cast: Cast
+	person: Person
+}
+
+export interface AllowedParams {
+	cast: Cast
+	first: Person
+	second: Person
+}
+
+export interface BusyParams {
+	cast: Cast
+	person: Person
 	startMs: number
-	kind: MarriageKind
-	betrothedMs: number | null
-	exclusive: boolean
+	endMs: number
+}
+
+export interface DueParams {
+	cast: Cast
+	person: Person
+	cursorMs: number
+}
+
+export interface PlaceParams {
+	cast: Cast
+	marriage: Marriage
+	reservation: Reservation
+}
+
+export interface MarkUnfitParams {
+	cast: Cast
+	person: Person
+	untilMs: number
+}
+
+export interface StandingParams {
+	cast: Cast
+	person: Person
+	timeMs: number
+}
+
+export interface TypeAtParams {
+	cast: Cast
+	person: Person
+	timeMs: number
+}
+
+export interface ExclusiveParams {
+	person: Person
+	marriage: Marriage
 }

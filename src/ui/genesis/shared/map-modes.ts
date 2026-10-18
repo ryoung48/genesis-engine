@@ -60,7 +60,7 @@ export type SocietyMapOption =
 
 export type MapModePrimary = "geography" | "society"
 
-export type ElevationSubMode = "colored" | "grayscale" | "alt"
+export type ElevationSubMode = "colored" | "grayscale" | "alt" | "red"
 
 export const ELEVATION_SUB_MODE_COLOR_MODE: Record<
 	ElevationSubMode,
@@ -69,6 +69,7 @@ export const ELEVATION_SUB_MODE_COLOR_MODE: Record<
 	colored: "terrain",
 	grayscale: "landHeightmap",
 	alt: "terrainAlt",
+	red: "terrainRed",
 }
 
 export function isElevationColorMode(colorMode: ColorMode): boolean {

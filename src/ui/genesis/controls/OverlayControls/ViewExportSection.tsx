@@ -122,7 +122,7 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 			<div className="space-y-2 border-t border-white/10 pt-2">
 				<div className="flex items-center justify-between gap-3">
 					<label className="text-[11px] font-medium text-slate-300">
-						Export PNG
+						Export
 					</label>
 					<button
 						type="button"
@@ -139,10 +139,15 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 					<div className="space-y-2">
 						<div className="flex items-center justify-between gap-3">
 							<label className="text-[11px] font-medium text-slate-300">
-								Resolution
+								Output
 							</label>
 							<SegmentedControl
 								options={[
+									{
+										value: "webgcm",
+										label: "WebGCM",
+										ariaLabel: "WebGCM terrain",
+									},
 									{
 										value: "4096",
 										label: "4k",
@@ -171,25 +176,37 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 								buttonClassName="px-1.5"
 							/>
 						</div>
-						<div className="space-y-1.5">
-							<LabeledSlider
-								label="Export Longitude"
-								value={`${exportCenterLongitude.toFixed(0)}°`}
-								min={-180}
-								max={180}
-								step={1}
-								numericValue={exportCenterLongitude}
-								onChange={setExportCenterLongitude}
-							/>
-						</div>
+						{exportWidthPreset !== "webgcm" && (
+							<div className="space-y-1.5">
+								<LabeledSlider
+									label="Export Longitude"
+									value={`${exportCenterLongitude.toFixed(0)}°`}
+									min={-180}
+									max={180}
+									step={1}
+									numericValue={exportCenterLongitude}
+									onChange={setExportCenterLongitude}
+								/>
+							</div>
+						)}
 						<Button
 							tone="overlay"
 							onClick={onExport}
 							disabled={exportDisabled}
 							className="w-full border-white/10 bg-white/8 px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal text-slate-100 hover:bg-white/12"
 						>
-							{exportBusy ? `Exporting ${exportWidthPreset}w` : "Export PNG"}
+							{exportBusy
+								? "Exporting…"
+								: exportWidthPreset === "webgcm"
+									? "Export WebGCM terrain"
+									: "Export PNG"}
 						</Button>
+						{exportWidthPreset === "webgcm" && (
+							<p className="text-[10px] text-slate-400">
+								Load the terrain file in WebGCM. Planet settings and climate are
+								not exported.
+							</p>
+						)}
 						{exportProgress && (
 							<div className="space-y-1">
 								<div className="flex items-center justify-between gap-2 text-[10px] text-slate-400">

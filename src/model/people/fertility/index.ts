@@ -1,17 +1,19 @@
+import { CAST } from "@/model/people/cast"
+import type { Person, Pregnancy } from "@/model/people/cast/types"
 import { CHARACTER } from "@/model/people/character"
 import type {
+	AdvanceParams,
+	CanBearParams,
 	CapParams,
 	ChildLineageParams,
-	CoupleParams,
 	Lineage,
+	LivingParams,
+	PlanBirthParams,
 	SmoothWeightParams,
 } from "@/model/people/fertility/types"
 import { HEALTH } from "@/model/people/health"
 import { AGEING } from "@/model/people/health/ageing"
 import type { Life } from "@/model/people/health/types"
-import { PERSON_KEY } from "@/model/people/keys"
-import type { Pregnancy } from "@/model/people/marriage/types"
-import { PERSON_STUB } from "@/model/people/stub"
 import { HASH } from "@/model/shared/random/hash"
 import { TIME } from "@/model/shared/time"
 
@@ -20,6 +22,7 @@ const DAY = TIME.constants.dayMS
 const MONTH = YEAR / 12
 const GESTATION = 280 * DAY
 const REST = 0.25 * YEAR
+const TWIN_WINDOW = 3 * DAY
 const ADULT = 16
 const LAST_BIRTH = 45
 const MONTHLY_SCALE = 0.0475
@@ -71,29 +74,25 @@ function smoothWeight({ health, earlier }: SmoothWeightParams): number {
 	return weight
 }
 
-function isRuler(key: string): boolean {
-	return key.startsWith("R(")
-}
-
-function lineageOf(stub: ChildLineageParams["husband"]): Lineage {
+function lineageOf(person: ChildLineageParams["husband"]): Lineage {
 	return {
-		house: stub.house,
-		dynasty: stub.dynasty,
-		dynastyOrigin: stub.dynastyOrigin,
-		home: stub.home,
+		house: person.house,
+		dynasty: person.dynasty,
+		dynastyOrigin: person.dynastyOrigin,
+		home: person.home,
 	}
 }
 
 function childLineage({ husband, wife }: ChildLineageParams): Lineage {
 	if (husband.house && wife.house)
-		return lineageOf(isRuler(wife.key) ? wife : husband)
+		return lineageOf(wife.ruler.kind === "ruler" ? wife : husband)
 	if (husband.house) return lineageOf(husband)
 	if (wife.house) return lineageOf(wife)
 	return { house: false, dynasty: -1, dynastyOrigin: -1, home: husband.home }
 }
 
 function capOf({ husband, wife, seed }: CapParams): number {
-	const ruler = isRuler(husband.key) || isRuler(wife.key)
+	const ruler = husband.ruler.kind === "ruler" || wife.ruler.kind === "ruler"
 	const standing = ruler
 		? STANDING.ruler
 		: husband.house || wife.house
@@ -114,77 +113,138 @@ function conditionFertility(life: Life, timeMs: number): number {
 	)
 }
 
-function couple({ store, marriage, anchored }: CoupleParams): void {
-	const husband = PERSON_STUB.of({ store, key: marriage.husband })
-	const wife = PERSON_STUB.of({ store, key: marriage.wife })
-	const husbandLife = PERSON_STUB.life({ store, stub: husband })
-	const wifeLife = PERSON_STUB.life({ store, stub: wife })
-	const husbandCharacter = PERSON_STUB.character({ store, stub: husband })
-	const wifeCharacter = PERSON_STUB.character({ store, stub: wife })
-	const seed = PERSON_KEY.seed({
-		worldSeed: store.worldSeed,
-		key: marriage.key,
-	})
-	const ruler = isRuler(husband.key) || isRuler(wife.key)
+function living({ cast, marriage, timeMs }: LivingParams): number {
+	let count = 0
+	for (const child of marriage.children) {
+		if (child.birthMs > timeMs) continue
+		const life = CAST.lifeOf({ cast, person: cast.persons[child.id] })
+		if (HEALTH.alive({ life, timeMs })) count++
+	}
+	return count
+}
+
+function blackedOut(
+	marriage: PlanBirthParams["marriage"],
+	time: number,
+): boolean {
+	for (const pregnancy of marriage.pregnancies) {
+		if (
+			time > pregnancy.conceptionMs - GESTATION - REST &&
+			time < pregnancy.dueMs + REST
+		)
+			return true
+	}
+	return false
+}
+
+function planned(
+	cast: CanBearParams["cast"],
+	husband: Person,
+	wife: Person,
+	dueMs: number,
+): boolean {
+	for (const parent of [husband, wife]) {
+		if (parent.ruler.kind !== "ruler") continue
+		const block = cast.blocks.get(parent.ruler.ref.rulerId)
+		if (block && dueMs > block.fromMs && dueMs < block.untilMs) return true
+	}
+	return false
+}
+
+function twinOf(pregnancy: Pregnancy, birthMs: number): boolean {
+	return (
+		pregnancy.outcome === "birth" &&
+		pregnancy.children.length === 1 &&
+		Math.abs(pregnancy.dueMs - birthMs) < TWIN_WINDOW
+	)
+}
+
+function canBear({ cast, marriage, birthMs }: CanBearParams): boolean {
+	const husband = cast.persons[marriage.husband]
+	const wife = cast.persons[marriage.wife]
+	const conceptionMs = birthMs - GESTATION
+	if (conceptionMs < marriage.startMs) return false
+	if (CAST.endOf({ cast, marriage }) < birthMs) return false
+	if (CAST.lifeOf({ cast, person: husband }).deathMs <= conceptionMs)
+		return false
+	if (CAST.lifeOf({ cast, person: wife }).deathMs < birthMs) return false
+	const motherAge = (conceptionMs - wife.birthMs) / YEAR
+	const fatherAge = (conceptionMs - husband.birthMs) / YEAR
+	if (motherAge < ADULT || fatherAge < ADULT) return false
+	if (motherAge + GESTATION / YEAR >= LAST_BIRTH) return false
+	for (const pregnancy of marriage.pregnancies) {
+		if (twinOf(pregnancy, birthMs)) continue
+		if (
+			conceptionMs < pregnancy.dueMs + REST &&
+			pregnancy.conceptionMs < birthMs + REST
+		)
+			return false
+	}
+	return true
+}
+
+function planBirth({ marriage, child, birthMs }: PlanBirthParams): void {
+	const twin = marriage.pregnancies.find((entry) => twinOf(entry, birthMs))
+	if (twin) {
+		twin.twins = true
+		twin.children.push(child)
+		marriage.children.push({ id: child, birthMs, planned: true })
+		marriage.children.sort((a, b) => a.birthMs - b.birthMs)
+		return
+	}
+	const pregnancy: Pregnancy = {
+		conceptionMs: birthMs - GESTATION,
+		dueMs: birthMs,
+		outcome: "birth",
+		twins: false,
+		planned: true,
+		children: [child],
+	}
+	marriage.pregnancies.push(pregnancy)
+	marriage.pregnancies.sort((a, b) => a.conceptionMs - b.conceptionMs)
+	marriage.children.push({ id: child, birthMs, planned: true })
+	marriage.children.sort((a, b) => a.birthMs - b.birthMs)
+}
+
+function run({ cast, marriage, untilMs }: AdvanceParams): void {
+	const cursor = marriage.cursor
+	if (cursor.closed) return
+	const husband = cast.persons[marriage.husband]
+	const wife = cast.persons[marriage.wife]
+	const husbandLife = CAST.lifeOf({ cast, person: husband })
+	const wifeLife = CAST.lifeOf({ cast, person: wife })
+	const seed = CAST.marriageSeed({ cast, id: marriage.id })
+	const ruler = husband.ruler.kind === "ruler" || wife.ruler.kind === "ruler"
 	const limit = capOf({ husband, wife, seed })
 	const lineage = childLineage({ husband, wife })
-	const husbandFertility = baseFertility(PERSON_STUB.seedOf(store, husband.key))
-	const wifeFertility = baseFertility(PERSON_STUB.seedOf(store, wife.key))
-	const husbandMultiplier = CHARACTER.fertilityMultiplier(husbandCharacter)
-	const wifeMultiplier = CHARACTER.fertilityMultiplier(wifeCharacter)
-	marriage.pregnancies = []
-	marriage.children = []
-	for (const child of [...anchored].sort((a, b) => a.birthMs - b.birthMs)) {
-		marriage.pregnancies.push({
-			conceptionMs: child.birthMs - GESTATION,
-			dueMs: child.birthMs,
-			outcome: "birth",
-			twins: false,
-			anchored: true,
-			children: [child.key],
-		})
-		marriage.children.push({
-			key: child.key,
-			birthMs: child.birthMs,
-			anchored: true,
-		})
-	}
-	const blackouts = marriage.pregnancies.map(
-		(pregnancy) =>
-			[
-				pregnancy.conceptionMs - GESTATION - REST,
-				pregnancy.dueMs + REST,
-			] as const,
-	)
-	const until = Math.min(marriage.endMs, store.horizonMs)
-	let nextFree = marriage.startMs
-	let freeIndex = 0
-	const livingAt = (time: number): number => {
-		let living = 0
-		for (const child of marriage.children) {
-			if (child.birthMs > time) continue
-			const stub = PERSON_STUB.of({ store, key: child.key })
-			if (
-				HEALTH.alive({ life: PERSON_STUB.life({ store, stub }), timeMs: time })
-			)
-				living++
-		}
-		return living
-	}
-	for (let month = 0; ; month++) {
+	const husbandFertility = baseFertility(CAST.seedOf({ cast, id: husband.id }))
+	const wifeFertility = baseFertility(CAST.seedOf({ cast, id: wife.id }))
+	const husbandMultiplier = CHARACTER.fertilityMultiplier(husband.character)
+	const wifeMultiplier = CHARACTER.fertilityMultiplier(wife.character)
+	const until = Math.min(CAST.endOf({ cast, marriage }), untilMs)
+	for (let month = cursor.month; ; month++) {
 		const time = marriage.startMs + month * MONTH
-		if (time >= until) break
+		if (time >= until) {
+			cursor.month = month
+			return
+		}
 		const motherAge = (time - wife.birthMs) / YEAR
 		const fatherAge = (time - husband.birthMs) / YEAR
-		if (motherAge + GESTATION / YEAR >= LAST_BIRTH) break
-		if (motherAge < ADULT || fatherAge < ADULT || time < nextFree) continue
+		if (motherAge + GESTATION / YEAR >= LAST_BIRTH) {
+			cursor.closed = true
+			return
+		}
+		if (motherAge < ADULT || fatherAge < ADULT || time < cursor.nextFreeMs)
+			continue
 		if (
 			HEALTH.incapable({ life: wifeLife, timeMs: time }) ||
 			HEALTH.incapable({ life: husbandLife, timeMs: time })
-		)
-			break
-		if (blackouts.some(([from, to]) => time > from && time < to)) continue
-		if (livingAt(time) >= limit) continue
+		) {
+			cursor.closed = true
+			return
+		}
+		if (blackedOut(marriage, time)) continue
+		if (living({ cast, marriage, timeMs: time }) >= limit) continue
 		const earlier = marriage.children.filter(
 			(child) => child.birthMs <= time,
 		).length
@@ -228,18 +288,30 @@ function couple({ store, marriage, anchored }: CoupleParams): void {
 		}
 		let due = time + duration
 		if (wifeLife.deathMs < due) {
-			if (outcome !== "birth" || wifeLife.deathMs < time + VIABLE) break
+			if (outcome !== "birth" || wifeLife.deathMs < time + VIABLE) {
+				cursor.closed = true
+				return
+			}
 			outcome = "childbirth death"
 			due = wifeLife.deathMs
 		}
-		if (due > store.horizonMs) break
-		nextFree = due + REST
+		if (due > cast.horizonMs) {
+			cursor.month = month
+			return
+		}
+		if (
+			outcome !== "miscarriage" &&
+			outcome !== "stillbirth" &&
+			planned(cast, husband, wife, due)
+		)
+			continue
+		cursor.nextFreeMs = due + REST
 		const pregnancy: Pregnancy = {
 			conceptionMs: time,
 			dueMs: due,
 			outcome,
 			twins: false,
-			anchored: false,
+			planned: false,
 			children: [],
 		}
 		marriage.pregnancies.push(pregnancy)
@@ -248,38 +320,56 @@ function couple({ store, marriage, anchored }: CoupleParams): void {
 		pregnancy.twins =
 			HASH.unit({ seed, channel: CHANNEL.twins, salt: month }) < twinChance
 		for (let baby = 0; baby < (pregnancy.twins ? 2 : 1); baby++) {
-			const key = PERSON_KEY.child({
-				marriage: marriage.key,
-				index: freeIndex++,
-			})
 			const survives =
 				outcome === "birth" ||
 				HASH.unit({ seed, channel: CHANNEL.survival, salt: month * 2 + baby }) <
 					MOTHER_SURVIVES
-			PERSON_STUB.make({
-				store,
-				key,
-				kind: "child",
-				sex:
-					HASH.unit({ seed, channel: CHANNEL.sex, salt: month * 2 + baby }) <
-					GIRL_CHANCE
-						? 1
-						: 0,
-				birthMs: due,
-				lineage,
-				noParentCharacter: false,
-				tier: -2,
-				seat: -2,
-				survivesMs: due,
-				fixedDeathMs: survives ? null : due,
-				forcedCause: survives ? null : "Died in childbirth",
+			const child = CAST.add({
+				cast,
+				spec: {
+					sex:
+						HASH.unit({ seed, channel: CHANNEL.sex, salt: month * 2 + baby }) <
+						GIRL_CHANCE
+							? 1
+							: 0,
+					birthMs: due,
+					lineage,
+					ruler: { kind: "none" },
+					tier: -2,
+					seat: -2,
+					parents: { kind: "couple", marriage: marriage.id },
+					inputs: {
+						survivesMs: due,
+						fixedDeathMs: survives ? null : due,
+						forcedCause: survives ? null : "Died in childbirth",
+					},
+				},
 			})
-			pregnancy.children.push(key)
-			marriage.children.push({ key, birthMs: due, anchored: false })
+			pregnancy.children.push(child.id)
+			marriage.children.push({ id: child.id, birthMs: due, planned: false })
 		}
 	}
+}
+
+function sortMarriage(marriage: PlanBirthParams["marriage"]): void {
 	marriage.pregnancies.sort((a, b) => a.conceptionMs - b.conceptionMs)
 	marriage.children.sort((a, b) => a.birthMs - b.birthMs)
 }
 
-export const FERTILITY = { couple, smoothWeight }
+function advance(params: AdvanceParams): void {
+	run(params)
+	sortMarriage(params.marriage)
+}
+
+export const FERTILITY = {
+	advance,
+	canBear,
+	planBirth,
+	sortMarriage,
+	childLineage,
+	smoothWeight,
+	gestationMs: GESTATION,
+	restMs: REST,
+	lastBirth: LAST_BIRTH,
+	adult: ADULT,
+}

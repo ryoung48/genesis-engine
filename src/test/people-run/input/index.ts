@@ -1,3 +1,4 @@
+import { HISTORY } from "@/model/history/record"
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { JOURNAL } from "@/model/history/sim/engine/journal"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
@@ -30,38 +31,51 @@ function build({ history, years, fresh }: PeopleInputParams): PeopleInput {
 	consume()
 	const rng = HISTORY_RNG.createHistoryRng(history.seed + 99999)
 	const start = engine.time
-	for (let year = 1; year <= years; year++) {
-		SIM_ENGINE.simulateUntil({
-			state: engine,
-			targetTimeMs: start + STATE.deltaYear(year),
-			rng,
-			validate: false,
-		})
-		consume()
+	let simulated = 0
+	const advance = (more: number) => {
+		for (let step = 0; step < more; step++) {
+			simulated++
+			SIM_ENGINE.simulateUntil({
+				state: engine,
+				targetTimeMs: start + STATE.deltaYear(simulated),
+				rng,
+				validate: false,
+			})
+			consume()
+		}
 	}
+	advance(years)
+	const geography =
+		world.provinces && world.locations
+			? NOBILITY.geographyOf({
+					provinceAdjOffset: world.provinces.adjOffset,
+					provinceAdjList: world.provinces.adjList,
+					locationProvince: world.locations.locationProvince,
+					locationCount: world.locations.count,
+				})
+			: null
+	const doctrine =
+		world.religionTypes && world.religionFamilies
+			? RELIGION_DOCTRINE.of({
+					religionTypes: world.religionTypes,
+					religionFamilies: world.religionFamilies,
+					seed: history.seed,
+				})
+			: null
 	return {
 		state,
 		seed: history.seed,
 		startYear: Math.round(start / STATE.yearMs),
 		generationMs,
 		historyMs: engineMs + performance.now() - started,
-		geography:
-			world.provinces && world.locations
-				? NOBILITY.geographyOf({
-						provinceAdjOffset: world.provinces.adjOffset,
-						provinceAdjList: world.provinces.adjList,
-						locationProvince: world.locations.locationProvince,
-						locationCount: world.locations.count,
-					})
-				: null,
-		doctrine:
-			world.religionTypes && world.religionFamilies
-				? RELIGION_DOCTRINE.of({
-						religionTypes: world.religionTypes,
-						religionFamilies: world.religionFamilies,
-						seed: history.seed,
-					})
-				: null,
+		geography,
+		doctrine,
+		context: {
+			geography,
+			doctrine,
+			frameAt: (timeMs) => HISTORY.frameAt({ state, timeMs }),
+		},
+		advance,
 	}
 }
 

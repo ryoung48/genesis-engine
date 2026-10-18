@@ -1,6 +1,6 @@
-# Nobility, seats and the spouse pool
+# Nobility, seats and the spouse search
 
-Spouses are no longer all lowborn. Each person has a **rank** and a **residence**, and a marriage draws its partner from the nobles of the realm and its neighbours, with a conjured person only as a fallback. This layer is generated lazily and is **history-dependent**: the pool grows as pages and families are generated, so two sessions that open pages in different orders can produce different spouses. Facts already shown never change.
+Spouses are not all lowborn. Each person has a **rank** and a **residence**, and a marriage draws its partner from people already in the [cast](overview.md#the-cast) before anyone is created. The cast grows with what is clicked and its neighbourhood, so two sessions that open pages in different orders can produce different spouses. Facts already shown never change.
 
 ## Ranks and seats
 
@@ -13,25 +13,20 @@ Spouses are no longer all lowborn. Each person has a **rank** and a **residence*
 | Emperor | 4 | an empire title |
 | Hegemon | 5 | a hegemony title |
 
-A ruler's rank is the top title his realm holds at the time, plus one, and at least Count. Everyone else's rank inherits from their parents. Lowborn is -1. A house member with no title is a courtier. A person's residence is a province: a ruler lives at the capital, children at the parent's seat, a married-in spouse at the owner's seat, and a relative with no title at court (the capital).
-
-## Seeding
-
-When a marriage search needs a spouse at time t, the owner's realm is seeded for the 25-year bucket of t, together with every realm bordering it (one ring):
-
-- Seats are the realm's held duchy-and-higher titles below its top title (except the capital's), and every province except the capital. Barons are not seeded; a baron spouse is conjured in the owner's province.
-- The ruler's adult siblings and uncles or aunts each roll for a title (sibling 0.6, uncle or aunt 0.35). A winner takes the highest vacant seat of rank at most Duke. A loser stays at court. Sons and cousins are not assigned titles.
-- Every other seat has a holder created on demand, a shallow stub: sex (85% male), age 36 to 62, a dynasty and the seat as home. With chance 0.4 in the king's realm and 0.25 in a neighbour the dynasty is the realm ruler's (a cadet branch with no tracked relation); otherwise it is a stable hash of the seat. Holders' parents and children are generated like anyone's.
+A ruler's rank is the top title his realm holds at the time, plus one, and at least Count. Everyone else's rank inherits from their parents; people created without parents (conjured spouses, outsider parents, seat holders) carry an explicit rank. Lowborn is -1. A house member with no title is a courtier. A person's residence is a province: a ruler lives at the capital, children at the parent's seat, a married-in spouse at the owner's seat, and a relative with no title at court (the capital).
 
 ## Choosing a spouse
 
-1. With chance 0.05 (baron owner) down to 0.005 (emperor) the spouse is lowborn.
-2. Otherwise a target rank is drawn. Weights by how far below the owner it is: same 1, one below 0.5, two 0.2, three 0.08, further 0.03; one above 0.3. Rank is capped at one above the owner's.
-3. Up to six seats of that rank, taken in a hashed order, are tried. A seat's holder must have an unmarried house child of the right sex, of age (a wife aged 16 to 44 and up to 10 years younger or 2 older; a husband 18 to 69 and up to 2 years younger or 10 older), alive, unrelated within two generations of ancestors, whose chain has not been built and who has not been claimed. That child is claimed: a marriage is created with the real person and recorded.
-4. If none qualifies, a person of that rank is conjured with the seat's dynasty and the owner's home. They have no parents in the tree.
+When a marriage search at time t needs a spouse for a seeker:
 
-Claimed people only: a chain already built is never changed, so no earlier page contradicts a later one. The claim also applies to betrothals and to plural wives and concubines.
+1. With chance 0.05 (baron seeker) down to 0.005 (emperor) the spouse is lowborn and is conjured.
+2. Otherwise a target rank is drawn. Weights by how far below the seeker it is: same 1, one below 0.5, two 0.2, three 0.08, further 0.03; one above 0.3. Rank is capped at one above the seeker's.
+3. **Cast candidates.** The cast's people of that rank and the opposite sex who live in the seeker's realm or a bordering realm (25-year frame), are alive, unmarried and unbetrothed, are of age (a wife 16 to 44 and up to 10 years younger or 2 older; a husband 18 to 69 and up to 2 years younger or 10 older), whose marriages are not generated past t, and who pass both partners' [consanguinity bars](families.md#marriages-between-relatives). Among the candidates the one with the lowest hash over the seeker's seed is taken. Relatives are never created by this check.
+4. **Seat families.** If none qualifies and the rank is a count or higher, up to three seats of that rank in the region whose family is not in the cast yet are tried in hashed order. A seat's holder is created with sex (85% male), age 36 to 62 and the seat as home; with chance 0.4 in the seeker's realm and 0.25 in a neighbour the dynasty is the realm ruler's (a cadet branch with no tracked relation), otherwise a stable hash of the seat. The holder's marriages and children are generated up to t, and the family stays in the cast, so later searches reuse it. A family is created only outside another family's generation.
+5. **Conjured.** Barons, and every search made while a seat family is being generated, conjure a noble of the target rank with the seat's dynasty and the seeker's home; the person has no parents in the tree. Otherwise a lowborn outsider is conjured with chance `min(0.5, max(0, age − 25) / 20)` and the seeker tries again next year, as the old market did (its reports calibrated first marriages to about 18 for women and 20 for men).
+
+The same search serves betrothals and plural wives and concubines.
 
 ## Limits
 
-The cost is bounded by a recursion depth of 2: a spouse search made while a holder's own chain is being built does not seed further. Constants are chosen for plausibility (the lowborn share is measured in the report's `nobility` section), not fitted.
+Family generation is bounded by a depth of 1: a spouse search made while a holder's family is being built does not create further families. Constants are chosen for plausibility, not fitted; the report's `castSpouseShare`, `seatFamilies` and `nobility` section measure the result.

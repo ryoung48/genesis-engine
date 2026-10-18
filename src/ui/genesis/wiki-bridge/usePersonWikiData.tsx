@@ -1,17 +1,18 @@
 import { useMemo } from "react"
 import { DATE } from "@/model/history/earth/date"
-import { HISTORY } from "@/model/history/record"
-import { RELIGION_DOCTRINE } from "@/model/people/doctrine"
-import { NOBILITY } from "@/model/people/nobility"
 import type { OpinionBreakdown } from "@/model/people/opinion/types"
 import { PERSON_QUERY } from "@/model/people/query"
-import type { FamilyMember, PersonPage } from "@/model/people/query/types"
-import { PEOPLE_STORE } from "@/model/people/store"
+import type {
+	FamilyGroup,
+	FamilyMember,
+	PersonPage,
+} from "@/model/people/query/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { EntityChip } from "@/ui/components/composites/EntityChip"
 import { GraveStoneIcon } from "@/ui/components/primitives/icons/GraveStoneIcon"
 import { HeartIcon } from "@/ui/components/primitives/icons/HeartIcon"
 import { uiPalette } from "@/ui/components/tokens"
+import { PEOPLE_CONTEXT } from "@/ui/genesis/shared/people-context"
 import {
 	PERSON_TRAITS,
 	type PersonTraitView,
@@ -197,7 +198,7 @@ function timelineOf(page: PersonPage): WikiTimelineEvent[] {
 			id: `person:${page.key}:${index}`,
 			date: row.timeMs / MS_PER_DAY,
 			type: row.type,
-			description: row.text,
+			description: row.revealed ? `${row.text} (revealed later)` : row.text,
 			people: row.people.map((person) => ({
 				id: person.key,
 				name: person.name,
@@ -225,6 +226,16 @@ function traitViews(page: PersonPage): {
 	}
 }
 
+export function groupsOf(
+	groups: FamilyGroup[],
+	select: (key: string) => void,
+): PersonWikiGroup[] {
+	return groups.map((group) => ({
+		label: group.label,
+		chips: group.members.map((member) => chipOf(member, select)),
+	}))
+}
+
 export function usePersonWikiData(
 	input: PersonWikiDataInput,
 ): PersonWikiData | null {
@@ -236,13 +247,16 @@ export function usePersonWikiData(
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
 	} = input
+	const state = history.state
+	const timeMs = history.selectedTimeMs
+	const context = useMemo(
+		() => (state ? PEOPLE_CONTEXT.of({ world, state }) : null),
+		[world, state],
+	)
 	return useMemo<PersonWikiData | null>(() => {
-		if (selectedWikiPerson === null || !history.state) return null
-		const state = history.state
+		if (selectedWikiPerson === null || !state || !context) return null
 		const record = state.record
 		if (record.origin !== "procedural") return null
-		const store = PEOPLE_STORE.of({ record })
-		const timeMs = history.selectedTimeMs
 		const base = {
 			planetTitle: planetName,
 			currentDate: timeMs / MS_PER_DAY,
@@ -252,36 +266,21 @@ export function usePersonWikiData(
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * MS_PER_DAY),
 		}
-		const page = PERSON_QUERY.page({
-			store,
+		const outcome = PERSON_QUERY.page({
+			record,
+			context,
 			key: selectedWikiPerson,
 			timeMs,
-			frameAt: (at) => HISTORY.frameAt({ state, timeMs: at }),
-			geography:
-				world?.provinces && world.locations
-					? NOBILITY.geographyOf({
-							provinceAdjOffset: world.provinces.adjOffset,
-							provinceAdjList: world.provinces.adjList,
-							locationProvince: world.locations.locationProvince,
-							locationCount: world.locations.count,
-						})
-					: null,
-			doctrine:
-				world?.religionTypes && world.religionFamilies
-					? RELIGION_DOCTRINE.of({
-							religionTypes: world.religionTypes,
-							religionFamilies: world.religionFamilies,
-							seed: world.params.seed,
-						})
-					: null,
 		})
-		if (!page) {
-			const header = PERSON_QUERY.header({ store, key: selectedWikiPerson })
+		if (!outcome) return null
+		if (outcome.kind !== "page") {
+			const header = outcome.header
+			const born = DATE.formatHistoryDays(header.birthMs / MS_PER_DAY)
 			return {
 				...base,
 				name: header.name,
-				title: "Not yet born",
-				life: `Born ${DATE.formatHistoryDays(header.birthMs / MS_PER_DAY)}`,
+				title: outcome.kind === "pending" ? "Pending" : "Not yet born",
+				life: `Born ${born}`,
 				stats: [],
 				personality: [],
 				physical: [],
@@ -290,9 +289,13 @@ export function usePersonWikiData(
 				timelineEvents: [],
 				dateRangeStart: header.birthMs / MS_PER_DAY,
 				dateRangeEnd: record.maxTimeMs / MS_PER_DAY,
-				emptyMessage: `Born ${DATE.formatHistoryDays(header.birthMs / MS_PER_DAY)}, after the selected date`,
+				emptyMessage:
+					outcome.kind === "pending"
+						? "Waiting for the history to reach this date"
+						: `Born ${born}, after the selected date`,
 			}
 		}
+		const page = outcome.page
 		const colors: PartitionColors = {
 			culture: (key) => {
 				const color = key ? history.cultureColorById?.get(key) : null
@@ -303,13 +306,8 @@ export function usePersonWikiData(
 				return color ? rgbToCss(color) : uiPalette.person.noHouse
 			},
 		}
+		const groups = groupsOf(page.groups, setSelectedWikiPerson)
 		const timelineEvents = timelineOf(page)
-		const groups: PersonWikiGroup[] = page.groups.map((group) => ({
-			label: group.label,
-			chips: group.members.map((member) =>
-				chipOf(member, setSelectedWikiPerson),
-			),
-		}))
 		return {
 			...base,
 			name: page.house ? `${page.name} ${page.house}` : page.name,
@@ -319,7 +317,7 @@ export function usePersonWikiData(
 				page,
 				colors,
 				selectReligion: world?.religionTypes ? setSelectedWikiReligionId : null,
-				residence: history.provinceMeta[page.seatProvince]?.name ?? null,
+				residence: history.provinceMeta?.[page.seatProvince]?.name ?? null,
 			}),
 			...traitViews(page),
 			groups,
@@ -332,8 +330,9 @@ export function usePersonWikiData(
 		selectedWikiPerson,
 		world,
 		setSelectedWikiReligionId,
-		history.state,
-		history.selectedTimeMs,
+		state,
+		context,
+		timeMs,
 		history.setSelectedTimeMs,
 		history.cultureColorById,
 		history.religionColorById,

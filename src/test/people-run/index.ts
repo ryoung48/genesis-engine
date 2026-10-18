@@ -55,8 +55,7 @@ function run({
 		const started = performance.now()
 		const people = PEOPLE_REPORT.of({
 			state: input.state,
-			doctrine: input.doctrine,
-			geography: input.geography,
+			context: input.context,
 			sampleSize,
 		})
 		result.seeds[seed] = {

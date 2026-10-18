@@ -14,7 +14,7 @@ import type {
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
-import type { PersonKey } from "@/model/people/keys/types"
+import type { PersonKey } from "@/model/people/query/types"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {

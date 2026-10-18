@@ -1245,15 +1245,16 @@ export function computeRegionColors(
 	const basinLandR = 0xa7 / 255,
 		basinLandG = 0xdf / 255,
 		basinLandB = 0xd2 / 255
+	const waterColorMode = colorMode === "terrainRed" ? "terrainRed" : "terrain"
 	for (let r = 0; r < N; r++) {
 		const km = world.elevation_km[r]
 		if (isLakeRegion(r)) {
-			const [cr, cg, cb] = getColor(Math.min(0, km), "terrain")
+			const [cr, cg, cb] = getColor(Math.min(0, km), waterColorMode)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
 		} else if (isOceanRegion(r)) {
-			const [cr, cg, cb] = getColor(Math.min(0, km), "terrain")
+			const [cr, cg, cb] = getColor(Math.min(0, km), waterColorMode)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

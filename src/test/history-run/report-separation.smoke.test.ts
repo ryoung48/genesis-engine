@@ -95,7 +95,7 @@ it("queries initialized procedural people without advancing history or sweeping 
 		expect(page.mock.calls.length).toBe(keys.size * 2)
 		expect(Object.values(result.seeds)[0].people.generatedPages).toBe(keys.size)
 		for (const [params] of page.mock.calls) {
-			expect(params.store.record.maxTimeMs).toBe(params.store.record.minTimeMs)
+			expect(params.record.maxTimeMs).toBe(params.record.minTimeMs)
 		}
 	} finally {
 		advance.mockRestore()

@@ -6,6 +6,7 @@ import {
 	elevationToColor,
 	grayscaleColor,
 	hex,
+	redElevationToColor,
 } from "@/ui/genesis/shared/colors/elevation"
 import { temperatureDifferenceColor } from "@/ui/genesis/shared/colors/temperature"
 
@@ -17,6 +18,7 @@ export { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors/misc"
 export type ColorMode =
 	| "terrain"
 	| "terrainAlt"
+	| "terrainRed"
 	| "landHeightmap"
 	| "slope"
 	| "topography"
@@ -639,7 +641,7 @@ export function windSpeedColor(speedMs: number): [number, number, number] {
 }
 
 export function isColoredTerrainMode(mode: ColorMode): boolean {
-	return mode === "terrain" || mode === "terrainAlt"
+	return mode === "terrain" || mode === "terrainAlt" || mode === "terrainRed"
 }
 
 export function getColor(
@@ -654,6 +656,8 @@ export function getColor(
 			return slopeColor(Math.max(0, Math.min(1, km)))
 		case "terrainAlt":
 			return altElevationToColor(km)
+		case "terrainRed":
+			return redElevationToColor(km)
 		default:
 			return elevationToColor(km, maxElevKm)
 	}

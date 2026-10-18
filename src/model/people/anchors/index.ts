@@ -1,100 +1,58 @@
-import { COUPLES } from "@/model/people/anchors/couples"
 import { RULER_FACTS } from "@/model/people/anchors/facts"
-import { PLACEMENT } from "@/model/people/anchors/placement"
 import type {
-	AnchorIndex,
-	BuildIndexParams,
-	TieEvent,
+	AddTieParams,
+	EndTieParams,
+	ReignAtParams,
+	RulerAtParams,
+	RulerFact,
+	TieRecord,
 } from "@/model/people/anchors/types"
 
-interface PlanItem {
-	timeMs: number
-	order: number
-	rulerId: number
-	tie: TieEvent | null
+function pairOf(first: number, second: number): string {
+	return `${Math.min(first, second)}:${Math.max(first, second)}`
 }
 
-function collectTies(params: BuildIndexParams): TieEvent[] {
-	const ties: TieEvent[] = []
-	const open = new Map<string, TieEvent>()
-	const sorted = params.record.events.diplomacy
-		.filter(
-			(event) =>
-				event.kind === "royalMarriageStart" ||
-				event.kind === "royalMarriageEnd",
-		)
-		.sort((a, b) => a.timeMs - b.timeMs)
-	for (const event of sorted) {
-		const pair = `${Math.min(event.firstId, event.secondId)}:${Math.max(event.firstId, event.secondId)}`
-		if (event.kind === "royalMarriageStart") {
-			const tie = {
-				timeMs: event.timeMs,
-				first: event.firstId,
-				second: event.secondId,
-				endMs: Infinity,
-			}
-			ties.push(tie)
-			open.set(pair, tie)
-		} else {
-			const tie = open.get(pair)
-			if (tie) tie.endMs = event.timeMs
-			open.delete(pair)
-		}
+function addTie({ index, timeMs, first, second }: AddTieParams): TieRecord {
+	const tie: TieRecord = {
+		timeMs,
+		first: Math.min(first, second),
+		second: Math.max(first, second),
+		endMs: Infinity,
+		status: "pending",
+		rule: 0,
 	}
-	return ties
+	index.ties.push(tie)
+	index.openTies.set(pairOf(first, second), tie)
+	return tie
 }
 
-function build(params: BuildIndexParams): AnchorIndex {
-	const started = performance.now()
-	const { facts, nationReigns } = RULER_FACTS.collect(params.record)
-	const index: AnchorIndex = {
-		worldSeed: params.worldSeed,
-		horizonMs: params.record.maxTimeMs,
-		facts,
-		nationReigns,
-		injected: new Map(),
-		couples: new Map(),
-		parentCouple: new Map(),
-		spouseCouples: new Map(),
-		placements: [],
-		ties: [],
-		indexMs: 0,
-	}
-	const ties = collectTies(params)
-	const plan: PlanItem[] = []
-	for (const fact of facts.values())
-		if (fact.kin)
-			plan.push({
-				timeMs: fact.accessionMs,
-				order: 0,
-				rulerId: fact.rulerId,
-				tie: null,
-			})
-	for (const [ordinal, tie] of ties.entries())
-		plan.push({ timeMs: tie.timeMs, order: 1, rulerId: ordinal, tie })
-	plan.sort(
-		(a, b) => a.timeMs - b.timeMs || a.order - b.order || a.rulerId - b.rulerId,
-	)
-	for (const item of plan) {
-		if (item.tie) {
-			PLACEMENT.placeTie({ index, tie: item.tie, ordinal: item.rulerId })
-			continue
-		}
-		const fact = facts.get(item.rulerId)
-		if (fact) PLACEMENT.place({ index, fact })
-	}
-	index.indexMs = performance.now() - started
-	return index
+function endTie({ index, timeMs, first, second }: EndTieParams): void {
+	const pair = pairOf(first, second)
+	const tie = index.openTies.get(pair)
+	if (tie) tie.endMs = timeMs
+	index.openTies.delete(pair)
+}
+
+function rulerAt({ index, nationId, timeMs }: RulerAtParams): RulerFact | null {
+	const reigns = index.nationReigns.get(nationId) ?? []
+	for (let at = reigns.length - 1; at >= 0; at--)
+		if (reigns[at].startMs <= timeMs)
+			return index.facts.get(reigns[at].rulerId) ?? null
+	return null
+}
+
+function nationAt({ fact, timeMs }: ReignAtParams): number | null {
+	let found = fact.reigns[0]
+	for (const reign of fact.reigns) if (reign.startMs <= timeMs) found = reign
+	return found ? found.nationId : null
 }
 
 export const ANCHORS = {
-	build,
-	birthOf: COUPLES.birthOf,
-	sexOf: COUPLES.sexOf,
-	lineage: COUPLES.lineage,
-	childLineage: COUPLES.childLineage,
-	parentCouple: COUPLES.parentCoupleFor,
-	spouseCouples: COUPLES.spouseCouples,
-	coupleStart: COUPLES.start,
-	unit: COUPLES.unit,
+	create: RULER_FACTS.create,
+	add: RULER_FACTS.add,
+	settle: RULER_FACTS.settle,
+	addTie,
+	endTie,
+	rulerAt,
+	nationAt,
 }

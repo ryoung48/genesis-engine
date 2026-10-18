@@ -1,33 +1,31 @@
 import { FRAME } from "@/model/history/world-frame"
-import { ANCHORS } from "@/model/people/anchors"
-import type { AnchoredCouple } from "@/model/people/anchors/types"
+import { CAST } from "@/model/people/cast"
+import type { Marriage, Reservation } from "@/model/people/cast/types"
 import { RELIGION_DOCTRINE } from "@/model/people/doctrine"
 import type { MarriageType } from "@/model/people/doctrine/types"
 import { FERTILITY } from "@/model/people/fertility"
-import { PERSON_KEY } from "@/model/people/keys"
-import type { PersonKey } from "@/model/people/keys/types"
-import { KIN } from "@/model/people/kin"
+import { KINSHIP } from "@/model/people/marriage/kinship"
+import { SPOUSE } from "@/model/people/marriage/spouse"
 import type {
-	AnchoredMarriageParams,
 	AttemptParams,
-	ByKeyParams,
-	Chain,
-	ChainParams,
-	ClaimParams,
-	ConjuredSpouse,
-	FinishParams,
-	FreeSearchParams,
-	Marriage,
-	SettleSpouseParams,
+	CoverParams,
+	DueParams,
+	ExclusiveParams,
+	ExtendParams,
+	MarkUnfitParams,
+	OpenParams,
+	PlaceParams,
+	SearchParams,
+	SettleParams,
+	StandingParams,
+	TypeAtParams,
 	WedParams,
 } from "@/model/people/marriage/types"
-import { NOBILITY } from "@/model/people/nobility"
-import { PEOPLE_STORE } from "@/model/people/store"
-import { PERSON_STUB } from "@/model/people/stub"
 import { HASH } from "@/model/shared/random/hash"
 import { TIME } from "@/model/shared/time"
 
 const YEAR = TIME.constants.yearMS
+const MONTH = YEAR / 12
 const MARKET_CHANCE = 0.35
 const MAX_GAP_YEARS = 9
 const AGES = {
@@ -48,301 +46,290 @@ const CHANNEL = {
 const PLURAL = {
 	minAge: 18,
 	maxAge: 69,
-	firstOrdinal: 100,
 	desired: [0, 0, 1, 2, 3, 3],
 }
-function LOWBORN_SPOUSE(seat: number): ConjuredSpouse {
-	return { tier: -1, seat, dynasty: -1, dynastyOrigin: -1 }
-}
-
 const BETROTHAL = { minAge: 12, adultAge: 16, maxGap: 5, maxSpouseAge: 20 }
+const FORCED_WIFE_MAX_AGE = 38
+const FORCED_LEAD = 2 * YEAR
 
 function clamp(value: number, low: number, high: number): number {
 	return Math.max(low, Math.min(high, value))
 }
 
-function anchoredMarriage({ store, couple }: AnchoredMarriageParams): Marriage {
-	const cached = store.marriages.get(couple.id)
-	if (cached) return cached
-	const index = PEOPLE_STORE.index(store)
-	const husband = PERSON_STUB.of({ store, key: couple.father })
-	const wife = PERSON_STUB.of({ store, key: couple.mother })
-	const startMs = ANCHORS.coupleStart({ index, couple })
-	const endMs = Math.min(
-		PERSON_STUB.life({ store, stub: husband }).deathMs,
-		PERSON_STUB.life({ store, stub: wife }).deathMs,
-		couple.tie?.endMs ?? Infinity,
-	)
-	const marriage: Marriage = {
-		key: PERSON_KEY.marriage({
-			husband: couple.father,
-			wife: couple.mother,
-			startMs,
-		}),
-		husband: couple.father,
-		wife: couple.mother,
-		startMs,
-		endMs,
-		kind: couple.tie ? "tie" : "anchored",
-		betrothedMs: null,
-		kinship: null,
-		pregnancies: [],
-		children: [],
-	}
-	store.marriages.set(couple.id, marriage)
-	store.marriages.set(marriage.key, marriage)
-	FERTILITY.couple({ store, marriage, anchored: couple.children })
-	return marriage
+function exclusive({ person, marriage }: ExclusiveParams): boolean {
+	if (marriage.wife === person.id) return true
+	return marriage.kind !== "plural" && marriage.kind !== "concubine"
 }
 
-function anchoredOf(store: ChainParams["store"], key: PersonKey): Marriage[] {
-	const index = PEOPLE_STORE.index(store)
-	return ANCHORS.spouseCouples({ index, key })
-		.map((couple: AnchoredCouple) => anchoredMarriage({ store, couple }))
-		.sort((a, b) => a.startMs - b.startMs)
-}
-
-function searchFree({ store, owner, anchored }: FreeSearchParams): Marriage[] {
-	const stub = PERSON_STUB.of({ store, key: owner })
-	const life = PERSON_STUB.life({ store, stub })
-	const ages = stub.sex === 1 ? AGES.female : AGES.male
-	const seed = PERSON_STUB.seedOf(store, owner)
-	const found: Marriage[] = []
-	const limit = Math.min(
-		life.deathMs,
-		stub.birthMs + ages.max * YEAR,
-		store.horizonMs,
-	)
-	let cursor = stub.birthMs + ages.min * YEAR
-	const betrothed = betroth({ store, owner, anchored })
-	if (betrothed) {
-		found.push(betrothed)
-		if (betrothed.endMs === Infinity) return found
-		cursor = betrothed.endMs + YEAR
-	}
-	while (cursor <= limit) {
-		const inside = anchored.find(
-			(marriage) => marriage.startMs <= cursor && cursor < marriage.endMs,
-		)
-		if (inside) {
-			if (inside.endMs === Infinity) break
-			cursor = inside.endMs + YEAR
-			continue
-		}
-		const age = Math.floor((cursor - stub.birthMs) / YEAR)
-		const salt = found.length * 200 + age
-		if (HASH.unit({ seed, channel: CHANNEL.seek, salt }) < MARKET_CHANCE) {
-			const marriage = attempt({
-				store,
-				owner,
-				anchored,
-				cursor,
-				salt,
-				ordinal: found.length,
-			})
-			if (marriage) {
-				found.push(marriage)
-				if (marriage.endMs === Infinity) break
-				cursor = marriage.endMs + YEAR
-				continue
-			}
-		}
-		cursor += YEAR
-	}
-	return found
-}
-
-function wed({
-	store,
-	owner,
-	anchored,
-	ordinal,
-	spouseBirthMs,
-	startMs,
-	betrothedMs,
-	kind,
-	exclusive,
-	spouse: conjured,
-}: WedParams): Marriage | null {
-	const stub = PERSON_STUB.of({ store, key: owner })
-	const key = PERSON_KEY.spouse({ owner, index: ordinal })
-	store.names.delete(key)
-	const spouse = PERSON_STUB.make({
-		store,
-		key,
-		kind: "spouse",
-		sex: 1 - stub.sex,
-		birthMs: spouseBirthMs,
-		lineage: {
-			house: false,
-			dynasty: conjured.dynasty,
-			dynastyOrigin: conjured.dynastyOrigin,
-			home: stub.home,
-		},
-		noParentCharacter: true,
-		tier: conjured.tier,
-		seat: conjured.seat,
-		survivesMs: startMs,
-		fixedDeathMs: null,
-		forcedCause: null,
-	})
-	const endMs = Math.min(
-		PERSON_STUB.life({ store, stub }).deathMs,
-		PERSON_STUB.life({ store, stub: spouse }).deathMs,
-	)
+function place({ cast, marriage, reservation }: PlaceParams): boolean {
+	const spec = reservation.child
 	if (
-		endMs <= startMs ||
-		(exclusive &&
-			anchored.some(
-				(marriage) => marriage.startMs < endMs && marriage.endMs > startMs,
-			))
+		spec.ruler.kind === "ruler" &&
+		cast.rulerPerson.has(spec.ruler.ref.rulerId)
 	)
-		return null
-	const [husband, wife] = stub.sex === 0 ? [owner, key] : [key, owner]
+		return false
+	const fact =
+		spec.ruler.kind === "ruler"
+			? cast.anchors.facts.get(spec.ruler.ref.rulerId)
+			: undefined
+	const child = CAST.add({
+		cast,
+		spec: {
+			sex: spec.sex,
+			birthMs: reservation.birthMs,
+			lineage:
+				spec.lineage ??
+				FERTILITY.childLineage({
+					husband: cast.persons[marriage.husband],
+					wife: cast.persons[marriage.wife],
+				}),
+			ruler: spec.ruler,
+			tier: spec.tier,
+			seat: -2,
+			parents: { kind: "couple", marriage: marriage.id },
+			inputs: fact
+				? {
+						survivesMs: fact.survivesMs,
+						fixedDeathMs: fact.fixedDeathMs,
+						forcedCause: null,
+					}
+				: {
+						survivesMs: spec.survivesMs,
+						fixedDeathMs: spec.ruler.kind === "ruler" ? Infinity : null,
+						forcedCause: null,
+					},
+		},
+	})
+	FERTILITY.planBirth({
+		marriage,
+		child: child.id,
+		birthMs: reservation.birthMs,
+	})
+	reservation.state = "placed"
+	reservation.placed = child.id
+	return true
+}
+
+function settleReserved(cast: OpenParams["cast"], marriage: Marriage): void {
+	for (const id of [marriage.husband, marriage.wife]) {
+		for (const reservation of cast.reservations.get(
+			CAST.ownerKey(cast.persons[id]),
+		) ?? []) {
+			if (
+				reservation.state !== "open" ||
+				!FERTILITY.canBear({ cast, marriage, birthMs: reservation.birthMs })
+			)
+				continue
+			place({ cast, marriage, reservation })
+		}
+	}
+}
+
+function open({
+	cast,
+	husband,
+	wife,
+	startMs,
+	kind,
+	betrothedMs,
+	kinship,
+	revealedLater,
+}: OpenParams): Marriage {
 	const marriage: Marriage = {
-		key: PERSON_KEY.marriage({ husband, wife, startMs }),
+		id: cast.marriages.length,
 		husband,
 		wife,
 		startMs,
-		endMs,
 		kind,
 		betrothedMs,
-		kinship: null,
+		kinship,
 		pregnancies: [],
 		children: [],
+		cursor: { month: 0, nextFreeMs: startMs, closed: false },
+		revealedLater,
 	}
-	store.marriages.set(marriage.key, marriage)
-	FERTILITY.couple({ store, marriage, anchored: [] })
+	cast.marriages.push(marriage)
+	for (const id of [husband, wife]) {
+		const list = cast.persons[id].marriages
+		list.push(marriage.id)
+		list.sort((a, b) => cast.marriages[a].startMs - cast.marriages[b].startMs)
+	}
+	settleReserved(cast, marriage)
 	return marriage
 }
 
-function attempt({
-	store,
+function wed({
+	cast,
 	owner,
-	anchored,
-	cursor,
+	spouse,
+	startMs,
+	betrothedMs,
+	kind,
+	exclusive: strict,
+}: WedParams): Marriage | null {
+	const start =
+		betrothedMs === null
+			? startMs
+			: Math.max(
+					owner.birthMs + BETROTHAL.adultAge * YEAR,
+					spouse.birthMs + BETROTHAL.adultAge * YEAR,
+				)
+	const endMs = Math.min(
+		CAST.lifeOf({ cast, person: owner }).deathMs,
+		CAST.lifeOf({ cast, person: spouse }).deathMs,
+	)
+	if (endMs <= start) return null
+	if (
+		betrothedMs !== null &&
+		spouse.birthMs > betrothedMs - BETROTHAL.minAge * YEAR
+	)
+		return null
+	if (
+		strict &&
+		owner.marriages.some((id) => {
+			const other = cast.marriages[id]
+			return (
+				exclusive({ person: owner, marriage: other }) &&
+				other.startMs < endMs &&
+				CAST.endOf({ cast, marriage: other }) > start
+			)
+		})
+	)
+		return null
+	const [husband, wife] = owner.sex === 0 ? [owner, spouse] : [spouse, owner]
+	return open({
+		cast,
+		husband: husband.id,
+		wife: wife.id,
+		startMs: start,
+		kind,
+		betrothedMs,
+		kinship: KINSHIP.label({ cast, first: owner, second: spouse }),
+		revealedLater: false,
+	})
+}
+
+function settle(params: SettleParams): Marriage | null {
+	const spouse = SPOUSE.choose({
+		cast: params.cast,
+		owner: params.owner,
+		startMs: params.startMs,
+		spouseBirthMs: params.spouseBirthMs,
+		betrothedMs: params.betrothedMs,
+		forced: params.forced,
+	})
+	if (!spouse) return null
+	return wed({
+		cast: params.cast,
+		owner: params.owner,
+		spouse,
+		startMs: params.startMs,
+		betrothedMs: params.betrothedMs,
+		kind: params.kind,
+		exclusive: params.exclusive,
+	})
+}
+
+function due({ cast, person, cursorMs }: DueParams) {
+	for (const reservation of cast.reservations.get(CAST.ownerKey(person)) ??
+		[]) {
+		if (reservation.state !== "open") continue
+		const conceptionMs = reservation.birthMs - FERTILITY.gestationMs
+		if (conceptionMs <= cursorMs || conceptionMs > cursorMs + FORCED_LEAD)
+			continue
+		const covered = person.marriages.some((id) =>
+			FERTILITY.canBear({
+				cast,
+				marriage: cast.marriages[id],
+				birthMs: reservation.birthMs,
+			}),
+		)
+		if (!covered) return reservation
+	}
+	return null
+}
+
+function cover({ cast, person, fromMs, toMs }: CoverParams): void {
+	for (const reservation of cast.reservations.get(CAST.ownerKey(person)) ??
+		[]) {
+		if (reservation.state !== "open") continue
+		const conceptionMs = reservation.birthMs - FERTILITY.gestationMs
+		if (conceptionMs <= fromMs || conceptionMs > toMs) continue
+		const covered = person.marriages.some((id) =>
+			FERTILITY.canBear({
+				cast,
+				marriage: cast.marriages[id],
+				birthMs: reservation.birthMs,
+			}),
+		)
+		if (covered) continue
+		attempt({
+			cast,
+			owner: person,
+			cursorMs: fromMs,
+			salt: 7000,
+			forced: reservation,
+			kind: "concubine",
+		})
+	}
+}
+
+function attempt({
+	cast,
+	owner,
+	cursorMs,
 	salt,
-	ordinal,
+	forced,
+	kind,
 }: AttemptParams): Marriage | null {
-	const stub = PERSON_STUB.of({ store, key: owner })
-	const seed = PERSON_STUB.seedOf(store, owner)
-	const startMs =
-		cursor + HASH.unit({ seed, channel: CHANNEL.season, salt }) * 0.99 * YEAR
-	const age = (startMs - stub.birthMs) / YEAR
+	const seed = CAST.seedOf({ cast, id: owner.id })
+	let startMs =
+		cursorMs + HASH.unit({ seed, channel: CHANNEL.season, salt }) * 0.99 * YEAR
+	if (forced)
+		startMs = Math.max(
+			cursorMs,
+			forced.birthMs - FERTILITY.gestationMs - 2 * MONTH,
+		)
+	const age = (startMs - owner.birthMs) / YEAR
 	const gap = Math.floor(
 		HASH.unit({ seed, channel: CHANNEL.gap, salt }) * MAX_GAP_YEARS,
 	)
 	const spouseAge =
-		stub.sex === 1
+		owner.sex === 1
 			? clamp(age + gap, AGES.male.min, AGES.male.max)
-			: clamp(age - gap, AGES.female.min, AGES.female.max)
-	return settleSpouse({
-		store,
+			: clamp(
+					age - gap,
+					AGES.female.min,
+					forced ? FORCED_WIFE_MAX_AGE : AGES.female.max,
+				)
+	return settle({
+		cast,
 		owner,
-		anchored,
-		ordinal,
+		startMs,
 		spouseBirthMs: startMs - spouseAge * YEAR,
-		startMs,
 		betrothedMs: null,
-		kind: "free",
-		exclusive: true,
-	})
-}
-
-function settleSpouse(params: SettleSpouseParams): Marriage | null {
-	const stub = PERSON_STUB.of({ store: params.store, key: params.owner })
-	const choice = NOBILITY.spouse({
-		store: params.store,
-		owner: stub,
-		startMs: params.startMs,
-		spouseSex: 1 - stub.sex,
-	})
-	if (choice.kind === "claim") {
-		const claimed = claim({
-			store: params.store,
-			owner: params.owner,
-			anchored: params.anchored,
-			candidate: choice.candidate.key,
-			startMs: params.startMs,
-			kind: params.kind,
-			betrothedMs: params.betrothedMs,
-			exclusive: params.exclusive,
-		})
-		if (claimed) return claimed
-	}
-	return wed({
-		...params,
-		spouse:
-			choice.kind === "conjure"
-				? choice
-				: LOWBORN_SPOUSE(
-						NOBILITY.seatOf({
-							store: params.store,
-							stub,
-							timeMs: params.startMs,
-						}),
-					),
-	})
-}
-
-function claim({
-	store,
-	owner,
-	anchored,
-	candidate,
-	startMs,
-	kind,
-	betrothedMs,
-	exclusive,
-}: ClaimParams): Marriage | null {
-	const stub = PERSON_STUB.of({ store, key: owner })
-	const other = PERSON_STUB.of({ store, key: candidate })
-	const endMs = Math.min(
-		PERSON_STUB.life({ store, stub }).deathMs,
-		PERSON_STUB.life({ store, stub: other }).deathMs,
-	)
-	const clash = (marriage: Marriage) =>
-		marriage.startMs < endMs && marriage.endMs > startMs
-	if (
-		endMs <= startMs ||
-		(exclusive && anchored.some(clash)) ||
-		(betrothedMs !== null &&
-			other.birthMs > betrothedMs - BETROTHAL.minAge * YEAR)
-	)
-		return null
-	const [husband, wife] =
-		stub.sex === 0 ? [owner, candidate] : [candidate, owner]
-	const marriage = finish({
-		store,
-		husband,
-		wife,
-		startMs,
-		endMs,
-		kinship: null,
 		kind,
-		betrothedMs,
+		exclusive: kind === "free",
+		forced: forced !== null,
 	})
-	store.claims.set(candidate, [marriage])
-	return marriage
 }
 
-function betroth({
-	store,
-	owner,
-	anchored,
-}: FreeSearchParams): Marriage | null {
-	const stub = PERSON_STUB.of({ store, key: owner })
-	const seed = PERSON_STUB.seedOf(store, owner)
-	for (let age = BETROTHAL.minAge; age < BETROTHAL.adultAge; age++) {
+function betroth({ cast, person, untilMs }: SearchParams): Marriage | null {
+	const state = person.search
+	const seed = CAST.seedOf({ cast, id: person.id })
+	while (state.betrothAge < BETROTHAL.adultAge) {
+		const age = state.betrothAge
+		const betrothedMs =
+			person.birthMs +
+			(age +
+				0.99 * HASH.unit({ seed, channel: CHANNEL.betrothSeason, salt: age })) *
+				YEAR
+		if (betrothedMs > untilMs) return null
+		state.betrothAge++
 		if (
 			HASH.unit({ seed, channel: CHANNEL.betroth, salt: age }) >= MARKET_CHANCE
 		)
 			continue
-		const betrothedMs =
-			stub.birthMs +
-			(age +
-				0.99 * HASH.unit({ seed, channel: CHANNEL.betrothSeason, salt: age })) *
-				YEAR
 		const gap =
 			Math.floor(
 				HASH.unit({ seed, channel: CHANNEL.betrothGap, salt: age }) *
@@ -351,34 +338,106 @@ function betroth({
 		const spouseBirthMs =
 			betrothedMs -
 			clamp(age + gap, BETROTHAL.minAge, BETROTHAL.maxSpouseAge) * YEAR
-		const marriage = settleSpouse({
-			store,
-			owner,
-			anchored,
-			ordinal: 0,
-			spouseBirthMs,
+		const marriage = settle({
+			cast,
+			owner: person,
 			startMs: Math.max(
-				stub.birthMs + BETROTHAL.adultAge * YEAR,
+				person.birthMs + BETROTHAL.adultAge * YEAR,
 				spouseBirthMs + BETROTHAL.adultAge * YEAR,
 			),
+			spouseBirthMs,
 			betrothedMs,
 			kind: "free",
 			exclusive: true,
+			forced: false,
 		})
-		if (marriage) return marriage
+		if (marriage) {
+			state.betrothAge = BETROTHAL.adultAge
+			return marriage
+		}
 	}
 	return null
 }
 
-function standingOf(
-	store: ChainParams["store"],
-	key: PersonKey,
-	timeMs: number,
-): number {
-	const parsed = PERSON_KEY.parse(key)
-	if (parsed.tag !== "R") return 0
-	const reign = PEOPLE_STORE.index(store).facts.get(parsed.rulerId)?.reigns[0]
-	const frame = PEOPLE_STORE.snappedFrame({ store, timeMs })
+function searchFree({ cast, person, untilMs }: SearchParams): void {
+	const state = person.search
+	const ages = person.sex === 1 ? AGES.female : AGES.male
+	const seed = CAST.seedOf({ cast, id: person.id })
+	const life = CAST.lifeOf({ cast, person })
+	const limit = Math.min(
+		life.deathMs,
+		person.birthMs + ages.max * YEAR,
+		untilMs,
+	)
+	const betrothed = betroth({ cast, person, untilMs })
+	if (betrothed) {
+		state.found++
+		const end = CAST.endOf({ cast, marriage: betrothed })
+		state.cursorMs = Math.max(
+			state.cursorMs,
+			end === Infinity ? betrothed.startMs : end + YEAR,
+		)
+	}
+	let cursor = state.cursorMs
+	if (person.sex === 0 && state.found === 0)
+		cover({
+			cast,
+			person,
+			fromMs: person.birthMs + FERTILITY.adult * YEAR,
+			toMs: Math.min(cursor + YEAR, untilMs),
+		})
+	while (cursor <= limit) {
+		const inside = person.marriages
+			.map((id) => cast.marriages[id])
+			.find(
+				(marriage) =>
+					exclusive({ person, marriage }) &&
+					marriage.startMs <= cursor &&
+					cursor < CAST.endOf({ cast, marriage }),
+			)
+		if (inside) {
+			const end = CAST.endOf({ cast, marriage: inside })
+			if (person.sex === 0)
+				cover({ cast, person, fromMs: cursor, toMs: Math.min(end, untilMs) })
+			if (end === Infinity || end > limit) break
+			cursor = end + YEAR
+			continue
+		}
+		const age = Math.floor((cursor - person.birthMs) / YEAR)
+		const salt = state.found * 200 + age
+		const forced = due({ cast, person, cursorMs: cursor })
+		if (
+			forced ||
+			HASH.unit({ seed, channel: CHANNEL.seek, salt }) < MARKET_CHANCE
+		) {
+			const marriage = attempt({
+				cast,
+				owner: person,
+				cursorMs: cursor,
+				salt,
+				forced,
+				kind: "free",
+			})
+			if (marriage) {
+				state.found++
+				const end = CAST.endOf({ cast, marriage })
+				if (end === Infinity) {
+					cursor = Math.max(cursor, marriage.startMs)
+					break
+				}
+				cursor = end + YEAR
+				continue
+			}
+		}
+		cursor += YEAR
+	}
+	state.cursorMs = cursor
+}
+
+function standingOf({ cast, person, timeMs }: StandingParams): number {
+	const fact = CAST.factOf({ cast, person })
+	const reign = fact?.reigns[0]
+	const frame = CAST.snappedFrame({ cast, timeMs })
 	if (!reign || !frame) return 0
 	const tier = FRAME.heldTitles({ frame, nationId: reign.nationId }).reduce(
 		(top, title) => Math.max(top, frame.titles?.tier[title] ?? 0),
@@ -387,48 +446,50 @@ function standingOf(
 	return tier + 1
 }
 
-function marriageTypeAt(
-	store: ChainParams["store"],
-	home: number,
-	timeMs: number,
-): MarriageType {
-	const doctrine = store.context?.doctrine
-	const frame = PEOPLE_STORE.snappedFrame({ store, timeMs })
+function marriageTypeAt({ cast, person, timeMs }: TypeAtParams): MarriageType {
+	const doctrine = cast.context?.doctrine
+	const frame = CAST.snappedFrame({ cast, timeMs })
 	if (!doctrine || !frame) return "monogamy"
 	return RELIGION_DOCTRINE.marriageType({
 		doctrine,
-		religion: frame.provinceReligion[home] ?? -1,
+		religion: frame.provinceReligion[person.home] ?? -1,
 	})
 }
 
-function searchPlural({
-	store,
-	owner,
-	anchored,
-}: FreeSearchParams): Marriage[] {
-	const stub = PERSON_STUB.of({ store, key: owner })
-	if (stub.sex !== 0 || !store.context?.doctrine) return []
-	const seed = PERSON_STUB.seedOf(store, owner)
+function searchPlural({ cast, person, untilMs }: SearchParams): void {
+	if (person.sex !== 0 || !cast.context?.doctrine) return
+	const state = person.search
+	const seed = CAST.seedOf({ cast, id: person.id })
 	const limit = Math.min(
-		PERSON_STUB.life({ store, stub }).deathMs,
-		stub.birthMs + PLURAL.maxAge * YEAR,
-		store.horizonMs,
+		CAST.lifeOf({ cast, person }).deathMs,
+		person.birthMs + PLURAL.maxAge * YEAR,
+		untilMs,
 	)
-	const found: Marriage[] = []
-	for (let age = PLURAL.minAge; stub.birthMs + age * YEAR <= limit; age++) {
+	for (; person.birthMs + state.pluralAge * YEAR <= limit; state.pluralAge++) {
+		const age = state.pluralAge
 		if (
 			HASH.unit({ seed, channel: CHANNEL.plural, salt: age }) >= MARKET_CHANCE
 		)
 			continue
-		const now = stub.birthMs + age * YEAR
-		const type = marriageTypeAt(store, stub.home, now)
+		const now = person.birthMs + age * YEAR
+		const type = marriageTypeAt({ cast, person, timeMs: now })
 		if (type === "monogamy") continue
 		const desired =
 			PLURAL.desired[
-				Math.min(standingOf(store, owner, now), PLURAL.desired.length - 1)
+				Math.min(
+					standingOf({ cast, person, timeMs: now }),
+					PLURAL.desired.length - 1,
+				)
 			]
-		if (found.filter((marriage) => marriage.endMs > now).length >= desired)
-			continue
+		const current = person.marriages.filter((id) => {
+			const marriage = cast.marriages[id]
+			return (
+				marriage.husband === person.id &&
+				!exclusive({ person, marriage }) &&
+				CAST.endOf({ cast, marriage }) > now
+			)
+		}).length
+		if (current >= desired) continue
 		const startMs =
 			now +
 			HASH.unit({ seed, channel: CHANNEL.pluralSeason, salt: age }) *
@@ -438,127 +499,54 @@ function searchPlural({
 			HASH.unit({ seed, channel: CHANNEL.pluralGap, salt: age }) *
 				MAX_GAP_YEARS,
 		)
-		const marriage = settleSpouse({
-			store,
-			owner,
-			anchored,
-			ordinal: PLURAL.firstOrdinal + found.length,
+		settle({
+			cast,
+			owner: person,
+			startMs,
 			spouseBirthMs:
 				startMs - clamp(age - gap, AGES.female.min, AGES.female.max) * YEAR,
-			startMs,
 			betrothedMs: null,
 			kind: type === "polygamy" ? "plural" : "concubine",
 			exclusive: false,
+			forced: false,
 		})
-		if (marriage) found.push(marriage)
 	}
-	return found
 }
 
-function finish({
-	store,
-	husband,
-	wife,
-	startMs,
-	endMs,
-	kinship,
-	kind,
-	betrothedMs,
-}: FinishParams): Marriage {
-	const marriage: Marriage = {
-		key: PERSON_KEY.marriage({ husband, wife, startMs }),
-		husband,
-		wife,
-		startMs,
-		endMs,
-		kind,
-		betrothedMs,
-		kinship,
-		pregnancies: [],
-		children: [],
+function settled(
+	cast: MarkUnfitParams["cast"],
+	reservation: Reservation,
+): boolean {
+	const spec = reservation.child
+	if (spec.ruler.kind !== "ruler") return false
+	const id = cast.rulerPerson.get(spec.ruler.ref.rulerId)
+	if (id === undefined) return false
+	reservation.state = "placed"
+	reservation.placed = id
+	return true
+}
+
+function markUnfit({ cast, person, untilMs }: MarkUnfitParams): void {
+	for (const reservation of cast.reservations.get(CAST.ownerKey(person)) ??
+		[]) {
+		if (reservation.state !== "open" || reservation.birthMs > untilMs) continue
+		if (settled(cast, reservation)) continue
+		reservation.state = "unfit"
+		if (reservation.source === "plan") cast.stats.reservedUnfit++
 	}
-	store.marriages.set(marriage.key, marriage)
-	FERTILITY.couple({ store, marriage, anchored: [] })
-	return marriage
 }
 
-function baseChain({ store, key }: ChainParams): Chain {
-	const cached = store.baseChains.get(key)
-	if (cached) return cached
-	const stub = PERSON_STUB.of({ store, key })
-	let marriages: Marriage[]
-	if (stub.house) {
-		const anchored = [
-			...anchoredOf(store, key),
-			...(store.claims.get(key) ?? []),
-		]
-		const free = searchFree({ store, owner: key, anchored })
-		marriages = [
-			...anchored,
-			...free,
-			...searchPlural({ store, owner: key, anchored: [...anchored, ...free] }),
-		]
-	} else {
-		const parsed = PERSON_KEY.parse(key)
-		const owned =
-			parsed.tag === "S"
-				? baseChain({ store, key: parsed.owner }).marriages.filter(
-						(marriage) => marriage.husband === key || marriage.wife === key,
-					)
-				: []
-		marriages = [...owned, ...anchoredOf(store, key)]
+function extend({ cast, id, untilMs }: ExtendParams): void {
+	const person = cast.persons[id]
+	if (untilMs <= person.generatedUntil) return
+	if (person.house) {
+		searchFree({ cast, person, untilMs })
+		searchPlural({ cast, person, untilMs })
 	}
-	marriages.sort((a, b) => a.startMs - b.startMs)
-	const result: Chain = { owner: key, marriages }
-	store.baseChains.set(key, result)
-	return result
+	for (const marriageId of [...person.marriages])
+		FERTILITY.advance({ cast, marriage: cast.marriages[marriageId], untilMs })
+	person.generatedUntil = untilMs
+	markUnfit({ cast, person, untilMs })
 }
 
-function chain({ store, key }: ChainParams): Chain {
-	const cached = store.chains.get(key)
-	if (cached) return cached
-	const base = baseChain({ store, key })
-	const marriages = [
-		...base.marriages,
-		...KIN.marriagesOf({ store, key }),
-	].sort((a, b) => a.startMs - b.startMs)
-	const result: Chain = { owner: key, marriages }
-	store.chains.set(key, result)
-	store.builds.l2.add(key)
-	return result
-}
-
-function parentMarriage({ store, key }: ChainParams): Marriage {
-	const parsed = PERSON_KEY.parse(key)
-	if (parsed.tag === "C") return byKey({ store, key: parsed.marriage })
-	const stub = PERSON_STUB.of({ store, key })
-	return anchoredMarriage({
-		store,
-		couple: ANCHORS.parentCouple({
-			index: PEOPLE_STORE.index(store),
-			key,
-			info: PERSON_STUB.infoOf(stub),
-		}),
-	})
-}
-
-function byKey({ store, key }: ByKeyParams): Marriage {
-	const known = store.marriages.get(key)
-	if (known) return known
-	const parsed = PERSON_KEY.parseMarriage(key)
-	for (const spouse of [parsed.husband, parsed.wife]) {
-		chain({ store, key: spouse })
-		const marriage = store.marriages.get(key)
-		if (marriage) return marriage
-	}
-	throw new Error(`Unknown marriage ${key}`)
-}
-
-export const MARRIAGE = {
-	chain,
-	baseChain,
-	byKey,
-	parentMarriage,
-	anchored: anchoredMarriage,
-	finish,
-}
+export const MARRIAGE = { extend, open, place, exclusive }

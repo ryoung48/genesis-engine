@@ -5,7 +5,9 @@ import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
 import { FRAME } from "@/model/history/world-frame"
 import type { PartitionRow } from "@/model/history/world-frame/types"
+import { INGEST } from "@/model/people/cast/ingest"
 import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
+import { PEOPLE_CONTEXT } from "@/ui/genesis/shared/people-context"
 
 const PROCEDURAL_START_TIME_MS =
 	(STATE_CLOCK.defaultStartYear - 2) * 365 * 86_400_000
@@ -52,6 +54,14 @@ export function useProceduralHistoryTimeline({
 		}
 	}, [isProcedural, world])
 	const state = session?.state ?? null
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recordVersion signals in-place record appends the cast must ingest.
+	useEffect(() => {
+		if (!session || !world) return
+		INGEST.open({
+			record: session.state.record,
+			context: PEOPLE_CONTEXT.of({ world, state: session.state }),
+		})
+	}, [session, world, recordVersion])
 	useEffect(() => {
 		if (!session) return
 		const { state: sessionState, translator, progress } = session

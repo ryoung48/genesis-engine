@@ -4,7 +4,6 @@ import type {
 	RulerRelation,
 } from "@/model/history/record/rulers/types"
 import type { HistoryRecord } from "@/model/history/record/types"
-import type { PersonKey } from "@/model/people/keys/types"
 
 export interface RulerReign {
 	rulerId: number
@@ -12,10 +11,15 @@ export interface RulerReign {
 	startMs: number
 	endMs: number
 	open: boolean
+	settled: boolean
+}
+
+export interface DeathNote {
+	deathMs: number
+	cause: "natural" | "deposed"
 }
 
 export interface RulerFact {
-	key: PersonKey
 	rulerId: number
 	ref: RulerRef
 	birthMs: number
@@ -25,6 +29,8 @@ export interface RulerFact {
 	deathCause: "natural" | "deposed" | null
 	// [JUSTIFICATION] Founders, appointees and usurpers record no kin.
 	kin: RulerKin | null
+	// [JUSTIFICATION] A ruler still reigning has no recorded death.
+	death: DeathNote | null
 	reigns: RulerReign[]
 }
 
@@ -33,33 +39,6 @@ export interface Lineage {
 	dynasty: number
 	dynastyOrigin: number
 	home: number
-}
-
-export interface InjectedPerson extends Lineage {
-	key: PersonKey
-	sex: number
-	birthMs: number
-	survivesMs: number
-	noParentCharacter: boolean
-}
-
-export interface AnchoredChild {
-	key: PersonKey
-	birthMs: number
-}
-
-export interface AnchoredTie {
-	startMs: number
-	endMs: number
-}
-
-export interface AnchoredCouple {
-	id: string
-	father: PersonKey
-	mother: PersonKey
-	children: AnchoredChild[]
-	// [JUSTIFICATION] Only a royal-marriage tie carries a recorded wedding span.
-	tie: AnchoredTie | null
 }
 
 export type PlacementStep =
@@ -79,136 +58,66 @@ export interface Placement {
 	first: boolean
 }
 
+export type TieStatus = "pending" | "filled" | "unfilled"
+
 export interface TieRecord {
 	timeMs: number
 	first: number
 	second: number
-	filled: boolean
+	endMs: number
+	status: TieStatus
 	rule: number
 }
 
 export interface AnchorIndex {
-	worldSeed: number
-	horizonMs: number
 	facts: Map<number, RulerFact>
 	nationReigns: Map<number, RulerReign[]>
-	injected: Map<PersonKey, InjectedPerson>
-	couples: Map<string, AnchoredCouple>
-	parentCouple: Map<PersonKey, string>
-	spouseCouples: Map<PersonKey, string[]>
-	placements: Placement[]
+	lastReign: Map<number, RulerReign>
 	ties: TieRecord[]
-	indexMs: number
+	openTies: Map<string, TieRecord>
+	dirty: Set<number>
 }
 
-export interface BuildIndexParams {
-	record: HistoryRecord
-	worldSeed: number
-}
-
-export interface IndexPersonParams {
+export interface AddRulerParams {
 	index: AnchorIndex
-	key: PersonKey
+	nationId: number
+	timeMs: number
+	payload: Record<string, unknown>
 }
 
-export interface ChildInfo extends Lineage {
-	birthMs: number
-	sex: number
-}
-
-export interface ParentCoupleParams {
-	index: AnchorIndex
-	key: PersonKey
-	info: ChildInfo
-}
-
-export interface NewCoupleParams {
-	index: AnchorIndex
-	id: string
-	father: PersonKey
-	mother: PersonKey
-	tie: AnchoredTie | null
-}
-
-export interface JoinParams {
-	index: AnchorIndex
-	couple: AnchoredCouple
-	child: PersonKey
-	birthMs: number
-}
-
-export interface WindowParams {
-	index: AnchorIndex
-	couple: AnchoredCouple
-}
-
-export interface BirthWindow {
-	lo: number
-	hi: number
-}
-
-export interface InjectParams {
-	index: AnchorIndex
-	anchor: string
-	role: string
-	sex: number
-	birthMs: number
-	lineage: Lineage
-	noParentCharacter: boolean
-	survivesMs: number
-}
-
-export interface ChildCoupleParams {
-	index: AnchorIndex
-	parent: PersonKey
-	anchor: string
-}
-
-export interface CoupleStartParams {
-	index: AnchorIndex
-	couple: AnchoredCouple
-}
-
-export interface FactsResult {
-	facts: Map<number, RulerFact>
-	nationReigns: Map<number, RulerReign[]>
-}
-
-export interface PlaceParams {
-	index: AnchorIndex
+export interface AddResult {
 	fact: RulerFact
+	created: boolean
+	entered: boolean
+	kin: RulerKin | null
 }
 
-export interface TieEvent {
+export interface SettleParams {
+	index: AnchorIndex
+	record: HistoryRecord
+}
+
+export interface AddTieParams {
+	index: AnchorIndex
 	timeMs: number
 	first: number
 	second: number
-	endMs: number
 }
 
-export interface PlaceTieParams {
+export interface EndTieParams {
 	index: AnchorIndex
-	tie: TieEvent
-	ordinal: number
+	timeMs: number
+	first: number
+	second: number
 }
 
-export interface SpanParams {
+export interface RulerAtParams {
 	index: AnchorIndex
-	key: PersonKey
+	nationId: number
+	timeMs: number
 }
 
-export interface BirthOfParams {
-	index: AnchorIndex
-	key: PersonKey
-}
-
-export interface AliveBoundParams {
-	index: AnchorIndex
-	key: PersonKey
-}
-
-export interface RaiseSurvivesParams {
-	index: AnchorIndex
-	key: PersonKey
+export interface ReignAtParams {
+	fact: RulerFact
 	timeMs: number
 }

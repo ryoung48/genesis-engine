@@ -1,12 +1,15 @@
-import type { AnchoredChild, Lineage } from "@/model/people/anchors/types"
-import type { Marriage } from "@/model/people/marriage/types"
-import type { PeopleStore } from "@/model/people/store/types"
-import type { PersonStub } from "@/model/people/stub/types"
+import type { Lineage } from "@/model/people/anchors/types"
+import type {
+	Cast,
+	Marriage,
+	Person,
+	PersonId,
+} from "@/model/people/cast/types"
 
-export interface CoupleParams {
-	store: PeopleStore
+export interface AdvanceParams {
+	cast: Cast
 	marriage: Marriage
-	anchored: AnchoredChild[]
+	untilMs: number
 }
 
 export interface SmoothWeightParams {
@@ -15,14 +18,37 @@ export interface SmoothWeightParams {
 }
 
 export interface ChildLineageParams {
-	husband: PersonStub
-	wife: PersonStub
+	husband: Person
+	wife: Person
 }
 
 export interface CapParams {
-	husband: PersonStub
-	wife: PersonStub
+	husband: Person
+	wife: Person
 	seed: number
+}
+
+export interface CanBearParams {
+	cast: Cast
+	marriage: Marriage
+	birthMs: number
+}
+
+export interface PlanBirthParams {
+	marriage: Marriage
+	child: PersonId
+	birthMs: number
+}
+
+export interface EndOfParams {
+	cast: Cast
+	marriage: Marriage
+}
+
+export interface LivingParams {
+	cast: Cast
+	marriage: Marriage
+	timeMs: number
 }
 
 export type { Lineage }

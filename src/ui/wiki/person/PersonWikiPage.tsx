@@ -62,7 +62,7 @@ export interface PersonWikiData {
 	dateRangeEnd: number
 	currentDate: number
 	currentDateLabel: string
-	// Set when the person is not yet born at the selected date.
+	// Set when the person is not yet born at the selected date or the history has not reached it.
 	emptyMessage: string | null
 	onBack: () => void
 	onSelectPerson: (key: string) => void

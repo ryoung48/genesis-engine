@@ -42,6 +42,7 @@ export const ElevationModeSection: React.FC<ElevationModeSectionProps> = ({
 							{ value: "colored" as const, label: "Colored" },
 							{ value: "grayscale" as const, label: "Grayscale" },
 							{ value: "alt" as const, label: "Alt" },
+							{ value: "red" as const, label: "Red" },
 						]}
 						value={elevationSubMode}
 						onChange={(v) => {

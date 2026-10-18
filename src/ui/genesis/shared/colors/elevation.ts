@@ -18,22 +18,53 @@ export function elevationToColor(
 	km: number,
 	maxElevKm = 6,
 ): [number, number, number] {
-	if (km <= 0) {
-		const t = 1 - Math.max(0, Math.min(1, (km + 5) / 5))
-		return COLOR_INTERPOLATION.sampleColorStops({ stops: oceanColorStops, t })
-	}
+	if (km <= 0) return oceanColor({ km, stops: oceanColorStops })
 
 	const t = Math.max(0, Math.min(1, km / maxElevKm))
 	return COLOR_INTERPOLATION.sampleColorStops({ stops: landColorStops, t })
 }
 
-export function altElevationToColor(km: number): [number, number, number] {
-	if (km <= 0) return elevationToColor(km)
+function oceanColor({
+	km,
+	stops,
+}: {
+	km: number
+	stops: RgbColor[]
+}): [number, number, number] {
+	const t = 1 - Math.max(0, Math.min(1, (km + 5) / 5))
+	return COLOR_INTERPOLATION.sampleColorStops({ stops, t })
+}
+
+function bandedElevationToColor({
+	km,
+	bands,
+	oceanStops,
+}: {
+	km: number
+	bands: { maxMeters: number; color: number }[]
+	oceanStops: RgbColor[]
+}): [number, number, number] {
+	if (km <= 0) return oceanColor({ km, stops: oceanStops })
 	const meters = km * 1000
 	const band =
-		altLandBands.find(({ maxMeters }) => meters < maxMeters) ??
-		altLandBands[altLandBands.length - 1]
+		bands.find(({ maxMeters }) => meters < maxMeters) ?? bands[bands.length - 1]
 	return hex(band.color)
+}
+
+export function altElevationToColor(km: number): [number, number, number] {
+	return bandedElevationToColor({
+		km,
+		bands: altLandBands,
+		oceanStops: oceanColorStops,
+	})
+}
+
+export function redElevationToColor(km: number): [number, number, number] {
+	return bandedElevationToColor({
+		km,
+		bands: redLandBands,
+		oceanStops: redOceanColorStops,
+	})
 }
 
 /**
@@ -58,6 +89,27 @@ const altLandBands: { maxMeters: number; color: number }[] = [
 	{ maxMeters: 2000, color: 0xc3977e },
 	{ maxMeters: 3000, color: 0x9f5449 },
 	{ maxMeters: Number.POSITIVE_INFINITY, color: 0xffffff },
+]
+
+const redLandBands: { maxMeters: number; color: number }[] = [
+	{ maxMeters: 100, color: 0xcddcc0 },
+	{ maxMeters: 300, color: 0xd9dcbc },
+	{ maxMeters: 500, color: 0xeadfbd },
+	{ maxMeters: 1000, color: 0xe0cba8 },
+	{ maxMeters: 2000, color: 0xc9a595 },
+	{ maxMeters: 3000, color: 0xb88a7e },
+	{ maxMeters: 5000, color: 0xa05a52 },
+	{ maxMeters: 5500, color: 0x8a3a38 },
+	{ maxMeters: Number.POSITIVE_INFINITY, color: 0xffffff },
+]
+
+const redOceanColorStops: RgbColor[] = [
+	hex(0xb3d5d6),
+	hex(0xa4cacf),
+	hex(0x96bfc7),
+	hex(0x88b3be),
+	hex(0x7aa7b5),
+	hex(0x6d9bac),
 ]
 
 const oceanColorStops: RgbColor[] = [

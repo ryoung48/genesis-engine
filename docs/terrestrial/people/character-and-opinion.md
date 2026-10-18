@@ -8,7 +8,7 @@ Three of 36 CK3 personality traits in 17 groups, active at ages 9, 11 and 13. Ea
 
 Fifteen congenital traits (giant, dwarf, clubfooted, hunchbacked, spindly, lisping, stuttering, bleeder, wheezing, infertile, scaly, albino, depressed, lunatic, possessed) and three graded ladders (intellect, physique, beauty). Each has an active or carried gene state. Inheritance chances by parent state: active + active 80%, active + carried 50%, active + none 25%, carried + carried 10%, carried + none 2%. Without parents the birth chance is 0.5% per congenital trait and the per-grade birth chances in `CHARACTER` apply (CK3 1.19.0.6 `common/traits/00_traits.txt`, `common/defines/00_defines.txt`). Inbred, Pure-blooded and the six base attributes are not modeled.
 
-Spouses and generated parents always use the no-parent rule. Everyone else inherits from their parents, so the inheritance recursion ends at the first spouse or generated ancestor.
+A character is drawn once, when the person is created, from their actual parents. Conjured people (spouses, outsider parents, seat holders) use the no-parent rule, and parents added later to such a person do not change the character already drawn, so the inheritance recursion ends at the first conjured ancestor.
 
 ## Orientation
 

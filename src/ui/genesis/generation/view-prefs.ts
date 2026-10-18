@@ -78,6 +78,7 @@ export interface StoredViewPrefs {
 const COLOR_MODES = new Set<ColorMode>([
 	"terrain",
 	"terrainAlt",
+	"terrainRed",
 	"landHeightmap",
 	"slope",
 	"topography",
@@ -452,7 +453,8 @@ export function parseStoredViewPrefs(
 			elevationSubMode:
 				parsed.elevationSubMode === "colored" ||
 				parsed.elevationSubMode === "grayscale" ||
-				parsed.elevationSubMode === "alt"
+				parsed.elevationSubMode === "alt" ||
+				parsed.elevationSubMode === "red"
 					? parsed.elevationSubMode
 					: DEFAULT_VIEW_PREFS.elevationSubMode,
 			topographySubMode:

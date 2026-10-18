@@ -1,27 +1,39 @@
+import type { HistoryRecord } from "@/model/history/record/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import type {
+	Cast,
+	Kinship,
+	PeopleContext,
+	Person,
+	UnionNote,
+} from "@/model/people/cast/types"
 import type {
 	CongenitalTrait,
 	GradeTrait,
 	PersonalityTrait,
 } from "@/model/people/character/types"
-import type { ReligionDoctrine } from "@/model/people/doctrine/types"
 import type { HealthBand } from "@/model/people/health/types"
-import type { PersonKey } from "@/model/people/keys/types"
-import type { Kinship } from "@/model/people/marriage/types"
 import type { OpinionBreakdown } from "@/model/people/opinion/types"
 import type { Orientation } from "@/model/people/orientation/types"
-import type { PeopleGeography, PeopleStore } from "@/model/people/store/types"
-import type { PersonStub } from "@/model/people/stub/types"
 
-export interface PersonQueryParams {
-	store: PeopleStore
+export type PersonKey = string
+
+export interface OpenParams {
+	record: HistoryRecord
+	context: PeopleContext
+}
+
+export interface PageParams {
+	record: HistoryRecord
+	context: PeopleContext
 	key: PersonKey
 	timeMs: number
-	frameAt: (timeMs: number) => WorldFrame
-	// [JUSTIFICATION] Worlds without religions have no doctrines.
-	doctrine: ReligionDoctrine | null
-	// [JUSTIFICATION] Worlds without province data have no seats.
-	geography: PeopleGeography | null
+}
+
+export interface ExtendedParams {
+	cast: Cast
+	key: PersonKey
+	timeMs: number
 }
 
 export interface FamilyMember {
@@ -35,6 +47,7 @@ export interface FamilyMember {
 	status: HealthBand | "Dead"
 	// [JUSTIFICATION] The dead hold no opinion that the page can show.
 	opinion: OpinionBreakdown | null
+	revealed: boolean
 }
 
 export interface FamilyGroup {
@@ -52,13 +65,15 @@ export interface TimelineRow {
 	type: string
 	text: string
 	people: PersonRef[]
+	revealed: boolean
 }
 
 export interface Describer {
 	row: (
 		timeMs: number,
 		type: string,
-		parts: Array<string | PersonStub>,
+		parts: Array<string | Person>,
+		revealed?: boolean,
 	) => TimelineRow
 }
 
@@ -95,12 +110,24 @@ export interface PersonPage {
 	conditions: ConditionView[]
 	groups: FamilyGroup[]
 	timeline: TimelineRow[]
+	revealed: boolean
 }
 
+export interface PersonHeader {
+	name: string
+	birthMs: number
+}
+
+export type PageOutcome =
+	| { kind: "page"; page: PersonPage }
+	| { kind: "unborn"; header: PersonHeader }
+	| { kind: "pending"; header: PersonHeader }
+
 export interface MemberParams {
-	store: PeopleStore
-	subject: PersonStub
-	stub: PersonStub
+	cast: Cast
+	context: PeopleContext
+	subject: Person
+	person: Person
 	timeMs: number
 	frame: WorldFrame
 	kin: boolean
@@ -108,37 +135,74 @@ export interface MemberParams {
 }
 
 export interface TitleParams {
-	store: PeopleStore
-	stub: PersonStub
-	parents: PersonStub[]
+	cast: Cast
+	person: Person
+	parents: Person[]
 	timeMs: number
 	frame: WorldFrame
 }
 
+export interface SpouseEntry {
+	person: Person
+	current: boolean
+	betrothed: boolean
+	concubine: boolean
+	kinship: Kinship | null
+}
+
 export interface RelativesResult {
-	parents: PersonStub[]
-	fullSiblings: PersonStub[]
-	halfSiblings: PersonStub[]
-	spouses: Array<{
-		stub: PersonStub
-		current: boolean
-		betrothed: boolean
-		concubine: boolean
-		kinship: Kinship | null
-	}>
-	children: PersonStub[]
-	grandparents: PersonStub[]
-	auncles: PersonStub[]
-	cousins: PersonStub[]
-	nephews: PersonStub[]
+	parents: Person[]
+	fullSiblings: Person[]
+	halfSiblings: Person[]
+	spouses: SpouseEntry[]
+	children: Person[]
+	grandparents: Person[]
+	auncles: Person[]
+	cousins: Person[]
+	nephews: Person[]
 }
 
-export interface HeaderParams {
-	store: PeopleStore
-	key: PersonKey
+export interface PassedOver {
+	timeMs: number
+	successorRulerId: number
 }
 
-export interface PersonHeader {
-	name: string
-	birthMs: number
+export interface PassedOverParams {
+	cast: Cast
+	person: Person
+	timeMs: number
+}
+
+export interface ViewParams {
+	cast: Cast
+	context: PeopleContext
+	person: Person
+	timeMs: number
+	frame: WorldFrame
+}
+
+export interface TimelineParams {
+	cast: Cast
+	person: Person
+	timeMs: number
+	found: RelativesResult
+}
+
+export interface GroupsParams {
+	cast: Cast
+	context: PeopleContext
+	subject: Person
+	timeMs: number
+	frame: WorldFrame
+	found: RelativesResult
+}
+
+export interface RelationsParams {
+	found: RelativesResult
+}
+
+export interface UnionLinkParams {
+	cast: Cast
+	person: Person
+	union: UnionNote
 }

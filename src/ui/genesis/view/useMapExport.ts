@@ -1,14 +1,12 @@
 import { useCallback, useState } from "react"
-import type { ExportWidthPreset } from "@/ui/genesis/controls/OverlayControls"
-import { buildMapExportFilename } from "@/ui/genesis/shared/export/map-export-naming"
+import { WEBGCM_EXPORT } from "@/model/climate/export/webgcm"
+import type { ExportWidthPreset } from "@/ui/genesis/controls/OverlayControls/types"
+import {
+	buildMapExportFilename,
+	sanitizeExportIdentity,
+} from "@/ui/genesis/shared/export/map-export-naming"
 import type { MapExportInput } from "@/ui/genesis/view/types"
 
-/**
- * Owns the map PNG export flow: the chosen output width, the in-flight
- * progress/error state the overlay controls surface, and the download itself.
- * The renderer does the actual rasterization (see exportMapPng); this only
- * drives it and turns the resulting blob into a download.
- */
 export function useMapExport(input: MapExportInput) {
 	const { sceneRef, worldForDisplay, seed, exportCenterLongitude } = input
 
@@ -22,29 +20,44 @@ export function useMapExport(input: MapExportInput) {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleExportMap = useCallback(async () => {
-		if (!worldForDisplay || !sceneRef.current || exportProgress) return
+		const terrain = exportWidthPreset === "webgcm"
+		if (!worldForDisplay || exportProgress || (!terrain && !sceneRef.current))
+			return
 		const width = Number(exportWidthPreset)
 		setExportError(null)
 		setExportProgress({ percent: 0, label: "Preparing export" })
 		try {
-			const blob = await sceneRef.current.exportMapPng({
-				width,
-				centerLongitudeDeg: exportCenterLongitude,
-				onProgress: (percent, label) => {
-					setExportProgress({ percent, label })
-				},
-			})
+			const blob = terrain
+				? new Blob(
+						[
+							await WEBGCM_EXPORT.createRaster({
+								mesh: worldForDisplay.mesh,
+								elevationKm: worldForDisplay.elevation_km,
+								onProgress: setExportProgress,
+							}),
+						],
+						{ type: "application/octet-stream" },
+					)
+				: await sceneRef.current.exportMapPng({
+						width,
+						centerLongitudeDeg: exportCenterLongitude,
+						onProgress: (percent, label) => {
+							setExportProgress({ percent, label })
+						},
+					})
 			const objectUrl = window.URL.createObjectURL(blob)
 			const link = document.createElement("a")
 			link.href = objectUrl
-			link.download = buildMapExportFilename(seed, width)
+			link.download = terrain
+				? `chaos-world-${sanitizeExportIdentity(seed?.toString()) ?? "terrain"}.bin`
+				: buildMapExportFilename(seed, width)
 			document.body.appendChild(link)
 			link.click()
 			link.remove()
 			window.URL.revokeObjectURL(objectUrl)
 			setExportProgress(null)
 		} catch (error) {
-			console.error("Failed to export map PNG:", error)
+			console.error("Failed to export world:", error)
 			setExportError(error instanceof Error ? error.message : "Export failed")
 			setExportProgress(null)
 		}

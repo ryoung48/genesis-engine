@@ -1,9 +1,11 @@
-import { HISTORY } from "@/model/history/record"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import { ALLIANCE } from "@/model/people/anchors/alliance"
+import { CAST } from "@/model/people/cast"
+import { INGEST } from "@/model/people/cast/ingest"
+import type { Cast } from "@/model/people/cast/types"
 import { HEALTH } from "@/model/people/health"
 import { NOBILITY } from "@/model/people/nobility"
 import { PERSON_QUERY } from "@/model/people/query"
-import { PEOPLE_STORE } from "@/model/people/store"
 import { HASH } from "@/model/shared/random/hash"
 import { TIME } from "@/model/shared/time"
 import type {
@@ -17,6 +19,7 @@ import type {
 
 const YEAR = TIME.constants.yearMS
 const CHANNEL = 7700
+const ADULT_SUCCESSION_AGE = 16
 
 function quantile({ values, share }: QuantileParams): number {
 	if (values.length === 0) return 0
@@ -46,8 +49,8 @@ function ms(values: number[]): MsQuantiles {
 	}
 }
 
-function sample({ facts, size, seed, timeMs }: SampleParams): string[] {
-	const groups = new Map<string, string[]>()
+function sample({ facts, size, seed, timeMs }: SampleParams): number[] {
+	const groups = new Map<string, number[]>()
 	const ordered = facts
 		.map((fact, at) => ({
 			fact,
@@ -57,47 +60,76 @@ function sample({ facts, size, seed, timeMs }: SampleParams): string[] {
 	for (const { fact } of ordered) {
 		const cohort = `${fact.ref.sex}:${timeMs - fact.birthMs < 16 * YEAR ? "minor" : "adult"}`
 		const group = groups.get(cohort) ?? []
-		group.push(fact.key)
+		group.push(fact.rulerId)
 		groups.set(cohort, group)
 	}
-	const picked: string[] = []
+	const picked: number[] = []
 	while (picked.length < Math.min(size, facts.length)) {
 		for (const group of groups.values()) {
-			const key = group.shift()
-			if (key) picked.push(key)
+			const rulerId = group.shift()
+			if (rulerId !== undefined) picked.push(rulerId)
 			if (picked.length === size) break
 		}
 	}
 	return picked
 }
 
-function of({
-	state,
-	doctrine,
-	geography,
-	sampleSize,
-}: PeopleReportParams): PeopleReport {
+function succession(
+	cast: Cast,
+	timeMs: number,
+): { considered: number; rows: number } {
+	let considered = 0
+	let rows = 0
+	for (const person of cast.persons) {
+		const couple = CAST.parentsOf({ cast, person })
+		if (!couple) continue
+		const deathMs = CAST.lifeOf({ cast, person }).deathMs
+		for (const parent of couple) {
+			const fact = CAST.factOf({ cast, person: parent })
+			if (!fact) continue
+			for (const reign of fact.reigns) {
+				if (reign.open || reign.endMs > timeMs) continue
+				const reigns = cast.anchors.nationReigns.get(reign.nationId) ?? []
+				const next = reigns[reigns.indexOf(reign) + 1]
+				if (!next || next.rulerId === fact.rulerId) continue
+				if (
+					person.ruler.kind === "ruler" &&
+					person.ruler.ref.rulerId === next.rulerId
+				)
+					continue
+				if (
+					person.birthMs > reign.endMs ||
+					deathMs <= reign.endMs ||
+					(reign.endMs - person.birthMs) / YEAR < ADULT_SUCCESSION_AGE
+				)
+					continue
+				considered++
+			}
+		}
+		rows += PERSON_QUERY.passedOver({ cast, person, timeMs }).length
+	}
+	return { considered, rows }
+}
+
+function of({ state, context, sampleSize }: PeopleReportParams): PeopleReport {
 	const record = state.record
-	const frameAt = (timeMs: number): WorldFrame =>
-		HISTORY.frameAt({ state, timeMs })
-	const shared = PEOPLE_STORE.reset({ record })
-	const indexStart = performance.now()
-	const index = PEOPLE_STORE.index(shared)
-	const indexMs = performance.now() - indexStart
-	const facts = [...index.facts.values()].filter(
+	const time = record.maxTimeMs
+	const ingestStart = performance.now()
+	const cast = INGEST.open({ record, context })
+	const ingestFirst = performance.now() - ingestStart
+	const facts = [...cast.anchors.facts.values()].filter(
 		(fact) => fact.reigns.length > 0,
 	)
-	const time = record.maxTimeMs
 	const picked = sample({
 		facts,
 		size: sampleSize,
-		seed: shared.worldSeed,
+		seed: cast.worldSeed,
 		timeMs: time,
 	})
 	const pageMs: number[] = []
+	const extendedMs: number[] = []
 	const frameMs: number[] = []
 	const warmMs: number[] = []
-	const builds = { l1: 0, l2: 0, l3: 0 }
 	const adultDeaths: number[] = []
 	const firstMarriage = { female: [] as number[], male: [] as number[] }
 	const completed: number[] = []
@@ -107,56 +139,46 @@ function of({
 	let incapableAt70 = 0
 	let wives = 0
 	let childbirthWives = 0
-	const store = shared
 	const generationStart = performance.now()
-	for (const key of picked) {
+	for (const rulerId of picked) {
 		let frameSpent = 0
-		const timed = (at: number): WorldFrame => {
-			const started = performance.now()
-			const frame = frameAt(at)
-			frameSpent += performance.now() - started
-			return frame
+		const timedContext = {
+			...context,
+			frameAt: (at: number): WorldFrame => {
+				const started = performance.now()
+				const frame = context.frameAt(at)
+				frameSpent += performance.now() - started
+				return frame
+			},
 		}
+		const key = PERSON_QUERY.rulerKey(rulerId)
 		const started = performance.now()
-		PERSON_QUERY.page({
-			store,
-			key,
-			timeMs: time,
-			frameAt: timed,
-			doctrine,
-			geography,
-		})
+		PERSON_QUERY.page({ record, context: timedContext, key, timeMs: time })
 		pageMs.push(performance.now() - started - frameSpent)
 		frameMs.push(frameSpent)
+		const extendStart = performance.now()
+		cast.context = timedContext
+		PERSON_QUERY.extended({ cast, key, timeMs: time })
+		extendedMs.push(performance.now() - extendStart)
+		cast.context = context
 		const warm = performance.now()
-		PERSON_QUERY.page({
-			store,
-			key,
-			timeMs: time,
-			frameAt: timed,
-			doctrine,
-			geography,
-		})
+		PERSON_QUERY.page({ record, context: timedContext, key, timeMs: time })
 		warmMs.push(performance.now() - warm)
 	}
 	const generationMs = performance.now() - generationStart
-	builds.l1 = store.builds.l1.size
-	builds.l2 = store.builds.l2.size
-	builds.l3 = store.builds.l3.size
-	for (const stub of store.stubs.values()) {
-		if (!stub.life) continue
-		const life = stub.life
-		if (stub.kind !== "ruler" && life.deathMs <= time) {
-			const age = (life.deathMs - stub.birthMs) / YEAR
+	for (const person of cast.persons) {
+		const life = CAST.lifeOf({ cast, person })
+		if (person.ruler.kind !== "ruler" && life.deathMs <= time) {
+			const age = (life.deathMs - person.birthMs) / YEAR
 			if (age >= 16) adultDeaths.push(age)
 		}
 		const reached = (years: number) =>
-			life.deathMs >= stub.birthMs + years * YEAR &&
-			stub.birthMs + years * YEAR <= time
+			life.deathMs >= person.birthMs + years * YEAR &&
+			person.birthMs + years * YEAR <= time
 		if (reached(60)) {
 			aliveAt60++
 			if (
-				HEALTH.at({ life, timeMs: stub.birthMs + 60 * YEAR }).levels.some(
+				HEALTH.at({ life, timeMs: person.birthMs + 60 * YEAR }).levels.some(
 					(level) => level >= 0,
 				)
 			)
@@ -164,73 +186,85 @@ function of({
 		}
 		if (reached(70)) {
 			aliveAt70++
-			if (HEALTH.incapable({ life, timeMs: stub.birthMs + 70 * YEAR }))
+			if (HEALTH.incapable({ life, timeMs: person.birthMs + 70 * YEAR }))
 				incapableAt70++
 		}
-	}
-	for (const chain of store.chains.values()) {
-		const first = chain.marriages[0]
-		if (first) {
-			const husband = store.stubs.get(first.husband)
-			const wife = store.stubs.get(first.wife)
-			if (husband && wife) {
-				firstMarriage.male.push((first.startMs - husband.birthMs) / YEAR)
-				firstMarriage.female.push((first.startMs - wife.birthMs) / YEAR)
-			}
-		}
-		for (const marriage of chain.marriages) {
-			const wife = store.stubs.get(marriage.wife)
-			if (!wife) continue
-			const wifeLife = wife.life
-			if (
-				marriage.startMs <= wife.birthMs + 30 * YEAR &&
-				marriage.endMs >= wife.birthMs + 45 * YEAR
+		const first = person.marriages
+			.map((id) => cast.marriages[id])
+			.find((marriage) => marriage.kind !== "origin" && marriage.kind !== "gap")
+		if (first && person.house)
+			(person.sex === 1 ? firstMarriage.female : firstMarriage.male).push(
+				(first.startMs - person.birthMs) / YEAR,
 			)
-				completed.push(marriage.children.length)
-			if (marriage.startMs <= wife.birthMs + 30 * YEAR) {
-				wives++
-				if (
-					wifeLife &&
-					marriage.pregnancies.some(
-						(pregnancy) => pregnancy.outcome === "childbirth death",
-					)
+	}
+	for (const marriage of cast.marriages) {
+		const wife = cast.persons[marriage.wife]
+		const endMs = CAST.endOf({ cast, marriage })
+		if (
+			marriage.startMs <= wife.birthMs + 30 * YEAR &&
+			endMs >= wife.birthMs + 45 * YEAR &&
+			marriage.cursor.closed
+		)
+			completed.push(marriage.children.length)
+		if (marriage.startMs <= wife.birthMs + 30 * YEAR) {
+			wives++
+			if (
+				marriage.pregnancies.some(
+					(pregnancy) => pregnancy.outcome === "childbirth death",
 				)
-					childbirthWives++
-			}
+			)
+				childbirthWives++
 		}
 	}
-	const pages = Math.max(1, picked.length)
 	const tiers: Record<string, number> = {}
 	let free = 0
 	let kin = 0
-	for (const marriage of new Set(store.marriages.values())) {
+	for (const marriage of cast.marriages) {
 		if (marriage.kind !== "free") continue
 		free++
 		if (marriage.kinship) kin++
-		for (const spouseKey of [marriage.husband, marriage.wife]) {
-			const stub = store.stubs.get(spouseKey)
-			if (stub?.kind !== "spouse") continue
-			const tier = NOBILITY.tierOf({
-				store,
-				stub,
-				timeMs: marriage.startMs,
-			})
+		for (const id of [marriage.husband, marriage.wife]) {
+			const person = cast.persons[id]
+			if (person.parents.kind !== "none") continue
+			const tier = NOBILITY.tierOf({ cast, person, timeMs: marriage.startMs })
 			tiers[tier] = (tiers[tier] ?? 0) + 1
 		}
 	}
-	let claimed = 0
-	for (const list of store.claims.values()) claimed += list.length
 	const spouses = Object.values(tiers).reduce((sum, count) => sum + count, 0)
+	const snapshot = {
+		persons: cast.persons.length,
+		marriages: cast.marriages.length,
+		stats: { ...cast.stats },
+	}
+	const passed = succession(cast, time)
+	const placementStart = performance.now()
+	for (const fact of facts)
+		if (fact.kin) INGEST.ruler({ cast, rulerId: fact.rulerId })
+	for (const tie of cast.anchors.ties) {
+		ALLIANCE.start({ cast, tie })
+		INGEST.drain(cast)
+	}
+	const placementMs = performance.now() - placementStart
 	const placed: Record<string, number> = {}
 	const first: Record<string, number> = {}
-	for (const placement of index.placements) {
+	for (const placement of cast.placements) {
 		placed[placement.requested] = (placed[placement.requested] ?? 0) + 1
 		if (placement.first)
 			first[placement.requested] = (first[placement.requested] ?? 0) + 1
 	}
+	const resolved = cast.anchors.ties.filter((tie) => tie.status !== "pending")
+	let allianceRows = 0
+	for (const union of cast.unions) {
+		const id = cast.rulerPerson.get(union.successor)
+		if (id === undefined) continue
+		if (!PERSON_QUERY.unionLinked({ cast, person: cast.persons[id], union }))
+			allianceRows++
+	}
 	return {
 		rulers: facts.length,
-		persons: store.stubs.size,
+		persons: snapshot.persons,
+		castSize: cast.persons.length,
+		marriages: snapshot.marriages,
 		relabelShare: Object.fromEntries(
 			Object.entries(placed).map(([relation, count]) => [
 				relation,
@@ -239,10 +273,9 @@ function of({
 		),
 		placed,
 		unfilledTieShare:
-			index.ties.filter((tie) => !tie.filled).length /
-			Math.max(1, index.ties.length),
-		ties: index.ties.length,
-		indexMs,
+			resolved.filter((tie) => tie.status === "unfilled").length /
+			Math.max(1, resolved.length),
+		ties: cast.anchors.ties.length,
 		childrenPerCompletedCouple: mean(completed),
 		completedCouples: completed.length,
 		adultDeathAge: spread(adultDeaths),
@@ -253,28 +286,33 @@ function of({
 		conditionShareAt60: conditionsAt60 / Math.max(1, aliveAt60),
 		incapableShare: incapableAt70 / Math.max(1, aliveAt70),
 		childbirthDeathShare: childbirthWives / Math.max(1, wives),
-		layerBuilds: {
-			l1: builds.l1 / pages,
-			l2: builds.l2 / pages,
-			l3: builds.l3 / pages,
-		},
 		frameMs: ms(frameMs),
 		warmMs: ms(warmMs),
 		pageMs: ms(pageMs),
+		extendedMs: ms(extendedMs),
+		ingestMs: { first: ingestFirst },
+		placementMs,
 		generationMs,
 		generatedPages: picked.length,
+		castSpouseShare:
+			snapshot.stats.castSpouses /
+			Math.max(1, snapshot.stats.castSpouses + snapshot.stats.createdSpouses),
+		seatFamilies: snapshot.stats.seatFamilies,
+		passedOverShare: passed.rows / Math.max(1, passed.considered),
+		passedOverRows: passed.rows,
+		revealedLaterCount: cast.stats.revealedLater,
+		reservedUnfit: cast.stats.reservedUnfit,
+		unrecordedParentCount: cast.stats.unrecordedParents,
+		allianceRows,
 		nobility: {
 			freeMarriages: free,
-			claimedShare: claimed / Math.max(1, free),
-			lowbornShare: (tiers[-1] ?? 0) / Math.max(1, spouses + claimed),
+			lowbornShare: (tiers[-1] ?? 0) / Math.max(1, spouses),
 			tierShare: Object.fromEntries(
 				Object.entries(tiers).map(([tier, count]) => [
 					tier,
 					count / Math.max(1, spouses),
 				]),
 			),
-			seededRealms: store.seeded.size,
-			holdersCreated: store.holders.size,
 			kinMarriageShare: kin / Math.max(1, free),
 		},
 	}

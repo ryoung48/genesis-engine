@@ -1,38 +1,43 @@
 import { FRAME } from "@/model/history/world-frame"
 import type { WorldFrame } from "@/model/history/world-frame/types"
+import { FIT } from "@/model/people/anchors/fit"
+import { CAST } from "@/model/people/cast"
+import { INGEST } from "@/model/people/cast/ingest"
+import type { Cast, Person, PersonRow } from "@/model/people/cast/types"
 import { CHARACTER } from "@/model/people/character"
 import { HEALTH } from "@/model/people/health"
 import { AGEING } from "@/model/people/health/ageing"
-import { PERSON_KEY } from "@/model/people/keys"
-import type { PersonKey } from "@/model/people/keys/types"
 import { MARRIAGE } from "@/model/people/marriage"
-import type { Marriage } from "@/model/people/marriage/types"
 import { NOBILITY } from "@/model/people/nobility"
 import { OPINION } from "@/model/people/opinion"
 import { ORIENTATION } from "@/model/people/orientation"
 import type {
 	ConditionView,
 	Describer,
+	ExtendedParams,
 	FamilyGroup,
 	FamilyMember,
-	HeaderParams,
+	GroupsParams,
 	MemberParams,
+	PageOutcome,
+	PageParams,
+	PassedOver,
+	PassedOverParams,
 	PersonHeader,
-	PersonPage,
-	PersonQueryParams,
+	PersonKey,
 	PersonRef,
 	RelativesResult,
+	TimelineParams,
 	TimelineRow,
 	TitleParams,
+	UnionLinkParams,
+	ViewParams,
 } from "@/model/people/query/types"
-import { PEOPLE_STORE } from "@/model/people/store"
-import type { PeopleStore } from "@/model/people/store/types"
-import { PERSON_STUB } from "@/model/people/stub"
-import type { PersonStub } from "@/model/people/stub/types"
 import { TIME } from "@/model/shared/time"
 
 const YEAR = TIME.constants.yearMS
 const BIRTH_FRAME_STEP = 25 * YEAR
+const NON_SON_MIN_AGE = 16
 const TIER_TITLES: readonly (readonly [string, string])[] = [
 	["Count", "Countess"],
 	["Duke", "Duchess"],
@@ -50,155 +55,109 @@ const CONDITION_LABELS: Record<string, string> = {
 	incapable: "Incapable",
 }
 
-function nameOf(store: PeopleStore, stub: PersonStub): string {
-	return PERSON_STUB.names({ store, stub }).name
+function keyOf(person: Person): PersonKey {
+	return `person:${person.id}`
 }
 
-function marriageOf(store: PeopleStore, stub: PersonStub): Marriage {
-	return MARRIAGE.parentMarriage({ store, key: stub.key })
+function rulerKey(rulerId: number): PersonKey {
+	return `ruler:${rulerId}`
 }
 
-function kinLabel(
-	marriage: Marriage,
-	husband: PersonStub,
-	wife: PersonStub,
-): string {
-	if (marriage.kinship === "sibling") return "his sister"
-	if (marriage.kinship === "half-sibling") return "his half-sister"
-	if (marriage.kinship === "cousin") return "his cousin"
-	return wife.birthMs < husband.birthMs ? "his aunt" : "his niece"
+function resolve(cast: Cast, key: PersonKey): Person | null {
+	if (key.startsWith("ruler:"))
+		return INGEST.ruler({ cast, rulerId: Number(key.slice(6)) })
+	if (key.startsWith("person:"))
+		return cast.persons[Number(key.slice(7))] ?? null
+	return null
 }
 
-function stubsOf(store: PeopleStore, keys: PersonKey[]): PersonStub[] {
-	return keys.map((key) => PERSON_STUB.of({ store, key }))
+function nameOf(cast: Cast, person: Person): string {
+	return CAST.names({ cast, person }).name
+}
+
+function marriageOfParents(cast: Cast, person: Person) {
+	return person.parents.kind === "couple"
+		? cast.marriages[person.parents.marriage]
+		: null
+}
+
+function childrenIn(cast: Cast, ids: number[]): Person[] {
+	return ids.flatMap((id) =>
+		cast.marriages[id].children.map((child) => cast.persons[child.id]),
+	)
 }
 
 function relatives(
-	store: PeopleStore,
-	subject: PersonStub,
+	cast: Cast,
+	subject: Person,
 	timeMs: number,
 ): RelativesResult {
-	const marriage = marriageOf(store, subject)
-	const parents = marriage
-		? stubsOf(store, [marriage.husband, marriage.wife])
+	const own = marriageOfParents(cast, subject)
+	const couple = CAST.parentsOf({ cast, person: subject })
+	const parents = couple ? [couple[0], couple[1]] : []
+	const born = (person: Person) => person.birthMs <= timeMs
+	const fullSiblings = own
+		? own.children
+				.map((child) => cast.persons[child.id])
+				.filter((person) => person.id !== subject.id && born(person))
 		: []
-	const born = (stub: PersonStub) => stub.birthMs <= timeMs
-	const fullSiblings = marriage
-		? stubsOf(
-				store,
-				marriage.children
-					.map((child) => child.key)
-					.filter((key) => key !== subject.key),
-			).filter(born)
-		: []
-	const halfSiblings: PersonStub[] = []
+	const halfSiblings: Person[] = []
 	for (const parent of parents)
-		for (const other of MARRIAGE.chain({ store, key: parent.key }).marriages) {
-			if (other.key === marriage?.key) continue
-			halfSiblings.push(
-				...stubsOf(
-					store,
-					other.children.map((child) => child.key),
-				).filter(born),
-			)
-		}
-	const chain = MARRIAGE.chain({ store, key: subject.key })
-	const spouses = chain.marriages
+		halfSiblings.push(
+			...childrenIn(
+				cast,
+				parent.marriages.filter((id) => id !== own?.id),
+			).filter(born),
+		)
+	const spouses = subject.marriages
+		.map((id) => cast.marriages[id])
 		.filter(
-			(own) =>
-				own.startMs <= timeMs ||
-				(own.betrothedMs !== null && own.betrothedMs <= timeMs),
+			(marriage) =>
+				marriage.startMs <= timeMs ||
+				(marriage.betrothedMs !== null && marriage.betrothedMs <= timeMs),
 		)
-		.map((own) => ({
-			betrothed: own.startMs > timeMs,
-			concubine: own.kind === "concubine",
-			kinship: own.kinship,
-			stub: PERSON_STUB.of({
-				store,
-				key: own.husband === subject.key ? own.wife : own.husband,
-			}),
-			current: own.startMs <= timeMs && own.endMs > timeMs,
+		.map((marriage) => ({
+			betrothed: marriage.startMs > timeMs,
+			concubine: marriage.kind === "concubine",
+			kinship: marriage.kinship,
+			person:
+				cast.persons[
+					marriage.husband === subject.id ? marriage.wife : marriage.husband
+				],
+			current:
+				marriage.startMs <= timeMs && CAST.endOf({ cast, marriage }) > timeMs,
 		}))
-	const children = chain.marriages.flatMap((own) =>
-		stubsOf(
-			store,
-			own.children.map((child) => child.key),
-		).filter(born),
-	)
-	const known = PEOPLE_STORE.index(store).parentCouple
-	const house = parents.filter(
-		(parent) => parent.house || known.has(parent.key),
-	)
-	const grandMarriages = house.map((parent) =>
-		MARRIAGE.parentMarriage({ store, key: parent.key }),
-	)
-	const grandparents = grandMarriages.flatMap((own) =>
-		stubsOf(store, [own.husband, own.wife]),
-	)
-	const auncles = grandMarriages.flatMap((own, at) =>
-		stubsOf(
-			store,
-			own.children
-				.map((child) => child.key)
-				.filter((key) => key !== house[at].key),
-		).filter(born),
-	)
-	const cousins = auncles
-		.filter((auncle) => auncle.house)
-		.flatMap((auncle) =>
-			MARRIAGE.baseChain({ store, key: auncle.key }).marriages.flatMap((own) =>
-				stubsOf(
-					store,
-					own.children.map((child) => child.key),
-				).filter(born),
-			),
-		)
-	const nephews = fullSiblings
-		.filter((sibling) => sibling.house)
-		.flatMap((sibling) =>
-			MARRIAGE.baseChain({ store, key: sibling.key }).marriages.flatMap((own) =>
-				stubsOf(
-					store,
-					own.children.map((child) => child.key),
-				).filter(born),
-			),
-		)
 	return {
 		parents,
 		fullSiblings,
 		halfSiblings,
 		spouses,
-		children,
-		grandparents,
-		auncles,
-		cousins,
-		nephews,
+		children: childrenIn(cast, subject.marriages).filter(born),
+		grandparents: [],
+		auncles: [],
+		cousins: [],
+		nephews: [],
 	}
 }
 
-function reigning(
-	store: PeopleStore,
-	stub: PersonStub,
-	timeMs: number,
-): number | null {
-	const parsed = PERSON_KEY.parse(stub.key)
-	if (parsed.tag !== "R") return null
-	const fact = PEOPLE_STORE.index(store).facts.get(parsed.rulerId)
-	const reign = fact?.reigns.find(
+function reigning(cast: Cast, person: Person, timeMs: number): number | null {
+	const fact = CAST.factOf({ cast, person })
+	if (!fact) return null
+	const reign = fact.reigns.find(
 		(entry) => entry.startMs <= timeMs && (timeMs < entry.endMs || entry.open),
 	)
 	return reign ? reign.nationId : null
 }
 
 function titleOf({
-	store,
-	stub,
+	cast,
+	person,
 	parents,
 	timeMs,
 	frame,
 }: TitleParams): string | null {
-	const female = stub.sex === 1
-	const nationId = reigning(store, stub, timeMs)
+	const female = person.sex === 1
+	const nationId = reigning(cast, person, timeMs)
 	if (nationId !== null) {
 		const tier = FRAME.heldTitles({ frame, nationId }).reduce(
 			(top, title) => Math.max(top, frame.titles?.tier[title] ?? 0),
@@ -211,104 +170,108 @@ function titleOf({
 			: TIER_TITLES[tier][female ? 1 : 0]
 	}
 	for (const parent of parents) {
-		const realm = reigning(store, parent, timeMs)
+		const realm = reigning(cast, parent, timeMs)
 		if (realm !== null)
-			return `${female ? "Princess" : "Prince"} of ${frame.nations.get(realm)?.name ?? store.record.nations[realm]?.name ?? "the realm"}`
+			return `${female ? "Princess" : "Prince"} of ${frame.nations.get(realm)?.name ?? cast.record.nations[realm]?.name ?? "the realm"}`
 	}
 	return null
 }
 
-function viewOf(
-	store: PeopleStore,
-	stub: PersonStub,
-	timeMs: number,
-	frame: WorldFrame,
-) {
-	const culture = frame.provinceCulture[stub.home] ?? -1
+function viewOf({ cast, person, timeMs, frame }: ViewParams) {
+	const culture = frame.provinceCulture[person.home] ?? -1
 	return {
-		character: PERSON_STUB.character({ store, stub }),
-		age: Math.max(0, (timeMs - stub.birthMs) / YEAR),
+		character: person.character,
+		age: Math.max(0, (timeMs - person.birthMs) / YEAR),
 		culture,
-		religion: frame.provinceReligion[stub.home] ?? -1,
+		religion: frame.provinceReligion[person.home] ?? -1,
 		heritage:
-			culture >= 0 ? (store.record.heritageOfCulture[culture] ?? -1) : -1,
+			culture >= 0 ? (cast.record.heritageOfCulture[culture] ?? -1) : -1,
 	}
 }
 
 function member({
-	store,
+	cast,
+	context,
 	subject,
-	stub,
+	person,
 	timeMs,
 	frame,
 	kin,
 	spouse,
 }: MemberParams): FamilyMember {
-	const life = PERSON_STUB.life({ store, stub })
+	const life = CAST.lifeOf({ cast, person })
 	const status = HEALTH.at({ life, timeMs }).band
-	const names = PERSON_STUB.names({ store, stub })
+	const names = CAST.names({ cast, person })
 	return {
-		key: stub.key,
+		key: keyOf(person),
 		name: names.name,
 		house: names.house,
-		female: stub.sex === 1,
-		ageYears: (Math.min(timeMs, life.deathMs) - stub.birthMs) / YEAR,
+		female: person.sex === 1,
+		ageYears: (Math.min(timeMs, life.deathMs) - person.birthMs) / YEAR,
 		status,
 		kinship: null,
 		opinion:
 			status === "Dead"
 				? null
 				: OPINION.of({
-						observer: viewOf(store, subject, timeMs, frame),
-						target: viewOf(store, stub, timeMs, frame),
+						observer: viewOf({ cast, context, person: subject, timeMs, frame }),
+						target: viewOf({ cast, context, person, timeMs, frame }),
 						kin,
 						spouse,
 					}),
+		revealed:
+			person.revealedLater ||
+			(CAST.parentsOf({ cast, person })?.some(
+				(parent) => parent.revealedLater,
+			) ??
+				false),
 	}
 }
 
-function groups(
-	store: PeopleStore,
-	subject: PersonStub,
-	timeMs: number,
-	frame: WorldFrame,
-	found: RelativesResult,
-): FamilyGroup[] {
-	const seen = new Set<PersonKey>()
+function groups({
+	cast,
+	context,
+	subject,
+	timeMs,
+	frame,
+	found,
+}: GroupsParams): FamilyGroup[] {
+	const seen = new Set<number>()
+	const kinships = new Map(
+		found.spouses.map((entry) => [entry.person.id, entry.kinship] as const),
+	)
 	const build = (
 		label: string,
-		stubs: PersonStub[],
+		people: Person[],
 		kin: boolean,
-		spouse: (stub: PersonStub) => boolean,
+		spouse: (person: Person) => boolean,
 	): FamilyGroup => ({
 		label,
-		members: stubs
-			.filter((stub) => {
-				if (seen.has(stub.key)) return false
-				seen.add(stub.key)
+		members: people
+			.filter((person) => {
+				if (seen.has(person.id)) return false
+				seen.add(person.id)
 				return true
 			})
-			.map((stub) => ({
+			.map((person) => ({
 				...member({
-					store,
+					cast,
+					context,
 					subject,
-					stub,
+					person,
 					timeMs,
 					frame,
 					kin,
-					spouse: spouse(stub),
+					spouse: spouse(person),
 				}),
-				kinship: kinships.get(stub.key) ?? null,
+				kinship: kinships.get(person.id) ?? null,
 			})),
 	})
 	const never = () => false
-	const kinships = new Map(
-		found.spouses.map((entry) => [entry.stub.key, entry.kinship] as const),
-	)
 	const current = new Set(
 		found.spouses
 			.filter((entry) => entry.current && !entry.concubine)
-			.map((entry) => entry.stub.key),
+			.map((entry) => entry.person.id),
 	)
 	return [
 		build("Parents", found.parents, true, never),
@@ -318,15 +281,15 @@ function groups(
 			"Spouses",
 			found.spouses
 				.filter((entry) => entry.current && !entry.concubine)
-				.map((entry) => entry.stub),
+				.map((entry) => entry.person),
 			false,
-			(stub) => current.has(stub.key),
+			(person) => current.has(person.id),
 		),
 		build(
 			"Concubines",
 			found.spouses
 				.filter((entry) => entry.current && entry.concubine)
-				.map((entry) => entry.stub),
+				.map((entry) => entry.person),
 			false,
 			never,
 		),
@@ -334,7 +297,7 @@ function groups(
 			"Betrothed",
 			found.spouses
 				.filter((entry) => entry.betrothed)
-				.map((entry) => entry.stub),
+				.map((entry) => entry.person),
 			false,
 			never,
 		),
@@ -342,7 +305,7 @@ function groups(
 			"Former spouses",
 			found.spouses
 				.filter((entry) => !entry.current && !entry.betrothed)
-				.map((entry) => entry.stub),
+				.map((entry) => entry.person),
 			false,
 			never,
 		),
@@ -351,12 +314,12 @@ function groups(
 }
 
 function conditionsOf(
-	store: PeopleStore,
-	stub: PersonStub,
+	cast: Cast,
+	person: Person,
 	timeMs: number,
 ): ConditionView[] {
 	const { levels } = HEALTH.at({
-		life: PERSON_STUB.life({ store, stub }),
+		life: CAST.lifeOf({ cast, person }),
 		timeMs,
 	})
 	return levels.flatMap((level, index) =>
@@ -373,115 +336,229 @@ function conditionsOf(
 
 function relationsOf(
 	found: RelativesResult,
-	side: (stub: PersonStub, male: string, female: string) => string,
-): Map<PersonKey, string> {
-	const relations = new Map<PersonKey, string>()
-	for (const stub of found.grandparents)
-		relations.set(stub.key, side(stub, "grandfather", "grandmother"))
-	for (const stub of found.auncles)
-		relations.set(stub.key, side(stub, "uncle", "aunt"))
-	for (const stub of found.cousins) relations.set(stub.key, "cousin")
-	for (const stub of found.nephews)
-		relations.set(stub.key, side(stub, "nephew", "niece"))
-	for (const stub of found.parents)
-		relations.set(stub.key, side(stub, "father", "mother"))
-	for (const stub of found.fullSiblings)
-		relations.set(stub.key, side(stub, "brother", "sister"))
-	for (const stub of found.halfSiblings)
-		relations.set(stub.key, side(stub, "half-brother", "half-sister"))
-	for (const stub of found.children)
-		relations.set(stub.key, side(stub, "son", "daughter"))
+	side: (person: Person, male: string, female: string) => string,
+): Map<number, string> {
+	const relations = new Map<number, string>()
+	for (const person of found.grandparents)
+		relations.set(person.id, side(person, "grandfather", "grandmother"))
+	for (const person of found.auncles)
+		relations.set(person.id, side(person, "uncle", "aunt"))
+	for (const person of found.cousins) relations.set(person.id, "cousin")
+	for (const person of found.nephews)
+		relations.set(person.id, side(person, "nephew", "niece"))
+	for (const person of found.parents)
+		relations.set(person.id, side(person, "father", "mother"))
+	for (const person of found.fullSiblings)
+		relations.set(person.id, side(person, "brother", "sister"))
+	for (const person of found.halfSiblings)
+		relations.set(person.id, side(person, "half-brother", "half-sister"))
+	for (const person of found.children)
+		relations.set(person.id, side(person, "son", "daughter"))
 	for (const entry of found.spouses)
 		relations.set(
-			entry.stub.key,
+			entry.person.id,
 			entry.betrothed
-				? side(entry.stub, "fiancé", "fiancée")
+				? side(entry.person, "fiancé", "fiancée")
 				: entry.concubine
 					? "concubine"
-					: side(entry.stub, "husband", "wife"),
+					: side(entry.person, "husband", "wife"),
 		)
 	return relations
 }
 
 function describer(
-	store: PeopleStore,
-	subject: PersonStub,
+	cast: Cast,
+	subject: Person,
 	found: RelativesResult,
 ): Describer {
-	const relations = relationsOf(found, (stub, male, female) =>
-		stub.sex === 1 ? female : male,
+	const relations = relationsOf(found, (person, male, female) =>
+		person.sex === 1 ? female : male,
 	)
 	const row = (
 		timeMs: number,
 		type: string,
-		parts: Array<string | PersonStub>,
-	) => {
+		parts: Array<string | Person>,
+		revealed = false,
+	): TimelineRow => {
 		const people: PersonRef[] = []
 		const text = parts
 			.map((part) => {
 				if (typeof part === "string") return part
-				const name = nameOf(store, part)
-				const relation = relations.get(part.key)
-				if (part.key === subject.key || !relation) return name
-				people.push({ key: part.key, name })
+				const name = nameOf(cast, part)
+				const relation = relations.get(part.id)
+				if (part.id === subject.id || !relation) return name
+				people.push({ key: keyOf(part), name })
 				return `${name} (${relation})`
 			})
 			.join("")
-		return { timeMs, type, text, people }
+		return { timeMs, type, text, people, revealed }
 	}
 	return { row }
 }
 
-function birthParts(
-	store: PeopleStore,
-	stub: PersonStub,
-	marriage: Marriage | null,
-): Array<string | PersonStub> {
-	if (!marriage) return [stub, " was born"]
-	return [
-		stub,
-		" was born to ",
-		PERSON_STUB.of({ store, key: marriage.husband }),
-		" and ",
-		PERSON_STUB.of({ store, key: marriage.wife }),
-	]
+function kinLabel(kinship: string, husband: Person, wife: Person): string {
+	if (kinship === "sibling") return "his sister"
+	if (kinship === "half-sibling") return "his half-sister"
+	if (kinship === "cousin") return "his cousin"
+	return wife.birthMs < husband.birthMs ? "his aunt" : "his niece"
 }
 
-function deathCause(store: PeopleStore, stub: PersonStub): string | null {
-	const life = PERSON_STUB.life({ store, stub })
-	const chain = MARRIAGE.chain({ store, key: stub.key })
-	const childbirth = chain.marriages.some((marriage) =>
-		marriage.pregnancies.some(
-			(pregnancy) =>
-				pregnancy.outcome === "childbirth death" &&
-				marriage.wife === stub.key &&
-				pregnancy.dueMs === life.deathMs,
-		),
-	)
+function birthParts(cast: Cast, person: Person): Array<string | Person> {
+	const couple = CAST.parentsOf({ cast, person })
+	if (!couple) return [person, " was born"]
+	return [person, " was born to ", couple[0], " and ", couple[1]]
+}
+
+function deathCause(cast: Cast, person: Person): string | null {
+	const life = CAST.lifeOf({ cast, person })
+	const childbirth = person.marriages.some((id) => {
+		const marriage = cast.marriages[id]
+		return (
+			marriage.wife === person.id &&
+			marriage.pregnancies.some(
+				(pregnancy) =>
+					pregnancy.outcome === "childbirth death" &&
+					pregnancy.dueMs === life.deathMs,
+			)
+		)
+	})
 	return childbirth ? "Died in childbirth" : life.cause
 }
 
-function timelineOf(
-	store: PeopleStore,
-	subject: PersonStub,
+function passedOver({ cast, person, timeMs }: PassedOverParams): PassedOver[] {
+	const found: PassedOver[] = []
+	const couple = CAST.parentsOf({ cast, person })
+	if (!couple) return found
+	const life = CAST.lifeOf({ cast, person })
+	for (const parent of couple) {
+		const fact = CAST.factOf({ cast, person: parent })
+		if (!fact) continue
+		for (const reign of fact.reigns) {
+			if (reign.open || reign.endMs > timeMs) continue
+			const reigns = cast.anchors.nationReigns.get(reign.nationId) ?? []
+			const at = reigns.indexOf(reign)
+			const next = reigns[at + 1]
+			if (!next || next.rulerId === fact.rulerId) continue
+			const successor = cast.anchors.facts.get(next.rulerId)
+			if (!successor) continue
+			if (
+				person.ruler.kind === "ruler" &&
+				person.ruler.ref.rulerId === successor.rulerId
+			)
+				continue
+			if (person.birthMs > reign.endMs || life.deathMs <= reign.endMs) continue
+			const sonOfLate =
+				successor.kin?.relation === "son" &&
+				successor.kin.late.rulerId === fact.rulerId
+			const outranks = sonOfLate
+				? person.birthMs < successor.birthMs &&
+					(person.sex === 0 || person.sex === successor.ref.sex)
+				: (reign.endMs - person.birthMs) / YEAR >= NON_SON_MIN_AGE
+			if (!outranks) continue
+			found.push({
+				timeMs: reign.endMs,
+				successorRulerId: successor.rulerId,
+			})
+		}
+	}
+	return found
+}
+
+function unionLinked({ cast, person, union }: UnionLinkParams): boolean {
+	const late = INGEST.ruler({ cast, rulerId: union.late })
+	if (!late) return false
+	return person.marriages.some((id) => {
+		const marriage = cast.marriages[id]
+		const other =
+			cast.persons[
+				marriage.husband === person.id ? marriage.wife : marriage.husband
+			]
+		const couple = CAST.parentsOf({ cast, person: other })
+		return (
+			marriage.startMs <= union.timeMs &&
+			couple !== null &&
+			couple.some((parent) => parent.id === late.id)
+		)
+	})
+}
+
+function extraRows(
+	cast: Cast,
+	describe: Describer,
+	person: Person,
 	timeMs: number,
-	found: RelativesResult,
 ): TimelineRow[] {
-	const { row } = describer(store, subject, found)
 	const rows: TimelineRow[] = []
-	const life = PERSON_STUB.life({ store, stub: subject })
+	for (const entry of person.rows as PersonRow[])
+		rows.push(
+			describe.row(
+				entry.timeMs,
+				entry.type,
+				entry.parts.map((part) =>
+					typeof part === "string" ? part : cast.persons[part.person],
+				),
+				entry.revealed,
+			),
+		)
+	for (const over of passedOver({ cast, person, timeMs })) {
+		const successor = INGEST.ruler({ cast, rulerId: over.successorRulerId })
+		const fact = cast.anchors.facts.get(over.successorRulerId)
+		const realm = fact?.reigns[0]
+			? (cast.record.nations[fact.reigns[0].nationId]?.name ?? "the realm")
+			: "the realm"
+		rows.push(
+			describe.row(over.timeMs, "Succession", [
+				person,
+				` was passed over in the succession to the throne of ${realm}`,
+				...(successor ? [" in favour of ", successor] : []),
+			]),
+		)
+	}
+	const union = cast.unions.find(
+		(entry) =>
+			person.ruler.kind === "ruler" &&
+			entry.successor === person.ruler.ref.rulerId,
+	)
+	if (
+		union &&
+		union.timeMs <= timeMs &&
+		!unionLinked({ cast, person, union })
+	) {
+		const late = INGEST.ruler({ cast, rulerId: union.late })
+		const house = late ? CAST.names({ cast, person: late }).house : null
+		rows.push(
+			describe.row(union.timeMs, "Succession", [
+				person,
+				` inherited through the marriage alliance with ${house ? `${house}'s` : "the late ruler's"} house`,
+			]),
+		)
+	}
+	return rows
+}
+
+function timelineOf({
+	cast,
+	person,
+	timeMs,
+	found,
+}: TimelineParams): TimelineRow[] {
+	const describe = describer(cast, person, found)
+	const { row } = describe
+	const rows: TimelineRow[] = []
+	const life = CAST.lifeOf({ cast, person })
 	rows.push(
 		row(
-			subject.birthMs,
+			person.birthMs,
 			"Birth",
-			birthParts(store, subject, marriageOf(store, subject)),
+			birthParts(cast, person),
+			person.revealedLater,
 		),
 	)
 	for (const entry of life.rows) {
-		if (entry.kind === "band" && entry.timeMs > subject.birthMs)
+		if (entry.kind === "band" && entry.timeMs > person.birthMs)
 			rows.push(
 				row(entry.timeMs, "Health", [
-					subject,
+					person,
 					`'s health became ${entry.band.toLowerCase()}`,
 				]),
 			)
@@ -492,32 +569,30 @@ function timelineOf(
 					entry.timeMs,
 					"Health",
 					entry.before < 0
-						? [subject, ` developed ${label}`]
+						? [person, ` developed ${label}`]
 						: entry.after < 0
-							? [subject, ` lost ${label}`]
+							? [person, ` lost ${label}`]
 							: [`${label} worsened to level ${entry.after + 1}`],
 				),
 			)
 		}
 	}
-	const parsed = PERSON_KEY.parse(subject.key)
-	if (parsed.tag === "R") {
-		const fact = PEOPLE_STORE.index(store).facts.get(parsed.rulerId)
-		for (const reign of fact?.reigns ?? []) {
-			const realm = store.record.nations[reign.nationId]?.name ?? "a realm"
+	const fact = CAST.factOf({ cast, person })
+	for (const reign of fact?.reigns ?? []) {
+		const realm = cast.record.nations[reign.nationId]?.name ?? "a realm"
+		rows.push(
+			row(reign.startMs, "Reign", [person, ` took the throne of ${realm}`]),
+		)
+		if (!reign.open)
 			rows.push(
-				row(reign.startMs, "Reign", [subject, ` took the throne of ${realm}`]),
+				row(reign.endMs, "Reign", [person, ` left the throne of ${realm}`]),
 			)
-			if (!reign.open)
-				rows.push(
-					row(reign.endMs, "Reign", [subject, ` left the throne of ${realm}`]),
-				)
-		}
 	}
-	const chain = MARRIAGE.chain({ store, key: subject.key })
-	for (const marriage of chain.marriages) {
-		const husband = PERSON_STUB.of({ store, key: marriage.husband })
-		const wife = PERSON_STUB.of({ store, key: marriage.wife })
+	for (const id of person.marriages) {
+		const marriage = cast.marriages[id]
+		const husband = cast.persons[marriage.husband]
+		const wife = cast.persons[marriage.wife]
+		const revealed = marriage.revealedLater
 		if (marriage.betrothedMs !== null)
 			rows.push(
 				row(marriage.betrothedMs, "Marriage", [
@@ -532,7 +607,14 @@ function timelineOf(
 				marriage.startMs,
 				"Marriage",
 				marriage.kind === "tie"
-					? [husband, " and ", wife, " wed in a royal marriage"]
+					? marriage.kinship
+						? [
+								husband,
+								" and ",
+								wife,
+								` wed in a royal marriage, ${kinLabel(marriage.kinship, husband, wife)}`,
+							]
+						: [husband, " and ", wife, " wed in a royal marriage"]
 					: marriage.kind === "concubine"
 						? [husband, " took ", wife, " as a concubine"]
 						: marriage.kinship
@@ -540,68 +622,70 @@ function timelineOf(
 									husband,
 									" married ",
 									wife,
-									`, ${kinLabel(marriage, husband, wife)}`,
+									`, ${kinLabel(marriage.kinship, husband, wife)}`,
 								]
 							: [husband, " married ", wife],
+				revealed,
 			),
 		)
-		const spouse = husband.key === subject.key ? wife : husband
-		const spouseLife = PERSON_STUB.life({ store, stub: spouse })
+		const spouse = husband.id === person.id ? wife : husband
+		const spouseLife = CAST.lifeOf({ cast, person: spouse })
 		if (
 			spouseLife.deathMs <= life.deathMs &&
 			spouseLife.deathMs > marriage.startMs
 		)
 			rows.push(
-				row(spouseLife.deathMs, "Marriage", [
-					subject,
-					" was widowed by the death of ",
-					spouse,
-				]),
+				row(
+					spouseLife.deathMs,
+					"Marriage",
+					[person, " was widowed by the death of ", spouse],
+					revealed || spouse.revealedLater,
+				),
 			)
-		for (const pregnancy of marriage.pregnancies) {
+		for (const pregnancy of marriage.pregnancies)
 			if (
 				(pregnancy.outcome === "miscarriage" ||
 					pregnancy.outcome === "stillbirth") &&
-				wife.key === subject.key
+				wife.id === person.id
 			)
 				rows.push(
 					row(pregnancy.dueMs, "Children", [
-						subject,
+						person,
 						` suffered a ${pregnancy.outcome} with `,
 						husband,
 					]),
 				)
-		}
-		for (const child of marriage.children)
+		for (const child of marriage.children) {
+			const born = cast.persons[child.id]
 			rows.push(
 				row(
 					child.birthMs,
 					"Children",
-					birthParts(
-						store,
-						PERSON_STUB.of({ store, key: child.key }),
-						marriage,
-					),
+					birthParts(cast, born),
+					born.revealedLater,
 				),
 			)
+		}
 	}
 	for (const relative of [
 		...found.parents,
 		...found.fullSiblings,
 		...found.halfSiblings,
 		...found.children,
-		...found.spouses.map((entry) => entry.stub),
+		...found.spouses.map((entry) => entry.person),
 	]) {
-		const deathMs = PERSON_STUB.life({ store, stub: relative }).deathMs
+		const deathMs = CAST.lifeOf({ cast, person: relative }).deathMs
 		if (deathMs <= timeMs)
-			rows.push(row(deathMs, "Family", [relative, " died"]))
+			rows.push(
+				row(deathMs, "Family", [relative, " died"], relative.revealedLater),
+			)
 	}
-	const deathMs = life.deathMs
-	if (deathMs <= timeMs)
+	rows.push(...extraRows(cast, describe, person, timeMs))
+	if (life.deathMs <= timeMs)
 		rows.push(
-			row(deathMs, "Death", [
-				subject,
-				` died (${(deathCause(store, subject) ?? "natural causes").toLowerCase()})`,
+			row(life.deathMs, "Death", [
+				person,
+				` died (${(deathCause(cast, person) ?? "natural causes").toLowerCase()})`,
 			]),
 		)
 	return rows
@@ -609,88 +693,170 @@ function timelineOf(
 		.sort((x, y) => x.timeMs - y.timeMs)
 }
 
+function headerOf(cast: Cast, person: Person): PersonHeader {
+	return { name: nameOf(cast, person), birthMs: person.birthMs }
+}
+
+function generate(cast: Cast, subject: Person, timeMs: number): void {
+	MARRIAGE.extend({ cast, id: subject.id, untilMs: timeMs })
+	FIT.ensureParents({ cast, person: subject })
+	const couple = CAST.parentsOf({ cast, person: subject })
+	for (const parent of couple ?? [])
+		MARRIAGE.extend({ cast, id: parent.id, untilMs: timeMs })
+}
+
 function page({
-	store,
+	record,
+	context,
 	key,
 	timeMs,
-	frameAt,
-	doctrine,
-	geography,
-}: PersonQueryParams): PersonPage | null {
-	store.context = { frameAt, doctrine, geography }
-	let subject: PersonStub
-	try {
-		subject = PERSON_STUB.of({ store, key })
-	} catch {
-		return null
-	}
-	if (subject.birthMs > timeMs) return null
-	store.builds.l3.add(key)
-	const life = PERSON_STUB.life({ store, stub: subject })
-	const frame = frameAt(timeMs)
-	const birthFrame = frameAt(
+}: PageParams): PageOutcome | null {
+	const cast = INGEST.open({ record, context })
+	INGEST.settle(cast)
+	const subject = resolve(cast, key)
+	if (!subject) return null
+	if (timeMs > record.maxTimeMs)
+		return { kind: "pending", header: headerOf(cast, subject) }
+	if (subject.birthMs > timeMs)
+		return { kind: "unborn", header: headerOf(cast, subject) }
+	generate(cast, subject, timeMs)
+	const life = CAST.lifeOf({ cast, person: subject })
+	const frame: WorldFrame = context.frameAt(timeMs)
+	const birthFrame = context.frameAt(
 		Math.min(
-			store.record.maxTimeMs,
+			record.maxTimeMs,
 			Math.max(
-				store.record.minTimeMs,
+				record.minTimeMs,
 				Math.floor(subject.birthMs / BIRTH_FRAME_STEP) * BIRTH_FRAME_STEP,
 			),
 		),
 	)
-	const found = relatives(store, subject, timeMs)
-	const names = PERSON_STUB.names({ store, stub: subject })
-	const character = PERSON_STUB.character({ store, stub: subject })
+	const found = relatives(cast, subject, timeMs)
+	const names = CAST.names({ cast, person: subject })
 	const age = (Math.min(timeMs, life.deathMs) - subject.birthMs) / YEAR
 	const culture = birthFrame.provinceCulture[subject.home] ?? -1
 	const religion = frame.provinceReligion[subject.home] ?? -1
 	return {
-		key,
-		name: names.name,
-		house: names.house,
-		female: subject.sex === 1,
-		birthMs: subject.birthMs,
-		ageYears: age,
-		status: HEALTH.at({ life, timeMs }).band,
-		deathMs: life.deathMs,
-		title: titleOf({
-			store,
-			stub: subject,
-			parents: found.parents,
-			timeMs,
-			frame,
-		}),
-		cultureKey:
-			culture >= 0 ? (birthFrame.cultures[culture]?.key ?? null) : null,
-		rank: NOBILITY.rankLabel(
-			subject,
-			NOBILITY.tierOf({ store, stub: subject, timeMs }),
-		),
-		seatProvince: NOBILITY.seatOf({ store, stub: subject, timeMs }),
-		religionId: religion,
-		religionKey:
-			religion >= 0 ? (frame.religions[religion]?.key ?? null) : null,
-		culture: culture >= 0 ? (birthFrame.cultures[culture]?.name ?? null) : null,
-		religion: religion >= 0 ? (frame.religions[religion]?.name ?? null) : null,
-		orientation:
-			age >= ORIENTATION.adultAge
-				? ORIENTATION.of({ seed: PERSON_STUB.seedOf(store, key) })
-				: null,
-		personality: CHARACTER.activeTraits({ character, age }),
-		grades: CHARACTER.gradeTraits(character),
-		congenital: CHARACTER.congenitalTraits(character),
-		conditions: conditionsOf(store, subject, timeMs),
-		groups: groups(store, subject, timeMs, frame, found),
-		timeline: timelineOf(store, subject, timeMs, found),
+		kind: "page",
+		page: {
+			key: keyOf(subject),
+			name: names.name,
+			house: names.house,
+			female: subject.sex === 1,
+			birthMs: subject.birthMs,
+			ageYears: age,
+			status: HEALTH.at({ life, timeMs }).band,
+			deathMs: life.deathMs,
+			title: titleOf({
+				cast,
+				person: subject,
+				parents: found.parents,
+				timeMs,
+				frame,
+			}),
+			cultureKey:
+				culture >= 0 ? (birthFrame.cultures[culture]?.key ?? null) : null,
+			rank: NOBILITY.rankLabel(
+				subject,
+				NOBILITY.tierOf({ cast, person: subject, timeMs }),
+			),
+			seatProvince: NOBILITY.seatOf({ cast, person: subject, timeMs }),
+			religionId: religion,
+			religionKey:
+				religion >= 0 ? (frame.religions[religion]?.key ?? null) : null,
+			culture:
+				culture >= 0 ? (birthFrame.cultures[culture]?.name ?? null) : null,
+			religion:
+				religion >= 0 ? (frame.religions[religion]?.name ?? null) : null,
+			orientation:
+				age >= ORIENTATION.adultAge
+					? ORIENTATION.of({ seed: CAST.seedOf({ cast, id: subject.id }) })
+					: null,
+			personality: CHARACTER.activeTraits({
+				character: subject.character,
+				age,
+			}),
+			grades: CHARACTER.gradeTraits(subject.character),
+			congenital: CHARACTER.congenitalTraits(subject.character),
+			conditions: conditionsOf(cast, subject, timeMs),
+			groups: groups({ cast, context, subject, timeMs, frame, found }),
+			timeline: timelineOf({ cast, person: subject, timeMs, found }),
+			revealed: subject.revealedLater,
+		},
 	}
 }
 
-function rulerKey(rulerId: number): PersonKey {
-	return PERSON_KEY.ruler(rulerId)
+function extended({ cast, key, timeMs }: ExtendedParams): FamilyGroup[] {
+	INGEST.settle(cast)
+	const subject = resolve(cast, key)
+	const context = cast.context
+	if (!subject || !context || timeMs > cast.horizonMs) return []
+	const frame = context.frameAt(timeMs)
+	const born = (person: Person) => person.birthMs <= timeMs
+	generate(cast, subject, timeMs)
+	const couple = CAST.parentsOf({ cast, person: subject })
+	const parents = couple ? [couple[0], couple[1]] : []
+	const grandparents: Person[] = []
+	for (const parent of parents) {
+		FIT.ensureParents({ cast, person: parent })
+		for (const elder of CAST.parentsOf({ cast, person: parent }) ?? []) {
+			grandparents.push(elder)
+			MARRIAGE.extend({ cast, id: elder.id, untilMs: timeMs })
+		}
+	}
+	const parentIds = new Set(parents.map((parent) => parent.id))
+	const auncles = new Map<number, Person>()
+	for (const elder of grandparents)
+		for (const child of childrenIn(cast, elder.marriages))
+			if (!parentIds.has(child.id) && born(child)) auncles.set(child.id, child)
+	const cousins = new Map<number, Person>()
+	for (const auncle of auncles.values()) {
+		MARRIAGE.extend({ cast, id: auncle.id, untilMs: timeMs })
+		for (const child of childrenIn(cast, auncle.marriages))
+			if (born(child)) cousins.set(child.id, child)
+	}
+	const seen = new Set<number>([subject.id])
+	const build = (label: string, people: Person[]): FamilyGroup => ({
+		label,
+		members: people
+			.filter((person) => {
+				if (seen.has(person.id)) return false
+				seen.add(person.id)
+				return true
+			})
+			.map((person) =>
+				member({
+					cast,
+					context,
+					subject,
+					person,
+					timeMs,
+					frame,
+					kin: true,
+					spouse: false,
+				}),
+			),
+	})
+	return [
+		build("Grandparents", grandparents),
+		build("Uncles and aunts", [...auncles.values()]),
+		build("Cousins", [...cousins.values()]),
+	]
 }
 
-function header({ store, key }: HeaderParams): PersonHeader {
-	const stub = PERSON_STUB.of({ store, key })
-	return { name: nameOf(store, stub), birthMs: stub.birthMs }
+function header(cast: Cast, key: PersonKey): PersonHeader | null {
+	const person = resolve(cast, key)
+	return person ? headerOf(cast, person) : null
 }
 
-export const PERSON_QUERY = { page, header, rulerKey }
+export const PERSON_QUERY = {
+	page,
+	extended,
+	header,
+	rulerKey,
+	keyOf,
+	resolve,
+	passedOver,
+	unionLinked,
+	open: INGEST.open,
+}

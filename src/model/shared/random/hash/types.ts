@@ -3,3 +3,8 @@ export interface HashParams {
 	channel: number
 	salt: number
 }
+
+export interface KeyedParams {
+	seed: number
+	key: string
+}
