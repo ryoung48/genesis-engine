@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react"
 import { WEBGCM_EXPORT } from "@/model/climate/export/webgcm"
+import { WEBGCM_NATIVE } from "@/model/climate/export/webgcm/native"
 import type { ExportWidthPreset } from "@/ui/genesis/controls/OverlayControls/types"
 import {
 	buildMapExportFilename,
@@ -20,7 +21,8 @@ export function useMapExport(input: MapExportInput) {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleExportMap = useCallback(async () => {
-		const terrain = exportWidthPreset === "webgcm"
+		const native = exportWidthPreset === "webgcm-native"
+		const terrain = exportWidthPreset === "webgcm" || native
 		if (!worldForDisplay || exportProgress || (!terrain && !sceneRef.current))
 			return
 		const width = Number(exportWidthPreset)
@@ -30,11 +32,16 @@ export function useMapExport(input: MapExportInput) {
 			const blob = terrain
 				? new Blob(
 						[
-							await WEBGCM_EXPORT.createRaster({
-								mesh: worldForDisplay.mesh,
-								elevationKm: worldForDisplay.elevation_km,
-								onProgress: setExportProgress,
-							}),
+							native
+								? await WEBGCM_NATIVE.createFile({
+										world: worldForDisplay,
+										onProgress: setExportProgress,
+									})
+								: await WEBGCM_EXPORT.createRaster({
+										mesh: worldForDisplay.mesh,
+										elevationKm: worldForDisplay.elevation_km,
+										onProgress: setExportProgress,
+									}),
 						],
 						{ type: "application/octet-stream" },
 					)
@@ -49,7 +56,7 @@ export function useMapExport(input: MapExportInput) {
 			const link = document.createElement("a")
 			link.href = objectUrl
 			link.download = terrain
-				? `chaos-world-${sanitizeExportIdentity(seed?.toString()) ?? "terrain"}.bin`
+				? `chaos-world-${sanitizeExportIdentity(seed?.toString()) ?? "terrain"}.${native ? "gcmworld" : "bin"}`
 				: buildMapExportFilename(seed, width)
 			document.body.appendChild(link)
 			link.click()

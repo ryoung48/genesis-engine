@@ -1,5 +1,7 @@
 # Exporting terrain to local WebGCM
 
+For an export that preserves the existing cells and land/water labels, see [the native-grid GCM integration](webgcm-native-grid.md). This page describes the separate raster format.
+
 In the world viewer's **Export** controls, choose **WebGCM**, then **Export WebGCM terrain**. The download is named `chaos-world-<seed>.bin`.
 
 With the local WebGCM server running, open [Load terrain](http://localhost:8766/terrain.html), choose the exported file and a climate resolution. The existing WebGCM app opens below the picker with the elevation overlay. Other overlays, including the local Köppen overlay, remain available.

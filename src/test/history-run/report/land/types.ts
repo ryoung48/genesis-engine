@@ -8,6 +8,11 @@ export interface LandReport {
 		stateless: number
 		stateHeld: number
 	}
+	population: {
+		stateHeld: number
+		stateless: number
+	}
+	largestCity: number
 	stateHeldTarget: number
 	bucketShares: number[]
 	bucketTargets: number[]

@@ -9,6 +9,12 @@ const PlanetRendererExperiment = lazy(() =>
 	).then((module) => ({ default: module.PlanetRendererExperiment })),
 )
 
+const BenchDashboard = lazy(() =>
+	import("@/ui/bench/BenchDashboard").then((module) => ({
+		default: module.BenchDashboard,
+	})),
+)
+
 function App() {
 	return (
 		<div className="relative h-screen w-screen overflow-hidden bg-white font-sans text-slate-900 selection:bg-slate-900 selection:text-white">
@@ -28,6 +34,14 @@ function App() {
 					path={APP_PATHS.galaxy}
 					element={
 						<GenesisView sessionNamespace="galaxy" initialGalaxyModeActive />
+					}
+				/>
+				<Route
+					path={APP_PATHS.bench}
+					element={
+						<Suspense fallback={<div role="status">Loading bench…</div>}>
+							<BenchDashboard />
+						</Suspense>
 					}
 				/>
 				<Route

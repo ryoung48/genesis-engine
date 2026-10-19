@@ -176,6 +176,10 @@ function summarize({
 			Math.max(1, realms),
 		ships: {
 			...REPORT_DISTRIBUTION.summarize(ships),
+			p10: REPORT_DISTRIBUTION.percentile({ values: ships, q: 0.1 }),
+			p25: REPORT_DISTRIBUTION.percentile({ values: ships, q: 0.25 }),
+			p75: REPORT_DISTRIBUTION.percentile({ values: ships, q: 0.75 }),
+			max: REPORT_DISTRIBUTION.percentile({ values: ships, q: 1 }),
 			total:
 				ships.reduce((sum, count) => sum + count, 0) /
 				Math.max(1, samples.length),

@@ -13,11 +13,20 @@ function tracker(): LandTracker {
 function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
 	const land = engine.land
 	const counts = { uninhabited: 0, stateless: 0, stateHeld: 0 }
+	const population = { stateHeld: 0, stateless: 0 }
+	let largestCity = 0
 	for (let p = 0; p < engine.P; p++) {
 		if (engine.desolate[p]) continue
+		const people = engine.popRuralCurrent[p] + engine.popUrbanCurrent[p]
+		largestCity = Math.max(largestCity, engine.popUrbanCurrent[p])
 		if (engine.uninhabited[p]) counts.uninhabited++
-		else if (engine.stateless[p]) counts.stateless++
-		else counts.stateHeld++
+		else if (engine.stateless[p]) {
+			counts.stateless++
+			population.stateless += people
+		} else {
+			counts.stateHeld++
+			population.stateHeld += people
+		}
 	}
 	const percent = (count: number) => (100 * count) / Math.max(1, land.habitable)
 	const sovereigns = new Array<number>(TARGET_PROFILE.bucketCount).fill(0)
@@ -37,6 +46,8 @@ function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
 			stateless: percent(counts.stateless),
 			stateHeld: percent(counts.stateHeld),
 		},
+		population,
+		largestCity,
 		stateHeldTarget: 100 * land.stateHeldTarget,
 		bucketShares,
 		bucketTargets,

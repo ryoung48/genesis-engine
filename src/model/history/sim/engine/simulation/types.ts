@@ -15,11 +15,20 @@ export interface SeedColonyRelationsParams {
 	nations: GenesisNationHierarchy | undefined
 }
 
+export interface EventTiming {
+	count: number
+	ms: number
+}
+
+// [JUSTIFICATION] only the history report records per-event timings; other callers leave this unset
+export type EventProfile = Record<string, EventTiming>
+
 export interface ProcessEventsUntilParams {
 	state: HistoryState
 	targetTime: number
 	rng: SharedRng
 	validate: boolean
+	profile?: EventProfile
 }
 
 export interface SimulateUntilParams {
@@ -27,6 +36,7 @@ export interface SimulateUntilParams {
 	targetTimeMs: number
 	rng: SharedRng
 	validate: boolean
+	profile?: EventProfile
 }
 
 export interface InitHistoryParams {

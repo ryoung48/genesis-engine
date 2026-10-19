@@ -202,14 +202,20 @@ function initHistory(params: InitHistoryParams): HistoryState {
 	return state
 }
 
+const EVENT_NAME: Record<number, string> = Object.fromEntries(
+	Object.entries(EVENT_HEAP.evt).map(([name, id]) => [id, name]),
+)
+
 function processEventsUntil({
 	state,
 	targetTime,
 	rng,
 	validate,
+	profile,
 }: ProcessEventsUntilParams): void {
 	const dataBuf = new Int32Array(4)
 	while (!state.heap.isEmpty() && state.heap.peekTime() <= targetTime) {
+		const started = profile ? performance.now() : 0
 		const noteCursor = state.events.length
 		state.time = state.heap.peekTime()
 		const type = state.heap.peekType()
@@ -295,6 +301,12 @@ function processEventsUntil({
 			census: type === EVENT_HEAP.evt.CENSUS,
 			initial: false,
 		})
+		if (profile) {
+			const name = EVENT_NAME[type] ?? `type ${type}`
+			const entry = (profile[name] ??= { count: 0, ms: 0 })
+			entry.count++
+			entry.ms += performance.now() - started
+		}
 		if (validate) {
 			STATE.validateLiveHierarchy({
 				state,
@@ -309,8 +321,15 @@ function simulateUntil({
 	targetTimeMs,
 	rng,
 	validate,
+	profile,
 }: SimulateUntilParams): void {
-	processEventsUntil({ state, targetTime: targetTimeMs, rng, validate })
+	processEventsUntil({
+		state,
+		targetTime: targetTimeMs,
+		rng,
+		validate,
+		profile,
+	})
 	state.time = targetTimeMs
 }
 

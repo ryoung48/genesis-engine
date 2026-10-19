@@ -27,7 +27,7 @@ const UNCLAIMED_BUCKET_COLOR = "rgb(203, 213, 225)"
 
 const UNINHABITED_BUCKET_COLOR = "rgb(226, 232, 240)"
 
-const SIZE_BUCKET_LABELS = [
+export const SIZE_BUCKET_LABELS = [
 	"1",
 	"2-4",
 	"5-9",
@@ -36,6 +36,12 @@ const SIZE_BUCKET_LABELS = [
 	"50-100",
 	"101+",
 ]
+
+export function sizeBucketColor(bucket: number): string {
+	return NATION_BUCKET_COLORS[
+		NATION_BUCKET_COLORS.length - 1 - Math.min(bucket, 5)
+	]
+}
 
 const MAX_OVERLORD_DEPTH = 8
 
@@ -124,8 +130,7 @@ export function buildLandStatusDistribution(
 		...SIZE_BUCKET_LABELS.map((label, b) => ({
 			label,
 			count: provincesBySize[b],
-			color:
-				NATION_BUCKET_COLORS[NATION_BUCKET_COLORS.length - 1 - Math.min(b, 5)],
+			color: sizeBucketColor(b),
 			target: 100 * profile.stateHeld * profile.sizeShares[b],
 		})),
 	]

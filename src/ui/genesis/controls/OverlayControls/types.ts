@@ -20,7 +20,13 @@ export type DangerSubMode =
 export type VegetationSubMode = "base" | "maps" | "satellite" | "eu5"
 export type ClimateSubMode = "basic" | "pasta" | "koppen" | "eu5"
 export type TopographySubMode = "classification" | "slope" | "eu5"
-export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768" | "webgcm"
+export type ExportWidthPreset =
+	| "4096"
+	| "8192"
+	| "16384"
+	| "32768"
+	| "webgcm"
+	| "webgcm-native"
 export interface LabelMode {
 	nations: boolean
 	dynasty: boolean

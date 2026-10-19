@@ -144,6 +144,11 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 							<SegmentedControl
 								options={[
 									{
+										value: "webgcm-native",
+										label: "Native GCM",
+										ariaLabel: "GCM with existing cells",
+									},
+									{
 										value: "webgcm",
 										label: "WebGCM",
 										ariaLabel: "WebGCM terrain",
@@ -176,19 +181,20 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 								buttonClassName="px-1.5"
 							/>
 						</div>
-						{exportWidthPreset !== "webgcm" && (
-							<div className="space-y-1.5">
-								<LabeledSlider
-									label="Export Longitude"
-									value={`${exportCenterLongitude.toFixed(0)}°`}
-									min={-180}
-									max={180}
-									step={1}
-									numericValue={exportCenterLongitude}
-									onChange={setExportCenterLongitude}
-								/>
-							</div>
-						)}
+						{exportWidthPreset !== "webgcm" &&
+							exportWidthPreset !== "webgcm-native" && (
+								<div className="space-y-1.5">
+									<LabeledSlider
+										label="Export Longitude"
+										value={`${exportCenterLongitude.toFixed(0)}°`}
+										min={-180}
+										max={180}
+										step={1}
+										numericValue={exportCenterLongitude}
+										onChange={setExportCenterLongitude}
+									/>
+								</div>
+							)}
 						<Button
 							tone="overlay"
 							onClick={onExport}
@@ -197,10 +203,19 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 						>
 							{exportBusy
 								? "Exporting…"
-								: exportWidthPreset === "webgcm"
-									? "Export WebGCM terrain"
-									: "Export PNG"}
+								: exportWidthPreset === "webgcm-native"
+									? "Export native GCM world"
+									: exportWidthPreset === "webgcm"
+										? "Export WebGCM terrain"
+										: "Export PNG"}
 						</Button>
+						{exportWidthPreset === "webgcm-native" && (
+							<p className="text-[10px] text-slate-400">
+								Load this file in the native GCM viewer at localhost:8767.
+								Existing cells and land/water labels are preserved. Climate
+								remains experimental.
+							</p>
+						)}
 						{exportWidthPreset === "webgcm" && (
 							<p className="text-[10px] text-slate-400">
 								Load the terrain file in WebGCM. Planet settings and climate are

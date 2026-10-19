@@ -687,6 +687,18 @@ function sample({ engine, tracker, relations }: SampleParams): void {
 function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	const window = tracker.window
 	const report: MilitaryReport = {}
+	const armySizes = FAMILIES.flatMap(
+		(government) => window.armySize[government],
+	)
+	for (const [name, q] of [
+		["p10", 0.1],
+		["p25", 0.25],
+		["p50", 0.5],
+		["p75", 0.75],
+		["p90", 0.9],
+		["max", 1],
+	] as const)
+		report[`armySize.${name}`] = quantile({ values: armySizes, q })
 	for (const government of FAMILIES) {
 		const years = window.sovereignYears[government]
 		const sovereigns = years / 100
@@ -993,6 +1005,16 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 	report["rebelWars.inVassal.n"] = allRebelWars.filter(
 		(war) => war.inVassal,
 	).length
+	for (const [name, q] of [
+		["p25", 0.25],
+		["p50", 0.5],
+		["p75", 0.75],
+		["p90", 0.9],
+	] as const)
+		report[`rebelWars.years.${name}`] = quantile({
+			values: allRebelWars.map((war) => war.years),
+			q,
+		})
 	report["backers.viaOverlord.n"] = window.backersViaOverlord
 	report["backers.overlord.n"] = window.backersOverlord
 	report["backers.disloyalVassal.n"] = window.backersDisloyalVassal

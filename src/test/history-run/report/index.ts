@@ -8,6 +8,7 @@ import { PARTITION } from "@/model/history/sim/engine/events/succession/partitio
 import { HISTORY_RNG } from "@/model/history/sim/engine/history-rng"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
+import type { EventProfile } from "@/model/history/sim/engine/simulation/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { ROUTE_TUNING } from "@/model/society/infrastructure/trade/routing/route-tuning"
@@ -270,10 +271,12 @@ function runSeed({
 		armyReconstitutions: logs.armyReconstitutions.value(),
 		rebelWarOutcomes: logs.rebelWarOutcomes.value(),
 		annualTicks: [] as number[],
+		annualEvents: [] as EventProfile[],
 		partitionTotal: null as PartitionReport | null,
 		governmentTotal: null as GovernmentReport | null,
 		districtsTotal: null as DistrictReport | null,
 		recordMs: 0,
+		simulateMs: 0,
 		wallMs: 0,
 		peakMemoryKb: 0,
 	}
@@ -348,12 +351,16 @@ function runSeed({
 	try {
 		for (let year = start + 1; year <= start + options.years; year++) {
 			const tickStart = performance.now()
+			const yearEvents: EventProfile = {}
 			SIM_ENGINE.simulateUntil({
 				state: engine,
 				targetTimeMs: year * STATE.yearMs,
 				rng,
 				validate: false,
+				profile: yearEvents,
 			})
+			diagnostics.simulateMs += performance.now() - tickStart
+			diagnostics.annualEvents.push(yearEvents)
 			if ((year - start) % ROUTE_TUNING.batchIntervalYears === 0)
 				SETTLEMENT_CHANGE_REPORT.sample({
 					tracker: settlementChanges,

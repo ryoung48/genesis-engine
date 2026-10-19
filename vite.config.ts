@@ -4,7 +4,35 @@ import { availableParallelism } from "node:os"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
-import { defineConfig } from "vite"
+import { type Connect, defineConfig, type Plugin } from "vite"
+import { BENCH_DIGEST } from "./src/bench/digest/index.ts"
+
+const BENCH_API_PREFIX = "/api/bench/runs"
+
+function benchApi(): Plugin {
+	const handle: Connect.NextHandleFunction = (req, res, next) => {
+		const url = new URL(req.url ?? "", "http://localhost")
+		if (!url.pathname.startsWith(BENCH_API_PREFIX)) return next()
+		const id = decodeURIComponent(
+			url.pathname.slice(BENCH_API_PREFIX.length).replace(/^\//, ""),
+		)
+		try {
+			const body = id
+				? BENCH_DIGEST.detail({ root: process.cwd(), id })
+				: BENCH_DIGEST.list(process.cwd())
+			res.setHeader("Content-Type", "application/json")
+			res.end(JSON.stringify(body))
+		} catch (error) {
+			res.statusCode = 404
+			res.end(error instanceof Error ? error.message : "Bench error")
+		}
+	}
+	return {
+		name: "bench-api",
+		configureServer: (server) => void server.middlewares.use(handle),
+		configurePreviewServer: (server) => void server.middlewares.use(handle),
+	}
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
@@ -59,7 +87,7 @@ export default defineConfig(({ command, mode }) => {
 						}
 					: {},
 			),
-			...(isTest ? [] : [tailwindcss()]),
+			...(isTest ? [] : [tailwindcss(), benchApi()]),
 		],
 		resolve: {
 			alias: {

@@ -55,7 +55,13 @@ export interface NavyReport {
 	largestFleet: number
 	top5ShipShare: number
 	top5NavalShare: number
-	ships: Distribution & { total: number }
+	ships: Distribution & {
+		p10: number
+		p25: number
+		p75: number
+		max: number
+		total: number
+	}
 	upkeepShareOfRevenue: number
 	engagements: {
 		count: number
