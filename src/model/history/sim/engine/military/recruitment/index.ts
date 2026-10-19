@@ -40,7 +40,7 @@ function targets({
 	const readiness = Number.isFinite(surplus) ? 0.75 * Math.max(0, surplus) : 0
 	const living = Number.isFinite(population) ? Math.max(0, population) : 0
 	const levyEligibility = tribal ? 0.05 : 0.02
-	const safety = living * 0.06
+	const safety = living * (tribal ? 0.06 : 0.035)
 	const level = Number.isFinite(knowledge) ? knowledge : 0
 	const knee = KNOWLEDGE.fieldArmyKnee({ knowledge: level })
 	const funding = MATH.piecewise({
@@ -59,8 +59,12 @@ function targets({
 	const expense = levy * home.levy + regular * home.regular
 	const budgetScale = expense > 0 ? Math.min(1, budget / expense) : 1
 	const populationScale = total > 0 ? Math.min(1, safety / total) : 1
-	const logisticsScale = KNOWLEDGE.logisticsScale({ knee, troops: total })
-	const scale = Math.min(budgetScale, populationScale, logisticsScale)
+	const capScale = Math.min(budgetScale, populationScale)
+	const logisticsScale = KNOWLEDGE.logisticsScale({
+		knee,
+		troops: total * capScale,
+	})
+	const scale = capScale * logisticsScale
 	const remainingBudget = Math.max(0, budget - expense * scale)
 
 	return {
@@ -70,9 +74,9 @@ function targets({
 		knee,
 		uncapped: { levy, regular },
 		limits: {
-			budget: budgetScale < 1 && budgetScale === scale,
-			population: populationScale < 1 && populationScale === scale,
-			logistics: logisticsScale < 1 && logisticsScale === scale,
+			budget: budgetScale < 1 && budgetScale === capScale,
+			population: populationScale < 1 && populationScale === capScale,
+			logistics: logisticsScale < 1,
 		},
 		levyEligibility,
 		funding,

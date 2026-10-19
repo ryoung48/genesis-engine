@@ -48,8 +48,8 @@ const DOMESTIC_DIFFUSION = 0.04
 const FOREIGN_DIFFUSION = 0.015
 
 const SELF_ADVANCE_CURVE = {
-	domain: [0, 0.5, 1, 2, 3, 4],
-	range: [0.0018, 0.0036, 0.006, 0.0072, 0.0108, 0.006],
+	domain: [0, 0.5, 1],
+	range: [0.0018, 0.0036, 0.006],
 }
 
 const MAX_LEAD_CURVE = {

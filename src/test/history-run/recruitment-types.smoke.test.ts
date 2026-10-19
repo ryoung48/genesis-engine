@@ -124,8 +124,14 @@ describe("recruitment and integrated military expense", () => {
 				expect(raw).toBeGreaterThan(target.knee)
 				expect(total).toBeGreaterThan(target.knee)
 				expect(total).toBeLessThan(raw)
+				const expense =
+					target.uncapped.levy * target.home.levy +
+					target.uncapped.regular * target.home.regular
+				const raised =
+					raw * Math.min(1, target.budget / expense, target.safety / raw)
 				expect(total).toBeCloseTo(
-					raw * KNOWLEDGE.logisticsScale({ knee: target.knee, troops: raw }),
+					raised *
+						KNOWLEDGE.logisticsScale({ knee: target.knee, troops: raised }),
 					7,
 				)
 				expect(target.levy / target.uncapped.levy).toBeCloseTo(
@@ -162,8 +168,8 @@ describe("recruitment and integrated military expense", () => {
 		expect(early.levy).toBeCloseTo(20000)
 		expect(early.regular).toBeCloseTo(500)
 		expect(late.uncapped.regular).toBeCloseTo(22500)
-		expect(late.levy).toBeCloseTo(20000)
-		expect(late.regular).toBeCloseTo(22500)
+		expect(late.levy).toBeCloseTo((20000 * 35000) / 42500)
+		expect(late.regular).toBeCloseTo((22500 * 35000) / 42500)
 		expect(
 			RECRUITMENT.targets({
 				population: 1e6,
@@ -232,7 +238,7 @@ describe("recruitment and integrated military expense", () => {
 			outputPerHead: 450,
 			navalShare: 0,
 		})
-		expect(target.levy + target.regular).toBeCloseTo(60, 9)
+		expect(target.levy + target.regular).toBeCloseTo(35, 9)
 		expect(target.levy / target.uncapped.levy).toBeCloseTo(
 			target.regular / target.uncapped.regular,
 			12,
