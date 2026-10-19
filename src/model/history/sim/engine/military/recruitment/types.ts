@@ -62,7 +62,7 @@ export interface InitializeTroopsParams extends NationParams {
 }
 
 export interface TargetParams {
-	population: number
+	manpower: number
 	tribal: boolean
 	knowledge: number
 	surplus: number

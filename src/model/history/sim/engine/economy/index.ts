@@ -125,6 +125,7 @@ function territory({ state, p, provinces }: TerritoryParams): RealmCacheEntry {
 	} = state
 	let output = 0
 	let population = 0
+	let manpower = 0
 	let revenue = 0
 	let stateMaintenance = 0
 	for (let i = 0; i < provinces.length; i++) {
@@ -144,15 +145,16 @@ function territory({ state, p, provinces }: TerritoryParams): RealmCacheEntry {
 		output += provinceOut
 		population += provincePopulation
 		revenue += provinceRevenue
-		stateMaintenance +=
-			provinceRevenue *
-			STATE_MAINTENANCE_SHARE *
-			(cache.capital[province] === p
+		const reach =
+			cache.capital[province] === p
 				? cache.distanceMultiplier[province]
-				: distanceMultiplier({ state, capital: p, p: province }))
+				: distanceMultiplier({ state, capital: p, p: province })
+		manpower += provincePopulation / reach
+		stateMaintenance += provinceRevenue * STATE_MAINTENANCE_SHARE * reach
 	}
 	return {
 		population,
+		manpower,
 		hierarchyVersion: state.hierarchyVersion,
 		censusVersion: state.censusVersion,
 		knowledge,

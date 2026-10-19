@@ -77,7 +77,7 @@ function mock({ caps }: SiegeMockParams): void {
 	vi.spyOn(RECRUITMENT, "advance").mockReturnValue(undefined)
 	vi.spyOn(RECRUITMENT, "realmTargets").mockReturnValue(
 		RECRUITMENT.targets({
-			population: 100000,
+			manpower: 100000,
 			tribal: false,
 			knowledge: 1,
 			surplus: 100,

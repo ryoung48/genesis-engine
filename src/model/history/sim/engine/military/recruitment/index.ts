@@ -24,7 +24,7 @@ import { MATH } from "@/model/shared/math/core"
 const FUNDING = { domain: [0.42, 1, 1.44, 2.38], range: [0.1, 0.25, 0.55, 0.9] }
 
 function targets({
-	population,
+	manpower,
 	tribal,
 	knowledge,
 	surplus,
@@ -38,7 +38,7 @@ function targets({
 	const home = { levy: 20 * price, regular: 200 * price }
 	const campaign = { levy: 62.5 * price, regular: 625 * price }
 	const readiness = Number.isFinite(surplus) ? 0.75 * Math.max(0, surplus) : 0
-	const living = Number.isFinite(population) ? Math.max(0, population) : 0
+	const living = Number.isFinite(manpower) ? Math.max(0, manpower) : 0
 	const levyEligibility = tribal ? 0.05 : 0.02
 	const safety = living * (tribal ? 0.06 : 0.035)
 	const level = Number.isFinite(knowledge) ? knowledge : 0
@@ -98,7 +98,7 @@ const realmTargetCache = new WeakMap<RealmCacheEntry, RealmTargetCacheEntry>()
 function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
 	const realm = ECONOMY.realm({ state, p: nation })
 	const inputs: TargetParams = {
-		population: realm.population,
+		manpower: realm.manpower,
 		tribal:
 			GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) === "tribal",
 		knowledge: realm.knowledge,
@@ -109,7 +109,7 @@ function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
 	const cached = realmTargetCache.get(realm)
 	if (
 		cached &&
-		cached.inputs.population === inputs.population &&
+		cached.inputs.manpower === inputs.manpower &&
 		cached.inputs.tribal === inputs.tribal &&
 		cached.inputs.knowledge === inputs.knowledge &&
 		cached.inputs.surplus === inputs.surplus &&
@@ -129,7 +129,7 @@ function territoryTargets({
 }: TerritoryTargetParams): RecruitmentTargets {
 	const economy = ECONOMY.territory({ state, p: nation, provinces })
 	return targets({
-		population: economy.population,
+		manpower: economy.manpower,
 		tribal:
 			GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) === "tribal",
 		knowledge: economy.knowledge,

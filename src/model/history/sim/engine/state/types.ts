@@ -156,6 +156,8 @@ export interface EngineNote {
 
 export interface RealmCacheEntry {
 	population: number
+	// Residents weighted by each province's reach from the capital, for recruitment.
+	manpower: number
 	hierarchyVersion: number
 	censusVersion: number
 	knowledge: number

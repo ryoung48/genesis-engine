@@ -37,7 +37,7 @@ let nations: number[]
 const STALEMATE = [0.99, (7 - 0.5) / 20]
 
 const BASE = {
-	population: 1_000_000,
+	manpower: 1_000_000,
 	tribal: false,
 	knowledge: 1,
 	surplus: 1_000_000,
