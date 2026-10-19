@@ -1073,7 +1073,8 @@ function runPostElevationPipeline(
 			habitableCount++
 			if (arrivalSteered) {
 				eraSettledMask[p] = 1
-				settledAtStart[p] = simulationMigration.arrivalYear[p] <= startYear ? 1 : 0
+				settledAtStart[p] =
+					simulationMigration.arrivalYear[p] <= startYear ? 1 : 0
 			} else if (
 				migrationWave[p] >= 0 &&
 				migrationWave[p] <= actualSettlementWave

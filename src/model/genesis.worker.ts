@@ -706,7 +706,12 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 					} satisfies GenesisWorkerResponse),
 				batchYears: 20,
 				yieldYear: () =>
- new Promise((resolve) => setTimeout(resolve, engine.year <= DISTRIBUTION_TARGETS.firstStateYear ? 100 : 0)),
+					new Promise((resolve) =>
+						setTimeout(
+							resolve,
+							engine.year <= DISTRIBUTION_TARGETS.firstStateYear ? 100 : 0,
+						),
+					),
 			})
 				.then(() => {
 					if (session !== historySession) return

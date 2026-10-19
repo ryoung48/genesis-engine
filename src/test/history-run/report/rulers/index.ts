@@ -1,6 +1,5 @@
 import { ROYAL_MARRIAGE } from "@/model/history/sim/engine/events/diplomacy/marriage"
 import { STATE } from "@/model/history/sim/engine/state"
-import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import type {
 	HeirDistribution,
 	HeirPlansReport,
@@ -9,6 +8,7 @@ import type {
 	RulerTracker,
 	RulerWindowParams,
 } from "@/test/history-run/report/rulers/types"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 function distribution(values: number[]): HeirDistribution {
 	const count = values.length

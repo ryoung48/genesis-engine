@@ -2,7 +2,6 @@ import { ECONOMY } from "@/model/history/sim/engine/economy"
 import { NAVY } from "@/model/history/sim/engine/military/navy"
 import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
-import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import type {
 	BlockadeBeats,
 	NavalOutcomeMix,
@@ -13,6 +12,7 @@ import type {
 	NavyTracker,
 	PortSiegeGroup,
 } from "@/test/history-run/report/navy/types"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 const TOP_FLEETS = 5
 

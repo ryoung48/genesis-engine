@@ -360,8 +360,11 @@ async function play({
 			return
 		}
 		if (
- queued.length >= (engine.year <= DISTRIBUTION_TARGETS.firstStateYear ? 1 : batchYears) || !isRunning() || engine.year === 2025
- )
+			queued.length >=
+				(engine.year <= DISTRIBUTION_TARGETS.firstStateYear ? 1 : batchYears) ||
+			!isRunning() ||
+			engine.year === 2025
+		)
 			flush()
 	}
 	flush()

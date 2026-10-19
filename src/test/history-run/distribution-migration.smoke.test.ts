@@ -1,7 +1,7 @@
-import { SIM_DERIVE } from "@/model/history/sim/derive"
-import { POPULATION } from "@/model/society/population"
 import { expect, it } from "vitest"
 import { DISTRIBUTION_MIGRATION as M } from "@/model/history/distribution/migration"
+import { SIM_DERIVE } from "@/model/history/sim/derive"
+import { POPULATION } from "@/model/society/population"
 import { DISTRIBUTION_FIXTURE as F } from "@/test/history-run/fixtures/distribution"
 
 it("uses normalized endpoint means, integrates the transport boundary, and waits for sea capability", () => {
@@ -148,17 +148,69 @@ it("performs no searches for empty and all-desolate worlds", () => {
 	}
 })
 
-it("excludes after-horizon and unreachable provinces from population weights and culture/religion context",()=>{
- const w=F.world({neighbors:[[1],[0,2],[1,3],[2]],desolate:[],seed:42}),provinces=w.provinces!
- const m=M.horizon({continuousArrival:Float64Array.of(-79999,-1000,2025.3,Infinity),desolate:provinces.desolate})
- const landmarks={count:1,regionLandmark:new Int32Array(4),type:Uint8Array.of(0),size:Int32Array.of(4)}
- const climateZones=new Uint8Array(4).fill(5),vegetation=new Uint8Array(4).fill(3),topography=new Uint8Array(4)
- const population=POPULATION.computePopulation({provinces,landmarks,climateZones,vegetation,topography,oceanCoastal:new Uint8Array(4),lakeCoastal:new Uint8Array(4),riverVisible:new Uint8Array(4),seed:42,mesh:w.mesh,planetRadiusKm:6371,migrationWave:Float32Array.from(m.migrationWave,(wave,p)=>m.contextMask[p]?wave:-1),settlementWave:1,migrationFalloff:0})
- population.migrationWave=m.migrationWave
- expect(population.population[2]).toBe(0);expect(population.population[3]).toBe(0)
- const society=SIM_DERIVE.deriveSociety({historyPipeline:"distribution",isEarthImport:false,provinces,population,landmarks,coastal:new Uint8Array(4),waterAccess:new Uint8Array(4),riverVisible:new Uint8Array(4),r_xyz:w.mesh.r_xyz,seed:42,planetRadiusKm:6371,era:"lateMedieval",eraSettledMask:m.contextMask,eraStatehoodMask:new Uint8Array(4),timings:[]})
- expect(society.cultures?.assignment[2]).toBe(-1);expect(society.cultures?.assignment[3]).toBe(-1)
- let negativeContributions=0
- for(let p=0;p<4;p++)if((society.cultures?.assignment[p]??-1)>=0 && m.migrationWave[p]<0)negativeContributions++
- expect(negativeContributions).toBe(0)
+it("excludes after-horizon and unreachable provinces from population weights and culture/religion context", () => {
+	const w = F.world({
+			neighbors: [[1], [0, 2], [1, 3], [2]],
+			desolate: [],
+			seed: 42,
+		}),
+		provinces = w.provinces!
+	const m = M.horizon({
+		continuousArrival: Float64Array.of(-79999, -1000, 2025.3, Infinity),
+		desolate: provinces.desolate,
+	})
+	const landmarks = {
+		count: 1,
+		regionLandmark: new Int32Array(4),
+		type: Uint8Array.of(0),
+		size: Int32Array.of(4),
+	}
+	const climateZones = new Uint8Array(4).fill(5),
+		vegetation = new Uint8Array(4).fill(3),
+		topography = new Uint8Array(4)
+	const population = POPULATION.computePopulation({
+		provinces,
+		landmarks,
+		climateZones,
+		vegetation,
+		topography,
+		oceanCoastal: new Uint8Array(4),
+		lakeCoastal: new Uint8Array(4),
+		riverVisible: new Uint8Array(4),
+		seed: 42,
+		mesh: w.mesh,
+		planetRadiusKm: 6371,
+		migrationWave: Float32Array.from(m.migrationWave, (wave, p) =>
+			m.contextMask[p] ? wave : -1,
+		),
+		settlementWave: 1,
+		migrationFalloff: 0,
+	})
+	population.migrationWave = m.migrationWave
+	expect(population.population[2]).toBe(0)
+	expect(population.population[3]).toBe(0)
+	const society = SIM_DERIVE.deriveSociety({
+		historyPipeline: "distribution",
+		isEarthImport: false,
+		provinces,
+		population,
+		landmarks,
+		coastal: new Uint8Array(4),
+		waterAccess: new Uint8Array(4),
+		riverVisible: new Uint8Array(4),
+		r_xyz: w.mesh.r_xyz,
+		seed: 42,
+		planetRadiusKm: 6371,
+		era: "lateMedieval",
+		eraSettledMask: m.contextMask,
+		eraStatehoodMask: new Uint8Array(4),
+		timings: [],
+	})
+	expect(society.cultures?.assignment[2]).toBe(-1)
+	expect(society.cultures?.assignment[3]).toBe(-1)
+	let negativeContributions = 0
+	for (let p = 0; p < 4; p++)
+		if ((society.cultures?.assignment[p] ?? -1) >= 0 && m.migrationWave[p] < 0)
+			negativeContributions++
+	expect(negativeContributions).toBe(0)
 })

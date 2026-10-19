@@ -1,8 +1,8 @@
-import { DISTRIBUTION_ENGINE as E } from "@/model/history/distribution/engine"
-import { DISTRIBUTION_REPORT as R } from "@/test/history-run/report/distribution"
 import { expect, it } from "vitest"
 import { DISTRIBUTION_CRADLES as C } from "@/model/history/distribution/cradles"
+import { DISTRIBUTION_ENGINE as E } from "@/model/history/distribution/engine"
 import { DISTRIBUTION_FIXTURE as F } from "@/test/history-run/fixtures/distribution"
+import { DISTRIBUTION_REPORT as R } from "@/test/history-run/report/distribution"
 
 it("enforces millennial residence and saturates maturity", () => {
 	expect(C.matureScore({ siteScore: 3, arrivalYear: 1, year: 2000 })).toBe(0)
@@ -41,11 +41,23 @@ it("keeps scheduled cradles inactive until their review dates and reconstructs e
 	expect(migration.arrivalYear).toEqual(Int32Array.of(-79999, -1600))
 })
 
-it("queries prehistoric ownership and cradle metadata after later playback without mutating the engine",()=>{
- const engine=E.create({world:F.world({neighbors:[[1],[0]],desolate:[],seed:42})})
- E.advanceUntil({engine,year:400})
- engine.cradles.schedule.push({province:1,selectionYear:400,arrivalYear:-10000,residenceYears:10400,componentId:0,nearestDistanceKm:3000})
- const row=R.snapshotAt({engine,year:-79999})
- expect(row.year).toBe(-79999);expect(row.count).toBe(0);expect(row.cradles).toHaveLength(0)
- expect(row.invariants.lifecycle).toBe(0);expect(engine.year).toBe(400)
+it("queries prehistoric ownership and cradle metadata after later playback without mutating the engine", () => {
+	const engine = E.create({
+		world: F.world({ neighbors: [[1], [0]], desolate: [], seed: 42 }),
+	})
+	E.advanceUntil({ engine, year: 400 })
+	engine.cradles.schedule.push({
+		province: 1,
+		selectionYear: 400,
+		arrivalYear: -10000,
+		residenceYears: 10400,
+		componentId: 0,
+		nearestDistanceKm: 3000,
+	})
+	const row = R.snapshotAt({ engine, year: -79999 })
+	expect(row.year).toBe(-79999)
+	expect(row.count).toBe(0)
+	expect(row.cradles).toHaveLength(0)
+	expect(row.invariants.lifecycle).toBe(0)
+	expect(engine.year).toBe(400)
 })

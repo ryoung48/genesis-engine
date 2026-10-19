@@ -9,13 +9,21 @@ it("keeps water preference for small states without giving large states first ch
 		provinceContinent: new Uint8Array(3),
 	}
 	const small = [0, 1, 2].map((province) =>
-		PLACEMENT_FRONTIER.nationPlacementScore({ ...provinces, province, target: 9 }),
+		PLACEMENT_FRONTIER.nationPlacementScore({
+			...provinces,
+			province,
+			target: 9,
+		}),
 	)
 	expect(small[2]).toBeGreaterThan(small[1])
 	expect(small[1]).toBeGreaterThan(small[0])
 	for (const target of [10, 24, 50, 250]) {
 		const scores = [0, 1, 2].map((province) =>
-			PLACEMENT_FRONTIER.nationPlacementScore({ ...provinces, province, target }),
+			PLACEMENT_FRONTIER.nationPlacementScore({
+				...provinces,
+				province,
+				target,
+			}),
 		)
 		expect(scores[1]).toBe(scores[0])
 		expect(scores[2]).toBe(scores[0])
@@ -39,9 +47,17 @@ it("lets large states grow by proximity and habitability without a water bonus",
 		sharedBorderWeight: PLACEMENT_FRONTIER.sharedBorderWeight,
 	}
 	expect(
-		PLACEMENT_FRONTIER.bestClaim({ ...claims, frontier: new Set([1, 2]), target: 9 }),
+		PLACEMENT_FRONTIER.bestClaim({
+			...claims,
+			frontier: new Set([1, 2]),
+			target: 9,
+		}),
 	).toBe(2)
 	expect(
-		PLACEMENT_FRONTIER.bestClaim({ ...claims, frontier: new Set([1, 2]), target: 10 }),
+		PLACEMENT_FRONTIER.bestClaim({
+			...claims,
+			frontier: new Set([1, 2]),
+			target: 10,
+		}),
 	).toBe(1)
 })

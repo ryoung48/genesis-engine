@@ -1,13 +1,13 @@
 import { DERIVE } from "@/model/history/sim/engine/derive"
 import type { InterregnumNoteData } from "@/model/history/sim/engine/events/succession/interregnum/types"
 import { STATE } from "@/model/history/sim/engine/state"
-import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 import type {
 	InterregnumReport,
 	InterregnumTracker,
 	ObserveInterregnumParams,
 	SummarizeInterregnumParams,
 } from "@/test/history-run/report/interregnum/types"
+import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 function tracker(): InterregnumTracker {
 	return { cursor: 0, events: [], withoutDistricts: [] }
