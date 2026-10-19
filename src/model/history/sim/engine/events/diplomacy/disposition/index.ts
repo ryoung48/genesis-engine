@@ -71,7 +71,7 @@ function drift({ state, a, b, rng, bound }: DriftParams): void {
 function afterWar({ state, war, outcome }: AfterWarParams): void {
 	if (outcome === "regime change" || outcome === "union") return
 	for (const leader of [war.attacker, war.defender]) {
-		const overlord = STATE.diplomaticOverlord({ state, nation: leader })
+		const overlord = STATE.vassalOverlord({ state, nation: leader })
 		if (overlord < 0) continue
 		const current = of({ state, a: leader, b: overlord })
 		const aided = war.allies.has(overlord)

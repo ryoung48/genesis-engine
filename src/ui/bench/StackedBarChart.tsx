@@ -22,7 +22,7 @@ interface StackedBarChartProps {
 	series: ChartSeries[]
 	unit: BenchUnit
 	// [JUSTIFICATION] only the government family card drills down; other stacks are not clickable
-	onBandClick?: (index: number) => void
+	onBandClick?: (label: string) => void
 }
 
 export const StackedBarChart: React.FC<StackedBarChartProps> = ({
@@ -38,6 +38,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
 				label: s.label,
 				data: s.values,
 				backgroundColor: s.color,
+				stack: s.group ?? "default",
 			})),
 		}),
 		[labels, series],
@@ -50,7 +51,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
 			onClick: (event, elements) => {
 				const [element] = elements
 				if (event.native && element && onBandClick)
-					onBandClick(element.datasetIndex)
+					onBandClick(series[element.datasetIndex]?.label ?? "")
 			},
 			plugins: {
 				legend: {
@@ -84,7 +85,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
 				},
 			},
 		}),
-		[unit, onBandClick],
+		[unit, onBandClick, series],
 	)
 	return <Bar data={data} options={options} />
 }

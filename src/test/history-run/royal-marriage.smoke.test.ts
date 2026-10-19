@@ -70,7 +70,7 @@ it("halves the chance of another tie for each tie a realm holds, as initiator an
 	isolate({ state, realms })
 	const others = realms.filter((p) => p !== hub)
 	const base = ROYAL_MARRIAGE.chance({ state, realm: hub })
-	expect(base).toBeCloseTo(0.0275, 12)
+	expect(base).toBeCloseTo(0.009625, 12)
 	expect(ROYAL_MARRIAGE.acceptance({ state, realm: hub })).toBe(1)
 	tie({ state, a: hub, b: others[0] })
 	expect(ROYAL_MARRIAGE.chance({ state, realm: hub })).toBeCloseTo(base / 2, 12)

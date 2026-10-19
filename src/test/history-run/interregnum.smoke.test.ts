@@ -231,7 +231,13 @@ it("frees every district at the moment of death and keeps the crown land", () =>
 		expect(
 			new Set(STATE.getNationProvinces({ state, root: entry.seat })),
 		).toEqual(entry.provinces)
-		expect(state.governmentType[entry.seat]).toBe(state.governmentType[realm])
+		expect(
+			[
+				state.governmentType[realm],
+				GOVERNMENT.getGovIdx().oligarchic_republic,
+				GOVERNMENT.getGovIdx().theocracy,
+			].includes(state.governmentType[entry.seat]),
+		).toBe(true)
 		expect(state.leaderClaimCurrent[entry.seat]).toBe(3)
 		expect(dynasties.has(state.leaderDynCurrent[entry.seat])).toBe(false)
 		dynasties.add(state.leaderDynCurrent[entry.seat])

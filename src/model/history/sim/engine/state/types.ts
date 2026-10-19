@@ -53,6 +53,8 @@ export type Relation =
 	| "NONE"
 	| "OVERLORD"
 	| "VASSAL"
+	| "TRIBUTARY"
+	| "SUZERAIN"
 	| "PU_SENIOR"
 	| "PU_JUNIOR"
 	| "ALLY"

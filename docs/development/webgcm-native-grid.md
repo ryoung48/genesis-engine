@@ -2,7 +2,9 @@
 
 The local native-grid integration provides world export, a WebGPU simulation worker, map overlays, hover information, run/pause controls and downloadable checkpoints. It retains cell IDs, centers, polygon vertices, adjacency, land/water labels and elevations. It does not regularize, retriangulate or rasterize the world.
 
-**The numerical port remains experimental.** Short execution and conservation checks do not establish realistic climate or long-term energy balance. Some unported diffusion and drag closures are disabled. See [numerical implementation and limitations](webgcm-native-numerics.md).
+**The numerical port has a known instability on a tested procedural world with terrain.** The 3,001-cell run develops excessive upper-atmosphere winds and non-finite state within six simulated hours. It is an integration prototype, not a reliable climate predictor. Some unported diffusion and drag closures are disabled. See [numerical implementation and limitations](webgcm-native-numerics.md).
+
+An alternative [geodesic-atmosphere/native-island experiment](webgcm-island-coupling.md) tests preserving the original land cells through conservative polygon overlaps and separate surface columns. It is a standalone experiment, not an enabled simulation backend.
 
 ## Run a world
 
@@ -10,7 +12,7 @@ The local native-grid integration provides world export, a WebGPU simulation wor
 2. From the repository root, start the local viewer:
 
    ```powershell
-   node webgcm-playground.local/experiments/native-grid/server.mjs
+   node scripts/webgcm-native/server.mjs
    ```
 
 3. Open [the native GCM viewer](http://localhost:8767). Choose the world file. The model initializes in a worker and starts paused.
@@ -34,9 +36,9 @@ Checkpoint compatibility is limited to the current implementation and matching G
 
 - `src/model/climate/export/webgcm/native/`: tracked export and shared typed-array packet format.
 - `src/ui/genesis/view/useMapExport.ts` and `src/ui/genesis/controls/OverlayControls/ViewExportSection.tsx`: export controls.
-- `webgcm-playground.local/experiments/native-grid/`: local adapter, CPU/GPU sessions, shader transformations, worker, viewer and checks.
+- `scripts/webgcm-native/`: tracked adapter, CPU/GPU sessions, shader transformations, worker, viewer and checks.
 
-The WebGCM checkout and its native runtime are ignored by Git. Preserve that directory separately when moving machines. The tracked exporter alone does not include the installed GCM. The existing [raster terrain export](webgcm-terrain-export.md) remains a separate option.
+The installed WebGCM checkout is ignored by Git; the custom integration is tracked under `scripts/webgcm-native`. Preserve the installed dependency separately when moving machines. This port was developed against checkout `ddd18f37c076e9f465ba36e52bb59789b6319b1b` plus its local modifications; source-anchor checks reject incompatible versions. The existing [raster terrain export](webgcm-terrain-export.md) remains a separate option.
 
 ## Verification
 
@@ -44,11 +46,14 @@ From the repository root:
 
 ```powershell
 pnpm exec vitest run --project smoke src/test/earth/webgcm-native-export.smoke.test.ts src/test/earth/webgcm-export.smoke.test.ts
-node --test webgcm-playground.local/experiments/native-grid/native-grid.test.mjs webgcm-playground.local/experiments/native-grid/session.test.mjs webgcm-playground.local/experiments/native-grid/packet.test.mjs
-node webgcm-playground.local/experiments/native-grid/browser-check.mjs
+node --test scripts/webgcm-native/native-grid.test.mjs scripts/webgcm-native/session.test.mjs scripts/webgcm-native/packet.test.mjs
+node --test scripts/webgcm-native/state-health.test.mjs
+node scripts/webgcm-native/browser-check.mjs
 pnpm typecheck
 ```
 
 The browser check requires the native server, Playwright and installed Chrome at the path in that script. It checks actual GPU operators against CPU references, model advancement, checkpoint restore/resume, polar rendering and, when available, a saved procedural-world cache. Reports and screenshots are saved under `stats/climate/<timestamp>-native-gcm/`.
+
+For longer diagnostics, run `node scripts/webgcm-native/validate.mjs 24` for the small fixture, or append a `.gcmworld` file or cached serialized world path. Add `--flat` for a control that removes atmospheric terrain while retaining the cell mesh, labels and original ocean depths. This flag applies only to the diagnostic run, not to exports or the viewer. Reports include hourly fields, fastest-wind location, model diagnostics, timing and adapter source hashes under `stats/climate/<timestamp>-native-validation/`. A completed report means the finite-state checks passed for that run; it does not certify realistic weather or energy conservation.
 
 TypeScript changes also require `pnpm lint`. During concurrent repository work, scope that rewriting command to the changed native-export and UI files so it does not alter another agent's files.

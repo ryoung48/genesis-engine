@@ -34,6 +34,12 @@ export interface GovernmentAccessionParams extends GovernmentReviewParams {
 	previousHouse: number
 }
 
+export interface ReleasedGovernmentParams {
+	state: HistoryState
+	formerSovereign: number
+	rng: SharedRng
+}
+
 export interface GovernmentChangeParams {
 	state: HistoryState
 	realm: number

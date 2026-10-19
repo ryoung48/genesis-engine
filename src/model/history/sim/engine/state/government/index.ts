@@ -4,6 +4,7 @@ import type {
 	GovernmentChangeParams,
 	GovernmentReviewParams,
 	GovernmentTransition,
+	ReleasedGovernmentParams,
 } from "@/model/history/sim/engine/state/government/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { ERAS } from "@/model/society/eras"
@@ -39,6 +40,18 @@ function change({
 	)
 		state.electionStreaks.delete(realm)
 	return { from, to, cause }
+}
+
+function released({
+	state,
+	formerSovereign,
+	rng,
+}: ReleasedGovernmentParams): number {
+	const { republic, theocracy } = ERAS.getEraConfig(state.era).governmentMix
+	const r = rng.random()
+	if (r < republic) return GOVERNMENT.getGovIdx().oligarchic_republic
+	if (r < republic + theocracy) return GOVERNMENT.getGovIdx().theocracy
+	return state.governmentType[formerSovereign]
 }
 
 function sizeReview({
@@ -154,4 +167,4 @@ function accede(
 	return null
 }
 
-export const STATE_GOVERNMENT = { found, accede, yearly }
+export const STATE_GOVERNMENT = { found, accede, yearly, released }

@@ -18,13 +18,8 @@ import { WAR } from "@/model/history/sim/engine/events/war"
 import { MILITARY } from "@/model/history/sim/engine/military"
 import { STATE } from "@/model/history/sim/engine/state"
 
-// More independent partners offset the shared half scale. The first final
-// report averaged 154.7 alliances against 230.2 before; halve ordinary pact
-// formation again to bring standing alliances nearer half as well.
 const PACT_CHANCE = DIPLOMATIC_FORMATION.chance({ base: 0.03 }) * 0.5
-// Calibrated against the 100-year half-formation report: more free realms
-// offset a simple half chance, so init needs a lower alliance roll.
-const INITIAL_ALLIANCE_CHANCE = 0.18
+const INITIAL_ALLIANCE_CHANCE = 0.06
 const INITIAL_OVERLORD_CHANCE = 0.4
 const DISSOLVE_CHANCE = {
 	TRUSTED: 0,
@@ -50,14 +45,7 @@ function syncVassalRelations({
 	for (const nb of vassalNeighbors) {
 		if (nb === overlord) continue
 		const vassalRel = STATE.getRelation({ state, a: vassal, b: nb })
-		if (
-			vassalRel === STATE.rel.VASSAL ||
-			vassalRel === STATE.rel.OVERLORD ||
-			vassalRel === STATE.rel.PU_SENIOR ||
-			vassalRel === STATE.rel.PU_JUNIOR ||
-			vassalRel === STATE.rel.COLONY
-		)
-			continue
+		if (STATE.isSubjectLink(vassalRel)) continue
 
 		const overlordRel = STATE.getDisposition({ state, a: overlord, b: nb })
 		if (
@@ -191,7 +179,9 @@ function seedInitialVassals({ state, rng }: SeedInitialVassalsParams): void {
 				continue
 			if (
 				STATE.getRelation({ state, a: nation, b: neighbor }) ===
-				STATE.rel.OVERLORD
+					STATE.rel.OVERLORD ||
+				STATE.getRelation({ state, a: nation, b: neighbor }) ===
+					STATE.rel.SUZERAIN
 			)
 				continue
 			if (STATE.getRulerRelation({ state, nation: neighbor })) continue
@@ -268,7 +258,11 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 			const pair = VASSALAGE.pair({ state, a: nation, b: other })
 			if (pair)
 				formedVassal = VASSALAGE.bind({ state, ...pair, cause: "diplomacy" })
-			if (!formedVassal && STATE.canAlly({ state, a: nation, b: other }))
+			if (
+				!formedVassal &&
+				STATE.canAlly({ state, a: nation, b: other }) &&
+				rng.random() < DIPLOMATIC_FORMATION.allianceScale
+			)
 				STATE.setRelation({ state, a: nation, b: other, rel: STATE.rel.ALLY })
 		}
 		if (
@@ -291,7 +285,10 @@ function runDiplomacy({ state, nation, rng }: RunDiplomacyParams): void {
 				value: STATE.disp.SUSPICIOUS,
 				cause: "size gate",
 			})
-		if (tie === STATE.rel.VASSAL && !formedVassal)
+		if (
+			(tie === STATE.rel.VASSAL || tie === STATE.rel.TRIBUTARY) &&
+			!formedVassal
+		)
 			processVassalDiplomacy({ state, vassal: other, overlord: nation, rng })
 	}
 

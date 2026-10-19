@@ -14,7 +14,7 @@ import { STATE } from "@/model/history/sim/engine/state"
 import type { Relation } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
-const RAID_CHANCE = 0.6
+const RAID_CHANCE = 0.3
 
 const RAID_GRUDGE = 0.3
 
@@ -23,6 +23,8 @@ const PROTECTED_RELATIONS = new Set<Relation>([
 	STATE.rel.ALLY,
 	STATE.rel.VASSAL,
 	STATE.rel.OVERLORD,
+	STATE.rel.TRIBUTARY,
+	STATE.rel.SUZERAIN,
 	STATE.rel.PU_SENIOR,
 	STATE.rel.PU_JUNIOR,
 	STATE.rel.COLONY,

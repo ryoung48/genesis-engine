@@ -37,3 +37,5 @@ verification/
 
 # Benchmark runs, reports and comparison pages are large; keep them local.
 stats/
+scripts/webgcm-native/
+scripts/webgcm-islands/

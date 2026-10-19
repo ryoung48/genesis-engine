@@ -59,10 +59,12 @@ export function setRelation({ state, a, b, rel }: SetRelationParams): void {
 	}
 }
 
-function isSubjectLink(relation: Relation): boolean {
+export function isSubjectLink(relation: Relation): boolean {
 	return (
 		relation === relationKind.OVERLORD ||
 		relation === relationKind.VASSAL ||
+		relation === relationKind.SUZERAIN ||
+		relation === relationKind.TRIBUTARY ||
 		relation === relationKind.PU_SENIOR ||
 		relation === relationKind.PU_JUNIOR ||
 		relation === relationKind.COLONY
@@ -72,9 +74,21 @@ function isSubjectLink(relation: Relation): boolean {
 function isSubject(relation: Relation): boolean {
 	return (
 		relation === relationKind.VASSAL ||
+		relation === relationKind.TRIBUTARY ||
 		relation === relationKind.PU_JUNIOR ||
 		relation === relationKind.COLONY
 	)
+}
+
+export function vassalOverlord({
+	state,
+	nation,
+}: GetRulerRelationParams): number {
+	const ruler = getRulerRelation({ state, nation })
+	return ruler?.relation === relationKind.OVERLORD &&
+		getRelation({ state, a: ruler.ruler, b: nation }) === relationKind.VASSAL
+		? ruler.ruler
+		: -1
 }
 
 export function diplomaticOverlord({
@@ -82,8 +96,12 @@ export function diplomaticOverlord({
 	nation,
 }: GetRulerRelationParams): number {
 	const ruler = getRulerRelation({ state, nation })
-	return ruler?.relation === relationKind.OVERLORD &&
-		getRelation({ state, a: ruler.ruler, b: nation }) === relationKind.VASSAL
+	if (ruler === undefined) return -1
+	const toSubject = getRelation({ state, a: ruler.ruler, b: nation })
+	return (ruler.relation === relationKind.OVERLORD &&
+		toSubject === relationKind.VASSAL) ||
+		(ruler.relation === relationKind.SUZERAIN &&
+			toSubject === relationKind.TRIBUTARY)
 		? ruler.ruler
 		: -1
 }
@@ -128,6 +146,7 @@ export function getRulerRelation({
 		const relation = decodeRelation(rels[base + other])
 		if (
 			relation === relationKind.OVERLORD ||
+			relation === relationKind.SUZERAIN ||
 			relation === relationKind.PU_SENIOR
 		) {
 			ruler = other

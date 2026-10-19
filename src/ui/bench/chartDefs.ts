@@ -14,14 +14,21 @@ import {
 	sizeBucketColor,
 } from "@/ui/genesis/political/nation-size-distribution"
 
+export interface ComboBarDef {
+	label: string
+	color: string
+	value: (window: BenchWindow) => number | null
+}
+
+export interface ComboDrilldownDef {
+	label: string
+	outcomes: (window: BenchWindow) => BenchDistribution
+}
+
 export interface ComboChartDef {
 	title: string
-	winnerLabel: string
-	loserLabel: string
-	winnerColor: string
-	loserColor: string
-	winner: (window: BenchWindow) => number | null
-	loser: (window: BenchWindow) => number | null
+	bars: ComboBarDef[]
+	drilldowns: ComboDrilldownDef[]
 	p50: (window: BenchWindow) => number | null
 	p90: (window: BenchWindow) => number | null
 }
@@ -57,28 +64,72 @@ export const COMBO_CHARTS: ComboChartDef[] = [
 	{
 		title:
 			"Wars (attacker vs defender victories) and duration (years, p50 / p90)",
-		winnerLabel: "Attacker won",
-		loserLabel: "Defender won",
-		winnerColor: uiChartPalette.bench.war.winner,
-		loserColor: uiChartPalette.bench.war.loser,
-		winner: (w) => w.warsAttackerWon,
-		loser: (w) => w.warsDefenderWon,
+		bars: [
+			{
+				label: "Attacker won",
+				color: uiChartPalette.bench.war.winner,
+				value: (w) => sumValues(w.warOutcomes.attacker),
+			},
+			{
+				label: "Defender won",
+				color: uiChartPalette.bench.war.loser,
+				value: (w) => sumValues(w.warOutcomes.defender),
+			},
+			{
+				label: "No victor",
+				color: uiChartPalette.bench.baseline,
+				value: (w) => sumValues(w.warOutcomes.none),
+			},
+			{
+				label: "Peaceful annexation",
+				color: uiChartPalette.bench.annexation,
+				value: (w) => w.peacefulAnnexations,
+			},
+		],
 		p50: (w) => w.warYearsP50,
 		p90: (w) => w.warYearsP90,
+		drilldowns: [
+			{ label: "Attacker won", outcomes: (w) => w.warOutcomes.attacker },
+			{ label: "Defender won", outcomes: (w) => w.warOutcomes.defender },
+			{ label: "No victor", outcomes: (w) => w.warOutcomes.none },
+		],
 	},
 	{
 		title:
 			"Rebellions (rebel vs loyalist victories) and duration (years, p50 / p90)",
-		winnerLabel: "Rebels won",
-		loserLabel: "Loyalists won",
-		winnerColor: uiChartPalette.bench.rebellion.winner,
-		loserColor: uiChartPalette.bench.rebellion.loser,
-		winner: (w) => w.rebelWarsRebelWon,
-		loser: (w) => w.rebelWarsLoyalistWon,
+		bars: [
+			{
+				label: "Rebels won",
+				color: uiChartPalette.bench.rebellion.winner,
+				value: (w) => sumValues(w.rebellionOutcomes.rebels),
+			},
+			{
+				label: "Loyalists won",
+				color: uiChartPalette.bench.rebellion.loser,
+				value: (w) => sumValues(w.rebellionOutcomes.loyalists),
+			},
+			{
+				label: "No victor",
+				color: uiChartPalette.bench.baseline,
+				value: (w) => sumValues(w.rebellionOutcomes.none),
+			},
+		],
 		p50: (w) => w.rebelWarYearsP50,
 		p90: (w) => w.rebelWarYearsP90,
+		drilldowns: [
+			{ label: "Rebels won", outcomes: (w) => w.rebellionOutcomes.rebels },
+			{
+				label: "Loyalists won",
+				outcomes: (w) => w.rebellionOutcomes.loyalists,
+			},
+			{ label: "No victor", outcomes: (w) => w.rebellionOutcomes.none },
+		],
 	},
 ]
+
+function sumValues(distribution: BenchDistribution): number {
+	return Object.values(distribution).reduce((sum, count) => sum + count, 0)
+}
 
 export const SIZE_CHART: DistributionChartDef = {
 	title: "Sovereigns by size (provinces)",

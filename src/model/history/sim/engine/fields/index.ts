@@ -228,6 +228,10 @@ function flipRelation(rel: Relation): Relation {
 			return "VASSAL"
 		case "VASSAL":
 			return "OVERLORD"
+		case "TRIBUTARY":
+			return "SUZERAIN"
+		case "SUZERAIN":
+			return "TRIBUTARY"
 		case "PU_SENIOR":
 			return "PU_JUNIOR"
 		case "PU_JUNIOR":

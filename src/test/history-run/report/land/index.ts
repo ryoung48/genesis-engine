@@ -10,6 +10,21 @@ function tracker(): LandTracker {
 	return { absorptions: 0, settlements: 0 }
 }
 
+const DEVELOPMENT_BUCKETS = 5
+const KNOWLEDGE_BUCKETS = 7
+
+function levelBucket(params: {
+	value: number
+	low: number
+	high: number
+	count: number
+}): number {
+	const index = Math.floor(
+		((params.value - params.low) / (params.high - params.low)) * params.count,
+	)
+	return Math.min(params.count - 1, Math.max(0, index))
+}
+
 function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
 	const land = engine.land
 	const counts = { uninhabited: 0, stateless: 0, stateHeld: 0 }
@@ -27,6 +42,27 @@ function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
 			counts.stateHeld++
 			population.stateHeld += people
 		}
+	}
+	const development = new Array<number>(DEVELOPMENT_BUCKETS).fill(0)
+	const knowledge = new Array<number>(KNOWLEDGE_BUCKETS).fill(0)
+	for (let p = 0; p < engine.P; p++) {
+		if (engine.desolate[p] || engine.uninhabited[p]) continue
+		development[
+			levelBucket({
+				value: engine.developmentCurrent[p],
+				low: 0,
+				high: 1,
+				count: DEVELOPMENT_BUCKETS,
+			})
+		]++
+		knowledge[
+			levelBucket({
+				value: engine.knowledgeCurrent[p],
+				low: -3,
+				high: 4,
+				count: KNOWLEDGE_BUCKETS,
+			})
+		]++
 	}
 	const percent = (count: number) => (100 * count) / Math.max(1, land.habitable)
 	const sovereigns = new Array<number>(TARGET_PROFILE.bucketCount).fill(0)
@@ -46,6 +82,8 @@ function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
 			stateless: percent(counts.stateless),
 			stateHeld: percent(counts.stateHeld),
 		},
+		development,
+		knowledge,
 		population,
 		largestCity,
 		stateHeldTarget: 100 * land.stateHeldTarget,

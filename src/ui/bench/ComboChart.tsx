@@ -37,6 +37,8 @@ interface ComboChartProps {
 	lines: ChartSeries[]
 	barUnit: BenchUnit
 	lineUnit: BenchUnit
+	// [JUSTIFICATION] only the wars card drills down; other combo charts are not clickable
+	onBandClick?: (label: string) => void
 }
 
 function axis(params: {
@@ -65,7 +67,9 @@ export const ComboChart: React.FC<ComboChartProps> = ({
 	lines,
 	barUnit,
 	lineUnit,
+	onBandClick,
 }) => {
+	const barCount = bars.length
 	const data = useMemo<ChartData<"bar" | "line">>(
 		() => ({
 			labels,
@@ -99,7 +103,17 @@ export const ComboChart: React.FC<ComboChartProps> = ({
 		() => ({
 			responsive: true,
 			maintainAspectRatio: false,
-			interaction: { mode: "index", intersect: false },
+			interaction: { mode: "nearest", intersect: true },
+			onClick: (event, elements) => {
+				const [element] = elements
+				if (
+					event.native &&
+					element &&
+					onBandClick &&
+					element.datasetIndex < barCount
+				)
+					onBandClick(bars[element.datasetIndex]?.label ?? "")
+			},
 			plugins: {
 				legend: {
 					position: "bottom",
@@ -132,7 +146,7 @@ export const ComboChart: React.FC<ComboChartProps> = ({
 				y1: axis({ position: "right", grid: false, unit: lineUnit }),
 			},
 		}),
-		[barUnit, lineUnit],
+		[barUnit, lineUnit, onBandClick, barCount, bars],
 	)
 	return <Chart type="bar" data={data} options={options} />
 }

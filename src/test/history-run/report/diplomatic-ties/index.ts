@@ -17,6 +17,7 @@ import type {
 const KINDS: TieKind[] = [
 	"alliance",
 	"vassal",
+	"tributary",
 	"union",
 	"dependency",
 	"marriage",
@@ -65,6 +66,7 @@ function capture({ engine }: CaptureParams): DiplomaticTieCapture {
 			const forward = STATE.getRelation({ state: engine, a, b })
 			const backward = STATE.getRelation({ state: engine, a: b, b: a })
 			let kind: TieKind
+			let tributary = false
 			if (forward === STATE.rel.COLONY || backward === STATE.rel.COLONY)
 				kind = "dependency"
 			else if (forward === STATE.rel.ALLY) {
@@ -72,11 +74,17 @@ function capture({ engine }: CaptureParams): DiplomaticTieCapture {
 				if (!STATE.canAlly({ state: engine, a, b })) invalidAlliances++
 			} else if (
 				forward === STATE.rel.VASSAL ||
-				forward === STATE.rel.OVERLORD
+				forward === STATE.rel.OVERLORD ||
+				forward === STATE.rel.TRIBUTARY ||
+				forward === STATE.rel.SUZERAIN
 			) {
 				kind = "vassal"
-				roles.vassals.add(forward === STATE.rel.VASSAL ? b : a)
-				roles.overlords.add(forward === STATE.rel.VASSAL ? a : b)
+				const subjectIsB =
+					forward === STATE.rel.VASSAL || forward === STATE.rel.TRIBUTARY
+				tributary =
+					forward === STATE.rel.TRIBUTARY || forward === STATE.rel.SUZERAIN
+				roles.vassals.add(subjectIsB ? b : a)
+				roles.overlords.add(subjectIsB ? a : b)
 			} else if (
 				forward === STATE.rel.PU_JUNIOR ||
 				forward === STATE.rel.PU_SENIOR
@@ -95,7 +103,10 @@ function capture({ engine }: CaptureParams): DiplomaticTieCapture {
 			} else if (forward === STATE.rel.WAR) kind = "war"
 			else continue
 			const key = a * engine.P + b
-			for (const group of [kind, "any"] as const) {
+			const groups: TieKind[] = tributary
+				? [kind, "tributary", "any"]
+				: [kind, "any"]
+			for (const group of groups) {
 				pairs[group].add(key)
 				members[group].add(a).add(b)
 			}

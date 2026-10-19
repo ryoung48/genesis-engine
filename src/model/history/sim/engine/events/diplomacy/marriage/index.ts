@@ -15,7 +15,7 @@ import type {
 } from "@/model/history/sim/engine/state/types"
 import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
-const MARRIAGE_CHANCE = DIPLOMATIC_FORMATION.chance({ base: 0.055 })
+const MARRIAGE_CHANCE = DIPLOMATIC_FORMATION.allianceChance({ base: 0.055 })
 // Each tie a realm already holds halves its chance of another, and a partner's
 // chance of accepting one. An assumption: monogamous rulers rarely take further
 // royal marriages, but kings did marry again across generations.
@@ -30,6 +30,8 @@ const UNALLIABLE = new Set<Relation>([
 	STATE.rel.WAR,
 	STATE.rel.OVERLORD,
 	STATE.rel.VASSAL,
+	STATE.rel.TRIBUTARY,
+	STATE.rel.SUZERAIN,
 	STATE.rel.PU_SENIOR,
 	STATE.rel.PU_JUNIOR,
 	STATE.rel.COLONY,

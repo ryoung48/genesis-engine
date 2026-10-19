@@ -2,12 +2,14 @@ import { ECONOMY } from "@/model/history/sim/engine/economy"
 import type {
 	AnswersParams,
 	BreaksParams,
+	TribalParams,
 	VassalBondParams,
 	VassalLinkParams,
 	VassalPair,
 	VassalPairParams,
 } from "@/model/history/sim/engine/events/diplomacy/vassalage/types"
 import { STATE } from "@/model/history/sim/engine/state"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 
 function pair({ state, a, b }: VassalPairParams): VassalPair | null {
 	const aR = ECONOMY.revenue({ state, p: a })
@@ -17,21 +19,37 @@ function pair({ state, a, b }: VassalPairParams): VassalPair | null {
 	return aR <= bR ? { vassal: a, overlord: b } : { vassal: b, overlord: a }
 }
 
+function isTribal({ state, nation }: TribalParams): boolean {
+	return GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) === "tribal"
+}
+
+function tributary({ state, vassal, overlord }: VassalLinkParams): boolean {
+	return (
+		isTribal({ state, nation: vassal }) || isTribal({ state, nation: overlord })
+	)
+}
+
 function bind({ state, vassal, overlord, cause }: VassalBondParams): boolean {
 	if (
 		STATE.getRulerRelation({ state, nation: vassal }) ||
 		STATE.getRulerRelation({ state, nation: overlord })
 	)
 		return false
-	STATE.setRelation({ state, a: vassal, b: overlord, rel: STATE.rel.VASSAL })
+	const paysTribute = tributary({ state, vassal, overlord })
+	STATE.setRelation({
+		state,
+		a: vassal,
+		b: overlord,
+		rel: paysTribute ? STATE.rel.TRIBUTARY : STATE.rel.VASSAL,
+	})
 	if (cause !== "seed")
 		state.events.push({
 			tag: "vassalized",
 			time: state.time,
 			data:
 				cause === "backing"
-					? { vassal, overlord, cause }
-					: { vassal, overlord },
+					? { vassal, overlord, cause, tributary: paysTribute }
+					: { vassal, overlord, tributary: paysTribute },
 		})
 	return true
 }

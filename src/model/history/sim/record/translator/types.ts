@@ -9,7 +9,7 @@ import type { LanguageNames } from "@/model/society/language/names"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 export interface ActiveTie {
-	kind: "alliance" | "vassal" | "colony" | "union"
+	kind: "alliance" | "vassal" | "tributary" | "colony" | "union"
 	firstId: number
 	secondId: number
 }

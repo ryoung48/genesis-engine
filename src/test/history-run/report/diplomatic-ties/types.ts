@@ -3,6 +3,7 @@ import type { HistoryState } from "@/model/history/sim/engine/state/types"
 export type TieKind =
 	| "alliance"
 	| "vassal"
+	| "tributary"
 	| "union"
 	| "dependency"
 	| "marriage"

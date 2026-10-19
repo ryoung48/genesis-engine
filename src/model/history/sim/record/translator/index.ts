@@ -300,6 +300,8 @@ function projectTie({
 	if (firstId < 0 || secondId < 0 || firstId === secondId) return null
 	if (value === RELATION_CODE.VASSAL)
 		return { kind: "vassal", firstId, secondId }
+	if (value === RELATION_CODE.TRIBUTARY)
+		return { kind: "tributary", firstId, secondId }
 	if (value === RELATION_CODE.COLONY)
 		return { kind: "colony", firstId, secondId }
 	if (value === RELATION_CODE.PU_JUNIOR)
@@ -321,8 +323,17 @@ function diplomacyKind({
 	tie: ActiveTie
 	ending: boolean
 }): string {
-	const stem = tie.kind === "colony" ? "dependency" : tie.kind
+	const stem =
+		tie.kind === "colony"
+			? "dependency"
+			: tie.kind === "tributary"
+				? "vassal"
+				: tie.kind
 	return `${stem}${ending ? "End" : "Start"}`
+}
+
+function subjectTypeOf(tie: ActiveTie): string | null {
+	return tie.kind === "colony" || tie.kind === "tributary" ? tie.kind : null
 }
 
 function updateTies({ translator, pairs, timeMs }: UpdateTiesParams): void {
@@ -359,7 +370,7 @@ function updateTies({ translator, pairs, timeMs }: UpdateTiesParams): void {
 				kind: diplomacyKind({ tie: previous, ending: true }),
 				firstId: previous.firstId,
 				secondId: previous.secondId,
-				subjectType: previous.kind === "colony" ? "colony" : null,
+				subjectType: subjectTypeOf(previous),
 			})
 			translator.activeTies.delete(pair)
 			// A marriage alliance also lapses if its alliance ends first.
@@ -387,7 +398,7 @@ function updateTies({ translator, pairs, timeMs }: UpdateTiesParams): void {
 				kind: diplomacyKind({ tie: next, ending: false }),
 				firstId: next.firstId,
 				secondId: next.secondId,
-				subjectType: next.kind === "colony" ? "colony" : null,
+				subjectType: subjectTypeOf(next),
 			})
 			translator.activeTies.set(pair, next)
 		}

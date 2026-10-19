@@ -289,6 +289,8 @@ function seedInterstateWars({ state, rng }: SeedInterstateWarsParams): void {
 					relation !== STATE.rel.ALLY &&
 					relation !== STATE.rel.VASSAL &&
 					relation !== STATE.rel.OVERLORD &&
+					relation !== STATE.rel.TRIBUTARY &&
+					relation !== STATE.rel.SUZERAIN &&
 					relation !== STATE.rel.PU_SENIOR &&
 					relation !== STATE.rel.PU_JUNIOR &&
 					relation !== STATE.rel.COLONY

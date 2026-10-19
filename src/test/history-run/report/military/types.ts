@@ -33,6 +33,7 @@ export interface CompletedWar {
 	backers: number
 	inVassal: boolean
 	rebelIndependent: boolean
+	battles: number
 	score: number
 	capitalHeld: boolean
 	enforced: boolean

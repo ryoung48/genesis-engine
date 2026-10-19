@@ -64,6 +64,7 @@ it("counts pairs once, deduplicates participants and overlapping marriages, and 
 	expect(snapshot.ties).toEqual({
 		alliance: { pairs: 2, realms: 3, realmShare: 3 / 8 },
 		vassal: { pairs: 2, realms: 3, realmShare: 3 / 8 },
+		tributary: { pairs: 0, realms: 0, realmShare: 0 },
 		union: { pairs: 1, realms: 2, realmShare: 2 / 8 },
 		dependency: { pairs: 1, realms: 2, realmShare: 2 / 8 },
 		marriage: { pairs: 1, realms: 2, realmShare: 2 / 8 },

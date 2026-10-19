@@ -8,6 +8,8 @@ export interface LandReport {
 		stateless: number
 		stateHeld: number
 	}
+	development: number[]
+	knowledge: number[]
 	population: {
 		stateHeld: number
 		stateless: number

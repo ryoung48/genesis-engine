@@ -244,23 +244,6 @@ function distribution(params: {
 	)
 }
 
-function won(params: {
-	rows: JsonObject[]
-	total: string
-	share: string
-	winners: boolean
-}): number | null {
-	return mean(
-		params.rows.map((row) => {
-			const military = object(row.military)
-			const total = number(military[params.total])
-			const share = number(military[params.share])
-			if (total === null || share === null) return null
-			return total * (params.winners ? share : 1 - share)
-		}),
-	)
-}
-
 function boxFor(params: {
 	rows: JsonObject[]
 	read: (row: JsonObject) => JsonValue | undefined
@@ -292,6 +275,46 @@ function landMean(params: {
 	return mean(params.rows.map((row) => number(params.read(object(row.land)))))
 }
 
+function sideOutcomes(params: {
+	rows: JsonObject[]
+	family: string
+	side: string
+}): BenchDistribution {
+	const prefix = `${params.family}.side.${params.side}.`
+	const outcomes = new Set<string>()
+	for (const row of params.rows)
+		for (const key of Object.keys(object(row.military)))
+			if (key.startsWith(prefix)) outcomes.add(key.slice(prefix.length))
+	return Object.fromEntries(
+		[...outcomes].map((outcome) => [
+			outcome,
+			mean(
+				params.rows.map((row) =>
+					number(object(row.military)[`${prefix}${outcome}`]),
+				),
+			) ?? 0,
+		]),
+	)
+}
+
+function levelBuckets(params: {
+	rows: JsonObject[]
+	key: "development" | "knowledge"
+	count: number
+}): BenchDistribution {
+	return Object.fromEntries(
+		Array.from({ length: params.count }, (_, index) => [
+			String(index),
+			mean(
+				params.rows.map((row) => {
+					const counts = object(row.land)[params.key]
+					return Array.isArray(counts) ? number(counts[index]) : null
+				}),
+			) ?? 0,
+		]),
+	)
+}
+
 function windowsFor(params: {
 	data: JsonObject
 	seeds: string[]
@@ -309,30 +332,6 @@ function windowsFor(params: {
 			mean(rows.map((row) => number(object(row.military)[key])))
 		return {
 			label: `${rows[0].from}–${rows[0].to}`,
-			warsAttackerWon: won({
-				rows,
-				total: "wars.completed.n",
-				share: "wars.attackerWinShare",
-				winners: true,
-			}),
-			warsDefenderWon: won({
-				rows,
-				total: "wars.completed.n",
-				share: "wars.attackerWinShare",
-				winners: false,
-			}),
-			rebelWarsRebelWon: won({
-				rows,
-				total: "rebelWars.completed.n",
-				share: "rebelWars.successShare",
-				winners: true,
-			}),
-			rebelWarsLoyalistWon: won({
-				rows,
-				total: "rebelWars.completed.n",
-				share: "rebelWars.successShare",
-				winners: false,
-			}),
 			warYearsP50: military("wars.years.p50"),
 			warYearsP90: military("wars.years.p90"),
 			rebelWarYearsP50: military("rebelWars.years.p50"),
@@ -340,6 +339,27 @@ function windowsFor(params: {
 			sovereignSizes: distribution({ rows, counts: sizeBucketCounts }),
 			governments: distribution({ rows, counts: governmentCounts }),
 			ties: distribution({ rows, counts: tieRealmCounts }),
+			development: levelBuckets({ rows, key: "development", count: 5 }),
+			knowledge: levelBuckets({ rows, key: "knowledge", count: 7 }),
+			peacefulAnnexations: mean(
+				rows.map((row) =>
+					number(object(row.military)["peacefulAnnexations.n"]),
+				),
+			),
+			rebellionOutcomes: {
+				rebels: sideOutcomes({ rows, family: "rebellions", side: "rebels" }),
+				loyalists: sideOutcomes({
+					rows,
+					family: "rebellions",
+					side: "loyalists",
+				}),
+				none: sideOutcomes({ rows, family: "rebellions", side: "none" }),
+			},
+			warOutcomes: {
+				attacker: sideOutcomes({ rows, family: "wars", side: "attacker" }),
+				defender: sideOutcomes({ rows, family: "wars", side: "defender" }),
+				none: sideOutcomes({ rows, family: "wars", side: "none" }),
+			},
 			population: {
 				stateHeld: landMean({
 					rows,

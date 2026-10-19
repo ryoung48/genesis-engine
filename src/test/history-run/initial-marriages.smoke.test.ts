@@ -13,7 +13,7 @@ it("starts with marriage ties and unions retaining each senior's ruler", () => {
 	const { engine } = HISTORY_RUN.createEngine({
 		seed: 14963991,
 		era: "lateMedieval",
-		numPoints: 20000,
+		numPoints: 60000,
 	})
 	seeding.mockRestore()
 	expect(engine.marriageTies.size).toBeGreaterThan(0)

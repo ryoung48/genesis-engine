@@ -9,4 +9,6 @@ export const RELATION_CODE: RelationCodes = {
 	ALLY: 5,
 	WAR: 10,
 	COLONY: 11,
+	TRIBUTARY: 12,
+	SUZERAIN: 13,
 }

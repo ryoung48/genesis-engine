@@ -32,6 +32,8 @@ import {
 	distributionSpecs,
 	eventSpecs,
 	familySpecs,
+	levelSpecs,
+	outcomeSpecs,
 	populationSpecs,
 	resolveSeries,
 } from "@/ui/bench/series"
@@ -62,23 +64,26 @@ function runLabel(run: BenchRunSummary): string {
 	return `${date} · ${run.title} · ${run.years}y`
 }
 
-function comboSpecs(def: ComboChartDef): {
+function comboSpecs(params: {
+	def: ComboChartDef
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+}): {
 	bars: SeriesSpec[]
 	lines: SeriesSpec[]
 } {
+	const { def, current, baseline } = params
+	const runs = baseline ? [current, baseline] : [current]
 	return {
-		bars: [
-			{
-				label: def.winnerLabel,
-				color: def.winnerColor,
-				values: (run) => run.windows.map(def.winner),
-			},
-			{
-				label: def.loserLabel,
-				color: def.loserColor,
-				values: (run) => run.windows.map(def.loser),
-			},
-		],
+		bars: def.bars
+			.filter((bar) =>
+				runs.some((run) => run.windows.some((w) => (bar.value(w) ?? 0) !== 0)),
+			)
+			.map((bar) => ({
+				label: bar.label,
+				color: bar.color,
+				values: (run) => run.windows.map(bar.value),
+			})),
 		lines: [
 			{
 				label: "p50",
@@ -184,7 +189,7 @@ const GovernmentCard: React.FC<{
 				current,
 				baseline,
 			})
-		: familySpecs()
+		: familySpecs({ current, baseline })
 	return (
 		<Surface padding="md" borderTone="default" className="border">
 			<div className="flex items-center justify-between gap-2">
@@ -214,9 +219,75 @@ const GovernmentCard: React.FC<{
 					unit="count"
 					series={resolveSeries({ specs, current, baseline })}
 					onBandClick={
-						family ? undefined : (index) => onFamily(DRILLDOWN_FAMILIES[index])
+						family ? undefined : (label) => onFamily(familyForLabel(label))
 					}
 				/>
+			</div>
+		</Surface>
+	)
+}
+
+const familyForLabel = (label: string): DrilldownFamily | null =>
+	DRILLDOWN_FAMILIES.find((family) => familyLabel(family) === label) ?? null
+
+const VictoryCard: React.FC<{
+	def: ComboChartDef
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+}> = ({ def, current, baseline }) => {
+	const [drill, setDrill] = useState<string | null>(null)
+	const drilldown = def.drilldowns.find((item) => item.label === drill) ?? null
+	const specs = comboSpecs({ def, current, baseline })
+	const labels = current.windows.map((w) => w.label)
+	return (
+		<Surface padding="md" borderTone="default" className="border">
+			<div className="flex items-center justify-between gap-2">
+				<div className={cx(uiTokens.type.control, uiTokens.text.muted)}>
+					{drilldown ? `${drilldown.label}: outcomes` : def.title}
+				</div>
+				{drilldown && (
+					<button
+						type="button"
+						className={cx(
+							uiTokens.type.controlSm,
+							uiTokens.border.default,
+							uiTokens.surface.panel,
+							"rounded-md border px-2 py-1",
+						)}
+						onClick={() => setDrill(null)}
+					>
+						← Back
+					</button>
+				)}
+			</div>
+			<div className="mt-2 h-48">
+				{drilldown ? (
+					<StackedBarChart
+						labels={labels}
+						unit="count"
+						series={resolveSeries({
+							specs: outcomeSpecs({
+								current,
+								baseline,
+								outcomes: drilldown.outcomes,
+							}),
+							current,
+							baseline,
+						})}
+					/>
+				) : (
+					<ComboChart
+						labels={labels}
+						barUnit="count"
+						lineUnit="ratio"
+						bars={resolveSeries({ specs: specs.bars, current, baseline })}
+						lines={resolveSeries({ specs: specs.lines, current, baseline })}
+						onBandClick={(label) => {
+							if (def.drilldowns.some((item) => item.label === label))
+								setDrill(label)
+						}}
+					/>
+				)}
 			</div>
 		</Surface>
 	)
@@ -379,28 +450,14 @@ export const BenchDashboard: React.FC = () => {
 								current={current}
 								baseline={baseline}
 							/>
-							{COMBO_CHARTS.map((def) => {
-								const specs = comboSpecs(def)
-								return (
-									<ChartCard key={def.title} title={def.title}>
-										<ComboChart
-											barUnit="count"
-											lineUnit="ratio"
-											labels={current.windows.map((w) => w.label)}
-											bars={resolveSeries({
-												specs: specs.bars,
-												current,
-												baseline,
-											})}
-											lines={resolveSeries({
-												specs: specs.lines,
-												current,
-												baseline,
-											})}
-										/>
-									</ChartCard>
-								)
-							})}
+							{COMBO_CHARTS.map((def) => (
+								<VictoryCard
+									key={def.title}
+									def={def}
+									current={current}
+									baseline={baseline}
+								/>
+							))}
 							<BoxCard
 								def={ARMY_BOX_CHART}
 								current={current}
@@ -413,7 +470,7 @@ export const BenchDashboard: React.FC = () => {
 							/>
 						</section>
 
-						<section className="grid gap-3">
+						<section className="grid gap-3 md:grid-cols-2">
 							<ChartCard title="World population: states and stateless, largest city">
 								<ComboChart
 									barUnit="people"
@@ -426,6 +483,17 @@ export const BenchDashboard: React.FC = () => {
 									})}
 									lines={resolveSeries({
 										specs: populationSpecs().lines,
+										current,
+										baseline,
+									})}
+								/>
+							</ChartCard>
+							<ChartCard title="Development and knowledge: provinces per bucket (development left, knowledge right)">
+								<StackedBarChart
+									labels={current.windows.map((w) => w.label)}
+									unit="count"
+									series={resolveSeries({
+										specs: levelSpecs({ current, baseline }),
 										current,
 										baseline,
 									})}

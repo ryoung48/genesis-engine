@@ -176,6 +176,20 @@ function emptyWindow(): MilitaryWindow {
 	}
 }
 
+const WAR_OUTCOMES = [
+	"annexation",
+	"restoration",
+	"cession",
+	"indemnity",
+	"bought peace",
+	"white peace",
+	"independence",
+	"lapsed",
+	"union",
+] as const
+
+const NO_VICTOR_OUTCOMES: readonly string[] = ["white peace", "lapsed"]
+
 function quantile({ values, q }: QuantileParams): number {
 	if (values.length === 0) return Number.NaN
 	const sorted = [...values].sort((a, b) => a - b)
@@ -459,6 +473,7 @@ function observeNote({ engine, tracker, note }: ObserveNoteParams): void {
 			inVassal: tracker.warInVassal.get(warIdx) ?? false,
 			rebelIndependent:
 				war.goal === "independence" && data.winner === war.defender,
+			battles: tracker.warBattles.get(warIdx) ?? 0,
 			score: data.score as number,
 			capitalHeld: (data.capital as number) > 0,
 			enforced: data.reason === "enforced",
@@ -639,10 +654,7 @@ function sample({ engine, tracker, relations }: SampleParams): void {
 		)
 			continue
 		for (const other of engine.relationColumns[nation])
-			if (
-				STATE.getRelation({ state: engine, a: other, b: nation }) ===
-				STATE.rel.VASSAL
-			) {
+			if (STATE.diplomaticOverlord({ state: engine, nation }) === other) {
 				window.vassalPairs++
 				const level = STATE.getDisposition({
 					state: engine,
@@ -883,20 +895,24 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		values: completed.map((war) => war.years),
 		q: 0.75,
 	})
-	for (const outcome of [
-		"annexation",
-		"restoration",
-		"cession",
-		"indemnity",
-		"bought peace",
-		"white peace",
-		"independence",
-		"lapsed",
-		"union",
-	])
+	for (const outcome of WAR_OUTCOMES)
 		report[`wars.outcome.${outcome}`] = share(
 			completed.map((war) => war.outcome === outcome),
 		)
+	const nonRebel = completed.filter(
+		(war) => !STATE.isRebelGoal({ goal: war.goal }),
+	)
+	for (const side of ["attacker", "defender", "none"] as const)
+		for (const outcome of WAR_OUTCOMES)
+			report[`wars.side.${side}.${outcome}`] = nonRebel.filter(
+				(war) =>
+					war.outcome === outcome &&
+					(NO_VICTOR_OUTCOMES.includes(outcome)
+						? "none"
+						: war.attackerWon
+							? "attacker"
+							: "defender") === side,
+			).length
 	for (const goal of ["conquest", "independence", "throne", "claim"]) {
 		const scores = completed
 			.filter((war) => war.goal === goal)
@@ -985,6 +1001,22 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		report[`throneWars.${name}.n`] = throneWars.filter(
 			(war) => war.outcome === outcome,
 		).length
+	const rebelWon = (war: (typeof allRebelWars)[number]) =>
+		war.outcome === "independence" ||
+		war.outcome === "regime change" ||
+		(war.outcome === "cession" && war.goal === "throne")
+	const rebelOutcomes = [...new Set(allRebelWars.map((war) => war.outcome))]
+	for (const side of ["rebels", "loyalists", "none"] as const)
+		for (const outcome of rebelOutcomes)
+			report[`rebellions.side.${side}.${outcome}`] = allRebelWars.filter(
+				(war) =>
+					war.outcome === outcome &&
+					(NO_VICTOR_OUTCOMES.includes(outcome)
+						? "none"
+						: rebelWon(war)
+							? "rebels"
+							: "loyalists") === side,
+			).length
 	report["rebelWars.backed.share"] = share(
 		allRebelWars.map((war) => war.backers > 0),
 	)
@@ -1111,6 +1143,20 @@ function summarize({ tracker }: SummarizeParams): MilitaryReport {
 		).length
 	report["battles.perCompletedWar"] =
 		battles.length / Math.max(1, completed.length)
+	for (const [name, q] of [
+		["p25", 0.25],
+		["p50", 0.5],
+		["p75", 0.75],
+		["p90", 0.9],
+		["max", 1],
+	] as const)
+		report[`wars.battles.${name}`] = quantile({
+			values: completed.map((war) => war.battles),
+			q,
+		})
+	report["wars.battles.noneShare"] = share(
+		completed.map((war) => war.battles === 0),
+	)
 	report["battles.attackerWinShare"] = share(
 		battles.map((battle) => battle.attackerWon),
 	)

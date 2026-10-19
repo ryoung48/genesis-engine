@@ -1,4 +1,8 @@
-import type { BenchRunDetail } from "@/bench/types"
+import type {
+	BenchDistribution,
+	BenchRunDetail,
+	BenchWindow,
+} from "@/bench/types"
 import type { BoxChartDef, DistributionChartDef } from "@/ui/bench/chartDefs"
 import {
 	DRILLDOWN_FAMILIES,
@@ -30,11 +34,19 @@ export function resolveSeries(params: {
 		return {
 			label: spec.label,
 			color: spec.color,
+			group: spec.group,
 			values: baseline
 				? diffValues({ current: values, baseline: spec.values(baseline) })
 				: values,
 		}
 	})
+}
+
+function runsOf(params: {
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+}): BenchRunDetail[] {
+	return params.baseline ? [params.current, params.baseline] : [params.current]
 }
 
 const BOX_QUANTILES = ["p10", "p25", "p50", "p75", "p90", "max"] as const
@@ -47,8 +59,18 @@ export function boxSpecs(def: BoxChartDef): SeriesSpec[] {
 	}))
 }
 
-export function familySpecs(): SeriesSpec[] {
-	return DRILLDOWN_FAMILIES.map((family) => ({
+export function familySpecs(params: {
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+}): SeriesSpec[] {
+	const runs = runsOf(params)
+	return DRILLDOWN_FAMILIES.filter((family) =>
+		runs.some((run) =>
+			run.windows.some(
+				(w) => familySum({ distribution: w.governments, family }) !== 0,
+			),
+		),
+	).map((family) => ({
 		label: familyLabel(family),
 		color: familyColor(family),
 		values: (run) =>
@@ -62,23 +84,86 @@ export function eventSpecs(params: {
 	current: BenchRunDetail
 	baseline: BenchRunDetail | null
 }): SeriesSpec[] {
-	const runs = params.baseline
-		? [params.current, params.baseline]
-		: [params.current]
 	const totals = new Map<string, number>()
-	for (const run of runs)
+	for (const run of runsOf(params))
 		for (const year of run.events)
 			for (const [name, ms] of Object.entries(year.types))
 				totals.set(name, (totals.get(name) ?? 0) + ms)
-	const names = [...totals.keys()].sort(
-		(a, b) => (totals.get(b) ?? 0) - (totals.get(a) ?? 0),
-	)
+	const names = [...totals.keys()]
+		.filter((name) => (totals.get(name) ?? 0) !== 0)
+		.sort((a, b) => (totals.get(b) ?? 0) - (totals.get(a) ?? 0))
 	const colors = uiChartPalette.bench.categories
 	return names.map((name, index) => ({
 		label: name,
 		color: colors[index % colors.length],
 		values: (run) => run.events.map((year) => year.types[name] ?? 0),
 	}))
+}
+
+export function outcomeSpecs(params: {
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+	outcomes: (window: BenchWindow) => BenchDistribution
+}): SeriesSpec[] {
+	const totals = new Map<string, number>()
+	for (const run of runsOf(params))
+		for (const window of run.windows)
+			for (const [name, count] of Object.entries(params.outcomes(window)))
+				totals.set(name, (totals.get(name) ?? 0) + count)
+	const names = [...totals.keys()]
+		.filter((name) => (totals.get(name) ?? 0) !== 0)
+		.sort((a, b) => (totals.get(b) ?? 0) - (totals.get(a) ?? 0))
+	const colors = uiChartPalette.bench.categories
+	return names.map((name, index) => ({
+		label: name,
+		color: colors[index % colors.length],
+		values: (run) => run.windows.map((w) => params.outcomes(w)[name] ?? 0),
+	}))
+}
+
+const DEVELOPMENT_LABELS = ["0–0.2", "0.2–0.4", "0.4–0.6", "0.6–0.8", "0.8–1"]
+const KNOWLEDGE_LABELS = [
+	"−3 to −2",
+	"−2 to −1",
+	"−1 to 0",
+	"0 to 1",
+	"1 to 2",
+	"2 to 3",
+	"3 to 4",
+]
+
+export function levelSpecs(params: {
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+}): SeriesSpec[] {
+	const runs = runsOf(params)
+	const series = (
+		key: "development" | "knowledge",
+		labels: readonly string[],
+		colors: readonly string[],
+	): SeriesSpec[] =>
+		labels
+			.map((label, index) => ({ label, index }))
+			.filter(({ index }) =>
+				runs.some((run) =>
+					run.windows.some((w) => (w[key][String(index)] ?? 0) !== 0),
+				),
+			)
+			.map(({ label, index }) => ({
+				label: `${key} ${label}`,
+				color: colors[index],
+				group: key,
+				values: (run: BenchRunDetail) =>
+					run.windows.map((w) => w[key][String(index)] ?? 0),
+			}))
+	return [
+		...series(
+			"development",
+			DEVELOPMENT_LABELS,
+			uiChartPalette.bench.development,
+		),
+		...series("knowledge", KNOWLEDGE_LABELS, uiChartPalette.bench.knowledge),
+	]
 }
 
 export function populationSpecs(): { bars: SeriesSpec[]; lines: SeriesSpec[] } {
@@ -110,15 +195,19 @@ export function distributionSpecs(params: {
 	current: BenchRunDetail
 	baseline: BenchRunDetail | null
 }): SeriesSpec[] {
-	const { def, current, baseline } = params
-	const runs = baseline ? [current, baseline] : [current]
+	const { def } = params
+	const runs = runsOf(params)
 	const keys = [
 		...new Set(
 			runs.flatMap((run) =>
 				run.windows.flatMap((window) => Object.keys(def.pick(window))),
 			),
 		),
-	]
+	].filter((key) =>
+		runs.some((run) =>
+			run.windows.some((window) => (def.pick(window)[key] ?? 0) !== 0),
+		),
+	)
 	const rank = (key: string) => {
 		const index = def.order.indexOf(key)
 		return index === -1 ? def.order.length : index

@@ -28,3 +28,8 @@ export interface BreaksParams extends VassalLinkParams {
 export interface AnswersParams extends VassalLinkParams {
 	attacking: boolean
 }
+
+export interface TribalParams {
+	state: HistoryState
+	nation: number
+}

@@ -52,8 +52,10 @@ function sample({ engine, tracker: current }: NavySampleParams): void {
 			continue
 		const ships = NAVY.ships({ state: engine, nation })
 		result.realms++
-		result.ships.push(ships)
-		if (ships > 0) result.withShips++
+		if (ships > 0) {
+			result.ships.push(ships)
+			result.withShips++
+		}
 		result.upkeep += NAVY.upkeep({ state: engine, nation })
 		result.revenue += ECONOMY.revenue({ state: engine, p: nation })
 		const targets = RECRUITMENT.realmTargets({ state: engine, nation })

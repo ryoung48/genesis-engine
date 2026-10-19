@@ -30,8 +30,10 @@ import {
 	getRulerRelation,
 	getSovereign,
 	isSovereign,
+	isSubjectLink,
 	setDisposition,
 	setRelation,
+	vassalOverlord,
 } from "@/model/history/sim/engine/state/relations"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
 import { HEIR_PLAN } from "@/model/history/sim/engine/state/rulers/heirs"
@@ -100,6 +102,8 @@ export const rel = {
 	NONE: "NONE",
 	OVERLORD: "OVERLORD",
 	VASSAL: "VASSAL",
+	TRIBUTARY: "TRIBUTARY",
+	SUZERAIN: "SUZERAIN",
 	PU_SENIOR: "PU_SENIOR",
 	PU_JUNIOR: "PU_JUNIOR",
 	ALLY: "ALLY",
@@ -166,6 +170,7 @@ function getWarAllies({
 		if (
 			towardTarget === rel.ALLY ||
 			towardTarget === rel.OVERLORD ||
+			towardTarget === rel.SUZERAIN ||
 			towardTarget === rel.PU_SENIOR
 		)
 			continue
@@ -207,7 +212,7 @@ function releaseFactions({ state, seats, rng }: ReleaseFactionsParams): void {
 			supportingSeats,
 			supportingProvinces,
 			share,
-			government: state.governmentType[formerSovereign],
+			government: STATE_GOVERNMENT.released({ state, formerSovereign, rng }),
 			ruler,
 		}
 	})
@@ -443,6 +448,26 @@ function releaseSubjectRelations({
 		}
 
 		if (relation === rel.OVERLORD) {
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
+			state.events.push({
+				tag: "vassalage ended",
+				time: state.time,
+				data: { vassal: other, overlord: nation },
+			})
+			continue
+		}
+
+		if (relation === rel.TRIBUTARY) {
+			setRelation({ state, a: nation, b: other, rel: rel.NONE })
+			state.events.push({
+				tag: "vassalage ended",
+				time: state.time,
+				data: { vassal: nation, overlord: other },
+			})
+			continue
+		}
+
+		if (relation === rel.SUZERAIN) {
 			setRelation({ state, a: nation, b: other, rel: rel.NONE })
 			state.events.push({
 				tag: "vassalage ended",
@@ -1505,6 +1530,8 @@ export const STATE = {
 	getRulerRelation,
 	getSovereign,
 	isSovereign,
+	isSubjectLink,
+	vassalOverlord,
 	getChildren,
 	getNationProvinces,
 	occupiedLand,

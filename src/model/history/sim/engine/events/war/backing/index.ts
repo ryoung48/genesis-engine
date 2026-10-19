@@ -17,7 +17,7 @@ const BACKING_DECAY = 0.5
 
 function enemies({ state, war }: BackerEnemiesParams): BackerCandidate[] {
 	const { crown } = STATE.warSides({ war })
-	const overlord = STATE.diplomaticOverlord({ state, nation: crown })
+	const overlord = STATE.vassalOverlord({ state, nation: crown })
 	const candidates = new Map<number, BackerCandidate>()
 	if (
 		war.goal === "throne" &&
@@ -73,7 +73,7 @@ function recruit({ state, war, rng }: RecruitParams): void {
 	const candidates = enemies({ state, war })
 	const first = candidates.find(
 		(candidate) =>
-			candidate.nation === STATE.diplomaticOverlord({ state, nation: crown }),
+			candidate.nation === STATE.vassalOverlord({ state, nation: crown }),
 	)
 	const shuffled = rng.shuffle(
 		candidates
@@ -83,10 +83,10 @@ function recruit({ state, war, rng }: RecruitParams): void {
 	for (const candidate of first ? [first, ...shuffled] : shuffled) {
 		const { nation, via, enemyOf } = candidate
 		const disloyalVassal =
-			STATE.diplomaticOverlord({ state, nation }) === crown &&
+			STATE.vassalOverlord({ state, nation }) === crown &&
 			STATE.getDisposition({ state, a: nation, b: crown }) === STATE.disp.RIVAL
 		const disloyalOverlord =
-			nation === STATE.diplomaticOverlord({ state, nation: crown }) &&
+			nation === STATE.vassalOverlord({ state, nation: crown }) &&
 			war.goal === "throne" &&
 			(STATE.getDisposition({ state, a: nation, b: crown }) ===
 				STATE.disp.SUSPICIOUS ||
@@ -107,6 +107,8 @@ function recruit({ state, war, rng }: RecruitParams): void {
 			tie === STATE.rel.ALLY ||
 			(tie === STATE.rel.VASSAL && !disloyalOverlord) ||
 			(tie === STATE.rel.OVERLORD && !disloyalVassal) ||
+			tie === STATE.rel.TRIBUTARY ||
+			tie === STATE.rel.SUZERAIN ||
 			tie === STATE.rel.PU_SENIOR ||
 			tie === STATE.rel.PU_JUNIOR ||
 			tie === STATE.rel.COLONY ||
@@ -153,7 +155,12 @@ function repay({ state, war, outcome, rng }: RepayParams): void {
 		)
 			continue
 		const existing = STATE.getRelation({ state, a: nation, b: backer })
-		if (existing === STATE.rel.VASSAL || existing === STATE.rel.OVERLORD) {
+		if (
+			existing === STATE.rel.VASSAL ||
+			existing === STATE.rel.OVERLORD ||
+			existing === STATE.rel.TRIBUTARY ||
+			existing === STATE.rel.SUZERAIN
+		) {
 			STATE.setDisposition({
 				state,
 				a: nation,
@@ -182,7 +189,11 @@ function repay({ state, war, outcome, rng }: RepayParams): void {
 				b: backer,
 				disposition: STATE.disp.TRUSTED,
 			})
-		} else if (formPact && STATE.canAlly({ state, a: nation, b: backer })) {
+		} else if (
+			formPact &&
+			STATE.canAlly({ state, a: nation, b: backer }) &&
+			rng.random() < DIPLOMATIC_FORMATION.allianceScale
+		) {
 			STATE.setRelation({ state, a: nation, b: backer, rel: STATE.rel.ALLY })
 			STATE.setDisposition({
 				state,

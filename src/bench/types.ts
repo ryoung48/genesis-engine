@@ -39,10 +39,6 @@ export interface BenchBox {
 
 export interface BenchWindow {
 	label: string
-	warsAttackerWon: number | null
-	warsDefenderWon: number | null
-	rebelWarsRebelWon: number | null
-	rebelWarsLoyalistWon: number | null
 	warYearsP50: number | null
 	warYearsP90: number | null
 	rebelWarYearsP50: number | null
@@ -50,6 +46,19 @@ export interface BenchWindow {
 	sovereignSizes: BenchDistribution
 	governments: BenchDistribution
 	ties: BenchDistribution
+	peacefulAnnexations: number | null
+	development: BenchDistribution
+	knowledge: BenchDistribution
+	warOutcomes: {
+		attacker: BenchDistribution
+		defender: BenchDistribution
+		none: BenchDistribution
+	}
+	rebellionOutcomes: {
+		rebels: BenchDistribution
+		loyalists: BenchDistribution
+		none: BenchDistribution
+	}
 	population: { stateHeld: number | null; stateless: number | null }
 	largestCity: number | null
 	armySize: BenchBox
