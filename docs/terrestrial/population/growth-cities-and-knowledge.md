@@ -61,7 +61,9 @@ Knowledge grows through a province's own development and contact with more knowl
 
 `new knowledge = old knowledge + (own advance + strongest neighbor pull) × years elapsed`
 
-Own advance is a knowledge-dependent rate multiplied by current development. It slows or stops if the province is too far ahead of the population-weighted world knowledge level. Neighbor pull uses only neighbors with higher knowledge: 4% of the gap for a neighbor in the same sovereign realm, or 1.5% across a sovereign border. Only the strongest neighbor pull is used, and all provinces read the previous knowledge values before the new values are committed.
+Own advance is a knowledge-dependent rate multiplied by current development: 0.18% per year at knowledge 0, 0.36% at 0.5, 0.6% at 1, 0.72% at 2, 1.08% at 3 and 0.6% at 4, interpolated. The rate shrinks linearly as the province's lead over the population-weighted knowledge of realm-held land grows, and stops at a lead of 0.45 to 2 (larger as that level rises). Stateless land is left out of this reference: it has no cities, so it sits near the 0.05 development floor and advances mostly by neighbour pull. Counting it (a third of the 867 population, at about 0.2) held the reference about 0.1 below realm-held land and slowed every realm above it.
+
+These rates are 1.2 times the earlier table, measured on seed 14963991 with a 204,000-point world. With the realm-held reference alone the world mean reached 1.26 by 1517 against the year baseline's 1.49; 1.2 times kept it within about 0.06 of the baseline from 867 to 1667, 1.3 times ran ahead from 1567 and 1.5 times from 1250. Knowledge, development and own advance reinforce each other, so any gap compounds after 1600. Neighbor pull uses only neighbors with higher knowledge: 4% of the gap for a neighbor in the same sovereign realm, or 1.5% across a sovereign border. Only the strongest neighbor pull is used, and all provinces read the previous knowledge values before the new values are committed.
 
 An isolated low-development realm with no more knowledgeable neighbour advances very slowly and can fall behind the world without limit.
 

@@ -49,7 +49,7 @@ const FOREIGN_DIFFUSION = 0.015
 
 const SELF_ADVANCE_CURVE = {
 	domain: [0, 0.5, 1, 2, 3, 4],
-	range: [0.0015, 0.003, 0.005, 0.006, 0.009, 0.005],
+	range: [0.0018, 0.0036, 0.006, 0.0072, 0.0108, 0.006],
 }
 
 const MAX_LEAD_CURVE = {
@@ -118,6 +118,12 @@ function allProvinces({ state }: InitKnowledgeParams): number[] {
 	return Array.from({ length: state.P }, (_, p) => p)
 }
 
+function heldProvinces({ state }: InitKnowledgeParams): number[] {
+	const held: number[] = []
+	for (let p = 0; p < state.P; p++) if (!state.stateless[p]) held.push(p)
+	return held
+}
+
 function realmKnowledge({ state, provinces }: RealmKnowledgeParams): number {
 	return populationMean({ state, provinces, values: state.knowledgeCurrent })
 }
@@ -138,6 +144,7 @@ function initKnowledge({ state }: InitKnowledgeParams): void {
 	const baseline = state.knowledgeBaseline
 	const origin = ERA_BASELINE[state.era] - 1
 	const provinces = allProvinces({ state })
+	const held = heldProvinces({ state })
 	state.knowledgeSpinUp = { origin, years: 0 }
 	fillLive({ state, value: origin })
 	let mean = populationMean({
@@ -160,7 +167,11 @@ function initKnowledge({ state }: InitKnowledgeParams): void {
 			next,
 			sovereign,
 			yearFraction: SPIN_UP_STEP_YEARS,
-			worldKnowledge: mean,
+			heldKnowledge: populationMean({
+				state,
+				provinces: held,
+				values: current,
+			}),
 		})
 		const after = populationMean({ state, provinces, values: next })
 		if (after <= mean) {
@@ -203,12 +214,12 @@ function maxLead({ knowledge }: KnowledgeLevelParams): number {
 
 function ownAdvance({
 	knowledge,
-	worldKnowledge,
+	heldKnowledge,
 	development,
 }: OwnAdvanceParams): number {
 	const drag = Math.max(
 		0,
-		1 - (knowledge - worldKnowledge) / maxLead({ knowledge: worldKnowledge }),
+		1 - (knowledge - heldKnowledge) / maxLead({ knowledge: heldKnowledge }),
 	)
 	return selfAdvanceRate({ knowledge }) * development * Math.min(1, drag)
 }
@@ -218,14 +229,14 @@ function step({
 	next,
 	sovereign,
 	yearFraction,
-	worldKnowledge,
+	heldKnowledge,
 }: StepParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		const knowledge = current[p]
 		const own = ownAdvance({
 			knowledge,
-			worldKnowledge,
+			heldKnowledge,
 			development: state.developmentCurrent[p],
 		})
 		let pull = 0
@@ -257,9 +268,9 @@ function advanceKnowledge({
 		next,
 		sovereign: sovereigns({ state }),
 		yearFraction,
-		worldKnowledge: realmKnowledge({
+		heldKnowledge: realmKnowledge({
 			state,
-			provinces: allProvinces({ state }),
+			provinces: heldProvinces({ state }),
 		}),
 	})
 	state.knowledgeCurrent.set(next)

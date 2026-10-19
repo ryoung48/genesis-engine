@@ -37,7 +37,7 @@ export interface MaxCitySizeParams {
 
 export interface OwnAdvanceParams {
 	knowledge: number
-	worldKnowledge: number
+	heldKnowledge: number
 	development: number
 }
 
@@ -71,5 +71,5 @@ export interface StepParams {
 	next: Float32Array
 	sovereign: Int32Array
 	yearFraction: number
-	worldKnowledge: number
+	heldKnowledge: number
 }
