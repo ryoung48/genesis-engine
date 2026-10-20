@@ -2,6 +2,19 @@ import type { NavalTotals } from "@/model/history/sim/engine/military/navy/types
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import type { Distribution } from "@/test/history-run/report/statistics/types"
 
+export type FleetBinding = "budget" | "sailors" | "none"
+
+export interface FleetLimits {
+	ships: number
+	target: number
+	budgetShips: number
+	sailorShips: number
+	coastalManpower: number
+	population: number
+	sailorShare: number
+	binding: FleetBinding
+}
+
 export interface NavySample {
 	shares: number[]
 	realms: number
@@ -12,6 +25,9 @@ export interface NavySample {
 	coastal: number
 	coastalWithShips: number
 	largest: number
+	largestLimits: FleetLimits
+	sailorBound: number
+	fleetTargets: number
 	top5Ships: number
 	top5Share: number
 }
@@ -53,6 +69,8 @@ export interface NavyReport {
 	realmsWithShips: number
 	coastalWithShips: number
 	largestFleet: number
+	largestFleetLimits: FleetLimits
+	sailorBoundShare: number
 	top5ShipShare: number
 	top5NavalShare: number
 	ships: Distribution & {

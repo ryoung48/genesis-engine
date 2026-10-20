@@ -13,6 +13,11 @@ export interface RecruitmentLimits {
 	logistics: boolean
 }
 
+export interface ShipLimits {
+	budget: number
+	sailors: number
+}
+
 export interface RecruitmentTargets extends Troops {
 	safety: number
 	knee: number
@@ -25,6 +30,7 @@ export interface RecruitmentTargets extends Troops {
 	home: Troops
 	campaign: Troops
 	ships: number
+	shipLimits: ShipLimits
 	crew: number
 	shipHome: number
 	shipCampaign: number

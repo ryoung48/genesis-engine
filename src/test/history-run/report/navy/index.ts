@@ -4,6 +4,7 @@ import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { STATE } from "@/model/history/sim/engine/state"
 import type {
 	BlockadeBeats,
+	FleetLimits,
 	NavalOutcomeMix,
 	NavyLogParams,
 	NavyReport,
@@ -15,6 +16,17 @@ import type {
 import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 const TOP_FLEETS = 5
+
+const NO_FLEET: FleetLimits = {
+	ships: 0,
+	target: 0,
+	budgetShips: 0,
+	sailorShips: 0,
+	coastalManpower: 0,
+	population: 0,
+	sailorShare: 0,
+	binding: "none",
+}
 
 function tracker(): NavyTracker {
 	return {
@@ -39,10 +51,13 @@ function sample({ engine, tracker: current }: NavySampleParams): void {
 		coastal: 0,
 		coastalWithShips: 0,
 		largest: 0,
+		largestLimits: NO_FLEET,
+		sailorBound: 0,
+		fleetTargets: 0,
 		top5Ships: 0,
 		top5Share: 0,
 	}
-	const fleets: { ships: number; share: number }[] = []
+	const fleets: { ships: number; share: number; limits: FleetLimits }[] = []
 	for (let nation = 0; nation < engine.P; nation++) {
 		if (
 			engine.desolate[nation] ||
@@ -61,7 +76,30 @@ function sample({ engine, tracker: current }: NavySampleParams): void {
 		const targets = RECRUITMENT.realmTargets({ state: engine, nation })
 		const spend = targets.fleetCost + targets.funding * targets.budget
 		const share = spend > 0 ? targets.fleetCost / spend : 0
-		fleets.push({ ships, share })
+		const realm = ECONOMY.realm({ state: engine, p: nation })
+		const binding =
+			targets.ships <= 0
+				? "none"
+				: targets.shipLimits.sailors < targets.shipLimits.budget
+					? "sailors"
+					: "budget"
+		if (binding !== "none") result.fleetTargets++
+		if (binding === "sailors") result.sailorBound++
+		fleets.push({
+			ships,
+			share,
+			limits: {
+				ships,
+				target: targets.ships,
+				budgetShips: targets.shipLimits.budget,
+				sailorShips: targets.shipLimits.sailors,
+				coastalManpower: realm.coastalManpower,
+				population: realm.population,
+				sailorShare:
+					realm.population > 0 ? (ships * targets.crew) / realm.population : 0,
+				binding,
+			},
+		})
 		if (NAVY.exposure({ state: engine, nation }).ports <= 0) continue
 		result.coastal++
 		if (ships > 0) result.coastalWithShips++
@@ -70,6 +108,7 @@ function sample({ engine, tracker: current }: NavySampleParams): void {
 	fleets.sort((a, b) => b.ships - a.ships)
 	const top = fleets.slice(0, TOP_FLEETS)
 	result.largest = top[0]?.ships ?? 0
+	result.largestLimits = top[0]?.limits ?? NO_FLEET
 	result.top5Ships = top.reduce((sum, fleet) => sum + fleet.ships, 0)
 	result.top5Share =
 		top.reduce((sum, fleet) => sum + fleet.share, 0) / Math.max(1, top.length)
@@ -193,6 +232,17 @@ function summarize({
 				samples.reduce((sum, entry) => sum + entry.coastal, 0),
 			),
 		largestFleet: Math.max(0, ...samples.map((entry) => entry.largest)),
+		largestFleetLimits: samples.reduce(
+			(best, entry) =>
+				entry.largestLimits.ships > best.ships ? entry.largestLimits : best,
+			NO_FLEET,
+		),
+		sailorBoundShare:
+			samples.reduce((sum, entry) => sum + entry.sailorBound, 0) /
+			Math.max(
+				1,
+				samples.reduce((sum, entry) => sum + entry.fleetTargets, 0),
+			),
 		top5ShipShare:
 			samples.reduce((sum, entry) => sum + entry.top5Ships, 0) /
 			Math.max(

@@ -58,13 +58,14 @@ function targets({
 	const sailors = Number.isFinite(coastalManpower)
 		? Math.max(0, coastalManpower) * SAILOR_SHARE
 		: 0
-	const ships =
-		shipHome > 0
-			? Math.min(
-					Math.floor((navalShare * funding * readiness) / shipHome),
-					Math.floor(sailors / crew),
-				)
-			: 0
+	const shipLimits = {
+		budget:
+			shipHome > 0
+				? Math.floor((navalShare * funding * readiness) / shipHome)
+				: 0,
+		sailors: shipHome > 0 ? Math.floor(sailors / crew) : 0,
+	}
+	const ships = Math.min(shipLimits.budget, shipLimits.sailors)
 	const fleetCost = ships * shipHome
 	const budget = funding > 0 ? readiness - fleetCost / funding : readiness
 	const regular = home.regular > 0 ? (funding * budget) / home.regular : 0
@@ -98,6 +99,7 @@ function targets({
 		home,
 		campaign,
 		ships,
+		shipLimits,
 		crew,
 		shipHome,
 		shipCampaign: crew * 625 * price * (1 + HULL_UPKEEP),
