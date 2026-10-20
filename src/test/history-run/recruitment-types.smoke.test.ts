@@ -113,6 +113,7 @@ describe("recruitment and integrated military expense", () => {
 			for (const knowledge of [0.42, 1.44, 2.38]) {
 				const target = RECRUITMENT.targets({
 					manpower: 1e8,
+					coastalManpower: 1e8,
 					tribal,
 					knowledge,
 					surplus: 1e6,
@@ -150,6 +151,7 @@ describe("recruitment and integrated military expense", () => {
 	it("calculates separate levy and regular targets without converting troops", () => {
 		const early = RECRUITMENT.targets({
 			manpower: 1e6,
+			coastalManpower: 1e6,
 			tribal: false,
 			knowledge: 0.42,
 			surplus: (1e6 / 0.75) * ECONOMY.ducatsPerGram,
@@ -158,6 +160,7 @@ describe("recruitment and integrated military expense", () => {
 		})
 		const late = RECRUITMENT.targets({
 			manpower: 1e6,
+			coastalManpower: 1e6,
 			tribal: false,
 			knowledge: 2.38,
 			surplus: (5e6 / 0.75) * ECONOMY.ducatsPerGram,
@@ -173,6 +176,7 @@ describe("recruitment and integrated military expense", () => {
 		expect(
 			RECRUITMENT.targets({
 				manpower: 1e6,
+				coastalManpower: 1e6,
 				tribal: false,
 				knowledge: 4,
 				surplus: 0,
@@ -183,6 +187,7 @@ describe("recruitment and integrated military expense", () => {
 		expect(
 			RECRUITMENT.targets({
 				manpower: 1e6,
+				coastalManpower: 1e6,
 				tribal: false,
 				knowledge: 4,
 				surplus: 1e6,
@@ -195,6 +200,7 @@ describe("recruitment and integrated military expense", () => {
 	it("scales both requested contributions when the shared budget is insufficient", () => {
 		const target = RECRUITMENT.targets({
 			manpower: 1e6,
+			coastalManpower: 1e6,
 			tribal: false,
 			knowledge: 1,
 			surplus: 1 / 0.75,
@@ -219,6 +225,7 @@ describe("recruitment and integrated military expense", () => {
 		})
 		const empty = RECRUITMENT.targets({
 			manpower: 1e6,
+			coastalManpower: 1e6,
 			tribal: false,
 			knowledge: 1,
 			surplus: 0,
@@ -232,6 +239,7 @@ describe("recruitment and integrated military expense", () => {
 	it("preserves requested composition when population safety is the strictest ceiling", () => {
 		const target = RECRUITMENT.targets({
 			manpower: 1000,
+			coastalManpower: 1000,
 			tribal: false,
 			knowledge: 1,
 			surplus: 1e6,
@@ -369,6 +377,7 @@ describe("recruitment and integrated military expense", () => {
 	it("gives tribal and steppe governments the same eligibility and shared troop prices", () => {
 		const common = {
 			manpower: 1e6,
+			coastalManpower: 1e6,
 			knowledge: 1.44,
 			surplus: 100 / 0.75,
 			outputPerHead: 450,

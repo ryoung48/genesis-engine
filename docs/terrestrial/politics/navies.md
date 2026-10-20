@@ -21,9 +21,12 @@ For each sovereign, over its realm provinces:
 naval share  = 0.35 × S / (S + L)             (0 when S = 0)
 navy money   = naval share × funding(knowledge) × B
 ship price   = crew(knowledge) × 200 g × price scale        (home upkeep)
-target ships = floor(navy money / ship price)
+sailor pool  = 0.01 × coastal manpower
+target ships = min(floor(navy money / ship price), floor(sailor pool / crew(knowledge)))
 army budget  = B − target ships × ship price / funding(knowledge)
 ```
+
+Crews come only from port provinces. Coastal manpower is the realm's [manpower](armies-and-wars.md#enrollment-and-recruitment) summed over its ports, so each port also counts less the farther it is from the capital. The sailor pool is separate from the army's safety ceiling: coastal seafarers and inland levies were largely different people, so sailors are not counted against it. Navy money the sailor pool cannot crew stays in the army budget.
 
 `B` is the existing readiness budget (`0.75 × max(0, civilian surplus)`), `funding` the existing piecewise from 10% at knowledge 0.42 to 90% at 2.38, and the price scale the existing `(output per resident / 450)^0.5 × ducats per gram`. The army runs its levy and regular logic on `army budget`, so it loses exactly what the navy buys: regular spending plus whole-ship home upkeep equals the regular spending without a navy. A budget too small for one ship goes to the army. Exposure is cached per realm and refreshed when the hierarchy or any relation changes. Rebellion previews apply the same split to each prospective territory; a province outside the previewed territory that shares its current sovereign counts as hostile, because it becomes a separate realm.
 
@@ -94,6 +97,7 @@ Census snapshots carry each realm's whole ships; naval upkeep is the `navalExpen
 | Naval share cap | 0.35 | The most naval power, Britain, spent about 20–36% of military money on the navy; the Seven Years' War navy took about a quarter of war spending. A Britain-like realm (S 0.7, L 0.05) gets 31%, a France-like realm (S 0.3, L 0.25) 13%, consistent with the French navy's 5–6% of the state budget, 1715–1789. |
 | Land-border weight | 1 | **Assumption.** A land invasion cannot be avoided, while a sea threat can be waited out. Lowered from 2 so port-heavy realms with land neighbours still build ships. Checked by the naval-share distribution in the report. |
 | Crew curve | 60 / 200 / 250 / 375 | 867: longships carried 30–80 men, 60–70 typical for war. 1300: Michael of Rhodes' war galley (1401) about 215 men. 1500: the Armada about 29,500 men on about 130 ships. 1800: 120,000 men voted for about 320 ships in commission in 1805. |
+| Sailor share | 0.01 of coastal manpower | The Royal Navy's peak, about 113,000 seamen and 31,400 marines (138,000 active in 1813), was about 0.9% of the roughly 16 million people of Britain and Ireland in 1801; it is the highest naval share of the sailing era. By the 1780s the British and French fleets already needed all the seamen their countries had (Frykman 2009), and the Dutch could crew only two-thirds of theirs in 1780–1784, so the limit is the seafaring population, not money. France's maritime registry (classes, 1668–1670) called one class in about three each year and classed 16,000–17,000 sailors a year in 1756–1760. All of Britain counts as coastal, so 1% of coastal manpower sits just above its peak. |
 | Crew prices | 200 g home, 625 g campaign | The existing regular prices. A sailor at sea cost about 2.7× a soldier at home (£81 against £25–35 a year), close to the existing 3.1× campaign/home ratio. |
 | Build rate | 0.25 per year | A 74 took about 3 years from laying down to launch and about 4 from order; France grew from about 23 to about 196 ships in about 10 years under Colbert. |
 | Naval kind weight | 0.90 × c | **Assumption.** Raised from 0.30 to move the naval share of battles from 1.2–2.1% to 2.7–7.3%. Wikipedia's battle lists give roughly 4–10% by century (10th–18th), a crude count that mixes sieges and uneven coverage. A port town that is siege-eligible still takes 95% of selections, so the weight mostly acts on ports that are not towns. |

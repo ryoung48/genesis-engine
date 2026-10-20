@@ -46,6 +46,7 @@ it("translates every siege snapshot and synchronizes coalition changes at siege 
 	vi.spyOn(RECRUITMENT, "realmTargets").mockReturnValue(
 		RECRUITMENT.targets({
 			manpower: 100000,
+			coastalManpower: 100000,
 			tribal: false,
 			knowledge: 1,
 			surplus: 100,

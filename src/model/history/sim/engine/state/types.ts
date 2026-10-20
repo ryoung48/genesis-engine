@@ -158,6 +158,8 @@ export interface RealmCacheEntry {
 	population: number
 	// Residents weighted by each province's reach from the capital, for recruitment.
 	manpower: number
+	// Manpower of the realm's port provinces, the pool its navy crews come from.
+	coastalManpower: number
 	hierarchyVersion: number
 	censusVersion: number
 	knowledge: number

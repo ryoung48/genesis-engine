@@ -38,6 +38,7 @@ const STALEMATE = [0.99, (7 - 0.5) / 20]
 
 const BASE = {
 	manpower: 1_000_000,
+	coastalManpower: 1e12,
 	tribal: false,
 	knowledge: 1,
 	surplus: 1_000_000,
@@ -118,6 +119,20 @@ describe("FR1 naval budget", () => {
 		expect(navy.ships).toBeGreaterThan(0)
 		expect(navy.fleetCost).toBeLessThanOrEqual(money)
 		expect(navy.fleetCost).toBeGreaterThan(money - navy.shipHome)
+		expectClose(
+			navy.uncapped.regular * navy.home.regular + navy.fleetCost,
+			none.uncapped.regular * none.home.regular,
+		)
+	})
+
+	it("crews ships only from 1% of coastal manpower and gives the rest to the army", () => {
+		const none = RECRUITMENT.targets({ ...BASE, navalShare: 0 })
+		const navy = RECRUITMENT.targets({
+			...BASE,
+			coastalManpower: 1_000_000,
+			navalShare: 0.2,
+		})
+		expect(navy.ships).toBe(Math.floor(10_000 / navy.crew))
 		expectClose(
 			navy.uncapped.regular * navy.home.regular + navy.fleetCost,
 			none.uncapped.regular * none.home.regular,

@@ -23,8 +23,11 @@ import { MATH } from "@/model/shared/math/core"
 
 const FUNDING = { domain: [0.42, 1, 1.44, 2.38], range: [0.1, 0.25, 0.55, 0.9] }
 
+const SAILOR_SHARE = 0.01
+
 function targets({
 	manpower,
+	coastalManpower,
 	tribal,
 	knowledge,
 	surplus,
@@ -50,8 +53,16 @@ function targets({
 	const levy = home.levy > 0 ? living * levyEligibility : 0
 	const crew = NAVY.crew({ knowledge: level })
 	const shipHome = crew * 200 * price
+	const sailors = Number.isFinite(coastalManpower)
+		? Math.max(0, coastalManpower) * SAILOR_SHARE
+		: 0
 	const ships =
-		shipHome > 0 ? Math.floor((navalShare * funding * readiness) / shipHome) : 0
+		shipHome > 0
+			? Math.min(
+					Math.floor((navalShare * funding * readiness) / shipHome),
+					Math.floor(sailors / crew),
+				)
+			: 0
 	const fleetCost = ships * shipHome
 	const budget = funding > 0 ? readiness - fleetCost / funding : readiness
 	const regular = home.regular > 0 ? (funding * budget) / home.regular : 0
@@ -99,6 +110,7 @@ function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
 	const realm = ECONOMY.realm({ state, p: nation })
 	const inputs: TargetParams = {
 		manpower: realm.manpower,
+		coastalManpower: realm.coastalManpower,
 		tribal:
 			GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) === "tribal",
 		knowledge: realm.knowledge,
@@ -110,6 +122,7 @@ function realmTargets({ state, nation }: NationParams): RecruitmentTargets {
 	if (
 		cached &&
 		cached.inputs.manpower === inputs.manpower &&
+		cached.inputs.coastalManpower === inputs.coastalManpower &&
 		cached.inputs.tribal === inputs.tribal &&
 		cached.inputs.knowledge === inputs.knowledge &&
 		cached.inputs.surplus === inputs.surplus &&
@@ -130,6 +143,7 @@ function territoryTargets({
 	const economy = ECONOMY.territory({ state, p: nation, provinces })
 	return targets({
 		manpower: economy.manpower,
+		coastalManpower: economy.coastalManpower,
 		tribal:
 			GOVERNMENT.govFamilyOfIndex(state.governmentType[nation]) === "tribal",
 		knowledge: economy.knowledge,
