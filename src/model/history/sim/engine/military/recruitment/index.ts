@@ -25,6 +25,8 @@ const FUNDING = { domain: [0.42, 1, 1.44, 2.38], range: [0.1, 0.25, 0.55, 0.9] }
 
 const SAILOR_SHARE = 0.01
 
+const HULL_UPKEEP = 1
+
 function targets({
 	manpower,
 	coastalManpower,
@@ -52,7 +54,7 @@ function targets({
 	})
 	const levy = home.levy > 0 ? living * levyEligibility : 0
 	const crew = NAVY.crew({ knowledge: level })
-	const shipHome = crew * 200 * price
+	const shipHome = crew * 200 * price * (1 + HULL_UPKEEP)
 	const sailors = Number.isFinite(coastalManpower)
 		? Math.max(0, coastalManpower) * SAILOR_SHARE
 		: 0
@@ -98,7 +100,7 @@ function targets({
 		ships,
 		crew,
 		shipHome,
-		shipCampaign: crew * 625 * price,
+		shipCampaign: crew * 625 * price * (1 + HULL_UPKEEP),
 		fleetCost,
 		militaryBudget: funding * readiness,
 	}

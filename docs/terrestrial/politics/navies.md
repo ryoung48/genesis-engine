@@ -20,7 +20,7 @@ For each sovereign, over its realm provinces:
 ```text
 naval share  = 0.35 × S / (S + L)             (0 when S = 0)
 navy money   = naval share × funding(knowledge) × B
-ship price   = crew(knowledge) × 200 g × price scale        (home upkeep)
+ship price   = 2 × crew(knowledge) × 200 g × price scale    (home upkeep, crew plus hull)
 sailor pool  = 0.01 × coastal manpower
 target ships = min(floor(navy money / ship price), floor(sailor pool / crew(knowledge)))
 army budget  = B − target ships × ship price / funding(knowledge)
@@ -40,7 +40,7 @@ Crew interpolates linearly and uses the realm's current knowledge. Each crew mem
 
 `state.shipsCurrent` holds fractional build progress `h`. The fleet that exists, fights and is billed is `round(h)` whole ships. `h` recovers toward the target through the same exponential rule as regulars at 0.25 per year, in peace or war, so the first ship of a build from nothing is delivered after `ln 2 / 0.288 ≈ 2.4` years. The money for unbuilt ships is saved, not passed to the army. When the target falls below `round(h)`, `h` drops to the target at once and each ship removed counts as a decommission. A target that wobbles around an integer boundary can therefore decommission and rebuild ships; the report counts it. Initial fleets start at their full target.
 
-Billing is `crew × 200 g` per ship-year at home and `crew × 625 g` on campaign, times the price scale, which are the regular-soldier prices. Upkeep integrates whole ship-years over the same peace and campaign intervals as troops, charges at tax settlement into `navalExpenses`, and shows as its own "Navy maintenance" treasury row. Pending naval upkeep counts against a participant's cash like pending army upkeep.
+Billing is `2 × crew × 200 g` per ship-year at home and `2 × crew × 625 g` on campaign, times the price scale: the crew at regular-soldier prices plus an equal hull upkeep for construction, repairs and stores. Hulls are charged as continuing wear and tear, the way Parliament voted them, rather than as a one-time purchase. Upkeep integrates whole ship-years over the same peace and campaign intervals as troops, charges at tax settlement into `navalExpenses`, and shows as its own "Navy maintenance" treasury row. Pending naval upkeep counts against a participant's cash like pending army upkeep.
 
 ## War commitment
 
@@ -79,7 +79,7 @@ At the start of each phase a blockaded siege whose besiegers no longer hold a re
 
 ## Threat
 
-`MILITARY.threat` adds each side member's fleet strength (whole ships × crew, divided across its current wars as troops are) to its attended troop force before the cubed share. Ships count wherever the war would be, with no water-body check. Because navy money buys crew at the regular price and a crew member fights at regular strength, moving money from regulars to ships keeps threat nearly unchanged. War declarations, peaceful annexation and alliance checks, buy-off and indemnity chances, and interregnum targets inherit it. A rebellion preview gives the crown and the rebels the ships each would hold after splitting the overlord's current fleet by port-province count. Strength exhaustion, the `no troops` ending and the rule that an unarmed realm cannot join a war stay troop-only.
+`MILITARY.threat` adds each side member's fleet strength (whole ships × crew, divided across its current wars as troops are) to its attended troop force before the cubed share. Ships count wherever the war would be, with no water-body check. A crew member fights at regular strength but costs twice a regular once the hull is paid for, so moving money from regulars to ships buys about half the threat: a navy is the costlier way to buy force. War declarations, peaceful annexation and alliance checks, buy-off and indemnity chances, and interregnum targets inherit it. A rebellion preview gives the crown and the rebels the ships each would hold after splitting the overlord's current fleet by port-province count. Strength exhaustion, the `no troops` ending and the rule that an unarmed realm cannot join a war stay troop-only.
 
 ## Realm changes
 
@@ -98,6 +98,7 @@ Census snapshots carry each realm's whole ships; naval upkeep is the `navalExpen
 | Land-border weight | 1 | **Assumption.** A land invasion cannot be avoided, while a sea threat can be waited out. Lowered from 2 so port-heavy realms with land neighbours still build ships. Checked by the naval-share distribution in the report. |
 | Crew curve | 60 / 200 / 250 / 375 | 867: longships carried 30–80 men, 60–70 typical for war. 1300: Michael of Rhodes' war galley (1401) about 215 men. 1500: the Armada about 29,500 men on about 130 ships. 1800: 120,000 men voted for about 320 ships in commission in 1805. |
 | Sailor share | 0.01 of coastal manpower | The Royal Navy's peak, about 113,000 seamen and 31,400 marines (138,000 active in 1813), was about 0.9% of the roughly 16 million people of Britain and Ireland in 1801; it is the highest naval share of the sailing era. By the 1780s the British and French fleets already needed all the seamen their countries had (Frykman 2009), and the Dutch could crew only two-thirds of theirs in 1780–1784, so the limit is the seafaring population, not money. France's maritime registry (classes, 1668–1670) called one class in about three each year and classed 16,000–17,000 sailors a year in 1756–1760. All of Britain counts as coastal, so 1% of coastal manpower sits just above its peak. |
+| Hull upkeep | 1 × crew pay | Parliament voted navy money per man per month in heads: wages, victuals, wear and tear (hulls, repairs and building) and ordnance. Wear and tear alone was about £3 per man per month by 1808 against victuals of 19s (Commons, 3 February 1809), ordnance was 7s in 1820, and the whole rate rose from £4 in the 1660s to about £7, so hull and guns took roughly half of the navy's money. A 74-gun ship cost about £44,000–50,000 to build in 1789–1793 (£62,000 in 1816), about a year of its roughly 590 men's pay at £81 each. Any value from 0.7 to 1 is defensible from these mixed-year figures. |
 | Crew prices | 200 g home, 625 g campaign | The existing regular prices. A sailor at sea cost about 2.7× a soldier at home (£81 against £25–35 a year), close to the existing 3.1× campaign/home ratio. |
 | Build rate | 0.25 per year | A 74 took about 3 years from laying down to launch and about 4 from order; France grew from about 23 to about 196 ships in about 10 years under Colbert. |
 | Naval kind weight | 0.90 × c | **Assumption.** Raised from 0.30 to move the naval share of battles from 1.2–2.1% to 2.7–7.3%. Wikipedia's battle lists give roughly 4–10% by century (10th–18th), a crude count that mixes sieges and uneven coverage. A port town that is siege-eligible still takes 95% of selections, so the weight mostly acts on ports that are not towns. |

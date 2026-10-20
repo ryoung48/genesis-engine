@@ -139,6 +139,12 @@ describe("FR1 naval budget", () => {
 		)
 	})
 
+	it("prices a ship at its crew's regular pay plus an equal hull upkeep", () => {
+		const target = RECRUITMENT.targets({ ...BASE, navalShare: 0.2 })
+		expectClose(target.shipHome, 2 * target.crew * target.home.regular)
+		expectClose(target.shipCampaign, 2 * target.crew * target.campaign.regular)
+	})
+
 	it("sends a budget too small for one ship to the army", () => {
 		const small = RECRUITMENT.targets({ ...BASE, surplus: 10, navalShare: 0.2 })
 		const none = RECRUITMENT.targets({ ...BASE, surplus: 10, navalShare: 0 })
