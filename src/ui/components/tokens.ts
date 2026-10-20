@@ -97,6 +97,8 @@ export const uiChartPalette = {
 		] as const,
 		better: "text-emerald-600",
 		worse: "text-rose-600",
+		targetBand: "rgba(16, 185, 129, 0.14)",
+		targetBandStroke: "#10b981",
 	},
 	axisText: "#64748b",
 	axisTextStrong: "#475569",

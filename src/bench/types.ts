@@ -39,6 +39,7 @@ export interface BenchBox {
 
 export interface BenchWindow {
 	label: string
+	to: number
 	warYearsP50: number | null
 	warYearsP90: number | null
 	rebelWarYearsP50: number | null

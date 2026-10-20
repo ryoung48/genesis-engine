@@ -1,3 +1,4 @@
+import type { TargetMetricId } from "@/bench/targets/types"
 import type {
 	BenchBox,
 	BenchDistribution,
@@ -36,6 +37,7 @@ export interface ComboChartDef {
 export interface BoxChartDef {
 	title: string
 	unit: BenchUnit
+	target: TargetMetricId | null
 	box: (window: BenchWindow) => BenchBox
 }
 
@@ -200,14 +202,18 @@ export function governmentSubtypeDef(
 }
 
 export const ARMY_BOX_CHART: BoxChartDef = {
-	title: "Army size per sovereign (box p25–p75, whiskers p10–p90, line median)",
+	title:
+		"Army size per sovereign (box p25–p75, whiskers p10–p90, line median, dot largest; band historical target for the largest)",
 	unit: "count",
+	target: "largestArmy",
 	box: (w) => w.armySize,
 }
 
 export const NAVY_BOX_CHART: BoxChartDef = {
-	title: "Navy ships per realm (box p25–p75, whiskers p10–p90, line median)",
+	title:
+		"Navy ships per realm (box p25–p75, whiskers p10–p90, line median, dot largest; band historical target for the largest)",
 	unit: "count",
+	target: "largestFleet",
 	box: (w) => w.ships,
 }
 

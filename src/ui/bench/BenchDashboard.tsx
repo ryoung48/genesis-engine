@@ -1,4 +1,6 @@
 import React, { useState } from "react"
+import { BENCH_TARGETS } from "@/bench/targets"
+import type { TargetMetricId } from "@/bench/targets/types"
 import type {
 	BenchMetric,
 	BenchRunDetail,
@@ -36,6 +38,7 @@ import {
 	outcomeSpecs,
 	populationSpecs,
 	resolveSeries,
+	targetBands,
 } from "@/ui/bench/series"
 import type { DrilldownFamily, SeriesSpec } from "@/ui/bench/types"
 import { useBenchDashboard } from "@/ui/bench/useBenchDashboard"
@@ -316,18 +319,68 @@ const BoxCard: React.FC<{
 	current: BenchRunDetail
 	baseline: BenchRunDetail | null
 }> = ({ def, current, baseline }) => (
-	<ChartCard title={def.title}>
-		<BoxWhiskerChart
-			labels={current.windows.map((w) => w.label)}
-			unit={def.unit}
-			series={resolveSeries({
-				specs: boxSpecs(def),
-				current,
-				baseline,
-			})}
-		/>
-	</ChartCard>
+	<Surface padding="md" borderTone="default" className="border">
+		<div className={cx(uiTokens.type.control, uiTokens.text.muted)}>
+			{def.title}
+		</div>
+		<div className="mt-2 h-48">
+			<BoxWhiskerChart
+				labels={current.windows.map((w) => w.label)}
+				unit={def.unit}
+				bands={targetBands({
+					target: def.target,
+					current,
+					baseline,
+				})}
+				series={resolveSeries({
+					specs: boxSpecs(def),
+					current,
+					baseline,
+				})}
+			/>
+		</div>
+		{def.target && (
+			<TargetSourceList metric={def.target} diffing={baseline !== null} />
+		)}
+	</Surface>
 )
+
+const TargetSourceList: React.FC<{
+	metric: TargetMetricId
+	diffing: boolean
+}> = ({ metric, diffing }) => {
+	const { references, sourced, assumed } = BENCH_TARGETS.sources({ metric })
+	return (
+		<div
+			className={cx(
+				uiTokens.type.valueSm,
+				uiTokens.text.muted,
+				"mt-2 flex flex-col gap-0.5",
+			)}
+		>
+			<span>
+				{diffing
+					? "Historical band hidden while diffing."
+					: `Green band: historical range for the largest, sourced for ${sourced.join(", ")}${assumed.length ? `; assumed for ${assumed.join(", ")}` : ""}.`}
+			</span>
+			{references.map((reference) =>
+				reference.url ? (
+					<a
+						key={reference.title}
+						href={reference.url}
+						target="_blank"
+						rel="noreferrer"
+						className="underline"
+					>
+						{reference.title}
+					</a>
+				) : (
+					<span key={reference.title}>{reference.title}</span>
+				),
+			)}
+		</div>
+	)
+}
 
 export const BenchDashboard: React.FC = () => {
 	const [diff, setDiff] = useState(false)

@@ -12,8 +12,10 @@ import {
 } from "chart.js"
 import React, { useMemo } from "react"
 import { Chart } from "react-chartjs-2"
+import type { TargetBand } from "@/bench/targets/types"
 import type { BenchUnit } from "@/bench/types"
 import { formatBenchValue } from "@/ui/bench/format"
+import { targetBandDatasets, targetBandPlugin } from "@/ui/bench/targetBand"
 import type { ChartSeries } from "@/ui/bench/types"
 import { uiChartPalette } from "@/ui/components/tokens"
 
@@ -93,27 +95,32 @@ interface BoxWhiskerChartProps {
 	labels: string[]
 	series: ChartSeries[]
 	unit: BenchUnit
+	bands: (TargetBand | null)[]
 }
 
 export const BoxWhiskerChart: React.FC<BoxWhiskerChartProps> = ({
 	labels,
 	series,
 	unit,
+	bands,
 }) => {
 	const data = useMemo<ChartData<"line">>(
 		() => ({
 			labels,
-			datasets: series.map((s) => ({
-				label: s.label,
-				data: s.values,
-				showLine: false,
-				pointRadius: 0,
-				pointHoverRadius: 0,
-				borderColor: s.color,
-				backgroundColor: s.color,
-			})),
+			datasets: [
+				...series.map((s) => ({
+					label: s.label,
+					data: s.values,
+					showLine: false,
+					pointRadius: 0,
+					pointHoverRadius: 0,
+					borderColor: s.color,
+					backgroundColor: s.color,
+				})),
+				...targetBandDatasets(bands),
+			],
 		}),
-		[labels, series],
+		[labels, series, bands],
 	)
 	const options = useMemo<ChartOptions<"line">>(
 		() => ({
@@ -151,12 +158,9 @@ export const BoxWhiskerChart: React.FC<BoxWhiskerChartProps> = ({
 		}),
 		[unit],
 	)
-	return (
-		<Chart
-			type="line"
-			data={data}
-			options={options}
-			plugins={[boxWhiskerPlugin]}
-		/>
+	const plugins = useMemo(
+		() => [targetBandPlugin(bands), boxWhiskerPlugin],
+		[bands],
 	)
+	return <Chart type="line" data={data} options={options} plugins={plugins} />
 }

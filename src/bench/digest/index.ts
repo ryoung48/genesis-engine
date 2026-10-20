@@ -332,6 +332,7 @@ function windowsFor(params: {
 			mean(rows.map((row) => number(object(row.military)[key])))
 		return {
 			label: `${rows[0].from}–${rows[0].to}`,
+			to: Number(rows[0].to),
 			warYearsP50: military("wars.years.p50"),
 			warYearsP90: military("wars.years.p90"),
 			rebelWarYearsP50: military("rebelWars.years.p50"),

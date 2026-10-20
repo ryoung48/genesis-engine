@@ -1,3 +1,5 @@
+import { BENCH_TARGETS } from "@/bench/targets"
+import type { TargetBand, TargetMetricId } from "@/bench/targets/types"
 import type {
 	BenchDistribution,
 	BenchRunDetail,
@@ -219,4 +221,17 @@ export function distributionSpecs(params: {
 			color: def.color({ key, index }),
 			values: (run) => run.windows.map((w) => def.pick(w)[key] ?? 0),
 		}))
+}
+
+export function targetBands(params: {
+	target: TargetMetricId | null
+	current: BenchRunDetail
+	baseline: BenchRunDetail | null
+}): (TargetBand | null)[] {
+	const { target, current: run, baseline } = params
+	if (!target || baseline) return run.windows.map((): TargetBand | null => null)
+	return BENCH_TARGETS.bands({
+		metric: target,
+		years: run.windows.map((window) => window.to),
+	})
 }

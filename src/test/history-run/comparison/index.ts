@@ -8,6 +8,8 @@ import {
 } from "node:fs"
 import { basename, dirname, join, relative, resolve } from "node:path"
 import { isDeepStrictEqual } from "node:util"
+import { BENCH_TARGETS } from "@/bench/targets"
+import type { TargetWindow } from "@/bench/targets/types"
 import type {
 	CompareParams,
 	CountryCountsParams,
@@ -630,6 +632,44 @@ function escapeHtml(value: string): string {
 	)
 }
 
+function targetWindows(report: SavedReport | null): TargetWindow[] | null {
+	const seed = report?.seeds[0]
+	if (!report || !seed || !Array.isArray(report.data[seed])) return null
+	return report.data[seed].map((value) => {
+		const row = object(value)
+		return { to: Number(row.to), values: BENCH_TARGETS.values({ rows: [row] }) }
+	})
+}
+
+function targetSection({ current, previous }: ReportPair): string {
+	const rows = BENCH_TARGETS.rows({
+		current: targetWindows(current) ?? [],
+		baseline: targetWindows(previous),
+	})
+	const status = (value: string) =>
+		`<span class="status ${value}">${value === "within" ? "on target" : value}</span>`
+	const references = (keys: string[]) =>
+		keys
+			.map((key) => {
+				const reference = BENCH_TARGETS.references[key]
+				return reference.url
+					? `<a href="${escapeHtml(reference.url)}">${escapeHtml(reference.title)}</a>`
+					: escapeHtml(reference.title)
+			})
+			.join("<br>")
+	const body = rows
+		.map(
+			({ target, baseline, current: now, baselineStatus, currentStatus }) => {
+				const metric = BENCH_TARGETS.metrics[target.metric]
+				const format = (value: number | null) =>
+					BENCH_TARGETS.format({ value, unit: metric.unit })
+				return `<tr><td>${target.to}</td><td>${escapeHtml(metric.label)}</td><td>${format(target.min)} – ${format(target.max)}</td><td>${format(baseline)} ${previous ? status(baselineStatus) : ""}</td><td>${format(now)} ${status(currentStatus)}</td><td>${target.basis}</td><td>${escapeHtml(target.note)}${target.references.length ? "<br>" + references(target.references) : ""}</td></tr>`
+			},
+		)
+		.join("")
+	return `<h2>Historical targets</h2><p>Ranges for the century ending in the listed year, from historical records where a source is given and stated assumptions otherwise. They ground the comparison and are not pass/fail gates. Absolute sizes assume the simulated world is roughly Earth-sized in population.</p><div class="scroll"><table><thead><tr><th>Century ending</th><th>Metric</th><th>Target</th><th>Previous</th><th>Current</th><th>Basis</th><th>Reference</th></tr></thead><tbody>${body}</tbody></table></div>`
+}
+
 function html({ current, previous }: ReportPair): string {
 	const rows = metrics({ current, previous })
 	const changed = rows.filter(
@@ -650,14 +690,15 @@ function html({ current, previous }: ReportPair): string {
 	const link = (report: SavedReport) =>
 		`<a href="${escapeHtml(relative(dirname(current.path), report.path).replace(/\\/g, "/"))}">${escapeHtml(report.path)}</a>`
 	return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>History benchmark comparison</title>
-<style>:root{font-family:system-ui;color:#17212b;background:#f5f7fa}body{max-width:1400px;margin:32px auto;padding:0 24px}h1{margin-bottom:8px}p{line-height:1.5;overflow-wrap:anywhere}.warning{background:#fff0cc;padding:16px;border-radius:8px}.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:24px 0}input,select,button{font:inherit;padding:8px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:10px;text-align:left;border-bottom:1px solid #dce1e7;overflow-wrap:anywhere}th{background:#e8edf3}td:nth-child(n+4){font-variant-numeric:tabular-nums}tr.changed{background:#fff8e8}.scroll{overflow:auto}button:disabled{opacity:.5}</style>
+<style>:root{font-family:system-ui;color:#17212b;background:#f5f7fa}body{max-width:1400px;margin:32px auto;padding:0 24px}h1{margin-bottom:8px}p{line-height:1.5;overflow-wrap:anywhere}.warning{background:#fff0cc;padding:16px;border-radius:8px}.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:24px 0}input,select,button{font:inherit;padding:8px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:10px;text-align:left;border-bottom:1px solid #dce1e7;overflow-wrap:anywhere}th{background:#e8edf3}td:nth-child(n+4){font-variant-numeric:tabular-nums}tr.changed{background:#fff8e8}.scroll{overflow:auto}button:disabled{opacity:.5}.status{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.85em}.status.within{background:#d8f3dc;color:#1b4332}.status.above,.status.below{background:#ffe0e0;color:#7a1f1f}.status.missing{background:#e8edf3;color:#4a5560}h2{margin-top:32px}</style>
 <h1>History benchmark comparison</h1><p>Current: ${link(current)}<br>Previous: ${previous ? link(previous) : "No earlier completed matching report found."}</p>
 ${!previous || !configMatches ? '<p class="warning">' + (!previous ? "First comparable run: values are shown without a baseline." : "Configuration differs or is missing from an older report. Review Configuration before interpreting changes as regressions.") + "</p>" : ""}
 ${current.data.pipeline === "distribution" ? '<p class="warning">Fast migration fields missing in older reports are labelled Missing. Prehistory warm-up and execution cadence can differ; trajectory rows compare exact checkpoint years.</p>' : ""}
 ${previous && (current.data.pipeline ?? "simulation") !== (previous.data.pipeline ?? "simulation") ? '<p class="warning">Different mechanisms: this explicit cross-pipeline comparison shows shared political counts and timings. People, military and economy statistics are inapplicable to distribution history.</p>' : ""}
 ${current.data.pipeline === undefined || (previous && previous.data.pipeline === undefined) ? '<p class="warning">An older saved report has no pipeline field and is interpreted as simulation.</p>' : ""}
 <p>Simulation and diagnostics: ${simulationChanges.filter((row) => row.before !== undefined && row.after !== undefined).length.toLocaleString("en-US")} changed existing values, ${simulationChanges.filter((row) => row.before === undefined).length.toLocaleString("en-US")} added, ${simulationChanges.filter((row) => row.after === undefined).length.toLocaleString("en-US")} removed. Timing and memory: ${changed.filter((row) => row.section === "Performance").length.toLocaleString("en-US")} differences. Numerical changes show current minus previous. No increase or decrease is automatically judged better.</p>
-<p>Century statistics cover the full timeline. Annual rows include army totals, cohorts and concentration. Raw event logs are checked for exact equality by entry count and SHA-256 digest, and top-realm lists by value; the top-realm lists remain in the linked JSON files. Performance values use milliseconds, except peakMemoryKb (KiB).</p>
+${targetSection({ current, previous })}
+<h2>All metrics</h2><p>Century statistics cover the full timeline. Annual rows include army totals, cohorts and concentration. Raw event logs are checked for exact equality by entry count and SHA-256 digest, and top-realm lists by value; the top-realm lists remain in the linked JSON files. Performance values use milliseconds, except peakMemoryKb (KiB).</p>
 <div class="controls"><label>Section <select id="section"><option value="">All sections</option>${[...new Set(rows.map((row) => row.section))].map((section) => `<option>${escapeHtml(section)}</option>`).join("")}</select></label><label>Search <input id="search" type="search" placeholder="Metric, seed or year"></label><label><input id="changed" type="checkbox" checked> Changes only</label><button id="prev">Previous page</button><button id="next">Next page</button><span id="count" aria-live="polite"></span></div>
 <div class="scroll"><table><thead><tr><th>Section</th><th>Seed / period</th><th>Metric</th><th>Previous</th><th>Current</th><th>Δ</th><th>Δ %</th></tr></thead><tbody id="rows"></tbody></table></div>
 <script type="application/json" id="data">${JSON.stringify(rows).replace(/</g, "\\u003c")}</script>
