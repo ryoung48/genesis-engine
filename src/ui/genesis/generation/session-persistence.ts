@@ -5,10 +5,6 @@ import type {
 	SystemBody,
 } from "@/model/celestial/system/types"
 import { GENERATION_SESSION_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
-import {
-	GENERATION_PREVIEW_TABS,
-	type GenerationPreviewTab,
-} from "@/ui/genesis/generation/generation-preview"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 
 type FocusTarget = OrbitAddress | null
@@ -34,7 +30,6 @@ interface GenerationSessionSnapshot {
 	solarSystemViewActive: boolean
 	currentFocus: FocusTarget
 	generationPanelOpen: boolean
-	generationPreviewTab: GenerationPreviewTab
 	/** [JUSTIFICATION] Absent from snapshots saved before this field existed
 	 * -- treated as "earth-clone" (the pre-existing default) wherever it's
 	 * read, so old sessions keep restoring exactly as they did before. */
@@ -208,9 +203,6 @@ function isGenerationSessionSnapshot(
 ): value is GenerationSessionSnapshot {
 	if (!value || typeof value !== "object") return false
 	const candidate = value as Record<string, unknown>
-	const validGenerationPreviewTabs = new Set(
-		GENERATION_PREVIEW_TABS.map(([tab]) => tab),
-	)
 	return (
 		(() => {
 			const solarSystem = candidate.solarSystem
@@ -229,9 +221,6 @@ function isGenerationSessionSnapshot(
 		typeof candidate.solarSystemViewActive === "boolean" &&
 		isFocusTarget(candidate.currentFocus) &&
 		typeof candidate.generationPanelOpen === "boolean" &&
-		validGenerationPreviewTabs.has(
-			candidate.generationPreviewTab as GenerationPreviewTab,
-		) &&
 		(candidate.mainWorldMode === undefined ||
 			VALID_MAIN_WORLD_MODES.has(candidate.mainWorldMode as MainWorldMode)) &&
 		(candidate.galaxyOrigin === undefined ||

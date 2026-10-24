@@ -45,7 +45,6 @@ import {
 	resolveEu4ProvinceSettlementName,
 	resolveEu4ProvinceSettlementPopulationCarrier,
 } from "@/ui/genesis/generation/earth-assets"
-import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import {
 	historyTimeToMonth,
 	historyYearToTime,
@@ -295,10 +294,6 @@ export const GenesisView: React.FC<{
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(
 		initialGenerationSession?.generationPanelOpen ?? true,
 	)
-	const [generationPreviewTab, setGenerationPreviewTab] =
-		useState<GenerationPreviewTab>(
-			initialGenerationSession?.generationPreviewTab ?? "climate",
-		)
 	// Left-panel "nation wiki page" selection, identified by history record
 	// nation id.
 	const [selectedWikiNationId, setSelectedWikiNationIdRaw] = useState<
@@ -389,7 +384,7 @@ export const GenesisView: React.FC<{
 	} = useProceduralHistory({ workerRef })
 	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
 	const [historyPipeline, setHistoryPipeline] =
-		useState<HistoryPipeline>("distribution")
+		useState<HistoryPipeline>("simulation")
 	const simStartTimeMs =
 		historyPipeline === "distribution"
 			? DATE.eu4DateToTimeMs(`${DISTRIBUTION_TARGETS.startYear}.1.1`)
@@ -1897,8 +1892,6 @@ export const GenesisView: React.FC<{
 		showSolarSystemBodyNames,
 		generationPanelOpen,
 		setGenerationPanelOpen,
-		generationPreviewTab,
-		setGenerationPreviewTab,
 		generationSessionRestored,
 		setGenerationSessionRestored,
 	})
@@ -2057,8 +2050,6 @@ export const GenesisView: React.FC<{
 						generationProgress={generationProgress}
 						generationTimings={generationTimings}
 						landCoverage={landCoverage}
-						generationPreviewTab={generationPreviewTab}
-						onSelectGenerationPreviewTab={setGenerationPreviewTab}
 						unitSystem={unitSystem}
 						handleGenerate={handleGenerate}
 						onClose={() => setGenerationPanelOpen(false)}

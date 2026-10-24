@@ -12,10 +12,6 @@ interface DisclosureButtonProps {
 	className?: string
 }
 
-/** Chevron-header disclosure toggle ("down" = rotating chevron that flips
- * open/closed) or a back-navigation button ("back" = static left chevron,
- * `expanded`/rotation ignored) -- shared by every collapsible section header
- * and drill-down "Back" button across the wiki/preview UI. */
 export const DisclosureButton: React.FC<DisclosureButtonProps> = ({
 	label,
 	expanded = false,
@@ -49,6 +45,7 @@ export const DisclosureButton: React.FC<DisclosureButtonProps> = ({
 		<button
 			type="button"
 			onClick={onClick}
+			aria-expanded={expanded}
 			className={cx(
 				"flex w-full items-center justify-between gap-3 text-left",
 				className,

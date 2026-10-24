@@ -29,7 +29,6 @@ import {
 } from "@/ui/genesis/details/drawer-state"
 import type { DetailsDrawerBaseProps } from "@/ui/genesis/details/shared"
 import { WorldDetails } from "@/ui/genesis/details/world/WorldDetails"
-import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
@@ -72,9 +71,6 @@ interface GenerationPanelProps {
 	setMainWorldMode: (v: MainWorldMode) => void
 	historyPipeline: HistoryPipeline
 	setHistoryPipeline: (v: HistoryPipeline) => void
-	/** True when the current system was opened from the galaxy map -- passed
-	 * straight through to GenerationPlanetNavigator, which then hides the
-	 * Preview section and makes every stat read-only. */
 	fromGalaxy?: boolean
 	/** The main world's SystemBody entry regardless of where it lives -- a
 	 * top-level orbit, or (gas-giant-moon mode) a moon nested inside a
@@ -120,8 +116,6 @@ interface GenerationPanelProps {
 	generationProgress: number
 	generationTimings?: StageTiming[] | null
 	landCoverage: number
-	generationPreviewTab: GenerationPreviewTab
-	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	handleGenerate: () => void
 	onClose?: () => void
@@ -199,8 +193,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	generationProgress,
 	generationTimings,
 	landCoverage,
-	generationPreviewTab,
-	onSelectGenerationPreviewTab,
 	unitSystem,
 	handleGenerate,
 	onClose,
@@ -216,11 +208,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	const [openWorldSections, setOpenWorldSections] = useState<
 		ReadonlySet<WorldSection>
 	>(DEFAULT_WORLD_SECTIONS)
-	// Portal target for GenerationPlanetNavigator's Preview section, placed
-	// below WorldDetails (see the JSX below) so Preview renders after every
-	// other section instead of directly under the orbit header where that
-	// component would otherwise put it inline. Starts null until the ref
-	// callback fires after mount.
 	const [previewSlot, setPreviewSlot] = useState<HTMLDivElement | null>(null)
 	void generatedMoons
 	void obliquity
@@ -446,12 +433,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								resetMainWorldToEarth={resetMainWorldToEarth}
 								setObliquity={setObliquity}
 								tidalSchedulePreview={tidalSchedulePreview}
-								generationPreviewTab={generationPreviewTab}
-								onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 								unitSystem={unitSystem}
 								onClose={onClose}
 								generateContent={generateContent}
-								generating={generating}
 								previewContainer={previewSlot}
 							/>
 

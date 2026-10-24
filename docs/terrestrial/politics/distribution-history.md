@@ -1,6 +1,6 @@
 # Distribution history
 
-Scope: `:history`, Pipe 3. Fast history is the generated-world application default; Detailed history remains explicitly selectable. It models independent countries, neighboring conquest and fragmentation from AD 2 through 2025-01-01. Culture and religion are static context. It does not simulate people, titles, subjects, armies, economy or population.
+Scope: `:history`, Pipe 3. Detailed history is the generation panel default; Fast history remains explicitly selectable. It models independent countries, neighboring conquest and fragmentation from AD 2 through 2025-01-01. Culture and religion are static context. It does not simulate people, titles, subjects, armies, economy or population.
 
 ## Measured targets
 

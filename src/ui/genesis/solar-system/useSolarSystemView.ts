@@ -7,7 +7,6 @@ import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RNG } from "@/model/shared/random/rng"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { GENERATION_SESSION_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
-import { GENERATION_PREVIEW_TABS } from "@/ui/genesis/generation/generation-preview"
 import {
 	loadGenerationSessionSnapshot,
 	saveGenerationSessionSnapshot,
@@ -172,8 +171,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemBodyNames,
 		generationPanelOpen,
 		setGenerationPanelOpen,
-		generationPreviewTab,
-		setGenerationPreviewTab,
 		generationSessionRestored,
 		setGenerationSessionRestored,
 	} = input
@@ -444,7 +441,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 				setSolarSystem(snapshot.solarSystem)
 				setSolarSystemViewActive(snapshot.solarSystemViewActive)
 				setGenerationPanelOpen(snapshot.generationPanelOpen)
-				setGenerationPreviewTab(snapshot.generationPreviewTab)
 				setCurrentFocus(snapshot.currentFocus)
 				setPendingFocus(
 					snapshot.solarSystemViewActive ? snapshot.currentFocus : null,
@@ -512,17 +508,12 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	}, [syncPrimaryFocusBookkeeping])
 	useEffect(() => {
 		if (typeof window === "undefined" || !generationSessionRestored) return
-		const validGenerationPreviewTabs = new Set(
-			GENERATION_PREVIEW_TABS.map(([tab]) => tab),
-		)
-		if (!validGenerationPreviewTabs.has(generationPreviewTab)) return
 		void saveGenerationSessionSnapshot(
 			{
 				solarSystem,
 				solarSystemViewActive,
 				currentFocus,
 				generationPanelOpen,
-				generationPreviewTab,
 				mainWorldMode,
 				galaxyOrigin: galaxyOrigin ?? undefined,
 			},
@@ -536,7 +527,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	}, [
 		currentFocus,
 		generationPanelOpen,
-		generationPreviewTab,
 		generationSessionRestored,
 		solarSystemViewActive,
 		solarSystem,

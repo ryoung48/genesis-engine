@@ -27,7 +27,6 @@ import type {
 	LabelMode,
 } from "@/ui/genesis/controls/OverlayControls"
 import type { Eu4GhslSettlementAsset } from "@/ui/genesis/generation/earth-assets"
-import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type {
 	GalaxyOrigin,
 	loadGenerationSessionSnapshotSync,
@@ -169,8 +168,6 @@ export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	showSolarSystemBodyNames: boolean
 	generationPanelOpen: boolean
 	setGenerationPanelOpen: Dispatch<SetStateAction<boolean>>
-	generationPreviewTab: GenerationPreviewTab
-	setGenerationPreviewTab: Dispatch<SetStateAction<GenerationPreviewTab>>
 	generationSessionRestored: boolean
 	setGenerationSessionRestored: Dispatch<SetStateAction<boolean>>
 }

@@ -14,12 +14,10 @@ import type {
 } from "@/model/celestial/planet/environment/temperature/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { SurfaceTidesBreakdown } from "@/model/climate/ocean/tides/tidal-schedule/types"
-import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { TraceTooltipContent } from "@/ui/components/composites/TraceTooltipContent"
 import { Slider } from "@/ui/components/primitives/Slider"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
-import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { formatTemperatureDelta } from "@/ui/genesis/shared/ui-format"
@@ -27,7 +25,7 @@ import {
 	classificationSwatchColor,
 	orbitZoneSwatchColor,
 } from "@/ui/genesis/solar-system/overlay/constants"
-import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
+import { PlanetDetails } from "@/ui/wiki/climate-preview/PlanetDetails"
 import {
 	atmosphereSwatchColor,
 	axialTiltSwatchColor,
@@ -299,11 +297,9 @@ function buildBodyStats({
 	avgTempK,
 	unitSystem,
 	greenhouseFactor,
-	greenhouseFactorEditor,
 	surfaceTidesM,
 	seismology,
 	albedo,
-	albedoEditor,
 	biosphere,
 	habitability,
 	luminositySol,
@@ -371,30 +367,21 @@ function buildBodyStats({
 	avgTempK?: number
 	unitSystem: UnitSystem
 	greenhouseFactor?: number
-	greenhouseFactorEditor?: StatEntry["editor"]
 	surfaceTidesM?: SurfaceTidesBreakdown
 	seismology?: SeismologyProfile
 	albedo?: number
-	albedoEditor?: StatEntry["editor"]
 	biosphere?: BiosphereProfile
 	/** Structurally identical to BiosphereProfile (code + trace) -- see
 	 * OrbitBody's habitability doc. */
 	habitability?: BiosphereProfile
-	/** Star's luminosity and this body's own orbital distance -- both needed
-	 * (alongside albedo/greenhouseFactor above) to run TEMPERATURE.trace for
-	 * the Temperature row's info-icon breakdown. Omitted (not just falsy)
-	 * skips the icon entirely rather than showing a broken/empty tooltip. */
+	// [JUSTIFICATION] The estimate tooltip needs stellar luminosity and orbital distance.
 	luminositySol?: number
 	orbitalDistanceAU?: number
 	/** Atmospheric pressure, in bar -- also needed for TEMPERATURE.trace's
 	 * seasonality term. Defaults to 0 (vacuum) in the trace call when unset,
 	 * same as finalize()'s own convention. */
 	pressureBar?: number
-	/** [JUSTIFICATION] Only set for a system opened from the galaxy map -- its
-	 * bodies are fully rolled and nothing on the card is editable, so the
-	 * Temperature row renders as a read-only estimate (value + trace tooltip
-	 * on hover) instead of the greenhouse/albedo popover. Every other caller
-	 * leaves it unset. */
+	// [JUSTIFICATION] Galaxy bodies display the analytic estimate instead of the climate preview mean.
 	readOnly?: boolean
 	/** [JUSTIFICATION] The body's generation-time analytic temperature
 	 * estimate (temperatureEstimate.mean). Fallback for the Temperature
@@ -509,11 +496,6 @@ function buildBodyStats({
 							seismologyTotal: seismology?.totalHeating,
 							group,
 						})
-						// The analytic estimate (the value the trace tooltip breaks
-						// down), derived live from the current inputs so tuned
-						// sliders move it -- identical to the stored
-						// temperatureEstimate for a static body. An editable planet
-						// locked to its star shows its locked climate preview's mean.
 						const liveEstimate = temperatureTraces?.estimate
 						const analyticK = liveEstimate?.mean ?? estimateTempK
 						const tempK = (
@@ -525,9 +507,6 @@ function buildBodyStats({
 							value: ` · ${describeTemperatureK(tempK)}`,
 							swatchColor: temperatureSwatchColor(tempK),
 						}
-						// Live delta badge -- same live-vs-stored preference as
-						// tempK above, so the badge and the row value move
-						// together when greenhouse/albedo are tuned.
 						const shownDeltaK = liveEstimate?.deltaK ?? estimateTempDeltaK
 						const deltaBadge =
 							shownDeltaK !== null ? (
@@ -550,70 +529,11 @@ function buildBodyStats({
 									</Tooltip>
 								</>
 							) : undefined
-						// A galaxy-opened body is fully read-only: show the estimate
-						// value with the trace tooltip on hover, no greenhouse/albedo
-						// popover.
-						if (readOnly) {
-							return {
-								...base,
-								valueAction: deltaBadge,
-								valueHelp: temperatureTraces?.mean,
-								valueHelpTarget: "prefix" as const,
-							}
-						}
 						return {
 							...base,
 							valueAction: deltaBadge,
-							editor: {
-								label: "Temperature",
-								value: tempK,
-								min: tempK,
-								max: tempK,
-								step: 1,
-								display: formatAvgTempValue(tempK, unitSystem),
-								set: () => {
-									// unused -- editor.content overrides the default slider
-								},
-								content: (
-									<ContributionTooltipContent
-										items={[
-											{
-												label: "Greenhouse",
-												value: (greenhouseFactor ?? 0).toFixed(2),
-												tone: "warm" as const,
-												editor: greenhouseFactorEditor
-													? {
-															value: greenhouseFactor ?? 0,
-															min: greenhouseFactorEditor.min,
-															max: greenhouseFactorEditor.max,
-															step: greenhouseFactorEditor.step,
-															set: greenhouseFactorEditor.set,
-														}
-													: undefined,
-											},
-											...(albedo !== undefined
-												? [
-														{
-															label: "Albedo",
-															value: albedo.toFixed(3),
-															tone: "cool" as const,
-															editor: albedoEditor
-																? {
-																		value: albedo,
-																		min: albedoEditor.min,
-																		max: albedoEditor.max,
-																		step: albedoEditor.step,
-																		set: albedoEditor.set,
-																	}
-																: undefined,
-														},
-													]
-												: []),
-										]}
-									/>
-								),
-							},
-							trailingHelp: temperatureTraces?.mean,
+							valueHelp: temperatureTraces?.mean,
+							valueHelpTarget: "prefix" as const,
 						}
 					})(),
 				]
@@ -749,8 +669,7 @@ function buildMoonStats({
 	}
 	biosphere?: BiosphereProfile
 	habitability?: BiosphereProfile
-	/** Star's luminosity and this moon's parent-planet orbital distance --
-	 * see buildBodyStats' doc on the same fields. */
+	// [JUSTIFICATION] The estimate tooltip needs stellar luminosity and orbital distance.
 	luminositySol?: number
 	orbitalDistanceAU?: number
 }): StatEntry[] {
@@ -1107,43 +1026,11 @@ export function buildOrbitBodyStats(params: {
 		unitSystem,
 		landCoverageEditor,
 		greenhouseFactor: body.greenhouseFactor,
-		greenhouseFactorEditor:
-			onUpdateBody && body.greenhouseFactor !== undefined
-				? {
-						label: "Greenhouse",
-						value: body.greenhouseFactor,
-						// 0-5 covers the overwhelming majority of realistic
-						// terrestrial/rocky main worlds (Earth 0.6, Mars 0.008, Titan
-						// 9 and Venus 44 are the rare exceptions this range doesn't
-						// reach -- widen it if a main world ever needs to hit those).
-						min: 0,
-						max: 5,
-						step: 0.01,
-						display: body.greenhouseFactor.toFixed(2),
-						set: (value: number) =>
-							onUpdateBody((current) => ({
-								...current,
-								greenhouseFactor: value,
-							})),
-					}
-				: undefined,
+
 		surfaceTidesM,
 		seismology: body.seismology,
 		albedo: body.albedo ?? estimateAlbedo(body.landCoverage),
-		albedoEditor: onUpdateBody
-			? {
-					label: "Albedo",
-					value: body.albedo ?? estimateAlbedo(body.landCoverage),
-					min: 0,
-					max: 1,
-					step: 0.01,
-					display: (body.albedo ?? estimateAlbedo(body.landCoverage)).toFixed(
-						3,
-					),
-					set: (value: number) =>
-						onUpdateBody((current) => ({ ...current, albedo: value })),
-				}
-			: undefined,
+
 		biosphere: body.biosphere,
 		habitability: body.habitability,
 		luminositySol: starLuminositySol,
@@ -1166,10 +1053,7 @@ export function buildOrbitMoonStats(params: {
 	onUpdateMoon?: (
 		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
-	/** Star's luminosity and the parent planet's orbital distance -- a moon
-	 * orbits its star at essentially the same AU as its planet, so this is
-	 * the parent's own orbitalDistanceAU, not the moon's PD offset. Needed
-	 * for the Temperature row's info-icon trace breakdown. */
+	// [JUSTIFICATION] The estimate tooltip needs stellar luminosity and orbital distance.
 	luminositySol?: number
 	orbitalDistanceAU?: number
 	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
@@ -1329,10 +1213,8 @@ export function buildMoonPreviewDataProps(params: {
 	parentPerihelionDeg: number
 	spectralClass: string
 	starSubtype: number
-	generationPreviewTab: GenerationPreviewTab
-	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
-}): React.ComponentProps<typeof LazyPlanetDetailTabs> {
+}): React.ComponentProps<typeof PlanetDetails> {
 	const parentYearHours =
 		params.parentOrbitalPeriodDays * params.parentHoursPerDay
 	const climateHoursPerDay =
@@ -1346,7 +1228,7 @@ export function buildMoonPreviewDataProps(params: {
 	const climateDaysPerYear =
 		climateHoursPerDay > 0 ? parentYearHours / climateHoursPerDay : 0
 	return {
-		inline: true,
+
 		seed: params.seed,
 		moons: [],
 		moonContext: {
@@ -1370,8 +1252,6 @@ export function buildMoonPreviewDataProps(params: {
 		substellarLon: params.moon.substellarLon ?? 0,
 		atmosphere: params.moon.atmosphere,
 		seismologyTotalHeatingK: params.moon.seismology?.totalHeating,
-		generationPreviewTab: params.generationPreviewTab,
-		onSelectGenerationPreviewTab: params.onSelectGenerationPreviewTab,
 		unitSystem: params.unitSystem,
 		tidesEmptyLabel: "Computing…",
 	}

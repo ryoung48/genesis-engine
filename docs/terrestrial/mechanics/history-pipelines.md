@@ -8,7 +8,7 @@ Scope: `:history`.
 | Pipe 2: simulation | Detailed history / HISTORY_PIPELINE=simulation | Existing simulation start | People, titles, population, military and economy |
 | Pipe 3: distribution | Fast history / HISTORY_PIPELINE=distribution | AD 2 to 2025-01-01 | Flat countries, territorial history, simple directed wars, static culture/religion |
 
-Fast history is the application default after all six checkpoints passed on 204,000-point seed 14963991, with zero annual ownership/connectivity/capital/lifecycle violations. The completed calibration is `stats/history/2026-10-10T01-20-34-437Z-distribution-history-final/2023.json`. The report runner retains its simulation default for benchmark reproduction; select `HISTORY_PIPELINE=distribution` for fast-history reports. This calibration gate is an implementation check, not a runtime dependency on files in stats. There is no fallback to detailed simulation after a fast-history error.
+Detailed history is the generation panel default. Fast history remains selectable; all six checkpoints passed on 204,000-point seed 14963991, with zero annual ownership/connectivity/capital/lifecycle violations. The completed calibration is `stats/history/2026-10-10T01-20-34-437Z-distribution-history-final/2023.json`. The report runner retains its simulation default for benchmark reproduction; select `HISTORY_PIPELINE=distribution` for fast-history reports. This calibration gate is an implementation check, not a runtime dependency on files in stats. There is no fallback to detailed simulation after a fast-history error.
 
 ## Common record and frame contracts
 

@@ -21,14 +21,12 @@ import type {
 import { RNG } from "@/model/shared/random/rng"
 import { SEED_LABEL } from "@/model/shared/random/seed-label"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
-import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
 import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import { uiChartPalette, uiPalette } from "@/ui/components/tokens"
-import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
@@ -40,9 +38,9 @@ import {
 } from "@/ui/wiki/climate-preview/ApparentSizePreview"
 import {
 	isApproxSolarLocked,
-	LazyPlanetDetailTabs,
+	PlanetDetails,
 	useLockedAvgTempK,
-} from "@/ui/wiki/climate-preview/PlanetDetailTabs"
+} from "@/ui/wiki/climate-preview/PlanetDetails"
 import { labelOrbitBodies } from "@/ui/wiki/navigator/GenerationPlanetNavigator/label-orbit-bodies"
 import { OrbitHeader } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitHeader"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
@@ -245,12 +243,9 @@ export function GenerationPlanetNavigator({
 	setSeed,
 	resetMainWorldToEarth,
 	setObliquity,
-	generationPreviewTab,
-	onSelectGenerationPreviewTab,
 	unitSystem,
 	onClose,
 	generateContent,
-	generating,
 	previewContainer,
 	fromGalaxy,
 }: {
@@ -312,32 +307,12 @@ export function GenerationPlanetNavigator({
 	resetMainWorldToEarth?: () => void
 	setObliquity: (v: number) => void
 	tidalSchedulePreview?: TidalSchedule
-	generationPreviewTab: GenerationPreviewTab
-	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	onClose?: () => void
-	/** Rendered below the climate preview, inside the same collapsible
-	 * section, only when the currently selected/focused body is the main
-	 * world -- the Generate button + progress/timing built by
-	 * GenerationPanel. Non-main-world selections show the climate preview
-	 * alone (section titled "Climate" instead of "Generate"). */
+	// [JUSTIFICATION] Only the main world has generation controls.
 	generateContent?: React.ReactNode
-	/** True while a Generate run is in flight -- used to auto-close the
-	 * Preview section the moment it finishes, so re-rolling doesn't leave the
-	 * panel sitting open on a section the user just triggered and is done
-	 * with. */
-	generating?: boolean
-	/** DOM node to portal the Preview section into (see GenerationPanel,
-	 * which places this after WorldDetails) so it renders below every other
-	 * section instead of directly under the orbit header/stats where this
-	 * component would otherwise put it inline. Falls back to inline
-	 * rendering if unset. */
+	// [JUSTIFICATION] Render inline until the panel portal target mounts.
 	previewContainer?: HTMLElement | null
-	/** True when this system was opened from the galaxy map (see
-	 * useSolarSystemBodies' galaxyOrigin). Its bodies are fully procedurally
-	 * rolled: the Preview section is hidden, no stat value is editable, and
-	 * Temperature renders as a read-only estimate with the trace tooltip on
-	 * hover of the value. */
 	fromGalaxy?: boolean
 }) {
 	// The solar-lock UI button that used setObliquity was removed; kept as a
@@ -369,67 +344,6 @@ export function GenerationPlanetNavigator({
 		},
 		[systemBodies],
 	)
-	const [dataExpanded, setDataExpanded] = useState(() =>
-		isSelectionMainWorld(selection),
-	)
-	// Tracks whether the "generate" tab currently has focus on whichever body
-	// is shown -- only ever true while on the main world, since that's the
-	// only card with a "generate" tab to begin with (see onDetailTabChange
-	// wired to the main world's LazyPlanetDetailTabs below). Read below to
-	// decide whether leaving that body should reset the section at all.
-	const [isGenerateTabFocused, setIsGenerateTabFocused] = useState(() =>
-		isSelectionMainWorld(selection),
-	)
-	// The actual `key` handed to the main world's LazyPlanetDetailTabs --
-	// separate from dataExpandedForKey below so it can be left unchanged
-	// (skipping a remount, preserving whatever tab was showing) on the same
-	// transitions that skip the section's expand/collapse reset.
-	const [contentKey, setContentKey] = useState(() => selectionKey(selection))
-	// A navigation resets Preview only when it leaves the main world's
-	// Generate tab. Every other body transition preserves the section's
-	// expansion state and active tab, including navigation back to the main
-	// world, so browsing on e.g. Observer does not snap back to Climate.
-	//
-	// Adjusted here during render (React's "adjusting state when a prop
-	// changes" pattern) rather than in a useEffect -- an effect fires a frame
-	// after commit, so the OLD dataExpanded value would still be "open" for
-	// one paint while viewModel.dataContent (below) has already remounted for
-	// the NEW selection, producing a visible flash of the new body's default
-	// tab before the section snaps shut. Comparing against the last selection
-	// we adjusted for (via its key, since OrbitSelection isn't
-	// reference-stable) keeps this a one-time sync per navigation instead of
-	// firing every render.
-	const [dataExpandedForKey, setDataExpandedForKey] = useState(() =>
-		selectionKey(selection),
-	)
-	if (selectionKey(selection) !== dataExpandedForKey) {
-		setDataExpandedForKey(selectionKey(selection))
-		if (isGenerateTabFocused) {
-			setDataExpanded(false)
-			setContentKey(selectionKey(selection))
-		}
-	}
-	// Let the render-phase transition above observe the old Generate-tab state
-	// exactly once when leaving the main world. Once the destination is a
-	// sibling, moon, or star, it can no longer have a Generate tab, so clear
-	// the flag before any later body-to-body navigation can reuse it.
-	useEffect(() => {
-		if (!isSelectionMainWorld(selection)) {
-			setIsGenerateTabFocused(false)
-		}
-	}, [selection, isSelectionMainWorld])
-	// Closes the Preview section the moment a Generate run finishes (the
-	// falling edge of `generating`), regardless of which body is selected --
-	// the button was just pressed from inside it, so leaving it open after
-	// the result lands just clutters the panel. Effect-based (not the
-	// render-phase pattern above) since there's no remount/flash risk here:
-	// generation finishing isn't a navigation, so a one-frame-late close
-	// just reads as a normal collapse animation.
-	const wasGeneratingRef = useRef(generating)
-	useEffect(() => {
-		if (wasGeneratingRef.current && !generating) setDataExpanded(false)
-		wasGeneratingRef.current = generating
-	}, [generating])
 	// Regenerating the system from the main world's own seed (dice/earth/apply)
 	// re-rolls every body, including which slot the main world lands in -- its
 	// bodyIndex is not stable across a regeneration. This tracks "the user is
@@ -1259,14 +1173,7 @@ export function GenerationPlanetNavigator({
 				}),
 				dataContent:
 					body.group === "asteroid belt" ? undefined : (
-						<LazyPlanetDetailTabs
-							// contentKey only changes on navigations that actually warrant
-							// a reset (see the render-phase adjustment above) -- plain
-							// planet-to-planet browsing that never touched "generate"
-							// keeps the same key, so this instance (and its active tab)
-							// carries over instead of remounting to the "climate" default.
-							key={contentKey}
-							inline
+						<PlanetDetails
 							seed={getDerivedSeedNumber(selection)}
 							moons={orbitMoons}
 							daysPerYear={body.orbitalPeriodDays}
@@ -1291,8 +1198,6 @@ export function GenerationPlanetNavigator({
 									? undefined
 									: body.seismology?.totalHeating
 							}
-							generationPreviewTab={generationPreviewTab}
-							onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 							unitSystem={unitSystem}
 							generateContent={isMainWorld ? generateContent : undefined}
 							observerContent={
@@ -1305,11 +1210,6 @@ export function GenerationPlanetNavigator({
 										starLabel: starTitleFor(selection.starIndex),
 									})}
 								/>
-							}
-							onDetailTabChange={
-								isMainWorld
-									? (tab) => setIsGenerateTabFocused(tab === "generate")
-									: undefined
 							}
 						/>
 					),
@@ -1508,11 +1408,7 @@ export function GenerationPlanetNavigator({
 					parentOrbitalPeriodDays,
 				}),
 				dataContent: (
-					<LazyPlanetDetailTabs
-						// Share the conditional key with planet tabs so ordinary
-						// moon-to-moon navigation preserves the active Preview tab.
-						// It changes only when leaving the main world's Generate tab.
-						key={contentKey}
+					<PlanetDetails
 						{...buildMoonPreviewDataProps({
 							seed: getDerivedSeedNumber(selection),
 							moon,
@@ -1529,8 +1425,6 @@ export function GenerationPlanetNavigator({
 							parentPerihelionDeg,
 							spectralClass: moonStarParams.spectralClass,
 							starSubtype: moonStarParams.starSubtype,
-							generationPreviewTab,
-							onSelectGenerationPreviewTab,
 							unitSystem,
 						})}
 						starTemperatureK={moonStarParams.starTemperatureK}
@@ -1554,7 +1448,6 @@ export function GenerationPlanetNavigator({
 		}
 	}, [
 		axialTiltSlider,
-		contentKey,
 		dayLengthSlider,
 		eccentricitySlider,
 		labeledOrbits,
@@ -1562,9 +1455,7 @@ export function GenerationPlanetNavigator({
 		getBodyMoonOrbitDistance,
 		getDerivedSeedNumber,
 		getMainWorldMoonOrbitDistance,
-		generationPreviewTab,
 		onFocusBody,
-		onSelectGenerationPreviewTab,
 		onToggleSpin,
 		mainWorldSystemBody,
 		updateMainWorldBody,
@@ -1667,28 +1558,9 @@ export function GenerationPlanetNavigator({
 			</Surface>
 
 			{viewModel.dataContent && !fromGalaxy
-				? (() => {
-						const preview = (
-							<Surface
-								tone="panel"
-								borderTone="default"
-								radius="xl"
-								className="border-t border-slate-200 px-3 py-2"
-							>
-								<div className="space-y-1">
-									<DisclosureButton
-										label="Preview"
-										expanded={dataExpanded}
-										onClick={() => setDataExpanded((current) => !current)}
-									/>
-									{dataExpanded ? viewModel.dataContent : null}
-								</div>
-							</Surface>
-						)
-						return previewContainer
-							? createPortal(preview, previewContainer)
-							: preview
-					})()
+				? previewContainer
+					? createPortal(viewModel.dataContent, previewContainer)
+					: viewModel.dataContent
 				: null}
 		</div>
 	)
