@@ -38,6 +38,19 @@ const EXOPLASIM_WORLDS = [
 	{ mass: 10, radius: 1.795, gravity: 3.105, sunlight: 1.131 },
 ] as const
 
+// Worldbuilding Pasta 2025, "Climate Explorations: Pressure": ExoPlaSim on Earth's terrain with N₂ varied (O₂ and CO₂
+// at Earth's partial pressures), the starlight that keeps each near 15 °C (14.1–15.9). Its global precipitation against
+// 1 bar's: 200, 145, 117, 100, 81, 61, 42 %
+const EXOPLASIM_PRESSURES = [
+	{ bar: 0.1, sunlight: 1.356 },
+	{ bar: 0.25, sunlight: 1.185 },
+	{ bar: 0.5, sunlight: 1.069 },
+	{ bar: 1, sunlight: 1 },
+	{ bar: 2, sunlight: 0.943 },
+	{ bar: 4, sunlight: 0.912 },
+	{ bar: 10, sunlight: 0.911 },
+] as const
+
 function sweeps(base: ClimateOrbit) {
 	const earthHours = 23.93447232
 	const runs: { knob: string; value: number; orbit: ClimateOrbit }[] = []
@@ -111,6 +124,15 @@ function sweeps(base: ClimateOrbit) {
 			knob: "planet mass (M⊕), ExoPlaSim's sunlight",
 			value: world.mass,
 			orbit: { ...size, sunScale: base.sunScale * world.sunlight },
+		})
+	}
+	for (const world of EXOPLASIM_PRESSURES) {
+		const air = { ...base, pressureScale: world.bar }
+		runs.push({ knob: "surface pressure (bar)", value: world.bar, orbit: air })
+		runs.push({
+			knob: "surface pressure (bar), ExoPlaSim's sunlight",
+			value: world.bar,
+			orbit: { ...air, sunScale: base.sunScale * world.sunlight },
 		})
 	}
 	for (const value of [0.5, 0.75, 1, 1.25, 1.5])

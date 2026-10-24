@@ -8,6 +8,7 @@ export interface ClimateOrbit {
 	sunScale: number
 	radiusScale: number
 	gravityScale: number
+	pressureScale: number
 }
 
 export const EARTH_ROTATION: number

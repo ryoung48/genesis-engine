@@ -32,6 +32,7 @@ import { PARAMS } from './config.js';
 import { orbitOf, EARTH_ROTATION } from './insolation.js';
 import { spinScaled, spinRatio } from './rotation.js';
 import { sizeScaled } from './size.js';
+import { windScale } from './pressure.js';
 
 const G_ACC = 9.81;               // m/s²
 const RHO_AIR = 1.2;              // kg/m³
@@ -214,10 +215,10 @@ export function derivedCirculation() {
                 mean += p[c] * cosLat[j]; mw += cosLat[j];
             }
             mean /= mw;
-            for (let c = 0; c < G; c++) p[c] += 1011 - mean;                  // the planet's mean sea-level pressure
+            for (let c = 0; c < G; c++) p[c] += 1011 * orbit.pressureScale - mean;   // the planet's mean sea-level pressure
 
             // ── Winds: f k×u + r u = −∇p/ρ, friction turning more over land ──
-            const tanO = Math.tan(P.CIRC_TURN_OCEAN_DEG * DEG), tanL = Math.tan(P.CIRC_TURN_LAND_DEG * DEG);
+            const tanO = Math.tan(P.CIRC_TURN_OCEAN_DEG * DEG), tanL = Math.tan(P.CIRC_TURN_LAND_DEG * DEG), speed = windScale(orbit);
             for (let j = 0; j < h; j++) {
                 const f = 2 * OMEGA_ROT * Math.sin(g.lat[j] * DEG);
                 const sx = 100 / (R_PLANET * Math.max(0.05, cosLat[j]) * 2 * dRad), sy = 100 / (R_PLANET * 2 * dRad);   // hPa → Pa, centred
@@ -228,7 +229,7 @@ export function derivedCirculation() {
                     const py = (pn - ps) * sy * (j > 0 && j < h - 1 ? 1 : 2);
                     const r = F45 * (tanO + (tanL - tanO) * land[c]);
                     const fE = 2 * EARTH_ROTATION * Math.sin(g.lat[j] * DEG);
-                    const d = RHO_AIR * (spin === 1 ? r * r + f * f : Math.sqrt(r * r + f * f) * Math.sqrt(r * r + fE * fE)), sh = P.CIRC_SURFACE_WIND + (P.CIRC_SURFACE_WIND_LAND - P.CIRC_SURFACE_WIND) * land[c];
+                    const d = RHO_AIR * (spin === 1 ? r * r + f * f : Math.sqrt(r * r + f * f) * Math.sqrt(r * r + fE * fE)), sh = speed * (P.CIRC_SURFACE_WIND + (P.CIRC_SURFACE_WIND_LAND - P.CIRC_SURFACE_WIND) * land[c]);
                     u[c] = -sh * (r * px + f * py) / d;
                     v[c] = -sh * (r * py - f * px) / d;
                 }

@@ -89,15 +89,15 @@ function sunHarmonics(phi, delta, s0, out) {
     return out;
 }
 
-function tileSurface({ kind, T, rainMm, windMs, p, out, cloud }) {
+function tileSurface({ kind, T, rainMm, windMs, p, ps, out, cloud }) {
     const wet = kind === WATER ? 1 : rainMm === null ? 0.5 : 1 - Math.exp(-Math.max(0, rainMm) / WET_MONTH_MM);
     const snow = kind === WATER ? 0 : kind === ICE ? 1 : snowShare(T);
     const albedo = kind === WATER ? p.ALBEDO_SEA : (1 - snow) * p.ALBEDO_LAND + snow * p.ALBEDO_SNOW;
-    const Tk = T + 273.15, U = Math.sqrt(windMs * windMs + p.GUST_MS * p.GUST_MS), cond = 1.2 * p.EXCHANGE * U;   // ρ C_H U
+    const Tk = T + 273.15, U = Math.sqrt(windMs * windMs + p.GUST_MS * p.GUST_MS), cond = 1.2 * ps * p.EXCHANGE * U;   // ρ C_H U (ρ ∝ the pressure)
     out.sun = p.CLEAR_SKY * (1 - p.CLOUD_DIM * cloud ** p.CLOUD_POWER) * (1 - albedo);
     out.lamRad = 4 * p.EMISSIVITY * SIGMA * Tk * Tk * Tk;
     out.h = 1005 * cond;
-    out.lamLat = 2.5e6 * cond * wet * qsatSlope(Math.max(-40, Math.min(45, T)));
+    out.lamLat = 2.5e6 * cond * wet * qsatSlope(Math.max(-40, Math.min(45, T))) / ps;   // (q_sat ∝ 1 / p)
     out.inertia = kind === WATER ? 0 : (1 - snow) * (p.INERTIA_DRY + (p.INERTIA_WET - p.INERTIA_DRY) * wet) + snow * p.INERTIA_SNOW;
     out.slab = kind === WATER ? 1025 * 3990 * p.SEA_LAYER_M : 0;
     out.weather = kind === WATER ? p.WEATHER_SEA_C : p.WEATHER_LAND_C;
@@ -105,8 +105,8 @@ function tileSurface({ kind, T, rainMm, windMs, p, out, cloud }) {
     return out;
 }
 
-function tileResponse(s, w, p, out) {
-    const sq = Math.sqrt(w / 2), cBl = 1.2 * 1005 * p.AIR_LAYER_M, k = p.AIR_LOSS;
+function tileResponse(s, w, p, ps, out) {
+    const sq = Math.sqrt(w / 2), cBl = 1.2 * ps * 1005 * p.AIR_LAYER_M, k = p.AIR_LOSS;
     const gRe = s.lamRad + s.lamLat + s.h + s.inertia * sq, gIm = s.inertia * sq + w * s.slab;      // Z_g
     const gD = gRe * gRe + gIm * gIm, igRe = gRe / gD, igIm = -gIm / gD;                            // 1 / Z_g
     const aRe = s.h + k - s.h * s.h * igRe, aIm = w * cBl - s.h * s.h * igIm;                        // Z_a
@@ -131,7 +131,7 @@ function sunRange(re, im, o) {
 }
 
 export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, cloudAt, iceAt, wind2Prev = null, params = DIURNAL_PARAMS }) {
-    const { w, h } = g, G = g.size, p = params, earthDay = orbit.solarDayScale === 1, R_PLANET = g.radiusM, airCap = AIR_COLUMN_HEAT_CAP / orbit.gravityScale;
+    const { w, h } = g, G = g.size, p = params, earthDay = orbit.solarDayScale === 1, R_PLANET = g.radiusM, airCap = AIR_COLUMN_HEAT_CAP * orbit.pressureScale / orbit.gravityScale;
     const omega = 2 * Math.PI / (EARTH_SOLAR_DAY_S * orbit.solarDayScale), omegaE = 2 * Math.PI / EARTH_SOLAR_DAY_S;
     // the free air's spread: the energy balance's own, plus the gravity waves' within the Rossby radius c / f (at 45°)
     const f45 = 2 * orbit.rotation * Math.sin(Math.PI / 4), reach = Math.min(1, (p.WAVE_SPEED_MS / (Math.max(1e-12, f45) * R_PLANET)) ** 2);
@@ -170,7 +170,7 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
             const wind = windOf(c), r = rain ? rain[c] : null;
             for (let q = 0; q < 3; q++) {
                 const cloud = clouds ? clouds[c] : 0.5;
-                const sf = tileSurface({ kind: q, T: T[c], rainMm: r, windMs: wind, p, out: surf[q], cloud }), o = (c * 3 + q) * TILE_FIELDS;
+                const sf = tileSurface({ kind: q, T: T[c], rainMm: r, windMs: wind, p, ps: orbit.pressureScale, out: surf[q], cloud }), o = (c * 3 + q) * TILE_FIELDS;
                 tiles[o] = sf.sun; tiles[o + 1] = sf.lamRad; tiles[o + 2] = sf.h; tiles[o + 3] = sf.lamLat;
                 tiles[o + 4] = sf.inertia; tiles[o + 5] = sf.slab; tiles[o + 6] = sf.weather; tiles[o + 7] = sf.Tk;
             }
@@ -184,7 +184,7 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
                 let dRe = 0, dIm = 0, bRe = 0, bIm = 0;
                 for (let q = 0; q < 3; q++) {
                     if (!(share[q] > 0)) continue;
-                    const sf = tileAt(c, q), z = tileResponse(sf, wn, p, resp[q]);
+                    const sf = tileAt(c, q), z = tileResponse(sf, wn, p, orbit.pressureScale, resp[q]);
                     // k² / Z_a and k h S / (Z_g Z_a), weighted by the tile's share
                     const k = p.AIR_LOSS, S = a * sf.sun;
                     dRe += share[q] * k * k * z.iaRe; dIm += share[q] * k * k * z.iaIm;
@@ -212,7 +212,7 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
                 const sf = tileAt(c, q);
                 let varP = 0, varE = 0;
                 for (let n = 1; n <= HARMONICS; n++) {
-                    const z = tileResponse(sf, n * omega, p, resp[q]), S = harm[j * HARMONICS + n - 1] * sf.sun;
+                    const z = tileResponse(sf, n * omega, p, orbit.pressureScale, resp[q]), S = harm[j * HARMONICS + n - 1] * sf.sun;
                     // the solved harmonics bring the free air's T_f (back in the cell's own phase: × e^{−i n lon})
                     let fRe = 0, fIm = 0;
                     if (n <= SOLVED) {
@@ -231,7 +231,7 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
                     }
                     varP += (sRe * sRe + sIm * sIm) / 2;
                     if (!earthDay) {
-                        const zE = tileResponse(sf, n * omegaE, p, respE[q]);
+                        const zE = tileResponse(sf, n * omegaE, p, orbit.pressureScale, respE[q]);
                         const eRe = sf.h * S * zE.igRe, eIm = sf.h * S * zE.igIm;
                         const a2Re = eRe * zE.iaRe - eIm * zE.iaIm, a2Im = eRe * zE.iaIm + eIm * zE.iaRe;
                         const m2Re = S + sf.h * a2Re, m2Im = sf.h * a2Im;
@@ -245,7 +245,7 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
                     if (heatK) {
                         // the land's own range on an Earth day (its free air barely moves on one)
                         for (let n = 1; n <= HARMONICS; n++) {
-                            const zE = tileResponse(sf, n * omegaE, p, respE[q]), S = harm[j * HARMONICS + n - 1] * sf.sun;
+                            const zE = tileResponse(sf, n * omegaE, p, orbit.pressureScale, respE[q]), S = harm[j * HARMONICS + n - 1] * sf.sun;
                             const eRe = sf.h * S * zE.igRe, eIm = sf.h * S * zE.igIm;
                             earthRe[n - 1] = eRe * zE.iaRe - eIm * zE.iaIm;
                             earthIm[n - 1] = eRe * zE.iaIm + eIm * zE.iaRe;

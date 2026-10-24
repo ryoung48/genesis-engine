@@ -11,6 +11,7 @@ export type ClimateV2OrbitParams = Pick<
 	| "starSubtype"
 	| "orbitalDistanceAU"
 	| "planetRadiusKm"
+	| "pressure"
 >
 
 export type SolarHoursParams = Pick<

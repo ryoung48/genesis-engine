@@ -9,10 +9,14 @@ import {
 	type ClimateOrbit,
 	EARTH_ROTATION,
 } from "@/model/climatev2/vendor/insolation.js"
+import { MATH } from "@/model/shared/math/core"
 import { UNITS } from "@/model/shared/units"
 
 // A near-locked planet's solar day is held to this many sidereal days (a locked one goes to our own climate).
 const MAX_SOLAR_PER_SIDEREAL = 1000
+// Surface pressure (bar) is held to ExoPlaSim's usable range, the span climatev2's pressure scalings are fitted on
+// (Worldbuilding Pasta 2025, "Climate Explorations: Pressure")
+const PRESSURE_RANGE_BAR = { lo: 0.1, hi: 10 }
 
 // hoursPerDay is the sidereal rotation period and the year is daysPerYear of those; the solar day adds (retrograde:
 // removes) one turn per year. All are scaled from Earth's so that Earth gives climatev2's own constants exactly.
@@ -61,6 +65,9 @@ function fromParams(params: ClimateV2OrbitParams): ClimateOrbit {
 		radiusScale,
 		// Earth's density, as our own climate takes it (classification/climate gravityRatio)
 		gravityScale: radiusScale,
+		pressureScale:
+			MATH.clamp({ value: params.pressure ?? 1, ...PRESSURE_RANGE_BAR }) /
+			earth.pressureBar,
 	}
 }
 

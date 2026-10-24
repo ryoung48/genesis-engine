@@ -108,11 +108,11 @@ function overturningHeat(g, isSea, channels, pw) {
  * Month m's wind stress (bulk, with gusts — and dayW2, the mean square of the winds that follow the sun, or null) and
  * sea temperature, and their running yearly means.
  */
-function monthStress(G, m, uM, vM, tM, gustMs, dayW2, txM, tyM, sstM, tx, ty, sst) {
+function monthStress(G, m, uM, vM, tM, gustMs, dayW2, rho, txM, tyM, sstM, tx, ty, sst) {
     for (let c = 0; c < G; c++) {
         // bulk stress with the storms the monthly mean leaves out: the typical speed, not the mean vector's
         const s = Math.sqrt(uM[c] * uM[c] + vM[c] * vM[c] + gustMs * gustMs + (dayW2 ? dayW2[c] : 0)), k = m * G + c;
-        txM[k] = RHO_AIR * DRAG_COEFF * s * uM[c]; tyM[k] = RHO_AIR * DRAG_COEFF * s * vM[c]; sstM[k] = Math.max(-1.8, tM[c]);
+        txM[k] = rho * DRAG_COEFF * s * uM[c]; tyM[k] = rho * DRAG_COEFF * s * vM[c]; sstM[k] = Math.max(-1.8, tM[c]);
         tx[c] += txM[k] / 12; ty[c] += tyM[k] / 12; sst[c] += sstM[k] / 12;
     }
 }
@@ -167,7 +167,7 @@ export function windDrivenOcean() {
             vM.set(co(circ.v.subarray(m * core.size, (m + 1) * core.size)));
             tM.set(co(temperature.monthlySL.subarray(m * core.size, (m + 1) * core.size)));
             const dayW2 = temperature.dayWind2 ? co(temperature.dayWind2.subarray(m * core.size, (m + 1) * core.size)) : null;
-            monthStress(G, m, uM, vM, tM, P.OCEAN_GUST_MS, dayW2, txM, tyM, sstM, tx, ty, sst);
+            monthStress(G, m, uM, vM, tM, P.OCEAN_GUST_MS, dayW2, RHO_AIR * orbit.pressureScale, txM, tyM, sstM, tx, ty, sst);
         }
         // the stress's annual cycle: its first harmonic, x(t) ≈ x̄ + 2(x₁ᵣ cos θ − x₁ᵢ sin θ), θ = 2πt/12, month m at t = m + ½
         const seasonal = P.OCEAN_SEASON_SCALE > 0;

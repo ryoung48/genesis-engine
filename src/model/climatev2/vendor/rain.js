@@ -40,6 +40,7 @@ import { dailyInsolation, orbitOf, sunAt } from './insolation.js';
 import { gaussianSmooth } from './circulation.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
+import { PSYCHRO_HPA } from './pressure.js';
 
 const RHO_AIR = 1.2;                          // kg/m³ near the surface
 const EARTH_SECONDS_PER_MONTH = 30.44 * 86400;
@@ -409,7 +410,7 @@ export function columnWaterRain() {
                     // in cold or dark months, most in the sunny tropics.
                     const es = 6.112 * Math.exp(17.67 * tc / (tc + 243.5));
                     const slope = es * 17.67 * 243.5 / ((tc + 243.5) ** 2);
-                    p.eLand[c] = evapScale * PT_ALPHA * slope / (slope + 0.66) * rn / LATENT;   // kg m⁻² s⁻¹ per unit land area
+                    p.eLand[c] = evapScale * PT_ALPHA * slope / (slope + PSYCHRO_HPA * orbit.pressureScale) * rn / LATENT;   // kg m⁻² s⁻¹ per unit land area
                 }
             }
             // The column's share over high ground: the moist boundary layer rides up with ground that heats the air

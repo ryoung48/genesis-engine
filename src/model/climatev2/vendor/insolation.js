@@ -63,13 +63,14 @@ export const EARTH_ROTATION = 7.292e-5;      // s⁻¹, Earth's (sidereal) rotat
  * longitude at aphelion, i.e. the solar longitude at perihelion − 180 (Earth: 102.9, perihelion on 3 January);
  * rotationRateRadS (sidereal, s⁻¹); yearScale, the year's length in seconds relative to Earth's; solarDayScale, the
  * solar day (sunrise to sunrise) relative to Earth's; sunScale, the sunlight at the semi-major axis relative to Earth's (the star's
- * luminosity over the distance squared, against Sol's at 1 AU).
+ * luminosity over the distance squared, against Sol's at 1 AU); pressureScale, the surface pressure relative to Earth's.
  */
 export function orbitOf(options) {
     return {
         tiltDeg: options?.tiltDeg ?? 23.44, eccentricity: options?.eccentricity ?? 0, perihelion: options?.perihelion ?? 102.94719,
         rotation: options?.rotationRateRadS ?? EARTH_ROTATION, yearScale: options?.yearScale ?? 1, solarDayScale: options?.solarDayScale ?? 1,
         sunScale: options?.sunScale ?? 1, radiusScale: options?.radiusScale ?? 1, gravityScale: options?.gravityScale ?? 1,
+        pressureScale: options?.pressureScale ?? 1,
     };
 }
 

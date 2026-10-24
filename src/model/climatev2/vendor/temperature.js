@@ -26,6 +26,7 @@ import { HelmholtzSolver } from './solver.js';
 import { PARAMS } from './config.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
+import { pressureScaled, rayleighReflect, PSYCHRO_KPA } from './pressure.js';
 import { dayCycle } from './diurnal.js';
 import { tropicsWeight, gaussianSmooth } from './circulation.js';
 import { FastNoise } from './fast-noise.js';
@@ -48,9 +49,9 @@ const AIR_STABLE_SUN = SOLAR_CONSTANT / 10; // W/m² daily sunlight (top of the 
 const AIR_MIXED_SUN = SOLAR_CONSTANT / 5;   // … and above which convection mixes it (≈ 25° in midwinter)
 export const WET_MONTH_MM = 100;                   // mm/month of rain at which the ground is ~63 % wet
 const WET_SUN_REF = 400;                    // W/m² of daily sunlight (top of the air) at which TEMP_WET_COOL_C applies
-const evapShareRaw = (T) => { const t = Math.max(-40, Math.min(45, T)), d = 4098 * 0.6108 * Math.exp(17.27 * t / (t + 237.3)) / ((t + 237.3) ** 2); return d / (d + 0.0665); };
-const EVAP_SHARE_25 = evapShareRaw(25);
-const evapShare = (T) => evapShareRaw(T) / EVAP_SHARE_25;
+const evapShareRaw = (T, ps) => { const t = Math.max(-40, Math.min(45, T)), d = 4098 * 0.6108 * Math.exp(17.27 * t / (t + 237.3)) / ((t + 237.3) ** 2); return d / (d + PSYCHRO_KPA * ps); };
+const EVAP_SHARE_25 = evapShareRaw(25, 1);
+const evapShare = (T, ps) => evapShareRaw(T, ps) / EVAP_SHARE_25;
 const WEAK_SUN = SOLAR_CONSTANT / 8;        // W/m² — half the planet's mean sunlight: below it, inversions form
 // The surface's own albedos and the air's absorption, for the planet's albedo (forcingSweep)
 // The air's absorption of sunlight: ozone and the other gases, ATM_ABSORB_DRY, and water vapour, growing with its
@@ -101,7 +102,7 @@ export function energyBalanceTemperature() {
     return ({ ctx, winds, init = null, qflux = null, rain = null, ocean = null, clouds = null }) => {
         const orbit = orbitOf(ctx.options), OMEGA = 2 * Math.PI / (EARTH_SECONDS_PER_YEAR * orbit.yearScale);
         const t0 = performance.now();
-        const P = sizeScaled(spinScaled({ ...PARAMS }, orbit), orbit);
+        const P = pressureScaled(sizeScaled(spinScaled({ ...PARAMS }, orbit), orbit), orbit);
         const dryLapse = DRY_LAPSE * orbit.gravityScale, airKm = AIR_SCALE_KM / orbit.gravityScale;
         // (the pages' Greenhouse: a radiative forcing, W/m² — the planet's heat to space lowered (or raised) as more (or
         // less) greenhouse gas would; ≈ 0.5 °C per W/m² before the snow, ice and seas answer. They amplify a cooling far
@@ -163,17 +164,20 @@ export function energyBalanceTemperature() {
             if (lat >= bt.hiS) return span(lat, bt.hiS, bt.itcz, E.hiS, E.itcz);
             return span(lat, -90, bt.hiS, -90, E.hiS);
         };
+        // (thicker air scatters more of the sun back from the clear sky: Rayleigh's optical depth ∝ the pressure — Earth's
+        // own is in TEMP_ALBEDO_SUN*, only the departure from it is added)
+        const clearExtra = (mu) => orbit.pressureScale === 1 ? 0 : (1 - CLOUD_COVER) * (rayleighReflect(mu, orbit.pressureScale) - rayleighReflect(mu, 1));
         for (let k = 0; k < NT; k++) {
             const bt = beltsAt(k);
             for (let j = 0; j < h; j++) {
                 const muE = muEarthAt(earthLat(g.lat[j], bt)), xE = 1 - muE;
-                albBase[k * h + j] = P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * xE + P.TEMP_ALBEDO_SUN2 * xE * xE + slantReflect(muRow[j]) - slantReflect(muE);
+                albBase[k * h + j] = P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * xE + P.TEMP_ALBEDO_SUN2 * xE * xE + slantReflect(muRow[j]) - slantReflect(muE) + clearExtra(muRow[j]);
             }
         }
         // (and the surface's own variety about that: smooth fractal noise by geographic position, a fixed size in km — an
         // input like the rest, which the heat's spread and the snow and ice then work through)
         const albVary = albedoVariety(g, ctx.options?.seed ?? 1, P.TEMP_ALBEDO_VARY, P.TEMP_ALBEDO_VARY_KM);
-        const gamma = P.TEMP_WIND_CARRY * AIR_COLUMN_HEAT_CAP / orbit.gravityScale;
+        const gamma = P.TEMP_WIND_CARRY * AIR_COLUMN_HEAT_CAP * orbit.pressureScale / orbit.gravityScale;
         const Cl = P.TEMP_LAND_HEAT_CAP, Co = SEAWATER_HEAT_CAP * P.TEMP_OCEAN_MIX_M;
         // Large-scale height effect per cell (the core applies the standard rate below the grid): sunlit plateaus
         // cool gently with height, ground snowy most of the year like an ice sheet — blended by the snow's duration.
@@ -632,7 +636,7 @@ export function energyBalanceTemperature() {
                     const s = sunRow[(c / cw) | 0];
                     if (!(lf[c] > 0) || s === 0) continue;
                     const p = (1 - f) * rain[a * N + c] + f * rain[b * N + c], wet = 1 - Math.exp(-Math.max(0, p / orbit.yearScale) / WET_MONTH_MM);
-                    out[off + c] -= P.TEMP_WET_COOL_C * lf[c] * s * evapShare(out[off + c]) * wet;
+                    out[off + c] -= P.TEMP_WET_COOL_C * lf[c] * s * evapShare(out[off + c], orbit.pressureScale) * wet;
                 }
             };
             for (let m = 0; m < 12; m++) adjust(monthly, m * N, m + 0.5);
