@@ -16,7 +16,6 @@ import type { PersonKey } from "@/model/people/query/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { HISTORY_SCALE } from "@/ui/genesis/controls/history-scale"
 import { ModeBar } from "@/ui/genesis/controls/ModeBar"
 import {
@@ -1536,7 +1535,6 @@ export const GenesisView: React.FC<{
 		generationProgress,
 		generationLabel,
 		handleGenerate,
-		handleChangeHistoryPipeline,
 		handleResetDefaults,
 		handleReturnToPlanetView,
 	} = useWorldGeneration({
@@ -1555,7 +1553,6 @@ export const GenesisView: React.FC<{
 		recordDistributionBatch,
 		stopProceduralHistory,
 		historyPipeline,
-		setHistoryPipeline,
 		seed,
 		setSeed,
 		setDataVariant: handleSetDataVariant,
@@ -2024,6 +2021,8 @@ export const GenesisView: React.FC<{
 						resetMainWorldToEarth={resetMainWorldToEarth}
 						mainWorldMode={mainWorldMode}
 						setMainWorldMode={setMainWorldMode}
+						historyPipeline={historyPipeline}
+						setHistoryPipeline={setHistoryPipeline}
 						fromGalaxy={galaxyOrigin != null}
 						mainWorldSystemBody={mainWorldSystemBody}
 						updateMainWorldBody={updateMainWorldBody}
@@ -2445,17 +2444,7 @@ export const GenesisView: React.FC<{
 													selectedDate={history.selectedTimeMs}
 													placement="below"
 												/>
-											) : (
-												<SegmentedControl<HistoryPipeline>
-													tone="overlay"
-													value={historyPipeline}
-													options={[
-														{ value: "distribution", label: "Fast history" },
-														{ value: "simulation", label: "Detailed history" },
-													]}
-													onChange={handleChangeHistoryPipeline}
-												/>
-											)
+											) : null
 										}
 									/>
 								</div>

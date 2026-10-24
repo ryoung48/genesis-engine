@@ -9,7 +9,7 @@
 
 export const PARAMS_DEFAULTS = Object.freeze({
     // ── Temperature (energy balance, temperature.js) ──
-    TEMP_OLR_A: 200,            // W/m²       outgoing heat to space at 0 °C (sets the planet's overall warmth)
+    TEMP_OLR_A: 203.3,          // W/m²       outgoing heat to space at 0 °C (sets the planet's overall warmth)
     TEMP_OLR_B: 2.09,           // W/m²/K     extra outgoing heat per degree warmer
     TEMP_DIFFUSIVITY: 0.65,     // W/m²/K     heat spread toward the poles by weather and ocean (unit-sphere diffusivity)
     TEMP_DIFFUSIVITY_EW: 0.3,   // W/m²/K     heat spread east–west: weaker — weather systems carry heat mainly poleward,
@@ -39,6 +39,7 @@ export const PARAMS_DEFAULTS = Object.freeze({
                                 //            below the first, all at the second: snow that outlives the summer) …
     TEMP_ICE_KEEP: [0.76, 0.9], // –          … and a sheet's margin, fed by the ice flowing from a neighbour that grows
                                 //            it, is kept while its ground is snowy this share (the ablation zone)
+    TEMP_SEA_ICE:      1,       // –          0 = no sea ice at all (open sea in every month; the bench's without-sea-ice run)
     TEMP_SEA_ICE_GROW: 0.002,   // m/°C/day   sea ice thickens this much per degree-day of frost (thin ice; 0 = sea ice
                                 //            from each month's cold alone, none lasting into the summer) …
     TEMP_SEA_ICE_STEFAN_M: 0.2, // m          … growing slower once thicker than this (insulated: Stefan's law; 0 = off) …
@@ -177,7 +178,7 @@ export const PARAMS = { ...PARAMS_DEFAULTS };
 // range. Tuning against Earth may only nudge a setting within its range and pays for moving away from the
 // literature value, so the result stays a set of physical constants rather than a fit to Earth's geography.
 export const PARAM_PRIORS = Object.freeze({
-    TEMP_OLR_A:         { value: 200, min: 195, max: 215, source: 'North & Coakley 1979, satellite OLR fit (203.3); refitted to Earth (200) once the polar seas were stepped through the year (seaice.js): their sea ice and its insulation took ≈ 3 W/m² of warmth the old fixed-store seas had made up for — Earth bench annual bias +0.19 °C' },
+    TEMP_OLR_A:         { value: 203.3, min: 195, max: 215, source: 'North & Coakley 1979, satellite OLR fit' },
     TEMP_OLR_B:         { value: 2.09, min: 1.6, max: 2.4, source: 'North & Coakley 1979; Graves et al. 1993 (1.5–2.2)' },
     TEMP_DIFFUSIVITY:   { value: 0.65, min: 0.3, max: 1.0, source: 'North 1981 (0.649); North, Mengel & Short 1983 (≈0.67)' },
     TEMP_ALBEDO_SUN0:   { value: -0.1378, min: -0.3, max: 0.1, source: 'Earth\'s air reflectance R by latitude (evaluated at Earth\'s μ̄) in the two-stream planetary albedo R + T²α_s/(1 − Rα_s) (Donohoe & Battisti 2011), fitted so Earth reproduces, row by row, the planetary albedo of the earlier calibrated scheme (North 1975\'s 0.30 + 0.15·P2 by μ̄, plus ice and snow at 0.60 / 0.325): insolation-weighted rms 0.0085, mean gap 0.0000; with these surfaces Earth\'s cryosphere radiative effect is −3.2 W/m² over the NH (Flanner et al. 2011: −3.3 ± 1.2) and −2.25 W/m² from land ice and snow (Singh et al. 2015: −2.6, kernels −2.2 to −3.0); μ̄ per Cronin 2014' },

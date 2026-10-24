@@ -24,22 +24,12 @@ export interface SeaIceCellYearParams {
 	r: number
 	coastBoost: number
 	cycles: number
-	monthlyOut: Float32Array | null
 }
 
 export interface SeaIceCellYear {
 	current: number
 	min: number
 	max: number
-}
-
-export interface ComputeSeaIceMonthlyParams {
-	mesh: SphereMesh
-	temperatureMonthly: Float32Array
-	isLand: Uint8Array
-	distCoast: Float32Array
-	cycles: number
-	planetRadiusKm: number
 }
 
 export type ComputeIceAccumulationParams = {

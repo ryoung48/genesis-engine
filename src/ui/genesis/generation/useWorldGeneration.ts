@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
@@ -62,7 +61,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		recordDistributionBatch,
 		stopProceduralHistory,
 		historyPipeline,
-		setHistoryPipeline,
 		seed,
 		setSeed,
 		setDataVariant,
@@ -580,13 +578,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		setDataVariant,
 	])
 
-	const handleChangeHistoryPipeline = useCallback(
-		(pipeline: HistoryPipeline) => {
-			setHistoryPipeline(pipeline)
-			handleGenerateWorld({ seed, overrides: { historyPipeline: pipeline } })
-		},
-		[seed, setHistoryPipeline, handleGenerateWorld],
-	)
 	const handleResetDefaults = useCallback(
 		() => resetWorldDefaults(setters),
 		[setters],
@@ -599,7 +590,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		handleEarthImport,
 		handleGenerate,
 		handleGenerateWorld,
-		handleChangeHistoryPipeline,
 		handleResetDefaults,
 		handleReturnToPlanetView,
 	}

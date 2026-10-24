@@ -280,7 +280,6 @@ export type WorldGenerationInput = {
 	recordDistributionBatch: (batch: RecordBatch) => void
 	stopProceduralHistory: (complete: boolean) => void
 	historyPipeline: HistoryPipeline
-	setHistoryPipeline: (pipeline: HistoryPipeline) => void
 	recordProceduralJournal: (transactions: JournalTransaction[]) => void
 	seed: number
 	setSeed: (seed: number) => void

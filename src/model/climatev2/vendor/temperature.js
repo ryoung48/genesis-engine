@@ -1,4 +1,4 @@
-// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/temperature.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: hot loops moved into top-level functions (forcingSweep, windSamples, monthsToSamples) and the albedo variety cached, computing the same values; OUTER 4 → 3 and OUTER_WARM 2 → 1 (fewer snow/ice outer iterations).
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/temperature.js (GPL-3.0, see LICENSE). Modified in chaos-machine: hot loops moved into top-level functions (forcingSweep, windSamples, monthsToSamples) and the albedo variety cached, computing the same values; OUTER 4 → 3 and OUTER_WARM 2 → 1 (fewer snow/ice outer iterations); the orbit, spin, size and year scaled through orbitOf, spinScaled and sizeScaled (the sea ice's time step by yearScale); the day cycle (diurnal.js); the surface albedos and the air's absorption; the cold-limit gray-body heat to space (coldOlr); a TEMP_SEA_ICE switch (0 = no sea ice).
 // Temperature stage: a seasonal energy-balance model on the climate grid. DOM-free.
 //
 //   C·∂T/∂t = S·(1 − α) − (A + B·T) + D·∇²T − γ·(u·∇)T
@@ -26,7 +26,6 @@ import { PARAMS } from './config.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
 import { dayCycle } from './diurnal.js';
-import { polarSeas } from './seaice.js';
 import { tropicsWeight, gaussianSmooth } from './circulation.js';
 import { FastNoise } from './fast-noise.js';
 
@@ -99,8 +98,6 @@ function coldOlr({ A, B }) {
     const tJ = (4 * 273.15 - 4 * A / B) / 3;
     return { tJC: tJ - 273.15, eps: B / (4 * STEFAN_BOLTZMANN * tJ ** 3), A, B };
 }
-const COLUMN_PIN = 1e5;                     // W/m²/K: the polar seas held at their columns' surface (seaice.js) — far above the
-                                            // grid's own exchange between neighbours (D/Δ² ≈ 2000 per face at 1°)
 /**
  * The temperature stage. The orbit, spin and year come from the options (orbitOf, insolation.js).
  * Returns stage(ctx, winds, init?) → { T (K anchors × G, °C at reference height), monthly (12 × G, same), monthlySL
@@ -301,7 +298,7 @@ export function energyBalanceTemperature() {
         // pack where winters are long and summers cool), and follows the currents through the sea's temperature. (The
         // energy balance's own sea ice stays each month's cold alone — iceRamp: the summer pack would chill the sea
         // around it and creep the winter edge out.) 0 = off: each month's cold alone.
-        const thickOn = P.TEMP_SEA_ICE_GROW > 0;
+        const seaIceOn = P.TEMP_SEA_ICE > 0, thickOn = seaIceOn && P.TEMP_SEA_ICE_GROW > 0;
         const iceHm = new Float64Array(12 * G);
         const thickCycle = (out, n, phase) => {             // (n months from January: n = 12, phase 0.5 — mid-month)
             const dt = 365 * orbit.yearScale / n, hMax = 6 * P.TEMP_SEA_ICE_H0, st = P.TEMP_SEA_ICE_STEFAN_M;
@@ -349,9 +346,6 @@ export function energyBalanceTemperature() {
             for (let c = 0; c < G; c++) landWet[c] = 1 - Math.exp(-Math.max(0, landWet[c] / orbit.yearScale) / WET_RAIN_MM);   // (per Earth year)
         }
         const C = new Float64Array(G);
-        // (the polar seas, seaice.js: their columns and, from the round before, their ice for the albedo; each place's
-        // heating at the sample times but the currents', Fk, for them)
-        let col = null, colIce = warm && init.colIce ? init.colIce : null, colW = warm && init.colW ? init.colW : null;
         const Fk = new Float64Array(NT * G);
         // (the sunlight reaching the land's surface and what it takes of it, W/m² of land at the sample times — the rain
         // stage's evaporation and convection)
@@ -371,7 +365,7 @@ export function energyBalanceTemperature() {
                 surfKm[c] = Math.max(landKm[c], P.TEMP_ICE_DOME_KM * perennial[c]);
             }
             forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, g.lat, dRad, g.radiusM, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
-                albVary, cloudT, snowYear, !!(winds && gamma), uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, colIce, colW, sunDown, sunTaken,
+                albVary, cloudT, snowYear, !!(winds && gamma), uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
                 P.TEMP_ICE_WARM_C, P.TEMP_ICE_COLD_C, it === outer - 1 ? budgetSums : null);
             if (dayRect) for (let k = 0; k < NT; k++) {
                 const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), t = 12 * k / NT;
@@ -380,27 +374,6 @@ export function energyBalanceTemperature() {
                     const r = (1 - f) * dayRect[a * G + c] + f * dayRect[b * G + c];
                     F0[c] -= r; F1r[c] -= r * co; F1i[c] += r * sn; F2r[c] -= r * co2; F2i[c] += r * sn2;
                 }
-            }
-            // The polar seas, stepped month by month (seaice.js) from this round's heating and temperatures: their
-            // surface holds the energy balance there (below), their ice is next round's albedo. From a warm start only:
-            // the columns' open water takes years to settle (C_w/B ≈ 3), which the harmonics find at once — so a
-            // fresh start settles first, and the columns take over from there.
-            if (thickOn && warm) {
-                const Ts = new Float64Array(NT * G), Fs = new Float64Array(NT * G), qs = new Float64Array(NT * G);
-                for (let k = 0; k < NT; k++) {
-                    const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), t = 12 * k / NT;
-                    const a = Math.floor(t) % 12, f = t - Math.floor(t), b = (a + 1) % 12;
-                    for (let c = 0; c < G; c++) {
-                        const o = k * G + c, sea = 1 - landFrac[c];
-                        Ts[o] = c0[c] + 2 * (c1r[c] * co - c1i[c] * sn) + 2 * (c2r[c] * co2 - c2i[c] * sn2);
-                        Fs[o] = Fk[o] - P.TEMP_OLR_A - (dayRect ? (1 - f) * dayRect[a * G + c] + f * dayRect[b * G + c] : 0);
-                        qs[o] = qAt ? qAt[o] * sea : qEbm ? qEbm[c] * sea : 0;
-                    }
-                }
-                col = polarSeas({ g, NT, T: Ts, F: Fs, q: qs, landFrac, B: P.TEMP_OLR_B, D: P.TEMP_DIFFUSIVITY, Dx: P.TEMP_DIFFUSIVITY_EW,
-                    uBar: winds ? uBar : null, vBar: winds ? vBar : null, gamma, Cw: Co, H0: P.TEMP_SEA_ICE_H0,
-                    yearSeconds: EARTH_SECONDS_PER_YEAR * orbit.yearScale, E: col ? col.E : warm && init.colE ? init.colE : null });
-                colIce = col.ice; colW = col.weight;
             }
             for (let c = 0; c < G; c++) {
                 F0[c] = F0[c] / NT - P.TEMP_OLR_A + (qEbm && !qAt ? qEbm[c] * (1 - landFrac[c]) : 0); F1r[c] /= NT; F1i[c] /= NT; F2r[c] /= NT; F2i[c] /= NT;
@@ -423,19 +396,6 @@ export function energyBalanceTemperature() {
                     srSeason[c] = P.TEMP_OLR_B + P.TEMP_EVAP_DAMPING * wt * cc * wet;
                 }
             } else srSeason.fill(P.TEMP_OLR_B);
-            // (the polar seas' sea, held at their columns' surface: its harmonics, × COLUMN_PIN by how much it is one)
-            const srYear = col ? Float64Array.from(sr) : sr;
-            if (col) for (let c = 0; c < G; c++) {
-                const L = COLUMN_PIN * col.weight[c] * (1 - landFrac[c]);
-                if (!(L > 0)) continue;
-                let a0 = 0, a1r = 0, a1i = 0, a2r = 0, a2i = 0;
-                for (let k = 0; k < NT; k++) {
-                    const th = 2 * Math.PI * k / NT, T = col.T[k * G + c] / NT;
-                    a0 += T; a1r += T * Math.cos(th); a1i -= T * Math.sin(th); a2r += T * Math.cos(2 * th); a2i -= T * Math.sin(2 * th);
-                }
-                srYear[c] += L; srSeason[c] += L;
-                F0[c] += L * a0; F1r[c] += L * a1r; F1i[c] += L * a1i; F2r[c] += L * a2r; F2i[c] += L * a2i;
-            }
             const relax = it === 0 && !warm ? 1 : 0.8;
             const tol = it === outer - 1 ? 1e-4 : 1e-3;
             prof.forcing += performance.now() - tp;
@@ -448,7 +408,7 @@ export function energyBalanceTemperature() {
                 return r;
             };
             // annual mean, then the first and second harmonics of the year
-            const n0 = solveWith(srYear, zero, F0, zero, c0, null);
+            const n0 = solveWith(sr, zero, F0, zero, c0, null);
             for (let c = 0; c < G; c++) si[c] = OMEGA * C[c];
             const n1 = solveWith(srSeason, si, F1r, F1i, c1r, c1i);
             for (let c = 0; c < G; c++) si[c] = 2 * OMEGA * C[c];
@@ -733,9 +693,8 @@ export function energyBalanceTemperature() {
             for (let m = 0; m < 12; m++) {
                 const sl = surfaceAt(m + 0.5, false);
                 for (let c = 0; c < G; c++) {
-                    const own = Math.max(iceRamp(sl[c]), iceHm[m * G + c]), k0 = Math.floor(m + 0.5) % NT, k1 = (k0 + 1) % NT;
-                    const cols = colIce ? colW[c] * ((colIce[k0 * G + c] + colIce[k1 * G + c]) / 2) + (1 - colW[c]) * own : own;
-                    iceTmp[c] = landFrac[c] < 0.5 ? cols : 0;       // sea ice, by month (the polar seas' from their columns)
+                    const own = Math.max(iceRamp(sl[c]), iceHm[m * G + c]);
+                                        iceTmp[c] = seaIceOn && landFrac[c] < 0.5 ? own : 0;       // sea ice, by month (the polar seas' from their columns)
                 }
                 refine(g, core, ratio, iceTmp, seaIce, m * core.size);
             }
@@ -757,7 +716,7 @@ export function energyBalanceTemperature() {
                 const sl = surfaceAt(m + 0.5, false);
                 slSea.set(sl); fillAcross(g, slSea, seaCoarse);
                 iceHmAll.set(iceHm.subarray(m * G, (m + 1) * G)); fillAcross(g, iceHmAll, seaCoarse);
-                for (let c = 0; c < G; c++) iceAll[c] = Math.max(iceRamp(slSea[c]), iceHmAll[c]);
+                for (let c = 0; c < G; c++) iceAll[c] = seaIceOn ? Math.max(iceRamp(slSea[c]), iceHmAll[c]) : 0;
                 refineForDrawing(g, core, ratio, iceAll, seaIceOpen, m * core.size, null, 0, 1);
                 airSea.set(surfaceAt(m + 0.5, true));
                 refineForDrawing(g, core, ratio, airSea, seaSL, m * core.size, seaCoarse);
@@ -766,7 +725,7 @@ export function energyBalanceTemperature() {
             refineForDrawing(g, core, ratio, domeG, domeDraw, 0, landCoarse, 0, Infinity);   // (from the land; an island far out, its own)
             return (drawn = { seaSL, seaIceOpen, domeDraw });
         };
-        const state = { step: g.step, c0, c1r, c1i, c2r, c2i, snowYear, perennial, dayRect: day ? day.rect : null, dayWind2: day ? day.wind2 : null, colE: col ? col.E : warm && init.colE ? init.colE : null, colIce, colW };
+        const state = { step: g.step, c0, c1r, c1i, c2r, c2i, snowYear, perennial, dayRect: day ? day.rect : null, dayWind2: day ? day.wind2 : null };
         // the planet's mean sunlight (W/m²) and its albedo by part: the air and clouds (by the sun's height), the surface's
         // variety, bare ground and sea seen through the air, what snow and ice add, clouds over land; and each row's
         // sunlight-weighted surface and planetary albedo
@@ -854,7 +813,7 @@ function monthsToSamples(G, qm, qAt) {
  * year's snow and ice shares. (A function of its own so it is optimised once rather than recompiled inside the stage.)
  */
 function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad, R_PLANET, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
-    albVary, cloudT, snowYear, windsOn, uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, colIce, colW, sunDown, sunTaken,
+    albVary, cloudT, snowYear, windsOn, uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
     iceWarmC, iceColdC, budget) {
     const iceSpan = iceWarmC - iceColdC;
     // (what holds all year at a cell: its height's lapse, the air left above it, its snow's brightness by the treeline)
@@ -876,8 +835,7 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 const c = j * w + i, T = Tk[c], f = landFrac[c];
                 const xL = (iceWarmC - (T - lapseKm[c])) / iceSpan, xO = (iceWarmC - T) / iceSpan;
                 const sL = xL <= 0 ? 0 : xL >= 1 ? 1 : xL * xL * (3 - 2 * xL), sOnow = xO <= 0 ? 0 : xO >= 1 ? 1 : xO * xO * (3 - 2 * xO);
-                // (the polar seas' ice from their columns, seaice.js)
-                const sO = colIce ? colW[c] * colIce[k * G + c] + (1 - colW[c]) * sOnow : sOnow;
+                const sO = PARAMS.TEMP_SEA_ICE <= 0 ? 0 : sOnow;
                 // (the planet's albedo: the air and its clouds reflect R (ab, by the sun's height alone — the surface's ice
                 // and snow are not in it, so they come and go with the temperature, not the sun's slant); what passes, T =
                 // 1 − R − the air's absorption (airAbsorb), reaches the surface, whose albedo α_s sends part back up through

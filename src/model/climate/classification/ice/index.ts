@@ -1,7 +1,6 @@
 import type {
 	CoastBoostParams,
 	ComputeIceAccumulationParams,
-	ComputeSeaIceMonthlyParams,
 	IceResult,
 	SeaIceCellYear,
 	SeaIceCellYearParams,
@@ -46,7 +45,6 @@ function seaIceCellYear({
 	r,
 	coastBoost,
 	cycles,
-	monthlyOut,
 }: SeaIceCellYearParams): SeaIceCellYear {
 	const freezeThresh = -2 + coastBoost * 2
 	const accumRate = 10 + coastBoost * 5
@@ -84,36 +82,10 @@ function seaIceCellYear({
 			const melt = (temp - freezeThresh) * DAYS_PER_MONTH[m] * meltRate
 			current = current > melt ? current - melt : 0
 		}
-		if (monthlyOut) monthlyOut[m * N + r] = current
 		if (current < minValue) minValue = current
 		if (current > maxValue) maxValue = current
 	}
 	return { current, min: minValue, max: maxValue }
-}
-
-function computeSeaIceMonthly({
-	mesh,
-	temperatureMonthly,
-	isLand,
-	distCoast,
-	cycles,
-	planetRadiusKm,
-}: ComputeSeaIceMonthlyParams): Float32Array {
-	const N = mesh.numRegions
-	const coastBoost = coastBoostOf({ mesh, isLand, distCoast, planetRadiusKm })
-	const monthlyOut = new Float32Array(12 * N)
-	for (let r = 0; r < N; r++) {
-		if (isLand[r]) continue
-		seaIceCellYear({
-			temperatureMonthly,
-			N,
-			r,
-			coastBoost: coastBoost[r],
-			cycles,
-			monthlyOut,
-		})
-	}
-	return monthlyOut
 }
 
 function computeIceAccumulation({
@@ -171,7 +143,6 @@ function computeIceAccumulation({
 				r,
 				coastBoost: coastBoost[r],
 				cycles,
-				monthlyOut: null,
 			})
 			ice[r] = sea.current
 			iceMin[r] = sea.min
@@ -224,5 +195,4 @@ function computeIceAccumulation({
 
 export const ICE = {
 	computeIceAccumulation,
-	computeSeaIceMonthly,
 }

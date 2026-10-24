@@ -6,6 +6,7 @@ import { WIND } from "@/model/climate/weather/wind"
 import { CLIMATE_V2 } from "@/model/climatev2"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import type { ClimateV2Cells } from "@/model/climatev2/types"
+import { setParams } from "@/model/climatev2/vendor/config.js"
 import {
 	classifyCell,
 	KOPPEN_CLASSES,
@@ -1109,6 +1110,7 @@ function score() {
 
 describe("climate vs observed Earth (diagnostic)", () => {
 	it("scores the climate on the imported Earth terrain", () => {
+		if (process.env.CLIMATE_SEA_ICE === "0") setParams({ TEMP_SEA_ICE: 0 })
 		const results = { v2: score() }
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-")
 		const title = process.env.CLIMATE_BENCH_TITLE ?? "atlas-comparison"

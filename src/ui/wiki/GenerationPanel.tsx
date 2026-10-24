@@ -9,6 +9,7 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/ocean/tides/tidal-schedule/types"
+import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import type { StageTiming } from "@/model/shared/timing/types"
@@ -69,6 +70,8 @@ interface GenerationPanelProps {
 	resetMainWorldToEarth?: () => void
 	mainWorldMode: MainWorldMode
 	setMainWorldMode: (v: MainWorldMode) => void
+	historyPipeline: HistoryPipeline
+	setHistoryPipeline: (v: HistoryPipeline) => void
 	/** True when the current system was opened from the galaxy map -- passed
 	 * straight through to GenerationPlanetNavigator, which then hides the
 	 * Preview section and makes every stat read-only. */
@@ -158,6 +161,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	showRealSolNames,
 	mainWorldMode,
 	setMainWorldMode,
+	historyPipeline,
+	setHistoryPipeline,
 	fromGalaxy,
 	mainWorldSystemBody,
 	updateMainWorldBody,
@@ -301,6 +306,17 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							mainWorldMode as "earth-clone" | "moon-system" | "gas-giant-moon"
 						}
 						onChange={setMainWorldMode}
+					/>
+					<SegmentedControl<HistoryPipeline>
+						tone="panel"
+						size="xs"
+						fullWidth
+						options={[
+							{ value: "distribution", label: "Fast history" },
+							{ value: "simulation", label: "Detailed history" },
+						]}
+						value={historyPipeline}
+						onChange={setHistoryPipeline}
 					/>
 				</div>
 			) : null}
