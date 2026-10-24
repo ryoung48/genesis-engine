@@ -1,5 +1,6 @@
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
+import { GREENHOUSE_ESTIMATE } from "@/model/celestial/planet/environment/greenhouse"
 import type {
 	SolSeedGenerationParams,
 	SolSeedGenerationResult,
@@ -9,7 +10,6 @@ import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
-import { GREENHOUSE_ESTIMATE } from "@/model/climate/temperature/ebm/greenhouse-estimate"
 
 function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 	const density = PLANET.buildDensityProfile({

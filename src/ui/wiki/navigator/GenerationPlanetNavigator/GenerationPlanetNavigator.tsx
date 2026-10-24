@@ -41,7 +41,7 @@ import {
 import {
 	isApproxSolarLocked,
 	LazyPlanetDetailTabs,
-	useAvgTempKPreview,
+	useLockedAvgTempK,
 } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
 import { labelOrbitBodies } from "@/ui/wiki/navigator/GenerationPlanetNavigator/label-orbit-bodies"
 import { OrbitHeader } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitHeader"
@@ -494,12 +494,8 @@ export function GenerationPlanetNavigator({
 				orbitalDistanceAU: probeBody.orbitalDistanceAU,
 				hoursPerDay: climateHoursPerDay,
 				daysPerYear: climateDaysPerYear,
-				landCoverage: probeMoon.landCoverage,
 				planetRadiusKm: probeMoon.diameterKm / 2,
 				pressureBar: probeMoon.atmosphere?.pressureBar ?? 0,
-				albedo: probeMoon.albedo,
-				greenhouseFactor: probeMoon.greenhouseFactor,
-				internalHeatTempK: undefined,
 				seismologyTotalHeatingK: probeMoon.seismology?.totalHeating,
 				substellarLon: probeMoon.substellarLon ?? 0,
 			}
@@ -521,19 +517,11 @@ export function GenerationPlanetNavigator({
 				orbitalDistanceAU: probeBody.orbitalDistanceAU,
 				hoursPerDay: probeBody.siderealDayHours,
 				daysPerYear: probeBody.orbitalPeriodDays,
-				landCoverage: probeBody.landCoverage,
 				planetRadiusKm: probeBody.diameterKm / 2,
 				pressureBar: probeBody.atmosphere?.pressureBar ?? 0,
-				albedo: probeBody.albedo,
-				greenhouseFactor: probeBody.greenhouseFactor,
-				internalHeatTempK: probeBody.internalHeatTempK,
-				// Excluded for jovians -- their real internalHeatTempK is
-				// individually fitted against Jupiter/Saturn/Uranus/Neptune's actual
-				// temperatures, and system-seismology.ts's residual-heating formula
+				// Excluded for jovians: system-seismology.ts's residual-heating formula
 				// (tuned for rocky/icy geologic stress, not gas-giant internal heat)
-				// produces values so large for a jovian's huge sizeClass that no
-				// greenhouseFactor can compensate -- see ebm/index.ts's
-				// EBMConfig.seismologyTotalHeatingK doc.
+				// gives values far too large for a jovian's huge sizeClass.
 				seismologyTotalHeatingK:
 					probeBody.group === "jovian"
 						? undefined
@@ -553,17 +541,13 @@ export function GenerationPlanetNavigator({
 			orbitalDistanceAU: 1,
 			hoursPerDay: 24,
 			daysPerYear: 365,
-			landCoverage: 0.3,
 			planetRadiusKm: 6371,
 			pressureBar: 1,
-			albedo: undefined,
-			greenhouseFactor: undefined,
-			internalHeatTempK: undefined,
 			seismologyTotalHeatingK: undefined,
 			substellarLon: 0,
 		}
 	}, [probeBody, probeMoon, spectralClass, starSubtype, probeHostStar])
-	const probedAvgTempK = useAvgTempKPreview(probeConfig)
+	const probedAvgTempK = useLockedAvgTempK(probeConfig)
 	const avgTempK =
 		selection.kind === "body" || selection.kind === "moon"
 			? probedAvgTempK
@@ -1301,11 +1285,7 @@ export function GenerationPlanetNavigator({
 							perihelion={body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg}
 							obliquity={body.axialTiltDeg}
 							substellarLon={body.substellarLon ?? 0}
-							landCoverage={body.landCoverage}
 							atmosphere={body.atmosphere}
-							albedo={body.albedo}
-							greenhouseFactor={body.greenhouseFactor}
-							internalHeatTempK={body.internalHeatTempK}
 							seismologyTotalHeatingK={
 								body.group === "jovian"
 									? undefined

@@ -7,13 +7,11 @@ export interface GenesisClimate {
 	real_temperature_monthly?: Float32Array // flattened [month * numRegions + region] observed mean °C
 	temperature_diff_avg?: Float32Array // per-cell annual modeled minus observed °C
 	temperature_diff_monthly?: Float32Array // flattened [month * numRegions + region] modeled minus observed °C
-	temperature_monthly_nolapse: Float32Array // flattened [month * numRegions + region] mean °C before terrain lapse correction
 	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temperature range °C
 	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²
 	declination_monthly: Float32Array // per-month sub-solar latitude in degrees
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
-	landFraction: number[] // 36-band land fraction used by EBM
 	/** CLOUD_COVER.estimate's modeled proxy, [month * numRegions + region],
 	 * cached once (by the cloud-cover temperature modifier, which already
 	 * computes it for every cell/month) so hover/map display don't each

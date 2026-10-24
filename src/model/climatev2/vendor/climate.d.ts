@@ -43,6 +43,7 @@ export interface ClimateBudget {
 export interface PlanetClimateResult {
 	grid: LatLonGrid
 	surface: ClimateSurface
+	anchorMonths: number[]
 	months: { T: Float32Array; P: Float32Array }
 	cell: {
 		koppen: Uint8Array
@@ -64,6 +65,7 @@ export interface PlanetClimateResult {
 		}
 		circulation: CirculationResult
 		ocean: OceanResult
+		rain: { r: Float32Array }
 	}
 	timing: { stage: string; ms: number }[]
 }

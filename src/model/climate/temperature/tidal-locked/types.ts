@@ -51,7 +51,6 @@ export type LockedMonthlyDaylightHoursParams = {
 export type ComputeTidalTemperatureParams = {
 	mesh: SphereMesh
 	elevation: Float32Array
-	landFraction: number[]
 	params: GenesisParams
 	oceanDist?: Float32Array
 	elevation_km?: Float32Array

@@ -10,12 +10,8 @@ function applyTemperatureNoise({
 	N,
 	seed,
 	temperature_monthly,
-	temperature_monthly_nolapse,
 	computeTaper,
 	includeCell,
-	temperature_avg,
-	temperature_min,
-	temperature_max,
 }: ApplyTemperatureNoiseParams): void {
 	const sn1 = new SimplexNoise(seed + 3001)
 	const sn2 = new SimplexNoise(seed + 3002)
@@ -36,13 +32,8 @@ function applyTemperatureNoise({
 			sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
 		const offset = n * Math.max(0, taper)
 
-		if (temperature_avg) temperature_avg[r] += offset
-		if (temperature_min) temperature_min[r] += offset
-		if (temperature_max) temperature_max[r] += offset
-		for (let month = 0; month < 12; month++) {
+		for (let month = 0; month < 12; month++)
 			temperature_monthly[month * N + r] += offset
-			temperature_monthly_nolapse[month * N + r] += offset
-		}
 	}
 }
 

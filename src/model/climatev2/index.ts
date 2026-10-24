@@ -1,10 +1,12 @@
+import { CLIMATE } from "@/model/climate/classification/climate"
 import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
+import type { GenesisClimate } from "@/model/climate/types"
 import { CLIMATEV2_DIURNAL } from "@/model/climatev2/diurnal"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import type {
-	ClimateV2ApplyParams,
 	ClimateV2Cells,
+	ClimateV2ClimateParams,
 	ClimateV2Input,
 	ClimateV2WorldParams,
 	ZonalSeaAnomalyParams,
@@ -147,20 +149,35 @@ function computeForWorld({
 	})
 }
 
-// The world's temperature is v2's; its annual mean and range follow from the months.
-function applyTemperature({ climate, v2 }: ClimateV2ApplyParams): void {
-	climate.temperature_monthly.set(v2.temperatureMonthly)
+// The world's climate record: v2's temperature by month (the annual mean and range follow from the months) and its
+// day-night range, beside the planet's sunlight; PET is filled once the day-night range is applied.
+function toClimate({
+	mesh,
+	params,
+	v2,
+}: ClimateV2ClimateParams): GenesisClimate {
+	const N = mesh.numRegions
+	const climate: GenesisClimate = {
+		temperature_avg: new Float32Array(N),
+		temperature_min: new Float32Array(N),
+		temperature_max: new Float32Array(N),
+		temperature_monthly: Float32Array.from(v2.temperatureMonthly),
+		temperature_monthly_range: Float32Array.from(v2.diurnalRange.monthly),
+		pet_monthly: new Float32Array(N * 12),
+		...CLIMATE.computeSunlight({ mesh, params }),
+	}
 	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
 		temperature_monthly: climate.temperature_monthly,
 		temperature_avg: climate.temperature_avg,
 		temperature_min: climate.temperature_min,
 		temperature_max: climate.temperature_max,
-		N: climate.temperature_avg.length,
+		N,
 	})
+	return climate
 }
 
 export const CLIMATE_V2 = {
 	computeCellClimate,
 	computeForWorld,
-	applyTemperature,
+	toClimate,
 }

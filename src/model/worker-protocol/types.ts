@@ -50,13 +50,11 @@ interface SerializedGenesisClimate {
 	real_temperature_monthly?: Float32Array
 	temperature_diff_avg?: Float32Array
 	temperature_diff_monthly?: Float32Array
-	temperature_monthly_nolapse: Float32Array
 	temperature_monthly_range: Float32Array
 	insolation_monthly: Float32Array
 	declination_monthly: Float32Array
 	pet_monthly: Float32Array
 	daylight_hours_monthly: Float32Array
-	landFraction: number[]
 	/** [JUSTIFICATION] Cached cloud cover is absent from worlds generated before this cache was introduced. */
 	cloud_cover_monthly?: Float32Array
 	/** [JUSTIFICATION] Observed-input cloud cover is only available for imported Earth worlds. */

@@ -1,7 +1,8 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { INSOLATION } from "@/model/climate/shared/insolation"
 import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
-import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import type {
 	ComputeTidalTemperatureParams,
 	LockedDeclinationParams,
@@ -41,7 +42,7 @@ function computeDailyLockedOrbit(
 	> &
 		LockedStarRadiationParams,
 ): { flux: number[]; libration: number[]; solarLongitude: number[] } {
-	const { SIGMA, R_SUN, AU } = CONSTANTS.embConstants.stellar
+	const { SIGMA, R_SUN, AU } = INSOLATION.sun
 	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
@@ -58,8 +59,7 @@ function computeDailyLockedOrbit(
 	const PI = Math.PI
 	const perihelionRad = (params.perihelion * Math.PI) / 180
 	const longP = perihelionRad + PI
-	const equinoxOffsetRad =
-		(40 * 2 * Math.PI) / CONSTANTS.embConstants.time.DAYS_PER_YEAR
+	const equinoxOffsetRad = (40 * 2 * Math.PI) / TIME.constants.daysPerYear
 
 	const calcEccFromTrue = ({
 		trueAnomaly,
@@ -83,18 +83,12 @@ function computeDailyLockedOrbit(
 	let eccA = calcEccFromTrue({ trueAnomaly: trueA, eccentricity: ecc })
 	let meanL = eccA - ecc * Math.sin(eccA) + longP
 
-	const flux = new Array<number>(
-		CONSTANTS.embConstants.time.DAYS_PER_YEAR,
-	).fill(0)
-	const libration = new Array<number>(
-		CONSTANTS.embConstants.time.DAYS_PER_YEAR,
-	).fill(0)
-	const solarLongitude = new Array<number>(
-		CONSTANTS.embConstants.time.DAYS_PER_YEAR,
-	).fill(0)
-	for (let day = 0; day < CONSTANTS.embConstants.time.DAYS_PER_YEAR; day++) {
+	const flux = new Array<number>(TIME.constants.daysPerYear).fill(0)
+	const libration = new Array<number>(TIME.constants.daysPerYear).fill(0)
+	const solarLongitude = new Array<number>(TIME.constants.daysPerYear).fill(0)
+	for (let day = 0; day < TIME.constants.daysPerYear; day++) {
 		if (day !== 0) {
-			meanL += (2 * PI) / CONSTANTS.embConstants.time.DAYS_PER_YEAR
+			meanL += (2 * PI) / TIME.constants.daysPerYear
 			const meanA = meanL - longP
 			eccA = meanA
 			for (let iter = 0; iter < 10; iter++) eccA = meanA + ecc * Math.sin(eccA)
@@ -276,7 +270,7 @@ function computeTidalTransportParams(
 	const pressure = params.pressure ?? 1.0
 	const ecc = params.eccentricity
 
-	const { SIGMA, R_SUN, AU } = CONSTANTS.embConstants.stellar
+	const { SIGMA, R_SUN, AU } = INSOLATION.sun
 	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
@@ -291,9 +285,7 @@ function computeTidalTransportParams(
 		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
 	const albedo = 0.3
 	let T_eq = Math.pow((S0 * (1 - albedo)) / (4 * SIGMA), 0.25)
-	// See ebm/index.ts's EBMConfig.seismologyTotalHeatingK doc -- same
-	// post-solve quartic bump, applied here to this model's own equilibrium
-	// temperature instead of a per-latitude EBM solve.
+	// Tidal heating adds its own flux: T⁴ sums
 	const seismologyTotalHeatingK = params.seismologyTotalHeatingK ?? 0
 	if (seismologyTotalHeatingK > 0) {
 		T_eq = (T_eq ** 4 + seismologyTotalHeatingK ** 4) ** 0.25
@@ -301,11 +293,11 @@ function computeTidalTransportParams(
 	const GREENHOUSE_OFFSET = 33
 	const T_mean_C = T_eq - 273.15 + GREENHOUSE_OFFSET
 
-	const radiusRatio = CONSTANTS.embConstants.planet.EARTH_RADIUS / radiusM
+	const radiusRatio = ORBIT_BODY.earthRadiusM / radiusM
 	const radiusFactor = radiusRatio * radiusRatio
 	const pressureFactor = Math.pow(pressure, 0.5)
 	const yearFactor = Math.pow(
-		params.daysPerYear / CONSTANTS.embConstants.time.DAYS_PER_YEAR,
+		params.daysPerYear / TIME.constants.daysPerYear,
 		0.25,
 	)
 	const transportFactor = radiusFactor * pressureFactor * yearFactor
@@ -340,7 +332,6 @@ function computeTidalTransportParams(
 function computeTidalTemperature({
 	mesh,
 	elevation,
-	landFraction,
 	params,
 	oceanDist,
 	elevation_km,
@@ -368,7 +359,6 @@ function computeTidalTemperature({
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
-	const temperature_monthly_nolapse = new Float32Array(N * 12)
 	const temperature_monthly_range = new Float32Array(N * 12)
 	const insolation_monthly = new Float32Array(N * 12)
 	const pet_monthly = new Float32Array(N * 12)
@@ -410,7 +400,6 @@ function computeTidalTemperature({
 
 			const monthValue = T + eccAmplitude * Math.sin((month / 12) * 2 * Math.PI)
 			temperature_monthly[month * N + r] = monthValue
-			temperature_monthly_nolapse[month * N + r] = monthValue + lapseCorrection
 			temperature_monthly_range[month * N + r] = tidalTd
 			insolation_monthly[month * N + r] =
 				monthlyFlux[month] * Math.max(0, cosTheta)
@@ -422,7 +411,6 @@ function computeTidalTemperature({
 		N,
 		seed: params.seed ?? 0,
 		temperature_monthly,
-		temperature_monthly_nolapse,
 		computeTaper: (...coordinates: [number, number, number, number]) => {
 			const x = coordinates[1]
 			const y = coordinates[2]
@@ -461,7 +449,6 @@ function computeTidalTemperature({
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
-		temperature_monthly_nolapse,
 		temperature_monthly_range,
 		insolation_monthly,
 		declination_monthly: Float32Array.from(
@@ -470,7 +457,6 @@ function computeTidalTemperature({
 		),
 		pet_monthly,
 		daylight_hours_monthly,
-		landFraction,
 	}
 }
 
@@ -480,7 +466,6 @@ export const HEAT = {
 	computeLockedSubstellarDeclinationRad,
 	computeMonthlyLockedDeclination,
 	getSubstellarDirWithOffsetAndDeclination,
-	computeLockedMonthlyDaylightHours,
 	computeTidalTransportParams,
 	computeTidalTemperature,
 }

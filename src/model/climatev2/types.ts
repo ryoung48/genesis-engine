@@ -1,7 +1,4 @@
-import type {
-	GenesisClimate,
-	GenesisOceanCurrents,
-} from "@/model/climate/types"
+import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { DiurnalCells } from "@/model/climatev2/diurnal/types"
 import type { ClimateOrbit } from "@/model/climatev2/vendor/insolation.js"
@@ -43,8 +40,9 @@ export interface ClimateV2WorldParams {
 	params: GenesisParams
 }
 
-export interface ClimateV2ApplyParams {
-	climate: GenesisClimate
+export interface ClimateV2ClimateParams {
+	mesh: SphereMesh
+	params: GenesisParams
 	v2: ClimateV2Cells
 }
 

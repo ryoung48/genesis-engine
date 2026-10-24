@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { STAR } from "@/model/celestial/star"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
-import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
-import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
@@ -17,7 +13,6 @@ import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-go
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
 import { loadEarthGrayscale } from "@/test/earth/assets"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
-import { buildGenerationPreviewConfig } from "@/ui/genesis/generation/generation-preview"
 
 const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
@@ -29,59 +24,6 @@ function buildSmokeParams(): GenesisParams {
 		...DEFAULT_WORLD_PARAMS,
 		tideLock: null,
 	}
-}
-
-function computePreviewAverageTempC(params: GenesisParams): number {
-	const previewConfig = buildGenerationPreviewConfig({
-		tideLock: params.tideLock,
-		obliquity: params.obliquity,
-		eccentricity: params.eccentricity,
-		perihelion: params.perihelion,
-		substellarLon: params.substellarLon,
-		spectralClass: params.spectralClass,
-		starSubtype: params.starSubtype,
-		orbitalDistanceAU: params.orbitalDistanceAU,
-		hoursPerDay: params.hoursPerDay,
-		daysPerYear: params.daysPerYear,
-		landCoverage: params.landCoverage,
-		planetRadiusKm: params.planetRadiusKm,
-		pressure: params.pressure,
-	})
-
-	const model = new EnergyBalanceModel({
-		orbital: {
-			OBLIQUITY: previewConfig.obliquity,
-			ECCENTRICITY: previewConfig.eccentricity,
-			PERIHELION: previewConfig.perihelion,
-		},
-		stellar: {
-			...CONSTANTS.embConstants.stellar,
-			T_SUN: STAR.getStarTemperatureK({
-				cls: previewConfig.spectralClass as MainSequenceClass,
-				subtype: previewConfig.starSubtype,
-			}),
-		},
-		time: {
-			HOURS_PER_DAY: previewConfig.hoursPerDay,
-			YEAR_LENGTH_DAYS: previewConfig.daysPerYear,
-		},
-		landFraction: new Array(CONSTANTS.embConstants.grid.NUM_LAT).fill(
-			previewConfig.landFraction,
-		),
-		radius: previewConfig.radius * 1000,
-		pressure: previewConfig.pressure,
-	})
-	model.runModel({ years: 30, dtDays: 0.5 })
-
-	let totalWeightedTemp = 0
-	let totalArea = 0
-	for (let i = 0; i < model.lats_deg.length; i++) {
-		const latAvg = model.temperature_avg[i]
-		const areaWeight = model.dx[i]
-		totalWeightedTemp += latAvg * areaWeight
-		totalArea += areaWeight
-	}
-	return totalWeightedTemp / Math.max(totalArea, 1)
 }
 
 function average(values: ArrayLike<number>): number {
@@ -218,7 +160,6 @@ function summarizeDistribution(
 describe("full world smoke generation", () => {
 	it("generates a world using the configured smoke params", () => {
 		const params = buildSmokeParams()
-		const previewAvgTempC = computePreviewAverageTempC(params)
 		const world = GENERATE_WORLD.generateGenesisWorld({ params })
 		const summary = summarizeWorld(world)
 		const fingerprint = computeWorldFingerprint(world)
@@ -280,7 +221,6 @@ describe("full world smoke generation", () => {
 			substellarLon: params.substellarLon,
 		})
 		console.info("Smoke climate summary", {
-			previewAvgTempC: Number(previewAvgTempC.toFixed(1)),
 			finalAvgTempC: Number(summary.avgTempC.toFixed(1)),
 			finalLandAvgTempC: Number(summary.landAvgTempC.toFixed(1)),
 			finalMinTempC: Number(summary.minTempC.toFixed(1)),

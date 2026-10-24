@@ -1,8 +1,8 @@
 import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { GREENHOUSE_ESTIMATE } from "@/model/celestial/planet/environment/greenhouse"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import type { SystemBody } from "@/model/celestial/system/types"
-import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { TIME } from "@/model/shared/time"
 
 // live from the UI at generation time (see buildHomeBody), so its entry here
@@ -182,19 +182,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		maxElevation: 6000,
 		/** Real Earth Bond albedo (NASA planetary fact sheet). */
 		albedo: 0.3,
-		/** Same value as, and always bisected together with, ebm/constants
-		 * index.ts's GREENHOUSE_FACTOR -- both are fit against the real
-		 * imported Earth world's own land-only WorldClim bias (zeroed
-		 * exactly; see test/earth/earth-import-greenhouse-refit.smoke.
-		 * test.ts) with the temperature-driven ice-albedo feedback ON
-		 * (default). useEbmPreview.ts never disables it for this override,
-		 * so the calibration has to match, not the model behavior.
-		 * Referencing the shared constant directly (instead of a duplicated
-		 * number) is what keeps that true -- this used to drift out of sync
-		 * with the default on every re-fit (0.534 -> 0.578 -> 0.6047 -> 0.65
-		 * -> 0.6321, each one a manual update easy to forget), until the two
-		 * were pointed at the same constant here. */
-		greenhouseFactor: CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR,
+		greenhouseFactor: GREENHOUSE_ESTIMATE.earthGreenhouseFactor,
 		/** Real Earth sea-level pressure (~1 bar), matching every sibling
 		 * body's own hand-authored atmosphere below. Without this, the static
 		 * Sol system's Earth entry (seed === SOL_SEED, unlike the live

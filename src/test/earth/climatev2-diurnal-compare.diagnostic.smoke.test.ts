@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
+import { DTR } from "@/model/climate/temperature/dtr"
 import { CLIMATEV2_DIURNAL } from "@/model/climatev2/diurnal"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
@@ -165,9 +166,21 @@ describe("climatev2 diurnal range vs WorldClim / NCEP (diagnostic)", () => {
 				`day cycle: land MAE ${scored.land.maeC} bias ${scored.land.biasC} r ${scored.land.correlation} | sea MAE ${scored.sea.maeC} bias ${scored.sea.biasC}`,
 			)
 			const rows = [{ label: "day cycle", ...scored }]
-			const ours = score({ world, model: world.dtr_monthly, observed })
+			const ours = score({
+				world,
+				model: DTR.computeDiurnalRange({
+					mesh: world.mesh,
+					rainfall: world.rainfall,
+					elevationKm: world.elevation_km,
+					oceanDist: world.oceanDist,
+					isLand: world.isLand,
+					params: world.params,
+					daylight_hours_monthly: world.climate.daylight_hours_monthly,
+				}).monthly,
+				observed,
+			})
 			console.log(
-				`ours (pipeline DTR): land MAE ${ours.land.maeC} bias ${ours.land.biasC} r ${ours.land.correlation} | sea MAE ${ours.sea.maeC} bias ${ours.sea.biasC}`,
+				`ours (DTR formula): land MAE ${ours.land.maeC} bias ${ours.land.biasC} r ${ours.land.correlation} | sea MAE ${ours.sea.maeC} bias ${ours.sea.biasC}`,
 			)
 			const stamp = new Date().toISOString().replace(/[:.]/g, "-")
 			const dir = path.join("stats", "climate", `${stamp}-diurnal-compare`)

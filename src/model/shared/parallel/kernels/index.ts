@@ -1,4 +1,3 @@
-import { CLIMATE } from "@/model/climate/classification/climate"
 import { HYDROLOGY } from "@/model/climate/classification/hydrology"
 import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
@@ -14,5 +13,4 @@ export const KERNELS: Record<string, (params: never) => void> = {
 	koppenCells: KOPPEN.koppenCells,
 	pastaZoneCells: PASTA.pastaZoneCells,
 	sstFlowMonths: SURFACE_FLOW.sstFlowMonths,
-	zonalTemperatureCells: CLIMATE.zonalTemperatureCells,
 }

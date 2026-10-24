@@ -15,11 +15,12 @@ import { RegularClimatePreview } from "@/ui/wiki/climate-preview/RegularClimateP
 import { TidalCalendarChart } from "@/ui/wiki/climate-preview/TidalCalendarChart"
 import type {
 	ClimatePreviewData,
+	LockedAvgTempConfig,
 	LockedClimatePreviewData,
 	RegularClimatePreviewData,
 } from "@/ui/wiki/climate-preview/types"
-import { useEbmPreview } from "@/ui/wiki/climate-preview/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/wiki/climate-preview/useLockedClimatePreview"
+import { useSunlightPreview } from "@/ui/wiki/climate-preview/useSunlightPreview"
 import { DataSectionSummary } from "@/ui/wiki/shared/ui-atoms"
 
 function PlanetDetailContent({
@@ -64,7 +65,9 @@ function PlanetDetailContent({
 	// navigation so this initializer re-runs instead of carrying over state.
 	const [detailTab, setDetailTab] = useState<
 		GenerationPreviewTab | "tides" | "generate" | "observer"
-	>(() => (generateContent ? "generate" : "climate"))
+	>(() =>
+		generateContent ? "generate" : isSolarLocked ? "climate" : "insolation",
+	)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: onDetailTabChange intentionally excluded -- callers pass an inline closure that would otherwise re-fire this on every parent render.
 	useEffect(() => {
@@ -75,7 +78,9 @@ function PlanetDetailContent({
 		...(generateContent
 			? [{ tab: "generate" as const, label: "generate" }]
 			: []),
-		...GENERATION_PREVIEW_TABS.map(([tab, label]) => ({
+		...GENERATION_PREVIEW_TABS.filter(
+			([tab]) => isSolarLocked || tab !== "climate",
+		).map(([tab, label]) => ({
 			tab,
 			label: label.toLowerCase(),
 		})),
@@ -140,8 +145,6 @@ function PlanetDetailContent({
 							<RegularClimatePreview
 								preview={climatePreview as RegularClimatePreviewData}
 								activeTab={generationPreviewTab}
-								unitSystem={unitSystem}
-								daysPerYear={daysPerYear}
 							/>
 						)}
 					</div>
@@ -176,11 +179,7 @@ export function LazyPlanetDetailTabs({
 	perihelion,
 	obliquity,
 	substellarLon,
-	landCoverage,
 	atmosphere,
-	albedo,
-	greenhouseFactor,
-	internalHeatTempK,
 	seismologyTotalHeatingK,
 	tidalSchedulePreviewOverride,
 	generationPreviewTab,
@@ -223,15 +222,7 @@ export function LazyPlanetDetailTabs({
 	perihelion: number
 	obliquity: number
 	substellarLon: number
-	landCoverage: number
 	atmosphere: AtmosphereProfile | null | undefined
-	/** Real per-body EBM overrides -- see useEbmPreview.ts's EbmConfig doc.
-	 * Pass these for an actual known body (sol-system.ts data); leave unset
-	 * for a procedurally generated one, which falls back to the generic
-	 * landFraction/pressure heuristics. */
-	albedo?: number
-	greenhouseFactor?: number
-	internalHeatTempK?: number
 	seismologyTotalHeatingK?: number
 	/** Overrides the tidal schedule this would otherwise compute internally --
 	 * used only by the main world, whose own tides tab needs to switch to
@@ -282,11 +273,7 @@ export function LazyPlanetDetailTabs({
 			perihelion={perihelion}
 			obliquity={obliquity}
 			substellarLon={substellarLon}
-			landCoverage={landCoverage}
 			atmosphere={atmosphere}
-			albedo={albedo}
-			greenhouseFactor={greenhouseFactor}
-			internalHeatTempK={internalHeatTempK}
 			seismologyTotalHeatingK={seismologyTotalHeatingK}
 			tidalSchedulePreviewOverride={tidalSchedulePreviewOverride}
 			generationPreviewTab={generationPreviewTab}
@@ -322,32 +309,11 @@ export function LazyPlanetDetailTabs({
 	)
 }
 
-/** Runs the same regular/locked EBM climate simulation as
- * LazyPlanetDetailTabsContent, but unconditionally (not gated by whether the
- * "Preview" section is expanded), so the stats card's Temperature row can
- * populate as soon as a body is selected. Returns the area-weighted average
- * surface temperature in Kelvin. */
-export function useAvgTempKPreview(config: {
-	isSolarLocked: boolean
-	obliquity: number
-	eccentricity: number
-	perihelion: number
-	spectralClass: string
-	starSubtype: number
-	starTemperatureK?: number
-	starDiameterSol?: number
-	orbitalDistanceAU: number
-	hoursPerDay: number
-	daysPerYear: number
-	landCoverage: number
-	planetRadiusKm: number
-	pressureBar: number
-	albedo?: number
-	greenhouseFactor?: number
-	internalHeatTempK?: number
-	seismologyTotalHeatingK?: number
-	substellarLon: number
-}): number {
+// A planet locked to its star: the mean surface temperature (K) of its climate preview, run whether or not the
+// preview is open so the stats card's Temperature row has it
+export function useLockedAvgTempK(
+	config: LockedAvgTempConfig,
+): number | undefined {
 	const {
 		isSolarLocked,
 		obliquity,
@@ -360,56 +326,11 @@ export function useAvgTempKPreview(config: {
 		orbitalDistanceAU,
 		hoursPerDay,
 		daysPerYear,
-		landCoverage,
 		planetRadiusKm,
 		pressureBar,
-		albedo,
-		greenhouseFactor,
-		internalHeatTempK,
 		seismologyTotalHeatingK,
 		substellarLon,
 	} = config
-	const landFraction = Math.max(0, Math.min(1, landCoverage))
-	const regularPreviewConfig = useMemo(
-		() => ({
-			obliquity,
-			eccentricity,
-			perihelion,
-			spectralClass,
-			starSubtype,
-			starTemperatureK,
-			starDiameterSol,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			landFraction,
-			radius: planetRadiusKm,
-			pressure: pressureBar,
-			albedo,
-			greenhouseFactor,
-			internalHeatTempK,
-			seismologyTotalHeatingK,
-		}),
-		[
-			obliquity,
-			eccentricity,
-			perihelion,
-			spectralClass,
-			starSubtype,
-			starTemperatureK,
-			starDiameterSol,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			landFraction,
-			planetRadiusKm,
-			pressureBar,
-			albedo,
-			greenhouseFactor,
-			internalHeatTempK,
-			seismologyTotalHeatingK,
-		],
-	)
 	const lockedPreviewConfig = useMemo(
 		() => ({
 			obliquity,
@@ -445,10 +366,8 @@ export function useAvgTempKPreview(config: {
 			seismologyTotalHeatingK,
 		],
 	)
-	const regularPreview = useEbmPreview(regularPreviewConfig)
 	const lockedPreview = useLockedClimatePreview(lockedPreviewConfig)
-	const climatePreview = isSolarLocked ? lockedPreview : regularPreview
-	return climatePreview.avgTemp + 273.15
+	return isSolarLocked ? lockedPreview.avgTemp + 273.15 : undefined
 }
 
 function LazyPlanetDetailTabsContent({
@@ -469,11 +388,7 @@ function LazyPlanetDetailTabsContent({
 	perihelion,
 	obliquity,
 	substellarLon,
-	landCoverage,
 	atmosphere,
-	albedo,
-	greenhouseFactor,
-	internalHeatTempK,
 	seismologyTotalHeatingK,
 	tidalSchedulePreviewOverride,
 	generationPreviewTab,
@@ -512,11 +427,7 @@ function LazyPlanetDetailTabsContent({
 	perihelion: number
 	obliquity: number
 	substellarLon: number
-	landCoverage: number
 	atmosphere: AtmosphereProfile | null | undefined
-	albedo?: number
-	greenhouseFactor?: number
-	internalHeatTempK?: number
 	seismologyTotalHeatingK?: number
 	tidalSchedulePreviewOverride?: TidalSchedule
 	generationPreviewTab: GenerationPreviewTab
@@ -530,47 +441,17 @@ function LazyPlanetDetailTabsContent({
 	) => void
 }) {
 	const pressureBar = atmosphere?.pressureBar ?? 0
-	const landFraction = Math.max(0, Math.min(1, landCoverage))
-	const regularPreviewConfig = useMemo(
-		() => ({
-			obliquity,
-			eccentricity,
-			perihelion,
-			spectralClass,
-			starSubtype,
-			starTemperatureK,
-			starDiameterSol,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			landFraction,
-			radius: planetRadiusKm,
-			pressure: pressureBar,
-			albedo,
-			greenhouseFactor,
-			internalHeatTempK,
-			seismologyTotalHeatingK,
-		}),
-		[
-			obliquity,
-			eccentricity,
-			perihelion,
-			spectralClass,
-			starSubtype,
-			starTemperatureK,
-			starDiameterSol,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			landFraction,
-			planetRadiusKm,
-			pressureBar,
-			albedo,
-			greenhouseFactor,
-			internalHeatTempK,
-			seismologyTotalHeatingK,
-		],
-	)
+	const sunlightPreview = useSunlightPreview({
+		obliquity,
+		eccentricity,
+		perihelion,
+		spectralClass,
+		starSubtype,
+		starTemperatureK,
+		starDiameterSol,
+		orbitalDistanceAU,
+		hoursPerDay,
+	})
 	const lockedPreviewConfig = useMemo(
 		() => ({
 			obliquity,
@@ -602,9 +483,8 @@ function LazyPlanetDetailTabsContent({
 			seismologyTotalHeatingK,
 		],
 	)
-	const regularPreview = useEbmPreview(regularPreviewConfig)
 	const lockedPreview = useLockedClimatePreview(lockedPreviewConfig)
-	const climatePreview = isSolarLocked ? lockedPreview : regularPreview
+	const climatePreview = isSolarLocked ? lockedPreview : sunlightPreview
 	const computedTidalSchedulePreview = useMemo(
 		() =>
 			moonContext

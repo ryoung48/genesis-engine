@@ -13,6 +13,7 @@ import { DICE_TABLE } from "@/model/celestial/planet/environment/classification/
 import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment/classification/dice-table/types"
 import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
 import { DENSITY } from "@/model/celestial/planet/environment/density"
+import { GREENHOUSE_ESTIMATE } from "@/model/celestial/planet/environment/greenhouse"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/environment/types"
 import type { Zone } from "@/model/celestial/planet/types"
@@ -20,7 +21,6 @@ import type {
 	LuminosityClass,
 	SpectralClass,
 } from "@/model/celestial/star/types"
-import { GREENHOUSE_ESTIMATE } from "@/model/climate/temperature/ebm/greenhouse-estimate"
 import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
@@ -302,8 +302,8 @@ function rollProtoAtmosphereCode({
 // Bond albedo, dice-rolled and stored at generation time. Chaos-machine
 // previously had no equivalent: a generated body's albedo stayed unset, and
 // the UI only ever synthesized a crude landCoverage-only linear blend
-// on the fly wherever an EBM preview needed one (see useEbmPreview.ts's
-// estimateAlbedo) -- that fallback still exists for a body that somehow
+// on the fly (see body-stat-cards.tsx's estimateAlbedo) -- that fallback
+// still exists for a body that somehow
 // still lacks a stored albedo, but every newly generated body now gets a
 // real one from this roll instead of relying on it.
 function buildClassificationEnvironment(params: {

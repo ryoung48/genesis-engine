@@ -18,6 +18,7 @@ import { RAIN } from "@/model/climate/precipitation/rain"
 import { CALENDAR } from "@/model/climate/shared/calendar"
 import { CLOUD_COVER_TEMPERATURE_MODIFIER } from "@/model/climate/temperature/cloud-cover-modifier"
 import { DTR } from "@/model/climate/temperature/dtr"
+import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { GenesisRainfall } from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
@@ -190,21 +191,7 @@ function runPostElevationPipeline(
 	const timings: StageTiming[] = []
 	// ── Climate ────────────────────────────────────────────────────────
 	let t0 = performance.now()
-	const landFraction = CLIMATE.computeLandFraction({ mesh, isLand })
 	const isLocked = params.tideLock?.type === "solar"
-	// (the climate's fields — daylight, insolation, PET — and, for a planet locked to its star, its own temperature)
-	let climate = CLIMATE.computeTemperature({
-		mesh,
-		elevation,
-		landFraction,
-		params,
-		oceanDist,
-		isLand,
-		elevation_km,
-		continentality: true,
-	})
-	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
-	t0 = performance.now()
 	const climateV2 = isLocked
 		? null
 		: CLIMATE_V2.computeForWorld({
@@ -213,10 +200,16 @@ function runPostElevationPipeline(
 				isLand,
 				params,
 			})
-	if (climateV2) {
-		CLIMATE_V2.applyTemperature({ climate, v2: climateV2 })
-		TIMING.record({ stage: "Post: climatev2", startedAt: t0, timings })
-	}
+	let climate = climateV2
+		? CLIMATE_V2.toClimate({ mesh, params, v2: climateV2 })
+		: HEAT.computeTidalTemperature({
+				mesh,
+				elevation,
+				params,
+				oceanDist,
+				elevation_km,
+			})
+	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
 	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
@@ -335,21 +328,19 @@ function runPostElevationPipeline(
 	})
 	if (drainedClosedWater) {
 		t0 = performance.now()
-		const updatedLandFraction = CLIMATE.computeLandFraction({ mesh, isLand })
-		climate = CLIMATE.computeTemperature({
-			mesh,
-			elevation,
-			landFraction: updatedLandFraction,
-			params,
-			oceanDist,
-			isLand,
-			elevation_km,
-			continentality: true,
-		})
-		if (climateV2) CLIMATE_V2.applyTemperature({ climate, v2: climateV2 })
-		else applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
-		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
-		monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
+		// (v2's temperature is solved once, from the terrain before any lake drains)
+		if (!climateV2) {
+			climate = HEAT.computeTidalTemperature({
+				mesh,
+				elevation,
+				params,
+				oceanDist,
+				elevation_km,
+			})
+			applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
+			HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+			monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
+		}
 		TIMING.record({
 			stage: "Post: drain arid closed water",
 			startedAt: t0,
@@ -484,20 +475,18 @@ function runPostElevationPipeline(
 			planetRadiusKm: params.planetRadiusKm,
 		}),
 	)
-	climate = CLIMATE.computeTemperature({
-		mesh,
-		elevation,
-		landFraction,
-		params,
-		oceanDist,
-		isLand,
-		elevation_km,
-		continentality: true,
-	})
-	if (climateV2) CLIMATE_V2.applyTemperature({ climate, v2: climateV2 })
-	else applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
-	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
-	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
+	if (!climateV2) {
+		climate = HEAT.computeTidalTemperature({
+			mesh,
+			elevation,
+			params,
+			oceanDist,
+			elevation_km,
+		})
+		applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
+		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+		monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
+	}
 	;({ monthly: dtr_monthly, annual: dtr_annual } =
 		climateV2?.diurnalRange ??
 		DTR.computeDiurnalRange({

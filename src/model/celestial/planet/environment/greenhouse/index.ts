@@ -1,13 +1,13 @@
-import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
-import type { RollGreenhouseFactorParams } from "@/model/climate/temperature/ebm/greenhouse-estimate/types"
+import type { RollGreenhouseFactorParams } from "@/model/celestial/planet/environment/greenhouse/types"
 import { DICE } from "@/model/shared/random/dice"
 import type { SharedRng } from "@/model/shared/random/rng"
 
+// Earth's greenhouse factor, T_eq·(1 + g/4) with its real Bond albedo 0.3: fitted to Earth's land temperatures in the
+// retired zonal energy balance; a planet's factor scales from it with √pressure
+const EARTH_GREENHOUSE_FACTOR = 0.596
+
 function estimateGreenhouseFactor(pressure: number): number {
-	return (
-		CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR *
-		Math.sqrt(Math.max(pressure, 0))
-	)
+	return EARTH_GREENHOUSE_FACTOR * Math.sqrt(Math.max(pressure, 0))
 }
 
 function rollGreenhouseFactor(params: RollGreenhouseFactorParams): number {
@@ -39,6 +39,7 @@ function rollGasGiantGreenhouseFactor(rng: Pick<SharedRng, "uniform">): number {
 }
 
 export const GREENHOUSE_ESTIMATE = {
+	earthGreenhouseFactor: EARTH_GREENHOUSE_FACTOR,
 	estimateGreenhouseFactor,
 	rollGreenhouseFactor,
 	rollGasGiantGreenhouseFactor,

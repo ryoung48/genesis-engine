@@ -19,7 +19,6 @@
 		"calibrate:siege": "vitest run --project smoke src/test/history-run/siege-calibration.smoke.test.ts",
 		"diff:history": "node --experimental-strip-types scripts/history-diff.mjs",
 		"gen:world": "vitest run --project smoke src/test/generate-default-world.smoke.test.ts",
-		"gen:world:earth-temp-compare": "vitest run --project smoke src/test/earth/earth-real-temperature-compare.smoke.test.ts",
 		"build:earth-real-population-eu4": "python scripts/regenerate-earth-population.py",
 		"build:earth-real-urban-population-eu4": "python scripts/regenerate-earth-population.py",
 		"knip": "knip --fix",

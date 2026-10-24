@@ -1,18 +1,28 @@
-import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
-import type { InsolationComputeParams } from "@/model/climate/temperature/ebm/insolation/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import type {
+	InsolationComputeParams,
+	StellarParams,
+} from "@/model/climate/shared/insolation/types"
 import { TIME } from "@/model/shared/time"
+
+const SUN: StellarParams = {
+	T_SUN: 5778,
+	R_SUN: 6.9634e8,
+	AU: ORBIT_BODY.astronomicalUnitM,
+	SIGMA: 5.67e-8,
+}
 
 function clampAcosInput(value: number): number {
 	return Math.max(-1, Math.min(1, value))
 }
 
 export const INSOLATION = {
+	sun: SUN,
 	compute: (params: InsolationComputeParams) => {
 		const { lats, orbital, stellarOverride } = params
-		const { time, stellar: defaultStellar, grid } = CONSTANTS.embConstants
-		const stellar = stellarOverride || defaultStellar
-		const sampleCount = params.sampleCount ?? time.DAYS_PER_YEAR
-		const latitudeCount = params.sampleCount ? lats.length : grid.NUM_LAT
+		const stellar = stellarOverride || SUN
+		const sampleCount = params.sampleCount ?? TIME.constants.daysPerYear
+		const latitudeCount = lats.length
 		const _insolation: number[][] = new Array(latitudeCount)
 			.fill(0)
 			.map(() => new Array(sampleCount).fill(0))
@@ -25,7 +35,7 @@ export const INSOLATION = {
 		const PI = Math.PI
 		const longP = perihelionRad + PI
 		const ecc = orbital.ECCENTRICITY
-		const equinoxOffsetRad = (40 * 2 * Math.PI) / time.DAYS_PER_YEAR
+		const equinoxOffsetRad = (40 * 2 * Math.PI) / TIME.constants.daysPerYear
 		let trueL =
 			params.startSolarLongitudeDegrees === undefined
 				? -equinoxOffsetRad

@@ -40,7 +40,7 @@ function buildLockedClimatePreview(
 		perihelion: config.perihelion,
 		substellarLon: config.substellarLon,
 		obliquity: config.obliquity,
-		// TEMP: seismology zeroed out for debugging -- see useEbmPreview.ts
+		// TEMP: seismology zeroed out for debugging
 		seismologyTotalHeatingK: 0,
 	} as const
 	const { flux, libration, solarLongitude } = HEAT.computeDailyLockedOrbit({

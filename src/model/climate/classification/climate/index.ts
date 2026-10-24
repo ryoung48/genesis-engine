@@ -2,27 +2,17 @@ import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import type {
 	ApplyDtrToClimateMinMaxParams,
-	ComputeLandFractionParams,
-	ComputeMonthlyDaylightHoursParams,
-	ComputeTemperatureParams,
-	EbmBands,
-	EbmBandsParams,
+	ComputeSunlightParams,
 	LatBandInterpolationParams,
-	MeshLatitudeGeometry,
-	ZonalTemperatureCellsParams,
+	Sunlight,
 } from "@/model/climate/classification/climate/types"
-import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
-import type { EBMConfig } from "@/model/climate/temperature/ebm/config"
-import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
-import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
-import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
-import { HEAT } from "@/model/climate/temperature/tidal-locked"
-import type { GenesisClimate } from "@/model/climate/types"
-import { ELEVATION } from "@/model/geography/terrain/elevation"
+import { INSOLATION } from "@/model/climate/shared/insolation"
+import type {
+	OrbitalParams,
+	StellarParams,
+} from "@/model/climate/shared/insolation/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
-import { MATH } from "@/model/shared/math/core"
-import { PARALLEL } from "@/model/shared/parallel"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
 
@@ -32,38 +22,26 @@ function getStellarCls(params: GenesisParams): MainSequenceClass {
 		: "G"
 }
 
-const NUM_LAT = CONSTANTS.embConstants.grid.NUM_LAT
+// Sunlight is computed at this many latitudes, pole to pole, and interpolated to the cells
+const NUM_LAT = 36
 
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 const LAT_STEP_INV = (NUM_LAT - 1) / 180
 
 const RAD_TO_DEG = 180 / Math.PI
-const meshLatitudeGeometryCache = new WeakMap<
-	SphereMesh,
-	MeshLatitudeGeometry
->()
+const meshLatitudeCache = new WeakMap<SphereMesh, Float64Array>()
 
-function getMeshLatitudeGeometry(mesh: SphereMesh): MeshLatitudeGeometry {
-	const cached = meshLatitudeGeometryCache.get(mesh)
+function meshLatitudes(mesh: SphereMesh): Float64Array {
+	const cached = meshLatitudeCache.get(mesh)
 	if (cached) return cached
-
 	const latDegByRegion = new Float64Array(mesh.numRegions)
-	const latBandByRegion = new Uint8Array(mesh.numRegions)
-
 	for (let r = 0; r < mesh.numRegions; r++) {
 		const z = mesh.r_xyz[3 * r + 2]
-		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * RAD_TO_DEG
-		latDegByRegion[r] = latDeg
-		latBandByRegion[r] = Math.max(
-			0,
-			Math.min(NUM_LAT - 1, Math.floor(((latDeg + 90) / 180) * NUM_LAT)),
-		)
+		latDegByRegion[r] = Math.asin(Math.max(-1, Math.min(1, z))) * RAD_TO_DEG
 	}
-
-	const geometry = { latDegByRegion, latBandByRegion }
-	meshLatitudeGeometryCache.set(mesh, geometry)
-	return geometry
+	meshLatitudeCache.set(mesh, latDegByRegion)
+	return latDegByRegion
 }
 
 function interpolateLatBand({
@@ -76,75 +54,56 @@ function interpolateLatBand({
 	return range[i0] + t * (range[i0 + 1] - range[i0])
 }
 
-function computeLandFraction({
-	mesh,
-	isLand,
-}: ComputeLandFractionParams): number[] {
-	const { latBandByRegion } = getMeshLatitudeGeometry(mesh)
-	const landCount = new Float64Array(NUM_LAT)
-	const totalCount = new Float64Array(NUM_LAT)
-
-	for (let r = 0; r < mesh.numRegions; r++) {
-		const band = latBandByRegion[r]
-		totalCount[band]++
-		if (isLand[r]) landCount[band]++
-	}
-
-	const landFraction: number[] = new Array(NUM_LAT)
-	for (let i = 0; i < NUM_LAT; i++) {
-		const frac = totalCount[i] > 0 ? landCount[i] / totalCount[i] : 0
-		landFraction[i] = Math.min(frac, 0.8) // cap at 0.8 matching existing EBM
-	}
-	return landFraction
-}
-
-function computeMonthlyDaylightHours({
-	mesh,
-	params,
-}: ComputeMonthlyDaylightHoursParams): Float32Array {
+// The world's sunlight by month: daylight hours, top-of-atmosphere insolation (W/m²) and the sub-solar latitude
+function computeSunlight({ mesh, params }: ComputeSunlightParams): Sunlight {
 	const N = mesh.numRegions
-	const { latDegByRegion } = getMeshLatitudeGeometry(mesh)
-	const monthly = new Float32Array(N * 12)
-	const hoursPerDay = params.hoursPerDay
-
-	if (params.tideLock?.type === "solar") {
-		return HEAT.computeLockedMonthlyDaylightHours({ mesh, params })
-	}
-
+	const latDegByRegion = meshLatitudes(mesh)
 	const lats: number[] = []
-	for (let i = 0; i < CONSTANTS.embConstants.grid.NUM_LAT; i++)
-		lats.push(
-			-Math.PI / 2 + (Math.PI * i) / (CONSTANTS.embConstants.grid.NUM_LAT - 1),
-		)
-	const { _daylight_hours } = INSOLATION.compute({
+	for (let i = 0; i < NUM_LAT; i++)
+		lats.push(-Math.PI / 2 + (Math.PI * i) / (NUM_LAT - 1))
+	const { _insolation, _daylight_hours, _declination } = INSOLATION.compute({
 		lats,
-		orbital: {
-			...CONSTANTS.embConstants.orbital,
-			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
-			ECCENTRICITY: params.eccentricity,
-			PERIHELION: params.perihelion,
-		},
+		orbital: orbitalOf(params),
+		stellarOverride: stellarOf(params),
 	})
-	const monthlyRanges: number[][] = new Array(12)
+	const daylightByBand: number[][] = new Array(12)
 	for (let month = 0; month < 12; month++) {
 		const days = TIME.month.days(month)
-		monthlyRanges[month] = _daylight_hours.map((row) => {
+		daylightByBand[month] = _daylight_hours.map((row) => {
 			let sum = 0
 			for (const day of days) sum += row[day]
-			return (sum / Math.max(1, days.length)) * (hoursPerDay / TIME.hoursPerDay)
+			return (
+				(sum / Math.max(1, days.length)) *
+				(params.hoursPerDay / TIME.hoursPerDay)
+			)
 		})
 	}
-
+	const insolationByBand = monthlyBandMeans(_insolation)
+	const declination_monthly = new Float32Array(12)
+	let dayStart = 0
+	for (let month = 0; month < 12; month++) {
+		const end = dayStart + MONTH_DAY_COUNTS[month]
+		let sum = 0
+		for (let day = dayStart; day < end; day++) sum += _declination[day]
+		declination_monthly[month] = (sum / (end - dayStart)) * RAD_TO_DEG
+		dayStart = end
+	}
+	const daylight_hours_monthly = new Float32Array(N * 12)
+	const insolation_monthly = new Float32Array(N * 12)
 	for (let r = 0; r < N; r++) {
+		const latDeg = latDegByRegion[r]
 		for (let month = 0; month < 12; month++) {
-			monthly[month * N + r] = interpolateLatBand({
-				range: monthlyRanges[month],
-				latDeg: latDegByRegion[r],
+			daylight_hours_monthly[month * N + r] = interpolateLatBand({
+				range: daylightByBand[month],
+				latDeg,
+			})
+			insolation_monthly[month * N + r] = interpolateLatBand({
+				range: insolationByBand[month],
+				latDeg,
 			})
 		}
 	}
-
-	return monthly
+	return { daylight_hours_monthly, insolation_monthly, declination_monthly }
 }
 
 function applyDtrToClimateMinMax({
@@ -166,128 +125,23 @@ function applyDtrToClimateMinMax({
 	}
 }
 
-// Convert ocean distance from km to miles for continentality model
-const KM_TO_MI = 0.621371
-
-function zonalTemperatureCells({
-	start,
-	end,
-	xyz,
-	elevation,
-	elevationKm,
-	oceanDist,
-	isLand,
-	annualByBand,
-	monthlyByBand,
-	monthlyRangeByBand,
-	monthlyInsolationByBand,
-	gravityRatio,
-	continentality,
-	monthly,
-	noLapse,
-	monthlyRange,
-	insolation,
-}: ZonalTemperatureCellsParams): void {
-	const N = isLand.length
-	for (let r = start; r < end; r++) {
-		const z = xyz[3 * r + 2]
-		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
-		const hKm = elevationKm
-			? elevationKm[r]
-			: ELEVATION.elevToHeightKm({ elev: elevation[r] })
-		const annualAvg = interpolateLatBand({
-			range: annualByBand,
-			latDeg,
-		})
-
-		// Continentality: scale seasonal deviation from annual mean
-		// Ocean (0 mi): factor ≈ 0.78 (damped), coast (~300 mi): factor ≈ 1.0, deep inland: → 1.75
-		// Taper toward poles: less solar energy = lower ceiling for continental amplification
-		const distMiles = oceanDist ? oceanDist[r] * KM_TO_MI : 0
-		const absLat = Math.abs(latDeg)
-		const polarTaper = absLat > 55 ? 1 - (absLat - 55) / 35 : 1 // linear fade 55°–90°
-		const maxAmplitude = 0.5 * Math.max(0, polarTaper)
-		const inertiaFactor = oceanDist
-			? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000)
-			: 1
-
-		for (let month = 0; month < 12; month++) {
-			const zonalMonthNoLapse = interpolateLatBand({
-				range: monthlyByBand[month],
-				latDeg,
-			})
-			const monthlyNoLapse = continentality
-				? annualAvg + (zonalMonthNoLapse - annualAvg) * inertiaFactor
-				: zonalMonthNoLapse
-			// Temperature proxies moisture: cold columns approach the dry lapse rate.
-			const moistureFraction = MATH.smoothstep({
-				edge0: -20,
-				edge1: 20,
-				x: monthlyNoLapse,
-			})
-			const lapseRate = (9.8 - 4.8 * moistureFraction) * gravityRatio
-			const lapseCorrection = isLand[r] === 1 ? hKm * lapseRate : 0
-			monthly[month * N + r] = monthlyNoLapse - lapseCorrection
-			noLapse[month * N + r] = monthlyNoLapse
-			// Range scales with continentality; insolation is purely astronomical
-			monthlyRange[month * N + r] =
-				interpolateLatBand({ range: monthlyRangeByBand[month], latDeg }) *
-				inertiaFactor
-			insolation[month * N + r] = interpolateLatBand({
-				range: monthlyInsolationByBand[month],
-				latDeg,
-			})
-		}
+function orbitalOf(params: GenesisParams): OrbitalParams {
+	return {
+		OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
+		ECCENTRICITY: params.eccentricity,
+		PERIHELION: params.perihelion,
 	}
 }
 
-const SOLVED_MODEL_LIMIT = 4
-
-const solvedModels = new Map<string, EnergyBalanceModel>()
-
-// Generation re-derives temperature after lakes settle with the same planet
-// and land fractions, so a solved model is kept and reused instead of re-run.
-function solvedModel(config: EBMConfig): EnergyBalanceModel {
-	const key = JSON.stringify(config)
-	const solved = solvedModels.get(key)
-	if (solved) return solved
-	const model = new EnergyBalanceModel(config)
-	model.runModel({ years: 30, dtDays: 0.5 })
-	if (solvedModels.size >= SOLVED_MODEL_LIMIT)
-		for (const oldest of solvedModels.keys()) {
-			solvedModels.delete(oldest)
-			break
-		}
-	solvedModels.set(key, model)
-	return model
-}
-
-function ebmConfig({ params, landFraction }: EbmBandsParams): EBMConfig {
+function stellarOf(params: GenesisParams): StellarParams {
 	const cls = getStellarCls(params)
 	return {
-		orbital: {
-			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
-			ECCENTRICITY: params.eccentricity,
-			PERIHELION: params.perihelion,
-		},
-		stellar: {
-			...CONSTANTS.embConstants.stellar,
-			T_SUN: STAR.getStarTemperatureK({ cls, subtype: params.starSubtype }),
-			R_SUN:
-				STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) *
-				CONSTANTS.embConstants.stellar.R_SUN,
-			AU: params.orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU,
-		},
-		time: {
-			YEAR_LENGTH_DAYS: params.daysPerYear,
-			HOURS_PER_DAY: params.hoursPerDay,
-		},
-		pressure: params.pressure ?? 1,
-		radius: params.planetRadiusKm * 1000,
-		landFraction,
-		albedo: params.albedo,
-		greenhouseFactor: params.greenhouseFactor,
-		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
+		...INSOLATION.sun,
+		T_SUN: STAR.getStarTemperatureK({ cls, subtype: params.starSubtype }),
+		R_SUN:
+			STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) *
+			INSOLATION.sun.R_SUN,
+		AU: params.orbitalDistanceAU * INSOLATION.sun.AU,
 	}
 }
 
@@ -307,153 +161,7 @@ function monthlyBandMeans(rows: number[][]): number[][] {
 	return out
 }
 
-function ebmBands(params: EbmBandsParams): EbmBands {
-	const config = ebmConfig(params)
-	const ebm = solvedModel(config)
-	const { stellar } = config
-	return {
-		landMonthly: monthlyBandMeans(ebm.temperature_land),
-		oceanMonthly: monthlyBandMeans(ebm.temperature_ocean),
-		blendMonthly: monthlyBandMeans(ebm.temperature),
-		insolationMonthly: monthlyBandMeans(ebm.insolation),
-		solarFlux:
-			stellar.SIGMA * stellar.T_SUN ** 4 * (stellar.R_SUN / stellar.AU) ** 2,
-		olrB: ebm.olrB,
-		oceanHeatCapacity: ebm.heat_capacity_ocean[0],
-	}
-}
-
-function computeTemperature({
-	mesh,
-	elevation,
-	landFraction,
-	params,
-	oceanDist,
-	isLand,
-	elevation_km,
-	continentality,
-}: ComputeTemperatureParams): GenesisClimate {
-	if (params.tideLock?.type === "solar") {
-		return HEAT.computeTidalTemperature({
-			mesh,
-			elevation,
-			landFraction,
-			params,
-			oceanDist,
-			elevation_km,
-		})
-	}
-
-	const daylight_hours_monthly = computeMonthlyDaylightHours({ mesh, params })
-	const monthlyRangeRanges: number[][] = new Array(12)
-	const declination_monthly = new Float32Array(12)
-	const ebm = solvedModel(ebmConfig({ params, landFraction }))
-	const monthlyRanges = monthlyBandMeans(ebm.temperature)
-	const monthlyInsolRanges = monthlyBandMeans(ebm.insolation)
-	const temperatureAvgByBand = ebm.temperature_avg
-	let dayStart = 0
-	for (let month = 0; month < 12; month++) {
-		const start = dayStart
-		const end = start + MONTH_DAY_COUNTS[month]
-		dayStart = end
-		let declinationSum = 0
-		for (let day = start; day < end; day++)
-			declinationSum += ebm.declination[day]
-		declination_monthly[month] = (declinationSum / (end - start)) * RAD_TO_DEG
-		monthlyRangeRanges[month] = ebm.temperature.map((row) => {
-			let min = Infinity
-			let max = -Infinity
-			for (let day = start; day < end; day++) {
-				min = Math.min(min, row[day])
-				max = Math.max(max, row[day])
-			}
-			return max - min
-		})
-	}
-
-	const N = mesh.numRegions
-	const temperature_avg = new Float32Array(N)
-	const temperature_min = new Float32Array(N)
-	const temperature_max = new Float32Array(N)
-	const monthly = PARALLEL.shared(new Float32Array(N * 12))
-	const noLapse = PARALLEL.shared(new Float32Array(N * 12))
-	const monthlyRange = PARALLEL.shared(new Float32Array(N * 12))
-	const insolation = PARALLEL.shared(new Float32Array(N * 12))
-	const pet_monthly = new Float32Array(N * 12)
-
-	PARALLEL.mapCells({
-		task: "zonalTemperatureCells",
-		kernel: zonalTemperatureCells,
-		count: N,
-		payload: {
-			xyz: PARALLEL.shared(mesh.r_xyz),
-			elevation: PARALLEL.shared(elevation),
-			elevationKm: elevation_km ? PARALLEL.shared(elevation_km) : null,
-			oceanDist: oceanDist ? PARALLEL.shared(oceanDist) : null,
-			isLand: PARALLEL.shared(isLand),
-			annualByBand: temperatureAvgByBand,
-			monthlyByBand: monthlyRanges,
-			monthlyRangeByBand: monthlyRangeRanges,
-			monthlyInsolationByBand: monthlyInsolRanges,
-			gravityRatio: params.planetRadiusKm / 6371,
-			continentality,
-			monthly,
-			noLapse,
-			monthlyRange,
-			insolation,
-		},
-	})
-	const temperature_monthly = PARALLEL.local(monthly)
-	const temperature_monthly_nolapse = PARALLEL.local(noLapse)
-	const temperature_monthly_range = PARALLEL.local(monthlyRange)
-	const insolation_monthly = PARALLEL.local(insolation)
-
-	// ── Ocean SST noise: break up straight latitude bands ──────────────
-	// Applied only to ocean cells; amplitude tapers toward equator and poles.
-	if (isLand) {
-		TEMPERATURE_SHARED.applyTemperatureNoise({
-			mesh,
-			N,
-			seed: params.seed ?? 0,
-			temperature_monthly,
-			temperature_monthly_nolapse,
-			computeTaper: (...coordinates: [number, number, number, number]) =>
-				Math.min(1, Math.abs(coordinates[3]) / 0.35),
-			includeCell: (r) => !isLand[r],
-			temperature_avg,
-			temperature_min,
-			temperature_max,
-		})
-	}
-
-	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
-		temperature_monthly,
-		temperature_avg,
-		temperature_min,
-		temperature_max,
-		N,
-	})
-
-	return {
-		temperature_avg,
-		temperature_min,
-		temperature_max,
-		temperature_monthly,
-		temperature_monthly_nolapse,
-		temperature_monthly_range,
-		insolation_monthly,
-		declination_monthly,
-		pet_monthly,
-		daylight_hours_monthly,
-		landFraction,
-	}
-}
-
 export const CLIMATE = {
-	computeLandFraction,
+	computeSunlight,
 	applyDtrToClimateMinMax,
-	computeTemperature,
-	ebmBands,
-	interpolateLatBand,
-	zonalTemperatureCells,
 }

@@ -1,4 +1,3 @@
-import type { TideLock } from "@/model/celestial/orbit-body/types"
 export const GENERATION_PREVIEW_TABS = [
 	["climate", "CLIMATE"],
 	["insolation", "INSOL"],
@@ -6,37 +5,3 @@ export const GENERATION_PREVIEW_TABS = [
 ] as const
 
 export type GenerationPreviewTab = (typeof GENERATION_PREVIEW_TABS)[number][0]
-
-interface GenerationPreviewParams {
-	tideLock: TideLock | null
-	obliquity: number
-	eccentricity: number
-	perihelion: number
-	substellarLon: number
-	spectralClass: string
-	starSubtype: number
-	orbitalDistanceAU: number
-	hoursPerDay: number
-	daysPerYear: number
-	landCoverage: number
-	planetRadiusKm: number
-	pressure: number
-}
-
-export function buildGenerationPreviewConfig(params: GenerationPreviewParams) {
-	return {
-		obliquity: params.obliquity,
-		eccentricity: params.eccentricity,
-		perihelion: params.perihelion,
-		substellarLon: params.substellarLon,
-		spectralClass: params.spectralClass,
-		starSubtype: params.starSubtype,
-		orbitalDistanceAU: params.orbitalDistanceAU,
-		hoursPerDay: params.hoursPerDay,
-		daysPerYear: params.daysPerYear,
-		landFraction: params.landCoverage,
-		radius: params.planetRadiusKm,
-		planetRadiusKm: params.planetRadiusKm,
-		pressure: params.pressure,
-	}
-}

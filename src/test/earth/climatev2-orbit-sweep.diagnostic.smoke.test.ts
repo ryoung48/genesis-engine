@@ -1,7 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
-import { CLIMATE } from "@/model/climate/classification/climate"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import type { PlanetClimateResult } from "@/model/climatev2/vendor/climate.js"
 import { planetClimate } from "@/model/climatev2/vendor/climate.js"
@@ -122,21 +121,11 @@ function sweeps(base: ClimateOrbit) {
 		})
 	const only = process.env.SWEEP_KNOBS?.split(",")
 	const values = process.env.SWEEP_VALUES?.split(",").map(Number)
-	// (the distance at which our own energy balance gets the same sunlight, in AU of the world's own: null for the
-	// knobs it does not share)
-	const oldEbmAU = (run: { knob: string; value: number }) =>
-		run.knob.startsWith("orbital distance")
-			? run.value
-			: run.knob.startsWith("star luminosity")
-				? 1 / Math.sqrt(run.value)
-				: null
-	return runs
-		.filter(
-			(run) =>
-				(!only || only.some((k) => run.knob.startsWith(k))) &&
-				(!values || values.some((v) => Math.abs(v - run.value) < 1e-6)),
-		)
-		.map((run) => ({ ...run, oldEbmAU: oldEbmAU(run) }))
+	return runs.filter(
+		(run) =>
+			(!only || only.some((k) => run.knob.startsWith(k))) &&
+			(!values || values.some((v) => Math.abs(v - run.value) < 1e-6)),
+	)
 }
 
 function round(params: { value: number; digits: number }) {
@@ -530,32 +519,6 @@ function runOne(params: { world: GenesisWorld; orbit: ClimateOrbit }) {
 	}
 }
 
-// Our own energy balance's global mean (°C) with the world's orbital distance × distanceScale: its latitude bands'
-// year, weighted by area
-function oldEbmGlobal(params: { world: GenesisWorld; distanceScale: number }) {
-	const { world, distanceScale } = params
-	const landFraction = CLIMATE.computeLandFraction({
-		mesh: world.mesh,
-		isLand: world.isLand,
-	})
-	const bands = CLIMATE.ebmBands({
-		params: {
-			...world.params,
-			orbitalDistanceAU: world.params.orbitalDistanceAU * distanceScale,
-		},
-		landFraction,
-	})
-	const n = bands.blendMonthly.length
-	let sum = 0
-	let weight = 0
-	bands.blendMonthly.forEach((months, i) => {
-		const w = Math.cos(((90 - ((i + 0.5) * 180) / n) * Math.PI) / 180)
-		sum += (w * months.reduce((a, b) => a + b, 0)) / months.length
-		weight += w
-	})
-	return round({ value: sum / weight, digits: 2 })
-}
-
 describe("climatev2 orbit sweep (diagnostic)", () => {
 	it(
 		"runs each orbit knob in isolation on Earth's terrain",
@@ -564,13 +527,7 @@ describe("climatev2 orbit sweep (diagnostic)", () => {
 			const world = CLIMATE_EARTH.importWorld()
 			const base = CLIMATEV2_ORBIT.fromParams(world.params)
 			const rows = sweeps(base).map((run) => {
-				const stats = {
-					...runOne({ world, orbit: run.orbit }),
-					oldEbmGlobalTC:
-						run.oldEbmAU === null
-							? null
-							: oldEbmGlobal({ world, distanceScale: run.oldEbmAU }),
-				}
+				const stats = runOne({ world, orbit: run.orbit })
 				console.log(`${run.knob} = ${run.value}: ${JSON.stringify(stats)}`)
 				return { knob: run.knob, value: run.value, ...stats }
 			})

@@ -456,7 +456,6 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.climate.temperature_min.buffer,
 			world.climate.temperature_max.buffer,
 			world.climate.temperature_monthly.buffer,
-			world.climate.temperature_monthly_nolapse.buffer,
 			world.climate.temperature_monthly_range.buffer,
 			world.climate.insolation_monthly.buffer,
 			world.climate.declination_monthly.buffer,

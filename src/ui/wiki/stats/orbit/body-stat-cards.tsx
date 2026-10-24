@@ -28,7 +28,6 @@ import {
 	orbitZoneSwatchColor,
 } from "@/ui/genesis/solar-system/overlay/constants"
 import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
-import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
 	atmosphereSwatchColor,
 	axialTiltSwatchColor,
@@ -366,9 +365,9 @@ function buildBodyStats({
 	 * composition/variation/sea-level mini-sliders) -- a generated sibling or
 	 * moon's land coverage is rolled, not hand-authored. */
 	landCoverageEditor?: StatEntry["editor"]
-	/** Area-weighted average surface temperature (Kelvin) from whichever
-	 * climate preview actually ran for this body -- see LazyPlanetDetailTabs'
-	 * onAvgTempKChange. Undefined until that preview has produced a result. */
+	/** Mean surface temperature (Kelvin) of a planet locked to its star, from
+	 * its locked climate preview (useLockedAvgTempK); undefined for any other
+	 * body, which shows the analytic estimate. */
 	avgTempK?: number
 	unitSystem: UnitSystem
 	greenhouseFactor?: number
@@ -492,7 +491,7 @@ function buildBodyStats({
 					},
 				]
 			: []),
-		...((readOnly ? (estimateTempK ?? avgTempK) : avgTempK) !== undefined
+		...((estimateTempK ?? avgTempK) !== undefined
 			? [
 					(() => {
 						const temperatureTraces = buildTemperatureTraceTooltips({
@@ -510,18 +509,15 @@ function buildBodyStats({
 							seismologyTotal: seismology?.totalHeating,
 							group,
 						})
-						// A galaxy-opened body shows the analytic estimate (the
-						// value the trace tooltip breaks down), not the live EBM
-						// climate-preview mean. Derived live from the current
-						// inputs so tuned sliders move it -- identical to the
-						// stored temperatureEstimate for a static body, which
-						// generation still computes for its own consumers
-						// (biosphere, boil-off, habitability).
+						// The analytic estimate (the value the trace tooltip breaks
+						// down), derived live from the current inputs so tuned
+						// sliders move it -- identical to the stored
+						// temperatureEstimate for a static body. An editable planet
+						// locked to its star shows its locked climate preview's mean.
 						const liveEstimate = temperatureTraces?.estimate
+						const analyticK = liveEstimate?.mean ?? estimateTempK
 						const tempK = (
-							readOnly
-								? (liveEstimate?.mean ?? estimateTempK ?? avgTempK)
-								: avgTempK
+							readOnly ? (analyticK ?? avgTempK) : (avgTempK ?? analyticK)
 						) as number
 						const base = {
 							label: "Temperature",
@@ -846,9 +842,9 @@ export function buildOrbitBodyStats(params: {
 	 * body, and only the main world currently exposes a solar-lock control. */
 	substellarLonSlider?: SliderDef
 	onToggleSpin?: () => void
-	/** Area-weighted average surface temperature (Kelvin) from whichever
-	 * climate preview actually ran for this body -- see LazyPlanetDetailTabs'
-	 * onAvgTempKChange. Undefined until that preview has produced a result. */
+	/** Mean surface temperature (Kelvin) of a planet locked to its star, from
+	 * its locked climate preview (useLockedAvgTempK); undefined for any other
+	 * body, which shows the analytic estimate. */
 	avgTempK?: number
 	unitSystem: UnitSystem
 	/** The Semi Major Axis editor's min/max are always ±20% of this value
@@ -1372,14 +1368,22 @@ export function buildMoonPreviewDataProps(params: {
 		perihelion: params.parentPerihelionDeg,
 		obliquity: params.moon.axialTiltDeg,
 		substellarLon: params.moon.substellarLon ?? 0,
-		landCoverage: params.moon.landCoverage,
 		atmosphere: params.moon.atmosphere,
-		albedo: params.moon.albedo,
-		greenhouseFactor: params.moon.greenhouseFactor,
 		seismologyTotalHeatingK: params.moon.seismology?.totalHeating,
 		generationPreviewTab: params.generationPreviewTab,
 		onSelectGenerationPreviewTab: params.onSelectGenerationPreviewTab,
 		unitSystem: params.unitSystem,
 		tidesEmptyLabel: "Computing…",
 	}
+}
+
+// A generated body's Bond albedo when it has none of its own: between open ocean's and bare land's by land cover
+const OCEAN_ALBEDO_ESTIMATE = 0.25
+const LAND_ALBEDO_ESTIMATE = 0.35
+
+function estimateAlbedo(landCoverage: number): number {
+	return (
+		OCEAN_ALBEDO_ESTIMATE * (1 - landCoverage) +
+		LAND_ALBEDO_ESTIMATE * landCoverage
+	)
 }

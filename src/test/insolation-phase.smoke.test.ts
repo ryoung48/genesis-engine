@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { INSOLATION } from "@/model/climate/temperature/ebm/insolation"
+import { INSOLATION } from "@/model/climate/shared/insolation"
 
 describe("explicit orbital phase", () => {
 	it("reindexes a circular orbit when the year starts a quarter orbit later", () => {

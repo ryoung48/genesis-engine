@@ -1,8 +1,3 @@
-import type {
-	OrbitalParams,
-	StellarParams,
-} from "@/model/climate/temperature/ebm/types"
-
 export interface InsolationComputeParams {
 	lats: number[]
 	orbital: OrbitalParams
@@ -10,6 +5,19 @@ export interface InsolationComputeParams {
 	sampleCount?: number
 	// [JUSTIFICATION] Standard world generation uses its existing calendar epoch.
 	startSolarLongitudeDegrees?: number
-	// [JUSTIFICATION] Defaults to the built-in stellar parameters.
+	// [JUSTIFICATION] Defaults to the Sun at 1 AU.
 	stellarOverride?: StellarParams
+}
+
+export interface OrbitalParams {
+	OBLIQUITY: number
+	ECCENTRICITY: number
+	PERIHELION: number
+}
+
+export interface StellarParams {
+	T_SUN: number
+	R_SUN: number
+	AU: number
+	SIGMA: number
 }
