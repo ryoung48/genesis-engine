@@ -1,7 +1,10 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
-import type { WindVectors } from "@/model/climate/weather/wind/types"
+import type {
+	GenesisWindMonthly,
+	WindVectors,
+} from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
@@ -86,6 +89,8 @@ export interface SerializedGenesisWorld {
 	continentCount: number
 	climate: SerializedGenesisClimate
 	wind: WindVectors
+	// [JUSTIFICATION] A planet locked to its star has no solved monthly winds.
+	windMonthly?: GenesisWindMonthly
 	oceanDist: Float32Array
 	distCoast?: Float32Array
 	rainfall: {

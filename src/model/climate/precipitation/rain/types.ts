@@ -86,13 +86,9 @@ export type SubsidenceFactorParams = {
 export type ComputeMonthlyRainParams = {
 	mesh: SphereMesh
 	climate: GenesisClimate
-	eastAdv: Float32Array
-	westAdv: Float32Array
 	isLand: Uint8Array
 	/** Omitted only in callers without generation settings. */
 	params?: GenesisParams
-	/** Per-month thermal-equator latitude by longitude bin (12 entries). */
-	monthlyTEQ: Float32Array[]
 	/** Omitted when coastal distance does not influence rainfall. */
 	distCoast?: Float32Array
 	/** Omitted when landmarks do not alter the rain mask. */

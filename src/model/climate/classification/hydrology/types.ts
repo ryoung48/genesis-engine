@@ -1,5 +1,5 @@
+import type { CalendarParams } from "@/model/climate/shared/calendar/types"
 import type { GenesisClimate, GenesisRainfall } from "@/model/climate/types"
-import type { GenesisParams } from "@/model/pipelines/types"
 import type { CellRange } from "@/model/shared/parallel/types"
 
 export type FillPetMonthlyHargreavesParams = {
@@ -25,8 +25,7 @@ export type RefreshClimatePetMonthlyParams = {
 		| "insolation_monthly"
 		| "pet_monthly"
 	>
-	/** Optional day-count conversion used when deriving monthly PET. */
-	params?: Pick<GenesisParams, "daysPerYear">
+	params: CalendarParams
 }
 
 export type ComputeAetFromPetParams = {

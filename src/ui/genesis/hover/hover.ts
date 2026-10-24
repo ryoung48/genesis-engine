@@ -2,10 +2,10 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
-import { HEURISTIC_CURRENTS } from "@/model/climate/ocean/currents/heuristic"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
+import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
@@ -905,7 +905,7 @@ export function getHoverOceanCurrents(
 	const saturationC =
 		world.params.tideLock?.type === "solar"
 			? OCEAN_CURRENTS.sstAnomalySaturationC
-			: HEURISTIC_CURRENTS.sstAnomalySaturationC
+			: CLIMATEV2_OUTPUTS.sstAnomalySaturationC
 	const monthlySst: number[] = []
 	for (let m = 0; m < 12; m++) {
 		monthlySst.push(world.oceanCurrents.sstMonthly[m * N + r] * saturationC)

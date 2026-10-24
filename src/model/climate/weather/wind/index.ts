@@ -1,6 +1,5 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
-import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import type {
 	ComputeWindVectorsInput,
 	FlowGrid,
@@ -164,10 +163,8 @@ function computeWindVectors(input: ComputeWindVectorsInput): {
 	pressure: Float32Array
 	windSpeed: Float32Array
 } {
-	if (input.params?.tideLock?.type === "solar") {
-		return LOCKED_WIND.computeLockedWindVectors(input)
-	}
-	return SIMPLE_WIND.computeWindVectors(input)
+	// (only a planet locked to its star derives its winds here: every other world's are climatev2's)
+	return LOCKED_WIND.computeLockedWindVectors(input)
 }
 
 /** Builds the same {windU, windV, pressure, windSpeed} shape as

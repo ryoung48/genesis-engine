@@ -75,6 +75,11 @@ export interface ComputeWindVectorsInput {
 
 export type WindGrid = FlowGrid
 
+export interface GenesisWindMonthly {
+	u: Float32Array // [month * N + r] eastward, m/s
+	v: Float32Array // [month * N + r] northward, m/s
+}
+
 export type WindVectors = {
 	windU: Float32Array
 	windV: Float32Array

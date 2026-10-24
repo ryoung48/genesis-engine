@@ -1,6 +1,10 @@
 import type {
+	CoastBoostParams,
 	ComputeIceAccumulationParams,
+	ComputeSeaIceMonthlyParams,
 	IceResult,
+	SeaIceCellYear,
+	SeaIceCellYearParams,
 } from "@/model/climate/classification/ice/types"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
@@ -10,6 +14,107 @@ const MELT_FACTOR = 6.0
 const DAYS_PER_MONTH = new Float64Array(12)
 
 for (let m = 0; m < 12; m++) DAYS_PER_MONTH[m] = TIME.month.days(m).length
+
+function coastBoostOf({
+	mesh,
+	isLand,
+	distCoast,
+	planetRadiusKm,
+}: CoastBoostParams): Float32Array {
+	const N = mesh.numRegions
+	// Near-coast ocean freezes easier (shallow water, land sheltering).
+	// Boost fades over ~8 mesh-edge-lengths from coastline (distCoast is real
+	// km — see computeCoastDistances — so this converts the old "~8 hops"
+	// heuristic into an equivalent km distance rather than comparing hops
+	// against km directly).
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
+	const COAST_FADE = 8 * avgEdgeKm
+	const coastBoost = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		const d = distCoast[r]
+		if (d < COAST_FADE) {
+			coastBoost[r] = 1 - d / COAST_FADE // 1.0 at coast, 0 at fade distance
+		}
+	}
+	return coastBoost
+}
+
+function seaIceCellYear({
+	temperatureMonthly,
+	N,
+	r,
+	coastBoost,
+	cycles,
+	monthlyOut,
+}: SeaIceCellYearParams): SeaIceCellYear {
+	const freezeThresh = -2 + coastBoost * 2
+	const accumRate = 10 + coastBoost * 5
+	const meltRate = 0.5 * (1 - coastBoost * 0.4)
+	let prefix = 0
+	let minPrefix = 0
+	let hasAccumulation = false
+	for (let m = 0; m < 12; m++) {
+		const temp = temperatureMonthly[m * N + r]
+		if (temp < freezeThresh) {
+			prefix += accumRate
+			hasAccumulation = true
+		} else if (temp > freezeThresh) {
+			prefix -= (temp - freezeThresh) * DAYS_PER_MONTH[m] * meltRate
+		}
+		if (prefix < minPrefix) minPrefix = prefix
+	}
+	if (!hasAccumulation) return { current: 0, min: 0, max: 0 }
+
+	const finalYearCycles = cycles - 1
+	const rebound = prefix - minPrefix
+	let current =
+		finalYearCycles <= 0
+			? 0
+			: prefix >= 0
+				? rebound + (finalYearCycles - 1) * prefix
+				: rebound
+	let minValue = Infinity
+	let maxValue = 0
+	for (let m = 0; m < 12; m++) {
+		const temp = temperatureMonthly[m * N + r]
+		if (temp < freezeThresh) {
+			current += accumRate
+		} else if (temp > freezeThresh && current > 0) {
+			const melt = (temp - freezeThresh) * DAYS_PER_MONTH[m] * meltRate
+			current = current > melt ? current - melt : 0
+		}
+		if (monthlyOut) monthlyOut[m * N + r] = current
+		if (current < minValue) minValue = current
+		if (current > maxValue) maxValue = current
+	}
+	return { current, min: minValue, max: maxValue }
+}
+
+function computeSeaIceMonthly({
+	mesh,
+	temperatureMonthly,
+	isLand,
+	distCoast,
+	cycles,
+	planetRadiusKm,
+}: ComputeSeaIceMonthlyParams): Float32Array {
+	const N = mesh.numRegions
+	const coastBoost = coastBoostOf({ mesh, isLand, distCoast, planetRadiusKm })
+	const monthlyOut = new Float32Array(12 * N)
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		seaIceCellYear({
+			temperatureMonthly,
+			N,
+			r,
+			coastBoost: coastBoost[r],
+			cycles,
+			monthlyOut,
+		})
+	}
+	return monthlyOut
+}
 
 function computeIceAccumulation({
 	mesh,
@@ -28,27 +133,11 @@ function computeIceAccumulation({
 		return { iceThickness: ice, iceMinMonthly: iceMin, iceMaxMonthly: iceMax }
 	}
 
-	// Pre-compute coastal boost for ocean cells.
-	// Near-coast ocean freezes easier (shallow water, land sheltering).
-	// Boost fades over ~8 mesh-edge-lengths from coastline (distCoast is real
-	// km — see computeCoastDistances — so this converts the old "~8 hops"
-	// heuristic into an equivalent km distance rather than comparing hops
-	// against km directly).
-	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
-	const COAST_FADE = 8 * avgEdgeKm
-	const coastBoost = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		if (isLand[r]) continue
-		const d = distCoast[r]
-		if (d < COAST_FADE) {
-			coastBoost[r] = 1 - d / COAST_FADE // 1.0 at coast, 0 at fade distance
-		}
-	}
+	const coastBoost = coastBoostOf({ mesh, isLand, distCoast, planetRadiusKm })
 
 	const annualTotal = new Float32Array(N)
 	const annualMinPrefix = new Float32Array(N)
 	const landActive: number[] = []
-	const oceanActive: number[] = []
 
 	// Each year is a capped random walk: ice = max(0, ice + delta_month).
 	// Pre-compute the per-cell annual transfer function once, then replay only
@@ -76,26 +165,17 @@ function computeIceAccumulation({
 
 			if (hasAccumulation) landActive.push(r)
 		} else {
-			const cb = coastBoost[r]
-			const freezeThresh = -2 + cb * 2
-			const accumRate = 10 + cb * 5
-			const meltRate = 0.5 * (1 - cb * 0.4)
-
-			for (let m = 0; m < 12; m++) {
-				const mOff = m * N
-				const temp = climate.temperature_monthly[mOff + r]
-
-				if (temp < freezeThresh) {
-					prefix += accumRate
-					hasAccumulation = true
-				} else if (temp > freezeThresh) {
-					prefix -= (temp - freezeThresh) * DAYS_PER_MONTH[m] * meltRate
-				}
-
-				if (prefix < minPrefix) minPrefix = prefix
-			}
-
-			if (hasAccumulation) oceanActive.push(r)
+			const sea = seaIceCellYear({
+				temperatureMonthly: climate.temperature_monthly,
+				N,
+				r,
+				coastBoost: coastBoost[r],
+				cycles,
+				monthlyOut: null,
+			})
+			ice[r] = sea.current
+			iceMin[r] = sea.min
+			iceMax[r] = sea.max
 		}
 
 		annualTotal[r] = prefix
@@ -139,48 +219,10 @@ function computeIceAccumulation({
 		iceMax[r] = maxValue
 	}
 
-	for (let i = 0; i < oceanActive.length; i++) {
-		const r = oceanActive[i]
-		const total = annualTotal[r]
-		const minPrefix = annualMinPrefix[r]
-		const rebound = total - minPrefix
-		let current =
-			finalYearCycles <= 0
-				? 0
-				: total >= 0
-					? rebound + (finalYearCycles - 1) * total
-					: rebound
-
-		const cb = coastBoost[r]
-		const freezeThresh = -2 + cb * 2
-		const accumRate = 10 + cb * 5
-		const meltRate = 0.5 * (1 - cb * 0.4)
-		let minValue = Infinity
-		let maxValue = 0
-
-		for (let m = 0; m < 12; m++) {
-			const mOff = m * N
-			const temp = climate.temperature_monthly[mOff + r]
-
-			if (temp < freezeThresh) {
-				current += accumRate
-			} else if (temp > freezeThresh && current > 0) {
-				const melt = (temp - freezeThresh) * DAYS_PER_MONTH[m] * meltRate
-				current = current > melt ? current - melt : 0
-			}
-
-			if (current < minValue) minValue = current
-			if (current > maxValue) maxValue = current
-		}
-
-		ice[r] = current
-		iceMin[r] = minValue === Infinity ? 0 : minValue
-		iceMax[r] = maxValue
-	}
-
 	return { iceThickness: ice, iceMinMonthly: iceMin, iceMaxMonthly: iceMax }
 }
 
 export const ICE = {
 	computeIceAccumulation,
+	computeSeaIceMonthly,
 }

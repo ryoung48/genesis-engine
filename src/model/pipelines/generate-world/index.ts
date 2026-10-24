@@ -812,6 +812,7 @@ function generateGenesisWorld({
 		params,
 		climate: post.climate,
 		wind: post.wind,
+		windMonthly: post.windMonthly ?? undefined,
 		oceanDist,
 		rainfall: post.rainfall,
 		hazards: post.hazards,

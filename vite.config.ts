@@ -49,6 +49,7 @@ export default defineConfig(({ command, mode }) => {
 
 	return {
 		base,
+		worker: { format: "es" },
 		server: {
 			headers: isolationHeaders,
 			watch: {

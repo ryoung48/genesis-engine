@@ -192,6 +192,7 @@ function serializeWorld(
 		continentCount: world.continentCount,
 		climate: world.climate,
 		wind: world.wind,
+		windMonthly: world.windMonthly,
 		oceanDist: world.oceanDist,
 		distCoast: world.distFields?.distCoast,
 		rainfall: world.rainfall,
@@ -481,6 +482,8 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		world.wind.pressure.buffer,
 		world.wind.windSpeed.buffer,
 	)
+	if (world.windMonthly)
+		add(world.windMonthly.u.buffer, world.windMonthly.v.buffer)
 	if (world.oceanDist) add(world.oceanDist.buffer)
 	if (world.distCoast) add(world.distCoast.buffer)
 	if (world.rainfall) {

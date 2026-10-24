@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite",
 		"typecheck": "tsc -b",
+		"build:solver-wasm": "node scripts/build-solver-wasm.mjs",
 		"build": "tsc -b && vite build",
 		"lint": "biome check --write --unsafe",
 		"test:history": "vitest run --project history-smoke",
@@ -50,6 +51,7 @@
 		"@types/three": "^0.183.1",
 		"@vitejs/plugin-react": "^5.1.1",
 		"@vitest/coverage-v8": "4.1.5",
+		"assemblyscript": "0.27.31",
 		"babel-plugin-react-compiler": "^1.0.0",
 		"jpeg-js": "^0.4.4",
 		"knip": "^6.7.0",

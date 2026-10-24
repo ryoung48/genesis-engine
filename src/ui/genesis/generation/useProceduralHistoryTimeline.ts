@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { DISTRIBUTION_RECORD } from "@/model/history/distribution/record"
 import { HISTORY } from "@/model/history/record"
+import { PROCEDURAL_RECORD } from "@/model/history/record/procedural"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { RELIGION } from "@/model/history/sim/religion"
@@ -54,6 +55,8 @@ export function useProceduralHistoryTimeline({
 					startTimeMs: PROCEDURAL_ENGINE_START_TIME_MS,
 				})
 		if (!next) return null
+		if (distribution)
+			PROCEDURAL_RECORD.attachNames({ record: next.record, world })
 		return {
 			state: next,
 			translator: distribution

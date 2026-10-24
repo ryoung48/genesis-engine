@@ -8,6 +8,7 @@ import type {
 	PetMonthHargreavesParams,
 	RefreshClimatePetMonthlyParams,
 } from "@/model/climate/classification/hydrology/types"
+import { CALENDAR } from "@/model/climate/shared/calendar"
 import type { GenesisHydrology } from "@/model/climate/types"
 import { PARALLEL } from "@/model/shared/parallel"
 
@@ -50,7 +51,7 @@ function refreshClimatePetMonthly({
 		rangeMonthly: climate.temperature_monthly_range,
 		insolationMonthly: climate.insolation_monthly,
 		petMonthly: climate.pet_monthly,
-		dpm: (params?.daysPerYear ?? 365) / 12,
+		dpm: CALENDAR.earthDaysPerMonth(params),
 	})
 }
 

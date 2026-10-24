@@ -1,6 +1,8 @@
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { HYDROLOGY } from "@/model/climate/classification/hydrology"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
+import { CALENDAR } from "@/model/climate/shared/calendar"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
 import type {
@@ -57,7 +59,9 @@ function attachObservedEarthHumidity(params: {
 		realRainfallMonthly: world.rainfall?.real_monthly,
 		modeledRainfallMonthly: world.rainfall?.monthly ?? new Float32Array(12 * N),
 		insolationMonthly: world.climate.insolation_monthly,
-		dpm: (world.params?.daysPerYear ?? 365) / 12,
+		dpm: CALENDAR.earthDaysPerMonth(
+			world.params ?? SOL_SYSTEM.solMainWorldDefaults,
+		),
 	})
 	const observedAet = observed?.aet_monthly
 	const observedPet = observed?.pet_monthly

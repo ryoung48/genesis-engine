@@ -5,6 +5,8 @@ import type {
 	ComputeLandFractionParams,
 	ComputeMonthlyDaylightHoursParams,
 	ComputeTemperatureParams,
+	EbmBands,
+	EbmBandsParams,
 	LatBandInterpolationParams,
 	MeshLatitudeGeometry,
 	ZonalTemperatureCellsParams,
@@ -180,6 +182,7 @@ function zonalTemperatureCells({
 	monthlyRangeByBand,
 	monthlyInsolationByBand,
 	gravityRatio,
+	continentality,
 	monthly,
 	noLapse,
 	monthlyRange,
@@ -213,8 +216,9 @@ function zonalTemperatureCells({
 				range: monthlyByBand[month],
 				latDeg,
 			})
-			const monthlyNoLapse =
-				annualAvg + (zonalMonthNoLapse - annualAvg) * inertiaFactor
+			const monthlyNoLapse = continentality
+				? annualAvg + (zonalMonthNoLapse - annualAvg) * inertiaFactor
+				: zonalMonthNoLapse
 			// Temperature proxies moisture: cold columns approach the dry lapse rate.
 			const moistureFraction = MATH.smoothstep({
 				edge0: -20,
@@ -258,6 +262,67 @@ function solvedModel(config: EBMConfig): EnergyBalanceModel {
 	return model
 }
 
+function ebmConfig({ params, landFraction }: EbmBandsParams): EBMConfig {
+	const cls = getStellarCls(params)
+	return {
+		orbital: {
+			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
+			ECCENTRICITY: params.eccentricity,
+			PERIHELION: params.perihelion,
+		},
+		stellar: {
+			...CONSTANTS.embConstants.stellar,
+			T_SUN: STAR.getStarTemperatureK({ cls, subtype: params.starSubtype }),
+			R_SUN:
+				STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) *
+				CONSTANTS.embConstants.stellar.R_SUN,
+			AU: params.orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU,
+		},
+		time: {
+			YEAR_LENGTH_DAYS: params.daysPerYear,
+			HOURS_PER_DAY: params.hoursPerDay,
+		},
+		pressure: params.pressure ?? 1,
+		radius: params.planetRadiusKm * 1000,
+		landFraction,
+		albedo: params.albedo,
+		greenhouseFactor: params.greenhouseFactor,
+		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
+	}
+}
+
+function monthlyBandMeans(rows: number[][]): number[][] {
+	const out: number[][] = new Array(12)
+	let dayStart = 0
+	for (let month = 0; month < 12; month++) {
+		const start = dayStart
+		const end = start + MONTH_DAY_COUNTS[month]
+		dayStart = end
+		out[month] = rows.map((row) => {
+			let sum = 0
+			for (let day = start; day < end; day++) sum += row[day]
+			return sum / (end - start)
+		})
+	}
+	return out
+}
+
+function ebmBands(params: EbmBandsParams): EbmBands {
+	const config = ebmConfig(params)
+	const ebm = solvedModel(config)
+	const { stellar } = config
+	return {
+		landMonthly: monthlyBandMeans(ebm.temperature_land),
+		oceanMonthly: monthlyBandMeans(ebm.temperature_ocean),
+		blendMonthly: monthlyBandMeans(ebm.temperature),
+		insolationMonthly: monthlyBandMeans(ebm.insolation),
+		solarFlux:
+			stellar.SIGMA * stellar.T_SUN ** 4 * (stellar.R_SUN / stellar.AU) ** 2,
+		olrB: ebm.olrB,
+		oceanHeatCapacity: ebm.heat_capacity_ocean[0],
+	}
+}
+
 function computeTemperature({
 	mesh,
 	elevation,
@@ -266,6 +331,7 @@ function computeTemperature({
 	oceanDist,
 	isLand,
 	elevation_km,
+	continentality,
 }: ComputeTemperatureParams): GenesisClimate {
 	if (params.tideLock?.type === "solar") {
 		return HEAT.computeTidalTemperature({
@@ -278,40 +344,12 @@ function computeTemperature({
 		})
 	}
 
-	const cls = getStellarCls(params)
-	const T_star = STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
-	const R_star_m =
-		STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) *
-		CONSTANTS.embConstants.stellar.R_SUN
-	const d_m = params.orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU
 	const daylight_hours_monthly = computeMonthlyDaylightHours({ mesh, params })
-	const monthlyRanges: number[][] = new Array(12)
 	const monthlyRangeRanges: number[][] = new Array(12)
-	const monthlyInsolRanges: number[][] = new Array(12)
 	const declination_monthly = new Float32Array(12)
-	const ebm = solvedModel({
-		orbital: {
-			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
-			ECCENTRICITY: params.eccentricity,
-			PERIHELION: params.perihelion,
-		},
-		stellar: {
-			...CONSTANTS.embConstants.stellar,
-			T_SUN: T_star,
-			R_SUN: R_star_m,
-			AU: d_m,
-		},
-		time: {
-			YEAR_LENGTH_DAYS: params.daysPerYear,
-			HOURS_PER_DAY: params.hoursPerDay,
-		},
-		pressure: params.pressure ?? 1,
-		radius: params.planetRadiusKm * 1000,
-		landFraction,
-		albedo: params.albedo,
-		greenhouseFactor: params.greenhouseFactor,
-		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
-	})
+	const ebm = solvedModel(ebmConfig({ params, landFraction }))
+	const monthlyRanges = monthlyBandMeans(ebm.temperature)
+	const monthlyInsolRanges = monthlyBandMeans(ebm.insolation)
 	const temperatureAvgByBand = ebm.temperature_avg
 	let dayStart = 0
 	for (let month = 0; month < 12; month++) {
@@ -322,11 +360,6 @@ function computeTemperature({
 		for (let day = start; day < end; day++)
 			declinationSum += ebm.declination[day]
 		declination_monthly[month] = (declinationSum / (end - start)) * RAD_TO_DEG
-		monthlyRanges[month] = ebm.temperature.map((row) => {
-			let sum = 0
-			for (let day = start; day < end; day++) sum += row[day]
-			return sum / (end - start)
-		})
 		monthlyRangeRanges[month] = ebm.temperature.map((row) => {
 			let min = Infinity
 			let max = -Infinity
@@ -335,11 +368,6 @@ function computeTemperature({
 				max = Math.max(max, row[day])
 			}
 			return max - min
-		})
-		monthlyInsolRanges[month] = ebm.insolation.map((row) => {
-			let sum = 0
-			for (let day = start; day < end; day++) sum += row[day]
-			return sum / (end - start)
 		})
 	}
 
@@ -368,6 +396,7 @@ function computeTemperature({
 			monthlyRangeByBand: monthlyRangeRanges,
 			monthlyInsolationByBand: monthlyInsolRanges,
 			gravityRatio: params.planetRadiusKm / 6371,
+			continentality,
 			monthly,
 			noLapse,
 			monthlyRange,
@@ -424,5 +453,7 @@ export const CLIMATE = {
 	computeLandFraction,
 	applyDtrToClimateMinMax,
 	computeTemperature,
+	ebmBands,
+	interpolateLatBand,
 	zonalTemperatureCells,
 }

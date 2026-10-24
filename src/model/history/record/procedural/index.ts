@@ -1,5 +1,8 @@
 import type { LonLat } from "@/model/history/earth/types"
-import type { BuildProceduralStateParams } from "@/model/history/record/procedural/types"
+import type {
+	AttachNamesParams,
+	BuildProceduralStateParams,
+} from "@/model/history/record/procedural/types"
 import { RECORD_ROUTES } from "@/model/history/record/routes"
 import { RULER_NAMES } from "@/model/history/record/rulers"
 import { PROVINCE_STATUS } from "@/model/history/record/status"
@@ -307,7 +310,18 @@ function buildProceduralState(
 	}
 }
 
+// A record that crossed from the worker is a structured-clone copy: ruler names keep their world context per
+// record object, so the copy needs its own before any name resolves.
+function attachNames({ record, world }: AttachNamesParams): void {
+	RULER_NAMES.initialize({
+		record,
+		seed: world.params.seed,
+		generator: NAMES.createWorldNames(world),
+	})
+}
+
 export const PROCEDURAL_RECORD = {
 	buildProceduralState,
+	attachNames,
 	successorNationColor,
 }

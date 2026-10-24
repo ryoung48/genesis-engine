@@ -16,7 +16,11 @@
 			"!scripts",
 			"!scripts/**",
 			"!public",
-			"!public/**"
+			"!public/**",
+			"!src/model/climatev2/vendor",
+			"!src/model/climatev2/vendor/**",
+			"!assembly",
+			"!assembly/**"
 		]
 	},
 	"formatter": { "enabled": true, "indentStyle": "tab" },

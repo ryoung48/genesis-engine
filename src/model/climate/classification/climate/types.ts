@@ -39,6 +39,22 @@ export type ComputeTemperatureParams = {
 	isLand: Uint8Array
 	// [JUSTIFICATION] Procedural terrain can derive height from normalized elevation.
 	elevation_km?: Float32Array
+	continentality: boolean
+}
+
+export interface EbmBandsParams {
+	params: GenesisParams
+	landFraction: number[]
+}
+
+export interface EbmBands {
+	landMonthly: number[][]
+	oceanMonthly: number[][]
+	blendMonthly: number[][]
+	insolationMonthly: number[][]
+	solarFlux: number
+	olrB: number
+	oceanHeatCapacity: number
 }
 
 export interface ZonalTemperatureCellsParams extends CellRange {
@@ -52,6 +68,7 @@ export interface ZonalTemperatureCellsParams extends CellRange {
 	monthlyRangeByBand: number[][]
 	monthlyInsolationByBand: number[][]
 	gravityRatio: number
+	continentality: boolean
 	monthly: Float32Array
 	noLapse: Float32Array
 	monthlyRange: Float32Array

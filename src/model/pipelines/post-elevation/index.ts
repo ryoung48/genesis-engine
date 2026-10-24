@@ -10,19 +10,19 @@ import { PASTA } from "@/model/climate/classification/pasta"
 import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
-import { HEURISTIC_CURRENTS } from "@/model/climate/ocean/currents/heuristic"
 import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RAIN } from "@/model/climate/precipitation/rain"
-import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
+import { CALENDAR } from "@/model/climate/shared/calendar"
 import { CLOUD_COVER_TEMPERATURE_MODIFIER } from "@/model/climate/temperature/cloud-cover-modifier"
 import { DTR } from "@/model/climate/temperature/dtr"
 import type { GenesisRainfall } from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { WIND } from "@/model/climate/weather/wind"
+import { CLIMATE_V2 } from "@/model/climatev2"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { HAZARDS } from "@/model/geography/terrain/hazards"
 import { LAKES } from "@/model/geography/terrain/lakes"
@@ -63,24 +63,13 @@ const MIGRATION_HORIZON_YEAR = 2025
 function applyOceanCurrentsToClimate(
 	params: ApplyOceanCurrentsToClimateParams,
 ): void {
-	const { mesh, climate, isLand, oceanCurrents, isLocked } = params
-	if (isLocked) {
-		LOCKED_OCEAN_CURRENTS.applyLockedSSTToClimate({
-			mesh,
-			climate,
-			isLand,
-			oceanCurrents,
-		})
-	} else {
-		TEMPERATURE_SHARED.applyOceanSst({
-			mesh,
-			climate,
-			isLand,
-			oceanCurrents,
-			saturationC: HEURISTIC_CURRENTS.sstAnomalySaturationC,
-			landScale: 1,
-		})
-	}
+	const { mesh, climate, isLand, oceanCurrents } = params
+	LOCKED_OCEAN_CURRENTS.applyLockedSSTToClimate({
+		mesh,
+		climate,
+		isLand,
+		oceanCurrents,
+	})
 }
 
 function reconcileClosedWaterBodies(params: {
@@ -202,6 +191,8 @@ function runPostElevationPipeline(
 	// ── Climate ────────────────────────────────────────────────────────
 	let t0 = performance.now()
 	const landFraction = CLIMATE.computeLandFraction({ mesh, isLand })
+	const isLocked = params.tideLock?.type === "solar"
+	// (the climate's fields — daylight, insolation, PET — and, for a planet locked to its star, its own temperature)
 	let climate = CLIMATE.computeTemperature({
 		mesh,
 		elevation,
@@ -210,13 +201,29 @@ function runPostElevationPipeline(
 		oceanDist,
 		isLand,
 		elevation_km,
+		continentality: true,
 	})
 	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
+	t0 = performance.now()
+	const climateV2 = isLocked
+		? null
+		: CLIMATE_V2.computeForWorld({
+				mesh,
+				elevationKm: elevation_km,
+				isLand,
+				params,
+			})
+	if (climateV2) {
+		CLIMATE_V2.applyTemperature({ climate, v2: climateV2 })
+		TIMING.record({ stage: "Post: climatev2", startedAt: t0, timings })
+	}
 	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
-	const wind = WIND.computeWindVectors({ mesh, climate, elevation_km, params })
-	TIMING.record({ stage: "Post: wind", startedAt: t0, timings })
+	const wind = climateV2
+		? climateV2.wind
+		: WIND.computeWindVectors({ mesh, climate, elevation_km, params })
+	if (!climateV2) TIMING.record({ stage: "Post: wind", startedAt: t0, timings })
 	onProgress?.("Post: wind", 43)
 
 	t0 = performance.now()
@@ -279,50 +286,38 @@ function runPostElevationPipeline(
 		})
 		observedWind = windHolder.observedWind
 	}
-	const isLockedOcean = params.tideLock?.type === "solar"
-	const oceanCurrents = isLockedOcean
-		? LOCKED_OCEAN_CURRENTS.computeLockedSST({
+	const oceanCurrents = climateV2
+		? climateV2.oceanCurrents
+		: LOCKED_OCEAN_CURRENTS.computeLockedSST({
 				mesh,
 				isLand,
 				distCoast,
 				landmarks: currentLandmarks,
 				params,
 			})
-		: HEURISTIC_CURRENTS.computeCurrents({
-				mesh,
-				isLand,
-				distCoast,
-				landmarks: currentLandmarks,
-				monthlyTEQ,
-				eastAdv,
-				westAdv,
-				planetRadiusKm: params.planetRadiusKm,
-			})
-	applyOceanCurrentsToClimate({
-		mesh,
-		climate,
-		isLand,
-		oceanCurrents,
-		isLocked: isLockedOcean,
-	})
+	if (!climateV2)
+		applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 	TIMING.record({ stage: "Post: ocean SST", startedAt: t0, timings })
 
 	// ── Rainfall ───────────────────────────────────────────────────────
 	t0 = performance.now()
-	const rain = RAIN.computeMonthlyRain({
-		mesh,
-		climate,
-		eastAdv,
-		westAdv,
-		isLand,
-		params,
-		monthlyTEQ,
-		distCoast,
-		landmarks: currentLandmarks,
-	})
-	TIMING.record({ stage: "Post: rainfall", startedAt: t0, timings })
+	const rain = climateV2
+		? {
+				monthly: climateV2.rainfallMonthly,
+				annual: climateV2.rainfallAnnual,
+			}
+		: RAIN.computeMonthlyRain({
+				mesh,
+				climate,
+				isLand,
+				params,
+				distCoast,
+				landmarks: currentLandmarks,
+			})
+	if (!climateV2)
+		TIMING.record({ stage: "Post: rainfall", startedAt: t0, timings })
 	onProgress?.("Post: rainfall", 54)
 	const rainfall: GenesisRainfall = {
 		monthly: rain.monthly,
@@ -349,14 +344,10 @@ function runPostElevationPipeline(
 			oceanDist,
 			isLand,
 			elevation_km,
+			continentality: true,
 		})
-		applyOceanCurrentsToClimate({
-			mesh,
-			climate,
-			isLand,
-			oceanCurrents,
-			isLocked: isLockedOcean,
-		})
+		if (climateV2) CLIMATE_V2.applyTemperature({ climate, v2: climateV2 })
+		else applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
 		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 		TIMING.record({
@@ -368,21 +359,23 @@ function runPostElevationPipeline(
 
 	// ── Diurnal temperature range + PET ───────────────────────────────
 	t0 = performance.now()
-	let { monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
-		mesh,
-		rainfall,
-		elevationKm: elevation_km,
-		oceanDist,
-		isLand,
-		params,
-		daylight_hours_monthly: climate.daylight_hours_monthly,
-	})
+	let { monthly: dtr_monthly, annual: dtr_annual } =
+		climateV2?.diurnalRange ??
+		DTR.computeDiurnalRange({
+			mesh,
+			rainfall,
+			elevationKm: elevation_km,
+			oceanDist,
+			isLand,
+			params,
+			daylight_hours_monthly: climate.daylight_hours_monthly,
+		})
 	HYDROLOGY.fillPetMonthlyHargreaves({
 		temperatureMonthly: climate.temperature_monthly,
 		rangeMonthly: dtr_monthly,
 		insolationMonthly: climate.insolation_monthly,
 		petMonthly: climate.pet_monthly,
-		dpm: params.daysPerYear / 12,
+		dpm: CALENDAR.earthDaysPerMonth(params),
 	})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
 	TIMING.record({ stage: "Post: dtr + pet", startedAt: t0, timings })
@@ -398,15 +391,17 @@ function runPostElevationPipeline(
 	onProgress?.("Post: hydrology", 57)
 
 	t0 = performance.now()
-	CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
-		climate,
-		rainfall,
-		hydrology,
-		dtrMonthly: dtr_monthly,
-		oceanDist,
-		isLand,
-		isTidallyLocked: params.tideLock?.type === "solar",
-	})
+	if (!climateV2) {
+		CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
+			climate,
+			rainfall,
+			hydrology,
+			dtrMonthly: dtr_monthly,
+			oceanDist,
+			isLand,
+			isTidallyLocked: params.tideLock?.type === "solar",
+		})
+	}
 	TIMING.record({ stage: "Post: clouds", startedAt: t0, timings })
 
 	// ── Rivers ─────────────────────────────────────────────────────────
@@ -497,31 +492,29 @@ function runPostElevationPipeline(
 		oceanDist,
 		isLand,
 		elevation_km,
+		continentality: true,
 	})
-	applyOceanCurrentsToClimate({
-		mesh,
-		climate,
-		isLand,
-		oceanCurrents,
-		isLocked: isLockedOcean,
-	})
+	if (climateV2) CLIMATE_V2.applyTemperature({ climate, v2: climateV2 })
+	else applyOceanCurrentsToClimate({ mesh, climate, isLand, oceanCurrents })
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
-	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
-		mesh,
-		rainfall,
-		elevationKm: elevation_km,
-		oceanDist,
-		isLand,
-		params,
-		daylight_hours_monthly: climate.daylight_hours_monthly,
-	}))
+	;({ monthly: dtr_monthly, annual: dtr_annual } =
+		climateV2?.diurnalRange ??
+		DTR.computeDiurnalRange({
+			mesh,
+			rainfall,
+			elevationKm: elevation_km,
+			oceanDist,
+			isLand,
+			params,
+			daylight_hours_monthly: climate.daylight_hours_monthly,
+		}))
 	HYDROLOGY.fillPetMonthlyHargreaves({
 		temperatureMonthly: climate.temperature_monthly,
 		rangeMonthly: dtr_monthly,
 		insolationMonthly: climate.insolation_monthly,
 		petMonthly: climate.pet_monthly,
-		dpm: params.daysPerYear / 12,
+		dpm: CALENDAR.earthDaysPerMonth(params),
 	})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
 	hydrology = HYDROLOGY.computeHydrologyFields({
@@ -537,15 +530,17 @@ function runPostElevationPipeline(
 	onProgress?.("Post: landmarks", 62)
 
 	t0 = performance.now()
-	CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
-		climate,
-		rainfall,
-		hydrology,
-		dtrMonthly: dtr_monthly,
-		oceanDist,
-		isLand,
-		isTidallyLocked: params.tideLock?.type === "solar",
-	})
+	if (!climateV2) {
+		CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
+			climate,
+			rainfall,
+			hydrology,
+			dtrMonthly: dtr_monthly,
+			oceanDist,
+			isLand,
+			isTidallyLocked: params.tideLock?.type === "solar",
+		})
+	}
 	TIMING.record({ stage: "Post: clouds (post-lake)", startedAt: t0, timings })
 
 	// ── Observed Earth climate (must run before pasta/vegetation so Earth
@@ -1163,6 +1158,9 @@ function runPostElevationPipeline(
 	return {
 		climate,
 		wind,
+		windMonthly: climateV2
+			? { u: climateV2.windUMonthly, v: climateV2.windVMonthly }
+			: null,
 		observedCloudCover,
 		rainfall,
 		monthlyTEQ,

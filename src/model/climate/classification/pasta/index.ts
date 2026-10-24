@@ -12,6 +12,7 @@ import type {
 	PastaDebug,
 	PastaZoneCellsParams,
 } from "@/model/climate/classification/pasta/types"
+import { CALENDAR } from "@/model/climate/shared/calendar"
 import { PARALLEL } from "@/model/shared/parallel"
 
 const ZONE_COLOR_MAP = {
@@ -647,7 +648,7 @@ function computePastaZones({
 			iceThickness: optional(iceThickness),
 			iceMinMonthly: optional(iceMinMonthly),
 			iceMaxMonthly: optional(iceMaxMonthly),
-			dpm: params.daysPerYear / 12,
+			dpm: CALENDAR.earthDaysPerMonth(params),
 			parFactor: STAR.getStarPARFactor({ cls, subtype: params.starSubtype }),
 			gintThreshold: params.pastaGintThreshold,
 			zones,
@@ -809,7 +810,7 @@ function assignEarthPastaClimate({
 }: AssignEarthPastaClimateParams):
 	| { zones: Uint8Array; debug: PastaDebug }
 	| undefined {
-	const dpm = params.daysPerYear / 12
+	const dpm = CALENDAR.earthDaysPerMonth(params)
 	const observed = HYDROLOGY.computeObservedAridity({
 		isLand,
 		realTemperatureMonthly: climate.real_temperature_monthly,

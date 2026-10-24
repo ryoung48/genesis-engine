@@ -135,6 +135,7 @@ describe("Earth GREENHOUSE_FACTOR refit against the real imported world", () => 
 					oceanDist: world.oceanDist,
 					isLand: world.isLand,
 					elevation_km: world.elevation_km,
+					continentality: true,
 				})
 				// Re-diff against the same real observed data already attached to
 				// `world` (real_temperature_avg doesn't depend on GREENHOUSE_FACTOR).

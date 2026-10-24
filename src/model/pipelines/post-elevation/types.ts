@@ -6,7 +6,10 @@ import type {
 	GenesisOceanCurrents,
 	GenesisRainfall,
 } from "@/model/climate/types"
-import type { WindVectors } from "@/model/climate/weather/wind/types"
+import type {
+	GenesisWindMonthly,
+	WindVectors,
+} from "@/model/climate/weather/wind/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -24,7 +27,6 @@ export type ApplyOceanCurrentsToClimateParams = {
 	climate: GenesisClimate
 	isLand: Uint8Array
 	oceanCurrents: GenesisOceanCurrents
-	isLocked: boolean
 }
 
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
@@ -145,6 +147,7 @@ export interface PostPipelineOutput {
 	historyMigration: HistoryMigration
 	climate: GenesisClimate
 	wind: WindVectors
+	windMonthly: GenesisWindMonthly | null
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
 	observedCloudCover?: {
 		real_monthly: Float32Array

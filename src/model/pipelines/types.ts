@@ -13,7 +13,10 @@ import type {
 	GenesisOceanCurrents,
 	GenesisRainfall,
 } from "@/model/climate/types"
-import type { WindVectors } from "@/model/climate/weather/wind/types"
+import type {
+	GenesisWindMonthly,
+	WindVectors,
+} from "@/model/climate/weather/wind/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -114,6 +117,8 @@ export interface GenesisWorld {
 	timings?: StageTiming[]
 	climate: GenesisClimate
 	wind: WindVectors
+	// [JUSTIFICATION] A planet locked to its star derives a month's wind on demand; v2 solves each month's.
+	windMonthly?: GenesisWindMonthly
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
 	observedCloudCover?: {
 		real_monthly: Float32Array
