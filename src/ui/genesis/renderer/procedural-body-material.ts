@@ -46,7 +46,7 @@ function selectProceduralBodyMaterial(
 			style,
 			palette: swatchCloudBandPalette({ hex: swatchHex }),
 		})
-	const cratered = (style: "cratered" | "martian" | "snowball" | "meltball") =>
+	const cratered = (style: "cratered" | "martian" | "meltball") =>
 		buildCraterMaterial({
 			seed,
 			color: `#${swatchHex.toString(16).padStart(6, "0")}`,
@@ -60,7 +60,6 @@ function selectProceduralBodyMaterial(
 	if (classification === "panthalassic") return cloudy("cloudy")
 	if (classification === "jovian") return cloudy("banded")
 	if (classification === "telluric") return cloudy("venusian")
-	if (classification === "snowball") return cratered("snowball")
 	if (classification === "meltball") return cratered("meltball")
 	if (classification === "rockball") return cratered("cratered")
 	return hasThinAtmosphere(atmosphere) ? cratered("martian") : cloudy("cloudy")

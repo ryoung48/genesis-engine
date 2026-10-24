@@ -86,7 +86,7 @@ export const CLASSIFICATION_COLOR: Partial<
 	"proto-terrestrial": 0xff6a1a,
 	"proto-helian": 0xffa347,
 	rockball: 0x8b7d7b,
-	snowball: 0xadd8e6,
+	snowball: 0xf0f8ff,
 	stygian: 0x2f4f4f,
 	tectonic: 0x7cfc00,
 	telluric: 0x8b0000,

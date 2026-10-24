@@ -23,25 +23,6 @@ export function buildCraterMaterial(
 		vec3 terrainColor = mix(craterColor, darkRock, darkTerrain * 0.85) * surfaceShade;
 		diffuseColor.rgb = terrainColor;
 	`,
-		snowball: `
-		vec3 craterPosition = normalize(vCraterPosition);
-		float terrain = craterNoise(craterPosition * 18.0 + vec3(craterSeed * 0.31));
-		vec3 fracturePosition = warpedRockPosition(craterPosition);
-		float fractureNoise = rockFbm(fracturePosition * 5.5 + vec3(craterSeed * 0.21));
-		float fractures = smoothstep(0.86, 0.98, 1.0 - abs(fractureNoise * 2.0 - 1.0));
-		float frostPatch = craterNoise(fracturePosition * 2.4 + vec3(craterSeed * 0.53));
-		float frostiness = smoothstep(0.3, 0.7, frostPatch);
-		float mediumCraters = craterLayer(CraterLayerInput(craterPosition, 9.0, 0.16, 0.18));
-		float smallCraters = craterLayer(CraterLayerInput(craterPosition, 20.0, 0.24, 0.22));
-		float tinyCraters = craterLayer(CraterLayerInput(craterPosition, 42.0, 0.18, 0.14));
-		vec3 dirtyIce = craterColor * vec3(0.62, 0.66, 0.74);
-		vec3 brightIce = craterColor * vec3(1.15, 1.18, 1.22);
-		vec3 terrainColor = mix(dirtyIce, brightIce, clamp(frostiness + fractures * 0.6, 0.0, 1.0));
-		terrainColor = mix(terrainColor, vec3(1.0), fractures * 0.5);
-		float shade = clamp(0.92 + (terrain - 0.5) * 0.1
-			+ mediumCraters * 0.7 + smallCraters * 0.55 + tinyCraters * 0.4, 0.5, 1.35);
-		diffuseColor.rgb = clamp(terrainColor * shade, 0.0, 1.3);
-	`,
 		meltball: `
 		vec3 craterPosition = normalize(vCraterPosition);
 		vec3 terrainPosition = warpedRockPosition(craterPosition);

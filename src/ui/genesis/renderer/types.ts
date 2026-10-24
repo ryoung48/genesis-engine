@@ -105,7 +105,7 @@ export type CloudBandMaterialInput = {
 export type CraterMaterialInput = {
 	seed: number
 	color: string
-	style: "cratered" | "martian" | "snowball" | "meltball"
+	style: "cratered" | "martian" | "meltball"
 }
 
 export interface GenesisHoverInfo {

@@ -11,6 +11,7 @@ import {
 } from "@/ui/genesis/renderer/cloud-band-material"
 import { buildCraterMaterial } from "@/ui/genesis/renderer/crater-material"
 import { buildNeutronJets } from "@/ui/genesis/renderer/neutron-jets"
+import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
 import {
 	buildStarGlowMaterial,
 	buildStarSurfaceLayers,
@@ -167,26 +168,32 @@ export function createPlanetPreview(canvas: HTMLCanvasElement): PlanetPreview {
 				planet.add(brownDwarfGlowMesh)
 			}
 			const material =
-				settings.style === "sun" ||
-				settings.style === "white-dwarf" ||
-				settings.style === "neutron-star"
-					? starSurfaceLayers!.surface
-					: settings.style === "cratered" ||
-							settings.style === "martian" ||
-							settings.style === "snowball" ||
-							settings.style === "meltball"
-						? buildCraterMaterial({
-								seed: settings.seed,
-								color: settings.color,
-								style: settings.style,
-							})
-						: buildCloudBandMaterial({
-								seed: settings.seed,
-								style: settings.style,
-								palette: swatchCloudBandPalette({
-									hex: Number.parseInt(settings.color.slice(1), 16),
-								}),
-							})
+				settings.style === "snowball"
+					? buildProceduralBodyMaterial({
+							seed: settings.seed,
+							classification: "snowball",
+							atmosphere: null,
+							swatchHex: Number.parseInt(settings.color.slice(1), 16),
+						})
+					: settings.style === "sun" ||
+							settings.style === "white-dwarf" ||
+							settings.style === "neutron-star"
+						? starSurfaceLayers!.surface
+						: settings.style === "cratered" ||
+								settings.style === "martian" ||
+								settings.style === "meltball"
+							? buildCraterMaterial({
+									seed: settings.seed,
+									color: settings.color,
+									style: settings.style,
+								})
+							: buildCloudBandMaterial({
+									seed: settings.seed,
+									style: settings.style,
+									palette: swatchCloudBandPalette({
+										hex: Number.parseInt(settings.color.slice(1), 16),
+									}),
+								})
 			mesh.material = material
 			oldMaterial.dispose()
 			neutronJets.group.visible = settings.style === "neutron-star"

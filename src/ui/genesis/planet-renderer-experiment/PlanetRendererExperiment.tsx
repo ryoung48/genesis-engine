@@ -14,7 +14,7 @@ import { CLASSIFICATION_COLOR } from "@/ui/genesis/solar-system/overlay/constant
 const initialColor = `#${CLASSIFICATION_COLOR.helian!.toString(16).padStart(6, "0")}`
 const initialMoonColor = uiPalette.moonHighland
 const initialMartianColor = uiPalette.martianHighland
-const initialSnowballColor = "#dcebf2"
+const initialSnowballColor = `#${CLASSIFICATION_COLOR.snowball!.toString(16).padStart(6, "0")}`
 const initialMeltballColor = "#ff8a3d"
 
 export function PlanetRendererExperiment() {
@@ -134,7 +134,7 @@ export function PlanetRendererExperiment() {
 						<option value="brown-dwarf-y">Y brown dwarf</option>
 						<option value="venusian">Venusian haze</option>
 						<option value="cratered">Cratered moon</option>
-						<option value="snowball">Frozen snowball moon</option>
+						<option value="snowball">Snowball (low atmosphere)</option>
 						<option value="meltball">Lava meltball</option>
 						<option value="martian">Martian terrain</option>
 					</select>

@@ -47,7 +47,7 @@ export function buildAsteroidField(
 	const material = buildCraterMaterial({
 		seed: isOuterZone ? 2 : 1,
 		color: isOuterZone ? "#dce7ed" : "#b0b0b0",
-		style: isOuterZone ? "snowball" : "cratered",
+		style: "cratered",
 	})
 	material.emissive.setHex(0x2a2a2a)
 	material.emissiveIntensity = 0.6
