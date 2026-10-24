@@ -174,6 +174,7 @@ function attachScriptTexture(
 	mesh.scale.set(planeHeight * textureEntry.aspect, planeHeight, 1)
 	mesh.visible = true
 	group.add(mesh)
+	delete group.userData.globeCameraQuaternion
 }
 
 function queueScriptTexture(

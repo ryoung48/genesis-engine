@@ -6,6 +6,15 @@ import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import { TERRAIN_ELEVATION_SCALE } from "@/ui/genesis/renderer/overlay-builders/shared"
 import type { GenesisViewMode, RiverData } from "@/ui/genesis/renderer/types"
 
+const RIVER_STYLE = {
+	color: 0x168bea,
+	minWidth: 0.5,
+	maxWidth: 1.25,
+	binStep: 0.05,
+	minOpacity: 0.85,
+	maxOpacity: 1,
+}
+
 function buildRiverGroup(
 	rivers: RiverData,
 	canvas: HTMLCanvasElement,
@@ -16,9 +25,7 @@ function buildRiverGroup(
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
 	const height = canvas.clientHeight || 1
-	const minWidth = 0.25
-	const maxWidth = 1.0
-	const binStep = 0.05
+	const { minWidth, maxWidth, binStep } = RIVER_STYLE
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
 	const logRange = logMax - logMin || 1
@@ -144,9 +151,11 @@ function buildRiverGroup(
 	for (const [binnedWidth, positions] of batchedPositions) {
 		if (positions.length < 6) continue
 		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
-		const baseOpacity = 0.55 + t * 0.4
+		const baseOpacity =
+			RIVER_STYLE.minOpacity +
+			t * (RIVER_STYLE.maxOpacity - RIVER_STYLE.minOpacity)
 		const material = new LineMaterial({
-			color: 0x8fc4e8,
+			color: RIVER_STYLE.color,
 			opacity: baseOpacity,
 			linewidth: binnedWidth,
 			transparent: true,
@@ -154,7 +163,6 @@ function buildRiverGroup(
 			worldUnits: false,
 		})
 		material.userData.baseWidth = binnedWidth
-		material.userData.baseOpacity = baseOpacity
 		material.resolution.set(width, height)
 		riverMaterials.push(material)
 
@@ -219,9 +227,7 @@ export function buildMapRivers(
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
 	const height = canvas.clientHeight || 1
-	const minWidth = 0.25
-	const maxWidth = 1.0
-	const binStep = 0.05
+	const { minWidth, maxWidth, binStep } = RIVER_STYLE
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
 	const logRange = logMax - logMin || 1
@@ -345,8 +351,10 @@ export function buildMapRivers(
 		if (positions.length < 6) continue
 		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
 		const material = new LineMaterial({
-			color: 0x8fc4e8,
-			opacity: 0.55 + t * 0.4,
+			color: RIVER_STYLE.color,
+			opacity:
+				RIVER_STYLE.minOpacity +
+				t * (RIVER_STYLE.maxOpacity - RIVER_STYLE.minOpacity),
 			linewidth: binnedWidth,
 			transparent: true,
 			depthWrite: false,

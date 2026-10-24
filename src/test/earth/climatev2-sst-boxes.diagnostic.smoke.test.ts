@@ -79,6 +79,7 @@ describe("climatev2 sea-surface boxes (diagnostic)", () => {
 				carried: 0,
 				coastCold: 0,
 				upwelledDT: 0,
+				thermocline: 0,
 			}
 			const fresh: Record<string, number> = {}
 			let w = 0

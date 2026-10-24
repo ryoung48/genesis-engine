@@ -180,15 +180,6 @@ export function createTerrainController(
 			ctx.waterMat.opacity = 0.12
 			ctx.waterMat.specular.set(0x000000)
 		}
-		const riverHex = 0x8fc4e8
-		for (const material of ctx.riverMaterials) {
-			material.color.setHex(riverHex)
-			material.opacity = useVegetationWaterMaterial
-				? 1
-				: (material.userData.baseOpacity ?? material.opacity)
-			material.transparent = !useVegetationWaterMaterial
-			material.needsUpdate = true
-		}
 		if (ctx.currentViewMode === "globe") {
 			ctx.waterMesh.visible = true
 			ctx.atmosMesh.visible = ctx.sun.intensity > 0

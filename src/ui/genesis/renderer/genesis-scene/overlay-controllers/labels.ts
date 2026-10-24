@@ -184,7 +184,7 @@ export function createLabelsController(
 			return
 		}
 		const showNationLabels = ctx.labelMode.nations || ctx.labelMode.dynasty
-		if (!showNationLabels) {
+		if (!showNationLabels && !ctx.labelMode.script) {
 			ctx.globeNationLabels?.clear()
 			ctx.mapNationLabels?.clear()
 			return
@@ -261,7 +261,7 @@ export function createLabelsController(
 				ctx.scene.add(ctx.mapNationLabels)
 		}
 		if (
-			!ctx.earthHistoryNationOverride &&
+			!ctx.currentWorld.isEarthImport &&
 			ctx.labelMode.script &&
 			ctx.currentWorld.heritages &&
 			ctx.currentWorld.cultures &&
@@ -271,7 +271,7 @@ export function createLabelsController(
 				createPendingNationScriptTextureQueue()
 			const scripts = getHeritageScripts(ctx.currentWorld)
 			ctx.globeNationScripts = buildGlobeNationScripts(
-				ctx.currentWorld,
+				worldForLabels,
 				labelNames,
 				scripts,
 				ctx.nationScriptTextureCache,
@@ -282,7 +282,7 @@ export function createLabelsController(
 				ctx.elevationVisible,
 			)
 			ctx.mapNationScripts = buildMapNationScripts(
-				ctx.currentWorld,
+				worldForLabels,
 				labelNames,
 				scripts,
 				ctx.nationScriptTextureCache,

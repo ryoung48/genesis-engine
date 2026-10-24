@@ -1118,6 +1118,8 @@ function score() {
 describe("climate vs observed Earth (diagnostic)", () => {
 	it("scores the climate on the imported Earth terrain", () => {
 		if (process.env.CLIMATE_SEA_ICE === "0") setParams({ TEMP_SEA_ICE: 0 })
+		if (process.env.CLIMATE_PARAMS)
+			setParams(JSON.parse(process.env.CLIMATE_PARAMS))
 		const results = { v2: score() }
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-")
 		const title = process.env.CLIMATE_BENCH_TITLE ?? "atlas-comparison"

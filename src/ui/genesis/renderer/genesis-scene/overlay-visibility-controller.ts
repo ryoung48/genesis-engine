@@ -146,19 +146,14 @@ export function createOverlayVisibilityController(
 				ctx.currentViewMode === "globe"
 		if (ctx.globeNationScripts)
 			ctx.globeNationScripts.visible =
-				ctx.labelMode.script &&
-				(ctx.labelMode.nations || ctx.labelMode.dynasty) &&
-				ctx.currentViewMode === "globe"
+				ctx.labelMode.script && ctx.currentViewMode === "globe"
 		if (ctx.mapNationLabels) {
 			ctx.mapNationLabels.visible =
 				(ctx.labelMode.nations || ctx.labelMode.dynasty) && showMap
 			if (ctx.mapMesh) ctx.mapNationLabels.position.copy(ctx.mapMesh.position)
 		}
 		if (ctx.mapNationScripts) {
-			ctx.mapNationScripts.visible =
-				ctx.labelMode.script &&
-				(ctx.labelMode.nations || ctx.labelMode.dynasty) &&
-				showMap
+			ctx.mapNationScripts.visible = ctx.labelMode.script && showMap
 			if (ctx.mapMesh) ctx.mapNationScripts.position.copy(ctx.mapMesh.position)
 		}
 		if (ctx.globeSettlementLabels)
