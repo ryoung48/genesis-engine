@@ -36,13 +36,13 @@ export function buildTerrainMesh(
 	regionColors: Float32Array | null,
 	elevationVisible: boolean,
 ): MeshBuildResult {
-	// genesis.worker.ts precomputes this for the default color mode
-	// (terrain / no region colors / elevation on) before the world ever
-	// reaches the main thread -- reuse that instead of redoing the
-	// per-vertex color/normal-averaging pass here, which is what used to
-	// freeze the tab right before the first paint after "Generate"/"Load
-	// Earth". Anything else (a non-default color mode already selected,
-	// region colors already set) falls back to computing it here.
+	// genesis.worker.ts precomputes this geometry (elevation on) before the
+	// world reaches the main thread -- reuse it instead of redoing the
+	// normal-averaging pass here, which is what freezes the tab right before
+	// the first paint after "Generate". Its colors are stale for any mode,
+	// but rebuildTerrain recolors in place right after building. Smoothed
+	// heightmap colors differ per vertex, and the in-place recolor ignores the
+	// worker's face winding flips, so that mode still computes everything here.
 	const precomputed = world.precomputedTerrainGeometry
 	const {
 		positions,
@@ -51,7 +51,7 @@ export function buildTerrainMesh(
 		contourControls,
 		faceToRegion,
 	}: TerrainGeometryArrays =
-		precomputed && colorMode === "terrain" && !regionColors && elevationVisible
+		precomputed && elevationVisible && !usesSmoothedHeightmapColors(colorMode)
 			? precomputed
 			: computeTerrainGeometryArrays(
 					world,
@@ -204,8 +204,8 @@ export function buildMapMesh(
 	projectionLatitudeDeg: number,
 ): MeshBuildResult {
 	// See buildTerrainMesh's comment: genesis.worker.ts precomputes this for
-	// the default color mode/map center before the world reaches the main
-	// thread. Anything else falls back to computing it here.
+	// the default map center, and rebuildTerrain recolors it in place. Map
+	// faces keep their vertex order, so every color mode can reuse it.
 	const precomputed = world.precomputedMapGeometry
 	const {
 		positions,
@@ -214,11 +214,7 @@ export function buildMapMesh(
 		contourControls,
 		faceToRegion,
 	}: MapGeometryArrays =
-		precomputed &&
-		colorMode === "terrain" &&
-		!regionColors &&
-		centerLongitudeDeg === 0 &&
-		projectionLatitudeDeg === 0
+		precomputed && centerLongitudeDeg === 0 && projectionLatitudeDeg === 0
 			? precomputed
 			: computeMapGeometryArrays(
 					world,

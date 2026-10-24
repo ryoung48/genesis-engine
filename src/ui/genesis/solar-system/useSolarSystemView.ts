@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { DataTexture } from "three"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RNG } from "@/model/shared/random/rng"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { GENERATION_SESSION_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
 import { GENERATION_PREVIEW_TABS } from "@/ui/genesis/generation/generation-preview"
 import {
@@ -18,6 +20,13 @@ import type {
 import type { SolarSystemViewInput } from "@/ui/genesis/view/types"
 
 const DEFAULT_COMPANION_DAYS_PER_YEAR = 365
+
+// One flipped clone per world, so reopening the solar-system view doesn't
+// upload a fresh (never-disposed, sharedTexture-marked) GPU texture each time.
+const sphereSatelliteTextures = new WeakMap<
+	SerializedGenesisWorld,
+	DataTexture
+>()
 
 /** Builds every companion star's own overlay params -- companions aren't
  * live-edited (no seed/spectral-class UI targets them), so this is a pure
@@ -204,6 +213,11 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		// returning null restores its default Earth texture until its matching
 		// generated world arrives.
 		if (!world || world.isEarthImport || world.params.seed !== seed) return null
+		// Building the raster takes ~2 s on a 204k-region world, so it waits
+		// until the solar-system view (its only consumer) actually opens.
+		if (!solarSystemViewActive) return null
+		const cachedSphereTexture = sphereSatelliteTextures.get(world)
+		if (cachedSphereTexture) return cachedSphereTexture
 		const texture = getSatelliteTexture(world, "vegetationSatellite")
 		if (!texture) return null
 		// getSatelliteTexture's DataTexture defaults to flipY=false, matching
@@ -220,8 +234,9 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		// clone) -- must not be disposed when this view's overlay tears
 		// down/rebuilds, same as loadBodyTexture's own shared-texture marking.
 		sphereTexture.userData.sharedTexture = true
+		sphereSatelliteTextures.set(world, sphereTexture)
 		return sphereTexture
-	}, [world, seed])
+	}, [world, seed, solarSystemViewActive])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
