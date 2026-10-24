@@ -8,6 +8,7 @@ import {
 	swatchCloudBandPalette,
 } from "@/ui/genesis/renderer/cloud-band-material"
 import { buildCraterMaterial } from "@/ui/genesis/renderer/crater-material"
+import { DEFERRED_SHADERS } from "@/ui/genesis/renderer/deferred-shaders"
 
 export interface ProceduralBodyMaterialInput {
 	seed: number
@@ -25,6 +26,17 @@ function hasThinAtmosphere(
 }
 
 export function buildProceduralBodyMaterial(
+	input: ProceduralBodyMaterialInput,
+): THREE.MeshStandardMaterial {
+	const material = selectProceduralBodyMaterial(input)
+	DEFERRED_SHADERS.mark({
+		material,
+		deferral: { kind: "stand-in", color: input.swatchHex, lit: true },
+	})
+	return material
+}
+
+function selectProceduralBodyMaterial(
 	input: ProceduralBodyMaterialInput,
 ): THREE.MeshStandardMaterial {
 	const { seed, classification, atmosphere, swatchHex } = input

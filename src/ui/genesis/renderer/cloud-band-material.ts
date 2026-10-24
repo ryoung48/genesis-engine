@@ -59,9 +59,9 @@ export function buildCloudBandMaterial(
 		"brown-dwarf-t": 4,
 		"brown-dwarf-y": 5,
 	}[style]
+	material.defines = { GIANT_BAND_MODE: bandMode }
 	material.onBeforeCompile = (shader) => {
 		shader.uniforms.giantSeed = { value: seed % 24 }
-		shader.uniforms.giantBandMode = { value: bandMode }
 		shader.uniforms.giantColTop = { value: palette.top }
 		shader.uniforms.giantColBot = { value: palette.bot }
 		shader.uniforms.giantColMid1 = { value: palette.mid1 }
@@ -86,7 +86,6 @@ export function buildCloudBandMaterial(
 				#include <common>
 				varying vec3 vGiantObjectPosition;
 				uniform float giantSeed;
-				uniform float giantBandMode;
 				uniform vec3 giantColTop;
 				uniform vec3 giantColBot;
 				uniform vec3 giantColMid1;
@@ -136,6 +135,7 @@ export function buildCloudBandMaterial(
 					return v;
 				}
 				float giantMax3(vec3 v) { return max(max(v.x, v.y), v.z); }
+				#if GIANT_BAND_MODE < 2
 				vec3 giantCloudColor(vec3 objectPosition, float seed, vec3 colTop, vec3 colBot, vec3 colMid1, vec3 colMid2, vec3 colMid3) {
 					vec3 X = objectPosition * GIANT_PLANET_SIZE
 						+ vec3(seed * 17.3, seed * 11.7, seed * 29.1);
@@ -154,6 +154,8 @@ export function buildCloudBandMaterial(
 					color = (clamp(0.4 * pow(v, 3.0) + pow(v, 2.0) + 0.5 * v, 0.0, 1.0) * 0.9 + 0.1) * color;
 					return color;
 				}
+				#endif
+				#if GIANT_BAND_MODE == 1
 				vec3 giantBandedColor(vec3 objectPosition) {
 					float textureSeed = mod(giantSeed, 8.0) + giantHash(giantSeed * 0.17 + 13.0) * 0.5;
 					vec3 offset = vec3(textureSeed * 17.3, textureSeed * 11.7, textureSeed * 29.1);
@@ -173,6 +175,8 @@ export function buildCloudBandMaterial(
 				vec3 banded = mix(zone, cloudy, 0.45);
 				return mix(giantBandWarm, banded, bandContrast);
 				}
+				#endif
+				#if GIANT_BAND_MODE > 2
 				vec3 giantBrownDwarfColor(vec3 objectPosition) {
 					vec3 offset = vec3(giantSeed * 17.3, giantSeed * 11.7, giantSeed * 29.1);
 					float flow = giantFbm(objectPosition * vec3(3.0, 1.0, 3.0) + offset);
@@ -181,12 +185,14 @@ export function buildCloudBandMaterial(
 					float streaks = giantFbm(vec3(objectPosition.x * 4.0, latitude * 6.0, objectPosition.z * 4.0) + offset);
 					float detail = giantFbm(vec3(objectPosition.x * 12.0, latitude * 16.0, objectPosition.z * 12.0) + offset + vec3(47.0));
 					float cloud = mix(broad, streaks, 0.55) + (detail - 0.5) * 0.25;
-					float brightness = giantBandMode > 4.5 ? 1.15 : giantBandMode > 3.5 ? 1.08 : 1.0;
-					float highlight = giantBandMode > 4.5 ? 0.4 : giantBandMode > 3.5 ? 0.55 : 0.7;
+					float brightness = GIANT_BAND_MODE > 4 ? 1.15 : GIANT_BAND_MODE > 3 ? 1.08 : 1.0;
+					float highlight = GIANT_BAND_MODE > 4 ? 0.4 : GIANT_BAND_MODE > 3 ? 0.55 : 0.7;
 					vec3 color = mix(giantColBot * 0.55, giantColMid1, smoothstep(0.2, 0.68, cloud));
 					color = mix(color, giantColTop, smoothstep(0.58, 0.82, cloud) * highlight);
 					return color * brightness;
 				}
+				#endif
+				#if GIANT_BAND_MODE == 2
 				vec3 giantVenusColor(vec3 objectPosition) {
 					vec3 offset = vec3(giantSeed * 17.3, giantSeed * 11.7, giantSeed * 29.1);
 					float latitude = objectPosition.y;
@@ -206,13 +212,22 @@ export function buildCloudBandMaterial(
 					color = mix(color, giantBandCream, smoothstep(0.55, 0.9, v));
 					return color;
 				}
+				#endif
 				`,
 			)
 			.replace(
 				"#include <map_fragment>",
 				`vec3 giantPosition = normalize(vGiantObjectPosition);
-				diffuseColor.rgb = giantBandMode > 2.5 ? giantBrownDwarfColor(giantPosition) : giantBandMode > 1.5 ? giantVenusColor(giantPosition) : giantBandMode > 0.5 ? giantBandedColor(giantPosition) : giantCloudColor(giantPosition, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);
-				if (giantBandMode > 2.5) totalEmissiveRadiance = diffuseColor.rgb * emissive.r;`,
+				#if GIANT_BAND_MODE > 2
+				diffuseColor.rgb = giantBrownDwarfColor(giantPosition);
+				totalEmissiveRadiance = diffuseColor.rgb * emissive.r;
+				#elif GIANT_BAND_MODE == 2
+				diffuseColor.rgb = giantVenusColor(giantPosition);
+				#elif GIANT_BAND_MODE == 1
+				diffuseColor.rgb = giantBandedColor(giantPosition);
+				#else
+				diffuseColor.rgb = giantCloudColor(giantPosition, giantSeed, giantColTop, giantColBot, giantColMid1, giantColMid2, giantColMid3);
+				#endif`,
 			)
 	}
 	return material

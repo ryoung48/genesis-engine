@@ -18,6 +18,7 @@ import {
 	swatchCloudBandPalette,
 } from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
+import { DEFERRED_SHADERS } from "@/ui/genesis/renderer/deferred-shaders"
 import {
 	buildMoonOrbitOverlay,
 	mod2pi,
@@ -282,6 +283,10 @@ export function buildSolarSystemOverlay(
 		: isNeutronStar
 			? starRadius * NEUTRON_STAR_SURFACE_FACTOR
 			: starRadius
+	DEFERRED_SHADERS.mark({
+		material: starMaterial,
+		deferral: { kind: "stand-in", color: starColor.getHex(), lit: false },
+	})
 	const starMesh = new THREE.Mesh(
 		new THREE.SphereGeometry(starSurfaceRadius, 48, 32),
 		starMaterial,
@@ -301,6 +306,10 @@ export function buildSolarSystemOverlay(
 				})
 			: null)
 	if (haloMaterial) {
+		DEFERRED_SHADERS.mark({
+			material: haloMaterial,
+			deferral: { kind: "hide" },
+		})
 		// A unit sphere scaled to the star, so the corona tracks it if
 		// starRadius is ever recomputed.
 		const coronaMesh = new THREE.Mesh(
@@ -500,6 +509,10 @@ export function buildSolarSystemOverlay(
 			blackHoleDiskMaterial,
 		)
 		blackHoleMesh.scale.setScalar(starRadius)
+		DEFERRED_SHADERS.mark({
+			material: blackHoleDiskMaterial,
+			deferral: { kind: "hide" },
+		})
 		// The actual event-horizon shadow: a plain opaque black sphere, sized
 		// to the shader's own holeRadius (in the same unit-sphere local
 		// space). A flat MeshBasicMaterial can't produce a tint/seam bug --

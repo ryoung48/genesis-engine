@@ -1,4 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { DEFERRED_SHADERS } from "@/ui/genesis/renderer/deferred-shaders"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import {
 	DEFAULT_CAMERA_FAR,
@@ -33,6 +34,7 @@ export function createSolarSystemController(
 ) {
 	let compilationNeeded = false
 	let compilation: Promise<void> | null = null
+	let programsWarm = false
 	let disposed = false
 	const retiredOverlays = new Set<SolarSystemOverlayState>()
 
@@ -41,26 +43,39 @@ export function createSolarSystemController(
 		retiredOverlays.clear()
 	}
 
+	function startCompilation() {
+		const swaps = DEFERRED_SHADERS.defer(ctx.solarSystemGroup)
+		// Acquire the new materials' programs before releasing the previous
+		// overlay, so shared shader variants stay in the renderer's cache.
+		compilation = DEFERRED_SHADERS.compile({
+			renderer: ctx.renderer,
+			camera: ctx.camera,
+			scene: ctx.scene,
+			swaps,
+		})
+			.catch((error: unknown) => {
+				console.error("Solar system shader compilation failed", error)
+			})
+			.then(() => {
+				DEFERRED_SHADERS.restore(swaps)
+				programsWarm = true
+				if (!compilationNeeded) disposeRetiredOverlays()
+			})
+			.finally(() => {
+				compilation = null
+				if (!disposed) deps.requestRender()
+			})
+	}
+
 	function renderSolarSystemView() {
-		if (disposed || compilation) return
-		if (compilationNeeded) {
+		if (disposed) return
+		if (compilationNeeded && !compilation) {
 			compilationNeeded = false
-			// Acquire the new materials' programs before releasing the previous
-			// overlay, so shared shader variants stay in the renderer's cache.
-			compilation = ctx.renderer
-				.compileAsync(ctx.solarSystemGroup, ctx.camera)
-				.then(() => {
-					if (!compilationNeeded) disposeRetiredOverlays()
-				})
-				.catch((error: unknown) => {
-					console.error("Solar system shader compilation failed", error)
-				})
-				.finally(() => {
-					compilation = null
-					if (!disposed) deps.requestRender()
-				})
-			return
+			startCompilation()
 		}
+		// Once programs have been built, a rebuild mostly hits the renderer's
+		// cache, so holding the last frame beats flashing placeholders.
+		if (compilation && programsWarm) return
 		frameNebulaBackground({ mesh: ctx.nebulaBackground, camera: ctx.camera })
 		ctx.renderer.render(ctx.scene, ctx.camera)
 	}
