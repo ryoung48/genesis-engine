@@ -445,6 +445,11 @@ export function energyBalanceTemperature() {
                 const mean = area > 0 ? sum / area : 0;
                 for (let i = 0; i < w; i++) { const c = j * w + i; if (seaAnom[c]) seaAnom[c] -= mean; }
             }
+            // (and the coastal upwelling zones' own cold, ocean.js — not relative to the latitude: it is the zone's cooling)
+            if (ocean.coastCold) {
+                const coldE = coarsen(core, g, ratio, ocean.coastCold);
+                for (let c = 0; c < G; c++) if (landFrac[c] < 1) seaAnom[c] += coldE[c];
+            }
             for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
                 const c = j * w + i, f = landFrac[c];
                 let carried = 0;

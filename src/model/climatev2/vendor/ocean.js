@@ -44,6 +44,17 @@ const MOC_FROM_DEG = 40;             // the overturning's heat is released polew
 const MOC_FULL_DEG = 55;             // … fully from here …
 const MOC_POLAR_DEG = 75;            // … in seas connected to the polar sea (poleward of this) …
 const MOC_REACH_KM = 2500;           // … most near the polar opening (e-folding distance by sea)
+// The coastal upwelling zone is a few hundred km wide, narrower than the energy balance spreads heat, so its cold is
+// kept as the zone's own: the surface layer, renewed at w by water ΔT colder and warmed back by the air at
+// λ (W/m²/K), stands at T' = −ΔT w/(w + λ/(ρ c_p)). λ, the air–sea feedback on a sea-surface anomaly, ≈ 10–30
+// W/m²/K (Frankignoul 1985): 20, so λ/(ρ c_p) ≈ 0.42 m/day.
+const COAST_AIR_FEEDBACK = 20;
+// Under a barrier layer the water the winds mix and well up into the surface is the fresh layer's own, warm, not the
+// cold water below it (Lukas & Lindstrom 1991; Vinayachandran, Murty & Ramesh Babu 2002): the upwelled water's cold
+// × e^{−F/BARRIER_FRESH_MM}, F the sea's fresh water (freshwater.js, mm per Earth month). Barrier layers stand where
+// the net fresh water passes ≈ 0.5 m a year — the warm pool, the Bay of Bengal, the river plumes (de Boyer Montégut et
+// al. 2007) — so the e-folding is 50 mm a month (0.6 m a year).
+const BARRIER_FRESH_MM = 50;
 
 /**
  * stage(ctx, circulation, temperature) → { psi (G, Sv), u, v (G, surface current m/s, annual), qflux (G, W/m², annual:
@@ -142,7 +153,7 @@ function traceCarried(w, h, isSea, U, V, cosLat, rowSm, nSteps, currentDepthM, c
 }
 
 export function windDrivenOcean() {
-    return (ctx, circ, temperature) => {
+    return (ctx, circ, temperature, freshwater = null) => {
         const orbit = orbitOf(ctx.options), OMEGA_ROT = orbit.rotation;
         const t0 = performance.now();
         const P = sizeScaled(spinScaled({ ...PARAMS }, orbit), orbit);
@@ -446,12 +457,13 @@ export function windDrivenOcean() {
                 flush();
             }
             for (let c = 0; c < G; c++) upDT[c] = P.OCEAN_UPWELL_DT * Math.exp(-Math.max(0, thermoD[c] - P.OCEAN_THERMO_EAST_M) / P.OCEAN_THERMO_SCALE_M);
+            if (freshwater) { const fw = co(freshwater.total); for (let c = 0; c < G; c++) upDT[c] *= Math.exp(-Math.max(0, fw[c]) / BARRIER_FRESH_MM); }
         }
 
         /** One period's heat (W/m²) from its stress, currents and sea temperature: advection, upwelling (and m/s of it). */
         const heatOf = (sx, sy, Uc, Vc, sstF) => {
             const { dTdy } = rowsOf(sstF);
-            const qAdv = new Float64Array(G), qUp = new Float64Array(G), wUp = new Float64Array(G);
+            const qAdv = new Float64Array(G), qUp = new Float64Array(G), wUp = new Float64Array(G), coastCold = new Float64Array(G);
             const { Mx, My, div } = ekmanOf(sx, sy);
             // the coastal cells' upwelling (offshore Ekman transport over the zone's width), then the zone takes it
             const coastW0 = new Float64Array(G);
@@ -481,13 +493,16 @@ export function windDrivenOcean() {
                     if (Uc[c] > 0 && isSea[cw]) gx = (Tc - sstF[cw]) / dx; else if (Uc[c] < 0 && isSea[ce]) gx = (sstF[ce] - Tc) / dx;
                     qAdv[c] = -RHO_SEA * CP_SEA * (P.OCEAN_HEAT_SHARE * Uc[c] * gx + P.OCEAN_MERID_SHARE * Vc[c] * dTdy[j]);
                     // upwelling (m/s): the Ekman divergence, or the coastal zone's
-                    const wv = Math.max(0, div[c], coastOf[c] >= 0 ? coastW0[coastOf[c]] : 0);
+                    const wEk = Math.max(0, div[c]), wv = Math.max(wEk, coastOf[c] >= 0 ? coastW0[coastOf[c]] : 0);
                     wUp[c] = wv;
                     const thermo = Math.max(0, Math.min(1, (Tc - 2) / 15));      // cold polar water has little to upwell
-                    qUp[c] = -RHO_SEA * CP_SEA * wv * upDT[c] * thermo;
+                    // (the open sea's Ekman pumping into the energy balance; the coastal zone's beyond it kept as its own cold)
+                    qUp[c] = -RHO_SEA * CP_SEA * wEk * upDT[c] * thermo;
+                    const wx = wv - wEk;
+                    if (wx > 0) coastCold[c] = -upDT[c] * thermo * wx / (wx + COAST_AIR_FEEDBACK / (RHO_SEA * CP_SEA));
                 }
             }
-            return { qAdv, qUp, wUp };
+            return { qAdv, qUp, wUp, coastCold };
         };
         // ── What each current carries: the temperature of the latitudes its water comes from. Traced back along the
         // current for CARRY_TRACE_KM (as far as surface water keeps its temperature against the air: a few months at
@@ -520,18 +535,18 @@ export function windDrivenOcean() {
             if (openArea > 0) for (let c = 0; c < G; c++) if (isSea[c]) q[c] -= net * open[c] / openArea;
             return q;
         };
-        const q = new Float64Array(G), qAdv = new Float64Array(G), qUp = new Float64Array(G), wUp = new Float64Array(G);
+        const q = new Float64Array(G), qAdv = new Float64Array(G), qUp = new Float64Array(G), wUp = new Float64Array(G), coastCold = new Float64Array(G);
         const qM = new Float64Array(12 * G), wUpM = new Float64Array(12 * G);
         if (seasonal) {
             for (let m = 0; m < 12; m++) {
                 const sl = (f) => f.subarray(m * G, (m + 1) * G);
                 const H = heatOf(sl(txM), sl(tyM), sl(UM), sl(VM), sl(sstM)), qm = qOf(H);
                 qM.set(qm, m * G); wUpM.set(H.wUp, m * G);
-                for (let c = 0; c < G; c++) { q[c] += qm[c] / 12; qAdv[c] += H.qAdv[c] / 12; qUp[c] += H.qUp[c] / 12; wUp[c] += H.wUp[c] / 12; }
+                for (let c = 0; c < G; c++) { q[c] += qm[c] / 12; qAdv[c] += H.qAdv[c] / 12; qUp[c] += H.qUp[c] / 12; wUp[c] += H.wUp[c] / 12; coastCold[c] += H.coastCold[c] / 12; }
             }
         } else {
             const H = heatOf(tx, ty, U, V, sst);
-            q.set(qOf(H)); qAdv.set(H.qAdv); qUp.set(H.qUp); wUp.set(H.wUp);
+            q.set(qOf(H)); qAdv.set(H.qAdv); qUp.set(H.qUp); wUp.set(H.wUp); coastCold.set(H.coastCold);
             for (let m = 0; m < 12; m++) { qM.set(q, m * G); wUpM.set(wUp, m * G); }
         }
         for (let c = 0; c < G; c++) qAdv[c] += qMoc[c];
@@ -548,7 +563,7 @@ export function windDrivenOcean() {
         // (the drawn fields are worked out when first asked for — only the pages ask, and only for the last round's)
         const lazy = (o, fields) => { for (const [k, make] of Object.entries(fields)) { let v; Object.defineProperty(o, k, { get: () => (v ??= make()), enumerable: true }); } return o; };
         return lazy({
-            psi: out(mapped(psi, x => x / 1e6)), qflux: out(q), qAdvection: out(qAdv), qUpwelling: out(qUp), qOverturning: out(qMoc), carried: out(carried),
+            psi: out(mapped(psi, x => x / 1e6)), qflux: out(q), qAdvection: out(qAdv), qUpwelling: out(qUp), qOverturning: out(qMoc), carried: out(carried), coastCold: out(coastCold), freshwater: freshwater ? Object.fromEntries(Object.entries(freshwater).map(([k, v]) => [k, Float32Array.from(v)])) : null,
             seaMask: out(Float64Array.from(isSea)), curl: out(curl), upwelledDT: out(upDT),
             // (null without seasons: the temperature stage then takes the year's heat, as before)
             monthly: seasonal ? lazy({ qflux: outM(qM) }, { u: () => drawM(mapped(UM, surf)), v: () => drawM(mapped(VM, surf)), upwelling: () => drawM(mapped(wUpM, x => x * 86400)) }) : null,

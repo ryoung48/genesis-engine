@@ -24,6 +24,7 @@ import { LatLonGrid, EARTH_RADIUS_M } from './grid.js';
 import { interpolationMatrix, PRECIP_TRANSFORMS } from './seasons.js';
 import { classifyCell } from './koppen.js';
 import { FastNoise } from './fast-noise.js';
+import { seaFreshwater } from './freshwater.js';
 
 export const CORE_DEFAULTS = Object.freeze({
     gridStepDeg: 1,
@@ -93,6 +94,12 @@ export function computeClimate(input, options = {}) {
         }
         let rain = o.stages.rain(sctx, winds, temperature);
         lap('rain');
+        // (the ocean once more, now with the sea's fresh water from the rain and the rivers: its barrier layers)
+        if (o.stages.ocean && circulation && rain.E) {
+            const freshwater = seaFreshwater({ grid, surface, P: rain.P, E: rain.E, K, yearScale: orbitOf(o).yearScale });
+            ocean = o.stages.ocean(sctx, circulation, temperature, freshwater);
+            lap('ocean with fresh water');
+        }
         let clouds = null;
         if (o.cloudsFromRain && o.stages.circulation) {
             const rainfall = monthsFromAnchors(rain.P, grid.size, K, o.anchorPhase, o.precipTransform);
