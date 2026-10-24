@@ -1,3 +1,5 @@
+export function coarsenField(core: LatLonGrid, grid: LatLonGrid, ratio: number, src: ArrayLike<number>): Float64Array
+
 export class LatLonGrid {
 	// [JUSTIFICATION] radiusM defaults to Earth's, as in grid.js
 	constructor(stepDeg: number, radiusM?: number)

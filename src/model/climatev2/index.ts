@@ -100,7 +100,7 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 			isLand,
 		}),
 	}
-	let iceDiagnostics: ClimateV2Cells["diagnostics"] = null
+	let climateDiagnostics: ClimateV2Cells["diagnostics"] = null
 	if (diagnostics) {
 		const seaIceMonthly = new Float32Array(MONTHS * N)
 		const snowIceShare = new Float32Array(N)
@@ -118,15 +118,24 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 			out: snowIceShare,
 			cells: isLand,
 		})
-		iceDiagnostics = { seaIceMonthly, snowIceShare }
+		climateDiagnostics = {
+			seaIceMonthly,
+			snowIceShare,
+			radiation: temperature.budget,
+		}
 	}
 	return {
+		cloudCoverMonthly: CLIMATEV2_OUTPUTS.monthlyCells({
+			weights,
+			field: result.stages.clouds.cover,
+			fieldSize: grid.size,
+		}),
 		temperatureMonthly,
 		rainfallMonthly,
 		rainfallAnnual,
 		...windFields,
 		oceanCurrents,
-		diagnostics: iceDiagnostics,
+		diagnostics: climateDiagnostics,
 		diurnalRange: CLIMATEV2_DIURNAL.cells({ result, weights, isLand }),
 		koppen: result.cell.koppen,
 		timing: result.timing,
@@ -158,6 +167,7 @@ function toClimate({
 }: ClimateV2ClimateParams): GenesisClimate {
 	const N = mesh.numRegions
 	const climate: GenesisClimate = {
+		cloud_cover_monthly: v2.cloudCoverMonthly,
 		temperature_avg: new Float32Array(N),
 		temperature_min: new Float32Array(N),
 		temperature_max: new Float32Array(N),

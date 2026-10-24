@@ -30,7 +30,7 @@
 
 import { HelmholtzSolver } from './solver.js';
 import { LatLonGrid, coarsenField, refineField } from './grid.js';
-import { CLOUD_RAIN_MM, WET_MONTH_MM } from './temperature.js';
+import { WET_MONTH_MM } from './temperature.js';
 import { sunAt, EARTH_ROTATION } from './insolation.js';
 
 const SIGMA = 5.670e-8;
@@ -79,7 +79,6 @@ for (let k = 0; k < SAMPLES; k++) for (let n = 1; n <= HARMONICS; n++) {
     COS[k * HARMONICS + n - 1] = Math.cos(n * 2 * Math.PI * k / SAMPLES); SIN[k * HARMONICS + n - 1] = Math.sin(n * 2 * Math.PI * k / SAMPLES);
 }
 
-/** The harmonics a_1 … a_N (W/m²) of a day's sunlight at the top of the air (latitude, declination in radians). */
 function sunHarmonics(phi, delta, s0, out) {
     const A = Math.sin(phi) * Math.sin(delta), B = Math.cos(phi) * Math.cos(delta), x = -Math.tan(phi) * Math.tan(delta);
     const h0 = x >= 1 ? 0 : x <= -1 ? Math.PI : Math.acos(x);
@@ -90,9 +89,7 @@ function sunHarmonics(phi, delta, s0, out) {
     return out;
 }
 
-/** A tile's surface (kind LAND, WATER or ICE) at mean air temperature T (°C), rain (mm per Earth month, or null), wind. */
-function tileSurface(kind, T, rainMm, windMs, p, out) {
-    const cloud = rainMm === null ? 0.5 : 1 - Math.exp(-Math.max(0, rainMm) / CLOUD_RAIN_MM);
+function tileSurface({ kind, T, rainMm, windMs, p, out, cloud }) {
     const wet = kind === WATER ? 1 : rainMm === null ? 0.5 : 1 - Math.exp(-Math.max(0, rainMm) / WET_MONTH_MM);
     const snow = kind === WATER ? 0 : kind === ICE ? 1 : snowShare(T);
     const albedo = kind === WATER ? p.ALBEDO_SEA : (1 - snow) * p.ALBEDO_LAND + snow * p.ALBEDO_SNOW;
@@ -108,10 +105,6 @@ function tileSurface(kind, T, rainMm, windMs, p, out) {
     return out;
 }
 
-/**
- * A tile's response to harmonic n at angular frequency w: the ground's and the boundary layer's impedances (complex,
- * as [re, im]) — T_a = (h S / Z_g + k T_f) / Z_a, T_s = (S + h T_a) / Z_g.
- */
 function tileResponse(s, w, p, out) {
     const sq = Math.sqrt(w / 2), cBl = 1.2 * 1005 * p.AIR_LAYER_M, k = p.AIR_LOSS;
     const gRe = s.lamRad + s.lamLat + s.h + s.inertia * sq, gIm = s.inertia * sq + w * s.slab;      // Z_g
@@ -126,7 +119,6 @@ const surf = [{}, {}, {}], resp = [{}, {}, {}], respE = [{}, {}, {}];
 const taRe = new Float64Array(3 * HARMONICS), taIm = new Float64Array(3 * HARMONICS);
 const earthRe = new Float64Array(HARMONICS), earthIm = new Float64Array(HARMONICS);
 
-/** The sun's part of the day's range of the air (max − min over the day) from its harmonics (re, im from offset o). */
 function sunRange(re, im, o) {
     let lo = Infinity, hi = -Infinity;
     for (let k = 0; k < SAMPLES; k++) {
@@ -138,15 +130,7 @@ function sunRange(re, im, o) {
     return hi - lo;
 }
 
-/**
- * The day's cycle on the energy-balance grid g: { g, P (the stage's parameters), orbit (orbitOf), landFrac, gamma (the
- * winds' heat carrying), airAt(t) → G mean air temperatures (°C), windAt(t) → { u, v }, rainAt(t) → G rains (mm per
- * Earth month) or null, iceAt(t) → G sea-ice shares, wind2Prev (12 × G, the previous round's wind2, or null), params
- * (optional) } → { land, sea (12 × G daily ranges, °C), heat (12 × G, land's daily heating against an Earth day's, or
- * null on Earth's day), rect (12 × G, W/m² extra heat radiated for the swing beyond an Earth day's, at t = 0 … 11
- * months, or null), wind2 (12 × G, m²/s², the mean square of the winds that follow the sun, or null on Earth's day) }.
- */
-export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, iceAt, wind2Prev = null, params = DIURNAL_PARAMS }) {
+export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, cloudAt, iceAt, wind2Prev = null, params = DIURNAL_PARAMS }) {
     const { w, h } = g, G = g.size, p = params, earthDay = orbit.solarDayScale === 1, R_PLANET = g.radiusM, airCap = AIR_COLUMN_HEAT_CAP / orbit.gravityScale;
     const omega = 2 * Math.PI / (EARTH_SOLAR_DAY_S * orbit.solarDayScale), omegaE = 2 * Math.PI / EARTH_SOLAR_DAY_S;
     // the free air's spread: the energy balance's own, plus the gravity waves' within the Rossby radius c / f (at 45°)
@@ -177,7 +161,7 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
     };
     const lowR = new Float64Array(SOLVED * G), lowI = new Float64Array(SOLVED * G), lowRC = new Float64Array(SOLVED * Gc), lowIC = new Float64Array(SOLVED * Gc);
     for (let s = 0; s < K; s++) {
-        const t = DAY_TIMES[s], sun = sunAt(t, orbit), T = airAt(t), { u, v } = windAt(t), rain = rainAt(t), ice = iceAt(t);
+        const t = DAY_TIMES[s], sun = sunAt(t, orbit), T = airAt(t), { u, v } = windAt(t), rain = rainAt(t), ice = iceAt(t), clouds = cloudAt(t);
         // (the wind the exchange feels: the month's mean and, from the previous round, the day's own swing)
         const w2 = wind2Prev ? wind2Prev.subarray(Math.round(t - 0.5) * G, (Math.round(t - 0.5) + 1) * G) : null;
         const windOf = (c) => w2 ? Math.sqrt(u[c] * u[c] + v[c] * v[c] + w2[c]) : Math.hypot(u[c], v[c]);
@@ -185,7 +169,8 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
         for (let c = 0; c < G; c++) {
             const wind = windOf(c), r = rain ? rain[c] : null;
             for (let q = 0; q < 3; q++) {
-                const sf = tileSurface(q, T[c], r, wind, p, surf[q]), o = (c * 3 + q) * TILE_FIELDS;
+                const cloud = clouds ? clouds[c] : 0.5;
+                const sf = tileSurface({ kind: q, T: T[c], rainMm: r, windMs: wind, p, out: surf[q], cloud }), o = (c * 3 + q) * TILE_FIELDS;
                 tiles[o] = sf.sun; tiles[o + 1] = sf.lamRad; tiles[o + 2] = sf.h; tiles[o + 3] = sf.lamLat;
                 tiles[o + 4] = sf.inertia; tiles[o + 5] = sf.slab; tiles[o + 6] = sf.weather; tiles[o + 7] = sf.Tk;
             }
@@ -299,14 +284,6 @@ export function dayCycle({ g, P, orbit, landFrac, gamma, airAt, windAt, rainAt, 
     return { land, sea, heat, rect, wind2 };
 }
 
-/**
- * The surface winds of the day's cycle on grid gc: the warmth of the air by the ground T_a (each cell's tiles, harmonics
- * in xr, xi) lowers the surface pressure by CIRC_THERMAL_HPA_PER_K per degree (circulation.js: hydrostatic, the lowest
- * 2–3 km — the day's heat low, as a summer continent's), and the wind answers it as the
- * circulation's does — friction (Earth's boundary layer, turned more over land), the Coriolis force, the surface's
- * share of the wind above — and, for a wind swinging with the day, its own inertia: (r + i n ω) u − f v = −∂ₓp/ρ,
- * (r + i n ω) v + f u = −∂ᵧp/ρ. Its mean square over the day, ½ Σ |u_n|² + |v_n|² (m²/s²), into out.
- */
 function dayWinds(gc, xr, xi, land, omega, orbit, P, out) {
     const { w, h } = gc, G = gc.size, R_PLANET = gc.radiusM, dRad = gc.step * Math.PI / 180, rho = 1.2, k = P.CIRC_THERMAL_HPA_PER_K * 100;
     const f45 = 2 * EARTH_ROTATION * Math.sin(Math.PI / 4), tanO = Math.tan(P.CIRC_TURN_OCEAN_DEG * Math.PI / 180), tanL = Math.tan(P.CIRC_TURN_LAND_DEG * Math.PI / 180);

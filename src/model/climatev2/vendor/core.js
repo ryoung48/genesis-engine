@@ -1,4 +1,5 @@
-// Vendored verbatim from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/core.js (GPL-3.0, see LICENSE).
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/core.js (GPL-3.0, see LICENSE).
+// Modified in chaos-machine: diagnose clouds from column moisture, stability and circulation.
 // The new climate — one generator-neutral entry point. DOM-free; runs in a worker or in Node.
 //
 //   computeClimate(input, options) → { grid, surface, anchors, months, cell, timing }
@@ -17,12 +18,13 @@
 // below feeds real data, measuring the best the rest of the pipeline can do). The coupled order: temperature ↔ winds
 // ↔ ocean for a couple of rounds, then rain, then the temperature once more with the clouds the rain brings.
 
+import { orbitOf } from './insolation.js';
+import { CLIMATEV2_CLOUDS } from '../clouds/index.ts';
 import { LatLonGrid, EARTH_RADIUS_M } from './grid.js';
 import { interpolationMatrix, PRECIP_TRANSFORMS } from './seasons.js';
 import { classifyCell } from './koppen.js';
 import { FastNoise } from './fast-noise.js';
 
-/** Default settings. Units in the names. */
 export const CORE_DEFAULTS = Object.freeze({
     gridStepDeg: 1,
     anchors: 6,                 // points in the year (Phase 0: 6 keeps ≥ 92 % of every seasonal regime; 4 does not)
@@ -41,18 +43,9 @@ export const CORE_DEFAULTS = Object.freeze({
     couplings: 2,               // rounds of temperature ↔ winds when the winds are derived …
     couplingsWithOcean: 2,      // … and with the ocean too (a third round changed nothing once clouds came in, Phase 6)
     cloudsFromRain: true,       // then rain → clouds → temperature once more …
-    rainAfterClouds: false,     // … and the rain again from that temperature (no better, Phase 6)
+    rainAfterClouds: true,      // update rain using the cloud-shaded surface radiation
 });
 
-/**
- * @param {object} input
- * @param {Float32Array|Float64Array} input.xyz     cell positions on the unit sphere (3 per cell)
- * @param {Float32Array} input.elevKm               surface height in km (sea floor negative)
- * @param {'y-up'|'z-up'} input.axes                V1: y is north, lon = atan2(x, z). Evolution: z is north, lon = atan2(y, x)
- * @param {Uint8Array} [input.land]                 1 = land; default elevKm > 0
- * @param {object} options                          CORE_DEFAULTS + anchorSource(ctx) → { T, P } (K·G each; °C at the grid's
- *                                                  reference height, mm/month; NaN = no data there)
- */
 export function computeClimate(input, options = {}) {
     const o = { ...CORE_DEFAULTS, ...options };
     const timing = [];
@@ -88,27 +81,31 @@ export function computeClimate(input, options = {}) {
             // given winds (or none) and no ocean heat; later ones the derived winds and the ocean's heat.
             const rounds = o.stages.ocean ? o.couplingsWithOcean : o.couplings;
             for (let it = 0; it < rounds; it++) {
-                temperature = o.stages.temperature(sctx, winds, temperature?.state, ocean?.qflux ?? null, null, ocean);
+                temperature = o.stages.temperature({ctx: sctx, winds, init: temperature?.state, qflux: ocean?.qflux ?? null, ocean});
                 circulation = o.stages.circulation(sctx, temperature);
                 winds = circulation;
                 if (o.stages.ocean) ocean = o.stages.ocean(sctx, circulation, temperature);
             }
             lap(o.stages.ocean ? 'temperature ↔ winds ↔ ocean' : 'temperature ↔ winds');
         } else {
-            temperature = o.stages.temperature(sctx, winds);
+            temperature = o.stages.temperature({ctx: sctx, winds});
             lap('temperature');
         }
         let rain = o.stages.rain(sctx, winds, temperature);
         lap('rain');
+        let clouds = null;
         if (o.cloudsFromRain && o.stages.circulation) {
-            // clouds from the rain shade rainy land (the temperature stage reads monthly rain); the rain then follows
-            // the new temperature from where it was
-            temperature = o.stages.temperature(sctx, winds, temperature.state, ocean?.qflux ?? null, monthsFromAnchors(rain.P, grid.size, K, o.anchorPhase, o.precipTransform), ocean);
+            const rainfall = monthsFromAnchors(rain.P, grid.size, K, o.anchorPhase, o.precipTransform);
+            clouds = CLIMATEV2_CLOUDS.estimate({ ctx: sctx, winds, humidity: rain.r, stability: rain.stability, temperatureMonthly: temperature.monthly, rainfall, yearScale: orbitOf(o).yearScale });
+            temperature = o.stages.temperature({ctx: sctx, winds, init: temperature.state, qflux: ocean?.qflux ?? null, rain: rainfall, ocean, clouds});
             lap('temperature with clouds');
-            if (o.rainAfterClouds) { rain = o.stages.rain(sctx, winds, temperature, rain.state ?? null); lap('rain again'); }
+            if (o.rainAfterClouds) {
+                rain = o.stages.rain(sctx, winds, temperature, rain.state ?? null);
+                lap('rain again');
+            }
         }
         anchors = { T: Float32Array.from(temperature.T), P: rain.P };
-        stages = { winds, temperature, circulation, ocean, rain };
+        stages = { winds, temperature, circulation, ocean, rain, clouds };
     } else {
         anchors = o.anchorSource(sctx);
         lap('anchors');
@@ -128,12 +125,6 @@ export function computeClimate(input, options = {}) {
     return { grid, surface, anchorMonths, anchors, months, cell, stages, timing };
 }
 
-/**
- * Step 5 again, for new heights on the same terrain cells — the grid's climate kept (`res`: computeClimate's result, or
- * {grid, surface, months, cell: {lat, lon}} kept from it): e.g. a surface carved after its climate was calculated.
- * With the same heights and options it returns exactly res.cell. `onCell(r, T12, P12)`, if given, is shown each land
- * cell's twelve months (°C, mm; reused arrays).
- */
 export function cellClimate(res, xyz, elevKm, land, options = {}, onCell = null) {
     return finishCells(res.grid, res.surface, res.months, res.cell.lat, res.cell.lon, elevKm, land, { ...CORE_DEFAULTS, ...options }, xyz, onCell);
 }
@@ -157,11 +148,6 @@ export function cellLatLon(xyz, axes, lat, lon) {
 }
 
 // ── 2 ─────────────────────────────────────────────────────────────────────────
-/**
- * Per grid cell: land fraction, mean land height (km), mean height of everything (km). Grid cells too small to hold
- * a terrain cell (near the poles, or at a coarse terrain resolution) take the values of the nearest grid cell in
- * their latitude row that does — a short distance, since such cells are tiny.
- */
 export function aggregateSurface(grid, lat, lon, elevKm, land) {
     const G = grid.size, n = lat.length;
     const cnt = new Float64Array(G), landCnt = new Float64Array(G), sumAll = new Float64Array(G), sumLand = new Float64Array(G);
@@ -181,7 +167,6 @@ export function aggregateSurface(grid, lat, lon, elevKm, land) {
     return { landFrac, meanLandKm, meanKm };
 }
 
-/** For each grid cell, itself if count[c] > 0, else the nearest cell in the same row with count > 0. */
 function rowFill(grid, count) {
     const from = new Int32Array(grid.size);
     for (let j = 0; j < grid.h; j++) for (let i = 0; i < grid.w; i++) {
@@ -197,7 +182,6 @@ function rowFill(grid, count) {
     return from;
 }
 
-/** K anchor layers of rain → 12 monthly layers (the same interpolation as the months themselves). */
 function monthsFromAnchors(fieldK, G, K, phase, transform) {
     const M = interpolationMatrix(K, phase, 0), tf = PRECIP_TRANSFORMS[transform], out = new Float32Array(12 * G);
     const pt = new Float64Array(K);
@@ -230,14 +214,6 @@ function synthesizeGrid(grid, anchors, K, o) {
 }
 
 // ── 5 ─────────────────────────────────────────────────────────────────────────
-/**
- * Terrain-cell finishing. Temperature is reduced to sea level on the grid (T + Γ·h_ref), interpolated, then lifted to
- * the cell's own height (− Γ·h): mountains colder than their grid cell, valleys warmer. Rain is interpolated and
- * scaled by the cell's height above its surroundings (o.rainPerKm: ridges wetter, valleys drier; windward and lee
- * slopes come with the rain stage). o.texture adds smooth noise of a fixed size in km to both — the local variety the
- * grid can't resolve. Grid cells without data (e.g. land-only observations over the sea) are filled from the nearest
- * grid cell that has data. Only land cells are classified; the sea gets class 0.
- */
 function finishCells(grid, surface, months, lat, lon, elevKm, land, o, xyz, onCell = null) {
     const G = grid.size, n = lat.length, w = grid.w, h = grid.h, gamma = o.lapseRateCPerKm * (o.gravityScale ?? 1);
     // sea-level-reduced temperature and rain, with gaps filled
@@ -298,7 +274,6 @@ function finishCells(grid, surface, months, lat, lon, elevKm, land, o, xyz, onCe
     return { koppen, tAnnual, pAnnual, lat, lon };
 }
 
-/** Breadth-first fill over the grid (longitude wraps): each cell → the nearest cell with valid[c] (−1 if none). */
 function nearestValid(grid, valid) {
     const G = grid.size, w = grid.w, h = grid.h;
     const out = new Int32Array(G).fill(-1), queue = new Int32Array(G);
@@ -313,10 +288,6 @@ function nearestValid(grid, valid) {
 }
 
 // ── Anchor sources ────────────────────────────────────────────────────────────
-/**
- * Real Earth as the anchor source: monthly fields on the same grid (12 layers each, °C and mm/month, NaN = none),
- * read at the anchor months (fractional months interpolated linearly). The oracle run.
- */
 export function observedAnchors(monthlyT, monthlyP) {
     return ({ grid, anchorMonths }) => {
         const G = grid.size, K = anchorMonths.length;

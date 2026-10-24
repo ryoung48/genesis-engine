@@ -12,15 +12,9 @@ export interface GenesisClimate {
 	declination_monthly: Float32Array // per-month sub-solar latitude in degrees
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
-	/** CLOUD_COVER.estimate's modeled proxy, [month * numRegions + region],
-	 * cached once (by the cloud-cover temperature modifier, which already
-	 * computes it for every cell/month) so hover/map display don't each
-	 * recompute the same values from the same modeled inputs. */
+	// [JUSTIFICATION] Cloud cover is attached by v2 or the tidal cloud modifier after initial temperature construction.
 	cloud_cover_monthly?: Float32Array
-	/** Same proxy, but computed from OBSERVED (real-Earth) aet/pet/rainfall/
-	 * dtr/temperature inputs once those are attached -- diverges from
-	 * cloud_cover_monthly for an imported Earth world, since hover/map prefer
-	 * observed inputs there. Cached the same way, for the same reason. */
+	// [JUSTIFICATION] An observed-input display estimate is available only for imported Earth worlds.
 	real_cloud_cover_monthly?: Float32Array
 }
 

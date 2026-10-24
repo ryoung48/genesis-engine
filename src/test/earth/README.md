@@ -1,5 +1,7 @@
 # Earth temperature MAE experiments
 
+For the current v2 cloud estimate, radiation coupling and Earth comparison, see [Climate v2 cloud cover](../../../docs/climate/clouds.md).
+
 This records the Earth-temperature calibration experiments exercised by `earth-real-temperature-compare.smoke.test.ts`. The fixture imports WorldClim land temperatures onto the generated Earth mesh.
 
 Run the comparison with:

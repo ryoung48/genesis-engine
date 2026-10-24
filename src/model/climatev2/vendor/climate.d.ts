@@ -1,4 +1,5 @@
 import type { CirculationResult } from "./circulation.js"
+import type { CloudFields } from "../clouds/types"
 import type { ClimateSurface } from "./core.js"
 import type { DiurnalRanges } from "./diurnal.js"
 import type { LatLonGrid } from "./grid.js"
@@ -25,6 +26,7 @@ export interface ClimateBudget {
 	ground: number
 	snowIce: number
 	cloud: number
+	cloudLongwaveWm2: number
 	cryoWm2: {
 		snowN: number
 		seaN: number
@@ -53,6 +55,7 @@ export interface PlanetClimateResult {
 		lon: Float32Array
 	}
 	stages: {
+		clouds: CloudFields
 		temperature: {
 			monthlySL: Float32Array
 			seaIce: Float32Array

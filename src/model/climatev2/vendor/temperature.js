@@ -19,6 +19,7 @@
 // swing of the winds) is updated over a few outer iterations. T is the sea-level temperature; the stage reports it
 // at each grid cell's reference height (its mean land height), and the core lifts it to each terrain cell.
 
+import { CLIMATEV2_CLOUD_RADIATION } from '../clouds/radiation/index.ts';
 import { LatLonGrid, coarsenField, refineField, refineForDrawing, fillAcross } from './grid.js';
 import { insolationTable, zenithTable, dailyInsolation, orbitOf, sunAt, SOLAR_CONSTANT } from './insolation.js';
 import { HelmholtzSolver } from './solver.js';
@@ -47,11 +48,9 @@ const AIR_STABLE_SUN = SOLAR_CONSTANT / 10; // W/m² daily sunlight (top of the 
 const AIR_MIXED_SUN = SOLAR_CONSTANT / 5;   // … and above which convection mixes it (≈ 25° in midwinter)
 export const WET_MONTH_MM = 100;                   // mm/month of rain at which the ground is ~63 % wet
 const WET_SUN_REF = 400;                    // W/m² of daily sunlight (top of the air) at which TEMP_WET_COOL_C applies
-/** Δ/(Δ+γ): the share of the available energy a wet surface evaporates (equilibrium evaporation), relative to 25 °C. */
 const evapShareRaw = (T) => { const t = Math.max(-40, Math.min(45, T)), d = 4098 * 0.6108 * Math.exp(17.27 * t / (t + 237.3)) / ((t + 237.3) ** 2); return d / (d + 0.0665); };
 const EVAP_SHARE_25 = evapShareRaw(25);
 const evapShare = (T) => evapShareRaw(T) / EVAP_SHARE_25;
-export const CLOUD_RAIN_MM = 100;                  // mm/month of rain at which land is ~63 % cloud-covered
 const WEAK_SUN = SOLAR_CONSTANT / 8;        // W/m² — half the planet's mean sunlight: below it, inversions form
 // The surface's own albedos and the air's absorption, for the planet's albedo (forcingSweep)
 // The air's absorption of sunlight: ozone and the other gases, ATM_ABSORB_DRY, and water vapour, growing with its
@@ -98,17 +97,8 @@ function coldOlr({ A, B }) {
     const tJ = (4 * 273.15 - 4 * A / B) / 3;
     return { tJC: tJ - 273.15, eps: B / (4 * STEFAN_BOLTZMANN * tJ ** 3), A, B };
 }
-/**
- * The temperature stage. The orbit, spin and year come from the options (orbitOf, insolation.js).
- * Returns stage(ctx, winds, init?) → { T (K anchors × G, °C at reference height), monthly (12 × G, same), monthlySL
- * (12 × G, sea level), iceFrac (G, share of the year a cell is snow- or ice-covered), state, timing }.
- * init: a previous run's `state` (same settings) to start from — used when temperature and winds are iterated
- * together; it then needs fewer outer iterations. qflux: the ocean's heating of the sea surface (W/m², core grid).
- * rain: monthly rain (12 × G, mm/month, core grid) from the rain stage, or null — then clouds shade rainy land and
- * leave dry land in full sun.
- */
 export function energyBalanceTemperature() {
-    return (ctx, winds, init = null, qflux = null, rain = null, ocean = null) => {
+    return ({ ctx, winds, init = null, qflux = null, rain = null, ocean = null, clouds = null }) => {
         const orbit = orbitOf(ctx.options), OMEGA = 2 * Math.PI / (EARTH_SECONDS_PER_YEAR * orbit.yearScale);
         const t0 = performance.now();
         const P = sizeScaled(spinScaled({ ...PARAMS }, orbit), orbit);
@@ -136,39 +126,8 @@ export function energyBalanceTemperature() {
         const uT = new Float64Array(NT * G), vT = new Float64Array(NT * G);
         windSamples(G, uM, vM, uBar, vBar, uT, vT);
 
-        // Clouds over land (with the rain stage's rain): cloudiness 1 − e^{−P/P₀} makes rainy land brighter and dry land
-        // darker than the land's average — the average stays in the base albedo — so deserts get the full summer sun
-        // and monsoon, rainforest and boreal summers are shaded. Per sample time, relative to the land's mean. In the
-        // rainy tropics (tropicsWeight about that month's belts) the extra brightness is × (1 − TEMP_CLOUD_LW_CANCEL):
-        // deep convective clouds trap about as much heat as they reflect (Kiehl 1994) — at full strength the rainforests
-        // of Sumatra, Borneo and the Amazon came out cold and the energy balance spread it over the seas around them.
-        let cloudT = null;
-        if (rain && P.TEMP_CLOUD_ALBEDO > 0) {
-            cloudT = new Float64Array(NT * G);
-            const Pm = new Float64Array(12 * G);
-            for (let m = 0; m < 12; m++) Pm.set(coarsen(core, g, ratio, rain.subarray(m * core.size, (m + 1) * core.size)), m * G);
-            for (let k = 0; k < NT; k++) {
-                const pos = 12 * k / NT - 0.5, m0 = Math.floor(pos), f = pos - m0, a = ((m0 % 12) + 12) % 12, b = (a + 1) % 12;
-                let sum = 0, wsum = 0;
-                for (let j = 0; j < h; j++) {
-                    const cw = Math.cos(g.lat[j] * Math.PI / 180);
-                    for (let i = 0; i < w; i++) {
-                        const c = j * w + i, p = (1 - f) * Pm[a * G + c] + f * Pm[b * G + c];
-                        // (the rain's rate per Earth month: the thresholds are Earth's, a month is a twelfth of the year)
-                        const cf = 1 - Math.exp(-Math.max(0, p / orbit.yearScale) / CLOUD_RAIN_MM);
-                        cloudT[k * G + c] = cf; sum += cf * landFrac[c] * cw; wsum += landFrac[c] * cw;
-                    }
-                }
-                const meanCf = wsum > 0 ? sum / wsum : 0, bt = winds?.belts?.[a];
-                for (let j = 0; j < h; j++) {
-                    const keep = bt ? 1 - P.TEMP_CLOUD_LW_CANCEL * tropicsWeight(g.lat[j], bt.itcz, bt.hiN, bt.hiS) : 1;
-                    for (let i = 0; i < w; i++) {
-                        const c = j * w + i, d = cloudT[k * G + c] - meanCf;
-                        cloudT[k * G + c] = P.TEMP_CLOUD_ALBEDO * (d > 0 ? d * keep : d);
-                    }
-                }
-            }
-        }
+        const cloudMonthly = clouds ? Array.from({ length: 12 }, (_, m) => coarsen(core, g, ratio, clouds.cover.subarray(m * core.size, (m + 1) * core.size))) : null;
+        const cloudT = clouds ? CLIMATEV2_CLOUD_RADIATION.compute({core, grid: g, ratio, clouds, landFrac, winds, albedo: P.TEMP_CLOUD_ALBEDO, longwaveCancellation: P.TEMP_CLOUD_LW_CANCEL, lowAlbedo: P.TEMP_LOW_CLOUD_ALBEDO, longwaveWindow: P.TEMP_CLOUD_LONGWAVE_WINDOW}) : null;
 
         // Sunlight and base albedo per row
         const Q = insolationTable(g.lat, orbit, NT);
@@ -354,7 +313,7 @@ export function energyBalanceTemperature() {
         const prof = { setup: performance.now() - t0, forcing: 0, operator: 0, solve: 0, output: 0 };
         let tp;
         // (the planet's sunlight and what reflects it, over the last outer iteration: diagnostics only)
-        const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
+        const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
         for (let it = 0; it < outer; it++) {
             tp = performance.now();
             F0.fill(0); F1r.fill(0); F1i.fill(0); F2r.fill(0); F2i.fill(0); iceYear.fill(0); seaIceYear.fill(0);
@@ -623,6 +582,7 @@ export function energyBalanceTemperature() {
                 g, P, orbit, landFrac, gamma: winds ? gamma : 0,
                 airAt: (t) => Float64Array.from(surfaceAt(t, true)),
                 windAt: (t) => { const { a, b, f } = monthAt(t); for (let c = 0; c < G; c++) { uD[c] = (1 - f) * uM[a * G + c] + f * uM[b * G + c]; vD[c] = (1 - f) * vM[a * G + c] + f * vM[b * G + c]; } return { u: uD, v: vD }; },
+                cloudAt: (t) => { if (!cloudMonthly) return null; const { a, b, f } = monthAt(t); return Float64Array.from(cloudMonthly[a], (v, c) => (1 - f) * v + f * cloudMonthly[b][c]); },
                 rainAt: (t) => { if (!Pm) return null; const { a, b, f } = monthAt(t); for (let c = 0; c < G; c++) rD[c] = ((1 - f) * Pm[a][c] + f * Pm[b][c]) / orbit.yearScale; return rD; },
                 iceAt: (t) => { const sl = surfaceAt(t, false); for (let c = 0; c < G; c++) iD[c] = iceRamp(sl[c]); return iD; },
                 wind2Prev: warm && init.dayWind2 ? init.dayWind2 : null,
@@ -731,7 +691,7 @@ export function energyBalanceTemperature() {
         // sunlight-weighted surface and planetary albedo
         const bs = budgetSums, sunMean = bs.sun / bs.area;
         const budget = {
-            sunWm2: sunMean, air: bs.base / bs.sun, vary: bs.vary / bs.sun, ground: bs.ground / bs.sun, snowIce: bs.snowIce / bs.sun, cloud: bs.cloud / bs.sun,
+            sunWm2: sunMean, air: bs.base / bs.sun, vary: bs.vary / bs.sun, ground: bs.ground / bs.sun, snowIce: bs.snowIce / bs.sun, cloud: bs.cloud / bs.sun, cloudLongwaveWm2: bs.cloudLongwave / bs.area,
             cryoWm2: { snowN: -bs.cryo[0] / bs.area, seaN: -bs.cryo[1] / bs.area, sheetN: -bs.cryo[2] / bs.area, snowS: -bs.cryo[3] / bs.area, seaS: -bs.cryo[4] / bs.area, sheetS: -bs.cryo[5] / bs.area, sheetShareN: NT * bs.sheetArea[0] / bs.area, sheetShareS: NT * bs.sheetArea[1] / bs.area },
             rowLat: Array.from(g.lat), rowSurface: Array.from(bs.rowSurface, (v, j) => bs.rowSun[j] > 0 ? v / bs.rowSun[j] : null),
             rowAlbedo: Array.from(bs.rowAlbedo, (v, j) => bs.rowSun[j] > 0 ? v / bs.rowSun[j] : null),
@@ -756,15 +716,6 @@ export function energyBalanceTemperature() {
     };
 }
 
-/**
- * Open share of each face of the energy-balance grid (faces.e: with the east neighbour, faces.n: with the north one):
- * e^{−(ridge − lower side)/H}, averaged over the 1° strips across the face; the ridge of a strip is the highest 1° mean
- * height from one cell's centre to the next, the sides the two cells' mean land heights.
- */
-/**
- * The surface's own albedo variety (smooth fractal noise by geographic position, a fixed size in km). It depends only on
- * the grid, the seed and the two settings, so it is worked out once and shared (read only) by every later call.
- */
 const albedoVarietyCache = new Map();
 function albedoVariety(g, seed, amount, sizeKm) {
     const key = `${g.step}|${g.w}|${g.h}|${g.radiusM}|${seed}|${amount}|${sizeKm}`;
@@ -786,7 +737,6 @@ function albedoVariety(g, seed, amount, sizeKm) {
     return albVary;
 }
 
-/** The year's mean winds and, at the NT sample times, the winds about that mean (linear between mid-month values). */
 function windSamples(G, uM, vM, uBar, vBar, uT, vT) {
     for (let m = 0; m < 12; m++) for (let c = 0; c < G; c++) { uBar[c] += uM[m * G + c] / 12; vBar[c] += vM[m * G + c] / 12; }
     for (let k = 0; k < NT; k++) {
@@ -798,7 +748,6 @@ function windSamples(G, uM, vM, uBar, vBar, uT, vT) {
     }
 }
 
-/** Twelve mid-month fields (an array of G-arrays) → the NT sample times, linear between them. */
 function monthsToSamples(G, qm, qAt) {
     for (let k = 0; k < NT; k++) {
         const pos = 12 * k / NT - 0.5, m0 = Math.floor(pos), fm = pos - m0, ma = ((m0 % 12) + 12) % 12, mb = (ma + 1) % 12;
@@ -807,11 +756,6 @@ function monthsToSamples(G, qm, qAt) {
     }
 }
 
-/**
- * One outer iteration's forcing: at each of the NT sample times, sunlight less the albedo (snow, sea ice, clouds), the
- * seasonal part of the winds' heat carrying and the ocean's heat, accumulated into the harmonics F0, F1, F2; and the
- * year's snow and ice shares. (A function of its own so it is optimised once rather than recompiled inside the stage.)
- */
 function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad, R_PLANET, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
     albVary, cloudT, snowYear, windsOn, uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
     iceWarmC, iceColdC, budget) {
@@ -856,10 +800,12 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 const absorb = airAbsorb(T - f * lapseEff[c] * surfKm[c]), as = f * landS + (1 - f) * seaS, tr = Math.max(0, 1 - R - absorb);
                 const surf = tr * tr * as / (1 - R * as);
                 let alb = R + albVary[c] + surf;
-                if (cloudT) alb += f * (1 - sLa) * cloudT[k * G + c];
+                const cloudAlbedo = cloudT ? f * (1 - sLa) * cloudT.land[k * G + c] + (1 - f) * (1 - sO) * cloudT.sea[k * G + c] : 0;
+                alb += cloudAlbedo;
+                const cloudLongwave = cloudT ? f * cloudT.landLongwave[k * G + c] + (1 - f) * cloudT.seaLongwave[k * G + c] : 0;
                 // (the land's surface: what comes down through the air and its clouds, less what the rain's clouds
                 // over it reflect, and the share its albedo keeps)
-                const down = Math.max(0, q * tr / (1 - R * as) - q * (1 - sLa) * (cloudT ? cloudT[k * G + c] : 0));
+                const down = Math.max(0, q * tr / (1 - R * as) - q * (1 - sLa) * (cloudT ? cloudT.land[k * G + c] : 0));
                 sunDown[k * G + c] = down; sunTaken[k * G + c] = down * (1 - landS);
                 if (budget) {
                     const wl = Math.cos(lat[j] * Math.PI / 180), wq = wl * q, ar = f * SURF_LAND + (1 - f) * SURF_SEA, bare = tr * tr * ar / (1 - R * ar);
@@ -868,12 +814,13 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                     const den = tr * tr / (1 - R * as), hem = lat[j] > 0 ? 0 : 3, sheet = perennial[c] > 0.5 ? 2 : 0;
                     budget.cryo[hem + sheet] += wq * den * f * (landS - SURF_LAND); budget.cryo[hem + 1] += wq * den * (1 - f) * (seaS - SURF_SEA);
                     if (k === 0 && sheet) budget.sheetArea[hem ? 1 : 0] += wl * f;
-                    if (cloudT) budget.cloud += wq * f * (1 - sLa) * cloudT[k * G + c];
+                    budget.cloud += wq * cloudAlbedo;
+                    budget.cloudLongwave += wl * cloudLongwave;
                     budget.area += wl;
                     budget.rowSun[j] += q; budget.rowSurface[j] += q * as; budget.rowAlbedo[j] += q * alb;
                 }
                 snowYear[c] += sL / NT;
-                let gF = q * (1 - alb);
+                let gF = q * (1 - alb) + cloudLongwave;
                 if (T < olrCold.tJC) gF -= olrCold.eps * STEFAN_BOLTZMANN * (T + 273.15) ** 4 - olrCold.A - olrCold.B * T;
                 if (windsOn) {
                     const du = uT[k * G + c], dv = vT[k * G + c];

@@ -10,6 +10,8 @@ export interface CirculationBelts {
 	midS: number
 }
 
+export function tropicsWeight(lat: number, itcz: number, hiN: number, hiS: number): number
+
 export interface CirculationResult {
 	u: Float32Array
 	v: Float32Array

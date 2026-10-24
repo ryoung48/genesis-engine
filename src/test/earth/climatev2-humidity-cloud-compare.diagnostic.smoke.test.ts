@@ -12,12 +12,10 @@ import { CLIMATE_EARTH } from "@/test/earth/fixtures/climate-earth"
 
 // v2's clouds and humidity against our display proxies, scored on observed Earth: ERA5 total cloud cover (1991-2020)
 // and WorldClim 2.1 vapour pressure over land, as relative humidity e / e_s(T) at WorldClim's own temperature.
-// v2 has no cloud-cover output: its temperature stage shades land by 1 − e^{−rain / 100 mm} of each month's rain,
-// which is what is scored as its cloud cover. Its humidity is the rain stage's column relative humidity (water
+// Cloud cover is the field used by v2's radiation. Its humidity is the rain stage's column relative humidity (water
 // vapour over the saturated column), not the near-surface humidity the observations measure.
 
 const MONTHS = 12
-const CLOUD_RAIN_MM = 100
 const BANDS = [
 	["60N–90N", 60, 90],
 	["30N–60N", 30, 60],
@@ -148,8 +146,7 @@ describe("climatev2 humidity and clouds vs observed Earth (diagnostic)", () => {
 					weight,
 				})
 				cloudV2[r].push({
-					model:
-						1 - Math.exp(-Math.max(0, rainfall.monthly[i]) / CLOUD_RAIN_MM),
+					model: climate.cloud_cover_monthly[i],
 					obs,
 					weight,
 				})

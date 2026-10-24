@@ -1,6 +1,7 @@
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { DiurnalCells } from "@/model/climatev2/diurnal/types"
+import type { ClimateBudget } from "@/model/climatev2/vendor/climate.js"
 import type { ClimateOrbit } from "@/model/climatev2/vendor/insolation.js"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
@@ -14,12 +15,14 @@ export interface ClimateV2Input {
 	diagnostics: boolean
 }
 
-export interface ClimateV2IceDiagnostics {
+export interface ClimateV2Diagnostics {
 	seaIceMonthly: Float32Array
 	snowIceShare: Float32Array
+	radiation: ClimateBudget
 }
 
 export interface ClimateV2Cells {
+	cloudCoverMonthly: Float32Array
 	temperatureMonthly: Float32Array
 	rainfallMonthly: Float32Array
 	rainfallAnnual: Float32Array
@@ -27,7 +30,7 @@ export interface ClimateV2Cells {
 	windUMonthly: Float32Array
 	windVMonthly: Float32Array
 	oceanCurrents: GenesisOceanCurrents
-	diagnostics: ClimateV2IceDiagnostics | null
+	diagnostics: ClimateV2Diagnostics | null
 	diurnalRange: DiurnalCells
 	koppen: Uint8Array
 	timing: { stage: string; ms: number }[]

@@ -3,6 +3,8 @@ import type { StageContext, TemperatureStageResult } from "./core.js"
 
 export interface RainResult {
 	P: Float32Array
+	r: Float32Array
+	stability: Float32Array
 }
 
 export function columnWaterRain(): (

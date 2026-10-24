@@ -3,6 +3,7 @@ import type { LatLonGrid } from "./grid.js"
 import type { ClimateOrbit } from "./insolation.js"
 import type { OceanResult } from "./ocean.js"
 import type { RainResult } from "./rain.js"
+import type { CloudFields } from "../clouds/types"
 
 export interface ClimateSurface {
 	landFrac: Float32Array
@@ -25,14 +26,17 @@ export interface TemperatureStageResult {
 	state: unknown
 }
 
-export type TemperatureStage = (
-	ctx: StageContext,
-	winds: CirculationResult | null,
-	init: unknown,
-	qflux: Float32Array | null,
-	rain: Float32Array | null,
-	ocean: OceanResult | null,
-) => TemperatureStageResult
+export interface TemperatureStageInput {
+	ctx: StageContext
+	winds: CirculationResult | null
+	init: unknown
+	qflux: Float32Array | null
+	rain: Float32Array | null
+	ocean: OceanResult | null
+	clouds: CloudFields | null
+}
+
+export type TemperatureStage = (input: TemperatureStageInput) => TemperatureStageResult
 
 export interface ClimateStages {
 	temperature: TemperatureStage

@@ -1,4 +1,5 @@
-// Vendored verbatim from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/rain.js (GPL-3.0, see LICENSE).
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/rain.js (GPL-3.0, see LICENSE).
+// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage.
 // Rain stage: a column-water budget on the climate grid, at each point in the year. DOM-free.
 //
 // The water vapour in the air column, W (mm = kg/m²), is in balance at each point in the year:
@@ -61,33 +62,17 @@ const STABLE_RELAX_S = 86400;                 // s, time for air to take on the 
 const CONVECT_RN_LOW = 30;
 const CONVECT_RN_FULL = 110;
 
-/** Saturation specific humidity (kg/kg) at T (°C), 1013 hPa — Magnus formula. */
 export function qSat(T) {
     const t = Math.max(-60, Math.min(50, T));
     return 0.622 * 6.112 * Math.exp(17.67 * t / (t + 243.5)) / 1013;
 }
 
-/** Evaporation from land with water `avail` and potential rate `ep` (same units) — Turc–Pike: the smaller, smoothly. */
 const turcPike = (avail, ep) => avail / Math.sqrt(1 + (avail / Math.max(1e-12, ep)) ** 2);
 
-/** The saturated column (mm) above air at T (°C): ≈ ρ q_s H with the water-vapour scale height H. */
 export function saturatedColumn(T, vapourHeightKm) {
     return RHO_AIR * qSat(T) * vapourHeightKm * 1000;
 }
 
-/**
- * Mountains below the rain grid's scale, on the 1° grid (its land's mean heights), at each point in the year. The wind
- * blowing up a slope lifts the air and wrings out more rain, blowing down it less; and air that has come down from
- * higher ground on its way is dry — the rain shadow: looking upwind along the wind, the largest drop from the ground
- * there to here, each counted less with distance (e^{−d / RAIN_LEE_RECOVER_KM}) as the air takes up moisture again.
- * Air lifted from lower ground on its way has condensed more of its water: windward slopes get wetter with height, up to
- * the crest (the largest rise, weighted the same way; RAIN_RISE_PER_KM).
- * The wind is the storms' as much as the month's mean (orographic rain falls in storms): the mean wind's direction at
- * speed √(U² + (s·σL)²), σ the Eady rate, L the storms' size. factor = e^{β·clamp(w / 0.1 m/s, −2, 2) + κ·rise − λ·drop}
- * (rise and drop in km, each saturating at the vapour scale height).
- * Rain is moved, not made: the factor is normalised over all within RAIN_OROG_SPREAD_KM (sea too), weighted by the rain —
- * windward slopes take it from the lee, so whole regions behind a range are dry.
- */
 function orographicRain(ctx, core, g, ratio, uA, vA, shareCoarse, eadyK, Pout, K, tA) {
     const orbit = orbitOf(ctx.options), P_ = sizeScaled(spinScaled(PARAMS, orbit), orbit), R_PLANET = core.radiusM;
     const h = core.h, w = core.w, G = core.size, dRad = core.step * DEG, stepKm = R_PLANET / 1000 * core.step * DEG;
@@ -179,14 +164,6 @@ function orographicRain(ctx, core, g, ratio, uA, vA, shareCoarse, eadyK, Pout, K
     }
 }
 
-/**
- * stage(ctx, winds, temperature) → { P (K × G, mm/month, at the anchor months), W (K × G, mm of column water),
- * E (K × G, mm/month evaporation), r (K × G, column relative humidity), eady (K arrays of per-row storm growth, 1/day),
- * balance (global rain / evaporation per anchor), cycles, newton, ms }.
- * winds: { u, v } (12 × G, m/s, near the surface) and optionally surfaceShare, surfaceShareLand (near-surface wind as a share of the
- * wind above the friction layer; default: observed-like, 0.75 over the sea and 0.45 over land). temperature:
- * { monthly (surface air at the reference height), monthlySL (sea level: the sea surface), seaIce } (12 × G).
- */
 export function columnWaterRain() {
     return (ctx, winds, temperature, init = null) => {
         const orbit = orbitOf(ctx.options), SECONDS_PER_MONTH = EARTH_SECONDS_PER_MONTH * orbit.yearScale;
@@ -230,7 +207,6 @@ export function columnWaterRain() {
         poisson.setOperator(new Float64Array(G).fill(1e-4), zero, null, null, 0);
 
         const chi = new Float64Array(G);
-        /** The divergent part ∇χ of a wind field, from ∇²χ = ∇·u (a slightly damped Poisson solve on the sphere). */
         function divergentPart(u, v) {
             const dv = new Float64Array(G), chiI = new Float64Array(G);
             let mean = 0, aw = 0;
@@ -330,6 +306,7 @@ export function columnWaterRain() {
             }
             carrier.setOperator(new Float64Array(G).fill(1 / STABLE_RELAX_S), zero, u, v, 1);
             carrier.solve(Sloc, zero, Sair, SairI, { maxCycles: P_.RAIN_CARRIER_CYCLES, tol: 1e-3 });
+            p.stability = Sair;
 
             const at = sunAt(ctx.anchorMonths[k] + 0.5, orbit);
             const sun = Float64Array.from(g.lat, l => dailyInsolation(l * DEG, at.delta, at.s0));
@@ -456,12 +433,6 @@ export function columnWaterRain() {
             prep.push(p);
         }
 
-        /**
-         * The divergent part of the moisture wind by how deep the converging layer is: shallow where the air is dry
-         * (heat lows under dry air aloft, the trade-wind layer), deep where the column is moist and convecting (the rain
-         * belt, monsoons, rainforests) — from RAIN_WIND_DIV_DRY to RAIN_WIND_DIV_MOIST of the near-surface wind as the
-         * column's relative humidity rises from RAIN_DEEP_R0 to RAIN_DEEP_R1.
-         */
         function setWind(p, Wv) {
             const d0 = P_.RAIN_WIND_DIV_DRY, d1 = P_.RAIN_WIND_DIV_MOIST;
             for (let c = 0; c < G; c++) {
@@ -478,11 +449,6 @@ export function columnWaterRain() {
         const sigma = new Float64Array(G), src = new Float64Array(G), srcI = new Float64Array(G), Wi = new Float64Array(G);
         const Wold = new Float64Array(G);
         let cycles = 0, newton = 0;
-        /**
-         * Newton steps on the budget at anchor k, from the column water in Wv (updated in place). ground: the snow melting
-         * and the soil water stored at this point in the year (kg m⁻² s⁻¹, per unit land area), or null (pass 1: the
-         * land evaporates only the month's rain). Returns { P, E, balance }.
-         */
         function solveAnchor(k, Wv, ground) {
             const p = prep[k], Ws = p.Ws, rate = p.rate, lift = p.lift, beta = p.beta, faces = p.faces;
             // Rain-out rate and its slope in W. In the air: (Ws/τ)·rate·e^{a(r−1)}, continued linearly beyond R_MAX. Over
@@ -587,6 +553,7 @@ export function columnWaterRain() {
 
         const Pout = new Float32Array(K * core.size), Wout = new Float32Array(K * core.size);
         const Eout = new Float32Array(K * core.size), Rout = new Float32Array(K * core.size);
+        const stability = new Float32Array(K * core.size);
         const tmp = new Float64Array(G);
         for (let k = 0; k < K; k++) {
             const off = k * core.size, { P, E } = results[k];
@@ -597,6 +564,7 @@ export function columnWaterRain() {
             refineField(g, core, ratio, Wk[k], Wout, off);
             for (let c = 0; c < G; c++) tmp[c] = Wk[k][c] / prep[k].Ws[c];
             refineField(g, core, ratio, tmp, Rout, off);
+            refineField(g, core, ratio, prep[k].stability, stability, off);
         }
         // the mountains' share of the rain: the year's rain with them over the year's without (1: none; > 1 the windward
         // slopes, < 1 the rain shadows) — for display (V1's Generate and Import: the Rain Shadow layer)
@@ -633,7 +601,7 @@ export function columnWaterRain() {
                 }
             }
         }
-        const out = { P: Pout, W: Wout, E: Eout, r: Rout, orographic, eady: eadyOut, balance: results.map(r => r.balance), cycles, newton,
+        const out = { P: Pout, W: Wout, E: Eout, r: Rout, stability, orographic, eady: eadyOut, balance: results.map(r => r.balance), cycles, newton,
             state: { step: g.step, Wk }, profile: prof, ms: performance.now() - t0, source: 'column water' };
         if (globalThis.RAIN_DEBUG) out.debug = { g, prep, Wk, results, land, hgt };
         return out;

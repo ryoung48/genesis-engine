@@ -934,6 +934,13 @@ function score() {
 	})
 	return {
 		landCells: tAnnualN,
+		radiation: v2Cells.diagnostics.radiation,
+		configuration: {
+			seed: world.params.seed,
+			points: world.params.numPoints,
+			obliquity: world.params.obliquity,
+			eccentricity: world.params.eccentricity,
+		},
 		temperature: {
 			monthlyMaeC: Number((tMonthlyAbs / tMonthlyN).toFixed(3)),
 			annualMaeC: Number((tAnnualAbs / tAnnualN).toFixed(3)),

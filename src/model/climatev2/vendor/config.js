@@ -1,4 +1,5 @@
-// Vendored verbatim from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/config.js (GPL-3.0, see LICENSE).
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/config.js (GPL-3.0, see LICENSE).
+// Modified in chaos-machine: add the residual low-cloud albedo contrast.
 // Tunable settings of the new climate, grouped by stage — a handful per stage, each with a physical meaning and a
 // unit. Mutable so the tuning suite (tuning/climate/) can set them in-process; the app always uses the defaults.
 // Each stage is tuned on its own against its own Earth observations, then frozen (plans/CLIMATE_REBUILD_PLAN.md).
@@ -58,8 +59,10 @@ export const PARAMS_DEFAULTS = Object.freeze({
     TEMP_EVAP_DAMPING: 15,      // W/m²/K     evaporation's damping of the seasons over a wet surface at 25 °C
     TEMP_WET_COOL_C: 2,         // °C         how much cooler fully wet tropical ground is than dry, at 25 °C under a strong sun
     TEMP_SEA_SWING: 0.3,        // –          the sea's seasonal swing as a share of the land's (continentality below the grid)
+    TEMP_CLOUD_LONGWAVE_WINDOW: 0.4, // effective clear-sky transmission of the diagnosed cloud thermal contrast
+    TEMP_LOW_CLOUD_ALBEDO: 0.04, // additional regional low-cloud albedo contrast, centred on the existing cloud background
     TEMP_CLOUD_ALBEDO: 0.262,   // –          albedo of land's clouds beyond the average (with the rain stage's rain)
-    TEMP_CLOUD_LW_CANCEL: 0.8,  // –          … less this share of it in the rainy tropics (deep clouds trap about the heat they reflect)
+    TEMP_CLOUD_LW_CANCEL: 0.8,  // –          deep-cloud longwave share in the convective tropics
     TEMP_ALBEDO_VARY: 0.025,    // –          the surface's own variety of brightness (soils, cover, cloudiness): smooth fractal
     TEMP_ALBEDO_VARY_KM: 900,   // km         noise up to ± this, its largest features this big — an input the energy balance
                                 //            works through, so snow lines and ice-sheet edges come out irregular, by the physics
