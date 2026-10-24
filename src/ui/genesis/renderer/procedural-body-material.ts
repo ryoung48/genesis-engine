@@ -62,5 +62,7 @@ function selectProceduralBodyMaterial(
 	if (classification === "telluric") return cloudy("venusian")
 	if (classification === "meltball") return cratered("meltball")
 	if (classification === "rockball") return cratered("cratered")
+	if (classification === "snowball" && hasThinAtmosphere(atmosphere))
+		return cratered("cratered")
 	return hasThinAtmosphere(atmosphere) ? cratered("martian") : cloudy("cloudy")
 }
