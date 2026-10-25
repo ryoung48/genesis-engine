@@ -297,6 +297,7 @@ function importGenesisWorld({
 
 	// Build GenesisParams from ImportParams
 	const genesisParams: GenesisParams = {
+		climateModel: params.climateModel,
 		seed: params.seed,
 		tideLock: params.tideLock ?? null,
 		numPoints: params.numPoints,

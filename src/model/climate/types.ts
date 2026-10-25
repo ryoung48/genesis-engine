@@ -1,4 +1,6 @@
 export interface GenesisClimate {
+	// [JUSTIFICATION] V1 winds require the pre-lapse temperature; v2 and locked solvers do not produce it.
+	temperature_monthly_nolapse?: Float32Array
 	temperature_avg: Float32Array // per-cell annual mean °C
 	temperature_min: Float32Array // per-cell annual min °C
 	temperature_max: Float32Array // per-cell annual max °C

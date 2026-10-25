@@ -23,6 +23,7 @@ import type { HistoryMigration } from "@/model/history/distribution/migration/ty
 import type { SphereMesh } from "@/model/mesh/types"
 
 export type ApplyOceanCurrentsToClimateParams = {
+	isLocked: boolean
 	mesh: SphereMesh
 	climate: GenesisClimate
 	isLand: Uint8Array

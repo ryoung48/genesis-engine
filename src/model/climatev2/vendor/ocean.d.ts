@@ -8,6 +8,7 @@ export interface OceanMonthly {
 }
 
 export interface OceanResult {
+	thermocline: Float32Array
 	u: Float32Array
 	v: Float32Array
 	qflux: Float32Array

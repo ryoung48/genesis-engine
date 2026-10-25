@@ -1,5 +1,6 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
+import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import type {
 	ComputeWindVectorsInput,
 	FlowGrid,
@@ -163,18 +164,12 @@ function computeWindVectors(input: ComputeWindVectorsInput): {
 	pressure: Float32Array
 	windSpeed: Float32Array
 } {
-	// (only a planet locked to its star derives its winds here: every other world's are climatev2's)
-	return LOCKED_WIND.computeLockedWindVectors(input)
+	if (input.params?.tideLock?.type === "solar") {
+		return LOCKED_WIND.computeLockedWindVectors(input)
+	}
+	return SIMPLE_WIND.computeWindVectors(input)
 }
 
-/** Builds the same {windU, windV, pressure, windSpeed} shape as
- * computeWindVectors (windU/windV are unit direction vectors, windSpeed the
- * magnitude in m/s; pressure is unused for observed data and left zeroed)
- * but sourced from GenesisWorld.observedWind (NCEP/NCAR reanalysis, sampled
- * onto mesh regions by attachObservedEarthWind) instead of the procedural
- * pressure-gradient model -- lets the wind particle overlay render real
- * Earth wind for comparison/tuning against the model (see the "Wind" ->
- * "Observed (NCEP)" toggle in OverlayControls). */
 function observedWindVectorsForMonth({
 	observedWind,
 	numRegions,

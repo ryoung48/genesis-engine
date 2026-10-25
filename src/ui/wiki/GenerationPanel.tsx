@@ -12,6 +12,7 @@ import type {
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
+import type { ClimateModel } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
@@ -57,6 +58,8 @@ import {
 import { type WarWikiData, WarWikiPage } from "@/ui/wiki/war/WarWikiPage"
 
 interface GenerationPanelProps {
+	climateModel: ClimateModel
+	setClimateModel: (model: ClimateModel) => void
 	worldTab: "planet" | "society"
 	setWorldTab: (tab: "planet" | "society") => void
 	resetWorldDefaults: () => void
@@ -189,6 +192,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	era,
 	setEra,
 	generating,
+	climateModel,
+	setClimateModel,
 	generationLabel,
 	generationProgress,
 	generationTimings,
@@ -307,6 +312,15 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 					/>
 				</div>
 			) : null}
+			<SegmentedControl
+				fullWidth
+				options={[
+					{ value: "v2", label: "Climate v2", disabled: generating },
+					{ value: "v1", label: "Climate v1", disabled: generating },
+				]}
+				value={climateModel}
+				onChange={setClimateModel}
+			/>
 			<Button
 				tone="panel"
 				selected

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
+import type { ClimateModel } from "@/model/pipelines/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
@@ -96,6 +97,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		mainWorldSystemBody,
 	} = input
 
+	const [climateModel, setClimateModel] = useState<ClimateModel>(
+		DEFAULT_WORLD_PARAMS.climateModel,
+	)
 	const [generating, setGenerating] = useState(false)
 	const [generationProgress, setGenerationProgress] = useState(0)
 	const [generationLabel, setGenerationLabel] = useState("Idle")
@@ -204,6 +208,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 					: 1,
 			craters: 0,
 			maxElevation,
+			climateModel,
 			pressure,
 			albedo: mainWorldSystemBody?.albedo,
 			greenhouseFactor: mainWorldSystemBody?.greenhouseFactor,
@@ -238,6 +243,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			ridgeSharpening,
 			glacialErosion,
 			seaLevel,
+			climateModel,
 			pressure,
 			mainWorldSystemBody?.albedo,
 			mainWorldSystemBody?.greenhouseFactor,
@@ -363,6 +369,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				orbitalDistanceAU,
 				daysPerYear,
 				hoursPerDay,
+				climateModel,
 				pressure,
 				// Real Earth values, not the live sliders -- this path is
 				// Earth-only (see callers). Prefer the live mainWorldSystemBody
@@ -444,6 +451,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			tideLock,
 			substellarLon,
 			seaLevel,
+			climateModel,
 			pressure,
 			mainWorldSystemBody?.albedo,
 			mainWorldSystemBody?.greenhouseFactor,
@@ -584,6 +592,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 	)
 
 	return {
+		climateModel,
+		setClimateModel,
 		generating,
 		generationProgress,
 		generationLabel,

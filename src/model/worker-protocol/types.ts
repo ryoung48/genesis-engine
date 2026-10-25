@@ -10,7 +10,7 @@ import type { HistoryMigration } from "@/model/history/distribution/migration/ty
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
-import type { GenesisParams } from "@/model/pipelines/types"
+import type { ClimateModel, GenesisParams } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
@@ -335,6 +335,8 @@ export type GenesisWorkerRequest =
 	| {
 			type: "import"
 			params: {
+				// [JUSTIFICATION] Imports use v2 when no model is selected.
+				climateModel?: ClimateModel
 				seed: number
 				numPoints: number
 				jitter: number

@@ -42,7 +42,11 @@ import type {
 	SocietyEra,
 } from "@/model/society/types"
 
+export type ClimateModel = "v1" | "v2"
+
 export interface GenesisParams {
+	// [JUSTIFICATION] Model callers may omit the selection to use the default v2 solver.
+	climateModel?: ClimateModel
 	// [JUSTIFICATION] Terrain-only callers need not select history; application and history runners select it explicitly.
 	historyPipeline?: HistoryPipeline
 	seed: number

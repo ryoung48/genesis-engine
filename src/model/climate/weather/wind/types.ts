@@ -6,24 +6,24 @@ export interface WindSurface {
 	vegetation?: Uint8Array | null
 	topography?: Uint8Array | null
 	slopeScore?: Float32Array | null
-	/** Per-region BFS distance to nearest ocean, in km. */
+	// Per-region BFS distance to nearest ocean, in km.
 	oceanDist?: Float32Array | null
 }
 
 export interface FlowGrid {
-	/** Eastward component per cell, row-major latÃ—lon. */
+	// Eastward component per cell, row-major lat×lon.
 	u: Float32Array
-	/** Northward component per cell. */
+	// Northward component per cell.
 	v: Float32Array
-	/** Approximate wind speed (m/s) per cell. */
+	// Approximate wind speed (m/s) per cell.
 	speed: Float32Array
-	/** Optional scalar field used for particle coloring or spawn masking. */
+	// Optional scalar field used for particle coloring or spawn masking.
 	scalar?: Float32Array
-	/** Optional active-cell mask (1 = active, 0 = inactive). */
+	// Optional active-cell mask (1 = active, 0 = inactive).
 	mask?: Uint8Array
-	/** Grid width (360 = 1° per column, lon -180…179). */
+	// Grid width (360 = 1° per column, lon -180…179).
 	width: 360
-	/** Grid height (181 = 1° per row, lat -90…90). */
+	// Grid height (181 = 1° per row, lat -90…90).
 	height: 181
 }
 
@@ -46,7 +46,7 @@ export interface WindArrowData {
 	lon: Float32Array
 	u: Float32Array
 	v: Float32Array
-	/** Approximate surface wind speed in m/s. */
+	// Approximate surface wind speed in m/s.
 	speed: Float32Array
 }
 
@@ -54,7 +54,7 @@ export interface ComputeWindVectorsInput {
 	mesh: SphereMesh
 	climate: GenesisClimate
 	elevation_km: Float32Array
-	/** Defaults to Earth-like rotation and pressure when no planet parameters are available. */
+	// Defaults to Earth-like rotation and pressure when no planet parameters are available.
 	params?: Pick<
 		GenesisParams,
 		| "obliquity"
@@ -67,9 +67,9 @@ export interface ComputeWindVectorsInput {
 		| "planetRadiusKm"
 		| "daysPerYear"
 	>
-	/** Omit to calculate annual-average wind vectors. */
+	// Omit to calculate annual-average wind vectors.
 	month?: number
-	/** Omit when terrain roughness and ocean distance are unavailable. */
+	// Omit when terrain roughness and ocean distance are unavailable.
 	surface?: WindSurface
 }
 
