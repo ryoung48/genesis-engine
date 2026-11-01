@@ -465,6 +465,7 @@ export const HEAT = {
 	computeMonthlyLibration,
 	computeLockedSubstellarDeclinationRad,
 	computeMonthlyLockedDeclination,
+	computeMonthlyOrbitalFlux,
 	getSubstellarDirWithOffsetAndDeclination,
 	computeTidalTransportParams,
 	computeTidalTemperature,

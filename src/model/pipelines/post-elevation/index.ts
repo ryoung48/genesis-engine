@@ -224,6 +224,14 @@ function runPostElevationPipeline(
 				oceanDist,
 				elevation_km,
 			})
+	if (isLocked && params.climateModel !== "v1")
+		CLIMATE_V2.applyLockedTemperature({
+			mesh,
+			climate,
+			elevationKm: elevation_km,
+			isLand,
+			params,
+		})
 	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
 	onProgress?.("Post: climate", 42)
 
@@ -1091,12 +1099,14 @@ function runPostElevationPipeline(
 		// after the start (or never) already has them and a name.
 		const settledAtStart = new Uint8Array(provinces.count)
 		let habitableCount = 0
+		let settledCount = 0
 		for (let p = 0; p < provinces.count; p++) {
 			if (provinces.desolate[p]) continue
 			habitableCount++
 			if (arrivalSteered) {
 				eraSettledMask[p] = 1
 				settledAtStart[p] = migration.arrivalYear[p] <= startYear ? 1 : 0
+				settledCount += settledAtStart[p]
 			} else if (
 				migrationWave[p] >= 0 &&
 				migrationWave[p] <= actualSettlementWave
@@ -1117,7 +1127,7 @@ function runPostElevationPipeline(
 					suitability: migration.suitability,
 					settled: settledAtStart,
 					sources: sources.length ? sources : [migration.origin],
-					count: Math.round(profile.stateHeld * habitableCount),
+					count: Math.round(profile.stateHeld * settledCount),
 					r_xyz: mesh.r_xyz,
 					planetRadiusKm,
 				})

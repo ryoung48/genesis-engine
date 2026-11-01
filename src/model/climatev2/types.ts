@@ -1,4 +1,7 @@
-import type { GenesisOceanCurrents } from "@/model/climate/types"
+import type {
+	GenesisClimate,
+	GenesisOceanCurrents,
+} from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { DiurnalCells } from "@/model/climatev2/diurnal/types"
 import type { ClimateBudget } from "@/model/climatev2/vendor/climate.js"
@@ -47,6 +50,17 @@ export interface ClimateV2ClimateParams {
 	mesh: SphereMesh
 	params: GenesisParams
 	v2: ClimateV2Cells
+}
+
+export interface LockedTemperatureParams {
+	mesh: SphereMesh
+	elevationKm: Float32Array
+	isLand: Uint8Array
+	params: GenesisParams
+}
+
+export interface ApplyLockedTemperatureParams extends LockedTemperatureParams {
+	climate: GenesisClimate
 }
 
 export interface ZonalSeaAnomalyParams {

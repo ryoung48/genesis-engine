@@ -43,6 +43,11 @@ export interface ClimateBudget {
 	rowNetWm2: number[]
 }
 
+export function lockedClimate(
+	input: PlanetClimateInput,
+	options: PlanetClimateOptions,
+): PlanetClimateResult
+
 export interface PlanetClimateResult {
 	grid: LatLonGrid
 	surface: ClimateSurface

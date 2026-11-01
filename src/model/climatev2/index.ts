@@ -5,13 +5,18 @@ import { CLIMATEV2_DIURNAL } from "@/model/climatev2/diurnal"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import type {
+	ApplyLockedTemperatureParams,
 	ClimateV2Cells,
 	ClimateV2ClimateParams,
 	ClimateV2Input,
 	ClimateV2WorldParams,
+	LockedTemperatureParams,
 	ZonalSeaAnomalyParams,
 } from "@/model/climatev2/types"
-import { planetClimate } from "@/model/climatev2/vendor/climate.js"
+import {
+	lockedClimate,
+	planetClimate,
+} from "@/model/climatev2/vendor/climate.js"
 
 const MONTHS = 12
 const DEG = 180 / Math.PI
@@ -186,7 +191,57 @@ function toClimate({
 	return climate
 }
 
+function computeLockedTemperature({
+	mesh,
+	elevationKm,
+	isLand,
+	params,
+}: LockedTemperatureParams): Float32Array {
+	const N = mesh.numRegions
+	const temperatureMonthly = new Float32Array(MONTHS * N)
+	const result = lockedClimate(
+		{ xyz: mesh.r_xyz, elevKm: elevationKm, axes: "z-up", land: isLand },
+		{
+			...CLIMATEV2_ORBIT.lockedFromParams(params),
+			seed: params.seed,
+			greenhouseWm2: 0,
+			onCell: (r, T12) => {
+				for (let m = 0; m < MONTHS; m++) temperatureMonthly[m * N + r] = T12[m]
+			},
+		},
+	)
+	const { grid } = result
+	const sea = new Uint8Array(N)
+	for (let r = 0; r < N; r++) sea[r] = isLand[r] ? 0 : 1
+	CLIMATEV2_OUTPUTS.sampleCells({
+		weights: CLIMATEV2_OUTPUTS.bilinearWeights({ mesh, grid }),
+		fieldSize: grid.size,
+		months: MONTHS,
+		field: result.stages.temperature.monthlySL,
+		out: temperatureMonthly,
+		cells: sea,
+	})
+	return temperatureMonthly
+}
+
+function applyLockedTemperature({
+	climate,
+	...world
+}: ApplyLockedTemperatureParams): void {
+	const N = world.mesh.numRegions
+	climate.temperature_monthly.set(computeLockedTemperature(world))
+	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
+		temperature_monthly: climate.temperature_monthly,
+		temperature_avg: climate.temperature_avg,
+		temperature_min: climate.temperature_min,
+		temperature_max: climate.temperature_max,
+		N,
+	})
+}
+
 export const CLIMATE_V2 = {
+	computeLockedTemperature,
+	applyLockedTemperature,
 	computeCellClimate,
 	computeForWorld,
 	toClimate,

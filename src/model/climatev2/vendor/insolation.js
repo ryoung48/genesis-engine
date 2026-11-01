@@ -56,6 +56,34 @@ export function insolationTable(latDeg, orbit, NT = 24) {
     return out;
 }
 
+const DEG = Math.PI / 180;
+const monthlyAt = (values, t) => { const pos = t - 0.5, m0 = Math.floor(pos), f = pos - m0, a = ((m0 % 12) + 12) % 12, b = (a + 1) % 12; return values[a] * (1 - f) + values[b] * f; };
+
+/**
+ * Sunlight on a planet locked to its star (orbit.locked: substellarLon °, and libration, declination (radians) and flux
+ * (W/m²) by month): at time t (months), each cell's instantaneous flux S·max(0, cos θ) (θ, its angle from the
+ * substellar point) into q, and cos θ itself into mu. Row-major over the latitude and longitude rows given.
+ */
+export function lockedSunAt(latDeg, lonDeg, orbit, t, q, mu) {
+    const L = orbit.locked, lon = L.substellarLon * DEG + monthlyAt(L.libration, t), dec = monthlyAt(L.declination, t), s0 = monthlyAt(L.flux, t);
+    const sx = Math.cos(dec) * Math.cos(lon), sy = Math.cos(dec) * Math.sin(lon), sz = Math.sin(dec), w = lonDeg.length;
+    for (let j = 0; j < latDeg.length; j++) {
+        const cl = Math.cos(latDeg[j] * DEG), sl = Math.sin(latDeg[j] * DEG);
+        for (let i = 0; i < w; i++) {
+            const c = Math.max(0, cl * Math.cos(lonDeg[i] * DEG) * sx + cl * Math.sin(lonDeg[i] * DEG) * sy + sl * sz);
+            q[j * w + i] = s0 * c;
+            if (mu) mu[j * w + i] = c;
+        }
+    }
+}
+
+/** lockedSunAt at NT evenly spaced times of year: { q, mu }, each NT × cells, time-major. */
+export function lockedTables(latDeg, lonDeg, orbit, NT = 24) {
+    const cells = latDeg.length * lonDeg.length, q = new Float64Array(NT * cells), mu = new Float64Array(NT * cells);
+    for (let k = 0; k < NT; k++) lockedSunAt(latDeg, lonDeg, orbit, 12 * k / NT, q.subarray(k * cells, (k + 1) * cells), mu.subarray(k * cells, (k + 1) * cells));
+    return { q, mu };
+}
+
 export const EARTH_ROTATION = 7.292e-5;      // s⁻¹, Earth's (sidereal) rotation
 
 /**
@@ -70,7 +98,7 @@ export function orbitOf(options) {
         tiltDeg: options?.tiltDeg ?? 23.44, eccentricity: options?.eccentricity ?? 0, perihelion: options?.perihelion ?? 102.94719,
         rotation: options?.rotationRateRadS ?? EARTH_ROTATION, yearScale: options?.yearScale ?? 1, solarDayScale: options?.solarDayScale ?? 1,
         sunScale: options?.sunScale ?? 1, radiusScale: options?.radiusScale ?? 1, gravityScale: options?.gravityScale ?? 1,
-        pressureScale: options?.pressureScale ?? 1,
+        pressureScale: options?.pressureScale ?? 1, locked: options?.locked ?? null,
     };
 }
 

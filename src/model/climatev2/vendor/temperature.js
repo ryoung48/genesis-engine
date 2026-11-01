@@ -21,7 +21,7 @@
 
 import { CLIMATEV2_CLOUD_RADIATION } from '../clouds/radiation/index.ts';
 import { LatLonGrid, coarsenField, refineField, refineForDrawing, fillAcross } from './grid.js';
-import { insolationTable, zenithTable, dailyInsolation, orbitOf, sunAt, SOLAR_CONSTANT } from './insolation.js';
+import { insolationTable, zenithTable, dailyInsolation, orbitOf, sunAt, lockedSunAt, lockedTables, SOLAR_CONSTANT } from './insolation.js';
 import { HelmholtzSolver } from './solver.js';
 import { PARAMS } from './config.js';
 import { spinScaled } from './rotation.js';
@@ -33,6 +33,8 @@ import { FastNoise } from './fast-noise.js';
 
 const EARTH_SECONDS_PER_YEAR = 3.156e7;
 const AIR_COLUMN_HEAT_CAP = 1.0e7;          // J/m²/K — the atmosphere's heat capacity per unit area
+const AIR_CP = 1004, AIR_R = 287;           // J/kg/K — dry air's specific heat and gas constant
+const ALBEDO_FOR_WAVES = 0.3;               // the albedo that sets the air's temperature for the gravity waves' speed (Earth's)
 const SEAWATER_HEAT_CAP = 1025 * 3990;      // J/m³/K
 const NT = 12;                              // samples per year for what is evaluated in time (≥ 5 for 2 harmonics)
 const OUTER = 3;                            // outer iterations (snow / ice, seasonal winds)
@@ -98,6 +100,22 @@ function coldOlr({ A, B }) {
     const tJ = (4 * 273.15 - 4 * A / B) / 3;
     return { tJC: tJ - 273.15, eps: B / (4 * STEFAN_BOLTZMANN * tJ ** 3), A, B };
 }
+/**
+ * The heat a locked planet's air carries between its day and night sides, as the unit-sphere diffusivity (W/m²/K)
+ * the energy balance spreads it with. The overturning crosses the planet at the speed of the first baroclinic gravity
+ * wave, c = N·H/π ≈ R·√T / (π·√c_p) (≈ 46 m/s at 255 K: Vallis 2017 §6; Pierrehumbert & Hammond 2019 §3), carrying
+ * the column's heat C_air = c_p·p/g, so a diffusivity κ = η·c·R and D = C_air·κ / R² = η·C_air·c / R: more air carries
+ * more, a bigger planet less. Rotation holds it back once the waves' Rossby radius c/2Ω falls below the planet's radius
+ * R, as η = min(1, c / (2·Ω·R)) (Earth's own spin gives 0.05; a 20-day or longer orbit gives 1). Both are for a dry
+ * troposphere; the sea and its ice, and the clouds, answer through the rest of the energy balance.
+ */
+function lockedDiffusivity(orbit, radiusM) {
+    const sBlack = 5.67e-8, tK = (SOLAR_CONSTANT * orbit.sunScale * (1 - ALBEDO_FOR_WAVES) / (4 * sBlack)) ** 0.25;
+    const c = AIR_R * Math.sqrt(tK) / (Math.PI * Math.sqrt(AIR_CP));
+    const eta = Math.min(1, c / (2 * orbit.rotation * radiusM));
+    return eta * AIR_COLUMN_HEAT_CAP * orbit.pressureScale / orbit.gravityScale * c / radiusM;
+}
+
 export function energyBalanceTemperature() {
     return ({ ctx, winds, init = null, qflux = null, rain = null, ocean = null, clouds = null }) => {
         const orbit = orbitOf(ctx.options), OMEGA = 2 * Math.PI / (EARTH_SECONDS_PER_YEAR * orbit.yearScale);
@@ -131,7 +149,7 @@ export function energyBalanceTemperature() {
         const cloudT = clouds ? CLIMATEV2_CLOUD_RADIATION.compute({core, grid: g, ratio, clouds, landFrac, winds, albedo: P.TEMP_CLOUD_ALBEDO, longwaveCancellation: P.TEMP_CLOUD_LW_CANCEL, lowAlbedo: P.TEMP_LOW_CLOUD_ALBEDO, longwaveWindow: P.TEMP_CLOUD_LONGWAVE_WINDOW}) : null;
 
         // Sunlight and base albedo per row
-        const Q = insolationTable(g.lat, orbit, NT);
+        const Qrow = insolationTable(g.lat, orbit, NT);
         // (the air's reflectance by the sun's height: air, clouds and the sea reflect more of a low sun — 1 − μ̄, the
         // sunlight-weighted mean cos(zenith) of each row's year. The year's, not each month's: the clouds that make most
         // of it follow the year's sun — the storm tracks stay cloudy through their summers — and with each month's the
@@ -141,10 +159,10 @@ export function energyBalanceTemperature() {
         // there), and only the sun's slant itself moves it as this orbit's μ̄ departs from Earth's: through clear air,
         // Rayleigh scattering 0.28 / (1 + 6.43μ) (Lacis & Hansen 1974), and through cloud tops, a conservatively
         // scattering cloud's Eddington reflectance (Lacis & Hansen 1974), in CLOUD_COVER of the sky
-        const Mu = zenithTable(g.lat, orbit, NT), albBase = new Float64Array(NT * h);
+        const Mu = zenithTable(g.lat, orbit, NT), albRow = new Float64Array(NT * h);
         const earth = orbitOf(null), QE = insolationTable(g.lat, earth, NT), MuE = zenithTable(g.lat, earth, NT);
         const meanMu = (q, mu, j) => { let sq = 0, smu = 0; for (let k = 0; k < NT; k++) { sq += q[k * h + j]; smu += q[k * h + j] * mu[k * h + j]; } return sq > 0 ? smu / sq : 0; };
-        const muRow = Float64Array.from(g.lat, (_, j) => meanMu(Q, Mu, j)), muEarth = Float64Array.from(g.lat, (_, j) => meanMu(QE, MuE, j));
+        const muRow = Float64Array.from(g.lat, (_, j) => meanMu(Qrow, Mu, j)), muEarth = Float64Array.from(g.lat, (_, j) => meanMu(QE, MuE, j));
         // (Earth's μ̄ at any latitude, between its rows)
         const muEarthAt = (lat) => { const y = Math.max(0, Math.min(h - 1, (90 - lat) / g.step - 0.5)), j0 = Math.floor(y), j1 = Math.min(h - 1, j0 + 1); return muEarth[j0] + (muEarth[j1] - muEarth[j0]) * (y - j0); };
         // And Earth's clouds sit where its circulation puts them: each month, a latitude is taken where it stands among
@@ -171,9 +189,17 @@ export function energyBalanceTemperature() {
             const bt = beltsAt(k);
             for (let j = 0; j < h; j++) {
                 const muE = muEarthAt(earthLat(g.lat[j], bt)), xE = 1 - muE;
-                albBase[k * h + j] = P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * xE + P.TEMP_ALBEDO_SUN2 * xE * xE + slantReflect(muRow[j]) - slantReflect(muE) + clearExtra(muRow[j]);
+                albRow[k * h + j] = P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * xE + P.TEMP_ALBEDO_SUN2 * xE * xE + slantReflect(muRow[j]) - slantReflect(muE) + clearExtra(muRow[j]);
             }
         }
+        // Sunlight and base albedo per cell: a row's, on a rotating planet; on a locked one, each cell's own from its angle to
+        // the substellar point, the air's reflectance by the sun's height there (no belts to place Earth's clouds by)
+        const Q = new Float64Array(NT * G), albBase = new Float64Array(NT * G);
+        if (orbit.locked) {
+            const L = lockedTables(g.lat, g.lon, orbit, NT);
+            Q.set(L.q);
+            for (let c = 0; c < NT * G; c++) { const mu = Math.max(L.mu[c], 0.05); albBase[c] = P.TEMP_ALBEDO_SUN0 + slantReflect(mu) - slantReflect(1) + clearExtra(mu); }
+        } else for (let k = 0; k < NT; k++) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { Q[k * G + j * w + i] = Qrow[k * h + j]; albBase[k * G + j * w + i] = albRow[k * h + j]; }
         // (and the surface's own variety about that: smooth fractal noise by geographic position, a fixed size in km — an
         // input like the rest, which the heat's spread and the snow and ice then work through)
         const albVary = albedoVariety(g, ctx.options?.seed ?? 1, P.TEMP_ALBEDO_VARY, P.TEMP_ALBEDO_VARY_KM);
@@ -212,10 +238,9 @@ export function energyBalanceTemperature() {
 
         // Harmonics of sea-level temperature: T(t) = c0 + 2·Re(c1·e^{iθ}) + 2·Re(c2·e^{2iθ}), θ = 2π·t/12
         const c0 = new Float64Array(G), c1r = new Float64Array(G), c1i = new Float64Array(G), c2r = new Float64Array(G), c2i = new Float64Array(G);
-        for (let j = 0; j < h; j++) {
-            let q = 0; for (let k = 0; k < NT; k++) q += Q[k * h + j] * (1 - albBase[k * h + j]) / NT;
-            const t = Math.max(-40, Math.min(35, (q - P.TEMP_OLR_A) / P.TEMP_OLR_B));
-            for (let i = 0; i < w; i++) c0[j * w + i] = t;
+        for (let c = 0; c < G; c++) {
+            let q = 0; for (let k = 0; k < NT; k++) q += Q[k * G + c] * (1 - albBase[k * G + c]) / NT;
+            c0[c] = Math.max(-40, Math.min(35, (q - P.TEMP_OLR_A) / P.TEMP_OLR_B));
         }
         const snowYear = new Float64Array(G), snowYearPrev = new Float64Array(G);   // share of the year the land is snowy
         const warm = !!(init && init.step === g.step && init.c0.length === G);
@@ -246,7 +271,8 @@ export function energyBalanceTemperature() {
             monthsToSamples(G, qm, qAt);
         }
 
-        const solver = new HelmholtzSolver(g, P.TEMP_DIFFUSIVITY, P.TEMP_DIFFUSIVITY_EW);
+        const lockedD = orbit.locked ? lockedDiffusivity(orbit, g.radiusM) : null;
+        const solver = new HelmholtzSolver(g, lockedD ?? P.TEMP_DIFFUSIVITY, lockedD ?? P.TEMP_DIFFUSIVITY_EW);
         // Mountains block the air near the ground, and the heat it carries and mixes, between the lowlands on either
         // side (the Himalaya keeps Tibet's cold out of India; the Sierra and Cascades keep the Pacific's air out of the
         // Great Basin; the Andes part Chile from Argentina). Each face between two cells is open by
@@ -491,6 +517,13 @@ export function energyBalanceTemperature() {
         // temperature — air coming down from a plateau warms as it sinks, air rising onto one cools. The
         // land's air is A; the sea's surface stays its own. Calm air goes nowhere, so a still interior keeps its own
         // temperature; islands and coasts downwind of the sea take the sea's air.
+        const cellSun = (t) => {
+            const out = new Float64Array(G);
+            if (orbit.locked) { lockedSunAt(g.lat, g.lon, orbit, t, out, null); return out; }
+            const sun = sunAt(t, orbit);
+            for (let j = 0; j < h; j++) out.fill(dailyInsolation(g.lat[j] * Math.PI / 180, sun.delta, sun.s0), j * w, (j + 1) * w);
+            return out;
+        };
         const airSolver = winds && P.TEMP_AIR_DARK_DAYS > 0 ? new HelmholtzSolver(g, 0, 0) : null;
         // (the low air itself, not the weather aloft: a range blocks it fully — Pacific air stays out of the Great Plains)
         const airFaces = airSolver && P.TEMP_BLOCK_KM > 0 ? ridgeFaces(ctx, core, g, ratio, landKm, P.TEMP_BLOCK_KM, 0) : null;
@@ -499,17 +532,16 @@ export function energyBalanceTemperature() {
         const airMass = (t, T) => {
             let A = airCache.get(t);
             if (!A) {
-                const sun = sunAt(t, orbit);
+                const qCell = cellSun(t);
                 const pos = t - 0.5, m0 = Math.floor(pos), fm = pos - m0, ma = ((m0 % 12) + 12) % 12, mb = (ma + 1) % 12;
                 const day = 86400, sSea = 1 / (P.TEMP_AIR_SEA_DAYS * day);
                 for (let j = 0; j < h; j++) {
-                    // stable where the ground loses more heat than the sun gives it (winter poleward of ≈ 45°): below
-                    // AIR_STABLE_SUN of daily sunlight, mixed above AIR_MIXED_SUN
-                    const q = dailyInsolation(g.lat[j] * Math.PI / 180, sun.delta, sun.s0);
-                    let x = (AIR_MIXED_SUN - q) / (AIR_MIXED_SUN - AIR_STABLE_SUN); x = x <= 0 ? 0 : x >= 1 ? 1 : x;
-                    const dark = x * x * (3 - 2 * x), sLand = 1 / ((P.TEMP_AIR_SUN_DAYS + (P.TEMP_AIR_DARK_DAYS - P.TEMP_AIR_SUN_DAYS) * dark) * day);
                     for (let i = 0; i < w; i++) {
                         const c = j * w + i, f = landFrac[c], ice = iceRamp(T[c]);
+                        // stable where the ground loses more heat than the sun gives it (winter poleward of ≈ 45°): below
+                        // AIR_STABLE_SUN of daily sunlight, mixed above AIR_MIXED_SUN
+                        let x = (AIR_MIXED_SUN - qCell[c]) / (AIR_MIXED_SUN - AIR_STABLE_SUN); x = x <= 0 ? 0 : x >= 1 ? 1 : x;
+                        const dark = x * x * (3 - 2 * x), sLand = 1 / ((P.TEMP_AIR_SUN_DAYS + (P.TEMP_AIR_DARK_DAYS - P.TEMP_AIR_SUN_DAYS) * dark) * day);
                         airSig[c] = f * sLand + (1 - f) * ((1 - ice) * sSea + ice * sLand);
                         airTheta[c] = T[c] + (dryLapse - lapseEff[c]) * f * landKm[c];
                         airRhs[c] = airSig[c] * airTheta[c];
@@ -532,17 +564,16 @@ export function energyBalanceTemperature() {
         const tmp = new Float64Array(G);
         const surfaceAt = (t, withInversion) => {
             const th = 2 * Math.PI * t / 12, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th);
-            const sun = sunAt(t, orbit);
+            const qCell = cellSun(t);
             const pos = t - 0.5, m0 = Math.floor(pos), fm = pos - m0, ma = ((m0 % 12) + 12) % 12, mb = (ma + 1) % 12;
             const U0sq = P.TEMP_INVERSION_WIND * P.TEMP_INVERSION_WIND;
             for (let c = 0; c < G; c++) tmp[c] = c0[c] + 2 * (c1r[c] * co - c1i[c] * sn) + 2 * (c2r[c] * co2 - c2i[c] * sn2);
             if (airSolver) airMass(t, tmp);
             for (let j = 0; j < h; j++) {
-                const q = dailyInsolation(g.lat[j] * Math.PI / 180, sun.delta, sun.s0);
-                let x = 1 - q / WEAK_SUN; x = x <= 0 ? 0 : x >= 1 ? 1 : x;
-                const dark = x * x * (3 - 2 * x);
                 for (let i = 0; i < w; i++) {
                     const c = j * w + i;
+                    let x = 1 - qCell[c] / WEAK_SUN; x = x <= 0 ? 0 : x >= 1 ? 1 : x;
+                    const dark = x * x * (3 - 2 * x);
                     let T = tmp[c];
                     if (withInversion && dark > 0) {
                         const f = landFrac[c], snow = f * iceRamp(T - lapseEff[c] * surfKm[c]) + (1 - f) * iceRamp(T);
@@ -583,7 +614,7 @@ export function energyBalanceTemperature() {
         // The day's cycle (diurnal.js): on a day other than Earth's every round, its extra heat radiated going into the
         // next; on Earth's day (already in this fit) only with the rain, for the daily range.
         let day = null;
-        if (orbit.solarDayScale !== 1 || rain) {
+        if (!orbit.locked && (orbit.solarDayScale !== 1 || rain)) {
             const monthAt = (t) => { const pos = t - 0.5, m0 = Math.floor(pos), f = pos - m0, a = ((m0 % 12) + 12) % 12; return { a, b: (a + 1) % 12, f }; };
             const Pm = rain ? Array.from({ length: 12 }, (_, m) => coarsen(core, g, ratio, rain.subarray(m * core.size, (m + 1) * core.size))) : null;
             const uD = new Float64Array(G), vD = new Float64Array(G), rD = new Float64Array(G), iD = new Float64Array(G);
@@ -628,7 +659,7 @@ export function energyBalanceTemperature() {
         // season before the rains is the hottest, as in the real monsoon lands. Full strength from the ITCZ to halfway
         // to each subtropical high, fading out at the high (the circulation's belts, month by month); poleward the
         // energy balance's own seasons stand.
-        if (rain && P.TEMP_WET_COOL_C > 0) {
+        if (rain && !orbit.locked && P.TEMP_WET_COOL_C > 0) {
             const lf = ctx.surface.landFrac, N = core.size, cw = core.w, ch = core.h;
             const sunRow = new Float64Array(ch), belts = winds?.belts;
             const adjust = (out, off, t) => {
@@ -783,10 +814,9 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
         const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th);
         for (let c = 0; c < G; c++) Tk[c] = c0[c] + 2 * (c1r[c] * co - c1i[c] * sn) + 2 * (c2r[c] * co2 - c2i[c] * sn2);
         for (let j = 0; j < h; j++) {
-            const q = Q[k * h + j], ab = albBase[k * h + j];
             const sx = 1 / (R_PLANET * Math.cos(lat[j] * Math.PI / 180) * dRad), sy = 1 / (R_PLANET * dRad);
             for (let i = 0; i < w; i++) {
-                const c = j * w + i, T = Tk[c], f = landFrac[c];
+                const c = j * w + i, T = Tk[c], f = landFrac[c], q = Q[k * G + c], ab = albBase[k * G + c];
                 const xL = (iceWarmC - (T - lapseKm[c])) / iceSpan, xO = (iceWarmC - T) / iceSpan;
                 const sL = xL <= 0 ? 0 : xL >= 1 ? 1 : xL * xL * (3 - 2 * xL), sOnow = xO <= 0 ? 0 : xO >= 1 ? 1 : xO * xO * (3 - 2 * xO);
                 const sO = PARAMS.TEMP_SEA_ICE <= 0 ? 0 : sOnow;

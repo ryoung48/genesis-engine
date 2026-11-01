@@ -20,6 +20,12 @@ export function climateStages() {
     return { temperature: energyBalanceTemperature(), circulation: derivedCirculation(), ocean: windDrivenOcean(), rain: columnWaterRain() };
 }
 
+/** A planet locked to its star, by its temperature alone: no winds, ocean or rain yet (rain is zero). */
+export function lockedClimate(input, options = {}) {
+    const stages = { temperature: energyBalanceTemperature(), rain: (ctx) => ({ P: new Float32Array(ctx.anchorMonths.length * ctx.grid.size) }) };
+    return computeClimate(input, { ...options, stages, cloudsFromRain: false });
+}
+
 /**
  * @param {{xyz: Float32Array|Float64Array, elevKm: Float32Array, axes: 'y-up'|'z-up', land?: Uint8Array}} input
  * @param {object} [options]  core options (anchors, lapseRateCPerKm, greenhouseWm2, precipScale, …) and the orbit (tiltDeg, eccentricity, perihelion, rotationRateRadS, yearScale: see orbitOf in insolation.js)

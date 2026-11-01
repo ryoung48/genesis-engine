@@ -1,3 +1,10 @@
+export interface LockedSpin {
+	substellarLon: number
+	libration: number[]
+	declination: number[]
+	flux: number[]
+}
+
 export interface ClimateOrbit {
 	tiltDeg: number
 	eccentricity: number
@@ -9,6 +16,7 @@ export interface ClimateOrbit {
 	radiusScale: number
 	gravityScale: number
 	pressureScale: number
+	locked: LockedSpin | null
 }
 
 export const EARTH_ROTATION: number
