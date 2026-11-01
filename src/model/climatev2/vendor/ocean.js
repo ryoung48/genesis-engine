@@ -1,4 +1,4 @@
-// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/ocean.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: hot loops moved into top-level functions (monthStress, stressHarmonic, traceCarried), computing the same values.
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/ocean.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: hot loops moved into top-level functions (monthStress, stressHarmonic, traceCarried), computing the same values; the overturning's latitude bands derived from the planet's own wind-stress curl and sea ice.
 // Ocean stage: wind-driven currents, and the heat they move — for the temperature stage. DOM-free.
 //
 //  • Gyres. The wind's stress on the sea, curled, drives a steady circulation: in the open ocean the Sverdrup
@@ -40,10 +40,10 @@ const DRAG_COEFF = 1.3e-3;           // air–sea drag coefficient
 const DEG = Math.PI / 180;
 const CARRY_TRACE_KM = 1500;         // how far back a current's water keeps the temperature of where it came from …
 const CARRY_CALM_MS = 0.005;         // … faded where the surface current is below about this (m/s)
-const MOC_FROM_DEG = 40;             // the overturning's heat is released poleward of this latitude …
-const MOC_FULL_DEG = 55;             // … fully from here …
-const MOC_POLAR_DEG = 75;            // … in seas connected to the polar sea (poleward of this) …
-const MOC_REACH_KM = 2500;           // … most near the polar opening (e-folding distance by sea)
+const MOC_REACH_KM = 2500;           // the overturning's heat is most near the polar opening (e-folding distance by sea)
+const MOC_MAX_LAT = 85;              // the wind-stress curl is read to this latitude (its cos φ divisor is floored beyond)
+const MOC_MIN_SEA_SHARE = 0.1;       // a latitude row needs this share of sea for its zonal-mean curl to count
+const MOC_LOBE_SHARE = 0.2;          // a subtropical gyre's curl must reach this share of the hemisphere's peak to count as one
 // The coastal upwelling zone is a few hundred km wide, narrower than the energy balance spreads heat, so its cold is
 // kept as the zone's own: the surface layer, renewed at w by water ΔT colder and warmed back by the air at
 // λ (W/m²/K), stands at T' = −ΔT w/(w + λ/(ρ c_p)). λ, the air–sea feedback on a sea-surface anomaly, ≈ 10–30
@@ -63,32 +63,76 @@ const BARRIER_FRESH_MM = 50;
  * ms }. Fields on the core grid; the annual ones are the months' means.
  */
 /**
- * Heat of the overturning (W/m², G): per hemisphere without a circumpolar channel, the sea poleward of MOC_FROM_DEG
- * connected to the polar sea (≥ MOC_POLAR_DEG) gets the heat, weighted by e^{−(distance by sea from the polar sea)/
- * MOC_REACH_KM} and a ramp from MOC_FROM_DEG to MOC_FULL_DEG — most in the seas nearest the polar opening, and none in
+ * Per hemisphere, the latitudes the overturning is released between, from the planet's own winds on its sea: it starts
+ * where the zonal-mean wind-stress curl turns from the subtropical gyre's sign to the subpolar gyre's (the first
+ * crossing past a real subtropical lobe), is fullest at the subpolar gyre's centre (the curl's peak poleward of it), and
+ * opens onto the polar sea, which begins where the curl turns again, as the subpolar gyre gives way to the polar
+ * circulation (else at the most poleward row of sea). A hemisphere with no subpolar gyre or no sea poleward of it has
+ * no overturning.
+ */
+function overturnBands(g, isSea, curl) {
+    const w = g.w, h = g.h, bands = [];
+    for (const s of [1, -1]) {
+        const rows = [];
+        for (let j = 0; j < h; j++) {
+            const la = s * g.lat[j];
+            if (la <= 0 || la > MOC_MAX_LAT) continue;
+            let z = 0, n = 0;
+            for (let i = 0; i < w; i++) { const c = j * w + i; if (isSea[c]) { z += curl[c]; n++; } }
+            if (n > 0) rows.push({ la, z: s * z / n, thin: n < MOC_MIN_SEA_SHARE * w });
+        }
+        rows.sort((a, b) => a.la - b.la);
+        const pts = rows.filter(r => !r.thin);
+        for (let pass = 0; pass < 2; pass++) {
+            const zs = pts.map((p, k) => (pts[Math.max(0, k - 1)].z + p.z + pts[Math.min(pts.length - 1, k + 1)].z) / 3);
+            pts.forEach((p, k) => { p.z = zs[k]; });
+        }
+        const crossing = (k) => pts[k - 1].la + (pts[k].la - pts[k - 1].la) * Math.abs(pts[k - 1].z) / (Math.abs(pts[k - 1].z) + Math.abs(pts[k].z));
+        const peak = pts.reduce((m, p) => Math.max(m, Math.abs(p.z)), 0);
+        let fromLat = NaN, trough = 0;
+        for (let k = 0; k < pts.length && !(fromLat > 0); k++) {
+            if (pts[k].z < 0) trough = Math.min(trough, pts[k].z);
+            else if (k > 0 && pts[k - 1].z < 0 && trough <= -MOC_LOBE_SHARE * peak) fromLat = crossing(k);
+        }
+        if (!(fromLat > 0)) continue;
+        let fullLat = NaN, best = -Infinity;
+        for (const p of pts) if (p.la > fromLat && p.z > best) { best = p.z; fullLat = p.la; }
+        let polarLat = rows[rows.length - 1].la;
+        for (let k = 1; k < pts.length; k++) if (pts[k].la > fullLat && pts[k - 1].z >= 0 && pts[k].z < 0) { polarLat = crossing(k); break; }
+        if (!(polarLat > fromLat + g.step)) continue;
+        if (!(fullLat > fromLat && fullLat < polarLat)) fullLat = (fromLat + polarLat) / 2;
+        bands.push({ s, fromLat, fullLat, polarLat });
+    }
+    return bands;
+}
+
+/**
+ * Heat of the overturning (W/m², G): per hemisphere without a circumpolar channel, the sea poleward of the band's start
+ * connected to the polar sea gets the heat, weighted by e^{−(distance by sea from the polar sea)/MOC_REACH_KM} and a
+ * ramp from the band's start to its full latitude — most in the seas nearest the polar opening, and none in
  * the polar sea itself: the warm water entering it sinks beneath its fresh surface layer, which keeps its heat from
  * the ice (Aagaard, Coachman & Carmack 1981). (The same
  * heat is taken from all the sea evenly, with the rest of the ocean's net, below: taking it from the hemisphere's
  * tropics alone cooled them enough to move the rain belts.)
  */
-function overturningHeat(g, isSea, channels, pw) {
+function overturningHeat(g, isSea, channels, pw, bands) {
     const G = g.size, w = g.w, h = g.h, dRad = g.step * DEG;
     const q = new Float64Array(G);
     if (!(pw > 0)) return q;
     const R_PLANET = g.radiusM;
     const area = (j) => R_PLANET * R_PLANET * dRad * dRad * Math.cos(g.lat[j] * DEG);
     const stepKm = R_PLANET / 1000 * g.step * DEG;
-    for (const s of [1, -1]) {
+    for (const { s, fromLat, fullLat, polarLat } of bands) {
         // a channel between the midlatitudes and the polar sea blocks it (an open polar cap is not one)
-        if (channels.some(ch => [ch.jStart, ch.jEnd].some(jj => s * g.lat[jj] > 0 && s * g.lat[jj] < MOC_POLAR_DEG))) continue;
-        // distance by sea from the polar sea, over the sea poleward of MOC_FROM_DEG (breadth-first, ≈ km)
+        if (channels.some(ch => [ch.jStart, ch.jEnd].some(jj => s * g.lat[jj] > 0 && s * g.lat[jj] < polarLat))) continue;
+        // distance by sea from the polar sea, over the sea poleward of the band's start (breadth-first, ≈ km)
         const dist = new Float64Array(G).fill(Infinity), queue = [];
-        for (let j = 0; j < h; j++) if (s * g.lat[j] >= MOC_POLAR_DEG) for (let i = 0; i < w; i++) { const c = j * w + i; if (isSea[c]) { dist[c] = 0; queue.push(c); } }
+        for (let j = 0; j < h; j++) if (s * g.lat[j] >= polarLat) for (let i = 0; i < w; i++) { const c = j * w + i; if (isSea[c]) { dist[c] = 0; queue.push(c); } }
         for (let k = 0; k < queue.length; k++) {
             const c = queue[k], j = Math.floor(c / w), i = c % w;
             const nb = [j * w + (i + 1) % w, j * w + (i - 1 + w) % w, j > 0 ? c - w : -1, j < h - 1 ? c + w : -1];
             for (const n of nb) {
-                if (n < 0 || !isSea[n] || s * g.lat[Math.floor(n / w)] < MOC_FROM_DEG) continue;
+                if (n < 0 || !isSea[n] || s * g.lat[Math.floor(n / w)] < fromLat) continue;
                 const d = dist[c] + (n === c - w || n === c + w ? stepKm : stepKm * Math.cos(g.lat[j] * DEG));
                 if (d < dist[n]) { dist[n] = d; queue.push(n); }
             }
@@ -97,15 +141,15 @@ function overturningHeat(g, isSea, channels, pw) {
         const wt = new Float64Array(G);
         for (let j = 0; j < h; j++) {
             const la = s * g.lat[j];
-            const ramp = Math.max(0, Math.min(1, (la - MOC_FROM_DEG) / (MOC_FULL_DEG - MOC_FROM_DEG)));
+            const ramp = Math.max(0, Math.min(1, (la - fromLat) / (fullLat - fromLat)));
             for (let i = 0; i < w; i++) {
                 const c = j * w + i; if (!isSea[c]) continue;
-                if (la >= MOC_FROM_DEG && la < MOC_POLAR_DEG && dist[c] < Infinity) { wt[c] = ramp * ramp * (3 - 2 * ramp) * Math.exp(-dist[c] / MOC_REACH_KM); wsum += wt[c] * area(j); }
+                if (la >= fromLat && la < polarLat && dist[c] < Infinity) { wt[c] = ramp * ramp * (3 - 2 * ramp) * Math.exp(-dist[c] / MOC_REACH_KM); wsum += wt[c] * area(j); }
             }
         }
         if (!(wsum > 0)) continue;
         const P = pw * 1e15;
-        for (let j = 0; j < h; j++) { const la = s * g.lat[j]; for (let i = 0; i < w; i++) {
+        for (let j = 0; j < h; j++) { for (let i = 0; i < w; i++) {
             const c = j * w + i; if (!isSea[c]) continue;
             if (wt[c] > 0) q[c] += P * wt[c] / wsum;
         } }
@@ -515,8 +559,6 @@ export function windDrivenOcean() {
             const nSteps = Math.max(1, Math.round(CARRY_TRACE_KM / (R_PLANET / 1000 * g.step * DEG)));
             traceCarried(w, h, isSea, U, V, cosLat, rowSm, nSteps, P.OCEAN_CURRENT_DEPTH_M, carried);
         }
-        // the overturning: OCEAN_OVERTURN_PW per hemisphere, released over the seas the polar ocean opens onto
-        const qMoc = overturningHeat(g, isSea, channels, P.OCEAN_OVERTURN_PW);
         // The heat of a period: advection + overturning + upwelling, capped, less the net (the ocean moves heat, it does
         // not make it; area-weighted over the sea — after the cap, or capping a strong upwelling's cooling would warm
         // every other sea — and over the open sea, by its share of the year free of ice: the net is settled with the
@@ -524,6 +566,9 @@ export function windDrivenOcean() {
         // (as before seasons: the months then all carry the year's heat).
         const open = new Float64Array(G);
         for (let m = 0; m < 12; m++) { const ice = co(temperature.seaIce.subarray(m * core.size, (m + 1) * core.size)); for (let c = 0; c < G; c++) open[c] += (1 - Math.min(1, ice[c])) / 12; }
+        // the overturning: OCEAN_OVERTURN_PW per hemisphere, released over the seas the polar ocean opens onto
+        const bands = overturnBands(g, isSea, curl);
+        const qMoc = overturningHeat(g, isSea, channels, P.OCEAN_OVERTURN_PW, bands);
         const qOf = (H) => {
             const q = new Float64Array(G);
             let net = 0, openArea = 0;
@@ -568,6 +613,7 @@ export function windDrivenOcean() {
             // (null without seasons: the temperature stage then takes the year's heat, as before)
             monthly: seasonal ? lazy({ qflux: outM(qM) }, { u: () => drawM(mapped(UM, surf)), v: () => drawM(mapped(VM, surf)), upwelling: () => drawM(mapped(wUpM, x => x * 86400)) }) : null,
             stress: { x: out(tx), y: out(ty) },
+            overturning: bands.map(b => ({ hemisphere: b.s, fromLat: b.fromLat, fullLat: b.fullLat, polarLat: b.polarLat })),
             channels: channels.map(ch => ({ fromLat: g.lat[ch.jStart], toLat: g.lat[ch.jEnd], transportSv: ch.transport / 1e6 })),
             solver: solveStats, ms: performance.now() - t0, source: 'wind-driven ocean',
         }, { u: () => draw(mapped(U, surf)), v: () => draw(mapped(V, surf)), upwelling: () => draw(mapped(wUp, x => x * 86400)), thermocline: () => draw(thermoD) });

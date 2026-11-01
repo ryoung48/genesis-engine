@@ -7,7 +7,15 @@ export interface OceanMonthly {
 	v: Float32Array
 }
 
+export interface OverturningBand {
+	hemisphere: 1 | -1
+	fromLat: number
+	fullLat: number
+	polarLat: number
+}
+
 export interface OceanResult {
+	overturning: OverturningBand[]
 	thermocline: Float32Array
 	u: Float32Array
 	v: Float32Array
