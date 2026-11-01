@@ -7,10 +7,7 @@ export type ComputeLockedWindVectorsParams = {
 	mesh: SphereMesh
 	climate: GenesisClimate
 	elevation_km: Float32Array
-	params?: Pick<
-		GenesisParams,
-		"substellarLon" | "obliquity" | "eccentricity" | "perihelion" | "pressure"
-	>
+	params?: Pick<GenesisParams, "pressure">
 	month?: number
 	surface?: WindSurface
 }

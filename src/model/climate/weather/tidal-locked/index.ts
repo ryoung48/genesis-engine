@@ -1,9 +1,13 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
-import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { ComputeLockedWindVectorsParams } from "@/model/climate/weather/tidal-locked/types"
 import { ROUGHNESS } from "@/model/climate/weather/wind/roughness"
-import { MATH } from "@/model/shared/math/core"
-import { UNITS } from "@/model/shared/units"
+
+const SEA_LEVEL_HPA = 1013.25
+const KELVIN = 273.15
+const GAS_CONSTANT = 287
+const LAPSE_C_PER_KM = 6.5
+const COLUMN_WARMING_SHARE = 0.5
+const FRICTION_EFFICIENCY = 0.1
 
 function computeLockedWindVectors({
 	mesh,
@@ -19,108 +23,32 @@ function computeLockedWindVectors({
 	windSpeed: Float32Array
 } {
 	const N = mesh.numRegions
-	const { adjOffset, adjList, r_xyz } = mesh
+	const { adjOffset, adjList } = mesh
 	const { edgeEastward, edgeNorthward } = RAIN.getClimateGeometry(mesh)
 
-	const substellarLon = params?.substellarLon ?? UNITS.defaultSubstellarLon
-	const obliquity = params?.obliquity ?? 0
-	const eccentricity = params?.eccentricity ?? 0
-	const perihelion = params?.perihelion ?? 102
-
-	// Monthly libration and declination — determine substellar position each month
-	const monthlyLibration = HEAT.computeMonthlyLibration({
-		eccentricity,
-		perihelion,
-	})
-	const monthlyDeclination = HEAT.computeMonthlyLockedDeclination({
-		obliquity,
-		eccentricity,
-		perihelion,
-	})
-
-	// Select which month's substellar point to use (undefined → annual mean ≈ 0,0)
-	const libRad =
-		month !== undefined && month >= 0 && month < 12
-			? monthlyLibration[month]
-			: 0
-	const decRad =
-		month !== undefined && month >= 0 && month < 12
-			? monthlyDeclination[month]
-			: 0
-
-	const sub = HEAT.getSubstellarDirWithOffsetAndDeclination({
-		substellarLon,
-		lonOffsetRad: libRad,
-		declinationRad: decRad,
-	})
-
-	// Primary pressure: minimum at substellar (hot), maximum at Substellar (cold)
-	const pressure = new Float32Array(N)
 	const temps =
 		month !== undefined && month >= 0 && month < 12
 			? climate.temperature_monthly.subarray(month * N, (month + 1) * N)
 			: climate.temperature_avg
 
-	// Compute per-cell stellar cosine (ct = cos θ, where θ = angular distance from
-	// substellar point) so it can be reused for both pressure and bin lookup.
-	const cellCt = new Float32Array(N)
+	const seaLevelC = new Float32Array(N)
+	let areaSum = 0
+	let tempSum = 0
 	for (let r = 0; r < N; r++) {
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-		cellCt[r] = MATH.clamp({
-			value: x * sub[0] + y * sub[1] + z * sub[2],
-			lo: -1,
-			hi: 1,
-		})
+		seaLevelC[r] = temps[r] + LAPSE_C_PER_KM * Math.max(0, elevation_km[r])
+		areaSum += mesh.regionArea[r]
+		tempSum += seaLevelC[r] * mesh.regionArea[r]
 	}
+	const meanC = tempSum / areaSum
+	const meanK = meanC + KELVIN
+	const surfaceHPa = SEA_LEVEL_HPA * Math.max(params?.pressure ?? 1, 0.01)
 
-	// Reference temperature binned by stellar angle (cos θ mapped to [0, BINS)).
-	// Using stellar-angle bins — not latitude bins — ensures the mean at each
-	// bin captures the expected temperature for that day/night distance, so the
-	// thermal anomaly only reflects genuine local deviations (hot deserts, cold
-	// uplands) rather than the entire day-night gradient.  Using latitude bins
-	// instead would produce a systematic pressure-gradient peak at ~45–60° from
-	// the substellar rather than at the terminator where it belongs.
-	const STELLAR_BINS = 36
-	const stellarBinSum = new Float64Array(STELLAR_BINS)
-	const stellarBinCount = new Int32Array(STELLAR_BINS)
+	// Thermal low: a warm column holds less mass, so surface pressure falls with the
+	// column's warming, taken as COLUMN_WARMING_SHARE of the surface anomaly
+	const pressure = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		if (elevation_km[r] > 0.5) continue
-		const bin = Math.max(
-			0,
-			Math.min(
-				STELLAR_BINS - 1,
-				Math.floor(((cellCt[r] + 1) / 2) * STELLAR_BINS),
-			),
-		)
-		stellarBinSum[bin] += temps[r]
-		stellarBinCount[bin]++
-	}
-	const stellarBinMean = new Float32Array(STELLAR_BINS)
-	for (let i = 0; i < STELLAR_BINS; i++) {
-		stellarBinMean[i] =
-			stellarBinCount[i] > 0 ? stellarBinSum[i] / stellarBinCount[i] : 0
-	}
-
-	for (let r = 0; r < N; r++) {
-		// Stellar pressure: -1 at substellar, +1 at Substellar
-		const stellarPressure = -cellCt[r]
-
-		if (elevation_km[r] > 0.5) {
-			pressure[r] = stellarPressure
-			continue
-		}
-		const bin = Math.max(
-			0,
-			Math.min(
-				STELLAR_BINS - 1,
-				Math.floor(((cellCt[r] + 1) / 2) * STELLAR_BINS),
-			),
-		)
-		const thermalAnomaly = (-0.2 * (temps[r] - stellarBinMean[bin])) / 15
-
-		pressure[r] = stellarPressure + thermalAnomaly
+		pressure[r] =
+			(-surfaceHPa * COLUMN_WARMING_SHARE * (seaLevelC[r] - meanC)) / meanK
 	}
 
 	// Smooth pressure (2 passes — stellar gradient is already smooth)
@@ -160,14 +88,7 @@ function computeLockedWindVectors({
 
 		const gradMag = Math.hypot(gradPEast, gradPNorth)
 
-		// Terminator jet: convergence of night→day surface flow amplifies winds
-		// near the terminator (ct≈0). Factor = 1 + k·sin⁴(θ) = 1 + k·(1−ct²)².
-		// Applied before normalisation so the 90th-percentile calibration absorbs it,
-		// keeping the absolute reference speed intact while sharpening the contrast.
-		const ct = cellCt[r]
-		const sin2 = 1.0 - ct * ct // sin²(θ): 1 at terminator, 0 at poles
-		const terminatorFactor = 1.0 + 2.0 * sin2 * sin2 // peaks at 3× at terminator
-		rawSpeed[r] = gradMag * terminatorFactor
+		rawSpeed[r] = gradMag
 
 		const u = -gradPEast
 		const v = -gradPNorth
@@ -178,10 +99,16 @@ function computeLockedWindVectors({
 		}
 	}
 
-	// No Coriolis rotation factor — circulation is purely ageostrophic.
-	// 90th percentile → 10 m/s reference, matching the thermally-direct cap used
-	// for slow rotators (same regime). Terminator jet factor handles spatial contrast.
-	// Pressure factor: thin atmosphere → faster winds for same thermal gradient.
+	// Winds are ageostrophic (no Coriolis): the day-night pressure drop (10th to 90th
+	// percentile of the thermal low) accelerates air as sqrt(2Δp/ρ), of which friction
+	// leaves FRICTION_EFFICIENCY; the mesh gradient only shapes the pattern around
+	// that scale. Thin air is less dense, so the same drop moves it faster.
+	const sortedP = pressure.slice().sort()
+	const dropHPa =
+		(sortedP[Math.floor(0.9 * N)] ?? 0) - (sortedP[Math.floor(0.1 * N)] ?? 0)
+	const density = (surfaceHPa * 100) / (GAS_CONSTANT * meanK)
+	const referenceSpeed =
+		FRICTION_EFFICIENCY * Math.sqrt((2 * dropHPa * 100) / density)
 	const sorted = rawSpeed.slice().sort()
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
 	const ref = Math.max(pct90, 1e-6)
@@ -192,7 +119,7 @@ function computeLockedWindVectors({
 		: undefined
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		const base = (rawSpeed[r] / ref) * 10 * pressureFactor
+		const base = (rawSpeed[r] / ref) * referenceSpeed * pressureFactor
 		windSpeed[r] = roughnessField ? base * roughnessField[r] : base
 	}
 
