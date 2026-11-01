@@ -1,3 +1,4 @@
+import type { LockedDeck } from "../clouds/locked/types"
 import type { CirculationResult } from "./circulation.js"
 import type { LatLonGrid } from "./grid.js"
 import type { ClimateOrbit } from "./insolation.js"

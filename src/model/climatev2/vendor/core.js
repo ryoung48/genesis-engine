@@ -111,6 +111,11 @@ export function computeClimate(input, options = {}) {
                 lap('rain again');
             }
         }
+        if (o.stages.clouds) {
+            clouds = o.stages.clouds({ ctx: sctx, temperature });
+            temperature = o.stages.temperature({ctx: sctx, winds, init: temperature.state, qflux: ocean?.qflux ?? null, ocean, clouds});
+            lap('temperature with clouds');
+        }
         anchors = { T: Float32Array.from(temperature.T), P: rain.P };
         stages = { winds, temperature, circulation, ocean, rain, clouds };
     } else {

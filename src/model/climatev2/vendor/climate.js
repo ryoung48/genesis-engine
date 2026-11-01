@@ -10,6 +10,7 @@
 // y north ('y-up'). The climate is computed on a fixed lat-lon grid, so it is the same at every terrain resolution.
 
 import { computeClimate } from './core.js';
+import { CLIMATEV2_LOCKED_CLOUDS } from '../clouds/locked/index.ts';
 import { energyBalanceTemperature } from './temperature.js';
 import { derivedCirculation } from './circulation.js';
 import { windDrivenOcean } from './ocean.js';
@@ -22,7 +23,7 @@ export function climateStages() {
 
 /** A planet locked to its star, by its temperature alone: no winds, ocean or rain yet (rain is zero). */
 export function lockedClimate(input, options = {}) {
-    const stages = { temperature: energyBalanceTemperature(), rain: (ctx) => ({ P: new Float32Array(ctx.anchorMonths.length * ctx.grid.size) }) };
+    const stages = { temperature: energyBalanceTemperature(), clouds: ({ ctx, temperature }) => CLIMATEV2_LOCKED_CLOUDS.estimate({ ctx, temperatureMonthly: temperature.monthly }), rain: (ctx) => ({ P: new Float32Array(ctx.anchorMonths.length * ctx.grid.size) }) };
     return computeClimate(input, { ...options, stages, cloudsFromRain: false });
 }
 

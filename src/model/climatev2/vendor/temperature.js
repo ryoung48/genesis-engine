@@ -20,6 +20,7 @@
 // at each grid cell's reference height (its mean land height), and the core lifts it to each terrain cell.
 
 import { CLIMATEV2_CLOUD_RADIATION } from '../clouds/radiation/index.ts';
+import { CLIMATEV2_LOCKED_CLOUDS } from '../clouds/locked/index.ts';
 import { LatLonGrid, coarsenField, refineField, refineForDrawing, fillAcross } from './grid.js';
 import { insolationTable, zenithTable, dailyInsolation, orbitOf, sunAt, lockedSunAt, lockedTables, SOLAR_CONSTANT } from './insolation.js';
 import { HelmholtzSolver } from './solver.js';
@@ -145,8 +146,8 @@ export function energyBalanceTemperature() {
         const uT = new Float64Array(NT * G), vT = new Float64Array(NT * G);
         windSamples(G, uM, vM, uBar, vBar, uT, vT);
 
-        const cloudMonthly = clouds ? Array.from({ length: 12 }, (_, m) => coarsen(core, g, ratio, clouds.cover.subarray(m * core.size, (m + 1) * core.size))) : null;
-        const cloudT = clouds ? CLIMATEV2_CLOUD_RADIATION.compute({core, grid: g, ratio, clouds, landFrac, winds, albedo: P.TEMP_CLOUD_ALBEDO, longwaveCancellation: P.TEMP_CLOUD_LW_CANCEL, lowAlbedo: P.TEMP_LOW_CLOUD_ALBEDO, longwaveWindow: P.TEMP_CLOUD_LONGWAVE_WINDOW}) : null;
+        const cloudMonthly = clouds && !clouds.deck ? Array.from({ length: 12 }, (_, m) => coarsen(core, g, ratio, clouds.cover.subarray(m * core.size, (m + 1) * core.size))) : null;
+        const cloudT = !clouds ? null : clouds.deck ? CLIMATEV2_LOCKED_CLOUDS.radiation({core, grid: g, ratio, orbit, clouds}) : CLIMATEV2_CLOUD_RADIATION.compute({core, grid: g, ratio, clouds, landFrac, winds, albedo: P.TEMP_CLOUD_ALBEDO, longwaveCancellation: P.TEMP_CLOUD_LW_CANCEL, lowAlbedo: P.TEMP_LOW_CLOUD_ALBEDO, longwaveWindow: P.TEMP_CLOUD_LONGWAVE_WINDOW});
 
         // Sunlight and base albedo per row
         const Qrow = insolationTable(g.lat, orbit, NT);
