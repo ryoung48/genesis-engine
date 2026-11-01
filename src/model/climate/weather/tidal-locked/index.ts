@@ -8,6 +8,7 @@ const GAS_CONSTANT = 287
 const LAPSE_C_PER_KM = 6.5
 const COLUMN_WARMING_SHARE = 0.5
 const FRICTION_EFFICIENCY = 0.1
+const MAX_GRADIENT_RATIO = 3
 
 function computeLockedWindVectors({
 	mesh,
@@ -102,7 +103,8 @@ function computeLockedWindVectors({
 	// Winds are ageostrophic (no Coriolis): the day-night pressure drop (10th to 90th
 	// percentile of the thermal low) accelerates air as sqrt(2Δp/ρ), of which friction
 	// leaves FRICTION_EFFICIENCY; the mesh gradient only shapes the pattern around
-	// that scale. Thin air is less dense, so the same drop moves it faster.
+	// that scale: a local drop of share x of it gives sqrt(x) of the speed (Bernoulli),
+	// and a local gradient past MAX_GRADIENT_RATIO times the 90th percentile is capped.
 	const sortedP = pressure.slice().sort()
 	const dropHPa =
 		(sortedP[Math.floor(0.9 * N)] ?? 0) - (sortedP[Math.floor(0.1 * N)] ?? 0)
@@ -112,14 +114,14 @@ function computeLockedWindVectors({
 	const sorted = rawSpeed.slice().sort()
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
 	const ref = Math.max(pct90, 1e-6)
-	const pressureFactor =
-		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
 	const roughnessField = surface
 		? ROUGHNESS.surfaceFactorField({ N, surface })
 		: undefined
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		const base = (rawSpeed[r] / ref) * referenceSpeed * pressureFactor
+		const base =
+			Math.sqrt(Math.min(rawSpeed[r] / ref, MAX_GRADIENT_RATIO)) *
+			referenceSpeed
 		windSpeed[r] = roughnessField ? base * roughnessField[r] : base
 	}
 

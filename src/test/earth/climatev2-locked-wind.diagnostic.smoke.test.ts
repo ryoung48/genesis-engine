@@ -64,7 +64,21 @@ describe("locked winds (diagnostic)", () => {
 					lo = Math.min(lo, p)
 					hi = Math.max(hi, p)
 				}
+				const sorted = Float64Array.from(wind.windSpeed).sort()
+				const at = (q: number) =>
+					Number(sorted[Math.floor(q * (N - 1))].toFixed(1))
+				let top = 0
+				for (let r = 0; r < N; r++)
+					if (wind.windSpeed[r] > wind.windSpeed[top]) top = r
 				return {
+					speedPercentiles: [at(0.1), at(0.5), at(0.9), at(0.99), at(1)],
+					fastest: {
+						lat: Number(
+							((Math.asin(mesh.r_xyz[3 * top + 2]) * 180) / Math.PI).toFixed(0),
+						),
+						cosTheta: Number(mesh.r_xyz[3 * top].toFixed(2)),
+						elevationKm: Number(world.elevation_km[top].toFixed(2)),
+					},
 					pressureBar: pressure,
 					pressureRangeHPa: [Number(lo.toFixed(1)), Number(hi.toFixed(1))],
 					meanSpeedMsByAngle: Array.from(speed, (v, i) =>
