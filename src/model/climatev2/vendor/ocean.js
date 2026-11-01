@@ -107,6 +107,20 @@ function overturnBands(g, isSea, curl) {
 }
 
 /**
+ * The heat (PW) a hemisphere must carry poleward through a latitude for its energy to balance: the net radiation —
+ * sunlight absorbed less heat to space, year and row means from the temperature stage — summed from the pole to there.
+ */
+function requiredTransportPW(budget, radiusM, s, lat) {
+    const lats = budget.rowLat, step = Math.abs(lats[1] - lats[0]) * DEG;
+    let total = 0;
+    for (let j = 0; j < lats.length; j++) {
+        if (s * lats[j] < lat) continue;
+        total -= budget.rowNetWm2[j] * 2 * Math.PI * radiusM * radiusM * Math.cos(lats[j] * DEG) * step;
+    }
+    return Math.max(0, total / 1e15);
+}
+
+/**
  * Heat of the overturning (W/m², G): per hemisphere without a circumpolar channel, the sea poleward of the band's start
  * connected to the polar sea gets the heat, weighted by e^{−(distance by sea from the polar sea)/MOC_REACH_KM} and a
  * ramp from the band's start to its full latitude — most in the seas nearest the polar opening, and none in
@@ -115,14 +129,14 @@ function overturnBands(g, isSea, curl) {
  * heat is taken from all the sea evenly, with the rest of the ocean's net, below: taking it from the hemisphere's
  * tropics alone cooled them enough to move the rain belts.)
  */
-function overturningHeat(g, isSea, channels, pw, bands) {
+function overturningHeat(g, isSea, channels, bands) {
     const G = g.size, w = g.w, h = g.h, dRad = g.step * DEG;
     const q = new Float64Array(G);
-    if (!(pw > 0)) return q;
     const R_PLANET = g.radiusM;
     const area = (j) => R_PLANET * R_PLANET * dRad * dRad * Math.cos(g.lat[j] * DEG);
     const stepKm = R_PLANET / 1000 * g.step * DEG;
-    for (const { s, fromLat, fullLat, polarLat } of bands) {
+    for (const { s, fromLat, fullLat, polarLat, pw } of bands) {
+        if (!(pw > 0)) continue;
         // a channel between the midlatitudes and the polar sea blocks it (an open polar cap is not one)
         if (channels.some(ch => [ch.jStart, ch.jEnd].some(jj => s * g.lat[jj] > 0 && s * g.lat[jj] < polarLat))) continue;
         // distance by sea from the polar sea, over the sea poleward of the band's start (breadth-first, ≈ km)
@@ -566,9 +580,13 @@ export function windDrivenOcean() {
         // (as before seasons: the months then all carry the year's heat).
         const open = new Float64Array(G);
         for (let m = 0; m < 12; m++) { const ice = co(temperature.seaIce.subarray(m * core.size, (m + 1) * core.size)); for (let c = 0; c < G; c++) open[c] += (1 - Math.min(1, ice[c])) / 12; }
-        // the overturning: OCEAN_OVERTURN_PW per hemisphere, released over the seas the polar ocean opens onto
+        // the overturning: OCEAN_OVERTURN_SHARE of the heat each hemisphere must carry poleward, released over the seas the polar ocean opens onto
         const bands = overturnBands(g, isSea, curl);
-        const qMoc = overturningHeat(g, isSea, channels, P.OCEAN_OVERTURN_PW, bands);
+        for (const b of bands) {
+            b.transportPW = requiredTransportPW(temperature.budget, R_PLANET, b.s, b.fullLat);
+            b.pw = P.OCEAN_OVERTURN_SHARE * b.transportPW;
+        }
+        const qMoc = overturningHeat(g, isSea, channels, bands);
         const qOf = (H) => {
             const q = new Float64Array(G);
             let net = 0, openArea = 0;
@@ -613,7 +631,7 @@ export function windDrivenOcean() {
             // (null without seasons: the temperature stage then takes the year's heat, as before)
             monthly: seasonal ? lazy({ qflux: outM(qM) }, { u: () => drawM(mapped(UM, surf)), v: () => drawM(mapped(VM, surf)), upwelling: () => drawM(mapped(wUpM, x => x * 86400)) }) : null,
             stress: { x: out(tx), y: out(ty) },
-            overturning: bands.map(b => ({ hemisphere: b.s, fromLat: b.fromLat, fullLat: b.fullLat, polarLat: b.polarLat })),
+            overturning: bands.map(b => ({ hemisphere: b.s, fromLat: b.fromLat, fullLat: b.fullLat, polarLat: b.polarLat, transportPW: b.transportPW, heatPW: b.pw })),
             channels: channels.map(ch => ({ fromLat: g.lat[ch.jStart], toLat: g.lat[ch.jEnd], transportSv: ch.transport / 1e6 })),
             solver: solveStats, ms: performance.now() - t0, source: 'wind-driven ocean',
         }, { u: () => draw(mapped(U, surf)), v: () => draw(mapped(V, surf)), upwelling: () => draw(mapped(wUp, x => x * 86400)), thermocline: () => draw(thermoD) });

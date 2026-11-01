@@ -38,6 +38,8 @@ describe("climatev2 overturning bands (diagnostic)", () => {
 					from: Number(band.fromLat.toFixed(1)),
 					full: Number(band.fullLat.toFixed(1)),
 					polar: Number(band.polarLat.toFixed(1)),
+					transportPW: Number(band.transportPW.toFixed(2)),
+					heatPW: Number(band.heatPW.toFixed(2)),
 				}))
 				const { grid } = result
 				const moc = result.stages.ocean.qOverturning

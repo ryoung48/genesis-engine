@@ -105,7 +105,7 @@ export const PARAMS_DEFAULTS = Object.freeze({
     OCEAN_CHANNEL_DRAG: 7.3e-7, // 1/s        friction balancing the wind in a circumpolar channel (its current's strength)
     OCEAN_GUST_MS: 4.26,        // m/s        wind variability (storms) that monthly-mean winds leave out, for the wind stress
     OCEAN_HEAT_SHARE: 0.073,    // –          share of the gyres' transport whose temperature reaches the sea surface
-    OCEAN_OVERTURN_PW: 0.925,       // PW         the overturning's poleward heat, per hemisphere open to the polar sea
+    OCEAN_OVERTURN_SHARE: 0.28, // –          share of the heat the planet must carry poleward (at the overturning's fullest latitude) that the overturning carries
     OCEAN_MERID_SHARE: 0.03,   // –          … and of their north–south transport across the latitudes' temperature gradient
     OCEAN_UPWELL_DT: 6,         // °C         how much colder upwelled water is than the surface where the thermocline is shallowest …
     OCEAN_THERMO_EAST_M: 50,    // m          … the thermocline's depth at a basin's eastern shore (where it is shallowest) …
@@ -242,7 +242,7 @@ export const PARAM_PRIORS = Object.freeze({
     OCEAN_GUST_MS:      { value: 6, min: 3, max: 9, source: 'bulk formulas on climatological winds add a gustiness / synoptic speed of a few m/s' },
     OCEAN_CHANNEL_DRAG: { value: 5e-7, min: 1e-7, max: 2e-6, source: 'sets a circumpolar current of ≈ 100–150 Sv on Earth (the ACC)' },
     OCEAN_HEAT_SHARE:   { value: 0.05, min: 0.01, max: 0.2, source: 'scaled to the ocean\'s ≈ 1–2 PW poleward heat transport; no direct literature value' },
-    OCEAN_OVERTURN_PW:  { value: 1.0, min: 0.4, max: 1.5, source: 'Atlantic meridional overturning heat transport ≈ 1.2 PW at 26°N (RAPID array), released in the subpolar and Nordic seas' },
+    OCEAN_OVERTURN_SHARE: { value: 0.28, min: 0.1, max: 0.4, source: 'the overturning carries ≈ 1.2 PW at 26°N (RAPID array) and releases ≈ 0.9 PW in the subpolar and Nordic seas; v2 Earth must carry 3.25 PW poleward at that latitude, so 0.925 / 3.25 ≈ 0.28' },
     OCEAN_MERID_SHARE:  { value: 0.15, min: 0.03, max: 0.4, source: 'western boundary currents release ≈ 100–200 W/m² (Gulf Stream, Kuroshio), eastern boundary currents take up ≈ 20–50 W/m² plus upwelling (Yu & Weller 2007 OAFlux); the gyres carry ≈ 1 PW poleward' },
     OCEAN_UPWELL_DT:    { value: 6, min: 3, max: 10, source: 'upwelling under a shallow thermocline cools the surface 5–10 °C below its latitude (Peru, Benguela, the east Pacific cold tongue)' },
     OCEAN_THERMO_EAST_M: { value: 50, min: 30, max: 80, source: 'the thermocline at the eastern ocean margins ≈ 30–60 m deep (east Pacific, Benguela)' },

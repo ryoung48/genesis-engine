@@ -40,6 +40,7 @@ export interface ClimateBudget {
 	rowLat: number[]
 	rowSurface: (number | null)[]
 	rowAlbedo: (number | null)[]
+	rowNetWm2: number[]
 }
 
 export interface PlanetClimateResult {

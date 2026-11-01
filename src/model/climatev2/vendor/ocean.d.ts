@@ -12,6 +12,8 @@ export interface OverturningBand {
 	fromLat: number
 	fullLat: number
 	polarLat: number
+	transportPW: number
+	heatPW: number
 }
 
 export interface OceanResult {

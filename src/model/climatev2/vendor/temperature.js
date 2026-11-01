@@ -317,7 +317,7 @@ export function energyBalanceTemperature() {
         const prof = { setup: performance.now() - t0, forcing: 0, operator: 0, solve: 0, output: 0 };
         let tp;
         // (the planet's sunlight and what reflects it, over the last outer iteration: diagnostics only)
-        const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
+        const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), rowNet: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
         for (let it = 0; it < outer; it++) {
             tp = performance.now();
             F0.fill(0); F1r.fill(0); F1i.fill(0); F2r.fill(0); F2i.fill(0); iceYear.fill(0); seaIceYear.fill(0);
@@ -704,6 +704,7 @@ export function energyBalanceTemperature() {
             cryoWm2: { snowN: -bs.cryo[0] / bs.area, seaN: -bs.cryo[1] / bs.area, sheetN: -bs.cryo[2] / bs.area, snowS: -bs.cryo[3] / bs.area, seaS: -bs.cryo[4] / bs.area, sheetS: -bs.cryo[5] / bs.area, sheetShareN: NT * bs.sheetArea[0] / bs.area, sheetShareS: NT * bs.sheetArea[1] / bs.area },
             rowLat: Array.from(g.lat), rowSurface: Array.from(bs.rowSurface, (v, j) => bs.rowSun[j] > 0 ? v / bs.rowSun[j] : null),
             rowAlbedo: Array.from(bs.rowAlbedo, (v, j) => bs.rowSun[j] > 0 ? v / bs.rowSun[j] : null),
+            rowNetWm2: Array.from(bs.rowNet, v => v / (NT * w)),
         };
         const landSunOf = (src) => {
             const o = new Float32Array(12 * core.size), tmpS = new Float64Array(G);
@@ -831,6 +832,7 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 snowYear[c] += sL / NT;
                 let gF = q * (1 - alb) + cloudLongwave;
                 if (T < olrCold.tJC) gF -= olrCold.eps * STEFAN_BOLTZMANN * (T + 273.15) ** 4 - olrCold.A - olrCold.B * T;
+                if (budget) budget.rowNet[j] += gF - olrCold.A - olrCold.B * T;
                 if (windsOn) {
                     const du = uT[k * G + c], dv = vT[k * G + c];
                     const Tw = Tk[j * w + (i === 0 ? w - 1 : i - 1)], Te = Tk[j * w + (i === w - 1 ? 0 : i + 1)];
