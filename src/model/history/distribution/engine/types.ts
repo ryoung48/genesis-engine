@@ -1,6 +1,5 @@
 import type { AttackState } from "@/model/history/distribution/attacks/types"
 import type { CradleState } from "@/model/history/distribution/cradles/types"
-import type { MigrationResult } from "@/model/history/distribution/migration/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { SettlementState } from "@/model/history/distribution/settlement/types"
 import type { Foundings } from "@/model/history/distribution/statehood/types"
@@ -11,6 +10,7 @@ import type {
 import type { Territory } from "@/model/history/distribution/territory/types"
 import type { HistoryState } from "@/model/history/record/types"
 import type { SharedRng } from "@/model/shared/random/rng"
+import type { MigrationResult } from "@/model/society/migration/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 export interface DistributionEngine {

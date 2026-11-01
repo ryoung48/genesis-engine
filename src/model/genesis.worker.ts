@@ -635,8 +635,9 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			m.edgeKind.buffer,
 			m.arrivalTier.buffer,
 			m.order.buffer,
-			m.contextMask.buffer,
 			m.componentId.buffer,
+			m.areaKm2.buffer,
+			m.suitability.buffer,
 		)
 	}
 	if (world.population) {

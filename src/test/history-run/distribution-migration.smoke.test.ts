@@ -1,67 +1,9 @@
 import { expect, it } from "vitest"
-import { DISTRIBUTION_MIGRATION as M } from "@/model/history/distribution/migration"
 import { SIM_DERIVE } from "@/model/history/sim/derive"
+import { MIGRATION } from "@/model/society/migration"
 import { POPULATION } from "@/model/society/population"
 import { DISTRIBUTION_FIXTURE as F } from "@/test/history-run/fixtures/distribution"
 
-it("uses normalized endpoint means, integrates the transport boundary, and waits for sea capability", () => {
-	expect(
-		M.transit({
-			sourceArrival: 0,
-			distanceKm: 100,
-			meanSuitability: 0.5,
-			corridorBonus: 1.25,
-			kind: "land",
-		}),
-	).toBe(160)
-	expect(
-		M.transit({
-			sourceArrival: 1490,
-			distanceKm: 100,
-			meanSuitability: 1,
-			corridorBonus: 1,
-			kind: "land",
-		}),
-	).toBeCloseTo(1501.8)
-	expect(
-		M.transit({
-			sourceArrival: -5000,
-			distanceKm: 500,
-			meanSuitability: 1,
-			corridorBonus: 1,
-			kind: "sea",
-		}),
-	).toBe(-2849)
-	expect(
-		M.transit({
-			sourceArrival: 2000,
-			distanceKm: 0,
-			meanSuitability: 0,
-			corridorBonus: 1,
-			kind: "land",
-		}),
-	).toBe(2000.2)
-})
-it("classifies each maritime threshold exactly", () => {
-	expect(
-		[150, 150.01, 500, 500.01, 2000, 2000.01].map((distanceKm) =>
-			M.capabilityYear({ distanceKm }),
-		),
-	).toEqual([-79999, -2999, -2999, -999, -999, 1500])
-})
-it("keeps the exact rounded cutoff and continuous after-horizon dates", () => {
-	const continuousArrival = Float64Array.of(-79999, 2025, 2025.3, Infinity)
-	const result = M.horizon({ continuousArrival, desolate: new Uint8Array(4) })
-	expect([...result.arrivalYear]).toEqual([
-		-79999,
-		2025,
-		M.sentinel,
-		M.sentinel,
-	])
-	expect([...result.contextMask]).toEqual([1, 1, 0, 0])
-	expect([...result.order]).toEqual([0, 1])
-	expect(result.migrationWave[3]).toBe(-1)
-})
 it("selects one reproducible origin and blocks desolate transit", () => {
 	const w = F.world({ neighbors: [[1], [0, 2], [1]], desolate: [1], seed: 42 })
 	if (w.historyMigration.pipeline !== "distribution") throw new Error("Fixture")
@@ -70,7 +12,6 @@ it("selects one reproducible origin and blocks desolate transit", () => {
 	expect([...m.arrivalYear].filter((y) => y === -79999)).toHaveLength(1)
 	expect(m.continuousArrival[1]).toBe(Infinity)
 	expect(m.continuousArrival[m.origin === 0 ? 2 : 0]).toBe(Infinity)
-	expect(m.diagnostics.arrivalPathfindingRuns).toBe(1)
 })
 it("allows successive 75 km ocean crossings without crossing an intermediate island", () => {
 	const w = F.world({ neighbors: [[], [], []], desolate: [], seed: 42 })
@@ -92,13 +33,15 @@ it("allows successive 75 km ocean crossings without crossing an intermediate isl
 		adjList: Int32Array.from(regionNeighbors.flat()),
 		regionArea: new Float32Array(count).fill(1),
 	}
-	const m = M.compute({
+	const m = MIGRATION.compute({
 		provinces,
 		mesh,
-		ocean: Uint8Array.of(0, 1, 0, 1, 0),
+		isLand: Uint8Array.of(1, 0, 1, 0, 1),
+		elevationKm: new Float32Array(count).fill(-0.5),
 		planetRadiusKm: 6371,
 		habitability: Float32Array.of(3, 1, 1),
 		seed: 42,
+		horizonYear: 2025,
 	})
 	expect(m.origin).toBe(0)
 	expect(m.diagnostics.seaEdges).toBe(2)
@@ -119,13 +62,15 @@ it("uses equal suitability for zero scores and scales physical distances with ra
 	const params = {
 		provinces: w.provinces!,
 		mesh,
-		ocean: new Uint8Array(2),
+		isLand: new Uint8Array(2).fill(1),
+		elevationKm: new Float32Array(2),
 		planetRadiusKm: 6371,
 		habitability: new Float32Array(2),
 		seed: 42,
+		horizonYear: 2025,
 	}
-	const a = M.compute(params),
-		b = M.compute({ ...params, planetRadiusKm: 12742 })
+	const a = MIGRATION.compute(params),
+		b = MIGRATION.compute({ ...params, planetRadiusKm: 12742 })
 	const destination = 1 - a.origin
 	expect(b.origin).toBe(a.origin)
 	expect(b.continuousArrival[destination] + 79999).toBeCloseTo(
@@ -133,7 +78,7 @@ it("uses equal suitability for zero scores and scales physical distances with ra
 	)
 	expect(a.continuousArrival[destination] + 79999).toBeCloseTo(127.42, 0)
 })
-it("performs no searches for empty and all-desolate worlds", () => {
+it("finds no origin for empty and all-desolate worlds", () => {
 	for (const neighbors of [[], [[]]] as number[][][]) {
 		const w = F.world({
 			neighbors,
@@ -143,8 +88,6 @@ it("performs no searches for empty and all-desolate worlds", () => {
 		if (w.historyMigration.pipeline !== "distribution")
 			throw new Error("Fixture")
 		expect(w.historyMigration.data.origin).toBe(-1)
-		expect(w.historyMigration.data.diagnostics.arrivalPathfindingRuns).toBe(0)
-		expect(w.historyMigration.data.diagnostics.seaCorridorBuildRuns).toBe(0)
 	}
 })
 
@@ -155,10 +98,8 @@ it("excludes after-horizon and unreachable provinces from population weights and
 			seed: 42,
 		}),
 		provinces = w.provinces!
-	const m = M.horizon({
-		continuousArrival: Float64Array.of(-79999, -1000, 2025.3, Infinity),
-		desolate: provinces.desolate,
-	})
+	const migrationWave = Float32Array.of(0, 0.5, -1, -1)
+	const eraSettledMask = Uint8Array.of(1, 1, 0, 0)
 	const landmarks = {
 		count: 1,
 		regionLandmark: new Int32Array(4),
@@ -180,13 +121,11 @@ it("excludes after-horizon and unreachable provinces from population weights and
 		seed: 42,
 		mesh: w.mesh,
 		planetRadiusKm: 6371,
-		migrationWave: Float32Array.from(m.migrationWave, (wave, p) =>
-			m.contextMask[p] ? wave : -1,
-		),
+		migrationWave,
 		settlementWave: 1,
 		migrationFalloff: 0,
 	})
-	population.migrationWave = m.migrationWave
+	population.migrationWave = migrationWave
 	expect(population.population[2]).toBe(0)
 	expect(population.population[3]).toBe(0)
 	const society = SIM_DERIVE.deriveSociety({
@@ -202,7 +141,7 @@ it("excludes after-horizon and unreachable provinces from population weights and
 		seed: 42,
 		planetRadiusKm: 6371,
 		era: "lateMedieval",
-		eraSettledMask: m.contextMask,
+		eraSettledMask,
 		eraStatehoodMask: new Uint8Array(4),
 		timings: [],
 	})
@@ -210,7 +149,7 @@ it("excludes after-horizon and unreachable provinces from population weights and
 	expect(society.cultures?.assignment[3]).toBe(-1)
 	let negativeContributions = 0
 	for (let p = 0; p < 4; p++)
-		if ((society.cultures?.assignment[p] ?? -1) >= 0 && m.migrationWave[p] < 0)
+		if ((society.cultures?.assignment[p] ?? -1) >= 0 && migrationWave[p] < 0)
 			negativeContributions++
 	expect(negativeContributions).toBe(0)
 })

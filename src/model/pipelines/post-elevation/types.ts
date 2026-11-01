@@ -19,8 +19,8 @@ import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
-import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { HistoryMigration } from "@/model/society/migration/types"
 
 export type ApplyOceanCurrentsToClimateParams = {
 	isLocked: boolean

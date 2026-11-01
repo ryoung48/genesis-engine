@@ -36,8 +36,6 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import { PROVINCES } from "@/model/geography/terrain/provinces"
 import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
-import { DISTRIBUTION_MIGRATION } from "@/model/history/distribution/migration"
-import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
@@ -55,6 +53,7 @@ import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { MIGRATION } from "@/model/society/migration"
+import type { HistoryMigration } from "@/model/society/migration/types"
 import { POPULATION } from "@/model/society/population"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type { GenesisProvinces } from "@/model/society/types"
@@ -1013,56 +1012,42 @@ function runPostElevationPipeline(
 		seed: params.seed,
 	})
 	const planetRadiusKm = params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
+	const migration = MIGRATION.compute({
+		provinces,
+		habitability: rawHabitability,
+		mesh,
+		isLand,
+		elevationKm: elevation_km,
+		planetRadiusKm,
+		seed: params.seed,
+		horizonYear: MIGRATION_HORIZON_YEAR,
+	})
+	provinces.areaKm2 = migration.areaKm2
 	const historyMigration: HistoryMigration =
 		params.historyPipeline === "distribution"
-			? {
-					pipeline: "distribution",
-					data: DISTRIBUTION_MIGRATION.compute({
-						provinces,
-						habitability: rawHabitability,
-						mesh,
-						ocean: LANDMARKS.regionTypeMask({ landmarks, type: "ocean" }),
-						planetRadiusKm,
-						seed: params.seed,
-					}),
-				}
+			? { pipeline: "distribution", data: migration }
 			: { pipeline: "simulation" }
-	const simulationMigration =
+	const cradles =
 		historyMigration.pipeline === "distribution"
 			? null
-			: MIGRATION.compute({
+			: MIGRATION.cradles({
 					provinces,
-					habitability: rawHabitability,
-					mesh,
-					isLand,
-					elevationKm: elevation_km,
+					arrivalYear: migration.arrivalYear,
+					siteScore: Float32Array.from(
+						{ length: provinces.count },
+						(_, province) =>
+							PLACEMENT.nationPlacementScore({
+								province,
+								habitability: rawHabitability,
+								waterAccess: provinces.waterAccess,
+								provinceContinent: undefined,
+								target: 1,
+							}),
+					),
+					r_xyz: mesh.r_xyz,
 					planetRadiusKm,
-					seed: params.seed,
-					horizonYear: MIGRATION_HORIZON_YEAR,
 				})
-	const cradles = simulationMigration
-		? MIGRATION.cradles({
-				provinces,
-				arrivalYear: simulationMigration.arrivalYear,
-				siteScore: Float32Array.from(
-					{ length: provinces.count },
-					(_, province) =>
-						PLACEMENT.nationPlacementScore({
-							province,
-							habitability: rawHabitability,
-							waterAccess: provinces.waterAccess,
-							provinceContinent: undefined,
-							target: 1,
-						}),
-				),
-				r_xyz: mesh.r_xyz,
-				planetRadiusKm,
-			})
-		: null
-	const migrationWave =
-		historyMigration.pipeline === "distribution"
-			? historyMigration.data.migrationWave
-			: (simulationMigration?.migrationWave ?? new Float32Array(0))
+	const migrationWave = migration.migrationWave
 	TIMING.record({ stage: "Post: migration", startedAt: t0, timings })
 	onProgress?.("Post: migration", 74)
 
@@ -1076,9 +1061,11 @@ function runPostElevationPipeline(
 	let eraSettledMask: Uint8Array = new Uint8Array(provinces.count)
 	let eraStatehoodMask: Uint8Array | undefined
 	if (historyMigration.pipeline === "distribution") {
-		eraSettledMask = historyMigration.data.contextMask
+		eraSettledMask = Uint8Array.from(migration.arrivalYear, (year) =>
+			year === MIGRATION.sentinel ? 0 : 1,
+		)
 		eraStatehoodMask = new Uint8Array(provinces.count)
-	} else if (simulationMigration && cradles) {
+	} else if (cradles) {
 		// Settled land has people (cultures, population); state-held land is the
 		// part of it that gets nations. The late medieval start reads both from the
 		// arrival field and the target profile; other eras keep their wave
@@ -1109,8 +1096,7 @@ function runPostElevationPipeline(
 			habitableCount++
 			if (arrivalSteered) {
 				eraSettledMask[p] = 1
-				settledAtStart[p] =
-					simulationMigration.arrivalYear[p] <= startYear ? 1 : 0
+				settledAtStart[p] = migration.arrivalYear[p] <= startYear ? 1 : 0
 			} else if (
 				migrationWave[p] >= 0 &&
 				migrationWave[p] <= actualSettlementWave
@@ -1128,9 +1114,9 @@ function runPostElevationPipeline(
 				const sources = MIGRATION.activeCradles({ cradles, year: startYear })
 				eraStatehoodMask = MIGRATION.heldCore({
 					provinces,
-					suitability: simulationMigration.suitability,
+					suitability: migration.suitability,
 					settled: settledAtStart,
-					sources: sources.length ? sources : [simulationMigration.origin],
+					sources: sources.length ? sources : [migration.origin],
 					count: Math.round(profile.stateHeld * habitableCount),
 					r_xyz: mesh.r_xyz,
 					planetRadiusKm,
@@ -1144,12 +1130,6 @@ function runPostElevationPipeline(
 		}
 	}
 
-	const populationWave =
-		historyMigration.pipeline === "distribution"
-			? Float32Array.from(migrationWave, (w, p) =>
-					historyMigration.data.contextMask[p] ? w : -1,
-				)
-			: migrationWave
 	const population: ProvincePopulation = POPULATION.computePopulation({
 		provinces,
 		landmarks,
@@ -1163,17 +1143,17 @@ function runPostElevationPipeline(
 		mesh,
 		planetRadiusKm: params.planetRadiusKm,
 		eraTargetPopulation: eraConfig.targetPopulation,
-		migrationWave: populationWave,
+		migrationWave,
 		settlementWave: actualSettlementWave,
 		migrationFalloff: eraConfig.migrationFalloff,
 	})
 	population.migrationWave = migrationWave
-	if (simulationMigration) {
-		population.arrivalYear = simulationMigration.arrivalYear
-		population.predecessor = simulationMigration.predecessor
-		population.settlementOrder = simulationMigration.order
+	if (historyMigration.pipeline !== "distribution") {
+		population.arrivalYear = migration.arrivalYear
+		population.predecessor = migration.predecessor
+		population.settlementOrder = migration.order
 		population.cradles = cradles ?? undefined
-		population.migrationDiagnostics = simulationMigration.diagnostics
+		population.migrationDiagnostics = migration.diagnostics
 	}
 	TIMING.record({ stage: "Post: population", startedAt: t0, timings })
 	onProgress?.("Post: population", 74)

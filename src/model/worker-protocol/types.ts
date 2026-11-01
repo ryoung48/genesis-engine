@@ -6,7 +6,6 @@ import type {
 	WindVectors,
 } from "@/model/climate/weather/wind/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
-import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
@@ -15,6 +14,7 @@ import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
 	CradleChoice,
+	HistoryMigration,
 	MigrationDiagnostics,
 } from "@/model/society/migration/types"
 import type {

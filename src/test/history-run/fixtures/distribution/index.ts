@@ -1,10 +1,10 @@
 import { DISTRIBUTION_ENGINE } from "@/model/history/distribution/engine"
 import type { DistributionEngine } from "@/model/history/distribution/engine/types"
-import { DISTRIBUTION_MIGRATION } from "@/model/history/distribution/migration"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 import type { Territory } from "@/model/history/distribution/territory/types"
 import { PROCEDURAL_RECORD } from "@/model/history/record/procedural"
+import { MIGRATION } from "@/model/society/migration"
 import type { GenesisProvinces } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
@@ -59,13 +59,15 @@ function world({
 	}
 	const historyMigration = {
 		pipeline: "distribution",
-		data: DISTRIBUTION_MIGRATION.compute({
+		data: MIGRATION.compute({
 			provinces,
 			habitability: new Float32Array(count).fill(1),
 			mesh,
-			ocean: new Uint8Array(count),
+			isLand: new Uint8Array(count).fill(1),
+			elevationKm: new Float32Array(count),
 			planetRadiusKm: 6371,
 			seed,
+			horizonYear: 2025,
 		}),
 	}
 	return {

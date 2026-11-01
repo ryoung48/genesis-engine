@@ -112,7 +112,6 @@ function summarize({ engine: e }: MigrationReportParams) {
 			m.order,
 			m.componentId,
 			m.arrivalTier,
-			m.contextMask,
 			e.cradles.nearestId,
 			e.cradles.nearestDistanceKm,
 			e.provincePositions,

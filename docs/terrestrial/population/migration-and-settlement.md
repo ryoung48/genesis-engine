@@ -4,6 +4,8 @@ Scope: `:history`. Source: `src/model/society/migration`, `src/model/society/mig
 
 Every habitable province has one dated first settlement, computed once while the world is generated. The yearly census then replays those dates, so land nobody has reached yet is empty, and everything the simulation does afterwards reads the result.
 
+Both history pipelines (`simulation` and `distribution`) read the same arrival field from `MIGRATION.compute`. The distribution engine replays it through `DISTRIBUTION_SETTLEMENT` and builds its cradle schedule with `MIGRATION.cradles`; the same pass also sets each province's `areaKm2`. Earth imports have no field.
+
 ## Arrival field
 
 `MIGRATION.compute` runs one earliest-arrival search from a single origin, starting at 79,999 BCE.

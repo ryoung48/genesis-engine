@@ -81,7 +81,7 @@ function create({ world }: CreateEngineParams): DistributionEngine {
 		provinces,
 		migration,
 		siteScore,
-		r_xyz: provincePositions,
+		r_xyz: world.mesh.r_xyz,
 		planetRadiusKm: world.params.planetRadiusKm,
 	})
 	return {

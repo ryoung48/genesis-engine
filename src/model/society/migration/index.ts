@@ -8,6 +8,7 @@ import type {
 	ActiveCradlesParams,
 	CapabilityParams,
 	CradleChoice,
+	CradleSpacingParams,
 	CradlesParams,
 	HeldCoreParams,
 	HorizonParams,
@@ -295,6 +296,8 @@ function compute({
 	)
 	return {
 		origin,
+		continuousArrival,
+		areaKm2: Float32Array.from(areas),
 		predecessor,
 		edgeKind,
 		arrivalTier,
@@ -329,6 +332,10 @@ function matureScore({
 		: siteScore * Math.min(age / CRADLE_RESIDENCE_YEARS, 2)
 }
 
+function cradleSpacingKm({ planetRadiusKm }: CradleSpacingParams): number {
+	return (CRADLE_SPACING_KM * planetRadiusKm) / UNITS.defaultPlanetRadiusKm
+}
+
 function cradles({
 	provinces,
 	arrivalYear,
@@ -336,8 +343,7 @@ function cradles({
 	r_xyz,
 	planetRadiusKm,
 }: CradlesParams): CradleChoice[] {
-	const spacingKm =
-		(CRADLE_SPACING_KM * planetRadiusKm) / UNITS.defaultPlanetRadiusKm
+	const spacingKm = cradleSpacingKm({ planetRadiusKm })
 	const nearest = new Float64Array(provinces.count).fill(Infinity)
 	const schedule: CradleChoice[] = []
 	const selected = new Set<number>()
@@ -456,6 +462,8 @@ export const MIGRATION = {
 	compute,
 	transit,
 	waveOf,
+	matureScore,
+	cradleSpacingKm,
 	cradles,
 	activeCradles,
 	heldCore,

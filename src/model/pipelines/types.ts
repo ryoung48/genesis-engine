@@ -28,12 +28,12 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
-import type { HistoryMigration } from "@/model/history/distribution/migration/types"
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import { StageTiming } from "@/model/shared/timing/types"
 import type { RouteComputation } from "@/model/society/infrastructure/trade/routing/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
+import type { HistoryMigration } from "@/model/society/migration/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,

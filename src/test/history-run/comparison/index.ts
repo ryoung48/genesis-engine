@@ -477,7 +477,6 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 			const migrationBefore = { ...object(da.migration) },
 				migrationAfter = { ...object(db.migration) }
 			for (const metric of [
-				"initializationMs",
 				"preStateAdvanceMs",
 				"politicalAdvanceMs",
 				"settlementRecordBytes",

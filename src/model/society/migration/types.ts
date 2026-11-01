@@ -54,6 +54,8 @@ export interface CradleChoice {
 export interface MigrationResult {
 	origin: number
 	arrivalYear: Int32Array
+	continuousArrival: Float64Array
+	areaKm2: Float32Array
 	predecessor: Int32Array
 	edgeKind: Uint8Array
 	arrivalTier: Uint8Array
@@ -63,6 +65,10 @@ export interface MigrationResult {
 	componentId: Int32Array
 	diagnostics: MigrationDiagnostics
 }
+
+export type HistoryMigration =
+	| { pipeline: "distribution"; data: MigrationResult }
+	| { pipeline: "simulation" | "earth" }
 
 export interface HorizonParams {
 	continuousArrival: Float64Array
@@ -77,6 +83,10 @@ export interface WaveParams {
 
 export interface CapabilityParams {
 	distanceKm: number
+}
+
+export interface CradleSpacingParams {
+	planetRadiusKm: number
 }
 
 export interface CradlesParams {

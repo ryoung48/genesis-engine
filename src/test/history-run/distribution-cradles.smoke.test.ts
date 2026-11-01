@@ -1,14 +1,23 @@
 import { expect, it } from "vitest"
 import { DISTRIBUTION_CRADLES as C } from "@/model/history/distribution/cradles"
 import { DISTRIBUTION_ENGINE as E } from "@/model/history/distribution/engine"
+import { MIGRATION } from "@/model/society/migration"
 import { DISTRIBUTION_FIXTURE as F } from "@/test/history-run/fixtures/distribution"
 import { DISTRIBUTION_REPORT as R } from "@/test/history-run/report/distribution"
 
 it("enforces millennial residence and saturates maturity", () => {
-	expect(C.matureScore({ siteScore: 3, arrivalYear: 1, year: 2000 })).toBe(0)
-	expect(C.matureScore({ siteScore: 3, arrivalYear: 0, year: 2000 })).toBe(3)
-	expect(C.matureScore({ siteScore: 3, arrivalYear: 0, year: 4000 })).toBe(6)
-	expect(C.matureScore({ siteScore: 3, arrivalYear: 0, year: 8000 })).toBe(6)
+	expect(
+		MIGRATION.matureScore({ siteScore: 3, arrivalYear: 1, year: 2000 }),
+	).toBe(0)
+	expect(
+		MIGRATION.matureScore({ siteScore: 3, arrivalYear: 0, year: 2000 }),
+	).toBe(3)
+	expect(
+		MIGRATION.matureScore({ siteScore: 3, arrivalYear: 0, year: 4000 }),
+	).toBe(6)
+	expect(
+		MIGRATION.matureScore({ siteScore: 3, arrivalYear: 0, year: 8000 }),
+	).toBe(6)
 })
 it("keeps scheduled cradles inactive until their review dates and reconstructs earlier choices", () => {
 	const w = F.world({ neighbors: [[], []], desolate: [], seed: 42 })

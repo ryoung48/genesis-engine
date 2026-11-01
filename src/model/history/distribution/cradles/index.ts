@@ -1,21 +1,12 @@
 import type {
 	ActivateParams,
-	CradleChoice,
 	CradleParams,
 	CradleState,
 	HistoricalParams,
-	MatureScoreParams,
 } from "@/model/history/distribution/cradles/types"
 import { UNITS } from "@/model/shared/units"
+import { MIGRATION } from "@/model/society/migration"
 
-function matureScore({
-	siteScore,
-	arrivalYear,
-	year,
-}: MatureScoreParams): number {
-	const age = year - arrivalYear
-	return age < 2000 ? 0 : siteScore * Math.min(age / 2000, 2)
-}
 function create({
 	provinces,
 	migration,
@@ -23,59 +14,19 @@ function create({
 	r_xyz,
 	planetRadiusKm,
 }: CradleParams): CradleState {
-	const spacingKm = (2000 * planetRadiusKm) / UNITS.defaultPlanetRadiusKm,
-		nearest = new Float64Array(provinces.count).fill(Infinity),
-		schedule: CradleChoice[] = []
-	const selected = new Set<number>()
-	for (let year = -3300; year <= 2025 && schedule.length < 8; year += 100) {
-		while (schedule.length < 8) {
-			let best = -1,
-				score = -Infinity
-			for (let p = 0; p < provinces.count; p++) {
-				if (
-					provinces.desolate[p] ||
-					selected.has(p) ||
-					year - migration.arrivalYear[p] < 2000 ||
-					nearest[p] < spacingKm
-				)
-					continue
-				const value =
-					matureScore({
-						siteScore: siteScore[p],
-						arrivalYear: migration.arrivalYear[p],
-						year,
-					}) * Math.min(nearest[p] / spacingKm, 2)
-				if (value > score || (value === score && p < best)) {
-					best = p
-					score = value
-				}
-			}
-			if (best < 0) break
-			schedule.push({
-				province: best,
-				selectionYear: year,
-				arrivalYear: migration.arrivalYear[best],
-				residenceYears: year - migration.arrivalYear[best],
-				componentId: migration.componentId[best],
-				nearestDistanceKm: nearest[best],
-			})
-			selected.add(best)
-			for (let p = 0; p < provinces.count; p++)
-				nearest[p] = Math.min(
-					nearest[p],
-					UNITS.regionDistanceKm({
-						r_xyz,
-						fromRegion: p,
-						toRegion: best,
-						planetRadiusKm,
-					}),
-				)
-		}
-	}
 	return {
-		schedule,
+		schedule: MIGRATION.cradles({
+			provinces,
+			arrivalYear: migration.arrivalYear,
+			siteScore,
+			r_xyz,
+			planetRadiusKm,
+		}).map((choice) => ({
+			...choice,
+			componentId: migration.componentId[choice.province],
+		})),
 		cursor: 0,
-		spacingKm,
+		spacingKm: MIGRATION.cradleSpacingKm({ planetRadiusKm }),
 		nearestId: new Int32Array(provinces.count).fill(-1),
 		nearestDistanceKm: new Float32Array(provinces.count).fill(Infinity),
 	}
@@ -117,4 +68,4 @@ function atYear(params: HistoricalParams): CradleState {
 	activate({ ...params, cradles })
 	return cradles
 }
-export const DISTRIBUTION_CRADLES = { create, activate, atYear, matureScore }
+export const DISTRIBUTION_CRADLES = { create, activate, atYear }

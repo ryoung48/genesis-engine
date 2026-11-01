@@ -1,5 +1,5 @@
-import type { MigrationResult } from "@/model/history/distribution/migration/types"
 import type { Territory } from "@/model/history/distribution/territory/types"
+import type { MigrationResult } from "@/model/society/migration/types"
 
 export interface SettlementState {
 	order: Int32Array

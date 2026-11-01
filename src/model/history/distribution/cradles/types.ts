@@ -1,4 +1,4 @@
-import type { MigrationResult } from "@/model/history/distribution/migration/types"
+import type { MigrationResult } from "@/model/society/migration/types"
 import type { GenesisProvinces } from "@/model/society/types"
 export interface CradleChoice {
 	province: number
@@ -30,8 +30,3 @@ export interface ActivateParams {
 	year: number
 }
 export interface HistoricalParams extends ActivateParams {}
-export interface MatureScoreParams {
-	siteScore: number
-	arrivalYear: number
-	year: number
-}
