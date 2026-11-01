@@ -17,7 +17,7 @@ export type DangerSubMode =
 	| "cyclone"
 	| "tornado"
 	| "tidal"
-export type VegetationSubMode = "base" | "maps" | "satellite" | "eu5"
+export type VegetationSubMode = "base" | "maps" | "satellite"
 export type ClimateSubMode = "basic" | "pasta" | "koppen" | "eu5"
 export type TopographySubMode = "classification" | "slope" | "eu5"
 export type ExportWidthPreset =

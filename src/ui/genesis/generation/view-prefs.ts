@@ -442,8 +442,7 @@ export function parseStoredViewPrefs(
 			vegetationSubMode:
 				parsed.vegetationSubMode === "base" ||
 				parsed.vegetationSubMode === "maps" ||
-				parsed.vegetationSubMode === "satellite" ||
-				parsed.vegetationSubMode === "eu5"
+				parsed.vegetationSubMode === "satellite"
 					? parsed.vegetationSubMode
 					: DEFAULT_VIEW_PREFS.vegetationSubMode,
 			climateSubMode:

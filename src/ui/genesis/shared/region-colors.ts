@@ -2,7 +2,7 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
-import { HUMIDITY } from "@/model/climate/precipitation/humidity"
+import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { RELIGION } from "@/model/history/sim/religion"
 import { MESH } from "@/model/mesh"
@@ -720,15 +720,8 @@ export function computeRegionColors(
 		world.climate &&
 		world.dtr_annual
 	) {
-		// Earth imports can carry observed RH sampled from WorldClim vapor
-		// pressure + observed temperature. Otherwise fall back to the temp/DTR
-		// estimate, which follows the same month index as DTR.
-		const monthlyTemp =
-			dtrMonth === 0 ? null : world.climate.temperature_monthly
-		const monthlyDtr = dtrMonth === 0 ? null : world.dtr_monthly
+		const modeled = HUMIDITY_MARINE.fields(world)
 		const offset = dtrMonth === 0 ? 0 : (dtrMonth - 1) * N
-		const aet = world.hydrology?.aet_monthly
-		const pet = world.climate.pet_monthly
 		for (let r = 0; r < N; r++) {
 			if (isOceanRegion(r) && !(colorMode === "humidity" && hasOceanClimate)) {
 				const [cr, cg, cb] = oceanRgb(r)
@@ -737,33 +730,12 @@ export function computeRegionColors(
 				rgb[3 * r + 2] = cb
 				continue
 			}
-			const meanT = monthlyTemp
-				? monthlyTemp[offset + r]
-				: world.climate.temperature_avg[r]
-			const dtr = monthlyDtr
-				? (monthlyDtr[offset + r] ?? world.dtr_annual[r])
-				: world.dtr_annual[r]
 			const observedRh =
 				dtrMonth === 0
 					? world.observedHumidity?.real_annual?.[r]
 					: world.observedHumidity?.real_monthly?.[offset + r]
-			let annualAridity: number | undefined
-			if (aet && pet && isLandRegion(r)) {
-				let aetSum = 0
-				let petSum = 0
-				for (let m = 0; m < 12; m++) {
-					aetSum += aet[m * N + r]
-					petSum += pet[m * N + r]
-				}
-				annualAridity = petSum > 0 ? aetSum / petSum : 1
-			}
-			const modeledRh = HUMIDITY.relativeHumidityFromTempRange({
-				meanTempC: meanT,
-				dtrC: dtr,
-				annualAridity,
-				annualRainfallMm: world.rainfall?.annual[r],
-				distFromOceanKm: world.oceanDist[r],
-			})
+			const modeledRh =
+				dtrMonth === 0 ? modeled.annual[r] : modeled.monthly[offset + r]
 			const value =
 				colorMode === "realHumidity"
 					? observedRh

@@ -5,6 +5,7 @@ import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { HEURISTIC_CURRENTS } from "@/model/climate/ocean/currents/heuristic"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
+import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
@@ -446,42 +447,11 @@ function getHoverModeledHumiditySeries(
 		return null
 	const N = world.mesh.numRegions
 
-	let annualAridity: number | undefined
-	const aet = world.hydrology?.aet_monthly
-	const pet = world.climate.pet_monthly
-	if (aet && pet && world.isLand?.[r]) {
-		let aetSum = 0
-		let petSum = 0
-		for (let m = 0; m < 12; m++) {
-			aetSum += aet[m * N + r]
-			petSum += pet[m * N + r]
-		}
-		annualAridity = petSum > 0 ? aetSum / petSum : 1
-	}
-
-	const annualRainfall = world.rainfall?.annual[r]
-	const distFromOceanKm = world.oceanDist[r]
-	const annual = HUMIDITY.relativeHumidityFromTempRange({
-		meanTempC: world.climate.temperature_avg[r],
-		dtrC: world.dtr_annual[r],
-		annualAridity,
-		annualRainfallMm: annualRainfall,
-		distFromOceanKm,
-	})
+	const fields = HUMIDITY_MARINE.fields(world)
+	const annual = fields.annual[r]
 	const monthly: number[] = []
-	if (world.dtr_monthly && world.climate.temperature_monthly) {
-		for (let m = 0; m < 12; m++) {
-			monthly.push(
-				HUMIDITY.relativeHumidityFromTempRange({
-					meanTempC: world.climate.temperature_monthly[m * N + r],
-					dtrC: world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
-					annualAridity,
-					annualRainfallMm: annualRainfall,
-					distFromOceanKm,
-				}),
-			)
-		}
-	}
+	if (world.dtr_monthly && world.climate.temperature_monthly)
+		for (let m = 0; m < 12; m++) monthly.push(fields.monthly[m * N + r])
 	return {
 		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
 		annual,
@@ -626,6 +596,9 @@ export function getHoverMisery({
 		annualAridity = petSum > 0 ? aetSum / petSum : 1
 	}
 
+	const marineHumidity = !world.isLand?.[r]
+		? HUMIDITY_MARINE.fields(world)
+		: null
 	const annualRainfall = world.rainfall?.annual[r]
 	const modeledAnnualWind = windSpeedMs ?? 0
 	const observedAnnualWind = useObserved
@@ -639,6 +612,7 @@ export function getHoverMisery({
 			? (observedAnnualT as number)
 			: modeledAnnualT
 	const annualRh =
+		marineHumidity?.annual[r] ??
 		observedHumidity?.annual ??
 		HUMIDITY.relativeHumidityFromTempRange({
 			meanTempC: annualT,
@@ -663,6 +637,7 @@ export function getHoverMisery({
 					: modeledT
 			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
 			const rh =
+				marineHumidity?.monthly[m * N + r] ??
 				observedHumidity?.monthly[m] ??
 				HUMIDITY.relativeHumidityFromTempRange({
 					meanTempC: T,

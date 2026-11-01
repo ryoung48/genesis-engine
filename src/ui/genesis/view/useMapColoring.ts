@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react"
 import { HUMIDITY } from "@/model/climate/precipitation/humidity"
+import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
 import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { COLOR } from "@/model/history/earth/color"
@@ -268,6 +269,10 @@ export function useMapColoring(input: MapColoringInput) {
 			const aet = worldForDisplay.hydrology?.aet_monthly
 			const pet = worldForDisplay.climate.pet_monthly
 			const { windSpeed } = windVectors
+			const marineHumidity =
+				!isObserved && hasOceanClimate
+					? HUMIDITY_MARINE.fields(worldForDisplay)
+					: null
 			for (let r = 0; r < N; r++) {
 				if (!worldForDisplay.isLand?.[r] && (isObserved || !hasOceanClimate)) {
 					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
@@ -284,7 +289,11 @@ export function useMapColoring(input: MapColoringInput) {
 				const meanT =
 					isObserved && Number.isFinite(observedT) ? observedT : modeledT
 				let humidity: number
-				if (isObserved) {
+				if (marineHumidity && !worldForDisplay.isLand?.[r]) {
+					humidity = isMonthly
+						? marineHumidity.monthly[offset + r]
+						: marineHumidity.annual[r]
+				} else if (isObserved) {
 					const observedRh = isMonthly
 						? worldForDisplay.observedHumidity?.real_monthly?.[offset + r]
 						: worldForDisplay.observedHumidity?.real_annual?.[r]

@@ -11,3 +11,15 @@ The selected model travels with the world in `params.climateModel`; model APIs t
 For non-locked v2 worlds, the Temperature, Rain, Humidity, Cloud Cover, DTR and MI maps include ocean cells. Temperature shows sea-surface temperature over the ocean; Rain shows ocean precipitation. Humidity uses the existing temperature/daily-range estimate, without land water-balance aridity over oceans; it is not v2's atmospheric column humidity. Cloud Cover uses the existing cached monthly cloud fractions. DTR shows the modeled near-surface air day/night temperature range. MI applies the existing apparent-temperature calculation using modeled temperature, estimated humidity and wind; ocean temperature is SST, so ocean MI is a proxy rather than an independently modeled marine air comfort index. These maps use the existing color scales and annual/monthly selectors. Observed and difference maps retain their existing coverage.
 
 Ocean hover cards expose the corresponding modeled climate readouts and monthly series, including rainfall, cloud cover, humidity, DTR and MI in their respective modes. The temperature chart is labeled SST over oceans. Ocean humidity and MI omit the land water-balance aridity adjustment, matching their map calculations.
+
+
+Modeled marine humidity uses 80% offshore, retaining the previous temperature/DTR
+estimate wherever it is below 80%. For other ocean cells, a smooth coastal
+transition blends the nearest coastal land's modeled humidity toward 80% over
+300 km. Distance is the shortest mesh path through water, using great-circle
+edge lengths. The 300 km width is a display-smoothing choice to spread the
+transition across several cells at normal world resolution, not a fitted
+atmospheric transport length. Annual and monthly values are calculated
+separately. Coastal values may exceed 80% next to humid land. Land humidity,
+observed humidity and the climate simulation are unchanged. Humidity maps,
+modeled ocean MI and their hover values share the same corrected fields.

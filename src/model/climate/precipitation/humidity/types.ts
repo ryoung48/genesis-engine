@@ -1,10 +1,10 @@
 export type RelativeHumidityFromTempRangeParams = {
 	meanTempC: number
 	dtrC: number
-	/** Optional AET/PET aridity ratio used to bias the dewpoint in dry climates. */
+	// [JUSTIFICATION] Callers without a land water balance cannot supply an AET/PET ratio.
 	annualAridity?: number
-	/** Optional annual rainfall used for moisture-source and dry-air corrections. */
+	// [JUSTIFICATION] Rainfall is unavailable to temperature-only callers.
 	annualRainfallMm?: number
-	/** Optional distance from the ocean used for continentality correction. */
+	// [JUSTIFICATION] Point estimates can lack coast-distance data.
 	distFromOceanKm?: number
 }

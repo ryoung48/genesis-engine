@@ -27,8 +27,7 @@ export const VegetationModeSection: React.FC<VegetationModeSectionProps> = ({
 		colorMode !== "vegetationSatellite" &&
 		colorMode !== "realVegetation" &&
 		colorMode !== "realVegetationMaps" &&
-		colorMode !== "realVegetationSatellite" &&
-		colorMode !== "eu5Vegetation"
+		colorMode !== "realVegetationSatellite"
 	) {
 		return null
 	}
@@ -48,15 +47,10 @@ export const VegetationModeSection: React.FC<VegetationModeSectionProps> = ({
 							{ value: "base" as const, label: "Base" },
 							{ value: "maps" as const, label: "Maps" },
 							{ value: "satellite" as const, label: "Satellite" },
-							{ value: "eu5" as const, label: "Alt" },
 						]}
 						value={vegetationSubMode}
 						onChange={(v) => {
 							setVegetationSubMode(v)
-							if (v === "eu5") {
-								setColorMode("eu5Vegetation")
-								return
-							}
 							const observed =
 								colorMode === "realVegetation" ||
 								colorMode === "realVegetationMaps" ||
