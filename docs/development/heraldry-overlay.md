@@ -1,0 +1,11 @@
+# Heraldry overlay
+
+Enable **Society > Heraldry** in the map controls. Shields can appear with nation or dynasty names, or on their own. They appear on the globe, flat map, and PNG map exports. Earth history also receives generated shields; these are decorative identifiers, not authentic historical coats of arms.
+
+Each name deterministically selects a design from the flag generator's map-safe pattern subset (see [flag-generator.md](flag-generator.md)); half are jdenticons, split evenly between the two variants whose palette is rotated to the nation's map colour (rounded to 15° buckets; near-grey colours fall back to a random palette), drawn in the shared shield shape with a black outline. Changing the displayed dynasty name does not change the nation's shield. Historical names come from the selected history frame. No heraldry state is stored in the simulation or worker protocol.
+
+Shield height is twice the nation-label font size computed from owned province count, without the label's name-length penalty. It uses the existing procedural or Earth-history scale curve and its minimum and maximum limits. Province count measures territory in the simulation, not physical land area or population. Placement follows the existing capital/settlement anchor; shields appear below names when names are enabled.
+
+`src/ui/genesis/renderer/heraldry-overlay/` attaches shield planes to pooled nation labels. The canvas renderer lives in `src/ui/heraldry/identicon/`, with shared geometry in `src/ui/heraldry/shield/`; the [flag generator](flag-generator.md) uses these same renderers. This reuses globe billboarding, horizon visibility, map projection and repeated map copies. Geometry is shared; 128-pixel-wide canvas textures with proportional height are cached by nation name and shared across globe/map copies. Meshes and materials are reused on subsequent updates. Canvas drawing happens when a shield first enters the cache, not on camera movement. Names absent from a later update are removed from the texture cache; controller disposal releases all shield resources.
+
+Each visible shield adds one draw call and two triangles. Instancing and a texture atlas are possible future improvements if measured draw-call overhead warrants them. The current implementation does not batch shields into a single draw call.

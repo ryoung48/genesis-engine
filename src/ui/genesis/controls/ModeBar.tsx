@@ -123,12 +123,16 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					getBaseMapMode(colorMode) === "population"
 						? societyMode === "knowledge"
 							? "development"
-							: societyMode
+							: societyMode === "migration"
+								? "density"
+								: societyMode
 						: colorMode === "timezone"
 							? "timezone"
 							: isTitlesNationMode(nationMode)
 								? "titles"
-								: nationMode
+								: nationMode === "borderShadow"
+									? "borders"
+									: nationMode
 				}
 				onChange={(mode) => {
 					if (mode === "timezone") {

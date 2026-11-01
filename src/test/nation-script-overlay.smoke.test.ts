@@ -13,6 +13,7 @@ import {
 } from "@/ui/genesis/renderer/nation-script-overlay"
 
 vi.mock("@/ui/genesis/renderer/script-texture", () => ({
+	DEFAULT_SCRIPT_RENDER_SCALE: 7,
 	renderScriptTexture: () => ({
 		canvas: { width: 100, height: 20 },
 		aspect: 5,
@@ -67,10 +68,10 @@ vi.mock("@/ui/genesis/renderer/nation-label-overlay/nation-labels", () => ({
 it.each([
 	false,
 	true,
-])("builds standalone scripts with a history override: %s", (withHistoryOverride) => {
+])("builds scripts with a history override: %s", (withHistoryOverride) => {
 	const ctx = {
 		currentWorld: createWorld(),
-		labelMode: { nations: false, dynasty: false, script: true },
+		labelMode: { nations: true, dynasty: false, script: true },
 		nationNames: ["Example"],
 		heritageScripts: new Map([[0, SCRIPT.spawn("overlay-regression")]]),
 		nationScriptTextureCache: new Map(),
@@ -86,6 +87,7 @@ it.each([
 			assignment: new Int32Array([0]),
 			seeds: new Int32Array([0]),
 			names: ["Historical Name"],
+			colors: new Float32Array([0.5, 0.5, 0.5]),
 		}
 	}
 	createLabelsController(ctx, {

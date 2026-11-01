@@ -13,12 +13,14 @@ export interface LandStatusLabelParams {
 
 export interface StatusAtParams {
 	provinceStatus: Uint8Array | null
+	distributionOwner: Int32Array | null
 	province: number
 }
 
 export interface PaintUninhabitedParams {
 	rgb: Float32Array
 	provinceStatus: Uint8Array
+	distributionOwner: Int32Array | null
 	regionProvince: Int32Array
 	elevationKm: Float32Array
 }

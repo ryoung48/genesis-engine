@@ -39,6 +39,7 @@ export interface LabelMode {
 	 * earthHistoryLabelPartitions. */
 	religion: boolean
 	script: boolean
+	heraldry: boolean
 }
 
 export interface OverlayControlsProps {
@@ -167,6 +168,13 @@ export interface OverlayControlsProps {
 }
 
 export interface DevelopmentModeSectionProps {
+	colorMode: ColorMode
+	societyMode: SocietyMapMode
+	setSocietyMode: (value: SocietyMapMode) => void
+	isEarthImport: boolean
+}
+
+export interface PopulationModeSectionProps {
 	colorMode: ColorMode
 	societyMode: SocietyMapMode
 	setSocietyMode: (value: SocietyMapMode) => void

@@ -3,4 +3,5 @@ export const APP_PATHS = {
 	galaxy: "/galaxy",
 	bench: "/history/bench",
 	planetRendererExperiment: "/experiments/planet-renderer",
+	flagGenerator: "/experiments/flags",
 } as const

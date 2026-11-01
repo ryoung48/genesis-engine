@@ -25,26 +25,36 @@ export function createNationLabelPools(): NationLabelPools {
 	}
 }
 
+function createLabelText(): Text {
+	const text = new Text()
+	text.font = jedarFontUrl
+	text.fontSize = LABEL_FONT_SIZE_GLOBE
+	text.fontWeight = 500
+	text.color = LABEL_TEXT_COLOR
+	text.strokeWidth = LABEL_OUTLINE_WIDTH
+	text.strokeColor = LABEL_OUTLINE_COLOR
+	text.anchorX = "center"
+	text.anchorY = "middle"
+	text.textRenderingMode = "distanceField"
+	text.renderOrder = LABEL_RENDER_ORDER
+	text.frustumCulled = true
+	text.visible = false
+	return text
+}
+
 export function ensurePoolSize(pool: LabelPool, count: number) {
 	while (pool.items.length < count) {
-		const text = new Text()
-		text.font = jedarFontUrl
-		text.fontSize = LABEL_FONT_SIZE_GLOBE
-		text.fontWeight = 500
-		text.color = LABEL_TEXT_COLOR
-		text.strokeWidth = LABEL_OUTLINE_WIDTH
-		text.strokeColor = LABEL_OUTLINE_COLOR
-		text.anchorX = "center"
-		text.anchorY = "middle"
-		text.textRenderingMode = "distanceField"
-		text.renderOrder = LABEL_RENDER_ORDER
-		text.frustumCulled = true
-		text.visible = false
+		const text = createLabelText()
 		const leader = createLabelLeaderLine()
 		text.userData.leaderLine = leader
 		pool.items.push(text)
 		pool.leaders.push(leader)
 	}
+}
+
+export function acquireLeaderlessLabel(pool: LabelPool, index: number): Text {
+	if (index >= pool.items.length) pool.items.push(createLabelText())
+	return pool.items[index]
 }
 
 export function hideUnusedPool(pool: LabelPool, usedCount: number) {

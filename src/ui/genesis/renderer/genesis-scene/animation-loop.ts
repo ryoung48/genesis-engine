@@ -1,19 +1,51 @@
+import type * as THREE from "three"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { updateGlobeLabelOrientations } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
-import { applySettlementLabelScreenScale } from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
+import { activateSettlementLabels } from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
 import {
 	applySettlementLabelCulling,
 	applySettlementMarkerCollisionCulling,
 	applySettlementMarkerScreenScale,
 } from "@/ui/genesis/renderer/nation-label-overlay/settlement-marker-collision"
-import { processPendingNationScriptTextures } from "@/ui/genesis/renderer/nation-script-overlay"
+import {
+	createPendingNationScriptTextureQueue,
+	processPendingNationScriptTextures,
+} from "@/ui/genesis/renderer/nation-script-overlay"
 import { createRenderScheduler } from "@/ui/genesis/renderer/render-scheduler"
+import { SETTLEMENT_SCRIPT } from "@/ui/genesis/renderer/settlement-script-overlay"
 import {
 	SOLAR_TERMINATOR_ELEVATED_RADIUS,
 	SOLAR_TERMINATOR_RADIUS,
 } from "@/ui/genesis/renderer/solar-terminator"
 
 const LABEL_CULLING_ENABLED = true
+const MAP_DASH_DENSE_ZOOM = 20
+const GLOBE_DASH_DENSE_DISTANCE = 1.1
+const DENSE_DASH_SCALE = 2
+
+function requestSettlementScripts(
+	ctx: GenesisContext,
+	group: THREE.Group | null,
+): boolean {
+	if (!group) return false
+	ctx.pendingSettlementScriptTextureQueue ??=
+		createPendingNationScriptTextureQueue()
+	return SETTLEMENT_SCRIPT.request({
+		group,
+		textureCache: ctx.nationScriptTextureCache,
+		textureQueue: ctx.pendingSettlementScriptTextureQueue,
+	})
+}
+
+function processSettlementScriptTextures(ctx: GenesisContext): boolean {
+	const progress = processPendingNationScriptTextures(
+		ctx.pendingSettlementScriptTextureQueue,
+		ctx.nationScriptTextureCache,
+		12,
+	)
+	if (progress.pending === 0) ctx.pendingSettlementScriptTextureQueue = null
+	return progress.pending > 0 || progress.processed > 0
+}
 
 export interface AnimationLoopControllerDeps {
 	stepFocusTween: () => void
@@ -94,6 +126,8 @@ export function createAnimationLoopController(
 					const zoomScale = Math.sqrt(ctx.mapCamera.zoom)
 					for (const mat of ctx.mapInfrastructureMaterials) {
 						mat.linewidth = mat.userData.baseWidth * zoomScale
+						mat.dashScale =
+							ctx.mapCamera.zoom >= MAP_DASH_DENSE_ZOOM ? DENSE_DASH_SCALE : 1
 					}
 				}
 				if (ctx.mapRiverMaterials.length > 0) {
@@ -120,10 +154,10 @@ export function createAnimationLoopController(
 					keepAnimating ||
 					scriptTextureProgress.pending > 0 ||
 					scriptTextureProgress.processed > 0
+				keepAnimating = processSettlementScriptTextures(ctx) || keepAnimating
 				{
 					applySettlementMarkerScreenScale(ctx, ctx.mapSettlements)
 					applySettlementMarkerScreenScale(ctx, ctx.mapEu4Settlements)
-					applySettlementLabelScreenScale(ctx, ctx.mapSettlementLabels)
 					const mapSettlementVisibility = new Map<string, boolean>()
 					applySettlementMarkerCollisionCulling(
 						ctx,
@@ -140,6 +174,11 @@ export function createAnimationLoopController(
 						mapSettlementVisibility,
 						true,
 					)
+					keepAnimating =
+						requestSettlementScripts(ctx, ctx.mapSettlementLabels) ||
+						keepAnimating
+					keepAnimating =
+						activateSettlementLabels(ctx.mapSettlementLabels) || keepAnimating
 				}
 				ctx.renderer.render(ctx.scene, ctx.mapCamera)
 				return keepAnimating
@@ -171,6 +210,8 @@ export function createAnimationLoopController(
 				const zoomScale = 3 / dist
 				for (const mat of ctx.globeInfrastructureMaterials) {
 					mat.linewidth = mat.userData.baseWidth * zoomScale
+					mat.dashScale =
+						dist <= GLOBE_DASH_DENSE_DISTANCE ? DENSE_DASH_SCALE : 1
 				}
 			}
 			if (ctx.globeControlsInteracting || ctx.globeControlActivityFrames > 0) {
@@ -198,6 +239,7 @@ export function createAnimationLoopController(
 				keepAnimating ||
 				scriptTextureProgress.pending > 0 ||
 				scriptTextureProgress.processed > 0
+			keepAnimating = processSettlementScriptTextures(ctx) || keepAnimating
 			updateGlobeLabelOrientations(
 				ctx.globeNationLabels,
 				ctx.camera,
@@ -216,7 +258,6 @@ export function createAnimationLoopController(
 			{
 				applySettlementMarkerScreenScale(ctx, ctx.globeSettlements)
 				applySettlementMarkerScreenScale(ctx, ctx.globeEu4Settlements)
-				applySettlementLabelScreenScale(ctx, ctx.globeSettlementLabels)
 				const globeSettlementVisibility = new Map<string, boolean>()
 				applySettlementMarkerCollisionCulling(
 					ctx,
@@ -233,6 +274,11 @@ export function createAnimationLoopController(
 					globeSettlementVisibility,
 					false,
 				)
+				keepAnimating =
+					requestSettlementScripts(ctx, ctx.globeSettlementLabels) ||
+					keepAnimating
+				keepAnimating =
+					activateSettlementLabels(ctx.globeSettlementLabels) || keepAnimating
 			}
 			updateGlobeLabelOrientations(
 				ctx.globeCultureLabels,

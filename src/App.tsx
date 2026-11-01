@@ -15,11 +15,27 @@ const BenchDashboard = lazy(() =>
 	})),
 )
 
+const FlagGenerator = lazy(() =>
+	import("@/ui/flag-generator/FlagGenerator").then((module) => ({
+		default: module.FlagGenerator,
+	})),
+)
+
 function App() {
 	return (
 		<div className="relative h-screen w-screen overflow-hidden bg-white font-sans text-slate-900 selection:bg-slate-900 selection:text-white">
 			<Routes>
 				<Route path={APP_PATHS.tectonicLab} element={<GenesisView />} />
+				<Route
+					path={APP_PATHS.flagGenerator}
+					element={
+						<Suspense
+							fallback={<div role="status">Loading flag generator…</div>}
+						>
+							<FlagGenerator />
+						</Suspense>
+					}
+				/>
 				<Route
 					path={APP_PATHS.planetRendererExperiment}
 					element={

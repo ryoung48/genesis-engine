@@ -4,7 +4,8 @@ import { GLYPH_MODULE } from "@/model/society/script/runegen/glyph-module"
 import { RUNE_RENDERER } from "@/model/society/script/runegen/rune-renderer"
 import { LABEL_OUTLINE_COLOR } from "@/ui/genesis/renderer/nation-label-overlay/constants"
 
-const CELL_SCALE = 7
+export const DEFAULT_SCRIPT_RENDER_SCALE = 7
+const CELL_SCALE = DEFAULT_SCRIPT_RENDER_SCALE
 // Layout spacing scales with the render scale (like stroke width already
 // does below), so a smaller scale doesn't leave fixed-pixel gaps looking
 // disproportionately wide next to shrunken glyphs

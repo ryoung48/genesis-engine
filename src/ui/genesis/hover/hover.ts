@@ -22,6 +22,7 @@ import type {
 	GetHoverRainfallSeriesFromArraysParams,
 } from "@/ui/genesis/hover/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
+import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 
 const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
@@ -181,6 +182,7 @@ export function getHoverRainfall(
 	const canShowRainfall =
 		region !== undefined &&
 		(!!world?.isLand?.[region] ||
+			supportsOceanClimate(world) ||
 			(world?.landmarks != null &&
 				world.landmarks.regionLandmark[region] >= 0 &&
 				world.landmarks.type[world.landmarks.regionLandmark[region]] ===
@@ -261,7 +263,11 @@ export function getHoverModeledCloudCover({
 	world,
 	rainfallMonth,
 }: GetHoverModeledCloudCoverParams): HoverRainfallSeries | null {
-	if (!(hoverInfo && world?.isLand?.[hoverInfo.region])) return null
+	if (
+		!(hoverInfo && world) ||
+		!(world.isLand?.[hoverInfo.region] || supportsOceanClimate(world))
+	)
+		return null
 	const r = hoverInfo.region
 	const N = world.mesh.numRegions
 
@@ -436,13 +442,14 @@ function getHoverModeledHumiditySeries(
 ): HoverHumidity | null {
 	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
 	const r = hoverInfo.region
-	if (world.isLand && !world.isLand[r]) return null
+	if (world.isLand && !world.isLand[r] && !supportsOceanClimate(world))
+		return null
 	const N = world.mesh.numRegions
 
 	let annualAridity: number | undefined
 	const aet = world.hydrology?.aet_monthly
 	const pet = world.climate.pet_monthly
-	if (aet && pet) {
+	if (aet && pet && world.isLand?.[r]) {
 		let aetSum = 0
 		let petSum = 0
 		for (let m = 0; m < 12; m++) {
@@ -585,11 +592,6 @@ export function getHoverHumidityDiff(
 	}
 }
 
-/** `useObserved` selects the data source for temperature, humidity, and wind
- * together (the "misery"/"realMisery" colorMode pair, mirroring
- * temperature/realTemperature) -- observed values are used where available
- * and fall back to the modeled estimate only when missing, model mode never
- * touches observed data at all. */
 export function getHoverMisery({
 	hoverInfo,
 	world,
@@ -600,7 +602,12 @@ export function getHoverMisery({
 }: GetHoverMiseryParams): HoverMisery | null {
 	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
 	const r = hoverInfo.region
-	if (world.isLand && !world.isLand[r]) return null
+	if (
+		world.isLand &&
+		!world.isLand[r] &&
+		(useObserved || !supportsOceanClimate(world))
+	)
+		return null
 	const N = world.mesh.numRegions
 	const observedHumidity = useObserved
 		? getHoverObservedHumiditySeries(hoverInfo, world, dtrMonth)
@@ -609,7 +616,7 @@ export function getHoverMisery({
 	let annualAridity: number | undefined
 	const aet = world.hydrology?.aet_monthly
 	const pet = world.climate.pet_monthly
-	if (aet && pet) {
+	if (aet && pet && world.isLand?.[r]) {
 		let aetSum = 0
 		let petSum = 0
 		for (let m = 0; m < 12; m++) {

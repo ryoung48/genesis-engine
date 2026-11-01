@@ -91,6 +91,14 @@ const spectralStops = palette(
 	"#9e0142",
 )
 
+const cloudStops = palette(
+	"#0b1d33",
+	"#2c4a6b",
+	"#7d93ab",
+	"#c9d4df",
+	"#f8fafc",
+)
+
 export const COLOR_PALETTES = {
 	bupuStops,
 	orangesStops,
@@ -99,4 +107,5 @@ export const COLOR_PALETTES = {
 	plasmaStops,
 	knowledgeStops,
 	spectralStops,
+	cloudStops,
 }

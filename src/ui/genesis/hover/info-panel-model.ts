@@ -404,12 +404,11 @@ export function buildDemographicDisplayData(params: {
 				color: null,
 			}
 		}
-		const wave = world.population?.migrationWave?.[province] ?? -1
-		if (isDesolate || wave < 0) return null
-		const pct = Math.round(wave * 100)
+		const year = world.population?.arrivalYear?.[province]
+		if (isDesolate || year === undefined) return null
 		return {
-			label: "Migration",
-			value: pct === 0 ? "Cradle" : `${pct}%`,
+			label: "Migration arrival",
+			value: year === 2147483647 ? "Unreached" : DATE.formatEu4Year(year),
 			color: null,
 		}
 	}

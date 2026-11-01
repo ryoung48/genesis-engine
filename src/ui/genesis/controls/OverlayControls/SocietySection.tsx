@@ -90,6 +90,13 @@ export const SocietySection: React.FC<SocietySectionProps> = ({
 							})
 						}}
 					/>
+					<ToggleRow
+						label="Heraldry"
+						checked={labelMode.heraldry}
+						onChange={(checked) =>
+							setLabelMode({ ...labelMode, heraldry: checked })
+						}
+					/>
 					{!isEarthImport && (
 						<ToggleRow
 							label="Script"

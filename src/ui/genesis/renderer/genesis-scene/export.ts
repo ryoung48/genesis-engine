@@ -110,7 +110,10 @@ export function createExportController(
 			},
 			{
 				object: ctx.mapNationLabels,
-				visible: ctx.labelMode.nations || ctx.labelMode.dynasty,
+				visible:
+					ctx.labelMode.nations ||
+					ctx.labelMode.dynasty ||
+					ctx.labelMode.heraldry,
 			},
 			{
 				object: ctx.mapNationScripts,

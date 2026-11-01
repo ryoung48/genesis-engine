@@ -3,6 +3,7 @@ import { SCRIPT } from "@/model/society/script"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { LabelMode } from "@/ui/genesis/controls/OverlayControls"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
+import { HERALDRY_OVERLAY } from "@/ui/genesis/renderer/heraldry-overlay"
 import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
 import { EARTH_HISTORY_LABEL_SCALE_CURVE } from "@/ui/genesis/renderer/nation-label-overlay/constants"
 import {
@@ -31,6 +32,8 @@ import {
 	createPendingNationScriptTextureQueue,
 	disposeNationScriptPools,
 } from "@/ui/genesis/renderer/nation-script-overlay"
+import { SETTLEMENT_SCRIPT } from "@/ui/genesis/renderer/settlement-script-overlay"
+import type { EarthHistoryNationOverride } from "@/ui/genesis/renderer/types"
 
 export function stringArraysEqual(
 	a: readonly string[] | null,
@@ -44,7 +47,10 @@ export function stringArraysEqual(
 	return true
 }
 
-function int32ArraysEqual(a: Int32Array | null, b: Int32Array | null): boolean {
+function numberArraysEqual(
+	a: ArrayLike<number> | null,
+	b: ArrayLike<number> | null,
+): boolean {
 	if (a === b) return true
 	if (!a || !b || a.length !== b.length) return false
 	for (let i = 0; i < a.length; i++) {
@@ -53,27 +59,17 @@ function int32ArraysEqual(a: Int32Array | null, b: Int32Array | null): boolean {
 	return true
 }
 
-/** Exported for setEarthHistoryNationOverride, which stays in
- * create-genesis-scene.ts since it also calls the not-yet-extracted
- * rebuildNationBorders. */
 export function earthHistoryNationOverridesEqual(
-	a: {
-		assignment: Int32Array
-		seeds: Int32Array
-		names: string[]
-	} | null,
-	b: {
-		assignment: Int32Array
-		seeds: Int32Array
-		names: string[]
-	} | null,
+	a: EarthHistoryNationOverride | null,
+	b: EarthHistoryNationOverride | null,
 ): boolean {
 	if (a === b) return true
 	if (!a || !b) return false
 	return (
-		int32ArraysEqual(a.assignment, b.assignment) &&
-		int32ArraysEqual(a.seeds, b.seeds) &&
-		stringArraysEqual(a.names, b.names)
+		numberArraysEqual(a.assignment, b.assignment) &&
+		numberArraysEqual(a.seeds, b.seeds) &&
+		stringArraysEqual(a.names, b.names) &&
+		numberArraysEqual(a.colors, b.colors)
 	)
 }
 
@@ -92,8 +88,8 @@ function earthHistoryLabelPartitionsEqual(
 	return (
 		a.culture.count === b.culture.count &&
 		a.religion.count === b.religion.count &&
-		int32ArraysEqual(a.culture.assignment, b.culture.assignment) &&
-		int32ArraysEqual(a.religion.assignment, b.religion.assignment) &&
+		numberArraysEqual(a.culture.assignment, b.culture.assignment) &&
+		numberArraysEqual(a.religion.assignment, b.religion.assignment) &&
 		stringArraysEqual(a.culture.names, b.culture.names) &&
 		stringArraysEqual(a.religion.names, b.religion.names)
 	)
@@ -103,13 +99,6 @@ export interface LabelsControllerDeps {
 	updateOverlayVisibility: () => void
 }
 
-/** Owns nation/settlement/culture/religion/heritage labels and the nation
- * heritage-script overlay -- the five `rebuildXLabels` functions and their
- * name/mode setters. Reads (but doesn't own) `earthHistoryNationOverride`
- * and `currentOrgHighlight`, which are set by setEarthHistoryNationOverride/
- * setOrganizationHighlight -- those stay in create-genesis-scene.ts since
- * they also call the not-yet-extracted rebuildNationBorders. See
- * plans/genesis-scene-controller-split.md. */
 export function createLabelsController(
 	ctx: GenesisContext,
 	deps: LabelsControllerDeps,
@@ -123,6 +112,7 @@ export function createLabelsController(
 	// create-genesis-scene.ts's updateOverlayVisibility/dispose still read
 	// their own copy, unaffected.
 	const nationLabelPools = createNationLabelPools()
+	const heraldryOverlay = HERALDRY_OVERLAY.create()
 	const nationScriptPools = createNationScriptPools()
 	const settlementLabelPools = createSettlementLabelPools()
 	const cultureLabelPools = createNationLabelPools()
@@ -184,7 +174,7 @@ export function createLabelsController(
 			return
 		}
 		const showNationLabels = ctx.labelMode.nations || ctx.labelMode.dynasty
-		if (!showNationLabels && !ctx.labelMode.script) {
+		if (!showNationLabels && !ctx.labelMode.heraldry) {
 			ctx.globeNationLabels?.clear()
 			ctx.mapNationLabels?.clear()
 			return
@@ -262,6 +252,7 @@ export function createLabelsController(
 		}
 		if (
 			!ctx.currentWorld.isEarthImport &&
+			showNationLabels &&
 			ctx.labelMode.script &&
 			ctx.currentWorld.heritages &&
 			ctx.currentWorld.cultures &&
@@ -299,6 +290,18 @@ export function createLabelsController(
 				ctx.scene.add(ctx.mapNationScripts)
 			}
 		}
+		heraldryOverlay.update({
+			groups: [ctx.globeNationLabels, ctx.mapNationLabels],
+			names:
+				ctx.earthHistoryNationOverride?.names ?? ctx.nationNames ?? labelNames,
+			colors:
+				ctx.earthHistoryNationOverride?.colors ??
+				ctx.currentWorld?.nations?.colors ??
+				null,
+			showHeraldry: ctx.labelMode.heraldry,
+			showNames: showNationLabels,
+			showScript: ctx.globeNationScripts !== null,
+		})
 		deps.updateOverlayVisibility()
 	}
 
@@ -340,6 +343,22 @@ export function createLabelsController(
 			if (ctx.mapSettlementLabels.parent !== ctx.scene)
 				ctx.scene.add(ctx.mapSettlementLabels)
 		}
+		const world = ctx.currentWorld
+		const settlementScriptsEnabled =
+			ctx.labelMode.script &&
+			!world.isEarthImport &&
+			!!world.heritages &&
+			!!world.cultures
+		ctx.pendingSettlementScriptTextureQueue = null
+		SETTLEMENT_SCRIPT.update({
+			groups: [ctx.globeSettlementLabels, ctx.mapSettlementLabels],
+			world,
+			names: ctx.settlementLabelNames,
+			scripts: settlementScriptsEnabled
+				? getHeritageScripts(world)
+				: new Map<number, HeritageScript>(),
+			enabled: settlementScriptsEnabled,
+		})
 		deps.updateOverlayVisibility()
 	}
 
@@ -576,6 +595,11 @@ export function createLabelsController(
 	}
 
 	function disposePools() {
+		heraldryOverlay.dispose()
+		SETTLEMENT_SCRIPT.dispose([
+			settlementLabelPools.globe,
+			settlementLabelPools.map,
+		])
 		disposePool(nationLabelPools.globe)
 		disposePool(nationLabelPools.map)
 		disposeNationScriptPools(nationScriptPools)

@@ -373,11 +373,10 @@ export function populationColor(
 	)
 }
 
-/** Observed total cloud-cover fraction: clear sky → overcast. */
 export function cloudCoverColor(fraction: number): [number, number, number] {
 	return COLOR_INTERPOLATION.quantizeRgb(
 		COLOR_INTERPOLATION.sampleColorStops({
-			stops: COLOR_PALETTES.bupuStops,
+			stops: COLOR_PALETTES.cloudStops,
 			t: Math.max(0, Math.min(1, fraction)),
 		}),
 	)

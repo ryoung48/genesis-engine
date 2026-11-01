@@ -29,7 +29,12 @@ export const NationsModeSection: React.FC<NationsModeSectionProps> = ({
 	setNationsExpanded,
 }) => {
 	if (colorMode !== "nations") return null
-	if (nationMode !== "borders" && nationMode !== "organizations") return null
+	if (
+		nationMode !== "borders" &&
+		nationMode !== "borderShadow" &&
+		nationMode !== "organizations"
+	)
+		return null
 	return (
 		<div>
 			<CollapsibleSectionHeader
@@ -44,6 +49,7 @@ export const NationsModeSection: React.FC<NationsModeSectionProps> = ({
 						orientation="horizontal"
 						options={[
 							{ value: "borders" as const, label: "Territory" },
+							{ value: "borderShadow" as const, label: "Borders" },
 							{ value: "organizations" as const, label: "Organizations" },
 						]}
 						value={nationMode}

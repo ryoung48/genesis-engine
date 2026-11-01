@@ -114,6 +114,18 @@ export const uiChartPalette = {
 } as const
 
 export const uiTokens = {
+	generator: {
+		page: "h-full overflow-y-auto space-y-5 p-5 sm:p-8",
+		header: "flex flex-wrap items-center justify-between gap-4",
+		toolbar: "flex flex-wrap items-end gap-4",
+		field: "flex min-w-0 flex-col gap-1",
+		input:
+			"w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400",
+		grid: "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6",
+		card: "flex min-w-0 flex-col items-center gap-4",
+		preview: "w-full max-w-40 h-auto",
+		caption: "space-y-1 text-center",
+	},
 	wiki: {
 		page: "space-y-2 overflow-x-hidden",
 		stats: "mt-3 grid grid-cols-2 gap-x-3 gap-y-1",

@@ -76,6 +76,7 @@ import {
 	getMapModePrimary,
 	type SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
+import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import {
 	formatDistance,
 	formatElevation,
@@ -293,7 +294,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		? computeLakeAverageAnnualPrecipitation(hoverLandmark, world)
 		: null
 	const showPrecipChart =
-		!!chartData && (!!chartData.isLand || !!chartData.isLake)
+		!!chartData &&
+		(!!chartData.isLand || !!chartData.isLake || supportsOceanClimate(world))
 	const activeDtrSeries =
 		colorMode === "dtr"
 			? hoverDtr
@@ -1028,7 +1030,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							<SeriesBars
 								values={chartData.temps}
 								labels={MONTH_SHORT}
-								label="Temp"
+								label={
+									!chartData.isLand && supportsOceanClimate(world)
+										? "SST"
+										: "Temp"
+								}
 								colorForValue={(value) => tempColor(value)}
 								activeIndex={activeBarIndex}
 								summary={buildSummary(annualTemp ?? undefined, {

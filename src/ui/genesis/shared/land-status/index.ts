@@ -1,3 +1,4 @@
+import { DISTRIBUTION_STATUS } from "@/model/history/distribution/status"
 import { PROVINCE_STATUS } from "@/model/history/record/status"
 import type { ProvinceStatusName } from "@/model/history/record/status/types"
 import { darkenPoliticalAtElevation } from "@/ui/genesis/shared/color-helpers"
@@ -36,8 +37,16 @@ function label({ status, settledYear }: LandStatusLabelParams): string {
 
 function statusAt({
 	provinceStatus,
+	distributionOwner,
 	province,
 }: StatusAtParams): ProvinceStatusName | null {
+	if (provinceStatus?.[province] === PROVINCE_STATUS.code.desolate)
+		return "desolate"
+	if (distributionOwner) {
+		const owner = distributionOwner[province]
+		if (DISTRIBUTION_STATUS.isUninhabited({ owner })) return "uninhabited"
+		return DISTRIBUTION_STATUS.isStateless({ owner }) ? "stateless" : "state"
+	}
 	return provinceStatus
 		? PROVINCE_STATUS.nameOf({ code: provinceStatus[province] })
 		: null
@@ -46,6 +55,7 @@ function statusAt({
 function paintUninhabited({
 	rgb,
 	provinceStatus,
+	distributionOwner,
 	regionProvince,
 	elevationKm,
 }: PaintUninhabitedParams): Float32Array {
@@ -53,7 +63,11 @@ function paintUninhabited({
 	const gray = color({ status: "uninhabited" })
 	for (let r = 0; r < regionProvince.length; r++) {
 		const p = regionProvince[r]
-		if (p < 0 || provinceStatus[p] !== PROVINCE_STATUS.code.uninhabited)
+		if (
+			p < 0 ||
+			statusAt({ provinceStatus, distributionOwner, province: p }) !==
+				"uninhabited"
+		)
 			continue
 		const shaded = darkenPoliticalAtElevation(gray, elevationKm[r] ?? 0)
 		painted[3 * r] = shaded[0]

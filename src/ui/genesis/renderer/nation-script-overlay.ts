@@ -20,15 +20,21 @@ import {
 	labelPositionGlobe,
 	labelPositionMap,
 } from "@/ui/genesis/renderer/nation-label-overlay/positioning"
-import { renderScriptTexture } from "@/ui/genesis/renderer/script-texture"
+import {
+	DEFAULT_SCRIPT_RENDER_SCALE,
+	renderScriptTexture,
+} from "@/ui/genesis/renderer/script-texture"
 import {
 	globeScaleForPop,
 	mapRadiusForPop,
 } from "@/ui/genesis/renderer/settlement-overlay"
 
-const SCRIPT_HEIGHT_FACTOR = 0.45
+const FRAME_BUDGET_MS = 6
+export const SCRIPT_HEIGHT_FACTOR = 0.45
 const SCRIPT_GLOBE_GAP_FACTOR = 0.12
-const SCRIPT_MAP_GAP_FACTOR = 0.12
+export const SCRIPT_MAP_GAP_FACTOR = 0.12
+export const SCRIPT_BLOCK_HEIGHT_FACTOR =
+	SCRIPT_HEIGHT_FACTOR + SCRIPT_MAP_GAP_FACTOR
 
 export interface ScriptTextureCacheEntry {
 	texture: THREE.CanvasTexture
@@ -36,7 +42,7 @@ export interface ScriptTextureCacheEntry {
 }
 
 interface PendingScriptTextureSubscriber {
-	group: THREE.Group
+	group: THREE.Object3D
 	mesh: ScriptMesh
 }
 
@@ -45,6 +51,7 @@ interface PendingScriptTextureTask {
 	heritageIdx: number
 	script: HeritageScript
 	text: string
+	renderScale: number
 	subscribers: PendingScriptTextureSubscriber[]
 }
 
@@ -53,7 +60,7 @@ export interface PendingNationScriptTextureQueue {
 	byKey: Map<string, PendingScriptTextureTask>
 }
 
-interface ScriptMesh
+export interface ScriptMesh
 	extends THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> {
 	userData: THREE.Mesh["userData"] & {
 		globeNormal?: THREE.Vector3
@@ -61,6 +68,7 @@ interface ScriptMesh
 		globeLeaderStubLength?: number
 		globeLabelTangentOffset?: number
 		scriptPlaneHeight?: number
+		scriptAspect?: number
 	}
 }
 
@@ -147,12 +155,13 @@ function getCachedScriptTexture(
 	heritageIdx: number,
 	script: HeritageScript,
 	text: string,
+	renderScale: number,
 ): ScriptTextureCacheEntry | null {
-	const key = `${heritageIdx}:${text}`
+	const key = `${heritageIdx}:${renderScale}:${text}`
 	const existing = cache.get(key)
 	if (existing) return existing
 
-	const rendered = renderScriptTexture(script, text)
+	const rendered = renderScriptTexture(script, text, { scale: renderScale })
 	if (!rendered) return null
 
 	const texture = new THREE.CanvasTexture(rendered.canvas)
@@ -164,29 +173,31 @@ function getCachedScriptTexture(
 }
 
 function attachScriptTexture(
-	group: THREE.Group,
+	group: THREE.Object3D,
 	mesh: ScriptMesh,
 	textureEntry: ScriptTextureCacheEntry,
 ) {
 	mesh.material.map = textureEntry.texture
 	mesh.material.needsUpdate = true
 	const planeHeight = mesh.userData.scriptPlaneHeight ?? 1
+	mesh.userData.scriptAspect = textureEntry.aspect
 	mesh.scale.set(planeHeight * textureEntry.aspect, planeHeight, 1)
 	mesh.visible = true
 	group.add(mesh)
 	delete group.userData.globeCameraQuaternion
 }
 
-function queueScriptTexture(
+export function queueScriptTexture(
 	queue: PendingNationScriptTextureQueue,
 	cache: Map<string, ScriptTextureCacheEntry>,
 	heritageIdx: number,
 	script: HeritageScript,
 	text: string,
-	group: THREE.Group,
+	group: THREE.Object3D,
 	mesh: ScriptMesh,
+	renderScale = DEFAULT_SCRIPT_RENDER_SCALE,
 ): boolean {
-	const key = `${heritageIdx}:${text}`
+	const key = `${heritageIdx}:${renderScale}:${text}`
 	const existing = cache.get(key)
 	if (existing) {
 		attachScriptTexture(group, mesh, existing)
@@ -204,6 +215,7 @@ function queueScriptTexture(
 		heritageIdx,
 		script,
 		text,
+		renderScale,
 		subscribers: [{ group, mesh }],
 	}
 	queue.byKey.set(key, createdTask)
@@ -221,7 +233,12 @@ export function processPendingNationScriptTextures(
 	}
 
 	let processed = 0
-	while (processed < maxTasksPerFrame && queue.tasks.length > 0) {
+	const startMs = performance.now()
+	while (
+		processed < maxTasksPerFrame &&
+		queue.tasks.length > 0 &&
+		(processed === 0 || performance.now() - startMs < FRAME_BUDGET_MS)
+	) {
 		const task = queue.tasks.shift()
 		if (!task) break
 		queue.byKey.delete(task.key)
@@ -230,6 +247,7 @@ export function processPendingNationScriptTextures(
 			task.heritageIdx,
 			task.script,
 			task.text,
+			task.renderScale,
 		)
 		if (textureEntry) {
 			for (const subscriber of task.subscribers) {

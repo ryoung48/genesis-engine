@@ -21,6 +21,7 @@ import type {
 	ScriptTextureCacheEntry,
 } from "@/ui/genesis/renderer/nation-script-overlay"
 import type {
+	EarthHistoryNationOverride,
 	GenesisHoverInfo,
 	GenesisViewMode,
 	OrgHighlightSpec,
@@ -147,8 +148,8 @@ export interface GenesisContext {
 
 	// overlay-controllers/infrastructure.ts's state (trade routes/transport
 	// network -- named "infrastructure" after its public setInfrastructure*
-	// GenesisScene methods, though it's built via buildGlobeTradeRoutes/
-	// buildMapTradeRoutes).
+	// GenesisScene methods, though it's built via the trade-route worker and
+	// buildTradeRouteLines).
 	globeInfrastructure: THREE.Group | null
 	mapInfrastructure: THREE.Group | null
 	infrastructureData: SerializedNetwork | null
@@ -177,11 +178,7 @@ export interface GenesisContext {
 	// create-genesis-scene.ts since they also call the not-yet-extracted
 	// rebuildNationBorders.
 	currentOrgHighlight: OrgHighlightSpec | null
-	earthHistoryNationOverride: {
-		assignment: Int32Array
-		seeds: Int32Array
-		names: string[]
-	} | null
+	earthHistoryNationOverride: EarthHistoryNationOverride | null
 	/** International organization label (HRE, Hanseatic League, ...) group
 	 * refs -- currently always null (pre-existing dead code the org-label
 	 * overlay never actually populates; see overlay-controllers/labels.ts's
@@ -210,6 +207,7 @@ export interface GenesisContext {
 	heritageScripts: Map<number, HeritageScript> | null
 	nationScriptTextureCache: Map<string, ScriptTextureCacheEntry>
 	pendingNationScriptTextureQueue: PendingNationScriptTextureQueue | null
+	pendingSettlementScriptTextureQueue: PendingNationScriptTextureQueue | null
 	nationNames: string[] | null
 	dynastyNames: string[] | null
 	settlementLabelNames: string[] | null

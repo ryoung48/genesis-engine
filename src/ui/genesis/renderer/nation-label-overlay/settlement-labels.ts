@@ -1,11 +1,10 @@
 import * as THREE from "three"
+import type { Text } from "troika-three-text"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
 	GLOBE_BASE_POSITION,
 	GLOBE_CAMERA_UP,
-	LABEL_MAP_FONT_GAP_FACTOR,
 	type LabelPool,
 	type NationLabelPools,
 	TERRAIN_ELEVATION_SCALE,
@@ -19,17 +18,15 @@ import {
 	updateGlobeLabelPosition,
 } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
 import {
+	acquireLeaderlessLabel,
 	createLabelPool,
-	ensurePoolSize,
 	hideUnusedPool,
 	prepareLabelGroup,
 } from "@/ui/genesis/renderer/nation-label-overlay/pool"
 import {
-	globeLabelTangentOffset,
 	labelPositionMap,
 	orientGlobeLabel,
 } from "@/ui/genesis/renderer/nation-label-overlay/positioning"
-import { dampedPixelsPerWorldUnitAt } from "@/ui/genesis/renderer/nation-label-overlay/settlement-marker-collision"
 import {
 	ghslSettlementId,
 	globeScaleForPop,
@@ -43,18 +40,9 @@ import {
 export const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
 export const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.0018
 export const SETTLEMENT_LABEL_OFFSET_GLOBE_Y = 0.001
+const SETTLEMENT_LABEL_GLOBE_TANGENT_FACTOR = 0.5
 export const SETTLEMENT_LABEL_LIFT_GLOBE = 0.002
 export const SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION = 0.003
-
-// Fixed target on-screen text height, in pixels, at "neutral" zoom -- no
-// population-based size variance (matches settlement-marker-collision.ts's
-// FIXED_PX_RADIUS). Actual rendered size still grows/shrinks with zoom by
-// SCREEN_SCALE_RESPONSIVENESS (see applySettlementLabelScreenScale below),
-// just damped so it doesn't balloon or vanish at the extremes the way a
-// pure world-space size would.
-const FIXED_LABEL_PX = 2
-
-const LABEL_WORLD_POS_VEC = new THREE.Vector3()
 
 /** Real-Earth-import labels are keyed by compact province index `p`, but
  * their marker (buildGlobeRealSettlements/buildMapRealSettlements in
@@ -77,37 +65,6 @@ function labelSettlementId(
 
 function settlementFontScale(_pop: number): number {
 	return 1
-}
-
-function labelPxHeightForPop(_pop: number): number {
-	return FIXED_LABEL_PX
-}
-
-/** Rescales every settlement label each frame so its text height matches
- * labelPxHeightForPop(pop), regardless of zoom -- the label counterpart of
- * applySettlementMarkerScreenScale (settlement-marker-collision.ts). Reads
- * population from userData.settlementPop, stamped at build time alongside
- * settlementId (see buildGlobeSettlementLabels/buildMapSettlementLabels). */
-export function applySettlementLabelScreenScale(
-	ctx: GenesisContext,
-	group: THREE.Group | null,
-): void {
-	if (!group) return
-	const cam: THREE.Camera =
-		ctx.currentViewMode === "map" ? ctx.mapCamera : ctx.camera
-
-	for (const child of group.children) {
-		if (child.type === "Line") continue
-		const label = child as THREE.Object3D & {
-			userData: Record<string, unknown>
-			fontSize: number
-		}
-		const pop = (label.userData.settlementPop as number | undefined) ?? 0
-		const worldPos = label.getWorldPosition(LABEL_WORLD_POS_VEC)
-		const pxPerWorldUnit = dampedPixelsPerWorldUnitAt(ctx, cam, worldPos)
-		if (!(pxPerWorldUnit > 0)) continue
-		label.fontSize = labelPxHeightForPop(pop) / pxPerWorldUnit
-	}
 }
 
 /** lonLatOverride lets a settlement place at its exact real coordinate
@@ -165,21 +122,36 @@ function settlementLabelPositionMapOverride(
 	lonDeg: number,
 	latDeg: number,
 	markerRadius: number,
-	fontSize: number,
 ): [number, number, number] {
 	const [px, py, pz] = projection.projectDegrees(lonDeg, latDeg, MAP_Z_LIFT)
-	return [
-		px,
-		py +
-			markerRadius +
-			fontSize * LABEL_MAP_FONT_GAP_FACTOR +
-			SETTLEMENT_LABEL_OFFSET_GLOBE_Y,
-		pz,
-	]
+	return [px, py + markerRadius, pz]
 }
 
 function settlementGlobeLabelStubLength(markerScale: number): number {
 	return markerScale * 0.5 + SETTLEMENT_LABEL_OFFSET_GLOBE_Y
+}
+
+const ACTIVATIONS_PER_FRAME = 40
+
+export function activateSettlementLabels(group: THREE.Group | null): boolean {
+	if (!group) return false
+	let budget = ACTIVATIONS_PER_FRAME
+	let remaining = false
+	for (const child of group.children) {
+		if (child.type === "Line" || !child.visible) continue
+		const label = child as Text
+		const name = label.userData.settlementName as string | undefined
+		if (name === undefined) continue
+		if (budget === 0) {
+			remaining = true
+			continue
+		}
+		budget--
+		label.text = name
+		label.sync()
+		delete label.userData.settlementName
+	}
+	return remaining
 }
 
 export function createSettlementLabelPools(): NationLabelPools {
@@ -202,7 +174,6 @@ export function buildGlobeSettlementLabels(
 	const elevation = world.elevation
 	const provinceCount = world.provinces.count ?? settlementNames.length
 
-	ensurePoolSize(pool, provinceCount)
 	const initialCameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
 		camera.quaternion,
 	)
@@ -230,12 +201,14 @@ export function buildGlobeSettlementLabels(
 			hasRealCoord ? { lonDeg: realLons![p], latDeg: realLats![p] } : undefined,
 		)
 
-		const text = pool.items[activeCount]
+		const text = acquireLeaderlessLabel(pool, activeCount)
 		applyGlobeLabelStyle(text)
 		text.frustumCulled = cullingEnabled
-		text.text = name
+		text.text = ""
+		text.userData.settlementName = name
 		text.fontSize = fontSize
 		text.userData.settlementId = labelSettlementId(world, p, hasRealCoord)
+		text.userData.settlementProvince = p
 		text.userData.settlementPop = pop
 		text.userData.globeNormal = globePlacement.normal
 		text.userData.globeBasePosition = GLOBE_BASE_POSITION.copy(
@@ -245,8 +218,9 @@ export function buildGlobeSettlementLabels(
 			.clone()
 		text.userData.globeLeaderStubLength =
 			settlementGlobeLabelStubLength(markerScale)
-		text.userData.globeLabelTangentOffset = globeLabelTangentOffset(fontSize)
-		text.sync()
+		text.userData.globeLabelTangentOffset =
+			fontSize * SETTLEMENT_LABEL_GLOBE_TANGENT_FACTOR
+		text.userData.settlementBaseTangent = text.userData.globeLabelTangentOffset
 		updateGlobeLabelPosition(text, initialCameraUp)
 		orientGlobeLabel(text, camera.quaternion)
 		text.visible = true
@@ -282,8 +256,6 @@ export function buildMapSettlementLabels(
 		? [-projection.repeatWidth, 0, projection.repeatWidth]
 		: [0]
 
-	ensurePoolSize(pool, provinceCount * wrapOffsets.length)
-
 	const realLons = world.realSettlement?.lons
 	const realLats = world.realSettlement?.lats
 	let activeCount = 0
@@ -305,28 +277,22 @@ export function buildMapSettlementLabels(
 					realLons![p],
 					realLats![p],
 					markerRadius,
-					fontSize,
 				)
-			: labelPositionMap(
-					projection,
-					r_xyz,
-					elevation,
-					region,
-					markerRadius,
-					fontSize,
-				)
+			: labelPositionMap(projection, r_xyz, elevation, region, 0, 0)
 
 		for (const wrapOffset of wrapOffsets) {
-			const text = pool.items[activeCount]
+			const text = acquireLeaderlessLabel(pool, activeCount)
 			applyMapLabelStyle(text)
 			text.frustumCulled = cullingEnabled
-			text.text = name
+			text.text = ""
+			text.userData.settlementName = name
 			text.userData.settlementId = labelSettlementId(world, p, hasRealCoord)
+			text.userData.settlementProvince = p
 			text.userData.settlementPop = pop
 			text.position.set(px + wrapOffset, py, pz)
+			text.userData.settlementBaseY = py
 			text.rotation.set(0, 0, 0)
 			text.fontSize = fontSize
-			text.sync()
 			text.visible = true
 			group.add(text)
 			activeCount++

@@ -42,6 +42,7 @@ export const TITLE_BORDER_TIERS: readonly TitleBorderTier[] = [
 
 export type NationMapMode =
 	| "borders"
+	| "borderShadow"
 	| "provinces"
 	| "earthProvinces"
 	| "dynasty"
@@ -131,7 +132,6 @@ const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["urban", "Urban"],
 	["heritage", "Heritage"],
-	["migration", "Migration"],
 ]
 
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<

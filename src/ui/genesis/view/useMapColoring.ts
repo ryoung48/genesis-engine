@@ -20,6 +20,7 @@ import {
 	OCEAN_LIGHT_BLUE,
 	windSpeedColor,
 } from "@/ui/genesis/shared/colors"
+import { applyBorderShadow } from "@/ui/genesis/shared/colors/border-shadow"
 import { applyWaves } from "@/ui/genesis/shared/colors/waves"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/ui/genesis/shared/history-region-colors"
 import { LAND_STATUS } from "@/ui/genesis/shared/land-status"
 import type { NationMapMode } from "@/ui/genesis/shared/map-modes"
+import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import { computeRegionColors } from "@/ui/genesis/shared/region-colors"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
 import {
@@ -38,15 +40,6 @@ import {
 } from "@/ui/genesis/shared/useThrottledValue"
 import type { MapColoringInput } from "@/ui/genesis/view/types"
 
-/**
- * Computes everything that colors the map surface: the per-region base fill
- * for the active map mode, the occupation/organization stripe overlays, the
- * open org wiki page's territory highlight, and the Earth-history overrides
- * that swap the procedural nation/culture/religion partitions for the real
- * ones at the scrubbed date. Playback-sensitive results are sampled through
- * usePlaybackSampledValue so timeline playback doesn't rebuild borders and
- * label textures on every tick.
- */
 function tierForNationMode(nationMode: NationMapMode): TitleTier | null {
 	switch (nationMode) {
 		case "titlesDuchy":
@@ -260,6 +253,7 @@ export function useMapColoring(input: MapColoringInput) {
 			// observed variant (no per-region historical wind data is
 			// available), so it always comes from the model regardless of mode.
 			const isObserved = colorMode === "realMisery"
+			const hasOceanClimate = supportsOceanClimate(worldForDisplay)
 			const N = worldForDisplay.mesh.numRegions
 			const rgb = new Float32Array(N * 3)
 			const isMonthly = dtrMonth > 0
@@ -275,7 +269,7 @@ export function useMapColoring(input: MapColoringInput) {
 			const pet = worldForDisplay.climate.pet_monthly
 			const { windSpeed } = windVectors
 			for (let r = 0; r < N; r++) {
-				if (!worldForDisplay.isLand?.[r]) {
+				if (!worldForDisplay.isLand?.[r] && (isObserved || !hasOceanClimate)) {
 					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
 					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
 					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
@@ -311,7 +305,7 @@ export function useMapColoring(input: MapColoringInput) {
 						? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
 						: worldForDisplay.dtr_annual[r]
 					let annualAridity: number | undefined
-					if (aet && pet) {
+					if (aet && pet && worldForDisplay.isLand?.[r]) {
 						let aetSum = 0
 						let petSum = 0
 						for (let m = 0; m < 12; m++) {
@@ -360,7 +354,22 @@ export function useMapColoring(input: MapColoringInput) {
 				organizationKindById,
 				uninhabitedGray: history.state?.record.pipeline === "distribution",
 			})
-			if (historyColors) return withOrgHighlight(historyColors)
+			if (historyColors) {
+				const { regionProvince } = worldForDisplay.provinces
+				const { provinceNation } = historyFrame
+				const shaded =
+					colorMode === "nations" && nationMode === "borderShadow"
+						? applyBorderShadow({
+								rgb: historyColors,
+								owner: Int32Array.from(regionProvince, (province) =>
+									province < 0 ? -1 : provinceNation[province],
+								),
+								adjOffset: worldForDisplay.mesh.adjOffset,
+								adjList: worldForDisplay.mesh.adjList,
+							})
+						: historyColors
+				return withOrgHighlight(shaded)
+			}
 		}
 		const baseColors = computeRegionColors(
 			worldForDisplay,
@@ -386,6 +395,10 @@ export function useMapColoring(input: MapColoringInput) {
 				? LAND_STATUS.paintUninhabited({
 						rgb: baseColors,
 						provinceStatus: historyFrame.provinceStatus,
+						distributionOwner:
+							history.state?.record.pipeline === "distribution"
+								? historyFrame.provinceNation
+								: null,
 						regionProvince: worldForDisplay.provinces.regionProvince,
 						elevationKm: worldForDisplay.elevation_km,
 					})
@@ -515,6 +528,10 @@ export function useMapColoring(input: MapColoringInput) {
 
 		const status = LAND_STATUS.statusAt({
 			provinceStatus: frame.provinceStatus,
+			distributionOwner:
+				history.state.record.pipeline === "distribution"
+					? frame.provinceNation
+					: null,
 			province: hoverProvince,
 		})
 		const landStatus =
@@ -788,6 +805,14 @@ export function useMapColoring(input: MapColoringInput) {
 		return {
 			assignment: historyRenderInputs.assignment,
 			seeds: historyRenderInputs.seeds,
+			colors: (() => {
+				const colors = new Float32Array(historyRenderInputs.names.length * 3)
+				for (const nation of historyFrame.nations.values()) {
+					for (let channel = 0; channel < 3; channel++)
+						colors[nation.id * 3 + channel] = nation.color[channel] / 255
+				}
+				return colors
+			})(),
 			names:
 				colorMode === "nations" && nationMode === "dynasty"
 					? (() => {

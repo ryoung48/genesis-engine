@@ -266,61 +266,69 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 
 	const generateContent = (
 		<div className="space-y-2.5 pt-1.5">
-			{seed !== SOL_DATA.solSeed ? (
-				<div className="space-y-1">
-					<SegmentedControl
-						tone="panel"
-						size="xs"
-						fullWidth
-						options={[
-							{
-								value: "earth-clone",
-								label: "Earth Clone",
-								title: "A literal Earth/Luna clone, unchanged from every slot.",
-							},
-							{
-								value: "moon-system",
-								label: "Procedural Moons",
-								title:
-									"The same Earth clone, with a procedurally rolled moon system instead of a single Luna clone.",
-							},
-							{
-								value: "gas-giant-moon",
-								label: "Gas Giant Moon",
-								title:
-									"A jovian world with Earth's eccentricity/rotation, whose moon system has one moon promoted to be the main world.",
-							},
-						]}
-						// mainWorldMode's type also allows a "procedural" value used
-						// elsewhere in the model layer, but this toggle never sets it and
-						// nothing else drives this UI's state to it.
-						value={
-							mainWorldMode as "earth-clone" | "moon-system" | "gas-giant-moon"
-						}
-						onChange={setMainWorldMode}
-					/>
-					<SegmentedControl<HistoryPipeline>
-						tone="panel"
-						size="xs"
-						fullWidth
-						options={[
-							{ value: "distribution", label: "Fast history" },
-							{ value: "simulation", label: "Detailed history" },
-						]}
-						value={historyPipeline}
-						onChange={setHistoryPipeline}
-					/>
-				</div>
-			) : null}
-			<SegmentedControl
-				fullWidth
-				options={[
-					{ value: "v2", label: "Climate v2", disabled: generating },
-					{ value: "v1", label: "Climate v1", disabled: generating },
-				]}
-				value={climateModel}
-				onChange={setClimateModel}
-			/>
+			<div className="space-y-1">
+				{seed !== SOL_DATA.solSeed ? (
+					<>
+						<SegmentedControl
+							tone="panel"
+							size="xs"
+							fullWidth
+							options={[
+								{
+									value: "earth-clone",
+									label: "Earth Clone",
+									title:
+										"A literal Earth/Luna clone, unchanged from every slot.",
+								},
+								{
+									value: "moon-system",
+									label: "Procedural Moons",
+									title:
+										"The same Earth clone, with a procedurally rolled moon system instead of a single Luna clone.",
+								},
+								{
+									value: "gas-giant-moon",
+									label: "Gas Giant Moon",
+									title:
+										"A jovian world with Earth's eccentricity/rotation, whose moon system has one moon promoted to be the main world.",
+								},
+							]}
+							// mainWorldMode's type also allows a "procedural" value used
+							// elsewhere in the model layer, but this toggle never sets it and
+							// nothing else drives this UI's state to it.
+							value={
+								mainWorldMode as
+									| "earth-clone"
+									| "moon-system"
+									| "gas-giant-moon"
+							}
+							onChange={setMainWorldMode}
+						/>
+						<SegmentedControl<HistoryPipeline>
+							tone="panel"
+							size="xs"
+							fullWidth
+							options={[
+								{ value: "distribution", label: "Fast history" },
+								{ value: "simulation", label: "Detailed history" },
+							]}
+							value={historyPipeline}
+							onChange={setHistoryPipeline}
+						/>
+					</>
+				) : null}
+				<SegmentedControl
+					tone="panel"
+					size="xs"
+					fullWidth
+					options={[
+						{ value: "v2", label: "Climate v2", disabled: generating },
+						{ value: "v1", label: "Climate v1", disabled: generating },
+					]}
+					value={climateModel}
+					onChange={setClimateModel}
+				/>
+			</div>
 			<Button
 				tone="panel"
 				selected

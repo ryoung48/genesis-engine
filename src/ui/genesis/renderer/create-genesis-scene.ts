@@ -86,6 +86,7 @@ export function createGenesisScene(
 			context.heritageScripts = null
 			disposeScriptTextureCache(context.nationScriptTextureCache)
 			context.pendingNationScriptTextureQueue = null
+			context.pendingSettlementScriptTextureQueue = null
 		},
 		resetHoveredRegion: () => {
 			context.hoveredRegion = -1
@@ -258,7 +259,6 @@ export function createGenesisScene(
 
 	const infrastructureController = createInfrastructureController(context, {
 		updateOverlayVisibility: () => updateOverlayVisibility(),
-		rebuildSettlementLabels: () => rebuildSettlementLabels(),
 	})
 	const rebuildTradeRouteOverlay = infrastructureController.rebuild
 	const setInfrastructure = infrastructureController.setInfrastructure

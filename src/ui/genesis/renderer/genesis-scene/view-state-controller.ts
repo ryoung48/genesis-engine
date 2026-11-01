@@ -2,6 +2,7 @@ import * as THREE from "three"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import type {
+	EarthHistoryNationOverride,
 	GenesisViewMode,
 	OrgHighlightSpec,
 } from "@/ui/genesis/renderer/types"
@@ -19,16 +20,8 @@ export interface ViewStateControllerDeps {
 	rebuildHeritageLabels: () => void
 	rebuildReligionLabels: () => void
 	earthHistoryNationOverridesEqual: (
-		a: {
-			assignment: Int32Array
-			seeds: Int32Array
-			names: string[]
-		} | null,
-		b: {
-			assignment: Int32Array
-			seeds: Int32Array
-			names: string[]
-		} | null,
+		a: EarthHistoryNationOverride | null,
+		b: EarthHistoryNationOverride | null,
 	) => boolean
 }
 
@@ -43,11 +36,7 @@ export function createViewStateController(
 	deps: ViewStateControllerDeps,
 ) {
 	function setEarthHistoryNationOverride(
-		override: {
-			assignment: Int32Array
-			seeds: Int32Array
-			names: string[]
-		} | null,
+		override: EarthHistoryNationOverride | null,
 	) {
 		if (
 			deps.earthHistoryNationOverridesEqual(

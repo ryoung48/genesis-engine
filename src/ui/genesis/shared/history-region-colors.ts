@@ -78,20 +78,8 @@ export function computeHistoryRegionColors(params: {
 	desolate: Uint8Array
 	elevationKm: Float32Array
 	isLand: Uint8Array | undefined
-	/** religion id -> [r,g,b] 0-1, from reference/religion-groups.ts. Falls
-	 * back to a deterministic hash color when a religion has none. */
 	religionColorById?: Map<string, [number, number, number]>
-	/** culture id -> [r,g,b] 0-1, from geo-explorer's cultures.json. Falls
-	 * back to a deterministic hash color when a culture has none. */
 	cultureColorById?: Map<string, [number, number, number]>
-	/** When true, the isPolitical/isDemographic branches skip their real
-	 * per-nation/per-culture/per-religion coloring and write a flat
-	 * neutral gray instead -- for when the caller is painting the same
-	 * territory with the real-province-polygon fill overlay
-	 * (eu4-nation-fill-overlay.ts) instead, and this per-region layer only
-	 * needs to exist as an underlying background (wasteland/desolate
-	 * classification still shows through it; only the mode-specific color
-	 * is suppressed, since the overlay renders that more precisely). */
 	suppressFill?: boolean
 	locations: Pick<GenesisLocations, "regionLocation"> | null
 	organizationKindById: ReadonlyMap<string, OrganizationKind>
@@ -117,6 +105,7 @@ export function computeHistoryRegionColors(params: {
 	const isPolitical =
 		colorMode === "nations" &&
 		(nationMode === "borders" ||
+			nationMode === "borderShadow" ||
 			nationMode === "government" ||
 			nationMode === "dynasty" ||
 			nationMode === "organizations" ||
@@ -235,6 +224,7 @@ export function computeHistoryRegionColors(params: {
 			if (owner < 0) {
 				const status = LAND_STATUS.statusAt({
 					provinceStatus: frame.provinceStatus,
+					distributionOwner: uninhabitedGray ? frame.provinceNation : null,
 					province: p,
 				})
 				write(
@@ -340,16 +330,14 @@ export function computeHistoryRegionColors(params: {
 		}
 
 		// isDemographic
-		if (
-			suppressFill ||
-			(uninhabitedGray && DISTRIBUTION_STATUS.isUninhabited({ owner }))
-		) {
+		if (suppressFill) {
 			write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
 			continue
 		}
 		if (
 			LAND_STATUS.statusAt({
 				provinceStatus: frame.provinceStatus,
+				distributionOwner: uninhabitedGray ? frame.provinceNation : null,
 				province: p,
 			}) === "uninhabited"
 		) {
@@ -395,14 +383,6 @@ export function computeHistoryRegionColors(params: {
 	return rgb
 }
 
-/** Occupation-stripe overlay for Earth-imported worlds: every province whose
- * controller differs from its owner (EU4's own convention for "occupied")
- * gets a stripe. Reads state.provinceStateById directly instead of going through
- * activeWars/nationIds (the mechanism computeEarthHistoryRegionColors's
- * sibling, buildPoliticalOccupationOverlay, uses for the procedural
- * generator's own war system) because most real occupations here have no
- * matching tracked war at all -- owner/controller divergence is the ground
- * truth. */
 export function computeHistoryOccupationOverlay(params: {
 	frame: WorldFrame
 	regionProvince: Int32Array
@@ -476,20 +456,6 @@ export function computeTitleStripeOverlay(params: {
 	return hasAny ? overlay : null
 }
 
-/** Diagonal-stripe overlay marking every province an org's OrgCategorizer
- * (organization-categories.ts) flags `striped` -- territory/sites associated
- * with the org without being a genuine member (HRE's foreign-held Imperial
- * soil, HSA's Hanseatic kontors/trade posts). Same Float32Array(numRegions*4)
- * shape as computeEarthHistoryOccupationOverlay above, feeding the exact
- * same scene.setOccupationOverlay -> applyFaceRegionColors path -- both
- * terrain and mapMesh already carry occColor/occMask attributes that this
- * writes into in place (mesh-builders.ts), so this does NOT need (and must
- * never gain back) a separate cloned overlay mesh: an earlier version of
- * this feature built one for map view mode (buildMapOccupationOverlay, since
- * removed) and it turned into a standing per-frame + per-pan rendering cost,
- * since HRE foreign-holder status is non-null across centuries of the
- * timeline (unlike ordinary occupation, which is only non-null during rare
- * active sieges). */
 export function computeOrgStripeOverlay(params: {
 	frame: WorldFrame
 	regionProvince: Int32Array

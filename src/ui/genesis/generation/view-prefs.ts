@@ -125,6 +125,7 @@ const COLOR_MODES = new Set<ColorMode>([
 
 const NATION_MAP_MODES = new Set<NationMapMode>([
 	"borders",
+	"borderShadow",
 	"provinces",
 	"earthProvinces",
 	"dynasty",
@@ -179,6 +180,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 		heritage: false,
 		religion: false,
 		script: false,
+		heraldry: false,
 	},
 	showElevation: true,
 	showThermalEquator: false,
@@ -271,6 +273,7 @@ function parseLabelMode(value: unknown): LabelMode {
 		heritage: typeof v?.heritage === "boolean" ? v.heritage : false,
 		religion: typeof v?.religion === "boolean" ? v.religion : false,
 		script: typeof v?.script === "boolean" ? v.script : false,
+		heraldry: typeof v?.heraldry === "boolean" ? v.heraldry : false,
 	}
 }
 

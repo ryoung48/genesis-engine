@@ -48,4 +48,6 @@ At the 867 start the settled land is the provinces with `arrival ≤ 867`. A mul
 
 ## Report
 
+The Population map mode has Density and Migration children in the overlay controls. Migration colors the arrival field from blue (earliest) through green and yellow to red (latest), using the normalized arrival time. Hover details show the arrival year. Unreached land stays neutral. This mode is available without debug map modes; Earth imports have no migration field and do not offer the selector.
+
 The detailed history report records the origin, cradles, link counts per kind, sea length quantiles, the gate-sensitivity counts, the suitability scale, and the shares settled at the start, uninhabited at the start and never reached.

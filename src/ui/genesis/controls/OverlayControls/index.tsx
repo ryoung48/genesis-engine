@@ -25,6 +25,7 @@ import { GeographySection } from "./GeographySection"
 import { GridSection } from "./GridSection"
 import { MeasureSection } from "./MeasureSection"
 import { NationsModeSection } from "./NationsModeSection"
+import { PopulationModeSection } from "./PopulationModeSection"
 import { ReligionModeSection } from "./ReligionModeSection"
 import { SocietySection } from "./SocietySection"
 import { TitlesModeSection } from "./TitlesModeSection"
@@ -394,6 +395,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setNationMode={setNationMode}
 									nationsExpanded={nationsExpanded}
 									setNationsExpanded={setNationsExpanded}
+								/>
+								<PopulationModeSection
+									colorMode={colorMode}
+									societyMode={populationMode}
+									setSocietyMode={setPopulationMode}
+									isEarthImport={isEarthImport}
 								/>
 								<DevelopmentModeSection
 									colorMode={colorMode}

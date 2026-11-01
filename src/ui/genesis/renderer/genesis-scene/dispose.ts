@@ -5,6 +5,7 @@ import {
 	disposePool,
 } from "@/ui/genesis/renderer/nation-label-overlay/pool"
 import { disposeScriptTextureCache } from "@/ui/genesis/renderer/nation-script-overlay"
+import { terminateTradeRouteWorker } from "@/ui/genesis/renderer/trade-route-overlay"
 
 export interface DisposeControllerDeps {
 	/** Removes the canvas/controls event listeners interaction-controller.ts
@@ -75,10 +76,12 @@ export function createDisposeController(
 		if (ctx.globeNationScripts) ctx.globeGroup.remove(ctx.globeNationScripts)
 		if (ctx.mapNationScripts) ctx.scene.remove(ctx.mapNationScripts)
 		ctx.pendingNationScriptTextureQueue = null
+		ctx.pendingSettlementScriptTextureQueue = null
 		disposeScriptTextureCache(ctx.nationScriptTextureCache)
 		disposeGroup(ctx.globeGroup, ctx.globeSettlementLabels)
 		disposeGroup(ctx.scene, ctx.mapSettlementLabels)
 		deps.disposeLabelPools()
+		terminateTradeRouteWorker()
 		ctx.waterGeo.dispose()
 		ctx.waterMat.dispose()
 		ctx.atmosGeo.dispose()

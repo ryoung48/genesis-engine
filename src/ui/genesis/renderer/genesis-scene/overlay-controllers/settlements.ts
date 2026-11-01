@@ -18,7 +18,17 @@ export function createSettlementsController(
 ) {
 	let routeEndpoints: ReadonlySet<number> = new Set()
 	let capitalProvinces: ReadonlySet<number> = new Set()
+	let rebuildQueued = false
 	function rebuildSettlementOverlay() {
+		if (rebuildQueued) return
+		rebuildQueued = true
+		queueMicrotask(() => {
+			rebuildQueued = false
+			buildSettlementOverlay()
+		})
+	}
+
+	function buildSettlementOverlay() {
 		disposeGroup(ctx.globeGroup, ctx.globeSettlements)
 		disposeGroup(ctx.scene, ctx.mapSettlements)
 		ctx.globeSettlements = null

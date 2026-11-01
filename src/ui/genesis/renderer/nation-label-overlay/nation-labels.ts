@@ -79,11 +79,8 @@ export function buildGlobeNationLabels(
 		const settlementRegion = world.settlementRegions?.[capitalProvince] ?? -1
 		const anchorRegion =
 			settlementRegion >= 0 ? settlementRegion : capitalRegion
-		const scale = computeLabelScale(
-			nationProvinceCount(world, n),
-			name,
-			scaleCurve,
-		)
+		const provinceCount = nationProvinceCount(world, n)
+		const scale = computeLabelScale(provinceCount, name, scaleCurve)
 		const globePlacement = labelPositionGlobe(
 			r_xyz,
 			elevation,
@@ -94,6 +91,9 @@ export function buildGlobeNationLabels(
 		const text = pool.items[activeCount]
 		applyGlobeLabelStyle(text)
 		text.frustumCulled = cullingEnabled
+		text.userData.nationIdx = n
+		text.userData.heraldryFontSize =
+			LABEL_FONT_SIZE_GLOBE * computeLabelScale(provinceCount, "", scaleCurve)
 		text.text = name
 		text.fontSize = LABEL_FONT_SIZE_GLOBE * scale
 		text.userData.globeNormal = globePlacement.normal
@@ -154,11 +154,8 @@ export function buildMapNationLabels(
 		const capitalRegion = nationCapitalRegion(world, n)
 		if (capitalRegion < 0) continue
 
-		const scale = computeLabelScale(
-			nationProvinceCount(world, n),
-			name,
-			scaleCurve,
-		)
+		const provinceCount = nationProvinceCount(world, n)
+		const scale = computeLabelScale(provinceCount, name, scaleCurve)
 		const fontSize = LABEL_FONT_SIZE_MAP * scale
 		const capitalProvince = nationCapitalProvince(world, n)
 		const settlementRegion = world.settlementRegions?.[capitalProvince] ?? -1
@@ -177,6 +174,9 @@ export function buildMapNationLabels(
 			const text = pool.items[activeCount]
 			applyMapLabelStyle(text)
 			text.frustumCulled = cullingEnabled
+			text.userData.nationIdx = n
+			text.userData.heraldryFontSize =
+				LABEL_FONT_SIZE_MAP * computeLabelScale(provinceCount, "", scaleCurve)
 			text.text = name
 			text.position.set(px + wrapOffset, py, pz)
 			text.rotation.set(0, 0, 0)

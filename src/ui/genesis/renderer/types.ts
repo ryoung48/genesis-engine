@@ -5,6 +5,7 @@ import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
 } from "@/model/history/earth/data-source/types"
+import type { SerializedRouteKind } from "@/model/society/infrastructure/transport/types"
 import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
@@ -185,11 +186,7 @@ export interface GenesisScene {
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void
 	setEarthHistoryNationOverride(
-		override: {
-			assignment: Int32Array
-			seeds: Int32Array
-			names: string[]
-		} | null,
+		override: EarthHistoryNationOverride | null,
 	): void
 	/** Pass null to clear the highlight (e.g. no org wiki page open). */
 	setOrganizationHighlight(spec: OrgHighlightSpec | null): void
@@ -509,4 +506,33 @@ export interface BuildMapSettlementsParams {
 	urbanPop: Float32Array
 	centerLongitudeDeg: number
 	projectionLatitudeDeg: number
+}
+
+export interface EarthHistoryNationOverride {
+	assignment: Int32Array
+	seeds: Int32Array
+	names: string[]
+	colors: Float32Array
+}
+
+export interface TradeRoutePositionRequest {
+	network: SerializedNetwork
+	r_xyz: Float32Array
+	elevation: Float32Array
+	elevationVisible: boolean
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+}
+export type TradeRoutePositionSet = Record<SerializedRouteKind, Float32Array>
+export interface TradeRoutePositions {
+	globe: TradeRoutePositionSet
+	map: TradeRoutePositionSet
+}
+export interface TradeRouteWorkerRequest {
+	requestId: number
+	request: TradeRoutePositionRequest
+}
+export interface TradeRouteWorkerResponse {
+	requestId: number
+	positions: TradeRoutePositions
 }

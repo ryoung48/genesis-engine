@@ -73,6 +73,7 @@ import type {
 	NationMapMode,
 	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
+import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
 	basinColor,
@@ -121,6 +122,7 @@ export function computeRegionColors(
 
 	const N = world.mesh.numRegions
 	const rgb = new Float32Array(N * 3)
+	const hasOceanClimate = supportsOceanClimate(world)
 	const isLakeRegion = (region: number) => {
 		if (world.topography?.[region] === 6) return true
 		if (!world.landmarks) return false
@@ -277,7 +279,10 @@ export function computeRegionColors(
 								temperatureMonth * N,
 							)
 		for (let r = 0; r < N; r++) {
-			if (isOceanRegion(r)) {
+			if (
+				isOceanRegion(r) &&
+				!(colorMode === "temperature" && hasOceanClimate)
+			) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -346,7 +351,7 @@ export function computeRegionColors(
 	) {
 		const monthlyOffset = rainfallMonth > 0 ? (rainfallMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
-			if (isOceanRegion(r)) {
+			if (isOceanRegion(r) && !hasOceanClimate) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -413,7 +418,9 @@ export function computeRegionColors(
 						? precipitationDifferenceColor(annualValue ?? 0)
 						: precipitationAnnualColor(annualValue ?? 0)
 				const [cr, cg, cb] = isOceanRegion(r)
-					? oceanRgb(r)
+					? colorMode === "precipitation" && hasOceanClimate
+						? baseColor
+						: oceanRgb(r)
 					: darkenClimateAtElevation(baseColor, world.elevation_km[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -433,7 +440,9 @@ export function computeRegionColors(
 						? precipitationDifferenceColor(monthlyValue ?? 0)
 						: precipitationColor(monthlyValue ?? 0)
 				const [cr, cg, cb] = isOceanRegion(r)
-					? oceanRgb(r)
+					? colorMode === "precipitation" && hasOceanClimate
+						? baseColor
+						: oceanRgb(r)
 					: darkenClimateAtElevation(baseColor, world.elevation_km[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -683,19 +692,20 @@ export function computeRegionColors(
 						: world.dtr_monthly
 		const offset = monthly ? (dtrMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = isLandRegion(r)
-				? colorMode === "dtrDiff"
-					? dtrDifferenceColor(
-							monthly
-								? (monthly[offset + r] ?? annual?.[r] ?? 0)
-								: (annual?.[r] ?? 0),
-						)
-					: dtrColor(
-							monthly
-								? (monthly[offset + r] ?? annual?.[r] ?? 0)
-								: (annual?.[r] ?? 0),
-						)
-				: oceanRgb(r)
+			const [cr, cg, cb] =
+				isLandRegion(r) || (colorMode === "dtr" && hasOceanClimate)
+					? colorMode === "dtrDiff"
+						? dtrDifferenceColor(
+								monthly
+									? (monthly[offset + r] ?? annual?.[r] ?? 0)
+									: (annual?.[r] ?? 0),
+							)
+						: dtrColor(
+								monthly
+									? (monthly[offset + r] ?? annual?.[r] ?? 0)
+									: (annual?.[r] ?? 0),
+							)
+					: oceanRgb(r)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -720,7 +730,7 @@ export function computeRegionColors(
 		const aet = world.hydrology?.aet_monthly
 		const pet = world.climate.pet_monthly
 		for (let r = 0; r < N; r++) {
-			if (isOceanRegion(r)) {
+			if (isOceanRegion(r) && !(colorMode === "humidity" && hasOceanClimate)) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -738,7 +748,7 @@ export function computeRegionColors(
 					? world.observedHumidity?.real_annual?.[r]
 					: world.observedHumidity?.real_monthly?.[offset + r]
 			let annualAridity: number | undefined
-			if (aet && pet) {
+			if (aet && pet && isLandRegion(r)) {
 				let aetSum = 0
 				let petSum = 0
 				for (let m = 0; m < 12; m++) {

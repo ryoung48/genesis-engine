@@ -142,14 +142,19 @@ export function createOverlayVisibilityController(
 		}
 		if (ctx.globeNationLabels)
 			ctx.globeNationLabels.visible =
-				(ctx.labelMode.nations || ctx.labelMode.dynasty) &&
+				(ctx.labelMode.nations ||
+					ctx.labelMode.dynasty ||
+					ctx.labelMode.heraldry) &&
 				ctx.currentViewMode === "globe"
 		if (ctx.globeNationScripts)
 			ctx.globeNationScripts.visible =
 				ctx.labelMode.script && ctx.currentViewMode === "globe"
 		if (ctx.mapNationLabels) {
 			ctx.mapNationLabels.visible =
-				(ctx.labelMode.nations || ctx.labelMode.dynasty) && showMap
+				(ctx.labelMode.nations ||
+					ctx.labelMode.dynasty ||
+					ctx.labelMode.heraldry) &&
+				showMap
 			if (ctx.mapMesh) ctx.mapNationLabels.position.copy(ctx.mapMesh.position)
 		}
 		if (ctx.mapNationScripts) {
