@@ -188,7 +188,7 @@ function sweeps(base: ClimateOrbit) {
 	// near 15 °C (14.1–16.1) at each tilt, as a forcing against Earth's ≈ 280 ppm, 5.35·ln(C/280) W/m² (Myhre et al. 1998)
 	for (const [tilt, ppm] of EXOPLASIM_TILTS)
 		runs.push({
-			knob: "axial tilt (°), ExoPlaSim's CO₂",
+			knob: "tilt with ExoPlaSim's CO₂ (°)",
 			value: tilt,
 			orbit: { ...base, tiltDeg: tilt },
 			greenhouseWm2: 5.35 * Math.log(ppm / 280),
