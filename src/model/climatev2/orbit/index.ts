@@ -1,7 +1,7 @@
 import { STAR } from "@/model/celestial/star"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import type { Sunlight } from "@/model/climate/classification/climate/types"
-import { HEAT } from "@/model/climate/temperature/tidal-locked"
+import { CLIMATEV2_LOCKED_ORBIT } from "@/model/climatev2/orbit/locked"
 import type {
 	ClimateV2OrbitParams,
 	LockedSunlightParams,
@@ -88,13 +88,16 @@ function lockedFromParams(params: GenesisParams): ClimateOrbit {
 		solarDayScale: 1,
 		locked: {
 			substellarLon: params.substellarLon,
-			libration: HEAT.computeMonthlyLibration({ eccentricity, perihelion }),
-			declination: HEAT.computeMonthlyLockedDeclination({
+			libration: CLIMATEV2_LOCKED_ORBIT.computeMonthlyLibration({
+				eccentricity,
+				perihelion,
+			}),
+			declination: CLIMATEV2_LOCKED_ORBIT.computeMonthlyLockedDeclination({
 				obliquity,
 				eccentricity,
 				perihelion,
 			}),
-			flux: HEAT.computeMonthlyOrbitalFlux(params),
+			flux: CLIMATEV2_LOCKED_ORBIT.computeMonthlyOrbitalFlux(params),
 		},
 	}
 }
@@ -104,20 +107,24 @@ function lockedFromParams(params: GenesisParams): ClimateOrbit {
 function lockedSunlight({ mesh, params }: LockedSunlightParams): Sunlight {
 	const N = mesh.numRegions
 	const { eccentricity, perihelion, obliquity } = params
-	const libration = HEAT.computeMonthlyLibration({ eccentricity, perihelion })
-	const declination = HEAT.computeMonthlyLockedDeclination({
+	const libration = CLIMATEV2_LOCKED_ORBIT.computeMonthlyLibration({
+		eccentricity,
+		perihelion,
+	})
+	const declination = CLIMATEV2_LOCKED_ORBIT.computeMonthlyLockedDeclination({
 		obliquity,
 		eccentricity,
 		perihelion,
 	})
-	const flux = HEAT.computeMonthlyOrbitalFlux(params)
+	const flux = CLIMATEV2_LOCKED_ORBIT.computeMonthlyOrbitalFlux(params)
 	const insolation_monthly = new Float32Array(12 * N)
 	for (let month = 0; month < 12; month++) {
-		const [sx, sy, sz] = HEAT.getSubstellarDirWithOffsetAndDeclination({
-			substellarLon: params.substellarLon,
-			lonOffsetRad: libration[month],
-			declinationRad: declination[month],
-		})
+		const [sx, sy, sz] =
+			CLIMATEV2_LOCKED_ORBIT.getSubstellarDirWithOffsetAndDeclination({
+				substellarLon: params.substellarLon,
+				lonOffsetRad: libration[month],
+				declinationRad: declination[month],
+			})
 		for (let r = 0; r < N; r++) {
 			const cosTheta =
 				mesh.r_xyz[3 * r] * sx +
@@ -127,10 +134,11 @@ function lockedSunlight({ mesh, params }: LockedSunlightParams): Sunlight {
 		}
 	}
 	return {
-		daylight_hours_monthly: HEAT.computeLockedMonthlyDaylightHours({
-			mesh,
-			params,
-		}),
+		daylight_hours_monthly:
+			CLIMATEV2_LOCKED_ORBIT.computeLockedMonthlyDaylightHours({
+				mesh,
+				params,
+			}),
 		insolation_monthly,
 		declination_monthly: Float32Array.from(
 			declination,

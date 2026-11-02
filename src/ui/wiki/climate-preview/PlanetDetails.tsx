@@ -3,16 +3,12 @@ import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
 import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { Surface } from "@/ui/components/primitives/Surface"
-import { LockedClimatePreview } from "@/ui/wiki/climate-preview/LockedClimatePreview"
 import { TidalCalendarChart } from "@/ui/wiki/climate-preview/TidalCalendarChart"
 import type {
-	LockedAvgTempConfig,
-	PlanetClimatePreviewProps,
 	PlanetDetailDataProps,
 	PlanetDetailSectionProps,
 	PlanetDetailsProps,
 } from "@/ui/wiki/climate-preview/types"
-import { useLockedClimatePreview } from "@/ui/wiki/climate-preview/useLockedClimatePreview"
 
 function PlanetDetailSection({
 	label,
@@ -37,13 +33,6 @@ function PlanetDetailSection({
 	)
 }
 
-export function isApproxSolarLocked(
-	siderealDayHours: number,
-	orbitalPeriodDays: number,
-): boolean {
-	return Math.abs(siderealDayHours - orbitalPeriodDays * 24) < 0.1
-}
-
 export function PlanetDetails({
 	seed,
 	moons,
@@ -52,20 +41,12 @@ export function PlanetDetails({
 	daysPerYear,
 	hoursPerDay,
 	planetRadiusKm,
-	isSolarLocked,
 	spectralClass,
 	starSubtype,
-	starTemperatureK,
-	starDiameterSol,
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
-	obliquity,
-	substellarLon,
-	atmosphere,
-	seismologyTotalHeatingK,
 	tidalSchedulePreviewOverride,
-	unitSystem,
 	tidesEmptyLabel,
 	generateContent,
 	observerContent,
@@ -91,20 +72,12 @@ export function PlanetDetails({
 					daysPerYear={daysPerYear}
 					hoursPerDay={hoursPerDay}
 					planetRadiusKm={planetRadiusKm}
-					isSolarLocked={isSolarLocked}
 					spectralClass={spectralClass}
 					starSubtype={starSubtype}
-					starTemperatureK={starTemperatureK}
-					starDiameterSol={starDiameterSol}
 					orbitalDistanceAU={orbitalDistanceAU}
 					eccentricity={eccentricity}
 					perihelion={perihelion}
-					obliquity={obliquity}
-					substellarLon={substellarLon}
-					atmosphere={atmosphere}
-					seismologyTotalHeatingK={seismologyTotalHeatingK}
 					tidalSchedulePreviewOverride={tidalSchedulePreviewOverride}
-					unitSystem={unitSystem}
 					tidesEmptyLabel={tidesEmptyLabel}
 				/>
 			) : null}
@@ -117,76 +90,6 @@ export function PlanetDetails({
 	)
 }
 
-function usePlanetClimatePreview(config: LockedAvgTempConfig) {
-	const {
-		obliquity,
-		eccentricity,
-		perihelion,
-		spectralClass,
-		starSubtype,
-		starTemperatureK,
-		starDiameterSol,
-		orbitalDistanceAU,
-		hoursPerDay,
-		daysPerYear,
-		planetRadiusKm,
-		pressureBar,
-		seismologyTotalHeatingK,
-		substellarLon,
-	} = config
-	const lockedPreviewConfig = useMemo(
-		() => ({
-			obliquity,
-			eccentricity,
-			perihelion,
-			spectralClass,
-			starSubtype,
-			starTemperatureK,
-			starDiameterSol,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			radius: planetRadiusKm,
-			pressure: pressureBar,
-			planetRadiusKm,
-			substellarLon,
-			seismologyTotalHeatingK,
-		}),
-		[
-			obliquity,
-			eccentricity,
-			perihelion,
-			spectralClass,
-			starSubtype,
-			starTemperatureK,
-			starDiameterSol,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			planetRadiusKm,
-			pressureBar,
-			substellarLon,
-			seismologyTotalHeatingK,
-		],
-	)
-	return useLockedClimatePreview(lockedPreviewConfig)
-}
-
-export function useLockedAvgTempK(
-	config: LockedAvgTempConfig,
-): number | undefined {
-	const preview = usePlanetClimatePreview(config)
-	return config.isSolarLocked ? preview.avgTemp + 273.15 : undefined
-}
-
-function PlanetClimatePreview({
-	config,
-	unitSystem,
-}: PlanetClimatePreviewProps) {
-	const preview = usePlanetClimatePreview(config)
-	return <LockedClimatePreview preview={preview} unitSystem={unitSystem} />
-}
-
 function PlanetDetailData({
 	seed,
 	moons,
@@ -195,20 +98,12 @@ function PlanetDetailData({
 	daysPerYear,
 	hoursPerDay,
 	planetRadiusKm,
-	isSolarLocked,
 	spectralClass,
 	starSubtype,
-	starTemperatureK,
-	starDiameterSol,
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
-	obliquity,
-	substellarLon,
-	atmosphere,
-	seismologyTotalHeatingK,
 	tidalSchedulePreviewOverride,
-	unitSystem,
 	tidesEmptyLabel,
 }: PlanetDetailDataProps) {
 	const computedTidalSchedulePreview = useMemo(
@@ -278,32 +173,6 @@ function PlanetDetailData({
 					<EmptyState minHeight={128} message={tidesEmptyLabel ?? "No tides"} />
 				)}
 			</PlanetDetailSection>
-			{isSolarLocked ? (
-				<PlanetDetailSection label="Preview" initiallyExpanded={false}>
-					<div className="h-[248px] overflow-hidden">
-						<PlanetClimatePreview
-							config={{
-								isSolarLocked,
-								obliquity,
-								eccentricity,
-								perihelion,
-								spectralClass,
-								starSubtype,
-								starTemperatureK,
-								starDiameterSol,
-								orbitalDistanceAU,
-								hoursPerDay,
-								daysPerYear,
-								planetRadiusKm,
-								pressureBar: atmosphere?.pressureBar ?? 0,
-								substellarLon,
-								seismologyTotalHeatingK,
-							}}
-							unitSystem={unitSystem}
-						/>
-					</div>
-				</PlanetDetailSection>
-			) : null}
 		</>
 	)
 }

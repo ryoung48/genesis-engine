@@ -57,7 +57,7 @@ Snow and sea ice follow the surface's temperature, and the surface's departure f
 | 4 | 16.0 / 17.9 / 14.0 / 22.2 / 13.8, 0 % | 11.3 / 13.6 / 9.0 / 17.3 / 8.8, 0 % | 14.5 / 10.8 |
 | 10 | 15.9 / 16.9 / 15.0 / 18.9 / 14.9, 0 % | 12.1 / 13.2 / 11.0 / 14.8 / 10.9, 0 % | 13.6 / 11.9 |
 
-At Earth's starlight thin air no longer freezes over: the substellar sea convects warm enough to stay open (an eyeball), where the even-surface model froze 0.1 bar solid. No ocean carries heat yet, so the nightside's seas freeze from 0.5 bar down.
+At Earth's starlight thin air no longer freezes over: the substellar sea convects warm enough to stay open (an eyeball), where the even-surface model froze 0.1 bar solid. These figures predate the ocean heat (below), which moves 30–45 W/m² to the nightside's seas; at Earth's starlight they still freeze from 0.5 bar down.
 
 ### Rain
 

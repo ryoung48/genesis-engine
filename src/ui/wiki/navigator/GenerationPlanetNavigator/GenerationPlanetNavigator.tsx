@@ -36,11 +36,7 @@ import {
 	type ApparentSizeEntry,
 	ApparentSizePreview,
 } from "@/ui/wiki/climate-preview/ApparentSizePreview"
-import {
-	isApproxSolarLocked,
-	PlanetDetails,
-	useLockedAvgTempK,
-} from "@/ui/wiki/climate-preview/PlanetDetails"
+import { PlanetDetails } from "@/ui/wiki/climate-preview/PlanetDetails"
 import { labelOrbitBodies } from "@/ui/wiki/navigator/GenerationPlanetNavigator/label-orbit-bodies"
 import { OrbitHeader } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitHeader"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
@@ -371,101 +367,6 @@ export function GenerationPlanetNavigator({
 			starIndex === 0 ? systemBodies : companionStars?.[starIndex - 1]?.orbits,
 		[systemBodies, companionStars],
 	)
-	const probeBody =
-		selection.kind === "body" || selection.kind === "moon"
-			? getBodiesForStar(selection.starIndex)?.[selection.bodyIdx]
-			: undefined
-	const probeMoon =
-		selection.kind === "moon" ? probeBody?.moons[selection.moonIdx] : undefined
-	const probeHostStar =
-		selection.starIndex === 0
-			? hostStar
-			: companionStars?.[selection.starIndex - 1]?.hostStar
-	const probeConfig = useMemo(() => {
-		if (probeMoon && probeBody) {
-			const parentYearHours =
-				probeBody.orbitalPeriodDays * probeBody.siderealDayHours
-			const climateHoursPerDay =
-				ORBIT_BODY.computeSolarDayHours({
-					siderealDayHours: probeMoon.siderealDayHours,
-					orbitalPeriodDays: parentYearHours / 24,
-					retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
-						probeMoon.axialTiltDeg,
-					),
-				}) ?? probeMoon.siderealDayHours
-			const climateDaysPerYear =
-				climateHoursPerDay > 0 ? parentYearHours / climateHoursPerDay : 0
-			return {
-				isSolarLocked: probeMoon.tideLock?.type === "solar",
-				obliquity: probeMoon.axialTiltDeg,
-				eccentricity: probeBody.eccentricity,
-				perihelion:
-					probeBody.lsAphelionDeg ?? probeBody.longitudeOfPerihelionDeg,
-				spectralClass,
-				starSubtype,
-				starTemperatureK: probeHostStar?.temperatureK,
-				starDiameterSol: probeHostStar?.diameterSol,
-				orbitalDistanceAU: probeBody.orbitalDistanceAU,
-				hoursPerDay: climateHoursPerDay,
-				daysPerYear: climateDaysPerYear,
-				planetRadiusKm: probeMoon.diameterKm / 2,
-				pressureBar: probeMoon.atmosphere?.pressureBar ?? 0,
-				seismologyTotalHeatingK: probeMoon.seismology?.totalHeating,
-				substellarLon: probeMoon.substellarLon ?? 0,
-			}
-		}
-		if (probeBody) {
-			return {
-				isSolarLocked: isApproxSolarLocked(
-					probeBody.siderealDayHours,
-					probeBody.orbitalPeriodDays,
-				),
-				obliquity: probeBody.axialTiltDeg,
-				eccentricity: probeBody.eccentricity,
-				perihelion:
-					probeBody.lsAphelionDeg ?? probeBody.longitudeOfPerihelionDeg,
-				spectralClass,
-				starSubtype,
-				starTemperatureK: probeHostStar?.temperatureK,
-				starDiameterSol: probeHostStar?.diameterSol,
-				orbitalDistanceAU: probeBody.orbitalDistanceAU,
-				hoursPerDay: probeBody.siderealDayHours,
-				daysPerYear: probeBody.orbitalPeriodDays,
-				planetRadiusKm: probeBody.diameterKm / 2,
-				pressureBar: probeBody.atmosphere?.pressureBar ?? 0,
-				// Excluded for jovians: system-seismology.ts's residual-heating formula
-				// (tuned for rocky/icy geologic stress, not gas-giant internal heat)
-				// gives values far too large for a jovian's huge sizeClass.
-				seismologyTotalHeatingK:
-					probeBody.group === "jovian"
-						? undefined
-						: probeBody.seismology?.totalHeating,
-				substellarLon: probeBody.substellarLon ?? 0,
-			}
-		}
-		return {
-			isSolarLocked: false,
-			obliquity: 0,
-			eccentricity: 0,
-			perihelion: 0,
-			spectralClass,
-			starSubtype,
-			starTemperatureK: probeHostStar?.temperatureK,
-			starDiameterSol: probeHostStar?.diameterSol,
-			orbitalDistanceAU: 1,
-			hoursPerDay: 24,
-			daysPerYear: 365,
-			planetRadiusKm: 6371,
-			pressureBar: 1,
-			seismologyTotalHeatingK: undefined,
-			substellarLon: 0,
-		}
-	}, [probeBody, probeMoon, spectralClass, starSubtype, probeHostStar])
-	const probedAvgTempK = useLockedAvgTempK(probeConfig)
-	const avgTempK =
-		selection.kind === "body" || selection.kind === "moon"
-			? probedAvgTempK
-			: undefined
 	useEffect(() => {
 		if (!currentFocus) return
 		if (currentFocus.kind === "star" || currentFocus.kind === "moon") {
@@ -1071,9 +972,7 @@ export function GenerationPlanetNavigator({
 					body,
 					starMassSol: bodyStarParams.starMassSol,
 					starLuminositySol: bodyStarParams.starLuminositySol,
-					avgTempK,
 					unitSystem,
-					readOnly: fromGalaxy,
 					orbitalDistanceBaselineAU: isMainWorld
 						? orbitalDistanceBaselineAU
 						: undefined,
@@ -1179,26 +1078,11 @@ export function GenerationPlanetNavigator({
 							daysPerYear={body.orbitalPeriodDays}
 							hoursPerDay={body.siderealDayHours}
 							planetRadiusKm={body.diameterKm / 2}
-							isSolarLocked={isApproxSolarLocked(
-								body.siderealDayHours,
-								body.orbitalPeriodDays,
-							)}
 							spectralClass={bodyStarParams.spectralClass}
 							starSubtype={bodyStarParams.starSubtype}
-							starTemperatureK={bodyStarParams.starTemperatureK}
-							starDiameterSol={bodyStarParams.starDiameterSol}
 							orbitalDistanceAU={body.orbitalDistanceAU}
 							eccentricity={body.eccentricity}
 							perihelion={body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg}
-							obliquity={body.axialTiltDeg}
-							substellarLon={body.substellarLon ?? 0}
-							atmosphere={body.atmosphere}
-							seismologyTotalHeatingK={
-								body.group === "jovian"
-									? undefined
-									: body.seismology?.totalHeating
-							}
-							unitSystem={unitSystem}
 							generateContent={isMainWorld ? generateContent : undefined}
 							observerContent={
 								<ApparentSizePreview
@@ -1338,9 +1222,7 @@ export function GenerationPlanetNavigator({
 				// main world's subtitle row does (see isMainWorldTarget).
 				stats: buildOrbitMoonStats({
 					moon,
-					avgTempK,
 					unitSystem,
-					readOnly: fromGalaxy,
 					luminositySol: moonStarParams.starLuminositySol,
 					orbitalDistanceAU: parentOrbitalDistanceAU,
 					tideLockStat: buildTideLockStat({
@@ -1425,10 +1307,7 @@ export function GenerationPlanetNavigator({
 							parentPerihelionDeg,
 							spectralClass: moonStarParams.spectralClass,
 							starSubtype: moonStarParams.starSubtype,
-							unitSystem,
 						})}
-						starTemperatureK={moonStarParams.starTemperatureK}
-						starDiameterSol={moonStarParams.starDiameterSol}
 						observerContent={
 							<ApparentSizePreview
 								entries={buildApparentSizeEntries({
@@ -1488,7 +1367,6 @@ export function GenerationPlanetNavigator({
 		selectAndFocus,
 		setTideLock,
 		namesEnabled,
-		avgTempK,
 		generateContent,
 		companionStars,
 		hostStar?.diameterSol,

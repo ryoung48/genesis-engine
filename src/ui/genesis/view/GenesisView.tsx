@@ -3,8 +3,8 @@ import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { RAIN } from "@/model/climate/precipitation/rain"
-import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import { WIND } from "@/model/climate/weather/wind"
+import { CLIMATEV2_LOCKED_ORBIT } from "@/model/climatev2/orbit/locked"
 import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
@@ -1212,20 +1212,22 @@ export const GenesisView: React.FC<{
 		scene.setSolarTerminatorVisible(showDaylight)
 		if (tidallyLocked) {
 			const selectedMonth = clockMonthMode === "annual" ? 5 : clockMonth
-			const monthlyLibration = HEAT.computeMonthlyLibration({
+			const monthlyLibration = CLIMATEV2_LOCKED_ORBIT.computeMonthlyLibration({
 				eccentricity,
 				perihelion,
 			})
-			const monthlyDeclination = HEAT.computeMonthlyLockedDeclination({
-				obliquity,
-				eccentricity,
-				perihelion,
-			})
-			const [sx, sy, sz] = HEAT.getSubstellarDirWithOffsetAndDeclination({
-				substellarLon,
-				lonOffsetRad: monthlyLibration[selectedMonth] ?? 0,
-				declinationRad: monthlyDeclination[selectedMonth] ?? 0,
-			})
+			const monthlyDeclination =
+				CLIMATEV2_LOCKED_ORBIT.computeMonthlyLockedDeclination({
+					obliquity,
+					eccentricity,
+					perihelion,
+				})
+			const [sx, sy, sz] =
+				CLIMATEV2_LOCKED_ORBIT.getSubstellarDirWithOffsetAndDeclination({
+					substellarLon,
+					lonOffsetRad: monthlyLibration[selectedMonth] ?? 0,
+					declinationRad: monthlyDeclination[selectedMonth] ?? 0,
+				})
 			scene.setSunDirection(sx, sy, sz, hoursPerDay)
 		} else {
 			const lightingMonth =

@@ -1,6 +1,6 @@
 import type { DiurnalRangeCellsParams } from "@/model/climate/temperature/dtr/types"
-import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { GenesisRainfall } from "@/model/climate/types"
+import { CLIMATEV2_LOCKED_ORBIT } from "@/model/climatev2/orbit/locked"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 import { PARALLEL } from "@/model/shared/parallel"
@@ -38,15 +38,16 @@ function computeLockedDiurnalRange(args: {
 	const N = isLand.length
 	const dtr_monthly = new Float32Array(12 * N)
 
-	const monthlyLibration = HEAT.computeMonthlyLibration({
+	const monthlyLibration = CLIMATEV2_LOCKED_ORBIT.computeMonthlyLibration({
 		eccentricity,
 		perihelion,
 	})
-	const monthlyDeclination = HEAT.computeMonthlyLockedDeclination({
-		obliquity,
-		eccentricity,
-		perihelion,
-	})
+	const monthlyDeclination =
+		CLIMATEV2_LOCKED_ORBIT.computeMonthlyLockedDeclination({
+			obliquity,
+			eccentricity,
+			perihelion,
+		})
 	// More eccentric orbits librate the substellar point further, widening
 	// the terminator's day/night wobble -- a modest amplitude boost, not a
 	// new mechanism.
@@ -55,11 +56,13 @@ function computeLockedDiurnalRange(args: {
 	const oceanPeak = LOCKED_OCEAN_PEAK_C * eccBoost
 
 	for (let month = 0; month < 12; month++) {
-		const sub = HEAT.getSubstellarDirWithOffsetAndDeclination({
-			substellarLon,
-			lonOffsetRad: monthlyLibration[month],
-			declinationRad: monthlyDeclination[month],
-		})
+		const sub = CLIMATEV2_LOCKED_ORBIT.getSubstellarDirWithOffsetAndDeclination(
+			{
+				substellarLon,
+				lonOffsetRad: monthlyLibration[month],
+				declinationRad: monthlyDeclination[month],
+			},
+		)
 		for (let r = 0; r < N; r++) {
 			const x = mesh.r_xyz[3 * r]
 			const y = mesh.r_xyz[3 * r + 1]

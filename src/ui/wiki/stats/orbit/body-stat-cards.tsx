@@ -294,7 +294,6 @@ function buildBodyStats({
 	landCoverage,
 	hydrosphereCode,
 	landCoverageEditor,
-	avgTempK,
 	unitSystem,
 	greenhouseFactor,
 	surfaceTidesM,
@@ -305,7 +304,6 @@ function buildBodyStats({
 	luminositySol,
 	orbitalDistanceAU,
 	pressureBar,
-	readOnly,
 	estimateTempK,
 	estimateTempDeltaK,
 }: {
@@ -361,10 +359,6 @@ function buildBodyStats({
 	 * composition/variation/sea-level mini-sliders) -- a generated sibling or
 	 * moon's land coverage is rolled, not hand-authored. */
 	landCoverageEditor?: StatEntry["editor"]
-	/** Mean surface temperature (Kelvin) of a planet locked to its star, from
-	 * its locked climate preview (useLockedAvgTempK); undefined for any other
-	 * body, which shows the analytic estimate. */
-	avgTempK?: number
 	unitSystem: UnitSystem
 	greenhouseFactor?: number
 	surfaceTidesM?: SurfaceTidesBreakdown
@@ -381,13 +375,8 @@ function buildBodyStats({
 	 * seasonality term. Defaults to 0 (vacuum) in the trace call when unset,
 	 * same as finalize()'s own convention. */
 	pressureBar?: number
-	// [JUSTIFICATION] Galaxy bodies display the analytic estimate instead of the climate preview mean.
-	readOnly?: boolean
-	/** [JUSTIFICATION] The body's generation-time analytic temperature
-	 * estimate (temperatureEstimate.mean). Fallback for the Temperature
-	 * row's value in `readOnly` mode when the live estimate can't run
-	 * (missing trace inputs); ignored otherwise. Generation still owns
-	 * this value for its own consumers -- the card only displays it. */
+	// [JUSTIFICATION] The body's generation-time analytic temperature estimate, the Temperature row's value when the
+	// live estimate can't run (missing trace inputs); absent for bodies generated without one.
 	estimateTempK?: number
 	estimateTempDeltaK: number | null
 }): StatEntry[] {
@@ -478,7 +467,7 @@ function buildBodyStats({
 					},
 				]
 			: []),
-		...((estimateTempK ?? avgTempK) !== undefined
+		...(estimateTempK !== undefined
 			? [
 					(() => {
 						const temperatureTraces = buildTemperatureTraceTooltips({
@@ -498,9 +487,7 @@ function buildBodyStats({
 						})
 						const liveEstimate = temperatureTraces?.estimate
 						const analyticK = liveEstimate?.mean ?? estimateTempK
-						const tempK = (
-							readOnly ? (analyticK ?? avgTempK) : (avgTempK ?? analyticK)
-						) as number
+						const tempK = analyticK as number
 						const base = {
 							label: "Temperature",
 							valuePrefix: formatAvgTempValue(tempK, unitSystem),
@@ -594,9 +581,7 @@ function buildMoonStats({
 	classification,
 	landCoverage,
 	hydrosphereCode,
-	avgTempK,
 	unitSystem,
-	readOnly,
 	estimateTempK,
 	estimateTempDeltaK,
 	atmosphere,
@@ -631,13 +616,9 @@ function buildMoonStats({
 	classification?: string
 	landCoverage?: number
 	hydrosphereCode?: number
-	avgTempK?: number
 	unitSystem: UnitSystem
-	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
-	 * Temperature row to its read-only estimate form (see buildBodyStats). */
-	readOnly?: boolean
-	/** [JUSTIFICATION] The moon's stored analytic temperature estimate -- used
-	 * as the Temperature row's value in `readOnly` mode (see buildBodyStats). */
+	// [JUSTIFICATION] The moon's stored analytic temperature estimate, the Temperature row's value when the live
+	// estimate can't run; absent for moons generated without one.
 	estimateTempK?: number
 	estimateTempDeltaK: number | null
 	atmosphere?: AtmosphereProfile | null
@@ -679,7 +660,6 @@ function buildMoonStats({
 		onSet: editors?.substellarLon,
 	})
 	return buildBodyStats({
-		readOnly,
 		estimateTempK,
 		estimateTempDeltaK,
 		group,
@@ -723,7 +703,6 @@ function buildMoonStats({
 			atmosphere !== undefined ? buildAtmosphereStat(atmosphere) : undefined,
 		landCoverage,
 		hydrosphereCode,
-		avgTempK,
 		unitSystem,
 		greenhouseFactor,
 		surfaceTidesM,
@@ -761,10 +740,6 @@ export function buildOrbitBodyStats(params: {
 	 * body, and only the main world currently exposes a solar-lock control. */
 	substellarLonSlider?: SliderDef
 	onToggleSpin?: () => void
-	/** Mean surface temperature (Kelvin) of a planet locked to its star, from
-	 * its locked climate preview (useLockedAvgTempK); undefined for any other
-	 * body, which shows the analytic estimate. */
-	avgTempK?: number
 	unitSystem: UnitSystem
 	/** The Semi Major Axis editor's min/max are always ±20% of this value
 	 * (defaults to the body's own current orbitalDistanceAU, i.e. no fixed
@@ -773,9 +748,6 @@ export function buildOrbitBodyStats(params: {
 	 * GenerationPlanetNavigator) pass it here so the range stays a stable,
 	 * balanced window instead of recentering on every edit. */
 	orbitalDistanceBaselineAU?: number
-	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
-	 * Temperature row to its read-only estimate form (see buildBodyStats). */
-	readOnly?: boolean
 }): StatEntry[] {
 	const {
 		body,
@@ -788,10 +760,8 @@ export function buildOrbitBodyStats(params: {
 		landCoverageEditor,
 		substellarLonSlider,
 		onToggleSpin,
-		avgTempK,
 		unitSystem,
 		orbitalDistanceBaselineAU,
-		readOnly,
 	} = params
 	if (body.group === "asteroid belt") {
 		return [
@@ -833,7 +803,6 @@ export function buildOrbitBodyStats(params: {
 					}) as StatEntry)
 			: undefined
 	return buildBodyStats({
-		readOnly,
 		estimateTempK: body.temperatureEstimate?.mean,
 		estimateTempDeltaK: body.temperatureEstimate?.deltaK ?? null,
 		group: body.group,
@@ -1022,7 +991,6 @@ export function buildOrbitBodyStats(params: {
 			: buildAtmosphereStat(body.atmosphere),
 		landCoverage: body.landCoverage,
 		hydrosphereCode: body.hydrosphereCode,
-		avgTempK,
 		unitSystem,
 		landCoverageEditor,
 		greenhouseFactor: body.greenhouseFactor,
@@ -1048,7 +1016,6 @@ export function buildOrbitMoonStats(params: {
 	pdOverride?: number
 	surfaceTidesM?: SurfaceTidesBreakdown
 	tideLockStat?: StatEntry
-	avgTempK?: number
 	unitSystem: UnitSystem
 	onUpdateMoon?: (
 		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
@@ -1056,9 +1023,6 @@ export function buildOrbitMoonStats(params: {
 	// [JUSTIFICATION] The estimate tooltip needs stellar luminosity and orbital distance.
 	luminositySol?: number
 	orbitalDistanceAU?: number
-	/** [JUSTIFICATION] Set only for a galaxy-opened system -- forces the
-	 * Temperature row to its read-only estimate form (see buildBodyStats). */
-	readOnly?: boolean
 }): StatEntry[] {
 	const {
 		moon,
@@ -1066,12 +1030,10 @@ export function buildOrbitMoonStats(params: {
 		pdOverride,
 		surfaceTidesM,
 		tideLockStat,
-		avgTempK,
 		unitSystem,
 		onUpdateMoon,
 		luminositySol,
 		orbitalDistanceAU,
-		readOnly,
 	} = params
 	const pd = moon.semiMajorAxisPlanetDiameters ?? pdOverride ?? 0
 	const gravityG = ORBIT_BODY.computeGravityG({
@@ -1089,9 +1051,7 @@ export function buildOrbitMoonStats(params: {
 		classification: moon.classification,
 		landCoverage: moon.landCoverage,
 		hydrosphereCode: moon.hydrosphereCode,
-		avgTempK,
 		unitSystem,
-		readOnly,
 		estimateTempK: moon.temperatureEstimate?.mean,
 		estimateTempDeltaK: moon.temperatureEstimate?.deltaK ?? null,
 		atmosphere: moon.atmosphere,
@@ -1213,7 +1173,6 @@ export function buildMoonPreviewDataProps(params: {
 	parentPerihelionDeg: number
 	spectralClass: string
 	starSubtype: number
-	unitSystem: UnitSystem
 }): React.ComponentProps<typeof PlanetDetails> {
 	const parentYearHours =
 		params.parentOrbitalPeriodDays * params.parentHoursPerDay
@@ -1242,17 +1201,11 @@ export function buildMoonPreviewDataProps(params: {
 		daysPerYear: climateDaysPerYear,
 		hoursPerDay: climateHoursPerDay,
 		planetRadiusKm: params.moon.diameterKm / 2,
-		isSolarLocked: params.moon.tideLock?.type === "solar",
 		spectralClass: params.spectralClass,
 		starSubtype: params.starSubtype,
 		orbitalDistanceAU: params.parentOrbitalDistanceAU,
 		eccentricity: params.parentEccentricity,
 		perihelion: params.parentPerihelionDeg,
-		obliquity: params.moon.axialTiltDeg,
-		substellarLon: params.moon.substellarLon ?? 0,
-		atmosphere: params.moon.atmosphere,
-		seismologyTotalHeatingK: params.moon.seismology?.totalHeating,
-		unitSystem: params.unitSystem,
 		tidesEmptyLabel: "Computing…",
 	}
 }

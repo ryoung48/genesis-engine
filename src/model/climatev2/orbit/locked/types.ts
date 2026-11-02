@@ -1,17 +1,6 @@
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 
-export interface TidalTransportParams {
-	T_mean_C: number
-	A1: number
-	A_night: number
-	eccAmplitude: number
-	LAPSE_RATE: number
-	tidalTd: number
-	redistribution: number
-	contrast: number
-}
-
 /** Physical stellar radiation values for a rolled galaxy host.
  * [JUSTIFICATION] Authored systems still derive these from class/subtype. */
 export interface LockedStarRadiationParams {
