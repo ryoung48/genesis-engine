@@ -20,7 +20,9 @@ export interface ClimateOrbit {
 }
 
 export const EARTH_ROTATION: number
-export function orbitOf(options: Record<string, unknown> | undefined): ClimateOrbit
+export function orbitOf(
+	options: Record<string, unknown> | undefined,
+): ClimateOrbit & { rotation: number }
 export function lockedSunAt(
 	latDeg: ArrayLike<number>,
 	lonDeg: ArrayLike<number>,

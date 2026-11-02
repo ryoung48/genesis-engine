@@ -1,6 +1,7 @@
 import type {
 	LockedRain,
 	LockedRainParams,
+	NightSnowPoint,
 	PotentialEvaporationParams,
 } from "@/model/climatev2/rain/locked/types"
 import { PARAMS } from "@/model/climatev2/vendor/config.js"
@@ -19,6 +20,27 @@ const SAMPLES = 12
 // Land's evaporation answers the rain that falls on it, which follows the evaporation: four rounds settle it to within
 // a percent on the Earth fixture
 const LAND_ROUNDS = 4
+// The nightside's mean snowfall in the climate models of Earth-like locked planets at Earth's starlight, by their
+// rotation (= orbital) period: Menou 2013, "Water-Trapped Worlds", Table 1 — 0.29 mm/day at 120 h (Earth.fast), 0.12
+// at 240 h (Earth1–3: 0.12, 0.11, 0.26) and 0.009 at 480 h (Earth.slow); between them in log–log, held beyond. A
+// slower planet carries less of its water past the terminator (Merlis & Schneider 2010)
+const NIGHT_SNOW: NightSnowPoint[] = [
+	{ hours: 120, mmPerDay: 0.29 },
+	{ hours: 240, mmPerDay: 0.12 },
+	{ hours: 480, mmPerDay: 0.009 },
+]
+
+const nightSnow = (hours: number) => {
+	const first = NIGHT_SNOW[0]
+	const last = NIGHT_SNOW[NIGHT_SNOW.length - 1]
+	if (hours <= first.hours) return first.mmPerDay
+	if (hours >= last.hours) return last.mmPerDay
+	const i = NIGHT_SNOW.findIndex((p) => p.hours >= hours)
+	const a = NIGHT_SNOW[i - 1]
+	const b = NIGHT_SNOW[i]
+	const t = Math.log(hours / a.hours) / Math.log(b.hours / a.hours)
+	return Math.exp(Math.log(a.mmPerDay) + t * Math.log(b.mmPerDay / a.mmPerDay))
+}
 
 const potential = ({ T, net, ps }: PotentialEvaporationParams) => {
 	const es = 6.112 * Math.exp((17.67 * T) / (T + 243.5))
@@ -42,6 +64,7 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 		PARAMS.RAIN_EVAP_COEFF *
 		surfaceWind(orbit) *
 		(1 - PARAMS.RAIN_SURFACE_RH)
+	const nightRate = nightSnow((2 * Math.PI) / orbit.rotation / 3600) / 86400
 	const eSea = new Float64Array(G)
 	const eLand = new Float64Array(G)
 	const ascent = new Float64Array(G)
@@ -60,6 +83,7 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 		}
 		const meanSun = sun / area
 		let rising = 0
+		let dark = 0
 		for (let c = 0; c < G; c++) {
 			const f = surface.landFrac[c]
 			const tSea = temperature.monthlySL[m * G + c]
@@ -72,6 +96,8 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 				f * surf.sunLand[o + c] + (1 - f) * surf.sunSea[o + c] - meanSun,
 			)
 			rising += grid.rowArea[Math.floor(c / grid.w)] * ascent[c]
+			if (surf.sunLand[o + c] <= 0 && surf.sunSea[o + c] <= 0)
+				dark += grid.rowArea[Math.floor(c / grid.w)]
 		}
 		rain.fill(0)
 		for (let round = 0; round < LAND_ROUNDS; round++) {
@@ -81,8 +107,13 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 				const e = eSea[c] + f * turcPike(rain[c], eLand[c])
 				water += grid.rowArea[Math.floor(c / grid.w)] * e
 			}
-			for (let c = 0; c < G; c++)
-				rain[c] = rising > 0 ? (water * ascent[c]) / rising : 0
+			const night = Math.min(water, nightRate * dark)
+			for (let c = 0; c < G; c++) {
+				const isDark = surf.sunLand[o + c] <= 0 && surf.sunSea[o + c] <= 0
+				rain[c] =
+					(rising > 0 ? ((water - night) * ascent[c]) / rising : 0) +
+					(isDark && dark > 0 ? night / dark : 0)
+			}
 		}
 		for (let c = 0; c < G; c++) P[k * G + c] = rain[c] * seconds
 	})

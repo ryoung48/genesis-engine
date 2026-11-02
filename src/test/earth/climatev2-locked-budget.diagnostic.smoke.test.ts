@@ -21,6 +21,7 @@ const PRESSURES_BAR = (process.env.LOCKED_PRESSURES ?? "0.1,0.25,0.5,1,2,4,10")
 	.split(",")
 	.map(Number)
 const EXOPLASIM_SUN = process.env.LOCKED_EXOPLASIM_SUN === "1"
+const PERIOD_HOURS = Number(process.env.LOCKED_PERIOD_HOURS ?? 365 * 24)
 const noCell = (): void => undefined
 const r1 = (v: number) => Number(v.toFixed(1))
 const r3 = (v: number) => Number(v.toFixed(3))
@@ -39,7 +40,7 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					obliquity: 0,
 					eccentricity: 0,
 					daysPerYear: 1,
-					hoursPerDay: 365 * 24,
+					hoursPerDay: PERIOD_HOURS,
 					pressure,
 				}
 				const orbit = CLIMATEV2_ORBIT.lockedFromParams(params)
@@ -187,6 +188,7 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 				return {
 					pressureBar: pressure,
 					sunlight,
+					periodHours: PERIOD_HOURS,
 					seconds: r1(seconds),
 					stageSeconds: Object.fromEntries(
 						result.timing.map((t) => [t.stage, r1(t.ms / 1000)]),
@@ -203,6 +205,9 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					oceanHeatNightWm2: r1(sums.nightQ / sums.nightSea),
 					dayRainMmYr: Math.round(sums.dayRain / sums.dayArea),
 					nightRainMmYr: Math.round(sums.nightRain / sums.nightArea),
+					nightRainMmDay: r3(
+						sums.nightRain / sums.nightArea / (PERIOD_HOURS / 24),
+					),
 					landRainMmYr: Math.round(sums.landRain / sums.land),
 					substellarRainMmYr: Math.round(subRain),
 					substellarC: r1(sub),

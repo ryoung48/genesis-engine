@@ -12,6 +12,11 @@ export interface LockedRain {
 	P: Float32Array
 }
 
+export interface NightSnowPoint {
+	hours: number
+	mmPerDay: number
+}
+
 export interface PotentialEvaporationParams {
 	T: number
 	net: number

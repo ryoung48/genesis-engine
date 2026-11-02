@@ -53,7 +53,9 @@ Current results with every piece below in place are under [Calibration and resul
 
 The locked rain stage (`src/model/climatev2/rain/locked`) runs after the cloud pass, on the climate grid; cells take it through the same sampler as the temperature (rain by height and texture included), and `post-elevation` uses it for every locked world. The sea evaporates by the rotating stage's bulk formula (`RAIN_EVAP_COEFF`, `RAIN_SURFACE_RH`) at the planet's mean surface wind (`surfaceWind`, `pressure.js`), none under sea ice; land at the Priestley–Taylor rate of its surface's net radiation, limited by the rain that reaches it (Turc–Pike). Under the even air the column rises where the surface heats it more than the planet's mean (the sunlight the surface takes beyond its mean, as in `lockedSurface`), and all the planet's evaporation rains out there in proportion; the subsiding nightside stays dry.
 
-The trend with pressure follows ExoPlaSim's rotating one in direction below 1 bar (more rain in thin air at its 15 °C-holding starlight), steeper below 0.5 bar, where the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled. No moisture reaches the nightside yet.
+The trend with pressure follows ExoPlaSim's rotating one in direction below 1 bar (more rain in thin air at its 15 °C-holding starlight), steeper below 0.5 bar, where the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled.
+
+Some of the water crosses the terminator and falls as snow on the permanently dark cells, evenly: the nightside's mean rate in the climate models of Earth-like locked planets by rotation period (Menou 2013, Table 1: 0.29 mm/day at 120 h, 0.12 at 240 h, 0.009 at 480 h; interpolated log–log and held beyond), taken out of the planet's evaporation so the rain still balances it. A slowly turning planet carries little past the terminator (Merlis & Schneider 2010): the year-long locked Earth gets ≈ 3 mm/yr on its nightside, a 5-day lock ≈ 100 mm/yr. The locked diagnostic's `LOCKED_PERIOD_HOURS` sets the period (rain there is per planet year; `nightRainMmDay` is per day).
 
 ### Winds and ocean
 
