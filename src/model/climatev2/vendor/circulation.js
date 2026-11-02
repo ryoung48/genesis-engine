@@ -107,6 +107,10 @@ export function derivedCirculation() {
         // sea (for the ITCZ) — the ITCZ, and each hemisphere's equator-to-pole contrast
         const zAt = (lat) => { const y = Math.max(0, Math.min(h - 1, (90 - lat) / g.step - 0.5)); const j0 = Math.floor(y), f = y - j0; return Tz[j0] * (1 - f) + Tz[Math.min(h - 1, j0 + 1)] * f; };
         const Bu = G_ACC * HADLEY_H / ((OMEGA_ROT * R_PLANET) ** 2);         // the planetary Burger number
+        // (how far thick air's ITCZ is taken from the profile's peak toward the centre of its warm half: none at 1 bar,
+        // all of it at 10, ln ps / ln 10 between — a flat profile's peak flips between hemispheres, 21° in a month at
+        // 10 bar, where ExoPlaSim's belts show "little global shift over the year": Worldbuilding Pasta 2025)
+        const centring = Math.max(0, Math.min(1, Math.log(orbit.pressureScale) / Math.LN10));
         const zonalMonth = (m) => {
             // (above the winter inversion: the surface layer of cold air over snow is not the air the belts feel — its
             // shallow cold highs come from CIRC_COLD_HIGH_BOOST on very cold ground)
@@ -118,7 +122,7 @@ export function derivedCirculation() {
                 for (let i = 0; i < w; i++) { const c = j * w + i, sw = (1 - land[c]) + 0.02; s += T[c]; ss += thetaE(T[c]) * sw; ws += sw; }
                 Tz[j] = s / w; Tzs[j] = ss / ws;
             }
-            return rising(g, smoothProfile(g, Tzs, 5), Bu);
+            return rising(g, smoothProfile(g, Tzs, 5), Bu, centring);
         };
         // The Hadley cells (Hill, Bordoni & Mitchell 2022, after Held 2000 and Kang & Lu 2012). They rise at the ITCZ —
         // the latitude where the air by the sea holds the most moist static energy (Privé & Plumb 2007), as far from the
@@ -321,7 +325,7 @@ function thetaE(T) {
  * the equator by heating there stays within φ_a = c_a (Ro_th / 2)^⅓, Ro_th = Bu·Δ_h·sin φ_m (Hill et al. 2021, 2022:
  * supercritical forcing), Δ_h the profile's fractional range. → { itcz (°), thetaA (θ_e there, K) }.
  */
-function rising(g, sm, Bu) {
+function rising(g, sm, Bu, centring) {
     const h = sm.length;
     let jBest = 0, lo = Infinity;
     for (let j = 0; j < h; j++) { if (sm[j] > sm[jBest]) jBest = j; lo = Math.min(lo, sm[j]); }
@@ -329,6 +333,15 @@ function rising(g, sm, Bu) {
     if (jBest > 0 && jBest < h - 1) {                             // (rows run north → south)
         const a = sm[jBest - 1], b = sm[jBest], c = sm[jBest + 1], den = a - 2 * b + c;
         if (den < 0) latM = g.lat[jBest] - g.step * Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den));
+    }
+    if (centring > 0) {
+        // (the centre of the profile's warmer-than-mean part, by area)
+        let mean = 0, area = 0;
+        for (let j = 0; j < h; j++) { const cw = Math.cos(g.lat[j] * DEG); mean += cw * sm[j]; area += cw; }
+        mean /= area;
+        let sum = 0, weight = 0;
+        for (let j = 0; j < h; j++) { const wj = Math.cos(g.lat[j] * DEG) * Math.max(0, sm[j] - mean); sum += wj * g.lat[j]; weight += wj; }
+        if (weight > 0) latM += centring * (sum / weight - latM);
     }
     const hi = sm[jBest], dh = (hi - lo) / hi, roTh = Bu * dh * Math.abs(Math.sin(latM * DEG));
     const cap = HADLEY_CA * Math.cbrt(roTh / 2) / DEG;
