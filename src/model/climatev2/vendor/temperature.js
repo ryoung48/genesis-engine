@@ -78,10 +78,14 @@ const CLOUD_G = 0.85;                       // cloud droplets' asymmetry paramet
 // Earth's year's belts, as v2 derives them for Earth (circulation.js, Earth bench): the rain belt and the Hadley
 // cells' edges, ° — where Earth's cloud reflectance (TEMP_ALBEDO_SUN*) stands among them
 const CLOUD_BELTS_EARTH = { itcz: -0.99, hiN: 31.26, hiS: -31.13 };
-const slantReflect = (mu) => {
+const cloudReflect = (mu) => {
     const m = Math.max(0.05, mu), t = (1 - CLOUD_G) * CLOUD_TAU;
-    return (1 - CLOUD_COVER) * 0.28 / (1 + 6.43 * m) + CLOUD_COVER * (t + (2 / 3 - m) * (1 - Math.exp(-CLOUD_TAU / m))) / (4 / 3 + t);
+    return (t + (2 / 3 - m) * (1 - Math.exp(-CLOUD_TAU / m))) / (4 / 3 + t);
 };
+const slantReflect = (mu) => (1 - CLOUD_COVER) * 0.28 / (1 + 6.43 * Math.max(0.05, mu)) + CLOUD_COVER * cloudReflect(mu);
+// (a conservatively scattering layer of reflectance r over a surface of reflectance c, by the adding method: r +
+// (1 − r)²·c / (1 − r·c) — Lacis & Hansen 1974)
+const overLayer = ({ r, c }) => r + (1 - r) ** 2 * c / (1 - r * c);
 // a locked planet's air reflectance is anchored where Earth's fit is best known: the equator, whose sunlight-weighted
 // mean cos zenith is π/4 (∫cos² / ∫cos over the day)
 const LOCKED_ANCHOR_MU = Math.PI / 4;
@@ -267,9 +271,14 @@ export function energyBalanceTemperature() {
             if (lat >= bt.hiS) return span(lat, bt.hiS, bt.itcz, E.hiS, E.itcz);
             return span(lat, -90, bt.hiS, -90, E.hiS);
         };
-        // (thicker air scatters more of the sun back from the clear sky: Rayleigh's optical depth ∝ the pressure — Earth's
-        // own is in TEMP_ALBEDO_SUN*, only the departure from it is added)
-        const clearExtra = (mu) => orbit.pressureScale === 1 ? 0 : (1 - CLOUD_COVER) * (rayleighReflect(mu, orbit.pressureScale) - rayleighReflect(mu, 1));
+        // (thicker air scatters more of the sun back: Rayleigh's optical depth ∝ the pressure, over the clear sky and over
+        // the cloud tops alike — Earth's own is in TEMP_ALBEDO_SUN*, only the departure from it is added. Over the clouds
+        // only, ExoPlaSim's Bond albedo of 0.39 and 0.47 at 4 and 10 bar (Worldbuilding Pasta 2025) came out 0.33 and 0.38)
+        const clearExtra = (mu) => {
+            if (orbit.pressureScale === 1) return 0;
+            const r = rayleighReflect(mu, orbit.pressureScale), r1 = rayleighReflect(mu, 1), c = cloudReflect(mu);
+            return (1 - CLOUD_COVER) * (r - r1) + CLOUD_COVER * (overLayer({ r, c }) - overLayer({ r: r1, c }));
+        };
         for (let k = 0; k < NT; k++) {
             const bt = beltsAt(k);
             for (let j = 0; j < h; j++) {
