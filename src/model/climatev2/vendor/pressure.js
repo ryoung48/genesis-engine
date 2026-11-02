@@ -28,12 +28,12 @@ const WIND_POWER = 0.13;
 // (Trenberth & Caron 2001; Frierson et al. 2007, Fig. 1: about half at 40°, a third at 60°)
 const LATENT_SHARE = 0.4;
 // Fitted to the starlight that holds ExoPlaSim's Earth near 15 °C (Worldbuilding Pasta 2025: 1.356, 1.185, 1.069,
-// 0.943, 0.912, 0.911 × Earth's at 0.1, 0.25, 0.5, 2, 4, 10 bar), Rayleigh's albedo over the clear sky and the cloud
-// tops (temperature.js), this model's own ice and the heat to space capped at a black body's included: at that
-// starlight 17.7, 15.9, 13.7, 15.8, 16.5, 16.1 °C (ExoPlaSim 15.9, 14.1, 14.1, 15.3, 14.5, 15.6; climatev2-orbit-sweep
-// diagnostic; RMS 1.37 °C, and 1.37 at 27.8). Thick air needs a plain log (2, 4 and 10 bar asked ≈ 19, 34 and 61 W/m²,
-// 26–27 per e-fold); thin air saturates (the bands open up) as SATURATION_POWER, joined at 1 bar with the log's slope.
-const PRESSURE_GREENHOUSE_WM2 = 27;
+// 0.943, 0.912, 0.911 × Earth's at 0.1, 0.25, 0.5, 2, 4, 10 bar), Rayleigh's albedo (below), this model's own ice and
+// the heat to space capped at a black body's (temperature.js) included: at that starlight 16.8, 15.1, 13.1, 15.7, 15.4,
+// 14.3 °C (ExoPlaSim 15.9, 14.1, 14.1, 15.3, 14.5, 15.6; climatev2-orbit-sweep diagnostic; RMS 0.95 °C, against 1.11
+// at 26 W/m² with power 0.32, 1.29 at 27 with 0.27 and 1.70 at 28 with 0.3). A plain log (SATURATION_POWER → 0) fit
+// the thick side at 20 W/m² per e-fold but left 0.25 bar 15 °C too warm.
+const PRESSURE_GREENHOUSE_WM2 = 26.5;
 const SATURATION_POWER = 0.3;
 // Clear air's broadband Rayleigh optical depth at 1 bar: the Eddington reflectance of this matches Lacis & Hansen
 // 1974's 0.28 / (1 + 6.43μ) at μ = 0.5 (0.065; 550 nm alone is 0.097, the near infrared far less)
@@ -50,7 +50,7 @@ export function pressureScaled(P, orbit) {
     const spread = Math.sqrt((1 - LATENT_SHARE) * ps + LATENT_SHARE);
     out.TEMP_DIFFUSIVITY = P.TEMP_DIFFUSIVITY * spread; out.TEMP_DIFFUSIVITY_EW = P.TEMP_DIFFUSIVITY_EW * spread;
     out.TEMP_LAND_HEAT_CAP = P.TEMP_LAND_HEAT_CAP * ps;
-    out.TEMP_OLR_A = P.TEMP_OLR_A - PRESSURE_GREENHOUSE_WM2 * (ps >= 1 ? Math.log(ps) : (1 - ps ** -SATURATION_POWER) / SATURATION_POWER);
+    out.TEMP_OLR_A = P.TEMP_OLR_A - PRESSURE_GREENHOUSE_WM2 * (1 - ps ** -SATURATION_POWER) / SATURATION_POWER;
     return out;
 }
 
