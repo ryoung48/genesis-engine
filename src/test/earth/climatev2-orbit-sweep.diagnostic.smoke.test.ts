@@ -141,7 +141,7 @@ function sweeps(base: ClimateOrbit) {
 			value,
 			orbit: { ...base, radiusScale: value, gravityScale: value },
 		})
-	const only = process.env.SWEEP_KNOBS?.split(",")
+	const only = process.env.SWEEP_KNOBS?.split("|")
 	const values = process.env.SWEEP_VALUES?.split(",").map(Number)
 	return runs.filter(
 		(run) =>
