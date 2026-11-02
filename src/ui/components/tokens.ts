@@ -58,6 +58,18 @@ export const uiPalette = {
 	},
 } as const
 
+export const uiWindMap = {
+	maxSpeedMs: 20,
+	columns: 32,
+	fullLengthFraction: 0.9,
+	headLengthFraction: 0.35,
+	headHalfAngleRad: 0.5,
+	arrowColor: uiPalette.activeDark,
+	globeRadius: 1.02,
+	raisedGlobeRadius: 1.06,
+	mapDepth: 0.003,
+} as const
+
 export const uiChartPalette = {
 	moon: ["#0ea5e9", "#8b5cf6", "#10b981"] as const,
 	solar: "#f59e0b",

@@ -22,6 +22,7 @@ export interface TransitParams {
 	sourceArrival: number
 	distanceKm: number
 	meanSuitability: number
+	destinationLandmassKm2: number
 	corridorBonus: number
 	kind: MigrationEdgeKind
 }
@@ -83,6 +84,10 @@ export interface WaveParams {
 
 export interface CapabilityParams {
 	distanceKm: number
+}
+
+export interface TargetParams {
+	destinationLandmassKm2: number
 }
 
 export interface CradleSpacingParams {

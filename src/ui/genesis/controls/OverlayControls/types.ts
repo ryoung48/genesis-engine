@@ -167,13 +167,6 @@ export interface OverlayControlsProps {
 	isEarthImport?: boolean
 }
 
-export interface DevelopmentModeSectionProps {
-	colorMode: ColorMode
-	societyMode: SocietyMapMode
-	setSocietyMode: (value: SocietyMapMode) => void
-	isEarthImport: boolean
-}
-
 export interface PopulationModeSectionProps {
 	colorMode: ColorMode
 	societyMode: SocietyMapMode

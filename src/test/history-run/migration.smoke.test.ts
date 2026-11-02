@@ -23,48 +23,68 @@ describe("arrival field", () => {
 		}
 	})
 
-	it("walks land at one kilometre per year times suitability, and fifty times that after 1500", () => {
-		const early = MIGRATION.transit({
-			sourceArrival: -1000,
-			distanceKm: 100,
-			meanSuitability: 0.5,
-			corridorBonus: 1,
-			kind: "land",
-		})
-		expect(early).toBe(-800)
-		const late = MIGRATION.transit({
-			sourceArrival: 1600,
-			distanceKm: 100,
-			meanSuitability: 0.5,
-			corridorBonus: 1,
-			kind: "land",
-		})
-		expect(late).toBe(1604)
-		const crossing = MIGRATION.transit({
-			sourceArrival: 1400,
-			distanceKm: 100,
-			meanSuitability: 0.5,
-			corridorBonus: 1,
-			kind: "land",
-		})
-		expect(crossing).toBe(1502)
+	it("walks land at 0.7 kilometres per year times suitability, speeding up smoothly from 10000 BCE to 50 kilometres per year times suitability at 1500", () => {
+		const walk = (sourceArrival: number) =>
+			MIGRATION.transit({
+				sourceArrival,
+				distanceKm: 100,
+				meanSuitability: 0.5,
+				destinationLandmassKm2: 1,
+				corridorBonus: 1,
+				kind: "land",
+			}) - sourceArrival
+		expect(walk(-20000)).toBeCloseTo(100 / 0.35)
+		expect(walk(1600)).toBeCloseTo(100 / 25)
+		let previous = walk(-12000)
+		for (let year = -11000; year <= 1600; year += 1000) {
+			expect(walk(year)).toBeLessThanOrEqual(previous)
+			previous = walk(year)
+		}
+		expect(walk(-5000)).toBeLessThan(walk(-20000))
+		expect(walk(-5000)).toBeGreaterThan(walk(1600))
 	})
 
-	it("opens each sea tier at its capability year", () => {
+	it("opens longer crossings later along a continuous capability curve", () => {
 		const sea = (distanceKm: number) =>
 			MIGRATION.transit({
-				sourceArrival: -50000,
+				sourceArrival: -64000,
 				distanceKm,
 				meanSuitability: 1,
+				destinationLandmassKm2: 1,
 				corridorBonus: 1,
 				kind: "sea",
 			})
-		expect(sea(150)).toBeCloseTo(-50000 + 100 + 15)
-		expect(sea(151)).toBeCloseTo(-2999 + 100 + 15.1)
-		expect(sea(500)).toBeCloseTo(-2999 + 100 + 50)
-		expect(sea(501)).toBeCloseTo(-999 + 100 + 50.1)
-		expect(sea(2000)).toBeCloseTo(-999 + 100 + 200)
-		expect(sea(2001)).toBeCloseTo(1500 + 100 + 200.1)
+		const open = (distanceKm: number) => sea(distanceKm) - 100 - distanceKm / 10
+		expect(open(130)).toBeCloseTo(-64000)
+		expect(open(185)).toBeCloseTo(-5000)
+		expect(open(850)).toBeCloseTo(-1000)
+		expect(open(3000)).toBeCloseTo(800)
+		expect(open(10000)).toBeCloseTo(800)
+		expect(open(131) - open(130)).toBeLessThan(500)
+		expect(open(186) - open(185)).toBeLessThan(20)
+		let previous = open(130)
+		for (let d = 135; d <= 3000; d += 5) {
+			expect(open(d)).toBeGreaterThanOrEqual(previous)
+			previous = open(d)
+		}
+	})
+
+	it("opens crossings to a large landmass earlier than to a small island", () => {
+		const open = (destinationLandmassKm2: number) =>
+			MIGRATION.transit({
+				sourceArrival: -64000,
+				distanceKm: 3000,
+				meanSuitability: 1,
+				destinationLandmassKm2,
+				corridorBonus: 1,
+				kind: "sea",
+			}) -
+			100 -
+			300
+		expect(open(1_000_000)).toBeCloseTo(800)
+		expect(open(10_000_000)).toBeLessThan(open(1_000_000))
+		expect(open(100_000_000)).toBeLessThan(open(10_000_000))
+		expect(open(20_000)).toBeCloseTo(800)
 	})
 
 	it("hops a 75 km strait at once", () => {
@@ -78,17 +98,30 @@ describe("arrival field", () => {
 		expect(result.predecessor[2]).toBe(1)
 		expect(result.edgeKind[2]).toBe(2)
 		expect(result.arrivalTier[2]).toBe(1)
-		expect(result.arrivalYear[2] - result.arrivalYear[1]).toBeLessThanOrEqual(
-			109,
-		)
+		expect(result.arrivalYear[2]).toBeLessThanOrEqual(-65000 + 520)
+	})
+
+	it("does not walk province links that cross water at land speed", () => {
+		const world = MIGRATION_FIXTURE.world({
+			layout: "LLLL",
+			stepDegrees: 0.5,
+			habitability: [5, 5, 1, 1],
+			horizonYear: 2025,
+		})
+		world.provinces.landmassId = Int32Array.of(0, 0, 1, 1)
+		const result = MIGRATION.compute(world)
+		for (const p of [2, 3]) {
+			expect(result.arrivalYear[p]).toBe(MIGRATION.sentinel)
+			expect(world.provinces.desolate[p]).toBe(0)
+		}
 	})
 
 	it("leaves land beyond the horizon unreached without making it desolate", () => {
 		const wide = MIGRATION_FIXTURE.world({
 			layout: "LL####LL",
-			stepDegrees: 9,
+			stepDegrees: 15,
 			habitability: [5, 5, 1, 1],
-			horizonYear: 2025,
+			horizonYear: 1000,
 		})
 		const result = MIGRATION.compute(wide)
 		for (const p of [2, 3]) {
@@ -126,7 +159,7 @@ describe("shelf links", () => {
 			}),
 		)
 		expect(shelf.edgeKind[2]).toBe(3)
-		expect(shelf.arrivalYear[2]).toBeLessThan(-70000)
+		expect(shelf.arrivalYear[2]).toBeLessThan(-50000)
 		const deep = MIGRATION.compute(
 			MIGRATION_FIXTURE.world({
 				layout: "LL##LL",
@@ -136,7 +169,7 @@ describe("shelf links", () => {
 			}),
 		)
 		expect(deep.edgeKind[2]).toBe(2)
-		expect(deep.arrivalYear[2]).toBeGreaterThanOrEqual(-2999)
+		expect(deep.arrivalYear[2]).toBeGreaterThan(-6000)
 	})
 
 	it("is an ordinary sea link once the shelf has drowned", () => {
@@ -145,6 +178,7 @@ describe("shelf links", () => {
 				sourceArrival,
 				distanceKm: 300,
 				meanSuitability: 1,
+				destinationLandmassKm2: 1,
 				corridorBonus: 1,
 				kind: "shelf",
 			})
@@ -153,10 +187,11 @@ describe("shelf links", () => {
 				sourceArrival,
 				distanceKm: 300,
 				meanSuitability: 1,
+				destinationLandmassKm2: 1,
 				corridorBonus: 1,
 				kind: "sea",
 			})
 		expect(shelf(-9400)).toBe(sea(-9400))
-		expect(shelf(-20000)).toBe(-19700)
+		expect(shelf(-20000)).toBeCloseTo(-20000 + 300 / 0.7)
 	})
 })

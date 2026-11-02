@@ -89,6 +89,7 @@ const COLOR_MODES = new Set<ColorMode>([
 	"dtrDiff",
 	"temperatureDelta",
 	"precipitation",
+	"rainfallSeasonality",
 	"realPrecipitation",
 	"precipitationDiff",
 	"moisture",

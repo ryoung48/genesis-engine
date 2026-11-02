@@ -68,6 +68,7 @@ import { OceanCurrentParticleCanvas } from "@/ui/genesis/particles/OceanCurrentP
 import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { findEu4ProvinceForLonLat } from "@/ui/genesis/political/eu4-hover-province"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
+import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import {
@@ -1193,10 +1194,15 @@ export const GenesisView: React.FC<{
 		})
 	}, [world, showOceanCurrents, showRealOceanCurrents, currentMonth])
 
-	// Particles replace the static arrow overlay — keep arrows cleared
+	const windMapArrows = useMemo(
+		() =>
+			colorMode === "wind" && windGrid ? buildWindArrowData(windGrid) : null,
+		[colorMode, windGrid],
+	)
+
 	useEffect(() => {
-		sceneRef.current?.setWindArrows(null)
-	}, [])
+		sceneRef.current?.setWindArrows(windMapArrows)
+	}, [windMapArrows])
 
 	useEffect(() => {
 		sceneRef.current?.setRivers(

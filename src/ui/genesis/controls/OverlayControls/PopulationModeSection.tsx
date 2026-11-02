@@ -2,6 +2,10 @@ import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
 import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
+import {
+	isPopulationSocietyMode,
+	POPULATION_MAP_MODE_OPTIONS,
+} from "@/ui/genesis/shared/map-modes"
 import type { PopulationModeSectionProps } from "./types"
 
 export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
@@ -14,7 +18,7 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 	if (
 		getBaseMapMode(colorMode) !== "population" ||
 		isEarthImport ||
-		(societyMode !== "density" && societyMode !== "migration")
+		!isPopulationSocietyMode(societyMode)
 	)
 		return null
 	return (
@@ -25,16 +29,18 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 				onToggle={() => setExpanded((value) => !value)}
 			/>
 			{expanded && (
-				<RadioGroup
-					label="Population mode"
-					orientation="horizontal"
-					options={[
-						{ value: "density" as const, label: "Density" },
-						{ value: "migration" as const, label: "Migration" },
-					]}
-					value={societyMode}
-					onChange={setSocietyMode}
-				/>
+				<div className="mt-1.5">
+					<RadioGroup
+						label="Population mode"
+						orientation="horizontal"
+						options={POPULATION_MAP_MODE_OPTIONS.map(([value, label]) => ({
+							value,
+							label,
+						}))}
+						value={societyMode}
+						onChange={setSocietyMode}
+					/>
+				</div>
 			)}
 		</div>
 	)

@@ -25,6 +25,18 @@ export type { WindArrowData }
 
 export type GenesisViewMode = "globe" | "map"
 
+export interface BuildGlobeWindArrowsInput {
+	data: WindArrowData
+	viewMode: GenesisViewMode
+	elevationVisible: boolean
+}
+
+export interface BuildMapWindArrowsInput {
+	data: WindArrowData
+	viewMode: GenesisViewMode
+	projectionLatitudeDeg: number
+}
+
 export interface FocusOnProvinceOptions {
 	// [JUSTIFICATION] Callers can use the standard focus animation duration.
 	durationMs?: number

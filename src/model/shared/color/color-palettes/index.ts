@@ -99,6 +99,15 @@ const cloudStops = palette(
 	"#f8fafc",
 )
 
+const windStops = palette(
+	"#e8fff1",
+	"#c8f9dc",
+	"#a4f3d0",
+	"#78eadb",
+	"#48d9e5",
+	"#00cfe8",
+)
+
 export const COLOR_PALETTES = {
 	bupuStops,
 	orangesStops,
@@ -108,4 +117,5 @@ export const COLOR_PALETTES = {
 	knowledgeStops,
 	spectralStops,
 	cloudStops,
+	windStops,
 }

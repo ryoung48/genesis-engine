@@ -7,6 +7,7 @@ import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { RELIGION } from "@/model/history/sim/religion"
 import { MESH } from "@/model/mesh"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
+import { MIGRATION } from "@/model/society/migration"
 import { TIMEZONE } from "@/model/society/timezone"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { DangerSubMode } from "@/ui/genesis/controls/OverlayControls"
@@ -73,8 +74,13 @@ import type {
 	NationMapMode,
 	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
+import {
+	getArrivalScale,
+	getArrivalYears,
+} from "@/ui/genesis/shared/migration-arrival"
 import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
+import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality"
 import {
 	basinColor,
 	TERRAIN_FEATURE_COLORS,
@@ -281,7 +287,10 @@ export function computeRegionColors(
 		for (let r = 0; r < N; r++) {
 			if (
 				isOceanRegion(r) &&
-				!(colorMode === "temperature" && hasOceanClimate)
+				!(
+					(colorMode === "temperature" || colorMode === "temperatureDelta") &&
+					hasOceanClimate
+				)
 			) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
@@ -392,6 +401,24 @@ export function computeRegionColors(
 				})
 			}
 			const [cr, cg, cb] = cloudCoverColor(cloudFraction)
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
+	if (colorMode === "rainfallSeasonality" && world.rainfall) {
+		for (let r = 0; r < N; r++) {
+			const range = getRainfallSeasonality({
+				monthly: world.rainfall.monthly,
+				numRegions: N,
+				region: r,
+			})
+			const [cr, cg, cb] =
+				isOceanRegion(r) && !hasOceanClimate
+					? oceanRgb(r)
+					: precipitationColor(range)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -983,6 +1010,11 @@ export function computeRegionColors(
 				}
 			}
 		}
+		const arrivalYears =
+			populationMode === "migration" ? getArrivalYears(world) : undefined
+		const arrivalScale = arrivalYears
+			? getArrivalScale({ years: arrivalYears, desolate })
+			: { min: 0, span: 0 }
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
 		const invAbsDiffMax = maxAbsDensityDiff > 0 ? 1 / maxAbsDensityDiff : 0
 		const developmentRange = maxDevelopment - minDevelopment
@@ -1052,12 +1084,9 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
-				} else if (
-					populationMode === "migration" &&
-					world.population?.migrationWave
-				) {
-					const t = world.population.migrationWave[p]
-					if (t < 0) {
+				} else if (populationMode === "migration" && arrivalYears) {
+					const year = arrivalYears[p]
+					if (desolate[p] || year === MIGRATION.sentinel) {
 						const neutral =
 							world.historyMigration.pipeline === "distribution"
 								? UNOWNED_GRAY
@@ -1066,7 +1095,11 @@ export function computeRegionColors(
 						rgb[3 * r + 1] = neutral[1]
 						rgb[3 * r + 2] = neutral[2]
 					} else {
-						const [cr, cg, cb] = migrationColor(t)
+						const [cr, cg, cb] = migrationColor(
+							arrivalScale.span > 0
+								? (year - arrivalScale.min) / arrivalScale.span
+								: 0,
+						)
 						rgb[3 * r] = cr
 						rgb[3 * r + 1] = cg
 						rgb[3 * r + 2] = cb

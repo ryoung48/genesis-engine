@@ -22,6 +22,7 @@ function build({
 		})
 	const shore = new Int32Array(mesh.numRegions).fill(-1)
 	const costs = new Float64Array(mesh.numRegions).fill(Infinity)
+	const firstLeg = new Float64Array(mesh.numRegions)
 	const heap = new PriorityHeap<number>()
 	const waterEdgeLengths: number[] = []
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -37,6 +38,7 @@ function build({
 			const cost = distance(r, q)
 			if (cost < costs[r] || (cost === costs[r] && province < shore[r])) {
 				costs[r] = cost
+				firstLeg[r] = cost
 				shore[r] = province
 			}
 		}
@@ -52,11 +54,13 @@ function build({
 			const next = entry.key + distance(r, q)
 			if (next < costs[q]) {
 				costs[q] = next
+				firstLeg[q] = firstLeg[r]
 				shore[q] = shore[r]
 				heap.push(next, q)
 			}
 		}
 	}
+	const waterFrom = (r: number) => costs[r] - firstLeg[r] / 2
 	const best = new Map<string, SeaLink>()
 	const retain = (from: number, to: number, distanceKm: number) => {
 		const a = Math.min(from, to)
@@ -71,11 +75,11 @@ function build({
 			const q = mesh.adjList[j]
 			if (water[q]) {
 				if (q <= r || shore[q] < 0 || shore[r] === shore[q]) continue
-				retain(shore[r], shore[q], costs[r] + distance(r, q) + costs[q])
+				retain(shore[r], shore[q], waterFrom(r) + distance(r, q) + waterFrom(q))
 			} else {
 				const province = regionProvince[q]
 				if (province < 0 || !active[province] || province === shore[r]) continue
-				retain(shore[r], province, costs[r] + distance(r, q))
+				retain(shore[r], province, waterFrom(r) + distance(r, q) / 2)
 			}
 		}
 	}

@@ -13,11 +13,12 @@ it("selects one reproducible origin and blocks desolate transit", () => {
 	expect(m.continuousArrival[1]).toBe(Infinity)
 	expect(m.continuousArrival[m.origin === 0 ? 2 : 0]).toBe(Infinity)
 })
-it("allows successive 75 km ocean crossings without crossing an intermediate island", () => {
+it("allows successive 37.5 km water gaps without crossing an intermediate island", () => {
 	const w = F.world({ neighbors: [[], [], []], desolate: [], seed: 42 })
 	const provinces = w.provinces!
 	provinces.seeds = Int32Array.of(0, 2, 4)
 	provinces.regionProvince = Int32Array.of(0, -1, 1, -1, 2)
+	provinces.landmassId = Int32Array.of(0, 1, 2)
 	const count = 5,
 		regionNeighbors = [[1], [0, 2], [1, 3], [2, 4], [3]]
 	const mesh = {
@@ -47,8 +48,8 @@ it("allows successive 75 km ocean crossings without crossing an intermediate isl
 	expect(m.diagnostics.seaEdges).toBe(2)
 	expect([...m.predecessor]).toEqual([-1, 0, 1])
 	expect([...m.edgeKind]).toEqual([0, 2, 2])
-	expect(m.continuousArrival[1]).toBeCloseTo(-79999 + 107.5, 0)
-	expect(m.continuousArrival[2]).toBeCloseTo(-79999 + 215, 0)
+	expect(m.continuousArrival[1]).toBeCloseTo(-65000 + 103.75, 0)
+	expect(m.continuousArrival[2]).toBeCloseTo(-65000 + 207.5, 0)
 })
 it("uses equal suitability for zero scores and scales physical distances with radius", () => {
 	const w = F.world({ neighbors: [[1], [0]], desolate: [], seed: 42 })
@@ -73,10 +74,10 @@ it("uses equal suitability for zero scores and scales physical distances with ra
 		b = MIGRATION.compute({ ...params, planetRadiusKm: 12742 })
 	const destination = 1 - a.origin
 	expect(b.origin).toBe(a.origin)
-	expect(b.continuousArrival[destination] + 79999).toBeCloseTo(
-		2 * (a.continuousArrival[destination] + 79999),
+	expect(b.continuousArrival[destination] + 65000).toBeCloseTo(
+		2 * (a.continuousArrival[destination] + 65000),
 	)
-	expect(a.continuousArrival[destination] + 79999).toBeCloseTo(127.42, 0)
+	expect(a.continuousArrival[destination] + 65000).toBeCloseTo(182.0, 0)
 })
 it("finds no origin for empty and all-desolate worlds", () => {
 	for (const neighbors of [[], [[]]] as number[][][]) {

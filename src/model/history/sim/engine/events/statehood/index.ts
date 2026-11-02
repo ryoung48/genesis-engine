@@ -137,9 +137,13 @@ function run({ state, rng }: StatehoodRunParams): void {
 	const land = state.land
 	if (!land.governed) return
 	LAND_SHARES.refresh({ state })
-	const wanted = Math.round(land.stateHeldTarget * land.habitable)
 	let held = 0
-	for (let p = 0; p < state.P; p++) if (isHeld({ state, p })) held++
+	let unsettled = 0
+	for (let p = 0; p < state.P; p++) {
+		if (isHeld({ state, p })) held++
+		if (!state.desolate[p] && state.uninhabited[p]) unsettled++
+	}
+	const wanted = Math.round(land.stateHeldTarget * (land.habitable - unsettled))
 	absorb({ state, rng, held, wanted })
 	LAND_SHARES.refresh({ state })
 }

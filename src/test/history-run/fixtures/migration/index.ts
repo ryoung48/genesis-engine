@@ -41,6 +41,10 @@ function world({
 			seeds.push(r)
 		}
 	const count = seeds.length
+	const landmassId = new Int32Array(count)
+	for (let p = 1; p < count; p++)
+		landmassId[p] =
+			seeds[p] === seeds[p - 1] + 1 ? landmassId[p - 1] : landmassId[p - 1] + 1
 	const adjacency = seeds.map((region, p) =>
 		[region - 1, region + 1]
 			.filter((q) => q >= 0 && q < regions && land[q])
@@ -56,7 +60,7 @@ function world({
 			seeds: Int32Array.from(seeds),
 			count,
 			desolate: new Uint8Array(count),
-			landmassId: new Int32Array(count),
+			landmassId,
 			adjOffset,
 			adjList: Int32Array.from(adjacency.flat()),
 			size: new Int32Array(count).fill(1),

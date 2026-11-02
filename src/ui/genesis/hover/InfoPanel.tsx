@@ -77,6 +77,7 @@ import {
 	type SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
 import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
+import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality"
 import {
 	formatDistance,
 	formatElevation,
@@ -362,6 +363,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		"knowledge",
 		"culture",
 		"religion",
+		...(populationMode === "migration" ? (["migration"] as const) : []),
 	]
 	const hoverTradeGood =
 		colorMode === "trade_goods" || showGeography
@@ -477,6 +479,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		demographicEntryMap.get("Culture"),
 		demographicEntryMap.get("Religion"),
 		demographicEntryMap.get("Development"),
+		demographicEntryMap.get("Migration arrival"),
 		demographicEntryMap.get("Population") ??
 			demographicEntryMap.get("Population (Real)") ??
 			demographicEntryMap.get("Population Δ"),
@@ -531,7 +534,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						{colorMode === "temperatureDelta" &&
 							hoverTemperatureDelta !== null && (
 								<Row
-									label="Temp Δ"
+									label="Seasonality"
 									value={formatTemperatureDelta(
 										hoverTemperatureDelta,
 										unitSystem,
@@ -708,6 +711,23 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								)}
 							/>
 						)}
+						{colorMode === "rainfallSeasonality" &&
+							hoverRegion !== null &&
+							world?.rainfall &&
+							showPrecipChart && (
+								<Row
+									label="Rain Δ"
+									value={formatPrecipitation(
+										getRainfallSeasonality({
+											monthly: world.rainfall.monthly,
+											numRegions: world.mesh.numRegions,
+											region: hoverRegion,
+										}),
+										unitSystem,
+										0,
+									)}
+								/>
+							)}
 						{colorMode === "precipitation" && hoverRainfall !== null && (
 							<Row
 								label="Rain"
@@ -1408,7 +1428,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								Length {formatDistance(hoverRiver.lengthKm, unitSystem)}
 							</div>
 						)}
-						{showWindArrows &&
+						{(showWindArrows || colorMode === "wind") &&
 							hoverWindMonthly &&
 							(() => {
 								const speedFmt = (v: number) =>

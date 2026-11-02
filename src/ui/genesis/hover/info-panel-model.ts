@@ -4,6 +4,7 @@ import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { DATE } from "@/model/history/earth/date"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
+import { MIGRATION } from "@/model/society/migration"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/genesis/hover/hover"
 import {
@@ -29,6 +30,7 @@ import {
 	getDataVariant,
 } from "@/ui/genesis/shared/data-variant"
 import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
+import { getArrivalYears } from "@/ui/genesis/shared/migration-arrival"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
 	getTerrainFeatureColor,
@@ -388,27 +390,12 @@ export function buildDemographicDisplayData(params: {
 	}
 
 	if (populationMode === "migration") {
-		if (world.historyMigration.pipeline === "distribution" && !isDesolate) {
-			const m = world.historyMigration.data,
-				year = m.arrivalYear[province]
-			return {
-				label: "Migration arrival",
-				value:
-					province === m.origin
-						? `Origin · ${DATE.formatEu4Year(year)}`
-						: !Number.isFinite(m.continuousArrival[province])
-							? "Unreachable"
-							: year === 2147483647
-								? "After 2025"
-								: DATE.formatEu4Year(year),
-				color: null,
-			}
-		}
-		const year = world.population?.arrivalYear?.[province]
+		const year = getArrivalYears(world)?.[province]
 		if (isDesolate || year === undefined) return null
 		return {
 			label: "Migration arrival",
-			value: year === 2147483647 ? "Unreached" : DATE.formatEu4Year(year),
+			value:
+				year === MIGRATION.sentinel ? "Unreached" : DATE.formatEu4Year(year),
 			color: null,
 		}
 	}

@@ -70,15 +70,16 @@ export function createRiversWindThermalController(
 	function rebuildWindArrows() {
 		disposeWindArrows()
 		if (!ctx.windArrowData) return
-		ctx.globeWindArrows = buildGlobeWindArrows(
-			ctx.windArrowData,
-			ctx.currentViewMode,
-			ctx.elevationVisible,
-		)
-		ctx.mapWindArrows = buildMapWindArrows(
-			ctx.windArrowData,
-			ctx.currentViewMode,
-		)
+		ctx.globeWindArrows = buildGlobeWindArrows({
+			data: ctx.windArrowData,
+			viewMode: ctx.currentViewMode,
+			elevationVisible: ctx.elevationVisible,
+		})
+		ctx.mapWindArrows = buildMapWindArrows({
+			data: ctx.windArrowData,
+			viewMode: ctx.currentViewMode,
+			projectionLatitudeDeg: ctx.currentMapProjectionLatitudeDeg,
+		})
 		if (ctx.globeWindArrows) ctx.globeGroup.add(ctx.globeWindArrows)
 		if (ctx.mapWindArrows) {
 			addMapSlideClones(ctx.mapWindArrows)

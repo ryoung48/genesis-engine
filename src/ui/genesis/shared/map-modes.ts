@@ -98,7 +98,7 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["temperatureDiff", "EBM - Real"],
 	["realDtr", "Observed DTR"],
 	["dtrDiff", "DTR Diff"],
-	["precipitation", "Rain"],
+	["precipitation", "Weather"],
 	["realPrecipitation", "Observed Rain"],
 	["precipitationDiff", "Rain Diff"],
 	["cloudCover", "Clouds"],
@@ -107,6 +107,35 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["trade_goods", "Trade Goods"],
 ]
 
+export const WEATHER_MAP_MODE_OPTIONS: ReadonlyArray<
+	readonly [ColorMode, string]
+> = [
+	["precipitation", "Rain"],
+	["rainfallSeasonality", "Rain Δ"],
+	["humidity", "Humidity"],
+	["cloudCover", "Clouds"],
+	["wind", "Wind"],
+]
+
+export function isWeatherColorMode(colorMode: ColorMode): boolean {
+	const baseMode = getBaseMapMode(colorMode)
+	return WEATHER_MAP_MODE_OPTIONS.some(([mode]) => mode === baseMode)
+}
+
+export const TEMPERATURE_MAP_MODE_OPTIONS: ReadonlyArray<
+	readonly [ColorMode, string]
+> = [
+	["temperature", "Temp"],
+	["dtr", "DTR"],
+	["misery", "MI"],
+	["temperatureDelta", "Seasonality"],
+]
+
+export function isTemperatureColorMode(colorMode: ColorMode): boolean {
+	const baseMode = getBaseMapMode(colorMode)
+	return TEMPERATURE_MAP_MODE_OPTIONS.some(([mode]) => mode === baseMode)
+}
+
 const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	readonly [ColorMode, string]
 > = [
@@ -114,7 +143,6 @@ const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["basins", "Basins"],
 	["hotspots", "Hotspots"],
 	["moisture", "Moist"],
-	["temperatureDelta", "Temp Δ"],
 	["oceanCurrents", "Current"],
 ]
 
@@ -122,7 +150,6 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	readonly [SocietyMapMode, string]
 > = [
 	["density", "Population"],
-	["development", "Development"],
 	["culture", "Culture"],
 	["religion", "Religion"],
 ]
@@ -133,6 +160,21 @@ const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	["urban", "Urban"],
 	["heritage", "Heritage"],
 ]
+
+export const POPULATION_MAP_MODE_OPTIONS: ReadonlyArray<
+	readonly [SocietyMapMode, string]
+> = [
+	["density", "Density"],
+	["migration", "Migration"],
+	["development", "Development"],
+	["knowledge", "Knowledge"],
+]
+
+export function isPopulationSocietyMode(mode: SocietyMapMode): boolean {
+	return POPULATION_MAP_MODE_OPTIONS.some(
+		([populationMode]) => populationMode === mode,
+	)
+}
 
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [SocietyMapOption, string]

@@ -17,7 +17,10 @@ import {
 	getMapModePrimary,
 	getVisibleGeographyModeOptions,
 	getVisibleSocietyModeOptions,
+	isPopulationSocietyMode,
+	isTemperatureColorMode,
 	isTitlesNationMode,
+	isWeatherColorMode,
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "@/ui/genesis/shared/map-modes"
 
@@ -101,7 +104,13 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 		activePrimary === "geography" ? (
 			<ModeButtonGroup
 				options={geographyOptions}
-				value={geographyMode}
+				value={
+					isWeatherColorMode(geographyMode)
+						? "precipitation"
+						: isTemperatureColorMode(geographyMode)
+							? "temperature"
+							: geographyMode
+				}
 				onChange={(mode) => {
 					setColorMode(
 						resolveSubMode({
@@ -121,11 +130,9 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				options={societyOptions}
 				value={
 					getBaseMapMode(colorMode) === "population"
-						? societyMode === "knowledge"
-							? "development"
-							: societyMode === "migration"
-								? "density"
-								: societyMode
+						? isPopulationSocietyMode(societyMode)
+							? "density"
+							: societyMode
 						: colorMode === "timezone"
 							? "timezone"
 							: isTitlesNationMode(nationMode)

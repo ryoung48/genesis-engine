@@ -81,13 +81,3 @@ export interface NationBoundarySide {
 // ---------------------------------------------------------------------------
 
 export const DEG2RAD = Math.PI / 180
-
-export const MAP_X_SCALE = 2 / Math.PI
-
-export const ARROW_SHAFT_DEG = 3.5
-
-// angular length of the arrow shaft (degrees of lat)
-export const ARROW_HEAD_DEG = 1.1
-
-// angular length of each arrowhead wing
-export const ARROW_HEAD_SPREAD = 0.5

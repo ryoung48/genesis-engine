@@ -14,6 +14,7 @@ import type { WorldFrame } from "@/model/history/world-frame/types"
 import { DEJURE } from "@/model/society/dejure"
 import { TITLES } from "@/model/society/titles"
 import type { TitleTier } from "@/model/society/titles/types"
+import { uiWindMap } from "@/ui/components/tokens"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
@@ -32,6 +33,7 @@ import {
 } from "@/ui/genesis/shared/history-region-colors"
 import { LAND_STATUS } from "@/ui/genesis/shared/land-status"
 import type { NationMapMode } from "@/ui/genesis/shared/map-modes"
+import { getArrivalYears } from "@/ui/genesis/shared/migration-arrival"
 import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import { computeRegionColors } from "@/ui/genesis/shared/region-colors"
 import { TITLE_TIER_LABELS } from "@/ui/genesis/shared/title-colors"
@@ -235,8 +237,10 @@ export function useMapColoring(input: MapColoringInput) {
 			const N = worldForDisplay.mesh.numRegions
 			const rgb = new Float32Array(N * 3)
 			const { windSpeed } = windVectors
+			const maxSpeed = windSpeed.reduce((max, speed) => Math.max(max, speed), 0)
+			const colorScale = maxSpeed > 0 ? uiWindMap.maxSpeedMs / maxSpeed : 0
 			for (let r = 0; r < N; r++) {
-				const [cr, cg, cb] = windSpeedColor(windSpeed[r])
+				const [cr, cg, cb] = windSpeedColor(windSpeed[r] * colorScale)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -551,7 +555,7 @@ export function useMapColoring(input: MapColoringInput) {
 						label: LAND_STATUS.label({
 							status,
 							settledYear:
-								worldForDisplay?.population?.arrivalYear?.[hoverProvince] ?? 0,
+								getArrivalYears(worldForDisplay)?.[hoverProvince] ?? 0,
 						}),
 					}
 		const provinceName = meta?.name ?? null
@@ -641,6 +645,7 @@ export function useMapColoring(input: MapColoringInput) {
 		worldForDisplay?.isEarthImport,
 		worldForDisplay?.population,
 		nationMode,
+		worldForDisplay,
 	])
 
 	const occupationOverlay = useMemo(() => {

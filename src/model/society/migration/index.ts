@@ -17,21 +17,33 @@ import type {
 	MigrationEdge,
 	MigrationParams,
 	MigrationResult,
+	TargetParams,
 	TransitParams,
 	WaveParams,
 } from "@/model/society/migration/types"
+import type { GenesisProvinces } from "@/model/society/types"
 
 const START_YEAR = -79999
+const DISPERSAL_START_YEAR = -65000
 const SENTINEL = 2147483647
 const SHELF_CLOSES_YEAR = -9500
 const SHELF_ELEVATION_KM = -0.06
 const SUITABILITY_QUANTILE = 0.95
+const EARLY_SPEED_KM_PER_YEAR = 0.7
+const SUITABILITY_FLOOR = 0.05
+const SEA_LANDING_YEARS = 100
+const LATE_SPEED_KM_PER_YEAR = 50
+const SPREAD_GROWTH_START_YEAR = -10000
+const SPREAD_GROWTH_END_YEAR = 1500
+const SPREAD_GROWTH_FACTOR = LATE_SPEED_KM_PER_YEAR / EARLY_SPEED_KM_PER_YEAR
+const TARGET_REFERENCE_KM2 = 1_000_000
+const TARGET_GAIN = 2
 
-const SEA_TIERS = [
-	{ maxKm: 150, capabilityYear: START_YEAR, tier: 1 },
-	{ maxKm: 500, capabilityYear: -2999, tier: 2 },
-	{ maxKm: 2000, capabilityYear: -999, tier: 3 },
-	{ maxKm: Number.POSITIVE_INFINITY, capabilityYear: 1500, tier: 4 },
+const SEA_VOYAGE_KNOTS = [
+	{ km: 130, year: DISPERSAL_START_YEAR },
+	{ km: 185, year: -5000 },
+	{ km: 850, year: -1000 },
+	{ km: 3000, year: 800 },
 ]
 
 const EDGE_KIND_CODE = { land: 1, sea: 2, shelf: 3 }
@@ -44,21 +56,72 @@ const CRADLE_REVIEW_STEP = 100
 const CRADLE_LAST_REVIEW_YEAR = 2025
 
 function seaTier({ distanceKm }: CapabilityParams) {
-	return SEA_TIERS.find(
-		(tier) => distanceKm <= tier.maxKm,
-	) as (typeof SEA_TIERS)[number]
+	const index = SEA_VOYAGE_KNOTS.findIndex((knot) => distanceKm <= knot.km)
+	return index < 0 ? SEA_VOYAGE_KNOTS.length : index + 1
+}
+
+function seaCapabilityYear({ distanceKm }: CapabilityParams): number {
+	const last = SEA_VOYAGE_KNOTS[SEA_VOYAGE_KNOTS.length - 1]
+	if (distanceKm >= last.km) return last.year
+	const upper = SEA_VOYAGE_KNOTS.findIndex((knot) => distanceKm <= knot.km)
+	if (upper === 0) return SEA_VOYAGE_KNOTS[0].year
+	const from = SEA_VOYAGE_KNOTS[upper - 1]
+	const to = SEA_VOYAGE_KNOTS[upper]
+	const fraction = Math.log(distanceKm / from.km) / Math.log(to.km / from.km)
+	return from.year + fraction * (to.year - from.year)
+}
+
+function targetReach({ destinationLandmassKm2 }: TargetParams): number {
+	return (
+		1 +
+		TARGET_GAIN *
+			Math.log10(Math.max(1, destinationLandmassKm2 / TARGET_REFERENCE_KM2))
+	)
 }
 
 function seaTransit({
 	sourceArrival,
 	distanceKm,
-}: Pick<TransitParams, "sourceArrival" | "distanceKm">): number {
+	destinationLandmassKm2,
+}: Pick<
+	TransitParams,
+	"sourceArrival" | "distanceKm" | "destinationLandmassKm2"
+>): number {
 	const distance = Math.max(1, distanceKm)
+	const effectiveKm = distance / targetReach({ destinationLandmassKm2 })
 	return (
-		Math.max(sourceArrival, seaTier({ distanceKm: distance }).capabilityYear) +
-		100 +
+		Math.max(sourceArrival, seaCapabilityYear({ distanceKm: effectiveKm })) +
+		SEA_LANDING_YEARS +
 		distance / 10
 	)
+}
+
+function spreadProgress(year: number): number {
+	const width = SPREAD_GROWTH_END_YEAR - SPREAD_GROWTH_START_YEAR
+	const x = (year - SPREAD_GROWTH_START_YEAR) / width
+	if (x <= 0) return year
+	const accumulated =
+		x >= 1
+			? width * 0.5 + (year - SPREAD_GROWTH_END_YEAR)
+			: width * (x ** 3 - x ** 4 / 2)
+	return year + (SPREAD_GROWTH_FACTOR - 1) * accumulated
+}
+
+function yearAtSpreadProgress(progress: number): number {
+	if (progress <= SPREAD_GROWTH_START_YEAR) return progress
+	const endProgress = spreadProgress(SPREAD_GROWTH_END_YEAR)
+	if (progress >= endProgress)
+		return (
+			SPREAD_GROWTH_END_YEAR + (progress - endProgress) / SPREAD_GROWTH_FACTOR
+		)
+	let low = SPREAD_GROWTH_START_YEAR
+	let high = SPREAD_GROWTH_END_YEAR
+	for (let i = 0; i < 50; i++) {
+		const mid = (low + high) / 2
+		if (spreadProgress(mid) < progress) low = mid
+		else high = mid
+	}
+	return high
 }
 
 function landTransit({
@@ -68,14 +131,17 @@ function landTransit({
 	corridorBonus,
 }: Omit<TransitParams, "kind">): number {
 	const distance = Math.max(1, distanceKm)
-	const speed = Math.max(0.1, meanSuitability) * corridorBonus
-	const earlyDistance = Math.max(0, 1500 - sourceArrival) * speed
-	return distance <= earlyDistance
-		? sourceArrival + distance / speed
-		: Math.max(1500, sourceArrival) + (distance - earlyDistance) / (50 * speed)
+	const speed = Math.max(SUITABILITY_FLOOR, meanSuitability) * corridorBonus
+	const target =
+		spreadProgress(sourceArrival) + distance / (EARLY_SPEED_KM_PER_YEAR * speed)
+	return yearAtSpreadProgress(target)
 }
 
-function transit(params: TransitParams): number {
+function transit(input: TransitParams): number {
+	const params = {
+		...input,
+		sourceArrival: Math.max(input.sourceArrival, DISPERSAL_START_YEAR),
+	}
 	if (params.kind === "land") return landTransit(params)
 	if (params.kind === "sea") return seaTransit(params)
 	return params.sourceArrival < SHELF_CLOSES_YEAR
@@ -133,8 +199,21 @@ function suitabilityScale(raw: Float64Array, active: Uint8Array): number {
 	return values[Math.floor(SUITABILITY_QUANTILE * (values.length - 1))]
 }
 
+function landGraph(provinces: GenesisProvinces): GenesisProvinces {
+	const offsets = new Int32Array(provinces.count + 1)
+	const list: number[] = []
+	for (let i = 0; i < provinces.count; i++) {
+		for (let j = provinces.adjOffset[i]; j < provinces.adjOffset[i + 1]; j++) {
+			const q = provinces.adjList[j]
+			if (provinces.landmassId[i] === provinces.landmassId[q]) list.push(q)
+		}
+		offsets[i + 1] = list.length
+	}
+	return { ...provinces, adjOffset: offsets, adjList: Int32Array.from(list) }
+}
+
 function compute({
-	provinces: p,
+	provinces: all,
 	habitability,
 	mesh,
 	isLand,
@@ -143,6 +222,7 @@ function compute({
 	seed,
 	horizonYear,
 }: MigrationParams): MigrationResult {
+	const p = landGraph(all)
 	const active = Uint8Array.from(p.desolate, (d) => (d ? 0 : 1))
 	const components = PLACEMENT.buildOpenComponents({
 		active,
@@ -166,6 +246,9 @@ function compute({
 	}
 	for (let i = 0; i < p.count; i++)
 		if (active[i]) mass[components.componentId[i]] += raw[i]
+	const landmassKm2 = new Float64Array(Math.max(0, ...p.landmassId) + 1)
+	for (let i = 0; i < p.count; i++)
+		if (active[i]) landmassKm2[p.landmassId[i]] += areas[i]
 	let component = -1
 	for (let i = 0; i < mass.length; i++)
 		if (component < 0 || mass[i] > mass[component]) component = i
@@ -216,8 +299,16 @@ function compute({
 		active,
 		planetRadiusKm,
 	})
-	const seaLinks = indexLinks({ count: p.count, links: open.links })
-	const shelfLinks = indexLinks({ count: p.count, links: shelf.links })
+	const betweenLandmasses = (links: SeaLink[]) =>
+		links.filter((link) => p.landmassId[link.a] !== p.landmassId[link.b])
+	const seaLinks = indexLinks({
+		count: p.count,
+		links: betweenLandmasses(open.links),
+	})
+	const shelfLinks = indexLinks({
+		count: p.count,
+		links: betweenLandmasses(shelf.links),
+	})
 
 	const provinceDistance = (a: number, b: number) =>
 		UNITS.regionDistanceKm({
@@ -251,6 +342,7 @@ function compute({
 					distanceKm: edge.distanceKm,
 					kind: edge.kind,
 					meanSuitability: (suitability[source] + suitability[q]) / 2,
+					destinationLandmassKm2: landmassKm2[p.landmassId[q]],
 					corridorBonus:
 						(p.riverAccess[source] || p.waterAccess[source] === 2) &&
 						(p.riverAccess[q] || p.waterAccess[q] === 2)
@@ -264,7 +356,7 @@ function compute({
 					edge.kind === "land" ||
 					(edge.kind === "shelf" && entry.key < SHELF_CLOSES_YEAR)
 						? arrivalTier[source]
-						: seaTier({ distanceKm: edge.distanceKm }).tier
+						: seaTier({ distanceKm: edge.distanceKm })
 				edgeKind[q] = EDGE_KIND_CODE[edge.kind]
 				heap.push(arrival, q)
 			}
@@ -311,9 +403,9 @@ function compute({
 			seaLengthQuantiles: quantiles(lengths),
 			waterEdgeQuantiles: quantiles(open.waterEdgeLengths),
 			nominalSpacingKm,
-			gateSensitivityCounts: SEA_TIERS.slice(0, 3).map(
+			gateSensitivityCounts: SEA_VOYAGE_KNOTS.slice(0, 3).map(
 				(tier) =>
-					lengths.filter((v) => Math.abs(v - tier.maxKm) <= nominalSpacingKm)
+					lengths.filter((v) => Math.abs(v - tier.km) <= nominalSpacingKm)
 						.length,
 			),
 			suitabilityScale: scale,
