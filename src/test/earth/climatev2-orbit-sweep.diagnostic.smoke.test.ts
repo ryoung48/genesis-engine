@@ -271,6 +271,8 @@ function summarize(params: {
 		Float64Array.from(a, (v, c) => (v + b[c]) / 2)
 	const solstices = meanOf(monthField(5), monthField(11))
 	const equinoxes = meanOf(monthField(2), monthField(8))
+	const afterSolstices = meanOf(monthField(0), monthField(6))
+	const afterEquinoxes = meanOf(monthField(3), monthField(9))
 	const highLand = (field: Float64Array) =>
 		(band({ from: 45, to: 90, field, surfaceKind: "land" }) +
 			band({ from: -90, to: -45, field, surfaceKind: "land" })) /
@@ -462,6 +464,35 @@ function summarize(params: {
 			value: band({ from: -10, to: 10, field: equinoxes, surfaceKind: "all" }),
 			digits: 1,
 		}),
+		equatorLandAfterSolsticeC: round({
+			value: band({
+				from: -10,
+				to: 10,
+				field: afterSolstices,
+				surfaceKind: "land",
+			}),
+			digits: 1,
+		}),
+		equatorLandAfterEquinoxC: round({
+			value: band({
+				from: -10,
+				to: 10,
+				field: afterEquinoxes,
+				surfaceKind: "land",
+			}),
+			digits: 1,
+		}),
+		equatorLandMonthlyC: Array.from({ length: 12 }, (_, m) =>
+			round({
+				value: band({
+					from: -10,
+					to: 10,
+					field: monthField(m),
+					surfaceKind: "land",
+				}),
+				digits: 1,
+			}),
+		),
 		highLandSummerC: round({ value: highLand(warmest), digits: 1 }),
 		highLandWinterC: round({ value: highLand(coldest), digits: 1 }),
 		southPoleSummerC: round({

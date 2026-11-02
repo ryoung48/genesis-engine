@@ -39,9 +39,27 @@ Poles minus equator in the annual mean, before → after (ExoPlaSim):
 
 Winter sea ice at 45–90°, N + S, falls from 18–24 Mkm² to 10–17 Mkm². ExoPlaSim has small coastal patches only.
 
+## Equatorial seasons
+
+At high tilt the sun crosses the equator at the equinoxes and stands far off it at the solstices, so the equator gets a twice-yearly cycle. ExoPlaSim's maps show equatorial land, in the months after each solstice and equinox. The sweep reports the same: `equatorLandAfterSolsticeC` (January and July) and `equatorLandAfterEquinoxC` (April and October), over land within 10° of the equator, plus `equatorLandMonthlyC`. The older `equatorSolsticeC` and `equatorEquinoxC` include the sea and use the solstice and equinox months themselves, so they mostly measure the slow ocean.
+
+Equatorial land, °C, after the solstices / after the equinoxes:
+
+| tilt | ours | ExoPlaSim |
+|---|---|---|
+| 45 | 13.6 / 17.9 | 15–25 all year |
+| 60 | 3.6 / 14.4 | about 5 / 20 |
+| 75 | −6.5 / 11.8 | snow at the solstices |
+| 90 | −11.1 / 11.0 | snow at the solstices |
+
+The 60° troughs match, but the equinox peak is about 5 °C short. Two causes were ruled out on the 60° run:
+
+- **Tropical evaporation damping** (`TEMP_EVAP_DAMPING`): with it off, the troughs fall to 0.3 and −1.7 °C and the peaks stay at 13.3 and 15.8.
+- **Rain-cloud radiation:** with it off, the peaks change by at most 0.4 °C.
+
 ## Known departures
 
 - Low tilt (0–15°) runs about 3 °C warm. Our land ice caps already reach about 50–55°, as ExoPlaSim's do, so the gap is not the ice extent alone. ExoPlaSim's ice-albedo response is stronger than Earth's observed cryosphere forcing, to which ours is fitted (−3.3 W/m² over the NH, Flanner et al. 2011).
 - At fixed CO₂ the global mean moves about a tenth as far as ExoPlaSim's between 23.5° and 15° or 30° (−0.6 and +0.5 °C against −4.8 and +4.3).
-- At 60° the equator's twice-yearly cycle is weak: about 12 °C at the solstices and 14 °C at the equinoxes, against ExoPlaSim's 5 and 20.
+- At 60° the equator's equinox peak is short (see [Equatorial seasons](#equatorial-seasons)).
 - The 90° cold-start ice belt (−27.6 °C at 300 ppm) is ExoPlaSim's second steady state. Our solve starts from one equilibrium and does not find it.
