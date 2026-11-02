@@ -2,6 +2,8 @@
 
 NEVER git stash without asking for permission first.
 
+Before running any script, test, benchmark or diagnostic, tell the user its estimated run time (and what the estimate is based on), so a hung process is easy to spot.
+
 Do not write doc comments. The code should speak for itself. If you see verbose doc strings, please remove them.
 
 Before finishing any TypeScript or TSX code change in this repository, verify it with:

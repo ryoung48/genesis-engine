@@ -40,24 +40,21 @@ Thick air damps the seasons and the day's range (40–70°N land seasonal range 
 
 The locked solve is deflated (`HelmholtzSolver.solve`'s `deflate`): its day–night transport is many times the radiative damping, and plain V-cycles barely moved the planet's mean, so the cloud pass stopped with the budget 24–36 W/m² out of balance and up to 18 °C too warm (the old 32–33 °C plateau above 2 bar). Each V-cycle now sets the mean exactly; the budget closes to within 1.4 W/m².
 
-| bar | Earth's starlight: global / day–night (°C) | ExoPlaSim's starlight: global / day–night / substellar / antistellar (°C) |
-| --- | --- | --- |
-| 0.1 | −63.9 / 13.6 (snowball, 99 % sea ice) | 6.4 / 36.0 / 51.7 / −21.5 (52 % sea ice) |
-| 0.25 | −2.6 / 13.2 | 6.7 / 13.9 / 23.8 / −4.3 |
-| 0.5 | 6.2 / 6.6 | 9.2 / 6.7 / 17.3 / 3.9 |
-| 1 | 11.8 / 3.2 | 11.8 / 3.2 / 15.7 / 9.2 |
-| 2 | 15.5 / 1.6 | 12.7 / 1.5 / 14.6 / 11.5 |
-| 4 | 17.3 / 0.8 | 13.2 / 0.7 / 14.1 / 12.6 |
-| 10 | 16.7 / 0.3 | 13.3 / 0.3 / 13.6 / 13.0 |
+Weak-gradient transport keeps the air column nearly even across the planet; each surface beneath it is set by its own balance (`lockedSurface`, `temperature.js`), solved as σT_s⁴ − σT_a⁴ + k·(T_s − T_a) = rhs (`groundBalance`):
 
-At Earth's starlight 0.1 bar freezes over, as the rotating planet does (−70.9 °C); the day–night contrast there is the ice's, not the transport's. The nightside's land and frozen sea lie under a stable surface layer (`darkGround`, `temperature.js`): the dark ground gets the air's back radiation, Earth's 333 / 396 W/m² (Trenberth et al. 2009) scaled by the greenhouse's share of the surface's emission (1 − OLR/σT⁴, so it follows the pressure's greenhouse), and the heat the layer brings down, ρ·c_p·C_H·U with C_H = 1.5 × 10⁻³ (Garratt 1992) and U = `TEMP_INVERSION_WIND`. It replaces the snow inversion on locked worlds. Like that inversion it sets the reported temperature over land, not the energy balance; the open sea keeps the air's temperature.
+- Sunlit ground and the open sea, by day and by night (stirred from below), convect: rhs is the sunlight the surface takes beyond the planet's mean, and k the surface layer's heat ρ·c_p·C_H·U plus, where wet, evaporation ρ·L·C_H·U·dq_s/dT (independent of the pressure). C_H = 1.5 × 10⁻³ (Garratt 1992), U = 22 km/h × `windScale` (ExoPlaSim's Earth mean), land half as wet as the sea.
+- Dark land and sea ice lie under a stable layer (`darkGround`): rhs = −(1 − ε)·σT_a⁴, with ε Earth's back radiation (333 / 396 W/m², Trenberth et al. 2009) scaled by the greenhouse's share of the surface's emission (1 − OLR/σT⁴), and k = ρ·c_p·C_H·`TEMP_INVERSION_WIND`. It replaces the snow inversion on locked worlds.
 
-| bar | Nightside land below the air (°C), Earth's / ExoPlaSim's starlight | Land day / night (°C), ExoPlaSim's starlight |
-| --- | --- | --- |
-| 0.1 | 36.6 / 68.3 | 22.3 / −75.4 |
-| 0.25 | 29.9 / 26.1 | 12.6 / −24.5 |
-| 0.5 | 12.5 / 12.1 | 12.0 / −5.3 |
-| 1 | 4.7 / 4.7 | 13.2 / 5.9 |
-| 2 | 1.1 / 1.3 | 13.5 / 10.9 |
-| 4 | 0 / 0 | 13.6 / 12.9 |
-| 10 | 0 / 0 | 13.4 / 13.2 |
+Snow and sea ice follow the surface's temperature, and the surface's departure from the air reaches space through the window, (1 − ε)·σ·((T_a + δ)⁴ − T_a⁴), in the energy balance, so the budget stays closed. The offsets are relaxed by half each round; 12 rounds (10 warm-started) close every pressure to within 0.9 W/m² (≈ 13 s per locked world on the Earth fixture).
+
+| bar | Earth's starlight: global / dayside / nightside / substellar / antistellar (°C), sea ice | ExoPlaSim's starlight: the same | ExoPlaSim's starlight: land day / night (°C) |
+| --- | --- | --- | --- |
+| 0.1 | −22.2 / 18.6 / −63.1 / 39.8 / −72.2, 58 % | 14.7 / 47.7 / −18.4 / 73.9 / −45.5, 42 % | 47.3 / −24.5 |
+| 0.25 | −9.9 / 11.6 / −31.3 / 26.6 / −35.1, 59 % | 8.6 / 23.8 / −6.6 / 37.3 / −21.5, 33 % | 24.8 / −14.6 |
+| 0.5 | 0.6 / 12.8 / −11.6 / 24.3 / −13.8, 55 % | 6.9 / 15.3 / −1.6 / 27.1 / −8.1, 12 % | 16.9 / −7.5 |
+| 1 | 8.9 / 14.4 / 3.5 / 23.3 / 2.5, 0 % | 8.9 / 14.4 / 3.5 / 23.3 / 2.5, 0 % | 15.9 / 2.5 |
+| 2 | 13.6 / 16.9 / 10.3 / 23.3 / 9.9, 0 % | 10.2 / 13.9 / 6.6 / 19.9 / 6.1, 0 % | 15.1 / 8.0 |
+| 4 | 16.0 / 17.9 / 14.0 / 22.2 / 13.8, 0 % | 11.3 / 13.6 / 9.0 / 17.3 / 8.8, 0 % | 14.5 / 10.8 |
+| 10 | 15.9 / 16.9 / 15.0 / 18.9 / 14.9, 0 % | 12.1 / 13.2 / 11.0 / 14.8 / 10.9, 0 % | 13.6 / 11.9 |
+
+At Earth's starlight thin air no longer freezes over: the substellar sea convects warm enough to stay open (an eyeball), where the even-surface model froze 0.1 bar solid. No ocean carries heat yet, so the nightside's seas freeze from 0.5 bar down.
