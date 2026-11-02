@@ -21,6 +21,6 @@ export class HelmholtzSolver {
 		fi: ArrayLike<number>,
 		Tr: Float64Array,
 		Ti: Float64Array,
-		options?: { maxCycles?: number; tol?: number },
+		options?: { maxCycles?: number; tol?: number; deflate?: boolean },
 	): { cycles: number; rel: number }
 }

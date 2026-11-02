@@ -1,4 +1,4 @@
-// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/solver.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: a real-only V-cycle (realVcycle, relaxReal, residualReal, prolongAddReal) runs when the operator, forcing and initial guess have no imaginary part; it computes the same values. The relax and residual kernels, real and complex, also run as WebAssembly (assembly/solver-kernels.ts, built into solver-kernels.wasm.js) on level arrays kept in each solver's own WebAssembly memory, the same arithmetic in the same order; plain arrays and the JavaScript kernels when WebAssembly is unavailable.
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/solver.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: a real-only V-cycle (realVcycle, relaxReal, residualReal, prolongAddReal) runs when the operator, forcing and initial guess have no imaginary part; it computes the same values. The relax and residual kernels, real and complex, also run as WebAssembly (assembly/solver-kernels.ts, built into solver-kernels.wasm.js) on level arrays kept in each solver's own WebAssembly memory, the same arithmetic in the same order; plain arrays and the JavaScript kernels when WebAssembly is unavailable. Optionally (the deflate option of solve) the planet-wide mean is set exactly after each V-cycle.
 // Multigrid solver on the lat-lon climate grid for the steady (complex) problem
 //
 //     σ·T − D·∇²T + γ·(u·∇)T = f
@@ -177,7 +177,7 @@ export class HelmholtzSolver {
      * Solve in place: Tr/Ti hold the initial guess and receive the solution. Stops when the residual falls below
      * tol × |f| or after maxCycles V-cycles. Returns { cycles, rel }.
      */
-    solve(fr, fi, Tr, Ti, { maxCycles = 12, tol = 1e-5 } = {}) {
+    solve(fr, fi, Tr, Ti, { maxCycles = 12, tol = 1e-5, deflate = false } = {}) {
         const L0 = this.levels[0];
         L0.fr.set(fr); L0.fi.set(fi); L0.Tr.set(Tr); L0.Ti.set(Ti);
         let fnorm = 0;
@@ -185,11 +185,30 @@ export class HelmholtzSolver {
         fnorm = Math.sqrt(fnorm) || 1;
         const real = this.realOp && allZero(fi) && allZero(Ti);
         const res = real ? residualReal : residual;
+        // (deflate: when the transport dwarfs the local damping the V-cycles barely move the planet's mean, the mode
+        // only the coarsest level sees; a uniform shift leaves the transport unchanged, so it is set exactly from the
+        // area-weighted mean residual over the mean damping after every cycle)
+        const shiftMean = () => {
+            let r = 0, q = 0, sr = 0, si = 0;
+            for (let j = 0; j < L0.h; j++) {
+                const rw = L0.rowWeight[j];
+                for (let i = 0; i < L0.w; i++) {
+                    const c = j * L0.w + i;
+                    r += rw * L0.rr[c]; q += rw * (real ? 0 : L0.ri[c]); sr += rw * L0.sr[c]; si += rw * L0.si[c];
+                }
+            }
+            const d = sr * sr + si * si;
+            if (!(d > 0)) return;
+            const dr = (r * sr + q * si) / d, di = (q * sr - r * si) / d;
+            for (let c = 0; c < L0.n; c++) { L0.Tr[c] += dr; if (!real) L0.Ti[c] += di; }
+        };
         let cycles = 0, rel = Math.sqrt(res(L0)) / fnorm;
+        if (deflate) { shiftMean(); rel = Math.sqrt(res(L0)) / fnorm; }
         while (cycles < maxCycles && rel >= tol) {
             if (real) this.realVcycle(0); else this.vcycle(0);
             cycles++;
             rel = Math.sqrt(res(L0)) / fnorm;
+            if (deflate) { shiftMean(); rel = Math.sqrt(res(L0)) / fnorm; }
         }
         Tr.set(L0.Tr); Ti.set(L0.Ti);
         return { cycles, rel };

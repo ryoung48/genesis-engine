@@ -1,4 +1,4 @@
-// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/temperature.js (GPL-3.0, see LICENSE). Modified in chaos-machine: hot loops moved into top-level functions (forcingSweep, windSamples, monthsToSamples) and the albedo variety cached, computing the same values; OUTER 4 → 3 and OUTER_WARM 2 → 1 (fewer snow/ice outer iterations); the orbit, spin, size and year scaled through orbitOf, spinScaled and sizeScaled (the sea ice's time step by yearScale); the day cycle (diurnal.js); the surface albedos and the air's absorption; the cold-limit gray-body heat to space (coldOlr); a TEMP_SEA_ICE switch (0 = no sea ice).
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/temperature.js (GPL-3.0, see LICENSE). Modified in chaos-machine: hot loops moved into top-level functions (forcingSweep, windSamples, monthsToSamples) and the albedo variety cached, computing the same values; OUTER 4 → 3 and OUTER_WARM 2 → 1 (fewer snow/ice outer iterations); the orbit, spin, size and year scaled through orbitOf, spinScaled and sizeScaled (the sea ice's time step by yearScale); the day cycle (diurnal.js); the surface albedos and the air's absorption; the cold-limit gray-body heat to space (coldOlr), never above a black body's; the locked planet's solve deflated (solver.js); a TEMP_SEA_ICE switch (0 = no sea ice).
 // Temperature stage: a seasonal energy-balance model on the climate grid. DOM-free.
 //
 //   C·∂T/∂t = S·(1 − α) − (A + B·T) + D·∇²T − γ·(u·∇)T
@@ -102,6 +102,9 @@ const STEFAN_BOLTZMANN = 5.670374e-8;        // W/m²/K⁴
 // body, ε·σ·T⁴ (in value and slope: 4·(A + B·T_J) = B·T_J in kelvin, so T_J = (4·273.15 − 4A/B) / 3, ≈ −36.5 °C and
 // ε ≈ 0.70 on Earth — near Earth's own 239/390 ≈ 0.61), it follows that body: what the line leaves out, a gray body's
 // heat beyond the line (≥ 0, the curve above its tangent), is taken from the heating sample by sample.
+// No surface sends space more than a black body at its temperature, σ·T⁴: under thin air the greenhouse (TEMP_OLR_A)
+// weakens until the line passes σ·T⁴ in the cold (at 0.1 bar below ≈ −15 °C, the tangent's ε > 1), and there the heat
+// to space is σ·T⁴ (never reached on Earth, where the line stays below it).
 function coldOlr({ A, B }) {
     const tJ = (4 * 273.15 - 4 * A / B) / 3;
     return { tJC: tJ - 273.15, eps: B / (4 * STEFAN_BOLTZMANN * tJ ** 3), A, B };
@@ -113,7 +116,9 @@ function coldOlr({ A, B }) {
  * the column's heat C_air = c_p·p/g, so a diffusivity κ = η·c·R and D = C_air·κ / R² = η·C_air·c / R: more air carries
  * more, a bigger planet less. Rotation holds it back once the waves' Rossby radius c/2Ω falls below the planet's radius
  * R, as η = min(1, c / (2·Ω·R)) (Earth's own spin gives 0.05; a 20-day or longer orbit gives 1). Both are for a dry
- * troposphere; the sea and its ice, and the clouds, answer through the rest of the energy balance.
+ * troposphere, and stay so under thin air (unlike the rotating planet's spread, pressure.js, which keeps its latent part):
+ * the dayside's water rains out in the substellar convection, so the nightside gets the dry static energy alone. The
+ * sea and its ice, and the clouds, answer through the rest of the energy balance.
  */
 function lockedDiffusivity(orbit, radiusM) {
     const sBlack = 5.67e-8, tK = (SOLAR_CONSTANT * orbit.sunScale * (1 - ALBEDO_FOR_WAVES) / (4 * sBlack)) ** 0.25;
@@ -406,7 +411,7 @@ export function energyBalanceTemperature() {
                 let ta = performance.now();
                 solver.setOperator(srArr, sigmaI, winds ? uBar : null, winds ? vBar : null, gamma, faces);
                 prof.operator += performance.now() - ta; ta = performance.now();
-                const r = solveRelaxed(solver, fr, fi, xr, xi, relax, tol);
+                const r = solveRelaxed(solver, fr, fi, xr, xi, relax, tol, !!orbit.locked);
                 prof.solve += performance.now() - ta;
                 return r;
             };
@@ -875,7 +880,9 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 }
                 snowYear[c] += sL / NT;
                 let gF = q * (1 - alb) + cloudLongwave;
-                if (T < olrCold.tJC) gF -= olrCold.eps * STEFAN_BOLTZMANN * (T + 273.15) ** 4 - olrCold.A - olrCold.B * T;
+                const black = STEFAN_BOLTZMANN * (T + 273.15) ** 4;
+                if (T < olrCold.tJC) gF -= Math.min(olrCold.eps * black, black) - olrCold.A - olrCold.B * T;
+                else if (olrCold.A + olrCold.B * T > black) gF -= black - olrCold.A - olrCold.B * T;
                 if (budget) budget.rowNet[j] += gF - olrCold.A - olrCold.B * T;
                 if (windsOn) {
                     const du = uT[k * G + c], dv = vT[k * G + c];
@@ -918,10 +925,10 @@ function ridgeFaces(ctx, core, g, ratio, landKm, hKm, floor = BLOCK_FLOOR) {
     return faces;
 }
 
-function solveRelaxed(solver, fr, fi, xr, xi, relax, tol) {
+function solveRelaxed(solver, fr, fi, xr, xi, relax, tol, deflate) {
     const n = fr.length;
     const nr = new Float64Array(xr), ni = xi ? new Float64Array(xi) : new Float64Array(n);
-    const res = solver.solve(fr, fi, nr, ni, { tol, maxCycles: 30 });
+    const res = solver.solve(fr, fi, nr, ni, { tol, maxCycles: 30, deflate });
     for (let c = 0; c < n; c++) {
         xr[c] += relax * (nr[c] - xr[c]);
         if (xi) xi[c] += relax * (ni[c] - xi[c]);

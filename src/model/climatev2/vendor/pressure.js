@@ -28,11 +28,12 @@ const WIND_POWER = 0.13;
 // (Trenberth & Caron 2001; Frierson et al. 2007, Fig. 1: about half at 40°, a third at 60°)
 const LATENT_SHARE = 0.4;
 // Fitted to the starlight that holds ExoPlaSim's Earth near 15 °C (Worldbuilding Pasta 2025: 1.356, 1.185, 1.069,
-// 0.943, 0.912, 0.911 × Earth's at 0.1, 0.25, 0.5, 2, 4, 10 bar), Rayleigh's albedo (below) and this model's own ice
-// included: at that starlight 17.1, 17.5, 14.3, 15.2, 14.6, 13.0 °C (ExoPlaSim 15.9, 14.1, 14.1, 15.3, 14.5, 15.6;
-// climatev2-orbit-sweep diagnostic). A plain log (SATURATION_POWER → 0) fit the thick side at 20 W/m² per e-fold but
-// left 0.25 bar 15 °C too warm.
-const PRESSURE_GREENHOUSE_WM2 = 25;
+// 0.943, 0.912, 0.911 × Earth's at 0.1, 0.25, 0.5, 2, 4, 10 bar), Rayleigh's albedo (below), this model's own ice and
+// the heat to space capped at a black body's (temperature.js) included: at that starlight 16.8, 15.1, 13.1, 15.7, 15.4,
+// 14.3 °C (ExoPlaSim 15.9, 14.1, 14.1, 15.3, 14.5, 15.6; climatev2-orbit-sweep diagnostic; RMS 0.95 °C, against 1.11
+// at 26 W/m² with power 0.32, 1.29 at 27 with 0.27 and 1.70 at 28 with 0.3). A plain log (SATURATION_POWER → 0) fit
+// the thick side at 20 W/m² per e-fold but left 0.25 bar 15 °C too warm.
+const PRESSURE_GREENHOUSE_WM2 = 26.5;
 const SATURATION_POWER = 0.3;
 // Clear air's broadband Rayleigh optical depth at 1 bar: the Eddington reflectance of this matches Lacis & Hansen
 // 1974's 0.28 / (1 + 6.43μ) at μ = 0.5 (0.065; 550 nm alone is 0.097, the near infrared far less)
