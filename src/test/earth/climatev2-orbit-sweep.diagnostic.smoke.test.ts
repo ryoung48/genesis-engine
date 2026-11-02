@@ -41,6 +41,23 @@ const EXOPLASIM_WORLDS = [
 // Worldbuilding Pasta 2025, "Climate Explorations: Pressure": ExoPlaSim on Earth's terrain with N₂ varied (O₂ and CO₂
 // at Earth's partial pressures), the starlight that keeps each near 15 °C (14.1–15.9). Its global precipitation against
 // 1 bar's: 200, 145, 117, 100, 81, 61, 42 %
+// Worldbuilding Pasta 2022, "Climate Explorations: Obliquity": the CO₂ (ppm) that holds ExoPlaSim's Earth near 15 °C at
+// each tilt
+const EXOPLASIM_TILTS = [
+	[0, 540],
+	[5, 540],
+	[15, 450],
+	[23.5, 280],
+	[30, 173],
+	[35, 110],
+	[40, 80],
+	[45, 60],
+	[60, 38],
+	[75, 38],
+	[90, 38],
+] as const
+const SWEEP_GREENHOUSE = Number(process.env.SWEEP_GREENHOUSE_WM2 ?? 0)
+
 const EXOPLASIM_PRESSURES = [
 	{ bar: 0.1, sunlight: 1.356 },
 	{ bar: 0.25, sunlight: 1.185 },
@@ -53,12 +70,18 @@ const EXOPLASIM_PRESSURES = [
 
 function sweeps(base: ClimateOrbit) {
 	const earthHours = 23.93447232
-	const runs: { knob: string; value: number; orbit: ClimateOrbit }[] = []
+	const runs: {
+		knob: string
+		value: number
+		orbit: ClimateOrbit
+		greenhouseWm2: number
+	}[] = []
 	for (const value of [0, 0.0167, 0.05, 0.1, 0.2, 0.3])
 		runs.push({
 			knob: "eccentricity",
 			value,
 			orbit: { ...base, eccentricity: value },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [0.1, 0.3])
 		runs.push({
@@ -69,6 +92,7 @@ function sweeps(base: ClimateOrbit) {
 				eccentricity: value,
 				perihelion: base.perihelion + 180,
 			},
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [6, 12, earthHours, 48, 96, 240])
 		runs.push({
@@ -78,6 +102,7 @@ function sweeps(base: ClimateOrbit) {
 				...base,
 				rotationRateRadS: base.rotationRateRadS * (earthHours / value),
 			},
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [6, 12, earthHours, 48, 96, 240, 720, 2400])
 		runs.push({
@@ -88,30 +113,35 @@ function sweeps(base: ClimateOrbit) {
 				rotationRateRadS: base.rotationRateRadS * (earthHours / value),
 				solarDayScale: value / earthHours,
 			},
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [0.25, 0.5, 1, 2, 4])
 		runs.push({
 			knob: "year (Earth years)",
 			value,
 			orbit: { ...base, yearScale: value },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [0, 5, 15, 23.5, 30, 35, 40, 45, 60, 75, 90])
 		runs.push({
 			knob: "axial tilt (°)",
 			value,
 			orbit: { ...base, tiltDeg: value },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.2])
 		runs.push({
 			knob: "orbital distance (AU)",
 			value,
 			orbit: { ...base, sunScale: base.sunScale / value ** 2 },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const value of [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2])
 		runs.push({
 			knob: "star luminosity (× Sol)",
 			value,
 			orbit: { ...base, sunScale: base.sunScale * value },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	for (const world of EXOPLASIM_WORLDS) {
 		const size = {
@@ -119,20 +149,32 @@ function sweeps(base: ClimateOrbit) {
 			radiusScale: world.radius,
 			gravityScale: world.gravity,
 		}
-		runs.push({ knob: "planet mass (M⊕)", value: world.mass, orbit: size })
+		runs.push({
+			knob: "planet mass (M⊕)",
+			value: world.mass,
+			orbit: size,
+			greenhouseWm2: SWEEP_GREENHOUSE,
+		})
 		runs.push({
 			knob: "planet mass (M⊕), ExoPlaSim's sunlight",
 			value: world.mass,
 			orbit: { ...size, sunScale: base.sunScale * world.sunlight },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	}
 	for (const world of EXOPLASIM_PRESSURES) {
 		const air = { ...base, pressureScale: world.bar }
-		runs.push({ knob: "surface pressure (bar)", value: world.bar, orbit: air })
+		runs.push({
+			knob: "surface pressure (bar)",
+			value: world.bar,
+			orbit: air,
+			greenhouseWm2: SWEEP_GREENHOUSE,
+		})
 		runs.push({
 			knob: "surface pressure (bar), ExoPlaSim's sunlight",
 			value: world.bar,
 			orbit: { ...air, sunScale: base.sunScale * world.sunlight },
+			greenhouseWm2: SWEEP_GREENHOUSE,
 		})
 	}
 	for (const value of [0.5, 0.75, 1, 1.25, 1.5])
@@ -140,6 +182,16 @@ function sweeps(base: ClimateOrbit) {
 			knob: "planet radius (R⊕), Earth's density",
 			value,
 			orbit: { ...base, radiusScale: value, gravityScale: value },
+			greenhouseWm2: SWEEP_GREENHOUSE,
+		})
+	// Worldbuilding Pasta 2022, "Climate Explorations: Obliquity": ExoPlaSim on Earth's terrain with the CO₂ that holds it
+	// near 15 °C (14.1–16.1) at each tilt, as a forcing against Earth's ≈ 280 ppm, 5.35·ln(C/280) W/m² (Myhre et al. 1998)
+	for (const [tilt, ppm] of EXOPLASIM_TILTS)
+		runs.push({
+			knob: "axial tilt (°), ExoPlaSim's CO₂",
+			value: tilt,
+			orbit: { ...base, tiltDeg: tilt },
+			greenhouseWm2: 5.35 * Math.log(ppm / 280),
 		})
 	const only = process.env.SWEEP_KNOBS?.split("|")
 	const values = process.env.SWEEP_VALUES?.split(",").map(Number)
@@ -508,8 +560,12 @@ function summarize(params: {
 	}
 }
 
-function runOne(params: { world: GenesisWorld; orbit: ClimateOrbit }) {
-	const { world, orbit } = params
+function runOne(params: {
+	world: GenesisWorld
+	orbit: ClimateOrbit
+	greenhouseWm2: number
+}) {
+	const { world, orbit, greenhouseWm2 } = params
 	const landAmp = new Float32Array(world.mesh.numRegions)
 	const landHot = new Float32Array(world.mesh.numRegions)
 	const landCold = new Float32Array(world.mesh.numRegions)
@@ -524,7 +580,7 @@ function runOne(params: { world: GenesisWorld; orbit: ClimateOrbit }) {
 		{
 			...orbit,
 			seed: world.params.seed,
-			greenhouseWm2: Number(process.env.SWEEP_GREENHOUSE_WM2 ?? 0),
+			greenhouseWm2,
 			onCell: (...cell) => {
 				const [r, T12] = cell
 				let lo = Infinity
@@ -553,7 +609,11 @@ describe("climatev2 orbit sweep (diagnostic)", () => {
 			const world = CLIMATE_EARTH.importWorld()
 			const base = CLIMATEV2_ORBIT.fromParams(world.params)
 			const rows = sweeps(base).map((run) => {
-				const stats = runOne({ world, orbit: run.orbit })
+				const stats = runOne({
+					world,
+					orbit: run.orbit,
+					greenhouseWm2: run.greenhouseWm2,
+				})
 				console.log(`${run.knob} = ${run.value}: ${JSON.stringify(stats)}`)
 				return { knob: run.knob, value: run.value, ...stats }
 			})
