@@ -38,6 +38,12 @@ const AIR_COLUMN_HEAT_CAP = 1.0e7;          // J/m²/K — the atmosphere's heat
 const AIR_CP = 1004, AIR_R = 287;           // J/kg/K — dry air's specific heat and gas constant
 const ALBEDO_FOR_WAVES = 0.3;               // the albedo that sets the air's temperature for the gravity waves' speed (Earth's)
 const SEAWATER_HEAT_CAP = 1025 * 3990;      // J/m³/K
+// The extratropics' monthly temperature drop, K — the Hadley edge's zonal mean less the mean poleward of it — at which
+// Earth's storm-track and polar clouds stand in full: Earth's weakest month (NH August, 8.0 K in this model). Weaker,
+// the clouds fade linearly with it: baroclinic eddies, and their clouds, scale with the temperature gradient (Stone 1978);
+// at high tilt the summer poles outwarm the tropics, the polar front and Ferrel cell vanish and the hot poles are
+// "too warm for clouds" (Worldbuilding Pasta 2022, "Climate Explorations: Obliquity", ExoPlaSim)
+const STORM_GRADIENT_K = 8;
 const NT = 12;                              // samples per year for what is evaluated in time (≥ 5 for 2 harmonics)
 const OUTER = 3;                            // outer iterations (snow / ice, seasonal winds)
 const OUTER_LOCKED = 12;                   // … on a locked planet, whose cells start far from their steady state (Phase: locked)
@@ -132,6 +138,30 @@ function coldOlr({ A, B }) {
         return Math.min(T < tJC ? eps * black : A + B * T, black);
     };
     return { tJC, eps, A, B, toSpace };
+}
+function stormTrackFade({ fade, belts, harmonics, lat, w, h }) {
+    const { c0, c1r, c1i, c2r, c2i } = harmonics, row = [c0, c1r, c1i, c2r, c2i].map((a) => {
+        const m = new Float64Array(h);
+        for (let j = 0; j < h; j++) { let s = 0; for (let i = 0; i < w; i++) s += a[j * w + i]; m[j] = s / w; }
+        return m;
+    });
+    let changed = false;
+    for (let k = 0; k < NT; k++) {
+        const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), bt = belts(k);
+        const T = (j) => row[0][j] + 2 * (row[1][j] * co - row[2][j] * sn) + 2 * (row[3][j] * co2 - row[4][j] * sn2);
+        for (let hem = 0; hem < 2; hem++) {
+            const edge = hem === 0 ? bt.hiN : -bt.hiS;
+            let edgeT = 0, edgeD = Infinity, sum = 0, wsum = 0;
+            for (let j = 0; j < h; j++) {
+                const l = hem === 0 ? lat[j] : -lat[j], d = Math.abs(l - edge);
+                if (d < edgeD) { edgeD = d; edgeT = T(j); }
+                if (l >= edge) { const wj = Math.cos(lat[j] * Math.PI / 180); sum += T(j) * wj; wsum += wj; }
+            }
+            const gap = wsum > 0 ? edgeT - sum / wsum : STORM_GRADIENT_K, f = Math.max(0, Math.min(1, gap / STORM_GRADIENT_K));
+            if (f !== fade[2 * k + hem]) { fade[2 * k + hem] = f; changed = true; }
+        }
+    }
+    return changed;
 }
 const backEmissivity = ({ olr, gEarth, T }) => Math.min(1, BACK_EMISSIVITY_EARTH * Math.max(0, 1 - olr.toSpace(T) / (STEFAN_BOLTZMANN * (T + 273.15) ** 4)) / gEarth);
 function groundBalance({ Ta, k, rhs }) {
@@ -279,13 +309,19 @@ export function energyBalanceTemperature() {
             const r = rayleighReflect(mu, orbit.pressureScale), r1 = rayleighReflect(mu, 1), c = cloudReflect(mu);
             return (1 - CLOUD_COVER) * (r - r1) + CLOUD_COVER * (overLayer({ r, c }) - overLayer({ r: r1, c }));
         };
-        for (let k = 0; k < NT; k++) {
-            const bt = beltsAt(k);
-            for (let j = 0; j < h; j++) {
-                const muE = muEarthAt(earthLat(g.lat[j], bt)), xE = 1 - muE;
-                albRow[k * h + j] = P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * xE + P.TEMP_ALBEDO_SUN2 * xE * xE + slantReflect(muRow[j]) - slantReflect(muE) + clearExtra(muRow[j]);
+        const fillAirRows = (fade) => {
+            for (let k = 0; k < NT; k++) {
+                const b = beltsAt(k), bt = { itcz: b.itcz, hiN: b.hiN + (90 - b.hiN) * (1 - fade[2 * k]), hiS: b.hiS - (90 + b.hiS) * (1 - fade[2 * k + 1]) };
+                for (let j = 0; j < h; j++) {
+                    const muE = muEarthAt(earthLat(g.lat[j], bt)), xE = 1 - muE;
+                    albRow[k * h + j] = P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * xE + P.TEMP_ALBEDO_SUN2 * xE * xE + slantReflect(muRow[j]) - slantReflect(muE) + clearExtra(muRow[j]);
+                }
             }
-        }
+        };
+        // (each month and hemisphere, as its extratropics stop cooling poleward (stormTrackFade), the clouds' Hadley edge
+        // moves to the pole: the summer pole gets Earth's Hadley cell's clouds, as one cell spans that hemisphere)
+        const stormFade = new Float64Array(2 * NT).fill(1);
+        fillAirRows(stormFade);
         // Sunlight and base albedo per cell: a row's, on a rotating planet; on a locked one, each cell's own from its angle to
         // the substellar point, the air's reflectance by the sun's height there (no belts to place Earth's clouds by)
         // (and of each, the pressure's own Rayleigh departure from Earth's air, for the surface's sunlight against 1 bar's)
@@ -296,6 +332,7 @@ export function energyBalanceTemperature() {
             Q.set(L.q);
             for (let c = 0; c < NT * G; c++) { const mu = Math.max(L.mu[c], 0.05); albExtra[c] = clearExtra(mu); albBase[c] = earthAirAlbedo(1 - LOCKED_ANCHOR_MU) + slantReflect(mu) - slantReflect(LOCKED_ANCHOR_MU) + albExtra[c]; }
         } else for (let k = 0; k < NT; k++) for (let j = 0; j < h; j++) { const extra = clearExtra(muRow[j]); for (let i = 0; i < w; i++) { Q[k * G + j * w + i] = Qrow[k * h + j]; albBase[k * G + j * w + i] = albRow[k * h + j]; albExtra[k * G + j * w + i] = extra; } }
+        const rowsToCells = () => { for (let k = 0; k < NT; k++) for (let j = 0; j < h; j++) albBase.fill(albRow[k * h + j], k * G + j * w, k * G + (j + 1) * w); };
         // (and the surface's own variety about that: smooth fractal noise by geographic position, a fixed size in km — an
         // input like the rest, which the heat's spread and the snow and ice then work through)
         const albVary = albedoVariety(g, ctx.options?.seed ?? 1, P.TEMP_ALBEDO_VARY, P.TEMP_ALBEDO_VARY_KM);
@@ -458,6 +495,7 @@ export function energyBalanceTemperature() {
         const budgetSums = { surfaceSun: 0, surfaceSun1: 0, sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), rowNet: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
         for (let it = 0; it < outer; it++) {
             tp = performance.now();
+            if (!orbit.locked && winds?.belts && stormTrackFade({ fade: stormFade, belts: beltsAt, harmonics: { c0, c1r, c1i, c2r, c2i }, lat: g.lat, w, h })) { fillAirRows(stormFade); rowsToCells(); }
             F0.fill(0); F1r.fill(0); F1i.fill(0); F2r.fill(0); F2i.fill(0); iceYear.fill(0); seaIceYear.fill(0);
             snowYearPrev.set(snowYear); snowYear.fill(0);
             for (let c = 0; c < G; c++) {
