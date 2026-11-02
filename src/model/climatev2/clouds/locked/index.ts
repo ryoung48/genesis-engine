@@ -8,8 +8,12 @@ import { coarsenField } from "@/model/climatev2/vendor/grid.js"
 import { lockedSunAt, orbitOf } from "@/model/climatev2/vendor/insolation.js"
 
 const MONTHS = 12
+// The substellar deck against Yang, Cowan & Abbot 2013 (CAM3, 1:1 locked, an M-star, no ocean currents; Table 1): a
+// locked planet's albedo 0.45–0.47 at 1200–1400 W/m² (a hotter star's higher still) — this gives 0.47 on the locked
+// Earth at 1 bar (climatev2-locked-budget diagnostic) — and its clouds' greenhouse 20–30 W/m² in the global mean —
+// a longwave share of 0.32 gives 25 W/m² (0.5 gave 39)
 const DECK_ALBEDO = 0.3
-const DECK_LONGWAVE_SHARE = 0.5
+const DECK_LONGWAVE_SHARE = 0.32
 const LAND_MOISTURE = 0.4
 const WET_REFERENCE_C = 25
 const MAGNUS_A = 17.67

@@ -219,6 +219,7 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 						snowIce: r3(b.snowIce),
 						cloud: r3(b.cloud),
 					},
+					cloudLongwaveWm2: r1(b.cloudLongwaveWm2),
 				}
 			})
 			for (const row of rows) console.log(JSON.stringify(row))

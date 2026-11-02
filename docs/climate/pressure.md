@@ -47,33 +47,13 @@ Weak-gradient transport keeps the air column nearly even across the planet; each
 
 Snow and sea ice follow the surface's temperature, and the surface's departure from the air reaches space through the window, (1 − ε)·σ·((T_a + δ)⁴ − T_a⁴), in the energy balance, so the budget stays closed. The offsets are relaxed by half each round; 12 rounds (10 warm-started) close every pressure to within 0.9 W/m² (≈ 16 s per locked world on the Earth fixture, rain, winds and ocean included).
 
-| bar | Earth's starlight: global / dayside / nightside / substellar / antistellar (°C), sea ice | ExoPlaSim's starlight: the same | ExoPlaSim's starlight: land day / night (°C) |
-| --- | --- | --- | --- |
-| 0.1 | −22.2 / 18.6 / −63.1 / 39.8 / −72.2, 58 % | 14.7 / 47.7 / −18.4 / 73.9 / −45.5, 42 % | 47.3 / −24.5 |
-| 0.25 | −9.9 / 11.6 / −31.3 / 26.6 / −35.1, 59 % | 8.6 / 23.8 / −6.6 / 37.3 / −21.5, 33 % | 24.8 / −14.6 |
-| 0.5 | 0.6 / 12.8 / −11.6 / 24.3 / −13.8, 55 % | 6.9 / 15.3 / −1.6 / 27.1 / −8.1, 12 % | 16.9 / −7.5 |
-| 1 | 8.9 / 14.4 / 3.5 / 23.3 / 2.5, 0 % | 8.9 / 14.4 / 3.5 / 23.3 / 2.5, 0 % | 15.9 / 2.5 |
-| 2 | 13.6 / 16.9 / 10.3 / 23.3 / 9.9, 0 % | 10.2 / 13.9 / 6.6 / 19.9 / 6.1, 0 % | 15.1 / 8.0 |
-| 4 | 16.0 / 17.9 / 14.0 / 22.2 / 13.8, 0 % | 11.3 / 13.6 / 9.0 / 17.3 / 8.8, 0 % | 14.5 / 10.8 |
-| 10 | 15.9 / 16.9 / 15.0 / 18.9 / 14.9, 0 % | 12.1 / 13.2 / 11.0 / 14.8 / 10.9, 0 % | 13.6 / 11.9 |
-
-At Earth's starlight thin air no longer freezes over: the substellar sea convects warm enough to stay open (an eyeball), where the even-surface model froze 0.1 bar solid. These figures predate the ocean heat (below), which moves 30–45 W/m² to the nightside's seas; at Earth's starlight they still freeze from 0.5 bar down.
+Current results with every piece below in place are under [Calibration and results](#calibration-and-results).
 
 ### Rain
 
 The locked rain stage (`src/model/climatev2/rain/locked`) runs after the cloud pass, on the climate grid; cells take it through the same sampler as the temperature (rain by height and texture included), and `post-elevation` uses it for every locked world. The sea evaporates by the rotating stage's bulk formula (`RAIN_EVAP_COEFF`, `RAIN_SURFACE_RH`) at the planet's mean surface wind (`surfaceWind`, `pressure.js`), none under sea ice; land at the Priestley–Taylor rate of its surface's net radiation, limited by the rain that reaches it (Turc–Pike). Under the even air the column rises where the surface heats it more than the planet's mean (the sunlight the surface takes beyond its mean, as in `lockedSurface`), and all the planet's evaporation rains out there in proportion; the subsiding nightside stays dry.
 
-| bar | Earth's starlight: global / substellar / land (mm/yr) | ExoPlaSim's starlight: global / substellar (mm/yr), vs 1 bar |
-| --- | --- | --- |
-| 0.1 | 495 / 2633 / 715 | 1760 / 13257, 374 % |
-| 0.25 | 321 / 1667 / 467 | 669 / 4181, 142 % |
-| 0.5 | 308 / 1636 / 460 | 456 / 2736, 97 % |
-| 1 | 471 / 2743 / 730 | 471 / 2743, 100 % |
-| 2 | 551 / 3464 / 885 | 460 / 2532, 98 % |
-| 4 | 546 / 3614 / 925 | 428 / 2247, 91 % |
-| 10 | 432 / 2809 / 849 | 347 / 1709, 74 % |
-
-The trend with pressure follows ExoPlaSim's rotating one in direction (more in thin air, less in thick), steeper below 0.5 bar: there the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled. No moisture reaches the nightside yet.
+The trend with pressure follows ExoPlaSim's rotating one in direction below 1 bar (more rain in thin air at its 15 °C-holding starlight), steeper below 0.5 bar, where the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled. No moisture reaches the nightside yet.
 
 ### Winds and ocean
 
@@ -81,12 +61,28 @@ Locked winds and currents are derived from the finished climate (`CLIMATE_V2.com
 
 - Winds (`src/model/climatev2/circulation/locked`): the surface air flows in to the ascent, u = ∇φ with ∇²φ = −(S − S̄) (the rain stage's driver), scaled so its mean speed is the planet's mean surface wind (`surfaceWind`). Sea-level pressure is the thermal low: 1013.25 hPa × ps less half the surface's warming over the planet's mean, as a share of its kelvin temperature.
 - Currents (`src/model/climatev2/ocean/locked`): with almost no Coriolis force the surface drifts downwind toward the substellar point at 3 % of the wind (Wu 1983).
-- Ocean heat: in the surface balance (`lockedSurface`), the sea's departure from the sea's mean sunlight is reduced by 0.35, Earth's ocean share of the poleward heat transport at 20° (Trenberth & Caron 2001), and that heat is given to the seas the sun heats least, so it sums to zero over the sea. It moves 30–45 W/m² from the dayside's seas to the nightside's (1 bar: substellar 23.3 → 19.4 °C, antistellar 2.5 → 3.6 °C; 0.5 bar at ExoPlaSim's starlight: sea ice 12 % → 1.5 %). The share is an analogue, not a locked-ocean result: dynamic-ocean studies of locked planets (Hu & Yang 2014) find the ocean opens much of the nightside's sea, more than this does at Earth's starlight (0.5 bar: 49 % sea ice).
+- Ocean heat: in the surface balance (`lockedSurface`), the sea's departure from the sea's mean sunlight is reduced by 0.35, Earth's ocean share of the poleward heat transport at 20° (Trenberth & Caron 2001), and that heat is given to the seas the sun heats least, so it sums to zero over the sea. It moves 30–45 W/m² from the dayside's seas to the nightside's (measured before the deck calibration, 1 bar: substellar 23.3 → 19.4 °C, antistellar 2.5 → 3.6 °C; 0.5 bar at ExoPlaSim's starlight: sea ice 12 % → 1.5 %). The share is an analogue, not a locked-ocean result: dynamic-ocean studies of locked planets (Hu & Yang 2014) find the ocean opens much of the nightside's sea, more than this does at Earth's starlight (0.5 bar: 49 % sea ice).
 
 The rotating ocean stage (`windDrivenOcean`) is not used: its gyres and Ekman transport are set by the Coriolis force, which a locked planet's year-long day all but removes.
 
 ### Range and potential evaporation
 
-A locked planet has no day cycle, so its within-month temperature range (`temperature_monthly_range`, and the daily minimum and maximum built from it) is only the libration's drift through the month: half the change in each cell's temperature from the month before to the month after (`CLIMATE_V2.computeLocked`). It is near zero for a circular, untilted orbit and grows with eccentricity and obliquity (test world with the default tilt, dayside land: 3.7 °C at eccentricity 0 and 7.1 °C at 0.2; nightside 0.5 and 1.4 °C).
+A locked planet has no day cycle, so its within-month temperature range (`temperature_monthly_range`, and the daily minimum and maximum built from it) is only the libration's drift through the month: half the change in each cell's temperature from the month before to the month after (`CLIMATE_V2.computeLocked`). It is near zero for a circular, untilted orbit and grows with eccentricity and obliquity (before the deck calibration, test world with the default tilt, dayside land: 3.7 °C at eccentricity 0 and 7.1 °C at 0.2; nightside 0.5 and 1.4 °C).
 
 Potential evaporation (`pet_monthly`) is Priestley–Taylor on the land surface's net radiation from the locked surface balance, at the surface's temperature (`CLIMATEV2_LOCKED_RAIN.potentialEvaporation`, the rain stage's own land evaporation), instead of Hargreaves on the top-of-air sunlight and the range: test world ≈ 1840 mm/yr on dayside land, ≈ 8 on the nightside.
+
+### Calibration and results
+
+The substellar cloud deck (`src/model/climatev2/clouds/locked`) is set against Yang, Cowan & Abbot 2013 (CAM3, 1:1 locked, an M-star, an ocean without currents; their Table 1): a locked planet's planetary albedo 0.45–0.47 at 1200–1400 W/m², higher for a hotter star, and its clouds' greenhouse 20–30 W/m² in the global mean. `DECK_ALBEDO` 0.3 gives 0.47 on the locked Earth at 1 bar; `DECK_LONGWAVE_SHARE` 0.32 gives 25 W/m² (0.5 gave 39 W/m² and a planet ≈ 8 °C warmer). Their locked planets are cold, 238 K at 1400 W/m², as the deck makes ours.
+
+The ocean share (0.35) remains an analogue. The coupled studies constrain it only in kind: a continent-free ocean carries enough heat to the nightside to halve the albedo (Yang et al. 2013: 0.48 → 0.26, 247 → 296 K at 1600 W/m², mostly by thinning the substellar clouds, which this deck does not do), while continents block it — two meridional ridges leave the albedo as without currents (Yang et al. 2013), and a substellar continent past ≈ 20 % of the surface leaves the climate as without ocean transport (Salazar et al. 2020).
+
+| bar | Earth's starlight: global / substellar / antistellar / day land / night land (°C), sea ice, rain, albedo | ExoPlaSim's starlight: the same |
+| --- | --- | --- |
+| 0.1 | −31.1 / 30.4 / −79.6 / 13.4 / −68.7, 59 %, 304 mm/yr, 0.48 | 1.9 / 64.3 / −50.6 / 40.6 / −31.6, 55 %, 1374 mm/yr, 0.49 |
+| 0.25 | −19.3 / 17.4 / −43.6 / 7.3 / −38.9, 78 %, 174 mm/yr, 0.46 | −4.0 / 29.2 / −28.0 / 19.1 / −22.0, 57 %, 395 mm/yr, 0.49 |
+| 0.5 | −8.3 / 14.7 / −21.7 / 7.8 / −19.2, 78 %, 160 mm/yr, 0.46 | −3.9 / 18.5 / −17.1 / 11.4 / −14.5, 58 %, 216 mm/yr, 0.48 |
+| 1 | 0.7 / 13.6 / −5.9 / 8.9 / −5.6, 39 %, 233 mm/yr, 0.47 | 0.7 / 13.6 / −5.9 / 8.9 / −5.6, 39 %, 233 mm/yr, 0.47 |
+| 2 | 5.3 / 13.4 / 2.2 / 10.3 / 3.1, 0 %, 332 mm/yr, 0.50 | 3.5 / 11.3 / 0.2 / 8.9 / 1.2, 0 %, 301 mm/yr, 0.46 |
+| 4 | 7.8 / 12.7 / 6.0 / 10.8 / 7.3, 0 %, 334 mm/yr, 0.53 | 5.5 / 10.0 / 3.6 / 8.9 / 5.0, 0 %, 299 mm/yr, 0.47 |
+| 10 | 8.4 / 10.6 / 7.6 / 9.9 / 8.3, 0 %, 272 mm/yr, 0.56 | 7.0 / 8.9 / 6.1 / 8.6 / 6.9, 0 %, 253 mm/yr, 0.50 |
