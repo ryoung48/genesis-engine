@@ -50,4 +50,14 @@ The locked solve is deflated (`HelmholtzSolver.solve`'s `deflate`): its day–ni
 | 4 | 17.3 / 0.8 | 13.2 / 0.7 / 14.1 / 12.6 |
 | 10 | 16.7 / 0.3 | 13.3 / 0.3 / 13.6 / 13.0 |
 
-At Earth's starlight 0.1 bar freezes over, as the rotating planet does (−70.9 °C); the day–night contrast there is the ice's, not the transport's. The surface follows the transported air everywhere: the nightside's stable boundary layer, which under thin dry air leaves the ground far colder than the air above it, is not modelled.
+At Earth's starlight 0.1 bar freezes over, as the rotating planet does (−70.9 °C); the day–night contrast there is the ice's, not the transport's. The nightside's land and frozen sea lie under a stable surface layer (`darkGround`, `temperature.js`): the dark ground gets the air's back radiation, Earth's 333 / 396 W/m² (Trenberth et al. 2009) scaled by the greenhouse's share of the surface's emission (1 − OLR/σT⁴, so it follows the pressure's greenhouse), and the heat the layer brings down, ρ·c_p·C_H·U with C_H = 1.5 × 10⁻³ (Garratt 1992) and U = `TEMP_INVERSION_WIND`. It replaces the snow inversion on locked worlds. Like that inversion it sets the reported temperature over land, not the energy balance; the open sea keeps the air's temperature.
+
+| bar | Nightside land below the air (°C), Earth's / ExoPlaSim's starlight | Land day / night (°C), ExoPlaSim's starlight |
+| --- | --- | --- |
+| 0.1 | 36.6 / 68.3 | 22.3 / −75.4 |
+| 0.25 | 29.9 / 26.1 | 12.6 / −24.5 |
+| 0.5 | 12.5 / 12.1 | 12.0 / −5.3 |
+| 1 | 4.7 / 4.7 | 13.2 / 5.9 |
+| 2 | 1.1 / 1.3 | 13.5 / 10.9 |
+| 4 | 0 / 0 | 13.6 / 12.9 |
+| 10 | 0 / 0 | 13.4 / 13.2 |

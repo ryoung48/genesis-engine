@@ -96,6 +96,12 @@ const SNOW_MELTING = 0.5;                   // melting snow and sea ice: wet sno
 const SNOW_FROZEN_C = -5;                   // °C: the air below which snow stays dry (melting from here to 0 °C)
 const AIR_SCALE_KM = 8;                     // the air's scale height, RT/g at ≈ 273 K
 const STEFAN_BOLTZMANN = 5.670374e-8;        // W/m²/K⁴
+// A locked planet's dark ground (surfaceAt): the back radiation Earth's surface gets, 333 of the 396 W/m² it sends up
+// (Trenberth et al. 2009), as the air's emissivity at Earth's greenhouse, and the heat a stable surface layer exchanges
+// with the air, ρ·c_p·C_H·U — C_H ≈ 1–2 × 10⁻³ over land near neutral (Garratt 1992, The Atmospheric Boundary Layer
+// §4.4), U the wind that half mixes an inversion away (TEMP_INVERSION_WIND)
+const BACK_EMISSIVITY_EARTH = 333 / 396;
+const NIGHT_HEAT_TRANSFER = 1.5e-3;
 
 // The heat to space, A + B·T, fitted where Earth's satellites see it (North & Coakley 1979: zonal means, ≈ −40 … 30 °C),
 // falls to nothing at −A/B (≈ −96 °C on Earth) and below it would heat the ground. Colder than where it touches a gray
@@ -108,6 +114,25 @@ const STEFAN_BOLTZMANN = 5.670374e-8;        // W/m²/K⁴
 function coldOlr({ A, B }) {
     const tJ = (4 * 273.15 - 4 * A / B) / 3;
     return { tJC: tJ - 273.15, eps: B / (4 * STEFAN_BOLTZMANN * tJ ** 3), A, B };
+}
+function heatToSpace({ olr, T }) {
+    const black = STEFAN_BOLTZMANN * (T + 273.15) ** 4;
+    return Math.min(T < olr.tJC ? olr.eps * black : olr.A + olr.B * T, black);
+}
+/**
+ * The ground under a locked planet's night, T_s, beneath air at T_a (°C): it gets no sun, the air's back radiation
+ * ε·σ·T_a⁴ and the heat the surface layer brings, k·(T_a − T_s), and sends σ·T_s⁴ — so it falls below the air where the
+ * greenhouse is weak (Wordsworth 2015: thin air's nightsides decouple from the air above). ε is Earth's back radiation
+ * scaled by the greenhouse's share of the surface's emission, 1 − OLR/σT⁴ (Raval & Ramanathan 1989), against Earth's
+ * at 15 °C, so it follows the pressure's greenhouse (pressure.js) and the air's temperature.
+ */
+function darkGround({ olr, gEarth, k, Ta }) {
+    const tK = Ta + 273.15, black = STEFAN_BOLTZMANN * tK ** 4;
+    const eps = Math.min(1, BACK_EMISSIVITY_EARTH * Math.max(0, 1 - heatToSpace({ olr, T: Ta }) / black) / gEarth);
+    const gain = eps * black + k * tK;
+    let ts = tK;
+    for (let n = 0; n < 4; n++) ts -= (STEFAN_BOLTZMANN * ts ** 4 + k * ts - gain) / (4 * STEFAN_BOLTZMANN * ts ** 3 + k);
+    return ts - 273.15;
 }
 /**
  * The heat a locked planet's air carries between its day and night sides, as the unit-sphere diffusivity (W/m²/K)
@@ -581,6 +606,9 @@ export function energyBalanceTemperature() {
         // near snowy or icy ground under a weak sun — the winter inversion, the air by the ground colder than the air
         // above it.
         const tmp = new Float64Array(G);
+        // (Earth's greenhouse share at 15 °C, and ρ·c_p·C_H·U·T_a of the dark ground's surface layer: ρ = p / (R·T_a))
+        const gEarth = 1 - (PARAMS.TEMP_OLR_A + PARAMS.TEMP_OLR_B * 15) / (STEFAN_BOLTZMANN * 288.15 ** 4);
+        const nightK = 101325 * orbit.pressureScale / AIR_R * AIR_CP * NIGHT_HEAT_TRANSFER * P.TEMP_INVERSION_WIND;
         const surfaceAt = (t, withInversion) => {
             const th = 2 * Math.PI * t / 12, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th);
             const qCell = cellSun(t);
@@ -594,7 +622,11 @@ export function energyBalanceTemperature() {
                     let x = 1 - qCell[c] / WEAK_SUN; x = x <= 0 ? 0 : x >= 1 ? 1 : x;
                     const dark = x * x * (3 - 2 * x);
                     let T = tmp[c];
-                    if (withInversion && dark > 0) {
+                    if (withInversion && dark > 0 && orbit.locked) {
+                        // (a locked night's ground: on land and frozen sea — the open sea is stirred from below)
+                        const f = landFrac[c], solid = f + (1 - f) * iceRamp(T);
+                        if (solid > 0) T += solid * dark * (darkGround({ olr: olrCold, gEarth, k: nightK / (T + 273.15), Ta: T }) - T);
+                    } else if (withInversion && dark > 0) {
                         const f = landFrac[c], snow = f * iceRamp(T - lapseEff[c] * surfKm[c]) + (1 - f) * iceRamp(T);
                         let calm = 1;
                         if (winds) {
@@ -880,9 +912,7 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 }
                 snowYear[c] += sL / NT;
                 let gF = q * (1 - alb) + cloudLongwave;
-                const black = STEFAN_BOLTZMANN * (T + 273.15) ** 4;
-                if (T < olrCold.tJC) gF -= Math.min(olrCold.eps * black, black) - olrCold.A - olrCold.B * T;
-                else if (olrCold.A + olrCold.B * T > black) gF -= black - olrCold.A - olrCold.B * T;
+                gF -= heatToSpace({ olr: olrCold, T }) - olrCold.A - olrCold.B * T;
                 if (budget) budget.rowNet[j] += gF - olrCold.A - olrCold.B * T;
                 if (windsOn) {
                     const du = uT[k * G + c], dv = vT[k * G + c];

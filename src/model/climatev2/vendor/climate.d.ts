@@ -64,6 +64,7 @@ export interface PlanetClimateResult {
 		clouds: CloudFields
 		temperature: {
 			monthlySL: Float32Array
+			inversion: Float32Array
 			seaIce: Float32Array
 			iceFrac: Float32Array
 			diurnal: DiurnalRanges | null

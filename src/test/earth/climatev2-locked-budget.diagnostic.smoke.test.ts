@@ -81,6 +81,11 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					sea: 0,
 					landIce: 0,
 					land: 0,
+					dayLand: 0,
+					dayLandArea: 0,
+					nightLand: 0,
+					nightLandArea: 0,
+					nightInversion: 0,
 				}
 				const band = new Float64Array(6)
 				const bandArea = new Float64Array(6)
@@ -97,9 +102,11 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 						const cosTheta = Math.cos(lat) * Math.cos(lon)
 						let t = 0
 						let ice = 0
+						let inv = 0
 						for (let m = 0; m < 12; m++) {
 							t += temperature.monthlySL[m * G + c] / 12
 							ice += temperature.seaIce[m * G + c] / 12
+							inv += temperature.inversion[m * G + c] / 12
 						}
 						sums.all += t * wj
 						sums.area += wj
@@ -111,6 +118,14 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 							sums.nightArea += wj
 						}
 						const lf = surface.landFrac[c]
+						if (cosTheta > 0) {
+							sums.dayLand += (t + inv) * wj * lf
+							sums.dayLandArea += wj * lf
+						} else {
+							sums.nightLand += (t + inv) * wj * lf
+							sums.nightInversion += inv * wj * lf
+							sums.nightLandArea += wj * lf
+						}
 						sums.sea += wj * (1 - lf)
 						sums.seaIce += wj * (1 - lf) * ice
 						sums.land += wj * lf
@@ -148,6 +163,9 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					daysideMeanC: r1(sums.day / sums.dayArea),
 					nightsideMeanC: r1(sums.night / sums.nightArea),
 					dayNightC: r1(sums.day / sums.dayArea - sums.night / sums.nightArea),
+					dayLandC: r1(sums.dayLand / sums.dayLandArea),
+					nightLandC: r1(sums.nightLand / sums.nightLandArea),
+					nightLandBelowAirC: r1(-sums.nightInversion / sums.nightLandArea),
 					substellarC: r1(sub),
 					antistellarC: r1(anti),
 					meanByAngleC: Array.from(band, (v, i) => r1(v / bandArea[i])),
