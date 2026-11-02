@@ -60,6 +60,8 @@ export interface LockedClimateParams {
 
 export interface LockedClimateCells {
 	cloudCoverMonthly: Float32Array
+	diurnalRange: { monthly: Float32Array; annual: Float32Array }
+	petMonthly: Float32Array
 	temperatureMonthly: Float32Array
 	rainfallMonthly: Float32Array
 	rainfallAnnual: Float32Array

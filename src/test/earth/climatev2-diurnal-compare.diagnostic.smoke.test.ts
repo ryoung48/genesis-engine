@@ -169,9 +169,7 @@ describe("climatev2 diurnal range vs WorldClim / NCEP (diagnostic)", () => {
 			const ours = score({
 				world,
 				model: DTR.computeDiurnalRange({
-					mesh: world.mesh,
 					rainfall: world.rainfall,
-					elevationKm: world.elevation_km,
 					oceanDist: world.oceanDist,
 					isLand: world.isLand,
 					params: world.params,

@@ -84,3 +84,9 @@ Locked winds and currents are derived from the finished climate (`CLIMATE_V2.com
 - Ocean heat: in the surface balance (`lockedSurface`), the sea's departure from the sea's mean sunlight is reduced by 0.35, Earth's ocean share of the poleward heat transport at 20° (Trenberth & Caron 2001), and that heat is given to the seas the sun heats least, so it sums to zero over the sea. It moves 30–45 W/m² from the dayside's seas to the nightside's (1 bar: substellar 23.3 → 19.4 °C, antistellar 2.5 → 3.6 °C; 0.5 bar at ExoPlaSim's starlight: sea ice 12 % → 1.5 %). The share is an analogue, not a locked-ocean result: dynamic-ocean studies of locked planets (Hu & Yang 2014) find the ocean opens much of the nightside's sea, more than this does at Earth's starlight (0.5 bar: 49 % sea ice).
 
 The rotating ocean stage (`windDrivenOcean`) is not used: its gyres and Ekman transport are set by the Coriolis force, which a locked planet's year-long day all but removes.
+
+### Range and potential evaporation
+
+A locked planet has no day cycle, so its within-month temperature range (`temperature_monthly_range`, and the daily minimum and maximum built from it) is only the libration's drift through the month: half the change in each cell's temperature from the month before to the month after (`CLIMATE_V2.computeLocked`). It is near zero for a circular, untilted orbit and grows with eccentricity and obliquity (test world with the default tilt, dayside land: 3.7 °C at eccentricity 0 and 7.1 °C at 0.2; nightside 0.5 and 1.4 °C).
+
+Potential evaporation (`pet_monthly`) is Priestley–Taylor on the land surface's net radiation from the locked surface balance, at the surface's temperature (`CLIMATEV2_LOCKED_RAIN.potentialEvaporation`, the rain stage's own land evaporation), instead of Hargreaves on the top-of-air sunlight and the range: test world ≈ 1840 mm/yr on dayside land, ≈ 8 on the nightside.

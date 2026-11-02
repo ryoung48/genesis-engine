@@ -16,10 +16,9 @@ describe("modeled DTR", () => {
 		for (const isLand of [0, 1]) {
 			const { monthly, annual } = DTR.computeDiurnalRange({
 				rainfall: createRainfall({ rainMm: isLand ? 10_000 : 0 }),
-				elevationKm: new Float32Array(1),
 				oceanDist: new Float32Array(1),
 				isLand: new Uint8Array([isLand]),
-				params: { hoursPerDay: 6, tideLock: null },
+				params: { hoursPerDay: 6 },
 				daylight_hours_monthly: new Float32Array(12),
 			})
 

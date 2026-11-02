@@ -89,4 +89,7 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 	return { P }
 }
 
-export const CLIMATEV2_LOCKED_RAIN = { estimate }
+export const CLIMATEV2_LOCKED_RAIN = {
+	estimate,
+	potentialEvaporation: potential,
+}

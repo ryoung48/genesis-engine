@@ -6,6 +6,7 @@ import { CLIMATEV2_DIURNAL } from "@/model/climatev2/diurnal"
 import { CLIMATEV2_LOCKED_OCEAN } from "@/model/climatev2/ocean/locked"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
+import { CLIMATEV2_LOCKED_RAIN } from "@/model/climatev2/rain/locked"
 import type {
 	ClimateV2Cells,
 	ClimateV2ClimateParams,
@@ -19,6 +20,7 @@ import {
 	lockedClimate,
 	planetClimate,
 } from "@/model/climatev2/vendor/climate.js"
+import { EARTH_SECONDS_PER_MONTH } from "@/model/climatev2/vendor/rain.js"
 
 const MONTHS = 12
 const DEG = 180 / Math.PI
@@ -253,7 +255,45 @@ function computeLocked({
 		circulation,
 		temperature,
 	})
+	// (each month's potential evaporation, Priestley–Taylor on the land's net radiation at its own temperature, as
+	// the locked rain stage's; and the month's own range: no day cycle, only the libration's drift through the month,
+	// half the change from the month before to the month after)
+	const G = grid.size
+	const petGrid = new Float32Array(MONTHS * G)
+	const surf = temperature.lockedSurf
+	const seconds = EARTH_SECONDS_PER_MONTH * orbit.yearScale
+	if (surf)
+		for (let m = 0; m < MONTHS; m++)
+			for (let c = 0; c < G; c++)
+				petGrid[m * G + c] =
+					seconds *
+					CLIMATEV2_LOCKED_RAIN.potentialEvaporation({
+						T:
+							temperature.monthlySL[m * G + c] +
+							temperature.inversion[m * G + c],
+						net: surf.netLand[m * G + c],
+						ps: orbit.pressureScale,
+					})
+	const rangeMonthly = new Float32Array(MONTHS * N)
+	const rangeAnnual = new Float32Array(N)
+	for (let m = 0; m < MONTHS; m++) {
+		const next = ((m + 1) % MONTHS) * N
+		const prev = ((m + MONTHS - 1) % MONTHS) * N
+		for (let r = 0; r < N; r++) {
+			const range =
+				Math.abs(temperatureMonthly[next + r] - temperatureMonthly[prev + r]) /
+				2
+			rangeMonthly[m * N + r] = range
+			rangeAnnual[r] += range / MONTHS
+		}
+	}
 	return {
+		diurnalRange: { monthly: rangeMonthly, annual: rangeAnnual },
+		petMonthly: CLIMATEV2_OUTPUTS.monthlyCells({
+			weights,
+			field: petGrid,
+			fieldSize: G,
+		}),
 		cloudCoverMonthly: CLIMATEV2_OUTPUTS.monthlyCells({
 			weights,
 			field: result.stages.clouds.deck,

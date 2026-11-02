@@ -217,10 +217,7 @@ function runPostElevationPipeline(
 			? CLIMATE_V2.toClimate({
 					mesh,
 					params,
-					v2: {
-						...locked,
-						diurnalRange: { monthly: new Float32Array(12 * mesh.numRegions) },
-					},
+					v2: locked,
 				})
 			: CLIMATE_V1.computeTemperature({
 					landFraction: CLIMATE_V1.computeLandFraction({ mesh, isLand }),
@@ -324,7 +321,8 @@ function runPostElevationPipeline(
 			isLand,
 			oceanCurrents,
 		})
-	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
+	if (locked) climate.pet_monthly.set(locked.petMonthly)
+	else HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
 	TIMING.record({ stage: "Post: ocean SST", startedAt: t0, timings })
 
@@ -397,24 +395,23 @@ function runPostElevationPipeline(
 	t0 = performance.now()
 	let { monthly: dtr_monthly, annual: dtr_annual } =
 		climateV2?.diurnalRange ??
+		locked?.diurnalRange ??
 		DTR.computeDiurnalRange({
-			mesh,
 			rainfall,
-			elevationKm: elevation_km,
 			oceanDist,
 			isLand,
 			params,
 			daylight_hours_monthly: climate.daylight_hours_monthly,
 		})
-	HYDROLOGY.fillPetMonthlyHargreaves({
-		temperatureMonthly: climate.temperature_monthly,
-		rangeMonthly: dtr_monthly,
-		insolationMonthly: climate.insolation_monthly,
-		petMonthly: climate.pet_monthly,
-		dpm: CALENDAR.earthDaysPerMonth(params),
-	})
+	if (!locked)
+		HYDROLOGY.fillPetMonthlyHargreaves({
+			temperatureMonthly: climate.temperature_monthly,
+			rangeMonthly: dtr_monthly,
+			insolationMonthly: climate.insolation_monthly,
+			petMonthly: climate.pet_monthly,
+			dpm: CALENDAR.earthDaysPerMonth(params),
+		})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
-	if (locked) climate.temperature_monthly_range.set(dtr_monthly)
 	TIMING.record({ stage: "Post: dtr + pet", startedAt: t0, timings })
 	onProgress?.("Post: dtr + pet", 56)
 
@@ -541,24 +538,23 @@ function runPostElevationPipeline(
 	}
 	;({ monthly: dtr_monthly, annual: dtr_annual } =
 		climateV2?.diurnalRange ??
+		locked?.diurnalRange ??
 		DTR.computeDiurnalRange({
-			mesh,
 			rainfall,
-			elevationKm: elevation_km,
 			oceanDist,
 			isLand,
 			params,
 			daylight_hours_monthly: climate.daylight_hours_monthly,
 		}))
-	HYDROLOGY.fillPetMonthlyHargreaves({
-		temperatureMonthly: climate.temperature_monthly,
-		rangeMonthly: dtr_monthly,
-		insolationMonthly: climate.insolation_monthly,
-		petMonthly: climate.pet_monthly,
-		dpm: CALENDAR.earthDaysPerMonth(params),
-	})
+	if (!locked)
+		HYDROLOGY.fillPetMonthlyHargreaves({
+			temperatureMonthly: climate.temperature_monthly,
+			rangeMonthly: dtr_monthly,
+			insolationMonthly: climate.insolation_monthly,
+			petMonthly: climate.pet_monthly,
+			dpm: CALENDAR.earthDaysPerMonth(params),
+		})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
-	if (locked) climate.temperature_monthly_range.set(dtr_monthly)
 	hydrology = HYDROLOGY.computeHydrologyFields({
 		climate,
 		rainfall,
