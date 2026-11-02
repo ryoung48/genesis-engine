@@ -224,7 +224,7 @@ function runPostElevationPipeline(
 				oceanDist,
 				elevation_km,
 			})
-	const lockedRain =
+	const locked =
 		isLocked && params.climateModel !== "v1"
 			? CLIMATE_V2.applyLocked({
 					mesh,
@@ -240,8 +240,10 @@ function runPostElevationPipeline(
 	t0 = performance.now()
 	const wind = climateV2
 		? climateV2.wind
-		: WIND.computeWindVectors({ mesh, climate, elevation_km, params })
-	if (!climateV2) TIMING.record({ stage: "Post: wind", startedAt: t0, timings })
+		: (locked?.wind ??
+			WIND.computeWindVectors({ mesh, climate, elevation_km, params }))
+	if (!climateV2 && !locked)
+		TIMING.record({ stage: "Post: wind", startedAt: t0, timings })
 	onProgress?.("Post: wind", 43)
 
 	t0 = performance.now()
@@ -306,25 +308,27 @@ function runPostElevationPipeline(
 	}
 	const oceanCurrents = climateV2
 		? climateV2.oceanCurrents
-		: isLocked
-			? LOCKED_OCEAN_CURRENTS.computeLockedSST({
-					mesh,
-					isLand,
-					distCoast,
-					landmarks: currentLandmarks,
-					params,
-				})
-			: HEURISTIC_CURRENTS.computeCurrents({
-					mesh,
-					isLand,
-					distCoast,
-					landmarks: currentLandmarks,
-					monthlyTEQ,
-					eastAdv,
-					westAdv,
-					planetRadiusKm: params.planetRadiusKm,
-				})
-	if (!climateV2)
+		: locked
+			? locked.oceanCurrents
+			: isLocked
+				? LOCKED_OCEAN_CURRENTS.computeLockedSST({
+						mesh,
+						isLand,
+						distCoast,
+						landmarks: currentLandmarks,
+						params,
+					})
+				: HEURISTIC_CURRENTS.computeCurrents({
+						mesh,
+						isLand,
+						distCoast,
+						landmarks: currentLandmarks,
+						monthlyTEQ,
+						eastAdv,
+						westAdv,
+						planetRadiusKm: params.planetRadiusKm,
+					})
+	if (!climateV2 && !locked)
 		applyOceanCurrentsToClimate({
 			mesh,
 			climate,
@@ -343,7 +347,7 @@ function runPostElevationPipeline(
 				monthly: climateV2.rainfallMonthly,
 				annual: climateV2.rainfallAnnual,
 			}
-		: (lockedRain ??
+		: (locked?.rain ??
 			RAIN.computeMonthlyRain({
 				eastAdv,
 				westAdv,
@@ -355,7 +359,7 @@ function runPostElevationPipeline(
 				distCoast,
 				landmarks: currentLandmarks,
 			}))
-	if (!climateV2 && !lockedRain)
+	if (!climateV2 && !locked)
 		TIMING.record({ stage: "Post: rainfall", startedAt: t0, timings })
 	onProgress?.("Post: rainfall", 54)
 	const rainfall: GenesisRainfall = {
@@ -375,7 +379,7 @@ function runPostElevationPipeline(
 	if (drainedClosedWater) {
 		t0 = performance.now()
 		// (v2's temperature is solved once, from the terrain before any lake drains)
-		if (!climateV2) {
+		if (!climateV2 && !locked) {
 			climate = CLIMATE_V1.computeTemperature({
 				landFraction: CLIMATE_V1.computeLandFraction({ mesh, isLand }),
 				isLand,
@@ -436,7 +440,7 @@ function runPostElevationPipeline(
 	onProgress?.("Post: hydrology", 57)
 
 	t0 = performance.now()
-	if (!climateV2) {
+	if (!climateV2 && !locked) {
 		CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
 			climate,
 			rainfall,
@@ -529,7 +533,7 @@ function runPostElevationPipeline(
 			planetRadiusKm: params.planetRadiusKm,
 		}),
 	)
-	if (!climateV2) {
+	if (!climateV2 && !locked) {
 		climate = CLIMATE_V1.computeTemperature({
 			landFraction: CLIMATE_V1.computeLandFraction({ mesh, isLand }),
 			isLand,
@@ -581,7 +585,7 @@ function runPostElevationPipeline(
 	onProgress?.("Post: landmarks", 62)
 
 	t0 = performance.now()
-	if (!climateV2) {
+	if (!climateV2 && !locked) {
 		CLOUD_COVER_TEMPERATURE_MODIFIER.applyCloudCoverTemperatureModifier({
 			climate,
 			rainfall,
@@ -1194,7 +1198,9 @@ function runPostElevationPipeline(
 		wind,
 		windMonthly: climateV2
 			? { u: climateV2.windUMonthly, v: climateV2.windVMonthly }
-			: null,
+			: locked
+				? { u: locked.windUMonthly, v: locked.windVMonthly }
+				: null,
 		observedCloudCover,
 		rainfall,
 		monthlyTEQ,

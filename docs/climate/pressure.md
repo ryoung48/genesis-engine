@@ -45,7 +45,7 @@ Weak-gradient transport keeps the air column nearly even across the planet; each
 - Sunlit ground and the open sea, by day and by night (stirred from below), convect: rhs is the sunlight the surface takes beyond the planet's mean, and k the surface layer's heat ρ·c_p·C_H·U plus, where wet, evaporation ρ·L·C_H·U·dq_s/dT (independent of the pressure). C_H = 1.5 × 10⁻³ (Garratt 1992), U = 22 km/h × `windScale` (ExoPlaSim's Earth mean), land half as wet as the sea.
 - Dark land and sea ice lie under a stable layer (`darkGround`): rhs = −(1 − ε)·σT_a⁴, with ε Earth's back radiation (333 / 396 W/m², Trenberth et al. 2009) scaled by the greenhouse's share of the surface's emission (1 − OLR/σT⁴), and k = ρ·c_p·C_H·`TEMP_INVERSION_WIND`. It replaces the snow inversion on locked worlds.
 
-Snow and sea ice follow the surface's temperature, and the surface's departure from the air reaches space through the window, (1 − ε)·σ·((T_a + δ)⁴ − T_a⁴), in the energy balance, so the budget stays closed. The offsets are relaxed by half each round; 12 rounds (10 warm-started) close every pressure to within 0.9 W/m² (≈ 18 s per locked world on the Earth fixture, rain included).
+Snow and sea ice follow the surface's temperature, and the surface's departure from the air reaches space through the window, (1 − ε)·σ·((T_a + δ)⁴ − T_a⁴), in the energy balance, so the budget stays closed. The offsets are relaxed by half each round; 12 rounds (10 warm-started) close every pressure to within 0.9 W/m² (≈ 16 s per locked world on the Earth fixture, rain, winds and ocean included).
 
 | bar | Earth's starlight: global / dayside / nightside / substellar / antistellar (°C), sea ice | ExoPlaSim's starlight: the same | ExoPlaSim's starlight: land day / night (°C) |
 | --- | --- | --- | --- |
@@ -74,3 +74,13 @@ The locked rain stage (`src/model/climatev2/rain/locked`) runs after the cloud p
 | 10 | 432 / 2809 / 849 | 347 / 1709, 74 % |
 
 The trend with pressure follows ExoPlaSim's rotating one in direction (more in thin air, less in thick), steeper below 0.5 bar: there the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled. No moisture reaches the nightside yet.
+
+### Winds and ocean
+
+Locked winds and currents are derived from the finished climate (`CLIMATE_V2.computeLocked`) and do not feed back into it: the day–night transport is the energy balance's own.
+
+- Winds (`src/model/climatev2/circulation/locked`): the surface air flows in to the ascent, u = ∇φ with ∇²φ = −(S − S̄) (the rain stage's driver), scaled so its mean speed is the planet's mean surface wind (`surfaceWind`). Sea-level pressure is the thermal low: 1013.25 hPa × ps less half the surface's warming over the planet's mean, as a share of its kelvin temperature.
+- Currents (`src/model/climatev2/ocean/locked`): with almost no Coriolis force the surface drifts downwind toward the substellar point at 3 % of the wind (Wu 1983).
+- Ocean heat: in the surface balance (`lockedSurface`), the sea's departure from the sea's mean sunlight is reduced by 0.35, Earth's ocean share of the poleward heat transport at 20° (Trenberth & Caron 2001), and that heat is given to the seas the sun heats least, so it sums to zero over the sea. It moves 30–45 W/m² from the dayside's seas to the nightside's (1 bar: substellar 23.3 → 19.4 °C, antistellar 2.5 → 3.6 °C; 0.5 bar at ExoPlaSim's starlight: sea ice 12 % → 1.5 %). The share is an analogue, not a locked-ocean result: dynamic-ocean studies of locked planets (Hu & Yang 2014) find the ocean opens much of the nightside's sea, more than this does at Earth's starlight (0.5 bar: 49 % sea ice).
+
+The rotating ocean stage (`windDrivenOcean`) is not used: its gyres and Ekman transport are set by the Coriolis force, which a locked planet's year-long day all but removes.

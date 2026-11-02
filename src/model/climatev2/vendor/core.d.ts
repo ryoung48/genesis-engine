@@ -28,6 +28,7 @@ export interface LockedSurfaceFields {
 	window: Float64Array
 	netLand: Float64Array
 	netSea: Float64Array
+	oceanQ: Float64Array
 }
 
 export interface TemperatureStageResult {

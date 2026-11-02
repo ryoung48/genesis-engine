@@ -67,11 +67,18 @@ export interface LockedClimateCells {
 	temperatureMonthly: Float32Array
 	rainfallMonthly: Float32Array
 	rainfallAnnual: Float32Array
+	wind: WindVectors
+	windUMonthly: Float32Array
+	windVMonthly: Float32Array
+	oceanCurrents: GenesisOceanCurrents
 }
 
-export interface LockedRainfall {
-	monthly: Float32Array
-	annual: Float32Array
+export interface LockedClimateOutputs {
+	rain: { monthly: Float32Array; annual: Float32Array }
+	wind: WindVectors
+	windUMonthly: Float32Array
+	windVMonthly: Float32Array
+	oceanCurrents: GenesisOceanCurrents
 }
 
 export interface ZonalSeaAnomalyParams {

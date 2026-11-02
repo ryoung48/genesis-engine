@@ -1,7 +1,9 @@
 import { CLIMATE } from "@/model/climate/classification/climate"
 import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import type { GenesisClimate } from "@/model/climate/types"
+import { CLIMATEV2_LOCKED_CIRCULATION } from "@/model/climatev2/circulation/locked"
 import { CLIMATEV2_DIURNAL } from "@/model/climatev2/diurnal"
+import { CLIMATEV2_LOCKED_OCEAN } from "@/model/climatev2/ocean/locked"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import type {
@@ -11,8 +13,8 @@ import type {
 	ClimateV2Input,
 	ClimateV2WorldParams,
 	LockedClimateCells,
+	LockedClimateOutputs,
 	LockedClimateParams,
-	LockedRainfall,
 	ZonalSeaAnomalyParams,
 } from "@/model/climatev2/types"
 import {
@@ -202,10 +204,11 @@ function computeLocked({
 	const N = mesh.numRegions
 	const temperatureMonthly = new Float32Array(MONTHS * N)
 	const rainfallMonthly = new Float32Array(MONTHS * N)
+	const orbit = CLIMATEV2_ORBIT.lockedFromParams(params)
 	const result = lockedClimate(
 		{ xyz: mesh.r_xyz, elevKm: elevationKm, axes: "z-up", land: isLand },
 		{
-			...CLIMATEV2_ORBIT.lockedFromParams(params),
+			...orbit,
 			seed: params.seed,
 			greenhouseWm2: 0,
 			onCell: (r, T12, P12) => {
@@ -219,12 +222,8 @@ function computeLocked({
 	const { grid } = result
 	const sea = new Uint8Array(N)
 	for (let r = 0; r < N; r++) sea[r] = isLand[r] ? 0 : 1
-	const monthly = {
-		weights: CLIMATEV2_OUTPUTS.bilinearWeights({ mesh, grid }),
-		fieldSize: grid.size,
-		months: MONTHS,
-		cells: sea,
-	}
+	const weights = CLIMATEV2_OUTPUTS.bilinearWeights({ mesh, grid })
+	const monthly = { weights, fieldSize: grid.size, months: MONTHS, cells: sea }
 	CLIMATEV2_OUTPUTS.sampleCells({
 		...monthly,
 		field: result.stages.temperature.monthlySL,
@@ -238,13 +237,49 @@ function computeLocked({
 	const rainfallAnnual = new Float32Array(N)
 	for (let m = 0; m < MONTHS; m++)
 		for (let r = 0; r < N; r++) rainfallAnnual[r] += rainfallMonthly[m * N + r]
-	return { temperatureMonthly, rainfallMonthly, rainfallAnnual }
+	const ctx = {
+		grid,
+		surface: result.surface,
+		anchorMonths: result.anchorMonths,
+		options: { ...orbit },
+	}
+	const temperature = result.stages.temperature
+	const circulation = CLIMATEV2_LOCKED_CIRCULATION.estimate({
+		ctx,
+		temperature,
+	})
+	const ocean = CLIMATEV2_LOCKED_OCEAN.estimate({
+		ctx,
+		circulation,
+		temperature,
+	})
+	return {
+		temperatureMonthly,
+		rainfallMonthly,
+		rainfallAnnual,
+		...CLIMATEV2_OUTPUTS.windFields({
+			weights,
+			circulation,
+			fieldSize: grid.size,
+		}),
+		oceanCurrents: {
+			...CLIMATEV2_OUTPUTS.currentFlows({
+				weights,
+				ocean,
+				fieldSize: grid.size,
+			}),
+			...CLIMATEV2_OUTPUTS.seaSurface({
+				anomalyMonthly: zonalSeaAnomaly({ mesh, isLand, temperatureMonthly }),
+				isLand,
+			}),
+		},
+	}
 }
 
 function applyLocked({
 	climate,
 	...world
-}: ApplyLockedClimateParams): LockedRainfall {
+}: ApplyLockedClimateParams): LockedClimateOutputs {
 	const N = world.mesh.numRegions
 	const cells = computeLocked(world)
 	climate.temperature_monthly.set(cells.temperatureMonthly)
@@ -255,7 +290,13 @@ function applyLocked({
 		temperature_max: climate.temperature_max,
 		N,
 	})
-	return { monthly: cells.rainfallMonthly, annual: cells.rainfallAnnual }
+	return {
+		rain: { monthly: cells.rainfallMonthly, annual: cells.rainfallAnnual },
+		wind: cells.wind,
+		windUMonthly: cells.windUMonthly,
+		windVMonthly: cells.windVMonthly,
+		oceanCurrents: cells.oceanCurrents,
+	}
 }
 
 export const CLIMATE_V2 = {

@@ -107,6 +107,11 @@ const NIGHT_HEAT_TRANSFER = 1.5e-3;
 // mean surface wind (surfaceWind, pressure.js), and evaporation's share, ρ·L·C_H·U·dq_s/dT (L: rain.js) — from a sunlit
 // land half as wet as the sea (the energy balance's land wetness without a rain stage, as for TEMP_EVAP_DAMPING)
 const LAND_WET = 0.5;
+// … and its sea's heat carried by the currents from the sea it heats most to the sea it heats least: this share of the
+// sea's own departure from the sea's mean sunlight, Earth's ocean's share of the heat the planet carries poleward at
+// 20° (Trenberth & Caron 2001: ≈ 2 of 5.5 PW). On a locked planet the currents run downwind to the substellar point
+// and the overturning carries the warmth back beneath them (Hu & Yang 2014: the ocean warms the nightside's seas).
+const OCEAN_SHARE = 0.35;
 
 // The heat to space, A + B·T, fitted where Earth's satellites see it (North & Coakley 1979: zonal means, ≈ −40 … 30 °C),
 // falls to nothing at −A/B (≈ −96 °C on Earth) and below it would heat the ground. Colder than where it touches a gray
@@ -148,11 +153,18 @@ function lockedSurface({ surf, Tk, harmonics, Q, landFrac, lat, w, h, olr, gEart
             for (let i = 0; i < w; i++) { const c = j * w + i, f = landFrac[c]; sum += wj * (f * surf.sunLand[o + c] + (1 - f) * surf.sunSea[o + c]); area += wj; }
         }
         const mean = sum / area;
+        let seaSun = 0, seaArea = 0;
+        for (let j = 0; j < h; j++) {
+            const wj = Math.cos(lat[j] * Math.PI / 180);
+            for (let i = 0; i < w; i++) { const c = j * w + i, s = wj * (1 - landFrac[c]); seaSun += s * surf.sunSea[o + c]; seaArea += s; }
+        }
+        const seaMean = seaArea > 0 ? seaSun / seaArea : 0;
         for (let c = 0; c < G; c++) {
             const T = Tk[c] = c0[c] + 2 * (c1r[c] * co - c1i[c] * sn) + 2 * (c2r[c] * co2 - c2i[c] * sn2), tK = T + 273.15, f = landFrac[c];
             const eps = backEmissivity({ olr, gEarth, T });
             const es = 611.2 * Math.exp(17.67 * T / (T + 243.5)), wetK = convK.latent / tK * es * 17.67 * 243.5 / (T + 243.5) ** 2;
-            const dryK = convK.sensible / tK, sea = surf.sunSea[o + c] - mean;
+            const ocean = surf.oceanQ[o + c] = -OCEAN_SHARE * (surf.sunSea[o + c] - seaMean);
+            const dryK = convK.sensible / tK, sea = surf.sunSea[o + c] - mean + ocean;
             let x = 1 - Q[o + c] / WEAK_SUN; x = x <= 0 ? 0 : x >= 1 ? 1 : x;
             const dark = x * x * (3 - 2 * x), stable = dark > 0 ? darkGround({ olr, gEarth, k: nightK / tK, Ta: T }) - T : 0;
             const ice = surf.seaIce[o + c];
@@ -166,7 +178,7 @@ function lockedSurface({ surf, Tk, harmonics, Q, landFrac, lat, w, h, olr, gEart
             if (final) {
                 const backLw = eps * STEFAN_BOLTZMANN * tK ** 4;
                 surf.netLand[o + c] = surf.sunLand[o + c] - STEFAN_BOLTZMANN * Math.max(1, tK + surf.dLand[o + c]) ** 4 + backLw;
-                surf.netSea[o + c] = surf.sunSea[o + c] - STEFAN_BOLTZMANN * Math.max(1, tK + surf.dSea[o + c]) ** 4 + backLw;
+                surf.netSea[o + c] = surf.sunSea[o + c] + ocean - STEFAN_BOLTZMANN * Math.max(1, tK + surf.dSea[o + c]) ** 4 + backLw;
             }
         }
     }
@@ -432,7 +444,7 @@ export function energyBalanceTemperature() {
         const convK = { sensible: 101325 * orbit.pressureScale / AIR_R * AIR_CP * NIGHT_HEAT_TRANSFER * convWind, latent: 0.622 / AIR_R * LATENT * NIGHT_HEAT_TRANSFER * convWind };
         // (a locked planet's surfaces against its air: lockedSurface — carried over from a previous run)
         const surfSize = NT * G, surf = !orbit.locked ? null : warm && init.surf?.window.length === surfSize ? init.surf
-            : { sunLand: new Float64Array(surfSize), sunSea: new Float64Array(surfSize), seaIce: new Float64Array(surfSize), dLand: new Float64Array(surfSize), dSea: new Float64Array(surfSize), window: new Float64Array(surfSize), netLand: new Float64Array(surfSize), netSea: new Float64Array(surfSize) };
+            : { sunLand: new Float64Array(surfSize), sunSea: new Float64Array(surfSize), seaIce: new Float64Array(surfSize), dLand: new Float64Array(surfSize), dSea: new Float64Array(surfSize), window: new Float64Array(surfSize), netLand: new Float64Array(surfSize), netSea: new Float64Array(surfSize), oceanQ: new Float64Array(surfSize) };
         const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), rowNet: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
         for (let it = 0; it < outer; it++) {
             tp = performance.now();

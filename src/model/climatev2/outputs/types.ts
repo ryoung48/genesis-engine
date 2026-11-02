@@ -35,7 +35,7 @@ export interface AnnualMeanParams {
 
 export interface WindFieldsParams {
 	weights: BilinearWeights
-	circulation: CirculationResult
+	circulation: Pick<CirculationResult, "u" | "v" | "slp">
 	fieldSize: number
 }
 
@@ -47,7 +47,7 @@ export interface WindFields {
 
 export interface CurrentFlowsParams {
 	weights: BilinearWeights
-	ocean: OceanResult
+	ocean: Pick<OceanResult, "u" | "v" | "monthly">
 	fieldSize: number
 }
 

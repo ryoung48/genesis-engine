@@ -90,7 +90,12 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					dayRain: 0,
 					nightRain: 0,
 					landRain: 0,
+					dayQ: 0,
+					daySea: 0,
+					nightQ: 0,
+					nightSea: 0,
 				}
+				const ocean = result.stages.temperature.lockedSurf
 				let subRain = Number.NaN
 				const band = new Float64Array(6)
 				const bandArea = new Float64Array(6)
@@ -125,6 +130,18 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 							sums.nightArea += wj
 						}
 						const lf = surface.landFrac[c]
+						if (ocean) {
+							const sea = wj * (1 - lf)
+							let q = 0
+							for (let s = 0; s < 12; s++) q += ocean.oceanQ[s * G + c] / 12
+							if (cosTheta > 0) {
+								sums.dayQ += sea * q
+								sums.daySea += sea
+							} else {
+								sums.nightQ += sea * q
+								sums.nightSea += sea
+							}
+						}
 						sums.rain += rain * wj
 						if (cosTheta > 0) sums.dayRain += rain * wj
 						else sums.nightRain += rain * wj
@@ -182,6 +199,8 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					nightLandC: r1(sums.nightLand / sums.nightLandArea),
 					nightLandBelowAirC: r1(-sums.nightInversion / sums.nightLandArea),
 					rainMmYr: Math.round(sums.rain / sums.area),
+					oceanHeatDayWm2: r1(sums.dayQ / sums.daySea),
+					oceanHeatNightWm2: r1(sums.nightQ / sums.nightSea),
 					dayRainMmYr: Math.round(sums.dayRain / sums.dayArea),
 					nightRainMmYr: Math.round(sums.nightRain / sums.nightArea),
 					landRainMmYr: Math.round(sums.landRain / sums.land),

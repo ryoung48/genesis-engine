@@ -22,7 +22,7 @@ export function climateStages() {
     return { temperature: energyBalanceTemperature(), circulation: derivedCirculation(), ocean: windDrivenOcean(), rain: columnWaterRain() };
 }
 
-/** A planet locked to its star: its temperature, its substellar cloud deck and its rain; no winds or ocean yet. */
+// A planet locked to its star: its temperature (its sea's heat carried within the surface balance), cloud deck and rain.
 export function lockedClimate(input, options = {}) {
     const stages = { temperature: energyBalanceTemperature(), clouds: ({ ctx, temperature }) => CLIMATEV2_LOCKED_CLOUDS.estimate({ ctx, temperatureMonthly: temperature.monthly }), rain: (ctx, winds, temperature) => CLIMATEV2_LOCKED_RAIN.estimate({ ctx, temperature }) };
     return computeClimate(input, { ...options, stages, cloudsFromRain: false });

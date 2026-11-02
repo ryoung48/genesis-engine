@@ -4,7 +4,7 @@ Choose **Climate v2** or **Climate v1** in the generation panel, then select **G
 
 V1 restores the active pipeline from immediately before commit `8977cda2`: the zonal energy-balance temperature model with continentality, simple pressure-gradient winds, heuristic coastal ocean currents and SST anomalies, and advected seasonal rainfall. Monthly winds are derived on demand for the overlay. Terrain, hydrology, classifications, ice, and observed Earth data use the shared current pipeline.
 
-V2 uses the current climatev2 temperature, monthly wind, ocean, rain, cloud and diurnal-range outputs. Planets tidally locked to their star take their temperature and rain from climatev2's locked climate (`CLIMATE_V2.applyLocked`, see [pressure.md](pressure.md#tidally-locked-planets)) and their winds and sea surface from the legacy locked modules; under V1 they keep the legacy locked solvers throughout.
+V2 uses the current climatev2 temperature, monthly wind, ocean, rain, cloud and diurnal-range outputs. Planets tidally locked to their star take their temperature, rain, winds and ocean currents from climatev2's locked climate (`CLIMATE_V2.applyLocked`, see [pressure.md](pressure.md#tidally-locked-planets)), solved once from the terrain before any lake drains, as for rotating worlds; their day–night range still comes from the legacy model. Under V1 they keep the legacy locked solvers throughout.
 
 The selected model travels with the world in `params.climateModel`; model APIs that omit it use v2.
 
