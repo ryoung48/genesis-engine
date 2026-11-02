@@ -7,7 +7,6 @@ import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
 import { CLIMATE_EARTH } from "./fixtures/climate-earth"
 
 const PRESSURES_BAR = [0.1, 0.25, 0.5, 1, 2, 5, 10]
-const STAR_MASS_SOL = 0.3
 
 interface Case {
 	label: string
@@ -100,7 +99,7 @@ function summarize({
 
 describe("climatev2 locked temperature (diagnostic)", () => {
 	it(
-		"sweeps surface pressure on Earth's terrain for a Sun-like and an M-dwarf host",
+		"sweeps surface pressure on Earth's terrain for a Sun-like host",
 		{ timeout: 1_800_000 },
 		() => {
 			const world = CLIMATE_EARTH.importWorld()
@@ -110,13 +109,6 @@ describe("climatev2 locked temperature (diagnostic)", () => {
 					label: "Sun, 1 AU, locked",
 					spectralClass: "G",
 					starSubtype: 2,
-					periodDays: null,
-					pressure,
-				})
-				cases.push({
-					label: "M dwarf, Earth flux",
-					spectralClass: "M",
-					starSubtype: 3,
 					periodDays: null,
 					pressure,
 				})
@@ -130,11 +122,7 @@ describe("climatev2 locked temperature (diagnostic)", () => {
 				})
 				const sunScale = CLIMATEV2_ORBIT.fromParams(probe).sunScale
 				const distanceAU = Math.sqrt(sunScale)
-				const periodDays =
-					365 *
-					Math.sqrt(
-						distanceAU ** 3 / (spec.spectralClass === "G" ? 1 : STAR_MASS_SOL),
-					)
+				const periodDays = 365 * Math.sqrt(distanceAU ** 3 / 1)
 				const params = lockedParams({
 					base: world.params,
 					spec,
@@ -155,24 +143,26 @@ describe("climatev2 locked temperature (diagnostic)", () => {
 					...summarize({ world, temperatureMonthly }),
 				}
 			})
-			const rotating = PRESSURES_BAR.map((pressure) => {
-				const cells = CLIMATE_V2.computeCellClimate({
-					mesh: world.mesh,
-					elevationKm: world.elevation_km,
-					isLand: world.isLand,
-					orbit: CLIMATEV2_ORBIT.fromParams({ ...world.params, pressure }),
-					seed: world.params.seed,
-					diagnostics: false,
-				})
-				return {
-					label: "rotating Earth day",
-					pressureBar: pressure,
-					globalMeanC: summarize({
-						world,
-						temperatureMonthly: cells.temperatureMonthly,
-					}).globalMeanC,
-				}
-			})
+			const rotating = (process.env.SWEEP_ROTATING ? PRESSURES_BAR : []).map(
+				(pressure) => {
+					const cells = CLIMATE_V2.computeCellClimate({
+						mesh: world.mesh,
+						elevationKm: world.elevation_km,
+						isLand: world.isLand,
+						orbit: CLIMATEV2_ORBIT.fromParams({ ...world.params, pressure }),
+						seed: world.params.seed,
+						diagnostics: false,
+					})
+					return {
+						label: "rotating Earth day",
+						pressureBar: pressure,
+						globalMeanC: summarize({
+							world,
+							temperatureMonthly: cells.temperatureMonthly,
+						}).globalMeanC,
+					}
+				},
+			)
 			rows.push(...(rotating as unknown as typeof rows))
 			const stamp = new Date().toISOString().replace(/[:.]/g, "-")
 			const dir = path.join("stats", "climate", `${stamp}-locked-temperature`)

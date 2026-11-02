@@ -39,6 +39,8 @@ const ALBEDO_FOR_WAVES = 0.3;               // the albedo that sets the air's te
 const SEAWATER_HEAT_CAP = 1025 * 3990;      // J/m³/K
 const NT = 12;                              // samples per year for what is evaluated in time (≥ 5 for 2 harmonics)
 const OUTER = 3;                            // outer iterations (snow / ice, seasonal winds)
+const OUTER_LOCKED = 8;                    // … on a locked planet, whose cells start far from their steady state (Phase: locked)
+const OUTER_LOCKED_WARM = 4;               // … and from a previous run
 const OUTER_WARM = 1;                       // … when starting from a previous run (temperature ↔ winds rounds)
 const CC_SLOPE_25 = Math.exp(17.67 * 25 / 268.5) * 17.67 * 243.5 / (268.5 * 268.5);   // de_s/dT at 25 °C (relative units)
 const WET_RAIN_MM = 800;                    // yearly rain at which land is ~63 % wet (evaporation not limited by water)
@@ -79,6 +81,9 @@ const slantReflect = (mu) => {
     const m = Math.max(0.05, mu), t = (1 - CLOUD_G) * CLOUD_TAU;
     return (1 - CLOUD_COVER) * 0.28 / (1 + 6.43 * m) + CLOUD_COVER * (t + (2 / 3 - m) * (1 - Math.exp(-CLOUD_TAU / m))) / (4 / 3 + t);
 };
+// a locked planet's air reflectance is anchored where Earth's fit is best known: the equator, whose sunlight-weighted
+// mean cos zenith is π/4 (∫cos² / ∫cos over the day)
+const LOCKED_ANCHOR_MU = Math.PI / 4;
 const SURF_SEA = 0.06;                     // open sea (Oke 1987 Table 1.1; Briegleb et al. 1986)
 const SURF_LAND = 0.2;                      // bare and vegetated ground, 0.15–0.25 (Oke 1987 Table 1.1)
 const SURF_SNOW = 0.5;                      // seasonal snow below the treeline: forests 0.2–0.35, fields 0.6–0.7 (Oke 1987; Robinson & Kukla 1985; Betts & Ball 1997)
@@ -197,9 +202,10 @@ export function energyBalanceTemperature() {
         // the substellar point, the air's reflectance by the sun's height there (no belts to place Earth's clouds by)
         const Q = new Float64Array(NT * G), albBase = new Float64Array(NT * G);
         if (orbit.locked) {
+            const earthAirAlbedo = (x) => P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * x + P.TEMP_ALBEDO_SUN2 * x * x;
             const L = lockedTables(g.lat, g.lon, orbit, NT);
             Q.set(L.q);
-            for (let c = 0; c < NT * G; c++) { const mu = Math.max(L.mu[c], 0.05); albBase[c] = P.TEMP_ALBEDO_SUN0 + slantReflect(mu) - slantReflect(1) + clearExtra(mu); }
+            for (let c = 0; c < NT * G; c++) { const mu = Math.max(L.mu[c], 0.05); albBase[c] = earthAirAlbedo(1 - LOCKED_ANCHOR_MU) + slantReflect(mu) - slantReflect(LOCKED_ANCHOR_MU) + clearExtra(mu); }
         } else for (let k = 0; k < NT; k++) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { Q[k * G + j * w + i] = Qrow[k * h + j]; albBase[k * G + j * w + i] = albRow[k * h + j]; }
         // (and the surface's own variety about that: smooth fractal noise by geographic position, a fixed size in km — an
         // input like the rest, which the heat's spread and the snow and ice then work through)
@@ -243,6 +249,13 @@ export function energyBalanceTemperature() {
             let q = 0; for (let k = 0; k < NT; k++) q += Q[k * G + c] * (1 - albBase[k * G + c]) / NT;
             c0[c] = Math.max(-40, Math.min(35, (q - P.TEMP_OLR_A) / P.TEMP_OLR_B));
         }
+        // (a locked planet moves its heat far faster than a first guess by each cell's own sunlight can know — the nightside
+        // would start frozen, with ice sheets that keep themselves so: it starts at the planet's mean balance instead)
+        if (orbit.locked) {
+            let sum = 0, weight = 0;
+            for (let j = 0; j < h; j++) { const wj = Math.cos(g.lat[j] * Math.PI / 180); for (let i = 0; i < w; i++) { for (let k = 0; k < NT; k++) sum += Q[k * G + j * w + i] * (1 - albBase[k * G + j * w + i]) * wj / NT; weight += wj; } }
+            c0.fill(Math.max(-40, Math.min(35, (sum / weight - P.TEMP_OLR_A) / P.TEMP_OLR_B)));
+        }
         const snowYear = new Float64Array(G), snowYearPrev = new Float64Array(G);   // share of the year the land is snowy
         const warm = !!(init && init.step === g.step && init.c0.length === G);
         if (warm) {
@@ -256,7 +269,7 @@ export function energyBalanceTemperature() {
             // the rounds keep the sheets that hold themselves (developer: the poles "frequently not icey … feels super wrong")
             for (let c = 0; c < G; c++) if (landFrac[c] > 0 && c0[c] < P.TEMP_ICE_START_C) { snowYear[c] = 1; perennial[c] = 1; }
         }
-        const outer = warm ? OUTER_WARM : OUTER;
+        const outer = orbit.locked ? (warm ? OUTER_LOCKED_WARM : OUTER_LOCKED) : warm ? OUTER_WARM : OUTER;
         // (the day's cycle's extra heat radiated, W/m² at t = 0 … 11 months, from the previous round — diurnal.js; none on
         // an Earth day)
         const dayRect = warm && init.dayRect ? init.dayRect : null;
