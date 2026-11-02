@@ -59,6 +59,12 @@ export function windScale(orbit) {
     return orbit.pressureScale ** -WIND_POWER;
 }
 
+// ExoPlaSim's mean surface wind on Earth, 22 km/h (as WIND_POWER), at the planet's pressure: the locked planet's surface
+// exchange with the air (temperature.js) and its sea's evaporation (rain/locked), which have no winds of their own yet
+export function surfaceWind(orbit) {
+    return 22 / 3.6 * windScale(orbit);
+}
+
 /** Clear air's Rayleigh reflectance for a sun at μ (cos zenith) under ps of Earth's air: Eddington, conservative, g = 0. */
 export function rayleighReflect(mu, ps) {
     const m = Math.max(0.05, mu), t = RAYLEIGH_TAU * ps;

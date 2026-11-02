@@ -27,7 +27,8 @@ import { HelmholtzSolver } from './solver.js';
 import { PARAMS } from './config.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
-import { pressureScaled, rayleighReflect, windScale, PSYCHRO_KPA } from './pressure.js';
+import { pressureScaled, rayleighReflect, surfaceWind, PSYCHRO_KPA } from './pressure.js';
+import { LATENT } from './rain.js';
 import { dayCycle } from './diurnal.js';
 import { tropicsWeight, gaussianSmooth } from './circulation.js';
 import { FastNoise } from './fast-noise.js';
@@ -102,12 +103,9 @@ const STEFAN_BOLTZMANN = 5.670374e-8;        // W/m²/K⁴
 // §4.4), U the wind that half mixes an inversion away (TEMP_INVERSION_WIND)
 const BACK_EMISSIVITY_EARTH = 333 / 396;
 const NIGHT_HEAT_TRANSFER = 1.5e-3;
-// … and its sunlit ground and its seas, convecting into the air above (lockedSurface): the same exchange at the surface
-// wind ExoPlaSim's Earth averages, 22 km/h (Worldbuilding Pasta 2025, "Climate Explorations: Pressure"; × windScale
-// with the pressure), and evaporation's share, ρ·L·C_H·U·dq_s/dT — from a sunlit land half as wet as the sea (the
-// energy balance's land wetness without a rain stage, as for TEMP_EVAP_DAMPING)
-const SURFACE_WIND_EARTH = 22 / 3.6;
-const LATENT_HEAT = 2.5e6;
+// … and its sunlit ground and its seas, convecting into the air above (lockedSurface): the same exchange at the planet's
+// mean surface wind (surfaceWind, pressure.js), and evaporation's share, ρ·L·C_H·U·dq_s/dT (L: rain.js) — from a sunlit
+// land half as wet as the sea (the energy balance's land wetness without a rain stage, as for TEMP_EVAP_DAMPING)
 const LAND_WET = 0.5;
 
 // The heat to space, A + B·T, fitted where Earth's satellites see it (North & Coakley 1979: zonal means, ≈ −40 … 30 °C),
@@ -119,19 +117,14 @@ const LAND_WET = 0.5;
 // weakens until the line passes σ·T⁴ in the cold (at 0.1 bar below ≈ −15 °C, the tangent's ε > 1), and there the heat
 // to space is σ·T⁴ (never reached on Earth, where the line stays below it).
 function coldOlr({ A, B }) {
-    const tJ = (4 * 273.15 - 4 * A / B) / 3;
-    return { tJC: tJ - 273.15, eps: B / (4 * STEFAN_BOLTZMANN * tJ ** 3), A, B };
+    const tJ = (4 * 273.15 - 4 * A / B) / 3, tJC = tJ - 273.15, eps = B / (4 * STEFAN_BOLTZMANN * tJ ** 3);
+    const toSpace = (T) => {
+        const black = STEFAN_BOLTZMANN * (T + 273.15) ** 4;
+        return Math.min(T < tJC ? eps * black : A + B * T, black);
+    };
+    return { tJC, eps, A, B, toSpace };
 }
-function heatToSpace({ olr, T }) {
-    const black = STEFAN_BOLTZMANN * (T + 273.15) ** 4;
-    return Math.min(T < olr.tJC ? olr.eps * black : olr.A + olr.B * T, black);
-}
-// The air's back radiation over the surface's emission: Earth's, scaled by the greenhouse's share of that emission
-const backEmissivity = ({ olr, gEarth, T }) => Math.min(1, BACK_EMISSIVITY_EARTH * Math.max(0, 1 - heatToSpace({ olr, T }) / (STEFAN_BOLTZMANN * (T + 273.15) ** 4)) / gEarth);
-/**
- * A surface beneath air at T_a (°C) whose own balance departs from the air's by rhs (W/m²): it sends the air and space
- * σ·T_s⁴ against the air's σ·T_a⁴, and exchanges k·(T_s − T_a) with it — σ·T_s⁴ − σ·T_a⁴ + k·(T_s − T_a) = rhs, by Newton.
- */
+const backEmissivity = ({ olr, gEarth, T }) => Math.min(1, BACK_EMISSIVITY_EARTH * Math.max(0, 1 - olr.toSpace(T) / (STEFAN_BOLTZMANN * (T + 273.15) ** 4)) / gEarth);
 function groundBalance({ Ta, k, rhs }) {
     const tK = Ta + 273.15, target = rhs + STEFAN_BOLTZMANN * tK * tK * tK * tK + k * tK;
     let ts = tK;
@@ -142,28 +135,10 @@ function groundBalance({ Ta, k, rhs }) {
     }
     return ts - 273.15;
 }
-/**
- * The ground under a locked planet's night beneath air at T_a (°C): it gets no sun, only the air's back radiation
- * ε·σ·T_a⁴ and the heat the stable surface layer brings — so it falls below the air where the greenhouse is weak
- * (Wordsworth 2015: thin air's nightsides decouple from the air above). ε is Earth's back radiation scaled by the
- * greenhouse's share of the surface's emission, 1 − OLR/σT⁴ (Raval & Ramanathan 1989), against Earth's at 15 °C, so it
- * follows the pressure's greenhouse (pressure.js) and the air's temperature.
- */
 function darkGround({ olr, gEarth, k, Ta }) {
     return groundBalance({ Ta, k, rhs: -(1 - backEmissivity({ olr, gEarth, T: Ta })) * STEFAN_BOLTZMANN * (Ta + 273.15) ** 4 });
 }
-/**
- * A locked planet's surface against the air column the energy balance solves (Tk: the day–night transport keeps that
- * air nearly even, Pierrehumbert & Hammond 2019): each surface is set by its own balance beneath it. Sunlit ground and
- * the open sea (stirred from below, by day and by night) convect: they run warmer than the column by (S − S̄) / k, the
- * sunlight they take beyond the planet's mean (groundBalance, against their own emission and their exchange with the
- * air: the surface layer's heat ρ·c_p·C_H·U and, where wet, evaporation ρ·L·C_H·U·dq_s/dT — independent of the pressure:
- * ρ·q_s goes as the vapour's own pressure). Dark land and sea ice lie under a stable layer: darkGround. Per sample time, the offsets of
- * the land (dLand) and of the sea (dSea), and the heat their surfaces send to space through the window beyond the
- * column's own, (1 − ε)·σ·((T + δ)⁴ − T⁴) (window), for the next round's forcing — each round's offsets relaxed toward
- * the new ones as the solve's are.
- */
-function lockedSurface({ surf, Tk, harmonics, Q, landFrac, lat, w, h, olr, gEarth, nightK, convK, relax }) {
+function lockedSurface({ surf, Tk, harmonics, Q, landFrac, lat, w, h, olr, gEarth, nightK, convK, relax, final }) {
     const G = landFrac.length, { c0, c1r, c1i, c2r, c2i } = harmonics;
     for (let k = 0; k < NT; k++) {
         const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), o = k * G;
@@ -182,13 +157,17 @@ function lockedSurface({ surf, Tk, harmonics, Q, landFrac, lat, w, h, olr, gEart
             const dark = x * x * (3 - 2 * x), stable = dark > 0 ? darkGround({ olr, gEarth, k: nightK / tK, Ta: T }) - T : 0;
             const ice = surf.seaIce[o + c];
             // (only what carries weight is solved: the dark side has no convecting ground, the open sea no ice)
-            const convect = ({ k, rhs }) => groundBalance({ Ta: T, k, rhs }) - T;
-            const dLand = (dark < 1 ? (1 - dark) * convect({ k: dryK + LAND_WET * wetK, rhs: surf.sunLand[o + c] - mean }) : 0) + dark * stable;
-            const dIce = ice > 0 ? (dark < 1 ? (1 - dark) * convect({ k: dryK, rhs: sea }) : 0) + dark * stable : 0;
-            const dSea = (ice < 1 ? (1 - ice) * convect({ k: dryK + wetK, rhs: sea }) : 0) + ice * dIce;
+            const dLand = (dark < 1 ? (1 - dark) * (groundBalance({ Ta: T, k: dryK + LAND_WET * wetK, rhs: surf.sunLand[o + c] - mean }) - T) : 0) + dark * stable;
+            const dIce = ice > 0 ? (dark < 1 ? (1 - dark) * (groundBalance({ Ta: T, k: dryK, rhs: sea }) - T) : 0) + dark * stable : 0;
+            const dSea = (ice < 1 ? (1 - ice) * (groundBalance({ Ta: T, k: dryK + wetK, rhs: sea }) - T) : 0) + ice * dIce;
             surf.dLand[o + c] += relax * (dLand - surf.dLand[o + c]); surf.dSea[o + c] += relax * (dSea - surf.dSea[o + c]);
             const d = f * surf.dLand[o + c] + (1 - f) * surf.dSea[o + c];
             surf.window[o + c] = (1 - eps) * STEFAN_BOLTZMANN * (Math.max(1, tK + d) ** 4 - tK ** 4);
+            if (final) {
+                const backLw = eps * STEFAN_BOLTZMANN * tK ** 4;
+                surf.netLand[o + c] = surf.sunLand[o + c] - STEFAN_BOLTZMANN * Math.max(1, tK + surf.dLand[o + c]) ** 4 + backLw;
+                surf.netSea[o + c] = surf.sunSea[o + c] - STEFAN_BOLTZMANN * Math.max(1, tK + surf.dSea[o + c]) ** 4 + backLw;
+            }
         }
     }
 }
@@ -449,11 +428,11 @@ export function energyBalanceTemperature() {
         // convecting surface's wind, and ρ·L·C_H·U·T_a·dq_s/dT ÷ de_s/dT for evaporation: ρ = p / (R·T_a), q_s = 0.622·e_s/p)
         const gEarth = 1 - (PARAMS.TEMP_OLR_A + PARAMS.TEMP_OLR_B * 15) / (STEFAN_BOLTZMANN * 288.15 ** 4);
         const nightK = 101325 * orbit.pressureScale / AIR_R * AIR_CP * NIGHT_HEAT_TRANSFER * P.TEMP_INVERSION_WIND;
-        const convWind = SURFACE_WIND_EARTH * windScale(orbit);
-        const convK = { sensible: 101325 * orbit.pressureScale / AIR_R * AIR_CP * NIGHT_HEAT_TRANSFER * convWind, latent: 0.622 / AIR_R * LATENT_HEAT * NIGHT_HEAT_TRANSFER * convWind };
+        const convWind = surfaceWind(orbit);
+        const convK = { sensible: 101325 * orbit.pressureScale / AIR_R * AIR_CP * NIGHT_HEAT_TRANSFER * convWind, latent: 0.622 / AIR_R * LATENT * NIGHT_HEAT_TRANSFER * convWind };
         // (a locked planet's surfaces against its air: lockedSurface — carried over from a previous run)
         const surfSize = NT * G, surf = !orbit.locked ? null : warm && init.surf?.window.length === surfSize ? init.surf
-            : { sunLand: new Float64Array(surfSize), sunSea: new Float64Array(surfSize), seaIce: new Float64Array(surfSize), dLand: new Float64Array(surfSize), dSea: new Float64Array(surfSize), window: new Float64Array(surfSize) };
+            : { sunLand: new Float64Array(surfSize), sunSea: new Float64Array(surfSize), seaIce: new Float64Array(surfSize), dLand: new Float64Array(surfSize), dSea: new Float64Array(surfSize), window: new Float64Array(surfSize), netLand: new Float64Array(surfSize), netSea: new Float64Array(surfSize) };
         const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), rowNet: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
         for (let it = 0; it < outer; it++) {
             tp = performance.now();
@@ -467,7 +446,7 @@ export function energyBalanceTemperature() {
             forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, g.lat, dRad, g.radiusM, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
                 albVary, cloudT, snowYear, !!(winds && gamma), uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
                 P.TEMP_ICE_WARM_C, P.TEMP_ICE_COLD_C, it === outer - 1 ? budgetSums : null, surf);
-            if (surf) lockedSurface({ surf, Tk, harmonics: { c0, c1r, c1i, c2r, c2i }, Q, landFrac, lat: g.lat, w, h, olr: olrCold, gEarth, nightK, convK, relax: it === 0 && !warm ? 1 : 0.5 });
+            if (surf) lockedSurface({ surf, Tk, harmonics: { c0, c1r, c1i, c2r, c2i }, Q, landFrac, lat: g.lat, w, h, olr: olrCold, gEarth, nightK, convK, relax: it === 0 && !warm ? 1 : 0.5, final: it === outer - 1 });
             if (dayRect) for (let k = 0; k < NT; k++) {
                 const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), t = 12 * k / NT;
                 const a = Math.floor(t) % 12, f = t - Math.floor(t), b = (a + 1) % 12;
@@ -864,7 +843,7 @@ export function energyBalanceTemperature() {
             return o;
         };
         const landSun = { down: landSunOf(sunDown), taken: landSunOf(sunTaken) };
-        const out = { T, monthly, monthlySL, landSun, iceFrac: iceCore, domeKm: domeCore, inversion, diurnal, dayHeating, dayWind2, budget, state, solverStats: stats, profile: prof, ms: performance.now() - t0, source: 'energy balance' };
+        const out = { T, monthly, monthlySL, lockedSurf: surf, landSun, iceFrac: iceCore, domeKm: domeCore, inversion, diurnal, dayHeating, dayWind2, budget, state, solverStats: stats, profile: prof, ms: performance.now() - t0, source: 'energy balance' };
         return Object.defineProperties(out, {
             seaIce: { get: seaIceOf, enumerable: true },
             seaIceOpen: { get: () => drawnOf().seaIceOpen, enumerable: true },
@@ -917,7 +896,7 @@ function monthsToSamples(G, qm, qAt) {
 function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad, R_PLANET, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
     albVary, cloudT, snowYear, windsOn, uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
     iceWarmC, iceColdC, budget, lockedSurf) {
-    const iceSpan = iceWarmC - iceColdC;
+    const iceSpan = iceWarmC - iceColdC, olrA = olrCold.A, olrB = olrCold.B, toSpace = olrCold.toSpace, seaIceOn = PARAMS.TEMP_SEA_ICE > 0;
     const dLandA = lockedSurf?.dLand, dSeaA = lockedSurf?.dSea, windowA = lockedSurf?.window;
     const sunLandA = lockedSurf?.sunLand, sunSeaA = lockedSurf?.sunSea, seaIceA = lockedSurf?.seaIce;
     // (what holds all year at a cell: its height's lapse, the air left above it, its snow's brightness by the treeline)
@@ -941,7 +920,7 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 const tL = lockedSurf ? T + dLandA[k * G + c] : T, tO = lockedSurf ? T + dSeaA[k * G + c] : T;
                 const xL = (iceWarmC - (tL - lapseKm[c])) / iceSpan, xO = (iceWarmC - tO) / iceSpan;
                 const sL = xL <= 0 ? 0 : xL >= 1 ? 1 : xL * xL * (3 - 2 * xL), sOnow = xO <= 0 ? 0 : xO >= 1 ? 1 : xO * xO * (3 - 2 * xO);
-                const sO = PARAMS.TEMP_SEA_ICE <= 0 ? 0 : sOnow;
+                const sO = seaIceOn ? sOnow : 0;
                 // (the planet's albedo: the air and its clouds reflect R (ab, by the sun's height alone — the surface's ice
                 // and snow are not in it, so they come and go with the temperature, not the sun's slant); what passes, T =
                 // 1 − R − the air's absorption (airAbsorb), reaches the surface, whose albedo α_s sends part back up through
@@ -983,13 +962,13 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 }
                 snowYear[c] += sL / NT;
                 let gF = q * (1 - alb) + cloudLongwave;
-                gF -= heatToSpace({ olr: olrCold, T }) - olrCold.A - olrCold.B * T;
+                gF -= toSpace(T) - olrA - olrB * T;
                 if (lockedSurf) {
                     const o = k * G + c, downAll = Math.max(0, q * tr / (1 - R * as) - q * cloudAlbedo);
                     sunLandA[o] = downAll * (1 - landS); sunSeaA[o] = downAll * (1 - seaS); seaIceA[o] = sO;
                     gF -= windowA[o];
                 }
-                if (budget) budget.rowNet[j] += gF - olrCold.A - olrCold.B * T;
+                if (budget) budget.rowNet[j] += gF - olrA - olrB * T;
                 if (windsOn) {
                     const du = uT[k * G + c], dv = vT[k * G + c];
                     const Tw = Tk[j * w + (i === 0 ? w - 1 : i - 1)], Te = Tk[j * w + (i === w - 1 ? 0 : i + 1)];

@@ -28,12 +28,12 @@ describe("locked winds (diagnostic)", () => {
 					hoursPerDay: 365 * 24,
 					pressure,
 				}
-				const temperatureMonthly = CLIMATE_V2.computeLockedTemperature({
+				const temperatureMonthly = CLIMATE_V2.computeLocked({
 					mesh,
 					elevationKm: world.elevation_km,
 					isLand: world.isLand,
 					params,
-				})
+				}).temperatureMonthly
 				const avg = new Float32Array(N)
 				for (let r = 0; r < N; r++) {
 					for (let m = 0; m < 12; m++)

@@ -86,7 +86,12 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					nightLand: 0,
 					nightLandArea: 0,
 					nightInversion: 0,
+					rain: 0,
+					dayRain: 0,
+					nightRain: 0,
+					landRain: 0,
 				}
+				let subRain = Number.NaN
 				const band = new Float64Array(6)
 				const bandArea = new Float64Array(6)
 				let sub = Number.NaN
@@ -103,7 +108,9 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 						let t = 0
 						let ice = 0
 						let inv = 0
+						let rain = 0
 						for (let m = 0; m < 12; m++) {
+							rain += result.months.P[m * G + c]
 							t += temperature.monthlySL[m * G + c] / 12
 							ice += temperature.seaIce[m * G + c] / 12
 							inv += temperature.inversion[m * G + c] / 12
@@ -118,6 +125,10 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 							sums.nightArea += wj
 						}
 						const lf = surface.landFrac[c]
+						sums.rain += rain * wj
+						if (cosTheta > 0) sums.dayRain += rain * wj
+						else sums.nightRain += rain * wj
+						sums.landRain += rain * wj * lf
 						if (cosTheta > 0) {
 							sums.dayLand += (t + inv) * wj * lf
 							sums.dayLandArea += wj * lf
@@ -138,6 +149,7 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 						bandArea[b] += wj
 						if (cosTheta > bestSub) {
 							bestSub = cosTheta
+							subRain = rain
 							sub = t
 						}
 						if (cosTheta < bestAnti) {
@@ -159,6 +171,9 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					pressureBar: pressure,
 					sunlight,
 					seconds: r1(seconds),
+					stageSeconds: Object.fromEntries(
+						result.timing.map((t) => [t.stage, r1(t.ms / 1000)]),
+					),
 					globalMeanC: r1(sums.all / sums.area),
 					daysideMeanC: r1(sums.day / sums.dayArea),
 					nightsideMeanC: r1(sums.night / sums.nightArea),
@@ -166,6 +181,11 @@ describe("climatev2 locked energy budget (diagnostic)", () => {
 					dayLandC: r1(sums.dayLand / sums.dayLandArea),
 					nightLandC: r1(sums.nightLand / sums.nightLandArea),
 					nightLandBelowAirC: r1(-sums.nightInversion / sums.nightLandArea),
+					rainMmYr: Math.round(sums.rain / sums.area),
+					dayRainMmYr: Math.round(sums.dayRain / sums.dayArea),
+					nightRainMmYr: Math.round(sums.nightRain / sums.nightArea),
+					landRainMmYr: Math.round(sums.landRain / sums.land),
+					substellarRainMmYr: Math.round(subRain),
 					substellarC: r1(sub),
 					antistellarC: r1(anti),
 					meanByAngleC: Array.from(band, (v, i) => r1(v / bandArea[i])),

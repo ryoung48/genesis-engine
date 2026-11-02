@@ -224,14 +224,16 @@ function runPostElevationPipeline(
 				oceanDist,
 				elevation_km,
 			})
-	if (isLocked && params.climateModel !== "v1")
-		CLIMATE_V2.applyLockedTemperature({
-			mesh,
-			climate,
-			elevationKm: elevation_km,
-			isLand,
-			params,
-		})
+	const lockedRain =
+		isLocked && params.climateModel !== "v1"
+			? CLIMATE_V2.applyLocked({
+					mesh,
+					climate,
+					elevationKm: elevation_km,
+					isLand,
+					params,
+				})
+			: null
 	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
 	onProgress?.("Post: climate", 42)
 
@@ -341,7 +343,8 @@ function runPostElevationPipeline(
 				monthly: climateV2.rainfallMonthly,
 				annual: climateV2.rainfallAnnual,
 			}
-		: RAIN.computeMonthlyRain({
+		: (lockedRain ??
+			RAIN.computeMonthlyRain({
 				eastAdv,
 				westAdv,
 				monthlyTEQ,
@@ -351,8 +354,8 @@ function runPostElevationPipeline(
 				params,
 				distCoast,
 				landmarks: currentLandmarks,
-			})
-	if (!climateV2)
+			}))
+	if (!climateV2 && !lockedRain)
 		TIMING.record({ stage: "Post: rainfall", startedAt: t0, timings })
 	onProgress?.("Post: rainfall", 54)
 	const rainfall: GenesisRainfall = {

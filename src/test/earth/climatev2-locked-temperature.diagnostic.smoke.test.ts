@@ -129,12 +129,12 @@ describe("climatev2 locked temperature (diagnostic)", () => {
 					distanceAU,
 					periodDays,
 				})
-				const temperatureMonthly = CLIMATE_V2.computeLockedTemperature({
+				const temperatureMonthly = CLIMATE_V2.computeLocked({
 					mesh: world.mesh,
 					elevationKm: world.elevation_km,
 					isLand: world.isLand,
 					params,
-				})
+				}).temperatureMonthly
 				return {
 					label: spec.label,
 					pressureBar: spec.pressure,

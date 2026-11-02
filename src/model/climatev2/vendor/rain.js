@@ -1,5 +1,5 @@
 // Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/rain.js (GPL-3.0, see LICENSE).
-// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage.
+// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage; export the month, latent heat, Priestley–Taylor and Turc–Pike constants for the locked rain stage.
 // Rain stage: a column-water budget on the climate grid, at each point in the year. DOM-free.
 //
 // The water vapour in the air column, W (mm = kg/m²), is in balance at each point in the year:
@@ -42,16 +42,16 @@ import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
 import { PSYCHRO_HPA } from './pressure.js';
 
-const RHO_AIR = 1.2;                          // kg/m³ near the surface
-const EARTH_SECONDS_PER_MONTH = 30.44 * 86400;
+export const RHO_AIR = 1.2;                          // kg/m³ near the surface
+export const EARTH_SECONDS_PER_MONTH = 30.44 * 86400;
 const DEG = Math.PI / 180;
 const R_MAX = 1.5;                            // column relative humidity beyond which rain-out grows linearly (keeps Newton bounded)
 const S_MAX = 0.2;                            // largest spread of the column's relative humidity by storms
 const STABLE_MAX_K = 10;                      // stability (surface below its latitude's temperature) counted up to this …
 const UNSTABLE_MAX_K = 8;                     // … and instability (above it) up to this
 const MELT_MM_PER_C_MONTH = 120;              // degree-day snowmelt, ≈ 4 mm per °C per day
-const LATENT = 2.5e6;                         // J/kg, latent heat of vaporisation
-const PT_ALPHA = 1.26;                        // Priestley–Taylor coefficient
+export const LATENT = 2.5e6;                         // J/kg, latent heat of vaporisation
+export const PT_ALPHA = 1.26;                        // Priestley–Taylor coefficient
 const DTR_GUESS_C = 10;                       // °C, the day's range without the day cycle (the land's typical ≈ 8–12)
 const CLOUDY_RATIO = 0.5;                     // R_s/R_so in the polar night (FAO-56 carries the last daylit value; ≈ overcast)
 const BRUNT = 0.01;                           // 1/s, buoyancy frequency of the troposphere (Eady growth rate, flow blocking)
@@ -68,7 +68,7 @@ export function qSat(T) {
     return 0.622 * 6.112 * Math.exp(17.67 * t / (t + 243.5)) / 1013;
 }
 
-const turcPike = (avail, ep) => avail / Math.sqrt(1 + (avail / Math.max(1e-12, ep)) ** 2);
+export const turcPike = (avail, ep) => avail / Math.sqrt(1 + (avail / Math.max(1e-12, ep)) ** 2);
 
 export function saturatedColumn(T, vapourHeightKm) {
     return RHO_AIR * qSat(T) * vapourHeightKm * 1000;

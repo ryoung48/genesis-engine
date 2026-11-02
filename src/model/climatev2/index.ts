@@ -5,12 +5,14 @@ import { CLIMATEV2_DIURNAL } from "@/model/climatev2/diurnal"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import type {
-	ApplyLockedTemperatureParams,
+	ApplyLockedClimateParams,
 	ClimateV2Cells,
 	ClimateV2ClimateParams,
 	ClimateV2Input,
 	ClimateV2WorldParams,
-	LockedTemperatureParams,
+	LockedClimateCells,
+	LockedClimateParams,
+	LockedRainfall,
 	ZonalSeaAnomalyParams,
 } from "@/model/climatev2/types"
 import {
@@ -191,45 +193,61 @@ function toClimate({
 	return climate
 }
 
-function computeLockedTemperature({
+function computeLocked({
 	mesh,
 	elevationKm,
 	isLand,
 	params,
-}: LockedTemperatureParams): Float32Array {
+}: LockedClimateParams): LockedClimateCells {
 	const N = mesh.numRegions
 	const temperatureMonthly = new Float32Array(MONTHS * N)
+	const rainfallMonthly = new Float32Array(MONTHS * N)
 	const result = lockedClimate(
 		{ xyz: mesh.r_xyz, elevKm: elevationKm, axes: "z-up", land: isLand },
 		{
 			...CLIMATEV2_ORBIT.lockedFromParams(params),
 			seed: params.seed,
 			greenhouseWm2: 0,
-			onCell: (r, T12) => {
-				for (let m = 0; m < MONTHS; m++) temperatureMonthly[m * N + r] = T12[m]
+			onCell: (r, T12, P12) => {
+				for (let m = 0; m < MONTHS; m++) {
+					temperatureMonthly[m * N + r] = T12[m]
+					rainfallMonthly[m * N + r] = P12[m]
+				}
 			},
 		},
 	)
 	const { grid } = result
 	const sea = new Uint8Array(N)
 	for (let r = 0; r < N; r++) sea[r] = isLand[r] ? 0 : 1
-	CLIMATEV2_OUTPUTS.sampleCells({
+	const monthly = {
 		weights: CLIMATEV2_OUTPUTS.bilinearWeights({ mesh, grid }),
 		fieldSize: grid.size,
 		months: MONTHS,
+		cells: sea,
+	}
+	CLIMATEV2_OUTPUTS.sampleCells({
+		...monthly,
 		field: result.stages.temperature.monthlySL,
 		out: temperatureMonthly,
-		cells: sea,
 	})
-	return temperatureMonthly
+	CLIMATEV2_OUTPUTS.sampleCells({
+		...monthly,
+		field: result.months.P,
+		out: rainfallMonthly,
+	})
+	const rainfallAnnual = new Float32Array(N)
+	for (let m = 0; m < MONTHS; m++)
+		for (let r = 0; r < N; r++) rainfallAnnual[r] += rainfallMonthly[m * N + r]
+	return { temperatureMonthly, rainfallMonthly, rainfallAnnual }
 }
 
-function applyLockedTemperature({
+function applyLocked({
 	climate,
 	...world
-}: ApplyLockedTemperatureParams): void {
+}: ApplyLockedClimateParams): LockedRainfall {
 	const N = world.mesh.numRegions
-	climate.temperature_monthly.set(computeLockedTemperature(world))
+	const cells = computeLocked(world)
+	climate.temperature_monthly.set(cells.temperatureMonthly)
 	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
 		temperature_monthly: climate.temperature_monthly,
 		temperature_avg: climate.temperature_avg,
@@ -237,11 +255,12 @@ function applyLockedTemperature({
 		temperature_max: climate.temperature_max,
 		N,
 	})
+	return { monthly: cells.rainfallMonthly, annual: cells.rainfallAnnual }
 }
 
 export const CLIMATE_V2 = {
-	computeLockedTemperature,
-	applyLockedTemperature,
+	computeLocked,
+	applyLocked,
 	computeCellClimate,
 	computeForWorld,
 	toClimate,

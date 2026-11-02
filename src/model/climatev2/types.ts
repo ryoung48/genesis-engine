@@ -52,15 +52,26 @@ export interface ClimateV2ClimateParams {
 	v2: ClimateV2Cells
 }
 
-export interface LockedTemperatureParams {
+export interface LockedClimateParams {
 	mesh: SphereMesh
 	elevationKm: Float32Array
 	isLand: Uint8Array
 	params: GenesisParams
 }
 
-export interface ApplyLockedTemperatureParams extends LockedTemperatureParams {
+export interface ApplyLockedClimateParams extends LockedClimateParams {
 	climate: GenesisClimate
+}
+
+export interface LockedClimateCells {
+	temperatureMonthly: Float32Array
+	rainfallMonthly: Float32Array
+	rainfallAnnual: Float32Array
+}
+
+export interface LockedRainfall {
+	monthly: Float32Array
+	annual: Float32Array
 }
 
 export interface ZonalSeaAnomalyParams {

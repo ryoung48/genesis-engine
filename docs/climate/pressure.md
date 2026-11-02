@@ -45,7 +45,7 @@ Weak-gradient transport keeps the air column nearly even across the planet; each
 - Sunlit ground and the open sea, by day and by night (stirred from below), convect: rhs is the sunlight the surface takes beyond the planet's mean, and k the surface layer's heat ρ·c_p·C_H·U plus, where wet, evaporation ρ·L·C_H·U·dq_s/dT (independent of the pressure). C_H = 1.5 × 10⁻³ (Garratt 1992), U = 22 km/h × `windScale` (ExoPlaSim's Earth mean), land half as wet as the sea.
 - Dark land and sea ice lie under a stable layer (`darkGround`): rhs = −(1 − ε)·σT_a⁴, with ε Earth's back radiation (333 / 396 W/m², Trenberth et al. 2009) scaled by the greenhouse's share of the surface's emission (1 − OLR/σT⁴), and k = ρ·c_p·C_H·`TEMP_INVERSION_WIND`. It replaces the snow inversion on locked worlds.
 
-Snow and sea ice follow the surface's temperature, and the surface's departure from the air reaches space through the window, (1 − ε)·σ·((T_a + δ)⁴ − T_a⁴), in the energy balance, so the budget stays closed. The offsets are relaxed by half each round; 12 rounds (10 warm-started) close every pressure to within 0.9 W/m² (≈ 13 s per locked world on the Earth fixture).
+Snow and sea ice follow the surface's temperature, and the surface's departure from the air reaches space through the window, (1 − ε)·σ·((T_a + δ)⁴ − T_a⁴), in the energy balance, so the budget stays closed. The offsets are relaxed by half each round; 12 rounds (10 warm-started) close every pressure to within 0.9 W/m² (≈ 18 s per locked world on the Earth fixture, rain included).
 
 | bar | Earth's starlight: global / dayside / nightside / substellar / antistellar (°C), sea ice | ExoPlaSim's starlight: the same | ExoPlaSim's starlight: land day / night (°C) |
 | --- | --- | --- | --- |
@@ -58,3 +58,19 @@ Snow and sea ice follow the surface's temperature, and the surface's departure f
 | 10 | 15.9 / 16.9 / 15.0 / 18.9 / 14.9, 0 % | 12.1 / 13.2 / 11.0 / 14.8 / 10.9, 0 % | 13.6 / 11.9 |
 
 At Earth's starlight thin air no longer freezes over: the substellar sea convects warm enough to stay open (an eyeball), where the even-surface model froze 0.1 bar solid. No ocean carries heat yet, so the nightside's seas freeze from 0.5 bar down.
+
+### Rain
+
+The locked rain stage (`src/model/climatev2/rain/locked`) runs after the cloud pass, on the climate grid; cells take it through the same sampler as the temperature (rain by height and texture included), and `post-elevation` uses it for v2 locked worlds. The sea evaporates by the rotating stage's bulk formula (`RAIN_EVAP_COEFF`, `RAIN_SURFACE_RH`) at the planet's mean surface wind (`surfaceWind`, `pressure.js`), none under sea ice; land at the Priestley–Taylor rate of its surface's net radiation, limited by the rain that reaches it (Turc–Pike). Under the even air the column rises where the surface heats it more than the planet's mean (the sunlight the surface takes beyond its mean, as in `lockedSurface`), and all the planet's evaporation rains out there in proportion; the subsiding nightside stays dry.
+
+| bar | Earth's starlight: global / substellar / land (mm/yr) | ExoPlaSim's starlight: global / substellar (mm/yr), vs 1 bar |
+| --- | --- | --- |
+| 0.1 | 495 / 2633 / 715 | 1760 / 13257, 374 % |
+| 0.25 | 321 / 1667 / 467 | 669 / 4181, 142 % |
+| 0.5 | 308 / 1636 / 460 | 456 / 2736, 97 % |
+| 1 | 471 / 2743 / 730 | 471 / 2743, 100 % |
+| 2 | 551 / 3464 / 885 | 460 / 2532, 98 % |
+| 4 | 546 / 3614 / 925 | 428 / 2247, 91 % |
+| 10 | 432 / 2809 / 849 | 347 / 1709, 74 % |
+
+The trend with pressure follows ExoPlaSim's rotating one in direction (more in thin air, less in thick), steeper below 0.5 bar: there the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled. No moisture reaches the nightside yet.

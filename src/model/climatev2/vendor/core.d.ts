@@ -19,11 +19,24 @@ export interface StageContext {
 	options: Record<string, unknown>
 }
 
+export interface LockedSurfaceFields {
+	sunLand: Float64Array
+	sunSea: Float64Array
+	seaIce: Float64Array
+	dLand: Float64Array
+	dSea: Float64Array
+	window: Float64Array
+	netLand: Float64Array
+	netSea: Float64Array
+}
+
 export interface TemperatureStageResult {
 	T: Float32Array
 	monthly: Float32Array
 	monthlySL: Float32Array
+	inversion: Float32Array
 	seaIce: Float32Array
+	lockedSurf: LockedSurfaceFields | null
 	state: unknown
 }
 

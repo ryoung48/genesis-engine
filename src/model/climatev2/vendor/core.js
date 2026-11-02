@@ -1,5 +1,5 @@
 // Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/core.js (GPL-3.0, see LICENSE).
-// Modified in chaos-machine: diagnose clouds from column moisture, stability and circulation.
+// Modified in chaos-machine: diagnose clouds from column moisture, stability and circulation; a stage's own clouds (stages.clouds) are followed by the rain again.
 // The new climate — one generator-neutral entry point. DOM-free; runs in a worker or in Node.
 //
 //   computeClimate(input, options) → { grid, surface, anchors, months, cell, timing }
@@ -115,6 +115,8 @@ export function computeClimate(input, options = {}) {
             clouds = o.stages.clouds({ ctx: sctx, temperature });
             temperature = o.stages.temperature({ctx: sctx, winds, init: temperature.state, qflux: ocean?.qflux ?? null, ocean, clouds});
             lap('temperature with clouds');
+            rain = o.stages.rain(sctx, winds, temperature);
+            lap('rain again');
         }
         anchors = { T: Float32Array.from(temperature.T), P: rain.P };
         stages = { winds, temperature, circulation, ocean, rain, clouds };
