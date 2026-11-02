@@ -38,6 +38,7 @@ export interface TemperatureStageResult {
 	inversion: Float32Array
 	seaIce: Float32Array
 	lockedSurf: LockedSurfaceFields | null
+	surfaceSunScale: number
 	state: unknown
 }
 

@@ -27,7 +27,7 @@ import { HelmholtzSolver } from './solver.js';
 import { PARAMS } from './config.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
-import { pressureScaled, rayleighReflect, surfaceWind, PSYCHRO_KPA } from './pressure.js';
+import { pressureScaled, rayleighReflect, surfaceWind, airAbsorbExtra, PSYCHRO_KPA } from './pressure.js';
 import { LATENT } from './rain.js';
 import { dayCycle } from './diurnal.js';
 import { tropicsWeight, gaussianSmooth } from './circulation.js';
@@ -78,10 +78,14 @@ const CLOUD_G = 0.85;                       // cloud droplets' asymmetry paramet
 // Earth's year's belts, as v2 derives them for Earth (circulation.js, Earth bench): the rain belt and the Hadley
 // cells' edges, ° — where Earth's cloud reflectance (TEMP_ALBEDO_SUN*) stands among them
 const CLOUD_BELTS_EARTH = { itcz: -0.99, hiN: 31.26, hiS: -31.13 };
-const slantReflect = (mu) => {
+const cloudReflect = (mu) => {
     const m = Math.max(0.05, mu), t = (1 - CLOUD_G) * CLOUD_TAU;
-    return (1 - CLOUD_COVER) * 0.28 / (1 + 6.43 * m) + CLOUD_COVER * (t + (2 / 3 - m) * (1 - Math.exp(-CLOUD_TAU / m))) / (4 / 3 + t);
+    return (t + (2 / 3 - m) * (1 - Math.exp(-CLOUD_TAU / m))) / (4 / 3 + t);
 };
+const slantReflect = (mu) => (1 - CLOUD_COVER) * 0.28 / (1 + 6.43 * Math.max(0.05, mu)) + CLOUD_COVER * cloudReflect(mu);
+// (a conservatively scattering layer of reflectance r over a surface of reflectance c, by the adding method: r +
+// (1 − r)²·c / (1 − r·c) — Lacis & Hansen 1974)
+const overLayer = ({ r, c }) => r + (1 - r) ** 2 * c / (1 - r * c);
 // a locked planet's air reflectance is anchored where Earth's fit is best known: the equator, whose sunlight-weighted
 // mean cos zenith is π/4 (∫cos² / ∫cos over the day)
 const LOCKED_ANCHOR_MU = Math.PI / 4;
@@ -267,9 +271,14 @@ export function energyBalanceTemperature() {
             if (lat >= bt.hiS) return span(lat, bt.hiS, bt.itcz, E.hiS, E.itcz);
             return span(lat, -90, bt.hiS, -90, E.hiS);
         };
-        // (thicker air scatters more of the sun back from the clear sky: Rayleigh's optical depth ∝ the pressure — Earth's
-        // own is in TEMP_ALBEDO_SUN*, only the departure from it is added)
-        const clearExtra = (mu) => orbit.pressureScale === 1 ? 0 : (1 - CLOUD_COVER) * (rayleighReflect(mu, orbit.pressureScale) - rayleighReflect(mu, 1));
+        // (thicker air scatters more of the sun back: Rayleigh's optical depth ∝ the pressure, over the clear sky and over
+        // the cloud tops alike — Earth's own is in TEMP_ALBEDO_SUN*, only the departure from it is added. Over the clouds
+        // only, ExoPlaSim's Bond albedo of 0.39 and 0.47 at 4 and 10 bar (Worldbuilding Pasta 2025) came out 0.33 and 0.38)
+        const clearExtra = (mu) => {
+            if (orbit.pressureScale === 1) return 0;
+            const r = rayleighReflect(mu, orbit.pressureScale), r1 = rayleighReflect(mu, 1), c = cloudReflect(mu);
+            return (1 - CLOUD_COVER) * (r - r1) + CLOUD_COVER * (overLayer({ r, c }) - overLayer({ r: r1, c }));
+        };
         for (let k = 0; k < NT; k++) {
             const bt = beltsAt(k);
             for (let j = 0; j < h; j++) {
@@ -279,13 +288,14 @@ export function energyBalanceTemperature() {
         }
         // Sunlight and base albedo per cell: a row's, on a rotating planet; on a locked one, each cell's own from its angle to
         // the substellar point, the air's reflectance by the sun's height there (no belts to place Earth's clouds by)
-        const Q = new Float64Array(NT * G), albBase = new Float64Array(NT * G);
+        // (and of each, the pressure's own Rayleigh departure from Earth's air, for the surface's sunlight against 1 bar's)
+        const Q = new Float64Array(NT * G), albBase = new Float64Array(NT * G), albExtra = new Float64Array(NT * G);
         if (orbit.locked) {
             const earthAirAlbedo = (x) => P.TEMP_ALBEDO_SUN0 + P.TEMP_ALBEDO_SUN1 * x + P.TEMP_ALBEDO_SUN2 * x * x;
             const L = lockedTables(g.lat, g.lon, orbit, NT);
             Q.set(L.q);
-            for (let c = 0; c < NT * G; c++) { const mu = Math.max(L.mu[c], 0.05); albBase[c] = earthAirAlbedo(1 - LOCKED_ANCHOR_MU) + slantReflect(mu) - slantReflect(LOCKED_ANCHOR_MU) + clearExtra(mu); }
-        } else for (let k = 0; k < NT; k++) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { Q[k * G + j * w + i] = Qrow[k * h + j]; albBase[k * G + j * w + i] = albRow[k * h + j]; }
+            for (let c = 0; c < NT * G; c++) { const mu = Math.max(L.mu[c], 0.05); albExtra[c] = clearExtra(mu); albBase[c] = earthAirAlbedo(1 - LOCKED_ANCHOR_MU) + slantReflect(mu) - slantReflect(LOCKED_ANCHOR_MU) + albExtra[c]; }
+        } else for (let k = 0; k < NT; k++) for (let j = 0; j < h; j++) { const extra = clearExtra(muRow[j]); for (let i = 0; i < w; i++) { Q[k * G + j * w + i] = Qrow[k * h + j]; albBase[k * G + j * w + i] = albRow[k * h + j]; albExtra[k * G + j * w + i] = extra; } }
         // (and the surface's own variety about that: smooth fractal noise by geographic position, a fixed size in km — an
         // input like the rest, which the heat's spread and the snow and ice then work through)
         const albVary = albedoVariety(g, ctx.options?.seed ?? 1, P.TEMP_ALBEDO_VARY, P.TEMP_ALBEDO_VARY_KM);
@@ -445,7 +455,7 @@ export function energyBalanceTemperature() {
         // (a locked planet's surfaces against its air: lockedSurface — carried over from a previous run)
         const surfSize = NT * G, surf = !orbit.locked ? null : warm && init.surf?.window.length === surfSize ? init.surf
             : { sunLand: new Float64Array(surfSize), sunSea: new Float64Array(surfSize), seaIce: new Float64Array(surfSize), dLand: new Float64Array(surfSize), dSea: new Float64Array(surfSize), window: new Float64Array(surfSize), netLand: new Float64Array(surfSize), netSea: new Float64Array(surfSize), oceanQ: new Float64Array(surfSize) };
-        const budgetSums = { sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), rowNet: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
+        const budgetSums = { surfaceSun: 0, surfaceSun1: 0, sun: 0, base: 0, vary: 0, ground: 0, snowIce: 0, cloud: 0, cloudLongwave: 0, area: 0, rowSun: new Float64Array(h), rowSurface: new Float64Array(h), rowAlbedo: new Float64Array(h), rowNet: new Float64Array(h), cryo: new Float64Array(6), sheetArea: [0, 0] };
         for (let it = 0; it < outer; it++) {
             tp = performance.now();
             F0.fill(0); F1r.fill(0); F1i.fill(0); F2r.fill(0); F2i.fill(0); iceYear.fill(0); seaIceYear.fill(0);
@@ -457,7 +467,7 @@ export function energyBalanceTemperature() {
             }
             forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, g.lat, dRad, g.radiusM, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
                 albVary, cloudT, snowYear, !!(winds && gamma), uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
-                P.TEMP_ICE_WARM_C, P.TEMP_ICE_COLD_C, it === outer - 1 ? budgetSums : null, surf);
+                P.TEMP_ICE_WARM_C, P.TEMP_ICE_COLD_C, it === outer - 1 ? budgetSums : null, surf, { extra: albExtra, absorb: airAbsorbExtra(orbit.pressureScale) });
             if (surf) lockedSurface({ surf, Tk, harmonics: { c0, c1r, c1i, c2r, c2i }, Q, landFrac, lat: g.lat, w, h, olr: olrCold, gEarth, nightK, convK, relax: it === 0 && !warm ? 1 : 0.5, final: it === outer - 1 });
             if (dayRect) for (let k = 0; k < NT; k++) {
                 const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), t = 12 * k / NT;
@@ -855,7 +865,9 @@ export function energyBalanceTemperature() {
             return o;
         };
         const landSun = { down: landSunOf(sunDown), taken: landSunOf(sunTaken) };
-        const out = { T, monthly, monthlySL, lockedSurf: surf, landSun, iceFrac: iceCore, domeKm: domeCore, inversion, diurnal, dayHeating, dayWind2, budget, state, solverStats: stats, profile: prof, ms: performance.now() - t0, source: 'energy balance' };
+        // (the sunlight the surface gets against the same planet's under 1 bar of air: the sea's evaporation follows it, rain.js)
+        const surfaceSunScale = orbit.pressureScale === 1 ? 1 : budgetSums.surfaceSun / budgetSums.surfaceSun1;
+        const out = { T, monthly, monthlySL, lockedSurf: surf, surfaceSunScale, landSun, iceFrac: iceCore, domeKm: domeCore, inversion, diurnal, dayHeating, dayWind2, budget, state, solverStats: stats, profile: prof, ms: performance.now() - t0, source: 'energy balance' };
         return Object.defineProperties(out, {
             seaIce: { get: seaIceOf, enumerable: true },
             seaIceOpen: { get: () => drawnOf().seaIceOpen, enumerable: true },
@@ -907,7 +919,7 @@ function monthsToSamples(G, qm, qAt) {
 
 function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad, R_PLANET, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
     albVary, cloudT, snowYear, windsOn, uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
-    iceWarmC, iceColdC, budget, lockedSurf) {
+    iceWarmC, iceColdC, budget, lockedSurf, pressureSun) {
     const iceSpan = iceWarmC - iceColdC, olrA = olrCold.A, olrB = olrCold.B, toSpace = olrCold.toSpace, seaIceOn = PARAMS.TEMP_SEA_ICE > 0;
     const dLandA = lockedSurf?.dLand, dSeaA = lockedSurf?.dSea, windowA = lockedSurf?.window;
     const sunLandA = lockedSurf?.sunLand, sunSeaA = lockedSurf?.sunSea, seaIceA = lockedSurf?.seaIce;
@@ -950,7 +962,7 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 const landS = SURF_LAND + (snowA + (SURF_SHEET - snowA) * perennial[c] - SURF_LAND) * sLa;
                 const seaS = SURF_SEA + (iceA - SURF_SEA) * sO;
                 // (the air's own temperature at the ground — on land at its height, an ice sheet's dome included)
-                const absorb = airAbsorb(T - f * lapseEff[c] * surfKm[c]), as = f * landS + (1 - f) * seaS, tr = Math.max(0, 1 - R - absorb);
+                const absorb = airAbsorb(T - f * lapseEff[c] * surfKm[c]) + pressureSun.absorb, as = f * landS + (1 - f) * seaS, tr = Math.max(0, 1 - R - absorb);
                 const surf = tr * tr * as / (1 - R * as);
                 let alb = R + albVary[c] + surf;
                 const cloudAlbedo = cloudT ? f * (1 - sLa) * cloudT.land[k * G + c] + (1 - f) * (1 - sO) * cloudT.sea[k * G + c] : 0;
@@ -962,6 +974,8 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 sunDown[k * G + c] = down; sunTaken[k * G + c] = down * (1 - landS);
                 if (budget) {
                     const wl = Math.cos(lat[j] * Math.PI / 180), wq = wl * q, ar = f * SURF_LAND + (1 - f) * SURF_SEA, bare = tr * tr * ar / (1 - R * ar);
+                    const R1 = (ab - pressureSun.extra[k * G + c]) * airLeft[c], tr1 = Math.max(0, 1 - R1 - absorb + pressureSun.absorb);
+                    budget.surfaceSun += wq * tr / (1 - R * as); budget.surfaceSun1 += wq * tr1 / (1 - R1 * as);
                     budget.sun += wq; budget.base += wq * R; budget.vary += wq * albVary[c]; budget.ground += wq * bare;
                     budget.snowIce += wq * (surf - bare);
                     const den = tr * tr / (1 - R * as), hem = lat[j] > 0 ? 0 : 3, sheet = perennial[c] > 0.5 ? 2 : 0;

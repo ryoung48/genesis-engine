@@ -40,7 +40,7 @@ import { dailyInsolation, orbitOf, sunAt } from './insolation.js';
 import { gaussianSmooth } from './circulation.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
-import { PSYCHRO_HPA } from './pressure.js';
+import { PSYCHRO_HPA, seaEvaporationScale } from './pressure.js';
 
 export const RHO_AIR = 1.2;                          // kg/m³ near the surface
 export const EARTH_SECONDS_PER_MONTH = 30.44 * 86400;
@@ -173,6 +173,7 @@ export function columnWaterRain() {
         // (the page's Precipitation: the planet's water cycle faster or slower — its evaporation, from sea and land, scaled;
         // where the extra water falls, and how far inland it is carried, is the budget's own doing)
         const evapScale = Math.max(0, ctx.options?.precipScale ?? 1);
+        const seaSun = seaEvaporationScale(temperature.surfaceSunScale);
         const core = ctx.grid;
         const ratio = Math.max(1, Math.round(P_.RAIN_GRID_DEG / core.step));
         const g = ratio > 1 ? new LatLonGrid(core.step * ratio, core.radiusM) : core;
@@ -404,7 +405,9 @@ export function columnWaterRain() {
                     p.snow[c] = Math.min(1, Math.max(0, (2 - Tair[c]) / 4));            // share of the rain falling as snow
                     p.Tair[c] = Tair[c];
                     const bulk = RHO_AIR * P_.RAIN_EVAP_COEFF * Math.sqrt(u[c] * u[c] + v[c] * v[c] + gust2 + (dw2 ? dw2[c] : 0)) * (1 - P_.RAIN_SURFACE_RH);
-                    p.eSea[c] = evapScale * (1 - land[c]) * bulk * qSat(Tsl[c]) * (ice ? 1 - Math.min(1, ice[c]) : 1);
+                    // (the sea's evaporation is partly energy-limited: it follows the sunlight the surface gets, which thick
+                    // air scatters and absorbs before it arrives — seaEvaporationScale, 1 under Earth's air)
+                    p.eSea[c] = evapScale * seaSun * (1 - land[c]) * bulk * qSat(Tsl[c]) * (ice ? 1 - Math.min(1, ice[c]) : 1);
                     // Land's potential evaporation is limited by the energy it gets (Priestley–Taylor): its net
                     // radiation (above), times Δ/(Δ + γ) (Clausius–Clapeyron slope Δ, psychrometric constant γ) — little
                     // in cold or dark months, most in the sunny tropics.

@@ -10,10 +10,12 @@
 | --- | --- | --- |
 | Air column heat capacity (land heat capacity, wind heat carry, day cycle) | ∝ ps | `pressureScaled`, `temperature.js`, `diurnal.js` |
 | Poleward heat spread | ∝ √(0.6·ps + 0.4): dry part ∝ ps, latent part independent of p | `pressureScaled` |
-| Greenhouse (OLR intercept) | −26.5 · (1 − ps^−0.3) / 0.3 W/m² | `pressureScaled` |
+| Greenhouse (OLR intercept) | −25 · ln ps W/m² above 1 bar, −25 · (1 − ps^−0.3) / 0.3 below | `pressureScaled` |
 | Heat to space in the cold | never above a black body's σ·T⁴ (the line passes it below ≈ −15 °C at 0.1 bar) | `temperature.js` (`forcingSweep`) |
 | Locked day–night heat transport | ∝ ps, dry only (the dayside's water rains out in the substellar convection) | `lockedDiffusivity`, `temperature.js` |
-| Clear-sky Rayleigh albedo | Eddington reflectance, τ = 0.07·ps | `rayleighReflect`, `temperature.js` |
+| Rayleigh albedo | Eddington reflectance, τ = 0.07·ps, over the clear sky and, by the adding method, over the cloud tops | `rayleighReflect`, `temperature.js` |
+| Air's absorption of sunlight | + 0.024 · ln ps (ExoPlaSim's 0.265 and 0.282 at 4 and 10 bar, from its albedo and surface sunlight) | `airAbsorbExtra`, `temperature.js` |
+| Sea evaporation | × (0.5 + 0.5 · the surface's sunlight against 1 bar's): half energy-limited, fitted to ExoPlaSim's rain | `seaEvaporationScale`, `rain.js`, `rain/locked` |
 | Surface wind speed | ∝ ps^−0.13 | `windScale`, `circulation.js` |
 | Wind stress on the ocean | air density ∝ ps | `ocean.js` |
 | Psychrometric constant (evaporative share Δ/(Δ+γ)) | ∝ ps | `rain.js`, `temperature.js`, `diurnal.js` |
@@ -23,14 +25,16 @@
 
 Worldbuilding Pasta 2025, "Climate Explorations: Pressure" (ExoPlaSim, Earth's terrain, N₂ varied). At that article's 15 °C-holding starlight the `surface pressure (bar), ExoPlaSim's sunlight` rows of `src/test/earth/climatev2-orbit-sweep.diagnostic.smoke.test.ts` give:
 
-| bar | Global T (°C), ours / ExoPlaSim | Precipitation vs 1 bar, ours / ExoPlaSim |
-| --- | --- | --- |
-| 0.1 | 16.8 / 15.9 | 194 % / 200 % |
-| 0.25 | 15.1 / 14.1 | 144 % / 145 % |
-| 0.5 | 13.1 / 14.1 | 107 % / 117 % |
-| 2 | 15.7 / 15.3 | 81 % / 81 % |
-| 4 | 15.4 / 14.5 | 67 % / 61 % |
-| 10 | 14.3 / 15.6 | 52 % / 42 % |
+| bar | Global T (°C), ours / ExoPlaSim | Precipitation vs 1 bar, ours / ExoPlaSim | Bond albedo, ours / ExoPlaSim | Surface sunlight vs 1 bar (per unit starlight), ours / ExoPlaSim |
+| --- | --- | --- | --- | --- |
+| 0.1 | 15.1 / 15.9 | 206 % / 200 % | 0.31 / – | 1.15 / – |
+| 0.25 | 15.6 / 14.1 | 158 % / 145 % | 0.30 / – | 1.10 / 1.11 |
+| 0.5 | 13.7 / 14.1 | 115 % / 117 % | 0.30 / – | 1.05 / 1.08 |
+| 2 | 15.4 / 15.3 | 77 % / 81 % | 0.31 / – | 0.93 / – |
+| 4 | 15.6 / 14.5 | 61 % / 61 % | 0.34 / 0.39 | 0.82 / 0.73 |
+| 10 | 14.4 / 15.6 | 42 % / 42 % | 0.42 / 0.47 | 0.61 / 0.53 |
+
+ExoPlaSim's thick air reflects more (0.30 → 0.39 → 0.47) and absorbs more of the sunlight before the surface, and its rain falls with the surface's sunlight. Here Rayleigh scattering over the cloud tops brings the albedo most of the way (it was 0.33 and 0.38 over the clear sky alone), the air's absorption grows with the pressure, and half of the sea's evaporation follows the surface's sunlight: thick-air rain now falls as ExoPlaSim's for the same reason rather than through a weaker greenhouse. The albedo stays ≈ 0.05 short at 4 and 10 bar.
 
 Thick air damps the seasons and the day's range (40–70°N land seasonal range 29 °C at 1 bar, 9.7 °C at 10 bar) and evens the equator-to-pole contrast (45 °C → 18 °C). Thin air sharpens both and grows larger ice caps, as in ExoPlaSim. Two known departures: below 0.25 bar the contrast keeps widening (82 °C at 0.1 bar), where ExoPlaSim's flattens; and boiling at low pressure (≈ 45 °C at 0.1 bar) is not modelled. Run the sweep with `SWEEP_KNOBS="surface pressure"`.
 
@@ -81,10 +85,10 @@ The ocean share (0.35) remains an analogue. The coupled studies constrain it onl
 
 | bar | Earth's starlight: global / substellar / antistellar / day land / night land (°C), sea ice, rain, albedo | ExoPlaSim's starlight: the same |
 | --- | --- | --- |
-| 0.1 | −31.1 / 30.4 / −79.6 / 13.4 / −68.7, 59 %, 304 mm/yr, 0.48 | 1.9 / 64.3 / −50.6 / 40.6 / −31.6, 55 %, 1374 mm/yr, 0.49 |
-| 0.25 | −19.3 / 17.4 / −43.6 / 7.3 / −38.9, 78 %, 174 mm/yr, 0.46 | −4.0 / 29.2 / −28.0 / 19.1 / −22.0, 57 %, 395 mm/yr, 0.49 |
-| 0.5 | −8.3 / 14.7 / −21.7 / 7.8 / −19.2, 78 %, 160 mm/yr, 0.46 | −3.9 / 18.5 / −17.1 / 11.4 / −14.5, 58 %, 216 mm/yr, 0.48 |
-| 1 | 0.7 / 13.6 / −5.9 / 8.9 / −5.6, 39 %, 233 mm/yr, 0.47 | 0.7 / 13.6 / −5.9 / 8.9 / −5.6, 39 %, 233 mm/yr, 0.47 |
-| 2 | 5.3 / 13.4 / 2.2 / 10.3 / 3.1, 0 %, 332 mm/yr, 0.50 | 3.5 / 11.3 / 0.2 / 8.9 / 1.2, 0 %, 301 mm/yr, 0.46 |
-| 4 | 7.8 / 12.7 / 6.0 / 10.8 / 7.3, 0 %, 334 mm/yr, 0.53 | 5.5 / 10.0 / 3.6 / 8.9 / 5.0, 0 %, 299 mm/yr, 0.47 |
-| 10 | 8.4 / 10.6 / 7.6 / 9.9 / 8.3, 0 %, 272 mm/yr, 0.56 | 7.0 / 8.9 / 6.1 / 8.6 / 6.9, 0 %, 253 mm/yr, 0.50 |
+| 0.1 | −31.2 / 30.1 / −78.8 / 12.9 / −68.0, 60 %, 344 mm/yr, 0.48 | 2.9 / 64.3 / −49.0 / 40.5 / −30.1, 54 %, 1563 mm/yr, 0.49 |
+| 0.25 | −20.2 / 17.7 / −44.2 / 6.7 / −39.7, 84 %, 175 mm/yr, 0.47 | −3.4 / 29.8 / −27.2 / 19.5 / −21.2, 57 %, 434 mm/yr, 0.49 |
+| 0.5 | −8.5 / 15.1 / −21.8 / 7.6 / −19.3, 80 %, 160 mm/yr, 0.46 | −3.7 / 19.0 / −16.8 / 11.6 / −14.2, 58 %, 223 mm/yr, 0.48 |
+| 1 | 0.7 / 13.6 / −5.9 / 8.9 / −5.6, 39 %, 232 mm/yr, 0.47 | 0.7 / 13.6 / −5.9 / 8.9 / −5.6, 39 %, 232 mm/yr, 0.47 |
+| 2 | 5.3 / 13.0 / 2.3 / 10.1 / 3.2, 0 %, 322 mm/yr, 0.50 | 3.6 / 10.9 / 0.4 / 8.8 / 1.4, 0 %, 295 mm/yr, 0.47 |
+| 4 | 8.1 / 12.3 / 6.5 / 10.9 / 7.8, 0 %, 315 mm/yr, 0.54 | 6.0 / 9.9 / 4.3 / 9.2 / 5.7, 0 %, 287 mm/yr, 0.48 |
+| 10 | 8.8 / 10.3 / 8.2 / 10.1 / 8.7, 0 %, 229 mm/yr, 0.59 | 7.6 / 8.9 / 7.0 / 9.0 / 7.6, 0 %, 218 mm/yr, 0.54 |

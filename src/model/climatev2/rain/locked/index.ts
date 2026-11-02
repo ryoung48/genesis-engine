@@ -6,7 +6,11 @@ import type {
 } from "@/model/climatev2/rain/locked/types"
 import { PARAMS } from "@/model/climatev2/vendor/config.js"
 import { orbitOf } from "@/model/climatev2/vendor/insolation.js"
-import { PSYCHRO_HPA, surfaceWind } from "@/model/climatev2/vendor/pressure.js"
+import {
+	PSYCHRO_HPA,
+	seaEvaporationScale,
+	surfaceWind,
+} from "@/model/climatev2/vendor/pressure.js"
 import {
 	EARTH_SECONDS_PER_MONTH,
 	LATENT,
@@ -89,7 +93,12 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 			const tSea = temperature.monthlySL[m * G + c]
 			const tLand = tSea + temperature.inversion[m * G + c]
 			const ps = orbit.pressureScale
-			eSea[c] = (1 - f) * (1 - surf.seaIce[o + c]) * bulk * qSat(tSea)
+			eSea[c] =
+				seaEvaporationScale(temperature.surfaceSunScale) *
+				(1 - f) *
+				(1 - surf.seaIce[o + c]) *
+				bulk *
+				qSat(tSea)
 			eLand[c] = potential({ T: tLand, net: surf.netLand[o + c], ps })
 			ascent[c] = Math.max(
 				0,

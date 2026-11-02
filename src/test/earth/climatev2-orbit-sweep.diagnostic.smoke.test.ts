@@ -496,6 +496,10 @@ function summarize(params: {
 		),
 		landIceNMkm2: round({ value: sheets.N, digits: 2 }),
 		landIceSMkm2: round({ value: sheets.S, digits: 2 }),
+		surfaceSunScale: round({
+			value: stages.temperature.surfaceSunScale,
+			digits: 3,
+		}),
 		budget: stages.temperature.budget,
 		iceBands,
 		koppenPct: Object.fromEntries(
