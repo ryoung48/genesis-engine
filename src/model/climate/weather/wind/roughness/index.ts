@@ -3,7 +3,7 @@ import type { WindSurface } from "@/model/climate/weather/wind/types"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 
 // Surface drag on the near-ground wind, shared by every wind model (the
-// pressure-gradient model, its "simple" variant, and the tidal-locked model).
+// pressure-gradient model and its "simple" variant).
 // The returned factor multiplies the balanced wind speed.
 
 function vegetationDragFactor(biomeCode: number | undefined): number {

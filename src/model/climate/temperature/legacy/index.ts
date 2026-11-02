@@ -13,7 +13,6 @@ import type {
 	MeshLatitudeGeometry,
 	ZonalTemperatureCellsParams,
 } from "@/model/climate/temperature/legacy/types"
-import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import type { GenesisClimate } from "@/model/climate/types"
 import { ELEVATION } from "@/model/geography/terrain/elevation"
 import type { SphereMesh } from "@/model/mesh/types"
@@ -196,16 +195,6 @@ function computeTemperature({
 	isLand,
 	elevation_km,
 }: ComputeTemperatureParams): GenesisClimate {
-	if (params.tideLock?.type === "solar") {
-		return HEAT.computeTidalTemperature({
-			mesh,
-			elevation,
-			params,
-			oceanDist,
-			elevation_km,
-		})
-	}
-
 	const cls = getStellarCls(params)
 	const T_star = STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
 	const R_star_m =

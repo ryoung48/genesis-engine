@@ -1,3 +1,4 @@
+import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
 
 export type ClimateV2OrbitParams = Pick<
@@ -23,3 +24,8 @@ export type StarLightParams = Pick<
 	ClimateV2OrbitParams,
 	"spectralClass" | "starSubtype" | "orbitalDistanceAU"
 >
+
+export interface LockedSunlightParams {
+	mesh: SphereMesh
+	params: GenesisParams
+}

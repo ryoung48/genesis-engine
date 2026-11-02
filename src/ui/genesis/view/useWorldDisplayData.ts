@@ -386,7 +386,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		const cacheKey = `${source}:${month ?? "annual"}`
 		const cached = windCacheRef.current.vectors.get(cacheKey)
 		if (cached) return cached
-		// (v2 solved each month's winds: a month's are on the world; a planet locked to its star derives them)
+		// (v2 solved each month's winds, locked planets' too: a month's are on the world; v1 derives them)
 		const solved = world.windMonthly
 			? {
 					real_u_monthly: world.windMonthly.u,

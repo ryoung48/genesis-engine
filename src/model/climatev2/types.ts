@@ -1,7 +1,4 @@
-import type {
-	GenesisClimate,
-	GenesisOceanCurrents,
-} from "@/model/climate/types"
+import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { DiurnalCells } from "@/model/climatev2/diurnal/types"
 import type { ClimateBudget } from "@/model/climatev2/vendor/climate.js"
@@ -49,7 +46,9 @@ export interface ClimateV2WorldParams {
 export interface ClimateV2ClimateParams {
 	mesh: SphereMesh
 	params: GenesisParams
-	v2: ClimateV2Cells
+	v2: Pick<ClimateV2Cells, "cloudCoverMonthly" | "temperatureMonthly"> & {
+		diurnalRange: Pick<ClimateV2Cells["diurnalRange"], "monthly">
+	}
 }
 
 export interface LockedClimateParams {
@@ -59,22 +58,11 @@ export interface LockedClimateParams {
 	params: GenesisParams
 }
 
-export interface ApplyLockedClimateParams extends LockedClimateParams {
-	climate: GenesisClimate
-}
-
 export interface LockedClimateCells {
+	cloudCoverMonthly: Float32Array
 	temperatureMonthly: Float32Array
 	rainfallMonthly: Float32Array
 	rainfallAnnual: Float32Array
-	wind: WindVectors
-	windUMonthly: Float32Array
-	windVMonthly: Float32Array
-	oceanCurrents: GenesisOceanCurrents
-}
-
-export interface LockedClimateOutputs {
-	rain: { monthly: Float32Array; annual: Float32Array }
 	wind: WindVectors
 	windUMonthly: Float32Array
 	windVMonthly: Float32Array

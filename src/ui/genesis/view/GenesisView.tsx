@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
-import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import { WIND } from "@/model/climate/weather/wind"
@@ -1177,15 +1176,6 @@ export const GenesisView: React.FC<{
 			})
 		}
 		if (!world.oceanCurrents) return null
-		if (world.params.tideLock?.type === "solar") {
-			return LOCKED_OCEAN_CURRENTS.buildLockedOceanCurrentGrid({
-				mesh: world.mesh,
-				isLand: world.isLand,
-				oceanCurrents: world.oceanCurrents,
-				month: currentMonth,
-				planetRadiusKm: world.params.planetRadiusKm,
-			})
-		}
 		return OCEAN_CURRENTS.buildOceanCurrentGrid({
 			mesh: world.mesh,
 			isLand: world.isLand,

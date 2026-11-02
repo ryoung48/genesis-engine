@@ -10,7 +10,6 @@ import type {
 	SmoothRainMonthsParams,
 	SubsidenceFactorParams,
 } from "@/model/climate/precipitation/rain/types"
-import { RAIN as LOCKED_RAIN } from "@/model/climate/precipitation/tidal-locked"
 import { RAIN_SHARED } from "@/model/climate/shared/rain"
 import { ELEVATION } from "@/model/geography/terrain/elevation"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
@@ -914,19 +913,9 @@ function computeMonthlyRain({
 	isLand,
 	params,
 	monthlyTEQ,
-	distCoast,
 	landmarks,
 }: ComputeMonthlyRainParams): { monthly: Float32Array; annual: Float32Array } {
 	const rainRegionMask = buildRainRegionMask({ isLand, landmarks })
-	if (params?.tideLock?.type === "solar") {
-		return LOCKED_RAIN.computeTidalRain({
-			mesh,
-			climate,
-			isLand: rainRegionMask,
-			params,
-			distCoast,
-		})
-	}
 
 	const N = mesh.numRegions
 	const reverseCirculation = UNITS.isRetrogradeObliquity(params?.obliquity ?? 0)

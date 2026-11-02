@@ -11,7 +11,6 @@ import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { HEURISTIC_CURRENTS } from "@/model/climate/ocean/currents/heuristic"
-import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
@@ -65,24 +64,15 @@ const MIGRATION_HORIZON_YEAR = 2025
 function applyOceanCurrentsToClimate(
 	params: ApplyOceanCurrentsToClimateParams,
 ): void {
-	const { mesh, climate, isLand, oceanCurrents, isLocked } = params
-	if (isLocked) {
-		LOCKED_OCEAN_CURRENTS.applyLockedSSTToClimate({
-			mesh,
-			climate,
-			isLand,
-			oceanCurrents,
-		})
-	} else {
-		TEMPERATURE_SHARED.applyOceanSst({
-			mesh,
-			climate,
-			isLand,
-			oceanCurrents,
-			saturationC: HEURISTIC_CURRENTS.sstAnomalySaturationC,
-			landScale: 1,
-		})
-	}
+	const { mesh, climate, isLand, oceanCurrents } = params
+	TEMPERATURE_SHARED.applyOceanSst({
+		mesh,
+		climate,
+		isLand,
+		oceanCurrents,
+		saturationC: HEURISTIC_CURRENTS.sstAnomalySaturationC,
+		landScale: 1,
+	})
 }
 
 function reconcileClosedWaterBodies(params: {
@@ -213,27 +203,34 @@ function runPostElevationPipeline(
 					isLand,
 					params,
 				})
+	const locked = isLocked
+		? CLIMATE_V2.computeLocked({
+				mesh,
+				elevationKm: elevation_km,
+				isLand,
+				params,
+			})
+		: null
 	let climate = climateV2
 		? CLIMATE_V2.toClimate({ mesh, params, v2: climateV2 })
-		: CLIMATE_V1.computeTemperature({
-				landFraction: CLIMATE_V1.computeLandFraction({ mesh, isLand }),
-				isLand,
-				mesh,
-				elevation,
-				params,
-				oceanDist,
-				elevation_km,
-			})
-	const locked =
-		isLocked && params.climateModel !== "v1"
-			? CLIMATE_V2.applyLocked({
+		: locked
+			? CLIMATE_V2.toClimate({
 					mesh,
-					climate,
-					elevationKm: elevation_km,
-					isLand,
 					params,
+					v2: {
+						...locked,
+						diurnalRange: { monthly: new Float32Array(12 * mesh.numRegions) },
+					},
 				})
-			: null
+			: CLIMATE_V1.computeTemperature({
+					landFraction: CLIMATE_V1.computeLandFraction({ mesh, isLand }),
+					isLand,
+					mesh,
+					elevation,
+					params,
+					oceanDist,
+					elevation_km,
+				})
 	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
 	onProgress?.("Post: climate", 42)
 
@@ -310,31 +307,22 @@ function runPostElevationPipeline(
 		? climateV2.oceanCurrents
 		: locked
 			? locked.oceanCurrents
-			: isLocked
-				? LOCKED_OCEAN_CURRENTS.computeLockedSST({
-						mesh,
-						isLand,
-						distCoast,
-						landmarks: currentLandmarks,
-						params,
-					})
-				: HEURISTIC_CURRENTS.computeCurrents({
-						mesh,
-						isLand,
-						distCoast,
-						landmarks: currentLandmarks,
-						monthlyTEQ,
-						eastAdv,
-						westAdv,
-						planetRadiusKm: params.planetRadiusKm,
-					})
+			: HEURISTIC_CURRENTS.computeCurrents({
+					mesh,
+					isLand,
+					distCoast,
+					landmarks: currentLandmarks,
+					monthlyTEQ,
+					eastAdv,
+					westAdv,
+					planetRadiusKm: params.planetRadiusKm,
+				})
 	if (!climateV2 && !locked)
 		applyOceanCurrentsToClimate({
 			mesh,
 			climate,
 			isLand,
 			oceanCurrents,
-			isLocked,
 		})
 	HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
@@ -347,18 +335,18 @@ function runPostElevationPipeline(
 				monthly: climateV2.rainfallMonthly,
 				annual: climateV2.rainfallAnnual,
 			}
-		: (locked?.rain ??
-			RAIN.computeMonthlyRain({
-				eastAdv,
-				westAdv,
-				monthlyTEQ,
-				mesh,
-				climate,
-				isLand,
-				params,
-				distCoast,
-				landmarks: currentLandmarks,
-			}))
+		: locked
+			? { monthly: locked.rainfallMonthly, annual: locked.rainfallAnnual }
+			: RAIN.computeMonthlyRain({
+					eastAdv,
+					westAdv,
+					monthlyTEQ,
+					mesh,
+					climate,
+					isLand,
+					params,
+					landmarks: currentLandmarks,
+				})
 	if (!climateV2 && !locked)
 		TIMING.record({ stage: "Post: rainfall", startedAt: t0, timings })
 	onProgress?.("Post: rainfall", 54)
@@ -394,7 +382,6 @@ function runPostElevationPipeline(
 				climate,
 				isLand,
 				oceanCurrents,
-				isLocked,
 			})
 			HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 			monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
@@ -427,6 +414,7 @@ function runPostElevationPipeline(
 		dpm: CALENDAR.earthDaysPerMonth(params),
 	})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
+	if (locked) climate.temperature_monthly_range.set(dtr_monthly)
 	TIMING.record({ stage: "Post: dtr + pet", startedAt: t0, timings })
 	onProgress?.("Post: dtr + pet", 56)
 
@@ -448,7 +436,6 @@ function runPostElevationPipeline(
 			dtrMonthly: dtr_monthly,
 			oceanDist,
 			isLand,
-			isTidallyLocked: params.tideLock?.type === "solar",
 		})
 	}
 	TIMING.record({ stage: "Post: clouds", startedAt: t0, timings })
@@ -548,7 +535,6 @@ function runPostElevationPipeline(
 			climate,
 			isLand,
 			oceanCurrents,
-			isLocked,
 		})
 		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
@@ -572,6 +558,7 @@ function runPostElevationPipeline(
 		dpm: CALENDAR.earthDaysPerMonth(params),
 	})
 	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
+	if (locked) climate.temperature_monthly_range.set(dtr_monthly)
 	hydrology = HYDROLOGY.computeHydrologyFields({
 		climate,
 		rainfall,
@@ -593,7 +580,6 @@ function runPostElevationPipeline(
 			dtrMonthly: dtr_monthly,
 			oceanDist,
 			isLand,
-			isTidallyLocked: params.tideLock?.type === "solar",
 		})
 	}
 	TIMING.record({ stage: "Post: clouds (post-lake)", startedAt: t0, timings })

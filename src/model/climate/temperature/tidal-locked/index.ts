@@ -2,9 +2,7 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { INSOLATION } from "@/model/climate/shared/insolation"
-import { TEMPERATURE_SHARED } from "@/model/climate/shared/temperature"
 import type {
-	ComputeTidalTemperatureParams,
 	LockedDeclinationParams,
 	LockedMonthlyDaylightHoursParams,
 	LockedStarRadiationParams,
@@ -12,8 +10,6 @@ import type {
 	SubstellarDirectionParams,
 	TidalTransportParams,
 } from "@/model/climate/temperature/tidal-locked/types"
-import type { GenesisClimate } from "@/model/climate/types"
-import { ELEVATION } from "@/model/geography/terrain/elevation"
 import type { GenesisParams } from "@/model/pipelines/types"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
@@ -329,137 +325,6 @@ function computeTidalTransportParams(
 	}
 }
 
-function computeTidalTemperature({
-	mesh,
-	elevation,
-	params,
-	oceanDist,
-	elevation_km,
-}: ComputeTidalTemperatureParams): GenesisClimate {
-	const N = mesh.numRegions
-	const monthlyLibration = computeMonthlyLibration({
-		eccentricity: params.eccentricity,
-		perihelion: params.perihelion,
-	})
-	const monthlyDeclination = computeMonthlyLockedDeclination({
-		obliquity: params.obliquity,
-		eccentricity: params.eccentricity,
-		perihelion: params.perihelion,
-	})
-	const daylight_hours_monthly = computeLockedMonthlyDaylightHours({
-		mesh,
-		params,
-	})
-
-	const { T_mean_C, A1, A_night, eccAmplitude, LAPSE_RATE, tidalTd, contrast } =
-		computeTidalTransportParams(params)
-	const KM_TO_MI = 0.621371
-
-	const temperature_avg = new Float32Array(N)
-	const temperature_min = new Float32Array(N)
-	const temperature_max = new Float32Array(N)
-	const temperature_monthly = new Float32Array(N * 12)
-	const temperature_monthly_range = new Float32Array(N * 12)
-	const insolation_monthly = new Float32Array(N * 12)
-	const pet_monthly = new Float32Array(N * 12)
-
-	const monthlyFlux = computeMonthlyOrbitalFlux(params)
-
-	for (let r = 0; r < N; r++) {
-		const x = mesh.r_xyz[3 * r]
-		const y = mesh.r_xyz[3 * r + 1]
-		const z = mesh.r_xyz[3 * r + 2]
-
-		for (let month = 0; month < 12; month++) {
-			const sub = getSubstellarDirWithOffsetAndDeclination({
-				substellarLon: params.substellarLon,
-				lonOffsetRad: monthlyLibration[month],
-				declinationRad: monthlyDeclination[month],
-			})
-			const cosTheta = Math.max(
-				-1,
-				Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]),
-			)
-
-			const P1 = cosTheta
-			const nightFrac = (1 - cosTheta) / 2
-
-			let T = T_mean_C + A1 * P1 + A_night * nightFrac
-
-			const hKm = elevation_km
-				? elevation_km[r]
-				: ELEVATION.elevToHeightKm({ elev: elevation[r] })
-			const lapseCorrection = hKm > 0 ? hKm * LAPSE_RATE : 0
-			T -= lapseCorrection
-
-			if (oceanDist) {
-				const distMiles = oceanDist[r] * KM_TO_MI
-				const inlandShift = Math.tanh((distMiles - 300) / 1000) * 2 * contrast
-				T += cosTheta > 0 ? inlandShift : -inlandShift
-			}
-
-			const monthValue = T + eccAmplitude * Math.sin((month / 12) * 2 * Math.PI)
-			temperature_monthly[month * N + r] = monthValue
-			temperature_monthly_range[month * N + r] = tidalTd
-			insolation_monthly[month * N + r] =
-				monthlyFlux[month] * Math.max(0, cosTheta)
-		}
-	}
-
-	TEMPERATURE_SHARED.applyTemperatureNoise({
-		mesh,
-		N,
-		seed: params.seed ?? 0,
-		temperature_monthly,
-		computeTaper: (...coordinates: [number, number, number, number]) => {
-			const x = coordinates[1]
-			const y = coordinates[2]
-			const z = coordinates[3]
-			let ct = -1
-			for (let month = 0; month < 12; month++) {
-				const baseSub = getSubstellarDirWithOffsetAndDeclination({
-					substellarLon: params.substellarLon,
-					lonOffsetRad: monthlyLibration[month],
-					declinationRad: monthlyDeclination[month],
-				})
-				const monthCt = Math.max(
-					-1,
-					Math.min(1, x * baseSub[0] + y * baseSub[1] + z * baseSub[2]),
-				)
-				if (monthCt > ct) ct = monthCt
-			}
-			return Math.min(
-				1 - Math.max(0, ct - 0.5) * 2,
-				1 + Math.min(0, ct + 0.5) * 2,
-			)
-		},
-		includeCell: () => true,
-	})
-
-	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
-		temperature_monthly,
-		temperature_avg,
-		temperature_min,
-		temperature_max,
-		N,
-	})
-
-	return {
-		temperature_avg,
-		temperature_min,
-		temperature_max,
-		temperature_monthly,
-		temperature_monthly_range,
-		insolation_monthly,
-		declination_monthly: Float32Array.from(
-			monthlyDeclination,
-			(rad) => (rad * 180) / Math.PI,
-		),
-		pet_monthly,
-		daylight_hours_monthly,
-	}
-}
-
 export const HEAT = {
 	computeDailyLockedOrbit,
 	computeMonthlyLibration,
@@ -468,5 +333,5 @@ export const HEAT = {
 	computeMonthlyOrbitalFlux,
 	getSubstellarDirWithOffsetAndDeclination,
 	computeTidalTransportParams,
-	computeTidalTemperature,
+	computeLockedMonthlyDaylightHours,
 }

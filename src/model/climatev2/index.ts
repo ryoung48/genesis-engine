@@ -7,13 +7,11 @@ import { CLIMATEV2_LOCKED_OCEAN } from "@/model/climatev2/ocean/locked"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import type {
-	ApplyLockedClimateParams,
 	ClimateV2Cells,
 	ClimateV2ClimateParams,
 	ClimateV2Input,
 	ClimateV2WorldParams,
 	LockedClimateCells,
-	LockedClimateOutputs,
 	LockedClimateParams,
 	ZonalSeaAnomalyParams,
 } from "@/model/climatev2/types"
@@ -183,7 +181,9 @@ function toClimate({
 		temperature_monthly: Float32Array.from(v2.temperatureMonthly),
 		temperature_monthly_range: Float32Array.from(v2.diurnalRange.monthly),
 		pet_monthly: new Float32Array(N * 12),
-		...CLIMATE.computeSunlight({ mesh, params }),
+		...(params.tideLock?.type === "solar"
+			? CLIMATEV2_ORBIT.lockedSunlight({ mesh, params })
+			: CLIMATE.computeSunlight({ mesh, params })),
 	}
 	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
 		temperature_monthly: climate.temperature_monthly,
@@ -254,6 +254,11 @@ function computeLocked({
 		temperature,
 	})
 	return {
+		cloudCoverMonthly: CLIMATEV2_OUTPUTS.monthlyCells({
+			weights,
+			field: result.stages.clouds.deck,
+			fieldSize: grid.size,
+		}),
 		temperatureMonthly,
 		rainfallMonthly,
 		rainfallAnnual,
@@ -276,32 +281,8 @@ function computeLocked({
 	}
 }
 
-function applyLocked({
-	climate,
-	...world
-}: ApplyLockedClimateParams): LockedClimateOutputs {
-	const N = world.mesh.numRegions
-	const cells = computeLocked(world)
-	climate.temperature_monthly.set(cells.temperatureMonthly)
-	TEMPERATURE_SHARED.recomputeAnnualTemperatureStats({
-		temperature_monthly: climate.temperature_monthly,
-		temperature_avg: climate.temperature_avg,
-		temperature_min: climate.temperature_min,
-		temperature_max: climate.temperature_max,
-		N,
-	})
-	return {
-		rain: { monthly: cells.rainfallMonthly, annual: cells.rainfallAnnual },
-		wind: cells.wind,
-		windUMonthly: cells.windUMonthly,
-		windVMonthly: cells.windVMonthly,
-		oceanCurrents: cells.oceanCurrents,
-	}
-}
-
 export const CLIMATE_V2 = {
 	computeLocked,
-	applyLocked,
 	computeCellClimate,
 	computeForWorld,
 	toClimate,

@@ -1,5 +1,4 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
-import { WIND as LOCKED_WIND } from "@/model/climate/weather/tidal-locked"
 import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import type {
 	ComputeWindVectorsInput,
@@ -164,9 +163,6 @@ function computeWindVectors(input: ComputeWindVectorsInput): {
 	pressure: Float32Array
 	windSpeed: Float32Array
 } {
-	if (input.params?.tideLock?.type === "solar") {
-		return LOCKED_WIND.computeLockedWindVectors(input)
-	}
 	return SIMPLE_WIND.computeWindVectors(input)
 }
 

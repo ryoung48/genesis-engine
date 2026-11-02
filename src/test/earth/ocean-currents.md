@@ -20,8 +20,7 @@ see below). Flow, however, is sverdrup's own field directly -- `flowU`/
 a real current field, not a proxy needing the calibrated-table treatment its
 SST magnitude does; `SURFACE_FLOW.fromSstFields` (deriving flow from the SST
 gradient) is no longer used for the rotating-planet path, only for the
-tide-locked one (`tidal-locked/index.ts`, a separate model sverdrup doesn't
-cover). Everything below this point that describes `sverdrup`'s own accuracy
+heuristic currents (`currents/heuristic`). Everything below this point that describes `sverdrup`'s own accuracy
 (SST magnitude, direction skill, the model's biggest weaknesses) is about
 that standalone module in isolation, run through its own diagnostic tests
 calling `SVERDRUP_CURRENTS.computeCurrents` directly -- not about what the hybrid

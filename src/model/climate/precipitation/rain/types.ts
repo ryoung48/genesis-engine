@@ -81,8 +81,6 @@ export type ComputeMonthlyRainParams = {
 	params?: GenesisParams
 	// Per-month thermal-equator latitude by longitude bin (12 entries).
 	monthlyTEQ: Float32Array[]
-	// [JUSTIFICATION] Omitted when coastal distance does not influence rainfall.
-	distCoast?: Float32Array
 	// [JUSTIFICATION] Omitted when landmarks do not alter the rain mask.
 	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">
 }

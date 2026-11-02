@@ -1,4 +1,5 @@
 import type { CirculationResult } from "./circulation.js"
+import type { LockedDeck } from "../clouds/locked/types"
 import type { CloudFields } from "../clouds/types"
 import type { ClimateSurface, TemperatureStageResult } from "./core.js"
 import type { DiurnalRanges } from "./diurnal.js"
@@ -46,7 +47,9 @@ export interface ClimateBudget {
 export function lockedClimate(
 	input: PlanetClimateInput,
 	options: PlanetClimateOptions,
-): PlanetClimateResult
+): Omit<PlanetClimateResult, "stages"> & {
+	stages: Omit<PlanetClimateResult["stages"], "clouds"> & { clouds: LockedDeck }
+}
 
 export interface PlanetClimateResult {
 	grid: LatLonGrid

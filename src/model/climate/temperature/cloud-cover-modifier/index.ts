@@ -18,7 +18,6 @@ function applyCloudCoverTemperatureModifier({
 	dtrMonthly,
 	oceanDist,
 	isLand,
-	isTidallyLocked,
 }: CloudCoverTemperatureModifierParams): void {
 	const N = oceanDist.length
 	// Cached here (rather than left for hover/map to recompute on their own)
@@ -46,7 +45,6 @@ function applyCloudCoverTemperatureModifier({
 			dtrMonthly: PARALLEL.shared(dtrMonthly),
 			oceanDist: PARALLEL.shared(oceanDist),
 			isLand: PARALLEL.shared(isLand),
-			isTidallyLocked,
 		},
 	})
 	climate.cloud_cover_monthly = PARALLEL.local(cloudCoverMonthly)
@@ -70,7 +68,6 @@ function cloudCoverCells({
 	dtrMonthly,
 	oceanDist,
 	isLand,
-	isTidallyLocked,
 }: CloudCoverCellsParams): void {
 	const N = oceanDist.length
 	for (let r = start; r < end; r++) {
@@ -89,7 +86,6 @@ function cloudCoverCells({
 				dtrC: dtrMonthly[idx],
 				temperatureC: temperatureMonthly[idx],
 				oceanDistanceKm,
-				isTidallyLocked,
 			})
 			cloudCoverMonthly[idx] = cloudFraction
 			if (!isLand[r]) continue
