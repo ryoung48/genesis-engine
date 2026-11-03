@@ -5,7 +5,7 @@ import type {
 	PotentialEvaporationParams,
 } from "@/model/climatev2/rain/locked/types"
 import { PARAMS } from "@/model/climatev2/vendor/config.js"
-import { orbitOf } from "@/model/climatev2/vendor/insolation.js"
+import { lockedSunAt, orbitOf } from "@/model/climatev2/vendor/insolation.js"
 import {
 	PSYCHRO_HPA,
 	seaEvaporationScale,
@@ -33,6 +33,16 @@ const NIGHT_SNOW: NightSnowPoint[] = [
 	{ hours: 240, mmPerDay: 0.12 },
 	{ hours: 480, mmPerDay: 0.009 },
 ]
+
+// Where the dayside's water rains out. The surface winds converge on the substellar point, and Merlis & Schneider 2010
+// (slowly rotating locked aquaplanet) find a convergence zone there of rain ≥ 40 mm/day, rain above evaporation only
+// near it, and the rest of the dayside evaporating more than it rains. So CONVERGED_SHARE of the water falls in a
+// Gaussian core about the substellar point of width CORE_DEG — their convergence zone's scale, the equatorial Rossby
+// radius ≈ 10° — and the rest by the surface's sunlight, as the evaporation goes, to the terminator (rain falls below
+// evaporation beyond ≈ 24°). 0.4 puts the core's peak at ≈ 7× the substellar evaporation, within the 5–8× of their 40 mm/day
+// against a subsolar evaporation of a sunlit warm sea's ≈ 5–8 mm/day
+const CONVERGED_SHARE = 0.4
+const CORE_DEG = 10
 
 const nightSnow = (hours: number) => {
 	const first = NIGHT_SNOW[0]
@@ -71,22 +81,24 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 	const nightRate = nightSnow((2 * Math.PI) / orbit.rotation / 3600) / 86400
 	const eSea = new Float64Array(G)
 	const eLand = new Float64Array(G)
-	const ascent = new Float64Array(G)
+	const sunlit = new Float64Array(G)
 	const rain = new Float64Array(G)
+	const core = new Float64Array(G)
+	const sunNow = new Float64Array(G)
+	const coreRad = (CORE_DEG * Math.PI) / 180
 	anchorMonths.forEach((month, k) => {
 		const s = Math.round((month * SAMPLES) / 12) % SAMPLES
 		const m = ((Math.floor(month) % 12) + 12) % 12
 		const o = s * G
-		let sun = 0
-		let area = 0
+		lockedSunAt(grid.lat, grid.lon, orbit, month, sunNow, core)
+		let coreSum = 0
 		for (let c = 0; c < G; c++) {
-			const f = surface.landFrac[c]
-			const w = grid.rowArea[Math.floor(c / grid.w)]
-			sun += w * (f * surf.sunLand[o + c] + (1 - f) * surf.sunSea[o + c])
-			area += w
+			const theta = Math.acos(Math.min(1, core[c]))
+			core[c] =
+				core[c] > 0 ? Math.exp(-(theta * theta) / (2 * coreRad * coreRad)) : 0
+			coreSum += grid.rowArea[Math.floor(c / grid.w)] * core[c]
 		}
-		const meanSun = sun / area
-		let rising = 0
+		let sunlitSum = 0
 		let dark = 0
 		for (let c = 0; c < G; c++) {
 			const f = surface.landFrac[c]
@@ -100,11 +112,8 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 				bulk *
 				qSat(tSea)
 			eLand[c] = potential({ T: tLand, net: surf.netLand[o + c], ps })
-			ascent[c] = Math.max(
-				0,
-				f * surf.sunLand[o + c] + (1 - f) * surf.sunSea[o + c] - meanSun,
-			)
-			rising += grid.rowArea[Math.floor(c / grid.w)] * ascent[c]
+			sunlit[c] = f * surf.sunLand[o + c] + (1 - f) * surf.sunSea[o + c]
+			sunlitSum += grid.rowArea[Math.floor(c / grid.w)] * sunlit[c]
 			if (surf.sunLand[o + c] <= 0 && surf.sunSea[o + c] <= 0)
 				dark += grid.rowArea[Math.floor(c / grid.w)]
 		}
@@ -119,8 +128,12 @@ function estimate({ ctx, temperature }: LockedRainParams): LockedRain {
 			const night = Math.min(water, nightRate * dark)
 			for (let c = 0; c < G; c++) {
 				const isDark = surf.sunLand[o + c] <= 0 && surf.sunSea[o + c] <= 0
+				const day = water - night
 				rain[c] =
-					(rising > 0 ? ((water - night) * ascent[c]) / rising : 0) +
+					(sunlitSum > 0
+						? ((1 - CONVERGED_SHARE) * day * sunlit[c]) / sunlitSum
+						: 0) +
+					(coreSum > 0 ? (CONVERGED_SHARE * day * core[c]) / coreSum : 0) +
 					(isDark && dark > 0 ? night / dark : 0)
 			}
 		}

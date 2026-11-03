@@ -55,7 +55,20 @@ Current results with every piece below in place are under [Calibration and resul
 
 ### Rain
 
-The locked rain stage (`src/model/climatev2/rain/locked`) runs after the cloud pass, on the climate grid; cells take it through the same sampler as the temperature (rain by height and texture included), and `post-elevation` uses it for every locked world. The sea evaporates by the rotating stage's bulk formula (`RAIN_EVAP_COEFF`, `RAIN_SURFACE_RH`) at the planet's mean surface wind (`surfaceWind`, `pressure.js`), none under sea ice; land at the Priestley–Taylor rate of its surface's net radiation, limited by the rain that reaches it (Turc–Pike). Under the even air the column rises where the surface heats it more than the planet's mean (the sunlight the surface takes beyond its mean, as in `lockedSurface`), and all the planet's evaporation rains out there in proportion; the subsiding nightside stays dry.
+The locked rain stage (`src/model/climatev2/rain/locked`) runs after the cloud pass, on the climate grid; cells take it through the same sampler as the temperature (rain by height and texture included), and `post-elevation` uses it for every locked world. The sea evaporates by the rotating stage's bulk formula (`RAIN_EVAP_COEFF`, `RAIN_SURFACE_RH`) at the planet's mean surface wind (`surfaceWind`, `pressure.js`), none under sea ice; land at the Priestley–Taylor rate of its surface's net radiation, limited by the rain that reaches it (Turc–Pike). All the dayside's evaporation rains out on the dayside, in two parts:
+
+- **Converged (`CONVERGED_SHARE` = 0.4):** falls in a Gaussian core about the substellar point, of width `CORE_DEG` = 10°. The surface winds converge there. Merlis & Schneider 2010 find a convergence zone of at least 40 mm/day, on the scale of the equatorial Rossby radius (about 10°).
+- **The rest:** falls in proportion to the sunlight the surface takes, out to the terminator.
+
+The core's peak comes to about 7 times the substellar evaporation. Rain exceeds evaporation only within about 24° of the substellar point, and the outer dayside evaporates more than it rains, as in Merlis & Schneider.
+
+At 1 bar, annual rain by distance from the substellar point, before → after this split:
+
+| distance | 0–10° | 10–20° | 30–40° | 50–60° | 70–80° | 80–90° |
+|---|---|---|---|---|---|---|
+| mm/yr | 1286 → 4862 | 1165 → 2208 | 948 → 432 | 463 → 267 | 77 → 138 | 0 → 44 |
+
+The subsiding nightside stays dry apart from its snow.
 
 The trend with pressure follows ExoPlaSim's rotating one in direction below 1 bar (more rain in thin air at its 15 °C-holding starlight), steeper below 0.5 bar, where the substellar sea runs past its boiling point (≈ 46 °C at 0.1 bar), which is not modelled.
 
