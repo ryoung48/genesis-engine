@@ -3,6 +3,8 @@ import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { RAIN } from "@/model/climate/precipitation/rain"
+import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
+import type { WeatherClockSelection } from "@/model/climate/weather/local/clock/types"
 import { WIND } from "@/model/climate/weather/wind"
 import { CLIMATEV2_LOCKED_ORBIT } from "@/model/climatev2/orbit/locked"
 import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
@@ -11,7 +13,6 @@ import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/
 import { DATE } from "@/model/history/earth/date"
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
-import type { PersonKey } from "@/model/people/query/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
@@ -65,8 +66,8 @@ import { type HoverInfo } from "@/ui/genesis/hover/hover"
 import { InfoPanel } from "@/ui/genesis/hover/InfoPanel"
 import { OceanCurrentParticleCanvas } from "@/ui/genesis/particles/OceanCurrentParticleCanvas"
 import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
-import { findEu4ProvinceForLonLat } from "@/ui/genesis/political/eu4-hover-province"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
+import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
@@ -82,11 +83,13 @@ import {
 } from "@/ui/genesis/shared/map-modes"
 import { canHandlePlanetClick } from "@/ui/genesis/shared/measurement-click"
 import { computePlanetStats } from "@/ui/genesis/shared/planet-stats"
+import { PROVINCE_SELECTION } from "@/ui/genesis/shared/province-selection"
 import { formatDistance } from "@/ui/genesis/shared/ui-format"
 import {
 	SCENE_REBUILD_THROTTLE_MS,
 	useThrottledValue,
 } from "@/ui/genesis/shared/useThrottledValue"
+import type { WeatherSummaryProps } from "@/ui/genesis/shared/weather-display/types"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import { SolarSystemControls } from "@/ui/genesis/solar-system/SolarSystemControls"
 import { useSolarSystemBodies } from "@/ui/genesis/solar-system/useSolarSystemBodies"
@@ -94,15 +97,18 @@ import { useSolarSystemView } from "@/ui/genesis/solar-system/useSolarSystemView
 import { ROAD_DISPLAY } from "@/ui/genesis/view/road-display"
 import type { WorldWindStatsCache } from "@/ui/genesis/view/types"
 import { useGenesisSceneSync } from "@/ui/genesis/view/useGenesisSceneSync"
+import { useLocalWeather } from "@/ui/genesis/view/useLocalWeather"
 import { useMapColoring } from "@/ui/genesis/view/useMapColoring"
 import { useMapExport } from "@/ui/genesis/view/useMapExport"
 import { useOverlayState } from "@/ui/genesis/view/useOverlayState"
 import { useWorldDisplayData } from "@/ui/genesis/view/useWorldDisplayData"
+import { PROVINCE_WIKI } from "@/ui/genesis/wiki-bridge/province"
 import { useNationWikiData } from "@/ui/genesis/wiki-bridge/useNationWikiData"
 import { useOrganizationWikiData } from "@/ui/genesis/wiki-bridge/useOrganizationWikiData"
 import { usePersonWikiData } from "@/ui/genesis/wiki-bridge/usePersonWikiData"
 import { useReligionWikiData } from "@/ui/genesis/wiki-bridge/useReligionWikiData"
 import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
+import { useWikiSelection } from "@/ui/genesis/wiki-bridge/useWikiSelection"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
 const NO_TITLE_BORDER_TIERS: readonly TitleBorderTier[] = []
@@ -294,61 +300,37 @@ export const GenesisView: React.FC<{
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(
 		initialGenerationSession?.generationPanelOpen ?? true,
 	)
-	// Left-panel "nation wiki page" selection, identified by history record
-	// nation id.
-	const [selectedWikiNationId, setSelectedWikiNationIdRaw] = useState<
-		number | null
-	>(null)
-	// International organization wiki page selection (e.g. "HRE"/"HSA") --
-	// mutually exclusive with the nation wiki page above; selecting either
-	// clears the other so GenerationPanel only ever renders one at a time.
-	const [selectedWikiOrganizationId, setSelectedWikiOrganizationIdRaw] =
-		useState<string | null>(null)
-	// War wiki page selection (wars.json warId) -- also mutually exclusive
-	// with the nation/organization wiki pages above.
-	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<number | null>(
-		null,
+	const {
+		selectedWikiNationId,
+		selectedWikiOrganizationId,
+		selectedWikiWarId,
+		selectedWikiPerson,
+		selectedWikiReligionId,
+		selectedWikiProvince,
+		setSelectedWikiNationId,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
+		setSelectedWikiPerson,
+		setSelectedWikiReligionId,
+		setSelectedWikiProvince,
+		provinceBack,
+		clearWiki,
+	} = useWikiSelection()
+	const openProvince = useCallback(
+		(province: number | null) => {
+			setSelectedWikiProvince(province)
+			if (province !== null) setGenerationPanelOpen(true)
+		},
+		[setSelectedWikiProvince],
 	)
-	const [selectedWikiPerson, setSelectedWikiPersonRaw] =
-		useState<PersonKey | null>(null)
-	const [selectedWikiReligionId, setSelectedWikiReligionIdRaw] = useState<
-		number | null
-	>(null)
-	const setSelectedWikiNationId = useCallback((id: number | null) => {
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonRaw(null)
-		setSelectedWikiReligionIdRaw(null)
-		setSelectedWikiNationIdRaw(id)
-	}, [])
-	const setSelectedWikiOrganizationId = useCallback((orgId: string | null) => {
-		setSelectedWikiNationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonRaw(null)
-		setSelectedWikiReligionIdRaw(null)
-		setSelectedWikiOrganizationIdRaw(orgId)
-	}, [])
-	const setSelectedWikiWarId = useCallback((warId: number | null) => {
-		setSelectedWikiNationIdRaw(null)
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiPersonRaw(null)
-		setSelectedWikiReligionIdRaw(null)
-		setSelectedWikiWarIdRaw(warId)
-	}, [])
-	const setSelectedWikiPerson = useCallback((key: PersonKey | null) => {
-		setSelectedWikiNationIdRaw(null)
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiReligionIdRaw(null)
-		setSelectedWikiPersonRaw(key)
-	}, [])
-	const setSelectedWikiReligionId = useCallback((id: number | null) => {
-		setSelectedWikiNationIdRaw(null)
-		setSelectedWikiOrganizationIdRaw(null)
-		setSelectedWikiWarIdRaw(null)
-		setSelectedWikiPersonRaw(null)
-		setSelectedWikiReligionIdRaw(id)
-	}, [])
+	const wikiWorld = useRef(world)
+	useEffect(() => {
+		if (wikiWorld.current !== world) {
+			clearWiki()
+			setHoverInfo(null)
+			wikiWorld.current = world
+		}
+	}, [world, clearWiki])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
 	)
@@ -464,14 +446,6 @@ export const GenesisView: React.FC<{
 		}
 	}, [world?.isEarthImport])
 	const displayMonth = historyTimeToMonth(selectedTimeMs)
-	// When clock is locked to current sim time, sync month control (day resets to 0)
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	useEffect(() => {
-		if (clockCurrent) {
-			setClockMonth(displayMonth - 1)
-			setClockDay(0)
-		}
-	}, [clockCurrent, displayMonth])
 	const resolvedClimateMonth =
 		clockMonthMode === "annual"
 			? 0
@@ -632,7 +606,15 @@ export const GenesisView: React.FC<{
 		sceneRef.current = genesisScene
 		genesisScene.setHoverHandler((info) => {
 			setHoverInfo(
-				info ? { region: info.region, x: info.clientX, y: info.clientY } : null,
+				info
+					? {
+							region: info.region,
+							longitude: info.longitude,
+							latitude: info.latitude,
+							x: info.clientX,
+							y: info.clientY,
+						}
+					: null,
 			)
 		})
 		const onResize = () => genesisScene.resize()
@@ -945,7 +927,6 @@ export const GenesisView: React.FC<{
 		hoverOccupation,
 		hoverOceanCurrents,
 		hoverOceanDist,
-		hoverProvince,
 		hoverRainfall,
 		hoverRainfallDiff,
 		hoverRealDtr,
@@ -970,6 +951,7 @@ export const GenesisView: React.FC<{
 		sampledNationLabelsArray,
 		sampledSettlementLabelsArray,
 		windVectors,
+		hoverProvince,
 	} = useWorldDisplayData({
 		sceneRef,
 		world,
@@ -1018,6 +1000,85 @@ export const GenesisView: React.FC<{
 		return stats
 	}, [world, showRealWind])
 
+	const weatherSelection = useRef<WeatherClockSelection | null>(null)
+	const weatherClock = useMemo(() => {
+		if (!world) {
+			weatherSelection.current = null
+			return null
+		}
+		const selection = WEATHER_CLOCK.select({
+			params: world.params,
+			elapsedYears: history.selectedTimeMs / STATE_CLOCK.yearMs,
+			current: clockCurrent,
+			manual: {
+				year: Math.floor(history.selectedTimeMs / STATE_CLOCK.yearMs),
+				month: clockMonth,
+				day: clockDay,
+				dialHour: clockHour,
+			},
+			previous: weatherSelection.current,
+		})
+		weatherSelection.current = selection
+		return selection.instant
+	}, [
+		world,
+		history.selectedTimeMs,
+		clockCurrent,
+		clockMonth,
+		clockDay,
+		clockHour,
+	])
+
+	useEffect(() => {
+		if (!clockCurrent || !weatherClock) return
+		const month = Math.floor(weatherClock.phase * 12)
+		const rotations =
+			(weatherClock.seconds -
+				weatherClock.year * weatherClock.yearSeconds -
+				(month * weatherClock.yearSeconds) / 12) /
+			weatherClock.rotationSeconds
+		setClockMonth(month)
+		setClockDay(Math.floor(rotations))
+		setClockHour((rotations % 1) * 24)
+	}, [clockCurrent, weatherClock, setClockMonth, setClockDay, setClockHour])
+
+	const weatherInstant =
+		clockMonthMode === "annual" && !clockCurrent ? null : weatherClock
+	const weatherRepresentatives = useMemo(
+		() =>
+			PROVINCE_SELECTION.representatives({
+				world,
+				geometry: eu4HoverFillGeometry,
+			}),
+		[world, eu4HoverFillGeometry],
+	)
+
+	const localWeather = useLocalWeather({
+		world,
+		instant: weatherInstant,
+		selectedProvince: selectedWikiProvince,
+		representatives: weatherRepresentatives,
+	})
+	const selectWeatherDate = useCallback(() => {
+		setClockMonthMode("monthly")
+	}, [setClockMonthMode])
+
+	const weatherDateLabel = weatherClock
+		? clockCurrent
+			? historyFormatLabel(history.selectedTimeMs)
+			: `${DATE.formatEu4Year(weatherClock.year + DATE.earthHistoryStartYear)} · Month ${Math.floor(weatherClock.phase * 12) + 1} · Day ${Math.floor((((weatherClock.phase * 12) % 1) * weatherClock.yearSeconds) / 12 / weatherClock.rotationSeconds) + 1}`
+		: ""
+	const weatherProps: WeatherSummaryProps = {
+		snapshot: localWeather.selected,
+		outlook: localWeather.outlook,
+		unitSystem,
+		dateLabel: weatherDateLabel,
+		loading: localWeather.loading,
+		error: localWeather.error,
+		annual: weatherInstant === null,
+		onSelectDate: selectWeatherDate,
+	}
+
 	// The scene rebuilds borders and labels whenever its world object changes, and
 	// worldForDisplay gets a new identity for every history frame, so the scene
 	// sees it throttled. A new generated world commits immediately.
@@ -1049,6 +1110,7 @@ export const GenesisView: React.FC<{
 		organizationHighlightSpec,
 		regionColors,
 	} = useMapColoring({
+		hoverProvince,
 		worldForDisplay,
 		history,
 		historyFrame,
@@ -1064,7 +1126,6 @@ export const GenesisView: React.FC<{
 		dangerSubMode,
 		selectedWikiOrganizationId,
 		windVectors,
-		hoverProvince,
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
@@ -1210,7 +1271,12 @@ export const GenesisView: React.FC<{
 		scene.setFullAmbient(!showDaylight)
 		scene.setSolarTerminatorUseMeridiem(clockUseMeridiem)
 		scene.setSolarTerminatorVisible(showDaylight)
-		if (tidallyLocked) {
+		if (weatherClock && (clockCurrent || clockMonthMode !== "annual")) {
+			scene.setSunDirection(
+				...weatherClock.sun,
+				(weatherClock.solarDaySeconds ?? weatherClock.rotationSeconds) / 3600,
+			)
+		} else if (tidallyLocked) {
 			const selectedMonth = clockMonthMode === "annual" ? 5 : clockMonth
 			const monthlyLibration = CLIMATEV2_LOCKED_ORBIT.computeMonthlyLibration({
 				eccentricity,
@@ -1242,6 +1308,8 @@ export const GenesisView: React.FC<{
 			)
 		}
 	}, [
+		weatherClock,
+		clockCurrent,
 		showDaylight,
 		clockUseMeridiem,
 		clockMonthMode,
@@ -1303,42 +1371,37 @@ export const GenesisView: React.FC<{
 				return
 			}
 
-			const province =
-				worldForDisplay.provinces.regionProvince[info.region] ?? -1
-
 			if (measureMode === "off") {
-				if (!history.state) return
-				const { provinceMap } = history.state
-				// Earth's real EU4 province polygons don't align with the underlying
-				// mesh cells, so prefer a point-in-polygon lookup against the actual
-				// province vector geometry (same approach hoverProvince uses),
-				// falling back to the regionProvince mapping.
-				let rawId: string | null = null
-				if (worldForDisplay.provinces?.realIds && eu4HoverFillGeometry) {
-					const base = info.region * 3
-					const r_xyz = worldForDisplay.mesh.r_xyz
-					const latDeg =
-						Math.asin(Math.max(-1, Math.min(1, r_xyz[base + 2]))) *
-						(180 / Math.PI)
-					const lonDeg =
-						Math.atan2(r_xyz[base + 1], r_xyz[base]) * (180 / Math.PI)
-					const rawProvinceId = findEu4ProvinceForLonLat(
-						eu4HoverFillGeometry,
-						lonDeg,
-						latDeg,
-					)
-					if (rawProvinceId !== null) rawId = String(rawProvinceId)
-				}
-				if (rawId === null && province >= 0) {
-					rawId = String(provinceMap.compactToRealId[province])
-				}
+				const province = PROVINCE_SELECTION.resolve({
+					world: worldForDisplay,
+					geometry: eu4HoverFillGeometry,
+					region: info.region,
+					longitude: info.longitude,
+					latitude: info.latitude,
+				})
 				const compact =
-					rawId === null ? undefined : provinceMap.realIdToCompact.get(rawId)
-				const nationId =
-					compact === undefined
-						? -1
-						: (history.query?.frame.provinceNation[compact] ?? -1)
-				setSelectedWikiNationId(nationId >= 0 ? nationId : null)
+					province === null
+						? null
+						: PROVINCE_WIKI.frameIndex({
+								world: worldForDisplay,
+								history,
+								province,
+							})
+				const owner =
+					compact === null
+						? null
+						: (history.query?.frame.provinceNation[compact] ?? null)
+				const target = PROVINCE_SELECTION.clickTarget({
+					province,
+					owner,
+					colorMode,
+					toolActive: false,
+				})
+				if (target.kind === "province") openProvince(target.id)
+				if (target.kind === "nation") {
+					setSelectedWikiNationId(target.id)
+					setGenerationPanelOpen(true)
+				}
 				return
 			}
 
@@ -1382,6 +1445,9 @@ export const GenesisView: React.FC<{
 		history.query,
 		eu4HoverFillGeometry,
 		setSelectedWikiNationId,
+		colorMode,
+		openProvince,
+		history,
 	])
 
 	const {
@@ -1576,7 +1642,7 @@ export const GenesisView: React.FC<{
 		spectralClass,
 		starSubtype,
 		orbitalDistanceAU,
-		daysPerYear,
+		daysPerYear: effectiveDaysPerYear,
 		hoursPerDay,
 		tideLock,
 		substellarLon,
@@ -1724,6 +1790,23 @@ export const GenesisView: React.FC<{
 	// for the same body.
 	const planetName = mainWorldSystemBody?.name || "Main World"
 
+	const provinceWikiData = PROVINCE_WIKI.describe({
+		world: worldForDisplay,
+		history,
+		province: selectedWikiProvince,
+		planetName,
+		unitSystem,
+		getProvinceName,
+		onBack: provinceBack,
+		onFocus: () => {
+			if (selectedWikiProvince !== null)
+				sceneRef.current?.focusOnProvince(selectedWikiProvince, {
+					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				})
+		},
+		onSelectNation: setSelectedWikiNationId,
+	})
+
 	const nationWikiData = useNationWikiData({
 		selectedWikiNationId,
 		world,
@@ -1737,6 +1820,7 @@ export const GenesisView: React.FC<{
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince: openProvince,
 		sceneRef,
 	})
 
@@ -1754,6 +1838,7 @@ export const GenesisView: React.FC<{
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince: openProvince,
 		buildOrgCategorizer,
 		sceneRef,
 	})
@@ -1769,6 +1854,7 @@ export const GenesisView: React.FC<{
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince: openProvince,
 		sceneRef,
 	})
 
@@ -1782,6 +1868,7 @@ export const GenesisView: React.FC<{
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince: openProvince,
 	})
 
 	const personWikiData = usePersonWikiData({
@@ -1794,6 +1881,7 @@ export const GenesisView: React.FC<{
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince: openProvince,
 		sceneRef,
 	})
 
@@ -2082,6 +2170,8 @@ export const GenesisView: React.FC<{
 							showObservedDistributions,
 							tradeGoodsDistribution,
 						}}
+						provinceWiki={provinceWikiData}
+						provinceWeather={weatherProps}
 						nationWiki={nationWikiData}
 						organizationWiki={organizationWikiData}
 						warWiki={warWikiData}
@@ -2306,7 +2396,10 @@ export const GenesisView: React.FC<{
 								clockDay={clockDay}
 								setClockDay={setClockDay}
 								clockHour={clockHour}
-								setClockHour={setClockHour}
+								setClockHour={(hour) => {
+									setClockCurrent(false)
+									setClockHour(hour)
+								}}
 								clockUseMeridiem={clockUseMeridiem}
 								setClockUseMeridiem={setClockUseMeridiem}
 								hoursPerDay={hoursPerDay}

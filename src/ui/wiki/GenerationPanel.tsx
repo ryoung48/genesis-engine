@@ -32,6 +32,7 @@ import type { DetailsDrawerBaseProps } from "@/ui/genesis/details/shared"
 import { WorldDetails } from "@/ui/genesis/details/world/WorldDetails"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import type { WeatherSummaryProps } from "@/ui/genesis/shared/weather-display/types"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
 import {
@@ -47,6 +48,8 @@ import {
 	type PersonWikiData,
 	PersonWikiPage,
 } from "@/ui/wiki/person/PersonWikiPage"
+import { ProvinceWikiPage } from "@/ui/wiki/province/ProvinceWikiPage"
+import type { ProvinceWikiData } from "@/ui/wiki/province/types"
 import { ReligionWikiPage } from "@/ui/wiki/religion/ReligionWikiPage"
 import type { ReligionWikiData } from "@/ui/wiki/religion/types"
 import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
@@ -58,6 +61,8 @@ import {
 import { type WarWikiData, WarWikiPage } from "@/ui/wiki/war/WarWikiPage"
 
 interface GenerationPanelProps {
+	provinceWiki: ProvinceWikiData | null
+	provinceWeather: WeatherSummaryProps
 	climateModel: ClimateModel
 	setClimateModel: (model: ClimateModel) => void
 	worldTab: "planet" | "society"
@@ -202,6 +207,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	handleGenerate,
 	onClose,
 	worldDetails,
+	provinceWiki,
+	provinceWeather,
 	nationWiki,
 	organizationWiki,
 	warWiki,
@@ -399,7 +406,12 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3">
 				<div className="rounded-2xl bg-slate-50 px-3 py-3 space-y-3">
-					{nationWiki ? (
+					{provinceWiki ? (
+						<ProvinceWikiPage
+							province={provinceWiki}
+							weather={provinceWeather}
+						/>
+					) : nationWiki ? (
 						<NationWikiPage nation={nationWiki} />
 					) : organizationWiki ? (
 						<OrganizationWikiPage organization={organizationWiki} />

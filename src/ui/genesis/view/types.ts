@@ -66,6 +66,7 @@ export type OrgCategorizerBuilder = (
 
 /** Wiki page selection setters -- mutually exclusive, see useWikiSelection. */
 export type WikiSelectionSetters = {
+	setSelectedWikiProvince: (id: number | null) => void
 	setSelectedWikiNationId: (id: number | null) => void
 	setSelectedWikiOrganizationId: (orgId: string | null) => void
 	setSelectedWikiWarId: (warId: number | null) => void

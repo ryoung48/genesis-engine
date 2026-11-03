@@ -1,4 +1,12 @@
-export type BenchUnit = "s" | "GB" | "count" | "%" | "ratio" | "people" | "ms"
+export type BenchUnit =
+	| "s"
+	| "GB"
+	| "count"
+	| "%"
+	| "ratio"
+	| "people"
+	| "ms"
+	| "pp"
 
 export interface BenchRunSummary {
 	id: string

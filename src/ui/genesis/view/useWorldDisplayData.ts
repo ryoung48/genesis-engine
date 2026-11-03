@@ -18,13 +18,11 @@ import {
 	getHoverIsLand,
 	getHoverKoppenClimate,
 	getHoverLandmark,
-	getHoverLonLat,
 	getHoverMisery,
 	getHoverModeledCloudCover,
 	getHoverOceanCurrents,
 	getHoverOceanDist,
 	getHoverPastaClimate,
-	getHoverProvince,
 	getHoverRainfall,
 	getHoverRainfallDiff,
 	getHoverRealCloudCover,
@@ -42,7 +40,6 @@ import {
 	getHoverTopography,
 	type HoverMisery,
 } from "@/ui/genesis/hover/hover"
-import { findEu4ProvinceForLonLat } from "@/ui/genesis/political/eu4-hover-province"
 import {
 	buildCultureLabelNames,
 	buildHeritageLabelNames,
@@ -52,6 +49,7 @@ import {
 	buildSettlementLabelNames,
 } from "@/ui/genesis/shared/label-names"
 import { getMapModePrimary } from "@/ui/genesis/shared/map-modes"
+import { PROVINCE_SELECTION } from "@/ui/genesis/shared/province-selection"
 import { rgbToCss, windDirectionLabel } from "@/ui/genesis/shared/ui-format"
 import {
 	SCENE_REBUILD_THROTTLE_MS,
@@ -182,41 +180,19 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		worldForDisplay,
 	)
 	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay, colorMode)
-	const earthImportRawIdToCompact = useMemo(() => {
-		const realIds = worldForDisplay?.provinces?.realIds
-		if (!realIds) return null
-		const map = new Map<number, number>()
-		for (let idx = 0; idx < realIds.length; idx++) {
-			map.set(realIds[idx], idx)
-		}
-		return map
-	}, [worldForDisplay?.provinces?.realIds])
-	const hoverProvince = useMemo(() => {
-		const fallbackProvince = getHoverProvince(hoverInfo, worldForDisplay)
-		if (
-			!hoverInfo ||
-			!worldForDisplay?.isEarthImport ||
-			!worldForDisplay.provinces?.realIds ||
-			!earthImportRawIdToCompact ||
-			!eu4HoverFillGeometry
-		) {
-			return fallbackProvince
-		}
-		const lonLat = getHoverLonLat(hoverInfo, worldForDisplay)
-		if (!lonLat) return fallbackProvince
-		const rawProvinceId = findEu4ProvinceForLonLat(
-			eu4HoverFillGeometry,
-			lonLat.lonDeg,
-			lonLat.latDeg,
-		)
-		if (rawProvinceId === null) return fallbackProvince
-		return earthImportRawIdToCompact.get(rawProvinceId) ?? fallbackProvince
-	}, [
-		earthImportRawIdToCompact,
-		eu4HoverFillGeometry,
-		hoverInfo,
-		worldForDisplay,
-	])
+	const hoverProvince = useMemo(
+		() =>
+			hoverInfo
+				? PROVINCE_SELECTION.resolve({
+						world: worldForDisplay,
+						geometry: eu4HoverFillGeometry,
+						region: hoverInfo.region,
+						longitude: hoverInfo.longitude,
+						latitude: hoverInfo.latitude,
+					})
+				: null,
+		[hoverInfo, worldForDisplay, eu4HoverFillGeometry],
+	)
 	const hoverLandmark = getHoverLandmark(hoverInfo, worldForDisplay)
 	const hoverIsLand = getHoverIsLand(hoverInfo, worldForDisplay)
 	const hoverOceanDist = getHoverOceanDist(hoverInfo, worldForDisplay)

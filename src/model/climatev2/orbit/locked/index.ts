@@ -238,6 +238,7 @@ function computeLockedMonthlyDaylightHours({
 }
 
 export const CLIMATEV2_LOCKED_ORBIT = {
+	computeDailyLockedOrbit,
 	computeMonthlyLibration,
 	computeMonthlyLockedDeclination,
 	computeMonthlyOrbitalFlux,

@@ -8,6 +8,7 @@ const UNIT_SUFFIX: Record<BenchUnit, string> = {
 	ratio: "",
 	people: "",
 	ms: " ms",
+	pp: " pp",
 }
 
 const LARGE_VALUE = 1000
@@ -32,13 +33,17 @@ export function formatBenchValue(params: {
 	if (value === null) return "—"
 	if (unit === "people") return formatPeople(value)
 	const digits =
-		unit === "count" && Math.abs(value) >= LARGE_VALUE
-			? 0
-			: Math.abs(value) >= 100
+		(unit === "%" || unit === "pp") &&
+		Math.abs(value) > 0 &&
+		Math.abs(value) < 0.01
+			? 6
+			: unit === "count" && Math.abs(value) >= LARGE_VALUE
 				? 0
-				: Math.abs(value) >= 10
-					? 1
-					: 2
+				: Math.abs(value) >= 100
+					? 0
+					: Math.abs(value) >= 10
+						? 1
+						: 2
 	return `${value.toLocaleString("en-US", { maximumFractionDigits: digits })}${UNIT_SUFFIX[unit]}`
 }
 

@@ -6,6 +6,7 @@ import type {
 	BenchRunDetail,
 	BenchRunSummary,
 } from "@/bench/types"
+import { BenchNavigation } from "@/ui/bench/BenchNavigation"
 import { BoxWhiskerChart } from "@/ui/bench/BoxWhiskerChart"
 import { ComboChart } from "@/ui/bench/ComboChart"
 import {
@@ -393,6 +394,7 @@ export const BenchDashboard: React.FC = () => {
 		<div className="h-full overflow-y-auto bg-slate-50">
 			<div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
 				<header className="flex flex-col gap-4">
+					<BenchNavigation />
 					<div>
 						<h1 className={uiTokens.type.title}>History bench</h1>
 						{current && (

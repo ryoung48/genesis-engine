@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react"
+import { BENCH_API } from "@/bench/api"
 import type { BenchRunDetail, BenchRunSummary } from "@/bench/types"
+import { BENCH_REQUEST } from "@/ui/bench/request"
 
-const API = "/api/bench/runs"
+const API = BENCH_API.history
 const LIVE_REFRESH_MS = 5000
 const RUN_LIST_REFRESH_MS = 30000
-
-async function fetchJson<T>(url: string): Promise<T> {
-	const response = await fetch(url)
-	if (!response.ok) throw new Error(await response.text())
-	return response.json()
-}
 
 function defaultBaseline(params: {
 	runs: BenchRunSummary[]
@@ -33,7 +29,7 @@ export function useBenchDashboard(diffEnabled: boolean) {
 	const [loading, setLoading] = useState(true)
 
 	useEffect(() => {
-		fetchJson<BenchRunSummary[]>(API)
+		BENCH_REQUEST.json<BenchRunSummary[]>({ url: API, signal: null })
 			.then((list) => {
 				setRuns(list)
 				const first = list[0]?.id ?? ""
@@ -59,7 +55,10 @@ export function useBenchDashboard(diffEnabled: boolean) {
 		let cancelled = false
 		Promise.all(
 			wanted.map((id) =>
-				fetchJson<BenchRunDetail>(`${API}/${encodeURIComponent(id)}`),
+				BENCH_REQUEST.json<BenchRunDetail>({
+					url: `${API}/${encodeURIComponent(id)}`,
+					signal: null,
+				}),
 			),
 		)
 			.then((loaded) => {
@@ -85,7 +84,10 @@ export function useBenchDashboard(diffEnabled: boolean) {
 	useEffect((): (() => void) | undefined => {
 		if (!liveRun) return
 		const timer = setInterval((): void => {
-			fetchJson<BenchRunDetail>(`${API}/${encodeURIComponent(currentId)}`)
+			BENCH_REQUEST.json<BenchRunDetail>({
+				url: `${API}/${encodeURIComponent(currentId)}`,
+				signal: null,
+			})
 				.then((detail) =>
 					setDetails((prev) => ({ ...prev, [detail.run.id]: detail })),
 				)
@@ -96,7 +98,7 @@ export function useBenchDashboard(diffEnabled: boolean) {
 
 	useEffect((): (() => void) | undefined => {
 		const timer = setInterval((): void => {
-			fetchJson<BenchRunSummary[]>(API)
+			BENCH_REQUEST.json<BenchRunSummary[]>({ url: API, signal: null })
 				.then(setRuns)
 				.catch((): null => null)
 		}, RUN_LIST_REFRESH_MS)

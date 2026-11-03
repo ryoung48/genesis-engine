@@ -3,6 +3,7 @@ import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { DATE } from "@/model/history/earth/date"
+import { TIME } from "@/model/shared/time"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { MIGRATION } from "@/model/society/migration"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
@@ -90,6 +91,10 @@ export function buildHoverChartData(
 	const daylight: number[] = []
 	const pet: number[] = []
 	const aet: number[] = []
+	const daylightScale =
+		world.params?.tideLock?.type === "solar" && world.params.hoursPerDay > 0
+			? TIME.constants.hoursPerDay / world.params.hoursPerDay
+			: 1
 	for (let month = 0; month < 12; month++) {
 		temps.push(
 			world.climate
@@ -111,7 +116,8 @@ export function buildHoverChartData(
 		)
 		daylight.push(
 			world.climate?.daylight_hours_monthly
-				? world.climate.daylight_hours_monthly[month * regionCount + region]
+				? world.climate.daylight_hours_monthly[month * regionCount + region] *
+						daylightScale
 				: 0,
 		)
 		pet.push(

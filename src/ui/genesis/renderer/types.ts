@@ -123,6 +123,8 @@ export type CraterMaterialInput = {
 
 export interface GenesisHoverInfo {
 	region: number
+	longitude: number
+	latitude: number
 	clientX: number
 	clientY: number
 }

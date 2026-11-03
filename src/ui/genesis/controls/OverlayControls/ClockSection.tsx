@@ -135,7 +135,7 @@ export const ClockSection: React.FC<ClockSectionProps> = ({
 					{!tidallyLocked && (
 						<div className="space-y-1">
 							<LabeledSlider
-								label="Hour"
+								label="Reference rotation time"
 								value={formatClockTimeDisplay(
 									scaledClockHour,
 									hoursPerDay,

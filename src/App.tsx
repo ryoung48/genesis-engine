@@ -15,6 +15,12 @@ const BenchDashboard = lazy(() =>
 	})),
 )
 
+const WeatherBenchDashboard = lazy(() =>
+	import("@/ui/bench/weather/WeatherBenchDashboard").then((module) => ({
+		default: module.WeatherBenchDashboard,
+	})),
+)
+
 const FlagGenerator = lazy(() =>
 	import("@/ui/flag-generator/FlagGenerator").then((module) => ({
 		default: module.FlagGenerator,
@@ -57,6 +63,16 @@ function App() {
 					element={
 						<Suspense fallback={<div role="status">Loading bench…</div>}>
 							<BenchDashboard />
+						</Suspense>
+					}
+				/>
+				<Route
+					path={APP_PATHS.weatherBench}
+					element={
+						<Suspense
+							fallback={<div role="status">Loading weather bench…</div>}
+						>
+							<WeatherBenchDashboard />
 						</Suspense>
 					}
 				/>

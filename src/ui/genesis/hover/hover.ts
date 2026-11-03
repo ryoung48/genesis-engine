@@ -29,6 +29,8 @@ const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
 export interface HoverInfo {
 	region: number
+	longitude: number
+	latitude: number
 	x: number
 	y: number
 }
@@ -143,13 +145,9 @@ export function getHoverLonLat(
 	world: SerializedGenesisWorld | null,
 ): HoverLonLat | null {
 	if (!hoverInfo || !world) return null
-	const base = hoverInfo.region * 3
-	const x = world.mesh.r_xyz[base]
-	const y = world.mesh.r_xyz[base + 1]
-	const z = world.mesh.r_xyz[base + 2]
 	return {
-		latDeg: Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI),
-		lonDeg: Math.atan2(y, x) * (180 / Math.PI),
+		latDeg: hoverInfo.latitude,
+		lonDeg: hoverInfo.longitude,
 	}
 }
 

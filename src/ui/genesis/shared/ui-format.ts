@@ -1,3 +1,5 @@
+import type { FormatWeatherValueParams } from "@/ui/genesis/shared/ui-format/types"
+
 export type UnitSystem = "metric" | "imperial"
 
 const KM_TO_MI = 0.621371
@@ -6,6 +8,20 @@ const MM_TO_IN = 0.0393701
 const M3S_TO_FT3S = 35.314667
 const KM2_TO_MI2 = 0.386102
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+export function formatWindSpeed({
+	value,
+	unitSystem,
+}: FormatWeatherValueParams): string {
+	return `${(unitSystem === "imperial" ? value * 3.6 * KM_TO_MI : value).toFixed(1)} ${unitSystem === "imperial" ? "mph" : "m/s"}`
+}
+
+export function formatRainRate({
+	value,
+	unitSystem,
+}: FormatWeatherValueParams): string {
+	return `${formatPrecipitation(value, unitSystem, 2)}/h`
+}
 
 export function rgbToCss([r, g, b]: [number, number, number]): string {
 	return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`

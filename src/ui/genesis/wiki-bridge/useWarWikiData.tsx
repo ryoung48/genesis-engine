@@ -5,7 +5,6 @@ import { HISTORY } from "@/model/history/record"
 import type { WarParticipantEventRecord } from "@/model/history/record/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { uiPalette } from "@/ui/components/tokens"
-import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import type { WarWikiDataInput } from "@/ui/genesis/view/types"
 import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
 import {
@@ -14,6 +13,7 @@ import {
 	battleVerb,
 	formatBattleForce,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { PROVINCE_WIKI } from "@/ui/genesis/wiki-bridge/province"
 import { SIEGE_TIMELINE } from "@/ui/genesis/wiki-bridge/siege-timeline"
 import { WAR_TROOP_SNAPSHOTS } from "@/ui/genesis/wiki-bridge/war-troop-snapshots"
 import {
@@ -46,6 +46,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiProvince,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -518,9 +519,13 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 				selectNation(Number(targetTag))
 			},
 			onSelectProvince: (provinceId: number) => {
-				sceneRef.current?.focusOnProvince(provinceId, {
-					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				if (!world) return
+				const province = PROVINCE_WIKI.worldIndex({
+					world,
+					history,
+					province: provinceId,
 				})
+				if (province !== null) setSelectedWikiProvince(province)
 			},
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
@@ -541,5 +546,6 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		setSelectedWikiNationId,
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
+		setSelectedWikiProvince,
 	])
 }

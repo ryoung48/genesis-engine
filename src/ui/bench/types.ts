@@ -3,7 +3,7 @@ import type { BenchRunDetail } from "@/bench/types"
 export interface ChartSeries {
 	label: string
 	color: string
-	// [JUSTIFICATION] only the development and knowledge chart groups its bars; other charts stack everything together
+	// [JUSTIFICATION] comparison and category charts can choose separate bar groups; ordinary series use the default stack
 	group?: string
 	values: (number | null)[]
 }
@@ -11,7 +11,7 @@ export interface ChartSeries {
 export interface SeriesSpec {
 	label: string
 	color: string
-	// [JUSTIFICATION] only the development and knowledge chart groups its bars; other charts stack everything together
+	// [JUSTIFICATION] comparison and category charts can choose separate bar groups; ordinary series use the default stack
 	group?: string
 	values: (run: BenchRunDetail) => (number | null)[]
 }

@@ -13,6 +13,8 @@ import type {
 	BenchWindow,
 } from "@/bench/types"
 import type { JsonObject, JsonValue } from "@/test/history-run/comparison/types"
+// biome-ignore lint/style/noRestrictedImports: Vite loads this digest before application aliases are configured.
+import { BENCH_RUN_TIME } from "../run-time/index.ts"
 
 const HISTORY_DIR = "stats/history"
 const SKIPPED_DIRS = ["pipeline", "profiled"]
@@ -126,12 +128,6 @@ function scaled(params: {
 	return params.value === null ? null : params.value * params.scale
 }
 
-function timestampMs(timestamp: string): number {
-	return Date.parse(
-		timestamp.replace(/T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/, "T$1:$2:$3.$4Z"),
-	)
-}
-
 function resolveRun(params: BenchDetailParams): string {
 	const base = resolve(params.root, HISTORY_DIR)
 	const path = resolve(base, params.id)
@@ -159,7 +155,7 @@ function list(root: string): BenchRunSummary[] {
 			runs.push({
 				id: `${folder.name}/${file}`,
 				title: match[2] || folder.name,
-				startedAt: new Date(timestampMs(match[1])).toISOString(),
+				startedAt: new Date(BENCH_RUN_TIME.parse(match[1])).toISOString(),
 				years: Number.parseInt(file, 10),
 				sizeMb: statSync(join(base, folder.name, file)).size / BYTES_PER_MB,
 			})

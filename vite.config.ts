@@ -5,23 +5,39 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
 import { type Connect, defineConfig, type Plugin } from "vite"
+import { BENCH_API } from "./src/bench/api.ts"
 import { BENCH_DIGEST } from "./src/bench/digest/index.ts"
+import { WEATHER_BENCH } from "./src/bench/weather/index.ts"
 
-const BENCH_API_PREFIX = "/api/bench/runs"
+const BENCH_APIS = [
+	{ prefix: BENCH_API.history, digest: BENCH_DIGEST },
+	{ prefix: BENCH_API.weather, digest: WEATHER_BENCH },
+]
 
 function benchApi(): Plugin {
 	const handle: Connect.NextHandleFunction = (req, res, next) => {
 		const url = new URL(req.url ?? "", "http://localhost")
-		if (!url.pathname.startsWith(BENCH_API_PREFIX)) return next()
-		const id = decodeURIComponent(
-			url.pathname.slice(BENCH_API_PREFIX.length).replace(/^\//, ""),
+		const api = BENCH_APIS.find(
+			({ prefix }) =>
+				url.pathname === prefix || url.pathname.startsWith(prefix + "/"),
 		)
+		if (!api) return next()
+		if (req.method !== "GET" && req.method !== "HEAD") {
+			res.statusCode = 405
+			res.setHeader("Allow", "GET, HEAD")
+			res.end("Read-only bench endpoint")
+			return
+		}
 		try {
+			const id = decodeURIComponent(
+				url.pathname.slice(api.prefix.length).replace(/^\//, ""),
+			)
 			const body = id
-				? BENCH_DIGEST.detail({ root: process.cwd(), id })
-				: BENCH_DIGEST.list(process.cwd())
+				? api.digest.detail({ root: process.cwd(), id })
+				: api.digest.list(process.cwd())
 			res.setHeader("Content-Type", "application/json")
-			res.end(JSON.stringify(body))
+			res.setHeader("Cache-Control", "no-cache")
+			res.end(req.method === "HEAD" ? undefined : JSON.stringify(body))
 		} catch (error) {
 			res.statusCode = 404
 			res.end(error instanceof Error ? error.message : "Bench error")

@@ -5,7 +5,7 @@ export function supportsOceanClimate(
 ): boolean {
 	return (
 		world !== null &&
-		world.params?.climateModel !== "v1" &&
-		world.params?.tideLock?.type !== "solar"
+		(world.params?.tideLock?.type === "solar" ||
+			world.params?.climateModel !== "v1")
 	)
 }

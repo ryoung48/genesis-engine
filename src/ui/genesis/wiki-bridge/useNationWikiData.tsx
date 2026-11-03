@@ -16,7 +16,6 @@ import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfF
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import { uiPalette } from "@/ui/components/tokens"
-import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
@@ -51,6 +50,7 @@ import {
 	mergeNations,
 	payloadValue,
 } from "@/ui/genesis/wiki-bridge/nation-wiki-timeline-format"
+import { PROVINCE_WIKI } from "@/ui/genesis/wiki-bridge/province"
 import { RAID_TIMELINE } from "@/ui/genesis/wiki-bridge/raid-timeline"
 import { religionSelection } from "@/ui/genesis/wiki-bridge/religion-selection"
 import { SIEGE_TIMELINE } from "@/ui/genesis/wiki-bridge/siege-timeline"
@@ -92,6 +92,7 @@ export function useNationWikiData(
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince,
 		sceneRef,
 	} = input
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -1666,9 +1667,13 @@ export function useNationWikiData(
 				setSelectedWikiNationId(id)
 			},
 			onSelectProvince: (provinceId: number) => {
-				sceneRef.current?.focusOnProvince(provinceId, {
-					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				if (!worldForDisplay) return
+				const province = PROVINCE_WIKI.worldIndex({
+					world: worldForDisplay,
+					history,
+					province: provinceId,
 				})
+				if (province !== null) setSelectedWikiProvince(province)
 			},
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
@@ -1707,5 +1712,6 @@ export function useNationWikiData(
 		setSelectedWikiWarId,
 		setSelectedWikiPerson,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince,
 	])
 }

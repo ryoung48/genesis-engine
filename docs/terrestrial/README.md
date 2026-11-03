@@ -53,3 +53,7 @@ The three history producers are [stored Earth, detailed simulation and default f
 - [History record ownership and memory usage](mechanics/record-memory.md)
 
 The topic references describe the implemented rules. Mechanics covers pipeline performance and memory; each historical measurement retains its own workload and limits. Proposed features remain in `plans/`, not in these references.
+
+## Interface and navigation
+
+[Province wiki](../development/province-wiki.md) explains map-click routing, current-frame province detail and synthetic local weather. Weather does not affect historical outcomes.

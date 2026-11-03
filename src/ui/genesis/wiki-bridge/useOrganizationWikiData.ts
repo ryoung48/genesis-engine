@@ -7,7 +7,6 @@ import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-cate
 import type { OrgProvinceCategory } from "@/model/history/earth/organization-categories/types"
 import { HISTORY } from "@/model/history/record"
 import { FRAME } from "@/model/history/world-frame"
-import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
@@ -15,6 +14,7 @@ import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { OrganizationWikiDataInput } from "@/ui/genesis/view/types"
 import { focusWikiNation } from "@/ui/genesis/wiki-bridge/nation-focus"
+import { PROVINCE_WIKI } from "@/ui/genesis/wiki-bridge/province"
 import { religionSelection } from "@/ui/genesis/wiki-bridge/religion-selection"
 import {
 	compareTimelineDayThenType,
@@ -52,6 +52,7 @@ export function useOrganizationWikiData(
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		setSelectedWikiReligionId,
+		setSelectedWikiProvince,
 		buildOrgCategorizer,
 		sceneRef,
 	} = input
@@ -490,9 +491,13 @@ export function useOrganizationWikiData(
 				setSelectedWikiNationId(id)
 			},
 			onSelectProvince: (provinceId: number) => {
-				sceneRef.current?.focusOnProvince(provinceId, {
-					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				if (!worldForDisplay) return
+				const province = PROVINCE_WIKI.worldIndex({
+					world: worldForDisplay,
+					history,
+					province: provinceId,
 				})
+				if (province !== null) setSelectedWikiProvince(province)
 			},
 			onSelectDate: (day: number) =>
 				history.setSelectedTimeMs(day * 86_400_000),
@@ -524,5 +529,6 @@ export function useOrganizationWikiData(
 		setSelectedWikiOrganizationId,
 		setSelectedWikiWarId,
 		buildOrgCategorizer,
+		setSelectedWikiProvince,
 	])
 }

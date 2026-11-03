@@ -4,6 +4,11 @@ function saturationVaporPressureKpa(tempC: number): number {
 	return 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3))
 }
 
+function dewPointFromVaporPressureKpa(pressure: number): number {
+	const logarithm = Math.log(pressure / 0.6108)
+	return (237.3 * logarithm) / (17.27 - logarithm)
+}
+
 function clampRelativeHumidity(rh: number): number {
 	if (rh <= 0) return 0
 	if (rh >= 100) return 100
@@ -69,6 +74,21 @@ function relativeHumidityFromTempRange({
 	return clampRelativeHumidity(rh)
 }
 
+function saturationVaporPressureIceKpa(tempC: number): number {
+	const kelvin = Math.max(110, Math.min(273.15, tempC + 273.15))
+	return (
+		Math.exp(
+			9.550426 -
+				5723.265 / kelvin +
+				3.53068 * Math.log(kelvin) -
+				0.00728332 * kelvin,
+		) / 1000
+	)
+}
+
 export const HUMIDITY = {
+	saturationVaporPressureIceKpa,
+	saturationVaporPressureKpa,
+	dewPointFromVaporPressureKpa,
 	relativeHumidityFromTempRange,
 }

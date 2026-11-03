@@ -25,3 +25,7 @@ atmospheric transport length. Annual and monthly values are calculated
 separately. Coastal values may exceed 80% next to humid land. Land humidity,
 observed humidity and the climate simulation are unchanged. Humidity maps,
 modeled ocean MI and their hover values share the same corrected fields.
+
+## Local weather
+
+[Province local weather](local-weather.md) adds synthetic instantaneous conditions in a display-only worker. Monthly climate maps keep their existing meanings; instantaneous weather appears only in the province wiki for this pass. See [province navigation](../development/province-wiki.md) for the wiki surface.

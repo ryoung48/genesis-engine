@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import type { GenesisHoverInfo } from "@/ui/genesis/renderer/types"
+import { PROVINCE_SELECTION } from "@/ui/genesis/shared/province-selection"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 
 export interface InteractionControllerDeps {
@@ -11,16 +12,29 @@ export interface InteractionControllerDeps {
 	) => void
 }
 
-/** Owns pointer/hover/click interaction with the canvas: hover raycasting
- * and the hover-info callback, region click selection, and double-clicking
- * a body in the solar-system view to focus it. See
- * plans/genesis-scene-controller-split.md. */
 export function createInteractionController(
 	ctx: GenesisContext,
 	deps: InteractionControllerDeps,
 ) {
 	const raycaster = new THREE.Raycaster()
 	const pointer = new THREE.Vector2()
+
+	function coordinates(hit: THREE.Intersection) {
+		if (ctx.currentViewMode === "map") {
+			const point = hit.object.worldToLocal(hit.point.clone())
+			return PROVINCE_SELECTION.unproject({
+				x: point.x,
+				y: point.y,
+				centerLongitude: ctx.mapMesh?.userData.builtCenterLonDeg ?? 0,
+				centerLatitude: ctx.currentMapProjectionLatitudeDeg,
+			})
+		}
+		const point = ctx.globeGroup.worldToLocal(hit.point.clone()).normalize()
+		return {
+			latitude: (Math.asin(Math.max(-1, Math.min(1, point.z))) * 180) / Math.PI,
+			longitude: (Math.atan2(point.y, point.x) * 180) / Math.PI,
+		}
+	}
 
 	function setHoveredRegion(region: number | null) {
 		ctx.hoveredRegion = region ?? -1
@@ -78,6 +92,7 @@ export function createInteractionController(
 		ctx.hoveredRegion = region
 		emitHover({
 			region,
+			...coordinates(hit),
 			clientX: event.clientX - rect.left,
 			clientY: event.clientY - rect.top,
 		})
@@ -117,6 +132,7 @@ export function createInteractionController(
 		deps.setSelectedProvince(null)
 		ctx.clickHandler({
 			region,
+			...coordinates(hit),
 			clientX: event.clientX - rect.left,
 			clientY: event.clientY - rect.top,
 		})
