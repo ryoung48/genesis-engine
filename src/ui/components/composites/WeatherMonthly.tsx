@@ -55,6 +55,7 @@ export function WeatherMonthly({ series, unitSystem }: WeatherMonthlyProps) {
 						`${series.names[index]}: ${chart.format(value)}`
 					}
 					showValues
+					surface="panel"
 				/>
 			))}
 		</div>

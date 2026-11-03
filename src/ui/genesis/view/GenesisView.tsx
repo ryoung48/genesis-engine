@@ -1071,6 +1071,7 @@ export const GenesisView: React.FC<{
 	const weatherProps: WeatherSummaryProps = {
 		snapshot: localWeather.selected,
 		outlook: localWeather.outlook,
+		moons: displayMoons,
 		unitSystem,
 		dateLabel: weatherDateLabel,
 		loading: localWeather.loading,

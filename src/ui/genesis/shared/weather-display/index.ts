@@ -2,6 +2,11 @@ import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { CloudGenus } from "@/model/climate/weather/local/clouds/types"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
 import { WEATHER_DESCRIPTION } from "@/model/climate/weather/local/description"
+import { WEATHER_SKY } from "@/model/climate/weather/local/sky"
+import type {
+	MoonPhase,
+	SkyCycle,
+} from "@/model/climate/weather/local/sky/types"
 import type { LocalWeatherValues } from "@/model/climate/weather/local/types"
 import { WEATHER_VOCABULARY } from "@/model/climate/weather/local/vocabulary"
 import type { WeatherPhenomenon } from "@/model/climate/weather/local/vocabulary/types"
@@ -10,6 +15,7 @@ import type { WeatherIconName } from "@/ui/components/primitives/icons/types"
 import { formatClockTimeDisplay } from "@/ui/genesis/shared/clock"
 import { monthLabels } from "@/ui/genesis/shared/constants"
 import {
+	formatPrecipitation,
 	formatRainRate,
 	formatTemperature,
 	formatWindSpeed,
@@ -18,9 +24,14 @@ import {
 import type {
 	PresentHourlyParams,
 	PresentMonthlyParams,
+	PresentSkyParams,
 	PresentWeatherParams,
-	WeatherHourCell,
+	WeatherHourlyDisplay,
 	WeatherMonthlySeries,
+	WeatherMoonPhaseDisplay,
+	WeatherSkyClockParams,
+	WeatherSkyDisplay,
+	WeatherSkyRow,
 	WeatherTile,
 	WeatherTone,
 } from "@/ui/genesis/shared/weather-display/types"
@@ -91,6 +102,16 @@ const iconTones: Record<WeatherIconName, WeatherTone> = {
 	umbrella: "rain",
 	cloud: "cloud",
 	"sun-angle": "sun",
+	"moon-new": "night",
+	"moon-waxing-crescent": "night",
+	"moon-first-quarter": "night",
+	"moon-waxing-gibbous": "night",
+	"moon-full": "night",
+	"moon-waning-gibbous": "night",
+	"moon-last-quarter": "night",
+	"moon-waning-crescent": "night",
+	"weather-moonset-up": "night",
+	"weather-moonset-down": "night",
 }
 
 function conditionIcon(values: LocalWeatherValues): WeatherIconName {
@@ -176,7 +197,7 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 			? values.daylight
 				? "Illuminated"
 				: "Dark"
-			: `${formatClockTimeDisplay(values.localHour, (snapshot.instant.solarDaySeconds ?? 86400) / 3600, false)} local solar time · ${timeOfDayDescription(snapshot)}`
+			: `${formatClockTimeDisplay(values.localHour, (snapshot.instant.solarDaySeconds ?? 86400) / 3600, true)} local solar time · ${timeOfDayDescription(snapshot)}`
 	const departure = WEATHER_DESCRIPTION.departure(values)
 	const anomaly =
 		departure === "warmerThanUsual"
@@ -302,27 +323,50 @@ function hourly({
 	outlook,
 	unitSystem,
 	solarDaySeconds,
-}: PresentHourlyParams): WeatherHourCell[] {
-	return outlook.hourly.map((hour) => {
-		const icon = conditionIcon(hour.values)
-		return {
-			key: hour.hoursAhead,
-			label:
-				hour.hoursAhead === 0
-					? "Now"
-					: hour.values.localHour === null
-						? `+${hour.hoursAhead}h`
-						: formatClockTimeDisplay(
-								Math.floor(hour.values.localHour),
-								(solarDaySeconds ?? 86400) / 3600,
-								false,
+}: PresentHourlyParams): WeatherHourlyDisplay {
+	const bare = (text: string) => text.replace(/ [^ ]+$/, "")
+	return {
+		precipitationUnit: formatRainRate({ value: 0, unitSystem }).replace(
+			/^[^ ]+ /,
+			"",
+		),
+		cells: outlook.hourly.map((hour) => {
+			const icon = conditionIcon(hour.values)
+			const rate = hour.values.rainRateMmH
+			return {
+				key: hour.hoursAhead,
+				label:
+					hour.hoursAhead === 0
+						? "Now"
+						: hour.values.localHour === null
+							? `+${hour.hoursAhead}h`
+							: formatClockTimeDisplay(
+									Math.floor(hour.values.localHour),
+									(solarDaySeconds ?? 86400) / 3600,
+									true,
+								).replace(":00 ", " "),
+				icon,
+				tone: iconTones[icon],
+				temperatureC: hour.values.temperatureC,
+				temperature: formatTemperature(hour.values.temperatureC, unitSystem, 0),
+				precipitationMmH: rate,
+				precipitation:
+					rate < 0.05
+						? ""
+						: bare(
+								formatPrecipitation(
+									rate,
+									unitSystem,
+									unitSystem === "imperial" ? 2 : 1,
+								),
 							),
-			icon,
-			tone: iconTones[icon],
-			temperatureC: hour.values.temperatureC,
-			temperature: formatTemperature(hour.values.temperatureC, unitSystem, 0),
-		}
-	})
+				precipitationTone:
+					hour.values.precipitation.snow + hour.values.precipitation.ice > 0.5
+						? "snow"
+						: "rain",
+			}
+		}),
+	}
 }
 
 function monthly({
@@ -339,8 +383,102 @@ function monthly({
 	}
 }
 
+const moonPhases: Record<MoonPhase, WeatherMoonPhaseDisplay> = {
+	new: { label: "New moon", icon: "moon-new" },
+	waxingCrescent: { label: "Waxing crescent", icon: "moon-waxing-crescent" },
+	firstQuarter: { label: "First quarter", icon: "moon-first-quarter" },
+	waxingGibbous: { label: "Waxing gibbous", icon: "moon-waxing-gibbous" },
+	full: { label: "Full moon", icon: "moon-full" },
+	waningGibbous: { label: "Waning gibbous", icon: "moon-waning-gibbous" },
+	lastQuarter: { label: "Last quarter", icon: "moon-last-quarter" },
+	waningCrescent: { label: "Waning crescent", icon: "moon-waning-crescent" },
+}
+const cycleLabels: Record<Exclude<SkyCycle, "cycle">, string> = {
+	alwaysUp: "Up all day",
+	neverUp: "Below horizon",
+	locked: "No day cycle",
+}
+
+function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
+	const values = snapshot.values
+	if (!values) return null
+	const input = { instant: snapshot.instant, latitudeDeg: values.latitudeDeg }
+	const dayHours = (snapshot.instant.solarDaySeconds ?? 86400) / 3600
+	const clock = ({ hour, cycle }: WeatherSkyClockParams) =>
+		cycle === "cycle" && hour !== null
+			? formatClockTimeDisplay(hour, dayHours, true)
+			: cycle === "cycle"
+				? "—"
+				: cycleLabels[cycle]
+	const duration = (hours: number | null) =>
+		hours === null ? "—" : `${hours.toFixed(1)} h`
+	const sun = WEATHER_SKY.sun(input)
+	const polar =
+		sun.cycle === "alwaysUp"
+			? "Polar day"
+			: sun.cycle === "neverUp"
+				? "Polar night"
+				: null
+	const sunRow: WeatherSkyRow = {
+		key: "sun",
+		name: "Sun",
+		detail: polar,
+		icon: "weather-sunny",
+		tone: "sun",
+		items: [
+			{
+				label: "Sunrise",
+				value: polar ? "—" : clock({ hour: sun.riseHour, cycle: sun.cycle }),
+				icon: "weather-sunset-up",
+			},
+			{
+				label: "Sunset",
+				value: polar ? "—" : clock({ hour: sun.setHour, cycle: sun.cycle }),
+				icon: "weather-sunset-down",
+			},
+			{
+				label: "Daylight",
+				value: duration(sun.daylightHours),
+				icon: "weather-sunny",
+			},
+		],
+	}
+	return {
+		rows: [
+			sunRow,
+			...WEATHER_SKY.moons({ ...input, moons }).map(
+				(moon): WeatherSkyRow => ({
+					key: `moon-${moon.label}`,
+					name: moon.label,
+					detail: `${moonPhases[moon.phase].label} · ${Math.round(moon.illumination * 100)}%`,
+					icon: moonPhases[moon.phase].icon,
+					tone: "night",
+					items: [
+						{
+							label: "Moonrise",
+							value: clock({ hour: moon.riseHour, cycle: moon.cycle }),
+							icon: "weather-moonset-up",
+						},
+						{
+							label: "Moonset",
+							value: clock({ hour: moon.setHour, cycle: moon.cycle }),
+							icon: "weather-moonset-down",
+						},
+						{
+							label: "Moonlight (moon above the horizon)",
+							value: duration(moon.upHours),
+							icon: "weather-night",
+						},
+					],
+				}),
+			),
+		],
+	}
+}
+
 export const WEATHER_DISPLAY = {
 	present,
+	sky,
 	hourly,
 	monthly,
 	conditionLabel,

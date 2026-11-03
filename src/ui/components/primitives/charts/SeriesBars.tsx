@@ -16,6 +16,39 @@ interface SeriesBarsProps {
 		index: number
 	}) => string
 	showValues?: boolean
+	// [JUSTIFICATION] Most charts sit on the dark hover panel; light wiki cards opt in.
+	surface?: SeriesBarsSurface
+}
+
+type SeriesBarsSurface = "overlay" | "panel"
+
+const surfaceClassName: Record<
+	SeriesBarsSurface,
+	{
+		value: string
+		activeValue: string
+		label: string
+		activeLabel: string
+		subLabel: string
+		activeBar: string
+	}
+> = {
+	overlay: {
+		value: "text-slate-500",
+		activeValue: "text-white",
+		label: "text-slate-600",
+		activeLabel: "font-bold text-slate-200",
+		subLabel: "text-slate-500",
+		activeBar: "",
+	},
+	panel: {
+		value: "text-slate-400",
+		activeValue: "font-bold text-slate-900",
+		label: "text-slate-400",
+		activeLabel: "font-bold text-slate-900",
+		subLabel: "text-slate-400",
+		activeBar: "ring-1 ring-slate-900/60",
+	},
 }
 
 function defaultFormatValue(value: number): string {
@@ -33,7 +66,9 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 	formatValue = defaultFormatValue,
 	tooltipLabel,
 	showValues = false,
+	surface = "overlay",
 }) => {
+	const tone = surfaceClassName[surface]
 	const maxPositive = Math.max(...values, 0.001)
 	const maxNegative = Math.max(...values.map((v) => -v), 0)
 	const hasNegativeValues = maxNegative > 0
@@ -77,7 +112,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 						>
 							{showValues && (
 								<span
-									className={`pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap font-mono text-[6px] leading-none ${isActive ? "text-white" : "text-slate-500"}`}
+									className={`pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap font-mono text-[6px] leading-none ${isActive ? tone.activeValue : tone.value}`}
 									style={{ bottom: labelBottom }}
 								>
 									{valueLabel}
@@ -85,7 +120,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 							)}
 							{value >= 0 ? (
 								<div
-									className={`absolute right-0 left-0 rounded-t-[1px] transition-all ${isActive ? "opacity-100" : "opacity-70"}`}
+									className={`absolute right-0 left-0 rounded-t-[1px] transition-all ${isActive ? `opacity-100 ${tone.activeBar}` : "opacity-70"}`}
 									style={{
 										height: `${barHeight * 100}%`,
 										bottom: `${(1 - zeroY) * 100}%`,
@@ -94,7 +129,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 								/>
 							) : (
 								<div
-									className={`absolute right-0 left-0 rounded-b-[1px] transition-all ${isActive ? "opacity-100" : "opacity-70"}`}
+									className={`absolute right-0 left-0 rounded-b-[1px] transition-all ${isActive ? `opacity-100 ${tone.activeBar}` : "opacity-70"}`}
 									style={{
 										height: `${barHeight * 100}%`,
 										top: `${zeroY * 100}%`,
@@ -110,7 +145,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 				{labels.map((itemLabel, index) => (
 					<span
 						key={`${itemLabel}-${index}`}
-						className={`flex-1 text-center text-[7px] leading-none ${index === activeIndex ? "font-bold text-slate-200" : "text-slate-600"}`}
+						className={`flex-1 text-center text-[7px] leading-none ${index === activeIndex ? tone.activeLabel : tone.label}`}
 					>
 						{itemLabel}
 					</span>
@@ -121,7 +156,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 					{subLabels.map((subLabel, index) => (
 						<span
 							key={`sub-${subLabel}-${index}`}
-							className={`flex-1 text-center text-[7px] leading-none ${index === activeIndex ? "font-bold text-slate-200" : "text-slate-500"}`}
+							className={`flex-1 text-center text-[7px] leading-none ${index === activeIndex ? tone.activeLabel : tone.subLabel}`}
 						>
 							{subLabel}
 						</span>

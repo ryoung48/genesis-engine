@@ -11,6 +11,7 @@ import { WEATHER_DISPLAY } from "@/ui/genesis/shared/weather-display"
 import type {
 	WeatherSummaryProps,
 	WeatherTab,
+	WeatherTileProps,
 } from "@/ui/genesis/shared/weather-display/types"
 
 const styles = uiTokens.weather
@@ -20,9 +21,30 @@ const tabs: { value: WeatherTab; label: string }[] = [
 	{ value: "monthly", label: "Monthly" },
 ]
 
+function WeatherTileCard({ tile }: WeatherTileProps) {
+	return (
+		<div className={cx(styles.tile, tile.wide && styles.tileWide)}>
+			<WeatherIcon name={tile.icon} className={styles.tileIcon} />
+			<div className={styles.tileText}>
+				<div className={styles.tileLabel}>
+					{tile.help ? (
+						<UITooltip content={tile.help} position="top" align="start">
+							<span className={styles.tileHelp}>{tile.label}</span>
+						</UITooltip>
+					) : (
+						tile.label
+					)}
+				</div>
+				<div className={styles.tileValue}>{tile.value}</div>
+			</div>
+		</div>
+	)
+}
+
 export function WeatherSummary({
 	snapshot,
 	outlook,
+	moons,
 	unitSystem,
 	dateLabel,
 	loading,
@@ -51,6 +73,7 @@ export function WeatherSummary({
 						: (snapshot?.reason ?? "Weather unavailable"))}
 			</div>
 		)
+	const sky = snapshot ? WEATHER_DISPLAY.sky({ snapshot, moons }) : null
 	return (
 		<div className={styles.card} aria-label="Province weather">
 			<SegmentedControl
@@ -63,7 +86,7 @@ export function WeatherSummary({
 			{tab === "hourly" &&
 				(outlook?.hourly.length ? (
 					<WeatherHourly
-						cells={WEATHER_DISPLAY.hourly({
+						display={WEATHER_DISPLAY.hourly({
 							outlook,
 							unitSystem,
 							solarDaySeconds: snapshot?.instant.solarDaySeconds ?? null,
@@ -119,30 +142,45 @@ export function WeatherSummary({
 					</div>
 					<div className={styles.tiles}>
 						{display.tiles.map((tile) => (
-							<div
-								key={tile.label}
-								className={cx(styles.tile, tile.wide && styles.tileWide)}
-							>
-								<WeatherIcon name={tile.icon} className={styles.tileIcon} />
-								<div className={styles.tileText}>
-									<div className={styles.tileLabel}>
-										{tile.help ? (
-											<UITooltip
-												content={tile.help}
-												position="top"
-												align="start"
-											>
-												<span className={styles.tileHelp}>{tile.label}</span>
-											</UITooltip>
-										) : (
-											tile.label
-										)}
-									</div>
-									<div className={styles.tileValue}>{tile.value}</div>
-								</div>
-							</div>
+							<WeatherTileCard key={tile.label} tile={tile} />
 						))}
 					</div>
+					{sky && (
+						<div className={styles.sky} aria-label="Sun and moon">
+							{sky.rows.map((row) => (
+								<div key={row.key} className={styles.skyRow}>
+									<WeatherIcon
+										name={row.icon}
+										className={cx(styles.skyIcon, styles.tone[row.tone])}
+									/>
+									<div className={styles.skyName}>
+										<span>{row.name}</span>
+										{row.detail && (
+											<span className={styles.skyDetail}>{row.detail}</span>
+										)}
+									</div>
+									<div className={styles.skyItems}>
+										{row.items.map((item) => (
+											<UITooltip
+												key={item.label}
+												content={item.label}
+												position="top"
+												align="center"
+											>
+												<span className={styles.skyItem}>
+													<WeatherIcon
+														name={item.icon}
+														className={styles.skyItemIcon}
+													/>
+													{item.value}
+												</span>
+											</UITooltip>
+										))}
+									</div>
+								</div>
+							))}
+						</div>
+					)}
 				</>
 			)}
 		</div>

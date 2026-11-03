@@ -28,6 +28,16 @@ export type WeatherIconName =
 	| "umbrella"
 	| "cloud"
 	| "sun-angle"
+	| "moon-new"
+	| "moon-waxing-crescent"
+	| "moon-first-quarter"
+	| "moon-waxing-gibbous"
+	| "moon-full"
+	| "moon-waning-gibbous"
+	| "moon-last-quarter"
+	| "moon-waning-crescent"
+	| "weather-moonset-up"
+	| "weather-moonset-down"
 
 export interface WeatherIconProps extends React.SVGProps<SVGSVGElement> {
 	name: WeatherIconName
