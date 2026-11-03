@@ -7,6 +7,12 @@ import { MATH } from "@/model/shared/math/core"
 import { MinHeap } from "@/model/shared/min-heap"
 import { UNITS } from "@/model/shared/units"
 
+// A major river carries at least this much water whatever the share of the land above it: an order of magnitude under
+// Earth's own top-5 % cutoff here (876 m³/s on the Earth import; even its top 10 % carry 310), so it does not bind on an
+// Earth-like world. On a tidally locked one, the dark side's dry land pulls the share's cutoff down to trickles
+// (9 m³/s at 1 bar) and the wet substellar region filled with rivers
+const MIN_RIVER_FLOW_M3S = 100
+
 function polylineLengthKm({ line, radiusKm }: PolylineLengthKmParams): number {
 	let sum = 0
 	for (let i = 1; i < line.length; i++) {
@@ -229,7 +235,7 @@ function computeRivers({
 		return 0.05 + (0.01 - 0.05) * t
 	})()
 	const thresholdIdx = Math.floor(landCount * (1 - majorRiverFraction))
-	const threshold = landFlows[thresholdIdx] || 1
+	const threshold = Math.max(landFlows[thresholdIdx] || 1, MIN_RIVER_FLOW_M3S)
 
 	const MIN_VISIBLE_RIVER_LENGTH_KM = 500
 
