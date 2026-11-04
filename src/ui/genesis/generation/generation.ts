@@ -1,3 +1,4 @@
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { ClimateModel, GenesisParams } from "@/model/pipelines/types"
 import { TIMING } from "@/model/shared/timing"
@@ -46,6 +47,7 @@ interface ImportHeightmapParams {
 	daysPerYear: number
 	hoursPerDay: number
 	tideLock: TideLock | null
+	moons: MoonBody[]
 	substellarLon: number
 	perihelion: number
 	pressure: number
@@ -291,6 +293,7 @@ export function generateWorld({
 		greenhouseFactor:
 			overrides?.greenhouseFactor ?? currentParams.greenhouseFactor,
 		tideLock,
+		moons: overrides?.moons ?? currentParams.moons,
 		substellarLon: overrides?.substellarLon ?? currentParams.substellarLon,
 		jitter: overrides?.jitter ?? currentParams.jitter,
 		roughness: overrides?.roughness ?? currentParams.roughness,
@@ -468,6 +471,7 @@ export function importHeightmap(
 			albedo: importParams.albedo,
 			greenhouseFactor: importParams.greenhouseFactor,
 			tideLock: importParams.tideLock,
+			moons: importParams.moons,
 			substellarLon: importParams.substellarLon as number,
 			terrainWarp: importParams.terrainWarp as number,
 			smoothing: importParams.smoothing as number,

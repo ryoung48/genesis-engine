@@ -2,6 +2,12 @@ import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { CloudGenus } from "@/model/climate/weather/local/clouds/types"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
 import { WEATHER_DESCRIPTION } from "@/model/climate/weather/local/description"
+import { WEATHER_MARINE } from "@/model/climate/weather/local/marine"
+import type {
+	MarineTideEvent,
+	MarineTidePhase,
+} from "@/model/climate/weather/local/marine/tide/types"
+import type { MarineSeaState } from "@/model/climate/weather/local/marine/waves/types"
 import { WEATHER_SKY } from "@/model/climate/weather/local/sky"
 import type {
 	MoonPhase,
@@ -15,6 +21,8 @@ import type { WeatherIconName } from "@/ui/components/primitives/icons/types"
 import { formatClockTimeDisplay } from "@/ui/genesis/shared/clock"
 import { monthLabels } from "@/ui/genesis/shared/constants"
 import {
+	compassLabel,
+	formatHeight,
 	formatPrecipitation,
 	formatRainRate,
 	formatTemperature,
@@ -24,11 +32,13 @@ import {
 import type {
 	PresentHourlyParams,
 	PresentMonthlyParams,
+	PresentSeaParams,
 	PresentSkyParams,
 	PresentWeatherParams,
 	WeatherHourlyDisplay,
 	WeatherMonthlySeries,
 	WeatherMoonPhaseDisplay,
+	WeatherSeaDisplay,
 	WeatherSkyClockParams,
 	WeatherSkyDisplay,
 	WeatherSkyRow,
@@ -123,6 +133,8 @@ const iconTones: Record<WeatherIconName, WeatherTone> = {
 	"moon-waning-crescent": "night",
 	"weather-moonset-up": "night",
 	"weather-moonset-down": "night",
+	waves: "sea",
+	tide: "sea",
 }
 
 function conditionIcon(values: LocalWeatherValues): WeatherIconName {
@@ -517,9 +529,152 @@ function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
 	}
 }
 
+const seaStateLabels: Record<MarineSeaState, string> = {
+	calm: "Calm",
+	smooth: "Smooth",
+	slight: "Slight",
+	moderate: "Moderate",
+	rough: "Rough",
+	veryRough: "Very rough",
+	high: "High",
+	veryHigh: "Very high",
+	phenomenal: "Phenomenal",
+	iceCovered: "Ice-covered",
+}
+const tidePhaseLabels: Record<MarineTidePhase, string> = {
+	spring: "Spring tide",
+	between: "Between spring and neap",
+	neap: "Neap tide",
+}
+const directionArrows = { rising: "↑", falling: "↓", steady: "→" }
+
+function sea({
+	snapshot,
+	moons,
+	params,
+	unitSystem,
+}: PresentSeaParams): WeatherSeaDisplay | null {
+	const marine = snapshot.marine
+	if (!marine) return null
+	const height = (value: number) => formatHeight({ value, unitSystem })
+	const signed = (value: number) => `${value > 0 ? "+" : ""}${height(value)}`
+	const dayHours = (snapshot.instant.solarDaySeconds ?? 86400) / 3600
+	const eventValue = (event: MarineTideEvent | null) => {
+		if (!event) return "Not found within forecast"
+		const time =
+			event.localHour === null
+				? "—"
+				: formatClockTimeDisplay(event.localHour, dayHours, true)
+		const day =
+			event.dayOffset === 0
+				? ""
+				: event.dayOffset === 1
+					? " tomorrow"
+					: ` +${event.dayOffset} d`
+		return `${time}${day} · ${signed(event.levelM)}`
+	}
+	const tide = WEATHER_MARINE.tide({
+		instant: snapshot.instant,
+		moons,
+		shore: marine.shore,
+		params,
+	})
+	const tideRows: WeatherSkyRow[] = tide
+		? [
+				{
+					key: "tide",
+					name: "Tide",
+					detail: tide.phase
+						? tidePhaseLabels[tide.phase]
+						: "Range not found within forecast",
+					icon: "tide",
+					tone: "sea",
+					moon: null,
+					items: [
+						{
+							label: "Water level relative to mean sea level",
+							value: `${signed(tide.levelM)} ${directionArrows[tide.direction]}`,
+							icon: "tide",
+						},
+					],
+				},
+				{
+					key: "high-water",
+					name: "High water",
+					detail: null,
+					icon: "tide",
+					tone: "sea",
+					moon: null,
+					items: [
+						{
+							label: "Next high water (local time and height)",
+							value: eventValue(tide.high),
+							icon: "weather-sunset-up",
+						},
+					],
+				},
+				{
+					key: "low-water",
+					name: "Low water",
+					detail: null,
+					icon: "tide",
+					tone: "sea",
+					moon: null,
+					items: [
+						{
+							label: "Next low water (local time and height)",
+							value: eventValue(tide.low),
+							icon: "weather-sunset-down",
+						},
+					],
+				},
+			]
+		: [
+				{
+					key: "tide",
+					name: "Tide",
+					detail: "No tidal cycle",
+					icon: "tide",
+					tone: "sea",
+					moon: null,
+					items: [],
+				},
+			]
+	const waves = marine.waves
+	const frozen = waves?.state === "iceCovered"
+	return {
+		rows: [
+			...tideRows,
+			{
+				key: "waves",
+				name: "Waves",
+				detail:
+					waves && !frozen && waves.fromDeg !== null
+						? `From ${compassLabel(waves.fromDeg)}`
+						: null,
+				icon: "waves",
+				tone: "sea",
+				moon: null,
+				items: [
+					{
+						label: "Significant wave height and sea state",
+						value: !waves
+							? "Unavailable"
+							: frozen
+								? seaStateLabels.iceCovered
+								: `${height(waves.heightM)} · ${seaStateLabels[waves.state]}`,
+						icon: "waves",
+					},
+				],
+			},
+		],
+	}
+}
+
 export const WEATHER_DISPLAY = {
 	present,
 	sky,
+	sea,
 	hourly,
 	monthly,
 	conditionLabel,

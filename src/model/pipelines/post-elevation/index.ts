@@ -1,7 +1,3 @@
-import { MOON } from "@/model/celestial/moons"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import { STAR } from "@/model/celestial/star"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CLIMATE } from "@/model/climate/classification/climate"
 import { HYDROLOGY } from "@/model/climate/classification/hydrology"
 import { ICE } from "@/model/climate/classification/ice"
@@ -796,32 +792,8 @@ function runPostElevationPipeline(
 	// formation in classifyTopography.
 	t0 = performance.now()
 	const coastalMask = COASTAL_MASK.computeCoastalMask({ mesh, isLand })
-	const cls = STAR.isValidSpectralClass(params.spectralClass)
-		? (params.spectralClass as MainSequenceClass)
-		: STAR.defaultSpectralClass
-	const starMassKg =
-		STAR.getStarMassSol({ cls, subtype: params.starSubtype ?? 5 }) *
-		ORBIT_BODY.solarMassKg
 	const tidalSchedule = TIDAL_SCHEDULE.computeTidalSchedule({
-		moons: MOON.generateMoons({
-			count: 1,
-			seed: params.seed + 8831,
-			planetRadiusKm: params.planetRadiusKm,
-			parentSizeClass: MOON.estimateMoonSizeClassFromDiameter(
-				params.planetRadiusKm * 2,
-			),
-			orbitalDistanceAU: params.orbitalDistanceAU,
-			starMassKg,
-			// This moon exists only to estimate a tidal schedule -- its own
-			// composition/density doesn't reach the user, so a Sol-like default
-			// is fine rather than threading real star attributes through this
-			// terrain pipeline.
-			luminositySol: STAR.getStarLuminositySolExtended({
-				cls,
-				subtype: params.starSubtype ?? 5,
-			}),
-			starAgeGyr: 4.6,
-		}),
+		moons: params.moons,
 		params,
 	})
 	const tidalRange = TIDAL_MAP.computeSpringTideMap({

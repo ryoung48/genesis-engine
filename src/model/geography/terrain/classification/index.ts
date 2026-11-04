@@ -101,12 +101,8 @@ function classifyTopography(params: ClassifyTopographyParams): {
 	const topography = new Uint8Array(mesh.numRegions)
 	const coastal = new Uint8Array(mesh.numRegions)
 	const { adjOffset, adjList, r_xyz } = mesh
-	const { regionLandmark, type: landmarkType } = params.landmarks
-	function isLake(r: number): boolean {
-		if (isLand[r]) return false
-		const lid = regionLandmark[r]
-		return lid >= 0 && landmarkType[lid] === LANDMARKS.landmarkTypeLake
-	}
+	const isLake = (r: number) =>
+		!isLand[r] && LANDMARKS.isLake({ landmarks: params.landmarks, region: r })
 	const adjacentLake = new Uint8Array(mesh.numRegions)
 	const adjacentOcean = new Uint8Array(mesh.numRegions)
 	const adjacentTerminal = new Uint8Array(mesh.numRegions)

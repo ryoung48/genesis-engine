@@ -515,6 +515,13 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 					metric: key,
 				})
 		}
+		addRows({
+			before: object(da.terrain),
+			after: object(db.terrain),
+			section: "Terrain diagnostics",
+			period: seed,
+			rows,
+		})
 		for (const key of ["generationMs", "engineMs", "wallMs", "peakMemoryKb"])
 			rows.push({
 				before: da[key],

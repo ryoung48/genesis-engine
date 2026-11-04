@@ -9,6 +9,7 @@ import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import { WEATHER_DECISION } from "@/model/climate/weather/local/decision"
 import type { WeatherReportCondition as WeatherCondition } from "@/model/climate/weather/local/description/types"
 import type { WeatherContext } from "@/model/climate/weather/local/types"
+import type { ProvinceLocation } from "@/model/geography/terrain/provinces/locations/types"
 import { HASH } from "@/model/shared/random/hash"
 import { CLIMATE_EARTH } from "@/test/earth/fixtures/climate-earth"
 import { WEATHER_DISTRIBUTIONS } from "@/test/earth/weather-distributions"
@@ -78,6 +79,7 @@ it(
 			revision: 1,
 			seed: 14963991,
 			radiusKm: world.params.planetRadiusKm,
+			marine: null,
 			provinces: chosen.map((region, province) => {
 				const point = {
 					region,
@@ -95,6 +97,7 @@ it(
 						longitude: (Math.atan2(point.xyz[1], point.xyz[0]) * 180) / Math.PI,
 						samples: [point],
 						approximateLocation: false,
+						marine: null as ProvinceLocation["marine"],
 					},
 					baselines: [
 						WEATHER_BASELINE.build({
@@ -103,6 +106,7 @@ it(
 							yearSeconds: epoch.yearSeconds,
 						}),
 					],
+					marine: null as WeatherContext["provinces"][number]["marine"],
 				}
 			}),
 		}

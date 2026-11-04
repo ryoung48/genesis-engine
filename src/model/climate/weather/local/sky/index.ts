@@ -1,12 +1,19 @@
+import type { MoonBody } from "@/model/celestial/moons/types"
+import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { WeatherInstant } from "@/model/climate/weather/local/clock/types"
 import type {
 	HalfArcParams,
+	MoonOrbitParams,
+	MoonOrbitState,
 	MoonPhase,
 	MoonSky,
 	MoonSkyParams,
 	RiseSetParams,
+	SkyBodyPosition,
 	SkyCycle,
 	SkyParams,
+	SkyPositions,
+	SkyPositionsParams,
 	SunSky,
 } from "@/model/climate/weather/local/sky/types"
 import { TIME } from "@/model/shared/time"
@@ -84,6 +91,60 @@ function sun({ instant, latitudeDeg }: SkyParams): SunSky {
 	}
 }
 
+function moonOrbit({ instant, moon }: MoonOrbitParams): MoonOrbitState {
+	const longitude =
+		(moon.longitudeOfAscendingNodeDeg +
+			moon.longitudeOfPerihelionDeg +
+			moon.meanAnomalyAtEpochDeg) *
+			RAD +
+		(TAU * instant.seconds) / (moon.orbitalPeriodDays * TIME.secondsPerDay)
+	const elongation = wrap((longitude - instant.solarLongitudeRad) / TAU)
+	const declinationRad = Math.asin(
+		Math.sin(instant.tiltDeg * RAD) * Math.sin(longitude),
+	)
+	const transitPhase = wrap(0.5 + (instant.retrograde ? -1 : 1) * elongation)
+	return { elongation, declinationRad, transitPhase }
+}
+
+function transitHours(relativeRateRadS: number): number | null {
+	return Math.abs(relativeRateRadS) > 0
+		? TAU / Math.abs(relativeRateRadS) / 3600
+		: null
+}
+
+function rotationRateRadS(instant: WeatherInstant): number {
+	return ((instant.retrograde ? -1 : 1) * TAU) / instant.rotationSeconds
+}
+
+function moonRateRadS(moon: MoonBody): number {
+	return TAU / (moon.orbitalPeriodDays * TIME.secondsPerDay)
+}
+
+function positions({
+	instant,
+	xyz,
+	moons: bodies,
+}: SkyPositionsParams): SkyPositions {
+	const localPhase = WEATHER_CLOCK.localSolar({ instant, xyz }).phase
+	const rotation = rotationRateRadS(instant)
+	const star: SkyBodyPosition = {
+		declinationRad: Math.asin(Math.max(-1, Math.min(1, instant.sun[2]))),
+		hourAngleRad: TAU * (localPhase - 0.5),
+		transitHours: dayHours(instant),
+	}
+	return {
+		star,
+		moons: bodies.map((moon) => {
+			const orbit = moonOrbit({ instant, moon })
+			return {
+				declinationRad: orbit.declinationRad,
+				hourAngleRad: TAU * (localPhase - orbit.transitPhase),
+				transitHours: transitHours(rotation - moonRateRadS(moon)),
+			}
+		}),
+	}
+}
+
 function moons({
 	instant,
 	latitudeDeg,
@@ -91,17 +152,13 @@ function moons({
 }: MoonSkyParams): MoonSky[] {
 	const hours = dayHours(instant)
 	const latitudeRad = latitudeDeg * RAD
-	const tilt = instant.tiltDeg * RAD
 	return bodies
 		.filter((moon) => moon.orbitalPeriodDays > 0)
 		.map((moon, index) => {
-			const longitude =
-				(moon.longitudeOfAscendingNodeDeg +
-					moon.longitudeOfPerihelionDeg +
-					moon.meanAnomalyAtEpochDeg) *
-					RAD +
-				(TAU * instant.seconds) / (moon.orbitalPeriodDays * TIME.secondsPerDay)
-			const elongation = wrap((longitude - instant.solarLongitudeRad) / TAU)
+			const { elongation, declinationRad, transitPhase } = moonOrbit({
+				instant,
+				moon,
+			})
 			const base = {
 				label: moon.name ?? `Moon ${index + 1}`,
 				phase: phases[Math.round(elongation * 8) % 8],
@@ -116,9 +173,7 @@ function moons({
 					setHour: null,
 					upHours: null,
 				}
-			const declinationRad = Math.asin(Math.sin(tilt) * Math.sin(longitude))
-			const transitHour =
-				wrap(0.5 + (instant.retrograde ? -1 : 1) * elongation) * hours
+			const transitHour = transitPhase * hours
 			const arc = halfArc({
 				latitudeRad,
 				declinationRad,
@@ -142,4 +197,4 @@ function moons({
 		})
 }
 
-export const WEATHER_SKY = { sun, moons }
+export const WEATHER_SKY = { sun, moons, positions }

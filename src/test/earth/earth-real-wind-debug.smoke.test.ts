@@ -16,6 +16,7 @@ describe("real Earth wind debug", () => {
 				seed: 14963991,
 				numPoints: DEFAULT_WORLD_PARAMS.numPoints,
 				jitter: DEFAULT_WORLD_PARAMS.jitter,
+				moons: DEFAULT_WORLD_PARAMS.moons,
 				grayscale: earth.grayscale,
 				imageWidth: earth.width,
 				imageHeight: earth.height,

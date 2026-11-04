@@ -39,6 +39,7 @@ import { RELIGION_REPORT } from "@/test/history-run/report/religion"
 import { ROADS_REPORT } from "@/test/history-run/report/roads"
 import { RULERS_REPORT } from "@/test/history-run/report/rulers"
 import { SETTLEMENT_CHANGE_REPORT } from "@/test/history-run/report/settlement-change"
+import { TERRAIN_REPORT } from "@/test/history-run/report/terrain"
 import type {
 	CenturyReport,
 	EngineParams,
@@ -215,6 +216,7 @@ function runSeed({
 			religionGender: generated.religionGender,
 		}),
 		validation,
+		terrain: TERRAIN_REPORT.summarize({ generated }),
 		migration: MIGRATION_REPORT.summarize({
 			generated,
 			startYear: Math.round(engine.time / STATE.yearMs),

@@ -230,6 +230,7 @@ export const uiTokens = {
 			snow: "text-cyan-500",
 			dust: "text-orange-400",
 			wind: "text-teal-500",
+			sea: "text-blue-500",
 		},
 	},
 	surface: {

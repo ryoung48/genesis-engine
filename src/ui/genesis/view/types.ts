@@ -315,6 +315,7 @@ export type WorldGenerationInput = {
 	seaLevel: number
 	pressure: number
 	mainWorldSystemBody: SystemBody | null
+	displayMoons: MoonBody[]
 }
 
 /** Worker pathfinding result surfaced by the measure/pathfinding overlay. */

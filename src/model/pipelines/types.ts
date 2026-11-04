@@ -1,3 +1,4 @@
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 
 import type { PastaDebug } from "@/model/climate/classification/pasta/types"
@@ -94,6 +95,7 @@ export interface GenesisParams {
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
 	pastaGintThreshold: number // GInt needed for a zero-GDD period to interrupt accumulation, default 1250
 	tideLock: TideLock | null // null = not locked
+	moons: MoonBody[]
 	substellarLon: number // longitude of the substellar point in degrees (0-360), default 0
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0

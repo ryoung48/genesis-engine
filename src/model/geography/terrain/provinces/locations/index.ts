@@ -1,14 +1,80 @@
 import type {
 	BuildProvinceLocationsParams,
+	OpenNeighborCountParams,
 	ProvinceLocation,
+	ProvinceMarineLocation,
 	ResolveProvinceLocationParams,
+	SelectMarineLocationParams,
 } from "@/model/geography/terrain/provinces/locations/types"
+
+function openNeighbors({
+	mesh,
+	openWater,
+	region,
+}: OpenNeighborCountParams): number {
+	let count = 0
+	for (let j = mesh.adjOffset[region]; j < mesh.adjOffset[region + 1]; j++)
+		if (openWater[mesh.adjList[j]]) count++
+	return count
+}
+
+function selectMarine({
+	mesh,
+	regions,
+	isLand,
+	openWater,
+	tidalRange,
+}: SelectMarineLocationParams): ProvinceMarineLocation | null {
+	let shore = -1
+	let shoreCount = 0
+	for (const region of regions) {
+		if (!isLand[region]) continue
+		const count = openNeighbors({ mesh, openWater, region })
+		if (count === 0) continue
+		const range = tidalRange?.[region] ?? 0
+		const bestRange = shore >= 0 ? (tidalRange?.[shore] ?? 0) : -Infinity
+		if (
+			count > shoreCount ||
+			(count === shoreCount &&
+				(range > bestRange || (range === bestRange && region < shore)))
+		) {
+			shore = region
+			shoreCount = count
+		}
+	}
+	if (shore < 0) return null
+	let sea = -1
+	let seaCount = -1
+	for (let j = mesh.adjOffset[shore]; j < mesh.adjOffset[shore + 1]; j++) {
+		const neighbor = mesh.adjList[j]
+		if (!openWater[neighbor]) continue
+		const count = openNeighbors({ mesh, openWater, region: neighbor })
+		if (count > seaCount || (count === seaCount && neighbor < sea)) {
+			sea = neighbor
+			seaCount = count
+		}
+	}
+	return {
+		shore,
+		sea: {
+			region: sea,
+			weight: 1,
+			xyz: [
+				mesh.r_xyz[3 * sea],
+				mesh.r_xyz[3 * sea + 1],
+				mesh.r_xyz[3 * sea + 2],
+			],
+		},
+	}
+}
 
 function build({
 	mesh,
 	provinces,
 	isLand,
 	representatives,
+	openWater,
+	tidalRange,
 }: BuildProvinceLocationsParams): ProvinceLocation[] {
 	const members = Array.from({ length: provinces.count }, () => [] as number[])
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -48,6 +114,7 @@ function build({
 				longitude: 0,
 				samples: [],
 				approximateLocation: true,
+				marine: null,
 			}
 		const seed = provinces.seeds[province]
 		const chosen = [regions.includes(seed) ? seed : regions[0]]
@@ -104,6 +171,10 @@ function build({
 				(Math.atan2(mesh.r_xyz[3 * first + 1], mesh.r_xyz[3 * first]) * 180) /
 				Math.PI,
 			approximateLocation,
+			marine:
+				openWater && !approximateLocation
+					? selectMarine({ mesh, regions, isLand, openWater, tidalRange })
+					: null,
 			samples: chosen.map((region, i) => ({
 				region,
 				weight: weights[i] / total,

@@ -46,6 +46,8 @@ Temperature, precipitation, wind vectors and total cloud fraction use area-weigh
 
 Each location has one primary phenomenon. For a province with precipitation, the representative location is the one with greatest area-weighted precipitation flux; otherwise its phenomenon has the greatest area share. Its regime and cloud description travel together, except that a clear or hazy representative in a province with positive mean cover takes the cloud description of the sample contributing the most cover. Per-phenomenon area shares and numeric genus cover remain available internally. Missing positive-weight cloud data makes the province cloud summary unavailable. No debug variation section is displayed.
 
+Ocean-facing provinces carry one extra sample at a sea cell, used only for waves and never blended into the province values; see [marine conditions](marine-conditions.md).
+
 A separate module worker receives immutable baselines, using initialization batches of 256 with task yields. Snapshot LRU capacity is 256. Exact-time keys, world revisions and request IDs prevent stale results. The UI retains one active request and one coalesced replacement. There is no weather map protocol or full-world instantaneous cache.
 
 ## Diagnostic

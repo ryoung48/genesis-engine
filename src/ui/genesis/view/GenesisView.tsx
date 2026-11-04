@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { TIDAL_CONTRIBUTORS } from "@/model/climate/ocean/tides/tidal-schedule/contributors"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { WeatherClockSelection } from "@/model/climate/weather/local/clock/types"
@@ -1069,10 +1070,22 @@ export const GenesisView: React.FC<{
 			? historyFormatLabel(history.selectedTimeMs)
 			: `${DATE.formatEu4Year(weatherClock.year + DATE.earthHistoryStartYear)} · Month ${Math.floor(weatherClock.phase * 12) + 1} · Day ${Math.floor((((weatherClock.phase * 12) % 1) * weatherClock.yearSeconds) / 12 / weatherClock.rotationSeconds) + 1}`
 		: ""
+	const worldParams = world?.params ?? null
+	const weatherMoons = useMemo(
+		() =>
+			worldParams
+				? TIDAL_CONTRIBUTORS.prepare({
+						moons: worldParams.moons,
+						params: worldParams,
+					}).moons
+				: [],
+		[worldParams],
+	)
 	const weatherProps: WeatherSummaryProps = {
 		snapshot: localWeather.selected,
 		outlook: localWeather.outlook,
-		moons: displayMoons,
+		moons: weatherMoons,
+		params: worldParams,
 		unitSystem,
 		dateLabel: weatherDateLabel,
 		loading: localWeather.loading,
@@ -1651,6 +1664,7 @@ export const GenesisView: React.FC<{
 		seaLevel,
 		pressure,
 		mainWorldSystemBody,
+		displayMoons,
 	})
 
 	const {

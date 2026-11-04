@@ -1,4 +1,5 @@
-﻿import { STAR } from "@/model/celestial/star"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
+import { STAR } from "@/model/celestial/star"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { ERAS } from "@/model/society/eras"
 
@@ -37,5 +38,6 @@ export const DEFAULT_WORLD_PARAMS = {
 	pressure: SOL_SYSTEM.solMainWorldDefaults.pressureBar,
 	substellarLon: SOL_SYSTEM.solMainWorldDefaults.substellarLon,
 	perihelion: SOL_SYSTEM.solMainWorldDefaults.perihelion,
+	moons: [{ ...SOL_SYSTEM.solLunaDefault, idx: 1 }] as MoonBody[],
 	era: ERAS.defaultEra,
 } as const

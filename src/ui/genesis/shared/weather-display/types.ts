@@ -2,6 +2,7 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WeatherOutlook } from "@/model/climate/weather/local/outlook/types"
 import type { SkyCycle } from "@/model/climate/weather/local/sky/types"
 import type { WeatherSnapshot } from "@/model/climate/weather/local/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	MoonIconPhase,
 	WeatherIconName,
@@ -19,6 +20,7 @@ export interface WeatherSummaryProps {
 	snapshot: WeatherSnapshot | null
 	outlook: WeatherOutlook | null
 	moons: MoonBody[]
+	params: GenesisParams | null
 	unitSystem: UnitSystem
 	dateLabel: string
 	loading: boolean
@@ -124,6 +126,22 @@ export interface WeatherSkyRow {
 }
 
 export interface WeatherSkyDisplay {
+	rows: WeatherSkyRow[]
+}
+
+export interface PresentSeaParams {
+	snapshot: WeatherSnapshot
+	moons: MoonBody[]
+	params: GenesisParams
+	unitSystem: UnitSystem
+}
+
+export interface WeatherSeaDisplay {
+	rows: WeatherSkyRow[]
+}
+
+export interface WeatherSkyRowsProps {
+	label: string
 	rows: WeatherSkyRow[]
 }
 

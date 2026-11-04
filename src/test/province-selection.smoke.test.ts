@@ -29,6 +29,8 @@ it("chooses stable region samples with normalized area weights and an explicit t
 			numRegions: 4,
 			r_xyz: new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0]),
 			regionArea: new Float32Array([1, 2, 3, 4]),
+			adjOffset: new Int32Array([0, 0, 0, 0, 0]),
+			adjList: new Int32Array(),
 		},
 		provinces: {
 			count: 2,
@@ -37,6 +39,8 @@ it("chooses stable region samples with normalized area weights and an explicit t
 		} as GenesisProvinces,
 		isLand: new Uint8Array([1, 1, 1, 1]),
 		representatives: new Map<number, [number, number]>([[1, [90, 0]]]),
+		openWater: null as Uint8Array | null,
+		tidalRange: null as Float32Array | null,
 	}
 	const locations = PROVINCE_LOCATIONS.build(input)
 	expect(locations).toEqual(PROVINCE_LOCATIONS.build(input))

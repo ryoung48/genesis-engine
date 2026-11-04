@@ -1,3 +1,4 @@
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { ClimateModel } from "@/model/pipelines/types"
 
@@ -142,6 +143,7 @@ interface ImportParams {
 	/** [JUSTIFICATION] Import callers may omit this newer Pasta tuning option. */
 	pastaGintThreshold?: number
 	tideLock?: TideLock | null
+	moons: MoonBody[]
 	substellarLon?: number
 	perihelion?: number
 	pressure?: number

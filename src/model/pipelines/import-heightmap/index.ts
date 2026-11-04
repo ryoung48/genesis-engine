@@ -300,6 +300,7 @@ function importGenesisWorld({
 		climateModel: params.climateModel,
 		seed: params.seed,
 		tideLock: params.tideLock ?? null,
+		moons: params.moons,
 		numPoints: params.numPoints,
 		numPlates: plateIds.length,
 		landDistribution: 0.25,

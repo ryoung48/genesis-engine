@@ -35,6 +35,16 @@ export interface RegionTypeMaskParams {
 	type: LandmarkType
 }
 
+export interface IsLakeParams {
+	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
+	region: number
+}
+
+export interface OpenWaterMaskParams {
+	isLand: ArrayLike<number>
+	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
+}
+
 export interface IncrementCountParams {
 	counts: Map<number, number>
 	key: number

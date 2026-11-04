@@ -1,3 +1,4 @@
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { GenesisOceanCurrents } from "@/model/climate/types"
@@ -448,6 +449,7 @@ export type GenesisWorkerRequest =
 				daysPerYear?: number
 				hoursPerDay?: number
 				tideLock?: TideLock | null
+				moons: MoonBody[]
 				substellarLon?: number
 				perihelion?: number
 				pressure?: number

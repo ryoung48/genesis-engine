@@ -8,17 +8,35 @@ import type {
 	WeatherRegime,
 	WeatherSystem,
 } from "@/model/climate/weather/local/decision/types"
+import type {
+	MarineShore,
+	MarineSnapshot,
+} from "@/model/climate/weather/local/marine/types"
+import type {
+	MarineSeaIce,
+	MarineWaveField,
+} from "@/model/climate/weather/local/marine/waves/types"
 import type { WeatherOutlook } from "@/model/climate/weather/local/outlook/types"
 import type {
 	WeatherCloudDescription,
 	WeatherPhenomenon,
 } from "@/model/climate/weather/local/vocabulary/types"
-import type { ProvinceLocation } from "@/model/geography/terrain/provinces/locations/types"
+import type {
+	ProvinceLocation,
+	ProvinceMarineLocation,
+} from "@/model/geography/terrain/provinces/locations/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+
+export interface WeatherProvinceMarine {
+	baseline: WeatherBaseline
+	shore: MarineShore
+	ice: MarineSeaIce
+}
 
 export interface WeatherProvince {
 	location: ProvinceLocation
 	baselines: WeatherBaseline[]
+	marine: WeatherProvinceMarine | null
 }
 
 export interface WeatherContext {
@@ -26,6 +44,7 @@ export interface WeatherContext {
 	seed: number
 	radiusKm: number
 	provinces: WeatherProvince[]
+	marine: MarineWaveField | null
 }
 
 export interface CreateLocalWeatherParams {
@@ -87,6 +106,7 @@ export interface WeatherSnapshot {
 	approximateLocation: boolean
 	values: LocalWeatherValues | null
 	samples: LocalWeatherSample[]
+	marine: MarineSnapshot | null
 }
 
 export interface SampleProvinceWeatherParams {
@@ -158,4 +178,18 @@ export interface ProvinceWeatherInspection {
 export interface ProvinceWeatherEvaluationParams {
 	weather: SampleProvinceWeatherParams
 	trace: ((sample: ProvinceWeatherSampleTrace) => void) | null
+	includeMarine: boolean
+}
+
+export interface MarineEvaluationParams {
+	context: WeatherContext
+	marine: WeatherProvinceMarine
+	instant: WeatherInstant
+}
+
+export interface PrepareMarineParams {
+	world: CreateLocalWeatherParams["world"]
+	marine: ProvinceMarineLocation
+	tidalRange: Float32Array | null
+	yearSeconds: number
 }

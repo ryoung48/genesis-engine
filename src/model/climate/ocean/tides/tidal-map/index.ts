@@ -39,12 +39,8 @@ function computeSpringTideMap({
 	const rng = RNG.makeRng(params.seed ^ 0x7a3f)
 	const planetRadiusKm = params.planetRadiusKm
 
-	function isLandmarkLake(r: number): boolean {
-		if (!landmarks) return false
-		const lid = landmarks.regionLandmark[r]
-		return lid >= 0 && landmarks.type[lid] === LANDMARKS.landmarkTypeLake
-	}
-	const isOcean = (r: number) => !isLand[r] && !isLandmarkLake(r)
+	const isOcean = (r: number) =>
+		!isLand[r] && !(landmarks && LANDMARKS.isLake({ landmarks, region: r }))
 
 	// Scale tidal range by spring tide force relative to Earth
 	const tidalStrength = maxForce

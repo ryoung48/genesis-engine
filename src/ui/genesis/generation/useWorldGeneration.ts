@@ -95,6 +95,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		seaLevel,
 		pressure,
 		mainWorldSystemBody,
+		displayMoons,
 	} = input
 
 	const [climateModel, setClimateModel] = useState<ClimateModel>(
@@ -217,6 +218,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			albedo: mainWorldSystemBody?.albedo,
 			greenhouseFactor: mainWorldSystemBody?.greenhouseFactor,
 			seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
+			moons: displayMoons,
 		}),
 		[
 			historyPipeline,
@@ -252,6 +254,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			mainWorldSystemBody?.albedo,
 			mainWorldSystemBody?.greenhouseFactor,
 			mainWorldSystemBody?.seismology?.totalHeating,
+			displayMoons,
 		],
 	)
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -386,6 +389,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 					mainWorldSystemBody?.greenhouseFactor ??
 					SOL_SYSTEM.solMainWorldDefaults.greenhouseFactor,
 				seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
+				moons: displayMoons,
 				tideLock,
 				substellarLon,
 				// Zeroed, not the live sliders -- this path is Earth-only (see
@@ -460,6 +464,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			mainWorldSystemBody?.albedo,
 			mainWorldSystemBody?.greenhouseFactor,
 			mainWorldSystemBody?.seismology?.totalHeating,
+			displayMoons,
 			generationCallbacks,
 			maxElevation,
 		],

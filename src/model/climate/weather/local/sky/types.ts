@@ -51,3 +51,31 @@ export interface RiseSetParams {
 	transitHour: number
 	dayHours: number
 }
+
+export interface SkyPositionsParams {
+	instant: WeatherInstant
+	xyz: [number, number, number]
+	moons: MoonBody[]
+}
+
+export interface SkyBodyPosition {
+	declinationRad: number
+	hourAngleRad: number
+	transitHours: number | null
+}
+
+export interface SkyPositions {
+	star: SkyBodyPosition
+	moons: SkyBodyPosition[]
+}
+
+export interface MoonOrbitParams {
+	instant: WeatherInstant
+	moon: MoonBody
+}
+
+export interface MoonOrbitState {
+	elongation: number
+	declinationRad: number
+	transitPhase: number
+}

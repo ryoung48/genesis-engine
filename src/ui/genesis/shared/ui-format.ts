@@ -8,12 +8,22 @@ const MM_TO_IN = 0.0393701
 const M3S_TO_FT3S = 35.314667
 const KM2_TO_MI2 = 0.386102
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+const M_TO_FT = 3.280839895
 
 export function formatWindSpeed({
 	value,
 	unitSystem,
 }: FormatWeatherValueParams): string {
 	return `${(unitSystem === "imperial" ? value * 3.6 * KM_TO_MI : value).toFixed(1)} ${unitSystem === "imperial" ? "mph" : "m/s"}`
+}
+
+export function formatHeight({
+	value,
+	unitSystem,
+}: FormatWeatherValueParams): string {
+	return unitSystem === "imperial"
+		? formatWithUnit(value * M_TO_FT, "ft", 1)
+		: formatWithUnit(value, "m", 2)
 }
 
 export function formatRainRate({
@@ -159,6 +169,10 @@ export function formatFlowRate(
 
 // "coming from" convention: negate u/v to get the source direction
 export function windDirectionLabel(u: number, v: number): string {
-	const deg = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360
+	return compassLabel((Math.atan2(-u, -v) * 180) / Math.PI)
+}
+
+export function compassLabel(degrees: number): string {
+	const deg = ((degrees % 360) + 360) % 360
 	return WIND_DIR_LABELS[Math.round(deg / 45) % 8] ?? "N"
 }

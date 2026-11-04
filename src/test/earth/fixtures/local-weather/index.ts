@@ -18,6 +18,7 @@ function context(): WeatherContext {
 		revision: 1,
 		seed: params.seed,
 		radiusKm: params.planetRadiusKm,
+		marine: null,
 		provinces: [
 			{
 				location: {
@@ -26,6 +27,7 @@ function context(): WeatherContext {
 					longitude: 0,
 					samples: [location],
 					approximateLocation: false,
+					marine: null,
 				},
 				baselines: [
 					{
@@ -47,6 +49,7 @@ function context(): WeatherContext {
 						valid: true,
 					},
 				],
+				marine: null,
 			},
 		],
 	}

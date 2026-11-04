@@ -2,7 +2,9 @@ import type {
 	ComputeLandmarksParams,
 	GenesisLandmarks,
 	IncrementCountParams,
+	IsLakeParams,
 	LandmarkType,
+	OpenWaterMaskParams,
 	RegionTypeMaskParams,
 } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
@@ -209,6 +211,18 @@ function regionTypeMask({ landmarks, type }: RegionTypeMaskParams): Uint8Array {
 	return mask
 }
 
+function isLake({ landmarks, region }: IsLakeParams): boolean {
+	const landmark = landmarks.regionLandmark[region]
+	return landmark >= 0 && landmarks.type[landmark] === landmarkTypeLake
+}
+
+function openWaterMask({ isLand, landmarks }: OpenWaterMaskParams): Uint8Array {
+	const mask = new Uint8Array(isLand.length)
+	for (let r = 0; r < mask.length; r++)
+		if (!isLand[r] && !isLake({ landmarks, region: r })) mask[r] = 1
+	return mask
+}
+
 export const LANDMARKS = {
 	landmarkTypes,
 	landmarkTypeOcean,
@@ -217,4 +231,6 @@ export const LANDMARKS = {
 	assignLandmarkIdentity,
 	landmarkTypeSea,
 	landmarkTypeLake,
+	isLake,
+	openWaterMask,
 }

@@ -821,6 +821,7 @@ function generateGenesisWorld({
 		cycloneRisk: post.cycloneRisk,
 		tornadoRisk: post.tornadoRisk,
 		tidalRange: post.tidalRange,
+		tidalSchedule: post.tidalSchedule,
 		volcanism: {
 			hotspot: r_hotspot,
 			mantleUpwelling: r_mantleUpwelling,

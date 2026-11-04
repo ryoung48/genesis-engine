@@ -13,13 +13,13 @@ const WIND_SAMPLES_PER_MONTH = 16
 function hourly(params: SampleProvinceWeatherParams): WeatherHour[] {
 	return Array.from({ length: HOURS }, (_, hoursAhead) => ({
 		hoursAhead,
-		values: LOCAL_WEATHER.sampleProvince({
+		values: LOCAL_WEATHER.sampleProvinceValues({
 			...params,
 			instant: WEATHER_CLOCK.shift({
 				instant: params.instant,
 				deltaSeconds: hoursAhead * 3600,
 			}),
-		}).values,
+		}),
 	})).filter((hour): hour is WeatherHour => hour.values !== null)
 }
 
@@ -37,14 +37,14 @@ function monthly(params: SampleProvinceWeatherParams): WeatherMonth[] {
 		let samples = 0
 		for (let k = 0; k < WIND_SAMPLES_PER_MONTH; k++) {
 			const phase = (month + (k + 0.5) / WIND_SAMPLES_PER_MONTH) / 12
-			const values = LOCAL_WEATHER.sampleProvince({
+			const values = LOCAL_WEATHER.sampleProvinceValues({
 				...params,
 				instant: WEATHER_CLOCK.shift({
 					instant: params.instant,
 					deltaSeconds:
 						(phase - params.instant.phase) * params.instant.yearSeconds,
 				}),
-			}).values
+			})
 			if (!values) continue
 			wind += values.windSpeedMs
 			samples++
