@@ -4,3 +4,8 @@ export interface FormatWeatherValueParams {
 	value: number
 	unitSystem: UnitSystem
 }
+
+export interface FormatLatLonParams {
+	latitude: number
+	longitude: number
+}

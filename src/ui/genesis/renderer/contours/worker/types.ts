@@ -1,22 +1,47 @@
 import type { BufferGeometry, Material, Mesh } from "three"
-import type { ContourWorld } from "@/ui/genesis/renderer/contours/surface/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import type {
+	ContourField,
+	ContourWorld,
+} from "@/ui/genesis/renderer/contours/surface/types"
 
 export type ContourWorkerRequest =
 	| { type: "initialize"; world: ContourWorld }
-	| { type: "generate"; id: number; sides: Int32Array; mapOrder: boolean }
+	| {
+			type: "generate"
+			id: number
+			field: ContourField
+			sides: Int32Array
+			mapOrder: boolean
+	  }
 
-export type ContourWorkerResponse = { id: number; controls: Float32Array }
+export type ContourWorkerResponse = {
+	id: number
+	field: ContourField
+	controls: Float32Array
+}
+
+export type ContourSource = Pick<
+	SerializedGenesisWorld,
+	"mesh" | "elevation_km" | "isLand" | "tidalRange"
+>
 
 export type PrepareContoursInput = {
-	world: ContourWorld
+	world: ContourSource
 	geometry: BufferGeometry
 	sides: Int32Array
 	mapOrder: boolean
 }
 
+export type SetContourControlsInput = {
+	job: ContourJob
+	controls: Float32Array
+}
+
 export type SetContoursVisibleInput = {
 	mesh: Mesh
 	visible: boolean
+	field: ContourField
 	requestRender: () => void
 }
 
@@ -28,8 +53,9 @@ export type ContourJob = {
 	material: Material | null
 	requestRender: (() => void) | null
 	visible: boolean
-	ready: boolean
-	pending: boolean
+	field: ContourField
+	readyField: ContourField | null
+	pendingField: ContourField | null
 }
 
 export type ContourWorkerState = {

@@ -55,7 +55,11 @@ describe("lazy contour generation", () => {
 			return worker
 		})
 		vi.stubGlobal("Worker", WorkerMock)
-		const world = { mesh, elevation_km: new Float32Array(mesh.numRegions) }
+		const world = {
+			mesh,
+			elevation_km: new Float32Array(mesh.numRegions),
+			isLand: new Uint8Array(mesh.numRegions),
+		}
 		const globe = new Mesh(new BufferGeometry(), new MeshBasicMaterial())
 		const map = new Mesh(new BufferGeometry(), new MeshBasicMaterial())
 		const requestRender = vi.fn()
@@ -72,33 +76,126 @@ describe("lazy contour generation", () => {
 				sides: Int32Array.of(0),
 				mapOrder: target === map,
 			})
-			CONTOUR_WORKER.setVisible({ mesh: target, visible: false, requestRender })
+			CONTOUR_WORKER.setVisible({
+				mesh: target,
+				visible: false,
+				field: "elevation",
+				requestRender,
+			})
 		}
 		expect(WorkerMock).not.toHaveBeenCalled()
 		expect(globe.geometry.hasAttribute("contourControl0")).toBe(false)
-		CONTOUR_WORKER.setVisible({ mesh: globe, visible: true, requestRender })
-		CONTOUR_WORKER.setVisible({ mesh: globe, visible: true, requestRender })
-		CONTOUR_WORKER.setVisible({ mesh: map, visible: true, requestRender })
+		CONTOUR_WORKER.setVisible({
+			mesh: globe,
+			visible: true,
+			field: "elevation",
+			requestRender,
+		})
+		CONTOUR_WORKER.setVisible({
+			mesh: globe,
+			visible: true,
+			field: "elevation",
+			requestRender,
+		})
+		CONTOUR_WORKER.setVisible({
+			mesh: map,
+			visible: true,
+			field: "elevation",
+			requestRender,
+		})
 		expect(WorkerMock).toHaveBeenCalledTimes(1)
 		const worker = workers[0]
 		expect(worker.postMessage).toHaveBeenCalledTimes(3)
-		CONTOUR_WORKER.setVisible({ mesh: globe, visible: false, requestRender })
+		CONTOUR_WORKER.setVisible({
+			mesh: globe,
+			visible: false,
+			field: "elevation",
+			requestRender,
+		})
 		worker.onmessage?.call(worker, {
-			data: { id: 0, controls: new Float32Array(30) },
+			data: { id: 0, field: "elevation", controls: new Float32Array(33) },
 		} as MessageEvent)
 		expect(globe.geometry.getAttribute("contourControl0").count).toBe(3)
 		expect(globe.material.userData.contourVisibility.value).toBe(0)
-		CONTOUR_WORKER.setVisible({ mesh: globe, visible: true, requestRender })
+		CONTOUR_WORKER.setVisible({
+			mesh: globe,
+			visible: true,
+			field: "elevation",
+			requestRender,
+		})
 		expect(globe.material.userData.contourVisibility.value).toBe(1)
 		expect(worker.postMessage).toHaveBeenCalledTimes(3)
 		map.geometry.dispose()
 		worker.onmessage?.call(worker, {
-			data: { id: 1, controls: new Float32Array(30) },
+			data: { id: 1, field: "elevation", controls: new Float32Array(33) },
 		} as MessageEvent)
 		expect(map.geometry.hasAttribute("contourControl0")).toBe(false)
 		expect(worker.terminate).not.toHaveBeenCalled()
 		globe.geometry.dispose()
 		expect(worker.terminate).toHaveBeenCalledTimes(1)
 		expect(requestRender).toHaveBeenCalledTimes(1)
+	})
+
+	it("regenerates in place when switching to the tidal field", () => {
+		const workers: Worker[] = []
+		vi.stubGlobal(
+			"Worker",
+			vi.fn(function () {
+				const worker = {
+					postMessage: vi.fn(),
+					terminate: vi.fn(),
+					onmessage: null,
+					onerror: null,
+				} as unknown as Worker
+				workers.push(worker)
+				return worker
+			}),
+		)
+		const world = {
+			mesh,
+			elevation_km: new Float32Array(mesh.numRegions),
+			isLand: new Uint8Array(mesh.numRegions),
+			tidalRange: new Float32Array(mesh.numRegions),
+		}
+		const globe = new Mesh(new BufferGeometry(), new MeshBasicMaterial())
+		const requestRender = vi.fn()
+		CONTOURS.attach({
+			material: globe.material,
+			visible: false,
+			fragmentTarget: "target",
+			colorExpression: "color",
+		})
+		CONTOUR_WORKER.prepare({
+			world,
+			geometry: globe.geometry,
+			sides: Int32Array.of(0),
+			mapOrder: false,
+		})
+		const show = (field: "elevation" | "tidal") =>
+			CONTOUR_WORKER.setVisible({
+				mesh: globe,
+				visible: true,
+				field,
+				requestRender,
+			})
+		show("elevation")
+		const worker = workers[0]
+		worker.onmessage?.call(worker, {
+			data: { id: 0, field: "elevation", controls: new Float32Array(33) },
+		} as MessageEvent)
+		const attribute = globe.geometry.getAttribute("contourControl0")
+		show("tidal")
+		expect(globe.material.userData.contourVisibility.value).toBe(0)
+		expect(globe.material.userData.contourField.value).toBe(1)
+		expect(worker.postMessage).toHaveBeenLastCalledWith(
+			expect.objectContaining({ type: "generate", field: "tidal" }),
+		)
+		worker.onmessage?.call(worker, {
+			data: { id: 1, field: "tidal", controls: new Float32Array(33).fill(2) },
+		} as MessageEvent)
+		expect(globe.geometry.getAttribute("contourControl0")).toBe(attribute)
+		expect(globe.geometry.getAttribute("contourMask").getX(0)).toBe(2)
+		expect(globe.material.userData.contourVisibility.value).toBe(1)
+		globe.geometry.dispose()
 	})
 })

@@ -1,8 +1,17 @@
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { getColor } from "@/ui/genesis/shared/colors"
+import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
+import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getProvinceAreaKm2 } from "@/ui/genesis/shared/population-density"
-import { formatArea, formatElevation } from "@/ui/genesis/shared/ui-format"
+import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
+import {
+	formatArea,
+	formatElevation,
+	formatLatLon,
+	rgbToCss,
+} from "@/ui/genesis/shared/ui-format"
 import type {
 	DescribeProvinceParams,
 	ProvinceDescription,
@@ -67,7 +76,7 @@ function describe(input: DescribeProvinceParams): ProvinceDescription {
 		{
 			label: "Location",
 			value: Number.isFinite(latitude + longitude)
-				? `${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`
+				? formatLatLon({ latitude, longitude })
 				: "Unavailable",
 		},
 		{
@@ -75,6 +84,9 @@ function describe(input: DescribeProvinceParams): ProvinceDescription {
 			value: Number.isFinite(world.elevation_km[region])
 				? formatElevation(world.elevation_km[region], unitSystem)
 				: "Unavailable",
+			swatchColor: Number.isFinite(world.elevation_km[region])
+				? rgbToCss(getColor(world.elevation_km[region], "terrain"))
+				: null,
 		},
 		{
 			label: "Terrain",
@@ -82,19 +94,36 @@ function describe(input: DescribeProvinceParams): ProvinceDescription {
 				CLASSIFICATION.genesisTopographyLabels[
 					world.topography?.[region] ?? -1
 				] ?? "Unavailable",
+			swatchColor:
+				world.topography?.[region] === undefined
+					? null
+					: (() => {
+							const color = getTopographyColor(world.topography[region])
+							return color ? rgbToCss(color) : null
+						})(),
 		},
 		{
 			label: "Vegetation",
 			value: VEGETATION.biomeLabels[world.vegetation[region]] ?? "Unavailable",
+			swatchColor: world.isLand[region]
+				? rgbToCss(vegetationColor(world.vegetation[region]))
+				: null,
 		},
 	]
 	stats.push({
 		label: "Climate",
 		value:
 			VEGETATION.climateLabels[world.climateZones[region]] ?? "Unavailable",
+		swatchColor: rgbToCss(climateZoneColor(world.climateZones[region])),
 	})
 	const societyStats: StatEntry[] = []
 	if (frame && index !== null) {
+		const culture = frame.cultures.find(
+			(entry) => entry.id === frame.provinceCulture[index],
+		)
+		const religion = frame.religions.find(
+			(entry) => entry.id === frame.provinceReligion[index],
+		)
 		societyStats.push(
 			{
 				label: "Population",
@@ -109,26 +138,14 @@ function describe(input: DescribeProvinceParams): ProvinceDescription {
 				).toLocaleString(),
 			},
 			{
-				label: "Development",
-				value: Number(frame.provinceDevelopment[index] ?? 0).toFixed(1),
-			},
-			{
-				label: "Knowledge",
-				value: Number(frame.provinceKnowledge[index] ?? 0).toFixed(1),
-			},
-			{
 				label: "Culture",
-				value:
-					frame.cultures.find(
-						(entry) => entry.id === frame.provinceCulture[index],
-					)?.name ?? "Unavailable",
+				value: culture?.name ?? "Unavailable",
+				swatchColor: culture ? `rgb(${culture.color.join(", ")})` : null,
 			},
 			{
 				label: "Religion",
-				value:
-					frame.religions.find(
-						(entry) => entry.id === frame.provinceReligion[index],
-					)?.name ?? "Unavailable",
+				value: religion?.name ?? "Unavailable",
+				swatchColor: religion ? `rgb(${religion.color.join(", ")})` : null,
 			},
 		)
 	}

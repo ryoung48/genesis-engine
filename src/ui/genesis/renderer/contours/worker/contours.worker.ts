@@ -18,13 +18,17 @@ self.onmessage = (event: MessageEvent<ContourWorkerRequest>) => {
 		return
 	}
 	if (!world) throw new Error("Contour world is not initialized")
-	const surface = CONTOUR_SURFACE.create(world)
-	const controls = new Float32Array(message.sides.length * 30)
+	const { field } = message
+	const surface = CONTOUR_SURFACE.create({ world, field })
+	const controls = new Float32Array(
+		message.sides.length * 3 * CONTOUR_SURFACE.stride,
+	)
 	for (let face = 0; face < message.sides.length; face++) {
 		const side = message.sides[face]
 		CONTOUR_SURFACE.writeControls({
 			world,
 			surface,
+			field,
 			innerTriangle: world.mesh.s_inner_t[side],
 			outerTriangle: world.mesh.s_outer_t[side],
 			region: world.mesh.s_begin_r[side],
@@ -34,7 +38,7 @@ self.onmessage = (event: MessageEvent<ContourWorkerRequest>) => {
 		})
 	}
 	self.postMessage(
-		{ id: message.id, controls } satisfies ContourWorkerResponse,
+		{ id: message.id, field, controls } satisfies ContourWorkerResponse,
 		[controls.buffer],
 	)
 }

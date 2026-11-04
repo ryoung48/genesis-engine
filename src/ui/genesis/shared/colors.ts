@@ -289,41 +289,33 @@ export function tornadoLandColor(risk: number): [number, number, number] {
 	)
 }
 
-// Five stops for the continuous tidal range gradient (raw metres).
-const TIDAL_ZERO: [number, number, number] = [1.0, 1.0, 1.0] // white  —  0 m (matches continent)
-const TIDAL_MICRO: [number, number, number] = [0.525, 0.91, 0.867] // seafoam —  1 m
-const TIDAL_MESO: [number, number, number] = [0.059, 0.729, 0.8] // teal    —  3 m
-const TIDAL_MACRO: [number, number, number] = [0.043, 0.302, 0.557] // navy    — 16 m
-const TIDAL_EXTREME: [number, number, number] = [0.42, 0.129, 0.659] // indigo  — 60 m
+export const TIDAL_LAND_COLOR: [number, number, number] = [0.006, 0.006, 0.008]
 
-function tidalLerp(
-	a: [number, number, number],
-	b: [number, number, number],
-	t: number,
-): [number, number, number] {
-	return [
-		a[0] + (b[0] - a[0]) * t,
-		a[1] + (b[1] - a[1]) * t,
-		a[2] + (b[2] - a[2]) * t,
-	]
-}
+export const TIDAL_RANGE_STOPS: ReadonlyArray<
+	readonly [number, readonly [number, number, number]]
+> = [
+	[0, [0.02, 0.035, 0.06]],
+	[1, [0.06, 0.17, 0.33]],
+	[2, [0.11, 0.32, 0.62]],
+	[4, [0.2, 0.55, 0.95]],
+	[8, [0.48, 0.56, 0.96]],
+	[16, [1, 1, 1]],
+]
 
-/**
- * Continuous tide color by raw tidal range in metres, piecewise-linear across five stops:
- *   0 m  — white (matches continent background)
- *   1 m  — pale seafoam
- *   3 m  — ocean teal
- *   16 m — deep navy
- *   60 m — deep indigo
- */
 export function tidalTierColor(valueM: number): [number, number, number] {
-	if (valueM <= 0) return TIDAL_ZERO
-	if (valueM < 1) return tidalLerp(TIDAL_ZERO, TIDAL_MICRO, valueM / 1)
-	if (valueM < 3) return tidalLerp(TIDAL_MICRO, TIDAL_MESO, (valueM - 1) / 2)
-	if (valueM < 16) return tidalLerp(TIDAL_MESO, TIDAL_MACRO, (valueM - 3) / 13)
-	if (valueM < 60)
-		return tidalLerp(TIDAL_MACRO, TIDAL_EXTREME, (valueM - 16) / 44)
-	return TIDAL_EXTREME
+	const [, first] = TIDAL_RANGE_STOPS[0]
+	let color: [number, number, number] = [first[0], first[1], first[2]]
+	for (let i = 1; i < TIDAL_RANGE_STOPS.length; i++) {
+		const [from] = TIDAL_RANGE_STOPS[i - 1]
+		const [to, rgb] = TIDAL_RANGE_STOPS[i]
+		const t = Math.max(0, Math.min(1, (valueM - from) / (to - from)))
+		color = [
+			color[0] + (rgb[0] - color[0]) * t,
+			color[1] + (rgb[1] - color[1]) * t,
+			color[2] + (rgb[2] - color[2]) * t,
+		]
+	}
+	return color
 }
 
 /** Land color for cyclone sub-mode: white (no risk) → deep navy (high risk). */

@@ -36,6 +36,7 @@ import type { useHistoryTimeline } from "@/ui/genesis/generation/useHistoryTimel
 import type { StoredViewPrefs } from "@/ui/genesis/generation/view-prefs"
 import type { HoverInfo } from "@/ui/genesis/hover/hover"
 import type { GenesisScene, GenesisViewMode } from "@/ui/genesis/renderer"
+import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
 import type {
@@ -341,7 +342,7 @@ export type GenesisSceneSyncInput = {
 	titleBorderTiers: readonly TitleBorderTier[]
 	sceneFrame: WorldFrame | null
 	showWireframe: boolean
-	showContours: boolean
+	contours: ContourDisplay
 	showCoastlines: boolean
 	showGrid: boolean
 	gridSpacing: number

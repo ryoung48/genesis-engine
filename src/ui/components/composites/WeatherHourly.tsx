@@ -3,6 +3,7 @@ import { cx } from "@/ui/components/lib"
 import { WeatherIcon } from "@/ui/components/primitives/icons/WeatherIcon"
 import { uiTokens } from "@/ui/components/tokens"
 import { tempColor } from "@/ui/genesis/hover/info-panel-format"
+import { windSpeedColorCss } from "@/ui/genesis/hover/info-panel-labels"
 import type {
 	WeatherHourlyBarsProps,
 	WeatherHourlyProps,
@@ -25,12 +26,16 @@ function WeatherHourlyBars({ items, minimumScale }: WeatherHourlyBarsProps) {
 					>
 						{item.value > 0 && (
 							<div
-								className={cx(styles.hourBar, styles.tone[item.tone])}
+								className={cx(
+									styles.hourBar,
+									item.color === null && styles.tone[item.tone],
+								)}
 								style={{
 									height: Math.max(
 										geometry.minimumVisiblePx,
 										(item.value / maximum) * geometry.heightPx,
 									),
+									backgroundColor: item.color ?? undefined,
 								}}
 							/>
 						)}
@@ -131,6 +136,7 @@ export function WeatherHourly({ display }: WeatherHourlyProps) {
 						label: cell.windSpeed,
 						tooltip: `${cell.label}: Wind ${cell.windSpeed} ${windUnit}`,
 						tone: "wind",
+						color: windSpeedColorCss(cell.windSpeedMs),
 					}))}
 				/>
 				<div className={styles.hourMetricCaption}>
@@ -144,6 +150,7 @@ export function WeatherHourly({ display }: WeatherHourlyProps) {
 						label: cell.precipitation || "–",
 						tooltip: `${cell.label}: Precipitation ${cell.precipitation || "0"} ${precipitationUnit}`,
 						tone: cell.precipitationTone,
+						color: null as string | null,
 					}))}
 				/>
 			</div>

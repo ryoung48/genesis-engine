@@ -5,7 +5,7 @@ export const InlineTextButton: React.FC<
 > = ({ className, type = "button", ...props }) => (
 	<button
 		type={type}
-		className={`cursor-pointer underline underline-offset-2 transition-colors hover:text-slate-900 ${className ?? ""}`.trim()}
+		className={`cursor-pointer font-[inherit] underline underline-offset-2 transition-colors hover:text-slate-900 ${className ?? ""}`.trim()}
 		{...props}
 	/>
 )

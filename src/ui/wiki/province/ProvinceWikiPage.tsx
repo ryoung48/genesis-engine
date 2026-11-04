@@ -9,6 +9,7 @@ import { GpsFocusButton, renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import { WikiSection } from "@/ui/wiki/shared/WikiTimeline"
 
 export function ProvinceWikiPage({ province, weather }: ProvinceWikiPageProps) {
+	const owner = province.owner
 	return (
 		<div className={uiTokens.wiki.page}>
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
@@ -24,6 +25,16 @@ export function ProvinceWikiPage({ province, weather }: ProvinceWikiPageProps) {
 							>
 								{province.planetTitle}
 							</InlineTextButton>
+							<span>·</span>
+							{owner ? (
+								<EntityChip
+									name={owner.name}
+									color={owner.color}
+									onClick={() => province.onSelectNation(owner.id)}
+								/>
+							) : (
+								<span>Unowned</span>
+							)}
 						</>
 					}
 					metaAction={<GpsFocusButton onClick={province.onFocus} />}
@@ -36,36 +47,6 @@ export function ProvinceWikiPage({ province, weather }: ProvinceWikiPageProps) {
 				{province.societyAvailable ? (
 					<div className={uiTokens.wiki.stats}>
 						{renderStatGrid(province.societyStats)}
-						<span className={uiTokens.wiki.note}>Owner</span>
-						<div className={uiTokens.wiki.body}>
-							{province.owner ? (
-								<EntityChip
-									name={province.owner.name}
-									color={province.owner.color}
-									onClick={() => {
-										if (province.owner)
-											province.onSelectNation(province.owner.id)
-									}}
-								/>
-							) : (
-								"Unowned"
-							)}
-						</div>
-						<span className={uiTokens.wiki.note}>Controller</span>
-						<div className={uiTokens.wiki.body}>
-							{province.controller ? (
-								<EntityChip
-									name={province.controller.name}
-									color={province.controller.color}
-									onClick={() => {
-										if (province.controller)
-											province.onSelectNation(province.controller.id)
-									}}
-								/>
-							) : (
-								"None"
-							)}
-						</div>
 					</div>
 				) : (
 					<p className={uiTokens.wiki.note}>

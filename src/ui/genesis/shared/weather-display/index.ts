@@ -234,7 +234,7 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 			? values.daylight
 				? "Illuminated"
 				: "Dark"
-			: `${formatClockTimeDisplay(values.localHour, (snapshot.instant.solarDaySeconds ?? 86400) / 3600, true)} local solar time · ${timeOfDayDescription(snapshot)}`
+			: `${formatClockTimeDisplay(values.localHour, (snapshot.instant.solarDaySeconds ?? 86400) / 3600, true)} · ${timeOfDayDescription(snapshot)}`
 	const departure = WEATHER_DESCRIPTION.departure(values)
 	const anomaly =
 		departure === "warmerThanUsual"
@@ -354,7 +354,7 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 			value: localTime,
 			icon: timeIcon(timeOfDay),
 			help: null,
-			wide: true,
+			wide: false,
 		},
 	]
 	return {

@@ -1,5 +1,6 @@
 import type * as THREE from "three"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import { CONTOUR_WORKER } from "@/ui/genesis/renderer/contours/worker"
 import { disposeObject3D } from "@/ui/genesis/renderer/disposal"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
@@ -231,13 +232,14 @@ export function createTerrainController(
 		ctx.mapCloudMesh = null
 	}
 
-	function setContoursVisible(visible: boolean) {
-		ctx.contoursVisible = visible
+	function setContours(contours: ContourDisplay) {
+		ctx.contours = contours
 		for (const mesh of [ctx.terrainMesh, ctx.mapMesh]) {
 			if (!mesh) continue
 			CONTOUR_WORKER.setVisible({
 				mesh,
-				visible,
+				visible: contours.visible,
+				field: contours.field,
 				requestRender: deps.requestRender,
 			})
 		}
@@ -281,7 +283,7 @@ export function createTerrainController(
 		)
 		ctx.mapMesh = mapBuild.mesh
 		ctx.mapFaceToRegion = mapBuild.faceToRegion
-		setContoursVisible(ctx.contoursVisible)
+		setContours(ctx.contours)
 		ctx.globeGroup.add(ctx.terrainMesh)
 		ctx.scene.add(ctx.mapMesh)
 		ctx.mapCloudMesh = buildMapCloudMesh(ctx.mapMesh.geometry, ctx.mapCloudMat)
@@ -394,6 +396,6 @@ export function createTerrainController(
 		setRegionColors,
 		setDisplayColors,
 		setOccupationOverlay,
-		setContoursVisible,
+		setContours,
 	}
 }

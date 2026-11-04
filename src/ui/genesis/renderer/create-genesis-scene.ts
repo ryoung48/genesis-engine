@@ -67,7 +67,7 @@ export function createGenesisScene(
 		setRegionColors,
 		setDisplayColors,
 		setOccupationOverlay,
-		setContoursVisible,
+		setContours,
 		showTerrainPreview,
 	} = createTerrainController(context, {
 		rebuildOverlays: () => rebuildOverlays(),
@@ -439,7 +439,7 @@ export function createGenesisScene(
 		setNationFillColorForRawId,
 		setNationOccupationStripeColorForRawId,
 		setOccupationOverlay,
-		setContoursVisible,
+		setContours,
 		setHoveredRegion,
 		setNationBordersVisible,
 		setEarthHistoryNationOverride,

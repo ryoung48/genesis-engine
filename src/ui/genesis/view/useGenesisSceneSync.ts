@@ -26,7 +26,7 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		titleBorderTiers,
 		sceneFrame,
 		showWireframe,
-		showContours,
+		contours,
 		showCoastlines,
 		showGrid,
 		gridSpacing,
@@ -102,8 +102,8 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		sceneRef.current?.setCoastlineOverlayVisible(showCoastlines)
 	}, [showCoastlines])
 	useEffect(() => {
-		sceneRef.current?.setContoursVisible(showContours)
-	}, [sceneRef, showContours])
+		sceneRef.current?.setContours(contours)
+	}, [sceneRef, contours])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setGridVisible(showGrid)

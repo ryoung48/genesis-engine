@@ -15,6 +15,7 @@ import type {
 	ColorForRawId,
 	ElevationKmForLonLat,
 } from "@/ui/genesis/political/eu4-nation-fill-overlay"
+import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { PreparedGeometry } from "@/ui/genesis/renderer/geometry-preparation/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type {
@@ -246,7 +247,7 @@ export interface GenesisScene {
 	setAtmospherePressure(pressureBar: number): void
 	setGlobeCloudTexturePath(texturePath: string | null): void
 	setCloudsVisible(visible: boolean): void
-	setContoursVisible(visible: boolean): void
+	setContours(contours: ContourDisplay): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
 	focusOnProvince(provinceId: number, opts?: FocusOnProvinceOptions): void

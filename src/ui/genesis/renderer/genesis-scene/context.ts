@@ -15,6 +15,7 @@ import type {
 import type { LabelMode } from "@/ui/genesis/controls/OverlayControls"
 import type { ColorForRawId } from "@/ui/genesis/political/eu4-nation-fill-overlay"
 import type { CoastlineLineData } from "@/ui/genesis/renderer/coastline-overlay"
+import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { MoonOrbitState } from "@/ui/genesis/renderer/moon-orbit-overlay"
 import type {
 	PendingNationScriptTextureQueue,
@@ -93,7 +94,7 @@ export interface GenesisContext {
 	currentViewMode: GenesisViewMode
 	currentMapCenterLongitudeDeg: number
 	currentMapProjectionLatitudeDeg: number
-	contoursVisible: boolean
+	contours: ContourDisplay
 	elevationVisible: boolean
 	/** River line materials, recolored by terrain-controller's
 	 * applyWaterMaterialForMode whenever the color mode changes; rebuilt by

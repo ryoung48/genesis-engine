@@ -92,6 +92,7 @@ export interface WeatherHourlyBar {
 	label: string
 	tooltip: string
 	tone: WeatherTone
+	color: string | null
 }
 
 export interface WeatherHourlyBarsProps {

@@ -43,6 +43,7 @@ import {
 	populationColor,
 	populationDifferenceColor,
 	slopeColor,
+	TIDAL_LAND_COLOR,
 	tidalTierColor,
 	tornadoLandColor,
 	VEGETATION_WATER_BLUE,
@@ -800,22 +801,9 @@ export function computeRegionColors(
 		world.tidalRange
 	) {
 		for (let r = 0; r < N; r++) {
-			const tidalVal = world.tidalRange[r] ?? 0
-			const isLand = isLandRegion(r)
-			let cr: number, cg: number, cb: number
-			if (isLand && tidalVal > 1e-5) {
-				;[cr, cg, cb] = darkenVegetationAtElevation(
-					tidalTierColor(tidalVal),
-					world.elevation_km[r],
-				)
-			} else if (!isLand) {
-				;[cr, cg, cb] = oceanRgb(r)
-			} else {
-				;[cr, cg, cb] = darkenVegetationAtElevation(
-					[1, 1, 1],
-					world.elevation_km[r],
-				)
-			}
+			const [cr, cg, cb] = isLandRegion(r)
+				? TIDAL_LAND_COLOR
+				: tidalTierColor(world.tidalRange[r] ?? 0)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

@@ -69,6 +69,7 @@ import { InfoPanel } from "@/ui/genesis/hover/InfoPanel"
 import { OceanCurrentParticleCanvas } from "@/ui/genesis/particles/OceanCurrentParticleCanvas"
 import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
+import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
 import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
@@ -1574,6 +1575,18 @@ export const GenesisView: React.FC<{
 		[colorMode, nationMode, titleBorderTiers],
 	)
 
+	const tidalContours =
+		colorMode === "dangerZones" &&
+		dangerSubMode === "tidal" &&
+		!!sceneWorld?.tidalRange
+	const contours = useMemo<ContourDisplay>(
+		() =>
+			tidalContours
+				? { visible: true, field: "tidal" }
+				: { visible: showContours, field: "elevation" },
+		[tidalContours, showContours],
+	)
+
 	useGenesisSceneSync({
 		sceneRef,
 		worldForDisplay: sceneWorld,
@@ -1589,7 +1602,7 @@ export const GenesisView: React.FC<{
 		titleBorderTiers: activeTitleBorderTiers,
 		sceneFrame,
 		showWireframe,
-		showContours,
+		contours,
 		showCoastlines,
 		showGrid,
 		gridSpacing,

@@ -24,6 +24,7 @@ import type {
 } from "@/ui/genesis/hover/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
+import { formatLatLon } from "@/ui/genesis/shared/ui-format"
 
 const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
@@ -134,10 +135,10 @@ export function getHoverCoordinates(
 ): string | null {
 	const lonLat = getHoverLonLat(hoverInfo, world)
 	if (!lonLat) return null
-	const { lonDeg: lon, latDeg: lat } = lonLat
-	const latLabel = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? "N" : "S"}`
-	const lonLabel = `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? "E" : "W"}`
-	return `${latLabel}, ${lonLabel}`
+	return formatLatLon({
+		latitude: lonLat.latDeg,
+		longitude: lonLat.lonDeg,
+	})
 }
 
 export function getHoverLonLat(

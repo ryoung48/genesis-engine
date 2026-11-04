@@ -1,6 +1,18 @@
-import type { FormatWeatherValueParams } from "@/ui/genesis/shared/ui-format/types"
+import type {
+	FormatLatLonParams,
+	FormatWeatherValueParams,
+} from "@/ui/genesis/shared/ui-format/types"
 
 export type UnitSystem = "metric" | "imperial"
+
+export function formatLatLon({
+	latitude,
+	longitude,
+}: FormatLatLonParams): string {
+	const lat = `${Math.abs(latitude).toFixed(1)}°${latitude >= 0 ? "N" : "S"}`
+	const lon = `${Math.abs(longitude).toFixed(1)}°${longitude >= 0 ? "E" : "W"}`
+	return `${lat}, ${lon}`
+}
 
 const KM_TO_MI = 0.621371
 const KM_TO_FT = 3280.839895
