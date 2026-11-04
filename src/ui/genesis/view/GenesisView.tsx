@@ -45,6 +45,7 @@ import {
 	resolveEu4ProvinceSettlementName,
 	resolveEu4ProvinceSettlementPopulationCarrier,
 } from "@/ui/genesis/generation/earth-assets"
+import { terminateGenerationWorker } from "@/ui/genesis/generation/generation"
 import {
 	historyTimeToMonth,
 	historyYearToTime,
@@ -624,7 +625,7 @@ export const GenesisView: React.FC<{
 		return () => {
 			window.removeEventListener("resize", onResize)
 			ro.disconnect()
-			workerRef.current?.terminate()
+			terminateGenerationWorker(workerRef.current)
 			workerRef.current = null
 			genesisScene.setHoverHandler(null)
 			genesisScene.dispose()

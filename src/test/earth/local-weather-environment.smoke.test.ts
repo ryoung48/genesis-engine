@@ -26,8 +26,8 @@ it("records primary phenomena, their actual cloud category, wind and temperature
 	const rain: LocalWeatherValues = {
 		...fair,
 		system: "rainy",
-		dominant: "spattering rain",
-		conditions: [{ kind: "spattering rain", share: 1 }],
+		dominant: "light rain",
+		conditions: [{ kind: "light rain", share: 1 }],
 		cloudDescription: "altostratus clouds",
 		cloudCover: 0.8,
 		clouds: [
@@ -68,7 +68,7 @@ it("records primary phenomena, their actual cloud category, wind and temperature
 	})
 	expect(env.byPhenomenon["clear skies"].samples).toBe(1)
 	expect(
-		env.byPhenomenon["spattering rain"].cloudDescriptions["altostratus clouds"],
+		env.byPhenomenon["light rain"].cloudDescriptions["altostratus clouds"],
 	).toBe(1)
 	expect(env.overall.departures).toEqual({
 		colderThanUsual: 1,

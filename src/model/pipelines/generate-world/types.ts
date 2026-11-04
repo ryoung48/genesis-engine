@@ -6,7 +6,7 @@ import type {
 	TectonicPlate,
 } from "@/model/geography/tectonics/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import type { GenesisParams } from "@/model/pipelines/types"
+import type { GenesisParams, TerrainSnapshot } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 
 export interface TectonicPathResult {
@@ -34,6 +34,8 @@ export interface SummarizeHotspotExposureParams {
 export interface GenerateGenesisWorldParams {
 	params: GenesisParams
 	onProgress?: ProgressFn
+	// [JUSTIFICATION] Headless generation does not prepare a browser terrain preview.
+	onTerrainReady?: (terrain: TerrainSnapshot) => void
 }
 
 export interface RunActivePathParams {

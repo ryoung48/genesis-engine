@@ -1,14 +1,14 @@
 ﻿// Pure typed-array geometry math shared between the main thread
-// (mesh-builders.ts, for on-demand rebuilds/fallbacks) and genesis.worker.ts
-// (which precomputes the default-colorMode geometry once, off the main
+// (mesh-builders.ts, for on-demand rebuilds/fallbacks) and geometry.worker.ts
+// (which prepares the default-colorMode geometry once, off the main
 // thread, so the initial "Generate"/"Load Earth" render doesn't have to run
 // this synchronously right before the first paint). No THREE.BufferGeometry/
 // Mesh/Material construction here -- callers wrap the returned arrays in
 // those themselves, since geometry/material objects aren't worker-safe to
 // hand back as-is (only their underlying typed arrays are transferable).
-import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import { CONTOUR_SURFACE } from "@/ui/genesis/renderer/contours/surface"
+import type { TerrainSnapshot } from "@/model/pipelines/types"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
+import { TRIANGLE_VALUES } from "@/ui/genesis/renderer/triangle-values"
 import { getColor } from "@/ui/genesis/shared/colors"
 
 export const TERRAIN_ELEVATION_SCALE = 0.04
@@ -22,13 +22,13 @@ function usesSmoothedHeightmapColors(
 export interface TerrainGeometryArrays {
 	positions: Float32Array
 	normals: Float32Array
-	contourControls: Float32Array
+	contourSides: Int32Array
 	colors: Float32Array
 	faceToRegion: Int32Array
 }
 
 export function computeTerrainGeometryArrays(
-	world: SerializedGenesisWorld,
+	world: TerrainSnapshot,
 	colorMode: Parameters<typeof getColor>[1],
 	regionColors: Float32Array | null,
 	elevationVisible: boolean,
@@ -47,26 +47,21 @@ export function computeTerrainGeometryArrays(
 		regionColors && regionColors.length >= mesh.numRegions * 3
 	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 
-	const tElevation = new Float32Array(numTriangles)
-	const contourSurface = CONTOUR_SURFACE.create(world)
-	const tElevationKm = contourSurface.triangleElevationKm
-	for (let triangle = 0; triangle < numTriangles; triangle++) {
-		const sideOffset = 3 * triangle
-		const a = s_begin_r[sideOffset]
-		const b = s_begin_r[sideOffset + 1]
-		const c = s_begin_r[sideOffset + 2]
-		tElevation[triangle] = (elevation[a] + elevation[b] + elevation[c]) / 3
-	}
+	const tElevation = TRIANGLE_VALUES.average({ mesh, values: elevation })
+	const tElevationKm = isSmoothHeightmap
+		? TRIANGLE_VALUES.average({ mesh, values: elevation_km })
+		: null
 
 	let validSideCount = 0
 	for (let side = 0; side < numSides; side++) {
 		if (s_outer_t[side] >= 0) validSideCount++
 	}
 
-	const contourControls = new Float32Array(validSideCount * 30)
+	const contourSides = new Int32Array(validSideCount)
 	const faceToRegion = new Int32Array(validSideCount)
 	const positions = new Float32Array(validSideCount * 9)
 	const colors = new Float32Array(validSideCount * 9)
+	const vertexIds = new Int32Array(validSideCount * 3)
 	let vertexOffset = 0
 	let faceIndex = 0
 
@@ -76,16 +71,10 @@ export function computeTerrainGeometryArrays(
 		if (tOuter < 0) continue
 
 		const region = s_begin_r[side]
-		CONTOUR_SURFACE.writeControls({
-			world,
-			surface: contourSurface,
-			innerTriangle: tInner,
-			outerTriangle: tOuter,
-			region,
-			mapOrder: false,
-			controls: contourControls,
-			face: faceIndex,
-		})
+		contourSides[faceIndex] = side
+		vertexIds[faceIndex * 3] = tInner
+		vertexIds[faceIndex * 3 + 1] = numTriangles + region
+		vertexIds[faceIndex * 3 + 2] = tOuter
 		faceToRegion[faceIndex++] = region
 		const vertices = [
 			{
@@ -93,7 +82,7 @@ export function computeTerrainGeometryArrays(
 				y: t_xyz[3 * tInner + 1],
 				z: t_xyz[3 * tInner + 2],
 				elev: tElevation[tInner],
-				colorElev: tElevationKm[tInner],
+				colorElev: tElevationKm?.[tInner] ?? 0,
 			},
 			{
 				x: r_xyz[3 * region],
@@ -107,7 +96,7 @@ export function computeTerrainGeometryArrays(
 				y: t_xyz[3 * tOuter + 1],
 				z: t_xyz[3 * tOuter + 2],
 				elev: tElevation[tOuter],
-				colorElev: tElevationKm[tOuter],
+				colorElev: tElevationKm?.[tOuter] ?? 0,
 			},
 		]
 
@@ -173,6 +162,9 @@ export function computeTerrainGeometryArrays(
 		const centerZ = (az + bz + cz) / 3
 
 		if (fnx * centerX + fny * centerY + fnz * centerZ < 0) {
+			const id = vertexIds[face * 3 + 1]
+			vertexIds[face * 3 + 1] = vertexIds[face * 3 + 2]
+			vertexIds[face * 3 + 2] = id
 			positions[base + 3] = cx
 			positions[base + 4] = cy
 			positions[base + 5] = cz
@@ -192,14 +184,9 @@ export function computeTerrainGeometryArrays(
 		}
 	}
 
-	// Smooth normals by averaging face normals at coincident vertex positions
-	// -- see mesh-builders.ts's buildTerrainMesh doc comment for why this is
-	// needed instead of THREE's computeVertexNormals().
 	const normals = new Float32Array(positions.length)
 	{
-		const keyOf = (i: number) =>
-			`${Math.round(positions[i] * 1e5)},${Math.round(positions[i + 1] * 1e5)},${Math.round(positions[i + 2] * 1e5)}`
-		const accum = new Map<string, [number, number, number]>()
+		const accum = new Float64Array((numTriangles + mesh.numRegions) * 3)
 		for (let face = 0; face < validSideCount; face++) {
 			const base = face * 9
 			const ax = positions[base]
@@ -224,41 +211,38 @@ export function computeTerrainGeometryArrays(
 			fnx /= flen
 			fny /= flen
 			fnz /= flen
-			for (const idx of [base, base + 3, base + 6]) {
-				const key = keyOf(idx)
-				const acc = accum.get(key)
-				if (acc) {
-					acc[0] += fnx
-					acc[1] += fny
-					acc[2] += fnz
-				} else {
-					accum.set(key, [fnx, fny, fnz])
-				}
+			for (let vertex = 0; vertex < 3; vertex++) {
+				const offset = vertexIds[face * 3 + vertex] * 3
+				accum[offset] += fnx
+				accum[offset + 1] += fny
+				accum[offset + 2] += fnz
 			}
 		}
-		for (let i = 0; i < positions.length; i += 3) {
-			const acc = accum.get(keyOf(i))!
-			const len =
-				Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) || 1
-			normals[i] = acc[0] / len
-			normals[i + 1] = acc[1] / len
-			normals[i + 2] = acc[2] / len
+		for (let vertex = 0; vertex < vertexIds.length; vertex++) {
+			const offset = vertexIds[vertex] * 3
+			const x = accum[offset],
+				y = accum[offset + 1],
+				z = accum[offset + 2]
+			const length = Math.sqrt(x * x + y * y + z * z) || 1
+			normals[vertex * 3] = x / length
+			normals[vertex * 3 + 1] = y / length
+			normals[vertex * 3 + 2] = z / length
 		}
 	}
 
-	return { positions, normals, colors, contourControls, faceToRegion }
+	return { positions, normals, colors, contourSides, faceToRegion }
 }
 
 export interface MapGeometryArrays {
 	positions: Float32Array
-	contourControls: Float32Array
+	contourSides: Int32Array
 	colors: Float32Array
 	lonLat: Float32Array
 	faceToRegion: Int32Array
 }
 
 export function computeMapGeometryArrays(
-	world: SerializedGenesisWorld,
+	world: TerrainSnapshot,
 	colorMode: Parameters<typeof getColor>[1],
 	regionColors: Float32Array | null,
 	centerLongitudeDeg: number,
@@ -274,14 +258,41 @@ export function computeMapGeometryArrays(
 		regionColors && regionColors.length >= mesh.numRegions * 3
 	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 
-	const contourSurface = CONTOUR_SURFACE.create(world)
-	const triangleElevationKm = contourSurface.triangleElevationKm
+	const triangleElevationKm = isSmoothHeightmap
+		? TRIANGLE_VALUES.average({ mesh, values: elevation_km })
+		: null
 
-	const contourControls = new Float32Array(numSides * 60)
-	const positions = new Float32Array(numSides * 18)
-	const colors = new Float32Array(numSides * 18)
-	const lonLat = new Float32Array(numSides * 12)
-	const faceToRegion = new Int32Array(numSides * 2)
+	const regionProjection = new Float64Array(mesh.numRegions * 2)
+	const triangleProjection = new Float64Array(mesh.numTriangles * 2)
+	for (const points of [
+		{ source: r_xyz, target: regionProjection },
+		{ source: t_xyz, target: triangleProjection },
+	]) {
+		for (let i = 0; i < points.target.length / 2; i++) {
+			const projected = projection.projectCartesian(
+				points.source[i * 3],
+				points.source[i * 3 + 1],
+				points.source[i * 3 + 2],
+			)
+			points.target[i * 2] = projected.lon
+			points.target[i * 2 + 1] = projected.lat
+		}
+	}
+	const seamSides = new Uint8Array(numSides)
+	let faceCount = 0
+	for (let side = 0; side < numSides; side++) {
+		if (s_outer_t[side] < 0) continue
+		const a = triangleProjection[s_inner_t[side] * 2]
+		const b = triangleProjection[s_outer_t[side] * 2]
+		const c = regionProjection[s_begin_r[side] * 2]
+		seamSides[side] = Math.max(a, b, c) - Math.min(a, b, c) > Math.PI ? 1 : 0
+		faceCount += 1 + seamSides[side]
+	}
+	const contourSides = new Int32Array(faceCount)
+	const positions = new Float32Array(faceCount * 9)
+	const colors = new Float32Array(faceCount * 9)
+	const lonLat = new Float32Array(faceCount * 6)
+	const faceToRegion = new Int32Array(faceCount)
 	let triangleCount = 0
 
 	for (let side = 0; side < numSides; side++) {
@@ -290,28 +301,22 @@ export function computeMapGeometryArrays(
 		if (tOuter < 0) continue
 		const region = s_begin_r[side]
 
-		const p0 = projection.projectCartesian(
-			t_xyz[3 * tInner],
-			t_xyz[3 * tInner + 1],
-			t_xyz[3 * tInner + 2],
-		)
-		const p1 = projection.projectCartesian(
-			t_xyz[3 * tOuter],
-			t_xyz[3 * tOuter + 1],
-			t_xyz[3 * tOuter + 2],
-		)
-		const p2 = projection.projectCartesian(
-			r_xyz[3 * region],
-			r_xyz[3 * region + 1],
-			r_xyz[3 * region + 2],
-		)
-
-		let lon0 = p0.lon
-		let lon1 = p1.lon
-		let lon2 = p2.lon
-		const maxLon = Math.max(lon0, lon1, lon2)
-		const minLon = Math.min(lon0, lon1, lon2)
-		const wraps = maxLon - minLon > Math.PI
+		const p0 = {
+			lon: triangleProjection[tInner * 2],
+			lat: triangleProjection[tInner * 2 + 1],
+		}
+		const p1 = {
+			lon: triangleProjection[tOuter * 2],
+			lat: triangleProjection[tOuter * 2 + 1],
+		}
+		const p2 = {
+			lon: regionProjection[region * 2],
+			lat: regionProjection[region * 2 + 1],
+		}
+		let lon0 = p0.lon,
+			lon1 = p1.lon,
+			lon2 = p2.lon
+		const wraps = seamSides[side] !== 0
 
 		const vertexColors = useRegionColors
 			? Array.from(
@@ -325,8 +330,8 @@ export function computeMapGeometryArrays(
 				)
 			: (isSmoothHeightmap
 					? [
-							triangleElevationKm[tInner],
-							triangleElevationKm[tOuter],
+							triangleElevationKm?.[tInner] ?? 0,
+							triangleElevationKm?.[tOuter] ?? 0,
 							elevation_km[region],
 						]
 					: [elevation_km[region], elevation_km[region], elevation_km[region]]
@@ -340,16 +345,7 @@ export function computeMapGeometryArrays(
 			cLon: number,
 			cLat: number,
 		) => {
-			CONTOUR_SURFACE.writeControls({
-				world,
-				surface: contourSurface,
-				innerTriangle: tInner,
-				outerTriangle: tOuter,
-				region,
-				mapOrder: true,
-				controls: contourControls,
-				face: triangleCount,
-			})
+			contourSides[triangleCount] = side
 			const offset = triangleCount * 9
 			faceToRegion[triangleCount] = region
 			const a = projection.projectRadians(aLon, aLat, 0)
@@ -397,14 +393,5 @@ export function computeMapGeometryArrays(
 		}
 	}
 
-	// .slice() (copy), not .subarray() (view): these backing arrays are
-	// over-allocated for the worst case (every side wraps into 2 triangles),
-	// and a view would keep that whole oversized buffer alive/transferred.
-	return {
-		contourControls: contourControls.slice(0, triangleCount * 30),
-		positions: positions.slice(0, triangleCount * 9),
-		colors: colors.slice(0, triangleCount * 9),
-		lonLat: lonLat.slice(0, triangleCount * 6),
-		faceToRegion: faceToRegion.slice(0, triangleCount),
-	}
+	return { contourSides, positions, colors, lonLat, faceToRegion }
 }

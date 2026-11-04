@@ -17,15 +17,15 @@ export type WeatherIconName =
 	| "weather-partly-snowy"
 	| "weather-snowy-heavy"
 	| "weather-dust"
+	| "flower"
+	| "leaf-maple"
+	| "weather-tornado"
 	| "weather-windy"
 	| "weather-sunset-up"
 	| "weather-sunset-down"
-	| "windsock"
+	| "fire"
 	| "water"
 	| "snowflake"
-	| "snowflake-thermometer"
-	| "thermometer"
-	| "umbrella"
 	| "cloud"
 	| "sun-angle"
 	| "moon-new"
@@ -42,3 +42,12 @@ export type WeatherIconName =
 export interface WeatherIconProps extends React.SVGProps<SVGSVGElement> {
 	name: WeatherIconName
 }
+
+export interface MoonIconPhase {
+	illumination: number
+	waxing: boolean
+}
+
+export interface MoonIconProps
+	extends React.SVGProps<SVGSVGElement>,
+		MoonIconPhase {}

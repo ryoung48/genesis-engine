@@ -3,6 +3,7 @@ import type {
 	ContourWorld,
 	WriteContourControlsInput,
 } from "@/ui/genesis/renderer/contours/surface/types"
+import { TRIANGLE_VALUES } from "@/ui/genesis/renderer/triangle-values"
 
 const SMOOTHING_PASSES = 12
 const SMOOTHING_SELF_WEIGHT = 0.5
@@ -82,15 +83,16 @@ function create(world: ContourWorld): ContourSurface {
 		regionSlopes[3 * r + 1] = du * uy + dv * vy
 		regionSlopes[3 * r + 2] = dv * vz
 	}
-	const triangleElevationKm = new Float32Array(mesh.numTriangles)
+	const triangleElevationKm = TRIANGLE_VALUES.average({
+		mesh,
+		values: elevation_km,
+	})
 	const contourTriangleElevationKm = new Float32Array(mesh.numTriangles)
 	const triangleSlopes = new Float32Array(mesh.numTriangles * 3)
 	for (let t = 0; t < mesh.numTriangles; t++) {
 		const a = mesh.s_begin_r[3 * t],
 			b = mesh.s_begin_r[3 * t + 1],
 			c = mesh.s_begin_r[3 * t + 2]
-		triangleElevationKm[t] =
-			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
 		contourTriangleElevationKm[t] =
 			(regionElevationKm[a] + regionElevationKm[b] + regionElevationKm[c]) / 3
 		for (let axis = 0; axis < 3; axis++)

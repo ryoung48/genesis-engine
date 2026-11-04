@@ -6,15 +6,25 @@ import type {
 	RepresentativeCloudParams,
 	WeatherCloudCategory,
 } from "@/model/climate/weather/local/clouds/types"
+import type { WeatherPhenomenon } from "@/model/climate/weather/local/vocabulary/types"
 
 const genera: CloudGenus[] = [
 	"cirrus",
 	"altostratus",
 	"altocumulus",
+	"stratocumulus",
 	"stratus",
 	"nimbostratus",
 	"cumulus",
 	"cumulonimbus",
+]
+const STORM_CELLS: WeatherPhenomenon[] = [
+	"thunderstorm",
+	"hail",
+	"tornado",
+	"thundersnow",
+	"tropical storm",
+	"hurricane",
 ]
 
 function fromCategory({
@@ -23,11 +33,10 @@ function fromCategory({
 	phenomenon,
 }: CategoryWeatherCloudsParams): EstimatedWeatherClouds {
 	if (cover === null || category === null) return { cover: null, clouds: null }
-	if (category === "clear skies" || category === "haze")
-		return { cover, clouds: [] }
+	if (category === "clear skies") return { cover, clouds: [] }
 	const genus: CloudGenus =
 		category === "nimbus clouds"
-			? phenomenon === "thunderstorm"
+			? STORM_CELLS.includes(phenomenon)
 				? "cumulonimbus"
 				: "nimbostratus"
 			: category === "cirrus clouds"
@@ -38,7 +47,9 @@ function fromCategory({
 						? "stratus"
 						: category === "altocumulus clouds"
 							? "altocumulus"
-							: "cumulus"
+							: category === "stratocumulus clouds"
+								? "stratocumulus"
+								: "cumulus"
 	const layer =
 		genus === "cumulonimbus"
 			? "deep"

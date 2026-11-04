@@ -12,10 +12,10 @@ The default is the latest report and nearest older compatible baseline. Compatib
 
 Headline tiles include blizzard share over snow-season sites (any monthly mean <0°C) and sand/dust share over arid bare sites (bare ground, aridity <0.3), so rare phenomena are not diluted by sites that can never produce them.
 
-The `original-tree-constrained-v4` generator uses one primary phenomenon and one regime per sample. Each group's occupancy totals 100%. The main tables include:
+The `original-tree-constrained-v6` generator uses one primary phenomenon and one regime per sample. Each group's occupancy totals 100%. The main tables include:
 
 - Regime frequencies, runs, and dry versus precipitating samples.
-- All 26 primary phenomena, including clear skies/cloudy and explicit zeros.
+- All 36 primary phenomena, including clear skies/cloudy and explicit zeros.
 - The full phenomenon × eight cloud/sky category matrix. Each populated row totals 100%; zero-occurrence rows have undefined conditional shares, shown as dashes.
 - Overall and selected-phenomenon cloud distributions, actual generated pairings rather than a fixed table imposed by the bench.
 - Wind-speed bands and absolute temperature vocabulary, plus mean/extreme wind and temperature departures.

@@ -33,11 +33,11 @@ it("accounts for completed versus terminal runs and independent versus sequentia
 			values: {
 				...snapshot.values!,
 				localHour: [21, 3, 9, 21][step],
-				dominant: active ? "spattering rain" : "clear skies",
+				dominant: active ? "light rain" : "clear skies",
 				conditions: active
 					? [
 							{
-								kind: "spattering rain",
+								kind: "light rain",
 								share: 1,
 							},
 						]
@@ -56,7 +56,7 @@ it("accounts for completed versus terminal runs and independent versus sequentia
 		})
 	})
 	const report = WEATHER_DISTRIBUTIONS.finish(state)
-	const rain = report.conditions.find((c) => c.kind === "spattering rain")!
+	const rain = report.conditions.find((c) => c.kind === "light rain")!
 	expect({
 		completed: rain.completedRuns,
 		histogram: rain.completedRunHistogramHours,

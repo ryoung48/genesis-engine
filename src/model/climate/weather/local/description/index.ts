@@ -2,6 +2,7 @@ import type {
 	WeatherDeparture,
 	WeatherDepartureParams,
 	WeatherDescriptionBand,
+	WeatherPressureTrend,
 	WeatherSky,
 } from "@/model/climate/weather/local/description/types"
 
@@ -104,6 +105,30 @@ function windBands(): WeatherDescriptionBand[] {
 		{ label: "Hurricane-force wind", minimum: 32.7, maximum: null },
 	]
 }
+const STEADY_PRESSURE_HPA = 0.7
+const RAPID_PRESSURE_HPA = 2
+const pressureLabels: Record<WeatherPressureTrend, string> = {
+	risingRapidly: "Rising rapidly",
+	rising: "Rising",
+	steady: "Steady",
+	falling: "Falling",
+	fallingRapidly: "Falling rapidly",
+}
+function pressureTrend(hpaPer3h: number): WeatherPressureTrend {
+	const size = Math.abs(hpaPer3h)
+	if (size < STEADY_PRESSURE_HPA) return "steady"
+	const rapid = size >= RAPID_PRESSURE_HPA
+	return hpaPer3h > 0
+		? rapid
+			? "risingRapidly"
+			: "rising"
+		: rapid
+			? "fallingRapidly"
+			: "falling"
+}
+function pressureLabel(trend: WeatherPressureTrend): string {
+	return pressureLabels[trend]
+}
 function departureThresholdC(): number {
 	return 40 / 9
 }
@@ -116,4 +141,6 @@ export const WEATHER_DESCRIPTION = {
 	temperatureBands,
 	windBands,
 	departureThresholdC,
+	pressureTrend,
+	pressureLabel,
 }

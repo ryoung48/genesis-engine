@@ -106,6 +106,7 @@ function moons({
 				label: moon.name ?? `Moon ${index + 1}`,
 				phase: phases[Math.round(elongation * 8) % 8],
 				illumination: (1 - Math.cos(elongation * TAU)) / 2,
+				waxing: elongation < 0.5,
 			}
 			if (hours === null)
 				return {

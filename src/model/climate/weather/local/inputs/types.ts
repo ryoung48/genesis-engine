@@ -13,10 +13,20 @@ export interface WeatherInputs {
 	monthlyRainMm: number
 	dtrC: number | null
 	solar: LocalSolarState
-	afternoon: boolean
+	convectiveBias: number
 	surfaceC: number
 	clearSurfaceC: number
+	stormTrack: number
+	pressureTendencyHpa: number
+	cyclone: number
 	branchDraw: number
 	eventDraw: number
 	precipitationDraw: number
+	gustDraw: number
+	layerDraw: number
+}
+export interface WeatherWindVectorParams {
+	u: number
+	v: number
+	speedMs: number
 }

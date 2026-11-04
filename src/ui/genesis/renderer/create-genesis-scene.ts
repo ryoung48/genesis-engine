@@ -68,6 +68,7 @@ export function createGenesisScene(
 		setDisplayColors,
 		setOccupationOverlay,
 		setContoursVisible,
+		showTerrainPreview,
 	} = createTerrainController(context, {
 		rebuildOverlays: () => rebuildOverlays(),
 		updateOverlayVisibility: () => updateOverlayVisibility(),
@@ -430,6 +431,7 @@ export function createGenesisScene(
 		},
 		resize,
 		updateWorld,
+		showTerrainPreview,
 		exportMapPng,
 		setColorMode,
 		setRegionColors,

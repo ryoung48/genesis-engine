@@ -61,7 +61,7 @@ function record({ state, values, conditions }: WeatherEnvironmentRecordParams) {
 	const groups = [
 		state.overall,
 		...phenomena.map((kind) => state.byPhenomenon[kind]),
-		...[...conditions].map(
+		...[...conditions, `regime:${values.regime}`].map(
 			(kind) =>
 				state.byCondition[kind] ?? (state.byCondition[kind] = summary()),
 		),

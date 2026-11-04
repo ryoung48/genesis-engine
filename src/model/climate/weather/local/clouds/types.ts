@@ -6,6 +6,7 @@ export type CloudGenus =
 	| "cirrus"
 	| "altostratus"
 	| "altocumulus"
+	| "stratocumulus"
 	| "stratus"
 	| "nimbostratus"
 	| "cumulus"

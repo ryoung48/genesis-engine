@@ -23,10 +23,14 @@ export interface WeatherDecisionInputs {
 	clearSurfaceC: number
 	windSpeedMs: number
 	gustMs: number
-	afternoon: boolean
 	daylight: boolean
 	particleSource: WeatherParticleSource | null
 	aridity: number
+	convectiveBias: number
+	land: boolean
+	stormTrack: number
+	severeRisk: number
+	pressureTendencyHpa: number
 }
 export interface WeatherOutcome {
 	kind: WeatherPhenomenon
@@ -34,6 +38,7 @@ export interface WeatherOutcome {
 	water: number
 }
 export interface WeatherBranch {
+	regime: WeatherRegime
 	system: WeatherSystem
 	wetBranch: boolean
 	cloud: WeatherCloudDescription
@@ -53,12 +58,14 @@ export interface WeatherDraws {
 	branch: number
 	event: number
 	precipitation: number
+	layer: number
 }
 export interface ResolveWeatherParams {
 	choices: WeatherChoices
 	draws: WeatherDraws
 }
 export interface WeatherDecision {
+	regime: WeatherRegime
 	system: WeatherSystem
 	cloud: WeatherCloudDescription
 	kind: WeatherPhenomenon
@@ -68,6 +75,7 @@ export interface WeatherDecision {
 export interface WeatherCloudChoiceParams {
 	system: WeatherRegime
 	rainChance: number
+	monthlyTemperatureC: number
 }
 export interface WeatherOutcomeParams {
 	system: WeatherSystem
@@ -102,4 +110,43 @@ export interface WeatherDryShares {
 	cloudy: number
 	wetScale: number
 	dryScale: number
+	clearScale: number
+}
+export interface WeatherBandParams {
+	kind: WeatherPhenomenon
+	rateMmH: number
+	stratiform: boolean
+}
+export interface WeatherPhase {
+	snow: number
+	mix: number
+	liquid: number
+	freezing: boolean
+}
+export interface WeatherWetParams {
+	rain: WeatherPhenomenon
+	snow: WeatherPhenomenon
+	weight: number
+	convective: boolean
+}
+export interface WeatherLimits {
+	windyMs: number
+	blowingSnowMs: number
+	blizzardGustMs: number
+	blizzardVisibilityM: number
+}
+export interface WeatherAddParams {
+	kind: WeatherPhenomenon
+	weight: number
+	convective: boolean
+}
+export interface WeatherPhaseParams {
+	input: WeatherDecisionInputs
+	layered: boolean
+}
+export type WeatherLayeredRegime = "overcast" | "cloudy"
+export interface WeatherLayerParams {
+	regime: WeatherLayeredRegime
+	input: WeatherDecisionInputs
+	draw: number
 }

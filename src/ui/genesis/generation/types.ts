@@ -9,6 +9,7 @@ import type {
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
 import type { GenerationRequest } from "@/ui/genesis/generation/progress/types"
+import type { PreparedGeometry } from "@/ui/genesis/renderer/geometry-preparation/types"
 import type { ReligionMapMode } from "@/ui/genesis/shared/map-modes"
 
 export interface HistoryTimelineInput {
@@ -31,6 +32,7 @@ export interface GenerationCallbacks {
 	setGenerationLabel: (v: string) => void
 	setSeed: (v: number) => void
 	setWorld: (v: SerializedGenesisWorld | null) => void
+	onTerrainPreview: (geometry: PreparedGeometry | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
 	onHistoryStart: (initial: ProceduralHistoryInitial | null) => void
 	onDistributionBatch: (batch: RecordBatch) => void

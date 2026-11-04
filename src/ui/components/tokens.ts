@@ -176,14 +176,17 @@ export const uiTokens = {
 		hourCell: "flex w-10 shrink-0 flex-col items-center gap-1",
 		hourLabel: "font-mono text-[8px] text-slate-400",
 		hourIcon: "h-4 w-4",
+		hourConditions:
+			"line-clamp-2 h-6 w-full px-0.5 text-center text-[7px] leading-3 text-slate-500",
 		hourTemperature: "font-mono text-[9px] text-slate-800",
 		sparkline: "block",
-		precipitationGeometry: { barPx: 16, precipitationScaleMmH: 2 },
-		precipitationCaption:
+		hourBarsGeometry: { heightPx: 16, minimumVisiblePx: 2 },
+		precipitationScaleMmH: 2,
+		hourMetricCaption:
 			"mt-1.5 px-1 font-mono text-[7px] uppercase tracking-[0.12em] text-slate-400",
-		precipitationTrack: "flex w-3 items-end",
-		precipitationBar: "w-full rounded-t-[1px] bg-current",
-		precipitationValue: "font-mono text-[8px] text-slate-500",
+		hourBarTrack: "flex w-3 items-end",
+		hourBar: "w-full rounded-t-[1px] bg-current",
+		hourMetricValue: "font-mono text-[8px] text-slate-500",
 		sparklineGeometry: { cellPx: 40, heightPx: 34, padPx: 5 },
 		hero: "flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5",
 		heroIcon: "h-10 w-10 shrink-0",

@@ -20,10 +20,7 @@ import type {
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
 } from "@/model/worker-protocol/types"
-import {
-	computeMapGeometryArrays,
-	computeTerrainGeometryArrays,
-} from "@/ui/genesis/renderer/terrain-geometry"
+import { GEOMETRY_DATA } from "@/ui/genesis/renderer/geometry-preparation/data"
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -285,21 +282,6 @@ function serializeWorld(
 		settlementWaterLandmarks: world.settlementWaterLandmarks,
 		settlementPortRegions: world.settlementPortRegions,
 	}
-}
-
-/** Precomputes the default-display-state terrain/map geometry (see
- * SerializedGenesisWorld's doc comment) so create-genesis-scene.ts's first
- * rebuildTerrain() after "Generate"/"Load Earth" can skip straight to
- * wrapping these arrays in THREE.BufferGeometry instead of running the
- * per-vertex color/normal-averaging pass on the main thread. */
-function attachPrecomputedGeometry(
-	world: SerializedGenesisWorld,
-): SerializedGenesisWorld {
-	const terrain = computeTerrainGeometryArrays(world, "terrain", null, true)
-	const map = computeMapGeometryArrays(world, "terrain", null, 0, 0)
-	world.precomputedTerrainGeometry = terrain
-	world.precomputedMapGeometry = map
-	return world
 }
 
 function partitionBuffers(p: {
@@ -653,24 +635,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			add(world.population.settlementOrder.buffer)
 	}
 	if (world.tradeGoods) add(world.tradeGoods.buffer)
-	if (world.precomputedTerrainGeometry) {
-		add(
-			world.precomputedTerrainGeometry.contourControls.buffer,
-			world.precomputedTerrainGeometry.positions.buffer,
-			world.precomputedTerrainGeometry.normals.buffer,
-			world.precomputedTerrainGeometry.colors.buffer,
-			world.precomputedTerrainGeometry.faceToRegion.buffer,
-		)
-	}
-	if (world.precomputedMapGeometry) {
-		add(
-			world.precomputedMapGeometry.contourControls.buffer,
-			world.precomputedMapGeometry.positions.buffer,
-			world.precomputedMapGeometry.colors.buffer,
-			world.precomputedMapGeometry.lonLat.buffer,
-			world.precomputedMapGeometry.faceToRegion.buffer,
-		)
-	}
+
 	return Array.from(transfer)
 }
 
@@ -832,6 +797,11 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			generated = GENERATE_WORLD.generateGenesisWorld({
 				params: message.params,
 				onProgress: progressCb,
+				onTerrainReady: (terrain) =>
+					self.postMessage({
+						type: "terrain-ready",
+						terrain: GEOMETRY_DATA.snapshot(terrain),
+					} satisfies GenesisWorkerResponse),
 			})
 		} else if (message.type === "import") {
 			generated = IMPORT_HEIGHTMAP.importGenesisWorld({
@@ -910,11 +880,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			timings: preparationTimings,
 			fn: () => serializeWorld(generated),
 		})
-		const world = TIMING.measure({
-			stage: "Geometry",
-			timings: preparationTimings,
-			fn: () => attachPrecomputedGeometry(serialized),
-		})
+		const world = serialized
 		TIMING.append({
 			stage: "Worker preparation",
 			timings: generated.timings,

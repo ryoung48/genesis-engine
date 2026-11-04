@@ -63,4 +63,15 @@ it("derives moon phase from elongation and moonlight from time above the horizon
 	})
 	expect(fresh.phase).toBe("new")
 	expect(fresh.riseHour).toBeCloseTo(6, 0)
+	const nearNew = WEATHER_SKY.moons({
+		instant: equinox(),
+		latitudeDeg: 0,
+		moons: [
+			{ ...moon, meanAnomalyAtEpochDeg: 10 },
+			{ ...moon, meanAnomalyAtEpochDeg: 350 },
+		],
+	})
+	expect(nearNew.map((entry) => entry.phase)).toEqual(["new", "new"])
+	expect(nearNew.map((entry) => entry.waxing)).toEqual([true, false])
+	expect(nearNew[0].illumination).toBeCloseTo(nearNew[1].illumination, 6)
 })

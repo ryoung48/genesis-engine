@@ -242,6 +242,7 @@ function runActivePath({
 function generateGenesisWorld({
 	params,
 	onProgress,
+	onTerrainReady,
 }: GenerateGenesisWorldParams): GenesisWorld {
 	const startedAt = performance.now()
 	PARALLEL.warm()
@@ -526,6 +527,7 @@ function generateGenesisWorld({
 			seaLevel: params.seaLevel,
 		})
 	elevation.set(finalElevation)
+	onTerrainReady?.({ mesh, elevation, elevation_km })
 	const emergedLand = new Uint8Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (baseElevation[r] <= 0 && elevation_km[r] > 0) emergedLand[r] = 1

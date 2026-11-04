@@ -21,3 +21,9 @@ export type WeatherDepartureParams = Pick<
 	LocalWeatherValues,
 	"temperatureC" | "temperatureNormalC"
 >
+export type WeatherPressureTrend =
+	| "risingRapidly"
+	| "rising"
+	| "steady"
+	| "falling"
+	| "fallingRapidly"

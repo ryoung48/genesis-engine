@@ -25,7 +25,8 @@ function combine({
 			| "temperatureNormalC"
 			| "rainRateMmH"
 			| "windU"
-			| "windV",
+			| "windV"
+			| "pressureTendencyHpa",
 	) =>
 		valid.reduce(
 			(sum, sample) => sum + sample.weight * (sample.values?.[key] ?? 0),
@@ -90,12 +91,25 @@ function combine({
 				: (conditions.get(best.values!.dominant!)?.share ?? 0)
 		return score > bestScore ? sample : best
 	}).values!
+	const cloudiest = valid.reduce((best, sample) =>
+		sample.weight * (sample.values!.cloudCover ?? 0) >
+		best.weight * (best.values!.cloudCover ?? 0)
+			? sample
+			: best,
+	).values!
+	const primaryClear = primary.cloudDescription === "clear skies"
+	const cloudDescription = !allCloud
+		? null
+		: primaryClear && (cloudiest.cloudCover ?? 0) > 0
+			? cloudiest.cloudDescription
+			: primary.cloudDescription
 
 	return {
 		...first,
+		regime: primary.regime,
 		system: primary.system,
 		particleSource: primary.particleSource,
-		cloudDescription: allCloud ? primary.cloudDescription : null,
+		cloudDescription,
 		temperatureC: mean("temperatureC"),
 		visibilityM: Math.min(...valid.map((sample) => sample.values!.visibilityM)),
 		precipitation: {
@@ -104,6 +118,7 @@ function combine({
 			ice: partition("ice"),
 		},
 		temperatureNormalC: mean("temperatureNormalC"),
+		pressureTendencyHpa: mean("pressureTendencyHpa"),
 		rainRateMmH,
 		windU,
 		windV,

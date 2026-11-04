@@ -33,6 +33,7 @@ export interface MoonSky {
 	label: string
 	phase: MoonPhase
 	illumination: number
+	waxing: boolean
 	cycle: SkyCycle
 	riseHour: number | null
 	setHour: number | null

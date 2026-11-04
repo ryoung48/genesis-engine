@@ -40,6 +40,8 @@ function context(): WeatherContext {
 						cloud: new Float32Array(12).fill(0.5),
 						isLand: true,
 						aridity: 0.5,
+						cycloneRisk: 0,
+						tornadoRisk: 0,
 						bare: false,
 						particleSource: null,
 						valid: true,

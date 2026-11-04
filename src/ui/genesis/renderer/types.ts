@@ -1,4 +1,4 @@
-﻿import type * as THREE from "three"
+import type * as THREE from "three"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WindArrowData } from "@/model/climate/weather/wind/types"
 import type {
@@ -15,6 +15,7 @@ import type {
 	ColorForRawId,
 	ElevationKmForLonLat,
 } from "@/ui/genesis/political/eu4-nation-fill-overlay"
+import type { PreparedGeometry } from "@/ui/genesis/renderer/geometry-preparation/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type {
 	OrbitAddress,
@@ -179,6 +180,7 @@ export interface RealmBordersSpec {
 }
 
 export interface GenesisScene {
+	showTerrainPreview(geometry: PreparedGeometry): void
 	dispose(): void
 	resize(): void
 	updateWorld(world: SerializedGenesisWorld | null): void

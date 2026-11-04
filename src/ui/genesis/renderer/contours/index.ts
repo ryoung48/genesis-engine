@@ -1,8 +1,4 @@
-import { InterleavedBuffer, InterleavedBufferAttribute } from "three"
-import type {
-	AttachContoursInput,
-	ContourAttributesInput,
-} from "@/ui/genesis/renderer/contours/types"
+import type { AttachContoursInput } from "@/ui/genesis/renderer/contours/types"
 
 const CONTOUR_INTERVAL_KM = 0.5
 const CONTOUR_OPACITY = 0.65
@@ -41,6 +37,7 @@ function attach(input: AttachContoursInput) {
 	material.userData.contourVisibility = visibility
 	material.onBeforeCompile = (shader, renderer) => {
 		beforeCompile.call(material, shader, renderer)
+		if (!material.userData.contourReady) return
 		shader.uniforms.uContoursVisible = visibility
 		shader.vertexShader = shader.vertexShader.replace(
 			"void main() {",
@@ -71,23 +68,9 @@ void main() {`,
 ${fragmentTarget}`,
 		)
 	}
-	material.customProgramCacheKey = () => "elevation-contours-v2"
+	material.customProgramCacheKey = () =>
+		material.userData.contourReady
+			? "elevation-contours-v2"
+			: "without-contours"
 }
-
-function addAttributes(input: ContourAttributesInput) {
-	const buffer = new InterleavedBuffer(input.controls, 10)
-	input.geometry.setAttribute(
-		"contourControl0",
-		new InterleavedBufferAttribute(buffer, 4, 0),
-	)
-	input.geometry.setAttribute(
-		"contourControl1",
-		new InterleavedBufferAttribute(buffer, 3, 4),
-	)
-	input.geometry.setAttribute(
-		"contourControl2",
-		new InterleavedBufferAttribute(buffer, 3, 7),
-	)
-}
-
-export const CONTOURS = { attach, addAttributes }
+export const CONTOURS = { attach }

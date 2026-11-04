@@ -4,7 +4,10 @@ import type {
 } from "@/model/climate/weather/local/baseline/types"
 import type { WeatherInstant } from "@/model/climate/weather/local/clock/types"
 import type { CloudOccurrence } from "@/model/climate/weather/local/clouds/types"
-import type { WeatherSystem } from "@/model/climate/weather/local/decision/types"
+import type {
+	WeatherRegime,
+	WeatherSystem,
+} from "@/model/climate/weather/local/decision/types"
 import type { WeatherOutlook } from "@/model/climate/weather/local/outlook/types"
 import type {
 	WeatherCloudDescription,
@@ -44,6 +47,7 @@ export interface ConditionOccurrence {
 
 export interface LocalWeatherValues {
 	cloudDescription: WeatherCloudDescription | null
+	regime: WeatherRegime
 	system: WeatherSystem
 	particleSource: WeatherParticleSource | null
 	precipitation: WeatherPartition
@@ -59,6 +63,7 @@ export interface LocalWeatherValues {
 	windSpeedMs: number
 	windDirectionDeg: number | null
 	gustMs: number
+	pressureTendencyHpa: number
 	cloudCover: number | null
 	clouds: CloudOccurrence[] | null
 	conditions: ConditionOccurrence[]

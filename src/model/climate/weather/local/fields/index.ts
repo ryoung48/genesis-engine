@@ -16,14 +16,14 @@ function sample({
 		channel === "weather-event" || channel === "weather-precipitation"
 	const spacing = gust ? 60 : event ? 150 : 600
 	const period = gust ? 600 : event ? 6 * 3600 : 48 * 3600
+	const channelSeed = HASH.keyed({ seed, key: channel })
 	const [x, y, z] = xyz
 	const horizontal = Math.hypot(x, y)
-	const east: [number, number, number] =
-		horizontal > 0 ? [-y / horizontal, x / horizontal, 0] : [0, 1, 0]
-	const north: [number, number, number] =
-		horizontal > 0
-			? [(-x * z) / horizontal, (-y * z) / horizontal, horizontal]
-			: [1, 0, 0]
+	const eastX = horizontal > 0 ? -y / horizontal : 0,
+		eastY = horizontal > 0 ? x / horizontal : 1,
+		northX = horizontal > 0 ? (-x * z) / horizontal : 1,
+		northY = horizontal > 0 ? (-y * z) / horizontal : 0,
+		northZ = horizontal > 0 ? horizontal : 0
 	const time = seconds / period
 	const firstTime = Math.floor(time)
 	const timeBlend = smooth(time - firstTime)
@@ -34,34 +34,37 @@ function sample({
 		if (timeWeight === 0) continue
 		const node = firstTime + step
 		const travelKm = (seconds - node * period) / 1000
-		const position = xyz.map(
-			(value, axis) =>
-				(value * radiusKm -
-					travelKm * (driftMs[0] * east[axis] + driftMs[1] * north[axis])) /
-				spacing,
-		)
-		const base = position.map(Math.floor)
-		const blend = position.map((value, axis) => smooth(value - base[axis]))
+		const px =
+			(x * radiusKm - travelKm * (driftMs[0] * eastX + driftMs[1] * northX)) /
+			spacing
+		const py =
+			(y * radiusKm - travelKm * (driftMs[0] * eastY + driftMs[1] * northY)) /
+			spacing
+		const pz = (z * radiusKm - travelKm * driftMs[1] * northZ) / spacing
+		const bx = Math.floor(px),
+			by = Math.floor(py),
+			bz = Math.floor(pz)
+		const fx = smooth(px - bx),
+			fy = smooth(py - by),
+			fz = smooth(pz - bz)
+		const nodeSeed = Math.imul(channelSeed ^ node, 0x9e3779b1)
 		for (let corner = 0; corner < 8; corner++) {
-			let weight = timeWeight
-			const coordinates = base.map((value, axis) => {
-				const high = (corner >> axis) & 1
-				weight *= high ? blend[axis] : 1 - blend[axis]
-				return value + high
-			})
+			const hx = corner & 1,
+				hy = (corner >> 1) & 1,
+				hz = (corner >> 2) & 1
+			const weight =
+				timeWeight *
+				(hx ? fx : 1 - fx) *
+				(hy ? fy : 1 - fy) *
+				(hz ? fz : 1 - fz)
 			if (weight === 0) continue
-			const key = `${channel}:${coordinates.join(":")}:${node}`
-			const a = Math.max(
-				2 ** -32,
-				HASH.unit({ seed: HASH.keyed({ seed, key }), channel: 0, salt: 0 }),
-			)
-			const b = HASH.unit({
-				seed: HASH.keyed({ seed, key }),
-				channel: 1,
-				salt: 0,
-			})
-			const normal = Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b)
-			sum += weight * normal
+			let h = nodeSeed ^ Math.imul(bx + hx, 0x85ebca6b)
+			h = Math.imul(h ^ (h >>> 15), 0xc2b2ae35) ^ Math.imul(by + hy, 0x27d4eb2f)
+			h = Math.imul(h ^ (h >>> 13), 0x165667b1) ^ Math.imul(bz + hz, 0x9e3779b1)
+			h = Math.imul(h ^ (h >>> 16), 0x85ebca6b)
+			const a = Math.max(2 ** -32, HASH.unit({ seed: h, channel: 0, salt: 0 }))
+			const b = HASH.unit({ seed: h, channel: 1, salt: 0 })
+			sum += weight * Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b)
 			squares += weight * weight
 		}
 	}

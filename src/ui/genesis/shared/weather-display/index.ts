@@ -40,6 +40,7 @@ const cloudLabels: Record<CloudGenus, string> = {
 	cirrus: "Cirrus clouds",
 	altostratus: "Altostratus clouds",
 	altocumulus: "Altocumulus clouds",
+	stratocumulus: "Stratocumulus clouds",
 	stratus: "Stratus clouds",
 	nimbostratus: "Nimbostratus clouds",
 	cumulus: "Cumulus clouds",
@@ -50,29 +51,39 @@ const phenomenonIcons: Record<WeatherPhenomenon, WeatherIconName> = {
 	"clear skies": "weather-sunny",
 	cloudy: "weather-cloudy",
 	dew: "water",
-	"thin mist": "weather-hazy",
-	mist: "weather-hazy",
-	fog: "weather-fog",
-	rime: "weather-fog",
-	"ice fog": "weather-fog",
-	drizzle: "weather-rainy",
-	"spattering rain": "weather-rainy",
-	"rain shower": "weather-partly-rainy",
-	"pelting rain": "weather-pouring",
-	"quiet downpour": "weather-pouring",
-	thunderstorm: "weather-lightning-rainy",
-	sleet: "weather-snowy-rainy",
-	"cold surface": "snowflake-thermometer",
-	"thin frost": "snowflake",
 	frost: "snowflake",
-	dusting: "weather-partly-snowy",
-	"tiny flakes": "weather-partly-snowy",
-	"ice crystals": "weather-partly-snowy",
-	"snow flurry": "weather-partly-snowy",
-	snowfall: "weather-snowy",
+	mist: "weather-hazy",
+	haze: "weather-hazy",
+	fog: "weather-fog",
+	"freezing fog": "weather-fog",
+	"ice fog": "weather-fog",
+	"ice crystals": "snowflake",
+	drizzle: "weather-partly-rainy",
+	"freezing drizzle": "weather-snowy-rainy",
+	"light rain": "weather-rainy",
+	"moderate rain": "weather-rainy",
+	"heavy rain": "weather-pouring",
+	"light showers": "weather-partly-rainy",
+	"rain showers": "weather-rainy",
+	"freezing rain": "weather-snowy-rainy",
+	"rain and snow": "weather-snowy-rainy",
+	thunderstorm: "weather-lightning-rainy",
+	hail: "weather-lightning-rainy",
+	tornado: "weather-tornado",
+	thundersnow: "weather-lightning-rainy",
+	"light snow": "weather-partly-snowy",
+	"moderate snow": "weather-snowy",
+	"heavy snow": "weather-snowy-heavy",
+	"snow showers": "weather-partly-snowy",
+	"heavy snow showers": "weather-snowy-heavy",
+	"drifting snow": "weather-windy",
 	blizzard: "weather-snowy-heavy",
+	"blowing sand": "weather-dust",
+	"blowing dust": "weather-dust",
 	"sand storm": "weather-dust",
 	"dust storm": "weather-dust",
+	"tropical storm": "weather-pouring",
+	hurricane: "weather-pouring",
 }
 const iconTones: Record<WeatherIconName, WeatherTone> = {
 	"weather-sunny": "sun",
@@ -91,17 +102,17 @@ const iconTones: Record<WeatherIconName, WeatherTone> = {
 	"weather-partly-snowy": "snow",
 	"weather-snowy-heavy": "snow",
 	"weather-dust": "dust",
+	"weather-tornado": "storm",
 	"weather-windy": "wind",
 	"weather-sunset-up": "sun",
 	"weather-sunset-down": "sun",
-	windsock: "wind",
+	fire: "sun",
 	water: "rain",
 	snowflake: "snow",
-	"snowflake-thermometer": "snow",
-	thermometer: "cloud",
-	umbrella: "rain",
 	cloud: "cloud",
 	"sun-angle": "sun",
+	flower: "sun",
+	"leaf-maple": "dust",
 	"moon-new": "night",
 	"moon-waxing-crescent": "night",
 	"moon-first-quarter": "night",
@@ -120,7 +131,6 @@ function conditionIcon(values: LocalWeatherValues): WeatherIconName {
 		return values.daylight ? "weather-sunny" : "weather-night"
 	if (kind !== "cloudy") return phenomenonIcons[kind]
 	if (values.system === "windy") return "weather-windy"
-	if (values.cloudDescription === "haze") return "weather-hazy"
 	if (values.cloudCover !== null && values.cloudCover < 0.7)
 		return values.daylight
 			? "weather-partly-cloudy"
@@ -150,9 +160,20 @@ function cloudLabel(kind: string): string {
 				? cloudLabels[kind as CloudGenus]
 				: kind
 }
+function skyDescription(values: LocalWeatherValues): string {
+	const coverage = values.cloudCover
+	const sky = WEATHER_DESCRIPTION.skyLabel(WEATHER_DESCRIPTION.sky(coverage))
+	return coverage === null ? sky : `${sky} · ${Math.round(coverage * 100)}%`
+}
 function cloudDescription(values: LocalWeatherValues): string {
 	const category = WEATHER_VOCABULARY.cloud(values)
 	return category ? TEXT.capitalize(category) : "Unavailable"
+}
+const seasonIcons: Record<string, WeatherIconName> = {
+	Spring: "flower",
+	Summer: "weather-sunny",
+	Autumn: "leaf-maple",
+	Winter: "snowflake",
 }
 
 function seasonDescription(snapshot: PresentWeatherParams["snapshot"]): string {
@@ -183,15 +204,19 @@ function timeOfDayDescription(
 	return values.daylight ? (phase < 0.5 ? "Morning" : "Afternoon") : "Night"
 }
 
+function conditionDescription(values: LocalWeatherValues): string {
+	return (
+		WEATHER_VOCABULARY.describeAll(values)
+			.map((label, index) => (index === 0 ? TEXT.capitalize(label) : label))
+			.join(" and ") || "Unavailable"
+	)
+}
+
 function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 	const values = snapshot.values
 	if (!values) return null
-	const conditions = WEATHER_VOCABULARY.describeAll(values)
-		.map((label, index) => (index === 0 ? TEXT.capitalize(label) : label))
-		.join(" and ")
+	const conditions = conditionDescription(values)
 
-	const coverage = values.cloudCover
-	const sky = WEATHER_DESCRIPTION.skyLabel(WEATHER_DESCRIPTION.sky(coverage))
 	const localTime =
 		values.localHour === null
 			? values.daylight
@@ -225,12 +250,12 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 					? ("cold" as const)
 					: null,
 		anomalyLabel: anomaly,
-		conditions: conditions || "Unavailable",
+		conditions,
 		temperature: `${WEATHER_DESCRIPTION.temperature(values.temperatureC)}${anomaly ? ` (${anomaly})` : ""} · ${formatTemperature(values.temperatureC, unitSystem)}`,
 		wind: `${WEATHER_DESCRIPTION.wind(values.windSpeedMs)} · ${values.windDirectionDeg === null ? "" : `${windDirectionLabel(values.windU, values.windV)} `}${formatWindSpeed({ value: values.windSpeedMs, unitSystem })}`,
 		gusts: formatWindSpeed({ value: values.gustMs, unitSystem }),
 		rain: formatRainRate({ value: values.rainRateMmH, unitSystem }),
-		sky: `${sky}${coverage === null ? "" : ` · ${Math.round(coverage * 100)}%`}`,
+		sky: skyDescription(values),
 		clouds: cloudDescription(values),
 		time: `${dateLabel} · ${localTime}`,
 	}
@@ -238,18 +263,18 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 		temperatureC: values.temperatureC,
 		dewPointC: values.dewPointC,
 	})
+	const feelsLikeC = WEATHER_COMFORT.apparentTemperature({
+		temperatureC: values.temperatureC,
+		relativeHumidity,
+		windSpeedMs: values.windSpeedMs,
+	})
+	const pressure = WEATHER_DESCRIPTION.pressureTrend(values.pressureTendencyHpa)
+	const season = seasonDescription(snapshot)
 	const tiles: WeatherTile[] = [
 		{
 			label: "Feels like",
-			value: formatTemperature(
-				WEATHER_COMFORT.apparentTemperature({
-					temperatureC: values.temperatureC,
-					relativeHumidity,
-					windSpeedMs: values.windSpeedMs,
-				}),
-				unitSystem,
-			),
-			icon: "thermometer",
+			value: formatTemperature(feelsLikeC, unitSystem),
+			icon: feelsLikeC <= 10 ? "snowflake" : "fire",
 			help: "Heat index at or above 27 °C, wind chill at or below 10 °C with wind over 1.3 m/s, otherwise the air temperature (US National Weather Service formulas).",
 			wide: false,
 		},
@@ -273,14 +298,21 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 		{
 			label: "Gusts",
 			value: display.gusts,
-			icon: "windsock",
+			icon: "weather-windy",
 			help: null,
+			wide: false,
+		},
+		{
+			label: "Pressure",
+			value: `${WEATHER_DESCRIPTION.pressureLabel(pressure)} · ${values.pressureTendencyHpa >= 0 ? "+" : "−"}${Math.abs(values.pressureTendencyHpa).toFixed(1)} hPa/3 h`,
+			icon: "weather-windy",
+			help: "Estimated three-hour surface pressure tendency as weather systems pass: falling ahead of a storm, rising behind it.",
 			wide: false,
 		},
 		{
 			label: "Precipitation",
 			value: display.rain,
-			icon: "umbrella",
+			icon: "weather-rainy",
 			help: "Liquid-water equivalent rate, including snow, ice pellets and hail; this is not snow depth.",
 			wide: false,
 		},
@@ -300,8 +332,8 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 		},
 		{
 			label: "Season",
-			value: seasonDescription(snapshot),
-			icon: "sun-angle",
+			value: season,
+			icon: seasonIcons[season] ?? "sun-angle",
 			help: "Astronomical season for the representative location and hemisphere, not a wet/dry-season classification.",
 			wide: false,
 		},
@@ -325,16 +357,16 @@ function hourly({
 	solarDaySeconds,
 }: PresentHourlyParams): WeatherHourlyDisplay {
 	const bare = (text: string) => text.replace(/ [^ ]+$/, "")
+	const unit = (text: string) => text.replace(/^[^ ]+ /, "")
 	return {
-		precipitationUnit: formatRainRate({ value: 0, unitSystem }).replace(
-			/^[^ ]+ /,
-			"",
-		),
+		windUnit: unit(formatWindSpeed({ value: 0, unitSystem })),
+		precipitationUnit: unit(formatRainRate({ value: 0, unitSystem })),
 		cells: outlook.hourly.map((hour) => {
 			const icon = conditionIcon(hour.values)
 			const rate = hour.values.rainRateMmH
 			return {
 				key: hour.hoursAhead,
+				conditions: conditionDescription(hour.values),
 				label:
 					hour.hoursAhead === 0
 						? "Now"
@@ -349,6 +381,10 @@ function hourly({
 				tone: iconTones[icon],
 				temperatureC: hour.values.temperatureC,
 				temperature: formatTemperature(hour.values.temperatureC, unitSystem, 0),
+				windSpeed: bare(
+					formatWindSpeed({ value: hour.values.windSpeedMs, unitSystem }),
+				),
+				windSpeedMs: hour.values.windSpeedMs,
 				precipitationMmH: rate,
 				precipitation:
 					rate < 0.05
@@ -425,6 +461,7 @@ function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
 		detail: polar,
 		icon: "weather-sunny",
 		tone: "sun",
+		moon: null,
 		items: [
 			{
 				label: "Sunrise",
@@ -452,6 +489,10 @@ function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
 					name: moon.label,
 					detail: `${moonPhases[moon.phase].label} · ${Math.round(moon.illumination * 100)}%`,
 					icon: moonPhases[moon.phase].icon,
+					moon: {
+						illumination: moon.illumination,
+						waxing: moon.waxing,
+					},
 					tone: "night",
 					items: [
 						{

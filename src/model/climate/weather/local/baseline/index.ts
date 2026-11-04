@@ -79,6 +79,8 @@ function build({
 		cloud: cloud && cloud.every(Number.isFinite) ? cloud : null,
 		isLand: world.isLand[r] !== 0,
 		aridity,
+		cycloneRisk: world.cycloneRisk?.[r] ?? 0,
+		tornadoRisk: world.tornadoRisk?.[r] ?? 0,
 		bare,
 		particleSource: bare ? (world.vegetation[r] === 1 ? "sand" : "dust") : null,
 		valid:

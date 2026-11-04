@@ -1,6 +1,21 @@
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
-export type ContourWorld = Pick<SerializedGenesisWorld, "mesh" | "elevation_km">
+export type ContourWorld = {
+	mesh: Pick<
+		SerializedGenesisWorld["mesh"],
+		| "numRegions"
+		| "numTriangles"
+		| "adjOffset"
+		| "adjList"
+		| "neighborDist"
+		| "r_xyz"
+		| "t_xyz"
+		| "s_begin_r"
+		| "s_inner_t"
+		| "s_outer_t"
+	>
+	elevation_km: Float32Array
+}
 
 export type ContourSurface = {
 	regionElevationKm: Float32Array

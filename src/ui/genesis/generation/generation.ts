@@ -1,5 +1,6 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { ClimateModel, GenesisParams } from "@/model/pipelines/types"
+import { TIMING } from "@/model/shared/timing"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
@@ -10,6 +11,17 @@ import type {
 	GenerateWorldParams,
 	GenerationCallbacks,
 } from "@/ui/genesis/generation/types"
+import { GEOMETRY_PREPARATION } from "@/ui/genesis/renderer/geometry-preparation"
+import type { GeometryPreparation } from "@/ui/genesis/renderer/geometry-preparation/types"
+
+const geometryPreparations = new WeakMap<Worker, GeometryPreparation>()
+
+export function terminateGenerationWorker(worker: Worker | null): void {
+	if (!worker) return
+	geometryPreparations.get(worker)?.cancel()
+	geometryPreparations.delete(worker)
+	worker.terminate()
+}
 
 interface ImportHeightmapParams {
 	climateModel: ClimateModel
@@ -111,7 +123,9 @@ function createWorker({
 	failLabel,
 	request,
 }: CreateWorkerParams): Worker {
-	callbacks.workerRef.current?.terminate()
+	const previous = callbacks.workerRef.current
+	terminateGenerationWorker(previous)
+	callbacks.onTerrainPreview(null)
 	const worker = new Worker(
 		new URL("../../../model/genesis.worker.ts", import.meta.url),
 		{ type: "module" },
@@ -123,10 +137,33 @@ function createWorker({
 		isCurrent: () => callbacks.workerRef.current === worker,
 	})
 
-	worker.onmessage = (event: MessageEvent<GenesisWorkerResponse>) => {
+	const geometry = GEOMETRY_PREPARATION.create({
+		onReady: (prepared) => {
+			if (callbacks.workerRef.current === worker)
+				callbacks.onTerrainPreview(prepared)
+		},
+		onError: (error) => {
+			if (callbacks.workerRef.current !== worker) return
+			callbacks.onTerrainPreview(null)
+			console.error("Geometry preparation failed", error)
+			progress.stop()
+			callbacks.onHistoryStopped(false)
+			callbacks.setGenerationLabel(failLabel)
+			callbacks.setGenerating(false)
+			worker.terminate()
+			callbacks.workerRef.current = null
+		},
+	})
+	geometryPreparations.set(worker, geometry)
+
+	worker.onmessage = async (event: MessageEvent<GenesisWorkerResponse>) => {
 		if (callbacks.workerRef.current !== worker) return
 		const message = event.data
 		if (callbacks.workerRef.current !== worker) return
+		if (message.type === "terrain-ready") {
+			geometry.start(message.terrain)
+			return
+		}
 		if (message.type === "distribution-progress") {
 			callbacks.onDistributionBatch(message.batch)
 			return
@@ -141,11 +178,28 @@ function createWorker({
 			return
 		}
 		if (message.type === "done") {
+			geometry.start(message.world)
+			const waitStartedAt = performance.now()
+			const prepared = await geometry.result
+			if (!prepared || callbacks.workerRef.current !== worker) return
+			message.world.precomputedTerrainGeometry = prepared.terrain
+			message.world.precomputedMapGeometry = prepared.map
+			message.world.timings ??= []
+
+			TIMING.append({
+				stage: "Geometry wait",
+				timings: message.world.timings,
+				ms: performance.now() - waitStartedAt,
+				children: [],
+			})
+			geometryPreparations.delete(worker)
 			progress.complete(message.world.timings ?? [])
 			onDone(message)
 			return
 		}
 		if (message.type === "error") {
+			geometry.cancel()
+			callbacks.onTerrainPreview(null)
 			progress.stop()
 			console.error("Genesis worker failed", message.message, message.stack)
 			callbacks.onHistoryStopped(false)
@@ -172,6 +226,8 @@ function createWorker({
 	}
 
 	worker.onerror = (event: ErrorEvent) => {
+		geometry.cancel()
+		callbacks.onTerrainPreview(null)
 		progress.stop()
 		const detail =
 			event.message ||

@@ -1,4 +1,5 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+
 import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import type {
 	GenesisObservedCurrent,
@@ -41,6 +42,22 @@ import type {
 	GenesisProvinces,
 	SocietyEra,
 } from "@/model/society/types"
+
+export type TerrainSnapshot = {
+	mesh: Pick<
+		SphereMesh,
+		| "numRegions"
+		| "numTriangles"
+		| "numSides"
+		| "s_begin_r"
+		| "s_inner_t"
+		| "s_outer_t"
+		| "r_xyz"
+		| "t_xyz"
+	>
+	elevation: Float32Array
+	elevation_km: Float32Array
+}
 
 export type ClimateModel = "v1" | "v2"
 

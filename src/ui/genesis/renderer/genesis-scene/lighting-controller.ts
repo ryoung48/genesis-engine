@@ -121,7 +121,8 @@ export function createLightingController(
 
 	function syncMapLighting() {
 		if (!ctx.mapMesh) return
-		const mat = ctx.mapMesh.material as THREE.ShaderMaterial
+		const mat = ctx.mapMesh.material
+		if (!(mat instanceof THREE.ShaderMaterial)) return
 		const invPi = 1 / Math.PI
 		mat.uniforms.uAmbient.value.set(
 			ctx.ambient.color.r * ctx.ambient.intensity * invPi,

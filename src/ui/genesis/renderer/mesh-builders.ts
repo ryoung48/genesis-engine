@@ -1,6 +1,7 @@
 ﻿import * as THREE from "three"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { CONTOURS } from "@/ui/genesis/renderer/contours"
+import { CONTOUR_WORKER } from "@/ui/genesis/renderer/contours/worker"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
 	createPlaceholderSatelliteTexture,
@@ -13,6 +14,7 @@ import {
 	TERRAIN_ELEVATION_SCALE,
 	type TerrainGeometryArrays,
 } from "@/ui/genesis/renderer/terrain-geometry"
+import { TRIANGLE_VALUES } from "@/ui/genesis/renderer/triangle-values"
 import type {
 	BuildMapWireframeParams,
 	GenesisViewMode,
@@ -48,7 +50,7 @@ export function buildTerrainMesh(
 		positions,
 		normals,
 		colors,
-		contourControls,
+		contourSides,
 		faceToRegion,
 	}: TerrainGeometryArrays =
 		precomputed && elevationVisible && !usesSmoothedHeightmapColors(colorMode)
@@ -64,7 +66,12 @@ export function buildTerrainMesh(
 	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 	geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3))
 	geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-	CONTOURS.addAttributes({ geometry, controls: contourControls })
+	CONTOUR_WORKER.prepare({
+		world,
+		geometry,
+		sides: contourSides,
+		mapOrder: false,
+	})
 	geometry.setAttribute(
 		"occColor",
 		new THREE.BufferAttribute(new Float32Array(faceToRegion.length * 9), 3),
@@ -211,7 +218,7 @@ export function buildMapMesh(
 		positions,
 		colors,
 		lonLat,
-		contourControls,
+		contourSides,
 		faceToRegion,
 	}: MapGeometryArrays =
 		precomputed && centerLongitudeDeg === 0 && projectionLatitudeDeg === 0
@@ -231,7 +238,12 @@ export function buildMapMesh(
 	const geometry = new THREE.BufferGeometry()
 	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 	geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-	CONTOURS.addAttributes({ geometry, controls: contourControls })
+	CONTOUR_WORKER.prepare({
+		world,
+		geometry,
+		sides: contourSides,
+		mapOrder: true,
+	})
 	geometry.setAttribute("lonLat", new THREE.BufferAttribute(lonLat, 2))
 
 	const vertexCount = faceToRegion.length * 3
@@ -498,16 +510,11 @@ export function applyTerrainColorModeColors(
 	if (!(colorArray instanceof Float32Array)) return false
 
 	const { mesh, elevation_km } = world
-	const { numSides, numTriangles, s_begin_r, s_inner_t, s_outer_t } = mesh
-	const triangleElevationKm = new Float32Array(numTriangles)
-	for (let triangle = 0; triangle < numTriangles; triangle++) {
-		const sideOffset = 3 * triangle
-		const a = s_begin_r[sideOffset]
-		const b = s_begin_r[sideOffset + 1]
-		const c = s_begin_r[sideOffset + 2]
-		triangleElevationKm[triangle] =
-			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
-	}
+	const { numSides, s_begin_r, s_inner_t, s_outer_t } = mesh
+	const triangleElevationKm = TRIANGLE_VALUES.average({
+		mesh,
+		values: elevation_km,
+	})
 
 	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 	let faceCount = 0
@@ -559,28 +566,15 @@ export function applyMapColorModeColors(
 	if (!(colorArray instanceof Float32Array)) return false
 
 	const { mesh, elevation_km } = world
-	const {
-		numSides,
-		numTriangles,
-		s_begin_r,
-		s_inner_t,
-		s_outer_t,
-		r_xyz,
-		t_xyz,
-	} = mesh
+	const { numSides, s_begin_r, s_inner_t, s_outer_t, r_xyz, t_xyz } = mesh
 	const projection = createMapProjection(
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
 	)
-	const triangleElevationKm = new Float32Array(numTriangles)
-	for (let triangle = 0; triangle < numTriangles; triangle++) {
-		const sideOffset = 3 * triangle
-		const a = s_begin_r[sideOffset]
-		const b = s_begin_r[sideOffset + 1]
-		const c = s_begin_r[sideOffset + 2]
-		triangleElevationKm[triangle] =
-			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
-	}
+	const triangleElevationKm = TRIANGLE_VALUES.average({
+		mesh,
+		values: elevation_km,
+	})
 
 	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 	let faceCount = 0

@@ -124,6 +124,10 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			setGenerationLabel,
 			setSeed,
 			setWorld: handleSetWorld,
+			onTerrainPreview: (geometry) => {
+				if (geometry) sceneRef.current?.showTerrainPreview(geometry)
+				else sceneRef.current?.updateWorld(null)
+			},
 			workerRef,
 			onHistoryStart: startProceduralJournal,
 			onHistoryJournal: recordProceduralJournal,

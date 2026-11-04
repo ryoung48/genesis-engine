@@ -1,5 +1,6 @@
 import { expect, it } from "vitest"
 import { LOCAL_WEATHER } from "@/model/climate/weather/local"
+import { WEATHER_AGGREGATION } from "@/model/climate/weather/local/aggregation"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
 import type { LocalWeatherValues } from "@/model/climate/weather/local/types"
 import { WEATHER_FIXTURE } from "@/test/earth/fixtures/local-weather"
@@ -41,22 +42,24 @@ it("displays the generated phenomenon and cloud category without reclassifying t
 			dateLabel: "",
 		})!
 	expect(metric.conditions).toBe("Clear skies")
+	expect(metric.sky).toBe("Clear · 0%")
 	expect(metric.clouds).toBe("Clear skies")
 	expect(metric.temperature).toBe("Mild · 20.0 °C")
 	expect(imperial.temperature).toBe("Mild · 68.0 °F")
 	expect(metric.wind).toBe("Gentle breeze · W 4.0 m/s")
 	expect(imperial.wind).toBe("Gentle breeze · W 8.9 mph")
 	expect(weather).toEqual(before)
-	weather.values.dominant = "spattering rain"
-	weather.values.conditions = [{ kind: "spattering rain", share: 1 }]
+	weather.values.dominant = "light rain"
+	weather.values.conditions = [{ kind: "light rain", share: 1 }]
 	weather.values.cloudDescription = "altostratus clouds"
+	weather.values.cloudCover = 0.6
 	expect(
 		WEATHER_DISPLAY.present({
 			snapshot: weather,
 			unitSystem: "metric",
 			dateLabel: "",
 		})!.conditions,
-	).toBe("Spattering rain")
+	).toBe("Light rain")
 	expect(
 		WEATHER_DISPLAY.present({
 			snapshot: weather,
@@ -207,4 +210,28 @@ it("matches the NWS heat index and wind chill tables", () => {
 			windSpeedMs: 8,
 		}),
 	).toBe(18)
+})
+it("names a province's clouds from its cloudiest sample when the representative sample is clear", () => {
+	const clear = { ...snapshot().values, rainRateMmH: 0 }
+	const cloudy: LocalWeatherValues = {
+		...clear,
+		dominant: "cloudy",
+		conditions: [{ kind: "cloudy", share: 1 }],
+		cloudCover: 0.8,
+		cloudDescription: "cumulus clouds",
+	}
+	const combined = WEATHER_AGGREGATION.combine({
+		samples: [
+			{ region: 0, weight: 0.6, values: clear },
+			{ region: 1, weight: 0.4, values: cloudy },
+		],
+	})!
+	expect(combined.dominant).toBe("clear skies")
+	expect(combined.cloudCover).toBeCloseTo(0.32, 12)
+	expect(combined.cloudDescription).toBe("cumulus clouds")
+	expect(
+		WEATHER_AGGREGATION.combine({
+			samples: [{ region: 0, weight: 1, values: clear }],
+		})!.cloudDescription,
+	).toBe("clear skies")
 })

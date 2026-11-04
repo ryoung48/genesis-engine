@@ -1,8 +1,10 @@
 import type * as THREE from "three"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+import { CONTOUR_WORKER } from "@/ui/genesis/renderer/contours/worker"
 import { disposeObject3D } from "@/ui/genesis/renderer/disposal"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { DEFAULT_WATER_SPECULAR } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
+import type { PreparedGeometry } from "@/ui/genesis/renderer/geometry-preparation/types"
 import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
 import {
 	applyFaceRegionColors,
@@ -13,6 +15,7 @@ import {
 	buildTerrainMesh,
 } from "@/ui/genesis/renderer/mesh-builders"
 import { getSatelliteStyleTexture } from "@/ui/genesis/renderer/satellite-texture"
+import { TERRAIN_PREVIEW } from "@/ui/genesis/renderer/terrain-preview"
 import type {
 	GenesisHoverInfo,
 	GenesisViewMode,
@@ -211,7 +214,7 @@ export function createTerrainController(
 		const mapMaterial = ctx.mapMesh?.material as
 			| THREE.ShaderMaterial
 			| undefined
-		if (mapMaterial?.uniforms.uSatelliteDetail) {
+		if (mapMaterial?.uniforms?.uSatelliteDetail) {
 			mapMaterial.uniforms.uSatelliteDetail.value = enabled ? 1 : 0
 			if (texture) mapMaterial.uniforms.uSatelliteMap.value = texture
 		}
@@ -232,9 +235,23 @@ export function createTerrainController(
 		ctx.contoursVisible = visible
 		for (const mesh of [ctx.terrainMesh, ctx.mapMesh]) {
 			if (!mesh) continue
-			const material = mesh.material as THREE.Material
-			material.userData.contourVisibility.value = visible ? 1 : 0
+			CONTOUR_WORKER.setVisible({
+				mesh,
+				visible,
+				requestRender: deps.requestRender,
+			})
 		}
+		deps.requestRender()
+	}
+
+	function showTerrainPreview(prepared: PreparedGeometry) {
+		updateWorld(null)
+		const preview = TERRAIN_PREVIEW.create(prepared)
+		ctx.terrainMesh = preview.globe
+		ctx.mapMesh = preview.map
+		ctx.globeGroup.add(preview.globe)
+		ctx.scene.add(preview.map)
+		deps.setViewMode(ctx.currentViewMode)
 		deps.requestRender()
 	}
 
@@ -366,6 +383,7 @@ export function createTerrainController(
 	}
 
 	return {
+		showTerrainPreview,
 		rebuildTerrain,
 		updateWorld,
 		recolorMeshesInPlace,

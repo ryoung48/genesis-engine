@@ -3,6 +3,7 @@ import { WeatherHourly } from "@/ui/components/composites/WeatherHourly"
 import { WeatherMonthly } from "@/ui/components/composites/WeatherMonthly"
 import { cx } from "@/ui/components/lib"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
+import { MoonIcon } from "@/ui/components/primitives/icons/MoonIcon"
 import { WeatherIcon } from "@/ui/components/primitives/icons/WeatherIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
@@ -149,10 +150,17 @@ export function WeatherSummary({
 						<div className={styles.sky} aria-label="Sun and moon">
 							{sky.rows.map((row) => (
 								<div key={row.key} className={styles.skyRow}>
-									<WeatherIcon
-										name={row.icon}
-										className={cx(styles.skyIcon, styles.tone[row.tone])}
-									/>
+									{row.moon ? (
+										<MoonIcon
+											{...row.moon}
+											className={cx(styles.skyIcon, styles.tone[row.tone])}
+										/>
+									) : (
+										<WeatherIcon
+											name={row.icon}
+											className={cx(styles.skyIcon, styles.tone[row.tone])}
+										/>
+									)}
 									<div className={styles.skyName}>
 										<span>{row.name}</span>
 										{row.detail && (

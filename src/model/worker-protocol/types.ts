@@ -9,7 +9,11 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
-import type { ClimateModel, GenesisParams } from "@/model/pipelines/types"
+import type {
+	ClimateModel,
+	GenesisParams,
+	TerrainSnapshot,
+} from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
@@ -295,23 +299,17 @@ export interface SerializedGenesisWorld {
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
 	settlementPortRegions?: Int32Array
-	/** Terrain/map geometry for the default display state (colorMode
-	 * "terrain", no region colors, elevation on, map centered at lon/lat 0),
-	 * computed once in genesis.worker.ts so the main thread doesn't have to
-	 * run that per-vertex color/normal-averaging pass synchronously right
-	 * before the first paint after "Generate"/"Load Earth" -- see
-	 * mesh-builders.ts's buildTerrainMesh/buildMapMesh. Any other display
-	 * state (a non-default color mode, region colors, a panned map) is
-	 * computed on the main thread as before. */
+	// [JUSTIFICATION] Geometry is supplied separately by the browser geometry worker.
 	precomputedTerrainGeometry?: {
-		contourControls: Float32Array
+		contourSides: Int32Array
 		positions: Float32Array
 		normals: Float32Array
 		colors: Float32Array
 		faceToRegion: Int32Array
 	}
+	// [JUSTIFICATION] Geometry is supplied separately by the browser geometry worker.
 	precomputedMapGeometry?: {
-		contourControls: Float32Array
+		contourSides: Int32Array
 		positions: Float32Array
 		colors: Float32Array
 		lonLat: Float32Array
@@ -492,6 +490,10 @@ export type GenesisWorkerResponse =
 			stage: string
 			label: string
 			pct?: number
+	  }
+	| {
+			type: "terrain-ready"
+			terrain: TerrainSnapshot
 	  }
 	| {
 			type: "done"

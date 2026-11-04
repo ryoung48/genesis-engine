@@ -11,7 +11,34 @@ import type {
 	SampleWeatherRegionParams,
 	WeatherTriggerTrace,
 } from "@/model/climate/weather/local/types"
+import type { WeatherPhenomenon } from "@/model/climate/weather/local/vocabulary/types"
 
+const RAIN_EXTINCTION_EXPONENT = 0.6
+const RAIN_EXTINCTION_COEFFICIENT = 0.025
+const OUTFLOW_BASE_MS = 10
+const OUTFLOW_SPAN_MS = 10
+const OUTFLOW_AFTERNOON_MS = 10
+const OUTFLOW_HAIL_MS = 5
+const OUTFLOW_SEVERE_MS = 5
+const HURRICANE_MS = 32.9
+const LIMITS = WEATHER_DECISION.limits()
+const CONVECTIVE: WeatherPhenomenon[] = [
+	"thunderstorm",
+	"hail",
+	"tornado",
+	"thundersnow",
+]
+const TORNADO_GUST_MS = 29
+const TORNADO_GUST_SPAN_MS = 20
+const FROZEN: WeatherPhenomenon[] = [
+	"light snow",
+	"moderate snow",
+	"heavy snow",
+	"snow showers",
+	"heavy snow showers",
+	"thundersnow",
+	"blizzard",
+]
 function sampleRaw(
 	input: SampleWeatherRegionParams,
 ): LocalWeatherValues | null {
@@ -31,55 +58,92 @@ function sampleRaw(
 		clearSurfaceC: atmosphere.clearSurfaceC,
 		windSpeedMs: atmosphere.windSpeedMs,
 		gustMs: atmosphere.gustMs,
-		afternoon: atmosphere.afternoon,
 		daylight: atmosphere.solar.daylight,
 		particleSource: input.baseline.particleSource,
 		aridity: input.baseline.aridity,
+		convectiveBias: atmosphere.convectiveBias,
+		land: input.baseline.isLand,
+		stormTrack: atmosphere.stormTrack,
+		severeRisk: input.baseline.tornadoRisk,
+		pressureTendencyHpa: atmosphere.pressureTendencyHpa,
 	})
-	const result = WEATHER_DECISION.resolve({
+	const cyclone = atmosphere.cyclone > 0
+	const decision = WEATHER_DECISION.resolve({
 		choices,
 		draws: {
-			branch: atmosphere.branchDraw,
+			branch: cyclone ? 0 : atmosphere.branchDraw,
 			event: atmosphere.eventDraw,
-			precipitation: atmosphere.precipitationDraw,
+			layer: atmosphere.layerDraw,
+			precipitation: cyclone
+				? atmosphere.precipitationDraw * choices.acceptance
+				: atmosphere.precipitationDraw,
 		},
 	})
-	const frozen = [
-		"dusting",
-		"tiny flakes",
-		"ice crystals",
-		"snow flurry",
-		"snowfall",
-		"blizzard",
-	].includes(result.kind)
+	const result = cyclone
+		? {
+				...decision,
+				system: "stormy" as const,
+				kind: (atmosphere.windSpeedMs >= HURRICANE_MS
+					? "hurricane"
+					: "tropical storm") as WeatherPhenomenon,
+			}
+		: decision
+	const gustMs = CONVECTIVE.includes(result.kind)
+		? Math.max(
+				atmosphere.gustMs,
+				OUTFLOW_BASE_MS +
+					OUTFLOW_SPAN_MS * atmosphere.gustDraw +
+					OUTFLOW_AFTERNOON_MS * Math.max(0, atmosphere.convectiveBias) +
+					(result.kind === "hail" ? OUTFLOW_HAIL_MS : 0) +
+					OUTFLOW_SEVERE_MS * input.baseline.tornadoRisk,
+				result.kind === "tornado"
+					? TORNADO_GUST_MS + TORNADO_GUST_SPAN_MS * atmosphere.gustDraw
+					: 0,
+			)
+		: atmosphere.gustMs
+	const frozen = FROZEN.includes(result.kind)
 	const precipitation =
 		result.rainRateMmH === 0
 			? { liquid: 0, snow: 0, ice: 0 }
-			: result.kind === "sleet"
-				? { liquid: 0.5, snow: 0, ice: 0.5 }
-				: frozen
-					? { liquid: 0, snow: 1, ice: 0 }
-					: { liquid: 1, snow: 0, ice: 0 }
+			: result.kind === "rain and snow"
+				? { liquid: 0.5, snow: 0.5, ice: 0 }
+				: result.kind === "hail"
+					? { liquid: 0, snow: 0, ice: 1 }
+					: frozen
+						? { liquid: 0, snow: 1, ice: 0 }
+						: { liquid: 1, snow: 0, ice: 0 }
 	const extinction =
 		(result.rainRateMmH * precipitation.snow) / 2.5 +
 		((precipitation.snow > 0 || result.kind === "blizzard") &&
-		atmosphere.gustMs >= 15.6
-			? (atmosphere.gustMs / 15.6) ** 2
+		gustMs >= LIMITS.blizzardGustMs
+			? (gustMs / LIMITS.blizzardGustMs) ** 2
 			: 0)
-	let visibilityM = Math.max(50, 10000 / (1 + 24 * extinction))
-	if (result.kind === "fog" || result.kind === "ice fog")
+	const rainExtinction =
+		(result.rainRateMmH * precipitation.liquid) ** RAIN_EXTINCTION_EXPONENT *
+		RAIN_EXTINCTION_COEFFICIENT
+	let visibilityM = Math.max(
+		50,
+		10000 / (1 + 24 * (extinction + rainExtinction)),
+	)
+	if (
+		result.kind === "fog" ||
+		result.kind === "freezing fog" ||
+		result.kind === "ice fog"
+	)
 		visibilityM = Math.min(visibilityM, 100)
-	else if (result.kind === "mist" || result.kind === "thin mist")
-		visibilityM = Math.min(visibilityM, 2000)
-	else if (result.cloud === "haze") visibilityM = Math.min(visibilityM, 5000)
+	else if (result.kind === "mist") visibilityM = Math.min(visibilityM, 2000)
+	else if (result.kind === "haze") visibilityM = Math.min(visibilityM, 5000)
 	else if (result.kind === "sand storm" || result.kind === "dust storm")
 		visibilityM = Math.min(visibilityM, 300)
+	else if (result.kind === "blowing sand" || result.kind === "blowing dust")
+		visibilityM = Math.min(visibilityM, 5000)
 	const clouds = WEATHER_CLOUDS.fromCategory({
 		category: result.cloud,
 		cover: result.cloudCover,
 		phenomenon: result.kind,
 	})
 	return {
+		regime: result.regime,
 		system: result.system,
 		particleSource: input.baseline.particleSource,
 		cloudDescription: result.cloudCover === null ? null : result.cloud,
@@ -100,7 +164,8 @@ function sampleRaw(
 				: ((Math.atan2(-atmosphere.windU, -atmosphere.windV) * 180) / Math.PI +
 						360) %
 					360,
-		gustMs: atmosphere.gustMs,
+		gustMs,
+		pressureTendencyHpa: atmosphere.pressureTendencyHpa,
 		cloudCover: result.cloudCover,
 		clouds: clouds.clouds,
 		conditions: [{ kind: result.kind, share: 1 }],
@@ -116,7 +181,9 @@ function evaluate({
 	const values = sampleRaw(weather)
 	if (!values) return null
 	if (values.dominant === "blizzard") {
-		let persistent = values.gustMs >= 15.6 && values.visibilityM < 400
+		let persistent =
+			values.gustMs >= LIMITS.blizzardGustMs &&
+			values.visibilityM < LIMITS.blizzardVisibilityM
 		for (let hours = 1; persistent && hours <= 3; hours++) {
 			const previous = sampleRaw({
 				...weather,
@@ -128,12 +195,16 @@ function evaluate({
 			persistent =
 				previous !== null &&
 				previous.dominant === "blizzard" &&
-				previous.gustMs >= 15.6 &&
-				previous.visibilityM < 400
+				previous.gustMs >= LIMITS.blizzardGustMs &&
+				previous.visibilityM < LIMITS.blizzardVisibilityM
 		}
 		if (!persistent) {
-			values.dominant = "snowfall"
-			values.conditions = [{ kind: "snowfall", share: 1 }]
+			values.dominant = WEATHER_DECISION.band({
+				kind: "light snow",
+				rateMmH: values.rainRateMmH,
+				stratiform: false,
+			})
+			values.conditions = [{ kind: values.dominant, share: 1 }]
 		}
 	}
 	if (trace)
@@ -159,14 +230,15 @@ function evaluate({
 					name: "clearSkyAgreement",
 					passed:
 						values.dominant !== "clear skies" ||
-						values.cloudDescription === null ||
-						values.cloudDescription === "clear skies",
+						values.cloudCover === null ||
+						values.cloudCover <= 0.25,
 				},
 				{
 					name: "blizzardWindAndVisibility",
 					passed:
 						values.dominant !== "blizzard" ||
-						(values.gustMs >= 15.6 && values.visibilityM < 400),
+						(values.gustMs >= LIMITS.blizzardGustMs &&
+							values.visibilityM < LIMITS.blizzardVisibilityM),
 				},
 			],
 		})

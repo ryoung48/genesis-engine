@@ -6,6 +6,7 @@ import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { LOCAL_WEATHER } from "@/model/climate/weather/local"
 import { WEATHER_BASELINE } from "@/model/climate/weather/local/baseline"
 import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
+import { WEATHER_DECISION } from "@/model/climate/weather/local/decision"
 import type { WeatherReportCondition as WeatherCondition } from "@/model/climate/weather/local/description/types"
 import type { WeatherContext } from "@/model/climate/weather/local/types"
 import { HASH } from "@/model/shared/random/hash"
@@ -13,9 +14,11 @@ import { CLIMATE_EARTH } from "@/test/earth/fixtures/climate-earth"
 import { WEATHER_DISTRIBUTIONS } from "@/test/earth/weather-distributions"
 import { WEATHER_DISTRIBUTION_PRESENTATION } from "@/test/earth/weather-distributions/presentation"
 import type { WeatherEventExposure } from "@/test/earth/weather-distributions/types"
+import { WORLD_CACHE } from "@/test/history-run/world-cache"
+import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
 it(
-	"reports ten synthetic years on 64 stratified Earth sites",
+	"reports ten synthetic years on 64 stratified land sites",
 	{ timeout: 1_800_000 },
 	() => {
 		const started = new Date()
@@ -25,7 +28,19 @@ it(
 			`${started.toISOString().replaceAll(":", "-").replace(".", "-")}-province-local-weather`,
 		)
 		fs.mkdirSync(directory, { recursive: true })
-		const world = CLIMATE_EARTH.importWorld()
+		const worldKind =
+			process.env.WEATHER_WORLD === "earth" ? "earth" : "procedural"
+		const world =
+			worldKind === "earth"
+				? CLIMATE_EARTH.importWorld()
+				: WORLD_CACHE.generate({
+						params: {
+							...DEFAULT_WORLD_PARAMS,
+							seed: 14963991,
+							numPoints: Number(process.env.WEATHER_POINTS ?? 204000),
+							tideLock: null,
+						},
+					})
 		const strata = new Map<string, number[]>()
 		for (let r = 0; r < world.mesh.numRegions; r++) {
 			if (!world.isLand[r]) continue
@@ -298,7 +313,8 @@ it(
 					site.stormCloudMismatches++
 				if (
 					value.conditions.some((c) => c.kind === "blizzard") &&
-					(value.gustMs < 15.6 || value.visibilityM >= 400)
+					(value.gustMs < WEATHER_DECISION.limits().blizzardGustMs ||
+						value.visibilityM >= WEATHER_DECISION.limits().blizzardVisibilityM)
 				)
 					site.blizzardViolations++
 				for (const cloud of value.clouds ?? [])
@@ -525,10 +541,11 @@ it(
 			),
 		}
 		const report = {
-			model: "original-tree-constrained-v5",
+			model: "original-tree-constrained-v6",
 			distributions: distributionReport,
 			comparison,
 			configuration: {
+				world: worldKind,
 				seed: 14963991,
 				regions: world.mesh.numRegions,
 				years: 10,

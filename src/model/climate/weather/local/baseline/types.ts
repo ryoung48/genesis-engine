@@ -16,6 +16,8 @@ export interface WeatherBaseline {
 	cloud: Float32Array | null
 	isLand: boolean
 	aridity: number
+	cycloneRisk: number
+	tornadoRisk: number
 	bare: boolean
 	valid: boolean
 }
@@ -34,6 +36,8 @@ export interface BuildWeatherBaselineParams {
 		| "vegetation"
 		| "topography"
 		| "isLand"
+		| "cycloneRisk"
+		| "tornadoRisk"
 	>
 	location: ProvinceSampleLocation
 	yearSeconds: number

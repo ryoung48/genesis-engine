@@ -2,7 +2,10 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WeatherOutlook } from "@/model/climate/weather/local/outlook/types"
 import type { SkyCycle } from "@/model/climate/weather/local/sky/types"
 import type { WeatherSnapshot } from "@/model/climate/weather/local/types"
-import type { WeatherIconName } from "@/ui/components/primitives/icons/types"
+import type {
+	MoonIconPhase,
+	WeatherIconName,
+} from "@/ui/components/primitives/icons/types"
 import type { uiTokens } from "@/ui/components/tokens"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
@@ -45,10 +48,13 @@ export interface PresentHourlyParams {
 export interface WeatherHourCell {
 	key: number
 	label: string
+	conditions: string
 	icon: WeatherIconName
 	tone: WeatherTone
 	temperatureC: number
 	temperature: string
+	windSpeed: string
+	windSpeedMs: number
 	precipitationMmH: number
 	precipitation: string
 	precipitationTone: WeatherTone
@@ -56,6 +62,7 @@ export interface WeatherHourCell {
 
 export interface WeatherHourlyDisplay {
 	cells: WeatherHourCell[]
+	windUnit: string
 	precipitationUnit: string
 }
 
@@ -75,6 +82,19 @@ export interface WeatherMonthlySeries {
 
 export interface WeatherHourlyProps {
 	display: WeatherHourlyDisplay
+}
+
+export interface WeatherHourlyBar {
+	key: number
+	value: number
+	label: string
+	tooltip: string
+	tone: WeatherTone
+}
+
+export interface WeatherHourlyBarsProps {
+	items: WeatherHourlyBar[]
+	minimumScale: number
 }
 
 export interface WeatherMonthlyProps {
@@ -98,6 +118,7 @@ export interface WeatherSkyRow {
 	name: string
 	detail: string | null
 	icon: WeatherIconName
+	moon: MoonIconPhase | null
 	tone: WeatherTone
 	items: WeatherSkyItem[]
 }
