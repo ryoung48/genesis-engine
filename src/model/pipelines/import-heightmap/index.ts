@@ -693,6 +693,8 @@ function importGenesisWorld({
 		iceThickness: post.iceThickness,
 		iceMinMonthly: post.iceMinMonthly,
 		iceMaxMonthly: post.iceMaxMonthly,
+		tidalRange: post.tidalRange,
+		tidalSchedule: post.tidalSchedule,
 		hydrology: post.hydrology,
 		rivers: post.rivers,
 		isLand,

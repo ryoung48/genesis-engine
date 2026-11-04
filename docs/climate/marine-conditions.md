@@ -12,6 +12,24 @@ Ocean-facing provinces carry a tide and a wave reading in the province weather c
 
 Moons are validated once by `TIDAL_CONTRIBUTORS.prepare` (`src/model/climate/ocean/tides/tidal-schedule/contributors`): periods are clamped between 1.5× the Roche limit and half the Hill sphere, eccentricity is capped below the Roche periapsis, and moons with no stable orbit are dropped. Preparation is idempotent. The stellar mass comes from `TIDAL_CONTRIBUTORS.starMassKg`, which falls back to the default spectral class for non-main-sequence stars.
 
+### Strait damping
+
+Nearly enclosed seas such as the Mediterranean, the Sea of Japan and the Gulf of Mexico have small tides because a narrow strait chokes the ocean tide. `TIDAL_STRAITS.damping` (`tidal-map/straits`) scales coastal ranges after the tier assignment, before the ranges spread offshore:
+
+1. **Width:** each open-water cell's distance to the nearest land or lake cell, in km.
+2. **Bottleneck:** a widest-path search from the widest cell of each ocean landmark. A cell's bottleneck is the largest narrowest-width over all water routes from there.
+3. **Basin:** each water cell climbs the width field to its local maximum, the basin's interior.
+4. **Factor:** `min(1, (ratio / 0.5)²)` with `ratio = bottleneck / interior width` at that maximum, floored at 0.1. A basin whose bottleneck half-width is at least 450 km is open (factor 1). A coastal cell takes the largest factor among its open-water neighbours.
+
+Isolated sea landmarks have no ocean connection and take the floor. Damping is skipped when the world has no landmarks.
+
+The constants:
+- **450 km half-width:** the deep-ocean semidiurnal wavelength is about √(g × 4000 m) × 12.42 h ≈ 8,900 km, and openings wider than about a tenth of that do not choke the tide.
+- **0.1 floor:** typical Mediterranean spring ranges (≈ 0.3 m) against Atlantic European coasts (≈ 3 m).
+- **Squared ratio:** calibrated on the Earth heightmap import at 204,000 points. Median coastal factors there are Mediterranean 0.10, Red Sea 0.14, Gulf of Mexico 0.21, Sea of Japan 0.29, and 1 on Atlantic Europe, Pacific Japan and the Bay of Fundy.
+
+Resonance is not modelled, so resonant basins behind narrow mouths, like Hudson Bay or the Persian Gulf, come out too small.
+
 `tidalRange` feeds the coastal marsh bonus in terrain classification (`tidalRange × 0.2`), so moons change the history start state. `pnpm report:history` records `diagnostics.terrain.marshShare` (marsh share of land regions) and `diagnostics.terrain.tidalMaxForce`.
 
 **Limitation:** in gas-giant-moon mode the parent giant is not a tide contributor; only the sibling moons are.
@@ -48,4 +66,4 @@ The weather worker builds one extra `WEATHER_BASELINE` per ocean-facing province
 
 ## Limitations
 
-Tides ignore basin resonance, amphidromic geometry, moon eccentricity and inclination, and the display uses mean circular orbits while generation samples Keplerian ones. Spring/neap thresholds are Earth-like heuristics. Waves are local wind sea only.
+Tides ignore basin resonance (strait damping only reduces ranges), amphidromic geometry, moon eccentricity and inclination, and the display uses mean circular orbits while generation samples Keplerian ones. Spring/neap thresholds are Earth-like heuristics. Waves are local wind sea only.

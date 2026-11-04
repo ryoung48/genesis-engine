@@ -1,3 +1,4 @@
+import { TIDAL_STRAITS } from "@/model/climate/ocean/tides/tidal-map/straits"
 import type { ComputeSpringTideMapInput } from "@/model/climate/ocean/tides/tidal-map/types"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { RNG } from "@/model/shared/random/rng"
@@ -86,6 +87,21 @@ function computeSpringTideMap({
 			} else {
 				result[r] = rng() * MESO_THRESHOLD_M
 			}
+		}
+	}
+
+	if (landmarks) {
+		const damping = TIDAL_STRAITS.damping({
+			mesh,
+			isOcean,
+			landmarks,
+			planetRadiusKm,
+		})
+		for (const r of coastalIndices) {
+			let factor = 0
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++)
+				if (isOcean(adjList[j])) factor = Math.max(factor, damping[adjList[j]])
+			result[r] *= factor
 		}
 	}
 
