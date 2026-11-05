@@ -341,6 +341,8 @@ export interface HistoryState {
 	uninhabited: Uint8Array
 	// Calendar year each province is first settled; the sentinel when never.
 	settledYear: Int32Array
+	// Year routine voyages first reach each province from the origin; the migration start when absent.
+	contactYear: Int32Array
 	land: LandRuntime
 	waterAccess: Uint8Array
 	regionProvince: Int32Array

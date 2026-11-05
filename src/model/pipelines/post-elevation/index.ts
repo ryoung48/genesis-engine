@@ -909,6 +909,11 @@ function runPostElevationPipeline(
 					suitability: migration.suitability,
 					settled: settledAtStart,
 					siteScore,
+					heldWeight: Float32Array.from(migration.contactYear, (year, p) =>
+						settledAtStart[p]
+							? TARGET_PROFILE.contactShare({ years: startYear - year })
+							: 0,
+					),
 					activeCradles: MIGRATION.activeCradles({ cradles, year: startYear }),
 					fallbackSource: migration.origin,
 					count: Math.round(profile.stateHeld * settledCount),
@@ -950,6 +955,7 @@ function runPostElevationPipeline(
 	population.migrationWave = migrationWave
 	if (historyMigration.pipeline !== "distribution") {
 		population.arrivalYear = migration.arrivalYear
+		population.contactYear = migration.contactYear
 		population.predecessor = migration.predecessor
 		population.settlementOrder = migration.order
 		population.cradles = cradles ?? undefined

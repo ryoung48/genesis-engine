@@ -251,6 +251,8 @@ export interface SerializedGenesisWorld {
 		// [JUSTIFICATION] Present exactly when arrivalYear is.
 		settlementOrder?: Int32Array
 		// [JUSTIFICATION] Present exactly when arrivalYear is.
+		contactYear?: Int32Array
+		// [JUSTIFICATION] Present exactly when arrivalYear is.
 		cradles?: CradleChoice[]
 		// [JUSTIFICATION] Present exactly when arrivalYear is.
 		migrationDiagnostics?: MigrationDiagnostics

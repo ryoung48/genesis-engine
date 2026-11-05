@@ -10,6 +10,7 @@ import type {
 } from "@/model/history/sim/engine/events/statehood/types"
 import { LAND_SHARES } from "@/model/history/sim/engine/land-shares"
 import { STATE } from "@/model/history/sim/engine/state"
+import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import { UNITS } from "@/model/shared/units"
 
 const STRETCH_PENALTY = 3
@@ -54,8 +55,12 @@ function claimOptions({
 	members,
 }: ClaimOptionsParams): ClaimOption[] {
 	DERIVE.ensureHierarchyClean(state)
+	const year = state.time / STATE.yearMs
 	const options: ClaimOption[] = []
 	for (const province of frontier) {
+		const contact = TARGET_PROFILE.contactShare({
+			years: year - state.contactYear[province],
+		})
 		const enclosure = new Map<number, number>()
 		for (
 			let j = state.provinceAdjOffset[province];
@@ -72,6 +77,7 @@ function claimOptions({
 				nation,
 				province,
 				weight:
+					contact *
 					count ** 2 *
 					Math.exp(
 						-STRETCH_PENALTY *

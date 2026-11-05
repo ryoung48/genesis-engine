@@ -34,11 +34,13 @@ export interface LandmassStatus {
 	heldShare: number
 	shareOfHeld: number
 	cradles: number
+	contactYear: number
 }
 
 export interface LandmassContext {
 	landmassId: Int32Array
 	cradleProvinces: number[]
+	contactYear: Int32Array
 }
 
 export interface LandmassBreakdownParams {

@@ -7,12 +7,14 @@ import type { SeaLink } from "@/model/society/migration/sea-links/types"
 import type {
 	ActiveCradlesParams,
 	AddNearestParams,
+	ApportionParams,
 	BestSpacedParams,
 	CapabilityParams,
 	CoreSeedsParams,
 	CradleChoice,
 	CradleSpacingParams,
 	CradlesParams,
+	GrowHeldParams,
 	HeldCoreParams,
 	HorizonParams,
 	IndexLinksParams,
@@ -324,6 +326,7 @@ function compute({
 	const predecessor = new Int32Array(p.count).fill(-1)
 	const edgeKind = new Uint8Array(p.count)
 	const arrivalTier = new Uint8Array(p.count)
+	const contact = new Float64Array(p.count).fill(Infinity)
 	let landEdges = 0
 	for (let i = 0; i < p.count; i++)
 		if (active[i])
@@ -332,6 +335,7 @@ function compute({
 	if (origin >= 0) {
 		const heap = new PriorityHeap<number>()
 		continuousArrival[origin] = START_YEAR
+		contact[origin] = START_YEAR
 		heap.push(START_YEAR, origin)
 		while (heap.size) {
 			const entry = heap.pop()!
@@ -355,11 +359,18 @@ function compute({
 				if (arrival >= continuousArrival[q]) return
 				continuousArrival[q] = arrival
 				predecessor[q] = source
-				arrivalTier[q] =
+				const overland =
 					edge.kind === "land" ||
 					(edge.kind === "shelf" && entry.key < SHELF_CLOSES_YEAR)
-						? arrivalTier[source]
-						: seaTier({ distanceKm: edge.distanceKm })
+				arrivalTier[q] = overland
+					? arrivalTier[source]
+					: seaTier({ distanceKm: edge.distanceKm })
+				contact[q] = overland
+					? contact[source]
+					: Math.max(
+							contact[source],
+							seaCapabilityYear({ distanceKm: edge.distanceKm }),
+						)
 				edgeKind[q] = EDGE_KIND_CODE[edge.kind]
 				heap.push(arrival, q)
 			}
@@ -389,6 +400,11 @@ function compute({
 	const nominalSpacingKm = Math.sqrt(
 		(4 * Math.PI * planetRadiusKm ** 2) / Math.max(1, mesh.numRegions),
 	)
+	const reached = horizon({
+		continuousArrival,
+		desolate: p.desolate,
+		horizonYear,
+	})
 	return {
 		origin,
 		continuousArrival,
@@ -398,7 +414,10 @@ function compute({
 		arrivalTier,
 		suitability,
 		componentId: components.componentId,
-		...horizon({ continuousArrival, desolate: p.desolate, horizonYear }),
+		...reached,
+		contactYear: Int32Array.from(reached.arrivalYear, (year, i) =>
+			year === SENTINEL ? SENTINEL : Math.ceil(contact[i]),
+		),
 		diagnostics: {
 			seaEdges: open.links.length,
 			shelfEdges: shelf.links.length,
@@ -547,48 +566,68 @@ function coreSeeds({
 	}
 }
 
-function heldCore({
+function apportion({ weights, count }: ApportionParams): Int32Array {
+	const sum = weights.reduce((total, weight) => total + weight, 0)
+	const budgets = new Int32Array(weights.length)
+	if (sum <= 0) return budgets
+	const remainders = weights.map((weight, i) => {
+		const exact = (count * weight) / sum
+		budgets[i] = Math.floor(exact)
+		return { i, rest: exact - budgets[i] }
+	})
+	let left = count - budgets.reduce((total, budget) => total + budget, 0)
+	remainders.sort((x, y) => y.rest - x.rest || x.i - y.i)
+	for (const { i } of remainders) {
+		if (left <= 0) break
+		budgets[i]++
+		left--
+	}
+	return budgets
+}
+
+function growHeld({
 	provinces,
 	suitability,
 	settled,
-	siteScore,
-	activeCradles,
-	fallbackSource,
+	mask,
+	sources,
+	budgets,
 	count,
 	r_xyz,
 	planetRadiusKm,
-}: HeldCoreParams): Uint8Array {
-	const seeds = coreSeeds({
-		provinces,
-		settled,
-		siteScore,
-		activeCradles,
-		r_xyz,
-		planetRadiusKm,
-	})
-	const sources = seeds.length ? seeds : [fallbackSource]
-	const mask = new Uint8Array(provinces.count)
+}: GrowHeldParams): void {
 	const cost = new Float64Array(provinces.count).fill(Infinity)
+	const expanded = new Uint8Array(provinces.count)
+	const used = new Int32Array(budgets.length)
+	const full = (province: number) =>
+		budgets.length > 0 &&
+		used[provinces.landmassId[province]] >=
+			budgets[provinces.landmassId[province]]
 	const heap = new PriorityHeap<number>()
+	let taken = mask.reduce((total, held) => total + held, 0)
 	for (const source of sources)
 		if (settled[source] && cost[source] > 0) {
 			cost[source] = 0
 			heap.push(0, source)
 		}
-	let taken = 0
 	while (heap.size && taken < count) {
 		const entry = heap.pop()!
 		const province = entry.value
-		if (entry.key !== cost[province] || mask[province]) continue
-		mask[province] = 1
-		taken++
+		if (entry.key !== cost[province] || expanded[province]) continue
+		if (!mask[province]) {
+			if (full(province)) continue
+			mask[province] = 1
+			taken++
+			if (budgets.length) used[provinces.landmassId[province]]++
+		}
+		expanded[province] = 1
 		for (
 			let j = provinces.adjOffset[province];
 			j < provinces.adjOffset[province + 1];
 			j++
 		) {
 			const neighbor = provinces.adjList[j]
-			if (!settled[neighbor] || mask[neighbor]) continue
+			if (!settled[neighbor] || mask[neighbor] || full(neighbor)) continue
 			const next =
 				entry.key +
 				UNITS.regionDistanceKm({
@@ -604,6 +643,56 @@ function heldCore({
 			}
 		}
 	}
+}
+
+function heldCore({
+	provinces,
+	suitability,
+	settled,
+	siteScore,
+	heldWeight,
+	activeCradles,
+	fallbackSource,
+	count,
+	r_xyz,
+	planetRadiusKm,
+}: HeldCoreParams): Uint8Array {
+	const seeds = coreSeeds({
+		provinces,
+		settled,
+		siteScore,
+		activeCradles,
+		r_xyz,
+		planetRadiusKm,
+	})
+	const weights = new Array<number>(
+		provinces.landmassId.reduce((max, id) => Math.max(max, id), -1) + 1,
+	).fill(0)
+	for (let p = 0; p < provinces.count; p++)
+		if (settled[p] && provinces.landmassId[p] >= 0)
+			weights[provinces.landmassId[p]] += heldWeight[p]
+	const mask = new Uint8Array(provinces.count)
+	const shared = {
+		provinces,
+		suitability,
+		settled,
+		mask,
+		count,
+		r_xyz,
+		planetRadiusKm,
+	}
+	growHeld({
+		...shared,
+		sources: seeds.length ? seeds : [fallbackSource],
+		budgets: apportion({ weights, count }),
+	})
+	const held: number[] = []
+	for (let p = 0; p < provinces.count; p++) if (mask[p]) held.push(p)
+	growHeld({
+		...shared,
+		sources: held.length ? held : [fallbackSource],
+		budgets: new Int32Array(0),
+	})
 	return mask
 }
 

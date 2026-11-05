@@ -64,6 +64,7 @@ export interface MigrationResult {
 	migrationWave: Float32Array
 	suitability: Float64Array
 	componentId: Int32Array
+	contactYear: Int32Array
 	diagnostics: MigrationDiagnostics
 }
 
@@ -118,8 +119,26 @@ export interface HeldCoreParams {
 	suitability: Float64Array
 	settled: Uint8Array
 	siteScore: Float32Array
+	heldWeight: Float32Array
 	activeCradles: number[]
 	fallbackSource: number
+	count: number
+	r_xyz: Float32Array
+	planetRadiusKm: number
+}
+
+export interface ApportionParams {
+	weights: number[]
+	count: number
+}
+
+export interface GrowHeldParams {
+	provinces: GenesisProvinces
+	suitability: Float64Array
+	settled: Uint8Array
+	mask: Uint8Array
+	sources: number[]
+	budgets: Int32Array
 	count: number
 	r_xyz: Float32Array
 	planetRadiusKm: number

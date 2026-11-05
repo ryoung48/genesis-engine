@@ -69,6 +69,8 @@ export interface ProvincePopulation {
 	/** Provinces in arrival order, unreached land excluded */
 	settlementOrder?: Int32Array
 	// [JUSTIFICATION] Present exactly when arrivalYear is.
+	contactYear?: Int32Array
+	// [JUSTIFICATION] Present exactly when arrivalYear is.
 	/** Agricultural cradles in selection order */
 	cradles?: CradleChoice[]
 	// [JUSTIFICATION] Present exactly when arrivalYear is.

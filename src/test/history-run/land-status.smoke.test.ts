@@ -37,6 +37,14 @@ function held(state: HistoryState, p: number) {
 }
 
 describe("target profile", () => {
+	it("rises from the isolated to the connected held share with contact age", () => {
+		const share = (years: number) => TARGET_PROFILE.contactShare({ years })
+		expect(share(-100)).toBeCloseTo(0.28, 10)
+		expect(share(0)).toBeCloseTo(0.28, 10)
+		expect(share(1200)).toBeCloseTo(0.28 + 0.667 * (1 - Math.exp(-1)), 10)
+		expect(share(1e9)).toBeCloseTo(0.947, 10)
+	})
+
 	it("sums every size row to one hundred percent", () => {
 		for (const year of [867, 1066, 1300, 1701, 1800])
 			expect(

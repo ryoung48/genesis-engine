@@ -196,18 +196,48 @@ describe("shelf links", () => {
 	})
 })
 
-describe("state-held core", () => {
-	it("seeds a core at every best site a cradle spacing apart, across landmasses, and grows them together to the count", () => {
-		const total = 202
+describe("contact year", () => {
+	it("starts at the origin, crosses land unchanged and waits for routine voyages over the raw sea distance", () => {
 		const world = MIGRATION_FIXTURE.world({
-			layout: "L".repeat(total),
-			stepDegrees: 0.5,
-			habitability: new Array(total).fill(1),
+			layout: "LL####LL",
+			stepDegrees: 2,
+			habitability: [5, 5, 1, 1],
 			horizonYear: 2025,
 		})
-		world.provinces.landmassId = Int32Array.from({ length: total }, (_, p) =>
-			p < 100 ? 0 : 1,
+		const result = MIGRATION.compute(world)
+		expect([result.contactYear[0], result.contactYear[1]]).toEqual([
+			START,
+			START,
+		])
+		expect(result.contactYear[2]).toBe(result.contactYear[3])
+		const km = (4 * 2 * Math.PI * 6371) / 180
+		expect(result.contactYear[2]).toBe(
+			Math.ceil(-1000 + (1800 * Math.log(km / 850)) / Math.log(3000 / 850)),
 		)
+		const land = MIGRATION.compute(
+			MIGRATION_FIXTURE.world({
+				layout: "LLLL",
+				stepDegrees: 0.5,
+				habitability: [1, 1, 1, 1],
+				horizonYear: 2025,
+			}),
+		)
+		expect([...land.contactYear]).toEqual([START, START, START, START])
+	})
+})
+
+describe("state-held core", () => {
+	const total = 200
+	const world = MIGRATION_FIXTURE.world({
+		layout: "L".repeat(total),
+		stepDegrees: 0.5,
+		habitability: new Array(total).fill(1),
+		horizonYear: 2025,
+	})
+	world.provinces.landmassId = Int32Array.from({ length: total }, (_, p) =>
+		p < 100 ? 0 : 1,
+	)
+	const held = (count: number) => {
 		const mask = MIGRATION.heldCore({
 			provinces: world.provinces,
 			suitability: new Float64Array(total).fill(1),
@@ -215,14 +245,27 @@ describe("state-held core", () => {
 			siteScore: Float32Array.from({ length: total }, (_, p) =>
 				p === 150 ? 1 : 0.5,
 			),
+			heldWeight: Float32Array.from({ length: total }, (_, p) =>
+				p < 100 ? 0.9 : 0.3,
+			),
 			activeCradles: [0],
 			fallbackSource: 0,
-			count: 60,
+			count,
 			r_xyz: world.mesh.r_xyz,
 			planetRadiusKm: 6371,
 		})
-		expect(mask.reduce((sum, held) => sum + held, 0)).toBe(60)
-		for (const seed of [0, 36, 72, 111, 150, 201]) expect(mask[seed]).toBe(1)
-		for (const gap of [20, 55, 92, 130, 175]) expect(mask[gap]).toBe(0)
+		const on = (from: number, to: number) =>
+			mask.subarray(from, to).reduce((sum, v) => sum + v, 0)
+		return { mask, counts: [on(0, 100), on(100, total)] }
+	}
+
+	it("apportions the count between landmasses by held weight and grows every spaced seed", () => {
+		const { mask, counts } = held(80)
+		expect(counts).toEqual([60, 20])
+		for (const seed of [0, 36, 72, 111, 150]) expect(mask[seed]).toBe(1)
+	})
+
+	it("fills past a landmass's capacity without budgets so the total is kept", () => {
+		expect(held(180).counts).toEqual([100, 80])
 	})
 })

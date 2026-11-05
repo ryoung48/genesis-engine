@@ -1023,6 +1023,9 @@ function createHistoryState({
 		stateless,
 		uninhabited,
 		settledYear,
+		contactYear:
+			population.contactYear?.slice() ??
+			new Int32Array(P).fill(MIGRATION.startYear),
 		land: {
 			governed: era === "lateMedieval" && population.arrivalYear !== undefined,
 			reachKm,

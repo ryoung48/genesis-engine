@@ -619,6 +619,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			m.componentId.buffer,
 			m.areaKm2.buffer,
 			m.suitability.buffer,
+			m.contactYear.buffer,
 		)
 	}
 	if (world.population) {
@@ -632,6 +633,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		if (world.population.predecessor) add(world.population.predecessor.buffer)
 		if (world.population.settlementOrder)
 			add(world.population.settlementOrder.buffer)
+		if (world.population.contactYear) add(world.population.contactYear.buffer)
 	}
 	if (world.tradeGoods) add(world.tradeGoods.buffer)
 

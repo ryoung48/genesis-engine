@@ -9,6 +9,10 @@ export interface TargetProfile {
 	ceiling: number
 }
 
+export interface ContactShareParams {
+	years: number
+}
+
 export interface SizeBucketParams {
 	size: number
 }

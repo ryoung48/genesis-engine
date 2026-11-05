@@ -51,6 +51,21 @@ CK3 measurements by sovereign ruler, in % (820 sovereigns on 3,835 held counties
 
 The uninhabited share is not steered; it is an output of the [arrival field](../population/migration-and-settlement.md).
 
+### Contact share
+
+`TARGET_PROFILE.contactShare({ years })` is the held share expected of land in routine contact with the origin's network for `years` years: `0.280 + (0.947 − 0.280) × (1 − exp(−max(0, years) / 1200))`. It weights the start's landmass budgets and absorption claims. It is fitted to EU4's province owners at 1444.11.11 (`scripts/measure-eu4-owned-by-continent.py`, wasteland excluded, counted in provinces):
+
+| Group | Owned % | Contact with the old-world network |
+|---|---:|---|
+| Europe + Asia (incl. Siberia) | 94.7 (1,872 / 1,977) | always |
+| Sub-Saharan Africa (8 regions) | 74.5 (260 / 349) | trans-Saharan camel trade from about 300 CE |
+| Maritime Southeast Asia (3 regions) | 69.2 (108 / 156) | Indian trade from about 50 CE |
+| North + South America | 28.0 (221 / 790) | none before 1492 |
+
+- **0.947** is Europe and Asia. Siberia is kept because the origin has its own marginal land too.
+- **0.280** is the Americas, with no contact.
+- **1,200 years** is the mean of two fits of the curve: sub-Saharan Africa after 1,144 years gives 958; maritime Southeast Asia after 1,394 years gives 1,448. The spread is the uncertainty; both contact dates are rounded consensus dates.
+
 ## Starting land
 
 The 867 start settles every province whose arrival year is 867 or earlier. `MIGRATION.heldCore` picks `round(h(867) × settled)` settled provinces as state-held, and the rest of the settled world starts stateless. Nations are placed inside that mask with the unchanged placement rules and `lateMedieval` size weights. Every reader that used the era's `statehoodFraction` now reads the generated mask's actual state-held share of settled land.
@@ -58,13 +73,15 @@ The 867 start settles every province whose arrival year is 867 or earlier. `MIGR
 The held provinces grow from core seeds spread over all settled land, so every landmass gets states and the stateless share sits on the poorest ground of each one:
 
 - **Seeds.** The cradles active in 867 are seeds. More seeds are added greedily, the same way cradles are chosen but without the residence rule: the settled province with the highest `site score × min(distance to nearest seed / spacing, 2)` among those at least one cradle spacing (`2000 × radius / 6371` km) from every seed, until none is left. The site score is `PLACEMENT.nationPlacementScore`. Seeds do not join the cradle schedule.
-- **Search.** One cheapest-first search from every seed at cost `distance / suitability` takes the cheapest `round(h(867) × settled)` settled provinces. Every seed grows on equal terms, so the costly land far from any good site stays stateless on every landmass, origin included. If there are no seeds, the search starts at the origin.
+- **Budgets.** Each landmass's weight is the sum of `contactShare(867 − contact year)` over its settled provinces. The count is apportioned by largest remainder: floors of `count × weight / total`, then one more to the largest remainders until the sum is the count.
+- **Search.** One cheapest-first search from every seed at cost `distance / suitability` takes settled provinces while their own landmass is under budget; a full landmass's provinces are skipped. The costly land far from any good site stays stateless on every landmass, origin included. If there are no seeds, the search starts at the origin.
+- **Fill.** If a landmass cannot use its budget, the search continues from all held land without budgets until the count is reached.
 
-An earlier version split the count between landmasses by EU4's 1444 owned shares (91.6% for Europe, Asia and Africa, 28.0% for the Americas; `scripts/measure-eu4-owned-by-continent.py`). Our later landmasses are not like the Americas: their land is as good as the origin's and they are young only because migration reaches them late, so the split left large stateless patches of good land beside the states. On the verification world the seeded search holds 48–66% of each sizeable landmass, and stateless land averages 0.35–0.45 habitability per region against 0.63–0.84 for held land.
+An earlier version split the count by whether a landmass held a cradle (EU4's 91.6% against 28.0%). That treated land with centuries of contact like land with none, and with one seed per landmass it left large stateless patches of good land, so contact years replaced it.
 
 ## Absorption
 
-`STATEHOOD.run` follows each census (after settlement and the share refresh). While the state-held share of habitable provinces is below `h`, it takes settled stateless land. Each claim is a weighted draw over (realm, adjacent stateless province) with weight `enclosure² × exp(−3 × max(0, stretch − 1))`. Enclosure is the number of the realm's provinces next to the candidate. Stretch is the distance from the realm's capital to the candidate over `spacing × sqrt((size + 1) / π)`, with spacing the mean distance between adjacent provinces; the factor 3 cuts a claim to 5% at stretch 2. The province joins through the ordinary ownership path (`repartitionNation`), not by array writes. No new states are founded: a world whose settled stateless land has no neighbouring state leaves the shortfall unmet, and the report records it.
+`STATEHOOD.run` follows each census (after settlement and the share refresh). While the state-held share of habitable provinces is below `h`, it takes settled stateless land. Each claim is a weighted draw over (realm, adjacent stateless province) with weight `contactShare(year − contact year) × enclosure² × exp(−3 × max(0, stretch − 1))`, so long-contacted land is claimed first. Earth imports have no contact years and use the migration start, which makes the factor a constant. Enclosure is the number of the realm's provinces next to the candidate. Stretch is the distance from the realm's capital to the candidate over `spacing × sqrt((size + 1) / π)`, with spacing the mean distance between adjacent provinces; the factor 3 cuts a claim to 5% at stretch 2. The province joins through the ordinary ownership path (`repartitionNation`), not by array writes. No new states are founded: a world whose settled stateless land has no neighbouring state leaves the shortfall unmet, and the report records it.
 
 ## Natural brakes on consolidation
 
@@ -79,4 +96,4 @@ A steering layer that biased war, rebellion and absorption by size-bucket pressu
 
 ## Report
 
-The detailed report records per window the shares of habitable provinces by status, the share of state-held provinces and of sovereigns in each size bucket against its target, the total-variation distance between them, and the settlements, absorptions and unmet demand. Snapshots at the start, 1066, 1444 and 1701 are kept separately; 1444 lines up with the EU4 table above. Every land snapshot also lists each unit-sized landmass (largest first) with its share of habitable provinces, the held share of its own land, its share of all held land and its cradle count. It also gives `heldCores`, the number of connected groups of held provinces, where provinces connect only if they are adjacent and on the same landmass.
+The detailed report records per window the shares of habitable provinces by status, the share of state-held provinces and of sovereigns in each size bucket against its target, the total-variation distance between them, and the settlements, absorptions and unmet demand. Snapshots at the start, 1066, 1444 and 1701 are kept separately; 1444 lines up with the EU4 table above. Every land snapshot also lists each unit-sized landmass (largest first) with its share of habitable provinces, the held share of its own land, its share of all held land, its cradle count and its median contact year. It also gives `heldCores`, the number of connected groups of held provinces, where provinces connect only if they are adjacent and on the same landmass.

@@ -210,6 +210,7 @@ function runSeed({
 		cradleProvinces: (generated.population?.cradles ?? []).map(
 			(cradle) => cradle.province,
 		),
+		contactYear: engine.contactYear,
 	}
 	const diagnostics = {
 		religionGenderSystems: RELIGION_REPORT.genderSystems({

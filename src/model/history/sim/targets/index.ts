@@ -1,4 +1,5 @@
 import type {
+	ContactShareParams,
 	InterpolateParams,
 	InterpolateRowsParams,
 	SizeBucketParams,
@@ -10,6 +11,10 @@ const BUCKET_UPPER_BOUNDS = [1, 4, 9, 24, 49, 100, Number.POSITIVE_INFINITY]
 
 const STATE_HELD_YEARS = [476, 1066, 1500, 1701, 1914]
 const STATE_HELD_PERCENT = [50, 60, 71, 79, 95]
+
+const CONNECTED_HELD_SHARE = 0.947
+const ISOLATED_HELD_SHARE = 0.28
+const CONTACT_MATURITY_YEARS = 1200
 
 const SIZE_YEARS = [867, 1066, 1701, 1914]
 const SIZE_PERCENT = [
@@ -75,6 +80,14 @@ function at({ year, habitableProvinces }: TargetProfileParams): TargetProfile {
 	}
 }
 
+function contactShare({ years }: ContactShareParams): number {
+	return (
+		ISOLATED_HELD_SHARE +
+		(CONNECTED_HELD_SHARE - ISOLATED_HELD_SHARE) *
+			(1 - Math.exp(-Math.max(0, years) / CONTACT_MATURITY_YEARS))
+	)
+}
+
 function bucketOf({ size }: SizeBucketParams): number {
 	let bucket = 0
 	while (size > BUCKET_UPPER_BOUNDS[bucket]) bucket++
@@ -85,4 +98,5 @@ export const TARGET_PROFILE = {
 	bucketCount: BUCKET_UPPER_BOUNDS.length,
 	at,
 	bucketOf,
+	contactShare,
 }

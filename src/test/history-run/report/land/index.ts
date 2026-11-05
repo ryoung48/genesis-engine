@@ -32,16 +32,24 @@ function landmassBreakdown({
 	engine,
 	context,
 }: LandmassBreakdownParams): Pick<LandReport, "landmasses" | "heldCores"> {
-	const { landmassId, cradleProvinces } = context
+	const { landmassId, cradleProvinces, contactYear } = context
 	const held = (p: number) =>
 		!engine.desolate[p] && !engine.uninhabited[p] && !engine.stateless[p]
-	const rows = new Map<number, { habitable: number; held: number }>()
+	const rows = new Map<
+		number,
+		{ habitable: number; held: number; contact: number[] }
+	>()
 	let habitable = 0
 	let heldTotal = 0
 	for (let p = 0; p < engine.P; p++) {
 		if (engine.desolate[p] || landmassId[p] < 0) continue
-		const row = rows.get(landmassId[p]) ?? { habitable: 0, held: 0 }
+		const row = rows.get(landmassId[p]) ?? {
+			habitable: 0,
+			held: 0,
+			contact: [],
+		}
 		row.habitable++
+		row.contact.push(contactYear[p])
 		habitable++
 		if (held(p)) {
 			row.held++
@@ -58,6 +66,7 @@ function landmassBreakdown({
 			heldShare: (100 * row.held) / row.habitable,
 			shareOfHeld: (100 * row.held) / Math.max(1, heldTotal),
 			cradles: cradleProvinces.filter((p) => landmassId[p] === landmass).length,
+			contactYear: row.contact.sort((a, b) => a - b)[row.contact.length >> 1],
 		}))
 	const seen = new Uint8Array(engine.P)
 	let heldCores = 0

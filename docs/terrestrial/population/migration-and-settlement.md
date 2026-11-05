@@ -32,6 +32,8 @@ The knots are calibrated to these dated settlements, and there are no tiers: the
 
 Each province keeps its arrival year (an integer; 2,147,483,647 when the search never reaches it or reaches it after 2025), its predecessor, the kind of link that reached it and the arrival tier. `migrationWave` is `(arrival + 79,999) / (2025 + 79,999)` clamped to the unit interval, and −1 for unreached land. Culture, religion and government read the wave unchanged; population falloff does too, except at the arrival-driven 867 start (below).
 
+Each reached province also has a contact year: the first year from which routine voyages span every sea crossing on its migration path from the origin. A land link, or a shelf link before the shelf closes, passes the predecessor's contact year on; a sea link takes the later of the predecessor's contact year and `seaCapabilityYear` of the raw crossing. Arrival over sea divides the crossing by `targetReach`, because a large landmass is an easy target for a one-way voyage; contact uses the raw distance, because a lasting connection needs the voyage made routinely. On the verification world the later continents are reached through single 1,718–2,071 km crossings, contacted between about 5 and 270 CE, against 460 km or less inside the origin's network. Unreached land gets the sentinel. Statehood uses it through `TARGET_PROFILE.contactShare` ([land status](../politics/land-status-and-targets.md)).
+
 Unreached land is **uninhabited**, never desolate: it stays part of the world, empty until its settlers arrive or for good.
 
 ## Cradles
@@ -50,7 +52,7 @@ Cultures and religions cover every habitable province, so a province already has
 
 ## Starting settlement and states
 
-At the 867 start the settled land is the provinces with `arrival ≤ 867`. `MIGRATION.heldCore` takes `round(h(867) × settled)` of them as state-held, grown from the active cradles plus core seeds spaced a cradle spacing apart over all settled land; the rest of the settled world starts stateless. If nothing seeds the search, it starts at the origin.
+At the 867 start the settled land is the provinces with `arrival ≤ 867`. `MIGRATION.heldCore` takes `round(h(867) × settled)` of them as state-held, grown from the active cradles plus core seeds spaced a cradle spacing apart over all settled land, with each landmass's count weighted by contact age; the rest of the settled world starts stateless. If nothing seeds the search, it starts at the origin.
 
 Population at this start replaces the wave falloff with settlement age: each province's weight is its habitability times `1 − exp(−age / 4,400)`, with `age = 867 − arrival`, renormalised to the era total. Land settled about 1,900 years before the start gets about 35% of the density of long-settled land, the ratio of the Americas to the rest of the world around 1500 per unit of habitable land: about 54 million people (Denevan 1992) on about 28% of habitable land, against about 400 million on 72%, so `(54 / 28) / (400 / 72) ≈ 0.35` and `τ = 1,900 / −ln(1 − 0.35) ≈ 4,400` years. The wave falloff gave such land about 1% of long-settled density, because the wave is linear in years from 80,000 BCE. The distribution pipeline and other eras keep the falloff. See [land status and targets](../politics/land-status-and-targets.md). Other eras keep their wave percentiles.
 
