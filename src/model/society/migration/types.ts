@@ -125,36 +125,26 @@ export interface HeldCoreParams {
 	planetRadiusKm: number
 }
 
-export interface LandmassUnitsParams {
+export interface CoreSeedsParams {
 	provinces: GenesisProvinces
 	settled: Uint8Array
 	siteScore: Float32Array
 	activeCradles: number[]
+	r_xyz: Float32Array
+	planetRadiusKm: number
 }
 
-export interface LandmassUnits {
-	unitOfLandmass: Int32Array
-	mature: Uint8Array
-	settled: Int32Array
-	sources: number[]
-	sourceUnit: number[]
-}
-
-export interface UnitBudgetsParams {
-	units: LandmassUnits
-	count: number
-}
-
-export interface GrowHeldParams {
+export interface BestSpacedParams {
 	provinces: GenesisProvinces
-	suitability: Float64Array
-	settled: Uint8Array
-	mask: Uint8Array
-	sources: number[]
-	sourceUnit: number[]
-	unitOfLandmass: Int32Array
-	budgets: Int32Array
-	count: number
+	nearest: Float64Array
+	spacingKm: number
+	value: (province: number) => number
+}
+
+export interface AddNearestParams {
+	provinces: GenesisProvinces
+	nearest: Float64Array
+	site: number
 	r_xyz: Float32Array
 	planetRadiusKm: number
 }

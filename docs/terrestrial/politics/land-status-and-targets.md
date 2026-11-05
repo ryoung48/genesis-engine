@@ -55,28 +55,12 @@ The uninhabited share is not steered; it is an output of the [arrival field](../
 
 The 867 start settles every province whose arrival year is 867 or earlier. `MIGRATION.heldCore` picks `round(h(867) × settled)` settled provinces as state-held, and the rest of the settled world starts stateless. Nations are placed inside that mask with the unchanged placement rules and `lateMedieval` size weights. Every reader that used the era's `statehoodFraction` now reads the generated mask's actual state-held share of settled land.
 
-The count is split between landmasses so that every sizeable landmass has a core of its own, as in EU4 at 1444:
+The held provinces grow from core seeds spread over all settled land, so every landmass gets states and the stateless share sits on the poorest ground of each one:
 
-- **Units.** A landmass with at least 1% of habitable provinces is a unit. At that size a young unit still gets about 36 held provinces on the 204,000-point world, one realm in the 25–49 bucket. Smaller landmasses are not units.
-- **Mature and young.** A unit holding a cradle active in 867 is mature and grows from those cradles. Any other unit is young and grows from its settled province with the highest site score (`PLACEMENT.nationPlacementScore`, the score that ranks cradles). These seeds do not join the cradle schedule.
-- **Budgets.** Each unit's weight is its settled count times 0.916 if mature or 0.280 if young. Its budget is the count times its weight over the sum of weights, rounded, with the rounding remainder on the heaviest unit.
-- **Search.** One cheapest-first search at cost `distance / suitability` grows every unit from its sources. A unit never enters another unit's landmass, may take small islands, and stops at its budget.
-- **Fill.** If a unit runs out of land before its budget, the search continues from all held land with no unit limits, the rule used before units existed, until the count is reached.
+- **Seeds.** The cradles active in 867 are seeds. More seeds are added greedily, the same way cradles are chosen but without the residence rule: the settled province with the highest `site score × min(distance to nearest seed / spacing, 2)` among those at least one cradle spacing (`2000 × radius / 6371` km) from every seed, until none is left. The site score is `PLACEMENT.nationPlacementScore`. Seeds do not join the cradle schedule.
+- **Search.** One cheapest-first search from every seed at cost `distance / suitability` takes the cheapest `round(h(867) × settled)` settled provinces. Every seed grows on equal terms, so the costly land far from any good site stays stateless on every landmass, origin included. If there are no seeds, the search starts at the origin.
 
-The two shares come from EU4's province owners at 1444.11.11 (`scripts/measure-eu4-owned-by-continent.py`, wasteland excluded, counted in provinces):
-
-| Continent | Owned % of its land | Share of all owned | Share of land |
-|---|---:|---:|---:|
-| Europe | 98.6 | 33.3 | 25.3 |
-| Asia (incl. Siberia) | 91.8 | 42.4 | 34.5 |
-| Africa | 78.0 | 14.1 | 13.5 |
-| North America | 31.7 | 6.9 | 16.3 |
-| Oceania | 30.3 | 1.1 | 2.7 |
-| South America | 19.9 | 2.0 | 7.6 |
-
-The 0.916 share is Europe, Asia and Africa together (2,220 of 2,423 provinces). The 0.280 share is the two Americas (221 of 790). Only their ratio matters, because the budgets are normalised to the count. EU4's European provinces are smaller than its American ones, so an area-based ratio would be lower.
-
-The origin landmass usually holds every settled province. The 867 total exceeds its land on the verification world, so its mature share cannot hold land back.
+An earlier version split the count between landmasses by EU4's 1444 owned shares (91.6% for Europe, Asia and Africa, 28.0% for the Americas; `scripts/measure-eu4-owned-by-continent.py`). Our later landmasses are not like the Americas: their land is as good as the origin's and they are young only because migration reaches them late, so the split left large stateless patches of good land beside the states. On the verification world the seeded search holds 48–66% of each sizeable landmass, and stateless land averages 0.35–0.45 habitability per region against 0.63–0.84 for held land.
 
 ## Absorption
 

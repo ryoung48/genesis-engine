@@ -41,6 +41,8 @@ export interface ComputePopulationParams {
 	migrationWave?: Float32Array
 	settlementWave?: number
 	migrationFalloff?: number
+	// [JUSTIFICATION] Only the arrival-driven late medieval start knows how long each province has been settled; it replaces the wave falloff there.
+	settlementAgeYears?: Float32Array
 }
 
 export interface ProvincePopulation {

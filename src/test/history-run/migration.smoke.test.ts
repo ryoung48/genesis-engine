@@ -197,53 +197,32 @@ describe("shelf links", () => {
 })
 
 describe("state-held core", () => {
-	const A = 100
-	const ISLET = 2
-	const total = A + ISLET + 100
-	const world = MIGRATION_FIXTURE.world({
-		layout: "L".repeat(total),
-		stepDegrees: 0.5,
-		habitability: new Array(total).fill(1),
-		horizonYear: 2025,
-	})
-	world.provinces.landmassId = Int32Array.from({ length: total }, (_, p) =>
-		p < A ? 0 : p < A + ISLET ? 2 : 1,
-	)
-	const seed = 150
-	const held = (count: number) => {
+	it("seeds a core at every best site a cradle spacing apart, across landmasses, and grows them together to the count", () => {
+		const total = 202
+		const world = MIGRATION_FIXTURE.world({
+			layout: "L".repeat(total),
+			stepDegrees: 0.5,
+			habitability: new Array(total).fill(1),
+			horizonYear: 2025,
+		})
+		world.provinces.landmassId = Int32Array.from({ length: total }, (_, p) =>
+			p < 100 ? 0 : 1,
+		)
 		const mask = MIGRATION.heldCore({
 			provinces: world.provinces,
 			suitability: new Float64Array(total).fill(1),
 			settled: new Uint8Array(total).fill(1),
 			siteScore: Float32Array.from({ length: total }, (_, p) =>
-				p === seed ? 1 : 0.5,
+				p === 150 ? 1 : 0.5,
 			),
 			activeCradles: [0],
 			fallbackSource: 0,
-			count,
+			count: 60,
 			r_xyz: world.mesh.r_xyz,
 			planetRadiusKm: 6371,
 		})
-		const on = (from: number, to: number) =>
-			mask.subarray(from, to).reduce((sum, v) => sum + v, 0)
-		return {
-			mask,
-			cradle: on(0, A),
-			islet: on(A, A + ISLET),
-			young: on(A + ISLET, total),
-		}
-	}
-
-	it("splits the count between landmasses by the mature and young held shares and seeds the young one at its best site", () => {
-		const { mask, cradle, islet, young } = held(120)
-		expect([cradle, islet, young]).toEqual([92, 0, 28])
-		expect(mask[seed]).toBe(1)
-		const youngHeld = [...mask.keys()].filter((p) => p >= A + ISLET && mask[p])
-		expect(youngHeld.at(-1)! - youngHeld[0] + 1).toBe(28)
-	})
-
-	it("fills past a landmass's capacity without budgets so the total is kept", () => {
-		const { cradle, islet, young } = held(180)
-		expect([cradle, islet, young]).toEqual([100, 2, 78])
+		expect(mask.reduce((sum, held) => sum + held, 0)).toBe(60)
+		for (const seed of [0, 36, 72, 111, 150, 201]) expect(mask[seed]).toBe(1)
+		for (const gap of [20, 55, 92, 130, 175]) expect(mask[gap]).toBe(0)
 	})
 })

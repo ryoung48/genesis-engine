@@ -1,6 +1,5 @@
 import { STATE } from "@/model/history/sim/engine/state"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
-import { MIGRATION } from "@/model/society/migration"
 import type {
 	LandmassBreakdownParams,
 	LandmassStatus,
@@ -14,6 +13,7 @@ function tracker(): LandTracker {
 }
 
 const DEVELOPMENT_BUCKETS = 5
+const MIN_LANDMASS_SHARE = 0.01
 const KNOWLEDGE_BUCKETS = 7
 
 function levelBucket(params: {
@@ -50,9 +50,7 @@ function landmassBreakdown({
 		rows.set(landmassId[p], row)
 	}
 	const landmasses: LandmassStatus[] = [...rows.entries()]
-		.filter(
-			([, row]) => row.habitable >= MIGRATION.minLandmassShare * habitable,
-		)
+		.filter(([, row]) => row.habitable >= MIN_LANDMASS_SHARE * habitable)
 		.sort((a, b) => b[1].habitable - a[1].habitable || a[0] - b[0])
 		.map(([landmass, row]) => ({
 			landmass,

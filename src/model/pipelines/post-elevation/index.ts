@@ -940,6 +940,12 @@ function runPostElevationPipeline(
 		migrationWave,
 		settlementWave: actualSettlementWave,
 		migrationFalloff: eraConfig.migrationFalloff,
+		settlementAgeYears:
+			cradles && arrivalSteered
+				? Float32Array.from(migration.arrivalYear, (year) =>
+						Math.max(0, startYear - year),
+					)
+				: undefined,
 	})
 	population.migrationWave = migrationWave
 	if (historyMigration.pipeline !== "distribution") {

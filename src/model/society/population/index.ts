@@ -7,6 +7,8 @@ import type {
 	ProvincePopulation,
 } from "@/model/society/population/types"
 
+const SETTLEMENT_MATURITY_YEARS = 4400
+
 const HAB_CLIMATE = new Float32Array([
 	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,
 ])
@@ -95,6 +97,7 @@ function computePopulation({
 	migrationWave,
 	settlementWave,
 	migrationFalloff,
+	settlementAgeYears,
 }: ComputePopulationParams): ProvincePopulation {
 	const { count } = provinces
 
@@ -151,6 +154,8 @@ function computePopulation({
 			// Provinces beyond the era's settlement frontier are unsettled: no
 			// population (their habitability is left intact for other consumers).
 			if (wave < 0 || wave > effectiveSettlementWave) w = 0
+			else if (settlementAgeYears)
+				w *= 1 - Math.exp(-settlementAgeYears[i] / SETTLEMENT_MATURITY_YEARS)
 			else if (falloff > 0) w *= (1 - Math.min(wave, 1)) ** falloff
 		}
 		weight[i] = w
