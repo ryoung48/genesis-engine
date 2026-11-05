@@ -20,18 +20,10 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import type { HistoryMigration } from "@/model/society/migration/types"
-
-export type ApplyOceanCurrentsToClimateParams = {
-	mesh: SphereMesh
-	climate: GenesisClimate
-	isLand: Uint8Array
-	oceanCurrents: GenesisOceanCurrents
-}
-
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
+import type { HistoryMigration } from "@/model/society/migration/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type { GenesisProvinces } from "@/model/society/types"
 
@@ -147,7 +139,7 @@ export interface PostPipelineOutput {
 	historyMigration: HistoryMigration
 	climate: GenesisClimate
 	wind: WindVectors
-	windMonthly: GenesisWindMonthly | null
+	windMonthly: GenesisWindMonthly
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
 	observedCloudCover?: {
 		real_monthly: Float32Array

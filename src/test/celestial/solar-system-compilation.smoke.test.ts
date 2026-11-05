@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { DEFERRED_SHADERS } from "@/ui/genesis/renderer/deferred-shaders"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { createSolarSystemController } from "@/ui/genesis/renderer/genesis-scene/solar-system-controller"
 import { buildSolarSystemOverlay } from "@/ui/genesis/solar-system/overlay/overlay"
@@ -17,8 +18,15 @@ vi.mock("@/ui/genesis/renderer/nebula-background", () => ({
 }))
 
 function createOverlay(): SolarSystemOverlayState {
+	const group = new THREE.Group()
+	const material = new THREE.MeshStandardMaterial()
+	DEFERRED_SHADERS.mark({
+		material,
+		deferral: { kind: "stand-in", lit: true, color: 0xffffff },
+	})
+	group.add(new THREE.Mesh(new THREE.SphereGeometry(), material))
 	return {
-		group: new THREE.Group(),
+		group,
 		suggestedCameraDistance: 6,
 		setDay: vi.fn(),
 		updateBodies: vi.fn(() => true),
@@ -75,19 +83,28 @@ describe("solar system shader compilation", () => {
 		vi.mocked(buildSolarSystemOverlay).mockImplementation(createOverlay)
 	})
 
-	it("waits for shaders without drawing or counting the scene's lights twice", async () => {
+	it("draws placeholders while compiling staged materials with the scene's lights", async () => {
 		const harness = createHarness()
 		harness.controller.setSolarSystemOverlay(harness.params)
+		const mesh = harness.context.solarSystemOverlayState!.group
+			.children[0] as THREE.Mesh
+		const material = mesh.material
 		harness.controller.renderSolarSystemView()
 		harness.controller.renderSolarSystemView()
 		expect(harness.compileAsync).toHaveBeenCalledExactlyOnceWith(
-			harness.context.solarSystemGroup,
+			expect.objectContaining({
+				children: [expect.objectContaining({ material })],
+			}),
 			harness.context.camera,
+			harness.context.scene,
 		)
-		expect(harness.render).not.toHaveBeenCalled()
+		expect(mesh.material).not.toBe(material)
+		expect(harness.render).toHaveBeenCalledTimes(2)
+		harness.render.mockClear()
 		harness.requestRender.mockClear()
 		harness.complete()
 		await vi.waitFor(() => expect(harness.requestRender).toHaveBeenCalledOnce())
+		expect(mesh.material).toBe(material)
 		harness.controller.renderSolarSystemView()
 		expect(harness.render).toHaveBeenCalledOnce()
 	})
@@ -116,6 +133,7 @@ describe("solar system shader compilation", () => {
 		harness.controller.renderSolarSystemView()
 		harness.controller.setSolarSystemOverlay(null)
 		harness.requestRender.mockClear()
+		harness.render.mockClear()
 		const cleanup = harness.controller.finishCompilation()
 		expect(previous.dispose).not.toHaveBeenCalled()
 		harness.complete()

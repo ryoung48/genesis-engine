@@ -1,14 +1,4 @@
-import type { GenesisClimate } from "@/model/climate/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import type { GenesisParams } from "@/model/pipelines/types"
-
-export interface WindSurface {
-	vegetation?: Uint8Array | null
-	topography?: Uint8Array | null
-	slopeScore?: Float32Array | null
-	// Per-region BFS distance to nearest ocean, in km.
-	oceanDist?: Float32Array | null
-}
 
 export interface FlowGrid {
 	// Eastward component per cell, row-major lat×lon.
@@ -48,29 +38,6 @@ export interface WindArrowData {
 	v: Float32Array
 	// Approximate surface wind speed in m/s.
 	speed: Float32Array
-}
-
-export interface ComputeWindVectorsInput {
-	mesh: SphereMesh
-	climate: GenesisClimate
-	elevation_km: Float32Array
-	// Defaults to Earth-like rotation and pressure when no planet parameters are available.
-	params?: Pick<
-		GenesisParams,
-		| "obliquity"
-		| "hoursPerDay"
-		| "tideLock"
-		| "substellarLon"
-		| "eccentricity"
-		| "perihelion"
-		| "pressure"
-		| "planetRadiusKm"
-		| "daysPerYear"
-	>
-	// Omit to calculate annual-average wind vectors.
-	month?: number
-	// Omit when terrain roughness and ocean distance are unavailable.
-	surface?: WindSurface
 }
 
 export type WindGrid = FlowGrid

@@ -111,7 +111,7 @@ Reducing the western addition to 6 m/s while also removing extra ocean-temperatu
 
 ## Calendar alignment: a distinct, testable input error
 
-[INSOLATION.compute](../../model/climate/temperature/ebm/insolation/index.ts) defaults the starting solar longitude to -(40 * 2 * pi / 365), putting the spring equinox roughly 40 days after year start. [The climate monthly aggregation](../../model/climate/classification/climate/index.ts) then bins those days using January–December day counts. The wind model uses the resulting declination sign and magnitude to drive both seasonal coastal additions. That clock is about six weeks ahead of the observed-temperature and observed-wind calendar.
+The removed v1 insolation solver (historical diagnostic) defaults the starting solar longitude to -(40 * 2 * pi / 365), putting the spring equinox roughly 40 days after year start. [The climate monthly aggregation](../../model/climate/classification/climate/index.ts) then bins those days using January–December day counts. The wind model uses the resulting declination sign and magnitude to drive both seasonal coastal additions. That clock is about six weeks ahead of the observed-temperature and observed-wind calendar.
 
 A separate wind-input diagnostic calculated daily Earth declination with the [NOAA solar-position equations](https://www.gml.noaa.gov/grad/solcalc/solareqns.PDF) and averaged it into the same non-leap-year months. Only declination_monthly changed; the EBM, pressure inputs, temperatures, torque solve and observation targets did not.
 

@@ -4,7 +4,6 @@ import type {
 	LocalWeatherRequest,
 	LocalWeatherResponse,
 } from "@/model/climate/weather/local/types"
-import { WIND } from "@/model/climate/weather/wind"
 import type {
 	CreateWeatherClientParams,
 	PendingWeatherRequest,
@@ -43,40 +42,13 @@ export function createWeatherClient({
 	async function initialize() {
 		await new Promise((resolve) => window.setTimeout(resolve, 0))
 		if (disposed) throw new Error("Weather worker disposed")
-		let source = world
-		if (!world.windMonthly) {
-			const N = world.mesh.numRegions
-			const u = new Float32Array(12 * N)
-			const v = new Float32Array(12 * N)
-			for (let month = 0; month < 12; month++) {
-				if (disposed) throw new Error("Weather worker disposed")
-				const wind = WIND.computeWindVectors({
-					mesh: world.mesh,
-					climate: world.climate,
-					elevation_km: world.elevation_km,
-					params: world.params,
-					month,
-					surface: {
-						vegetation: world.vegetation,
-						topography: world.topography,
-						oceanDist: world.oceanDist,
-					},
-				})
-				for (let r = 0; r < N; r++) {
-					u[month * N + r] = wind.windU[r] * wind.windSpeed[r]
-					v[month * N + r] = wind.windV[r] * wind.windSpeed[r]
-				}
-				await new Promise((resolve) => window.setTimeout(resolve, 0))
-			}
-			source = { ...world, windMonthly: { u, v } }
-		}
 		const instant = WEATHER_CLOCK.resolve({
 			params: world.params,
 			elapsedYears: 0,
 			manual: null,
 		})
 		const context = await LOCAL_WEATHER.createContext({
-			world: source,
+			world,
 			revision,
 			representatives,
 			yearSeconds: instant.yearSeconds,

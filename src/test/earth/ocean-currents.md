@@ -1,12 +1,6 @@
 # Ocean currents
 
-Production uses `HEURISTIC_CURRENTS` from
-`src/model/climate/ocean/currents/heuristic`, which classifies coasts from
-moisture advection and uses the original west/east SST bands. The wind-driven
-`OCEAN_CURRENTS` model remains available for diagnostics and direct callers.
-Wind-side work is in `wind.md`; land temperature MAE is `README.md`.
-The production heuristic SST anomaly now adjusts modeled temperature before
-rainfall and cloud cover are computed.
+Production uses Climate v2 for rotating and solar-locked worlds; see [climate models](../../../docs/climate/models.md). The heuristic v1 currents have been removed. The following notes describe historical standalone current-model diagnostics.
 
 `currents/index.ts` provides a hybrid: a coast-facing warm/cold table indexed by
 distance from the ITCZ for SST *magnitude*, but which side of the table
@@ -20,7 +14,7 @@ see below). Flow, however, is sverdrup's own field directly -- `flowU`/
 a real current field, not a proxy needing the calibrated-table treatment its
 SST magnitude does; `SURFACE_FLOW.fromSstFields` (deriving flow from the SST
 gradient) is no longer used for the rotating-planet path, only for the
-heuristic currents (`currents/heuristic`). Everything below this point that describes `sverdrup`'s own accuracy
+historical heuristic currents. Everything below this point that describes `sverdrup`'s own accuracy
 (SST magnitude, direction skill, the model's biggest weaknesses) is about
 that standalone module in isolation, run through its own diagnostic tests
 calling `SVERDRUP_CURRENTS.computeCurrents` directly -- not about what the hybrid

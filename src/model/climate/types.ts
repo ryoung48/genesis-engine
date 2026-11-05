@@ -1,6 +1,4 @@
 export interface GenesisClimate {
-	// [JUSTIFICATION] V1 winds require the pre-lapse temperature; v2 and locked solvers do not produce it.
-	temperature_monthly_nolapse?: Float32Array
 	temperature_avg: Float32Array // per-cell annual mean °C
 	temperature_min: Float32Array // per-cell annual min °C
 	temperature_max: Float32Array // per-cell annual max °C
@@ -14,7 +12,7 @@ export interface GenesisClimate {
 	declination_monthly: Float32Array // per-month sub-solar latitude in degrees
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
-	// [JUSTIFICATION] Cloud cover is attached by v2 or the tidal cloud modifier after initial temperature construction.
+	// [JUSTIFICATION] Cloud cover is attached by the climate solver after initial temperature construction.
 	cloud_cover_monthly?: Float32Array
 	// [JUSTIFICATION] An observed-input display estimate is available only for imported Earth worlds.
 	real_cloud_cover_monthly?: Float32Array

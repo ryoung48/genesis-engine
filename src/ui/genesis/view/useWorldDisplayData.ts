@@ -362,13 +362,10 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		const cacheKey = `${source}:${month ?? "annual"}`
 		const cached = windCacheRef.current.vectors.get(cacheKey)
 		if (cached) return cached
-		// (v2 solved each month's winds, locked planets' too: a month's are on the world; v1 derives them)
-		const solved = world.windMonthly
-			? {
-					real_u_monthly: world.windMonthly.u,
-					real_v_monthly: world.windMonthly.v,
-				}
-			: null
+		const solved = {
+			real_u_monthly: world.windMonthly.u,
+			real_v_monthly: world.windMonthly.v,
+		}
 		const vectors = showRealWind
 			? WIND.observedWindVectorsForMonth({
 					observedWind: world.observedWind,
@@ -377,25 +374,11 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 				})
 			: month === undefined
 				? world.wind
-				: solved
-					? WIND.observedWindVectorsForMonth({
-							observedWind: solved,
-							numRegions: world.mesh.numRegions,
-							month,
-						})
-					: WIND.computeWindVectors({
-							mesh: world.mesh,
-							climate: world.climate,
-							elevation_km: world.elevation_km,
-							params: world.params,
-							month,
-							surface: {
-								vegetation: world.vegetation,
-								topography: world.topography,
-								slopeScore: world.slopeScore,
-								oceanDist: world.oceanDist,
-							},
-						})
+				: WIND.observedWindVectorsForMonth({
+						observedWind: solved,
+						numRegions: world.mesh.numRegions,
+						month,
+					})
 		windCacheRef.current.vectors.set(cacheKey, vectors)
 		return vectors
 	}, [world, showWindArrows, showRealWind, colorMode, resolvedClimateMonth])
@@ -422,61 +405,23 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 			setMonthlyWindReady(true)
 			return
 		}
-		if (showRealWind || world.windMonthly) {
-			const numRegions = world.mesh.numRegions
-			const monthlySource =
-				!showRealWind && world.windMonthly
-					? {
-							real_u_monthly: world.windMonthly.u,
-							real_v_monthly: world.windMonthly.v,
-						}
-					: world.observedWind
-			const monthly = Array.from({ length: 12 }, (_, m) =>
-				WIND.observedWindVectorsForMonth({
-					observedWind: monthlySource,
-					numRegions,
-					month: m,
-				}),
-			)
-			windCacheRef.current.monthly.set(source, monthly)
-			monthlyWindRef.current = monthly
-			setMonthlyWindReady(true)
-			return
-		}
-		const results: typeof monthlyWindRef.current = []
-		setMonthlyWindReady(false)
-		let m = 0
-		let cancelled = false
-		const tick = () => {
-			if (cancelled) return
-			if (m >= 12) {
-				windCacheRef.current.monthly.set(source, results)
-				monthlyWindRef.current = results
-				setMonthlyWindReady(true)
-				return
-			}
-			results.push(
-				WIND.computeWindVectors({
-					mesh: world.mesh,
-					climate: world.climate,
-					elevation_km: world.elevation_km,
-					params: world.params,
-					month: m++,
-					surface: {
-						vegetation: world.vegetation,
-						topography: world.topography,
-						slopeScore: world.slopeScore,
-						oceanDist: world.oceanDist,
-					},
-				}),
-			)
-			setTimeout(tick, 0)
-		}
-		setTimeout(tick, 0)
-		return () => {
-			cancelled = true
-			setMonthlyWindReady(false)
-		}
+		const numRegions = world.mesh.numRegions
+		const monthlySource = !showRealWind
+			? {
+					real_u_monthly: world.windMonthly.u,
+					real_v_monthly: world.windMonthly.v,
+				}
+			: world.observedWind
+		const monthly = Array.from({ length: 12 }, (_, m) =>
+			WIND.observedWindVectorsForMonth({
+				observedWind: monthlySource,
+				numRegions,
+				month: m,
+			}),
+		)
+		windCacheRef.current.monthly.set(source, monthly)
+		monthlyWindRef.current = monthly
+		setMonthlyWindReady(true)
 	}, [world, windActive, showRealWind])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.

@@ -1624,8 +1624,6 @@ export const GenesisView: React.FC<{
 	const {
 		generating,
 		generationProgress,
-		climateModel,
-		setClimateModel,
 		generationLabel,
 		handleGenerate,
 		handleResetDefaults,
@@ -2177,8 +2175,6 @@ export const GenesisView: React.FC<{
 						era={era}
 						setEra={setEra}
 						generating={generating}
-						climateModel={climateModel}
-						setClimateModel={setClimateModel}
 						generationLabel={generationLabel}
 						generationProgress={generationProgress}
 						generationTimings={generationTimings}

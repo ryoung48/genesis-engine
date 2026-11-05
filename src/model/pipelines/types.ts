@@ -60,11 +60,7 @@ export type TerrainSnapshot = {
 	elevation_km: Float32Array
 }
 
-export type ClimateModel = "v1" | "v2"
-
 export interface GenesisParams {
-	// [JUSTIFICATION] Model callers may omit the selection to use the default v2 solver.
-	climateModel?: ClimateModel
 	// [JUSTIFICATION] Terrain-only callers need not select history; application and history runners select it explicitly.
 	historyPipeline?: HistoryPipeline
 	seed: number
@@ -142,8 +138,7 @@ export interface GenesisWorld {
 	timings?: StageTiming[]
 	climate: GenesisClimate
 	wind: WindVectors
-	// [JUSTIFICATION] A planet locked to its star derives a month's wind on demand; v2 solves each month's.
-	windMonthly?: GenesisWindMonthly
+	windMonthly: GenesisWindMonthly
 	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
 	observedCloudCover?: {
 		real_monthly: Float32Array

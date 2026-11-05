@@ -204,6 +204,13 @@ function runSeed({
 		initial: initialTies.snapshot,
 	})
 	const validation = HISTORY_VALIDATION.tracker()
+	const landmass = {
+		landmassId:
+			generated.provinces?.landmassId ?? new Int32Array(engine.P).fill(-1),
+		cradleProvinces: (generated.population?.cradles ?? []).map(
+			(cradle) => cradle.province,
+		),
+	}
 	const diagnostics = {
 		religionGenderSystems: RELIGION_REPORT.genderSystems({
 			systems: engine.cultureGenderSystems,
@@ -223,7 +230,13 @@ function runSeed({
 		}),
 		reachKm: options.reachKm,
 		cohesionStep: options.cohesionStep,
-		landCheckpoints: [] as LandReport[],
+		landCheckpoints: [
+			LAND_REPORT.snapshot({
+				engine,
+				tracker: LAND_REPORT.tracker(),
+				landmass,
+			}),
+		] as LandReport[],
 		initialBattlefields: BATTLEFIELD_REPORT.initial({ engine }),
 		siegeLifecycle: BATTLEFIELD_REPORT.lifecycle({ engine }),
 		completed: false,
@@ -396,11 +409,12 @@ function runSeed({
 			HISTORY_VALIDATION.unions({ engine, tracker: validation })
 			HISTORY_VALIDATION.marriageTies({ engine, tracker: validation })
 			HISTORY_VALIDATION.landStatus({ engine, tracker: validation })
-			if ([1066, 1701].includes(year))
+			if ([1066, 1444, 1701].includes(year))
 				diagnostics.landCheckpoints.push(
 					LAND_REPORT.snapshot({
 						engine,
 						tracker: LAND_REPORT.tracker(),
+						landmass,
 					}),
 				)
 			if ((year - start) % 10 === 0)
@@ -524,7 +538,11 @@ function runSeed({
 					from,
 					to: year,
 				}),
-				land: LAND_REPORT.snapshot({ engine, tracker: landTracker }),
+				land: LAND_REPORT.snapshot({
+					engine,
+					tracker: landTracker,
+					landmass,
+				}),
 			})
 			if (year === start + options.years)
 				diagnostics.governmentTotal = GOVERNMENT_REPORT.summarize({

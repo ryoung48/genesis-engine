@@ -27,12 +27,8 @@ function build({
 	const ranges = world.dtr_monthly ? field(world.dtr_monthly) : null
 	const dtr = ranges?.every(Number.isFinite) ? ranges : null
 	const rain = field(world.rainfall.monthly)
-	const windU = world.windMonthly
-		? field(world.windMonthly.u)
-		: new Float32Array(12).fill(world.wind.windU[r] * world.wind.windSpeed[r])
-	const windV = world.windMonthly
-		? field(world.windMonthly.v)
-		: new Float32Array(12).fill(world.wind.windV[r] * world.wind.windSpeed[r])
+	const windU = field(world.windMonthly.u)
+	const windV = field(world.windMonthly.v)
 	const annualPet = world.climate.pet_monthly
 		? field(world.climate.pet_monthly).reduce((a, b) => a + b, 0)
 		: 0

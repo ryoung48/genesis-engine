@@ -463,8 +463,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		world.wind.pressure.buffer,
 		world.wind.windSpeed.buffer,
 	)
-	if (world.windMonthly)
-		add(world.windMonthly.u.buffer, world.windMonthly.v.buffer)
+	add(world.windMonthly.u.buffer, world.windMonthly.v.buffer)
 	if (world.oceanDist) add(world.oceanDist.buffer)
 	if (world.distCoast) add(world.distCoast.buffer)
 	if (world.rainfall) {

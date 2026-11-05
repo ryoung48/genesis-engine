@@ -1,6 +1,9 @@
 import { STATE } from "@/model/history/sim/engine/state"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
+import { MIGRATION } from "@/model/society/migration"
 import type {
+	LandmassBreakdownParams,
+	LandmassStatus,
 	LandReport,
 	LandSnapshotParams,
 	LandTracker,
@@ -25,7 +28,68 @@ function levelBucket(params: {
 	return Math.min(params.count - 1, Math.max(0, index))
 }
 
-function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
+function landmassBreakdown({
+	engine,
+	context,
+}: LandmassBreakdownParams): Pick<LandReport, "landmasses" | "heldCores"> {
+	const { landmassId, cradleProvinces } = context
+	const held = (p: number) =>
+		!engine.desolate[p] && !engine.uninhabited[p] && !engine.stateless[p]
+	const rows = new Map<number, { habitable: number; held: number }>()
+	let habitable = 0
+	let heldTotal = 0
+	for (let p = 0; p < engine.P; p++) {
+		if (engine.desolate[p] || landmassId[p] < 0) continue
+		const row = rows.get(landmassId[p]) ?? { habitable: 0, held: 0 }
+		row.habitable++
+		habitable++
+		if (held(p)) {
+			row.held++
+			heldTotal++
+		}
+		rows.set(landmassId[p], row)
+	}
+	const landmasses: LandmassStatus[] = [...rows.entries()]
+		.filter(
+			([, row]) => row.habitable >= MIGRATION.minLandmassShare * habitable,
+		)
+		.sort((a, b) => b[1].habitable - a[1].habitable || a[0] - b[0])
+		.map(([landmass, row]) => ({
+			landmass,
+			habitableShare: (100 * row.habitable) / Math.max(1, habitable),
+			heldShare: (100 * row.held) / row.habitable,
+			shareOfHeld: (100 * row.held) / Math.max(1, heldTotal),
+			cradles: cradleProvinces.filter((p) => landmassId[p] === landmass).length,
+		}))
+	const seen = new Uint8Array(engine.P)
+	let heldCores = 0
+	for (let p = 0; p < engine.P; p++) {
+		if (seen[p] || !held(p)) continue
+		heldCores++
+		seen[p] = 1
+		const stack = [p]
+		while (stack.length) {
+			const q = stack.pop()!
+			for (
+				let j = engine.provinceAdjOffset[q];
+				j < engine.provinceAdjOffset[q + 1];
+				j++
+			) {
+				const n = engine.provinceAdjList[j]
+				if (seen[n] || !held(n) || landmassId[n] !== landmassId[q]) continue
+				seen[n] = 1
+				stack.push(n)
+			}
+		}
+	}
+	return { landmasses, heldCores }
+}
+
+function snapshot({
+	engine,
+	tracker: since,
+	landmass,
+}: LandSnapshotParams): LandReport {
 	const land = engine.land
 	const counts = { uninhabited: 0, stateless: 0, stateHeld: 0 }
 	const population = { stateHeld: 0, stateless: 0 }
@@ -102,6 +166,7 @@ function snapshot({ engine, tracker: since }: LandSnapshotParams): LandReport {
 		absorptionViolations: land.counters.absorptionViolations,
 		settlements: land.counters.settlements - since.settlements,
 		unmetDemand: land.counters.unmetDemand,
+		...landmassBreakdown({ engine, context: landmass }),
 	}
 	since.absorptions = land.counters.absorptions
 	since.settlements = land.counters.settlements

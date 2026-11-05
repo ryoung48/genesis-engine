@@ -53,7 +53,30 @@ The uninhabited share is not steered; it is an output of the [arrival field](../
 
 ## Starting land
 
-The 867 start settles every province whose arrival year is 867 or earlier. The state-held core is the cheapest `h(867) × habitable` settled provinces from the cradles active in 867, so states form contiguous cores around cradles and the rest of the settled world starts stateless. Nations are placed inside that mask with the unchanged placement rules and `lateMedieval` size weights. Every reader that used the era's `statehoodFraction` now reads the generated mask's actual state-held share of settled land.
+The 867 start settles every province whose arrival year is 867 or earlier. `MIGRATION.heldCore` picks `round(h(867) × settled)` settled provinces as state-held, and the rest of the settled world starts stateless. Nations are placed inside that mask with the unchanged placement rules and `lateMedieval` size weights. Every reader that used the era's `statehoodFraction` now reads the generated mask's actual state-held share of settled land.
+
+The count is split between landmasses so that every sizeable landmass has a core of its own, as in EU4 at 1444:
+
+- **Units.** A landmass with at least 1% of habitable provinces is a unit. At that size a young unit still gets about 36 held provinces on the 204,000-point world, one realm in the 25–49 bucket. Smaller landmasses are not units.
+- **Mature and young.** A unit holding a cradle active in 867 is mature and grows from those cradles. Any other unit is young and grows from its settled province with the highest site score (`PLACEMENT.nationPlacementScore`, the score that ranks cradles). These seeds do not join the cradle schedule.
+- **Budgets.** Each unit's weight is its settled count times 0.916 if mature or 0.280 if young. Its budget is the count times its weight over the sum of weights, rounded, with the rounding remainder on the heaviest unit.
+- **Search.** One cheapest-first search at cost `distance / suitability` grows every unit from its sources. A unit never enters another unit's landmass, may take small islands, and stops at its budget.
+- **Fill.** If a unit runs out of land before its budget, the search continues from all held land with no unit limits, the rule used before units existed, until the count is reached.
+
+The two shares come from EU4's province owners at 1444.11.11 (`scripts/measure-eu4-owned-by-continent.py`, wasteland excluded, counted in provinces):
+
+| Continent | Owned % of its land | Share of all owned | Share of land |
+|---|---:|---:|---:|
+| Europe | 98.6 | 33.3 | 25.3 |
+| Asia (incl. Siberia) | 91.8 | 42.4 | 34.5 |
+| Africa | 78.0 | 14.1 | 13.5 |
+| North America | 31.7 | 6.9 | 16.3 |
+| Oceania | 30.3 | 1.1 | 2.7 |
+| South America | 19.9 | 2.0 | 7.6 |
+
+The 0.916 share is Europe, Asia and Africa together (2,220 of 2,423 provinces). The 0.280 share is the two Americas (221 of 790). Only their ratio matters, because the budgets are normalised to the count. EU4's European provinces are smaller than its American ones, so an area-based ratio would be lower.
+
+The origin landmass usually holds every settled province. The 867 total exceeds its land on the verification world, so its mature share cannot hold land back.
 
 ## Absorption
 
@@ -72,4 +95,4 @@ A steering layer that biased war, rebellion and absorption by size-bucket pressu
 
 ## Report
 
-The detailed report records per window the shares of habitable provinces by status, the share of state-held provinces and of sovereigns in each size bucket against its target, the total-variation distance between them, and the settlements, absorptions and unmet demand. Snapshots at 1066 and 1701 are kept separately.
+The detailed report records per window the shares of habitable provinces by status, the share of state-held provinces and of sovereigns in each size bucket against its target, the total-variation distance between them, and the settlements, absorptions and unmet demand. Snapshots at the start, 1066, 1444 and 1701 are kept separately; 1444 lines up with the EU4 table above. Every land snapshot also lists each unit-sized landmass (largest first) with its share of habitable provinces, the held share of its own land, its share of all held land and its cradle count. It also gives `heldCores`, the number of connected groups of held provinces, where provinces connect only if they are adjacent and on the same landmass.

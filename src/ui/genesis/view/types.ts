@@ -189,7 +189,7 @@ export type WorldDisplayDataInput = {
 	dtrMonth: number
 }
 
-export type WindVectorData = ReturnType<typeof WIND.computeWindVectors>
+export type WindVectorData = ReturnType<typeof WIND.observedWindVectorsForMonth>
 
 export type MonthlyWindData = Pick<
 	WindVectorData,
@@ -249,7 +249,7 @@ export type MapColoringInput = {
 	showWaves: boolean
 	dangerSubMode: DangerSubMode
 	selectedWikiOrganizationId: string | null
-	windVectors: ReturnType<typeof WIND.computeWindVectors> | null
+	windVectors: ReturnType<typeof WIND.observedWindVectorsForMonth> | null
 	hoverProvince: number | null
 	temperatureMonth: number
 	rainfallMonth: number

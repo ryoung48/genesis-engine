@@ -10,15 +10,19 @@ import type {
 	CradleChoice,
 	CradleSpacingParams,
 	CradlesParams,
+	GrowHeldParams,
 	HeldCoreParams,
 	HorizonParams,
 	IndexLinksParams,
+	LandmassUnits,
+	LandmassUnitsParams,
 	MatureScoreParams,
 	MigrationEdge,
 	MigrationParams,
 	MigrationResult,
 	TargetParams,
 	TransitParams,
+	UnitBudgetsParams,
 	WaveParams,
 } from "@/model/society/migration/types"
 import type { GenesisProvinces } from "@/model/society/types"
@@ -54,6 +58,9 @@ const CRADLE_RESIDENCE_YEARS = 2000
 const CRADLE_FIRST_REVIEW_YEAR = -3300
 const CRADLE_REVIEW_STEP = 100
 const CRADLE_LAST_REVIEW_YEAR = 2025
+const MIN_LANDMASS_SHARE = 0.01
+const MATURE_HELD_SHARE = 0.916
+const YOUNG_HELD_SHARE = 0.28
 
 function seaTier({ distanceKm }: CapabilityParams) {
 	const index = SEA_VOYAGE_KNOTS.findIndex((knot) => distanceKm <= knot.km)
@@ -499,30 +506,113 @@ function activeCradles({
 		.map((choice) => choice.province)
 }
 
-function heldCore({
+function landmassUnits({
+	provinces,
+	settled,
+	siteScore,
+	activeCradles,
+}: LandmassUnitsParams): LandmassUnits {
+	const landmasses =
+		provinces.landmassId.reduce((max, id) => Math.max(max, id), -1) + 1
+	const habitable = new Int32Array(landmasses)
+	let total = 0
+	for (let p = 0; p < provinces.count; p++)
+		if (!provinces.desolate[p] && provinces.landmassId[p] >= 0) {
+			habitable[provinces.landmassId[p]]++
+			total++
+		}
+	const unitOfLandmass = new Int32Array(landmasses).fill(-1)
+	let unitCount = 0
+	for (let lm = 0; lm < landmasses; lm++)
+		if (habitable[lm] > 0 && habitable[lm] >= MIN_LANDMASS_SHARE * total)
+			unitOfLandmass[lm] = unitCount++
+	const unitOf = (p: number) =>
+		provinces.landmassId[p] >= 0 ? unitOfLandmass[provinces.landmassId[p]] : -1
+	const unitSettled = new Int32Array(unitCount)
+	const best = new Int32Array(unitCount).fill(-1)
+	for (let p = 0; p < provinces.count; p++) {
+		const unit = unitOf(p)
+		if (unit < 0 || provinces.desolate[p] || !settled[p]) continue
+		unitSettled[unit]++
+		if (best[unit] < 0 || siteScore[p] > siteScore[best[unit]]) best[unit] = p
+	}
+	const mature = new Uint8Array(unitCount)
+	const sources: number[] = []
+	const sourceUnit: number[] = []
+	for (const cradle of activeCradles) {
+		const unit = unitOf(cradle)
+		if (unit < 0 || !settled[cradle]) continue
+		mature[unit] = 1
+		sources.push(cradle)
+		sourceUnit.push(unit)
+	}
+	for (let unit = 0; unit < unitCount; unit++)
+		if (!mature[unit] && best[unit] >= 0) {
+			sources.push(best[unit])
+			sourceUnit.push(unit)
+		}
+	return { unitOfLandmass, mature, settled: unitSettled, sources, sourceUnit }
+}
+
+function unitBudgets({ units, count }: UnitBudgetsParams): Int32Array {
+	const weights = Array.from(
+		units.settled,
+		(settled, unit) =>
+			settled * (units.mature[unit] ? MATURE_HELD_SHARE : YOUNG_HELD_SHARE),
+	)
+	const budgets = new Int32Array(weights.length)
+	const sum = weights.reduce((a, b) => a + b, 0)
+	if (sum <= 0) return budgets
+	let largest = 0
+	for (let unit = 0; unit < weights.length; unit++) {
+		budgets[unit] = Math.round((count * weights[unit]) / sum)
+		if (weights[unit] > weights[largest]) largest = unit
+	}
+	budgets[largest] = Math.max(
+		0,
+		budgets[largest] + count - budgets.reduce((a, b) => a + b, 0),
+	)
+	return budgets
+}
+
+function growHeld({
 	provinces,
 	suitability,
 	settled,
+	mask,
 	sources,
+	sourceUnit,
+	unitOfLandmass,
+	budgets,
 	count,
 	r_xyz,
 	planetRadiusKm,
-}: HeldCoreParams): Uint8Array {
-	const mask = new Uint8Array(provinces.count)
+}: GrowHeldParams): void {
 	const cost = new Float64Array(provinces.count).fill(Infinity)
+	const reachedBy = new Int32Array(provinces.count).fill(-1)
+	const expanded = new Uint8Array(provinces.count)
+	const used = new Int32Array(budgets.length)
 	const heap = new PriorityHeap<number>()
-	for (const source of sources)
-		if (settled[source] && cost[source] > 0) {
-			cost[source] = 0
-			heap.push(0, source)
-		}
-	let taken = 0
+	let taken = mask.reduce((sum, held) => sum + held, 0)
+	sources.forEach((source, i) => {
+		if (!settled[source] || cost[source] === 0) return
+		cost[source] = 0
+		reachedBy[source] = sourceUnit[i]
+		heap.push(0, source)
+	})
 	while (heap.size && taken < count) {
 		const entry = heap.pop()!
 		const province = entry.value
-		if (entry.key !== cost[province] || mask[province]) continue
-		mask[province] = 1
-		taken++
+		if (entry.key !== cost[province] || expanded[province]) continue
+		const unit = reachedBy[province]
+		if (!mask[province]) {
+			if (unit >= 0 && used[unit] >= budgets[unit]) continue
+			mask[province] = 1
+			taken++
+			if (unit >= 0) used[unit]++
+		}
+		expanded[province] = 1
+		if (unit >= 0 && used[unit] >= budgets[unit]) continue
 		for (
 			let j = provinces.adjOffset[province];
 			j < provinces.adjOffset[province + 1];
@@ -530,6 +620,11 @@ function heldCore({
 		) {
 			const neighbor = provinces.adjList[j]
 			if (!settled[neighbor] || mask[neighbor]) continue
+			if (unit >= 0) {
+				const landmass = provinces.landmassId[neighbor]
+				const owner = landmass >= 0 ? unitOfLandmass[landmass] : -1
+				if (owner >= 0 && owner !== unit) continue
+			}
 			const next =
 				entry.key +
 				UNITS.regionDistanceKm({
@@ -541,10 +636,55 @@ function heldCore({
 					Math.max(0.1, suitability[neighbor])
 			if (next < cost[neighbor]) {
 				cost[neighbor] = next
+				reachedBy[neighbor] = unit
 				heap.push(next, neighbor)
 			}
 		}
 	}
+}
+
+function heldCore({
+	provinces,
+	suitability,
+	settled,
+	siteScore,
+	activeCradles,
+	fallbackSource,
+	count,
+	r_xyz,
+	planetRadiusKm,
+}: HeldCoreParams): Uint8Array {
+	const mask = new Uint8Array(provinces.count)
+	const units = landmassUnits({ provinces, settled, siteScore, activeCradles })
+	const shared = {
+		provinces,
+		suitability,
+		settled,
+		mask,
+		unitOfLandmass: units.unitOfLandmass,
+		count,
+		r_xyz,
+		planetRadiusKm,
+	}
+	growHeld({
+		...shared,
+		sources: units.sources,
+		sourceUnit: units.sourceUnit,
+		budgets: unitBudgets({ units, count }),
+	})
+	const held: number[] = []
+	for (let p = 0; p < provinces.count; p++) if (mask[p]) held.push(p)
+	const sources = held.length
+		? held
+		: activeCradles.length
+			? activeCradles
+			: [fallbackSource]
+	growHeld({
+		...shared,
+		sources,
+		sourceUnit: sources.map(() => -1),
+		budgets: new Int32Array(0),
+	})
 	return mask
 }
 
@@ -559,4 +699,5 @@ export const MIGRATION = {
 	cradles,
 	activeCradles,
 	heldCore,
+	minLandmassShare: MIN_LANDMASS_SHARE,
 }

@@ -24,6 +24,26 @@ export interface LandReport {
 	absorptionViolations: number
 	settlements: number
 	unmetDemand: number
+	landmasses: LandmassStatus[]
+	heldCores: number
+}
+
+export interface LandmassStatus {
+	landmass: number
+	habitableShare: number
+	heldShare: number
+	shareOfHeld: number
+	cradles: number
+}
+
+export interface LandmassContext {
+	landmassId: Int32Array
+	cradleProvinces: number[]
+}
+
+export interface LandmassBreakdownParams {
+	engine: HistoryState
+	context: LandmassContext
 }
 
 export interface LandTracker {
@@ -34,4 +54,5 @@ export interface LandTracker {
 export interface LandSnapshotParams {
 	engine: HistoryState
 	tracker: LandTracker
+	landmass: LandmassContext
 }

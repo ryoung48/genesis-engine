@@ -117,7 +117,43 @@ export interface HeldCoreParams {
 	provinces: GenesisProvinces
 	suitability: Float64Array
 	settled: Uint8Array
+	siteScore: Float32Array
+	activeCradles: number[]
+	fallbackSource: number
+	count: number
+	r_xyz: Float32Array
+	planetRadiusKm: number
+}
+
+export interface LandmassUnitsParams {
+	provinces: GenesisProvinces
+	settled: Uint8Array
+	siteScore: Float32Array
+	activeCradles: number[]
+}
+
+export interface LandmassUnits {
+	unitOfLandmass: Int32Array
+	mature: Uint8Array
+	settled: Int32Array
 	sources: number[]
+	sourceUnit: number[]
+}
+
+export interface UnitBudgetsParams {
+	units: LandmassUnits
+	count: number
+}
+
+export interface GrowHeldParams {
+	provinces: GenesisProvinces
+	suitability: Float64Array
+	settled: Uint8Array
+	mask: Uint8Array
+	sources: number[]
+	sourceUnit: number[]
+	unitOfLandmass: Int32Array
+	budgets: Int32Array
 	count: number
 	r_xyz: Float32Array
 	planetRadiusKm: number

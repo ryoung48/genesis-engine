@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
+import { STAR } from "@/model/celestial/star"
 import { FINAL_ORBIT_ENVIRONMENT } from "@/model/celestial/system/generation/final-orbit-environment"
 
 describe("Final orbit environment", () => {
@@ -47,14 +48,30 @@ describe("Final orbit environment", () => {
 			const slots = star.worldTypeAllocation.orbitSlots.filter(
 				(slot) => slot.type !== "empty",
 			)
-			const bodies = star.bodies.filter((body) => body.beltOfIdx === undefined)
+			const bodies = star.bodies.filter(
+				(body) =>
+					body.beltOfIdx === undefined && body.trojanOfIdx === undefined,
+			)
 			expect(bodies).toHaveLength(slots.length)
 			for (const [index, slot] of slots.entries()) {
 				const body = bodies[index]!
 				expect(body.orbitalDistanceAU).toBe(slot.orbitalDistanceAU)
-				if (slot.type === "gas-giant") expect(body.group).toBe("jovian")
+				const isWrapped =
+					STAR.isProto({ ageGyr: star.ageGyr, massSol: star.massSol }) &&
+					slot.type !== "belt"
+				const content = isWrapped
+					? star.bodies.find(
+							(member) =>
+								member.beltOfIdx === body.idx &&
+								member.orbitalDistanceAU === slot.orbitalDistanceAU,
+						)
+					: body
+				expect(content).toBeDefined()
+				if (isWrapped) expect(body.group).toBe("asteroid belt")
+				if (slot.type === "gas-giant") expect(content?.group).toBe("jovian")
 				if (slot.type === "belt") expect(body.group).toBe("asteroid belt")
-				if (slot.type === "terrestrial") expect(body.group).not.toBe("jovian")
+				if (slot.type === "terrestrial")
+					expect(content?.group).not.toBe("jovian")
 			}
 		}
 	})

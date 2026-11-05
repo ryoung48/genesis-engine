@@ -1,6 +1,6 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import type { ClimateModel, GenesisParams } from "@/model/pipelines/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import { TIMING } from "@/model/shared/timing"
 import type {
 	GenesisWorkerRequest,
@@ -25,7 +25,6 @@ export function terminateGenerationWorker(worker: Worker | null): void {
 }
 
 interface ImportHeightmapParams {
-	climateModel: ClimateModel
 	seed: number
 	numPoints: number
 	jitter: number
@@ -267,7 +266,6 @@ export function generateWorld({
 			? overrides.tideLock
 			: currentParams.tideLock
 	const params = {
-		climateModel: overrides?.climateModel ?? currentParams.climateModel,
 		seed: overrideSeed,
 		numPoints: overrides?.numPoints ?? currentParams.numPoints,
 		numPlates: overrides?.numPlates ?? currentParams.numPlates,
@@ -370,7 +368,6 @@ export function importHeightmap(
 	const request: GenesisWorkerRequest = {
 		type: "import",
 		params: {
-			climateModel: importParams.climateModel,
 			seed: importParams.seed as number,
 			numPoints: importParams.numPoints as number,
 			jitter: importParams.jitter as number,

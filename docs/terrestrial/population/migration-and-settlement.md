@@ -50,7 +50,7 @@ Cultures and religions cover every habitable province, so a province already has
 
 ## Starting settlement and states
 
-At the 867 start the settled land is the provinces with `arrival ≤ 867`. A multi-source search from the cradles active in 867 over the land graph, at cost `distance / suitability`, takes the cheapest `h(867) × habitable` provinces as the state-held core; the rest of the settled world starts stateless. If no cradle is active, the search starts at the origin. See [land status and targets](../politics/land-status-and-targets.md). Other eras keep their wave percentiles.
+At the 867 start the settled land is the provinces with `arrival ≤ 867`. `MIGRATION.heldCore` takes `round(h(867) × settled)` of them as state-held, split between landmasses so that each sizeable landmass grows a core from its cradles or, without one, from its best site; the rest of the settled world starts stateless. If nothing else seeds the search, it starts at the origin. See [land status and targets](../politics/land-status-and-targets.md). Other eras keep their wave percentiles.
 
 ## Report
 

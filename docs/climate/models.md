@@ -1,14 +1,10 @@
 # Climate models
 
-Choose **Climate v2** or **Climate v1** in the generation panel, then select **Generate**. This applies to procedural planets and Earth heightmap imports. Changing the selector stages the next generation. V2 is the default.
+All procedural planets and Earth heightmap imports use **Climate v2**. Select **Generate** in the generation panel to apply the current settings. Climate v1 and the model-selection parameter have been removed.
 
-V1 restores the active pipeline from immediately before commit `8977cda2`: the zonal energy-balance temperature model with continentality, simple pressure-gradient winds, heuristic coastal ocean currents and SST anomalies, and advected seasonal rainfall. Monthly winds are derived on demand for the overlay. Terrain, hydrology, classifications, ice, and observed Earth data use the shared current pipeline.
-
-V2 uses the current climatev2 temperature, monthly wind, ocean, rain, cloud and diurnal-range outputs. Planets tidally locked to their star use climatev2's locked climate under either selection (`CLIMATE_V2.computeLocked`, see [pressure.md](pressure.md#tidally-locked-planets)): its temperature, cloud deck, rain, winds and ocean currents, solved once from the terrain before any lake drains, as for rotating v2 worlds, with the sunlight of a fixed substellar point (`CLIMATEV2_ORBIT.lockedSunlight`). Their within-month range and potential evaporation come from it too (see [pressure.md](pressure.md#range-and-potential-evaporation)), not from the DTR model or Hargreaves.
+V2 uses the current climatev2 temperature, monthly wind, ocean, rain, cloud and diurnal-range outputs. Planets tidally locked to their star use climatev2's locked climate (`CLIMATE_V2.computeLocked`, see [pressure.md](pressure.md#tidally-locked-planets)): its temperature, cloud deck, rain, winds and ocean currents, solved once from the terrain before any lake drains, as for rotating v2 worlds, with the sunlight of a fixed substellar point (`CLIMATEV2_ORBIT.lockedSunlight`). Their within-month range and potential evaporation come from it too (see [pressure.md](pressure.md#range-and-potential-evaporation)), not from the DTR model or Hargreaves.
 
 For how rotating v2 worlds respond to axial tilt, and how they compare with ExoPlaSim, see [obliquity.md](obliquity.md).
-
-The selected model travels with the world in `params.climateModel`; model APIs that omit it use v2.
 
 For non-locked v2 worlds, the Temperature, Rain, Humidity, Cloud Cover, DTR and MI maps include ocean cells. Temperature shows sea-surface temperature over the ocean; Rain shows ocean precipitation. Humidity uses the existing temperature/daily-range estimate, without land water-balance aridity over oceans; it is not v2's atmospheric column humidity. Cloud Cover uses the existing cached monthly cloud fractions. DTR shows the modeled near-surface air day/night temperature range. MI applies the existing apparent-temperature calculation using modeled temperature, estimated humidity and wind; ocean temperature is SST, so ocean MI is a proxy rather than an independently modeled marine air comfort index. These maps use the existing color scales and annual/monthly selectors. Observed and difference maps retain their existing coverage.
 

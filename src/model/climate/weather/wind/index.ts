@@ -1,13 +1,10 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
-import { SIMPLE_WIND } from "@/model/climate/weather/wind/simple"
 import type {
-	ComputeWindVectorsInput,
 	FlowGrid,
 	RasterizeVectorGridInput,
 	WindGrid,
 } from "@/model/climate/weather/wind/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import { MATH } from "@/model/shared/math/core"
 
 function rasterizeVectorGrid({
 	mesh,
@@ -140,32 +137,6 @@ function computeWindGrid({
 	})
 }
 
-// Rotation's share of cell collapse: 0 for Earth-like rotation, 1 once the
-// day is long enough that Coriolis no longer organises the circulation.
-// Shared by the wind models and by the ocean gyres, which fade on the same
-// signal. Anchored to the GCM staging: the polar cell is gone structurally
-// by 4 days (the boundary table carries that, not this curve), and this
-// curve fades the Ferrel-to-pole remnant from full strength at 4 days to
-// nothing at 16 days, when a single Hadley cell dominates each hemisphere.
-const COLLAPSE_HOURS_EDGE0 = 96
-const COLLAPSE_HOURS_EDGE1 = 384
-function rotationCollapse(hoursPerDay: number): number {
-	return MATH.smoothstep({
-		edge0: COLLAPSE_HOURS_EDGE0,
-		edge1: COLLAPSE_HOURS_EDGE1,
-		x: hoursPerDay,
-	})
-}
-
-function computeWindVectors(input: ComputeWindVectorsInput): {
-	windU: Float32Array
-	windV: Float32Array
-	pressure: Float32Array
-	windSpeed: Float32Array
-} {
-	return SIMPLE_WIND.computeWindVectors(input)
-}
-
 function observedWindVectorsForMonth({
 	observedWind,
 	numRegions,
@@ -227,7 +198,5 @@ function observedWindVectorsForMonth({
 export const WIND = {
 	rasterizeVectorGrid,
 	computeWindGrid,
-	computeWindVectors,
 	observedWindVectorsForMonth,
-	rotationCollapse,
 }

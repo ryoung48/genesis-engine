@@ -10,11 +10,7 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
-import type {
-	ClimateModel,
-	GenesisParams,
-	TerrainSnapshot,
-} from "@/model/pipelines/types"
+import type { GenesisParams, TerrainSnapshot } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
@@ -92,8 +88,7 @@ export interface SerializedGenesisWorld {
 	continentCount: number
 	climate: SerializedGenesisClimate
 	wind: WindVectors
-	// [JUSTIFICATION] A planet locked to its star has no solved monthly winds.
-	windMonthly?: GenesisWindMonthly
+	windMonthly: GenesisWindMonthly
 	oceanDist: Float32Array
 	distCoast?: Float32Array
 	rainfall: {
@@ -334,8 +329,6 @@ export type GenesisWorkerRequest =
 	| {
 			type: "import"
 			params: {
-				// [JUSTIFICATION] Imports use v2 when no model is selected.
-				climateModel?: ClimateModel
 				seed: number
 				numPoints: number
 				jitter: number

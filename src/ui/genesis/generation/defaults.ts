@@ -8,7 +8,6 @@ export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"
 export const GENERATION_SESSION_STORAGE_KEY = "genesis:generationSession"
 
 export const DEFAULT_WORLD_PARAMS = {
-	climateModel: "v2",
 	numPoints: 204000,
 	jitter: 0.75,
 	numPlates: 80,

@@ -1,10 +1,7 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import type { ClimateModel } from "@/model/pipelines/types"
 
 interface ImportParams {
-	// [JUSTIFICATION] Omitting the selection uses the default v2 model.
-	climateModel?: ClimateModel
 	seed: number
 	numPoints: number
 	jitter: number
