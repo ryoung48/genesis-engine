@@ -299,19 +299,6 @@ export function computePlanetStats(
 						const avg = gaps.reduce((s, g) => s + g, 0) / gaps.length
 						return [{ label: "Spring Interval", value: `~${avg.toFixed(0)} d` }]
 					})(),
-					...(() => {
-						const nextEclipse = world.tidalSchedule.events.find(
-							(e) => e.eclipseType !== "none",
-						)
-						return nextEclipse
-							? [
-									{
-										label: "Next Eclipse",
-										value: `Day ${nextEclipse.dayOfYear}`,
-									},
-								]
-							: []
-					})(),
 				]
 			: []),
 		{ label: "Tilt", value: `${obliquityValue.toFixed(1)} deg` },

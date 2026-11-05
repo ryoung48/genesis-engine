@@ -26,7 +26,12 @@ function computeDailyLockedOrbit(
 		| "orbitalDistanceAU"
 	> &
 		LockedStarRadiationParams,
-): { flux: number[]; libration: number[]; solarLongitude: number[] } {
+): {
+	flux: number[]
+	libration: number[]
+	solarLongitude: number[]
+	distance: number[]
+} {
 	const { SIGMA, R_SUN, AU } = INSOLATION.sun
 	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
@@ -71,6 +76,7 @@ function computeDailyLockedOrbit(
 	const flux = new Array<number>(TIME.constants.daysPerYear).fill(0)
 	const libration = new Array<number>(TIME.constants.daysPerYear).fill(0)
 	const solarLongitude = new Array<number>(TIME.constants.daysPerYear).fill(0)
+	const distance = new Array<number>(TIME.constants.daysPerYear).fill(0)
 	for (let day = 0; day < TIME.constants.daysPerYear; day++) {
 		if (day !== 0) {
 			meanL += (2 * PI) / TIME.constants.daysPerYear
@@ -93,6 +99,7 @@ function computeDailyLockedOrbit(
 		while (trueL < 0) trueL += 2 * PI
 
 		const astroDist = (1 - ecc * ecc) / (1 + ecc * Math.cos(trueA))
+		distance[day] = astroDist
 		flux[day] = s0 / (astroDist * astroDist)
 		solarLongitude[day] = trueL
 
@@ -103,7 +110,7 @@ function computeDailyLockedOrbit(
 		libration[day] = lib
 	}
 
-	return { flux, libration, solarLongitude }
+	return { flux, libration, solarLongitude, distance }
 }
 
 function computeMonthlyLibration({

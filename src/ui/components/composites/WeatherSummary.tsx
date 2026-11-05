@@ -94,6 +94,7 @@ export function WeatherSummary({
 	outlook,
 	moons,
 	params,
+	xyz,
 	unitSystem,
 	dateLabel,
 	loading,
@@ -122,7 +123,10 @@ export function WeatherSummary({
 						: (snapshot?.reason ?? "Weather unavailable"))}
 			</div>
 		)
-	const sky = snapshot ? WEATHER_DISPLAY.sky({ snapshot, moons }) : null
+	const sky =
+		snapshot && params
+			? WEATHER_DISPLAY.sky({ snapshot, moons, params, xyz })
+			: null
 	const seaDisplay =
 		snapshot && params
 			? WEATHER_DISPLAY.sea({ snapshot, moons, params, unitSystem })

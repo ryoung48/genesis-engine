@@ -6,6 +6,7 @@ import type {
 	LockedToMoonParams,
 	PrepareContributorsParams,
 	PreparedContributors,
+	StarDiameterParams,
 	StarMassParams,
 	ValidateMoonParams,
 } from "@/model/climate/ocean/tides/tidal-schedule/contributors/types"
@@ -17,6 +18,23 @@ function starMassKg({ spectralClass, starSubtype }: StarMassParams): number {
 	return (
 		STAR.getStarMassSol({ cls, subtype: starSubtype }) * ORBIT_BODY.solarMassKg
 	)
+}
+
+function starDiameterM({
+	spectralClass,
+	starSubtype,
+	starDiameterSol,
+}: StarDiameterParams): number {
+	if (
+		starDiameterSol !== undefined &&
+		Number.isFinite(starDiameterSol) &&
+		starDiameterSol > 0
+	)
+		return starDiameterSol * 1.392e9
+	const cls = STAR.isValidSpectralClass(spectralClass)
+		? spectralClass
+		: STAR.defaultSpectralClass
+	return STAR.getStarDiameterSol({ cls, subtype: starSubtype }) * 1.392e9
 }
 
 function validateMoon({
@@ -99,5 +117,6 @@ function lockedToMoon({ tideLock, moon }: LockedToMoonParams): boolean {
 export const TIDAL_CONTRIBUTORS = {
 	prepare,
 	starMassKg,
+	starDiameterM,
 	lockedToMoon,
 }

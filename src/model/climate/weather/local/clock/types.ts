@@ -65,3 +65,23 @@ export interface WeatherSeasonParams {
 	instant: WeatherInstant
 	latitudeDeg: number
 }
+
+export interface WeatherEclipticParams {
+	params: GenesisParams
+	seconds: number
+}
+
+export interface WeatherEclipticState {
+	solarLongitudeRad: number
+	starDistanceM: number
+	yearSeconds: number
+	day: number
+	next: number
+	fraction: number
+	librationRad: number
+}
+
+export interface WeatherClockRates {
+	starSpeedRatio: number
+	frameRadS: number
+}

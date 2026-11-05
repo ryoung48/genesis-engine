@@ -2,6 +2,10 @@
 
 Local weather is a deterministic, display-only realization of generated monthly climate. It does not change climate arrays, water balance or history. The province wiki is its interactive surface; no Conditions map, legend or hover mode is provided. See [province navigation](../development/province-wiki.md).
 
+## Sky and eclipses
+
+Moon rows follow prepared inclined, eccentric Kepler orbits in the clock's shared frame, with nodes and apsides precessing so eclipse seasons drift through the year. The Sun & moon section includes current eclipses and the next confirmed locally visible eclipse, with local maximum, observable duration and solar coverage. Forecasts are computed synchronously and cached per world and site, show "None in the next 20 years" or "Unavailable" when there is nothing to list, and never change weather values. See [eclipse geometry, frame and numerical limits](../celestial/eclipses.md).
+
 ## One generator
 
 `inputs` samples numeric climate and actual local solar context. `decision` contains the original model's regime → cloud → phenomenon tree and the agreed numeric constraints. `region` turns that one decision into numeric precipitation, a primary phenomenon and a cloud description. `clouds` only represents the selected category as numeric estimated occurrences; it does not independently classify weather. `vocabulary` contains the 36 primary phenomena and eight cloud/sky descriptions.

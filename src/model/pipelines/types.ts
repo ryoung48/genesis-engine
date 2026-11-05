@@ -90,6 +90,8 @@ export interface GenesisParams {
 	eccentricity: number // orbital eccentricity, default 0.0167
 	spectralClass: string // stellar spectral class, default "G"
 	starSubtype: number // spectral subtype 0–9, default 2.0 (G2 ≈ Sol)
+	// [JUSTIFICATION] Captured host radii are absent on authored worlds, which use spectral fallback.
+	starDiameterSol?: number
 	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24

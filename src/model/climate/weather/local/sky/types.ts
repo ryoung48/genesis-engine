@@ -1,5 +1,6 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WeatherInstant } from "@/model/climate/weather/local/clock/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 
 export type SkyCycle = "cycle" | "alwaysUp" | "neverUp" | "locked"
 
@@ -20,6 +21,7 @@ export interface SkyParams {
 
 export interface MoonSkyParams extends SkyParams {
 	moons: MoonBody[]
+	params: GenesisParams
 }
 
 export interface SunSky {
@@ -56,6 +58,7 @@ export interface SkyPositionsParams {
 	instant: WeatherInstant
 	xyz: [number, number, number]
 	moons: MoonBody[]
+	params: GenesisParams
 }
 
 export interface SkyBodyPosition {
@@ -76,6 +79,12 @@ export interface MoonOrbitParams {
 
 export interface MoonOrbitState {
 	elongation: number
+	illumination: number
 	declinationRad: number
 	transitPhase: number
+}
+
+export interface BodyFixedParams {
+	instant: WeatherInstant
+	vector: [number, number, number]
 }

@@ -38,15 +38,9 @@ import type { WorldGenerationInput } from "@/ui/genesis/view/types"
 // hardcoded default for every generated world).
 const SEISMOLOGY_VOLCANISM_DIVISOR = 25.599
 
-/**
- * Owns world generation: the worker callbacks, the assembled generation
- * parameter set, the seed input field's own dirty/error state, and the two
- * entry points that kick a build off -- procedural generation and the
- * Earth heightmap import (which loads every real-Earth raster before handing
- * them to the same worker pipeline).
- */
 export function useWorldGeneration(input: WorldGenerationInput) {
 	const {
+		starDiameterSol,
 		sceneRef,
 		workerRef,
 		lastWorldRef,
@@ -112,9 +106,13 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				setProceduralHistoryPlaying(false)
 				startProceduralJournal(null)
 			}
-			setWorld(w)
+			setWorld(
+				w && !w.isEarthImport && starDiameterSol !== null
+					? { ...w, params: { ...w.params, starDiameterSol } }
+					: w,
+			)
 		},
-		[startProceduralJournal],
+		[startProceduralJournal, starDiameterSol],
 	)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.

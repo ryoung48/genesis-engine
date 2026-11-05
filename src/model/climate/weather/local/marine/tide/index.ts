@@ -66,10 +66,12 @@ function tide({
 		(moon) =>
 			!TIDAL_CONTRIBUTORS.lockedToMoon({ tideLock: params.tideLock, moon }),
 	)
-	const rotation =
-		((instant.retrograde ? -1 : 1) * 2 * Math.PI) / instant.rotationSeconds
-	const transit = (rate: number) =>
-		Math.abs(rate) > 0 ? (2 * Math.PI) / Math.abs(rate) : null
+	const sky = WEATHER_SKY.positions({
+		instant,
+		xyz: shore.xyz,
+		moons: active,
+		params,
+	})
 	const star: MarineTideBody = {
 		strength:
 			params.tideLock?.type === "solar"
@@ -80,21 +82,22 @@ function tide({
 						planetMassKg,
 						planetRadiusM,
 					}),
-		transitSeconds: transit(rotation - (2 * Math.PI) / instant.yearSeconds),
+		transitSeconds:
+			sky.star.transitHours === null ? null : sky.star.transitHours * 3600,
 	}
 	const bodies: MarineTideBody[] = [
 		star,
-		...active.map((moon) => ({
+		...active.map((moon, index) => ({
 			strength: strength({
 				massKg: moon.massKg,
 				distanceM: MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }),
 				planetMassKg,
 				planetRadiusM,
 			}),
-			transitSeconds: transit(
-				rotation -
-					(2 * Math.PI) / (moon.orbitalPeriodDays * TIME.secondsPerDay),
-			),
+			transitSeconds:
+				sky.moons[index].transitHours === null
+					? null
+					: sky.moons[index].transitHours * 3600,
 		})),
 	]
 	const total = bodies.reduce((sum, body) => sum + body.strength, 0)
@@ -126,6 +129,7 @@ function tide({
 			instant: lagged,
 			xyz: shore.xyz,
 			moons: active,
+			params,
 		})
 		const positions = [sky.star, ...sky.moons]
 		let sum = 0

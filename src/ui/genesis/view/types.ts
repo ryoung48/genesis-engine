@@ -258,6 +258,7 @@ export type MapColoringInput = {
 }
 
 export type WorldGenerationInput = {
+	starDiameterSol: number | null
 	sceneRef: SceneRef
 	workerRef: RefObject<Worker | null>
 	lastWorldRef: RefObject<SerializedGenesisWorld | null>

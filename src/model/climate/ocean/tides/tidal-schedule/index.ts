@@ -2,11 +2,9 @@ import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import { STAR } from "@/model/celestial/star"
 import { TIDAL_FORCE } from "@/model/climate/ocean/tides/tidal-force"
 import { TIDAL_CONTRIBUTORS } from "@/model/climate/ocean/tides/tidal-schedule/contributors"
 import type {
-	EclipseType,
 	SurfaceTidesBreakdown,
 	SurfaceTidesContribution,
 	TidalContributor,
@@ -16,117 +14,6 @@ import type {
 import type { GenesisParams } from "@/model/pipelines/types"
 
 const MAX_TIDAL_SCHEDULE_SAMPLES = 2000
-
-function starDiameterM({
-	spectralClass,
-	starSubtype,
-	starDiameterM: directStarDiameterM,
-}: {
-	spectralClass: string
-	starSubtype: number
-	starDiameterM?: number
-}): number {
-	if (directStarDiameterM !== undefined) return directStarDiameterM
-	// spectralClass can be one of the exotic SpectralClass values for a
-	// galaxy-generated star (giant, white dwarf, etc. -- see
-	// rollStarAttributes) -- STAR.getStarDiameterSol only models main-sequence
-	// (V-class) stars, same guard buildMoonContributors above already uses.
-	const cls = STAR.isValidSpectralClass(spectralClass)
-		? spectralClass
-		: STAR.defaultSpectralClass
-	return STAR.getStarDiameterSol({ cls, subtype: starSubtype }) * 1.392e9
-}
-
-function moonIlluminatedFraction({
-	moonLatRad,
-	moonLonRad,
-	starLatRad,
-	starLonRad,
-}: {
-	moonLatRad: number
-	moonLonRad: number
-	starLatRad: number
-	starLonRad: number
-}): number {
-	// cos Î± = dot product of unit vectors from planet to moon and planet to star
-	const cosMoon = Math.cos(moonLatRad)
-	const mx = cosMoon * Math.cos(moonLonRad)
-	const my = cosMoon * Math.sin(moonLonRad)
-	const mz = Math.sin(moonLatRad)
-
-	const cosStar = Math.cos(starLatRad)
-	const sx = cosStar * Math.cos(starLonRad)
-	const sy = cosStar * Math.sin(starLonRad)
-	const sz = Math.sin(starLatRad)
-
-	// Angle at moon between planet (origin) and star
-	// The star direction from the moon is approximately the same as star direction from planet
-	// (star is ~1 AU away, moon is <0.01 AU away — negligible parallax)
-	const cosAlpha = mx * sx + my * sy + mz * sz
-	return (1 - cosAlpha) / 2
-}
-
-function detectEclipse({
-	moonLatRad,
-	moonLonRad,
-	moonDistanceM,
-	moonDiameterM,
-	starLatRad,
-	starLonRad,
-	starDistM,
-	starDiamM,
-	phase,
-}: {
-	moonLatRad: number
-	moonLonRad: number
-	moonDistanceM: number
-	moonDiameterM: number
-	starLatRad: number
-	starLonRad: number
-	starDistM: number
-	starDiamM: number
-	phase: number
-}): EclipseType {
-	// Solar eclipse: new moon (phase ≈ 0) + moon near ecliptic (near star direction)
-	// Lunar eclipse: full moon (phase ≈ 1) + moon opposite star
-	const isNew = phase < 0.05
-	const isFull = phase > 0.95
-
-	if (!isNew && !isFull) return "none"
-
-	// Angular separation between moon and star (new) or moon and anti-star (full)
-	const cosMoon = Math.cos(moonLatRad)
-	const mx = cosMoon * Math.cos(moonLonRad)
-	const my = cosMoon * Math.sin(moonLonRad)
-	const mz = Math.sin(moonLatRad)
-
-	const cosStar = Math.cos(starLatRad)
-	const sx = cosStar * Math.cos(starLonRad)
-	const sy = cosStar * Math.sin(starLonRad)
-	const sz = Math.sin(starLatRad)
-
-	const dotMoonStar = mx * sx + my * sy + mz * sz
-
-	if (isNew && dotMoonStar > 0.9998) {
-		// Moon between planet and star — solar eclipse
-		const moonApp = TIDAL_FORCE.apparentDiameterRad({
-			bodyDiameterM: moonDiameterM,
-			distanceM: moonDistanceM,
-		})
-		const starApp = TIDAL_FORCE.apparentDiameterRad({
-			bodyDiameterM: starDiamM,
-			distanceM: starDistM,
-		})
-		return moonApp >= starApp ? "solar-total" : "solar-annular"
-	}
-
-	if (isFull && dotMoonStar < -0.9998) {
-		// Moon in planet's shadow — lunar eclipse
-		return "lunar"
-	}
-
-	return "none"
-}
 
 function buildMoonContributors({
 	moons,
@@ -188,16 +75,13 @@ function computeTidalScheduleFromContributors({
 		| "orbitalDistanceAU"
 		| "eccentricity"
 		| "perihelion"
-	> & { starMassKg?: number; starDiameterM?: number }
+	> & { starMassKg?: number }
 	moonsClamped: boolean
 }): TidalSchedule {
 	const {
 		daysPerYear,
 		planetRadiusKm,
 		tideLock,
-		spectralClass,
-		starSubtype,
-		starDiameterM: directStarDiameterM,
 		orbitalDistanceAU,
 		eccentricity,
 		perihelion,
@@ -205,11 +89,6 @@ function computeTidalScheduleFromContributors({
 	const starMassKg = params.starMassKg ?? TIDAL_CONTRIBUTORS.starMassKg(params)
 	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 	const planetRadiusM = planetRadiusKm * 1000
-	const starDiamM = starDiameterM({
-		spectralClass,
-		starSubtype,
-		starDiameterM: directStarDiameterM,
-	})
 	const contributorLabels = contributors.map((contributor) => contributor.label)
 
 	// Every unordered moon pair -- tide each raises on the other, per the
@@ -266,8 +145,6 @@ function computeTidalScheduleFromContributors({
 					})
 
 		const perMoonRaw: number[] = []
-		const moonPhases: number[] = []
-		let eclipse: EclipseType = "none"
 
 		for (const contributor of contributors) {
 			const pos = contributor.positionAt(t)
@@ -288,28 +165,6 @@ function computeTidalScheduleFromContributors({
 						planetRadiusM,
 					})
 			perMoonRaw.push(contrib)
-
-			const phase = moonIlluminatedFraction({
-				moonLatRad: pos.latRad,
-				moonLonRad: pos.lonRad,
-				starLatRad: starPos.latRad,
-				starLonRad: starPos.lonRad,
-			})
-			moonPhases.push(phase)
-
-			if (eclipse === "none") {
-				eclipse = detectEclipse({
-					moonLatRad: pos.latRad,
-					moonLonRad: pos.lonRad,
-					moonDistanceM: pos.distanceM,
-					moonDiameterM: contributor.diameterKm * 1000,
-					starLatRad: starPos.latRad,
-					starLonRad: starPos.lonRad,
-					starDistM: starPos.distanceM,
-					starDiamM,
-					phase,
-				})
-			}
 		}
 
 		const moonForces = perMoonRaw.map(
@@ -355,8 +210,6 @@ function computeTidalScheduleFromContributors({
 			tidalForce,
 			moonForces,
 			starForce,
-			moonPhases,
-			eclipseType: eclipse,
 			moonMoonForces,
 			moonMoonSeparationsKm,
 		})
@@ -396,7 +249,7 @@ function computeMoonTidalSchedule({
 		| "orbitalDistanceAU"
 		| "eccentricity"
 		| "perihelion"
-	> & { starMassKg?: number; starDiameterM?: number }
+	> & { starMassKg?: number }
 }): TidalSchedule {
 	const {
 		daysPerYear,
@@ -512,8 +365,6 @@ function computeMoonTidalSchedule({
 			tidalForce,
 			moonForces,
 			starForce,
-			moonPhases: [],
-			eclipseType: "none",
 			moonMoonForces: [],
 			moonMoonSeparationsKm: [],
 		})

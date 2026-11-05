@@ -1,3 +1,4 @@
+import { TIDAL_CONTRIBUTORS } from "@/model/climate/ocean/tides/tidal-schedule/contributors"
 import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { CloudGenus } from "@/model/climate/weather/local/clouds/types"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
@@ -9,6 +10,7 @@ import type {
 } from "@/model/climate/weather/local/marine/tide/types"
 import type { MarineSeaState } from "@/model/climate/weather/local/marine/waves/types"
 import { WEATHER_SKY } from "@/model/climate/weather/local/sky"
+import { WEATHER_ECLIPSES } from "@/model/climate/weather/local/sky/eclipses"
 import type {
 	MoonPhase,
 	SkyCycle,
@@ -29,6 +31,7 @@ import {
 	formatWindSpeed,
 	windDirectionLabel,
 } from "@/ui/genesis/shared/ui-format"
+import { ECLIPSE_DISPLAY } from "@/ui/genesis/shared/weather-display/eclipses"
 import type {
 	PresentHourlyParams,
 	PresentMonthlyParams,
@@ -447,7 +450,12 @@ const cycleLabels: Record<Exclude<SkyCycle, "cycle">, string> = {
 	locked: "No day cycle",
 }
 
-function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
+function sky({
+	snapshot,
+	moons,
+	params,
+	xyz,
+}: PresentSkyParams): WeatherSkyDisplay | null {
 	const values = snapshot.values
 	if (!values) return null
 	const input = { instant: snapshot.instant, latitudeDeg: values.latitudeDeg }
@@ -495,7 +503,11 @@ function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
 	return {
 		rows: [
 			sunRow,
-			...WEATHER_SKY.moons({ ...input, moons }).map(
+			...WEATHER_SKY.moons({
+				...input,
+				params,
+				moons: TIDAL_CONTRIBUTORS.prepare({ params, moons }).moons,
+			}).map(
 				(moon): WeatherSkyRow => ({
 					key: `moon-${moon.label}`,
 					name: moon.label,
@@ -525,6 +537,16 @@ function sky({ snapshot, moons }: PresentSkyParams): WeatherSkyDisplay | null {
 					],
 				}),
 			),
+			...(xyz
+				? ECLIPSE_DISPLAY.rows({
+						result: WEATHER_ECLIPSES.local({
+							params,
+							xyz,
+							instant: snapshot.instant,
+						}),
+						instant: snapshot.instant,
+					})
+				: []),
 		],
 	}
 }
@@ -565,12 +587,7 @@ function sea({
 			event.localHour === null
 				? "—"
 				: formatClockTimeDisplay(event.localHour, dayHours, true)
-		const day =
-			event.dayOffset === 0
-				? ""
-				: event.dayOffset === 1
-					? " tomorrow"
-					: ` +${event.dayOffset} d`
+		const day = ECLIPSE_DISPLAY.dayOffset(event.dayOffset)
 		return `${time}${day} · ${signed(event.levelM)}`
 	}
 	const tide = WEATHER_MARINE.tide({

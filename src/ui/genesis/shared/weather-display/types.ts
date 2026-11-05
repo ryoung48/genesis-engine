@@ -21,6 +21,7 @@ export interface WeatherSummaryProps {
 	outlook: WeatherOutlook | null
 	moons: MoonBody[]
 	params: GenesisParams | null
+	xyz: [number, number, number] | null
 	unitSystem: UnitSystem
 	dateLabel: string
 	loading: boolean
@@ -108,6 +109,8 @@ export interface WeatherMonthlyProps {
 export interface PresentSkyParams {
 	snapshot: WeatherSnapshot
 	moons: MoonBody[]
+	params: GenesisParams
+	xyz: [number, number, number] | null
 }
 
 export interface WeatherSkyItem {

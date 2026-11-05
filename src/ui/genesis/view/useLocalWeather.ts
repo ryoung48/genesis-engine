@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createWeatherClient } from "@/ui/genesis/view/local-weather-client"
 import type {
 	LocalWeatherDisplayState,
@@ -101,7 +101,25 @@ export function useLocalWeather({
 		state.world === world &&
 		state.seconds === instant?.seconds &&
 		state.selected?.province === selectedProvince
+	const xyz = useMemo((): [number, number, number] | null => {
+		const region = state.selected?.samples[0]?.region
+		if (!matches || !world || region === undefined) return null
+		const vector = world.mesh.r_xyz
+		const length = Math.hypot(
+			vector[3 * region],
+			vector[3 * region + 1],
+			vector[3 * region + 2],
+		)
+		return length > 0
+			? [
+					vector[3 * region] / length,
+					vector[3 * region + 1] / length,
+					vector[3 * region + 2] / length,
+				]
+			: null
+	}, [matches, world, state.selected])
 	return {
+		xyz,
 		selected: matches ? state.selected : null,
 		outlook: matches ? state.outlook : null,
 		loading:

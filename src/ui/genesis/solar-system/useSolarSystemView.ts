@@ -630,9 +630,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 					starMassKg: solarSystem.star.hostStar
 						? solarSystem.star.hostStar.massSol * ORBIT_BODY.solarMassKg
 						: undefined,
-					starDiameterM: solarSystem.star.hostStar
-						? solarSystem.star.hostStar.diameterSol * 1.392e9
-						: undefined,
 					orbitalDistanceAU: focusedMoonParent.orbitalDistanceAU,
 					eccentricity: focusedMoonParent.eccentricity,
 					perihelion,
@@ -649,9 +646,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			starSubtype,
 			starMassKg: solarSystem.star.hostStar
 				? solarSystem.star.hostStar.massSol * ORBIT_BODY.solarMassKg
-				: undefined,
-			starDiameterM: solarSystem.star.hostStar
-				? solarSystem.star.hostStar.diameterSol * 1.392e9
 				: undefined,
 			orbitalDistanceAU,
 			eccentricity,

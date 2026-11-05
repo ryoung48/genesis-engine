@@ -7,6 +7,11 @@ export type StarMassParams = Pick<
 	"spectralClass" | "starSubtype"
 >
 
+export type StarDiameterParams = Pick<
+	GenesisParams,
+	"spectralClass" | "starSubtype" | "starDiameterSol"
+>
+
 export interface PrepareContributorsParams {
 	moons: MoonBody[]
 	params: Pick<

@@ -227,6 +227,8 @@ function moonAt({
 			(luna.orbitalPeriodDays * TIME.secondsPerDay)
 	return {
 		...luna,
+		inclinationDeg: 0,
+		eccentricity: 0,
 		longitudeOfAscendingNodeDeg: 0,
 		longitudeOfPerihelionDeg: 0,
 		meanAnomalyAtEpochDeg: (longitude * 180) / Math.PI,
@@ -329,7 +331,7 @@ it("handles polar, synchronous, retrograde and slow-rotation edge cases", () => 
 	const instant = resolve(baseParams, 1e6)
 	const polar = MARINE_TIDE.tide({
 		instant,
-		moons: [luna],
+		moons: [{ ...luna, inclinationDeg: 0, eccentricity: 0 }],
 		shore: { ...equator, latitudeDeg: 90, xyz: [0, 0, 1] },
 		params: baseParams,
 	})!

@@ -92,6 +92,7 @@ import {
 	SCENE_REBUILD_THROTTLE_MS,
 	useThrottledValue,
 } from "@/ui/genesis/shared/useThrottledValue"
+import { ECLIPSE_DISPLAY } from "@/ui/genesis/shared/weather-display/eclipses"
 import type { WeatherSummaryProps } from "@/ui/genesis/shared/weather-display/types"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import { SolarSystemControls } from "@/ui/genesis/solar-system/SolarSystemControls"
@@ -1083,6 +1084,7 @@ export const GenesisView: React.FC<{
 		[worldParams],
 	)
 	const weatherProps: WeatherSummaryProps = {
+		xyz: localWeather.xyz,
 		snapshot: localWeather.selected,
 		outlook: localWeather.outlook,
 		moons: weatherMoons,
@@ -1629,6 +1631,7 @@ export const GenesisView: React.FC<{
 		handleResetDefaults,
 		handleReturnToPlanetView,
 	} = useWorldGeneration({
+		starDiameterSol: solarSystem.star.hostStar?.diameterSol ?? null,
 		sceneRef,
 		workerRef,
 		lastWorldRef,
@@ -1915,8 +1918,7 @@ export const GenesisView: React.FC<{
 	})
 
 	// --- Planet stats ---
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	const planetStats = useMemo(
+	const basePlanetStats = useMemo(
 		() =>
 			computePlanetStats(
 				// sceneWorld, not world: for an Earth import it carries the
@@ -1961,8 +1963,18 @@ export const GenesisView: React.FC<{
 			world,
 			windStats,
 			dataVariant,
+			maxElevation,
 		],
 	)
+	const eclipseParams = (sceneWorld ?? world)?.params
+	const eclipseStat = useMemo(
+		() =>
+			eclipseParams ? ECLIPSE_DISPLAY.planet({ params: eclipseParams }) : null,
+		[eclipseParams],
+	)
+	const planetStats = eclipseStat
+		? [...basePlanetStats, { label: "Next Eclipse", value: eclipseStat }]
+		: basePlanetStats
 
 	const {
 		currentFocus,

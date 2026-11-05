@@ -1,10 +1,14 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	LocalSolarParams,
 	LocalSolarState,
 	ResolveWeatherClockParams,
 	SelectWeatherClockParams,
 	ShiftWeatherInstantParams,
+	WeatherClockRates,
 	WeatherClockSelection,
+	WeatherEclipticParams,
+	WeatherEclipticState,
 	WeatherInstant,
 	WeatherSeasonParams,
 } from "@/model/climate/weather/local/clock/types"
@@ -17,9 +21,114 @@ const orbitalTables = new WeakMap<
 	ReturnType<typeof CLIMATEV2_LOCKED_ORBIT.computeDailyLockedOrbit>
 >()
 
+const clockRates = new WeakMap<GenesisParams, WeatherClockRates>()
+const yearLengths = new WeakMap<GenesisParams, number>()
+
 const YEAR_SECONDS = 3.156e7
 const TAU = 2 * Math.PI
 const wrap = (value: number) => ((value % 1) + 1) % 1
+
+function tableFor(params: GenesisParams) {
+	let table = orbitalTables.get(params)
+	if (!table) {
+		table = CLIMATEV2_LOCKED_ORBIT.computeDailyLockedOrbit(params)
+		orbitalTables.set(params, table)
+	}
+	return table
+}
+
+function ecliptic({
+	params,
+	seconds,
+}: WeatherEclipticParams): WeatherEclipticState {
+	let yearSeconds = yearLengths.get(params)
+	if (yearSeconds === undefined) {
+		const orbit =
+			params.tideLock?.type === "solar"
+				? CLIMATEV2_ORBIT.lockedFromParams(params)
+				: CLIMATEV2_ORBIT.fromParams(params)
+		yearSeconds = orbit.yearScale * YEAR_SECONDS
+		yearLengths.set(params, yearSeconds)
+	}
+	const table = tableFor(params)
+	const position = wrap(seconds / yearSeconds) * table.solarLongitude.length
+	const day = Math.floor(position),
+		fraction = position - day
+	const next = (day + 1) % table.solarLongitude.length
+	const a = table.solarLongitude[day]
+	const difference =
+		((table.solarLongitude[next] - a + 3 * Math.PI) % TAU) - Math.PI
+	return {
+		solarLongitudeRad: a + difference * fraction,
+		starDistanceM:
+			(table.distance[day] * (1 - fraction) + table.distance[next] * fraction) *
+			params.orbitalDistanceAU *
+			ORBIT_BODY.astronomicalUnitM,
+		yearSeconds,
+		day,
+		next,
+		fraction,
+		librationRad:
+			table.libration[day] * (1 - fraction) +
+			table.libration[next] * fraction -
+			table.libration[0],
+	}
+}
+
+function rates(params: GenesisParams): WeatherClockRates {
+	const previous = clockRates.get(params)
+	if (previous) return previous
+	const orbit =
+		params.tideLock?.type === "solar"
+			? CLIMATEV2_ORBIT.lockedFromParams(params)
+			: CLIMATEV2_ORBIT.fromParams(params)
+	const yearSeconds = orbit.yearScale * YEAR_SECONDS
+	const table = tableFor(params)
+	const count = table.solarLongitude.length
+	const dt = yearSeconds / count
+	const turn = (value: number) => ((value + 3 * Math.PI) % TAU) - Math.PI
+	let speed = 0,
+		angular = 0,
+		libration = 0,
+		nearest = Infinity
+	for (let day = 0; day < count; day++) {
+		const next = (day + 1) % count
+		const change = Math.abs(
+			turn(table.solarLongitude[next] - table.solarLongitude[day]),
+		)
+		const radius = Math.max(table.distance[day], table.distance[next])
+		angular = Math.max(angular, change / dt)
+		speed = Math.max(
+			speed,
+			Math.hypot(radius * change, table.distance[next] - table.distance[day]) /
+				dt,
+		)
+		libration = Math.max(
+			libration,
+			Math.abs(table.libration[next] - table.libration[day]) / dt,
+		)
+		nearest = Math.min(nearest, table.distance[day])
+	}
+	const slope = (values: number[]) =>
+		values.reduce(
+			(max, value, n) =>
+				Math.max(
+					max,
+					Math.abs(values[(n + 1) % values.length] - value) /
+						(yearSeconds / values.length),
+				),
+			0,
+		)
+	const locked = orbit.locked
+		? slope(orbit.locked.libration) + slope(orbit.locked.declination)
+		: libration
+	const result = {
+		starSpeedRatio: speed / nearest,
+		frameRadS: Math.abs(orbit.rotationRateRadS) + 3 * angular + locked,
+	}
+	clockRates.set(params, result)
+	return result
+}
 
 function resolve({
 	params,
@@ -43,27 +152,13 @@ function resolve({
 	let declination =
 		((orbit.tiltDeg * Math.PI) / 180) * Math.sin(TAU * (phase - 0.25))
 
-	let table = orbitalTables.get(params)
-	if (!table) {
-		table = CLIMATEV2_LOCKED_ORBIT.computeDailyLockedOrbit(params)
-		orbitalTables.set(params, table)
-	}
-	const position = phase * table.solarLongitude.length
-	const day = Math.floor(position)
-	const fraction = position - day
-	const next = (day + 1) % table.solarLongitude.length
-	const a = table.solarLongitude[day]
-	const difference =
-		((table.solarLongitude[next] - a + 3 * Math.PI) % TAU) - Math.PI
-	const solarLongitude = a + difference * fraction
+	const state = ecliptic({ params, seconds })
+	const solarLongitude = state.solarLongitudeRad
 	if (!orbit.locked) {
 		declination = Math.asin(
 			Math.sin((orbit.tiltDeg * Math.PI) / 180) * Math.sin(solarLongitude),
 		)
-		subLon +=
-			table.libration[day] * (1 - fraction) +
-			table.libration[next] * fraction -
-			table.libration[0]
+		subLon += state.librationRad
 	}
 	if (orbit.locked) {
 		const position = phase * 12 - 0.5
@@ -186,6 +281,8 @@ function season({ instant, latitudeDeg }: WeatherSeasonParams): string {
 }
 
 export const WEATHER_CLOCK = {
+	ecliptic,
+	rates,
 	resolve,
 	localSolar,
 	select,

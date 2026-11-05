@@ -3,8 +3,6 @@ export interface TidalEvent {
 	tidalForce: number
 	moonForces: number[]
 	starForce: number
-	moonPhases: number[]
-	eclipseType: EclipseType
 	moonMoonForces: number[]
 	moonMoonSeparationsKm: number[]
 }
@@ -40,5 +38,3 @@ export interface SurfaceTidesBreakdown {
 	totalM: number
 	contributions: SurfaceTidesContribution[]
 }
-
-export type EclipseType = "solar-total" | "solar-annular" | "lunar" | "none"

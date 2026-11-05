@@ -26,6 +26,18 @@ function solveKeplersEquation({
 		E -= dE
 		if (Math.abs(dE) < 1e-10) break
 	}
+	if (
+		!Number.isFinite(E) ||
+		Math.abs(E - eccentricity * Math.sin(E) - meanAnomalyRad) > 1e-10
+	) {
+		let lo = meanAnomalyRad - eccentricity,
+			hi = meanAnomalyRad + eccentricity
+		for (let iteration = 0; iteration < 64; iteration++) {
+			E = lo + (hi - lo) / 2
+			if (E - eccentricity * Math.sin(E) < meanAnomalyRad) lo = E
+			else hi = E
+		}
+	}
 	return E
 }
 
@@ -59,7 +71,10 @@ function keplerMoonPositionVector({
 	const yOrb = r * Math.sin(nu)
 
 	// Euler rotations: ω (arg of periapsis), i (inclination), Ω (lon of ascending node)
-	const omega = (moon.longitudeOfPerihelionDeg * Math.PI) / 180
+	const omega =
+		((moon.longitudeOfPerihelionDeg - moon.longitudeOfAscendingNodeDeg) *
+			Math.PI) /
+		180
 	const inc = (moon.inclinationDeg * Math.PI) / 180
 	const Omega = (moon.longitudeOfAscendingNodeDeg * Math.PI) / 180
 
@@ -70,7 +85,7 @@ function keplerMoonPositionVector({
 	const cosI = Math.cos(inc),
 		sinI = Math.sin(inc)
 
-	// Rotation matrix columns (perifocal → equatorial)
+	// Rotation matrix columns (perifocal → ecliptic)
 	const x =
 		(cosO * coso - sinO * sino * cosI) * xOrb +
 		(-cosO * sino - sinO * coso * cosI) * yOrb
@@ -191,6 +206,7 @@ function keplerMoonPositionCartesian({
 }
 
 export const MECHANICS = {
+	eccentricAnomaly: solveKeplersEquation,
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
 	moonOrbitalPeriodDaysFromSemiMajorAxisM,

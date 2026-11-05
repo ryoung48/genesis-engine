@@ -5,8 +5,18 @@ export interface KeplerEquationInput {
 	eccentricity: number
 }
 
+export type KeplerElements = Pick<
+	MoonBody,
+	| "orbitalPeriodDays"
+	| "eccentricity"
+	| "inclinationDeg"
+	| "longitudeOfAscendingNodeDeg"
+	| "longitudeOfPerihelionDeg"
+	| "meanAnomalyAtEpochDeg"
+>
+
 export interface MoonPositionVectorInput {
-	moon: MoonBody
+	moon: KeplerElements
 	semiMajorAxisM: number
 	t: number
 }

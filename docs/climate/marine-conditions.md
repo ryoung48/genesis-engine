@@ -40,7 +40,7 @@ The weather worker builds one extra `WEATHER_BASELINE` per ocean-facing province
 
 `WEATHER_MARINE.tide` runs in the display layer, next to `WEATHER_SKY.moons`. Both use the generated world's captured `params` and prepared `params.moons`, not the live editor.
 
-- **Equilibrium tide:** `ζ = Σ C_k P2(cos ψ_k)` over the star and each moon, minus its rotational mean `Σ C_k [1.5 (sin φ sin δ)² + 0.75 (cos φ cos δ)² − 0.5]`. `C_k` is `TIDAL_FORCE.tideContribution` at `cos ψ = 1`, moons at their semi-major axis. A moon the world is tidally locked to is omitted. Declinations and hour angles come from `WEATHER_SKY.positions`, which shares the sky's circular, coplanar moon model.
+- **Equilibrium tide:** `ζ = Σ C_k P2(cos ψ_k)` over the star and each moon, minus its rotational mean `Σ C_k [1.5 (sin φ sin δ)² + 0.75 (cos φ cos δ)² − 0.5]`. `C_k` is `TIDAL_FORCE.tideContribution` at `cos ψ = 1`, moons at their semi-major axis. A moon the world is tidally locked to is omitted. Declinations and hour angles come from `WEATHER_SKY.positions`, using inclined, eccentric Kepler positions in the [shared eclipse frame](../celestial/eclipses.md#frame).
 - **Scaling:** `level = springRangeM (ζ − ζ̄) / (1.5 cos² φ_eff Σ C)` with `φ_eff = min(|φ|, 60°)`. Aligned bodies at a low-latitude shore give a daily range equal to the shore's `tidalRange`. Beyond 60° the range tapers with cos² φ.
 - **Lag:** a per-shore uniform draw in `[0, 1)` times half the dominant contributor's transit period, so neighbouring coasts have high water at different times.
 - **Sampling:** a horizon of `min(1.25 T_dom, 7 days)` with step `min(T_min / 144, horizon / 180)`, at most 4096 steps. Every sample resolves the clock afresh with `WEATHER_CLOCK.resolve`. The card shows the current level and direction, the first strict high and low after now (or "Not found within forecast"), and a spring/neap label from the first full dominant transit: spring at ≥ 80 % of the spring range, neap at ≤ 50 %.
@@ -48,4 +48,4 @@ The weather worker builds one extra `WEATHER_BASELINE` per ocean-facing province
 
 ## Limitations
 
-Tides ignore basin resonance, amphidromic geometry, moon eccentricity and inclination, and the display uses mean circular orbits while generation samples Keplerian ones. Spring/neap thresholds are Earth-like heuristics. Waves are local wind sea only.
+Tides ignore basin resonance and amphidromic geometry. Display positions include moon eccentricity and inclination, but amplitude uses mean distance and transit periods remain mean-rate approximations. Correcting argument of periapsis to longitude of perihelion minus ascending node intentionally changes generated forces for nonzero-node moons; default/history Luna remains identical. Display tides change with the corrected sky positions. Spring/neap thresholds are Earth-like heuristics. Waves are local wind sea only.

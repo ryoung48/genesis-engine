@@ -45,10 +45,13 @@ it("derives moon phase from elongation and moonlight from time above the horizon
 		meanAnomalyAtEpochDeg: 180,
 		longitudeOfPerihelionDeg: 0,
 		longitudeOfAscendingNodeDeg: 0,
+		eccentricity: 0,
+		inclinationDeg: 0,
 	} as unknown as MoonBody
 	const [full] = WEATHER_SKY.moons({
 		instant: equinox(),
 		latitudeDeg: 0,
+		params: WEATHER_FIXTURE.params,
 		moons: [moon],
 	})
 	expect(full.phase).toBe("full")
@@ -59,6 +62,7 @@ it("derives moon phase from elongation and moonlight from time above the horizon
 	const [fresh] = WEATHER_SKY.moons({
 		instant: equinox(),
 		latitudeDeg: 0,
+		params: WEATHER_FIXTURE.params,
 		moons: [{ ...moon, meanAnomalyAtEpochDeg: 0 }],
 	})
 	expect(fresh.phase).toBe("new")
@@ -66,6 +70,7 @@ it("derives moon phase from elongation and moonlight from time above the horizon
 	const nearNew = WEATHER_SKY.moons({
 		instant: equinox(),
 		latitudeDeg: 0,
+		params: WEATHER_FIXTURE.params,
 		moons: [
 			{ ...moon, meanAnomalyAtEpochDeg: 10 },
 			{ ...moon, meanAnomalyAtEpochDeg: 350 },
