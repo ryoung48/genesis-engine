@@ -6,6 +6,7 @@ export interface WeatherHour {
 }
 
 export interface WeatherMonth {
+	daylightHours: number
 	temperatureC: number
 	rainMm: number
 	windSpeedMs: number

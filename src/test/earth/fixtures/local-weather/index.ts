@@ -37,6 +37,7 @@ function context(): WeatherContext {
 						dewPoint: new Float32Array(12).fill(15),
 						rain: new Float32Array(12).fill(30),
 						rainSlopes: new Float64Array(12).fill(360 / 3.156e7),
+						daylightHours: new Float32Array(12).fill(12),
 						windU: new Float32Array(12).fill(3),
 						windV: new Float32Array(12).fill(2),
 						cloud: new Float32Array(12).fill(0.5),

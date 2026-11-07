@@ -54,7 +54,7 @@ function color({ hue, saturation, lightness }: IdenticonColorParams): string {
 function style({ name, forcedHue }: IdenticonConfigParams): IdenticonStyle {
 	const hash = HASH.keyed({ seed: 0, key: name }) >>> 0
 	const hue = forcedHue ?? hash % 361
-	const roll = HASH.unit({ seed: hash, channel: 0, salt: 0 })
+	const roll = HASH.unit({ seed: hash, channel: 9, salt: 0 })
 	const tone = TONES.find((entry) => roll < entry.roll)!
 	return {
 		hue,

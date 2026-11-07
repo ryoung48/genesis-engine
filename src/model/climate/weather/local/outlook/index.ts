@@ -51,6 +51,7 @@ function monthly(params: SampleProvinceWeatherParams): WeatherMonth[] {
 		}
 		return {
 			temperatureC: mean((b) => b.temperature[month]),
+			daylightHours: mean((b) => b.daylightHours[month]),
 			rainMm: mean((b) => b.rain[month]),
 			windSpeedMs: samples ? wind / samples : 0,
 		}

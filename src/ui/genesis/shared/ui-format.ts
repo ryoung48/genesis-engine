@@ -5,6 +5,10 @@ import type {
 
 export type UnitSystem = "metric" | "imperial"
 
+export function formatDurationHours(hours: number | null): string {
+	return hours === null ? "—" : `${hours.toFixed(1)} h`
+}
+
 export function formatLatLon({
 	latitude,
 	longitude,

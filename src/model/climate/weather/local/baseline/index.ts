@@ -66,6 +66,7 @@ function build({
 	return {
 		location,
 		temperature,
+		daylightHours: field(world.climate.daylight_hours_monthly),
 		dtr,
 		dewPoint,
 		rain,

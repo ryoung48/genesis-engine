@@ -2,10 +2,13 @@ import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
 import { uiTokens } from "@/ui/components/tokens"
 import { rainColor, tempColor } from "@/ui/genesis/hover/info-panel-format"
 import { windSpeedColorCss } from "@/ui/genesis/hover/info-panel-labels"
+import { daylightColor } from "@/ui/genesis/shared/colors/misc"
 import {
+	formatDurationHours,
 	formatPrecipitation,
 	formatTemperature,
 	formatWindSpeed,
+	rgbToCss,
 } from "@/ui/genesis/shared/ui-format"
 import type { WeatherMonthlyProps } from "@/ui/genesis/shared/weather-display/types"
 
@@ -20,6 +23,13 @@ export function WeatherMonthly({ series, unitSystem }: WeatherMonthlyProps) {
 	return (
 		<div className={uiTokens.weather.monthly} aria-label="Monthly climate">
 			{[
+				{
+					label: "Daylight",
+					values: series.daylightHours,
+					color: (value: number) => rgbToCss(daylightColor(value)),
+					format: formatDurationHours,
+					summary: `AVG ${formatDurationHours(mean(series.daylightHours))}`,
+				},
 				{
 					label: "Temperature",
 					values: series.temperatureC,

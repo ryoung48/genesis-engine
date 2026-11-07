@@ -7,6 +7,7 @@ export interface WeatherBaseline {
 	particleSource: WeatherParticleSource | null
 	location: ProvinceSampleLocation
 	temperature: Float32Array
+	daylightHours: Float32Array
 	dtr: Float32Array | null
 	dewPoint: Float32Array | null
 	rain: Float32Array

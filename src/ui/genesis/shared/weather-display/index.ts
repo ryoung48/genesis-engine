@@ -24,6 +24,7 @@ import { formatClockTimeDisplay } from "@/ui/genesis/shared/clock"
 import { monthLabels } from "@/ui/genesis/shared/constants"
 import {
 	compassLabel,
+	formatDurationHours,
 	formatHeight,
 	formatPrecipitation,
 	formatRainRate,
@@ -428,6 +429,7 @@ function monthly({
 		labels: monthLabels.slice(1, 13).map((label) => label[0]),
 		names: monthLabels.slice(1, 13),
 		temperatureC: outlook.monthly.map((month) => month.temperatureC),
+		daylightHours: outlook.monthly.map((month) => month.daylightHours),
 		rainMm: outlook.monthly.map((month) => month.rainMm),
 		windSpeedMs: outlook.monthly.map((month) => month.windSpeedMs),
 		activeIndex: Math.min(11, Math.floor(phase * 12)),
@@ -466,8 +468,6 @@ function sky({
 			: cycle === "cycle"
 				? "—"
 				: cycleLabels[cycle]
-	const duration = (hours: number | null) =>
-		hours === null ? "—" : `${hours.toFixed(1)} h`
 	const sun = WEATHER_SKY.sun(input)
 	const polar =
 		sun.cycle === "alwaysUp"
@@ -495,7 +495,7 @@ function sky({
 			},
 			{
 				label: "Daylight",
-				value: duration(sun.daylightHours),
+				value: formatDurationHours(sun.daylightHours),
 				icon: "weather-sunny",
 			},
 		],
@@ -531,7 +531,7 @@ function sky({
 						},
 						{
 							label: "Moonlight (moon above the horizon)",
-							value: duration(moon.upHours),
+							value: formatDurationHours(moon.upHours),
 							icon: "weather-night",
 						},
 					],

@@ -75,6 +75,7 @@ export interface PresentMonthlyParams {
 }
 
 export interface WeatherMonthlySeries {
+	daylightHours: number[]
 	labels: string[]
 	names: string[]
 	temperatureC: number[]
