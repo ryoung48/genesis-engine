@@ -1,12 +1,6 @@
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { Cast, PeopleGeography, Person } from "@/model/people/cast/types"
 
-export interface Seat {
-	key: string
-	tier: number
-	province: number
-}
-
 export interface TierParams {
 	cast: Cast
 	person: Person
@@ -51,11 +45,6 @@ export interface GeographyParams {
 export interface NeighborParams {
 	frame: WorldFrame
 	geography: PeopleGeography
-	nationId: number
-}
-
-export interface SeatsParams {
-	frame: WorldFrame
 	nationId: number
 }
 

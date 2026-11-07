@@ -14,7 +14,6 @@ import { ORIENTATION } from "@/model/people/orientation"
 import type {
 	ConditionView,
 	Describer,
-	ExtendedParams,
 	FamilyGroup,
 	FamilyMember,
 	GroupsParams,
@@ -133,10 +132,6 @@ function relatives(
 		halfSiblings,
 		spouses,
 		children: childrenIn(cast, subject.marriages).filter(born),
-		grandparents: [],
-		auncles: [],
-		cousins: [],
-		nephews: [],
 	}
 }
 
@@ -339,13 +334,6 @@ function relationsOf(
 	side: (person: Person, male: string, female: string) => string,
 ): Map<number, string> {
 	const relations = new Map<number, string>()
-	for (const person of found.grandparents)
-		relations.set(person.id, side(person, "grandfather", "grandmother"))
-	for (const person of found.auncles)
-		relations.set(person.id, side(person, "uncle", "aunt"))
-	for (const person of found.cousins) relations.set(person.id, "cousin")
-	for (const person of found.nephews)
-		relations.set(person.id, side(person, "nephew", "niece"))
 	for (const person of found.parents)
 		relations.set(person.id, side(person, "father", "mother"))
 	for (const person of found.fullSiblings)
@@ -700,9 +688,6 @@ function headerOf(cast: Cast, person: Person): PersonHeader {
 function generate(cast: Cast, subject: Person, timeMs: number): void {
 	MARRIAGE.extend({ cast, id: subject.id, untilMs: timeMs })
 	FIT.ensureParents({ cast, person: subject })
-	const couple = CAST.parentsOf({ cast, person: subject })
-	for (const parent of couple ?? [])
-		MARRIAGE.extend({ cast, id: parent.id, untilMs: timeMs })
 }
 
 function page({
@@ -786,64 +771,6 @@ function page({
 	}
 }
 
-function extended({ cast, key, timeMs }: ExtendedParams): FamilyGroup[] {
-	INGEST.settle(cast)
-	const subject = resolve(cast, key)
-	const context = cast.context
-	if (!subject || !context || timeMs > cast.horizonMs) return []
-	const frame = context.frameAt(timeMs)
-	const born = (person: Person) => person.birthMs <= timeMs
-	generate(cast, subject, timeMs)
-	const couple = CAST.parentsOf({ cast, person: subject })
-	const parents = couple ? [couple[0], couple[1]] : []
-	const grandparents: Person[] = []
-	for (const parent of parents) {
-		FIT.ensureParents({ cast, person: parent })
-		for (const elder of CAST.parentsOf({ cast, person: parent }) ?? []) {
-			grandparents.push(elder)
-			MARRIAGE.extend({ cast, id: elder.id, untilMs: timeMs })
-		}
-	}
-	const parentIds = new Set(parents.map((parent) => parent.id))
-	const auncles = new Map<number, Person>()
-	for (const elder of grandparents)
-		for (const child of childrenIn(cast, elder.marriages))
-			if (!parentIds.has(child.id) && born(child)) auncles.set(child.id, child)
-	const cousins = new Map<number, Person>()
-	for (const auncle of auncles.values()) {
-		MARRIAGE.extend({ cast, id: auncle.id, untilMs: timeMs })
-		for (const child of childrenIn(cast, auncle.marriages))
-			if (born(child)) cousins.set(child.id, child)
-	}
-	const seen = new Set<number>([subject.id])
-	const build = (label: string, people: Person[]): FamilyGroup => ({
-		label,
-		members: people
-			.filter((person) => {
-				if (seen.has(person.id)) return false
-				seen.add(person.id)
-				return true
-			})
-			.map((person) =>
-				member({
-					cast,
-					context,
-					subject,
-					person,
-					timeMs,
-					frame,
-					kin: true,
-					spouse: false,
-				}),
-			),
-	})
-	return [
-		build("Grandparents", grandparents),
-		build("Uncles and aunts", [...auncles.values()]),
-		build("Cousins", [...cousins.values()]),
-	]
-}
-
 function header(cast: Cast, key: PersonKey): PersonHeader | null {
 	const person = resolve(cast, key)
 	return person ? headerOf(cast, person) : null
@@ -851,7 +778,6 @@ function header(cast: Cast, key: PersonKey): PersonHeader | null {
 
 export const PERSON_QUERY = {
 	page,
-	extended,
 	header,
 	rulerKey,
 	keyOf,

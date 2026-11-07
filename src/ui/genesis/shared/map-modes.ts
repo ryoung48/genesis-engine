@@ -142,7 +142,6 @@ const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["terrainFeatures", "Features"],
 	["basins", "Basins"],
 	["hotspots", "Hotspots"],
-	["moisture", "Moist"],
 	["oceanCurrents", "Current"],
 ]
 

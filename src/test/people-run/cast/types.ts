@@ -1,11 +1,6 @@
 import type { Cast, Person } from "@/model/people/cast/types"
-import type { FamilyGroup, PersonPage } from "@/model/people/query/types"
+import type { PersonPage } from "@/model/people/query/types"
 import type { PeopleFixture } from "@/test/history-run/fixtures/people/types"
-
-export interface Shown {
-	page: PersonPage
-	extended: FamilyGroup[]
-}
 
 export interface MarriageShot {
 	shownUntil: number
@@ -27,7 +22,6 @@ export interface Scenario {
 	spouseSearches: number
 	ingestMs: number[]
 	pageMs: number[]
-	extendedMs: number[]
 }
 
 export interface PickParams {
@@ -42,8 +36,8 @@ export interface CompareMarriagesParams {
 }
 
 export interface CompareShownParams {
-	before: Shown
-	after: Shown
+	before: PersonPage
+	after: PersonPage
 }
 
 export interface QualifiesParams {
@@ -78,7 +72,6 @@ export interface GrownFigures {
 	lifeDrift: number
 	castSize: number
 	castSpouseShare: number
-	seatFamilies: number
 	relabelShare: Record<string, number>
 	placed: Record<string, number>
 	unfilledTieShare: number
@@ -90,5 +83,4 @@ export interface GrownFigures {
 	deathContradictions: number
 	ingestMs: { p50: number; p95: number; max: number }
 	pageMs: { p50: number; p95: number }
-	extendedMs: { p50: number; p95: number }
 }

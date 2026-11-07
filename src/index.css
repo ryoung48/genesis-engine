@@ -38,6 +38,49 @@ button {
 	height: 100vh;
 }
 
+@layer components {
+	.recent-seeds-picker {
+		@apply opacity-0;
+	}
+
+	@supports (appearance: base-select) and selector(::picker(select)) {
+		.recent-seeds-picker,
+		.recent-seeds-picker::picker(select) {
+			appearance: base-select;
+		}
+
+		.recent-seeds-picker {
+			@apply border-0 bg-transparent p-0 text-transparent opacity-100 outline-none;
+		}
+
+		.recent-seeds-picker::picker-icon,
+		.recent-seeds-picker option::checkmark {
+			display: none;
+		}
+
+		.recent-seeds-picker::picker(select) {
+			@apply m-0 mt-1 max-h-56 min-w-36 max-w-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 text-slate-700 shadow-lg;
+			position-area: block-end span-inline-start;
+			position-try-fallbacks:
+				flip-block,
+				flip-inline,
+				flip-block flip-inline;
+		}
+
+		.recent-seeds-picker option {
+			@apply cursor-pointer rounded-md px-2 py-1.5 font-mono text-xs wrap-anywhere;
+		}
+
+		.recent-seeds-picker option:enabled:is(:hover, :focus-visible) {
+			@apply bg-slate-100 text-slate-950 outline-none;
+		}
+
+		.recent-seeds-picker option:disabled {
+			@apply cursor-default py-1 font-sans text-xs font-semibold text-slate-500 opacity-100;
+		}
+	}
+}
+
 /* Hide scrollbar but allow scrolling */
 .no-scrollbar::-webkit-scrollbar {
 	display: none;

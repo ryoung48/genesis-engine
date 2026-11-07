@@ -1,5 +1,5 @@
 // Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/rain.js (GPL-3.0, see LICENSE).
-// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage; export the month, latent heat, Priestley–Taylor and Turc–Pike constants for the locked rain stage.
+// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage; export the month, latent heat, Priestley–Taylor and Turc–Pike constants for the locked rain stage; export the snow share and snowmelt rate for the temperature stage's snow cover.
 // Rain stage: a column-water budget on the climate grid, at each point in the year. DOM-free.
 //
 // The water vapour in the air column, W (mm = kg/m²), is in balance at each point in the year:
@@ -49,7 +49,7 @@ const R_MAX = 1.5;                            // column relative humidity beyond
 const S_MAX = 0.2;                            // largest spread of the column's relative humidity by storms
 const STABLE_MAX_K = 10;                      // stability (surface below its latitude's temperature) counted up to this …
 const UNSTABLE_MAX_K = 8;                     // … and instability (above it) up to this
-const MELT_MM_PER_C_MONTH = 120;              // degree-day snowmelt, ≈ 4 mm per °C per day
+export const MELT_MM_PER_C_MONTH = 120;              // degree-day snowmelt, ≈ 4 mm per °C per day
 export const LATENT = 2.5e6;                         // J/kg, latent heat of vaporisation
 export const PT_ALPHA = 1.26;                        // Priestley–Taylor coefficient
 const DTR_GUESS_C = 10;                       // °C, the day's range without the day cycle (the land's typical ≈ 8–12)
@@ -67,6 +67,9 @@ export function qSat(T) {
     const t = Math.max(-60, Math.min(50, T));
     return 0.622 * 6.112 * Math.exp(17.67 * t / (t + 243.5)) / 1013;
 }
+
+// the share of precipitation falling as snow at an air temperature (°C): all of it by −2, none from +2
+export const snowShare = (T) => Math.min(1, Math.max(0, (2 - T) / 4));
 
 export const turcPike = (avail, ep) => avail / Math.sqrt(1 + (avail / Math.max(1e-12, ep)) ** 2);
 
@@ -402,7 +405,7 @@ export function columnWaterRain() {
                     // the column's temperature follows the surface only in part — the troposphere above a hot or frozen
                     // surface stays nearer its latitude's temperature — and that sets how much water it holds
                     p.Ws[c] = saturatedColumn(Tair[c] + (1 - P_.RAIN_COLUMN_LOCAL) * (Tzs[j] - Tsl[c]), P_.RAIN_VAPOUR_HEIGHT_KM);
-                    p.snow[c] = Math.min(1, Math.max(0, (2 - Tair[c]) / 4));            // share of the rain falling as snow
+                    p.snow[c] = snowShare(Tair[c]);            // share of the rain falling as snow
                     p.Tair[c] = Tair[c];
                     const bulk = RHO_AIR * P_.RAIN_EVAP_COEFF * Math.sqrt(u[c] * u[c] + v[c] * v[c] + gust2 + (dw2 ? dw2[c] : 0)) * (1 - P_.RAIN_SURFACE_RH);
                     // (the sea's evaporation is partly energy-limited: it follows the sunlight the surface gets, which thick

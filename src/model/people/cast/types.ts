@@ -171,7 +171,6 @@ export interface Reservation {
 export interface CastStats {
 	castSpouses: number
 	createdSpouses: number
-	seatFamilies: number
 	unrecordedParents: number
 	revealedLater: number
 	reservedUnfit: number
@@ -194,13 +193,11 @@ export interface Cast {
 	marriages: Marriage[]
 	bySex: [PersonId[], PersonId[]]
 	rulerPerson: Map<number, PersonId>
-	seatFamilies: Map<string, PersonId>
 	reservations: Map<string, Reservation[]>
 	reserved: Map<number, Reservation>
 	pendingTies: Map<number, TieRecord[]>
 	ingested: IngestMark
 	horizonMs: number
-	depth: number
 	houses: Map<string, string>
 	namePool: Map<string, string>
 	tiers: Map<string, number>

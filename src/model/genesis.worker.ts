@@ -69,8 +69,6 @@ function getProgressLabel(label: string): string {
 			return "Temperature"
 		case "Post: thermal equator":
 			return "Thermal equator"
-		case "Post: moisture advection":
-			return "Moisture"
 		case "Post: dtr + pet":
 			return "DTR + PET"
 		case "Post: observed Earth climate":
@@ -467,12 +465,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.oceanDist) add(world.oceanDist.buffer)
 	if (world.distCoast) add(world.distCoast.buffer)
 	if (world.rainfall) {
-		add(
-			world.rainfall.monthly.buffer,
-			world.rainfall.annual.buffer,
-			world.rainfall.east.buffer,
-			world.rainfall.west.buffer,
-		)
+		add(world.rainfall.monthly.buffer, world.rainfall.annual.buffer)
 		if (world.rainfall.real_monthly) add(world.rainfall.real_monthly.buffer)
 		if (world.rainfall.real_annual) add(world.rainfall.real_annual.buffer)
 		if (world.rainfall.diff_monthly) add(world.rainfall.diff_monthly.buffer)

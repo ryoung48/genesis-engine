@@ -39,6 +39,8 @@ import {
 import { PlanetDetails } from "@/ui/wiki/climate-preview/PlanetDetails"
 import { labelOrbitBodies } from "@/ui/wiki/navigator/GenerationPlanetNavigator/label-orbit-bodies"
 import { OrbitHeader } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitHeader"
+import type { RecentSeed } from "@/ui/wiki/navigator/GenerationPlanetNavigator/types"
+import { useRecentSeeds } from "@/ui/wiki/navigator/GenerationPlanetNavigator/useRecentSeeds"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	buildMoonPreviewDataProps,
@@ -384,10 +386,11 @@ export function GenerationPlanetNavigator({
 		seed === SOL_DATA.solSeed ? "sol" : seed.toString(36).padStart(6, "0"),
 	)
 	const [seedInput, setSeedInput] = useState(rootSeedLabel)
-	const lastAppliedRootSeedRef = useRef<{
-		numeric: number
-		label: string
-	} | null>(null)
+	const { recentSeeds, rememberSeed } = useRecentSeeds({
+		numeric: seed,
+		label: rootSeedLabel,
+	})
+	const lastAppliedRootSeedRef = useRef<RecentSeed | null>(null)
 	const starClass: SpectralClass =
 		hostStar?.spectralClass ?? (spectralClass as SpectralClass)
 	// showRealSolNames itself is already Sol-gated by the caller (real Sol
@@ -563,90 +566,63 @@ export function GenerationPlanetNavigator({
 		pendingMainWorldFocusRef.current = false
 		focusSelection(next)
 	}, [systemBodies, focusSelection])
-	const applySeedInput = useCallback(() => {
-		const normalized = SEED_LABEL.normalizeSeedLabel(seedInput)
-		if (seedInput.trim() === "") {
-			setSeedInput(seedDisplay)
-			return
-		}
-		if (isMainWorldTarget(selection)) {
-			const numericSeed =
-				normalized === "sol"
-					? SOL_DATA.solSeed
-					: (SEED_LABEL.resolveSeedLabel(normalized) ??
-						RNG.seedStringToNumber(normalized))
-			lastAppliedRootSeedRef.current = {
-				numeric: numericSeed,
-				label: normalized,
-			}
-			setRootSeedLabel(normalized)
-			setSeed(numericSeed)
-			// The main world's host star should mimic Sol too, not whatever
-			// class/subtype/age the star card was last left on -- mainWorldMode is
-			// left as-is (whatever the user last picked) rather than reset here.
+	const commitRootSeed = useCallback(
+		(entry: RecentSeed) => {
+			lastAppliedRootSeedRef.current = entry
+			setRootSeedLabel(entry.label)
+			setSeedInput(entry.label)
+			pendingMainWorldFocusRef.current = true
+			rememberSeed(entry)
+		},
+		[rememberSeed],
+	)
+	const applyRootSeed = useCallback(
+		(entry: RecentSeed) => {
+			commitRootSeed(entry)
+			setSeed(entry.numeric)
 			setSpectralClass(STAR.defaultSpectralClass)
 			setStarSubtype(STAR.defaultStarSubtype)
 			setStarAgeGyr(SOL_DATA.solStarAgeGyr)
+		},
+		[commitRootSeed, setSeed, setSpectralClass, setStarSubtype, setStarAgeGyr],
+	)
+	const applySeedInput = useCallback(
+		(value: string) => {
+			if (value.trim() === "" || value === seedDisplay) {
+				setSeedInput(seedDisplay)
+				return
+			}
+			const normalized = SEED_LABEL.normalizeSeedLabel(value)
+			if (isMainWorldTarget(selection)) {
+				const numeric =
+					normalized === "sol"
+						? SOL_DATA.solSeed
+						: (SEED_LABEL.resolveSeedLabel(normalized) ??
+							RNG.seedStringToNumber(normalized))
+				applyRootSeed({ numeric, label: normalized })
+				return
+			}
+			setSeedOverrides((current) => ({
+				...current,
+				[selectionKey(selection)]: normalized,
+			}))
 			setSeedInput(normalized)
-			pendingMainWorldFocusRef.current = true
-			return
-		}
-		setSeedOverrides((current) => ({
-			...current,
-			[selectionKey(selection)]: normalized,
-		}))
-		setSeedInput(normalized)
-	}, [
-		isMainWorldTarget,
-		seedDisplay,
-		seedInput,
-		selection,
-		selectionKey,
-		setSeed,
-		setSpectralClass,
-		setStarSubtype,
-		setStarAgeGyr,
-	])
-	// Rolls a fresh random label straight into the seed and applies it --
-	// same immediate regenerate-on-click behavior as the Earth shortcut. Only
-	// ever rendered on the main world's row (like the Earth button), so it
-	// always drives seed unconditionally rather than re-checking
-	// isMainWorldTarget against a selection that may not have re-rendered yet.
+		},
+		[applyRootSeed, isMainWorldTarget, seedDisplay, selection, selectionKey],
+	)
 	const randomizeSeed = useCallback(() => {
 		const label = SEED_LABEL.makeRandomSeedLabel()
-		const numericSeed = RNG.seedStringToNumber(label)
-		lastAppliedRootSeedRef.current = { numeric: numericSeed, label }
-		setRootSeedLabel(label)
-		setSeed(numericSeed)
-		setSpectralClass(STAR.defaultSpectralClass)
-		setStarSubtype(STAR.defaultStarSubtype)
-		setStarAgeGyr(SOL_DATA.solStarAgeGyr)
-		setSeedInput(label)
-		pendingMainWorldFocusRef.current = true
-	}, [setSeed, setSpectralClass, setStarSubtype, setStarAgeGyr])
-	// The main world's dedicated "set to Earth" shortcut -- applies
-	// SOL_DATA.solSeed immediately (no staging/Generate step needed) so the
-	// whole solar system regenerates as the real Sol system.
+		applyRootSeed({ numeric: RNG.seedStringToNumber(label), label })
+	}, [applyRootSeed])
 	const applyEarthSeed = useCallback(() => {
-		lastAppliedRootSeedRef.current = { numeric: SOL_DATA.solSeed, label: "sol" }
-		setRootSeedLabel("sol")
+		const entry = { numeric: SOL_DATA.solSeed, label: "sol" }
 		if (resetMainWorldToEarth) {
+			commitRootSeed(entry)
 			resetMainWorldToEarth()
 		} else {
-			setSeed(SOL_DATA.solSeed)
-			setSpectralClass(STAR.defaultSpectralClass)
-			setStarSubtype(STAR.defaultStarSubtype)
-			setStarAgeGyr(SOL_DATA.solStarAgeGyr)
+			applyRootSeed(entry)
 		}
-		setSeedInput("sol")
-		pendingMainWorldFocusRef.current = true
-	}, [
-		resetMainWorldToEarth,
-		setSeed,
-		setSpectralClass,
-		setStarSubtype,
-		setStarAgeGyr,
-	])
+	}, [applyRootSeed, commitRootSeed, resetMainWorldToEarth])
 	const getMainWorldMoonOrbitDistance = useCallback(
 		(moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
@@ -1383,12 +1359,14 @@ export function GenerationPlanetNavigator({
 					typeLabel={viewModel.typeLabel}
 					breadcrumbs={viewModel.breadcrumbs}
 					seedInput={seedInput}
+					recentSeeds={recentSeeds}
 					onFocus={viewModel.onFocus}
 					onClose={onClose}
 					headerAction={viewModel.headerAction}
 					showSeedControls={isMainWorldTarget(selection)}
 					onSeedInputChange={setSeedInput}
 					onSeedApply={applySeedInput}
+					onRecentSeedSelect={applyRootSeed}
 					onSeedRandomize={randomizeSeed}
 					onSeedSetEarth={applyEarthSeed}
 				/>

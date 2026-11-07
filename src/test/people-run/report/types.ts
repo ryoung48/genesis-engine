@@ -33,13 +33,11 @@ export interface PeopleReport {
 	frameMs: MsQuantiles
 	warmMs: MsQuantiles
 	pageMs: MsQuantiles
-	extendedMs: MsQuantiles
 	ingestMs: { first: number }
 	placementMs: number
 	generationMs: number
 	generatedPages: number
 	castSpouseShare: number
-	seatFamilies: number
 	passedOverShare: number
 	passedOverRows: number
 	revealedLaterCount: number

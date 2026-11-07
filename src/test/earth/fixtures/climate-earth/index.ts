@@ -13,6 +13,7 @@ function importWorld() {
 	const lake = loadEarthGrayscale("lake-mask.png")
 	const realClimate = loadEarthMonthlyRaster("earth-real-temperature")
 	const realPrecip = loadEarthMonthlyRaster("earth-real-precipitation")
+	const realDtr = loadEarthMonthlyRaster("earth-real-dtr")
 	const realElevation = loadEarthElevationRaster()
 	const realWindU = loadEarthMonthlyRaster("earth-real-wind-u")
 	const realWindV = loadEarthMonthlyRaster("earth-real-wind-v")
@@ -48,6 +49,12 @@ function importWorld() {
 			realPrecipMonths: realPrecip.months,
 			realPrecipScale: realPrecip.scale,
 			realPrecipNoData: realPrecip.nodata,
+			realDtrMonthly: realDtr.monthly,
+			realDtrWidth: realDtr.width,
+			realDtrHeight: realDtr.height,
+			realDtrMonths: realDtr.months,
+			realDtrScale: realDtr.scale,
+			realDtrNoData: realDtr.nodata,
 			realElevationRaster: realElevation.raster,
 			realElevationWidth: realElevation.width,
 			realElevationHeight: realElevation.height,

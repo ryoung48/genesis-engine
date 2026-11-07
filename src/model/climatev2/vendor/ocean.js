@@ -1,4 +1,4 @@
-// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/ocean.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: hot loops moved into top-level functions (monthStress, stressHarmonic, traceCarried), computing the same values; the overturning's latitude bands derived from the planet's own wind-stress curl and sea ice.
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/ocean.js (GPL-3.0, see LICENSE). Modified for speed in chaos-machine: hot loops moved into top-level functions (monthStress, stressHarmonic, traceCarried), computing the same values; the overturning's latitude bands derived from the planet's own wind-stress curl and sea ice; the barrier layer from each month's fresh water; archipelagos as basin shores (OCEAN_SHORE_LAT_DEG); the eastern shores' thermocline from the equator's at the ocean's eastern end.
 // Ocean stage: wind-driven currents, and the heat they move — for the temperature stage. DOM-free.
 //
 //  • Gyres. The wind's stress on the sea, curled, drives a steady circulation: in the open ocean the Sverdrup
@@ -51,7 +51,7 @@ const MOC_LOBE_SHARE = 0.2;          // a subtropical gyre's curl must reach thi
 const COAST_AIR_FEEDBACK = 20;
 // Under a barrier layer the water the winds mix and well up into the surface is the fresh layer's own, warm, not the
 // cold water below it (Lukas & Lindstrom 1991; Vinayachandran, Murty & Ramesh Babu 2002): the upwelled water's cold
-// × e^{−F/BARRIER_FRESH_MM}, F the sea's fresh water (freshwater.js, mm per Earth month). Barrier layers stand where
+// × e^{−F/BARRIER_FRESH_MM}, F the sea's fresh water (freshwater.js, mm per Earth month) — each month's own when the gyres follow the seasons, so a sea that freshens in its rainy season is shielded in that season. Barrier layers stand where
 // the net fresh water passes ≈ 0.5 m a year — the warm pool, the Bay of Bengal, the river plumes (de Boyer Montégut et
 // al. 2007) — so the e-folding is 50 mm a month (0.6 m a year).
 const BARRIER_FRESH_MM = 50;
@@ -465,9 +465,9 @@ export function windDrivenOcean() {
         //  • away from it, set by the gyres' Ekman pumping from the basin's eastern shore, where it is shallowest
         //    (OCEAN_THERMO_EAST_M): deep under the subtropical highs, shallow under the subpolar lows (Sverdrup:
         //    h² = h_E² + (2f²/βg′)∫(−w_E)dx).
-        const thermoD = new Float64Array(G).fill(P.OCEAN_THERMO_EAST_M), upDT = new Float64Array(G);
+        const thermoD = new Float64Array(G).fill(P.OCEAN_THERMO_EAST_M), upDT = new Float64Array(G), upDT0 = new Float64Array(G);
         {
-            const ek = ekmanOf(tx, ty), hE2 = P.OCEAN_THERMO_EAST_M ** 2, h02 = P.OCEAN_THERMO_EQ_M ** 2, H_MIN = 20, H_MAX = 400;
+            const ek = ekmanOf(tx, ty), h02 = P.OCEAN_THERMO_EQ_M ** 2, H_MIN = 20, H_MAX = 400;
             // (the waveguide's mean east–west stress, per longitude: weighted e^{−(lat/OCEAN_EQ_DEG)²}, over the sea)
             const txEq = new Float64Array(w);
             {
@@ -480,24 +480,32 @@ export function windDrivenOcean() {
                 for (let i = 0; i < w; i++) txEq[i] = sw[i] > 0 ? txEq[i] / sw[i] : 0;
             }
             const seg = [], aEqs = [], aSvs = [];
-            for (let j = 0; j < h; j++) {
+            const rowPass = (hEAt) => { for (let j = 0; j < h; j++) {
                 const la = g.lat[j], f = 2 * OMEGA_ROT * Math.sin(la * DEG), beta = Math.max(1e-13, 2 * OMEGA_ROT * Math.cos(la * DEG) / R_PLANET);
                 const wEq = Math.exp(-((la / P.OCEAN_EQ_DEG) ** 2)), kEq = 2 / (RHO_SEA * P.OCEAN_GPRIME), kSv = 2 * f * f / (beta * P.OCEAN_GPRIME);
                 const dx = dRad * R_PLANET * Math.max(0.05, cosLat[j]), minRun = Math.max(1, Math.round(P.OCEAN_SHORE_KM * 1000 / dx));
-                // the row's shores: runs of land at least minRun cells long
-                const shore = new Uint8Array(w);
+                // the row's shores: its land within runs at least minRun cells long of land within OCEAN_SHORE_LAT_DEG of
+                // the row — an archipelago whose islands lie within a deformation radius of one another (the Malay
+                // peninsula, Sumatra, Borneo, the Philippines) blocks the planetary waves as a continent does, though no
+                // one island is wide enough along the row; without it the northern Indian Ocean's rows ran on to Colombia
+                // and took the whole Pacific's upwelling
+                const near = new Uint8Array(w), shore = new Uint8Array(w), kRows = Math.round(P.OCEAN_SHORE_LAT_DEG / g.step);
+                for (let i = 0; i < w; i++) for (let jj = Math.max(0, j - kRows); jj <= Math.min(h - 1, j + kRows); jj++) if (!isSea[jj * w + i]) { near[i] = 1; break; }
+                const done = new Uint8Array(w);
                 for (let i = 0; i < w; i++) {
-                    if (isSea[j * w + i] || shore[i]) continue;
-                    let len = 0; while (len < w && !isSea[j * w + (i + len) % w]) len++;
-                    if (len >= minRun) for (let k = 0; k < len; k++) shore[(i + k) % w] = 1;
+                    if (!near[i] || done[i]) continue;
+                    let len = 0; while (len < w && near[(i + len) % w]) len++;
+                    for (let k = 0; k < len; k++) { const ii = (i + k) % w; done[ii] = 1; if (len >= minRun && !isSea[j * w + ii]) shore[ii] = 1; }
                 }
                 let i0 = shore.indexOf(1);
                 const shoreless = i0 < 0;
                 if (shoreless) i0 = 0;
                 // each basin, westward from its eastern shore: the integrals, then the depth
+                let eastI = i0;
                 const flush = () => {
                     if (!seg.length) return;
                     let mEq = 0; for (const v of aEqs) mEq += v; mEq /= aEqs.length;
+                    const hE2 = hEAt(eastI) ** 2;
                     for (let q = 0; q < seg.length; q++) {
                         const hEq2 = h02 + kEq * (aEqs[q] - mEq), hSv2 = shoreless ? hE2 : hE2 + kSv * aSvs[q];
                         thermoD[seg[q]] = Math.sqrt(Math.max(H_MIN * H_MIN, Math.min(H_MAX * H_MAX, wEq * hEq2 + (1 - wEq) * hSv2)));
@@ -507,14 +515,36 @@ export function windDrivenOcean() {
                 let aEq = 0, aSv = 0;
                 for (let k = 1; k <= w; k++) {
                     const i = ((i0 - k) % w + w) % w, c = j * w + i;
-                    if (shore[i]) { flush(); aEq = 0; aSv = 0; continue; }
+                    if (shore[i]) { flush(); eastI = i; aEq = 0; aSv = 0; continue; }
                     if (!isSea[c]) continue;                                   // (an island: passed round)
                     aEq += -txEq[i] * dx; aSv += -ek.div[c] * dx;
                     seg.push(c); aEqs.push(aEq); aSvs.push(aSv);
                 }
                 flush();
+            } };
+            rowPass(() => P.OCEAN_THERMO_EAST_M);
+            // The eastern shores' depth from the equator's: coastal Kelvin waves carry the equatorial ocean's eastern
+            // thermocline poleward along its eastern shores (Anderson & Gill 1975; McCreary 1976), so a basin's eastern
+            // shore stands as deep as the equator at that ocean's eastern end — shallow in the Pacific and Atlantic, whose
+            // trades raise their east, deep in an ocean whose equatorial westerlies pile the warm water up in the east
+            // (the Indian Ocean: the Bay of Bengal's and the Arabian Sea's rims, Yu, O'Brien & Yang 1991)
+            {
+                const eq = new Float64Array(w), eqSea = new Uint8Array(w);
+                for (let i = 0; i < w; i++) {
+                    let s = 0, n = 0;
+                    for (let j = 0; j < h; j++) { if (Math.abs(g.lat[j]) > g.step) continue; const c = j * w + i; if (isSea[c]) { s += thermoD[c]; n++; } }
+                    if (n > 0) { eq[i] = s / n; eqSea[i] = 1; }
+                }
+                // (a shore on sea at the equator: that ocean's eastern end, eastward to its land; on land: the ocean west of it)
+                const eastEnd = (i) => {
+                    if (eqSea[i]) { let k = i; for (let n = 0; n < w && eqSea[(k + 1) % w]; n++) k = (k + 1) % w; return eq[k]; }
+                    let k = i; for (let n = 0; n < w && !eqSea[k]; n++) k = (k - 1 + w) % w;
+                    return eqSea[k] ? eq[k] : P.OCEAN_THERMO_EAST_M;
+                };
+                rowPass((i) => Math.max(P.OCEAN_THERMO_EAST_M, eastEnd(i)));
             }
             for (let c = 0; c < G; c++) upDT[c] = P.OCEAN_UPWELL_DT * Math.exp(-Math.max(0, thermoD[c] - P.OCEAN_THERMO_EAST_M) / P.OCEAN_THERMO_SCALE_M);
+            upDT0.set(upDT);
             if (freshwater) { const fw = co(freshwater.total); for (let c = 0; c < G; c++) upDT[c] *= Math.exp(-Math.max(0, fw[c]) / BARRIER_FRESH_MM); }
         }
 
@@ -601,12 +631,18 @@ export function windDrivenOcean() {
         const q = new Float64Array(G), qAdv = new Float64Array(G), qUp = new Float64Array(G), wUp = new Float64Array(G), coastCold = new Float64Array(G);
         const qM = new Float64Array(12 * G), wUpM = new Float64Array(12 * G);
         if (seasonal) {
+            // (each month's barrier layer from that month's fresh water: the Bay of Bengal's is thickest in the summer
+            // monsoon's rain and floods, when its winds well it up; an evaporating sea, the Arabian, has none)
+            const barrierM = freshwater ? freshwater.monthly : null;
+            const upDTyear = barrierM ? Float64Array.from(upDT) : null;
             for (let m = 0; m < 12; m++) {
                 const sl = (f) => f.subarray(m * G, (m + 1) * G);
+                if (barrierM) { const fw = co(barrierM.subarray(m * core.size, (m + 1) * core.size)); for (let c = 0; c < G; c++) upDT[c] = upDT0[c] * Math.exp(-Math.max(0, fw[c]) / BARRIER_FRESH_MM); }
                 const H = heatOf(sl(txM), sl(tyM), sl(UM), sl(VM), sl(sstM)), qm = qOf(H);
                 qM.set(qm, m * G); wUpM.set(H.wUp, m * G);
                 for (let c = 0; c < G; c++) { q[c] += qm[c] / 12; qAdv[c] += H.qAdv[c] / 12; qUp[c] += H.qUp[c] / 12; wUp[c] += H.wUp[c] / 12; coastCold[c] += H.coastCold[c] / 12; }
             }
+            if (upDTyear) upDT.set(upDTyear);
         } else {
             const H = heatOf(tx, ty, U, V, sst);
             q.set(qOf(H)); qAdv.set(H.qAdv); qUp.set(H.qUp); wUp.set(H.wUp); coastCold.set(H.coastCold);

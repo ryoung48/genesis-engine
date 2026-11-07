@@ -216,9 +216,7 @@ function settle(params: SettleParams): Marriage | null {
 		startMs: params.startMs,
 		spouseBirthMs: params.spouseBirthMs,
 		betrothedMs: params.betrothedMs,
-		forced: params.forced,
 	})
-	if (!spouse) return null
 	return wed({
 		cast: params.cast,
 		owner: params.owner,
@@ -310,7 +308,6 @@ function attempt({
 		betrothedMs: null,
 		kind,
 		exclusive: kind === "free",
-		forced: forced !== null,
 	})
 }
 
@@ -349,7 +346,6 @@ function betroth({ cast, person, untilMs }: SearchParams): Marriage | null {
 			betrothedMs,
 			kind: "free",
 			exclusive: true,
-			forced: false,
 		})
 		if (marriage) {
 			state.betrothAge = BETROTHAL.adultAge
@@ -508,7 +504,6 @@ function searchPlural({ cast, person, untilMs }: SearchParams): void {
 			betrothedMs: null,
 			kind: type === "polygamy" ? "plural" : "concubine",
 			exclusive: false,
-			forced: false,
 		})
 	}
 }

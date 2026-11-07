@@ -1,4 +1,3 @@
-import { ANCHORS } from "@/model/people/anchors"
 import { CAST } from "@/model/people/cast"
 import type { Person } from "@/model/people/cast/types"
 import { MARRIAGE } from "@/model/people/marriage"
@@ -7,34 +6,18 @@ import type {
 	CandidateParams,
 	ChooseParams,
 	ConjureParams,
-	FamilyParams,
 	FreeParams,
-	SeatOption,
-	SeatOptionsParams,
 } from "@/model/people/marriage/spouse/types"
 import { NOBILITY } from "@/model/people/nobility"
 import { HASH } from "@/model/shared/random/hash"
 import { TIME } from "@/model/shared/time"
 
 const YEAR = TIME.constants.yearMS
-const BUCKET = NOBILITY.bucketMs
-const HOLDER_AGE = { min: 36, span: 26 }
-const HOLDER_MALE_SHARE = 0.85
-const CADET_CHANCE = { focus: 0.4, ring: 0.25 }
-const MAX_DEPTH = 1
-const MAX_SEATS_TRIED = 3
 const SPOUSE_AGE = {
 	male: { min: 18, max: 69 },
 	female: { min: 16, max: 44 },
 }
-const CHANNEL = {
-	sex: 1130,
-	age: 1131,
-	cadet: 1132,
-	family: 1133,
-	order: 1137,
-	late: 1141,
-}
+const CHANNEL = { order: 1137 }
 
 function conjure({
 	cast,
@@ -118,97 +101,13 @@ function candidate({
 	return best
 }
 
-function family({
-	cast,
-	seat,
-	nationId,
-	focusNation,
-	timeMs,
-}: FamilyParams): Person {
-	const bucket = Math.floor(timeMs / BUCKET)
-	const id = `${seat.key}:${bucket}`
-	const male = NOBILITY.keyed(cast, id, CHANNEL.sex, 0) < HOLDER_MALE_SHARE
-	const age =
-		HOLDER_AGE.min + NOBILITY.keyed(cast, id, CHANNEL.age, 0) * HOLDER_AGE.span
-	const ruler = ANCHORS.rulerAt({ index: cast.anchors, nationId, timeMs })
-	const cadet =
-		ruler !== null &&
-		ruler.ref.dynasty >= 0 &&
-		NOBILITY.keyed(cast, id, CHANNEL.cadet, 0) <
-			(nationId === focusNation ? CADET_CHANCE.focus : CADET_CHANCE.ring)
-	const holder = CAST.add({
-		cast,
-		spec: {
-			sex: male ? 0 : 1,
-			birthMs: timeMs - age * YEAR,
-			lineage: {
-				house: true,
-				dynasty:
-					cadet && ruler
-						? ruler.ref.dynasty
-						: Math.floor(
-								NOBILITY.keyed(cast, seat.key, CHANNEL.family, 0) * 50000,
-							),
-				dynastyOrigin: cadet && ruler ? ruler.ref.dynastyOrigin : seat.province,
-				home: seat.province,
-			},
-			ruler: { kind: "none" },
-			tier: seat.tier,
-			seat: seat.province,
-			parents: { kind: "none", reason: "conjured" },
-			inputs: { survivesMs: timeMs, fixedDeathMs: null, forcedCause: null },
-		},
-	})
-	cast.seatFamilies.set(id, holder.id)
-	cast.stats.seatFamilies++
-	cast.depth++
-	try {
-		MARRIAGE.extend({ cast, id: holder.id, untilMs: timeMs })
-	} finally {
-		cast.depth--
-	}
-	return holder
-}
-
-function seatOptions({
-	cast,
-	nations,
-	tier,
-	owner,
-	startMs,
-}: SeatOptionsParams): SeatOption[] {
-	const frame = CAST.snappedFrame({ cast, timeMs: startMs })
-	if (!frame) return []
-	const bucket = Math.floor(startMs / BUCKET)
-	const seed = CAST.seedOf({ cast, id: owner.id })
-	const order = (key: string) =>
-		HASH.unit({
-			seed: HASH.keyed({ seed, key }),
-			channel: CHANNEL.order,
-			salt: 0,
-		})
-	return nations
-		.flatMap((nationId) =>
-			NOBILITY.seatsOf({ frame, nationId })
-				.filter(
-					(seat) =>
-						seat.tier === tier &&
-						!cast.seatFamilies.has(`${seat.key}:${bucket}`),
-				)
-				.map((seat) => ({ seat, nationId })),
-		)
-		.sort((a, b) => order(a.seat.key) - order(b.seat.key))
-		.slice(0, MAX_SEATS_TRIED)
-}
-
 function choose({
 	cast,
 	owner,
 	startMs,
 	spouseBirthMs,
 	betrothedMs,
-	forced,
-}: ChooseParams): Person | null {
+}: ChooseParams): Person {
 	const seat = NOBILITY.seatOf({ cast, person: owner, timeMs: startMs })
 	const frame = CAST.snappedFrame({ cast, timeMs: startMs })
 	const nation = frame?.provinceNation[seat] ?? -1
@@ -217,54 +116,22 @@ function choose({
 	if (!frame || nation < 0) return conjureWith(NOBILITY.lowbornSpouse(seat))
 	const rank = NOBILITY.draw({ cast, owner, startMs })
 	if (rank.lowborn) return conjureWith(NOBILITY.lowbornSpouse(seat))
-	const nations = [
-		nation,
-		...NOBILITY.ringOf({ cast, nationId: nation, timeMs: startMs }),
-	]
-	const params = {
+	const found = candidate({
 		cast,
 		owner,
 		startMs,
 		fromMs: betrothedMs ?? startMs,
 		tier: rank.tier,
-		realms: new Set(nations),
-	}
-	const found = candidate(params)
+		realms: new Set([
+			nation,
+			...NOBILITY.ringOf({ cast, nationId: nation, timeMs: startMs }),
+		]),
+	})
 	if (found) {
 		cast.stats.castSpouses++
 		return found
 	}
-	if (rank.tier < 1 || cast.depth >= MAX_DEPTH)
-		return conjureWith(NOBILITY.nobleSpouse(cast, rank.tier, seat))
-	for (const option of seatOptions({
-		cast,
-		nations,
-		tier: rank.tier,
-		owner,
-		startMs,
-	})) {
-		family({
-			cast,
-			seat: option.seat,
-			nationId: option.nationId,
-			focusNation: nation,
-			timeMs: startMs,
-		})
-		const raised = candidate(params)
-		if (raised) {
-			cast.stats.castSpouses++
-			return raised
-		}
-	}
-	const age = (startMs - owner.birthMs) / YEAR
-	const chance = Math.min(0.5, Math.max(0, age - 25) / 20)
-	const roll = HASH.unit({
-		seed: CAST.seedOf({ cast, id: owner.id }),
-		channel: CHANNEL.late,
-		salt: Math.floor(startMs / YEAR),
-	})
-	if (forced || roll < chance) return conjureWith(NOBILITY.lowbornSpouse(seat))
-	return null
+	return conjureWith(NOBILITY.nobleSpouse(cast, rank.tier, seat))
 }
 
 export const SPOUSE = { choose }

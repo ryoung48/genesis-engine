@@ -92,7 +92,6 @@ const COLOR_MODES = new Set<ColorMode>([
 	"rainfallSeasonality",
 	"realPrecipitation",
 	"precipitationDiff",
-	"moisture",
 	"vegetation",
 	"vegetationMaps",
 	"vegetationSatellite",

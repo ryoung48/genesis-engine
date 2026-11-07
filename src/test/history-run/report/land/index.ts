@@ -1,6 +1,8 @@
 import { STATE } from "@/model/history/sim/engine/state"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import type {
+	GapStatus,
+	GapStatusParams,
 	LandmassBreakdownParams,
 	LandmassStatus,
 	LandReport,
@@ -28,17 +30,44 @@ function levelBucket(params: {
 	return Math.min(params.count - 1, Math.max(0, index))
 }
 
+function median(values: number[]): number {
+	if (!values.length) return 0
+	const sorted = [...values].sort((a, b) => a - b)
+	return sorted[sorted.length >> 1]
+}
+
+function gapStatus({ held, stateless, threshold }: GapStatusParams): GapStatus {
+	return {
+		heldSuitability: median(held),
+		statelessSuitability: median(stateless),
+		goodStatelessShare:
+			(100 * stateless.filter((value) => value >= threshold).length) /
+			Math.max(1, stateless.length),
+	}
+}
+
 function landmassBreakdown({
 	engine,
 	context,
-}: LandmassBreakdownParams): Pick<LandReport, "landmasses" | "heldCores"> {
-	const { landmassId, cradleProvinces, contactYear } = context
+}: LandmassBreakdownParams): Pick<
+	LandReport,
+	"landmasses" | "heldCores" | "gaps"
+> {
+	const { landmassId, cradleProvinces, contactYear, suitability } = context
 	const held = (p: number) =>
 		!engine.desolate[p] && !engine.uninhabited[p] && !engine.stateless[p]
 	const rows = new Map<
 		number,
-		{ habitable: number; held: number; contact: number[] }
+		{
+			habitable: number
+			held: number
+			contact: number[]
+			heldSuitability: number[]
+			statelessSuitability: number[]
+		}
 	>()
+	const heldSuitability: number[] = []
+	const statelessSuitability: number[] = []
 	let habitable = 0
 	let heldTotal = 0
 	for (let p = 0; p < engine.P; p++) {
@@ -47,6 +76,8 @@ function landmassBreakdown({
 			habitable: 0,
 			held: 0,
 			contact: [],
+			heldSuitability: [],
+			statelessSuitability: [],
 		}
 		row.habitable++
 		row.contact.push(contactYear[p])
@@ -54,9 +85,15 @@ function landmassBreakdown({
 		if (held(p)) {
 			row.held++
 			heldTotal++
+			row.heldSuitability.push(suitability[p])
+			heldSuitability.push(suitability[p])
+		} else if (!engine.uninhabited[p]) {
+			row.statelessSuitability.push(suitability[p])
+			statelessSuitability.push(suitability[p])
 		}
 		rows.set(landmassId[p], row)
 	}
+	const threshold = median(heldSuitability)
 	const landmasses: LandmassStatus[] = [...rows.entries()]
 		.filter(([, row]) => row.habitable >= MIN_LANDMASS_SHARE * habitable)
 		.sort((a, b) => b[1].habitable - a[1].habitable || a[0] - b[0])
@@ -66,7 +103,12 @@ function landmassBreakdown({
 			heldShare: (100 * row.held) / row.habitable,
 			shareOfHeld: (100 * row.held) / Math.max(1, heldTotal),
 			cradles: cradleProvinces.filter((p) => landmassId[p] === landmass).length,
-			contactYear: row.contact.sort((a, b) => a - b)[row.contact.length >> 1],
+			contactYear: median(row.contact),
+			gaps: gapStatus({
+				held: row.heldSuitability,
+				stateless: row.statelessSuitability,
+				threshold,
+			}),
 		}))
 	const seen = new Uint8Array(engine.P)
 	let heldCores = 0
@@ -89,7 +131,15 @@ function landmassBreakdown({
 			}
 		}
 	}
-	return { landmasses, heldCores }
+	return {
+		landmasses,
+		heldCores,
+		gaps: gapStatus({
+			held: heldSuitability,
+			stateless: statelessSuitability,
+			threshold,
+		}),
+	}
 }
 
 function snapshot({

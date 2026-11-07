@@ -30,12 +30,6 @@ export interface PageParams {
 	timeMs: number
 }
 
-export interface ExtendedParams {
-	cast: Cast
-	key: PersonKey
-	timeMs: number
-}
-
 export interface FamilyMember {
 	// [JUSTIFICATION] Only a spouse who is a blood relative has a kinship.
 	kinship: Kinship | null
@@ -156,10 +150,6 @@ export interface RelativesResult {
 	halfSiblings: Person[]
 	spouses: SpouseEntry[]
 	children: Person[]
-	grandparents: Person[]
-	auncles: Person[]
-	cousins: Person[]
-	nephews: Person[]
 }
 
 export interface PassedOver {

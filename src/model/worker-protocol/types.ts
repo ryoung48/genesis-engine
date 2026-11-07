@@ -1,7 +1,10 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
-import type { GenesisOceanCurrents } from "@/model/climate/types"
+import type {
+	GenesisOceanCurrents,
+	GenesisRainfall,
+} from "@/model/climate/types"
 import type {
 	GenesisWindMonthly,
 	WindVectors,
@@ -91,16 +94,7 @@ export interface SerializedGenesisWorld {
 	windMonthly: GenesisWindMonthly
 	oceanDist: Float32Array
 	distCoast?: Float32Array
-	rainfall: {
-		monthly: Float32Array
-		annual: Float32Array
-		real_monthly?: Float32Array
-		real_annual?: Float32Array
-		diff_monthly?: Float32Array
-		diff_annual?: Float32Array
-		east: Float32Array
-		west: Float32Array
-	}
+	rainfall: GenesisRainfall
 	cycloneRisk?: Float32Array
 	tornadoRisk?: Float32Array
 	tidalRange?: Float32Array

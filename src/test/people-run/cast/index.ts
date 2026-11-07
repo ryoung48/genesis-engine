@@ -6,6 +6,7 @@ import { KINSHIP } from "@/model/people/marriage/kinship"
 import { SPOUSE } from "@/model/people/marriage/spouse"
 import { NOBILITY } from "@/model/people/nobility"
 import { PERSON_QUERY } from "@/model/people/query"
+import type { PersonPage } from "@/model/people/query/types"
 import { HASH } from "@/model/shared/random/hash"
 import { TIME } from "@/model/shared/time"
 import { PEOPLE_FIXTURE } from "@/test/history-run/fixtures/people"
@@ -20,7 +21,6 @@ import type {
 	PickParams,
 	QualifiesParams,
 	Scenario,
-	Shown,
 } from "@/test/people-run/cast/types"
 
 const YEAR = TIME.constants.yearMS
@@ -34,11 +34,11 @@ const SPOUSE_AGE = {
 	female: { min: 16, max: 44 },
 }
 
-function shownKey(shown: Shown): Map<string, unknown> {
+function shownKey(page: PersonPage): Map<string, unknown> {
 	const out = new Map<string, unknown>()
-	const { groups, timeline, ...rest } = shown.page
+	const { groups, timeline, ...rest } = page
 	out.set("page", rest)
-	for (const group of [...groups, ...shown.extended])
+	for (const group of groups)
 		for (const member of group.members)
 			out.set(`${group.label}/${member.key}`, member)
 	for (const row of timeline)
@@ -140,9 +140,6 @@ function compareShown({ before, after }: CompareShownParams): string[] {
 		)
 		if (fields.length > 0) problems.push(`changed ${key} [${fields.join(",")}]`)
 	}
-	for (const [key, value] of next)
-		if (!old.has(key) && !(value as { revealed?: boolean }).revealed)
-			problems.push(`added ${key}`)
 	return problems
 }
 
@@ -301,8 +298,7 @@ function run(): Scenario {
 	const firstTimeMs = record.maxTimeMs - MARGIN
 	const ids = pick({ cast, count: FIRST, skip: new Set() })
 	const pageMs: number[] = []
-	const extendedMs: number[] = []
-	const show = (rulerId: number, timeMs: number): Shown => {
+	const show = (rulerId: number, timeMs: number): PersonPage => {
 		const key = PERSON_QUERY.rulerKey(rulerId)
 		const started = performance.now()
 		const outcome = PERSON_QUERY.page({
@@ -313,10 +309,7 @@ function run(): Scenario {
 		})
 		pageMs.push(performance.now() - started)
 		if (outcome?.kind !== "page") throw new Error(`No page for ${key}`)
-		const extendStart = performance.now()
-		const extended = PERSON_QUERY.extended({ cast, key, timeMs })
-		extendedMs.push(performance.now() - extendStart)
-		return { page: outcome.page, extended }
+		return outcome.page
 	}
 	const born = ids.filter((rulerId) => {
 		const fact = cast.anchors.facts.get(rulerId)
@@ -363,6 +356,16 @@ function run(): Scenario {
 		})
 		.slice(0, SECOND)
 	for (const rulerId of second) show(rulerId, secondTimeMs)
+	for (const rulerId of born) {
+		const person = PERSON_QUERY.resolve(cast, PERSON_QUERY.rulerKey(rulerId))
+		for (const parent of CAST.parentsOf({ cast, person }) ?? [])
+			PERSON_QUERY.page({
+				record,
+				context: fixture.context,
+				key: PERSON_QUERY.keyOf(parent),
+				timeMs: firstTimeMs,
+			})
+	}
 	const changed: string[] = []
 	for (const [rulerId, before] of firstShown)
 		changed.push(...compareShown({ before, after: show(rulerId, firstTimeMs) }))
@@ -388,7 +391,6 @@ function run(): Scenario {
 		spouseSearches,
 		ingestMs,
 		pageMs,
-		extendedMs,
 	}
 }
 
@@ -425,7 +427,6 @@ function figures({ scenario }: FiguresParams): GrownFigures {
 		lifeDrift: scenario.lifeDrift,
 		castSize: cast.persons.length,
 		castSpouseShare: castSpouses / Math.max(1, castSpouses + createdSpouses),
-		seatFamilies: cast.stats.seatFamilies,
 		relabelShare: Object.fromEntries(
 			Object.entries(placed).map(([relation, count]) => [
 				relation,
@@ -450,10 +451,6 @@ function figures({ scenario }: FiguresParams): GrownFigures {
 		pageMs: {
 			p50: quantile(scenario.pageMs, 0.5),
 			p95: quantile(scenario.pageMs, 0.95),
-		},
-		extendedMs: {
-			p50: quantile(scenario.extendedMs, 0.5),
-			p95: quantile(scenario.extendedMs, 0.95),
 		},
 	}
 }

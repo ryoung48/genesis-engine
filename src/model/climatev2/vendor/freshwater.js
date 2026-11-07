@@ -78,13 +78,24 @@ function riverRunoff(grid, landFrac, meanKm, runoff) {
 }
 
 // P and E: the rain stage's rain and evaporation (K anchors × the core grid, mm a month of the planet's year)
-export function seaFreshwater({ grid, surface, P, E, K, yearScale }) {
+export function seaFreshwater({ grid, surface, P, E, K, yearScale, anchorPhase }) {
     const size = grid.size, pBar = new Float64Array(size), eBar = new Float64Array(size);
     for (let k = 0; k < K; k++) for (let c = 0; c < size; c++) { pBar[c] += P[k * size + c] / K; eBar[c] += E[k * size + c] / K; }
     const net = Float64Array.from(pBar, (p, c) => (p - eBar[c]) / yearScale);
     const rivers = riverRunoff(grid, surface.landFrac, surface.meanKm, net);
     const sea = (c) => surface.landFrac[c] < 0.5;
+    // each month's: its rain less its evaporation (between the anchors, linearly round the year) and the year's rivers
+    const monthly = new Float64Array(12 * size);
+    for (let m = 0; m < 12; m++) {
+        const x = (((m - anchorPhase) * K / 12) % K + K) % K, k0 = Math.floor(x), k1 = (k0 + 1) % K, f = x - k0;
+        for (let c = 0; c < size; c++) {
+            if (!sea(c)) continue;
+            const p = P[k0 * size + c] * (1 - f) + P[k1 * size + c] * f, e = E[k0 * size + c] * (1 - f) + E[k1 * size + c] * f;
+            monthly[m * size + c] = (p - e) / yearScale + rivers[c];
+        }
+    }
     return {
+        monthly,
         total: Float64Array.from(net, (x, c) => (sea(c) ? x + rivers[c] : 0)),
         rivers: Float64Array.from(rivers, (x, c) => (sea(c) ? x : 0)),
         rain: Float64Array.from(pBar, (x, c) => (sea(c) ? x / yearScale : 0)),

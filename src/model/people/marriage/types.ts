@@ -55,7 +55,6 @@ export interface SettleParams {
 	betrothedMs: number | null
 	kind: MarriageKind
 	exclusive: boolean
-	forced: boolean
 }
 
 export interface WedParams {

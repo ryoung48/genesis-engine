@@ -195,29 +195,11 @@ function runPostElevationPipeline(
 	TIMING.record({ stage: "Post: thermal equator", startedAt: t0, timings })
 	onProgress?.("Post: thermal equator", 44)
 
-	// ── Moisture advection ─────────────────────────────────────────────
-	t0 = performance.now()
-	// Computed once here (instead of inside classifyTopography below) so the
-	// windward-lift orographic term uses the exact same per-cell slope value
-	// shown in the hover panel, rather than a separately-derived grade.
 	const slopeScore = CLASSIFICATION.computeSlopeScore({
 		mesh,
 		elevationKm: elevation_km,
 		planetRadiusKm: params.planetRadiusKm,
 	})
-	const { east: eastAdv, west: westAdv } = RAIN.computeAdvection({
-		mesh,
-		elevation,
-		distCoast,
-		climate,
-		params,
-		isLand,
-		elevation_km,
-		landmarks: currentLandmarks,
-		slopeScore,
-	})
-	TIMING.record({ stage: "Post: moisture advection", startedAt: t0, timings })
-	onProgress?.("Post: moisture advection", 50)
 
 	// ── Ocean SST ────────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -252,16 +234,10 @@ function runPostElevationPipeline(
 
 	// ── Rainfall ───────────────────────────────────────────────────────
 	t0 = performance.now()
-	const rain = {
-		monthly: climateV2.rainfallMonthly,
-		annual: climateV2.rainfallAnnual,
-	}
 	onProgress?.("Post: rainfall", 54)
 	const rainfall: GenesisRainfall = {
-		monthly: rain.monthly,
-		annual: rain.annual,
-		east: eastAdv,
-		west: westAdv,
+		monthly: climateV2.rainfallMonthly,
+		annual: climateV2.rainfallAnnual,
 	}
 
 	reconcileClosedWaterBodies({

@@ -14,10 +14,6 @@ interface GalaxyMapModeControlProps {
 	onModeChange: (mode: GalaxyMapMode) => void
 }
 
-/** Floating top-center switcher for the galaxy map's exclusive overlay mode
- * -- "stars" shows the bare star field, "nations" / "cultures" swap in the
- * matching partition overlay (see partition-overlay.ts). Replaces the old
- * independent "Nations" toggle in the gear Display panel. */
 export const GalaxyMapModeControl: React.FC<GalaxyMapModeControlProps> = ({
 	mode,
 	onModeChange,
@@ -30,7 +26,7 @@ export const GalaxyMapModeControl: React.FC<GalaxyMapModeControlProps> = ({
 			tone="overlay"
 			size="sm"
 		/>
-		{mode === "nations" ? (
+		{mode === "nations" && (
 			<div
 				className={`${uiTokens.surface.overlay} ${uiTokens.type.controlSm} ${uiTokens.radius.sm} flex items-center gap-3 px-2 py-1`}
 			>
@@ -45,6 +41,6 @@ export const GalaxyMapModeControl: React.FC<GalaxyMapModeControlProps> = ({
 					<span className={uiTokens.text.nationCapital}>◇</span>Nation capital
 				</span>
 			</div>
-		) : null}
+		)}
 	</div>
 )

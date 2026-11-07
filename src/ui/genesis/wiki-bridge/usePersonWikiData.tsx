@@ -226,7 +226,7 @@ function traitViews(page: PersonPage): {
 	}
 }
 
-export function groupsOf(
+function groupsOf(
 	groups: FamilyGroup[],
 	select: (key: string) => void,
 ): PersonWikiGroup[] {

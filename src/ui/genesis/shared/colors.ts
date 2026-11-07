@@ -35,7 +35,6 @@ export type ColorMode =
 	| "precipitationDiff"
 	| "cloudCover"
 	| "realCloudCover"
-	| "moisture"
 	| "vegetation"
 	| "vegetationMaps"
 	| "vegetationSatellite"

@@ -6,8 +6,6 @@ function createRainfall({ rainMm }: { rainMm: number }): GenesisRainfall {
 	return {
 		monthly: new Float32Array(12).fill(rainMm),
 		annual: new Float32Array([rainMm * 12]),
-		east: new Float32Array(1),
-		west: new Float32Array(1),
 	}
 }
 

@@ -734,20 +734,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={formatPrecipitation(hoverRainfall, unitSystem, 0)}
 							/>
 						)}
-						{colorMode === "moisture" &&
-							hoverRegion !== null &&
-							world?.rainfall && (
-								<>
-									<Row
-										label="East Moisture"
-										value={`${(world.rainfall.east[hoverRegion] * 100).toFixed(0)}%`}
-									/>
-									<Row
-										label="West Moisture"
-										value={`${(world.rainfall.west[hoverRegion] * 100).toFixed(0)}%`}
-									/>
-								</>
-							)}
 						{colorMode === "cloudCover" && hoverCloudCover && (
 							<Row
 								label="Cloud Cover"

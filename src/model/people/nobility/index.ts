@@ -14,8 +14,6 @@ import type {
 	RankDrawParams,
 	RealmParams,
 	RingParams,
-	Seat,
-	SeatsParams,
 	TierParams,
 } from "@/model/people/nobility/types"
 import { HASH } from "@/model/shared/random/hash"
@@ -196,24 +194,6 @@ function realmOf({ cast, person, timeMs }: RealmParams): number {
 	return frame.provinceNation[seatOf({ cast, person, timeMs })] ?? -1
 }
 
-function seatsOf({ frame, nationId }: SeatsParams): Seat[] {
-	const capital = frame.nations.get(nationId)?.capitalProvince ?? -1
-	const titles = indexOf(frame).titles.get(nationId) ?? []
-	const top = topTier(frame, nationId)
-	const seats: Seat[] = []
-	if (frame.titles)
-		for (const title of titles) {
-			const tier = frame.titles.tier[title]
-			const province = frame.titles.seat[title]
-			if (tier < top && tier >= 1 && province !== capital)
-				seats.push({ key: `T${title}`, tier: tier + 1, province })
-		}
-	for (const province of indexOf(frame).provinces.get(nationId) ?? [])
-		if (province !== capital)
-			seats.push({ key: `P${province}`, tier: 1, province })
-	return seats.sort((a, b) => b.tier - a.tier || a.key.localeCompare(b.key))
-}
-
 function targetTier(
 	cast: Cast,
 	owner: Person,
@@ -302,13 +282,10 @@ export const NOBILITY = {
 	draw,
 	consort,
 	geographyOf,
-	seatsOf,
 	ringOf,
 	realmOf,
-	keyed,
 	lowbornSpouse,
 	nobleSpouse,
 	inherit: INHERIT,
 	lowborn: LOWBORN,
-	bucketMs: BUCKET,
 }

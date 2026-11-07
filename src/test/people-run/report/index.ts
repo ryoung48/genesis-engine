@@ -127,7 +127,6 @@ function of({ state, context, sampleSize }: PeopleReportParams): PeopleReport {
 		timeMs: time,
 	})
 	const pageMs: number[] = []
-	const extendedMs: number[] = []
 	const frameMs: number[] = []
 	const warmMs: number[] = []
 	const adultDeaths: number[] = []
@@ -156,11 +155,6 @@ function of({ state, context, sampleSize }: PeopleReportParams): PeopleReport {
 		PERSON_QUERY.page({ record, context: timedContext, key, timeMs: time })
 		pageMs.push(performance.now() - started - frameSpent)
 		frameMs.push(frameSpent)
-		const extendStart = performance.now()
-		cast.context = timedContext
-		PERSON_QUERY.extended({ cast, key, timeMs: time })
-		extendedMs.push(performance.now() - extendStart)
-		cast.context = context
 		const warm = performance.now()
 		PERSON_QUERY.page({ record, context: timedContext, key, timeMs: time })
 		warmMs.push(performance.now() - warm)
@@ -289,7 +283,6 @@ function of({ state, context, sampleSize }: PeopleReportParams): PeopleReport {
 		frameMs: ms(frameMs),
 		warmMs: ms(warmMs),
 		pageMs: ms(pageMs),
-		extendedMs: ms(extendedMs),
 		ingestMs: { first: ingestFirst },
 		placementMs,
 		generationMs,
@@ -297,7 +290,6 @@ function of({ state, context, sampleSize }: PeopleReportParams): PeopleReport {
 		castSpouseShare:
 			snapshot.stats.castSpouses /
 			Math.max(1, snapshot.stats.castSpouses + snapshot.stats.createdSpouses),
-		seatFamilies: snapshot.stats.seatFamilies,
 		passedOverShare: passed.rows / Math.max(1, passed.considered),
 		passedOverRows: passed.rows,
 		revealedLaterCount: cast.stats.revealedLater,

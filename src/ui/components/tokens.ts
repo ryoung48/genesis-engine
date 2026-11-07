@@ -274,6 +274,7 @@ export const uiTokens = {
 		md: "backdrop-blur-md",
 	},
 	type: {
+		caption: "text-[9px]",
 		label: "font-mono text-[9px] uppercase tracking-[0.12em]",
 		labelWide: "font-mono text-[9px] uppercase tracking-[0.16em]",
 		labelSm: "text-[8px] font-semibold uppercase tracking-[0.08em]",

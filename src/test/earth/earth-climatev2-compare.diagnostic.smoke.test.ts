@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
-import { describe, expect, it } from "vitest"
+import { assert, describe, expect, it } from "vitest"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
 import { CLIMATE_V2 } from "@/model/climatev2"
@@ -665,12 +666,15 @@ function score() {
 		u: v2Cells.oceanCurrents.flowU,
 		v: v2Cells.oceanCurrents.flowV,
 	}
-	const { climate, rainfall, isLand, mesh } = world
+	const { climate, rainfall, isLand, mesh, pastaClimate, realPastaClimate } =
+		world
 	const N = mesh.numRegions
 	const realT = climate.real_temperature_monthly
 	const realP = rainfall.real_monthly
+	const realDtr = world.observedDtr?.real_monthly
 	expect(realT).toBeDefined()
 	expect(realP).toBeDefined()
+	assert(realDtr && realPastaClimate, "Expected Earth DTR and PASTA data")
 	const modelT = climate.temperature_monthly
 	const modelP = rainfall.monthly
 
@@ -705,6 +709,10 @@ function score() {
 	let kExact = 0
 	let kMajor = 0
 	let kN = 0
+	let pastaN = 0
+	const pastaCounts = PASTA.pastaLabels.map(
+		() => new Uint32Array(PASTA.pastaLabels.length),
+	)
 	const kShareModel = Object.fromEntries(GROUPS.map((g) => [g, 0]))
 	const kShareObserved = Object.fromEntries(GROUPS.map((g) => [g, 0]))
 	const kClasses = new Map<
@@ -779,6 +787,7 @@ function score() {
 		const rainBand = rainBands.find((b) => latDeg >= b.lo && latDeg < b.hi)
 		let tAll = true
 		let pAll = true
+		let dtrAll = true
 		let tSumM = 0
 		let tSumO = 0
 		let pSumM = 0
@@ -828,6 +837,7 @@ function score() {
 				}
 			} else tAll = false
 			if (!Number.isFinite(realP[i])) pAll = false
+			if (!Number.isFinite(realDtr[i])) dtrAll = false
 			tSumM += modelT[i]
 			tSumO += realT[i]
 			pSumM += modelP[i]
@@ -855,6 +865,10 @@ function score() {
 			}
 		}
 		if (tAll && pAll) {
+			if (dtrAll) {
+				pastaN++
+				pastaCounts[realPastaClimate[r]][pastaClimate[r]]++
+			}
 			const codeM = KOPPEN_CLASSES[classifyCell(T12m, P12m)].code
 			const codeO = KOPPEN_CLASSES[classifyCell(T12o, P12o)].code
 			if (codeM === codeO) kExact++
@@ -927,6 +941,18 @@ function score() {
 			kN++
 		}
 	}
+	expect(pastaN).toBeGreaterThan(0)
+	const pastaExact = pastaCounts.reduce((sum, row, code) => sum + row[code], 0)
+	const pastaConfusion = Object.fromEntries(
+		pastaCounts.flatMap((row, observedCode) => {
+			const modeledCounts = PASTA.pastaLabels.flatMap((label, modeledCode) =>
+				row[modeledCode] > 0 ? [[label, row[modeledCode]] as const] : [],
+			)
+			return modeledCounts.length > 0
+				? [[PASTA.pastaLabels[observedCode], Object.fromEntries(modeledCounts)]]
+				: []
+		}),
+	)
 	const pct = (x: number) => Number(((100 * x) / Math.max(1, kN)).toFixed(1))
 	const climateMs = stageMs({
 		timings: world.timings ?? [],
@@ -1009,6 +1035,11 @@ function score() {
 		ice: scoreIce({ world, v2: v2Cells }),
 		landSeaGap: scoreLandSeaGap(world),
 		seaBoxes: scoreSeaBoxes(world),
+		pasta: {
+			cells: pastaN,
+			exactPct: Number(((100 * pastaExact) / pastaN).toFixed(1)),
+			confusion: pastaConfusion,
+		},
 		koppen: {
 			cells: kN,
 			exactPct: pct(kExact),

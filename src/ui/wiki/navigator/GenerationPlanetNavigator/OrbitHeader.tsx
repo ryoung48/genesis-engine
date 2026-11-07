@@ -2,8 +2,11 @@ import React from "react"
 import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
+import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { EarthIcon } from "@/ui/components/primitives/icons/EarthIcon"
+import { uiTokens } from "@/ui/components/tokens"
+import type { RecentSeed } from "@/ui/wiki/navigator/GenerationPlanetNavigator/types"
 import { GpsFocusButton } from "@/ui/wiki/shared/ui-atoms"
 
 export function OrbitHeader({
@@ -11,12 +14,14 @@ export function OrbitHeader({
 	typeLabel,
 	breadcrumbs,
 	seedInput,
+	recentSeeds,
 	onFocus,
 	onClose,
 	headerAction,
 	showSeedControls,
 	onSeedInputChange,
 	onSeedApply,
+	onRecentSeedSelect,
 	onSeedRandomize,
 	onSeedSetEarth,
 }: {
@@ -27,15 +32,14 @@ export function OrbitHeader({
 		onClick: () => void
 	}>
 	seedInput: string
+	recentSeeds: RecentSeed[]
 	onFocus?: () => void
 	onClose?: () => void
 	headerAction?: React.ReactNode
-	/** Only the main world's subtitle row exposes seed/dice/earth controls --
-	 * its seed drives the whole system's seed. The star and every
-	 * sibling/moon show neither this, just focus. */
 	showSeedControls: boolean
 	onSeedInputChange: (value: string) => void
-	onSeedApply: () => void
+	onSeedApply: (value: string) => void
+	onRecentSeedSelect: (seed: RecentSeed) => void
 	onSeedRandomize: () => void
 	onSeedSetEarth: () => void
 }) {
@@ -96,21 +100,59 @@ export function OrbitHeader({
 				<div className="flex items-center gap-1.5">
 					{showSeedControls ? (
 						<>
-							<input
-								type="text"
-								value={seedInput}
-								onChange={(event) => onSeedInputChange(event.target.value)}
-								onKeyDown={(event) => {
-									if (event.key === "Enter") {
-										event.preventDefault()
-										event.currentTarget.blur()
+							<div
+								className={`mr-1 inline-flex rounded-md border border-slate-200 bg-white font-mono text-slate-700 focus-within:border-slate-400 ${uiTokens.type.caption}`}
+								onBlur={(event) => {
+									if (!event.currentTarget.contains(event.relatedTarget)) {
+										onSeedApply(seedInput)
 									}
 								}}
-								onBlur={onSeedApply}
-								aria-label="Procedural seed"
-								title="Procedural seed"
-								className="mr-1 w-20 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-700 outline-none transition-colors focus:border-slate-400"
-							/>
+							>
+								<input
+									type="text"
+									value={seedInput}
+									onChange={(event) => onSeedInputChange(event.target.value)}
+									onKeyDown={(event) => {
+										if (event.key === "Enter") {
+											event.preventDefault()
+											event.currentTarget.blur()
+										}
+									}}
+									aria-label="Procedural seed"
+									title="Procedural seed"
+									className="w-20 bg-transparent px-1.5 py-0.5 outline-none"
+								/>
+								<span className="relative grid place-items-center rounded-r-md border-l border-slate-200 px-1 has-enabled:hover:bg-slate-100 has-disabled:opacity-50 focus-within:bg-slate-100">
+									<ChevronIcon className="h-4 w-4" />
+									<select
+										aria-label="Recent seeds"
+										title={
+											recentSeeds.length
+												? "Recent seeds"
+												: "No recent seeds yet"
+										}
+										disabled={recentSeeds.length === 0}
+										value=""
+										className="recent-seeds-picker absolute inset-0 h-full w-full cursor-pointer disabled:cursor-default"
+										onChange={(event) => {
+											const entry = recentSeeds.find(
+												(seed) =>
+													String(seed.numeric) === event.currentTarget.value,
+											)
+											if (entry) onRecentSeedSelect(entry)
+										}}
+									>
+										<option value="" disabled>
+											Recent seeds
+										</option>
+										{recentSeeds.map((entry) => (
+											<option key={entry.numeric} value={entry.numeric}>
+												{entry.label}
+											</option>
+										))}
+									</select>
+								</span>
+							</div>
 							<IconButton
 								tone="borderless"
 								size="xs"

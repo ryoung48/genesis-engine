@@ -25,8 +25,6 @@ export interface GenesisRainfall {
 	real_annual?: Float32Array // per-cell observed annual precipitation mm
 	diff_monthly?: Float32Array // [month * N + r] modeled minus observed precipitation mm
 	diff_annual?: Float32Array // per-cell annual modeled minus observed precipitation mm
-	east: Float32Array // per-cell normalized east moisture (0–1)
-	west: Float32Array // per-cell normalized west moisture (0–1)
 }
 
 export interface GenesisOceanCurrents {

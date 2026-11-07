@@ -2,9 +2,7 @@ import type { ApplyBorderShadowParams } from "@/ui/genesis/shared/colors/types"
 
 const SHADOW_DEPTH_HOPS = 5
 const SHADOW_FALLOFF_POWER = 2
-const EDGE_DARKEN = 0.68
 const EDGE_SATURATION = 1.35
-const INTERIOR_WASH = 0.22
 
 function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))
@@ -15,6 +13,10 @@ export function applyBorderShadow({
 	owner,
 	adjOffset,
 	adjList,
+	shading: { edgeBrightness, interiorWash } = {
+		edgeBrightness: 0.68,
+		interiorWash: 0.22,
+	},
 }: ApplyBorderShadowParams): Float32Array {
 	const N = owner.length
 	const out = new Float32Array(rgb)
@@ -51,9 +53,9 @@ export function applyBorderShadow({
 			rgb[base] * 0.299 + rgb[base + 1] * 0.587 + rgb[base + 2] * 0.114
 		for (let c = 0; c < 3; c++) {
 			const value = rgb[base + c]
-			const wash = value + (1 - value) * INTERIOR_WASH
+			const wash = value + (1 - value) * interiorWash
 			const shadow = clamp01(
-				(luma + (value - luma) * EDGE_SATURATION) * EDGE_DARKEN,
+				(luma + (value - luma) * EDGE_SATURATION) * edgeBrightness,
 			)
 			out[base + c] = wash + (shadow - wash) * edge
 		}

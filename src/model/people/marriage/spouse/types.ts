@@ -1,5 +1,5 @@
 import type { Cast, Person } from "@/model/people/cast/types"
-import type { ConjuredSpouse, Seat } from "@/model/people/nobility/types"
+import type { ConjuredSpouse } from "@/model/people/nobility/types"
 
 export interface ChooseParams {
 	cast: Cast
@@ -7,7 +7,6 @@ export interface ChooseParams {
 	startMs: number
 	spouseBirthMs: number
 	betrothedMs: number | null
-	forced: boolean
 }
 
 export interface CandidateParams {
@@ -24,27 +23,6 @@ export interface ConjureParams {
 	owner: Person
 	profile: ConjuredSpouse
 	spouseBirthMs: number
-	startMs: number
-}
-
-export interface FamilyParams {
-	cast: Cast
-	seat: Seat
-	nationId: number
-	focusNation: number
-	timeMs: number
-}
-
-export interface SeatOption {
-	seat: Seat
-	nationId: number
-}
-
-export interface SeatOptionsParams {
-	cast: Cast
-	nations: number[]
-	tier: number
-	owner: Person
 	startMs: number
 }
 

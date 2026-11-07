@@ -1,5 +1,5 @@
 // Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/core.js (GPL-3.0, see LICENSE).
-// Modified in chaos-machine: diagnose clouds from column moisture, stability and circulation; a stage's own clouds (stages.clouds) are followed by the rain again.
+// Modified in chaos-machine: diagnose clouds from column moisture, stability and circulation; a stage's own clouds (stages.clouds) are followed by the rain again; the sea's fresh water is passed its months (the anchor phase).
 // The new climate — one generator-neutral entry point. DOM-free; runs in a worker or in Node.
 //
 //   computeClimate(input, options) → { grid, surface, anchors, months, cell, timing }
@@ -96,7 +96,7 @@ export function computeClimate(input, options = {}) {
         lap('rain');
         // (the ocean once more, now with the sea's fresh water from the rain and the rivers: its barrier layers)
         if (o.stages.ocean && circulation && rain.E) {
-            const freshwater = seaFreshwater({ grid, surface, P: rain.P, E: rain.E, K, yearScale: orbitOf(o).yearScale });
+            const freshwater = seaFreshwater({ grid, surface, P: rain.P, E: rain.E, K, yearScale: orbitOf(o).yearScale, anchorPhase: o.anchorPhase });
             ocean = o.stages.ocean(sctx, circulation, temperature, freshwater);
             lap('ocean with fresh water');
         }

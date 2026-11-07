@@ -5,12 +5,15 @@ import { GALAXY_IDENTITY } from "@/model/celestial/galaxy/galaxy-identity"
 import type { Galaxy } from "@/model/celestial/galaxy/types"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 import { uiPalette } from "@/ui/components/tokens"
+import { computeGalaxyDensityScale } from "@/ui/genesis/galaxy/renderer/galaxy-scene/density-scale"
+import { applyBorderShadow } from "@/ui/genesis/shared/colors/border-shadow"
 
 // Nation-overlay defaults (unchanged). The cultures overlay passes higher
 // values via PartitionOverlayInput so its partition fills read closer to
 // their true palette color rather than a faint tint.
 const TINT_ALPHA = 0.4
 const BORDER_OPACITY = 0.85
+const BORDER_SHADING = { edgeBrightness: 0.44, interiorWash: 0.55 }
 const CULTURE_TINT_ALPHA = 0.68
 const CULTURE_BORDER_OPACITY = 0.95
 // World-space half-width of each side of a border (so the whole stroke is
@@ -20,6 +23,7 @@ const CULTURE_BORDER_OPACITY = 0.95
 const BORDER_HALF_WIDTH_FRACTION = 0.0018
 const SECTOR_BORDER_HALF_WIDTH_FRACTION = 0.0015
 const SECTOR_DOT_PERIOD_FRACTION = 0.008
+const CAPITAL_MARKER_SIZE_FRACTION = 0.005
 // Diagonal culture-blend stripe wavelength, as a fraction of the galaxy's
 // own radius -- one light + one dark band per this much world distance.
 const STRIPE_PERIOD_FRACTION = 0.012
@@ -34,7 +38,7 @@ const LABEL_COLOR = "#f8fafc"
 const LABEL_MIN_FONT_SCALE = 0.35
 const LABEL_MAX_FONT_SCALE = 2.6
 const LABEL_BASE_FONT_FRACTION = 0.008
-// Fixed clearance above the capital marker plus half the label height,
+// Clearance above the capital marker plus half the label height,
 // so small labels clear the fixed-size marker and large labels sit closer.
 const LABEL_VERTICAL_BASE_FRACTION = 0.006
 const LABEL_VERTICAL_OFFSET_SCALE = 0.6
@@ -493,7 +497,10 @@ export interface PartitionOverlayResult {
 }
 
 export interface PartitionOverlayInput {
-	galaxy: Pick<Galaxy, "numSystems" | "r_xy" | "r_edge" | "radius">
+	galaxy: Pick<
+		Galaxy,
+		"numSystems" | "r_xy" | "r_edge" | "radius" | "adjOffset" | "adjList"
+	>
 	/** Partition index per system, -1 for edge/unassigned. */
 	assignment: Int32Array
 	/** Interleaved rgb (0-1) per partition. */
@@ -516,6 +523,7 @@ export interface PartitionOverlayInput {
 	showBorders?: boolean
 	// [JUSTIFICATION] Only the nations overlay renders sector boundaries.
 	sectorAssignment?: Int32Array
+	withBorderShadow: boolean
 }
 
 /**
@@ -570,6 +578,7 @@ export function buildPartitionOverlay(
 		seeds,
 		size,
 		blend,
+		withBorderShadow,
 	} = input
 	const labelText = input.labelText
 	const fillAlpha = input.fillAlpha ?? TINT_ALPHA
@@ -577,6 +586,9 @@ export function buildPartitionOverlay(
 	const showBorders = input.showBorders ?? true
 	const sectorAssignment = input.sectorAssignment
 	const { numSystems, r_xy, r_edge, radius } = galaxy
+	const densityScaledRadius = radius.max * computeGalaxyDensityScale(numSystems)
+	const sectorHalfWidth =
+		densityScaledRadius * SECTOR_BORDER_HALF_WIDTH_FRACTION
 
 	// Generous bbox for d3-delaunay's own clip -- just needs to comfortably
 	// exceed the fade zone below so nothing gets truncated before the shader
@@ -603,6 +615,18 @@ export function buildPartitionOverlay(
 					partitionColors[3 * partition + 2]!,
 				]
 			: UNCLAIMED_COLOR
+	let borderShadowColors: Float32Array | undefined
+	if (withBorderShadow) {
+		const rgb = new Float32Array(numSystems * 3)
+		for (let i = 0; i < numSystems; i++) rgb.set(colorFor(assignment[i]), 3 * i)
+		borderShadowColors = applyBorderShadow({
+			rgb,
+			owner: assignment,
+			adjOffset: galaxy.adjOffset,
+			adjList: galaxy.adjList,
+			shading: BORDER_SHADING,
+		})
+	}
 
 	const indices = Array.from({ length: numSystems }, (_, i) => i)
 	const delaunay = Delaunay.from(
@@ -745,7 +769,7 @@ export function buildPartitionOverlay(
 	for (const chain of buildBorderChains(rawSectorEdges)) {
 		buildChainRibbon(
 			chain,
-			radius.max * SECTOR_BORDER_HALF_WIDTH_FRACTION,
+			sectorHalfWidth,
 			[1, 1, 1],
 			[1, 1, 1],
 			sectorPositions,
@@ -787,7 +811,8 @@ export function buildPartitionOverlay(
 			? polygon.length - 1
 			: polygon.length
 		if (uniqueCount < 3) continue
-		const [r, g, b] = colorFor(partition)
+		const [r, g, b] =
+			borderShadowColors?.subarray(3 * i, 3 * i + 3) ?? colorFor(partition)
 		const secondary =
 			blend && blend.secondary[i]! >= 0 ? blend.secondary[i]! : -1
 		const [br, bg, bb] = secondary >= 0 ? colorFor(secondary) : [r, g, b]
@@ -927,10 +952,8 @@ export function buildPartitionOverlay(
 		sectorMaterial = new THREE.ShaderMaterial({
 			uniforms: {
 				uColor: { value: new THREE.Color(uiPalette.sectorBoundary) },
-				uPeriod: { value: radius.max * SECTOR_DOT_PERIOD_FRACTION },
-				uHalfWidth: {
-					value: radius.max * SECTOR_BORDER_HALF_WIDTH_FRACTION,
-				},
+				uPeriod: { value: densityScaledRadius * SECTOR_DOT_PERIOD_FRACTION },
+				uHalfWidth: { value: sectorHalfWidth },
 				uInnerFadeStart: { value: innerFadeStart },
 				uInnerFadeEnd: { value: innerFadeEnd },
 				uOuterFadeStart: { value: outerFadeStart },
@@ -953,7 +976,8 @@ export function buildPartitionOverlay(
 	const partitionCount = size.length
 	let maxSize = 1
 	for (let n = 0; n < partitionCount; n++) maxSize = Math.max(maxSize, size[n]!)
-	const baseFontSize = radius.max * LABEL_BASE_FONT_FRACTION
+	const baseFontSize = densityScaledRadius * LABEL_BASE_FONT_FRACTION
+	const baseLabelOffset = densityScaledRadius * LABEL_VERTICAL_BASE_FRACTION
 
 	const labels: Text[] = []
 	for (let partition = 0; partition < partitionCount; partition++) {
@@ -983,7 +1007,7 @@ export function buildPartitionOverlay(
 		label.position.set(
 			r_xy[2 * capital]!,
 			r_xy[2 * capital + 1]! +
-				radius.max * LABEL_VERTICAL_BASE_FRACTION +
+				baseLabelOffset +
 				fontSize * LABEL_VERTICAL_OFFSET_SCALE,
 			1,
 		)
@@ -1005,7 +1029,6 @@ export function buildPartitionOverlay(
 	}
 }
 
-/** The nations map mode: a flat per-nation fill, no border bleed. */
 export function buildNationOverlay(galaxy: Galaxy): PartitionOverlayResult {
 	return buildPartitionOverlay({
 		galaxy,
@@ -1016,6 +1039,7 @@ export function buildNationOverlay(galaxy: Galaxy): PartitionOverlayResult {
 		labelText: (nation) =>
 			GALAXY_IDENTITY.generateNationName(galaxy.seed, nation),
 		sectorAssignment: galaxy.sectorState.assignment,
+		withBorderShadow: true,
 	})
 }
 
@@ -1037,6 +1061,7 @@ export function buildCultureOverlay(galaxy: Galaxy): PartitionOverlayResult {
 		fillAlpha: CULTURE_TINT_ALPHA,
 		borderAlpha: CULTURE_BORDER_OPACITY,
 		showBorders: false,
+		withBorderShadow: false,
 	})
 }
 
@@ -1070,11 +1095,19 @@ function buildLineMarkers(input: LineMarkerInput): PartitionOverlayResult {
 	}
 }
 
+function capitalMarkerSize(galaxy: Galaxy): number {
+	return (
+		galaxy.radius.max *
+		CAPITAL_MARKER_SIZE_FRACTION *
+		computeGalaxyDensityScale(galaxy.numSystems)
+	)
+}
+
 export function buildSectorCapitalMarkers(
 	galaxy: Galaxy,
 ): PartitionOverlayResult {
 	const positions: number[] = []
-	const outer = galaxy.radius.max * 0.005
+	const outer = capitalMarkerSize(galaxy)
 	const arm = outer * 0.65
 	const nationCapitals = new Set(galaxy.nationSeeds)
 	for (const sector of galaxy.sectorState.sectors) {
@@ -1101,7 +1134,7 @@ export function buildNationCapitalMarkers(
 	galaxy: Galaxy,
 ): PartitionOverlayResult {
 	const positions: number[] = []
-	const radius = galaxy.radius.max * 0.005
+	const radius = capitalMarkerSize(galaxy)
 	for (const seed of galaxy.nationSeeds) {
 		const x = galaxy.r_xy[2 * seed]!
 		const y = galaxy.r_xy[2 * seed + 1]!

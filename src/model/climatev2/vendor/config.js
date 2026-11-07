@@ -113,6 +113,7 @@ export const PARAMS_DEFAULTS = Object.freeze({
     OCEAN_THERMO_EQ_M: 100,     // m          … the equator's mean thermocline depth, about which the winds tilt it …
     OCEAN_SHORE_KM: 600,        // km         … across each basin, shore to shore: land at least this wide along a latitude (smaller
                                 //            islands the ocean's slow adjustment passes round)
+    OCEAN_SHORE_LAT_DEG: 3,     // °          … counting land within this of the latitude (an archipelago's islands as one shore)
     OCEAN_GPRIME: 0.03,         // m/s²       reduced gravity across the thermocline (how far the winds can tilt it)
     OCEAN_EQ_DEG: 6,            // °          the equatorial waveguide: the trade winds tilt the thermocline within this (e-folding);
                                 //            beyond, the gyres' Ekman pumping sets its depth (Sverdrup)
@@ -249,6 +250,7 @@ export const PARAM_PRIORS = Object.freeze({
     OCEAN_THERMO_SCALE_M: { value: 70, min: 40, max: 120, source: 'the warm pool\'s thermocline ≈ 150–200 m deep: upwelling there barely cools the surface (Bjerknes; McPhaden & Picaut 1990)' },
     OCEAN_THERMO_EQ_M:  { value: 100, min: 70, max: 150, source: 'the equatorial thermocline (20 °C isotherm) ≈ 150–200 m deep in the west Pacific, ≈ 50 m in the east: a mean ≈ 100–120 m' },
     OCEAN_SHORE_KM:     { value: 600, min: 300, max: 1500, source: 'islands smaller than a few deformation radii (≈ 100–300 km) barely block the planetary waves that set the thermocline' },
+    OCEAN_SHORE_LAT_DEG: { value: 3, min: 0, max: 6, source: 'the equatorial Rossby radius ≈ 300 km ≈ 3° (as for OCEAN_EQ_DEG): islands closer than about a deformation radius block the planetary waves as one barrier (the Indonesian seas pass only ≈ 15 Sv between the Pacific and Indian Oceans, Gordon 2005); 0: only the land on the row itself' },
     OCEAN_GPRIME:       { value: 0.03, min: 0.02, max: 0.05, source: 'reduced gravity of the tropical thermocline ≈ 0.02–0.04 m/s² (Δρ/ρ ≈ 0.002–0.004)' },
     OCEAN_EQ_DEG:       { value: 6, min: 3, max: 10, source: 'the equatorial Rossby radius ≈ 300 km ≈ 3°; the zonal tilt holds within ≈ 5–8° of the equator' },
     OCEAN_EKMAN_TAUY_DEG: { value: 5, min: 3, max: 8, source: 'Ekman balance fails within ≈ 3–5° of the equator; there a meridional stress drives a downwind, not a zonal, drift (Zebiak & Cane 1987; Philander & Pacanowski 1981)' },

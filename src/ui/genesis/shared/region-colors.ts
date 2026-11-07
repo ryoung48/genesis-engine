@@ -54,7 +54,6 @@ import {
 	oceanCurrentColor,
 } from "@/ui/genesis/shared/colors/misc"
 import {
-	moistureDirectionalColor,
 	precipitationAnnualColor,
 	precipitationColor,
 	precipitationDifferenceColor,
@@ -475,55 +474,6 @@ export function computeRegionColors(
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
-			}
-		}
-		return rgb
-	}
-
-	if (colorMode === "moisture" && world.rainfall) {
-		if (rainfallMonth === 0) {
-			for (let r = 0; r < N; r++) {
-				if (isOceanRegion(r)) {
-					const [cr, cg, cb] = oceanRgb(r)
-					rgb[3 * r] = cr
-					rgb[3 * r + 1] = cg
-					rgb[3 * r + 2] = cb
-				} else {
-					const east = world.rainfall.east[r]
-					const west = world.rainfall.west[r]
-					const moisture = Math.max(east, west)
-					const dominantIsEast =
-						Math.abs(east - west) < 0.02 ? moisture >= 0.35 : east > west
-					const [cr, cg, cb] = moistureDirectionalColor(
-						moisture,
-						dominantIsEast,
-					)
-					rgb[3 * r] = cr
-					rgb[3 * r + 1] = cg
-					rgb[3 * r + 2] = cb
-				}
-			}
-		} else {
-			for (let r = 0; r < N; r++) {
-				if (isOceanRegion(r)) {
-					const [cr, cg, cb] = oceanRgb(r)
-					rgb[3 * r] = cr
-					rgb[3 * r + 1] = cg
-					rgb[3 * r + 2] = cb
-				} else {
-					const east = world.rainfall.east[r]
-					const west = world.rainfall.west[r]
-					const moisture = Math.max(east, west)
-					const dominantIsEast =
-						Math.abs(east - west) < 0.02 ? moisture >= 0.35 : east > west
-					const [cr, cg, cb] = moistureDirectionalColor(
-						moisture,
-						dominantIsEast,
-					)
-					rgb[3 * r] = cr
-					rgb[3 * r + 1] = cg
-					rgb[3 * r + 2] = cb
-				}
 			}
 		}
 		return rgb

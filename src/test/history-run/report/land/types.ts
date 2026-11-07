@@ -26,6 +26,13 @@ export interface LandReport {
 	unmetDemand: number
 	landmasses: LandmassStatus[]
 	heldCores: number
+	gaps: GapStatus
+}
+
+export interface GapStatus {
+	heldSuitability: number
+	statelessSuitability: number
+	goodStatelessShare: number
 }
 
 export interface LandmassStatus {
@@ -35,12 +42,20 @@ export interface LandmassStatus {
 	shareOfHeld: number
 	cradles: number
 	contactYear: number
+	gaps: GapStatus
 }
 
 export interface LandmassContext {
 	landmassId: Int32Array
 	cradleProvinces: number[]
 	contactYear: Int32Array
+	suitability: Float32Array
+}
+
+export interface GapStatusParams {
+	held: number[]
+	stateless: number[]
+	threshold: number
 }
 
 export interface LandmassBreakdownParams {

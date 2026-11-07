@@ -1,4 +1,4 @@
-// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/temperature.js (GPL-3.0, see LICENSE). Modified in chaos-machine: hot loops moved into top-level functions (forcingSweep, windSamples, monthsToSamples) and the albedo variety cached, computing the same values; OUTER 4 → 3 and OUTER_WARM 2 → 1 (fewer snow/ice outer iterations); the orbit, spin, size and year scaled through orbitOf, spinScaled and sizeScaled (the sea ice's time step by yearScale); the day cycle (diurnal.js); the surface albedos and the air's absorption; the cold-limit gray-body heat to space (coldOlr), never above a black body's; the locked planet's solve deflated (solver.js); a TEMP_SEA_ICE switch (0 = no sea ice).
+// Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/temperature.js (GPL-3.0, see LICENSE). Modified in chaos-machine: hot loops moved into top-level functions (forcingSweep, windSamples, monthsToSamples) and the albedo variety cached, computing the same values; OUTER 4 → 3 and OUTER_WARM 2 → 1 (fewer snow/ice outer iterations); the orbit, spin, size and year scaled through orbitOf, spinScaled and sizeScaled (the sea ice's time step by yearScale); the day cycle (diurnal.js); the surface albedos and the air's absorption; the cold-limit gray-body heat to space (coldOlr), never above a black body's; the locked planet's solve deflated (solver.js); a TEMP_SEA_ICE switch (0 = no sea ice); snow cover on land from the rain stage's snowfall (SNOW_COVER_MM).
 // Temperature stage: a seasonal energy-balance model on the climate grid. DOM-free.
 //
 //   C·∂T/∂t = S·(1 − α) − (A + B·T) + D·∇²T − γ·(u·∇)T
@@ -28,7 +28,7 @@ import { PARAMS } from './config.js';
 import { spinScaled } from './rotation.js';
 import { sizeScaled } from './size.js';
 import { pressureScaled, rayleighReflect, surfaceWind, airAbsorbExtra, PSYCHRO_KPA } from './pressure.js';
-import { LATENT } from './rain.js';
+import { LATENT, MELT_MM_PER_C_MONTH, snowShare } from './rain.js';
 import { dayCycle } from './diurnal.js';
 import { tropicsWeight, gaussianSmooth } from './circulation.js';
 import { FastNoise } from './fast-noise.js';
@@ -104,6 +104,13 @@ const TREELINE_WARM_C = 13;                 // … trees above this: the treelin
 const SURF_SHEET = 0.82;                    // an ice sheet's dry snow: the Antarctic plateau 0.80–0.85 (Grenfell et al. 1994), Greenland's ≈ 0.8
 const SEA_ICE_SNOWY = 0.8;                  // sea ice under snow while the frost holds (Perovich et al. 2002: ≈ 0.8–0.85 in spring)
 const SNOW_MELTING = 0.5;                   // melting snow and sea ice: wet snow 0.4–0.6 (Oke 1987), bare and ponded ice 0.4–0.6 (Perovich et al. 2002)
+// Snow covers the ground only where enough has fallen: cover = tanh(snow water / SNOW_COVER_MM) (Roesch, Wild,
+// Gilgen & Ohmura 2001: 0.95·tanh(100·SWE[m]), i.e. ≈ 10 mm of water for most of the ground) — a dry cold plateau or
+// desert (Tibet, the Gobi, the Altiplano) stays mostly bare and dark through its frosts
+const SNOW_COVER_MM = 10;
+// …less what sublimates: thin snow on cold, sunny, windy ground turns to vapour without melting, ≈ 0.1–1 mm of water
+// a day (seasonal snowpacks, most on high plateaus), so a dry winter's first snows do not lie all season
+const SNOW_SUBLIMATE_MM_MONTH = 10;
 const SNOW_FROZEN_C = -5;                   // °C: the air below which snow stays dry (melting from here to 0 °C)
 const AIR_SCALE_KM = 8;                     // the air's scale height, RT/g at ≈ 273 K
 const STEFAN_BOLTZMANN = 5.670374e-8;        // W/m²/K⁴
@@ -474,6 +481,31 @@ export function energyBalanceTemperature() {
             for (let m = 0; m < 12; m++) { const pm = coarsen(core, g, ratio, rain.subarray(m * core.size, (m + 1) * core.size)); for (let c = 0; c < G; c++) landWet[c] += pm[c]; }
             for (let c = 0; c < G; c++) landWet[c] = 1 - Math.exp(-Math.max(0, landWet[c] / orbit.yearScale) / WET_RAIN_MM);   // (per Earth year)
         }
+        // The snow on the land through the year, from the rain stage's precipitation (none before there is one: then
+        // snow is wherever it is cold): each month the freezing share of its precipitation falls as snow (snowShare,
+        // rain.js) and the snow melts by the degree-day (MELT_MM_PER_C_MONTH) and sublimates, at the ground's height, two turns of
+        // the year for a steady cycle; the ground's cover is tanh(snow water / SNOW_COVER_MM), at mid-month.
+        const precipM = rain ? Array.from({ length: 12 }, (_, m) => coarsen(core, g, ratio, rain.subarray(m * core.size, (m + 1) * core.size))) : null;
+        const snowCover = precipM ? new Float64Array(NT * G) : null;
+        const snowCoverOf = () => {
+            if (!snowCover) return null;
+            const melt = MELT_MM_PER_C_MONTH * orbit.yearScale, Tm = new Float64Array(NT);
+            for (let c = 0; c < G; c++) {
+                if (!(landFrac[c] > 0)) continue;
+                for (let k = 0; k < NT; k++) {
+                    const th = 2 * Math.PI * k / NT;
+                    Tm[k] = c0[c] + 2 * (c1r[c] * Math.cos(th) - c1i[c] * Math.sin(th)) + 2 * (c2r[c] * Math.cos(2 * th) - c2i[c] * Math.sin(2 * th)) - lapseEff[c] * surfKm[c];
+                }
+                let swe = 0;
+                for (let turn = 0; turn < 2; turn++) for (let k = 0; k < NT; k++) {
+                    const before = swe;
+                    swe += Math.max(0, precipM[k * 12 / NT | 0][c]) * snowShare(Tm[k]);
+                    swe = Math.max(0, swe - melt * Math.max(0, Tm[k]) - SNOW_SUBLIMATE_MM_MONTH * orbit.yearScale);
+                    if (turn === 1) snowCover[k * G + c] = Math.tanh(0.5 * (before + swe) / SNOW_COVER_MM);
+                }
+            }
+            return snowCover;
+        };
         const C = new Float64Array(G);
         const Fk = new Float64Array(NT * G);
         // (the sunlight reaching the land's surface and what it takes of it, W/m² of land at the sample times — the rain
@@ -505,7 +537,8 @@ export function energyBalanceTemperature() {
             }
             forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, g.lat, dRad, g.radiusM, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
                 albVary, cloudT, snowYear, !!(winds && gamma), uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
-                P.TEMP_ICE_WARM_C, P.TEMP_ICE_COLD_C, it === outer - 1 ? budgetSums : null, surf, { extra: albExtra, absorb: airAbsorbExtra(orbit.pressureScale) });
+                P.TEMP_ICE_WARM_C, P.TEMP_ICE_COLD_C, it === outer - 1 ? budgetSums : null, surf, { extra: albExtra, absorb: airAbsorbExtra(orbit.pressureScale) },
+                snowCoverOf());
             if (surf) lockedSurface({ surf, Tk, harmonics: { c0, c1r, c1i, c2r, c2i }, Q, landFrac, lat: g.lat, w, h, olr: olrCold, gEarth, nightK, convK, relax: it === 0 && !warm ? 1 : 0.5, final: it === outer - 1 });
             if (dayRect) for (let k = 0; k < NT; k++) {
                 const th = 2 * Math.PI * k / NT, co = Math.cos(th), sn = Math.sin(th), co2 = Math.cos(2 * th), sn2 = Math.sin(2 * th), t = 12 * k / NT;
@@ -957,7 +990,7 @@ function monthsToSamples(G, qm, qAt) {
 
 function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad, R_PLANET, airKm, olrCold, landFrac, lapseEff, surfKm, perennial,
     albVary, cloudT, snowYear, windsOn, uT, vT, gamma, qAt, F0, F1r, F1i, F2r, F2i, iceYear, seaIceYear, Fk, sunDown, sunTaken,
-    iceWarmC, iceColdC, budget, lockedSurf, pressureSun) {
+    iceWarmC, iceColdC, budget, lockedSurf, pressureSun, snowCover) {
     const iceSpan = iceWarmC - iceColdC, olrA = olrCold.A, olrB = olrCold.B, toSpace = olrCold.toSpace, seaIceOn = PARAMS.TEMP_SEA_ICE > 0;
     const dLandA = lockedSurf?.dLand, dSeaA = lockedSurf?.dSea, windowA = lockedSurf?.window;
     const sunLandA = lockedSurf?.sunLand, sunSeaA = lockedSurf?.sunSea, seaIceA = lockedSurf?.seaIce;
@@ -996,7 +1029,7 @@ function forcingSweep(G, w, h, c0, c1r, c1i, c2r, c2i, Tk, Q, albBase, lat, dRad
                 const mO = (tO - SNOW_FROZEN_C) / -SNOW_FROZEN_C, meltO = mO <= 0 ? 0 : mO >= 1 ? 1 : mO * mO * (3 - 2 * mO);
                 const dryA = dryAll[c], snowA = dryA + (SNOW_MELTING - dryA) * meltL;
                 const iceA = SEA_ICE_SNOWY + (SNOW_MELTING - SEA_ICE_SNOWY) * meltO;
-                const sLa = Math.max(sL, perennial[c]);
+                const sLa = Math.max(snowCover ? sL * snowCover[k * G + c] : sL, perennial[c]);
                 const landS = SURF_LAND + (snowA + (SURF_SHEET - snowA) * perennial[c] - SURF_LAND) * sLa;
                 const seaS = SURF_SEA + (iceA - SURF_SEA) * sO;
                 // (the air's own temperature at the ground — on land at its height, an ice sheet's dome included)

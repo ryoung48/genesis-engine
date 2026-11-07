@@ -211,6 +211,12 @@ function runSeed({
 			(cradle) => cradle.province,
 		),
 		contactYear: engine.contactYear,
+		suitability: Float32Array.from(
+			{ length: engine.P },
+			(_, p) =>
+				(generated.population?.habitability[p] ?? 0) /
+				Math.max(1, generated.provinces?.size[p] ?? 1),
+		),
 	}
 	const diagnostics = {
 		religionGenderSystems: RELIGION_REPORT.genderSystems({

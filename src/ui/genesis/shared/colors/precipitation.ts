@@ -55,24 +55,6 @@ export function precipitationDifferenceColor(
 	return [last.r, last.g, last.b]
 }
 
-export function moistureDirectionalColor(
-	normalized: number,
-	isEastDominant: boolean,
-): [number, number, number] {
-	const tintStops = isEastDominant ? eastMoistureTints : westMoistureTints
-	const clamped = Math.max(0, Math.min(1, normalized))
-	const scaled = clamped * (tintStops.length - 1)
-	const i = Math.min(tintStops.length - 2, Math.floor(scaled))
-	const localT = scaled - i
-	const a = tintStops[i]
-	const b = tintStops[i + 1]
-	return [
-		a[0] + (b[0] - a[0]) * localT,
-		a[1] + (b[1] - a[1]) * localT,
-		a[2] + (b[2] - a[2]) * localT,
-	]
-}
-
 const monthlyPrecipStops: { mm: number; r: number; g: number; b: number }[] = [
 	{ mm: 0, r: 0.76, g: 0.7, b: 0.5 },
 	{ mm: 10, r: 0.85, g: 0.78, b: 0.45 },
@@ -97,20 +79,4 @@ const precipDiffStops: { v: number; r: number; g: number; b: number }[] = [
 	{ v: 25, r: 0.76, g: 0.9, b: 0.78 },
 	{ v: 100, r: 0.23, g: 0.63, b: 0.69 },
 	{ v: 200, r: 0.08, g: 0.28, b: 0.48 },
-]
-
-const eastMoistureTints: [number, number, number][] = [
-	[0.98, 0.95, 0.9],
-	[0.97, 0.8, 0.52],
-	[0.95, 0.58, 0.3],
-	[0.75, 0.28, 0.18],
-	[0.4, 0.12, 0.18],
-]
-
-const westMoistureTints: [number, number, number][] = [
-	[0.97, 0.97, 0.92],
-	[0.83, 0.95, 0.77],
-	[0.54, 0.86, 0.6],
-	[0.2, 0.65, 0.62],
-	[0.12, 0.34, 0.62],
 ]
