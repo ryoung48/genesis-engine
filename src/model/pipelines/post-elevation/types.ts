@@ -10,6 +10,7 @@ import type {
 	GenesisWindMonthly,
 	WindVectors,
 } from "@/model/climate/weather/wind/types"
+import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -183,6 +184,7 @@ export interface PostPipelineOutput {
 	tradeGoods: LocationTradeGoods | undefined
 	hazards: GenesisHazards
 	cycloneRisk: Float32Array
+	circulationBelts: CirculationBelts[] | null
 	tornadoRisk: Float32Array
 	tidalRange: Float32Array
 	tidalSchedule: TidalSchedule

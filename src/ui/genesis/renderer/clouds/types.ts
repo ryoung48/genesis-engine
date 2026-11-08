@@ -1,4 +1,12 @@
+import type { Vector3 } from "three"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
+
+export interface CloudLighting {
+	enabled: boolean
+	direction: Vector3
+	ambient: Vector3
+	sunlight: Vector3
+}
 
 export interface CloudDisplay {
 	world: SerializedGenesisWorld | null

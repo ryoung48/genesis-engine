@@ -996,6 +996,7 @@ function runPostElevationPipeline(
 		tradeGoods,
 		hazards,
 		cycloneRisk,
+		circulationBelts: circulation?.belts ?? null,
 		tornadoRisk,
 		tidalRange,
 		tidalSchedule,

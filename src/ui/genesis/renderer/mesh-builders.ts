@@ -7,6 +7,7 @@ import {
 	createPlaceholderSatelliteTexture,
 	getSatelliteStyleTexture,
 } from "@/ui/genesis/renderer/satellite-texture"
+import { SURFACE_LIGHTING_GLSL } from "@/ui/genesis/renderer/surface-lighting"
 import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
@@ -291,9 +292,7 @@ export function buildMapMesh(
 			}
 		`,
 		fragmentShader: `
-			uniform vec3 uAmbient;
-			uniform vec3 uSunDirection;
-			uniform vec3 uSunLight;
+			${SURFACE_LIGHTING_GLSL}
 			uniform float uSatelliteDetail;
 			uniform sampler2D uSatelliteMap;
 			varying vec3 vColor;
@@ -308,8 +307,7 @@ export function buildMapMesh(
 					cosLat * sin(vLonLat.x),
 					sin(vLonLat.y)
 				);
-				float daylight = max(dot(normalize(surfaceNormal), normalize(uSunDirection)), 0.0);
-				vec3 light = uAmbient + (uSunLight * daylight);
+				vec3 light = surfaceLight(sunlightAt(surfaceNormal));
 				vec3 baseColor = vColor;
 				if (uSatelliteDetail > 0.5) {
 					vec2 satUv = vec2((vLonLat.x + 3.14159265) / 6.2831853, 0.5 - vLonLat.y / 3.14159265);

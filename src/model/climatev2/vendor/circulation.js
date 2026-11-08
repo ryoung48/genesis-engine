@@ -163,7 +163,7 @@ export function derivedCirculation() {
             const contrast = (a, b) => Math.sqrt(Math.max(0, zAt(a) - zAt(b)) / 25);
             const midN = P.CIRC_MIDLAT_HPA * beltSea(hiN, loN) ** P.CIRC_OPEN_SEA_POWER * contrast(hiN, loN);
             const midS = P.CIRC_MIDLAT_HPA * beltSea(hiS, loS) ** P.CIRC_OPEN_SEA_POWER * contrast(hiS, loS);
-            belts.push({ itcz, hiN, hiS, loN, loS, midN, midS });
+            belts.push({ itcz, hiN, hiS, loN, loS, midN, midS, extraLowsN: extraLows(loN, P), extraLowsS: extraLows(loS, P).map((at) => -at) });
 
             // ── Thermal lows and highs: temperature against its latitude's average, at the Rossby scale ──
             // Over land, a heat low is CIRC_HEAT_LOW_MILD of its full depth on mild ground (≤ 15 °C at the surface) and
@@ -293,11 +293,16 @@ function localTrough(g, T, h, w, lo, hi, zonalItcz) {
  * they fit — each a secondary high CIRC_POLAR_HPA above the low (an easterly band, as the polar easterlies), then a low
  * as deep, CIRC_FERREL_DEG on (the next jet).
  */
+// (the further lows' latitudes poleward of the first subpolar low lo, unsigned: one every CIRC_FERREL_DEG while they fit)
+function extraLows(lo, P) {
+    const out = [], F = P.CIRC_FERREL_DEG;
+    for (let at = Math.abs(lo); at + F <= LAST_LOW_LAT && F < PARAMS.CIRC_FERREL_DEG; at += F) out.push(at + F);
+    return out;
+}
+
 function extraCells(sgn, lo, low, P) {
     const out = [], F = P.CIRC_FERREL_DEG;
-    for (let at = Math.abs(lo); at + F <= LAST_LOW_LAT && F < PARAMS.CIRC_FERREL_DEG; at += F) {
-        out.push([sgn * (at + F / 2), low + P.CIRC_POLAR_HPA], [sgn * (at + F), low]);
-    }
+    for (const at of extraLows(lo, P)) out.push([sgn * (at - F / 2), low + P.CIRC_POLAR_HPA], [sgn * at, low]);
     out.push([sgn * 90, low + P.CIRC_POLAR_HPA]);
     return sgn > 0 ? out : out.reverse();
 }

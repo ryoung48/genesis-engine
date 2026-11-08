@@ -73,7 +73,7 @@ export function createGenesisScene(
 		rebuildOverlays: () => rebuildOverlays(),
 		updateOverlayVisibility: () => updateOverlayVisibility(),
 		setViewMode: (mode) => setViewMode(mode),
-		syncMapLighting: () => syncMapLighting(),
+		syncLighting: () => syncLighting(),
 		rebuildNationBorders: () => rebuildNationBorders(),
 		rebuildSelectedProvinceBorder: () => rebuildSelectedProvinceBorder(),
 		rebuildSettlementLabels: () => rebuildSettlementLabels(),
@@ -413,7 +413,7 @@ export function createGenesisScene(
 		setAtmospherePressure,
 		setSunPosition,
 		setSunDirection,
-		syncMapLighting,
+		syncLighting,
 		setFullAmbient,
 	} = lightingController
 

@@ -9,6 +9,7 @@ import type {
 	GenesisWindMonthly,
 	WindVectors,
 } from "@/model/climate/weather/wind/types"
+import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
@@ -96,6 +97,7 @@ export interface SerializedGenesisWorld {
 	distCoast?: Float32Array
 	rainfall: GenesisRainfall
 	cycloneRisk?: Float32Array
+	circulationBelts: CirculationBelts[] | null
 	tornadoRisk?: Float32Array
 	tidalRange?: Float32Array
 	tidalSchedule?: TidalSchedule

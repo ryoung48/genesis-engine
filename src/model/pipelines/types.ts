@@ -1,6 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-
 import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import type {
 	GenesisObservedCurrent,
@@ -19,6 +18,7 @@ import type {
 	GenesisWindMonthly,
 	WindVectors,
 } from "@/model/climate/weather/wind/types"
+import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -179,6 +179,7 @@ export interface GenesisWorld {
 	oceanCurrents: GenesisOceanCurrents
 	/** Per-cell cyclone risk score in [0, 1]. */
 	cycloneRisk?: Float32Array
+	circulationBelts: CirculationBelts[] | null
 	/** Per-cell tornado risk score in [0, 1]. */
 	tornadoRisk?: Float32Array
 	/** Per-cell modeled tidal range in meters. */

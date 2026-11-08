@@ -39,7 +39,7 @@ export interface TerrainControllerDeps {
 	rebuildOverlays: () => void
 	updateOverlayVisibility: () => void
 	setViewMode: (mode: GenesisViewMode) => void
-	syncMapLighting: () => void
+	syncLighting: () => void
 	rebuildNationBorders: () => void
 	rebuildSelectedProvinceBorder: () => void
 	rebuildSettlementLabels: () => void
@@ -305,7 +305,7 @@ export function createTerrainController(
 			mapCenterLongitudeDeg: ctx.currentMapCenterLongitudeDeg,
 			mapProjectionLatitudeDeg: ctx.currentMapProjectionLatitudeDeg,
 		})
-		deps.syncMapLighting()
+		deps.syncLighting()
 		deps.rebuildOverlays()
 		deps.setViewMode(ctx.currentViewMode)
 	}

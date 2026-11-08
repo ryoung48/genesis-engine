@@ -8,6 +8,8 @@ export interface CirculationBelts {
 	loS: number
 	midN: number
 	midS: number
+	extraLowsN: number[]
+	extraLowsS: number[]
 }
 
 export function tropicsWeight(lat: number, itcz: number, hiN: number, hiS: number): number

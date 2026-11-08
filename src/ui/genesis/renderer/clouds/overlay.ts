@@ -1,11 +1,14 @@
 import * as THREE from "three"
 import type {
 	CloudDisplay,
+	CloudLighting,
 	CloudTextureInput,
 } from "@/ui/genesis/renderer/clouds/types"
+import type { CloudClimateGrid } from "@/ui/genesis/renderer/clouds/vendor/orogen.js"
 import {
 	CLOUD_GLSL,
 	CLOUDS,
+	cloudBeltUniforms,
 	cloudEdges,
 	cloudFields,
 	cloudNoiseTexture,
@@ -13,10 +16,12 @@ import {
 	cloudStorms,
 	cloudStormsAt,
 	driftRadPerS,
+	MAX_LOWS,
 	MAX_STORMS,
 	scaleOf,
 } from "@/ui/genesis/renderer/clouds/vendor/orogen.js"
 import { rasterizeCloudWeather } from "@/ui/genesis/renderer/clouds/weather"
+import { SURFACE_LIGHTING_GLSL } from "@/ui/genesis/renderer/surface-lighting"
 
 export const CLOUD_FRAME_MS = 80
 
@@ -41,9 +46,11 @@ const MAP_VERTEX = `
 
 const FRAGMENT = `
 	${CLOUD_GLSL}
+	${SURFACE_LIGHTING_GLSL}
 	uniform vec4 uCloudOp;
 	uniform vec2 uCloudGrey;
 	uniform float uCloudLight, uCloudLit, uCloudShadow, uCloudShadowStep;
+	uniform bool uCloudDaylight;
 	varying vec3 vCloudPoint;
 	vec2 cloudUv(vec3 p) {
 		float longitude = atan(-p.z, p.x);
@@ -53,18 +60,22 @@ const FRAGMENT = `
 		vec3 p = normalize(vCloudPoint);
 		vec2 uv = cloudUv(p);
 		float px = length(fwidth(p));
+		float daylight = sunlightAt(p);
 		float shadow = 0.0;
 		#if defined(CLOUD_SHADOW) || defined(CLOUD_MAP)
-		if (uCloudShadow > 0.0) {
-			vec3 towardLight = cloudTowardLight(p, uCloudShadowStep);
-			shadow = uCloudShadow * cloudShade(towardLight, cloudUv(towardLight), px);
+		float shadowStrength = uCloudShadow * (uCloudDaylight ? daylight : 1.0);
+		if (shadowStrength > 0.0) {
+			vec3 towardLight = uCloudDaylight
+				? normalize(p + uSunDirection * uCloudShadowStep)
+				: cloudTowardLight(p, uCloudShadowStep);
+			shadow = shadowStrength * cloudShade(towardLight, cloudUv(towardLight), px);
 		}
 		#endif
 		#ifdef CLOUD_SHADOW
 		gl_FragColor = vec4(0.0, 0.0, 0.0, shadow);
 		#else
 		vec4 cloud = cloudColour(p, uv, px, uCloudOp, uCloudGrey, uCloudLight, uCloudLit);
-		vec3 rgb = sRGBTransferEOTF(vec4(cloud.rgb, 1.0)).rgb;
+		vec3 rgb = sRGBTransferEOTF(vec4(cloud.rgb, 1.0)).rgb * surfaceLight(daylight);
 		float alpha = cloud.a + shadow * (1.0 - cloud.a);
 		gl_FragColor = vec4(rgb * cloud.a / max(alpha, 1e-4), alpha);
 		#endif
@@ -77,11 +88,22 @@ export function createCloudOverlay() {
 	const lit = !window.matchMedia?.("(pointer: coarse)").matches
 	const mapRotation = new THREE.Matrix3()
 	const uniforms = {
+		uAmbient: { value: new THREE.Vector3(1, 1, 1) },
+		uSunDirection: { value: new THREE.Vector3(1, 0, 0) },
+		uSunLight: { value: new THREE.Vector3() },
+		uCloudDaylight: { value: false },
 		uCloudCover: { value: null as THREE.DataTexture | null },
 		uCloudWind: { value: null as THREE.DataTexture | null },
 		uCloudNoise: { value: null as THREE.Data3DTexture | null },
 		uCloudMapRotation: { value: mapRotation },
-		uCloudScale: { value: scaleOf() },
+		uCloudScale: { value: 0 },
+		uCloudRadiusKm: { value: 1 },
+		uCloudItcz: { value: 0 },
+		uCloudHigh: { value: new THREE.Vector2() },
+		uCloudLowsN: { value: new Float32Array(MAX_LOWS) },
+		uCloudLowsS: { value: new Float32Array(MAX_LOWS) },
+		uCloudLowCount: { value: new THREE.Vector2() },
+		uCloudZonal: { value: 0 },
 		uCloudStretch: { value: K.stretch },
 		uCloudWarp1: { value: K.warp1 },
 		uCloudWarp2: { value: K.warp2 },
@@ -137,7 +159,7 @@ export function createCloudOverlay() {
 		uCloudGrey: { value: new THREE.Vector2(K.greyLow, K.greyCirrus) },
 		uCloudLit: { value: Number(lit) },
 		uCloudShadow: { value: lit ? K.shadow : 0 },
-		uCloudShadowStep: { value: K.shadowKm / 6371 },
+		uCloudShadowStep: { value: 0 },
 	}
 
 	const globeMaterial = new THREE.ShaderMaterial({
@@ -181,10 +203,28 @@ export function createCloudOverlay() {
 	let started = 0
 	let updated = 0
 	let storms: ReturnType<typeof cloudStorms> = []
+	let belts: CloudClimateGrid["belts"] = null
+
+	function setLighting({
+		enabled,
+		direction,
+		ambient,
+		sunlight,
+	}: CloudLighting) {
+		uniforms.uCloudDaylight.value = enabled
+		uniforms.uSunDirection.value.set(direction.x, direction.z, -direction.y)
+		if (enabled) {
+			uniforms.uAmbient.value.copy(ambient)
+			uniforms.uSunLight.value.copy(sunlight)
+		} else {
+			uniforms.uAmbient.value.setScalar(1)
+			uniforms.uSunLight.value.setScalar(0)
+		}
+	}
 
 	function setTime(time: number) {
 		uniforms.uCloudTime.value = time
-		const positions = cloudStormsAt(storms, time)
+		const positions = cloudStormsAt(storms, time, belts)
 		for (let i = 0; i < positions.length; i++) {
 			const [x, y, z, strength, size] = positions[i]
 			uniforms.uCloudStorm.value[i].set(x, y, z, strength)
@@ -219,6 +259,18 @@ export function createCloudOverlay() {
 
 		const season = month === 0 ? 0 : Math.cos(((month - 1) * Math.PI) / 6)
 		uniforms.uCloudSeason.value.set(0.42 * season, -0.3 * season, 0.25 * season)
+		const radiusKm = world.params.planetRadiusKm
+		uniforms.uCloudScale.value = scaleOf(radiusKm)
+		uniforms.uCloudRadiusKm.value = radiusKm
+		uniforms.uCloudShadowStep.value = K.shadowKm / radiusKm
+		belts = weather.belts
+		uniforms.uCloudZonal.value = Number(!!belts)
+		const beltUniforms = cloudBeltUniforms(belts)
+		uniforms.uCloudItcz.value = beltUniforms.itcz
+		uniforms.uCloudHigh.value.fromArray(beltUniforms.high)
+		uniforms.uCloudLowsN.value.set(beltUniforms.lowsN)
+		uniforms.uCloudLowsS.value.set(beltUniforms.lowsS)
+		uniforms.uCloudLowCount.value.fromArray(beltUniforms.lowCount)
 		storms = cloudStorms(world.params.seed, weather)
 		uniforms.uCloudStorms.value = storms.length
 		source = world
@@ -266,6 +318,7 @@ export function createCloudOverlay() {
 			return frozen
 		},
 		setDisplay,
+		setLighting,
 		advance,
 		freezeForExport,
 		dispose,

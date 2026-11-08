@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Robert Aguilar. GPL-3.0, see src/model/climatev2/vendor/LICENSE.
 // Vendored from github.com/raguilar011095/planet_heightmap_generation@9432fa2b11d6058550fbc5eb0abdd986992739e4 v2/js/view/clouds.js.
-// Adapted for Chaos Machine: flat climate input, live shader only, rounded cumulus and filtered frontal detail.
+// Adapted for Chaos Machine: flat climate input, live shader only, rounded cumulus and filtered frontal detail; the
+// latitudes, pressures, radius and tropical storms are the planet's own (beltLatitude, slp as the anomaly from the
+// planet's mean, radiusKm, the modeled cyclone risk).
 export const CLOUDS = {
     sizeKm: 5400, stretch: 1.5, warp1: 0.7, warp2: 0.16, w0: 0.7, w1: 0.25, w2: 0.05, contrast: 1.4,
     edgeLow: 0.08, edgeConv: 0.065, edgeFront: 0.09, edgeCirrus: 0.08, veil: 0.16, veilWidth: 0.1, erosion: 0.45, detail: 4, sharp: 1.2,
@@ -22,27 +24,60 @@ export const MAX_STORMS = 16;
 
 const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-export function cloudFields({ P, T, slp: S, u: U, v: V, sstAnom: sa, seaIce: ice, sea }) {
+// (the rules' latitudes are Earth's as climatev2 has it — the ITCZ at 0°, the subtropical highs at ±30°, the subpolar
+// lows at ±65° (its Earth: highs 29–31°, lows 64–66°, seed 14963991) — and a planet's own are read through its belts,
+// piecewise linear between them and on to the poles. A faster planet's further Ferrel cells (circulation.js extraLows:
+// a low, a secondary high halfway, the next low) fold back over Earth's 65° → 30° → 65°, each with its own storm
+// track; no belts (a locked planet): the latitude as it is)
+const EARTH_HIGH = 30, EARTH_LOW = 65;
+export const MAX_LOWS = 9;
+const lowsOf = (b, n) => [n ? b.loN : b.loS, ...(n ? b.extraLowsN : b.extraLowsS)].slice(0, MAX_LOWS);
+export function beltLatitude(lat, b) {
+    if (!b) return lat;
+    const n = lat >= b.itcz, s = n ? 1 : -1, d = s * lat, I = s * b.itcz, H = s * (n ? b.hiN : b.hiS), L = lowsOf(b, n).map(l => s * l);
+    if (d <= H) return s * EARTH_HIGH * (d - I) / (H - I);
+    if (d <= L[0]) return s * (EARTH_HIGH + (EARTH_LOW - EARTH_HIGH) * (d - H) / (L[0] - H));
+    for (let k = 1; k < L.length; k++) {
+        const mid = (L[k - 1] + L[k]) / 2;
+        if (d <= mid) return s * (EARTH_LOW - (EARTH_LOW - EARTH_HIGH) * (d - L[k - 1]) / (mid - L[k - 1]));
+        if (d <= L[k]) return s * (EARTH_HIGH + (EARTH_LOW - EARTH_HIGH) * (d - mid) / (L[k] - mid));
+    }
+    const last = L[L.length - 1];
+    return s * (EARTH_LOW + (90 - EARTH_LOW) * (d - last) / (90 - last));
+}
+export function cloudBeltUniforms(b) {
+    const n = b ? lowsOf(b, true) : [EARTH_LOW], so = b ? lowsOf(b, false) : [-EARTH_LOW];
+    const lowsN = new Float32Array(MAX_LOWS), lowsS = new Float32Array(MAX_LOWS);
+    lowsN.set(n); lowsS.set(so);
+    return { itcz: b ? b.itcz : 0, high: [b ? b.hiN : EARTH_HIGH, b ? b.hiS : -EARTH_HIGH], lowsN, lowsS, lowCount: [n.length, so.length] };
+}
+// (the storm tracks, by Earth latitude: from the highs' poleward flank to past the subpolar lows)
+const stormTrack = al => sm(28, 40, al) * (1 - sm(64, 76, al));
+
+export function cloudFields({ P, T, slp: S, u: U, v: V, sstAnom: sa, seaIce: ice, sea, belts }) {
     const w = 360, h = 180, G = w * h;
     const L = [0, 1, 2, 3].map(() => new Float32Array(G)), wind = new Uint8Array(4 * G);
     if (P && T && S) {
         for (let j = 0; j < h; j++) {
-            const lat = 90 - (j + 0.5), al = Math.abs(lat);
+            const al = Math.abs(beltLatitude(90 - (j + 0.5), belts));
             let zm = 0, zn = 0;
             for (let i = 0; i < w; i++) { const v = S[j * w + i]; if (v === v) { zm += v; zn++; } }
-            zm = zn ? zm / zn : 1013;
-            const track = sm(28, 40, al) * (1 - sm(64, 76, al));
+            zm = zn ? zm / zn : 0;
+            // (no belts, no storm tracks: a locked planet's day-to-night flow has no baroclinic zone)
+            const track = belts ? stormTrack(al) : 0;
             for (let i = 0; i < w; i++) {
                 const c = j * w + i, p = Math.max(0, P[c] || 0), wet = 1 - Math.exp(-p / 100), t = T[c], isSea = sea ? sea[c] === 1 : false;
-                const warm = sm(18, 26, t), highP = sm(1014, 1024, S[c]), lowP = sm(2, -8, S[c] - zm);
+                // (the pressures against the planet's mean, Earth's 1011 hPa: 1014–1024 hPa is +3–13)
+                const warm = sm(18, 26, t), highP = sm(3, 13, S[c]), lowP = sm(2, -8, S[c] - zm);
                 // convective: the warm wet tropics; fair-weather cumulus over warm summer land
                 const conv = Math.max(0.7 * warm * sm(0.45, 0.92, wet), isSea ? 0 : 0.3 * sm(14, 24, t) * sm(0.1, 0.45, wet));
                 // frontal: the storm tracks (wetter, lower pressure, more), the cool rainy country elsewhere; less under highs
                 const front = Math.max(0, track * (0.15 + 0.5 * wet + 0.45 * lowP) + (1 - track) * (1 - warm) * 0.45 * wet - 0.45 * highP);
                 // low decks: cool upwelling seas under the subtropical highs; polar sea stratus
                 const cool = sm(0, -4, sa[c]);
-                const deck = isSea ? cool * sm(1008, 1018, S[c]) * sm(8, 18, al) * (1 - sm(42, 55, al)) * sm(28, 18, t) : 0;
-                const polar = isSea ? 0.65 * sm(48, 62, al) * (1 - sm(0.5, 0.95, ice?.[c] ?? 0)) : 0;
+                const band = belts ? sm(8, 18, al) * (1 - sm(42, 55, al)) : 1;
+                const deck = isSea ? cool * sm(-3, 7, S[c]) * band * sm(28, 18, t) : 0;
+                const polar = isSea && belts ? 0.65 * sm(48, 62, al) * (1 - sm(0.5, 0.95, ice?.[c] ?? 0)) : 0;
                 const low = Math.min(1, Math.max(deck, polar));
                 // cirrus: the storm tracks' and the tropical anvils'; fewer under highs
                 const cirr = Math.min(1, (0.02 + 0.4 * front + 0.4 * conv * warm) * (1 - 0.7 * highP));
@@ -132,17 +167,17 @@ export function cloudNoiseTexture() {
     return noiseTex;
 }
 
-export function cloudStorms(seed, { slp: S, P, T: Ts, sea }, K = CLOUDS) {
+export function cloudStorms(seed, { slp: S, P, T: Ts, cyclone, belts }, K = CLOUDS) {
     const out = [], s0 = (seed | 0) ^ 0x5bd1e995, w = 360, h = 180;
     const at = (lat, lon) => { const d = Math.PI / 180; return [-Math.cos(lon * d + Math.PI) * Math.cos(lat * d), Math.sin(lat * d), Math.sin(lon * d + Math.PI) * Math.cos(lat * d)]; };
     const far = (lat, lon, deg) => out.every(s => { const p = at(lat, lon); return Math.acos(Math.min(1, p[0] * s[0] + p[1] * s[1] + p[2] * s[2])) * 180 / Math.PI > deg; });
-    if (S) {
+    if (S && belts) {
         // (the lows: local minima against the row's mean, deepest first)
         const zm = new Float32Array(h);
         for (let j = 0; j < h; j++) { let t = 0; for (let i = 0; i < w; i++) t += S[j * w + i]; zm[j] = t / w; }
         const lows = [];
         for (let j = 0; j < h; j++) {
-            const lat = 90 - (j + 0.5), al = Math.abs(lat);
+            const lat = 90 - (j + 0.5), al = Math.abs(beltLatitude(lat, belts));
             if (al < 35 || al > 68) continue;
             for (let i = 0; i < w; i += 2) {
                 const v = S[j * w + i] - zm[j];
@@ -159,19 +194,22 @@ export function cloudStorms(seed, { slp: S, P, T: Ts, sea }, K = CLOUDS) {
             out.push([...at(lat, lon), Math.sign(lat) * Math.min(1, 0.5 + 0.06 * -v), 1.1 + 0.4 * hash(out.length, 3, 7, s0)]);
         }
     }
-    // (more along the tracks, where wet and low — from the seed)
-    for (let k = 0; out.length < K.storms && k < 400; k++) {
-        const north = hash(k, 1, 2, s0) < 0.5, lat = (36 + 30 * hash(k, 3, 5, s0)) * (north ? 1 : -1), lon = hash(k, 7, 9, s0) * 360 - 180;
+    // (more along the tracks, where wet and low — from the seed: equal-area tries, each kept with its track's weight,
+    // so a faster planet's further cells have theirs)
+    for (let k = 0; belts && out.length < K.storms && k < 2000; k++) {
+        const lat = Math.asin(2 * hash(k, 3, 5, s0) - 1) * 180 / Math.PI, north = lat >= 0, lon = hash(k, 7, 9, s0) * 360 - 180;
+        if (hash(k, 1, 2, s0) >= stormTrack(Math.abs(beltLatitude(lat, belts)))) continue;
         if (P) { const c = Math.min(h - 1, Math.floor(90 - lat)) * w + Math.min(w - 1, Math.floor(lon + 180)); if (hash(k, 21, 23, s0) > 0.25 + 0.75 * (1 - Math.exp(-(P[c] || 0) / 60))) continue; }
         if (!far(lat, lon, 16)) continue;
         out.push([...at(lat, lon), (north ? 1 : -1) * (0.35 + 0.55 * hash(k, 11, 13, s0) ** 1.5), 0.6 + 0.7 * hash(k, 17, 19, s0)]);
     }
-    // (tropical cyclones over warm seas)
+    // (tropical cyclones where the climate's cyclone risk has them — its own Coriolis, ITCZ and SST rules — the
+    // month's sea at least 27 °C, near Gray's 26.5 °C (1968): equal-area tries, each kept with the cell's risk)
     let tc = 0;
-    for (let k = 0; tc < K.tropical && k < 600 && Ts; k++) {
-        const north = hash(k, 31, 2, s0) < 0.5, lat = (8 + 16 * hash(k, 33, 5, s0)) * (north ? 1 : -1), lon = hash(k, 37, 9, s0) * 360 - 180;
+    for (let k = 0; tc < K.tropical && k < 4000 && Ts && cyclone; k++) {
+        const lat = Math.asin(2 * hash(k, 33, 5, s0) - 1) * 180 / Math.PI, north = lat >= 0, lon = hash(k, 37, 9, s0) * 360 - 180;
         const c = Math.min(h - 1, Math.floor(90 - lat)) * w + Math.min(w - 1, Math.floor(lon + 180));
-        if (!(sea ? sea[c] === 1 : true) || !(Ts[c] >= 27) || !far(lat, lon, 12) || out.length >= MAX_STORMS) continue;
+        if (!(hash(k, 31, 2, s0) < cyclone[c]) || !(Ts[c] >= 27) || !far(lat, lon, 12) || out.length >= MAX_STORMS) continue;
         out.push([...at(lat, lon), (north ? 1 : -1) * (0.8 + 0.2 * hash(k, 41, 13, s0)), 0.32 + 0.12 * hash(k, 43, 19, s0)]);
         tc++;
     }
@@ -185,11 +223,28 @@ uniform float uCloudScale, uCloudStretch, uCloudWarp1, uCloudWarp2, uCloudW0, uC
 uniform vec4 uCloudAA; uniform float uCloudEdge[4], uCloudQ[20], uCloudVeil, uCloudVeilWidth, uCloudErosion, uCloudDetail, uCloudSharp;
 uniform float uCloudLowScale, uCloudConvScale, uCloudCirrusScale, uCloudStreakFront, uCloudStreakCirrus, uCloudWindFull;
 uniform float uCloudTime, uCloudDrift, uCloudEvolve, uCloudFlowPeriod, uCloudFlowKm, uCloudStormKm, uCloudStormTwist, uCloudStormCover, uCloudTropicalTwist;
-uniform vec2 uCloudFlowLat; uniform vec3 uCloudStreakLat, uCloudSeason; uniform float uCloudCirrusWarp, uCloudCirrusFine; uniform float uCloudWeatherScale, uCloudWeatherAmp, uCloudStreakVary; uniform float uCloudBillow, uCloudRelief, uCloudThick, uCloudThinOp, uCloudThinGrey;
+uniform vec2 uCloudFlowLat, uCloudHigh; uniform float uCloudItcz, uCloudZonal, uCloudRadiusKm, uCloudLowsN[${MAX_LOWS}], uCloudLowsS[${MAX_LOWS}]; uniform ivec2 uCloudLowCount; uniform vec3 uCloudStreakLat, uCloudSeason; uniform float uCloudCirrusWarp, uCloudCirrusFine; uniform float uCloudWeatherScale, uCloudWeatherAmp, uCloudStreakVary; uniform float uCloudBillow, uCloudRelief, uCloudThick, uCloudThinOp, uCloudThinGrey;
 
+// (beltLatitude: uCloudHigh the highs', uCloudLowsN/S each hemisphere's lows' latitudes)
+float cloudBeltLat(float lat) {
+    const float EH = ${EARTH_HIGH.toFixed(1)}, EL = ${EARTH_LOW.toFixed(1)};
+    bool n = lat >= uCloudItcz; float s = n ? 1.0 : -1.0, d = s * lat, I = s * uCloudItcz, H = s * (n ? uCloudHigh.x : uCloudHigh.y);
+    int count = n ? uCloudLowCount.x : uCloudLowCount.y;
+    if (d <= H) return s * EH * (d - I) / (H - I);
+    float prev = s * (n ? uCloudLowsN[0] : uCloudLowsS[0]);
+    if (d <= prev) return s * (EH + (EL - EH) * (d - H) / (prev - H));
+    for (int k = 1; k < ${MAX_LOWS}; k++) {
+        if (k >= count) break;
+        float L = s * (n ? uCloudLowsN[k] : uCloudLowsS[k]), mid = 0.5 * (prev + L);
+        if (d <= mid) return s * (EL - (EL - EH) * (d - prev) / (mid - prev));
+        if (d <= L) return s * (EH + (EL - EH) * (d - mid) / (L - mid));
+        prev = L;
+    }
+    return s * (EL + (90.0 - EL) * (d - prev) / (90.0 - prev));
+}
 float cloudDriftRate(float lat) {
-    float d = degrees(lat), v = -0.55 * exp(-(d / 20.0) * (d / 20.0)) + 0.95 * exp(-((abs(d) - 52.0) / 22.0) * ((abs(d) - 52.0) / 22.0));
-    return v / max(cos(lat), 0.2);
+    float d = cloudBeltLat(degrees(lat)), v = -0.55 * exp(-(d / 20.0) * (d / 20.0)) + 0.95 * exp(-((abs(d) - 52.0) / 22.0) * ((abs(d) - 52.0) / 22.0));
+    return uCloudZonal * v / max(cos(lat), 0.2);
 }
 uniform vec4 uCloudStorm[${MAX_STORMS}]; uniform float uCloudStormSize[${MAX_STORMS}]; uniform int uCloudStorms;
 const mat3 cloudM3 = mat3(0.00, 0.80, 0.60, -0.80, 0.36, -0.48, -0.60, -0.48, 0.64);
@@ -218,7 +273,7 @@ vec4 cloudRaw(vec3 q0, vec3 r, vec3 Wq, float ss, float px, float tm, vec4 need,
     // (only the layers with cover here — the rest are clear; a shadow's pass, fast, without the wind's smear)
     float nF = 0.0, nL = 0.0, nC = 0.0, nR = 0.0;
     if (need.z > 0.5) {
-        vec3 sf = Wq * (uCloudStreakFront / 6371.0) * 0.5;
+        vec3 sf = Wq * (uCloudStreakFront / uCloudRadiusKm) * 0.5;
         float n = uCloudW0 * (fast > 0.5 ? cloudR(w * 0.5) : 0.25 * cloudR(w * 0.5 - sf) + 0.5 * cloudR(w * 0.5) + 0.25 * cloudR(w * 0.5 + sf));
         vec3 a1 = cloudM3 * w * 1.03; n += uCloudW1 * cloudR(a1 + vec3(0.4, 0.0, 0.0));
         vec3 a2 = cloudM3 * w * 2.07;
@@ -243,7 +298,7 @@ vec4 cloudRaw(vec3 q0, vec3 r, vec3 Wq, float ss, float px, float tm, vec4 need,
         }
     }
     if (need.w > 0.5) {
-    vec3 qr = (q0 + uCloudCirrusWarp * r) * uCloudCirrusScale + vec3(0.77, 0.0, 0.33) + ev * vec3(0.2, 0.3, -0.2), sr = Wq * uCloudCirrusScale * (uCloudStreakCirrus / 6371.0) * 0.25;
+    vec3 qr = (q0 + uCloudCirrusWarp * r) * uCloudCirrusScale + vec3(0.77, 0.0, 0.33) + ev * vec3(0.2, 0.3, -0.2), sr = Wq * uCloudCirrusScale * (uCloudStreakCirrus / uCloudRadiusKm) * 0.25;
     // (three taps along the wind, half again as far apart as five were: the same streaks' length)
     for (int k = -1; k <= 1; k++) nR += (1.0 - uCloudCirrusFine) * cloudR(qr + float(k) * 1.6 * sr) + uCloudCirrusFine * cloudR(qr * 2.3 + vec3(0.13, 0.57, 0.0) + float(k) * 1.6 * sr * 2.3);
     nR = 0.5 + (nR / 3.0 - 0.5) * (1.0 + 0.8 * ss);
@@ -257,10 +312,10 @@ vec4 cloudLayers(vec3 p, vec2 uv, float px, float fast, float lit, out float vei
     vec2 uvw = (wd.rg - 0.5) * 80.0;
     float speed = length(uvw);
     vec3 W = speed > 1e-3 ? (uvw.x * east + uvw.y * north) / speed : east, Lt = normalize(north - east);
-    float lat = asin(clamp(p.y, -1.0, 1.0));
+    float lat = asin(clamp(p.y, -1.0, 1.0)), beltLat = abs(cloudBeltLat(degrees(lat)));
     // (smeared along the wind: the jets' streets toward the mid-latitudes, broken cells — not ribbons — in the trades)
-    float ss = smoothstep(0.5, uCloudWindFull, speed) * mix(uCloudStreakLat.x, 1.0, smoothstep(uCloudStreakLat.y, uCloudStreakLat.z, abs(degrees(lat))));
-    float flowLat = mix(uCloudFlowLat.x, uCloudFlowLat.y, smoothstep(10.0, 45.0, abs(degrees(lat))));
+    float ss = smoothstep(0.5, uCloudWindFull, speed) * mix(uCloudStreakLat.x, 1.0, smoothstep(uCloudStreakLat.y, uCloudStreakLat.z, beltLat));
+    float flowLat = mix(uCloudFlowLat.x, uCloudFlowLat.y, smoothstep(10.0, 45.0, beltLat));
     // (the storms: the point turned about each centre, more the nearer — Rodrigues' rotation — and cloudier there)
     for (int i = 0; i < ${MAX_STORMS}; i++) {
         if (i >= uCloudStorms) break;
@@ -268,7 +323,7 @@ vec4 cloudLayers(vec3 p, vec2 uv, float px, float fast, float lit, out float vei
         // (its reach 2.2 of its sizes — the largest's ~33°: past it, none; its turn and cloud fading to nothing there)
         vec3 C = uCloudStorm[i].xyz; float dt = dot(C, p);
         if (dt < 0.83) continue;
-        float r = acos(min(1.0, dt)) / (uCloudStormKm * uCloudStormSize[i] / 6371.0);
+        float r = acos(min(1.0, dt)) / (uCloudStormKm * uCloudStormSize[i] / uCloudRadiusKm);
         if (r > 2.2) continue;
         float g = (exp(-r * r) - 7.907e-3) / (1.0 - 7.907e-3), th = uCloudStorm[i].w * g * (uCloudStormSize[i] < 0.6 ? uCloudTropicalTwist : uCloudStormTwist), co = cos(th), si = sin(th);
         p = p * co + cross(C, p) * si + C * dt * (1.0 - co);
@@ -299,7 +354,7 @@ vec4 cloudLayers(vec3 p, vec2 uv, float px, float fast, float lit, out float vei
     float ev0 = uCloudTime * uCloudEvolve;
     vec3 wq = cloudV3(q0 * 0.5 + ev0 * vec3(0.6, 0.2, -0.3), vec3(0.11, 0.53, 0.77));
     vec3 wr = cloudV3(q0 * 0.5 + uCloudWarp1 * wq + ev0 * vec3(-0.4, 0.5, 0.25), vec3(0.29, 0.91, 0.37));
-    vec3 L = Wn * speed * flowLat * (uCloudFlowKm / 6371.0) + vec3(east.x, east.y * uCloudStretch, east.z) * sc * (uCloudDrift * cloudDriftRate(lat) * cos(lat) * uCloudFlowPeriod), wA = vec3(0.0), wB = vec3(0.0);
+    vec3 L = Wn * speed * flowLat * (uCloudFlowKm / uCloudRadiusKm) + vec3(east.x, east.y * uCloudStretch, east.z) * sc * (uCloudDrift * cloudDriftRate(lat) * cos(lat) * uCloudFlowPeriod), wA = vec3(0.0), wB = vec3(0.0);
     // Filter the two cellular scales independently as their lobes approach pixel size.
     vec2 puffFades = 1.0 - smoothstep(vec2(0.2), vec2(0.55), (px * sc * uCloudConvScale * 0.5) * vec2(4.0, 8.0));
     vec2 puffWeights = vec2(0.78, 0.22) * puffFades;
@@ -383,16 +438,17 @@ float cloudShade(vec3 p, vec2 uv, float px) { float v; vec3 l; vec4 d = cloudLay
 #endif
 `;
 
-export function cloudStormsAt(S, t, K = CLOUDS) {
-    return S.map(([x, y, z, s, sz]) => { const a = -t * driftRadPerS(K) * cloudDriftRate(Math.asin(Math.max(-1, Math.min(1, y)))), c = Math.cos(a), n = Math.sin(a); return [c * x - n * z, y, n * x + c * z, s, sz]; });
+export function cloudStormsAt(S, t, belts, K = CLOUDS) {
+    return S.map(([x, y, z, s, sz]) => { const a = -t * driftRadPerS(K) * cloudDriftRate(Math.asin(Math.max(-1, Math.min(1, y))), belts), c = Math.cos(a), n = Math.sin(a); return [c * x - n * z, y, n * x + c * z, s, sz]; });
 }
 
-function cloudDriftRate(lat) {
-    const d = lat * 180 / Math.PI, v = -0.55 * Math.exp(-((d / 20) ** 2)) + 0.95 * Math.exp(-(((Math.abs(d) - 52) / 22) ** 2));
+function cloudDriftRate(lat, belts) {
+    if (!belts) return 0;
+    const d = beltLatitude(lat * 180 / Math.PI, belts), v = -0.55 * Math.exp(-((d / 20) ** 2)) + 0.95 * Math.exp(-(((Math.abs(d) - 52) / 22) ** 2));
     return v / Math.max(Math.cos(lat), 0.2);
 }
 
-export const scaleOf = (K = CLOUDS) => 2 * 6371 / K.sizeKm;
+export const scaleOf = (radiusKm, K = CLOUDS) => 2 * radiusKm / K.sizeKm;
 export const driftRadPerS = (K = CLOUDS) => K.driftDegPerS * Math.PI / 180;
 
 export const cloudEdges = (K = CLOUDS) => [K.edgeLow, K.edgeConv, K.edgeFront, K.edgeCirrus];

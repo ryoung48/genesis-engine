@@ -23,6 +23,9 @@ export function createLightingController(
 	ctx.sun.position.set(SUN_DIST, 0, 0)
 	ctx.currentSunDirection.set(1, 0, 0)
 	ctx.atmosMat.uniforms.sunDirection.value.set(1, 0, 0)
+	const ambient = new THREE.Vector3()
+	const sunlight = new THREE.Vector3()
+	const worldToMap = new THREE.Matrix3()
 
 	function setAtmospherePressure(pressureBar: number) {
 		const clamped = Math.max(
@@ -72,7 +75,7 @@ export function createLightingController(
 		const spinAngle = Math.PI + 2 * Math.PI * (timeOfDay / (hoursPerDay || 24))
 		ctx.currentSunHoursPerDay = hoursPerDay || 24
 		applyGlobeOrientation(subSolarLat, spinAngle)
-		syncMapLighting()
+		syncLighting()
 		if (ctx.solarTerminatorVisible) deps.rebuildSolarTerminator()
 		deps.requestRender()
 	}
@@ -90,29 +93,33 @@ export function createLightingController(
 		const spinAngle = -Math.atan2(y, x)
 		ctx.currentSunHoursPerDay = hoursPerDay || 24
 		applyGlobeOrientation(subSolarLatRad, spinAngle)
-		syncMapLighting()
+		syncLighting()
 		if (ctx.solarTerminatorVisible) deps.rebuildSolarTerminator()
 		deps.requestRender()
 	}
 
-	function syncMapLighting() {
-		if (!ctx.mapMesh) return
-		const mat = ctx.mapMesh.material
+	function syncLighting() {
+		ambient
+			.set(ctx.ambient.color.r, ctx.ambient.color.g, ctx.ambient.color.b)
+			.multiplyScalar(ctx.ambient.intensity / Math.PI)
+		sunlight
+			.set(ctx.sun.color.r, ctx.sun.color.g, ctx.sun.color.b)
+			.multiplyScalar(ctx.sun.intensity / Math.PI)
+		ctx.clouds.setLighting({
+			enabled: ctx.sun.intensity > 0,
+			direction: ctx.currentLocalSunDirection,
+			ambient,
+			sunlight,
+		})
+		const mat = ctx.mapMesh?.material
 		if (!(mat instanceof THREE.ShaderMaterial)) return
-		const invPi = 1 / Math.PI
-		mat.uniforms.uAmbient.value.set(
-			ctx.ambient.color.r * ctx.ambient.intensity * invPi,
-			ctx.ambient.color.g * ctx.ambient.intensity * invPi,
-			ctx.ambient.color.b * ctx.ambient.intensity * invPi,
-		)
+		mat.uniforms.uAmbient.value.copy(ambient)
+		mat.uniforms.uSunLight.value.copy(sunlight)
+		// The terrain shader reads normals in the projection's coordinate frame.
+		worldToMap.copy(ctx.clouds.mapRotation).transpose()
 		mat.uniforms.uSunDirection.value
 			.copy(ctx.currentLocalSunDirection)
-			.normalize()
-		mat.uniforms.uSunLight.value.set(
-			ctx.sun.color.r * ctx.sun.intensity * invPi,
-			ctx.sun.color.g * ctx.sun.intensity * invPi,
-			ctx.sun.color.b * ctx.sun.intensity * invPi,
-		)
+			.applyMatrix3(worldToMap)
 	}
 
 	function setFullAmbient(enabled: boolean) {
@@ -133,7 +140,7 @@ export function createLightingController(
 					: 0x000000,
 			)
 		}
-		syncMapLighting()
+		syncLighting()
 		deps.requestRender()
 	}
 
@@ -141,7 +148,7 @@ export function createLightingController(
 		setAtmospherePressure,
 		setSunPosition,
 		setSunDirection,
-		syncMapLighting,
+		syncLighting,
 		setFullAmbient,
 	}
 }

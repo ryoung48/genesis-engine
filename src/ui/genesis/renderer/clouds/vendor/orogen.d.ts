@@ -1,3 +1,5 @@
+import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
+
 export interface CloudClimateGrid {
 	P: Float32Array
 	T: Float32Array
@@ -7,6 +9,16 @@ export interface CloudClimateGrid {
 	sstAnom: Float32Array
 	seaIce: Uint8Array
 	sea: Uint8Array
+	cyclone: Float32Array
+	belts: CirculationBelts | null
+}
+
+export interface CloudBeltUniforms {
+	itcz: number
+	high: [number, number]
+	lowsN: Float32Array
+	lowsS: Float32Array
+	lowCount: [number, number]
 }
 
 export type CloudStorm = [number, number, number, number, number]
@@ -89,8 +101,16 @@ export function cloudStorms(
 	seed: number,
 	climate: CloudClimateGrid,
 ): CloudStorm[]
-export function cloudStormsAt(storms: CloudStorm[], time: number): CloudStorm[]
-export function scaleOf(): number
+export function cloudStormsAt(
+	storms: CloudStorm[],
+	time: number,
+	belts: CirculationBelts | null,
+): CloudStorm[]
+export function cloudBeltUniforms(
+	belts: CirculationBelts | null,
+): CloudBeltUniforms
+export const MAX_LOWS: number
+export function scaleOf(radiusKm: number): number
 export function driftRadPerS(): number
 export function cloudEdges(): number[]
 export function cloudQuantileList(): number[]

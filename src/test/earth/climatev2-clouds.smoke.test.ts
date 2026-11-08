@@ -109,6 +109,8 @@ describe("v2 diagnostic clouds", () => {
 		input.winds.belts = Array.from({ length: 12 }, () => ({
 			itcz: 45,
 			hiN: 80,
+			extraLowsN: [] as number[],
+			extraLowsS: [] as number[],
 			hiS: -30,
 			loN: 85,
 			loS: -60,
