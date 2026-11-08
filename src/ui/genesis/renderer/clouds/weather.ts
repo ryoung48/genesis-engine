@@ -61,6 +61,7 @@ export function rasterizeCloudWeather({
 	const seaIce = new Uint8Array(SIZE)
 	const sea = new Uint8Array(SIZE)
 	const cyclone = new Float32Array(SIZE)
+	const cloud = new Float32Array(SIZE)
 	const annual = month === 0
 	const offset = (month - 1) * mesh.numRegions
 	const orbit = CLIMATEV2_ORBIT.fromParams(world.params)
@@ -93,6 +94,11 @@ export function rasterizeCloudWeather({
 		sea[cell] = world.isLand[region] ? 0 : 1
 		seaIce[cell] = sea[cell] && world.iceMinMonthly[region] > 0 ? 1 : 0
 		cyclone[cell] = sea[cell] ? (world.cycloneRisk?.[region] ?? 0) : 0
+		if (annual) {
+			for (let m = 0; m < 12; m++)
+				cloud[cell] +=
+					world.cloudCoverMonthly[m * mesh.numRegions + region] / 12
+		} else cloud[cell] = world.cloudCoverMonthly[i]
 	}
 	const meanPressure = pressureSum / areaSum
 	for (let cell = 0; cell < SIZE; cell++) slp[cell] -= meanPressure
@@ -103,5 +109,5 @@ export function rasterizeCloudWeather({
 		: annual
 			? averageBelts(months)
 			: months[month - 1]
-	return { P, T, slp, u, v, sstAnom, seaIce, sea, cyclone, belts }
+	return { P, T, slp, u, v, sstAnom, seaIce, sea, cyclone, cloud, belts }
 }

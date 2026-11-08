@@ -662,6 +662,7 @@ function importGenesisWorld({
 		rainfall: post.rainfall,
 		hazards: post.hazards,
 		circulationBelts: post.circulationBelts,
+		cloudCoverMonthly: post.cloudCoverMonthly,
 		volcanism: {
 			hotspot: new Float32Array(mesh.numRegions),
 			mantleUpwelling: new Float32Array(mesh.numRegions),

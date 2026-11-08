@@ -180,6 +180,7 @@ export interface GenesisWorld {
 	/** Per-cell cyclone risk score in [0, 1]. */
 	cycloneRisk?: Float32Array
 	circulationBelts: CirculationBelts[] | null
+	cloudCoverMonthly: Float32Array
 	/** Per-cell tornado risk score in [0, 1]. */
 	tornadoRisk?: Float32Array
 	/** Per-cell modeled tidal range in meters. */

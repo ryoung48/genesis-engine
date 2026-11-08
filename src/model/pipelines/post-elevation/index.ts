@@ -997,6 +997,7 @@ function runPostElevationPipeline(
 		hazards,
 		cycloneRisk,
 		circulationBelts: circulation?.belts ?? null,
+		cloudCoverMonthly: climateV2.cloudCoverMonthly,
 		tornadoRisk,
 		tidalRange,
 		tidalSchedule,

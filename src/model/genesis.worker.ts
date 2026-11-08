@@ -194,6 +194,7 @@ function serializeWorld(
 		hazards: world.hazards,
 		cycloneRisk: world.cycloneRisk,
 		circulationBelts: world.circulationBelts,
+		cloudCoverMonthly: world.cloudCoverMonthly,
 		tornadoRisk: world.tornadoRisk,
 		tidalRange: world.tidalRange,
 		tidalSchedule: world.tidalSchedule,

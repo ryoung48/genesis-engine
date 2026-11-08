@@ -185,6 +185,7 @@ export interface PostPipelineOutput {
 	hazards: GenesisHazards
 	cycloneRisk: Float32Array
 	circulationBelts: CirculationBelts[] | null
+	cloudCoverMonthly: Float32Array
 	tornadoRisk: Float32Array
 	tidalRange: Float32Array
 	tidalSchedule: TidalSchedule

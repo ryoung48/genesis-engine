@@ -20,6 +20,10 @@ export const CLOUDS = {
 };
 
 const NOISE_N = 64;
+// (how far a cell's layers are scaled toward the climate's cover before the rest is made low cloud: 4×, so a rule's
+// trace — a little cirrus — never stands in for a whole deck; and the cover the layers are held under, as cloudCut
+// thins a layer's coverage only down to 5 % clear)
+const MAX_LAYER_SCALE = 4, MAX_COVER = 0.95;
 export const MAX_STORMS = 16;
 
 const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -54,7 +58,7 @@ export function cloudBeltUniforms(b) {
 // (the storm tracks, by Earth latitude: from the highs' poleward flank to past the subpolar lows)
 const stormTrack = al => sm(28, 40, al) * (1 - sm(64, 76, al));
 
-export function cloudFields({ P, T, slp: S, u: U, v: V, sstAnom: sa, seaIce: ice, sea, belts }) {
+export function cloudFields({ P, T, slp: S, u: U, v: V, sstAnom: sa, seaIce: ice, sea, cloud, belts }) {
     const w = 360, h = 180, G = w * h;
     const L = [0, 1, 2, 3].map(() => new Float32Array(G)), wind = new Uint8Array(4 * G);
     if (P && T && S) {
@@ -96,6 +100,23 @@ export function cloudFields({ P, T, slp: S, u: U, v: V, sstAnom: sa, seaIce: ice
         }
     };
     blur(L[0], 3); blur(L[1], 3); blur(L[2], 3); blur(L[3], 5);
+    // (how much is the climate's own cloud fraction; the rules above say only which kind: each cell's layers scaled
+    // together, at most MAX_LAYER_SCALE×, until their union is the climate's cover — the shortfall, where the rules
+    // have too little, as low broken cloud — so a locked planet's substellar deck and clear night side are the
+    // climate's, and none of the rules' cool-sea decks under its cold dry night)
+    if (cloud) {
+        const want = Float32Array.from(cloud);
+        blur(want, 3);
+        const union = (c, k) => 1 - (1 - Math.min(1, k * L[0][c])) * (1 - Math.min(1, k * L[1][c])) * (1 - Math.min(1, k * L[2][c])) * (1 - Math.min(1, k * L[3][c]));
+        for (let c = 0; c < G; c++) {
+            const target = Math.max(0, Math.min(MAX_COVER, want[c]));
+            let lo = 0, hi = MAX_LAYER_SCALE;
+            if (union(c, hi) > target) for (let it = 0; it < 20; it++) { const mid = (lo + hi) / 2; if (union(c, mid) > target) hi = mid; else lo = mid; }
+            for (let k = 0; k < 4; k++) L[k][c] = Math.min(1, hi * L[k][c]);
+            const rest = (1 - L[1][c]) * (1 - L[2][c]) * (1 - L[3][c]);
+            if (1 - (1 - L[0][c]) * rest < target) L[0][c] = 1 - (1 - target) / rest;
+        }
+    }
     const cover = new Uint8Array(4 * G);
     for (let c = 0; c < G; c++) for (let k = 0; k < 4; k++) cover[4 * c + k] = Math.round(255 * Math.max(0, Math.min(1, L[k][c])));
     return { w, h, cover, wind };

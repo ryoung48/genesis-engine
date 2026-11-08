@@ -820,6 +820,7 @@ function generateGenesisWorld({
 		hazards: post.hazards,
 		cycloneRisk: post.cycloneRisk,
 		circulationBelts: post.circulationBelts,
+		cloudCoverMonthly: post.cloudCoverMonthly,
 		tornadoRisk: post.tornadoRisk,
 		tidalRange: post.tidalRange,
 		tidalSchedule: post.tidalSchedule,

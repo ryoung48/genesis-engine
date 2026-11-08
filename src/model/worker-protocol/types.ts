@@ -98,6 +98,7 @@ export interface SerializedGenesisWorld {
 	rainfall: GenesisRainfall
 	cycloneRisk?: Float32Array
 	circulationBelts: CirculationBelts[] | null
+	cloudCoverMonthly: Float32Array
 	tornadoRisk?: Float32Array
 	tidalRange?: Float32Array
 	tidalSchedule?: TidalSchedule

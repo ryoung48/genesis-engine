@@ -10,6 +10,7 @@ export interface CloudClimateGrid {
 	seaIce: Uint8Array
 	sea: Uint8Array
 	cyclone: Float32Array
+	cloud: Float32Array
 	belts: CirculationBelts | null
 }
 
