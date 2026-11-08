@@ -7,6 +7,7 @@ import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context
 import { DEFAULT_WATER_SPECULAR } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
 import type { PreparedGeometry } from "@/ui/genesis/renderer/geometry-preparation/types"
 import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
+import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
 	applyFaceRegionColors,
 	applyMapColorModeColors,
@@ -221,14 +222,8 @@ export function createTerrainController(
 		}
 	}
 
-	// mapCloudMesh uses the shared, persistent ctx.mapCloudMat (mirrors
-	// globeCloudMat, never disposed per-rebuild) -- disposeObject3D would
-	// dispose that shared material's GPU program on every terrain rebuild, so
-	// this only tears down the geometry wrapper and detaches from the scene.
 	function disposeMapCloudMesh() {
-		if (!ctx.mapCloudMesh) return
-		ctx.scene.remove(ctx.mapCloudMesh)
-		ctx.mapCloudMesh.geometry.dispose()
+		ctx.mapCloudMesh?.removeFromParent()
 		ctx.mapCloudMesh = null
 	}
 
@@ -286,7 +281,16 @@ export function createTerrainController(
 		setContours(ctx.contours)
 		ctx.globeGroup.add(ctx.terrainMesh)
 		ctx.scene.add(ctx.mapMesh)
-		ctx.mapCloudMesh = buildMapCloudMesh(ctx.mapMesh.geometry, ctx.mapCloudMat)
+		ctx.clouds.mapRotation.copy(
+			createMapProjection(
+				ctx.currentMapCenterLongitudeDeg,
+				ctx.currentMapProjectionLatitudeDeg,
+			).worldRotation(),
+		)
+		ctx.mapCloudMesh = buildMapCloudMesh({
+			mapMeshGeometry: ctx.mapMesh.geometry,
+			material: ctx.clouds.mapMaterial,
+		})
 		addMapSlideClones(ctx.mapCloudMesh)
 		ctx.scene.add(ctx.mapCloudMesh)
 		reapplyMeshOverlayState({

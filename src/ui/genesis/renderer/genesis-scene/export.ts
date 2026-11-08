@@ -28,11 +28,11 @@ export function createExportController(
 ) {
 	function syncMapExportObjectPositions() {
 		const mapObjects = [
+			ctx.mapCloudMesh,
 			ctx.mapWireframe,
 			ctx.mapNationBorders,
 			ctx.mapSelectedProvinceBorder,
 			ctx.mapGrid,
-			ctx.mapThermalEquator,
 			ctx.mapSolarTerminator,
 			ctx.mapRivers,
 			ctx.mapMeasureLine,
@@ -59,11 +59,11 @@ export function createExportController(
 	function buildMapExportVisibilityTargets(): MapExportVisibilityTarget[] {
 		return [
 			{ object: ctx.terrainMesh, visible: false },
+			{ object: ctx.clouds.globe, visible: false },
 			{ object: ctx.waterMesh, visible: false },
 			{ object: ctx.atmosMesh, visible: false },
 			{ object: ctx.terrainWireframe, visible: false },
 			{ object: ctx.globeGrid, visible: false },
-			{ object: ctx.globeThermalEquator, visible: false },
 			{ object: ctx.globeRivers, visible: false },
 			{ object: ctx.globeNationBorders, visible: false },
 			{ object: ctx.globeSelectedProvinceBorder, visible: false },
@@ -83,9 +83,9 @@ export function createExportController(
 			{ object: ctx.globeReligionLabels, visible: false },
 			{ object: ctx.pulseGlobe, visible: false },
 			{ object: ctx.mapMesh, visible: true },
+			{ object: ctx.mapCloudMesh, visible: ctx.clouds.ready },
 			{ object: ctx.mapWireframe, visible: ctx.wireframeVisible },
 			{ object: ctx.mapGrid, visible: ctx.gridVisible },
-			{ object: ctx.mapThermalEquator, visible: false },
 			{
 				object: ctx.mapSolarTerminator,
 				visible: ctx.solarTerminatorVisible,
@@ -160,6 +160,7 @@ export function createExportController(
 		const restoreVisibility = applyMapExportVisibility(
 			buildMapExportVisibilityTargets(),
 		)
+		const resumeClouds = ctx.clouds.freezeForExport()
 		const exportCamera = new THREE.OrthographicCamera(-2, 2, 1, -1, 0.1, 100)
 		exportCamera.position.set(0, 0, 5)
 		exportCamera.lookAt(0, 0, 0)
@@ -180,6 +181,7 @@ export function createExportController(
 					(() => new Promise((resolve) => window.setTimeout(resolve, 0))),
 			})
 		} finally {
+			resumeClouds()
 			restoreVisibility()
 			if (shouldRecenterForExport) {
 				deps.setMapCenterLongitude(previousCenterLongitude)

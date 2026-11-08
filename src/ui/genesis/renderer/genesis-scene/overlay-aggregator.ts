@@ -14,7 +14,6 @@ import type { ColorMode } from "@/ui/genesis/shared/colors"
 export interface OverlayAggregatorControllerDeps {
 	syncAnimationState: () => void
 	rebuildCoastline: () => void
-	rebuildThermalEquator: () => void
 	rebuildSolarTerminator: () => void
 	rebuildWindArrows: () => void
 	rebuildRivers: () => void
@@ -139,7 +138,6 @@ export function createOverlayAggregatorController(
 			ctx.scene.add(ctx.mapGrid)
 		}
 		deps.rebuildCoastline()
-		deps.rebuildThermalEquator()
 		deps.rebuildSolarTerminator()
 		deps.rebuildWindArrows()
 		deps.rebuildRivers()

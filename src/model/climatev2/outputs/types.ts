@@ -33,6 +33,12 @@ export interface AnnualMeanParams {
 	N: number
 }
 
+export interface RainBeltCellsParams {
+	mesh: SphereMesh
+	grid: { w: number; step: number }
+	itczLat: Float32Array
+}
+
 export interface WindFieldsParams {
 	weights: BilinearWeights
 	circulation: Pick<CirculationResult, "u" | "v" | "slp">

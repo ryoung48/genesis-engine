@@ -16,8 +16,6 @@ export interface GeographySectionProps {
 	isEarthImport: boolean
 	showOceanCurrents: boolean
 	setShowOceanCurrents: (v: boolean) => void
-	showThermalEquator: boolean
-	setShowThermalEquator: (v: boolean) => void
 	showClouds: boolean
 	setShowClouds: (v: boolean) => void
 	showContours: boolean
@@ -43,8 +41,6 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 	isEarthImport,
 	showOceanCurrents,
 	setShowOceanCurrents,
-	showThermalEquator,
-	setShowThermalEquator,
 	showClouds,
 	setShowClouds,
 	showContours,
@@ -96,11 +92,6 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 						label="Ocean Currents"
 						checked={showOceanCurrents}
 						onChange={setShowOceanCurrents}
-					/>
-					<ToggleRow
-						label="Thermal Equator"
-						checked={showThermalEquator}
-						onChange={setShowThermalEquator}
 					/>
 					<ToggleRow
 						label="Clouds"

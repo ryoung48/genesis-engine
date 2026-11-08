@@ -67,8 +67,8 @@ function getProgressLabel(label: string): string {
 			return "Cities"
 		case "Post: climate":
 			return "Temperature"
-		case "Post: thermal equator":
-			return "Thermal equator"
+		case "Post: circulation":
+			return "Circulation"
 		case "Post: dtr + pet":
 			return "DTR + PET"
 		case "Post: observed Earth climate":
@@ -263,7 +263,6 @@ function serializeWorld(
 		urbanPopulation: world.urbanPopulation,
 		population: world.population,
 		historyMigration: world.historyMigration,
-		monthlyTEQ: world.monthlyTEQ,
 		dtr_annual: world.dtr_annual,
 		dtr_monthly: world.dtr_monthly,
 		observedCloudCover: world.observedCloudCover,
@@ -570,9 +569,6 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.rivers.basinId.buffer,
 			world.rivers.waterLevel.buffer,
 		)
-	}
-	if (world.monthlyTEQ) {
-		for (const teq of world.monthlyTEQ) add(teq.buffer)
 	}
 	if (world.nations) add(...nationBuffers(world.nations))
 	if (world.leaderDynasty) add(world.leaderDynasty.buffer)

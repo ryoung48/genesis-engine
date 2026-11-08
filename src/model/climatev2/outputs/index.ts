@@ -5,6 +5,7 @@ import type {
 	CurrentFlows,
 	CurrentFlowsParams,
 	MonthlyCellsParams,
+	RainBeltCellsParams,
 	SampleCellsParams,
 	SeaSurface,
 	SeaSurfaceParams,
@@ -84,6 +85,27 @@ function monthlyCells({
 }: MonthlyCellsParams): Float32Array {
 	const out = new Float32Array((MONTHS * weights.index.length) / 4)
 	sampleCells({ weights, field, fieldSize, months: MONTHS, out, cells: null })
+	return out
+}
+
+function rainBeltCells({
+	mesh,
+	grid,
+	itczLat,
+}: RainBeltCellsParams): Float32Array {
+	const N = mesh.numRegions
+	const { w, step } = grid
+	const out = new Float32Array(MONTHS * N)
+	for (let r = 0; r < N; r++) {
+		const lonDeg = Math.atan2(mesh.r_xyz[3 * r + 1], mesh.r_xyz[3 * r]) * DEG
+		const x = (lonDeg + 180) / step - 0.5
+		const x0 = Math.floor(x)
+		const f = x - x0
+		const i0 = ((x0 % w) + w) % w
+		const i1 = i0 + 1 === w ? 0 : i0 + 1
+		for (let m = 0; m < MONTHS; m++)
+			out[m * N + r] = itczLat[m * w + i0] * (1 - f) + itczLat[m * w + i1] * f
+	}
 	return out
 }
 
@@ -171,6 +193,7 @@ export const CLIMATEV2_OUTPUTS = {
 	sampleCells,
 	annualMean,
 	monthlyCells,
+	rainBeltCells,
 	windFields,
 	currentFlows,
 	seaSurface,

@@ -2,19 +2,13 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js"
 import { buildAtmosphereMaterial } from "@/ui/genesis/renderer/atmosphere-material"
-import {
-	boostCloudAlphaMap,
-	createMapCloudMaterial,
-} from "@/ui/genesis/renderer/cloud-material"
+import { createCloudOverlay } from "@/ui/genesis/renderer/clouds/overlay"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import {
 	buildNebulaBackground,
 	sizeNebulaBackground,
 } from "@/ui/genesis/renderer/nebula-background"
-import { createPlaceholderSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
 import { configureBodyTextureAnisotropy } from "@/ui/genesis/solar-system/overlay/textures"
-
-const GLOBE_CLOUD_RADIUS = 1.035
 
 export const DEFAULT_AMBIENT_INTENSITY = 0.55
 export const DEFAULT_SUN_INTENSITY = 2.8
@@ -156,24 +150,8 @@ export function buildGenesisSceneSetup(
 	const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat)
 	globeGroup.add(atmosMesh)
 
-	const globeCloudGeo = new THREE.SphereGeometry(GLOBE_CLOUD_RADIUS, 64, 48)
-	const globeCloudMat = new THREE.MeshBasicMaterial({
-		color: 0xffffff,
-		transparent: true,
-		opacity: 1,
-		alphaTest: 0.02,
-		depthWrite: false,
-	})
-	boostCloudAlphaMap(globeCloudMat)
-	const globeCloudMesh = new THREE.Mesh(globeCloudGeo, globeCloudMat)
-	globeCloudMesh.rotation.x = Math.PI / 2
-	globeCloudMesh.renderOrder = 2
-	globeCloudMesh.visible = false
-	globeGroup.add(globeCloudMesh)
-
-	const mapCloudMat = createMapCloudMaterial(
-		createPlaceholderSatelliteTexture(),
-	)
+	const clouds = createCloudOverlay()
+	globeGroup.add(clouds.globe)
 
 	// Starfield
 	const starCount = 3000
@@ -221,11 +199,8 @@ export function buildGenesisSceneSetup(
 		atmosGeo,
 		atmosMat,
 		atmosMesh,
-		globeCloudMat,
-		globeCloudMesh,
-		mapCloudMat,
+		clouds,
 		mapCloudMesh: null,
-		cloudsVisible: false,
 		starGeo,
 		starMat,
 		starPoints,
@@ -284,9 +259,6 @@ export function buildGenesisSceneSetup(
 		mapInfrastructureMaterials: [],
 		infrastructureMaterials: [],
 		infrastructureVisible: false,
-		globeThermalEquator: null,
-		mapThermalEquator: null,
-		thermalEquatorPoints: null,
 		globeWindArrows: null,
 		mapWindArrows: null,
 		windArrowData: null,

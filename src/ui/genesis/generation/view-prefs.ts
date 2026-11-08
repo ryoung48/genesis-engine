@@ -40,7 +40,6 @@ export interface StoredViewPrefs {
 	titleBorderTiers: TitleBorderTier[]
 	labelMode: LabelMode
 	showElevation: boolean
-	showThermalEquator: boolean
 	showClouds: boolean
 	showContours: boolean
 	showCoastlines: boolean
@@ -183,7 +182,6 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 		heraldry: false,
 	},
 	showElevation: true,
-	showThermalEquator: false,
 	showClouds: false,
 	showContours: false,
 	showCoastlines: false,
@@ -357,10 +355,6 @@ export function parseStoredViewPrefs(
 			showElevation: readBoolean(
 				parsed.showElevation,
 				DEFAULT_VIEW_PREFS.showElevation,
-			),
-			showThermalEquator: readBoolean(
-				parsed.showThermalEquator,
-				DEFAULT_VIEW_PREFS.showThermalEquator,
 			),
 			showClouds: readBoolean(parsed.showClouds, DEFAULT_VIEW_PREFS.showClouds),
 			showContours: readBoolean(

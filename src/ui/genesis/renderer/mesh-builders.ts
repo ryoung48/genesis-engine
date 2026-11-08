@@ -18,6 +18,7 @@ import { TRIANGLE_VALUES } from "@/ui/genesis/renderer/triangle-values"
 import type {
 	BuildMapWireframeParams,
 	GenesisViewMode,
+	MapCloudMeshInput,
 } from "@/ui/genesis/renderer/types"
 import { getColor } from "@/ui/genesis/shared/colors"
 
@@ -345,21 +346,11 @@ export function buildMapMesh(
 	}
 }
 
-/** Cloud overlay plane for the flat map, sharing the just-built map mesh's
- * position/lonLat buffers (so it always matches whatever projection/center
- * longitude produced them) with a material that samples the equirect cloud
- * texture via that lonLat attribute -- see createMapCloudMaterial. Caller
- * (terrain-controller.ts's rebuildTerrain) is expected to addMapSlideClones
- * and add it to the scene alongside mapMesh, matching every other flat
- * overlay's build pattern. */
-export function buildMapCloudMesh(
-	mapMeshGeometry: THREE.BufferGeometry,
-	material: THREE.Material,
-): THREE.Mesh {
-	const geometry = new THREE.BufferGeometry()
-	geometry.setAttribute("position", mapMeshGeometry.getAttribute("position"))
-	geometry.setAttribute("lonLat", mapMeshGeometry.getAttribute("lonLat"))
-	const mesh = new THREE.Mesh(geometry, material)
+export function buildMapCloudMesh({
+	mapMeshGeometry,
+	material,
+}: MapCloudMeshInput): THREE.Mesh {
+	const mesh = new THREE.Mesh(mapMeshGeometry, material)
 	mesh.renderOrder = 2
 	return mesh
 }

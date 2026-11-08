@@ -19,6 +19,7 @@
 			"!public/**",
 			"!src/model/climatev2/vendor",
 			"!src/model/climatev2/vendor/**",
+			"!src/ui/genesis/renderer/clouds/vendor/orogen.js",
 			"!assembly",
 			"!assembly/**"
 		]

@@ -1,5 +1,8 @@
 import { RAIN } from "@/model/climate/precipitation/rain"
-import type { ComputeTornadoRiskParams } from "@/model/climate/weather/tornadoes/types"
+import type {
+	ComputeTornadoRiskParams,
+	StormBeltFactorParams,
+} from "@/model/climate/weather/tornadoes/types"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { MATH } from "@/model/shared/math/core"
 
@@ -39,6 +42,31 @@ function terrainFactor(topoCode: number): number {
 	}
 }
 
+function stormBeltFactor({ lat, belts }: StormBeltFactorParams): number {
+	let best = 0
+	for (const belt of belts) {
+		const north = lat >= 0
+		const inner = north ? belt.hiN : -belt.hiS
+		const width = north ? belt.loN - belt.hiN : belt.hiS - belt.loS
+		if (width <= 0) continue
+		const dist = Math.abs(lat)
+		const factor =
+			MATH.smoothstep({
+				edge0: inner,
+				edge1: inner + width * 0.25,
+				x: dist,
+			}) *
+			(1 -
+				MATH.smoothstep({
+					edge0: inner + width * 0.75,
+					edge1: inner + width * 1.125,
+					x: dist,
+				}))
+		if (factor > best) best = factor
+	}
+	return best
+}
+
 function computeTornadoRisk({
 	mesh,
 	temperatureAvg,
@@ -48,20 +76,12 @@ function computeTornadoRisk({
 	topography,
 	vegetation,
 	oceanDist,
-	params,
+	circulation,
 }: ComputeTornadoRiskParams): Float32Array {
 	const N = mesh.numRegions
 
 	// No Coriolis on locked planets → no organized rotation → no tornadoes
-	if (params.tideLock?.type === "solar") return new Float32Array(N)
-
-	const hoursPerDay = params.hoursPerDay ?? 24
-	const hw = RAIN.hadleyWidth(hoursPerDay)
-
-	// The Ferrel cell spans [hw, 2*hw] from the thermal equator. When its outer
-	// edge (2*hw) reaches or exceeds the pole (90°), the cell has collapsed →
-	// no frontal shear zone → no tornadoes.
-	if (hw * 2 >= 90) return new Float32Array(N)
+	if (!circulation) return new Float32Array(N)
 
 	// --- Global temperature statistics (used for relative thresholds) ---
 	let globalTempSum = 0
@@ -77,15 +97,7 @@ function computeTornadoRisk({
 	const globalMean = globalTempSum / N
 	const globalMeanRange = landCount > 0 ? globalRangeSum / landCount : 30
 
-	// --- Ferrel cell latitude band (fully relative to hw) ---
-	const ferrelInner = hw
-	const ferrelOuter = hw * 2
-	const ferrelWidth = ferrelOuter - ferrelInner // always = hw
-	const transIn = ferrelWidth * 0.25
-	const transOut = ferrelWidth * 0.25
-
-	const { latDeg, regionBin } = RAIN.getClimateGeometry(mesh)
-	const annualTEQ = RAIN.computeThermalEquator({ mesh, temps: temperatureAvg })
+	const { latDeg } = RAIN.getClimateGeometry(mesh)
 
 	// --- Per-cell scoring ---
 	const risk = new Float32Array(N)
@@ -115,21 +127,12 @@ function computeTornadoRisk({
 		// c. Moisture via vegetation biome
 		const moistureScore = vegetationMoistureScore(vegetation[r])
 
-		// d. Ferrel cell latitude factor — all thresholds relative to hw
-		const teq = annualTEQ[regionBin[r]]
-		const distFromTeq = Math.abs(latDeg[r] - teq)
-		const latFactor =
-			MATH.smoothstep({
-				edge0: ferrelInner,
-				edge1: ferrelInner + transIn,
-				x: distFromTeq,
-			}) *
-			(1 -
-				MATH.smoothstep({
-					edge0: ferrelOuter - transOut,
-					edge1: ferrelOuter + transOut * 0.5,
-					x: distFromTeq,
-				}))
+		// d. Mid-latitude storm belt: v2's Ferrel band (hiN→loN / hiS→loS),
+		//    best of the twelve months so seasonal belt migration counts
+		const latFactor = stormBeltFactor({
+			lat: latDeg[r],
+			belts: circulation.belts,
+		})
 
 		if (latFactor <= 0) continue
 

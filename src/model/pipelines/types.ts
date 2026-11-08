@@ -239,6 +239,4 @@ export interface GenesisWorld {
 	/** Per-province development in [0, 1] from the urbanization stage. */
 	development?: Float32Array
 	continentCount: number
-	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
-	monthlyTEQ?: Float32Array[]
 }

@@ -14,6 +14,7 @@ import type {
 } from "@/model/worker-protocol/types"
 import type { LabelMode } from "@/ui/genesis/controls/OverlayControls"
 import type { ColorForRawId } from "@/ui/genesis/political/eu4-nation-fill-overlay"
+import type { createCloudOverlay } from "@/ui/genesis/renderer/clouds/overlay"
 import type { CoastlineLineData } from "@/ui/genesis/renderer/coastline-overlay"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { MoonOrbitState } from "@/ui/genesis/renderer/moon-orbit-overlay"
@@ -66,11 +67,8 @@ export interface GenesisContext {
 	atmosGeo: THREE.SphereGeometry
 	atmosMat: THREE.ShaderMaterial
 	atmosMesh: THREE.Mesh
-	globeCloudMat: THREE.MeshBasicMaterial
-	globeCloudMesh: THREE.Mesh
-	mapCloudMat: THREE.ShaderMaterial
+	clouds: ReturnType<typeof createCloudOverlay>
 	mapCloudMesh: THREE.Mesh | null
-	cloudsVisible: boolean
 	starGeo: THREE.BufferGeometry
 	starMat: THREE.PointsMaterial
 	/** Shared point starfield -- hidden while the solar-system view is up
@@ -159,10 +157,6 @@ export interface GenesisContext {
 	infrastructureMaterials: LineMaterial[]
 	infrastructureVisible: boolean
 
-	// overlay-controllers/rivers-wind-thermal.ts's state.
-	globeThermalEquator: THREE.Line | null
-	mapThermalEquator: THREE.Line | null
-	thermalEquatorPoints: [number, number][] | null
 	globeWindArrows: THREE.LineSegments | null
 	mapWindArrows: THREE.LineSegments | null
 	windArrowData: WindArrowData | null

@@ -1,6 +1,7 @@
 import type { GenesisOceanCurrents } from "@/model/climate/types"
 import type { WindVectors } from "@/model/climate/weather/wind/types"
 import type { DiurnalCells } from "@/model/climatev2/diurnal/types"
+import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
 import type { ClimateBudget } from "@/model/climatev2/vendor/climate.js"
 import type { ClimateOrbit } from "@/model/climatev2/vendor/insolation.js"
 import type { SphereMesh } from "@/model/mesh/types"
@@ -21,7 +22,13 @@ export interface ClimateV2Diagnostics {
 	radiation: ClimateBudget
 }
 
+export interface ClimateV2Circulation {
+	itczLatMonthly: Float32Array
+	belts: CirculationBelts[]
+}
+
 export interface ClimateV2Cells {
+	circulation: ClimateV2Circulation
 	cloudCoverMonthly: Float32Array
 	temperatureMonthly: Float32Array
 	rainfallMonthly: Float32Array

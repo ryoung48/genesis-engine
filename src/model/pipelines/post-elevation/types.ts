@@ -148,7 +148,6 @@ export interface PostPipelineOutput {
 	/** [JUSTIFICATION] Derived only while importing Earth from observed temperature, rainfall, and DTR rasters. */
 	observedHydrology?: GenesisWorld["observedHydrology"]
 	rainfall: GenesisRainfall
-	monthlyTEQ: Float32Array[]
 	hydrology: GenesisHydrology
 	vegetation: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where it is classified from observed climate data. */

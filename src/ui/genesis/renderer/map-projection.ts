@@ -51,6 +51,12 @@ export function createMapProjection(
 		projectionLatitudeDeg,
 		halfWidth,
 		repeatWidth,
+		worldRotation() {
+			const inverse = new THREE.Matrix4()
+				.makeRotationZ(centerLongitude)
+				.multiply(new THREE.Matrix4().makeRotationY(-centerLatitude))
+			return new THREE.Matrix3().setFromMatrix4(inverse)
+		},
 		clampX(value: number) {
 			return THREE.MathUtils.clamp(value, -halfWidth, halfWidth)
 		},

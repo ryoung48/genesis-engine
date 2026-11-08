@@ -108,9 +108,6 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [titleBorderTiers, setTitleBorderTiers] = useState(
 		initialViewPrefs.titleBorderTiers,
 	)
-	const [showThermalEquator, setShowThermalEquator] = useState(
-		initialViewPrefs.showThermalEquator,
-	)
 	const [showClouds, setShowClouds] = useState(initialViewPrefs.showClouds)
 	const [showContours, setShowContours] = useState(
 		initialViewPrefs.showContours,
@@ -230,7 +227,6 @@ export function useOverlayState(input: OverlayStateInput) {
 				titleBorderTiers,
 				labelMode,
 				showElevation,
-				showThermalEquator,
 				showClouds,
 				showContours,
 				showCoastlines,
@@ -302,7 +298,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		labelMode,
 		showElevation,
 		showRivers,
-		showThermalEquator,
 		showClouds,
 		showContours,
 		showCoastlines,
@@ -398,7 +393,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowSolarSystemEllipticalOrbits,
 		setShowSolarSystemInclination,
 		setShowSolarSystemRealisticSizes,
-		setShowThermalEquator,
 		setShowWindArrows,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
@@ -430,7 +424,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
 		showSolarSystemRealisticSizes,
-		showThermalEquator,
 		showWindArrows,
 		showWireframe,
 		solarSystemControlsExpanded,

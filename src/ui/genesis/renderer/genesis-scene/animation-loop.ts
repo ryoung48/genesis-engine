@@ -1,4 +1,5 @@
 import type * as THREE from "three"
+import { CLOUD_FRAME_MS } from "@/ui/genesis/renderer/clouds/overlay"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { updateGlobeLabelOrientations } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
 import { activateSettlementLabels } from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
@@ -65,11 +66,27 @@ export function createAnimationLoopController(
 	ctx: GenesisContext,
 	deps: AnimationLoopControllerDeps,
 ) {
+	let cloudFrame: number | null = null
 	const renderScheduler = createRenderScheduler({
 		requestFrame: (callback) => window.requestAnimationFrame(callback),
 		cancelFrame: (handle) => window.cancelAnimationFrame(handle),
 		onFrame: () => {
 			let keepAnimating = false
+			if (
+				!ctx.solarSystemActive &&
+				!ctx.clouds.frozen &&
+				((ctx.globeGroup.visible && ctx.clouds.globe.visible) ||
+					ctx.mapCloudMesh?.visible)
+			) {
+				ctx.clouds.advance()
+				cloudFrame ??= window.setTimeout(() => {
+					cloudFrame = null
+					renderScheduler.requestRender()
+				}, CLOUD_FRAME_MS)
+			} else if (cloudFrame !== null) {
+				window.clearTimeout(cloudFrame)
+				cloudFrame = null
+			}
 
 			if (ctx.focusTween) {
 				deps.stepFocusTween()
@@ -322,6 +339,7 @@ export function createAnimationLoopController(
 	}
 
 	function dispose() {
+		if (cloudFrame !== null) window.clearTimeout(cloudFrame)
 		renderScheduler.dispose()
 	}
 

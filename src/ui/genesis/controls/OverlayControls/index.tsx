@@ -57,8 +57,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowWireframe,
 	showRivers,
 	setShowRivers,
-	showThermalEquator,
-	setShowThermalEquator,
 	showClouds,
 	setShowClouds,
 	showContours,
@@ -347,8 +345,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									isEarthImport={isEarthImport}
 									showOceanCurrents={showOceanCurrents}
 									setShowOceanCurrents={setShowOceanCurrents}
-									showThermalEquator={showThermalEquator}
-									setShowThermalEquator={setShowThermalEquator}
 									showClouds={showClouds}
 									setShowClouds={setShowClouds}
 									showContours={showContours}

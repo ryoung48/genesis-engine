@@ -1,5 +1,6 @@
+import type { ClimateV2Circulation } from "@/model/climatev2/types"
+import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
 import type { SphereMesh } from "@/model/mesh/types"
-import type { GenesisParams } from "@/model/pipelines/types"
 
 export type ComputeTornadoRiskParams = {
 	mesh: SphereMesh
@@ -10,5 +11,10 @@ export type ComputeTornadoRiskParams = {
 	topography: Uint8Array
 	vegetation: Uint8Array
 	oceanDist: Float32Array
-	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">
+	circulation: ClimateV2Circulation | null
+}
+
+export type StormBeltFactorParams = {
+	lat: number
+	belts: CirculationBelts[]
 }

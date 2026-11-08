@@ -15,6 +15,7 @@ import type {
 	ColorForRawId,
 	ElevationKmForLonLat,
 } from "@/ui/genesis/political/eu4-nation-fill-overlay"
+import type { CloudDisplay } from "@/ui/genesis/renderer/clouds/types"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { PreparedGeometry } from "@/ui/genesis/renderer/geometry-preparation/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
@@ -26,6 +27,11 @@ import type {
 export type { WindArrowData }
 
 export type GenesisViewMode = "globe" | "map"
+
+export interface MapCloudMeshInput {
+	mapMeshGeometry: THREE.BufferGeometry
+	material: THREE.Material
+}
 
 export interface BuildGlobeWindArrowsInput {
 	data: WindArrowData
@@ -231,7 +237,6 @@ export interface GenesisScene {
 		xyz: [number, number, number],
 		lonOffsetRad?: number,
 	): [number, number] | null
-	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: RiverData | null): void
 	setRiversVisible(visible: boolean): void
 	setRealmBorders(spec: RealmBordersSpec | null): void
@@ -245,8 +250,7 @@ export interface GenesisScene {
 	setSolarTerminatorUseMeridiem(enabled: boolean): void
 	setSolarTerminatorVisible(visible: boolean): void
 	setAtmospherePressure(pressureBar: number): void
-	setGlobeCloudTexturePath(texturePath: string | null): void
-	setCloudsVisible(visible: boolean): void
+	setClouds(display: CloudDisplay): void
 	setContours(contours: ContourDisplay): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void

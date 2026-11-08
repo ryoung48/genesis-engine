@@ -870,7 +870,6 @@ function generateGenesisWorld({
 		development: urbanization.development,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: STATS.countContinents({ mesh, isLand }),
-		monthlyTEQ: post.monthlyTEQ,
 		timings,
 	}
 }

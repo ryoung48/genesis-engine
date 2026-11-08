@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
-import { RAIN } from "@/model/climate/precipitation/rain"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
@@ -347,126 +346,6 @@ describe("vegetation: modeled vs observed Earth", () => {
 					modeledWarmShare: Number((b.mod / Math.max(1, b.n)).toFixed(3)),
 				})),
 			)
-		}
-
-		// ITCZ reach: closest the modeled thermal equator gets to each land
-		// cell over the year (deg lat). If this is large in the 20-32° bands,
-		// the ITCZ term contributes ~nothing there in any month, so the
-		// winter-phased eastStorms term is the only rain source -> phase flips.
-		const meshFull = world.mesh as unknown as Parameters<
-			typeof RAIN.computeThermalEquator
-		>[0]["mesh"]
-		const tMonthly = world.climate?.temperature_monthly
-		const rxyz = world.mesh?.r_xyz
-		if (meshFull && tMonthly && rxyz) {
-			const nRegions = isLand.length
-			const teqMonths: Float32Array[] = []
-			for (let m = 0; m < 12; m++) {
-				teqMonths.push(
-					RAIN.computeThermalEquator({
-						mesh: meshFull,
-						temps: tMonthly.subarray(m * nRegions, (m + 1) * nRegions),
-					}),
-				)
-			}
-			const nBins = teqMonths[0].length
-			const reachBands = [
-				{ label: "0-15", lo: 0, hi: 15 },
-				{ label: "15-25", lo: 15, hi: 25 },
-				{ label: "25-35", lo: 25, hi: 35 },
-				{ label: "35-45", lo: 35, hi: 45 },
-			].map((b) => ({ ...b, n: 0, minApproach: 0, teqMax: 0 }))
-			for (let r = 0; r < isLand.length; r++) {
-				if (!isLand[r]) continue
-				const x = rxyz[r * 3]
-				const y = rxyz[r * 3 + 1]
-				const z = Math.max(-1, Math.min(1, rxyz[r * 3 + 2]))
-				const lat = (Math.asin(z) * 180) / Math.PI
-				const lon = (Math.atan2(y, x) * 180) / Math.PI
-				const bin = Math.max(
-					0,
-					Math.min(nBins - 1, Math.floor(((lon + 180) / 360) * nBins)),
-				)
-				let closest = Infinity
-				let teqPeak = -Infinity
-				for (let m = 0; m < 12; m++) {
-					const teq = teqMonths[m][bin]
-					closest = Math.min(closest, Math.abs(lat - teq))
-					if (lat >= 0) teqPeak = Math.max(teqPeak, teq)
-					else teqPeak = Math.max(teqPeak, -teq)
-				}
-				const b = reachBands.find(
-					(bb) => Math.abs(lat) >= bb.lo && Math.abs(lat) < bb.hi,
-				)
-				if (!b) continue
-				b.n++
-				b.minApproach += closest
-				b.teqMax += teqPeak
-			}
-			console.info(
-				"ITCZ reach: mean closest approach of modeled thermal equator (deg lat), + mean poleward-most teq",
-			)
-			console.table(
-				reachBands.map((b) => ({
-					absLatBand: b.label,
-					cells: b.n,
-					meanClosestApproachDeg: Number(
-						(b.minApproach / Math.max(1, b.n)).toFixed(1),
-					),
-					meanPolewardTeqDeg: Number((b.teqMax / Math.max(1, b.n)).toFixed(1)),
-				})),
-			)
-
-			// Is the thermal equator under-migrating because of the smoothing, or
-			// because the modeled temperature field's warm hemisphere isn't hot
-			// enough at 20-35°? Compare teq from MODELED vs REAL monthly temps for
-			// NH mid-summer (Jul) and mid-winter (Jan), by longitude sector.
-			const realT = world.climate?.real_temperature_monthly
-			if (realT) {
-				const teqReal = (m: number) =>
-					RAIN.computeThermalEquator({
-						mesh: meshFull,
-						temps: realT.subarray(m * nRegions, (m + 1) * nRegions),
-					})
-				const sectors = [
-					{ label: "Africa/Europe 0-40E", lo: 0, hi: 40 },
-					{ label: "Asia 60-100E", lo: 60, hi: 100 },
-					{ label: "N America 120-80W", lo: -120, hi: -80 },
-					{ label: "S America 70-40W", lo: -70, hi: -40 },
-				]
-				const julMod = teqMonths[6]
-				const janMod = teqMonths[0]
-				const julReal = teqReal(6)
-				const janReal = teqReal(0)
-				const binLon = (bin: number) => (bin / nBins) * 360 - 180
-				const rows = sectors.map((s) => {
-					let jm = 0
-					let jr = 0
-					let wm = 0
-					let wr = 0
-					let n = 0
-					for (let bin = 0; bin < nBins; bin++) {
-						const lon = binLon(bin)
-						if (lon < s.lo || lon >= s.hi) continue
-						n++
-						jm += julMod[bin]
-						jr += julReal[bin]
-						wm += janMod[bin]
-						wr += janReal[bin]
-					}
-					return {
-						sector: s.label,
-						julTeqModeled: Number((jm / Math.max(1, n)).toFixed(1)),
-						julTeqReal: Number((jr / Math.max(1, n)).toFixed(1)),
-						janTeqModeled: Number((wm / Math.max(1, n)).toFixed(1)),
-						janTeqReal: Number((wr / Math.max(1, n)).toFixed(1)),
-					}
-				})
-				console.info(
-					"Thermal equator: modeled vs real, Jul & Jan, by longitude sector",
-				)
-				console.table(rows)
-			}
 		}
 
 		// EBM seasonal amplitude: (warmest month - coldest month) of temperature,

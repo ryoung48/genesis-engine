@@ -134,6 +134,14 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 		}
 	}
 	return {
+		circulation: {
+			itczLatMonthly: CLIMATEV2_OUTPUTS.rainBeltCells({
+				mesh,
+				grid,
+				itczLat: circulation.itczLat,
+			}),
+			belts: circulation.belts,
+		},
 		cloudCoverMonthly: CLIMATEV2_OUTPUTS.monthlyCells({
 			weights,
 			field: result.stages.clouds.cover,

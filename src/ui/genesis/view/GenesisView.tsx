@@ -3,7 +3,6 @@ import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
 import { TIDAL_CONTRIBUTORS } from "@/model/climate/ocean/tides/tidal-schedule/contributors"
-import { RAIN } from "@/model/climate/precipitation/rain"
 import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { WeatherClockSelection } from "@/model/climate/weather/local/clock/types"
 import { WIND } from "@/model/climate/weather/wind"
@@ -234,7 +233,6 @@ export const GenesisView: React.FC<{
 		setShowSolarSystemEllipticalOrbits,
 		setShowSolarSystemInclination,
 		setShowSolarSystemRealisticSizes,
-		setShowThermalEquator,
 		setShowWindArrows,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
@@ -265,7 +263,6 @@ export const GenesisView: React.FC<{
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
 		showSolarSystemRealisticSizes,
-		showThermalEquator,
 		showClouds,
 		setShowClouds,
 		showWindArrows,
@@ -640,16 +637,13 @@ export const GenesisView: React.FC<{
 	useEffect(() => {
 		sceneRef.current?.setAtmospherePressure(world?.params.pressure ?? pressure)
 	}, [world, pressure])
-	// Always the real Earth cloud texture, for every planet -- no per-planet
-	// procedural generation.
 	useEffect(() => {
-		sceneRef.current?.setGlobeCloudTexturePath(
-			SOL_DATA.solEarthCloudsTexturePath,
-		)
-	}, [])
-	useEffect(() => {
-		sceneRef.current?.setCloudsVisible(showClouds)
-	}, [showClouds])
+		sceneRef.current?.setClouds({
+			world,
+			month: currentMonth,
+			visible: showClouds,
+		})
+	}, [world, currentMonth, showClouds])
 	useEffect(() => {
 		if (!world) {
 			setHoverInfo(null)
@@ -1206,33 +1200,6 @@ export const GenesisView: React.FC<{
 		selectedWikiOrganizationId,
 		cultureBlendOverlay,
 	])
-
-	const thermalEquator = useMemo(() => {
-		if (!world?.climate) return null
-		const N = world.mesh.numRegions
-		const useObserved = dataVariant === "observed"
-		const avgTemps = useObserved
-			? world.climate.real_temperature_avg
-			: world.climate.temperature_avg
-		const monthlyTemps = useObserved
-			? world.climate.real_temperature_monthly
-			: world.climate.temperature_monthly
-		const temps =
-			resolvedClimateMonth === 0
-				? avgTemps
-				: monthlyTemps?.subarray(
-						(resolvedClimateMonth - 1) * N,
-						resolvedClimateMonth * N,
-					)
-		if (!temps) return null
-		return RAIN.computeThermalEquatorLine({ mesh: world.mesh, temps })
-	}, [resolvedClimateMonth, world, dataVariant])
-
-	useEffect(() => {
-		sceneRef.current?.setThermalEquator(
-			showThermalEquator ? thermalEquator : null,
-		)
-	}, [thermalEquator, showThermalEquator])
 
 	const windGrid = useMemo(() => {
 		if (!windVectors || !world) return null
@@ -2366,8 +2333,6 @@ export const GenesisView: React.FC<{
 								setShowWireframe={handleSetWireframe}
 								showRivers={showRivers}
 								setShowRivers={setShowRivers}
-								showThermalEquator={showThermalEquator}
-								setShowThermalEquator={setShowThermalEquator}
 								showClouds={showClouds}
 								setShowClouds={setShowClouds}
 								showContours={showContours}
@@ -2473,7 +2438,6 @@ export const GenesisView: React.FC<{
 									setGridSpacing(15)
 									setShowWireframe(false)
 									setShowRivers(false)
-									setShowThermalEquator(false)
 									setShowNationBorders(false)
 									setShowDistrictBorders(false)
 									setTitleBorderTiers([])

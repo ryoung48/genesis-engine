@@ -285,7 +285,6 @@ export interface SerializedGenesisWorld {
 		 * population carrier. */
 		sourceIndex: Int32Array
 	}
-	monthlyTEQ?: Float32Array[]
 	/** Per-location trade good index (0=unassigned, 1-based into TRADE_GOOD_LABELS). */
 	tradeGoods?: Uint8Array
 	settlementRegions?: Int32Array

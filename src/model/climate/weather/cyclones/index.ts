@@ -9,17 +9,19 @@ function computeCycloneRisk({
 	climate,
 	isLand,
 	topography,
+	circulation,
+	rainfallAnnual,
 	params,
 }: ComputeCycloneRiskParams): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const { latDeg, regionBin } = RAIN.getClimateGeometry(mesh)
+	const { latDeg } = RAIN.getClimateGeometry(mesh)
 
 	// Tidally locked: no meaningful Coriolis → no cyclones
-	if (params.tideLock?.type === "solar") return new Float32Array(N)
+	if (!circulation) return new Float32Array(N)
 
 	// Slow rotators: the Coriolis no-go zone (radius = geoTransitionLat degrees
-	// from the thermal equator) engulfs the entire valid formation band (≤38°).
+	// from the ITCZ) engulfs the entire valid formation band (≤38°).
 	const hoursPerDay = params.hoursPerDay ?? 24
 	const noGoRadius = (15 * hoursPerDay) / TIME.hoursPerDay // same formula as wind model
 	if (noGoRadius >= 38) return new Float32Array(N)
@@ -31,12 +33,10 @@ function computeCycloneRisk({
 	const SST_THRESHOLD = globalMeanTemp + 11
 	const SST_RANGE = 12 // full score at threshold + 12°C
 
-	const annualTEQ = RAIN.computeThermalEquator({
-		mesh,
-		temps: climate.temperature_avg,
-	})
-
 	// --- Step 1: Genesis potential (ocean cells only) ---
+	// Each month scores its own SST against that month's ITCZ latitude at the
+	// cell's longitude, so the genesis band follows the seasonal rain-belt
+	// migration; the best month is kept.
 	const genesis = new Float32Array(N)
 
 	for (let r = 0; r < N; r++) {
@@ -45,35 +45,32 @@ function computeCycloneRisk({
 		// reliable discriminator here.
 		if (topography[r] !== CLASSIFICATION.topoOcean) continue
 
-		// Peak monthly SST over the annual cycle
-		let peakTemp = -Infinity
+		let best = 0
 		for (let m = 0; m < 12; m++) {
-			const t = climate.temperature_monthly[m * N + r]
-			if (t > peakTemp) peakTemp = t
+			const sstScore = MATH.clamp({
+				value:
+					(climate.temperature_monthly[m * N + r] - SST_THRESHOLD) / SST_RANGE,
+				lo: 0,
+				hi: 1,
+			})
+			if (sstScore <= 0) continue
+
+			const distFromItcz = Math.abs(
+				latDeg[r] - circulation.itczLatMonthly[m * N + r],
+			)
+
+			// Smooth bell: zero within no-go zone, peaks midway, zero beyond 38°
+			const latFactor =
+				MATH.smoothstep({
+					edge0: noGoRadius,
+					edge1: noGoRadius + 8,
+					x: distFromItcz,
+				}) *
+				(1 - MATH.smoothstep({ edge0: 30, edge1: 38, x: distFromItcz }))
+			const score = sstScore * latFactor
+			if (score > best) best = score
 		}
-
-		const sstScore = MATH.clamp({
-			value: (peakTemp - SST_THRESHOLD) / SST_RANGE,
-			lo: 0,
-			hi: 1,
-		})
-		if (sstScore <= 0) continue
-
-		// Latitude from thermal equator — must be inside formation band
-		const teq = annualTEQ[regionBin[r]]
-		const distFromTeq = Math.abs(latDeg[r] - teq)
-
-		// Smooth bell: zero within no-go zone, peaks midway, zero beyond 38°
-		const latFactor =
-			MATH.smoothstep({
-				edge0: noGoRadius,
-				edge1: noGoRadius + 8,
-				x: distFromTeq,
-			}) *
-			(1 - MATH.smoothstep({ edge0: 30, edge1: 38, x: distFromTeq }))
-		if (latFactor <= 0) continue
-
-		genesis[r] = sstScore * latFactor
+		genesis[r] = best
 	}
 
 	// --- Step 2: BFS storm-track propagation across open ocean ---
@@ -105,9 +102,24 @@ function computeCycloneRisk({
 	}
 
 	// --- Step 3: Coastal land risk ---
-	// Seed from land cells adjacent to storm-track ocean; propagate 3 hops inland.
+	// Seed from land cells adjacent to storm-track ocean; propagate 3 hops inland,
+	// each hop scaled by the receiving cell's wetness: a landfalling storm
+	// keeps its rain only over moist ground, and the 250-750 mm ramp spans the
+	// Köppen dry-climate threshold (~250-500 mm) up to humid-climate rainfall.
 	const COASTAL_DECAY = 0.4
 	const COASTAL_HOPS = 3
+	const DRY_MM = 250
+	const WET_MM = 750
+
+	const wetness = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		wetness[r] = MATH.smoothstep({
+			edge0: DRY_MM,
+			edge1: WET_MM,
+			x: rainfallAnnual[r],
+		})
+	}
 
 	const coastalRisk = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
@@ -127,7 +139,7 @@ function computeCycloneRisk({
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
 				if (!isLand[nb]) continue
-				const p = prev[nb] * COASTAL_DECAY
+				const p = prev[nb] * COASTAL_DECAY * wetness[r]
 				if (p > coastalRisk[r]) coastalRisk[r] = p
 			}
 		}

@@ -2,6 +2,12 @@
 
 V2 diagnoses monthly cloud fractions on its climate grid. The same fractions supply the daily solar attenuation, regional radiation corrections, generated cloud map and hover values. Imported Earth observations remain available separately for comparison.
 
+## Genesis cloud overlay
+
+The **Clouds** overlay on the Genesis globe and flat map uses [World Orogen's procedural cloud renderer](https://github.com/raguilar011095/planet_heightmap_generation/blob/9432fa2b11d6058550fbc5eb0abdd986992739e4/v2/js/view/clouds.js), vendored under `src/ui/genesis/renderer/clouds/vendor/` under GPL-3.0. It builds low, convective, frontal, and cirrus layers from the selected month's climate, then uses Perlin and Worley noise, winds, and seeded storm centers to shape and animate them. Annual mode uses annual climate and average monthly rainfall. Map PNGs include a still cloud frame when the overlay is enabled.
+
+The renderer uses annual sea-level pressure with the planet's pressure offset removed, sea-surface temperature anomalies as a proxy for upwelling, and perennial sea ice as its ice mask. It computes visual coverage independently from the diagnosed cloud fractions used by Climate v2 and the Clouds data map.
+
 ## Cloud estimate
 
 `src/model/climatev2/clouds/index.ts` owns `CLIMATEV2_CLOUDS`. It reuses the rain stage's column relative humidity and transported stability, and the circulation stage's low-level convergence. Column humidity is not surface humidity; stability is the model's regional surface-temperature and pressure proxy, not a measured vertical inversion.

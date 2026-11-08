@@ -5,27 +5,17 @@ import {
 	DEFAULT_SUN_INTENSITY,
 	DEFAULT_WATER_SPECULAR,
 } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
-import { loadGlobeCloudTexture } from "@/ui/genesis/renderer/textures"
 import { isColoredTerrainMode } from "@/ui/genesis/shared/colors"
 
 export interface LightingControllerDeps {
 	requestRender: () => void
 	rebuildSolarTerminator: () => void
-	updateOverlayVisibility: () => void
 }
 
 const SUN_DIST = 10
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const Z_AXIS = new THREE.Vector3(0, 0, 1)
 
-/** Owns the sun/atmosphere/cloud lighting state: globe orientation (spin +
- * obliquity) from month/time-of-day or a fixed tidally-locked sun
- * direction, the map mesh's matching shader-uniform lighting, atmosphere
- * pressure/full-ambient toggles, and the cloud alpha-map texture. Sun is
- * fixed at +X; the globe spins (Z) for time-of-day and tilts (Y) for
- * obliquity. orbitGroup gets the obliquity tilt only so orbit rings stay in
- * the ecliptic plane regardless of the planet's rotation. See
- * plans/genesis-scene-controller-split.md. */
 export function createLightingController(
 	ctx: GenesisContext,
 	deps: LightingControllerDeps,
@@ -44,20 +34,6 @@ export function createLightingController(
 		const shellScale = 1.105 + pressureFactor * 0.02
 		ctx.atmosMesh.scale.setScalar(shellScale / 1.12)
 		deps.requestRender()
-	}
-
-	function setGlobeCloudTexturePath(texturePath: string | null): void {
-		const texture = texturePath ? loadGlobeCloudTexture(texturePath) : null
-		ctx.globeCloudMat.alphaMap = texture
-		ctx.globeCloudMat.needsUpdate = true
-		if (texture) ctx.mapCloudMat.uniforms.uCloudMap.value = texture
-		deps.requestRender()
-	}
-
-	function setCloudsVisible(visible: boolean): void {
-		if (ctx.cloudsVisible === visible) return
-		ctx.cloudsVisible = visible
-		deps.updateOverlayVisibility()
 	}
 
 	function applyGlobeOrientation(subSolarLatRad: number, spinAngle: number) {
@@ -163,8 +139,6 @@ export function createLightingController(
 
 	return {
 		setAtmospherePressure,
-		setGlobeCloudTexturePath,
-		setCloudsVisible,
 		setSunPosition,
 		setSunDirection,
 		syncMapLighting,

@@ -17,10 +17,11 @@ export function createOverlayVisibilityController(
 ) {
 	function updateOverlayVisibility() {
 		const showMap = ctx.currentViewMode === "map" && !ctx.solarSystemActive
-		ctx.globeCloudMesh.visible =
-			ctx.cloudsVisible && ctx.currentViewMode === "globe"
+		const showClouds = ctx.clouds.ready && !!ctx.currentWorld
+		ctx.clouds.globe.visible =
+			showClouds && ctx.currentViewMode === "globe" && !ctx.solarSystemActive
 		if (ctx.mapCloudMesh) {
-			ctx.mapCloudMesh.visible = ctx.cloudsVisible && showMap
+			ctx.mapCloudMesh.visible = showClouds && showMap
 			if (ctx.mapMesh) ctx.mapCloudMesh.position.copy(ctx.mapMesh.position)
 		}
 		if (ctx.globeCoastlineOverlay)
@@ -76,12 +77,6 @@ export function createOverlayVisibilityController(
 		if (ctx.mapGrid) {
 			ctx.mapGrid.visible = ctx.gridVisible && showMap
 			if (ctx.mapMesh) ctx.mapGrid.position.copy(ctx.mapMesh.position)
-		}
-		if (ctx.globeThermalEquator)
-			ctx.globeThermalEquator.visible = ctx.currentViewMode === "globe"
-		if (ctx.mapThermalEquator) {
-			ctx.mapThermalEquator.visible = showMap
-			if (ctx.mapMesh) ctx.mapThermalEquator.position.copy(ctx.mapMesh.position)
 		}
 		if (ctx.mapSolarTerminator) {
 			ctx.mapSolarTerminator.visible = ctx.solarTerminatorVisible && showMap

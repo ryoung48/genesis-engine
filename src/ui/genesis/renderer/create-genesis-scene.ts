@@ -17,7 +17,7 @@ import { createMeasurementController } from "@/ui/genesis/renderer/genesis-scene
 import { createNationBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/nation-borders"
 import { createPathfindingController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/pathfinding"
 import { createRealmBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/realm-borders"
-import { createRiversWindThermalController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/rivers-wind-thermal"
+import { createRiversWindController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/rivers-wind"
 import { createSettlementsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/settlements"
 import { createSolarTerminatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/solar-terminator"
 import { createOverlayVisibilityController } from "@/ui/genesis/renderer/genesis-scene/overlay-visibility-controller"
@@ -108,12 +108,10 @@ export function createGenesisScene(
 	})
 	const setCoastlineOverlayVisible = coastlineController.setVisible
 
-	const riversWindThermalController = createRiversWindThermalController(
-		context,
-		{ rebuildOverlays: () => rebuildOverlays() },
-	)
-	const { setThermalEquator, setWindArrows, setRivers, setRiversVisible } =
-		riversWindThermalController
+	const riversWindController = createRiversWindController(context, {
+		rebuildOverlays: () => rebuildOverlays(),
+	})
+	const { setWindArrows, setRivers, setRiversVisible } = riversWindController
 
 	const orgLabelPools = createNationLabelPools()
 
@@ -277,11 +275,9 @@ export function createGenesisScene(
 		{
 			syncAnimationState: () => syncAnimationState(),
 			rebuildCoastline: () => coastlineController.rebuild(),
-			rebuildThermalEquator: () =>
-				riversWindThermalController.rebuildThermalEquator(),
 			rebuildSolarTerminator: () => rebuildSolarTerminator(),
-			rebuildWindArrows: () => riversWindThermalController.rebuildWindArrows(),
-			rebuildRivers: () => riversWindThermalController.rebuildRivers(),
+			rebuildWindArrows: () => riversWindController.rebuildWindArrows(),
+			rebuildRivers: () => riversWindController.rebuildRivers(),
 			applyWaterMaterialForMode: (mode) => applyWaterMaterialForMode(mode),
 			rebuildNationBorders: () => rebuildNationBorders(),
 			rebuildSelectedProvinceBorder: () => rebuildSelectedProvinceBorder(),
@@ -412,12 +408,9 @@ export function createGenesisScene(
 	const lightingController = createLightingController(context, {
 		requestRender: () => requestRender(),
 		rebuildSolarTerminator: () => rebuildSolarTerminator(),
-		updateOverlayVisibility: () => updateOverlayVisibility(),
 	})
 	const {
 		setAtmospherePressure,
-		setGlobeCloudTexturePath,
-		setCloudsVisible,
 		setSunPosition,
 		setSunDirection,
 		syncMapLighting,
@@ -468,7 +461,6 @@ export function createGenesisScene(
 				.applyMatrix4(globeGroup.matrixWorld.clone().invert())
 			return [bodyPos.x, bodyPos.y, bodyPos.z]
 		},
-		setThermalEquator,
 		setWindArrows,
 		setRivers,
 		setRiversVisible,
@@ -493,8 +485,10 @@ export function createGenesisScene(
 		setSolarTerminatorUseMeridiem,
 		setSolarTerminatorVisible,
 		setAtmospherePressure,
-		setGlobeCloudTexturePath,
-		setCloudsVisible,
+		setClouds(display) {
+			context.clouds.setDisplay(display)
+			updateOverlayVisibility()
+		},
 		setCoastlineOverlayVisible,
 		setFullAmbient,
 		focusOnProvince,

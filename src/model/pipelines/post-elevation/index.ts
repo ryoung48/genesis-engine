@@ -9,7 +9,6 @@ import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
-import { RAIN } from "@/model/climate/precipitation/rain"
 import { CALENDAR } from "@/model/climate/shared/calendar"
 import type { GenesisRainfall } from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
@@ -191,9 +190,8 @@ function runPostElevationPipeline(
 
 	const N = mesh.numRegions
 	t0 = performance.now()
-	const monthlyTEQ = RAIN.computeMonthlyThermalEquators({ mesh, climate })
-	TIMING.record({ stage: "Post: thermal equator", startedAt: t0, timings })
-	onProgress?.("Post: thermal equator", 44)
+	const circulation = "circulation" in climateV2 ? climateV2.circulation : null
+	onProgress?.("Post: circulation", 44)
 
 	const slopeScore = CLASSIFICATION.computeSlopeScore({
 		mesh,
@@ -691,6 +689,8 @@ function runPostElevationPipeline(
 		climate,
 		isLand,
 		topography,
+		circulation,
+		rainfallAnnual: rainfall.annual,
 		params,
 	})
 	TIMING.record({ stage: "Post: cyclones", startedAt: t0, timings })
@@ -705,7 +705,7 @@ function runPostElevationPipeline(
 		topography,
 		vegetation,
 		oceanDist,
-		params,
+		circulation,
 	})
 	TIMING.record({ stage: "Post: tornadoes", startedAt: t0, timings })
 
@@ -964,7 +964,6 @@ function runPostElevationPipeline(
 		windMonthly: { u: climateV2.windUMonthly, v: climateV2.windVMonthly },
 		observedCloudCover,
 		rainfall,
-		monthlyTEQ,
 		hydrology,
 		vegetation,
 		realVegetation,
