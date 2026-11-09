@@ -14,6 +14,15 @@ export type BodyGenerationParams = GenerateSystemBodiesParams
  * cascade (World Builder's Handbook p. 224), which both need the same
  * "roll a small body and place it in a belt" pipeline at a different group/
  * sizeClass. */
+export interface SpacedOrbitAnchor {
+	orbitalDistanceAU: number
+	massKg: number
+}
+
+export interface PinnedOrbit extends SpacedOrbitAnchor {
+	slotIndex: number
+}
+
 export interface RollBeltResidentBodyInput {
 	rng: ReturnType<typeof RNG.createRng>
 	group: OrbitGroup

@@ -394,6 +394,26 @@ export interface OrbitNumberToAUInput {
 	orbitNumber: number
 }
 
+export interface MinimumSpacedOrbitInput {
+	innerOrbitalDistanceAU: number
+	innerMassKg: number
+	outerMassKg: number
+	starMassKg: number
+}
+
+export interface MutualHillSpacingInput {
+	innerMassKg: number
+	outerMassKg: number
+	starMassKg: number
+}
+
+export interface MaximumSpacedInnerOrbitInput {
+	outerOrbitalDistanceAU: number
+	innerMassKg: number
+	outerMassKg: number
+	starMassKg: number
+}
+
 export interface HillSphereInput {
 	planetOrbitalDistanceM: number
 	planetMassKg: number

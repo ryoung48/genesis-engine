@@ -4,12 +4,21 @@ import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { uiTokens } from "@/ui/components/tokens"
+import { WEATHER_DISPLAY } from "@/ui/genesis/shared/weather-display"
 import type { ProvinceWikiPageProps } from "@/ui/wiki/province/types"
 import { GpsFocusButton, renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import { WikiSection } from "@/ui/wiki/shared/WikiTimeline"
 
 export function ProvinceWikiPage({ province, weather }: ProvinceWikiPageProps) {
 	const owner = province.owner
+	const weatherDisplay =
+		!weather.annual && weather.snapshot
+			? WEATHER_DISPLAY.present({
+					snapshot: weather.snapshot,
+					unitSystem: weather.unitSystem,
+					dateLabel: weather.dateLabel,
+				})
+			: null
 	return (
 		<div className={uiTokens.wiki.page}>
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
@@ -54,7 +63,10 @@ export function ProvinceWikiPage({ province, weather }: ProvinceWikiPageProps) {
 					</p>
 				)}
 			</WikiSection>
-			<WikiSection title="Weather" meta={weather.dateLabel}>
+			<WikiSection
+				title="Weather"
+				meta={weatherDisplay?.time ?? weather.dateLabel}
+			>
 				<WeatherSummary {...weather} />
 			</WikiSection>
 		</div>

@@ -61,9 +61,20 @@ function WeatherSkyRows({ label, rows }: WeatherSkyRowsProps) {
 					)}
 					<div className={styles.skyName}>
 						<span>{row.name}</span>
-						{row.detail && (
-							<span className={styles.skyDetail}>{row.detail}</span>
-						)}
+						{row.detail &&
+							(row.detailHelp ? (
+								<UITooltip
+									content={row.detailHelp}
+									position="top"
+									align="start"
+								>
+									<span className={cx(styles.skyDetail, styles.skyDetailHelp)}>
+										{row.detail}
+									</span>
+								</UITooltip>
+							) : (
+								<span className={styles.skyDetail}>{row.detail}</span>
+							))}
 					</div>
 					<div className={styles.skyItems}>
 						{row.items.map((item) => (
@@ -73,12 +84,24 @@ function WeatherSkyRows({ label, rows }: WeatherSkyRowsProps) {
 								position="top"
 								align="center"
 							>
-								<span className={styles.skyItem}>
+								<span
+									className={cx(
+										styles.skyItem,
+										item.detail && styles.skyItemStacked,
+									)}
+								>
 									<WeatherIcon
 										name={item.icon}
 										className={styles.skyItemIcon}
 									/>
-									{item.value}
+									<span>
+										<span>{item.value}</span>
+										{item.detail && (
+											<span className={styles.skyItemDetail}>
+												{item.detail}
+											</span>
+										)}
+									</span>
 								</span>
 							</UITooltip>
 						))}
@@ -203,6 +226,9 @@ export function WeatherSummary({
 						))}
 					</div>
 					{sky && <WeatherSkyRows label="Sun and moon" rows={sky.rows} />}
+					{sky && sky.eclipses.length > 0 && (
+						<WeatherSkyRows label="Eclipses" rows={sky.eclipses} />
+					)}
 					{seaDisplay && <WeatherSkyRows label="Sea" rows={seaDisplay.rows} />}
 				</>
 			)}

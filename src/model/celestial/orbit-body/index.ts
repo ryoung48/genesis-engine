@@ -3,6 +3,9 @@ import type {
 	DensityFromMassAndDiameterInput,
 	HillSphereInput,
 	MassFromDensityInput,
+	MaximumSpacedInnerOrbitInput,
+	MinimumSpacedOrbitInput,
+	MutualHillSpacingInput,
 	OrbitNumberToAUInput,
 	SeasonalTiltFactorInput,
 	SizeClassToDiameterRangeInput,
@@ -30,6 +33,25 @@ const differenceByOrbitNumber = [
 	4900, 9700, 20000, 39200,
 ]
 const maxOrbitNumber = distanceByOrbitNumber.length - 1
+// Adjacent planets closer than ~10 mutual Hill radii tend to go unstable
+// within the system's lifetime (Chambers, Wetherill & Boss 1996); Kepler
+// multi-planet systems mostly sit at 10-30 (Pu & Wu 2015). The Solar
+// System's tightest pair, Jupiter-Saturn, is ~8, so 7.5 keeps it valid while
+// ruling out the 1-3 the book's even Orbit# spread could produce.
+const MIN_MUTUAL_HILL_SPACING = 7.5
+
+// Half the required gap as a fraction of the pair's mean orbit:
+// (spacing / 2) * ((m1 + m2) / 3M)^(1/3).
+function mutualHillHalfSpacing({
+	innerMassKg,
+	outerMassKg,
+	starMassKg,
+}: MutualHillSpacingInput): number {
+	return (
+		(MIN_MUTUAL_HILL_SPACING / 2) *
+		Math.cbrt((innerMassKg + outerMassKg) / (3 * starMassKg))
+	)
+}
 const ROCKY_SIZE_DIAMETER_BANDS_KM = [
 	[400, 800],
 	[1000, 2000],
@@ -202,6 +224,41 @@ export const ORBIT_BODY = {
 	solarMassKg,
 	astronomicalUnitM,
 	gravitationalConstantM3KgS2,
+
+	// The closest an outer planet may orbit outside an inner one: at least
+	// MIN_MUTUAL_HILL_SPACING mutual Hill radii apart, where the mutual Hill
+	// radius is ((m1 + m2) / 3M)^(1/3) * (a1 + a2) / 2.
+	minimumSpacedOrbitAU({
+		innerOrbitalDistanceAU,
+		innerMassKg,
+		outerMassKg,
+		starMassKg,
+	}: MinimumSpacedOrbitInput): number {
+		const halfSpacing = mutualHillHalfSpacing({
+			innerMassKg,
+			outerMassKg,
+			starMassKg,
+		})
+		if (halfSpacing >= 1) return Number.POSITIVE_INFINITY
+		return (innerOrbitalDistanceAU * (1 + halfSpacing)) / (1 - halfSpacing)
+	},
+
+	// The same rule seen from the outer planet: the farthest an inner planet
+	// may orbit inside it.
+	maximumSpacedInnerOrbitAU({
+		outerOrbitalDistanceAU,
+		innerMassKg,
+		outerMassKg,
+		starMassKg,
+	}: MaximumSpacedInnerOrbitInput): number {
+		const halfSpacing = mutualHillHalfSpacing({
+			innerMassKg,
+			outerMassKg,
+			starMassKg,
+		})
+		if (halfSpacing >= 1) return 0
+		return (outerOrbitalDistanceAU * (1 - halfSpacing)) / (1 + halfSpacing)
+	},
 
 	hillSphereM({
 		planetOrbitalDistanceM,

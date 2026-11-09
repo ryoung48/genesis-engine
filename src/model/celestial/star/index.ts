@@ -154,17 +154,6 @@ function getExtendedStarSpectralPosition({
 	return start + (Math.max(0, Math.min(9, subtype)) / 9) * (end - start)
 }
 
-// Non-realistic-sizes star radius: same spirit as galaxy-gen's
-// getStarRenderRadius (a handful of fixed radii instead of scaling
-// continuously with the star's true diameter/luminosity), but interpolated
-// linearly across the full O0→M9 spectral position instead of galaxy-gen's
-// flat per-class buckets — so hotter/bigger subtypes within a class still
-// read as a bit bigger than cooler/smaller ones in the same class, without
-// ever reflecting the real (sqrt-of-hundreds-to-thousands-x) diameter ratio.
-const NON_REALISTIC_STAR_RATIO_AT_O0 = 24
-const NON_REALISTIC_STAR_RATIO_AT_M9 = 8
-const NON_REALISTIC_STAR_SPECTRAL_POSITION_MAX = 14 // O0 = 0 … M9 = 14
-
 // --- Extended stellar-evolution model (galaxy-gen parity) -----------------
 // Ports galaxy-gen's rollStarAttributes (stars/generation.ts) end to end: the
 // giant/subgiant/subdwarf/supergiant luminosity-class ladder, the brown-
@@ -1265,18 +1254,6 @@ export const STAR = {
 
 	isValidSpectralClass(cls: string): cls is MainSequenceClass {
 		return (mainSequenceClasses as readonly string[]).includes(cls)
-	},
-
-	getNonRealisticStarToPlanetRatio({
-		cls,
-		subtype,
-	}: StarSpectralInput): number {
-		const position = getStarSpectralPosition({ cls, subtype })
-		const t = position / NON_REALISTIC_STAR_SPECTRAL_POSITION_MAX
-		return (
-			NON_REALISTIC_STAR_RATIO_AT_O0 +
-			t * (NON_REALISTIC_STAR_RATIO_AT_M9 - NON_REALISTIC_STAR_RATIO_AT_O0)
-		)
 	},
 
 	// Ported from galaxy-gen's rollStarAttributes age roll, restricted to the

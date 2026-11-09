@@ -16,7 +16,11 @@ export interface ClusterData {
 
 const CLUSTER_SCREEN_PX = 4
 const COLLAPSE_ZOOM = 2
-const COMPACT_CLUSTER_SEPARATION_RATIO = 0.3
+// Each star sits this many point-diameters from its system's centre; with a
+// binary's 0.8 cluster factor its two stars land ~0.72 of a diameter apart:
+// close enough to read as one system, far enough that each bright core and
+// most of its glow stay separate.
+const COMPACT_CLUSTER_SEPARATION_RATIO = 0.45
 
 /** Keeps multi-star systems' points at a constant screen-space separation
  * regardless of zoom, collapsing them onto their system center below

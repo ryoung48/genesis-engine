@@ -1,6 +1,8 @@
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import {
 	type AttachParentTideLocksInput,
+	type CapMoonDiameterInput,
+	type CappedMoonSize,
 	DEFAULT_MOON_ATMOSPHERE as DEFAULT_MOON_ATMOSPHERE_VALUE,
 	type GenerateMoonsInput,
 	type MoonBody,
@@ -136,6 +138,35 @@ function rollMoonSizeClass({
 function rollMoonDiameterKm({ rng, sizeClass }: RollMoonDiameterInput): number {
 	const [minKm, maxKm] = ORBIT_BODY.sizeClassToDiameterRangeKm({ sizeClass })
 	return rng.uniform(minKm, maxKm)
+}
+
+// A moon may be at most a random 25-50% of its planet's diameter: the Moon is
+// 27% of Earth, and Charon, at 51% of Pluto, is the largest known ratio (a
+// near-binary). The cap fraction is only rolled when the moon could exceed
+// the low end, so most moons keep their original random stream.
+const MOON_MIN_DIAMETER_CAP_FRACTION = 0.25
+const MOON_MAX_DIAMETER_CAP_FRACTION = 0.5
+
+function capMoonDiameter({
+	rng,
+	sizeClass,
+	diameterKm,
+	planetDiameterKm,
+}: CapMoonDiameterInput): CappedMoonSize {
+	if (diameterKm <= planetDiameterKm * MOON_MIN_DIAMETER_CAP_FRACTION) {
+		return { sizeClass, diameterKm }
+	}
+	const capKm =
+		planetDiameterKm *
+		rng.uniform(MOON_MIN_DIAMETER_CAP_FRACTION, MOON_MAX_DIAMETER_CAP_FRACTION)
+	if (diameterKm <= capKm) return { sizeClass, diameterKm }
+	return {
+		sizeClass: Math.min(
+			sizeClass,
+			ORBIT_BODY.estimateRockySizeClassFromDiameterKm(capKm),
+		),
+		diameterKm: capKm,
+	}
 }
 
 // Direct port of galaxy-gen's rollMoonOrbit (orbits/moons/index.ts):
@@ -368,8 +399,17 @@ export const MOON = {
 		const pendingMoons: PendingMoon[] = []
 
 		for (let i = 0; i < count; i++) {
-			const sizeClass = rollMoonSizeClass({ rng, parentSizeClass, parentGroup })
-			const diameterKm = rollMoonDiameterKm({ rng, sizeClass })
+			const rolledSizeClass = rollMoonSizeClass({
+				rng,
+				parentSizeClass,
+				parentGroup,
+			})
+			const { sizeClass, diameterKm } = capMoonDiameter({
+				rng,
+				sizeClass: rolledSizeClass,
+				diameterKm: rollMoonDiameterKm({ rng, sizeClass: rolledSizeClass }),
+				planetDiameterKm,
+			})
 			// A moon above sizeClass 15 is jovian-family (galaxy-gen's own
 			// moon-spawn branch, mirrored in buildMoonEnvironment's groupHint),
 			// same density range as any other jovian. Otherwise this is the exact

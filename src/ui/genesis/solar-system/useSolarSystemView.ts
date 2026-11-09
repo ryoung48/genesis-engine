@@ -12,6 +12,7 @@ import {
 	saveGenerationSessionSnapshot,
 } from "@/ui/genesis/generation/session-persistence"
 import { getSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
+import { ORBIT_TRAIL } from "@/ui/genesis/solar-system/overlay/orbit-trail"
 import type {
 	CompanionOverlayParams,
 	OrbitAddress,
@@ -39,8 +40,8 @@ function buildCompanionOverlayParams(
 		showDaylight: boolean
 		showInclination: boolean
 		showAxialTilt: boolean
-		showRealisticSizes: boolean
 		showBodyNames: boolean
+		showBodyMarkers: boolean
 		namesEnabled: boolean
 	},
 	initialDay: number,
@@ -60,8 +61,8 @@ function buildCompanionOverlayParams(
 			showDaylight: toggles.showDaylight,
 			showInclination: toggles.showInclination,
 			showAxialTilt: toggles.showAxialTilt,
-			showRealisticSizes: toggles.showRealisticSizes,
 			showBodyNames: toggles.showBodyNames,
+			showBodyMarkers: toggles.showBodyMarkers,
 			showRealNames: false,
 			namesEnabled: toggles.namesEnabled,
 			starName: companion.starName,
@@ -167,8 +168,9 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
-		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
+		solarSystemTrailDegrees,
 		generationPanelOpen,
 		setGenerationPanelOpen,
 		generationSessionRestored,
@@ -235,11 +237,22 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		return sphereTexture
 	}, [world, seed, solarSystemViewActive])
 
+	// Declared before the overlay-building effect so a freshly built overlay's
+	// first setDay already draws trails at the chosen length; later changes
+	// redraw them through the same day update, with no overlay rebuild.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
+	useEffect(() => {
+		ORBIT_TRAIL.setSpanDegrees(solarSystemTrailDegrees)
+		if (solarSystemViewActive)
+			sceneRef.current?.updateSolarSystemDay(
+				solarSystemElapsedHoursRef.current / 24,
+			)
+	}, [solarSystemTrailDegrees, solarSystemViewActive])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		const initialDay = solarSystemElapsedHoursRef.current / 24
 		sceneRef.current?.setSolarSystemOverlay(
-			solarSystemViewActive && systemBodiesRef.current.length > 0
+			solarSystemViewActive
 				? {
 						bodies: systemBodiesRef.current,
 						daysPerYear: effectiveDaysPerYear,
@@ -251,8 +264,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
 						showAxialTilt: showSolarSystemAxialTilt,
-						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
+						showBodyMarkers: showSolarSystemBodyMarkers,
 						showRealNames: seed === SOL_DATA.solSeed,
 						proceduralSystem: seed !== SOL_DATA.solSeed,
 						namesEnabled,
@@ -265,8 +278,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 								showDaylight: showSolarSystemDaylight,
 								showInclination: showSolarSystemInclination,
 								showAxialTilt: showSolarSystemAxialTilt,
-								showRealisticSizes: showSolarSystemRealisticSizes,
 								showBodyNames: showSolarSystemBodyNames,
+								showBodyMarkers: showSolarSystemBodyMarkers,
 								namesEnabled,
 							},
 							initialDay,
@@ -274,7 +287,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 					}
 				: null,
 		)
-		if (solarSystemViewActive && systemBodiesRef.current.length > 0) {
+		if (solarSystemViewActive) {
 			sceneRef.current?.setNebulaBackgroundSeed(seed)
 		}
 		overlayBodiesRef.current = solarSystemViewActive
@@ -288,8 +301,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
-		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
 		seed,
 		starName,
 		showSolarSystemDaylight,
@@ -314,8 +327,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
 						showAxialTilt: showSolarSystemAxialTilt,
-						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
+						showBodyMarkers: showSolarSystemBodyMarkers,
 						showRealNames: seed === SOL_DATA.solSeed,
 						proceduralSystem: seed !== SOL_DATA.solSeed,
 						namesEnabled,
@@ -328,8 +341,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 								showDaylight: showSolarSystemDaylight,
 								showInclination: showSolarSystemInclination,
 								showAxialTilt: showSolarSystemAxialTilt,
-								showRealisticSizes: showSolarSystemRealisticSizes,
 								showBodyNames: showSolarSystemBodyNames,
+								showBodyMarkers: showSolarSystemBodyMarkers,
 								namesEnabled,
 							},
 							initialDay,
@@ -347,8 +360,8 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
-		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
 		seed,
 		starName,
 		showSolarSystemDaylight,

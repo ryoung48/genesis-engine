@@ -205,13 +205,21 @@ export const uiTokens = {
 		sky: "divide-y divide-slate-100 rounded-lg border border-slate-200/80 bg-white/80",
 		skyRow: "flex items-center gap-2 px-2 py-1",
 		skyIcon: "h-4 w-4 shrink-0",
+		eclipseIcon: {
+			"lunar-eclipse": "fill-orange-400",
+			"solar-eclipse": "fill-black stroke-white",
+		},
+		eclipseOutline: "stroke-black",
 		skyName:
 			"flex min-w-0 flex-1 flex-col text-[9px] font-semibold leading-tight text-slate-800",
 		skyDetail: "truncate font-mono text-[8px] font-normal text-slate-500",
+		skyDetailHelp: "cursor-help",
 		skyItems: "flex shrink-0 items-center gap-2.5",
 		skyItem:
 			"inline-flex cursor-help items-center gap-0.5 font-mono text-[9px] text-slate-700",
 		skyItemIcon: "h-3 w-3 text-slate-400",
+		skyItemStacked: "items-start",
+		skyItemDetail: "block text-slate-400",
 		tile: "flex min-w-0 items-start gap-1.5 rounded-lg border border-slate-200/80 bg-white/80 px-2 py-1.5",
 		tileWide: "col-span-2",
 		tileIcon: "mt-px h-3.5 w-3.5 shrink-0 text-slate-400",

@@ -16,6 +16,14 @@ import type {
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
 
+// Cap on a belt's total AU width, as a multiple of its centre distance. The
+// book's span is in Orbit#, which roughly doubles AU per step outward, so a
+// far belt's span balloons (Orbit# 10 with span 4 is 20-308 AU). Real belts
+// run about half their centre distance (main belt 1.2 AU wide at 2.77 AU,
+// classical Kuiper belt 20 AU wide at 43 AU), an inner/outer edge ratio of
+// ~0.6, so that is the cap.
+const BELT_MAX_WIDTH_CENTER_RATIO = 0.5
+
 // Book's Belt Span (p. 73): Spread x (2D+DMs) / 10, using the system's own
 // spread value where the Stage 8 walk supplied one, otherwise the book's own
 // substitute (2D x 0.1 Orbit#). DM-1 for an adjacent gas giant (its clearing
@@ -211,20 +219,28 @@ function rollProfile({
 // A belt's occupied AU range: p. 73's Belt Span, centred on the belt's own
 // orbitalDistanceAU, converted through the shared Orbit# table (which is
 // where the belt's actual physical width in AU comes from -- span itself is
-// stored in Orbit# units, see BeltProfile.spanOrbitNumber).
-function _beltAURange({
+// stored in Orbit# units, see BeltProfile.spanOrbitNumber), then each edge
+// clamped to BELT_MAX_WIDTH_CENTER_RATIO / 2 of the centre distance.
+function beltAURange({
 	orbitalDistanceAU,
 	spanOrbitNumber,
 }: BeltCrossingInput): { minAU: number; maxAU: number } {
 	const beltOrbitNumber = ORBIT_BODY.auToOrbitNumber({ au: orbitalDistanceAU })
 	const halfSpan = spanOrbitNumber / 2
+	const maxHalfWidthAU = (orbitalDistanceAU * BELT_MAX_WIDTH_CENTER_RATIO) / 2
 	return {
-		minAU: ORBIT_BODY.orbitNumberToAU({
-			orbitNumber: Math.max(0, beltOrbitNumber - halfSpan),
-		}),
-		maxAU: ORBIT_BODY.orbitNumberToAU({
-			orbitNumber: beltOrbitNumber + halfSpan,
-		}),
+		minAU: Math.max(
+			orbitalDistanceAU - maxHalfWidthAU,
+			ORBIT_BODY.orbitNumberToAU({
+				orbitNumber: Math.max(0, beltOrbitNumber - halfSpan),
+			}),
+		),
+		maxAU: Math.min(
+			orbitalDistanceAU + maxHalfWidthAU,
+			ORBIT_BODY.orbitNumberToAU({
+				orbitNumber: beltOrbitNumber + halfSpan,
+			}),
+		),
 	}
 }
 
@@ -244,7 +260,7 @@ function crossesAnyBelt({
 	const perihelionAU = bodyOrbitalDistanceAU * (1 - bodyEccentricity)
 	const aphelionAU = bodyOrbitalDistanceAU * (1 + bodyEccentricity)
 	return belts.some((belt) => {
-		const { minAU, maxAU } = _beltAURange(belt)
+		const { minAU, maxAU } = beltAURange(belt)
 		return maxAU >= perihelionAU && minAU <= aphelionAU
 	})
 }
@@ -252,4 +268,5 @@ function crossesAnyBelt({
 export const ASTEROID_BELT = {
 	rollProfile,
 	crossesAnyBelt,
+	beltAURange,
 }

@@ -65,13 +65,28 @@ function dayOffset(day: number): string {
 }
 
 function row({ event, instant, current }: EclipseRowParams): WeatherSkyRow {
-	const solar = ECLIPSES.category(event.kind) === "solar"
+	const category = ECLIPSES.category(event.kind)
+	const solar = category === "solar"
 	const maximum = when({ ...event, instant })
 	return {
 		key: `eclipse-${event.moonIdx}-${event.occluderIdx}-${event.kind}-${event.ingressS}`,
-		name: current ? "Eclipse in progress" : "Next eclipse",
-		detail: `${describe(event)}${current && event.instantaneousCoverage !== null ? ` · ${Math.round(event.instantaneousCoverage * 100)}% covered` : ""}`,
-		icon: solar ? "weather-sunny" : "moon-full",
+		name: current
+			? category === "solar"
+				? "Solar eclipse in progress"
+				: category === "lunar"
+					? "Lunar eclipse in progress"
+					: "Eclipse in progress"
+			: category === "solar"
+				? "Next solar eclipse"
+				: category === "lunar"
+					? "Next lunar eclipse"
+					: "Next eclipse",
+		detail: `${describe(event)}${!solar && current && event.instantaneousCoverage !== null ? ` · ${Math.round(event.instantaneousCoverage * 100)}% covered` : ""}`,
+		icon: solar
+			? "solar-eclipse"
+			: category === "lunar"
+				? "lunar-eclipse"
+				: "moon-full",
 		moon: null,
 		tone: solar ? "sun" : "night",
 		items: [
@@ -85,7 +100,7 @@ function row({ event, instant, current }: EclipseRowParams): WeatherSkyRow {
 				value: `${(event.durationS / 3600).toFixed(2)} h${event.durationClipped ? " (clipped)" : ""}`,
 				icon: "weather-night",
 			},
-			...(event.coverage !== null
+			...(!solar && event.coverage !== null
 				? [
 						{
 							label: "Coverage",
@@ -107,8 +122,8 @@ function combinedRow({
 		name: group.current
 			? "Combined eclipse in progress"
 			: "Next combined eclipse",
-		detail: `${group.total ? "Total" : "Partial"} combined solar eclipse · ${group.moonLabels.join(" + ")}${group.instantaneousCoverage !== null ? ` · ${Math.round(group.instantaneousCoverage * 100)}% covered` : ""}`,
-		icon: "weather-sunny",
+		detail: `${group.total ? "Total" : "Partial"} combined solar eclipse · ${group.moonLabels.join(" + ")}`,
+		icon: "solar-eclipse",
 		moon: null,
 		tone: "sun",
 		items: [
@@ -117,26 +132,32 @@ function combinedRow({
 				value: when({ ...group, instant }),
 				icon: "weather-sunny",
 			},
-			{
-				label: "Combined coverage",
-				value: `${Math.round(group.coverage * 100)}%`,
-				icon: "weather-sunny",
-			},
 		],
 	}
 }
 
 function rows({ result, instant }: EclipseRowsParams): WeatherSkyRow[] {
 	const seen = new Set<string>()
+	const activeCategories = new Set(
+		result.current.map((event) => ECLIPSES.category(event.kind)),
+	)
+	if (result.combined.some((group) => group.current))
+		activeCategories.add("solar")
 	const rows = [true, false].flatMap((current) => [
 		...(current ? result.current : result.next).flatMap((event) => {
+			if (!current && activeCategories.has(ECLIPSES.category(event.kind)))
+				return []
 			const display = row({ event, current, instant })
 			if (seen.has(display.key)) return []
 			seen.add(display.key)
 			return [display]
 		}),
 		...result.combined
-			.filter((group) => group.current === current)
+			.filter(
+				(group) =>
+					group.current === current &&
+					(current || !activeCategories.has("solar")),
+			)
 			.map((group) => combinedRow({ group, instant })),
 	])
 	const none = !rows.length

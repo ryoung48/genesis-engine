@@ -82,14 +82,15 @@ function local({
 				dayOffset: Math.floor(phase + (found.maximumS - now) / solarDay),
 			})
 		}
-		const first = events
-			.filter((event) => event.visibleIntervals[0][0] > now)
-			.reduce<LocalEclipse | null>(
-				(best, event) =>
-					!best || event.maximumS < best.maximumS ? event : best,
-				null,
-			)
-		if (first && first.maximumS <= endS) break
+		const futureCategories = new Set(
+			events
+				.filter(
+					(event) =>
+						event.visibleIntervals[0][0] > now && event.maximumS <= endS,
+				)
+				.map((event) => ECLIPSES.category(event.kind)),
+		)
+		if (futureCategories.has("solar") && futureCategories.has("lunar")) break
 	}
 	const current = events
 		.filter((event) =>
@@ -109,8 +110,20 @@ function local({
 	const future = events
 		.filter((event) => event.visibleIntervals[0][0] > now)
 		.sort((a, b) => a.maximumS - b.maximumS || a.moonIdx - b.moonIdx)
-	const next = future.filter(
-		(event) => event.maximumS - future[0].maximumS <= 1,
+	const firstSolarEvent = future.find(
+		(event) => ECLIPSES.category(event.kind) === "solar",
+	)
+	const firstLunarEvent = future.find(
+		(event) => ECLIPSES.category(event.kind) === "lunar",
+	)
+	const next = future.filter((event) =>
+		[future[0], firstSolarEvent, firstLunarEvent].some(
+			(first) =>
+				first &&
+				event.maximumS - first.maximumS >= 0 &&
+				event.maximumS - first.maximumS <= 1 &&
+				ECLIPSES.category(event.kind) === ECLIPSES.category(first.kind),
+		),
 	)
 	const solar = (event: LocalEclipse) =>
 		ECLIPSES.category(event.kind) === "solar"

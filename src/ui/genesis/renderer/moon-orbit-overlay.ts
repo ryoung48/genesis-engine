@@ -1,33 +1,49 @@
 import * as THREE from "three"
-import { MOON } from "@/model/celestial/moons"
-import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { buildBodyAtmosphereShell } from "@/ui/genesis/renderer/atmosphere-shell"
+import { BODY_MARKER } from "@/ui/genesis/renderer/body-marker"
 import {
 	createNameLabel,
 	createNameLeaderLine,
-	sizeNameLabel,
 	type Text,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
+import { ECLIPSE_SHADOW } from "@/ui/genesis/renderer/eclipse-shadow"
+import type {
+	EclipseShadowState,
+	UpdateMoonEclipsesInput,
+} from "@/ui/genesis/renderer/eclipse-shadow/types"
 import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
-import {
-	BODY_VISUAL_BASE_RADIUS,
-	getMoonOrbitDistanceRelativeToPlanet,
-	layoutMoonOrbitPeriapsesForDisplay,
-	scaleBodyDiameterToVisualRadius,
-} from "@/ui/genesis/shared/moon-visual-scale"
+import { layoutMoonOrbitPeriapsesForDisplay } from "@/ui/genesis/shared/moon-visual-scale"
 import {
 	CLASSIFICATION_COLOR,
 	ROCKY_SIBLING_COLOR,
 } from "@/ui/genesis/solar-system/overlay/constants"
+import { ORBIT_TRAIL } from "@/ui/genesis/solar-system/overlay/orbit-trail"
 import { moonOrbitRangeSwatchColor } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 
 const MOON_COLORS_HEX = [0x0ea5e9, 0x8b5cf6, 0x10b981]
 const TWO_PI = 2 * Math.PI
 const ORBIT_SEGMENTS = 256
 const MIN_MOON_VISUAL_RADIUS = 0.004
+// Moon trail colours keep their swatch hue at 85% saturation and 60%
+// lightness, vivid enough to read as colour on a 1 px line.
+const MOON_TRAIL_SATURATION = 0.85
+const MOON_TRAIL_LIGHTNESS = 0.6
+
+function vividTrailColor(hex: number): number {
+	const color = new THREE.Color(hex)
+	const hsl = { h: 0, s: 0, l: 0 }
+	color.getHSL(hsl)
+	return color
+		.setHSL(hsl.h, MOON_TRAIL_SATURATION, MOON_TRAIL_LIGHTNESS)
+		.getHex()
+}
+// Fraction of the viewport's half-height a moon must sit from its planet
+// before its marker and label show: about twice a label's height, so they
+// clear the planet's own.
+const MOON_MIN_SCREEN_SEPARATION = 0.08
 const textureLoader = new THREE.TextureLoader()
 let sharedMoonTexture: THREE.Texture | null = null
 const namedMoonTextureCache = new Map<string, THREE.Texture>()
@@ -253,6 +269,13 @@ export interface MoonOrbitState {
 	group: THREE.Group
 	/** Suggested camera maxDistance for this system. */
 	suggestedMaxDistance?: number
+	/** Farthest moon apoapsis plus that moon's radius, in planet radii (the
+	 * parent's own occupied radius when it has no moons). */
+	outerRadius: number
+	/** Points every moon's eclipse shadows at the star and its planet (so the
+	 * planet shades its moons), and returns each moon's world-space sphere
+	 * for the planet's own shadows. Absent for an empty moon system. */
+	updateEclipseShadows?(input: UpdateMoonEclipsesInput): void
 	/** Update moon positions for a new day without rebuilding geometry. */
 	setDay(day: number): void
 	/** Toggle daylight-dependent effects (atmosphere rim, lightning). */
@@ -291,9 +314,7 @@ export function buildMoonOrbitOverlay(
 	showEllipticalOrbits: boolean,
 	showInclination: boolean = true,
 	parentOccupiedRadiusRelativeToPlanet: number = 1,
-	parentSceneRadiusForGlobalScaling?: number,
 	showAxialTilt: boolean = true,
-	realisticSizes: boolean = true,
 	showMoonNames: boolean = false,
 	showRealNames: boolean = false,
 	/** Real-name fallback for the first moon (index 0) when it has no
@@ -308,11 +329,18 @@ export function buildMoonOrbitOverlay(
 	 * moon then renders the swatch-tinted cloud-band mesh instead of the
 	 * shared grey moon photo. The real Sol view passes false. */
 	proceduralSystem: boolean = false,
+	/** Outlined circles on moons drawn too small to find (see BODY_MARKER);
+	 * the globe view's moon overlay leaves them off. */
+	showMarkers: boolean = false,
+	/** Fading trails behind each moon instead of full orbit rings, as the
+	 * solar-system view draws for planets; the globe view keeps full rings. */
+	showTrails: boolean = false,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 	if (moons.length === 0) {
 		return {
 			group,
+			outerRadius: parentOccupiedRadiusRelativeToPlanet,
 			setDay: () => undefined,
 			dispose: () => {
 				group.clear()
@@ -320,37 +348,25 @@ export function buildMoonOrbitOverlay(
 		}
 	}
 
-	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
-	// Scale all orbits to fit between 1.3 and 2.6 scene units
-	// (planet surface = 1.0 scene unit).
+	// Periapses span 1.35 to 4.5 planet radii (planet surface = 1.0 scene unit):
+	// a log mapping of 2-400 real planet radii, so the Moon (60) lands near 3.4
+	// and Io (6) near 2. Each moon keeps its true eccentricity on top of that,
+	// so Nereid (e = 0.75) runs from about 3.3 out to about 23.
 	const SCENE_MIN = 1.35
-	const SCENE_MAX = 2.55
+	const SCENE_MAX = 4.5
 	const moonDisplayRadii = moons.map((moon) =>
 		Math.max(
 			MIN_MOON_VISUAL_RADIUS,
-			parentSceneRadiusForGlobalScaling && parentSceneRadiusForGlobalScaling > 0
-				? scaleBodyDiameterToVisualRadius(
-						moon.diameterKm,
-						BODY_VISUAL_BASE_RADIUS,
-						realisticSizes,
-						moon.sizeClass ??
-							MOON.estimateMoonSizeClassFromDiameter(moon.diameterKm),
-					) / parentSceneRadiusForGlobalScaling
-				: moon.diameterKm / Math.max(planetRadiusKm * 2, 1),
+			moon.diameterKm / Math.max(planetRadiusKm * 2, 1),
 		),
 	)
+	const moonOrbits = moons.map((moon, index) => ({
+		orbitalDistancePlanetRadii: (moon.semiMajorAxisPlanetDiameters ?? 0) * 2,
+		eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
+		bodyVisualRadius: moonDisplayRadii[index] ?? MIN_MOON_VISUAL_RADIUS,
+	}))
 	const orbitPeriapses = layoutMoonOrbitPeriapsesForDisplay({
-		orbits: moons.map((moon, index) => {
-			const smaM = MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg })
-			return {
-				orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
-					smaM,
-					planetRadiusKm,
-				),
-				eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
-				bodyVisualRadius: moonDisplayRadii[index] ?? MIN_MOON_VISUAL_RADIUS,
-			}
-		}),
+		orbits: moonOrbits,
 		parentVisualRadius: parentOccupiedRadiusRelativeToPlanet,
 		minDisplayDistance: SCENE_MIN,
 		maxDisplayDistance: SCENE_MAX,
@@ -377,6 +393,11 @@ export function buildMoonOrbitOverlay(
 		nameLabelAnchor?: THREE.Group
 		nameLabel?: Text
 		nameLeader?: THREE.Line
+		// [JUSTIFICATION] Only built when showMarkers is on.
+		marker?: THREE.Sprite
+		// [JUSTIFICATION] Only built when showTrails is on.
+		trail?: THREE.Line
+		eclipse: EclipseShadowState
 		localRadius: number
 	}> = []
 
@@ -418,18 +439,31 @@ export function buildMoonOrbitOverlay(
 			: moonColor
 
 		// --- Orbit path ---
-		const pathPoints: THREE.Vector3[] = []
-		for (let j = 0; j <= ORBIT_SEGMENTS; j++) {
-			const E = (j / ORBIT_SEGMENTS) * TWO_PI
-			pathPoints.push(orbitPoint(E, a, b, ae, P, Q))
+		// The orbit-range swatches are pastel (chart-friendly) and read as grey
+		// on a thin line, so trails use the same hue pushed to vivid saturation,
+		// at the same peak opacity as planet trails.
+		const trail = showTrails
+			? ORBIT_TRAIL.create({
+					color: vividTrailColor(lineColor),
+					peakOpacity: 0.85,
+				})
+			: undefined
+		if (trail) {
+			group.add(trail)
+		} else {
+			const pathPoints: THREE.Vector3[] = []
+			for (let j = 0; j <= ORBIT_SEGMENTS; j++) {
+				const E = (j / ORBIT_SEGMENTS) * TWO_PI
+				pathPoints.push(orbitPoint(E, a, b, ae, P, Q))
+			}
+			const orbitGeo = new THREE.BufferGeometry().setFromPoints(pathPoints)
+			const orbitMat = new THREE.LineBasicMaterial({
+				color: lineColor,
+				transparent: true,
+				opacity: 0.4,
+			})
+			group.add(new THREE.Line(orbitGeo, orbitMat))
 		}
-		const orbitGeo = new THREE.BufferGeometry().setFromPoints(pathPoints)
-		const orbitMat = new THREE.LineBasicMaterial({
-			color: lineColor,
-			transparent: true,
-			opacity: 0.4,
-		})
-		group.add(new THREE.Line(orbitGeo, orbitMat))
 
 		// --- Moon body ---
 		const moonR = moonDisplayRadii[i] ?? MIN_MOON_VISUAL_RADIUS
@@ -487,11 +521,18 @@ export function buildMoonOrbitOverlay(
 						: `Moon ${i + 1}`
 			nameLabel = createNameLabel(moonName)
 			nameLeader = createNameLeaderLine()
-			sizeNameLabel(nameLabel, moonR)
 			nameLabelAnchor.add(nameLabel)
 			nameLabelAnchor.add(nameLeader)
 			group.add(nameLabelAnchor)
 		}
+
+		const eclipse = ECLIPSE_SHADOW.createState()
+		ECLIPSE_SHADOW.attachToLitSurface({
+			material: moonMesh.material as THREE.Material,
+			state: eclipse,
+		})
+		const marker = showMarkers ? BODY_MARKER.create(lineColor) : undefined
+		if (marker) group.add(marker)
 
 		moonData.push({
 			a,
@@ -509,9 +550,17 @@ export function buildMoonOrbitOverlay(
 			nameLabelAnchor,
 			nameLabel,
 			nameLeader,
+			marker,
+			trail,
+			eclipse,
 			localRadius: moonR,
 		})
 	})
+
+	let outerRadius = parentOccupiedRadiusRelativeToPlanet
+	for (const d of moonData) {
+		outerRadius = Math.max(outerRadius, d.a + d.ae + d.localRadius)
+	}
 
 	const spinQuat = new THREE.Quaternion()
 	const spinAxis = new THREE.Vector3(0, 1, 0)
@@ -550,6 +599,10 @@ export function buildMoonOrbitOverlay(
 			const pos = orbitPoint(E, d.a, d.b, d.ae, d.P, d.Q)
 			d.moonMesh.position.copy(pos)
 			d.nameLabelAnchor?.position.copy(pos)
+			d.marker?.position.copy(pos)
+			if (d.trail) {
+				ORBIT_TRAIL.update({ trail: d.trail, kepler: d, eccentricAnomaly: E })
+			}
 		}
 		// A locked moon's facing depends on its just-updated orbital position,
 		// not on currentSpinHours -- refresh it so a date-only change keeps it
@@ -563,7 +616,10 @@ export function buildMoonOrbitOverlay(
 		// troika Text's own dispose() releases its SDF glyph atlas/font
 		// ref-count too — the generic Mesh handling below only disposes the
 		// geometry/material, which isn't enough for it.
-		for (const d of moonData) d.nameLabel?.dispose()
+		for (const d of moonData) {
+			d.nameLabel?.dispose()
+			d.marker?.material.dispose()
+		}
 		group.traverse((obj) => {
 			if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
 				obj.geometry.dispose()
@@ -623,6 +679,8 @@ export function buildMoonOrbitOverlay(
 	function getMoonIndexForMesh(object: THREE.Object3D): number | null {
 		const index = moonMeshes.indexOf(object as THREE.Mesh)
 		if (index !== -1) return index
+		const markerIndex = moonData.findIndex((d) => d.marker === object)
+		if (markerIndex !== -1) return markerIndex
 		// A moon's cloud shell (see buildMoonMesh) is a child of its moon mesh,
 		// not a sibling in moonMeshes -- and sits just above the surface, so a
 		// raycast from outside typically hits it (or its own children) first.
@@ -637,9 +695,49 @@ export function buildMoonOrbitOverlay(
 		return null
 	}
 
+	const screenMoonWorld = new THREE.Vector3()
+	const screenPlanetWorld = new THREE.Vector3()
+	const screenGroupScale = new THREE.Vector3()
+	// Per frame: each moon's outlined-circle marker, then its label. A moon
+	// too close to its planet on screen shows neither, so a zoomed-out
+	// planet doesn't sprout a cluster of rings and names.
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
+		group.getWorldPosition(screenPlanetWorld)
+		const groupScale = Math.max(group.getWorldScale(screenGroupScale).x, 1e-12)
+		const halfHeightTangent = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)
 		for (const d of moonData) {
-			if (!d.nameLabel || !d.nameLeader) continue
+			d.moonMesh.getWorldPosition(screenMoonWorld)
+			const screenUnit = Math.max(
+				camera.position.distanceTo(screenMoonWorld) * halfHeightTangent,
+				1e-12,
+			)
+			const separated =
+				screenMoonWorld.distanceTo(screenPlanetWorld) / screenUnit >=
+				MOON_MIN_SCREEN_SEPARATION
+			if (d.trail) {
+				ORBIT_TRAIL.fadeForZoom({
+					trail: d.trail,
+					orbitScreenRadius: (d.a * groupScale) / screenUnit,
+					bodyScreenRadius: (d.localRadius * groupScale) / screenUnit,
+				})
+			}
+			if (d.marker) {
+				BODY_MARKER.update({
+					marker: d.marker,
+					camera,
+					projectedRadius: (d.localRadius * groupScale) / screenUnit,
+					visibility: separated ? 1 : 0,
+				})
+			}
+			if (!d.nameLabel || !d.nameLeader || !d.nameLabelAnchor) continue
+			d.nameLabelAnchor.visible = separated
+			if (!separated) continue
+			const markerLocalRadius = d.marker?.visible
+				? BODY_MARKER.worldRadius({
+						camera,
+						distance: camera.position.distanceTo(screenMoonWorld),
+					}) / groupScale
+				: 0
 			// `group` carries the parent planet's axial tilt (premultiplied in
 			// once by the caller) — passing its quaternion here cancels that
 			// rotation so the label still points toward the camera's own
@@ -647,10 +745,29 @@ export function buildMoonOrbitOverlay(
 			updateLabelPlacement(
 				d.nameLabel,
 				d.nameLeader,
-				d.localRadius,
+				Math.max(d.localRadius, markerLocalRadius),
 				group.quaternion,
 				camera,
 			)
+		}
+	}
+
+	function updateEclipseShadows({
+		starPosition,
+		parentSphere,
+		parentRing,
+	}: UpdateMoonEclipsesInput): void {
+		for (const d of moonData) {
+			d.eclipse.starPosition.copy(starPosition)
+			ECLIPSE_SHADOW.setSpheres({
+				state: d.eclipse,
+				spheres: [parentSphere],
+			})
+			if (parentRing) {
+				ECLIPSE_SHADOW.setRing({ state: d.eclipse, ...parentRing })
+			} else {
+				ECLIPSE_SHADOW.clearRing(d.eclipse)
+			}
 		}
 	}
 
@@ -662,12 +779,14 @@ export function buildMoonOrbitOverlay(
 
 	return {
 		group,
+		outerRadius,
 		setDay,
 		dispose,
 		getMoonFocus,
 		setSpinHours,
 		getMoonIndexForMesh,
 		updateLabelOrientations,
+		updateEclipseShadows,
 		setAtmosphereSunDirection,
 	}
 }

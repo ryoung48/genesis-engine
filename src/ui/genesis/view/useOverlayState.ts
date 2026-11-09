@@ -78,10 +78,14 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showSolarSystemAxialTilt, setShowSolarSystemAxialTilt] = useState(
 		initialViewPrefs.showSolarSystemAxialTilt,
 	)
-	const [showSolarSystemRealisticSizes, setShowSolarSystemRealisticSizes] =
-		useState(initialViewPrefs.showSolarSystemRealisticSizes)
 	const [showSolarSystemBodyNames, setShowSolarSystemBodyNames] = useState(
 		initialViewPrefs.showSolarSystemBodyNames,
+	)
+	const [showSolarSystemBodyMarkers, setShowSolarSystemBodyMarkers] = useState(
+		initialViewPrefs.showSolarSystemBodyMarkers,
+	)
+	const [solarSystemTrailDegrees, setSolarSystemTrailDegrees] = useState(
+		initialViewPrefs.solarSystemTrailDegrees,
 	)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
@@ -218,8 +222,9 @@ export function useOverlayState(input: OverlayStateInput) {
 				showSolarSystemDaylight,
 				showSolarSystemInclination,
 				showSolarSystemAxialTilt,
-				showSolarSystemRealisticSizes,
 				showSolarSystemBodyNames,
+				showSolarSystemBodyMarkers,
+				solarSystemTrailDegrees,
 				showWireframe,
 				showGrid,
 				showNationBorders,
@@ -268,8 +273,9 @@ export function useOverlayState(input: OverlayStateInput) {
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
-		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
+		solarSystemTrailDegrees,
 		showDaylight,
 		clockCurrent,
 		clockDay,
@@ -389,13 +395,14 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowRivers,
 		setShowSolarSystemAxialTilt,
 		setShowSolarSystemBodyNames,
+		setShowSolarSystemBodyMarkers,
 		setShowSolarSystemDaylight,
 		setShowSolarSystemEllipticalOrbits,
 		setShowSolarSystemInclination,
-		setShowSolarSystemRealisticSizes,
 		setShowWindArrows,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
+		setSolarSystemTrailDegrees,
 		setSolarSystemViewActive,
 		setTopographySubMode,
 		setUnitSystem,
@@ -420,13 +427,14 @@ export function useOverlayState(input: OverlayStateInput) {
 		showRivers,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
 		showSolarSystemDaylight,
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
-		showSolarSystemRealisticSizes,
 		showWindArrows,
 		showWireframe,
 		solarSystemControlsExpanded,
+		solarSystemTrailDegrees,
 		solarSystemViewActive,
 		topographySubMode,
 		unitSystem,

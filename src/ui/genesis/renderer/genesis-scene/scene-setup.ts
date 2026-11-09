@@ -23,6 +23,7 @@ export const DEFAULT_CONTROLS_MAX_DISTANCE = 12
 // toward `maxDistance` pushes the camera past its own far plane and the
 // whole scene gets clipped — reads as the view going blank/"crashing".
 export const DEFAULT_CAMERA_FAR = 2000
+export const DEFAULT_CAMERA_NEAR = 0.01
 
 export function setCameraFarForMaxDistance(
 	ctx: GenesisContext,
@@ -58,8 +59,8 @@ export function buildGenesisSceneSetup(
 	const camera = new THREE.PerspectiveCamera(
 		50,
 		canvas.clientWidth / canvas.clientHeight,
-		0.01,
-		2000,
+		DEFAULT_CAMERA_NEAR,
+		DEFAULT_CAMERA_FAR,
 	)
 	camera.position.set(0, 0, 3)
 

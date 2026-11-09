@@ -54,8 +54,18 @@ const STAR_POINT_FRAGMENT_SHADER = /* glsl */ `
 		// Squaring concentrates brightness toward the center and tapers the
 		// rim off more gently, closer to how a point-source glow should look
 		// at any size.
-		float alpha = pow(1.0 - dist, 2.0);
-		gl_FragColor = vec4(vColor, alpha);
+		//
+		// A purely additive glow washes out over the lighter faction tints, so
+		// a small white-hot core (inner ~20%, fading softly so it never reads as
+		// a hard disc) partly covers the background, and the coloured glow is
+		// added around it -- brighter than before, so the glow carries the
+		// star's look. Keeping the core small stops clustered companions from
+		// covering each other. Output is premultiplied.
+		float core = 1.0 - smoothstep(0.06, 0.2, dist);
+		float halo = pow(1.0 - dist, 2.2);
+		vec3 coreColor = mix(vColor, vec3(1.0), 0.6);
+		vec3 rgb = coreColor * core + vColor * halo * (1.0 - core);
+		gl_FragColor = vec4(rgb, core * 0.85);
 	}
 `
 
@@ -203,9 +213,11 @@ export function buildGalaxyPoints(galaxy: Galaxy): GalaxyPointsResult {
 		fragmentShader: STAR_POINT_FRAGMENT_SHADER,
 		transparent: true,
 		depthWrite: false,
+		// Premultiplied "over": the opaque core replaces what's behind it while
+		// the halo (alpha 0) adds on top, like the additive glow before.
 		blending: THREE.CustomBlending,
-		blendSrc: THREE.SrcAlphaFactor,
-		blendDst: THREE.OneFactor,
+		blendSrc: THREE.OneFactor,
+		blendDst: THREE.OneMinusSrcAlphaFactor,
 		blendEquation: THREE.AddEquation,
 	})
 	const blackHoleGeometry = new THREE.BufferGeometry()

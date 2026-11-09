@@ -1,5 +1,4 @@
 export {
-	BELT_WIDTH_MIN,
 	BELT_WIDTH_RATIO,
 	TWO_PI,
 } from "@/ui/genesis/solar-system/overlay/constants"

@@ -1,5 +1,5 @@
 // Vendored from github.com/raguilar011095/planet_heightmap_generation@47edc28acc17719b6bed03e211d20eb87441c2be v2/js/climate/rain.js (GPL-3.0, see LICENSE).
-// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage; export the month, latent heat, Priestley–Taylor and Turc–Pike constants for the locked rain stage; export the snow share and snowmelt rate for the temperature stage's snow cover.
+// Modified in chaos-machine: expose transported stability to the diagnostic cloud stage; export the month, latent heat, Priestley–Taylor and Turc–Pike constants for the locked rain stage; export the snow share and snowmelt rate for the temperature stage's snow cover; storms lift the air through the stable layer (RAIN_STORM_LIFT).
 // Rain stage: a column-water budget on the climate grid, at each point in the year. DOM-free.
 //
 // The water vapour in the air column, W (mm = kg/m²), is in balance at each point in the year:
@@ -377,7 +377,10 @@ export function columnWaterRain() {
                     // … and unstable air (off a sea warmer than its latitude: a warm current, a warm sea under colder
                     // air, carried onshore by the wind) convects and rains more — humidity effectively raised by
                     // RAIN_INSTABILITY per K
-                    const stable = Sair[c] >= 0 ? Math.exp(-a * P_.RAIN_STABILITY * Sair[c]) : Math.exp(-a * P_.RAIN_INSTABILITY * Sair[c]);
+                    // … but storms lift the air through a stable surface layer (fronts, the warm conveyor belt): the
+                    // stability counts less by RAIN_STORM_LIFT × the storms' share of their fullest spread
+                    const lifted = 1 - P_.RAIN_STORM_LIFT * sd / S_MAX;
+                    const stable = Sair[c] >= 0 ? Math.exp(-a * P_.RAIN_STABILITY * lifted * Sair[c]) : Math.exp(-a * P_.RAIN_INSTABILITY * Sair[c]);
                     // Land convection: ground heated by its net radiation heats the air near it by day, and afternoon
                     // storms spread the column's humidity within the month (as the storms of the mid-latitudes do) —
                     // over land rain picks up at a lower column humidity than over the sea: × e^{(a·s)²/2}, s =

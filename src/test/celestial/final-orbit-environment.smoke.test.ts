@@ -55,7 +55,11 @@ describe("Final orbit environment", () => {
 			expect(bodies).toHaveLength(slots.length)
 			for (const [index, slot] of slots.entries()) {
 				const body = bodies[index]!
-				expect(body.orbitalDistanceAU).toBe(slot.orbitalDistanceAU)
+				// With no forced main world here, minimum Hill spacing only ever
+				// pushes a body outward from its slot.
+				expect(body.orbitalDistanceAU).toBeGreaterThanOrEqual(
+					slot.orbitalDistanceAU!,
+				)
 				const isWrapped =
 					STAR.isProto({ ageGyr: star.ageGyr, massSol: star.massSol }) &&
 					slot.type !== "belt"
@@ -63,7 +67,7 @@ describe("Final orbit environment", () => {
 					? star.bodies.find(
 							(member) =>
 								member.beltOfIdx === body.idx &&
-								member.orbitalDistanceAU === slot.orbitalDistanceAU,
+								member.orbitalDistanceAU === body.orbitalDistanceAU,
 						)
 					: body
 				expect(content).toBeDefined()

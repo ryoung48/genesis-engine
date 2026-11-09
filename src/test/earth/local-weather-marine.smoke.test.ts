@@ -21,6 +21,7 @@ import { TIME } from "@/model/shared/time"
 import type { GenesisProvinces } from "@/model/society/types"
 import { WEATHER_FIXTURE } from "@/test/earth/fixtures/local-weather"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
+import { WEATHER_DISPLAY } from "@/ui/genesis/shared/weather-display"
 
 const STEP_RAD = 0.01
 const RADIUS_KM = 6371
@@ -203,6 +204,40 @@ const equator: MarineShore = {
 	springRangeM: 2,
 	lagDraw: 0,
 }
+
+it("shows upcoming tides after earlier tides have passed", () => {
+	const instant = resolve(baseParams, 1e6)
+	const phase = WEATHER_CLOCK.localSolar({ instant, xyz: equator.xyz }).phase
+	const midnight = WEATHER_CLOCK.shift({
+		instant,
+		deltaSeconds: -phase * instant.solarDaySeconds!,
+	})
+	const snapshot = LOCAL_WEATHER.sampleProvince({
+		context: WEATHER_FIXTURE.context(),
+		instant,
+		province: 0,
+	})
+	const display = (fraction: number) =>
+		WEATHER_DISPLAY.sea({
+			snapshot: {
+				...snapshot,
+				instant: WEATHER_CLOCK.shift({
+					instant: midnight,
+					deltaSeconds: fraction * instant.solarDaySeconds!,
+				}),
+				marine: { shore: equator, waves: null },
+			},
+			moons: [luna],
+			params: baseParams,
+			unitSystem: "metric",
+		})!.rows.find((row) => row.key === "tide")!.items
+	const morning = display(0.1)
+	const evening = display(0.9)
+	expect(morning.map((item) => item.value)).not.toEqual(
+		evening.map((item) => item.value),
+	)
+	expect(morning.every((item) => item.value !== "—")).toBe(true)
+})
 
 function resolve(params: GenesisParams, seconds: number): WeatherInstant {
 	const year = WEATHER_CLOCK.resolve({ params, elapsedYears: 0, manual: null })

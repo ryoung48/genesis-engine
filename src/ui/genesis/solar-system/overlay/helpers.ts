@@ -1,17 +1,10 @@
-import { MOON } from "@/model/celestial/moons"
-import { MECHANICS } from "@/model/celestial/moons/mechanics"
+import { ASTEROID_BELT } from "@/model/celestial/system/generation/asteroid-belt"
 import type { SystemBody } from "@/model/celestial/system/types"
 import {
-	getMoonOrbitDistanceRelativeToPlanet,
-	measureMoonOrbitOuterRadiusForDisplay,
-	scaleBodyDiameterToVisualRadius,
-} from "@/ui/genesis/shared/moon-visual-scale"
-import {
+	BELT_WIDTH_RATIO,
+	BODY_SIZE_RADIUS_KM,
 	GROUP_LABEL,
-	MIN_MOON_VISUAL_RADIUS,
-	MOON_SYSTEM_SCENE_MAX,
-	MOON_SYSTEM_SCENE_MIN,
-	PLANET_SCENE_RADIUS,
+	MIN_BODY_SIZE,
 } from "@/ui/genesis/solar-system/overlay/constants"
 
 // `showRealNames` gates real Sol names the same way the stat-panel titles
@@ -34,64 +27,27 @@ export function bodyDisplayName(
 	return `${GROUP_LABEL[body.group]} ${siblingNumber}`
 }
 
-export function bodySceneRadius(
-	diameterKm: number,
-	sizeClass: number,
-	realisticSizes: boolean,
-): number {
-	return scaleBodyDiameterToVisualRadius(
-		diameterKm,
-		PLANET_SCENE_RADIUS,
-		realisticSizes,
-		sizeClass,
+// A body's size before the per-system fit (see BODY_GAP_FRACTION).
+export function bodySizeUnits(diameterKm: number): number {
+	return Math.max(
+		MIN_BODY_SIZE,
+		Math.tanh(Math.max(diameterKm, 0) / 2 / BODY_SIZE_RADIUS_KM),
 	)
 }
 
-export function measureBodyMoonSystemOuterRadius(
-	body: SystemBody,
-	sceneRadius: number,
-	showEllipticalOrbits: boolean,
-	realisticSizes: boolean,
-): number {
-	if (body.moons.length === 0) return sceneRadius
-
-	const planetRadiusKm = body.diameterKm / 2
-	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
-	const parentOccupiedRadiusRelativeToPlanet =
-		body.rings?.outerRadiusRelative ?? 1
-
-	const outerRadiusInMoonOverlayUnits = measureMoonOrbitOuterRadiusForDisplay({
-		orbits: body.moons.map((moon) => ({
-			orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
-				MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }),
-				planetRadiusKm,
-			),
-			eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
-			bodyVisualRadius: Math.max(
-				MIN_MOON_VISUAL_RADIUS,
-				scaleBodyDiameterToVisualRadius(
-					moon.diameterKm,
-					PLANET_SCENE_RADIUS,
-					realisticSizes,
-					moon.sizeClass ??
-						MOON.estimateMoonSizeClassFromDiameter(moon.diameterKm),
-				) / Math.max(sceneRadius, 1e-6),
-			),
-		})),
-		parentVisualRadius: parentOccupiedRadiusRelativeToPlanet,
-		minDisplayDistance: MOON_SYSTEM_SCENE_MIN,
-		maxDisplayDistance: MOON_SYSTEM_SCENE_MAX,
-	})
-
-	return outerRadiusInMoonOverlayUnits * sceneRadius
-}
-
-export function maxNonRealisticPlanetSceneRadius(bodies: SystemBody[]): number {
-	let maxRadius = 0
-	for (const body of bodies) {
-		if (body.group === "asteroid belt") continue
-		const radius = bodySceneRadius(body.diameterKm, body.sizeClass, false)
-		if (radius > maxRadius) maxRadius = radius
+export function beltEdgesAU(body: SystemBody): {
+	minAU: number
+	maxAU: number
+} {
+	if (body.belt) {
+		return ASTEROID_BELT.beltAURange({
+			orbitalDistanceAU: body.orbitalDistanceAU,
+			spanOrbitNumber: body.belt.spanOrbitNumber,
+		})
 	}
-	return maxRadius
+	const halfSpanAU = (body.orbitalDistanceAU * BELT_WIDTH_RATIO) / 2
+	return {
+		minAU: body.orbitalDistanceAU - halfSpanAU,
+		maxAU: body.orbitalDistanceAU + halfSpanAU,
+	}
 }

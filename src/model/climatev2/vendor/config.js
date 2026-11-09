@@ -149,6 +149,7 @@ export const PARAMS_DEFAULTS = Object.freeze({
     RAIN_DEEP_R0: 0.6,          // –          column relative humidity where the converging layer starts to deepen …
     RAIN_DEEP_R1: 0.9,          //            … and where it is fully deep (moist convection)
     RAIN_STABILITY: 0.0225,     // 1/K        humidity effectively lost per K the surface is colder than its region (stable air) …
+    RAIN_STORM_LIFT: 1,         // –          share of the stability that storms at their fullest spread lift the air through
     RAIN_STABLE_REF_KM: 1500,   // km         … the region: the surface's mean within this (Gaussian σ; the air mass's scale)
     RAIN_TERRAIN_HEAT_K: 6,     // K          … over ground this much warmer than its latitude (at sea level); none if 0
     RAIN_HIGH_K_PER_HPA: 0.6,     // K/hPa      stability counted per hPa of pressure above the latitude's mean (sinking air)
@@ -210,6 +211,8 @@ export const PARAM_PRIORS = Object.freeze({
     TEMP_ALBEDO_VARY_KM: { value: 900, min: 400, max: 2000, source: 'the size of regional albedo anomalies (deserts, forests, cloud decks) ≈ 500–2000 km' },
     TEMP_CLOUD_ALBEDO:  { value: 0.15, min: 0.0, max: 0.3, source: 'shortwave cloud forcing over land ≈ −50 to −100 W/m² under persistent rain clouds, ≈ 0 over deserts (CERES): an albedo contrast ≈ 0.1–0.25' },
     TEMP_CLOUD_LW_CANCEL: { value: 0.8, min: 0.5, max: 1, source: 'deep tropical convection: shortwave cloud forcing ≈ −100 W/m² nearly cancelled by longwave ≈ +90 W/m² (Kiehl 1994; Hartmann et al. 2001; ERBE/CERES)' },
+    TEMP_LOW_CLOUD_ALBEDO: { value: 0.04, min: 0, max: 0.1, source: 'a conservative residual low-cloud albedo contrast about the fitted background reflectance; 0.1 evaluated on Earth worsened monthly temperature and Köppen (docs/climate/clouds.md)' },
+    TEMP_CLOUD_LONGWAVE_WINDOW: { value: 0.4, min: 0.25, max: 0.7, source: 'the share of the clear-sky outgoing longwave that added cloud intercepts, a gray Earth calibration; 0.25, 0.5 and 0.7 evaluated, 0.4 kept the rain gain at a small Köppen cost (docs/climate/clouds.md)' },
     TEMP_ICE_LAPSE:     { value: 8.0, min: 6.5, max: 10, source: 'Antarctic ice-sheet surface temperature vs height ≈ 8 K/km (Fortuin & Oerlemans 1990)' },
     TEMP_ICE_DOME_KM:   { value: 1.5, min: 0.5, max: 3, source: 'mean surface elevation of ice sheets ≈ 2.1 km (Greenland) and 2.3 km (Antarctica); small ice caps less' },
     TEMP_SEA_ICE_GROW:  { value: 0.002, min: 0.001, max: 0.004, source: 'thin sea ice grows ≈ 1–3 cm/day at −10 °C (Stefan / Lebedev: h ≈ 1.33·FDD^0.58 cm)' },
@@ -274,6 +277,7 @@ export const PARAM_PRIORS = Object.freeze({
     RAIN_WIND_DIV_DRY:  { value: 0.3, min: 0.15, max: 0.5, source: 'shallow (≈ 1 km) convergence of heat lows and trade-wind divergence: ≈ 30–40 % of the column’s water (scale height ≈ 2.5 km)' },
     RAIN_WIND_DIV_MOIST: { value: 0.6, min: 0.4, max: 0.9, source: 'rain-belt inflow ≈ 1.5–3 km deep: moisture convergence ≈ 0.5–0.7 × W × surface convergence (P − E ≈ 5–10 mm/day)' },
     RAIN_STABILITY:     { value: 0.015, min: 0.0, max: 0.03, source: 'rain is suppressed under strong low inversions (cold upwelling, stratocumulus decks; Klein & Hartmann 1993: low cloud +6 %/K of stability); no direct literature value' },
+    RAIN_STORM_LIFT:    { value: 1, min: 0, max: 1, source: 'winter rain at 25–45° comes from fronts and warm conveyor belts that lift air through the shallow stable layer over cold land (Browning 1990; Eckhardt et al. 2004); scored on the Earth comparison: 0.5 and 1 against 0 raise 25–45° winter land rain from 0.65 to 0.72 and 0.80 of observed, 1 best (annual rain MAE 411.6 → 409.1 mm, Köppen 47.2 → 47.7 %)' },
     RAIN_TERRAIN_HEAT_K: { value: 6, min: 3, max: 10, source: 'a deep convective boundary layer (2–4 km) forms over strongly heated high ground (Tibet, pre-monsoon and monsoon); over cold or snowy high ground the boundary layer is shallow and stable' },
     RAIN_HIGH_K_PER_HPA: { value: 0.5, min: 0, max: 1.5, source: 'subsidence under the subtropical highs warms the air above the marine layer by several K (a trade-wind / stratocumulus inversion of 5–10 K under +5–10 hPa highs)' },
     RAIN_INSTABILITY:   { value: 0.015, min: 0, max: 0.03, source: 'convection over surfaces warmer than their surroundings (heated plateaus, warm currents such as the Gulf Stream and Kuroshio) raises rain for the same humidity; no direct literature value — kept to the scale of the stable-air term' },

@@ -14,6 +14,21 @@ import type { RingProfile } from "@/model/celestial/system/types"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
 
+// Jovian size class 16 (2-6 R_earth) : 17 (6-12) : 18 (8-18). Real planet
+// occurrence falls steeply with size -- Kepler's 2-6 R_earth planets far
+// outnumber Saturn- and Jupiter-sized ones (Fressin et al. 2013) -- where the
+// book's flat 1:1:1 made every size equally common.
+const JOVIAN_SIZE_CLASS_WEIGHTS = [
+	{ v: 16, w: 3 },
+	{ v: 17, w: 2 },
+	{ v: 18, w: 1 },
+]
+// Class 16's diameter is skewed toward its small end: diameter =
+// min + (max - min) * u^2.4 puts 75% of rolls in 2-4 R_earth and 25% in 4-6,
+// matching small Neptunes being ~3x as common as large ones (Fressin et al.
+// 2013); 0.5^(1/2.4) = 0.75.
+const SMALL_JOVIAN_DIAMETER_SKEW = 2.4
+
 // Ported from galaxy-gen's ORBIT.spawn group weightedChoice + star-age
 // overrides (orbits/index.ts) -- dwarf and helian weights are fixed
 // regardless of zone (galaxy-gen never varies them), asteroid-belt/
@@ -118,7 +133,7 @@ function rollSizeClass({
 	if (group === "dwarf") return rng.randint(0, 4)
 	if (group === "terrestrial") return rng.randint(5, 10)
 	if (group === "helian") return rng.randint(11, 15)
-	return rng.randint(16, 18)
+	return rng.weightedChoice(JOVIAN_SIZE_CLASS_WEIGHTS) ?? 16
 }
 
 function rollDiameterKmFromSizeClass({
@@ -130,6 +145,11 @@ function rollDiameterKmFromSizeClass({
 }): number {
 	if (sizeClass < 0) return 0
 	const [minKm, maxKm] = ORBIT_BODY.sizeClassToDiameterRangeKm({ sizeClass })
+	if (sizeClass === 16) {
+		return (
+			minKm + (maxKm - minKm) * rng.uniform(0, 1) ** SMALL_JOVIAN_DIAMETER_SKEW
+		)
+	}
 	return rng.uniform(minKm, maxKm)
 }
 

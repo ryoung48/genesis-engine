@@ -1,6 +1,8 @@
 import * as THREE from "three"
 
-export const NEBULA_BACKGROUND_RADIUS = 1500
+// The sky sphere's radius as a multiple of the camera's near plane, which
+// tracks the zoom in the solar-system view: it must stay between near and far.
+const NEBULA_RADIUS_NEAR_MULTIPLE = 100
 
 /** Luminance-preserving per-system hue for the nebula backdrop, derived
  * deterministically from the system's own seed so every system reads
@@ -128,10 +130,7 @@ export function buildNebulaBackground(): THREE.Mesh {
 			}
 		`,
 	})
-	const mesh = new THREE.Mesh(
-		new THREE.SphereGeometry(NEBULA_BACKGROUND_RADIUS, 32, 24),
-		material,
-	)
+	const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), material)
 	mesh.frustumCulled = false
 	mesh.renderOrder = -1
 	return mesh
@@ -145,9 +144,10 @@ function nebulaMaterial(mesh: THREE.Mesh): THREE.ShaderMaterial {
  * view regardless of zoom). Call once per rendered solar-system frame. */
 export function frameNebulaBackground(params: {
 	mesh: THREE.Mesh
-	camera: THREE.Camera
+	camera: THREE.PerspectiveCamera
 }): void {
 	params.mesh.position.copy(params.camera.position)
+	params.mesh.scale.setScalar(params.camera.near * NEBULA_RADIUS_NEAR_MULTIPLE)
 }
 
 /** Tints the backdrop toward the calling system's own hue (see

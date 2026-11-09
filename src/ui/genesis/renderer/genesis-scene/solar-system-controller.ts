@@ -3,6 +3,7 @@ import { DEFERRED_SHADERS } from "@/ui/genesis/renderer/deferred-shaders"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import {
 	DEFAULT_CAMERA_FAR,
+	DEFAULT_CAMERA_NEAR,
 	DEFAULT_CONTROLS_MAX_DISTANCE,
 	DEFAULT_CONTROLS_MIN_DISTANCE,
 	setCameraFarForMaxDistance,
@@ -26,7 +27,15 @@ export interface SolarSystemControllerDeps {
 }
 
 const SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER = 6
-const SOLAR_SYSTEM_MIN_FOCUS_DISTANCE = 0.3
+// The camera may come no closer than this many radii of the focused body,
+// so it never ends up inside it.
+const SOLAR_SYSTEM_MIN_DISTANCE_RADII = 1.2
+// True-scale distances span ~1e9 from a small moon to the system's edge,
+// more than one fixed near/far pair can resolve, so the near plane tracks
+// the camera's distance to its target.
+const SOLAR_SYSTEM_NEAR_FRACTION = 0.01
+// Keeps the projection finite with the camera sitting on its target.
+const SOLAR_SYSTEM_MIN_NEAR = 1e-9
 
 export function createSolarSystemController(
 	ctx: GenesisContext,
@@ -76,6 +85,12 @@ export function createSolarSystemController(
 		// Once programs have been built, a rebuild mostly hits the renderer's
 		// cache, so holding the last frame beats flashing placeholders.
 		if (compilation && programsWarm) return
+		ctx.camera.near = Math.max(
+			ctx.camera.position.distanceTo(ctx.controls.target) *
+				SOLAR_SYSTEM_NEAR_FRACTION,
+			SOLAR_SYSTEM_MIN_NEAR,
+		)
+		ctx.camera.updateProjectionMatrix()
 		frameNebulaBackground({ mesh: ctx.nebulaBackground, camera: ctx.camera })
 		ctx.renderer.render(ctx.scene, ctx.camera)
 	}
@@ -124,10 +139,8 @@ export function createSolarSystemController(
 		ctx.solarSystemTrackedFocus = address
 		ctx.solarSystemTrackedFocusPosition = focus.position.clone()
 		ctx.solarSystemFocusChangeHandler?.(address)
-		const distance = Math.max(
-			focus.radius * SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER,
-			SOLAR_SYSTEM_MIN_FOCUS_DISTANCE,
-		)
+		ctx.controls.minDistance = focus.radius * SOLAR_SYSTEM_MIN_DISTANCE_RADII
+		const distance = focus.radius * SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER
 		const dir = ctx.camera.position.clone().sub(ctx.controls.target).normalize()
 		if (!Number.isFinite(dir.x) || dir.lengthSq() === 0) dir.set(0, 0, 1)
 		const camTo = focus.position.clone().add(dir.multiplyScalar(distance))
@@ -228,7 +241,11 @@ export function createSolarSystemController(
 			ctx.savedControlsTarget = ctx.controls.target.clone()
 			ctx.controls.target.set(0, 0, 0)
 			const dist = ctx.solarSystemOverlayState?.suggestedCameraDistance ?? 6
-			ctx.controls.minDistance = 0.1
+			ctx.controls.minDistance =
+				(ctx.solarSystemOverlayState?.getBodyFocus({
+					kind: "star",
+					starIndex: 0,
+				})?.radius ?? 0) * SOLAR_SYSTEM_MIN_DISTANCE_RADII
 			ctx.controls.maxDistance = dist * 4
 			setCameraFarForMaxDistance(ctx, ctx.controls.maxDistance)
 			ctx.camera.position.set(0, 0, dist)
@@ -239,6 +256,7 @@ export function createSolarSystemController(
 				ctx.controls.target.copy(ctx.savedControlsTarget)
 			ctx.controls.minDistance = DEFAULT_CONTROLS_MIN_DISTANCE
 			ctx.controls.maxDistance = DEFAULT_CONTROLS_MAX_DISTANCE
+			ctx.camera.near = DEFAULT_CAMERA_NEAR
 			ctx.camera.far = DEFAULT_CAMERA_FAR
 			ctx.camera.updateProjectionMatrix()
 		}

@@ -69,11 +69,11 @@ function buildMoon({
 			(1 - seed.landCoverage) * 100,
 		),
 		atmosphere: seed.atmosphere,
-		orbitalPeriodDays: seed.rotationHours / TIME.hoursPerDay,
-		// Real named moons here are (like nearly every major moon in our own
-		// solar system) tidally locked, so this happens to equal the orbital
-		// period above — but it's the moon's actual sidereal rotation period
-		// from the ported data, not derived from orbitalPeriodDays.
+		orbitalPeriodDays:
+			seed.orbitalPeriodDays ?? seed.rotationHours / TIME.hoursPerDay,
+		// Tidally locked moons (the default here) orbit in their rotation period;
+		// the few that aren't set orbitalPeriodDays on their seed. This is the
+		// moon's actual sidereal rotation period, not derived from the orbit.
 		siderealDayHours: seed.rotationHours,
 		eccentricity: seed.eccentricity,
 		inclinationDeg: seed.inclinationDeg ?? rolled.inclinationDeg,

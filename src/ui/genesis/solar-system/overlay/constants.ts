@@ -1,39 +1,82 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	OrbitClassification,
 	OrbitZone,
 } from "@/model/celestial/orbit-body/types"
 import type { SpectralClass } from "@/model/celestial/star/types"
 import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
-import { BODY_VISUAL_BASE_RADIUS } from "@/ui/genesis/shared/moon-visual-scale"
-
 export const DEG2RAD = Math.PI / 180
 
 export const TWO_PI = 2 * Math.PI
 export const ORBIT_SEGMENTS = 256
-export const PLANET_SCENE_RADIUS = BODY_VISUAL_BASE_RADIUS
-export const MOON_SYSTEM_SCENE_MIN = 1.35
-export const MOON_SYSTEM_SCENE_MAX = 2.55
-export const MIN_MOON_VISUAL_RADIUS = 0.004
-// Visual clearance between one body's outer edge and the next body's orbit,
-// as a multiple of the (larger of the two) body's own radius — a real
-// AU-based distance would either bunch everything near the star or spread it
-// beyond any reasonable camera distance depending on spectral class.
-export const ORBIT_GAP_STAR_RADII = 1.5
-export const BELT_SCENE_RADIUS = 0.05
-export const NON_REALISTIC_STAR_PLANET_SIZE_MARGIN = 1.25
-// Real main-belt asteroids span roughly 2.1-3.3 AU around a ~2.77 AU center
-// -- an inner-to-outer radial spread of about 0.44x its own orbit radius, far
-// wider than a thin fixed-width ring. beltHalfWidth (overlay.ts) derives each
-// belt's actual half-width from this ratio against its own orbitRadius, with
-// BELT_WIDTH_MIN as a floor so a belt packed in close to its star doesn't
-// collapse to an invisible sliver.
+export const KM_PER_AU = ORBIT_BODY.astronomicalUnitM / 1000
+
+// --- System layout: as close to true scale as each system allows ---
+// Orbits are laid out by their gap above the star's true surface, raised to
+// a per-system power p = min(1, ln(MAX_ORBIT_SPREAD) / ln(outer / inner)):
+// a compact system stays linear, a spread-out one is compressed just enough.
+// 120 puts Sol (Mercury 0.39 AU to Eris 68 AU, a ~175x spread) at p ~ 0.93,
+// drawing Neptune at ~23x Earth's distance against the true 30x -- closer to
+// real than the ~18x of Sangil Lee's solar system simulator (sangillee.com,
+// assets/solar/js/solar.min.js), our readability reference.
+export const MAX_ORBIT_SPREAD = 120
+// Floor on an orbit's gap above the star's surface, below the closest known
+// exoplanet orbits (~0.006 AU), so the power law never sees zero.
+export const MIN_ORBIT_GAP_AU = 0.001
+// Every system is scaled so its farthest apoapsis or belt edge lands here.
+export const LAYOUT_OUTER_RADIUS = 100
+// A Sun-sized star's drawn radius: ~1.2% of the outer edge, the reference
+// simulator's Sun-to-Neptune-orbit ratio (1 : ~73).
+export const SUN_DRAWN_RADIUS = 1.2
+// Star radius = SUN_DRAWN_RADIUS * (1 + 0.5 * log10(R / R_sun)): 0.1 R_sun
+// -> 0.5, 100 R_sun -> 2, 1000 R_sun -> 2.5. Floored at 0.25 so white
+// dwarfs, neutron stars and black holes stay visible.
+export const STAR_LOG_SLOPE = 0.5
+// Orbits are drawn from the star's centre (a surface offset would inflate
+// every inner distance and flatten the spacing), so a star is capped at half
+// its innermost drawn periapsis: a giant shrinks instead of covering its
+// orbits, and nothing ever sits inside the star.
+export const STAR_MAX_INNER_PERIAPSIS_FRACTION = 0.5
+export const MIN_STAR_SIZE = 0.25
+// Body size before fitting: tanh(radius_km / 1e5) from the reference
+// simulator, linear for rocky worlds and saturating for giants (Earth 0.064,
+// Jupiter 0.60), floored so the smallest moonlets keep a sliver of size.
+export const BODY_SIZE_RADIUS_KM = 1e5
+export const MIN_BODY_SIZE = 0.001
+// One per-system factor scales every body as large as its spacing allows: a
+// body plus its moon system fills at most 40% of the gap to its nearest
+// neighbouring orbit (leaving 20% clear between two equal neighbours).
+export const BODY_GAP_FRACTION = 0.4
+// ...and never larger than this fraction of a Sun-sized star per unit of
+// tanh size, which draws the Sun ~58x Earth's size: between the reference
+// simulator's 15.6x and the true 109x, so the star reads as dominant while
+// rocky planets stay visible up close.
+export const MAX_BODY_TO_STAR_SCALE = 0.27
+// Lower bound on that factor (1% of its maximum) for two orbits drawn on
+// top of each other; their bodies stay findable through their markers.
+export const MIN_BODY_SCALE_FRACTION = 0.01
+// Name labels fade as a body's orbit shrinks on screen (orbit radius as a
+// fraction of the viewport's half-height), and the smaller the body the
+// sooner: a body of radius <= 1,500 km (Pluto-sized) fades from 0.3 down to
+// 0.15, one of >= 60,000 km (Saturn-sized) from 0.08 down to 0.03, with sizes
+// between interpolated on a log scale. Zoomed out on Sol, only the giants
+// stay named; the inner planets' names return as you zoom in.
+export const LABEL_FADE_SMALL_RADIUS_KM = 1_500
+export const LABEL_FADE_LARGE_RADIUS_KM = 60_000
+export const LABEL_FADE_SMALL_ORBIT = { full: 0.3, gone: 0.15 }
+export const LABEL_FADE_LARGE_ORBIT = { full: 0.08, gone: 0.03 }
+// A body's ring marker hides only when its orbit is so small on screen that
+// the ring (0.02 of the half-height) would sit on the star, whatever the
+// body's size: full from twice the ring radius, gone at the ring radius.
+export const BODY_MARKER_MIN_ORBIT_SCREEN_RADIUS = { full: 0.04, gone: 0.02 }
+// Fallback radial spread for a belt with no rolled span (the Sol seed's
+// belts): real main-belt asteroids span roughly 2.1-3.3 AU around 2.77 AU,
+// and the classical Kuiper belt 30-50 AU around 43 AU, both about 0.44x
+// their centre distance.
 export const BELT_WIDTH_RATIO = 0.44
-export const BELT_WIDTH_MIN = 0.12
 // Real main-belt inclinations mostly fall within ~20deg of the ecliptic, so
 // the belt's vertical (out-of-plane) thickness is real but much shallower
-// than its radial spread -- this ratio is applied against beltHalfWidth
-// rather than getting its own fixed jitter constant, so a wide belt also
-// reads as a proportionally thicker toroidal swarm instead of a flat disc.
+// than its radial spread.
 export const BELT_VERTICAL_RATIO = 0.35
 // Fallbacks only for a body whose classification isn't in
 // CLASSIFICATION_COLOR below (shouldn't happen in practice, since every

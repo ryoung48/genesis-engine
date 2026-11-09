@@ -5,11 +5,12 @@ import { STAR } from "@/model/celestial/star"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { uiPalette } from "@/ui/components/tokens"
 import { buildBodyAtmosphereShell } from "@/ui/genesis/renderer/atmosphere-shell"
+import { BODY_MARKER } from "@/ui/genesis/renderer/body-marker"
 import {
 	createNameLabel,
 	createNameLeaderLine,
 	IDENTITY_QUATERNION,
-	sizeNameLabel,
+	setNameLabelOpacity,
 	updateLabelPlacement,
 } from "@/ui/genesis/renderer/body-name-label"
 import { brownDwarfGlow } from "@/ui/genesis/renderer/brown-dwarf-glow"
@@ -19,6 +20,8 @@ import {
 } from "@/ui/genesis/renderer/cloud-band-material"
 import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
 import { DEFERRED_SHADERS } from "@/ui/genesis/renderer/deferred-shaders"
+import { ECLIPSE_SHADOW } from "@/ui/genesis/renderer/eclipse-shadow"
+import type { EclipseRing } from "@/ui/genesis/renderer/eclipse-shadow/types"
 import {
 	buildMoonOrbitOverlay,
 	mod2pi,
@@ -28,45 +31,61 @@ import {
 } from "@/ui/genesis/renderer/moon-orbit-overlay"
 import { buildNeutronJets } from "@/ui/genesis/renderer/neutron-jets"
 import { buildProceduralBodyMaterial } from "@/ui/genesis/renderer/procedural-body-material"
+import { STAR_FLARE } from "@/ui/genesis/renderer/star-flare"
 import {
 	buildStarGlowMaterial,
 	buildStarSurfaceLayers,
 	STAR_GLOW_RADIUS_SCALE,
 } from "@/ui/genesis/renderer/star-surface-material"
-import { scaleBodyDiameterToVisualRadius } from "@/ui/genesis/shared/moon-visual-scale"
 import {
 	buildAsteroidField,
 	updateAsteroidField,
 } from "@/ui/genesis/solar-system/overlay/asteroid-field"
 import {
-	BELT_SCENE_RADIUS,
-	BELT_WIDTH_MIN,
-	BELT_WIDTH_RATIO,
+	BODY_GAP_FRACTION,
 	BODY_LOD_SEGMENTS,
 	BODY_LOD_THRESHOLDS,
+	BODY_MARKER_MIN_ORBIT_SCREEN_RADIUS,
 	CLASSIFICATION_COLOR,
 	DEG2RAD,
 	FULL_OCEAN_COLOR,
 	GOLDEN_ANGLE_RAD,
 	JOVIAN_COLOR_BY_ZONE,
+	KM_PER_AU,
+	LABEL_FADE_LARGE_ORBIT,
+	LABEL_FADE_LARGE_RADIUS_KM,
+	LABEL_FADE_SMALL_ORBIT,
+	LABEL_FADE_SMALL_RADIUS_KM,
+	LAYOUT_OUTER_RADIUS,
 	MAIN_WORLD_COLOR,
-	NON_REALISTIC_STAR_PLANET_SIZE_MARGIN,
-	ORBIT_GAP_STAR_RADII,
+	MAX_BODY_TO_STAR_SCALE,
+	MAX_ORBIT_SPREAD,
+	MIN_BODY_SCALE_FRACTION,
+	MIN_ORBIT_GAP_AU,
+	MIN_STAR_SIZE,
 	ORBIT_LINE_COLOR_BY_ZONE,
 	ORBIT_SEGMENTS,
-	PLANET_SCENE_RADIUS,
 	ROCKY_SIBLING_COLOR,
 	STAR_COLOR_BY_CLASS,
+	STAR_LOG_SLOPE,
+	STAR_MAX_INNER_PERIAPSIS_FRACTION,
+	SUN_DRAWN_RADIUS,
 	TWO_PI,
 } from "@/ui/genesis/solar-system/overlay/constants"
 import {
+	beltEdgesAU,
 	bodyDisplayName,
-	bodySceneRadius,
-	maxNonRealisticPlanetSceneRadius,
-	measureBodyMoonSystemOuterRadius,
+	bodySizeUnits,
 } from "@/ui/genesis/solar-system/overlay/helpers"
+import { ORBIT_TRAIL } from "@/ui/genesis/solar-system/overlay/orbit-trail"
 import { loadBodyTexture } from "@/ui/genesis/solar-system/overlay/textures"
 import type {
+	CompanionBand,
+	ComputeBodyScaleInput,
+	DistanceMapping,
+	DrawnDistanceInput,
+	LabelVisibilityInput,
+	LayoutSlot,
 	OrbitAddress,
 	PlacedBody,
 	PlacedCompanion,
@@ -74,14 +93,10 @@ import type {
 	SolarSystemOverlayState,
 } from "@/ui/genesis/solar-system/overlay/types"
 
-// Companions are packed by rendered size (like every other orbit -- see
-// ORBIT_GAP_STAR_RADII's own comment: a real AU-based distance would either
-// bunch everything near the star or spread it beyond any reasonable camera
-// distance depending on spectral class), not a literal AU-to-scene-unit
-// conversion -- this constant is just the companion-scale equivalent of
-// ORBIT_GAP_STAR_RADII, one level up.
-const COMPANION_ORBIT_GAP_FACTOR = 0.4
 const NEUTRON_STAR_SURFACE_FACTOR = 0.28
+// The black-hole disc shader's torus reaches ~1.8 local units; its bounding
+// sphere is radius 2.
+const BLACK_HOLE_BOUNDS_RADIUS = 2
 
 // One shared unit sphere per tessellation tier, reused by every body mesh
 // (and cloud shell) currently at that tier -- see BODY_LOD_SEGMENTS. Kept at
@@ -130,15 +145,15 @@ export function buildSolarSystemOverlay(
 		showDaylight,
 		showInclination,
 		showAxialTilt,
-		showRealisticSizes,
 		showBodyNames,
+		showBodyMarkers,
 		showRealNames,
 		namesEnabled,
 		starName,
 		mainWorldTexture,
 		proceduralSystem,
 		isCompanion,
-		minStarRadius,
+		parentStarSizeScale,
 	} = params
 	// A companion's own recursive build always passes companions: [], so it
 	// can't see its sibling primary star that way -- isCompanion carries it.
@@ -180,57 +195,50 @@ export function buildSolarSystemOverlay(
 		? Math.max(rolledStarDiameterSol, 4.218 * (hostStar?.massSol ?? 1))
 		: rolledStarDiameterSol
 	const starDiameterKm = starDiameterSol * ORBIT_BODY.solarDiameterKm
-	// Realistic mode uses the same shared floor/ceiling (and fixed
-	// Earth-diameter reference) as every other body in the scene — see
-	// scaleBodyDiameterToVisualRadius — so the star sits on the same absolute
-	// scale instead of being sized relative to the (resizable) main world.
-	// Non-realistic mode instead buckets by spectral class only, with no
-	// sizeClass equivalent to hand it — see getNonRealisticStarToPlanetRatio.
-	const rawStarRadius = showRealisticSizes
-		? scaleBodyDiameterToVisualRadius(
-				starDiameterKm,
-				PLANET_SCENE_RADIUS,
-				true,
-				0,
+	const starRadiusAU = starDiameterKm / 2 / KM_PER_AU
+	// Log-scaled around a Sun-sized star (see STAR_LOG_SLOPE). A neutron
+	// star's visible surface is a fraction of starRadius, so starRadius is
+	// sized for that surface to get the floor.
+	const uncappedStarRadius =
+		(SUN_DRAWN_RADIUS *
+			Math.max(
+				MIN_STAR_SIZE,
+				1 + STAR_LOG_SLOPE * Math.log10(Math.max(starDiameterSol, 1e-12)),
+			)) /
+		(isNeutronStar ? NEUTRON_STAR_SURFACE_FACTOR : 1)
+	// Orbits are drawn from the star's centre, so the star is capped inside its
+	// innermost drawn orbit (bodies, belts and companions alike) -- the guard
+	// against giants.
+	function computeStarRadius(starBodies: SystemBody[]): number {
+		const mapping = computeDistanceMapping(starBodies)
+		let innermostAU = Number.POSITIVE_INFINITY
+		for (const body of starBodies) {
+			const periapsisAU =
+				body.group === "asteroid belt"
+					? beltEdgesAU(body).minAU
+					: body.orbitalDistanceAU * (1 - eccentricityOf(body.eccentricity))
+			innermostAU = Math.min(innermostAU, periapsisAU)
+		}
+		for (const companion of companions) {
+			innermostAU = Math.min(
+				innermostAU,
+				companion.orbitalDistanceAU *
+					(1 - eccentricityOf(companion.eccentricity)),
 			)
-		: isNeutronStar
-			? PLANET_SCENE_RADIUS * 0.75
-			: isWhiteDwarf
-				? PLANET_SCENE_RADIUS * 0.6
-				: isBrownDwarf
-					? PLANET_SCENE_RADIUS *
-						(renderSpectralClass === "L"
-							? 1.15
-							: renderSpectralClass === "T"
-								? 0.9
-								: 0.7)
-					: PLANET_SCENE_RADIUS *
-						(hostStar
-							? Math.max(1, Math.sqrt(starDiameterSol) * 3) *
-								(isBlackHole ? 1.75 : 1)
-							: STAR.getNonRealisticStarToPlanetRatio({
-									cls: renderSpectralClass as (typeof STAR.mainSequenceClasses)[number],
-									subtype: starSubtype,
-								}))
-	let systemMaxPlanetRadius = maxNonRealisticPlanetSceneRadius(bodies)
-	for (const companion of companions) {
-		const companionMax = maxNonRealisticPlanetSceneRadius(companion.star.bodies)
-		if (companionMax > systemMaxPlanetRadius)
-			systemMaxPlanetRadius = companionMax
+		}
+		// A companion is shrunk at least as much as the star it orbits, so stars
+		// sharing a view keep their true size order.
+		const sharedRadius = uncappedStarRadius * (parentStarSizeScale ?? 1)
+		if (!Number.isFinite(innermostAU)) return sharedRadius
+		const extent = isBlackHole ? BLACK_HOLE_BOUNDS_RADIUS : 1
+		return Math.min(
+			sharedRadius,
+			(STAR_MAX_INNER_PERIAPSIS_FRACTION *
+				drawnDistance({ mapping, au: innermostAU })) /
+				extent,
+		)
 	}
-	const nonRealisticStarFloor = Math.max(
-		systemMaxPlanetRadius * NON_REALISTIC_STAR_PLANET_SIZE_MARGIN,
-		minStarRadius ?? 0,
-	)
-	const nonRealisticVisibleFactor = isNeutronStar
-		? NEUTRON_STAR_SURFACE_FACTOR
-		: 1
-	const starRadius = showRealisticSizes
-		? rawStarRadius
-		: Math.max(rawStarRadius, nonRealisticStarFloor / nonRealisticVisibleFactor)
-	const companionMinStarRadius = showRealisticSizes
-		? undefined
-		: nonRealisticStarFloor
+	const starRadius = computeStarRadius(bodies)
 	const starColorHex = isGiant
 		? uiPalette.giantStar
 		: (brownDwarfGlowSettings?.color ??
@@ -297,6 +305,14 @@ export function buildSolarSystemOverlay(
 	// mesh elsewhere in this renderer.
 	starMesh.rotation.x = Math.PI / 2
 	group.add(starMesh)
+	// A black hole draws its own accretion-disc glow instead.
+	const starFlare = isBlackHole
+		? null
+		: STAR_FLARE.create({
+				color: starColor,
+				intensity: isBrownDwarf ? 0.5 : 1,
+			})
+	if (starFlare) group.add(starFlare)
 	const haloMaterial =
 		starSurfaceLayers?.glow ??
 		(brownDwarfGlowSettings
@@ -503,7 +519,6 @@ export function buildSolarSystemOverlay(
 		// of letting it taper off. mesh.scale (not this geometry radius) is
 		// what ties local units to starRadius, so bounding the mesh bigger
 		// only changes which pixels get shaded, not the disc's actual size.
-		const BLACK_HOLE_BOUNDS_RADIUS = 2
 		blackHoleMesh = new THREE.Mesh(
 			new THREE.SphereGeometry(BLACK_HOLE_BOUNDS_RADIUS, 48, 32),
 			blackHoleDiskMaterial,
@@ -581,7 +596,6 @@ export function buildSolarSystemOverlay(
 					: `${spectralClass}${Math.round(starSubtype)} Star`,
 		)
 		starNameLeader = createNameLeaderLine()
-		sizeNameLabel(starNameLabel, starRadius)
 		group.add(starNameLabel)
 		group.add(starNameLeader)
 	}
@@ -622,8 +636,7 @@ export function buildSolarSystemOverlay(
 		if (body.group === "asteroid belt") {
 			return {
 				body,
-				sceneRadius: BELT_SCENE_RADIUS,
-				moonSystemOuterRadius: BELT_SCENE_RADIUS,
+				sceneRadius: 0,
 				isBelt: true,
 				lodTier: 0,
 				orbitRadius: 0,
@@ -631,11 +644,8 @@ export function buildSolarSystemOverlay(
 			}
 		}
 
-		const sceneRadius = bodySceneRadius(
-			body.diameterKm,
-			body.sizeClass,
-			showRealisticSizes,
-		)
+		const sceneRadius =
+			bodySizeUnits(body.diameterKm) * SUN_DRAWN_RADIUS * MAX_BODY_TO_STAR_SCALE
 		const bodyGroup = new THREE.Group()
 		// These three all target `classification`, not `group` -- a body's
 		// group (jovian/helian/terrestrial/...) is a broader bucket that can
@@ -818,25 +828,42 @@ export function buildSolarSystemOverlay(
 			showEllipticalOrbits,
 			showInclination,
 			body.rings?.outerRadiusRelative ?? 1,
-			sceneRadius,
 			showAxialTilt,
-			showRealisticSizes,
 			showBodyNames,
 			showRealNames,
 			body.isMainWorld ? "Luna" : undefined,
 			namesEnabled,
 			proceduralSystem,
+			showBodyMarkers,
+			true,
 		)
 		moonState.group.scale.setScalar(sceneRadius)
 		bodyGroup.add(moonState.group)
+		// Moons and the ring shade the planet's surface and clouds; the planet
+		// shades its ring (moons get their shadows from their own overlay).
+		const eclipse = ECLIPSE_SHADOW.createState()
+		ECLIPSE_SHADOW.attachToLitSurface({
+			material: mesh.material,
+			state: eclipse,
+		})
+		if (cloudsMesh) {
+			ECLIPSE_SHADOW.attachToLitSurface({
+				material: cloudsMesh.material as THREE.Material,
+				state: eclipse,
+			})
+		}
+		const ringEclipse = ringMesh ? ECLIPSE_SHADOW.createState() : undefined
+		if (ringMesh && ringEclipse) {
+			ECLIPSE_SHADOW.attachToUnlitRing({
+				material: ringMesh.material as THREE.Material,
+				state: ringEclipse,
+			})
+		}
+		const marker = showBodyMarkers
+			? BODY_MARKER.create(ORBIT_LINE_COLOR_BY_ZONE[body.zone ?? "distant"])
+			: undefined
+		if (marker) bodyGroup.add(marker)
 		group.add(bodyGroup)
-
-		const moonSystemOuterRadius = measureBodyMoonSystemOuterRadius(
-			body,
-			sceneRadius,
-			showEllipticalOrbits,
-			showRealisticSizes,
-		)
 
 		let nameLabel: Text | undefined
 		let nameLeader: THREE.Line | undefined
@@ -850,7 +877,6 @@ export function buildSolarSystemOverlay(
 				),
 			)
 			nameLeader = createNameLeaderLine()
-			sizeNameLabel(nameLabel, sceneRadius)
 			bodyGroup.add(nameLabel)
 			bodyGroup.add(nameLeader)
 		}
@@ -858,7 +884,6 @@ export function buildSolarSystemOverlay(
 		return {
 			body,
 			sceneRadius,
-			moonSystemOuterRadius,
 			isBelt: false,
 			lodTier: 0,
 			bodyGroup,
@@ -869,6 +894,9 @@ export function buildSolarSystemOverlay(
 			meshRestQuaternion: mesh.quaternion.clone(),
 			baseQuaternion: mesh.quaternion.clone(),
 			moonState,
+			marker,
+			eclipse,
+			ringEclipse,
 			nameLabel,
 			nameLeader,
 			orbitRadius: 0,
@@ -892,7 +920,7 @@ export function buildSolarSystemOverlay(
 			const overlay = buildSolarSystemOverlay({
 				...companion.star,
 				isCompanion: true,
-				minStarRadius: companionMinStarRadius,
+				parentStarSizeScale: starRadius / uncappedStarRadius,
 			})
 			const mount = new THREE.Group()
 			mount.add(overlay.group)
@@ -916,7 +944,7 @@ export function buildSolarSystemOverlay(
 				orbitalPeriodDays: companion.orbitalPeriodDays,
 				eccentricity: companion.eccentricity,
 				inclinationDeg: companion.inclinationDeg,
-				orbitRadius: 0,
+				orbitalDistanceAU: companion.orbitalDistanceAU,
 				kepler: {
 					P: new THREE.Vector3(),
 					Q: new THREE.Vector3(),
@@ -930,30 +958,6 @@ export function buildSolarSystemOverlay(
 			}
 		},
 	)
-
-	// --- Combined distance ordering: bodies and companion stars are
-	// different kinds of things to build, but the SAME kind of orbit slot --
-	// interleaved by orbitalDistanceAU exactly like galaxy-gen's own
-	// populateOrbitals sorts `[...companions, ...satellites]` by deviation
-	// and walks that one list outward. Without this, a close-in "epistellar"
-	// companion would unconditionally render beyond every one of this star's
-	// own planets instead of interleaved among the inner ones, regardless of
-	// its real (tiny) distance. ---
-	type LayoutSlot =
-		| { kind: "body"; placedIndex: number; orbitalDistanceAU: number }
-		| { kind: "companion"; companionIndex: number; orbitalDistanceAU: number }
-	const layoutSlots: LayoutSlot[] = [
-		...placed.map((p, placedIndex) => ({
-			kind: "body" as const,
-			placedIndex,
-			orbitalDistanceAU: p.body.orbitalDistanceAU,
-		})),
-		...placedCompanions.map((_c, companionIndex) => ({
-			kind: "companion" as const,
-			companionIndex,
-			orbitalDistanceAU: companions[companionIndex]!.orbitalDistanceAU,
-		})),
-	].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 
 	// --- Orbit rings + asteroid belt rings ---
 	function rebuildMoonState(p: PlacedBody) {
@@ -971,14 +975,14 @@ export function buildSolarSystemOverlay(
 			showEllipticalOrbits,
 			showInclination,
 			p.body.rings?.outerRadiusRelative ?? 1,
-			p.sceneRadius,
 			showAxialTilt,
-			showRealisticSizes,
 			showBodyNames,
 			showRealNames,
 			p.body.isMainWorld ? "Luna" : undefined,
 			namesEnabled,
 			proceduralSystem,
+			showBodyMarkers,
+			true,
 		)
 		p.moonState.group.scale.setScalar(p.sceneRadius)
 		p.bodyGroup.add(p.moonState.group)
@@ -987,45 +991,17 @@ export function buildSolarSystemOverlay(
 	function rebuildAsteroidFieldForPlacedBody(p: PlacedBody) {
 		if (!p.isBelt) return
 		if (p.asteroidField) {
-			group.remove(p.asteroidField.mesh)
-			p.asteroidField.mesh.geometry.dispose()
-			const material = p.asteroidField.mesh.material
-			if (Array.isArray(material)) material.forEach((entry) => entry.dispose())
-			else material.dispose()
+			group.remove(p.asteroidField.points)
+			p.asteroidField.points.geometry.dispose()
+			;(p.asteroidField.points.material as THREE.Material).dispose()
 		}
-		p.asteroidField = buildAsteroidField(
-			p.orbitRadius,
-			p.body.zone === "outer",
-			p.beltHalfWidth ?? BELT_WIDTH_MIN / 2,
-		)
-		group.add(p.asteroidField.mesh)
-	}
-
-	function updateOrbitLineGeometry(p: PlacedBody) {
-		if (!p.orbitLine) return
-		const orbitPoints: THREE.Vector3[] = []
-		for (let i = 0; i <= ORBIT_SEGMENTS; i++) {
-			const a = (i / ORBIT_SEGMENTS) * TWO_PI
-			orbitPoints.push(
-				p.kepler
-					? orbitPoint(
-							a,
-							p.kepler.a,
-							p.kepler.b,
-							p.kepler.ae,
-							p.kepler.P,
-							p.kepler.Q,
-						)
-					: new THREE.Vector3(
-							p.orbitRadius * Math.cos(a),
-							p.orbitRadius * Math.sin(a),
-							0,
-						),
-			)
-		}
-		const nextGeometry = new THREE.BufferGeometry().setFromPoints(orbitPoints)
-		p.orbitLine.geometry.dispose()
-		p.orbitLine.geometry = nextGeometry
+		if (!p.beltEdges) return
+		p.asteroidField = buildAsteroidField({
+			innerRadius: p.beltEdges.inner,
+			outerRadius: p.beltEdges.outer,
+			isOuterZone: p.body.zone === "outer",
+		})
+		group.add(p.asteroidField.points)
 	}
 
 	function updateCompanionOrbitLineGeometry(c: PlacedCompanion) {
@@ -1048,163 +1024,255 @@ export function buildSolarSystemOverlay(
 		c.orbitLine.geometry = nextGeometry
 	}
 
+	// Bodies and companion stars share one distance-ordered walk, so a close
+	// "epistellar" companion lands among the inner planets.
+	const layoutSlots: LayoutSlot[] = [
+		...placed.map((p, placedIndex) => ({
+			kind: "body" as const,
+			placedIndex,
+			orbitalDistanceAU: p.body.orbitalDistanceAU,
+		})),
+		...placedCompanions.map((c, companionIndex) => ({
+			kind: "companion" as const,
+			companionIndex,
+			orbitalDistanceAU: c.orbitalDistanceAU,
+		})),
+	].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
+
+	function eccentricityOf(eccentricity: number): number {
+		return showEllipticalOrbits ? eccentricity : 0
+	}
+
+	function orbitGapAU(au: number): number {
+		return Math.max(au - starRadiusAU, MIN_ORBIT_GAP_AU)
+	}
+
+	// The power-law exponent (see MAX_ORBIT_SPREAD) from this system's own
+	// spread of periapsis and belt gaps, and the scale that lands its farthest
+	// apoapsis or belt edge on LAYOUT_OUTER_RADIUS.
+	function computeDistanceMapping(starBodies: SystemBody[]): DistanceMapping {
+		const gaps: number[] = []
+		for (const body of starBodies) {
+			if (body.group === "asteroid belt") {
+				const { minAU, maxAU } = beltEdgesAU(body)
+				gaps.push(orbitGapAU(minAU), orbitGapAU(maxAU))
+				continue
+			}
+			const e = eccentricityOf(body.eccentricity)
+			gaps.push(orbitGapAU(body.orbitalDistanceAU * (1 - e)))
+		}
+		if (gaps.length === 0) return { exponent: 1, scale: 1 }
+		const spread = Math.max(...gaps) / Math.min(...gaps)
+		const exponent =
+			spread > 1
+				? Math.min(1, Math.log(MAX_ORBIT_SPREAD) / Math.log(spread))
+				: 1
+		let scale = Number.POSITIVE_INFINITY
+		for (const body of starBodies) {
+			if (body.group === "asteroid belt") {
+				scale = Math.min(
+					scale,
+					LAYOUT_OUTER_RADIUS / orbitGapAU(beltEdgesAU(body).maxAU) ** exponent,
+				)
+				continue
+			}
+			const e = eccentricityOf(body.eccentricity)
+			scale = Math.min(
+				scale,
+				(LAYOUT_OUTER_RADIUS * (1 - e)) /
+					(1 + e) /
+					orbitGapAU(body.orbitalDistanceAU * (1 - e)) ** exponent,
+			)
+		}
+		return { exponent, scale }
+	}
+
+	let distanceMapping: DistanceMapping = { exponent: 1, scale: 1 }
+
+	// A circular distance in AU -> drawn distance from the star's centre.
+	function drawnDistance({ mapping, au }: DrawnDistanceInput): number {
+		return mapping.scale * orbitGapAU(au) ** mapping.exponent
+	}
+
+	function mapDistanceAU(au: number): number {
+		return drawnDistance({ mapping: distanceMapping, au })
+	}
+
+	// A trojan or belt-interior body shares a ring with another orbit, so it
+	// claims no spacing of its own.
+	function sharesRing(p: PlacedBody): boolean {
+		return (
+			(p.body.trojan === true &&
+				p.body.trojanOfIdx !== undefined &&
+				placedByIdx.has(p.body.trojanOfIdx)) ||
+			(p.body.beltOfIdx !== undefined && placedByIdx.has(p.body.beltOfIdx))
+		)
+	}
+
+	// Compressing distances by gap^p shrinks a far orbit more than a near one,
+	// so a body drawn at true relative size looks ever larger against its
+	// orbit the farther out it is. Scaling each body by gap^(p - 1), the same
+	// compression its orbit got, keeps size-to-orbit even across the system
+	// (identity at p = 1); normalised at a 1 AU gap.
+	function orbitSizeFactor(body: SystemBody): number {
+		return orbitGapAU(body.orbitalDistanceAU) ** (distanceMapping.exponent - 1)
+	}
+
+	// The one factor that sizes every body: as large as possible while each
+	// body plus its moon system fits BODY_GAP_FRACTION of the gap to its
+	// nearest obstacle: a neighbouring orbit, a companion star's occupied band,
+	// or the star's surface.
+	function computeBodyScale({
+		drawnSemiMajor,
+		companionBands,
+	}: ComputeBodyScaleInput): number {
+		const spaced = placed
+			.filter((p) => !p.isBelt && !sharesRing(p))
+			.sort((a, b) => drawnSemiMajor.get(a)! - drawnSemiMajor.get(b)!)
+		// Bodies shrink by the same factor the inner-orbit cap shrank the star,
+		// so the star-to-planet size ratio holds.
+		const maxScale =
+			SUN_DRAWN_RADIUS *
+			MAX_BODY_TO_STAR_SCALE *
+			(starRadius / uncappedStarRadius)
+		let scale = maxScale
+		spaced.forEach((p, index) => {
+			const a = drawnSemiMajor.get(p)!
+			let innerLimit =
+				index === 0 ? starRadius : drawnSemiMajor.get(spaced[index - 1]!)!
+			const outerNeighbour = spaced[index + 1]
+			let outerLimit = outerNeighbour
+				? drawnSemiMajor.get(outerNeighbour)!
+				: Number.POSITIVE_INFINITY
+			for (const band of companionBands) {
+				if (band.outer <= a) innerLimit = Math.max(innerLimit, band.outer)
+				else if (band.inner >= a) outerLimit = Math.min(outerLimit, band.inner)
+			}
+			const gap = Math.min(a - innerLimit, outerLimit - a)
+			const extent =
+				bodySizeUnits(p.body.diameterKm) *
+				orbitSizeFactor(p.body) *
+				(p.moonState?.outerRadius ?? 1)
+			scale = Math.min(scale, (BODY_GAP_FRACTION * gap) / extent)
+		})
+		return Math.max(scale, maxScale * MIN_BODY_SCALE_FRACTION)
+	}
+
+	// Two stars' coronas reach STAR_GLOW_RADIUS_SCALE times their radii, so a
+	// star needs that much beyond its surface before anything else begins.
+	function coronaClearance(radius: number): number {
+		return (STAR_GLOW_RADIUS_SCALE - 1) * radius
+	}
+
 	// Populated by applyPlacedBodyLayout, read by starLight's distance cutoff
 	// below -- must be declared before that function's first call.
 	let lastPlanetOuterEdge = starRadius
 
-	// Walks layoutSlots (bodies AND companions, distance-ordered together)
-	// once, threading one shared previousOuterEdge accumulator through both
-	// kinds -- this is the single combined pack-by-size pass that replaces
-	// what used to be two separate passes (all planets, then all companions
-	// unconditionally beyond them).
-	function applyPlacedBodyLayout() {
-		let previousOuterEdge = starRadius
-		// Tracks the outer edge of only THIS star's own planets/belts, ignoring
-		// any companion-star slots interleaved into layoutSlots by distance --
-		// see starLight.distance below, which must stop at this star's own
-		// system instead of also reaching a companion's, unlike previousOuterEdge
-		// (used for camera framing) which intentionally does include companions.
-		lastPlanetOuterEdge = starRadius
-		// Own sceneRadius/moonSystemOuterRadius don't depend on packing order --
-		// computed for every body up front so a trojan's footprint is known
-		// before its target's slot is packed, regardless of which one the
-		// (orbitalDistanceAU-tied, so arbitrarily ordered) sort put first.
-		for (const p of placed) {
-			p.sceneRadius = p.isBelt
-				? BELT_SCENE_RADIUS
-				: bodySceneRadius(
-						p.body.diameterKm,
-						p.body.sizeClass,
-						showRealisticSizes,
-					)
-			p.moonSystemOuterRadius = p.isBelt
-				? BELT_SCENE_RADIUS
-				: measureBodyMoonSystemOuterRadius(
-						p.body,
-						p.sceneRadius,
-						showEllipticalOrbits,
-						showRealisticSizes,
-					)
-		}
-		// Groups each trojan under the idx of the body it shares an Orbit# with
-		// -- consulted below so that body's own slot reserves enough clearance
-		// for whichever of the pair has the larger moon system, since a trojan
-		// consumes no independent slot of its own (see the isTrojanSlot branch).
-		const trojansByTargetIdx = new Map<number, PlacedBody[]>()
-		for (const p of placed) {
-			if (p.isBelt || !p.body.trojan || p.body.trojanOfIdx === undefined)
-				continue
-			if (!placedByIdx.has(p.body.trojanOfIdx)) continue
-			const list = trojansByTargetIdx.get(p.body.trojanOfIdx) ?? []
-			list.push(p)
-			trojansByTargetIdx.set(p.body.trojanOfIdx, list)
-		}
+	// Lays out every orbit through the adaptive power law (an ellipse keeps
+	// its true eccentricity: a = drawn periapsis / (1 - e)), walking outward
+	// in distance order. A companion star is pushed clear of everything inside
+	// it, coronas included, and every orbit past a companion is pushed clear
+	// of it in turn. Bodies are then sized to the resulting spacing. Returns
+	// the system's outer edge.
+	function applyPlacedBodyLayout(): number {
+		distanceMapping = computeDistanceMapping(placed.map((p) => p.body))
+		const drawnSemiMajor = new Map<PlacedBody, number>()
+		const companionBands: CompanionBand[] = []
+		let innerEdge = starRadius + coronaClearance(starRadius)
+		let clearOfCompanions = starRadius
+		let outerEdge = starRadius
 		for (const slot of layoutSlots) {
 			if (slot.kind === "companion") {
 				const c = placedCompanions[slot.companionIndex]!
-				// A companion's own suggestedCameraDistance is already sized to
-				// frame its whole nested system (see buildSolarSystemOverlay's own
-				// `suggestedCameraDistance = previousOuterEdge * 2.2`), so half of
-				// it is a reasonable stand-in for "this companion's own outer
-				// edge" -- same role p.moonSystemOuterRadius plays for a planet.
-				const companionOuterRadius = c.overlay.suggestedCameraDistance / 2.2
-				const gap =
-					COMPANION_ORBIT_GAP_FACTOR *
-					(previousOuterEdge + companionOuterRadius)
-				const orbitRadius = previousOuterEdge + gap + companionOuterRadius
-				c.orbitRadius = orbitRadius
-				const e = showEllipticalOrbits ? c.eccentricity : 0
+				const e = eccentricityOf(c.eccentricity)
 				const inc = (showInclination ? c.inclinationDeg : 0) * DEG2RAD
-				const a = orbitRadius / (1 - e)
+				const companionStarRadius =
+					c.overlay.getBodyFocus({ kind: "star", starIndex: 0 })?.radius ?? 0
+				const footprint = Math.max(
+					c.overlay.outerRadius,
+					companionStarRadius + coronaClearance(companionStarRadius),
+				)
+				const periapsis = Math.max(
+					mapDistanceAU(c.orbitalDistanceAU * (1 - e)),
+					innerEdge + footprint,
+				)
+				const a = periapsis / (1 - e)
 				const b = a * Math.sqrt(1 - e * e)
 				const { P, Q } = perifocalBasis(0, inc, 0)
 				c.kepler = { P, Q, a, b, ae: a * e, e }
-				previousOuterEdge = a * (1 + e) + companionOuterRadius
+				const band = {
+					inner: a * (1 - e) - footprint,
+					outer: a * (1 + e) + footprint,
+				}
+				companionBands.push(band)
+				innerEdge = Math.max(innerEdge, band.outer)
+				// One footprint of margin past the band, so the first orbit beyond
+				// a companion has room for a body instead of a zero gap that would
+				// shrink every body in the system to its floor.
+				clearOfCompanions = Math.max(clearOfCompanions, band.outer + footprint)
+				outerEdge = Math.max(outerEdge, band.outer)
 				continue
 			}
 
 			const p = placed[slot.placedIndex]!
-			// A trojan shares its target's ring (set in the trojan pass below)
-			// instead of packing its own independent slot -- it must still get
-			// its own mesh/quaternion/tilt setup below, just not consume any
-			// previousOuterEdge space or get its own orbitRadius/kepler here.
-			const isTrojanSlot =
-				p.body.trojan === true &&
-				p.body.trojanOfIdx !== undefined &&
-				placedByIdx.has(p.body.trojanOfIdx)
-			// A belt-interior dwarf planet (Ceres, Pallas, Pluto, ...) gets
-			// re-anchored onto its belt's own orbitRadius by the belt-child pass
-			// below, same as a trojan sharing its target's ring -- it must not
-			// consume its own previousOuterEdge space here using ITS OWN
-			// eccentricity, since that packed slot is discarded outright. Left
-			// ungated (as main-belt Ceres/Pallas were before Kuiper Belt existed),
-			// a real-eccentricity outer-system body like Pluto (e=0.248) inflates
-			// previousOuterEdge by its own apoapsis before being thrown away, and
-			// with three such bodies in a row (Pluto/Haumea/Makemake, all e>0.15)
-			// ahead of the Kuiper Belt the inflation compounds enough to push
-			// Eris (and suggestedCameraDistance/camera framing with it) out by
-			// roughly 10x, shrinking the belt itself to an invisible sliver on
-			// screen at the default zoom.
-			const isBeltChildSlot =
-				p.body.beltOfIdx !== undefined && placedByIdx.has(p.body.beltOfIdx)
-			const skipsOwnSlot = isTrojanSlot || isBeltChildSlot
-			const trojansHere = trojansByTargetIdx.get(p.body.idx)
-			const effectiveMoonSystemOuterRadius = trojansHere?.length
-				? Math.max(
-						p.moonSystemOuterRadius,
-						...trojansHere.map((t) => t.moonSystemOuterRadius),
-					)
-				: p.moonSystemOuterRadius
-			const gap =
-				ORBIT_GAP_STAR_RADII * Math.max(p.sceneRadius, starRadius * 0.05)
-
 			if (p.isBelt) {
-				// The belt's own half-width scales off its own orbitRadius (real
-				// main-belt asteroids span ~0.44x their orbit radius -- see
-				// BELT_WIDTH_RATIO's doc), but orbitRadius isn't known until the
-				// periapsis below is computed from it, so previousOuterEdge (the
-				// belt's inner clearance boundary, only a small `gap` short of its
-				// eventual orbitRadius) stands in for it here.
-				const beltHalfWidth = Math.max(
-					BELT_WIDTH_MIN / 2,
-					previousOuterEdge * (BELT_WIDTH_RATIO / 2),
-				)
-				const periapsis = previousOuterEdge + gap + beltHalfWidth
+				const { minAU, maxAU } = beltEdgesAU(p.body)
+				const shift = Math.max(0, clearOfCompanions - mapDistanceAU(minAU))
+				p.orbitRadius = mapDistanceAU(p.body.orbitalDistanceAU) + shift
+				p.beltEdges = {
+					inner: mapDistanceAU(minAU) + shift,
+					outer: mapDistanceAU(maxAU) + shift,
+				}
 				p.kepler = undefined
-				if (!isTrojanSlot) {
-					p.orbitRadius = periapsis
-					p.beltHalfWidth = beltHalfWidth
-					previousOuterEdge = periapsis + beltHalfWidth
-					lastPlanetOuterEdge = previousOuterEdge
+				innerEdge = Math.max(innerEdge, p.beltEdges.outer)
+				continue
+			}
+			const e = eccentricityOf(p.body.eccentricity)
+			const periapsis = Math.max(
+				mapDistanceAU(p.body.orbitalDistanceAU * (1 - e)),
+				clearOfCompanions,
+			)
+			const a = periapsis / (1 - e)
+			drawnSemiMajor.set(p, a)
+			innerEdge = Math.max(innerEdge, a * (1 + e))
+		}
+		const bodyScale = computeBodyScale({ drawnSemiMajor, companionBands })
+		lastPlanetOuterEdge = starRadius
+		for (const p of placed) {
+			if (p.isBelt) {
+				if (p.beltEdges) {
+					outerEdge = Math.max(outerEdge, p.beltEdges.outer)
+					lastPlanetOuterEdge = Math.max(lastPlanetOuterEdge, p.beltEdges.outer)
 				}
 				continue
 			}
 
-			const periapsis = previousOuterEdge + gap + effectiveMoonSystemOuterRadius
-			if (!skipsOwnSlot) p.orbitRadius = periapsis
-
+			const nextRadius =
+				bodySizeUnits(p.body.diameterKm) * orbitSizeFactor(p.body) * bodyScale
+			if (p.sceneRadius > 0) {
+				p.atmosphereMesh?.scale.multiplyScalar(nextRadius / p.sceneRadius)
+			}
+			p.sceneRadius = nextRadius
 			p.mesh?.scale.setScalar(p.sceneRadius)
 			p.cloudsMesh?.scale.setScalar(p.sceneRadius * 1.025)
 			p.ringMesh?.scale.setScalar(p.sceneRadius)
 			p.moonState?.group.scale.setScalar(p.sceneRadius)
-			if (p.nameLabel) {
-				sizeNameLabel(p.nameLabel, p.sceneRadius)
-			}
 
-			const e = showEllipticalOrbits ? p.body.eccentricity : 0
+			const e = eccentricityOf(p.body.eccentricity)
 			const inc = (showInclination ? p.body.inclinationDeg : 0) * DEG2RAD
 			const Omega = p.body.longitudeOfAscendingNodeDeg * DEG2RAD
 			const omega =
 				(p.body.longitudeOfPerihelionDeg - p.body.longitudeOfAscendingNodeDeg) *
 				DEG2RAD
-			if (!skipsOwnSlot) {
-				const a = periapsis / (1 - e)
-				const b = a * Math.sqrt(1 - e * e)
-				const { P, Q } = perifocalBasis(Omega, inc, omega)
-				p.kepler = { P, Q, a, b, ae: a * e, e }
-				previousOuterEdge = a * (1 + e) + effectiveMoonSystemOuterRadius
-				lastPlanetOuterEdge = previousOuterEdge
-			}
+			const a = drawnSemiMajor.get(p)!
+			p.orbitRadius = a
+			const b = a * Math.sqrt(1 - e * e)
+			const { P, Q } = perifocalBasis(Omega, inc, omega)
+			p.kepler = { P, Q, a, b, ae: a * e, e }
+			const apoapsisEdge =
+				a * (1 + e) + (p.moonState?.outerRadius ?? 1) * p.sceneRadius
+			outerEdge = Math.max(outerEdge, apoapsisEdge)
+			lastPlanetOuterEdge = Math.max(lastPlanetOuterEdge, apoapsisEdge)
 
 			if (p.mesh && p.meshRestQuaternion) {
 				p.baseQuaternion = p.meshRestQuaternion.clone()
@@ -1231,11 +1299,8 @@ export function buildSolarSystemOverlay(
 				p.ringMesh?.quaternion.premultiply(tiltQuat)
 			}
 		}
-		// Trojan pass: re-point each trojan onto the exact ring (orbitRadius +
-		// kepler ellipse) of the body it shares an Orbit# with, overriding
-		// whatever independent slot the size-packing loop above just gave it --
-		// a real trojan orbits at the same radius as its target, just ±60° of
-		// mean anomaly away (already baked into meanAnomalyAtEpoch above).
+		// Trojan pass: a trojan rides its target's exact ellipse, ±60° of mean
+		// anomaly away (already baked into meanAnomalyAtEpoch above).
 		for (const p of placed) {
 			if (p.isBelt || !p.body.trojan || p.body.trojanOfIdx === undefined)
 				continue
@@ -1244,34 +1309,10 @@ export function buildSolarSystemOverlay(
 			p.orbitRadius = target.orbitRadius
 			p.kepler = { ...target.kepler }
 		}
-		// Belt-child pass: re-point each belt-interior dwarf planet (Ceres,
-		// Pallas, ...) onto its own ring at the belt's own radius, overriding
-		// the independent slot the size-packing loop above gave it. Unlike a
-		// trojan these aren't offset/shared with the belt's own basis (belts
-		// have no kepler -- see the `p.isBelt` branch above, which sets
-		// `p.kepler = undefined`); each belt child instead gets its own real
-		// eccentricity/inclination ellipse anchored at the belt's radius.
-		for (const p of placed) {
-			if (p.isBelt || p.body.beltOfIdx === undefined) continue
-			const target = placedByIdx.get(p.body.beltOfIdx)
-			if (!target || !target.isBelt) continue
-			const e = showEllipticalOrbits ? p.body.eccentricity : 0
-			const inc = (showInclination ? p.body.inclinationDeg : 0) * DEG2RAD
-			const Omega = p.body.longitudeOfAscendingNodeDeg * DEG2RAD
-			const omega =
-				(p.body.longitudeOfPerihelionDeg - p.body.longitudeOfAscendingNodeDeg) *
-				DEG2RAD
-			const periapsis = target.orbitRadius
-			const a = periapsis / (1 - e)
-			const b = a * Math.sqrt(1 - e * e)
-			const { P, Q } = perifocalBasis(Omega, inc, omega)
-			p.orbitRadius = periapsis
-			p.kepler = { P, Q, a, b, ae: a * e, e }
-		}
-		return previousOuterEdge
+		return outerEdge
 	}
 
-	let previousOuterEdge = applyPlacedBodyLayout()
+	let outerRadius = applyPlacedBodyLayout()
 	// Capped to this star's own outer planet/belt only when there's an actual
 	// companion star to protect against -- a lone star has nothing else in
 	// the scene to bleed light onto, so leave it at the uncapped default
@@ -1289,95 +1330,31 @@ export function buildSolarSystemOverlay(
 	const hostsMainWorld = (p: PlacedBody) =>
 		p.body.isMainWorld || p.body.moons.some((moon) => moon.isMainWorld)
 	for (const p of placed) {
-		const orbitPoints: THREE.Vector3[] = []
-		for (let i = 0; i <= ORBIT_SEGMENTS; i++) {
-			const a = (i / ORBIT_SEGMENTS) * TWO_PI
-			orbitPoints.push(
-				p.kepler
-					? orbitPoint(
-							a,
-							p.kepler.a,
-							p.kepler.b,
-							p.kepler.ae,
-							p.kepler.P,
-							p.kepler.Q,
-						)
-					: new THREE.Vector3(
-							p.orbitRadius * Math.cos(a),
-							p.orbitRadius * Math.sin(a),
-							0,
-						),
-			)
-		}
-		const orbitLine = new THREE.Line(
-			new THREE.BufferGeometry().setFromPoints(orbitPoints),
-			new THREE.LineBasicMaterial({
+		// Belts have no orbit line: their rocks and haze already trace the ring.
+		if (!p.isBelt) {
+			p.orbitLine = ORBIT_TRAIL.create({
 				color: ORBIT_LINE_COLOR_BY_ZONE[p.body.zone ?? "distant"],
-				transparent: true,
-				opacity: hostsMainWorld(p) ? 0.75 : 0.5,
-				depthWrite: false,
-			}),
-		)
-		orbitLine.renderOrder = 1
-		p.orbitLine = orbitLine
-		group.add(orbitLine)
+				peakOpacity: hostsMainWorld(p) ? 0.9 : 0.7,
+			})
+			group.add(p.orbitLine)
+		}
 
-		if (p.isBelt) {
-			const beltHalfWidth = p.beltHalfWidth ?? BELT_WIDTH_MIN / 2
-			const haze = new THREE.Mesh(
-				new THREE.RingGeometry(
-					p.orbitRadius - beltHalfWidth,
-					p.orbitRadius + beltHalfWidth,
-					128,
-				),
-				new THREE.MeshBasicMaterial({
-					color: 0xb8b8b8,
-					transparent: true,
-					// The ring is now wide enough (see BELT_WIDTH_RATIO) that the
-					// old flat 0.25 read as a solid disc instead of a haze behind
-					// the instanced rocks -- thinned out further so it stays a
-					// faint backdrop. Unlit (MeshBasicMaterial), so it doesn't dim
-					// under daylight mode's darker ambient the way the lit rocks do
-					// -- bumped up in that mode specifically so the ring still helps
-					// the band read as a whole against a scene that's otherwise
-					// noticeably darker there.
-					opacity: showDaylight ? 0.18 : 0.1,
-					side: THREE.DoubleSide,
-				}),
-			)
-			// Purely decorative -- untracked in `placed`, so a raycast hit on it
-			// can't resolve to anything and would otherwise swallow a double-click
-			// aimed at a belt-interior dwarf planet or empty space behind it
-			// (resolveHitBodyIndex returning null for an unrecognized hit stops
-			// the click dead instead of falling back to the nearest body).
-			haze.raycast = () => {
-				// Intentionally inert -- see doc above.
-			}
-			group.add(haze)
-			p.asteroidField = buildAsteroidField(
-				p.orbitRadius,
-				p.body.zone === "outer",
-				beltHalfWidth,
-			)
-			group.add(p.asteroidField.mesh)
+		if (p.isBelt && p.beltEdges) {
+			p.asteroidField = buildAsteroidField({
+				innerRadius: p.beltEdges.inner,
+				outerRadius: p.beltEdges.outer,
+				isOuterZone: p.body.zone === "outer",
+			})
+			group.add(p.asteroidField.points)
 		}
 	}
 	for (const c of placedCompanions) updateCompanionOrbitLineGeometry(c)
 
-	// Scene orbit radii are packed by rendered size, not real AU distance (see
-	// ORBIT_GAP_STAR_RADII's comment), so deriving a body's period from its
-	// scene radius via Kepler's law produced a period that only matched the
-	// body's real orbitalPeriodDays for whichever body happened to anchor
-	// mainOrbitRadius (Earth) -- every other body's visual orbit then
-	// completed a different fraction of a lap than the "watch one orbit"
-	// slider (which advances time using the real orbitalPeriodDays) expected.
-	// Using each body's own real orbitalPeriodDays directly keeps the two in
-	// sync for every body, not just the one anchor.
+	// Each body's own rolled period, which keeps it in step with the "watch
+	// one orbit" slider (that slider advances time by orbitalPeriodDays).
 	function periodDaysFor(body: SystemBody): number {
 		return Math.max(1, body.orbitalPeriodDays || daysPerYear)
 	}
-
-	const asteroidDummy = new THREE.Object3D()
 
 	const bodySpinQuat = new THREE.Quaternion()
 	const bodySpinAxis = new THREE.Vector3(0, 1, 0)
@@ -1428,12 +1405,11 @@ export function buildSolarSystemOverlay(
 		for (const p of placed) {
 			if (p.isBelt) {
 				if (p.asteroidField) {
-					updateAsteroidField(
-						p.asteroidField,
-						asteroidDummy,
+					updateAsteroidField({
+						field: p.asteroidField,
 						day,
-						periodDaysFor(p.body),
-					)
+						centerPeriodDays: periodDaysFor(p.body),
+					})
 				}
 				continue
 			}
@@ -1450,6 +1426,13 @@ export function buildSolarSystemOverlay(
 				p.kepler.Q,
 			)
 			p.bodyGroup.position.copy(pos)
+			if (p.orbitLine) {
+				ORBIT_TRAIL.update({
+					trail: p.orbitLine,
+					kepler: p.kepler,
+					eccentricAnomaly: E,
+				})
+			}
 			// The star sits at this group's origin, so the direction from the
 			// body back to it is just its negated position. Directions are
 			// unaffected by the group's own translation (a companion star's
@@ -1500,7 +1483,11 @@ export function buildSolarSystemOverlay(
 			;(c.orbitLine.material as THREE.Material).dispose()
 		}
 		group.traverse((obj) => {
-			if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
+			if (
+				obj instanceof THREE.Mesh ||
+				obj instanceof THREE.Line ||
+				obj instanceof THREE.Points
+			) {
 				// Body/cloud meshes share one unit sphere per tessellation tier
 				// across every overlay ever built (see bodyGeometryForTier), so
 				// disposing one here would break every other body still using it
@@ -1539,9 +1526,11 @@ export function buildSolarSystemOverlay(
 		group.clear()
 	}
 
-	const suggestedCameraDistance = previousOuterEdge * 2.2
+	const suggestedCameraDistance = outerRadius * 2.2
 
 	const lodWorldPosition = new THREE.Vector3()
+	const orbitVisibility = (relativeRadius: number) =>
+		THREE.MathUtils.smoothstep(relativeRadius, 0.1, 0.7)
 
 	// Bodies are drawn from a shared low-tessellation sphere by default, which
 	// is indistinguishable from a smooth one until a body actually fills part
@@ -1551,7 +1540,18 @@ export function buildSolarSystemOverlay(
 	// be large on screen at once, so the higher tiers cost close to nothing.
 	function updateLevelOfDetail(camera: THREE.PerspectiveCamera): void {
 		const halfHeightTangent = Math.tan((camera.fov * DEG2RAD) / 2)
+		group.getWorldPosition(lodWorldPosition)
+		const viewHalfHeight = Math.max(
+			camera.position.distanceTo(lodWorldPosition) * halfHeightTangent,
+			1e-6,
+		)
 		for (const p of placed) {
+			if (p.isBelt && p.beltEdges && p.asteroidField) {
+				const relativeRadius = p.beltEdges.outer / viewHalfHeight
+				const visibility = orbitVisibility(relativeRadius)
+				;(p.asteroidField.points.material as THREE.PointsMaterial).opacity =
+					0.85 * visibility
+			}
 			if (p.isBelt || !p.mesh || !p.bodyGroup) continue
 			p.bodyGroup.getWorldPosition(lodWorldPosition)
 			const distance = camera.position.distanceTo(lodWorldPosition)
@@ -1575,7 +1575,103 @@ export function buildSolarSystemOverlay(
 		for (const c of placedCompanions) c.overlay.updateLevelOfDetail(camera)
 	}
 
+	const screenBodyWorld = new THREE.Vector3()
+
+	const eclipseStarWorld = new THREE.Vector3()
+	const eclipsePlanetWorld = new THREE.Vector3()
+	const eclipsePlanetSphere = new THREE.Vector4()
+	const eclipseRingNormal = new THREE.Vector3()
+	const eclipseRingQuaternion = new THREE.Quaternion()
+	const RING_LOCAL_NORMAL = new THREE.Vector3(0, 0, 1)
+	// Refreshes every body's eclipse casters from current world positions:
+	// moons and ring onto the planet, the planet onto its ring and moons.
+	function updateEclipseShadows(): void {
+		group.updateMatrixWorld(true)
+		group.getWorldPosition(eclipseStarWorld)
+		for (const p of placed) {
+			if (p.isBelt || !p.bodyGroup || !p.eclipse) continue
+			p.bodyGroup.getWorldPosition(eclipsePlanetWorld)
+			eclipsePlanetSphere.set(
+				eclipsePlanetWorld.x,
+				eclipsePlanetWorld.y,
+				eclipsePlanetWorld.z,
+				p.sceneRadius,
+			)
+			let ring: EclipseRing | null = null
+			if (p.ringMesh && p.body.rings) {
+				p.ringMesh.getWorldQuaternion(eclipseRingQuaternion)
+				eclipseRingNormal
+					.copy(RING_LOCAL_NORMAL)
+					.applyQuaternion(eclipseRingQuaternion)
+				ring = {
+					center: eclipsePlanetWorld,
+					normal: eclipseRingNormal,
+					innerRadius: p.body.rings.innerRadiusRelative * p.sceneRadius,
+					outerRadius: p.body.rings.outerRadiusRelative * p.sceneRadius,
+					opacity: p.body.rings.opacity,
+				}
+			}
+			p.moonState?.updateEclipseShadows?.({
+				starPosition: eclipseStarWorld,
+				parentSphere: eclipsePlanetSphere,
+				parentRing: ring,
+			})
+			p.eclipse.starPosition.copy(eclipseStarWorld)
+			ECLIPSE_SHADOW.setSpheres({ state: p.eclipse, spheres: [] })
+			if (ring && p.ringEclipse) {
+				ECLIPSE_SHADOW.setRing({ state: p.eclipse, ...ring })
+				p.ringEclipse.starPosition.copy(eclipseStarWorld)
+				ECLIPSE_SHADOW.setSpheres({
+					state: p.ringEclipse,
+					spheres: [eclipsePlanetSphere],
+				})
+			}
+		}
+	}
+
+	// See LABEL_FADE_SMALL_ORBIT: a label fades as its orbit shrinks on
+	// screen, small bodies first.
+	function labelVisibility({
+		orbitScreenRadius,
+		radiusKm,
+	}: LabelVisibilityInput): number {
+		const sizeWeight = THREE.MathUtils.clamp(
+			Math.log(Math.max(radiusKm, 1) / LABEL_FADE_SMALL_RADIUS_KM) /
+				Math.log(LABEL_FADE_LARGE_RADIUS_KM / LABEL_FADE_SMALL_RADIUS_KM),
+			0,
+			1,
+		)
+		const full = THREE.MathUtils.lerp(
+			LABEL_FADE_SMALL_ORBIT.full,
+			LABEL_FADE_LARGE_ORBIT.full,
+			sizeWeight,
+		)
+		const gone = THREE.MathUtils.lerp(
+			LABEL_FADE_SMALL_ORBIT.gone,
+			LABEL_FADE_LARGE_ORBIT.gone,
+			sizeWeight,
+		)
+		return THREE.MathUtils.smoothstep(orbitScreenRadius, gone, full)
+	}
+	// Per frame: every body's outlined-circle marker (shown while the body is
+	// drawn too small to find), then its name label, whose leader starts at
+	// the ring's edge while the ring shows.
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
+		updateEclipseShadows()
+		if (starFlare) {
+			group.getWorldPosition(screenBodyWorld)
+			STAR_FLARE.update({
+				flare: starFlare,
+				camera,
+				projectedRadius:
+					starSurfaceRadius /
+					Math.max(
+						camera.position.distanceTo(screenBodyWorld) *
+							Math.tan((camera.fov * DEG2RAD) / 2),
+						1e-12,
+					),
+			})
+		}
 		if (starNameLabel && starNameLeader) {
 			updateLabelPlacement(
 				starNameLabel,
@@ -1585,15 +1681,58 @@ export function buildSolarSystemOverlay(
 				camera,
 			)
 		}
+		const halfHeightTangent = Math.tan((camera.fov * DEG2RAD) / 2)
 		for (const p of placed) {
-			if (p.nameLabel && p.nameLeader) {
-				updateLabelPlacement(
-					p.nameLabel,
-					p.nameLeader,
-					p.sceneRadius,
-					IDENTITY_QUATERNION,
+			let labelRadius = p.sceneRadius
+			p.bodyGroup?.getWorldPosition(screenBodyWorld)
+			const screenUnit = Math.max(
+				camera.position.distanceTo(screenBodyWorld) * halfHeightTangent,
+				1e-12,
+			)
+			if (p.orbitLine && !p.isBelt) {
+				ORBIT_TRAIL.fadeForZoom({
+					trail: p.orbitLine,
+					orbitScreenRadius: p.orbitRadius / screenUnit,
+					bodyScreenRadius: p.sceneRadius / screenUnit,
+				})
+			}
+			if (p.marker && p.bodyGroup) {
+				const distance = camera.position.distanceTo(screenBodyWorld)
+				BODY_MARKER.update({
+					marker: p.marker,
 					camera,
-				)
+					projectedRadius: p.sceneRadius / screenUnit,
+					visibility: THREE.MathUtils.smoothstep(
+						p.orbitRadius / screenUnit,
+						BODY_MARKER_MIN_ORBIT_SCREEN_RADIUS.gone,
+						BODY_MARKER_MIN_ORBIT_SCREEN_RADIUS.full,
+					),
+				})
+				if (p.marker.visible) {
+					labelRadius = Math.max(
+						labelRadius,
+						BODY_MARKER.worldRadius({ camera, distance }),
+					)
+				}
+			}
+			if (p.nameLabel && p.nameLeader) {
+				setNameLabelOpacity({
+					label: p.nameLabel,
+					leader: p.nameLeader,
+					opacity: labelVisibility({
+						orbitScreenRadius: p.orbitRadius / screenUnit,
+						radiusKm: p.body.diameterKm / 2,
+					}),
+				})
+				if (p.nameLabel.visible) {
+					updateLabelPlacement(
+						p.nameLabel,
+						p.nameLeader,
+						labelRadius,
+						IDENTITY_QUATERNION,
+						camera,
+					)
+				}
 			}
 			p.moonState?.updateLabelOrientations?.(camera)
 		}
@@ -1628,20 +1767,20 @@ export function buildSolarSystemOverlay(
 			if (moonFocus) {
 				return {
 					position: moonFocus.position,
-					radius: Math.max(moonFocus.localRadius * p.sceneRadius, 0.01),
+					radius: moonFocus.localRadius * p.sceneRadius,
 				}
 			}
 		}
 		if (p.isBelt) {
 			return {
 				position: new THREE.Vector3(p.orbitRadius, 0, 0),
-				radius: (p.beltHalfWidth ?? BELT_WIDTH_MIN / 2) * 2,
+				radius: p.beltEdges ? p.beltEdges.outer - p.beltEdges.inner : 0,
 			}
 		}
 		if (!p.bodyGroup) return null
 		return {
 			position: p.bodyGroup.position.clone(),
-			radius: Math.max(p.sceneRadius, p.moonSystemOuterRadius * 0.5),
+			radius: p.sceneRadius,
 		}
 	}
 
@@ -1691,7 +1830,10 @@ export function buildSolarSystemOverlay(
 			// instead of resolving to the belt.
 			if (
 				!p.isBelt &&
-				(p.mesh === object || p.cloudsMesh === object || p.ringMesh === object)
+				(p.mesh === object ||
+					p.cloudsMesh === object ||
+					p.ringMesh === object ||
+					p.marker === object)
 			) {
 				return { kind: "body", starIndex: 0, bodyIdx: i }
 			}
@@ -1734,14 +1876,10 @@ export function buildSolarSystemOverlay(
 		nextMainWorldTexture?: THREE.DataTexture | null,
 	) {
 		if (nextBodies.length !== placed.length) return false
+		// The star mesh bakes its radius in, so a change to its inner-orbit cap
+		// needs a full rebuild.
+		if (computeStarRadius(nextBodies) !== starRadius) return false
 		if ((nextMainWorldTexture ?? null) !== (mainWorldTexture ?? null))
-			return false
-		if (
-			!showRealisticSizes &&
-			maxNonRealisticPlanetSceneRadius(nextBodies) *
-				NON_REALISTIC_STAR_PLANET_SIZE_MARGIN >
-				starRadius * (isNeutronStar ? NEUTRON_STAR_SURFACE_FACTOR : 1)
-		)
 			return false
 
 		for (let i = 0; i < placed.length; i++) {
@@ -1765,11 +1903,10 @@ export function buildSolarSystemOverlay(
 			if (!p.isBelt) rebuildMoonState(p)
 		}
 
-		previousOuterEdge = applyPlacedBodyLayout()
+		outerRadius = applyPlacedBodyLayout()
 		starLight.distance =
 			placedCompanions.length > 0 ? lastPlanetOuterEdge * 1.05 : 0
 		for (const p of placed) {
-			updateOrbitLineGeometry(p)
 			if (p.isBelt) rebuildAsteroidFieldForPlacedBody(p)
 		}
 		for (const c of placedCompanions) updateCompanionOrbitLineGeometry(c)
@@ -1780,6 +1917,7 @@ export function buildSolarSystemOverlay(
 
 	return {
 		group,
+		outerRadius,
 		suggestedCameraDistance,
 		setDay,
 		updateBodies,

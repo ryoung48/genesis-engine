@@ -36,10 +36,14 @@ export type WeatherIconName =
 	| "moon-waning-gibbous"
 	| "moon-last-quarter"
 	| "moon-waning-crescent"
+	| "lunar-eclipse"
+	| "solar-eclipse"
 	| "weather-moonset-up"
 	| "weather-moonset-down"
 	| "waves"
 	| "tide"
+	| "arrow-up"
+	| "arrow-down"
 
 export interface WeatherIconProps extends React.SVGProps<SVGSVGElement> {
 	name: WeatherIconName

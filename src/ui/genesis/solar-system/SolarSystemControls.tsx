@@ -5,6 +5,7 @@ import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
+import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { TransferDownIcon } from "@/ui/components/primitives/icons/TransferDownIcon"
 import { TransferUpIcon } from "@/ui/components/primitives/icons/TransferUpIcon"
 import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
@@ -40,10 +41,13 @@ interface SolarSystemControlsProps {
 	setShowInclination: (v: boolean) => void
 	showAxialTilt: boolean
 	setShowAxialTilt: (v: boolean) => void
-	showRealisticSizes: boolean
-	setShowRealisticSizes: (v: boolean) => void
 	showBodyNames: boolean
+	showBodyMarkers: boolean
 	setShowBodyNames: (v: boolean) => void
+	setShowBodyMarkers: (v: boolean) => void
+	trailDegrees: number
+	setTrailDegrees: (v: number) => void
+	onReset: () => void
 	/** null when the star is focused (no rotation/orbit knobs to show). */
 	clock: SolarSystemClockProps | null
 }
@@ -74,36 +78,43 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 	setShowInclination,
 	showAxialTilt,
 	setShowAxialTilt,
-	showRealisticSizes,
-	setShowRealisticSizes,
 	showBodyNames,
+	showBodyMarkers,
 	setShowBodyNames,
+	setShowBodyMarkers,
+	trailDegrees,
+	setTrailDegrees,
+	onReset,
 	clock,
 }) => {
-	const headerAction =
-		onBackToGalaxy || canReturnToPlanetMap ? (
-			<div className="flex items-center gap-1.5">
-				{onBackToGalaxy && (
-					<Tooltip content="Galaxy map" position="top">
-						<IconButton
-							onClick={onBackToGalaxy}
-							tone="overlay"
-							shape="pill"
-							size="sm"
-						>
-							<TransferUpIcon className="h-3.5 w-3.5" />
-						</IconButton>
-					</Tooltip>
-				)}
-				{canReturnToPlanetMap && (
-					<Tooltip content="Planet map" position="top">
-						<IconButton onClick={onBack} tone="overlay" shape="pill" size="sm">
-							<TransferDownIcon className="h-3.5 w-3.5" />
-						</IconButton>
-					</Tooltip>
-				)}
-			</div>
-		) : undefined
+	const headerAction = (
+		<div className="flex items-center gap-1.5">
+			<Tooltip content="Reset to defaults" position="top">
+				<IconButton onClick={onReset} tone="overlay" shape="pill" size="sm">
+					<RefreshIcon className="h-3.5 w-3.5" />
+				</IconButton>
+			</Tooltip>
+			{onBackToGalaxy && (
+				<Tooltip content="Galaxy map" position="top">
+					<IconButton
+						onClick={onBackToGalaxy}
+						tone="overlay"
+						shape="pill"
+						size="sm"
+					>
+						<TransferUpIcon className="h-3.5 w-3.5" />
+					</IconButton>
+				</Tooltip>
+			)}
+			{canReturnToPlanetMap && (
+				<Tooltip content="Planet map" position="top">
+					<IconButton onClick={onBack} tone="overlay" shape="pill" size="sm">
+						<TransferDownIcon className="h-3.5 w-3.5" />
+					</IconButton>
+				</Tooltip>
+			)}
+		</div>
+	)
 
 	return (
 		<>
@@ -162,16 +173,26 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 									labelClassName="text-slate-200"
 								/>
 								<ToggleRow
-									label="Realistic Sizes"
-									checked={showRealisticSizes}
-									onChange={setShowRealisticSizes}
-									labelClassName="text-slate-200"
-								/>
-								<ToggleRow
 									label="Body Names"
 									checked={showBodyNames}
 									onChange={setShowBodyNames}
 									labelClassName="text-slate-200"
+								/>
+								<ToggleRow
+									label="Body Markers"
+									checked={showBodyMarkers}
+									onChange={setShowBodyMarkers}
+									labelClassName="text-slate-200"
+								/>
+								<LabeledSlider
+									label="Orbit Trail"
+									value={`${Math.round(trailDegrees)}°`}
+									min={0}
+									max={360}
+									step={1}
+									numericValue={trailDegrees}
+									onChange={setTrailDegrees}
+									sliderClassName="m-0 block"
 								/>
 								{clock && (
 									<div className="space-y-3 border-t border-white/10 pt-3">

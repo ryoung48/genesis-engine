@@ -33,6 +33,7 @@ declare module "troika-three-text" {
 		color: string | number
 		strokeWidth: number
 		strokeColor: string | number
+		fillOpacity: number
 		anchorX: string | number
 		anchorY: string | number
 		textRenderingMode: "distanceField" | "standard"

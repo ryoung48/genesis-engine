@@ -2,6 +2,7 @@ import { MOON } from "@/model/celestial/moons"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
+	OrbitGroup,
 	TemperatureTraceEntry,
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
@@ -11,8 +12,10 @@ import { ASTEROID_BELT } from "@/model/celestial/system/generation/asteroid-belt
 import type { BeltCrossingInput } from "@/model/celestial/system/generation/asteroid-belt/types"
 import type {
 	BodyGenerationParams,
+	PinnedOrbit,
 	RollBeltResidentBodyInput,
 	RollYouthBeltWrapperInput,
+	SpacedOrbitAnchor,
 } from "@/model/celestial/system/generation/body/types"
 import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
 import type { Slot } from "@/model/celestial/system/generation/environment/types"
@@ -44,6 +47,22 @@ const LUNA_SEED = EARTH_SEED.moons![0]!
 // Earth's own sizeClass (8, [12000, 13600]) -- used for the "gas-giant-moon"
 // mode's promoted moon (see promoteMoonToMainWorld).
 const MAIN_WORLD_MOON_SIZE_CLASS = 6
+const JUPITER_MASS_KG = 1.898e27
+// Typical mass per group, for spacing slots before their bodies are rolled:
+// the generated medians are ~0.22 R_earth for dwarfs (~0.01 M_earth at
+// rocky density), ~0.93 R_earth for terrestrials (~1 M_earth), ~1.55 R_earth
+// for helians (~3 M_earth) and ~0.8 R_jupiter for jovians (Saturn's 95
+// M_earth). Belts are massless.
+const TYPICAL_GROUP_MASS_KG: Record<OrbitGroup, number> = {
+	"asteroid belt": 0,
+	dwarf: 0.01 * ORBIT_BODY.earthMassKg,
+	terrestrial: ORBIT_BODY.earthMassKg,
+	helian: 3 * ORBIT_BODY.earthMassKg,
+	jovian: 95 * ORBIT_BODY.earthMassKg,
+}
+// How far past a companion exclusion zone's outer edge a pushed orbit lands,
+// matching the galaxy-level overlap nudge's own clearance step.
+const EXCLUSION_ZONE_CLEARANCE = 1.02
 
 /** Turns an already fully-rolled moon into the gas-giant-moon mode's main
  * world: forces its size into the sizeClass-6 band and copies Earth's
@@ -490,7 +509,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		maxAU: maxOrbitalDistanceAU,
 	})
 
-	const slots: Slot[] = params.orbitSlots
+	const rolledSlots: Slot[] = params.orbitSlots
 		? params.orbitSlots
 				.filter((slot) => slot.type !== "empty")
 				.map((slot) => {
@@ -580,6 +599,80 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// here since every proto-specific roll below needs the same conversion.
 	const starAgeMyr = starAgeGyr * 1000
 
+	// A forced main world keeps its slot's orbit, but it is generated later in
+	// the outward walk than the planets inside it, so their placement is
+	// limited by where it will be. Its mass isn't rolled yet: Earth's for a
+	// terrestrial main world, Jupiter's for a gas giant hosting a main-world
+	// moon.
+	function resolvePinnedOrbit(list: Slot[]): PinnedOrbit | null {
+		if (mainWorldMode === "procedural") return null
+		const slotIndex = list.findIndex((slot) => slot.isMainWorld === true)
+		if (slotIndex < 0) return null
+		const pinnedSlot = list[slotIndex]!
+		const deviationAU = PLANET.deviationToAU({
+			deviation: pinnedSlot.deviation,
+			luminositySol,
+		})
+		return {
+			slotIndex,
+			orbitalDistanceAU:
+				mainWorldMode === "earth-clone" || mainWorldMode === "moon-system"
+					? deviationAU
+					: (pinnedSlot.orbitalDistanceAU ?? deviationAU),
+			massKg:
+				mainWorldMode === "gas-giant-moon"
+					? JUPITER_MASS_KG
+					: ORBIT_BODY.earthMassKg,
+		}
+	}
+
+	// Inner slots that can't fit between their inner neighbour and the forced
+	// main world at the minimum Hill spacing are not placed at all -- real
+	// systems with a giant near the habitable zone have few planets inside
+	// it. Masses aren't rolled yet, so each slot uses its group's typical
+	// mass; the walk below still spaces every placed body by its real mass.
+	function dropUnfittableInnerSlots(list: Slot[]): Slot[] {
+		const pinned = resolvePinnedOrbit(list)
+		if (!pinned) return list
+		const dropped = new Set<Slot>()
+		let anchor: SpacedOrbitAnchor | null = null
+		for (let index = 0; index < pinned.slotIndex; index++) {
+			const slot = list[index]!
+			const massKg = TYPICAL_GROUP_MASS_KG[slot.groupHint ?? "terrestrial"]
+			if (massKg === 0) continue
+			let orbitalDistanceAU =
+				slot.orbitalDistanceAU ??
+				PLANET.deviationToAU({ deviation: slot.deviation, luminositySol })
+			if (anchor) {
+				orbitalDistanceAU = Math.max(
+					orbitalDistanceAU,
+					ORBIT_BODY.minimumSpacedOrbitAU({
+						innerOrbitalDistanceAU: anchor.orbitalDistanceAU,
+						innerMassKg: anchor.massKg,
+						outerMassKg: massKg,
+						starMassKg,
+					}),
+				)
+			}
+			const capAU = ORBIT_BODY.maximumSpacedInnerOrbitAU({
+				outerOrbitalDistanceAU: pinned.orbitalDistanceAU,
+				innerMassKg: massKg,
+				outerMassKg: pinned.massKg,
+				starMassKg,
+			})
+			if (orbitalDistanceAU > capAU) {
+				dropped.add(slot)
+				continue
+			}
+			anchor = { orbitalDistanceAU, massKg }
+		}
+		return list.filter((slot) => !dropped.has(slot))
+	}
+
+	const slots = dropUnfittableInnerSlots(rolledSlots)
+	const pinnedOrbit = resolvePinnedOrbit(slots)
+	const pinnedSlotIndex = pinnedOrbit?.slotIndex ?? -1
+
 	// Ported from galaxy-gen's impactZone (stars/index.ts) -- a giant
 	// (luminosityClass "III") or white dwarf ("D") host star's innermost few
 	// orbit slots (closest first, independent of zone) are forced into a
@@ -612,6 +705,14 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// is later concatenated onto `bodies` (see the `bodies.push(...)` below,
 	// which must run before beltDwarfs' own `bodies.length`-based idx math).
 	const youthAppendages: SystemBody[] = []
+	// The previous massive body walking outward, which the next one must sit
+	// clear of (see ORBIT_BODY.minimumSpacedOrbitAU), and the last orbit placed
+	// of any kind, which nothing may move inside of so slot order holds.
+	let previousSpacedBody: SpacedOrbitAnchor | null = null
+	const sortedExclusionZonesAU = [...companionExclusionZonesAU].sort(
+		(a, b) => a.minAU - b.minAU,
+	)
+	let lastPlacedAU = 0
 	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
 		if (
 			slot.isMainWorld &&
@@ -649,6 +750,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				}),
 				zone: slot.zone,
 			}
+			previousSpacedBody = {
+				orbitalDistanceAU: builtMainWorld.orbitalDistanceAU,
+				massKg: builtMainWorld.massKg,
+			}
+			lastPlacedAU = Math.max(lastPlacedAU, builtMainWorld.orbitalDistanceAU)
 			if (mainWorldMode !== "moon-system") return builtMainWorld
 			// Roll a moon system the same way any sibling planet's moons are
 			// rolled, instead of the single literal Luna clone above.
@@ -851,6 +957,59 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						diameterKm,
 						densityEarthRelative,
 					})
+		// The book's even Orbit# spread can set neighbours closer than they
+		// could stay stable, so a body is pushed out until it clears the
+		// previous massive one (a massless belt just clears its Hill zone),
+		// and never inside an orbit already placed. A pinned main world keeps
+		// its habitable-zone orbit; bodies past it are pushed clear of it.
+		if (!isPrimaryWorld) {
+			if (previousSpacedBody) {
+				const minimumAU = ORBIT_BODY.minimumSpacedOrbitAU({
+					innerOrbitalDistanceAU: previousSpacedBody.orbitalDistanceAU,
+					innerMassKg: previousSpacedBody.massKg,
+					outerMassKg: massKg,
+					starMassKg,
+				})
+				if (Number.isFinite(minimumAU)) {
+					orbitalDistanceAU = Math.max(orbitalDistanceAU, minimumAU)
+				}
+			}
+			orbitalDistanceAU = Math.max(orbitalDistanceAU, lastPlacedAU)
+			// A push may not land inside a companion star's exclusion zone (the
+			// slot walk already avoided them) or past this star's outer ceiling.
+			for (const zone of sortedExclusionZonesAU) {
+				if (
+					orbitalDistanceAU >= zone.minAU &&
+					orbitalDistanceAU <= zone.maxAU
+				) {
+					orbitalDistanceAU = zone.maxAU * EXCLUSION_ZONE_CLEARANCE
+				}
+			}
+			if (Number.isFinite(maxOrbitalDistanceAU)) {
+				orbitalDistanceAU = Math.min(orbitalDistanceAU, maxOrbitalDistanceAU)
+			}
+			// Inside the forced main world, a body stops short of crowding it,
+			// moving inward from its own slot if it must -- but never inside the
+			// star's dust-clearing floor or an orbit already placed. When the
+			// previous body leaves no room, clearing the main world wins.
+			if (pinnedOrbit && siblingIdx < pinnedSlotIndex) {
+				const capAU = ORBIT_BODY.maximumSpacedInnerOrbitAU({
+					outerOrbitalDistanceAU: pinnedOrbit.orbitalDistanceAU,
+					innerMassKg: massKg,
+					outerMassKg: pinnedOrbit.massKg,
+					starMassKg,
+				})
+				orbitalDistanceAU = Math.max(
+					maoAu,
+					lastPlacedAU,
+					Math.min(orbitalDistanceAU, capAU),
+				)
+			}
+		}
+		lastPlacedAU = Math.max(lastPlacedAU, orbitalDistanceAU)
+		if (group !== "asteroid belt") {
+			previousSpacedBody = { orbitalDistanceAU, massKg }
+		}
 		// This is the pre-tide-lock "natural" rotation baseline -- see
 		// rollPlanetTideLock below, which may override it entirely.
 		const siderealDayHours =

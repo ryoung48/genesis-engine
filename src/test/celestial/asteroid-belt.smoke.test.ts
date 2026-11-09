@@ -33,6 +33,16 @@ describe("ASTEROID_BELT.crossesAnyBelt", () => {
 		).toBe(true)
 	})
 
+	it("caps a far belt's width at half its centre distance", () => {
+		// Orbit# 10 (77 AU) with a 4 Orbit# span is 20-308 AU uncapped.
+		const { minAU, maxAU } = ASTEROID_BELT.beltAURange({
+			orbitalDistanceAU: 77,
+			spanOrbitNumber: 4,
+		})
+		expect(minAU).toBeCloseTo(57.75)
+		expect(maxAU).toBeCloseTo(96.25)
+	})
+
 	it("is false with no belts in the system", () => {
 		expect(
 			ASTEROID_BELT.crossesAnyBelt({

@@ -229,10 +229,11 @@ export const GenesisView: React.FC<{
 		setShowRivers,
 		setShowSolarSystemAxialTilt,
 		setShowSolarSystemBodyNames,
+		setShowSolarSystemBodyMarkers,
+		setSolarSystemTrailDegrees,
 		setShowSolarSystemDaylight,
 		setShowSolarSystemEllipticalOrbits,
 		setShowSolarSystemInclination,
-		setShowSolarSystemRealisticSizes,
 		setShowWindArrows,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
@@ -259,10 +260,11 @@ export const GenesisView: React.FC<{
 		showRivers,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
+		solarSystemTrailDegrees,
 		showSolarSystemDaylight,
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
-		showSolarSystemRealisticSizes,
 		showClouds,
 		setShowClouds,
 		showWindArrows,
@@ -1984,8 +1986,9 @@ export const GenesisView: React.FC<{
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
-		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
+		showSolarSystemBodyMarkers,
+		solarSystemTrailDegrees,
 		generationPanelOpen,
 		setGenerationPanelOpen,
 		generationSessionRestored,
@@ -2298,10 +2301,23 @@ export const GenesisView: React.FC<{
 								setShowInclination={setShowSolarSystemInclination}
 								showAxialTilt={showSolarSystemAxialTilt}
 								setShowAxialTilt={setShowSolarSystemAxialTilt}
-								showRealisticSizes={showSolarSystemRealisticSizes}
-								setShowRealisticSizes={setShowSolarSystemRealisticSizes}
 								showBodyNames={showSolarSystemBodyNames}
+								showBodyMarkers={showSolarSystemBodyMarkers}
 								setShowBodyNames={setShowSolarSystemBodyNames}
+								setShowBodyMarkers={setShowSolarSystemBodyMarkers}
+								trailDegrees={solarSystemTrailDegrees}
+								setTrailDegrees={setSolarSystemTrailDegrees}
+								onReset={() => {
+									setShowSolarSystemEllipticalOrbits(true)
+									setShowSolarSystemDaylight(true)
+									setShowSolarSystemInclination(true)
+									setShowSolarSystemAxialTilt(true)
+									setShowSolarSystemBodyNames(true)
+									setShowSolarSystemBodyMarkers(true)
+									setSolarSystemTrailDegrees(
+										DEFAULT_VIEW_PREFS.solarSystemTrailDegrees,
+									)
+								}}
 								clock={
 									solarSystemClock
 										? {

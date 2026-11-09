@@ -45,15 +45,17 @@ const FIELD_CYCLES = 30;            // … and at most this many multigrid cycle
 const AIR_COLUMN_HEAT_CAP = 1.0e7;  // J/m²/K (temperature.js)
 export const DAY_TIMES = [0.5, 2.5, 4.5, 6.5, 8.5, 10.5];   // months: the times of year the day's cycle is solved at
 
+// (tuned: the climatev2-tune diagnostic's DTR objective, PASTA exact match with the observed temperature and rain and
+// the model's day range on the imported Earth, 87.6 → 89.5 %; land DTR error 2.64 → 2.26 °C)
 export const DIURNAL_PARAMS = {
-    CLEAR_SKY: 0.73,        // –          sunlight reaching the ground through a clear sky (Wild et al. 2013: 247 of 340 W/m², global clear-sky)
+    CLEAR_SKY: 0.693,       // –          sunlight reaching the ground through a clear sky (Wild et al. 2013: 247 of 340 W/m², global clear-sky; tuned)
     CLOUD_DIM: 0.75,        // –          … under full cloud: × (1 − CLOUD_DIM · cloud^CLOUD_POWER) (Kasten & Czeplak 1980)
     CLOUD_POWER: 3.4,       // –
-    ALBEDO_LAND: 0.2,       // –          bare and vegetated ground, 0.15–0.25 (Oke 1987 Table 1.1)
+    ALBEDO_LAND: 0.213,     // –          bare and vegetated ground, 0.15–0.25 (Oke 1987 Table 1.1; tuned)
     ALBEDO_SNOW: 0.6,       // –          old snow 0.4–0.7 (Oke 1987 Table 1.1)
     ALBEDO_SEA: 0.06,       // –          (Oke 1987 Table 1.1)
     EMISSIVITY: 0.95,       // –          (Oke 1987 Table 1.1: soils 0.90–0.98)
-    EXCHANGE: 0.0075,       // –          bulk transfer coefficient for heat, neutral, 10 m over z₀ = 0.1 m: (κ / ln(10/0.1))² (Garratt 1992 §3)
+    EXCHANGE: 0.005,        // –          bulk transfer coefficient for heat, neutral, 10 m over z₀ ≈ 0.03 m: (κ / ln(10/z₀))² (Garratt 1992 §3; tuned)
     GUST_MS: 1,             // m/s        the wind's floor in the exchange: convective gustiness (Beljaars 1995)
     INERTIA_DRY: 620,       // J m⁻² K⁻¹ s^-½   dry soil (Oke 1987 Table 2.1: dry sandy 620, dry clay 600)
     INERTIA_WET: 2000,      // J m⁻² K⁻¹ s^-½   wet soil (Oke 1987 Table 2.1: saturated sandy 2550, clay 1590)
@@ -64,9 +66,23 @@ export const DIURNAL_PARAMS = {
                             //            climatev2-diurnal-compare diagnostic)
     AIR_LOSS: 3,            // W/m²/K     the boundary layer's exchange with the air above: its emission (emissivity ≈ 0.3) up and down, 2 · 0.3 · 4σT³
     WAVE_SPEED_MS: 50,      // m/s        the first baroclinic gravity wave, which evens out the free air's temperature (Gill 1982 §11; ≈ 50 m/s dry)
-    WEATHER_LAND_C: 5,      // °C         the weather's own swing within a day over land (air masses, fronts, clear-night cooling) …
+    WEATHER_LAND_C: 6.5,    // °C         the weather's own swing within a day over land (air masses, fronts, clear-night cooling) …
     WEATHER_SEA_C: 2,       // °C         … and over the open sea: fitted to the ranges without sun, the polar night's (WorldClim 6–9 °C over land,
                             //            NCEP 1–2 °C over the open sea) and to the ranges on the whole (climatev2-diurnal-compare diagnostic)
+};
+
+// The literature ranges of the parameters a tune may move (tuning: the climatev2-tune diagnostic's DTR objective)
+export const DIURNAL_PRIORS = {
+    CLEAR_SKY: { value: 0.73, min: 0.65, max: 0.8, source: 'clear-sky surface transmission ≈ 0.70–0.78 of the top of the air (Wild et al. 2013; drier, cleaner air higher)' },
+    CLOUD_DIM: { value: 0.75, min: 0.6, max: 0.85, source: 'Kasten & Czeplak 1980: 0.75 under full cloud; overcast transmission 0.15–0.4 by cloud type' },
+    ALBEDO_LAND: { value: 0.2, min: 0.15, max: 0.25, source: 'bare and vegetated ground 0.15–0.25 (Oke 1987 Table 1.1)' },
+    EXCHANGE: { value: 0.0075, min: 0.0035, max: 0.015, source: 'neutral C_H = (κ / ln(10 m / z₀))² for z₀ = 0.01–0.4 m, short grass to scrub (Garratt 1992 §3, Table A5)' },
+    GUST_MS: { value: 1, min: 0.5, max: 2, source: 'convective gustiness ≈ 1–1.25 × the convective velocity scale, ≈ 0.5–2 m/s (Beljaars 1995)' },
+    INERTIA_DRY: { value: 620, min: 400, max: 800, source: 'dry soils: sandy 620, clay 600, with organic and gravel soils either side (Oke 1987 Table 2.1)' },
+    INERTIA_WET: { value: 2000, min: 1500, max: 2600, source: 'saturated soils: clay 1590, sandy 2550 (Oke 1987 Table 2.1)' },
+    AIR_LAYER_M: { value: 200, min: 150, max: 300, source: 'the shallow night mixed layer ≈ 100–300 m, which the screen-level range follows most (Stull 1988 §1.6)' },
+    AIR_LOSS: { value: 3, min: 2.2, max: 4.3, source: 'the boundary-layer longwave exchange with the air above, 2 · ε · 4σT³ for an effective emissivity 0.2–0.4' },
+    WEATHER_LAND_C: { value: 5, min: 3, max: 7, source: 'the day range without sun over land: WorldClim polar-night ranges 6–9 °C, added in quadrature with the sunlit range' },
 };
 
 const LAND = 0, WATER = 1, ICE = 2;

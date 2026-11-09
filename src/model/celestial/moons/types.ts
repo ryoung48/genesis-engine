@@ -40,6 +40,17 @@ export interface RollMoonSizeClassInput extends MoonRngInput {
 export interface RollMoonDiameterInput extends MoonRngInput {
 	sizeClass: number
 }
+export interface CapMoonDiameterInput extends MoonRngInput {
+	sizeClass: number
+	diameterKm: number
+	planetDiameterKm: number
+}
+
+export interface CappedMoonSize {
+	sizeClass: number
+	diameterKm: number
+}
+
 export interface RollMoonOrbitCandidateInput extends MoonRngInput {
 	morPd: number
 }

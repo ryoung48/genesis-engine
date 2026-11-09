@@ -1,4 +1,5 @@
 import type * as THREE from "three"
+import type { Text } from "troika-three-text"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WindArrowData } from "@/model/climate/weather/wind/types"
 import type {
@@ -556,4 +557,10 @@ export interface TradeRouteWorkerRequest {
 export interface TradeRouteWorkerResponse {
 	requestId: number
 	positions: TradeRoutePositions
+}
+
+export interface SetNameLabelOpacityInput {
+	label: Text
+	leader: THREE.Line
+	opacity: number
 }

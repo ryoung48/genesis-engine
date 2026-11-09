@@ -5,6 +5,7 @@ import type {
 	SpectralClass,
 } from "@/model/celestial/star/types"
 import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
+import type { EclipseShadowState } from "@/ui/genesis/renderer/eclipse-shadow/types"
 import type { MoonOrbitState } from "@/ui/genesis/renderer/moon-orbit-overlay"
 
 /** Addresses any node in a solar system's orbit tree -- the parent of any
@@ -25,19 +26,83 @@ export type OrbitAddress =
 	| { kind: "body"; starIndex: number; bodyIdx: number }
 	| { kind: "moon"; starIndex: number; bodyIdx: number; moonIdx: number }
 
-// Scatters a field of small, irregularly-scaled rocks around a belt's ring —
-// each on its own randomized circular sub-orbit (slightly jittered radius and
-// out-of-plane offset) plus a random tumble, so the belt reads as a lively
-// swarm rather than a flat static band.
 export interface AsteroidFieldData {
-	mesh: THREE.InstancedMesh
-	count: number
+	points: THREE.Points
+	centerRadius: number
 	angles: Float32Array
 	radii: Float32Array
 	zOffsets: Float32Array
-	scales: Float32Array
-	rotationAxes: THREE.Vector3[]
-	rotationSpeeds: Float32Array
+}
+
+export interface BuildAsteroidFieldInput {
+	innerRadius: number
+	outerRadius: number
+	// Belts get no temperature estimate, so the orbital zone is the only
+	// signal for an icy (outer-zone) versus rocky tint.
+	isOuterZone: boolean
+}
+
+// The drawn radial band a companion star sweeps, its footprint included.
+export interface CompanionBand {
+	inner: number
+	outer: number
+}
+
+export interface ComputeBodyScaleInput {
+	drawnSemiMajor: Map<PlacedBody, number>
+	companionBands: CompanionBand[]
+}
+
+export interface CreateOrbitTrailInput {
+	color: number
+	// The trail's opacity right at the body; it fades to zero at the tail.
+	peakOpacity: number
+}
+
+export interface FadeOrbitTrailInput {
+	trail: THREE.Line
+	// Orbit radius as a fraction of the viewport's half-height.
+	orbitScreenRadius: number
+	// The body's radius as a fraction of the viewport's half-height.
+	bodyScreenRadius: number
+}
+
+export interface LogFadeInput {
+	value: number
+	start: number
+	end: number
+}
+
+export interface UpdateOrbitTrailInput {
+	trail: THREE.Line
+	kepler: NonNullable<PlacedBody["kepler"]>
+	eccentricAnomaly: number
+}
+
+export interface LabelVisibilityInput {
+	// Orbit radius as a fraction of the viewport's half-height.
+	orbitScreenRadius: number
+	radiusKm: number
+}
+
+export interface DistanceMapping {
+	exponent: number
+	scale: number
+}
+
+export interface DrawnDistanceInput {
+	mapping: DistanceMapping
+	au: number
+}
+
+export type LayoutSlot =
+	| { kind: "body"; placedIndex: number; orbitalDistanceAU: number }
+	| { kind: "companion"; companionIndex: number; orbitalDistanceAU: number }
+
+export interface UpdateAsteroidFieldInput {
+	field: AsteroidFieldData
+	day: number
+	centerPeriodDays: number
 }
 
 /** One companion star's own overlay params plus where it sits relative to
@@ -91,16 +156,13 @@ export interface SolarSystemOverlayParams {
 	 * planes, and rings all sit flat/untitled) — a diagnostic/visual toggle,
 	 * doesn't affect the underlying axialTiltDeg data. */
 	showAxialTilt: boolean
-	/** When true, every body (planets, moons, the star) renders at its true
-	 * relative diameter (clamped only by a floor/ceiling — see
-	 * scaleBodyDiameterToVisualRadius). When false, falls back to the old
-	 * sqrt-compressed sizing so nothing strays far from Earth's own scene
-	 * size. */
-	showRealisticSizes: boolean
 	/** Shows each body's (and the star's) name as a billboarded label with a
 	 * leader line to the top of the body, similar in spirit to the globe
 	 * view's solar-terminator/nation-label overlays. */
 	showBodyNames: boolean
+	/** Outlined circles marking bodies drawn too small to find (see
+	 * BODY_MARKER), for planets and moons alike. */
+	showBodyMarkers: boolean
 	/** When true and showBodyNames is on, uses real Sol names (star: "Sol",
 	 * main world: "Earth", named siblings/moons from the Sol seed data)
 	 * instead of generic group-based labels — true exactly when this is the
@@ -134,14 +196,17 @@ export interface SolarSystemOverlayParams {
 	 * companion-of-a-companion nesting) and so can't see that sibling in its
 	 * own `companions.length`. See starLight.distance and systemAmbient. */
 	isCompanion?: boolean
-	// [JUSTIFICATION] Only set on the internal recursive companion call so a
-	// companion star stays bigger than the primary's planets too, not just its
-	// own; external callers never provide it.
-	minStarRadius?: number
+	// [JUSTIFICATION] Only set by the internal recursive companion call: the
+	// factor the primary star was shrunk by (its drawn radius over its
+	// uncapped one), applied to the companion too so the two stars keep their
+	// true size order. External callers never provide it.
+	parentStarSizeScale?: number
 }
 
 export interface SolarSystemOverlayState {
 	group: THREE.Group
+	/** Farthest extent of this star's bodies, belts and companions. */
+	outerRadius: number
 	suggestedCameraDistance: number
 	setDay(day: number): void
 	/** Only ever called with the primary's own next bodies (see
@@ -187,7 +252,6 @@ export interface SolarSystemOverlayState {
 export interface PlacedBody {
 	body: SystemBody
 	sceneRadius: number
-	moonSystemOuterRadius: number
 	isBelt: boolean
 	bodyGroup?: THREE.Group
 	mesh?: THREE.Mesh
@@ -205,6 +269,14 @@ export interface PlacedBody {
 	meshRestQuaternion?: THREE.Quaternion
 	baseQuaternion?: THREE.Quaternion
 	moonState?: MoonOrbitState
+	/** [JUSTIFICATION] Outlined circle shown while the body is drawn too small
+	 * to find; belts have none, like `mesh`. */
+	marker?: THREE.Sprite
+	/** [JUSTIFICATION] Eclipse casters for the planet's surface and clouds;
+	 * belts have none, like `mesh`. */
+	eclipse?: EclipseShadowState
+	/** [JUSTIFICATION] Eclipse casters for the ring; only ringed bodies. */
+	ringEclipse?: EclipseShadowState
 	/** Which shared tessellation tier this body's mesh currently draws from
 	 * (see updateLevelOfDetail) — starts at the tier the build path assigns,
 	 * so a first frame that picks the same one correctly does nothing. Always
@@ -229,10 +301,9 @@ export interface PlacedBody {
 	}
 	/** Only set for asteroid belts. */
 	asteroidField?: AsteroidFieldData
-	/** Only set for asteroid belts — half the belt's radial (inner-to-outer)
-	 * span, scaled off its own orbitRadius (see BELT_WIDTH_RATIO) rather than
-	 * a fixed constant. */
-	beltHalfWidth?: number
+	/** [JUSTIFICATION] Only set for asteroid belts — the belt's inner and
+	 * outer edges in scene units, from its real AU range. */
+	beltEdges?: { inner: number; outer: number }
 }
 
 /** A companion star mounted inside its parent's own group, orbiting it --
@@ -244,9 +315,7 @@ export interface PlacedCompanion {
 	orbitalPeriodDays: number
 	eccentricity: number
 	inclinationDeg: number
-	/** Assigned by the combined distance-ordered layout pass (see
-	 * buildSolarSystemOverlay's layoutSlots) -- 0 until then. */
-	orbitRadius: number
+	orbitalDistanceAU: number
 	kepler: {
 		P: THREE.Vector3
 		Q: THREE.Vector3

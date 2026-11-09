@@ -117,6 +117,8 @@ export interface PresentSkyParams {
 export interface WeatherSkyItem {
 	label: string
 	value: string
+	// [JUSTIFICATION] Only items with a secondary measurement need a second line.
+	detail?: string | null
 	icon: WeatherIconName
 }
 
@@ -124,6 +126,8 @@ export interface WeatherSkyRow {
 	key: string
 	name: string
 	detail: string | null
+	// [JUSTIFICATION] Some row details need additional context.
+	detailHelp?: string
 	icon: WeatherIconName
 	moon: MoonIconPhase | null
 	tone: WeatherTone
@@ -132,6 +136,7 @@ export interface WeatherSkyRow {
 
 export interface WeatherSkyDisplay {
 	rows: WeatherSkyRow[]
+	eclipses: WeatherSkyRow[]
 }
 
 export interface PresentSeaParams {

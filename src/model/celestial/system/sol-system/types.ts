@@ -16,6 +16,9 @@ export interface SolMoonSeed {
 	densityEarthRelative: number
 	densityDescription: string
 	rotationHours: number
+	// [JUSTIFICATION] Only moons that are not tidally locked need it; every other
+	// moon's orbital period equals its rotation period.
+	orbitalPeriodDays?: number
 	tiltDeg: number
 	eccentricity: number
 	pd: number

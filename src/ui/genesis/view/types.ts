@@ -166,8 +166,9 @@ export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	showSolarSystemDaylight: boolean
 	showSolarSystemInclination: boolean
 	showSolarSystemAxialTilt: boolean
-	showSolarSystemRealisticSizes: boolean
 	showSolarSystemBodyNames: boolean
+	showSolarSystemBodyMarkers: boolean
+	solarSystemTrailDegrees: number
 	generationPanelOpen: boolean
 	setGenerationPanelOpen: Dispatch<SetStateAction<boolean>>
 	generationSessionRestored: boolean

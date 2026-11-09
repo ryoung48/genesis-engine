@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import { Text } from "troika-three-text"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
+import type { SetNameLabelOpacityInput } from "@/ui/genesis/renderer/types"
 
 // Body/moon/star name labels — a leader-line-to-a-billboarded-label idea
 // similar in spirit to the globe's solar-terminator/nation-label overlays.
@@ -10,18 +11,17 @@ import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 // on-screen "up" — recomputed every frame in updateLabelPlacement — so a
 // label reads as sticking out of the top of the body from the viewer's
 // perspective, not the body's own (possibly tilted) one.
-const LABEL_FONT_SIZE_FACTOR = 0.4
-const MIN_LABEL_FONT_SIZE = 0.012
-const MAX_LABEL_FONT_SIZE = 0.05
+// Labels hold a constant on-screen size, in fractions of the viewport's
+// half-height, because true-scale bodies span from sub-pixel to
+// screen-filling: a world-sized label would vanish or swamp the view.
+const LABEL_SCREEN_FONT_FRACTION = 0.02
+const LABEL_SCREEN_STUB_FRACTION = 0.03
+const LABEL_SCREEN_GAP_FRACTION = 0.006
 const LABEL_TEXT_COLOR = "#0f172a"
 const LABEL_RENDER_ORDER = 1001
 const LABEL_LEADER_COLOR = 0xf8fafc
 const LABEL_LEADER_OPACITY = 0.55
 const LABEL_LEADER_RENDER_ORDER = 1000
-// Leader stub extends this many extra body-radii above the surface; the
-// label then floats a further fixed gap past the stub tip.
-const LABEL_LEADER_STUB_FACTOR = 0.8
-const LABEL_GAP = 0.03
 
 // White card/chip behind each label — like a map-pin tooltip — so text
 // reads clearly against the star field regardless of what's behind it,
@@ -72,6 +72,27 @@ function fitLabelBackground(label: Text): void {
 	})
 }
 
+// Fades a label, its card and its leader together; fully faded hides them so
+// they cost nothing and can't be clicked.
+export function setNameLabelOpacity({
+	label,
+	leader,
+	opacity,
+}: SetNameLabelOpacityInput): void {
+	const visible = opacity > 0.01
+	label.visible = visible
+	leader.visible = visible
+	if (!visible) return
+	label.fillOpacity = opacity
+	const background = label.userData.labelBackground as THREE.Mesh | undefined
+	if (background) {
+		;(background.material as THREE.MeshBasicMaterial).opacity =
+			LABEL_BG_OPACITY * opacity
+	}
+	;(leader.material as THREE.LineBasicMaterial).opacity =
+		LABEL_LEADER_OPACITY * opacity
+}
+
 export function createNameLeaderLine(): THREE.Line {
 	const geometry = new THREE.BufferGeometry().setFromPoints([
 		new THREE.Vector3(),
@@ -100,24 +121,12 @@ export function createNameLabel(name: string): Text {
 	text.textRenderingMode = "distanceField"
 	text.renderOrder = LABEL_RENDER_ORDER
 	text.frustumCulled = false
+	text.fontSize = 1
 	const background = createLabelBackground()
 	text.userData.labelBackground = background
 	text.add(background)
+	fitLabelBackground(text)
 	return text
-}
-
-// Sizes a label/background for its current local radius — called both at
-// initial build and on every layout pass (sizes can change live, e.g.
-// toggling "Realistic Sizes"). Position/orientation are handled separately,
-// every frame, by updateLabelPlacement below.
-export function sizeNameLabel(label: Text, localRadius: number): void {
-	const fontSize = THREE.MathUtils.clamp(
-		localRadius * LABEL_FONT_SIZE_FACTOR,
-		MIN_LABEL_FONT_SIZE,
-		MAX_LABEL_FONT_SIZE,
-	)
-	label.fontSize = fontSize
-	fitLabelBackground(label)
 }
 
 /** A fixed identity — shared instead of re-allocating one per translate-only
@@ -131,6 +140,8 @@ const scratchParentInverse = new THREE.Quaternion()
 const scratchLocalUp = new THREE.Vector3()
 const scratchBase = new THREE.Vector3()
 const scratchTip = new THREE.Vector3()
+const scratchAnchorWorld = new THREE.Vector3()
+const scratchAnchorScale = new THREE.Vector3()
 
 // Re-billboards and repositions a label/leader every frame so the leader
 // always points toward the camera's on-screen "up" — not a fixed local
@@ -145,8 +156,17 @@ export function updateLabelPlacement(
 	leader: THREE.Line,
 	localRadius: number,
 	parentWorldQuaternion: THREE.Quaternion,
-	camera: THREE.Camera,
+	camera: THREE.PerspectiveCamera,
 ): void {
+	const anchor = label.parent
+	if (!anchor) return
+	anchor.getWorldPosition(scratchAnchorWorld)
+	anchor.getWorldScale(scratchAnchorScale)
+	const localPerScreen =
+		(camera.position.distanceTo(scratchAnchorWorld) *
+			Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) /
+		Math.max(scratchAnchorScale.x, 1e-12)
+	label.scale.setScalar(LABEL_SCREEN_FONT_FRACTION * localPerScreen)
 	scratchCameraWorldUp.copy(WORLD_UP).applyQuaternion(camera.quaternion)
 	scratchParentInverse.copy(parentWorldQuaternion).invert()
 	scratchLocalUp
@@ -154,10 +174,12 @@ export function updateLabelPlacement(
 		.applyQuaternion(scratchParentInverse)
 		.normalize()
 
-	const stubTip = localRadius * (1 + LABEL_LEADER_STUB_FACTOR)
+	const stubTip = localRadius + LABEL_SCREEN_STUB_FRACTION * localPerScreen
 	scratchBase.copy(scratchLocalUp).multiplyScalar(localRadius)
 	scratchTip.copy(scratchLocalUp).multiplyScalar(stubTip)
-	label.position.copy(scratchLocalUp).multiplyScalar(stubTip + LABEL_GAP)
+	label.position
+		.copy(scratchLocalUp)
+		.multiplyScalar(stubTip + LABEL_SCREEN_GAP_FRACTION * localPerScreen)
 	label.quaternion.copy(scratchParentInverse).multiply(camera.quaternion)
 
 	const positions = (leader.geometry as THREE.BufferGeometry).attributes

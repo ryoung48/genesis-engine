@@ -4,10 +4,7 @@ import type { CloudGenus } from "@/model/climate/weather/local/clouds/types"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
 import { WEATHER_DESCRIPTION } from "@/model/climate/weather/local/description"
 import { WEATHER_MARINE } from "@/model/climate/weather/local/marine"
-import type {
-	MarineTideEvent,
-	MarineTidePhase,
-} from "@/model/climate/weather/local/marine/tide/types"
+import type { MarineTideEvent } from "@/model/climate/weather/local/marine/tide/types"
 import type { MarineSeaState } from "@/model/climate/weather/local/marine/waves/types"
 import { WEATHER_SKY } from "@/model/climate/weather/local/sky"
 import { WEATHER_ECLIPSES } from "@/model/climate/weather/local/sky/eclipses"
@@ -135,8 +132,12 @@ const iconTones: Record<WeatherIconName, WeatherTone> = {
 	"moon-waning-gibbous": "night",
 	"moon-last-quarter": "night",
 	"moon-waning-crescent": "night",
+	"lunar-eclipse": "night",
+	"solar-eclipse": "sun",
 	"weather-moonset-up": "night",
 	"weather-moonset-down": "night",
+	"arrow-up": "sea",
+	"arrow-down": "sea",
 	waves: "sea",
 	tide: "sea",
 }
@@ -153,16 +154,6 @@ function conditionIcon(values: LocalWeatherValues): WeatherIconName {
 			: "weather-night-partly-cloudy"
 	return "weather-cloudy"
 }
-function timeIcon(label: string): WeatherIconName {
-	return label === "Dawn"
-		? "weather-sunset-up"
-		: label === "Dusk"
-			? "weather-sunset-down"
-			: label === "Night" || label === "Polar night" || label === "Dark"
-				? "weather-night"
-				: "weather-sunny"
-}
-
 function conditionLabel(kind: string): string {
 	if (kind.startsWith("system:")) return TEXT.capitalize(kind.slice(7))
 	return TEXT.capitalize(kind)
@@ -185,13 +176,6 @@ function cloudDescription(values: LocalWeatherValues): string {
 	const category = WEATHER_VOCABULARY.cloud(values)
 	return category ? TEXT.capitalize(category) : "Unavailable"
 }
-const seasonIcons: Record<string, WeatherIconName> = {
-	Spring: "flower",
-	Summer: "weather-sunny",
-	Autumn: "leaf-maple",
-	Winter: "snowflake",
-}
-
 function seasonDescription(snapshot: PresentWeatherParams["snapshot"]): string {
 	const { instant, values } = snapshot
 	if (!values) return "Unavailable"
@@ -247,13 +231,8 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 				? "colder than usual"
 				: null
 
-	const timeOfDay =
-		values.localHour === null
-			? values.daylight
-				? "Illuminated"
-				: "Dark"
-			: timeOfDayDescription(snapshot)
 	const icon = conditionIcon(values)
+	const season = seasonDescription(snapshot)
 	const display = {
 		icon,
 		tone: iconTones[icon],
@@ -273,7 +252,7 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 		rain: formatRainRate({ value: values.rainRateMmH, unitSystem }),
 		sky: skyDescription(values),
 		clouds: cloudDescription(values),
-		time: `${dateLabel} · ${localTime}`,
+		time: `${dateLabel} · ${season} · ${localTime}`,
 	}
 	const relativeHumidity = WEATHER_COMFORT.relativeHumidity({
 		temperatureC: values.temperatureC,
@@ -284,8 +263,6 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 		relativeHumidity,
 		windSpeedMs: values.windSpeedMs,
 	})
-	const pressure = WEATHER_DESCRIPTION.pressureTrend(values.pressureTendencyHpa)
-	const season = seasonDescription(snapshot)
 	const tiles: WeatherTile[] = [
 		{
 			label: "Feels like",
@@ -319,13 +296,6 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 			wide: false,
 		},
 		{
-			label: "Pressure",
-			value: `${WEATHER_DESCRIPTION.pressureLabel(pressure)} · ${values.pressureTendencyHpa >= 0 ? "+" : "−"}${Math.abs(values.pressureTendencyHpa).toFixed(1)} hPa/3 h`,
-			icon: "weather-windy",
-			help: "Estimated three-hour surface pressure tendency as weather systems pass: falling ahead of a storm, rising behind it.",
-			wide: false,
-		},
-		{
 			label: "Precipitation",
 			value: display.rain,
 			icon: "weather-rainy",
@@ -336,27 +306,6 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 			label: "Sky",
 			value: display.sky,
 			icon: "cloud",
-			help: null,
-			wide: false,
-		},
-		{
-			label: "Clouds",
-			value: display.clouds,
-			icon: "weather-cloudy",
-			help: "Representative estimated cloud type for this province. Sky coverage is shown separately.",
-			wide: false,
-		},
-		{
-			label: "Season",
-			value: season,
-			icon: seasonIcons[season] ?? "sun-angle",
-			help: "Astronomical season for the representative location and hemisphere, not a wet/dry-season classification.",
-			wide: false,
-		},
-		{
-			label: "Local time",
-			value: localTime,
-			icon: timeIcon(timeOfDay),
 			help: null,
 			wide: false,
 		},
@@ -537,17 +486,17 @@ function sky({
 					],
 				}),
 			),
-			...(xyz
-				? ECLIPSE_DISPLAY.rows({
-						result: WEATHER_ECLIPSES.local({
-							params,
-							xyz,
-							instant: snapshot.instant,
-						}),
-						instant: snapshot.instant,
-					})
-				: []),
 		],
+		eclipses: xyz
+			? ECLIPSE_DISPLAY.rows({
+					result: WEATHER_ECLIPSES.local({
+						params,
+						xyz,
+						instant: snapshot.instant,
+					}),
+					instant: snapshot.instant,
+				})
+			: [],
 	}
 }
 
@@ -563,11 +512,6 @@ const seaStateLabels: Record<MarineSeaState, string> = {
 	phenomenal: "Phenomenal",
 	iceCovered: "Ice-covered",
 }
-const tidePhaseLabels: Record<MarineTidePhase, string> = {
-	spring: "Spring tide",
-	between: "Between spring and neap",
-	neap: "Neap tide",
-}
 const directionArrows = { rising: "↑", falling: "↓", steady: "→" }
 
 function sea({
@@ -582,13 +526,15 @@ function sea({
 	const signed = (value: number) => `${value > 0 ? "+" : ""}${height(value)}`
 	const dayHours = (snapshot.instant.solarDaySeconds ?? 86400) / 3600
 	const eventValue = (event: MarineTideEvent | null) => {
-		if (!event) return "Not found within forecast"
+		if (!event) return { value: "—", detail: null }
 		const time =
 			event.localHour === null
 				? "—"
 				: formatClockTimeDisplay(event.localHour, dayHours, true)
-		const day = ECLIPSE_DISPLAY.dayOffset(event.dayOffset)
-		return `${time}${day} · ${signed(event.levelM)}`
+		return {
+			value: `${time}${ECLIPSE_DISPLAY.dayOffset(event.dayOffset)}`,
+			detail: signed(event.levelM),
+		}
 	}
 	const tide = WEATHER_MARINE.tide({
 		instant: snapshot.instant,
@@ -600,48 +546,23 @@ function sea({
 		? [
 				{
 					key: "tide",
-					name: "Tide",
-					detail: tide.phase
-						? tidePhaseLabels[tide.phase]
-						: "Range not found within forecast",
+					name: "Tides",
+					detail: `${signed(tide.levelM)} ${directionArrows[tide.direction]}`,
+					detailHelp:
+						"The current water level is relative to mean sea level, and the arrow shows whether it is rising or falling.",
 					icon: "tide",
 					tone: "sea",
 					moon: null,
 					items: [
 						{
-							label: "Water level relative to mean sea level",
-							value: `${signed(tide.levelM)} ${directionArrows[tide.direction]}`,
-							icon: "tide",
+							label: "Next high tide (local time and height)",
+							...eventValue(tide.high),
+							icon: "arrow-up",
 						},
-					],
-				},
-				{
-					key: "high-water",
-					name: "High water",
-					detail: null,
-					icon: "tide",
-					tone: "sea",
-					moon: null,
-					items: [
 						{
-							label: "Next high water (local time and height)",
-							value: eventValue(tide.high),
-							icon: "weather-sunset-up",
-						},
-					],
-				},
-				{
-					key: "low-water",
-					name: "Low water",
-					detail: null,
-					icon: "tide",
-					tone: "sea",
-					moon: null,
-					items: [
-						{
-							label: "Next low water (local time and height)",
-							value: eventValue(tide.low),
-							icon: "weather-sunset-down",
+							label: "Next low tide (local time and height)",
+							...eventValue(tide.low),
+							icon: "arrow-down",
 						},
 					],
 				},
@@ -649,7 +570,7 @@ function sea({
 		: [
 				{
 					key: "tide",
-					name: "Tide",
+					name: "Tides",
 					detail: "No tidal cycle",
 					icon: "tide",
 					tone: "sea",

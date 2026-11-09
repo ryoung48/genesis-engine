@@ -27,6 +27,7 @@ function createOverlay(): SolarSystemOverlayState {
 	group.add(new THREE.Mesh(new THREE.SphereGeometry(), material))
 	return {
 		group,
+		outerRadius: 3,
 		suggestedCameraDistance: 6,
 		setDay: vi.fn(),
 		updateBodies: vi.fn(() => true),
@@ -52,7 +53,7 @@ function createHarness() {
 		solarSystemGroup: new THREE.Group(),
 		scene: new THREE.Scene(),
 		camera: new THREE.PerspectiveCamera(),
-		controls: { maxDistance: 24 },
+		controls: { maxDistance: 24, target: new THREE.Vector3() },
 		renderer: { compileAsync, render },
 		solarSystemActive: true,
 		solarSystemOverlayState: null,
