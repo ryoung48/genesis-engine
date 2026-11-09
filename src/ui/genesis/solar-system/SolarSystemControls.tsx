@@ -35,6 +35,8 @@ interface SolarSystemControlsProps {
 	onToggleGenerationPanel?: () => void
 	showEllipticalOrbits: boolean
 	setShowEllipticalOrbits: (v: boolean) => void
+	trueScale: boolean
+	setTrueScale: (v: boolean) => void
 	showDaylight: boolean
 	setShowDaylight: (v: boolean) => void
 	showInclination: boolean
@@ -72,6 +74,8 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 	onToggleGenerationPanel,
 	showEllipticalOrbits,
 	setShowEllipticalOrbits,
+	trueScale,
+	setTrueScale,
 	showDaylight,
 	setShowDaylight,
 	showInclination,
@@ -148,6 +152,12 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 								action={headerAction}
 							/>
 							<div className="space-y-3">
+								<ToggleRow
+									label="True Scale"
+									checked={trueScale}
+									onChange={setTrueScale}
+									labelClassName="text-slate-200"
+								/>
 								<ToggleRow
 									label="Elliptical Orbits"
 									checked={showEllipticalOrbits}

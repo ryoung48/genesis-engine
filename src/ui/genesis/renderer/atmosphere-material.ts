@@ -39,13 +39,13 @@ export function buildAtmosphereMaterial(
 			limbConcentration: { value: input.limbConcentration },
 		},
 		vertexShader: `
-			varying vec3 vWorldNormal;
-			varying vec3 vWorldPosition;
+			varying vec3 vViewNormal;
+			varying vec3 vViewPosition;
 			void main() {
-				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-				vWorldPosition = worldPosition.xyz;
-				vWorldNormal = normalize(mat3(modelMatrix) * normal);
-				gl_Position = projectionMatrix * viewMatrix * worldPosition;
+				vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+				vViewPosition = viewPosition.xyz;
+				vViewNormal = normalize(normalMatrix * normal);
+				gl_Position = projectionMatrix * viewPosition;
 			}
 		`,
 		fragmentShader: `
@@ -53,10 +53,12 @@ export function buildAtmosphereMaterial(
 			uniform vec3 sunDirection;
 			uniform float atmosphereStrength;
 			uniform float limbConcentration;
-			varying vec3 vWorldNormal;
-			varying vec3 vWorldPosition;
+			varying vec3 vViewNormal;
+			varying vec3 vViewPosition;
 			void main() {
-				vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+				vec3 viewDir = normalize(-vViewPosition);
+				vec3 viewNormal = normalize(vViewNormal);
+				vec3 viewSun = normalize(mat3(viewMatrix) * sunDirection);
 				// This shell renders BackSide, so every drawn fragment faces away
 				// from the camera and this dot is always negative -- its magnitude
 				// runs from 0 at the shell's own silhouette up toward 1 behind the
@@ -64,9 +66,9 @@ export function buildAtmosphereMaterial(
 				// limbConcentration therefore makes the haze densest against the
 				// body's limb and fade outward. Guarded against an exactly-zero
 				// base, which pow leaves undefined at exponent 0.
-				float grazing = max(abs(dot(viewDir, normalize(vWorldNormal))), 1e-4);
+				float grazing = max(abs(dot(viewDir, viewNormal)), 1e-4);
 				float rim = pow(grazing, limbConcentration);
-				float daylight = smoothstep(-0.15, 0.65, dot(normalize(vWorldNormal), normalize(sunDirection)));
+				float daylight = smoothstep(-0.15, 0.65, dot(viewNormal, viewSun));
 				float alpha = rim * mix(0.03, 0.18, daylight) * atmosphereStrength;
 				gl_FragColor = vec4(atmosphereColor, alpha);
 			}

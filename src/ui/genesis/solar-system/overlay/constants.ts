@@ -8,10 +8,31 @@ import type { CompanionStar, SystemBody } from "@/model/celestial/system/types"
 export const DEG2RAD = Math.PI / 180
 
 export const TWO_PI = 2 * Math.PI
-export const ORBIT_SEGMENTS = 256
 export const KM_PER_AU = ORBIT_BODY.astronomicalUnitM / 1000
 
-// --- System layout: as close to true scale as each system allows ---
+// --- System layout: true scale ---
+// Every distance and every body radius is drawn at the same units-per-AU, so
+// sizes and orbits keep their real proportions. The factor puts the system's
+// farthest apoapsis, belt edge or companion star on LAYOUT_OUTER_RADIUS.
+export const LAYOUT_OUTER_RADIUS = 100
+// The generator keeps every orbit outside its star's real radius, so a star is
+// drawn true size; this only stops it (a black hole's disk bounds reach twice
+// its drawn radius) from covering the innermost periapsis.
+export const STAR_MAX_INNER_PERIAPSIS_FRACTION = 1
+// True size makes a white dwarf, neutron star or black hole subpixel, so a
+// star is never drawn smaller than this fraction of a Sun-sized star at the
+// system's own scale (a fixed size would swamp small stars in a large system).
+// 0.1 R_sun is about the smallest a hydrogen-burning star gets, so only
+// compact remnants (a white dwarf is ~0.01 R_sun) are ever raised to it; their
+// flare keeps them findable.
+export const MIN_STAR_RADIUS_SUN_FRACTION = 0.1
+// Three.js windows a cutoff point light by (1 - (d/cutoff)^4)^2, so a body at
+// the cutoff is dark and one at 0.4 of it keeps 95%. In a multi-star system
+// the light is cut off at this multiple of the outer orbit edge, so every
+// orbit stays lit at 95% or better while the far sibling's bodies still fall
+// outside the window.
+export const STAR_LIGHT_CUTOFF_OUTER_EDGE_FACTOR = 2.5
+// --- Readable layout: as close to true scale as each system allows ---
 // Orbits are laid out by their gap above the star's true surface, raised to
 // a per-system power p = min(1, ln(MAX_ORBIT_SPREAD) / ln(outer / inner)):
 // a compact system stays linear, a spread-out one is compressed just enough.
@@ -23,8 +44,6 @@ export const MAX_ORBIT_SPREAD = 120
 // Floor on an orbit's gap above the star's surface, below the closest known
 // exoplanet orbits (~0.006 AU), so the power law never sees zero.
 export const MIN_ORBIT_GAP_AU = 0.001
-// Every system is scaled so its farthest apoapsis or belt edge lands here.
-export const LAYOUT_OUTER_RADIUS = 100
 // A Sun-sized star's drawn radius: ~1.2% of the outer edge, the reference
 // simulator's Sun-to-Neptune-orbit ratio (1 : ~73).
 export const SUN_DRAWN_RADIUS = 1.2
@@ -36,7 +55,7 @@ export const STAR_LOG_SLOPE = 0.5
 // every inner distance and flatten the spacing), so a star is capped at half
 // its innermost drawn periapsis: a giant shrinks instead of covering its
 // orbits, and nothing ever sits inside the star.
-export const STAR_MAX_INNER_PERIAPSIS_FRACTION = 0.5
+export const READABLE_STAR_MAX_INNER_PERIAPSIS_FRACTION = 0.5
 export const MIN_STAR_SIZE = 0.25
 // Body size before fitting: tanh(radius_km / 1e5) from the reference
 // simulator, linear for rocky worlds and saturating for giants (Earth 0.064,

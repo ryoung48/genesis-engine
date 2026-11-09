@@ -29,6 +29,20 @@ describe("Non-Primary Star Determination table", () => {
 			) {
 				continue
 			}
+			const hostIndex = companion.parentIndex ?? 0
+			const minimumPeriapsisAU = Math.max(
+				stars[hostIndex]!.mao,
+				STAR.getMinimumStarPeriapsisAU({
+					a: companion,
+					b: stars[hostIndex]!,
+				}),
+			)
+			if (
+				companion.orbitalDistanceAU * (1 - companion.eccentricity) <=
+				minimumPeriapsisAU * 1.0001
+			) {
+				continue
+			}
 			const orbitNumber = ORBIT_BODY.auToOrbitNumber({
 				au: companion.orbitalDistanceAU,
 			})

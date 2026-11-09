@@ -432,6 +432,16 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			cls: tableSpectralClass,
 			subtype: starSubtype,
 		})
+	// The host's real radius: no orbit may dip inside it, so an eccentric orbit
+	// is capped to keep its periapsis outside (see the eccentricity cap below).
+	const starRadiusAU = STAR.getStarRadiusAU({
+		diameterSol:
+			hostStar?.diameterSol ??
+			STAR.getStarDiameterSol({
+				cls: tableSpectralClass,
+				subtype: starSubtype,
+			}),
+	})
 	// Hill-sphere stability ceiling for a multi-star host (see
 	// GenerateSystemBodiesParams.maxOrbitalDistanceAU's doc) -- absent (no
 	// ceiling) for every single-star caller.
@@ -1335,7 +1345,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
 			orbitalPeriodDays,
 			siderealDayHours: finalSiderealDayHours,
-			eccentricity: finalEccentricity,
+			eccentricity: Math.min(
+				finalEccentricity,
+				Math.max(0, 1 - starRadiusAU / orbitalDistanceAU),
+			),
 			longitudeOfPerihelionDeg: rng.uniform(0, 360),
 			// Independently rolled, not derived from longitudeOfPerihelionDeg
 			// above -- see OrbitBody.lsAphelionDeg's doc. For a procedurally

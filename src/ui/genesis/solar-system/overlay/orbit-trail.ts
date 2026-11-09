@@ -3,7 +3,6 @@ import { orbitPoint } from "@/ui/genesis/renderer/moon-orbit-overlay"
 import type {
 	CreateOrbitTrailInput,
 	FadeOrbitTrailInput,
-	LogFadeInput,
 	UpdateOrbitTrailInput,
 } from "@/ui/genesis/solar-system/overlay/types"
 
@@ -23,30 +22,14 @@ const ORBIT_TRAIL_FADE_POWER = 1
 // visible closed ring at the full 360 degrees; up to a half orbit it is
 // untouched.
 const ORBIT_TRAIL_FLAT_FROM_RAD = Math.PI
-// Zoomed in close, an orbit spans far more than the screen and its trail is
-// just a near-straight line slicing the view, so the whole trail fades out
-// as the orbit's radius grows from 1.5 to 10 viewport half-heights. A wide,
-// smoothstepped range keeps the dimming gradual over several zoom steps.
-const ORBIT_TRAIL_ZOOM_FADE_START = 1.5
-const ORBIT_TRAIL_ZOOM_FADE_END = 10
-// Orbit size alone misses bodies whose view is set by their own size: a far
-// planet or a large moon is approached until it fills the screen long before
-// its orbit reaches 10 half-heights. So the trail also fades as the body's
-// radius grows from 2% to 30% of the viewport half-height (the body is
-// clearly resolved by then, and the marker ring is long gone at 6%).
-const ORBIT_TRAIL_BODY_FADE_START = 0.02
-const ORBIT_TRAIL_BODY_FADE_END = 0.3
-
-function logFade({ value, start, end }: LogFadeInput): number {
-	return (
-		1 -
-		THREE.MathUtils.smoothstep(
-			Math.log(Math.max(value, 1e-6)),
-			Math.log(start),
-			Math.log(end),
-		)
-	)
-}
+// A trail is a hint of where a body is headed, so it dims as the camera closes
+// on the body: the body's radius going from 1% to 20% of the viewport
+// half-height (a speck to a large disc) takes the trail from full to gone.
+// Judged by the body's own size rather than its orbit's, so a tiny body keeps
+// its trail until the camera is actually near it, and a large moon or far
+// planet still fades once approached.
+const ORBIT_TRAIL_BODY_FADE_START = 0.01
+const ORBIT_TRAIL_BODY_FADE_END = 0.2
 
 function writeTrailAlpha(trail: THREE.Line): void {
 	const flatten = THREE.MathUtils.clamp(
@@ -129,27 +112,19 @@ function updateOrbitTrail({
 	trail.geometry.computeBoundingSphere()
 }
 
-// Scales the whole trail's opacity by how large its orbit is on screen
-// (orbit radius as a fraction of the viewport's half-height).
+// Measured on a log scale, since each zoom step multiplies the body's
+// screen size: every step then dims the trail by about the same amount.
 function fadeOrbitTrailForZoom({
 	trail,
-	orbitScreenRadius,
 	bodyScreenRadius,
 }: FadeOrbitTrailInput): void {
-	// Measured on a log scale, since each zoom step multiplies the on-screen
-	// size: every step then dims the trail by about the same amount.
-	const opacity = Math.min(
-		logFade({
-			value: orbitScreenRadius,
-			start: ORBIT_TRAIL_ZOOM_FADE_START,
-			end: ORBIT_TRAIL_ZOOM_FADE_END,
-		}),
-		logFade({
-			value: bodyScreenRadius,
-			start: ORBIT_TRAIL_BODY_FADE_START,
-			end: ORBIT_TRAIL_BODY_FADE_END,
-		}),
-	)
+	const opacity =
+		1 -
+		THREE.MathUtils.smoothstep(
+			Math.log(Math.max(bodyScreenRadius, 1e-6)),
+			Math.log(ORBIT_TRAIL_BODY_FADE_START),
+			Math.log(ORBIT_TRAIL_BODY_FADE_END),
+		)
 	trail.visible = opacity > 0
 	;(trail.material as THREE.LineBasicMaterial).opacity = opacity
 }

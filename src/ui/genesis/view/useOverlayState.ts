@@ -7,7 +7,13 @@ import type {
 	VegetationSubMode,
 } from "@/ui/genesis/controls/OverlayControls"
 import { VIEW_PREFS_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
-import { serializeStoredViewPrefs } from "@/ui/genesis/generation/view-prefs"
+import {
+	copySolarSystemOverlayPrefs,
+	DEFAULT_VIEW_PREFS,
+	parseStoredViewPrefs,
+	type StoredViewPrefs,
+	serializeStoredViewPrefs,
+} from "@/ui/genesis/generation/view-prefs"
 import type { GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
@@ -69,6 +75,9 @@ export function useOverlayState(input: OverlayStateInput) {
 		useState(false)
 	const [showSolarSystemEllipticalOrbits, setShowSolarSystemEllipticalOrbits] =
 		useState(initialViewPrefs.showSolarSystemEllipticalOrbits)
+	const [showSolarSystemTrueScale, setShowSolarSystemTrueScale] = useState(
+		initialViewPrefs.showSolarSystemTrueScale,
+	)
 	const [showSolarSystemDaylight, setShowSolarSystemDaylight] = useState(
 		initialViewPrefs.showSolarSystemDaylight,
 	)
@@ -208,68 +217,84 @@ export function useOverlayState(input: OverlayStateInput) {
 
 	useEffect(() => {
 		if (typeof window === "undefined") return
+		const prefs: StoredViewPrefs = {
+			colorMode,
+			geographyMode,
+			nationMode,
+			societyMode,
+			religionMode,
+			viewMode,
+			solarSystemViewActive,
+			showSolarSystemEllipticalOrbits,
+			showSolarSystemTrueScale,
+			showSolarSystemDaylight,
+			showSolarSystemInclination,
+			showSolarSystemAxialTilt,
+			showSolarSystemBodyNames,
+			showSolarSystemBodyMarkers,
+			solarSystemTrailDegrees,
+			showWireframe,
+			showGrid,
+			showNationBorders,
+			showDistrictBorders,
+			titleBorderTiers,
+			labelMode,
+			showElevation,
+			showClouds,
+			showContours,
+			showCoastlines,
+			showWaves,
+			showWindArrows,
+			showGdd,
+			showGint,
+			showPet,
+			showAet,
+			showOceanCurrents,
+			showRivers,
+			showInfrastructure,
+			overlaysExpanded,
+			gridSpacing,
+			unitSystem,
+			mapProjectionLatitude,
+			debugMapModes,
+			measureMode,
+			pathfindingLand,
+			pathfindingSea,
+			showDaylight,
+			clockCurrent,
+			clockDay,
+			clockHour,
+			clockUseMeridiem,
+			clockMonthMode,
+			clockMonth,
+			vegetationSubMode,
+			climateSubMode,
+			elevationSubMode,
+			topographySubMode,
+			dangerSubMode,
+		}
 		window.localStorage.setItem(
 			viewPrefsStorageKey,
-			serializeStoredViewPrefs({
-				colorMode,
-				geographyMode,
-				nationMode,
-				societyMode,
-				religionMode,
-				viewMode,
-				solarSystemViewActive,
-				showSolarSystemEllipticalOrbits,
-				showSolarSystemDaylight,
-				showSolarSystemInclination,
-				showSolarSystemAxialTilt,
-				showSolarSystemBodyNames,
-				showSolarSystemBodyMarkers,
-				solarSystemTrailDegrees,
-				showWireframe,
-				showGrid,
-				showNationBorders,
-				showDistrictBorders,
-				titleBorderTiers,
-				labelMode,
-				showElevation,
-				showClouds,
-				showContours,
-				showCoastlines,
-				showWaves,
-				showWindArrows,
-				showGdd,
-				showGint,
-				showPet,
-				showAet,
-				showOceanCurrents,
-				showRivers,
-				showInfrastructure,
-				overlaysExpanded,
-				gridSpacing,
-				unitSystem,
-				mapProjectionLatitude,
-				debugMapModes,
-				measureMode,
-				pathfindingLand,
-				pathfindingSea,
-				showDaylight,
-				clockCurrent,
-				clockDay,
-				clockHour,
-				clockUseMeridiem,
-				clockMonthMode,
-				clockMonth,
-				vegetationSubMode,
-				climateSubMode,
-				elevationSubMode,
-				topographySubMode,
-				dangerSubMode,
-			}),
+			serializeStoredViewPrefs(prefs),
+		)
+		if (!sessionNamespace) return
+		window.localStorage.setItem(
+			VIEW_PREFS_STORAGE_KEY,
+			serializeStoredViewPrefs(
+				copySolarSystemOverlayPrefs({
+					from: prefs,
+					to:
+						parseStoredViewPrefs(
+							window.localStorage.getItem(VIEW_PREFS_STORAGE_KEY),
+						) ?? DEFAULT_VIEW_PREFS,
+				}),
+			),
 		)
 	}, [
 		colorMode,
 		solarSystemViewActive,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
@@ -321,6 +346,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		pathfindingLand,
 		pathfindingSea,
 		viewPrefsStorageKey,
+		sessionNamespace,
 	])
 
 	return {
@@ -398,6 +424,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowSolarSystemBodyMarkers,
 		setShowSolarSystemDaylight,
 		setShowSolarSystemEllipticalOrbits,
+		setShowSolarSystemTrueScale,
 		setShowSolarSystemInclination,
 		setShowWindArrows,
 		setShowWireframe,
@@ -430,6 +457,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showSolarSystemBodyMarkers,
 		showSolarSystemDaylight,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemInclination,
 		showWindArrows,
 		showWireframe,

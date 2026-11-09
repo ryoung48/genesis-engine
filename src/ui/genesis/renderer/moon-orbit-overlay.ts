@@ -335,6 +335,9 @@ export function buildMoonOrbitOverlay(
 	/** Fading trails behind each moon instead of full orbit rings, as the
 	 * solar-system view draws for planets; the globe view keeps full rings. */
 	showTrails: boolean = false,
+	/** Moon orbits at their real distance in planet radii, instead of the
+	 * compressed display layout the globe view uses. */
+	trueScale: boolean = false,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 	if (moons.length === 0) {
@@ -365,12 +368,16 @@ export function buildMoonOrbitOverlay(
 		eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
 		bodyVisualRadius: moonDisplayRadii[index] ?? MIN_MOON_VISUAL_RADIUS,
 	}))
-	const orbitPeriapses = layoutMoonOrbitPeriapsesForDisplay({
-		orbits: moonOrbits,
-		parentVisualRadius: parentOccupiedRadiusRelativeToPlanet,
-		minDisplayDistance: SCENE_MIN,
-		maxDisplayDistance: SCENE_MAX,
-	})
+	const orbitPeriapses = trueScale
+		? moonOrbits.map(
+				(orbit) => orbit.orbitalDistancePlanetRadii * (1 - orbit.eccentricity),
+			)
+		: layoutMoonOrbitPeriapsesForDisplay({
+				orbits: moonOrbits,
+				parentVisualRadius: parentOccupiedRadiusRelativeToPlanet,
+				minDisplayDistance: SCENE_MIN,
+				maxDisplayDistance: SCENE_MAX,
+			})
 
 	const moonMeshes: THREE.Mesh[] = []
 	const moonAtmosphereShells: THREE.Mesh<
@@ -717,7 +724,6 @@ export function buildMoonOrbitOverlay(
 			if (d.trail) {
 				ORBIT_TRAIL.fadeForZoom({
 					trail: d.trail,
-					orbitScreenRadius: (d.a * groupScale) / screenUnit,
 					bodyScreenRadius: (d.localRadius * groupScale) / screenUnit,
 				})
 			}

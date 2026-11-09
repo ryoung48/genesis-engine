@@ -53,38 +53,6 @@ export interface ComputeBodyScaleInput {
 	companionBands: CompanionBand[]
 }
 
-export interface CreateOrbitTrailInput {
-	color: number
-	// The trail's opacity right at the body; it fades to zero at the tail.
-	peakOpacity: number
-}
-
-export interface FadeOrbitTrailInput {
-	trail: THREE.Line
-	// Orbit radius as a fraction of the viewport's half-height.
-	orbitScreenRadius: number
-	// The body's radius as a fraction of the viewport's half-height.
-	bodyScreenRadius: number
-}
-
-export interface LogFadeInput {
-	value: number
-	start: number
-	end: number
-}
-
-export interface UpdateOrbitTrailInput {
-	trail: THREE.Line
-	kepler: NonNullable<PlacedBody["kepler"]>
-	eccentricAnomaly: number
-}
-
-export interface LabelVisibilityInput {
-	// Orbit radius as a fraction of the viewport's half-height.
-	orbitScreenRadius: number
-	radiusKm: number
-}
-
 export interface DistanceMapping {
 	exponent: number
 	scale: number
@@ -98,6 +66,38 @@ export interface DrawnDistanceInput {
 export type LayoutSlot =
 	| { kind: "body"; placedIndex: number; orbitalDistanceAU: number }
 	| { kind: "companion"; companionIndex: number; orbitalDistanceAU: number }
+
+export interface PlacedLayout {
+	drawnSemiMajor: Map<PlacedBody, number>
+	// [JUSTIFICATION] Only the readable layout sizes bodies to their spacing;
+	// the true-scale layout sizes them from their radius and leaves this unset.
+	bodyScale?: number
+	outerEdge: number
+}
+
+export interface CreateOrbitTrailInput {
+	color: number
+	// The trail's opacity right at the body; it fades to zero at the tail.
+	peakOpacity: number
+}
+
+export interface FadeOrbitTrailInput {
+	trail: THREE.Line
+	// The body's radius as a fraction of the viewport's half-height.
+	bodyScreenRadius: number
+}
+
+export interface UpdateOrbitTrailInput {
+	trail: THREE.Line
+	kepler: NonNullable<PlacedBody["kepler"]>
+	eccentricAnomaly: number
+}
+
+export interface LabelVisibilityInput {
+	// Orbit radius as a fraction of the viewport's half-height.
+	orbitScreenRadius: number
+	radiusKm: number
+}
 
 export interface UpdateAsteroidFieldInput {
 	field: AsteroidFieldData
@@ -117,6 +117,7 @@ export interface UpdateAsteroidFieldInput {
 export interface CompanionOverlayParams {
 	star: SolarSystemOverlayParams
 	role: CompanionStar["role"]
+	parentIndex: CompanionStar["parentIndex"]
 	orbitalDistanceAU: number
 	orbitalPeriodDays: number
 	eccentricity: number
@@ -201,6 +202,11 @@ export interface SolarSystemOverlayParams {
 	// uncapped one), applied to the companion too so the two stars keep their
 	// true size order. External callers never provide it.
 	parentStarSizeScale?: number
+	// [JUSTIFICATION] Only set by the internal recursive companion call: the
+	// primary's units-per-AU, so a companion's bodies share the primary's
+	// true scale instead of fitting their own system to LAYOUT_OUTER_RADIUS.
+	unitsPerAU?: number
+	trueScale: boolean
 }
 
 export interface SolarSystemOverlayState {
@@ -325,6 +331,9 @@ export interface PlacedCompanion {
 		e: number
 	}
 	orbitLine: THREE.Line
+	parentIndex: number
+	// [JUSTIFICATION] Absent for a companion that orbits the primary directly.
+	parent?: PlacedCompanion
 	/** Golden-angle-spread starting angle, same technique as every planet's
 	 * own meanAnomalyAtEpoch -- without this every companion starts at angle
 	 * 0 and multiple companions render collinear from the primary instead of

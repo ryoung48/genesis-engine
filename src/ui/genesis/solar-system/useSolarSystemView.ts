@@ -37,6 +37,7 @@ function buildCompanionOverlayParams(
 	companionStars: CompanionStar[] | undefined,
 	toggles: {
 		showEllipticalOrbits: boolean
+		trueScale: boolean
 		showDaylight: boolean
 		showInclination: boolean
 		showAxialTilt: boolean
@@ -58,6 +59,7 @@ function buildCompanionOverlayParams(
 			hostStar: companion.hostStar,
 			initialDay,
 			showEllipticalOrbits: toggles.showEllipticalOrbits,
+			trueScale: toggles.trueScale,
 			showDaylight: toggles.showDaylight,
 			showInclination: toggles.showInclination,
 			showAxialTilt: toggles.showAxialTilt,
@@ -69,6 +71,7 @@ function buildCompanionOverlayParams(
 			proceduralSystem: true,
 		},
 		role: companion.role,
+		parentIndex: companion.parentIndex,
 		orbitalDistanceAU: companion.orbitalDistanceAU,
 		orbitalPeriodDays: companion.orbitalPeriodDays,
 		eccentricity: companion.eccentricity,
@@ -165,6 +168,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		solarSystemViewActive,
 		setSolarSystemViewActive,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
@@ -261,6 +265,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						hostStar: solarSystem.star.hostStar,
 						initialDay,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+						trueScale: showSolarSystemTrueScale,
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
 						showAxialTilt: showSolarSystemAxialTilt,
@@ -275,6 +280,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 							solarSystem.companionStars,
 							{
 								showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+								trueScale: showSolarSystemTrueScale,
 								showDaylight: showSolarSystemDaylight,
 								showInclination: showSolarSystemInclination,
 								showAxialTilt: showSolarSystemAxialTilt,
@@ -299,6 +305,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		spectralClass,
 		starSubtype,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,
@@ -324,6 +331,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						hostStar: solarSystem.star.hostStar,
 						initialDay,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+						trueScale: showSolarSystemTrueScale,
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
 						showAxialTilt: showSolarSystemAxialTilt,
@@ -338,6 +346,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 							solarSystem.companionStars,
 							{
 								showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+								trueScale: showSolarSystemTrueScale,
 								showDaylight: showSolarSystemDaylight,
 								showInclination: showSolarSystemInclination,
 								showAxialTilt: showSolarSystemAxialTilt,
@@ -358,6 +367,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		spectralClass,
 		starSubtype,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,

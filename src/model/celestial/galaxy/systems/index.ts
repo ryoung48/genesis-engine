@@ -210,7 +210,7 @@ function rollStarTree(rng: SharedRng): StarPreview[] {
 							: role === "outer"
 								? rng.randint(1, 6) + 5
 								: rng.randint(1, 6) + 11
-		const orbitalDistanceAU = ORBIT_BODY.orbitNumberToAU({ orbitNumber })
+		const rolledDistanceAU = ORBIT_BODY.orbitNumberToAU({ orbitNumber })
 		// Book's "for each star an object directly orbits beyond the first"
 		// eccentricity DM (p. 27-28): only an epistellar companion of a
 		// non-primary star (the tree's one nested case) counts as beyond the
@@ -228,6 +228,17 @@ function rollStarTree(rng: SharedRng): StarPreview[] {
 					})
 		const inclinationDeg =
 			role === "primary" ? 0 : ORBIT_BODY.rollInclinationDeg(rng)
+		const minimumPeriapsisAU =
+			parentStar === undefined
+				? 0
+				: Math.max(
+						parentStar.mao,
+						STAR.getMinimumStarPeriapsisAU({ a: rolled, b: parentStar }),
+					)
+		const orbitalDistanceAU = Math.max(
+			rolledDistanceAU,
+			minimumPeriapsisAU / (1 - eccentricity),
+		)
 		stars.push({
 			spectralClass: rolled.spectralClass,
 			luminosityClass: rolled.luminosityClass,

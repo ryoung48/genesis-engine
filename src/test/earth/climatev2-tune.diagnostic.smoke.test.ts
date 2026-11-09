@@ -31,7 +31,7 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 // into PARAMS_DEFAULTS / DIURNAL_PARAMS by hand. TUNE_OBJECTIVE=dtr scores instead the PASTA exact match with the
 // observed temperature and rain and only the model's day range (its keys default to DIURNAL_PRIORS'); TUNE_OBJECTIVE=
 // rain, with the observed temperature and day range and only the model's rain (its keys default to the rain stage's);
-// either way the combined PASTA exact match is guarded too. TUNE_KEYS (comma list) and TUNE_ROUNDS override the defaults.
+// either way the combined PASTA exact match is guarded too. TUNE_KEYS (comma list), TUNE_ROUNDS and TUNE_STEP (the first step, a share of each range) override the defaults.
 
 const OBJECTIVE =
 	process.env.TUNE_OBJECTIVE === "dtr" || process.env.TUNE_OBJECTIVE === "rain"
@@ -47,7 +47,7 @@ const KEYS = (
 ).split(",")
 const DIURNAL_DEFAULTS = { ...DIURNAL_PARAMS }
 const ROUNDS = Number(process.env.TUNE_ROUNDS ?? 4)
-const START_STEP = 0.25
+const START_STEP = Number(process.env.TUNE_STEP ?? 0.25)
 // the vendor's pull toward the literature value: 0.02 of its objective (a fraction) per range² → 2 points of PASTA
 // exact match for a key moved across its whole range
 const PRIOR_POINTS = 2

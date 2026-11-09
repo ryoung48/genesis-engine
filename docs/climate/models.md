@@ -6,6 +6,8 @@ V2 uses the current climatev2 temperature, monthly wind, ocean, rain, cloud and 
 
 For how rotating v2 worlds respond to axial tilt, and how they compare with ExoPlaSim, see [obliquity.md](obliquity.md).
 
+For what has been measured, tried and ruled out in raising v2's PASTA and Köppen match on Earth, and the diagnostics and tuner used, see [accuracy-investigations.md](accuracy-investigations.md).
+
 For non-locked v2 worlds, the Temperature, Rain, Humidity, Cloud Cover, DTR and MI maps include ocean cells. Temperature shows sea-surface temperature over the ocean; Rain shows ocean precipitation. Humidity uses the existing temperature/daily-range estimate, without land water-balance aridity over oceans; it is not v2's atmospheric column humidity. Cloud Cover uses the existing cached monthly cloud fractions. DTR shows the modeled near-surface air day/night temperature range. MI applies the existing apparent-temperature calculation using modeled temperature, estimated humidity and wind; ocean temperature is SST, so ocean MI is a proxy rather than an independently modeled marine air comfort index. These maps use the existing color scales and annual/monthly selectors. Observed and difference maps retain their existing coverage.
 
 Ocean hover cards expose the corresponding modeled climate readouts and monthly series, including rainfall, cloud cover, humidity, DTR and MI in their respective modes. The temperature chart is labeled SST over oceans. Ocean humidity and MI omit the land water-balance aridity adjustment, matching their map calculations.

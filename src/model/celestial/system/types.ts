@@ -151,6 +151,10 @@ export interface CompanionStar {
 	 * GALAXY_SYSTEMS' StarRole minus "primary" (only the root star has no
 	 * parent). */
 	role: "epistellar" | "inner" | "outer" | "distant"
+	/** The star this one orbits: 0 for the primary, otherwise the 1-based
+	 * position of its parent in the companionStars array. orbitalDistanceAU,
+	 * period, eccentricity and inclination are all relative to that star. */
+	parentIndex: number
 	/** Distance from the star it orbits, using that parent's own
 	 * habitable-zone deviation-to-AU mapping -- see GalaxyStar's doc. */
 	orbitalDistanceAU: number

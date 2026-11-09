@@ -1058,27 +1058,22 @@ export function rollStarAttributes(
 		? blackHoleRoll.luminositySol(rng)
 		: diameterSol ** 2 * (temperatureK / 5772) ** 4
 
-	// A black hole's own accretion disk (diameterSol, in solar diameters) can
-	// physically extend well past the flat 0.001 floor white dwarfs/neutron
-	// stars use -- e.g. a near-minimum-mass hole with a large diameter roll
-	// can reach ~0.05 AU, comfortably inside where a planet could otherwise
-	// land. MAO takes whichever is larger so a planet orbit is never placed
-	// inside the visible disk itself.
-	const blackHoleDiskRadiusAU =
-		(diameterSol * ORBIT_BODY.solarDiameterKm * 1000) /
-		ORBIT_BODY.astronomicalUnitM /
-		2
-	const mao = brownDwarf
+	// The closest a world can sit is the star's own surface (a black hole's
+	// visible accretion disk, a giant's real radius), whatever the table's floor:
+	// a larger star would have engulfed anything inside that, so no planet is
+	// ever generated there. A near-minimum-mass hole with a large diameter roll
+	// reaches ~0.05 AU, and a giant's radius runs to several AU.
+	const starRadiusAU = getStarRadiusAU({ diameterSol })
+	const tableMao = brownDwarf
 		? 0.005
-		: whiteDwarf || neutronStar
+		: whiteDwarf || neutronStar || blackHole
 			? 0.001
-			: blackHole
-				? Math.max(blackHoleDiskRadiusAU, 0.001)
-				: fullInterpolateSeries(
-						idx,
-						starMAOByLuminosityClass[physicalLuminosityClass],
-						COMPACT_STAR_DOMAIN_LENGTH,
-					)
+			: fullInterpolateSeries(
+					idx,
+					starMAOByLuminosityClass[physicalLuminosityClass],
+					COMPACT_STAR_DOMAIN_LENGTH,
+				)
+	const mao = Math.max(tableMao, starRadiusAU)
 
 	const deadStar = whiteDwarf || neutronStar || blackHole
 	let ageGyr = parent?.ageGyr ?? 0
@@ -1177,7 +1172,41 @@ export function rollStarAttributes(
 	}
 }
 
+function getStarRadiusAU({ diameterSol }: { diameterSol: number }): number {
+	return (
+		(diameterSol * ORBIT_BODY.solarDiameterKm * 1000) /
+		ORBIT_BODY.astronomicalUnitM /
+		2
+	)
+}
+
+// Eggleton (1983), ApJ 268, 368: a star of mass ratio q = M_star / M_other
+// fills its Roche lobe at a radius of this fraction of the separation.
+function rocheLobeFraction({ massRatio }: { massRatio: number }): number {
+	const q23 = massRatio ** (2 / 3)
+	return (0.49 * q23) / (0.6 * q23 + Math.log(1 + massRatio ** (1 / 3)))
+}
+
+// The closest two stars can pass and both stay inside their Roche lobes (so
+// they neither overlap nor trade mass); the larger of the two stars' limits.
+function getMinimumStarPeriapsisAU({
+	a,
+	b,
+}: {
+	a: { massSol: number; diameterSol: number }
+	b: { massSol: number; diameterSol: number }
+}): number {
+	const limit = (star: typeof a, other: typeof a) =>
+		getStarRadiusAU({ diameterSol: star.diameterSol }) /
+		rocheLobeFraction({
+			massRatio: Math.max(star.massSol, 1e-6) / Math.max(other.massSol, 1e-6),
+		})
+	return Math.max(limit(a, b), limit(b, a))
+}
+
 export const STAR = {
+	getStarRadiusAU,
+	getMinimumStarPeriapsisAU,
 	getStarTemperatureK({ cls, subtype }: StarSpectralInput): number {
 		return interpolateSeries({
 			position: getStarSpectralPosition({ cls, subtype }),

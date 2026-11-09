@@ -60,6 +60,7 @@ import { useProceduralHistory } from "@/ui/genesis/generation/useProceduralHisto
 import { useWorldDistributions } from "@/ui/genesis/generation/useWorldDistributions"
 import { useWorldGeneration } from "@/ui/genesis/generation/useWorldGeneration"
 import {
+	copySolarSystemOverlayPrefs,
 	DEFAULT_VIEW_PREFS,
 	parseStoredViewPrefs,
 } from "@/ui/genesis/generation/view-prefs"
@@ -142,12 +143,22 @@ export const GenesisView: React.FC<{
 	const viewPrefsStorageKey = sessionNamespace
 		? `${VIEW_PREFS_STORAGE_KEY}:${sessionNamespace}`
 		: VIEW_PREFS_STORAGE_KEY
-	const initialViewPrefs =
-		typeof window === "undefined"
-			? DEFAULT_VIEW_PREFS
-			: (parseStoredViewPrefs(
-					window.localStorage.getItem(viewPrefsStorageKey),
-				) ?? DEFAULT_VIEW_PREFS)
+	// The solar-system overlay settings are shared by every instance (the
+	// unnamespaced Earth page owns them), so a procedural system opens with the
+	// same toggles and trail length.
+	const initialViewPrefs = (() => {
+		if (typeof window === "undefined") return DEFAULT_VIEW_PREFS
+		const shared = parseStoredViewPrefs(
+			window.localStorage.getItem(VIEW_PREFS_STORAGE_KEY),
+		)
+		const own = sessionNamespace
+			? parseStoredViewPrefs(window.localStorage.getItem(viewPrefsStorageKey))
+			: shared
+		const base = own ?? DEFAULT_VIEW_PREFS
+		return shared
+			? copySolarSystemOverlayPrefs({ from: shared, to: base })
+			: base
+	})()
 	const initialGenerationSession =
 		typeof window === "undefined"
 			? null
@@ -233,6 +244,7 @@ export const GenesisView: React.FC<{
 		setSolarSystemTrailDegrees,
 		setShowSolarSystemDaylight,
 		setShowSolarSystemEllipticalOrbits,
+		setShowSolarSystemTrueScale,
 		setShowSolarSystemInclination,
 		setShowWindArrows,
 		setShowWireframe,
@@ -264,6 +276,7 @@ export const GenesisView: React.FC<{
 		solarSystemTrailDegrees,
 		showSolarSystemDaylight,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemInclination,
 		showClouds,
 		setShowClouds,
@@ -1983,6 +1996,7 @@ export const GenesisView: React.FC<{
 		solarSystemViewActive,
 		setSolarSystemViewActive,
 		showSolarSystemEllipticalOrbits,
+		showSolarSystemTrueScale,
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
 		showSolarSystemAxialTilt,
@@ -2040,6 +2054,9 @@ export const GenesisView: React.FC<{
 			const sortedCompanions = [...companions].sort(
 				(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
 			)
+			const companionPosition = new Map(
+				sortedCompanions.map((star, index) => [star, index + 1]),
+			)
 			setSolarSystem({
 				star: {
 					class: primary.spectralClass,
@@ -2056,6 +2073,10 @@ export const GenesisView: React.FC<{
 					seed: star.seed.toString(36).padStart(6, "0"),
 					starName: star.starName,
 					role: star.role as "epistellar" | "inner" | "outer" | "distant",
+					parentIndex:
+						star.parentIndex === null || star.parentIndex === 0
+							? 0
+							: (companionPosition.get(system.stars[star.parentIndex]!) ?? 0),
 					orbitalDistanceAU: star.orbitalDistanceAU,
 					orbitalPeriodDays: star.orbitalPeriodDays,
 					eccentricity: star.eccentricity,
@@ -2295,6 +2316,8 @@ export const GenesisView: React.FC<{
 								onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
 								showEllipticalOrbits={showSolarSystemEllipticalOrbits}
 								setShowEllipticalOrbits={setShowSolarSystemEllipticalOrbits}
+								trueScale={showSolarSystemTrueScale}
+								setTrueScale={setShowSolarSystemTrueScale}
 								showDaylight={showSolarSystemDaylight}
 								setShowDaylight={setShowSolarSystemDaylight}
 								showInclination={showSolarSystemInclination}
@@ -2309,6 +2332,9 @@ export const GenesisView: React.FC<{
 								setTrailDegrees={setSolarSystemTrailDegrees}
 								onReset={() => {
 									setShowSolarSystemEllipticalOrbits(true)
+									setShowSolarSystemTrueScale(
+										DEFAULT_VIEW_PREFS.showSolarSystemTrueScale,
+									)
 									setShowSolarSystemDaylight(true)
 									setShowSolarSystemInclination(true)
 									setShowSolarSystemAxialTilt(true)

@@ -163,6 +163,7 @@ export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	solarSystemViewActive: boolean
 	setSolarSystemViewActive: Dispatch<SetStateAction<boolean>>
 	showSolarSystemEllipticalOrbits: boolean
+	showSolarSystemTrueScale: boolean
 	showSolarSystemDaylight: boolean
 	showSolarSystemInclination: boolean
 	showSolarSystemAxialTilt: boolean

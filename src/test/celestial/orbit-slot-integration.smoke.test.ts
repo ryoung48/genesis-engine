@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { GALAXY_SYSTEMS } from "@/model/celestial/galaxy/systems"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { STAR } from "@/model/celestial/star"
 import type { HostStarAttributes } from "@/model/celestial/star/types"
 import { SYSTEM_GENERATION } from "@/model/celestial/system/generation"
 
@@ -168,5 +169,63 @@ describe("Orbit slot -> generated body integration", () => {
 				expect(body.orbitalDistanceAU).toBeGreaterThan(0)
 			}
 		}
+	})
+
+	it("no generated orbit has its periapsis inside its own star's real radius", () => {
+		let giantsSeen = 0
+		let violations = 0
+		for (let systemIndex = 0; systemIndex < 300; systemIndex++) {
+			const system = GALAXY_SYSTEMS.generate({
+				galaxySeed: 13,
+				systemIndex,
+				skipNaming: true,
+			})
+			for (const star of system.stars) {
+				const radiusAU =
+					(star.diameterSol * ORBIT_BODY.solarDiameterKm * 1000) /
+					ORBIT_BODY.astronomicalUnitM /
+					2
+				if (star.luminosityClass !== "V") giantsSeen++
+				for (const body of star.bodies) {
+					if (body.beltOfIdx !== undefined || body.trojanOfIdx !== undefined) {
+						continue
+					}
+					if (
+						body.orbitalDistanceAU * (1 - body.eccentricity) <
+						radiusAU * 0.999
+					)
+						violations++
+				}
+			}
+		}
+		expect(giantsSeen).toBeGreaterThan(0)
+		expect(violations).toBe(0)
+	})
+
+	it("no companion star's periapsis is inside its parent's MAO or the two stars' combined radii", () => {
+		let companionsSeen = 0
+		let violations = 0
+		for (let systemIndex = 0; systemIndex < 300; systemIndex++) {
+			const system = GALAXY_SYSTEMS.generate({
+				galaxySeed: 14,
+				systemIndex,
+				skipNaming: true,
+			})
+			for (const star of system.stars) {
+				if (star.parentIndex === null) continue
+				const parent = system.stars[star.parentIndex]!
+				companionsSeen++
+				const combinedRadiusAU =
+					STAR.getStarRadiusAU({ diameterSol: parent.diameterSol }) +
+					STAR.getStarRadiusAU({ diameterSol: star.diameterSol })
+				if (
+					star.orbitalDistanceAU * (1 - star.eccentricity) <
+					Math.max(combinedRadiusAU, parent.mao) * 0.999
+				)
+					violations++
+			}
+		}
+		expect(companionsSeen).toBeGreaterThan(0)
+		expect(violations).toBe(0)
 	})
 })

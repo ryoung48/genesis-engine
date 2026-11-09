@@ -689,24 +689,29 @@ export function GenerationPlanetNavigator({
 			// clickable to view that star's own real generated system. See
 			// CompanionStar's doc for why "big star orbiting a small one" can't
 			// happen here (companions are rolled floored at one class-step
-			// cooler than their own parent). A companion never has its own
-			// companions (see CompanionStar's doc), so this list is only ever
-			// built for the primary.
-			const companionChildren = isPrimary
-				? (companionStars ?? []).map((childCompanion, companionIndex) => ({
-						key: `companion-star-${companionIndex}`,
-						au: childCompanion.orbitalDistanceAU,
-						title: childCompanion.starName,
-						subtitle: "Star",
-						color: SPECTRAL_CLASS_COLORS[childCompanion.class],
-						icon: "star" as const,
-						onClick: () =>
-							selectAndFocus({
-								kind: "star",
-								starIndex: companionIndex + 1,
-							}),
-					}))
-				: []
+			// cooler than their own parent). Only the stars that orbit this one
+			// are listed (CompanionStar.parentIndex): a companion's own
+			// epistellar companion appears under it, not under the primary.
+			const companionChildren = (companionStars ?? []).flatMap(
+				(childCompanion, companionIndex) =>
+					childCompanion.parentIndex === starIndex
+						? [
+								{
+									key: `companion-star-${companionIndex}`,
+									au: childCompanion.orbitalDistanceAU,
+									title: childCompanion.starName,
+									subtitle: "Star",
+									color: SPECTRAL_CLASS_COLORS[childCompanion.class],
+									icon: "star" as const,
+									onClick: () =>
+										selectAndFocus({
+											kind: "star",
+											starIndex: companionIndex + 1,
+										}),
+								},
+							]
+						: [],
+			)
 			const starChildren = [...planetChildren, ...companionChildren].sort(
 				(a, b) => a.au - b.au,
 			)
@@ -720,6 +725,20 @@ export function GenerationPlanetNavigator({
 								label: starTitle,
 								onClick: () => selectAndFocus({ kind: "star", starIndex: 0 }),
 							},
+							...(companion!.parentIndex > 0
+								? [
+										{
+											label:
+												companionStars?.[companion!.parentIndex - 1]
+													?.starName ?? "Companion Star",
+											onClick: () =>
+												selectAndFocus({
+													kind: "star",
+													starIndex: companion!.parentIndex,
+												}),
+										},
+									]
+								: []),
 						],
 				childrenLabel: "Orbits",
 				onFocus: onFocusBody ? () => focusSelection(selection) : undefined,

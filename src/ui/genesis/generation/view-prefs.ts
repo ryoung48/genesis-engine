@@ -28,6 +28,7 @@ export interface StoredViewPrefs {
 	viewMode: GenesisViewMode
 	solarSystemViewActive: boolean
 	showSolarSystemEllipticalOrbits: boolean
+	showSolarSystemTrueScale: boolean
 	showSolarSystemDaylight: boolean
 	showSolarSystemInclination: boolean
 	showSolarSystemAxialTilt: boolean
@@ -73,6 +74,33 @@ export interface StoredViewPrefs {
 	elevationSubMode: ElevationSubMode
 	topographySubMode: TopographySubMode
 	dangerSubMode: DangerSubMode
+}
+
+const SOLAR_SYSTEM_OVERLAY_PREF_KEYS = [
+	"showSolarSystemEllipticalOrbits",
+	"showSolarSystemTrueScale",
+	"showSolarSystemDaylight",
+	"showSolarSystemInclination",
+	"showSolarSystemAxialTilt",
+	"showSolarSystemBodyNames",
+	"showSolarSystemBodyMarkers",
+	"solarSystemTrailDegrees",
+] as const satisfies readonly (keyof StoredViewPrefs)[]
+
+interface CopySolarSystemPrefsInput {
+	from: StoredViewPrefs
+	to: StoredViewPrefs
+}
+
+export function copySolarSystemOverlayPrefs({
+	from,
+	to,
+}: CopySolarSystemPrefsInput): StoredViewPrefs {
+	const merged = { ...to }
+	for (const key of SOLAR_SYSTEM_OVERLAY_PREF_KEYS) {
+		Object.assign(merged, { [key]: from[key] })
+	}
+	return merged
 }
 
 const COLOR_MODES = new Set<ColorMode>([
@@ -162,6 +190,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	viewMode: "globe",
 	solarSystemViewActive: false,
 	showSolarSystemEllipticalOrbits: true,
+	showSolarSystemTrueScale: false,
 	showSolarSystemDaylight: true,
 	showSolarSystemInclination: true,
 	showSolarSystemAxialTilt: true,
@@ -318,6 +347,10 @@ export function parseStoredViewPrefs(
 			showSolarSystemEllipticalOrbits: readBoolean(
 				parsed.showSolarSystemEllipticalOrbits,
 				DEFAULT_VIEW_PREFS.showSolarSystemEllipticalOrbits,
+			),
+			showSolarSystemTrueScale: readBoolean(
+				parsed.showSolarSystemTrueScale,
+				DEFAULT_VIEW_PREFS.showSolarSystemTrueScale,
 			),
 			showSolarSystemDaylight: readBoolean(
 				parsed.showSolarSystemDaylight,
