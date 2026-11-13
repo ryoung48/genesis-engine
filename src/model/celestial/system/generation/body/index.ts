@@ -3,8 +3,8 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	OrbitGroup,
-	TemperatureTraceEntry,
 	TideLock,
+	TideLockTraceEntry,
 } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
@@ -410,6 +410,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const solBodies = SOL_SEED_BODIES.generate(params)
 	if (solBodies) return solBodies
 	const rng = RNG.createRng({ seed })
+	const phaseRng = RNG.createStringRng({ seed: `orbit-phase:${seed}` })
 
 	const luminositySol =
 		hostStar?.luminositySol ??
@@ -740,6 +741,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				seed: "main-world",
 				name: nameBody("main-world"),
 				au: orbitalDistanceAU,
+				meanAnomalyAtEpochDeg: phaseRng.uniform(0, 360),
 				moons:
 					mainWorldMode === "moon-system"
 						? []
@@ -748,6 +750,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 									...LUNA_SEED,
 									texturePath: undefined,
 									name: nameBody("main-moon-1"),
+									meanAnomalyAtEpochDeg: phaseRng.uniform(0, 360),
 								},
 							],
 			}
@@ -1247,7 +1250,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		let finalAxialTiltDeg = rolledAxialTiltDeg
 		let finalEccentricity = eccentricity
 		let tideLock: TideLock | null = null
-		let tideLockTrace: TemperatureTraceEntry[] = []
+		let tideLockTrace: TideLockTraceEntry[] = []
 		let finalEnvironment = environment
 		// Skipped entirely for the gas-giant-moon slot -- its eccentricity and
 		// rotation are forced to Earth's above, and a star-lock here would
@@ -1265,6 +1268,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				orbitalPeriodDays,
 				baseSiderealDayHours: siderealDayHours,
 				moons: moonsWithTideLocks,
+				planetDiameterKm: diameterKm,
 				// A capital homeworld still rolls for tide lock, but `homeworld`
 				// forces a dm-0 "broke" reroll on any full 1:1 lock -- so a full
 				// lock is rare while a rolled partial spin-down / 3:2 resonance
@@ -1345,6 +1349,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
 			orbitalPeriodDays,
 			siderealDayHours: finalSiderealDayHours,
+			meanAnomalyAtEpochDeg:
+				group === "asteroid belt" ? 0 : phaseRng.uniform(0, 360),
 			eccentricity: Math.min(
 				finalEccentricity,
 				Math.max(0, 1 - starRadiusAU / orbitalDistanceAU),
@@ -1412,6 +1418,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				})
 				youthAppendages.push({
 					...cascadeResident,
+					meanAnomalyAtEpochDeg: phaseRng.uniform(0, 360),
 					idx: cascadeIdx,
 					seed: `orbit-${siblingIdx}-cascade-${c + 1}`,
 					name: nameBody(`orbit-${siblingIdx}-cascade-${c + 1}`),
@@ -1451,6 +1458,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			})
 			return {
 				...wrapper,
+				meanAnomalyAtEpochDeg: 0,
 				idx: siblingIdx,
 				seed: `orbit-${siblingIdx + 1}`,
 				name: nameBody(`orbit-${siblingIdx}`),
@@ -1504,6 +1512,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				})
 				youthAppendages.push({
 					...cascadeBeltWrapper,
+					meanAnomalyAtEpochDeg: 0,
 					idx: cascadeBeltIdx,
 					seed: `orbit-${siblingIdx}-cascade-belt`,
 					name: nameBody(`orbit-${siblingIdx}-cascade-belt`),
@@ -1558,6 +1567,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					})
 					youthAppendages.push({
 						...cascadeResident,
+						meanAnomalyAtEpochDeg: phaseRng.uniform(0, 360),
 						idx: cascadeIdx,
 						seed: `orbit-${siblingIdx}-cascade-${c + 1}`,
 						name: nameBody(`orbit-${siblingIdx}-cascade-${c + 1}`),
@@ -1618,6 +1628,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				})
 				youthAppendages.push({
 					...extraResident,
+					meanAnomalyAtEpochDeg: phaseRng.uniform(0, 360),
 					idx: extraIdx,
 					seed: `orbit-${siblingIdx}-co-orbital`,
 					name: nameBody(`orbit-${siblingIdx}-co-orbital`),
@@ -1686,6 +1697,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			})
 			beltDwarfs.push({
 				...resident,
+				meanAnomalyAtEpochDeg: phaseRng.uniform(0, 360),
 				idx: dwarfIdx,
 				seed: `belt-${belt.idx}-dwarf-${i + 1}`,
 				name: nameBody(`belt-${belt.idx}-dwarf-${i + 1}`),
@@ -1741,6 +1753,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					proto,
 					primordial,
 				})
+				const trojanOffsetDeg = rng.randint(1, 6) <= 3 ? -60 : 60
 				trojans.push({
 					...resident,
 					idx,
@@ -1751,8 +1764,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					impactZone: false,
 					moons: [],
 					trojan: true,
-					trojanOffsetDeg: rng.randint(1, 6) <= 3 ? -60 : 60,
+					trojanOffsetDeg,
 					trojanOfIdx: host.idx,
+					meanAnomalyAtEpochDeg:
+						(host.meanAnomalyAtEpochDeg + trojanOffsetDeg + 360) % 360,
 					// Cloned orbital stats -- see the doc above.
 					orbitalDistanceAU: host.orbitalDistanceAU,
 					eccentricity: host.eccentricity,

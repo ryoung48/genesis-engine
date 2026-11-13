@@ -1,9 +1,7 @@
 import type {
-	TemperatureTraceEntry,
 	TideLock,
+	TideLockTraceEntry,
 } from "@/model/celestial/orbit-body/types"
-
-export type TideLockTraceEntry = TemperatureTraceEntry
 
 export interface TideLockEffectResult {
 	siderealDayHours: number

@@ -153,6 +153,13 @@ export interface TemperatureTraceEntry {
 	description: string
 }
 
+export interface TideLockTraceEntry {
+	value: number
+	description: string
+	// [JUSTIFICATION] Only moon orbit modifiers carry a distance.
+	moonOrbitDistanceKm?: number
+}
+
 // Kept local to this dependency-free leaf rather than imported from
 // environment/temperature/types.ts's TemperatureFinalizeResult (which itself
 // imports OrbitGroup/TideLock from here) -- see this file's own doc comment
@@ -337,7 +344,7 @@ export interface OrbitBody {
 	 * plus the final 2d6+dm base-roll entry, in the order they were applied by
 	 * tide-lock.ts's rollPlanetTideLock/rollMoonTideLock. Empty for an asteroid
 	 * belt (never rolled) or a body generated before this field existed. */
-	tideLockTrace?: TemperatureTraceEntry[]
+	tideLockTrace?: TideLockTraceEntry[]
 	/** Longitude of the substellar point (the spot on the surface directly
 	 * facing the star), in degrees 0-360 — only meaningful when tideLock is
 	 * set. Defaults to 0° when unset. */

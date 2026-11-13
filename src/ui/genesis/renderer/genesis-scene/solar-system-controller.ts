@@ -43,7 +43,6 @@ export function createSolarSystemController(
 ) {
 	let compilationNeeded = false
 	let compilation: Promise<void> | null = null
-	let programsWarm = false
 	let disposed = false
 	const retiredOverlays = new Set<SolarSystemOverlayState>()
 
@@ -67,7 +66,6 @@ export function createSolarSystemController(
 			})
 			.then(() => {
 				DEFERRED_SHADERS.restore(swaps)
-				programsWarm = true
 				if (!compilationNeeded) disposeRetiredOverlays()
 			})
 			.finally(() => {
@@ -82,9 +80,6 @@ export function createSolarSystemController(
 			compilationNeeded = false
 			startCompilation()
 		}
-		// Once programs have been built, a rebuild mostly hits the renderer's
-		// cache, so holding the last frame beats flashing placeholders.
-		if (compilation && programsWarm) return
 		ctx.camera.near = Math.max(
 			ctx.camera.position.distanceTo(ctx.controls.target) *
 				SOLAR_SYSTEM_NEAR_FRACTION,
@@ -240,12 +235,10 @@ export function createSolarSystemController(
 			ctx.savedCameraPosition = ctx.camera.position.clone()
 			ctx.savedControlsTarget = ctx.controls.target.clone()
 			ctx.controls.target.set(0, 0, 0)
+			ctx.solarSystemTrackedFocus = null
+			ctx.solarSystemTrackedFocusPosition = null
 			const dist = ctx.solarSystemOverlayState?.suggestedCameraDistance ?? 6
-			ctx.controls.minDistance =
-				(ctx.solarSystemOverlayState?.getBodyFocus({
-					kind: "star",
-					starIndex: 0,
-				})?.radius ?? 0) * SOLAR_SYSTEM_MIN_DISTANCE_RADII
+			reapplyTrackedSolarSystemFocus()
 			ctx.controls.maxDistance = dist * 4
 			setCameraFarForMaxDistance(ctx, ctx.controls.maxDistance)
 			ctx.camera.position.set(0, 0, dist)
@@ -315,10 +308,12 @@ export function createSolarSystemController(
 	}
 
 	function reapplyTrackedSolarSystemFocus() {
-		if (!ctx.solarSystemTrackedFocus || !ctx.solarSystemOverlayState) return
-		const focus = ctx.solarSystemOverlayState.getBodyFocus(
-			ctx.solarSystemTrackedFocus,
+		if (!ctx.solarSystemActive) return
+		const focus = ctx.solarSystemOverlayState?.getBodyFocus(
+			ctx.solarSystemTrackedFocus ?? { kind: "star", starIndex: 0 },
 		)
+		ctx.controls.minDistance =
+			(focus?.radius ?? 0) * SOLAR_SYSTEM_MIN_DISTANCE_RADII
 		if (!focus) return
 		if (ctx.solarSystemTrackedFocusPosition) {
 			const delta = focus.position

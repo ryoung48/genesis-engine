@@ -5,20 +5,6 @@ import {
 } from "@/ui/genesis/shared/colors"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 
-export function formatCompactNumber(value: number): string {
-	if (!Number.isFinite(value)) return "0"
-	if (value >= 1_000_000_000)
-		return `${(value / 1_000_000_000).toFixed(value >= 10_000_000_000 ? 0 : 1).replace(/\.0$/, "")}B`
-	if (value >= 1_000_000)
-		return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`
-	if (value >= 1_000)
-		return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, "")}k`
-	return value
-		.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)
-		.replace(/\.0+$/, "")
-		.replace(/(\.\d*[1-9])0+$/, "$1")
-}
-
 export function tempColor(v: number): string {
 	if (v < -20) return "#6366f1"
 	if (v < -5) return "#818cf8"

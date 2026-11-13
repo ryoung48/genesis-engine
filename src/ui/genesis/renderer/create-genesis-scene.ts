@@ -349,35 +349,29 @@ export function createGenesisScene(
 	controls.addEventListener("start", () => {
 		context.globeControlsInteracting = true
 		context.globeControlActivityFrames = CONTROL_SETTLE_FRAMES
-		syncAnimationState()
 		requestRender()
 	})
 	controls.addEventListener("change", () => {
 		context.globeControlActivityFrames = CONTROL_SETTLE_FRAMES
-		syncAnimationState()
 		requestRender()
 	})
 	controls.addEventListener("end", () => {
 		context.globeControlsInteracting = false
 		context.globeControlActivityFrames = CONTROL_SETTLE_FRAMES
-		syncAnimationState()
 		requestRender()
 	})
 	mapControls.addEventListener("start", () => {
 		context.mapControlsInteracting = true
 		context.mapControlActivityFrames = CONTROL_SETTLE_FRAMES
-		syncAnimationState()
 		requestRender()
 	})
 	mapControls.addEventListener("change", () => {
 		context.mapControlActivityFrames = CONTROL_SETTLE_FRAMES
-		syncAnimationState()
 		requestRender()
 	})
 	mapControls.addEventListener("end", () => {
 		context.mapControlsInteracting = false
 		context.mapControlActivityFrames = CONTROL_SETTLE_FRAMES
-		syncAnimationState()
 		requestRender()
 	})
 

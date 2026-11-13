@@ -1,4 +1,5 @@
 import { TIDAL_CONTRIBUTORS } from "@/model/climate/ocean/tides/tidal-schedule/contributors"
+import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
 import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { CloudGenus } from "@/model/climate/weather/local/clouds/types"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
@@ -258,17 +259,23 @@ function present({ snapshot, unitSystem, dateLabel }: PresentWeatherParams) {
 		temperatureC: values.temperatureC,
 		dewPointC: values.dewPointC,
 	})
-	const feelsLikeC = WEATHER_COMFORT.apparentTemperature({
-		temperatureC: values.temperatureC,
-		relativeHumidity,
-		windSpeedMs: values.windSpeedMs,
-	})
+	const feelsLikeC =
+		relativeHumidity === null
+			? null
+			: APPARENT_TEMP.apparentTemperatureC({
+					tempC: values.temperatureC,
+					rhPercent: relativeHumidity,
+					windSpeedMs: values.windSpeedMs,
+				})
 	const tiles: WeatherTile[] = [
 		{
 			label: "Feels like",
-			value: formatTemperature(feelsLikeC, unitSystem),
-			icon: feelsLikeC <= 10 ? "snowflake" : "fire",
-			help: "Heat index at or above 27 °C, wind chill at or below 10 °C with wind over 1.3 m/s, otherwise the air temperature (US National Weather Service formulas).",
+			value:
+				feelsLikeC === null
+					? "Unavailable"
+					: formatTemperature(feelsLikeC, unitSystem),
+			icon: feelsLikeC !== null && feelsLikeC < 9 ? "snowflake" : "fire",
+			help: "Universal Thermal Climate Index (UTCI) in shade, based on air temperature, humidity, and wind speed.",
 			wide: false,
 		},
 		{

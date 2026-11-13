@@ -1,4 +1,5 @@
 import { expect, it } from "vitest"
+import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
 import { LOCAL_WEATHER } from "@/model/climate/weather/local"
 import { WEATHER_AGGREGATION } from "@/model/climate/weather/local/aggregation"
 import { WEATHER_COMFORT } from "@/model/climate/weather/local/comfort"
@@ -179,37 +180,35 @@ it("does not impose dawn on polar night or axial seasons on an untilted world", 
 		})?.tiles.find((tile) => tile.label === "Season")?.value,
 	).toBe("No axial seasons")
 })
-it("matches the NWS heat index and wind chill tables", () => {
-	const f = (c: number) => (c * 9) / 5 + 32
-	const c = (f: number) => ((f - 32) * 5) / 9
+it.each([
+	{ tempC: 32, rhPercent: 70, windSpeedMs: 2, expected: 34.38 },
+	{ tempC: -10, rhPercent: 50, windSpeedMs: 4.5, expected: -25.97 },
+	{ tempC: 18, rhPercent: 50, windSpeedMs: 8, expected: 6.88 },
+	{ tempC: 70, rhPercent: 100, windSpeedMs: 25, expected: 60.92 },
+	{ tempC: 20, rhPercent: 50, windSpeedMs: 0, expected: 19.85 },
+])("matches shade UTCI at $tempC °C, $rhPercent% RH, and $windSpeedMs m/s", ({
+	expected,
+	...inputs
+}) => {
+	expect(APPARENT_TEMP.apparentTemperatureC(inputs)).toBeCloseTo(expected, 2)
+})
+it("displays shade UTCI in both unit systems and requires humidity", () => {
+	const weather = snapshot()
+	weather.values.dewPointC = 20
 	expect(
-		WEATHER_COMFORT.relativeHumidity({ temperatureC: 12, dewPointC: 12 }),
+		WEATHER_COMFORT.relativeHumidity({ temperatureC: 20, dewPointC: 20 }),
 	).toBeCloseTo(100, 6)
-	expect(
-		f(
-			WEATHER_COMFORT.apparentTemperature({
-				temperatureC: c(90),
-				relativeHumidity: 70,
-				windSpeedMs: 2,
-			}),
-		),
-	).toBeCloseTo(106, 0)
-	expect(
-		f(
-			WEATHER_COMFORT.apparentTemperature({
-				temperatureC: c(15),
-				relativeHumidity: 50,
-				windSpeedMs: 10 / 2.23694,
-			}),
-		),
-	).toBeCloseTo(3, 0)
-	expect(
-		WEATHER_COMFORT.apparentTemperature({
-			temperatureC: 18,
-			relativeHumidity: 50,
-			windSpeedMs: 8,
-		}),
-	).toBe(18)
+	const feelsLike = (unitSystem: "metric" | "imperial") =>
+		WEATHER_DISPLAY.present({
+			snapshot: weather,
+			unitSystem,
+			dateLabel: "",
+		})?.tiles.find((tile) => tile.label === "Feels like")?.value
+
+	expect(feelsLike("metric")).toBe("17.2 °C")
+	expect(feelsLike("imperial")).toBe("62.9 °F")
+	weather.values.dewPointC = null
+	expect(feelsLike("metric")).toBe("Unavailable")
 })
 it("names a province's clouds from its cloudiest sample when the representative sample is clear", () => {
 	const clear = { ...snapshot().values, rainRateMmH: 0 }

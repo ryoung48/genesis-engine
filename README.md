@@ -105,3 +105,13 @@ claude --resume 4bc48604-7335-4e3b-a1c5-87270824c9e0 --dangerously-skip-permissi
 
 
 claude --resume e60f57a7-0a1d-47d6-b7f2-70d6c833590d
+
+## References
+
+Work this project draws on directly. Add an entry here whenever a committed change is built on a clear outside source.
+
+- **NASA JPL, Approximate Positions of the Planets** ([Keplerian elements](https://ssd.jpl.nasa.gov/planets/approx_pos.html)). Source for the eight Solar System planets' approximate J2000 starting phases and orbital orientations.
+- **Sangil Lee, solar system simulator** ([sangillee.com](https://sangillee.com), [How to create the solar system](https://sangillee.com/2024-02-16-how-to-create-the-solar-system/)). The inspiration for the solar-system view's fading orbit trails, its readable (symbolic) layout versus a true-scale layout, its moon spacing, and the star's bloom flare.
+- **Eggleton (1983), "Approximations to the radii of Roche lobes"**, ApJ 268, 368 ([ADS](https://ui.adsabs.harvard.edu/abs/1983ApJ...268..368E)). The Roche-lobe fraction used for the closest two stars can pass.
+- **Mongoose Traveller, World Builder's Handbook**. The star, companion-star and orbit generation tables and rules the celestial model follows.
+- **Bröde et al. (2012), “Deriving the operational procedure for the Universal Thermal Climate Index (UTCI)”** ([paper and polynomial coefficients](https://doi.org/10.1007/s00484-011-0454-1)). The shade UTCI used for the Misery Index and feels-like temperature.

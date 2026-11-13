@@ -118,10 +118,17 @@ export function formatElevation(
 export function formatDistance(
 	valueKm: number,
 	unitSystem: UnitSystem,
-	options?: { under100Digits?: number; over100Digits?: number },
+	options?: {
+		// [JUSTIFICATION] Callers can override precision for short or long distances.
+		under100Digits?: number
+		over100Digits?: number
+		// [JUSTIFICATION] Compact notation is opt-in for space-constrained displays.
+		compact?: boolean
+	},
 ): string {
 	const converted = unitSystem === "imperial" ? valueKm * KM_TO_MI : valueKm
 	const unit = unitSystem === "imperial" ? "mi" : "km"
+	if (options?.compact) return `${formatCompactNumber(converted)} ${unit}`
 	const digits =
 		converted < 100
 			? (options?.under100Digits ?? 0)
@@ -191,4 +198,18 @@ export function windDirectionLabel(u: number, v: number): string {
 export function compassLabel(degrees: number): string {
 	const deg = ((degrees % 360) + 360) % 360
 	return WIND_DIR_LABELS[Math.round(deg / 45) % 8] ?? "N"
+}
+
+export function formatCompactNumber(value: number): string {
+	if (!Number.isFinite(value)) return "0"
+	if (value >= 1_000_000_000)
+		return `${(value / 1_000_000_000).toFixed(value >= 10_000_000_000 ? 0 : 1).replace(/\.0$/, "")}B`
+	if (value >= 1_000_000)
+		return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`
+	if (value >= 1_000)
+		return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, "")}k`
+	return value
+		.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)
+		.replace(/\.0+$/, "")
+		.replace(/(\.\d*[1-9])0+$/, "$1")
 }

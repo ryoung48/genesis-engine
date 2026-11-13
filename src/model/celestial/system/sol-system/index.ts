@@ -209,6 +209,8 @@ function buildPlanet({
 		orbitalPeriodDays,
 		siderealDayHours: seed.rotationHours,
 		eccentricity: seed.eccentricity,
+		meanAnomalyAtEpochDeg:
+			seed.meanAnomalyAtEpochDeg ?? rolled.meanAnomalyAtEpochDeg,
 		longitudeOfPerihelionDeg:
 			seed.longitudeOfPerihelionDeg ?? rolled.longitudeOfPerihelionDeg,
 		lsAphelionDeg: seed.lsAphelionDeg,

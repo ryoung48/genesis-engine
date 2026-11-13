@@ -20,7 +20,7 @@ import { Slider } from "@/ui/components/primitives/Slider"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
-import { formatTemperatureDelta } from "@/ui/genesis/shared/ui-format"
+import { formatDistance, formatTemperatureDelta } from "@/ui/genesis/shared/ui-format"
 import {
 	classificationSwatchColor,
 	orbitZoneSwatchColor,
@@ -313,9 +313,7 @@ function buildBodyStats({
 	 * row. */
 	sizeClass?: number
 	semiMajorAxis: {
-		value: number
-		unit: "AU" | "PD"
-		precision: number
+		label: string
 		editor?: StatEntry["editor"]
 		/** Shown as a " · <suffix>" after the distance. */
 		rangeLabel?: string
@@ -382,16 +380,11 @@ function buildBodyStats({
 }): StatEntry[] {
 	const diameterRel = diameterKm / ORBIT_BODY.earthDiameterKm
 	const massRelEarth = massKg / ORBIT_BODY.earthMassKg
-	const semiMajorAxisLabel =
-		semiMajorAxis.unit === "AU"
-			? `${semiMajorAxis.value.toFixed(semiMajorAxis.precision)} AU`
-			: `${semiMajorAxis.value.toFixed(semiMajorAxis.precision)} PD`
-
 	return [
 		...buildGroupClassStat(group, classification),
 		{
 			label: "Semi Major Axis",
-			valuePrefix: semiMajorAxisLabel,
+			valuePrefix: semiMajorAxis.label,
 			value: semiMajorAxis.rangeLabel ? ` · ${semiMajorAxis.rangeLabel}` : "",
 			editor: semiMajorAxis.editor,
 			swatchColor: semiMajorAxis.rangeSwatchColor,
@@ -588,7 +581,7 @@ function buildMoonStats({
 	albedo,
 	greenhouseFactor,
 	seismology,
-	pd,
+	semiMajorAxisLabel,
 	orbitRange,
 	orbitalPeriodDays,
 	siderealDayHours,
@@ -626,7 +619,7 @@ function buildMoonStats({
 	greenhouseFactor?: number
 	seismology?: SeismologyProfile
 	surfaceTidesM?: SurfaceTidesBreakdown
-	pd: number
+	semiMajorAxisLabel: string
 	orbitRange?: MoonOrbitRange
 	orbitalPeriodDays: number
 	/** Moon's own sidereal rotation period, in hours — independent of
@@ -666,9 +659,7 @@ function buildMoonStats({
 		classification,
 		sizeClass,
 		semiMajorAxis: {
-			value: pd,
-			unit: "PD",
-			precision: 1,
+			label: semiMajorAxisLabel,
 			editor: editors?.semiMajorAxis,
 			rangeLabel: orbitRange
 				? formatClassificationLabel(orbitRange)
@@ -809,9 +800,7 @@ export function buildOrbitBodyStats(params: {
 		classification: body.classification,
 		sizeClass: body.sizeClass,
 		semiMajorAxis: {
-			value: body.orbitalDistanceAU,
-			unit: "AU",
-			precision: 3,
+			label: `${body.orbitalDistanceAU.toFixed(3)} AU`,
 			rangeLabel: body.zone ? formatClassificationLabel(body.zone) : undefined,
 			rangeSwatchColor: body.zone ? orbitZoneSwatchColor(body.zone) : undefined,
 			editor: onUpdateBody
@@ -1013,7 +1002,8 @@ export function buildOrbitBodyStats(params: {
 export function buildOrbitMoonStats(params: {
 	moon: MoonBody
 	parentOrbitalPeriodDays: number
-	pdOverride?: number
+	semiMajorAxisPd: number
+	parentDiameterKm: number
 	surfaceTidesM?: SurfaceTidesBreakdown
 	tideLockStat?: StatEntry
 	unitSystem: UnitSystem
@@ -1027,7 +1017,8 @@ export function buildOrbitMoonStats(params: {
 	const {
 		moon,
 		parentOrbitalPeriodDays,
-		pdOverride,
+		semiMajorAxisPd,
+		parentDiameterKm,
 		surfaceTidesM,
 		tideLockStat,
 		unitSystem,
@@ -1035,7 +1026,11 @@ export function buildOrbitMoonStats(params: {
 		luminositySol,
 		orbitalDistanceAU,
 	} = params
-	const pd = moon.semiMajorAxisPlanetDiameters ?? pdOverride ?? 0
+	const semiMajorAxisLabel = formatDistance(
+		semiMajorAxisPd * parentDiameterKm,
+		unitSystem,
+		{ compact: true },
+	)
 	const gravityG = ORBIT_BODY.computeGravityG({
 		massKg: moon.massKg,
 		diameterKm: moon.diameterKm,
@@ -1059,7 +1054,7 @@ export function buildOrbitMoonStats(params: {
 		greenhouseFactor: moon.greenhouseFactor,
 		seismology: moon.seismology,
 		surfaceTidesM,
-		pd,
+		semiMajorAxisLabel,
 		orbitRange: moon.orbitRange,
 		orbitalPeriodDays: moon.orbitalPeriodDays,
 		siderealDayHours: moon.siderealDayHours,
@@ -1092,11 +1087,11 @@ export function buildOrbitMoonStats(params: {
 					},
 					semiMajorAxis: {
 						label: "Semi Major Axis",
-						value: pd,
+						value: semiMajorAxisPd,
 						min: 0.5,
 						max: 120,
 						step: 0.1,
-						display: `${pd.toFixed(1)} PD`,
+						display: semiMajorAxisLabel,
 						set: (value: number) =>
 							onUpdateMoon((current, body) =>
 								updateMoonSemiMajorAxis(current, body, value),

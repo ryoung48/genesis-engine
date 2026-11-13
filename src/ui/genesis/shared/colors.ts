@@ -563,7 +563,7 @@ export function humidityDifferenceColor(
 	return [last.r, last.g, last.b]
 }
 
-// Misery Index (apparent temperature) ramp. Black zone (6–26 °C) = comfortable.
+// Shade UTCI ramp. Black marks the 9–26 °C no-stress band.
 // Cold end → blues/whites; hot end → dark red → yellow → white.
 const miseryStops: { v: number; r: number; g: number; b: number }[] = [
 	{ v: -40, r: 1.0, g: 1.0, b: 1.0 },
@@ -575,7 +575,7 @@ const miseryStops: { v: number; r: number; g: number; b: number }[] = [
 	{ v: -11, r: 46 / 255, g: 131 / 255, b: 1.0 },
 	{ v: -4, r: 31 / 255, g: 89 / 255, b: 173 / 255 },
 	{ v: 3, r: 9 / 255, g: 26 / 255, b: 50 / 255 },
-	{ v: 6, r: 0, g: 0, b: 0 },
+	{ v: 9, r: 0, g: 0, b: 0 },
 	{ v: 26, r: 0, g: 0, b: 0 },
 	{ v: 30, r: 155 / 255, g: 13 / 255, b: 22 / 255 },
 	{ v: 32, r: 247 / 255, g: 20 / 255, b: 35 / 255 },

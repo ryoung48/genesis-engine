@@ -291,9 +291,6 @@ export interface PlacedBody {
 	nameLabel?: Text
 	nameLeader?: THREE.Line
 	orbitRadius: number
-	/** Mean anomaly at epoch — spreads bodies around their orbits instead of
-	 * lining them all up at day 0. */
-	meanAnomalyAtEpoch: number
 	/** Kepler orbit basis (perifocal P/Q vectors + semi-major/minor axes),
 	 * computed once orbitRadius/eccentricity/inclination are known — null for
 	 * asteroid belts, which render as a flat static ring instead. */

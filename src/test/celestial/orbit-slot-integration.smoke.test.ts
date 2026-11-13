@@ -4,6 +4,7 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { HostStarAttributes } from "@/model/celestial/star/types"
 import { SYSTEM_GENERATION } from "@/model/celestial/system/generation"
+import type { GenerateSystemBodiesParams } from "@/model/celestial/system/generation/types"
 
 const SOL_LIKE_HOST_STAR: HostStarAttributes = {
 	spectralClass: "G",
@@ -18,6 +19,42 @@ const SOL_LIKE_HOST_STAR: HostStarAttributes = {
 }
 
 describe("Orbit slot -> generated body integration", () => {
+	it("stores seeded orbit phases and offsets Trojans from their host", () => {
+		const params: GenerateSystemBodiesParams = {
+			seed: 42,
+			hostStar: SOL_LIKE_HOST_STAR,
+			mainWorldMode: "procedural",
+			exactHZC: false,
+			skipNaming: true,
+			orbitSlots: [
+				{
+					orbitNumber: 3,
+					type: "terrestrial",
+					anomalousOrbitType: "trojan",
+					trojanCount: 1,
+					isBaseline: false,
+					orbitalDistanceAU: 1,
+					deviation: 0,
+					zone: "inner",
+					spreadOrbitNumber: 0.5,
+				},
+			],
+		}
+		const bodies = SYSTEM_GENERATION.generateSystemBodies(params)
+		const trojan = bodies.find((body) => body.trojan)!
+		const host = bodies.find((body) => body.idx === trojan.trojanOfIdx)!
+		expect(host.meanAnomalyAtEpochDeg).toBeGreaterThanOrEqual(0)
+		expect(host.meanAnomalyAtEpochDeg).toBeLessThan(360)
+		expect(trojan.meanAnomalyAtEpochDeg).toBeCloseTo(
+			(host.meanAnomalyAtEpochDeg + trojan.trojanOffsetDeg! + 360) % 360,
+		)
+		expect(trojan.orbitalPeriodDays).toBe(host.orbitalPeriodDays)
+		const regenerated = SYSTEM_GENERATION.generateSystemBodies(params)
+		expect(regenerated.map((body) => body.meanAnomalyAtEpochDeg)).toEqual(
+			bodies.map((body) => body.meanAnomalyAtEpochDeg),
+		)
+	})
+
 	it("multi-star: every non-empty slot becomes exactly one booked-type body, within this star's legal AU range", () => {
 		for (let systemIndex = 0; systemIndex < 20; systemIndex++) {
 			const system = GALAXY_SYSTEMS.generate({

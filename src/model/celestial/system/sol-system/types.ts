@@ -65,6 +65,8 @@ export interface SolPlanetSeed {
 	 * retain their seeded fallback rather than carrying a physical node. */
 	longitudeOfAscendingNodeDeg?: number
 	longitudeOfPerihelionDeg?: number
+	// [JUSTIFICATION] Bodies without an authored epoch phase use a seeded roll.
+	meanAnomalyAtEpochDeg?: number
 	/** See OrbitBody.lsAphelionDeg's doc -- the EBM's actual seasonal-
 	 * insolation input, distinct from longitudeOfPerihelionDeg above.
 	 * Required (not optional, unlike longitudeOfPerihelionDeg) so every real

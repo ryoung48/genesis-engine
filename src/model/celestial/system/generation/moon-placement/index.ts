@@ -47,6 +47,7 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 				atmospherePressureBar: moonEnvironment.atmosphere?.pressureBar ?? 0,
 				starAgeGyr: params.starAgeGyr,
 				semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters ?? 0,
+				planetDiameterKm: params.diameterKm,
 				orbitalPeriodDays: moon.orbitalPeriodDays,
 				planetMassEarths: params.massKg / ORBIT_BODY.earthMassKg,
 				baseSiderealDayHours: moon.siderealDayHours,

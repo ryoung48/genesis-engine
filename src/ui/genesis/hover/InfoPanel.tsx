@@ -25,7 +25,6 @@ import {
 	currentImpactColor,
 	dtrChartColor,
 	flowColor,
-	formatCompactNumber,
 	gddColor,
 	gintColor,
 	humidityChartColor,
@@ -79,6 +78,7 @@ import {
 import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality"
 import {
+	formatCompactNumber,
 	formatDistance,
 	formatElevation,
 	formatFlowRate,

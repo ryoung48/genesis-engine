@@ -13,7 +13,9 @@ import { TIME } from "@/model/shared/time"
 // is the Sun's equator and +X is its ascending node on the J2000 ecliptic.
 // The source J2000 ecliptic elements are from JPL's approximate-positions
 // table, rotated into HGI so inclination, node, and perihelion all share one
-// reference frame. Near-circular moon orbits still use seeded display values:
+// reference frame. The eight planets' starting phases are J2000 mean
+// longitude minus longitude of perihelion from that table, wrapped to 0–360°.
+// Near-circular moon orbits still use seeded display values:
 // perihelion and node are not stable/meaningful enough to author as constants.
 // Every moon should carry an explicit atmosphere so its stats card shows an
 // Atmosphere row -- omitting the field (rather than stating "none") used to
@@ -110,6 +112,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 3.38,
 		longitudeOfAscendingNodeDeg: 252.348,
 		longitudeOfPerihelionDeg: 1.902,
+		meanAnomalyAtEpochDeg: 174.79252722,
 		// Reuses the raw fixed-frame value rather than a verified real Ls:
 		// Mercury's ~0.03 deg axial tilt means the EBM sees essentially no
 		// latitude-dependent declination swing to get out of phase in the
@@ -151,6 +154,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 3.86,
 		longitudeOfAscendingNodeDeg: 179.19,
 		longitudeOfPerihelionDeg: 55.839,
+		meanAnomalyAtEpochDeg: 50.37663232,
 		// Reuses the raw fixed-frame value: Venus's real axial tilt is 177.36
 		// deg, i.e. ~2.64 deg of *effective* obliquity (nearly upside-down,
 		// not upright), so its seasonal declination swing is tiny -- combined
@@ -182,6 +186,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 7.25,
 		longitudeOfAscendingNodeDeg: 180,
 		longitudeOfPerihelionDeg: 27.178,
+		meanAnomalyAtEpochDeg: 357.52688973,
 		// The EBM uses a body-fixed seasonal angle, not this HGI-frame value.
 		lsAphelionDeg: 102,
 		landDistribution: 0.25,
@@ -235,9 +240,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				landCoverage: 1,
 				albedo: 0.12,
 				greenhouseFactor: 0,
-				// Luna's real inclination/node/periapsis/anomaly are
-				// well-known, unlike every other moon here (which get a
-				// seeded roll instead).
+				// Luna's simplified orbit starts at periapsis on simulation day zero.
 				inclinationDeg: 5.1,
 				longitudeOfAscendingNodeDeg: 0,
 				longitudeOfPerihelionDeg: 0,
@@ -276,6 +279,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 5.65,
 		longitudeOfAscendingNodeDeg: 188.324,
 		longitudeOfPerihelionDeg: 260.348,
+		meanAnomalyAtEpochDeg: 19.39019754,
 		// EBM insolation input (see OrbitBody.lsAphelionDeg's doc) -- NOT the
 		// same quantity as longitudeOfPerihelionDeg above. That field is the
 		// real, fixed HGI-frame value used to orient Mars's orbit
@@ -459,6 +463,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 6.09,
 		longitudeOfAscendingNodeDeg: 174.853,
 		longitudeOfPerihelionDeg: 298.934,
+		meanAnomalyAtEpochDeg: 19.66796068,
 		// EBM insolation input (see OrbitBody.lsAphelionDeg's doc) -- Ls
 		// (heliocentric solar longitude, in Jupiter's own vernal-equinox
 		// frame) at APHELION. Real Jupiter perihelion falls at Ls ~= 57-58 deg
@@ -584,6 +589,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 5.51,
 		longitudeOfAscendingNodeDeg: 163.869,
 		longitudeOfPerihelionDeg: 16.742,
+		meanAnomalyAtEpochDeg: 317.35536592,
 		// EBM insolation input (see OrbitBody.lsAphelionDeg's doc). Real
 		// Saturn perihelion falls at Ls ~= 280 deg (shortly after its own
 		// northern winter solstice, making southern summer -- which happens
@@ -772,6 +778,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 6.48,
 		longitudeOfAscendingNodeDeg: 180.208,
 		longitudeOfPerihelionDeg: 95.196,
+		meanAnomalyAtEpochDeg: 142.28382821,
 		// EBM insolation input (see OrbitBody.lsAphelionDeg's doc). Real
 		// Uranus perihelion falls near its own northern autumn equinox, at
 		// Ls ~= 182 deg, so aphelion sits 180 deg earlier/later at Ls ~= 2.
@@ -927,6 +934,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		inclinationDeg: 6.43,
 		longitudeOfAscendingNodeDeg: 166.777,
 		longitudeOfPerihelionDeg: 329.112,
+		meanAnomalyAtEpochDeg: 259.91520804,
 		// Derived, not a directly-published Ls-at-perihelion figure like
 		// Mars/Jupiter/Saturn/Uranus's: combines two published facts (real
 		// southern summer solstice, Ls=270, occurred in 2005; real perihelion

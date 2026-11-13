@@ -75,7 +75,10 @@ function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
 		bodies: SOL_SYSTEM.solSystemBodies.map((body) =>
 			body.isMainWorld
 				? SOL_SYSTEM.buildPlanet({
-						seed: mainWorldSeed,
+						seed: {
+							...mainWorldSeed,
+							meanAnomalyAtEpochDeg: body.meanAnomalyAtEpochDeg,
+						},
 						seedTag: params.seed,
 						idx: -1,
 						options: {

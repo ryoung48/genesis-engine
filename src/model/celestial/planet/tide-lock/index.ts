@@ -1,11 +1,13 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type {
+	TideLock,
+	TideLockTraceEntry,
+} from "@/model/celestial/orbit-body/types"
 import type {
 	MoonTideLockResult,
 	PlanetTideLockResult,
 	TideLockEffectResult,
-	TideLockTraceEntry,
 } from "@/model/celestial/planet/tide-lock/types"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
@@ -20,11 +22,14 @@ type DmBreakdown = { value: number; trace: TideLockTraceEntry[] }
 function createDmCollector() {
 	let value = 0
 	const trace: TideLockTraceEntry[] = []
+	const addEntry = (entry: TideLockTraceEntry) => {
+		value += entry.value
+		if (entry.value !== 0) trace.push(entry)
+	}
 	return {
-		add: (delta: number, description: string) => {
-			value += delta
-			if (delta !== 0) trace.push({ value: delta, description })
-		},
+		add: (delta: number, description: string) =>
+			addEntry({ value: delta, description }),
+		addEntry,
 		result: (): DmBreakdown => ({ value, trace }),
 	}
 }
@@ -139,17 +144,23 @@ function rollStarLockDM(params: {
 function rollMoonLockDM(params: {
 	moonSizeClass: number
 	moonSemiMajorAxisPlanetDiameters: number
+	planetDiameterKm: number
 	siblingMoonCount: number
 }): DmBreakdown {
 	const dm = createDmCollector()
 	dm.add(-10 + params.moonSizeClass, `Moon size (${params.moonSizeClass})`)
 	const pd = params.moonSemiMajorAxisPlanetDiameters
-	const pdNote = `Moon orbit (PD ${pd.toFixed(0)})`
-	if (pd < 5) dm.add(5 + Math.ceil((5 - pd) * 5), pdNote)
-	else if (pd < 10) dm.add(4, pdNote)
-	else if (pd < 20) dm.add(2, pdNote)
-	else if (pd < 40) dm.add(1, pdNote)
-	else if (pd > 60) dm.add(-6, pdNote)
+	let orbitModifier = 0
+	if (pd < 5) orbitModifier = 5 + Math.ceil((5 - pd) * 5)
+	else if (pd < 10) orbitModifier = 4
+	else if (pd < 20) orbitModifier = 2
+	else if (pd < 40) orbitModifier = 1
+	else if (pd > 60) orbitModifier = -6
+	dm.addEntry({
+		value: orbitModifier,
+		description: "Moon orbit",
+		moonOrbitDistanceKm: pd * params.planetDiameterKm,
+	})
 	if (params.siblingMoonCount > 0)
 		dm.add(
 			-2 * params.siblingMoonCount,
@@ -273,6 +284,7 @@ function rollPlanetTideLock(params: {
 	orbitalPeriodDays: number
 	baseSiderealDayHours: number
 	moons: MoonBody[]
+	planetDiameterKm: number
 	homeworld: boolean
 	rerollEccentricity: () => number
 }): PlanetTideLockResult {
@@ -313,6 +325,7 @@ function rollPlanetTideLock(params: {
 		const moonBreakdown = rollMoonLockDM({
 			moonSizeClass: moon.sizeClass ?? 0,
 			moonSemiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters ?? 0,
+			planetDiameterKm: params.planetDiameterKm,
 			siblingMoonCount,
 		})
 		const moonDM = moonBreakdown.value + general.value
@@ -356,14 +369,19 @@ function rollPlanetTideLock(params: {
 // uses.
 function rollMoonToPlanetLockDM(params: {
 	moonSemiMajorAxisPlanetDiameters: number
+	planetDiameterKm: number
 	moonRetrograde: boolean
 	planetMassEarths: number
 }): DmBreakdown {
 	const dm = createDmCollector()
 	dm.add(6, "Planet modifier")
 	const pd = params.moonSemiMajorAxisPlanetDiameters
-	const pdNote = `Moon orbit (PD ${pd.toFixed(0)})`
-	if (pd > 20) dm.add(-Math.floor(pd / 20), pdNote)
+	if (pd > 20)
+		dm.addEntry({
+			value: -Math.floor(pd / 20),
+			description: "Moon orbit",
+			moonOrbitDistanceKm: pd * params.planetDiameterKm,
+		})
 	if (params.moonRetrograde) dm.add(-2, "Retrograde")
 	const planetMassNote = `Planet mass (${params.planetMassEarths.toFixed(0)} M⊕)`
 	if (params.planetMassEarths <= 10) dm.add(2, planetMassNote)
@@ -395,6 +413,7 @@ function rollMoonTideLock(params: {
 	atmospherePressureBar: number
 	starAgeGyr: number
 	semiMajorAxisPlanetDiameters: number
+	planetDiameterKm: number
 	orbitalPeriodDays: number
 	planetMassEarths: number
 	baseSiderealDayHours: number
@@ -409,6 +428,7 @@ function rollMoonTideLock(params: {
 	})
 	const moon = rollMoonToPlanetLockDM({
 		moonSemiMajorAxisPlanetDiameters: params.semiMajorAxisPlanetDiameters,
+		planetDiameterKm: params.planetDiameterKm,
 		moonRetrograde: params.axialTiltDeg > 90,
 		planetMassEarths: params.planetMassEarths,
 	})

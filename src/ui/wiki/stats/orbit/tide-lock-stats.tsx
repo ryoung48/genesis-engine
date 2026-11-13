@@ -1,8 +1,8 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
-	TemperatureTraceEntry,
 	TideLock,
+	TideLockTraceEntry,
 } from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
 import {
@@ -16,6 +16,7 @@ import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons
 import { Slider } from "@/ui/components/primitives/Slider"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { uiTokens } from "@/ui/components/tokens"
+import { formatDistance, type UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { getMoonSeedBaseName } from "@/ui/wiki/stats/orbit/body-titles"
 import {
 	formatHours,
@@ -218,7 +219,8 @@ export function buildTideLockStat(params: {
 	/** Ported from galaxy-gen's OrbitTooltips.tsx RotationTooltip -- the DM
 	 * breakdown behind this body's lock roll (see tide-lock/index.ts's
 	 * rollPlanetTideLock/rollMoonTideLock). Empty/unset shows no help icon. */
-	trace?: TemperatureTraceEntry[]
+	trace?: TideLockTraceEntry[]
+	unitSystem: UnitSystem
 }): StatEntry {
 	const { tideLock, trace = [] } = params
 	const unlockedDescriptor =
@@ -236,7 +238,14 @@ export function buildTideLockStat(params: {
 		trace.length > 0 ? (
 			<TraceTooltipContent
 				title="Tidal Lock Modifiers"
-				trace={trace}
+				trace={trace.map((entry) =>
+					entry.moonOrbitDistanceKm === undefined
+						? entry
+						: {
+								...entry,
+								description: `${entry.description} (${formatDistance(entry.moonOrbitDistanceKm, params.unitSystem, { compact: true })})`,
+							},
+				)}
 				finalLabel="Total Score"
 				finalValue={totalDm}
 			/>

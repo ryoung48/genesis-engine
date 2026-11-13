@@ -632,24 +632,7 @@ export function buildSolarSystemOverlay(
 	// --- Build every body (siblings + main world), each with its own nested
 	// moon system, but don't position them yet — spacing depends on every
 	// body's own size, computed below in orbital order. ---
-	// A trojan shares its target's orbitalPeriodDays (see generateSystemBodies'
-	// trojan roll), so locking its epoch phase to the target's own golden-angle
-	// phase plus the rolled ±60° offset keeps it exactly that far ahead/behind
-	// the target at every day forever, instead of the arbitrary golden-angle
-	// phase every other body gets from its own array index.
-	const arrayIndexByIdx = new Map(
-		bodies.map((body, index) => [body.idx, index]),
-	)
-	const placed: PlacedBody[] = bodies.map((body, index) => {
-		const trojanTargetIndex =
-			body.trojan && body.trojanOfIdx !== undefined
-				? arrayIndexByIdx.get(body.trojanOfIdx)
-				: undefined
-		const meanAnomalyAtEpoch =
-			trojanTargetIndex !== undefined
-				? trojanTargetIndex * GOLDEN_ANGLE_RAD +
-					(body.trojanOffsetDeg ?? 60) * DEG2RAD
-				: index * GOLDEN_ANGLE_RAD
+	const placed: PlacedBody[] = bodies.map((body) => {
 		groupCounters[body.group] += 1
 		if (body.group === "asteroid belt") {
 			return {
@@ -658,7 +641,6 @@ export function buildSolarSystemOverlay(
 				isBelt: true,
 				lodTier: 0,
 				orbitRadius: 0,
-				meanAnomalyAtEpoch,
 			}
 		}
 
@@ -922,7 +904,6 @@ export function buildSolarSystemOverlay(
 			nameLabel,
 			nameLeader,
 			orbitRadius: 0,
-			meanAnomalyAtEpoch,
 		}
 	})
 	// Looked up by applyPlacedBodyLayout's trojan pass below to copy a trojan's
@@ -1413,8 +1394,7 @@ export function buildSolarSystemOverlay(
 				p.ringMesh?.quaternion.premultiply(tiltQuat)
 			}
 		}
-		// Trojan pass: a trojan rides its target's exact ellipse, ±60° of mean
-		// anomaly away (already baked into meanAnomalyAtEpoch above).
+		// Trojans share the host's drawn ellipse and have a stored phase offset.
 		for (const p of placed) {
 			if (p.isBelt || !p.body.trojan || p.body.trojanOfIdx === undefined)
 				continue
@@ -1467,7 +1447,7 @@ export function buildSolarSystemOverlay(
 	// Each body's own rolled period, which keeps it in step with the "watch
 	// one orbit" slider (that slider advances time by orbitalPeriodDays).
 	function periodDaysFor(body: SystemBody): number {
-		return Math.max(1, body.orbitalPeriodDays || daysPerYear)
+		return body.orbitalPeriodDays || daysPerYear
 	}
 
 	const bodySpinQuat = new THREE.Quaternion()
@@ -1529,7 +1509,9 @@ export function buildSolarSystemOverlay(
 			}
 			if (!p.bodyGroup || !p.kepler) continue
 			const period = periodDaysFor(p.body)
-			const M = mod2pi(p.meanAnomalyAtEpoch + (TWO_PI * day) / period)
+			const M = mod2pi(
+				p.body.meanAnomalyAtEpochDeg * DEG2RAD + (TWO_PI * day) / period,
+			)
 			const E = solveKepler(M, p.kepler.e)
 			const pos = orbitPoint(
 				E,

@@ -976,6 +976,7 @@ export function GenerationPlanetNavigator({
 						tideLock: body.tideLock,
 						tideLockStatus: body.tideLockStatus,
 						trace: body.tideLockTrace,
+						unitSystem,
 						retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 							body.axialTiltDeg,
 						),
@@ -1170,11 +1171,6 @@ export function GenerationPlanetNavigator({
 			const parentEccentricity = body.eccentricity
 			const parentPerihelionDeg =
 				body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg
-			const pd = isMainWorld
-				? (moon.semiMajorAxisPlanetDiameters ??
-					MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }) /
-						(planetRadiusKm * 2000))
-				: getBodyMoonOrbitDistance(body, moon)
 			const parentTitle =
 				isMainWorld && !body.name
 					? appendSizeToTitle(
@@ -1224,6 +1220,7 @@ export function GenerationPlanetNavigator({
 						tideLock: moon.tideLock,
 						tideLockStatus: moon.tideLockStatus,
 						trace: moon.tideLockTrace,
+						unitSystem,
 						retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 							moon.axialTiltDeg,
 						),
@@ -1281,7 +1278,8 @@ export function GenerationPlanetNavigator({
 									: undefined,
 						},
 					}),
-					pdOverride: pd,
+					semiMajorAxisPd: getBodyMoonOrbitDistance(body, moon),
+					parentDiameterKm,
 					parentOrbitalPeriodDays,
 				}),
 				dataContent: (
@@ -1337,8 +1335,6 @@ export function GenerationPlanetNavigator({
 		orbitalDistanceBaselineAU,
 		orbitalDistanceSlider,
 		perihelionSlider,
-		planetMassKg,
-		planetRadiusKm,
 		pressureSlider,
 		radiusSlider,
 		seed,

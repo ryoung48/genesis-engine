@@ -74,6 +74,8 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		rings?: RingProfile
 		isMainWorld: boolean
 		orbitalDistanceAU: number
+		// Starting phase at simulation day zero, in degrees.
+		meanAnomalyAtEpochDeg: number
 		/** 0 / unused for asteroid belts. */
 		/** 0 / unused for asteroid belts. */
 		/** 0 / unused for asteroid belts. */

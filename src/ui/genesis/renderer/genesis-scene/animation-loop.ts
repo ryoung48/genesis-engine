@@ -1,4 +1,4 @@
-import type * as THREE from "three"
+import * as THREE from "three"
 import { CLOUD_FRAME_MS } from "@/ui/genesis/renderer/clouds/overlay"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { updateGlobeLabelOrientations } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
@@ -23,6 +23,7 @@ const LABEL_CULLING_ENABLED = true
 const MAP_DASH_DENSE_ZOOM = 20
 const GLOBE_DASH_DENSE_DISTANCE = 1.1
 const DENSE_DASH_SCALE = 2
+const SOLAR_SYSTEM_CAMERA_SETTLE_FRACTION = 1e-4
 
 function requestSettlementScripts(
 	ctx: GenesisContext,
@@ -56,17 +57,12 @@ export interface AnimationLoopControllerDeps {
 	updateSolarTerminatorLabels: (radius: number) => void
 }
 
-/** Owns the `onFrame` render-scheduler callback -- the single per-frame
- * step that advances every other controller's tween/pulse/streaming state
- * and decides whether the loop needs to keep running. Also owns
- * `requestRender`/`syncAnimationState`, since both are really just thin
- * wrappers around the render scheduler this controller constructs. See
- * plans/genesis-scene-controller-split.md. */
 export function createAnimationLoopController(
 	ctx: GenesisContext,
 	deps: AnimationLoopControllerDeps,
 ) {
 	let cloudFrame: number | null = null
+	const previousCameraPosition = new THREE.Vector3()
 	const renderScheduler = createRenderScheduler({
 		requestFrame: (callback) => window.requestAnimationFrame(callback),
 		cancelFrame: (handle) => window.cancelAnimationFrame(handle),
@@ -107,6 +103,7 @@ export function createAnimationLoopController(
 					ctx.globeControlsInteracting ||
 					ctx.globeControlActivityFrames > 0
 				) {
+					previousCameraPosition.copy(ctx.camera.position)
 					ctx.controls.update()
 					if (
 						!ctx.globeControlsInteracting &&
@@ -114,6 +111,17 @@ export function createAnimationLoopController(
 					) {
 						ctx.globeControlActivityFrames--
 					}
+					// TrackballControls uses a fixed world-space change threshold.
+					// At moon scale, even a large on-screen move can fall below it.
+					const cameraStillMoving =
+						ctx.camera.position.distanceToSquared(previousCameraPosition) >
+						ctx.camera.position.distanceToSquared(ctx.controls.target) *
+							SOLAR_SYSTEM_CAMERA_SETTLE_FRACTION ** 2
+					if (cameraStillMoving)
+						ctx.globeControlActivityFrames = Math.max(
+							1,
+							ctx.globeControlActivityFrames,
+						)
 					keepAnimating =
 						keepAnimating ||
 						ctx.globeControlsInteracting ||
@@ -328,13 +336,7 @@ export function createAnimationLoopController(
 
 	function syncAnimationState() {
 		renderScheduler.setAnimationActive(
-			!!ctx.focusTween ||
-				!!ctx.solarSystemFocusTween ||
-				!!ctx.pulse ||
-				ctx.globeControlsInteracting ||
-				ctx.mapControlsInteracting ||
-				ctx.globeControlActivityFrames > 0 ||
-				ctx.mapControlActivityFrames > 0,
+			!!ctx.focusTween || !!ctx.solarSystemFocusTween || !!ctx.pulse,
 		)
 	}
 
