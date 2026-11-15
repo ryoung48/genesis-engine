@@ -11,12 +11,18 @@ import type { PortedGalaxyDisplayFlags } from "@/ui/genesis/galaxy/view/portedGa
 
 const DISPLAY_FLAG_LABELS: Record<keyof PortedGalaxyDisplayFlags, string> = {
 	showStarOverlay: "Star Map",
+	showSearchMatches: "Search Match Markers",
+	showCapitalMarkers: "Capital Markers",
+	showSectorBoundaries: "Sector Boundaries",
 	showGalaxy: "Galaxy",
 	showDensityWaves: "Density-Wave Guides",
 }
 
 const DISPLAY_FLAG_KEYS: (keyof PortedGalaxyDisplayFlags)[] = [
 	"showStarOverlay",
+	"showSearchMatches",
+	"showCapitalMarkers",
+	"showSectorBoundaries",
 	"showGalaxy",
 	"showDensityWaves",
 ]
@@ -39,14 +45,6 @@ const TIME_STEP_MIN = 0
 const TIME_STEP_MAX = 500_000
 const TIME_STEP_STEP = 10_000
 
-/** Bottom-left gear-triggered floating settings panel for the ported
- * density-wave galaxy view -- same shell/primitives as the standard planet
- * map's OverlayControls (FloatingPanel + PanelHeader + ToggleRow, gear
- * IconButton toggle). Everything else GalaxyRenderer exposes (axis grid,
- * dust/filaments/H2, velocity curve, dark matter halo, the renderer's own
- * decorative stars) is pinned to a fixed value in PortedGalaxyView.tsx
- * instead of being exposed here -- only the density-wave guide overlay and
- * the real (old-model) star overlay are meaningful things to hide/show. */
 export const GalaxyOverlayControls: React.FC<GalaxyOverlayControlsProps> = ({
 	displayFlags,
 	onDisplayFlagChange,

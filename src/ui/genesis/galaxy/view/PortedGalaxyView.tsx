@@ -9,6 +9,7 @@ import type { SystemBody } from "@/model/celestial/system/types"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
+import { uiGalaxyMap } from "@/ui/components/tokens"
 import { GalaxyMapModeControl } from "@/ui/genesis/galaxy/controls/GalaxyMapModeControl"
 import { GalaxyOverlayControls } from "@/ui/genesis/galaxy/controls/GalaxyOverlayControls"
 import { GalaxyRenderer } from "@/ui/genesis/galaxy/renderer/GalaxyRendererThree"
@@ -25,6 +26,7 @@ import {
 	BLACK_HOLE_POINT_SIZE_RATIO,
 	buildGalaxyPoints,
 } from "@/ui/genesis/galaxy/renderer/galaxy-scene/points"
+import { buildSearchMatchMarkers } from "@/ui/genesis/galaxy/renderer/galaxy-scene/search-match-markers"
 import { recenterGalaxy } from "@/ui/genesis/galaxy/view/old-galaxy-overlay"
 import {
 	DEFAULT_GALAXY_MAP_MODE,
@@ -48,7 +50,15 @@ import {
 	temperatureCategory,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 import { habitabilityCategoryLabel } from "@/ui/wiki/stats/orbit/formatters"
+import { filterSystemIndices } from "@/ui/wiki/system-filter/evaluate-system-filter"
+import type { SystemFilterRoot } from "@/ui/wiki/system-filter/types"
 
+const EMPTY_SYSTEM_FILTER: SystemFilterRoot = {
+	kind: "group",
+	id: "root",
+	operator: "and",
+	nodes: [],
+}
 const DEFAULT_SEED = 1
 const DEFAULT_SYSTEM_COUNT = 2000
 const MAJOR_RING_MINIMUM_WIDTH = 0.4
@@ -64,6 +74,12 @@ type SelectionPulse = {
 
 function specialCircumstances(body: SystemBody): SpecialCircumstance[] {
 	const circumstances: SpecialCircumstance[] = []
+	if (
+		body.orbitRegion?.center.kind === "binary" &&
+		body.group !== "asteroid belt"
+	) {
+		circumstances.push("Circumbinary")
+	}
 	if (body.trojan) circumstances.push("Trojan Orbit")
 	if (body.rings) {
 		const ringWidth =
@@ -135,6 +151,9 @@ export const PortedGalaxyView: React.FC<{
 	const galaxyRef = useRef<Galaxy | null>(null)
 	const pointsRef = useRef<ReturnType<typeof buildGalaxyPoints> | null>(null)
 	const lanesRef = useRef<ReturnType<typeof buildGalaxyLanes> | null>(null)
+	const matchMarkersRef = useRef<ReturnType<
+		typeof buildSearchMatchMarkers
+	> | null>(null)
 	const nationOverlayRef = useRef<ReturnType<typeof buildNationOverlay> | null>(
 		null,
 	)
@@ -181,6 +200,8 @@ export const PortedGalaxyView: React.FC<{
 		0,
 	)
 	const [panelOpen, setPanelOpen] = useState(true)
+	const [advancedFilter, setAdvancedFilter] =
+		useState<SystemFilterRoot>(EMPTY_SYSTEM_FILTER)
 	const [timeStep, setTimeStep] = useState(0)
 
 	const [seed, setSeed] = useState(DEFAULT_SEED)
@@ -217,7 +238,7 @@ export const PortedGalaxyView: React.FC<{
 		if (lanesRef.current) {
 			renderer.scene.remove(lanesRef.current)
 			lanesRef.current.geometry.dispose()
-			;(lanesRef.current.material as THREE.Material).dispose()
+			lanesRef.current.material.dispose()
 		}
 		if (nationOverlayRef.current) {
 			renderer.scene.remove(nationOverlayRef.current.group)
@@ -366,13 +387,10 @@ export const PortedGalaxyView: React.FC<{
 
 		const handleResize = () => {
 			renderer.resize()
-			if (lanesRef.current) {
-				;(
-					lanesRef.current.material as InstanceType<
-						typeof import("three/examples/jsm/lines/LineMaterial.js").LineMaterial
-					>
-				).resolution.set(canvas.clientWidth, canvas.clientHeight)
-			}
+			lanesRef.current?.material.resolution.set(
+				canvas.clientWidth,
+				canvas.clientHeight,
+			)
 		}
 		window.addEventListener("resize", handleResize)
 		const ro = new ResizeObserver(handleResize)
@@ -395,6 +413,13 @@ export const PortedGalaxyView: React.FC<{
 				const sizeScale =
 					zoom <= 1 ? Math.max(0.0005, zoom ** 2) : Math.min(4, zoom)
 				const pointSizePx = baseStarSizeRef.current * sizeScale
+				const matchMarkers = matchMarkersRef.current
+				if (matchMarkers) {
+					matchMarkers.material.uniforms.uSize!.value = Math.max(
+						uiGalaxyMap.matchMarkerMinSizePx,
+						pointSizePx * uiGalaxyMap.matchMarkerStarSizeRatio,
+					)
+				}
 				const material = pointsRef.current.points
 					.material as THREE.ShaderMaterial
 				material.uniforms.uSize!.value = pointSizePx
@@ -475,9 +500,7 @@ export const PortedGalaxyView: React.FC<{
 			if (renderer) renderer.showGalaxy = checked
 			return
 		}
-		// showStarOverlay -- toggles the OLD packed-galaxy model's points/
-		// lanes visibility directly, not any GalaxyRenderer property (its own
-		// decorative stars stay on unconditionally, see the mount effect).
+		if (key !== "showStarOverlay") return
 		showStarOverlayRef.current = checked
 		if (pointsRef.current) pointsRef.current.points.visible = checked
 		if (pointsRef.current) pointsRef.current.blackHolePoints.visible = checked
@@ -612,6 +635,58 @@ export const PortedGalaxyView: React.FC<{
 		[pregeneratedSystems],
 	)
 
+	const advancedFilterSystemIndices = useMemo(
+		() =>
+			filterSystemIndices(advancedFilter, {
+				systems: pregeneratedSystems,
+				starEntries: systemSearchEntries,
+				bodyEntries: systemBodySearchEntries,
+			}),
+		[
+			advancedFilter,
+			pregeneratedSystems,
+			systemSearchEntries,
+			systemBodySearchEntries,
+		],
+	)
+	useEffect(() => {
+		const renderer = rendererRef.current
+		if (
+			!renderer ||
+			!galaxy ||
+			!displayFlags.showSearchMatches ||
+			!advancedFilterSystemIndices?.length
+		)
+			return
+		const markers = buildSearchMatchMarkers({
+			galaxy,
+			matchingSystemIndices: advancedFilterSystemIndices,
+		})
+		matchMarkersRef.current = markers
+		renderer.scene.add(markers)
+		return () => {
+			renderer.scene.remove(markers)
+			markers.geometry.dispose()
+			markers.material.dispose()
+			matchMarkersRef.current = null
+		}
+	}, [galaxy, advancedFilterSystemIndices, displayFlags.showSearchMatches])
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apply visibility to overlays rebuilt on galaxy generation.
+	useEffect(() => {
+		const sectorBoundaries = nationOverlayRef.current?.sectorBoundaries
+		if (sectorBoundaries)
+			sectorBoundaries.visible = displayFlags.showSectorBoundaries
+		if (nationMarkersRef.current)
+			nationMarkersRef.current.group.visible = displayFlags.showCapitalMarkers
+		if (sectorMarkersRef.current)
+			sectorMarkersRef.current.group.visible = displayFlags.showCapitalMarkers
+	}, [
+		galaxy,
+		displayFlags.showCapitalMarkers,
+		displayFlags.showSectorBoundaries,
+	])
+
 	const focusSearchedSystem = (systemIndex: number) => {
 		const renderer = rendererRef.current
 		const currentGalaxy = galaxyRef.current
@@ -670,6 +745,9 @@ export const PortedGalaxyView: React.FC<{
 					onClose={() => setPanelOpen(false)}
 					systemSearchEntries={systemSearchEntries}
 					systemBodySearchEntries={systemBodySearchEntries}
+					advancedFilter={advancedFilter}
+					advancedFilterSystemIndices={advancedFilterSystemIndices}
+					onAdvancedFilterChange={setAdvancedFilter}
 					onFocusSystem={focusSearchedSystem}
 					onOpenSystem={(systemIndex, focus) => {
 						const currentGalaxy = galaxyRef.current
@@ -720,6 +798,8 @@ export const PortedGalaxyView: React.FC<{
 				/>
 				<GalaxyMapModeControl
 					mode={mapMode}
+					showCapitalMarkers={displayFlags.showCapitalMarkers}
+					showSectorBoundaries={displayFlags.showSectorBoundaries}
 					onModeChange={handleMapModeChange}
 				/>
 				{!panelOpen ? (

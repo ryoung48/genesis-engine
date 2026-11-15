@@ -20,7 +20,10 @@ import { Slider } from "@/ui/components/primitives/Slider"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
-import { formatDistance, formatTemperatureDelta } from "@/ui/genesis/shared/ui-format"
+import {
+	formatDistance,
+	formatTemperatureDelta,
+} from "@/ui/genesis/shared/ui-format"
 import {
 	classificationSwatchColor,
 	orbitZoneSwatchColor,
@@ -1182,7 +1185,6 @@ export function buildMoonPreviewDataProps(params: {
 	const climateDaysPerYear =
 		climateHoursPerDay > 0 ? parentYearHours / climateHoursPerDay : 0
 	return {
-
 		seed: params.seed,
 		moons: [],
 		moonContext: {

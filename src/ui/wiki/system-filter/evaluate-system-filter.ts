@@ -9,6 +9,8 @@ import {
 import type {
 	SystemFilterBodyEntry,
 	SystemFilterBodyPair,
+	SystemFilterBodyTarget,
+	SystemFilterBodyTargetsInput,
 	SystemFilterCondition,
 	SystemFilterData,
 	SystemFilterGroup,
@@ -89,6 +91,61 @@ function isStarAttributeField(field: SystemFilterCondition["field"]): boolean {
 		field === "starLuminosityClass" ||
 		field === "starYouth"
 	)
+}
+
+export function objectFilterScope(
+	node: SystemFilterNode,
+): "body" | "star" | null {
+	const scopes = new Set<"body" | "star" | "system">()
+	function collect(child: SystemFilterNode) {
+		if (child.kind === "group") {
+			child.nodes.forEach(collect)
+		} else if (isBodyField(child.field)) {
+			scopes.add("body")
+		} else if (isStarAttributeField(child.field)) {
+			scopes.add("star")
+		} else {
+			scopes.add("system")
+		}
+	}
+	collect(node)
+	if (scopes.size !== 1) return null
+	return scopes.has("body") ? "body" : scopes.has("star") ? "star" : null
+}
+
+export function* matchingBodyTargets({
+	node,
+	system,
+	entry,
+}: SystemFilterBodyTargetsInput): Generator<SystemFilterBodyTarget> {
+	const matchPlanets = hasBodyFilterForKind(node, "planet")
+	const matchMoons = hasBodyFilterForKind(node, "moon")
+	let planetIndex = 0
+	let moonIndex = 0
+	for (const star of system.stars) {
+		for (const [bodyIdx, body] of star.bodies.entries()) {
+			const pair = entry.planetClassificationTemperaturePairs[planetIndex++]
+			if (matchPlanets && pair && matchesBodyFilter(node, "planet", pair)) {
+				yield { kind: "planet", starIndex: star.index, bodyIdx, body }
+			}
+			for (const [moonIdx, moon] of body.moons.entries()) {
+				const moonPair = entry.moonClassificationTemperaturePairs[moonIndex++]
+				if (
+					matchMoons &&
+					moonPair &&
+					matchesBodyFilter(node, "moon", moonPair)
+				) {
+					yield {
+						kind: "moon",
+						starIndex: star.index,
+						bodyIdx,
+						moonIdx,
+						body: moon,
+					}
+				}
+			}
+		}
+	}
 }
 
 export function hasBodyFilter(node: SystemFilterNode): boolean {
@@ -349,6 +406,28 @@ export function filterSystemIndices(
 		data.starEntries.map((entry) => entry.systemIndex),
 	)
 	for (const system of data.systems ?? []) systemIndices.add(system.systemIndex)
+	const scope = objectFilterScope(root)
+	if (scope === "body") {
+		const entries = new Map(
+			data.bodyEntries?.map((entry) => [entry.systemIndex, entry]),
+		)
+		return [...systemIndices].filter((index) => {
+			const entry = entries.get(index)
+			return (
+				entry !== undefined &&
+				taggedBodyPairs(entry).some(({ kind, pair }) =>
+					matchesBodyFilter(root, kind, pair),
+				)
+			)
+		})
+	}
+	if (scope === "star") {
+		return data.starEntries
+			.filter(({ stars }) =>
+				stars.some((star) => matchesStarFilter({ node: root, star })),
+			)
+			.map(({ systemIndex }) => systemIndex)
+	}
 	return [...systemIndices].filter((systemIndex) =>
 		matchesNode(root, data, systemIndex),
 	)

@@ -71,6 +71,8 @@ export type MainWorldMode =
 	| "temperate-native"
 
 export interface GenerateSystemBodiesParams {
+	// [JUSTIFICATION] Standalone generation has no allocated region to reconcile.
+	placement?: RegionalBodyPlacement
 	seed: number
 	/** The already-rolled physical host star. Galaxy generation supplies this
 	 * so planetary physics uses its actual attributes rather than a
@@ -140,4 +142,9 @@ export interface GenerateSystemBodiesParams {
 	 * where both are pure flavor/refinement that only matter once a system is
 	 * actually opened. */
 	skipNaming?: boolean
+}
+
+export interface RegionalBodyPlacement {
+	region: import("@/model/celestial/orbit-body/types").OrbitRegion
+	acceptedSlots: OrbitSlot[]
 }

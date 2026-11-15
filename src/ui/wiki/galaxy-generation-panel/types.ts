@@ -1,4 +1,5 @@
 export type SpecialCircumstance =
+	| "Circumbinary"
 	| "Trojan Orbit"
 	| "Minor Rings"
 	| "Major Rings"

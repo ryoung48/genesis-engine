@@ -229,6 +229,7 @@ export function createGenesisScene(
 		updateSolarSystemDay,
 		setSolarSystemSpinHours,
 		setSolarSystemFocusChangeHandler,
+		clearSolarSystemFocus,
 		setNebulaBackgroundSeed,
 	} = solarSystemController
 
@@ -496,6 +497,7 @@ export function createGenesisScene(
 		setSolarSystemSpinHours,
 		focusOnSystemBody,
 		setSolarSystemFocusChangeHandler,
+		clearSolarSystemFocus,
 		setNebulaBackgroundSeed,
 	}
 }

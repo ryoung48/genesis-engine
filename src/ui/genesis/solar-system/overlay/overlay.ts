@@ -164,6 +164,21 @@ export function buildSolarSystemOverlay(
 	const hasSiblingStar = companions.length > 0 || isCompanion === true
 
 	const group = new THREE.Group()
+	const binaryOrbits = params.binaryOrbits ?? []
+	const uniformDistances = params.uniformDistances || binaryOrbits.length > 0
+	const starFrame = new THREE.Group()
+	group.add(starFrame)
+	const binaryFrames = binaryOrbits.map(() => {
+		const frame = new THREE.Group()
+		group.add(frame)
+		return frame
+	})
+	const bodyFrame = (body: SystemBody) => {
+		const center = body.orbitRegion?.center
+		return (
+			(center?.kind === "binary" && binaryFrames[center.index]) || starFrame
+		)
+	}
 	let currentDay = initialDay
 	let currentSpinHours = 0
 
@@ -202,7 +217,10 @@ export function buildSolarSystemOverlay(
 	// True scale: the star's real radius at the system's units-per-AU. A
 	// neutron star's visible surface is a fraction of starRadius, so starRadius
 	// is sized for that surface to get the floor.
-	const unitsPerAU = trueScale ? (params.unitsPerAU ?? computeUnitsPerAU()) : 1
+	const unitsPerAU =
+		trueScale || uniformDistances
+			? (params.unitsPerAU ?? computeUnitsPerAU())
+			: 1
 	const uncappedStarSize = trueScale
 		? Math.max(
 				MIN_STAR_RADIUS_SUN_FRACTION *
@@ -216,6 +234,51 @@ export function buildSolarSystemOverlay(
 			)
 	const uncappedStarRadius =
 		uncappedStarSize / (isNeutronStar ? NEUTRON_STAR_SURFACE_FACTOR : 1)
+	const readableStarClearances = new Map<number, number>()
+	if (!trueScale) {
+		const binaryExcursions = binaryOrbits.map(
+			(orbit) =>
+				(orbit.orbitalDistanceAU *
+					(1 + orbit.eccentricity) *
+					Math.max(orbit.a.massSol, orbit.b.massSol)) /
+				(orbit.a.massSol + orbit.b.massSol),
+		)
+		for (const orbit of binaryOrbits) {
+			const components = [orbit.a.center, orbit.b.center]
+			const excursionAU = components.reduce(
+				(total, center) =>
+					total +
+					(center.kind === "binary" ? binaryExcursions[center.index]! : 0),
+				0,
+			)
+			const clearance =
+				Math.max(
+					0,
+					orbit.orbitalDistanceAU * (1 - orbit.eccentricity) - excursionAU,
+				) *
+				unitsPerAU *
+				READABLE_STAR_MAX_INNER_PERIAPSIS_FRACTION
+			for (const center of components) {
+				const stellarCenters =
+					center.kind === "binary"
+						? [
+								binaryOrbits[center.index]!.a.center,
+								binaryOrbits[center.index]!.b.center,
+							]
+						: [center]
+				for (const stellarCenter of stellarCenters) {
+					if (stellarCenter.kind !== "star") continue
+					readableStarClearances.set(
+						stellarCenter.index,
+						Math.min(
+							clearance,
+							readableStarClearances.get(stellarCenter.index) ?? Infinity,
+						),
+					)
+				}
+			}
+		}
+	}
 	// Orbits are drawn from the star's centre, so the star is capped inside its
 	// innermost drawn orbit (bodies, belts and companions alike) -- the guard
 	// against giants.
@@ -238,15 +301,26 @@ export function buildSolarSystemOverlay(
 		}
 		// A companion is shrunk at least as much as the star it orbits, so stars
 		// sharing a view keep their true size order.
-		const sharedRadius = uncappedStarRadius * (parentStarSizeScale ?? 1)
+		const clearance =
+			params.readableStarClearance ?? readableStarClearances.get(0) ?? Infinity
+		const footprintScale = Math.max(
+			STAR_GLOW_RADIUS_SCALE,
+			isBlackHole ? BLACK_HOLE_BOUNDS_RADIUS : 1,
+		)
+		const sharedRadius = Math.min(
+			uncappedStarRadius * (parentStarSizeScale ?? 1),
+			clearance / footprintScale,
+		)
+		if (uniformDistances && trueScale) return sharedRadius
 		if (!Number.isFinite(innermostAU)) return sharedRadius
 		const extent = isBlackHole ? BLACK_HOLE_BOUNDS_RADIUS : 1
-		const innermostDrawn = trueScale
-			? innermostAU * unitsPerAU
-			: drawnDistance({
-					mapping: computeDistanceMapping(starBodies),
-					au: innermostAU,
-				})
+		const innermostDrawn =
+			trueScale || uniformDistances
+				? innermostAU * unitsPerAU
+				: drawnDistance({
+						mapping: computeDistanceMapping(starBodies),
+						au: innermostAU,
+					})
 		return Math.min(
 			sharedRadius,
 			((trueScale
@@ -322,7 +396,7 @@ export function buildSolarSystemOverlay(
 	// the planets' orbital plane. Same fix already applied to the gas-giant
 	// mesh elsewhere in this renderer.
 	starMesh.rotation.x = Math.PI / 2
-	group.add(starMesh)
+	starFrame.add(starMesh)
 	// A black hole draws its own accretion-disc glow instead.
 	const starFlare = isBlackHole
 		? null
@@ -330,7 +404,7 @@ export function buildSolarSystemOverlay(
 				color: starColor,
 				intensity: isBrownDwarf ? 0.5 : 1,
 			})
-	if (starFlare) group.add(starFlare)
+	if (starFlare) starFrame.add(starFlare)
 	const haloMaterial =
 		starSurfaceLayers?.glow ??
 		(brownDwarfGlowSettings
@@ -358,13 +432,13 @@ export function buildSolarSystemOverlay(
 		coronaMesh.raycast = () => {
 			// Intentionally inert -- see doc above.
 		}
-		group.add(coronaMesh)
+		starFrame.add(coronaMesh)
 	}
 	let blackHoleDiskMaterial: THREE.ShaderMaterial | null = null
 	let blackHoleMesh: THREE.Mesh | null = null
 	const HOLE_RADIUS = 0.3
 	if (isBlackHole) {
-		group.remove(starMesh)
+		starFrame.remove(starMesh)
 		starMesh.geometry.dispose()
 		starMaterial.dispose()
 		// Port of a volumetric-raymarch black hole shader (Shadertoy-style: a
@@ -555,9 +629,9 @@ export function buildSolarSystemOverlay(
 			new THREE.MeshBasicMaterial({ color: 0x000000 }),
 		)
 		blackHoleShadowMesh.scale.setScalar(starRadius)
-		group.add(blackHoleShadowMesh)
+		starFrame.add(blackHoleShadowMesh)
 		blackHoleMesh.renderOrder = 10_000
-		group.add(blackHoleMesh)
+		starFrame.add(blackHoleMesh)
 	}
 	if (isNeutronStar) {
 		const neutronJets = buildNeutronJets({
@@ -565,7 +639,7 @@ export function buildSolarSystemOverlay(
 			starRadius: starSurfaceRadius,
 			beamLength: starRadius * 5,
 		})
-		group.add(neutronJets.group)
+		starFrame.add(neutronJets.group)
 	}
 
 	// decay=0 keeps the light's intensity constant regardless of a body's
@@ -590,7 +664,7 @@ export function buildSolarSystemOverlay(
 		0,
 		0,
 	)
-	group.add(starLight)
+	starFrame.add(starLight)
 	// AmbientLight has no position/distance falloff -- it lights the whole
 	// scene uniformly, so only the primary star adds one. A companion adding
 	// its own would stack, washing out every body's day/night terminator
@@ -614,8 +688,8 @@ export function buildSolarSystemOverlay(
 					: `${spectralClass}${Math.round(starSubtype)} Star`,
 		)
 		starNameLeader = createNameLeaderLine()
-		group.add(starNameLabel)
-		group.add(starNameLeader)
+		starFrame.add(starNameLabel)
+		starFrame.add(starNameLeader)
 	}
 
 	// Per-group ordinal (1-indexed), matching GenerationPanel's own sibling
@@ -867,7 +941,7 @@ export function buildSolarSystemOverlay(
 			? BODY_MARKER.create(ORBIT_LINE_COLOR_BY_ZONE[body.zone ?? "distant"])
 			: undefined
 		if (marker) bodyGroup.add(marker)
-		group.add(bodyGroup)
+		bodyFrame(body).add(bodyGroup)
 
 		let nameLabel: Text | undefined
 		let nameLeader: THREE.Line | undefined
@@ -923,7 +997,11 @@ export function buildSolarSystemOverlay(
 			const overlay = buildSolarSystemOverlay({
 				...companion.star,
 				isCompanion: true,
-				parentStarSizeScale: starRadius / uncappedStarRadius,
+				parentStarSizeScale: uniformDistances
+					? 1
+					: starRadius / uncappedStarRadius,
+				uniformDistances,
+				readableStarClearance: readableStarClearances.get(index + 1),
 				unitsPerAU,
 				trueScale,
 			})
@@ -962,7 +1040,7 @@ export function buildSolarSystemOverlay(
 	// moves with its parent: it and its orbit ring live in the parent's mount,
 	// so its distances are measured from the parent, not the primary.
 	for (const c of placedCompanions) {
-		if (c.parentIndex <= 0) continue
+		if (uniformDistances || c.parentIndex <= 0) continue
 		const parent = placedCompanions[c.parentIndex - 1]
 		if (!parent || parent === c) continue
 		c.parent = parent
@@ -1003,7 +1081,7 @@ export function buildSolarSystemOverlay(
 	function rebuildAsteroidFieldForPlacedBody(p: PlacedBody) {
 		if (!p.isBelt) return
 		if (p.asteroidField) {
-			group.remove(p.asteroidField.points)
+			p.asteroidField.points.removeFromParent()
 			p.asteroidField.points.geometry.dispose()
 			;(p.asteroidField.points.material as THREE.Material).dispose()
 		}
@@ -1013,7 +1091,14 @@ export function buildSolarSystemOverlay(
 			outerRadius: p.beltEdges.outer,
 			isOuterZone: p.body.zone === "outer",
 		})
-		group.add(p.asteroidField.points)
+		p.asteroidField.points.rotation.x = bodyPlaneInclination(p.body)
+		bodyFrame(p.body).add(p.asteroidField.points)
+	}
+
+	function bodyPlaneInclination(body: SystemBody): number {
+		return showInclination
+			? (body.orbitRegion?.inclinationDeg ?? 0) * DEG2RAD
+			: 0
 	}
 
 	function eccentricityOf(eccentricity: number): number {
@@ -1039,6 +1124,15 @@ export function buildSolarSystemOverlay(
 				companion.orbitalDistanceAU *
 					(1 + eccentricityOf(companion.eccentricity)),
 			)
+			if (uniformDistances) {
+				for (const body of companion.star.bodies) {
+					const extent =
+						body.group === "asteroid belt"
+							? beltEdgesAU(body).maxAU
+							: body.orbitalDistanceAU * (1 + body.eccentricity)
+					farthestAU = Math.max(farthestAU, extent)
+				}
+			}
 		}
 		return farthestAU > 0 ? LAYOUT_OUTER_RADIUS / farthestAU : 1
 	}
@@ -1300,9 +1394,9 @@ export function buildSolarSystemOverlay(
 	function layoutTrueScale(): PlacedLayout {
 		const drawnSemiMajor = new Map<PlacedBody, number>()
 		let outerEdge = starRadius
-		layoutNestedCompanions()
+		if (!uniformDistances) layoutNestedCompanions()
 		for (const c of placedCompanions) {
-			if (c.parent) continue
+			if (uniformDistances || c.parent) continue
 			const e = eccentricityOf(c.eccentricity)
 			const inc = (showInclination ? c.inclinationDeg : 0) * DEG2RAD
 			const a = c.orbitalDistanceAU * unitsPerAU
@@ -1321,13 +1415,20 @@ export function buildSolarSystemOverlay(
 			}
 			drawnSemiMajor.set(p, p.body.orbitalDistanceAU * unitsPerAU)
 		}
-		return { drawnSemiMajor, outerEdge }
+		return {
+			drawnSemiMajor,
+			outerEdge,
+			bodyScale: trueScale
+				? undefined
+				: computeBodyScale({ drawnSemiMajor, companionBands: [] }),
+		}
 	}
 
 	// Lays out every orbit and sizes every body for the chosen scale. Returns
 	// the system's outer edge.
 	function applyPlacedBodyLayout(): number {
-		const layout = trueScale ? layoutTrueScale() : layoutReadable()
+		const layout =
+			trueScale || uniformDistances ? layoutTrueScale() : layoutReadable()
 		const { drawnSemiMajor, bodyScale } = layout
 		let { outerEdge } = layout
 		lastPlanetOuterEdge = starRadius
@@ -1363,6 +1464,9 @@ export function buildSolarSystemOverlay(
 			p.orbitRadius = a
 			const b = a * Math.sqrt(1 - e * e)
 			const { P, Q } = perifocalBasis(Omega, inc, omega)
+			const planeInclination = bodyPlaneInclination(p.body)
+			P.applyAxisAngle(orbitPlaneAxis, planeInclination)
+			Q.applyAxisAngle(orbitPlaneAxis, planeInclination)
 			p.kepler = { P, Q, a, b, ae: a * e, e }
 			const apoapsisEdge =
 				a * (1 + e) + (p.moonState?.outerRadius ?? 1) * p.sceneRadius
@@ -1378,6 +1482,7 @@ export function buildSolarSystemOverlay(
 
 			if (showAxialTilt && p.body.axialTiltDeg) {
 				const { Q: tiltAxis } = perifocalBasis(Omega, inc, 0)
+				tiltAxis.applyAxisAngle(orbitPlaneAxis, planeInclination)
 				const tiltRad = p.body.axialTiltDeg * DEG2RAD
 				const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
 					tiltAxis,
@@ -1406,7 +1511,112 @@ export function buildSolarSystemOverlay(
 		return outerEdge
 	}
 
+	const orbitPlaneAxis = new THREE.Vector3(1, 0, 0)
 	let outerRadius = applyPlacedBodyLayout()
+	const stellarMounts = [
+		starFrame,
+		...placedCompanions.map((companion) => companion.mount),
+	]
+	const binaryTracks = binaryOrbits.map((orbit, index) => {
+		const e = eccentricityOf(orbit.eccentricity)
+		const inclination = showInclination ? orbit.inclinationDeg * DEG2RAD : 0
+		const { P, Q } = perifocalBasis(0, inclination, 0)
+		const a = orbit.orbitalDistanceAU * unitsPerAU
+		const kepler = { P, Q, a, b: a * Math.sqrt(1 - e * e), ae: a * e, e }
+		const totalMass = orbit.a.massSol + orbit.b.massSol
+		const frame = binaryFrames[index]!
+		const components = [orbit.a, orbit.b].map(({ center }, componentIndex) => {
+			const mount =
+				center.kind === "star"
+					? stellarMounts[center.index]!
+					: binaryFrames[center.index]!
+			const fraction =
+				componentIndex === 0
+					? -orbit.b.massSol / totalMass
+					: orbit.a.massSol / totalMass
+			const trail =
+				center.kind === "star" && center.index > 0
+					? placedCompanions[center.index - 1]!.orbitLine
+					: ORBIT_TRAIL.create({
+							color: ORBIT_LINE_COLOR_BY_ZONE.epistellar,
+							peakOpacity: 0.7,
+						})
+			frame.add(mount, trail)
+			return {
+				mount,
+				fraction,
+				trail,
+				kepler: {
+					a: kepler.a * Math.abs(fraction),
+					b: kepler.b * Math.abs(fraction),
+					ae: kepler.ae * Math.abs(fraction),
+					e,
+					P: P.clone().multiplyScalar(Math.sign(fraction)),
+					Q: Q.clone().multiplyScalar(Math.sign(fraction)),
+				},
+			}
+		})
+		return {
+			kepler,
+			components,
+			periodDays: orbit.orbitalPeriodDays,
+		}
+	})
+	const stellarRadiusByFrame = new Map<THREE.Group, number>([
+		[starFrame, starRadius],
+		...placedCompanions.map((companion): [THREE.Group, number] => [
+			companion.mount,
+			companionStarRadius(companion),
+		]),
+	])
+	if (binaryTracks.length > 0) {
+		const extentByFrame = new Map<THREE.Group, number>([
+			[starFrame, starRadius],
+			...placedCompanions.map(({ mount, overlay }): [THREE.Group, number] => [
+				mount,
+				overlay.outerRadius,
+			]),
+		])
+		for (const p of placed) {
+			const frame = bodyFrame(p.body)
+			const extent =
+				p.beltEdges?.outer ??
+				(p.kepler
+					? p.kepler.a * (1 + p.kepler.e) +
+						(p.moonState?.outerRadius ?? 1) * p.sceneRadius
+					: 0)
+			extentByFrame.set(frame, Math.max(extentByFrame.get(frame) ?? 0, extent))
+		}
+		for (const [index, track] of binaryTracks.entries()) {
+			const frame = binaryFrames[index]!
+			stellarRadiusByFrame.set(
+				frame,
+				Math.max(
+					...track.components.map(
+						({ mount, kepler }) =>
+							kepler.a * (1 + kepler.e) +
+							(stellarRadiusByFrame.get(mount) ?? 0),
+					),
+				),
+			)
+			const extent = Math.max(
+				extentByFrame.get(frame) ?? 0,
+				...track.components.map(
+					({ mount, kepler }) =>
+						kepler.a * (1 + kepler.e) + (extentByFrame.get(mount) ?? 0),
+				),
+			)
+			extentByFrame.set(frame, extent)
+		}
+		outerRadius = extentByFrame.get(binaryFrames.at(-1)!) ?? outerRadius
+	}
+	const stellarTrails =
+		binaryTracks.length > 0
+			? binaryTracks.flatMap((track) => track.components)
+			: placedCompanions.map(({ mount, orbitLine }) => ({
+					mount,
+					trail: orbitLine,
+				}))
 	// Capped to this star's own outer planet/belt only when there's an actual
 	// companion star to protect against -- a lone star has nothing else in
 	// the scene to bleed light onto, so leave it at the uncapped default
@@ -1432,16 +1642,11 @@ export function buildSolarSystemOverlay(
 				color: ORBIT_LINE_COLOR_BY_ZONE[p.body.zone ?? "distant"],
 				peakOpacity: hostsMainWorld(p) ? 0.9 : 0.7,
 			})
-			group.add(p.orbitLine)
+			bodyFrame(p.body).add(p.orbitLine)
 		}
 
 		if (p.isBelt && p.beltEdges) {
-			p.asteroidField = buildAsteroidField({
-				innerRadius: p.beltEdges.inner,
-				outerRadius: p.beltEdges.outer,
-				isOuterZone: p.body.zone === "outer",
-			})
-			group.add(p.asteroidField.points)
+			rebuildAsteroidFieldForPlacedBody(p)
 		}
 	}
 	// Each body's own rolled period, which keeps it in step with the "watch
@@ -1496,6 +1701,21 @@ export function buildSolarSystemOverlay(
 
 	function setDay(day: number) {
 		currentDay = day
+		for (const track of binaryTracks) {
+			const { a, b, ae, P, Q, e } = track.kepler
+			const anomaly = solveKepler(mod2pi((TWO_PI * day) / track.periodDays), e)
+			const relative = orbitPoint(anomaly, a, b, ae, P, Q)
+			for (const component of track.components) {
+				component.mount.position
+					.copy(relative)
+					.multiplyScalar(component.fraction)
+				ORBIT_TRAIL.update({
+					trail: component.trail,
+					kepler: component.kepler,
+					eccentricAnomaly: anomaly,
+				})
+			}
+		}
 		for (const p of placed) {
 			if (p.isBelt) {
 				if (p.asteroidField) {
@@ -1544,6 +1764,10 @@ export function buildSolarSystemOverlay(
 			p.moonState?.setDay(day)
 		}
 		for (const c of placedCompanions) {
+			if (uniformDistances) {
+				c.overlay.setDay(day)
+				continue
+			}
 			const period = Math.max(1, c.orbitalPeriodDays)
 			const angle = mod2pi(c.meanAnomalyAtEpoch + (TWO_PI * day) / period)
 			const E = solveKepler(angle, c.kepler.e)
@@ -1580,10 +1804,6 @@ export function buildSolarSystemOverlay(
 		// geometry/material, which isn't enough for it.
 		starNameLabel?.dispose()
 		for (const p of placed) p.nameLabel?.dispose()
-		for (const c of placedCompanions) {
-			c.orbitLine.geometry.dispose()
-			;(c.orbitLine.material as THREE.Material).dispose()
-		}
 		group.traverse((obj) => {
 			if (
 				obj instanceof THREE.Mesh ||
@@ -1689,7 +1909,7 @@ export function buildSolarSystemOverlay(
 	// moons and ring onto the planet, the planet onto its ring and moons.
 	function updateEclipseShadows(): void {
 		group.updateMatrixWorld(true)
-		group.getWorldPosition(eclipseStarWorld)
+		starFrame.getWorldPosition(eclipseStarWorld)
 		for (const p of placed) {
 			if (p.isBelt || !p.bodyGroup || !p.eclipse) continue
 			p.bodyGroup.getWorldPosition(eclipsePlanetWorld)
@@ -1761,7 +1981,7 @@ export function buildSolarSystemOverlay(
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
 		updateEclipseShadows()
 		if (starFlare) {
-			group.getWorldPosition(screenBodyWorld)
+			starFrame.getWorldPosition(screenBodyWorld)
 			STAR_FLARE.update({
 				flare: starFlare,
 				camera,
@@ -1784,15 +2004,15 @@ export function buildSolarSystemOverlay(
 			)
 		}
 		const halfHeightTangent = Math.tan((camera.fov * DEG2RAD) / 2)
-		for (const c of placedCompanions) {
-			c.mount.getWorldPosition(screenBodyWorld)
+		for (const { mount, trail } of stellarTrails) {
+			mount.getWorldPosition(screenBodyWorld)
 			const screenUnit = Math.max(
 				camera.position.distanceTo(screenBodyWorld) * halfHeightTangent,
 				1e-12,
 			)
 			ORBIT_TRAIL.fadeForZoom({
-				trail: c.orbitLine,
-				bodyScreenRadius: companionStarRadius(c) / screenUnit,
+				trail,
+				bodyScreenRadius: (stellarRadiusByFrame.get(mount) ?? 0) / screenUnit,
 			})
 		}
 		for (const p of placed) {
@@ -1858,21 +2078,13 @@ export function buildSolarSystemOverlay(
 			const c = placedCompanions[address.starIndex - 1]
 			if (!c) return null
 			const focus = c.overlay.getBodyFocus({ ...address, starIndex: 0 })
-			if (!focus) return null
-			// MoonOrbitState.getMoonFocus resolves its mesh through the complete
-			// scene graph, so a companion moon's position already includes the
-			// companion mount translation. Body and star positions are local to the
-			// nested overlay, hence only those still need the mount translation.
-			if (address.kind === "moon") return focus
-			const position = focus.position.clone()
-			for (let mounted: PlacedCompanion | undefined = c; mounted; ) {
-				position.add(mounted.mount.position)
-				mounted = mounted.parent
-			}
-			return { position, radius: focus.radius }
+			return focus
 		}
 		if (address.kind === "star") {
-			return { position: new THREE.Vector3(0, 0, 0), radius: starRadius }
+			return {
+				position: starFrame.getWorldPosition(new THREE.Vector3()),
+				radius: starRadius,
+			}
 		}
 		const p = placed[address.bodyIdx]
 		if (!p) return null
@@ -1887,13 +2099,18 @@ export function buildSolarSystemOverlay(
 		}
 		if (p.isBelt) {
 			return {
-				position: new THREE.Vector3(p.orbitRadius, 0, 0),
+				position: bodyFrame(p.body).localToWorld(
+					new THREE.Vector3(0, p.orbitRadius, 0).applyAxisAngle(
+						orbitPlaneAxis,
+						bodyPlaneInclination(p.body),
+					),
+				),
 				radius: p.beltEdges ? p.beltEdges.outer - p.beltEdges.inner : 0,
 			}
 		}
 		if (!p.bodyGroup) return null
 		return {
-			position: p.bodyGroup.position.clone(),
+			position: p.bodyGroup.getWorldPosition(new THREE.Vector3()),
 			radius: p.sceneRadius,
 		}
 	}
@@ -1989,6 +2206,7 @@ export function buildSolarSystemOverlay(
 		nextBodies: SystemBody[],
 		nextMainWorldTexture?: THREE.DataTexture | null,
 	) {
+		if (uniformDistances) return false
 		if (nextBodies.length !== placed.length) return false
 		// The star mesh bakes its radius in, so a change to its inner-orbit cap
 		// needs a full rebuild.

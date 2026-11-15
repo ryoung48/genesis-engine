@@ -47,13 +47,12 @@ import {
 	TEMPERATURE_CATEGORIES,
 } from "@/ui/wiki/stats/galaxy/galaxy-body-distributions"
 import {
-	filterSystemIndices,
 	findBodyClassificationConditions,
 	hasBodyFilter,
-	hasBodyFilterForKind,
 	hasStarAttributeFilter,
-	matchesBodyFilter,
 	matchesStarFilter,
+	matchingBodyTargets,
+	objectFilterScope,
 } from "@/ui/wiki/system-filter/evaluate-system-filter"
 import { SystemFilterBuilder } from "@/ui/wiki/system-filter/SystemFilterBuilder"
 import type { SystemFilterRoot } from "@/ui/wiki/system-filter/types"
@@ -123,6 +122,7 @@ function matchesStarCountFilter(
 }
 
 const SPECIAL_CIRCUMSTANCE_OPTIONS: SpecialCircumstance[] = [
+	"Circumbinary",
 	"Trojan Orbit",
 	"Minor Rings",
 	"Major Rings",
@@ -183,6 +183,11 @@ function matchesSimpleBodyFilter({
 	)
 }
 
+interface SystemSearchTarget {
+	address: OrbitAddress
+	label: string
+}
+
 interface SystemSearchResult {
 	systemIndex: number
 	match: string
@@ -201,12 +206,6 @@ type SystemBodyCountComparator = "greaterThan" | "lessThan"
 const MIN_SYSTEM_COUNT = 50
 const MAX_SYSTEM_COUNT = 200_000
 const SEARCH_RESULTS_PER_PAGE = 5
-const EMPTY_SYSTEM_FILTER: SystemFilterRoot = {
-	kind: "group",
-	id: "root",
-	operator: "and",
-	nodes: [],
-}
 
 // Systems count spans too wide a range (50-200,000) for a slider to give
 // useful precision, so it gets a plain number input instead -- clamped to
@@ -353,6 +352,9 @@ interface PortedGalaxyPanelProps {
 	/** [JUSTIFICATION] Planet and moon classifications only exist after the
 	 * user has requested all systems be pre-generated. */
 	systemBodySearchEntries: GalaxySystemBodySearchEntry[] | null
+	advancedFilter: SystemFilterRoot
+	advancedFilterSystemIndices: number[] | null
+	onAdvancedFilterChange: (filter: SystemFilterRoot) => void
 	onFocusSystem: (systemIndex: number) => void
 	onOpenSystem: (systemIndex: number, focus: OrbitAddress) => void
 	/** Built-in density-wave shape presets (see GalaxyRendererThree.ts's
@@ -394,6 +396,9 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	onClose,
 	systemSearchEntries,
 	systemBodySearchEntries,
+	advancedFilter,
+	advancedFilterSystemIndices,
+	onAdvancedFilterChange,
 	onFocusSystem,
 	onOpenSystem,
 	presetCount,
@@ -405,8 +410,9 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false)
 	const [isSearchResultsExpanded, setIsSearchResultsExpanded] = useState(false)
 	const [searchResultsPage, setSearchResultsPage] = useState(0)
-	const [advancedFilter, setAdvancedFilter] =
-		useState<SystemFilterRoot>(EMPTY_SYSTEM_FILTER)
+	const [expandedMatchSystem, setExpandedMatchSystem] = useState<number | null>(
+		null,
+	)
 	const [searchTab, setSearchTab] = useState<SystemSearchTab>("stars")
 	const [spectralClassFilter, setSpectralClassFilter] = useState("all")
 	const [luminosityClassFilter, setLuminosityClassFilter] = useState("all")
@@ -770,20 +776,6 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 			),
 		[systemBodySearchEntries],
 	)
-	const advancedFilterSystemIndices = useMemo(
-		() =>
-			filterSystemIndices(advancedFilter, {
-				systems: pregeneratedSystems,
-				starEntries: systemSearchEntries,
-				bodyEntries: systemBodySearchEntries,
-			}),
-		[
-			advancedFilter,
-			pregeneratedSystems,
-			systemSearchEntries,
-			systemBodySearchEntries,
-		],
-	)
 	const bodyClassificationSelections = useMemo(() => {
 		const advancedSelections = findBodyClassificationConditions(advancedFilter)
 		if (advancedSelections.length > 0) return advancedSelections
@@ -814,53 +806,58 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 		(selection) => selection.bodyKind === "moon",
 	)
 	const hasAdvancedBodyFilter = hasBodyFilter(advancedFilter)
-	const hasAdvancedPlanetFilter = hasBodyFilterForKind(advancedFilter, "planet")
-	const hasAdvancedMoonFilter = hasBodyFilterForKind(advancedFilter, "moon")
 	const hasAdvancedStarFilter = hasStarAttributeFilter(advancedFilter)
-	// The tab-based search UI (searchTab and its per-tab classification/
-	// temperature/etc dropdowns) is currently rendered inside a `hidden` div
-	// further down this file -- unreachable, so the rule-builder (advancedFilter)
-	// is the only live source of a search match. This only ever resolves
-	// against advancedFilter for that reason; see the `hidden` wrapper's own
-	// plan note for the tab UI's dead-code status generally.
-	const firstMatchedAddress = (system: GalaxySystem): OrbitAddress => {
-		const entry = systemBodySearchEntries?.find(
-			(candidate) => candidate.systemIndex === system.systemIndex,
+	const matchScope = objectFilterScope(advancedFilter)
+	const starTargets = (systemIndex: number): SystemSearchTarget[] =>
+		systemSearchEntries
+			.find((entry) => entry.systemIndex === systemIndex)
+			?.stars.flatMap((star, starIndex): SystemSearchTarget[] =>
+				matchesStarFilter({ node: advancedFilter, star })
+					? [
+							{
+								address: { kind: "star", starIndex },
+								label: `Star ${starIndex + 1} · ${star.spectralClass} ${star.luminosityClass}`,
+							},
+						]
+					: [],
+			) ?? []
+	const bodyTargets = (systemIndex: number): SystemSearchTarget[] => {
+		const system = pregeneratedSystems?.find(
+			(entry) => entry.systemIndex === systemIndex,
 		)
-		if (entry && hasAdvancedBodyFilter) {
-			let planetIndex = 0
-			let moonIndex = 0
-			for (const star of system.stars) {
-				for (const [bodyIdx, body] of star.bodies.entries()) {
-					const pair = entry.planetClassificationTemperaturePairs[planetIndex++]
-					if (
-						pair &&
-						hasAdvancedPlanetFilter &&
-						matchesBodyFilter(advancedFilter, "planet", pair)
-					)
-						return { kind: "body", starIndex: star.index, bodyIdx }
-					for (const [moonIdx, moon] of body.moons.entries()) {
-						const moonPair =
-							entry.moonClassificationTemperaturePairs[moonIndex++]
-						if (
-							moon &&
-							moonPair &&
-							hasAdvancedMoonFilter &&
-							matchesBodyFilter(advancedFilter, "moon", moonPair)
-						)
-							return { kind: "moon", starIndex: star.index, bodyIdx, moonIdx }
-					}
-				}
-			}
-		}
-		if (hasAdvancedStarFilter) {
-			const matchingStar = system.stars.find((star) =>
-				matchesAdvancedStarFilter({ star, filter: advancedFilter }),
-			)
-			if (matchingStar) return { kind: "star", starIndex: matchingStar.index }
-		}
-		return { kind: "star", starIndex: 0 }
+		const entry = systemBodySearchEntries?.find(
+			(entry) => entry.systemIndex === systemIndex,
+		)
+		if (!system || !entry) return []
+		return Array.from(
+			matchingBodyTargets({ node: advancedFilter, system, entry }),
+			(target) => {
+				const { starIndex, bodyIdx, body } = target
+				const parent = `Star ${starIndex + 1} · Orbit ${bodyIdx + 1}`
+				return target.kind === "moon"
+					? {
+							address: {
+								kind: "moon",
+								starIndex,
+								bodyIdx,
+								moonIdx: target.moonIdx,
+							},
+							label: `${parent} · Moon ${target.moonIdx + 1} · ${body.classification}`,
+						}
+					: {
+							address: { kind: "body", starIndex, bodyIdx },
+							label: `${parent} · ${body.classification}`,
+						}
+			},
+		)
 	}
+	const firstMatchedAddress = (systemIndex: number): OrbitAddress =>
+		(hasAdvancedBodyFilter
+			? bodyTargets(systemIndex)[0]?.address
+			: undefined) ??
+		(hasAdvancedStarFilter
+			? starTargets(systemIndex)[0]?.address
+			: undefined) ?? { kind: "star", starIndex: 0 }
 	const systemSearchResults = useMemo<SystemSearchResults>(() => {
 		if (advancedFilterSystemIndices !== null) {
 			return {
@@ -1120,34 +1117,19 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 					(candidate) => candidate.systemIndex === system.systemIndex,
 				)
 				if (!entry) continue
-				let planetIndex = 0
-				let moonIndex = 0
-				for (const star of system.stars) {
-					const matchesStar =
-						!hasAdvancedStarFilter ||
-						matchesAdvancedStarFilter({ star, filter: advancedFilter })
-					for (const body of star.bodies) {
-						const pair =
-							entry.planetClassificationTemperaturePairs[planetIndex++]
-						if (
-							matchesStar &&
-							hasAdvancedPlanetFilter &&
-							pair &&
-							matchesBodyFilter(advancedFilter, "planet", pair)
-						)
-							planets.push(body)
-						for (const moon of body.moons) {
-							const moonPair =
-								entry.moonClassificationTemperaturePairs[moonIndex++]
-							if (
-								matchesStar &&
-								hasAdvancedMoonFilter &&
-								moonPair &&
-								matchesBodyFilter(advancedFilter, "moon", moonPair)
-							)
-								moons.push(moon)
-						}
-					}
+				for (const target of matchingBodyTargets({
+					node: advancedFilter,
+					system,
+					entry,
+				})) {
+					const star = system.stars[target.starIndex]!
+					if (
+						hasAdvancedStarFilter &&
+						!matchesAdvancedStarFilter({ star, filter: advancedFilter })
+					)
+						continue
+					if (target.kind === "planet") planets.push(target.body)
+					else moons.push(target.body)
 				}
 			}
 		} else {
@@ -1223,8 +1205,6 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 		hasAdvancedStarFilter,
 		advancedFilter,
 		systemBodySearchEntries,
-		hasAdvancedPlanetFilter,
-		hasAdvancedMoonFilter,
 	])
 	const searchResultsPageCount = Math.ceil(
 		systemSearchResults.total / SEARCH_RESULTS_PER_PAGE,
@@ -1519,7 +1499,11 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 							<div className="mt-2 border-t border-slate-100 pt-2 space-y-2">
 								<SystemFilterBuilder
 									value={advancedFilter}
-									onChange={setAdvancedFilter}
+									onChange={(filter) => {
+										onAdvancedFilterChange(filter)
+										setSearchResultsPage(0)
+										setExpandedMatchSystem(null)
+									}}
 									disabled={generating}
 									options={{
 										spectralClasses: spectralClassOptions,
@@ -1858,54 +1842,97 @@ export const PortedGalaxyPanel: React.FC<PortedGalaxyPanelProps> = ({
 														<tbody>
 															{visibleSearchResults.map(
 																({ systemIndex, match }) => (
-																	<tr
-																		key={systemIndex}
-																		onClick={() => onFocusSystem(systemIndex)}
-																		className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
-																	>
-																		<td className="px-2 py-1.5 font-mono text-slate-700">
-																			#{systemIndex + 1}
-																		</td>
-																		<td className="max-w-0 truncate px-2 py-1.5 text-slate-400">
-																			{match}
-																		</td>
-																		<td className="px-1 py-1 text-right">
-																			<button
-																				type="button"
-																				onClick={(event) => {
-																					event.stopPropagation()
-																					onFocusSystem(systemIndex)
-																				}}
-																				title="Zoom to system"
-																				aria-label="Zoom to system"
-																				className="px-1 text-slate-400 hover:text-slate-700"
-																			>
-																				◎
-																			</button>
-																			<button
-																				type="button"
-																				onClick={(event) => {
-																					event.stopPropagation()
-																					const system =
-																						pregeneratedSystems?.find(
-																							(entry) =>
-																								entry.systemIndex ===
-																								systemIndex,
-																						)
-																					if (system)
+																	<React.Fragment key={systemIndex}>
+																		<tr
+																			onClick={() => onFocusSystem(systemIndex)}
+																			className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+																		>
+																			<td className="px-2 py-1.5 font-mono text-slate-700">
+																				#{systemIndex + 1}
+																			</td>
+																			<td className="max-w-0 truncate px-2 py-1.5 text-slate-400">
+																				{match}
+																			</td>
+																			<td className="px-1 py-1 text-right">
+																				<button
+																					type="button"
+																					onClick={(event) => {
+																						event.stopPropagation()
+																						onFocusSystem(systemIndex)
+																					}}
+																					title="Zoom to system"
+																					aria-label="Zoom to system"
+																					className="px-1 text-slate-400 hover:text-slate-700"
+																				>
+																					◎
+																				</button>
+																				<button
+																					type="button"
+																					onClick={(event) => {
+																						event.stopPropagation()
 																						onOpenSystem(
 																							systemIndex,
-																							firstMatchedAddress(system),
+																							firstMatchedAddress(systemIndex),
 																						)
-																				}}
-																				title="Open solar system"
-																				aria-label="Open solar system"
-																				className="px-1 text-slate-400 hover:text-slate-700"
-																			>
-																				◉
-																			</button>
-																		</td>
-																	</tr>
+																					}}
+																					title="Open solar system"
+																					aria-label="Open solar system"
+																					className="px-1 text-slate-400 hover:text-slate-700"
+																				>
+																					◉
+																				</button>
+																			</td>
+																		</tr>
+																		{matchScope ? (
+																			<tr className="border-t border-slate-100">
+																				<td colSpan={3} className="px-2 py-1">
+																					<DisclosureButton
+																						label={
+																							matchScope === "star"
+																								? "Matching stars"
+																								: "Matching planets and moons"
+																						}
+																						expanded={
+																							expandedMatchSystem ===
+																							systemIndex
+																						}
+																						onClick={() =>
+																							setExpandedMatchSystem(
+																								(current) =>
+																									current === systemIndex
+																										? null
+																										: systemIndex,
+																							)
+																						}
+																					/>
+																					{expandedMatchSystem ===
+																					systemIndex ? (
+																						<ul className="space-y-1 py-1">
+																							{(matchScope === "star"
+																								? starTargets(systemIndex)
+																								: bodyTargets(systemIndex)
+																							).map(({ address, label }) => (
+																								<li key={label}>
+																									<Button
+																										className="w-full text-left"
+																										title="Zoom to matching object"
+																										onClick={() =>
+																											onOpenSystem(
+																												systemIndex,
+																												address,
+																											)
+																										}
+																									>
+																										{label}
+																									</Button>
+																								</li>
+																							))}
+																						</ul>
+																					) : null}
+																				</td>
+																			</tr>
+																		) : null}
+																	</React.Fragment>
 																),
 															)}
 														</tbody>

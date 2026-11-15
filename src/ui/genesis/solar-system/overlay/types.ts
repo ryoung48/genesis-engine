@@ -131,6 +131,12 @@ export interface CompanionOverlayParams {
  * this is also what a companion's own nested system looks like (with its
  * own `companions: []`, per CompanionOverlayParams' doc). */
 export interface SolarSystemOverlayParams {
+	// [JUSTIFICATION] Only resolved multi-star systems specify a hierarchy.
+	binaryOrbits?: BinaryOrbit[]
+	// [JUSTIFICATION] Nested overlays in a resolved hierarchy share the parent's linear mapping.
+	uniformDistances?: boolean
+	// [JUSTIFICATION] A resolved companion inherits its Readable-mode clearance from the system overlay.
+	readableStarClearance?: number
 	/** All bodies orbiting this star (siblings + the main world), sorted by
 	 * generated orbital distance — see generateSystemBodies. */
 	bodies: SystemBody[]
@@ -337,3 +343,5 @@ export interface PlacedCompanion {
 	 * spread around it. */
 	meanAnomalyAtEpoch: number
 }
+
+import type { BinaryOrbit } from "@/model/celestial/galaxy/systems/binary-orbit/types"

@@ -45,9 +45,9 @@ describe("Final orbit environment", () => {
 		}
 		expect(system.stars.length).toBeGreaterThan(1)
 		for (const star of system.stars) {
-			const slots = star.worldTypeAllocation.orbitSlots.filter(
-				(slot) => slot.type !== "empty",
-			)
+			const slots = star.regions
+				.flatMap(({ orbitSlots }) => orbitSlots)
+				.filter((slot) => slot.type !== "empty")
 			const bodies = star.bodies.filter(
 				(body) =>
 					body.beltOfIdx === undefined && body.trojanOfIdx === undefined,

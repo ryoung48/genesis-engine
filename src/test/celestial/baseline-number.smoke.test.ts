@@ -122,8 +122,9 @@ describe("Baseline number", () => {
 			systemIndex: 0,
 			skipNaming: true,
 		})
-		for (const star of system.stars) {
-			const { baselineNumber, totalWorlds } = star.worldTypeAllocation
+		for (const { baselineNumber, totalWorlds } of system.stars.flatMap(
+			(star) => star.regions,
+		)) {
 			expect(baselineNumber === null).toBe(totalWorlds === 0)
 		}
 	})

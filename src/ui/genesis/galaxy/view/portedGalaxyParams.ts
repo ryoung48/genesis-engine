@@ -31,6 +31,9 @@ export interface PortedGalaxyDisplayFlags {
 	 * GalaxyRenderer's own decorative star particles, which stay on
 	 * unconditionally. */
 	showStarOverlay: boolean
+	showSearchMatches: boolean
+	showCapitalMarkers: boolean
+	showSectorBoundaries: boolean
 }
 
 /** Exclusive galaxy map mode -- "stars" shows neither partition overlay,
@@ -70,6 +73,9 @@ export const DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS: PortedGalaxyDisplayFlags = {
 	showDensityWaves: false,
 	showGalaxy: true,
 	showStarOverlay: true,
+	showSearchMatches: true,
+	showCapitalMarkers: true,
+	showSectorBoundaries: true,
 }
 
 export function toGalaxyParam(p: PortedGalaxyParams): GalaxyParam {

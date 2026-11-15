@@ -41,18 +41,17 @@ describe("Anomalous orbits", () => {
 		}
 	})
 
-	it("records each system reservation on its assigned star", () => {
+	it("keeps fitted-region reservations compatible with circular coplanar placement", () => {
 		const system = GALAXY_SYSTEMS.generate({
 			galaxySeed: 42,
 			systemIndex: 0,
 			skipNaming: true,
 		})
-		const assignedReservations = system.stars.flatMap(
-			(star) => star.worldTypeAllocation.anomalousOrbitReservations,
-		)
-		expect(assignedReservations).toEqual(system.anomalousOrbitReservations)
-		for (const reservation of system.anomalousOrbitReservations) {
-			expect(system.stars[reservation.starIndex]!.role).not.toBe("epistellar")
+		for (const allocation of system.stars.flatMap((star) => star.regions)) {
+			for (const reservation of allocation.anomalousOrbitReservations) {
+				if (allocation.region.fitted)
+					expect(["random", "trojan"]).toContain(reservation.type)
+			}
 		}
 	})
 })

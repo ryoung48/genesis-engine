@@ -94,6 +94,8 @@ interface GenerationPanelProps {
 	/** Every companion star bound to this system -- see CompanionStar's doc.
 	 * Passed straight through to GenerationPlanetNavigator. */
 	companionStars?: CompanionStar[]
+	// [JUSTIFICATION] Only a loaded galaxy catalog supplies resolved stellar orbits.
+	binaryOrbits?: BinaryOrbit[]
 	hostStar?: HostStarAttributes
 	/** Focuses the 3D solar-system view's camera on any addressed node. */
 	onFocusBody?: (address: OrbitAddress) => void
@@ -172,6 +174,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	orbitBodies,
 	systemBodies,
 	companionStars,
+	binaryOrbits,
 	hostStar,
 	onFocusBody,
 	currentFocus,
@@ -412,6 +415,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								orbitBodies={orbitBodies}
 								systemBodies={systemBodies}
 								companionStars={companionStars}
+								binaryOrbits={binaryOrbits}
 								hostStar={hostStar}
 								onFocusBody={onFocusBody}
 								currentFocus={currentFocus}
@@ -576,3 +580,5 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		</div>
 	)
 }
+
+import type { BinaryOrbit } from "@/model/celestial/galaxy/systems/binary-orbit/types"

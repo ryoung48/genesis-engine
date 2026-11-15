@@ -345,6 +345,12 @@ export function createSolarSystemController(
 		ctx.solarSystemFocusChangeHandler = handler
 	}
 
+	function clearSolarSystemFocus() {
+		ctx.solarSystemTrackedFocus = null
+		ctx.solarSystemTrackedFocusPosition = null
+		ctx.solarSystemFocusTween = null
+	}
+
 	function setNebulaBackgroundSeed(seed: number) {
 		applyNebulaBackgroundSeed({ mesh: ctx.nebulaBackground, seed })
 		deps.requestRender()
@@ -364,6 +370,7 @@ export function createSolarSystemController(
 		updateSolarSystemDay,
 		setSolarSystemSpinHours,
 		setSolarSystemFocusChangeHandler,
+		clearSolarSystemFocus,
 		setNebulaBackgroundSeed,
 	}
 }

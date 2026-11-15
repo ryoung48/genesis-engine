@@ -16,6 +16,8 @@ export interface AnomalousOrbitReservation {
 }
 
 export interface AnomalousOrbitRollInput {
+	// [JUSTIFICATION] Only fitted regions restrict which anomaly rolls can be reserved.
+	circularCoplanar?: boolean
 	rng: SharedRng
 	terrestrialCount: number
 	eligibleStarIndices: number[]

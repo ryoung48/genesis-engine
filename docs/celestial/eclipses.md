@@ -12,6 +12,8 @@ Moon rows derive phase and illumination from the three-dimensional Kepler positi
 
 ## Geometry
 
+The forecast uses one stellar illuminator, the star supplied to the planet's eclipse schedule. A circumbinary planet's generated baseline heating uses the pair's summed luminosity. See the [multi-star orbit model](multi-star-orbits.md) for the heating approximation.
+
 Local solar geometry subtracts the surface observer from both finite centre vectors, including stellar parallax. Apparent semidiameters are `asin(radius / distance)`; only foreground moons occult the star. Partial, annular and total classifications use angular disk intersection. Coverage uses a planar two-circle lens on angular radii, with explicit disjoint, containment and concentric cases. It approximates angular disks rather than exact spherical solid angles.
 
 Planet-wide solar geometry intersects the whole planet sphere with closed tangent shadow cones. The external and internal tangent sines are `(Rstar − Roccluder) / L` and `(Rstar + Roccluder) / L`. A meridian disk and signed distance to the truncated cone wedge handle side, vertex and tangent-plane contacts. Umbral intersection takes precedence over antumbral intersection, including hybrid events. Classification never substitutes the sub-moon point for the planet sphere.

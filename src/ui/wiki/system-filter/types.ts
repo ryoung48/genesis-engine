@@ -1,4 +1,6 @@
 import type { GalaxySystem } from "@/model/celestial/galaxy/systems/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 
 export type SystemFilterOperator = "and" | "or"
@@ -90,6 +92,22 @@ export interface SystemFilterData {
 	starEntries: SystemFilterStarEntry[]
 	bodyEntries: SystemFilterBodyEntry[] | null
 }
+
+export interface SystemFilterBodyTargetsInput {
+	node: SystemFilterNode
+	system: GalaxySystem
+	entry: SystemFilterBodyEntry
+}
+
+export type SystemFilterBodyTarget =
+	| { kind: "planet"; starIndex: number; bodyIdx: number; body: SystemBody }
+	| {
+			kind: "moon"
+			starIndex: number
+			bodyIdx: number
+			moonIdx: number
+			body: MoonBody
+	  }
 
 export interface SystemFilterOptions {
 	spectralClasses: string[]

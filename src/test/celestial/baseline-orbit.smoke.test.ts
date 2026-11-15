@@ -121,8 +121,7 @@ describe("Baseline orbit", () => {
 			systemIndex: 0,
 			skipNaming: true,
 		})
-		for (const star of system.stars) {
-			const allocation = star.worldTypeAllocation
+		for (const allocation of system.stars.flatMap((star) => star.regions)) {
 			expect(allocation.baselineOrbitNumber === null).toBe(
 				allocation.baselineNumber === null,
 			)

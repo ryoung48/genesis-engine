@@ -1,5 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/types"
-import type { OrbitBody } from "@/model/celestial/orbit-body/types"
+import type { OrbitBody, OrbitRegion } from "@/model/celestial/orbit-body/types"
 
 export interface RingProfile {
 	innerRadiusRelative: number
@@ -68,6 +68,8 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		 * moon's tideLock reference "my parent" without embedding an object
 		 * reference. See attachParentTideLocks. */
 		seed: string
+		// [JUSTIFICATION] Only galaxy-generated top-level bodies have a resolved region.
+		orbitRegion?: OrbitRegion
 		/** Jovians roll rings; eligible non-jovian planets have a 1-in-100
 		 * minor-ring chance. [JUSTIFICATION] Optional because ringless planets
 		 * have no geometry to render; moons never receive this field. */
@@ -170,6 +172,8 @@ export interface CompanionStar {
 }
 
 export interface SolarSystemState {
+	// [JUSTIFICATION] Only a loaded galaxy catalog owns a galaxy system index and hierarchy.
+	galaxyCatalog?: { systemIndex: number; binaryOrbits: BinaryOrbit[] }
 	star: {
 		class: SpectralClass
 		subtype: number
@@ -191,3 +195,5 @@ export interface SolarSystemState {
 	orbits: SystemBody[]
 	companionStars?: CompanionStar[]
 }
+
+import type { BinaryOrbit } from "@/model/celestial/galaxy/systems/binary-orbit/types"

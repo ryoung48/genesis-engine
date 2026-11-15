@@ -87,6 +87,8 @@ function findMainWorldSelection(systemBodies?: SystemBody[]): OrbitSelection {
 interface OrbitChildCardModel {
 	key: string
 	title: string
+	// [JUSTIFICATION] Only star pages show how many orbits each listed child has.
+	childOrbitCount?: number
 	subtitle: string
 	/** Swatch color for this body's classification (see CLASSIFICATION_COLOR)
 	 * -- null when unclassified, in which case no swatch renders. */
@@ -230,6 +232,7 @@ export function GenerationPlanetNavigator({
 	planetRadiusKm,
 	seed,
 	starName,
+	binaryOrbits,
 	surfaceStats,
 	showRealSolNames,
 	spectralClass,
@@ -281,6 +284,8 @@ export function GenerationPlanetNavigator({
 	planetRadiusKm: number
 	seed: number
 	starName?: string
+	// [JUSTIFICATION] Only loaded galaxy catalogs have resolved pair orbits.
+	binaryOrbits?: BinaryOrbit[]
 	daysPerYear: number
 	surfaceStats: StatEntry[]
 	orbitalDistanceAU: number
@@ -639,6 +644,9 @@ export function GenerationPlanetNavigator({
 	)
 
 	const viewModel = useMemo<OrbitNavigatorViewModel>(() => {
+		const outerOrbit = binaryOrbits?.find(
+			(orbit) => orbit.a.center.kind === "binary",
+		)
 		if (selection.kind === "star") {
 			const starIndex = selection.starIndex
 			const isPrimary = starIndex === 0
@@ -681,6 +689,10 @@ export function GenerationPlanetNavigator({
 							: (labeledOrbits.find((entry) => entry.body === body)?.title ??
 								resolveOrbitBodyTitle(body, bodyIdx + 1, namesEnabled)),
 					subtitle: getSystemBodyKindLabel(body),
+					childOrbitCount:
+						body.group === "asteroid belt"
+							? bodies.filter((child) => child.beltOfIdx === body.idx).length
+							: body.moons.length,
 					color: classificationSwatchColor(body.classification),
 					onClick: () => selectAndFocus({ kind: "body", starIndex, bodyIdx }),
 				}))
@@ -701,6 +713,13 @@ export function GenerationPlanetNavigator({
 									au: childCompanion.orbitalDistanceAU,
 									title: childCompanion.starName,
 									subtitle: "Star",
+									childOrbitCount:
+										childCompanion.orbits.filter(
+											(body) => body.beltOfIdx === undefined,
+										).length +
+										(companionStars?.filter(
+											(child) => child.parentIndex === companionIndex + 1,
+										).length ?? 0),
 									color: SPECTRAL_CLASS_COLORS[childCompanion.class],
 									icon: "star" as const,
 									onClick: () =>
@@ -742,28 +761,37 @@ export function GenerationPlanetNavigator({
 						],
 				childrenLabel: "Orbits",
 				onFocus: onFocusBody ? () => focusSelection(selection) : undefined,
-				stats: buildStarStats({
-					starClass: isPrimary ? starClass : companion!.class,
-					starSubtype: isPrimary ? starSubtype : companion!.subtype,
-					hostStar: isPrimary ? hostStar : companion!.hostStar,
-					// Sol is always a real G2V star -- its type isn't editable.
-					// A companion isn't live-edited either (no seed/spectral-class
-					// UI targets one).
-					setSpectralClass:
-						isPrimary && seed !== SOL_DATA.solSeed
-							? setSpectralClass
-							: undefined,
-					setStarSubtype:
-						isPrimary && seed !== SOL_DATA.solSeed ? setStarSubtype : undefined,
-					setStarAgeGyr:
-						isPrimary && seed !== SOL_DATA.solSeed ? setStarAgeGyr : undefined,
-					ageGyr: isPrimary ? starAgeGyr : undefined,
-					orbitalDistanceAU: isPrimary
-						? undefined
-						: companion!.orbitalDistanceAU,
-					eccentricity: isPrimary ? undefined : companion!.eccentricity,
-					inclinationDeg: isPrimary ? undefined : companion!.inclinationDeg,
-				}),
+				stats: [
+					...(outerOrbit?.b.center.index === starIndex
+						? [{ label: "Orbital Reference", value: "Inner Pair Barycenter" }]
+						: []),
+					...buildStarStats({
+						starClass: isPrimary ? starClass : companion!.class,
+						starSubtype: isPrimary ? starSubtype : companion!.subtype,
+						hostStar: isPrimary ? hostStar : companion!.hostStar,
+						// Sol is always a real G2V star -- its type isn't editable.
+						// A companion isn't live-edited either (no seed/spectral-class
+						// UI targets one).
+						setSpectralClass:
+							isPrimary && seed !== SOL_DATA.solSeed
+								? setSpectralClass
+								: undefined,
+						setStarSubtype:
+							isPrimary && seed !== SOL_DATA.solSeed
+								? setStarSubtype
+								: undefined,
+						setStarAgeGyr:
+							isPrimary && seed !== SOL_DATA.solSeed
+								? setStarAgeGyr
+								: undefined,
+						ageGyr: isPrimary ? starAgeGyr : undefined,
+						orbitalDistanceAU: isPrimary
+							? undefined
+							: companion!.orbitalDistanceAU,
+						eccentricity: isPrimary ? undefined : companion!.eccentricity,
+						inclinationDeg: isPrimary ? undefined : companion!.inclinationDeg,
+					}),
+				],
 				children: starChildren.filter((entry) => entry.title),
 				emptyChildrenLabel: "No child orbits.",
 			}
@@ -965,8 +993,9 @@ export function GenerationPlanetNavigator({
 				// orbit body's card.
 				stats: buildOrbitBodyStats({
 					body,
-					starMassSol: bodyStarParams.starMassSol,
-					starLuminositySol: bodyStarParams.starLuminositySol,
+					starMassSol: body.orbitRegion?.massSol ?? bodyStarParams.starMassSol,
+					starLuminositySol:
+						body.orbitRegion?.luminositySol ?? bodyStarParams.starLuminositySol,
 					unitSystem,
 					orbitalDistanceBaselineAU: isMainWorld
 						? orbitalDistanceBaselineAU
@@ -982,7 +1011,10 @@ export function GenerationPlanetNavigator({
 						),
 						starTitle: starTitleFor(selection.starIndex),
 						onSelectStar: () =>
-							selectAndFocus({ kind: "star", starIndex: selection.starIndex }),
+							selectAndFocus({
+								kind: "star",
+								starIndex: selection.starIndex,
+							}),
 						siblingMoons: orbitMoons,
 						onSelectSiblingMoon: (moonIndex) =>
 							selectAndFocus({
@@ -1214,7 +1246,8 @@ export function GenerationPlanetNavigator({
 				stats: buildOrbitMoonStats({
 					moon,
 					unitSystem,
-					luminositySol: moonStarParams.starLuminositySol,
+					luminositySol:
+						body.orbitRegion?.luminositySol ?? moonStarParams.starLuminositySol,
 					orbitalDistanceAU: parentOrbitalDistanceAU,
 					tideLockStat: buildTideLockStat({
 						tideLock: moon.tideLock,
@@ -1364,6 +1397,7 @@ export function GenerationPlanetNavigator({
 		hostStar?.temperatureK,
 		hostStar,
 		fromGalaxy,
+		binaryOrbits,
 	])
 
 	return (
@@ -1418,6 +1452,11 @@ export function GenerationPlanetNavigator({
 											className="text-slate-700"
 										>
 											{child.title}
+											{(child.childOrbitCount ?? 0) > 0 && (
+												<sup title={`${child.childOrbitCount} child orbits`}>
+													+{child.childOrbitCount}
+												</sup>
+											)}
 										</InlineTextButton>
 										{index < viewModel.children.length - 1 ? ", " : ""}
 									</span>
@@ -1436,3 +1475,5 @@ export function GenerationPlanetNavigator({
 		</div>
 	)
 }
+
+import type { BinaryOrbit } from "@/model/celestial/galaxy/systems/binary-orbit/types"

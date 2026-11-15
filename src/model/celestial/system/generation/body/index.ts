@@ -394,6 +394,8 @@ function rollYouthBeltWrapper({
  */
 function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const { seed, mainWorldMode, starMassKgOverride, exactHZC } = params
+	const region = params.placement?.region
+	const fitted = region?.fitted === true
 	const hostStar = params.hostStar
 	const spectralClass =
 		hostStar?.spectralClass ?? params.spectralClass ?? STAR.defaultSpectralClass
@@ -413,14 +415,15 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const phaseRng = RNG.createStringRng({ seed: `orbit-phase:${seed}` })
 
 	const luminositySol =
+		region?.luminositySol ??
 		hostStar?.luminositySol ??
 		STAR.getStarLuminositySolExtended({
 			cls: spectralClass,
 			subtype: starSubtype,
 		})
 	const starMassKg =
-		hostStar?.massSol !== undefined
-			? hostStar.massSol * ORBIT_BODY.solarMassKg
+		region || hostStar
+			? (region?.massSol ?? hostStar!.massSol) * ORBIT_BODY.solarMassKg
 			: (starMassKgOverride ?? ORBIT_BODY.solarMassKg)
 	// Book's Minimum Allowable Orbit# (p. 19013 glossary entry): the closest a
 	// world can form, inside of which the star's own dust-clearing has swept
@@ -428,6 +431,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// any slot is even sampled, rather than clamping an already-rolled slot
 	// after the fact -- see filterDeviationsInRange.
 	const maoAu =
+		region?.minAU ??
 		hostStar?.mao ??
 		STAR.getStarMAO({
 			cls: tableSpectralClass,
@@ -535,6 +539,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						exactHZC && mainWorldMode !== "procedural" && slot.isBaseline
 					const habitableZoneAU = STAR.getHabitableZoneAU(luminositySol)
 					return {
+						source: slot,
 						zone: pinBaselineToHZC ? "inner" : slot.zone!,
 						deviation: pinBaselineToHZC ? 0 : slot.deviation!,
 						orbitalDistanceAU: pinBaselineToHZC
@@ -589,6 +594,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			]
 
 	const starMassSol =
+		region?.massSol ??
 		hostStar?.massSol ??
 		STAR.getStarMassSol({
 			cls: tableSpectralClass,
@@ -724,7 +730,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		(a, b) => a.minAU - b.minAU,
 	)
 	let lastPlacedAU = 0
-	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
+	const proposedBodies = slots.map((slot, siblingIdx): SystemBody | null => {
 		if (
 			slot.isMainWorld &&
 			mainWorldMode !== "gas-giant-moon" &&
@@ -928,48 +934,74 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			sizeClass = ROLLS.rollSizeClass({ rng, group })
 		}
 		const impactZone = impactZoneSlots.has(slot)
-		const classification = isHomeworld
-			? ("tectonic" as const)
-			: PLANET.classifyBody({
-					rng,
-					groupHint: group,
-					impactZone,
-					zone: slot.zone,
-					orbitalDistanceAU,
-					sizeClass,
-					isMoon: false,
-					tidal: false,
-					forceMeltball,
-				}).classification
-		const assignment = PLANET.rollClassificationAssignment({
-			rng,
-			classification,
-			sizeClass,
-			zone: slot.zone,
-			deviation: slot.deviation,
-			spectralClass,
-			isPrimaryWorld,
-		})
-		const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
-		const densityEarthRelative =
-			group === "asteroid belt"
-				? 0
-				: ROLLS.pickDensityEarthRelative({
-						rng,
-						group,
-						classification,
-						sizeClass,
-						orbitalDistanceAU,
+		const physicalSeed = fitted
+			? RNG.seedStringToNumber(`physical:${seed}:${siblingIdx}`)
+			: null
+		function evaluatePhysicalProperties(distanceAU: number) {
+			const physicalRng =
+				physicalSeed === null ? rng : RNG.createRng({ seed: physicalSeed })
+			const deviation = fitted
+				? PLANET.estimateDeviationFromOrbitalDistance({
+						orbitalDistanceAU: distanceAU,
 						luminositySol,
-						starAgeGyr,
 					})
-		const massKg =
-			group === "asteroid belt"
-				? 0
-				: ORBIT_BODY.massKgFromEarthRelativeDensity({
-						diameterKm,
-						densityEarthRelative,
-					})
+				: slot.deviation
+			const zone = fitted ? PLANET.zoneFromDeviation(deviation) : slot.zone
+			const classification = isHomeworld
+				? ("tectonic" as const)
+				: PLANET.classifyBody({
+						rng: physicalRng,
+						groupHint: group,
+						impactZone,
+						zone,
+						orbitalDistanceAU: distanceAU,
+						sizeClass,
+						isMoon: false,
+						tidal: false,
+						forceMeltball,
+					}).classification
+			const assignment = PLANET.rollClassificationAssignment({
+				rng: physicalRng,
+				classification,
+				sizeClass,
+				zone,
+				deviation,
+				spectralClass,
+				isPrimaryWorld,
+			})
+			const diameterKm = ROLLS.rollDiameterKmFromSizeClass({
+				rng: physicalRng,
+				sizeClass,
+			})
+			const densityEarthRelative =
+				group === "asteroid belt"
+					? 0
+					: ROLLS.pickDensityEarthRelative({
+							rng: physicalRng,
+							group,
+							classification,
+							sizeClass,
+							orbitalDistanceAU: distanceAU,
+							luminositySol,
+							starAgeGyr,
+						})
+			const massKg =
+				group === "asteroid belt"
+					? 0
+					: ORBIT_BODY.massKgFromEarthRelativeDensity({
+							diameterKm,
+							densityEarthRelative,
+						})
+			return {
+				assignment,
+				diameterKm,
+				classification,
+				massKg,
+				zone,
+				deviation,
+			}
+		}
+		const provisional = evaluatePhysicalProperties(orbitalDistanceAU)
 		// The book's even Orbit# spread can set neighbours closer than they
 		// could stay stable, so a body is pushed out until it clears the
 		// previous massive one (a massless belt just clears its Hill zone),
@@ -980,10 +1012,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				const minimumAU = ORBIT_BODY.minimumSpacedOrbitAU({
 					innerOrbitalDistanceAU: previousSpacedBody.orbitalDistanceAU,
 					innerMassKg: previousSpacedBody.massKg,
-					outerMassKg: massKg,
+					outerMassKg: provisional.massKg,
 					starMassKg,
 				})
-				if (Number.isFinite(minimumAU)) {
+				if (fitted || Number.isFinite(minimumAU)) {
 					orbitalDistanceAU = Math.max(orbitalDistanceAU, minimumAU)
 				}
 			}
@@ -998,7 +1030,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					orbitalDistanceAU = zone.maxAU * EXCLUSION_ZONE_CLEARANCE
 				}
 			}
-			if (Number.isFinite(maxOrbitalDistanceAU)) {
+			if (!fitted && Number.isFinite(maxOrbitalDistanceAU)) {
 				orbitalDistanceAU = Math.min(orbitalDistanceAU, maxOrbitalDistanceAU)
 			}
 			// Inside the forced main world, a body stops short of crowding it,
@@ -1008,7 +1040,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			if (pinnedOrbit && siblingIdx < pinnedSlotIndex) {
 				const capAU = ORBIT_BODY.maximumSpacedInnerOrbitAU({
 					outerOrbitalDistanceAU: pinnedOrbit.orbitalDistanceAU,
-					innerMassKg: massKg,
+					innerMassKg: provisional.massKg,
 					outerMassKg: pinnedOrbit.massKg,
 					starMassKg,
 				})
@@ -1018,6 +1050,49 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					Math.min(orbitalDistanceAU, capAU),
 				)
 			}
+		}
+		const { assignment, diameterKm, classification, massKg, zone, deviation } =
+			fitted ? evaluatePhysicalProperties(orbitalDistanceAU) : provisional
+		const orbitNumber = ORBIT_BODY.auToOrbitNumber({ au: orbitalDistanceAU })
+		const beltHalfSpan = fitted
+			? Math.min(
+					orbitNumber - ORBIT_BODY.auToOrbitNumber({ au: maoAu }),
+					ORBIT_BODY.auToOrbitNumber({ au: maxOrbitalDistanceAU }) -
+						orbitNumber,
+				)
+			: Infinity
+		if (fitted) {
+			if (orbitalDistanceAU < maoAu || orbitalDistanceAU > maxOrbitalDistanceAU)
+				return null
+			if (
+				(group === "asteroid belt" ||
+					isProtoSlot ||
+					(isPrimordialSlot && cascadeCount > 0)) &&
+				beltHalfSpan <= 0
+			)
+				return null
+			if (
+				previousSpacedBody &&
+				orbitalDistanceAU <
+					ORBIT_BODY.minimumSpacedOrbitAU({
+						innerOrbitalDistanceAU: previousSpacedBody.orbitalDistanceAU,
+						innerMassKg: previousSpacedBody.massKg,
+						outerMassKg: massKg,
+						starMassKg,
+					})
+			)
+				return null
+			slot.zone = zone
+			slot.deviation = deviation
+		}
+		if (slot.source && params.placement) {
+			params.placement.acceptedSlots.push({
+				...slot.source,
+				orbitalDistanceAU,
+				orbitNumber,
+				zone,
+				deviation,
+			})
 		}
 		lastPlacedAU = Math.max(lastPlacedAU, orbitalDistanceAU)
 		if (group !== "asteroid belt") {
@@ -1066,7 +1141,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					? 2
 					: 0
 		const eccentricity =
-			group === "asteroid belt"
+			fitted || group === "asteroid belt"
 				? 0
 				: isGasGiantMainWorld
 					? EARTH_SEED.eccentricity
@@ -1351,10 +1426,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			siderealDayHours: finalSiderealDayHours,
 			meanAnomalyAtEpochDeg:
 				group === "asteroid belt" ? 0 : phaseRng.uniform(0, 360),
-			eccentricity: Math.min(
-				finalEccentricity,
-				Math.max(0, 1 - starRadiusAU / orbitalDistanceAU),
-			),
+			eccentricity: fitted
+				? 0
+				: Math.min(
+						finalEccentricity,
+						Math.max(0, 1 - starRadiusAU / orbitalDistanceAU),
+					),
 			longitudeOfPerihelionDeg: rng.uniform(0, 360),
 			// Independently rolled, not derived from longitudeOfPerihelionDeg
 			// above -- see OrbitBody.lsAphelionDeg's doc. For a procedurally
@@ -1368,7 +1445,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			// inclination formula instead of the ordinary Inclination table --
 			// retrograde adds 90 degrees on top (see rollAnomalousInclinationDeg).
 			inclinationDeg:
-				group === "asteroid belt"
+				fitted || group === "asteroid belt"
 					? 0
 					: slot.anomalousOrbitType === "inclined"
 						? ROLLS.rollAnomalousInclinationDeg({ rng })
@@ -1657,7 +1734,26 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// idx math (dwarfIdx) already accounts for these -- see youthAppendages'
 	// own idx precomputation (slots.length + youthAppendages.length at push
 	// time) inside the map above, which this ordering keeps consistent.
+	const bodies = proposedBodies.filter((body) => body !== null)
 	bodies.push(...youthAppendages)
+	for (const body of bodies) {
+		if (!fitted || !body.belt) continue
+		const orbitNumber = ORBIT_BODY.auToOrbitNumber({
+			au: body.orbitalDistanceAU,
+		})
+		body.belt.spanOrbitNumber = Math.min(
+			body.belt.spanOrbitNumber,
+			2 *
+				Math.max(
+					0,
+					Math.min(
+						orbitNumber - ORBIT_BODY.auToOrbitNumber({ au: maoAu }),
+						ORBIT_BODY.auToOrbitNumber({ au: maxOrbitalDistanceAU }) -
+							orbitNumber,
+					),
+				),
+		)
+	}
 
 	// Real-body asteroid-belt residents: an asteroid belt occasionally hosts
 	// one or two protoplanet-sized dwarf worlds embedded within it (a
@@ -1673,7 +1769,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		if (rng.uniform(0, 1) > BELT_DWARF_CHANCE) continue
 		const dwarfCount = rng.randint(1, 2)
 		for (let i = 0; i < dwarfCount; i++) {
-			const dwarfIdx = bodies.length + beltDwarfs.length
+			const dwarfIdx = slots.length + youthAppendages.length + beltDwarfs.length
 			// Belt residents skew much smaller than free-orbiting dwarf planets
 			// (most real belt dwarfs are Ceres/Pallas-scale, not Pluto-scale) --
 			// weighted toward sizeClass 0, with 1 rare and 2-4 rarer still.
@@ -1725,10 +1821,14 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	if (params.orbitSlots !== undefined) {
 		const trojans: SystemBody[] = []
 		for (const [slotIndex, slot] of slots.entries()) {
-			const host = bodies[slotIndex]
+			const host = proposedBodies[slotIndex]
 			if (!host || slot.trojanCount === undefined) continue
 			for (let trojanIndex = 0; trojanIndex < slot.trojanCount; trojanIndex++) {
-				const idx = bodies.length + trojans.length
+				const idx =
+					slots.length +
+					youthAppendages.length +
+					beltDwarfs.length +
+					trojans.length
 				// A real trojan shares its target's orbit (same ellipse, offset
 				// ±60° in longitude), not the target's own physical identity --
 				// only the orbital elements below are cloned; everything else
@@ -1789,6 +1889,21 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			}
 		}
 		bodies.push(...trojans)
+	}
+	if (region) {
+		const byIndex = new Map(bodies.map((body) => [body.idx, body]))
+		for (const body of bodies) {
+			body.orbitRegion = region
+			if (!fitted) continue
+			body.eccentricity = 0
+			body.inclinationDeg = 0
+			if (body.beltOfIdx === undefined) continue
+			const belt = byIndex.get(body.beltOfIdx)
+			if (belt) {
+				body.orbitalDistanceAU = belt.orbitalDistanceAU
+				body.orbitalPeriodDays = belt.orbitalPeriodDays
+			}
+		}
 	}
 
 	// Every belt in the system contributes debris flux to every other body --

@@ -1,9 +1,10 @@
+import type { BinaryOrbit } from "@/model/celestial/galaxy/systems/binary-orbit/types"
+import type { OrbitRegion } from "@/model/celestial/orbit-body/types"
 import type {
 	HostStarAttributes,
 	LuminosityClass,
 	SpectralClass,
 } from "@/model/celestial/star/types"
-import type { AnomalousOrbitReservation } from "@/model/celestial/system/generation/anomalous-orbits/types"
 import type { WorldTypeAllocation } from "@/model/celestial/system/generation/world-type-allocation/types"
 import type { WorldTypeCounts } from "@/model/celestial/system/generation/world-type-counts/types"
 import type { SystemBody } from "@/model/celestial/system/types"
@@ -92,17 +93,19 @@ export interface GalaxyStar extends HostStarAttributes {
 	 * this should be ready to render "D"/"NS"/"BH"/"L"/"T"/"Y", not just
 	 * O-M. */
 	bodies: SystemBody[]
-	/** Distance from the star it orbits, in AU -- 0 for the primary, which
-	 * has no parent to orbit. Copied straight from StarPreview.orbitalDistanceAU. */
+	// Relative semimajor axis in AU. A supported triple's wider star is measured from the inner barycenter.
 	orbitalDistanceAU: number
-	/** Kepler period around its parent, using the parent's mass -- 0 for the
-	 * primary. */
+	// Both members of a binary share the mutual Kepler period.
 	orbitalPeriodDays: number
 	/** Orbital eccentricity around the parent star; 0 for the primary. */
 	eccentricity: number
 	/** Orbital inclination around the parent star; 0 for the primary. */
 	inclinationDeg: number
-	worldTypeAllocation: WorldTypeAllocation
+	regions: GalaxyOrbitAllocation[]
+}
+
+export interface GalaxyOrbitAllocation extends WorldTypeAllocation {
+	region: OrbitRegion
 }
 
 export interface GalaxySystem {
@@ -113,8 +116,9 @@ export interface GalaxySystem {
 	seed: number
 	/** stars[0] is always the primary. */
 	stars: GalaxyStar[]
+	binaryOrbits: BinaryOrbit[]
 	worldTypeCounts: WorldTypeCounts
-	anomalousOrbitReservations: AnomalousOrbitReservation[]
+	unplacedWorldTypeCounts: WorldTypeCounts
 }
 
 /** Growable columnar accumulator for GALAXY_SYSTEMS.appendPackedSystemStarData
@@ -164,7 +168,7 @@ export interface PackedGalaxyStars {
 	 * kept as Float32 (not Uint8 like galaxy-gen's integer-subtype encoding)
 	 * since this repo rolls a continuous subtype, not a single digit. */
 	starSubtype: Float32Array
-	/** Companion orbit distance in AU per star; 0 for a system's primary. */
+	// Relative semimajor axis in AU, including the outer orbit of a supported triple.
 	starOrbitalDistanceAU: Float32Array
 	/** Companion orbit eccentricity; 0 for a system's primary. */
 	starEccentricity: Float32Array

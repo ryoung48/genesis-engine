@@ -116,6 +116,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			initialGenerationSession?.solarSystem ?? SOL_SYSTEM.solDefaultSolarSystem,
 		),
 	)
+	const galaxyCatalog = solarSystem.galaxyCatalog
 	const spectralClass = solarSystem.star.class
 	const starSubtype = solarSystem.star.subtype
 	const hostStar = solarSystem.star.hostStar
@@ -140,18 +141,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 				: STAR_IDENTITY.generateStarName(seed),
 		[seed],
 	)
-	const setSeed = useCallback((value: number) => {
-		setSolarSystem((current) => ({
-			...current,
-			star: {
-				...current.star,
-				seed:
-					value === SOL_DATA.solSeed
-						? "sol"
-						: value.toString(36).padStart(6, "0"),
-			},
-		}))
-	}, [])
 	// Guards the generatedSystemBodies sync effect below (see its own doc) --
 	// armed right before a direct setSolarSystem call whose orbits are already
 	// final/correct, so that effect's next fire doesn't clobber them with a
@@ -212,9 +201,25 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	// -- there's no longer a separate route to round-trip through, so this is
 	// the only place that ever changes it. Drives SolarSystemControls' "back
 	// to galaxy" control.
-	const [galaxyOrigin, setGalaxyOrigin] = useState(
-		() => initialGenerationSession?.galaxyOrigin ?? null,
-	)
+	const galaxyOrigin = galaxyCatalog
+		? { systemIndex: galaxyCatalog.systemIndex }
+		: null
+	const setSeed = useCallback((value: number) => {
+		setSolarSystem((current) => ({
+			orbits: current.orbits,
+			star: {
+				...current.star,
+				hostStar: undefined,
+				seed:
+					value === SOL_DATA.solSeed
+						? "sol"
+						: value.toString(36).padStart(6, "0"),
+			},
+		}))
+		setMainWorldMode((mode) =>
+			mode === "temperate-native" ? "earth-clone" : mode,
+		)
+	}, [])
 
 	// --- The main world's own physical/orbital state ---
 	// Every one of these fields lives ONLY on the main world's SystemBody
@@ -279,6 +284,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	}, [seed, spectralClass, starSubtype, hostStar, starAgeGyr])
 
 	const generatedSystemBodies: SystemBody[] = useMemo(() => {
+		if (galaxyCatalog) return []
 		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: STAR.defaultSpectralClass
@@ -371,7 +377,15 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			exactHZC: false,
 			solMainWorldOverrides,
 		})
-	}, [seed, spectralClass, starSubtype, mainWorldMode, starAgeGyr, hostStar])
+	}, [
+		seed,
+		spectralClass,
+		starSubtype,
+		mainWorldMode,
+		starAgeGyr,
+		hostStar,
+		galaxyCatalog,
+	])
 	const resetSourceSystemBodies = useMemo(
 		() =>
 			seed === SOL_DATA.solSeed
@@ -381,6 +395,10 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	)
 
 	useEffect(() => {
+		if (galaxyCatalog) {
+			skipNextGeneratedSystemBodiesSyncRef.current = false
+			return
+		}
 		if (skipNextGeneratedSystemBodiesSyncRef.current) {
 			skipNextGeneratedSystemBodiesSyncRef.current = false
 			return
@@ -389,7 +407,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			...current,
 			orbits: generatedSystemBodies,
 		}))
-	}, [generatedSystemBodies])
+	}, [generatedSystemBodies, galaxyCatalog])
 	const systemBodies = solarSystem.orbits
 	const mainWorldLocation = findMainWorldLocation(systemBodies)
 	const mainWorldSystemBody =
@@ -802,7 +820,6 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		effectiveDaysPerYear,
 		mainWorldMode,
 		galaxyOrigin,
-		setGalaxyOrigin,
 		glacialErosion,
 		hoursPerDay,
 		hydraulicErosion,

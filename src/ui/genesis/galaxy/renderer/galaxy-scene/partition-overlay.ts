@@ -568,9 +568,7 @@ export interface PartitionOverlayInput {
  * orthographic projection (see GalaxyRendererThree's adjustCamera), so text
  * laid flat in the XY plane already faces it.
  */
-export function buildPartitionOverlay(
-	input: PartitionOverlayInput,
-): PartitionOverlayResult {
+export function buildPartitionOverlay(input: PartitionOverlayInput) {
 	const {
 		galaxy,
 		assignment,
@@ -931,6 +929,7 @@ export function buildPartitionOverlay(
 	}
 	let sectorGeometry: THREE.BufferGeometry | null = null
 	let sectorMaterial: THREE.ShaderMaterial | null = null
+	let sectorBoundaries: THREE.Mesh | null = null
 	if (sectorAssignment) {
 		sectorGeometry = new THREE.BufferGeometry()
 		sectorGeometry.setAttribute(
@@ -968,9 +967,9 @@ export function buildPartitionOverlay(
 			depthTest: false,
 			side: THREE.DoubleSide,
 		})
-		const mesh = new THREE.Mesh(sectorGeometry, sectorMaterial)
-		mesh.renderOrder = 0.5
-		group.add(mesh)
+		sectorBoundaries = new THREE.Mesh(sectorGeometry, sectorMaterial)
+		sectorBoundaries.renderOrder = 0.5
+		group.add(sectorBoundaries)
 	}
 
 	const partitionCount = size.length
@@ -1017,6 +1016,7 @@ export function buildPartitionOverlay(
 
 	return {
 		group,
+		sectorBoundaries,
 		dispose() {
 			fillGeometry.dispose()
 			fillMaterial.dispose()
@@ -1029,7 +1029,7 @@ export function buildPartitionOverlay(
 	}
 }
 
-export function buildNationOverlay(galaxy: Galaxy): PartitionOverlayResult {
+export function buildNationOverlay(galaxy: Galaxy) {
 	return buildPartitionOverlay({
 		galaxy,
 		assignment: galaxy.nationAssignment,

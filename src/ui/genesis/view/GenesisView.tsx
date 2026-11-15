@@ -554,7 +554,6 @@ export const GenesisView: React.FC<{
 		effectiveDaysPerYear,
 		mainWorldMode,
 		galaxyOrigin,
-		setGalaxyOrigin,
 		glacialErosion,
 		hoursPerDay,
 		hydraulicErosion,
@@ -1989,7 +1988,7 @@ export const GenesisView: React.FC<{
 		spectralClass,
 		starSubtype,
 		mainWorldMode,
-		galaxyOrigin,
+		setMainWorldMode,
 		starName,
 		namesEnabled,
 		seed,
@@ -2036,28 +2035,11 @@ export const GenesisView: React.FC<{
 			// mode or that homeworld is silently dropped for a plain procedural
 			// slot. Any other galaxy system stays fully procedural.
 			const hasForcedHomeworld = primary.bodies.some((body) => body.isMainWorld)
-			// The galaxy already ran BODY_GENERATION.generateSystemBodies for this
-			// exact system (with orbitSlots/companion-exclusion params the plain
-			// useSolarSystemBodies regeneration below doesn't have access to), so
-			// primary.bodies is authoritative. Without this, the seed change here
-			// would trigger useSolarSystemBodies' own generatedSystemBodies sync
-			// effect to immediately re-roll a DIFFERENT body list from just the
-			// seed, silently swapping out the system that was actually opened
-			// (and any `focus` address computed against the galaxy's bodies would
-			// then point at the wrong body, or none at all).
-			skipNextGeneratedSystemBodiesSyncRef.current = true
-			// Sorted by orbitalDistanceAU so this array's order matches exactly
-			// what buildSolarSystemOverlay's composer sorts its own companions
-			// into (see overlay.ts) -- the two MUST agree, since starIndex
-			// (1-based into this array) is how the renderer's focus/pick API and
-			// the wiki Navigator address "which companion".
-			const sortedCompanions = [...companions].sort(
-				(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-			)
-			const companionPosition = new Map(
-				sortedCompanions.map((star, index) => [star, index + 1]),
-			)
 			setSolarSystem({
+				galaxyCatalog: {
+					systemIndex: system.systemIndex,
+					binaryOrbits: system.binaryOrbits,
+				},
 				star: {
 					class: primary.spectralClass,
 					subtype: primary.subtype,
@@ -2066,17 +2048,14 @@ export const GenesisView: React.FC<{
 					ageGyr: primary.ageGyr,
 				},
 				orbits: primary.bodies,
-				companionStars: sortedCompanions.map((star) => ({
+				companionStars: companions.map((star) => ({
 					class: star.spectralClass,
 					subtype: star.subtype,
 					hostStar: star,
 					seed: star.seed.toString(36).padStart(6, "0"),
 					starName: star.starName,
 					role: star.role as "epistellar" | "inner" | "outer" | "distant",
-					parentIndex:
-						star.parentIndex === null || star.parentIndex === 0
-							? 0
-							: (companionPosition.get(system.stars[star.parentIndex]!) ?? 0),
+					parentIndex: star.parentIndex ?? 0,
 					orbitalDistanceAU: star.orbitalDistanceAU,
 					orbitalPeriodDays: star.orbitalPeriodDays,
 					eccentricity: star.eccentricity,
@@ -2085,10 +2064,6 @@ export const GenesisView: React.FC<{
 				})),
 			})
 			setMainWorldMode(hasForcedHomeworld ? "temperate-native" : "procedural")
-			// Marks this system as galaxy-opened so the solar-system view shows
-			// its "back to galaxy" control (see SolarSystemControls' onBackToGalaxy
-			// and useSolarSystemBodies' galaxyOrigin).
-			setGalaxyOrigin({ systemIndex: system.systemIndex })
 			setSolarSystemViewActive(true)
 			setGalaxyModeActive(false)
 			// Zoom/focus the matched body on both the 3D view and the wiki
@@ -2109,10 +2084,8 @@ export const GenesisView: React.FC<{
 		[
 			setSolarSystem,
 			setMainWorldMode,
-			setGalaxyOrigin,
 			setSolarSystemViewActive,
 			handleFocusBody,
-			skipNextGeneratedSystemBodiesSyncRef,
 		],
 	)
 
@@ -2144,6 +2117,7 @@ export const GenesisView: React.FC<{
 						orbitBodies={systemBodies.filter((b) => !b.isMainWorld)}
 						systemBodies={systemBodies}
 						companionStars={solarSystem.companionStars}
+						binaryOrbits={solarSystem.galaxyCatalog?.binaryOrbits}
 						hostStar={hostStar}
 						onFocusBody={handleFocusBody}
 						currentFocus={currentFocus}

@@ -319,6 +319,7 @@ export interface GenesisScene {
 	 * frame the addressed node (a star, one of its bodies, or a body's
 	 * moon). */
 	focusOnSystemBody(address: OrbitAddress, opts?: { durationMs?: number }): void
+	clearSolarSystemFocus(): void
 	/** Notifies the caller whenever the solar-system focus target changes for
 	 * any reason (GPS button, double-click, ...), so React state (e.g. the
 	 * clock knobs' reference body) can stay in sync even when the change

@@ -3,6 +3,7 @@ import {
 	filterSystemIndices,
 	findBodyClassificationConditions,
 	hasBodyFilterForKind,
+	objectFilterScope,
 } from "@/ui/wiki/system-filter/evaluate-system-filter"
 import type {
 	SystemFilterBodyPair,
@@ -78,6 +79,25 @@ describe("filterSystemIndices", () => {
 	it("requires class, luminosity, and age conditions to match one star", () => {
 		expect(filterSystemIndices(root, data)).toEqual([2])
 	})
+
+	it("offers star targets only for rules about individual stars", () => {
+		expect(objectFilterScope(root)).toBe("star")
+		expect(
+			objectFilterScope({
+				...root,
+				nodes: [
+					...root.nodes,
+					{
+						kind: "condition",
+						id: "count",
+						field: "starCount",
+						comparison: "is",
+						value: "2",
+					},
+				],
+			}),
+		).toBeNull()
+	})
 })
 
 function bodyPair(pair: Partial<SystemFilterBodyPair>): SystemFilterBodyPair {
@@ -139,6 +159,43 @@ function bodyRoot(nodes: SystemFilterRoot["nodes"]): SystemFilterRoot {
 }
 
 describe("unified body filters", () => {
+	it("requires nested body-only rules to have a single focusable match", () => {
+		const filter = bodyRoot([
+			{
+				kind: "condition",
+				id: "rock",
+				field: "bodyComposition",
+				comparison: "is",
+				value: "Mostly Rock",
+			},
+			{
+				kind: "group",
+				id: "alternatives",
+				operator: "or",
+				nodes: [
+					{
+						kind: "condition",
+						id: "ice",
+						field: "bodyComposition",
+						comparison: "is",
+						value: "Mostly Ice",
+					},
+					{
+						kind: "condition",
+						id: "cold",
+						field: "bodyTemperature",
+						comparison: "is",
+						value: "Frozen (<-50C)",
+					},
+				],
+			},
+		])
+		expect(objectFilterScope(filter)).toBe("body")
+		expect(filterSystemIndices(filter, bodyData)).toEqual([])
+		expect(
+			filterSystemIndices({ ...filter, operator: "or" }, bodyData),
+		).toEqual([1])
+	})
 	it("matches composition on either planets or moons without a body type", () => {
 		const filter = bodyRoot([
 			{

@@ -1,3 +1,17 @@
+export type OrbitCenter =
+	| { kind: "star"; index: number }
+	| { kind: "binary"; index: number }
+
+export interface OrbitRegion {
+	center: OrbitCenter
+	minAU: number
+	maxAU: number
+	massSol: number
+	luminositySol: number
+	inclinationDeg: number
+	fitted: boolean
+}
+
 export type OrbitGroup =
 	| "asteroid belt"
 	| "dwarf"

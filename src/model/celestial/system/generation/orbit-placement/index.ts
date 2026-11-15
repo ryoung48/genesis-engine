@@ -261,12 +261,11 @@ function assignType({
 			slot.type === "terrestrial" &&
 			(type !== "empty" || (!slot.isBaseline && slot.trojanCount === 0)),
 	)
-	for (let index = 0; index < Math.min(count, availableSlots.length); index++) {
-		rng.choice(availableSlots).type = type
-		availableSlots.splice(
-			availableSlots.findIndex((slot) => slot.type === type),
-			1,
-		)
+	const assignedCount = Math.min(count, availableSlots.length)
+	for (let index = 0; index < assignedCount; index++) {
+		const selectedIndex = rng.randint(0, availableSlots.length - 1)
+		const [slot] = availableSlots.splice(selectedIndex, 1)
+		slot!.type = type
 	}
 }
 
@@ -330,12 +329,13 @@ function place({
 		rng,
 	})
 	assignType({ slots: ordinarySlots, type: "belt", count: beltCount, rng })
-	assignType({
-		slots: ordinarySlots,
-		type: "terrestrial",
-		count: terrestrialCount,
-		rng,
-	})
+	const terrestrialSlots = ordinarySlots.filter(
+		(slot) => slot.type === "terrestrial",
+	)
+	for (const slot of terrestrialSlots.slice(terrestrialCount)) {
+		slot.type = "empty"
+		slot.trojanCount = 0
+	}
 	return slots.sort((a, b) => a.orbitNumber - b.orbitNumber)
 }
 

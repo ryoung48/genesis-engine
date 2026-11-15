@@ -27,10 +27,7 @@ import type {
 	LabelMode,
 } from "@/ui/genesis/controls/OverlayControls"
 import type { Eu4GhslSettlementAsset } from "@/ui/genesis/generation/earth-assets"
-import type {
-	GalaxyOrigin,
-	loadGenerationSessionSnapshotSync,
-} from "@/ui/genesis/generation/session-persistence"
+import type { loadGenerationSessionSnapshotSync } from "@/ui/genesis/generation/session-persistence"
 import type { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
 import type { useHistoryTimeline } from "@/ui/genesis/generation/useHistoryTimeline"
 import type { StoredViewPrefs } from "@/ui/genesis/generation/view-prefs"
@@ -154,7 +151,7 @@ export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	spectralClass: SolarSystemState["star"]["class"]
 	starSubtype: number
 	mainWorldMode: MainWorldMode
-	galaxyOrigin: GalaxyOrigin | null
+	setMainWorldMode: (mode: MainWorldMode) => void
 	// [JUSTIFICATION] Sol's star uses its own hardcoded "Sol" name instead of
 	// a generated one, so there is no generated name to pass for that system.
 	starName: string | undefined

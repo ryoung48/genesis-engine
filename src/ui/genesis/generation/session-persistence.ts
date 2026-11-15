@@ -14,6 +14,7 @@ const VALID_MAIN_WORLD_MODES = new Set<MainWorldMode>([
 	"moon-system",
 	"gas-giant-moon",
 	"procedural",
+	"temperate-native",
 ])
 
 /** Present only when this system was opened from galaxy mode (see
@@ -34,10 +35,6 @@ interface GenerationSessionSnapshot {
 	 * -- treated as "earth-clone" (the pre-existing default) wherever it's
 	 * read, so old sessions keep restoring exactly as they did before. */
 	mainWorldMode?: MainWorldMode
-	/** [JUSTIFICATION] Absent for any session not opened from the galaxy
-	 * view -- absence itself is the signal to hide the "back to galaxy"
-	 * control. */
-	galaxyOrigin?: GalaxyOrigin
 }
 
 type StoredGenerationSession = {
@@ -167,6 +164,7 @@ function isSystemBodyArray(
 		return (
 			typeof candidate.idx === "number" &&
 			typeof candidate.seed === "string" &&
+			!("incidentIrradiance" in candidate) &&
 			isMoonBodyArray(candidate.moons)
 		)
 	})
@@ -192,12 +190,6 @@ function isFocusTarget(value: unknown): value is FocusTarget {
 	}
 }
 
-function isGalaxyOrigin(value: unknown): value is GalaxyOrigin {
-	if (!value || typeof value !== "object") return false
-	const candidate = value as Record<string, unknown>
-	return typeof candidate.systemIndex === "number"
-}
-
 function isGenerationSessionSnapshot(
 	value: unknown,
 ): value is GenerationSessionSnapshot {
@@ -215,16 +207,19 @@ function isGenerationSessionSnapshot(
 				typeof typedStar.class === "string" &&
 				typeof typedStar.subtype === "number" &&
 				typeof typedStar.seed === "string" &&
-				isSystemBodyArray(typedSolarSystem.orbits)
+				isSystemBodyArray(typedSolarSystem.orbits) &&
+				(typedSolarSystem.companionStars === undefined ||
+					(Array.isArray(typedSolarSystem.companionStars) &&
+						typedSolarSystem.companionStars.every((companion) =>
+							isSystemBodyArray(companion?.orbits),
+						)))
 			)
 		})() &&
 		typeof candidate.solarSystemViewActive === "boolean" &&
 		isFocusTarget(candidate.currentFocus) &&
 		typeof candidate.generationPanelOpen === "boolean" &&
 		(candidate.mainWorldMode === undefined ||
-			VALID_MAIN_WORLD_MODES.has(candidate.mainWorldMode as MainWorldMode)) &&
-		(candidate.galaxyOrigin === undefined ||
-			isGalaxyOrigin(candidate.galaxyOrigin))
+			VALID_MAIN_WORLD_MODES.has(candidate.mainWorldMode as MainWorldMode))
 	)
 }
 

@@ -161,7 +161,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		spectralClass,
 		starSubtype,
 		mainWorldMode,
-		galaxyOrigin,
+		setMainWorldMode,
 		starName,
 		namesEnabled,
 		seed,
@@ -259,6 +259,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			solarSystemViewActive
 				? {
 						bodies: systemBodiesRef.current,
+						binaryOrbits: solarSystem.galaxyCatalog?.binaryOrbits,
 						daysPerYear: effectiveDaysPerYear,
 						spectralClass,
 						starSubtype,
@@ -315,6 +316,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemDaylight,
 		mainWorldSatelliteTexture,
 		solarSystem.companionStars,
+		solarSystem.galaxyCatalog,
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -325,6 +327,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			solarSystemViewActive
 				? {
 						bodies: systemBodies,
+						binaryOrbits: solarSystem.galaxyCatalog?.binaryOrbits,
 						daysPerYear: effectiveDaysPerYear,
 						spectralClass,
 						starSubtype,
@@ -377,6 +380,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemDaylight,
 		mainWorldSatelliteTexture,
 		solarSystem.companionStars,
+		solarSystem.galaxyCatalog,
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -405,6 +409,21 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	const [currentFocus, setCurrentFocus] = useState<OrbitAddress | null>(
 		initialGenerationSession?.currentFocus ?? null,
 	)
+	const isGalaxyCatalog = solarSystem.galaxyCatalog !== undefined
+	const [wasGalaxyCatalog, setWasGalaxyCatalog] = useState(isGalaxyCatalog)
+	const previousCatalogRef = useRef(isGalaxyCatalog)
+	if (wasGalaxyCatalog !== isGalaxyCatalog) {
+		setWasGalaxyCatalog(isGalaxyCatalog)
+		if (!isGalaxyCatalog) {
+			setCurrentFocus(null)
+			setPendingFocus(null)
+		}
+	}
+	useEffect(() => {
+		if (previousCatalogRef.current && !isGalaxyCatalog)
+			sceneRef.current?.clearSolarSystemFocus()
+		previousCatalogRef.current = isGalaxyCatalog
+	}, [isGalaxyCatalog, sceneRef])
 	// Whether the camera is (or was, as of the last systemBodies snapshot)
 	// following the main world specifically -- kept in sync imperatively
 	// wherever focus is set explicitly (handleFocusBody, the renderer's
@@ -460,8 +479,11 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						? SOL_DATA.solSeed
 						: RNG.seedStringToNumber(snapshot.solarSystem.star.seed)
 				skipNextGeneratedSystemBodiesSyncRef.current =
-					snapshot.solarSystem.orbits.length > 0 && snapshotSeed !== seed
+					!snapshot.solarSystem.galaxyCatalog &&
+					snapshot.solarSystem.orbits.length > 0 &&
+					snapshotSeed !== seed
 				setSolarSystem(snapshot.solarSystem)
+				if (snapshot.mainWorldMode) setMainWorldMode(snapshot.mainWorldMode)
 				setSolarSystemViewActive(snapshot.solarSystemViewActive)
 				setGenerationPanelOpen(snapshot.generationPanelOpen)
 				setCurrentFocus(snapshot.currentFocus)
@@ -538,7 +560,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 				currentFocus,
 				generationPanelOpen,
 				mainWorldMode,
-				galaxyOrigin: galaxyOrigin ?? undefined,
 			},
 			sessionNamespace,
 		).catch((error) => {
@@ -554,7 +575,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		solarSystemViewActive,
 		solarSystem,
 		mainWorldMode,
-		galaxyOrigin,
 		sessionNamespace,
 	])
 	// Finds the main world wherever it lives -- a top-level SystemBody, or
@@ -586,9 +606,16 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	// knobs stay hidden for the star (no parent to orbit, and no rotation
 	// period worth exposing here) and default to the main world otherwise.
 	const solarSystemClock = useMemo(() => {
-		const focus = toPrimaryBodyFocus(currentFocus) ?? mainWorldFocus
+		const focusedCompanion =
+			currentFocus && currentFocus.kind !== "star" && currentFocus.starIndex > 0
+				? solarSystem.companionStars?.[currentFocus.starIndex - 1]
+				: undefined
+		const focus =
+			focusedCompanion && currentFocus
+				? toPrimaryBodyFocus({ ...currentFocus, starIndex: 0 })
+				: (toPrimaryBodyFocus(currentFocus) ?? mainWorldFocus)
 		if (!focus) return null
-		const body = systemBodies[focus.bodyIndex]
+		const body = (focusedCompanion?.orbits ?? systemBodies)[focus.bodyIndex]
 		if (!body) return null
 		const moon =
 			focus.moonIndex !== undefined ? body.moons[focus.moonIndex] : undefined
@@ -600,7 +627,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 			: body.orbitalPeriodDays
 		if (rotationPeriodHours <= 0 || orbitalPeriodDays <= 0) return null
 		return { rotationPeriodHours, orbitalPeriodDays }
-	}, [systemBodies, currentFocus, mainWorldFocus])
+	}, [systemBodies, currentFocus, mainWorldFocus, solarSystem.companionStars])
 
 	const wrapFraction = (value: number, period: number) =>
 		period > 0 ? (((value % period) + period) % period) / period : 0

@@ -1,4 +1,5 @@
 import { GALAXY_IDENTITY } from "@/model/celestial/galaxy/galaxy-identity"
+import { BINARY_ORBIT } from "@/model/celestial/galaxy/systems/binary-orbit"
 import {
 	decodeLuminosityClass,
 	decodeSpectralClass,
@@ -8,6 +9,7 @@ import {
 	encodeStarRole,
 } from "@/model/celestial/galaxy/systems/codes"
 import type {
+	GalaxyOrbitAllocation,
 	GalaxyStar,
 	GalaxyStarSeedParams,
 	GalaxySystem,
@@ -20,6 +22,7 @@ import type {
 	StarRole,
 } from "@/model/celestial/galaxy/systems/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import type { OrbitRegion } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type {
 	HostStarAttributes,
@@ -34,10 +37,14 @@ import { BODY_GENERATION } from "@/model/celestial/system/generation/body"
 import { EMPTY_ORBITS } from "@/model/celestial/system/generation/empty-orbits"
 import { FINAL_ORBIT_ENVIRONMENT } from "@/model/celestial/system/generation/final-orbit-environment"
 import { ORBIT_PLACEMENT } from "@/model/celestial/system/generation/orbit-placement"
-import type { OrbitExclusionZone } from "@/model/celestial/system/generation/orbit-placement/types"
+import type {
+	OrbitExclusionZone,
+	OrbitSlot,
+} from "@/model/celestial/system/generation/orbit-placement/types"
 import { ROLLS } from "@/model/celestial/system/generation/rolls"
 import { WORLD_TYPE_ALLOCATION } from "@/model/celestial/system/generation/world-type-allocation"
 import { WORLD_TYPE_COUNTS } from "@/model/celestial/system/generation/world-type-counts"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { DICE } from "@/model/shared/random/dice"
 import type { SharedRng } from "@/model/shared/random/rng"
 import { RNG } from "@/model/shared/random/rng"
@@ -348,7 +355,9 @@ function rollStarTree(rng: SharedRng): StarPreview[] {
 		hasParent: false,
 		presenceThreshold,
 	})
-	resolveStellarOrbitCrossings(primaryIndex)
+	if (!BINARY_ORBIT.normalizeTriple(stars)) {
+		resolveStellarOrbitCrossings(primaryIndex)
+	}
 
 	// System age reset (book: "if a new star is a post-stellar object but
 	// the primary is a fusing star, the age of the entire stellar system
@@ -853,8 +862,6 @@ function computeMaxOrbitalDistanceAU({
 // total mass (parent + inner sibling, treated as one system being
 // perturbed), e_out is the outer body's own eccentricity, and K = 2.8 is
 // Mardling & Aarseth's own empirically-fit long-term-stability threshold.
-const MARDLING_AARSETH_K = 2.8
-
 function computeMinimumOuterOrbitalDistanceAU({
 	innerIndex,
 	outerIndex,
@@ -873,11 +880,11 @@ function computeMinimumOuterOrbitalDistanceAU({
 		effectiveMassSolAt({ index: parentIndex, previews }) +
 		effectiveMassSolAt({ index: innerIndex, previews })
 	const massRatio = outerMass / innerSystemMass
-	const bracket =
-		((1 + massRatio) * (1 + outer.eccentricity)) /
-		Math.sqrt(1 - outer.eccentricity)
-	const requiredRatio = MARDLING_AARSETH_K * bracket ** 0.4
-	return requiredRatio * inner.orbitalDistanceAU
+	return BINARY_ORBIT.outerPeriapsisFloorAU({
+		innerAxisAU: inner.orbitalDistanceAU,
+		eccentricity: outer.eccentricity,
+		massRatio,
+	})
 }
 
 // Book's Available Orbits exclusion zones (pp. 38-39) exist because every
@@ -1074,7 +1081,10 @@ function generate({
 	const previews = packed
 		? unpackStarPreviews(getPackedSystemStarSlice(packed, systemIndex))
 		: rollStarTree(RNG.createRng({ seed }))
+	if (packed) BINARY_ORBIT.normalizeTriple(previews)
 	const primary = previews[0]!
+	const binaryOrbits = BINARY_ORBIT.resolve(previews)
+	const fitted = binaryOrbits.length > 0 && previews[1]?.role === "epistellar"
 	const worldTypeCounts = WORLD_TYPE_COUNTS.roll({
 		rng: RNG.createStringRng({ seed: `world-type-counts:${seed}` }),
 		primarySpectralClass: primary.spectralClass,
@@ -1090,20 +1100,42 @@ function generate({
 		systemHasBlackHole: previews.some((star) => star.spectralClass === "BH"),
 	})
 	const maxOrbitalDistanceAUByIndex = previews.map((_, index) =>
-		computeMaxOrbitalDistanceAU({ index, previews }),
+		fitted ? Infinity : computeMaxOrbitalDistanceAU({ index, previews }),
+	)
+	const maximumOrbitAU = ORBIT_BODY.orbitNumberToAU({ orbitNumber: Infinity })
+	const regions = fitted
+		? BINARY_ORBIT.planetaryRegions({ stars: previews, orbits: binaryOrbits })
+		: previews.map(
+				(preview, index): OrbitRegion => ({
+					center: { kind: "star", index },
+					minAU: preview.mao,
+					maxAU: Math.min(maximumOrbitAU, maxOrbitalDistanceAUByIndex[index]!),
+					massSol: preview.massSol,
+					luminositySol: effectiveLuminositySolAt({ index, previews }),
+					inclinationDeg: 0,
+					fitted: false,
+				}),
+			)
+	const owners = regions.map((region) =>
+		region.center.kind === "star" ? region.center.index : 0,
+	)
+	const regionSeeds = regions.map(({ center }) =>
+		fitted
+			? `${seed}:${center.kind}:${center.index}`
+			: `${seed}:${center.index}`,
 	)
 	const allocatedWorldTypes = WORLD_TYPE_ALLOCATION.allocate({
 		worldTypeCounts,
-		stars: previews.map((preview, index) => ({
-			orbitalDistanceAU: preview.orbitalDistanceAU,
-			mao: preview.mao,
-			maxOrbitalDistanceAU: maxOrbitalDistanceAUByIndex[index]!,
-			acceptsBodies: preview.role !== "epistellar",
+		stars: regions.map((region, index) => ({
+			orbitalDistanceAU: fitted ? index : previews[index]!.orbitalDistanceAU,
+			mao: region.minAU,
+			maxOrbitalDistanceAU: region.maxAU,
+			acceptsBodies: fitted || previews[index]!.role !== "epistellar",
 		})),
 	})
 	const worldTypeAllocations = allocatedWorldTypes.map((allocation, index) => {
 		const emptyOrbitCount = EMPTY_ORBITS.roll({
-			rng: RNG.createStringRng({ seed: `empty-orbits:${seed}:${index}` }),
+			rng: RNG.createStringRng({ seed: `empty-orbits:${regionSeeds[index]}` }),
 			normalWorldCount: allocation.totalWorlds,
 		})
 		return {
@@ -1113,15 +1145,18 @@ function generate({
 		}
 	})
 	const baselineWorldTypes = worldTypeAllocations.map((allocation, index) => {
-		const preview = previews[index]!
+		const owner = owners[index]!
+		const preview = previews[owner]!
 		return {
 			...allocation,
 			baselineNumber: BASELINE_NUMBER.roll({
-				rng: RNG.createStringRng({ seed: `baseline-number:${seed}:${index}` }),
+				rng: RNG.createStringRng({
+					seed: `baseline-number:${regionSeeds[index]}`,
+				}),
 				totalWorlds: allocation.totalWorlds,
 				otherStarCount: previews.length - 1,
 				hasEpistellarCompanion: previews.some(
-					(star) => star.parentIndex === index && star.role === "epistellar",
+					(star) => star.parentIndex === owner && star.role === "epistellar",
 				),
 				hostSpectralClass: preview.spectralClass,
 				hostLuminosityClass: preview.luminosityClass,
@@ -1130,31 +1165,33 @@ function generate({
 	})
 	const baselineOrbitWorldTypes = baselineWorldTypes.map(
 		(allocation, index) => {
-			const preview = previews[index]!
+			const region = regions[index]!
 			return {
 				...allocation,
 				baselineOrbitNumber: BASELINE_ORBIT.roll({
-					rng: RNG.createStringRng({ seed: `baseline-orbit:${seed}:${index}` }),
+					rng: RNG.createStringRng({
+						seed: `baseline-orbit:${regionSeeds[index]}`,
+					}),
 					baselineNumber: allocation.baselineNumber,
 					totalWorlds: allocation.totalWorlds,
 					habitableZoneOrbitNumber: ORBIT_BODY.auToOrbitNumber({
-						au: STAR.getHabitableZoneAU(
-							effectiveLuminositySolAt({ index, previews }),
-						),
+						au: STAR.getHabitableZoneAU(region.luminositySol),
 					}),
-					minimumOrbitNumber: ORBIT_BODY.auToOrbitNumber({ au: preview.mao }),
+					minimumOrbitNumber: ORBIT_BODY.auToOrbitNumber({ au: region.minAU }),
 					maximumOrbitNumber: ORBIT_BODY.auToOrbitNumber({
-						au: maxOrbitalDistanceAUByIndex[index]!,
+						au: region.maxAU,
 					}),
 				}),
 			}
 		},
 	)
 	const anomalousOrbitReservations = ANOMALOUS_ORBITS.roll({
+		circularCoplanar: fitted,
 		rng: RNG.createStringRng({ seed: `anomalous-orbits:${seed}` }),
 		terrestrialCount: worldTypeCounts.terrestrialCount,
 		eligibleStarIndices: baselineOrbitWorldTypes.flatMap((allocation, index) =>
-			allocation.starCapacity > 0 && previews[index]!.role !== "epistellar"
+			allocation.starCapacity > 0 &&
+			(fitted || previews[index]!.role !== "epistellar")
 				? [index]
 				: [],
 		),
@@ -1170,7 +1207,9 @@ function generate({
 	const placedWorldTypes = reservedWorldTypes.map((allocation, index) => ({
 		...allocation,
 		orbitSlots: ORBIT_PLACEMENT.place({
-			rng: RNG.createStringRng({ seed: `orbit-placement:${seed}:${index}` }),
+			rng: RNG.createStringRng({
+				seed: `orbit-placement:${regionSeeds[index]}`,
+			}),
 			baselineNumber: allocation.baselineNumber,
 			baselineOrbitNumber: allocation.baselineOrbitNumber,
 			totalWorlds: allocation.totalWorlds,
@@ -1180,19 +1219,21 @@ function generate({
 			emptyOrbitCount: allocation.emptyOrbitCount,
 			anomalousOrbitReservations: allocation.anomalousOrbitReservations,
 			minimumOrbitNumber: ORBIT_BODY.auToOrbitNumber({
-				au: previews[index]!.mao,
+				au: regions[index]!.minAU,
 			}),
 			maximumOrbitNumber: ORBIT_BODY.auToOrbitNumber({
-				au: maxOrbitalDistanceAUByIndex[index]!,
+				au: regions[index]!.maxAU,
 			}),
-			exclusionZones: companionExclusionZonesOrbitNumbers({ index, previews }),
+			exclusionZones: fitted
+				? []
+				: companionExclusionZonesOrbitNumbers({ index, previews }),
 		}),
 	}))
 	const finalizedWorldTypes = placedWorldTypes.map((allocation, index) => ({
 		...allocation,
 		orbitSlots: FINAL_ORBIT_ENVIRONMENT.hydrate({
 			slots: allocation.orbitSlots,
-			luminositySol: effectiveLuminositySolAt({ index, previews }),
+			luminositySol: regions[index]!.luminositySol,
 		}),
 	}))
 
@@ -1201,36 +1242,81 @@ function generate({
 
 		const orbitalDistanceAU = preview.orbitalDistanceAU
 		const orbitalPeriodDays =
-			preview.parentIndex === null
+			binaryOrbits.find(
+				({ a, b }) =>
+					(a.center.kind === "star" && a.center.index === index) ||
+					(b.center.kind === "star" && b.center.index === index),
+			)?.orbitalPeriodDays ??
+			(preview.parentIndex === null
 				? 0
 				: STAR.getKeplerYearYears({
 						orbitalDistanceAU,
 						massSol: previews[preview.parentIndex]!.massSol,
-					}) * TIME.astronomicalDaysPerYear
+					}) * TIME.astronomicalDaysPerYear)
 
-		const bodies = BODY_GENERATION.generateSystemBodies({
-			seed: starSeed,
-			hostStar: {
-				...toHostStarAttributes(preview),
-				// A planet's climate sees this star's own epistellar companion's
-				// light too, if it has one -- see effectiveLuminositySolAt's doc.
-				luminositySol: effectiveLuminositySolAt({ index, previews }),
+		const bodies: SystemBody[] = []
+		const allocations = finalizedWorldTypes.flatMap(
+			(allocation, regionIndex): GalaxyOrbitAllocation[] => {
+				if (owners[regionIndex] !== index) return []
+				const region = regions[regionIndex]!
+				const acceptedSlots: OrbitSlot[] = allocation.orbitSlots.filter(
+					(slot) => slot.type === "empty",
+				)
+				const regionBodies = BODY_GENERATION.generateSystemBodies({
+					seed: fitted
+						? RNG.seedStringToNumber(`bodies:${regionSeeds[regionIndex]}`)
+						: starSeed,
+					hostStar: toHostStarAttributes(preview),
+					placement: {
+						region,
+						acceptedSlots,
+					},
+					hasParent: preview.parentIndex !== null,
+					isEpistellarCompanion: preview.role === "epistellar",
+					maxOrbitalDistanceAU: region.maxAU,
+					companionExclusionZonesAU: fitted
+						? []
+						: companionExclusionZonesAU({
+								index,
+								previews,
+							}),
+					orbitSlots: allocation.orbitSlots,
+					mainWorldMode:
+						isCapital && preview.parentIndex === null && !fitted
+							? "temperate-native"
+							: "procedural",
+					exactHZC: false,
+					skipNaming,
+				})
+				const indices = new Map(
+					regionBodies.map((body, offset) => [
+						body.idx,
+						body.isMainWorld ? -1 : bodies.length + offset,
+					]),
+				)
+				for (const body of regionBodies) {
+					body.idx = indices.get(body.idx)!
+					if (body.beltOfIdx !== undefined)
+						body.beltOfIdx = indices.get(body.beltOfIdx)
+					if (body.trojanOfIdx !== undefined)
+						body.trojanOfIdx = indices.get(body.trojanOfIdx)
+					for (const moon of body.moons) {
+						if (moon.tideLock?.type === "planet")
+							moon.tideLock.target = body.idx
+					}
+				}
+				bodies.push(...regionBodies)
+				return [
+					{
+						...allocation,
+						region,
+						orbitSlots: acceptedSlots.sort(
+							(a, b) => a.orbitNumber - b.orbitNumber,
+						),
+					},
+				]
 			},
-			hasParent: preview.parentIndex !== null,
-			isEpistellarCompanion: preview.role === "epistellar",
-			maxOrbitalDistanceAU: maxOrbitalDistanceAUByIndex[index],
-			companionExclusionZonesAU: companionExclusionZonesAU({
-				index,
-				previews,
-			}),
-			orbitSlots: finalizedWorldTypes[index]!.orbitSlots,
-			mainWorldMode:
-				isCapital && preview.parentIndex === null
-					? "temperate-native"
-					: "procedural",
-			exactHZC: false,
-			skipNaming,
-		})
+		)
 		return {
 			index,
 			parentIndex: preview.parentIndex,
@@ -1251,18 +1337,39 @@ function generate({
 			orbitalPeriodDays,
 			eccentricity: preview.eccentricity,
 			inclinationDeg: preview.inclinationDeg,
-			worldTypeAllocation: finalizedWorldTypes[index]!,
+			regions: allocations,
 		}
 	})
 
-	resolvePlanetVsCompanionStarOverlaps({ stars, maxOrbitalDistanceAUByIndex })
+	if (!fitted)
+		resolvePlanetVsCompanionStarOverlaps({ stars, maxOrbitalDistanceAUByIndex })
+	const regularSlots = stars.flatMap((star) =>
+		star.regions.flatMap((allocation) =>
+			allocation.orbitSlots.filter((slot) => slot.anomalousOrbitType === null),
+		),
+	)
+	const gasGiantCount =
+		worldTypeCounts.gasGiantCount -
+		regularSlots.filter((slot) => slot.type === "gas-giant").length
+	const beltCount =
+		worldTypeCounts.beltCount -
+		regularSlots.filter((slot) => slot.type === "belt").length
+	const terrestrialCount =
+		worldTypeCounts.terrestrialCount -
+		regularSlots.filter((slot) => slot.type === "terrestrial").length
 
 	return {
 		systemIndex,
 		seed,
 		stars,
 		worldTypeCounts,
-		anomalousOrbitReservations,
+		binaryOrbits,
+		unplacedWorldTypeCounts: {
+			gasGiantCount,
+			beltCount,
+			terrestrialCount,
+			totalWorlds: gasGiantCount + beltCount + terrestrialCount,
+		},
 	}
 }
 

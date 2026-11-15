@@ -17,6 +17,7 @@ export const uiPalette = {
 	sectorBoundary: "#cbd5e1",
 	sectorCapital: "#38bdf8",
 	nationCapital: "#fbbf24",
+	galaxySearchMatch: "#4ade80",
 	rebel: "#000000",
 	activeDark: "#0f172a",
 	person: {
@@ -56,6 +57,12 @@ export const uiPalette = {
 		stripedBorder: "rgba(255, 255, 255, 0.15)",
 		plainBorder: "rgba(203, 213, 225, 0.8)",
 	},
+} as const
+
+export const uiGalaxyMap = {
+	matchMarkerMinSizePx: 12,
+	matchMarkerStarSizeRatio: 2.6,
+	matchMarkerStrokePx: 1.5,
 } as const
 
 export const uiWindMap = {

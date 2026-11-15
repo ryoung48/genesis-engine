@@ -1,8 +1,11 @@
 import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
 import type { Zone } from "@/model/celestial/planet/types"
 import type { AnomalousOrbitType } from "@/model/celestial/system/generation/anomalous-orbits/types"
+import type { OrbitSlot } from "@/model/celestial/system/generation/orbit-placement/types"
 
 export interface Slot {
+	// [JUSTIFICATION] Only allocated slots have a source record to reconcile.
+	source?: OrbitSlot
 	zone: Zone
 	deviation: number
 	/** [JUSTIFICATION] Legacy callers still roll an environment-derived slot;

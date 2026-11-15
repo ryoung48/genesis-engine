@@ -22,16 +22,19 @@ function roll({
 	rng,
 	terrestrialCount,
 	eligibleStarIndices,
+	circularCoplanar,
 }: AnomalousOrbitRollInput): AnomalousOrbitReservation[] {
 	if (eligibleStarIndices.length === 0) return []
 	const reservations: AnomalousOrbitReservation[] = []
 	let remainingTerrestrialCount = terrestrialCount
 	const count = rollCount(DICE.roll2d6(rng))
 	for (let index = 0; index < count; index++) {
+		const type = rollType(DICE.roll2d6(rng))
+		if (circularCoplanar && type !== "random" && type !== "trojan") continue
 		const worldType = remainingTerrestrialCount < 13 ? "terrestrial" : "belt"
 		if (worldType === "terrestrial") remainingTerrestrialCount++
 		reservations.push({
-			type: rollType(DICE.roll2d6(rng)),
+			type,
 			worldType,
 			starIndex: rng.choice(eligibleStarIndices),
 		})
