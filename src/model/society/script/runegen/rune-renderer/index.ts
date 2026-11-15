@@ -13,6 +13,8 @@ export type RuneRenderOptions = {
 	color: string
 	scale: number
 	dotStyle: "fill" | "outline" | "small"
+	// [JUSTIFICATION] Only carved glyphs use this override. They default to full wear.
+	carvingWear?: number
 	// A continuous bar spanning each word, like Devanagari's shirorekha;
 	// independent of any per-glyph motif since it must stay visible
 	// regardless of how the template's own strokes happen to land

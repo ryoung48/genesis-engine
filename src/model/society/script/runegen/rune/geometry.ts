@@ -5,7 +5,11 @@ import {
 	DIR_S,
 	DIR_W,
 } from "@/model/society/script/runegen/rune/index"
-import type { RuneData } from "@/model/society/script/runegen/rune/types"
+import type {
+	CountInkBlobsParams,
+	PlaceRuneDotsParams,
+	RuneData,
+} from "@/model/society/script/runegen/rune/types"
 
 export function _coin({
 	rune,
@@ -60,39 +64,41 @@ export function _placeDots({
 	rune,
 	spots,
 	budget,
-}: {
-	rune: RuneData
-	spots: Point2D[]
-	budget: number
-}): void {
+	mirrored = false,
+}: PlaceRuneDotsParams): void {
 	let remaining = budget
 	for (const spot of rune.rng.shuffle(spots)) {
 		if (remaining <= 0) {
 			break
 		}
-		if (_canPlaceDot({ rune, i: spot.y, j: spot.x })) {
-			rune.bitmap[spot.y][spot.x] = true
-			remaining--
-		}
+		const otherX = mirrored ? rune.width - spot.x - 1 : spot.x
+		const pair = spot.x !== otherX
+		if (!_canPlaceDot({ rune, i: spot.y, j: spot.x })) continue
+		if (
+			pair &&
+			(remaining < 2 ||
+				Math.abs(spot.x - otherX) === 1 ||
+				!_canPlaceDot({ rune, i: spot.y, j: otherX }))
+		)
+			continue
+		rune.bitmap[spot.y][spot.x] = true
+		rune.bitmap[spot.y][otherX] = true
+		remaining -= pair ? 2 : 1
 	}
 }
 
-// Solid 2x2 ink blocks read as blobs rather than letterforms
-export function _countInkBlobs(rune: RuneData): number {
-	let n = 0
-	for (let i = 0; i < rune.height - 1; i++) {
-		for (let j = 0; j < rune.width - 1; j++) {
-			if (
-				rune.bitmap[i][j] &&
-				rune.bitmap[i][j + 1] &&
-				rune.bitmap[i + 1][j] &&
-				rune.bitmap[i + 1][j + 1]
-			) {
-				n++
-			}
+export function _countInkBlobs({ rune, size }: CountInkBlobsParams): number {
+	let blocks = 0
+	for (let y = 0; y <= rune.height - size; y++) {
+		let filledColumns = 0
+		for (let x = 0; x < rune.width; x++) {
+			let filledRows = 0
+			while (filledRows < size && rune.bitmap[y + filledRows][x]) filledRows++
+			filledColumns = filledRows === size ? filledColumns + 1 : 0
+			if (filledColumns >= size) blocks++
 		}
 	}
-	return n
+	return blocks
 }
 
 export function _isConnected({

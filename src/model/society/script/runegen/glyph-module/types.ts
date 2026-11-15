@@ -10,6 +10,7 @@ export interface LayoutGlyphTextParams {
 	text: string
 	config: {
 		paddedWidth: number
+		glyphWidths: Record<string, number>
 		paddedHeight: number
 		spaceWidth: number
 		gap: number

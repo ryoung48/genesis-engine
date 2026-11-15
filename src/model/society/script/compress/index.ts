@@ -29,9 +29,14 @@ function compressWord({ word, ratio, seedSalt }: CompressWordParams): string {
 	return word[0] + selected.map((index) => word[index]).join("")
 }
 
-function compressName({ name, ratio, seedSalt }: CompressNameParams): string {
+function compressName({
+	name,
+	ratio,
+	languageSeed,
+}: CompressNameParams): string {
 	const normalized = normalizeName(name)
 	if (!normalized) return ""
+	const seedSalt = `heritage:${languageSeed}`
 	return normalized
 		.split(" ")
 		.filter(Boolean)

@@ -27,7 +27,11 @@ function createWorld(): SerializedGenesisWorld {
 		provinces: { count: 1, seeds: new Int32Array([0]) },
 		nations: { seeds: new Int32Array([0]), size: new Int32Array([1]) },
 		cultures: { assignment: new Int32Array([0]) },
-		heritages: { assignment: new Int32Array([0]) },
+		heritages: {
+			count: 1,
+			assignment: new Int32Array([0]),
+			languageSeeds: new Int32Array([1]),
+		},
 	} as unknown as SerializedGenesisWorld
 }
 
@@ -41,7 +45,7 @@ it("positions scripts loaded after the first frame without moving the camera", (
 	const group = buildGlobeNationScripts(
 		world,
 		["Example"],
-		new Map([[0, SCRIPT.spawn("overlay-regression")]]),
+		new Map([[0, SCRIPT.spawn({ languageSeed: 1 })]]),
 		cache,
 		queue,
 		camera,
@@ -73,7 +77,6 @@ it.each([
 		currentWorld: createWorld(),
 		labelMode: { nations: true, dynasty: false, script: true },
 		nationNames: ["Example"],
-		heritageScripts: new Map([[0, SCRIPT.spawn("overlay-regression")]]),
 		nationScriptTextureCache: new Map(),
 		camera: new THREE.PerspectiveCamera(),
 		scene: new THREE.Scene(),
@@ -96,4 +99,13 @@ it.each([
 	expect(ctx.globeNationScripts?.parent).toBe(ctx.globeGroup)
 	expect(ctx.mapNationScripts?.parent).toBe(ctx.scene)
 	expect(ctx.pendingNationScriptTextureQueue?.tasks).toHaveLength(1)
+	const script = SCRIPT.spawn({ languageSeed: 1 })
+	const queuedLabel = ctx.pendingNationScriptTextureQueue?.tasks[0]
+	expect(queuedLabel?.script.glyphs.a.seed).toBe(script.glyphs.a.seed)
+	expect(queuedLabel?.text).toBe(
+		SCRIPT.compressLabel({
+			name: withHistoryOverride ? "Historical Name" : "Example",
+			script,
+		}),
+	)
 })

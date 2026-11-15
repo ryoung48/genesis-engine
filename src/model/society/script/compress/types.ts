@@ -7,5 +7,5 @@ export interface CompressWordParams {
 export interface CompressNameParams {
 	name: string
 	ratio: number
-	seedSalt: string
+	languageSeed: number
 }

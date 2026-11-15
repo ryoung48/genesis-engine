@@ -133,7 +133,9 @@ export function createLabelsController(
 			) {
 				scripts.set(
 					heritageIdx,
-					SCRIPT.spawn(`script:${world.heritages.languageSeeds[heritageIdx]}`),
+					SCRIPT.spawn({
+						languageSeed: world.heritages.languageSeeds[heritageIdx],
+					}),
 				)
 			}
 		}

@@ -5,4 +5,5 @@ export const APP_PATHS = {
 	weatherBench: "/weather/bench",
 	planetRendererExperiment: "/experiments/planet-renderer",
 	flagGenerator: "/experiments/flags",
+	scriptExperiment: "/experiments/scripts",
 } as const

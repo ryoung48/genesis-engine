@@ -1,7 +1,9 @@
 ﻿import { RNG } from "@/model/shared/random/rng"
-import type { HeritageScript } from "@/model/society/script"
+import { CARVING } from "@/model/society/script/runegen/carving"
+import type { CarvingPoint } from "@/model/society/script/runegen/carving/types"
 import { GLYPH_MODULE } from "@/model/society/script/runegen/glyph-module"
 import { RUNE_RENDERER } from "@/model/society/script/runegen/rune-renderer"
+import type { ScriptAppearance } from "@/model/society/script/types"
 import { LABEL_OUTLINE_COLOR } from "@/ui/genesis/renderer/nation-label-overlay/constants"
 
 export const DEFAULT_SCRIPT_RENDER_SCALE = 7
@@ -67,7 +69,7 @@ function drawHeadlineBars(
 
 function drawCursiveConnectors(
 	ctx: CanvasRenderingContext2D,
-	script: HeritageScript,
+	script: ScriptAppearance,
 	layout: NonNullable<ReturnType<typeof GLYPH_MODULE.layoutGlyphText>>,
 	scale: number,
 	padding: number,
@@ -98,7 +100,7 @@ function drawCursiveConnectors(
 }
 
 export function renderScriptTexture(
-	script: HeritageScript,
+	script: ScriptAppearance,
 	text: string,
 	options?: { scale?: number; targetLineHeight?: number; wrapWidth?: number },
 ): ScriptTextureRender | null {
@@ -131,6 +133,12 @@ export function renderScriptTexture(
 		text,
 		config: {
 			paddedWidth,
+			glyphWidths: Object.fromEntries(
+				Object.entries(script.glyphs).map(([char, rune]) => [
+					char,
+					rune.width * scale + padding * 2,
+				]),
+			),
 			paddedHeight,
 			spaceWidth,
 			gap,
@@ -148,51 +156,79 @@ export function renderScriptTexture(
 
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 	ctx.lineCap = script.render.roundCaps ? "round" : "butt"
+	const carvings = new Map<string, { path: Path2D; dots: CarvingPoint[] }>()
 
 	for (let index = 0; index < layout.placements.length; index++) {
 		const placement = layout.placements[index]
 		const rune = script.glyphs[placement.char]
 		if (!rune) continue
-
-		const rng = RNG.createStringRng({
-			seed: `${text}:${placement.char}:${index}`,
-		})
-		const strokes = RUNE_RENDERER.prepareRuneStrokes({
-			rune,
-			options: renderOptions,
-			rng,
-		})
-		const dots = RUNE_RENDERER.getRuneDots({ rune, options: renderOptions })
-		const dotRadius = RUNE_RENDERER.getRuneDotRadius(renderOptions)
 		const tx = placement.x + padding + margin
 		const ty = placement.y + padding + margin
+		let dots: CarvingPoint[]
+		if (rune.template === "carved") {
+			let carving = carvings.get(placement.char)
+			if (!carving) {
+				const path = new Path2D()
+				const geometry = CARVING.geometry({ rune, options: renderOptions })
+				for (const [start, ...points] of geometry.contours) {
+					path.moveTo(...start)
+					for (const point of points) path.lineTo(...point)
+					path.closePath()
+				}
+				carving = {
+					path,
+					dots: geometry.dots.map(([x, y]) => [x * scale, y * scale]),
+				}
+				carvings.set(placement.char, carving)
+			}
+			ctx.save()
+			ctx.translate(tx, ty)
+			ctx.scale(scale, scale)
+			ctx.fillStyle = LABEL_DARK
+			ctx.fill(carving.path)
+			ctx.restore()
+			dots = carving.dots
+		} else {
+			const rng = RNG.createStringRng({
+				seed: `${text}:${placement.char}:${index}`,
+			})
+			const strokes = RUNE_RENDERER.prepareRuneStrokes({
+				rune,
+				options: renderOptions,
+				rng,
+			})
+			dots = RUNE_RENDERER.getRuneDots({ rune, options: renderOptions }).map(
+				({ x, y }) => [x, y],
+			)
 
-		for (const width of [
-			renderOptions.scale * STROKE_WIDTH_FACTOR * OUTLINE_WIDTH_FACTOR,
-			renderOptions.scale * STROKE_WIDTH_FACTOR,
-		]) {
-			ctx.strokeStyle = LABEL_DARK
-			ctx.lineWidth = width
+			for (const width of [
+				renderOptions.scale * STROKE_WIDTH_FACTOR * OUTLINE_WIDTH_FACTOR,
+				renderOptions.scale * STROKE_WIDTH_FACTOR,
+			]) {
+				ctx.strokeStyle = LABEL_DARK
+				ctx.lineWidth = width
 
-			for (const stroke of strokes) {
-				ctx.beginPath()
-				stroke.forEach((point, pointIndex) => {
-					const x = tx + point.x
-					const y = ty + point.y
-					if (pointIndex === 0) {
-						ctx.moveTo(x, y)
-					} else {
-						ctx.lineTo(x, y)
-					}
-				})
-				ctx.stroke()
+				for (const stroke of strokes) {
+					ctx.beginPath()
+					stroke.forEach((point, pointIndex) => {
+						const x = tx + point.x
+						const y = ty + point.y
+						if (pointIndex === 0) {
+							ctx.moveTo(x, y)
+						} else {
+							ctx.lineTo(x, y)
+						}
+					})
+					ctx.stroke()
+				}
 			}
 		}
 
+		const dotRadius = RUNE_RENDERER.getRuneDotRadius(renderOptions)
 		ctx.fillStyle = LABEL_DARK
-		for (const dot of dots) {
-			const x = tx + dot.x
-			const y = ty + dot.y
+		for (const [dotX, dotY] of dots) {
+			const x = tx + dotX
+			const y = ty + dotY
 			if (script.render.dotStyle === "outline") {
 				drawOutlineDot(ctx, x, y, dotRadius, renderOptions.scale)
 				continue

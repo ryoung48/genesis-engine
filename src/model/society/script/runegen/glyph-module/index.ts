@@ -1,4 +1,5 @@
 import { RNG } from "@/model/shared/random/rng"
+import { CARVING } from "@/model/society/script/runegen/carving"
 import type {
 	GenerateGlyphSetParams,
 	LayoutGlyphTextParams,
@@ -21,13 +22,14 @@ const MAX_GLYPH_TRIES = 40
 
 const FREQUENCY_ORDER = "etaoinshrdlcumwfgypbvkjxqz"
 
-const TEMPLATES: RuneTemplate[] = [
+const MIXABLE_TEMPLATES: RuneTemplate[] = [
 	"random1",
 	"random2",
 	"random4",
 	"random5",
 	"cursive",
 ]
+const TEMPLATES: RuneTemplate[] = [...MIXABLE_TEMPLATES, "carved"]
 
 function frequencyWeightBand(char: string): RuneGeneratorOptions["weightBand"] {
 	const rank = FREQUENCY_ORDER.indexOf(char)
@@ -54,12 +56,13 @@ function generateGlyphSet({
 		(options.seedTemplate !== "any" ? options.seedTemplate : undefined)
 	const scriptStyle = pinnedTemplate ?? dominant
 	const isCursiveScript = scriptStyle === "cursive"
+	const isCarvedScript = scriptStyle === "carved"
 	// A joined cursive script mixed with disconnected letterforms would look
 	// broken, so it pairs only with the vertical-spine template as its outlier
 	const secondary = isCursiveScript
 		? "random5"
 		: dice.choice(
-				TEMPLATES.filter(
+				MIXABLE_TEMPLATES.filter(
 					(template) => template !== dominant && template !== "cursive",
 				),
 			)
@@ -76,39 +79,47 @@ function generateGlyphSet({
 	// Cursive's connector line is already its unifying feature; a headline or
 	// stave on top would clash with the ascenders and teeth
 	const motif =
-		options.motif ?? (isCursiveScript ? "none" : dice.choice(motifs))
+		options.motif ??
+		(isCursiveScript || isCarvedScript ? "none" : dice.choice(motifs))
 	const dotRoll = dice.random()
 	const maxDots =
 		options.maxDots ??
-		(isCursiveScript
-			? dice.randint(2, 3)
-			: dotRoll < 0.5
-				? 0
-				: dotRoll < 0.85
-					? 1
-					: 2)
+		(isCarvedScript
+			? 0
+			: isCursiveScript
+				? dice.randint(2, 3)
+				: dotRoll < 0.5
+					? 0
+					: dotRoll < 0.85
+						? 1
+						: 2)
 	const useFrequencyWeights =
 		!options.weightBand || options.weightBand === "any"
+	const carvingFamilies = isCarvedScript ? dice.shuffle(CARVING.families) : null
 
 	for (const rawChar of chars) {
 		const char = rawChar.toLowerCase()
 		if (!char || glyphs[char]) continue
 
 		const frequencyBand = frequencyWeightBand(char)
-		const weightBand = useFrequencyWeights ? frequencyBand : options.weightBand
-
 		const others = Object.values(glyphs)
+		const carvingFamily =
+			carvingFamilies?.[others.length % carvingFamilies.length]
+		const weightBand =
+			useFrequencyWeights && !carvingFamily ? frequencyBand : options.weightBand
 		let best: RuneData | null = null
 		let bestDistance = -1
 
 		for (let attempt = 0; attempt < MAX_GLYPH_TRIES; attempt++) {
 			const runeSeed = Math.floor(dice.random() * 1e9).toString(36)
 			const runeRng = RNG.createStringRng({ seed: runeSeed })
-			let styleTemplate: RuneTemplate | undefined
-			if (useHouseStyle) {
+			let styleTemplate: RuneTemplate | undefined = isCarvedScript
+				? "carved"
+				: undefined
+			if (useHouseStyle && !isCarvedScript) {
 				styleTemplate =
 					attempt >= MAX_GLYPH_TRIES / 2
-						? dice.choice(TEMPLATES)
+						? dice.choice(MIXABLE_TEMPLATES)
 						: dice.random() < dominantShare
 							? dominant
 							: secondary
@@ -124,6 +135,7 @@ function generateGlyphSet({
 				},
 				rng: runeRng,
 				seed: runeSeed,
+				carvingFamily,
 			})
 			const distance =
 				others.length === 0
@@ -166,19 +178,35 @@ function layoutGlyphText({
 	text,
 	config,
 }: LayoutGlyphTextParams): GlyphTextLayout | null {
-	const { paddedWidth, paddedHeight, spaceWidth, gap, lineGap, wrapWidth } =
-		config
-	const sanitized = (text || "").toLowerCase().replace(/[^a-z ]/g, "")
+	const {
+		paddedWidth,
+		glyphWidths,
+		paddedHeight,
+		spaceWidth,
+		gap,
+		lineGap,
+		wrapWidth,
+	} = config
+	const sanitized = text
+		.toLowerCase()
+		.replace(/\s/g, " ")
+		.replace(/[^a-z ]/g, "")
 	if (!sanitized) return null
 
-	type Token = { word: string; spacesAfter: number }
+	const glyphWidth = (char: string) => glyphWidths[char] ?? paddedWidth
+	type Token = { word: string; width: number; spacesAfter: number }
 	const tokens: Token[] = []
 	let currentWord = ""
 	let spaceCount = 0
 
 	const pushToken = () => {
 		if (currentWord.length > 0 || spaceCount > 0) {
-			tokens.push({ word: currentWord, spacesAfter: spaceCount })
+			const width = Array.from(currentWord).reduce(
+				(total, char, index) =>
+					total + glyphWidth(char) + (index > 0 ? gap : 0),
+				0,
+			)
+			tokens.push({ word: currentWord, width, spacesAfter: spaceCount })
 		}
 		currentWord = ""
 		spaceCount = 0
@@ -207,12 +235,7 @@ function layoutGlyphText({
 	}
 
 	tokens.forEach((token, index) => {
-		const wordWidth =
-			token.word.length > 0
-				? token.word.length * paddedWidth +
-					Math.max(0, token.word.length - 1) * gap
-				: 0
-		const tokenWidth = wordWidth + token.spacesAfter * spaceWidth
+		const tokenWidth = token.width + token.spacesAfter * spaceWidth
 		if (
 			wrapWidth &&
 			current.width + tokenWidth > maxWidth &&
@@ -239,16 +262,13 @@ function layoutGlyphText({
 		let x = 0
 		for (const token of line.tokens) {
 			if (token.word.length > 0) {
-				const segmentWidth =
-					token.word.length * paddedWidth +
-					Math.max(0, token.word.length - 1) * gap
-				headlines.push({ from: x, to: x + segmentWidth, y })
+				headlines.push({ from: x, to: x + token.width, y })
 				const letters: GlyphPlacement[] = []
 				token.word.split("").forEach((char, index) => {
 					const placement = { char, x, y }
 					placements.push(placement)
 					letters.push(placement)
-					x += paddedWidth + (index === token.word.length - 1 ? 0 : gap)
+					x += glyphWidth(char) + (index === token.word.length - 1 ? 0 : gap)
 				})
 				words.push({ letters })
 			}

@@ -1,9 +1,12 @@
 import { RNG } from "@/model/shared/random/rng"
+import { CARVING } from "@/model/society/script/runegen/carving"
+import { Point2D } from "@/model/society/script/runegen/point2d"
 import {
 	_buildStrokes,
 	_countInkBlobs,
 	_isConnected,
 	_isSymmetric,
+	_placeDots,
 } from "@/model/society/script/runegen/rune/geometry"
 import {
 	_applyMotif,
@@ -42,6 +45,7 @@ const TEMPLATE_SPECS: Record<RuneTemplate, TemplateSpec> = {
 	random4: CLASSIC_SPEC,
 	random5: CLASSIC_SPEC,
 	cursive: CLASSIC_SPEC,
+	carved: { width: 8, height: 7, minWeight: 9, maxWeight: 36 },
 }
 
 function _getWeight(rune: RuneData): number {
@@ -56,7 +60,12 @@ function _getWeight(rune: RuneData): number {
 	return w
 }
 
-function generate({ options = {}, rng, seed }: GenerateRuneParams): RuneData {
+function generate({
+	options = {},
+	rng,
+	seed,
+	carvingFamily,
+}: GenerateRuneParams): RuneData {
 	const seedStr = seed ?? Date.now().toString(36)
 	const rune: RuneData = {
 		bitmap: [],
@@ -88,13 +97,20 @@ function generate({ options = {}, rng, seed }: GenerateRuneParams): RuneData {
 		// size and weight budgets follow it
 		rune.template = _resolveTemplate({ options, rune })
 		const spec = TEMPLATE_SPECS[rune.template]
-		rune.width = spec.width
+		const carved = rune.template === "carved"
+		const family = carved
+			? ((enforceAesthetics ? carvingFamily : undefined) ??
+				rune.rng.choice(CARVING.families))
+			: undefined
+		rune.carvingFamily = family
+		rune.width = family ? CARVING.width({ family, rng: rune.rng }) : spec.width
 		rune.height = spec.height
 		rune.maxDots = Math.max(0, options.maxDots ?? 1)
+		rune.allowDiscontinuousStrokes = options.allowDiscontinuousStrokes ?? carved
 
 		// Named weight bands are defined against the classic 5x7 grid; scale by
 		// area so light/medium/heavy keep their meaning on bigger grids
-		const areaScale = (spec.width * spec.height) / (WIDTH * HEIGHT)
+		const areaScale = (rune.width * rune.height) / (WIDTH * HEIGHT)
 		let minWeight = spec.minWeight
 		let maxWeight = spec.maxWeight
 		if (options.weightBand === "light") {
@@ -132,18 +148,57 @@ function generate({ options = {}, rng, seed }: GenerateRuneParams): RuneData {
 			Array.from({ length: rune.width }, () => false),
 		)
 
-		_applyTemplate(rune)
+		if (family) {
+			CARVING.apply({ rune, family })
+		} else {
+			_applyTemplate(rune)
+		}
 		_applyMotif({ rune, motif })
+		const mirrorCarving =
+			carved &&
+			(options.symmetryBias === "symmetric" ||
+				(options.symmetryBias !== "asymmetric" &&
+					(family === "flanked" || family === "fork")))
+		if (mirrorCarving) {
+			for (const row of rune.bitmap) {
+				for (let left = 0; left < Math.floor(rune.width / 2); left++) {
+					const right = rune.width - left - 1
+					const ink = row[left] || row[right]
+					row[left] = ink
+					row[right] = ink
+				}
+			}
+		}
+		if (carved && rune.maxDots > 0) {
+			const spots = rune.bitmap.flatMap((row, y) =>
+				row.flatMap((filled, x) => (filled ? [] : [new Point2D(x, y)])),
+			)
+			_placeDots({ rune, spots, budget: rune.maxDots, mirrored: mirrorCarving })
+		}
 
 		const w = _getWeight(rune)
 		if (w < minWeight || w > maxWeight) {
 			continue
 		}
 
-		if (enforceSymmetry) {
-			if (options.symmetryBias === "symmetric" && !_isSymmetric(rune)) {
+		if (
+			carved ||
+			(enforceSymmetry &&
+				options.symmetryBias &&
+				options.symmetryBias !== "none")
+		) {
+			const symmetric = _isSymmetric(rune)
+			if (
+				enforceSymmetry &&
+				options.symmetryBias === "symmetric" &&
+				!symmetric
+			) {
 				continue
-			} else if (options.symmetryBias === "asymmetric" && _isSymmetric(rune)) {
+			} else if (
+				enforceSymmetry &&
+				options.symmetryBias === "asymmetric" &&
+				symmetric
+			) {
 				continue
 			}
 		}
@@ -152,7 +207,10 @@ function generate({ options = {}, rng, seed }: GenerateRuneParams): RuneData {
 			continue
 		}
 
-		if (enforceAesthetics && _countInkBlobs(rune) > 0) {
+		if (
+			(carved || enforceAesthetics) &&
+			_countInkBlobs({ rune, size: carved ? 3 : 2 }) > 0
+		) {
 			continue
 		}
 
@@ -163,18 +221,14 @@ function generate({ options = {}, rng, seed }: GenerateRuneParams): RuneData {
 }
 
 function diff({ a, b }: DiffRunesParams): number {
-	// Different grids can't be compared cell-wise; report maximal distance
-	if (a.width !== b.width || a.height !== b.height) {
-		return Math.max(a.width * a.height, b.width * b.height)
-	}
-
 	let r = 0
-
-	for (let i = 0; i < a.height; i++) {
+	const width = Math.max(a.width, b.width)
+	const height = Math.max(a.height, b.height)
+	for (let i = 0; i < height; i++) {
 		const row1 = a.bitmap[i]
 		const row2 = b.bitmap[i]
-		for (let j = 0; j < a.width; j++) {
-			if (row1[j] !== row2[j]) {
+		for (let j = 0; j < width; j++) {
+			if (Boolean(row1?.[j]) !== Boolean(row2?.[j])) {
 				r++
 			}
 		}
@@ -195,9 +249,10 @@ function _cloneTransformed(source: RuneData, bitmap: boolean[][]): RuneData {
 		dotx: -1,
 		doty: -1,
 		dots: [],
-		hSym: false,
-		vSym: false,
+		hSym: source.hSym,
+		vSym: source.vSym,
 		template: source.template,
+		carvingFamily: source.carvingFamily,
 		maxDots: source.maxDots,
 		allowDiscontinuousStrokes: source.allowDiscontinuousStrokes,
 		rng: RNG.createStringRng({ seed: source.seed }),

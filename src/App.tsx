@@ -27,6 +27,12 @@ const FlagGenerator = lazy(() =>
 	})),
 )
 
+const ScriptExperiment = lazy(() =>
+	import("@/ui/genesis/controls/ScriptExperiment").then((module) => ({
+		default: module.ScriptExperiment,
+	})),
+)
+
 function App() {
 	return (
 		<div className="relative h-screen w-screen overflow-hidden bg-white font-sans text-slate-900 selection:bg-slate-900 selection:text-white">
@@ -39,6 +45,14 @@ function App() {
 							fallback={<div role="status">Loading flag generator…</div>}
 						>
 							<FlagGenerator />
+						</Suspense>
+					}
+				/>
+				<Route
+					path={APP_PATHS.scriptExperiment}
+					element={
+						<Suspense fallback={<div role="status">Loading scripts…</div>}>
+							<ScriptExperiment />
 						</Suspense>
 					}
 				/>

@@ -1,6 +1,5 @@
 ﻿import * as THREE from "three"
-import type { HeritageScript } from "@/model/society/script"
-import { COMPRESS } from "@/model/society/script/compress"
+import { type HeritageScript, SCRIPT } from "@/model/society/script"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
@@ -308,11 +307,7 @@ export function buildGlobeNationScripts(
 		const script = scripts.get(heritageIdx)
 		if (!script) continue
 
-		const text = COMPRESS.compressName({
-			name,
-			ratio: script.compressionRatio,
-			seedSalt: `heritage:${heritageIdx}`,
-		})
+		const text = SCRIPT.compressLabel({ name, script })
 		if (!text) continue
 
 		const capitalProvince = nationCapitalProvince(world, nationIdx)
@@ -410,11 +405,7 @@ export function buildMapNationScripts(
 		const script = scripts.get(heritageIdx)
 		if (!script) continue
 
-		const text = COMPRESS.compressName({
-			name,
-			ratio: script.compressionRatio,
-			seedSalt: `heritage:${heritageIdx}`,
-		})
+		const text = SCRIPT.compressLabel({ name, script })
 		if (!text) continue
 
 		const capitalRegion = nationCapitalRegion(world, nationIdx)

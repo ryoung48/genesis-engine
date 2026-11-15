@@ -1,7 +1,6 @@
 import * as THREE from "three"
 import type { Text } from "troika-three-text"
-import type { HeritageScript } from "@/model/society/script"
-import { COMPRESS } from "@/model/society/script/compress"
+import { type HeritageScript, SCRIPT } from "@/model/society/script"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { LABEL_RENDER_ORDER } from "@/ui/genesis/renderer/nation-label-overlay/constants"
 import {
@@ -115,11 +114,7 @@ function update({
 			if (heritageIdx < 0) continue
 			const script = scripts.get(heritageIdx)
 			if (!script) continue
-			const text = COMPRESS.compressName({
-				name,
-				ratio: script.compressionRatio,
-				seedSalt: `heritage:${heritageIdx}`,
-			})
+			const text = SCRIPT.compressLabel({ name, script })
 			if (!text) continue
 			scriptMeshFor(label).userData.scriptPlaneHeight =
 				label.fontSize * SETTLEMENT_SCRIPT_HEIGHT_FACTOR
