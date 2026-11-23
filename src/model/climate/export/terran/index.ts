@@ -1,7 +1,7 @@
 import { KOPPEN } from "@/model/climate/classification/koppen"
 import type { TerranWorldInput } from "@/model/climate/export/terran/types"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
-import { ELEVATION } from "@/model/geography/terrain/elevation"
+import { HEIGHT_SCALE } from "@/model/geography/terrain/height-scale"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { UNITS } from "@/model/shared/units"
 
@@ -39,7 +39,7 @@ async function createFile(world: TerranWorldInput): Promise<Blob> {
 		const level = rivers.waterLevel[cell]
 		const levelKm = world.isEarthImport
 			? level || world.elevation_km[cell]
-			: ELEVATION.elevToHeightKm({ elev: level, maxElevKm, maxDepthKm })
+			: HEIGHT_SCALE.elevToHeightKm({ elev: level, maxElevKm, maxDepthKm })
 		lakeLevels[lake] += levelKm * 1000
 		lakeCounts[lake]++
 	}
@@ -61,7 +61,11 @@ async function createFile(world: TerranWorldInput): Promise<Blob> {
 				1000 *
 				(world.isEarthImport
 					? height
-					: ELEVATION.elevToHeightKm({ elev: height, maxElevKm, maxDepthKm }))
+					: HEIGHT_SCALE.elevToHeightKm({
+							elev: height,
+							maxElevKm,
+							maxDepthKm,
+						}))
 		}
 	}
 

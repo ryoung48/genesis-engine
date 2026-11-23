@@ -3,11 +3,9 @@ import type {
 	DistanceFields,
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
+import { ARC_HEIGHTS } from "@/model/geography/terrain/arc-heights"
 import type {
 	AssignDistanceFieldParams,
-	BackArcBasinParams,
-	BackArcBfsParams,
-	BackArcBfsResult,
 	BlendElevationParams,
 	BoundedBfsParams,
 	CoastAdjacencyParams,
@@ -20,7 +18,6 @@ import type {
 	FractureBfsParams,
 	FractureBfsResult,
 	InteriorPlateauUpliftParams,
-	IslandArcsParams,
 	LandCoastSeedsResult,
 	LandNoiseParams,
 	LandRegionElevationParams,
@@ -390,49 +387,6 @@ function _computeFractureBfs({
 	return { fractureDist, fractureHalfWidth }
 }
 
-/** BFS from convergent-boundary back-arc seeds, carrying stress along with distance. */
-function _computeBackArcBfs({
-	mesh,
-	r_boundaryType,
-	r_hasOcean,
-	r_subductFactor,
-	r_stress,
-	r_plate,
-	maxStress,
-	scaleFactor,
-}: BackArcBfsParams): BackArcBfsResult {
-	const { numRegions, adjOffset, adjList } = mesh
-	const baStart = Math.max(1, Math.round(2 * scaleFactor))
-	const baPeak = Math.max(2, Math.round(3 * scaleFactor))
-	const baEnd = Math.max(3, Math.round(5 * scaleFactor))
-	const backArcDist = new Float32Array(numRegions).fill(Infinity)
-	const backArcStress = new Float32Array(numRegions)
-	const backArcSeeds: number[] = []
-	for (let r = 0; r < numRegions; r++) {
-		if (r_boundaryType[r] === 1 && r_hasOcean[r] && r_subductFactor[r] < 0.5) {
-			backArcSeeds.push(r)
-			backArcDist[r] = 0
-			backArcStress[r] = Math.min(1, r_stress[r] / maxStress)
-		}
-	}
-	let qi = 0
-	while (qi < backArcSeeds.length) {
-		const r = backArcSeeds[qi++]
-		const nd = backArcDist[r] + 1
-		if (nd > baEnd) continue
-		const plate = r_plate[r]
-		for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
-			const nr = adjList[ni]
-			if (nd < backArcDist[nr] && r_plate[nr] === plate) {
-				backArcDist[nr] = nd
-				backArcStress[nr] = backArcStress[r]
-				backArcSeeds.push(nr)
-			}
-		}
-	}
-	return { backArcDist, backArcStress, baStart, baPeak, baEnd }
-}
-
 /** BFS from the land/ocean boundary, used for coastal roughening. */
 function _computeCoastBoundaryBfs({
 	mesh,
@@ -496,43 +450,6 @@ function _computeCoastBoundaryBfs({
 		coastConvergent,
 		maxCD,
 	}
-}
-
-/** Back-arc basin uplift/depression — shared by land and ocean region elevation. */
-function _applyBackArcBasin({ r, ctx }: BackArcBasinParams): void {
-	const {
-		distMountain,
-		backArcDist,
-		backArcStress,
-		baStart,
-		baPeak,
-		baEnd,
-		elev,
-		backArc,
-		markFeature,
-	} = ctx
-	const bad = backArcDist[r]
-	if (bad === Infinity || bad < baStart) return
-	const dMtn = distMountain[r]
-	const genesisyFactor =
-		dMtn !== Infinity && dMtn < bad ? Math.max(0, dMtn / bad) : 1.0
-	let baEffect = 0
-	if (bad <= baPeak) {
-		const t = (bad - baStart) / Math.max(1, baPeak - baStart)
-		const s = t * t * (3 - 2 * t)
-		baEffect = -0.1 * backArcStress[r] * s * genesisyFactor
-	} else if (bad <= baEnd) {
-		const t = (bad - baPeak) / Math.max(1, baEnd - baPeak)
-		const s = t * t * (3 - 2 * t)
-		baEffect = -0.1 * backArcStress[r] * (1 - s) * genesisyFactor
-	}
-	elev[r] += baEffect
-	backArc[r] = baEffect
-	markFeature(
-		r,
-		TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN,
-		baEffect,
-	)
 }
 
 /** Rift valley floor/shoulder profile for a land region straddling a continental rift. */
@@ -797,7 +714,6 @@ function _computeLandRegionElevation({
 
 	_applyRiftValley({ r, x, y, z, ctx })
 	_applyPullApartBasin({ r, x, y, z, ctx })
-	_applyBackArcBasin({ r, ctx })
 
 	// Tectonic activity (for noise scaling + fold ridges), including stress contribution
 	const {
@@ -924,9 +840,6 @@ function _computeOceanRegionElevation({
 		elev[r] += trenchEffect
 		markFeature(r, TERRAIN_FEATURES.genesisTerrainFeature.TRENCH, trenchEffect)
 	}
-
-	// Back-arc basin (ocean)
-	_applyBackArcBasin({ r, ctx })
 
 	// Ocean noise
 	elev[r] += fbm(wx, wy, wz) * noiseMag * 0.3
@@ -1066,88 +979,6 @@ function _applyCoastalRoughening({
 	}
 }
 
-/** BFS from oceanic convergent-boundary arc seeds, then uplifts ridged-noise island arcs. */
-function _computeIslandArcs({
-	mesh,
-	r_plate,
-	r_isOcean,
-	r_boundaryType,
-	r_bothOcean,
-	r_subductFactor,
-	r_stress,
-	maxStress,
-	scaleFactor,
-	volcanism,
-	seed,
-	elev,
-	markFeature,
-}: IslandArcsParams): void {
-	const { numRegions, r_xyz, adjOffset, adjList } = mesh
-	const MAX_OCEAN_ARC_ELEV = 0.6
-	const arcNoise = new SimplexNoise(seed + 307)
-	const maxArcDist = Math.max(5, Math.round(5 * scaleFactor))
-	const threshold = VOLCANISM.getVolcanicActivityThreshold(0.2, volcanism)
-	const arcDist = new Float32Array(numRegions).fill(maxArcDist + 1)
-	const arcStress = new Float32Array(numRegions)
-	const arcSeedsList: number[] = []
-
-	for (let r = 0; r < numRegions; r++) {
-		if (
-			r_boundaryType[r] === 1 &&
-			r_bothOcean[r] &&
-			r_subductFactor[r] < 0.45
-		) {
-			arcSeedsList.push(r)
-			arcDist[r] = 0
-			arcStress[r] = Math.min(1, r_stress[r] / maxStress)
-		}
-	}
-
-	let aq = 0
-	while (aq < arcSeedsList.length) {
-		const r = arcSeedsList[aq++]
-		const nd = arcDist[r] + 1
-		if (nd > maxArcDist) continue
-		const plate = r_plate[r]
-		for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
-			const nr = adjList[ni]
-			if (nd < arcDist[nr] && r_plate[nr] === plate && r_isOcean[nr]) {
-				arcDist[nr] = nd
-				arcStress[nr] = arcStress[r]
-				arcSeedsList.push(nr)
-			}
-		}
-	}
-
-	for (let r = 0; r < numRegions; r++) {
-		const d = arcDist[r]
-		if (d < 1 || d > maxArcDist) continue
-		const x = r_xyz[3 * r],
-			y = r_xyz[3 * r + 1],
-			z = r_xyz[3 * r + 2]
-		const peakDist = Math.max(1.5, 1.5 * scaleFactor)
-		const sigma = Math.max(1.5, 1.5 * scaleFactor)
-		const distWeight = Math.exp(-0.5 * ((d - peakDist) / sigma) ** 2)
-		const n = arcNoise.ridgedFbm(x * 4, y * 4, z * 4, 4, 2.0, 0.5, 1.0)
-		if (n > threshold) {
-			const excess = (n - threshold) / (1 - threshold)
-			let uplift = excess * excess * 0.8 * distWeight * (0.5 + arcStress[r])
-			if (r_isOcean[r]) {
-				const maxOceanUplift = Math.max(0, -elev[r] + MAX_OCEAN_ARC_ELEV)
-				uplift = Math.min(uplift, maxOceanUplift)
-			}
-			elev[r] += uplift
-			if (uplift > 0.001) {
-				markFeature(
-					r,
-					TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC,
-					uplift,
-				)
-			}
-		}
-	}
-}
-
 /** Runs all boundary-relative BFS passes (rift, pull-apart, ridge, fracture, back-arc, coast). */
 function _computeTectonicBfsFields({
 	mesh,
@@ -1184,8 +1015,8 @@ function _computeTectonicBfsFields({
 		startedAt: coastAndRiftStart,
 	})
 
-	// Mid-ocean ridge / fracture zone / back-arc / coast boundary BFS
-	const ridgeAndBackArcStart = performance.now()
+	// Mid-ocean ridge / fracture zone / coast boundary BFS
+	const ridgeAndFractureStart = performance.now()
 	const { ridgeDist, ridgeHalfWidth } = _computeRidgeBfs({
 		mesh,
 		r_boundaryType,
@@ -1200,17 +1031,6 @@ function _computeTectonicBfsFields({
 		r_isOcean,
 		scaleFactor,
 	})
-	const { backArcDist, backArcStress, baStart, baPeak, baEnd } =
-		_computeBackArcBfs({
-			mesh,
-			r_boundaryType,
-			r_hasOcean,
-			r_subductFactor,
-			r_stress,
-			r_plate,
-			maxStress,
-			scaleFactor,
-		})
 	const { r_coastDist, coastStressMax, coastSubductMax, coastConvergent } =
 		_computeCoastBoundaryBfs({
 			mesh,
@@ -1222,9 +1042,9 @@ function _computeTectonicBfsFields({
 			scaleFactor,
 		})
 	TIMING.record({
-		stage: "Ridge/fracture/back-arc BFS",
+		stage: "Ridge/fracture BFS",
 		timings: timing,
-		startedAt: ridgeAndBackArcStart,
+		startedAt: ridgeAndFractureStart,
 	})
 
 	return {
@@ -1236,11 +1056,6 @@ function _computeTectonicBfsFields({
 		ridgeHalfWidth,
 		fractureDist,
 		fractureHalfWidth,
-		backArcDist,
-		backArcStress,
-		baStart,
-		baPeak,
-		baEnd,
 		r_coastDist,
 		coastStressMax,
 		coastSubductMax,
@@ -1341,46 +1156,36 @@ function _runMainElevationLoop({
 	})
 }
 
-/** Island-arc uplift BFS (if volcanism enabled) followed by named volcanic arc features. */
+/** Island-arc and back-arc crust stamping followed by named volcanic arc features. */
 function _applyPostProcessingArcs({
 	mesh,
-	r_plate,
-	r_isOcean,
-	r_boundaryType,
-	r_bothOcean,
-	r_subductFactor,
-	r_stress,
 	boundary,
 	maxStress,
-	scaleFactor,
+	planetRadiusKm,
+	maxElevKm,
+	maxDepthKm,
+	arcCrust,
 	volcanism,
 	seed,
 	elev,
 	markFeature,
 	timing,
 }: PostProcessingArcsParams): void {
-	const islandArcsStart = performance.now()
-	if (volcanism > 0) {
-		_computeIslandArcs({
-			mesh,
-			r_plate,
-			r_isOcean,
-			r_boundaryType,
-			r_bothOcean,
-			r_subductFactor,
-			r_stress,
-			maxStress,
-			scaleFactor,
-			volcanism,
-			seed,
-			elev,
-			markFeature,
-		})
-	}
+	const arcCrustStart = performance.now()
+	ARC_HEIGHTS.stamp({
+		mesh,
+		planetRadiusKm,
+		seed,
+		crust: arcCrust,
+		elev,
+		maxElevKm,
+		maxDepthKm,
+		markFeature,
+	})
 	TIMING.record({
-		stage: "Island arcs",
+		stage: "Island and back-arc crust",
 		timings: timing,
-		startedAt: islandArcsStart,
+		startedAt: arcCrustStart,
 	})
 
 	const volcanicArcsStart = performance.now()
@@ -1410,6 +1215,10 @@ function blendElevation({
 	roughness,
 	volcanism,
 	seed,
+	planetRadiusKm,
+	maxElevKm,
+	maxDepthKm,
+	arcCrust,
 	timing,
 }: BlendElevationParams): {
 	elevation: Float32Array
@@ -1418,7 +1227,7 @@ function blendElevation({
 	const { numRegions, r_xyz } = mesh
 	const { distMountain, distOcean, distCoastline, distCoast, distCoastLand } =
 		distFields
-	const { r_stress, r_subductFactor, r_boundaryType, r_bothOcean } = boundary
+	const { r_stress, r_subductFactor, r_boundaryType } = boundary
 
 	const elev = new Float32Array(numRegions)
 	const featureMask = new Uint32Array(numRegions)
@@ -1461,7 +1270,6 @@ function blendElevation({
 	const r_isOcean = _computeOceanLandMask({ numRegions, r_plate, plateIsOcean })
 	const coastal = new Float32Array(numRegions)
 	const margins = new Float32Array(numRegions)
-	const backArc = new Float32Array(numRegions)
 	const foldRidge = new Float32Array(numRegions)
 	const genesisicPowerField = new Float32Array(numRegions)
 
@@ -1499,11 +1307,6 @@ function blendElevation({
 		ridgeHalfWidth,
 		fractureDist,
 		fractureHalfWidth,
-		backArcDist,
-		backArcStress,
-		baStart,
-		baPeak,
-		baEnd,
 		r_coastDist,
 		coastStressMax,
 		coastSubductMax,
@@ -1521,11 +1324,6 @@ function blendElevation({
 		riftHalfWidth,
 		pullApartDist,
 		pullApartHalfWidth,
-		backArcDist,
-		backArcStress,
-		baStart,
-		baPeak,
-		baEnd,
 		ridgeDist,
 		ridgeHalfWidth,
 		fractureDist,
@@ -1543,7 +1341,6 @@ function blendElevation({
 		noise,
 		elev,
 		markFeature,
-		backArc,
 		foldRidge,
 		margins,
 	}
@@ -1595,15 +1392,12 @@ function blendElevation({
 
 	_applyPostProcessingArcs({
 		mesh,
-		r_plate,
-		r_isOcean,
-		r_boundaryType,
-		r_bothOcean,
-		r_subductFactor,
-		r_stress,
 		boundary,
 		maxStress,
-		scaleFactor,
+		planetRadiusKm,
+		maxElevKm,
+		maxDepthKm,
+		arcCrust,
 		volcanism,
 		seed,
 		elev,
@@ -1613,7 +1407,6 @@ function blendElevation({
 
 	void coastal
 	void margins
-	void backArc
 	void foldRidge
 	void genesisicPowerField
 
@@ -1627,20 +1420,7 @@ function blendElevation({
 	}
 }
 
-function elevToHeightKm(args: {
-	elev: number
-	maxElevKm?: number
-	maxDepthKm?: number
-}): number {
-	const { elev, maxElevKm = 6, maxDepthKm = 10 } = args
-	if (elev <= 0) return elev * maxDepthKm
-	const t = Math.min(elev, 1)
-	const t2 = t * t
-	return maxElevKm * t2 * t2 * (5 - 4 * t)
-}
-
 export const ELEVATION = {
 	computeDistanceFields,
 	blendElevation,
-	elevToHeightKm,
 }

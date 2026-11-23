@@ -1,8 +1,5 @@
-import { ELEVATION } from "@/model/geography/terrain/elevation"
-import type {
-	ComputeSeaLevelOffsetKmParams,
-	HeightKmToElevParams,
-} from "@/model/geography/terrain/sea-level/types"
+import { HEIGHT_SCALE } from "@/model/geography/terrain/height-scale"
+import type { ComputeSeaLevelOffsetKmParams } from "@/model/geography/terrain/sea-level/types"
 
 function computeSeaLevelOffsetKm({
 	seaLevel,
@@ -11,30 +8,6 @@ function computeSeaLevelOffsetKm({
 	if (seaLevel === 1) return 0
 	if (seaLevel < 1) return -(1 - seaLevel) * maxDepthKm
 	return (seaLevel - 1) * maxDepthKm
-}
-
-function heightKmToElev({
-	heightKm,
-	maxElevKm = 6,
-	maxDepthKm = 10,
-}: HeightKmToElevParams): number {
-	if (heightKm <= 0) return heightKm / maxDepthKm
-	if (maxElevKm <= 0) return 0
-	if (heightKm >= maxElevKm) return 1
-
-	let lo = 0
-	let hi = 1
-	for (let i = 0; i < 24; i++) {
-		const mid = (lo + hi) * 0.5
-		const midHeight = ELEVATION.elevToHeightKm({
-			elev: mid,
-			maxElevKm,
-			maxDepthKm,
-		})
-		if (midHeight < heightKm) lo = mid
-		else hi = mid
-	}
-	return (lo + hi) * 0.5
 }
 
 function applySeaLevelToElevation(params: {
@@ -52,7 +25,7 @@ function applySeaLevelToElevation(params: {
 	if (seaLevelOffsetKm === 0) {
 		const elevation_km = new Float32Array(baseElevation.length)
 		for (let r = 0; r < baseElevation.length; r++) {
-			elevation_km[r] = ELEVATION.elevToHeightKm({
+			elevation_km[r] = HEIGHT_SCALE.elevToHeightKm({
 				elev: baseElevation[r],
 				maxElevKm,
 				maxDepthKm,
@@ -69,13 +42,13 @@ function applySeaLevelToElevation(params: {
 	const elevation_km = new Float32Array(baseElevation.length)
 	for (let r = 0; r < baseElevation.length; r++) {
 		const adjustedHeightKm =
-			ELEVATION.elevToHeightKm({
+			HEIGHT_SCALE.elevToHeightKm({
 				elev: baseElevation[r],
 				maxElevKm,
 				maxDepthKm,
 			}) - seaLevelOffsetKm
 		elevation_km[r] = adjustedHeightKm
-		elevation[r] = heightKmToElev({
+		elevation[r] = HEIGHT_SCALE.heightKmToElev({
 			heightKm: adjustedHeightKm,
 			maxElevKm,
 			maxDepthKm,

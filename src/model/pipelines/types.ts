@@ -25,6 +25,7 @@ import type {
 	GenesisTerrainFeatures,
 	TectonicPlate,
 } from "@/model/geography/tectonics/types"
+import type { ArcCrustRun } from "@/model/geography/terrain/arc-crust/types"
 import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
@@ -130,6 +131,8 @@ export interface GenesisWorld {
 	distFields: DistanceFields
 	elevation: Float32Array
 	terrainFeatures?: GenesisTerrainFeatures
+	/** [JUSTIFICATION] Present only for procedural worlds; an Earth import has no plates to cut arcs from. */
+	arcRun?: ArcCrustRun
 	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
 	elevation_km: Float32Array
 	params: GenesisParams

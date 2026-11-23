@@ -11,3 +11,5 @@ One generation owns one geometry worker. Starting another generation, leaving th
 Globe normals accumulate by mesh vertex identity rather than rounded-coordinate strings. Map projection caches each mesh point, counts seam duplicates, and allocates exact output buffers before writing faces. [Contours](terrain-contours.md) remain separately generated on demand.
 
 Regression checks live in `src/test/geometry-preparation.smoke.test.ts`, `src/test/contour-worker.smoke.test.ts`, and `src/test/contour-surface.smoke.test.ts`.
+
+Island arcs and the seas behind them are cut and heightened by their own stage before volcanic arcs; see [island arcs](../terrestrial/island-arcs.md).

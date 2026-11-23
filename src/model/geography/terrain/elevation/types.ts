@@ -3,13 +3,14 @@ import type {
 	DistanceFields,
 	PlateVec,
 } from "@/model/geography/tectonics/types"
+import type { ArcCrust } from "@/model/geography/terrain/arc-crust/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { SimplexNoise } from "@/model/shared/math/simplex-noise"
 
 import type { StageTiming } from "@/model/shared/timing/types"
 
 type FbmFn = (x: number, y: number, z: number, octaves?: number) => number
-type MarkFeatureFn = (r: number, feature: number, delta: number) => void
+export type MarkFeatureFn = (r: number, feature: number, delta: number) => void
 
 export interface BoundedBfsParams {
 	dist: Float32Array
@@ -45,6 +46,10 @@ export interface BlendElevationParams {
 	roughness: number
 	volcanism: number
 	seed: number
+	planetRadiusKm: number
+	maxElevKm: number
+	maxDepthKm: number
+	arcCrust: ArcCrust
 	timing?: StageTiming[]
 }
 
@@ -126,25 +131,6 @@ export interface FractureBfsResult {
 	fractureHalfWidth: number
 }
 
-export interface BackArcBfsParams {
-	mesh: SphereMesh
-	r_boundaryType: Int8Array
-	r_hasOcean: Uint8Array
-	r_subductFactor: Float32Array
-	r_stress: Float32Array
-	r_plate: Int32Array
-	maxStress: number
-	scaleFactor: number
-}
-
-export interface BackArcBfsResult {
-	backArcDist: Float32Array
-	backArcStress: Float32Array
-	baStart: number
-	baPeak: number
-	baEnd: number
-}
-
 export interface CoastBoundaryBfsParams {
 	mesh: SphereMesh
 	r_isOcean: Uint8Array
@@ -175,11 +161,6 @@ export interface ElevationRegionContext {
 	riftHalfWidth: number
 	pullApartDist: Float32Array
 	pullApartHalfWidth: number
-	backArcDist: Float32Array
-	backArcStress: Float32Array
-	baStart: number
-	baPeak: number
-	baEnd: number
 	ridgeDist: Float32Array
 	ridgeHalfWidth: number
 	fractureDist: Float32Array
@@ -197,7 +178,6 @@ export interface ElevationRegionContext {
 	noise: SimplexNoise
 	elev: Float32Array
 	markFeature: MarkFeatureFn
-	backArc: Float32Array
 	foldRidge: Float32Array
 	margins: Float32Array
 }
@@ -248,28 +228,7 @@ export interface CoastalRougheningParams {
 	markFeature: MarkFeatureFn
 }
 
-export interface IslandArcsParams {
-	mesh: SphereMesh
-	r_plate: Int32Array
-	r_isOcean: Uint8Array
-	r_boundaryType: Int8Array
-	r_bothOcean: Uint8Array
-	r_subductFactor: Float32Array
-	r_stress: Float32Array
-	maxStress: number
-	scaleFactor: number
-	volcanism: number
-	seed: number
-	elev: Float32Array
-	markFeature: MarkFeatureFn
-}
-
 /** Shared back-arc basin uplift/depression step, used by both land and ocean regions. */
-export interface BackArcBasinParams {
-	r: number
-	ctx: ElevationRegionContext
-}
-
 /** A single-region feature step keyed on a region's unit-sphere position. */
 export interface RegionPointParams {
 	r: number
@@ -355,11 +314,6 @@ export interface TectonicBfsFieldsResult {
 	ridgeHalfWidth: number
 	fractureDist: Float32Array
 	fractureHalfWidth: number
-	backArcDist: Float32Array
-	backArcStress: Float32Array
-	baStart: number
-	baPeak: number
-	baEnd: number
 	r_coastDist: Float32Array
 	coastStressMax: Float32Array
 	coastSubductMax: Float32Array
@@ -388,15 +342,12 @@ export interface MainElevationLoopParams {
 
 export interface PostProcessingArcsParams {
 	mesh: SphereMesh
-	r_plate: Int32Array
-	r_isOcean: Uint8Array
-	r_boundaryType: Int8Array
-	r_bothOcean: Uint8Array
-	r_subductFactor: Float32Array
-	r_stress: Float32Array
 	boundary: BoundaryInfo
 	maxStress: number
-	scaleFactor: number
+	planetRadiusKm: number
+	maxElevKm: number
+	maxDepthKm: number
+	arcCrust: ArcCrust
 	volcanism: number
 	seed: number
 	elev: Float32Array

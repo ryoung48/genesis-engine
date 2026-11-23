@@ -1,6 +1,7 @@
 import { COARSE_PLATES } from "@/model/geography/tectonics/coarse-plates"
 import { COLLISION } from "@/model/geography/tectonics/collision"
 import { MANTLE } from "@/model/geography/tectonics/mantle"
+import { PLATE_MOTION } from "@/model/geography/tectonics/plate-motion"
 import { PLATES } from "@/model/geography/tectonics/plates"
 import { SUPER_PLATES } from "@/model/geography/tectonics/super-plates"
 import type {
@@ -8,6 +9,7 @@ import type {
 	DistanceFields,
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
+import { ARC_CRUST } from "@/model/geography/terrain/arc-crust"
 import { CRATERS } from "@/model/geography/terrain/craters"
 import { ELEVATION } from "@/model/geography/terrain/elevation"
 import { EROSION } from "@/model/geography/terrain/erosion"
@@ -175,6 +177,25 @@ function runActivePath({
 	})
 	onProgress?.("distance-fields", 16)
 
+	// 8b. Island-arc and back-arc crust
+	const arcRun = TIMING.measure({
+		stage: "arc-crust",
+		timings: pipelineTiming,
+		fn: () =>
+			ARC_CRUST.run({
+				mesh,
+				planetRadiusKm: params.planetRadiusKm,
+				seed: params.seed,
+				plates: PLATE_MOTION.buildMovingPlates({
+					r_plate,
+					plateVec: coarse.coarsePlateVec,
+					plateIsOcean: coarse.coarsePlateIsOcean,
+					plateDensity,
+					superPlateData,
+				}),
+			}),
+	})
+
 	// 9. Elevation assignment
 	const blendResult = TIMING.measure({
 		stage: "elevation",
@@ -190,6 +211,10 @@ function runActivePath({
 				roughness: params.roughness,
 				volcanism,
 				seed: params.seed,
+				planetRadiusKm: params.planetRadiusKm,
+				maxElevKm: (params.maxElevation ?? 6000) / 1000,
+				maxDepthKm: UNITS.getMaxOceanDepthKm(params.planetRadiusKm),
+				arcCrust: arcRun.crust,
 				timing: elevationTiming,
 			}),
 	})
@@ -239,6 +264,7 @@ function runActivePath({
 		distFields,
 		r_hotspot,
 		r_mantleUpwelling,
+		arcRun,
 	}
 }
 
@@ -346,14 +372,7 @@ function generateGenesisWorld({
 		plateAssignment[r] = idx !== -1 ? idx : 0
 	}
 	// 5–11. Active plate tectonics pipeline
-	;({
-		elevation,
-		terrainFeatures,
-		boundary,
-		distFields,
-		r_hotspot,
-		r_mantleUpwelling,
-	} = runActivePath({
+	const activePath = runActivePath({
 		mesh,
 		r_plate,
 		plates,
@@ -365,7 +384,16 @@ function generateGenesisWorld({
 		pipelineTiming,
 		elevationTiming,
 		onProgress,
-	}))
+	})
+	;({
+		elevation,
+		terrainFeatures,
+		boundary,
+		distFields,
+		r_hotspot,
+		r_mantleUpwelling,
+	} = activePath)
+	const { arcRun } = activePath
 
 	// 12. Terrain post-processing (genesis order)
 	TIMING.measure({
@@ -856,6 +884,7 @@ function generateGenesisWorld({
 		distFields,
 		elevation,
 		terrainFeatures,
+		arcRun,
 		elevation_km,
 		params,
 		climate: post.climate,

@@ -5,6 +5,7 @@ import type {
 	GenesisTerrainFeatures,
 	TectonicPlate,
 } from "@/model/geography/tectonics/types"
+import type { ArcCrustRun } from "@/model/geography/terrain/arc-crust/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams, TerrainSnapshot } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
@@ -16,6 +17,7 @@ export interface TectonicPathResult {
 	distFields: DistanceFields
 	r_hotspot: Float32Array
 	r_mantleUpwelling: Float32Array
+	arcRun: ArcCrustRun
 }
 
 export type ProgressFn = (label: string, pct?: number) => void
