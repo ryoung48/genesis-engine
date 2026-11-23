@@ -1,6 +1,7 @@
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import type { RawOrganizationReference } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { NAMES } from "@/model/society/language/names"
 import type { HistoryTimelineInput } from "@/ui/genesis/generation/types"
 import { useEarthHistoryTimeline } from "@/ui/genesis/generation/useEarthHistoryTimeline"
@@ -33,12 +34,22 @@ export function useHistoryTimeline(input: HistoryTimelineInput) {
 			}),
 		)
 	}, [input.world])
+	const planetStart = input.world?.population?.startYear
+	const calendarShiftMs =
+		planetStart !== undefined &&
+		input.world?.params.historyPipeline !== "distribution"
+			? (planetStart - STATE_CLOCK.defaultStartYear) * STATE_CLOCK.yearMs
+			: 0
+	const formatLabel = useCallback(
+		(timeMs: number) => DATE.formatHistoryTimeMs(timeMs + calendarShiftMs),
+		[calendarShiftMs],
+	)
 	if (input.world?.isEarthImport) return earth
 	return {
 		...procedural,
 		loading: false,
 		provinceMeta: procedural.state?.provinceMeta ?? null,
 		organizationReference: proceduralOrganizations,
-		formatLabel: DATE.formatHistoryTimeMs,
+		formatLabel,
 	}
 }

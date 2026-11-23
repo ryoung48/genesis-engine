@@ -2,6 +2,7 @@ import { GRAPH_PARTITION } from "@/model/history/sim/graph-partition"
 import type {
 	BestClaimParams,
 	BuildOpenComponentsParams,
+	CapitalEligibleParams,
 	ClaimProvinceDynamicParams,
 	ContinentPlacementBonusParams,
 	MarkBlockedParams,
@@ -17,6 +18,7 @@ import { RNG } from "@/model/shared/random/rng"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
 const SHARED_BORDER_WEIGHT = 0.05
+const CAPITAL_AGRARIAN_SHARE = 0.5
 const COMPACT_SHARED_BORDER_WEIGHT = 1
 const NOISE_FREQ = 4.0
 
@@ -178,6 +180,14 @@ function claimProvinceDynamic({
 	}
 }
 
+// A capital needs most of its people farming or herding.
+function capitalEligible({
+	agrarian,
+	province,
+}: CapitalEligibleParams): boolean {
+	return !agrarian || agrarian[province] >= CAPITAL_AGRARIAN_SHARE
+}
+
 function selectSeed({
 	seed,
 	target,
@@ -192,11 +202,13 @@ function selectSeed({
 	componentSizes,
 	adjOffset,
 	adjList,
+	agrarian,
 }: SelectSeedParams): number {
 	const candidates: SeedPlacementCandidate[] = []
 	const fallback: SeedPlacementCandidate[] = []
 	for (let p = 0; p < assignment.length; p++) {
 		if (!active[p] || assignment[p] >= 0) continue
+		if (!capitalEligible({ agrarian, province: p })) continue
 		const cid = componentId[p]
 		const componentSize = cid >= 0 ? componentSizes[cid] : 0
 		if (componentSize <= 0) continue
@@ -222,7 +234,8 @@ function selectSeed({
 					target,
 					migrationWave,
 				}) *
-				blockedPenalty +
+				blockedPenalty *
+				(agrarian ? agrarian[p] : 1) +
 			expansion +
 			sizeFactor
 		const candidate = { v: p, w: score }
@@ -315,6 +328,7 @@ function markBlocked({
 }
 
 export const PLACEMENT_FRONTIER = {
+	capitalEligible,
 	buildOpenComponents,
 	selectSeed,
 	bestClaim,

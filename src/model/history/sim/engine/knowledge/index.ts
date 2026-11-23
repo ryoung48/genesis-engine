@@ -1,23 +1,21 @@
 import type {
 	AdvanceKnowledgeParams,
-	FillLiveParams,
 	InitKnowledgeParams,
 	KnowledgeLevelParams,
 	LogisticsScaleParams,
 	MaxCitySizeParams,
-	OwnAdvanceParams,
 	PopulationMeanParams,
 	RealmKnowledgeParams,
 	SovereignsParams,
 	StartBaselineParams,
-	StepParams,
-	UrbanKnowledgeParams,
 } from "@/model/history/sim/engine/knowledge/types"
 import { STATE } from "@/model/history/sim/engine/state"
 import { MATH } from "@/model/shared/math/core"
 import { ERAS } from "@/model/society/eras"
+import { KNOWLEDGE_DIFFUSION } from "@/model/society/knowledge-diffusion"
+import type { KnowledgeGraph } from "@/model/society/knowledge-diffusion/types"
 import type { SocietyEra } from "@/model/society/types"
-import type { UrbanKnowledge } from "@/model/society/urbanization/types"
+import { URBANIZATION } from "@/model/society/urbanization"
 
 const ERA_BASELINE: Record<SocietyEra, number> = {
 	paleolithic: -3,
@@ -33,28 +31,6 @@ const ERA_BASELINE: Record<SocietyEra, number> = {
 const YEAR_BASELINE = {
 	domain: [867, 1300, 1500, 1800],
 	range: [0.42, 1, 1.44, 2.38],
-}
-
-const REALM_REFERENCE_POPULATION = 10_000_000
-
-const REALM_EXPONENT = 0.3
-
-const MAX_REALM_FACTOR = 2.5
-
-const SPIN_UP_STEP_YEARS = 10
-
-const DOMESTIC_DIFFUSION = 0.04
-
-const FOREIGN_DIFFUSION = 0.015
-
-const SELF_ADVANCE_CURVE = {
-	domain: [0, 0.5, 1],
-	range: [0.0018, 0.0036, 0.006],
-}
-
-const MAX_LEAD_CURVE = {
-	domain: [0.5, 1, 1.5, 2, 2.5],
-	range: [0.45, 0.55, 1.0, 1.6, 2.0],
 }
 
 const GROWTH_CURVE = {
@@ -114,10 +90,6 @@ function populationMean({
 	return pop > 0 ? mass / pop : 0
 }
 
-function allProvinces({ state }: InitKnowledgeParams): number[] {
-	return Array.from({ length: state.P }, (_, p) => p)
-}
-
 function heldProvinces({ state }: InitKnowledgeParams): number[] {
 	const held: number[] = []
 	for (let p = 0; p < state.P; p++) if (!state.stateless[p]) held.push(p)
@@ -135,126 +107,38 @@ function sovereigns({ state }: SovereignsParams): Int32Array {
 	return sovereign
 }
 
-function fillLive({ state, value }: FillLiveParams): void {
-	for (let p = 0; p < state.P; p++)
-		if (!state.desolate[p]) state.knowledgeCurrent[p] = value
+function knowledgeGraph({ state }: InitKnowledgeParams): KnowledgeGraph {
+	return {
+		count: state.P,
+		desolate: state.desolate,
+		adjOffset: state.provinceAdjOffset,
+		adjList: state.provinceAdjList,
+		sovereign: sovereigns({ state }),
+		development: state.developmentCurrent,
+	}
+}
+
+function heldMask({ state }: InitKnowledgeParams): Uint8Array {
+	return Uint8Array.from(state.stateless, (stateless, p) =>
+		stateless || state.desolate[p] ? 0 : 1,
+	)
 }
 
 function initKnowledge({ state }: InitKnowledgeParams): void {
-	const baseline = state.knowledgeBaseline
 	const origin = ERA_BASELINE[state.era] - 1
-	const provinces = allProvinces({ state })
-	const held = heldProvinces({ state })
-	state.knowledgeSpinUp = { origin, years: 0 }
-	fillLive({ state, value: origin })
-	let mean = populationMean({
-		state,
-		provinces,
+	for (let p = 0; p < state.P; p++)
+		if (!state.desolate[p]) state.knowledgeCurrent[p] = origin
+	const years = KNOWLEDGE_DIFFUSION.spinUp({
+		graph: knowledgeGraph({ state }),
 		values: state.knowledgeCurrent,
+		population: Float64Array.from(
+			state.popRuralCurrent,
+			(rural, p) => rural + state.popUrbanCurrent[p],
+		),
+		held: heldMask({ state }),
+		baseline: state.knowledgeBaseline,
 	})
-	if (baseline <= origin || mean >= baseline) {
-		fillLive({ state, value: baseline })
-		return
-	}
-	const sovereign = sovereigns({ state })
-	let current: Float32Array = state.knowledgeCurrent
-	let next: Float32Array = state.knowledgeCurrent.slice()
-	let years = 0
-	for (;;) {
-		step({
-			state,
-			current,
-			next,
-			sovereign,
-			yearFraction: SPIN_UP_STEP_YEARS,
-			heldKnowledge: populationMean({
-				state,
-				provinces: held,
-				values: current,
-			}),
-		})
-		const after = populationMean({ state, provinces, values: next })
-		if (after <= mean) {
-			fillLive({ state, value: baseline })
-			state.knowledgeSpinUp = { origin, years: 0 }
-			return
-		}
-		if (after >= baseline) {
-			const fraction = (baseline - mean) / (after - mean)
-			for (let p = 0; p < state.P; p++)
-				if (!state.desolate[p]) current[p] += (next[p] - current[p]) * fraction
-			years += SPIN_UP_STEP_YEARS * fraction
-			break
-		}
-		years += SPIN_UP_STEP_YEARS
-		mean = after
-		const done = current
-		current = next
-		next = done
-	}
-	if (current !== state.knowledgeCurrent) state.knowledgeCurrent.set(current)
 	state.knowledgeSpinUp = { origin, years }
-}
-
-function selfAdvanceRate({ knowledge }: KnowledgeLevelParams): number {
-	return MATH.piecewise({
-		domain: SELF_ADVANCE_CURVE.domain,
-		range: SELF_ADVANCE_CURVE.range,
-		x: knowledge,
-	})
-}
-
-function maxLead({ knowledge }: KnowledgeLevelParams): number {
-	return MATH.piecewise({
-		domain: MAX_LEAD_CURVE.domain,
-		range: MAX_LEAD_CURVE.range,
-		x: knowledge,
-	})
-}
-
-function ownAdvance({
-	knowledge,
-	heldKnowledge,
-	development,
-}: OwnAdvanceParams): number {
-	const drag = Math.max(
-		0,
-		1 - (knowledge - heldKnowledge) / maxLead({ knowledge: heldKnowledge }),
-	)
-	return selfAdvanceRate({ knowledge }) * development * Math.min(1, drag)
-}
-function step({
-	state,
-	current,
-	next,
-	sovereign,
-	yearFraction,
-	heldKnowledge,
-}: StepParams): void {
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-		const knowledge = current[p]
-		const own = ownAdvance({
-			knowledge,
-			heldKnowledge,
-			development: state.developmentCurrent[p],
-		})
-		let pull = 0
-		for (
-			let i = state.provinceAdjOffset[p];
-			i < state.provinceAdjOffset[p + 1];
-			i++
-		) {
-			const nb = state.provinceAdjList[i]
-			if (state.desolate[nb]) continue
-			const gap = current[nb] - knowledge
-			if (gap <= 0) continue
-			const rate =
-				sovereign[nb] === sovereign[p] ? DOMESTIC_DIFFUSION : FOREIGN_DIFFUSION
-			pull = Math.max(pull, gap * rate)
-		}
-		next[p] = knowledge + (own + pull) * yearFraction
-	}
 }
 
 function advanceKnowledge({
@@ -262,11 +146,10 @@ function advanceKnowledge({
 	yearFraction,
 }: AdvanceKnowledgeParams): void {
 	const next = state.knowledgeCurrent.slice()
-	step({
-		state,
+	KNOWLEDGE_DIFFUSION.step({
+		graph: knowledgeGraph({ state }),
 		current: state.knowledgeCurrent,
 		next,
-		sovereign: sovereigns({ state }),
 		yearFraction,
 		heldKnowledge: realmKnowledge({
 			state,
@@ -309,11 +192,7 @@ function maxCitySize({
 		range: CITY_SIZE_CURVE.range,
 		x: knowledge,
 	})
-	const realmFactor = Math.min(
-		MAX_REALM_FACTOR,
-		(realmPopulation / REALM_REFERENCE_POPULATION) ** REALM_EXPONENT,
-	)
-	return base * realmFactor
+	return base * URBANIZATION.realmCityFactor(realmPopulation)
 }
 
 function productivity({ knowledge }: KnowledgeLevelParams): number {
@@ -355,19 +234,6 @@ function startBaseline({ era, startYear }: StartBaselineParams): number {
 		: yearBaseline(startYear ?? STATE.defaultStartYear)
 }
 
-function urbanKnowledge({
-	era,
-	baseline,
-}: UrbanKnowledgeParams): UrbanKnowledge {
-	return {
-		urbanFactor:
-			urbanFactor({ knowledge: baseline }) /
-			urbanFactor({ knowledge: eraBaseline(era) }),
-		maxCitySize: (realmPopulation) =>
-			maxCitySize({ knowledge: baseline, realmPopulation }),
-	}
-}
-
 function yearBaseline(year: number): number {
 	return MATH.piecewise({
 		domain: YEAR_BASELINE.domain,
@@ -377,7 +243,6 @@ function yearBaseline(year: number): number {
 }
 
 export const KNOWLEDGE = {
-	ownAdvance,
 	initKnowledge,
 	advanceKnowledge,
 	growthRate,
@@ -392,5 +257,4 @@ export const KNOWLEDGE = {
 	eraBaseline,
 	yearBaseline,
 	startBaseline,
-	urbanKnowledge,
 }

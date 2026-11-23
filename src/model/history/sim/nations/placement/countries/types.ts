@@ -13,6 +13,8 @@ export interface PlaceCountriesParams {
 	maxSpreadRad: number
 	targets: number[]
 	policy: PlacementPolicy
+	// [JUSTIFICATION] null where any province may hold a capital, unweighted (fast history).
+	agrarian: Float32Array | null
 }
 
 export interface PlacedCountries {

@@ -7,6 +7,8 @@ import type {
 	Eu4ProvinceFillGeometry,
 } from "@/model/history/earth/data-source/types"
 import type { SerializedRouteKind } from "@/model/society/infrastructure/transport/types"
+import type { MigrationRoutes } from "@/model/society/migration/types"
+import type { SocietyEra } from "@/model/society/types"
 import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
@@ -44,6 +46,59 @@ export interface BuildMapWindArrowsInput {
 	data: WindArrowData
 	viewMode: GenesisViewMode
 	projectionLatitudeDeg: number
+}
+
+export interface BuildMigrationRoutesInput {
+	routes: MigrationRoutes
+	seeds: Int32Array
+	r_xyz: Float32Array
+	elevation: Float32Array | null
+	canvasSize: [number, number]
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	viewMode: GenesisViewMode
+}
+
+export interface TrunkCurveInput {
+	controls: THREE.Vector3[]
+	halfWidths: number[]
+	shades: number[]
+	spherical: boolean
+}
+
+export interface TrunkCurve {
+	points: THREE.Vector3[]
+	halfWidths: number[]
+	shades: number[]
+}
+
+export interface ArrowBuffers {
+	positions: number[]
+	colors: number[]
+	indices: number[]
+}
+
+export interface TrunkArrowInput {
+	curve: TrunkCurve
+	spherical: boolean
+	scale: number
+	buffers: ArrowBuffers
+}
+
+export interface ArrowMeshInput {
+	buffers: ArrowBuffers
+	depthTest: boolean
+}
+
+export interface TrunkAnchor {
+	globe: THREE.Vector3
+	map: THREE.Vector3
+	halfWidth: number
+}
+
+export interface MigrationRoutesOverlay {
+	globe: THREE.Group
+	map: THREE.Group
 }
 
 export interface FocusOnProvinceOptions {
@@ -217,7 +272,7 @@ export interface GenesisScene {
 	setViewMode(mode: GenesisViewMode): void
 	setWireframeVisible(visible: boolean): void
 	setGridVisible(visible: boolean): void
-	setGridSpacing(spacingDeg: number): void
+	setCoordinateTicksVisible(visible: boolean): void
 	setMapCenterLongitude(longitudeDeg: number): void
 	setMapProjectionLatitude(latitudeDeg: number): void
 	commitMapCenterLongitude(): void
@@ -269,6 +324,7 @@ export interface GenesisScene {
 	setEu4SettlementsVisible(visible: boolean): void
 	setInfrastructure(edges: SerializedNetwork | null): void
 	setInfrastructureVisible(visible: boolean): void
+	setMigrationRoutes(routes: MigrationRoutes | null): void
 	setLabelMode(mode: LabelMode): void
 	setNationNames(names: string[] | null): void
 	setDynastyNames(names: string[] | null): void
@@ -512,7 +568,7 @@ export interface BuildGlobeSettlementsParams {
 }
 export interface SettlementExistsParams {
 	pop: number
-	era: SerializedGenesisWorld["params"]["era"] | undefined
+	era: SocietyEra | undefined
 	province: number
 	routeEndpoints: ReadonlySet<number>
 }

@@ -1,5 +1,6 @@
 import React from "react"
 import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
+import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
 import { CopyButton } from "@/ui/components/composites/CopyButton"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
@@ -11,6 +12,7 @@ import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { TransferUpIcon } from "@/ui/components/primitives/icons/TransferUpIcon"
 import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
+import { GRID_SPACING_DEG } from "@/ui/genesis/shared/constants"
 import {
 	getAvailableVariants,
 	getBaseMapMode,
@@ -21,7 +23,6 @@ import { ClockSection } from "./ClockSection"
 import { DangerSection } from "./DangerSection"
 import { ElevationModeSection } from "./ElevationModeSection"
 import { GeographySection } from "./GeographySection"
-import { GridSection } from "./GridSection"
 import { MeasureSection } from "./MeasureSection"
 import { NationsModeSection } from "./NationsModeSection"
 import { PopulationModeSection } from "./PopulationModeSection"
@@ -79,6 +80,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowOceanCurrents,
 	showGrid,
 	setShowGrid,
+	showCoordinateTicks,
+	setShowCoordinateTicks,
 	showNationBorders,
 	showDistrictBorders,
 	setShowNationBorders,
@@ -89,6 +92,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setNationMode,
 	populationMode,
 	setPopulationMode,
+	availablePopulationModes,
 	religionMode,
 	setReligionMode,
 	labelMode,
@@ -97,8 +101,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowElevation,
 	showInfrastructure,
 	setShowInfrastructure,
-	gridSpacing,
-	setGridSpacing,
+	showMigrationRoutes,
+	setShowMigrationRoutes,
 	viewMode,
 	setViewMode,
 	unitSystem,
@@ -160,14 +164,13 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setExportExpanded: controlledSetExportExpanded,
 	isEarthImport = false,
 }) => {
-	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
+	const [mapExpanded, setMapExpanded] = React.useState(false)
 	const [societyExpanded, setSocietyExpanded] = React.useState(false)
 	const [geographyExpanded, setGeographyExpanded] = React.useState(false)
 	const [clockExpanded, setClockExpanded] = React.useState(false)
 	const [vegetationExpanded, setVegetationExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
 	const [dangerExpanded, setDangerExpanded] = React.useState(false)
-	const [measureExpanded, setMeasureExpanded] = React.useState(false)
 	const [elevationExpanded, setElevationExpanded] = React.useState(false)
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [nationsExpanded, setNationsExpanded] = React.useState(false)
@@ -282,34 +285,44 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								action={headerAction}
 							/>
 							<div className="space-y-3">
-								<ToggleRow
-									label="Wireframe"
-									checked={showWireframe}
-									onChange={() => setShowWireframe(!showWireframe)}
-									labelClassName="text-slate-200"
-								/>
+								<div>
+									<CollapsibleSectionHeader
+										title="Map"
+										expanded={mapExpanded}
+										onToggle={() => setMapExpanded((v) => !v)}
+									/>
+									{mapExpanded && (
+										<div className="mt-1.5 space-y-1.5">
+											<ToggleRow
+												label="Wireframe"
+												checked={showWireframe}
+												onChange={() => setShowWireframe(!showWireframe)}
+												labelClassName="text-slate-200"
+											/>
 
-								<MeasureSection
-									measureExpanded={measureExpanded}
-									setMeasureExpanded={setMeasureExpanded}
-									measureMode={measureMode}
-									setMeasureMode={setMeasureMode}
-									pathfindingLand={pathfindingLand}
-									setPathfindingLand={setPathfindingLand}
-									pathfindingSea={pathfindingSea}
-									setPathfindingSea={setPathfindingSea}
-									pathfindingResult={pathfindingResult}
-									unitSystem={unitSystem}
-								/>
-
-								<GridSection
-									gridSpacingExpanded={gridSpacingExpanded}
-									setGridSpacingExpanded={setGridSpacingExpanded}
-									showGrid={showGrid}
-									setShowGrid={setShowGrid}
-									gridSpacing={gridSpacing}
-									setGridSpacing={setGridSpacing}
-								/>
+											<ToggleRow
+												label={`Latitude/longitudes (${GRID_SPACING_DEG}°)`}
+												checked={showGrid}
+												onChange={setShowGrid}
+											/>
+											<ToggleRow
+												label="Latitude/longitude ticks"
+												checked={showCoordinateTicks}
+												onChange={setShowCoordinateTicks}
+											/>
+											<MeasureSection
+												measureMode={measureMode}
+												setMeasureMode={setMeasureMode}
+												pathfindingLand={pathfindingLand}
+												setPathfindingLand={setPathfindingLand}
+												pathfindingSea={pathfindingSea}
+												setPathfindingSea={setPathfindingSea}
+												pathfindingResult={pathfindingResult}
+												unitSystem={unitSystem}
+											/>
+										</div>
+									)}
+								</div>
 
 								<ClockSection
 									clockExpanded={clockExpanded}
@@ -367,6 +380,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setShowDistrictBorders={setShowDistrictBorders}
 									showInfrastructure={showInfrastructure}
 									setShowInfrastructure={setShowInfrastructure}
+									showMigrationRoutes={showMigrationRoutes}
+									setShowMigrationRoutes={setShowMigrationRoutes}
 									colorMode={colorMode}
 									populationMode={populationMode}
 									nationMode={nationMode}
@@ -395,7 +410,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									colorMode={colorMode}
 									societyMode={populationMode}
 									setSocietyMode={setPopulationMode}
-									isEarthImport={isEarthImport}
+									availableModes={availablePopulationModes}
 								/>
 								<ReligionModeSection
 									colorMode={colorMode}

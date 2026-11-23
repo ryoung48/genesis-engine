@@ -358,6 +358,9 @@ vec4 cloudLayers(vec3 p, vec2 uv, float px, float fast, float lit, out float vei
     vec3 qw = q0 * uCloudWeatherScale + uCloudTime * uCloudEvolve * vec3(0.12, 0.05, -0.08);
     float wk = clamp((cloudR(qw + vec3(0.57, 0.11, 0.39)) - 0.5) * 2.5, -1.0, 1.0), wk2 = clamp((cloudR(qw * 1.7 + vec3(0.31, 0.83, 0.07)) - 0.5) * 2.5, -1.0, 1.0);
     cv = clamp(cv * (1.0 + uCloudWeatherAmp * wk), 0.0, 1.0);
+    float tropicalBand = uCloudZonal * (1.0 - smoothstep(8.0, 24.0, abs(degrees(lat) - uCloudItcz)));
+    float tropicalClearing = 1.0 - smoothstep(-0.35, 0.25, wk2);
+    cv *= 1.0 - 0.8 * tropicalBand * tropicalClearing;
     ss *= 1.0 - uCloudStreakVary * (1.0 - smoothstep(-0.4, 0.4, wk2));
     // (the layers with cover here — none: clear sky, nothing more to work out; a shadow's pass without the cirrus)
     vec4 need = step(vec4(0.01), cv) * vec4(1.0, 1.0, 1.0, 1.0 - fast), fadeOut = smoothstep(vec4(0.01), vec4(0.04), cv);

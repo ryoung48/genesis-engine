@@ -10,13 +10,14 @@ export interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
 	params: Pick<
 		GenesisParams,
-		"seed" | "planetRadiusKm" | "era" | "historyPipeline"
+		"seed" | "planetRadiusKm" | "targetTechLevel" | "historyPipeline"
 	>
 	post: Pick<
 		ReturnType<typeof POST_ELEVATION.runPostElevationPipeline>,
 		| "coastal"
 		| "eraSettledMask"
 		| "eraStatehoodMask"
+		| "agrarianShare"
 		| "landmarks"
 		| "population"
 		| "provinces"

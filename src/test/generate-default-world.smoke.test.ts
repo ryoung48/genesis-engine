@@ -11,6 +11,7 @@ import { ERAS } from "@/model/society/eras"
 import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import { loadEarthGrayscale } from "@/test/earth/assets"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 
@@ -178,6 +179,11 @@ describe("full world smoke generation", () => {
 			world: {
 				mesh: world.mesh,
 				params: world.params,
+				era: ERAS.eraOf({
+					techLevel: TECH_LEVEL.averageLevel({
+						target: world.params.targetTechLevel,
+					}),
+				}),
 				provinces: world.provinces!,
 				nations: world.nations!,
 				landmarks: world.landmarks!,
@@ -470,7 +476,12 @@ describe("full world smoke generation", () => {
 	it("neolithic era leaves most land stateless", () => {
 		const base = buildSmokeParams()
 		const world = GENERATE_WORLD.generateGenesisWorld({
-			params: { ...base, era: "neolithic" },
+			params: {
+				...base,
+				targetTechLevel: TECH_LEVEL.leaderLevel({
+					techLevel: ERAS.eraConfigs.neolithic.techLevel,
+				}),
+			},
 		})
 		const provinceCount = world.provinces?.count ?? 0
 		const nationCount = world.nations?.count ?? 0
@@ -496,7 +507,12 @@ describe("full world smoke generation", () => {
 	it("late medieval era leaves no stateless non-desolate provinces", () => {
 		const base = buildSmokeParams()
 		const world = GENERATE_WORLD.generateGenesisWorld({
-			params: { ...base, era: "lateMedieval" },
+			params: {
+				...base,
+				targetTechLevel: TECH_LEVEL.leaderLevel({
+					techLevel: ERAS.eraConfigs.lateMedieval.techLevel,
+				}),
+			},
 		})
 
 		let statelessProvinces = 0
@@ -526,7 +542,12 @@ describe("full world smoke generation", () => {
 		const base = buildSmokeParams()
 		for (const era of ERAS.eraOrder) {
 			const world = GENERATE_WORLD.generateGenesisWorld({
-				params: { ...base, era },
+				params: {
+					...base,
+					targetTechLevel: TECH_LEVEL.leaderLevel({
+						techLevel: ERAS.eraConfigs[era].techLevel,
+					}),
+				},
 			})
 			if (
 				!world.nations ||

@@ -38,16 +38,27 @@ import { TIMING } from "@/model/shared/timing"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
+import { FARMING } from "@/model/society/farming"
+import { FARMING_WAY_OF_LIFE } from "@/model/society/farming/way-of-life"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { MIGRATION } from "@/model/society/migration"
 import type { HistoryMigration } from "@/model/society/migration/types"
 import { POPULATION } from "@/model/society/population"
 import type { ProvincePopulation } from "@/model/society/population/types"
+import { TECH_LEVEL } from "@/model/society/tech-level"
+import { TECH_START } from "@/model/society/tech-level/start-year"
 import type { GenesisProvinces } from "@/model/society/types"
 
 const LAKE_RETENTION_THRESHOLD = 100
 
-const MIGRATION_HORIZON_YEAR = 2025
+const MIGRATION_HORIZON_YEAR = 10000
+
+const AGRARIAN_PREFERENCE_FLOOR = 0.05
+
+// States prefer farming and herding land but may still take foraging land.
+function agrarianPreference(share: number): number {
+	return AGRARIAN_PREFERENCE_FLOOR + (1 - AGRARIAN_PREFERENCE_FLOOR) * share
+}
 
 function reconcileClosedWaterBodies(params: {
 	isLand: Uint8Array
@@ -778,17 +789,36 @@ function runPostElevationPipeline(
 		seed: params.seed,
 	})
 	const planetRadiusKm = params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
-	const migration = MIGRATION.compute({
+	const migrationOutput = MIGRATION.compute({
 		provinces,
 		habitability: rawHabitability,
 		mesh,
 		isLand,
 		elevationKm: elevation_km,
+		temperatureC: climate.temperature_avg,
+		rainfallMm: rainfall.annual,
+		originHint: input.originHint ?? null,
 		planetRadiusKm,
 		seed: params.seed,
 		horizonYear: MIGRATION_HORIZON_YEAR,
 	})
+	const migration = migrationOutput.result
 	provinces.areaKm2 = migration.areaKm2
+	const farming = FARMING.compute({
+		provinces,
+		migration: migrationOutput,
+		mesh,
+		planetRadiusKm,
+		temperatureMonthly: climate.temperature_monthly,
+		rainfallMonthly: rainfall.monthly,
+		petMonthly: climate.pet_monthly,
+		elevationKm: elevation_km,
+		gdd: pastaDebug.gdd,
+		topography,
+		vegetation,
+		riverVisible: rivers.visible,
+		horizonYear: MIGRATION_HORIZON_YEAR,
+	})
 	const historyMigration: HistoryMigration =
 		params.historyPipeline === "distribution"
 			? { pipeline: "distribution", data: migration }
@@ -820,13 +850,33 @@ function runPostElevationPipeline(
 
 	// ── Population ─────────────────────────────────────────────────────
 	t0 = performance.now()
-	const eraConfig = ERAS.getEraConfig(params.era)
-	const startYear = STATE_CLOCK.defaultStartYear
-	const arrivalSteered = eraConfig.id === "lateMedieval"
+	const techLevel = TECH_LEVEL.averageLevel({
+		target: params.targetTechLevel,
+	})
+	const eraConfig = ERAS.getEraConfig(ERAS.eraOf({ techLevel }))
+	const stateHeld = TECH_LEVEL.stateHeld({ techLevel })
+	const startYear = cradles
+		? TECH_START.startYear({
+				farming: farming.startClock,
+				areaKm2: migration.areaKm2,
+				graph: provinces,
+				horizonYear: MIGRATION_HORIZON_YEAR,
+				techLevel,
+			})
+		: STATE_CLOCK.defaultStartYear
 
 	let actualSettlementWave = 1
 	let eraSettledMask: Uint8Array = new Uint8Array(provinces.count)
 	let eraStatehoodMask: Uint8Array | undefined
+	let agrarianShare: Float32Array | undefined
+	const wayOfLife = cradles
+		? FARMING_WAY_OF_LIFE.wayOfLife({
+				farming,
+				graph: provinces,
+				year: startYear,
+				techLevel,
+			})
+		: null
 	if (historyMigration.pipeline === "distribution") {
 		eraSettledMask = Uint8Array.from(migration.arrivalYear, (year) =>
 			year === MIGRATION.sentinel ? 0 : 1,
@@ -834,75 +884,55 @@ function runPostElevationPipeline(
 		eraStatehoodMask = new Uint8Array(provinces.count)
 	} else if (cradles) {
 		// Settled land has people (cultures, population); state-held land is the
-		// part of it that gets nations. The late medieval start reads both from the
-		// arrival field and the target profile; other eras keep their wave
-		// percentiles.
-		actualSettlementWave = arrivalSteered
-			? Math.fround(
-					MIGRATION.waveOf({
-						year: startYear,
-						horizonYear: MIGRATION_HORIZON_YEAR,
-					}),
-				)
-			: ERAS.wavePercentileThreshold({
-					migrationWave,
-					desolate: provinces.desolate,
-					fraction: eraConfig.settlementFraction,
-				})
-		const actualStatehoodWave = ERAS.wavePercentileThreshold({
-			migrationWave,
-			desolate: provinces.desolate,
-			fraction: eraConfig.settlementFraction * eraConfig.statehoodFraction,
-		})
+		// part of it that gets nations. Both are read from the arrival field at
+		// the planet's own start year.
+		actualSettlementWave = Math.fround(
+			MIGRATION.waveOf({
+				year: startYear,
+				horizonYear: MIGRATION_HORIZON_YEAR,
+			}),
+		)
 		// Cultures and religions cover every habitable province, so land settled
 		// after the start (or never) already has them and a name.
 		const settledAtStart = new Uint8Array(provinces.count)
-		let habitableCount = 0
 		let settledCount = 0
 		for (let p = 0; p < provinces.count; p++) {
 			if (provinces.desolate[p]) continue
-			habitableCount++
-			if (arrivalSteered) {
-				eraSettledMask[p] = 1
-				settledAtStart[p] = migration.arrivalYear[p] <= startYear ? 1 : 0
-				settledCount += settledAtStart[p]
-			} else if (
-				migrationWave[p] >= 0 &&
-				migrationWave[p] <= actualSettlementWave
-			) {
-				eraSettledMask[p] = 1
-				settledAtStart[p] = 1
-			}
+			eraSettledMask[p] = 1
+			settledAtStart[p] = migration.arrivalYear[p] <= startYear ? 1 : 0
+			settledCount += settledAtStart[p]
 		}
-		if (eraConfig.hasNations && provinces.count > 0) {
-			if (arrivalSteered) {
-				const profile = TARGET_PROFILE.at({
-					year: startYear,
-					habitableProvinces: habitableCount,
-				})
-				eraStatehoodMask = MIGRATION.heldCore({
-					provinces,
-					suitability: migration.suitability,
-					settled: settledAtStart,
+		// The share of each settled province's people who farm or herd at the
+		// start: capitals need a majority and placement prefers more.
+		agrarianShare = Float32Array.from(settledAtStart, (settled, province) =>
+			settled && wayOfLife
+				? wayOfLife.farm[province] + wayOfLife.herd[province]
+				: 0,
+		)
+		if (eraConfig.hasNations && provinces.count > 0)
+			eraStatehoodMask = MIGRATION.heldCore({
+				provinces,
+				suitability: Float64Array.from(
+					migration.suitability,
+					(value, p) => value * agrarianPreference(agrarianShare?.[p] ?? 0),
+				),
+				settled: settledAtStart,
+				siteScore: Float32Array.from(
 					siteScore,
-					heldWeight: Float32Array.from(migration.contactYear, (year, p) =>
-						settledAtStart[p]
-							? TARGET_PROFILE.contactShare({ years: startYear - year })
-							: 0,
-					),
-					activeCradles: MIGRATION.activeCradles({ cradles, year: startYear }),
-					fallbackSource: migration.origin,
-					count: Math.round(profile.stateHeld * settledCount),
-					r_xyz: mesh.r_xyz,
-					planetRadiusKm,
-				})
-			} else {
-				eraStatehoodMask = Uint8Array.from(settledAtStart)
-				if (eraConfig.settlementFraction * eraConfig.statehoodFraction < 1.0)
-					for (let p = 0; p < provinces.count; p++)
-						if (migrationWave[p] > actualStatehoodWave) eraStatehoodMask[p] = 0
-			}
-		}
+					(value, p) => value * agrarianPreference(agrarianShare?.[p] ?? 0),
+				),
+				heldWeight: Float32Array.from(migration.contactYear, (year, p) =>
+					settledAtStart[p]
+						? TARGET_PROFILE.contactShare({ years: startYear - year }) *
+							agrarianPreference(agrarianShare?.[p] ?? 0)
+						: 0,
+				),
+				activeCradles: MIGRATION.activeCradles({ cradles, year: startYear }),
+				fallbackSource: migration.origin,
+				count: Math.round(stateHeld * settledCount),
+				r_xyz: mesh.r_xyz,
+				planetRadiusKm,
+			})
 	}
 
 	const population: ProvincePopulation = POPULATION.computePopulation({
@@ -917,18 +947,19 @@ function runPostElevationPipeline(
 		seed: params.seed,
 		mesh,
 		planetRadiusKm: params.planetRadiusKm,
-		eraTargetPopulation: eraConfig.targetPopulation,
+		techLevel,
 		migrationWave,
 		settlementWave: actualSettlementWave,
 		migrationFalloff: eraConfig.migrationFalloff,
-		settlementAgeYears:
-			cradles && arrivalSteered
-				? Float32Array.from(migration.arrivalYear, (year) =>
-						Math.max(0, startYear - year),
-					)
-				: undefined,
+		densityWeights: wayOfLife
+			? Float32Array.from(
+					wayOfLife.density,
+					(density, province) => density * migration.areaKm2[province],
+				)
+			: undefined,
 	})
 	population.migrationWave = migrationWave
+	population.startYear = startYear
 	if (historyMigration.pipeline !== "distribution") {
 		population.arrivalYear = migration.arrivalYear
 		population.contactYear = migration.contactYear
@@ -993,6 +1024,7 @@ function runPostElevationPipeline(
 		locations,
 		population,
 		historyMigration,
+		farming,
 		tradeGoods,
 		hazards,
 		cycloneRisk,
@@ -1005,6 +1037,7 @@ function runPostElevationPipeline(
 		oceanCurrents,
 		timings,
 		eraSettledMask,
+		agrarianShare,
 		eraStatehoodMask,
 	}
 }

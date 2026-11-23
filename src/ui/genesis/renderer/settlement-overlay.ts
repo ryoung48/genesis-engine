@@ -1,5 +1,7 @@
 ﻿import * as THREE from "three"
+import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import type {
 	BuildGlobeRealSettlementsParams,
@@ -185,7 +187,13 @@ export function buildGlobeSettlements({
 		if (
 			!settlementExists({
 				pop,
-				era: world.params?.era,
+				era: world.params
+					? ERAS.eraOf({
+							techLevel: TECH_LEVEL.averageLevel({
+								target: world.params.targetTechLevel,
+							}),
+						})
+					: undefined,
 				province: p,
 				routeEndpoints,
 			})
@@ -280,7 +288,13 @@ export function buildMapSettlements({
 		if (
 			!settlementExists({
 				pop,
-				era: world.params?.era,
+				era: world.params
+					? ERAS.eraOf({
+							techLevel: TECH_LEVEL.averageLevel({
+								target: world.params.targetTechLevel,
+							}),
+						})
+					: undefined,
 				province: p,
 				routeEndpoints,
 			})

@@ -24,6 +24,7 @@ export interface ModeBarProps {
 	setColorMode: (v: ColorMode) => void
 	geographyMode: ColorMode
 	setGeographyMode: (v: ColorMode) => void
+	lastSocietyColorMode: ColorMode
 	nationMode: NationMapMode
 	setNationMode: (v: NationMapMode) => void
 	societyMode: SocietyMapMode

@@ -43,6 +43,8 @@ export interface InitHistoryParams {
 	nations: GenesisNationHierarchy
 	provinces: GenesisProvinces
 	population: ProvincePopulation
+	urbanPopulation: Float32Array
+	development: Float32Array
 	coastal: Uint8Array
 	// [JUSTIFICATION] Worlds without a separate water-access mask use coastal access.
 	waterAccess?: Uint8Array

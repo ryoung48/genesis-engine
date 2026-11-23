@@ -79,6 +79,7 @@ import {
 	isDebugGeographyMode,
 	isDebugNationMode,
 	isElevationColorMode,
+	isPopulationSocietyMode,
 	isTitlesNationMode,
 	normalizeGeographyColorMode,
 	normalizeNationMapMode,
@@ -86,6 +87,7 @@ import {
 } from "@/ui/genesis/shared/map-modes"
 import { canHandlePlanetClick } from "@/ui/genesis/shared/measurement-click"
 import { computePlanetStats } from "@/ui/genesis/shared/planet-stats"
+import { getAvailablePopulationModes } from "@/ui/genesis/shared/population-mode-availability"
 import { PROVINCE_SELECTION } from "@/ui/genesis/shared/province-selection"
 import { formatDistance } from "@/ui/genesis/shared/ui-format"
 import {
@@ -186,7 +188,7 @@ export const GenesisView: React.FC<{
 		elevationSubMode,
 		exportCenterLongitude,
 		geographyMode,
-		gridSpacing,
+		lastSocietyColorMode,
 		handleSetDataVariant,
 		labelMode,
 		mapProjectionLatitude,
@@ -212,7 +214,6 @@ export const GenesisView: React.FC<{
 		setExportCenterLongitude,
 		setGeographyColorMode,
 		setGeographyMode,
-		setGridSpacing,
 		setLabelMode,
 		setMapProjectionLatitude,
 		setMeasureModeState,
@@ -231,7 +232,9 @@ export const GenesisView: React.FC<{
 		setShowGdd,
 		setShowGint,
 		setShowGrid,
+		setShowCoordinateTicks,
 		setShowInfrastructure,
+		setShowMigrationRoutes,
 		setShowNationBorders,
 		setShowDistrictBorders,
 		setTitleBorderTiers,
@@ -263,7 +266,9 @@ export const GenesisView: React.FC<{
 		showGdd,
 		showGint,
 		showGrid,
+		showCoordinateTicks,
 		showInfrastructure,
+		showMigrationRoutes,
 		showNationBorders,
 		showDistrictBorders,
 		titleBorderTiers,
@@ -542,7 +547,9 @@ export const GenesisView: React.FC<{
 	})
 
 	// Planet params
-	const numPoints = DEFAULT_WORLD_PARAMS.numPoints
+	const [numPoints, setNumPoints] = useState<number>(
+		DEFAULT_WORLD_PARAMS.numPoints,
+	)
 	const jitter = DEFAULT_WORLD_PARAMS.jitter
 	const numPlates = DEFAULT_WORLD_PARAMS.numPlates
 	const roughness = DEFAULT_WORLD_PARAMS.roughness
@@ -592,8 +599,8 @@ export const GenesisView: React.FC<{
 		starAgeGyr,
 		setSubstellarLon,
 		setTideLock,
-		setEra,
-		era,
+		setTargetTechLevel,
+		targetTechLevel,
 		setters,
 		skipNextGeneratedSystemBodiesSyncRef,
 		smoothing,
@@ -867,6 +874,19 @@ export const GenesisView: React.FC<{
 			cancelled = true
 		}
 	}, [worldForDisplay?.isEarthImport])
+	const availablePopulationModes = useMemo(
+		() => getAvailablePopulationModes(worldForDisplay),
+		[worldForDisplay],
+	)
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters arrive as hook parameters here, so Biome cannot see their useState origin.
+	useEffect(() => {
+		if (!worldForDisplay || history.loading) return
+		if (
+			isPopulationSocietyMode(societyMode) &&
+			!availablePopulationModes.includes(societyMode)
+		)
+			setSocietyMode("density")
+	}, [worldForDisplay, history.loading, societyMode, availablePopulationModes])
 	const historyFormatLabel = useCallback(
 		(timeValue: number) => history.formatLabel(timeValue),
 		[history.formatLabel],
@@ -1453,6 +1473,7 @@ export const GenesisView: React.FC<{
 		climateDistribution,
 		conflictDistribution,
 		governmentDistribution,
+		techLevelDistribution,
 		nationSizeDistribution,
 		relationDistribution,
 		religionTypeDistribution,
@@ -1588,8 +1609,9 @@ export const GenesisView: React.FC<{
 		contours,
 		showCoastlines,
 		showGrid,
-		gridSpacing,
+		showCoordinateTicks,
 		showInfrastructure,
+		showMigrationRoutes,
 		showElevation,
 		eu4GhslSettlements,
 		labelMode,
@@ -1630,7 +1652,7 @@ export const GenesisView: React.FC<{
 		setSeed,
 		setDataVariant: handleSetDataVariant,
 		setters,
-		era,
+		targetTechLevel,
 		numPoints,
 		numPlates,
 		jitter,
@@ -2097,7 +2119,10 @@ export const GenesisView: React.FC<{
 					<GenerationPanel
 						worldTab={worldTab}
 						setWorldTab={setWorldTab}
-						resetWorldDefaults={handleResetDefaults}
+						resetWorldDefaults={() => {
+							setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
+							handleResetDefaults()
+						}}
 						setTideLock={setTideLock}
 						setObliquity={setObliquity}
 						seed={seed}
@@ -2126,6 +2151,8 @@ export const GenesisView: React.FC<{
 						planetRadiusKm={planetRadiusKm}
 						generatedMoons={displayMoons}
 						planetSliders={planetSliders}
+						numPoints={numPoints}
+						setNumPoints={setNumPoints}
 						terrainSliders={terrainSliders}
 						spectralClass={spectralClass}
 						setSpectralClass={setSpectralClass}
@@ -2137,8 +2164,8 @@ export const GenesisView: React.FC<{
 						eccentricity={eccentricity}
 						perihelion={perihelion}
 						obliquity={obliquity}
-						era={era}
-						setEra={setEra}
+						targetTechLevel={targetTechLevel}
+						setTargetTechLevel={setTargetTechLevel}
 						generating={generating}
 						generationLabel={generationLabel}
 						generationProgress={generationProgress}
@@ -2152,6 +2179,7 @@ export const GenesisView: React.FC<{
 							planetName,
 							planetStats,
 							worldPopulation: drawerWorldPopulation,
+							techLevelDistribution,
 							activeWarCount: historySocialCounts?.activeWarCount ?? null,
 							cultureCount:
 								historySocialCounts?.cultureCount ??
@@ -2370,6 +2398,8 @@ export const GenesisView: React.FC<{
 								showOceanCurrents={showOceanCurrents}
 								setShowOceanCurrents={setShowOceanCurrents}
 								showGrid={showGrid}
+								showCoordinateTicks={showCoordinateTicks}
+								setShowCoordinateTicks={setShowCoordinateTicks}
 								setShowGrid={setShowGrid}
 								showNationBorders={showNationBorders}
 								showDistrictBorders={showDistrictBorders}
@@ -2381,6 +2411,7 @@ export const GenesisView: React.FC<{
 								setNationMode={setNationMode}
 								populationMode={populationMode}
 								setPopulationMode={setSocietyMode}
+								availablePopulationModes={availablePopulationModes}
 								religionMode={religionMode}
 								setReligionMode={setReligionMode}
 								labelMode={labelMode}
@@ -2389,8 +2420,8 @@ export const GenesisView: React.FC<{
 								setShowElevation={handleSetElevation}
 								showInfrastructure={showInfrastructure}
 								setShowInfrastructure={setShowInfrastructure}
-								gridSpacing={gridSpacing}
-								setGridSpacing={setGridSpacing}
+								showMigrationRoutes={showMigrationRoutes}
+								setShowMigrationRoutes={setShowMigrationRoutes}
 								viewMode={viewMode}
 								setViewMode={setViewMode}
 								unitSystem={unitSystem}
@@ -2451,7 +2482,7 @@ export const GenesisView: React.FC<{
 									setViewMode("globe")
 									setUnitSystem("metric")
 									setShowGrid(true)
-									setGridSpacing(15)
+									setShowCoordinateTicks(true)
 									setShowWireframe(false)
 									setShowRivers(false)
 									setShowNationBorders(false)
@@ -2469,6 +2500,7 @@ export const GenesisView: React.FC<{
 									})
 									setShowElevation(false)
 									setShowInfrastructure(false)
+									setShowMigrationRoutes(false)
 									setMeasureMode("off")
 									setPathfindingLand(true)
 									setPathfindingSea(true)
@@ -2567,6 +2599,7 @@ export const GenesisView: React.FC<{
 										setColorMode={setGeographyColorMode}
 										geographyMode={geographyMode}
 										setGeographyMode={setGeographyMode}
+										lastSocietyColorMode={lastSocietyColorMode}
 										nationMode={nationMode}
 										setNationMode={setNationMode}
 										societyMode={societyMode}

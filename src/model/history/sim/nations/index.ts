@@ -106,6 +106,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 		maxSpreadRad,
 		targets: plan.targets,
 		policy: { kind: "simulation", titles, titleMembers },
+		agrarian: params.agrarian,
 	})
 
 	let organizationPlan: ReturnType<
@@ -124,6 +125,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 			provinceContinent,
 			maxSpreadRad,
 			seed: params.seed,
+			agrarian: params.agrarian,
 		})
 	}
 
@@ -178,6 +180,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 				maxRepublicSize: params.maxRepublicSize,
 				maxTheocracySize: params.maxTheocracySize,
 				excludeNations,
+				agrarian: params.agrarian,
 			})
 			if (!plan) break
 			tradeLeaguePlans.push(plan)

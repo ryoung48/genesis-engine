@@ -1,3 +1,5 @@
+import type { HeraldryShape } from "@/ui/heraldry/shield/types"
+
 export type FlagPattern =
 	| "identicon"
 	| "organic-identicon"
@@ -82,6 +84,11 @@ export interface FlagPaintParams {
 	height: number
 }
 
+export interface FlagSize {
+	width: number
+	height: number
+}
+
 export interface FlagStar extends FlagCircle {
 	points: number
 	innerRatio: number
@@ -113,6 +120,7 @@ export interface FlagSampleParams {
 export interface FlagRenderParams {
 	design: FlagDesign
 	width: number
+	shape: HeraldryShape
 }
 
 export type FlagPoint = readonly [number, number]

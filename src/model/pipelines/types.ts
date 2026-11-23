@@ -32,7 +32,8 @@ import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import { StageTiming } from "@/model/shared/timing/types"
+import type { StageTiming } from "@/model/shared/timing/types"
+import type { FarmingResult } from "@/model/society/farming/types"
 import type { RouteComputation } from "@/model/society/infrastructure/trade/routing/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
 import type { HistoryMigration } from "@/model/society/migration/types"
@@ -41,7 +42,6 @@ import type {
 	GenesisNationHierarchy,
 	GenesisPartition,
 	GenesisProvinces,
-	SocietyEra,
 } from "@/model/society/types"
 
 export type TerrainSnapshot = {
@@ -116,13 +116,13 @@ export interface GenesisParams {
 	 * jovian -- see that doc's explanation of why it breaks their
 	 * temperature calibration. */
 	seismologyTotalHeatingK?: number
-	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */
-	era?: SocietyEra
+	targetTechLevel: number
 }
 
 export interface GenesisWorld {
 	routes: RouteComputation | null
 	historyMigration: HistoryMigration
+	farming: FarmingResult | null
 	mesh: SphereMesh
 	plates: TectonicPlate[]
 	plateAssignment: Int32Array

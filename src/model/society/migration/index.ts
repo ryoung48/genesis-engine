@@ -14,16 +14,25 @@ import type {
 	CradleChoice,
 	CradleSpacingParams,
 	CradlesParams,
+	DisplayTree,
+	DisplayTreeParams,
 	GrowHeldParams,
 	HeldCoreParams,
 	HorizonParams,
 	IndexLinksParams,
 	MatureScoreParams,
 	MigrationEdge,
+	MigrationOutput,
 	MigrationParams,
 	MigrationResult,
+	MigrationRoutes,
+	MigrationTrunk,
+	OriginHint,
+	RampYearsParams,
+	RoutesParams,
 	TargetParams,
 	TransitParams,
+	WalkGraph,
 	WaveParams,
 } from "@/model/society/migration/types"
 import type { GenesisProvinces } from "@/model/society/types"
@@ -31,11 +40,23 @@ import type { GenesisProvinces } from "@/model/society/types"
 const START_YEAR = -79999
 const DISPERSAL_START_YEAR = -65000
 const SENTINEL = 2147483647
+const RAMP_LAST_YEAR = 1300
+const TRUNK_MIN_SHARE = 0.006
+const LANDFALL_MIN_SHARE = 0.00012
+const DISPLAY_SEA_PENALTY = 4
+const ORIGIN_MIN_TEMPERATURE_C = 20
+const ORIGIN_MIN_RAINFALL_MM = 600
+const ORIGIN_MAX_RAINFALL_MM = 1500
 const SHELF_CLOSES_YEAR = -9500
 const SHELF_ELEVATION_KM = -0.06
 const SUITABILITY_QUANTILE = 0.95
-const EARLY_SPEED_KM_PER_YEAR = 0.7
-const SUITABILITY_FLOOR = 0.05
+const EARLY_SPEED_KM_PER_YEAR = 0.55
+const SUITABILITY_FLOOR = 0.3
+const HOMELAND_RADIUS_KM = 1000
+const ISLAND_OPEN_AREA_KM2 = 30000
+const ISLAND_OPEN_YEAR = -11700
+const ISLAND_FLOOR_AREA_KM2 = 2000
+const ISLAND_FLOOR_YEAR = -500
 const SEA_LANDING_YEARS = 100
 const LATE_SPEED_KM_PER_YEAR = 50
 const SPREAD_GROWTH_START_YEAR = -10000
@@ -82,6 +103,16 @@ function targetReach({ destinationLandmassKm2 }: TargetParams): number {
 		TARGET_GAIN *
 			Math.log10(Math.max(1, destinationLandmassKm2 / TARGET_REFERENCE_KM2))
 	)
+}
+
+function islandOpenYear({ destinationLandmassKm2 }: TargetParams): number {
+	if (destinationLandmassKm2 >= ISLAND_OPEN_AREA_KM2) return -Infinity
+	const fraction = Math.min(
+		1,
+		Math.log(ISLAND_OPEN_AREA_KM2 / Math.max(1, destinationLandmassKm2)) /
+			Math.log(ISLAND_OPEN_AREA_KM2 / ISLAND_FLOOR_AREA_KM2),
+	)
+	return ISLAND_OPEN_YEAR + fraction * (ISLAND_FLOOR_YEAR - ISLAND_OPEN_YEAR)
 }
 
 function seaTransit({
@@ -136,7 +167,9 @@ function landTransit({
 	corridorBonus,
 }: Omit<TransitParams, "kind">): number {
 	const distance = Math.max(1, distanceKm)
-	const speed = Math.max(SUITABILITY_FLOOR, meanSuitability) * corridorBonus
+	const speed =
+		(SUITABILITY_FLOOR + (1 - SUITABILITY_FLOOR) * meanSuitability) *
+		corridorBonus
 	const target =
 		spreadProgress(sourceArrival) + distance / (EARLY_SPEED_KM_PER_YEAR * speed)
 	return yearAtSpreadProgress(target)
@@ -145,7 +178,10 @@ function landTransit({
 function transit(input: TransitParams): number {
 	const params = {
 		...input,
-		sourceArrival: Math.max(input.sourceArrival, DISPERSAL_START_YEAR),
+		sourceArrival:
+			input.sourceOriginKm <= HOMELAND_RADIUS_KM
+				? input.sourceArrival
+				: Math.max(input.sourceArrival, DISPERSAL_START_YEAR),
 	}
 	if (params.kind === "land") return landTransit(params)
 	if (params.kind === "sea") return seaTransit(params)
@@ -175,6 +211,156 @@ function horizon({ continuousArrival, desolate, horizonYear }: HorizonParams) {
 	}
 	order.sort((a, b) => arrivalYear[a] - arrivalYear[b] || a - b)
 	return { arrivalYear, migrationWave, order: Int32Array.from(order) }
+}
+
+function rampYears({ arrivalYear, desolate }: RampYearsParams): Int32Array {
+	const years = new Int32Array(arrivalYear.length).fill(SENTINEL)
+	const ranked: number[] = []
+	for (let p = 0; p < arrivalYear.length; p++)
+		if (!desolate[p] && arrivalYear[p] !== SENTINEL) ranked.push(p)
+	ranked.sort((a, b) => arrivalYear[a] - arrivalYear[b] || a - b)
+	const steps = Math.max(1, ranked.length - 2)
+	ranked.forEach((p, rank) => {
+		years[p] =
+			rank === 0
+				? START_YEAR
+				: Math.ceil(
+						DISPERSAL_START_YEAR +
+							((rank - 1) / steps) * (RAMP_LAST_YEAR - DISPERSAL_START_YEAR),
+					)
+	})
+	return years
+}
+
+function displayTree({
+	provinces,
+	r_xyz,
+	predecessor,
+	reached,
+}: DisplayTreeParams): DisplayTree {
+	const land = landGraph(provinces)
+	const hops: number[][] = Array.from(
+		{ length: provinces.count },
+		(): number[] => [],
+	)
+	for (let q = 0; q < provinces.count; q++) {
+		const from = predecessor[q]
+		if (!reached[q] || from < 0) continue
+		if (provinces.landmassId[q] === provinces.landmassId[from]) continue
+		hops[from].push(q)
+		hops[q].push(from)
+	}
+	const angle = (a: number, b: number) => {
+		const ra = provinces.seeds[a] * 3
+		const rb = provinces.seeds[b] * 3
+		const dot =
+			r_xyz[ra] * r_xyz[rb] +
+			r_xyz[ra + 1] * r_xyz[rb + 1] +
+			r_xyz[ra + 2] * r_xyz[rb + 2]
+		const norms =
+			Math.hypot(r_xyz[ra], r_xyz[ra + 1], r_xyz[ra + 2]) *
+			Math.hypot(r_xyz[rb], r_xyz[rb + 1], r_xyz[rb + 2])
+		return Math.acos(Math.max(-1, Math.min(1, dot / Math.max(1e-12, norms))))
+	}
+	const cost = new Float64Array(provinces.count).fill(Infinity)
+	const parent = new Int32Array(provinces.count).fill(-1)
+	const order: number[] = []
+	const heap = new PriorityHeap<number>()
+	for (let q = 0; q < provinces.count; q++)
+		if (reached[q] && predecessor[q] < 0) {
+			cost[q] = 0
+			heap.push(0, q)
+		}
+	while (heap.size) {
+		const entry = heap.pop()!
+		const source = entry.value
+		if (entry.key !== cost[source]) continue
+		order.push(source)
+		const relax = (q: number, penalty: number) => {
+			if (!reached[q]) return
+			const next = entry.key + angle(source, q) * penalty
+			if (next >= cost[q]) return
+			cost[q] = next
+			parent[q] = source
+			heap.push(next, q)
+		}
+		for (let j = land.adjOffset[source]; j < land.adjOffset[source + 1]; j++)
+			relax(land.adjList[j], 1)
+		for (const q of hops[source]) relax(q, DISPLAY_SEA_PENALTY)
+	}
+	return { parent, order }
+}
+
+function routes({
+	provinces,
+	r_xyz,
+	arrivalYear,
+	predecessor,
+}: RoutesParams): MigrationRoutes {
+	const reached = Uint8Array.from(arrivalYear, (year, p) =>
+		!provinces.desolate[p] && year !== SENTINEL ? 1 : 0,
+	)
+	const { parent, order } = displayTree({
+		provinces,
+		r_xyz,
+		predecessor,
+		reached,
+	})
+	const size = new Float64Array(provinces.count)
+	let total = 0
+	for (const p of order) {
+		size[p] = provinces.size[p]
+		total += size[p]
+	}
+	for (let i = order.length - 1; i >= 0; i--) {
+		const p = order[i]
+		if (parent[p] >= 0) size[parent[p]] += size[p]
+	}
+	const minSize = TRUNK_MIN_SHARE * total
+	const landfallSize = LANDFALL_MIN_SHARE * total
+	const heavy = new Int32Array(provinces.count).fill(-1)
+	for (const p of order) {
+		const q = parent[p]
+		if (
+			size[p] >= minSize &&
+			q >= 0 &&
+			(heavy[q] < 0 || size[p] > size[heavy[q]])
+		)
+			heavy[q] = p
+	}
+	const trunks: MigrationTrunk[] = []
+	for (const p of order) {
+		const q = parent[p]
+		const landfall =
+			q >= 0 &&
+			provinces.landmassId[p] !== provinces.landmassId[q] &&
+			size[p] >= landfallSize
+		if (size[p] < minSize && !landfall) continue
+		if (q >= 0 && heavy[q] === p) continue
+		const provincesOnTrunk = q >= 0 ? [q] : []
+		for (let c = p; c >= 0; c = heavy[c]) provincesOnTrunk.push(c)
+		let latest = -Infinity
+		const years = provincesOnTrunk.map((c) => {
+			latest = Math.max(latest, arrivalYear[c])
+			return latest
+		})
+		trunks.push({
+			provinces: provincesOnTrunk,
+			sizes: provincesOnTrunk.map((c, i) => (i === 0 ? size[p] : size[c])),
+			years,
+		})
+	}
+	const origin = order.find((p) => parent[p] < 0)
+	const milestones = [
+		...(origin === undefined ? [] : [{ province: origin, weight: Infinity }]),
+		...trunks.map((trunk) => ({
+			province: trunk.provinces[trunk.provinces.length - 1],
+			weight: trunk.sizes[0],
+		})),
+	]
+		.sort((a, b) => b.weight - a.weight)
+		.map(({ province }) => ({ province, year: arrivalYear[province] }))
+	return { trunks, milestones }
 }
 
 function indexLinks({ count, links }: IndexLinksParams): SeaLink[][] {
@@ -217,17 +403,61 @@ function landGraph(provinces: GenesisProvinces): GenesisProvinces {
 	return { ...provinces, adjOffset: offsets, adjList: Int32Array.from(list) }
 }
 
+function walkGraph(provinces: GenesisProvinces): WalkGraph {
+	const offsets = new Int32Array(provinces.count + 1)
+	const list: number[] = []
+	for (let i = 0; i < provinces.count; i++) {
+		for (let j = provinces.adjOffset[i]; j < provinces.adjOffset[i + 1]; j++) {
+			const q = provinces.adjList[j]
+			if (
+				provinces.desolate[i] ||
+				provinces.desolate[q] ||
+				provinces.landmassId[i] === provinces.landmassId[q]
+			)
+				list.push(q)
+		}
+		offsets[i + 1] = list.length
+	}
+	const adjList = Int32Array.from(list)
+	const { componentId, sizes } = PLACEMENT.buildOpenComponents({
+		active: new Uint8Array(provinces.count).fill(1),
+		assignment: new Int32Array(provinces.count).fill(-1),
+		adjOffset: offsets,
+		adjList,
+	})
+	return {
+		adjOffset: offsets,
+		adjList,
+		componentId,
+		componentCount: sizes.length,
+	}
+}
+
+function unitVector({ lonDeg, latDeg }: OriginHint): [number, number, number] {
+	const lon = (lonDeg * Math.PI) / 180
+	const lat = (latDeg * Math.PI) / 180
+	return [
+		Math.cos(lat) * Math.cos(lon),
+		Math.cos(lat) * Math.sin(lon),
+		Math.sin(lat),
+	]
+}
+
 function compute({
 	provinces: all,
 	habitability,
 	mesh,
 	isLand,
 	elevationKm,
+	temperatureC,
+	rainfallMm,
+	originHint,
 	planetRadiusKm,
 	seed,
 	horizonYear,
-}: MigrationParams): MigrationResult {
+}: MigrationParams): MigrationOutput {
 	const p = landGraph(all)
+	const walk = walkGraph(all)
 	const active = Uint8Array.from(p.desolate, (d) => (d ? 0 : 1))
 	const components = PLACEMENT.buildOpenComponents({
 		active,
@@ -251,17 +481,43 @@ function compute({
 	}
 	for (let i = 0; i < p.count; i++)
 		if (active[i]) mass[components.componentId[i]] += raw[i]
-	const landmassKm2 = new Float64Array(Math.max(0, ...p.landmassId) + 1)
+	const landmassKm2 = new Float64Array(walk.componentCount)
 	for (let i = 0; i < p.count; i++)
-		if (active[i]) landmassKm2[p.landmassId[i]] += areas[i]
+		if (active[i]) landmassKm2[walk.componentId[i]] += areas[i]
 	let component = -1
 	for (let i = 0; i < mass.length; i++)
 		if (component < 0 || mass[i] > mass[component]) component = i
+	const warm = Uint8Array.from({ length: p.count }, (_, i) =>
+		temperatureC[all.seeds[i]] >= ORIGIN_MIN_TEMPERATURE_C &&
+		rainfallMm[all.seeds[i]] >= ORIGIN_MIN_RAINFALL_MM &&
+		rainfallMm[all.seeds[i]] <= ORIGIN_MAX_RAINFALL_MM
+			? 1
+			: 0,
+	)
+	let anyWarm = false
+	for (let i = 0; i < p.count && !anyWarm; i++)
+		anyWarm =
+			!!active[i] && components.componentId[i] === component && !!warm[i]
+	const hint = originHint ? unitVector(originHint) : null
 	let origin = -1
 	let bestScore = -Infinity
 	let bestTie = -Infinity
 	for (let i = 0; i < p.count; i++) {
-		if (!active[i] || components.componentId[i] !== component) continue
+		if (!active[i]) continue
+		if (hint) {
+			const r = all.seeds[i] * 3
+			const value =
+				mesh.r_xyz[r] * hint[0] +
+				mesh.r_xyz[r + 1] * hint[1] +
+				mesh.r_xyz[r + 2] * hint[2]
+			if (value > bestScore) {
+				origin = i
+				bestScore = value
+			}
+			continue
+		}
+		if (components.componentId[i] !== component) continue
+		if (anyWarm && !warm[i]) continue
 		let area = 0
 		let score = 0
 		let wet = 0
@@ -304,15 +560,21 @@ function compute({
 		active,
 		planetRadiusKm,
 	})
-	const betweenLandmasses = (links: SeaLink[]) =>
-		links.filter((link) => p.landmassId[link.a] !== p.landmassId[link.b])
+	const between = (ids: Int32Array) => (links: SeaLink[]) =>
+		links.filter((link) => ids[link.a] !== ids[link.b])
+	const betweenLandmasses = between(p.landmassId)
+	const betweenComponents = between(walk.componentId)
 	const seaLinks = indexLinks({
 		count: p.count,
 		links: betweenLandmasses(open.links),
 	})
-	const shelfLinks = indexLinks({
+	const walkSeaLinks = indexLinks({
 		count: p.count,
-		links: betweenLandmasses(shelf.links),
+		links: betweenComponents(open.links),
+	})
+	const walkShelfLinks = indexLinks({
+		count: p.count,
+		links: betweenComponents(shelf.links),
 	})
 
 	const provinceDistance = (a: number, b: number) =>
@@ -332,6 +594,9 @@ function compute({
 		if (active[i])
 			for (let j = p.adjOffset[i]; j < p.adjOffset[i + 1]; j++)
 				if (active[p.adjList[j]] && p.adjList[j] > i) landEdges++
+	const originKm = new Float64Array(p.count)
+	if (origin >= 0)
+		for (let i = 0; i < p.count; i++) originKm[i] = provinceDistance(origin, i)
 	if (origin >= 0) {
 		const heap = new PriorityHeap<number>()
 		continuousArrival[origin] = START_YEAR
@@ -343,14 +608,18 @@ function compute({
 			if (entry.key !== continuousArrival[source]) continue
 			const visit = (edge: MigrationEdge) => {
 				const q = edge.destination
-				if (!active[q]) return
+				const crossing = !active[source] || !active[q]
 				const arrival = transit({
 					sourceArrival: entry.key,
+					sourceOriginKm: originKm[source],
 					distanceKm: edge.distanceKm,
 					kind: edge.kind,
-					meanSuitability: (suitability[source] + suitability[q]) / 2,
-					destinationLandmassKm2: landmassKm2[p.landmassId[q]],
+					meanSuitability: crossing
+						? 0
+						: (suitability[source] + suitability[q]) / 2,
+					destinationLandmassKm2: landmassKm2[walk.componentId[q]],
 					corridorBonus:
+						!crossing &&
 						(p.riverAccess[source] || p.waterAccess[source] === 2) &&
 						(p.riverAccess[q] || p.waterAccess[q] === 2)
 							? 1.25
@@ -374,21 +643,25 @@ function compute({
 				edgeKind[q] = EDGE_KIND_CODE[edge.kind]
 				heap.push(arrival, q)
 			}
-			for (let j = p.adjOffset[source]; j < p.adjOffset[source + 1]; j++) {
-				const q = p.adjList[j]
+			for (
+				let j = walk.adjOffset[source];
+				j < walk.adjOffset[source + 1];
+				j++
+			) {
+				const q = walk.adjList[j]
 				visit({
 					destination: q,
 					distanceKm: provinceDistance(source, q),
 					kind: "land",
 				})
 			}
-			for (const link of seaLinks[source])
+			for (const link of walkSeaLinks[source])
 				visit({
 					destination: link.a === source ? link.b : link.a,
 					distanceKm: link.distanceKm,
 					kind: "sea",
 				})
-			for (const link of shelfLinks[source])
+			for (const link of walkShelfLinks[source])
 				visit({
 					destination: link.a === source ? link.b : link.a,
 					distanceKm: link.distanceKm,
@@ -396,6 +669,59 @@ function compute({
 				})
 		}
 	}
+	if (origin >= 0) {
+		const reachedProvinces: number[] = []
+		for (let i = 0; i < p.count; i++)
+			if (Number.isFinite(continuousArrival[i])) reachedProvinces.push(i)
+		const first = new Float64Array(landmassKm2.length).fill(Infinity)
+		for (const i of reachedProvinces) {
+			const lm = walk.componentId[i]
+			first[lm] = Math.min(first[lm], continuousArrival[i])
+		}
+		const kept = Uint8Array.from(landmassKm2, (area) =>
+			area >= ISLAND_OPEN_AREA_KM2 ? 1 : 0,
+		)
+		kept[walk.componentId[origin]] = 1
+		for (let changed = true; changed; ) {
+			changed = false
+			for (const i of reachedProvinces) {
+				const from = predecessor[i]
+				if (from < 0) continue
+				const lm = walk.componentId[i]
+				const fromLm = walk.componentId[from]
+				if (kept[lm] && !kept[fromLm] && first[lm] > first[fromLm]) {
+					kept[fromLm] = 1
+					changed = true
+				}
+			}
+		}
+		const delay = Float64Array.from(first, (year, lm) =>
+			kept[lm] || !Number.isFinite(year)
+				? 0
+				: Math.max(
+						0,
+						islandOpenYear({ destinationLandmassKm2: landmassKm2[lm] }) - year,
+					),
+		)
+		for (const i of reachedProvinces)
+			continuousArrival[i] += delay[walk.componentId[i]]
+		for (const i of reachedProvinces) {
+			while (
+				predecessor[i] >= 0 &&
+				continuousArrival[predecessor[i]] > continuousArrival[i]
+			)
+				predecessor[i] = predecessor[predecessor[i]]
+		}
+	}
+	const settledPredecessor = new Int32Array(p.count).fill(-1)
+	for (let i = 0; i < p.count; i++) {
+		if (!active[i]) continue
+		let from = predecessor[i]
+		while (from >= 0 && !active[from]) from = predecessor[from]
+		settledPredecessor[i] = from
+	}
+	for (let i = 0; i < p.count; i++)
+		if (!active[i]) continuousArrival[i] = Infinity
 	const lengths = open.links.map((link) => link.distanceKm)
 	const nominalSpacingKm = Math.sqrt(
 		(4 * Math.PI * planetRadiusKm ** 2) / Math.max(1, mesh.numRegions),
@@ -405,11 +731,11 @@ function compute({
 		desolate: p.desolate,
 		horizonYear,
 	})
-	return {
+	const result: MigrationResult = {
 		origin,
 		continuousArrival,
 		areaKm2: Float32Array.from(areas),
-		predecessor,
+		predecessor: settledPredecessor,
 		edgeKind,
 		arrivalTier,
 		suitability,
@@ -433,6 +759,7 @@ function compute({
 			suitabilityScale: scale,
 		},
 	}
+	return { result, landGraph: p, seaLinks }
 }
 
 function matureScore({
@@ -703,6 +1030,8 @@ export const MIGRATION = {
 	transit,
 	waveOf,
 	matureScore,
+	rampYears,
+	routes,
 	cradleSpacingKm,
 	cradles,
 	activeCradles,

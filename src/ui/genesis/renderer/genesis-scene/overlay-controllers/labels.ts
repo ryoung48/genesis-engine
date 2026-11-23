@@ -300,6 +300,9 @@ export function createLabelsController(
 				ctx.earthHistoryNationOverride?.colors ??
 				ctx.currentWorld?.nations?.colors ??
 				null,
+			shape: HERALDRY_OVERLAY.shapeForTechLevel(
+				ctx.currentWorld?.params.targetTechLevel,
+			),
 			showHeraldry: ctx.labelMode.heraldry,
 			showNames: showNationLabels,
 			showScript: ctx.globeNationScripts !== null,

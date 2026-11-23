@@ -10,9 +10,7 @@ import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { MIGRATION } from "@/model/society/migration"
 import { TIMEZONE } from "@/model/society/timezone"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import type { DangerSubMode } from "@/ui/genesis/controls/OverlayControls"
 import type { ElevationKmForLonLat } from "@/ui/genesis/political/eu4-nation-fill-overlay"
-import type { PoliticalMapWar } from "@/ui/genesis/political/political-conflict-display"
 import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
@@ -22,7 +20,6 @@ import {
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
 } from "@/ui/genesis/shared/color-helpers"
-import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
 	cloudCoverColor,
 	cycloneLandColor,
@@ -48,16 +45,20 @@ import {
 	tornadoLandColor,
 	VEGETATION_WATER_BLUE,
 	volcanicLandColor,
+	wayOfLifeBlend,
 } from "@/ui/genesis/shared/colors"
 import {
 	climateZoneColor,
 	oceanCurrentColor,
 } from "@/ui/genesis/shared/colors/misc"
+import { populationDensityColor } from "@/ui/genesis/shared/colors/population-density"
 import {
 	precipitationAnnualColor,
 	precipitationColor,
 	precipitationDifferenceColor,
+	rainfallSeasonalityColor,
 } from "@/ui/genesis/shared/colors/precipitation"
+import { techLevelColor } from "@/ui/genesis/shared/colors/tech-level"
 import {
 	climateTempColor,
 	temperatureColor,
@@ -70,13 +71,11 @@ import {
 	vegetationSatelliteColor,
 } from "@/ui/genesis/shared/colors/vegetation"
 import { getDataVariant } from "@/ui/genesis/shared/data-variant"
-import type {
-	NationMapMode,
-	SocietyMapMode,
-} from "@/ui/genesis/shared/map-modes"
+import { getFarming, getWayOfLife } from "@/ui/genesis/shared/farming-display"
+import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
 import {
+	getArrivalRampYears,
 	getArrivalScale,
-	getArrivalYears,
 } from "@/ui/genesis/shared/migration-arrival"
 import { supportsOceanClimate } from "@/ui/genesis/shared/ocean-climate"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
@@ -87,6 +86,7 @@ import {
 	TOPOGRAPHY_COLORS,
 	UNOWNED_GRAY,
 } from "@/ui/genesis/shared/region-colors/palette"
+import type { RegionColorsInput } from "@/ui/genesis/shared/region-colors/types"
 
 const CULTURE_ELEVATION_BUMP_SCALE = 1.6
 
@@ -108,22 +108,20 @@ function darkenPartitionAtElevation(
 	)
 }
 
-export function computeRegionColors(
-	world: SerializedGenesisWorld,
-	colorMode: ColorMode,
-	nationMode: NationMapMode,
-	populationMode: SocietyMapMode,
-	temperatureMonth: number,
-	rainfallMonth: number,
-	dtrMonth: number,
-	currentMonth: number,
-	viewMode: "globe" | "map" = "globe",
-	_showElevation = true,
-	_occupiedRegions?: Set<number>,
-	_activeWars?: readonly PoliticalMapWar[] | null,
-	dangerSubMode: DangerSubMode = "earthquake",
-	religionMode: "religions" | "types" = "religions",
-): Float32Array | null {
+export function computeRegionColors({
+	world,
+	colorMode,
+	nationMode,
+	populationMode,
+	temperatureMonth,
+	rainfallMonth,
+	dtrMonth,
+	currentMonth,
+	viewMode,
+	dangerSubMode,
+	religionMode,
+	year,
+}: RegionColorsInput): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
 
 	const N = world.mesh.numRegions
@@ -418,7 +416,7 @@ export function computeRegionColors(
 			const [cr, cg, cb] =
 				isOceanRegion(r) && !hasOceanClimate
 					? oceanRgb(r)
-					: precipitationColor(range)
+					: rainfallSeasonalityColor(range)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -899,15 +897,6 @@ export function computeRegionColors(
 					: world.population?.population
 				: world.population?.population
 		const urbanPop = world.realUrbanPopulation?.population
-		let maxDensity = 0
-		if (populationMode === "density" && pop) {
-			for (let i = 0; i < world.provinces.count; i++) {
-				if (!desolate[i]) {
-					const d = getProvincePopulationDensity(world, i, pop[i])
-					if (d > maxDensity) maxDensity = d
-				}
-			}
-		}
 		let maxAbsDensityDiff = 0
 		if (
 			populationMode === "density" &&
@@ -940,6 +929,8 @@ export function computeRegionColors(
 				maxDevelopment = Math.max(maxDevelopment, developmentValues[i])
 			}
 		}
+		const techLevels =
+			populationMode === "techLevel" ? world.population?.techLevel : undefined
 		let maxUrbanPopulation = 0
 		if (populationMode === "urban" && urbanPop) {
 			for (let i = 0; i < world.provinces.count; i++) {
@@ -949,11 +940,25 @@ export function computeRegionColors(
 			}
 		}
 		const arrivalYears =
-			populationMode === "migration" ? getArrivalYears(world) : undefined
+			populationMode === "migration" ? getArrivalRampYears(world) : undefined
+		const farming =
+			populationMode === "farming" || populationMode === "wayOfLife"
+				? getFarming(world)
+				: undefined
+		const wayOfLife =
+			populationMode === "wayOfLife" && farming
+				? getWayOfLife({ world, year })
+				: undefined
 		const arrivalScale = arrivalYears
 			? getArrivalScale({ years: arrivalYears, desolate })
-			: { min: 0, span: 0 }
-		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
+			: farming && populationMode === "farming"
+				? getArrivalScale({ years: farming.farmingYear, desolate })
+				: { min: 0, span: 0 }
+		const neutralArrival =
+			(arrivalYears || farming) &&
+			world.historyMigration.pipeline === "distribution"
+				? UNOWNED_GRAY
+				: [0.35, 0.33, 0.32]
 		const invAbsDiffMax = maxAbsDensityDiff > 0 ? 1 / maxAbsDensityDiff : 0
 		const developmentRange = maxDevelopment - minDevelopment
 		const invDevelopmentRange = developmentRange > 0 ? 1 / developmentRange : 0
@@ -981,8 +986,8 @@ export function computeRegionColors(
 					populationVariant !== "diff" &&
 					pop
 				) {
-					const [cr, cg, cb] = populationColor(
-						getProvincePopulationDensity(world, p, pop[p]) * invMax,
+					const [cr, cg, cb] = populationDensityColor(
+						getProvincePopulationDensity(world, p, pop[p]),
 					)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
@@ -1022,26 +1027,59 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
+				} else if (populationMode === "techLevel" && techLevels) {
+					const level = techLevels[p]
+					const [cr, cg, cb] = Number.isFinite(level)
+						? techLevelColor(level)
+						: [0.35, 0.33, 0.32]
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
 				} else if (populationMode === "migration" && arrivalYears) {
-					const year = arrivalYears[p]
-					if (desolate[p] || year === MIGRATION.sentinel) {
-						const neutral =
-							world.historyMigration.pipeline === "distribution"
-								? UNOWNED_GRAY
-								: [0.35, 0.33, 0.32]
-						rgb[3 * r] = neutral[0]
-						rgb[3 * r + 1] = neutral[1]
-						rgb[3 * r + 2] = neutral[2]
+					const arrival = arrivalYears[p]
+					if (desolate[p] || arrival === MIGRATION.sentinel) {
+						rgb[3 * r] = neutralArrival[0]
+						rgb[3 * r + 1] = neutralArrival[1]
+						rgb[3 * r + 2] = neutralArrival[2]
 					} else {
 						const [cr, cg, cb] = migrationColor(
 							arrivalScale.span > 0
-								? (year - arrivalScale.min) / arrivalScale.span
+								? (arrival - arrivalScale.min) / arrivalScale.span
 								: 0,
 						)
 						rgb[3 * r] = cr
 						rgb[3 * r + 1] = cg
 						rgb[3 * r + 2] = cb
 					}
+				} else if (populationMode === "farming" && farming) {
+					const arrival = farming.farmingYear[p]
+					if (arrival === MIGRATION.sentinel) {
+						rgb[3 * r] = neutralArrival[0]
+						rgb[3 * r + 1] = neutralArrival[1]
+						rgb[3 * r + 2] = neutralArrival[2]
+					} else {
+						const [cr, cg, cb] = migrationColor(
+							arrivalScale.span > 0
+								? (arrival - arrivalScale.min) / arrivalScale.span
+								: 0,
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
+				} else if (populationMode === "wayOfLife" && wayOfLife) {
+					const shares = {
+						forage: wayOfLife.forage[p],
+						farm: wayOfLife.farm[p],
+						herd: wayOfLife.herd[p],
+					}
+					const [cr, cg, cb] =
+						shares.forage + shares.farm + shares.herd > 0
+							? wayOfLifeBlend(shares)
+							: neutralArrival
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
 				} else if (populationMode === "culture") {
 					const cultureIdx = world.cultures?.assignment[p] ?? -1
 					if (cultureIdx < 0 || !world.cultures) {

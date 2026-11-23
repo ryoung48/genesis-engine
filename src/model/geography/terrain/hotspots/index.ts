@@ -10,6 +10,8 @@ import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { RNG } from "@/model/shared/random/rng"
 
+const ENABLE_LARGE_IGNEOUS_PROVINCES = false
+
 function findNearestR({ mesh, px, py, pz }: FindNearestRParams): number {
 	let bestDot = -2,
 		bestR = 0
@@ -118,6 +120,9 @@ function applyHotspots({
 
 	const domes: Dome[] = []
 	const lipSites: LipSite[] = []
+	const lipSpawnChance = ENABLE_LARGE_IGNEOUS_PROVINCES
+		? VOLCANISM.getLipSpawnChance(volcanism)
+		: 0
 
 	const spawnSatellites = (parent: Dome) => {
 		for (let s = 0; s < DOME_SATELLITE_COUNT; s++) {
@@ -333,10 +338,12 @@ function applyHotspots({
 			}
 		}
 
-		const lipRegion = findNearestR({ mesh, px: cx, py: cy, pz: cz })
-		const upwelling = mantleNorm ? Math.max(0, mantleNorm[lipRegion]) : 0.5
-		const lipSpawnChance = VOLCANISM.getLipSpawnChance(volcanism)
-		if (lipSpawnChance >= 1 || hsRng.random() <= lipSpawnChance) {
+		if (
+			lipSpawnChance > 0 &&
+			(lipSpawnChance >= 1 || hsRng.random() <= lipSpawnChance)
+		) {
+			const lipRegion = findNearestR({ mesh, px: cx, py: cy, pz: cz })
+			const upwelling = mantleNorm ? Math.max(0, mantleNorm[lipRegion]) : 0.5
 			VOLCANISM.appendLargeIgneousProvinceSites(lipSites, {
 				x: cx,
 				y: cy,
@@ -519,6 +526,8 @@ function applyHotspots({
 			hotspotContrib[r] = uplift
 		}
 	}
+
+	if (lipSites.length === 0) return hotspotContrib
 
 	const lipContrib = VOLCANISM.applyLargeIgneousProvinces({
 		mesh,

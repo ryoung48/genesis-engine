@@ -7,10 +7,22 @@ export type SocietyMapMode =
 	| "urban"
 	| "development"
 	| "knowledge"
+	| "techLevel"
 	| "culture"
 	| "heritage"
 	| "religion"
 	| "migration"
+	| "farming"
+	| "wayOfLife"
+
+export type PopulationSocietyMode =
+	| "density"
+	| "migration"
+	| "farming"
+	| "wayOfLife"
+	| "development"
+	| "knowledge"
+	| "techLevel"
 
 export type ReligionMapMode = "religions" | "types"
 
@@ -165,11 +177,16 @@ export const POPULATION_MAP_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["density", "Density"],
 	["migration", "Migration"],
+	["farming", "Farming"],
+	["wayOfLife", "Way of life"],
 	["development", "Development"],
 	["knowledge", "Knowledge"],
+	["techLevel", "Tech level"],
 ]
 
-export function isPopulationSocietyMode(mode: SocietyMapMode): boolean {
+export function isPopulationSocietyMode(
+	mode: SocietyMapOption,
+): mode is PopulationSocietyMode {
 	return POPULATION_MAP_MODE_OPTIONS.some(
 		([populationMode]) => populationMode === mode,
 	)

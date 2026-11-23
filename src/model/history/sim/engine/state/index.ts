@@ -887,9 +887,16 @@ function createHistoryState({
 		}
 	}
 	const spacingKm = spacingEdges > 0 ? spacingSum / spacingEdges : 1
-	const settledYear =
-		population.arrivalYear?.slice() ??
-		new Int32Array(P).fill(MIGRATION.sentinel)
+	// The planet's timeline is shifted so its own start year lands on the
+	// history calendar's start year.
+	const calendarShift = startYear - (population.startYear ?? startYear)
+	const shifted = (years: Int32Array) =>
+		Int32Array.from(years, (year) =>
+			year === MIGRATION.sentinel ? year : year + calendarShift,
+		)
+	const settledYear = population.arrivalYear
+		? shifted(population.arrivalYear)
+		: new Int32Array(P).fill(MIGRATION.sentinel)
 	const settlementOrder =
 		population.settlementOrder?.slice() ?? new Int32Array(0)
 	let settlementCursor = 0
@@ -1023,9 +1030,9 @@ function createHistoryState({
 		stateless,
 		uninhabited,
 		settledYear,
-		contactYear:
-			population.contactYear?.slice() ??
-			new Int32Array(P).fill(MIGRATION.startYear),
+		contactYear: population.contactYear
+			? shifted(population.contactYear)
+			: new Int32Array(P).fill(MIGRATION.startYear),
 		land: {
 			governed: era === "lateMedieval" && population.arrivalYear !== undefined,
 			reachKm,

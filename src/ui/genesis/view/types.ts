@@ -17,7 +17,6 @@ import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { WorldFrame } from "@/model/history/world-frame/types"
 import type { PersonKey } from "@/model/people/query/types"
-import type { SocietyEra } from "@/model/society/types"
 import type {
 	ProceduralHistoryInitial,
 	SerializedGenesisWorld,
@@ -287,7 +286,7 @@ export type WorldGenerationInput = {
 	 * seed shows the EBM-modeled "generated" climate. */
 	setDataVariant: (variant: "generated" | "observed") => void
 	setters: Parameters<typeof resetWorldDefaults>[0]
-	era: SocietyEra
+	targetTechLevel: number
 	numPoints: number
 	numPlates: number
 	jitter: number
@@ -345,8 +344,9 @@ export type GenesisSceneSyncInput = {
 	contours: ContourDisplay
 	showCoastlines: boolean
 	showGrid: boolean
-	gridSpacing: number
+	showCoordinateTicks: boolean
 	showInfrastructure: boolean
+	showMigrationRoutes: boolean
 	showElevation: boolean
 	eu4GhslSettlements: Eu4GhslSettlementAsset | null
 	labelMode: LabelMode

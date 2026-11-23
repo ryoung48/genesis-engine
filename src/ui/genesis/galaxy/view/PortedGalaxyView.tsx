@@ -29,16 +29,17 @@ import {
 import { buildSearchMatchMarkers } from "@/ui/genesis/galaxy/renderer/galaxy-scene/search-match-markers"
 import { recenterGalaxy } from "@/ui/genesis/galaxy/view/old-galaxy-overlay"
 import {
-	DEFAULT_GALAXY_MAP_MODE,
-	DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS,
 	DEFAULT_PORTED_GALAXY_PARAMS,
 	densityWaveShapeFor,
 	fromGalaxyParam,
 	type GalaxyMapMode,
 	type PortedGalaxyDisplayFlags,
 	type PortedGalaxyParams,
+	parseStoredGalaxyOverlayPrefs,
+	serializeStoredGalaxyOverlayPrefs,
 	toGalaxyParam,
 } from "@/ui/genesis/galaxy/view/portedGalaxyParams"
+import { GALAXY_OVERLAY_PREFS_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay/types"
 import type { SpecialCircumstance } from "@/ui/wiki/galaxy-generation-panel/types"
 import { PortedGalaxyPanel } from "@/ui/wiki/PortedGalaxyPanel"
@@ -182,19 +183,29 @@ export const PortedGalaxyView: React.FC<{
 	// applyOldGalaxy's worker-callback closure so a freshly rebuilt overlay
 	// always picks up the CURRENT toggle state rather than whatever it was
 	// when that particular regenerate() call started.
+	const [initialOverlayPrefs] = useState(() =>
+		parseStoredGalaxyOverlayPrefs(
+			window.localStorage.getItem(GALAXY_OVERLAY_PREFS_STORAGE_KEY),
+		),
+	)
 	const showStarOverlayRef = useRef(
-		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS.showStarOverlay,
+		initialOverlayPrefs.displayFlags.showStarOverlay,
 	)
 	// Same reasoning as showStarOverlayRef above -- read inside
 	// applyOldGalaxy's worker-callback closure so a freshly rebuilt overlay
 	// picks up the current map mode ("stars" = neither overlay visible).
-	const mapModeRef = useRef<GalaxyMapMode>(DEFAULT_GALAXY_MAP_MODE)
+	const mapModeRef = useRef<GalaxyMapMode>(initialOverlayPrefs.mapMode)
 
 	const [params, setParams] = useState(DEFAULT_PORTED_GALAXY_PARAMS)
 	const [displayFlags, setDisplayFlags] = useState(
-		DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS,
+		initialOverlayPrefs.displayFlags,
 	)
-	const [mapMode, setMapMode] = useState<GalaxyMapMode>(DEFAULT_GALAXY_MAP_MODE)
+	const [mapMode, setMapMode] = useState<GalaxyMapMode>(
+		initialOverlayPrefs.mapMode,
+	)
+	const [overlaysExpanded, setOverlaysExpanded] = useState(
+		initialOverlayPrefs.overlaysExpanded,
+	)
 	const [presetCount, setPresetCount] = useState(0)
 	const [selectedPresetIndex, setSelectedPresetIndex] = useState<number | null>(
 		0,
@@ -202,7 +213,19 @@ export const PortedGalaxyView: React.FC<{
 	const [panelOpen, setPanelOpen] = useState(true)
 	const [advancedFilter, setAdvancedFilter] =
 		useState<SystemFilterRoot>(EMPTY_SYSTEM_FILTER)
-	const [timeStep, setTimeStep] = useState(0)
+	const [timeStep, setTimeStep] = useState(initialOverlayPrefs.timeStep)
+
+	useEffect(() => {
+		window.localStorage.setItem(
+			GALAXY_OVERLAY_PREFS_STORAGE_KEY,
+			serializeStoredGalaxyOverlayPrefs({
+				displayFlags,
+				mapMode,
+				timeStep,
+				overlaysExpanded,
+			}),
+		)
+	}, [displayFlags, mapMode, timeStep, overlaysExpanded])
 
 	const [seed, setSeed] = useState(DEFAULT_SEED)
 	const [systemCount, setSystemCount] = useState(DEFAULT_SYSTEM_COUNT)
@@ -795,6 +818,8 @@ export const PortedGalaxyView: React.FC<{
 					onDisplayFlagChange={handleDisplayFlagChange}
 					timeStep={timeStep}
 					onTimeStepChange={handleTimeStepChange}
+					overlaysExpanded={overlaysExpanded}
+					onOverlaysExpandedChange={setOverlaysExpanded}
 				/>
 				<GalaxyMapModeControl
 					mode={mapMode}

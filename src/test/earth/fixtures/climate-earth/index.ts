@@ -24,6 +24,7 @@ function importWorld() {
 	return IMPORT_HEIGHTMAP.importGenesisWorld({
 		params: {
 			seed: 14963991,
+			targetTechLevel: DEFAULT_WORLD_PARAMS.targetTechLevel,
 			numPoints: DEFAULT_WORLD_PARAMS.numPoints,
 			jitter: DEFAULT_WORLD_PARAMS.jitter,
 			moons: DEFAULT_WORLD_PARAMS.moons,

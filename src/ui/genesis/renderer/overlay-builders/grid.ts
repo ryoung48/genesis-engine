@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
+import type { MapGridParams } from "@/ui/genesis/renderer/overlay-builders/grid-types"
 import {
 	appendProjectedSegment,
 	createLineSegments,
@@ -56,17 +57,21 @@ export function buildGlobeGrid(
 	)!
 }
 
-export function buildMapGrid(
-	spacingDeg: number,
-	projectionLatitudeDeg: number,
-	gridVisible: boolean,
-	viewMode: GenesisViewMode,
-): THREE.LineSegments {
+export function buildMapGrid({
+	spacingDeg,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	gridVisible,
+	viewMode,
+}: MapGridParams): THREE.LineSegments {
 	const spacing = Math.max(2.5, spacingDeg)
 	const lonStep = Math.max(2.5, spacing / 2)
 	const latStep = Math.max(2.5, spacing / 2)
 	const positions: number[] = []
-	const projection = createMapProjection(0, projectionLatitudeDeg)
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
 
 	for (let latDeg = -90 + spacing; latDeg < 90; latDeg += spacing) {
 		let previous: { lon: number; lat: number } | null = null

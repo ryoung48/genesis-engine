@@ -10,7 +10,7 @@ import { Swatch } from "@/ui/components/primitives/Swatch"
 import { uiTokens } from "@/ui/components/tokens"
 import type { WorldSection } from "@/ui/genesis/details/drawer-state"
 import type { DetailsDrawerBaseProps } from "@/ui/genesis/details/shared"
-import { formatPopulation } from "@/ui/genesis/details/shared"
+import { DetailRow, formatPopulation } from "@/ui/genesis/details/shared"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 
 // Matches GenerationPanel's own top-level collapsible blocks ("Generate",
@@ -175,6 +175,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	climateDistribution,
 	vegetationDistribution,
 	topographyDistribution,
+	techLevelDistribution,
 	tradeGoodsDistribution,
 }) => {
 	const worldSections = getWorldSections({
@@ -269,8 +270,15 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 						{renderStatGrid(worldSections.social)}
 					</div>
 					<div className="space-y-1">
+						<DetailRow
+							label="Nations"
+							value={nationSizeDistribution
+								.reduce((sum, bucket) => sum + bucket.count, 0)
+								.toLocaleString()}
+						/>
 						<DistributionChart
 							title="Nation Size"
+							valueDisplay="count"
 							buckets={nationSizeDistribution}
 							variant="compact"
 							showTotal={false}
@@ -296,6 +304,12 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 						<DistributionChart
 							title="Relations"
 							buckets={relationDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
+						<DistributionChart
+							title="Tech Level"
+							buckets={techLevelDistribution}
 							variant="compact"
 							showTotal={false}
 						/>

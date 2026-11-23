@@ -15,7 +15,8 @@ import type {
 
 export interface RouteWorldInput {
 	mesh: Pick<SphereMesh, "r_xyz" | "adjOffset" | "adjList">
-	params: Pick<GenesisParams, "planetRadiusKm" | "era">
+	params: Pick<GenesisParams, "planetRadiusKm">
+	era: SocietyEra
 	provinces: Pick<
 		GenesisProvinces,
 		"count" | "desolate" | "regionProvince" | "adjOffset" | "adjList"

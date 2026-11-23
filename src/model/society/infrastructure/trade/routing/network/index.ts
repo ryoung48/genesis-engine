@@ -30,7 +30,7 @@ function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	}
 	return {
 		P: provinces.count,
-		era: input.params.era ?? "lateMedieval",
+		era: input.era,
 		desolate: provinces.desolate,
 		stateless,
 		regionProvince: provinces.regionProvince,

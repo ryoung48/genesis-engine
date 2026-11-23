@@ -1,17 +1,22 @@
 import { expect, it } from "vitest"
 import { SIM_DERIVE } from "@/model/history/sim/derive"
+import { ERAS } from "@/model/society/eras"
 import { MIGRATION } from "@/model/society/migration"
+import type { MigrationParams } from "@/model/society/migration/types"
 import { POPULATION } from "@/model/society/population"
 import { DISTRIBUTION_FIXTURE as F } from "@/test/history-run/fixtures/distribution"
 
-it("selects one reproducible origin and blocks desolate transit", () => {
+it("selects one reproducible origin and never settles desolate land", () => {
 	const w = F.world({ neighbors: [[1], [0, 2], [1]], desolate: [1], seed: 42 })
 	if (w.historyMigration.pipeline !== "distribution") throw new Error("Fixture")
 	const m = w.historyMigration.data
 	expect(m.origin).toBeGreaterThanOrEqual(0)
 	expect([...m.arrivalYear].filter((y) => y === -79999)).toHaveLength(1)
 	expect(m.continuousArrival[1]).toBe(Infinity)
-	expect(m.continuousArrival[m.origin === 0 ? 2 : 0]).toBe(Infinity)
+	expect(m.arrivalYear[1]).toBe(MIGRATION.sentinel)
+	expect(Number.isFinite(m.continuousArrival[m.origin === 0 ? 2 : 0])).toBe(
+		true,
+	)
 })
 it("allows successive 37.5 km water gaps without crossing an intermediate island", () => {
 	const w = F.world({ neighbors: [[], [], []], desolate: [], seed: 42 })
@@ -39,11 +44,14 @@ it("allows successive 37.5 km water gaps without crossing an intermediate island
 		mesh,
 		isLand: Uint8Array.of(1, 0, 1, 0, 1),
 		elevationKm: new Float32Array(count).fill(-0.5),
+		temperatureC: new Float32Array(count).fill(25),
+		rainfallMm: new Float32Array(count).fill(1000),
+		originHint: null,
 		planetRadiusKm: 6371,
 		habitability: Float32Array.of(3, 1, 1),
 		seed: 42,
 		horizonYear: 2025,
-	})
+	}).result
 	expect(m.origin).toBe(0)
 	expect(m.diagnostics.seaEdges).toBe(2)
 	expect([...m.predecessor]).toEqual([-1, 0, 1])
@@ -60,24 +68,27 @@ it("uses equal suitability for zero scores and scales physical distances with ra
 		adjList: Int32Array.of(1, 0),
 		regionArea: new Float32Array(2).fill(1),
 	}
-	const params = {
+	const params: MigrationParams = {
 		provinces: w.provinces!,
 		mesh,
 		isLand: new Uint8Array(2).fill(1),
 		elevationKm: new Float32Array(2),
+		temperatureC: new Float32Array(2).fill(25),
+		rainfallMm: new Float32Array(2).fill(1000),
+		originHint: null,
 		planetRadiusKm: 6371,
 		habitability: new Float32Array(2),
 		seed: 42,
 		horizonYear: 2025,
 	}
-	const a = MIGRATION.compute(params),
-		b = MIGRATION.compute({ ...params, planetRadiusKm: 12742 })
+	const a = MIGRATION.compute(params).result,
+		b = MIGRATION.compute({ ...params, planetRadiusKm: 12742 }).result
 	const destination = 1 - a.origin
 	expect(b.origin).toBe(a.origin)
-	expect(b.continuousArrival[destination] + 65000).toBeCloseTo(
-		2 * (a.continuousArrival[destination] + 65000),
+	expect(b.continuousArrival[destination] + 79999).toBeCloseTo(
+		2 * (a.continuousArrival[destination] + 79999),
 	)
-	expect(a.continuousArrival[destination] + 65000).toBeCloseTo(182.0, 0)
+	expect(a.continuousArrival[destination] + 79999).toBeCloseTo(231.6, 0)
 })
 it("finds no origin for empty and all-desolate worlds", () => {
 	for (const neighbors of [[], [[]]] as number[][][]) {
@@ -125,6 +136,7 @@ it("excludes after-horizon and unreachable provinces from population weights and
 		migrationWave,
 		settlementWave: 1,
 		migrationFalloff: 0,
+		techLevel: ERAS.defaultTechLevel,
 	})
 	population.migrationWave = migrationWave
 	expect(population.population[2]).toBe(0)
@@ -141,9 +153,10 @@ it("excludes after-horizon and unreachable provinces from population weights and
 		r_xyz: w.mesh.r_xyz,
 		seed: 42,
 		planetRadiusKm: 6371,
-		era: "lateMedieval",
+		techLevel: ERAS.defaultTechLevel,
 		eraSettledMask,
 		eraStatehoodMask: new Uint8Array(4),
+		agrarianShare: undefined,
 		timings: [],
 	})
 	expect(society.cultures?.assignment[2]).toBe(-1)

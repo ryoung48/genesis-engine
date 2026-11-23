@@ -5,6 +5,7 @@ import {
 	buildGhslSettlementPopulationSlice,
 	topSettlementIndices,
 } from "@/ui/genesis/generation/earth-assets"
+import { getMigrationRoutes } from "@/ui/genesis/shared/migration-arrival"
 import {
 	buildDistrictBorderLayer,
 	buildRealmBorderLayers,
@@ -29,8 +30,9 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		contours,
 		showCoastlines,
 		showGrid,
-		gridSpacing,
+		showCoordinateTicks,
 		showInfrastructure,
+		showMigrationRoutes,
 		showElevation,
 		eu4GhslSettlements,
 		labelMode,
@@ -108,10 +110,9 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		sceneRef.current?.setGridVisible(showGrid)
 	}, [showGrid])
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
-		sceneRef.current?.setGridSpacing(gridSpacing)
-	}, [gridSpacing])
+		sceneRef.current?.setCoordinateTicksVisible(showCoordinateTicks)
+	}, [sceneRef, showCoordinateTicks])
 	// Real (EU4-import) settlements replace the procedural province settlement
 	// dots and trade-route "roads" entirely -- both share the Infrastructure
 	// toggle, but only one of the two marker sets is ever shown at once.
@@ -168,6 +169,14 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 			scene.setInfrastructure(null)
 		}
 	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
+	useEffect(() => {
+		sceneRef.current?.setMigrationRoutes(
+			showMigrationRoutes
+				? (getMigrationRoutes(worldForDisplay) ?? null)
+				: null,
+		)
+	}, [showMigrationRoutes, worldForDisplay])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		sceneRef.current?.setEu4SettlementsVisible(

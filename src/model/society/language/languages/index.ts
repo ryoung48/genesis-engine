@@ -6,7 +6,7 @@ import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
 import { INTERNAL } from "@/model/society/language/languages/internal"
 import {
-	Gender,
+	type Gender,
 	type Language,
 	PhonemeCatalog,
 	type WordParams,
@@ -130,11 +130,12 @@ export const LANGUAGE = {
 		})
 		const dice = lang.dice
 
-		const stop = dice.weightedChoice([
-			{ v: " ", w: 0.8 },
-			{ v: "'", w: 0.1 },
-			{ v: "-", w: 0.1 },
-		])
+		const stop =
+			dice.weightedChoice([
+				{ v: " ", w: 0.8 },
+				{ v: "'", w: 0.1 },
+				{ v: "-", w: 0.1 },
+			]) ?? " "
 		lang.stop = stop
 		const stopChance =
 			stop === "'" ? dice.uniform(0.3, 0.6) : stop === "-" ? 1 : 0
@@ -187,9 +188,8 @@ export const LANGUAGE = {
 			const start = dice.weightedChoice(
 				lang.phonemes[PhonemeCatalog.START_CONSONANT],
 			)
-			const end = dice.weightedChoice(
-				lang.phonemes[PhonemeCatalog.END_CONSONANT],
-			)
+			const end =
+				dice.weightedChoice(lang.phonemes[PhonemeCatalog.END_CONSONANT]) ?? ""
 			const endVowel = dice.weightedChoice(
 				CLUSTER.endVowels({ cluster: lang.clusters.female, prev: end }).filter(
 					(v: { v: string }) => v.v.length < 2,
@@ -240,7 +240,7 @@ export const LANGUAGE = {
 							v: `${PhonemeCatalog.START_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.END_CONSONANT}`,
 							w: 0.8,
 						},
-					]),
+					]) ?? "",
 				),
 			],
 			title: [
@@ -256,7 +256,7 @@ export const LANGUAGE = {
 							v: `${PhonemeCatalog.START_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.END_CONSONANT}`,
 							w: 0.8,
 						},
-					]),
+					]) ?? "",
 				),
 			],
 		}

@@ -5,7 +5,6 @@ import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { SLIDER_RANGES } from "@/model/pipelines/genesis-params/ranges"
 import { UNITS } from "@/model/shared/units"
-import type { SocietyEra } from "@/model/society/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
@@ -227,7 +226,7 @@ export function resetWorldDefaults(setters: {
 	setPressure: (v: number) => void
 	setSeed: (v: number) => void
 	setSeaLevel: (v: number) => void
-	setEra: (v: SocietyEra) => void
+	setTargetTechLevel: (v: number) => void
 }): void {
 	setters.setLandDistribution(DEFAULT_WORLD_PARAMS.landDistribution)
 	setters.setContinentSizeVariety(DEFAULT_WORLD_PARAMS.continentSizeVariety)
@@ -245,5 +244,5 @@ export function resetWorldDefaults(setters: {
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
 	setters.setSeed(SOL_DATA.solSeed)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
-	setters.setEra(DEFAULT_WORLD_PARAMS.era)
+	setters.setTargetTechLevel(DEFAULT_WORLD_PARAMS.targetTechLevel)
 }

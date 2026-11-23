@@ -14,6 +14,7 @@ import {
 	earthHistoryNationOverridesEqual,
 } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/labels"
 import { createMeasurementController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/measurement"
+import { createMigrationRoutesController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/migration-routes"
 import { createNationBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/nation-borders"
 import { createPathfindingController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/pathfinding"
 import { createRealmBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/realm-borders"
@@ -265,6 +266,11 @@ export function createGenesisScene(
 	const setInfrastructureVisible =
 		infrastructureController.setInfrastructureVisible
 
+	const migrationRoutesController = createMigrationRoutesController(context, {
+		updateOverlayVisibility: () => updateOverlayVisibility(),
+	})
+	const { setMigrationRoutes } = migrationRoutesController
+
 	const overlayVisibilityController = createOverlayVisibilityController(
 		context,
 		{ requestRender: () => requestRender() },
@@ -286,6 +292,7 @@ export function createGenesisScene(
 			rebuildSettlementOverlay: () => rebuildSettlementOverlay(),
 			rebuildEu4SettlementOverlay: () => rebuildEu4SettlementOverlay(),
 			rebuildTradeRouteOverlay: () => rebuildTradeRouteOverlay(),
+			rebuildMigrationRoutes: () => migrationRoutesController.rebuild(),
 			rebuildNationLabels: () => rebuildNationLabels(),
 			updateOverlayVisibility: () => updateOverlayVisibility(),
 		},
@@ -312,10 +319,13 @@ export function createGenesisScene(
 		setViewMode,
 		setWireframeVisible,
 		setGridVisible,
-		setGridSpacing,
 		setElevationVisible,
 		projectToScreen,
 	} = viewStateController
+	function setCoordinateTicksVisible(visible: boolean) {
+		context.coordinateTicksVisible = visible
+		requestRender()
+	}
 
 	if (initialWorld) {
 		updateWorld(initialWorld)
@@ -435,7 +445,7 @@ export function createGenesisScene(
 		setViewMode,
 		setWireframeVisible,
 		setGridVisible,
-		setGridSpacing,
+		setCoordinateTicksVisible,
 		setMapCenterLongitude,
 		setMapProjectionLatitude,
 		commitMapCenterLongitude,
@@ -466,6 +476,7 @@ export function createGenesisScene(
 		setEu4SettlementsVisible,
 		setInfrastructure,
 		setInfrastructureVisible,
+		setMigrationRoutes,
 		setLabelMode,
 		setNationNames,
 		setDynastyNames,

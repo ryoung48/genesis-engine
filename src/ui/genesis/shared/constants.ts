@@ -14,4 +14,4 @@ export const monthLabels = [
 	"Dec",
 ]
 
-export const gridSpacingOptions = [30, 15, 10, 5, 2.5]
+export const GRID_SPACING_DEG = 15

@@ -19,6 +19,7 @@ export interface DetailsDrawerBaseProps {
 	climateDistribution: DistributionBucket[]
 	vegetationDistribution: DistributionBucket[]
 	topographyDistribution: DistributionBucket[]
+	techLevelDistribution: DistributionBucket[]
 	/** Whether climate/vegetation/topography above are bucketed from real EU5
 	 * observed data rather than the procedural model -- tracks the map
 	 * overlay's model/observed dataVariant flag (Earth import only). Used to

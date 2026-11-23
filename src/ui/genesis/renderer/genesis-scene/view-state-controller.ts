@@ -97,12 +97,6 @@ export function createViewStateController(
 		deps.rebuildOverlays()
 	}
 
-	function setGridSpacing(spacingDeg: number) {
-		if (ctx.gridSpacingDeg === spacingDeg) return
-		ctx.gridSpacingDeg = spacingDeg
-		deps.rebuildOverlays()
-	}
-
 	function setElevationVisible(visible: boolean) {
 		if (ctx.elevationVisible === visible) return
 		ctx.elevationVisible = visible
@@ -157,7 +151,6 @@ export function createViewStateController(
 		setViewMode,
 		setWireframeVisible,
 		setGridVisible,
-		setGridSpacing,
 		setElevationVisible,
 		projectToScreen,
 	}

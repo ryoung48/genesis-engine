@@ -2,6 +2,7 @@ import { MATH } from "@/model/shared/math/core"
 import { DEJURE } from "@/model/society/dejure"
 import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { GovernmentType } from "@/model/society/types"
 import type {
 	CityTargetsParams,
@@ -12,8 +13,11 @@ import type {
 	SortByRankParams,
 	SpreadDevelopmentParams,
 	SpreadEntry,
+	StateDevelopmentParams,
+	TechKnowledgeParams,
 	UrbanizationInputs,
 	UrbanizationResult,
+	UrbanKnowledge,
 } from "@/model/society/urbanization/types"
 
 const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
@@ -84,6 +88,48 @@ function urbanPopToDev(pop: number): number {
 		range: [0.05, 0.1, 0.25, 0.65, 0.95],
 		x: pop,
 	})
+}
+
+const REALM_REFERENCE_POPULATION = 10_000_000
+
+const REALM_EXPONENT = 0.3
+
+const MAX_REALM_FACTOR = 2.5
+
+function realmCityFactor(realmPopulation: number): number {
+	return Math.min(
+		MAX_REALM_FACTOR,
+		(realmPopulation / REALM_REFERENCE_POPULATION) ** REALM_EXPONENT,
+	)
+}
+
+function techKnowledge({
+	nations,
+	population,
+}: TechKnowledgeParams): UrbanKnowledge {
+	const realm = TECH_LEVEL.realmLevels({
+		sovereign: nations.sovereign,
+		population: population.population,
+		techLevel: population.techLevel,
+	})
+	let mass = 0
+	let weight = 0
+	for (let p = 0; p < nations.sovereign.length; p++) {
+		const root = nations.sovereign[p]
+		if (root < 0) continue
+		const people = population.population[p]
+		mass += people * nationProfile(nations.governmentType?.[root] ?? 1).U
+		weight += people
+	}
+	const meanShare = weight > 0 && mass > 0 ? mass / weight : 1
+	return {
+		urbanFactor: (nation) =>
+			TECH_LEVEL.urbanShare({ techLevel: realm[nation] }) / meanShare,
+		maxCitySize: ({ nation, realmPopulation }) =>
+			(TECH_LEVEL.largestCity({ techLevel: realm[nation] }) /
+				MAX_REALM_FACTOR) *
+			realmCityFactor(realmPopulation),
+	}
 }
 
 const MAX_SPREAD_HOPS = 20
@@ -253,6 +299,30 @@ function spreadDevelopment({
 	return devFromCities
 }
 
+const FRONTIER_LOSS = 0.15
+
+// Development as states hold it: each state province keeps its city
+// development, frontier provinces without a town lose a share per stateless
+// neighbour, and stateless land keeps none of its own.
+function stateDevelopment({
+	provinces,
+	sovereign,
+	development,
+	urbanPopulation,
+}: StateDevelopmentParams): Float32Array {
+	const { count, desolate, adjOffset, adjList } = provinces
+	return Float32Array.from({ length: count }, (_, p) => {
+		if (desolate[p] || sovereign[p] < 0) return 0
+		if (urbanPopulation[p] > 0) return development[p]
+		let stateless = 0
+		for (let i = adjOffset[p]; i < adjOffset[p + 1]; i++) {
+			const nb = adjList[i]
+			if (!desolate[nb] && sovereign[nb] < 0) stateless++
+		}
+		return development[p] * (1 - FRONTIER_LOSS) ** stateless
+	})
+}
+
 function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 	const { count: P, desolate } = inputs.provinces
 	const { parent, sovereign, governmentType, titles } = inputs.nations
@@ -268,10 +338,17 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 	// whole. The sim walked the live hierarchy for this; the static hierarchy
 	// gives the same grouping directly.
 	const provincesByNation = new Map<number, number[]>()
+	const realmPopulation = new Map<number, number>()
 	for (let p = 0; p < P; p++) {
 		if (desolate[p]) continue
 		const root = sovereign[p]
 		if (root < 0) continue
+		realmPopulation.set(
+			root,
+			(realmPopulation.get(root) ?? 0) + inputs.population.population[p],
+		)
+		// Foraging provinces hold no towns; a realm's capital always may.
+		if (inputs.foraging[p] && p !== root) continue
 		const bucket = provincesByNation.get(root)
 		if (bucket) bucket.push(p)
 		else provincesByNation.set(root, [p])
@@ -280,8 +357,7 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 	for (const [nation, provinces] of provincesByNation) {
 		if (desolate[nation] || parent[nation] >= 0) continue
 
-		let totalPop = 0
-		for (const prov of provinces) totalPop += population[prov]
+		const totalPop = realmPopulation.get(nation) ?? 0
 
 		const sorted = sortByRank({
 			provinces,
@@ -293,9 +369,12 @@ function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
 			governmentTypeIndex: governmentType?.[nation] ?? 1,
 			totalPopulation: totalPop,
 			provinceCount: sorted.length,
-			urbanFactor: inputs.knowledge.urbanFactor,
+			urbanFactor: inputs.knowledge.urbanFactor(nation),
 		})
-		const maxCitySize = inputs.knowledge.maxCitySize(totalPop)
+		const maxCitySize = inputs.knowledge.maxCitySize({
+			nation,
+			realmPopulation: totalPop,
+		})
 		const targets = cityTargets({
 			sizes,
 			count: sorted.length,
@@ -323,9 +402,7 @@ function computeDevelopment({
 		waterAccess,
 	} = inputs.provinces
 	const { sovereign } = inputs.nations
-	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(
-		inputs.params.era ?? "lateMedieval",
-	)
+	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(inputs.era)
 	const development = spreadDevelopment({
 		count: P,
 		cityMin,
@@ -363,7 +440,10 @@ export const URBANIZATION = {
 	cityTargets,
 	computeUrbanization,
 	rankSizesForNation,
+	realmCityFactor,
+	techKnowledge,
 	sortByRank,
 	spreadDevelopment,
+	stateDevelopment,
 	urbanPopToDev,
 }

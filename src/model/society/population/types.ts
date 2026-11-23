@@ -37,12 +37,12 @@ export interface ComputePopulationParams {
 	seed: number
 	mesh: SphereMesh
 	planetRadiusKm?: number
-	eraTargetPopulation?: number
+	techLevel: number
 	migrationWave?: Float32Array
 	settlementWave?: number
 	migrationFalloff?: number
-	// [JUSTIFICATION] Only the arrival-driven late medieval start knows how long each province has been settled; it replaces the wave falloff there.
-	settlementAgeYears?: Float32Array
+	// [JUSTIFICATION] Only the arrival-driven late medieval start has a start year to evaluate farming density at; it replaces the wave falloff there.
+	densityWeights?: Float32Array
 }
 
 export interface ProvincePopulation {
@@ -50,6 +50,7 @@ export interface ProvincePopulation {
 	habitability: Float32Array
 	/** Per-province rural population */
 	population: Float32Array
+	techLevel: Float32Array
 	/** Aggregated global habitability score */
 	habitabilityScore: number
 	/** Total world population */
@@ -83,4 +84,6 @@ export interface ProvincePopulation {
 	 * without re-importing era configs.
 	 */
 	settlementWave?: number
+	// [JUSTIFICATION] Set by generation from the requested tech level; Earth imports start on their own calendar.
+	startYear?: number
 }

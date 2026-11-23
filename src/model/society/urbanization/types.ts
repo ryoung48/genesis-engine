@@ -1,13 +1,33 @@
-import type { GenesisParams } from "@/model/pipelines/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type {
 	GenesisNationHierarchy,
 	GenesisProvinces,
+	SocietyEra,
 } from "@/model/society/types"
 
+export interface CitySizeQuery {
+	nation: number
+	realmPopulation: number
+}
+
 export interface UrbanKnowledge {
-	urbanFactor: number
-	maxCitySize: (realmPopulation: number) => number
+	urbanFactor: (nation: number) => number
+	maxCitySize: (query: CitySizeQuery) => number
+}
+
+export interface StateDevelopmentParams {
+	provinces: Pick<
+		GenesisProvinces,
+		"count" | "desolate" | "adjOffset" | "adjList" | "waterAccess"
+	>
+	sovereign: Int32Array
+	development: Float32Array
+	urbanPopulation: Float32Array
+}
+
+export interface TechKnowledgeParams {
+	nations: Pick<GenesisNationHierarchy, "sovereign" | "governmentType">
+	population: Pick<ProvincePopulation, "population" | "techLevel">
 }
 
 export interface CityTargetsParams {
@@ -65,7 +85,7 @@ export interface NationProfile {
 }
 
 export interface UrbanizationInputs {
-	params: Pick<GenesisParams, "era">
+	era: SocietyEra
 	provinces: Pick<
 		GenesisProvinces,
 		"count" | "desolate" | "adjOffset" | "adjList" | "waterAccess"
@@ -76,6 +96,7 @@ export interface UrbanizationInputs {
 	>
 	population: Pick<ProvincePopulation, "population" | "habitability">
 	knowledge: UrbanKnowledge
+	foraging: Uint8Array
 }
 
 export interface UrbanizationResult {

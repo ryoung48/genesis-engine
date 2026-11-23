@@ -4,8 +4,10 @@ import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { DATE } from "@/model/history/earth/date"
 import { TIME } from "@/model/shared/time"
+import type { WayOfLifeShares } from "@/model/society/farming/types"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { MIGRATION } from "@/model/society/migration"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/genesis/hover/hover"
 import {
@@ -30,8 +32,16 @@ import {
 	getBaseMapMode,
 	getDataVariant,
 } from "@/ui/genesis/shared/data-variant"
+import {
+	displayYear,
+	getFarming,
+	getWayOfLife,
+} from "@/ui/genesis/shared/farming-display"
 import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
-import { getArrivalYears } from "@/ui/genesis/shared/migration-arrival"
+import {
+	getArrivalRampYears,
+	getArrivalYears,
+} from "@/ui/genesis/shared/migration-arrival"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
 	getTerrainFeatureColor,
@@ -313,6 +323,79 @@ export function buildTopographySwatchColor(
 	return color ? rgbToCss(color) : null
 }
 
+const WAY_OF_LIFE_MIN_SHARE = 0.05
+
+export function buildFarmingDisplayData(params: {
+	populationMode: SocietyMapMode
+	hoverProvince: number | null
+	world: SerializedGenesisWorld | null
+	timeMs: number | null
+	getProvinceName: (provinceId: number) => string
+}): HoverDemographicDisplayData[] {
+	const { populationMode, hoverProvince, world, timeMs, getProvinceName } =
+		params
+	const farming = getFarming(world)
+	if (
+		(populationMode !== "farming" && populationMode !== "wayOfLife") ||
+		!world?.provinces ||
+		!farming ||
+		hoverProvince === null ||
+		hoverProvince < 0 ||
+		hoverProvince >= world.provinces.desolate.length ||
+		world.provinces.desolate[hoverProvince]
+	)
+		return []
+	const year = farming.farmingYear[hoverProvince]
+	const source = farming.hearthOf[hoverProvince]
+	const at = {
+		farming,
+		province: hoverProvince,
+		year: displayYear({ timeMs, world }),
+		techLevel: TECH_LEVEL.averageLevel({
+			target: world.params.targetTechLevel,
+		}),
+	}
+	const describeMix = (shares: WayOfLifeShares) =>
+		(["farm", "herd", "forage"] as const)
+			.filter((way) => shares[way] >= WAY_OF_LIFE_MIN_SHARE)
+			.map(
+				(way) =>
+					`${way[0].toUpperCase()}${way.slice(1)} ${Math.round(100 * shares[way])}%`,
+			)
+			.join(" · ")
+	const field = getWayOfLife({ world, year: at.year })
+	const people = field
+		? describeMix({
+				forage: field.forage[hoverProvince],
+				farm: field.farm[hoverProvince],
+				herd: field.herd[hoverProvince],
+			})
+		: ""
+
+	return [
+		{
+			label: "Farming arrival",
+			value: year === MIGRATION.sentinel ? "Never" : DATE.formatEu4Year(year),
+			color: null,
+		},
+		{
+			label: "Farming hearth",
+			value:
+				source < 0
+					? "—"
+					: source === hoverProvince
+						? "Own hearth"
+						: getProvinceName(source),
+			color: null,
+		},
+		{
+			label: "Way of life",
+			value: people || "Uninhabited",
+			color: null,
+		},
+	]
+}
+
 export function buildDemographicDisplayData(params: {
 	populationMode: SocietyMapMode
 	colorMode: ColorMode
@@ -384,6 +467,17 @@ export function buildDemographicDisplayData(params: {
 		}
 	}
 
+	if (populationMode === "techLevel") {
+		const techLevel = world.population?.techLevel[province]
+		if (isDesolate || techLevel === undefined || !Number.isFinite(techLevel))
+			return null
+		return {
+			label: "Tech level",
+			value: `TL ${techLevel.toFixed(2)} · ${TECH_LEVEL.describe({ techLevel })}`,
+			color: null,
+		}
+	}
+
 	if (populationMode === "urban") {
 		const urbanPopulation =
 			world.realUrbanPopulation?.population?.[province] ?? 0
@@ -397,11 +491,14 @@ export function buildDemographicDisplayData(params: {
 
 	if (populationMode === "migration") {
 		const year = getArrivalYears(world)?.[province]
-		if (isDesolate || year === undefined) return null
+		const rampYear = getArrivalRampYears(world)?.[province]
+		if (isDesolate || year === undefined || rampYear === undefined) return null
 		return {
 			label: "Migration arrival",
 			value:
-				year === MIGRATION.sentinel ? "Unreached" : DATE.formatEu4Year(year),
+				year === MIGRATION.sentinel
+					? "Unreached"
+					: `${DATE.formatEu4Year(year)} · ramp ${DATE.formatEu4Year(rampYear)}`,
 			color: null,
 		}
 	}

@@ -153,7 +153,7 @@ export type LocalWeatherResponse =
 	| { type: "error"; revision: number; requestId: number; message: string }
 
 export interface LocalWeatherWorkerScope {
-	onmessage: ((event: MessageEvent<LocalWeatherRequest>) => void) | null
+	onmessage: ((event: { data: LocalWeatherRequest }) => void) | null
 	postMessage: (message: LocalWeatherResponse) => void
 }
 

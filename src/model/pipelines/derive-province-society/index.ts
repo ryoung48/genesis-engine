@@ -7,6 +7,7 @@ import type {
 import { TIMING } from "@/model/shared/timing"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/society/infrastructure/settlements"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 
 function deriveProvinceSociety({
 	mesh,
@@ -28,9 +29,10 @@ function deriveProvinceSociety({
 		r_xyz: mesh.r_xyz,
 		seed: params.seed,
 		planetRadiusKm: params.planetRadiusKm,
-		era: params.era,
+		techLevel: TECH_LEVEL.averageLevel({ target: params.targetTechLevel }),
 		eraSettledMask: post.eraSettledMask,
 		eraStatehoodMask: post.eraStatehoodMask,
+		agrarianShare: post.agrarianShare,
 		timings,
 	})
 

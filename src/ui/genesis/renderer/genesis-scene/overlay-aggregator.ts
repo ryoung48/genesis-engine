@@ -10,6 +10,7 @@ import {
 	buildMapGrid,
 } from "@/ui/genesis/renderer/overlay-builders/grid"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
+import { GRID_SPACING_DEG } from "@/ui/genesis/shared/constants"
 
 export interface OverlayAggregatorControllerDeps {
 	syncAnimationState: () => void
@@ -24,6 +25,7 @@ export interface OverlayAggregatorControllerDeps {
 	rebuildSettlementOverlay: () => void
 	rebuildEu4SettlementOverlay: () => void
 	rebuildTradeRouteOverlay: () => void
+	rebuildMigrationRoutes: () => void
 	rebuildNationLabels: () => void
 	updateOverlayVisibility: () => void
 }
@@ -62,6 +64,8 @@ export function createOverlayAggregatorController(
 		disposeGroup(ctx.scene, ctx.mapEu4Settlements)
 		disposeGroup(ctx.globeGroup, ctx.globeInfrastructure)
 		disposeGroup(ctx.scene, ctx.mapInfrastructure)
+		disposeGroup(ctx.globeGroup, ctx.globeMigrationRoutes)
+		disposeGroup(ctx.scene, ctx.mapMigrationRoutes)
 		disposeGroup(ctx.globeGroup, ctx.globeNationLabels)
 		disposeGroup(ctx.scene, ctx.mapNationLabels)
 		if (ctx.globeNationScripts) ctx.globeGroup.remove(ctx.globeNationScripts)
@@ -92,6 +96,8 @@ export function createOverlayAggregatorController(
 		ctx.settlementsDirty = true
 		ctx.globeInfrastructure = null
 		ctx.mapInfrastructure = null
+		ctx.globeMigrationRoutes = null
+		ctx.mapMigrationRoutes = null
 		ctx.globeNationLabels = null
 		ctx.mapNationLabels = null
 		ctx.globeNationScripts = null
@@ -122,17 +128,18 @@ export function createOverlayAggregatorController(
 		}
 		if (ctx.gridVisible) {
 			ctx.globeGrid = buildGlobeGrid(
-				ctx.gridSpacingDeg,
+				GRID_SPACING_DEG,
 				ctx.gridVisible,
 				ctx.currentViewMode,
 				ctx.elevationVisible,
 			)
-			ctx.mapGrid = buildMapGrid(
-				ctx.gridSpacingDeg,
-				ctx.currentMapProjectionLatitudeDeg,
-				ctx.gridVisible,
-				ctx.currentViewMode,
-			)
+			ctx.mapGrid = buildMapGrid({
+				spacingDeg: GRID_SPACING_DEG,
+				centerLongitudeDeg: ctx.currentMapCenterLongitudeDeg,
+				projectionLatitudeDeg: ctx.currentMapProjectionLatitudeDeg,
+				gridVisible: ctx.gridVisible,
+				viewMode: ctx.currentViewMode,
+			})
 			ctx.globeGroup.add(ctx.globeGrid)
 			addMapSlideClones(ctx.mapGrid)
 			ctx.scene.add(ctx.mapGrid)
@@ -148,6 +155,7 @@ export function createOverlayAggregatorController(
 		deps.rebuildSettlementOverlay()
 		deps.rebuildEu4SettlementOverlay()
 		deps.rebuildTradeRouteOverlay()
+		deps.rebuildMigrationRoutes()
 		deps.rebuildNationLabels()
 		deps.updateOverlayVisibility()
 	}

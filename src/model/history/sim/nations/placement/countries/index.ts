@@ -4,7 +4,15 @@ import type {
 } from "@/model/history/sim/nations/placement/countries/types"
 import { PLACEMENT_FRONTIER } from "@/model/history/sim/nations/placement/frontier"
 import { TITLE_CLAIM } from "@/model/history/sim/nations/title-claim"
+import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
+
+// Leftover land goes to a neighbour that stays in its size bucket whenever one
+// exists; this outweighs any placement score, which stays within a few units.
+// When every neighbour would cross a bucket edge, the pocket founds its own
+// realm if it has an eligible capital and otherwise joins the largest
+// neighbour, where a few extra provinces move the size profile least.
+const BUCKET_CROSSING_PENALTY = 1000
 
 function placeCountries({
 	provinces,
@@ -18,6 +26,7 @@ function placeCountries({
 	maxSpreadRad,
 	targets,
 	policy,
+	agrarian,
 }: PlaceCountriesParams): PlacedCountries {
 	const provinceCount = provinces.count
 	const active = baseActive
@@ -67,6 +76,7 @@ function placeCountries({
 			componentSizes: components.sizes,
 			adjOffset: provinces.adjOffset,
 			adjList: provinces.adjList,
+			agrarian,
 		})
 		if (seedProvince < 0) continue
 
@@ -82,10 +92,16 @@ function placeCountries({
 						remaining: target,
 					})
 				: { title: -1, provinces: [seedProvince] }
-		const root =
+		const seat =
 			policy.kind === "simulation" && seedUnit.title >= 0
 				? policy.titles.seat[seedUnit.title]
 				: seedProvince
+		const root = PLACEMENT_FRONTIER.capitalEligible({
+			agrarian,
+			province: seat,
+		})
+			? seat
+			: seedProvince
 		seeds.push(root)
 		sizes.push(0)
 		quotas.push(target)
@@ -175,6 +191,7 @@ function placeCountries({
 
 			let bestNation = -1
 			let bestScore = -Infinity
+			let largestNation = -1
 			for (let i = 0; i < members.length; i++) {
 				const province = members[i]
 				for (
@@ -185,6 +202,8 @@ function placeCountries({
 				) {
 					const nation = assignment[provinces.adjList[j]]
 					if (nation < 0) continue
+					if (largestNation < 0 || sizes[nation] > sizes[largestNation])
+						largestNation = nation
 					const score =
 						PLACEMENT_FRONTIER.nationPlacementScore({
 							province,
@@ -193,7 +212,11 @@ function placeCountries({
 							provinceContinent,
 							target: members.length,
 						}) -
-						sizes[nation] * 0.02
+						sizes[nation] * 0.02 -
+						(TARGET_PROFILE.bucketOf({ size: sizes[nation] }) ===
+						TARGET_PROFILE.bucketOf({ size: sizes[nation] + members.length })
+							? 0
+							: BUCKET_CROSSING_PENALTY)
 					if (score > bestScore) {
 						bestScore = score
 						bestNation = nation
@@ -201,38 +224,42 @@ function placeCountries({
 				}
 			}
 
-			if (bestNation >= 0) {
-				for (let i = 0; i < members.length; i++) {
-					assignment[members[i]] = bestNation
-				}
-				sizes[bestNation] += members.length
-				assigned += members.length
-				continue
-			}
-
 			const nation = seeds.length
-			let seedProvince = members[0]
-			let seedScore = PLACEMENT_FRONTIER.nationPlacementScore({
-				province: seedProvince,
-				habitability,
-				waterAccess,
-				provinceContinent,
-				target: members.length,
-			})
-			for (let i = 1; i < members.length; i++) {
+			let seedProvince = -1
+			let seedScore = -Infinity
+			for (let i = 0; i < members.length; i++) {
 				const province = members[i]
-				const score = PLACEMENT_FRONTIER.nationPlacementScore({
-					province,
-					habitability,
-					waterAccess,
-					provinceContinent,
-					target: members.length,
-				})
+				if (!PLACEMENT_FRONTIER.capitalEligible({ agrarian, province }))
+					continue
+				const score =
+					PLACEMENT_FRONTIER.nationPlacementScore({
+						province,
+						habitability,
+						waterAccess,
+						provinceContinent,
+						target: members.length,
+					}) * (agrarian ? agrarian[province] : 1)
 				if (score > seedScore) {
 					seedProvince = province
 					seedScore = score
 				}
 			}
+			const crosses = bestScore < -BUCKET_CROSSING_PENALTY / 2
+			const recipient =
+				bestNation >= 0 && !crosses
+					? bestNation
+					: seedProvince < 0
+						? largestNation
+						: -1
+			if (recipient >= 0) {
+				for (let i = 0; i < members.length; i++) {
+					assignment[members[i]] = recipient
+				}
+				sizes[recipient] += members.length
+				assigned += members.length
+				continue
+			}
+			if (seedProvince < 0) continue
 			seeds.push(seedProvince)
 			sizes.push(members.length)
 			for (let i = 0; i < members.length; i++) {
@@ -319,6 +346,7 @@ function placeCountries({
 				componentSizes: open.sizes,
 				adjOffset: provinces.adjOffset,
 				adjList: provinces.adjList,
+				agrarian,
 			})
 			const root =
 				selected >= 0 ? selected : mask.findIndex((value) => value === 1)

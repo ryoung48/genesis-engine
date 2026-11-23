@@ -26,6 +26,7 @@ export function terminateGenerationWorker(worker: Worker | null): void {
 
 interface ImportHeightmapParams {
 	seed: number
+	targetTechLevel: number
 	numPoints: number
 	jitter: number
 	terrainWarp: number
@@ -307,7 +308,8 @@ export function generateWorld({
 		volcanism: overrides?.volcanism ?? currentParams.volcanism,
 		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
-		era: overrides?.era ?? currentParams.era,
+		targetTechLevel:
+			overrides?.targetTechLevel ?? currentParams.targetTechLevel,
 		historyPipeline:
 			overrides?.historyPipeline ?? currentParams.historyPipeline,
 	} as GenesisParams
@@ -369,6 +371,7 @@ export function importHeightmap(
 		type: "import",
 		params: {
 			seed: importParams.seed as number,
+			targetTechLevel: importParams.targetTechLevel,
 			numPoints: importParams.numPoints as number,
 			jitter: importParams.jitter as number,
 			grayscale,

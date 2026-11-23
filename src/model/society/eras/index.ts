@@ -1,8 +1,4 @@
-import { MATH } from "@/model/shared/math/core"
-import type {
-	EraConfig,
-	WavePercentileThresholdParams,
-} from "@/model/society/eras/types"
+import type { EraConfig, EraOfParams } from "@/model/society/eras/types"
 import type {
 	GovernmentFamily,
 	GovernmentType,
@@ -110,30 +106,18 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	paleolithic: {
 		id: "paleolithic",
 		label: "Paleolithic",
-		targetPopulation: 3e6,
-		// All habitable land has some band presence by late paleolithic; migrationFalloff
-		// concentrates population near cradles so density near zero at the frontier
-		settlementFraction: 0.45,
+		techLevel: 0,
 		migrationFalloff: 12,
-		statehoodFraction: 0,
 		hasNations: false,
-		nationPercentages: [],
-		nationBuckets: [],
 		governmentMix: { tribal: 1.0, monarchy: 0, republic: 0, theocracy: 0 },
 		governmentSizeWeight: 1.0,
 	},
 	neolithic: {
 		id: "neolithic",
 		label: "Neolithic",
-		targetPopulation: 10e6,
-		// All continental land inhabited; remote Pacific/Madagascar still genuinely empty
-		settlementFraction: 0.75,
+		techLevel: 0.19,
 		migrationFalloff: 8,
-		statehoodFraction: 0.08,
 		hasNations: true,
-		// Only tiny chiefdoms (1–4 provinces)
-		nationPercentages: MATH.normalize([0, 0, 0, 0, 0.15, 0.35, 0.5]),
-		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.92,
 			monarchy: 0.07,
@@ -146,18 +130,9 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	bronze: {
 		id: "bronze",
 		label: "Bronze Age",
-		targetPopulation: 50e6,
-		// Near-complete continental coverage; Pacific/Madagascar edge cases
-		settlementFraction: 0.9,
+		techLevel: 0.56,
 		migrationFalloff: 5,
-		statehoodFraction: 0.6,
 		hasNations: true,
-		// Count-calibrated against Bronze Age size-tier targets:
-		// 56% [1], 33% [2-4], 9% [5-9], 2% [10-24], 1% [25-49], 0% [50-250], 0% [251-600]
-		nationPercentages: MATH.normalize([
-			0.0, 0.0, 0.128, 0.1176, 0.218, 0.3426, 0.1938,
-		]),
-		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.62,
 			monarchy: 0.31,
@@ -170,18 +145,9 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	iron: {
 		id: "iron",
 		label: "Iron Age",
-		targetPopulation: 150e6,
-		// All non-desolate land has at least band/tribal presence by the Iron Age
-		settlementFraction: 1.0,
+		techLevel: 1.42,
 		migrationFalloff: 3,
-		statehoodFraction: 0.8,
 		hasNations: true,
-		// Count-calibrated against Iron Age size-tier targets:
-		// 41% [1], 38% [2-4], 15% [5-9], 4% [10-24], 1% [25-49], 1% [50-250], 1% [251-600]
-		nationPercentages: MATH.normalize([
-			0.4524, 0.1595, 0.0393, 0.0723, 0.1116, 0.1212, 0.0436,
-		]),
-		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.56,
 			monarchy: 0.36,
@@ -194,44 +160,9 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	lateMedieval: {
 		id: "lateMedieval",
 		label: "Late Medieval",
-		targetPopulation: 285e6,
-		settlementFraction: 1.0,
+		techLevel: 2.35,
 		migrationFalloff: 1.5,
-		statehoodFraction: 1.0,
 		hasNations: true,
-		// Measured directly from EU4 extended-timeline ownership folded to
-		// 1444.11.11 (public/earth-history/events/provinces.json): 711 nations
-		// holding 2,563 provinces. Share of *provinces* per size bucket --
-		// which is what buildNationPlan budgets against:
-		//   50+   4.4%   25-49 13.8%   10-24 25.7%
-		//   5-9  16.0%   2-4   27.3%   1     12.8%
-		// By nation count that is 46.1% [1], 37.3% [2-4], 9.1% [5-9],
-		// 5.9% [10-24], 1.4% [25-49], 0.1% [50+].
-		//
-		// These are taken as province shares rather than converted from count
-		// shares: the previous weights assumed the 50-250 bucket averaged 150
-		// provinces, which handed it 26.8% of all provinces. In 1444 the only
-		// nation above 49 is Ming at 113, so that bucket is really 4.4%.
-		// Rebalanced from the raw EU4-measured shares above: nation *count* skews
-		// heavily to the [1,1] bucket relative to its province mass (a size-1
-		// nation is 1 count per 1 province, while a [10,24] nation is 1 count per
-		// ~17 provinces), so trimming its mass share meaningfully thins out
-		// single-province nations and fills in the middle tiers by count.
-		// [1,1] trimmed further (0.1 -> 0.03) to cut the remaining
-		// singleton-nation count, with the freed mass spread across the other
-		// buckets in proportion to their existing share.
-		nationPercentages: MATH.normalize([
-			0.0, 0.4907, 0.1099, 0.1638, 0.1235, 0.0847, 0.03,
-		]),
-		nationBuckets: [
-			[251, 600],
-			[50, 250],
-			[25, 49],
-			[10, 24],
-			[5, 9],
-			[2, 4],
-			[1, 1],
-		],
 		governmentMix: {
 			tribal: 0.44,
 			monarchy: 0.49,
@@ -242,22 +173,13 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		governmentSizeWeight: 0.55,
 		maxRepublicSize: 40,
 		maxTheocracySize: 40,
-		organizations: { imperialPatchwork: false, tradeLeague: false },
 	},
 	earlyModern: {
 		id: "earlyModern",
 		label: "Early Modern",
-		targetPopulation: 600e6,
-		settlementFraction: 1.0,
+		techLevel: 3.27,
 		migrationFalloff: 1.5,
-		statehoodFraction: 1.0,
 		hasNations: true,
-		// Count-calibrated against Renaissance / Early Modern size-tier targets:
-		// 51% [1], 33% [2-4], 8% [5-9], 5% [10-24], 2% [25-49], 1% [50-250], 1% [251-600]
-		nationPercentages: MATH.normalize([
-			0.4524, 0.1595, 0.0787, 0.0904, 0.0595, 0.1053, 0.0542,
-		]),
-		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.45,
 			monarchy: 0.42,
@@ -271,17 +193,9 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	industrial: {
 		id: "industrial",
 		label: "Industrial",
-		targetPopulation: 1.2e9,
-		settlementFraction: 1.0,
+		techLevel: 4.24,
 		migrationFalloff: 1.5,
-		statehoodFraction: 1.0,
 		hasNations: true,
-		// Count-calibrated against Industrial size-tier targets:
-		// 36% [1], 30% [2-4], 16% [5-9], 8% [10-24], 4% [25-49], 4% [50-250], 3% [251-600]
-		nationPercentages: MATH.normalize([
-			0.5322, 0.2502, 0.0617, 0.0567, 0.0467, 0.0375, 0.015,
-		]),
-		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.12,
 			monarchy: 0.55,
@@ -295,17 +209,9 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 	information: {
 		id: "information",
 		label: "Information Age",
-		targetPopulation: 8e9,
-		settlementFraction: 1.0,
+		techLevel: 7.78,
 		migrationFalloff: 1.5,
-		statehoodFraction: 1.0,
 		hasNations: true,
-		// Count-calibrated against modern nation-state size-tier targets:
-		// 22% [1], 15% [2-4], 21% [5-9], 23% [10-24], 10% [25-49], 6% [50-250], 3% [251-600]
-		nationPercentages: MATH.normalize([
-			0.405, 0.2856, 0.1174, 0.1241, 0.0466, 0.0143, 0.007,
-		]),
-		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.0,
 			monarchy: 0.15,
@@ -334,23 +240,11 @@ const eraOrder: SocietyEra[] = [
 	"information",
 ]
 
-function wavePercentileThreshold({
-	migrationWave,
-	desolate,
-	fraction,
-}: WavePercentileThresholdParams): number {
-	if (fraction >= 1.0) return 1.0
-	if (fraction <= 0) return 0
-
-	const waves: number[] = []
-	for (let p = 0; p < migrationWave.length; p++) {
-		if (!desolate[p] && migrationWave[p] >= 0) waves.push(migrationWave[p])
-	}
-	if (waves.length === 0) return 1.0
-
-	waves.sort((a, b) => a - b)
-	const idx = Math.min(Math.floor(fraction * waves.length), waves.length - 1)
-	return waves[idx]
+function eraOf({ techLevel }: EraOfParams): SocietyEra {
+	let era = eraOrder[0]
+	for (const candidate of eraOrder)
+		if (eraConfigs[candidate].techLevel <= techLevel) era = candidate
+	return era
 }
 
 export const ERAS = {
@@ -362,5 +256,6 @@ export const ERAS = {
 	defaultEra,
 	eraOrder,
 	getEraConfig,
-	wavePercentileThreshold,
+	eraOf,
+	defaultTechLevel: eraConfigs[defaultEra].techLevel,
 }

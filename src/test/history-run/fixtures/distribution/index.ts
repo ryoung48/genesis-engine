@@ -65,10 +65,13 @@ function world({
 			mesh,
 			isLand: new Uint8Array(count).fill(1),
 			elevationKm: new Float32Array(count),
+			temperatureC: new Float32Array(count).fill(25),
+			rainfallMm: new Float32Array(count).fill(1000),
+			originHint: null,
 			planetRadiusKm: 6371,
 			seed,
 			horizonYear: 2025,
-		}),
+		}).result,
 	}
 	return {
 		params: { seed, planetRadiusKm: 6371, historyPipeline: "distribution" },

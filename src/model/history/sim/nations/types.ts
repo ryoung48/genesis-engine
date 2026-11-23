@@ -34,6 +34,8 @@ export interface ComputeNationsParams {
 	planetRadiusKm?: number
 	/** [JUSTIFICATION] when provided, only provinces where eraActiveMask[p] === 1 are eligible for nations; omitted entirely outside era-gated pipelines */
 	eraActiveMask?: Uint8Array
+	// [JUSTIFICATION] null where any province may hold a capital, unweighted (fast history, Earth imports).
+	agrarian: Float32Array | null
 	/** [JUSTIFICATION] era-specific nation budget percentages (must align with nationBuckets); omitted callers fall back to the default NATION_PERCENTAGES */
 	nationPercentages?: number[]
 	/** [JUSTIFICATION] era-specific province-size ranges for nation buckets; omitted callers fall back to ERAS.nationBuckets */

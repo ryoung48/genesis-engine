@@ -30,7 +30,8 @@ function create({ sea, landCount }: RouteFixtureParams) {
 			adjOffset,
 			adjList,
 		},
-		params: { era: "lateMedieval", planetRadiusKm: 6371 },
+		params: { planetRadiusKm: 6371 },
+		era: "lateMedieval",
 		provinces: {
 			count: provinces,
 			desolate: new Uint8Array(provinces),

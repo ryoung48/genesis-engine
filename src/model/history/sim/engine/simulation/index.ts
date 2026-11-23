@@ -29,7 +29,6 @@ import { HEIR_PLAN } from "@/model/history/sim/engine/state/rulers/heirs"
 import type { HistoryState } from "@/model/history/sim/engine/state/types"
 import { TIMING } from "@/model/shared/timing"
 import { UNITS } from "@/model/shared/units"
-import { URBANIZATION } from "@/model/society/urbanization"
 
 function seedColonyRelations({
 	state,
@@ -106,16 +105,14 @@ function initHistory(params: InitHistoryParams): HistoryState {
 		fn: () =>
 			POPULATION.initPopulation({
 				state,
-				urbanization: URBANIZATION.computeUrbanization({
-					params: { era: state.era },
-					provinces: params.provinces,
-					nations: params.nations,
-					population: params.population,
-					knowledge: KNOWLEDGE.urbanKnowledge({
-						era: state.era,
-						baseline: state.knowledgeBaseline,
-					}),
-				}),
+				urbanization: {
+					urbanPopulation: params.urbanPopulation,
+					ruralPopulation: Float32Array.from(
+						params.population.population,
+						(people, p) => Math.max(0, people - params.urbanPopulation[p]),
+					),
+					development: params.development,
+				},
 			}),
 	})
 	if (
@@ -138,7 +135,8 @@ function initHistory(params: InitHistoryParams): HistoryState {
 							adjOffset: state.regionAdjOffset,
 							adjList: state.regionAdjList,
 						},
-						params: { era: state.era, planetRadiusKm: state.planetRadiusKm },
+						params: { planetRadiusKm: state.planetRadiusKm },
+						era: state.era,
 						provinces: {
 							count: state.P,
 							desolate: state.desolate,

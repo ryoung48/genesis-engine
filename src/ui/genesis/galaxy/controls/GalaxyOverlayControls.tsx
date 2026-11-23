@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React from "react"
 import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
@@ -7,7 +7,11 @@ import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
 import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
-import type { PortedGalaxyDisplayFlags } from "@/ui/genesis/galaxy/view/portedGalaxyParams"
+import {
+	GALAXY_TIME_STEP_MAX,
+	GALAXY_TIME_STEP_MIN,
+	type PortedGalaxyDisplayFlags,
+} from "@/ui/genesis/galaxy/view/portedGalaxyParams"
 
 const DISPLAY_FLAG_LABELS: Record<keyof PortedGalaxyDisplayFlags, string> = {
 	showStarOverlay: "Star Map",
@@ -39,10 +43,10 @@ interface GalaxyOverlayControlsProps {
 	 * animation-speed control: 0 pauses the rotation entirely. */
 	timeStep: number
 	onTimeStepChange: (value: number) => void
+	overlaysExpanded: boolean
+	onOverlaysExpandedChange: (expanded: boolean) => void
 }
 
-const TIME_STEP_MIN = 0
-const TIME_STEP_MAX = 500_000
 const TIME_STEP_STEP = 10_000
 
 export const GalaxyOverlayControls: React.FC<GalaxyOverlayControlsProps> = ({
@@ -50,9 +54,9 @@ export const GalaxyOverlayControls: React.FC<GalaxyOverlayControlsProps> = ({
 	onDisplayFlagChange,
 	timeStep,
 	onTimeStepChange,
+	overlaysExpanded,
+	onOverlaysExpandedChange,
 }) => {
-	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
-
 	return (
 		<div className="absolute inset-0 z-20 pointer-events-none">
 			<div className="absolute bottom-3 left-3 flex flex-col items-start gap-2">
@@ -86,8 +90,8 @@ export const GalaxyOverlayControls: React.FC<GalaxyOverlayControlsProps> = ({
 								<LabeledSlider
 									label="Time Step"
 									value={timeStep.toLocaleString()}
-									min={TIME_STEP_MIN}
-									max={TIME_STEP_MAX}
+									min={GALAXY_TIME_STEP_MIN}
+									max={GALAXY_TIME_STEP_MAX}
 									step={TIME_STEP_STEP}
 									numericValue={timeStep}
 									onChange={onTimeStepChange}
@@ -102,7 +106,7 @@ export const GalaxyOverlayControls: React.FC<GalaxyOverlayControlsProps> = ({
 						position="top"
 					>
 						<IconButton
-							onClick={() => setOverlaysExpanded((value) => !value)}
+							onClick={() => onOverlaysExpandedChange(!overlaysExpanded)}
 							tone="overlay"
 							selected={overlaysExpanded}
 							shape="rounded"

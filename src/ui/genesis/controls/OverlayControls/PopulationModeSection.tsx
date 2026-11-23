@@ -12,12 +12,11 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 	colorMode,
 	societyMode,
 	setSocietyMode,
-	isEarthImport,
+	availableModes,
 }) => {
 	const [expanded, setExpanded] = React.useState(true)
 	if (
 		getBaseMapMode(colorMode) !== "population" ||
-		isEarthImport ||
 		!isPopulationSocietyMode(societyMode)
 	)
 		return null
@@ -33,7 +32,9 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 					<RadioGroup
 						label="Population mode"
 						orientation="horizontal"
-						options={POPULATION_MAP_MODE_OPTIONS.map(([value, label]) => ({
+						options={POPULATION_MAP_MODE_OPTIONS.filter(([value]) =>
+							availableModes.includes(value),
+						).map(([value, label]) => ({
 							value,
 							label,
 						}))}

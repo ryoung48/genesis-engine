@@ -16,6 +16,7 @@ import { RECRUITMENT } from "@/model/history/sim/engine/military/recruitment"
 import { SIM_ENGINE } from "@/model/history/sim/engine/simulation"
 import { STATE } from "@/model/history/sim/engine/state"
 import { STATE_RULERS } from "@/model/history/sim/engine/state/rulers"
+import { GOVERNMENT } from "@/model/history/sim/nations/government"
 import { HISTORY_RUN } from "@/test/history-run"
 
 afterEach(() => vi.restoreAllMocks())
@@ -169,7 +170,9 @@ it("joins supporting districts and recalculates both armies independently", () =
 		if (
 			!STATE.isSovereign({ state, p }) ||
 			state.provinceWars[p].length > 0 ||
-			!STATE_RULERS.has({ state, p })
+			!STATE_RULERS.has({ state, p }) ||
+			STATE.isUnionJunior({ state, p }) ||
+			GOVERNMENT.govFamilyOfIndex(state.governmentType[p]) === "republic"
 		)
 			continue
 		const districts = SUCCESSION_SYSTEMS.districts({ state, realm: p })

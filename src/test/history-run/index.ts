@@ -9,6 +9,7 @@ import type { HistoryState as EngineState } from "@/model/history/sim/engine/sta
 import { SIM_RECORD } from "@/model/history/sim/record"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { ERAS } from "@/model/society/eras"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { SocietyEra } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_OUTPUT } from "@/test/history-run/output"
@@ -87,7 +88,9 @@ function build({
 		params: {
 			...DEFAULT_WORLD_PARAMS,
 			seed,
-			era,
+			targetTechLevel: TECH_LEVEL.leaderLevel({
+				techLevel: ERAS.getEraConfig(era).techLevel,
+			}),
 			numPoints,
 			tideLock: null,
 		},
@@ -102,7 +105,9 @@ function build({
 		!generated.coastal ||
 		!generated.waterAccess ||
 		!riverVisible ||
-		!cultures
+		!cultures ||
+		!generated.urbanPopulation ||
+		!generated.development
 	)
 		throw new Error("Generated world has no society data to run history on")
 
@@ -111,6 +116,8 @@ function build({
 		nations,
 		provinces,
 		population,
+		urbanPopulation: generated.urbanPopulation,
+		development: generated.development,
 		coastal: generated.coastal,
 		waterAccess: generated.waterAccess,
 		riverVisible,
@@ -119,7 +126,7 @@ function build({
 		religions: generated.religions,
 		religionGender: generated.religionGender,
 		heritages: generated.heritages,
-		era: generated.params.era,
+		era,
 		seed: generated.params.seed,
 		startYear,
 		reachKm,

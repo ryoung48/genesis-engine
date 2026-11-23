@@ -27,6 +27,7 @@ export type ExportWidthPreset =
 	| "32768"
 	| "webgcm"
 	| "webgcm-native"
+	| "terran"
 export interface LabelMode {
 	nations: boolean
 	dynasty: boolean
@@ -82,6 +83,8 @@ export interface OverlayControlsProps {
 	showOceanCurrents: boolean
 	setShowOceanCurrents: (v: boolean) => void
 	showGrid: boolean
+	showCoordinateTicks: boolean
+	setShowCoordinateTicks: (v: boolean) => void
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
 	showDistrictBorders: boolean
@@ -93,6 +96,7 @@ export interface OverlayControlsProps {
 	setNationMode: (v: NationMapMode) => void
 	populationMode: SocietyMapMode
 	setPopulationMode: (v: SocietyMapMode) => void
+	availablePopulationModes: ReadonlyArray<SocietyMapMode>
 	religionMode: ReligionMapMode
 	setReligionMode: (v: ReligionMapMode) => void
 	labelMode: LabelMode
@@ -101,8 +105,8 @@ export interface OverlayControlsProps {
 	setShowElevation: (v: boolean) => void
 	showInfrastructure: boolean
 	setShowInfrastructure: (v: boolean) => void
-	gridSpacing: number
-	setGridSpacing: (v: number) => void
+	showMigrationRoutes: boolean
+	setShowMigrationRoutes: (v: boolean) => void
 	viewMode: GenesisViewMode
 	setViewMode: (v: GenesisViewMode) => void
 	unitSystem: UnitSystem
@@ -169,5 +173,5 @@ export interface PopulationModeSectionProps {
 	colorMode: ColorMode
 	societyMode: SocietyMapMode
 	setSocietyMode: (value: SocietyMapMode) => void
-	isEarthImport: boolean
+	availableModes: ReadonlyArray<SocietyMapMode>
 }

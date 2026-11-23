@@ -9,14 +9,16 @@ import type {
 import { LABEL_RENDER_ORDER } from "@/ui/genesis/renderer/nation-label-overlay/constants"
 import { SCRIPT_BLOCK_HEIGHT_FACTOR } from "@/ui/genesis/renderer/nation-script-overlay"
 import { HERALDRY_SHIELD } from "@/ui/heraldry/shield"
+import type { HeraldryShape } from "@/ui/heraldry/shield/types"
 import { FLAG_GENERATOR } from "@/ui/heraldry/simple"
 
 const HUE_BUCKET_DEGREES = 15
 const MIN_NATION_CHROMA = 0.08
+const FLAG_TECH_LEVEL = 5
 
 const STYLE = {
 	textureSize: 128,
-	heightInFontSizes: 2,
+	heightInFontSizes: 1.5,
 	gapInFontSizes: 0.35,
 }
 
@@ -35,13 +37,21 @@ function nationHue({ colors, index }: NationHueParams): number | null {
 	)
 }
 
+function shapeForTechLevel(techLevel: number | undefined): HeraldryShape {
+	return techLevel !== undefined && techLevel >= FLAG_TECH_LEVEL
+		? "flag"
+		: "shield"
+}
+
 function renderTexture({
 	name,
 	hue,
+	shape,
 }: TextureParams): THREE.CanvasTexture | null {
 	const canvas = FLAG_GENERATOR.render({
 		design: FLAG_GENERATOR.sample({ seed: name, pattern: "map", hue }),
 		width: STYLE.textureSize,
+		shape,
 	})
 	if (!canvas) return null
 	const texture = new THREE.CanvasTexture(canvas)
@@ -58,12 +68,13 @@ function create() {
 		groups,
 		names,
 		colors,
+		shape,
 		showHeraldry,
 		showNames,
 		showScript,
 	}: HeraldryOverlayUpdate) {
 		const hues = names.map((_, index) => nationHue({ colors, index }))
-		const keyFor = (index: number) => `${names[index]}|${hues[index]}`
+		const keyFor = (index: number) => `${names[index]}|${hues[index]}|${shape}`
 		const activeKeys = new Set(names.map((_, index) => keyFor(index)))
 		for (const [key, texture] of textures) {
 			if (activeKeys.has(key)) continue
@@ -86,7 +97,7 @@ function create() {
 				const key = keyFor(index)
 				let texture = textures.get(key)
 				if (!texture) {
-					const rendered = renderTexture({ name, hue: hues[index] })
+					const rendered = renderTexture({ name, hue: hues[index], shape })
 					if (!rendered) continue
 					texture = rendered
 					textures.set(key, texture)
@@ -112,7 +123,7 @@ function create() {
 					mesh.material.needsUpdate = true
 				}
 				const height = label.userData.heraldryFontSize * STYLE.heightInFontSizes
-				mesh.scale.set(height * HERALDRY_SHIELD.aspect, height, 1)
+				mesh.scale.set(height * HERALDRY_SHIELD.aspect(shape), height, 1)
 				const scriptBlock =
 					showScript && showNames
 						? label.fontSize * SCRIPT_BLOCK_HEIGHT_FACTOR
@@ -143,4 +154,4 @@ function create() {
 	return { update, dispose }
 }
 
-export const HERALDRY_OVERLAY = { create }
+export const HERALDRY_OVERLAY = { create, shapeForTechLevel }

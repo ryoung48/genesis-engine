@@ -11,6 +11,8 @@ import { DISTRIBUTION_TERRITORY } from "@/model/history/distribution/territory"
 import { DATE } from "@/model/history/earth/date"
 import { HISTORY } from "@/model/history/record"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import { ERAS } from "@/model/society/eras"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { DISTRIBUTION_MIGRATION_REPORT } from "@/test/history-run/report/distribution/migration"
@@ -330,7 +332,9 @@ function run(options: DistributionReportOptions): void {
 			params: {
 				...DEFAULT_WORLD_PARAMS,
 				seed,
-				era: options.era,
+				targetTechLevel: TECH_LEVEL.leaderLevel({
+					techLevel: ERAS.getEraConfig(options.era).techLevel,
+				}),
 				numPoints: options.numPoints,
 				tideLock: null,
 				historyPipeline: "distribution",

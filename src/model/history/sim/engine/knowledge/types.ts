@@ -35,20 +35,9 @@ export interface MaxCitySizeParams {
 	realmPopulation: number
 }
 
-export interface OwnAdvanceParams {
-	knowledge: number
-	heldKnowledge: number
-	development: number
-}
-
 export interface StartBaselineParams {
 	era: SocietyEra
 	startYear: number | undefined
-}
-
-export interface UrbanKnowledgeParams {
-	era: SocietyEra
-	baseline: number
 }
 
 export interface KnowledgeSpinUp {
@@ -58,18 +47,4 @@ export interface KnowledgeSpinUp {
 
 export interface SovereignsParams {
 	state: HistoryState
-}
-
-export interface FillLiveParams {
-	state: HistoryState
-	value: number
-}
-
-export interface StepParams {
-	state: HistoryState
-	current: Float32Array
-	next: Float32Array
-	sovereign: Int32Array
-	yearFraction: number
-	heldKnowledge: number
 }

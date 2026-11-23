@@ -1,6 +1,7 @@
 import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import type { RgbColor } from "@/model/shared/color/color-interpolation/types"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
+import type { WayOfLife, WayOfLifeShares } from "@/model/society/farming/types"
 import { uiWindMap } from "@/ui/components/tokens"
 import {
 	altElevationToColor,
@@ -409,6 +410,26 @@ export function populationDifferenceColor(
 	}
 	const last = populationDiffStops[populationDiffStops.length - 1]
 	return [last.r, last.g, last.b]
+}
+
+const WAY_OF_LIFE_COLORS: Record<
+	Exclude<WayOfLife, "uninhabited">,
+	[number, number, number]
+> = {
+	forage: [0, 0.62, 0.451],
+	farm: [0.902, 0.624, 0],
+	herd: [0.8, 0.475, 0.655],
+}
+
+export function wayOfLifeBlend(
+	shares: WayOfLifeShares,
+): [number, number, number] {
+	const ways = ["forage", "farm", "herd"] as const
+	const rgb: [number, number, number] = [0, 0, 0]
+	for (const way of ways)
+		for (let c = 0; c < 3; c++)
+			rgb[c] += shares[way] * WAY_OF_LIFE_COLORS[way][c]
+	return rgb
 }
 
 export function migrationColor(

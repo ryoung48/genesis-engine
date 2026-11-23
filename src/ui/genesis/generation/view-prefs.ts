@@ -7,26 +7,35 @@ import type {
 	VegetationSubMode,
 } from "@/ui/genesis/controls/OverlayControls"
 import type { GenesisViewMode } from "@/ui/genesis/renderer"
+import { CLOCK_DIAL_HOURS } from "@/ui/genesis/shared/clock"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
 	DEFAULT_GEOGRAPHY_MODE,
 	type ElevationSubMode,
+	getMapModePrimary,
 	type NationMapMode,
 	type ReligionMapMode,
 	type SocietyMapMode,
 	TITLE_BORDER_TIERS,
 	type TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
+import {
+	readBoolean,
+	readNumber,
+	readNumberInRange,
+} from "@/ui/genesis/shared/stored-prefs"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
 export interface StoredViewPrefs {
 	colorMode: ColorMode
 	geographyMode: ColorMode
+	lastSocietyColorMode: ColorMode
 	nationMode: NationMapMode
 	societyMode: SocietyMapMode
 	religionMode: ReligionMapMode
 	viewMode: GenesisViewMode
 	solarSystemViewActive: boolean
+	solarSystemControlsExpanded: boolean
 	showSolarSystemEllipticalOrbits: boolean
 	showSolarSystemTrueScale: boolean
 	showSolarSystemDaylight: boolean
@@ -37,6 +46,7 @@ export interface StoredViewPrefs {
 	solarSystemTrailDegrees: number
 	showWireframe: boolean
 	showGrid: boolean
+	showCoordinateTicks: boolean
 	showNationBorders: boolean
 	showDistrictBorders: boolean
 	titleBorderTiers: TitleBorderTier[]
@@ -54,10 +64,11 @@ export interface StoredViewPrefs {
 	showOceanCurrents: boolean
 	showRivers: boolean
 	showInfrastructure: boolean
+	showMigrationRoutes: boolean
 	overlaysExpanded: boolean
-	gridSpacing: number
 	unitSystem: UnitSystem
 	mapProjectionLatitude: number
+	exportCenterLongitude: number
 	debugMapModes: boolean
 	measureMode: MeasureMode
 	pathfindingLand: boolean
@@ -172,10 +183,13 @@ const SOCIETY_MAP_MODES = new Set<SocietyMapMode>([
 	"urban",
 	"development",
 	"knowledge",
+	"techLevel",
 	"culture",
 	"heritage",
 	"religion",
 	"migration",
+	"farming",
+	"wayOfLife",
 ])
 
 const VIEW_MODES = new Set<GenesisViewMode>(["globe", "map"])
@@ -184,11 +198,13 @@ const MEASURE_MODES = new Set<MeasureMode>(["off", "ruler", "pathfinding"])
 export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	colorMode: DEFAULT_GEOGRAPHY_MODE,
 	geographyMode: DEFAULT_GEOGRAPHY_MODE,
+	lastSocietyColorMode: "nations",
 	nationMode: "borders",
 	societyMode: "density",
 	religionMode: "religions",
 	viewMode: "globe",
 	solarSystemViewActive: false,
+	solarSystemControlsExpanded: false,
 	showSolarSystemEllipticalOrbits: true,
 	showSolarSystemTrueScale: false,
 	showSolarSystemDaylight: true,
@@ -199,6 +215,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	solarSystemTrailDegrees: 180,
 	showWireframe: false,
 	showGrid: true,
+	showCoordinateTicks: true,
 	showNationBorders: false,
 	showDistrictBorders: false,
 	titleBorderTiers: [],
@@ -225,10 +242,11 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showOceanCurrents: false,
 	showRivers: false,
 	showInfrastructure: false,
+	showMigrationRoutes: false,
 	overlaysExpanded: false,
-	gridSpacing: 15,
 	unitSystem: "metric",
 	mapProjectionLatitude: 0,
+	exportCenterLongitude: 0,
 	debugMapModes: false,
 	measureMode: "off",
 	pathfindingLand: true,
@@ -306,14 +324,6 @@ function parseLabelMode(value: unknown): LabelMode {
 	}
 }
 
-function readBoolean(value: unknown, fallback: boolean): boolean {
-	return typeof value === "boolean" ? value : fallback
-}
-
-function readNumber(value: unknown, fallback: number): number {
-	return typeof value === "number" && Number.isFinite(value) ? value : fallback
-}
-
 export function parseStoredViewPrefs(
 	stored: string | null,
 ): StoredViewPrefs | null {
@@ -327,6 +337,11 @@ export function parseStoredViewPrefs(
 			geographyMode: isColorMode(parsed.geographyMode)
 				? parsed.geographyMode
 				: DEFAULT_VIEW_PREFS.geographyMode,
+			lastSocietyColorMode:
+				isColorMode(parsed.lastSocietyColorMode) &&
+				getMapModePrimary(parsed.lastSocietyColorMode) === "society"
+					? parsed.lastSocietyColorMode
+					: DEFAULT_VIEW_PREFS.lastSocietyColorMode,
 			nationMode: isNationMapMode(parsed.nationMode)
 				? parsed.nationMode
 				: DEFAULT_VIEW_PREFS.nationMode,
@@ -343,6 +358,10 @@ export function parseStoredViewPrefs(
 			solarSystemViewActive: readBoolean(
 				parsed.solarSystemViewActive,
 				DEFAULT_VIEW_PREFS.solarSystemViewActive,
+			),
+			solarSystemControlsExpanded: readBoolean(
+				parsed.solarSystemControlsExpanded,
+				DEFAULT_VIEW_PREFS.solarSystemControlsExpanded,
 			),
 			showSolarSystemEllipticalOrbits: readBoolean(
 				parsed.showSolarSystemEllipticalOrbits,
@@ -372,21 +391,21 @@ export function parseStoredViewPrefs(
 				parsed.showSolarSystemBodyMarkers,
 				DEFAULT_VIEW_PREFS.showSolarSystemBodyMarkers,
 			),
-			solarSystemTrailDegrees: Math.min(
+			solarSystemTrailDegrees: readNumberInRange(
+				parsed.solarSystemTrailDegrees,
+				DEFAULT_VIEW_PREFS.solarSystemTrailDegrees,
+				0,
 				360,
-				Math.max(
-					0,
-					readNumber(
-						parsed.solarSystemTrailDegrees,
-						DEFAULT_VIEW_PREFS.solarSystemTrailDegrees,
-					),
-				),
 			),
 			showWireframe: readBoolean(
 				parsed.showWireframe,
 				DEFAULT_VIEW_PREFS.showWireframe,
 			),
 			showGrid: readBoolean(parsed.showGrid, DEFAULT_VIEW_PREFS.showGrid),
+			showCoordinateTicks: readBoolean(
+				parsed.showCoordinateTicks,
+				DEFAULT_VIEW_PREFS.showCoordinateTicks,
+			),
 			showNationBorders: readBoolean(
 				parsed.showNationBorders,
 				DEFAULT_VIEW_PREFS.showNationBorders,
@@ -428,20 +447,28 @@ export function parseStoredViewPrefs(
 				parsed.showInfrastructure,
 				DEFAULT_VIEW_PREFS.showInfrastructure,
 			),
+			showMigrationRoutes: readBoolean(
+				parsed.showMigrationRoutes,
+				DEFAULT_VIEW_PREFS.showMigrationRoutes,
+			),
 			overlaysExpanded: readBoolean(
 				parsed.overlaysExpanded,
 				DEFAULT_VIEW_PREFS.overlaysExpanded,
 			),
-			gridSpacing: readNumber(
-				parsed.gridSpacing,
-				DEFAULT_VIEW_PREFS.gridSpacing,
-			),
 			unitSystem: isUnitSystem(parsed.unitSystem)
 				? parsed.unitSystem
 				: DEFAULT_VIEW_PREFS.unitSystem,
-			mapProjectionLatitude: readNumber(
+			mapProjectionLatitude: readNumberInRange(
 				parsed.mapProjectionLatitude,
 				DEFAULT_VIEW_PREFS.mapProjectionLatitude,
+				-90,
+				90,
+			),
+			exportCenterLongitude: readNumberInRange(
+				parsed.exportCenterLongitude,
+				DEFAULT_VIEW_PREFS.exportCenterLongitude,
+				-180,
+				180,
 			),
 			debugMapModes: readBoolean(
 				parsed.debugMapModes,
@@ -467,7 +494,12 @@ export function parseStoredViewPrefs(
 				DEFAULT_VIEW_PREFS.clockCurrent,
 			),
 			clockDay: readNumber(parsed.clockDay, DEFAULT_VIEW_PREFS.clockDay),
-			clockHour: readNumber(parsed.clockHour, DEFAULT_VIEW_PREFS.clockHour),
+			clockHour: readNumberInRange(
+				parsed.clockHour,
+				DEFAULT_VIEW_PREFS.clockHour,
+				0,
+				CLOCK_DIAL_HOURS,
+			),
 			clockUseMeridiem: readBoolean(
 				parsed.clockUseMeridiem,
 				DEFAULT_VIEW_PREFS.clockUseMeridiem,
@@ -477,7 +509,12 @@ export function parseStoredViewPrefs(
 				parsed.clockMonthMode === "monthly"
 					? parsed.clockMonthMode
 					: DEFAULT_VIEW_PREFS.clockMonthMode,
-			clockMonth: readNumber(parsed.clockMonth, DEFAULT_VIEW_PREFS.clockMonth),
+			clockMonth: readNumberInRange(
+				parsed.clockMonth,
+				DEFAULT_VIEW_PREFS.clockMonth,
+				0,
+				11,
+			),
 			vegetationSubMode:
 				parsed.vegetationSubMode === "base" ||
 				parsed.vegetationSubMode === "maps" ||

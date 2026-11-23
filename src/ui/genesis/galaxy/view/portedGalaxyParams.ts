@@ -1,4 +1,8 @@
 import { GalaxyParam } from "@/ui/genesis/galaxy/renderer/Types"
+import {
+	readBoolean,
+	readNumberInRange,
+} from "@/ui/genesis/shared/stored-prefs"
 
 /** Panel-editable subset of gal/Types.ts's GalaxyParam, as a plain object
  * (React state doesn't need the class wrapper -- that's only required by
@@ -76,6 +80,79 @@ export const DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS: PortedGalaxyDisplayFlags = {
 	showSearchMatches: true,
 	showCapitalMarkers: true,
 	showSectorBoundaries: true,
+}
+
+export const GALAXY_TIME_STEP_MIN = 0
+export const GALAXY_TIME_STEP_MAX = 500_000
+
+export interface StoredGalaxyOverlayPrefs {
+	displayFlags: PortedGalaxyDisplayFlags
+	mapMode: GalaxyMapMode
+	timeStep: number
+	overlaysExpanded: boolean
+}
+
+// Paused (0) by default so the galaxy holds still until the user starts it.
+export const DEFAULT_GALAXY_OVERLAY_PREFS: StoredGalaxyOverlayPrefs = {
+	displayFlags: DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS,
+	mapMode: DEFAULT_GALAXY_MAP_MODE,
+	timeStep: 0,
+	overlaysExpanded: false,
+}
+
+const GALAXY_MAP_MODES = new Set<GalaxyMapMode>([
+	"stars",
+	"nations",
+	"cultures",
+])
+
+function isGalaxyMapMode(value: unknown): value is GalaxyMapMode {
+	return (
+		typeof value === "string" && GALAXY_MAP_MODES.has(value as GalaxyMapMode)
+	)
+}
+
+export function parseStoredGalaxyOverlayPrefs(
+	stored: string | null,
+): StoredGalaxyOverlayPrefs {
+	if (!stored) return DEFAULT_GALAXY_OVERLAY_PREFS
+	try {
+		const parsed = JSON.parse(stored) as Record<string, unknown>
+		const storedFlags = (parsed.displayFlags ?? {}) as Record<string, unknown>
+		const displayFlags = { ...DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS }
+		for (const key of Object.keys(
+			displayFlags,
+		) as (keyof PortedGalaxyDisplayFlags)[]) {
+			displayFlags[key] = readBoolean(
+				storedFlags[key],
+				DEFAULT_PORTED_GALAXY_DISPLAY_FLAGS[key],
+			)
+		}
+		return {
+			displayFlags,
+			mapMode: isGalaxyMapMode(parsed.mapMode)
+				? parsed.mapMode
+				: DEFAULT_GALAXY_OVERLAY_PREFS.mapMode,
+			timeStep: readNumberInRange(
+				parsed.timeStep,
+				DEFAULT_GALAXY_OVERLAY_PREFS.timeStep,
+				GALAXY_TIME_STEP_MIN,
+				GALAXY_TIME_STEP_MAX,
+			),
+			overlaysExpanded: readBoolean(
+				parsed.overlaysExpanded,
+				DEFAULT_GALAXY_OVERLAY_PREFS.overlaysExpanded,
+			),
+		}
+	} catch {
+		return DEFAULT_GALAXY_OVERLAY_PREFS
+	}
+}
+
+export function serializeStoredGalaxyOverlayPrefs(
+	prefs: StoredGalaxyOverlayPrefs,
+): string {
+	return JSON.stringify(prefs)
 }
 
 export function toGalaxyParam(p: PortedGalaxyParams): GalaxyParam {

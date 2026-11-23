@@ -3,11 +3,7 @@ import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { NATIONS } from "@/model/history/sim/nations"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
-import type {
-	GenesisPartition,
-	GenesisProvinces,
-	SocietyEra,
-} from "@/model/society/types"
+import type { GenesisPartition, GenesisProvinces } from "@/model/society/types"
 
 export interface DeriveSocietyParams {
 	// [JUSTIFICATION] Non-history direct callers use the existing society generation.
@@ -22,11 +18,13 @@ export interface DeriveSocietyParams {
 	r_xyz: Float32Array
 	seed: number
 	planetRadiusKm: number
-	era: SocietyEra | undefined
+	techLevel: number
 	// [JUSTIFICATION] undefined outside era-gated pipelines -- means "all non-desolate provinces qualify".
 	eraSettledMask: Uint8Array | undefined
 	// [JUSTIFICATION] undefined outside era-gated pipelines -- means "all non-desolate provinces qualify".
 	eraStatehoodMask: Uint8Array | undefined
+	// [JUSTIFICATION] undefined outside the arrival-steered start: any held province may hold a capital.
+	agrarianShare: Float32Array | undefined
 	timings: StageTiming[]
 }
 

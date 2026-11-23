@@ -23,8 +23,12 @@ import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
+import type { FarmingResult } from "@/model/society/farming/types"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
-import type { HistoryMigration } from "@/model/society/migration/types"
+import type {
+	HistoryMigration,
+	OriginHint,
+} from "@/model/society/migration/types"
 import type { ProvincePopulation } from "@/model/society/population/types"
 import type { GenesisProvinces } from "@/model/society/types"
 
@@ -61,6 +65,8 @@ export interface PostPipelineInput {
 	terrainFeatures?: GenesisTerrainFeatures
 	onProgress?: (label: string, pct?: number) => void
 	/** Real lake cells (from a vector lake mask) that must survive the arid/rainfall-based lake-draining heuristic below — real lakes (e.g. the Aral Sea) can sit in regions too dry for computeLakes' own rainfall model to have created them procedurally. */
+	/** [JUSTIFICATION] Only Earth imports know the real cradle of the first migration; procedural worlds derive the origin from climate and suitability. */
+	originHint?: OriginHint
 	realLakeRegions?: Uint8Array
 	/** Real river network — see RealRiversInput. */
 	realRivers?: RealRiversInput
@@ -138,6 +144,7 @@ export interface PostPipelineInput {
 
 export interface PostPipelineOutput {
 	historyMigration: HistoryMigration
+	farming: FarmingResult | null
 	climate: GenesisClimate
 	wind: WindVectors
 	windMonthly: GenesisWindMonthly
@@ -194,4 +201,5 @@ export interface PostPipelineOutput {
 	timings: StageTiming[]
 	eraSettledMask: Uint8Array | undefined
 	eraStatehoodMask: Uint8Array | undefined
+	agrarianShare: Float32Array | undefined
 }

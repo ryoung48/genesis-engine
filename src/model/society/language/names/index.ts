@@ -16,7 +16,7 @@ import type {
 	RulerNameParams,
 	SpawnSeededLanguageParams,
 } from "@/model/society/language/names/types"
-import { CultureGenderSystem } from "@/model/society/types"
+import type { CultureGenderSystem } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 export interface LanguageNameLeaderEntry {

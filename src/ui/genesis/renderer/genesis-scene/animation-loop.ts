@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import { CLOUD_FRAME_MS } from "@/ui/genesis/renderer/clouds/overlay"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
+import { createGridLabels } from "@/ui/genesis/renderer/grid-labels"
 import { updateGlobeLabelOrientations } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
 import { activateSettlementLabels } from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
 import {
@@ -62,6 +63,7 @@ export function createAnimationLoopController(
 	deps: AnimationLoopControllerDeps,
 ) {
 	let cloudFrame: number | null = null
+	const gridLabels = createGridLabels(ctx)
 	const previousCameraPosition = new THREE.Vector3()
 	const renderScheduler = createRenderScheduler({
 		requestFrame: (callback) => window.requestAnimationFrame(callback),
@@ -99,6 +101,7 @@ export function createAnimationLoopController(
 			}
 
 			if (ctx.solarSystemActive) {
+				gridLabels.draw()
 				if (
 					ctx.globeControlsInteracting ||
 					ctx.globeControlActivityFrames > 0
@@ -206,6 +209,7 @@ export function createAnimationLoopController(
 						activateSettlementLabels(ctx.mapSettlementLabels) || keepAnimating
 				}
 				ctx.renderer.render(ctx.scene, ctx.mapCamera)
+				gridLabels.draw()
 				return keepAnimating
 			}
 
@@ -326,6 +330,7 @@ export function createAnimationLoopController(
 					: SOLAR_TERMINATOR_RADIUS,
 			)
 			ctx.renderer.render(ctx.scene, ctx.camera)
+			gridLabels.draw()
 			return keepAnimating
 		},
 	})
@@ -341,6 +346,7 @@ export function createAnimationLoopController(
 	}
 
 	function dispose() {
+		gridLabels.dispose()
 		if (cloudFrame !== null) window.clearTimeout(cloudFrame)
 		renderScheduler.dispose()
 	}

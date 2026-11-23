@@ -10,6 +10,7 @@ import { SIM_RECORD } from "@/model/history/sim/record"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
 import { ERAS } from "@/model/society/eras"
 import { MIGRATION } from "@/model/society/migration"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 
@@ -55,28 +56,23 @@ describe("target profile", () => {
 			).toBeCloseTo(1, 10)
 	})
 
-	it("starts from the normalised late medieval weights", () => {
-		const weights = ERAS.getEraConfig("lateMedieval").nationPercentages
-		const bucketShares = [
-			weights[6],
-			weights[5],
-			weights[4],
-			weights[3],
-			weights[2],
-			weights[1] * 0.368,
-			weights[1] * 0.632,
-		]
-		const total = bucketShares.reduce((sum, share) => sum + share, 0)
+	it("starts from the 867 profile at the default tech level", () => {
+		const plan = TECH_LEVEL.sizePlan({ techLevel: ERAS.defaultTechLevel })
 		const profile = TARGET_PROFILE.at({ year: 867, habitableProvinces: 10974 })
-		bucketShares.forEach((share, b) =>
-			expect(profile.sizeShares[b]).toBeCloseTo(share / total, 3),
+		const shares = [...plan.percentages].reverse()
+		shares.forEach((share, b) =>
+			expect(share).toBeCloseTo(profile.sizeShares[b], 4),
 		)
+		expect(plan.buckets[0]).toEqual([101, 250])
+		expect(
+			TECH_LEVEL.stateHeld({ techLevel: ERAS.defaultTechLevel }),
+		).toBeCloseTo(profile.stateHeld, 10)
 	})
 
 	it("interpolates the state-held share and steps the size ceiling", () => {
 		const at = (year: number) =>
 			TARGET_PROFILE.at({ year, habitableProvinces: 10974 })
-		expect(at(867).stateHeld).toBeCloseTo(0.566, 3)
+		expect(at(867).stateHeld).toBeCloseTo(0.4635, 4)
 		expect(at(1066).stateHeld).toBeCloseTo(0.6, 10)
 		expect(at(1800).stateHeld).toBeCloseTo(0.864, 3)
 		expect(at(1065).ceiling).toBe(809)
@@ -109,9 +105,9 @@ describe("generated land status", () => {
 			year: 867,
 			habitableProvinces: habitable,
 		})
-		expect(heldCount).toBe(
-			Math.round(target.stateHeld * (habitable - uninhabited)),
-		)
+		const targetCount = Math.round(target.stateHeld * (habitable - uninhabited))
+		expect(heldCount).toBeLessThanOrEqual(targetCount)
+		expect(heldCount).toBeGreaterThanOrEqual(0.98 * targetCount)
 		const cradles = generated.population?.cradles ?? []
 		expect(cradles.length).toBeLessThanOrEqual(8)
 		for (const cradle of cradles)

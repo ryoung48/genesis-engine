@@ -1,10 +1,11 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import { STAR } from "@/model/celestial/star"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
-import { ERAS } from "@/model/society/eras"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 
 export const PLANET_SEED_STORAGE_KEY = "genesis:lastPlanetSeed"
 export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"
+export const GALAXY_OVERLAY_PREFS_STORAGE_KEY = "genesis:galaxyOverlayPrefs"
 export const GENERATION_SESSION_STORAGE_KEY = "genesis:generationSession"
 
 export const DEFAULT_WORLD_PARAMS = {
@@ -38,5 +39,5 @@ export const DEFAULT_WORLD_PARAMS = {
 	substellarLon: SOL_SYSTEM.solMainWorldDefaults.substellarLon,
 	perihelion: SOL_SYSTEM.solMainWorldDefaults.perihelion,
 	moons: [{ ...SOL_SYSTEM.solLunaDefault, idx: 1 }] as MoonBody[],
-	era: ERAS.defaultEra,
+	targetTechLevel: TECH_LEVEL.defaultTarget,
 } as const

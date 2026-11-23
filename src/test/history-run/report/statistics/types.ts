@@ -7,3 +7,14 @@ export interface PercentileParams {
 	values: number[]
 	fraction: number
 }
+
+export interface SpearmanParams {
+	a: number[]
+	b: number[]
+}
+
+export interface WeightedPercentileParams {
+	values: number[]
+	weights: number[]
+	fraction: number
+}

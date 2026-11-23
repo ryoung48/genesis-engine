@@ -144,6 +144,11 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 							<SegmentedControl
 								options={[
 									{
+										value: "terran",
+										label: "Terran",
+										ariaLabel: "Terran world data",
+									},
+									{
 										value: "webgcm-native",
 										label: "Native GCM",
 										ariaLabel: "GCM with existing cells",
@@ -181,7 +186,8 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 								buttonClassName="px-1.5"
 							/>
 						</div>
-						{exportWidthPreset !== "webgcm" &&
+						{exportWidthPreset !== "terran" &&
+							exportWidthPreset !== "webgcm" &&
 							exportWidthPreset !== "webgcm-native" && (
 								<div className="space-y-1.5">
 									<LabeledSlider
@@ -203,12 +209,20 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 						>
 							{exportBusy
 								? "Exporting…"
-								: exportWidthPreset === "webgcm-native"
-									? "Export native GCM world"
-									: exportWidthPreset === "webgcm"
-										? "Export WebGCM terrain"
-										: "Export PNG"}
+								: exportWidthPreset === "terran"
+									? "Export Terran world"
+									: exportWidthPreset === "webgcm-native"
+										? "Export native GCM world"
+										: exportWidthPreset === "webgcm"
+											? "Export WebGCM terrain"
+											: "Export PNG"}
 						</Button>
+						{exportWidthPreset === "terran" && (
+							<p className="text-[10px] text-slate-400">
+								Import this file in Terran to explore the world's elevation,
+								Köppen climates, lakes, rivers, and marshes.
+							</p>
+						)}
 						{exportWidthPreset === "webgcm-native" && (
 							<p className="text-[10px] text-slate-400">
 								Load this file in the native GCM viewer at localhost:8767.

@@ -16,10 +16,12 @@ import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { HISTORY_RUN } from "@/test/history-run"
 import { HISTORY_COMPARISON } from "@/test/history-run/comparison"
 import { CORONATION_REPORT } from "@/test/history-run/report/coronation"
+import { DEVELOPMENT_REPORT } from "@/test/history-run/report/development"
 import { DIPLOMATIC_TIES_REPORT } from "@/test/history-run/report/diplomatic-ties"
 import { DISTRIBUTION_REPORT } from "@/test/history-run/report/distribution"
 import { DISTRICTS_REPORT } from "@/test/history-run/report/districts"
 import type { DistrictReport } from "@/test/history-run/report/districts/types"
+import { FARMING_REPORT } from "@/test/history-run/report/farming"
 import { GOVERNMENT_REPORT } from "@/test/history-run/report/government"
 import type { GovernmentReport } from "@/test/history-run/report/government/types"
 import { INTERREGNUM_REPORT } from "@/test/history-run/report/interregnum"
@@ -39,6 +41,7 @@ import { RELIGION_REPORT } from "@/test/history-run/report/religion"
 import { ROADS_REPORT } from "@/test/history-run/report/roads"
 import { RULERS_REPORT } from "@/test/history-run/report/rulers"
 import { SETTLEMENT_CHANGE_REPORT } from "@/test/history-run/report/settlement-change"
+import { TECH_LEVEL_REPORT } from "@/test/history-run/report/tech-level"
 import { TERRAIN_REPORT } from "@/test/history-run/report/terrain"
 import type {
 	CenturyReport,
@@ -231,6 +234,9 @@ function runSeed({
 		}),
 		validation,
 		terrain: TERRAIN_REPORT.summarize({ generated }),
+		farming: FARMING_REPORT.summarize({ generated }),
+		techLevel: TECH_LEVEL_REPORT.summarize({ generated }),
+		development: DEVELOPMENT_REPORT.summarize({ generated }),
 		migration: MIGRATION_REPORT.summarize({
 			generated,
 			startYear: Math.round(engine.time / STATE.yearMs),

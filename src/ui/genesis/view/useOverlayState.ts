@@ -28,7 +28,10 @@ import type {
 	ReligionMapMode,
 	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
-import { syncLabelModeToMapMode } from "@/ui/genesis/shared/map-modes"
+import {
+	getMapModePrimary,
+	syncLabelModeToMapMode,
+} from "@/ui/genesis/shared/map-modes"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import type { OverlayStateInput } from "@/ui/genesis/view/types"
 
@@ -55,6 +58,13 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [geographyMode, setGeographyMode] = useState<ColorMode>(
 		initialViewPrefs.geographyMode,
 	)
+	const [lastSocietyColorMode, setLastSocietyColorMode] = useState<ColorMode>(
+		initialViewPrefs.lastSocietyColorMode,
+	)
+	useEffect(() => {
+		if (getMapModePrimary(colorMode) === "society")
+			setLastSocietyColorMode(colorMode)
+	}, [colorMode])
 	const [nationMode, setNationMode] = useState<NationMapMode>(
 		initialViewPrefs.nationMode,
 	)
@@ -72,7 +82,7 @@ export function useOverlayState(input: OverlayStateInput) {
 			initialViewPrefs.solarSystemViewActive,
 	)
 	const [solarSystemControlsExpanded, setSolarSystemControlsExpanded] =
-		useState(false)
+		useState(initialViewPrefs.solarSystemControlsExpanded)
 	const [showSolarSystemEllipticalOrbits, setShowSolarSystemEllipticalOrbits] =
 		useState(initialViewPrefs.showSolarSystemEllipticalOrbits)
 	const [showSolarSystemTrueScale, setShowSolarSystemTrueScale] = useState(
@@ -99,7 +109,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
 	)
-	const [exportCenterLongitude, setExportCenterLongitude] = useState(0)
+	const [exportCenterLongitude, setExportCenterLongitude] = useState(
+		initialViewPrefs.exportCenterLongitude,
+	)
 	const [draftMapProjectionLatitude, setDraftMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
 	)
@@ -112,6 +124,9 @@ export function useOverlayState(input: OverlayStateInput) {
 		initialViewPrefs.showWireframe,
 	)
 	const [showGrid, setShowGrid] = useState(initialViewPrefs.showGrid)
+	const [showCoordinateTicks, setShowCoordinateTicks] = useState(
+		initialViewPrefs.showCoordinateTicks,
+	)
 	const [showNationBorders, setShowNationBorders] = useState(
 		initialViewPrefs.showNationBorders,
 	)
@@ -142,6 +157,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showAet, setShowAet] = useState(initialViewPrefs.showAet)
 	const [showInfrastructure, setShowInfrastructure] = useState(
 		initialViewPrefs.showInfrastructure,
+	)
+	const [showMigrationRoutes, setShowMigrationRoutes] = useState(
+		initialViewPrefs.showMigrationRoutes,
 	)
 	const [labelMode, setLabelMode] = useState<LabelMode>(
 		initialViewPrefs.labelMode,
@@ -202,7 +220,6 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [debugMapModes, setDebugMapModes] = useState(
 		initialViewPrefs.debugMapModes,
 	)
-	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
 
 	const [measureMode, setMeasureModeState] = useState<MeasureMode>(
 		initialViewPrefs.measureMode,
@@ -220,11 +237,13 @@ export function useOverlayState(input: OverlayStateInput) {
 		const prefs: StoredViewPrefs = {
 			colorMode,
 			geographyMode,
+			lastSocietyColorMode,
 			nationMode,
 			societyMode,
 			religionMode,
 			viewMode,
 			solarSystemViewActive,
+			solarSystemControlsExpanded,
 			showSolarSystemEllipticalOrbits,
 			showSolarSystemTrueScale,
 			showSolarSystemDaylight,
@@ -235,6 +254,7 @@ export function useOverlayState(input: OverlayStateInput) {
 			solarSystemTrailDegrees,
 			showWireframe,
 			showGrid,
+			showCoordinateTicks,
 			showNationBorders,
 			showDistrictBorders,
 			titleBorderTiers,
@@ -252,10 +272,11 @@ export function useOverlayState(input: OverlayStateInput) {
 			showOceanCurrents,
 			showRivers,
 			showInfrastructure,
+			showMigrationRoutes,
 			overlaysExpanded,
-			gridSpacing,
 			unitSystem,
 			mapProjectionLatitude,
+			exportCenterLongitude,
 			debugMapModes,
 			measureMode,
 			pathfindingLand,
@@ -293,6 +314,8 @@ export function useOverlayState(input: OverlayStateInput) {
 	}, [
 		colorMode,
 		solarSystemViewActive,
+		solarSystemControlsExpanded,
+		exportCenterLongitude,
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemTrueScale,
 		showSolarSystemDaylight,
@@ -315,14 +338,16 @@ export function useOverlayState(input: OverlayStateInput) {
 		dangerSubMode,
 		debugMapModes,
 		geographyMode,
-		gridSpacing,
+		lastSocietyColorMode,
 		mapProjectionLatitude,
 		nationMode,
 		overlaysExpanded,
 		societyMode,
 		religionMode,
 		showGrid,
+		showCoordinateTicks,
 		showInfrastructure,
+		showMigrationRoutes,
 		showNationBorders,
 		showDistrictBorders,
 		titleBorderTiers,
@@ -365,7 +390,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		elevationSubMode,
 		exportCenterLongitude,
 		geographyMode,
-		gridSpacing,
+		lastSocietyColorMode,
 		handleSetDataVariant,
 		labelMode,
 		mapProjectionLatitude,
@@ -392,7 +417,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		setExportCenterLongitude,
 		setGeographyColorMode,
 		setGeographyMode,
-		setGridSpacing,
 		setLabelMode,
 		setMapProjectionLatitude,
 		setMeasureModeState,
@@ -412,7 +436,9 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowGdd,
 		setShowGint,
 		setShowGrid,
+		setShowCoordinateTicks,
 		setShowInfrastructure,
+		setShowMigrationRoutes,
 		setShowNationBorders,
 		setShowDistrictBorders,
 		setTitleBorderTiers,
@@ -445,7 +471,9 @@ export function useOverlayState(input: OverlayStateInput) {
 		showGdd,
 		showGint,
 		showGrid,
+		showCoordinateTicks,
 		showInfrastructure,
+		showMigrationRoutes,
 		showNationBorders,
 		showDistrictBorders,
 		titleBorderTiers,

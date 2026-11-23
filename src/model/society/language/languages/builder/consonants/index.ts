@@ -7,14 +7,16 @@ const orthography = (dice: SharedRng): Record<string, string> => {
 	return {
 		ŋ: "ng",
 		ð: "th",
-		ʃ: dice.weightedChoice([
-			{ v: "sh", w: 0.9 },
-			{ v: "x", w: 0.1 },
-		]),
-		ʧ: dice.weightedChoice([
-			{ v: "ch", w: 0.9 },
-			{ v: "q", w: 0.1 },
-		]),
+		ʃ:
+			dice.weightedChoice([
+				{ v: "sh", w: 0.9 },
+				{ v: "x", w: 0.1 },
+			]) ?? "sh",
+		ʧ:
+			dice.weightedChoice([
+				{ v: "ch", w: 0.9 },
+				{ v: "q", w: 0.1 },
+			]) ?? "ch",
 		ʒ: "zh",
 	}
 }
@@ -34,15 +36,17 @@ const buildConsonants = (params: {
 	stops: boolean
 }) => {
 	const ortho = orthography(params.dice)
-	const k = params.dice.weightedChoice([
-		{ v: "k", w: 0.4 },
-		{ v: "c", w: 0.4 },
-		{ v: "q", w: 0.2 },
-	])
-	const j = params.dice.weightedChoice([
-		{ v: "y", w: params.vowels.includes("y") ? 0 : 0.3 },
-		{ v: "j", w: 0.7 },
-	])
+	const k =
+		params.dice.weightedChoice([
+			{ v: "k", w: 0.4 },
+			{ v: "c", w: 0.4 },
+			{ v: "q", w: 0.2 },
+		]) ?? "k"
+	const j =
+		params.dice.weightedChoice([
+			{ v: "y", w: params.vowels.includes("y") ? 0 : 0.3 },
+			{ v: "j", w: 0.7 },
+		]) ?? "j"
 	const essentials = ["n"].concat(params.dice.choice("rl".split("")))
 	const startConsonants = [
 		...essentials,

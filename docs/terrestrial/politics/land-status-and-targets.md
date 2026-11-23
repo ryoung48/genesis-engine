@@ -24,18 +24,18 @@ Buckets: 1, 2–4, 5–9, 10–24, 25–49, 50–100 and 101+ provinces.
 
 | Year | State-held % of habitable | 1 | 2–4 | 5–9 | 10–24 | 25–49 | 50–100 | 101+ | Size source |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 867 | 56.6 | 2.99 | 8.45 | 12.32 | 16.34 | 10.96 | 18.02 | 30.93 | the `lateMedieval` era weights |
+| 867 | 46.35 | 1.44 | 9.14 | 12.25 | 18.53 | 21.90 | 23.32 | 13.42 | EU4 extended timeline, area-normalised |
 | 1066 | 60 | 3.00 | 18.14 | 10.84 | 12.40 | 7.06 | 8.97 | 39.59 | CK3 sovereigns, singles trimmed |
 | 1500 | 71 | | | | | | | | interpolated |
 | 1701 | 79 | 1.34 | 3.97 | 6.62 | 11.60 | 7.64 | 8.85 | 59.98 | EU4 |
 | 1914 | 95 | 0.17 | 0.72 | 0.69 | 3.04 | 2.34 | 5.39 | 87.64 | EU4 |
 
-Interpolation is linear and piecewise. `h` uses all five checkpoints plus 50 at 476, so 867 is `50 + 10 × (867 − 476) / (1066 − 476) = 56.6`. Size shares interpolate between the 867, 1066, 1701 and 1914 rows only. The 1914 row exists only to interpolate 1701 to 1800, where `h` is 86.4. The ceiling is a hard cap on one realm, not part of the distribution: 809 provinces up to 1065, 1,870 up to 1700, 2,014 from 1701, scaled by the habitable province count against the 10,974 of the 204,000-point verification world.
+Interpolation is linear and piecewise. `h` uses the five checkpoints 867, 1066, 1500, 1701 and 1914, and is held at its 867 value before 867. Size shares interpolate between the 867, 1066, 1701 and 1914 rows only. The 1914 row exists only to interpolate 1701 to 1800, where `h` is 86.4. The ceiling is a hard cap on one realm, not part of the distribution: 809 provinces up to 1065, 1,870 up to 1700, 2,014 from 1701, scaled by the habitable province count against the 10,974 of the 204,000-point verification world.
 
 Sources:
 
-- **State-held share** is a design series (50 at 476, 60 at 1066, 71 at 1500, 79 at 1701, 95 at 1914) taken from the earlier Fast-history work, not sourced data. Cross-check: 3,835 held CK3 counties of about 15,000 km² in 867 is 57.5 million km², about 53% of a 109 million km² habitable world, against 56.6% here.
-- **867 sizes** are the `lateMedieval` nation weights normalised, with the 50 to 250 share split 36.8% / 63.2% into 50–100 and 101+, the CK3 867 ratio (612 to 1,050 counties). A test keeps the two in step.
+- **State-held share at 867** is measured from the EU4 extended timeline: 52.75 million km² owned of 113.80 million km² habitable, which is the 132.73 million km² of mapped land minus 14.26% removed as desolate-equivalent (1,822 of the 12,775 provinces of the 204,000-point verification world, seed 14963991), taking the emptiest unowned provinces first by HYDE people per km² at 800–900 and counting EU4 wasteland first. That is 46.35%. The later values (60 at 1066, 71 at 1500, 79 at 1701, 95 at 1914) are a design series from the earlier Fast-history work, not sourced data. Cross-check: 3,835 held CK3 counties of about 15,000 km² in 867 is 57.5 million km², about 53% of a 109 million km² habitable world.
+- **867 sizes** are measured from the EU4 extended-timeline ownership log (`public/earth-history/events/provinces.json`) at 867.1.1: 464 owner tags, vassals not folded, on 2,280 provinces and 52.7 million km². Each tag's area, from `provinceAreasKm2` in `public/earth-data/earth-real-population-eu4.json`, is divided by 10,000 km² per generated province, rounded and floored at 1, then bucketed by share of held land. The [tech level](../population/tech-levels.md#state-held-land-and-realm-sizes) size plan carries the same row at its default 2.35, and a test keeps the two in step. At a 15,000 km² province the singles share would be 3.7% and the 101+ share 11.4%.
 - **1066 sizes** were measured from the local CK3 install at 867.1.1 and 1066.9.15, counting sovereign rulers only: each held county is assigned to its holder, each holder to their liege's holder through the highest-tier title that has a liege, and counties are summed under the ruler at the top. Singles are trimmed to 3% and the freed mass spread proportionally. `scripts/measure-ck3-governments.py` groups counties this way.
 - **1701 and 1914 rows and the ceilings** come from the EU4-format tables and period peaks of the earlier work; each bucket's province share is its realm share times its mean size, renormalised.
 - A province is treated as one CK3 county, as `ck3.md` does, although a county is about 15,000 km² and a 204,000-point province about 10,000 km².
@@ -68,7 +68,9 @@ The uninhabited share is not steered; it is an output of the [arrival field](../
 
 ## Starting land
 
-The 867 start settles every province whose arrival year is 867 or earlier. `MIGRATION.heldCore` picks `round(h(867) × settled)` settled provinces as state-held, and the rest of the settled world starts stateless. Nations are placed inside that mask with the unchanged placement rules and `lateMedieval` size weights. Every reader that used the era's `statehoodFraction` now reads the generated mask's actual state-held share of settled land.
+The 867 start settles every province whose arrival year is 867 or earlier. `MIGRATION.heldCore` picks `round(h × settled)` settled provinces as state-held, and the rest of the settled world starts stateless. `h` and the size weights come from the requested [tech level](../population/tech-levels.md#state-held-land-and-realm-sizes); at the default 2.35 they equal the 867 row of the target profile. Nations are placed inside that mask with the unchanged placement rules. The in-run target profile stays keyed by year.
+
+State land prefers farming and herding. Each settled province's suitability, site score and contact weight are multiplied by `0.05 + 0.95 × share`, where share is the fraction of its people who farm or herd at the start (`FARMING_WAY_OF_LIFE.wayOfLife`). Foraging land is still taken where the target needs it. On the verification world (seed 14963991, 204,000 points) this cut mostly-foraging held provinces from 1,860 to 394, and left 52 of the 5,077 target provinces stateless (1%): pockets with no eligible capital. Every one of the 356 starting capitals is in a province where at least half the people farm or herd (mean 91%), and every realm-size bucket is within 0.015 of the 867 profile.
 
 The held provinces grow from core seeds spread over all settled land, so every landmass gets states and the stateless share sits on the poorest ground of each one:
 

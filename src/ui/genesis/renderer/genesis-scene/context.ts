@@ -7,6 +7,7 @@ import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
 } from "@/model/history/earth/data-source/types"
+import type { MigrationRoutes } from "@/model/society/migration/types"
 import type { HeritageScript } from "@/model/society/script"
 import type {
 	SerializedGenesisWorld,
@@ -156,6 +157,10 @@ export interface GenesisContext {
 	mapInfrastructureMaterials: LineMaterial[]
 	infrastructureMaterials: LineMaterial[]
 	infrastructureVisible: boolean
+
+	globeMigrationRoutes: THREE.Group | null
+	mapMigrationRoutes: THREE.Group | null
+	migrationRoutesData: MigrationRoutes | null
 
 	globeWindArrows: THREE.LineSegments | null
 	mapWindArrows: THREE.LineSegments | null
@@ -312,7 +317,7 @@ export interface GenesisContext {
 	mapGrid: THREE.LineSegments | null
 	wireframeVisible: boolean
 	gridVisible: boolean
-	gridSpacingDeg: number
+	coordinateTicksVisible: boolean
 	globeSolarTerminator: THREE.Group | null
 	mapSolarTerminator: THREE.Group | null
 	solarTerminatorVisible: boolean

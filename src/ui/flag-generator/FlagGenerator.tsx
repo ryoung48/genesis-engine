@@ -12,11 +12,13 @@ export function FlagGenerator() {
 		seed,
 		pattern,
 		hue,
+		shape,
 		previews,
 		setSeed,
 		resample,
 		setPattern,
 		setHue,
+		setShape,
 	} = useFlagGenerator()
 	return (
 		<main className={cx(uiTokens.generator.page, uiTokens.surface.canvas)}>
@@ -24,7 +26,7 @@ export function FlagGenerator() {
 				<div>
 					<h1 className={uiTokens.type.hero}>Flag generator</h1>
 					<p className={cx(uiTokens.type.value, uiTokens.text.muted)}>
-						Explore patterns and colors in the map's shield shape.
+						Explore patterns and colors in the map's {shape} shape.
 					</p>
 				</div>
 				<Link
@@ -79,6 +81,18 @@ export function FlagGenerator() {
 						))}
 					</select>
 				</label>
+				<label className={uiTokens.generator.field}>
+					<span className={uiTokens.type.label}>Shape</span>
+					<select
+						aria-label="Shape"
+						value={shape}
+						onChange={(event) => setShape(event.target.value)}
+						className={cx(uiTokens.generator.input, uiTokens.type.value)}
+					>
+						<option value="shield">Shield</option>
+						<option value="flag">Flag</option>
+					</select>
+				</label>
 				<Button size="md" selected onClick={resample}>
 					Resample flags
 				</Button>
@@ -101,7 +115,7 @@ export function FlagGenerator() {
 						{preview.imageUrl ? (
 							<img
 								src={preview.imageUrl}
-								alt={`${preview.label} shield, sample ${index + 1}`}
+								alt={`${preview.label} ${shape}, sample ${index + 1}`}
 								className={uiTokens.generator.preview}
 							/>
 						) : (

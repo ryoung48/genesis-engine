@@ -43,6 +43,7 @@ import {
 import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
+	buildFarmingDisplayData,
 	buildHoverChartData,
 	buildPastaMonthlyData,
 	buildProvinceName,
@@ -252,9 +253,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	clockMonthMode,
 	clockMonth,
 	unitSystem,
+	selectedTimeMs,
 	world,
 	routes,
 	hoverCardRef,
+	getProvinceName,
 	getCultureName,
 	getHeritageName,
 	getReligionName,
@@ -361,6 +364,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		"urban",
 		"development",
 		"knowledge",
+		"techLevel",
 		"culture",
 		"religion",
 		...(populationMode === "migration" ? (["migration"] as const) : []),
@@ -382,6 +386,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					getReligionName,
 				})
 				return display ? [display] : []
+			})
+		: []
+	const farmingDisplays = showSociety
+		? buildFarmingDisplayData({
+				populationMode,
+				hoverProvince,
+				world,
+				timeMs: selectedTimeMs,
+				getProvinceName: (id) => getProvinceName?.(id) ?? `Province ${id}`,
 			})
 		: []
 	const urbanPopulation =
@@ -407,7 +420,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const hoverPortLabel = showSociety
 		? buildHoverPortLabel(hoverProvince, world, getLandmarkName)
 		: null
-	const demographicEntries: DemographicEntry[] = [...demographicDisplays]
+	const demographicEntries: DemographicEntry[] = [
+		...demographicDisplays,
+		...farmingDisplays,
+	]
 	if (urbanPopulation !== null && urbanPopulation > 0) {
 		demographicEntries.push({
 			label: "Urban Pop",
@@ -468,6 +484,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				"Religion",
 				"Development",
 				"Knowledge",
+				"Tech level",
 				"Population",
 				"Population (Real)",
 				"Population Δ",
@@ -479,7 +496,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		demographicEntryMap.get("Culture"),
 		demographicEntryMap.get("Religion"),
 		demographicEntryMap.get("Development"),
+		demographicEntryMap.get("Tech level"),
 		demographicEntryMap.get("Migration arrival"),
+		demographicEntryMap.get("Farming arrival"),
+		demographicEntryMap.get("Farming hearth"),
+		demographicEntryMap.get("Way of life"),
 		demographicEntryMap.get("Population") ??
 			demographicEntryMap.get("Population (Real)") ??
 			demographicEntryMap.get("Population Δ"),

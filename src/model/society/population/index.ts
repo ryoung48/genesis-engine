@@ -6,8 +6,7 @@ import type {
 	ProvinceAreasKm2Params,
 	ProvincePopulation,
 } from "@/model/society/population/types"
-
-const SETTLEMENT_MATURITY_YEARS = 4400
+import { TECH_LEVEL } from "@/model/society/tech-level"
 
 const HAB_CLIMATE = new Float32Array([
 	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,
@@ -93,11 +92,11 @@ function computePopulation({
 	seed,
 	mesh,
 	planetRadiusKm,
-	eraTargetPopulation,
+	techLevel,
 	migrationWave,
 	settlementWave,
 	migrationFalloff,
-	settlementAgeYears,
+	densityWeights,
 }: ComputePopulationParams): ProvincePopulation {
 	const { count } = provinces
 
@@ -116,10 +115,6 @@ function computePopulation({
 
 	const effectiveSettlementWave = settlementWave ?? 1.0
 
-	// Global habitability score = sum over land of cellArea * habitability,
-	// normalized. Per-province mean cell area (area / land-region count) so the
-	// adaptive Earth import — which packs more, smaller cells onto land — no
-	// longer inflates the score; identical to a uniform 4piR**2/N on an even mesh.
 	const radiusKm = planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
 	const provinceAreaKm2 = _provinceAreasKm2({
 		mesh,
@@ -128,39 +123,40 @@ function computePopulation({
 		planetRadiusKm: radiusKm,
 	})
 
-	let habitabilityScore = 0
-	for (let i = 0; i < count; i++) {
-		const meanCellAreaKm2 = provinceAreaKm2[i] / Math.max(1, provinces.size[i])
-		habitabilityScore += meanCellAreaKm2 * habitability[i]
-	}
-	habitabilityScore /= 81234131.618
-
-	const targetPop = eraTargetPopulation ?? 215e6
-	const totalPop = targetPop * habitabilityScore
-
 	// Distribution weight = habitability shaped by distance from the cradles.
-	// Province share âˆ habitability * (1 - migrationWave)^falloff, so people
-	// concentrate near the cradles (strongly in early eras) while the frontier
-	// trends toward zero. falloff = 0 leaves the distribution at pure
-	// habitability. Renormalizing preserves the era's total population.
+	// Provinces beyond the era's settlement frontier are unsettled: no
+	// population (their habitability is left intact for other consumers).
 	const falloff = migrationFalloff ?? 0
 	const weight = new Float32Array(count)
+	const settled = new Uint8Array(count)
 	let totalWeight = 0
 	for (let i = 0; i < count; i++) {
 		let w = habitability[i]
+		settled[i] = 1
 		if (w > 0 && migrationWave) {
 			const wave = migrationWave[i]
-			// wave < 0 marks desolate/unreachable provinces (habitability already 0).
-			// Provinces beyond the era's settlement frontier are unsettled: no
-			// population (their habitability is left intact for other consumers).
-			if (wave < 0 || wave > effectiveSettlementWave) w = 0
-			else if (settlementAgeYears)
-				w *= 1 - Math.exp(-settlementAgeYears[i] / SETTLEMENT_MATURITY_YEARS)
+			if (wave < 0 || wave > effectiveSettlementWave) {
+				w = 0
+				settled[i] = 0
+			} else if (densityWeights) w = densityWeights[i]
 			else if (falloff > 0) w *= (1 - Math.min(wave, 1)) ** falloff
 		}
 		weight[i] = w
 		totalWeight += w
 	}
+
+	// Settled habitability score = sum over settled land of cellArea *
+	// habitability, normalized to Earth. Per-province mean cell area (area /
+	// land-region count) so the adaptive Earth import -- which packs more,
+	// smaller cells onto land -- does not inflate the score.
+	let habitabilityScore = 0
+	for (let i = 0; i < count; i++) {
+		if (!settled[i]) continue
+		const meanCellAreaKm2 = provinceAreaKm2[i] / Math.max(1, provinces.size[i])
+		habitabilityScore += meanCellAreaKm2 * habitability[i]
+	}
+	habitabilityScore /= 81234131.618
+	const totalPop = TECH_LEVEL.worldPopulation({ techLevel }) * habitabilityScore
 
 	const population = new Float32Array(count)
 	if (totalWeight > 0) {
@@ -172,6 +168,7 @@ function computePopulation({
 	return {
 		habitability,
 		population,
+		techLevel: new Float32Array(count).fill(Number.NaN),
 		habitabilityScore,
 		totalPopulation: totalPop,
 		settlementWave: effectiveSettlementWave,

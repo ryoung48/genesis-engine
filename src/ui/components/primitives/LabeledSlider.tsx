@@ -1,6 +1,7 @@
 import React from "react"
 import { cx } from "@/ui/components/lib"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
+import { uiTokens } from "@/ui/components/tokens"
 
 interface LabeledSliderProps {
 	label: React.ReactNode
@@ -16,6 +17,8 @@ interface LabeledSliderProps {
 	onPointerUp?: React.PointerEventHandler<HTMLInputElement>
 	onKeyUp?: React.KeyboardEventHandler<HTMLInputElement>
 	onBlur?: React.FocusEventHandler<HTMLInputElement>
+	// [JUSTIFICATION] Panel sliders need a light surface treatment; overlay sliders use the default.
+	tone?: "overlay" | "panel"
 }
 
 export const LabeledSlider: React.FC<LabeledSliderProps> = ({
@@ -32,16 +35,26 @@ export const LabeledSlider: React.FC<LabeledSliderProps> = ({
 	onPointerUp,
 	onKeyUp,
 	onBlur,
+	tone = "overlay",
 }) => (
 	<div className={className}>
 		<LabeledValueRow
 			label={label}
 			value={value}
-			labelClassName="text-[11px] font-medium text-slate-300"
-			valueClassName="font-mono text-[11px] text-slate-400"
+			labelClassName={
+				tone === "panel"
+					? uiTokens.slider.panelLabel
+					: "text-[11px] font-medium text-slate-300"
+			}
+			valueClassName={
+				tone === "panel"
+					? uiTokens.slider.panelValue
+					: "font-mono text-[11px] text-slate-400"
+			}
 		/>
 		<input
 			type="range"
+			aria-label={typeof label === "string" ? label : undefined}
 			min={min}
 			max={max}
 			step={step}
@@ -52,7 +65,9 @@ export const LabeledSlider: React.FC<LabeledSliderProps> = ({
 			onKeyUp={onKeyUp}
 			onBlur={onBlur}
 			className={cx(
-				"w-full accent-slate-100 disabled:cursor-not-allowed",
+				tone === "panel"
+					? uiTokens.slider.panelInput
+					: "w-full accent-slate-100 disabled:cursor-not-allowed",
 				sliderClassName,
 			)}
 		/>

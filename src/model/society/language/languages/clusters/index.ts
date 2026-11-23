@@ -22,8 +22,8 @@ import type {
 	WordLengthParams,
 } from "@/model/society/language/languages/clusters/types"
 import {
-	Cluster,
-	Language,
+	type Cluster,
+	type Language,
 	PhonemeCatalog,
 	STOP_CHAR,
 	vowelRules,

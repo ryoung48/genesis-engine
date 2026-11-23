@@ -158,10 +158,11 @@ const buildBasicVowels = (params: {
 	dice: SharedRng
 }) => {
 	const vowelCount = 3
-	const i = params.dice.weightedChoice([
-		{ v: "i", w: 0.9 },
-		{ v: "y", w: 0.1 },
-	])
+	const i =
+		params.dice.weightedChoice([
+			{ v: "i", w: 0.9 },
+			{ v: "y", w: 0.1 },
+		]) ?? "i"
 	const required = ["a"]
 	if (params.ending === PhonemeCatalog.MIDDLE_VOWEL) {
 		required.push(params.dice.choice(["o", "u"]))
@@ -188,11 +189,12 @@ const buildComplexVowels = (params: {
 		U: "uu",
 		Y: "i",
 	}
-	const vowelOrthography: Record<string, string> = dice.weightedChoice([
-		{ v: doubles, w: 0.1 },
-		{ v: diphthongs({ vowels, consonants, dice }), w: 0.5 },
-		{ v: stops > 0 || exoticCons ? basicVowels : exoticVowels(dice), w: 0.4 },
-	])
+	const vowelOrthography: Record<string, string> =
+		dice.weightedChoice([
+			{ v: doubles, w: 0.1 },
+			{ v: diphthongs({ vowels, consonants, dice }), w: 0.5 },
+			{ v: stops > 0 || exoticCons ? basicVowels : exoticVowels(dice), w: 0.4 },
+		]) ?? doubles
 	const specialVowels = dice
 		.sample(
 			["A", "E", "I", "O", "U", "Y"].filter((v) =>

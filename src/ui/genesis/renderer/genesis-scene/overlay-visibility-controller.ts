@@ -135,6 +135,13 @@ export function createOverlayVisibilityController(
 			ctx.mapInfrastructure.visible = ctx.infrastructureVisible && showMap
 			if (ctx.mapMesh) ctx.mapInfrastructure.position.copy(ctx.mapMesh.position)
 		}
+		if (ctx.globeMigrationRoutes)
+			ctx.globeMigrationRoutes.visible = ctx.currentViewMode === "globe"
+		if (ctx.mapMigrationRoutes) {
+			ctx.mapMigrationRoutes.visible = showMap
+			if (ctx.mapMesh)
+				ctx.mapMigrationRoutes.position.copy(ctx.mapMesh.position)
+		}
 		if (ctx.globeNationLabels)
 			ctx.globeNationLabels.visible =
 				(ctx.labelMode.nations ||

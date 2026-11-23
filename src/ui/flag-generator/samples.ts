@@ -8,6 +8,7 @@ export function createFlagBatch({
 	seed,
 	pattern,
 	hue,
+	shape,
 }: FlagBatchParams): FlagPreview[] {
 	const degrees = FLAG_GENERATOR.hues.find(
 		(entry) => entry.value === hue,
@@ -19,7 +20,11 @@ export function createFlagBatch({
 			pattern,
 			hue: degrees,
 		})
-		const canvas = FLAG_GENERATOR.render({ design, width: PREVIEW_WIDTH })
+		const canvas = FLAG_GENERATOR.render({
+			design,
+			width: PREVIEW_WIDTH,
+			shape,
+		})
 		return {
 			seed: sampleSeed,
 			pattern: design.pattern,

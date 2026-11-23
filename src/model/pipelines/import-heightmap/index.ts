@@ -17,6 +17,10 @@ import { RNG } from "@/model/shared/random/rng"
 import { TIMING } from "@/model/shared/timing"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { UNITS } from "@/model/shared/units"
+import type { OriginHint } from "@/model/society/migration/types"
+
+// Omo Kibish / Lake Turkana basin: earliest anatomically modern human fossils (about 233 ka; Vidal et al. 2022, Nature).
+const EARTH_MIGRATION_ORIGIN: OriginHint = { lonDeg: 36, latDeg: 5 }
 
 function importGenesisWorld({
 	params,
@@ -305,6 +309,7 @@ function importGenesisWorld({
 		landDistribution: 0.25,
 		continentSizeVariety: 0,
 		landCoverage: 0.3,
+		targetTechLevel: params.targetTechLevel,
 		jitter: params.jitter,
 		roughness: 0,
 		terrainWarp: params.terrainWarp,
@@ -494,6 +499,7 @@ function importGenesisWorld({
 		eu4ProvinceFallbackSeeds: params.eu4ProvinceFallbackSeeds,
 		r_hotspot: new Float32Array(mesh.numRegions),
 		r_mantleUpwelling: new Float32Array(mesh.numRegions),
+		originHint: EARTH_MIGRATION_ORIGIN,
 		terrainFeatures: undefined,
 		realClimateMonthly: params.realClimateMonthly,
 		realClimateWidth: params.realClimateWidth,
@@ -712,6 +718,7 @@ function importGenesisWorld({
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		historyMigration: { pipeline: "earth" },
+		farming: post.farming,
 		tradeGoods: post.tradeGoods,
 		settlementRegions: provinceSociety.settlementRegions,
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
@@ -724,4 +731,5 @@ function importGenesisWorld({
 
 export const IMPORT_HEIGHTMAP = {
 	importGenesisWorld,
+	earthMigrationOrigin: EARTH_MIGRATION_ORIGIN,
 }

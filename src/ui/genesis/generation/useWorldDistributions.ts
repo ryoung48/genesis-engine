@@ -6,13 +6,12 @@ import { RELIGION } from "@/model/history/sim/religion"
 import { ERAS } from "@/model/society/eras"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
-import {
-	buildLandStatusDistribution,
-	buildNationSizeDistribution,
-} from "@/ui/genesis/political/nation-size-distribution"
+import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-size-distribution"
 import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
+import { techLevelColor } from "@/ui/genesis/shared/colors/tech-level"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
@@ -28,6 +27,33 @@ import { buildDistribution } from "@/ui/wiki/stats/nation/nation-distributions"
  */
 export function useWorldDistributions(input: WorldDistributionsInput) {
 	const { world, worldForDisplay, history, dataVariant } = input
+	const techLevelDistribution = useMemo((): DistributionBucket[] => {
+		const population = worldForDisplay?.population
+		if (!population) return []
+		const settled: number[] = []
+		for (let p = 0; p < population.techLevel.length; p++)
+			if (
+				Number.isFinite(population.techLevel[p]) &&
+				population.population[p] > 0
+			)
+				settled.push(p)
+		settled.sort((a, b) => population.techLevel[a] - population.techLevel[b])
+		const eras = new Map<string, { provinces: number; mass: number }>()
+		for (const p of settled) {
+			const label = TECH_LEVEL.describe({
+				techLevel: population.techLevel[p],
+			})
+			const era = eras.get(label) ?? { provinces: 0, mass: 0 }
+			era.provinces++
+			era.mass += population.techLevel[p]
+			eras.set(label, era)
+		}
+		return Array.from(eras, ([label, { provinces, mass }]) => ({
+			label,
+			count: provinces,
+			color: rgbToCss(techLevelColor(mass / provinces)),
+		}))
+	}, [worldForDisplay])
 
 	const nationProvinceCounts = useMemo(() => {
 		const counts = new Map<number, number>()
@@ -59,33 +85,11 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		}))
 	}, [world?.isEarthImport, history.query, nationProvinceCounts])
 
-	// Habitable provinces owned by nobody. On Earth import that is land EU4 has
-	// not colonised at the scrubbed date; procedurally it is the era's stateless
-	// land (see TARGET_PROFILE for the late medieval start). Desolate
-	// provinces are excluded -- they are uninhabitable, not merely unclaimed.
-	const unclaimedProvinceCount = useMemo(() => {
-		if (!history.query) return 0
-		const desolate = world?.isEarthImport
-			? null
-			: worldForDisplay?.provinces?.desolate
-		let unclaimed = 0
-		const { provinceNation } = history.query.frame
-		for (let province = 0; province < provinceNation.length; province++) {
-			if (desolate?.[province]) continue
-			if (provinceNation[province] < 0) unclaimed++
-		}
-		return unclaimed
-	}, [world?.isEarthImport, history.query, worldForDisplay])
-
-	const nationSizeDistribution = useMemo(() => {
-		const provinceStatus = history.query?.frame.provinceStatus
-		return history.query && provinceStatus
-			? buildLandStatusDistribution(history.query.frame, provinceStatus)
-			: buildNationSizeDistribution(
-					nationProvinceCounts,
-					unclaimedProvinceCount,
-				)
-	}, [history.query, nationProvinceCounts, unclaimedProvinceCount])
+	const nationSizeDistribution = useMemo(
+		() =>
+			history.query ? buildNationSizeDistribution(history.query.frame) : [],
+		[history.query],
+	)
 
 	const governmentDistribution = useMemo(() => {
 		if (earthGovernmentDistribution) return earthGovernmentDistribution
@@ -235,6 +239,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 	}, [world?.tradeGoods])
 
 	return {
+		techLevelDistribution,
 		climateDistribution,
 		conflictDistribution,
 		governmentDistribution,

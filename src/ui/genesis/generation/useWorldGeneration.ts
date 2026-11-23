@@ -59,7 +59,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		setSeed,
 		setDataVariant,
 		setters,
-		era,
+		targetTechLevel,
 		numPoints,
 		numPlates,
 		jitter,
@@ -170,7 +170,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			numPlates,
 			landDistribution,
 			continentSizeVariety,
-			era,
+			targetTechLevel,
 			landCoverage,
 			planetRadiusKm,
 			obliquity,
@@ -220,7 +220,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			numPlates,
 			landDistribution,
 			continentSizeVariety,
-			era,
+			targetTechLevel,
 			landCoverage,
 			planetRadiusKm,
 			obliquity,
@@ -357,6 +357,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		) => {
 			const importParams = {
 				seed,
+				targetTechLevel,
 				numPoints,
 				jitter,
 				planetRadiusKm,
@@ -436,6 +437,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		},
 		[
 			seed,
+			targetTechLevel,
 			numPoints,
 			jitter,
 			planetRadiusKm,

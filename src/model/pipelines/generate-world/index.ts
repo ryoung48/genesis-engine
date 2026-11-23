@@ -13,7 +13,7 @@ import { ELEVATION } from "@/model/geography/terrain/elevation"
 import { EROSION } from "@/model/geography/terrain/erosion"
 import { HOTSPOTS } from "@/model/geography/terrain/hotspots"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
-import { KNOWLEDGE } from "@/model/history/sim/engine/knowledge"
+import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { MESH } from "@/model/mesh"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
 import type {
@@ -31,7 +31,10 @@ import { RNG } from "@/model/shared/random/rng"
 import { TIMING } from "@/model/shared/timing"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { UNITS } from "@/model/shared/units"
+import { ERAS } from "@/model/society/eras"
+import { FARMING_WAY_OF_LIFE } from "@/model/society/farming/way-of-life"
 import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import { URBANIZATION } from "@/model/society/urbanization"
 
 function applyPeakCompression({ elev, N }: ApplyPeakCompressionParams): void {
@@ -704,28 +707,70 @@ function generateGenesisWorld({
 	const infrastructureTiming: StageTiming[] = []
 	const { provinces, population } = post
 	const { nations, landmarks } = provinceSociety
+	const techLevel = TECH_LEVEL.averageLevel({ target: params.targetTechLevel })
 	const urbanization = TIMING.measure({
 		stage: "urbanization",
 		timings: infrastructureTiming,
-		fn: () =>
-			provinces && nations && population
-				? URBANIZATION.computeUrbanization({
-						params,
-						provinces,
-						nations,
-						population,
-						knowledge: KNOWLEDGE.urbanKnowledge({
-							era: params.era,
-							baseline: KNOWLEDGE.startBaseline({
-								era: params.era,
-								startYear: undefined,
-							}),
-						}),
+		fn: () => {
+			if (!provinces || !nations || !population)
+				return {
+					urbanPopulation: new Float32Array(provinces?.count ?? 0),
+					development: new Float32Array(provinces?.count ?? 0),
+				}
+			const era = ERAS.eraOf({ techLevel })
+			const farming = post.farming
+			const wayOfLife = farming
+				? FARMING_WAY_OF_LIFE.wayOfLife({
+						farming,
+						graph: provinces,
+						year: population.startYear ?? STATE_CLOCK.defaultStartYear,
+						techLevel,
 					})
-				: {
-						urbanPopulation: new Float32Array(provinces?.count ?? 0),
-						development: new Float32Array(provinces?.count ?? 0),
-					},
+				: null
+			const foraging = Uint8Array.from({ length: provinces.count }, (_, p) =>
+				wayOfLife &&
+				FARMING_WAY_OF_LIFE.foraging({ field: wayOfLife, province: p })
+					? 1
+					: 0,
+			)
+			const even = {
+				...population,
+				techLevel: new Float32Array(provinces.count).fill(techLevel),
+			}
+			const relative = URBANIZATION.computeUrbanization({
+				era,
+				provinces,
+				nations,
+				population: even,
+				knowledge: URBANIZATION.techKnowledge({ nations, population: even }),
+				foraging,
+			})
+			population.techLevel.set(
+				TECH_LEVEL.assign({
+					provinces,
+					population: population.population,
+					development: URBANIZATION.stateDevelopment({
+						provinces,
+						sovereign: nations.sovereign,
+						development: relative.development,
+						urbanPopulation: relative.urbanPopulation,
+					}),
+					urbanPopulation: relative.urbanPopulation,
+					sovereign: nations.sovereign,
+					farming: post.farming,
+					year: population.startYear ?? STATE_CLOCK.defaultStartYear,
+					techLevel,
+				}),
+			)
+			return URBANIZATION.computeUrbanization({
+				era,
+				provinces,
+				nations,
+				population,
+				knowledge: URBANIZATION.techKnowledge({ nations, population }),
+				foraging,
+			})
+		},
 	})
 	onProgress?.("urbanization", 80)
 
@@ -739,6 +784,7 @@ function generateGenesisWorld({
 							world: {
 								mesh,
 								params,
+								era: ERAS.eraOf({ techLevel }),
 								provinces,
 								nations,
 								landmarks,
@@ -863,6 +909,7 @@ function generateGenesisWorld({
 		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		historyMigration: post.historyMigration,
+		farming: post.farming,
 		tradeGoods: post.tradeGoods,
 		settlementRegions: provinceSociety.settlementRegions,
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,

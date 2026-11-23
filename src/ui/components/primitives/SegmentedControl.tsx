@@ -92,6 +92,7 @@ export function SegmentedControl<T extends string>({
 						disabled={option.disabled}
 						title={option.title}
 						aria-label={option.ariaLabel}
+						aria-pressed={active}
 						className={cx(
 							uiTokens.radius.sm,
 							"font-semibold uppercase tracking-[0.08em]",

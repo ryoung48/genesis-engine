@@ -12,9 +12,10 @@ import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { TIMING } from "@/model/shared/timing"
 import type { StageTiming } from "@/model/shared/timing/types"
+import { ERAS } from "@/model/society/eras"
 import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
-import type { SocietyEra } from "@/model/society/types"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
@@ -140,7 +141,7 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 }
 
 interface PathfindSeedWorld {
-	params: { planetRadiusKm?: number; era?: SocietyEra }
+	params: { planetRadiusKm?: number; targetTechLevel: number }
 	mesh: { r_xyz: Float32Array; adjOffset: Int32Array; adjList: Int32Array }
 	isLand: Uint8Array | null
 	vegetation: Uint8Array | null
@@ -158,7 +159,7 @@ function clonePathfindSeedWorld(
 	return {
 		params: {
 			planetRadiusKm: world.params.planetRadiusKm,
-			era: world.params.era,
+			targetTechLevel: world.params.targetTechLevel,
 		},
 		mesh: {
 			r_xyz: world.mesh.r_xyz.slice(),
@@ -265,6 +266,7 @@ function serializeWorld(
 		urbanPopulation: world.urbanPopulation,
 		population: world.population,
 		historyMigration: world.historyMigration,
+		farming: world.farming,
 		dtr_annual: world.dtr_annual,
 		dtr_monthly: world.dtr_monthly,
 		observedCloudCover: world.observedCloudCover,
@@ -613,10 +615,29 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			m.contactYear.buffer,
 		)
 	}
+	if (world.farming)
+		add(
+			world.farming.farmingYear.buffer,
+			world.farming.adoptionYear.buffer,
+			world.farming.herdYear.buffer,
+			world.farming.herdAdoptionYear.buffer,
+			world.farming.hearthOf.buffer,
+			world.farming.farmingFrom.buffer,
+			world.farming.settledYear.buffer,
+			world.farming.postMode.buffer,
+			world.farming.forageDensity.buffer,
+			world.farming.farmCapacity.buffer,
+			world.farming.herdCapacity.buffer,
+			world.farming.farmFit.buffer,
+			world.farming.herdFit.buffer,
+			world.farming.herdColonial.buffer,
+			world.farming.farmModern.buffer,
+		)
 	if (world.population) {
 		add(
 			world.population.habitability.buffer,
 			world.population.population.buffer,
+			world.population.techLevel.buffer,
 		)
 		if (world.population.migrationWave)
 			add(world.population.migrationWave.buffer)
@@ -817,7 +838,9 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			generated.coastal &&
 			generated.waterAccess &&
 			generated.rivers?.visible &&
-			generated.cultures
+			generated.cultures &&
+			generated.urbanPopulation &&
+			generated.development
 		) {
 			progressCb("Initializing history", 95)
 			historyRng = HISTORY_RNG.createHistoryRng(generated.params.seed + 99999)
@@ -828,6 +851,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				nations: generated.nations,
 				provinces: generated.provinces,
 				population: generated.population,
+				urbanPopulation: generated.urbanPopulation,
+				development: generated.development,
 				coastal: generated.coastal,
 				waterAccess: generated.waterAccess,
 				riverVisible: generated.rivers.visible,
@@ -836,7 +861,11 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				heritages: generated.heritages,
 				religions: generated.religions,
 				religionGender: generated.religionGender,
-				era: generated.params.era,
+				era: ERAS.eraOf({
+					techLevel: TECH_LEVEL.averageLevel({
+						target: generated.params.targetTechLevel,
+					}),
+				}),
 				seed: generated.params.seed,
 				landmarks: generated.landmarks,
 				regionProvince: generated.provinces.regionProvince,

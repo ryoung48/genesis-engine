@@ -32,6 +32,10 @@ export function precipitationColor(mm: number): [number, number, number] {
 	return precipitationMonthlyColor(mm)
 }
 
+export function rainfallSeasonalityColor(mm: number): [number, number, number] {
+	return interpolatePrecipitationStops(mm, rainfallSeasonalityStops)
+}
+
 export function precipitationDifferenceColor(
 	diffMm: number,
 ): [number, number, number] {
@@ -70,6 +74,17 @@ const annualPrecipStops = monthlyPrecipStops.map((stop) => ({
 	...stop,
 	mm: stop.mm * 12,
 }))
+
+const rainfallSeasonalityStops = [
+	{ mm: 0, r: 0.91, g: 0.43, b: 0.12 },
+	{ mm: 10, r: 0.96, g: 0.53, b: 0.19 },
+	{ mm: 40, r: 0.99, g: 0.68, b: 0.32 },
+	{ mm: 83, r: 1, g: 0.83, b: 0.56 },
+	{ mm: 125, r: 0.96, g: 0.93, b: 0.81 },
+	{ mm: 165, r: 0.7, g: 0.88, b: 0.79 },
+	{ mm: 250, r: 0.27, g: 0.72, b: 0.66 },
+	{ mm: 400, r: 0.02, g: 0.46, b: 0.43 },
+]
 
 const precipDiffStops: { v: number; r: number; g: number; b: number }[] = [
 	{ v: -200, r: 0.35, g: 0.16, b: 0.06 },

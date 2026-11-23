@@ -27,6 +27,8 @@ export interface ShatterPatchworkParams {
 	provinceContinent: Uint8Array | undefined
 	maxSpreadRad: number
 	seed: number
+	// [JUSTIFICATION] null where any province may hold a capital, unweighted.
+	agrarian: Float32Array | null
 	/** XORed into the noise/nameSeed derivation so different org kinds
 	 * sharing this module don't correlate with each other. */
 	seedSalt: number
@@ -166,6 +168,7 @@ function shatterPatchwork(
 		minTerritorySize,
 		memberBuckets,
 		findEligibleNation,
+		agrarian,
 	} = params
 
 	const targetNation = findEligibleNation({ seeds, sizes })
@@ -212,6 +215,7 @@ function shatterPatchwork(
 			componentSizes: components.sizes,
 			adjOffset: provinces.adjOffset,
 			adjList: provinces.adjList,
+			agrarian,
 		})
 		if (seedProvince < 0) continue
 
@@ -296,7 +300,7 @@ function shatterPatchwork(
 		if (attached >= 0) {
 			assignment[p] = attached
 			sizes[attached] += 1
-		} else {
+		} else if (PLACEMENT_FRONTIER.capitalEligible({ agrarian, province: p })) {
 			const nationIndex = seeds.length
 			seeds.push(p)
 			sizes.push(1)

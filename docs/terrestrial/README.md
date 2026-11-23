@@ -40,6 +40,8 @@ The three history producers are [stored Earth, detailed simulation and default f
 ## Population and economy
 
 - [Migration and settlement](population/migration-and-settlement.md)
+- [Farming arrival and way of life](population/farming.md)
+- [Tech levels](population/tech-levels.md)
 - [Population growth, cities, knowledge and development](population/growth-cities-and-knowledge.md)
 - [Economic output, taxation and state maintenance](population/output-and-taxation.md)
 - [Religions](population/religions.md)

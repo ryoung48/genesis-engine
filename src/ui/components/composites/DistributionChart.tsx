@@ -20,6 +20,8 @@ interface DistributionChartProps {
 	variant?: "default" | "compact"
 	// [JUSTIFICATION] Compact sidebars may omit the total to leave room for their bar.
 	showTotal?: boolean
+	// [JUSTIFICATION] Some distributions are most useful as counts rather than percentages.
+	valueDisplay?: "percent" | "count"
 }
 
 export const DistributionChart: React.FC<DistributionChartProps> = ({
@@ -27,6 +29,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 	buckets,
 	variant = "default",
 	showTotal = true,
+	valueDisplay = "percent",
 }) => {
 	const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 	const totalCount = buckets.reduce((sum, bucket) => sum + bucket.count, 0)
@@ -94,7 +97,9 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 							style={{ left: `${midpoints[hoveredIndex]}%` }}
 						>
 							<span className="font-semibold">
-								{((hovered.count / totalCount) * 100).toFixed(1)}%
+								{valueDisplay === "count"
+									? hovered.count.toLocaleString()
+									: `${((hovered.count / totalCount) * 100).toFixed(1)}%`}
 							</span>
 							<span className="text-slate-300"> {hovered.label}</span>
 						</div>

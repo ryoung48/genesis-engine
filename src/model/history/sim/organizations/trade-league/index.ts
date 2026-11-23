@@ -21,6 +21,8 @@ export interface TradeLeagueParams {
 	provinceContinent: Uint8Array | undefined
 	maxSpreadRad: number
 	seed: number
+	// [JUSTIFICATION] null where any province may hold a capital, unweighted.
+	agrarian: Float32Array | null
 	/** Used only to probe each candidate nation's likely government family
 	 * (via GOVERNMENT.assignGovernmentType) when picking a coastal, non-tribal
 	 * nation to shatter -- the real, authoritative government for every final

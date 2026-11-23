@@ -21,7 +21,6 @@ import type {
 import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
-import type { SocietyEra } from "@/model/society/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import type { SolarSystemBodiesInput } from "@/ui/genesis/view/types"
 import {
@@ -707,7 +706,9 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 	// Not user-adjustable -- fixed at Earth's real max elevation for every
 	// generated world rather than tracked as UI state.
 	const maxElevation = 6000
-	const [era, setEra] = useState<SocietyEra>(DEFAULT_WORLD_PARAMS.era)
+	const [targetTechLevel, setTargetTechLevel] = useState<number>(
+		DEFAULT_WORLD_PARAMS.targetTechLevel,
+	)
 
 	const updateEditableSystemBody = useCallback(
 		(bodyIndex: number, updater: (body: SystemBody) => SystemBody) => {
@@ -779,7 +780,7 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			setPressure,
 			setSeed,
 			setSeaLevel,
-			setEra,
+			setTargetTechLevel,
 			resetMainWorldToEarth,
 		}),
 		[
@@ -859,8 +860,8 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		starAgeGyr,
 		setSubstellarLon,
 		setTideLock,
-		setEra,
-		era,
+		setTargetTechLevel,
+		targetTechLevel,
 		setters,
 		skipNextGeneratedSystemBodiesSyncRef,
 		smoothing,

@@ -16,6 +16,7 @@ import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
 import type { GenesisParams, TerrainSnapshot } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
+import type { FarmingResult } from "@/model/society/farming/types"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import type {
 	CradleChoice,
@@ -78,6 +79,7 @@ export interface SerializedGenesisWorld {
 	routes: SerializedRoutes | null
 	network: SerializedNetwork | null
 	historyMigration: HistoryMigration
+	farming: FarmingResult | null
 	mesh: SerializedSphereMesh
 	plateAssignment: Int32Array
 	elevation: Float32Array
@@ -238,6 +240,7 @@ export interface SerializedGenesisWorld {
 	population?: {
 		habitability: Float32Array
 		population: Float32Array
+		techLevel: Float32Array
 		habitabilityScore: number
 		totalPopulation: number
 		migrationWave?: Float32Array
@@ -254,6 +257,8 @@ export interface SerializedGenesisWorld {
 		// [JUSTIFICATION] Present exactly when arrivalYear is.
 		migrationDiagnostics?: MigrationDiagnostics
 		settlementWave?: number
+		// [JUSTIFICATION] Set by generation from the requested tech level; Earth imports start on their own calendar.
+		startYear?: number
 	}
 	realPopulation?: {
 		population: Float32Array
@@ -328,6 +333,7 @@ export type GenesisWorkerRequest =
 			type: "import"
 			params: {
 				seed: number
+				targetTechLevel: number
 				numPoints: number
 				jitter: number
 				grayscale: Uint8Array

@@ -10,13 +10,13 @@ import type {
 	TidalSchedule,
 } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
-import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
-import { TARGET_PROFILE } from "@/model/history/sim/targets"
+import { SLIDER_RANGES } from "@/model/pipelines/genesis-params/ranges"
 import type { StageTiming } from "@/model/shared/timing/types"
 import { ERAS } from "@/model/society/eras"
-import type { SocietyEra } from "@/model/society/types"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import { Button } from "@/ui/components/primitives/Button"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
+import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
 import { ProgressBar } from "@/ui/components/primitives/ProgressBar"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { ToggleChip } from "@/ui/components/primitives/ToggleChip"
@@ -30,7 +30,7 @@ import {
 import type { DetailsDrawerBaseProps } from "@/ui/genesis/details/shared"
 import { WorldDetails } from "@/ui/genesis/details/world/WorldDetails"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
-import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import { formatDistance, type UnitSystem } from "@/ui/genesis/shared/ui-format"
 import type { WeatherSummaryProps } from "@/ui/genesis/shared/weather-display/types"
 import type { OrbitAddress } from "@/ui/genesis/solar-system/overlay"
 import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
@@ -105,6 +105,8 @@ interface GenerationPanelProps {
 	planetRadiusKm: number
 	generatedMoons: MoonBody[]
 	planetSliders: SliderDef[]
+	numPoints: number
+	setNumPoints: (value: number) => void
 	terrainSliders: SliderDef[]
 	spectralClass: string
 	setSpectralClass: (v: string) => void
@@ -116,8 +118,8 @@ interface GenerationPanelProps {
 	eccentricity: number
 	perihelion: number
 	obliquity: number
-	era: SocietyEra
-	setEra: (v: SocietyEra) => void
+	targetTechLevel: number
+	setTargetTechLevel: (v: number) => void
 	generating: boolean
 	generationLabel: string
 	generationProgress: number
@@ -183,6 +185,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	planetRadiusKm,
 	generatedMoons,
 	planetSliders,
+	numPoints,
+	setNumPoints,
 	terrainSliders,
 	spectralClass,
 	setSpectralClass,
@@ -194,8 +198,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	eccentricity,
 	perihelion,
 	obliquity,
-	era,
-	setEra,
+	targetTechLevel,
+	setTargetTechLevel,
 	generating,
 	generationLabel,
 	generationProgress,
@@ -214,6 +218,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	religionWiki,
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
+	const techLevel = TECH_LEVEL.averageLevel({ target: targetTechLevel })
+	const era = ERAS.eraOf({ techLevel })
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
 	const [openWorldSections, setOpenWorldSections] = useState<
 		ReadonlySet<WorldSection>
@@ -269,6 +275,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	)
 	const surfaceStats = buildSurfaceStats(planetSliders, terrainSliders)
 
+	const approximateCellSpacingKm =
+		planetRadiusKm * Math.sqrt((4 * Math.PI) / numPoints)
 	const generateContent = (
 		<div className="space-y-2.5 pt-1.5">
 			<div className="space-y-1">
@@ -322,6 +330,26 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						/>
 					</>
 				) : null}
+			</div>
+			<div className="space-y-1">
+				<LabeledSlider
+					tone="panel"
+					label="Terrain detail"
+					value={`${numPoints.toLocaleString()} points · ~${formatDistance(approximateCellSpacingKm, unitSystem)} spacing`}
+					{...SLIDER_RANGES.numPoints}
+					numericValue={numPoints}
+					onChange={setNumPoints}
+					disabled={generating}
+				/>
+				<LabeledSlider
+					tone="panel"
+					label="Tech level"
+					value={`TL ${targetTechLevel.toFixed(2)} · ${TECH_LEVEL.describe({ techLevel: targetTechLevel })}`}
+					{...SLIDER_RANGES.targetTechLevel}
+					numericValue={targetTechLevel}
+					onChange={setTargetTechLevel}
+					disabled={generating}
+				/>
 			</div>
 			<Button
 				tone="panel"
@@ -493,27 +521,29 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						</div>
 						{societySubtab === "era" ? (
 							<>
-								<p
-									className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}
-								>
-									Era Preset
-								</p>
+								<LabeledSlider
+									label="Tech level"
+									value={`TL ${targetTechLevel.toFixed(2)} · ${TECH_LEVEL.describe({ techLevel: targetTechLevel })}`}
+									{...SLIDER_RANGES.targetTechLevel}
+									numericValue={targetTechLevel}
+									onChange={setTargetTechLevel}
+									disabled={generating}
+								/>
 								<div className="grid grid-cols-2 gap-1.5">
 									{ERAS.eraOrder.map((eraId) => {
 										const cfg = ERAS.eraConfigs[eraId]
-										const pop = cfg.targetPopulation
-										const popLabel =
-											pop >= 1e9
-												? `${(pop / 1e9).toFixed(1)}B`
-												: pop >= 1e6
-													? `${Math.round(pop / 1e6)}M`
-													: `${Math.round(pop / 1e3)}K`
 										const active = era === eraId
 										return (
 											<ToggleChip
 												key={eraId}
 												active={active}
-												onClick={() => setEra(eraId)}
+												onClick={() =>
+													setTargetTechLevel(
+														TECH_LEVEL.leaderLevel({
+															techLevel: cfg.techLevel,
+														}),
+													)
+												}
 											>
 												<div
 													className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${active ? "text-white" : "text-slate-700"}`}
@@ -523,7 +553,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 												<div
 													className={`mt-0.5 font-mono text-[9px] ${active ? "text-slate-300" : "text-slate-400"}`}
 												>
-													~{popLabel} pop
+													TL{" "}
+													{TECH_LEVEL.leaderLevel({
+														techLevel: cfg.techLevel,
+													}).toFixed(2)}
 												</div>
 											</ToggleChip>
 										)
@@ -531,36 +564,34 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								</div>
 								{(() => {
 									const cfg = ERAS.eraConfigs[era]
-									const arrivalSteered = era === "lateMedieval"
-									const startStateHeld = Math.round(
-										100 *
-											TARGET_PROFILE.at({
-												year: STATE_CLOCK.defaultStartYear,
-												habitableProvinces: 1,
-											}).stateHeld,
+									const stateHeld = Math.round(
+										100 * TECH_LEVEL.stateHeld({ techLevel }),
 									)
+									const pop = TECH_LEVEL.worldPopulation({ techLevel })
+									const popLabel =
+										pop >= 1e9
+											? `${(pop / 1e9).toFixed(1)}B`
+											: `${Math.round(pop / 1e6)}M`
 									return (
 										<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 space-y-1">
 											<div className="flex justify-between text-[10px]">
+												<span className="text-slate-500">
+													People at Earth size
+												</span>
+												<span className="font-mono text-slate-700">
+													~{popLabel}
+												</span>
+											</div>
+											<div className="flex justify-between text-[10px]">
 												<span className="text-slate-500">Settled land</span>
 												<span className="font-mono text-slate-700">
-													{arrivalSteered
-														? `reached by ${STATE_CLOCK.defaultStartYear}`
-														: cfg.settlementFraction >= 1.0
-															? "100%"
-															: `${Math.round(cfg.settlementFraction * 100)}%`}
+													reached by the start
 												</span>
 											</div>
 											<div className="flex justify-between text-[10px]">
 												<span className="text-slate-500">Under states</span>
 												<span className="font-mono text-slate-700">
-													{!cfg.hasNations
-														? "none"
-														: arrivalSteered
-															? `${startStateHeld}% of habitable`
-															: cfg.statehoodFraction >= 1.0
-																? "all settled"
-																: `${Math.round(cfg.statehoodFraction * 100)}% of settled`}
+													{cfg.hasNations ? `${stateHeld}% of settled` : "none"}
 												</span>
 											</div>
 										</div>

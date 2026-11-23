@@ -18,16 +18,23 @@ it("scales knowledge from yellow to purple within each frame, excluding desolate
 		knowledge: new Float32Array([0.4, 0.7, -100]),
 		development: new Float32Array([0.9, 0.1, 0]),
 	} as unknown as SerializedGenesisWorld
-	const first = computeRegionColors(
+	const input = {
+		colorMode: "population",
+		nationMode: "borders",
+		populationMode: "knowledge",
+		temperatureMonth: -1,
+		rainfallMonth: -1,
+		dtrMonth: -1,
+		currentMonth: -1,
+		viewMode: "globe",
+		dangerSubMode: "earthquake",
+		religionMode: "religions",
+		year: 0,
+	} as const
+	const first = computeRegionColors({
+		...input,
 		world,
-		"population",
-		"borders",
-		"knowledge",
-		-1,
-		-1,
-		-1,
-		-1,
-	)
+	})
 	if (!first) throw new Error("Knowledge produced no colors")
 	expect(first.slice(0, 3)).not.toEqual(first.slice(3, 6))
 	expect(first[0]).toBeGreaterThan(0.8)
@@ -36,29 +43,17 @@ it("scales knowledge from yellow to purple within each frame, excluding desolate
 	expect(first[5]).toBeGreaterThan(first[3])
 	expect(first[4]).toBeLessThan(0.1)
 	world.knowledge?.set([10, 20, -100])
-	const later = computeRegionColors(
+	const later = computeRegionColors({
+		...input,
 		world,
-		"population",
-		"borders",
-		"knowledge",
-		-1,
-		-1,
-		-1,
-		-1,
-	)
+	})
 	expect(later?.slice(0, 3)).toEqual(first.slice(0, 3))
 	expect(later?.slice(3, 6)).toEqual(first.slice(3, 6))
 	world.knowledge?.set([2, 2, -100])
-	const uniform = computeRegionColors(
+	const uniform = computeRegionColors({
+		...input,
 		world,
-		"population",
-		"borders",
-		"knowledge",
-		-1,
-		-1,
-		-1,
-		-1,
-	)
+	})
 	expect(uniform?.slice(0, 3)).toEqual(uniform?.slice(3, 6))
 	expect(uniform?.every(Number.isFinite)).toBe(true)
 })

@@ -67,6 +67,8 @@ export function createDisposeController(
 		disposeGroup(ctx.scene, ctx.mapEu4Settlements)
 		disposeGroup(ctx.globeGroup, ctx.globeInfrastructure)
 		disposeGroup(ctx.scene, ctx.mapInfrastructure)
+		disposeGroup(ctx.globeGroup, ctx.globeMigrationRoutes)
+		disposeGroup(ctx.scene, ctx.mapMigrationRoutes)
 		disposeGroup(ctx.globeGroup, ctx.globeNationLabels)
 		disposeGroup(ctx.scene, ctx.mapNationLabels)
 		disposeGroup(ctx.globeGroup, ctx.globeOrgLabel)

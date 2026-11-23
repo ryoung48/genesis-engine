@@ -1,4 +1,6 @@
+import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
+import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type {
 	LabelNameResolvers,
@@ -39,7 +41,13 @@ export function buildSettlementLabelNames({
 	)
 		return null
 	const { townMin } = SETTLEMENT_TUNING.getSettlementEraTuning(
-		world.params?.era,
+		world.params
+			? ERAS.eraOf({
+					techLevel: TECH_LEVEL.averageLevel({
+						target: world.params.targetTechLevel,
+					}),
+				})
+			: undefined,
 	)
 	const provinceCount = world.provinces?.count ?? world.settlementRegions.length
 	const names: string[] = new Array(provinceCount)

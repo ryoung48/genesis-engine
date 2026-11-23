@@ -12,7 +12,7 @@ describe("arrival field", () => {
 			habitability: [1, 1, 1, 1, 1, 1],
 			horizonYear: 2025,
 		})
-		const result = MIGRATION.compute(world)
+		const result = MIGRATION.compute(world).result
 		const origins = [...result.arrivalYear].filter((year) => year === START)
 		expect(origins).toHaveLength(1)
 		for (let p = 0; p < world.provinces.count; p++) {
@@ -23,18 +23,19 @@ describe("arrival field", () => {
 		}
 	})
 
-	it("walks land at 0.7 kilometres per year times suitability, speeding up smoothly from 10000 BCE to 50 kilometres per year times suitability at 1500", () => {
+	it("walks land at 0.55 kilometres per year times a speed factor of 0.3 plus 0.7 times suitability, speeding up smoothly from 10000 BCE to 50 kilometres per year times that factor at 1500", () => {
 		const walk = (sourceArrival: number) =>
 			MIGRATION.transit({
 				sourceArrival,
+				sourceOriginKm: 0,
 				distanceKm: 100,
 				meanSuitability: 0.5,
 				destinationLandmassKm2: 1,
 				corridorBonus: 1,
 				kind: "land",
 			}) - sourceArrival
-		expect(walk(-20000)).toBeCloseTo(100 / 0.35)
-		expect(walk(1600)).toBeCloseTo(100 / 25)
+		expect(walk(-20000)).toBeCloseTo(100 / (0.55 * 0.65))
+		expect(walk(1600)).toBeCloseTo(100 / (50 * 0.65))
 		let previous = walk(-12000)
 		for (let year = -11000; year <= 1600; year += 1000) {
 			expect(walk(year)).toBeLessThanOrEqual(previous)
@@ -44,10 +45,26 @@ describe("arrival field", () => {
 		expect(walk(-5000)).toBeGreaterThan(walk(1600))
 	})
 
+	it("lets departures inside the homeland radius leave before the dispersal year", () => {
+		const walk = (sourceOriginKm: number) =>
+			MIGRATION.transit({
+				sourceArrival: -75000,
+				sourceOriginKm,
+				distanceKm: 100,
+				meanSuitability: 1,
+				destinationLandmassKm2: 1,
+				corridorBonus: 1,
+				kind: "land",
+			})
+		expect(walk(500)).toBeCloseTo(-75000 + 100 / 0.55)
+		expect(walk(5000)).toBeCloseTo(-65000 + 100 / 0.55)
+	})
+
 	it("opens longer crossings later along a continuous capability curve", () => {
 		const sea = (distanceKm: number) =>
 			MIGRATION.transit({
 				sourceArrival: -64000,
+				sourceOriginKm: 0,
 				distanceKm,
 				meanSuitability: 1,
 				destinationLandmassKm2: 1,
@@ -73,6 +90,7 @@ describe("arrival field", () => {
 		const open = (destinationLandmassKm2: number) =>
 			MIGRATION.transit({
 				sourceArrival: -64000,
+				sourceOriginKm: 0,
 				distanceKm: 3000,
 				meanSuitability: 1,
 				destinationLandmassKm2,
@@ -94,11 +112,59 @@ describe("arrival field", () => {
 			habitability: [5, 5, 1, 1],
 			horizonYear: 2025,
 		})
-		const result = MIGRATION.compute(world)
+		const result = MIGRATION.compute(world).result
 		expect(result.predecessor[2]).toBe(1)
 		expect(result.edgeKind[2]).toBe(2)
 		expect(result.arrivalTier[2]).toBe(1)
-		expect(result.arrivalYear[2]).toBeLessThanOrEqual(-65000 + 520)
+		expect(result.arrivalYear[2]).toBeGreaterThan(-11700)
+	})
+
+	it("ramps the arrival order evenly from the dispersal year to 1300 without touching arrival years", () => {
+		const world = MIGRATION_FIXTURE.world({
+			layout: "L".repeat(12),
+			stepDegrees: 0.5,
+			habitability: new Array<number>(12).fill(1),
+			horizonYear: 2025,
+		})
+		const result = MIGRATION.compute(world).result
+		const ramp = MIGRATION.rampYears({
+			arrivalYear: result.arrivalYear,
+			desolate: world.provinces.desolate,
+		})
+		const years = [...result.order].map((p) => ramp[p])
+		expect(years[0]).toBe(MIGRATION.startYear)
+		expect(years[1]).toBe(-65000)
+		expect(years[years.length - 1]).toBe(1300)
+		const gaps = years.slice(2).map((year, i) => year - years[i + 1])
+		for (const gap of gaps)
+			expect(Math.abs(gap - gaps[0])).toBeLessThanOrEqual(1)
+		expect(result.arrivalYear[result.order[1]]).not.toBe(ramp[result.order[1]])
+	})
+
+	it("traces trunk routes from the origin along the heaviest branches and dates their tips", () => {
+		const world = MIGRATION_FIXTURE.world({
+			layout: "L".repeat(40),
+			stepDegrees: 0.5,
+			habitability: new Array<number>(40).fill(1),
+			horizonYear: 2025,
+		})
+		const result = MIGRATION.compute(world).result
+		const { trunks, milestones } = MIGRATION.routes({
+			provinces: world.provinces,
+			r_xyz: world.mesh.r_xyz,
+			arrivalYear: result.arrivalYear,
+			predecessor: result.predecessor,
+		})
+		expect(trunks.length).toBeGreaterThan(0)
+		expect(trunks[0].provinces[0]).toBe(result.origin)
+		for (const trunk of trunks)
+			for (let i = 1; i < trunk.provinces.length; i++)
+				expect(result.predecessor[trunk.provinces[i]]).toBe(
+					trunk.provinces[i - 1],
+				)
+		expect(milestones.some((m) => m.province === result.origin)).toBe(true)
+		for (const m of milestones)
+			expect(m.year).toBe(result.arrivalYear[m.province])
 	})
 
 	it("does not walk province links that cross water at land speed", () => {
@@ -109,11 +175,42 @@ describe("arrival field", () => {
 			horizonYear: 2025,
 		})
 		world.provinces.landmassId = Int32Array.of(0, 0, 1, 1)
-		const result = MIGRATION.compute(world)
+		const result = MIGRATION.compute(world).result
 		for (const p of [2, 3]) {
 			expect(result.arrivalYear[p]).toBe(MIGRATION.sentinel)
 			expect(world.provinces.desolate[p]).toBe(0)
 		}
+	})
+
+	it("crosses a desolate strip without settling it, more slowly than open land", () => {
+		const build = (desolate: boolean) => {
+			const world = MIGRATION_FIXTURE.world({
+				layout: "LLLLL",
+				stepDegrees: 0.5,
+				habitability: [5, 5, 5, 5, 5],
+				horizonYear: 2025,
+			})
+			if (desolate) {
+				world.provinces.desolate[2] = 1
+				world.provinces.landmassId = Int32Array.of(0, 0, -1, 1, 1)
+			}
+			return MIGRATION.compute({
+				...world,
+				originHint: { lonDeg: 0, latDeg: 0 },
+			}).result
+		}
+		const open = build(false)
+		const strip = build(true)
+		expect(strip.origin).toBe(0)
+		expect(strip.arrivalYear[2]).toBe(MIGRATION.sentinel)
+		expect(strip.continuousArrival[2]).toBe(Infinity)
+		for (const p of [3, 4]) {
+			expect(strip.arrivalYear[p]).not.toBe(MIGRATION.sentinel)
+			expect(strip.arrivalYear[p]).toBeGreaterThan(open.arrivalYear[p])
+		}
+		expect(strip.predecessor[3]).toBe(1)
+		expect(strip.edgeKind[3]).toBe(1)
+		expect(strip.order).not.toContain(2)
 	})
 
 	it("leaves land beyond the horizon unreached without making it desolate", () => {
@@ -123,7 +220,7 @@ describe("arrival field", () => {
 			habitability: [5, 5, 1, 1],
 			horizonYear: 1000,
 		})
-		const result = MIGRATION.compute(wide)
+		const result = MIGRATION.compute(wide).result
 		for (const p of [2, 3]) {
 			expect(result.arrivalYear[p]).toBe(MIGRATION.sentinel)
 			expect(result.migrationWave[p]).toBe(-1)
@@ -141,7 +238,7 @@ describe("arrival field", () => {
 			habitability,
 			horizonYear: 2025,
 		})
-		const result = MIGRATION.compute(world)
+		const result = MIGRATION.compute(world).result
 		expect(result.diagnostics.suitabilityScale).toBe(1)
 		expect(result.suitability[0]).toBe(1)
 		expect(result.suitability[19]).toBe(1)
@@ -157,9 +254,9 @@ describe("shelf links", () => {
 				habitability: [5, 5, 1, 1],
 				horizonYear: 2025,
 			}),
-		)
+		).result
 		expect(shelf.edgeKind[2]).toBe(3)
-		expect(shelf.arrivalYear[2]).toBeLessThan(-50000)
+		expect(shelf.arrivalYear[2]).toBeGreaterThan(-11700)
 		const deep = MIGRATION.compute(
 			MIGRATION_FIXTURE.world({
 				layout: "LL##LL",
@@ -167,7 +264,7 @@ describe("shelf links", () => {
 				habitability: [5, 5, 1, 1],
 				horizonYear: 2025,
 			}),
-		)
+		).result
 		expect(deep.edgeKind[2]).toBe(2)
 		expect(deep.arrivalYear[2]).toBeGreaterThan(-6000)
 	})
@@ -176,6 +273,7 @@ describe("shelf links", () => {
 		const shelf = (sourceArrival: number) =>
 			MIGRATION.transit({
 				sourceArrival,
+				sourceOriginKm: 0,
 				distanceKm: 300,
 				meanSuitability: 1,
 				destinationLandmassKm2: 1,
@@ -185,6 +283,7 @@ describe("shelf links", () => {
 		const sea = (sourceArrival: number) =>
 			MIGRATION.transit({
 				sourceArrival,
+				sourceOriginKm: 0,
 				distanceKm: 300,
 				meanSuitability: 1,
 				destinationLandmassKm2: 1,
@@ -192,7 +291,7 @@ describe("shelf links", () => {
 				kind: "sea",
 			})
 		expect(shelf(-9400)).toBe(sea(-9400))
-		expect(shelf(-20000)).toBeCloseTo(-20000 + 300 / 0.7)
+		expect(shelf(-20000)).toBeCloseTo(-20000 + 300 / 0.55)
 	})
 })
 
@@ -204,7 +303,7 @@ describe("contact year", () => {
 			habitability: [5, 5, 1, 1],
 			horizonYear: 2025,
 		})
-		const result = MIGRATION.compute(world)
+		const result = MIGRATION.compute(world).result
 		expect([result.contactYear[0], result.contactYear[1]]).toEqual([
 			START,
 			START,
@@ -221,7 +320,7 @@ describe("contact year", () => {
 				habitability: [1, 1, 1, 1],
 				horizonYear: 2025,
 			}),
-		)
+		).result
 		expect([...land.contactYear]).toEqual([START, START, START, START])
 	})
 })

@@ -20,6 +20,8 @@ export interface ImperialPatchworkParams {
 	provinceContinent: Uint8Array | undefined
 	maxSpreadRad: number
 	seed: number
+	// [JUSTIFICATION] null where any province may hold a capital, unweighted.
+	agrarian: Float32Array | null
 }
 
 export type ImperialPatchworkResult = ShatterPatchworkResult

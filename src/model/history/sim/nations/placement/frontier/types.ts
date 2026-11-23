@@ -73,6 +73,8 @@ export interface SelectSeedParams {
 	componentSizes: number[]
 	adjOffset: Int32Array
 	adjList: Int32Array
+	// [JUSTIFICATION] null where any province may hold a capital, unweighted (fast history, organization members).
+	agrarian: Float32Array | null
 }
 
 export interface SeedPlacementCandidate {
@@ -101,4 +103,9 @@ export interface MarkBlockedParams {
 	blocked: Uint8Array
 	adjOffset: Int32Array
 	adjList: Int32Array
+}
+
+export interface CapitalEligibleParams {
+	agrarian: Float32Array | null
+	province: number
 }

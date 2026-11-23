@@ -516,6 +516,13 @@ function metrics({ current, previous }: ReportPair): MetricRow[] {
 				})
 		}
 		addRows({
+			before: object(da.farming),
+			after: object(db.farming),
+			section: "Farming diagnostics",
+			period: seed,
+			rows,
+		})
+		addRows({
 			before: object(da.terrain),
 			after: object(db.terrain),
 			section: "Terrain diagnostics",

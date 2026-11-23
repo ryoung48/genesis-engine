@@ -3,6 +3,7 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 
 interface ImportParams {
 	seed: number
+	targetTechLevel: number
 	numPoints: number
 	jitter: number
 	grayscale: Uint8Array

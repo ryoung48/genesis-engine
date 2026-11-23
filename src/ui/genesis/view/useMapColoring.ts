@@ -25,6 +25,7 @@ import {
 import { applyBorderShadow } from "@/ui/genesis/shared/colors/border-shadow"
 import { applyWaves } from "@/ui/genesis/shared/colors/waves"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
+import { displayYear } from "@/ui/genesis/shared/farming-display"
 import {
 	computeHistoryOccupationOverlay,
 	computeHistoryRegionColors,
@@ -70,7 +71,6 @@ export function useMapColoring(input: MapColoringInput) {
 		societyMode: populationMode,
 		religionMode,
 		viewMode,
-		showElevation,
 		showWaves,
 		dangerSubMode,
 		selectedWikiOrganizationId,
@@ -384,8 +384,8 @@ export function useMapColoring(input: MapColoringInput) {
 				return withOrgHighlight(shaded)
 			}
 		}
-		const baseColors = computeRegionColors(
-			worldForDisplay,
+		const baseColors = computeRegionColors({
+			world: worldForDisplay,
 			colorMode,
 			nationMode,
 			populationMode,
@@ -394,16 +394,18 @@ export function useMapColoring(input: MapColoringInput) {
 			dtrMonth,
 			currentMonth,
 			viewMode,
-			showElevation,
-			undefined,
-			undefined,
 			dangerSubMode,
 			religionMode,
-		)
+			year: displayYear({
+				timeMs: historyFrame?.timeMs ?? null,
+				world: worldForDisplay,
+			}),
+		})
 		return withOrgHighlight(
 			historyFrame?.provinceStatus &&
 				worldForDisplay.provinces &&
 				worldForDisplay.elevation_km &&
+				populationMode !== "farming" &&
 				getBaseMapMode(colorMode as ColorMode) === "population"
 				? LAND_STATUS.paintUninhabited({
 						rgb: baseColors,
@@ -425,7 +427,6 @@ export function useMapColoring(input: MapColoringInput) {
 		rainfallMonth,
 		dtrMonth,
 		viewMode,
-		showElevation,
 		currentMonth,
 		worldForDisplay,
 		windVectors,

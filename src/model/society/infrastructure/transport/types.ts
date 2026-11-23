@@ -1,4 +1,4 @@
-import { SerializedNetwork } from "@/model/worker-protocol/types"
+import type { SerializedNetwork } from "@/model/worker-protocol/types"
 
 export type SerializedRouteKind = 0 | 1 | 2
 

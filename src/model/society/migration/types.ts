@@ -4,6 +4,11 @@ import type { GenesisProvinces } from "@/model/society/types"
 
 export type MigrationEdgeKind = "land" | "sea" | "shelf"
 
+export interface OriginHint {
+	lonDeg: number
+	latDeg: number
+}
+
 export interface MigrationParams {
 	provinces: GenesisProvinces
 	habitability: Float32Array
@@ -13,6 +18,9 @@ export interface MigrationParams {
 	>
 	isLand: Uint8Array
 	elevationKm: Float32Array
+	temperatureC: Float32Array
+	rainfallMm: Float32Array
+	originHint: OriginHint | null
 	planetRadiusKm: number
 	seed: number
 	horizonYear: number
@@ -20,6 +28,7 @@ export interface MigrationParams {
 
 export interface TransitParams {
 	sourceArrival: number
+	sourceOriginKm: number
 	distanceKm: number
 	meanSuitability: number
 	destinationLandmassKm2: number
@@ -68,6 +77,12 @@ export interface MigrationResult {
 	diagnostics: MigrationDiagnostics
 }
 
+export interface MigrationOutput {
+	result: MigrationResult
+	landGraph: GenesisProvinces
+	seaLinks: SeaLink[][]
+}
+
 export type HistoryMigration =
 	| { pipeline: "distribution"; data: MigrationResult }
 	| { pipeline: "simulation" | "earth" }
@@ -93,6 +108,46 @@ export interface TargetParams {
 
 export interface CradleSpacingParams {
 	planetRadiusKm: number
+}
+
+export interface RampYearsParams {
+	arrivalYear: Int32Array
+	desolate: Uint8Array
+}
+
+export interface RoutesParams {
+	provinces: GenesisProvinces
+	r_xyz: Float32Array
+	arrivalYear: Int32Array
+	predecessor: Int32Array
+}
+
+export interface DisplayTreeParams {
+	provinces: GenesisProvinces
+	r_xyz: Float32Array
+	predecessor: Int32Array
+	reached: Uint8Array
+}
+
+export interface DisplayTree {
+	parent: Int32Array
+	order: number[]
+}
+
+export interface MigrationTrunk {
+	provinces: number[]
+	sizes: number[]
+	years: number[]
+}
+
+export interface MigrationMilestone {
+	province: number
+	year: number
+}
+
+export interface MigrationRoutes {
+	trunks: MigrationTrunk[]
+	milestones: MigrationMilestone[]
 }
 
 export interface CradlesParams {
@@ -171,4 +226,11 @@ export interface AddNearestParams {
 export interface IndexLinksParams {
 	count: number
 	links: SeaLink[]
+}
+
+export interface WalkGraph {
+	adjOffset: Int32Array
+	adjList: Int32Array
+	componentId: Int32Array
+	componentCount: number
 }

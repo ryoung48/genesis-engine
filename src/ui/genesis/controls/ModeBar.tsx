@@ -59,6 +59,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	setColorMode,
 	geographyMode,
 	setGeographyMode,
+	lastSocietyColorMode,
 	nationMode,
 	setNationMode,
 	societyMode,
@@ -147,14 +148,11 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						return
 					}
 					if (
-						mode === "density" ||
+						isPopulationSocietyMode(mode) ||
 						mode === "urban" ||
-						mode === "development" ||
-						mode === "knowledge" ||
 						mode === "culture" ||
 						mode === "heritage" ||
-						mode === "religion" ||
-						mode === "migration"
+						mode === "religion"
 					) {
 						setColorMode("population")
 						setSocietyMode(mode)
@@ -197,7 +195,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 							return
 						}
 						if (primary === "society") {
-							setColorMode("nations")
+							setColorMode(lastSocietyColorMode)
 						}
 					}}
 					tone="overlay"

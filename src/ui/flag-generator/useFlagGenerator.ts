@@ -14,9 +14,10 @@ export function useFlagGenerator() {
 	const hue =
 		FLAG_GENERATOR.hues.find((entry) => entry.value === params.get("hue"))
 			?.value ?? "random"
+	const shape = params.get("shape") === "flag" ? "flag" : "shield"
 	const previews = useMemo(
-		() => createFlagBatch({ seed, pattern, hue }),
-		[seed, pattern, hue],
+		() => createFlagBatch({ seed, pattern, hue, shape }),
+		[seed, pattern, hue, shape],
 	)
 
 	function updateQuery({ key, value }: FlagQueryUpdate) {
@@ -47,14 +48,20 @@ export function useFlagGenerator() {
 		updateQuery({ key: "hue", value })
 	}
 
+	function setShape(value: string) {
+		updateQuery({ key: "shape", value })
+	}
+
 	return {
 		seed,
 		pattern,
 		hue,
+		shape,
 		previews,
 		setSeed,
 		resample,
 		setPattern,
 		setHue,
+		setShape,
 	}
 }

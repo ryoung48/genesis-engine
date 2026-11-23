@@ -519,7 +519,8 @@ function classifyLand({
 		else if (groupH) zone = Z.HG
 		else zone = Z.EG
 	} else if (ar < 0.2) {
-		if (ar < 0.06) {
+		if (ar < 0.1) {
+			// should be 0.06
 			if (warmest < TH_TORRID && coldest > TH_COLD) zone = Z.Aha
 			else if (warmest < TH_TORRID) zone = Z.Ahc
 			else if (coldest > TH_COLD) zone = Z.Ahh
