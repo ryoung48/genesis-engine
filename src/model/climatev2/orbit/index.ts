@@ -54,6 +54,10 @@ const SOL_LIGHT = starLight({
 	orbitalDistanceAU: SOL_SYSTEM.solMainWorldDefaults.orbitalDistanceAU,
 })
 
+function surfacePressureBar(params: Pick<GenesisParams, "pressure">): number {
+	return MATH.clamp({ value: params.pressure ?? 1, ...PRESSURE_RANGE_BAR })
+}
+
 function fromParams(params: ClimateV2OrbitParams): ClimateOrbit {
 	const { hoursPerDay, daysPerYear } = params
 	const earth = SOL_SYSTEM.solMainWorldDefaults
@@ -70,9 +74,7 @@ function fromParams(params: ClimateV2OrbitParams): ClimateOrbit {
 		radiusScale,
 		// Earth's density, as our own climate takes it (classification/climate gravityRatio)
 		gravityScale: radiusScale,
-		pressureScale:
-			MATH.clamp({ value: params.pressure ?? 1, ...PRESSURE_RANGE_BAR }) /
-			earth.pressureBar,
+		pressureScale: surfacePressureBar(params) / earth.pressureBar,
 		locked: null,
 	}
 }
@@ -147,4 +149,9 @@ function lockedSunlight({ mesh, params }: LockedSunlightParams): Sunlight {
 	}
 }
 
-export const CLIMATEV2_ORBIT = { fromParams, lockedFromParams, lockedSunlight }
+export const CLIMATEV2_ORBIT = {
+	fromParams,
+	lockedFromParams,
+	lockedSunlight,
+	surfacePressureBar,
+}

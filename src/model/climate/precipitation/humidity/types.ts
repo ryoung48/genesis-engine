@@ -8,3 +8,16 @@ export type RelativeHumidityFromTempRangeParams = {
 	// [JUSTIFICATION] Point estimates can lack coast-distance data.
 	distFromOceanKm?: number
 }
+
+export type AnnualAridityParams = {
+	annualRainMm: number
+	annualPetMm: number
+}
+
+export type MonthlyRelativeHumidityParams = {
+	temperatureC: ArrayLike<number>
+	dtrC: ArrayLike<number>
+	annualAridity: number
+	annualRainMm: number
+	distFromOceanKm: number
+}

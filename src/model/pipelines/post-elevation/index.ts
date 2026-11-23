@@ -5,6 +5,7 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
+import { HABITABILITY } from "@/model/climate/habitability"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
 import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
@@ -14,6 +15,7 @@ import type { GenesisRainfall } from "@/model/climate/types"
 import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { CLIMATE_V2 } from "@/model/climatev2"
+import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { HAZARDS } from "@/model/geography/terrain/hazards"
 import { LAKES } from "@/model/geography/terrain/lakes"
@@ -722,9 +724,17 @@ function runPostElevationPipeline(
 
 	// ── Provinces ──────────────────────────────────────────────────────
 	t0 = performance.now()
-	const provinceOptions = {
-		climateZones,
+	const habitability = HABITABILITY.classify({
+		climate,
 		rainfall,
+		dtrMonthly: dtr_monthly,
+		oceanDist,
+		isLand,
+		pressureBar: CLIMATEV2_ORBIT.surfacePressureBar(params),
+		numRegions: N,
+	})
+	const provinceOptions = {
+		habitability,
 		oceanCoastal,
 		lakeCoastal,
 		riverVisible: rivers.visible,

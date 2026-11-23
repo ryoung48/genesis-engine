@@ -33,22 +33,27 @@ function build({
 		? field(world.climate.pet_monthly).reduce((a, b) => a + b, 0)
 		: 0
 	const annualRain = rain.reduce((a, b) => a + b, 0)
-	const aridity = annualPet > 0 ? Math.min(1, annualRain / annualPet) : 1
-	const dewPoint = dtr
-		? Float32Array.from(temperature, (temp, m) => {
-				const rh = HUMIDITY.relativeHumidityFromTempRange({
-					meanTempC: temp,
-					dtrC: dtr[m],
-					annualAridity: aridity,
-					annualRainfallMm: annualRain,
-					distFromOceanKm: world.oceanDist?.[r] ?? 0,
-				})
-				return rh > 0
-					? HUMIDITY.dewPointFromVaporPressureKpa(
-							(HUMIDITY.saturationVaporPressureKpa(temp) * rh) / 100,
-						)
-					: -Infinity
+	const aridity = HUMIDITY.annualAridity({
+		annualRainMm: annualRain,
+		annualPetMm: annualPet,
+	})
+	const humidity = dtr
+		? HUMIDITY.monthlyRelativeHumidity({
+				temperatureC: temperature,
+				dtrC: dtr,
+				annualAridity: aridity,
+				annualRainMm: annualRain,
+				distFromOceanKm: world.oceanDist?.[r] ?? 0,
 			})
+		: null
+	const dewPoint = humidity
+		? Float32Array.from(temperature, (temp, m) =>
+				humidity[m] > 0
+					? HUMIDITY.dewPointFromVaporPressureKpa(
+							(HUMIDITY.saturationVaporPressureKpa(temp) * humidity[m]) / 100,
+						)
+					: -Infinity,
+			)
 		: null
 	const cloud = world.climate.cloud_cover_monthly
 		? field(world.climate.cloud_cover_monthly)

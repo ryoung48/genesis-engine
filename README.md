@@ -151,6 +151,10 @@ Work this project draws on directly. Add an entry here whenever a committed chan
 - **Marlowe (2005), "Hunter-gatherers and human evolution"**, Evolutionary Anthropology 14, 54. Forager population densities.
 - **Lot (1929), "L'etat des paroisses et des feux de 1328"**, Bibliotheque de l'Ecole des Chartes 90, 51. The hearth survey behind the farming capacity per km2.
 - **Middleton & Thomas (1997), World Atlas of Desertification, 2nd ed.**, UNEP. The aridity index classes.
+- **Vecellio et al. (2022), "Evaluating the 35°C wet-bulb temperature adaptability threshold for young, healthy subjects (PSU HEAT Project)"**, Journal of Applied Physiology 132 ([paper](https://doi.org/10.1152/japplphysiol.00738.2021)). The 31 °C critical wet bulb behind the heat gate; see [habitability](docs/climate/habitability.md).
+- **Sherwood & Huber (2010), "An adaptability limit to climate change due to heat stress"**, PNAS 107, 9552 ([paper](https://doi.org/10.1073/pnas.0913352107)). The 35 °C theoretical wet-bulb ceiling.
+- **Allen et al. (1998), FAO Irrigation and Drainage Paper 56, Crop evapotranspiration**, equation 8 ([FAO](https://www.fao.org/4/x0490e/x0490e00.htm)). The psychrometric constant in the wet-bulb solve.
+- **Stull (1947), "Vapor pressure of pure substances"**, via the [NIST Chemistry WebBook](https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=4&Type=ANTOINE&Plot=on) Antoine constants for water. The boiling point at the surface pressure.
 - **Butzer (1976), Early Hydraulic Civilization in Egypt**. Irrigated population density in the Nile valley.
 - **Bocquet-Appel & Naji (2006), "Testing the Hypothesis of a Worldwide Neolithic Demographic Transition: Corroboration from American Cemeteries"**, Current Anthropology 47: 341–365. The share of immature skeletons rises by 20–30% over 500–700 years from the Mesolithic to the Neolithic. Sets `RAMP_YEARS`, behind the farming adoption lag; see [farming](docs/terrestrial/population/farming.md).
 - **Southern African foraging-to-herding transition (2014)**, PLoS ONE. The herding spread rate of about 2.4 km per year.

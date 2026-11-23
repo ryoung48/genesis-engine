@@ -1,4 +1,4 @@
-import type { GenesisRainfall } from "@/model/climate/types"
+import type { HabitabilityMasks } from "@/model/climate/habitability/types"
 import type { SphereMesh } from "@/model/mesh/types"
 
 export interface ComputeProvincesParams {
@@ -7,8 +7,8 @@ export interface ComputeProvincesParams {
 	topography: Uint8Array
 	seed: number
 	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
+		// [JUSTIFICATION] Raster and Earth-import paths classify no desolate land.
+		habitability?: HabitabilityMasks
 		oceanCoastal?: Uint8Array
 		lakeCoastal?: Uint8Array
 		riverVisible?: Uint8Array
@@ -24,8 +24,8 @@ export interface ComputeWeightedProvincesParams {
 	seedNames: string[]
 	seed: number
 	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
+		// [JUSTIFICATION] Raster and Earth-import paths classify no desolate land.
+		habitability?: HabitabilityMasks
 		oceanCoastal?: Uint8Array
 		lakeCoastal?: Uint8Array
 		riverVisible?: Uint8Array
@@ -40,8 +40,8 @@ export interface ComputeProvincesFromRasterParams {
 	regionIds: Int16Array
 	seed: number
 	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
+		// [JUSTIFICATION] Raster and Earth-import paths classify no desolate land.
+		habitability?: HabitabilityMasks
 		oceanCoastal?: Uint8Array
 		lakeCoastal?: Uint8Array
 		riverVisible?: Uint8Array

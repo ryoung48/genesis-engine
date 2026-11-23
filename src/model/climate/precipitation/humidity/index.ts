@@ -1,4 +1,8 @@
-import type { RelativeHumidityFromTempRangeParams } from "@/model/climate/precipitation/humidity/types"
+import type {
+	AnnualAridityParams,
+	MonthlyRelativeHumidityParams,
+	RelativeHumidityFromTempRangeParams,
+} from "@/model/climate/precipitation/humidity/types"
 
 function saturationVaporPressureKpa(tempC: number): number {
 	return 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3))
@@ -74,6 +78,31 @@ function relativeHumidityFromTempRange({
 	return clampRelativeHumidity(rh)
 }
 
+function annualAridity({
+	annualRainMm,
+	annualPetMm,
+}: AnnualAridityParams): number {
+	return annualPetMm > 0 ? Math.min(1, annualRainMm / annualPetMm) : 1
+}
+
+function monthlyRelativeHumidity({
+	temperatureC,
+	dtrC,
+	annualAridity,
+	annualRainMm,
+	distFromOceanKm,
+}: MonthlyRelativeHumidityParams): Float64Array {
+	return Float64Array.from(temperatureC, (meanTempC, m) =>
+		relativeHumidityFromTempRange({
+			meanTempC,
+			dtrC: dtrC[m],
+			annualAridity,
+			annualRainfallMm: annualRainMm,
+			distFromOceanKm,
+		}),
+	)
+}
+
 function saturationVaporPressureIceKpa(tempC: number): number {
 	const kelvin = Math.max(110, Math.min(273.15, tempC + 273.15))
 	return (
@@ -91,4 +120,6 @@ export const HUMIDITY = {
 	saturationVaporPressureKpa,
 	dewPointFromVaporPressureKpa,
 	relativeHumidityFromTempRange,
+	annualAridity,
+	monthlyRelativeHumidity,
 }

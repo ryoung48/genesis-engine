@@ -1,4 +1,4 @@
-import type { GenesisRainfall } from "@/model/climate/types"
+import type { HabitabilityMasks } from "@/model/climate/habitability/types"
 import type {
 	CompetitiveBfsAssignParams,
 	ComputeProvincesFromRasterParams,
@@ -189,8 +189,8 @@ function assemblePartition(
 	provinceCount: number,
 	rng: ReturnType<typeof RNG.createRng>,
 	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
+		// [JUSTIFICATION] Raster and Earth-import paths classify no desolate land.
+		habitability?: HabitabilityMasks
 		oceanCoastal?: Uint8Array
 		lakeCoastal?: Uint8Array
 		riverVisible?: Uint8Array
@@ -211,7 +211,7 @@ function assemblePartition(
 	}
 
 	// ── Phase 3b: Water access ──────────────────────────────────────────
-	const { climateZones, rainfall, oceanCoastal, lakeCoastal, riverVisible } =
+	const { habitability, oceanCoastal, lakeCoastal, riverVisible } =
 		options ?? {}
 	const waterAccess = new Uint8Array(provinceCount)
 	const riverAccess = new Uint8Array(provinceCount)
@@ -227,22 +227,18 @@ function assemblePartition(
 	}
 
 	// ── Phase 4: Desolate classification ────────────────────────────────
-	// Climate-zone desolate: arctic/subarctic/infernal/chaotic regardless of rivers.
-	// Rainfall desolate: < 5mm annual precipitation, exempted if province has river access.
+	// Physical limits only (see HABITABILITY): heat, no liquid water, or a
+	// hyper-arid water balance with no river.
 
 	const desolate = new Uint8Array(provinceCount)
-	if (!skipDesolate) {
+	if (!skipDesolate && habitability) {
 		for (let i = 0; i < provinceCount; i++) {
 			const r = seeds[i]
-			if (climateZones) {
-				const zone = climateZones[r]
-				// 1=arctic, 2=subarctic, 7=infernal, 8=chaotic
-				if (zone === 1 || zone === 2 || zone >= 7) {
-					desolate[i] = 1
-					continue
-				}
-			}
-			if (rainfall && rainfall.annual[r] < 5 && !riverAccess[i]) desolate[i] = 1
+			if (
+				habitability.uninhabitable[r] ||
+				(habitability.hyperArid[r] && !riverAccess[i])
+			)
+				desolate[i] = 1
 		}
 	}
 
