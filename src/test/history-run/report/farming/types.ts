@@ -1,6 +1,6 @@
 import type { GenesisWorld } from "@/model/pipelines/types"
 import type { FarmingHearth } from "@/model/society/farming/hearths/types"
-import type { WayOfLife } from "@/model/society/farming/types"
+import type { WayOfLife, WayOfLifeShares } from "@/model/society/farming/types"
 
 export interface SampleQuantiles {
 	samples: number
@@ -10,6 +10,14 @@ export interface SampleQuantiles {
 }
 
 export type WayOfLifePercents = Record<WayOfLife, number | null>
+
+export interface GroundReport {
+	ploughMean: number | null
+	terraceMean: number | null
+	ploughBelowHalfPercent: number | null
+	hillPercentOfLand: number | null
+	mountainsPercentOfLand: number | null
+}
 
 export interface FarmingReport {
 	scheduledHearths: number
@@ -28,10 +36,23 @@ export interface FarmingReport {
 	neverAdoptingPercent: number | null
 	adoptionLagYears: SampleQuantiles
 	wayOfLifePercentAt: Record<string, WayOfLifePercents>
+	ground: GroundReport
+	meanSharesAtTechLevel: Record<string, WayOfLifeShares>
 }
 
 export interface FarmingReportParams {
 	generated: GenesisWorld
+}
+
+export interface GroundReportParams {
+	generated: GenesisWorld
+	settled: number[]
+}
+
+export interface MeanSharesParams {
+	generated: GenesisWorld
+	settled: number[]
+	techLevel: number
 }
 
 export interface QuantilesParams {

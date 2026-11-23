@@ -1,3 +1,4 @@
+import { FARMING_GROUND } from "@/model/society/farming/ground"
 import { FARMING_HEARTHS } from "@/model/society/farming/hearths"
 import { LIVESTOCK_VOYAGES } from "@/model/society/farming/livestock-voyages"
 import { FARMING_LIVING } from "@/model/society/farming/living"
@@ -22,6 +23,7 @@ function compute({
 	mesh,
 	planetRadiusKm,
 	horizonYear,
+	slopeScore,
 	...climate
 }: FarmingParams): FarmingResult {
 	const { result, landGraph } = migration
@@ -39,7 +41,16 @@ function compute({
 		measures,
 		suitability: result.suitability,
 	})
-	const cropFit = FARMING_LIVING.cropFit({ measures })
+	const ground = FARMING_GROUND.provinceGround({
+		provinces,
+		mesh,
+		elevationKm: climate.elevationKm,
+		slopeScore,
+	})
+	const { cropFit, terraceFit } = FARMING_GROUND.fits({
+		climateFit: FARMING_LIVING.cropFit({ measures }),
+		ground,
+	})
 	const herdShare = FARMING_LIVING.herdShare({ measures, cropFit })
 	const postMode = Uint8Array.from({ length: provinces.count }, (_, p) =>
 		FARMING_LIVING.postMode({
@@ -226,6 +237,7 @@ function compute({
 			farmCapacity: capacities.farm,
 			herdCapacity: capacities.herd,
 			farmFit,
+			terraceFit,
 			herdFit: farmingOnly.herdFit,
 			herdColonial: farmingOnly.herdColonial,
 			farmModern: new Uint8Array(provinces.count),
@@ -298,6 +310,8 @@ function compute({
 		farmCapacity: capacities.farm,
 		herdCapacity: capacities.herd,
 		farmFit,
+		terraceFit,
+		ground,
 		herdFit: herding.herdFit,
 		herdColonial: herding.herdColonial,
 		startClock: clock.farming,

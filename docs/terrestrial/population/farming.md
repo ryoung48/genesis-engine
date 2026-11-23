@@ -169,6 +169,17 @@ Step 5 used `1 − 0.7 · wooded · S([15, 18], Tc) · S([0.9, 1.3], arid)` on t
 
 Final ArchaeoGLOBE slices (−8050 to 1500): 0.696, 0.590, 0.504, 0.444, 0.437, 0.472, 0.379, 0.521.
 
+## Ground and terraces
+
+`FARMING_GROUND` (`src/model/society/farming/ground`) cuts farm land on steep ground using the topography slope score (`CLASSIFICATION.computeSlopeScore`), so farming and the map's hill and mountain labels agree. The score is normalised to each planet's 95th-percentile slope, so "steep" is relative to the world.
+
+- **Plough factor:** `1 − 0.92 · S([0.2, 0.6], slopeScore)`: losses start where topography starts calling land hill and reach the maximum where land over 0.5 km is mountain. Regions at or below 0.1 km elevation have factor 1. The province value is the area-weighted mean. `cropFit` (and so farm land share, post-farming mode and herd share) is multiplied by it; farm capacity and adoption are unchanged, to avoid double counting.
+- **Terrace factor:** `1 − 0.92 · S([0.3, 1.0], slopeScore)`, never worse than the plough. `terraceFit = climateFit · (terrace − plough)` is the extra farm land terraces recover.
+- **Tech gating:** `landAt` adds `S([0.5, 1.6], T̄) · terraceFit` to the farm potential, where T̄ is the average tech level: about −3000 (Yemen highland terraces) to −250 (southern Peru) on the Earth timeline.
+- `MAX_SLOPE_LOSS = 0.92` is upstream `slopeMaxLoss` (garden plots remain on the steepest ground).
+
+Earth diagnostic effect of the slope factor alone: ArchaeoGLOBE sum 4.518 → 4.511, Pinhasi mean absolute error 877 → 880 years, HYDE population-share distance 0.5254 → 0.5268; about 290 provinces change post-farming mode and 17 get farming roughly 400 years later. The report's `ground` block carries the mean plough and terrace factors, the share of provinces below 0.5, hill and mountain percentages of land, and `meanShares` at T̄ 0.5, 1 and 1.6.
+
 ## Carrying density
 
 **Mixed ways of life.** A province is not one way of life but a mix. `FARMING_WAY_OF_LIFE.wayOfLife` returns, per province, the share of its people who forage, farm and herd.

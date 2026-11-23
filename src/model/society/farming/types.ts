@@ -1,4 +1,5 @@
 import type { SphereMesh } from "@/model/mesh/types"
+import type { ProvinceGround } from "@/model/society/farming/ground/types"
 import type { FarmingHearth } from "@/model/society/farming/hearths/types"
 import type {
 	Quantiles,
@@ -37,6 +38,8 @@ export interface FarmingResult {
 	farmCapacity: Float32Array
 	herdCapacity: Float32Array
 	farmFit: Float32Array
+	terraceFit: Float32Array
+	ground: ProvinceGround
 	herdFit: Float32Array
 	herdColonial: Uint8Array
 	farmModern: Uint8Array
@@ -54,6 +57,7 @@ export interface FarmingParams {
 	rainfallMonthly: Float32Array
 	petMonthly: Float32Array
 	elevationKm: Float32Array
+	slopeScore: Float32Array
 	gdd: Float32Array
 	topography: Uint8Array
 	vegetation: Uint8Array
@@ -71,6 +75,7 @@ export interface WayOfLifeAtParams {
 		| "farmCapacity"
 		| "herdCapacity"
 		| "farmFit"
+		| "terraceFit"
 		| "herdFit"
 		| "herdColonial"
 		| "farmModern"

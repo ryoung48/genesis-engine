@@ -823,6 +823,7 @@ function runPostElevationPipeline(
 		rainfallMonthly: rainfall.monthly,
 		petMonthly: climate.pet_monthly,
 		elevationKm: elevation_km,
+		slopeScore,
 		gdd: pastaDebug.gdd,
 		topography,
 		vegetation,

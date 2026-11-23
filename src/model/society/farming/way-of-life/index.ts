@@ -1,4 +1,5 @@
 import { MATH } from "@/model/shared/math/core"
+import { FARMING_GROUND } from "@/model/society/farming/ground"
 import { FARMING_LIVING } from "@/model/society/farming/living"
 import type {
 	AdvantageParams,
@@ -41,7 +42,8 @@ function landAt({
 				advantage({ capacity: capacity * yieldFactor, forage })
 			: 0
 	let farmPotential = potential(
-		farming.farmFit[province],
+		farming.farmFit[province] +
+			FARMING_GROUND.terraceShare({ techLevel }) * farming.terraceFit[province],
 		farming.farmCapacity[province],
 	)
 	let herdPotential =

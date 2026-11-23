@@ -46,9 +46,9 @@ The request does not pick an Earth date. It picks a level of progress, and the p
 
   | TL | 0.5 | 1 | 1.8 | 2.35 | 3 |
   |---|---|---|---|---|---|
-  | Average farming age | 2,522 | 4,178 | 5,002 | 5,713 | 6,155 |
+  | Average farming age | 2,429 | 4,050 | 4,871 | 5,580 | 5,997 |
 
-  - **Below TL 0.5** the target is the settled share of habitable land instead: 0.86 at TL 0 to 0.987 at TL 0.5.
+  - **Below TL 0.5** the target is the settled share of habitable land instead: 0.962 at TL 0 to 0.989 at TL 0.5.
   - **Above TL 3** the start is the planet's own TL 3 year (searched at TL 3's yield) plus Earth's gap after 1500, used as a duration: 300 years at TL 3.8, 400 at 5, 450 at 6, 500 at 7.3, 525 at 7.8.
 - **Search.** The timeline is scanned in 50-year steps from the first adoption (or first settlement) to the horizon, taking the first step that reaches the target, then bisected to the year. Migration and farming run to year 10,000, so planets that farm late still reach their level. A planet that never reaches it starts at the horizon.
 - **Clock.** The search reads the farming state before the crop exchange, the modern-farming ramps and the livestock voyages (`FarmingResult.startClock`, the same pre-voyage clock that dates the ocean year), so the start year cannot depend on land those later steps fill in. Otherwise a world that reaches the ocean year would date its own start by farmland that exists only because of that start's ocean year. Seed 1311714991 at 7.8 starts at 7002 on this clock (7228 with the crop exchange counted, 7842 with the modern ramps counted); seed 14963991 at the default level 5369 (5371).

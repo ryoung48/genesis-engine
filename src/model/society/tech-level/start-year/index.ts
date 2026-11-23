@@ -9,10 +9,10 @@ import type {
 	TimelineAtParams,
 } from "@/model/society/tech-level/start-year/types"
 
-const SETTLED_TARGET = { domain: [0, 0.5], range: [0.86, 0.987] }
+const SETTLED_TARGET = { domain: [0, 0.5], range: [0.962, 0.989] }
 const FARMING_AGE_TARGET = {
 	domain: [0.5, 1, 1.8, 2.35, 3],
-	range: [2522, 4178, 5002, 5713, 6155],
+	range: [2429, 4050, 4871, 5580, 5997],
 }
 const AGRARIAN_LIMIT = 3
 const YEARS_AFTER_AGRARIAN = {

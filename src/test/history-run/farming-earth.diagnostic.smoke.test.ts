@@ -159,6 +159,7 @@ it.skipIf(process.env.HISTORY_FARMING_EARTH !== "1")(
 			rainfallMonthly: withoutNaN(realRain),
 			petMonthly: withoutNaN(observedPet),
 			elevationKm: world.elevation_km,
+			slopeScore: world.slopeScore,
 			gdd: withoutNaN(real.gdd),
 			topography: world.topography,
 			vegetation: world.realVegetation ?? world.vegetation,
@@ -300,7 +301,7 @@ it.skipIf(process.env.HISTORY_FARMING_EARTH !== "1")(
 			}),
 			livestock,
 			hyde,
-			timeline: [-10000, -3000, -1000, 1, 900, 1500].map((year) => ({
+			timeline: [-10000, -3000, -1000, 1, 900, 917, 1500].map((year) => ({
 				year,
 				farmingAge: TECH_START.farmingAgeAt({
 					farming,

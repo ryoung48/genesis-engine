@@ -265,6 +265,7 @@ describe("tech level", () => {
 			farmCapacity: Float32Array.of(60, 60, 60),
 			herdCapacity: Float32Array.of(2, 2, 2),
 			farmFit: Float32Array.of(0.9, 0.9, 0.9),
+			terraceFit: new Float32Array(3),
 			herdFit: Float32Array.of(0, 0, 0),
 			herdColonial: new Uint8Array(3),
 			farmModern: new Uint8Array(3),
@@ -286,7 +287,7 @@ describe("tech level", () => {
 		expect(late).toBeGreaterThan(early)
 		expect(
 			TECH_START.farmingAgeAt({ ...timeline, year: late }),
-		).toBeGreaterThanOrEqual(5713)
+		).toBeGreaterThanOrEqual(5580)
 		expect(
 			TECH_START.targetYear({
 				farming,
@@ -312,6 +313,7 @@ describe("tech level", () => {
 			farmCapacity: new Float32Array(count).fill(60),
 			herdCapacity: new Float32Array(count).fill(2),
 			farmFit: new Float32Array(count),
+			terraceFit: new Float32Array(count),
 			herdFit: new Float32Array(count),
 			herdColonial: new Uint8Array(count),
 			farmModern: new Uint8Array(count),
@@ -337,6 +339,11 @@ describe("tech level", () => {
 			farmCapacity: new Float32Array(count).fill(60),
 			herdCapacity: new Float32Array(count).fill(2),
 			farmFit: new Float32Array(count),
+			terraceFit: new Float32Array(count),
+			ground: {
+				plough: new Float32Array(count).fill(1),
+				terrace: new Float32Array(count).fill(1),
+			},
 			herdFit: new Float32Array(count),
 			herdColonial: new Uint8Array(count),
 			farmModern: new Uint8Array(count),

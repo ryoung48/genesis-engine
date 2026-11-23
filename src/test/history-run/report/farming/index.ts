@@ -1,10 +1,14 @@
-import type { WayOfLife } from "@/model/society/farming/types"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import type { WayOfLife, WayOfLifeShares } from "@/model/society/farming/types"
 import { FARMING_WAY_OF_LIFE } from "@/model/society/farming/way-of-life"
 import { MIGRATION } from "@/model/society/migration"
 import { TECH_LEVEL } from "@/model/society/tech-level"
 import type {
 	FarmingReport,
 	FarmingReportParams,
+	GroundReport,
+	GroundReportParams,
+	MeanSharesParams,
 	PercentParams,
 	QuantilesParams,
 	SampleQuantiles,
@@ -14,6 +18,11 @@ import { REPORT_STATISTICS } from "@/test/history-run/report/statistics"
 
 const REPORT_YEARS = [-5000, 1, 867, 1500]
 const WAYS: WayOfLife[] = ["uninhabited", "forage", "farm", "herd"]
+const TERRACE_REPORT_TECH_LEVELS = [0.5, 1, 1.6]
+const TERRACE_REPORT_YEAR = 1500
+const HALF = 0.5
+const HILL = CLASSIFICATION.topoHill
+const MOUNTAIN = CLASSIFICATION.topoMountain
 
 function quantiles({ values }: QuantilesParams): SampleQuantiles {
 	if (!values.length) return { samples: 0, p10: null, p50: null, p90: null }
@@ -24,6 +33,73 @@ function quantiles({ values }: QuantilesParams): SampleQuantiles {
 
 function percent({ count, total }: PercentParams): number | null {
 	return total > 0 ? (100 * count) / total : null
+}
+
+function groundReport({
+	generated,
+	settled,
+}: GroundReportParams): GroundReport {
+	const farming = generated.farming
+	const provinces = generated.provinces
+	let land = 0
+	let hills = 0
+	let mountains = 0
+	for (let r = 0; r < generated.isLand.length; r++) {
+		if (!generated.isLand[r]) continue
+		land++
+		if (generated.topography[r] === HILL) hills++
+		if (generated.topography[r] === MOUNTAIN) mountains++
+	}
+	let weight = 0
+	let plough = 0
+	let terrace = 0
+	let steep = 0
+	if (farming && provinces)
+		for (const p of settled) {
+			const w = provinces.size[p]
+			weight += w
+			plough += w * farming.ground.plough[p]
+			terrace += w * farming.ground.terrace[p]
+			if (farming.ground.plough[p] < HALF) steep++
+		}
+	return {
+		ploughMean: weight > 0 ? plough / weight : null,
+		terraceMean: weight > 0 ? terrace / weight : null,
+		ploughBelowHalfPercent: percent({ count: steep, total: settled.length }),
+		hillPercentOfLand: percent({ count: hills, total: land }),
+		mountainsPercentOfLand: percent({ count: mountains, total: land }),
+	}
+}
+
+function meanShares({
+	generated,
+	settled,
+	techLevel,
+}: MeanSharesParams): WayOfLifeShares {
+	const farming = generated.farming
+	const provinces = generated.provinces
+	const out = { forage: 0, farm: 0, herd: 0 }
+	if (!farming || !provinces) return out
+	const field = FARMING_WAY_OF_LIFE.wayOfLife({
+		farming,
+		graph: provinces,
+		year: TERRACE_REPORT_YEAR,
+		techLevel,
+	})
+	let weight = 0
+	for (const p of settled) {
+		const w = provinces.size[p]
+		weight += w
+		out.forage += w * field.forage[p]
+		out.farm += w * field.farm[p]
+		out.herd += w * field.herd[p]
+	}
+	if (weight > 0) {
+		out.forage /= weight
+		out.farm /= weight
+		out.herd /= weight
+	}
+	return out
 }
 
 function summarize({ generated }: FarmingReportParams): FarmingReport | null {
@@ -105,6 +181,13 @@ function summarize({ generated }: FarmingReportParams): FarmingReport | null {
 		}),
 		adoptionLagYears: quantiles({ values: lags }),
 		wayOfLifePercentAt,
+		ground: groundReport({ generated, settled }),
+		meanSharesAtTechLevel: Object.fromEntries(
+			TERRACE_REPORT_TECH_LEVELS.map((techLevel) => [
+				String(techLevel),
+				meanShares({ generated, settled, techLevel }),
+			]),
+		),
 	}
 }
 

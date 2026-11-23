@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest"
+import { MATH } from "@/model/shared/math/core"
+import { FARMING_GROUND } from "@/model/society/farming/ground"
 import { FARMING_HEARTHS } from "@/model/society/farming/hearths"
 import type { FarmingHearth } from "@/model/society/farming/hearths/types"
 import { LIVESTOCK_VOYAGES } from "@/model/society/farming/livestock-voyages"
@@ -758,6 +760,7 @@ describe("way of life", () => {
 			farmCapacity: Float32Array.of(0, 0, 0, 60),
 			herdCapacity: Float32Array.of(10, 10, 10, 0),
 			farmFit: Float32Array.of(0, 0, 0, 0.5),
+			terraceFit: new Float32Array(4),
 			herdFit: Float32Array.of(0.8, 0.8, 0.8, 0),
 			herdColonial: new Uint8Array(4),
 			farmModern: new Uint8Array(4),
@@ -818,6 +821,7 @@ describe("colonial herds", () => {
 			farmCapacity: Float32Array.of(0),
 			herdCapacity: Float32Array.of(1.1),
 			farmFit: Float32Array.of(0),
+			terraceFit: Float32Array.of(0),
 			herdFit: Float32Array.of(0.8),
 			herdColonial: Uint8Array.of(colonial),
 			farmModern: Uint8Array.of(0),
@@ -866,6 +870,7 @@ describe("colonial herds", () => {
 			farmCapacity: Float32Array.of(60),
 			herdCapacity: Float32Array.of(0),
 			farmFit: Float32Array.of(0.8),
+			terraceFit: Float32Array.of(0),
 			herdFit: Float32Array.of(0),
 			herdColonial: Uint8Array.of(0),
 			farmModern: Uint8Array.of(modern),
@@ -961,5 +966,95 @@ describe("dependence lag", () => {
 				oceanYear: 1500,
 			}),
 		).toBe(MIGRATION.sentinel)
+	})
+})
+
+describe("ground and terraces", () => {
+	const mesh = { numRegions: 4, regionArea: Float32Array.of(1, 1, 1, 2) }
+	const plough = (score: number) =>
+		1 - 0.92 * MATH.smoothstep({ edge0: 0.2, edge1: 0.6, x: score })
+	const terrace = (score: number) =>
+		1 - 0.92 * MATH.smoothstep({ edge0: 0.3, edge1: 1, x: score })
+
+	it("loses land with the topography slope score and keeps low land flat", () => {
+		const ground = FARMING_GROUND.provinceGround({
+			provinces: { count: 2, regionProvince: Int32Array.of(0, 0, 1, -1) },
+			mesh,
+			elevationKm: Float32Array.of(0.5, 0.5, 0.05, 0.5),
+			slopeScore: Float32Array.of(0.1, 0.6, 1, 1),
+		})
+		expect(ground.plough[0]).toBeCloseTo((plough(0.1) + plough(0.6)) / 2, 6)
+		expect(ground.terrace[0]).toBeCloseTo((terrace(0.1) + terrace(0.6)) / 2, 6)
+		expect(ground.plough[0]).toBeCloseTo(0.54, 6)
+		expect(ground.plough[1]).toBe(1)
+		expect(ground.terrace[1]).toBe(1)
+	})
+
+	it("starts losing land at the hill score and never loses more with terraces", () => {
+		let worse = 0
+		for (let i = 0; i <= 100; i++) {
+			const ground = FARMING_GROUND.provinceGround({
+				provinces: { count: 1, regionProvince: Int32Array.of(0) },
+				mesh: { numRegions: 1, regionArea: Float32Array.of(1) },
+				elevationKm: Float32Array.of(1),
+				slopeScore: Float32Array.of(i / 100),
+			})
+			if (ground.terrace[0] < ground.plough[0] - 1e-6) worse++
+			if (i <= 20) expect(ground.plough[0]).toBe(1)
+		}
+		expect(worse).toBe(0)
+	})
+
+	it("brings terraces in over the tech window", () => {
+		expect(FARMING_GROUND.terraceShare({ techLevel: 0 })).toBe(0)
+		expect(FARMING_GROUND.terraceShare({ techLevel: 0.5 })).toBe(0)
+		expect(FARMING_GROUND.terraceShare({ techLevel: 1.05 })).toBeCloseTo(0.5, 6)
+		expect(FARMING_GROUND.terraceShare({ techLevel: 1.6 })).toBe(1)
+		expect(FARMING_GROUND.terraceShare({ techLevel: 7 })).toBe(1)
+	})
+
+	it("splits the climate fit into the plough share and the terrace gain", () => {
+		const fits = FARMING_GROUND.fits({
+			climateFit: Float64Array.of(0.8),
+			ground: {
+				plough: Float32Array.of(0.5),
+				terrace: Float32Array.of(0.9),
+			},
+		})
+		expect(fits.cropFit[0]).toBeCloseTo(0.4, 6)
+		expect(fits.terraceFit[0]).toBeCloseTo(0.32, 6)
+	})
+
+	it("adds the terrace gain to the farm land share only as tech rises", () => {
+		const farming = (terraceFit: number) => ({
+			settledYear: Int32Array.of(-4000),
+			adoptionYear: Int32Array.of(-2000),
+			herdAdoptionYear: Int32Array.of(MIGRATION.sentinel),
+			forageDensity: Float32Array.of(1),
+			farmCapacity: Float32Array.of(60),
+			herdCapacity: Float32Array.of(0),
+			farmFit: Float32Array.of(0.2),
+			terraceFit: Float32Array.of(terraceFit),
+			herdFit: Float32Array.of(0),
+			herdColonial: new Uint8Array(1),
+			farmModern: new Uint8Array(1),
+		})
+		const graph = {
+			count: 1,
+			desolate: new Uint8Array(1),
+			adjOffset: new Int32Array(2),
+			adjList: new Int32Array(0),
+		}
+		const farmAt = (terraceFit: number, techLevel: number) =>
+			FARMING_WAY_OF_LIFE.wayOfLife({
+				farming: farming(terraceFit),
+				graph,
+				year: 2000,
+				techLevel,
+			}).farm[0]
+		expect(farmAt(0.4, 0.5)).toBe(farmAt(0, 0.5))
+		expect(farmAt(0.4, 1.6)).toBeGreaterThan(farmAt(0, 1.6))
+		expect(farmAt(0.4, 1.05)).toBeGreaterThan(farmAt(0.4, 0.5))
+		expect(farmAt(0.4, 1.05)).toBeLessThan(farmAt(0.4, 1.6))
 	})
 })
