@@ -159,6 +159,12 @@ export interface SerializedGenesisWorld {
 	riverAccess?: Uint8Array
 	lakeAccess?: Uint8Array
 	slopeScore: Float32Array
+	/** [JUSTIFICATION] Rock, young-sediment tag, ice mask and soil fertility exist only for procedural worlds. */
+	rock?: Uint8Array
+	youngKind?: Uint8Array
+	glaciated?: Uint8Array
+	soilFertility?: Float32Array
+	soilModifier?: Uint8Array
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	dtr_annual: Float32Array

@@ -215,6 +215,16 @@ export interface GenesisWorld {
 	lakeAccess?: Uint8Array
 	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
 	slopeScore: Float32Array
+	/** [JUSTIFICATION] Surface rock kind per region (index into ROCKS.kinds); present only for procedural worlds. */
+	rock?: Uint8Array
+	/** [JUSTIFICATION] Young-sediment tag per region (index into ROCKS.youngKinds); present only for procedural worlds. */
+	youngKind?: Uint8Array
+	/** [JUSTIFICATION] Land under the glacial model's ice; present only for procedural worlds. */
+	glaciated?: Uint8Array
+	/** [JUSTIFICATION] Soil fertility 0..1 per region; absent for Earth imports, where the farming soil factor is 1. */
+	soilFertility?: Float32Array
+	/** [JUSTIFICATION] Dominant soil climate modifier code per region (none, black, leached, podzol); absent for Earth imports. */
+	soilModifier?: Uint8Array
 	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array

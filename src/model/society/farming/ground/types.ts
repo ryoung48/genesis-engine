@@ -6,11 +6,13 @@ export interface ProvinceGroundParams {
 	mesh: Pick<SphereMesh, "numRegions" | "regionArea">
 	elevationKm: Float32Array
 	slopeScore: Float32Array
+	soilFertility: Float32Array | null
 }
 
 export interface ProvinceGround {
 	plough: Float32Array
 	terrace: Float32Array
+	soil: Float32Array
 }
 
 export interface GroundFactorParams {

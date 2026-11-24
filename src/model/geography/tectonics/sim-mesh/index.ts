@@ -8,8 +8,8 @@ import type {
 	SimSpace,
 } from "@/model/geography/tectonics/sim-mesh/types"
 import { MESH } from "@/model/mesh"
-import { PriorityHeap } from "@/model/shared/min-heap"
 import { RNG } from "@/model/shared/random/rng"
+import { SPREAD } from "@/model/shared/spread"
 
 const SIM_CELLS = 40000
 const SIM_JITTER = 0.35
@@ -64,30 +64,23 @@ function dijkstra({
 	carry,
 }: DijkstraParams): DijkstraResult {
 	const n = s.mesh.numRegions
-	const { adjOffset, adjList } = s.mesh
 	const km = new Float64Array(n).fill(Infinity)
 	const carried = new Float32Array(n)
-	const heap = new PriorityHeap<number>()
 	for (let c = 0; c < n; c++)
 		if (isSource(c)) {
 			km[c] = 0
 			carried[c] = carry(c)
-			heap.push(0, c)
 		}
-	for (let top = heap.pop(); top; top = heap.pop()) {
-		const c = top.value
-		if (top.key > km[c]) continue
-		for (let k = adjOffset[c]; k < adjOffset[c + 1]; k++) {
-			const nb = adjList[k]
-			if (!canEnter(nb)) continue
-			const nd = top.key + distanceKm({ space: s, a: c, b: nb })
-			if (nd < km[nb] && nd <= maxKm) {
-				km[nb] = nd
-				carried[nb] = carried[c]
-				heap.push(nd, nb)
-			}
-		}
-	}
+	SPREAD.km({
+		mesh: s.mesh,
+		radiusKm: s.radiusKm,
+		dist: km,
+		maxKm,
+		canEnter: ({ to }) => canEnter(to),
+		onReach: ({ from, to }) => {
+			carried[to] = carried[from]
+		},
+	})
 	return { km, carried }
 }
 

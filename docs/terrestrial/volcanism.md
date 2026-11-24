@@ -10,7 +10,7 @@ Volcanoes are placed from the present-day records, not from a volcanism paramete
 
 A track walks back along its plate's rotation (the crust now at the rotated plume passed over it that long ago) in 0.5 Myr steps up to 90 Myr (`trackMyr`; Hawaii-Emperor is about 80), stopping where the nearest cell is on another plate (the 90 Myr length is set from the Hawaiian-Emperor chain, Sharp & Clague 2006). It alternates bursts of eruption (0.6 to 2 Myr, one volcano each, building 8 km/Myr times the plume's strength 0.6 to 1.4, capped at 10 km, 70 km wide) with quiet spells of 1.5 to 5 Myr, on a swell 110 km wide. The volcano over the plume is still active (under 2 Myr); the rest is worn at 0.15 km/Myr after that, so a 5 km volcano is gone in tens of Myr (a tuned value; no single cited rate).
 
-Up to 2 plume heads (`lipCount`) make a flood basalt with chance 0.45, 15 to 200 Myr old on the track, 0.15 to 2 million km² (log-uniform; the Deccan is about 0.5), 2 km thick, with a lobed outline (Ernst 2014 for the province sizes). A LIP on land wears at 0.004 km/Myr.
+Between 2 and 6 plume heads (`lipCount`) make a flood basalt, each with chance 0.8 (`lipChance`, up to the drawn count; it was 0 to 2 with chance 0.45, which left basalt at 0.9 to 1.3% of land against a few percent on Earth, not checked against a cited source; now 1.4 to 2.1% on seeds 14963991, 20251107 and 77031), 15 to 200 Myr old on the track, 0.15 to 2 million km² (log-uniform; the Deccan is about 0.5), 2 km thick, with a lobed outline (Ernst 2014 for the province sizes). A LIP on land wears at 0.004 km/Myr.
 
 A LIP also raises the ground (`PLUMES.lift`, applied in the volcano stamp before the cones): each region under it gets its remaining pile (thickness minus wear, at most `lipMaxPileKm`) times 0.75 km of height per km of basalt on land or 1.4 km per km at sea (an oceanic plateau). The lift is then diffused over about `lipFeatherKm` and never lowered inside the province, so the edge slopes instead of stepping. LIPs are a terrain feature (shown in purple on the features map mode) but still carry no volcano danger.
 
@@ -47,7 +47,8 @@ The mesh is coarse (about 54 km between regions at 204,000 regions), so each con
 | `trackMyr` | 90 | Hawaii-Emperor, about 80 Myr (Sharp & Clague 2006) |
 | `trackBuildKmPerMyr` / `trackMaxKm` | 8 / 10 | Hawaii: about 9 km above the floor over a few Myr |
 | `islandErosionKmPerMyr` | 0.15 | tuned: a 5 km volcano is gone in tens of Myr |
-| `lipCount` / `lipAgeMyr` / `lipAreaKm2` | 0 to 2 / 15 to 200 / 0.15 to 2 million | Ernst 2014 |
+| `lipCount` / `lipChance` | 2 to 6 / 0.8 | Raised from 0 to 2 / 0.45 so exposed flood basalt reaches 1.4 to 2.1% of land (Earth's continental flood basalts add up to a few percent; not checked against a cited source). Each LIP also lifts the ground, so this changes elevation |
+| `lipAgeMyr` / `lipAreaKm2` | 15 to 200 / 0.15 to 2 million | Ernst 2014 |
 | `arcConeShare` / `andeanConeShare` | 0.6 / 0.35 | upstream, tuned for one cone per few sim cells |
 | `activityCoreShare` | 0.25 | tuned: danger starts at the summit and upper flanks, not the faint skirt of a widened cone; on the default seed it cuts regions above 0.05 volcano danger from 3,375 to 1,944 |
 | `minRadiusMeshEdges` | 1 | a feature needs at least two samples across its diameter, so a radius of one mesh edge |

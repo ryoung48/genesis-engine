@@ -75,3 +75,10 @@ export interface ErodeCompositeParams {
 	gIters?: number
 	glacialStrength?: number
 }
+
+export interface ErosionRecord {
+	sedimentElev: Float32Array
+	morainesElev: Float32Array
+	glaciated: Uint8Array
+	pastIce: Uint8Array
+}

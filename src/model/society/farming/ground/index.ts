@@ -19,6 +19,10 @@ const TERRACE_SLOPE = { edge0: 0.3, edge1: 1 }
 // 8% of the steepest ground stays farmable (garden plots); upstream
 // raguilar011095/planet_heightmap_generation at commit ed466f9d, slopeMaxLoss.
 const MAX_SLOPE_LOSS = 0.92
+// Average ground loses nothing: only fertility below this loses land share. The
+// parent-material table puts average rock and soil at 0.5, which is upstream's
+// value for ground of unknown kind (farming-config.js parent.unknown).
+const SOIL_REF = 0.5
 // Topography's hill rule (elevation > 0.1 km): lower land is flat at any score.
 const LOW_LAND_KM = 0.1
 // Terraces come in between the 3rd millennium BCE highland terraces of Yemen
@@ -31,16 +35,22 @@ function groundFactor({ slope, edges }: GroundFactorParams): number {
 	return 1 - MAX_SLOPE_LOSS * MATH.smoothstep({ ...edges, x: slope })
 }
 
+function soilFactor(fertility: number): number {
+	return Math.max(1 - MAX_SLOPE_LOSS, Math.min(1, fertility / SOIL_REF))
+}
+
 function provinceGround({
 	provinces,
 	mesh,
 	elevationKm,
 	slopeScore,
+	soilFertility,
 }: ProvinceGroundParams): ProvinceGround {
 	const count = provinces.count
 	const area = new Float64Array(count)
 	const plough = new Float64Array(count)
 	const terrace = new Float64Array(count)
+	const soil = new Float64Array(count)
 	for (let r = 0; r < mesh.numRegions; r++) {
 		const p = provinces.regionProvince[r]
 		if (p < 0) continue
@@ -53,6 +63,7 @@ function provinceGround({
 		terrace[p] +=
 			a *
 			(low ? 1 : groundFactor({ slope: slopeScore[r], edges: TERRACE_SLOPE }))
+		soil[p] += a * (soilFertility ? soilFactor(soilFertility[r]) : 1)
 	}
 	return {
 		plough: Float32Array.from(plough, (v, p) =>
@@ -61,14 +72,19 @@ function provinceGround({
 		terrace: Float32Array.from(terrace, (v, p) =>
 			area[p] > 0 ? v / area[p] : 1,
 		),
+		soil: Float32Array.from(soil, (v, p) => (area[p] > 0 ? v / area[p] : 1)),
 	}
 }
 
 function fits({ climateFit, ground }: GroundFitsParams): GroundFits {
+	const soilFit = Float64Array.from(
+		climateFit,
+		(fit, p) => fit * ground.soil[p],
+	)
 	return {
-		cropFit: Float64Array.from(climateFit, (fit, p) => fit * ground.plough[p]),
+		cropFit: Float64Array.from(soilFit, (fit, p) => fit * ground.plough[p]),
 		terraceFit: Float32Array.from(
-			climateFit,
+			soilFit,
 			(fit, p) => fit * (ground.terrace[p] - ground.plough[p]),
 		),
 	}

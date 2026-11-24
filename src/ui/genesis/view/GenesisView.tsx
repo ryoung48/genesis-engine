@@ -677,12 +677,20 @@ export const GenesisView: React.FC<{
 		const normalizedColorMode = normalizeGeographyColorMode({
 			colorMode,
 			hasHazards: !!world?.hazards,
+			hasRock: !!world?.rock,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
 			setGeographyMode(normalizedColorMode)
 		}
-	}, [colorMode, world?.hazards, world?.volcanism, world?.isEarthImport, world])
+	}, [
+		colorMode,
+		world?.hazards,
+		world?.rock,
+		world?.volcanism,
+		world?.isEarthImport,
+		world,
+	])
 
 	// --- Nation mode guard ---
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
@@ -1478,6 +1486,7 @@ export const GenesisView: React.FC<{
 		worldForDisplay,
 		history,
 		dataVariant,
+		climateSubMode,
 	})
 
 	const measureDistanceKm = useMemo(() => {

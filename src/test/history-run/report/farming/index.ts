@@ -54,18 +54,24 @@ function groundReport({
 	let plough = 0
 	let terrace = 0
 	let steep = 0
+	let soil = 0
+	let poorSoil = 0
 	if (farming && provinces)
 		for (const p of settled) {
 			const w = provinces.size[p]
 			weight += w
 			plough += w * farming.ground.plough[p]
 			terrace += w * farming.ground.terrace[p]
+			soil += w * farming.ground.soil[p]
 			if (farming.ground.plough[p] < HALF) steep++
+			if (farming.ground.soil[p] < HALF) poorSoil++
 		}
 	return {
 		ploughMean: weight > 0 ? plough / weight : null,
 		terraceMean: weight > 0 ? terrace / weight : null,
 		ploughBelowHalfPercent: percent({ count: steep, total: settled.length }),
+		soilMean: weight > 0 ? soil / weight : null,
+		soilBelowHalfPercent: percent({ count: poorSoil, total: settled.length }),
 		hillPercentOfLand: percent({ count: hills, total: land }),
 		mountainsPercentOfLand: percent({ count: mountains, total: land }),
 	}

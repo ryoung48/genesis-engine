@@ -1,4 +1,6 @@
 import { useMemo } from "react"
+import { KOPPEN } from "@/model/climate/classification/koppen"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { GOVERNMENT } from "@/model/history/earth/government"
@@ -10,7 +12,6 @@ import { TECH_LEVEL } from "@/model/society/tech-level"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
 import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-size-distribution"
-import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
 import { techLevelColor } from "@/ui/genesis/shared/colors/tech-level"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
@@ -18,15 +19,8 @@ import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { WorldDistributionsInput } from "@/ui/genesis/view/types"
 import { buildDistribution } from "@/ui/wiki/stats/nation/nation-distributions"
 
-/**
- * Builds every aggregate chart series the world-details panel renders --
- * nation sizes, governments, religion types, trade goods and the
- * climate/vegetation/topography breakdowns -- from whichever source is
- * authoritative for the current world (earth-history's real per-date engine
- * for Earth imports, the procedural snapshot otherwise).
- */
 export function useWorldDistributions(input: WorldDistributionsInput) {
-	const { world, worldForDisplay, history, dataVariant } = input
+	const { world, worldForDisplay, history, dataVariant, climateSubMode } = input
 	const techLevelDistribution = useMemo((): DistributionBucket[] => {
 		const population = worldForDisplay?.population
 		if (!population) return []
@@ -165,28 +159,43 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 	const conflictDistribution = useMemo<DistributionBucket[]>(() => [], [])
 	const relationDistribution = useMemo<DistributionBucket[]>(() => [], [])
 
-	// "Observed" sources the real-Earth-derived realClimateZones/realVegetation
-	// arrays (assignEarthClimateZones/assignVegetation run against actual
-	// climate data for Earth imports) instead of the model's own
-	// climateZones/vegetation -- same category scheme and bucketer either
-	// way, so this tracks the Model/Observed radio the map overlay uses
-	// (see OverlayControls' dataVariant) without falling back to the EU5
-	// game's coarser per-province preset categories.
 	const showObservedDistributions =
 		dataVariant === "observed" && !!world?.isEarthImport
 
-	const climateDistribution = useMemo(
-		() =>
-			buildDistribution(
-				VEGETATION.climateLabels,
-				showObservedDistributions
-					? world?.realClimateZones
-					: world?.climateZones,
-				(index) => rgbToCss(climateZoneColor(index)),
-				new Set([0]),
-			),
-		[showObservedDistributions, world?.realClimateZones, world?.climateZones],
-	)
+	const climateDistribution = useMemo(() => {
+		if (!world) return []
+		const koppen = climateSubMode === "koppen"
+		const values = koppen
+			? showObservedDistributions
+				? world.realKoppenClimate
+				: world.koppenClimate
+			: showObservedDistributions
+				? world.realPastaClimate
+				: world.pastaClimate
+		if (!values) return []
+		const landValues: number[] = []
+		for (let i = 0; i < values.length; i++) {
+			if (world.isLand[i]) landValues.push(values[i])
+		}
+		const labels = koppen
+			? KOPPEN.koppenLabels.map((label) =>
+					KOPPEN.koppenClimateName(KOPPEN.koppenLabels.indexOf(label)),
+				)
+			: PASTA.pastaLabels.map((label) =>
+					PASTA.pastaClimateName(PASTA.pastaLabels.indexOf(label)),
+				)
+		return buildDistribution(
+			labels,
+			landValues,
+			(index) =>
+				rgbToCss(
+					koppen
+						? KOPPEN.koppenClimateColor(index)
+						: PASTA.pastaClimateColor(index),
+				),
+			new Set([0]),
+		)
+	}, [world, climateSubMode, showObservedDistributions])
 
 	const vegetationDistribution = useMemo(
 		() =>

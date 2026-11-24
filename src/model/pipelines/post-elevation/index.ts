@@ -26,6 +26,9 @@ import type { GenesisLocations } from "@/model/geography/terrain/locations/types
 import { PROVINCES } from "@/model/geography/terrain/provinces"
 import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import { ROCKS } from "@/model/geography/terrain/rocks"
+import type { GenesisSurface } from "@/model/geography/terrain/rocks/types"
+import { SOILS } from "@/model/geography/terrain/soils"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
 import { TARGET_PROFILE } from "@/model/history/sim/targets"
@@ -122,6 +125,7 @@ function runPostElevationPipeline(
 		boundary,
 		distFields,
 		volcanoActivity,
+		surface,
 		onProgress,
 		realLakeRegions,
 		realRivers,
@@ -683,6 +687,56 @@ function runPostElevationPipeline(
 	TIMING.record({ stage: "Post: koppen climate", startedAt: t0, timings })
 	onProgress?.("Post: koppen climate", 69)
 
+	// ── Rock and soil ──────────────────────────────────────────────────
+	let surfaceFields: GenesisSurface | undefined
+	if (surface) {
+		t0 = performance.now()
+		const { presentTectonics } = surface
+		if (!presentTectonics.record)
+			throw new Error("rocks and soil need the geologic record")
+		const classification = ROCKS.classify({
+			mesh,
+			planetRadiusKm: params.planetRadiusKm,
+			seed: params.seed,
+			crust: presentTectonics.crust,
+			oldLip: presentTectonics.record.oldLip,
+			simMesh: presentTectonics.simMesh,
+			sample: presentTectonics.sample,
+			isLand,
+			elevation,
+			elevationKm: elevation_km,
+			maxElevKm: (params.maxElevation ?? 6000) / 1000,
+			maxDepthKm: UNITS.getMaxOceanDepthKm(params.planetRadiusKm),
+			discharge: rivers.flow,
+			erosion: surface.erosion,
+			koppen: koppenClimate,
+			pasta: pastaClimate,
+			windU: wind.windU,
+			windV: wind.windV,
+			temperatureAvg: climate.temperature_avg,
+		})
+		const soil = SOILS.fertility({
+			rock: classification.rock,
+			youngKind: classification.youngKind,
+			rising: classification.rising,
+			vegetation,
+			isLand,
+			temperatureMonthly: climate.temperature_monthly,
+			temperatureAvg: climate.temperature_avg,
+			rainfallAnnual: rainfall.annual,
+			petMonthly: climate.pet_monthly,
+		})
+		surfaceFields = {
+			rock: classification.rock,
+			youngKind: classification.youngKind,
+			glaciated: classification.glaciated,
+			soilFertility: soil.fertility,
+			soilModifier: soil.modifier,
+		}
+		TIMING.record({ stage: "Post: rocks and soil", startedAt: t0, timings })
+		onProgress?.("Post: rocks and soil", 69)
+	}
+
 	// ── Hazards ────────────────────────────────────────────────────────
 	t0 = performance.now()
 	const hazards = HAZARDS.computeHazards({
@@ -825,6 +879,7 @@ function runPostElevationPipeline(
 		petMonthly: climate.pet_monthly,
 		elevationKm: elevation_km,
 		slopeScore,
+		soilFertility: surfaceFields?.soilFertility ?? null,
 		gdd: pastaDebug.gdd,
 		topography,
 		vegetation,
@@ -1017,6 +1072,7 @@ function runPostElevationPipeline(
 		topography,
 		coastal,
 		slopeScore,
+		surface: surfaceFields,
 		climateZones,
 		realClimateZones,
 		koppenClimate,

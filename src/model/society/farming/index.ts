@@ -24,6 +24,7 @@ function compute({
 	planetRadiusKm,
 	horizonYear,
 	slopeScore,
+	soilFertility,
 	...climate
 }: FarmingParams): FarmingResult {
 	const { result, landGraph } = migration
@@ -46,6 +47,7 @@ function compute({
 		mesh,
 		elevationKm: climate.elevationKm,
 		slopeScore,
+		soilFertility,
 	})
 	const { cropFit, terraceFit } = FARMING_GROUND.fits({
 		climateFit: FARMING_LIVING.cropFit({ measures }),

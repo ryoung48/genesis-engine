@@ -343,6 +343,7 @@ describe("tech level", () => {
 			ground: {
 				plough: new Float32Array(count).fill(1),
 				terrace: new Float32Array(count).fill(1),
+				soil: new Float32Array(count).fill(1),
 			},
 			herdFit: new Float32Array(count),
 			herdColonial: new Uint8Array(count),

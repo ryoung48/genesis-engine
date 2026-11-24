@@ -15,6 +15,8 @@ export interface GroundReport {
 	ploughMean: number | null
 	terraceMean: number | null
 	ploughBelowHalfPercent: number | null
+	soilMean: number | null
+	soilBelowHalfPercent: number | null
 	hillPercentOfLand: number | null
 	mountainsPercentOfLand: number | null
 }

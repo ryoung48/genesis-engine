@@ -19,6 +19,8 @@ Pass 1 runs inside `GENERATE_WORLD` right after `blendElevation` (`PRESENT_TECTO
 
 Pass 2 runs after the final land mask exists (`GEOLOGIC_RECORD.build`): the sediment cover, facies, exhumation, forelands, shelves, rift basins, arc and setting flags of every land cell, and a few old flood basalts.
 
+Rock kind and soil fertility are derived from this record after elevation and climate; see [rocks and soil](rocks-and-soil.md).
+
 ## What is read from the world
 
 - `r_plate`, the coarse plate vectors, ocean flags and densities, the super-plate grouping.

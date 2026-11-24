@@ -16,11 +16,14 @@ import type {
 	DistanceFields,
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
+import type { ErosionRecord } from "@/model/geography/terrain/erosion/types"
 import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import type { GenesisSurface } from "@/model/geography/terrain/rocks/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { PresentTectonics } from "@/model/pipelines/present-tectonics/types"
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { FarmingResult } from "@/model/society/farming/types"
@@ -62,6 +65,8 @@ export interface PostPipelineInput {
 	distFields: DistanceFields
 	volcanoActivity: Float32Array
 	terrainFeatures?: GenesisTerrainFeatures
+	/** [JUSTIFICATION] Only procedural worlds have a tectonic record and an erosion record to read rock and soil from; Earth imports have neither. */
+	surface?: { presentTectonics: PresentTectonics; erosion: ErosionRecord }
 	onProgress?: (label: string, pct?: number) => void
 	/** Real lake cells (from a vector lake mask) that must survive the arid/rainfall-based lake-draining heuristic below — real lakes (e.g. the Aral Sea) can sit in regions too dry for computeLakes' own rainfall model to have created them procedurally. */
 	/** [JUSTIFICATION] Only Earth imports know the real cradle of the first migration; procedural worlds derive the origin from climate and suitability. */
@@ -166,6 +171,8 @@ export interface PostPipelineOutput {
 	topography: Uint8Array
 	coastal: Uint8Array
 	slopeScore: Float32Array
+	/** [JUSTIFICATION] Present only for procedural worlds; Earth imports have no rock or soil record. */
+	surface?: GenesisSurface
 	climateZones: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
 	realClimateZones?: Uint8Array

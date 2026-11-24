@@ -123,6 +123,7 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["precipitationDiff", "Rain Diff"],
 	["cloudCover", "Clouds"],
 	["realCloudCover", "Observed Clouds"],
+	["rock", "Geology"],
 	["dangerZones", "Danger"],
 	["trade_goods", "Trade Goods"],
 ]
@@ -155,6 +156,17 @@ export const TEMPERATURE_MAP_MODE_OPTIONS: ReadonlyArray<
 export function isTemperatureColorMode(colorMode: ColorMode): boolean {
 	const baseMode = getBaseMapMode(colorMode)
 	return TEMPERATURE_MAP_MODE_OPTIONS.some(([mode]) => mode === baseMode)
+}
+
+export const GEOLOGY_MAP_MODE_OPTIONS: ReadonlyArray<
+	readonly [ColorMode, string]
+> = [
+	["rock", "Rock"],
+	["soil", "Soil"],
+]
+
+export function isGeologyColorMode(colorMode: ColorMode): boolean {
+	return GEOLOGY_MAP_MODE_OPTIONS.some(([mode]) => mode === colorMode)
 }
 
 const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
@@ -271,11 +283,14 @@ export function normalizeNationMapMode(
 export function normalizeGeographyColorMode({
 	colorMode,
 	hasHazards,
+	hasRock,
 }: {
 	colorMode: ColorMode
 	hasHazards: boolean
+	hasRock: boolean
 }): ColorMode {
 	if (!hasHazards && colorMode === "dangerZones") return "terrain"
+	if (!hasRock && isGeologyColorMode(colorMode)) return "terrain"
 	return colorMode
 }
 

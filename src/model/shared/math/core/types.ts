@@ -12,6 +12,11 @@ export interface ClampParams {
 	hi: number
 }
 
+export interface RampParams {
+	range: readonly number[]
+	x: number
+}
+
 export interface SmoothstepParams {
 	edge0: number
 	edge1: number

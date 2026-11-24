@@ -9,3 +9,10 @@ export interface HeightKmToElevParams {
 	maxElevKm: number
 	maxDepthKm: number
 }
+
+export interface ElevDeltaKmParams {
+	elev: number
+	delta: number
+	maxElevKm: number
+	maxDepthKm: number
+}

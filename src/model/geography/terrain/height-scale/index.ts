@@ -1,4 +1,5 @@
 import type {
+	ElevDeltaKmParams,
 	ElevToHeightKmParams,
 	HeightKmToElevParams,
 } from "@/model/geography/terrain/height-scale/types"
@@ -34,4 +35,17 @@ function heightKmToElev({
 	return (lo + hi) * 0.5
 }
 
-export const HEIGHT_SCALE = { elevToHeightKm, heightKmToElev }
+function elevDeltaKm({
+	elev,
+	delta,
+	maxElevKm,
+	maxDepthKm,
+}: ElevDeltaKmParams): number {
+	if (!(delta > 0)) return 0
+	return (
+		elevToHeightKm({ elev, maxElevKm, maxDepthKm }) -
+		elevToHeightKm({ elev: Math.max(0, elev - delta), maxElevKm, maxDepthKm })
+	)
+}
+
+export const HEIGHT_SCALE = { elevToHeightKm, heightKmToElev, elevDeltaKm }

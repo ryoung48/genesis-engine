@@ -6,6 +6,7 @@ import type {
 	LerpParams,
 	MaskedRanksParams,
 	PiecewiseParams,
+	RampParams,
 	SmoothstepParams,
 } from "@/model/shared/math/core/types"
 
@@ -32,6 +33,10 @@ function smoothstep({ edge0, edge1, x }: SmoothstepParams): number {
 	if (edge0 === edge1) return x >= edge0 ? 1 : 0
 	const t = clamp01((x - edge0) / (edge1 - edge0))
 	return t * t * (3 - 2 * t)
+}
+
+function ramp({ range, x }: RampParams): number {
+	return smoothstep({ edge0: range[0], edge1: range[1], x })
 }
 
 function eulerVelocityAt({
@@ -113,6 +118,7 @@ export const MATH = {
 	lerp,
 	normalize,
 	smoothstep,
+	ramp,
 	eulerVelocityAt,
 	getRegionLatLonDegrees,
 	piecewise,

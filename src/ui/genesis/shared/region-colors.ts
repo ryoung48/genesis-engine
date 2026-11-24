@@ -5,6 +5,7 @@ import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { ROCKS } from "@/model/geography/terrain/rocks"
 import { RELIGION } from "@/model/history/sim/religion"
 import { MESH } from "@/model/mesh"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
@@ -82,6 +83,8 @@ import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-den
 import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality"
 import {
 	basinColor,
+	rockColor,
+	soilColor,
 	TERRAIN_FEATURE_COLORS,
 	TOPOGRAPHY_COLORS,
 	UNOWNED_GRAY,
@@ -1131,6 +1134,28 @@ export function computeRegionColors({
 					rgb[3 * r + 2] = 0.32
 				}
 			}
+		}
+		return rgb
+	}
+
+	if (
+		(colorMode === "rock" || colorMode === "soil") &&
+		world.rock &&
+		world.youngKind &&
+		world.soilFertility
+	) {
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = !isLandRegion(r)
+				? oceanRgb(r)
+				: colorMode === "soil"
+					? soilColor(world.soilFertility[r])
+					: rockColor({
+							rock: ROCKS.kinds[world.rock[r]],
+							young: ROCKS.youngKinds[world.youngKind[r]],
+						})
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
 		}
 		return rgb
 	}

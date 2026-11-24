@@ -1,4 +1,5 @@
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
 import { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
 
 export function basinColor(id: number): [number, number, number] {
@@ -85,3 +86,61 @@ export const TOPOGRAPHY_COLORS: Record<number, [number, number, number]> = {
 }
 
 export const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
+
+const rgb255 = (r: number, g: number, b: number): [number, number, number] => [
+	r / 255,
+	g / 255,
+	b / 255,
+]
+
+export const ROCK_COLORS: Record<RockKind, [number, number, number]> = {
+	sea: OCEAN_LIGHT_BLUE,
+	young: rgb255(240, 228, 168),
+	sandstone: rgb255(222, 182, 110),
+	shale: rgb255(176, 150, 112),
+	limestone: rgb255(118, 172, 222),
+	salt: rgb255(236, 176, 208),
+	basalt: rgb255(96, 80, 120),
+	volcanic: rgb255(172, 124, 204),
+	granite: rgb255(226, 110, 104),
+	slate: rgb255(136, 192, 140),
+	gneiss: rgb255(70, 140, 112),
+	shield: rgb255(212, 150, 164),
+	greenstone: rgb255(52, 112, 84),
+	ophiolite: rgb255(44, 98, 112),
+}
+
+export const YOUNG_TAG_COLORS: Record<YoungKind, [number, number, number]> = {
+	none: ROCK_COLORS.young,
+	river: rgb255(250, 238, 120),
+	loess: rgb255(214, 196, 132),
+	till: rgb255(200, 204, 196),
+	erg: rgb255(246, 222, 142),
+}
+
+const SOIL_BARREN = rgb255(196, 180, 146)
+const SOIL_MIDDLING = rgb255(150, 150, 64)
+const SOIL_RICH = rgb255(22, 96, 40)
+
+export function soilColor(fertility: number): [number, number, number] {
+	const f = Math.max(0, Math.min(1, fertility))
+	const [from, to, t] =
+		f < 0.5
+			? [SOIL_BARREN, SOIL_MIDDLING, f * 2]
+			: [SOIL_MIDDLING, SOIL_RICH, (f - 0.5) * 2]
+	return [
+		from[0] + (to[0] - from[0]) * t,
+		from[1] + (to[1] - from[1]) * t,
+		from[2] + (to[2] - from[2]) * t,
+	]
+}
+
+export function rockColor({
+	rock,
+	young,
+}: {
+	rock: RockKind
+	young: YoungKind
+}): [number, number, number] {
+	return rock === "young" ? YOUNG_TAG_COLORS[young] : ROCK_COLORS[rock]
+}

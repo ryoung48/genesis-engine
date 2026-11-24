@@ -3,6 +3,7 @@ import type {
 	BuildGlacialBuffersParams,
 	DiffuseIterationParams,
 	ErodeCompositeParams,
+	ErosionRecord,
 	GlacialBuffers,
 	PriorityFloodCarveParams,
 	SharpenRidgesParams,
@@ -12,6 +13,18 @@ import type {
 import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { MinHeap } from "@/model/shared/min-heap"
+
+const ICE_GLACIDX = 0.2
+const ICE_PAST_GLACIDX = 0.06
+
+function emptyRecord(numRegions: number): ErosionRecord {
+	return {
+		sedimentElev: new Float32Array(numRegions),
+		morainesElev: new Float32Array(numRegions),
+		glaciated: new Uint8Array(numRegions),
+		pastIce: new Uint8Array(numRegions),
+	}
+}
 
 function diffuseIteration({
 	cells,
@@ -383,19 +396,21 @@ function erodeComposite({
 	kThermal,
 	gIters = 0,
 	glacialStrength = 0,
-}: ErodeCompositeParams): void {
-	const totalIters = Math.max(hIters, tIters, gIters)
-	if (totalIters <= 0) return
-
+}: ErodeCompositeParams): ErosionRecord {
 	const N = mesh.numRegions
+	const record = emptyRecord(N)
+	const totalIters = Math.max(hIters, tIters, gIters)
+	if (totalIters <= 0) return record
+
 	const { adjOffset, adjList, neighborDist } = mesh
+	const sediment = record.sedimentElev
 
 	const landCells: number[] = []
 	for (let r = 0; r < N; r++) {
 		if (!r_isOcean[r]) landCells.push(r)
 	}
 	const landCount = landCells.length
-	if (landCount === 0) return
+	if (landCount === 0) return record
 
 	const drainTarget = new Int32Array(N)
 	const cellDist = new Float32Array(N)
@@ -422,6 +437,12 @@ function erodeComposite({
 	const iceTarget = glacialBuffers?.iceTarget ?? null
 	const iceFlow = glacialBuffers?.iceFlow ?? null
 	const numIceUpstream = glacialBuffers?.numIceUpstream ?? null
+	if (glacIdx) {
+		for (let r = 0; r < N; r++) {
+			if (glacIdx[r] > ICE_GLACIDX) record.glaciated[r] = 1
+			if (glacIdx[r] > ICE_PAST_GLACIDX) record.pastIce[r] = 1
+		}
+	}
 
 	// Per-iteration glacial rates (scaled so total effect ~ same regardless of iter count)
 	const gScale = gIters > 0 ? 1.0 / gIters : 0
@@ -546,14 +567,17 @@ function erodeComposite({
 				const target = iceTarget![r]
 				if (target < 0 || r_isOcean[target]) continue
 				if (glacIdx![target] < glacIdx![r] * 0.3) {
-					elev[target] += gDepositAmount * Math.pow(iceFlow![r], 0.3)
+					const deposit = gDepositAmount * Math.pow(iceFlow![r], 0.3)
+					elev[target] += deposit
+					record.morainesElev[target] += deposit
 				}
 			}
 
 			// Fjord enhancement on coastal glaciated cells
 			for (let r = 0; r < N; r++) {
 				if (r_isOcean[r]) continue
-				if (glacIdx![r] <= 0.2 || iceFlow![r] <= gFjordThreshold) continue
+				if (glacIdx![r] <= ICE_GLACIDX || iceFlow![r] <= gFjordThreshold)
+					continue
 				let isCoastal = false
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					if (r_isOcean[adjList[j]]) {
@@ -638,6 +662,7 @@ function erodeComposite({
 
 				// Sediment deposition
 				const eroded = elev[r] - h_new
+				if (eroded > 0) sediment[r] = Math.max(0, sediment[r] - eroded)
 				if (eroded > 0 && !r_isOcean[target]) {
 					const drainOfTarget = drainTarget[target]
 					let receiverSlope = 0
@@ -647,8 +672,10 @@ function erodeComposite({
 					}
 					const depositFrac = 0.5 / (1 + receiverSlope * 50)
 					const deposit = eroded * depositFrac
+					const before = elev[target]
 					elev[target] += deposit
 					if (elev[target] > h_new) elev[target] = h_new
+					sediment[target] += Math.max(0, elev[target] - before)
 				}
 
 				elev[r] = h_new
@@ -716,6 +743,7 @@ function erodeComposite({
 			if (!r_isOcean[r] && glacIdx[r] > 0) elev[r] = tmp[r]
 		}
 	}
+	return record
 }
 
 function sharpenRidges({
@@ -804,6 +832,9 @@ function applySoilCreep({
 }
 
 export const EROSION = {
+	iceGlacIdx: ICE_GLACIDX,
+	icePastGlacIdx: ICE_PAST_GLACIDX,
+	emptyRecord,
 	warpTerrain,
 	smoothElevation,
 	erodeComposite,

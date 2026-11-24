@@ -45,6 +45,7 @@ import {
 	buildDemographicDisplayData,
 	buildFarmingDisplayData,
 	buildHoverChartData,
+	buildHoverGeology,
 	buildPastaMonthlyData,
 	buildProvinceName,
 	buildTerrainFeatureSwatches,
@@ -337,6 +338,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showGeography && hoverRegion !== null && slopeScoreByRegion
 			? slopeScoreByRegion[hoverRegion] * 100
 			: null
+	const hoverGeology = showGeography
+		? buildHoverGeology({ world, region: hoverRegion })
+		: null
 	const hoverRouteLabel = showGeography
 		? buildHoverRouteLabel(hoverRegion, routes ?? null)
 		: null
@@ -551,6 +555,20 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							label="Elev"
 							value={`${formatElevation(hoverElevationKm, unitSystem)}${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
 						/>
+						{hoverGeology && (
+							<>
+								<SwatchRow
+									label="Rock"
+									value={hoverGeology.rock}
+									color={hoverGeology.rockColor}
+								/>
+								<SwatchRow
+									label="Soil"
+									value={hoverGeology.soil}
+									color={hoverGeology.soilColor}
+								/>
+							</>
+						)}
 						{hoverRouteLabel && <Row label="Route" value={hoverRouteLabel} />}
 						{colorMode === "temperatureDelta" &&
 							hoverTemperatureDelta !== null && (

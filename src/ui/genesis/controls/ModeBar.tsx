@@ -17,6 +17,7 @@ import {
 	getMapModePrimary,
 	getVisibleGeographyModeOptions,
 	getVisibleSocietyModeOptions,
+	isGeologyColorMode,
 	isPopulationSocietyMode,
 	isTemperatureColorMode,
 	isTitlesNationMode,
@@ -83,7 +84,8 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 			mode !== "precipitationDiff" &&
 			mode !== "cloudCover" &&
 			mode !== "realCloudCover" &&
-			(!isEarthImport || (mode !== "dangerZones" && mode !== "trade_goods")),
+			(!isEarthImport ||
+				(mode !== "dangerZones" && mode !== "trade_goods" && mode !== "rock")),
 	)
 	const societyOptions = getVisibleSocietyModeOptions(
 		debugMapModes,
@@ -110,7 +112,9 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						? "precipitation"
 						: isTemperatureColorMode(geographyMode)
 							? "temperature"
-							: geographyMode
+							: isGeologyColorMode(geographyMode)
+								? "rock"
+								: geographyMode
 				}
 				onChange={(mode) => {
 					setColorMode(

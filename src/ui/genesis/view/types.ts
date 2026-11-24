@@ -25,6 +25,7 @@ import type {
 	DangerSubMode,
 	LabelMode,
 } from "@/ui/genesis/controls/OverlayControls"
+import type { ClimateSubMode } from "@/ui/genesis/controls/OverlayControls/types"
 import type { Eu4GhslSettlementAsset } from "@/ui/genesis/generation/earth-assets"
 import type { loadGenerationSessionSnapshotSync } from "@/ui/genesis/generation/session-persistence"
 import type { resetWorldDefaults } from "@/ui/genesis/generation/sliders"
@@ -215,6 +216,7 @@ export type WorldDistributionsInput = {
 	worldForDisplay: SerializedGenesisWorld | null
 	history: HistoryTimeline
 	dataVariant: DataVariant
+	climateSubMode: ClimateSubMode
 }
 
 export type ProceduralHistoryInput = {

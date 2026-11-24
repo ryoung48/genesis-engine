@@ -23,6 +23,8 @@ export type ColorMode =
 	| "terrainRed"
 	| "landHeightmap"
 	| "slope"
+	| "rock"
+	| "soil"
 	| "topography"
 	| "temperature"
 	| "realTemperature"

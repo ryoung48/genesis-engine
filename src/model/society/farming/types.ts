@@ -58,6 +58,7 @@ export interface FarmingParams {
 	petMonthly: Float32Array
 	elevationKm: Float32Array
 	slopeScore: Float32Array
+	soilFertility: Float32Array | null
 	gdd: Float32Array
 	topography: Uint8Array
 	vegetation: Uint8Array

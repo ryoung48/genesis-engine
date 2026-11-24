@@ -48,9 +48,9 @@ Written in closed form, per land cell, in the order the plate history keeps it:
 2. The cover, oldest first: the platform (thick in the basins, thin on the swells; 0.25 to 2.5 km), rift basins along passive margins and failed arms, forelands in front of every belt that had one, thickening in belts, inland seas of the low interiors (not over exposed shield: a craton patch left bare by `recShieldBare` and `recShieldPatchKm` is kept dry), shelf wedges.
 3. Facies of each layer by latitude (warm clear seas lay carbonate, the arid belt salt, the wet belts coal, restricted seas black mud), the youngest on top.
 4. Flags: foreland, rift basin, ophiolite, slab change, shelf, inland sea, was-arc; the arc time of live arcs and docked arcs.
-5. A few old flood basalts inland (2 to 5, 250 to 1,500 Myr old, 0.3 to 2 million km²).
+5. A few old flood basalts inland (2 to 5, 250 to 1,500 Myr old, 0.3 to 2 million km²). The rock stage reads them as basalt where the province survives (see [rocks and soil](rocks-and-soil.md)).
 
-Records only: nothing in the world reads them yet.
+The surface rock and soil stage reads the record; see [rocks and soil](rocks-and-soil.md).
 
 ## Checks against Earth
 
@@ -68,3 +68,5 @@ Shares of land cells on seeds 14963991, 20251107 and 77031:
 | Carbonate, evaporite, coal and black shale as shares of cover thickness | 19 to 20%, 1%, 8 to 11%, 3 to 5% | not checked against a cited source |
 
 Reading: before inland seas skipped bare shield, 95% of craton cells carried an epeiric layer, so bare shield was 1 to 2% of land. Keeping the bare patches dry brought it to the US figure. Sediment cover is now below the 66% reference, which counts shelf we do not model on land cells; the epeiric flag is still above the one-third peak.
+
+Rock family shares of land regions (young sediment, sedimentary, metamorphic, plutonic, volcanic) on the same seeds are in [rocks and soil](rocks-and-soil.md#checks).

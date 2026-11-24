@@ -13,3 +13,5 @@ Globe normals accumulate by mesh vertex identity rather than rounded-coordinate 
 Regression checks live in `src/test/geometry-preparation.smoke.test.ts`, `src/test/contour-worker.smoke.test.ts`, and `src/test/contour-surface.smoke.test.ts`.
 
 Island arcs and the seas behind them are cut and heightened by their own stage before the present-day records and volcano stamps; see [island arcs](../terrestrial/island-arcs.md), [tectonics records](../terrestrial/tectonics.md) and [volcanoes](../terrestrial/volcanism.md).
+
+Erosion also returns an `ErosionRecord` as a side output: the hydraulic step's sediment ledger, the glacial step's moraine ledger (both in elevation units) and the glaciated mask (`glacIdx` above the threshold the fjord step already uses) and the past-ice mask (`glacIdx` above a lower threshold, read only by till). The record only accumulates; the eroded heights are unchanged. [Rocks and soil](../terrestrial/rocks-and-soil.md) reads it.

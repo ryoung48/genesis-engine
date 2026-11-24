@@ -222,6 +222,11 @@ function serializeWorld(
 		riverAccess: world.riverAccess,
 		lakeAccess: world.lakeAccess,
 		slopeScore: world.slopeScore,
+		rock: world.rock,
+		youngKind: world.youngKind,
+		glaciated: world.glaciated,
+		soilFertility: world.soilFertility,
+		soilModifier: world.soilModifier,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
 		rivers: world.rivers
@@ -520,6 +525,11 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.riverAccess) add(world.riverAccess.buffer)
 	if (world.lakeAccess) add(world.lakeAccess.buffer)
 	if (world.slopeScore) add(world.slopeScore.buffer)
+	if (world.rock) add(world.rock.buffer)
+	if (world.youngKind) add(world.youngKind.buffer)
+	if (world.glaciated) add(world.glaciated.buffer)
+	if (world.soilFertility) add(world.soilFertility.buffer)
+	if (world.soilModifier) add(world.soilModifier.buffer)
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)
 	if (world.observedCloudCover?.real_monthly)

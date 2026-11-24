@@ -2,6 +2,8 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { ROCKS } from "@/model/geography/terrain/rocks"
+import { SOILS } from "@/model/geography/terrain/soils"
 import { DATE } from "@/model/history/earth/date"
 import { TIME } from "@/model/shared/time"
 import type { WayOfLifeShares } from "@/model/society/farming/types"
@@ -46,6 +48,8 @@ import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-den
 import {
 	getTerrainFeatureColor,
 	getTopographyColor,
+	rockColor,
+	soilColor,
 } from "@/ui/genesis/shared/region-colors/palette"
 import {
 	formatDensity,
@@ -562,4 +566,45 @@ export function buildTradeGoodSwatchColor(
 ): string | null {
 	if (materialIndex <= 0) return null
 	return rgbToCss(TRADE_GOODS.tradeGoodColor(materialIndex))
+}
+
+interface HoverGeology {
+	rock: string
+	rockColor: string
+	soil: string
+	soilColor: string
+}
+
+export function buildHoverGeology({
+	world,
+	region,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+}): HoverGeology | null {
+	if (
+		!world?.rock ||
+		!world.youngKind ||
+		!world.soilFertility ||
+		!world.soilModifier ||
+		region === null ||
+		!world.isLand[region]
+	)
+		return null
+	const rock = ROCKS.kinds[world.rock[region]]
+	const young = ROCKS.youngKinds[world.youngKind[region]]
+	const fertility = world.soilFertility[region]
+	const modifier = SOILS.modifierWord(
+		SOILS.modifiers[world.soilModifier[region]],
+	)
+	const rockName =
+		rock === "young" && young !== "none"
+			? `${ROCKS.info.young.name} (${young})`
+			: ROCKS.info[rock].name
+	return {
+		rock: rockName,
+		rockColor: rgbToCss(rockColor({ rock, young })),
+		soil: `${SOILS.kindWord({ rock, young })}${modifier ? `, ${modifier}` : ""} · ${SOILS.grade(fertility)} ${(fertility * 100).toFixed(0)}%`,
+		soilColor: rgbToCss(soilColor(fertility)),
+	}
 }

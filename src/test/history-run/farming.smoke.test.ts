@@ -982,6 +982,7 @@ describe("ground and terraces", () => {
 			mesh,
 			elevationKm: Float32Array.of(0.5, 0.5, 0.05, 0.5),
 			slopeScore: Float32Array.of(0.1, 0.6, 1, 1),
+			soilFertility: null,
 		})
 		expect(ground.plough[0]).toBeCloseTo((plough(0.1) + plough(0.6)) / 2, 6)
 		expect(ground.terrace[0]).toBeCloseTo((terrace(0.1) + terrace(0.6)) / 2, 6)
@@ -998,6 +999,7 @@ describe("ground and terraces", () => {
 				mesh: { numRegions: 1, regionArea: Float32Array.of(1) },
 				elevationKm: Float32Array.of(1),
 				slopeScore: Float32Array.of(i / 100),
+				soilFertility: null,
 			})
 			if (ground.terrace[0] < ground.plough[0] - 1e-6) worse++
 			if (i <= 20) expect(ground.plough[0]).toBe(1)
@@ -1019,6 +1021,7 @@ describe("ground and terraces", () => {
 			ground: {
 				plough: Float32Array.of(0.5),
 				terrace: Float32Array.of(0.9),
+				soil: Float32Array.of(1),
 			},
 		})
 		expect(fits.cropFit[0]).toBeCloseTo(0.4, 6)

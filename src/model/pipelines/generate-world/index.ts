@@ -354,6 +354,8 @@ function generateGenesisWorld({
 	;({ elevation, terrainFeatures, boundary, distFields } = activePath)
 	const { arcRun, presentTectonics } = activePath
 
+	let erosion = EROSION.emptyRecord(mesh.numRegions)
+
 	// 12. Terrain post-processing (genesis order)
 	TIMING.measure({
 		stage: "post",
@@ -413,7 +415,7 @@ function generateGenesisWorld({
 				const talusSlope = 1.2 - params.thermalErosion * 0.4
 				const kThermal = params.thermalErosion * 0.15
 				const postStageStart = performance.now()
-				EROSION.erodeComposite({
+				erosion = EROSION.erodeComposite({
 					mesh,
 					elev: elevation,
 					r_isOcean: ocean,
@@ -683,6 +685,7 @@ function generateGenesisWorld({
 				distFields,
 				volcanoActivity: volcanoStamp.activity,
 				terrainFeatures,
+				surface: { presentTectonics, erosion },
 				onProgress,
 			}),
 	})
@@ -904,6 +907,11 @@ function generateGenesisWorld({
 		riverAccess: post.riverAccess,
 		lakeAccess: post.lakeAccess,
 		slopeScore: post.slopeScore,
+		rock: post.surface?.rock,
+		youngKind: post.surface?.youngKind,
+		glaciated: post.surface?.glaciated,
+		soilFertility: post.surface?.soilFertility,
+		soilModifier: post.surface?.soilModifier,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,
 		hydrology: post.hydrology,

@@ -23,6 +23,7 @@ import { ClockSection } from "./ClockSection"
 import { DangerSection } from "./DangerSection"
 import { ElevationModeSection } from "./ElevationModeSection"
 import { GeographySection } from "./GeographySection"
+import { GeologyModeSection } from "./GeologyModeSection"
 import { MeasureSection } from "./MeasureSection"
 import { NationsModeSection } from "./NationsModeSection"
 import { PopulationModeSection } from "./PopulationModeSection"
@@ -170,6 +171,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [clockExpanded, setClockExpanded] = React.useState(false)
 	const [vegetationExpanded, setVegetationExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
+	const [geologyExpanded, setGeologyExpanded] = React.useState(false)
 	const [dangerExpanded, setDangerExpanded] = React.useState(false)
 	const [elevationExpanded, setElevationExpanded] = React.useState(false)
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
@@ -427,6 +429,13 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setColorMode={setColorMode}
 									climateExpanded={climateExpanded}
 									setClimateExpanded={setClimateExpanded}
+								/>
+
+								<GeologyModeSection
+									colorMode={colorMode}
+									setColorMode={setColorMode}
+									geologyExpanded={geologyExpanded}
+									setGeologyExpanded={setGeologyExpanded}
 								/>
 
 								<DangerSection
