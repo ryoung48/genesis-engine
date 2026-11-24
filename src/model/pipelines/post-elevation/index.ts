@@ -121,7 +121,7 @@ function runPostElevationPipeline(
 		emergedLand,
 		boundary,
 		distFields,
-		r_hotspot,
+		volcanoActivity,
 		onProgress,
 		realLakeRegions,
 		realRivers,
@@ -691,7 +691,8 @@ function runPostElevationPipeline(
 		distFields,
 		elevationKm: elevation_km,
 		isLand,
-		hotspot: r_hotspot,
+		volcanoActivity,
+		planetRadiusKm: params.planetRadiusKm,
 	})
 	TIMING.record({ stage: "Post: hazards", startedAt: t0, timings })
 	onProgress?.("Post: hazards", 70)

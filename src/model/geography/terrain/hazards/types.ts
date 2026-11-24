@@ -18,7 +18,8 @@ export interface ComputeHazardsParams {
 	distFields: DistanceFields
 	elevationKm: Float32Array
 	isLand: Uint8Array
-	hotspot?: Float32Array
+	volcanoActivity: Float32Array
+	planetRadiusKm: number
 }
 
 export interface PercentileParams {

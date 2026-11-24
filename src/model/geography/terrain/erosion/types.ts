@@ -20,7 +20,6 @@ export interface WarpTerrainParams {
 	elev: Float32Array
 	seed: number
 	strength: number
-	r_hotspot?: Float32Array | null
 }
 
 export interface SmoothElevationParams {

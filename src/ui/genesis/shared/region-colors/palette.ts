@@ -63,6 +63,15 @@ export const TERRAIN_FEATURE_COLORS: Record<number, [number, number, number]> =
 			0.98, 0.9, 0.5,
 		],
 		[TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC]: [0.9, 0.4, 0.72],
+		[TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_SPLIT_ARC]: [
+			0.55, 0.35, 0.95,
+		],
+		[TERRAIN_FEATURES.genesisTerrainFeature.SUNDA_SPLIT_ARC]: [0.15, 0.8, 0.55],
+		[TERRAIN_FEATURES.genesisTerrainFeature.VOLCANIC_ARC]: [0.78, 0.12, 0.2],
+		[TERRAIN_FEATURES.genesisTerrainFeature.LARGE_IGNEOUS_PROVINCE]: [
+			0.55, 0.2, 0.75,
+		],
+		[TERRAIN_FEATURES.genesisTerrainFeature.HOTSPOT_VOLCANO]: [1, 0.5, 0],
 	}
 
 export const TOPOGRAPHY_COLORS: Record<number, [number, number, number]> = {

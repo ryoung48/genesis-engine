@@ -12,4 +12,4 @@ Globe normals accumulate by mesh vertex identity rather than rounded-coordinate 
 
 Regression checks live in `src/test/geometry-preparation.smoke.test.ts`, `src/test/contour-worker.smoke.test.ts`, and `src/test/contour-surface.smoke.test.ts`.
 
-Island arcs and the seas behind them are cut and heightened by their own stage before volcanic arcs; see [island arcs](../terrestrial/island-arcs.md).
+Island arcs and the seas behind them are cut and heightened by their own stage before the present-day records and volcano stamps; see [island arcs](../terrestrial/island-arcs.md), [tectonics records](../terrestrial/tectonics.md) and [volcanoes](../terrestrial/volcanism.md).

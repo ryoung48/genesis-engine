@@ -73,7 +73,13 @@ export type SocietyMapOption =
 
 export type MapModePrimary = "geography" | "society"
 
-export type ElevationSubMode = "colored" | "grayscale" | "alt" | "red"
+export type ElevationSubMode =
+	| "colored"
+	| "grayscale"
+	| "alt"
+	| "red"
+	| "features"
+	| "basins"
 
 export const ELEVATION_SUB_MODE_COLOR_MODE: Record<
 	ElevationSubMode,
@@ -83,6 +89,8 @@ export const ELEVATION_SUB_MODE_COLOR_MODE: Record<
 	grayscale: "landHeightmap",
 	alt: "terrainAlt",
 	red: "terrainRed",
+	features: "terrainFeatures",
+	basins: "basins",
 }
 
 export function isElevationColorMode(colorMode: ColorMode): boolean {
@@ -141,21 +149,13 @@ export const TEMPERATURE_MAP_MODE_OPTIONS: ReadonlyArray<
 	["dtr", "DTR"],
 	["misery", "MI"],
 	["temperatureDelta", "Seasonality"],
+	["oceanCurrents", "Current"],
 ]
 
 export function isTemperatureColorMode(colorMode: ColorMode): boolean {
 	const baseMode = getBaseMapMode(colorMode)
 	return TEMPERATURE_MAP_MODE_OPTIONS.some(([mode]) => mode === baseMode)
 }
-
-const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
-	readonly [ColorMode, string]
-> = [
-	["terrainFeatures", "Features"],
-	["basins", "Basins"],
-	["hotspots", "Hotspots"],
-	["oceanCurrents", "Current"],
-]
 
 const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	readonly [SocietyMapMode, string]
@@ -222,10 +222,6 @@ export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
 		: "geography"
 }
 
-export function isDebugGeographyMode(colorMode: ColorMode): boolean {
-	return DEBUG_GEOGRAPHY_MODE_OPTIONS.some(([mode]) => mode === colorMode)
-}
-
 const TITLES_NATION_MODES: readonly TitlesNationMode[] = [
 	"titlesBarony",
 	"titlesCounty",
@@ -275,14 +271,11 @@ export function normalizeNationMapMode(
 export function normalizeGeographyColorMode({
 	colorMode,
 	hasHazards,
-	hasVolcanism,
 }: {
 	colorMode: ColorMode
 	hasHazards: boolean
-	hasVolcanism: boolean
 }): ColorMode {
 	if (!hasHazards && colorMode === "dangerZones") return "terrain"
-	if (!hasVolcanism && colorMode === "hotspots") return "terrain"
 	return colorMode
 }
 
@@ -290,8 +283,8 @@ export function getVisibleGeographyModeOptions(
 	debugEnabled: boolean,
 ): ReadonlyArray<readonly [ColorMode, string]> {
 	return debugEnabled
-		? [...DEFAULT_GEOGRAPHY_MODE_OPTIONS, ...DEBUG_GEOGRAPHY_MODE_OPTIONS]
-		: [...DEFAULT_GEOGRAPHY_MODE_OPTIONS]
+		? [...DEFAULT_GEOGRAPHY_MODE_OPTIONS]
+		: DEFAULT_GEOGRAPHY_MODE_OPTIONS
 }
 
 export function getVisibleSocietyModeOptions(

@@ -75,8 +75,6 @@ import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import {
-	DEFAULT_GEOGRAPHY_MODE,
-	isDebugGeographyMode,
 	isDebugNationMode,
 	isElevationColorMode,
 	isPopulationSocietyMode,
@@ -679,7 +677,6 @@ export const GenesisView: React.FC<{
 		const normalizedColorMode = normalizeGeographyColorMode({
 			colorMode,
 			hasHazards: !!world?.hazards,
-			hasVolcanism: !!world?.volcanism,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
@@ -701,11 +698,6 @@ export const GenesisView: React.FC<{
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		if (debugMapModes) return
-		if (isDebugGeographyMode(colorMode)) {
-			setColorMode(DEFAULT_GEOGRAPHY_MODE)
-			setGeographyMode(DEFAULT_GEOGRAPHY_MODE)
-			return
-		}
 		if (colorMode === "nations" && isDebugNationMode(nationMode)) {
 			setNationMode("borders")
 		}

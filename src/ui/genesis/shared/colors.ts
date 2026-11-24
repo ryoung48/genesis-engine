@@ -50,7 +50,6 @@ export type ColorMode =
 	| "realKoppenClimate"
 	| "oceanCurrents"
 	| "dangerZones"
-	| "hotspots"
 	| "nations"
 	| "population"
 	| "realPopulation"
@@ -257,14 +256,6 @@ const DANGER_BASIS_STOPS: RgbColor[] = [
 	"#dc2626",
 	"#fff7ed",
 ].map(COLOR_INTERPOLATION.cssColorToRgb)
-const HOTSPOT_BASIS_STOPS: RgbColor[] = [
-	"#0f172a",
-	"#1d4ed8",
-	"#22d3ee",
-	"#facc15",
-	"#fb7185",
-	"#fff7ed",
-].map(COLOR_INTERPOLATION.cssColorToRgb)
 const SLOPE_BASIS_STOPS: RgbColor[] = [
 	"#f8fafc",
 	"#d9f99d",
@@ -345,15 +336,6 @@ export function earthquakeLandColor(score: number): [number, number, number] {
 export function volcanicLandColor(score: number): [number, number, number] {
 	const t = Math.max(0, Math.min(1, score))
 	return [1 - 0.3 * t, 1 - 0.9 * t, 1 - t]
-}
-
-export function hotspotColor(score: number): [number, number, number] {
-	return COLOR_INTERPOLATION.quantizeRgb(
-		COLOR_INTERPOLATION.sampleBasisColorStops({
-			stops: HOTSPOT_BASIS_STOPS,
-			t: Math.max(0, Math.min(1, score)),
-		}),
-	)
 }
 
 export function populationColor(

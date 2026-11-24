@@ -40,7 +40,6 @@ import type {
 	TectonicBfsFieldsParams,
 	TectonicBfsFieldsResult,
 } from "@/model/geography/terrain/elevation/types"
-import { VOLCANISM } from "@/model/geography/terrain/volcanism"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { RNG } from "@/model/shared/random/rng"
 import { TIMING } from "@/model/shared/timing"
@@ -1156,16 +1155,13 @@ function _runMainElevationLoop({
 	})
 }
 
-/** Island-arc and back-arc crust stamping followed by named volcanic arc features. */
+/** Island-arc and back-arc crust stamping. */
 function _applyPostProcessingArcs({
 	mesh,
-	boundary,
-	maxStress,
 	planetRadiusKm,
 	maxElevKm,
 	maxDepthKm,
 	arcCrust,
-	volcanism,
 	seed,
 	elev,
 	markFeature,
@@ -1187,22 +1183,6 @@ function _applyPostProcessingArcs({
 		timings: timing,
 		startedAt: arcCrustStart,
 	})
-
-	const volcanicArcsStart = performance.now()
-	VOLCANISM.applyVolcanicArcs({
-		mesh,
-		elevation: elev,
-		boundary,
-		maxStress,
-		seed,
-		volcanism,
-		markFeature,
-	})
-	TIMING.record({
-		stage: "Volcanic arcs",
-		timings: timing,
-		startedAt: volcanicArcsStart,
-	})
 }
 
 function blendElevation({
@@ -1213,7 +1193,6 @@ function blendElevation({
 	distFields,
 	boundary,
 	roughness,
-	volcanism,
 	seed,
 	planetRadiusKm,
 	maxElevKm,
@@ -1392,13 +1371,10 @@ function blendElevation({
 
 	_applyPostProcessingArcs({
 		mesh,
-		boundary,
-		maxStress,
 		planetRadiusKm,
 		maxElevKm,
 		maxDepthKm,
 		arcCrust,
-		volcanism,
 		seed,
 		elev,
 		markFeature,

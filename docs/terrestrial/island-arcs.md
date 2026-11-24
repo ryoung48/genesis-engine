@@ -34,7 +34,7 @@ Arc crust: `h = -2 + (matureAt + 2) x m^0.7 + 1.0 x m x island`, with `m = min(1
 
 Back-arc sea floor: `-(2.6 + 0.345 sqrt(age))` km, capped at 6.4 km (half-space cooling). Shelf-sea cells are held near -0.25 km, softly over 0.12 km. The sea only lowers existing land.
 
-Heights are written after the main elevation loop and coastal roughening, before volcanic arcs, in the world's own units (`maxElevation`, the radius-scaled ocean depth). Footprint cells blend with the existing elevation over 60 km at the footprint's edge, so cells outside the footprint are never written.
+Heights are written after the main elevation loop and coastal roughening, before the volcano edifices are stamped after erosion (see [volcanoes](volcanism.md)), in the world's own units (`maxElevation`, the radius-scaled ocean depth). Footprint cells blend with the existing elevation over 60 km at the footprint's edge, so cells outside the footprint are never written.
 
 ## Not modeled
 
@@ -45,4 +45,4 @@ Heights are written after the main elevation loop and coastal roughening, before
 
 ## Output
 
-`GenesisWorld.arcRun` carries the crust (`crustType`: continent, arc or ocean; `formedAtMyr`, negative; `shelfSea`; `sundaDeep`; `arcFront`, the arc cells within one edge of the trench side), the plate motion, the fronts and the sea-floor age, for the records and volcano stages to read.
+`GenesisWorld.arcRun` carries the crust (`crustType`: continent, arc or ocean; `arcType`: oceanic, continental split or Sunda-style split; `formedAtMyr`, negative; `shelfSea`; `sundaDeep`; `arcFront`, the arc cells within one edge of the trench side), the plate motion, the fronts and the sea-floor age, for the records and volcano stages to read. The Features map and hover labels distinguish the three arc types where arc height changes contribute to the terrain; the dominant feature determines the map color.

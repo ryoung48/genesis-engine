@@ -3,6 +3,7 @@ import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
+import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { RELIGION } from "@/model/history/sim/religion"
 import { MESH } from "@/model/mesh"
@@ -31,7 +32,6 @@ import {
 	EU5_VEGETATION_COLORS,
 	earthquakeLandColor,
 	getColor,
-	hotspotColor,
 	humidityColor,
 	humidityDifferenceColor,
 	knowledgeColor,
@@ -794,37 +794,6 @@ export function computeRegionColors({
 		return rgb
 	}
 
-	if (colorMode === "hotspots" && world.volcanism) {
-		let maxHotspot = 0
-		for (let r = 0; r < N; r++) {
-			if (world.volcanism.hotspot[r] > maxHotspot)
-				maxHotspot = world.volcanism.hotspot[r]
-		}
-		const invMax = maxHotspot > 1e-6 ? 1 / maxHotspot : 0
-		for (let r = 0; r < N; r++) {
-			const isLand = isLandRegion(r)
-			if (!isLand) {
-				const [cr, cg, cb] = oceanRgb(r)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-			} else {
-				const score = Math.max(
-					0,
-					Math.min(1, world.volcanism.hotspot[r] * invMax),
-				)
-				const [cr, cg, cb] = darkenVegetationAtElevation(
-					hotspotColor(score),
-					world.elevation_km[r],
-				)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-			}
-		}
-		return rgb
-	}
-
 	if (colorMode === "nations" && world.provinces) {
 		if (nationMode === "provinces" || nationMode === "earthProvinces") {
 			const { regionProvince, colors: provColors, desolate } = world.provinces
@@ -1198,7 +1167,11 @@ export function computeRegionColors({
 			let feature = dominantFeature[r]
 			if (!(mask & (1 << (feature - 1)))) {
 				feature = 0
-				for (let bit = 1; bit <= 11; bit++) {
+				for (
+					let bit = 1;
+					bit < TERRAIN_FEATURES.genesisTerrainFeatureLabels.length;
+					bit++
+				) {
 					if (mask & (1 << (bit - 1))) {
 						feature = bit
 						break

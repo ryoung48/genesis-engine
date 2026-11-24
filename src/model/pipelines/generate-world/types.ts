@@ -3,10 +3,10 @@ import type {
 	BoundaryInfo,
 	DistanceFields,
 	GenesisTerrainFeatures,
-	TectonicPlate,
 } from "@/model/geography/tectonics/types"
 import type { ArcCrustRun } from "@/model/geography/terrain/arc-crust/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { PresentTectonics } from "@/model/pipelines/present-tectonics/types"
 import type { GenesisParams, TerrainSnapshot } from "@/model/pipelines/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 
@@ -15,9 +15,8 @@ export interface TectonicPathResult {
 	terrainFeatures: GenesisTerrainFeatures | undefined
 	boundary: BoundaryInfo
 	distFields: DistanceFields
-	r_hotspot: Float32Array
-	r_mantleUpwelling: Float32Array
 	arcRun: ArcCrustRun
+	presentTectonics: PresentTectonics
 }
 
 export type ProgressFn = (label: string, pct?: number) => void
@@ -43,12 +42,9 @@ export interface GenerateGenesisWorldParams {
 export interface RunActivePathParams {
 	mesh: SphereMesh
 	r_plate: Int32Array
-	plates: TectonicPlate[]
 	plateIds: number[]
 	coarse: ReturnType<typeof COARSE_PLATES.generateCoarsePlates>
 	params: GenesisParams
-	volcanism: number
-	plateAssignment: Int32Array
 	pipelineTiming: StageTiming[]
 	elevationTiming: StageTiming[]
 	onProgress: ProgressFn | undefined

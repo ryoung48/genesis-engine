@@ -204,7 +204,13 @@ function stamp({
 			const newKm = existingKm * (1 - wArc) + targetKm * wArc
 			const delta = heightOf(newKm) - elev[c]
 			elev[c] += delta
-			markFeature(c, TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC, delta)
+			const feature =
+				crust.arcType[c] === ARC_CRUST.ARC_TYPE.SUNDA
+					? TERRAIN_FEATURES.genesisTerrainFeature.SUNDA_SPLIT_ARC
+					: crust.arcType[c] === ARC_CRUST.ARC_TYPE.CONTINENTAL
+						? TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_SPLIT_ARC
+						: TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC
+			markFeature(c, feature, delta)
 			continue
 		}
 		const ageMyr = -crust.formedAtMyr[c]

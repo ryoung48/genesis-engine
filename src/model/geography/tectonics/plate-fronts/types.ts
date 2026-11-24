@@ -6,9 +6,6 @@ export interface Front {
 	pb: number
 	edges: number[]
 	id: number
-}
-
-export interface SubductionFront extends Front {
 	activeMyr: number
 }
 
@@ -19,13 +16,17 @@ export interface FrontEdges {
 	plateA: Int32Array
 	plateB: Int32Array
 	closingCmYr: Float32Array
+	alongCmYr: Float32Array
 	overA: Uint8Array
 }
 
 export interface PlateFronts {
 	edges: FrontEdges
-	subduction: SubductionFront[]
+	subduction: Front[]
 	ridge: Front[]
+	collision: Front[]
+	rift: Front[]
+	transform: Front[]
 }
 
 export interface BuildPlateFrontsParams {
@@ -33,6 +34,7 @@ export interface BuildPlateFrontsParams {
 	motion: PlateMotion
 	planetRadiusKm: number
 	seed: number
+	durationGroup: (plate: number) => number
 }
 
 export interface SmoothAlongParams {
@@ -49,9 +51,18 @@ export interface ClassifiedEdge {
 	plateB: number
 	opening: number
 	slip: number
+	along: number
 }
 
 export interface ClassifyEdgesParams {
 	mesh: SphereMesh
 	motion: PlateMotion
+}
+
+export type TimedFrontKind = "subduction" | "collision" | "rift" | "transform"
+
+export interface DrawActiveMyrParams {
+	seed: number
+	kind: TimedFrontKind
+	id: number
 }

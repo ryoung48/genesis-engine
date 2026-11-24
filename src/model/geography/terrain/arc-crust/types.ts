@@ -1,6 +1,6 @@
 import type {
+	Front,
 	PlateFronts,
-	SubductionFront,
 } from "@/model/geography/tectonics/plate-fronts/types"
 import type {
 	MovingPlates,
@@ -33,6 +33,7 @@ export interface ArcFrontReport {
 
 export interface ArcCrust {
 	crustType: Uint8Array
+	arcType: Uint8Array
 	formedAtMyr: Float32Array
 	shelfSea: Uint8Array
 	sundaDeep: Uint8Array
@@ -74,7 +75,7 @@ export interface StageContext {
 
 export interface FrontParams {
 	ctx: StageContext
-	front: SubductionFront
+	front: Front
 }
 
 export interface FrontReportParams extends FrontParams {

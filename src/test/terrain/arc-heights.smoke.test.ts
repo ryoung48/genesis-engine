@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { ARC_CRUST } from "@/model/geography/terrain/arc-crust"
 import type { ArcCrust } from "@/model/geography/terrain/arc-crust/types"
 import { ARC_HEIGHTS } from "@/model/geography/terrain/arc-heights"
@@ -57,6 +58,7 @@ describe("arc heights", () => {
 		const n = mesh.numRegions
 		const crust: ArcCrust = {
 			crustType: new Uint8Array(n),
+			arcType: new Uint8Array(n),
 			formedAtMyr: new Float32Array(n),
 			shelfSea: new Uint8Array(n),
 			sundaDeep: new Uint8Array(n),
@@ -75,6 +77,7 @@ describe("arc heights", () => {
 			if (Math.abs(z) > 0.25) continue
 			if (x > 0.2 && x < 0.5) {
 				crust.crustType[c] = ARC_CRUST.CRUST.ARC
+				crust.arcType[c] = 1 + (c % 3)
 				crust.formedAtMyr[c] = -80
 			} else if (x > -0.5 && x < -0.2) {
 				crust.crustType[c] = ARC_CRUST.CRUST.OCEAN
@@ -84,6 +87,7 @@ describe("arc heights", () => {
 		}
 		const before = elev.slice()
 		const marked = new Set<number>()
+		const arcFeatures = new Set<number>()
 		ARC_HEIGHTS.stamp({
 			mesh,
 			planetRadiusKm: 6371,
@@ -92,8 +96,17 @@ describe("arc heights", () => {
 			elev,
 			maxElevKm: MAX_ELEV_KM,
 			maxDepthKm: MAX_DEPTH_KM,
-			markFeature: (r) => {
+			markFeature: (r, feature) => {
 				marked.add(r)
+				if (crust.crustType[r] === ARC_CRUST.CRUST.ARC) {
+					const expected = [
+						TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC,
+						TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_SPLIT_ARC,
+						TERRAIN_FEATURES.genesisTerrainFeature.SUNDA_SPLIT_ARC,
+					][crust.arcType[r] - 1]
+					expect(feature).toBe(expected)
+					arcFeatures.add(feature)
+				}
 			},
 		})
 		let changed = 0
@@ -113,6 +126,13 @@ describe("arc heights", () => {
 		}
 		expect(changed).toBeGreaterThan(0)
 		expect(marked.size).toBeGreaterThan(0)
+		expect(arcFeatures).toEqual(
+			new Set([
+				TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC,
+				TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_SPLIT_ARC,
+				TERRAIN_FEATURES.genesisTerrainFeature.SUNDA_SPLIT_ARC,
+			]),
+		)
 		for (let c = 0; c < n; c++) {
 			if (crust.crustType[c] !== ARC_CRUST.CRUST.OCEAN) continue
 			if (crust.formedAtMyr[c] >= 0) continue

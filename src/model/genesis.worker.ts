@@ -494,8 +494,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.hazards.danger.buffer,
 		)
 	}
-	if (world.volcanism)
-		add(world.volcanism.hotspot.buffer, world.volcanism.mantleUpwelling.buffer)
+	if (world.volcanism) add(world.volcanism.hotspot.buffer)
 	if (world.climateZones) add(world.climateZones.buffer)
 	if (world.pastaClimate) add(world.pastaClimate.buffer)
 	if (world.pastaDebug) {

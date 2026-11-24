@@ -25,6 +25,7 @@ import { PriorityHeap } from "@/model/shared/min-heap"
 import { RNG } from "@/model/shared/random/rng"
 
 const CRUST = { CONTINENT: 0, ARC: 1, OCEAN: 2 } as const
+const ARC_TYPE = { OCEANIC: 1, CONTINENTAL: 2, SUNDA: 3 } as const
 
 const ARC_MIN_RATE_CM_YR = 2
 const ARC_MIN_SLAB_MYR = 15
@@ -279,6 +280,7 @@ function buildArc({ ctx, front, report }: FrontReportParams): void {
 		const k = keep[d.src[c]]
 		if (d.km[c] < k.setback) continue
 		crust.crustType[c] = CRUST.ARC
+		crust.arcType[c] = ARC_TYPE.OCEANIC
 		crust.formedAtMyr[c] = -k.age
 		if (d.km[c] < k.setback + ctx.edgeKm) crust.arcFront[c] = 1
 		report.arcCells++
@@ -344,6 +346,7 @@ function buildSplit({ ctx, front, report }: FrontReportParams): void {
 				continue
 			}
 			crust.crustType[c] = CRUST.ARC
+			crust.arcType[c] = sunda ? ARC_TYPE.SUNDA : ARC_TYPE.CONTINENTAL
 			crust.formedAtMyr[c] = -Math.min(front.activeMyr, islandAge)
 			report.islandCells++
 			if (d.km[c] < edgeKm) crust.arcFront[c] = 1
@@ -412,6 +415,7 @@ function build({
 	const cellPlate = motion.plates.cellPlate
 	const crust: ArcCrust = {
 		crustType: new Uint8Array(numRegions),
+		arcType: new Uint8Array(numRegions),
 		formedAtMyr: new Float32Array(numRegions),
 		shelfSea: new Uint8Array(numRegions),
 		sundaDeep: new Uint8Array(numRegions),
@@ -485,10 +489,16 @@ function run({
 	plates,
 }: RunArcCrustParams): ArcCrustRun {
 	const motion = PLATE_MOTION.build({ mesh, plates })
-	const fronts = PLATE_FRONTS.build({ mesh, motion, planetRadiusKm, seed })
+	const fronts = PLATE_FRONTS.build({
+		mesh,
+		motion,
+		planetRadiusKm,
+		seed,
+		durationGroup: (plate) => plate,
+	})
 	const seaAgeMyr = SEA_FLOOR.build({ mesh, plates, fronts, planetRadiusKm })
 	const crust = build({ mesh, planetRadiusKm, seed, motion, fronts, seaAgeMyr })
 	return { crust, motion, fronts, seaAgeMyr }
 }
 
-export const ARC_CRUST = { CRUST, run }
+export const ARC_CRUST = { CRUST, ARC_TYPE, run }

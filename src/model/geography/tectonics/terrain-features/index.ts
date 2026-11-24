@@ -10,9 +10,12 @@ const genesisTerrainFeatureLabels = [
 	"fracture zone",
 	"trench",
 	"coastal roughening",
-	"island arc",
+	"oceanic island arc",
 	"volcanic arc",
 	"large igneous province",
+	"hotspot volcano",
+	"continental split arc",
+	"Sunda-style split arc",
 ] as const
 
 const genesisTerrainFeature = {
@@ -29,6 +32,9 @@ const genesisTerrainFeature = {
 	ISLAND_ARC: 11,
 	VOLCANIC_ARC: 12,
 	LARGE_IGNEOUS_PROVINCE: 13,
+	HOTSPOT_VOLCANO: 14,
+	CONTINENTAL_SPLIT_ARC: 15,
+	SUNDA_SPLIT_ARC: 16,
 } as const
 
 export const TERRAIN_FEATURES = {

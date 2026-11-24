@@ -2,20 +2,31 @@ import type {
 	BuildPlateFrontsParams,
 	ClassifiedEdge,
 	ClassifyEdgesParams,
+	DrawActiveMyrParams,
 	Front,
 	FrontEdges,
 	PlateFronts,
 	SmoothAlongParams,
-	SubductionFront,
+	TimedFrontKind,
 } from "@/model/geography/tectonics/plate-fronts/types"
 import { PLATE_MOTION } from "@/model/geography/tectonics/plate-motion"
 import { RNG } from "@/model/shared/random/rng"
 
-const ANDEAN_MYR: [number, number] = [40, 140]
+const ACTIVE_MYR = {
+	subduction: [40, 140],
+	collision: [8, 45],
+	rift: [3, 25],
+	transform: [5, 25],
+} as const
+const KIND_SALT = {
+	subduction: 3,
+	collision: 4,
+	rift: 5,
+	transform: 6,
+} as const
 const MIN_RATE_CM_YR = 0.4
 const TRANSFORM_RATIO = 0.45
 const SMOOTH_KM = 450
-const SUBDUCTION_KIND_SALT = 3
 const FRONT_SEED_SALT = 0xbe17
 
 function smoothAlong({
@@ -110,15 +121,25 @@ function classifyEdges({
 			const ry = vb[1] - va[1]
 			const rz = vb[2] - va[2]
 			const opening = rx * nx + ry * ny + rz * nz
+			const sx = my * nz - mz * ny
+			const sy = mz * nx - mx * nz
+			const sz = mx * ny - my * nx
+			const along = rx * sx + ry * sy + rz * sz
 			const slip = Math.hypot(
 				rx - opening * nx,
 				ry - opening * ny,
 				rz - opening * nz,
 			)
-			found.push({ cellA: a, cellB: b, plateA, plateB, opening, slip })
+			found.push({ cellA: a, cellB: b, plateA, plateB, opening, slip, along })
 		}
 	}
 	return found
+}
+
+function drawActiveMyr({ seed, kind, id }: DrawActiveMyrParams): number {
+	const [lo, hi] = ACTIVE_MYR[kind]
+	const r = RNG.makeRng((seed ^ FRONT_SEED_SALT) + KIND_SALT[kind] * 7919 + id)
+	return lo + (hi - lo) * r()
 }
 
 function build({
@@ -126,6 +147,7 @@ function build({
 	motion,
 	planetRadiusKm,
 	seed,
+	durationGroup,
 }: BuildPlateFrontsParams): PlateFronts {
 	const plates = motion.plates
 	const found = classifyEdges({ mesh, motion })
@@ -137,10 +159,12 @@ function build({
 		plateA: Int32Array.from(found, (e) => e.plateA),
 		plateB: Int32Array.from(found, (e) => e.plateB),
 		closingCmYr: new Float32Array(count),
+		alongCmYr: new Float32Array(count),
 		overA: new Uint8Array(count),
 	}
 	const opening = Float32Array.from(found, (e) => e.opening)
 	const slip = Float32Array.from(found, (e) => e.slip)
+	const along = Float32Array.from(found, (e) => e.along)
 
 	const byPair = new Map<number, number[]>()
 	for (let i = 0; i < count; i++) {
@@ -158,9 +182,12 @@ function build({
 		(edgeSum / Math.max(1, mesh.neighborDist.length)) * planetRadiusKm
 	const iterations = Math.max(1, Math.round(SMOOTH_KM / edgeKm))
 	for (const group of byPair.values())
-		smoothAlong({ edges, group, values: [opening, slip], iterations })
+		smoothAlong({ edges, group, values: [opening, slip, along], iterations })
 
-	const subduction = new Map<number, SubductionFront>()
+	const subduction = new Map<number, Front>()
+	const collision = new Map<number, Front>()
+	const rift = new Map<number, Front>()
+	const transform = new Map<number, Front>()
 	const ridge = new Map<number, Front>()
 	for (let i = 0; i < count; i++) {
 		const pa = edges.plateA[i]
@@ -169,42 +196,64 @@ function build({
 		const landB = !plates.isOcean.has(pb)
 		const open = opening[i]
 		edges.closingCmYr[i] = -open
+		edges.alongCmYr[i] = along[i]
 		if (Math.hypot(open, slip[i]) < MIN_RATE_CM_YR) continue
-		if (Math.abs(open) < TRANSFORM_RATIO * slip[i]) continue
 		const lo = Math.min(pa, pb)
 		const hi = Math.max(pa, pb)
 		const id = lo * 131 + hi * 17
 		const key = lo * 100003 + hi
-		if (open > 0) {
-			if (landA || landB) continue
-			const front = ridge.get(key)
+		const groupA = durationGroup(pa)
+		const groupB = durationGroup(pb)
+		const durationId =
+			groupA === groupB
+				? id
+				: Math.min(groupA, groupB) * 131 + Math.max(groupA, groupB) * 17
+		const addTimed = (kind: TimedFrontKind, into: Map<number, Front>) => {
+			const front = into.get(key)
 			if (front) front.edges.push(i)
-			else ridge.set(key, { pa: lo, pb: hi, edges: [i], id })
+			else
+				into.set(key, {
+					pa: lo,
+					pb: hi,
+					edges: [i],
+					id,
+					activeMyr: drawActiveMyr({ seed, kind, id: durationId }),
+				})
+		}
+		if (Math.abs(open) < TRANSFORM_RATIO * slip[i]) {
+			addTimed("transform", transform)
 			continue
 		}
-		if (landA && landB) continue
+		if (open > 0) {
+			if (landA || landB) {
+				addTimed("rift", rift)
+				continue
+			}
+			const front = ridge.get(key)
+			if (front) front.edges.push(i)
+			else ridge.set(key, { pa: lo, pb: hi, edges: [i], id, activeMyr: 0 })
+			continue
+		}
+		if (landA && landB) {
+			addTimed("collision", collision)
+			continue
+		}
 		const densityA = plates.density.get(pa) ?? 2.7
 		const densityB = plates.density.get(pb) ?? 2.7
 		edges.overA[i] =
 			landA !== landB ? (landA ? 1 : 0) : densityA <= densityB ? 1 : 0
-		const front = subduction.get(key)
-		if (front) front.edges.push(i)
-		else {
-			const r = RNG.makeRng(
-				(seed ^ FRONT_SEED_SALT) + SUBDUCTION_KIND_SALT * 7919 + id,
-			)
-			subduction.set(key, {
-				pa: lo,
-				pb: hi,
-				edges: [i],
-				id,
-				activeMyr: ANDEAN_MYR[0] + (ANDEAN_MYR[1] - ANDEAN_MYR[0]) * r(),
-			})
-		}
+		addTimed("subduction", subduction)
 	}
 	const byId = <T extends Front>(list: Map<number, T>): T[] =>
 		[...list.values()].sort((x, y) => x.id - y.id)
-	return { edges, subduction: byId(subduction), ridge: byId(ridge) }
+	return {
+		edges,
+		subduction: byId(subduction),
+		ridge: byId(ridge),
+		collision: byId(collision),
+		rift: byId(rift),
+		transform: byId(transform),
+	}
 }
 
 export const PLATE_FRONTS = { build }

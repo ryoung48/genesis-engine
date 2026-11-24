@@ -130,7 +130,6 @@ function importGenesisWorld({
 			elev: elevation,
 			seed: params.seed,
 			strength: params.terrainWarp,
-			r_hotspot: new Float32Array(mesh.numRegions),
 		})
 		TIMING.record({
 			stage: `Terrain warp (strength=${params.terrainWarp.toFixed(2)})`,
@@ -497,8 +496,7 @@ function importGenesisWorld({
 		realProvinceSeeds,
 		eu4ProvinceIds,
 		eu4ProvinceFallbackSeeds: params.eu4ProvinceFallbackSeeds,
-		r_hotspot: new Float32Array(mesh.numRegions),
-		r_mantleUpwelling: new Float32Array(mesh.numRegions),
+		volcanoActivity: new Float32Array(mesh.numRegions),
 		originHint: EARTH_MIGRATION_ORIGIN,
 		terrainFeatures: undefined,
 		realClimateMonthly: params.realClimateMonthly,
@@ -671,7 +669,6 @@ function importGenesisWorld({
 		cloudCoverMonthly: post.cloudCoverMonthly,
 		volcanism: {
 			hotspot: new Float32Array(mesh.numRegions),
-			mantleUpwelling: new Float32Array(mesh.numRegions),
 		},
 		climateZones: post.climateZones,
 		realClimateZones: post.realClimateZones,

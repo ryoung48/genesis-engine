@@ -60,8 +60,7 @@ export interface PostPipelineInput {
 	tectonicMode: "active"
 	boundary: BoundaryInfo
 	distFields: DistanceFields
-	r_hotspot: Float32Array
-	r_mantleUpwelling?: Float32Array
+	volcanoActivity: Float32Array
 	terrainFeatures?: GenesisTerrainFeatures
 	onProgress?: (label: string, pct?: number) => void
 	/** Real lake cells (from a vector lake mask) that must survive the arid/rainfall-based lake-draining heuristic below — real lakes (e.g. the Aral Sea) can sit in regions too dry for computeLakes' own rainfall model to have created them procedurally. */

@@ -30,9 +30,10 @@ import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
-import type { GenesisVolcanism } from "@/model/geography/terrain/volcanism/types"
+import type { GenesisVolcanism } from "@/model/geography/terrain/volcano-edifices/types"
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import type { PresentTectonics } from "@/model/pipelines/present-tectonics/types"
 import type { StageTiming } from "@/model/shared/timing/types"
 import type { FarmingResult } from "@/model/society/farming/types"
 import type { RouteComputation } from "@/model/society/infrastructure/trade/routing/types"
@@ -133,6 +134,8 @@ export interface GenesisWorld {
 	terrainFeatures?: GenesisTerrainFeatures
 	/** [JUSTIFICATION] Present only for procedural worlds; an Earth import has no plates to cut arcs from. */
 	arcRun?: ArcCrustRun
+	/** [JUSTIFICATION] Present only for procedural worlds; an Earth import has no plates to record. */
+	presentTectonics?: PresentTectonics
 	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
 	elevation_km: Float32Array
 	params: GenesisParams

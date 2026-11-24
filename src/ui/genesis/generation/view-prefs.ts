@@ -143,7 +143,6 @@ const COLOR_MODES = new Set<ColorMode>([
 	"koppenClimate",
 	"oceanCurrents",
 	"dangerZones",
-	"hotspots",
 	"nations",
 	"population",
 	"realPopulation",
@@ -532,7 +531,9 @@ export function parseStoredViewPrefs(
 				parsed.elevationSubMode === "colored" ||
 				parsed.elevationSubMode === "grayscale" ||
 				parsed.elevationSubMode === "alt" ||
-				parsed.elevationSubMode === "red"
+				parsed.elevationSubMode === "red" ||
+				parsed.elevationSubMode === "features" ||
+				parsed.elevationSubMode === "basins"
 					? parsed.elevationSubMode
 					: DEFAULT_VIEW_PREFS.elevationSubMode,
 			topographySubMode:

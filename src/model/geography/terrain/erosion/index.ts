@@ -189,7 +189,6 @@ function warpTerrain({
 	elev,
 	seed,
 	strength,
-	r_hotspot,
 }: WarpTerrainParams): Float32Array {
 	if (strength <= 0) return elev
 
@@ -273,14 +272,7 @@ function warpTerrain({
 	for (let r = 0; r < N; r++) {
 		const orig = elev[r]
 		const warped = out[r]
-		let bias = warpBias
-		if (r_hotspot) {
-			const hotFrac = Math.min(
-				1,
-				Math.abs(r_hotspot[r]) / (Math.abs(orig) || 1),
-			)
-			bias *= 1 - 0.8 * hotFrac
-		}
+		const bias = warpBias
 		if (warped > orig) {
 			elev[r] = orig + (warped - orig) * bias
 		} else {

@@ -1,6 +1,6 @@
 import { COARSE_PLATES } from "@/model/geography/tectonics/coarse-plates"
 import { COLLISION } from "@/model/geography/tectonics/collision"
-import { MANTLE } from "@/model/geography/tectonics/mantle"
+import { GEOLOGIC_RECORD } from "@/model/geography/tectonics/geologic-record"
 import { PLATE_MOTION } from "@/model/geography/tectonics/plate-motion"
 import { PLATES } from "@/model/geography/tectonics/plates"
 import { SUPER_PLATES } from "@/model/geography/tectonics/super-plates"
@@ -9,11 +9,11 @@ import type {
 	DistanceFields,
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
+import { WORLD_SAMPLE } from "@/model/geography/tectonics/world-sample"
 import { ARC_CRUST } from "@/model/geography/terrain/arc-crust"
 import { CRATERS } from "@/model/geography/terrain/craters"
 import { ELEVATION } from "@/model/geography/terrain/elevation"
 import { EROSION } from "@/model/geography/terrain/erosion"
-import { HOTSPOTS } from "@/model/geography/terrain/hotspots"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { MESH } from "@/model/mesh"
@@ -26,6 +26,7 @@ import type {
 	TectonicPathResult,
 } from "@/model/pipelines/generate-world/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import { PRESENT_TECTONICS } from "@/model/pipelines/present-tectonics"
 import type { GenesisWorld } from "@/model/pipelines/types"
 import { STATS } from "@/model/shared/math/stats"
 import { PARALLEL } from "@/model/shared/parallel"
@@ -43,14 +44,6 @@ function applyPeakCompression({ elev, N }: ApplyPeakCompressionParams): void {
 	for (let r = 0; r < N; r++) {
 		if (elev[r] > 0) elev[r] = Math.pow(elev[r], 0.92)
 	}
-}
-
-function clampHotspots(raw: Float32Array): Float32Array {
-	for (let i = 0; i < raw.length; i++) {
-		const value = raw[i]
-		raw[i] = value <= 0 ? 0 : value >= 1 ? 1 : value
-	}
-	return raw
 }
 
 const HOTSPOT_EXPOSURE_THRESHOLD = 0.01
@@ -80,12 +73,9 @@ function summarizeHotspotExposure({
 function runActivePath({
 	mesh,
 	r_plate,
-	plates,
 	plateIds,
 	coarse,
 	params,
-	volcanism,
-	plateAssignment,
 	pipelineTiming,
 	elevationTiming,
 	onProgress,
@@ -101,20 +91,6 @@ function runActivePath({
 			coarse.coarsePlateIsOcean.has(pid) ? oceanDensity : landDensity,
 		)
 	}
-
-	const coarseMantleField = MANTLE.computeMantleField({
-		plateVec: coarse.coarsePlateVec,
-		plateSeeds: coarse.coarsePlateSeeds,
-		plateIsOcean: coarse.coarsePlateIsOcean,
-		r_plate: coarse.coarse_r_plate,
-		mesh: coarse.coarseMesh,
-		seed: params.seed,
-	})
-	const r_mantleUpwelling = MANTLE.projectMantleFieldToRegions({
-		coarseMantleField,
-		coarseMesh: coarse.coarseMesh,
-		mesh,
-	})
 
 	// 6. Build super plates (skip if < 8 plates)
 	let superPlateData = null
@@ -209,7 +185,6 @@ function runActivePath({
 				distFields,
 				boundary,
 				roughness: params.roughness,
-				volcanism,
 				seed: params.seed,
 				planetRadiusKm: params.planetRadiusKm,
 				maxElevKm: (params.maxElevation ?? 6000) / 1000,
@@ -226,26 +201,24 @@ function runActivePath({
 	const { elevation, terrainFeatures } = blendResult
 	onProgress?.("elevation", 26)
 
-	// 10. Hotspot volcanism
-	const r_hotspot = TIMING.measure({
-		stage: "hotspots",
+	const presentTectonics = TIMING.measure({
+		stage: "present-tectonics",
 		timings: pipelineTiming,
 		fn: () =>
-			volcanism <= 0
-				? new Float32Array(mesh.numRegions)
-				: HOTSPOTS.applyHotspots({
-						mesh,
-						plates,
-						plateAssignment,
-						elevation,
-						mantleUpwelling: r_mantleUpwelling,
-						terrainFeatures,
-						seed: params.seed,
-						volcanism,
-					}),
+			PRESENT_TECTONICS.build({
+				mesh,
+				planetRadiusKm: params.planetRadiusKm,
+				seed: params.seed,
+				r_plate,
+				plateVec: coarse.coarsePlateVec,
+				plateIsOcean: coarse.coarsePlateIsOcean,
+				plateDensity,
+				superPlateData,
+				featureMask: terrainFeatures!.featureMask,
+				arc: arcRun.crust,
+				seaAgeMyr: arcRun.seaAgeMyr,
+			}),
 	})
-	clampHotspots(r_hotspot)
-	onProgress?.("hotspots", 29)
 
 	// 11. Peak compression (Math.pow(elev, 0.92) for positive elevations)
 	TIMING.measure({
@@ -262,9 +235,8 @@ function runActivePath({
 		terrainFeatures,
 		boundary,
 		distFields,
-		r_hotspot,
-		r_mantleUpwelling,
 		arcRun,
+		presentTectonics,
 	}
 }
 
@@ -276,7 +248,6 @@ function generateGenesisWorld({
 	const startedAt = performance.now()
 	PARALLEL.warm()
 	const rng = RNG.createRng({ seed: params.seed })
-	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []
 	const elevationTiming: StageTiming[] = []
 	const postTiming: StageTiming[] = []
@@ -296,8 +267,6 @@ function generateGenesisWorld({
 	let plateAssignment: Int32Array
 	let boundary: BoundaryInfo
 	let distFields: DistanceFields
-	let r_hotspot: Float32Array
-	let r_mantleUpwelling: Float32Array
 	let terrainFeatures: GenesisTerrainFeatures | undefined
 
 	// 2. Generate coarse plates on fixed 20K mesh
@@ -375,25 +344,15 @@ function generateGenesisWorld({
 	const activePath = runActivePath({
 		mesh,
 		r_plate,
-		plates,
 		plateIds,
 		coarse,
 		params,
-		volcanism,
-		plateAssignment,
 		pipelineTiming,
 		elevationTiming,
 		onProgress,
 	})
-	;({
-		elevation,
-		terrainFeatures,
-		boundary,
-		distFields,
-		r_hotspot,
-		r_mantleUpwelling,
-	} = activePath)
-	const { arcRun } = activePath
+	;({ elevation, terrainFeatures, boundary, distFields } = activePath)
+	const { arcRun, presentTectonics } = activePath
 
 	// 12. Terrain post-processing (genesis order)
 	TIMING.measure({
@@ -408,7 +367,6 @@ function generateGenesisWorld({
 					elev: elevation,
 					seed: params.seed,
 					strength: params.terrainWarp,
-					r_hotspot,
 				})
 				TIMING.record({
 					stage: `Terrain warp (strength=${params.terrainWarp.toFixed(2)})`,
@@ -509,19 +467,39 @@ function generateGenesisWorld({
 				timings: postTiming,
 				startedAt: postStageStart,
 			})
-
-			// Honor exact coverage extremes after all terrain shaping.
-			if (params.landCoverage <= 0 && volcanism <= 0) {
-				for (let r = 0; r < mesh.numRegions; r++) {
-					elevation[r] = Math.min(elevation[r], -0.02)
-				}
-			} else if (params.landCoverage >= 1) {
-				for (let r = 0; r < mesh.numRegions; r++) {
-					elevation[r] = Math.max(elevation[r], 0.02)
-				}
-			}
 		},
 	})
+
+	const maxElevKm = (params.maxElevation ?? 6000) / 1000
+	const maxDepthKm = UNITS.getMaxOceanDepthKm(params.planetRadiusKm)
+	const volcanoStamp = TIMING.measure({
+		stage: "volcano-edifices",
+		timings: pipelineTiming,
+		fn: () =>
+			PRESENT_TECTONICS.stampVolcanoes({
+				present: presentTectonics,
+				mesh,
+				planetRadiusKm: params.planetRadiusKm,
+				seed: params.seed,
+				elevation,
+				maxElevKm,
+				maxDepthKm,
+				terrainFeatures,
+			}),
+	})
+	presentTectonics.volcano = volcanoStamp
+	const r_hotspot = volcanoStamp.hotspotKm
+
+	// Honor exact coverage extremes after all terrain shaping.
+	if (params.landCoverage <= 0) {
+		for (let r = 0; r < mesh.numRegions; r++) {
+			elevation[r] = Math.min(elevation[r], -0.02)
+		}
+	} else if (params.landCoverage >= 1) {
+		for (let r = 0; r < mesh.numRegions; r++) {
+			elevation[r] = Math.max(elevation[r], 0.02)
+		}
+	}
 
 	// Pre-crater land mask — captures tectonic land/ocean boundary before impacts
 	const preCraterLand = new Uint8Array(mesh.numRegions)
@@ -547,8 +525,6 @@ function generateGenesisWorld({
 		onProgress?.("craters", 39)
 	}
 
-	const maxElevKm = (params.maxElevation ?? 6000) / 1000
-	const maxDepthKm = UNITS.getMaxOceanDepthKm(params.planetRadiusKm)
 	const baseElevation = elevation.slice()
 	const { elevation: finalElevation, elevation_km } =
 		SEA_LEVEL.applySeaLevelToElevation({
@@ -598,6 +574,15 @@ function generateGenesisWorld({
 			if (!flooded[r]) isLand[r] = 1
 		}
 	}
+	presentTectonics.record = GEOLOGIC_RECORD.build({
+		space: presentTectonics.space,
+		crust: presentTectonics.crust,
+		seed: params.seed,
+		land: WORLD_SAMPLE.gather({
+			sample: presentTectonics.sample,
+			field: isLand,
+		}),
+	})
 	const finalCoastDist = TIMING.measure({
 		stage: "coastDist",
 		timings: pipelineTiming,
@@ -696,8 +681,7 @@ function generateGenesisWorld({
 				tectonicMode: "active" as const,
 				boundary,
 				distFields,
-				r_hotspot,
-				r_mantleUpwelling,
+				volcanoActivity: volcanoStamp.activity,
 				terrainFeatures,
 				onProgress,
 			}),
@@ -885,6 +869,7 @@ function generateGenesisWorld({
 		elevation,
 		terrainFeatures,
 		arcRun,
+		presentTectonics,
 		elevation_km,
 		params,
 		climate: post.climate,
@@ -901,7 +886,6 @@ function generateGenesisWorld({
 		tidalSchedule: post.tidalSchedule,
 		volcanism: {
 			hotspot: r_hotspot,
-			mantleUpwelling: r_mantleUpwelling,
 			hotspotExposure,
 		},
 		climateZones: post.climateZones,

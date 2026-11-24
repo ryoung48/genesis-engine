@@ -44,7 +44,6 @@ export interface BlendElevationParams {
 	distFields: DistanceFields
 	boundary: BoundaryInfo
 	roughness: number
-	volcanism: number
 	seed: number
 	planetRadiusKm: number
 	maxElevKm: number
@@ -342,13 +341,10 @@ export interface MainElevationLoopParams {
 
 export interface PostProcessingArcsParams {
 	mesh: SphereMesh
-	boundary: BoundaryInfo
-	maxStress: number
 	planetRadiusKm: number
 	maxElevKm: number
 	maxDepthKm: number
 	arcCrust: ArcCrust
-	volcanism: number
 	seed: number
 	elev: Float32Array
 	markFeature: MarkFeatureFn

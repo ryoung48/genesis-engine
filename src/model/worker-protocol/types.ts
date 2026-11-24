@@ -111,7 +111,6 @@ export interface SerializedGenesisWorld {
 	}
 	volcanism: {
 		hotspot: Float32Array
-		mantleUpwelling: Float32Array
 		hotspotExposure?: {
 			threshold: number
 			activeCells: number
