@@ -21,6 +21,7 @@ export interface DetailsDrawerBaseProps {
 	topographyDistribution: DistributionBucket[]
 	wetlandDistribution: DistributionBucket[]
 	shoreDistribution: DistributionBucket[]
+	seabedDistribution: DistributionBucket[]
 	springDistribution: DistributionBucket[]
 	oasisDistribution: DistributionBucket[]
 	rockDistribution: DistributionBucket[]

@@ -71,6 +71,7 @@ import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
+import { buildAtollSymbolData } from "@/ui/genesis/renderer/overlay-builders/atoll-symbols"
 import { buildCaveSymbolData } from "@/ui/genesis/renderer/overlay-builders/cave-symbols"
 import { buildWaterSymbolData } from "@/ui/genesis/renderer/overlay-builders/water-symbols"
 import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
@@ -1304,17 +1305,17 @@ export const GenesisView: React.FC<{
 		sceneRef.current?.setWaterSymbols(waterSymbolData)
 	}, [waterSymbolData])
 
-	const caveSymbolData = useMemo(
-		() =>
-			showCaves && colorMode === "karst" && world?.caveSites
-				? buildCaveSymbolData(world.caveSites)
-				: null,
-		[showCaves, colorMode, world],
-	)
+	const siteSymbolData = useMemo(() => {
+		if (showCaves && colorMode === "karst" && world?.caveSites)
+			return buildCaveSymbolData(world.caveSites)
+		if (colorMode === "topography" && world?.atolls?.region.length)
+			return buildAtollSymbolData(world.atolls)
+		return null
+	}, [showCaves, colorMode, world])
 
 	useEffect(() => {
-		sceneRef.current?.setCaveSymbols(caveSymbolData)
-	}, [caveSymbolData])
+		sceneRef.current?.setSiteSymbols(siteSymbolData)
+	}, [siteSymbolData])
 
 	useEffect(() => {
 		sceneRef.current?.setRivers(
@@ -1523,6 +1524,7 @@ export const GenesisView: React.FC<{
 		topographyDistribution,
 		wetlandDistribution,
 		shoreDistribution,
+		seabedDistribution,
 		springDistribution,
 		oasisDistribution,
 		rockDistribution,
@@ -2247,6 +2249,7 @@ export const GenesisView: React.FC<{
 							topographyDistribution,
 							wetlandDistribution,
 							shoreDistribution,
+							seabedDistribution,
 							springDistribution,
 							oasisDistribution,
 							rockDistribution,

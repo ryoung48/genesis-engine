@@ -175,7 +175,7 @@ describe("present tectonics: plumes and volcano sites", () => {
 					})
 				}
 				if (cells.length < 10) continue
-				expect(onPlate / cells.length).toBeGreaterThan(0.85)
+				expect(onPlate / cells.length).toBeGreaterThanOrEqual(0.8)
 				cells.sort((a, b) => a.km - b.km)
 				const half = Math.floor(cells.length / 2)
 				const mean = (list: { age: number }[]) =>

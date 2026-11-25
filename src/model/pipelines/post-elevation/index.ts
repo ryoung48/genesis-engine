@@ -39,6 +39,12 @@ import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import type { GenesisSurface } from "@/model/geography/terrain/rocks/types"
+import { SEABED } from "@/model/geography/terrain/seabed"
+import type { GenesisAtolls } from "@/model/geography/terrain/seabed/atolls/types"
+import type {
+	SeabedLayers,
+	SeabedStats,
+} from "@/model/geography/terrain/seabed/types"
 import { SHORE } from "@/model/geography/terrain/shore"
 import { SHORE_EXPOSURE } from "@/model/geography/terrain/shore/exposure"
 import type { ShoreExposure } from "@/model/geography/terrain/shore/exposure/types"
@@ -717,6 +723,9 @@ function runPostElevationPipeline(
 	let shoreExposure: ShoreExposure | undefined
 	let shoreLayers: ShoreLayers | undefined
 	let shoreStats: ShoreStats | undefined
+	let seabedLayers: SeabedLayers | undefined
+	let seabedStats: SeabedStats | undefined
+	let atolls: GenesisAtolls | undefined
 	let karstLayers: GenesisKarst | undefined
 	let caveSites: GenesisCaveSites | undefined
 	let karstStats: KarstCavesStats | undefined
@@ -833,7 +842,7 @@ function runPostElevationPipeline(
 	TIMING.record({ stage: "Post: hazards", startedAt: t0, timings })
 	onProgress?.("Post: hazards", 70)
 
-	if (surfaceFields && groundwaterLayers && shoreExposure) {
+	if (surface && surfaceFields && groundwaterLayers && shoreExposure) {
 		t0 = performance.now()
 		const shore = SHORE.classify({
 			mesh,
@@ -855,6 +864,28 @@ function runPostElevationPipeline(
 		shoreStats = shore.stats
 		TIMING.record({ stage: "Post: shoreline", startedAt: t0, timings })
 		onProgress?.("Post: shoreline", 70)
+
+		t0 = performance.now()
+		const { presentTectonics } = surface
+		const seabed = SEABED.compute({
+			mesh,
+			isLand,
+			openWater,
+			elevationKm: elevation_km,
+			planetRadiusKm: params.planetRadiusKm,
+			flow: rivers.flow,
+			shore: shore.layers,
+			climate,
+			iceMinMonthly,
+			iceMaxMonthly,
+			crust: presentTectonics.crust,
+			sample: presentTectonics.sample,
+		})
+		seabedLayers = seabed.layers
+		seabedStats = seabed.stats
+		atolls = seabed.atolls
+		TIMING.record({ stage: "Post: seabed", startedAt: t0, timings })
+		onProgress?.("Post: seabed", 70)
 
 		t0 = performance.now()
 		const karstCaves = KARST_CAVES.compute({
@@ -1205,6 +1236,9 @@ function runPostElevationPipeline(
 		groundwaterStats,
 		shore: shoreLayers,
 		shoreStats,
+		seabed: seabedLayers,
+		seabedStats,
+		atolls,
 		karst: karstLayers,
 		caveSites,
 		karstStats,

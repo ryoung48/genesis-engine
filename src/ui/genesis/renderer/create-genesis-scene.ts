@@ -7,7 +7,6 @@ import { createExportController } from "@/ui/genesis/renderer/genesis-scene/expo
 import { createInteractionController } from "@/ui/genesis/renderer/genesis-scene/interaction-controller"
 import { createLightingController } from "@/ui/genesis/renderer/genesis-scene/lighting-controller"
 import { createOverlayAggregatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-aggregator"
-import { createCaveSymbolsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/cave-symbols"
 import { createCoastlineController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/coastline"
 import { createInfrastructureController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/infrastructure"
 import {
@@ -21,6 +20,7 @@ import { createPathfindingController } from "@/ui/genesis/renderer/genesis-scene
 import { createRealmBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/realm-borders"
 import { createRiversWindController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/rivers-wind"
 import { createSettlementsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/settlements"
+import { createSiteSymbolsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/site-symbols"
 import { createSolarTerminatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/solar-terminator"
 import { createWaterSymbolsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/water-symbols"
 import { createOverlayVisibilityController } from "@/ui/genesis/renderer/genesis-scene/overlay-visibility-controller"
@@ -121,10 +121,10 @@ export function createGenesisScene(
 	})
 	const { setWaterSymbols } = waterSymbolsController
 
-	const caveSymbolsController = createCaveSymbolsController(context, {
+	const siteSymbolsController = createSiteSymbolsController(context, {
 		rebuildOverlays: () => rebuildOverlays(),
 	})
-	const { setCaveSymbols } = caveSymbolsController
+	const { setSiteSymbols } = siteSymbolsController
 
 	const orgLabelPools = createNationLabelPools()
 
@@ -297,7 +297,7 @@ export function createGenesisScene(
 			rebuildSolarTerminator: () => rebuildSolarTerminator(),
 			rebuildWindArrows: () => riversWindController.rebuildWindArrows(),
 			rebuildWaterSymbols: () => waterSymbolsController.rebuild(),
-			rebuildCaveSymbols: () => caveSymbolsController.rebuild(),
+			rebuildSiteSymbols: () => siteSymbolsController.rebuild(),
 			rebuildRivers: () => riversWindController.rebuildRivers(),
 			applyWaterMaterialForMode: (mode) => applyWaterMaterialForMode(mode),
 			rebuildNationBorders: () => rebuildNationBorders(),
@@ -482,7 +482,7 @@ export function createGenesisScene(
 		},
 		setWindArrows,
 		setWaterSymbols,
-		setCaveSymbols,
+		setSiteSymbols,
 		setRivers,
 		setRiversVisible,
 		setRealmBorders,

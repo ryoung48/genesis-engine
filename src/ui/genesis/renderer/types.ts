@@ -57,6 +57,7 @@ export interface BuildMapWindArrowsInput {
 export interface BuildGlobeDotsInput {
 	data: DotSymbolData
 	colors: readonly number[]
+	ringKeys: ReadonlySet<number>
 	radiusRad: number
 	globeRadius: number
 	viewMode: GenesisViewMode
@@ -65,6 +66,7 @@ export interface BuildGlobeDotsInput {
 export interface BuildMapDotsInput {
 	data: DotSymbolData
 	colors: readonly number[]
+	ringKeys: ReadonlySet<number>
 	radiusRad: number
 	mapDepth: number
 	viewMode: GenesisViewMode
@@ -366,7 +368,7 @@ export interface GenesisScene {
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void
 	setWaterSymbols(data: DotSymbolData | null): void
-	setCaveSymbols(data: DotSymbolData | null): void
+	setSiteSymbols(data: DotSymbolData | null): void
 	setMoonOrbitOverlay(
 		moons: MoonBody[] | null,
 		planetRadiusKm: number,

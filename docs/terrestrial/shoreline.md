@@ -90,4 +90,4 @@ Fresh volcanic coasts are mostly steep at region scale: of 108 coastal regions o
 
 ## Not modelled
 
-Swell and distant storms, barrier islands, reefs, beach width, cliff height, longshore drift, and sub-region variety (a region with a cliff and a pocket beach has one label).
+Swell and distant storms, barrier islands, beach width, cliff height, longshore drift, and sub-region variety (a region with a cliff and a pocket beach has one label). Reefs, seagrass and kelp offshore of these coasts are the [seabed habitats](seabed-habitats.md), a separate layer that reads this one.

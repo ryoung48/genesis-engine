@@ -6,7 +6,7 @@ Volcanoes are placed from the present-day records, not from a volcanism paramete
 
 ## Plumes and hotspot tracks (`plumes`)
 
-4 to 7 mantle plumes (`plumeCount`) are fixed under the moving plates. A plume is accepted with probability 1 under land and 0.4 under sea (`plumeOceanWeight`), at least 1,800 km from the others (`plumeApartKm`; Earth's hotspots are of order thousands of km apart, Courtillot et al. 2003). Each draws on streams keyed by its try index, so an edit that turns the land under one plume leaves the others as they were.
+24 to 32 mantle plumes (`plumeCount`) are fixed under the moving plates, between the 7 deep-mantle primary plumes and the 49 candidate hotspots Courtillot et al. 2003 list (from memory). 40 to 55 was tried and gave 54 to 73 hotspot island regions per world, too many scattered islands. A plume is accepted with probability 1 under land and under sea (`plumeOceanWeight`, 0.4 and 4 to 7 plumes before 2026-11-25, which left most worlds with no oceanic hotspot track to turn into atolls), at least 1,800 km from the others (`plumeApartKm`; Earth's hotspots are of order thousands of km apart, Courtillot et al. 2003). Each draws on streams keyed by its try index, so an edit that turns the land under one plume leaves the others as they were.
 
 A track walks back along its plate's rotation (the crust now at the rotated plume passed over it that long ago) in 0.5 Myr steps up to 90 Myr (`trackMyr`; Hawaii-Emperor is about 80), stopping where the nearest cell is on another plate (the 90 Myr length is set from the Hawaiian-Emperor chain, Sharp & Clague 2006). It alternates bursts of eruption (0.6 to 2 Myr, one volcano each, building 8 km/Myr times the plume's strength 0.6 to 1.4, capped at 10 km, 70 km wide) with quiet spells of 1.5 to 5 Myr, on a swell 110 km wide. The volcano over the plume is still active (under 2 Myr); the rest is worn at 0.15 km/Myr after that, so a 5 km volcano is gone in tens of Myr (a tuned value; no single cited rate).
 
@@ -14,7 +14,7 @@ Between 2 and 6 plume heads (`lipCount`) make a flood basalt, each with chance 0
 
 A LIP also raises the ground (`PLUMES.lift`, applied in the volcano stamp before the cones): each region under it gets its remaining pile (thickness minus wear, at most `lipMaxPileKm`) times 0.75 km of height per km of basalt on land or 1.4 km per km at sea (an oceanic plateau). The lift is then diffused over about `lipFeatherKm` and never lowered inside the province, so the edge slopes instead of stepping. LIPs are a terrain feature (shown in purple on the features map mode) but still carry no volcano danger.
 
-A track is written wherever its plate carries it, in either rotation direction, until it reaches another plate. Hotspot cones are stamped only where the track crosses oceanic crust: a track under a continent stays a record (the crust's `volcType`), and a volcano old enough to have worn below `hotspotMinKm` is dropped.
+A track is written wherever its plate carries it, in either rotation direction, until it reaches another plate. Hotspot cones are stamped only where the track crosses oceanic crust: a track under a continent stays a record (the crust's `volcType`), and a volcano old enough to have worn below `hotspotMinKm` is dropped. A dropped volcano that stood at least `seamountKm` high and now sits in water that never falls below 18 °C is an atoll site on the map; see [seabed habitats](seabed-habitats.md#atolls).
 
 ## Arc and Andean sites (`arc-sites`)
 
@@ -42,7 +42,7 @@ The mesh is coarse (about 54 km between regions at 204,000 regions), so each con
 
 | Constant | Value | Basis |
 |---|---|---|
-| `plumeCount` | 4 to 7 | Courtillot et al. 2003: a handful of primary plumes |
+| `plumeCount` | 24 to 32 | Courtillot et al. 2003: 7 primary and about 49 candidate hotspots; a middle value chosen for atoll count against scattered islands |
 | `plumeApartKm` | 1,800 | spacing of the major Earth hotspots |
 | `trackMyr` | 90 | Hawaii-Emperor, about 80 Myr (Sharp & Clague 2006) |
 | `trackBuildKmPerMyr` / `trackMaxKm` | 8 / 10 | Hawaii: about 9 km above the floor over a few Myr |

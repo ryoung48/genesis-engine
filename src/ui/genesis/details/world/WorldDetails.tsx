@@ -180,6 +180,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	topographyDistribution,
 	wetlandDistribution,
 	shoreDistribution,
+	seabedDistribution,
 	springDistribution,
 	oasisDistribution,
 	rockDistribution,
@@ -274,6 +275,12 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 						<DistributionChart
 							title="Shoreline"
 							buckets={shoreDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
+						<DistributionChart
+							title="Seabed"
+							buckets={seabedDistribution}
 							variant="compact"
 							showTotal={false}
 						/>

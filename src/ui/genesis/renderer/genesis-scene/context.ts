@@ -169,9 +169,9 @@ export interface GenesisContext {
 	globeWaterSymbols: THREE.Group | null
 	mapWaterSymbols: THREE.Group | null
 	waterSymbolData: DotSymbolData | null
-	globeCaveSymbols: THREE.Group | null
-	mapCaveSymbols: THREE.Group | null
-	caveSymbolData: DotSymbolData | null
+	globeSiteSymbols: THREE.Group | null
+	mapSiteSymbols: THREE.Group | null
+	siteSymbolData: DotSymbolData | null
 	globeRivers: THREE.Group | null
 	mapRivers: THREE.Group | null
 	riverData: RiverData | null

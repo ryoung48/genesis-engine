@@ -18,7 +18,7 @@ export interface OverlayAggregatorControllerDeps {
 	rebuildSolarTerminator: () => void
 	rebuildWindArrows: () => void
 	rebuildWaterSymbols: () => void
-	rebuildCaveSymbols: () => void
+	rebuildSiteSymbols: () => void
 	rebuildRivers: () => void
 	applyWaterMaterialForMode: (mode: ColorMode) => void
 	rebuildNationBorders: () => void
@@ -150,7 +150,7 @@ export function createOverlayAggregatorController(
 		deps.rebuildSolarTerminator()
 		deps.rebuildWindArrows()
 		deps.rebuildWaterSymbols()
-		deps.rebuildCaveSymbols()
+		deps.rebuildSiteSymbols()
 		deps.rebuildRivers()
 		deps.applyWaterMaterialForMode(ctx.currentColorMode)
 		deps.rebuildNationBorders()

@@ -20,6 +20,11 @@ import type {
 	KarstCavesStats,
 } from "@/model/geography/terrain/karst-caves/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import type { GenesisAtolls } from "@/model/geography/terrain/seabed/atolls/types"
+import type {
+	SeabedLayers,
+	SeabedStats,
+} from "@/model/geography/terrain/seabed/types"
 import type {
 	ShoreLayers,
 	ShoreStats,
@@ -186,6 +191,12 @@ export interface SerializedGenesisWorld {
 	shore?: ShoreLayers
 	/** [JUSTIFICATION] Present exactly when shore is. */
 	shoreStats?: ShoreStats
+	/** [JUSTIFICATION] Seabed layers need the shore layer and plate boundaries, so only procedural worlds have them. */
+	seabed?: SeabedLayers
+	/** [JUSTIFICATION] Present exactly when seabed is. */
+	seabedStats?: SeabedStats
+	/** [JUSTIFICATION] Present exactly when seabed is. */
+	atolls?: GenesisAtolls
 	/** [JUSTIFICATION] Karst needs the rock, groundwater and shore layers, so only procedural worlds have it. */
 	karst?: GenesisKarst
 	/** [JUSTIFICATION] Present exactly when karst is. */

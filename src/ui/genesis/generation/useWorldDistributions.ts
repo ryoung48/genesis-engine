@@ -28,6 +28,10 @@ import {
 	WETLAND_KIND_COLORS,
 	WETLAND_LEGEND,
 } from "@/ui/genesis/shared/region-colors/palette"
+import {
+	SEABED_COLORS,
+	SEABED_LEGEND,
+} from "@/ui/genesis/shared/region-colors/seabed"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { WorldDistributionsInput } from "@/ui/genesis/view/types"
 import { buildDistribution } from "@/ui/wiki/stats/nation/nation-distributions"
@@ -266,6 +270,16 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		})
 	}, [world?.shoreStats])
 
+	const seabedDistribution = useMemo(() => {
+		const stats = world?.seabedStats
+		if (!stats) return []
+		return SEABED_LEGEND.flatMap(({ kind, name }) => {
+			const count = stats.habitat[kind]
+			if (count <= 0) return []
+			return [{ label: name, count, color: rgbToCss(SEABED_COLORS[kind]) }]
+		})
+	}, [world?.seabedStats])
+
 	const springDistribution = useMemo(() => {
 		const counts = world?.groundwaterStats?.springCount
 		if (!counts) return []
@@ -350,6 +364,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		vegetationDistribution,
 		wetlandDistribution,
 		shoreDistribution,
+		seabedDistribution,
 		springDistribution,
 		oasisDistribution,
 		rockDistribution,

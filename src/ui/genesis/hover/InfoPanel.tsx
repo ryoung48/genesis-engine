@@ -49,6 +49,7 @@ import {
 	buildHoverGroundwater,
 	buildHoverKarst,
 	buildHoverLakeKind,
+	buildHoverSeabed,
 	buildHoverShore,
 	buildPastaMonthlyData,
 	buildProvinceName,
@@ -359,6 +360,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			unitSystem,
 		}),
 		...buildHoverKarst({
+			world,
+			region: hoverRegion,
+			colorMode,
+			unitSystem,
+		}),
+		...buildHoverSeabed({
 			world,
 			region: hoverRegion,
 			colorMode,

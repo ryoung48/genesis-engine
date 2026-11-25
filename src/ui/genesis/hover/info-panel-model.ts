@@ -12,6 +12,7 @@ import { KARST_CAVES } from "@/model/geography/terrain/karst-caves"
 import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
+import { SEABED_HABITAT } from "@/model/geography/terrain/seabed/habitat"
 import { SHORE } from "@/model/geography/terrain/shore"
 import { SHORE_EXPOSURE } from "@/model/geography/terrain/shore/exposure"
 import { SHORE_MATERIAL } from "@/model/geography/terrain/shore/material"
@@ -74,6 +75,10 @@ import {
 	waterTableClass,
 	waterTableColor,
 } from "@/ui/genesis/shared/region-colors/palette"
+import {
+	ATOLL_DOT_COLOR,
+	SEABED_COLORS,
+} from "@/ui/genesis/shared/region-colors/seabed"
 import {
 	formatDensity,
 	formatFlowRate,
@@ -843,6 +848,70 @@ export function buildHoverKarst({
 			})
 		}
 	}
+	return rows
+}
+
+const SEABED_HOVER_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
+	"topography",
+	"vegetation",
+	"vegetationMaps",
+	"vegetationSatellite",
+])
+
+function atollIndex({
+	atolls,
+	region,
+}: {
+	atolls: NonNullable<SerializedGenesisWorld["atolls"]>
+	region: number
+}): number {
+	let lo = 0
+	let hi = atolls.region.length
+	while (lo < hi) {
+		const mid = (lo + hi) >> 1
+		if (atolls.region[mid] < region) lo = mid + 1
+		else hi = mid
+	}
+	return atolls.region[lo] === region ? lo : -1
+}
+
+export function buildHoverSeabed({
+	world,
+	region,
+	colorMode,
+	unitSystem,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+	colorMode: ColorMode
+	unitSystem: UnitSystem
+}): HoverGroundwaterRow[] {
+	const layers = world?.seabed
+	if (!layers || region === null || !SEABED_HOVER_MODES.has(colorMode))
+		return []
+	const rows: HoverGroundwaterRow[] = []
+	const habitat = SEABED_HABITAT.habitats[layers.habitat[region]]
+	if (habitat !== "none")
+		rows.push(
+			{
+				label: "Habitat",
+				value: `${camelWords(habitat)} · ${layers.share[region]}% of the cell`,
+				color: rgbToCss(SEABED_COLORS[habitat]),
+			},
+			{
+				label: "Substrate",
+				value: SHORE_MATERIAL.kinds[layers.substrate[region]],
+				color: null,
+			},
+		)
+	const atolls = world?.atolls
+	const atoll = atolls ? atollIndex({ atolls, region }) : -1
+	if (atolls && atoll >= 0)
+		rows.push({
+			label: "Atoll",
+			value: `reef on an extinct hotspot volcano · ${Math.round(atolls.ageMyr[atoll])} Myr · peak ${formatHeight({ value: atolls.peakKm[atoll] * 1000, unitSystem })}`,
+			color: rgbToCss(ATOLL_DOT_COLOR),
+		})
 	return rows
 }
 

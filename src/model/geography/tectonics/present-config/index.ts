@@ -1,7 +1,7 @@
 export const PRESENT_CONFIG = {
 	segmentVary: 0.35,
-	plumeCount: [4, 7],
-	plumeOceanWeight: 0.4,
+	plumeCount: [24, 32],
+	plumeOceanWeight: 1,
 	plumeApartKm: 1800,
 	trackMyr: 90,
 	trackStepMyr: 0.5,

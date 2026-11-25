@@ -98,6 +98,10 @@ import {
 	waterTableColor,
 	wetlandColor,
 } from "@/ui/genesis/shared/region-colors/palette"
+import {
+	topographySeabedColor,
+	vegetationSeabedColor,
+} from "@/ui/genesis/shared/region-colors/seabed"
 import type { RegionColorsInput } from "@/ui/genesis/shared/region-colors/types"
 
 const CULTURE_ELEVATION_BUMP_SCALE = 1.6
@@ -268,7 +272,11 @@ export function computeRegionColors({
 			const topo = world.topography[r]
 			const isWater = topo === 5 || topo === 6
 			if (isWater) {
-				const [cr, cg, cb] = oceanRgb(r)
+				const [cr, cg, cb] = topographySeabedColor({
+					seabed: world.seabed,
+					region: r,
+					base: oceanRgb(r),
+				})
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -560,7 +568,11 @@ export function computeRegionColors({
 	) {
 		for (let r = 0; r < N; r++) {
 			if (isOceanRegion(r)) {
-				const [cr, cg, cb] = VEGETATION_WATER_BLUE
+				const [cr, cg, cb] = vegetationSeabedColor({
+					seabed: world.seabed,
+					region: r,
+					base: VEGETATION_WATER_BLUE,
+				})
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -599,11 +611,15 @@ export function computeRegionColors({
 		satellitePastaClimate
 	) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = vegetationSatelliteColor(
-				world.isLand[r] !== 0,
-				satelliteTemperature[r],
-				satelliteRainfall[r],
-			)
+			const [cr, cg, cb] = vegetationSeabedColor({
+				seabed: world.seabed,
+				region: r,
+				base: vegetationSatelliteColor(
+					world.isLand[r] !== 0,
+					satelliteTemperature[r],
+					satelliteRainfall[r],
+				),
+			})
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

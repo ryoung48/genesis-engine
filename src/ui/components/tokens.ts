@@ -84,7 +84,7 @@ export const uiWaterSymbols = {
 	mapDepth: 0.003,
 } as const
 
-export const uiCaveSymbols = {
+export const uiSiteSymbols = {
 	radiusRad: 0.0035,
 	globeRadius: 1.021,
 	raisedGlobeRadius: 1.061,
