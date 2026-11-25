@@ -99,6 +99,29 @@ describe("shore label", () => {
 		)
 	})
 
+	it("a flagged volcanic coast is black sand whatever its material or relief", () => {
+		expect(labelOf({ volcanicSand: true })).toBe("blackSandBeach")
+		expect(
+			labelOf({
+				volcanicSand: true,
+				material: MATERIAL.rock,
+				relief: RELIEF.steep,
+			}),
+		).toBe("blackSandBeach")
+		expect(labelOf({ volcanicSand: true, material: MATERIAL.ice })).toBe(
+			"iceCoast",
+		)
+		expect(
+			labelOf({ volcanicSand: true, setting: SHORE_SETTING.code.delta }),
+		).toBe("deltaCoast")
+	})
+
+	it("a steep soft coast is a gravel beach, not a cliff", () => {
+		expect(labelOf({ relief: RELIEF.steep, material: MATERIAL.gravel })).toBe(
+			"gravelBeach",
+		)
+	})
+
 	it("a steep sheltered coast is not a cliff", () => {
 		expect(
 			labelOf({ relief: RELIEF.steep, openClass: 0, material: MATERIAL.rock }),

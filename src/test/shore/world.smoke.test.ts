@@ -56,19 +56,19 @@ describe("shoreline on generated worlds", () => {
 	)
 
 	it(
-		"black sand labels need sand with the flag, and the flag never sits on ice",
+		"black sand labels sit exactly on flagged coasts that are not marsh, flat, delta or ice",
 		() => {
 			for (const seed of SEEDS) {
 				const world = cachedWorld(seed)
 				const shore = shoreOf(world)
 				for (let r = 0; r < world.mesh.numRegions; r++) {
-					if (SHORE.labels[shore.label[r]] === "blackSandBeach") {
-						expect(shore.material[r]).toBe(SHORE_MATERIAL.code.sand)
+					if (SHORE.labels[shore.label[r]] === "blackSandBeach")
 						expect(shore.volcanicSand[r]).toBe(1)
-					}
 					if (shore.volcanicSand[r]) {
 						expect(shore.material[r]).not.toBe(SHORE_MATERIAL.code.ice)
-						expect(shore.label[r]).toBeGreaterThan(0)
+						expect(SHORE.labels[shore.label[r]]).toMatch(
+							/^(blackSandBeach|mangroveCoast|saltMarshCoast|tidalFlat|deltaCoast)$/,
+						)
 					}
 				}
 			}

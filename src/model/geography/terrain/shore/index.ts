@@ -89,12 +89,16 @@ function labelOf({
 	if (habitat === habitatCode.saltMarsh) return labelCode.saltMarshCoast
 	if (habitat === habitatCode.tidalFlat) return labelCode.tidalFlat
 	if (setting === SHORE_SETTING.code.delta) return labelCode.deltaCoast
-	if (relief === SHORE_RELIEF.code.steep && openClass >= 1)
+	if (volcanicSand) return labelCode.blackSandBeach
+	if (
+		material === SHORE_MATERIAL.code.rock &&
+		relief === SHORE_RELIEF.code.steep &&
+		openClass >= 1
+	)
 		return labelCode.cliff
 	if (material === SHORE_MATERIAL.code.rock) return labelCode.rockyShore
 	if (material === SHORE_MATERIAL.code.gravel) return labelCode.gravelBeach
-	if (material === SHORE_MATERIAL.code.sand)
-		return volcanicSand ? labelCode.blackSandBeach : labelCode.sandyBeach
+	if (material === SHORE_MATERIAL.code.sand) return labelCode.sandyBeach
 	return labelCode.muddyShore
 }
 

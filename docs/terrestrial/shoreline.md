@@ -38,7 +38,7 @@ First match wins:
 1. **Ice**: land-ice thickness above 0.
 2. **Rock**: substrate resistance at least 0.6, relief not low or open exposure at least moderate, and not fresh volcanic on a non-steep coast.
 3. **Gravel**: till substrate or steep relief.
-4. **Sand with the volcanic flag**: substrate basalt or volcanic with `hazards.volcano` at least 0.25 (fresh volcanic). The flag is set on every non-ice fresh volcanic coast, including those that end up rock or gravel because they are steep; the label is black-sand beach only when the material is sand.
+4. **Sand with the volcanic flag**: substrate basalt or volcanic with `hazards.volcano` at least 0.25 (fresh volcanic). The flag is set on every non-ice fresh volcanic coast, including those that end up rock or gravel because they are steep; the flag decides the label: a flagged coast is black-sand beach unless it is already ice, marsh, flat or delta, so steep volcanic coasts read as black sand rather than cliff (Hawaii, Iceland and the Canaries are of this kind: cliffs broken by black beaches).
 5. **Mud**: sand share under 50% and the open face sheltered or river flow at least 500 m³/s.
 6. **Sand**.
 
@@ -49,7 +49,7 @@ First match wins:
 
 ## Labels
 
-First match wins: ice coast, mangrove coast, salt marsh coast, tidal flat, delta coast, cliff (steep with open face at least moderate), rocky shore, gravel beach, black sand beach, sandy beach, muddy shore.
+First match wins: ice coast, mangrove coast, salt marsh coast, tidal flat, delta coast, black sand beach (the volcanic flag), cliff (rock material, steep, open face at least moderate; steep soft coasts fall through to gravel beach), rocky shore, gravel beach, sandy beach, muddy shore.
 
 ## Constants
 
@@ -79,13 +79,13 @@ Default procedural world, seeds 14963991, 20251107, 77031 (`SHORE_SHARES=1` runs
 | Lee face sheltered / moderate / exposed | 22 to 25% / 23 to 25% / 51 to 52% |
 | Relief low / sloping / steep | 38 to 45% / 30 to 33% / 25 to 31% |
 | Material ice / rock / gravel / sand / mud | 12 to 24% / 40 to 50% / 9 to 12% / 22 to 32% / 3 to 4% |
-| Labels: cliff / rocky / sandy / muddy | 19 to 23% / 27 to 34% / 22 to 31% / 2% |
+| Labels: cliff / rocky / gravel / sandy / muddy | 9 to 13% / 26 to 33% / 9 to 12% / 21 to 31% / 2% |
 | Delta / estuary / fjord setting | 1.4 to 1.8% / 4.7 to 5.1% / 0.1% |
 | Mangrove / salt marsh / tidal flat | 1.1 to 1.2% / 0.5 to 0.9% / 0.5 to 1.1% |
-| Volcanic-sand flag / black sand label | 1.3 to 1.8% / 0.02 to 0.13% (1 to 8 regions) |
+| Volcanic-sand flag / black sand label | 1.3 to 1.8% / 1.3 to 1.8% |
 | Stage time | about 50 to 60 ms (classification only) |
 
-The black-sand label is rare because fresh volcanic coasts are mostly steep at region scale: of 108 coastal regions on fresh volcanic substrate in seed 14963991, 70 are steep and read as cliff, 27 are ice and 8 are black sand beaches. The flag covers the 81 non-ice ones, so hover still reports volcanic sand on a cliff region.
+Fresh volcanic coasts are mostly steep at region scale: of 108 coastal regions on fresh volcanic substrate in seed 14963991, 70 are steep, 27 are ice and 8 are sand. The flag covers the 81 non-ice ones and decides their label, so they read as black sand beach instead of cliff. Likewise a steep soft coast reads as gravel beach, not cliff (cliff needs rock material); before these two rules the cliff label was 19 to 23% and gravel beach 1 to 3%.
 
 ## Not modelled
 
