@@ -28,6 +28,7 @@ export type ColorMode =
 	| "shore"
 	| "rock"
 	| "soil"
+	| "karst"
 	| "topography"
 	| "temperature"
 	| "realTemperature"

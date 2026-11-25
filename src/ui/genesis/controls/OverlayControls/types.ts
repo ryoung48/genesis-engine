@@ -82,6 +82,9 @@ export interface OverlayControlsProps {
 	setShowWaterSymbols: (v: boolean) => void
 	hasGroundwater: boolean
 	hasShore: boolean
+	hasKarst: boolean
+	showCaves: boolean
+	setShowCaves: (v: boolean) => void
 	showGdd: boolean
 	setShowGdd: (v: boolean) => void
 	showGint: boolean

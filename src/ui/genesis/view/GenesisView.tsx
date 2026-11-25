@@ -71,6 +71,7 @@ import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
+import { buildCaveSymbolData } from "@/ui/genesis/renderer/overlay-builders/cave-symbols"
 import { buildWaterSymbolData } from "@/ui/genesis/renderer/overlay-builders/water-symbols"
 import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
@@ -250,6 +251,7 @@ export const GenesisView: React.FC<{
 		setShowSolarSystemInclination,
 		setShowWindArrows,
 		setShowWaterSymbols,
+		setShowCaves,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
 		setSolarSystemViewActive,
@@ -287,6 +289,7 @@ export const GenesisView: React.FC<{
 		setShowClouds,
 		showWindArrows,
 		showWaterSymbols,
+		showCaves,
 		showWireframe,
 		solarSystemControlsExpanded,
 		solarSystemViewActive,
@@ -683,6 +686,7 @@ export const GenesisView: React.FC<{
 			hasRock: !!world?.rock,
 			hasGroundwater: !!world?.groundwater,
 			hasShore: !!world?.shore,
+			hasKarst: !!world?.karst,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
@@ -1299,6 +1303,18 @@ export const GenesisView: React.FC<{
 	useEffect(() => {
 		sceneRef.current?.setWaterSymbols(waterSymbolData)
 	}, [waterSymbolData])
+
+	const caveSymbolData = useMemo(
+		() =>
+			showCaves && colorMode === "karst" && world?.caveSites
+				? buildCaveSymbolData(world.caveSites)
+				: null,
+		[showCaves, colorMode, world],
+	)
+
+	useEffect(() => {
+		sceneRef.current?.setCaveSymbols(caveSymbolData)
+	}, [caveSymbolData])
 
 	useEffect(() => {
 		sceneRef.current?.setRivers(
@@ -2428,6 +2444,9 @@ export const GenesisView: React.FC<{
 								setShowWaterSymbols={setShowWaterSymbols}
 								hasGroundwater={!!world?.groundwater}
 								hasShore={!!world?.shore}
+								hasKarst={!!world?.karst}
+								showCaves={showCaves}
+								setShowCaves={setShowCaves}
 								showGdd={showGdd}
 								setShowGdd={setShowGdd}
 								showGint={showGint}

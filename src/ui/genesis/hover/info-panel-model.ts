@@ -1,11 +1,14 @@
 import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import { CAVES } from "@/model/geography/terrain/caves"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { OASES } from "@/model/geography/terrain/groundwater/oases"
 import { SPRINGS } from "@/model/geography/terrain/groundwater/springs"
 import { WETLANDS } from "@/model/geography/terrain/groundwater/wetlands"
 import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
+import { KARST } from "@/model/geography/terrain/karst"
+import { KARST_CAVES } from "@/model/geography/terrain/karst-caves"
 import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
@@ -57,8 +60,10 @@ import {
 } from "@/ui/genesis/shared/migration-arrival"
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
+	CAVE_DOT_COLORS,
 	getTerrainFeatureColor,
 	getTopographyColor,
+	KARST_CLASS_COLORS,
 	rockColor,
 	SALT_PAN_COLOR,
 	SHORE_LABEL_COLORS,
@@ -73,6 +78,7 @@ import {
 	formatDensity,
 	formatFlowRate,
 	formatHeight,
+	formatPassage,
 	formatPrecipitation,
 	rgbToCss,
 	type UnitSystem,
@@ -761,6 +767,84 @@ export function buildHoverGroundwater({
 
 const camelWords = (kind: string) =>
 	kind.replace(/([A-Z])/g, " $1").toLowerCase()
+
+function caveRange({
+	sites,
+	region,
+}: {
+	sites: NonNullable<SerializedGenesisWorld["caveSites"]>
+	region: number
+}): [number, number] {
+	let lo = 0
+	let hi = sites.region.length
+	while (lo < hi) {
+		const mid = (lo + hi) >> 1
+		if (sites.region[mid] < region) lo = mid + 1
+		else hi = mid
+	}
+	const start = lo
+	while (lo < sites.region.length && sites.region[lo] === region) lo++
+	return [start, lo]
+}
+
+export function buildHoverKarst({
+	world,
+	region,
+	colorMode,
+	unitSystem,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+	colorMode: ColorMode
+	unitSystem: UnitSystem
+}): HoverGroundwaterRow[] {
+	const karst = world?.karst
+	if (
+		!karst ||
+		!world.isLand ||
+		region === null ||
+		colorMode !== "karst" ||
+		!world.isLand[region]
+	)
+		return []
+	const className = KARST_CAVES.classes[karst.karstClass[region]]
+	const rows: HoverGroundwaterRow[] = [
+		{
+			label: "Karst class",
+			value: className,
+			color: rgbToCss(KARST_CLASS_COLORS[className]),
+		},
+	]
+	const kind = KARST.kinds[karst.kind[region]]
+	if (kind !== "none") {
+		rows.push(
+			{ label: "Karst kind", value: camelWords(kind), color: null },
+			{
+				label: "Karst potential",
+				value: percentOf(karst.potential[region]),
+				color: null,
+			},
+			{
+				label: "Karst activity",
+				value: KARST.activities[karst.activity[region]],
+				color: null,
+			},
+		)
+	}
+	const sites = world.caveSites
+	if (sites) {
+		const [start, end] = caveRange({ sites, region })
+		for (let i = start; i < end; i++) {
+			const type = CAVES.types[sites.type[i]]
+			rows.push({
+				label: "Cave",
+				value: `${camelWords(type)} · ${formatPassage({ value: sites.lengthM[i], unitSystem })}`,
+				color: rgbToCss(CAVE_DOT_COLORS[type]),
+			})
+		}
+	}
+	return rows
+}
 
 export function buildHoverShore({
 	world,

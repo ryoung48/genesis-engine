@@ -1,6 +1,7 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
 import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
+import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import {
 	GEOLOGY_MAP_MODE_OPTIONS,
@@ -12,6 +13,9 @@ export interface GeologyModeSectionProps {
 	setColorMode: (v: ColorMode) => void
 	geologyExpanded: boolean
 	setGeologyExpanded: (v: boolean | ((prev: boolean) => boolean)) => void
+	hasKarst: boolean
+	showCaves: boolean
+	setShowCaves: (v: boolean) => void
 }
 
 export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
@@ -19,6 +23,9 @@ export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
 	setColorMode,
 	geologyExpanded,
 	setGeologyExpanded,
+	hasKarst,
+	showCaves,
+	setShowCaves,
 }) => {
 	if (!isGeologyColorMode(colorMode)) return null
 	return (
@@ -33,13 +40,22 @@ export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
 					<RadioGroup
 						label="Geology mode"
 						orientation="horizontal"
-						options={GEOLOGY_MAP_MODE_OPTIONS.map(([value, label]) => ({
+						options={GEOLOGY_MAP_MODE_OPTIONS.filter(
+							([value]) => hasKarst || value !== "karst",
+						).map(([value, label]) => ({
 							value,
 							label,
 						}))}
 						value={colorMode}
 						onChange={setColorMode}
 					/>
+					{colorMode === "karst" && hasKarst && (
+						<ToggleRow
+							label="Caves"
+							checked={showCaves}
+							onChange={setShowCaves}
+						/>
+					)}
 				</div>
 			)}
 		</div>

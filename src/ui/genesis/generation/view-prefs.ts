@@ -58,6 +58,7 @@ export interface StoredViewPrefs {
 	showWaves: boolean
 	showWindArrows: boolean
 	showWaterSymbols: boolean
+	showCaves: boolean
 	showGdd: boolean
 	showGint: boolean
 	showPet: boolean
@@ -126,6 +127,7 @@ const COLOR_MODES = new Set<ColorMode>([
 	"shore",
 	"rock",
 	"soil",
+	"karst",
 	"topography",
 	"temperature",
 	"realTemperature",
@@ -241,6 +243,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showWaves: false,
 	showWindArrows: false,
 	showWaterSymbols: false,
+	showCaves: true,
 	showGdd: false,
 	showGint: false,
 	showPet: false,
@@ -444,6 +447,7 @@ export function parseStoredViewPrefs(
 				parsed.showWaterSymbols,
 				DEFAULT_VIEW_PREFS.showWaterSymbols,
 			),
+			showCaves: readBoolean(parsed.showCaves, DEFAULT_VIEW_PREFS.showCaves),
 			showGdd: readBoolean(parsed.showGdd, DEFAULT_VIEW_PREFS.showGdd),
 			showGint: readBoolean(parsed.showGint, DEFAULT_VIEW_PREFS.showGint),
 			showPet: readBoolean(parsed.showPet, DEFAULT_VIEW_PREFS.showPet),

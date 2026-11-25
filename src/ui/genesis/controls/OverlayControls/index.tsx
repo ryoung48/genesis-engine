@@ -73,6 +73,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowWaterSymbols,
 	hasGroundwater,
 	hasShore,
+	hasKarst,
+	showCaves,
+	setShowCaves,
 	showGdd,
 	setShowGdd,
 	showGint,
@@ -440,6 +443,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setColorMode={setColorMode}
 									geologyExpanded={geologyExpanded}
 									setGeologyExpanded={setGeologyExpanded}
+									hasKarst={hasKarst}
+									showCaves={showCaves}
+									setShowCaves={setShowCaves}
 								/>
 
 								<DangerSection

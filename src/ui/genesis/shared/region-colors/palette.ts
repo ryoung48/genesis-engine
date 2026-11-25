@@ -1,10 +1,12 @@
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import type { CaveType } from "@/model/geography/terrain/caves/types"
 import type {
 	OasisKind,
 	SpringKind,
 	WetlandKind,
 } from "@/model/geography/terrain/groundwater/types"
 import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
+import type { KarstClass } from "@/model/geography/terrain/karst-caves/types"
 import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
 import type { ShoreLabel } from "@/model/geography/terrain/shore/types"
 import { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
@@ -225,6 +227,25 @@ export const SHORE_LEGEND: ReadonlyArray<{ label: ShoreLabel; name: string }> =
 		{ label: "sandyBeach", name: "Sandy beach" },
 		{ label: "muddyShore", name: "Muddy shore" },
 	]
+
+export const KARST_CLASS_COLORS: Record<KarstClass, [number, number, number]> =
+	{
+		none: rgb255(232, 230, 222),
+		absent: rgb255(196, 210, 224),
+		short: rgb255(236, 205, 110),
+		long: rgb255(205, 110, 50),
+		pseudo: rgb255(150, 120, 185),
+	}
+
+export const CAVE_DOT_COLORS: Record<CaveType, [number, number, number]> = {
+	solution: rgb255(0, 0, 0),
+	sinkhole: rgb255(235, 120, 20),
+	grotto: rgb255(0, 150, 110),
+	lava: rgb255(225, 0, 200),
+	sea: rgb255(30, 110, 235),
+	talus: rgb255(120, 100, 80),
+	glacier: rgb255(150, 225, 250),
+}
 
 export function waterTableClass(depthM: number): number {
 	const bounds = GROUNDWATER_CONFIG.depthColourBoundsM

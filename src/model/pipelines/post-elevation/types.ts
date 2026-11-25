@@ -16,12 +16,17 @@ import type {
 	DistanceFields,
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
+import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
 import type { ErosionRecord } from "@/model/geography/terrain/erosion/types"
 import type {
 	GroundwaterLayers,
 	GroundwaterStats,
 } from "@/model/geography/terrain/groundwater/types"
 import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
+import type {
+	GenesisKarst,
+	KarstCavesStats,
+} from "@/model/geography/terrain/karst-caves/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
@@ -189,6 +194,12 @@ export interface PostPipelineOutput {
 	shore?: ShoreLayers
 	/** [JUSTIFICATION] Present exactly when shore is. */
 	shoreStats?: ShoreStats
+	/** [JUSTIFICATION] Karst needs the rock, groundwater and shore layers, so only procedural worlds have it. */
+	karst?: GenesisKarst
+	/** [JUSTIFICATION] Present exactly when karst is. */
+	caveSites?: GenesisCaveSites
+	/** [JUSTIFICATION] Present exactly when karst is. */
+	karstStats?: KarstCavesStats
 	climateZones: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
 	realClimateZones?: Uint8Array

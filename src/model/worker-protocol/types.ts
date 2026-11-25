@@ -10,10 +10,15 @@ import type {
 	WindVectors,
 } from "@/model/climate/weather/wind/types"
 import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
+import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
 import type {
 	GroundwaterLayers,
 	GroundwaterStats,
 } from "@/model/geography/terrain/groundwater/types"
+import type {
+	GenesisKarst,
+	KarstCavesStats,
+} from "@/model/geography/terrain/karst-caves/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type {
 	ShoreLayers,
@@ -181,6 +186,12 @@ export interface SerializedGenesisWorld {
 	shore?: ShoreLayers
 	/** [JUSTIFICATION] Present exactly when shore is. */
 	shoreStats?: ShoreStats
+	/** [JUSTIFICATION] Karst needs the rock, groundwater and shore layers, so only procedural worlds have it. */
+	karst?: GenesisKarst
+	/** [JUSTIFICATION] Present exactly when karst is. */
+	caveSites?: GenesisCaveSites
+	/** [JUSTIFICATION] Present exactly when karst is. */
+	karstStats?: KarstCavesStats
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	dtr_annual: Float32Array

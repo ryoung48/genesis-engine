@@ -42,6 +42,22 @@ export function formatHeight({
 		: formatWithUnit(value, "m", 2)
 }
 
+export function formatPassage({
+	value,
+	unitSystem,
+}: FormatWeatherValueParams): string {
+	const twoFigures = (n: number) => Number(n.toPrecision(2)).toLocaleString()
+	if (unitSystem === "imperial") {
+		const miles = (value / 1000) * KM_TO_MI
+		return miles >= 1
+			? `${twoFigures(miles)} mi`
+			: `${twoFigures(value * M_TO_FT)} ft`
+	}
+	return value >= 1000
+		? `${twoFigures(value / 1000)} km`
+		: `${twoFigures(value)} m`
+}
+
 export function formatRainRate({
 	value,
 	unitSystem,

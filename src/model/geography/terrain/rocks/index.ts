@@ -255,6 +255,7 @@ function classify({
 	const { r_xyz } = mesh
 	const rock = new Uint8Array(n)
 	const youngKind = new Uint8Array(n)
+	const beneath = new Uint8Array(n)
 	const score = new Float64Array(KINDS.length)
 	const wave = (x: number, y: number, z: number, km: number, off: number) => {
 		const f = R / km
@@ -277,6 +278,7 @@ function classify({
 		const w = landCellOf[sample.cellOfRegion[r]]
 		if (w < 0) {
 			rock[r] = CODE.young
+			beneath[r] = CODE.young
 			youngKind[r] = iced[r] ? YOUNG_CODE.till : YOUNG_CODE.river
 			continue
 		}
@@ -409,12 +411,20 @@ function classify({
 		)
 		let best = CODE.slate
 		let bestScore = -1
-		for (let k = 1; k < KINDS.length; k++)
+		let under = CODE.young
+		let underScore = 0
+		for (let k = 1; k < KINDS.length; k++) {
 			if (score[k] > bestScore) {
 				bestScore = score[k]
 				best = k
 			}
+			if (k !== CODE.young && score[k] > underScore) {
+				underScore = score[k]
+				under = k
+			}
+		}
 		rock[r] = best
+		beneath[r] = under
 		if (best === CODE.young)
 			youngKind[r] =
 				young === riverScore
@@ -432,12 +442,14 @@ function classify({
 		(ice, r) => ice & isLand[r],
 	)
 	const rising = new Float32Array(n)
+	const bedrock = new Uint8Array(n)
 	for (let r = 0; r < n; r++) {
 		if (!isLand[r]) continue
 		const w = landCellOf[sample.cellOfRegion[r]]
 		if (w >= 0) rising[r] = basement.rising[w]
+		bedrock[r] = rock[r] === CODE.young ? beneath[r] : rock[r]
 	}
-	return { rock, youngKind, glaciated, rising }
+	return { rock, youngKind, bedrock, glaciated, rising }
 }
 
 export const ROCKS = {

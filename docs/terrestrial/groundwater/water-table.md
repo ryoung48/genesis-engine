@@ -43,7 +43,7 @@ Cap = T · g · e         g = max(S_MIN, (z − z_target) / d)         e = d / �
 Qout = min(Qavail, Cap)
 ```
 
-`Qout` goes to the target's `Qin` when it is a land region, or is counted as discharge to a water body. Ice, pans and roots with no target have `Cap = 0`. Effective recharge `R_eff = R + (Qin − Qout) / A`; flux that cannot pass a region surfaces there, `Qem = max(0, Qin − Cap)`. A second carried array `Qkarst` holds the part of `Qin` that came from karst regions. Water is conserved: recharge over land equals local retention plus discharge to water bodies.
+`Qout` goes to the target's `Qin` when it is a land region, or is counted as discharge to a water body. Ice, pans and roots with no target have `Cap = 0`. Effective recharge `R_eff = R + (Qin − Qout) / A`; flux that cannot pass a region surfaces there, `Qem = max(0, Qin − Cap)`. A second carried array `Qkarst` holds the part of `Qin` that came from karst regions (exposed limestone only: the karst flag needs the limestone rock key and sediment-covered limestone does not count; the [karst map](../karst-and-caves.md) reuses this spring class for its activity). Water is conserved: recharge over land equals local retention plus discharge to water bodies.
 
 It cannot climb or split across a divide, and it routes by the filled surface, not by head. Flat ground and tight rock have a small `Cap`, so most flat land keeps its water; the cascade matters in steep, permeable and karst country.
 

@@ -41,6 +41,10 @@ Young sediment carries a tag in `youngKind`: `river` (1), `loess` (2), `till` (3
 
 All noise seeds derive from the world seed with distinct salts, so a seed always gives the same map.
 
+## Bedrock
+
+`ROCKS.classify` also returns `bedrock`: the rock a young-sediment region would show without its young tag, the best-scoring kind other than young from the same score loop. It equals `rock` wherever rock is not young; a coastal region that falls back to river sediment or till has young bedrock. Nothing else reads the difference except [karst and caves](karst-and-caves.md), which uses it for carbonate and evaporite buried under sediment. Adding it left every other output unchanged.
+
 ## Erosion's side outputs
 
 `EROSION.erodeComposite` returns an `ErosionRecord` (`sedimentElev`, `morainesElev`, `glaciated`, `pastIce`). The first two are ledgers in elevation units of what the hydraulic step deposited and what the glacial step left as moraine; `HEIGHT_SCALE.elevDeltaKm` converts them to km at the final height. Nothing in the record feeds back into the elevation arithmetic: the eroded heights are bit-identical to those from before the record existed, which `src/test/rocks-soil/erosion-record.smoke.test.ts` checks against a stored checksum.
@@ -94,7 +98,7 @@ All live in `SURFACE_CONFIG` (`src/model/geography/terrain/surface-config`). Val
 
 ## Map modes and hover
 
-The Geography tray has a Geology button with two modes, Rock and Soil, switched in the Geology section of the overlay controls. Rock colours are upstream's `ROCK_INFO` colours, with young sediment's tags as variants. Soil runs from barren tan to rich green. It shows nutrient potential of the ground, not whether crops can grow: water is the climate fit's job, so desert ground keeps its parent value unless it is sand sea (desert mean fertility 0.43 to 0.46 with sand seas, about 0.52 before them) and irrigable desert alluvium reads as rich. Hover shows the rock kind (with the young tag) and the soil in upstream's words with its grade, fertility and modifier, for example "river silt, black earth · Rich 91%". The button is absent for Earth imports.
+The Geography tray has a Geology button with modes Rock, Soil and (when the layers exist) Karst, switched in the Geology section of the overlay controls. Rock colours are upstream's `ROCK_INFO` colours, with young sediment's tags as variants. Soil runs from barren tan to rich green. It shows nutrient potential of the ground, not whether crops can grow: water is the climate fit's job, so desert ground keeps its parent value unless it is sand sea (desert mean fertility 0.43 to 0.46 with sand seas, about 0.52 before them) and irrigable desert alluvium reads as rich. Hover shows the rock kind (with the young tag) and the soil in upstream's words with its grade, fertility and modifier, for example "river silt, black earth · Rich 91%". The button is absent for Earth imports.
 
 The detailed simulation report's `farming.ground` block carries the area-weighted mean soil factor (`soilMean`) and the percentage of settled provinces with a factor below 0.5 (`soilBelowHalfPercent`).
 

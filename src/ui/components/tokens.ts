@@ -84,6 +84,13 @@ export const uiWaterSymbols = {
 	mapDepth: 0.003,
 } as const
 
+export const uiCaveSymbols = {
+	radiusRad: 0.0035,
+	globeRadius: 1.021,
+	raisedGlobeRadius: 1.061,
+	mapDepth: 0.0032,
+} as const
+
 export const uiChartPalette = {
 	moon: ["#0ea5e9", "#8b5cf6", "#10b981"] as const,
 	solar: "#f59e0b",

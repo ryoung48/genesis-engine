@@ -5,6 +5,7 @@ import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { KARST_CAVES } from "@/model/geography/terrain/karst-caves"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import { SHORE } from "@/model/geography/terrain/shore"
@@ -85,6 +86,7 @@ import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-den
 import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality"
 import {
 	basinColor,
+	KARST_CLASS_COLORS,
 	rockColor,
 	SALT_PAN_COLOR,
 	SHORE_LABEL_COLORS,
@@ -241,6 +243,19 @@ export function computeRegionColors({
 				: labelCode[r] === 0
 					? UNOWNED_GRAY
 					: SHORE_LABEL_COLORS[SHORE.labels[labelCode[r]]]
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
+	if (colorMode === "karst" && world.karst) {
+		const classCode = world.karst.karstClass
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = !isLandRegion(r)
+				? oceanRgb(r)
+				: KARST_CLASS_COLORS[KARST_CAVES.classes[classCode[r]]]
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

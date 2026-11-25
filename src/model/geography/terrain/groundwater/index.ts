@@ -475,4 +475,4 @@ function statistics({
 	}
 }
 
-export const GROUNDWATER = { compute }
+export const GROUNDWATER = { compute, regionClimate }

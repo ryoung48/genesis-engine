@@ -231,6 +231,9 @@ function serializeWorld(
 		groundwaterStats: world.groundwaterStats,
 		shore: world.shore,
 		shoreStats: world.shoreStats,
+		karst: world.karst,
+		caveSites: world.caveSites,
+		karstStats: world.karstStats,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
 		rivers: world.rivers
@@ -545,6 +548,8 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.soilModifier) add(world.soilModifier.buffer)
 	if (world.groundwater) add(...layerBuffers(world.groundwater))
 	if (world.shore) add(...layerBuffers(world.shore))
+	if (world.karst) add(...layerBuffers(world.karst))
+	if (world.caveSites) add(...layerBuffers(world.caveSites))
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)
 	if (world.observedCloudCover?.real_monthly)

@@ -16,6 +16,7 @@ import { CYCLONES } from "@/model/climate/weather/cyclones"
 import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { CLIMATE_V2 } from "@/model/climatev2"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
+import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { GROUNDWATER } from "@/model/geography/terrain/groundwater"
 import type {
@@ -23,6 +24,11 @@ import type {
 	GroundwaterStats,
 } from "@/model/geography/terrain/groundwater/types"
 import { HAZARDS } from "@/model/geography/terrain/hazards"
+import { KARST_CAVES } from "@/model/geography/terrain/karst-caves"
+import type {
+	GenesisKarst,
+	KarstCavesStats,
+} from "@/model/geography/terrain/karst-caves/types"
 import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
@@ -711,6 +717,9 @@ function runPostElevationPipeline(
 	let shoreExposure: ShoreExposure | undefined
 	let shoreLayers: ShoreLayers | undefined
 	let shoreStats: ShoreStats | undefined
+	let karstLayers: GenesisKarst | undefined
+	let caveSites: GenesisCaveSites | undefined
+	let karstStats: KarstCavesStats | undefined
 	const openWater = LANDMARKS.openWaterMask({ isLand, landmarks })
 	if (surface) {
 		t0 = performance.now()
@@ -752,6 +761,7 @@ function runPostElevationPipeline(
 		surfaceFields = {
 			rock: classification.rock,
 			youngKind: classification.youngKind,
+			bedrock: classification.bedrock,
 			glaciated: classification.glaciated,
 			soilFertility: soil.fertility,
 			soilModifier: soil.modifier,
@@ -845,6 +855,28 @@ function runPostElevationPipeline(
 		shoreStats = shore.stats
 		TIMING.record({ stage: "Post: shoreline", startedAt: t0, timings })
 		onProgress?.("Post: shoreline", 70)
+
+		t0 = performance.now()
+		const karstCaves = KARST_CAVES.compute({
+			mesh,
+			seed: params.seed,
+			isLand,
+			openWater,
+			surface: surfaceFields,
+			groundwater: groundwaterLayers,
+			shore: shore.layers,
+			volcano: hazards.volcano,
+			topography,
+			slopeScore,
+			iceThickness,
+			climate,
+			rainfall,
+		})
+		karstLayers = karstCaves.karst
+		caveSites = karstCaves.sites
+		karstStats = karstCaves.stats
+		TIMING.record({ stage: "Post: karst and caves", startedAt: t0, timings })
+		onProgress?.("Post: karst and caves", 70)
 	}
 
 	t0 = performance.now()
@@ -1173,6 +1205,9 @@ function runPostElevationPipeline(
 		groundwaterStats,
 		shore: shoreLayers,
 		shoreStats,
+		karst: karstLayers,
+		caveSites,
+		karstStats,
 		climateZones,
 		realClimateZones,
 		koppenClimate,

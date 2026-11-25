@@ -26,11 +26,16 @@ import type {
 	TectonicPlate,
 } from "@/model/geography/tectonics/types"
 import type { ArcCrustRun } from "@/model/geography/terrain/arc-crust/types"
+import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
 import type {
 	GroundwaterLayers,
 	GroundwaterStats,
 } from "@/model/geography/terrain/groundwater/types"
 import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
+import type {
+	GenesisKarst,
+	KarstCavesStats,
+} from "@/model/geography/terrain/karst-caves/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
@@ -227,6 +232,8 @@ export interface GenesisWorld {
 	rock?: Uint8Array
 	/** [JUSTIFICATION] Young-sediment tag per region (index into ROCKS.youngKinds); present only for procedural worlds. */
 	youngKind?: Uint8Array
+	/** [JUSTIFICATION] Rock a region shows without its young-sediment tag; present only for procedural worlds, and kept in the model (the UI does not receive it). */
+	bedrock?: Uint8Array
 	/** [JUSTIFICATION] Land under the glacial model's ice; present only for procedural worlds. */
 	glaciated?: Uint8Array
 	/** [JUSTIFICATION] Soil fertility 0..1 per region; absent for Earth imports, where the farming soil factor is 1. */
@@ -241,6 +248,12 @@ export interface GenesisWorld {
 	shore?: ShoreLayers
 	/** [JUSTIFICATION] Present exactly when shore is. */
 	shoreStats?: ShoreStats
+	/** [JUSTIFICATION] Karst needs the rock, groundwater and shore layers, so only procedural worlds have it. */
+	karst?: GenesisKarst
+	/** [JUSTIFICATION] Present exactly when karst is. */
+	caveSites?: GenesisCaveSites
+	/** [JUSTIFICATION] Present exactly when karst is. */
+	karstStats?: KarstCavesStats
 	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array

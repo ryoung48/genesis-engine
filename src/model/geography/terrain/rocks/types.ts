@@ -60,6 +60,7 @@ export interface RockClassifyParams {
 export interface GenesisSurface {
 	rock: Uint8Array
 	youngKind: Uint8Array
+	bedrock: Uint8Array
 	glaciated: Uint8Array
 	soilFertility: Float32Array
 	soilModifier: Uint8Array
@@ -68,6 +69,7 @@ export interface GenesisSurface {
 export interface RockClassification {
 	rock: Uint8Array
 	youngKind: Uint8Array
+	bedrock: Uint8Array
 	glaciated: Uint8Array
 	rising: Float32Array
 }

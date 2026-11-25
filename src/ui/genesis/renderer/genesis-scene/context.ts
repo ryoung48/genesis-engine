@@ -24,13 +24,13 @@ import type {
 	ScriptTextureCacheEntry,
 } from "@/ui/genesis/renderer/nation-script-overlay"
 import type {
+	DotSymbolData,
 	EarthHistoryNationOverride,
 	GenesisHoverInfo,
 	GenesisViewMode,
 	OrgHighlightSpec,
 	RealmBordersSpec,
 	RiverData,
-	WaterSymbolData,
 	WindArrowData,
 } from "@/ui/genesis/renderer/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
@@ -168,7 +168,10 @@ export interface GenesisContext {
 	windArrowData: WindArrowData | null
 	globeWaterSymbols: THREE.Group | null
 	mapWaterSymbols: THREE.Group | null
-	waterSymbolData: WaterSymbolData | null
+	waterSymbolData: DotSymbolData | null
+	globeCaveSymbols: THREE.Group | null
+	mapCaveSymbols: THREE.Group | null
+	caveSymbolData: DotSymbolData | null
 	globeRivers: THREE.Group | null
 	mapRivers: THREE.Group | null
 	riverData: RiverData | null
