@@ -71,6 +71,7 @@ import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
+import { buildWaterSymbolData } from "@/ui/genesis/renderer/overlay-builders/water-symbols"
 import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
 import { scaleClockDialHourToDayLength } from "@/ui/genesis/shared/clock"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
@@ -248,6 +249,7 @@ export const GenesisView: React.FC<{
 		setShowSolarSystemTrueScale,
 		setShowSolarSystemInclination,
 		setShowWindArrows,
+		setShowWaterSymbols,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
 		setSolarSystemViewActive,
@@ -284,6 +286,7 @@ export const GenesisView: React.FC<{
 		showClouds,
 		setShowClouds,
 		showWindArrows,
+		showWaterSymbols,
 		showWireframe,
 		solarSystemControlsExpanded,
 		solarSystemViewActive,
@@ -678,6 +681,7 @@ export const GenesisView: React.FC<{
 			colorMode,
 			hasHazards: !!world?.hazards,
 			hasRock: !!world?.rock,
+			hasGroundwater: !!world?.groundwater,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
@@ -687,6 +691,7 @@ export const GenesisView: React.FC<{
 		colorMode,
 		world?.hazards,
 		world?.rock,
+		world?.groundwater,
 		world?.volcanism,
 		world?.isEarthImport,
 		world,
@@ -1274,6 +1279,26 @@ export const GenesisView: React.FC<{
 		sceneRef.current?.setWindArrows(windMapArrows)
 	}, [windMapArrows])
 
+	const waterSymbolData = useMemo(
+		() =>
+			showWaterSymbols &&
+			(colorMode === "waterTable" || colorMode === "wetlands") &&
+			world?.groundwater &&
+			world.isLand
+				? buildWaterSymbolData({
+						r_xyz: world.mesh.r_xyz,
+						spring: world.groundwater.spring,
+						oasis: world.groundwater.oasis,
+						isLand: world.isLand,
+					})
+				: null,
+		[showWaterSymbols, colorMode, world],
+	)
+
+	useEffect(() => {
+		sceneRef.current?.setWaterSymbols(waterSymbolData)
+	}, [waterSymbolData])
+
 	useEffect(() => {
 		sceneRef.current?.setRivers(
 			showRivers && world?.rivers ? world.rivers : null,
@@ -1479,6 +1504,10 @@ export const GenesisView: React.FC<{
 		religionTypeDistribution,
 		showObservedDistributions,
 		topographyDistribution,
+		wetlandDistribution,
+		springDistribution,
+		oasisDistribution,
+		rockDistribution,
 		tradeGoodsDistribution,
 		vegetationDistribution,
 	} = useWorldDistributions({
@@ -2198,6 +2227,10 @@ export const GenesisView: React.FC<{
 							climateDistribution,
 							vegetationDistribution,
 							topographyDistribution,
+							wetlandDistribution,
+							springDistribution,
+							oasisDistribution,
+							rockDistribution,
 							showObservedDistributions,
 							tradeGoodsDistribution,
 						}}
@@ -2388,6 +2421,9 @@ export const GenesisView: React.FC<{
 								setShowWaves={setShowWaves}
 								showWindArrows={showWindArrows}
 								setShowWindArrows={setShowWindArrows}
+								showWaterSymbols={showWaterSymbols}
+								setShowWaterSymbols={setShowWaterSymbols}
+								hasGroundwater={!!world?.groundwater}
 								showGdd={showGdd}
 								setShowGdd={setShowGdd}
 								showGint={showGint}

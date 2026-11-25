@@ -1,6 +1,27 @@
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import type {
+	OasisKind,
+	SpringKind,
+	WetlandKind,
+} from "@/model/geography/terrain/groundwater/types"
+import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
 import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
 import { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
+
+export const WETLAND_LEGEND: ReadonlyArray<{
+	kind: WetlandKind
+	label: string
+}> = [
+	{ kind: "mangrove", label: "Mangrove" },
+	{ kind: "coastalSaltMarsh", label: "Coastal salt marsh" },
+	{ kind: "inlandSaltMarsh", label: "Inland salt marsh" },
+	{ kind: "floodplain", label: "Floodplain wetland" },
+	{ kind: "peatBog", label: "Peat bog" },
+	{ kind: "wetMeadow", label: "Wet meadow" },
+	{ kind: "marsh", label: "Marsh" },
+	{ kind: "swampForest", label: "Swamp forest" },
+	{ kind: "forestedPeatland", label: "Forested peatland" },
+]
 
 export function basinColor(id: number): [number, number, number] {
 	if (id < 0) return OCEAN_LIGHT_BLUE
@@ -143,4 +164,99 @@ export function rockColor({
 	young: YoungKind
 }): [number, number, number] {
 	return rock === "young" ? YOUNG_TAG_COLORS[young] : ROCK_COLORS[rock]
+}
+
+export const WATER_TABLE_COLORS: ReadonlyArray<[number, number, number]> = [
+	rgb255(8, 48, 107),
+	rgb255(33, 102, 172),
+	rgb255(67, 147, 195),
+	rgb255(146, 197, 222),
+	rgb255(209, 229, 240),
+	rgb255(253, 219, 160),
+	rgb255(224, 160, 80),
+	rgb255(166, 97, 26),
+]
+
+export const SALT_PAN_COLOR: [number, number, number] = rgb255(255, 255, 255)
+
+export const WETLAND_KIND_COLORS: ReadonlyArray<[number, number, number]> = [
+	rgb255(200, 196, 180),
+	rgb255(0, 150, 100),
+	rgb255(110, 160, 170),
+	rgb255(190, 170, 200),
+	rgb255(120, 180, 90),
+	rgb255(110, 80, 60),
+	rgb255(170, 210, 110),
+	rgb255(40, 160, 170),
+	rgb255(20, 100, 70),
+	rgb255(80, 70, 50),
+]
+
+export function waterTableClass(depthM: number): number {
+	const bounds = GROUNDWATER_CONFIG.depthColourBoundsM
+	for (let k = 0; k < bounds.length; k++) if (depthM <= bounds[k]) return k
+	return bounds.length
+}
+
+export function waterTableColor(depthClass: number): [number, number, number] {
+	return WATER_TABLE_COLORS[
+		Math.max(0, Math.min(WATER_TABLE_COLORS.length - 1, depthClass))
+	]
+}
+
+export function wetlandColor({
+	kind,
+	share,
+}: {
+	kind: number
+	share: number
+}): [number, number, number] {
+	const base = WETLAND_KIND_COLORS[0]
+	const tint = WETLAND_KIND_COLORS[kind] ?? base
+	const t = kind === 0 ? 0 : 0.55 + 0.45 * Math.max(0, Math.min(1, share))
+	return [
+		base[0] + (tint[0] - base[0]) * t,
+		base[1] + (tint[1] - base[1]) * t,
+		base[2] + (tint[2] - base[2]) * t,
+	]
+}
+
+export type WaterDotKey =
+	| Exclude<SpringKind, "none">
+	| Exclude<OasisKind, "none">
+
+export const WATER_DOT_KEYS: readonly WaterDotKey[] = [
+	"seepage",
+	"contact",
+	"karst",
+	"piedmont",
+	"river",
+	"spring",
+	"foothill",
+	"fossil",
+	"wells",
+]
+
+export const WATER_DOT_COLORS: Record<WaterDotKey, [number, number, number]> = {
+	seepage: rgb255(130, 200, 255),
+	contact: rgb255(30, 100, 230),
+	karst: rgb255(0, 170, 170),
+	piedmont: rgb255(100, 70, 200),
+	river: rgb255(30, 160, 70),
+	spring: rgb255(235, 200, 0),
+	foothill: rgb255(240, 130, 20),
+	fossil: rgb255(210, 40, 140),
+	wells: rgb255(130, 80, 40),
+}
+
+export const WATER_DOT_LABELS: Record<WaterDotKey, string> = {
+	seepage: "Seepage spring",
+	contact: "Contact spring",
+	karst: "Karst spring",
+	piedmont: "Piedmont spring",
+	river: "River oasis",
+	spring: "Spring oasis (surfacing flux)",
+	foothill: "Foothill oasis (mountain front)",
+	fossil: "Fossil aquifer oasis (depression)",
+	wells: "Well oasis",
 }

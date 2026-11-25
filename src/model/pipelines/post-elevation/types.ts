@@ -17,6 +17,10 @@ import type {
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
 import type { ErosionRecord } from "@/model/geography/terrain/erosion/types"
+import type {
+	GroundwaterLayers,
+	GroundwaterStats,
+} from "@/model/geography/terrain/groundwater/types"
 import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
@@ -173,6 +177,10 @@ export interface PostPipelineOutput {
 	slopeScore: Float32Array
 	/** [JUSTIFICATION] Present only for procedural worlds; Earth imports have no rock or soil record. */
 	surface?: GenesisSurface
+	/** [JUSTIFICATION] Groundwater needs the rock layer, which only procedural worlds have. */
+	groundwater?: GroundwaterLayers
+	/** [JUSTIFICATION] Present exactly when groundwater is. */
+	groundwaterStats?: GroundwaterStats
 	climateZones: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
 	realClimateZones?: Uint8Array

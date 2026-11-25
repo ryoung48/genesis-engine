@@ -46,6 +46,8 @@ import {
 	buildFarmingDisplayData,
 	buildHoverChartData,
 	buildHoverGeology,
+	buildHoverGroundwater,
+	buildHoverLakeKind,
 	buildPastaMonthlyData,
 	buildProvinceName,
 	buildTerrainFeatureSwatches,
@@ -341,6 +343,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const hoverGeology = showGeography
 		? buildHoverGeology({ world, region: hoverRegion })
 		: null
+	const hoverGroundwater = buildHoverGroundwater({
+		world,
+		region: hoverRegion,
+		colorMode,
+		unitSystem,
+	})
+	const hoverLakeKind = showGeography
+		? buildHoverLakeKind({ world, region: hoverRegion })
+		: null
 	const hoverRouteLabel = showGeography
 		? buildHoverRouteLabel(hoverRegion, routes ?? null)
 		: null
@@ -569,6 +580,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								/>
 							</>
 						)}
+						{hoverGroundwater.map((row) => (
+							<SwatchRow
+								key={row.label}
+								label={row.label}
+								value={row.value}
+								color={row.color}
+							/>
+						))}
 						{hoverRouteLabel && <Row label="Route" value={hoverRouteLabel} />}
 						{colorMode === "temperatureDelta" &&
 							hoverTemperatureDelta !== null && (
@@ -739,6 +758,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={hoverBiome}
 								color={vegetationSwatch}
 							/>
+						)}
+						{hoverLakeKind && (
+							<Row label="Lake type" value={TEXT.titleCase(hoverLakeKind)} />
 						)}
 						{lakeAverageAnnualPrecip !== null && (
 							<Row

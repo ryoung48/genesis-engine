@@ -1,8 +1,11 @@
+import { ENDORHEIC } from "@/model/geography/terrain/endorheic"
+import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
 import type {
 	ComputeLakeSurfaceParams,
 	ComputeLakesParams,
 	ComputeSubgraphNeighborCountParams,
 	EstimateSubgraphDiameterParams,
+	LakeKind,
 	SelectCompactLakeFallbackParams,
 	SelectConnectedLakeCellsParams,
 	TrimLakeCorridorsParams,
@@ -343,43 +346,89 @@ function selectConnectedLakeCells({
 	})
 }
 
+const lakeKinds: readonly LakeKind[] = ["none", "fresh", "salt", "pan"]
+
+const lakeKindCode: Record<LakeKind, number> = {
+	none: 0,
+	fresh: 1,
+	salt: 2,
+	pan: 3,
+}
+
 function computeLakes({
 	mesh,
+	planetRadiusKm,
+	secondsPerYear,
 	elevation,
 	rainfall,
+	petMonthly,
 	waterLevel,
 	basinId,
+	basinTerminal,
+	basinInflow,
+	lakeKind,
 	isLand,
 	emergedLand,
 	elevationKm,
 }: ComputeLakesParams): void {
 	const { numRegions: N, adjOffset, adjList } = mesh
 	const lakes = new Uint8Array(N)
+	const salty = new Uint8Array(N)
 
-	let nextBasin = 0
-	for (let r = 0; r < N; r++) {
-		if (basinId[r] >= nextBasin) nextBasin = basinId[r] + 1
-	}
+	const layout = ENDORHEIC.layout({ basinId, elevation })
+	const nextBasin = layout.cells.length
 	if (nextBasin === 0) return
 
-	const basinCells: number[][] = Array.from(
-		{ length: nextBasin },
-		(): number[] => [],
-	)
+	const basinCells = layout.cells
 	const basinRain = new Float32Array(nextBasin)
+	for (let bid = 0; bid < nextBasin; bid++)
+		for (const r of basinCells[bid]) basinRain[bid] += rainfall.annual[r]
 
-	for (let r = 0; r < N; r++) {
-		const bid = basinId[r]
-		if (bid < 0) continue
-		basinCells[bid].push(r)
-		basinRain[bid] += rainfall.annual[r]
-	}
+	const areaM2 = new Float64Array(N)
+	const r2 = planetRadiusKm * planetRadiusKm * 1e6
+	for (let r = 0; r < N; r++) areaM2[r] = mesh.regionArea[r] * r2
+	const sill = new Float32Array(nextBasin)
+	for (let bid = 0; bid < nextBasin; bid++)
+		sill[bid] = waterLevel[layout.lowest[bid]]
+	const bodies = ENDORHEIC.waterBodies({
+		mesh,
+		elevation,
+		layout,
+		terminal: basinTerminal,
+		inflowM3s: basinInflow,
+		sill,
+		deficitMm: ENDORHEIC.evaporationDeficit({
+			petMonthly,
+			rainfallAnnual: rainfall.annual,
+			numRegions: N,
+		}),
+		areaM2,
+		secondsPerYear,
+		floorFraction: GROUNDWATER_CONFIG.panFloorFraction,
+	})
 
 	const EVAP_RATE = 1200 // mm/cell/yr — hot open-water evaporation
 	const DESERT_THRESHOLD = 250 // mm/yr — below this, too arid for lakes
 
 	for (let bid = 0; bid < nextBasin; bid++) {
 		const allCells = basinCells[bid]
+		if (basinTerminal[bid]) {
+			const { lake, pan } = bodies[bid]
+			for (const cell of allCells) waterLevel[cell] = elevation[cell]
+			if (lake.length > 0) {
+				const lakeSurface = computeLakeSurface({ lakeCells: lake, elevation })
+				for (const c of lake) {
+					lakes[c] = 1
+					salty[c] = 1
+					waterLevel[c] = lakeSurface
+				}
+			}
+			for (const c of pan) {
+				lakeKind[c] = lakeKindCode.pan
+				isLand[c] = 1
+			}
+			continue
+		}
 		const inflow = basinRain[bid]
 		const avgRain = inflow / allCells.length
 		if (avgRain < DESERT_THRESHOLD) {
@@ -408,9 +457,12 @@ function computeLakes({
 		if (emergedLand?.[r] && elevationKm?.[r] != null && elevationKm[r] > 0)
 			continue
 		isLand[r] = 0
+		lakeKind[r] = salty[r] ? lakeKindCode.salt : lakeKindCode.fresh
 	}
 }
 
 export const LAKES = {
 	computeLakes,
+	kinds: lakeKinds,
+	kindCode: lakeKindCode,
 }

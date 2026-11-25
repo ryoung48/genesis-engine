@@ -3,6 +3,10 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { OASES } from "@/model/geography/terrain/groundwater/oases"
+import { SPRINGS } from "@/model/geography/terrain/groundwater/springs"
+import { WETLANDS } from "@/model/geography/terrain/groundwater/wetlands"
+import { ROCKS } from "@/model/geography/terrain/rocks"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { RELIGION } from "@/model/history/sim/religion"
 import { ERAS } from "@/model/society/eras"
@@ -14,7 +18,14 @@ import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
 import { buildNationSizeDistribution } from "@/ui/genesis/political/nation-size-distribution"
 import { techLevelColor } from "@/ui/genesis/shared/colors/tech-level"
 import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
-import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
+import {
+	getTopographyColor,
+	ROCK_COLORS,
+	WATER_DOT_COLORS,
+	WATER_DOT_LABELS,
+	WETLAND_KIND_COLORS,
+	WETLAND_LEGEND,
+} from "@/ui/genesis/shared/region-colors/palette"
 import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { WorldDistributionsInput } from "@/ui/genesis/view/types"
 import { buildDistribution } from "@/ui/wiki/stats/nation/nation-distributions"
@@ -222,6 +233,67 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		[world?.topography],
 	)
 
+	const wetlandDistribution = useMemo(() => {
+		const areas = world?.groundwaterStats?.wetlandAreaKm2
+		if (!areas) return []
+		return WETLAND_LEGEND.flatMap(({ kind, label }) => {
+			const count = areas[kind]
+			if (count <= 0) return []
+			return [
+				{
+					label,
+					count,
+					color: rgbToCss(WETLAND_KIND_COLORS[WETLANDS.code[kind]]),
+				},
+			]
+		})
+	}, [world?.groundwaterStats])
+
+	const springDistribution = useMemo(() => {
+		const counts = world?.groundwaterStats?.springCount
+		if (!counts) return []
+		return SPRINGS.kinds.flatMap((kind) => {
+			if (kind === "none" || counts[kind] <= 0) return []
+			return [
+				{
+					label: WATER_DOT_LABELS[kind],
+					count: counts[kind],
+					color: rgbToCss(WATER_DOT_COLORS[kind]),
+				},
+			]
+		})
+	}, [world?.groundwaterStats])
+
+	const oasisDistribution = useMemo(() => {
+		const counts = world?.groundwaterStats?.oasisCount
+		if (!counts) return []
+		return OASES.kinds.flatMap((kind) => {
+			if (kind === "none" || counts[kind] <= 0) return []
+			return [
+				{
+					label: WATER_DOT_LABELS[kind],
+					count: counts[kind],
+					color: rgbToCss(WATER_DOT_COLORS[kind]),
+				},
+			]
+		})
+	}, [world?.groundwaterStats])
+
+	const rockDistribution = useMemo(() => {
+		if (!world?.rock) return []
+		if (!world?.rock) return []
+		const landRocks: number[] = []
+		for (let r = 0; r < world.rock.length; r++) {
+			if (world.isLand[r]) landRocks.push(world.rock[r])
+		}
+		return buildDistribution(
+			ROCKS.kinds.map((kind) => ROCKS.info[kind].name),
+			landRocks,
+			(index) => rgbToCss(ROCK_COLORS[ROCKS.kinds[index]]),
+			new Set([ROCKS.kinds.indexOf("sea")]),
+		)
+	}, [world])
+
 	const tradeGoodsDistribution = useMemo(() => {
 		const material = world?.tradeGoods
 		if (!material) return []
@@ -259,5 +331,9 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		topographyDistribution,
 		tradeGoodsDistribution,
 		vegetationDistribution,
+		wetlandDistribution,
+		springDistribution,
+		oasisDistribution,
+		rockDistribution,
 	}
 }

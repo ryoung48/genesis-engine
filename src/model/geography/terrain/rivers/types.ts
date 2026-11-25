@@ -35,6 +35,12 @@ export interface GenesisRivers {
 	basinId: Int32Array
 	/** Per-cell water surface elevation (only meaningful for lake cells) */
 	waterLevel: Float32Array
+	/** Per-basin flag: lake evaporation outruns the river inflow, so nothing leaves the basin. */
+	basinTerminal: Uint8Array
+	/** Per-basin annual mean inflow at the outlets, in m3/s. */
+	basinInflow: Float32Array
+	/** Per-cell lake kind: 0 none, 1 fresh lake, 2 salt lake, 3 pan. Filled by computeLakes. */
+	lakeKind: Uint8Array
 }
 
 export interface ComputeRiversParams {

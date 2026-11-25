@@ -28,12 +28,20 @@ export interface SelectConnectedLakeCellsParams {
 	targetCellCount: number
 }
 
+export type LakeKind = "none" | "fresh" | "salt" | "pan"
+
 export interface ComputeLakesParams {
-	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList">
+	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList" | "regionArea">
+	planetRadiusKm: number
+	secondsPerYear: number
 	elevation: Float32Array
 	rainfall: Pick<GenesisRainfall, "annual">
+	petMonthly: Float32Array
 	waterLevel: Float32Array
 	basinId: Int32Array
+	basinTerminal: Uint8Array
+	basinInflow: Float32Array
+	lakeKind: Uint8Array
 	isLand: Uint8Array
 	emergedLand?: Uint8Array
 	elevationKm?: Float32Array

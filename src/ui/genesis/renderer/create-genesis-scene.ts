@@ -21,6 +21,7 @@ import { createRealmBordersController } from "@/ui/genesis/renderer/genesis-scen
 import { createRiversWindController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/rivers-wind"
 import { createSettlementsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/settlements"
 import { createSolarTerminatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/solar-terminator"
+import { createWaterSymbolsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/water-symbols"
 import { createOverlayVisibilityController } from "@/ui/genesis/renderer/genesis-scene/overlay-visibility-controller"
 import { buildGenesisSceneSetup } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
 import { createSolarSystemController } from "@/ui/genesis/renderer/genesis-scene/solar-system-controller"
@@ -113,6 +114,11 @@ export function createGenesisScene(
 		rebuildOverlays: () => rebuildOverlays(),
 	})
 	const { setWindArrows, setRivers, setRiversVisible } = riversWindController
+
+	const waterSymbolsController = createWaterSymbolsController(context, {
+		rebuildOverlays: () => rebuildOverlays(),
+	})
+	const { setWaterSymbols } = waterSymbolsController
 
 	const orgLabelPools = createNationLabelPools()
 
@@ -284,6 +290,7 @@ export function createGenesisScene(
 			rebuildCoastline: () => coastlineController.rebuild(),
 			rebuildSolarTerminator: () => rebuildSolarTerminator(),
 			rebuildWindArrows: () => riversWindController.rebuildWindArrows(),
+			rebuildWaterSymbols: () => waterSymbolsController.rebuild(),
 			rebuildRivers: () => riversWindController.rebuildRivers(),
 			applyWaterMaterialForMode: (mode) => applyWaterMaterialForMode(mode),
 			rebuildNationBorders: () => rebuildNationBorders(),
@@ -467,6 +474,7 @@ export function createGenesisScene(
 			return [bodyPos.x, bodyPos.y, bodyPos.z]
 		},
 		setWindArrows,
+		setWaterSymbols,
 		setRivers,
 		setRiversVisible,
 		setRealmBorders,

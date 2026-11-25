@@ -23,6 +23,8 @@ export type ColorMode =
 	| "terrainRed"
 	| "landHeightmap"
 	| "slope"
+	| "waterTable"
+	| "wetlands"
 	| "rock"
 	| "soil"
 	| "topography"

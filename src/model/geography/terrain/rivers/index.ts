@@ -1,10 +1,11 @@
+import { DRAINAGE } from "@/model/geography/terrain/drainage"
+import { ENDORHEIC } from "@/model/geography/terrain/endorheic"
 import type {
 	ComputeRiversParams,
 	GenesisRivers,
 	PolylineLengthKmParams,
 } from "@/model/geography/terrain/rivers/types"
 import { MATH } from "@/model/shared/math/core"
-import { MinHeap } from "@/model/shared/min-heap"
 import { UNITS } from "@/model/shared/units"
 
 // A major river carries at least this much water whatever the share of the land above it: an order of magnitude under
@@ -50,147 +51,21 @@ function computeRivers({
 	const regionAreaKm2 = UNITS.regionAreasKm2({ mesh, planetRadiusKm: radiusKm })
 	const cellAreaM2 = new Float64Array(N)
 	for (let r = 0; r < N; r++) cellAreaM2[r] = regionAreaKm2[r] * 1e6
-	const secondsPerYear =
-		(params?.daysPerYear ?? 365) * (params?.hoursPerDay ?? 24) * 3600
+	const secondsPerYear = UNITS.secondsPerYear({
+		daysPerYear: params?.daysPerYear,
+		hoursPerDay: params?.hoursPerDay,
+	})
 
 	// ── 1. Priority-flood drainage ──────────────────────────────────
-	const drainTarget = new Int32Array(N).fill(-1)
-	const visited = new Uint8Array(N)
-	const processOrder: number[] = []
-
-	const key = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		let h = (r * 2654435761) >>> 0
-		h = (((h >>> 16) ^ h) * 0x45d9f3b) >>> 0
-		h = ((h >>> 16) ^ h) >>> 0
-		key[r] = elevation[r] + (h / 0xffffffff) * 1e-7
-	}
-	const heap = new MinHeap(key)
-
 	const land = isLand
+	const { drainTarget, processOrder, waterLevel } = DRAINAGE.order({
+		mesh,
+		elevation,
+		isLand: land,
+		sinks: new Uint8Array(N),
+	})
 
-	// Track effective water surface for lake detection
-	const waterLevel = new Float32Array(N)
-
-	for (let r = 0; r < N; r++) {
-		if (!land[r]) visited[r] = 1
-	}
-
-	for (let r = 0; r < N; r++) {
-		if (visited[r]) continue
-		for (let j = adjOffset[r]; j < adjOffset[r + 1]; j++) {
-			if (!land[adjList[j]]) {
-				visited[r] = 1
-				drainTarget[r] = adjList[j]
-				waterLevel[r] = elevation[r]
-				heap.push(r)
-				processOrder.push(r)
-				break
-			}
-		}
-	}
-
-	while (heap.size > 0) {
-		const r = heap.pop()
-		for (let j = adjOffset[r]; j < adjOffset[r + 1]; j++) {
-			const nb = adjList[j]
-			if (visited[nb]) continue
-			visited[nb] = 1
-			drainTarget[nb] = r
-			// Water level = max of parent's water level and own elevation
-			// In basins, parent's water level (the rim) exceeds the cell's elevation
-			waterLevel[nb] = Math.max(waterLevel[r], elevation[nb])
-			heap.push(nb)
-			processOrder.push(nb)
-		}
-	}
-
-	// ── 2. Flow accumulation (per-month) ───────────────────────────
-	// Use the Pasta AET (actual evapotranspiration) soil-water balance model
-	// to compute runoff = rainfall - AET. This accounts for temperature-driven
-	// PET, soil moisture storage (500mm bucket), and saturation excess.
-	const flow_monthly = new Float32Array(12 * N)
-	const flow = new Float32Array(N)
-	const secondsPerMonth = secondsPerYear / 12
-	const hydro = hydrology
-	const aetMonthly = hydro.aet_monthly
-	const aridityMonthly = hydro.aridity_monthly
-	const baseflowMonthly = hydro.baseflow_monthly
-	const runoffBoost = new Float32Array(N)
-	const passThroughElevBoost = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		const elev = MATH.smoothstep({ edge0: 0, edge1: 0.5, x: elevation[r] })
-		runoffBoost[r] = 1 + elev * 0.5
-		passThroughElevBoost[r] = elev * 0.003
-	}
-
-	// Per-cell pass-through: gentle loss from riparian ET, scaled by monthly PET.
-	// This keeps hot/dry months leakier than cool/wet months instead of using one annual value.
-	const monthlyPetHigh = 2000 / 12
-	const passThroughMonth = new Float32Array(N)
-	const flowToTarget = new Float32Array(N)
-	// Reference discharge (m³/s) at which hydraulic-geometry scaling halves the loss.
-	// Loss fraction âˆ Q^-0.4, motivated by: wetted perimeter ~ Q^0.5, volume ~ Q^0.9.
-	const Q_REF = 500
-
-	for (let month = 0; month < 12; month++) {
-		const mOff = month * N
-		for (let r = 0; r < N; r++) {
-			const idx = mOff + r
-			if (!land[r]) {
-				passThroughMonth[r] = 0
-				flowToTarget[r] = 0
-				continue
-			}
-			const runoffMm =
-				Math.max(0, rainfall.monthly[idx] - aetMonthly[idx]) * runoffBoost[r]
-			const baseflowMm = baseflowMonthly[idx]
-			const totalMm = runoffMm + baseflowMm
-			flowToTarget[r] =
-				totalMm > 0 ? ((totalMm / 1000) * cellAreaM2[r]) / secondsPerMonth : 0
-			const pet = climate.pet_monthly[idx]
-			const loss =
-				0.001 +
-				MATH.smoothstep({ edge0: 0, edge1: monthlyPetHigh, x: pet }) * 0.004
-			passThroughMonth[r] = Math.min(0.999, 1 - loss + passThroughElevBoost[r])
-		}
-
-		// Downstream accumulation for this month
-		for (let i = processOrder.length - 1; i >= 0; i--) {
-			const r = processOrder[i]
-			const target = drainTarget[r]
-			if (target >= 0) {
-				const temp = climate.temperature_monthly[mOff + target]
-				let pt = passThroughMonth[target]
-				pt *=
-					0.9 +
-					0.1 *
-						MATH.smoothstep({
-							edge0: 0.2,
-							edge1: 0.9,
-							x: aridityMonthly[mOff + target],
-						})
-				if (temp <= 0) pt *= MATH.smoothstep({ edge0: -20, edge1: 0, x: temp })
-				else if (temp >= 90)
-					pt *= MATH.smoothstep({ edge0: 150, edge1: 90, x: temp })
-				// Larger rivers lose proportionally less: scale loss by Q^-0.4
-				const inFlow = flowToTarget[r]
-				if (inFlow > 0) pt = 1 - (1 - pt) / Math.pow(1 + inFlow / Q_REF, 0.4)
-				flowToTarget[target] += flowToTarget[r] * pt
-			}
-		}
-
-		for (let r = 0; r < N; r++) flow_monthly[mOff + r] = flowToTarget[r]
-	}
-
-	// Annual average flow (mean of monthly)
-	for (let r = 0; r < N; r++) {
-		let sum = 0
-		for (let month = 0; month < 12; month++) sum += flow_monthly[month * N + r]
-		flow[r] = sum / 12
-	}
-
-	// ── 2b. Basin identification ─────────────────────────────────────
+	// ── 2a. Basin identification ─────────────────────────────────────
 	// Label connected components where priority-flood water level > ground.
 	// computeLakes (lakes.ts) uses basinId to determine lake cells after this returns.
 	const basinId = new Int32Array(N).fill(-1)
@@ -216,6 +91,141 @@ function computeRivers({
 				}
 			}
 		}
+	}
+	const basins = ENDORHEIC.layout({ basinId, elevation })
+	const basinOutlets = ENDORHEIC.outlets({
+		basinId,
+		drainTarget,
+		basinCount: basins.cells.length,
+	})
+	const deficitMm = ENDORHEIC.evaporationDeficit({
+		petMonthly: climate.pet_monthly,
+		rainfallAnnual: rainfall.annual,
+		numRegions: N,
+	})
+
+	// ── 2b. Flow accumulation (per-month) ───────────────────────────
+	// Use the Pasta AET (actual evapotranspiration) soil-water balance model
+	// to compute runoff = rainfall - AET. This accounts for temperature-driven
+	// PET, soil moisture storage (500mm bucket), and saturation excess.
+	const flow_monthly = new Float32Array(12 * N)
+	const flow = new Float32Array(N)
+	const secondsPerMonth = secondsPerYear / 12
+	const hydro = hydrology
+	const aetMonthly = hydro.aet_monthly
+	const aridityMonthly = hydro.aridity_monthly
+	const baseflowMonthly = hydro.baseflow_monthly
+	const runoffBoost = new Float32Array(N)
+	const passThroughElevBoost = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const elev = MATH.smoothstep({ edge0: 0, edge1: 0.5, x: elevation[r] })
+		runoffBoost[r] = 1 + elev * 0.5
+		passThroughElevBoost[r] = elev * 0.003
+	}
+
+	// Per-cell pass-through: gentle loss from riparian ET, scaled by monthly PET.
+	// This keeps hot/dry months leakier than cool/wet months instead of using one annual value.
+	const monthlyPetHigh = 2000 / 12
+	const ownFlow = new Float32Array(12 * N)
+	const passThroughMonth = new Float32Array(12 * N)
+	const flowToTarget = new Float32Array(N)
+	// Reference discharge (m³/s) at which hydraulic-geometry scaling halves the loss.
+	// Loss fraction scales as Q^-0.4, motivated by: wetted perimeter ~ Q^0.5, volume ~ Q^0.9.
+	const Q_REF = 500
+
+	for (let month = 0; month < 12; month++) {
+		const mOff = month * N
+		for (let r = 0; r < N; r++) {
+			const idx = mOff + r
+			if (!land[r]) continue
+			const runoffMm =
+				Math.max(0, rainfall.monthly[idx] - aetMonthly[idx]) * runoffBoost[r]
+			const baseflowMm = baseflowMonthly[idx]
+			const totalMm = runoffMm + baseflowMm
+			ownFlow[idx] =
+				totalMm > 0 ? ((totalMm / 1000) * cellAreaM2[r]) / secondsPerMonth : 0
+			const pet = climate.pet_monthly[idx]
+			const loss =
+				0.001 +
+				MATH.smoothstep({ edge0: 0, edge1: monthlyPetHigh, x: pet }) * 0.004
+			passThroughMonth[idx] = Math.min(
+				0.999,
+				1 - loss + passThroughElevBoost[r],
+			)
+		}
+	}
+
+	const terminalOutlet = new Uint8Array(N)
+	const basinTerminal = new Uint8Array(basins.cells.length)
+	const basinInflow = new Float32Array(basins.cells.length)
+
+	function accumulate(): void {
+		for (let month = 0; month < 12; month++) {
+			const mOff = month * N
+			for (let r = 0; r < N; r++) flowToTarget[r] = ownFlow[mOff + r]
+
+			// Downstream accumulation for this month
+			for (let i = processOrder.length - 1; i >= 0; i--) {
+				const r = processOrder[i]
+				const target = drainTarget[r]
+				if (target >= 0 && !terminalOutlet[r]) {
+					const temp = climate.temperature_monthly[mOff + target]
+					let pt = passThroughMonth[mOff + target]
+					pt *=
+						0.9 +
+						0.1 *
+							MATH.smoothstep({
+								edge0: 0.2,
+								edge1: 0.9,
+								x: aridityMonthly[mOff + target],
+							})
+					if (temp <= 0)
+						pt *= MATH.smoothstep({ edge0: -20, edge1: 0, x: temp })
+					else if (temp >= 90)
+						pt *= MATH.smoothstep({ edge0: 150, edge1: 90, x: temp })
+					// Larger rivers lose proportionally less: scale loss by Q^-0.4
+					const inFlow = flowToTarget[r]
+					if (inFlow > 0) pt = 1 - (1 - pt) / Math.pow(1 + inFlow / Q_REF, 0.4)
+					flowToTarget[target] += flowToTarget[r] * pt
+				}
+			}
+
+			for (let r = 0; r < N; r++) flow_monthly[mOff + r] = flowToTarget[r]
+		}
+
+		// Annual average flow (mean of monthly)
+		for (let r = 0; r < N; r++) {
+			let sum = 0
+			for (let month = 0; month < 12; month++)
+				sum += flow_monthly[month * N + r]
+			flow[r] = sum / 12
+		}
+	}
+
+	// A depression whose lake could not stay filled against evaporation keeps
+	// its water; flows below it fall, which can starve basins further down, so
+	// the verdicts repeat until no basin is newly terminal.
+	for (;;) {
+		accumulate()
+		let added = 0
+		for (let bid = 0; bid < basins.cells.length; bid++) {
+			if (basinTerminal[bid]) continue
+			let inflow = 0
+			for (const outlet of basinOutlets[bid]) inflow += flow[outlet]
+			basinInflow[bid] = inflow
+			const { terminal } = ENDORHEIC.verdict({
+				inflowM3s: inflow,
+				cells: basins.cells[bid],
+				deficitMm,
+				areaM2: cellAreaM2,
+				secondsPerYear,
+			})
+			if (!terminal) continue
+			basinTerminal[bid] = 1
+			for (const outlet of basinOutlets[bid]) terminalOutlet[outlet] = 1
+			added++
+		}
+		if (added === 0) break
 	}
 
 	// ── 3. Threshold (top 5% of land flow) ──────────────────────────
@@ -393,6 +403,9 @@ function computeRivers({
 		visible,
 		basinId,
 		waterLevel,
+		basinTerminal,
+		basinInflow,
+		lakeKind: new Uint8Array(N),
 	}
 }
 

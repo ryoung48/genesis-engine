@@ -122,10 +122,16 @@ export function getHoverTopography(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
 ): string | null {
-	if (!hoverInfo || !world) return null
-	return hoverInfo && world?.topography
-		? (GENESIS_TOPOGRAPHY_LABELS[world.topography[hoverInfo.region]] ?? null)
-		: null
+	if (!hoverInfo || !world?.topography) return null
+	const code = world.topography[hoverInfo.region]
+	if (
+		CLASSIFICATION.isSaltFlat({
+			code,
+			lakeKind: world.rivers?.lakeKind?.[hoverInfo.region],
+		})
+	)
+		return "salt flat"
+	return GENESIS_TOPOGRAPHY_LABELS[code] ?? null
 }
 
 export function getHoverCoordinates(

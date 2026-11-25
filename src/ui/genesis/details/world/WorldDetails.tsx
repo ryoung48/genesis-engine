@@ -115,6 +115,9 @@ function getWorldSections({
 			{ label: "Max Wind", value: stats.get("Max Wind") },
 			{ label: "Major Rivers", value: stats.get("Major Rivers") },
 			{ label: "Longest River", value: stats.get("Longest River") },
+			{ label: "Wetlands", value: stats.get("Wetlands") },
+			{ label: "Springs", value: stats.get("Springs") },
+			{ label: "Oases", value: stats.get("Oases") },
 		].filter((stat): stat is { label: string; value: string } =>
 			Boolean(stat.value),
 		),
@@ -175,6 +178,10 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	climateDistribution,
 	vegetationDistribution,
 	topographyDistribution,
+	wetlandDistribution,
+	springDistribution,
+	oasisDistribution,
+	rockDistribution,
 	techLevelDistribution,
 	tradeGoodsDistribution,
 }) => {
@@ -254,6 +261,30 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 						<DistributionChart
 							title="Topography"
 							buckets={topographyDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
+						<DistributionChart
+							title="Wetlands"
+							buckets={wetlandDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
+						<DistributionChart
+							title="Springs"
+							buckets={springDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
+						<DistributionChart
+							title="Oases"
+							buckets={oasisDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
+						<DistributionChart
+							title="Rocks"
+							buckets={rockDistribution}
 							variant="compact"
 							showTotal={false}
 						/>

@@ -56,6 +56,12 @@ The three history producers are [stored Earth, detailed simulation and default f
 
 The topic references describe the implemented rules. Mechanics covers pipeline performance and memory; each historical measurement retains its own workload and limits. Proposed features remain in `plans/`, not in these references.
 
+## Terrain
+
+- [Rivers and lakes, terminal salt lakes and pans](rivers-and-lakes.md)
+- [Rocks and soil](rocks-and-soil.md)
+- [Groundwater overview](groundwater/overview.md): [hydraulic soil](groundwater/hydraulic-soil.md), [water table, springs, oases and wells](groundwater/water-table.md), [wetlands and the marsh label](groundwater/wetlands.md)
+
 ## Interface and navigation
 
 [Province wiki](../development/province-wiki.md) explains map-click routing, current-frame province detail and synthetic local weather. Weather does not affect historical outcomes.

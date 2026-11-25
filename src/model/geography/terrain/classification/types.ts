@@ -1,5 +1,4 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
-import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { SphereMesh } from "@/model/mesh/types"
 
 export interface ComputeSlopeScoreParams {
@@ -12,11 +11,17 @@ export interface ClassifyTopographyParams {
 	mesh: SphereMesh
 	elevationKm: Float32Array
 	isLand: Uint8Array
-	rivers: Pick<GenesisRivers, "visible" | "terminal">
 	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
-	vegetation?: Uint8Array
 	slopeScore?: Float32Array
 	planetRadiusKm?: number
-	seed?: number
-	tidalRange?: Float32Array
+}
+
+export interface ApplyMarshParams {
+	topography: Uint8Array
+	wetlandShare: Float32Array
+}
+
+export interface IsSaltFlatParams {
+	code: number
+	lakeKind: number | undefined
 }

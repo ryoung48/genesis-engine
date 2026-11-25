@@ -10,6 +10,10 @@ import type {
 	WindVectors,
 } from "@/model/climate/weather/wind/types"
 import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
+import type {
+	GroundwaterLayers,
+	GroundwaterStats,
+} from "@/model/geography/terrain/groundwater/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
@@ -165,6 +169,10 @@ export interface SerializedGenesisWorld {
 	glaciated?: Uint8Array
 	soilFertility?: Float32Array
 	soilModifier?: Uint8Array
+	/** [JUSTIFICATION] Groundwater needs the rock layer, so only procedural worlds have it. */
+	groundwater?: GroundwaterLayers
+	/** [JUSTIFICATION] Present exactly when groundwater is. */
+	groundwaterStats?: GroundwaterStats
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	dtr_annual: Float32Array
@@ -212,6 +220,7 @@ export interface SerializedGenesisWorld {
 		visible: Uint8Array
 		basinId: Int32Array
 		waterLevel: Float32Array
+		lakeKind: Uint8Array
 	}
 	oceanCurrents: GenesisOceanCurrents
 	provinces?: SerializedProvinces

@@ -1,10 +1,15 @@
-import { VEGETATION } from "@/model/climate/classification/vegetation"
 import type {
+	ApplyMarshParams,
 	ClassifyTopographyParams,
 	ComputeSlopeScoreParams,
+	IsSaltFlatParams,
 } from "@/model/geography/terrain/classification/types"
+import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
+import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
-import { SimplexNoise } from "@/model/shared/math/simplex-noise"
+import { TERRAIN_SLOPE } from "@/model/geography/terrain/slope"
+
+const C = GROUNDWATER_CONFIG
 
 const topoFlat = 0
 
@@ -26,25 +31,8 @@ function computeSlopeScore({
 	planetRadiusKm = 6371,
 }: ComputeSlopeScoreParams): Float32Array {
 	const N = mesh.numRegions
-	const { adjOffset, adjList, neighborDist } = mesh
-	const localSlope = new Float32Array(N)
-	const localWeight = new Float32Array(N)
-
-	for (let r = 0; r < N; r++) {
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			const edgeKm = Math.max(1e-6, (neighborDist[j] ?? 0) * planetRadiusKm)
-			const reliefKm = Math.abs(elevationKm[r] - elevationKm[nb])
-			const slope = reliefKm / edgeKm
-			const weight = 1 / edgeKm
-			localSlope[r] += slope * weight
-			localWeight[r] += weight
-		}
-	}
-
-	for (let r = 0; r < N; r++) {
-		localSlope[r] = localWeight[r] > 0 ? localSlope[r] / localWeight[r] : 0
-	}
+	const { adjOffset, adjList } = mesh
+	const localSlope = TERRAIN_SLOPE.local({ mesh, elevationKm, planetRadiusKm })
 
 	const smoothedSlope = new Float32Array(N)
 	const smoothWeight = new Float32Array(N)
@@ -86,44 +74,17 @@ function classifyTopography(params: ClassifyTopographyParams): {
 	lakeCoastal: Uint8Array
 	slopeScore: Float32Array
 } {
-	const {
-		mesh,
-		elevationKm,
-		isLand,
-		rivers,
-		vegetation,
-		planetRadiusKm,
-		tidalRange,
-	} = params
+	const { mesh, elevationKm, isLand, planetRadiusKm } = params
 	const slopeScore =
 		params.slopeScore ??
 		computeSlopeScore({ mesh, elevationKm, planetRadiusKm })
 	const topography = new Uint8Array(mesh.numRegions)
 	const coastal = new Uint8Array(mesh.numRegions)
-	const { adjOffset, adjList, r_xyz } = mesh
+	const { adjOffset, adjList } = mesh
 	const isLake = (r: number) =>
 		!isLand[r] && LANDMARKS.isLake({ landmarks: params.landmarks, region: r })
 	const adjacentLake = new Uint8Array(mesh.numRegions)
 	const adjacentOcean = new Uint8Array(mesh.numRegions)
-	const adjacentTerminal = new Uint8Array(mesh.numRegions)
-	const adjacentRiver = new Uint8Array(mesh.numRegions)
-	const marsh = new Uint8Array(mesh.numRegions)
-	const marshNoise = new Float32Array(mesh.numRegions)
-	const noise1 = new SimplexNoise((params.seed ?? 0) + 7101)
-	const noise2 = new SimplexNoise((params.seed ?? 0) + 7102)
-	const noise3 = new SimplexNoise((params.seed ?? 0) + 7103)
-	const desertBiome = VEGETATION.biomeLabels.indexOf("desert")
-	const marshNoiseThreshold = 0.48
-	const marshScoreThreshold = 0.64
-
-	function isMarshCandidate(r: number): boolean {
-		const isDesert = vegetation?.[r] === desertBiome
-		return isLand[r] === 1 && (!isDesert || rivers.terminal[r] === 1)
-	}
-
-	function marshEdgeBias(r: number): number {
-		return marshNoise[r]
-	}
 
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (isLake(r)) {
@@ -135,55 +96,11 @@ function classifyTopography(params: ClassifyTopographyParams): {
 			continue
 		}
 
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-		const broad = noise1.noise3D(x * 5.5, y * 5.5, z * 5.5)
-		const medium = noise2.noise3D(x * 12.5 + 17, y * 12.5 + 17, z * 12.5 + 17)
-		const breakup = noise3.noise3D(x * 24 + 31, y * 24 + 31, z * 24 + 31)
-		const n = broad * 0.55 + medium * 0.2 + breakup * 0.25
-		marshNoise[r] = 0.5 + 0.5 * n
-
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
 			if (isLake(nb)) adjacentLake[r] = 1
 			if (!isLand[nb] && !isLake(nb)) adjacentOcean[r] = 1
-			if (rivers.visible[nb] || rivers.terminal[nb]) adjacentRiver[r] = 1
-			if (rivers.terminal[nb]) adjacentTerminal[r] = 1
 		}
-	}
-
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (!isMarshCandidate(r)) continue
-		if (rivers.visible[r] || rivers.terminal[r]) adjacentRiver[r] = 1
-		if (rivers.terminal[r]) {
-			marsh[r] = 1
-			continue
-		}
-
-		const noiseBias = marshEdgeBias(r)
-		const elevation = elevationKm[r]
-		const slope = slopeScore[r]
-		if (elevation > 0.27 || slope > 0.16) continue
-
-		const elevationFactor = Math.max(0, Math.min(1, 1 - elevation / 0.22))
-		const slopeFactor = Math.max(0, Math.min(1, 1 - slope / 0.11))
-		const lakeBonus = adjacentLake[r] ? 0.14 : 0
-		const riverBonus = adjacentRiver[r] ? 0.08 : 0
-		const terminalBonus = adjacentTerminal[r] ? 0.14 : 0
-		const coastalBonus = adjacentOcean[r] ? 0.1 : 0
-		const tidalBonus = (tidalRange?.[r] ?? 0) * 0.2
-		const marshScore =
-			noiseBias * 0.58 +
-			elevationFactor * 0.17 +
-			slopeFactor * 0.13 +
-			lakeBonus +
-			riverBonus +
-			terminalBonus +
-			coastalBonus +
-			tidalBonus
-		if (noiseBias >= marshNoiseThreshold && marshScore >= marshScoreThreshold)
-			marsh[r] = 1
 	}
 
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -193,10 +110,6 @@ function classifyTopography(params: ClassifyTopographyParams): {
 		const slope = slopeScore[r]
 		if (adjacentOcean[r] || adjacentLake[r]) coastal[r] = 1
 
-		if (marsh[r]) {
-			topography[r] = topoMarsh
-			continue
-		}
 		if (
 			(elevation >= 2.2 && slope >= 0.3) ||
 			(elevation >= 1.2 && slope >= 0.45) ||
@@ -228,6 +141,16 @@ function classifyTopography(params: ClassifyTopographyParams): {
 	}
 }
 
+function applyMarsh({ topography, wetlandShare }: ApplyMarshParams): void {
+	for (let r = 0; r < topography.length; r++)
+		if (topography[r] === topoFlat && wetlandShare[r] >= C.marshShare)
+			topography[r] = topoMarsh
+}
+
+function isSaltFlat({ code, lakeKind }: IsSaltFlatParams): boolean {
+	return code === topoFlat && lakeKind === LAKES.kindCode.pan
+}
+
 export const CLASSIFICATION = {
 	computeSlopeScore,
 	topoFlat,
@@ -239,4 +162,6 @@ export const CLASSIFICATION = {
 	topoLake,
 	genesisTopographyLabels,
 	classifyTopography,
+	applyMarsh,
+	isSaltFlat,
 }

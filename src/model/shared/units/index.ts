@@ -3,6 +3,7 @@ import type {
 	RegionAreasKm2Params,
 	RegionDistanceKmParams,
 	RegionPathLengthKmParams,
+	SecondsPerYearParams,
 } from "@/model/shared/units/types"
 
 const defaultPlanetRadiusKm = 6371
@@ -89,6 +90,13 @@ function regionDistanceKm({
 	return Math.acos(Math.max(-1, Math.min(1, cosTheta))) * planetRadiusKm
 }
 
+function secondsPerYear({
+	daysPerYear = defaultDaysPerYear,
+	hoursPerDay = defaultHoursPerDay,
+}: SecondsPerYearParams): number {
+	return daysPerYear * hoursPerDay * 3600
+}
+
 export const UNITS = {
 	defaultPlanetRadiusKm,
 	defaultObliquityDeg,
@@ -104,4 +112,5 @@ export const UNITS = {
 	regionAreasKm2,
 	regionPathLengthKm,
 	regionDistanceKm,
+	secondsPerYear,
 }

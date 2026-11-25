@@ -69,6 +69,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowWaves,
 	showWindArrows,
 	setShowWindArrows,
+	showWaterSymbols,
+	setShowWaterSymbols,
+	hasGroundwater,
 	showGdd,
 	setShowGdd,
 	showGint,
@@ -465,6 +468,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setTopographyExpanded={setTopographyExpanded}
 									topographySubMode={topographySubMode}
 									setTopographySubMode={setTopographySubMode}
+									hasGroundwater={hasGroundwater}
+									showWaterSymbols={showWaterSymbols}
+									setShowWaterSymbols={setShowWaterSymbols}
 								/>
 
 								<VegetationModeSection

@@ -26,6 +26,10 @@ import type {
 	TectonicPlate,
 } from "@/model/geography/tectonics/types"
 import type { ArcCrustRun } from "@/model/geography/terrain/arc-crust/types"
+import type {
+	GroundwaterLayers,
+	GroundwaterStats,
+} from "@/model/geography/terrain/groundwater/types"
 import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
@@ -225,6 +229,10 @@ export interface GenesisWorld {
 	soilFertility?: Float32Array
 	/** [JUSTIFICATION] Dominant soil climate modifier code per region (none, black, leached, podzol); absent for Earth imports. */
 	soilModifier?: Uint8Array
+	/** [JUSTIFICATION] Groundwater layers need the rock layer; absent for Earth imports. */
+	groundwater?: GroundwaterLayers
+	/** [JUSTIFICATION] Present exactly when groundwater is. */
+	groundwaterStats?: GroundwaterStats
 	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array

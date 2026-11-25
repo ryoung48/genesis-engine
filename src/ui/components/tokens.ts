@@ -77,6 +77,13 @@ export const uiWindMap = {
 	mapDepth: 0.003,
 } as const
 
+export const uiWaterSymbols = {
+	radiusRad: 0.003,
+	globeRadius: 1.02,
+	raisedGlobeRadius: 1.06,
+	mapDepth: 0.003,
+} as const
+
 export const uiChartPalette = {
 	moon: ["#0ea5e9", "#8b5cf6", "#10b981"] as const,
 	solar: "#f59e0b",

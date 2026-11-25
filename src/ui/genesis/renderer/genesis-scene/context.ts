@@ -30,6 +30,7 @@ import type {
 	OrgHighlightSpec,
 	RealmBordersSpec,
 	RiverData,
+	WaterSymbolData,
 	WindArrowData,
 } from "@/ui/genesis/renderer/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
@@ -165,6 +166,9 @@ export interface GenesisContext {
 	globeWindArrows: THREE.LineSegments | null
 	mapWindArrows: THREE.LineSegments | null
 	windArrowData: WindArrowData | null
+	globeWaterSymbols: THREE.Group | null
+	mapWaterSymbols: THREE.Group | null
+	waterSymbolData: WaterSymbolData | null
 	globeRivers: THREE.Group | null
 	mapRivers: THREE.Group | null
 	riverData: RiverData | null

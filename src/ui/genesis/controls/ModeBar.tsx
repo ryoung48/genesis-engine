@@ -47,6 +47,8 @@ function resolveSubMode({
 	}
 	if (baseMode === "topography") {
 		if (topographySubMode === "slope") return "slope"
+		if (topographySubMode === "waterTable") return "waterTable"
+		if (topographySubMode === "wetlands") return "wetlands"
 		return "topography"
 	}
 	return baseMode

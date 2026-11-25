@@ -147,6 +147,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showWindArrows, setShowWindArrows] = useState(
 		initialViewPrefs.showWindArrows,
 	)
+	const [showWaterSymbols, setShowWaterSymbols] = useState(
+		initialViewPrefs.showWaterSymbols,
+	)
 	const [showOceanCurrents, setShowOceanCurrents] = useState(
 		initialViewPrefs.showOceanCurrents,
 	)
@@ -265,6 +268,7 @@ export function useOverlayState(input: OverlayStateInput) {
 			showCoastlines,
 			showWaves,
 			showWindArrows,
+			showWaterSymbols,
 			showGdd,
 			showGint,
 			showPet,
@@ -359,6 +363,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showCoastlines,
 		showWaves,
 		showWindArrows,
+		showWaterSymbols,
 		showGdd,
 		showGint,
 		showPet,
@@ -453,6 +458,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowSolarSystemTrueScale,
 		setShowSolarSystemInclination,
 		setShowWindArrows,
+		setShowWaterSymbols,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
 		setSolarSystemTrailDegrees,
@@ -488,6 +494,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showSolarSystemTrueScale,
 		showSolarSystemInclination,
 		showWindArrows,
+		showWaterSymbols,
 		showWireframe,
 		solarSystemControlsExpanded,
 		solarSystemTrailDegrees,

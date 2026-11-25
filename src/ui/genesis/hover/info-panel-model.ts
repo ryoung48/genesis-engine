@@ -1,6 +1,12 @@
 import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { OASES } from "@/model/geography/terrain/groundwater/oases"
+import { SPRINGS } from "@/model/geography/terrain/groundwater/springs"
+import { WETLANDS } from "@/model/geography/terrain/groundwater/wetlands"
+import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
+import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import { SOILS } from "@/model/geography/terrain/soils"
@@ -49,10 +55,19 @@ import {
 	getTerrainFeatureColor,
 	getTopographyColor,
 	rockColor,
+	SALT_PAN_COLOR,
 	soilColor,
+	WATER_DOT_COLORS,
+	WATER_DOT_LABELS,
+	WETLAND_KIND_COLORS,
+	waterTableClass,
+	waterTableColor,
 } from "@/ui/genesis/shared/region-colors/palette"
 import {
 	formatDensity,
+	formatFlowRate,
+	formatHeight,
+	formatPrecipitation,
 	rgbToCss,
 	type UnitSystem,
 } from "@/ui/genesis/shared/ui-format"
@@ -323,7 +338,13 @@ export function buildTopographySwatchColor(
 	world: SerializedGenesisWorld | null,
 ): string | null {
 	if (hoverRegion === null || !world?.topography) return null
-	const color = getTopographyColor(world.topography[hoverRegion])
+	const code = world.topography[hoverRegion]
+	const color = CLASSIFICATION.isSaltFlat({
+		code,
+		lakeKind: world.rivers?.lakeKind?.[hoverRegion],
+	})
+		? SALT_PAN_COLOR
+		: getTopographyColor(code)
 	return color ? rgbToCss(color) : null
 }
 
@@ -607,4 +628,127 @@ export function buildHoverGeology({
 		soil: `${SOILS.kindWord({ rock, young })}${modifier ? `, ${modifier}` : ""} · ${SOILS.grade(fertility)} ${(fertility * 100).toFixed(0)}%`,
 		soilColor: rgbToCss(soilColor(fertility)),
 	}
+}
+
+export interface HoverGroundwaterRow {
+	label: string
+	value: string
+	color: string | null
+}
+
+const SHARE_BYTE = 255
+
+const percentOf = (share: number) => `${Math.round(share * 100)}%`
+
+export function buildHoverLakeKind({
+	world,
+	region,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+}): string | null {
+	const code = region === null ? 0 : (world?.rivers?.lakeKind?.[region] ?? 0)
+	if (code === 0) return null
+	return LAKES.kinds[code]
+}
+
+export function buildHoverGroundwater({
+	world,
+	region,
+	colorMode,
+	unitSystem,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+	colorMode: ColorMode
+	unitSystem: UnitSystem
+}): HoverGroundwaterRow[] {
+	const layers = world?.groundwater
+	if (
+		!layers ||
+		region === null ||
+		!world.isLand[region] ||
+		(colorMode !== "waterTable" && colorMode !== "wetlands")
+	)
+		return []
+	const flow = (value: number) =>
+		formatFlowRate(value, unitSystem, (v) => v.toFixed(2))
+	const rate = (mm: number) => `${formatPrecipitation(mm, unitSystem, 0)}/yr`
+	const rows: HoverGroundwaterRow[] = []
+	const spring = SPRINGS.kinds[layers.spring[region]]
+	const oasis = OASES.kinds[layers.oasis[region]]
+	if (spring !== "none")
+		rows.push({
+			label: "Springs",
+			value: WATER_DOT_LABELS[spring],
+			color: rgbToCss(WATER_DOT_COLORS[spring]),
+		})
+	else if (oasis !== "none")
+		rows.push({ label: "Springs", value: "None classified", color: null })
+	if (oasis !== "none")
+		rows.push({
+			label: "Oasis",
+			value: WATER_DOT_LABELS[oasis],
+			color: rgbToCss(WATER_DOT_COLORS[oasis]),
+		})
+	if (colorMode === "waterTable") {
+		const depth = layers.waterTableM[region]
+		const classes = GROUNDWATER_CONFIG.depthClassesM
+		rows.push(
+			{
+				label: "Water table",
+				value: formatHeight({ value: depth, unitSystem }),
+				color: rgbToCss(waterTableColor(waterTableClass(depth))),
+			},
+			{
+				label: "Shallow share",
+				value: classes
+					.map(
+						(limit, k) =>
+							`${percentOf(layers.shallowShare[region * classes.length + k] / SHARE_BYTE)} ≤${formatHeight({ value: limit, unitSystem })}`,
+					)
+					.join(" · "),
+				color: null,
+			},
+			{
+				label: "Recharge",
+				value: rate(layers.rechargeMm[region]),
+				color: null,
+			},
+			{
+				label: "Lateral inflow",
+				value: flow(layers.lateralInM3s[region]),
+				color: null,
+			},
+			{
+				label: "Surfacing",
+				value: flow(layers.surfaceM3s[region]),
+				color: null,
+			},
+			{
+				label: "Channel recharge",
+				value: flow(layers.channelRechargeM3s[region]),
+				color: null,
+			},
+			{ label: "Well yield", value: rate(layers.wellMm[region]), color: null },
+			{
+				label: "Texture",
+				value: `${layers.sand[region].toFixed(0)}% sand · ${layers.clay[region].toFixed(0)}% clay · ${formatHeight({ value: layers.soilDepthM[region], unitSystem })}`,
+				color: null,
+			},
+		)
+		return rows
+	}
+	const kind = WETLANDS.kinds[layers.wetlandKind[region]]
+	rows.push({
+		label: "Wetland",
+		value: `${kind.replace(/([A-Z])/g, " $1").toLowerCase()} ${percentOf(layers.wetlandShare[region])}`,
+		color: rgbToCss(WETLAND_KIND_COLORS[layers.wetlandKind[region]]),
+	})
+	rows.push({
+		label: "Causes",
+		value: `groundwater ${percentOf(layers.wetGw[region])} · flood ${percentOf(layers.wetFlood[region])} · coast ${percentOf(layers.wetCoast[region])} · lake ${percentOf(layers.wetLake[region])}`,
+		color: null,
+	})
+	return rows
 }

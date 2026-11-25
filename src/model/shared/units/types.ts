@@ -26,3 +26,10 @@ export interface RegionDistanceKmParams {
 	toRegion: number
 	planetRadiusKm?: number
 }
+
+export interface SecondsPerYearParams {
+	/** [JUSTIFICATION] Callers pass the planet's own orbital and rotation settings, which may be unset. */
+	daysPerYear?: number
+	/** [JUSTIFICATION] Callers pass the planet's own orbital and rotation settings, which may be unset. */
+	hoursPerDay?: number
+}

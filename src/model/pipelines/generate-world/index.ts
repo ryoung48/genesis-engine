@@ -912,6 +912,8 @@ function generateGenesisWorld({
 		glaciated: post.surface?.glaciated,
 		soilFertility: post.surface?.soilFertility,
 		soilModifier: post.surface?.soilModifier,
+		groundwater: post.groundwater,
+		groundwaterStats: post.groundwaterStats,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,
 		hydrology: post.hydrology,

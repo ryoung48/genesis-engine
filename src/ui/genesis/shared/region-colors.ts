@@ -4,6 +4,7 @@ import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import { RELIGION } from "@/model/history/sim/religion"
@@ -84,10 +85,14 @@ import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality
 import {
 	basinColor,
 	rockColor,
+	SALT_PAN_COLOR,
 	soilColor,
 	TERRAIN_FEATURE_COLORS,
 	TOPOGRAPHY_COLORS,
 	UNOWNED_GRAY,
+	waterTableClass,
+	waterTableColor,
+	wetlandColor,
 } from "@/ui/genesis/shared/region-colors/palette"
 import type { RegionColorsInput } from "@/ui/genesis/shared/region-colors/types"
 
@@ -202,6 +207,30 @@ export function computeRegionColors({
 		return rgb
 	}
 
+	if (
+		(colorMode === "waterTable" || colorMode === "wetlands") &&
+		world.groundwater
+	) {
+		const groundwater = world.groundwater
+		for (let r = 0; r < N; r++) {
+			const active = isLandRegion(r) && !world.iceThickness?.[r]
+			const [cr, cg, cb] = !isLandRegion(r)
+				? oceanRgb(r)
+				: !active
+					? UNOWNED_GRAY
+					: colorMode === "waterTable"
+						? waterTableColor(waterTableClass(groundwater.waterTableM[r]))
+						: wetlandColor({
+								kind: groundwater.wetlandKind[r],
+								share: groundwater.wetlandShare[r],
+							})
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
 	if (colorMode === "topography" && world.topography) {
 		for (let r = 0; r < N; r++) {
 			const topo = world.topography[r]
@@ -212,7 +241,12 @@ export function computeRegionColors({
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else {
-				const [cr, cg, cb] = TOPOGRAPHY_COLORS[topo] ?? [1, 1, 1]
+				const [cr, cg, cb] = CLASSIFICATION.isSaltFlat({
+					code: topo,
+					lakeKind: world.rivers?.lakeKind?.[r],
+				})
+					? SALT_PAN_COLOR
+					: (TOPOGRAPHY_COLORS[topo] ?? [1, 1, 1])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb

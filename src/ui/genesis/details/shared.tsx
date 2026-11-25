@@ -19,6 +19,10 @@ export interface DetailsDrawerBaseProps {
 	climateDistribution: DistributionBucket[]
 	vegetationDistribution: DistributionBucket[]
 	topographyDistribution: DistributionBucket[]
+	wetlandDistribution: DistributionBucket[]
+	springDistribution: DistributionBucket[]
+	oasisDistribution: DistributionBucket[]
+	rockDistribution: DistributionBucket[]
 	techLevelDistribution: DistributionBucket[]
 	/** Whether climate/vegetation/topography above are bucketed from real EU5
 	 * observed data rather than the procedural model -- tracks the map

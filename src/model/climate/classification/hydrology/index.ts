@@ -101,6 +101,7 @@ function computeHydrologyFields({
 	const aet = PARALLEL.shared(new Float32Array(12 * N))
 	const aridity = PARALLEL.shared(new Float32Array(12 * N))
 	const baseflow = PARALLEL.shared(new Float32Array(12 * N))
+	const runoff = PARALLEL.shared(new Float32Array(N))
 	PARALLEL.mapCells({
 		task: "hydrologyCells",
 		kernel: hydrologyCells,
@@ -112,12 +113,14 @@ function computeHydrologyFields({
 			aet_monthly: aet,
 			aridity_monthly: aridity,
 			baseflow_monthly: baseflow,
+			runoff_annual: runoff,
 		},
 	})
 	return {
 		aet_monthly: PARALLEL.local(aet),
 		aridity_monthly: PARALLEL.local(aridity),
 		baseflow_monthly: PARALLEL.local(baseflow),
+		runoff_annual: PARALLEL.local(runoff),
 	}
 }
 
@@ -130,6 +133,7 @@ function hydrologyCells({
 	aet_monthly,
 	aridity_monthly,
 	baseflow_monthly,
+	runoff_annual,
 }: HydrologyCellsParams): void {
 	const N = isLand.length
 	const rain = new Float64Array(12)
@@ -155,6 +159,10 @@ function hydrologyCells({
 		// Spin up groundwater store to cyclostationary state.
 		// Recharge = F_PERC × surface runoff each month; release = K_GW × S_gw.
 		let gw = 0
+		let annualRunoff = 0
+		for (let m = 0; m < 12; m++)
+			annualRunoff += Math.max(0, rain[m] - aetBuf[m])
+		runoff_annual[r] = annualRunoff
 		for (let iter = 0; iter < 30; iter++) {
 			const startGw = gw
 			for (let m = 0; m < 12; m++) {

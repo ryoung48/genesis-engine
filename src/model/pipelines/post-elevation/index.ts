@@ -17,6 +17,11 @@ import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { CLIMATE_V2 } from "@/model/climatev2"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { GROUNDWATER } from "@/model/geography/terrain/groundwater"
+import type {
+	GroundwaterLayers,
+	GroundwaterStats,
+} from "@/model/geography/terrain/groundwater/types"
 import { HAZARDS } from "@/model/geography/terrain/hazards"
 import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
@@ -312,6 +317,9 @@ function runPostElevationPipeline(
 			terminalInterior: new Uint8Array(N),
 			basinId: new Int32Array(N).fill(-1),
 			waterLevel: new Float32Array(N),
+			basinTerminal: new Uint8Array(0),
+			basinInflow: new Float32Array(0),
+			lakeKind: new Uint8Array(N),
 		}
 		if (realLakeRegions) {
 			for (let r = 0; r < N; r++) {
@@ -334,10 +342,16 @@ function runPostElevationPipeline(
 		t0 = performance.now()
 		LAKES.computeLakes({
 			mesh,
+			planetRadiusKm: params.planetRadiusKm,
+			secondsPerYear: UNITS.secondsPerYear(params),
 			elevation,
 			rainfall,
+			petMonthly: climate.pet_monthly,
 			waterLevel: rivers.waterLevel,
 			basinId: rivers.basinId,
+			basinTerminal: rivers.basinTerminal,
+			basinInflow: rivers.basinInflow,
+			lakeKind: rivers.lakeKind,
 			isLand,
 			emergedLand,
 			elevationKm: elevation_km,
@@ -625,12 +639,8 @@ function runPostElevationPipeline(
 			mesh,
 			elevationKm: elevation_km,
 			isLand,
-			rivers,
 			landmarks,
-			vegetation,
 			planetRadiusKm: params.planetRadiusKm,
-			seed: params.seed,
-			tidalRange,
 			slopeScore,
 		})
 	TIMING.record({ stage: "Post: topography", startedAt: t0, timings })
@@ -689,6 +699,8 @@ function runPostElevationPipeline(
 
 	// ── Rock and soil ──────────────────────────────────────────────────
 	let surfaceFields: GenesisSurface | undefined
+	let groundwaterLayers: GroundwaterLayers | undefined
+	let groundwaterStats: GroundwaterStats | undefined
 	if (surface) {
 		t0 = performance.now()
 		const { presentTectonics } = surface
@@ -735,6 +747,34 @@ function runPostElevationPipeline(
 		}
 		TIMING.record({ stage: "Post: rocks and soil", startedAt: t0, timings })
 		onProgress?.("Post: rocks and soil", 69)
+
+		t0 = performance.now()
+		const groundwater = GROUNDWATER.compute({
+			mesh,
+			elevationKm: elevation_km,
+			isLand,
+			lakeKind: rivers.lakeKind,
+			iceThickness,
+			climate,
+			rainfall,
+			hydrology,
+			rivers,
+			tidalRange,
+			vegetation,
+			surface: surfaceFields,
+			planetRadiusKm: params.planetRadiusKm,
+			secondsPerYear: UNITS.secondsPerYear(params),
+			maxElevKm: (params.maxElevation ?? 6000) / 1000,
+			maxDepthKm: UNITS.getMaxOceanDepthKm(params.planetRadiusKm),
+		})
+		groundwaterLayers = groundwater.layers
+		groundwaterStats = groundwater.stats
+		CLASSIFICATION.applyMarsh({
+			topography,
+			wetlandShare: groundwater.layers.wetlandShare,
+		})
+		TIMING.record({ stage: "Post: groundwater", startedAt: t0, timings })
+		onProgress?.("Post: groundwater", 69)
 	}
 
 	// ── Hazards ────────────────────────────────────────────────────────
@@ -1073,6 +1113,8 @@ function runPostElevationPipeline(
 		coastal,
 		slopeScore,
 		surface: surfaceFields,
+		groundwater: groundwaterLayers,
+		groundwaterStats,
 		climateZones,
 		realClimateZones,
 		koppenClimate,

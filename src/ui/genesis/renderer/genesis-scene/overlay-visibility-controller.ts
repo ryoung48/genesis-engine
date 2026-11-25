@@ -89,6 +89,12 @@ export function createOverlayVisibilityController(
 			ctx.mapWindArrows.visible = showMap
 			if (ctx.mapMesh) ctx.mapWindArrows.position.copy(ctx.mapMesh.position)
 		}
+		if (ctx.globeWaterSymbols)
+			ctx.globeWaterSymbols.visible = ctx.currentViewMode === "globe"
+		if (ctx.mapWaterSymbols) {
+			ctx.mapWaterSymbols.visible = showMap
+			if (ctx.mapMesh) ctx.mapWaterSymbols.position.copy(ctx.mapMesh.position)
+		}
 		if (ctx.globeRivers)
 			ctx.globeRivers.visible =
 				ctx.riversVisible && ctx.currentViewMode === "globe"

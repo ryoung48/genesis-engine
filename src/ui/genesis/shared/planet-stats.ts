@@ -234,6 +234,14 @@ export function computePlanetStats(
 		riverCount = seenIds.size
 	}
 
+	const groundwaterStats = world?.groundwaterStats ?? null
+	const springTotal = groundwaterStats
+		? Object.values(groundwaterStats.springCount).reduce((a, b) => a + b, 0)
+		: null
+	const oasisTotal = groundwaterStats
+		? Object.values(groundwaterStats.oasisCount).reduce((a, b) => a + b, 0)
+		: null
+
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = (activeParams?.tideLock ?? params.tideLock)?.type === "solar"
 	const retrograde =
@@ -389,6 +397,20 @@ export function computePlanetStats(
 				longestRiverKm !== null
 					? formatDistance(longestRiverKm, unitSystem)
 					: "-",
+		},
+		{
+			label: "Wetlands",
+			value: groundwaterStats
+				? `${(groundwaterStats.wetlandShare * 100).toFixed(1)}%`
+				: "",
+		},
+		{
+			label: "Springs",
+			value: springTotal !== null ? springTotal.toLocaleString() : "",
+		},
+		{
+			label: "Oases",
+			value: oasisTotal !== null ? oasisTotal.toLocaleString() : "",
 		},
 		{
 			label: "Avg Temp",

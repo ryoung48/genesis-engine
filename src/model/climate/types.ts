@@ -39,5 +39,6 @@ export interface GenesisOceanCurrents {
 export interface GenesisHydrology {
 	aet_monthly: Float32Array // [month * N + r] mm
 	aridity_monthly: Float32Array // [month * N + r] AET / PET
+	runoff_annual: Float32Array // [r] mm, sum over months of max(0, rain - AET)
 	baseflow_monthly: Float32Array // [month * N + r] mm — slow groundwater discharge
 }

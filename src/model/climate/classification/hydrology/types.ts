@@ -68,4 +68,5 @@ export interface HydrologyCellsParams extends CellRange {
 	aet_monthly: Float32Array
 	aridity_monthly: Float32Array
 	baseflow_monthly: Float32Array
+	runoff_annual: Float32Array
 }

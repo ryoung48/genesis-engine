@@ -29,6 +29,12 @@ import type {
 
 export type { WindArrowData }
 
+export interface WaterSymbolData {
+	r_xyz: Float32Array
+	key: Uint8Array
+	side: Int8Array
+}
+
 export type GenesisViewMode = "globe" | "map"
 
 export interface MapCloudMeshInput {
@@ -44,6 +50,18 @@ export interface BuildGlobeWindArrowsInput {
 
 export interface BuildMapWindArrowsInput {
 	data: WindArrowData
+	viewMode: GenesisViewMode
+	projectionLatitudeDeg: number
+}
+
+export interface BuildGlobeWaterSymbolsInput {
+	data: WaterSymbolData
+	viewMode: GenesisViewMode
+	elevationVisible: boolean
+}
+
+export interface BuildMapWaterSymbolsInput {
+	data: WaterSymbolData
 	viewMode: GenesisViewMode
 	projectionLatitudeDeg: number
 }
@@ -342,6 +360,7 @@ export interface GenesisScene {
 	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void
+	setWaterSymbols(data: WaterSymbolData | null): void
 	setMoonOrbitOverlay(
 		moons: MoonBody[] | null,
 		planetRadiusKm: number,

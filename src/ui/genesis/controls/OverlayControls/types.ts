@@ -19,7 +19,12 @@ export type DangerSubMode =
 	| "tidal"
 export type VegetationSubMode = "base" | "maps" | "satellite"
 export type ClimateSubMode = "basic" | "pasta" | "koppen" | "eu5"
-export type TopographySubMode = "classification" | "slope" | "eu5"
+export type TopographySubMode =
+	| "classification"
+	| "slope"
+	| "waterTable"
+	| "wetlands"
+	| "eu5"
 export type ExportWidthPreset =
 	| "4096"
 	| "8192"
@@ -72,6 +77,9 @@ export interface OverlayControlsProps {
 	setShowWaves: (v: boolean) => void
 	showWindArrows: boolean
 	setShowWindArrows: (v: boolean) => void
+	showWaterSymbols: boolean
+	setShowWaterSymbols: (v: boolean) => void
+	hasGroundwater: boolean
 	showGdd: boolean
 	setShowGdd: (v: boolean) => void
 	showGint: boolean
