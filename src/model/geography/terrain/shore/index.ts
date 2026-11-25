@@ -38,6 +38,7 @@ const labels: readonly ShoreLabel[] = [
 	"saltMarshCoast",
 	"tidalFlat",
 	"deltaCoast",
+	"estuaryCoast",
 	"cliff",
 	"rockyShore",
 	"gravelBeach",
@@ -89,6 +90,7 @@ function labelOf({
 	if (habitat === habitatCode.saltMarsh) return labelCode.saltMarshCoast
 	if (habitat === habitatCode.tidalFlat) return labelCode.tidalFlat
 	if (setting === SHORE_SETTING.code.delta) return labelCode.deltaCoast
+	if (setting === SHORE_SETTING.code.estuary) return labelCode.estuaryCoast
 	if (volcanicSand) return labelCode.blackSandBeach
 	if (
 		material === SHORE_MATERIAL.code.rock &&

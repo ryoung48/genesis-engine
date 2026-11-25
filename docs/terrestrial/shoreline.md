@@ -2,7 +2,7 @@
 
 Scope: terrain generation.
 
-Every coastal land region of a procedural world gets a wave exposure on two faces, a relief class, a shore material, a habitat and a setting, and one of eleven labels summarising them. The attributes describe the dominant character of the region's coast, not individual sites. Earth imports have no shore layer (it needs the rock and groundwater layers).
+Every coastal land region of a procedural world gets a wave exposure on two faces, a relief class, a shore material, a habitat and a setting, and one of twelve labels summarising them. The attributes describe the dominant character of the region's coast, not individual sites. Earth imports have no shore layer (it needs the rock and groundwater layers).
 
 Code: `src/model/geography/terrain/shore` (`SHORE`, `SHORE_EXPOSURE`, `SHORE_RELIEF`, `SHORE_MATERIAL`, `SHORE_SETTING`), constants in `src/model/geography/terrain/shore-config`, wave physics in `src/model/climate/ocean/waves` (`OCEAN_WAVES`).
 
@@ -49,7 +49,7 @@ First match wins:
 
 ## Labels
 
-First match wins: ice coast, mangrove coast, salt marsh coast, tidal flat, delta coast, black sand beach (the volcanic flag), cliff (rock material, steep, open face at least moderate; steep soft coasts fall through to gravel beach), rocky shore, gravel beach, sandy beach, muddy shore.
+First match wins: ice coast, mangrove coast, salt marsh coast, tidal flat, delta coast, estuary coast, black sand beach (the volcanic flag), cliff (rock material, steep, open face at least moderate; steep soft coasts fall through to gravel beach), rocky shore, gravel beach, sandy beach, muddy shore.
 
 ## Constants
 
@@ -79,7 +79,8 @@ Default procedural world, seeds 14963991, 20251107, 77031 (`SHORE_SHARES=1` runs
 | Lee face sheltered / moderate / exposed | 22 to 25% / 23 to 25% / 51 to 52% |
 | Relief low / sloping / steep | 38 to 45% / 30 to 33% / 25 to 31% |
 | Material ice / rock / gravel / sand / mud | 12 to 24% / 40 to 50% / 9 to 12% / 22 to 32% / 3 to 4% |
-| Labels: cliff / rocky / gravel / sandy / muddy | 9 to 13% / 26 to 33% / 9 to 12% / 21 to 31% / 2% |
+| Labels: cliff / rocky / gravel / sandy / muddy | 9 to 12% / 25 to 32% / 9 to 11% / 21 to 30% / 2% |
+| Labels: delta / estuary | 1.2 to 1.6% / 2.9 to 3.4% (estuary setting is 4.7 to 5.1%; marsh, flat and delta labels outrank it) |
 | Delta / estuary / fjord setting | 1.4 to 1.8% / 4.7 to 5.1% / 0.1% |
 | Mangrove / salt marsh / tidal flat | 1.1 to 1.2% / 0.5 to 0.9% / 0.5 to 1.1% |
 | Volcanic-sand flag / black sand label | 1.3 to 1.8% / 1.3 to 1.8% |

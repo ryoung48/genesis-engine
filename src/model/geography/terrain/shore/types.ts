@@ -17,6 +17,7 @@ export type ShoreLabel =
 	| "saltMarshCoast"
 	| "tidalFlat"
 	| "deltaCoast"
+	| "estuaryCoast"
 	| "cliff"
 	| "rockyShore"
 	| "gravelBeach"

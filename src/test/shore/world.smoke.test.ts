@@ -67,7 +67,7 @@ describe("shoreline on generated worlds", () => {
 					if (shore.volcanicSand[r]) {
 						expect(shore.material[r]).not.toBe(SHORE_MATERIAL.code.ice)
 						expect(SHORE.labels[shore.label[r]]).toMatch(
-							/^(blackSandBeach|mangroveCoast|saltMarshCoast|tidalFlat|deltaCoast)$/,
+							/^(blackSandBeach|mangroveCoast|saltMarshCoast|tidalFlat|deltaCoast|estuaryCoast)$/,
 						)
 					}
 				}

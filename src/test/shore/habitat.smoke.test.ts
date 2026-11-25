@@ -94,6 +94,12 @@ describe("shore label", () => {
 		expect(
 			labelOf({ setting: SHORE_SETTING.code.delta, relief: RELIEF.steep }),
 		).toBe("deltaCoast")
+		expect(
+			labelOf({ setting: SHORE_SETTING.code.estuary, volcanicSand: true }),
+		).toBe("estuaryCoast")
+		expect(
+			labelOf({ setting: SHORE_SETTING.code.estuary, relief: RELIEF.steep }),
+		).toBe("estuaryCoast")
 		expect(labelOf({ relief: RELIEF.steep, material: MATERIAL.rock })).toBe(
 			"cliff",
 		)
@@ -139,6 +145,6 @@ describe("shore label", () => {
 	it("label codes are unique with none first", () => {
 		expect(new Set(SHORE.labels).size).toBe(SHORE.labels.length)
 		expect(SHORE.labels[0]).toBe("none")
-		expect(SHORE.labels).toHaveLength(12)
+		expect(SHORE.labels).toHaveLength(13)
 	})
 })
