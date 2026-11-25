@@ -1,4 +1,5 @@
 import type {
+	CoastalLandMaskParams,
 	ComputeLandmarksParams,
 	GenesisLandmarks,
 	IncrementCountParams,
@@ -223,6 +224,23 @@ function openWaterMask({ isLand, landmarks }: OpenWaterMaskParams): Uint8Array {
 	return mask
 }
 
+function coastalLandMask({
+	mesh,
+	isLand,
+	openWater,
+}: CoastalLandMaskParams): Uint8Array {
+	const mask = new Uint8Array(isLand.length)
+	for (let r = 0; r < mask.length; r++) {
+		if (!isLand[r]) continue
+		for (let j = mesh.adjOffset[r]; j < mesh.adjOffset[r + 1]; j++)
+			if (openWater[mesh.adjList[j]]) {
+				mask[r] = 1
+				break
+			}
+	}
+	return mask
+}
+
 export const LANDMARKS = {
 	landmarkTypes,
 	landmarkTypeOcean,
@@ -233,4 +251,5 @@ export const LANDMARKS = {
 	landmarkTypeLake,
 	isLake,
 	openWaterMask,
+	coastalLandMask,
 }

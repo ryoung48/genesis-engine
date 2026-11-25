@@ -72,6 +72,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	showWaterSymbols,
 	setShowWaterSymbols,
 	hasGroundwater,
+	hasShore,
 	showGdd,
 	setShowGdd,
 	showGint,
@@ -469,6 +470,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									topographySubMode={topographySubMode}
 									setTopographySubMode={setTopographySubMode}
 									hasGroundwater={hasGroundwater}
+									hasShore={hasShore}
 									showWaterSymbols={showWaterSymbols}
 									setShowWaterSymbols={setShowWaterSymbols}
 								/>

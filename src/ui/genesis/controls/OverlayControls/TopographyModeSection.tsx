@@ -13,6 +13,7 @@ export interface TopographyModeSectionProps {
 	topographySubMode: TopographySubMode
 	setTopographySubMode: (v: TopographySubMode) => void
 	hasGroundwater: boolean
+	hasShore: boolean
 	showWaterSymbols: boolean
 	setShowWaterSymbols: (v: boolean) => void
 }
@@ -22,6 +23,7 @@ const SUB_MODE_COLOR_MODE: Record<TopographySubMode, ColorMode> = {
 	slope: "slope",
 	waterTable: "waterTable",
 	wetlands: "wetlands",
+	shore: "shore",
 	eu5: "eu5Topography",
 }
 
@@ -33,6 +35,7 @@ export const TopographyModeSection: React.FC<TopographyModeSectionProps> = ({
 	topographySubMode,
 	setTopographySubMode,
 	hasGroundwater,
+	hasShore,
 	showWaterSymbols,
 	setShowWaterSymbols,
 }) => {
@@ -41,7 +44,8 @@ export const TopographyModeSection: React.FC<TopographyModeSectionProps> = ({
 		colorMode !== "slope" &&
 		colorMode !== "eu5Topography" &&
 		colorMode !== "waterTable" &&
-		colorMode !== "wetlands"
+		colorMode !== "wetlands" &&
+		colorMode !== "shore"
 	) {
 		return null
 	}
@@ -55,6 +59,7 @@ export const TopographyModeSection: React.FC<TopographyModeSectionProps> = ({
 			{ value: "wetlands", label: "Wetlands" },
 		)
 	}
+	if (hasShore) options.push({ value: "shore", label: "Shoreline" })
 	const groundwaterMode = colorMode === "waterTable" || colorMode === "wetlands"
 	return (
 		<div>

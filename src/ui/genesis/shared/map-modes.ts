@@ -169,6 +169,10 @@ export function isGeologyColorMode(colorMode: ColorMode): boolean {
 	return GEOLOGY_MAP_MODE_OPTIONS.some(([mode]) => mode === colorMode)
 }
 
+export function isShoreColorMode(colorMode: ColorMode): boolean {
+	return colorMode === "shore"
+}
+
 export function isGroundwaterColorMode(colorMode: ColorMode): boolean {
 	return colorMode === "waterTable" || colorMode === "wetlands"
 }
@@ -289,15 +293,18 @@ export function normalizeGeographyColorMode({
 	hasHazards,
 	hasRock,
 	hasGroundwater,
+	hasShore,
 }: {
 	colorMode: ColorMode
 	hasHazards: boolean
 	hasRock: boolean
 	hasGroundwater: boolean
+	hasShore: boolean
 }): ColorMode {
 	if (!hasHazards && colorMode === "dangerZones") return "terrain"
 	if (!hasRock && isGeologyColorMode(colorMode)) return "terrain"
 	if (!hasGroundwater && isGroundwaterColorMode(colorMode)) return "topography"
+	if (!hasShore && isShoreColorMode(colorMode)) return "topography"
 	return colorMode
 }
 

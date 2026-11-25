@@ -79,6 +79,7 @@ function compute(params: GroundwaterComputeParams): GroundwaterResult {
 		elevationKm,
 		isLand,
 		lakeKind,
+		openWater,
 		iceThickness,
 		rivers,
 		surface,
@@ -152,7 +153,8 @@ function compute(params: GroundwaterComputeParams): GroundwaterResult {
 				if (lake[nb]) {
 					touchesLake[r] = 1
 					if (lakeKind[nb] === LAKES.kindCode.salt) touchesSalt[r] = 1
-				} else touchesSea[r] = 1
+				}
+				if (openWater[nb]) touchesSea[r] = 1
 			} else if (pan[nb]) {
 				touchesLake[r] = 1
 				touchesSalt[r] = 1
@@ -320,6 +322,7 @@ function compute(params: GroundwaterComputeParams): GroundwaterResult {
 		widthM,
 		slope,
 		tidalRange: params.tidalRange,
+		shelter: params.shelter,
 		touchesSea,
 		touchesLake,
 		touchesSalt,

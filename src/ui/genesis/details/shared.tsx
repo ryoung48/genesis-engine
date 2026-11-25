@@ -20,6 +20,7 @@ export interface DetailsDrawerBaseProps {
 	vegetationDistribution: DistributionBucket[]
 	topographyDistribution: DistributionBucket[]
 	wetlandDistribution: DistributionBucket[]
+	shoreDistribution: DistributionBucket[]
 	springDistribution: DistributionBucket[]
 	oasisDistribution: DistributionBucket[]
 	rockDistribution: DistributionBucket[]

@@ -30,7 +30,7 @@ The constants:
 
 Resonance is not modelled, so resonant basins behind narrow mouths, like Hudson Bay or the Persian Gulf, come out too small.
 
-`tidalRange` feeds the coastal marsh bonus in terrain classification (`tidalRange × 0.2`), so moons change the history start state. `pnpm report:history` records `diagnostics.terrain.marshShare` (marsh share of land regions) and `diagnostics.terrain.tidalMaxForce`.
+`tidalRange` feeds the coast cause of [wetlands](../terrestrial/groundwater/wetlands.md) and the tidal-flat and estuary rules of the [shoreline](../terrestrial/shoreline.md), so moons change the history start state. `pnpm report:history` records `diagnostics.terrain.marshShare` (marsh share of land regions) and `diagnostics.terrain.tidalMaxForce`.
 
 **Limitation:** in gas-giant-moon mode the parent giant is not a tide contributor; only the sibling moons are.
 
@@ -46,7 +46,7 @@ A cell is open water when it is not land and not a lake landmark (`LANDMARKS.ope
 
 ## Waves
 
-The weather worker builds one extra `WEATHER_BASELINE` per ocean-facing province for its sea cell and samples it with `WEATHER_REGION.sample`. That sample never enters `WEATHER_AGGREGATION`, so province weather values are unchanged. Hourly and monthly outlooks use the value-only `LOCAL_WEATHER.sampleProvinceValues` and skip marine work.
+Fetch, height and sea ice live in `OCEAN_WAVES` (`src/model/climate/ocean/waves`), shared with the [shoreline](../terrestrial/shoreline.md) exposure; `MARINE_WAVES` keeps the province-level sampling and sea state. The weather worker builds one extra `WEATHER_BASELINE` per ocean-facing province for its sea cell and samples it with `WEATHER_REGION.sample`. That sample never enters `WEATHER_AGGREGATION`, so province weather values are unchanged. Hourly and monthly outlooks use the value-only `LOCAL_WEATHER.sampleProvinceValues` and skip marine work.
 
 - **Fetch:** a walk from the sea cell along the upwind great circle. Each step takes the neighbour best aligned with the circle's forward tangent and stops before land or a lake, on a non-positive alignment or on a revisited cell. It never reroutes around an obstruction. Distance is capped at 2000 km.
 - **Growth:** USACE *Coastal Engineering Manual* (2002) fetch-limited growth with `C_D = 0.001 (1.1 + 0.035 U)` and `u*² = C_D U²`: `Hs = 4.13e-2 u* √(F/g)`, capped by the fully developed Pierson–Moskowitz sea `0.21 (1.06 U)² / g`. The 1.06 factor converts the 10 m wind to 19.5 m. Gravity comes from the planet radius with Earth's mean density.

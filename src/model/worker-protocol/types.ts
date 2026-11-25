@@ -15,6 +15,10 @@ import type {
 	GroundwaterStats,
 } from "@/model/geography/terrain/groundwater/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import type {
+	ShoreLayers,
+	ShoreStats,
+} from "@/model/geography/terrain/shore/types"
 import type { RecordBatch } from "@/model/history/distribution/record/types"
 import type { HistoryState as RecordState } from "@/model/history/record/types"
 import type { JournalTransaction } from "@/model/history/sim/engine/journal/types"
@@ -173,6 +177,10 @@ export interface SerializedGenesisWorld {
 	groundwater?: GroundwaterLayers
 	/** [JUSTIFICATION] Present exactly when groundwater is. */
 	groundwaterStats?: GroundwaterStats
+	/** [JUSTIFICATION] Shoreline classification needs the rock and groundwater layers, so only procedural worlds have it. */
+	shore?: ShoreLayers
+	/** [JUSTIFICATION] Present exactly when shore is. */
+	shoreStats?: ShoreStats
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	dtr_annual: Float32Array

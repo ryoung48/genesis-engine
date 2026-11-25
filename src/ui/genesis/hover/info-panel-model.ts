@@ -9,6 +9,11 @@ import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config
 import { LAKES } from "@/model/geography/terrain/lakes"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
+import { SHORE } from "@/model/geography/terrain/shore"
+import { SHORE_EXPOSURE } from "@/model/geography/terrain/shore/exposure"
+import { SHORE_MATERIAL } from "@/model/geography/terrain/shore/material"
+import { SHORE_RELIEF } from "@/model/geography/terrain/shore/relief"
+import { SHORE_SETTING } from "@/model/geography/terrain/shore/setting"
 import { SOILS } from "@/model/geography/terrain/soils"
 import { DATE } from "@/model/history/earth/date"
 import { TIME } from "@/model/shared/time"
@@ -56,6 +61,7 @@ import {
 	getTopographyColor,
 	rockColor,
 	SALT_PAN_COLOR,
+	SHORE_LABEL_COLORS,
 	soilColor,
 	WATER_DOT_COLORS,
 	WATER_DOT_LABELS,
@@ -750,5 +756,62 @@ export function buildHoverGroundwater({
 		value: `groundwater ${percentOf(layers.wetGw[region])} · flood ${percentOf(layers.wetFlood[region])} · coast ${percentOf(layers.wetCoast[region])} · lake ${percentOf(layers.wetLake[region])}`,
 		color: null,
 	})
+	return rows
+}
+
+const camelWords = (kind: string) =>
+	kind.replace(/([A-Z])/g, " $1").toLowerCase()
+
+export function buildHoverShore({
+	world,
+	region,
+	colorMode,
+	unitSystem,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+	colorMode: ColorMode
+	unitSystem: UnitSystem
+}): HoverGroundwaterRow[] {
+	const layers = world?.shore
+	if (
+		!layers ||
+		region === null ||
+		colorMode !== "shore" ||
+		layers.label[region] === 0
+	)
+		return []
+	const label = SHORE.labels[layers.label[region]]
+	const height = (value: number) => formatHeight({ value, unitSystem })
+	const rows: HoverGroundwaterRow[] = [
+		{
+			label: "Shore",
+			value: camelWords(label),
+			color: rgbToCss(SHORE_LABEL_COLORS[label]),
+		},
+		{
+			label: "Exposure",
+			value: `open ${height(layers.exposureOpenM[region])} (${SHORE_EXPOSURE.classes[SHORE_EXPOSURE.classOf({ exposureM: layers.exposureOpenM[region] })]}) · lee ${height(layers.exposureLeeM[region])} (${SHORE_EXPOSURE.classes[SHORE_EXPOSURE.classOf({ exposureM: layers.exposureLeeM[region] })]})`,
+			color: null,
+		},
+		{
+			label: "Relief",
+			value: SHORE_RELIEF.kinds[layers.relief[region]],
+			color: null,
+		},
+		{
+			label: "Material",
+			value: layers.volcanicSand[region]
+				? `${SHORE_MATERIAL.kinds[layers.material[region]]} (volcanic)`
+				: SHORE_MATERIAL.kinds[layers.material[region]],
+			color: null,
+		},
+	]
+	const habitat = SHORE.habitats[layers.habitat[region]]
+	if (habitat !== "none")
+		rows.push({ label: "Habitat", value: camelWords(habitat), color: null })
+	const setting = SHORE_SETTING.kinds[layers.setting[region]]
+	if (setting !== "none")
+		rows.push({ label: "Setting", value: setting, color: null })
 	return rows
 }

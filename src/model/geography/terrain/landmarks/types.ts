@@ -45,6 +45,12 @@ export interface OpenWaterMaskParams {
 	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
 }
 
+export interface CoastalLandMaskParams {
+	mesh: Pick<SphereMesh, "adjOffset" | "adjList">
+	isLand: ArrayLike<number>
+	openWater: Uint8Array
+}
+
 export interface IncrementCountParams {
 	counts: Map<number, number>
 	key: number

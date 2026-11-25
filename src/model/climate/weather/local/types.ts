@@ -1,4 +1,8 @@
 import type {
+	OceanSeaIce,
+	OceanWaveField,
+} from "@/model/climate/ocean/waves/types"
+import type {
 	WeatherBaseline,
 	WeatherParticleSource,
 } from "@/model/climate/weather/local/baseline/types"
@@ -12,10 +16,6 @@ import type {
 	MarineShore,
 	MarineSnapshot,
 } from "@/model/climate/weather/local/marine/types"
-import type {
-	MarineSeaIce,
-	MarineWaveField,
-} from "@/model/climate/weather/local/marine/waves/types"
 import type { WeatherOutlook } from "@/model/climate/weather/local/outlook/types"
 import type {
 	WeatherCloudDescription,
@@ -30,7 +30,7 @@ import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 export interface WeatherProvinceMarine {
 	baseline: WeatherBaseline
 	shore: MarineShore
-	ice: MarineSeaIce
+	ice: OceanSeaIce
 }
 
 export interface WeatherProvince {
@@ -44,7 +44,7 @@ export interface WeatherContext {
 	seed: number
 	radiusKm: number
 	provinces: WeatherProvince[]
-	marine: MarineWaveField | null
+	marine: OceanWaveField | null
 }
 
 export interface CreateLocalWeatherParams {

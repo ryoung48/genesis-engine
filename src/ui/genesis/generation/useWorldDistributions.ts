@@ -21,6 +21,8 @@ import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
 import {
 	getTopographyColor,
 	ROCK_COLORS,
+	SHORE_LABEL_COLORS,
+	SHORE_LEGEND,
 	WATER_DOT_COLORS,
 	WATER_DOT_LABELS,
 	WETLAND_KIND_COLORS,
@@ -249,6 +251,21 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		})
 	}, [world?.groundwaterStats])
 
+	const shoreDistribution = useMemo(() => {
+		const counts = world?.shoreStats?.label
+		if (!counts) return []
+		return SHORE_LEGEND.flatMap(({ label, name }) => {
+			if (counts[label] <= 0) return []
+			return [
+				{
+					label: name,
+					count: counts[label],
+					color: rgbToCss(SHORE_LABEL_COLORS[label]),
+				},
+			]
+		})
+	}, [world?.shoreStats])
+
 	const springDistribution = useMemo(() => {
 		const counts = world?.groundwaterStats?.springCount
 		if (!counts) return []
@@ -332,6 +349,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 		tradeGoodsDistribution,
 		vegetationDistribution,
 		wetlandDistribution,
+		shoreDistribution,
 		springDistribution,
 		oasisDistribution,
 		rockDistribution,

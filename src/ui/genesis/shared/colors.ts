@@ -25,6 +25,7 @@ export type ColorMode =
 	| "slope"
 	| "waterTable"
 	| "wetlands"
+	| "shore"
 	| "rock"
 	| "soil"
 	| "topography"

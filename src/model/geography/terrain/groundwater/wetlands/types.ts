@@ -26,6 +26,7 @@ export interface WetlandsParams {
 	widthM: Float64Array
 	slope: Float32Array
 	tidalRange: Float32Array
+	shelter: Float32Array
 	touchesSea: Uint8Array
 	touchesLake: Uint8Array
 	touchesSalt: Uint8Array

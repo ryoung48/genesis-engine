@@ -33,6 +33,13 @@ import { RIVERS } from "@/model/geography/terrain/rivers"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import type { GenesisSurface } from "@/model/geography/terrain/rocks/types"
+import { SHORE } from "@/model/geography/terrain/shore"
+import { SHORE_EXPOSURE } from "@/model/geography/terrain/shore/exposure"
+import type { ShoreExposure } from "@/model/geography/terrain/shore/exposure/types"
+import type {
+	ShoreLayers,
+	ShoreStats,
+} from "@/model/geography/terrain/shore/types"
 import { SOILS } from "@/model/geography/terrain/soils"
 import { STATE_CLOCK } from "@/model/history/sim/engine/state/clock"
 import { PLACEMENT } from "@/model/history/sim/nations/placement"
@@ -701,6 +708,10 @@ function runPostElevationPipeline(
 	let surfaceFields: GenesisSurface | undefined
 	let groundwaterLayers: GroundwaterLayers | undefined
 	let groundwaterStats: GroundwaterStats | undefined
+	let shoreExposure: ShoreExposure | undefined
+	let shoreLayers: ShoreLayers | undefined
+	let shoreStats: ShoreStats | undefined
+	const openWater = LANDMARKS.openWaterMask({ isLand, landmarks })
 	if (surface) {
 		t0 = performance.now()
 		const { presentTectonics } = surface
@@ -749,17 +760,38 @@ function runPostElevationPipeline(
 		onProgress?.("Post: rocks and soil", 69)
 
 		t0 = performance.now()
+		shoreExposure = SHORE_EXPOSURE.compute({
+			mesh,
+			isLand,
+			openWater,
+			windMonthly: {
+				u: climateV2.windUMonthly,
+				v: climateV2.windVMonthly,
+			},
+			temperatureMonthly: climate.temperature_monthly,
+			iceMinMonthly,
+			iceMaxMonthly,
+			planetRadiusKm: params.planetRadiusKm,
+		})
+		TIMING.record({ stage: "Post: shore exposure", startedAt: t0, timings })
+		onProgress?.("Post: shore exposure", 69)
+
+		t0 = performance.now()
 		const groundwater = GROUNDWATER.compute({
 			mesh,
 			elevationKm: elevation_km,
 			isLand,
 			lakeKind: rivers.lakeKind,
+			openWater,
 			iceThickness,
 			climate,
 			rainfall,
 			hydrology,
 			rivers,
 			tidalRange,
+			shelter: SHORE_EXPOSURE.shelter({
+				exposureLeeM: shoreExposure.exposureLeeM,
+			}),
 			vegetation,
 			surface: surfaceFields,
 			planetRadiusKm: params.planetRadiusKm,
@@ -790,6 +822,30 @@ function runPostElevationPipeline(
 	})
 	TIMING.record({ stage: "Post: hazards", startedAt: t0, timings })
 	onProgress?.("Post: hazards", 70)
+
+	if (surfaceFields && groundwaterLayers && shoreExposure) {
+		t0 = performance.now()
+		const shore = SHORE.classify({
+			mesh,
+			isLand,
+			openWater,
+			elevationKm: elevation_km,
+			planetRadiusKm: params.planetRadiusKm,
+			exposure: shoreExposure,
+			rock: surfaceFields.rock,
+			youngKind: surfaceFields.youngKind,
+			glaciated: surfaceFields.glaciated,
+			iceThickness,
+			groundwater: groundwaterLayers,
+			flow: rivers.flow,
+			tidalRange,
+			volcano: hazards.volcano,
+		})
+		shoreLayers = shore.layers
+		shoreStats = shore.stats
+		TIMING.record({ stage: "Post: shoreline", startedAt: t0, timings })
+		onProgress?.("Post: shoreline", 70)
+	}
 
 	t0 = performance.now()
 	const cycloneRisk = CYCLONES.computeCycloneRisk({
@@ -1115,6 +1171,8 @@ function runPostElevationPipeline(
 		surface: surfaceFields,
 		groundwater: groundwaterLayers,
 		groundwaterStats,
+		shore: shoreLayers,
+		shoreStats,
 		climateZones,
 		realClimateZones,
 		koppenClimate,

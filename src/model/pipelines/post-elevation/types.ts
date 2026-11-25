@@ -26,6 +26,10 @@ import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { GenesisSurface } from "@/model/geography/terrain/rocks/types"
+import type {
+	ShoreLayers,
+	ShoreStats,
+} from "@/model/geography/terrain/shore/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { PresentTectonics } from "@/model/pipelines/present-tectonics/types"
 import type { GenesisParams, GenesisWorld } from "@/model/pipelines/types"
@@ -181,6 +185,10 @@ export interface PostPipelineOutput {
 	groundwater?: GroundwaterLayers
 	/** [JUSTIFICATION] Present exactly when groundwater is. */
 	groundwaterStats?: GroundwaterStats
+	/** [JUSTIFICATION] Shoreline classification needs the rock and groundwater layers, so only procedural worlds have it. */
+	shore?: ShoreLayers
+	/** [JUSTIFICATION] Present exactly when shore is. */
+	shoreStats?: ShoreStats
 	climateZones: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
 	realClimateZones?: Uint8Array

@@ -123,6 +123,7 @@ const COLOR_MODES = new Set<ColorMode>([
 	"slope",
 	"waterTable",
 	"wetlands",
+	"shore",
 	"rock",
 	"soil",
 	"topography",
@@ -551,6 +552,7 @@ export function parseStoredViewPrefs(
 				parsed.topographySubMode === "slope" ||
 				parsed.topographySubMode === "waterTable" ||
 				parsed.topographySubMode === "wetlands" ||
+				parsed.topographySubMode === "shore" ||
 				parsed.topographySubMode === "eu5"
 					? parsed.topographySubMode
 					: DEFAULT_VIEW_PREFS.topographySubMode,

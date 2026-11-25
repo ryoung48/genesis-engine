@@ -7,6 +7,7 @@ import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
+import { SHORE } from "@/model/geography/terrain/shore"
 import { RELIGION } from "@/model/history/sim/religion"
 import { MESH } from "@/model/mesh"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
@@ -86,6 +87,7 @@ import {
 	basinColor,
 	rockColor,
 	SALT_PAN_COLOR,
+	SHORE_LABEL_COLORS,
 	soilColor,
 	TERRAIN_FEATURE_COLORS,
 	TOPOGRAPHY_COLORS,
@@ -224,6 +226,21 @@ export function computeRegionColors({
 								kind: groundwater.wetlandKind[r],
 								share: groundwater.wetlandShare[r],
 							})
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
+	if (colorMode === "shore" && world.shore) {
+		const labelCode = world.shore.label
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = !isLandRegion(r)
+				? oceanRgb(r)
+				: labelCode[r] === 0
+					? UNOWNED_GRAY
+					: SHORE_LABEL_COLORS[SHORE.labels[labelCode[r]]]
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

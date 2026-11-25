@@ -106,6 +106,7 @@ export interface GroundwaterComputeParams {
 	elevationKm: Float32Array
 	isLand: Uint8Array
 	lakeKind: Uint8Array
+	openWater: Uint8Array
 	iceThickness: Float32Array
 	climate: Pick<
 		GenesisClimate,
@@ -115,6 +116,7 @@ export interface GroundwaterComputeParams {
 	hydrology: Pick<GenesisHydrology, "runoff_annual" | "baseflow_monthly">
 	rivers: Pick<GenesisRivers, "flow" | "flow_monthly" | "waterLevel">
 	tidalRange: Float32Array
+	shelter: Float32Array
 	vegetation: Uint8Array
 	surface: Pick<GenesisSurface, "rock" | "youngKind" | "glaciated">
 	planetRadiusKm: number

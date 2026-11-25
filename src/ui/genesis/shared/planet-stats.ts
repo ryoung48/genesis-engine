@@ -236,10 +236,10 @@ export function computePlanetStats(
 
 	const groundwaterStats = world?.groundwaterStats ?? null
 	const springTotal = groundwaterStats
-		? Object.values(groundwaterStats.springCount).reduce((a, b) => a + b, 0)
+		? groundwaterStats.landRegions - groundwaterStats.springCount.none
 		: null
 	const oasisTotal = groundwaterStats
-		? Object.values(groundwaterStats.oasisCount).reduce((a, b) => a + b, 0)
+		? groundwaterStats.landRegions - groundwaterStats.oasisCount.none
 		: null
 
 	const pressureValue = activeParams?.pressure ?? params.pressure

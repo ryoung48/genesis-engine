@@ -8,7 +8,7 @@ Details: [hydraulic soil](hydraulic-soil.md), [water table, springs, oases and w
 
 ## Pipeline position
 
-`Post: groundwater` runs in `pipelines/post-elevation` right after `Post: rocks and soil`. It needs the rock kind, young tag and glaciated mask, the final land mask, ice, climate (monthly temperature, PET, annual rain), hydrology (`runoff_annual`, baseflow), rivers, lakes and their `lakeKind`, tidal range and vegetation. It runs before hazards and everything else that reads `topography`, and only when the rocks-and-soil stage ran. The world gains an optional `groundwater` layers object and `groundwaterStats`; both buffers go to the UI through the worker transfer list.
+`Post: shore exposure` runs first (see [shoreline](../shoreline.md#pipeline-position)); its sheltered-face index scales the coast wetland cause. `Post: groundwater` runs in `pipelines/post-elevation` right after it, which is right after `Post: rocks and soil`. It needs the rock kind, young tag and glaciated mask, the final land mask, ice, climate (monthly temperature, PET, annual rain), hydrology (`runoff_annual`, baseflow), rivers, lakes and their `lakeKind`, tidal range and vegetation. It runs before hazards and everything else that reads `topography`, and only when the rocks-and-soil stage ran. The world gains an optional `groundwater` layers object and `groundwaterStats`; both buffers go to the UI through the worker transfer list.
 
 Hydrology's kernel gained one side output, `runoff_annual` (mm): the sum over months of `max(0, rain − AET)`.
 
@@ -26,6 +26,7 @@ Water table and Wetlands are sub-modes of Geography → Topography, beside Class
 
 - **Water table** colours the mean depth on a ramp with classes at surface, 0.25, 1, 3, 10, 30 and 100 m. The legend gives land share within 0.25, 1, 3 and 30 m.
 - **Wetlands** colours the kind, tinted by wetland share. The legend gives area per kind.
+- **Shoreline** is a sibling sub-mode (hidden for Earth imports and worlds without the layer) that colours coastal land by its shoreline label; see [shoreline](../shoreline.md). The legend gives region counts per label; hover shows both exposures in metres, relief, material (with the volcanic flag), habitat and setting.
 - **Springs and oases** is a toggle for either mode. It draws one small filled dot per region centre without touching the underlying colours, one colour per kind: four spring classes (seepage, contact, karst, piedmont) and five oasis kinds (river, spring, foothill, fossil, wells). A region with both gets two dots side by side; an oasis in a region with no classified spring gets one dot, and hover says no spring is classified. The dots are approximate regional indicators, not exact sites or counts. The Springs and Oases charts in the world details panel are the legend, with the share of regions per kind.
 - **Hover** adds the lake kind (fresh, salt, pan) on lake and pan regions. In the two modes it also shows mean depth, the four shares, recharge, lateral inflow, surfacing, channel recharge, well yield, soil texture and depth and the spring and oasis classes, or the wetland kind with its four cause shares.
 

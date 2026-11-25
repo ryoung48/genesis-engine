@@ -5,6 +5,8 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { TIDAL_FORCE } from "@/model/climate/ocean/tides/tidal-force"
 import { TIDAL_CONTRIBUTORS } from "@/model/climate/ocean/tides/tidal-schedule/contributors"
+import { OCEAN_WAVES } from "@/model/climate/ocean/waves"
+import type { OceanWaveField } from "@/model/climate/ocean/waves/types"
 import { LOCAL_WEATHER } from "@/model/climate/weather/local"
 import { WEATHER_CLOCK } from "@/model/climate/weather/local/clock"
 import type { WeatherInstant } from "@/model/climate/weather/local/clock/types"
@@ -12,7 +14,6 @@ import { WEATHER_MARINE } from "@/model/climate/weather/local/marine"
 import { MARINE_TIDE } from "@/model/climate/weather/local/marine/tide"
 import type { MarineShore } from "@/model/climate/weather/local/marine/types"
 import { MARINE_WAVES } from "@/model/climate/weather/local/marine/waves"
-import type { MarineWaveField } from "@/model/climate/weather/local/marine/waves/types"
 import { WEATHER_OUTLOOK } from "@/model/climate/weather/local/outlook"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { PROVINCE_LOCATIONS } from "@/model/geography/terrain/provinces/locations"
@@ -61,7 +62,7 @@ function grid({ centerLon }: { centerLon: number }) {
 			}
 		}
 	adjOffset[size * size] = adjList.length
-	const field: MarineWaveField = {
+	const field: OceanWaveField = {
 		adjOffset,
 		adjList: Int32Array.from(adjList),
 		neighborDist: Float32Array.from(neighborDist),
@@ -126,7 +127,7 @@ it("selects open-water shores, excluding lake-only coasts", () => {
 
 it("grows waves with wind and fetch up to a fully developed sea", () => {
 	const height = (windSpeedMs: number, fetchKm: number) =>
-		MARINE_WAVES.height({ windSpeedMs, fetchKm, gravityMs2: 9.81 })
+		OCEAN_WAVES.height({ windSpeedMs, fetchKm, gravityMs2: 9.81 })
 	expect(Math.abs(height(10, 100) - 1.59)).toBeLessThan(0.02)
 	expect(Math.abs(height(10, 1e6) - 2.41)).toBeLessThan(0.03)
 	expect(Math.abs(height(20, 1e6) - 9.62)).toBeLessThan(0.1)
@@ -140,7 +141,7 @@ it("walks fetch straight upwind and stops at obstructions", () => {
 	const edgeKm = STEP_RAD * RADIUS_KM
 	const { field, center, index } = grid({ centerLon: 0 })
 	const fetch = (windU: number, windV: number, f = field) =>
-		MARINE_WAVES.fetch({ field: f, sea: center, windU, windV })
+		OCEAN_WAVES.fetch({ field: f, sea: center, windU, windV })
 	expect(fetch(5, 0)).toBeCloseTo(3 * edgeKm, 1)
 	expect(fetch(0, -5)).toBeCloseTo(3 * edgeKm, 1)
 	expect(fetch(0, 0)).toBe(0)
@@ -152,7 +153,7 @@ it("walks fetch straight upwind and stops at obstructions", () => {
 	offshore.openWater[index(3, 4)] = 0
 	expect(fetch(5, 0, offshore)).toBe(0)
 	expect(
-		MARINE_WAVES.height({
+		OCEAN_WAVES.height({
 			windSpeedMs: 15,
 			fetchKm: fetch(5, 0, offshore),
 			gravityMs2: 9.81,
@@ -164,7 +165,7 @@ it("walks fetch straight upwind and stops at obstructions", () => {
 
 	const seam = grid({ centerLon: Math.PI })
 	expect(
-		MARINE_WAVES.fetch({
+		OCEAN_WAVES.fetch({
 			field: seam.field,
 			sea: seam.center,
 			windU: 5,
@@ -179,7 +180,7 @@ it("freezes the sea for perennial ice or seasonal ice below seawater freezing", 
 		seasonal: boolean,
 		temperatureNormalC: number,
 	) =>
-		MARINE_WAVES.iceCovered({
+		OCEAN_WAVES.iceCovered({
 			ice: { perennial, seasonal },
 			temperatureNormalC,
 		})

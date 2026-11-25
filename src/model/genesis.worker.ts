@@ -1,4 +1,3 @@
-import type { GroundwaterLayers } from "@/model/geography/terrain/groundwater/types"
 import { DISTRIBUTION_TARGETS } from "@/model/history/distribution/targets"
 /// <reference lib="webworker" />
 
@@ -230,6 +229,8 @@ function serializeWorld(
 		soilModifier: world.soilModifier,
 		groundwater: world.groundwater,
 		groundwaterStats: world.groundwaterStats,
+		shore: world.shore,
+		shoreStats: world.shoreStats,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
 		rivers: world.rivers
@@ -326,8 +327,12 @@ function partitionBuffers(p: {
 	return buffers
 }
 
-function groundwaterBuffers(layers: GroundwaterLayers): ArrayBufferLike[] {
-	return Object.values(layers).map((layer) => layer.buffer)
+function layerBuffers<
+	T extends { [K in keyof T]: { buffer: ArrayBufferLike } },
+>(layers: T): ArrayBufferLike[] {
+	return Object.values<{ buffer: ArrayBufferLike }>(layers).map(
+		(layer) => layer.buffer,
+	)
 }
 
 function nationBuffers(n: {
@@ -538,7 +543,8 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.glaciated) add(world.glaciated.buffer)
 	if (world.soilFertility) add(world.soilFertility.buffer)
 	if (world.soilModifier) add(world.soilModifier.buffer)
-	if (world.groundwater) add(...groundwaterBuffers(world.groundwater))
+	if (world.groundwater) add(...layerBuffers(world.groundwater))
+	if (world.shore) add(...layerBuffers(world.shore))
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)
 	if (world.observedCloudCover?.real_monthly)

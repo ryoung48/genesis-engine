@@ -34,6 +34,10 @@ import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
+import type {
+	ShoreLayers,
+	ShoreStats,
+} from "@/model/geography/terrain/shore/types"
 import type { GenesisVolcanism } from "@/model/geography/terrain/volcano-edifices/types"
 import type { HistoryPipeline } from "@/model/history/record/procedural/types"
 import type { SphereMesh } from "@/model/mesh/types"
@@ -233,6 +237,10 @@ export interface GenesisWorld {
 	groundwater?: GroundwaterLayers
 	/** [JUSTIFICATION] Present exactly when groundwater is. */
 	groundwaterStats?: GroundwaterStats
+	/** [JUSTIFICATION] Shoreline classification needs the rock and groundwater layers, so only procedural worlds have it. */
+	shore?: ShoreLayers
+	/** [JUSTIFICATION] Present exactly when shore is. */
+	shoreStats?: ShoreStats
 	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array

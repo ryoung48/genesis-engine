@@ -60,6 +60,7 @@ The topic references describe the implemented rules. Mechanics covers pipeline p
 
 - [Rivers and lakes, terminal salt lakes and pans](rivers-and-lakes.md)
 - [Rocks and soil](rocks-and-soil.md)
+- [Shoreline](shoreline.md)
 - [Groundwater overview](groundwater/overview.md): [hydraulic soil](groundwater/hydraulic-soil.md), [water table, springs, oases and wells](groundwater/water-table.md), [wetlands and the marsh label](groundwater/wetlands.md)
 
 ## Interface and navigation

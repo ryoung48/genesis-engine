@@ -48,6 +48,7 @@ import {
 	buildHoverGeology,
 	buildHoverGroundwater,
 	buildHoverLakeKind,
+	buildHoverShore,
 	buildPastaMonthlyData,
 	buildProvinceName,
 	buildTerrainFeatureSwatches,
@@ -343,12 +344,20 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const hoverGeology = showGeography
 		? buildHoverGeology({ world, region: hoverRegion })
 		: null
-	const hoverGroundwater = buildHoverGroundwater({
-		world,
-		region: hoverRegion,
-		colorMode,
-		unitSystem,
-	})
+	const hoverGroundwater = [
+		...buildHoverGroundwater({
+			world,
+			region: hoverRegion,
+			colorMode,
+			unitSystem,
+		}),
+		...buildHoverShore({
+			world,
+			region: hoverRegion,
+			colorMode,
+			unitSystem,
+		}),
+	]
 	const hoverLakeKind = showGeography
 		? buildHoverLakeKind({ world, region: hoverRegion })
 		: null

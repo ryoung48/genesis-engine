@@ -6,6 +6,7 @@ import type {
 } from "@/model/geography/terrain/groundwater/types"
 import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
 import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
+import type { ShoreLabel } from "@/model/geography/terrain/shore/types"
 import { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
 
 export const WETLAND_LEGEND: ReadonlyArray<{
@@ -177,7 +178,7 @@ export const WATER_TABLE_COLORS: ReadonlyArray<[number, number, number]> = [
 	rgb255(166, 97, 26),
 ]
 
-export const SALT_PAN_COLOR: [number, number, number] = rgb255(255, 255, 255)
+export const SALT_PAN_COLOR: [number, number, number] = rgb255(190, 180, 151)
 
 export const WETLAND_KIND_COLORS: ReadonlyArray<[number, number, number]> = [
 	rgb255(200, 196, 180),
@@ -191,6 +192,37 @@ export const WETLAND_KIND_COLORS: ReadonlyArray<[number, number, number]> = [
 	rgb255(20, 100, 70),
 	rgb255(80, 70, 50),
 ]
+
+export const SHORE_LABEL_COLORS: Record<ShoreLabel, [number, number, number]> =
+	{
+		none: UNOWNED_GRAY,
+		iceCoast: rgb255(224, 240, 250),
+		mangroveCoast: rgb255(20, 130, 80),
+		saltMarshCoast: rgb255(130, 190, 120),
+		tidalFlat: rgb255(150, 140, 190),
+		deltaCoast: rgb255(60, 170, 190),
+		cliff: rgb255(110, 80, 70),
+		rockyShore: rgb255(150, 140, 135),
+		gravelBeach: rgb255(190, 160, 120),
+		blackSandBeach: rgb255(50, 45, 60),
+		sandyBeach: rgb255(245, 220, 130),
+		muddyShore: rgb255(140, 105, 70),
+	}
+
+export const SHORE_LEGEND: ReadonlyArray<{ label: ShoreLabel; name: string }> =
+	[
+		{ label: "iceCoast", name: "Ice coast" },
+		{ label: "mangroveCoast", name: "Mangrove coast" },
+		{ label: "saltMarshCoast", name: "Salt marsh coast" },
+		{ label: "tidalFlat", name: "Tidal flat" },
+		{ label: "deltaCoast", name: "Delta coast" },
+		{ label: "cliff", name: "Cliff" },
+		{ label: "rockyShore", name: "Rocky shore" },
+		{ label: "gravelBeach", name: "Gravel beach" },
+		{ label: "blackSandBeach", name: "Black sand beach" },
+		{ label: "sandyBeach", name: "Sandy beach" },
+		{ label: "muddyShore", name: "Muddy shore" },
+	]
 
 export function waterTableClass(depthM: number): number {
 	const bounds = GROUNDWATER_CONFIG.depthColourBoundsM

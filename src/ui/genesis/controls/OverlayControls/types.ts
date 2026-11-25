@@ -24,6 +24,7 @@ export type TopographySubMode =
 	| "slope"
 	| "waterTable"
 	| "wetlands"
+	| "shore"
 	| "eu5"
 export type ExportWidthPreset =
 	| "4096"
@@ -80,6 +81,7 @@ export interface OverlayControlsProps {
 	showWaterSymbols: boolean
 	setShowWaterSymbols: (v: boolean) => void
 	hasGroundwater: boolean
+	hasShore: boolean
 	showGdd: boolean
 	setShowGdd: (v: boolean) => void
 	showGint: boolean

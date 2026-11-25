@@ -121,10 +121,12 @@ describe("wetlands", () => {
 		width,
 		clayShallow,
 		coast = 0,
+		shelter = 1,
 	}: {
 		width: number
 		clayShallow: number
 		coast?: number
+		shelter?: number
 	}) {
 		const shallowShare = new Uint8Array(C.depthClassesM.length)
 		shallowShare[SURFACE_CLASS] = Math.round(clayShallow * 255)
@@ -134,6 +136,7 @@ describe("wetlands", () => {
 			widthM: Float64Array.of(width),
 			slope: Float32Array.of(0.001),
 			tidalRange: Float32Array.of(0),
+			shelter: Float32Array.of(shelter),
 			touchesSea: Uint8Array.of(coast),
 			touchesLake: Uint8Array.of(0),
 			touchesSalt: Uint8Array.of(0),
@@ -153,6 +156,26 @@ describe("wetlands", () => {
 		expect(narrow.wetCoast[0]).toBeCloseTo(2 * wide.wetCoast[0], 6)
 	})
 
+	it("the coast cause is multiplied by shelter and the other causes are not", () => {
+		const open = classify({ width: 20000, clayShallow: 0.5, coast: 1 })
+		const half = classify({
+			width: 20000,
+			clayShallow: 0.5,
+			coast: 1,
+			shelter: 0.5,
+		})
+		const none = classify({
+			width: 20000,
+			clayShallow: 0.5,
+			coast: 1,
+			shelter: 0,
+		})
+		expect(half.wetCoast[0]).toBeCloseTo(0.5 * open.wetCoast[0], 6)
+		expect(none.wetCoast[0]).toBe(0)
+		expect(half.wetGw[0]).toBe(open.wetGw[0])
+		expect(none.wetGw[0]).toBe(open.wetGw[0])
+	})
+
 	it("inactive regions carry no wetland", () => {
 		const out = WETLANDS.classify({
 			shallowShare: new Uint8Array(C.depthClassesM.length).fill(255),
@@ -160,6 +183,7 @@ describe("wetlands", () => {
 			widthM: Float64Array.of(20000),
 			slope: Float32Array.of(0.001),
 			tidalRange: Float32Array.of(0),
+			shelter: Float32Array.of(1),
 			touchesSea: Uint8Array.of(1),
 			touchesLake: Uint8Array.of(0),
 			touchesSalt: Uint8Array.of(0),

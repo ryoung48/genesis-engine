@@ -682,6 +682,7 @@ export const GenesisView: React.FC<{
 			hasHazards: !!world?.hazards,
 			hasRock: !!world?.rock,
 			hasGroundwater: !!world?.groundwater,
+			hasShore: !!world?.shore,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
@@ -1505,6 +1506,7 @@ export const GenesisView: React.FC<{
 		showObservedDistributions,
 		topographyDistribution,
 		wetlandDistribution,
+		shoreDistribution,
 		springDistribution,
 		oasisDistribution,
 		rockDistribution,
@@ -2228,6 +2230,7 @@ export const GenesisView: React.FC<{
 							vegetationDistribution,
 							topographyDistribution,
 							wetlandDistribution,
+							shoreDistribution,
 							springDistribution,
 							oasisDistribution,
 							rockDistribution,
@@ -2424,6 +2427,7 @@ export const GenesisView: React.FC<{
 								showWaterSymbols={showWaterSymbols}
 								setShowWaterSymbols={setShowWaterSymbols}
 								hasGroundwater={!!world?.groundwater}
+								hasShore={!!world?.shore}
 								showGdd={showGdd}
 								setShowGdd={setShowGdd}
 								showGint={showGint}

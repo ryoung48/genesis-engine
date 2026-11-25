@@ -1,3 +1,7 @@
+import type {
+	OceanSeaIce,
+	OceanWaveField,
+} from "@/model/climate/ocean/waves/types"
 import type { LocalWeatherValues } from "@/model/climate/weather/local/types"
 
 export type MarineSeaState =
@@ -19,43 +23,10 @@ export interface MarineWaves {
 	fetchKm: number
 }
 
-export interface MarineWaveField {
-	adjOffset: Int32Array
-	adjList: Int32Array
-	neighborDist: Float32Array
-	r_xyz: Float32Array
-	openWater: Uint8Array
-	radiusKm: number
-	gravityMs2: number
-}
-
-export interface MarineSeaIce {
-	perennial: boolean
-	seasonal: boolean
-}
-
-export interface MarineFetchParams {
-	field: MarineWaveField
-	sea: number
-	windU: number
-	windV: number
-}
-
-export interface MarineWaveHeightParams {
-	windSpeedMs: number
-	fetchKm: number
-	gravityMs2: number
-}
-
-export interface MarineIceCoveredParams {
-	ice: MarineSeaIce
-	temperatureNormalC: number
-}
-
 export interface MarineWavesParams {
-	field: MarineWaveField
+	field: OceanWaveField
 	sea: number
-	ice: MarineSeaIce
+	ice: OceanSeaIce
 	values: Pick<
 		LocalWeatherValues,
 		| "windU"

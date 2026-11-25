@@ -93,6 +93,7 @@ function classify({
 	widthM,
 	slope,
 	tidalRange,
+	shelter,
 	touchesSea,
 	touchesLake,
 	touchesSalt,
@@ -131,7 +132,10 @@ function classify({
 						})
 					: 0,
 			coast: touchesSea[r]
-				? Math.min(1, (C.coastSurgeM + tidalRange[r]) / (gradient * widthM[r]))
+				? Math.min(
+						1,
+						(C.coastSurgeM + tidalRange[r]) / (gradient * widthM[r]),
+					) * shelter[r]
 				: 0,
 			lake: touchesLake[r] ? Math.min(1, C.lakeHM / (gradient * widthM[r])) : 0,
 		}

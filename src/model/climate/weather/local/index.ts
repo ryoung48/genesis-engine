@@ -1,5 +1,4 @@
-import { MECHANICS } from "@/model/celestial/moons/mechanics"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { OCEAN_WAVES } from "@/model/climate/ocean/waves"
 import { WEATHER_AGGREGATION } from "@/model/climate/weather/local/aggregation"
 import { WEATHER_BASELINE } from "@/model/climate/weather/local/baseline"
 import { WEATHER_MARINE } from "@/model/climate/weather/local/marine"
@@ -73,26 +72,17 @@ async function createContext({
 				tidalRange,
 			})
 		: []
-	const radiusKm = world.params.planetRadiusKm
-	const radiusM = radiusKm * 1000
 	const context: WeatherContext = {
 		revision,
 		seed: world.params.seed,
-		radiusKm,
+		radiusKm: world.params.planetRadiusKm,
 		provinces: [],
 		marine: openWater
-			? {
-					adjOffset: world.mesh.adjOffset,
-					adjList: world.mesh.adjList,
-					neighborDist: world.mesh.neighborDist,
-					r_xyz: world.mesh.r_xyz,
+			? OCEAN_WAVES.field({
+					mesh: world.mesh,
 					openWater,
-					radiusKm,
-					gravityMs2:
-						(ORBIT_BODY.gravitationalConstantM3KgS2 *
-							MECHANICS.derivePlanetMassKg(radiusKm)) /
-						(radiusM * radiusM),
-				}
+					planetRadiusKm: world.params.planetRadiusKm,
+				})
 			: null,
 	}
 	for (let first = 0; first < locations.length; first += 256) {
