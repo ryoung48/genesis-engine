@@ -15,7 +15,6 @@ export interface TrimLakeCorridorsParams {
 	adjOffset: Int32Array
 	adjList: Int32Array
 	elevation: Float32Array
-	basinCells: number[]
 	lakeCells: number[]
 }
 
@@ -28,7 +27,7 @@ export interface SelectConnectedLakeCellsParams {
 	targetCellCount: number
 }
 
-export type LakeKind = "none" | "fresh" | "salt" | "pan"
+export type LakeKind = "none" | "fresh" | "salt" | "pan" | "brackish"
 
 export interface ComputeLakesParams {
 	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList" | "regionArea">
@@ -41,6 +40,7 @@ export interface ComputeLakesParams {
 	basinId: Int32Array
 	basinTerminal: Uint8Array
 	basinInflow: Float32Array
+	basinEvaporation: Float32Array
 	lakeKind: Uint8Array
 	isLand: Uint8Array
 	emergedLand?: Uint8Array

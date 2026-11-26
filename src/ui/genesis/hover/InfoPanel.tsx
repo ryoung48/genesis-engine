@@ -45,6 +45,7 @@ import {
 	buildDemographicDisplayData,
 	buildFarmingDisplayData,
 	buildHoverChartData,
+	buildHoverDeposits,
 	buildHoverGeology,
 	buildHoverGroundwater,
 	buildHoverKarst,
@@ -78,6 +79,7 @@ import {
 	type DataVariant,
 	getDataVariant,
 } from "@/ui/genesis/shared/data-variant"
+import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
 import {
 	getMapModePrimary,
 	type SocietyMapMode,
@@ -164,6 +166,7 @@ interface InfoPanelProps {
 	clockMonthMode: "annual" | "monthly"
 	clockMonth: number
 	unitSystem: UnitSystem
+	depositsView: DepositsView
 	world: SerializedGenesisWorld | null
 	routes?: SerializedRoutes | null
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
@@ -259,6 +262,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	clockMonthMode,
 	clockMonth,
 	unitSystem,
+	depositsView,
 	selectedTimeMs,
 	world,
 	routes,
@@ -358,6 +362,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			region: hoverRegion,
 			colorMode,
 			unitSystem,
+		}),
+		...buildHoverDeposits({
+			world,
+			region: hoverRegion,
+			colorMode,
+			depositsView,
 		}),
 		...buildHoverKarst({
 			world,

@@ -1,6 +1,7 @@
 import type { GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
+import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
 import type {
 	ElevationSubMode,
 	NationMapMode,
@@ -74,6 +75,8 @@ export interface OverlayControlsProps {
 	setShowContours: (v: boolean) => void
 	showCoastlines: boolean
 	setShowCoastlines: (v: boolean) => void
+	showSeaIceExtent: boolean
+	setShowSeaIceExtent: (v: boolean) => void
 	showWaves: boolean
 	setShowWaves: (v: boolean) => void
 	showWindArrows: boolean
@@ -85,6 +88,9 @@ export interface OverlayControlsProps {
 	hasKarst: boolean
 	showCaves: boolean
 	setShowCaves: (v: boolean) => void
+	hasDeposits: boolean
+	depositsView: DepositsView
+	setDepositsView: (v: DepositsView) => void
 	showGdd: boolean
 	setShowGdd: (v: boolean) => void
 	showGint: boolean
@@ -187,4 +193,6 @@ export interface PopulationModeSectionProps {
 	societyMode: SocietyMapMode
 	setSocietyMode: (value: SocietyMapMode) => void
 	availableModes: ReadonlyArray<SocietyMapMode>
+	showMigrationRoutes: boolean
+	setShowMigrationRoutes: (value: boolean) => void
 }

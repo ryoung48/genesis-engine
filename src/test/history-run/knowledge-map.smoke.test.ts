@@ -29,6 +29,7 @@ it("scales knowledge from yellow to purple within each frame, excluding desolate
 		viewMode: "globe",
 		dangerSubMode: "earthquake",
 		religionMode: "religions",
+		depositsView: "commodities",
 		year: 0,
 	} as const
 	const first = computeRegionColors({

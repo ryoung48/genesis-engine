@@ -63,6 +63,7 @@ The topic references describe the implemented rules. Mechanics covers pipeline p
 - [Shoreline](shoreline.md)
 - [Seabed habitats and atolls](seabed-habitats.md)
 - [Karst and caves](karst-and-caves.md)
+- [Mineral deposits overview](deposits/overview.md): [systems and commodities](deposits/systems.md), [districts](deposits/districts.md)
 - [Groundwater overview](groundwater/overview.md): [hydraulic soil](groundwater/hydraulic-soil.md), [water table, springs, oases and wells](groundwater/water-table.md), [wetlands and the marsh label](groundwater/wetlands.md)
 
 ## Interface and navigation

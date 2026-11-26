@@ -70,6 +70,7 @@ export function useMapColoring(input: MapColoringInput) {
 		nationMode,
 		societyMode: populationMode,
 		religionMode,
+		depositsView,
 		viewMode,
 		showWaves,
 		dangerSubMode,
@@ -396,6 +397,7 @@ export function useMapColoring(input: MapColoringInput) {
 			viewMode,
 			dangerSubMode,
 			religionMode,
+			depositsView,
 			year: displayYear({
 				timeMs: historyFrame?.timeMs ?? null,
 				world: worldForDisplay,
@@ -436,6 +438,7 @@ export function useMapColoring(input: MapColoringInput) {
 		historyFrame,
 		withOrgHighlight,
 		religionMode,
+		depositsView,
 		organizationKindById,
 		history.state?.record.pipeline,
 	])

@@ -11,6 +11,7 @@ import type {
 } from "@/model/climate/weather/wind/types"
 import type { CirculationBelts } from "@/model/climatev2/vendor/circulation.js"
 import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
+import type { GenesisDeposits } from "@/model/geography/terrain/deposits/types"
 import type {
 	GroundwaterLayers,
 	GroundwaterStats,
@@ -203,6 +204,8 @@ export interface SerializedGenesisWorld {
 	caveSites?: GenesisCaveSites
 	/** [JUSTIFICATION] Present exactly when karst is. */
 	karstStats?: KarstCavesStats
+	/** [JUSTIFICATION] Deposits read the rock layer, which only procedural worlds have. */
+	deposits?: GenesisDeposits
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	dtr_annual: Float32Array

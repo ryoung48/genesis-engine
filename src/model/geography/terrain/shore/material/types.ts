@@ -4,7 +4,7 @@ export interface ShoreMaterialParams {
 	coastal: Uint8Array
 	keyCode: Uint8Array
 	sand: Float32Array
-	iceThickness: Float32Array
+	pastaClimate: Uint8Array
 	relief: Uint8Array
 	exposureOpenM: Float32Array
 	flow: Float32Array

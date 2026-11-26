@@ -29,6 +29,7 @@ export type ColorMode =
 	| "rock"
 	| "soil"
 	| "karst"
+	| "deposits"
 	| "topography"
 	| "temperature"
 	| "realTemperature"

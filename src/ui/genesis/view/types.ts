@@ -36,6 +36,7 @@ import type { GenesisScene, GenesisViewMode } from "@/ui/genesis/renderer"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
+import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
 import type {
 	NationMapMode,
 	ReligionMapMode,
@@ -244,6 +245,7 @@ export type MapColoringInput = {
 	nationMode: NationMapMode
 	societyMode: SocietyMapMode
 	religionMode: ReligionMapMode
+	depositsView: DepositsView
 	viewMode: GenesisViewMode
 	showElevation: boolean
 	showWaves: boolean

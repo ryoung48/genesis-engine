@@ -1,10 +1,8 @@
 import { KOPPEN } from "@/model/climate/classification/koppen"
-import type {
-	NeighbourAverageParams,
-	SandSeaParams,
-} from "@/model/geography/terrain/rocks/sand-sea/types"
+import type { SandSeaParams } from "@/model/geography/terrain/rocks/sand-sea/types"
 import { SURFACE_CONFIG } from "@/model/geography/terrain/surface-config"
 import { MATH } from "@/model/shared/math/core"
+import { SPREAD } from "@/model/shared/spread"
 
 const C = SURFACE_CONFIG
 const DESERT_WEIGHT = new Map<number, number>(
@@ -12,33 +10,6 @@ const DESERT_WEIGHT = new Map<number, number>(
 		(label) => [KOPPEN.koppenLabels.indexOf(label), C.sandDesert[label]],
 	),
 )
-
-function neighbourAverage({
-	mesh,
-	field,
-	include,
-	passes,
-}: NeighbourAverageParams): Float32Array {
-	const { adjOffset, adjList, numRegions: n } = mesh
-	let current = Float32Array.from(field)
-	for (let pass = 0; pass < passes; pass++) {
-		const next = Float32Array.from(current)
-		for (let r = 0; r < n; r++) {
-			if (!include[r]) continue
-			let sum = current[r]
-			let count = 1
-			for (let k = adjOffset[r]; k < adjOffset[r + 1]; k++) {
-				const nb = adjList[k]
-				if (!include[nb]) continue
-				sum += current[nb]
-				count++
-			}
-			next[r] = sum / count
-		}
-		current = next
-	}
-	return current
-}
 
 function extent({
 	mesh,
@@ -72,7 +43,7 @@ function extent({
 		}
 		slope[r] = steepest
 	}
-	const around = neighbourAverage({
+	const around = SPREAD.neighbourAverage({
 		mesh,
 		field: elevationKm,
 		include: isLand,
@@ -94,7 +65,7 @@ function extent({
 				x: around[r] - elevationKm[r],
 			})
 	}
-	const sea = neighbourAverage({
+	const sea = SPREAD.neighbourAverage({
 		mesh,
 		field: raw,
 		include: isLand,

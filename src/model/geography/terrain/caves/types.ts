@@ -27,7 +27,7 @@ export interface CavePotentialsParams {
 	exposureOpenM: Float32Array
 	topography: Uint8Array
 	slopeScore: Float32Array
-	iceThickness: Float32Array
+	iceMinMonthly: Float32Array
 	warmest: Float32Array
 }
 

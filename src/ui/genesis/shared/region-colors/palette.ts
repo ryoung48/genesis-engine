@@ -1,5 +1,7 @@
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import type { CaveType } from "@/model/geography/terrain/caves/types"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import type { IsSaltFlatParams } from "@/model/geography/terrain/classification/types"
 import type {
 	OasisKind,
 	SpringKind,
@@ -7,6 +9,7 @@ import type {
 } from "@/model/geography/terrain/groundwater/types"
 import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
 import type { KarstClass } from "@/model/geography/terrain/karst-caves/types"
+import { LAKES } from "@/model/geography/terrain/lakes"
 import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
 import type { ShoreLabel } from "@/model/geography/terrain/shore/types"
 import { OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
@@ -180,7 +183,26 @@ export const WATER_TABLE_COLORS: ReadonlyArray<[number, number, number]> = [
 	rgb255(166, 97, 26),
 ]
 
+export const FROZEN_COLOR: [number, number, number] = rgb255(255, 255, 255)
+
 export const SALT_PAN_COLOR: [number, number, number] = rgb255(190, 180, 151)
+
+export const BRACKISH_LAKE_COLOR: [number, number, number] = rgb255(
+	148,
+	163,
+	184,
+)
+
+export function getLakeKindColor({
+	code,
+	lakeKind,
+}: IsSaltFlatParams): [number, number, number] | null {
+	if (code === CLASSIFICATION.topoLake) {
+		if (lakeKind === LAKES.kindCode.brackish) return BRACKISH_LAKE_COLOR
+		if (lakeKind === LAKES.kindCode.salt) return FROZEN_COLOR
+	}
+	return CLASSIFICATION.isSaltFlat({ code, lakeKind }) ? SALT_PAN_COLOR : null
+}
 
 export const WETLAND_KIND_COLORS: ReadonlyArray<[number, number, number]> = [
 	rgb255(200, 196, 180),

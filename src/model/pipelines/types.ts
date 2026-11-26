@@ -27,6 +27,7 @@ import type {
 } from "@/model/geography/tectonics/types"
 import type { ArcCrustRun } from "@/model/geography/terrain/arc-crust/types"
 import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
+import type { GenesisDeposits } from "@/model/geography/terrain/deposits/types"
 import type {
 	GroundwaterLayers,
 	GroundwaterStats,
@@ -186,7 +187,6 @@ export interface GenesisWorld {
 	pastaClimate: Uint8Array
 	/** Per-cell pasta climate detail metrics used by hover charts */
 	pastaDebug?: PastaDebug
-	/** Per-cell ice thickness in mm water equivalent (0 for ice-free) */
 	iceThickness: Float32Array
 	/** Per-cell minimum ice across final-year months (mm w.e.) — for sea ice classification */
 	iceMinMonthly: Float32Array
@@ -265,6 +265,8 @@ export interface GenesisWorld {
 	caveSites?: GenesisCaveSites
 	/** [JUSTIFICATION] Present exactly when karst is. */
 	karstStats?: KarstCavesStats
+	/** [JUSTIFICATION] Deposits read the rock layer, which only procedural worlds have. */
+	deposits?: GenesisDeposits
 	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array

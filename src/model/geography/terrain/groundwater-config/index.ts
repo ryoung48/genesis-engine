@@ -3,6 +3,9 @@ export const GROUNDWATER_CONFIG = {
 	saltMinRegions: 2,
 	panFloorFraction: 0.5,
 	panDepthM: 0.5,
+	riverSalinityGL: 0.12,
+	brackishMinGL: 0.5,
+	saltMinGL: 30,
 	logK: {
 		young: -12.5,
 		river: -13,

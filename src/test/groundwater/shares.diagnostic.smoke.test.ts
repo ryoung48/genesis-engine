@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { describe, it } from "vitest"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { OASES } from "@/model/geography/terrain/groundwater/oases"
 import { SPRINGS } from "@/model/geography/terrain/groundwater/springs"
 import { WETLANDS } from "@/model/geography/terrain/groundwater/wetlands"
@@ -26,7 +27,7 @@ function sharesOf(seed: number): Shares {
 		groundwaterStats: stats,
 		mesh,
 		isLand,
-		iceThickness,
+		pastaClimate,
 	} = world
 	if (!g || !stats) throw new Error("world has no groundwater")
 	const N = mesh.numRegions
@@ -45,7 +46,7 @@ function sharesOf(seed: number): Shares {
 	const sandHistogram = new Array<number>(BINS).fill(0)
 	const marsh = MARSH_STEPS.map(() => 0)
 	for (let r = 0; r < N; r++) {
-		if (!isLand[r] || iceThickness[r] > 0) continue
+		if (!isLand[r] || pastaClimate[r] === PASTA.iceCode) continue
 		land++
 		landArea += areaKm2[r]
 		if (g.surfaceM3s[r] > 0) emergent++

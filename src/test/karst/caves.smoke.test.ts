@@ -145,7 +145,7 @@ describe("glacier potential", () => {
 		const mountain = CLASSIFICATION.topoMountain
 		const out = GLACIER_CAVE.potential({
 			isLand: Uint8Array.from([1, 1, 1, 1, 0, 1]),
-			iceThickness: Float32Array.from([1, 1, 1, 0, 1, 1]),
+			iceMinMonthly: Float32Array.from([1, 1, 1, 0, 1, 1]),
 			topography: Uint8Array.from([
 				mountain,
 				mountain,

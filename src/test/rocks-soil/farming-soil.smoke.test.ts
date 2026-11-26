@@ -20,6 +20,7 @@ function groundFrom(soilFertility: Float32Array | null): ProvinceGround {
 		elevationKm: Float32Array.of(0, 0),
 		slopeScore: Float32Array.of(0, 0),
 		soilFertility,
+		lakeKind: new Uint8Array(2),
 	})
 }
 

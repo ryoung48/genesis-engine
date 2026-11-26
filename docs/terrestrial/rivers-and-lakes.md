@@ -8,9 +8,9 @@ Code: `src/model/geography/terrain/{drainage,rivers,endorheic,lakes}`, constants
 
 ## Routing
 
-`DRAINAGE.order({ mesh, elevation, isLand, sinks })` runs a priority flood from the sea. It returns each land region's `drainTarget` (the neighbour it drains to), the processing order, and `waterLevel`, the level the flood filled each region to. A region whose `waterLevel` is above its ground sits in a depression. `sinks` marks land regions that are drainage roots with no target; rivers pass none, groundwater passes the pans.
+`DRAINAGE.order({ mesh, elevation, isLand, sinks })` runs a priority flood from the sea. It returns each land region's `drainTarget` (the neighbour it drains to), the processing order, and `waterLevel`, the level the flood filled each region to. A region whose `waterLevel` is above its ground sits in a depression. `sinks` marks land regions that are drainage roots with no target; rivers pass none on their first flood and the floors of the terminal basins on their second, and groundwater passes the pans.
 
-Rivers build `basinId` first: connected land regions with `waterLevel > elevation` share an id. Monthly discharge then accumulates down the drain order from each region's own runoff (rain minus actual evapotranspiration, boosted with elevation), less a small pass-through loss that grows with PET and shrinks with discharge. `drainTarget` is never changed, so visible-river tracing and the `terminal*` flags keep their meaning.
+Rivers build `basinId` first: connected land regions with `waterLevel > elevation` share an id. Monthly discharge then accumulates down the drain order from each region's own runoff (rain minus actual evapotranspiration, boosted with elevation), less a small pass-through loss that grows with PET and shrinks with discharge.
 
 ## Open basins
 
@@ -28,6 +28,8 @@ terminal  ⇔  Q < E
 `PET` and `rain` are annual sums, `A` the region area. The factor 1.2 is `LAKE_EVAP_SHARE`: open water evaporates more than a reference surface. A basin whose inflow equals `E` is open. Rain on the lake is netted in `E` and also counted in `Q` through the basin's own runoff; the double count is small.
 
 A terminal outlet passes nothing on. That lowers the flow the downstream basins see, so one verdict can change another. Rivers therefore repeat accumulation with the current mask of terminal outlets, run the verdict on every basin, and add the newly terminal ones until no basin is added. A pass can only lower downstream inflow, so a terminal basin never reopens and the loop ends after at most one pass per basin in a chain.
+
+The first priority flood drains every depression over its rim, so inside a terminal basin it still points toward the outlet. When any basin is terminal, rivers run the flood a second time with each terminal basin's lowest region as a sink and accumulate once more. Flow then ends at the basin floor instead of crossing the basin and climbing to the rim. `basinId`, `waterLevel`, the verdicts and `basinInflow` keep their first-flood values; discharge, drawn rivers and the `terminal*` flags follow the second drain order. A drawn river follows that order to the floor, so where a salt lake covers the floor the line runs through its water to the lowest region.
 
 ### Water bodies
 
@@ -54,17 +56,17 @@ Three default worlds (seeds 14963991, 20251107, 77031; 204,000 regions) from `sh
 
 | Metric | Ours |
 |---|---|
-| Depressions | 562 to 736 |
-| Terminal | 170 to 212 (26 to 38% of depressions) |
-| Terminal basins with a salt lake / with only a pan | 18 to 20 / 151 to 194 |
-| Salt lake regions and area | 125 to 480 regions, 0.31 to 1.2 million km² |
-| Pan regions and area | 336 to 341 regions, 0.73 to 0.77 million km² |
+| Depressions | 581 to 745 |
+| Terminal | 170 to 217 (26 to 37% of depressions) |
+| Terminal basins with a salt lake / with only a pan | 17 to 20 / 150 to 197 |
+| Salt lake regions and area | 64 to 205 regions, 0.15 to 0.51 million km² |
+| Pan regions and area | 327 to 384 regions, 0.71 to 0.85 million km² |
 | Land downstream of a terminal outlet | 2.8 to 3.7% |
-| Pan area at floor fraction 0.25 / 0.5 / 0.75 | 0.45 to 0.53 / 0.73 to 0.77 / 1.1 to 1.7 million km² |
+| Pan area at floor fraction 0.25 / 0.5 / 0.75 | 0.45 to 0.54 / 0.68 to 0.76 / 0.99 to 1.2 million km² |
 | Rivers stage, lakes stage | 0.55 to 0.61 s, 0.14 to 0.24 s |
 
-Differences from the expectations. Terminal depressions are a minority of all depressions but more than a handful, and the largest salt lake of one seed (20251107) is about 1.2 million km² in total, several times the Caspian Sea, because that seed's driest depression has a large catchment. The pan footprint is sensitive to the floor-fraction proxy: widening it from 0.5 to 0.75 raises pan area by about 45 to 130%, and the largest single pan from 26 to 293 regions on that seed, so the 0.5 setting is a mid-point of a wide range, not a measurement. The rivers stage costs about 0.55 to 0.6 s, inside the 0.2 to 0.6 s estimate. The diagnostic does not record the number of accumulation rounds, the share of regions whose flow changed or the rivers shortened.
+Differences from the expectations. Terminal depressions are a minority of all depressions but more than a handful. The pan footprint is sensitive to the floor-fraction proxy: widening it from 0.5 to 0.75 raises pan area by about 45 to 60%, and on seed 77031 the largest single pan from 11 to 59 regions, so the 0.5 setting is a mid-point of a wide range, not a measurement. The rivers stage costs about 0.55 to 0.6 s, inside the 0.2 to 0.6 s estimate. The diagnostic does not record the number of accumulation rounds, the share of regions whose flow changed or the rivers shortened.
 
 ## Checks
 
-`src/test/terminal-lakes/`: `balance` (the verdict and PET deficit), `water-body` (lake growth, pan floor, disconnected pockets), `routing` (a synthetic bowl on a sphere mesh: wet catchment open, dry terminal, flow below a terminal outlet drops, determinism, kinds in 0 to 3). `shares.diagnostic.smoke.test.ts` asserts nothing; run it with `$env:TERMINAL_LAKE_SHARES = '1'` to write `stats/terminal-lakes/<UTC timestamp>-shares/`.
+`src/test/terminal-lakes/`: `balance` (the verdict and PET deficit), `water-body` (lake growth, pan floor, disconnected pockets), `routing` (a synthetic bowl on a sphere mesh: wet catchment open, dry terminal, flow below a terminal outlet drops, flow ending at a terminal floor, determinism, kinds in 0 to 3). `shares.diagnostic.smoke.test.ts` asserts nothing; run it with `$env:TERMINAL_LAKE_SHARES = '1'` to write `stats/terminal-lakes/<UTC timestamp>-shares/`.

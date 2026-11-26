@@ -18,6 +18,8 @@ import { CLIMATE_V2 } from "@/model/climatev2"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
 import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { DEPOSITS } from "@/model/geography/terrain/deposits"
+import type { GenesisDeposits } from "@/model/geography/terrain/deposits/types"
 import { GROUNDWATER } from "@/model/geography/terrain/groundwater"
 import type {
 	GroundwaterLayers,
@@ -338,6 +340,7 @@ function runPostElevationPipeline(
 			waterLevel: new Float32Array(N),
 			basinTerminal: new Uint8Array(0),
 			basinInflow: new Float32Array(0),
+			basinEvaporation: new Float32Array(0),
 			lakeKind: new Uint8Array(N),
 		}
 		if (realLakeRegions) {
@@ -370,6 +373,7 @@ function runPostElevationPipeline(
 			basinId: rivers.basinId,
 			basinTerminal: rivers.basinTerminal,
 			basinInflow: rivers.basinInflow,
+			basinEvaporation: rivers.basinEvaporation,
 			lakeKind: rivers.lakeKind,
 			isLand,
 			emergedLand,
@@ -729,6 +733,7 @@ function runPostElevationPipeline(
 	let karstLayers: GenesisKarst | undefined
 	let caveSites: GenesisCaveSites | undefined
 	let karstStats: KarstCavesStats | undefined
+	let deposits: GenesisDeposits | undefined
 	const openWater = LANDMARKS.openWaterMask({ isLand, landmarks })
 	if (surface) {
 		t0 = performance.now()
@@ -802,7 +807,7 @@ function runPostElevationPipeline(
 			isLand,
 			lakeKind: rivers.lakeKind,
 			openWater,
-			iceThickness,
+			pastaClimate,
 			climate,
 			rainfall,
 			hydrology,
@@ -826,6 +831,29 @@ function runPostElevationPipeline(
 		})
 		TIMING.record({ stage: "Post: groundwater", startedAt: t0, timings })
 		onProgress?.("Post: groundwater", 69)
+
+		t0 = performance.now()
+		deposits = DEPOSITS.compute({
+			mesh,
+			seed: params.seed,
+			planetRadiusKm: params.planetRadiusKm,
+			crust: presentTectonics.crust,
+			simMesh: presentTectonics.simMesh,
+			sample: presentTectonics.sample,
+			isLand,
+			elevationKm: elevation_km,
+			rock: surfaceFields.rock,
+			youngKind: surfaceFields.youngKind,
+			glaciated: surfaceFields.glaciated,
+			temperatureMonthly: climate.temperature_monthly,
+			rainfallMonthly: rainfall.monthly,
+			flow: rivers.flow,
+			lakeKind: rivers.lakeKind,
+			coastal: coastalMask,
+			sand: groundwater.layers.sand,
+		})
+		TIMING.record({ stage: "Post: deposits", startedAt: t0, timings })
+		onProgress?.("Post: deposits", 69)
 	}
 
 	// ── Hazards ────────────────────────────────────────────────────────
@@ -854,7 +882,7 @@ function runPostElevationPipeline(
 			rock: surfaceFields.rock,
 			youngKind: surfaceFields.youngKind,
 			glaciated: surfaceFields.glaciated,
-			iceThickness,
+			pastaClimate,
 			groundwater: groundwaterLayers,
 			flow: rivers.flow,
 			tidalRange,
@@ -899,7 +927,8 @@ function runPostElevationPipeline(
 			volcano: hazards.volcano,
 			topography,
 			slopeScore,
-			iceThickness,
+			iceMinMonthly,
+			pastaClimate,
 			climate,
 			rainfall,
 		})
@@ -1039,6 +1068,7 @@ function runPostElevationPipeline(
 		elevationKm: elevation_km,
 		slopeScore,
 		soilFertility: surfaceFields?.soilFertility ?? null,
+		lakeKind: rivers.lakeKind,
 		gdd: pastaDebug.gdd,
 		topography,
 		vegetation,
@@ -1242,6 +1272,7 @@ function runPostElevationPipeline(
 		karst: karstLayers,
 		caveSites,
 		karstStats,
+		deposits,
 		climateZones,
 		realClimateZones,
 		koppenClimate,

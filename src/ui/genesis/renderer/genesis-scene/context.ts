@@ -112,6 +112,10 @@ export interface GenesisContext {
 	derivedCoastlineData: CoastlineLineData | null
 	coastlineOverlayVisible: boolean
 	coastlineMaterials: LineMaterial[]
+	seaIceExtentVisible: boolean
+	seaIceExtentMaterials: LineMaterial[]
+	globeSeaIceExtent: THREE.Group | null
+	mapSeaIceExtent: THREE.Group | null
 
 	// overlay-controllers/measurement.ts's state.
 	globeMeasureLine: THREE.Line | null

@@ -4,7 +4,6 @@ import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { HUMIDITY_MARINE } from "@/model/climate/precipitation/humidity/marine"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
-import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { KARST_CAVES } from "@/model/geography/terrain/karst-caves"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ROCKS } from "@/model/geography/terrain/rocks"
@@ -75,6 +74,7 @@ import {
 	vegetationSatelliteColor,
 } from "@/ui/genesis/shared/colors/vegetation"
 import { getDataVariant } from "@/ui/genesis/shared/data-variant"
+import { DEPOSITS_VIEW } from "@/ui/genesis/shared/deposits-view"
 import { getFarming, getWayOfLife } from "@/ui/genesis/shared/farming-display"
 import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
 import {
@@ -86,9 +86,10 @@ import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-den
 import { getRainfallSeasonality } from "@/ui/genesis/shared/rainfall-seasonality"
 import {
 	basinColor,
+	FROZEN_COLOR,
+	getLakeKindColor,
 	KARST_CLASS_COLORS,
 	rockColor,
-	SALT_PAN_COLOR,
 	SHORE_LABEL_COLORS,
 	soilColor,
 	TERRAIN_FEATURE_COLORS,
@@ -136,6 +137,7 @@ export function computeRegionColors({
 	viewMode,
 	dangerSubMode,
 	religionMode,
+	depositsView,
 	year,
 }: RegionColorsInput): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
@@ -221,11 +223,11 @@ export function computeRegionColors({
 	) {
 		const groundwater = world.groundwater
 		for (let r = 0; r < N; r++) {
-			const active = isLandRegion(r) && !world.iceThickness?.[r]
+			const active = isLandRegion(r) && world.pastaClimate[r] !== PASTA.iceCode
 			const [cr, cg, cb] = !isLandRegion(r)
 				? oceanRgb(r)
 				: !active
-					? UNOWNED_GRAY
+					? FROZEN_COLOR
 					: colorMode === "waterTable"
 						? waterTableColor(waterTableClass(groundwater.waterTableM[r]))
 						: wetlandColor({
@@ -254,6 +256,24 @@ export function computeRegionColors({
 		return rgb
 	}
 
+	if (colorMode === "deposits" && world.deposits) {
+		const { rows } = world.deposits
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = DEPOSITS_VIEW.paint({
+				rows,
+				numRegions: N,
+				region: r,
+				view: depositsView,
+				isLand: world.isLand[r] === 1,
+				base: isLandRegion(r) ? UNOWNED_GRAY : oceanRgb(r),
+			})
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
 	if (colorMode === "karst" && world.karst) {
 		const classCode = world.karst.karstClass
 		for (let r = 0; r < N; r++) {
@@ -271,7 +291,16 @@ export function computeRegionColors({
 		for (let r = 0; r < N; r++) {
 			const topo = world.topography[r]
 			const isWater = topo === 5 || topo === 6
-			if (isWater) {
+			const lakeColor = getLakeKindColor({
+				code: topo,
+				lakeKind: world.rivers?.lakeKind?.[r],
+			})
+			if (lakeColor) {
+				const [cr, cg, cb] = lakeColor
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else if (isWater) {
 				const [cr, cg, cb] = topographySeabedColor({
 					seabed: world.seabed,
 					region: r,
@@ -281,12 +310,7 @@ export function computeRegionColors({
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else {
-				const [cr, cg, cb] = CLASSIFICATION.isSaltFlat({
-					code: topo,
-					lakeKind: world.rivers?.lakeKind?.[r],
-				})
-					? SALT_PAN_COLOR
-					: (TOPOGRAPHY_COLORS[topo] ?? [1, 1, 1])
+				const [cr, cg, cb] = TOPOGRAPHY_COLORS[topo] ?? [1, 1, 1]
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb

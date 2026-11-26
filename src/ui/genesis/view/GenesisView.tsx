@@ -253,6 +253,7 @@ export const GenesisView: React.FC<{
 		setShowWindArrows,
 		setShowWaterSymbols,
 		setShowCaves,
+		setDepositsView,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
 		setSolarSystemViewActive,
@@ -291,6 +292,7 @@ export const GenesisView: React.FC<{
 		showWindArrows,
 		showWaterSymbols,
 		showCaves,
+		depositsView,
 		showWireframe,
 		solarSystemControlsExpanded,
 		solarSystemViewActive,
@@ -309,6 +311,11 @@ export const GenesisView: React.FC<{
 	// Entered via the primary star's "view galaxy" dice icon or the solar-
 	// system view's "back to galaxy" control, exited by opening a system or
 	// the galaxy panel's "view Sol system" Earth icon.
+	const [showSeaIceExtent, setShowSeaIceExtent] = useState(false)
+	useEffect(() => {
+		sceneRef.current?.setSeaIceExtentVisible(showSeaIceExtent)
+	}, [showSeaIceExtent])
+
 	const [galaxyModeActive, setGalaxyModeActive] = useState(
 		initialGalaxyModeActive,
 	)
@@ -688,6 +695,7 @@ export const GenesisView: React.FC<{
 			hasGroundwater: !!world?.groundwater,
 			hasShore: !!world?.shore,
 			hasKarst: !!world?.karst,
+			hasDeposits: !!world?.deposits,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
@@ -1177,6 +1185,7 @@ export const GenesisView: React.FC<{
 		nationMode,
 		societyMode,
 		religionMode,
+		depositsView,
 		viewMode,
 		showElevation,
 		showWaves,
@@ -2295,6 +2304,7 @@ export const GenesisView: React.FC<{
 						{hoverInfo && hoverElevationKm !== null ? (
 							<InfoPanel
 								hoverInfo={hoverInfo}
+								depositsView={depositsView}
 								hoverElevationKm={hoverElevationKm}
 								hoverTopography={hoverTopography}
 								hoverCoordinates={hoverCoordinates}
@@ -2439,6 +2449,8 @@ export const GenesisView: React.FC<{
 								setShowContours={setShowContours}
 								showCoastlines={showCoastlines}
 								setShowCoastlines={setShowCoastlines}
+								showSeaIceExtent={showSeaIceExtent}
+								setShowSeaIceExtent={setShowSeaIceExtent}
 								showWaves={showWaves}
 								setShowWaves={setShowWaves}
 								showWindArrows={showWindArrows}
@@ -2450,6 +2462,9 @@ export const GenesisView: React.FC<{
 								hasKarst={!!world?.karst}
 								showCaves={showCaves}
 								setShowCaves={setShowCaves}
+								hasDeposits={world?.deposits !== undefined}
+								depositsView={depositsView}
+								setDepositsView={setDepositsView}
 								showGdd={showGdd}
 								setShowGdd={setShowGdd}
 								showGint={showGint}

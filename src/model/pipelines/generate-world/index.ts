@@ -923,6 +923,7 @@ function generateGenesisWorld({
 		karst: post.karst,
 		caveSites: post.caveSites,
 		karstStats: post.karstStats,
+		deposits: post.deposits,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,
 		hydrology: post.hydrology,

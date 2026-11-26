@@ -3,10 +3,12 @@ import { CollapsibleSectionHeader } from "@/ui/components/composites/Collapsible
 import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
+import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
 import {
 	GEOLOGY_MAP_MODE_OPTIONS,
 	isGeologyColorMode,
 } from "@/ui/genesis/shared/map-modes"
+import { DepositsModeSection } from "./DepositsModeSection"
 
 export interface GeologyModeSectionProps {
 	colorMode: ColorMode
@@ -16,6 +18,9 @@ export interface GeologyModeSectionProps {
 	hasKarst: boolean
 	showCaves: boolean
 	setShowCaves: (v: boolean) => void
+	hasDeposits: boolean
+	depositsView: DepositsView
+	setDepositsView: (v: DepositsView) => void
 }
 
 export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
@@ -26,6 +31,9 @@ export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
 	hasKarst,
 	showCaves,
 	setShowCaves,
+	hasDeposits,
+	depositsView,
+	setDepositsView,
 }) => {
 	if (!isGeologyColorMode(colorMode)) return null
 	return (
@@ -41,7 +49,9 @@ export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
 						label="Geology mode"
 						orientation="horizontal"
 						options={GEOLOGY_MAP_MODE_OPTIONS.filter(
-							([value]) => hasKarst || value !== "karst",
+							([value]) =>
+								(hasKarst || value !== "karst") &&
+								(hasDeposits || value !== "deposits"),
 						).map(([value, label]) => ({
 							value,
 							label,
@@ -49,6 +59,13 @@ export const GeologyModeSection: React.FC<GeologyModeSectionProps> = ({
 						value={colorMode}
 						onChange={setColorMode}
 					/>
+					{colorMode === "deposits" && (
+						<DepositsModeSection
+							hasDeposits={hasDeposits}
+							depositsView={depositsView}
+							setDepositsView={setDepositsView}
+						/>
+					)}
 					{colorMode === "karst" && hasKarst && (
 						<ToggleRow
 							label="Caves"

@@ -74,18 +74,6 @@ export interface RockClassification {
 	rising: Float32Array
 }
 
-export interface BlurRecordParams {
-	simMesh: SimMesh
-	land: Uint8Array
-	fields: Float32Array[]
-	strides: number[]
-}
-
-export interface LandCellsParams {
-	simMesh: SimMesh
-	land: Uint8Array
-}
-
 export interface DespeckleParams {
 	mesh: SphereMesh
 	rock: Uint8Array

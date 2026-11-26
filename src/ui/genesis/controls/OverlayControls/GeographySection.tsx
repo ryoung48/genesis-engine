@@ -22,6 +22,8 @@ export interface GeographySectionProps {
 	setShowContours: (v: boolean) => void
 	showCoastlines: boolean
 	setShowCoastlines: (v: boolean) => void
+	showSeaIceExtent: boolean
+	setShowSeaIceExtent: (v: boolean) => void
 	showWaves: boolean
 	setShowWaves: (v: boolean) => void
 	availableVariants: DataVariant[]
@@ -47,6 +49,8 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 	showCoastlines,
 	setShowContours,
 	setShowCoastlines,
+	showSeaIceExtent,
+	setShowSeaIceExtent,
 	showWaves,
 	setShowWaves,
 	availableVariants,
@@ -125,6 +129,11 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 							/>
 						</div>
 					)}
+					<ToggleRow
+						label="Sea ice extent (winter: blue, summer: red)"
+						checked={showSeaIceExtent}
+						onChange={setShowSeaIceExtent}
+					/>
 				</div>
 			)}
 		</div>

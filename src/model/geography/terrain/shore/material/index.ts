@@ -1,3 +1,4 @@
+import { PASTA } from "@/model/climate/classification/pasta"
 import { ROCK_KEY } from "@/model/geography/terrain/groundwater/rock-key"
 import { SHORE_EXPOSURE } from "@/model/geography/terrain/shore/exposure"
 import type {
@@ -64,7 +65,7 @@ function classify({
 	coastal,
 	keyCode,
 	sand,
-	iceThickness,
+	pastaClimate,
 	relief,
 	exposureOpenM,
 	flow,
@@ -79,7 +80,7 @@ function classify({
 		const result = materialOf({
 			resist: known ? resistByKey[key] : 0,
 			isTill: known && key === tillKey,
-			isIce: iceThickness[r] > 0,
+			isIce: pastaClimate[r] === PASTA.iceCode,
 			freshVolcanic:
 				known &&
 				volcanicKeys.includes(key) &&

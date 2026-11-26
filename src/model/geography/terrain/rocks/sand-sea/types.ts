@@ -7,10 +7,3 @@ export interface SandSeaParams {
 	koppen: Uint8Array
 	elevationKm: Float32Array
 }
-
-export interface NeighbourAverageParams {
-	mesh: SphereMesh
-	field: Float32Array
-	include: Uint8Array
-	passes: number
-}

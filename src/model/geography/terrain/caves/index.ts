@@ -42,7 +42,7 @@ function potentials({
 	exposureOpenM,
 	topography,
 	slopeScore,
-	iceThickness,
+	iceMinMonthly,
 	warmest,
 }: CavePotentialsParams): Float32Array[] {
 	const solution = karst.potential
@@ -53,7 +53,7 @@ function potentials({
 		LAVA_CAVE.potential({ rock, volcano }),
 		SEA_CAVE.potential({ label: shoreLabel, exposureOpenM }),
 		TALUS_CAVE.potential({ topography, slopeScore, rock }),
-		GLACIER_CAVE.potential({ isLand, iceThickness, topography, warmest }),
+		GLACIER_CAVE.potential({ isLand, iceMinMonthly, topography, warmest }),
 	]
 }
 

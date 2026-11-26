@@ -173,6 +173,8 @@ Final ArchaeoGLOBE slices (−8050 to 1500): 0.696, 0.590, 0.504, 0.444, 0.437, 
 
 `FARMING_GROUND` (`src/model/society/farming/ground`) cuts farm land on steep ground using the topography slope score (`CLASSIFICATION.computeSlopeScore`), so farming and the map's hill and mountain labels agree. The score is normalised to each planet's 95th-percentile slope, so "steep" is relative to the world.
 
+Classified salt-pan regions receive the existing barren-soil factor of 0.08, regardless of their underlying fertility. The factor is area-weighted with the province's other regions; the pan classification covers whole regions, not a measured fraction within each region. It reduces crop and terrace fit, not farm capacity per farmed area.
+
 - **Plough factor:** `1 − 0.92 · S([0.2, 0.6], slopeScore)`: losses start where topography starts calling land hill and reach the maximum where land over 0.5 km is mountain. Regions at or below 0.1 km elevation have factor 1. The province value is the area-weighted mean. `cropFit` (and so farm land share, post-farming mode and herd share) is multiplied by it; farm capacity and adoption are unchanged, to avoid double counting.
 - **Terrace factor:** `1 − 0.92 · S([0.3, 1.0], slopeScore)`, never worse than the plough. `terraceFit = climateFit · (terrace − plough)` is the extra farm land terraces recover.
 - **Tech gating:** `landAt` adds `S([0.5, 1.6], T̄) · terraceFit` to the farm potential, where T̄ is the average tech level: about −3000 (Yemen highland terraces) to −250 (southern Peru) on the Earth timeline.

@@ -14,6 +14,14 @@ import type {
 	SerializedNetwork,
 } from "@/model/worker-protocol/types"
 import type { LabelMode } from "@/ui/genesis/controls/OverlayControls"
+import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
+
+export interface SeaIceExtentControllerParams {
+	ctx: GenesisContext
+	requestRender: () => void
+	updateOverlayVisibility: () => void
+}
+
 import type {
 	ColorForRawId,
 	ElevationKmForLonLat,
@@ -334,6 +342,7 @@ export interface GenesisScene {
 	setClouds(display: CloudDisplay): void
 	setContours(contours: ContourDisplay): void
 	setCoastlineOverlayVisible(visible: boolean): void
+	setSeaIceExtentVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
 	focusOnProvince(provinceId: number, opts?: FocusOnProvinceOptions): void
 	setSettlements(params: SetSettlementsParams): void

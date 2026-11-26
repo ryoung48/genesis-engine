@@ -8,9 +8,7 @@ import { LOESS } from "@/model/geography/terrain/rocks/loess"
 import { RIVER_SEDIMENT } from "@/model/geography/terrain/rocks/river-sediment"
 import { SAND_SEA } from "@/model/geography/terrain/rocks/sand-sea"
 import type {
-	BlurRecordParams,
 	DespeckleParams,
-	LandCellsParams,
 	RockClassification,
 	RockClassifyParams,
 	RockInfo,
@@ -20,6 +18,7 @@ import type {
 import { SURFACE_CONFIG } from "@/model/geography/terrain/surface-config"
 import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
+import { SPREAD } from "@/model/shared/spread"
 
 const C = SURFACE_CONFIG
 const B = BASEMENT.kinds
@@ -75,45 +74,6 @@ const INFO: Record<RockKind, RockInfo> = {
 const SALT = {
 	contact: 0x2c1b4d,
 	facies: 0x3f7a11,
-}
-
-function blurSim({ simMesh, land, fields, strides }: BlurRecordParams): void {
-	const { adjOffset, adjList, numRegions: n } = simMesh.mesh
-	fields.forEach((field, f) => {
-		const stride = strides[f]
-		const was = field.slice()
-		for (let c = 0; c < n; c++) {
-			if (!land[c]) continue
-			let count = 1
-			for (let k = adjOffset[c]; k < adjOffset[c + 1]; k++)
-				if (land[adjList[k]]) count += C.recordBlurNeighbour
-			for (let s = 0; s < stride; s++) {
-				let sum = was[stride * c + s]
-				for (let k = adjOffset[c]; k < adjOffset[c + 1]; k++) {
-					const nb = adjList[k]
-					if (land[nb]) sum += C.recordBlurNeighbour * was[stride * nb + s]
-				}
-				field[stride * c + s] = sum / count
-			}
-		}
-	})
-}
-
-function landCells({ simMesh, land }: LandCellsParams): Int32Array {
-	const { adjOffset, adjList, numRegions: n } = simMesh.mesh
-	const out = new Int32Array(n).fill(-1)
-	for (let c = 0; c < n; c++) {
-		if (land[c]) {
-			out[c] = c
-			continue
-		}
-		for (let k = adjOffset[c]; k < adjOffset[c + 1]; k++)
-			if (land[adjList[k]]) {
-				out[c] = adjList[k]
-				break
-			}
-	}
-	return out
 }
 
 function despeckle({ mesh, rock, youngKind, eligible }: DespeckleParams): void {
@@ -242,13 +202,17 @@ function classify({
 			? Math.max(cap, 1 - C.oldLipWearShown * oldLip.worn[c])
 			: cap,
 	)
-	blurSim({
-		simMesh,
+	SPREAD.blurRecord({
+		mesh: simMesh.mesh,
 		land: basement.land,
 		fields: [scores, cover, carb, salt, organic, marine, lava],
 		strides: [BASEMENT.count, 1, 1, 1, 1, 1, 1],
+		neighbour: C.recordBlurNeighbour,
 	})
-	const landCellOf = landCells({ simMesh, land: basement.land })
+	const landCellOf = SPREAD.nearestLand({
+		mesh: simMesh.mesh,
+		land: basement.land,
+	})
 	const noise = new SimplexNoise((seed ^ SALT.contact) >>> 0)
 	const facies = new SimplexNoise((seed ^ SALT.facies) >>> 0)
 	const R = planetRadiusKm

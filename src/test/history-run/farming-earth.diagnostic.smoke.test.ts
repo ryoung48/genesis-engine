@@ -161,6 +161,7 @@ it.skipIf(process.env.HISTORY_FARMING_EARTH !== "1")(
 			elevationKm: world.elevation_km,
 			slopeScore: world.slopeScore,
 			soilFertility: world.soilFertility ?? null,
+			lakeKind: world.rivers.lakeKind,
 			gdd: withoutNaN(real.gdd),
 			topography: world.topography,
 			vegetation: world.realVegetation ?? world.vegetation,

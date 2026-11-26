@@ -16,7 +16,7 @@ Code: `src/model/geography/terrain/karst` (`KARST`), `caves` (`CAVES`, with one 
 
 ## Kind, potential and activity
 
-Kind, for a land region that is not under ice (`glaciated` or ice thickness above 0):
+Kind, for a land region that is not under ice (`glaciated` or the Pasta Ice climate class):
 
 | Kind | Rule |
 |---|---|
@@ -41,7 +41,7 @@ Seven types, each with a potential from 0 to 1:
 | lava | basalt; `OLD_BASALT_FLOOR` at zero volcanic hazard rising to 1 at the volcanic-sand activity of the shoreline stage (young flows hold intact tubes) |
 | sea | cliff or rocky-shore label; ramp of open-face exposure over the shoreline exposure classes, rocky shore at `SEA_ROCKY_TERM` of a cliff |
 | talus | mountains; ramp of the slope score over `TALUS_SLOPE`, zero on young sediment, `TALUS_SHALE` on shale |
-| glacier | ice on mountain terrain only (ice sheets would give a dot per region); ramp of the warmest month over `MELT_C` (meltwater cuts the cave) |
+| glacier | year-round ice on mountain terrain only (ice sheets would give a dot per region); ramp of the warmest month over `MELT_C` (meltwater cuts the cave) |
 
 ## Class
 
@@ -94,16 +94,16 @@ Shares of land regions on seeds 14963991, 20251107 and 77031 (the report also ha
 
 | Metric | Ours |
 |---|---|
-| Kind: exposed carbonate, covered carbonate, evaporite | 16 to 18%, 2.3 to 2.7%, 0.7 to 1.1% |
-| Class: none, absent, short, long, pseudo | 77 to 79%, 5.7 to 7.2%, 7.2 to 9.5%, 4.4 to 5.7%, 1.4 to 2.1% |
-| Absent split: exposed carbonate, covered carbonate | 3.9 to 5.2%, 1.7 to 1.8% of land |
-| Activity of karst regions: relict, active, spring | 9 to 11%, 7 to 9%, 1.7 to 2.0% of land |
-| Share of sites by type: solution, sinkhole, grotto, lava, sea, talus, glacier | 51 to 57%, 13 to 15%, 7 to 9%, 3 to 5%, 8 to 11%, 6 to 11%, 2 to 5% |
+| Kind: exposed carbonate, covered carbonate, evaporite | 18 to 20%, 2.8 to 4.0%, 0.9 to 1.2% |
+| Class: none, absent, short, long, pseudo | 72 to 77%, 7.5 to 10%, 7.7 to 10%, 4.5 to 5.6%, 1.6 to 2.4% |
+| Absent split: exposed carbonate, covered carbonate | 4.9 to 6.6%, 2.3 to 3.3% of land |
+| Activity of karst regions: relict, active, spring | 11 to 14%, 7 to 9%, 1.7 to 1.9% of land |
+| Share of sites by type: solution, sinkhole, grotto, lava, sea, talus, glacier | 52 to 59%, 13 to 15%, 7 to 8%, 3 to 6%, 8 to 11%, 6 to 11%, 1.2 to 1.5% |
 | Notable sites per 100 land regions | 3.0 to 3.3 |
-| Median passage length: solution, sinkhole, grotto, lava, sea, talus, glacier | 230 to 310 m, 180 to 190 m, 135 to 180 m, 850 to 1,900 m, 58 to 65 m, 86 to 93 m, 130 to 210 m |
+| Median passage length: solution, sinkhole, grotto, lava, sea, talus, glacier | 230 to 310 m, 180 to 190 m, 135 to 180 m, 820 to 1,400 m, 52 to 63 m, 89 to 93 m, 130 to 230 m |
 | Karst-and-caves stage | 140 to 175 ms |
 
-Differences from the plan's estimates. Exposed carbonate is a little under the 18 to 21% estimate (ice land is excluded, which I did not measure as the whole gap); covered carbonate is 2.3 to 2.7% against an estimated 5 to 11%, so young sediment rarely has limestone as its best underlying kind in this model; sites are 3.0 to 3.3 per 100 land regions against an estimated 6 to 15 (the density was cut twice after it read as too dense on the map, then reweighted by type); the stage takes about three to five times the estimated 30 to 80 ms, and I did not profile where the time goes. Long karst is now about a third to two fifths of non-absent karst regions (32 to 43%, from the class table), above the 18 to 24% of exposed carbonate a first version gave, because the wider water ramp pushes more regions to full potential. Absent is now mostly dry exposed carbonate; before the relict floor moved it was almost all covered carbonate, and exposed karst could never be absent.
+Differences from the plan's estimates. Exposed carbonate is at the low end of the 18 to 21% estimate; covered carbonate is 2.8 to 4.0% against an estimated 5 to 11%, so young sediment rarely has limestone as its best underlying kind in this model; sites are 3.0 to 3.3 per 100 land regions against an estimated 6 to 15 (the density was cut twice after it read as too dense on the map, then reweighted by type); the stage takes about three to five times the estimated 30 to 80 ms, and I did not profile where the time goes. Long karst is now about a third to two fifths of non-absent karst regions (31 to 41%, from the class table), above the 18 to 24% of exposed carbonate a first version gave, because the wider water ramp pushes more regions to full potential. Absent is now mostly dry exposed carbonate; before the relict floor moved it was almost all covered carbonate, and exposed karst could never be absent.
 
 Review findings that changed the model, from the first world runs: glacier dots were 28 to 42% of sites (ice sheets gave a dot per region), only 5 to 8 lava sites existed per world although all basalt read pseudo, sinkholes took the solution length regime and reached the 100 km cap, relict was about 60% of exposed carbonate, and absent was 80% of covered carbonate and nothing else. The per-constant sweeps in the plan were not run.
 

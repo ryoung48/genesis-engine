@@ -65,6 +65,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	showCoastlines,
 	setShowContours,
 	setShowCoastlines,
+	showSeaIceExtent,
+	setShowSeaIceExtent,
 	showWaves,
 	setShowWaves,
 	showWindArrows,
@@ -76,6 +78,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	hasKarst,
 	showCaves,
 	setShowCaves,
+	hasDeposits,
+	depositsView,
+	setDepositsView,
 	showGdd,
 	setShowGdd,
 	showGint,
@@ -275,7 +280,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 				<div
 					className={fadeVisibilityClassName(
 						overlaysExpanded,
-						"pointer-events-none absolute bottom-full left-0 mb-2",
+						"pointer-events-none absolute bottom-full left-0 z-10 mb-2",
 					)}
 				>
 					<div
@@ -373,6 +378,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setShowContours={setShowContours}
 									showCoastlines={showCoastlines}
 									setShowCoastlines={setShowCoastlines}
+									showSeaIceExtent={showSeaIceExtent}
+									setShowSeaIceExtent={setShowSeaIceExtent}
 									showWaves={showWaves}
 									setShowWaves={setShowWaves}
 									availableVariants={availableVariants}
@@ -389,8 +396,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setShowDistrictBorders={setShowDistrictBorders}
 									showInfrastructure={showInfrastructure}
 									setShowInfrastructure={setShowInfrastructure}
-									showMigrationRoutes={showMigrationRoutes}
-									setShowMigrationRoutes={setShowMigrationRoutes}
 									colorMode={colorMode}
 									populationMode={populationMode}
 									nationMode={nationMode}
@@ -420,6 +425,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									societyMode={populationMode}
 									setSocietyMode={setPopulationMode}
 									availableModes={availablePopulationModes}
+									showMigrationRoutes={showMigrationRoutes}
+									setShowMigrationRoutes={setShowMigrationRoutes}
 								/>
 								<ReligionModeSection
 									colorMode={colorMode}
@@ -446,6 +453,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									hasKarst={hasKarst}
 									showCaves={showCaves}
 									setShowCaves={setShowCaves}
+									hasDeposits={hasDeposits}
+									depositsView={depositsView}
+									setDepositsView={setDepositsView}
 								/>
 
 								<DangerSection

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
+import { LAKES } from "@/model/geography/terrain/lakes"
 import { generateWorld } from "@/test/tectonics/world-cache"
 
 const SEED = 14963991
@@ -33,7 +35,7 @@ describe("groundwater on a generated world", () => {
 	)
 
 	it(
-		"has no NaN, shares inside [0, 1] and lake kinds from 0 to 3",
+		"has no NaN, shares inside [0, 1] and only known lake kinds",
 		() => {
 			const g = first.groundwater as NonNullable<typeof first.groundwater>
 			for (const key of Object.keys(g) as Array<keyof typeof g>)
@@ -42,10 +44,8 @@ describe("groundwater on a generated world", () => {
 				expect(share).toBeGreaterThanOrEqual(0)
 				expect(share).toBeLessThanOrEqual(1)
 			}
-			for (const kind of first.rivers.lakeKind) {
-				expect(kind).toBeGreaterThanOrEqual(0)
-				expect(kind).toBeLessThanOrEqual(3)
-			}
+			for (const kind of first.rivers.lakeKind)
+				expect(LAKES.kinds[kind]).toBeDefined()
 		},
 		TIMEOUT_MS,
 	)
@@ -57,12 +57,32 @@ describe("groundwater on a generated world", () => {
 			const { mesh, isLand, elevation_km } = first
 			for (let r = 0; r < mesh.numRegions; r++) {
 				expect(g.waterTableM[r]).toBeGreaterThanOrEqual(0)
-				if (first.rivers.lakeKind[r] === 3) expect(isLand[r]).toBe(1)
+				if (first.rivers.lakeKind[r] === LAKES.kindCode.pan)
+					expect(isLand[r]).toBe(1)
 				if (isLand[r] && g.waterTableM[r] > 0)
 					expect(g.waterTableM[r]).toBeLessThanOrEqual(
 						elevation_km[r] * 1000 + C.incisionMaxM + 1,
 					)
 			}
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		"skips only the Ice climate class, so other snowy land has groundwater",
+		() => {
+			const g = first.groundwater as NonNullable<typeof first.groundwater>
+			const { mesh, isLand, iceThickness, pastaClimate } = first
+			let snowyOutsideIce = 0
+			for (let r = 0; r < mesh.numRegions; r++) {
+				if (!isLand[r]) continue
+				if (pastaClimate[r] === PASTA.iceCode) expect(g.soilDepthM[r]).toBe(0)
+				else {
+					expect(g.soilDepthM[r]).toBeGreaterThan(0)
+					if (iceThickness[r] > 0) snowyOutsideIce++
+				}
+			}
+			expect(snowyOutsideIce).toBeGreaterThan(0)
 		},
 		TIMEOUT_MS,
 	)

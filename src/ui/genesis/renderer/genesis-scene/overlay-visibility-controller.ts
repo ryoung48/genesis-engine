@@ -32,6 +32,15 @@ export function createOverlayVisibilityController(
 			if (ctx.mapMesh)
 				ctx.mapCoastlineOverlay.position.copy(ctx.mapMesh.position)
 		}
+		if (ctx.globeSeaIceExtent)
+			ctx.globeSeaIceExtent.visible =
+				ctx.seaIceExtentVisible &&
+				ctx.currentViewMode === "globe" &&
+				!ctx.solarSystemActive
+		if (ctx.mapSeaIceExtent) {
+			ctx.mapSeaIceExtent.visible = ctx.seaIceExtentVisible && showMap
+			if (ctx.mapMesh) ctx.mapSeaIceExtent.position.copy(ctx.mapMesh.position)
+		}
 		if (ctx.terrainWireframe)
 			ctx.terrainWireframe.visible =
 				ctx.wireframeVisible && ctx.currentViewMode === "globe"

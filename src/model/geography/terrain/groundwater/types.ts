@@ -107,7 +107,7 @@ export interface GroundwaterComputeParams {
 	isLand: Uint8Array
 	lakeKind: Uint8Array
 	openWater: Uint8Array
-	iceThickness: Float32Array
+	pastaClimate: Uint8Array
 	climate: Pick<
 		GenesisClimate,
 		"temperature_monthly" | "temperature_avg" | "pet_monthly"

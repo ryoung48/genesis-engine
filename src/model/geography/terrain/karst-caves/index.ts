@@ -1,3 +1,4 @@
+import { PASTA } from "@/model/climate/classification/pasta"
 import { CAVE_CONFIG } from "@/model/geography/terrain/cave-config"
 import { CAVES } from "@/model/geography/terrain/caves"
 import { GROUNDWATER } from "@/model/geography/terrain/groundwater"
@@ -141,7 +142,8 @@ function compute({
 	volcano,
 	topography,
 	slopeScore,
-	iceThickness,
+	iceMinMonthly,
+	pastaClimate,
 	climate,
 	rainfall,
 }: KarstCavesComputeParams): KarstCavesResult {
@@ -155,7 +157,7 @@ function compute({
 		rainfallAnnual: rainfall.annual,
 	})
 	const iced = Uint8Array.from(surface.glaciated, (ice, r) =>
-		ice || iceThickness[r] > 0 ? 1 : 0,
+		ice || pastaClimate[r] === PASTA.iceCode ? 1 : 0,
 	)
 	const layers = KARST.classify({
 		numRegions: n,
@@ -177,7 +179,7 @@ function compute({
 		exposureOpenM: shore.exposureOpenM,
 		topography,
 		slopeScore,
-		iceThickness,
+		iceMinMonthly,
 		warmest: regional.warmest,
 	})
 	const lava = potentials[CAVES.typeCode.lava]

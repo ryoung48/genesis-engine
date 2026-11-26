@@ -17,6 +17,7 @@ import type {
 	GenesisTerrainFeatures,
 } from "@/model/geography/tectonics/types"
 import type { GenesisCaveSites } from "@/model/geography/terrain/caves/types"
+import type { GenesisDeposits } from "@/model/geography/terrain/deposits/types"
 import type { ErosionRecord } from "@/model/geography/terrain/erosion/types"
 import type {
 	GroundwaterLayers,
@@ -211,6 +212,8 @@ export interface PostPipelineOutput {
 	caveSites?: GenesisCaveSites
 	/** [JUSTIFICATION] Present exactly when karst is. */
 	karstStats?: KarstCavesStats
+	/** [JUSTIFICATION] Deposits read the rock layer, which only procedural worlds have. */
+	deposits?: GenesisDeposits
 	climateZones: Uint8Array
 	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
 	realClimateZones?: Uint8Array

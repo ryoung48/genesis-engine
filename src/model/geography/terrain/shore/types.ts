@@ -64,7 +64,7 @@ export interface ShoreClassifyParams {
 	rock: Uint8Array
 	youngKind: Uint8Array
 	glaciated: Uint8Array
-	iceThickness: Float32Array
+	pastaClimate: Uint8Array
 	groundwater: Pick<
 		GroundwaterLayers,
 		"sand" | "wetlandKind" | "coastFlag" | "wetCoast"

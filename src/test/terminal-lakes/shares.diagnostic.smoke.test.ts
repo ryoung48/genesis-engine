@@ -32,6 +32,10 @@ interface Shares {
 	panRegions: number
 	panAreaKm2: number
 	panOnlyBasins: number
+	openLakeBasins: Record<string, number>
+	brackishLakeRegions: number
+	brackishLakeAreaKm2: number
+	lakeAreaKm2: number
 	downstreamLandShare: number
 	floorSensitivity: FloorRow[]
 	riversMs: number
@@ -82,10 +86,19 @@ function sharesOf(seed: number): Shares {
 	let saltLakeAreaKm2 = 0
 	let panRegions = 0
 	let panAreaKm2 = 0
+	let brackishLakeRegions = 0
+	let brackishLakeAreaKm2 = 0
+	let lakeAreaKm2 = 0
 	for (let r = 0; r < N; r++) {
 		if (world.riverLand[r]) landRegions++
 		if (downstream[r]) downstreamLand++
 		const kind = rivers.lakeKind[r]
+		if (kind !== LAKES.kindCode.none && kind !== LAKES.kindCode.pan)
+			lakeAreaKm2 += areaKm2[r]
+		if (kind === LAKES.kindCode.brackish) {
+			brackishLakeRegions++
+			brackishLakeAreaKm2 += areaKm2[r]
+		}
 		if (kind === LAKES.kindCode.salt) {
 			saltLakeRegions++
 			saltLakeAreaKm2 += areaKm2[r]
@@ -97,8 +110,16 @@ function sharesOf(seed: number): Shares {
 	}
 	let saltLakes = 0
 	let panOnly = 0
+	const openLakeBasins = { fresh: 0, brackish: 0, salt: 0 }
 	for (let bid = 0; bid < basinCount; bid++) {
-		if (!rivers.basinTerminal[bid]) continue
+		if (!rivers.basinTerminal[bid]) {
+			const wet = layout.cells[bid].find((r) => rivers.lakeKind[r] > 0)
+			if (wet === undefined) continue
+			const kind = LAKES.kinds[rivers.lakeKind[wet]]
+			if (kind === "fresh" || kind === "brackish" || kind === "salt")
+				openLakeBasins[kind]++
+			continue
+		}
 		let salt = 0
 		let pan = 0
 		for (const r of layout.cells[bid]) {
@@ -166,6 +187,10 @@ function sharesOf(seed: number): Shares {
 		panRegions,
 		panAreaKm2,
 		panOnlyBasins: panOnly,
+		openLakeBasins,
+		brackishLakeRegions,
+		brackishLakeAreaKm2,
+		lakeAreaKm2,
 		downstreamLandShare: downstreamLand / Math.max(1, landRegions),
 		floorSensitivity,
 		riversMs: ms("Post: rivers"),
@@ -187,6 +212,12 @@ function table(rows: Shares[]): string {
 		line("terminal basins with a pan and no lake", (r) => r.panOnlyBasins),
 		line("salt lake regions", (r) => r.saltLakeRegions),
 		line("salt lake area km2", (r) => r.saltLakeAreaKm2),
+		line("open basins with a fresh lake", (r) => r.openLakeBasins.fresh),
+		line("open basins with a brackish lake", (r) => r.openLakeBasins.brackish),
+		line("open basins with a salt lake", (r) => r.openLakeBasins.salt),
+		line("brackish lake regions", (r) => r.brackishLakeRegions),
+		line("brackish lake area km2", (r) => r.brackishLakeAreaKm2),
+		line("all lake area km2", (r) => r.lakeAreaKm2),
 		line("pan regions", (r) => r.panRegions),
 		line("pan area km2", (r) => r.panAreaKm2),
 		line(

@@ -19,6 +19,7 @@ import { createNationBordersController } from "@/ui/genesis/renderer/genesis-sce
 import { createPathfindingController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/pathfinding"
 import { createRealmBordersController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/realm-borders"
 import { createRiversWindController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/rivers-wind"
+import { createSeaIceExtentController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/sea-ice-extent"
 import { createSettlementsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/settlements"
 import { createSiteSymbolsController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/site-symbols"
 import { createSolarTerminatorController } from "@/ui/genesis/renderer/genesis-scene/overlay-controllers/solar-terminator"
@@ -289,11 +290,20 @@ export function createGenesisScene(
 	)
 	const { updateOverlayVisibility } = overlayVisibilityController
 
+	const seaIceExtentController = createSeaIceExtentController({
+		ctx: context,
+		requestRender: () => requestRender(),
+		updateOverlayVisibility: () => updateOverlayVisibility(),
+	})
+
 	const overlayAggregatorController = createOverlayAggregatorController(
 		context,
 		{
 			syncAnimationState: () => syncAnimationState(),
-			rebuildCoastline: () => coastlineController.rebuild(),
+			rebuildCoastline: () => {
+				coastlineController.rebuild()
+				seaIceExtentController.rebuild()
+			},
 			rebuildSolarTerminator: () => rebuildSolarTerminator(),
 			rebuildWindArrows: () => riversWindController.rebuildWindArrows(),
 			rebuildWaterSymbols: () => waterSymbolsController.rebuild(),
@@ -355,6 +365,7 @@ export function createGenesisScene(
 		updateMapCameraFrustum()
 		renderer.setSize(w, h, false)
 		for (const mat of context.coastlineMaterials) mat.resolution.set(w, h)
+		for (const mat of context.seaIceExtentMaterials) mat.resolution.set(w, h)
 		for (const mat of context.riverMaterials) mat.resolution.set(w, h)
 		for (const mat of context.pulseMaterials) mat.resolution.set(w, h)
 		for (const mat of context.infrastructureMaterials) mat.resolution.set(w, h)
@@ -512,6 +523,7 @@ export function createGenesisScene(
 			updateOverlayVisibility()
 		},
 		setCoastlineOverlayVisible,
+		setSeaIceExtentVisible: seaIceExtentController.setVisible,
 		setFullAmbient,
 		focusOnProvince,
 		setMoonOrbitOverlay,

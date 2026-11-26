@@ -135,8 +135,8 @@ Differences from the plan's estimates: sedimentary rock is 47 to 49% of land aga
 
 ## Hydraulic soil
 
-Soil fertility says how rich the ground is. How fast water moves through it, its texture, depth, conductivity and capacity, and the rock permeability behind it are a separate layer built on the same rock kinds and young-sediment tags by the groundwater stage; neither reads the other. See [hydraulic soil](groundwater/hydraulic-soil.md).
+Soil fertility says how rich the ground is. How fast water moves through it, its texture, depth, conductivity and capacity, and the rock permeability behind it are a separate layer built on the same rock kinds and young-sediment tags by the groundwater stage; neither reads the other. See [hydraulic soil](groundwater/hydraulic-soil.md). The surface rock also gates where mineral deposits can sit; see the [deposits overview](deposits/overview.md).
 
 ## Not modelled
 
-Mineral deposits, lithology-driven relief, bed banding, dune relief and the filling of sand-sea hollows, an ice-age climate, routed bedload and deltas, per-crop soil demand, soil depth and salinity, and any recalibration of the farming start-year targets. Upstream's soil-region blur (`soilRegionKm`) is not ported: soil is per region.
+Lithology-driven relief, bed banding, dune relief and the filling of sand-sea hollows, an ice-age climate, routed bedload and deltas, per-crop soil demand, soil depth and salinity, and any recalibration of the farming start-year targets. Upstream's soil-region blur (`soilRegionKm`) is not ported: soil is per region.

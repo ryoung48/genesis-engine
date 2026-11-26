@@ -13,3 +13,23 @@ export interface SpreadParams {
 	canEnter: (step: SpreadStep) => boolean
 	onReach: (step: SpreadStep) => void
 }
+
+export interface BlurRecordParams {
+	mesh: SphereMesh
+	land: Uint8Array
+	fields: Float32Array[]
+	strides: number[]
+	neighbour: number
+}
+
+export interface NearestLandParams {
+	mesh: SphereMesh
+	land: Uint8Array
+}
+
+export interface NeighbourAverageParams {
+	mesh: SphereMesh
+	field: Float32Array
+	include: Uint8Array
+	passes: number
+}

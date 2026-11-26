@@ -976,6 +976,18 @@ describe("ground and terraces", () => {
 	const terrace = (score: number) =>
 		1 - 0.92 * MATH.smoothstep({ edge0: 0.3, edge1: 1, x: score })
 
+	it("area-weights the poor-soil penalty for salt pans", () => {
+		const ground = FARMING_GROUND.provinceGround({
+			provinces: { count: 1, regionProvince: Int32Array.of(0, 0) },
+			mesh: { numRegions: 2, regionArea: Float32Array.of(1, 3) },
+			elevationKm: Float32Array.of(0, 0),
+			slopeScore: Float32Array.of(0, 0),
+			soilFertility: Float32Array.of(0.8, 0.8),
+			lakeKind: Uint8Array.of(3, 0),
+		})
+		expect(ground.soil[0]).toBeCloseTo(0.25 * 0.08 + 0.75, 6)
+	})
+
 	it("loses land with the topography slope score and keeps low land flat", () => {
 		const ground = FARMING_GROUND.provinceGround({
 			provinces: { count: 2, regionProvince: Int32Array.of(0, 0, 1, -1) },
@@ -983,6 +995,7 @@ describe("ground and terraces", () => {
 			elevationKm: Float32Array.of(0.5, 0.5, 0.05, 0.5),
 			slopeScore: Float32Array.of(0.1, 0.6, 1, 1),
 			soilFertility: null,
+			lakeKind: new Uint8Array(4),
 		})
 		expect(ground.plough[0]).toBeCloseTo((plough(0.1) + plough(0.6)) / 2, 6)
 		expect(ground.terrace[0]).toBeCloseTo((terrace(0.1) + terrace(0.6)) / 2, 6)
@@ -1000,6 +1013,7 @@ describe("ground and terraces", () => {
 				elevationKm: Float32Array.of(1),
 				slopeScore: Float32Array.of(i / 100),
 				soilFertility: null,
+				lakeKind: new Uint8Array(1),
 			})
 			if (ground.terrace[0] < ground.plough[0] - 1e-6) worse++
 			if (i <= 20) expect(ground.plough[0]).toBe(1)

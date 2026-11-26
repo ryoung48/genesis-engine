@@ -85,6 +85,12 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
   - Documentation scope: require explicit create/edit/move/split actions with exact paths under `docs/`, clear content changes, and any necessary link updates. Flag oversized or mixed-concern documents that should be split into focused files and sensible subfolders.
   - Unjustified constants: flag any constant without an assigned value, or whose value lacks a citation explaining why it makes sense.
 
+# Script and test output
+- Vitest and Vite swallow `console.log` output, and a piped run can be cut off by an escape or timeout. Do not rerun a script just to see its output, and do not re-run once per missing line.
+- From the first run, have any diagnostic or measurement test write its results to a file (under `stats/`, or the scratchpad for throwaway runs) and read that file afterwards. Print nothing you need to see only via the console.
+- Write one file holding everything the question needs (all variants, all counts) instead of a series of runs that each add one number.
+- Delete throwaway test files and their output files when done.
+
 # Parallel Agents
 - Other agents are often working in this repo at the same time. Uncommitted changes you didn't make, including ones related to your work, are probably theirs: don't panic, don't revert or clean them up.
 - Stick to the files your task needs.

@@ -6,6 +6,8 @@ import type {
 	BasinVerdictParams,
 	BasinWaterBody,
 	EvaporationDeficitParams,
+	OpenLakeKind,
+	OpenLakeKindParams,
 	WaterBodiesParams,
 } from "@/model/geography/terrain/endorheic/types"
 import { GROUNDWATER_CONFIG } from "@/model/geography/terrain/groundwater-config"
@@ -84,6 +86,18 @@ function verdict({
 	for (const region of cells)
 		evaporation += evaporationM3s({ deficitMm, areaM2, secondsPerYear, region })
 	return { terminal: inflowM3s < evaporation, evaporationM3s: evaporation }
+}
+
+function openLakeKind({
+	inflowM3s,
+	evaporationM3s,
+}: OpenLakeKindParams): OpenLakeKind {
+	if (evaporationM3s <= 0) return "fresh"
+	const outflowM3s = inflowM3s - evaporationM3s
+	if (outflowM3s <= 0) return "salt"
+	const salinityGL = (C.riverSalinityGL * inflowM3s) / outflowM3s
+	if (salinityGL >= C.saltMinGL) return "salt"
+	return salinityGL >= C.brackishMinGL ? "brackish" : "fresh"
 }
 
 function waterBodies({
@@ -168,5 +182,6 @@ export const ENDORHEIC = {
 	outlets,
 	evaporationDeficit,
 	verdict,
+	openLakeKind,
 	waterBodies,
 }

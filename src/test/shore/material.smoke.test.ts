@@ -81,7 +81,7 @@ describe("shore material", () => {
 			coastal: Uint8Array.of(0, 1),
 			keyCode: Uint8Array.of(0, 0),
 			sand: Float32Array.of(70, 70),
-			iceThickness: new Float32Array(2),
+			pastaClimate: new Uint8Array(2),
 			relief: Uint8Array.of(0, SHORE_RELIEF.code.sloping),
 			exposureOpenM: Float32Array.of(2, 2),
 			flow: new Float32Array(2),

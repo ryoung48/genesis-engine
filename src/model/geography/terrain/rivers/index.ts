@@ -58,12 +58,14 @@ function computeRivers({
 
 	// ── 1. Priority-flood drainage ──────────────────────────────────
 	const land = isLand
-	const { drainTarget, processOrder, waterLevel } = DRAINAGE.order({
+	const filled = DRAINAGE.order({
 		mesh,
 		elevation,
 		isLand: land,
 		sinks: new Uint8Array(N),
 	})
+	const { waterLevel } = filled
+	let { drainTarget, processOrder } = filled
 
 	// ── 2a. Basin identification ─────────────────────────────────────
 	// Label connected components where priority-flood water level > ground.
@@ -158,6 +160,7 @@ function computeRivers({
 	const terminalOutlet = new Uint8Array(N)
 	const basinTerminal = new Uint8Array(basins.cells.length)
 	const basinInflow = new Float32Array(basins.cells.length)
+	const basinEvaporation = new Float32Array(basins.cells.length)
 
 	function accumulate(): void {
 		for (let month = 0; month < 12; month++) {
@@ -213,19 +216,34 @@ function computeRivers({
 			let inflow = 0
 			for (const outlet of basinOutlets[bid]) inflow += flow[outlet]
 			basinInflow[bid] = inflow
-			const { terminal } = ENDORHEIC.verdict({
+			const { terminal, evaporationM3s } = ENDORHEIC.verdict({
 				inflowM3s: inflow,
 				cells: basins.cells[bid],
 				deficitMm,
 				areaM2: cellAreaM2,
 				secondsPerYear,
 			})
+			basinEvaporation[bid] = evaporationM3s
 			if (!terminal) continue
 			basinTerminal[bid] = 1
 			for (const outlet of basinOutlets[bid]) terminalOutlet[outlet] = 1
 			added++
 		}
 		if (added === 0) break
+	}
+
+	if (basinTerminal.includes(1)) {
+		const sinks = new Uint8Array(N)
+		for (let bid = 0; bid < basins.cells.length; bid++)
+			if (basinTerminal[bid]) sinks[basins.lowest[bid]] = 1
+		;({ drainTarget, processOrder } = DRAINAGE.order({
+			mesh,
+			elevation,
+			isLand: land,
+			sinks,
+		}))
+		terminalOutlet.fill(0)
+		accumulate()
 	}
 
 	// ── 3. Threshold (top 5% of land flow) ──────────────────────────
@@ -385,7 +403,8 @@ function computeRivers({
 		}
 		if (!terminal[r] && (cur < 0 || !land[cur])) {
 			terminal[r] = 1
-			terminalCoastal[r] = 1
+			if (cur < 0) terminalInterior[r] = 1
+			else terminalCoastal[r] = 1
 		}
 	}
 
@@ -405,6 +424,7 @@ function computeRivers({
 		waterLevel,
 		basinTerminal,
 		basinInflow,
+		basinEvaporation,
 		lakeKind: new Uint8Array(N),
 	}
 }

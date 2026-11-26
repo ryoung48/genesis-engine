@@ -139,7 +139,6 @@ function trimLakeCorridors({
 	adjOffset,
 	adjList,
 	elevation,
-	basinCells,
 	lakeCells,
 }: TrimLakeCorridorsParams): { lakeCells: number[]; lakeSurface: number } {
 	if (lakeCells.length === 0) return { lakeCells: [], lakeSurface: 0 }
@@ -150,17 +149,17 @@ function trimLakeCorridors({
 		}
 	}
 
-	const basinNeighborCount = computeSubgraphNeighborCount({
+	const lakeNeighborCount = computeSubgraphNeighborCount({
 		numRegions,
 		adjOffset,
 		adjList,
-		cells: basinCells,
+		cells: lakeCells,
 	})
 	const inLake = new Uint8Array(numRegions)
 	const isCorridor = new Uint8Array(numRegions)
 	for (const cell of lakeCells) inLake[cell] = 1
 	for (const cell of lakeCells) {
-		if (basinNeighborCount[cell] <= 2) isCorridor[cell] = 1
+		if (lakeNeighborCount[cell] <= 2) isCorridor[cell] = 1
 	}
 
 	const pruned = new Uint8Array(numRegions)
@@ -197,24 +196,24 @@ function trimLakeCorridors({
 
 	const elongatedSeen = new Uint8Array(numRegions)
 	for (const start of lakeCells) {
-		if (pruned[start] || elongatedSeen[start] || basinNeighborCount[start] > 3)
+		if (pruned[start] || elongatedSeen[start] || lakeNeighborCount[start] > 3)
 			continue
 
 		const stack = [start]
 		const component: number[] = []
 		const attachments = new Set<number>()
-		let basinNeighborSum = 0
+		let lakeNeighborSum = 0
 		elongatedSeen[start] = 1
 
 		while (stack.length > 0) {
 			const cell = stack.pop()!
 			component.push(cell)
-			basinNeighborSum += basinNeighborCount[cell]
+			lakeNeighborSum += lakeNeighborCount[cell]
 
 			for (let j = adjOffset[cell]; j < adjOffset[cell + 1]; j++) {
 				const nb = adjList[j]
 				if (!inLake[nb] || pruned[nb]) continue
-				if (basinNeighborCount[nb] > 3) {
+				if (lakeNeighborCount[nb] > 3) {
 					attachments.add(nb)
 					continue
 				}
@@ -233,14 +232,10 @@ function trimLakeCorridors({
 			adjList,
 			cells: component,
 		})
-		const averageBasinNeighbors = basinNeighborSum / component.length
+		const averageLakeNeighbors = lakeNeighborSum / component.length
 		const widthEstimate = component.length / Math.max(1, diameter + 1)
 
-		if (
-			diameter >= 4 &&
-			widthEstimate <= 1.6 &&
-			averageBasinNeighbors <= 2.75
-		) {
+		if (diameter >= 4 && widthEstimate <= 1.6 && averageLakeNeighbors <= 2.75) {
 			for (const cell of component) pruned[cell] = 1
 		}
 	}
@@ -341,18 +336,24 @@ function selectConnectedLakeCells({
 		adjOffset,
 		adjList,
 		elevation,
-		basinCells,
 		lakeCells,
 	})
 }
 
-const lakeKinds: readonly LakeKind[] = ["none", "fresh", "salt", "pan"]
+const lakeKinds: readonly LakeKind[] = [
+	"none",
+	"fresh",
+	"salt",
+	"pan",
+	"brackish",
+]
 
 const lakeKindCode: Record<LakeKind, number> = {
 	none: 0,
 	fresh: 1,
 	salt: 2,
 	pan: 3,
+	brackish: 4,
 }
 
 function computeLakes({
@@ -366,6 +367,7 @@ function computeLakes({
 	basinId,
 	basinTerminal,
 	basinInflow,
+	basinEvaporation,
 	lakeKind,
 	isLand,
 	emergedLand,
@@ -373,7 +375,7 @@ function computeLakes({
 }: ComputeLakesParams): void {
 	const { numRegions: N, adjOffset, adjList } = mesh
 	const lakes = new Uint8Array(N)
-	const salty = new Uint8Array(N)
+	const waterKind = new Uint8Array(N)
 
 	const layout = ENDORHEIC.layout({ basinId, elevation })
 	const nextBasin = layout.cells.length
@@ -414,18 +416,37 @@ function computeLakes({
 		const allCells = basinCells[bid]
 		if (basinTerminal[bid]) {
 			const { lake, pan } = bodies[bid]
+			const panCells = [...pan]
 			for (const cell of allCells) waterLevel[cell] = elevation[cell]
 			if (lake.length > 0) {
-				const lakeSurface = computeLakeSurface({ lakeCells: lake, elevation })
+				const { lakeCells, lakeSurface } = trimLakeCorridors({
+					numRegions: N,
+					adjOffset,
+					adjList,
+					elevation,
+					lakeCells: lake,
+				})
+				const retained = new Set(lakeCells)
 				for (const c of lake) {
+					if (!retained.has(c)) {
+						panCells.push(c)
+						continue
+					}
 					lakes[c] = 1
-					salty[c] = 1
+					waterKind[c] = lakeKindCode.salt
 					waterLevel[c] = lakeSurface
 				}
 			}
-			for (const c of pan) {
+			for (const c of panCells) isLand[c] = 1
+			const { lakeCells: trimmedPan } = trimLakeCorridors({
+				numRegions: N,
+				adjOffset,
+				adjList,
+				elevation,
+				lakeCells: panCells,
+			})
+			for (const c of trimmedPan) {
 				lakeKind[c] = lakeKindCode.pan
-				isLand[c] = 1
 			}
 			continue
 		}
@@ -444,8 +465,13 @@ function computeLakes({
 			basinCells: allCells,
 			targetCellCount,
 		})
+		const openKind = ENDORHEIC.openLakeKind({
+			inflowM3s: basinInflow[bid],
+			evaporationM3s: basinEvaporation[bid],
+		})
 		for (const c of lakeCells) {
 			lakes[c] = 1
+			waterKind[c] = lakeKindCode[openKind]
 			waterLevel[c] = lakeSurface
 		}
 		for (const cell of allCells) {
@@ -457,7 +483,7 @@ function computeLakes({
 		if (emergedLand?.[r] && elevationKm?.[r] != null && elevationKm[r] > 0)
 			continue
 		isLand[r] = 0
-		lakeKind[r] = salty[r] ? lakeKindCode.salt : lakeKindCode.fresh
+		lakeKind[r] = waterKind[r]
 	}
 }
 

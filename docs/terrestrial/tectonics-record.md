@@ -42,6 +42,8 @@ The footprint is the set of cells the elevation already drew a feature on, so a 
 
 ## Geologic record (`geologic-record`)
 
+The deposits stage reads this record; see the [deposits overview](deposits/overview.md).
+
 Written in closed form, per land cell, in the order the plate history keeps it:
 
 1. How deep the basement is worn: shield by its own amount (16 to 28 km), belts about it less (6 to 16 km), plus each belt's wear since it rose (an old belt the longer ago, a live one by how much it stands), capped at 60 km.

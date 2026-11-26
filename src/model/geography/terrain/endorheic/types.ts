@@ -35,6 +35,13 @@ export interface BasinVerdict {
 	evaporationM3s: number
 }
 
+export interface OpenLakeKindParams {
+	inflowM3s: number
+	evaporationM3s: number
+}
+
+export type OpenLakeKind = "fresh" | "brackish" | "salt"
+
 export interface WaterBodiesParams {
 	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList">
 	elevation: Float32Array

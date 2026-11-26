@@ -2,7 +2,6 @@ import { KOPPEN } from "@/model/climate/classification/koppen"
 import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { CAVES } from "@/model/geography/terrain/caves"
-import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { OASES } from "@/model/geography/terrain/groundwater/oases"
 import { SPRINGS } from "@/model/geography/terrain/groundwater/springs"
 import { WETLANDS } from "@/model/geography/terrain/groundwater/wetlands"
@@ -49,6 +48,8 @@ import {
 	getBaseMapMode,
 	getDataVariant,
 } from "@/ui/genesis/shared/data-variant"
+import { DEPOSITS_VIEW } from "@/ui/genesis/shared/deposits-view"
+import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
 import {
 	displayYear,
 	getFarming,
@@ -62,11 +63,12 @@ import {
 import { getProvincePopulationDensity } from "@/ui/genesis/shared/population-density"
 import {
 	CAVE_DOT_COLORS,
+	FROZEN_COLOR,
+	getLakeKindColor,
 	getTerrainFeatureColor,
 	getTopographyColor,
 	KARST_CLASS_COLORS,
 	rockColor,
-	SALT_PAN_COLOR,
 	SHORE_LABEL_COLORS,
 	soilColor,
 	WATER_DOT_COLORS,
@@ -356,12 +358,11 @@ export function buildTopographySwatchColor(
 ): string | null {
 	if (hoverRegion === null || !world?.topography) return null
 	const code = world.topography[hoverRegion]
-	const color = CLASSIFICATION.isSaltFlat({
-		code,
-		lakeKind: world.rivers?.lakeKind?.[hoverRegion],
-	})
-		? SALT_PAN_COLOR
-		: getTopographyColor(code)
+	const color =
+		getLakeKindColor({
+			code,
+			lakeKind: world.rivers?.lakeKind?.[hoverRegion],
+		}) ?? getTopographyColor(code)
 	return color ? rgbToCss(color) : null
 }
 
@@ -688,6 +689,14 @@ export function buildHoverGroundwater({
 		(colorMode !== "waterTable" && colorMode !== "wetlands")
 	)
 		return []
+	if (world.pastaClimate[region] === PASTA.iceCode)
+		return [
+			{
+				label: colorMode === "waterTable" ? "Water table" : "Wetland",
+				value: "Frozen",
+				color: rgbToCss(FROZEN_COLOR),
+			},
+		]
 	const flow = (value: number) =>
 		formatFlowRate(value, unitSystem, (v) => v.toFixed(2))
 	const rate = (mm: number) => `${formatPrecipitation(mm, unitSystem, 0)}/yr`
@@ -790,6 +799,32 @@ function caveRange({
 	const start = lo
 	while (lo < sites.region.length && sites.region[lo] === region) lo++
 	return [start, lo]
+}
+
+export function buildHoverDeposits({
+	world,
+	region,
+	colorMode,
+	depositsView,
+}: {
+	world: SerializedGenesisWorld | null
+	region: number | null
+	colorMode: ColorMode
+	depositsView: DepositsView
+}): HoverGroundwaterRow[] {
+	const deposits = world?.deposits
+	if (!deposits || !world.isLand || region === null || colorMode !== "deposits")
+		return []
+	return DEPOSITS_VIEW.hover({
+		rows: deposits.rows,
+		numRegions: world.isLand.length,
+		region,
+		view: depositsView,
+	}).map(({ label, value, rgb }) => ({
+		label,
+		value,
+		color: rgbToCss(rgb),
+	}))
 }
 
 export function buildHoverKarst({

@@ -160,6 +160,20 @@ describe("terminal basin routing", () => {
 		)
 	})
 
+	it("a terminal bowl's flow ends at its floor, not at its spill rim", () => {
+		const { rivers } = run({ world, runoffMmPerMonth: 1 })
+		const bid = rivers.basinId[world.bowlRegion]
+		expect(rivers.basinTerminal[bid]).toBe(1)
+		let floor = -1
+		let wettest = -1
+		for (let r = 0; r < world.N; r++) {
+			if (rivers.basinId[r] !== bid) continue
+			if (floor < 0 || world.elevation[r] < world.elevation[floor]) floor = r
+			if (wettest < 0 || rivers.flow[r] > rivers.flow[wettest]) wettest = r
+		}
+		expect(wettest).toBe(floor)
+	})
+
 	it("flow into the bowl is unchanged by the verdict", () => {
 		const open = run({ world, runoffMmPerMonth: 30 }).rivers
 		const closed = run({ world, runoffMmPerMonth: 30 }).rivers
@@ -177,8 +191,19 @@ describe("terminal basin routing", () => {
 describe("terminal basin lakes", () => {
 	const world = build()
 
-	function lakes(runoffMmPerMonth: number) {
+	function lakes({
+		runoffMmPerMonth,
+		outflowShare,
+	}: {
+		runoffMmPerMonth: number
+		outflowShare?: number
+	}) {
 		const { rivers, inputs } = run({ world, runoffMmPerMonth })
+		if (outflowShare !== undefined) {
+			const bowl = rivers.basinId[world.bowlRegion]
+			rivers.basinEvaporation[bowl] =
+				rivers.basinInflow[bowl] * (1 - outflowShare)
+		}
 		const isLand = Uint8Array.from(world.isLand)
 		const elevation = Float32Array.from(world.elevation)
 		LAKES.computeLakes({
@@ -195,38 +220,45 @@ describe("terminal basin lakes", () => {
 			basinId: rivers.basinId,
 			basinTerminal: rivers.basinTerminal,
 			basinInflow: rivers.basinInflow,
+			basinEvaporation: rivers.basinEvaporation,
 			lakeKind: rivers.lakeKind,
 			isLand,
 		})
 		return { rivers, isLand }
 	}
 
-	it("every region has a lake kind from 0 to 3", () => {
-		const { rivers } = lakes(1)
-		for (const kind of rivers.lakeKind) {
-			expect(kind).toBeGreaterThanOrEqual(0)
-			expect(kind).toBeLessThanOrEqual(3)
-		}
+	it("every region has a known lake kind", () => {
+		const { rivers } = lakes({ runoffMmPerMonth: 1 })
+		for (const kind of rivers.lakeKind) expect(LAKES.kinds[kind]).toBeDefined()
 	})
 
 	it("a terminal bowl holds a salt lake or a pan and never a fresh lake", () => {
-		const { rivers, isLand } = lakes(1)
+		const { rivers, isLand } = lakes({ runoffMmPerMonth: 1 })
 		const kinds = new Set<number>()
 		const bid = rivers.basinId[world.bowlRegion]
 		for (let r = 0; r < world.N; r++)
 			if (rivers.basinId[r] === bid) kinds.add(rivers.lakeKind[r])
 		expect(kinds.has(2) || kinds.has(3)).toBe(true)
-		expect(kinds.has(1)).toBe(false)
+		expect(kinds.has(1) || kinds.has(4)).toBe(false)
 		for (let r = 0; r < world.N; r++)
 			if (rivers.lakeKind[r] === 3) expect(isLand[r]).toBe(1)
 	})
 
-	it("an open bowl holds only fresh lakes", () => {
-		const { rivers } = lakes(30)
+	it.each([
+		{ outflowShare: 0.9, kind: "fresh" },
+		{ outflowShare: 0.1, kind: "brackish" },
+		{ outflowShare: 0.001, kind: "salt" },
+	] as const)("an open bowl passing on $outflowShare of its inflow holds a $kind lake", ({
+		outflowShare,
+		kind,
+	}) => {
+		const { rivers } = lakes({ runoffMmPerMonth: 30, outflowShare })
 		const bid = rivers.basinId[world.bowlRegion]
 		expect(rivers.basinTerminal[bid]).toBe(0)
+		const kinds = new Set<string>()
 		for (let r = 0; r < world.N; r++)
-			if (rivers.basinId[r] === bid)
-				expect(rivers.lakeKind[r] === 0 || rivers.lakeKind[r] === 1).toBe(true)
+			if (rivers.basinId[r] === bid && rivers.lakeKind[r] > 0)
+				kinds.add(LAKES.kinds[rivers.lakeKind[r]])
+		expect([...kinds]).toEqual([kind])
 	})
 })

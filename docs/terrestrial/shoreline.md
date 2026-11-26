@@ -35,7 +35,7 @@ Gradient in m/km: the larger of the region's own height over half its sea edge a
 
 First match wins:
 
-1. **Ice**: land-ice thickness above 0.
+1. **Ice**: the Pasta Ice climate class.
 2. **Rock**: substrate resistance at least 0.6, relief not low or open exposure at least moderate, and not fresh volcanic on a non-steep coast.
 3. **Gravel**: till substrate or steep relief.
 4. **Sand with the volcanic flag**: substrate basalt or volcanic with `hazards.volcano` at least 0.25 (fresh volcanic). The flag is set on every non-ice fresh volcanic coast, including those that end up rock or gravel because they are steep; the flag decides the label: a flagged coast is black-sand beach unless it is already ice, marsh, flat or delta, so steep volcanic coasts read as black sand rather than cliff (Hawaii, Iceland and the Canaries are of this kind: cliffs broken by black beaches).
@@ -74,19 +74,19 @@ Default procedural world, seeds 14963991, 20251107, 77031 (`SHORE_SHARES=1` runs
 
 | Quantity | Result |
 |---|---|
-| Coastal land regions | 10.3 to 10.9% of land (6,188 to 6,440) |
-| Open face sheltered / moderate / exposed | 9 to 11% / 18% / 71 to 73% |
-| Lee face sheltered / moderate / exposed | 22 to 25% / 23 to 25% / 51 to 52% |
-| Relief low / sloping / steep | 38 to 45% / 30 to 33% / 25 to 31% |
-| Material ice / rock / gravel / sand / mud | 12 to 24% / 40 to 50% / 9 to 12% / 22 to 32% / 3 to 4% |
-| Labels: cliff / rocky / gravel / sandy / muddy | 9 to 12% / 25 to 32% / 9 to 11% / 21 to 30% / 2% |
-| Labels: delta / estuary | 1.2 to 1.6% / 2.9 to 3.4% (estuary setting is 4.7 to 5.1%; marsh, flat and delta labels outrank it) |
-| Delta / estuary / fjord setting | 1.4 to 1.8% / 4.7 to 5.1% / 0.1% |
-| Mangrove / salt marsh / tidal flat | 1.1 to 1.2% / 0.5 to 0.9% / 0.5 to 1.1% |
-| Volcanic-sand flag / black sand label | 1.3 to 1.8% / 1.3 to 1.8% |
+| Coastal land regions | 10.4 to 10.7% of land (6,285 to 6,421) |
+| Open face sheltered / moderate / exposed | 9 to 11% / 18 to 19% / 71 to 73% |
+| Lee face sheltered / moderate / exposed | 22 to 25% / 22 to 25% / 51 to 53% |
+| Relief low / sloping / steep | 37 to 44% / 29 to 31% / 27 to 32% |
+| Material ice / rock / gravel / sand / mud | 0.4 to 0.9% / 44 to 52% / 15 to 17% / 28 to 36% / 4 to 5% |
+| Labels: cliff / rocky / gravel / sandy / muddy | 9 to 13% / 29 to 32% / 14 to 16% / 26 to 33% / 3% |
+| Labels: delta / estuary | 1.3 to 1.6% / 3.9 to 4.6% (estuary setting is 4.6 to 5.3%; marsh, flat and delta labels outrank it) |
+| Delta / estuary / fjord setting | 1.4 to 1.8% / 4.6 to 5.3% / 0.1% |
+| Mangrove / salt marsh / tidal flat | 1.0 to 1.3% / 0.8 to 1.1% / 1.2 to 1.4% |
+| Volcanic-sand flag / black sand label | 1.7 to 2.1% / 1.7 to 2.0% |
 | Stage time | about 50 to 60 ms (classification only) |
 
-Fresh volcanic coasts are mostly steep at region scale: of 108 coastal regions on fresh volcanic substrate in seed 14963991, 70 are steep, 27 are ice and 8 are sand. The flag covers the 81 non-ice ones and decides their label, so they read as black sand beach instead of cliff. Likewise a steep soft coast reads as gravel beach, not cliff (cliff needs rock material); before these two rules the cliff label was 19 to 23% and gravel beach 1 to 3%.
+Fresh volcanic coasts are mostly steep at region scale. The flag covers every fresh volcanic coast that is not ice and decides its label, so these read as black sand beach instead of cliff. Likewise a steep soft coast reads as gravel beach, not cliff (cliff needs rock material); before these two rules the cliff label was 19 to 23% and gravel beach 1 to 3%.
 
 ## Not modelled
 

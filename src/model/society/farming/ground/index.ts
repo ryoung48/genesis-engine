@@ -1,3 +1,4 @@
+import { LAKES } from "@/model/geography/terrain/lakes"
 import { MATH } from "@/model/shared/math/core"
 import type {
 	GroundFactorParams,
@@ -45,6 +46,7 @@ function provinceGround({
 	elevationKm,
 	slopeScore,
 	soilFertility,
+	lakeKind,
 }: ProvinceGroundParams): ProvinceGround {
 	const count = provinces.count
 	const area = new Float64Array(count)
@@ -63,7 +65,13 @@ function provinceGround({
 		terrace[p] +=
 			a *
 			(low ? 1 : groundFactor({ slope: slopeScore[r], edges: TERRACE_SLOPE }))
-		soil[p] += a * (soilFertility ? soilFactor(soilFertility[r]) : 1)
+		soil[p] +=
+			a *
+			(lakeKind[r] === LAKES.kindCode.pan
+				? 1 - MAX_SLOPE_LOSS
+				: soilFertility
+					? soilFactor(soilFertility[r])
+					: 1)
 	}
 	return {
 		plough: Float32Array.from(plough, (v, p) =>

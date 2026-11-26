@@ -164,6 +164,7 @@ export const GEOLOGY_MAP_MODE_OPTIONS: ReadonlyArray<
 	["rock", "Rock"],
 	["soil", "Soil"],
 	["karst", "Karst"],
+	["deposits", "Deposits"],
 ]
 
 export function isGeologyColorMode(colorMode: ColorMode): boolean {
@@ -296,6 +297,7 @@ export function normalizeGeographyColorMode({
 	hasGroundwater,
 	hasShore,
 	hasKarst,
+	hasDeposits,
 }: {
 	colorMode: ColorMode
 	hasHazards: boolean
@@ -303,10 +305,12 @@ export function normalizeGeographyColorMode({
 	hasGroundwater: boolean
 	hasShore: boolean
 	hasKarst: boolean
+	hasDeposits: boolean
 }): ColorMode {
 	if (!hasHazards && colorMode === "dangerZones") return "terrain"
 	if (!hasRock && isGeologyColorMode(colorMode)) return "terrain"
 	if (!hasKarst && colorMode === "karst") return "rock"
+	if (!hasDeposits && colorMode === "deposits") return "rock"
 	if (!hasGroundwater && isGroundwaterColorMode(colorMode)) return "topography"
 	if (!hasShore && isShoreColorMode(colorMode)) return "topography"
 	return colorMode

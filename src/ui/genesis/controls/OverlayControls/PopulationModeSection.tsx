@@ -1,6 +1,7 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
 import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
+import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import {
 	isPopulationSocietyMode,
@@ -13,6 +14,8 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 	societyMode,
 	setSocietyMode,
 	availableModes,
+	showMigrationRoutes,
+	setShowMigrationRoutes,
 }) => {
 	const [expanded, setExpanded] = React.useState(true)
 	if (
@@ -28,7 +31,7 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 				onToggle={() => setExpanded((value) => !value)}
 			/>
 			{expanded && (
-				<div className="mt-1.5">
+				<div className="mt-1.5 space-y-1.5">
 					<RadioGroup
 						label="Population mode"
 						orientation="horizontal"
@@ -40,6 +43,11 @@ export const PopulationModeSection: React.FC<PopulationModeSectionProps> = ({
 						}))}
 						value={societyMode}
 						onChange={setSocietyMode}
+					/>
+					<ToggleRow
+						label="Migration route"
+						checked={showMigrationRoutes}
+						onChange={setShowMigrationRoutes}
 					/>
 				</div>
 			)}

@@ -1,3 +1,4 @@
+import { PASTA } from "@/model/climate/classification/pasta"
 import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { DRAINAGE } from "@/model/geography/terrain/drainage"
 import { DRAIN_LEVEL } from "@/model/geography/terrain/groundwater/drain-level"
@@ -80,7 +81,7 @@ function compute(params: GroundwaterComputeParams): GroundwaterResult {
 		isLand,
 		lakeKind,
 		openWater,
-		iceThickness,
+		pastaClimate,
 		rivers,
 		surface,
 		planetRadiusKm,
@@ -99,14 +100,10 @@ function compute(params: GroundwaterComputeParams): GroundwaterResult {
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) {
 			water[r] = 1
-			lake[r] =
-				lakeKind[r] === LAKES.kindCode.fresh ||
-				lakeKind[r] === LAKES.kindCode.salt
-					? 1
-					: 0
+			lake[r] = lakeKind[r] !== LAKES.kindCode.none ? 1 : 0
 			continue
 		}
-		if (iceThickness[r] > 0) continue
+		if (pastaClimate[r] === PASTA.iceCode) continue
 		active[r] = 1
 		pan[r] = lakeKind[r] === LAKES.kindCode.pan ? 1 : 0
 	}
