@@ -5,6 +5,7 @@
 	"version": "0.0.0",
 	"type": "module",
 	"scripts": {
+		"prepare": "git config core.hooksPath .githooks",
 		"dev": "vite",
 		"typecheck": "tsc -b",
 		"build:solver-wasm": "node scripts/build-solver-wasm.mjs",
