@@ -7,17 +7,21 @@ import type {
 	MonthlyCellsParams,
 	RainBeltCellsParams,
 	SampleCellsParams,
+	SeaStateParams,
 	SeaSurface,
 	SeaSurfaceParams,
 	WindFields,
 	WindFieldsParams,
 } from "@/model/climatev2/outputs/types"
+import { SEA_ICE_PATCHES } from "@/model/climatev2/sea-ice-patches"
+import { SST_NOISE } from "@/model/climatev2/sst-noise"
 
 // v2's warm/cold sea anomaly (°C vs the latitude's mean sea) that fills the ±1 display scale
 const SST_ANOMALY_SATURATION_C = 9
 
 const MONTHS = 12
 const DEG = 180 / Math.PI
+const SEA_ICE_EXTENT_CONCENTRATION = 0.15
 
 function bilinearWeights({
 	mesh,
@@ -86,6 +90,50 @@ function monthlyCells({
 	const out = new Float32Array((MONTHS * weights.index.length) / 4)
 	sampleCells({ weights, field, fieldSize, months: MONTHS, out, cells: null })
 	return out
+}
+
+function seaState({
+	weights,
+	grid,
+	temperature,
+	temperatureMonthly,
+	cells,
+	mesh,
+	seed,
+	procedural,
+}: SeaStateParams) {
+	const N = cells.length
+	const sampling = { weights, fieldSize: grid.size, months: MONTHS, cells }
+	const noise = procedural ? SST_NOISE.field({ grid, seed }) : null
+	sampleCells({
+		...sampling,
+		field: temperature.monthlySL,
+		out: temperatureMonthly,
+	})
+	if (noise) {
+		const cellNoise = new Float32Array(N)
+		sampleCells({ ...sampling, months: 1, field: noise, out: cellNoise })
+		for (let m = 0; m < MONTHS; m++)
+			for (let r = 0; r < N; r++) temperatureMonthly[m * N + r] += cellNoise[r]
+	}
+	const iceMonthly = new Float32Array(MONTHS * N)
+	sampleCells({
+		...sampling,
+		field: noise ? temperature.seaIceWithOffset(noise) : temperature.seaIce,
+		out: iceMonthly,
+	})
+	const iceMonths = new Uint8Array(N)
+	for (let m = 0; m < MONTHS; m++)
+		for (let r = 0; r < N; r++)
+			if (iceMonthly[m * N + r] >= SEA_ICE_EXTENT_CONCENTRATION) iceMonths[r]++
+	if (procedural)
+		SEA_ICE_PATCHES.merge({
+			mesh,
+			ocean: cells,
+			months: iceMonths,
+			monthCount: MONTHS,
+		})
+	return { iceMonthly, iceMonths }
 }
 
 function rainBeltCells({
@@ -189,10 +237,12 @@ function seaSurface({ anomalyMonthly, isLand }: SeaSurfaceParams): SeaSurface {
 
 export const CLIMATEV2_OUTPUTS = {
 	sstAnomalySaturationC: SST_ANOMALY_SATURATION_C,
+	seaIceExtentConcentration: SEA_ICE_EXTENT_CONCENTRATION,
 	bilinearWeights,
 	sampleCells,
 	annualMean,
 	monthlyCells,
+	seaState,
 	rainBeltCells,
 	windFields,
 	currentFlows,

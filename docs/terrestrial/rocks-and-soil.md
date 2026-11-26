@@ -4,6 +4,8 @@ Scope: `:history`.
 
 Every land region of a procedural world has a surface rock, one of 13 kinds, and a soil fertility between 0 and 1. Farming reads the fertility as a soil factor on its climate fit. Earth imports have neither; their soil factor is 1.
 
+Classified salt-pan regions have fertility 0.03, the existing salt parent-material value, and a saline modifier. This makes them Barren on the soil map and reduces their contribution to farming. The classification covers whole regions, so it does not represent variations within a region.
+
 The rules are ported from World Orogen (`v2/js/geology/rocks.js`, `geology-config.js`, `finish/*`, `farming/farming-config.js`, commit `ed466f9db71292e912d8d0160e689a67a994f2d9`), fitted to our own crust record ([tectonics records](tectonics-record.md)) and erosion. See the README references.
 
 ## Kinds

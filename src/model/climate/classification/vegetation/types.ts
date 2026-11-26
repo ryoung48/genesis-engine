@@ -25,6 +25,8 @@ export type AssignVegetationParams = {
 	rng: () => number
 	/** Omitted when Pasta zones are unavailable and the fallback classifier is used. */
 	pastaZones?: Uint8Array
+	// [JUSTIFICATION] Omitted when Pasta diagnostics are unavailable.
+	ar?: Float32Array
 	/** Omitted when no growing-degree-day diagnostics were computed. */
 	gdd?: Float32Array
 	/** Omitted when no growing-aridity diagnostics were computed. */

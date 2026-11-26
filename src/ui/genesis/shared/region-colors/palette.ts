@@ -187,19 +187,16 @@ export const FROZEN_COLOR: [number, number, number] = rgb255(255, 255, 255)
 
 export const SALT_PAN_COLOR: [number, number, number] = rgb255(190, 180, 151)
 
-export const BRACKISH_LAKE_COLOR: [number, number, number] = rgb255(
-	148,
-	163,
-	184,
-)
+export const FRESH_LAKE_COLOR: [number, number, number] = rgb255(98, 145, 176)
 
 export function getLakeKindColor({
 	code,
 	lakeKind,
 }: IsSaltFlatParams): [number, number, number] | null {
 	if (code === CLASSIFICATION.topoLake) {
-		if (lakeKind === LAKES.kindCode.brackish) return BRACKISH_LAKE_COLOR
+		if (lakeKind === LAKES.kindCode.brackish) return null
 		if (lakeKind === LAKES.kindCode.salt) return FROZEN_COLOR
+		return FRESH_LAKE_COLOR
 	}
 	return CLASSIFICATION.isSaltFlat({ code, lakeKind }) ? SALT_PAN_COLOR : null
 }

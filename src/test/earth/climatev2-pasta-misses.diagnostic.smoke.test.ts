@@ -62,8 +62,6 @@ describe("climatev2 PASTA misses (diagnostic)", () => {
 					params,
 					realDtrMonthly: dtr,
 					iceThickness: world.iceThickness,
-					iceMinMonthly: world.iceMinMonthly,
-					iceMaxMonthly: world.iceMaxMonthly,
 				}) as { zones: Uint8Array }
 			).zones
 		const exact = (zones: Uint8Array) => {

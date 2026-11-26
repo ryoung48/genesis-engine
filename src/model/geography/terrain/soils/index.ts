@@ -1,3 +1,4 @@
+import { LAKES } from "@/model/geography/terrain/lakes"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import type {
 	RegionClimateParams,
@@ -29,6 +30,7 @@ const MODIFIERS: readonly SoilModifier[] = [
 	"black",
 	"leached",
 	"podzol",
+	"saline",
 ]
 const KIND_WORDS: Record<SoilParentKey, string> = {
 	river: "river silt",
@@ -53,6 +55,7 @@ const MODIFIER_WORDS: Record<SoilModifier, string> = {
 	black: "black earth",
 	leached: "leached red earth",
 	podzol: "acid podzol",
+	saline: "saline",
 }
 const LEACHED_AT = 0.45
 const BLACK_AT = 0.5
@@ -160,6 +163,7 @@ function fertility({
 	rising,
 	vegetation,
 	isLand,
+	lakeKind,
 	temperatureMonthly,
 	temperatureAvg,
 	rainfallAnnual,
@@ -170,6 +174,11 @@ function fertility({
 	const modifier = new Uint8Array(n)
 	for (let r = 0; r < n; r++) {
 		if (!isLand[r]) continue
+		if (lakeKind[r] === LAKES.kindCode.pan) {
+			out[r] = C.parentFertility.salt
+			modifier[r] = MODIFIERS.indexOf("saline")
+			continue
+		}
 		const soil = soilAt({
 			rock: ROCKS.kinds[rock[r]],
 			young: ROCKS.youngKinds[youngKind[r]],

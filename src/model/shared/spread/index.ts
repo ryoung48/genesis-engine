@@ -1,6 +1,7 @@
 import { PriorityHeap } from "@/model/shared/min-heap"
 import type {
 	BlurRecordParams,
+	ComponentsParams,
 	NearestLandParams,
 	NeighbourAverageParams,
 	SpreadParams,
@@ -36,6 +37,29 @@ function km({
 			}
 		}
 	}
+}
+
+function components({ mesh, isMember, canConnect }: ComponentsParams) {
+	const { numRegions: n, adjOffset, adjList } = mesh
+	const label = new Int32Array(n).fill(-1)
+	const cells: number[][] = []
+	for (let start = 0; start < n; start++) {
+		if (label[start] >= 0 || !isMember(start)) continue
+		const group = [start]
+		label[start] = cells.length
+		for (let i = 0; i < group.length; i++) {
+			const from = group[i]
+			for (let k = adjOffset[from]; k < adjOffset[from + 1]; k++) {
+				const to = adjList[k]
+				if (label[to] >= 0 || !isMember(to) || !canConnect({ from, to }))
+					continue
+				label[to] = cells.length
+				group.push(to)
+			}
+		}
+		cells.push(group)
+	}
+	return { label, cells }
 }
 
 function blurRecord({
@@ -110,4 +134,10 @@ function neighbourAverage({
 	return current
 }
 
-export const SPREAD = { km, blurRecord, nearestLand, neighbourAverage }
+export const SPREAD = {
+	km,
+	components,
+	blurRecord,
+	nearestLand,
+	neighbourAverage,
+}

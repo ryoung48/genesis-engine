@@ -4,6 +4,10 @@ All procedural planets and Earth heightmap imports use **Climate v2**. Select **
 
 V2 uses the current climatev2 temperature, monthly wind, ocean, rain, cloud and diurnal-range outputs. Planets tidally locked to their star use climatev2's locked climate (`CLIMATE_V2.computeLocked`, see [pressure.md](pressure.md#tidally-locked-planets)): its temperature, cloud deck, rain, winds and ocean currents, solved once from the terrain before any lake drains, as for rotating v2 worlds, with the sunlight of a fixed substellar point (`CLIMATEV2_ORBIT.lockedSunlight`). Their within-month range and potential evaporation come from it too (see [pressure.md](pressure.md#range-and-potential-evaporation)), not from the DTR model or Hargreaves.
 
+The PASTA ocean colors and Sea Ice Extent outlines use Climate v2's monthly ice concentration. At least 15% concentration in all 12 months gives permanent ice. Meeting that threshold in fewer months gives seasonal ice. Earth imports use the same modeled ice coverage in the Observed PASTA view.
+
+On procedural maps, a seeded noise field of up to ±2 °C, the same in every month, is added to sea temperature to give ocean classes and the ice edge broad lobes and bays. It is added after the climate solve, so rain, winds, currents and land temperature do not respond to it. Sea ice is recalculated from the noisy temperature. Small isolated ice patches and holes are then merged into the surrounding ocean class. Land separates these patches.
+
 For how rotating v2 worlds respond to axial tilt, and how they compare with ExoPlaSim, see [obliquity.md](obliquity.md).
 
 For what has been measured, tried and ruled out in raising v2's PASTA and Köppen match on Earth, and the diagnostics and tuner used, see [accuracy-investigations.md](accuracy-investigations.md).

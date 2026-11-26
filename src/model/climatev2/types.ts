@@ -14,6 +14,7 @@ export interface ClimateV2Input {
 	orbit: ClimateOrbit
 	seed: number
 	diagnostics: boolean
+	procedural: boolean
 }
 
 export interface ClimateV2Diagnostics {
@@ -30,6 +31,7 @@ export interface ClimateV2Circulation {
 export interface ClimateV2Cells {
 	circulation: ClimateV2Circulation
 	cloudCoverMonthly: Float32Array
+	seaIceMonths: Uint8Array
 	temperatureMonthly: Float32Array
 	rainfallMonthly: Float32Array
 	rainfallAnnual: Float32Array
@@ -48,25 +50,23 @@ export interface ClimateV2WorldParams {
 	elevationKm: Float32Array
 	isLand: Uint8Array
 	params: GenesisParams
+	procedural: boolean
 }
 
 export interface ClimateV2ClimateParams {
 	mesh: SphereMesh
 	params: GenesisParams
-	v2: Pick<ClimateV2Cells, "cloudCoverMonthly" | "temperatureMonthly"> & {
+	v2: Pick<
+		ClimateV2Cells,
+		"cloudCoverMonthly" | "seaIceMonths" | "temperatureMonthly"
+	> & {
 		diurnalRange: Pick<ClimateV2Cells["diurnalRange"], "monthly">
 	}
 }
 
-export interface LockedClimateParams {
-	mesh: SphereMesh
-	elevationKm: Float32Array
-	isLand: Uint8Array
-	params: GenesisParams
-}
-
 export interface LockedClimateCells {
 	cloudCoverMonthly: Float32Array
+	seaIceMonths: Uint8Array
 	diurnalRange: { monthly: Float32Array; annual: Float32Array }
 	petMonthly: Float32Array
 	temperatureMonthly: Float32Array

@@ -7,7 +7,6 @@ export interface ProvinceGroundParams {
 	elevationKm: Float32Array
 	slopeScore: Float32Array
 	soilFertility: Float32Array | null
-	lakeKind: Uint8Array
 }
 
 export interface ProvinceGround {

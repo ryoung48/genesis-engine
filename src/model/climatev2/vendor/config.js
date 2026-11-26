@@ -45,8 +45,11 @@ export const PARAMS_DEFAULTS = Object.freeze({
                                 //            from each month's cold alone, none lasting into the summer) …
     TEMP_SEA_ICE_STEFAN_M: 0.2, // m          … growing slower once thicker than this (insulated: Stefan's law; 0 = off) …
     TEMP_SEA_ICE_MELT: 0.003,   // m/°C/day   … and thins this much per degree-day of thaw
+    TEMP_SEA_ICE_FREEZE_C: -0.8, // °C        onset of degree-day growth on the rotating model's sea-temperature proxy
+    TEMP_SEA_ICE_EDGE_SHIFT_C: 1.8, // °C    move the new-ice concentration ramp colder than the fitted albedo ramp
+    TEMP_SEA_ICE_MELT_SHIELD: 0.7, // –      asymptotic melt reduction in thick pack, where less open water absorbs heat
     TEMP_SEA_ICE_H0: 0.5,       // m          the sea is covered once its ice is this thick (and holds at most 6× this)
-    TEMP_SEA_ICE_SPREAD_KM: 700,// km         the ice follows the sea's temperature averaged within this (a warm current's
+    TEMP_SEA_ICE_SPREAD_KM: 500,// km         the ice follows the sea's temperature averaged within this (a warm current's
                                 //            water spreads well out from its coast; the pack drifts)
     TEMP_BLOCK_KM: 1.5,           // km         mountains block the low air's heat exchange: e^{−(ridge above the lower side)/this}; 0 = off
     TEMP_LOCAL_K: 11,            // W/m²/K     land's own seasons below the grid: a column's exchange with its surroundings (0 = off)

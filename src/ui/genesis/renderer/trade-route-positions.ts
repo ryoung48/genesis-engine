@@ -2,7 +2,10 @@ import * as THREE from "three"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
 import type { SerializedRouteKind } from "@/model/society/infrastructure/transport/types"
 import type { SerializedNetwork } from "@/model/worker-protocol/types"
-import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
+import {
+	createMapProjection,
+	splitMapPoints,
+} from "@/ui/genesis/renderer/map-projection"
 import type {
 	TradeRoutePositionRequest,
 	TradeRoutePositionSet,
@@ -227,44 +230,6 @@ function appendPolylineSegments(
 	}
 }
 
-// Corridors that cross the antimeridian relative to the current view
-// project to a huge jump in map-space x. Rather than dropping the
-// crossing edge (which is fine for coastline polygons but leaves real
-// connectivity data like trade routes visibly disconnected), each
-// crossing edge is split and extended to the map's left/right border --
-// the slide clones added by addMapSlideClones() then make the route
-// appear to continue seamlessly off one edge and back in on the other.
-function splitMapPoints(
-	points: THREE.Vector3[],
-	halfWidth: number,
-	repeatWidth: number,
-): THREE.Vector3[][] {
-	if (points.length < 2) return points.length === 0 ? [] : [points]
-	const segments: THREE.Vector3[][] = [[points[0]]]
-	for (let i = 1; i < points.length; i++) {
-		const current = points[i]
-		const previous = points[i - 1]
-		if (Math.abs(current.x - previous.x) > halfWidth) {
-			const sign = Math.sign(previous.x) || 1
-			const unwrappedCurrentX = current.x - sign * repeatWidth
-			const edgeX = sign * halfWidth
-			const denom = unwrappedCurrentX - previous.x
-			const t = THREE.MathUtils.clamp(
-				denom !== 0 ? (edgeX - previous.x) / denom : 0,
-				0,
-				1,
-			)
-			const y = THREE.MathUtils.lerp(previous.y, current.y, t)
-			const z = THREE.MathUtils.lerp(previous.z, current.z, t)
-			segments[segments.length - 1].push(new THREE.Vector3(edgeX, y, z))
-			segments.push([new THREE.Vector3(-edgeX, y, z), current])
-			continue
-		}
-		segments[segments.length - 1].push(current)
-	}
-	return segments.filter((segment) => segment.length >= 2)
-}
-
 function toPositionSet(batched: BatchedPositions): TradeRoutePositionSet {
 	return {
 		[TRANSPORT.ROUTE_LAND_MAJOR]: new Float32Array(
@@ -301,11 +266,11 @@ function compute({
 		const mapPoints = corridor.regions.map((region) =>
 			regionPositionMap(projection, r_xyz, elevation, region),
 		)
-		for (const segment of splitMapPoints(
-			mapPoints,
-			projection.halfWidth,
-			projection.repeatWidth,
-		)) {
+		for (const segment of splitMapPoints({
+			points: mapPoints,
+			halfWidth: projection.halfWidth,
+			repeatWidth: projection.repeatWidth,
+		})) {
 			appendPolylineSegments(map[corridor.kind], segment)
 		}
 	}

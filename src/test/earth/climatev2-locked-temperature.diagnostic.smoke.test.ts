@@ -134,6 +134,7 @@ describe("climatev2 locked temperature (diagnostic)", () => {
 					elevationKm: world.elevation_km,
 					isLand: world.isLand,
 					params,
+					procedural: false,
 				}).temperatureMonthly
 				return {
 					label: spec.label,
@@ -152,6 +153,7 @@ describe("climatev2 locked temperature (diagnostic)", () => {
 						orbit: CLIMATEV2_ORBIT.fromParams({ ...world.params, pressure }),
 						seed: world.params.seed,
 						diagnostics: false,
+						procedural: false,
 					})
 					return {
 						label: "rotating Earth day",

@@ -81,6 +81,7 @@ describe("rocks and soil on a generated world", () => {
 			rising: new Float32Array(rock.length),
 			vegetation: world.vegetation,
 			isLand: world.isLand,
+			lakeKind: world.rivers.lakeKind,
 			temperatureMonthly: climate.temperature_monthly,
 			temperatureAvg: climate.temperature_avg,
 			rainfallAnnual: world.rainfall.annual,

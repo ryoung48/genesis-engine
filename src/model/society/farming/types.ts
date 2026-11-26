@@ -59,7 +59,6 @@ export interface FarmingParams {
 	elevationKm: Float32Array
 	slopeScore: Float32Array
 	soilFertility: Float32Array | null
-	lakeKind: Uint8Array
 	gdd: Float32Array
 	topography: Uint8Array
 	vegetation: Uint8Array

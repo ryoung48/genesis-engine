@@ -1,6 +1,5 @@
 import type {
 	CellDistanceParams,
-	Components,
 	ComponentsParams,
 	DijkstraParams,
 	DijkstraResult,
@@ -84,26 +83,8 @@ function dijkstra({
 	return { km, carried }
 }
 
-function components({ space: s, isMember }: ComponentsParams): Components {
-	const n = s.mesh.numRegions
-	const { adjOffset, adjList } = s.mesh
-	const label = new Int32Array(n).fill(-1)
-	const cells: number[][] = []
-	for (let start = 0; start < n; start++) {
-		if (!isMember(start) || label[start] >= 0) continue
-		const q = [start]
-		label[start] = cells.length
-		for (let h = 0; h < q.length; h++)
-			for (let k = adjOffset[q[h]]; k < adjOffset[q[h] + 1]; k++) {
-				const nb = adjList[k]
-				if (isMember(nb) && label[nb] < 0) {
-					label[nb] = cells.length
-					q.push(nb)
-				}
-			}
-		cells.push(q)
-	}
-	return { label, cells }
+function components({ space: { mesh }, isMember }: ComponentsParams) {
+	return SPREAD.components({ mesh, isMember, canConnect: () => true })
 }
 
 export const SIM_MESH = { get, space, distanceKm, dijkstra, components }

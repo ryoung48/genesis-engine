@@ -1,6 +1,6 @@
 import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
 
-export type SoilModifier = "none" | "black" | "leached" | "podzol"
+export type SoilModifier = "none" | "black" | "leached" | "podzol" | "saline"
 
 export type SoilParentKey =
 	| Exclude<RockKind, "sea" | "young">
@@ -55,6 +55,7 @@ export interface SoilFertilityParams {
 	rising: Float32Array
 	vegetation: Uint8Array
 	isLand: Uint8Array
+	lakeKind: Uint8Array
 	temperatureMonthly: Float32Array
 	temperatureAvg: Float32Array
 	rainfallAnnual: Float32Array

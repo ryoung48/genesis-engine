@@ -276,6 +276,7 @@ function assignVegetation({
 	rainfall,
 	rng,
 	pastaZones,
+	ar,
 	gdd,
 	gar,
 }: AssignVegetationParams): Uint8Array {
@@ -322,6 +323,7 @@ function assignVegetation({
 			if (!isLand[r]) continue
 			const zoneLabel = PASTA.pastaLabels[pastaZones[r]]
 			let biomeCode = PASTA_BIOME_MAP[zoneLabel] ?? 1
+			if (zoneLabel === "TUf" && ar !== undefined && ar[r] > 0.88) biomeCode = 6
 			// Cold/extraseasonal forest → woods transition at GAr < 0.6 or GDD < 600
 			if (biomeCode === 5 && COLD_EXTRA_FORESTS.has(zoneLabel)) {
 				const lowGar = gar !== undefined && gar[r] < 0.75

@@ -1,4 +1,5 @@
 export interface GenesisClimate {
+	sea_ice_months: Uint8Array // per ocean cell, number of months meeting the sea-ice extent cutoff
 	temperature_avg: Float32Array // per-cell annual mean °C
 	temperature_min: Float32Array // per-cell annual min °C
 	temperature_max: Float32Array // per-cell annual max °C

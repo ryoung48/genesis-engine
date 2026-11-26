@@ -3,6 +3,7 @@ import { PASTA } from "@/model/climate/classification/pasta"
 import {
 	buildCoastlineGlobeLines,
 	buildCoastlineMapLines,
+	chainBoundaryEdges,
 } from "@/ui/genesis/renderer/coastline-overlay"
 import { disposeObject3D } from "@/ui/genesis/renderer/disposal"
 import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
@@ -42,7 +43,7 @@ export function createSeaIceExtentController({
 			[[permanentIce, ...seasonalIce], 0x1687ff],
 			[[permanentIce], 0xff3344],
 		] as const) {
-			const rings: number[][] = []
+			const edges: Array<[number, number]> = []
 			for (let side = 0; side < mesh.numSides; side++) {
 				const opposite = mesh.halfedges[side]
 				if (opposite < 0 || side > opposite) continue
@@ -58,17 +59,23 @@ export function createSeaIceExtentController({
 				const t0 = mesh.s_inner_t[side],
 					t1 = mesh.s_outer_t[side]
 				if (t0 < 0 || t1 < 0) continue
-				const ring: number[] = []
-				for (const t of [t0, t1]) {
-					const x = mesh.t_xyz[3 * t],
-						y = mesh.t_xyz[3 * t + 1],
-						z = mesh.t_xyz[3 * t + 2]
-					ring.push(
-						(Math.atan2(y, x) * 180) / Math.PI,
-						(Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI,
-					)
+				edges.push([t0, t1])
+			}
+			const rings: number[][] = []
+			for (const path of chainBoundaryEdges(edges)) {
+				for (let i = 1; i < path.length; i++) {
+					const ring: number[] = []
+					for (const t of [path[i - 1], path[i]]) {
+						const x = mesh.t_xyz[3 * t],
+							y = mesh.t_xyz[3 * t + 1],
+							z = mesh.t_xyz[3 * t + 2]
+						ring.push(
+							(Math.atan2(y, x) * 180) / Math.PI,
+							(Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI,
+						)
+					}
+					rings.push(ring)
 				}
-				rings.push(ring)
 			}
 			const data = { rings }
 			const globeLine = buildCoastlineGlobeLines(data, 1.004, resolution)
@@ -81,9 +88,10 @@ export function createSeaIceExtentController({
 			for (const line of [globeLine, mapLine]) {
 				ctx.seaIceExtentMaterials.push(line.material)
 				line.material.color.setHex(color)
+				line.material.linewidth = 2.5
 				line.material.dashed = true
 				line.material.dashSize = 0.008
-				line.material.gapSize = 0.008
+				line.material.gapSize = 0.016
 				line.material.needsUpdate = true
 			}
 			globe.add(globeLine)

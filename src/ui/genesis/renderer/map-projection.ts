@@ -1,7 +1,41 @@
 import * as THREE from "three"
-import type { RotateForProjectionParams } from "@/ui/genesis/renderer/types"
+import type {
+	RotateForProjectionParams,
+	SplitMapPointsParams,
+} from "@/ui/genesis/renderer/types"
 
 const MAP_X_SCALE = 2 / Math.PI
+
+export function splitMapPoints({
+	points,
+	halfWidth,
+	repeatWidth,
+}: SplitMapPointsParams): THREE.Vector3[][] {
+	if (points.length < 2) return points.length === 0 ? [] : [points]
+	const segments: THREE.Vector3[][] = [[points[0]]]
+	for (let i = 1; i < points.length; i++) {
+		const current = points[i]
+		const previous = points[i - 1]
+		if (Math.abs(current.x - previous.x) > halfWidth) {
+			const sign = Math.sign(previous.x) || 1
+			const unwrappedCurrentX = current.x - sign * repeatWidth
+			const edgeX = sign * halfWidth
+			const denom = unwrappedCurrentX - previous.x
+			const t = THREE.MathUtils.clamp(
+				denom !== 0 ? (edgeX - previous.x) / denom : 0,
+				0,
+				1,
+			)
+			const y = THREE.MathUtils.lerp(previous.y, current.y, t)
+			const z = THREE.MathUtils.lerp(previous.z, current.z, t)
+			segments[segments.length - 1].push(new THREE.Vector3(edgeX, y, z))
+			segments.push([new THREE.Vector3(-edgeX, y, z), current])
+			continue
+		}
+		segments[segments.length - 1].push(current)
+	}
+	return segments.filter((segment) => segment.length >= 2)
+}
 export const MAX_MAP_PROJECTION_LATITUDE_DEG = 90
 
 function wrapLongitudeRadians(longitude: number, centerLongitude = 0): number {

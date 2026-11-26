@@ -6,6 +6,7 @@ import { RAIN } from "@/model/climate/precipitation/rain"
 import { WIND } from "@/model/climate/weather/wind"
 import { CLIMATE_V2 } from "@/model/climatev2"
 import { CLIMATEV2_ORBIT } from "@/model/climatev2/orbit"
+import { CLIMATEV2_OUTPUTS } from "@/model/climatev2/outputs"
 import type { ClimateV2Cells } from "@/model/climatev2/types"
 import { setParams } from "@/model/climatev2/vendor/config.js"
 import {
@@ -96,7 +97,6 @@ const CURRENT_BOXES: CurrentBox[] = [
 ]
 const MIN_OBSERVED_CURRENT_MS = 0.02
 const STRONG_SST_ANOMALY_C = 1
-const SEA_ICE_EXTENT_CONCENTRATION = 0.15
 const PERMANENT_SNOW_SHARE = 0.95
 const SEASONAL_SNOW_SHARE = 0.05
 const OUR_ICE_MIN_MM = 1
@@ -148,7 +148,8 @@ function scoreIce(params: { world: GenesisWorld; v2: ClimateV2Cells | null }) {
 			let months = 0
 			for (let m = 0; m < 12; m++) {
 				if (
-					v2.diagnostics.seaIceMonthly[m * N + r] < SEA_ICE_EXTENT_CONCENTRATION
+					v2.diagnostics.seaIceMonthly[m * N + r] <
+					CLIMATEV2_OUTPUTS.seaIceExtentConcentration
 				)
 					continue
 				hemi.seaMonthly[m] += a
@@ -173,6 +174,7 @@ function scoreIce(params: { world: GenesisWorld; v2: ClimateV2Cells | null }) {
 		hemis.map((h) => [
 			h.h,
 			{
+				seaIceMonthlyMkm2: v2 ? Array.from(h.seaMonthly, mkm2) : null,
 				seaIceMaxMonthMkm2: v2 ? mkm2(Math.max(...h.seaMonthly)) : null,
 				seaIceMinMonthMkm2: v2 ? mkm2(Math.min(...h.seaMonthly)) : null,
 				seaIceEverMkm2: mkm2(h.seaEver),
@@ -371,6 +373,7 @@ function computeV2Cells(world: GenesisWorld): ClimateV2Cells {
 		orbit: CLIMATEV2_ORBIT.fromParams(world.params),
 		seed: world.params.seed,
 		diagnostics: true,
+		procedural: false,
 	})
 }
 
@@ -669,6 +672,10 @@ function score() {
 	const { climate, rainfall, isLand, mesh, pastaClimate, realPastaClimate } =
 		world
 	const N = mesh.numRegions
+	let northPole = 0
+	for (let r = 1; r < N; r++) {
+		if (mesh.r_xyz[3 * r + 2] > mesh.r_xyz[3 * northPole + 2]) northPole = r
+	}
 	const realT = climate.real_temperature_monthly
 	const realP = rainfall.real_monthly
 	const realDtr = world.observedDtr?.real_monthly
@@ -1033,6 +1040,11 @@ function score() {
 		wind: scoreWind({ world, monthlyWind }),
 		currents: scoreCurrents({ world, engineCurrents }),
 		ice: scoreIce({ world, v2: v2Cells }),
+		northPoleIce: {
+			months: climate.sea_ice_months[northPole],
+			generatedPastaClass: PASTA.pastaLabels[pastaClimate[northPole]],
+			observedPastaClass: PASTA.pastaLabels[realPastaClimate[northPole]],
+		},
 		landSeaGap: scoreLandSeaGap(world),
 		seaBoxes: scoreSeaBoxes(world),
 		pasta: {

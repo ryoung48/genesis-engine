@@ -361,8 +361,7 @@ function classifyOcean({
 	mGInt,
 	gddAccBuf,
 	giAccBuf,
-	iceMin,
-	iceMax,
+	seaIceMonths,
 	dpm,
 	warmest,
 	coldest,
@@ -391,12 +390,9 @@ function classifyOcean({
 		gintInterruptionThreshold: null,
 	})
 
-	// Sea ice from ice accumulation model (1cm snow ≈ 10% cover, per Pasta spec):
-	//   minIce > 80mm (8cm) all months → permanent ice (Ofi)
-	//   maxIce > 20mm (2cm) any month  → seasonal ice (Ofd/Ofg)
 	let zone: number
-	if (iceMin > 80) zone = Z.Ofi
-	else if (iceMax > 20) zone = gddz >= 50 ? Z.Ofd : Z.Ofg
+	if (seaIceMonths === 12) zone = Z.Ofi
+	else if (seaIceMonths > 0) zone = gddz >= 50 ? Z.Ofd : Z.Ofg
 	else if (gddz < 50) zone = Z.Og
 	else if (warmest > OCEAN.torrid) zone = Z.Or
 	else if (coldest > OCEAN.cold) zone = warmest > OCEAN.hot ? Z.Oh : Z.Ot
@@ -426,6 +422,7 @@ function classifyLand({
 	coldest,
 }: ClassifyLandParams): {
 	zone: number
+	ar: number
 	gdd: number
 	gar: number
 	gint: number
@@ -596,6 +593,7 @@ function classifyLand({
 
 	return {
 		zone,
+		ar,
 		gdd,
 		gar,
 		gint,
@@ -614,8 +612,7 @@ function computePastaZones({
 	aetMonthly,
 	params,
 	iceThickness,
-	iceMinMonthly,
-	iceMaxMonthly,
+	seaIceMonths,
 }: ComputePastaZonesParams): { zones: Uint8Array; debug: PastaDebug } {
 	const N = mesh.numRegions
 	const cls = STAR.isValidSpectralClass(params.spectralClass)
@@ -625,6 +622,7 @@ function computePastaZones({
 		values ? PARALLEL.shared(values) : null
 	const zones = PARALLEL.shared(new Uint8Array(N))
 	const fields = {
+		ar: PARALLEL.shared(new Float32Array(N)),
 		gdd: PARALLEL.shared(new Float32Array(N)),
 		gar: PARALLEL.shared(new Float32Array(N)),
 		gint: PARALLEL.shared(new Float32Array(N)),
@@ -647,8 +645,7 @@ function computePastaZones({
 			petMonthly: PARALLEL.shared(petMonthly),
 			aetMonthly: PARALLEL.shared(aetMonthly),
 			iceThickness: optional(iceThickness),
-			iceMinMonthly: optional(iceMinMonthly),
-			iceMaxMonthly: optional(iceMaxMonthly),
+			seaIceMonths: PARALLEL.shared(seaIceMonths),
 			dpm: CALENDAR.earthDaysPerMonth(params),
 			parFactor: STAR.getStarPARFactor({ cls, subtype: params.starSubtype }),
 			gintThreshold: params.pastaGintThreshold,
@@ -659,6 +656,7 @@ function computePastaZones({
 	return {
 		zones: PARALLEL.local(zones),
 		debug: {
+			ar: PARALLEL.local(fields.ar),
 			gdd: PARALLEL.local(fields.gdd),
 			gar: PARALLEL.local(fields.gar),
 			gint: PARALLEL.local(fields.gint),
@@ -682,12 +680,12 @@ function pastaZoneCells({
 	petMonthly,
 	aetMonthly,
 	iceThickness,
-	iceMinMonthly,
-	iceMaxMonthly,
+	seaIceMonths,
 	dpm,
 	parFactor,
 	gintThreshold,
 	zones,
+	ar,
 	gdd,
 	gar,
 	gint,
@@ -727,8 +725,7 @@ function pastaZoneCells({
 				mGInt,
 				gddAccBuf,
 				giAccBuf,
-				iceMin: iceMinMonthly ? iceMinMonthly[r] : 0,
-				iceMax: iceMaxMonthly ? iceMaxMonthly[r] : 0,
+				seaIceMonths: seaIceMonths[r],
 				dpm,
 				warmest,
 				coldest,
@@ -759,6 +756,7 @@ function pastaZoneCells({
 				coldest,
 			})
 			zones[r] = result.zone
+			ar[r] = result.ar
 			gdd[r] = result.gdd
 			gar[r] = result.gar
 			gint[r] = result.gint === Infinity ? 99999 : result.gint
@@ -778,8 +776,6 @@ function assignPastaClimate({
 	hydrology,
 	params,
 	iceThickness,
-	iceMinMonthly,
-	iceMaxMonthly,
 }: AssignPastaClimateParams): { zones: Uint8Array; debug: PastaDebug } {
 	return computePastaZones({
 		mesh,
@@ -793,8 +789,7 @@ function assignPastaClimate({
 		aetMonthly: hydrology.aet_monthly,
 		params,
 		iceThickness,
-		iceMinMonthly,
-		iceMaxMonthly,
+		seaIceMonths: climate.sea_ice_months,
 	})
 }
 
@@ -806,8 +801,6 @@ function assignEarthPastaClimate({
 	params,
 	realDtrMonthly,
 	iceThickness,
-	iceMinMonthly,
-	iceMaxMonthly,
 }: AssignEarthPastaClimateParams):
 	| { zones: Uint8Array; debug: PastaDebug }
 	| undefined {
@@ -861,8 +854,7 @@ function assignEarthPastaClimate({
 		aetMonthly: aet_monthly,
 		params,
 		iceThickness,
-		iceMinMonthly,
-		iceMaxMonthly,
+		seaIceMonths: climate.sea_ice_months,
 	})
 }
 

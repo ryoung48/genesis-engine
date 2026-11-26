@@ -1,5 +1,7 @@
 import type { WindVectors } from "@/model/climate/weather/wind/types"
+import type { SstNoiseParams } from "@/model/climatev2/sst-noise/types"
 import type { CirculationResult } from "@/model/climatev2/vendor/circulation.js"
+import type { TemperatureStageResult } from "@/model/climatev2/vendor/core.js"
 import type { OceanResult } from "@/model/climatev2/vendor/ocean.js"
 import type { SphereMesh } from "@/model/mesh/types"
 
@@ -26,6 +28,20 @@ export interface MonthlyCellsParams {
 	weights: BilinearWeights
 	field: ArrayLike<number>
 	fieldSize: number
+}
+
+export interface SeaStateParams {
+	weights: BilinearWeights
+	grid: SstNoiseParams["grid"]
+	temperature: Pick<
+		TemperatureStageResult,
+		"monthlySL" | "seaIce" | "seaIceWithOffset"
+	>
+	temperatureMonthly: Float32Array
+	cells: Uint8Array
+	mesh: SphereMesh
+	seed: number
+	procedural: boolean
 }
 
 export interface AnnualMeanParams {

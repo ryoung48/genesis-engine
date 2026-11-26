@@ -103,6 +103,7 @@ const TREELINE_COLD_C = 7;                  // °C, warmest month: no trees belo
 const TREELINE_WARM_C = 13;                 // … trees above this: the treeline near a 10 °C warmest month (Köppen 1936; Körner & Paulsen 2004)
 const SURF_SHEET = 0.82;                    // an ice sheet's dry snow: the Antarctic plateau 0.80–0.85 (Grenfell et al. 1994), Greenland's ≈ 0.8
 const SEA_ICE_SNOWY = 0.8;                  // sea ice under snow while the frost holds (Perovich et al. 2002: ≈ 0.8–0.85 in spring)
+const SEA_ICE_PACK_SCALE_M = 1.5;            // first-year ice reaches about 1–2 m (see the sea-ice growth prior)
 const SNOW_MELTING = 0.5;                   // melting snow and sea ice: wet snow 0.4–0.6 (Oke 1987), bare and ponded ice 0.4–0.6 (Perovich et al. 2002)
 // Snow covers the ground only where enough has fallen: cover = tanh(snow water / SNOW_COVER_MM) (Roesch, Wild,
 // Gilgen & Ohmura 2001: 0.95·tanh(100·SWE[m]), i.e. ≈ 10 mm of water for most of the ground) — a dry cold plateau or
@@ -428,15 +429,15 @@ export function energyBalanceTemperature() {
         const faces = P.TEMP_BLOCK_KM > 0 ? ridgeFaces(ctx, core, g, ratio, landKm, P.TEMP_BLOCK_KM) : null;
         const dRad = g.step * Math.PI / 180;
         const Tk = new Float64Array(G), iceYear = new Float64Array(G), seaIceYear = new Float64Array(G);
-        // The sea ice drawn and handed on, month by month: a degree-day budget through the year — the ice thickens by
-        // TEMP_SEA_ICE_GROW per °C·day below freezing (slower as it thickens) and thins by TEMP_SEA_ICE_MELT per °C·day
-        // above, and covers the sea as its thickness reaches TEMP_SEA_ICE_H0. So it lingers after the thaw (the summer
-        // pack where winters are long and summers cool), and follows the currents through the sea's temperature. (The
-        // energy balance's own sea ice stays each month's cold alone — iceRamp: the summer pack would chill the sea
-        // around it and creep the winter edge out.) 0 = off: each month's cold alone.
+        // Monthly coverage combines new ice from the local temperature with ice carried over by the degree-day budget.
+        // The atmospheric energy balance uses its own fitted instantaneous ice-albedo ramp.
         const seaIceOn = P.TEMP_SEA_ICE > 0, thickOn = seaIceOn && P.TEMP_SEA_ICE_GROW > 0;
         const iceHm = new Float64Array(12 * G);
-        const thickCycle = (out, n, phase) => {             // (n months from January: n = 12, phase 0.5 — mid-month)
+        const seaIceEdgeShift = orbit.locked ? 0 : P.TEMP_SEA_ICE_EDGE_SHIFT_C;
+        const seaIceFreezeC = orbit.locked ? 0 : P.TEMP_SEA_ICE_FREEZE_C;
+        const meltShield = orbit.locked ? 0 : P.TEMP_SEA_ICE_MELT_SHIELD;
+        const newSeaIce = (temperature) => iceRamp(temperature + seaIceEdgeShift);
+        const thickCycle = (out, n, phase, offset) => {     // (n months from January: n = 12, phase 0.5 — mid-month; offset: °C added to the sea)
             const dt = 365 * orbit.yearScale / n, hMax = 6 * P.TEMP_SEA_ICE_H0, st = P.TEMP_SEA_ICE_STEFAN_M;
             // the sea's temperature through the year, averaged over the sea within TEMP_SEA_ICE_SPREAD_KM (a warm current's
             // water spreads well out from its coast, and the ice drifts)
@@ -448,6 +449,7 @@ export function energyBalanceTemperature() {
                 for (let c = 0; c < G; c++) f[c] = (1 - landFrac[c]) * (c0[c] + 2 * (c1r[c] * Math.cos(th) - c1i[c] * Math.sin(th)) + 2 * (c2r[c] * Math.cos(2 * th) - c2i[c] * Math.sin(2 * th)));
                 if (sp > 0) { gaussianSmooth(g, f, tmpS, sp); for (let c = 0; c < G; c++) f[c] = wS[c] > 1e-3 ? f[c] / wS[c] : 0; }
                 else for (let c = 0; c < G; c++) f[c] = landFrac[c] < 1 ? f[c] / (1 - landFrac[c]) : 0;
+                for (let c = 0; c < G; c++) f[c] += offset[c];
             }
             for (let c = 0; c < G; c++) {
                 if (landFrac[c] >= 1) continue;
@@ -457,8 +459,14 @@ export function energyBalanceTemperature() {
                     // (growth slows as the ice thickens — it insulates the water below, Stefan's law: thickness grows
                     // as the square root of the winter's frost, so a marginal sea's first-year ice stays thin enough to
                     // melt back in summer)
-                    const grow = st > 0 ? P.TEMP_SEA_ICE_GROW * Math.min(1, st / Math.max(hh, 1e-3)) : P.TEMP_SEA_ICE_GROW;
-                    hh = Math.min(hMax, Math.max(0, hh + dt * (T < 0 ? -grow * T : -P.TEMP_SEA_ICE_MELT * T)));
+                    if (T < seaIceFreezeC) {
+                        const grow = st > 0 ? P.TEMP_SEA_ICE_GROW * Math.min(1, st / Math.max(hh, 1e-3)) : P.TEMP_SEA_ICE_GROW;
+                        hh = Math.min(hMax, hh + dt * (grow * (seaIceFreezeC - T)));
+                    } else if (T > 0 && hh > 0) {
+                        // Use thickness to approximate the shelter from open-water heat in consolidated pack.
+                        const melt = P.TEMP_SEA_ICE_MELT * (1 - meltShield * hh * hh / (hh * hh + SEA_ICE_PACK_SCALE_M ** 2));
+                        hh = Math.max(0, hh - dt * (melt * T));
+                    }
                     if (pass === 2) { const x = Math.min(1, hh / P.TEMP_SEA_ICE_H0); out[k * G + c] = x * x * (3 - 2 * x); }
                 }
                 // The summer pack only pulls back from the winter's edge: no month has more ice than the place's winter
@@ -874,21 +882,22 @@ export function energyBalanceTemperature() {
         // the coupled rounds before the last never are. (From this call's own fields alone — the next call copies its
         // start from `state`, it does not write into it — so the same whenever it is asked.)
         let seaIce = null, drawn = null;
-        const seaIceOf = () => {
-            if (seaIce) return seaIce;
-            seaIce = new Float32Array(12 * core.size);
+        const noOffset = new Float64Array(G);
+        const seaIceFrom = (offset, thick) => {
+            const ice = new Float32Array(12 * core.size);
             const iceTmp = new Float64Array(G);
-            if (thickOn) thickCycle(iceHm, 12, 0.5);
+            if (thickOn) thickCycle(thick, 12, 0.5, offset);
             for (let m = 0; m < 12; m++) {
                 const sl = surfaceAt(m + 0.5, false);
                 for (let c = 0; c < G; c++) {
-                    const own = Math.max(iceRamp(sl[c]), iceHm[m * G + c]);
-                                        iceTmp[c] = seaIceOn && landFrac[c] < 0.5 ? own : 0;       // sea ice, by month (the polar seas' from their columns)
+                    const own = Math.max(newSeaIce(sl[c] + offset[c]), thick[m * G + c]);
+                    iceTmp[c] = seaIceOn && landFrac[c] < 0.5 ? own : 0;
                 }
-                refine(g, core, ratio, iceTmp, seaIce, m * core.size);
+                refine(g, core, ratio, iceTmp, ice, m * core.size);
             }
-            return seaIce;
+            return ice;
         };
+        const seaIceOf = () => (seaIce ??= seaIceFrom(noOffset, iceHm));
         // (for the pages' drawing only — grid.js refineForDrawing — the sea's own air temperature and its ice: the energy
         // balance's mostly-land cells carry the land's temperature and no sea ice, and refined linearly that drew every
         // coast's sea with the coarse cells' straight edges (a rim of open water along icy coasts). Here the sea's
@@ -905,7 +914,7 @@ export function energyBalanceTemperature() {
                 const sl = surfaceAt(m + 0.5, false);
                 slSea.set(sl); fillAcross(g, slSea, seaCoarse);
                 iceHmAll.set(iceHm.subarray(m * G, (m + 1) * G)); fillAcross(g, iceHmAll, seaCoarse);
-                for (let c = 0; c < G; c++) iceAll[c] = seaIceOn ? Math.max(iceRamp(slSea[c]), iceHmAll[c]) : 0;
+                for (let c = 0; c < G; c++) iceAll[c] = seaIceOn ? Math.max(newSeaIce(slSea[c]), iceHmAll[c]) : 0;
                 refineForDrawing(g, core, ratio, iceAll, seaIceOpen, m * core.size, null, 0, 1);
                 airSea.set(surfaceAt(m + 0.5, true));
                 refineForDrawing(g, core, ratio, airSea, seaSL, m * core.size, seaCoarse);
@@ -941,6 +950,7 @@ export function energyBalanceTemperature() {
         const out = { T, monthly, monthlySL, lockedSurf: surf, surfaceSunScale, landSun, iceFrac: iceCore, domeKm: domeCore, inversion, diurnal, dayHeating, dayWind2, budget, state, solverStats: stats, profile: prof, ms: performance.now() - t0, source: 'energy balance' };
         return Object.defineProperties(out, {
             seaIce: { get: seaIceOf, enumerable: true },
+            seaIceWithOffset: { value: (offset) => seaIceFrom(coarsen(core, g, ratio, offset), new Float64Array(12 * G)) },
             seaIceOpen: { get: () => drawnOf().seaIceOpen, enumerable: true },
             seaSL: { get: () => drawnOf().seaSL, enumerable: true },
             domeDraw: { get: () => drawnOf().domeDraw, enumerable: true },

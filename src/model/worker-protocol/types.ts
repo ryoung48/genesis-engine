@@ -67,6 +67,7 @@ interface SerializedSphereMesh {
 }
 
 interface SerializedGenesisClimate {
+	sea_ice_months: Uint8Array
 	temperature_avg: Float32Array
 	temperature_min: Float32Array
 	temperature_max: Float32Array

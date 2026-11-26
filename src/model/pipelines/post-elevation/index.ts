@@ -207,19 +207,16 @@ function runPostElevationPipeline(
 	// ── Climate ────────────────────────────────────────────────────────
 	let t0 = performance.now()
 	const isLocked = params.tideLock?.type === "solar"
+	const climateInput = {
+		mesh,
+		elevationKm: elevation_km,
+		isLand,
+		params,
+		procedural: Boolean(surface),
+	}
 	const climateV2 = isLocked
-		? CLIMATE_V2.computeLocked({
-				mesh,
-				elevationKm: elevation_km,
-				isLand,
-				params,
-			})
-		: CLIMATE_V2.computeForWorld({
-				mesh,
-				elevationKm: elevation_km,
-				isLand,
-				params,
-			})
+		? CLIMATE_V2.computeLocked(climateInput)
+		: CLIMATE_V2.computeForWorld(climateInput)
 	const climate = CLIMATE_V2.toClimate({ mesh, params, v2: climateV2 })
 	TIMING.record({ stage: "Post: climate", startedAt: t0, timings })
 	onProgress?.("Post: climate", 42)
@@ -582,8 +579,6 @@ function runPostElevationPipeline(
 		hydrology,
 		params,
 		iceThickness,
-		iceMinMonthly,
-		iceMaxMonthly,
 	})
 	const pastaClimate: Uint8Array = pastaResult.zones
 	const pastaDebug: PastaDebug = pastaResult.debug
@@ -600,8 +595,6 @@ function runPostElevationPipeline(
 					params,
 					realDtrMonthly: observedDtr?.real_monthly,
 					iceThickness,
-					iceMinMonthly,
-					iceMaxMonthly,
 				})
 			: undefined
 	const realPastaClimate: Uint8Array | undefined = earthPastaResult?.zones
@@ -618,6 +611,7 @@ function runPostElevationPipeline(
 		rainfall,
 		rng: RNG.makeRng(params.seed),
 		pastaZones: pastaClimate,
+		ar: pastaDebug.ar,
 		gdd: pastaDebug.gdd,
 		gar: pastaDebug.gar,
 	})
@@ -629,6 +623,7 @@ function runPostElevationPipeline(
 				rainfall,
 				rng: RNG.makeRng(params.seed),
 				pastaZones: earthPastaResult.zones,
+				ar: earthPastaResult.debug.ar,
 				gdd: earthPastaResult.debug.gdd,
 				gar: earthPastaResult.debug.gar,
 			})
@@ -767,6 +762,7 @@ function runPostElevationPipeline(
 			rising: classification.rising,
 			vegetation,
 			isLand,
+			lakeKind: rivers.lakeKind,
 			temperatureMonthly: climate.temperature_monthly,
 			temperatureAvg: climate.temperature_avg,
 			rainfallAnnual: rainfall.annual,
@@ -1068,7 +1064,6 @@ function runPostElevationPipeline(
 		elevationKm: elevation_km,
 		slopeScore,
 		soilFertility: surfaceFields?.soilFertility ?? null,
-		lakeKind: rivers.lakeKind,
 		gdd: pastaDebug.gdd,
 		topography,
 		vegetation,

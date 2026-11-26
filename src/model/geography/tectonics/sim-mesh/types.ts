@@ -42,8 +42,3 @@ export interface ComponentsParams {
 	space: SimSpace
 	isMember: (cell: number) => boolean
 }
-
-export interface Components {
-	label: Int32Array
-	cells: number[][]
-}

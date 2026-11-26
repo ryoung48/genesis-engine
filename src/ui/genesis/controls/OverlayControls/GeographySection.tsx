@@ -112,6 +112,11 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 						checked={showWaves}
 						onChange={setShowWaves}
 					/>
+					<ToggleRow
+						label="Sea ice extent"
+						checked={showSeaIceExtent}
+						onChange={setShowSeaIceExtent}
+					/>
 					{showDataVariantRadio && (
 						<div className="pt-1">
 							<RadioGroup
@@ -129,11 +134,6 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 							/>
 						</div>
 					)}
-					<ToggleRow
-						label="Sea ice extent (winter: blue, summer: red)"
-						checked={showSeaIceExtent}
-						onChange={setShowSeaIceExtent}
-					/>
 				</div>
 			)}
 		</div>

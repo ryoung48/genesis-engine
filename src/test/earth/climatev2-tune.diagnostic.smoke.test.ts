@@ -136,8 +136,6 @@ function scoreEarth({
 				params: input.params,
 				realDtrMonthly: dtr,
 				iceThickness: post.iceThickness,
-				iceMinMonthly: post.iceMinMonthly,
-				iceMaxMonthly: post.iceMaxMonthly,
 			}) as { zones: Uint8Array }
 		).zones
 	const dtrSwap = swapZones({ dtr: modelDtr, rain: realP })

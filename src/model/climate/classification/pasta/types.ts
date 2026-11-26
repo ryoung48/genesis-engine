@@ -30,8 +30,7 @@ export type GddTotalParams = {
 }
 
 export type ClassifyOceanParams = PastaClassificationBuffers & {
-	iceMin: number
-	iceMax: number
+	seaIceMonths: number
 	dpm: number
 	warmest: number
 	coldest: number
@@ -60,12 +59,9 @@ export type ComputePastaZonesParams = {
 	petMonthly: Float32Array
 	aetMonthly: Float32Array
 	params: GenesisParams
+	seaIceMonths: Uint8Array
 	/** Omitted when no ice model has been computed. */
 	iceThickness?: Float32Array
-	/** Omitted when no monthly minimum ice values have been computed. */
-	iceMinMonthly?: Float32Array
-	/** Omitted when no monthly maximum ice values have been computed. */
-	iceMaxMonthly?: Float32Array
 }
 
 export type AssignEarthPastaClimateParams = Omit<
@@ -77,6 +73,7 @@ export type AssignEarthPastaClimateParams = Omit<
 }
 
 export type PastaDebug = {
+	ar: Float32Array
 	gdd: Float32Array
 	gar: Float32Array
 	gint: Float32Array
@@ -104,10 +101,6 @@ export type AssignPastaClimateParams = {
 	params: GenesisParams
 	/** Omitted when no ice model has been computed. */
 	iceThickness?: Float32Array
-	/** Omitted when no monthly minimum ice values have been computed. */
-	iceMinMonthly?: Float32Array
-	/** Omitted when no monthly maximum ice values have been computed. */
-	iceMaxMonthly?: Float32Array
 }
 
 export interface PastaZoneCellsParams extends CellRange {
@@ -120,12 +113,12 @@ export interface PastaZoneCellsParams extends CellRange {
 	petMonthly: Float32Array
 	aetMonthly: Float32Array
 	iceThickness: Float32Array | null
-	iceMinMonthly: Float32Array | null
-	iceMaxMonthly: Float32Array | null
+	seaIceMonths: Uint8Array
 	dpm: number
 	parFactor: number
 	gintThreshold: GenesisParams["pastaGintThreshold"]
 	zones: Uint8Array
+	ar: Float32Array
 	gdd: Float32Array
 	gar: Float32Array
 	gint: Float32Array

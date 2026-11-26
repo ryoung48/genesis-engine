@@ -438,6 +438,12 @@ export interface RotateForProjectionParams {
 	centerLatitude: number
 }
 
+export interface SplitMapPointsParams {
+	points: THREE.Vector3[]
+	halfWidth: number
+	repeatWidth: number
+}
+
 export interface CreateLineSegmentsParams {
 	positions: number[]
 	color: number

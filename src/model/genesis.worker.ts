@@ -460,6 +460,7 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	}
 	if (world.climate) {
 		add(
+			world.climate.sea_ice_months.buffer,
 			world.climate.temperature_avg.buffer,
 			world.climate.temperature_min.buffer,
 			world.climate.temperature_max.buffer,

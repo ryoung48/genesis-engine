@@ -37,6 +37,7 @@ export interface TemperatureStageResult {
 	monthlySL: Float32Array
 	inversion: Float32Array
 	seaIce: Float32Array
+	seaIceWithOffset(offsetC: Float32Array): Float32Array
 	lockedSurf: LockedSurfaceFields | null
 	surfaceSunScale: number
 	state: unknown

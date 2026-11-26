@@ -13,7 +13,6 @@ import type {
 	ClimateV2Input,
 	ClimateV2WorldParams,
 	LockedClimateCells,
-	LockedClimateParams,
 	ZonalSeaAnomalyParams,
 } from "@/model/climatev2/types"
 import {
@@ -58,7 +57,8 @@ function zonalSeaAnomaly({
 }
 
 function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
-	const { mesh, elevationKm, isLand, orbit, seed, diagnostics } = input
+	const { mesh, elevationKm, isLand, orbit, seed, diagnostics, procedural } =
+		input
 	const N = mesh.numRegions
 	const temperatureMonthly = new Float32Array(MONTHS * N)
 	const rainfallMonthly = new Float32Array(MONTHS * N)
@@ -82,11 +82,15 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 	const sea = new Uint8Array(N)
 	for (let r = 0; r < N; r++) sea[r] = isLand[r] ? 0 : 1
 	const monthly = { weights, fieldSize: grid.size, months: MONTHS }
-	CLIMATEV2_OUTPUTS.sampleCells({
-		...monthly,
-		field: temperature.monthlySL,
-		out: temperatureMonthly,
+	const seaState = CLIMATEV2_OUTPUTS.seaState({
+		weights,
+		grid,
+		temperature,
+		temperatureMonthly,
 		cells: sea,
+		mesh,
+		seed,
+		procedural,
 	})
 	CLIMATEV2_OUTPUTS.sampleCells({
 		...monthly,
@@ -111,14 +115,7 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 	}
 	let climateDiagnostics: ClimateV2Cells["diagnostics"] = null
 	if (diagnostics) {
-		const seaIceMonthly = new Float32Array(MONTHS * N)
 		const snowIceShare = new Float32Array(N)
-		CLIMATEV2_OUTPUTS.sampleCells({
-			...monthly,
-			field: temperature.seaIce,
-			out: seaIceMonthly,
-			cells: sea,
-		})
 		CLIMATEV2_OUTPUTS.sampleCells({
 			weights,
 			fieldSize: grid.size,
@@ -128,7 +125,7 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 			cells: isLand,
 		})
 		climateDiagnostics = {
-			seaIceMonthly,
+			seaIceMonthly: seaState.iceMonthly,
 			snowIceShare,
 			radiation: temperature.budget,
 		}
@@ -147,6 +144,7 @@ function computeCellClimate(input: ClimateV2Input): ClimateV2Cells {
 			field: result.stages.clouds.cover,
 			fieldSize: grid.size,
 		}),
+		seaIceMonths: seaState.iceMonths,
 		temperatureMonthly,
 		rainfallMonthly,
 		rainfallAnnual,
@@ -164,6 +162,7 @@ function computeForWorld({
 	elevationKm,
 	isLand,
 	params,
+	procedural,
 }: ClimateV2WorldParams): ClimateV2Cells {
 	return computeCellClimate({
 		mesh,
@@ -172,6 +171,7 @@ function computeForWorld({
 		orbit: CLIMATEV2_ORBIT.fromParams(params),
 		seed: params.seed,
 		diagnostics: false,
+		procedural,
 	})
 }
 
@@ -185,6 +185,7 @@ function toClimate({
 	const N = mesh.numRegions
 	const climate: GenesisClimate = {
 		cloud_cover_monthly: v2.cloudCoverMonthly,
+		sea_ice_months: v2.seaIceMonths,
 		temperature_avg: new Float32Array(N),
 		temperature_min: new Float32Array(N),
 		temperature_max: new Float32Array(N),
@@ -210,7 +211,8 @@ function computeLocked({
 	elevationKm,
 	isLand,
 	params,
-}: LockedClimateParams): LockedClimateCells {
+	procedural,
+}: ClimateV2WorldParams): LockedClimateCells {
 	const N = mesh.numRegions
 	const temperatureMonthly = new Float32Array(MONTHS * N)
 	const rainfallMonthly = new Float32Array(MONTHS * N)
@@ -234,10 +236,15 @@ function computeLocked({
 	for (let r = 0; r < N; r++) sea[r] = isLand[r] ? 0 : 1
 	const weights = CLIMATEV2_OUTPUTS.bilinearWeights({ mesh, grid })
 	const monthly = { weights, fieldSize: grid.size, months: MONTHS, cells: sea }
-	CLIMATEV2_OUTPUTS.sampleCells({
-		...monthly,
-		field: result.stages.temperature.monthlySL,
-		out: temperatureMonthly,
+	const seaState = CLIMATEV2_OUTPUTS.seaState({
+		weights,
+		grid,
+		temperature: result.stages.temperature,
+		temperatureMonthly,
+		cells: sea,
+		mesh,
+		seed: params.seed,
+		procedural,
 	})
 	CLIMATEV2_OUTPUTS.sampleCells({
 		...monthly,
@@ -297,6 +304,7 @@ function computeLocked({
 	}
 	return {
 		diurnalRange: { monthly: rangeMonthly, annual: rangeAnnual },
+		seaIceMonths: seaState.iceMonths,
 		petMonthly: CLIMATEV2_OUTPUTS.monthlyCells({
 			weights,
 			field: petGrid,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { LAKES } from "@/model/geography/terrain/lakes"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import type { RockKind, YoungKind } from "@/model/geography/terrain/rocks/types"
 import { SOILS } from "@/model/geography/terrain/soils"
@@ -26,6 +27,27 @@ function fertility({
 }
 
 describe("soil", () => {
+	it("marks salt pans as barren saline soil without changing neighboring land", () => {
+		const result = SOILS.fertility({
+			rock: Uint8Array.of(
+				ROCKS.kinds.indexOf("basalt"),
+				ROCKS.kinds.indexOf("basalt"),
+			),
+			youngKind: new Uint8Array(2),
+			rising: new Float32Array(2),
+			vegetation: new Uint8Array(2),
+			isLand: Uint8Array.of(1, 1),
+			lakeKind: Uint8Array.of(LAKES.kindCode.pan, LAKES.kindCode.none),
+			temperatureMonthly: new Float32Array(24).fill(15),
+			temperatureAvg: new Float32Array(2).fill(15),
+			rainfallAnnual: new Float32Array(2).fill(500),
+			petMonthly: new Float32Array(24).fill(50),
+		})
+		expect(result.fertility[0]).toBeCloseTo(0.03)
+		expect(SOILS.grade(result.fertility[0])).toBe("Barren")
+		expect(SOILS.modifiers[result.modifier[0]]).toBe("saline")
+		expect(result.fertility[1]).toBeGreaterThan(result.fertility[0])
+	})
 	it("keeps fertility within 0..1 for every rock and young tag under every climate", () => {
 		for (const climate of [NEUTRAL, STEPPE, TROPICAL, TAIGA])
 			for (const rock of ROCKS.kinds.filter((k) => k !== "sea"))

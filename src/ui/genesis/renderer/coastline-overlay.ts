@@ -3,7 +3,10 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import type { createMapProjection } from "@/ui/genesis/renderer/map-projection"
+import {
+	type createMapProjection,
+	splitMapPoints,
+} from "@/ui/genesis/renderer/map-projection"
 
 export interface CoastlineLineData {
 	rings: number[][] // each ring: flat [lon0, lat0, lon1, lat1, ...] in degrees
@@ -89,7 +92,7 @@ function extractCoastlineBoundaryEdges(
 // closed curves (the sphere has no border), so loops are expected to close;
 // a hard iteration cap guards against degenerate/non-manifold edge cases
 // (e.g. three regions meeting at one point) turning into an infinite walk.
-function chainEdgesIntoLoops(edges: Array<[number, number]>): number[][] {
+export function chainBoundaryEdges(edges: Array<[number, number]>): number[][] {
 	const adjacency = new Map<number, number[]>()
 	for (const [a, b] of edges) {
 		;(adjacency.get(a) ?? adjacency.set(a, []).get(a)!).push(b)
@@ -115,10 +118,10 @@ function chainEdgesIntoLoops(edges: Array<[number, number]>): number[][] {
 				if (nextStep === undefined) break
 				visited.add(edgeKey(current, nextStep))
 				current = nextStep
-				if (current === start) break
 				loop.push(current)
+				if (current === start) break
 			}
-			if (loop.length >= 3) loops.push(loop)
+			loops.push(loop)
 		}
 	}
 	return loops
@@ -156,7 +159,11 @@ export function deriveCoastlineFromWorld(
 	world: SerializedGenesisWorld,
 ): CoastlineLineData {
 	const edges = extractCoastlineBoundaryEdges(world)
-	const loops = chainEdgesIntoLoops(edges)
+	const loops = chainBoundaryEdges(edges)
+		.map((loop) =>
+			loop[0] === loop[loop.length - 1] ? loop.slice(0, -1) : loop,
+		)
+		.filter((loop) => loop.length >= 3)
 	const rings = loops.map((loop) =>
 		smoothLoopToLonLatRing(loop, world.mesh.t_xyz, 4),
 	)
@@ -189,9 +196,10 @@ export function buildCoastlineGlobeLines(
 	const positions: number[] = []
 	for (const ring of data.rings) {
 		const numPoints = ring.length / 2
-		for (let i = 0; i < numPoints; i++) {
+		for (let i = 0; i < (numPoints === 2 ? 1 : numPoints); i++) {
 			const j = (i + 1) % numPoints
-			if (isDatelineClipArtifact(ring[2 * i], ring[2 * j])) continue
+			if (numPoints !== 2 && isDatelineClipArtifact(ring[2 * i], ring[2 * j]))
+				continue
 			const [x0, y0, z0] = lonLatToXyz(ring[2 * i], ring[2 * i + 1], radius)
 			const [x1, y1, z1] = lonLatToXyz(ring[2 * j], ring[2 * j + 1], radius)
 			positions.push(x0, y0, z0, x1, y1, z1)
@@ -218,7 +226,7 @@ export function buildCoastlineGlobeLines(
 // huge jump in map-space x (the seam in this projection sits at
 // centerLongitude ± 180°) — rather than draw a spurious line all the way
 // across the map, such edges are simply skipped (LineSegments2 draws
-// independent segments, so a gap here is visually correct, not a bug).
+// independent segments. Two-point mesh edges are split at the seam instead.
 export function buildCoastlineMapLines(
 	data: CoastlineLineData,
 	projection: ReturnType<typeof createMapProjection>,
@@ -229,12 +237,24 @@ export function buildCoastlineMapLines(
 	const positions: number[] = []
 	for (const ring of data.rings) {
 		const numPoints = ring.length / 2
-		for (let i = 0; i < numPoints; i++) {
+		for (let i = 0; i < (numPoints === 2 ? 1 : numPoints); i++) {
 			const j = (i + 1) % numPoints
-			if (isDatelineClipArtifact(ring[2 * i], ring[2 * j])) continue
+			if (numPoints !== 2 && isDatelineClipArtifact(ring[2 * i], ring[2 * j]))
+				continue
 			const a = projection.projectDegrees(ring[2 * i], ring[2 * i + 1], z)
 			const b = projection.projectDegrees(ring[2 * j], ring[2 * j + 1], z)
-			if (Math.abs(b[0] - a[0]) > seamThreshold) continue
+			if (Math.abs(b[0] - a[0]) > seamThreshold) {
+				if (numPoints === 2) {
+					const parts = splitMapPoints({
+						points: [new THREE.Vector3(...a), new THREE.Vector3(...b)],
+						halfWidth: projection.halfWidth,
+						repeatWidth: projection.repeatWidth,
+					})
+					for (const [start, end] of parts)
+						positions.push(start.x, start.y, start.z, end.x, end.y, end.z)
+				}
+				continue
+			}
 			positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
 		}
 	}

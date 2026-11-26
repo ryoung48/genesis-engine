@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { TIMING } from "@/model/shared/timing"
 import { loadEarthGrayscale } from "@/test/earth/assets"
@@ -43,5 +44,21 @@ describe("generation climate", () => {
 			expect(field?.length).toBe(12 * world.mesh.numRegions)
 			expect(field?.every(Number.isFinite)).toBe(true)
 		}
+		const iceMonths = world.climate.sea_ice_months
+		expect(iceMonths).toHaveLength(world.mesh.numRegions)
+		const permanent = PASTA.pastaLabels.indexOf("Ofi")
+		const seasonal = [
+			PASTA.pastaLabels.indexOf("Ofd"),
+			PASTA.pastaLabels.indexOf("Ofg"),
+		]
+		const mismatch = world.pastaClimate.findIndex((zone, region) => {
+			if (world.isLand[region]) return false
+			const months = iceMonths[region]
+			return (
+				(zone === permanent) !== (months === 12) ||
+				seasonal.includes(zone) !== (months > 0 && months < 12)
+			)
+		})
+		expect(mismatch).toBe(-1)
 	}, 120000)
 })

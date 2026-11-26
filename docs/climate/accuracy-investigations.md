@@ -94,6 +94,29 @@ Other measured signals:
 - **The yardstick:** many PASTA misses are adjacent classes (tropical forest vs moist savanna). A near-match or graded score would show how much of the 56% miss is close.
 - **Mean temperature** (24 points): mostly high-latitude winters too mild (continental temperate read as oceanic, boreal as temperate); not yet investigated.
 
+## Sea-ice extent on Earth
+
+The Earth comparison reports 12 monthly extents per hemisphere using the full area of each ocean mesh region at or above 15% ice concentration. Compare those midmonth samples with the 1981–2010 observed monthly averages in tables 5 and 11 of the [NSIDC Sea Ice Index analysis](https://nsidc.org/sites/default/files/nsidc-special-report-19.pdf). NSIDC averages daily extents over the month. This comparison measures hemispheric extent and seasonal timing.
+
+On the original Earth run, mean monthly extent error was 3.39 million km² in the Arctic and 4.72 million km² in the Antarctic. The northern pack reached zero in October, when the climatology had 8.35 million km². The modeled sea-level temperature over ocean north of 85°N reached 6.79 °C in August and was still 2.58 °C in October. Turning off degree-day growth changed either winter peak by at most 0.20 million km² and reduced Antarctic January extent from 16.01 million km² to zero.
+
+A 35 m global mixed layer, down from 50 m, increased land temperature error and ice extent error in both hemispheres. Feeding 35% of the degree-day ice into the energy balance as a minimum concentration also increased both ice errors. Moving the new-ice ramp 1.8 °C colder in both the energy balance and the monthly ice field reduced extent error in both hemispheres, with about 0.39 mm/month more land rain error.
+
+The retained settings change the monthly concentration used by the ocean and rain stages. The new-ice ramp shifts 1.8 °C colder than the fitted atmospheric ice-albedo ramp. In the degree-day calculation, growth starts below −0.8 °C on the model's temperature proxy, and melt slows with thickness. The reduction is 35% at 1.5 m, about the middle of the first-year thickness range in the existing growth prior. The ocean-temperature smoothing width is 500 km, selected from the Earth comparisons. The 700 km finalist scored better on ice and raised annual land rain error from 409.0 to 409.5 mm/year.
+
+| Earth comparison | Original settings | Retained settings | Observed extent |
+| --- | ---: | ---: | ---: |
+| Arctic monthly extent MAE (million km²) | 3.39 | 2.63 | |
+| Antarctic monthly extent MAE (million km²) | 4.72 | 3.53 | |
+| Arctic October extent (million km²) | 0.00 | 2.44 | 8.35 |
+| Antarctic September extent (million km²) | 25.20 | 19.79 | 18.49 |
+| Antarctic February extent (million km²) | 9.40 | 11.43 | 3.07 |
+| Land temperature MAE (°C, monthly / annual) | 3.437 / 2.593 | 3.438 / 2.594 | |
+| Land rain MAE (mm, monthly / annual) | 45.3 / 409.0 | 45.3 / 409.0 | |
+| Köppen / PASTA exact match (%) | 47.7 / 43.9 | 47.7 / 43.9 | |
+
+To reproduce the original settings, run `earth-climatev2-compare.diagnostic.smoke.test.ts` with `CLIMATE_PARAMS` set to `{"TEMP_SEA_ICE_SPREAD_KM":700,"TEMP_SEA_ICE_FREEZE_C":0,"TEMP_SEA_ICE_EDGE_SHIFT_C":0,"TEMP_SEA_ICE_MELT_SHIELD":0}`.
+
 ## Tools
 
 | Diagnostic (`src/test/earth/`) | What it measures | Run time |

@@ -14,6 +14,12 @@ export interface SpreadParams {
 	onReach: (step: SpreadStep) => void
 }
 
+export interface ComponentsParams {
+	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList">
+	isMember: (cell: number) => boolean
+	canConnect: (step: SpreadStep) => boolean
+}
+
 export interface BlurRecordParams {
 	mesh: SphereMesh
 	land: Uint8Array
