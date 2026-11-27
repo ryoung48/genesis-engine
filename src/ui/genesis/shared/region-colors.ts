@@ -75,7 +75,6 @@ import {
 } from "@/ui/genesis/shared/colors/vegetation"
 import { getDataVariant } from "@/ui/genesis/shared/data-variant"
 import { DEPOSITS_VIEW } from "@/ui/genesis/shared/deposits-view"
-import { TRADE_GOODS_VIEW } from "@/ui/genesis/shared/trade-goods-view"
 import { getFarming, getWayOfLife } from "@/ui/genesis/shared/farming-display"
 import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
 import {
@@ -105,6 +104,7 @@ import {
 	vegetationSeabedColor,
 } from "@/ui/genesis/shared/region-colors/seabed"
 import type { RegionColorsInput } from "@/ui/genesis/shared/region-colors/types"
+import { TRADE_GOODS_VIEW } from "@/ui/genesis/shared/trade-goods-view"
 
 const CULTURE_ELEVATION_BUMP_SCALE = 1.6
 

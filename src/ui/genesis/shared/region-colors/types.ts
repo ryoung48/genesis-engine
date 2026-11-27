@@ -2,11 +2,11 @@ import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { DangerSubMode } from "@/ui/genesis/controls/OverlayControls"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
-import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 import type {
 	NationMapMode,
 	SocietyMapMode,
 } from "@/ui/genesis/shared/map-modes"
+import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 
 export interface RegionColorsInput {
 	world: SerializedGenesisWorld

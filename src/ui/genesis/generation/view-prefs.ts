@@ -11,8 +11,6 @@ import { CLOCK_DIAL_HOURS } from "@/ui/genesis/shared/clock"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { DEPOSITS_VIEW } from "@/ui/genesis/shared/deposits-view"
 import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
-import { TRADE_GOODS_VIEW } from "@/ui/genesis/shared/trade-goods-view"
-import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 import {
 	DEFAULT_GEOGRAPHY_MODE,
 	type ElevationSubMode,
@@ -28,6 +26,8 @@ import {
 	readNumber,
 	readNumberInRange,
 } from "@/ui/genesis/shared/stored-prefs"
+import { TRADE_GOODS_VIEW } from "@/ui/genesis/shared/trade-goods-view"
+import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
 export interface StoredViewPrefs {

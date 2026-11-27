@@ -37,13 +37,13 @@ import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DataVariant } from "@/ui/genesis/shared/data-variant"
 import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
-import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 import type {
 	NationMapMode,
 	ReligionMapMode,
 	SocietyMapMode,
 	TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
+import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 
 /** The live `GenesisScene` handle shared by every GenesisView concern hook. */
 export type SceneRef = RefObject<GenesisScene | null>
