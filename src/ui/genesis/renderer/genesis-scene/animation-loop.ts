@@ -3,11 +3,14 @@ import { CLOUD_FRAME_MS } from "@/ui/genesis/renderer/clouds/overlay"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { createGridLabels } from "@/ui/genesis/renderer/grid-labels"
 import { updateGlobeLabelOrientations } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
-import { activateSettlementLabels } from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
+import {
+	activateSettlementLabels,
+	settlementLabelsInView,
+} from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
 import {
 	applySettlementLabelCulling,
 	applySettlementMarkerCollisionCulling,
-	applySettlementMarkerScreenScale,
+	createSettlementFrustum,
 } from "@/ui/genesis/renderer/nation-label-overlay/settlement-marker-collision"
 import {
 	createPendingNationScriptTextureQueue,
@@ -19,26 +22,14 @@ import {
 	SOLAR_TERMINATOR_ELEVATED_RADIUS,
 	SOLAR_TERMINATOR_RADIUS,
 } from "@/ui/genesis/renderer/solar-terminator"
+import { syncTradeRouteDetail } from "@/ui/genesis/renderer/trade-route-overlay"
+import type { SettlementOverlayFrameParams } from "@/ui/genesis/renderer/types"
 
 const LABEL_CULLING_ENABLED = true
 const MAP_DASH_DENSE_ZOOM = 20
 const GLOBE_DASH_DENSE_DISTANCE = 1.1
 const DENSE_DASH_SCALE = 2
 const SOLAR_SYSTEM_CAMERA_SETTLE_FRACTION = 1e-4
-
-function requestSettlementScripts(
-	ctx: GenesisContext,
-	group: THREE.Group | null,
-): boolean {
-	if (!group) return false
-	ctx.pendingSettlementScriptTextureQueue ??=
-		createPendingNationScriptTextureQueue()
-	return SETTLEMENT_SCRIPT.request({
-		group,
-		textureCache: ctx.nationScriptTextureCache,
-		textureQueue: ctx.pendingSettlementScriptTextureQueue,
-	})
-}
 
 function processSettlementScriptTextures(ctx: GenesisContext): boolean {
 	const progress = processPendingNationScriptTextures(
@@ -65,6 +56,37 @@ export function createAnimationLoopController(
 	let cloudFrame: number | null = null
 	const gridLabels = createGridLabels(ctx)
 	const previousCameraPosition = new THREE.Vector3()
+	function updateSettlements({
+		camera,
+		markers,
+		labels,
+	}: SettlementOverlayFrameParams): boolean {
+		const frustum = createSettlementFrustum(camera)
+		const viewport = {
+			camera,
+			frustum,
+			width: ctx.canvas.clientWidth,
+			height: ctx.canvas.clientHeight,
+		}
+		const visibility = new Map<string, boolean>()
+		for (const group of markers)
+			applySettlementMarkerCollisionCulling({ group, viewport, visibility })
+		applySettlementLabelCulling({
+			group: labels,
+			isGlobe: camera === ctx.camera,
+			visibility,
+		})
+		const inView = settlementLabelsInView({ group: labels, frustum })
+		if (!inView.length) return false
+		ctx.pendingSettlementScriptTextureQueue ??=
+			createPendingNationScriptTextureQueue()
+		const scriptsQueued = SETTLEMENT_SCRIPT.request({
+			labels: inView,
+			textureCache: ctx.nationScriptTextureCache,
+			textureQueue: ctx.pendingSettlementScriptTextureQueue,
+		})
+		return activateSettlementLabels(inView) || scriptsQueued
+	}
 	const renderScheduler = createRenderScheduler({
 		requestFrame: (callback) => window.requestAnimationFrame(callback),
 		cancelFrame: (handle) => window.cancelAnimationFrame(handle),
@@ -183,31 +205,13 @@ export function createAnimationLoopController(
 					scriptTextureProgress.pending > 0 ||
 					scriptTextureProgress.processed > 0
 				keepAnimating = processSettlementScriptTextures(ctx) || keepAnimating
-				{
-					applySettlementMarkerScreenScale(ctx, ctx.mapSettlements)
-					applySettlementMarkerScreenScale(ctx, ctx.mapEu4Settlements)
-					const mapSettlementVisibility = new Map<string, boolean>()
-					applySettlementMarkerCollisionCulling(
-						ctx,
-						ctx.mapSettlements,
-						mapSettlementVisibility,
-					)
-					applySettlementMarkerCollisionCulling(
-						ctx,
-						ctx.mapEu4Settlements,
-						mapSettlementVisibility,
-					)
-					applySettlementLabelCulling(
-						ctx.mapSettlementLabels,
-						mapSettlementVisibility,
-						true,
-					)
-					keepAnimating =
-						requestSettlementScripts(ctx, ctx.mapSettlementLabels) ||
-						keepAnimating
-					keepAnimating =
-						activateSettlementLabels(ctx.mapSettlementLabels) || keepAnimating
-				}
+				keepAnimating =
+					updateSettlements({
+						camera: ctx.mapCamera,
+						markers: [ctx.mapSettlements, ctx.mapEu4Settlements],
+						labels: ctx.mapSettlementLabels,
+					}) || keepAnimating
+				syncTradeRouteDetail(ctx.mapCamera)
 				ctx.renderer.render(ctx.scene, ctx.mapCamera)
 				gridLabels.draw()
 				return keepAnimating
@@ -284,31 +288,12 @@ export function createAnimationLoopController(
 				ctx.camera,
 				LABEL_CULLING_ENABLED,
 			)
-			{
-				applySettlementMarkerScreenScale(ctx, ctx.globeSettlements)
-				applySettlementMarkerScreenScale(ctx, ctx.globeEu4Settlements)
-				const globeSettlementVisibility = new Map<string, boolean>()
-				applySettlementMarkerCollisionCulling(
-					ctx,
-					ctx.globeSettlements,
-					globeSettlementVisibility,
-				)
-				applySettlementMarkerCollisionCulling(
-					ctx,
-					ctx.globeEu4Settlements,
-					globeSettlementVisibility,
-				)
-				applySettlementLabelCulling(
-					ctx.globeSettlementLabels,
-					globeSettlementVisibility,
-					false,
-				)
-				keepAnimating =
-					requestSettlementScripts(ctx, ctx.globeSettlementLabels) ||
-					keepAnimating
-				keepAnimating =
-					activateSettlementLabels(ctx.globeSettlementLabels) || keepAnimating
-			}
+			keepAnimating =
+				updateSettlements({
+					camera: ctx.camera,
+					markers: [ctx.globeSettlements, ctx.globeEu4Settlements],
+					labels: ctx.globeSettlementLabels,
+				}) || keepAnimating
 			updateGlobeLabelOrientations(
 				ctx.globeCultureLabels,
 				ctx.camera,
@@ -329,6 +314,7 @@ export function createAnimationLoopController(
 					? SOLAR_TERMINATOR_ELEVATED_RADIUS
 					: SOLAR_TERMINATOR_RADIUS,
 			)
+			syncTradeRouteDetail(ctx.camera)
 			ctx.renderer.render(ctx.scene, ctx.camera)
 			gridLabels.draw()
 			return keepAnimating

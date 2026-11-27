@@ -35,12 +35,12 @@ function advance({
 				: tier === 0
 					? population > limits[tier]
 					: population >= limits[tier]
-			if (Number(next) !== was) {
-				state.membership[tier][p] = Number(next)
-				state.enteredBatch[tier][p] = next ? state.batch : -1
-				;(tier === 2 ? sea : land).add(group)
-				count++
-			}
+			if (Number(next) === was) continue
+			state.membership[tier][p] = Number(next)
+			state.enteredBatch[tier][p] = next ? state.batch : -1
+			if (tier === 2) sea.add(group)
+			else land.add(group)
+			count++
 		}
 		const longSea = Number(population >= thresholds.shortRouteMaxPop)
 		if (state.membership[2][p] && longSea !== state.longSea[p])

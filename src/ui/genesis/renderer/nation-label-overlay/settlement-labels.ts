@@ -36,6 +36,7 @@ import {
 	SETTLEMENT_LIFT,
 	settlementId,
 } from "@/ui/genesis/renderer/settlement-overlay"
+import type { SettlementLabelViewportParams } from "@/ui/genesis/renderer/types"
 
 export const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
 export const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.0018
@@ -132,26 +133,65 @@ function settlementGlobeLabelStubLength(markerScale: number): number {
 }
 
 const ACTIVATIONS_PER_FRAME = 40
+const pendingLabelBounds = new THREE.Sphere()
+const PENDING_LABEL_GLYPH_MARGIN = 2
 
-export function activateSettlementLabels(group: THREE.Group | null): boolean {
-	if (!group) return false
-	let budget = ACTIVATIONS_PER_FRAME
-	let remaining = false
+export function settlementLabelsInView({
+	group,
+	frustum,
+}: SettlementLabelViewportParams): Text[] {
+	if (!group?.visible) return []
+	group.updateWorldMatrix(true, false)
+	const labels: Text[] = []
 	for (const child of group.children) {
 		if (child.type === "Line" || !child.visible) continue
 		const label = child as Text
-		const name = label.userData.settlementName as string | undefined
-		if (name === undefined) continue
-		if (budget === 0) {
-			remaining = true
+		label.updateWorldMatrix(false, false)
+		const name: string | undefined = label.userData.settlementName
+		if (name !== undefined) {
+			pendingLabelBounds.center.setFromMatrixPosition(label.matrixWorld)
+			pendingLabelBounds.radius =
+				Math.max(1, name.length) *
+				label.fontSize *
+				PENDING_LABEL_GLYPH_MARGIN *
+				label.matrixWorld.getMaxScaleOnAxis()
+			if (!frustum.intersectsSphere(pendingLabelBounds)) continue
+		} else if (!frustum.intersectsObject(label)) {
 			continue
 		}
-		budget--
-		label.text = name
-		label.sync()
-		delete label.userData.settlementName
+		labels.push(label)
 	}
-	return remaining
+	return labels
+}
+
+function setSettlementLabelText(label: Text): boolean {
+	const name: string | undefined = label.userData.settlementName
+	if (name === undefined) return false
+	label.text = name
+	delete label.userData.settlementName
+	return true
+}
+
+export function activateSettlementLabels(labels: readonly Text[]): boolean {
+	let budget = ACTIVATIONS_PER_FRAME
+	for (const label of labels) {
+		if (label.userData.settlementName === undefined) continue
+		if (budget === 0) return true
+		if (setSettlementLabelText(label)) label.sync()
+		budget--
+	}
+	return false
+}
+
+export async function syncSettlementLabelsForExport(
+	labels: readonly Text[],
+): Promise<void> {
+	await Promise.all(
+		labels.map((label) => {
+			if (!setSettlementLabelText(label)) return
+			return new Promise<void>((resolve) => label.sync(resolve))
+		}),
+	)
 }
 
 export function createSettlementLabelPools(): NationLabelPools {
@@ -229,6 +269,7 @@ export function buildGlobeSettlementLabels(
 	}
 
 	hideUnusedPool(pool, activeCount)
+	delete group.userData.globeCameraPosition
 	updateGlobeLabelOrientations(group, camera, cullingEnabled)
 	return group
 }
@@ -287,6 +328,7 @@ export function buildMapSettlementLabels(
 			text.text = ""
 			text.userData.settlementName = name
 			text.userData.settlementId = labelSettlementId(world, p, hasRealCoord)
+			text.userData.settlementWrapOffset = wrapOffset
 			text.userData.settlementProvince = p
 			text.userData.settlementPop = pop
 			text.position.set(px + wrapOffset, py, pz)

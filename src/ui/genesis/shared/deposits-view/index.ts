@@ -30,7 +30,7 @@ const OVERVIEW = COMMODITIES.list
 	.map((commodity, index) => ({ commodity, index }))
 	.filter(({ commodity }) => OVERVIEW_GROUPS.includes(commodity.group))
 const WATER_OVERVIEW = OVERVIEW.filter(
-	({ commodity }) => commodity.id === "salt" || commodity.id === "oilGas",
+	({ commodity }) => commodity.id === "salt" || commodity.id === "oilAndGas",
 )
 
 function kind(view: DepositsView): DepositsViewKind {

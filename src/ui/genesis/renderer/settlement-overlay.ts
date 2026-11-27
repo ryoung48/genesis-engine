@@ -323,6 +323,7 @@ export function buildMapSettlements({
 				province: p,
 				settlementPop: pop,
 				settlementId: settlementId(p),
+				settlementWrapOffset: wrapOffset,
 				baseRadius: radius,
 			}
 			group.add(circle)
@@ -433,6 +434,7 @@ export function buildMapRealSettlements({
 				isCapital,
 				settlementPop: pop,
 				settlementId: ghslSettlementId(i),
+				settlementWrapOffset: wrapOffset,
 				baseRadius: radius,
 			}
 			group.add(circle)

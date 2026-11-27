@@ -42,7 +42,6 @@ import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import { ROCKS } from "@/model/geography/terrain/rocks"
 import type { GenesisSurface } from "@/model/geography/terrain/rocks/types"
 import { SEABED } from "@/model/geography/terrain/seabed"
-import type { GenesisAtolls } from "@/model/geography/terrain/seabed/atolls/types"
 import type {
 	SeabedLayers,
 	SeabedStats,
@@ -724,7 +723,6 @@ function runPostElevationPipeline(
 	let shoreStats: ShoreStats | undefined
 	let seabedLayers: SeabedLayers | undefined
 	let seabedStats: SeabedStats | undefined
-	let atolls: GenesisAtolls | undefined
 	let karstLayers: GenesisKarst | undefined
 	let caveSites: GenesisCaveSites | undefined
 	let karstStats: KarstCavesStats | undefined
@@ -890,7 +888,6 @@ function runPostElevationPipeline(
 		onProgress?.("Post: shoreline", 70)
 
 		t0 = performance.now()
-		const { presentTectonics } = surface
 		const seabed = SEABED.compute({
 			mesh,
 			isLand,
@@ -902,12 +899,9 @@ function runPostElevationPipeline(
 			climate,
 			iceMinMonthly,
 			iceMaxMonthly,
-			crust: presentTectonics.crust,
-			sample: presentTectonics.sample,
 		})
 		seabedLayers = seabed.layers
 		seabedStats = seabed.stats
-		atolls = seabed.atolls
 		TIMING.record({ stage: "Post: seabed", startedAt: t0, timings })
 		onProgress?.("Post: seabed", 70)
 
@@ -1235,6 +1229,18 @@ function runPostElevationPipeline(
 				coastal,
 				numRegions: N,
 				pastaClimate,
+				r_xyz: mesh.r_xyz,
+				regionLandmark: landmarks.regionLandmark,
+				leaderTechLevel: TECH_LEVEL.leaderLevel({ techLevel }),
+				wayOfLife: wayOfLife
+					? {
+							farm: wayOfLife.farm,
+							herd: wayOfLife.herd,
+							density: wayOfLife.density,
+							herdAdoptionYear: farming.herdAdoptionYear,
+							startYear,
+						}
+					: null,
 			})
 		: undefined
 	TIMING.record({ stage: "Post: trade goods", startedAt: t0, timings })
@@ -1263,7 +1269,6 @@ function runPostElevationPipeline(
 		shoreStats,
 		seabed: seabedLayers,
 		seabedStats,
-		atolls,
 		karst: karstLayers,
 		caveSites,
 		karstStats,

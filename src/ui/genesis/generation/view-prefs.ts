@@ -11,6 +11,8 @@ import { CLOCK_DIAL_HOURS } from "@/ui/genesis/shared/clock"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import { DEPOSITS_VIEW } from "@/ui/genesis/shared/deposits-view"
 import type { DepositsView } from "@/ui/genesis/shared/deposits-view/types"
+import { TRADE_GOODS_VIEW } from "@/ui/genesis/shared/trade-goods-view"
+import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 import {
 	DEFAULT_GEOGRAPHY_MODE,
 	type ElevationSubMode,
@@ -62,6 +64,7 @@ export interface StoredViewPrefs {
 	showWaterSymbols: boolean
 	showCaves: boolean
 	depositsView: DepositsView
+	tradeGoodsView: TradeGoodsView
 	showGdd: boolean
 	showGint: boolean
 	showPet: boolean
@@ -249,6 +252,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showWaterSymbols: false,
 	showCaves: true,
 	depositsView: DEPOSITS_VIEW.defaultView,
+	tradeGoodsView: TRADE_GOODS_VIEW.defaultView,
 	showGdd: false,
 	showGint: false,
 	showPet: false,
@@ -456,6 +460,9 @@ export function parseStoredViewPrefs(
 			depositsView: DEPOSITS_VIEW.isView(parsed.depositsView)
 				? parsed.depositsView
 				: DEFAULT_VIEW_PREFS.depositsView,
+			tradeGoodsView: TRADE_GOODS_VIEW.isView(parsed.tradeGoodsView)
+				? parsed.tradeGoodsView
+				: DEFAULT_VIEW_PREFS.tradeGoodsView,
 			showGdd: readBoolean(parsed.showGdd, DEFAULT_VIEW_PREFS.showGdd),
 			showGint: readBoolean(parsed.showGint, DEFAULT_VIEW_PREFS.showGint),
 			showPet: readBoolean(parsed.showPet, DEFAULT_VIEW_PREFS.showPet),

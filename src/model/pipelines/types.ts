@@ -40,7 +40,6 @@ import type {
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
-import type { GenesisAtolls } from "@/model/geography/terrain/seabed/atolls/types"
 import type {
 	SeabedLayers,
 	SeabedStats,
@@ -257,8 +256,6 @@ export interface GenesisWorld {
 	seabed?: SeabedLayers
 	/** [JUSTIFICATION] Present exactly when seabed is. */
 	seabedStats?: SeabedStats
-	/** [JUSTIFICATION] Present exactly when seabed is. */
-	atolls?: GenesisAtolls
 	/** [JUSTIFICATION] Karst needs the rock, groundwater and shore layers, so only procedural worlds have it. */
 	karst?: GenesisKarst
 	/** [JUSTIFICATION] Present exactly when karst is. */

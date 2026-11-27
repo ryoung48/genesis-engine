@@ -1,4 +1,3 @@
-import { SEABED_ATOLLS } from "@/model/geography/terrain/seabed/atolls"
 import { SEABED_HABITAT } from "@/model/geography/terrain/seabed/habitat"
 import type {
 	SeabedComputeParams,
@@ -29,7 +28,6 @@ function tally<K extends string>({
 function statistics({
 	layers,
 	openWater,
-	atolls,
 	stageMs,
 }: SeabedStatsParams): SeabedStats {
 	let oceanCells = 0
@@ -52,7 +50,7 @@ function statistics({
 			codes: layers.substrate,
 			openWater,
 		}),
-		atolls,
+
 		stageMs,
 	}
 }
@@ -68,8 +66,6 @@ function compute({
 	climate,
 	iceMinMonthly,
 	iceMaxMonthly,
-	crust,
-	sample,
 }: SeabedComputeParams): SeabedResult {
 	const startedAt = performance.now()
 	const source = SEABED_HABITAT.reach({
@@ -93,22 +89,14 @@ function compute({
 		iceMinMonthly,
 		iceMaxMonthly,
 	})
-	const atolls = SEABED_ATOLLS.sites({
-		mesh,
-		crust,
-		sample,
-		isLand,
-		openWater,
-		temperatureMonthly: climate.temperature_monthly,
-	})
 	const layers = { substrate, habitat, share }
 	return {
 		layers,
-		atolls,
+
 		stats: statistics({
 			layers,
 			openWater,
-			atolls: atolls.region.length,
+
 			stageMs: performance.now() - startedAt,
 		}),
 	}

@@ -7,22 +7,16 @@ import type {
 } from "@/ui/genesis/renderer/types"
 
 const DOT_SIDES = 10
-const RING_SIDES = 28
-const RING_SCALE = 1
-const RING_INNER = 0.6
 const SIDE_SPACING = 1.1
-const NO_RINGS: ReadonlySet<number> = new Set()
 
 function dotTriangles({
 	data,
 	keyIndex,
 	radiusRad,
-	ring,
 }: {
 	data: DotSymbolData
 	keyIndex: number
 	radiusRad: number
-	ring: boolean
 }): THREE.Vector3[] {
 	const triangles: THREE.Vector3[] = []
 	for (let i = 0; i < data.key.length; i++) {
@@ -42,29 +36,16 @@ function dotTriangles({
 			.clone()
 			.addScaledVector(east, data.side[i] * radiusRad * SIDE_SPACING)
 			.normalize()
-		const sides = ring ? RING_SIDES : DOT_SIDES
-		const outerRad = ring ? radiusRad * RING_SCALE : radiusRad
 		const around = (rad: number, k: number) => {
-			const angle = (2 * Math.PI * k) / sides
+			const angle = (2 * Math.PI * k) / DOT_SIDES
 			return shifted
 				.clone()
 				.addScaledVector(east, Math.cos(angle) * rad)
 				.addScaledVector(north, Math.sin(angle) * rad)
 				.normalize()
 		}
-		if (ring) {
-			const innerRad = outerRad * RING_INNER
-			for (let k = 0; k < sides; k++) {
-				const outerA = around(outerRad, k)
-				const outerB = around(outerRad, k + 1)
-				const innerA = around(innerRad, k)
-				const innerB = around(innerRad, k + 1)
-				triangles.push(outerA, outerB, innerA, innerA, outerB, innerB)
-			}
-			continue
-		}
-		for (let k = 0; k < sides; k++)
-			triangles.push(shifted, around(outerRad, k), around(outerRad, k + 1))
+		for (let k = 0; k < DOT_SIDES; k++)
+			triangles.push(shifted, around(radiusRad, k), around(radiusRad, k + 1))
 	}
 	return triangles
 }
@@ -109,7 +90,6 @@ function rgbHex(rgb: readonly [number, number, number]): number {
 function buildGlobeDots({
 	data,
 	colors,
-	ringKeys,
 	radiusRad,
 	globeRadius,
 	viewMode,
@@ -121,7 +101,6 @@ function buildGlobeDots({
 					data,
 					keyIndex,
 					radiusRad,
-					ring: ringKeys.has(keyIndex),
 				}).flatMap((point) =>
 					point.clone().multiplyScalar(globeRadius).toArray(),
 				),
@@ -135,7 +114,6 @@ function buildGlobeDots({
 function buildMapDots({
 	data,
 	colors,
-	ringKeys,
 	radiusRad,
 	mapDepth,
 	viewMode,
@@ -148,7 +126,6 @@ function buildMapDots({
 				data,
 				keyIndex,
 				radiusRad,
-				ring: ringKeys.has(keyIndex),
 			})
 			const positions: number[] = []
 			for (let i = 0; i < triangles.length; i += 3) {
@@ -176,7 +153,6 @@ function buildMapDots({
 
 export const DOT_SYMBOLS = {
 	rgbHex,
-	noRings: NO_RINGS,
 	buildGlobeDots,
 	buildMapDots,
 }

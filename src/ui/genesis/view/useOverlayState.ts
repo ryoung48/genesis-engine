@@ -154,6 +154,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [depositsView, setDepositsView] = useState(
 		initialViewPrefs.depositsView,
 	)
+	const [tradeGoodsView, setTradeGoodsView] = useState(
+		initialViewPrefs.tradeGoodsView,
+	)
 	const [showOceanCurrents, setShowOceanCurrents] = useState(
 		initialViewPrefs.showOceanCurrents,
 	)
@@ -275,6 +278,7 @@ export function useOverlayState(input: OverlayStateInput) {
 			showWaterSymbols,
 			showCaves,
 			depositsView,
+			tradeGoodsView,
 			showGdd,
 			showGint,
 			showPet,
@@ -372,6 +376,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showWaterSymbols,
 		showCaves,
 		depositsView,
+		tradeGoodsView,
 		showGdd,
 		showGint,
 		showPet,
@@ -469,6 +474,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowWaterSymbols,
 		setShowCaves,
 		setDepositsView,
+		setTradeGoodsView,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
 		setSolarSystemTrailDegrees,
@@ -507,6 +513,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showWaterSymbols,
 		showCaves,
 		depositsView,
+		tradeGoodsView,
 		showWireframe,
 		solarSystemControlsExpanded,
 		solarSystemTrailDegrees,

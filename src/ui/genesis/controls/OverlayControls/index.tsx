@@ -31,6 +31,7 @@ import { ReligionModeSection } from "./ReligionModeSection"
 import { SocietySection } from "./SocietySection"
 import { TitlesModeSection } from "./TitlesModeSection"
 import { TopographyModeSection } from "./TopographyModeSection"
+import { TradeGoodsModeSection } from "./TradeGoodsModeSection"
 import type { OverlayControlsProps } from "./types"
 import { VegetationModeSection } from "./VegetationModeSection"
 import { ViewExportSection } from "./ViewExportSection"
@@ -81,6 +82,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	hasDeposits,
 	depositsView,
 	setDepositsView,
+	tradeGoodsView,
+	setTradeGoodsView,
 	showGdd,
 	setShowGdd,
 	showGint,
@@ -189,6 +192,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [nationsExpanded, setNationsExpanded] = React.useState(false)
 	const [religionExpanded, setReligionExpanded] = React.useState(false)
+	const [tradeGoodsExpanded, setTradeGoodsExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
 	const exportExpanded =
 		controlledExportExpanded !== undefined
@@ -456,6 +460,14 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									hasDeposits={hasDeposits}
 									depositsView={depositsView}
 									setDepositsView={setDepositsView}
+								/>
+
+								<TradeGoodsModeSection
+									colorMode={colorMode}
+									tradeGoodsExpanded={tradeGoodsExpanded}
+									setTradeGoodsExpanded={setTradeGoodsExpanded}
+									tradeGoodsView={tradeGoodsView}
+									setTradeGoodsView={setTradeGoodsView}
 								/>
 
 								<DangerSection

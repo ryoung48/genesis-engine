@@ -128,6 +128,7 @@ export function updateGlobeLabelOrientations(
 		if (leader) leader.visible = visible
 
 		label.visible = visible
+		label.userData.globeLabelFacingCamera = visible
 		if (!visible) continue
 
 		updateGlobeLabelPosition(label, GLOBE_CAMERA_UP)

@@ -11,9 +11,8 @@ const SEEDS = [14963991, 20251107, 77031]
 const TIMEOUT_MS = 600_000
 
 function paramsOf(world: GenesisWorld): SeabedComputeParams {
-	const { shore, presentTectonics } = world
-	if (!shore || !presentTectonics)
-		throw new Error("world has no shore layer or tectonics")
+	const { shore } = world
+	if (!shore) throw new Error("world has no shore layer")
 	return {
 		mesh: world.mesh,
 		isLand: world.isLand,
@@ -28,8 +27,6 @@ function paramsOf(world: GenesisWorld): SeabedComputeParams {
 		climate: world.climate,
 		iceMinMonthly: world.iceMinMonthly,
 		iceMaxMonthly: world.iceMaxMonthly,
-		crust: presentTectonics.crust,
-		sample: presentTectonics.sample,
 	}
 }
 
@@ -71,34 +68,6 @@ describe("seabed on generated worlds", () => {
 	)
 
 	it(
-		"every atoll is open water in warm water",
-		() => {
-			for (const seed of SEEDS) {
-				const world = cachedWorld(seed)
-				const { atolls } = world
-				if (!atolls) throw new Error("world has no atolls")
-				const { openWater } = paramsOf(world)
-				const n = world.mesh.numRegions
-				expect(atolls.region.length).toBe(atolls.ageMyr.length)
-				expect(atolls.xyz.length).toBe(3 * atolls.region.length)
-				for (let i = 0; i < atolls.region.length; i++) {
-					const r = atolls.region[i]
-					expect(openWater[r]).toBe(1)
-					let coldest = Infinity
-					for (let m = 0; m < 12; m++)
-						coldest = Math.min(
-							coldest,
-							world.climate.temperature_monthly[m * n + r],
-						)
-					expect(coldest).toBeGreaterThanOrEqual(SEABED_CONFIG.coralMinColdC)
-				}
-				expect(world.seabedStats?.atolls).toBe(atolls.region.length)
-			}
-		},
-		TIMEOUT_MS,
-	)
-
-	it(
 		"recomputing from the world's own layers gives the same result and mutates no input",
 		() => {
 			const world = cachedWorld(SEEDS[0])
@@ -115,9 +84,6 @@ describe("seabed on generated worlds", () => {
 				true,
 			)
 			expect(sameArray(again.layers.share, world.seabed?.share ?? [])).toBe(
-				true,
-			)
-			expect(sameArray(again.atolls.region, world.atolls?.region ?? [])).toBe(
 				true,
 			)
 			expect(sameArray(params.elevationKm, before.elevation)).toBe(true)

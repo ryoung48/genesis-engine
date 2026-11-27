@@ -50,7 +50,6 @@ function sharesOf(seed: number): Shares {
 		"habitat share of ocean %": (100 * habitatCells) / Math.max(1, total),
 		"mean habitat share %": shareSum / Math.max(1, habitatCells),
 		"median habitat share %": shares[Math.floor(shares.length / 2)] ?? 0,
-		"atoll sites": stats.atolls,
 		"stage ms": stats.stageMs,
 	}
 	percentRecord({
@@ -78,7 +77,7 @@ function table(rows: Shares[]): string {
 }
 
 describe.skipIf(!process.env.SEABED_SHARES)("seabed: shares", () => {
-	it("writes habitat and atoll shares", () => {
+	it("writes habitat shares", () => {
 		const rows = SEEDS.map(sharesOf)
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-")
 		const dir = `stats/seabed/${stamp}-shares`

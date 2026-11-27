@@ -71,7 +71,6 @@ import { WindParticleCanvas } from "@/ui/genesis/particles/WindParticleCanvas"
 import { createGenesisScene, type GenesisScene } from "@/ui/genesis/renderer"
 import type { ContourDisplay } from "@/ui/genesis/renderer/contours/types"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/genesis/renderer/focus"
-import { buildAtollSymbolData } from "@/ui/genesis/renderer/overlay-builders/atoll-symbols"
 import { buildCaveSymbolData } from "@/ui/genesis/renderer/overlay-builders/cave-symbols"
 import { buildWaterSymbolData } from "@/ui/genesis/renderer/overlay-builders/water-symbols"
 import { buildWindArrowData } from "@/ui/genesis/renderer/overlay-builders/wind-arrows"
@@ -254,6 +253,7 @@ export const GenesisView: React.FC<{
 		setShowWaterSymbols,
 		setShowCaves,
 		setDepositsView,
+		setTradeGoodsView,
 		setShowWireframe,
 		setSolarSystemControlsExpanded,
 		setSolarSystemViewActive,
@@ -293,6 +293,7 @@ export const GenesisView: React.FC<{
 		showWaterSymbols,
 		showCaves,
 		depositsView,
+		tradeGoodsView,
 		showWireframe,
 		solarSystemControlsExpanded,
 		solarSystemViewActive,
@@ -1186,6 +1187,7 @@ export const GenesisView: React.FC<{
 		societyMode,
 		religionMode,
 		depositsView,
+		tradeGoodsView,
 		viewMode,
 		showElevation,
 		showWaves,
@@ -1317,8 +1319,6 @@ export const GenesisView: React.FC<{
 	const siteSymbolData = useMemo(() => {
 		if (showCaves && colorMode === "karst" && world?.caveSites)
 			return buildCaveSymbolData(world.caveSites)
-		if (colorMode === "topography" && world?.atolls?.region.length)
-			return buildAtollSymbolData(world.atolls)
 		return null
 	}, [showCaves, colorMode, world])
 
@@ -2465,6 +2465,8 @@ export const GenesisView: React.FC<{
 								hasDeposits={world?.deposits !== undefined}
 								depositsView={depositsView}
 								setDepositsView={setDepositsView}
+								tradeGoodsView={tradeGoodsView}
+								setTradeGoodsView={setTradeGoodsView}
 								showGdd={showGdd}
 								setShowGdd={setShowGdd}
 								showGint={showGint}

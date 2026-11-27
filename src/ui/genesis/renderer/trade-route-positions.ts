@@ -7,6 +7,8 @@ import {
 	splitMapPoints,
 } from "@/ui/genesis/renderer/map-projection"
 import type {
+	TradeRouteCorridorEdge,
+	TradeRouteCorridorStart,
 	TradeRoutePositionRequest,
 	TradeRoutePositionSet,
 	TradeRoutePositions,
@@ -16,12 +18,11 @@ const TERRAIN_ELEVATION_SCALE = 0.04
 const GLOBE_Z_LIFT = 0.009
 const MAP_Z_LIFT = 0.012
 const MAP_Z_ELEVATION_FACTOR = 0.5
+const CURVE_TOLERANCE_SQUARED = 0.0001 ** 2
 
 interface Corridor {
 	regions: number[]
 	kind: SerializedRouteKind
-	usage: number
-	weight: number
 }
 
 type BatchedPositions = Record<SerializedRouteKind, number[]>
@@ -76,38 +77,18 @@ function regionPositionMap(
 	return new THREE.Vector3(x, y, z)
 }
 
-function smoothPoints(points: THREE.Vector3[]): THREE.Vector3[] {
-	if (points.length <= 2) return points
-	const curve = new THREE.CatmullRomCurve3(points, false, "centripetal")
-	const segments = Math.max(points.length * 4, 8)
-	return curve.getPoints(segments)
-}
-
 function buildTradeRouteCorridors(network: SerializedNetwork): Corridor[] {
-	const adjacency = new Map<
-		number,
-		Array<{
-			neighbor: number
-			kind: SerializedRouteKind
-			usage: number
-			weight: number
-			key: string
-		}>
-	>()
+	const adjacency = new Map<number, TradeRouteCorridorEdge[]>()
 	const appendEdge = (edge: {
 		fromRegion: number
 		toRegion: number
 		kind: SerializedRouteKind
-		usage: number
-		weight: number
 	}) => {
 		const key = `${edge.kind}:${networkKey(edge.fromRegion, edge.toRegion)}`
 		const fromList = adjacency.get(edge.fromRegion) ?? []
 		fromList.push({
 			neighbor: edge.toRegion,
 			kind: edge.kind,
-			usage: edge.usage,
-			weight: edge.weight,
 			key,
 		})
 		adjacency.set(edge.fromRegion, fromList)
@@ -115,8 +96,6 @@ function buildTradeRouteCorridors(network: SerializedNetwork): Corridor[] {
 		toList.push({
 			neighbor: edge.fromRegion,
 			kind: edge.kind,
-			usage: edge.usage,
-			weight: edge.weight,
 			key,
 		})
 		adjacency.set(edge.toRegion, toList)
@@ -126,30 +105,20 @@ function buildTradeRouteCorridors(network: SerializedNetwork): Corridor[] {
 	const visited = new Set<string>()
 	const corridors: Corridor[] = []
 
-	function walk(
-		start: number,
-		next: number,
-		initialKey: string,
-		corridorKind: SerializedRouteKind,
-	): Corridor {
+	function walk({
+		region: start,
+		edge: initialEdge,
+	}: TradeRouteCorridorStart): Corridor {
+		const { neighbor: next, kind } = initialEdge
 		const regions = [start, next]
-		const usages: number[] = []
-		const weights: number[] = []
 		let previous = start
 		let current = next
-		let edgeId = initialKey
+		let edge = initialEdge
 
 		while (true) {
-			visited.add(edgeId)
-			const step = adjacency
-				.get(previous)
-				?.find((entry) => entry.neighbor === current && entry.key === edgeId)
-			if (step) {
-				usages.push(step.usage)
-				weights.push(step.weight)
-			}
+			visited.add(edge.key)
 			const neighbors = (adjacency.get(current) ?? []).filter(
-				(entry) => entry.kind === corridorKind,
+				(entry) => entry.kind === kind,
 			)
 			const candidates = neighbors.filter(
 				(entry) => entry.neighbor !== previous && !visited.has(entry.key),
@@ -160,15 +129,13 @@ function buildTradeRouteCorridors(network: SerializedNetwork): Corridor[] {
 			const nextEdge = candidates[0]
 			previous = current
 			current = nextEdge.neighbor
-			edgeId = nextEdge.key
+			edge = nextEdge
 			regions.push(current)
 		}
 
 		return {
 			regions,
-			kind: corridorKind,
-			usage: Math.max(...usages),
-			weight: Math.max(...weights),
+			kind,
 		}
 	}
 
@@ -183,9 +150,7 @@ function buildTradeRouteCorridors(network: SerializedNetwork): Corridor[] {
 			if (kindNeighbors.length === 2) continue
 			for (const neighbor of kindNeighbors) {
 				if (visited.has(neighbor.key)) continue
-				corridors.push(
-					walk(region, neighbor.neighbor, neighbor.key, neighbor.kind),
-				)
+				corridors.push(walk({ region, edge: neighbor }))
 			}
 		}
 	}
@@ -193,9 +158,7 @@ function buildTradeRouteCorridors(network: SerializedNetwork): Corridor[] {
 	for (const [region, neighbors] of adjacency) {
 		for (const neighbor of neighbors) {
 			if (visited.has(neighbor.key)) continue
-			corridors.push(
-				walk(region, neighbor.neighbor, neighbor.key, neighbor.kind),
-			)
+			corridors.push(walk({ region, edge: neighbor }))
 		}
 	}
 
@@ -215,18 +178,34 @@ function appendPolylineSegments(
 	points: THREE.Vector3[],
 ): void {
 	if (points.length < 2) return
-	const smoothed = smoothPoints(points)
-	for (let i = 1; i < smoothed.length; i++) {
-		const previous = smoothed[i - 1]
-		const current = smoothed[i]
-		positions.push(
-			previous.x,
-			previous.y,
-			previous.z,
-			current.x,
-			current.y,
-			current.z,
-		)
+	const edgeCount = points.length - 1
+	const curve =
+		edgeCount > 1
+			? new THREE.CatmullRomCurve3(points, false, "centripetal")
+			: null
+	const midpoint = new THREE.Vector3()
+	const chord = new THREE.Line3()
+	const nearest = new THREE.Vector3()
+	for (let i = 0; i < edgeCount; i++) {
+		const start = points[i]
+		const end = points[i + 1]
+		if (curve) {
+			curve.getPoint((i + 0.5) / edgeCount, midpoint)
+			chord.set(start, end).closestPointToPoint(midpoint, true, nearest)
+			if (midpoint.distanceToSquared(nearest) > CURVE_TOLERANCE_SQUARED) {
+				positions.push(
+					start.x,
+					start.y,
+					start.z,
+					midpoint.x,
+					midpoint.y,
+					midpoint.z,
+				)
+				positions.push(midpoint.x, midpoint.y, midpoint.z, end.x, end.y, end.z)
+				continue
+			}
+		}
+		positions.push(start.x, start.y, start.z, end.x, end.y, end.z)
 	}
 }
 

@@ -32,7 +32,7 @@ Pooled over three default worlds (seeds 14963991, 20251107, 77031). The first nu
 | leadZinc | 2.8 | 77/18/4 | mercury | 0.22 | 34/45/21 |
 | salt | 3.9 | 51/26/23 | saltpeter | 1.2 | 50/39/11 |
 | coal | 4.7 | 74/21/5 | amber | 0.11 | 66/26/8 |
-| oilGas | 4.7 | 75/19/6 | gems | 1.7 | 80/16/4 |
+| oilAndGas | 4.7 | 75/19/6 | gems | 1.7 | 80/16/4 |
 
 Offshore oil and gas: 7.5% of ocean regions shallower than 2 km, grade mix 71/22/6. Grade mixes are rounded.
 

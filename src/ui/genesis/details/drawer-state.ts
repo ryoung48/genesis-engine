@@ -1,4 +1,4 @@
-export type WorldSection = "environmental" | "social" | "trade-goods"
+export type WorldSection = "environmental" | "social"
 
 export const DEFAULT_WORLD_SECTIONS: ReadonlySet<WorldSection> = new Set([])
 

@@ -1,5 +1,13 @@
+import * as THREE from "three"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { expect, it } from "vitest"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
+import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
+import {
+	buildTradeRouteLines,
+	syncTradeRouteDetail,
+	TRADE_ROUTE_DETAIL_LAYER,
+} from "@/ui/genesis/renderer/trade-route-overlay"
 import { TRADE_ROUTE_POSITIONS } from "@/ui/genesis/renderer/trade-route-positions"
 
 it("computes globe and map segments for a land corridor", () => {
@@ -21,9 +29,12 @@ it("computes globe and map segments for a land corridor", () => {
 		projectionLatitudeDeg: 0,
 	})
 	const globe = positions.globe[TRANSPORT.ROUTE_LAND_MAJOR]
-	expect(globe.length).toBeGreaterThan(0)
+	expect(globe.length).toBeGreaterThanOrEqual(12)
+	expect(globe.length).toBeLessThanOrEqual(24)
 	expect(globe.length % 6).toBe(0)
-	expect(positions.map[TRANSPORT.ROUTE_LAND_MAJOR].length % 6).toBe(0)
+	const map = positions.map[TRANSPORT.ROUTE_LAND_MAJOR]
+	expect(map.length).toBe(12)
+	expect(map.slice(3, 6)).toEqual(map.slice(6, 9))
 	expect(positions.globe[TRANSPORT.ROUTE_SEA]).toHaveLength(0)
 	for (let i = 0; i < globe.length; i += 3) {
 		expect(Math.hypot(globe[i], globe[i + 1], globe[i + 2])).toBeGreaterThan(
@@ -47,7 +58,89 @@ it("splits an edge that crosses the antimeridian on the map", () => {
 		centerLongitudeDeg: 0,
 		projectionLatitudeDeg: 0,
 	})
+	expect(positions.map[TRANSPORT.ROUTE_LAND_MAJOR]).toHaveLength(12)
+})
+
+it("shows all major roads and sea routes, and gates only minor roads on map and globe zoom", () => {
+	const segment = new Float32Array([0, 0, 0, 1, 0, 0])
+	const { group } = buildTradeRouteLines(
+		{
+			[TRANSPORT.ROUTE_LAND_MAJOR]: segment,
+			[TRANSPORT.ROUTE_LAND_MINOR]: segment,
+			[TRANSPORT.ROUTE_SEA]: segment,
+		},
+		{ width: 100, height: 100 },
+	)
+	addMapSlideClones(group)
+	const visibleLines = (camera: THREE.Camera) => {
+		const visible: LineSegments2[] = []
+		group.traverse((child) => {
+			if (child instanceof LineSegments2 && camera.layers.test(child.layers)) {
+				visible.push(child)
+			}
+		})
+		return visible
+	}
+	const mapCamera = new THREE.OrthographicCamera()
+	const globeCamera = new THREE.PerspectiveCamera()
+	globeCamera.position.z = 3
+	for (const camera of [mapCamera, globeCamera]) {
+		syncTradeRouteDetail(camera)
+		const overview = visibleLines(camera)
+		expect(overview).toHaveLength(6)
+		expect(overview.filter((line) => line.material.dashed)).toHaveLength(3)
+		expect(
+			overview.every(
+				(line) => !line.layers.isEnabled(TRADE_ROUTE_DETAIL_LAYER),
+			),
+		).toBe(true)
+	}
+	mapCamera.zoom = 4
+	globeCamera.position.z = 1.5
+	for (const camera of [mapCamera, globeCamera]) {
+		syncTradeRouteDetail(camera)
+		expect(visibleLines(camera)).toHaveLength(9)
+	}
+	mapCamera.zoom = 1
+	syncTradeRouteDetail(mapCamera)
+	expect(visibleLines(mapCamera)).toHaveLength(6)
+})
+
+it("culls off-screen detail tiles while retaining crossing segments and sea dash distances", () => {
+	const { group } = buildTradeRouteLines(
+		{
+			[TRANSPORT.ROUTE_LAND_MAJOR]: new Float32Array(),
+			[TRANSPORT.ROUTE_LAND_MINOR]: new Float32Array(),
+			[TRANSPORT.ROUTE_SEA]: new Float32Array([
+				0, 0, 0, 0.1, 0, 0, 1, 0, 0, 1.1, 0, 0, 0.05, 0.01, 0, 0.8, 0.01, 0,
+			]),
+		},
+		{ width: 100, height: 100 },
+	)
+	const camera = new THREE.OrthographicCamera(-0.4, 0.4, 0.4, -0.4, 0.1, 10)
+	camera.position.z = 2
+	camera.zoom = 4
+	camera.updateProjectionMatrix()
+	camera.updateMatrixWorld()
+	syncTradeRouteDetail(camera)
+	group.updateMatrixWorld()
+	const frustum = new THREE.Frustum().setFromProjectionMatrix(
+		new THREE.Matrix4().multiplyMatrices(
+			camera.projectionMatrix,
+			camera.matrixWorldInverse,
+		),
+	)
+	const detailTiles = group.children.filter(
+		(child): child is LineSegments2 =>
+			child instanceof LineSegments2 && camera.layers.test(child.layers),
+	)
+	expect(detailTiles).toHaveLength(3)
+	expect(detailTiles.map((tile) => frustum.intersectsObject(tile))).toEqual([
+		true,
+		false,
+		true,
+	])
 	expect(
-		positions.map[TRANSPORT.ROUTE_LAND_MAJOR].length,
-	).toBeGreaterThanOrEqual(12)
+		detailTiles[2].geometry.getAttribute("instanceDistanceStart").getX(0),
+	).toBeCloseTo(0.2)
 })

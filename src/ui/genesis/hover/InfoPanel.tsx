@@ -379,7 +379,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			world,
 			region: hoverRegion,
 			colorMode,
-			unitSystem,
 		}),
 	]
 	const hoverLakeKind = showGeography

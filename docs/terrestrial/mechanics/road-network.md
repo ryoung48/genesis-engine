@@ -10,7 +10,9 @@ The history adapter reads the engine's owned geography buffers and copies settle
 
 `ROUTES.advance` is the single build and update operation. Generation applies it once to empty state; history repeats that build after population initialization. At the default start year the two use identical urban population and produce identical routes. An explicit historical start year uses that year's knowledge and city targets. Worlds without settlement inputs keep `roads: null`.
 
-Membership uses the run's fixed era: minor land and ports enter at `townMin`, major land above `2 × cityMin`. Existing geographic eligibility and isolated-town exclusions remain. A member leaves only below 70% of its threshold and after two batches of dwell. With ten-year batches, capped migration alone leaves `0.97^10 ≈ 73.7%`; the two-batch dwell also prevents immediate release after siege storms. A severe decline just after entry can retain roads for about twenty years.
+Membership uses the run's fixed era: minor land and ports enter at `townMin`, major land above `2 × cityMin`. Existing geographic eligibility and isolated-town exclusions remain. Population alone removes a member only below 70% of its threshold and after two batches of dwell. With ten-year batches, capped migration alone leaves `0.97^10 ≈ 73.7%`; the two-batch dwell also prevents immediate release after siege storms. A severe decline just after entry can retain roads for about twenty years.
+
+Each connected land group admits all settlements eligible for its major and minor tiers. The tiers can share endpoints.
 
 ## Batch order and local work
 
@@ -36,7 +38,9 @@ History advances roads after population in the census event when at least ten si
 
 The record retains one lifetime entry per accepted route, with kind, province endpoints, exact path, inclusive start and exclusive end. Releases close the active lifetime; subsequent additions create another entry. A frame filters lifetimes at its requested date. This preserves old paths without rerouting them out of order.
 
-The display packs the frame's routes and derives its edge network only while infrastructure is visible. Globe and map marker builders and the label-name builder receive the route endpoint set. Endpoints retain markers and names even below `townMin`, until their roads are released. Capital marker styling uses the selected frame's capital-preferring nation seeds, so moved capitals gain the capital pattern and former or extinct capitals lose it; before history is available it uses the generated capital list. Imported Earth worlds retain their existing settlement display.
+The display packs the frame's routes and derives its edge network only while infrastructure is visible. The renderer joins shared edges into corridors and draws each edge in one or two segments, keeping a curve midpoint where its deviation from the straight edge exceeds `0.0001` scene units. Globe and map marker builders and the label-name builder receive the route endpoint set. Endpoints retain markers and names even below `townMin`, until their roads are released. Capital marker styling uses the selected frame's capital-preferring nation seeds, so moved capitals gain the capital pattern and former or extinct capitals lose it; before history is available it uses the generated capital list. Imported Earth worlds retain their existing settlement display.
+
+The infrastructure overlay shows major roads and sea routes at every zoom. Minor roads appear at map zoom 4 or higher, within 1.5 planet radii of the globe center, and in map exports. At those zoom levels, the renderer submits spatial batches only when their bounds intersect the camera view. Each batch spans a tile of 0.25 scene units and retains the full extent of any segment that crosses its boundary.
 
 ## Report
 

@@ -9,6 +9,7 @@ import type {
 	SocietyMapMode,
 	TitleBorderTier,
 } from "@/ui/genesis/shared/map-modes"
+import type { TradeGoodsView } from "@/ui/genesis/shared/trade-goods-view/types"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
@@ -91,6 +92,8 @@ export interface OverlayControlsProps {
 	hasDeposits: boolean
 	depositsView: DepositsView
 	setDepositsView: (v: DepositsView) => void
+	tradeGoodsView: TradeGoodsView
+	setTradeGoodsView: (v: TradeGoodsView) => void
 	showGdd: boolean
 	setShowGdd: (v: boolean) => void
 	showGint: boolean
@@ -186,6 +189,19 @@ export interface OverlayControlsProps {
 	setShowDaylight?: (v: boolean) => void
 	onEnterSolarSystem?: () => void
 	isEarthImport?: boolean
+}
+
+export interface SwatchDropdownOption<T extends string> {
+	value: T
+	label: string
+	rgb: [number, number, number] | null
+}
+
+export interface SwatchDropdownProps<T extends string> {
+	label: string
+	options: readonly SwatchDropdownOption<T>[]
+	value: T
+	onChange: (v: T) => void
 }
 
 export interface PopulationModeSectionProps {

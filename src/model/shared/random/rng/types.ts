@@ -15,3 +15,8 @@ export interface CreateSourceRngParams {
 	random: () => number
 	nonPositiveWeightBehavior: "undefined" | "first"
 }
+
+export interface WeightedIndexParams {
+	length: number
+	weightAt: (index: number) => number
+}

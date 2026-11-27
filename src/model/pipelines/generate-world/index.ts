@@ -919,7 +919,6 @@ function generateGenesisWorld({
 		shoreStats: post.shoreStats,
 		seabed: post.seabed,
 		seabedStats: post.seabedStats,
-		atolls: post.atolls,
 		karst: post.karst,
 		caveSites: post.caveSites,
 		karstStats: post.karstStats,

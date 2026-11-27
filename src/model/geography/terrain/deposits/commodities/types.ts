@@ -22,7 +22,7 @@ export type CommodityId =
 	| "saltpeter"
 	| "amber"
 	| "gems"
-	| "oilGas"
+	| "oilAndGas"
 
 export interface CommodityInfo {
 	id: CommodityId

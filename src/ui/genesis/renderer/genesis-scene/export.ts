@@ -10,6 +10,17 @@ import {
 	applyMapExportVisibility,
 	renderMapExportPng,
 } from "@/ui/genesis/renderer/map-export"
+import {
+	settlementLabelsInView,
+	syncSettlementLabelsForExport,
+} from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
+import { createSettlementFrustum } from "@/ui/genesis/renderer/nation-label-overlay/settlement-marker-collision"
+import {
+	createPendingNationScriptTextureQueue,
+	processPendingNationScriptTextures,
+} from "@/ui/genesis/renderer/nation-script-overlay"
+import { SETTLEMENT_SCRIPT } from "@/ui/genesis/renderer/settlement-script-overlay"
+import { TRADE_ROUTE_DETAIL_LAYER } from "@/ui/genesis/renderer/trade-route-overlay"
 
 export interface ExportControllerDeps {
 	requestRender: () => void
@@ -162,9 +173,36 @@ export function createExportController(
 		)
 		const resumeClouds = ctx.clouds.freezeForExport()
 		const exportCamera = new THREE.OrthographicCamera(-2, 2, 1, -1, 0.1, 100)
+		exportCamera.layers.enable(TRADE_ROUTE_DETAIL_LAYER)
 		exportCamera.position.set(0, 0, 5)
 		exportCamera.lookAt(0, 0, 0)
+		const yieldToMainThread =
+			deps.mapExportDependencies.yieldToMainThread ??
+			(() => new Promise<void>((resolve) => window.setTimeout(resolve, 0)))
 		try {
+			const labels = settlementLabelsInView({
+				group: ctx.mapSettlementLabels,
+				frustum: createSettlementFrustum(exportCamera),
+			})
+			if (labels.length > 0) {
+				const textureQueue = (ctx.pendingSettlementScriptTextureQueue ??=
+					createPendingNationScriptTextureQueue())
+				SETTLEMENT_SCRIPT.request({
+					labels,
+					textureCache: ctx.nationScriptTextureCache,
+					textureQueue,
+				})
+				await syncSettlementLabelsForExport(labels)
+				while (
+					processPendingNationScriptTextures(
+						textureQueue,
+						ctx.nationScriptTextureCache,
+						12,
+					).pending > 0
+				) {
+					await yieldToMainThread()
+				}
+			}
 			return await renderMapExportPng({
 				scene: ctx.scene,
 				renderer: ctx.renderer as unknown as ExportRendererLike,
@@ -176,9 +214,7 @@ export function createExportController(
 					deps.mapExportDependencies.createRenderTarget ??
 					((tileWidth, tileHeight) =>
 						new THREE.WebGLRenderTarget(tileWidth, tileHeight)),
-				yieldToMainThread:
-					deps.mapExportDependencies.yieldToMainThread ??
-					(() => new Promise((resolve) => window.setTimeout(resolve, 0))),
+				yieldToMainThread,
 			})
 		} finally {
 			resumeClouds()

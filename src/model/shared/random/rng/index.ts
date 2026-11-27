@@ -2,6 +2,7 @@ import type {
 	CreateRngParams,
 	CreateSourceRngParams,
 	CreateStringRngParams,
+	WeightedIndexParams,
 } from "@/model/shared/random/rng/types"
 
 export type WeightedValue<T> = { v: T; w: number }
@@ -12,6 +13,7 @@ export interface SharedRng {
 	randint(a: number, b: number): number
 	choice<T>(arr: readonly T[]): T
 	weightedChoice<T>(arr: readonly WeightedValue<T>[]): T | undefined
+	weightedIndex(params: WeightedIndexParams): number
 	shuffle<T>(arr: readonly T[]): T[]
 	sample<T>(arr: readonly T[], count: number): T[]
 	weightedSample<T>(
@@ -70,23 +72,28 @@ function fromSource({
 	const choice = <T>(arr: readonly T[]): T =>
 		arr[randint(0, Math.max(0, arr.length - 1))] as T
 
+	const weightedIndex = ({ length, weightAt }: WeightedIndexParams): number => {
+		let total = 0
+		for (let i = 0; i < length; i++) total += weightAt(i)
+		if (total <= 0)
+			return nonPositiveWeightBehavior === "first" && length > 0 ? 0 : -1
+
+		let roll = uniform(0, total)
+		for (let i = 0; i < length; i++) {
+			roll -= weightAt(i)
+			if (roll <= 0) return i
+		}
+		return length - 1
+	}
+
 	const weightedChoice = <T>(
 		arr: readonly WeightedValue<T>[],
 	): T | undefined => {
-		let total = 0
-		for (const entry of arr) total += entry.w
-		if (total <= 0) {
-			return nonPositiveWeightBehavior === "first"
-				? (arr[0]?.v as T | undefined)
-				: undefined
-		}
-
-		let roll = uniform(0, total)
-		for (const entry of arr) {
-			roll -= entry.w
-			if (roll <= 0) return entry.v
-		}
-		return arr[arr.length - 1]?.v
+		const index = weightedIndex({
+			length: arr.length,
+			weightAt: (i) => arr[i]!.w,
+		})
+		return index < 0 ? undefined : arr[index]!.v
 	}
 
 	const shuffle = <T>(arr: readonly T[]): T[] => {
@@ -128,6 +135,7 @@ function fromSource({
 		randint,
 		choice,
 		weightedChoice,
+		weightedIndex,
 		shuffle,
 		sample,
 		weightedSample,

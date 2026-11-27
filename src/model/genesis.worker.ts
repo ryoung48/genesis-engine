@@ -233,7 +233,6 @@ function serializeWorld(
 		shoreStats: world.shoreStats,
 		seabed: world.seabed,
 		seabedStats: world.seabedStats,
-		atolls: world.atolls,
 		karst: world.karst,
 		caveSites: world.caveSites,
 		karstStats: world.karstStats,
@@ -554,7 +553,6 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.groundwater) add(...layerBuffers(world.groundwater))
 	if (world.shore) add(...layerBuffers(world.shore))
 	if (world.seabed) add(...layerBuffers(world.seabed))
-	if (world.atolls) add(...layerBuffers(world.atolls))
 	if (world.karst) add(...layerBuffers(world.karst))
 	if (world.caveSites) add(...layerBuffers(world.caveSites))
 	if (world.deposits) add(world.deposits.rows.buffer)

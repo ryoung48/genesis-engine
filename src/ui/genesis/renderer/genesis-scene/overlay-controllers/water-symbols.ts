@@ -34,7 +34,6 @@ export function createWaterSymbolsController(
 		ctx.globeWaterSymbols = DOT_SYMBOLS.buildGlobeDots({
 			data: ctx.waterSymbolData,
 			colors: COLORS,
-			ringKeys: DOT_SYMBOLS.noRings,
 			radiusRad: uiWaterSymbols.radiusRad,
 			globeRadius: ctx.elevationVisible
 				? uiWaterSymbols.raisedGlobeRadius
@@ -44,7 +43,6 @@ export function createWaterSymbolsController(
 		ctx.mapWaterSymbols = DOT_SYMBOLS.buildMapDots({
 			data: ctx.waterSymbolData,
 			colors: COLORS,
-			ringKeys: DOT_SYMBOLS.noRings,
 			radiusRad: uiWaterSymbols.radiusRad,
 			mapDepth: uiWaterSymbols.mapDepth,
 			viewMode: ctx.currentViewMode,

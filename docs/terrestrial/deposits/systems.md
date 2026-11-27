@@ -112,7 +112,7 @@ Not stored. `COMMODITIES.richness` computes one from a region's stored bytes as 
 | tin | tin, placerTin |
 | leadZinc | mvt, sedex; vms 0.6; skarn 0.4 |
 | salt, coal | the system of the same name |
-| oilGas | oil; gas 0.9; bitumen 0.6 |
+| oilAndGas | oil; gas 0.9; bitumen 0.6 |
 
 Added here and not upstream's: stone, marble, clay, sand, alum, mercury, saltpeter, amber, and gems (pegmatite, emerald, corundum, lapis, basaltGems, amethyst, opal, turquoise, gemPlacer, kimberlite and placerDiamond at 1; garnet at 0.25 so the commonest gem does not hide the rare ones).
 

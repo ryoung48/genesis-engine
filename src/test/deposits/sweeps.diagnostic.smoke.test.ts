@@ -70,7 +70,7 @@ const SWEEPS: Sweep[] = [
 		apply: (v) => {
 			MUTABLE.oilArch = v as number
 		},
-		commodities: ["oilGas"],
+		commodities: ["oilAndGas"],
 		systems: ["oil", "gas"],
 	},
 ]

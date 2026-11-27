@@ -32,8 +32,6 @@ export const SEABED_LEGEND: ReadonlyArray<{
 	{ kind: "seagrass", name: "Seagrass meadow" },
 ]
 
-export const ATOLL_DOT_COLOR: Rgb = rgb255(17, 94, 89)
-
 function tint({
 	base,
 	target,

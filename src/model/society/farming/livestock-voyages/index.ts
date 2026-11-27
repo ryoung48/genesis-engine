@@ -38,6 +38,7 @@ const KNOTS: VoyageKnot[] = [
 ]
 
 const levels = KNOTS.map((knot) => knot.level)
+const openOceanLevel = levels.at(-1)!
 
 // Longest direct route: the longest crossing the Atlantic evidence covers.
 // Beyond it (the Pacific) livestock travelled only after the 1560s galleon
@@ -112,6 +113,7 @@ function openOceanYear({ knotYears }: OpenOceanYearParams): number {
 export const LIVESTOCK_VOYAGES = {
 	levels,
 	crossingYear,
+	openOceanLevel,
 	openOceanYear,
 	routes,
 }

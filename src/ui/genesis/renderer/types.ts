@@ -1,4 +1,6 @@
 import type * as THREE from "three"
+import type { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import type { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { Text } from "troika-three-text"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WindArrowData } from "@/model/climate/weather/wind/types"
@@ -65,7 +67,6 @@ export interface BuildMapWindArrowsInput {
 export interface BuildGlobeDotsInput {
 	data: DotSymbolData
 	colors: readonly number[]
-	ringKeys: ReadonlySet<number>
 	radiusRad: number
 	globeRadius: number
 	viewMode: GenesisViewMode
@@ -74,7 +75,6 @@ export interface BuildGlobeDotsInput {
 export interface BuildMapDotsInput {
 	data: DotSymbolData
 	colors: readonly number[]
-	ringKeys: ReadonlySet<number>
 	radiusRad: number
 	mapDepth: number
 	viewMode: GenesisViewMode
@@ -645,6 +645,46 @@ export interface TradeRoutePositionRequest {
 	projectionLatitudeDeg: number
 }
 export type TradeRoutePositionSet = Record<SerializedRouteKind, Float32Array>
+export interface TradeRouteDetailBuildParams {
+	group: THREE.Group
+	positions: Float32Array
+	material: LineMaterial
+	dashSource: LineSegmentsGeometry | null
+}
+export interface SettlementViewport {
+	camera: THREE.PerspectiveCamera | THREE.OrthographicCamera
+	frustum: THREE.Frustum
+	width: number
+	height: number
+}
+export interface SettlementMarkerCullingParams {
+	group: THREE.Group | null
+	viewport: SettlementViewport
+	visibility: Map<string, boolean>
+}
+export interface SettlementLabelCullingParams {
+	group: THREE.Group | null
+	isGlobe: boolean
+	visibility: ReadonlyMap<string, boolean>
+}
+export interface SettlementLabelViewportParams {
+	group: THREE.Group | null
+	frustum: THREE.Frustum
+}
+export interface SettlementOverlayFrameParams {
+	camera: SettlementViewport["camera"]
+	markers: (THREE.Group | null)[]
+	labels: THREE.Group | null
+}
+export interface TradeRouteCorridorEdge {
+	neighbor: number
+	kind: SerializedRouteKind
+	key: string
+}
+export interface TradeRouteCorridorStart {
+	region: number
+	edge: TradeRouteCorridorEdge
+}
 export interface TradeRoutePositions {
 	globe: TradeRoutePositionSet
 	map: TradeRoutePositionSet

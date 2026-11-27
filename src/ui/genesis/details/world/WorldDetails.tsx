@@ -1,12 +1,6 @@
-import React, { useMemo, useState } from "react"
+import React from "react"
 import { DistributionChart } from "@/ui/components/composites/DistributionChart"
-import {
-	DataTable,
-	type DataTableColumn,
-} from "@/ui/components/primitives/DataTable"
-import { Pagination } from "@/ui/components/primitives/Pagination"
 import { Surface } from "@/ui/components/primitives/Surface"
-import { Swatch } from "@/ui/components/primitives/Swatch"
 import { uiTokens } from "@/ui/components/tokens"
 import type { WorldSection } from "@/ui/genesis/details/drawer-state"
 import type { DetailsDrawerBaseProps } from "@/ui/genesis/details/shared"
@@ -143,19 +137,15 @@ function getWorldSections({
 	}
 }
 
-const TRADE_GOODS_PAGE_SIZE = 5
-/** Trade Goods section is hidden for now -- data plumbing left intact. */
-const SHOW_TRADE_GOODS = false
-
 interface WorldDetailsProps extends DetailsDrawerBaseProps {
 	openSections: ReadonlySet<WorldSection>
 	onSectionToggle: (section: WorldSection) => void
 	/** Whether a world has actually finished generating. The Planetary
 	 * section's own rows already self-filter (see hasValue above -- a
 	 * world-derived stat like Provinces/Land Coverage/Cell just reads "-"
-	 * pre-generation and gets dropped), but Environmental/Social/Trade Goods
+	 * pre-generation and gets dropped), but Environmental/Social
 	 * are ALL world-derived (their rows fall back to "N/A" text or render
-	 * empty charts/tables instead of disappearing) -- those three whole
+	 * empty charts/tables instead of disappearing) -- those two whole
 	 * sections are gated on this instead, so they're simply absent rather
 	 * than showing empty pre-generation. */
 	hasGeneratedWorld: boolean
@@ -194,45 +184,6 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		cultureCount,
 		religionCount,
 	})
-
-	const tradeGoodsTotal = tradeGoodsDistribution.reduce(
-		(sum, row) => sum + row.count,
-		0,
-	)
-
-	const [tradeGoodsPage, setTradeGoodsPage] = useState(0)
-	const pagedTradeGoods = useMemo(() => {
-		const start = tradeGoodsPage * TRADE_GOODS_PAGE_SIZE
-		return tradeGoodsDistribution.slice(start, start + TRADE_GOODS_PAGE_SIZE)
-	}, [tradeGoodsDistribution, tradeGoodsPage])
-	type TradeGoodRow = (typeof tradeGoodsDistribution)[number]
-	const tradeGoodsColumns: ReadonlyArray<DataTableColumn<TradeGoodRow>> = [
-		{
-			id: "name",
-			header: "Trade Good",
-			cell: (row) => (
-				<span className="inline-flex items-center gap-1.5">
-					<Swatch color={row.color} />
-					<span>{row.label}</span>
-				</span>
-			),
-		},
-		{
-			id: "count",
-			header: "Count",
-			align: "end",
-			cell: (row) => row.count.toLocaleString(),
-		},
-		{
-			id: "pct",
-			header: "Dist%",
-			align: "end",
-			cell: (row) =>
-				tradeGoodsTotal > 0
-					? `${((row.count / tradeGoodsTotal) * 100).toFixed(1)}%`
-					: "—",
-		},
-	]
 
 	if (!hasGeneratedWorld) return null
 
@@ -358,29 +309,15 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 							variant="compact"
 							showTotal={false}
 						/>
+						<DistributionChart
+							title="Trade Goods"
+							buckets={tradeGoodsDistribution}
+							variant="compact"
+							showTotal={false}
+						/>
 					</div>
 				</div>
 			</TopLevelSection>
-			{SHOW_TRADE_GOODS && (
-				<TopLevelSection
-					title="Trade Goods"
-					open={openSections.has("trade-goods")}
-					onToggle={() => onSectionToggle("trade-goods")}
-				>
-					<DataTable
-						columns={tradeGoodsColumns}
-						rows={pagedTradeGoods}
-						rowKey={(row) => row.label}
-						empty="No trade goods assigned"
-					/>
-					<Pagination
-						pageIndex={tradeGoodsPage}
-						pageSize={TRADE_GOODS_PAGE_SIZE}
-						totalItems={tradeGoodsDistribution.length}
-						onPageChange={setTradeGoodsPage}
-					/>
-				</TopLevelSection>
-			)}
 		</>
 	)
 }

@@ -347,7 +347,7 @@ export function useWorldDistributions(input: WorldDistributionsInput) {
 					},
 				]
 			})
-			.sort((a, b) => b.count - a.count)
+			.sort((a, b) => a.label.localeCompare(b.label))
 	}, [world?.tradeGoods])
 
 	return {

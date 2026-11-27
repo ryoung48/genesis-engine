@@ -127,7 +127,7 @@ const LIST: readonly CommodityInfo[] = [
 		sources: [["coal", 1]],
 	},
 	{
-		id: "oilGas",
+		id: "oilAndGas",
 		name: "Oil and gas",
 		group: "fuel",
 		rgb: [30, 150, 100],

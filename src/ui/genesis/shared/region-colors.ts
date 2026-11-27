@@ -75,6 +75,7 @@ import {
 } from "@/ui/genesis/shared/colors/vegetation"
 import { getDataVariant } from "@/ui/genesis/shared/data-variant"
 import { DEPOSITS_VIEW } from "@/ui/genesis/shared/deposits-view"
+import { TRADE_GOODS_VIEW } from "@/ui/genesis/shared/trade-goods-view"
 import { getFarming, getWayOfLife } from "@/ui/genesis/shared/farming-display"
 import type { SocietyMapMode } from "@/ui/genesis/shared/map-modes"
 import {
@@ -138,6 +139,7 @@ export function computeRegionColors({
 	dangerSubMode,
 	religionMode,
 	depositsView,
+	tradeGoodsView,
 	year,
 }: RegionColorsInput): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
@@ -1320,6 +1322,7 @@ export function computeRegionColors({
 	// Terrain / heightmap modes
 	if (colorMode === "trade_goods" && world.tradeGoods && world.locations) {
 		const { regionLocation } = world.locations
+		const filter = TRADE_GOODS_VIEW.filterIndex(tradeGoodsView)
 		for (let r = 0; r < N; r++) {
 			if (isOceanRegion(r)) {
 				const [cr, cg, cb] = oceanRgb(r)
@@ -1329,7 +1332,12 @@ export function computeRegionColors({
 			} else {
 				const l = regionLocation[r]
 				const tgIdx = l != null && l >= 0 ? (world.tradeGoods[l] ?? 0) : 0
-				const [cr, cg, cb] = TRADE_GOODS.tradeGoodColor(tgIdx)
+				const [cr, cg, cb] = TRADE_GOODS_VIEW.paint({
+					filter,
+					good: tgIdx,
+					color: TRADE_GOODS.tradeGoodColor(tgIdx),
+					base: UNOWNED_GRAY,
+				})
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb

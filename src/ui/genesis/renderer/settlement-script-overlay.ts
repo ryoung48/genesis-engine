@@ -19,7 +19,7 @@ export interface SettlementScriptUpdate {
 }
 
 export interface SettlementScriptRequest {
-	group: THREE.Group
+	labels: readonly Text[]
 	textureCache: Map<string, ScriptTextureCacheEntry>
 	textureQueue: PendingNationScriptTextureQueue
 }
@@ -137,14 +137,12 @@ function update({
 }
 
 function request({
-	group,
+	labels,
 	textureCache,
 	textureQueue,
 }: SettlementScriptRequest): boolean {
 	let queued = false
-	for (const child of group.children) {
-		if (child.type === "Line" || !child.visible) continue
-		const label = child as Text
+	for (const label of labels) {
 		const pending = label.userData.settlementScriptRequest as
 			| SettlementScriptPending
 			| undefined

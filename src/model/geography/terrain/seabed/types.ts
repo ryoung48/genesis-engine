@@ -1,9 +1,4 @@
 import type { GenesisClimate } from "@/model/climate/types"
-import type { WorldSample } from "@/model/geography/tectonics/world-sample/types"
-import type {
-	AtollCrust,
-	GenesisAtolls,
-} from "@/model/geography/terrain/seabed/atolls/types"
 import type { SeabedHabitat } from "@/model/geography/terrain/seabed/habitat/types"
 import type { ShoreMaterial } from "@/model/geography/terrain/shore/material/types"
 import type { ShoreLayers } from "@/model/geography/terrain/shore/types"
@@ -20,7 +15,6 @@ export interface SeabedStats {
 	reachedCells: number
 	habitat: Record<SeabedHabitat, number>
 	substrate: Record<ShoreMaterial, number>
-	atolls: number
 	stageMs: number
 }
 
@@ -35,19 +29,15 @@ export interface SeabedComputeParams {
 	climate: Pick<GenesisClimate, "temperature_monthly">
 	iceMinMonthly: Float32Array
 	iceMaxMonthly: Float32Array
-	crust: AtollCrust
-	sample: Pick<WorldSample, "regionOfCell">
 }
 
 export interface SeabedResult {
 	layers: SeabedLayers
-	atolls: GenesisAtolls
 	stats: SeabedStats
 }
 
 export interface SeabedStatsParams {
 	layers: SeabedLayers
 	openWater: Uint8Array
-	atolls: number
 	stageMs: number
 }
